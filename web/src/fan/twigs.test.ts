@@ -52,47 +52,91 @@ describe('width = individuals', () => {
     expect(strandAt(b, 0, 'linear').w * perUnit).toBeCloseTo(rec.alive, 0);
   });
 
-  it("a generation's individuals partition the branch width at their height", () => {
+  it('the lanes partition the branch: green on the left, gray on the right, same as the fan', () => {
     for (const f of [fanLin, fanLog]) {
       const m = lion(f);
+      const b = f.branches[lionIdx];
       for (const g of [0, 1234, m.G >> 1, m.G - 1]) {
-        const r = m.row(g);
-        const xs0 = r.left + (0 * r.w) / r.n;
-        const xsN = r.left + (r.n * r.w) / r.n;
-        expect(xsN - xs0).toBeCloseTo(r.w, 12);
-        expect(m.indexRange(g, r.left - 1, r.left + r.w + 1)).toEqual([0, r.n]);
-        const x = m.x(g, 777);
-        const [i0, i1] = m.indexRange(g, x - 1e-12, x + 1e-12);
-        expect(i0).toBeLessThanOrEqual(777);
-        expect(i1).toBeGreaterThan(777);
+        const y = m.row(g).y;
+        const L = m.lanes(y);
+        const st = strandAt(b, f.time.ageAt(y), f.mode);
+        expect(L.w).toBeCloseTo(st.w, 12);
+        expect(L.gw).toBeCloseTo(st.w * st.f, 12);
+        expect(L.left).toBeCloseTo(b.colX - st.w / 2, 12);
+        for (const alive of [false, true]) {
+          const lo = alive ? L.left : L.left + L.gw;
+          const hi = alive ? L.left + L.gw : L.left + L.w;
+          expect(m.indexRange(g, lo - 1, hi + 1, y, alive)).toEqual([0, m.size(g)]);
+          const x = m.xAt(m.u(g, 777), y, alive);
+          const [i0, i1] = m.indexRange(g, x - 1e-15, x + 1e-15, y, alive);
+          expect(i0).toBeLessThanOrEqual(777);
+          expect(i1).toBeGreaterThan(777);
+        }
       }
     }
   });
 
-  it('the twigs stay exactly inside the branch silhouette at every height', () => {
+  it('the strands stay exactly inside the branch silhouette at every height', () => {
     for (const f of [fanLin, fanLog]) {
       const m = lion(f);
       const b = f.branches[lionIdx];
       for (const g of [0, 999, m.G >> 1, m.G - 40, m.G - 1]) {
         const n = m.size(g);
-        // Sample heights along a lifespan above the birth row, up to "now".
-        for (const y of [m.row(g).y, m.row(g).y - 0.3 * m.GL * 1e-6, m.yOf(Math.min(m.T, (g + 2) * m.GL)), f.time.y(0)]) {
-          const w = strandAt(b, f.time.ageAt(y), f.mode).w;
-          const cell = w / n;
-          // The cells of the first and last individuals bound the union of all twigs' cells.
-          const lo = m.xAt(m.u(g, 0), y) - cell / 2;
-          const hi = m.xAt(m.u(g, n - 1), y) + cell / 2;
-          expect(lo).toBeCloseTo(b.colX - w / 2, 9);
-          expect(hi).toBeCloseTo(b.colX + w / 2, 9);
-          // Every twig is inside.
+        // Heights from the birth row up to "now".
+        for (const y of [m.row(g).y, m.yOf(Math.min(m.T, (g + 2) * m.GL)), m.yOf((g + 0.9) * m.GL), f.time.y(0)]) {
+          const st = strandAt(b, f.time.ageAt(y), f.mode);
+          const gw = st.w * st.f;
+          const left = b.colX - st.w / 2;
+          // The union of the slots' cells is exactly the branch: green lane, then gray lane.
+          expect(m.xAt(m.u(g, 0), y, true) - gw / n / 2).toBeCloseTo(left, 9);
+          expect(m.xAt(m.u(g, n - 1), y, true) + gw / n / 2).toBeCloseTo(left + gw, 9);
+          expect(m.xAt(m.u(g, 0), y, false) - (st.w - gw) / n / 2).toBeCloseTo(left + gw, 9);
+          expect(m.xAt(m.u(g, n - 1), y, false) + (st.w - gw) / n / 2).toBeCloseTo(left + st.w, 9);
           for (const i of [1, 77, n >> 1, n - 2]) {
-            const x = m.xAt(m.u(g, i), y);
-            expect(x).toBeGreaterThan(b.colX - w / 2);
-            expect(x).toBeLessThan(b.colX + w / 2);
+            for (const alive of [false, true]) {
+              const x = m.xAt(m.u(g, i), y, alive);
+              expect(x).toBeGreaterThanOrEqual(left);
+              expect(x).toBeLessThanOrEqual(left + st.w);
+            }
           }
         }
       }
     }
+  });
+
+  it('a dead individual with a living descendant is green; a line that ended is gray', () => {
+    const m = lion(fanLin);
+    const g = m.aliveFrom - 3;
+    let greenDead: number | null = null;
+    let deadEnd: number | null = null;
+    for (let i = 0; i < 3000 && (greenDead === null || deadEnd === null); i++) {
+      if (m.alive(g, i)) continue;
+      const has = m.hasLivingDescendant(g, i, 1e6);
+      if (has && greenDead === null) greenDead = i;
+      if (!has && deadEnd === null) deadEnd = i;
+    }
+    expect(greenDead).not.toBeNull();
+    expect(deadEnd).not.toBeNull();
+    // Check both against a brute-force walk of procgen's children down the mother line.
+    const brute = (gg: number, ii: bigint, first: boolean): boolean => {
+      const a = { generation: gg, index: ii };
+      if (!first && m.sp.attributes(a).alive) return true;
+      if (!first && m.sp.sexOf(a) !== 'female') return false;
+      const ch = m.sp.children(a);
+      for (let c = ch.start; c < ch.start + ch.count; c++) if (brute(ch.generation, c, false)) return true;
+      return false;
+    };
+    expect(brute(g, BigInt(greenDead!), true)).toBe(true);
+    expect(brute(g, BigInt(deadEnd!), true)).toBe(false);
+    // The answer is the same however it is asked (cached or not, any model instance).
+    expect(lion(fanLin).hasLivingDescendant(g, greenDead!)).toBe(true);
+    expect(lion(fanLog).hasLivingDescendant(g, deadEnd!)).toBe(false);
+  });
+
+  it('the far-past shortcut is deterministic', () => {
+    const a = lion(fanLin);
+    const b = lion(fanLog);
+    for (const i of [3, 4000, 50000]) expect(a.hasLivingDescendant(1000, i, 50)).toBe(b.hasLivingDescendant(1000, i, 50));
   });
 
   it('generationAt inverts the birth heights', () => {
@@ -115,7 +159,7 @@ describe('determinism and links', () => {
       expect(a.sp.handle(ad)).toBe(b.sp.handle(ad));
       const t = a.twig(g, i);
       const ym = (t.yBirth + t.yDeath) / 2;
-      expect(a.hit(a.xAt(t.u, ym), ym, 1e-9)).toEqual({ g, i });
+      expect(a.hit(a.xAt(t.u, ym, t.alive), ym, 1e-9)).toEqual({ g, i });
     }
   });
 
@@ -131,7 +175,7 @@ describe('determinism and links', () => {
         expect(p.generation).toBe(g - 1);
         const pt = m.twig(p.generation, Number(p.index));
         // The link's parent end is on the parent's twig, at x(parent) and below the child's birth.
-        expect(pt.x).toBe(m.xAt(m.u(p.generation, Number(p.index)), pt.yBirth));
+        expect(pt.x).toBe(m.xAt(m.u(p.generation, Number(p.index)), pt.yBirth, pt.alive));
         expect(pt.yBirth).toBeGreaterThan(child.yBirth);
         const ch = m.sp.children(p);
         expect(BigInt(i) >= ch.start && BigInt(i) < ch.start + ch.count).toBe(true);

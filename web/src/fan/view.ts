@@ -147,14 +147,57 @@ export class FanView implements InputHandlers {
     return this.fan.time.y(0);
   }
 
+  /**
+   * Deep inside a branch the view follows the strands. A branch narrows with
+   * height (the dead peel off), so every strand drifts sideways by its share
+   * of that; at the width zoom of individuals (10^10 in linear mode) the drift
+   * would lay the strands flat. The camera therefore shears x by the drift of
+   * the strand under the screen centre: that strand is vertical on screen and
+   * its neighbours nearly so. The shear is weighed in only when the branch is
+   * wider than the screen (it is sub-pixel before that), so it never jumps.
+   */
+  private shearRef: { b: FanBranch; u: number; alive: boolean; x0: number; k: number } | null = null;
+
+  private laneX(b: FanBranch, u: number, alive: boolean, y: number): number {
+    const st = strandAt(b, this.fan.time.ageAt(Math.min(b.p3.y, Math.max(b.tipY, y))), this.mode);
+    const left = b.colX - st.w / 2;
+    const gw = st.w * st.f;
+    return alive ? left + u * gw : left + gw + u * (st.w - gw);
+  }
+
+  private updateShear(): void {
+    this.shearRef = null;
+    const { cx, cy } = this.cam;
+    for (const b of this.fan.branches) {
+      if (cy < b.tipY || cy > b.p3.y) continue;
+      const st = strandAt(b, this.fan.time.ageAt(cy), this.mode);
+      const left = b.colX - st.w / 2;
+      if (cx < left || cx > left + st.w) continue;
+      const gw = st.w * st.f;
+      const alive = cx < left + gw;
+      const u = alive ? (cx - left) / gw : (cx - left - gw) / (st.w - gw);
+      const k = Math.max(0, Math.min(1, ((st.w * this.cam.sx) / this.w - 1) / 3));
+      if (k > 0) this.shearRef = { b, u, alive, x0: cx, k };
+      return;
+    }
+  }
+
+  /** World x drift of the reference strand at height y (0 when not shearing). */
+  shear(y: number): number {
+    const r = this.shearRef;
+    if (!r) return 0;
+    return (this.laneX(r.b, r.u, r.alive, y) - r.x0) * r.k;
+  }
+
   toScreen(x: number, y: number): [number, number] {
     const c = this.cam;
-    return [(x - c.cx) * c.sx + this.w / 2, (y - c.cy) * c.sy + this.h / 2];
+    return [(x - this.shear(y) - c.cx) * c.sx + this.w / 2, (y - c.cy) * c.sy + this.h / 2];
   }
 
   toWorld(px: number, py: number): [number, number] {
     const c = this.cam;
-    return [c.cx + (px - this.w / 2) / c.sx, c.cy + (py - this.h / 2) / c.sy];
+    const y = c.cy + (py - this.h / 2) / c.sy;
+    return [c.cx + (px - this.w / 2) / c.sx + this.shear(y), y];
   }
 
   /** Zoom about a screen point by factors fx (width) and fy (time). */
@@ -263,7 +306,14 @@ export class FanView implements InputHandlers {
         cx = b.colX;
       } else {
         sx = this.cam.sx * 16;
-        sy = this.cam.sy * 2;
+        // Time zooms enough that a generation is about as tall as two strands are wide
+        // (deep in the past a screen holds thousands of generations).
+        const m = this.model(b);
+        const g = m.generationAt(wy);
+        const genH = Math.abs(m.yOf(g * m.GL) - m.yOf((g + 1) * m.GL));
+        const L = m.lanes(wy);
+        const cell = Math.max(L.gw, L.w - L.gw) / m.size(g);
+        sy = Math.max(this.cam.sy * 2, Math.min(this.cam.sy * 64, (2 * cell * sx) / Math.max(1e-300, genH)));
         cx = wx - (x - this.w / 2) / sx;
       }
     }
@@ -305,6 +355,7 @@ export class FanView implements InputHandlers {
   draw(): void {
     const ctx = this.ctx;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    this.updateShear();
     ctx.fillStyle = BG;
     ctx.fillRect(0, 0, this.w, this.h);
     this.drawTimeAxis(false);
@@ -324,7 +375,7 @@ export class FanView implements InputHandlers {
       const p = pts[i];
       const [sx, sy] = this.toScreen(p.x, p.y);
       const off = a(p) * p.w * this.cam.sx;
-      ctx[i ? 'lineTo' : 'moveTo'](sx + p.nx * off, sy + p.ny * off);
+      ctx[i ? 'lineTo' : 'moveTo'](clampPx(sx + p.nx * off), clampPx(sy + p.ny * off));
     }
     for (let i = pts.length - 1; i >= 0; i--) {
       const p = pts[i];
@@ -333,7 +384,7 @@ export class FanView implements InputHandlers {
       const ao = a(p) * wpx;
       const bo = bOff(p) * wpx;
       const off = minPx >= 0 ? Math.max(bo, ao + minPx) : Math.min(bo, ao + minPx);
-      ctx.lineTo(sx + p.nx * off, sy + p.ny * off);
+      ctx.lineTo(clampPx(sx + p.nx * off), clampPx(sy + p.ny * off));
     }
     ctx.closePath();
     ctx.fill();
@@ -382,22 +433,24 @@ export class FanView implements InputHandlers {
     // Keep only points within a screen of the viewport: canvas paths with
     // coordinates far beyond the screen (deep zoom) are not drawn reliably.
     const mY = this.h / this.cam.sy;
-    const mX = (4 * this.w) / this.cam.sx;
-    const [sLeft] = this.toWorld(0, 0);
-    const [sRight] = this.toWorld(this.w, 0);
-    const kept = pts.filter((p) => p.y >= sTop - mY && p.y <= sBot + mY && p.x >= sLeft - mX && p.x <= sRight + mX);
+    const kept = pts.filter((p) => {
+      if (p.y < sTop - mY || p.y > sBot + mY) return false;
+      const [px] = this.toScreen(p.x, p.y);
+      const half = p.w * this.cam.sx;
+      return px - half < 5 * this.w && px + half > -4 * this.w;
+    });
     pts.length = 0;
     pts.push(...kept);
     if (pts.length < 2) return;
     const ctx = this.ctx;
-    // When the individuals are drawn, they are the truth: the bundle becomes a dim backdrop.
+    // As the strands fade in (twigs.ts), the lanes dim to a backdrop under them: the same
+    // lanes, the same geometry, never a switch.
     const tw = this.twigStats.get(b.sp.gid);
-    const backdrop = !!tw && tw.mode !== 'texture';
-    ctx.fillStyle = backdrop ? '#1c2521' : b.sp.extinct ? WITHERED : GRAY;
+    ctx.fillStyle = mix(b.sp.extinct ? WITHERED : GRAY, '#1c2521', (tw?.fade ?? 0) * 0.85);
     this.ribbon(pts, () => -0.5, () => 0.5, 0.6);
-    if (!b.sp.extinct && !backdrop) {
+    if (!b.sp.extinct) {
       // Green lane on the left, floored at 1 px all the way from the tip to the root.
-      ctx.fillStyle = GREEN;
+      ctx.fillStyle = mix(GREEN, '#174a2b', (tw?.fadeGreen ?? 0) * 0.8);
       this.ribbon(pts, () => 0.5, (p) => 0.5 - p.f, -1);
     }
     if (this.selected === b.sp && !this.selInd) {
@@ -413,8 +466,9 @@ export class FanView implements InputHandlers {
   private drawIndividuals(b: FanBranch): void {
     const st = drawTwigs(this, b, this.model(b), this.selected === b.sp ? this.selInd : null);
     const prev = this.twigStats.get(b.sp.gid);
-    // The bundle under the twigs depends on the mode: redraw once when it changes.
-    if ((prev?.mode ?? null) !== (st?.mode ?? null)) this.request();
+    // The lanes under the strands depend on the fade: redraw once when it changes,
+    // and keep drawing while lineage answers are still being worked out.
+    if ((prev?.fade ?? 0) !== (st?.fade ?? 0) || (prev?.fadeGreen ?? 0) !== (st?.fadeGreen ?? 0) || st?.pending) this.request();
     if (st) this.twigStats.set(b.sp.gid, st);
     else this.twigStats.delete(b.sp.gid);
   }
@@ -607,6 +661,19 @@ export function formatTick(yrs: number, step: number): string {
   const v = yrs / div;
   const d = step > 0 ? dec : v >= 100 ? 0 : v >= 10 ? 1 : 2;
   return `${Number(v.toFixed(d)).toLocaleString('en-US', { maximumFractionDigits: d })} ${unit}`;
+}
+
+/** Keep ribbon points within canvas-safe pixel coordinates (edges far off screen stay off screen). */
+function clampPx(o: number): number {
+  return Math.max(-1e5, Math.min(1e5, o));
+}
+
+/** Mix two #rrggbb colours: t = 0 gives a, 1 gives b. */
+function mix(a: string, b: string, t: number): string {
+  const p = parseInt(a.slice(1), 16);
+  const q = parseInt(b.slice(1), 16);
+  const c = (sh: number) => Math.round(((p >> sh) & 255) * (1 - t) + ((q >> sh) & 255) * t);
+  return `rgb(${c(16)},${c(8)},${c(0)})`;
 }
 
 export function fmtInt(n: number): string {
