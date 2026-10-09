@@ -54,7 +54,7 @@ const TAPER_IN_U = Math.round(TAPER_IN * U); // 6554
 const DEAD_PARENT_MAX_END = U - Math.round(TAPER_OUT * U); // children of an extinct node end before its taper-out
 const ALIVE_PARENT_MAX_DEAD_END = Math.round(0.97 * U);
 const MIN_LEN = Math.round(0.08 * U);
-const START_RANGE = Math.round(0.5 * U); // child starts in [0.1, 0.6) of the parent span
+const START_RANGE = Math.round(0.3 * U); // child starts in [0.1, 0.4) of the parent span
 
 export class SyntheticTree implements TreeSource<SynthNode> {
   private readonly rootNode: SynthNode;

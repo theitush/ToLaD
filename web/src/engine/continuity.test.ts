@@ -64,11 +64,12 @@ function relErr(a: number, b: number): number {
   return Math.abs(a - b) / Math.max(1, Math.abs(a), Math.abs(b));
 }
 
-function runDive(seed: number, minLevels: number) {
+function runDive(seed: number, minLevels: number, preferAlive: boolean) {
   const layout = new Layout(new SyntheticTree(seed));
   const cam = new Camera(layout, W, H);
   const scene = new SceneBuilder(layout);
   const dive = new DiveDriver(cam, layout, seed * 7919 + 1);
+  dive.preferAlive = preferAlive;
   let maxCamErr = 0;
   let maxPxErr = 0;
   let steps = 0;
@@ -118,9 +119,13 @@ function runDive(seed: number, minLevels: number) {
 }
 
 describe('random deep-zoom continuity', () => {
-  for (const seed of [1, 2]) {
-    it(`seed ${seed}: 1000+ levels with no teleport, jitter or vanishing`, () => {
-      const r = runDive(seed, 1050);
+  for (const [seed, alive] of [
+    [1, false],
+    [2, false],
+    [3, true], // surviving chain: converges on the shared "now" edge
+  ] as const) {
+    it(`seed ${seed}${alive ? ' (survivors)' : ''}: 1000+ levels with no teleport, jitter or vanishing`, () => {
+      const r = runDive(seed, 1050, alive);
       const ex = r.cam.scaleExponents();
       // eslint-disable-next-line no-console
       console.log(

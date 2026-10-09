@@ -143,6 +143,8 @@ export class SceneBuilder {
   private frameNo = 0;
   stats: SceneStats = { instances: 0, draws: 0, chunksBuilt: 0, chunksResident: 0, nearInstances: 0, topDepth: 0 };
   onEvict: ((c: Chunk) => void) | null = null;
+  /** The node the last build started from (covers the viewport, or the root). */
+  top: LNode | null = null;
   W = 1;
   H = 1;
 
@@ -174,6 +176,7 @@ export class SceneBuilder {
       top = top.parent;
     }
     this.stats.topDepth = top.depth;
+    this.top = top;
     this.visitNear(top, ft);
 
     let inst = this.near.count;

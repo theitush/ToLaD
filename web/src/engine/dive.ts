@@ -22,6 +22,8 @@ export class DiveDriver {
   maxStep = 1.3;
   panFrac = 0.35;
   fill = 0.8;
+  /** Prefer surviving lineages (so the green "now" rim stays in view). */
+  preferAlive = false;
 
   constructor(
     readonly cam: Camera,
@@ -39,7 +41,8 @@ export class DiveDriver {
     let wantX = (this.fill * cam.W) / F.kx;
     let wantT = (this.fill * cam.H) / F.kt;
     if (Math.abs(Math.log(wantX)) < 0.05 && Math.abs(Math.log(wantT)) < 0.05) {
-      const kids = this.layout.children(this.target);
+      let kids = this.layout.children(this.target);
+      if (this.preferAlive && kids.some((k) => k.alive)) kids = kids.filter((k) => k.alive);
       this.target = kids[hash3(this.seed, this.target.depth, 7) % kids.length];
       this.levels++;
       F = cam.frameOf(this.target);
