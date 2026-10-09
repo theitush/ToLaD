@@ -176,14 +176,7 @@ def pbdb_range(r: dict) -> tuple[float, float] | None:
     return t0, t1
 
 
-# Records excluded on purpose (documented in pipeline/SOURCES.md).
-PBDB_EXCLUDE = {
-    "Tikitherium copei": "Carnian (~230 Ma) age is a ~25 Myr outlier vs every other PBDB mammal;"
-                         " the type material has been argued to be a much younger shrew",
-}
-
-
-def graft_pbdb(root: Node, species: list[dict], exact, syn, log: dict) -> None:
+def graft_pbdb(root: Node, species: list[dict], exact, syn, log: dict, ov) -> None:
     how = Counter()
     # OT name indices for higher taxa
     by_name: dict[str, list[Node]] = defaultdict(list)
@@ -271,13 +264,23 @@ def graft_pbdb(root: Node, species: list[dict], exact, syn, log: dict) -> None:
 
     for r in species:
         name = norm_name(r["taxon_name"])
-        if name in PBDB_EXCLUDE:
-            how["excluded (see PBDB_EXCLUDE)"] += 1
+        if name in ov.exclude:
+            how["excluded (overrides.toml)"] += 1
+            ov.applied["exclude"].append(name)
             continue
         if not BINOMIAL.match(name):
             how["not a plain binomial"] += 1
             continue
         rng = pbdb_range(r)
+        if name in ov.dates:
+            e = ov.dates[name]
+            new = (float(e.get("fad", rng[0] if rng else 0.0)), float(e.get("lad", rng[1] if rng else 0.0)))
+            if not new[0] > new[1]:
+                raise RuntimeError(f"overrides.toml date {name}: first appearance {new[0]} must be older "
+                                   f"than last appearance {new[1]} (set lad too)")
+            ov.applied["date"].append({"name": name, "pbdb_fad_lad": [round(x, 3) for x in rng] if rng else None,
+                                       "fad_lad": list(new)})
+            rng = new
         fam, order, genus = r.get("family"), r.get("order"), r.get("genus") or name.split()[0]
         # 1. existing OT leaf?
         hit = None
@@ -292,6 +295,8 @@ def graft_pbdb(root: Node, species: list[dict], exact, syn, log: dict) -> None:
         if hit is not None:
             how["matched OT leaf (" + m + ")"] += 1
             hit.pbdb = int(r["taxon_no"]) if r.get("taxon_no") else None
+            if name in ov.dates:
+                hit.data["date_override"] = True
             if rng:
                 hit.fad, lad = rng
                 if hit.extinct:
@@ -337,6 +342,8 @@ def graft_pbdb(root: Node, species: list[dict], exact, syn, log: dict) -> None:
         leaf.fad, leaf.lad = rng
         leaf.date_src = D_FOSSIL
         leaf.data["n_occs"] = r.get("n_occs")
+        if name in ov.dates:
+            leaf.data["date_override"] = True
         leaf.data["pbdb_family"] = fam
         leaf.data["pbdb_order"] = order
         g.add(leaf)
@@ -462,6 +469,119 @@ def calibrate(root: Node, up_root: NNode, log: dict) -> None:
     log["dating"] = {"upham_calibrated_nodes": n_cal, "uncalibrated_internal": n_int}
 
 
+# ------------------------------------------------------------------ stem fossils
+#
+# Taxonomy often files fossils inside a crown group that they predate: a
+# Cretaceous "didelphimorph", a Paleocene "carnivoran", an Eocene "equid". The
+# dating rule "a parent is at least as old as its oldest child's first
+# appearance" then drags the crown node (and every extant lineage under it)
+# back to the fossil's age, which inflates the clade's band and its share of
+# deep-time ghost lineages.
+#
+# Instead, a fossil-only subtree that is older than the upper end of the
+# Upham 95% HPD of an enclosing crown node is treated as a stem member: it is
+# moved next to that crown, inside a new "total group" node that carries the
+# taxon's name, while the crown keeps its molecular age and is renamed
+# "<name> (crown)". Manual cases are listed in overrides.toml [[placement]];
+# everything else follows this rule (rehome_stem_fossils).
+
+
+def total_group(c: Node) -> Node:
+    """Wrap crown node c in a total-group node (once) and return the wrapper."""
+    if c.data.get("total_group_of"):
+        return c
+    w = c.data.get("tg")
+    if w is not None:
+        return w
+    w = Node(name=c.name, ott=c.ott, rank=c.rank, kind="tree", taxonomic=True)
+    w.data["total_group_of"] = c.name
+    par = c.parent
+    par.children[par.children.index(c)] = w
+    w.parent = par
+    w.add(c)
+    c.data["crown_of"] = c.name
+    c.data["tg"] = w
+    c.name = f"{c.name} (crown)" if c.name else None
+    c.ott = None
+    return w
+
+
+def _find(root: Node, name: str) -> list[Node]:
+    hits = [n for n in root.preorder() if n.name == name or name in n.alt]
+    # keep only the outermost matches
+    return [h for h in hits if not any(o is not h and _is_desc(h, o) for o in hits)]
+
+
+def apply_placements(root: Node, ov, log: dict) -> None:
+    for p in ov.placements:
+        targets = [t for t in _find(root, p["stem_of"]) if t.kind == "tree" and not t.is_leaf]
+        if len(targets) != 1:
+            raise RuntimeError(f"overrides.toml placement {p['name']}: stem_of {p['stem_of']!r} matched "
+                               f"{len(targets)} nodes")
+        tgt = targets[0]
+        for s in _find(root, p["name"]):
+            if s is tgt or not _is_desc(s, tgt):
+                raise RuntimeError(f"overrides.toml placement {p['name']}: not inside {p['stem_of']}")
+            old = s.parent
+            old.children.remove(s)
+            s.parent = None
+            total_group(tgt).add(s)
+            for x in s.preorder():
+                x.data["placement_override"] = p["name"]
+            ov.applied["placement"].append({"name": p["name"], "from_parent": old.name or "(unnamed)",
+                                            "to": f"stem of {p['stem_of']}",
+                                            "leaves": sum(1 for x in s.preorder() if x.is_leaf)})
+
+
+def rehome_stem_fossils(root: Node, log: dict) -> None:
+    live: dict[int, bool] = {}
+    floor: dict[int, float] = {}
+    for nd in root.postorder():
+        if nd.is_leaf:
+            live[id(nd)] = (not nd.extinct) or bool(nd.upham)
+            floor[id(nd)] = leaf_floor(nd)
+        else:
+            live[id(nd)] = any(live[id(c)] for c in nd.children)
+            floor[id(nd)] = max(floor[id(c)] for c in nd.children)
+    cands = [nd for nd in root.preorder()
+             if nd.parent is not None and not live[id(nd)] and live[id(nd.parent)]]
+    moves = []
+    for s in cands:
+        f = floor[id(s)]
+        violated = []
+        p = s.parent
+        while p is not None:
+            if p.date_src == D_UPHAM and not p.data.get("total_group_of"):
+                hpd = p.data.get("age_hpd")
+                upper = hpd[1] if hpd else p.age
+                if f > upper:
+                    violated.append(p)
+                else:
+                    break
+            p = p.parent
+        if not violated:
+            continue
+        tgt = violated[-1]
+        if tgt is root:
+            if len(violated) < 2:
+                continue
+            tgt = violated[-2]
+        s.parent.children.remove(s)
+        s.parent = None
+        total_group(tgt).add(s)
+        moves.append((tgt.data["crown_of"] or "(unnamed clade)", s.name or "(unnamed)", round(f, 2), round(tgt.age, 2)))
+    by_target = Counter(m[0] for m in moves)
+    log["stem_rehoming"] = {
+        "rule": "fossil-only subtrees older than the Upham 95% HPD upper bound of an enclosing crown node "
+                "are moved to that crown's stem (inside a total-group node)",
+        "subtrees_moved": len(moves),
+        "total_groups": len(by_target),
+        "by_crown": dict(by_target.most_common()),
+        "largest_age_gaps": [{"crown": m[0], "moved": m[1], "fossil_Ma": m[2], "crown_Ma": m[3]}
+                             for m in sorted(moves, key=lambda m: m[3] - m[2])[:25]],
+    }
+
+
 def leaf_floor(nd: Node) -> float:
     if nd.kind == "graft":
         return nd.fad or 0.0
@@ -506,7 +626,7 @@ def date_tree(root: Node, log: dict) -> None:
     for nd in root.preorder():
         if nd is root or nd.is_leaf:
             continue
-        if nd.kind in ("group", "bucket"):
+        if nd.kind in ("group", "bucket") or nd.data.get("total_group_of"):
             nd.age = floor[id(nd)]
             nd.date_src = D_FOSSIL
         elif nd.age is None:

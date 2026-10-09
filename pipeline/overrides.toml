@@ -1,0 +1,112 @@
+# ToLaD manual overrides for the mammal pipeline.
+#
+# Every hand-made change to what the pinned sources say lives here, with a
+# reason and a citation. The build reads this file (tolad_pipeline/overrides.py),
+# applies each entry, fails if an entry no longer matches anything, and writes
+# what it applied to data/mammals/stats.json -> overrides.
+#
+# Bump `version` whenever an entry is added, removed or changed, and say why in
+# the commit message.
+#
+# Sections
+#   [[exclude]]    drop a PBDB species record before grafting
+#   [[date]]       replace a PBDB first/last appearance (Ma) for one species
+#   [[placement]]  move a taxon (an Open Tree node or a PBDB-created group, by
+#                  name) out of the clade the taxonomy puts it in, to the stem
+#                  of `stem_of`: it becomes a sibling of that clade's crown
+#                  inside a "total group" node (see SOURCES.md, "Stem fossils")
+#
+# Automatic stem re-homing (merge.rehome_stem_fossils) handles the general case
+# of fossils older than a molecular crown age without entries here; it is a
+# rule, not an override, and its moves are listed in stats.json ->
+# stem_rehoming.
+
+version = 2
+
+[[exclude]]
+name = "Tikitherium copei"
+reason = """PBDB still dates it to the Carnian (Tiki Formation, ~237-227 Ma), a ~25 Myr outlier \
+against every other PBDB mammal. The type and only specimen, an isolated upper molar, was \
+re-described as a Neogene shrew (Soricidae, Crocidurinae) that does not belong to the Triassic \
+fauna."""
+citation = """Averianov, A.O. & Voyta, L.L. (2024). Putative Triassic stem mammal Tikitherium \
+copei is a Neogene shrew. Journal of Mammalian Evolution 31(1). doi:10.1007/s10914-024-09703-w"""
+
+# --- Mammuthus ------------------------------------------------------------------
+# PBDB's first-appearance windows for several mammoths are very wide (one
+# occurrence spans the whole Late Miocene to Pliocene), and the pipeline uses
+# the window midpoint. That put the genus origin at 13.3 Ma via M. subplanifrons.
+
+[[date]]
+name = "Mammuthus subplanifrons"
+fad = 6.2
+lad = 3.75
+reason = """PBDB first-appearance window 23.04-3.6 Ma (midpoint 13.3 Ma) comes from a loosely \
+dated occurrence. The earliest mammoth records are latest Miocene, ~6.2-5.3 Ma, in southern \
+and eastern Africa (e.g. Langebaanweg, ~5 Ma); the species is not known after ~3.75 Ma."""
+citation = """Sanders, W.J. (2023). Evolution and Fossil Record of African Proboscidea. \
+CRC Press, Boca Raton, pp. 155, 208-212. doi:10.1201/b20016"""
+
+[[date]]
+name = "Mammuthus meridionalis"
+fad = 2.6
+reason = """PBDB first-appearance window 7.246-2.58 Ma (midpoint 4.9 Ma). In Eurasia the \
+species first appears at the start of the Pleistocene, ~2.6 Ma, after M. rumanus."""
+citation = """Lister, A.M., Sher, A.V., van Essen, H. & Wei, G. (2005). The pattern and process \
+of mammoth evolution in Eurasia. Quaternary International 126-128: 49-64. \
+doi:10.1016/j.quaint.2004.04.014"""
+
+[[date]]
+name = "Mammuthus primigenius"
+fad = 0.6
+reason = """PBDB first-appearance window 7.246-2.58 Ma (midpoint 4.9 Ma). The woolly mammoth \
+evolved from M. trogontherii in NE Siberia in the Middle Pleistocene, by ~0.6-0.5 Ma (0.7-0.4 \
+Ma across sources)."""
+citation = """Lister, A.M. (2022). Mammoth evolution in the late Middle Pleistocene: the \
+Mammuthus trogontherii-primigenius transition in Europe. Quaternary Science Reviews 294: \
+107693. doi:10.1016/j.quascirev.2022.107693"""
+
+[[date]]
+name = "Mammuthus lamarmorae"
+fad = 0.3
+lad = 0.04
+reason = """PBDB first-appearance window 11.63-5.09 Ma (midpoint 8.4 Ma). The Sardinian dwarf \
+mammoth (M. lamarmorai) is late Middle to Late Pleistocene; its youngest specimen is dated to \
+roughly 57-29 ka."""
+citation = """Palombo, M.R., Zedda, M. & Zoboli, D. (2024). The Sardinian mammoth's \
+evolutionary history: lights and shadows. Quaternary 7(1): 10. doi:10.3390/quat7010010"""
+
+# --- Cretaceous metatherians filed under Didelphimorphia ------------------------
+# OTT 3.7.3 lists Stagodontidae and Pediomyidae (incertae sedis) under
+# Didelphimorphia, and PBDB-grafted Kokopellia and Asiatherium end up there too.
+# They are Cretaceous metatherians outside crown Marsupialia. Left in place
+# they drag Didelphimorphia (and Didelphidae) back to ~98 Ma.
+
+[[placement]]
+name = "Stagodontidae"
+stem_of = "Metatheria"
+reason = "Late Cretaceous North American metatherians, outside crown Marsupialia."
+citation = """Williamson, T.E., Brusatte, S.L. & Wilson, G.P. (2014). The origin and early \
+evolution of metatherian mammals: the Cretaceous record. ZooKeys 465: 1-76. \
+doi:10.3897/zookeys.465.8178"""
+
+[[placement]]
+name = "Pediomyidae"
+stem_of = "Metatheria"
+reason = "Late Cretaceous North American metatherians, outside crown Marsupialia."
+citation = """Williamson, T.E., Brusatte, S.L. & Wilson, G.P. (2014). ZooKeys 465: 1-76. \
+doi:10.3897/zookeys.465.8178"""
+
+[[placement]]
+name = "Kokopellia"
+stem_of = "Metatheria"
+reason = "Albian-Cenomanian (~100 Ma) metatherian from Utah, outside crown Marsupialia."
+citation = """Williamson, T.E., Brusatte, S.L. & Wilson, G.P. (2014). ZooKeys 465: 1-76. \
+doi:10.3897/zookeys.465.8178"""
+
+[[placement]]
+name = "Asiatherium"
+stem_of = "Metatheria"
+reason = "Late Cretaceous Mongolian metatherian (Asiatheriidae), outside crown Marsupialia."
+citation = """Williamson, T.E., Brusatte, S.L. & Wilson, G.P. (2014). ZooKeys 465: 1-76. \
+doi:10.3897/zookeys.465.8178"""

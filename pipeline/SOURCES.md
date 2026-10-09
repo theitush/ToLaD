@@ -27,7 +27,8 @@ All files below were retrieved on **2026-10-09**.
 | PHYLACINE 1.2.1 (Faurby et al. 2018, *Ecology* 99:2626) | Body mass for 5,831 species, including late-Quaternary extinct ones. IUCN status (`EP`/`EX` = extinct → gray). Marine flag. Synonymy table | `https://raw.githubusercontent.com/MegaPast2Future/PHYLACINE_1.2/2fb87f0b994ee82daa6691931f15971535322a2e/Data/{Traits/Trait_data.csv, Taxonomy/Synonymy_table_valid_species_only.csv}` | traits `ab035a8fab3d18673dea1d4a56f741e3ea9f8ba460461c7a1e738621ca315ec7`, synonyms `3a3c624ec31f609f56f0d7f177f2c380c1d1db8b9eb872a11ac46d2044d1c427` | CC0 (Dryad doi:10.5061/dryad.bp26v20) |
 | COMBINE (Soria et al. 2021, *Ecology* 102:e03344), figshare v4 | Generation length: Pacifici et al. 2013 values, reported and phylogenetically imputed. Population density and adult mass | https://ndownloader.figshare.com/files/27703263 (reported), …/27703266 (imputed) | `14ace2dff03b71c20dc923a9eb293aaadc29934e21c6f11fa30d1b70e5abab92`, `b576cfd9f12b1441eb564bbf7acb65f06e676108aa0651aed9594585e7ff65f9` | CC BY 4.0 |
 | PanTHERIA 1.0 WR05 (Jones et al. 2009, *Ecology* 90:2648) | Population density, geographic range area (`26-1_GR_Area_km2`), mass | https://esapubs.org/archive/ecol/E090/184/PanTHERIA_1-0_WR05_Aug2008.txt | `36e64314cae0394a966a63b949504d1975ac5c5629e05e36c1b139b3348f044a` | ESA Ecological Archives data paper. No explicit license; used for derived estimates with attribution |
-| Paleobiology Database | Accepted, regular-preservation (no form or ichno taxa) Mammalia species and genera, with first/last appearance (`show=app,parent,class`) | `https://paleobiodb.org/data1.2/taxa/list.json?base_name=Mammalia&rank=species&taxon_status=accepted&pres=regular&show=app,parent,class&vocab=pbdb` (and `rank=genus`) | species `a0102693edd96d8bcbbd506e9d46e2c858f263c927f3c8fbd8087b56462f4bd2`, genera `080aff40f61bd5392dd7b44f4360ae42443d68d3b81a1f9a27b5cefcefea1388` | CC BY 4.0 |
+| Paleobiology Database | Accepted, regular-preservation (no form or ichno taxa) Mammalia species and genera, with first/last appearance (`show=app,parent,class`) | `https://paleobiodb.org/data1.2/taxa/list.json?base_name=Mammalia&rank=species&taxon_status=accepted&pres=regular&show=app,parent,class&vocab=pbdb` (and `rank=genus`) | species `2b305dfbc722e91e272ff03fdef972f3fbaca0fb512b371bbe589d160999e1bc`, genera `49f271f778d1fb4e26b10dd1c1f19c8f64a7d0e377b07c513300c68c5b1760dd` (after the fetcher zeroes PBDB's volatile `elapsed_time` field, see below) | CC BY 4.0 |
+| Greenspoon et al. 2023, *PNAS* 120:e2204892120, data and code release v1.0 (Zenodo doi:10.5281/zenodo.7594807) | Census anchors: global population reports for 392 land species (`data/species_w_pop_reports.csv`, mostly IUCN Red List assessments) and the marine species with a report (`data/marine_data/wild_marine_pop_error.csv`). Their per-species model estimates for the other land species (`results/wild_land_mammal_biomass.csv` with masses from `data/all_species_list.csv`). Wild land biomass and individuals per order (`results/results_grouped_by_order.csv`). Dogs 1e9 and cats 6e8 (`data/domesticated_data/pets_rats_mouse.csv`). The zip is only opened with `zipfile` and read as CSV | https://zenodo.org/api/records/7594807/files/mammal_biomass-master.zip/content → `greenspoon/mammal_biomass-master.zip` | `b076b5c6b401196401eda8703ea12f7353ca86e38a03096eaaee0202dfac7a6c` | CC BY 4.0 |
 | FAOSTAT QCL (crops and livestock), bulk normalized | World livestock **stocks** (element 5111), latest year (2024): cattle, sheep, goats, pigs, buffalo, horses, asses, camels | https://bulks-faostat.fao.org/production/Production_Crops_Livestock_E_All_Data_(Normalized).zip | `c5835418c18f9322e7decbd6800f93a216eaae3cdfa31acb08f0518c0c6d6853` | CC BY 4.0 (FAO open data) |
 | UN World Population Prospects 2024, medium variant | World population on 1 July 2026 (alive humans) and annual births 2022–2026 | https://population.un.org/wpp/assets/Excel%20Files/1_Indicator%20(Standard)/CSV_FILES/WPP2024_Demographic_Indicators_Medium.csv.gz | `286ac36bb1415e2e1ade03acfef0a29f0e4c087e2f78e38c48f50c5df89082bc` | CC BY 3.0 IGO |
 | PRB, "How Many People Have Ever Lived on Earth?" (Kaneda, Greenbaum & Haub, Nov 2022) | Table 1 benchmarks: births between benchmarks, 117,020,448,575 total through 2022. The figures are copied into `anchors.py`, and the build checks they still appear in the pinned page | https://www.prb.org/articles/how-many-people-have-ever-lived-on-earth/ | `3e39289adcb6759687d5a71b100a12e472799b57a31cbe1aa1fb8ebaef0ac1b4` | © PRB. Facts cited with attribution |
@@ -36,7 +37,7 @@ All files below were retrieved on **2026-10-09**.
 
 | Constant | Value | Source |
 |---|---|---|
-| Wild mammal biomass, used for the occupancy calibration | land 20 Mt, marine 40 Mt (wet) | Greenspoon et al. 2023, *PNAS* 120:e2204892120 (doi:10.1073/pnas.2204892120) |
+| Wild mammal biomass, reported next to the model's totals | land 20 Mt (95% CI 13–38), marine 40 Mt (wet) | Greenspoon et al. 2023, *PNAS* 120:e2204892120 (doi:10.1073/pnas.2204892120) |
 | Mammalia effective duration, used for the ghost-lineage top-down total | T_eff = 1.5e8 yr at modern-equivalent abundance | research/02-population-estimates.md §2.3 (grade C derivation) |
 | Allometry forms | density ∝ M^b (Damuth 1981), generation ∝ M^d (Brook & Bowman 2005; Hatton et al. 2019) | Coefficients are refit on COMBINE + PanTHERIA in each build and written to `stats.json` → `fits` |
 
@@ -46,14 +47,75 @@ All files below were retrieved on **2026-10-09**.
 - **AnAge** (HAGR): its license terms are unclear, and COMBINE + PanTHERIA already cover longevity and maturity.
 - **OneZoom dated tree** (Duke et al. 2026): for all-life scale-out (plan step 5). Upham is the better mammal source.
 
-## Deliberate exclusions and known quirks
+## Manual overrides
 
-- `Tikitherium copei` (PBDB) is excluded. Its Carnian (~230 Ma) age is a ~25 Myr outlier against every other PBDB mammal, and the material has been argued to be a much younger shrew. The reassessment citation still needs checking. See `PBDB_EXCLUDE` in `merge.py`.
+Every hand-made change to what the sources say is in [`overrides.toml`](overrides.toml): versioned, one entry per change, each with a reason and a citation. The build fails if an entry stops matching anything, and lists what it applied in `stats.json` → `overrides`. Current entries:
+
+- **Excluded:** `Tikitherium copei`. PBDB dates it to the Carnian (~230 Ma), but the single molar was re-described as a Neogene shrew: Averianov & Voyta 2024, *J. Mammal. Evol.* 31(1), doi:10.1007/s10914-024-09703-w.
+- **Dates:** *Mammuthus subplanifrons* 6.2–3.75 Ma (PBDB's window midpoint gave 13.3 Ma; Sanders 2023), *M. meridionalis* from 2.6 Ma (Lister et al. 2005), *M. primigenius* from 0.6 Ma (Lister 2022), *M. lamarmorae* 0.3–0.04 Ma (Palombo et al. 2024). *Mammuthus* now starts at 6.4 Ma.
+- **Placements:** Stagodontidae, Pediomyidae, *Kokopellia* and *Asiatherium* are Cretaceous metatherians outside crown Marsupialia (Williamson, Brusatte & Wilson 2014, *ZooKeys* 465:1–76). OTT and the PBDB graft put them under Didelphimorphia, which dragged the order back to 98 Ma. They now sit on the stem of Metatheria.
+
+## Stem fossils (automatic)
+
+Taxonomy often files a fossil inside a crown group that it predates. The dating rule "a parent is at least as old as its oldest child" then drags the crown node and every extant lineage under it back to the fossil's age. Examples are Cretaceous "didelphimorphs", Paleocene "carnivorans", Eocene equids and the Cretaceous "soricid" *Cretasorex*. These old crowns then soaked up deep-time ghost lineages.
+
+Now a fossil-only subtree older than the upper end of the Upham 95% HPD of an enclosing crown node counts as a stem member. It moves next to that crown, inside a new node that carries the taxon's name (the total group). The crown keeps its molecular age and is renamed "*name* (crown)". This is a rule, not an override. The 2026-10-09 build moves 782 fossil subtrees into 115 total groups, listed in `stats.json` → `stem_rehoming`. Crown nodes not calibrated by Upham can still be raised by fossils.
+
+## Counts calibration
+
+Wild standing populations come from, in order of preference:
+1. a global population report from an IUCN assessment, as compiled by Greenspoon et al. 2023 (479 species)
+2. Greenspoon's per-species model estimate (≈4,350 land species)
+3. density × range × occupancy *k*. *k* is fitted per order group (the nine orders Greenspoon report, plus "Other") as a function of body mass, on the species that have 1 or 2. Marine species use a mass + order fit on the marine census species.
+
+Dogs (1e9) and cats (6e8) come from Greenspoon's pets table and get alive grade C. FAOSTAT livestock stays at grade B. Both are added on top of the wild lineage. Domestic forms with no wild population of their own (cattle, sheep, horse, donkey, dromedary, water buffalo, cat) keep their modelled wild ancestor only up to domestication.
+
+Wild land individuals come to 8.4e10 (Greenspoon: 8.8e10). Land biomass is 34 Mt, inside Greenspoon's 13–38 Mt CI but above their 20 Mt median, because census species use PHYLACINE adult masses. Details are in `stats.json` → `occupancy_calibration`.
+
+Before and after, wild alive (v0 = the previous pipeline on the same raw snapshot):
+
+| Species | v0 | now | Published | Source of published figure |
+|---|---|---|---|---|
+| Wolf *Canis lupus* | 2.1e4 | 2.2e5 (+1e9 dogs) | 2.2e5 | IUCN (via Greenspoon) |
+| Red fox *Vulpes vulpes* | 1.1e6 | 3.1e6 | 3.1e6 | Greenspoon model (no census) |
+| African bush elephant *Loxodonta africana* | 3.8e4 | 4.4e5 | 4.4e5 | IUCN |
+| House mouse *Mus musculus* | 1.1e8 | 7.0e8 | 7.0e8 (commensal guess 1e9) | Greenspoon model / guess |
+| Brown rat *Rattus norvegicus* | 1.7e6 | 9.5e7 | 9.5e7 (commensal guess 1e9) | Greenspoon model / guess |
+| White-tailed deer *Odocoileus virginianus* | 1.2e6 | 4.5e7 | 4.5e7 | IUCN |
+| Chimpanzee *Pan troglodytes* | 4.8e4 | 4.0e5 | 4.0e5 | IUCN |
+| Western gorilla *Gorilla gorilla* | 1.2e4 | 3.2e5 | 3.2e5 | IUCN |
+| Blue whale *Balaenoptera musculus* | 5.2e2 | 2.8e4 | 2.8e4 | IUCN |
+| Harbour seal *Phoca vitulina* | 4.4e6 | 9.4e5 | 9.4e5 | IUCN |
+| Little brown bat *Myotis lucifugus* | 4.2e7 | 1.2e8 | 1.2e8 | Greenspoon model |
+| Mexican free-tailed bat *Tadarida brasiliensis* | 2.5e8 | 1.3e8 | 1.3e8 | Greenspoon model |
+| Eastern grey kangaroo *Macropus giganteus* | 1.1e6 | 2.2e7 | 2.2e7 | IUCN |
+| Wild boar *Sus scrofa* (wild part) | 3e6 | 2.3e7 (+9.6e8 pigs) | 2.3e7 | Greenspoon model |
+| Brown bear *Ursus arctos* | 1.0e5 | 2.2e5 | 2.2e5 | IUCN |
+| Raccoon *Procyon lotor* | 2.8e7 | 4.0e7 | 4.0e7 | IUCN |
+
+For census species, `stats.json` → `calibration_check` also shows what the occupancy model alone would give. For the wolf that is 2.7e4, so the per-species model error is still about 1 dex. That is why census figures take priority.
+
+## Ghost lineages
+
+The ghost share of Mammalia's ever-lived count is about 95%. The computation is sound: an extant species' band only reaches back to its split from its sister, a few Myr, and PBDB samples only a small fraction of fossil species. By era, the share is about 7% in the last 2.6 Myr, 77% in the Neogene, 99% in the Paleogene and 100% before 66 Ma (`stats.json` → `ghost_lineages.by_era`). Ghosts are kept separate in `GHST`.
+
+They are allocated by crown membership. At time t, the deficit is split over the reconstructed lineages crossing t, weighted by the present-day wild births of each lineage's extant descendants. It is credited to the clade in whose crown that lineage runs. So:
+- a crown order collects ghosts only after its own crown split
+- deep-time ghosts go to Mammalia, Theria and Placentalia-level nodes
+- relict lineages and stem fossils do not soak them up
+
+The old allocation, by lineage rate over any covering band, let old-looking orders such as Didelphimorphia, Macroscelidea and Monotremata outrank Rodentia.
+
+Mammalia's ever-lived total is 8.5e18 (95% range 1e17–1e21). That is just under 02's 1e19 lower bound. 02 assumed about 3e11 wild mammals alive; the Greenspoon-calibrated count is 8.5e10, and T_eff × wild births scales with it.
+
+## Known quirks
+
+- PBDB API responses start with a volatile `"elapsed_time"` field. The fetcher rewrites it to 0 before hashing, so the pinned checksum covers the records only. The lock was re-pinned on 2026-10-09: same records, byte length −4.
 - PBDB species with no occurrences or no first/last appearance are skipped. So are names that are not plain binomials (`cf.`, subgenera in the name, and so on).
 - Infraspecific Open Tree tips are folded into their species, e.g. *Canis lupus familiaris* → *Canis lupus*. Tips that are not species are dropped.
 - Where the synthesis tree does not resolve a family as a node (a "broken" taxon such as Hominidae), the family is placed at the MRCA of the species Upham assigns to it, if that MRCA is tight.
-- Fossil first appearances push calibrated ages upward when the PBDB taxonomy puts old fossils inside a crown group. Examples: Cretaceous stagodontids and pediomyids, which OTT files under Didelphimorphia, and the Cretaceous "Soricidae" *Cretasorex*. This follows the brief's rule that a parent is at least as old as the oldest child's first appearance. `stats.json` → `dating.calibrated_raised_by_fossils` counts these.
+- 1,628 Open Tree tips are treated as living although no extant-species list (Upham, PHYLACINE, Greenspoon/IUCN) recognises them. They are recent splits, synonyms, and some fossils that lack an extinct flag (e.g. *Elephas zulu*). They hold about 6.8e9 modelled individuals. See `stats.json` → `unverified_extant_tips`.
 
 ## License of the built dataset
 
-The files in `data/mammals/` are **CC BY 4.0**. Attribute Open Tree of Life (CC0), Upham et al. 2019 (CC0), PHYLACINE (CC0), COMBINE (CC BY 4.0), PanTHERIA, the Paleobiology Database (CC BY 4.0), FAOSTAT (CC BY 4.0), UN WPP 2024 (CC BY 3.0 IGO) and PRB.
+The files in `data/mammals/` are **CC BY 4.0**. Attribute Open Tree of Life (CC0), Upham et al. 2019 (CC0), PHYLACINE (CC0), COMBINE (CC BY 4.0), PanTHERIA, the Paleobiology Database (CC BY 4.0), FAOSTAT (CC BY 4.0), Greenspoon et al. 2023 (CC BY 4.0), UN WPP 2024 (CC BY 3.0 IGO) and PRB.

@@ -20,6 +20,13 @@
   "sha256": "c5835418c18f9322e7decbd6800f93a216eaae3cdfa31acb08f0518c0c6d6853",
   "url": "https://bulks-faostat.fao.org/production/Production_Crops_Livestock_E_All_Data_(Normalized).zip"
  },
+ "greenspoon/mammal_biomass-master.zip": {
+  "bytes": 37863133,
+  "post_body": null,
+  "retrieved": "2026-10-09",
+  "sha256": "b076b5c6b401196401eda8703ea12f7353ca86e38a03096eaaee0202dfac7a6c",
+  "url": "https://zenodo.org/api/records/7594807/files/mammal_biomass-master.zip/content"
+ },
  "opentree/about.json": {
   "bytes": 611,
   "post_body": {},
@@ -54,17 +61,17 @@
   "url": "https://esapubs.org/archive/ecol/E090/184/PanTHERIA_1-0_WR05_Aug2008.txt"
  },
  "pbdb/mammalia_genera.json": {
-  "bytes": 3071933,
+  "bytes": 3071929,
   "post_body": null,
   "retrieved": "2026-10-09",
-  "sha256": "080aff40f61bd5392dd7b44f4360ae42443d68d3b81a1f9a27b5cefcefea1388",
+  "sha256": "49f271f778d1fb4e26b10dd1c1f19c8f64a7d0e377b07c513300c68c5b1760dd",
   "url": "https://paleobiodb.org/data1.2/taxa/list.json?base_name=Mammalia&rank=genus&taxon_status=accepted&pres=regular&show=app,parent,class&vocab=pbdb"
  },
  "pbdb/mammalia_species.json": {
-  "bytes": 6723175,
+  "bytes": 6723171,
   "post_body": null,
   "retrieved": "2026-10-09",
-  "sha256": "a0102693edd96d8bcbbd506e9d46e2c858f263c927f3c8fbd8087b56462f4bd2",
+  "sha256": "2b305dfbc722e91e272ff03fdef972f3fbaca0fb512b371bbe589d160999e1bc",
   "url": "https://paleobiodb.org/data1.2/taxa/list.json?base_name=Mammalia&rank=species&taxon_status=accepted&pres=regular&show=app,parent,class&vocab=pbdb"
  },
  "phylacine/Synonymy_table_valid_species_only.csv": {

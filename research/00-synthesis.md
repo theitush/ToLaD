@@ -38,6 +38,18 @@ Everything below species is generated on the fly from integer hashes and needs n
 - **Uniform vs separate X/Y zoom.** 03 generalizes OneZoom's uniform similarity frames. 04 needs separate width and time scales, because a clade can be 500 My long and 1e-20 wide. Resolution: per-chunk frames carry separate (sx, st) scales, and the re-anchoring logic is otherwise the same. This is the main thing to test in the spike.
 - **Green in log mode.** 02 suggests a log-scaled hue or a minimum sliver. 04 suggests green following the active width mode. Proposal: green lane width follows the active mode, there's a 1 px floor, and the true % is always in the ledger.
 
+## Layout change (2026-10-09, later the same day)
+
+After trying the time-river prototype on a phone, the user found it hard to read. **The main view is now a OneZoom-style fractal tree:**
+- Self-similar spiral branches with uniform zoom.
+- Branch thickness = individuals ever lived (log by default, linear toggle).
+- Green/gray split by alive share; extinct branches fully gray.
+- Species end in **leaves made of individuals**: zooming into a leaf opens the population mesh, then the pedigree.
+- The time river stays as an optional "deep time" view for later. Dates show on tap.
+- The layout is our own implementation; no OneZoom code (license).
+
+Superseded: the "Layout", "Width semantics" (births-rate river) and "Deep zoom (separate X/Y scales)" rows below now apply only to the deep-time view.
+
 ## Decisions confirmed by the user (2026-10-09)
 
 1. **Width:** births-rate river, so area = individuals ever lived. The total count goes on the label and in the ledger.
