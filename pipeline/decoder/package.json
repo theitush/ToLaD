@@ -1,0 +1,13 @@
+{
+  "name": "@tolad/tile-decoder",
+  "version": "1.0.0",
+  "description": "Zero-dependency decoder for the ToLaD tile format v1 (see ../FORMAT.md)",
+  "type": "module",
+  "main": "tolad-decoder.js",
+  "exports": "./tolad-decoder.js",
+  "scripts": {
+    "test": "node --test test/roundtrip.test.mjs"
+  },
+  "license": "MIT",
+  "private": true
+}
