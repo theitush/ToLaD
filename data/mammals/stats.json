@@ -1,0 +1,243 @@
+{
+ "anchors_found": {
+  "FAO:Bos taurus": 1,
+  "FAO:Bubalus bubalis": 1,
+  "FAO:Camelus dromedarius": 1,
+  "FAO:Capra aegagrus": 1,
+  "FAO:Equus asinus": 1,
+  "FAO:Equus caballus": 1,
+  "FAO:Ovis aries": 1,
+  "FAO:Sus scrofa": 1,
+  "Homo sapiens": 1
+ },
+ "counts": {
+  "internal": 6340,
+  "nodes": 25005,
+  "taxonomic_nodes": 13321,
+  "tips": 18665,
+  "tips_extant": 7329,
+  "tips_extinct": 11336,
+  "tips_extinct_in_opentree": 323,
+  "tips_fossil_grafted": 11013
+ },
+ "dating": {
+  "calibrated_raised_by_fossils": 484,
+  "uncalibrated_internal": 8342,
+  "upham_calibrated_nodes": 1655
+ },
+ "extinct_flags": {
+  "extinct": 240,
+  "living": 2189,
+  "phylacine:extinct": 83,
+  "phylacine:living": 5144
+ },
+ "fits": {
+  "density_log10 = a + b*log10(mass_g)": {
+   "a": 3.868,
+   "b": -0.757,
+   "n": 1381,
+   "resid_sd": 0.858
+  },
+  "generation_yr_log10 = a + b*log10(mass_g)": {
+   "a": 0.201,
+   "b": 0.163,
+   "resid_sd": 0.234
+  }
+ },
+ "ghost_lineages": {
+  "T_eff_yr": 150000000.0,
+  "births_now_per_yr": 105136260305.59818,
+  "f_ramp_Ma": [
+   208.64,
+   91.36
+  ],
+  "ghost_share": 0.944,
+  "max_multiplier": 319459.7368312078,
+  "multiplier_at_Ma": {
+   "0.01": 1.014,
+   "1": 1.036,
+   "100": 102454.374,
+   "150": 128043.363,
+   "20": 7.493,
+   "200": 42934.832,
+   "5": 2.181,
+   "50": 256.106,
+   "66": 3360.275
+  },
+  "sampled_sum": 8.83399430692771e+17,
+  "top_down_estimate": 1.5770439045839727e+19,
+  "with_ghosts": 1.577043904982807e+19
+ },
+ "grid_cells": 1600,
+ "knuckles_collapsed": 3657,
+ "mammalia": {
+  "alive": 133253369650.52266,
+  "ever": 1.577043904982807e+19,
+  "ghost": 1.48870396191353e+19,
+  "grade": "D",
+  "hi": 1.386377025921144e+21,
+  "lo": 1.943307593783951e+17
+ },
+ "mass_sources": {
+  "mass:combine": 183,
+  "mass:pantheria": 46,
+  "mass:phylacine": 5646
+ },
+ "mock_individuals": 7,
+ "occupancy_calibration": {
+  "k_land": 0.01612,
+  "k_marine": 0.512,
+  "raw_land_biomass_Mt": 1240.52,
+  "raw_marine_biomass_Mt": 78.13,
+  "target": "Greenspoon et al. 2023: wild land 20 Mt, marine 40 Mt"
+ },
+ "opentree": {
+  "empty_higher_dropped": 8,
+  "raw_tips": 9328,
+  "species_tips": 7656,
+  "synth_id": "opentree16.1",
+  "taxonomy_version": "3.7draft3"
+ },
+ "opentree_dropped": {
+  "duplicate binomial": 36,
+  "infraspecific": 1812,
+  "non-species tip": 551
+ },
+ "output": {
+  "brotli_bytes": 493947,
+  "files": 16,
+  "raw_bytes": 1926648,
+  "skeleton_brotli": 27705,
+  "skeleton_nodes": 1147,
+  "skeleton_raw": 108672,
+  "tiles": 15
+ },
+ "pbdb_graft": {
+  "excluded (see PBDB_EXCLUDE)": 1,
+  "grafted: MRCA of OT genus members": 153,
+  "grafted: OT genus": 783,
+  "grafted: PBDB genus (created)": 10077,
+  "living, not in OT (skipped)": 328,
+  "matched OT leaf (exact)": 2154,
+  "matched OT leaf (synonym)": 316,
+  "no occurrences/range (skipped)": 2466,
+  "not a plain binomial": 240,
+  "status unknown (skipped)": 85
+ },
+ "pbdb_groups_created": {
+  "family": 416,
+  "genus": 4925,
+  "order": 32
+ },
+ "pbdb_match": {
+  "grafted under OT family-level node": 4329,
+  "grafted under OT genus": 1038,
+  "grafted under OT order or higher": 3028,
+  "grafted unplaced (Mammalia root / incertae sedis)": 2618,
+  "matched_existing_OT_species": 2470,
+  "rate_family_or_better": 0.5813,
+  "rate_matched_species": 0.1832,
+  "rate_species_or_genus": 0.2602,
+  "species_used": 13483
+ },
+ "pieces": 24283,
+ "spot_checks": {
+  "Bos taurus": {
+   "alive": 1578614312.385115,
+   "ever": 315792666695.6812,
+   "ever_range": [
+    1959123373.7862072,
+    50902873026337.68
+   ],
+   "extinct(gray)": false,
+   "ghost": 0.0,
+   "grade": "D",
+   "t0_Ma": 4.0100999999999996,
+   "t1_Ma": 0.0
+  },
+  "Hominidae": {
+   "alive": 8300765727.468964,
+   "ever": 4164669957918.5093,
+   "ever_range": [
+    83945202590.3667,
+    505942837826032.75
+   ],
+   "extinct(gray)": false,
+   "ghost": 3589469798793.8633,
+   "grade": "D",
+   "t0_Ma": 19.2152,
+   "t1_Ma": 0.0
+  },
+  "Homo sapiens": {
+   "alive": 8300678396.0,
+   "ever": 117651866999.13,
+   "ever_range": [
+    74920181931.49986,
+    184756115795.83182
+   ],
+   "extinct(gray)": false,
+   "ghost": 0.0,
+   "grade": "B",
+   "t0_Ma": 0.19202676999999999,
+   "t1_Ma": 0.0
+  },
+  "Mammalia": {
+   "alive": 133253369650.52266,
+   "ever": 1.577043904982807e+19,
+   "ever_range": [
+    1.943307593783951e+17,
+    1.386377025921144e+21
+   ],
+   "extinct(gray)": false,
+   "ghost": 1.48870396191353e+19,
+   "grade": "D",
+   "t0_Ma": 208.64140800000004,
+   "t1_Ma": 0.0
+  },
+  "Mammuthus": {
+   "alive": 0.0,
+   "ever": 25987728950.802044,
+   "ever_range": [
+    171296393.1822839,
+    10316071043636.805
+   ],
+   "extinct(gray)": true,
+   "ghost": 16836591379.981178,
+   "grade": "D",
+   "t0_Ma": 13.32015,
+   "t1_Ma": 0.00585
+  },
+  "Mammuthus primigenius": {
+   "alive": 0.0,
+   "ever": 1435233366.5602906,
+   "ever_range": [
+    4861475.191984057,
+    423718055763.0912
+   ],
+   "extinct(gray)": true,
+   "ghost": 0.0,
+   "grade": "D",
+   "t0_Ma": 13.32005,
+   "t1_Ma": 0.00585
+  }
+ },
+ "trait_coverage_extant": {
+  "log_density_obs:no": 6122,
+  "log_density_obs:yes": 1207,
+  "log_gen_obs:no": 1731,
+  "log_gen_obs:yes": 5598,
+  "log_mass:no": 1688,
+  "log_mass:yes": 5641,
+  "log_range_obs:no": 2698,
+  "log_range_obs:yes": 4631
+ },
+ "upham_match": {
+  "exact": 5470,
+  "msw3-name": 16,
+  "rate": 0.9633,
+  "synonym": 208,
+  "tips": 5911,
+  "unmatched": 217
+ },
+ "upham_named_broken_taxa": 14
+}

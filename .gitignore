@@ -7,5 +7,10 @@ dist/
 data/raw/
 data/build/
 
+# python
+__pycache__/
+*.pyc
+pipeline/.venv/
+
 # agent worktrees
 .claude/worktrees/
