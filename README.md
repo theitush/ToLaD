@@ -7,4 +7,4 @@ A mobile-first, zoomable tree of life where every leaf is an individual organism
 - Below species level the tree becomes a mesh: populations with gene flow, then individual pedigrees
 - Individuals (e.g. `human#49837299`) are generated procedurally and deterministically from population estimates. Any "real" individuals are clearly marked as mock for now.
 
-Status: research phase — see `research/`.
+Status: research phase — start with [`research/00-synthesis.md`](research/00-synthesis.md).
