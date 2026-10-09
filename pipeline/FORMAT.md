@@ -86,7 +86,7 @@ Bin 0 is the youngest (ends at `t1`) and bin 15 the oldest (starts at `t0`). Eac
 | 4–5 | date source: 0 = Upham-calibrated, 1 = interpolated, 2 = fossil range or fossil-constrained, 3 = anchored |
 | 6 | species tip (in the full tree) |
 | 7 | stub: children are in tile `STUB[...]` |
-| 8 | anchored count (humans, FAOSTAT livestock) |
+| 8 | anchored count: humans, an IUCN census figure, or a domestic stock (FAOSTAT livestock, dogs, cats) |
 | 9 | PBDB fossil species graft |
 | 10 | created taxonomic group (genus, family or order from PBDB, or the "incertae sedis" bucket) |
 
@@ -106,6 +106,7 @@ Every file has `META.stub_rep` (representative names, aligned with the `STUB` pa
 
 See research/02 §3 and `pipeline/tolad_pipeline/model.py`. In short:
 
-- **Species bands:** `rate = N_alive / L`, with `N_alive = k_occ · density · range area` and `L = generation length / 2`. Fossils use their PBDB first/last appearance and their body mass and range are imputed from relatives. Anchors replace or add to this: humans use PRB + UN WPP; livestock adds the FAOSTAT stock on top of the wild lineage, growing like human births since domestication.
-- **Internal bands:** the sum of the children, plus a *lineage fill* for any part of the band with no child (the stem before the first split, or gaps in fossil fans), plus *ghost lineages*. Ghosts are the 02 §2.3 top-down Mammalia total (births now × T_eff) minus what the sampled tree explains. At each time they are split among the clades alive then, in proportion to lineage rate. `GHST` lets the renderer draw them in a distinct style.
-- **Uncertainty:** each leaf gets a log-normal error from its inputs. Sums use Fenton–Wilkinson, plus a shared 0.6 dex systematic term. Grade = the worse of the method cap and the 95% half-width (A ≤ 0.5 dex, B ≤ 1, C ≤ 2, D above).
+- **Species bands:** `rate = N_alive / L`, with `L = generation length / 2`. `N_alive` is the census figure where an IUCN population report exists (Greenspoon et al. 2023 compilation), else Greenspoon's per-species model estimate, else `k · density · range area` with `k` fitted per order group and body mass. Fossils use their PBDB first/last appearance (or a dated entry in `overrides.toml`); their body mass and range are imputed from relatives. Humans use PRB + UN WPP. Domestic stocks are added on top of the wild lineage and grow like human births since domestication: FAOSTAT livestock, plus Greenspoon's dog and cat numbers. Domestic forms with no wild population (cattle, sheep, cat, ...) have no wild band after domestication.
+- **Internal bands:** the sum of the children, plus a *lineage fill* for any part of the band with no child (the stem before the first split, or gaps in fossil fans), plus *ghost lineages*. Ghosts are the 02 §2.3 top-down Mammalia total (wild births now × T_eff) minus what the sampled tree explains. At each time t they are split over the reconstructed lineages crossing t, weighted by the present-day wild births of each lineage's descendants. They are credited to the clade in whose crown the lineage runs, so a crown clade only collects ghosts after its own crown split. `GHST` lets the renderer draw them in a distinct style.
+- **Total groups:** when fossils predate a clade's molecular crown age (above the Upham 95% HPD), they move onto its stem. They sit in a node that carries the clade's name, next to the crown node, which is renamed "*name* (crown)". Such nodes have the `taxonomic` flag and date source 2.
+- **Uncertainty:** each leaf gets a log-normal error from its inputs. Sums use Fenton–Wilkinson, plus a shared systematic term: 0.6 dex for modelled species, 0.3 dex for species with a census or a Greenspoon estimate. Grade = the worse of the method cap and the 95% half-width (A ≤ 0.5 dex, B ≤ 1, C ≤ 2, D above).
