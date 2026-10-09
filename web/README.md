@@ -1,4 +1,18 @@
-# ToLaD web: spike
+# ToLaD web
+
+The app now shows the real mammal dataset (`../data/mammals`, format v1) as a births-rate
+time river; `?synthetic` brings back the spike's infinite synthetic tree.
+
+- `src/data/`: `river.ts` decodes a `.tld` file and lays it out (pure, runs in the data
+  worker `worker.ts` and in tests); `tile-source.ts` is the `TreeSource` that loads the
+  skeleton, then tiles when a stub is on screen; `names.ts` has display names (a small
+  hand-made common-name table: v1 data has scientific names only).
+- `npm run build:single` writes `dist-single/index.html`: JS, CSS and all data (base64)
+  in one file that works from `file://` with no network (`node scripts/check-single.mjs`).
+- `node scripts/shot.mjs` screenshots the opening view and named clades;
+  `npm run perf` runs the real-data perf phases (`PERF_SYNTH=1` for the spike's dives).
+
+The rest of this file describes the spike.
 
 This spike tests the two hardest problems before any real data exists:
 

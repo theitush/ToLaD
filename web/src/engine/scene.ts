@@ -15,10 +15,10 @@
 
 import { copyFrame, frame, toChild, toParent, type Frame } from './frame';
 import type { Camera } from './camera';
-import type { Layout, LNode } from './layout';
-import { TAPER_IN, TAPER_OUT } from './tree';
+import { RIVER_S, type Layout, type LNode } from './layout';
+import { DRAW_STUB, TAPER_IN, TAPER_OUT } from './tree';
 
-/** Floats per instance. Layout: lb rb lt rt | mb mt tb tt | tint flags 0 0 */
+/** Floats per instance. Layout: lb rb lt rt | mb mt tb tt | tint flags gb gt */
 export const INST_FLOATS = 12;
 /** Max chunk-root scale (px) for the float32 chunk path. */
 export const GPU_MAX_PX = 2e5;
@@ -28,21 +28,37 @@ export const TOP_MAX_PX = 1e9;
 const THREAD = 0.08;
 const CLIP_MARGIN = 2;
 
+/** Instance flag bits (the debug outline uses 2). */
 export const FLAG_ALIVE = 1;
+export const FLAG_OUTLINE = 2;
+export const FLAG_SELECTED = 32;
+/** A stub band whose tile is on screen and large enough to be worth loading. */
+export const STUB_REQUEST_PX = 24;
+/** Min screen width (px) of a river chunk root before its chunk is opened. */
+export const RIVER_OPEN_MIN_W = 8;
 
 export class Chunk {
   epoch = -1;
+  dataEpoch = -1;
+  /** Bumped on every rebuild (the renderer re-uploads when it changes). */
+  version = 0;
   nodes: LNode[] = [];
   /** First instance index of each node in `nodes`. */
   nodeFirst: number[] = [];
   /** Boundary nodes also get a flat "proxy" band in this chunk, drawn while their own chunk is too small to open. */
   proxyFirst: number[] = [];
   data = new Float32Array(0);
+  /** The same instances in reverse order (deepest first), for the front-to-back interior pass. */
+  rev = new Float32Array(0);
   count = 0;
   boundary: LNode[] = [];
   /** (x0, xs, t0, ts) of each boundary node relative to the chunk root, float64. */
   brel = new Float64Array(0);
   lastUsed = 0;
+  /** (x0, xs, t0, ts) of every node in `nodes` relative to the chunk root (labels, picking). */
+  rel = new Float64Array(0);
+  /** Indices into `nodes` of pending stubs (children not loaded). */
+  stubIdx: number[] = [];
   /** Renderer-owned GPU handle. */
   gpu: unknown = null;
   gpuEpoch = -1;
@@ -67,7 +83,7 @@ export interface SceneStats {
 class InstanceBuf {
   data = new Float32Array(INST_FLOATS * 1024);
   count = 0;
-  push(lb: number, rb: number, lt: number, rt: number, mb: number, mt: number, tb: number, tt: number, tint: number, flags: number): void {
+  push(lb: number, rb: number, lt: number, rt: number, mb: number, mt: number, tb: number, tt: number, tint: number, flags: number, gb = rb, gt = rt): void {
     if ((this.count + 1) * INST_FLOATS > this.data.length) {
       const d = new Float32Array(this.data.length * 2);
       d.set(this.data);
@@ -85,15 +101,92 @@ class InstanceBuf {
     d[o + 7] = tt;
     d[o + 8] = tint;
     d[o + 9] = flags;
-    d[o + 10] = 0;
-    d[o + 11] = 0;
+    d[o + 10] = gb;
+    d[o + 11] = gt;
     this.count++;
   }
 }
 
-type PushFn = (b: InstanceBuf, lb: number, rb: number, lt: number, rt: number, mb: number, mt: number, tb: number, tt: number, tint: number, flags: number) => void;
+type PushFn = (
+  b: InstanceBuf,
+  lb: number,
+  rb: number,
+  lt: number,
+  rt: number,
+  mb: number,
+  mt: number,
+  tb: number,
+  tt: number,
+  tint: number,
+  flags: number,
+  gb?: number,
+  gt?: number,
+) => void;
 
-const directPush: PushFn = (b, lb, rb, lt, rt, mb, mt, tb, tt, tint, flags) => b.push(lb, rb, lt, rt, mb, mt, tb, tt, tint, flags);
+const directPush: PushFn = (b, lb, rb, lt, rt, mb, mt, tb, tt, tint, flags, gb, gt) => b.push(lb, rb, lt, rt, mb, mt, tb, tt, tint, flags, gb, gt);
+
+/**
+ * Emit any node: a shaped river band (one trapezoid per sample segment, with
+ * green / gray / ghost lanes) or a rectangular synthetic band.
+ */
+/**
+ * The tint slot carries the node's tree depth too (integer part): the renderer
+ * uses it as a depth-buffer level so nested bands occlude their ancestors.
+ */
+export const DEPTH_LEVELS = 4000;
+function depthTint(n: LNode): number {
+  return (n.depth % DEPTH_LEVELS) + n.tint * 0.999;
+}
+
+/** Chunk path: drop polyline samples whose removal moves an edge by less than this (chunk-local units). */
+const SIMPLIFY_TOL = 2e-6;
+const keep = new Uint8Array(RIVER_S);
+
+function emitNode(out: InstanceBuf, L: Layout, n: LNode, x0: number, xs: number, t0: number, ts: number, clip: PushFn | null, extra = 0): void {
+  if (!n.rv) {
+    emitBand(out, x0, xs, t0, ts, L.aliveFrac(n), n.alive, depthTint(n), clip, extra);
+    return;
+  }
+  L.ensureShape(n);
+  const push = clip ?? directPush;
+  const flags = (n.alive ? FLAG_ALIVE : 0) | (n.info.draw ?? 0) | extra;
+  const f = L.aliveFrac(n);
+  const g = L.ghostFrac(n);
+  const T = n.rv.T;
+  const o = n.rv.o;
+  const tint = depthTint(n);
+  const Ls = n.L!;
+  const Rs = n.R!;
+  keep.fill(1);
+  if (!clip && xs > 0) {
+    // Greedy polyline simplification (flat stretches of a profile need no extra trapezoids).
+    const tol = SIMPLIFY_TOL / Math.abs(xs);
+    let a = 0;
+    for (let k = 1; k < RIVER_S - 1; k++) {
+      const d = T[o + k + 1] - T[o + a];
+      const u = d > 0 ? (T[o + k] - T[o + a]) / d : 0;
+      const el = Math.abs(Ls[a] + (Ls[k + 1] - Ls[a]) * u - Ls[k]);
+      const er = Math.abs(Rs[a] + (Rs[k + 1] - Rs[a]) * u - Rs[k]);
+      if (el < tol && er < tol) keep[k] = 0;
+      else a = k;
+    }
+  }
+  let lb = x0 + xs * Ls[0];
+  let rb = x0 + xs * Rs[0];
+  let yb = t0 + ts * T[o];
+  for (let k = 1; k < RIVER_S; k++) {
+    if (!keep[k]) continue;
+    const lt = x0 + xs * Ls[k];
+    const rt = x0 + xs * Rs[k];
+    const yt = t0 + ts * T[o + k];
+    if (yt !== yb) {
+      push(out, lb, rb, lt, rt, lb + (rb - lb) * f, lt + (rt - lt) * f, yb, yt, tint, flags, rb - (rb - lb) * g, rt - (rt - lt) * g);
+    }
+    lb = lt;
+    rb = rt;
+    yb = yt;
+  }
+}
 
 /**
  * Emit a node's band as up to three trapezoids (taper-in, body, taper-out).
@@ -110,8 +203,9 @@ function emitBand(
   alive: boolean,
   tint: number,
   clip: PushFn | null,
+  extra = 0,
 ): void {
-  const flags = alive ? FLAG_ALIVE : 0;
+  const flags = (alive ? FLAG_ALIVE : 0) | extra;
   const push = clip ?? directPush;
   const xl = x0;
   const xr = x0 + xs;
@@ -132,6 +226,13 @@ function emitBand(
   }
 }
 
+/** Instance array in reverse order. */
+export function reverseInstances(src: Float32Array, count: number, out?: Float32Array<ArrayBuffer>): Float32Array<ArrayBuffer> {
+  const d = out && out.length >= count * INST_FLOATS ? out : new Float32Array(count * INST_FLOATS);
+  for (let i = 0; i < count; i++) d.set(src.subarray(i * INST_FLOATS, (i + 1) * INST_FLOATS), (count - 1 - i) * INST_FLOATS);
+  return d;
+}
+
 export class SceneBuilder {
   readonly chunks = new Map<string, Chunk>();
   maxChunks = 900;
@@ -145,6 +246,8 @@ export class SceneBuilder {
   chunkOpenArea = 32 * 32;
   readonly near = new InstanceBuf();
   nearNodes: LNode[] = [];
+  /** Nodes drawn on the near path with their screen frames (valid until the next build). */
+  nearList: { n: LNode; f: Frame }[] = [];
   draws: ChunkDraw[] = [];
   private framePool: Frame[] = [];
   private frameUsed = 0;
@@ -153,10 +256,18 @@ export class SceneBuilder {
   onEvict: ((c: Chunk) => void) | null = null;
   /** The node the last build started from (covers the viewport, or the root). */
   top: LNode | null = null;
+  /** Highlighted node (info panel open). Set through `select` so chunks rebuild. */
+  selected: LNode | null = null;
   W = 1;
   H = 1;
 
   constructor(readonly layout: Layout) {}
+
+  select(n: LNode | null): void {
+    if (n === this.selected) return;
+    this.selected = n;
+    this.layout.invalidate();
+  }
 
   private allocFrame(): Frame {
     if (this.frameUsed === this.framePool.length) this.framePool.push(frame());
@@ -168,6 +279,7 @@ export class SceneBuilder {
     this.frameUsed = 0;
     this.near.count = 0;
     this.nearNodes.length = 0;
+    this.nearList.length = 0;
     this.draws.length = 0;
     this.stats.chunksBuilt = 0;
     this.stats.instances = 0;
@@ -198,36 +310,77 @@ export class SceneBuilder {
 
   private covers(n: LNode, f: Frame): boolean {
     if (f.ox > 0 || f.ox + f.kx < this.W) return false;
+    if (n.rv) return this.riverCovers(n, f);
     const bodyBottom = f.oy - f.kt * TAPER_IN;
     if (bodyBottom < this.H) return false;
     if (n.alive) return true; // above "now" is empty for every node
     return f.oy - f.kt * (1 - TAPER_OUT) <= 0;
   }
 
+  /** Does a shaped band cover the whole viewport? (Then nothing above it in the tree is visible.) */
+  private riverCovers(n: LNode, f: Frame): boolean {
+    // Own T at the bottom and top of the screen.
+    const Tb = (f.oy - this.H) / f.kt;
+    const Tt = f.oy / f.kt;
+    if (Tb < 0) return false;
+    if (Tt > 1 && !n.alive) return false;
+    const L = this.layout;
+    const e: [number, number] = [0, 1];
+    const check = (T: number) => {
+      L.edgesAt(n, T, e);
+      return f.ox + f.kx * e[0] <= 0 && f.ox + f.kx * e[1] >= this.W;
+    };
+    const hi = Math.min(1, Tt);
+    if (!check(Tb) || !check(hi)) return false;
+    const Ts = n.rv!.T;
+    const o = n.rv!.o;
+    for (let k = 0; k < RIVER_S; k++) {
+      const t = Ts[o + k];
+      if (t > Tb && t < hi && !check(t)) return false;
+    }
+    return true;
+  }
+
   private offscreen(f: Frame): boolean {
     return f.ox > this.W || f.ox + f.kx < 0 || f.oy < 0 || f.oy - f.kt > this.H;
   }
 
-  private tooSmall(f: Frame): boolean {
-    return f.kt < this.minPx || f.kx < this.minPx * 0.25 || f.kx * f.kt < this.minPx * this.minPx * 2;
+  private tooSmall(f: Frame, n?: LNode): boolean {
+    const kx = n?.rv ? f.kx * this.wmax(n) : f.kx;
+    return f.kt < this.minPx || kx < this.minPx * 0.25 || kx * f.kt < this.minPx * this.minPx * 2;
   }
 
-  private worthOpening(f: Frame): boolean {
+  private wmax(n: LNode): number {
+    this.layout.ensureShape(n);
+    return n.wmax;
+  }
+
+  private worthOpening(f: Frame, n?: LNode): boolean {
+    if (n?.rv) {
+      // River bands are tall, thin and wander sideways: judge by the band's real width, not its frame.
+      const kx = f.kx * this.wmax(n);
+      return kx >= RIVER_OPEN_MIN_W && kx * f.kt >= this.chunkOpenArea;
+    }
     return f.kx * f.kt >= this.chunkOpenArea;
   }
 
   private visitNear(n: LNode, f: Frame): void {
-    if (this.offscreen(f) || this.tooSmall(f)) return;
+    if (this.offscreen(f) || this.tooSmall(f, n)) return;
     const L = this.layout;
     const small = n.chunkRoot && f.kx <= GPU_MAX_PX && f.kt <= GPU_MAX_PX;
-    if (small && this.worthOpening(f)) {
+    if (small && this.worthOpening(f, n)) {
       this.drawChunk(n, f);
       return;
     }
     const before = this.near.count;
-    emitBand(this.near, f.ox, f.kx, f.oy, -f.kt, L.aliveFrac(n), n.alive, n.tint, this.clipPush);
+    emitNode(this.near, L, n, f.ox, f.kx, f.oy, -f.kt, this.clipPush, n === this.selected ? FLAG_SELECTED : 0);
     for (let i = before; i < this.near.count; i++) this.nearNodes.push(n);
+    this.nearList.push({ n, f });
     if (small) return; // too small to open: drawn as a flat band
+    if (this.isPending(n)) {
+      if (f.kx >= STUB_REQUEST_PX && f.kt >= STUB_REQUEST_PX) L.source.request?.(n.src as never);
+      return;
+    }
     const kids = L.children(n);
     for (const c of kids) {
       const fc = toChild(this.allocFrame(), f, L.x0(c), L.xs(c), c.t0, c.ts);
@@ -236,7 +389,11 @@ export class SceneBuilder {
   }
 
   /** Clip a screen-space trapezoid vertically to the viewport, in float64. */
-  private clipPush: PushFn = (b, lb, rb, lt, rt, mb, mt, yb, yt, tint, flags) => {
+  private isPending(n: LNode): boolean {
+    return !n.kids && ((n.info.draw ?? 0) & DRAW_STUB) !== 0 && !!this.layout.source.pending?.(n.src as never);
+  }
+
+  private clipPush: PushFn = (b, lb, rb, lt, rt, mb, mt, yb, yt, tint, flags, gb = rb, gt = rt) => {
     // yb is the bottom (larger y), yt the top.
     const lo = -CLIP_MARGIN;
     const hi = this.H + CLIP_MARGIN;
@@ -246,6 +403,7 @@ export class SceneBuilder {
       lb += (lt - lb) * u;
       rb += (rt - rb) * u;
       mb += (mt - mb) * u;
+      gb += (gt - gb) * u;
       yb = hi;
     }
     if (yt < lo) {
@@ -253,6 +411,7 @@ export class SceneBuilder {
       lt = lb + (lt - lb) * u;
       rt = rb + (rt - rb) * u;
       mt = mb + (mt - mb) * u;
+      gt = gb + (gt - gb) * u;
       yt = lo;
     }
     const xlo = -CLIP_MARGIN;
@@ -264,17 +423,30 @@ export class SceneBuilder {
     if (rb > xhi && rt > xhi) rb = rt = xhi + 1;
     if (mb < xlo && mt < xlo) mb = mt = xlo - 1;
     if (mb > xhi && mt > xhi) mb = mt = xhi + 1;
-    b.push(lb, rb, lt, rt, mb, mt, yb, yt, tint, flags);
+    if (gb < xlo && gt < xlo) gb = gt = xlo - 1;
+    if (gb > xhi && gt > xhi) gb = gt = xhi + 1;
+    b.push(lb, rb, lt, rt, mb, mt, yb, yt, tint, flags, gb, gt);
   };
 
   private drawChunk(root: LNode, f: Frame): void {
     const c = this.getChunk(root);
     this.draws.push({ chunk: c, f });
+    if (c.stubIdx.length && this.layout.source.request) {
+      const fs = this.allocFrame();
+      for (const i of c.stubIdx) {
+        const r = c.rel;
+        toChild(fs, f, r[i * 4], r[i * 4 + 1], r[i * 4 + 2], r[i * 4 + 3]);
+        if (fs.kx >= STUB_REQUEST_PX && fs.kt >= STUB_REQUEST_PX && !this.offscreen(fs)) {
+          this.layout.source.request(c.nodes[i].src as never);
+        }
+      }
+      this.frameUsed--;
+    }
     const br = c.brel;
     for (let i = 0; i < c.boundary.length; i++) {
       const o = i * 4;
       const fb = toChild(this.allocFrame(), f, br[o], br[o + 1], br[o + 2], br[o + 3]);
-      if (this.offscreen(fb) || this.tooSmall(fb) || !this.worthOpening(fb)) {
+      if (this.offscreen(fb) || this.tooSmall(fb, c.boundary[i]) || !this.worthOpening(fb, c.boundary[i])) {
         this.frameUsed--;
         continue;
       }
@@ -292,7 +464,13 @@ export class SceneBuilder {
       this.chunks.set(root.id, c);
     }
     c.lastUsed = this.frameNo;
-    if (c.epoch !== this.layout.mixEpoch) this.buildChunk(c);
+    const L = this.layout;
+    if (c.epoch !== L.geomEpoch) this.buildChunk(c);
+    else if (c.dataEpoch !== L.dataEpoch) {
+      // New tiles: only chunks whose stubs just got children need rebuilding.
+      if (c.stubIdx.some((i) => !L.source.pending?.(c.nodes[i].src as never))) this.buildChunk(c);
+      c.dataEpoch = L.dataEpoch;
+    }
     return c;
   }
 
@@ -304,13 +482,17 @@ export class SceneBuilder {
     const proxyFirst: number[] = [];
     const boundary: LNode[] = [];
     const brel: number[] = [];
+    const rel: number[] = [];
+    const stubIdx: number[] = [];
     // Iterative preorder DFS (parents before children = painter's order).
     const stack: { n: LNode; x0: number; xs: number; t0: number; ts: number }[] = [{ n: c.root, x0: 0, xs: 1, t0: 0, ts: 1 }];
     while (stack.length) {
       const e = stack.pop()!;
+      if (this.isPending(e.n)) stubIdx.push(nodes.length);
       nodes.push(e.n);
       first.push(buf.count);
-      emitBand(buf, e.x0, e.xs, e.t0, e.ts, L.aliveFrac(e.n), e.n.alive, e.n.tint, null);
+      rel.push(e.x0, e.xs, e.t0, e.ts);
+      emitNode(buf, L, e.n, e.x0, e.xs, e.t0, e.ts, null, e.n === this.selected ? FLAG_SELECTED : 0);
       const kids = L.children(e.n);
       for (let i = kids.length - 1; i >= 0; i--) {
         const k = kids[i];
@@ -322,7 +504,7 @@ export class SceneBuilder {
           boundary.push(k);
           brel.push(x0, xs, t0, ts);
           proxyFirst.push(buf.count);
-          emitBand(buf, x0, xs, t0, ts, L.aliveFrac(k), k.alive, k.tint, null);
+          emitNode(buf, L, k, x0, xs, t0, ts, null, k === this.selected ? FLAG_SELECTED : 0);
         } else {
           stack.push({ n: k, x0, xs, t0, ts });
         }
@@ -330,8 +512,11 @@ export class SceneBuilder {
     }
     c.nodes = nodes;
     c.nodeFirst = first;
+    c.rel = new Float64Array(rel);
+    c.stubIdx = stubIdx;
     c.proxyFirst = proxyFirst.reverse();
     c.data = buf.data.slice(0, buf.count * INST_FLOATS);
+    c.rev = reverseInstances(c.data, buf.count);
     c.count = buf.count;
     // Boundary order: reverse of push order so child chunks draw left to right.
     c.boundary = boundary.reverse();
@@ -344,7 +529,9 @@ export class SceneBuilder {
       b[i * 4 + 3] = brel[src + 3];
     }
     c.brel = b;
-    c.epoch = L.mixEpoch;
+    c.epoch = L.geomEpoch;
+    c.dataEpoch = L.dataEpoch;
+    c.version++;
     this.stats.chunksBuilt++;
   }
 

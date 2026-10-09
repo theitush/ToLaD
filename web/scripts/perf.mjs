@@ -12,13 +12,17 @@
 // as a CPU-side stress test; real-device testing is still required.
 
 import { spawn } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { chromium } from 'playwright';
 
 const PORT = 4179;
 const OUT = process.env.PERF_OUT || 'perf-out';
 const THROTTLE = Number(process.env.PERF_THROTTLE || 4);
+/** PERF_SYNTH=1: the spike's synthetic 1000-level dives instead of the mammal data. */
+const SYNTH = !!process.env.PERF_SYNTH;
 mkdirSync(OUT, { recursive: true });
 
 const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', 'preview', '--port', String(PORT), '--strictPort'], {
@@ -47,16 +51,16 @@ try {
   page.on('pageerror', (e) => errors.push(String(e)));
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
   const cdp = await context.newCDPSession(page);
-  await page.goto(`http://localhost:${PORT}/?debug`);
-  await page.waitForFunction(() => !!window.__tolad);
-  await sleep(500);
+  await page.goto(`http://localhost:${PORT}/${SYNTH ? '?synthetic&debug' : ''}`);
+  await page.waitForFunction(() => !!window.__tolad, null, { timeout: 20000 });
+  await sleep(SYNTH ? 500 : 2500);
   const glInfo = await page.evaluate(() => {
     const gl = document.createElement('canvas').getContext('webgl2');
     const ext = gl && gl.getExtension('WEBGL_debug_renderer_info');
     return gl ? (ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)) : 'no webgl2';
   });
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: THROTTLE });
-  await page.screenshot({ path: `${OUT}/0-root.png` });
+  await page.screenshot({ timeout: 120000, path: `${OUT}/0-${SYNTH ? 'root' : 'opening'}.png` });
 
   const W = 390;
   const H = 844;
@@ -128,43 +132,107 @@ try {
     );
   }
 
-  await phase('pinch+pan at root', async () => {
-    for (let i = 0; i < 3; i++) {
-      await pinch(W / 2, H * 0.55, 80, 300);
-      await pan(200, 600, 140, 420);
-    }
-  });
-  await page.screenshot({ path: `${OUT}/1-shallow.png` });
+  if (SYNTH) {
+    await phase('pinch+pan at root', async () => {
+      for (let i = 0; i < 3; i++) {
+        await pinch(W / 2, H * 0.55, 80, 300);
+        await pan(200, 600, 140, 420);
+      }
+    });
+    await page.screenshot({ timeout: 120000, path: `${OUT}/1-shallow.png` });
 
-  await phase('animated dive 0 -> ~60', async () => {
-    await page.evaluate(() => window.__tolad.diveAnimated(60, 11));
-  });
-  await page.screenshot({ path: `${OUT}/2-depth60.png` });
+    await phase('animated dive 0 -> ~60', async () => {
+      await page.evaluate(() => window.__tolad.diveAnimated(60, 11));
+    });
+    await page.screenshot({ timeout: 120000, path: `${OUT}/2-depth60.png` });
 
-  await page.evaluate(() => window.__tolad.diveInstant(940, 12));
-  await sleep(300);
+    await page.evaluate(() => window.__tolad.diveInstant(940, 12));
+    await sleep(300);
 
-  await phase('pinch+pan at ~1000 levels', async () => {
-    for (let i = 0; i < 4; i++) {
-      await pinch(W / 2, H / 2, 80, 280);
-      await pan(250, 500, 150, 380);
-      await pinch(W / 2, H / 2, 260, 120);
-    }
-  });
-  await page.screenshot({ path: `${OUT}/3-depth1000.png` });
+    await phase('pinch+pan at ~1000 levels', async () => {
+      for (let i = 0; i < 4; i++) {
+        await pinch(W / 2, H / 2, 80, 280);
+        await pan(250, 500, 150, 380);
+        await pinch(W / 2, H / 2, 260, 120);
+      }
+    });
+    await page.screenshot({ timeout: 120000, path: `${OUT}/3-depth1000.png` });
 
-  await phase('animated dive ~1000 -> ~1060', async () => {
-    await page.evaluate(() => window.__tolad.diveAnimated(60, 13));
-  });
-  await page.screenshot({ path: `${OUT}/4-depth1060.png` });
+    await phase('animated dive ~1000 -> ~1060', async () => {
+      await page.evaluate(() => window.__tolad.diveAnimated(60, 13));
+    });
+    await page.screenshot({ timeout: 120000, path: `${OUT}/4-depth1060.png` });
 
-  await phase('log/linear toggle + pinch deep', async () => {
-    await page.evaluate(() => window.__tolad.setMode(1));
-    await sleep(900);
-    await pinch(W / 2, H / 2, 100, 260);
+    await phase('log/linear toggle + pinch deep', async () => {
+      await page.evaluate(() => window.__tolad.setMode(1));
+      await sleep(900);
+      await pinch(W / 2, H / 2, 100, 260);
+      await page.evaluate(() => window.__tolad.setMode(0));
+      await sleep(900);
+    });
+  } else {
+    const fly = async (name, file) => {
+      const ok = await page.evaluate((n) => window.__toladApp.flyToName(n), name);
+      if (!ok) errors.push(`flyToName(${name}) failed`);
+      await sleep(2200);
+      await page.screenshot({ timeout: 120000, path: `${OUT}/${file}` });
+    };
+    await phase('pinch+pan at root (Mammalia)', async () => {
+      for (let i = 0; i < 3; i++) {
+        await pinch(W / 2, H * 0.55, 80, 300);
+        await pan(200, 600, 140, 420);
+      }
+    });
+    await page.screenshot({ timeout: 120000, path: `${OUT}/1-after-pinch.png` });
+    await phase('fly to Primates', () => fly('Primates', '2-primates.png'));
+    await phase('pinch+pan in Primates', async () => {
+      for (let i = 0; i < 2; i++) {
+        await pinch(W / 2, H * 0.4, 80, 300);
+        await pan(200, 300, 160, 500);
+        await pinch(W / 2, H * 0.4, 260, 110);
+      }
+    });
+    await fly('Homo sapiens', '3-homo-sapiens.png');
+    await fly('Mammuthus', '4-mammuthus.png');
+    await page.evaluate(() => window.__tolad.resetView());
+    await sleep(1600);
+    await page.screenshot({ timeout: 120000, path: `${OUT}/5-root-linear.png` });
+    await phase('log/linear toggle at root', async () => {
+      await page.evaluate(() => window.__tolad.setMode(1));
+      await sleep(1000);
+    });
+    await page.screenshot({ timeout: 120000, path: `${OUT}/6-root-log.png` });
+    await fly('Primates', '7-primates-log.png');
     await page.evaluate(() => window.__tolad.setMode(0));
-    await sleep(900);
-  });
+    await page.evaluate(() => window.__tolad.resetView());
+    await sleep(1600);
+    await phase('animated dive root -> leaf', async () => {
+      await page.evaluate(() => window.__tolad.diveAnimated(60, 11));
+    });
+    await page.screenshot({ timeout: 120000, path: `${OUT}/8-dive-leaf.png` });
+    const tiles = await page.evaluate(() => [...window.__toladApp.source.files.keys()]);
+    console.log(`tiles loaded: ${tiles.length - 1} of 15`);
+  }
+
+  // Single-file build from file:// with all network blocked.
+  const single = resolve('dist-single/index.html');
+  if (!SYNTH && existsSync(single)) {
+    const p2 = await context.newPage();
+    const blocked = [];
+    await p2.route(/^(https?|wss?):/, (r) => {
+      blocked.push(r.request().url());
+      return r.abort();
+    });
+    p2.on('pageerror', (e) => errors.push('single: ' + String(e)));
+    await p2.goto(pathToFileURL(single).href);
+    await p2.waitForFunction(() => !!window.__tolad, null, { timeout: 20000 });
+    await sleep(2500);
+    const labels = await p2.evaluate(() => window.__tolad.labels?.count ?? 0);
+    await p2.screenshot({ timeout: 120000, path: `${OUT}/9-single-file.png` });
+    console.log(`single-file from file://: ok, ${labels} labels, ${blocked.length} network requests blocked`);
+    if (blocked.length) errors.push('single-file made network requests: ' + blocked.join(', '));
+    await p2.close();
+  }
 
   const summary = { date: new Date().toISOString(), renderer: glInfo, throttle: THROTTLE, viewport: '390x844@3 (backing store capped at DPR 2)', phases, errors };
   writeFileSync(`${OUT}/perf.json`, JSON.stringify(summary, null, 2));

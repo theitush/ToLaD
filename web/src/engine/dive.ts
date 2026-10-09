@@ -24,6 +24,8 @@ export class DiveDriver {
   fill = 0.8;
   /** Prefer surviving lineages (so the green "now" rim stays in view). */
   preferAlive = false;
+  /** Reached a leaf (finite real data): no deeper level to dive into. */
+  done = false;
 
   constructor(
     readonly cam: Camera,
@@ -42,6 +44,10 @@ export class DiveDriver {
     let wantT = (this.fill * cam.H) / F.kt;
     if (Math.abs(Math.log(wantX)) < 0.05 && Math.abs(Math.log(wantT)) < 0.05) {
       let kids = this.layout.children(this.target);
+      if (kids.length === 0) {
+        this.done = true;
+        return { dx: 0, dy: 0, px: cam.W / 2, py: cam.H / 2, fx: 1, ft: 1 };
+      }
       if (this.preferAlive && kids.some((k) => k.alive)) kids = kids.filter((k) => k.alive);
       this.target = kids[hash3(this.seed, this.target.depth, 7) % kids.length];
       this.levels++;

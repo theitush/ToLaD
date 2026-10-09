@@ -33,6 +33,48 @@ export interface NodeInfo {
   log10N: number;
   /** log10 of individuals alive now; -Infinity if extinct (presentation only). */
   log10A: number;
+  /**
+   * Real data only: a shaped band whose width varies along time (births-rate
+   * river). When present, `weight`, `start` and `end` are ignored.
+   */
+  river?: RiverPlacement;
+  /** Real data only: band start (oldest) and end ages in Ma, for the time axis. */
+  age0?: number;
+  age1?: number;
+  /** Drawing flags (DRAW_* bits). */
+  draw?: number;
+}
+
+/** Draw flag: topology from taxonomy (PBDB graft / created group), not a phylogeny. */
+export const DRAW_TAXONOMIC = 4;
+/** Draw flag: children live in a tile that is not loaded yet. */
+export const DRAW_STUB = 16;
+
+/**
+ * Placement of a shaped band, as S samples along its own time axis. Sample k
+ * of this node sits in its parent's polyline segment seg[o+k] at weight w[o+k];
+ * its left edge is at offset off*[o+k] and its width w*[o+k], both as fractions
+ * of the parent band's width at that time. The mode mix interpolates Lin/Log.
+ */
+export interface RiverPlacement {
+  o: number;
+  T: Float64Array;
+  seg: Uint8Array;
+  w: Float64Array;
+  offLin: Float64Array;
+  wLin: Float64Array;
+  offLog: Float64Array;
+  wLog: Float64Array;
+  /** Time placement in the parent frame. */
+  t0: number;
+  ts: number;
+  /** Green and ghost lane fractions per width mode. */
+  fLin: number;
+  fLog: number;
+  gLin: number;
+  gLog: number;
+  /** Placed relative to a unit band [0,1] (the root), not to a parent polyline. */
+  root: boolean;
 }
 
 /** The only interface the engine needs from a data source. */
@@ -41,6 +83,10 @@ export interface TreeSource<N> {
   /** Children, ordered left to right. Must be deterministic and depend only on `node`. */
   children(node: N): N[];
   info(node: N): NodeInfo;
+  /** True while the node's children exist but are not loaded yet (do not cache the empty list). */
+  pending?(node: N): boolean;
+  /** Ask for a pending node's children to be loaded (it is on screen and large). */
+  request?(node: N): void;
 }
 
 export interface SynthNode {
