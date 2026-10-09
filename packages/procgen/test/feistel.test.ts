@@ -17,11 +17,8 @@ describe('Feistel permutation is a bijection on [0, domain)', () => {
       const seen = new Uint8Array(d);
       for (let x = 0; x < d; x++) {
         const y = p.forward(x);
-        expect(y).toBeGreaterThanOrEqual(0);
-        expect(y).toBeLessThan(d);
-        expect(seen[y]).toBe(0);
+        if (!(y >= 0 && y < d) || seen[y] || p.inverse(y) !== x) throw new Error(`domain ${d}: bad at x=${x}`);
         seen[y] = 1;
-        expect(p.inverse(y)).toBe(x);
       }
     }
   });

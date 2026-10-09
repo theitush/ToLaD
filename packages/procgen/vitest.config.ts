@@ -3,8 +3,11 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
+    // exhaustive property tests are CPU-bound; leave headroom on loaded machines
+    testTimeout: 60_000,
     projects: [
       {
+        extends: true,
         test: {
           name: 'node',
           environment: 'node',
@@ -13,6 +16,7 @@ export default defineConfig({
         },
       },
       {
+        extends: true,
         test: {
           name: 'browser',
           include: ['test/**/*.test.ts'],
