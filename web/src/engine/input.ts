@@ -10,6 +10,8 @@ export interface InputHandlers {
   /** Release velocity: px/ms for pan, log-zoom/ms for zoom, about (px, py). */
   fling(vx: number, vy: number, vz: number, px: number, py: number): void;
   doubleTap(x: number, y: number): void;
+  /** Optional: a single tap (also fires before the second tap of a double-tap). */
+  tap?(x: number, y: number): void;
 }
 
 interface Sample {
@@ -142,6 +144,7 @@ export class Input {
         return;
       }
       this.lastTap = { t: e.timeStamp, x: p.x, y: p.y };
+      this.h.tap?.(p.x, p.y);
     }
     // Fling from the last ~80 ms of movement, if the pointer was still moving.
     const now = e.timeStamp;
