@@ -6,3 +6,8 @@ dist/
 # large downloaded/derived datasets
 data/raw/
 data/build/
+
+# python
+__pycache__/
+*.pyc
+pipeline/.venv/
