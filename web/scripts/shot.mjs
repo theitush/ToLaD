@@ -1,6 +1,6 @@
 // Quick look: serve dist/ and screenshot the opening view plus named clades.
 //   npm run build && node scripts/shot.mjs [out-dir]
-//   NAMES="Primates,Mammuthus" DPR=2 Q="?debug" LOG=1 node scripts/shot.mjs
+//   NAMES="Primates,Mammuthus" DPR=2 Q="?river&debug" LOG=1 node scripts/shot.mjs
 import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -17,7 +17,7 @@ try {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: Number(process.env.DPR || 2), isMobile: true, hasTouch: true });
   const page = await ctx.newPage();
   page.on('pageerror', (e) => console.log('pageerror', String(e)));
-  await page.goto(`http://localhost:${PORT}/${process.env.Q || ''}`);
+  await page.goto(`http://localhost:${PORT}/${process.env.Q || '?river'}`);
   await page.waitForFunction(() => !!window.__tolad, null, { timeout: 20000 });
   await sleep(2500);
   // Headless SwiftShader can stall frame production for several seconds once after

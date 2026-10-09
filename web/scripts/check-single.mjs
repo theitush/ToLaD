@@ -20,7 +20,7 @@ try {
     return r.abort();
   });
   page.on('pageerror', (e) => errors.push(String(e)));
-  await page.goto(pathToFileURL(resolve('dist-single/index.html')).href);
+  await page.goto(pathToFileURL(resolve('dist-single/index.html')).href + '?river');
   await page.waitForFunction(() => !!window.__tolad, null, { timeout: 30000 });
   await sleep(3000);
   const r = await page.evaluate(() => ({ labels: window.__tolad.labels?.count ?? 0, tiles: window.__toladApp.source.files.size - 1, inst: window.__tolad.info().instances }));
