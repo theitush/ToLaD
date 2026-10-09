@@ -1,6 +1,36 @@
 # ToLaD web
 
-The app now shows the real mammal dataset (`../data/mammals`, format v1) as a births-rate
+## Main view: the Panthera fan (`src/fan/`)
+
+The default page is a OneZoom-style fan of one polytomy, the big cats (Panthera), with
+real numbers from `data/mammals` (tile 10, hard-coded in `panthera.ts`). The rules:
+width = individuals, green = alive, gray = dead, height = time.
+
+- **Height = time** on a log years-before-present axis (`TimeScale`, offset 1 kyr so
+  the last ~10 kyr are not squashed): the fork is Panthera's origin, living species reach
+  the "now" line, extinct ones stop at their last appearance.
+- **Width** at any height = the individuals whose strands pass through it (not yet dead),
+  as log or linear sibling shares. A branch is everyone ever at its base and thins as dead
+  strands peel off; at the tip only the living remain. The stem is drawn as its children's
+  strands side by side, so each green lane runs unbroken from now to the root (1 px floor).
+- **Individuals** (`twigs.ts`): zoomed in, a branch resolves into its procgen individuals
+  (`packages/procgen`; `speciesModel` builds a constant-size model from ever, alive, span
+  and generation length). Each is a vertical twig from birth to death; a generation splits
+  the branch width equally in index order; links to both parents converge on each twig's
+  base. Only visible generations and index ranges are generated. LOD: lanes, twigs, links,
+  handles. Tap a branch for the species card, a twig for the `lion#…` card.
+- `node scripts/fanshot.mjs [out] [prefix]` screenshots `dist-single` at 390×844
+  (`STEPS_FILE` = JSON list of `[name, js]` steps run against `window.__fan`).
+
+Known limit: with log time, generations near "now" are far taller than one individual is
+wide, so there you see parallel twigs (green ones reaching now) and the parent links span
+several screens; the braid reads best around 0.3–3 Mya.
+
+The time river is still there at `?river`.
+
+## Time river (`?river`)
+
+The river shows the real mammal dataset (`../data/mammals`, format v1) as a births-rate
 time river; `?synthetic` brings back the spike's infinite synthetic tree.
 
 - `src/data/`: `river.ts` decodes a `.tld` file and lays it out (pure, runs in the data

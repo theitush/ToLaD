@@ -513,7 +513,7 @@ export function fmtInt(n: number): string {
 }
 
 export function formatYearsAgo(y: number): string {
-  if (y < 1) return 'now';
+  if (y < 1) return 'under a year ago';
   if (y < 1e4) return `${fmtInt(y)} years ago`;
   if (y < 999500) return `${(y / 1e3).toFixed(y < 1e5 ? 1 : 0)} thousand years ago`;
   return `${(y / 1e6).toFixed(2)} million years ago`;

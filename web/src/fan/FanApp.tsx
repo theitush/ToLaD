@@ -61,7 +61,7 @@ export function FanApp() {
         <div className="legend">
           <span className="dot alive" /> alive <span className="dot dead" /> dead
           <br />
-          width = individuals ever lived · tap or zoom a leaf
+          width = individuals ever lived · tap or zoom a branch
         </div>
       )}
     </div>
