@@ -161,7 +161,7 @@ class Segments(unittest.TestCase):
         hist = json.loads(dbg.read_text())["history"]
         for h in hist:
             s = st["species"][h["species"]]
-            if s["use"] != "counts" or s["component"] != "wild":
+            if s["use"] != "counts" or s["component"] != "wild" or s["domestic_on_leaf"]:
                 continue
             seg = h["segments"][-1]
             alive_seg = seg["end"] * h["L"] / h["G"]
@@ -193,12 +193,25 @@ class Baseline(unittest.TestCase):
                 continue
             if b["n"] > 2 * s["alive_after"]:
                 n += 1
-                self.assertGreater(s["ever_after"], s["ever_before"], sp)
+                if b["n"] > 2 * s["alive_before"]:  # baseline above the model's count: ever rises
+                    self.assertGreater(s["ever_after"], s["ever_before"], sp)
                 # ever scales with the deep-past level: baseline / today's model count
                 want = b["n"] / s["alive_before"]
                 self.assertAlmostEqual(math.log10(s["ever_after"] / s["ever_before"]), math.log10(want),
                                        delta=0.15, msg=sp)
         self.assertGreaterEqual(n, 10)
+
+    def test_no_baseline_keeps_todays_level(self):
+        """Without a baseline the deep past runs at today's level, so a recorded
+        bottleneck is not held back over the whole band."""
+        st = _stats()
+        if st is None:
+            self.skipTest("no build output")
+        for sp, s in st["species"].items():
+            if s["use"] != "counts" or s["component"] != "wild" or s["baseline"] or s["domestic_on_leaf"]:
+                continue
+            self.assertAlmostEqual(math.log10(s["ever_after"] / s["ever_before"]),
+                                   math.log10(s["alive_after"] / s["alive_before"]), delta=0.1, msg=sp)
 
 
 if __name__ == "__main__":

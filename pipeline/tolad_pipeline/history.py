@@ -27,7 +27,7 @@ import tomllib
 import zipfile
 from pathlib import Path
 
-from .anchors import NOW_YEAR, year_to_ma
+from .anchors import DOMESTIC_ALIASES, NOW_YEAR, year_to_ma
 
 HIST_DIR = Path(__file__).resolve().parents[1] / "history"
 
@@ -224,15 +224,16 @@ def mean_loglinear(n0: float, n1: float) -> float:
 
 
 def curve_pieces(pts: list[dict], L: float, t0_ma: float, end_year: float = NOW_YEAR,
-                 step: float = STEP_YR) -> list[tuple[float, float, float]]:
-    """Births pieces [(old_Ma, young_Ma, births/yr)] for a curve: the first
-    point's level held from the band start t0, then the curve in steps of at
-    most `step` years (each piece = the exact mean of the log-linear curve
-    over it), then the last level held to end_year."""
+                 step: float = STEP_YR, pre_level: float | None = None) -> list[tuple[float, float, float]]:
+    """Births pieces [(old_Ma, young_Ma, births/yr)] for a curve: a level held
+    from the band start t0 to the first point (the first point's own level, or
+    `pre_level` if given), then the curve in steps of at most `step` years
+    (each piece = the exact mean of the log-linear curve over it), then the
+    last level held to end_year."""
     y_first = pts[0]["year"]
     out = []
     if year_to_ma(y_first) < t0_ma:
-        out.append((t0_ma, year_to_ma(y_first), pts[0]["n"] / L))
+        out.append((t0_ma, year_to_ma(y_first), (pts[0]["n"] if pre_level is None else pre_level) / L))
     knots = [p["year"] for p in pts] + ([end_year] if end_year > pts[-1]["year"] else [])
     for ya, yb in zip(knots, knots[1:]):
         if ya < year_to_ma_inv(t0_ma):
@@ -260,13 +261,32 @@ def pieces_births(pieces) -> float:
 
 
 def compile_segments(pts: list[dict], G: float, L: float, t0_ma: float, has_baseline: bool,
-                     end_year: float = NOW_YEAR) -> list[dict]:
+                     end_year: float = NOW_YEAR, pre_level: float | None = None,
+                     pre_grade: int = 3) -> list[dict]:
+    """Curve -> procgen segments (see _segments). With `pre_level`, the span
+    from the band start to the first point is one segment held at that level
+    (kind `model`: no baseline is known, so the model's level stands), and the
+    curve's segments follow it, with a step at the first point."""
+    if pre_level is None:
+        return _segments(pts, G, L, t0_ma, has_baseline, end_year)
+    segs = _segments(pts, G, L, year_to_ma(pts[0]["year"]), has_baseline, end_year)
+    g_curve = round(segs[0]["gens"] + sum(s["gens"] for s in segs[1:]))
+    g_start = round((end_year - year_to_ma_inv(t0_ma)) / G)
+    if g_start > g_curve:
+        bpg = G / L
+        segs.insert(0, {"year0": end_year - g_start * G, "gens": g_start - g_curve, "start": pre_level * bpg,
+                        "end": pre_level * bpg, "grade": pre_grade, "kind": K["model"]})
+    return segs
+
+
+def _segments(pts: list[dict], G: float, L: float, t0_ma: float, has_baseline: bool,
+              end_year: float = NOW_YEAR) -> list[dict]:
     """Curve -> procgen segments, oldest first, contiguous, ending at end_year.
 
     births per generation = N(t) * G / L. Knots sit on whole generations
-    counted back from end_year: the band start (t0), each point snapped to its
-    nearest generation, and now. The level at a knot is the curve's value at
-    that generation's year, so segments join without jumps. A span whose level
+    counted back from end_year: the band start (t0), the two generation
+    boundaries around each point, and now. Each knot carries the curve's value
+    at its year, so segments join without jumps. A span whose level
     changes by more than SPLIT_RATIO is split evenly in time (= evenly in log
     level, the curve being log-linear there) into sub-spans of at most
     SUB_RATIO, as far as whole generations allow."""
@@ -279,25 +299,23 @@ def compile_segments(pts: list[dict], G: float, L: float, t0_ma: float, has_base
     def year_of(g: int) -> float:
         return end_year - g * G
 
-    g_start = max(snap(start_year), snap(pts[0]["year"]), 1)
-    # base knots: band start, each point at its snapped generation (carrying the point's
-    # own level, the later point winning if two share a generation), and now
-    lev = {g_start: pts[0]["n"], 0: pts[-1]["n"]}
+    g_start = max(snap(start_year), math.ceil((end_year - pts[0]["year"]) / G - 1e-9), 1)
+    # base knots: band start, now, and the two generation boundaries around each point
+    base = {0, g_start}
     for p in pts:
-        g = min(snap(p["year"]), g_start)
-        if g != 0 or p is pts[-1]:
-            lev[g] = p["n"]
-    base = sorted(lev, reverse=True)
+        x = (end_year - p["year"]) / G
+        base |= {min(max(math.floor(x + 1e-9), 0), g_start), min(max(math.ceil(x - 1e-9), 0), g_start)}
+    base = sorted(base, reverse=True)
+    lev = {g: interp(pts, year_of(g)) for g in base}
+    # between base knots the curve is one log-linear piece: split big changes
     for ga, gb in zip(base, base[1:]):
-        la, lb = lev[ga], lev[gb]
-        ratio = max(la, lb) / min(la, lb)
+        ratio = max(lev[ga], lev[gb]) / min(lev[ga], lev[gb])
         if ratio > SPLIT_RATIO and ga - gb >= 2:
             m = min(math.ceil(math.log(ratio) / math.log(SUB_RATIO) - 1e-9), ga - gb)
             for j in range(1, m):
                 g = round(ga - (ga - gb) * j / m)
-                if ga > g > gb and g not in lev:  # log-linear between the two base levels
-                    f = (ga - g) / (ga - gb)
-                    lev[g] = math.exp(math.log(la) * (1 - f) + math.log(lb) * f)
+                if ga > g > gb:
+                    lev[g] = interp(pts, year_of(g))
     knots = sorted(lev, reverse=True)
 
     def level(g: int) -> float:
@@ -335,14 +353,17 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
     recs = load_all() if recs is None else recs
     leaves = {}
     for n in root.preorder():
-        if n.is_leaf and n.name and not n.extinct:
-            leaves.setdefault(n.name, n)
+        if n.is_leaf and n.name and (not n.extinct or n.name not in leaves):
+            leaves[n.name] = n if not n.extinct else leaves.get(n.name, n)
     fao_items = {r["faostat_item"] for r in recs if r["faostat_item"] is not None}
     series = faostat_series(raw, fao_items) if fao_items else {}
     report = {}
     missing = []
     for rec in recs:
-        leaf = next((leaves[c] for c in [rec["species"]] + rec["aliases"] if c in leaves), None)
+        cands = [rec["species"]] + rec["aliases"] + DOMESTIC_ALIASES.get(rec["species"], [])
+        # a domestic form may sit on a leaf flagged extinct in the wild (dromedary)
+        leaf = next((leaves[c] for c in cands
+                     if c in leaves and (not leaves[c].extinct or rec["component"] == "domestic")), None)
         if leaf is None:
             missing.append(rec["species"])
             continue
@@ -375,8 +396,10 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
         if rec["use"] == "counts" and rec["component"] == "wild":
             if D.get("domestic") and nw == len(D["pieces"]):
                 raise HistoryError(f"{rec['file']}: domestic leaf without n_wild_pieces")
-            new = curve_pieces(pts, L, leaf.t0)
             n_now = pts[-1]["n"]
+            # no baseline: the deep past keeps the level of today's count (as the model had it)
+            pre = None if rec["baseline"] else n_now
+            new = curve_pieces(pts, L, leaf.t0, pre_level=pre)
             D["pieces"] = new + D["pieces"][nw:]
             D["n_wild_pieces"] = len(new)
             D["alive"] = n_now + (D["domestic"]["stock"] if D.get("domestic") else 0.0)
@@ -395,7 +418,8 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
             D["pieces"] = D["pieces"][:nw] + early + new
             D["alive"] = D["alive"] - D["domestic"]["stock"] + pts[-1]["n"]
         if rec["use"] == "counts":
-            base = rec["baseline"] or pts[0]
+            # the deep-past level: the baseline, else today's level (wild) or the first point (domestic)
+            base = rec["baseline"] or (pts[-1] if rec["component"] == "wild" else pts[0])
             D["ever_med"] = pieces_births(D["pieces"])
             # the deep-past level sets "ever": widen the error by its range, cap the grade by its grade
             D["sd_leaf"] = math.hypot(D["sd_leaf"], _sd_of(base))
@@ -410,7 +434,10 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
         # wild: the first segment holds the baseline back to the band start; domestic and
         # humans: segments cover the curated span only (before it the model's own shape stands)
         t0_seg = leaf.t0 if rec["component"] == "wild" else year_to_ma(pts[0]["year"])
-        rec["segments"] = compile_segments(pts, G, L, t0_seg, rec["baseline"] is not None)
+        pre = (pts[-1]["n"] if rec["use"] == "counts" and rec["component"] == "wild" and not rec["baseline"]
+               else None)
+        rec["segments"] = compile_segments(pts, G, L, t0_seg, rec["baseline"] is not None, pre_level=pre,
+                                           pre_grade=min(3, D["grade_cap"]))
         report[rec["species"]] = {
             "file": rec["file"], "leaf": leaf.name, "use": rec["use"], "component": rec["component"],
             "points": len(rec["points"]), "grades": "".join(sorted({p["grade"] for p in rec["points"]})),

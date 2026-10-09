@@ -63,8 +63,11 @@ wider than 3x, D = speculative or unverified.
 also a point of the curve (at its `year`), and the build holds it constant
 before that year, back to the start of the species' band. So it raises the
 deep-past births rate and "individuals ever" (research/00-synthesis, "Recent
-population history"). Species with no decline story have no baseline, and
-the first point's level is held back instead.
+population history"). A wild species with no known baseline keeps the
+model's level (today's count) before its first point, as before this
+history existed, with a step to the curve at the first point. This keeps a
+recorded bottleneck (e.g. ~100 northern elephant seals in 1890) from being
+held back over the whole band.
 
 ## How the build uses it (`tolad_pipeline/history.py`)
 
@@ -78,8 +81,8 @@ the first point's level is held back instead.
 - **Alive now:** the latest point if it is from 2000 or later and graded A-C;
   otherwise the model's alive-now figure stays and is appended to the curve
   as a `model` point, so the curve and the green lane agree.
-- **Error and grade:** the leaf's log error is widened by the baseline's (or
-  first point's) 95% range, and its grade is capped by that point's grade,
+- **Error and grade:** the leaf's log error is widened by the baseline's
+  (without one: the latest point's) 95% range, and its grade is capped by that point's grade,
   because the deep-past level dominates "ever".
 - **Births:** births/yr = `N(t) / L`, with `L = G / 2` the census-pool
   residence time (research/02 §3.1). Before the baseline year the rate is
