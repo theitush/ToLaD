@@ -38,11 +38,13 @@ export const TIME_H = 900;
 /** Horizontal spacing of the leaves. */
 export const COL_W = 46;
 /**
- * Time axis offset (years). Height is log10(years before present + C), so the
- * last ~10 kyr are not squashed against "now": the cave lion (extinct ~12 kya)
- * and a 4.9 Myr old genus both read clearly. The axis is labelled as log.
+ * Time axis offset (years). Height is log10(years before present + C). With
+ * C = 10 years the axis resolves the last decades and centuries; it is close
+ * to the mean lifespan of the living big cats (alive·span/ever ≈ 3–5 years),
+ * which keeps the log-width taper of a living branch (the dead peeling off at
+ * a constant rate) smooth right up to "now", with no bend near the tip.
  */
-export const TIME_C = 1000;
+export const TIME_C = 10;
 
 /** Time scale for a clade of age `originMa`: years before present ↔ height fraction (0 = origin, 1 = now). */
 export class TimeScale {

@@ -36,6 +36,12 @@ export class Input {
   constructor(
     readonly el: HTMLElement,
     readonly h: InputHandlers,
+    /**
+     * Per-axis pinch: the fingers' horizontal spread zooms x, their vertical
+     * spread zooms y (a sideways pinch zooms width only, an upright one time only,
+     * a diagonal one both). Off: the pinch distance zooms both axes.
+     */
+    readonly axisPinch = false,
   ) {
     el.style.touchAction = 'none';
     el.addEventListener('pointerdown', this.onDown);
@@ -121,7 +127,14 @@ export class Input {
     const dy = c1y - c0y;
     this.moved += Math.abs(dx) + Math.abs(dy) + Math.abs(d1 - d0);
     this.h.pan(dx, dy);
-    if (s !== 1) this.h.zoom(c1x, c1y, s, s);
+    if (this.axisPinch) {
+      // An axis counts once the fingers are spread along it (> 40 px), so a
+      // sideways pinch does not also jitter the other axis.
+      const ax = (u0: number, u1: number) => (Math.abs(u0) > 40 && Math.abs(u1) > 40 ? Math.abs(u1) / Math.abs(u0) : 1);
+      const fx = ax(pa0.x - pb0.x, pa1.x - pb1.x);
+      const ft = ax(pa0.y - pb0.y, pa1.y - pb1.y);
+      if (fx !== 1 || ft !== 1) this.h.zoom(c1x, c1y, fx, ft);
+    } else if (s !== 1) this.h.zoom(c1x, c1y, s, s);
     this.sample(e.timeStamp, dx, dy, Math.log(s), c1x, c1y);
   };
 

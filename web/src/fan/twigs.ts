@@ -71,7 +71,9 @@ export interface IndInfo {
 }
 
 export interface Twig {
+  /** x at the birth height, and the fraction across the branch it keeps. */
   x: number;
+  u: number;
   /** Birth and death heights (world y; death is clamped to "now"). */
   yBirth: number;
   yDeath: number;
@@ -128,31 +130,52 @@ export class TwigModel {
     return Math.min(this.G - 1, Math.max(0, Math.floor(t / this.GL)));
   }
 
+  /** Branch width at world height y (the fan's width function, layout.ts). */
+  widthAt(y: number): number {
+    return strandAt(this.b, this.time.ageAt(y), this.mode).w;
+  }
+
   /** Branch width and left edge at the height of generation g's births (row centre). */
   row(g: number): { y: number; left: number; w: number; n: number } {
     const y = this.yOf((g + 0.5) * this.GL);
-    const w = strandAt(this.b, this.ageOf((g + 0.5) * this.GL), this.mode).w;
+    const w = this.widthAt(y);
     return { y, left: this.b.colX - w / 2, w, n: this.size(g) };
   }
 
-  /** x of individual (g, i): the centre of its equal share of the row. */
+  /** Fraction across the branch of individual (g, i): the centre of its equal share of its generation. */
+  u(g: number, i: number): number {
+    return (i + 0.5) / this.size(g);
+  }
+
+  /**
+   * x of a strand at fraction u at height y. A twig keeps its fraction of the
+   * branch, so it follows the branch's silhouette as the branch narrows: the
+   * twigs never stick out of the bundle drawn when zoomed out.
+   */
+  xAt(u: number, y: number): number {
+    return this.b.colX + (u - 0.5) * this.widthAt(y);
+  }
+
+  /** x of individual (g, i) at the height of its generation's births. */
   x(g: number, i: number): number {
     const r = this.row(g);
     return r.left + ((i + 0.5) * r.w) / r.n;
   }
 
-  /** Index range [i0, i1) of generation g whose shares overlap [x0, x1]. */
-  indexRange(g: number, x0: number, x1: number): [number, number] {
+  /** Index range [i0, i1) of generation g whose shares overlap [x0, x1] at height y (default: g's birth row). */
+  indexRange(g: number, x0: number, x1: number, y?: number): [number, number] {
     const r = this.row(g);
-    const i0 = Math.max(0, Math.floor(((x0 - r.left) / r.w) * r.n));
-    const i1 = Math.min(r.n, Math.ceil(((x1 - r.left) / r.w) * r.n));
+    const w = y === undefined ? r.w : this.widthAt(y);
+    const left = this.b.colX - w / 2;
+    const i0 = Math.max(0, Math.floor(((x0 - left) / w) * r.n));
+    const i1 = Math.min(r.n, Math.ceil(((x1 - left) / w) * r.n));
     return [i0, Math.max(i0, i1)];
   }
 
   twig(g: number, i: number): Twig {
     const a = this.sp.attributes({ generation: g, index: BigInt(i) });
     const end = Math.min(a.deathTime, this.sp.now);
-    return { x: this.x(g, i), yBirth: this.yOf(a.birthTime), yDeath: this.yOf(end), alive: a.alive };
+    return { x: this.xAt(this.u(g, i), this.yOf(a.birthTime)), u: this.u(g, i), yBirth: this.yOf(a.birthTime), yDeath: this.yOf(end), alive: a.alive };
   }
 
   alive(g: number, i: number): boolean {
@@ -164,18 +187,21 @@ export class TwigModel {
     return this.sp.parents({ generation: g, index: BigInt(i) });
   }
 
-  /** Nearest twig to a world point within `slop`, searching the generations that can reach that height. */
-  hit(wx: number, wy: number, slop: number): { g: number; i: number } | null {
+  /**
+   * Nearest twig to a world point within `slop` (x) and `slopY` (y): a finger's
+   * reach in world units per axis. Searches the generations that can reach that height.
+   */
+  hit(wx: number, wy: number, slop: number, slopY = slop): { g: number; i: number } | null {
     const gTop = this.generationAt(wy);
     let best: { g: number; i: number } | null = null;
     let bd = Infinity;
-    for (let g = gTop; g >= Math.max(0, gTop - this.span); g--) {
-      const [i0, i1] = this.indexRange(g, wx - slop, wx + slop);
+    for (let g = this.generationAt(wy - slopY); g >= Math.max(0, gTop - this.span); g--) {
+      const [i0, i1] = this.indexRange(g, wx - slop, wx + slop, wy);
       for (let i = i0; i < i1; i++) {
         const t = this.twig(g, i);
-        const dy = wy > t.yBirth ? wy - t.yBirth : wy < t.yDeath ? t.yDeath - wy : 0;
-        const d = Math.hypot(Math.abs(wx - t.x), dy);
-        if (d <= slop && d < bd) {
+        const yc = Math.min(t.yBirth, Math.max(t.yDeath, wy));
+        const d = Math.hypot((wx - this.xAt(t.u, yc)) / slop, (wy - yc) / slopY);
+        if (d <= 1 && d < bd) {
           bd = d;
           best = { g, i };
         }
@@ -205,13 +231,42 @@ export class TwigModel {
 
 // ---- drawing ------------------------------------------------------------------
 
+/** Pixels a dead twig stops short of "now", at any zoom: only the living touch it. */
+const DEAD_GAP_PX = 3;
+
+/** World y of a twig's top: its death, kept visibly below "now" if it is dead. */
+function twigTop(v: TwigView, t: Twig): number {
+  if (t.alive) return t.yDeath;
+  return Math.max(t.yDeath, v.yNow + DEAD_GAP_PX / v.sy);
+}
+
+/** Trace a twig from birth to top, following the branch's silhouette; returns the top's screen point. */
+function twigPath(v: TwigView, m: TwigModel, t: Twig, path: Path2D | CanvasRenderingContext2D): [number, number] {
+  const top = twigTop(v, t);
+  const [x0, y0] = v.toScreen(t.x, t.yBirth);
+  path.moveTo(x0, y0);
+  const lenPx = (t.yBirth - top) * v.sy;
+  const K = Math.max(1, Math.min(12, Math.ceil(lenPx / 60)));
+  let p: [number, number] = [x0, y0];
+  for (let k = 1; k <= K; k++) {
+    const y = t.yBirth + ((top - t.yBirth) * k) / K;
+    p = v.toScreen(m.xAt(t.u, y), y);
+    path.lineTo(p[0], p[1]);
+  }
+  return p;
+}
+
 export interface TwigView {
   ctx: CanvasRenderingContext2D;
   w: number;
   h: number;
-  s: number;
+  /** Pixels per world unit: width and time. */
+  sx: number;
+  sy: number;
   toScreen(x: number, y: number): [number, number];
   toWorld(px: number, py: number): [number, number];
+  /** World y of "now". */
+  readonly yNow: number;
 }
 
 export interface TwigStats {
@@ -241,7 +296,7 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
   const gLo = Math.max(0, m.generationAt(Math.min(wyBot, b.p3.y)) - m.span);
   const gm = Math.round((gHi + Math.max(gLo, gHi - 50)) / 2);
   const r = m.row(gm);
-  const cellPx = (r.w / r.n) * v.s;
+  const cellPx = (r.w / r.n) * v.sx;
   if (cellPx < 2) return null;
   // Estimate how many twigs are visible.
   const visFrac = Math.min(1, (wx1 - wx0) / Math.max(1e-300, r.w));
@@ -256,7 +311,8 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
 
   const twigs: { g: number; i: number; t: Twig }[] = [];
   for (let g = gLo; g <= gHi; g++) {
-    const [i0, i1] = m.indexRange(g, wx0, wx1);
+    // The branch is widest at the lowest visible point of this generation's twigs.
+    const [i0, i1] = m.indexRange(g, wx0, wx1, Math.min(wyBot, m.row(g).y + m.GL));
     for (let i = i0; i < i1; i++) {
       const t = m.twig(g, i);
       if (t.yBirth < wyTop || t.yDeath > wyBot) continue; // whole twig off screen vertically
@@ -277,7 +333,8 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
         const pi = Number(p.index);
         const pt = m.twig(pg, pi);
         // From the parent's strand at the child's birth (or at its own death, if earlier) to the child's base.
-        const [px, py] = v.toScreen(pt.x, Math.max(pt.yDeath, t.yBirth));
+        const yl = Math.max(pt.yDeath, t.yBirth);
+        const [px, py] = v.toScreen(m.xAt(pt.u, yl), yl);
         // Long links (the rare migrants) are drawn faint so the local braid reads.
         const far = Math.abs(px - cx) > 8 * cellPx;
         const path = pt.alive ? green : far ? grayFar : gray;
@@ -298,11 +355,8 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
   const gray = new Path2D();
   const tipR = Math.max(1.2, Math.min(5, cellPx * 0.18));
   for (const { t } of twigs) {
-    const [x, yb] = v.toScreen(t.x, t.yBirth);
-    const [, yd] = v.toScreen(t.x, t.yDeath);
     const path = t.alive ? green : gray;
-    path.moveTo(x, yb);
-    path.lineTo(x, yd);
+    const [x, yd] = twigPath(v, m, t, path);
     path.moveTo(x + tipR, yd);
     path.arc(x, yd, tipR, 0, Math.PI * 2);
   }
@@ -320,16 +374,15 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
   if (sel) {
     const t = m.twig(sel.g, sel.i);
     const [x, yb] = v.toScreen(t.x, t.yBirth);
-    const [, yd] = v.toScreen(t.x, t.yDeath);
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = lw + 2;
     ctx.beginPath();
-    ctx.moveTo(x, yb);
-    ctx.lineTo(x, yd);
+    twigPath(v, m, t, ctx);
     if (sel.g > 0) {
       for (const p of m.parents(sel.g, sel.i)) {
         const pt = m.twig(p.generation, Number(p.index));
-        const [px, py] = v.toScreen(pt.x, Math.max(pt.yDeath, t.yBirth));
+        const yl = Math.max(pt.yDeath, t.yBirth);
+        const [px, py] = v.toScreen(m.xAt(pt.u, yl), yl);
         ctx.moveTo(px, py);
         ctx.lineTo(x, yb);
       }
@@ -344,7 +397,7 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
     ctx.textBaseline = 'bottom';
     ctx.fillStyle = '#dfe7e2';
     for (const { g, i, t } of twigs) {
-      const [x, yd] = v.toScreen(t.x, t.yDeath);
+      const [x, yd] = v.toScreen(m.xAt(t.u, twigTop(v, t)), twigTop(v, t));
       const y = Math.min(v.h - 4, Math.max(16, yd - tipR - 3));
       ctx.fillText(m.sp.handle({ generation: g, index: BigInt(i) }), x, y, cellPx * 0.95);
     }

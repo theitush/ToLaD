@@ -69,6 +69,32 @@ describe('width = individuals', () => {
     }
   });
 
+  it('the twigs stay exactly inside the branch silhouette at every height', () => {
+    for (const f of [fanLin, fanLog]) {
+      const m = lion(f);
+      const b = f.branches[lionIdx];
+      for (const g of [0, 999, m.G >> 1, m.G - 40, m.G - 1]) {
+        const n = m.size(g);
+        // Sample heights along a lifespan above the birth row, up to "now".
+        for (const y of [m.row(g).y, m.row(g).y - 0.3 * m.GL * 1e-6, m.yOf(Math.min(m.T, (g + 2) * m.GL)), f.time.y(0)]) {
+          const w = strandAt(b, f.time.ageAt(y), f.mode).w;
+          const cell = w / n;
+          // The cells of the first and last individuals bound the union of all twigs' cells.
+          const lo = m.xAt(m.u(g, 0), y) - cell / 2;
+          const hi = m.xAt(m.u(g, n - 1), y) + cell / 2;
+          expect(lo).toBeCloseTo(b.colX - w / 2, 9);
+          expect(hi).toBeCloseTo(b.colX + w / 2, 9);
+          // Every twig is inside.
+          for (const i of [1, 77, n >> 1, n - 2]) {
+            const x = m.xAt(m.u(g, i), y);
+            expect(x).toBeGreaterThan(b.colX - w / 2);
+            expect(x).toBeLessThan(b.colX + w / 2);
+          }
+        }
+      }
+    }
+  });
+
   it('generationAt inverts the birth heights', () => {
     const m = lion(fanLog);
     for (const g of [0, 5, 4321, m.G - 3, m.G - 1]) expect(m.generationAt(m.row(g).y)).toBe(g);
@@ -88,7 +114,8 @@ describe('determinism and links', () => {
       const ad = { generation: g, index: BigInt(i) };
       expect(a.sp.handle(ad)).toBe(b.sp.handle(ad));
       const t = a.twig(g, i);
-      expect(a.hit(t.x, (t.yBirth + t.yDeath) / 2, 1e-9)).toEqual({ g, i });
+      const ym = (t.yBirth + t.yDeath) / 2;
+      expect(a.hit(a.xAt(t.u, ym), ym, 1e-9)).toEqual({ g, i });
     }
   });
 
@@ -104,7 +131,7 @@ describe('determinism and links', () => {
         expect(p.generation).toBe(g - 1);
         const pt = m.twig(p.generation, Number(p.index));
         // The link's parent end is on the parent's twig, at x(parent) and below the child's birth.
-        expect(pt.x).toBe(m.x(p.generation, Number(p.index)));
+        expect(pt.x).toBe(m.xAt(m.u(p.generation, Number(p.index)), pt.yBirth));
         expect(pt.yBirth).toBeGreaterThan(child.yBirth);
         const ch = m.sp.children(p);
         expect(BigInt(i) >= ch.start && BigInt(i) < ch.start + ch.count).toBe(true);

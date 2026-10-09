@@ -16,7 +16,7 @@ declare global {
 export function FanApp() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const viewRef = useRef<FanView | null>(null);
-  const [mode, setMode] = useState<WidthMode>('log');
+  const [mode, setMode] = useState<WidthMode>('linear');
   const [sel, setSel] = useState<Selection | null>(null);
 
   useEffect(() => {
