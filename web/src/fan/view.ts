@@ -6,28 +6,18 @@
 
 import { formatAge, formatCount } from '../data/names';
 import { Input, type InputHandlers } from '../engine/input';
-import { bezier, bezierTangent, layoutFan, strandAt, type Fan, type FanBranch, type WidthMode } from './layout';
+import { FanCamera, STRAND_PX, type Camera } from './camera';
+import { bezier, bezierTangent, branchLeft, layoutFan, strandAt, type Fan, type FanBranch, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { drawTwigs, TwigModel, type IndInfo, type TwigStats } from './twigs';
 
 export type { IndInfo } from './twigs';
+export type { Camera } from './camera';
 
 export const GREEN = '#33bd66';
 export const GRAY = '#676e75';
 export const BG = '#0d1411';
 const WITHERED = '#6d675c';
-
-export interface Camera {
-  /** World point at the screen centre. */
-  cx: number;
-  cy: number;
-  /**
-   * Pixels per world unit, per axis: width (x) and time (y) zoom separately,
-   * because a linear-width branch is ~10^10 times thinner than it is tall.
-   */
-  sx: number;
-  sy: number;
-}
 
 export interface Selection {
   sp: SpeciesRec;
@@ -46,11 +36,8 @@ interface RibbonPt {
 export class FanView implements InputHandlers {
   readonly ctx: CanvasRenderingContext2D;
   readonly input: Input;
-  cam: Camera = { cx: 0, cy: 0, sx: 1, sy: 1 };
-  fan: Fan;
+  readonly camera: FanCamera;
   mode: WidthMode = 'linear';
-  w = 1;
-  h = 1;
   dpr = 1;
   selected: SpeciesRec | null = null;
   selInd: { g: number; i: number } | null = null;
@@ -69,12 +56,13 @@ export class FanView implements InputHandlers {
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('No 2D canvas context');
     this.ctx = ctx;
-    this.fan = layoutFan(clade, this.mode);
-    this.input = new Input(canvas, this, true);
+    this.camera = new FanCamera(layoutFan(clade, this.mode), (b) => this.model(b));
+    this.input = new Input(canvas, this);
     this.ro = new ResizeObserver(() => this.resize());
     this.ro.observe(canvas);
     this.resize();
-    this.cam = this.homeCamera();
+    this.camera.cam = this.homeCamera();
+    this.camera.settle();
   }
 
   destroy(): void {
@@ -86,37 +74,41 @@ export class FanView implements InputHandlers {
   resize(): void {
     const r = this.canvas.getBoundingClientRect();
     const first = this.w === 1;
-    this.w = Math.max(1, r.width);
-    this.h = Math.max(1, r.height);
+    this.camera.w = Math.max(1, r.width);
+    this.camera.h = Math.max(1, r.height);
     this.dpr = Math.min(2, window.devicePixelRatio || 1);
     this.canvas.width = Math.round(this.w * this.dpr);
     this.canvas.height = Math.round(this.h * this.dpr);
     if (first) this.cam = this.homeCamera();
+    this.camera.settle();
     this.request();
+  }
+
+  get cam(): Camera {
+    return this.camera.cam;
+  }
+  set cam(c: Camera) {
+    this.camera.cam = c;
+  }
+  get fan(): Fan {
+    return this.camera.fan;
+  }
+  get w(): number {
+    return this.camera.w;
+  }
+  get h(): number {
+    return this.camera.h;
   }
 
   /** The whole fan: "now" near the top, the stem entering from the bottom edge. */
   homeCamera(): Camera {
-    let x0 = Infinity;
-    let x1 = -Infinity;
-    for (const b of this.fan.branches) {
-      x0 = Math.min(x0, b.colX - b.width);
-      x1 = Math.max(x1, b.colX + b.width);
-    }
-    const y0 = this.fan.time.y(0);
-    // Pixel margins: time labels on the left, species labels above "now", some stem below the fork.
-    const left = 58;
-    const right = 14;
-    const top = 120;
-    const bottom = 150; // room for the clade label below the fork, above the legend
-    const s = Math.min((this.w - left - right) / (x1 - x0), (this.h - top - bottom) / -y0);
-    const cx = (x0 + x1) / 2 - (left - right) / 2 / s;
-    return { cx, cy: y0 + (this.h / 2 - top) / s, sx: s, sy: s };
+    return this.camera.home();
   }
 
   setMode(mode: WidthMode): void {
     this.mode = mode;
-    this.fan = layoutFan(this.clade, mode);
+    this.camera.fan = layoutFan(this.clade, mode);
+    this.camera.settle();
     this.request();
   }
 
@@ -147,67 +139,17 @@ export class FanView implements InputHandlers {
     return this.fan.time.y(0);
   }
 
-  /**
-   * Deep inside a branch the view follows the strands. A branch narrows with
-   * height (the dead peel off), so every strand drifts sideways by its share
-   * of that; at the width zoom of individuals (10^10 in linear mode) the drift
-   * would lay the strands flat. The camera therefore shears x by the drift of
-   * the strand under the screen centre: that strand is vertical on screen and
-   * its neighbours nearly so. The shear is weighed in only when the branch is
-   * wider than the screen (it is sub-pixel before that), so it never jumps.
-   */
-  private shearRef: { b: FanBranch; u: number; alive: boolean; x0: number; k: number } | null = null;
-
-  private laneX(b: FanBranch, u: number, alive: boolean, y: number): number {
-    const st = strandAt(b, this.fan.time.ageAt(Math.min(b.p3.y, Math.max(b.tipY, y))), this.mode);
-    const left = b.colX - st.w / 2;
-    const gw = st.w * st.f;
-    return alive ? left + u * gw : left + gw + u * (st.w - gw);
-  }
-
-  private updateShear(): void {
-    this.shearRef = null;
-    const { cx, cy } = this.cam;
-    for (const b of this.fan.branches) {
-      if (cy < b.tipY || cy > b.p3.y) continue;
-      const st = strandAt(b, this.fan.time.ageAt(cy), this.mode);
-      const left = b.colX - st.w / 2;
-      if (cx < left || cx > left + st.w) continue;
-      const gw = st.w * st.f;
-      const alive = cx < left + gw;
-      const u = alive ? (cx - left) / gw : (cx - left - gw) / (st.w - gw);
-      const k = Math.max(0, Math.min(1, ((st.w * this.cam.sx) / this.w - 1) / 3));
-      if (k > 0) this.shearRef = { b, u, alive, x0: cx, k };
-      return;
-    }
-  }
-
-  /** World x drift of the reference strand at height y (0 when not shearing). */
-  shear(y: number): number {
-    const r = this.shearRef;
-    if (!r) return 0;
-    return (this.laneX(r.b, r.u, r.alive, y) - r.x0) * r.k;
-  }
-
   toScreen(x: number, y: number): [number, number] {
-    const c = this.cam;
-    return [(x - this.shear(y) - c.cx) * c.sx + this.w / 2, (y - c.cy) * c.sy + this.h / 2];
+    return this.camera.toScreen(x, y);
   }
 
   toWorld(px: number, py: number): [number, number] {
-    const c = this.cam;
-    const y = c.cy + (py - this.h / 2) / c.sy;
-    return [c.cx + (px - this.w / 2) / c.sx + this.shear(y), y];
+    return this.camera.toWorld(px, py);
   }
 
-  /** Zoom about a screen point by factors fx (width) and fy (time). */
+  /** Zoom about a screen point by factors fx (width) and fy (time), within the camera's limits. */
   zoomAbout(px: number, py: number, fx: number, fy = fx): void {
-    const [wx, wy] = this.toWorld(px, py);
-    const h = this.homeCamera().sx * 0.3;
-    this.cam.sx = Math.min(1e15, Math.max(h, this.cam.sx * fx));
-    this.cam.sy = Math.min(1e9, Math.max(h, this.cam.sy * fy));
-    this.cam.cx = wx - (px - this.w / 2) / this.cam.sx;
-    this.cam.cy = wy - (py - this.h / 2) / this.cam.sy;
+    this.camera.zoomAbout(px, py, fx, fy);
   }
 
   flyTo(to: Camera, ms = 650): void {
@@ -223,8 +165,9 @@ export class FanView implements InputHandlers {
       const u = Math.min(1, (now - t0) / ms);
       const e = u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
       const [sx, cx] = axis(from.sx, to.sx, from.cx, to.cx, e);
-      const [sy, cy] = axis(from.sy, to.sy, from.cy, to.cy, e);
-      this.cam = { sx, sy, cx, cy };
+      const [ty, cy] = axis(from.sy, to.ty, from.cy, to.cy, e);
+      this.cam = { sx, sy: ty, ty, cx, cy };
+      this.camera.settle();
       return u < 1;
     };
     this.request();
@@ -240,8 +183,8 @@ export class FanView implements InputHandlers {
     for (const b of this.fan.branches) {
       if (wy > b.p3.y + slopY || wy < b.tipY - slopY) continue;
       const age = this.fan.time.ageAt(Math.min(b.p3.y, Math.max(b.tipY, wy)));
-      const half = strandAt(b, age, this.mode).w / 2;
-      const d = Math.max(0, Math.abs(wx - b.colX) - half);
+      const left = branchLeft(b);
+      const d = Math.max(0, left - wx, wx - left - strandAt(b, age, this.mode).w);
       if (d <= slop && d < bd) {
         bd = d;
         best = b;
@@ -259,8 +202,7 @@ export class FanView implements InputHandlers {
   }
   gestureEnd(): void {}
   pan(dx: number, dy: number): void {
-    this.cam.cx -= dx / this.cam.sx;
-    this.cam.cy -= dy / this.cam.sy;
+    this.camera.pan(dx, dy);
     this.request();
   }
   zoom(px: number, py: number, fx: number, ft: number): void {
@@ -295,15 +237,16 @@ export class FanView implements InputHandlers {
     const b = this.hitBranch(x, y);
     let sx = this.cam.sx * 4;
     let sy = this.cam.sy * 4;
-    let cx = wx - (x - this.w / 2) / sx;
+    let framing = false;
     if (b) {
       const age = this.fan.time.ageAt(Math.min(b.p3.y, Math.max(b.tipY, wy)));
-      const wpx = strandAt(b, age, this.mode).w * this.cam.sx;
-      const frame = (this.w * 0.6) / Math.max(1e-300, strandAt(b, age, this.mode).w);
+      const bw = strandAt(b, age, this.mode).w;
+      const wpx = bw * this.cam.sx;
+      const frame = (this.w * 0.6) / Math.max(1e-300, bw);
       if (wpx < this.w * 0.45) {
         sx = frame;
         sy = this.cam.sy * 2;
-        cx = b.colX;
+        framing = true;
       } else {
         sx = this.cam.sx * 16;
         // Time zooms enough that a generation is about as tall as two strands are wide
@@ -312,21 +255,36 @@ export class FanView implements InputHandlers {
         const g = m.generationAt(wy);
         const genH = Math.abs(m.yOf(g * m.GL) - m.yOf((g + 1) * m.GL));
         const L = m.lanes(wy);
-        const cell = Math.max(L.gw, L.w - L.gw) / m.size(g);
-        // Stop widening once strands are ~90 px apart (handles legible); past that,
-        // width zoom only shows one empty strand.
-        sx = Math.max(this.cam.sx, Math.min(sx, 90 / Math.max(1e-300, cell)));
+        // The strand spacing of the lane under the finger.
+        const cell = (wx < L.left + L.gw ? L.gw : L.w - L.gw) / m.size(g);
+        sx = Math.min(sx, STRAND_PX / Math.max(1e-300, cell));
         sy = Math.max(this.cam.sy * 2, Math.min(this.cam.sy * 64, (2 * cell * sx) / Math.max(1e-300, genH)));
-        cx = wx - (x - this.w / 2) / sx;
-        // In the green lane, land on a living strand rather than a vacant slot
-        // (only about a third of the index slots hold someone alive).
-        const slotPx = (L.gw / m.size(g)) * sx;
-        if (wx < L.left + L.gw && slotPx > 12) cx = m.nearestLiving(wx, wy, Math.ceil(this.w / slotPx)) ?? cx;
       }
+      // Time zooms in too where the strands would otherwise lean (the camera's slope limit).
+      sy = Math.max(sy, this.slopeSy(wx, wy, sx));
     }
-    sx = Math.min(1e15, sx);
-    sy = Math.min(1e9, sy);
-    this.flyTo({ sx, sy, cx, cy: wy - (y - this.h / 2) / sy });
+    // Within the camera's limits: at least 10 years on screen, the width limit where the finger is.
+    sy = this.camera.timeCap(wy, y, sy);
+    let cx = wx - (x - this.w / 2) / sx;
+    if (b) {
+      sx = Math.min(sx, Math.max(this.cam.sx, this.camera.sxCap(wx, wy, sy)));
+      const age = this.fan.time.ageAt(Math.min(b.p3.y, Math.max(b.tipY, wy)));
+      cx = framing ? branchLeft(b) + strandAt(b, age, this.mode).w / 2 : wx - (x - this.w / 2) / sx;
+      // In the green lane, land on a living strand rather than a vacant slot
+      // (only about a third of the index slots hold someone alive).
+      const m = this.model(b);
+      const L = m.lanes(wy);
+      const slotPx = (L.gw / m.size(m.generationAt(wy))) * sx;
+      if (wx < L.left + L.gw && slotPx > 12) cx = m.nearestLiving(wx, wy, Math.ceil(this.w / slotPx)) ?? cx;
+    }
+    this.flyTo({ sx, sy, ty: sy, cx, cy: wy - (y - this.h / 2) / sy });
+  }
+
+  /** The time zoom at which the width zoom sx is within the slope limit at (wx, wy). */
+  private slopeSy(wx: number, wy: number, sx: number): number {
+    let sy = this.cam.sy;
+    for (let k = 0; k < 40 && this.camera.sxCap(wx, wy, sy) < sx; k++) sy *= 1.5;
+    return sy;
   }
   tap(x: number, y: number): void {
     const b = this.hitBranch(x, y);
@@ -362,7 +320,6 @@ export class FanView implements InputHandlers {
   draw(): void {
     const ctx = this.ctx;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    this.updateShear();
     ctx.fillStyle = BG;
     ctx.fillRect(0, 0, this.w, this.h);
     this.drawTimeAxis(false);
@@ -374,22 +331,21 @@ export class FanView implements InputHandlers {
     this.drawTimeAxis(true);
   }
 
-  /** Fill a ribbon between lane offsets a(p) and b(p) (fractions of the width along the left normal). */
+  /** Fill a ribbon between offsets a(p) and b(p) (world units along the left normal). */
   private ribbon(pts: RibbonPt[], a: (p: RibbonPt) => number, bOff: (p: RibbonPt) => number, minPx = 0): void {
     const ctx = this.ctx;
     ctx.beginPath();
     for (let i = 0; i < pts.length; i++) {
       const p = pts[i];
       const [sx, sy] = this.toScreen(p.x, p.y);
-      const off = a(p) * p.w * this.cam.sx;
+      const off = a(p) * this.cam.sx;
       ctx[i ? 'lineTo' : 'moveTo'](clampPx(sx + p.nx * off), clampPx(sy + p.ny * off));
     }
     for (let i = pts.length - 1; i >= 0; i--) {
       const p = pts[i];
       const [sx, sy] = this.toScreen(p.x, p.y);
-      const wpx = p.w * this.cam.sx;
-      const ao = a(p) * wpx;
-      const bo = bOff(p) * wpx;
+      const ao = a(p) * this.cam.sx;
+      const bo = bOff(p) * this.cam.sx;
       const off = minPx >= 0 ? Math.max(bo, ao + minPx) : Math.min(bo, ao + minPx);
       ctx.lineTo(clampPx(sx + p.nx * off), clampPx(sy + p.ny * off));
     }
@@ -440,11 +396,15 @@ export class FanView implements InputHandlers {
     // Keep only points within a screen of the viewport: canvas paths with
     // coordinates far beyond the screen (deep zoom) are not drawn reliably.
     const mY = this.h / this.cam.sy;
+    // Left-aligned (layout.ts branchLeft): the ribbon spans the left normal offsets
+    // [hw - w, hw] from the spine.
+    const hw = b.width / 2;
     const kept = pts.filter((p) => {
       if (p.y < sTop - mY || p.y > sBot + mY) return false;
       const [px] = this.toScreen(p.x, p.y);
-      const half = p.w * this.cam.sx;
-      return px - half < 5 * this.w && px + half > -4 * this.w;
+      const mid = px + p.nx * (hw - p.w / 2) * this.cam.sx;
+      const half = (p.w / 2) * this.cam.sx;
+      return mid - half < 5 * this.w && mid + half > -4 * this.w;
     });
     pts.length = 0;
     pts.push(...kept);
@@ -454,14 +414,14 @@ export class FanView implements InputHandlers {
     // lanes, the same geometry, never a switch.
     const tw = this.twigStats.get(b.sp.gid);
     ctx.fillStyle = mix(b.sp.extinct ? WITHERED : GRAY, '#1c2521', (tw?.fade ?? 0) * 0.85);
-    this.ribbon(pts, () => -0.5, () => 0.5, 0.6);
+    this.ribbon(pts, (p) => hw - p.w, () => hw, 0.6);
     if (!b.sp.extinct) {
       // Green lane on the left, floored at 1 px all the way from the tip to the root.
       ctx.fillStyle = mix(GREEN, '#174a2b', (tw?.fadeGreen ?? 0) * 0.8);
-      this.ribbon(pts, () => 0.5, (p) => 0.5 - p.f, -1);
+      this.ribbon(pts, () => hw, (p) => hw - p.w * p.f, -1);
     }
     if (this.selected === b.sp && !this.selInd) {
-      const [tx, ty] = this.toScreen(b.colX, b.tipY);
+      const [tx, ty] = this.toScreen(tipX(b, this.fan, this.mode), b.tipY);
       ctx.beginPath();
       ctx.arc(tx, ty, 7, 0, Math.PI * 2);
       ctx.strokeStyle = 'rgba(232,240,234,0.9)';
@@ -482,7 +442,7 @@ export class FanView implements InputHandlers {
 
   private drawLabel(b: FanBranch): void {
     const ctx = this.ctx;
-    const [cx, cy] = this.toScreen(b.colX, b.tipY);
+    const [cx, cy] = this.toScreen(tipX(b, this.fan, this.mode), b.tipY);
     if (cx < -30 || cx > this.w + 30 || cy < -10 || cy > this.h + 200) return;
     if (this.twigStats.has(b.sp.gid)) return; // Zoomed into the individuals: the HUD names it.
     const name = b.sp.common;
@@ -652,6 +612,11 @@ export class FanView implements InputHandlers {
 
 }
 
+
+/** x of the middle of a branch's tip (branches are left-aligned). */
+function tipX(b: FanBranch, fan: Fan, mode: WidthMode): number {
+  return branchLeft(b) + strandAt(b, fan.time.ageAt(b.tipY), mode).w / 2;
+}
 
 /** A round step (1, 2 or 5 × 10^k) near `x`. */
 export function niceStep(x: number): number {

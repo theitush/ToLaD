@@ -62,6 +62,10 @@ export class TimeScale {
   y(ageMa: number): number {
     return -TIME_H * this.frac(ageMa);
   }
+  /** Years per world unit of height at world y (the axis's local rate). */
+  yearsPerUnit(y: number): number {
+    return ((Math.LN10 * this.span) / TIME_H) * (this.ageAt(y) * 1e6 + TIME_C);
+  }
   /** Age in Ma at world y. */
   ageAt(y: number): number {
     const f = -y / TIME_H;
@@ -141,6 +145,17 @@ export function strandAt(b: FanBranch, ageMa: number, mode: WidthMode): { w: num
   const w = rem > 0 ? (b.width * g(rem, mode)) / gEver : 0;
   const green = sp.alive > 0 ? (b.width * g(sp.alive, mode)) / gEver : 0;
   return { w, f: w > 0 ? Math.min(1, green / w) : 0 };
+}
+
+/**
+ * Left edge of a branch's column. Branches are left-aligned: the green lane
+ * (the living, constant width) runs straight along the left edge from the tip
+ * to the fork, and the gray lane on its right narrows as the dead peel off. So
+ * the living's strands are exactly vertical, and the dead's lean only in
+ * proportion to how far across their lane they are.
+ */
+export function branchLeft(b: FanBranch): number {
+  return b.colX - b.width / 2;
 }
 
 export function layoutFan(clade: CladeRec, mode: WidthMode): Fan {
