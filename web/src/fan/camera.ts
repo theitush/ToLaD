@@ -90,9 +90,11 @@ export class FanCamera {
     const right = 14;
     const top = 120;
     const bottom = 150; // room for the clade label below the fork, above the legend
-    const s = Math.min((this.w - left - right) / (x1 - x0), (this.h - top - bottom) / -y0);
-    const cx = (x0 + x1) / 2 - (left - right) / 2 / s;
-    return { cx, cy: y0 + (this.h / 2 - top) / s, sx: s, sy: s, ty: s };
+    // Width and time each fill the screen (a narrow fan is not stretched past its height).
+    const sy = (this.h - top - bottom) / -y0;
+    const sx = Math.min((this.w - left - right) / (x1 - x0), 4 * sy);
+    const cx = (x0 + x1) / 2 - (left - right) / 2 / sx;
+    return { cx, cy: y0 + (this.h / 2 - top) / sy, sx, sy, ty: sy };
   }
 
   /** Zoom-out bounds (px per world unit) for width and time. */
@@ -218,4 +220,41 @@ export class FanCamera {
     c.cy -= dy / c.sy;
     this.settle();
   }
+}
+
+/**
+ * Clip a polygon to the rectangle [x0, x1] × [y0, y1] (Sutherland–Hodgman), in
+ * float64, so the canvas only ever sees coordinates near the screen.
+ */
+export function clipPoly(xs: number[], ys: number[], x0: number, y0: number, x1: number, y1: number): [number[], number[]] {
+  let px = xs;
+  let py = ys;
+  // Each edge of the rectangle: keep the side where inside(x, y) ≥ 0.
+  const sides: ((x: number, y: number) => number)[] = [(x) => x - x0, (x) => x1 - x, (_, y) => y - y0, (_, y) => y1 - y];
+  for (const inside of sides) {
+    const n = px.length;
+    if (!n) break;
+    const ox: number[] = [];
+    const oy: number[] = [];
+    for (let i = 0; i < n; i++) {
+      const ax = px[i];
+      const ay = py[i];
+      const bx = px[(i + 1) % n];
+      const by = py[(i + 1) % n];
+      const da = inside(ax, ay);
+      const db = inside(bx, by);
+      if (da >= 0) {
+        ox.push(ax);
+        oy.push(ay);
+      }
+      if ((da >= 0) !== (db >= 0)) {
+        const t = da / (da - db);
+        ox.push(ax + (bx - ax) * t);
+        oy.push(ay + (by - ay) * t);
+      }
+    }
+    px = ox;
+    py = oy;
+  }
+  return [px, py];
 }

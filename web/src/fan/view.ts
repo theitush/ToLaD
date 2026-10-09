@@ -6,7 +6,7 @@
 
 import { formatAge, formatCount } from '../data/names';
 import { Input, type InputHandlers } from '../engine/input';
-import { FanCamera, STRAND_PX, type Camera } from './camera';
+import { clipPoly, FanCamera, STRAND_PX, type Camera } from './camera';
 import { bezier, bezierTangent, branchLeft, layoutFan, strandAt, type Fan, type FanBranch, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { drawTwigs, TwigModel, type IndInfo, type TwigStats } from './twigs';
@@ -325,30 +325,43 @@ export class FanView implements InputHandlers {
     this.drawTimeAxis(false);
     for (const b of this.fan.branches) this.drawStrand(b);
     for (const b of this.fan.branches) this.drawIndividuals(b);
-    for (const b of this.fan.branches) this.drawLabel(b);
+    // Labels by size: one that would overlap a bigger species' label waits for a closer zoom.
+    const placed: number[][] = [];
+    for (const b of [...this.fan.branches].sort((p, q) => q.sp.ever - p.sp.ever)) this.drawLabel(b, placed);
     this.drawTrunkLabel();
     this.drawHud();
     this.drawTimeAxis(true);
   }
 
-  /** Fill a ribbon between offsets a(p) and b(p) (world units along the left normal). */
+  /**
+   * Fill a ribbon between offsets a(p) and b(p) (world width units along the
+   * left normal, scaled by the width zoom), at least minPx thick (negative:
+   * towards the right). The polygon is clipped to the screen in float64 before
+   * it reaches the canvas, which mishandles coordinates far off screen.
+   */
   private ribbon(pts: RibbonPt[], a: (p: RibbonPt) => number, bOff: (p: RibbonPt) => number, minPx = 0): void {
-    const ctx = this.ctx;
-    ctx.beginPath();
-    for (let i = 0; i < pts.length; i++) {
-      const p = pts[i];
-      const [sx, sy] = this.toScreen(p.x, p.y);
-      const off = a(p) * this.cam.sx;
-      ctx[i ? 'lineTo' : 'moveTo'](clampPx(sx + p.nx * off), clampPx(sy + p.ny * off));
+    const k = this.cam.sx;
+    const xs: number[] = [];
+    const ys: number[] = [];
+    for (const p of pts) {
+      const off = a(p) * k;
+      xs.push(p.x + p.nx * off);
+      ys.push(p.y + p.ny * off);
     }
     for (let i = pts.length - 1; i >= 0; i--) {
       const p = pts[i];
-      const [sx, sy] = this.toScreen(p.x, p.y);
-      const ao = a(p) * this.cam.sx;
-      const bo = bOff(p) * this.cam.sx;
+      const ao = a(p) * k;
+      const bo = bOff(p) * k;
       const off = minPx >= 0 ? Math.max(bo, ao + minPx) : Math.min(bo, ao + minPx);
-      ctx.lineTo(clampPx(sx + p.nx * off), clampPx(sy + p.ny * off));
+      xs.push(p.x + p.nx * off);
+      ys.push(p.y + p.ny * off);
     }
+    const [cx, cy] = clipPoly(xs, ys, -8, -8, this.w + 8, this.h + 8);
+    if (cx.length < 3) return;
+    const ctx = this.ctx;
+    ctx.beginPath();
+    ctx.moveTo(cx[0], cy[0]);
+    for (let i = 1; i < cx.length; i++) ctx.lineTo(cx[i], cy[i]);
     ctx.closePath();
     ctx.fill();
   }
@@ -359,6 +372,12 @@ export class FanView implements InputHandlers {
    * stem is just its children's strands side by side (in branch order, widths
    * adding up to the stem's width), so each green lane runs unbroken from the
    * tip to the root. The same rule nests for a deeper tree.
+   *
+   * The spine is sampled in screen space: the S-curve adaptively (finer
+   * wherever an edge on screen would be off by more than a fraction of a
+   * pixel), its normal taken on screen so the bundle keeps its width-zoomed
+   * thickness through the bend whatever the two axes' zooms. Nothing is
+   * dropped: a skipped sample would let the outline cut a chord across the screen.
    */
   private drawStrand(b: FanBranch): void {
     const yb = this.fan.trunkBottom.y;
@@ -367,17 +386,59 @@ export class FanView implements InputHandlers {
     if (bx < 0 || ax > this.w || by < 0 || ay > this.h) return;
     const time = this.fan.time;
     const at = (y: number) => strandAt(b, time.ageAt(y), this.mode);
+    // Left-aligned (layout.ts branchLeft): the ribbon spans the left normal offsets [hw - w, hw] from the spine.
+    const hw = b.width / 2;
+    const up = (x: number, y: number, st = at(y)): RibbonPt => {
+      const [px, py] = this.toScreen(x, y);
+      return { x: px, y: py, nx: -1, ny: 0, w: st.w, f: st.f };
+    };
     const pts: RibbonPt[] = [];
-    // Stem part, straight up to the fork. Left normal of an upward strand is (-1, 0).
+    // Stem part, straight up to the fork.
     const base = at(0);
-    for (let i = 0; i < 4; i++) pts.push({ x: b.p0.x, y: yb * (1 - i / 4), nx: -1, ny: 0, w: base.w, f: base.f });
-    const N = 32;
-    for (let i = 0; i <= N; i++) {
-      const t = i / N;
+    for (let i = 0; i < 4; i++) pts.push(up(b.p0.x, yb * (1 - i / 4), base));
+    // The S-curve.
+    const curve = (t: number): RibbonPt => {
       const p = bezier(b, t);
       const d = bezierTangent(b, t);
       const st = at(p.y);
-      pts.push({ x: p.x, y: p.y, nx: d.y, ny: -d.x, w: st.w, f: st.f });
+      const [px, py] = this.toScreen(p.x, p.y);
+      const tx = d.x * this.cam.sx;
+      const ty = d.y * this.cam.sy;
+      const l = Math.hypot(tx, ty) || 1;
+      return { x: px, y: py, nx: ty / l, ny: -tx / l, w: st.w, f: st.f };
+    };
+    const offs = (p: RibbonPt) => [hw, hw - p.w, hw - p.w * p.f];
+    const edge = (p: RibbonPt, o: number): [number, number] => [p.x + p.nx * o * this.cam.sx, p.y + p.ny * o * this.cam.sx];
+    const refine = (t0: number, a: RibbonPt, t1: number, c: RibbonPt, depth: number): void => {
+      if (depth > 48 || pts.length > 6000) return;
+      const tm = (t0 + t1) / 2;
+      const m = curve(tm);
+      const oa = offs(a);
+      const om = offs(m);
+      const oc = offs(c);
+      let err = 0;
+      for (let e = 0; e < 3; e++) {
+        const [x0, y0] = edge(a, oa[e]);
+        const [x1, y1] = edge(m, om[e]);
+        const [x2, y2] = edge(c, oc[e]);
+        const pad = 0.5 * (Math.abs(x2 - x0) + Math.abs(y2 - y0)) + 2;
+        if (Math.max(x0, x1, x2) < -pad || Math.min(x0, x1, x2) > this.w + pad) continue;
+        if (Math.max(y0, y1, y2) < -pad || Math.min(y0, y1, y2) > this.h + pad) continue;
+        err = Math.max(err, Math.hypot((x0 + x2) / 2 - x1, (y0 + y2) / 2 - y1), Math.hypot(x2 - x0, y2 - y0) / 64);
+      }
+      if (err < 0.3) return;
+      refine(t0, a, tm, m, depth + 1);
+      pts.push(m);
+      refine(tm, m, t1, c, depth + 1);
+    };
+    const N = 32;
+    let prev = curve(0);
+    pts.push(prev);
+    for (let i = 1; i <= N; i++) {
+      const next = curve(i / N);
+      refine((i - 1) / N, prev, i / N, next, 0);
+      pts.push(next);
+      prev = next;
     }
     // Column: sample the visible part finely (the taper follows log time).
     const [, sTop] = this.toWorld(0, -20);
@@ -385,30 +446,11 @@ export class FanView implements InputHandlers {
     const ya = Math.min(b.p3.y, sBot);
     const yt = Math.max(b.tipY, sTop);
     if (ya > yt) {
-      if (ya < b.p3.y) pts.push({ x: b.colX, y: ya, nx: -1, ny: 0, ...at(ya) });
+      if (ya < b.p3.y) pts.push(up(b.colX, ya));
       const M = 80;
-      for (let i = 1; i <= M; i++) {
-        const y = ya + ((yt - ya) * i) / M;
-        pts.push({ x: b.colX, y, nx: -1, ny: 0, ...at(y) });
-      }
-      if (yt > b.tipY) pts.push({ x: b.colX, y: b.tipY, nx: -1, ny: 0, ...at(b.tipY) });
+      for (let i = 1; i <= M; i++) pts.push(up(b.colX, ya + ((yt - ya) * i) / M));
     }
-    // Keep only points within a screen of the viewport: canvas paths with
-    // coordinates far beyond the screen (deep zoom) are not drawn reliably.
-    const mY = this.h / this.cam.sy;
-    // Left-aligned (layout.ts branchLeft): the ribbon spans the left normal offsets
-    // [hw - w, hw] from the spine.
-    const hw = b.width / 2;
-    const kept = pts.filter((p) => {
-      if (p.y < sTop - mY || p.y > sBot + mY) return false;
-      const [px] = this.toScreen(p.x, p.y);
-      const mid = px + p.nx * (hw - p.w / 2) * this.cam.sx;
-      const half = (p.w / 2) * this.cam.sx;
-      return mid - half < 5 * this.w && mid + half > -4 * this.w;
-    });
-    pts.length = 0;
-    pts.push(...kept);
-    if (pts.length < 2) return;
+    if (pts[pts.length - 1].y > this.toScreen(0, b.tipY)[1] + 1e-9) pts.push(up(b.colX, b.tipY));
     const ctx = this.ctx;
     // As the strands fade in (twigs.ts), the lanes dim to a backdrop under them: the same
     // lanes, the same geometry, never a switch.
@@ -440,7 +482,7 @@ export class FanView implements InputHandlers {
     else this.twigStats.delete(b.sp.gid);
   }
 
-  private drawLabel(b: FanBranch): void {
+  private drawLabel(b: FanBranch, placed: number[][]): void {
     const ctx = this.ctx;
     const [cx, cy] = this.toScreen(tipX(b, this.fan, this.mode), b.tipY);
     if (cx < -30 || cx > this.w + 30 || cy < -10 || cy > this.h + 200) return;
@@ -450,7 +492,16 @@ export class FanView implements InputHandlers {
     const fs = 15;
     ctx.save();
     ctx.textBaseline = 'middle';
+    ctx.font = `${fs * 0.72}px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
+    const subLen = ctx.measureText(sub).width;
     ctx.font = `600 ${fs}px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
+    // Screen box of the upright two-line label (x0, y0, x1, y1).
+    const box = [cx - 13, cy - 8 - Math.max(subLen, ctx.measureText(name).width), cx + 14, cy - 8];
+    if (placed.some((q) => box[0] < q[2] + 2 && q[0] < box[2] + 2 && box[1] < q[3] + 2 && q[1] < box[3] + 2)) {
+      ctx.restore();
+      return;
+    }
+    placed.push(box);
     // Upright text running up from the tip.
     ctx.translate(cx, cy - 8);
     ctx.rotate(-Math.PI / 2);
@@ -633,11 +684,6 @@ export function formatTick(yrs: number, step: number): string {
   const v = yrs / div;
   const d = step > 0 ? dec : v >= 100 ? 0 : v >= 10 ? 1 : 2;
   return `${Number(v.toFixed(d)).toLocaleString('en-US', { maximumFractionDigits: d })} ${unit}`;
-}
-
-/** Keep ribbon points within canvas-safe pixel coordinates (edges far off screen stay off screen). */
-function clampPx(o: number): number {
-  return Math.max(-1e5, Math.min(1e5, o));
 }
 
 /** Mix two #rrggbb colours: t = 0 gives a, 1 gives b. */

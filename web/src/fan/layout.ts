@@ -7,7 +7,7 @@
 //
 // Height = time: the fork is the clade's origin, a branch's tip is the species'
 // last appearance (living species: the "now" line), on a log years-before-
-// present scale (TimeScale). Branches are spread in tree order across the width.
+// present scale (TimeScale). Columns are packed in tree order by their widths.
 //
 // Width at any height = the individuals whose strands pass through it: every
 // individual's strand runs from the root up to its death, so at age τ the
@@ -35,8 +35,14 @@ export const TRUNK_WIDTH = 110;
 export const TRUNK_LENGTH = 2400;
 /** Height = time: the fork (the clade's origin) is at y = 0, "now" at y = −TIME_H. */
 export const TIME_H = 900;
-/** Horizontal spacing of the leaves. */
-export const COL_W = 46;
+/**
+ * Columns are packed side by side by their widths (OneZoom-style), with a gap
+ * of GAP_FRAC of the neighbours' mean width plus GAP_MIN (a few pixels in the
+ * overview), so zooming into a species dives into it and its sisters stay next
+ * to it instead of spread across empty space.
+ */
+export const GAP_FRAC = 0.15;
+export const GAP_MIN = 0.02 * 110;
 /**
  * Time axis offset (years). Height is log10(years before present + C). With
  * C = 10 years the axis resolves the last decades and centuries; it is close
@@ -162,16 +168,19 @@ export function layoutFan(clade: CladeRec, mode: WidthMode): Fan {
   const sp = clade.species;
   const gs = sp.map((s) => g(s.ever, mode));
   const sum = gs.reduce((a, b) => a + b, 0);
-  const n = sp.length;
   const W = TRUNK_WIDTH;
   const time = new TimeScale(clade.t0);
+  const widths = gs.map((v) => (v / sum) * W);
+  const gaps = widths.slice(1).map((w, i) => GAP_FRAC * ((w + widths[i]) / 2) + GAP_MIN);
+  let colLeft = -(W + gaps.reduce((a, b) => a + b, 0)) / 2;
   let x = -W / 2;
   const branches: FanBranch[] = sp.map((s, i) => {
     const share = gs[i] / sum;
     const width = share * W;
     const x0 = x + width / 2;
     x += width;
-    const colX = (i - (n - 1) / 2) * COL_W;
+    const colX = colLeft + width / 2;
+    colLeft += width + (gaps[i] ?? 0);
     const tipY = time.y(s.t1);
     // The curve takes the lower part of the branch (less for short extinct ones).
     const yC = Math.max(tipY * 0.6, -0.1 * TIME_H);

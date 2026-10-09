@@ -34,11 +34,24 @@ width = individuals, green = alive, gray = dead, height = time.
     ranges are computed.
   - "Has a living descendant" is exact (children, then down the mother line) within a
     lookup budget; past it, a critical-branching estimate decides, deterministically.
-- **Camera**: width and time zoom separately (pinch per axis, shift/alt+wheel). Deep in, the
-  camera shears to keep the strand under it upright. Double-tap fits a branch, then zooms
-  16× in width and 2× or more in time, stopping when strands are ~90 px apart. In the green
-  lane it lands on a living strand. Tap a branch for the species card, an individual for
-  the `lion#…` card.
+- **Layout**: columns are packed in tree order by their base widths with small gaps
+  (`GAP_FRAC`, `GAP_MIN`), so the fan reads as one bundle splitting and zooming into a
+  species dives into it. Branches are left-aligned: the green lane runs straight along
+  the left edge, the gray lane narrows on its right. Labels go biggest species first; one
+  that would overlap waits for a closer zoom.
+- **Camera** (`camera.ts`): axis-aligned, never rotated or sheared. One uniform pinch
+  (shift/alt+wheel zoom one axis). Limits: the screen spans at least 10 years (the camera
+  keeps the requested time zoom `ty` and shows the capped one, so zooming out undoes a
+  zoom-in); width zoom-in stops at ~90 px per strand and where the strands under the finger
+  would lean flatter than 1.5 (near "now" the gray lane closes within a few generations);
+  zoom-out stops at the whole fan; panning keeps part of the fan on screen. Living strands
+  are exactly vertical (left-aligned lanes). Double-tap fits a branch, then zooms 16× in
+  width and 2× or more in time, stopping when the strands of the lane under the finger are
+  ~90 px apart. In the green lane it lands on a living strand. Tap a branch for the
+  species card, an individual for the `lion#…` card.
+- **Ribbons** are built in screen space: the S-curve is sampled adaptively (to 0.3 px on
+  screen), its normal taken on screen, and each polygon is clipped to the screen in
+  float64 before it reaches the canvas.
 - `node scripts/fanshot.mjs [out] [prefix]` screenshots `dist-single` at 390×844
   (`STEPS_FILE` = JSON list of `[name, js]` steps run against `window.__fan`).
 

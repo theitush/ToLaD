@@ -439,7 +439,7 @@ function rgba(hex: string, a: number): string {
 export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: number; i: number } | null): TwigStats | null {
   const [, wyTop] = v.toWorld(0, 0);
   const [, wyBot] = v.toWorld(v.w, v.h);
-  // The visible x range at a height (the camera may shear x with height, view.ts).
+  // The visible x range at a height.
   const xr = (y: number): [number, number] => {
     const py = v.toScreen(0, y)[1];
     return [v.toWorld(0, py)[0], v.toWorld(v.w, py)[0]];

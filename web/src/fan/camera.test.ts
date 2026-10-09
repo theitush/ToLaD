@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FanCamera, MIN_YEARS, MIN_ZOOM, STRAND_PX } from './camera';
+import { clipPoly, FanCamera, MIN_YEARS, MIN_ZOOM, STRAND_PX } from './camera';
 import { layoutFan, type FanBranch, type WidthMode } from './layout';
 import { PANTHERA } from './panthera';
 import { TwigModel } from './twigs';
@@ -105,5 +105,14 @@ describe('fan camera', () => {
     const cap = c.sxCap(c.cam.cx, c.cam.cy, c.cam.sy);
     expect(c.cam.sx).toBeLessThanOrEqual(cap * (1 + 1e-9));
     expect(STRAND_PX / c.cam.sx).toBeGreaterThan(0);
+  });
+
+  it('clips ribbons to the screen in float64 (no far-off coordinates reach the canvas)', () => {
+    // A thin sliver from far left to far right through the screen, and one entirely off screen.
+    const [xs, ys] = clipPoly([-1e12, 1e12, 1e12, -1e12], [100, 101, 103, 102], 0, 0, 390, 844);
+    expect(xs.length).toBeGreaterThanOrEqual(3);
+    for (const x of xs) expect(x >= 0 && x <= 390).toBe(true);
+    for (const y of ys) expect(y > 100 && y < 103).toBe(true);
+    expect(clipPoly([-5e9, -4e9, -4e9], [0, 0, 1e9], 0, 0, 390, 844)[0].length).toBe(0);
   });
 });
