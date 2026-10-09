@@ -1,0 +1,39 @@
+species   = "Pan troglodytes"
+common    = "Chimpanzee"
+component = "wild"
+use       = "counts"
+scope     = "global wild population, all ages, all four subspecies"
+notes     = "Totals are compilations of patchy nest-count surveys. Oates 2006 notes that the apparent rise in totals from ~200,000 (1980s) to almost 300,000 (2003) comes from new survey data, not a real increase. IUCN 2016 (Humle et al., doi:10.2305/IUCN.UK.2016-2.RLTS.T15933A17964454.en) lists the species Endangered, with a suspected >50% reduction over 1975-2050. Subspecies figures: central chimpanzee ~128,700 (Strindberg et al. 2018), western ~52,800 (Heinicke et al. 2019); no newer whole-species total was found."
+
+[baseline]
+year  = 1900
+n     = 1.0e6
+lo    = 1.0e6
+hi    = 2.0e6
+grade = "D"
+kind  = "unverified"
+cite  = "Jane Goodall Institute figure as quoted by Swissinfo ('The Swiss chimpanzee champion')"
+url   = "https://swissinfo.ch/eng/science/the-swiss-chimpanzee-champion/47352268"
+note  = "'About one million chimpanzees in the wild in 1900', attributed to the Jane Goodall Institute and repeated widely; a JGI Uganda director quoted 'over 2 million' (Daily Monitor). No traceable primary survey or reconstruction."
+
+[[point]]
+year  = 1985
+n     = 2.0e5
+lo    = 2.0e5
+hi    = 2.0e5
+grade = "C"
+kind  = "estimate"
+cite  = "Oates 2006, Primates 47:102-112"
+url   = "https://doi.org/10.1007/s10329-005-0149-5"
+note  = "'Estimates of total surviving numbers have increased from about 200,000 in the 1980s to a maximum of almost 300,000 in 2003'; the rise reflects new surveys, not growth. Year set to mid-1980s."
+
+[[point]]
+year  = 2003
+n     = 236200
+lo    = 172700
+hi    = 299700
+grade = "C"
+kind  = "estimate"
+cite  = "Butynski 2001, 'Africa's great apes' in Great Apes and Humans (Smithsonian), as given in WWF African great apes fact sheet 2007; Oates 2006"
+url   = "https://wwfeu.awsassets.panda.org/downloads/african_greatapes_factsheet2007w.pdf"
+note  = "172,700-299,700 wild chimpanzees ('a wide range due to a lack of survey data'); n is the midpoint. Oates 2006 dates the ~300,000 maximum to 2003."

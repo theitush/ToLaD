@@ -1,0 +1,72 @@
+species   = "Diceros bicornis"
+common    = "Black rhinoceros"
+component = "wild"
+use       = "counts"
+scope     = "Africa (whole species range), all ages"
+notes     = "Continental decline of ~97% since 1960 to a low of 2,410 in 1995, mainly from poaching for horn (SANBI 2019 assessment); recovery since under intensive protection. AfRSG continental totals compile national rhino surveys."
+
+[baseline]
+year  = 1960
+n     = 1.0e5
+lo    = 1.0e5
+hi    = 1.0e5
+grade = "D"
+kind  = "unverified"
+cite  = "Union of International Associations, Encyclopedia of World Problems, 'Threatened species of Diceros bicornis'"
+url   = "https://encyclopedia.uia.org/problem/threatened-species-diceros-bicornis"
+note  = "'At least 100 000 in 1960'. Widely repeated (rhino charities, fact sheets) without a traceable primary survey; consistent in size with SANBI's ~97% decline since 1960 to 2,410."
+
+[[point]]
+year  = 1970
+n     = 65000
+lo    = 65000
+hi    = 65000
+grade = "C"
+kind  = "estimate"
+cite  = "SANBI Red List of South African Species, Diceros bicornis (2019 assessment)"
+url   = "https://speciesstatus.sanbi.org/assessment/last-assessment/2019/"
+note  = "'There were an estimated 65,000 Black Rhino in Africa in 1970'; used there as the three-generations-ago level. Original figure from AfRSG compilations (Emslie & Brooks 1999)."
+
+[[point]]
+year  = 1995
+n     = 2410
+lo    = 2410
+hi    = 2410
+grade = "B"
+kind  = "census"
+cite  = "SANBI Red List of South African Species, Diceros bicornis (2019 assessment)"
+url   = "https://speciesstatus.sanbi.org/assessment/last-assessment/2019/"
+note  = "Continental low ('numbers bottoming out at 2,410 in 1995'), AfRSG compilation."
+
+[[point]]
+year  = 1999
+n     = 2700
+lo    = 2700
+hi    = 2700
+grade = "B"
+kind  = "census"
+cite  = "Emslie 2000, Pachyderm 29:53-56 ('African rhinos numbering 13,000 for first time since the mid-1980s')"
+url   = "https://pachydermjournal.org/index.php/pachyderm/article/view/1019"
+note  = "AfRSG continental total, ~2,700 black rhinos; stable at ~2,400 1992-1995, ~2,600 by 1997."
+
+[[point]]
+year  = 2015
+n     = 5261
+lo    = 5053
+hi    = 5467
+grade = "B"
+kind  = "census"
+cite  = "Knight 2017, African Rhino Specialist Group report, Pachyderm 58:17-35"
+url   = "https://doi.org/10.69649/pachyderm.v58i.414"
+note  = "Revised end-2015 estimate, 90% CI 5,053-5,467."
+
+[[point]]
+year  = 2024
+n     = 6788
+lo    = 6788
+hi    = 6788
+grade = "B"
+kind  = "census"
+cite  = "IUCN SSC AfRSG/AsRSG and TRAFFIC 2025, African and Asian Rhinoceroses - Status, Conservation and Trade (IUCN press release 7 Aug 2025)"
+url   = "https://iucn.org/press-release/202508/poaching-african-rhinos-down-drought-and-other-threats-drive-losses-globally"
+note  = "End-2024 reported estimate, +5.2% since 2023."

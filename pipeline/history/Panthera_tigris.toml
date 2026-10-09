@@ -1,0 +1,66 @@
+species   = "Panthera tigris"
+common    = "Tiger"
+component = "wild"
+use       = "counts"
+scope     = "global wild tigers; modern figures exclude cubs"
+notes     = """
+The 1900 figure of ~100,000 is repeated by the IUCN Cat Specialist Group and the press without a
+named study (grade D). Part of the rise from 2010 to 2022 reflects better and wider surveys, not
+only real growth. India holds most tigers: All India Tiger Estimation 1,411 (2006), 1,706 (2010),
+2,226 (2014), 2,967 (2018), 3,682 (2022), with methods changing between rounds.
+"""
+
+[baseline]
+year  = 1900
+n     = 100000
+lo    = 100000
+hi    = 100000
+grade = "D"
+kind  = "unverified"
+cite  = "IUCN SSC Cat Specialist Group, Tiger species page ('an estimated 100,000 at the start of the 20th century')"
+url   = "https://www.catsg.org/living-species-tiger"
+note  = "Widely repeated (CatSG, WWF, press coverage of the 2016 count); no primary survey or reconstruction behind it."
+
+[[point]]
+year  = 2010
+n     = 3200
+lo    = 3200
+hi    = 3200
+grade = "C"
+kind  = "estimate"
+cite  = "Global Tiger Recovery Program / St Petersburg Tiger Summit 2010 baseline, as stated by WWF and the IUCN Cat Specialist Group"
+url   = "https://www.worldwildlife.org/news/stories/new-tiger-population-estimate-of-5574-wild-tigers-announced-by-global-tiger-forum"
+note  = "'An all-time low of about 3,200'; CatSG dates the ~3,200 in-situ estimate to 2009."
+
+[[point]]
+year  = 2015
+n     = 3890
+lo    = 3890
+hi    = 3890
+grade = "C"
+kind  = "estimate"
+cite  = "WWF & Global Tiger Forum, revised global wild tiger count announced 11 April 2016"
+url   = "https://www.thejakartapost.com/life/2016/04/11/worlds-wild-tiger-count-rising-for-first-time-in-a-century"
+note  = "A minimum estimate from the IUCN Red List account updated with newer national surveys (India 2014: 2,226)."
+
+[[point]]
+year  = 2021
+n     = 4650
+lo    = 3726
+hi    = 5578
+grade = "B"
+kind  = "estimate"
+cite  = "Goodrich et al. 2022, Panthera tigris, IUCN Red List e.T15955A214862019"
+url   = "https://doi.org/10.2305/IUCN.UK.2022-1.RLTS.T15955A214862019.en"
+note  = "3,726-5,578 individuals excluding cubs (n = midpoint), ~3,140 mature (2,608-3,905); mainly capture-recapture and occupancy surveys."
+
+[[point]]
+year  = 2022
+n     = 5574
+lo    = 5574
+hi    = 5574
+grade = "B"
+kind  = "estimate"
+cite  = "Global Tiger Forum, global wild tiger estimate released July 2023 (reported by WWF)"
+url   = "https://www.worldwildlife.org/news/stories/new-tiger-population-estimate-of-5574-wild-tigers-announced-by-global-tiger-forum"
+note  = "Sum of national estimates, ~74% above the 2010 figure; India 3,682 of these (AITE 2022)."

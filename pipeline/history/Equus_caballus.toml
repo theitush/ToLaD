@@ -1,0 +1,62 @@
+species   = "Equus caballus"
+common    = "Horse"
+component = "domestic"
+use       = "counts"
+scope     = "global domestic stock"
+faostat_item = 1096
+notes     = "FAO item 1096 'Horses' (domestic horses; mules and asses are separate items). Pre-1961 points are world totals compiled by FAO and printed in the UN Statistical Yearbook (archive.org scans); FAOSTAT QCL World stocks are added from 1961 by the build. Graded C: agency aggregates of national counts with incomplete coverage and no stated range."
+
+[[point]]
+year  = 1939
+n     = 9.46e7
+lo    = 9.46e7
+hi    = 9.46e7
+grade = "C"
+kind  = "estimate"
+cite  = "UN Statistical Office, Statistical Yearbook 1957 (9th issue), table 29 'Livestock population', world row (data supplied by FAO)"
+url   = "https://archive.org/details/united-nations-statistical-yearbook_1957_9"
+note  = "Prewar (latest estimate up to 31 Dec 1939): 94.6 million head (OCR of the archive.org scan, thousand head). World total including the USSR; the yearbook notes no allowance is made for countries with no information, so it is a slight undercount."
+
+[[point]]
+year  = 1950
+n     = 7.58e7
+lo    = 7.58e7
+hi    = 7.58e7
+grade = "C"
+kind  = "estimate"
+cite  = "UN Statistical Office, Statistical Yearbook 1960 (12th issue), table 31 'Livestock population', world row (data supplied by FAO)"
+url   = "https://archive.org/details/united-nations-statistical-yearbook_1960_12"
+note  = "Average 1947/48-1951/52 (counts nearest 1 Jan; centred on 1950): 75.8 million head (OCR of the archive.org scan, thousand head). World total including the USSR; the yearbook notes no allowance is made for countries with no information, so it is a slight undercount."
+
+[[point]]
+year  = 1953
+n     = 7.55e7
+lo    = 7.55e7
+hi    = 7.55e7
+grade = "C"
+kind  = "estimate"
+cite  = "UN Statistical Office, Statistical Yearbook 1957 (9th issue), table 29 'Livestock population', world row (data supplied by FAO)"
+url   = "https://archive.org/details/united-nations-statistical-yearbook_1957_9"
+note  = "1952/53 (count or estimate nearest 1 Jan 1953): 75.5 million head (OCR of the archive.org scan, thousand head). World total including the USSR; the yearbook notes no allowance is made for countries with no information, so it is a slight undercount."
+
+[[point]]
+year  = 1956
+n     = 7.3e7
+lo    = 7.3e7
+hi    = 7.3e7
+grade = "C"
+kind  = "estimate"
+cite  = "UN Statistical Office, Statistical Yearbook 1960 (12th issue), table 31 'Livestock population', world row (data supplied by FAO)"
+url   = "https://archive.org/details/united-nations-statistical-yearbook_1960_12"
+note  = "1955/56 (count or estimate nearest 1 Jan 1956): 73.0 million head (OCR of the archive.org scan, thousand head). World total including the USSR; the yearbook notes no allowance is made for countries with no information, so it is a slight undercount."
+
+[[point]]
+year  = 1959
+n     = 7.02e7
+lo    = 7.02e7
+hi    = 7.02e7
+grade = "C"
+kind  = "estimate"
+cite  = "UN Statistical Office, Statistical Yearbook 1960 (12th issue), table 31 'Livestock population', world row (data supplied by FAO)"
+url   = "https://archive.org/details/united-nations-statistical-yearbook_1960_12"
+note  = "1958/59 (count or estimate nearest 1 Jan 1959): 70.2 million head (OCR of the archive.org scan, thousand head). World total including the USSR; the yearbook notes no allowance is made for countries with no information, so it is a slight undercount."

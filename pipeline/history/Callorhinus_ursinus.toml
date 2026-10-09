@@ -1,0 +1,61 @@
+species   = "Callorhinus ursinus"
+common    = "Northern fur seal"
+component = "wild"
+use       = "display"
+scope     = "Eastern Pacific stock (Pribilof Islands, plus Bogoslof since the 1980s), all ages; roughly half the world population"
+notes     = "Regional only, so display. Most of the world population breeds on the Pribilofs; the rest in Russia (Commander, Kuril, Robben, Tyuleniy islands) and California. Worldwide ~1.1 million, about half on the Pribilofs (Encyclopedia of Marine Mammals, 2nd ed. 2008, Northern fur seal, pp. 788-791). Pelagic and land sealing cut the herd to an extreme low c. 1911 (~70,000 pups per year by one account); the 1911 Fur Seal Treaty let it grow ~8.6%/yr 1912-1924. NOAA designated the stock depleted in 1988 (below 50% of late-1950s levels). No traceable pre-exploitation (pre-1786) figure was found, so there is no baseline."
+
+[[point]]
+year  = 1912
+n     = 216000
+lo    = 216000
+hi    = 216000
+grade = "D"
+kind  = "unverified"
+cite  = "Wikipedia, 'Northern fur seal'"
+url   = "https://en.wikipedia.org/wiki/Northern_fur_seal"
+note  = "Pribilof population 'reached a low of 216,000 animals in 1912', given without a citation; the treaty-era low is widely described but this exact figure could not be traced to a primary report."
+
+[[point]]
+year  = 1957
+n     = 1800000
+lo    = 1800000
+hi    = 1800000
+grade = "C"
+kind  = "estimate"
+cite  = "Young et al. 2026, Alaska Marine Mammal Stock Assessments 2024, NOAA-TM-AFSC-503 (citing 53 FR 17888, 18 May 1988)"
+url   = "https://www.fisheries.noaa.gov/s3/2026-04/northern-fur-seal-callorhinus-ursinus-eastern-pacific-stock.pdf"
+note  = "Late-1950s level of 1.8 million, the reference for the 1988 depleted designation. Year approximate (late 1950s)."
+
+[[point]]
+year  = 1974
+n     = 1250000
+lo    = 1250000
+hi    = 1250000
+grade = "C"
+kind  = "estimate"
+cite  = "Young et al. 2026, Alaska Marine Mammal Stock Assessments 2024, NOAA-TM-AFSC-503"
+url   = "https://www.fisheries.noaa.gov/s3/2026-04/northern-fur-seal-callorhinus-ursinus-eastern-pacific-stock.pdf"
+note  = "Alaska population 'increased to approximately 1.25 million in 1974', then pup production fell 6.5-7.8%/yr into the 1980s."
+
+[[point]]
+year  = 1983
+n     = 877000
+lo    = 877000
+hi    = 877000
+grade = "B"
+kind  = "estimate"
+cite  = "Briggs & Fowler 1984, as cited in Young et al. 2026, NOAA-TM-AFSC-503"
+url   = "https://www.fisheries.noaa.gov/s3/2026-04/northern-fur-seal-callorhinus-ursinus-eastern-pacific-stock.pdf"
+note  = "'By 1983, the total stock estimate was 877,000 northern fur seals.'"
+
+[[point]]
+year  = 2022
+n     = 612765
+lo    = 518651
+hi    = 612765
+grade = "B"
+kind  = "index-scaled"
+cite  = "Young et al. 2026, Alaska Marine Mammal Stock Assessments 2024, NOAA-TM-AFSC-503"
+url   = "https://www.fisheries.noaa.gov/s3/2026-04/northern-fur-seal-callorhinus-ursinus-eastern-pacific-stock.pdf"
+note  = "N = 4.47 x 137,084 pups (St. Paul mean of 2018/2021/2022, St. George 2018/2022, Sea Lion Rock 2014, Bogoslof 2019). The x4.47 life-table expansion factor is the report's (Lander 1981, Loughlin et al. 1994). lo is the report's Nmin."

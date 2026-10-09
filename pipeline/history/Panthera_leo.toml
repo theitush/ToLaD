@@ -1,0 +1,67 @@
+species   = "Panthera leo"
+common    = "Lion"
+component = "wild"
+use       = "counts"
+scope     = "global wild lions; African totals (Asiatic lions add ~3-4%, see notes); recent figures exclude cubs"
+notes     = """
+The 1950 and 1975 figures are widely repeated round numbers with no traceable survey behind them
+(grade D). Modern estimates (2002-) are sums of site estimates of very mixed quality. Asiatic lions
+(Gir, India): 674 in 2020 and 891 in the May 2025 Gujarat census, not added to the African totals.
+IUCN 2016 (Bauer et al.) gave 23,000-39,000 mature individuals and a ~43% decline over 1993-2014.
+Bauer et al. 2015 (PNAS, doi:10.1073/pnas.1500664112) gives regional trends since 1990.
+"""
+
+[baseline]
+year  = 1950
+n     = 500000
+lo    = 400000
+hi    = 500000
+grade = "D"
+kind  = "unverified"
+cite  = "Hazzah, Borgerhoff Mulder & Frank 2009, Biological Conservation 142:2428-2437 (historical series, as quoted by San Diego Zoo Wildlife Alliance)"
+url   = "https://doi.org/10.1016/j.biocon.2009.06.006"
+note  = "'1950: 500,000'; the variant '400,000 in the 1950s' circulates in media and NGO pages. No survey underlies either figure."
+
+[[point]]
+year  = 1975
+n     = 200000
+lo    = 200000
+hi    = 200000
+grade = "D"
+kind  = "unverified"
+cite  = "Hazzah, Borgerhoff Mulder & Frank 2009, Biological Conservation 142:2428-2437 (as quoted by San Diego Zoo Wildlife Alliance)"
+url   = "https://doi.org/10.1016/j.biocon.2009.06.006"
+note  = "'1975: 200,000' in the same series; often attributed to Myers 1975, not traced to a count."
+
+[[point]]
+year  = 2002
+n     = 23000
+lo    = 16500
+hi    = 30000
+grade = "C"
+kind  = "estimate"
+cite  = "Bauer & Van Der Merwe 2004, Inventory of free-ranging lions Panthera leo in Africa, Oryx 38:26-31"
+url   = "https://doi.org/10.1017/S0030605304000055"
+note  = "Conservative continental inventory; inputs range from educated guesses to individually known populations."
+
+[[point]]
+year  = 2012
+n     = 33500
+lo    = 32000
+hi    = 35000
+grade = "B"
+kind  = "estimate"
+cite  = "Riggio et al. 2013, The size of savannah Africa: a lion's (Panthera leo) view, Biodiversity and Conservation 22:17-35"
+url   = "https://doi.org/10.1007/s10531-012-0381-4"
+note  = "32,000-35,000 free-ranging lions in 67 lion areas (n = midpoint)."
+
+[[point]]
+year  = 2024
+n     = 23500
+lo    = 22000
+hi    = 25000
+grade = "C"
+kind  = "estimate"
+cite  = "Nicholson, Bauer et al. 2025, Panthera leo, IUCN Red List e.T15951A280792135 (as quoted by San Diego Zoo Wildlife Alliance)"
+url   = "https://doi.org/10.2305/IUCN.UK.2025-2.RLTS.T15951A280792135.en"
+note  = "'Roughly 22,000 to 25,000 subadults and adults' in Africa (n = midpoint); cubs and ~891 Asiatic lions not included. Reported 25% continent-wide decline 2006-2018."

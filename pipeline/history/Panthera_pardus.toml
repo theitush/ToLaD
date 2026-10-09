@@ -1,0 +1,34 @@
+species   = "Panthera pardus"
+common    = "Leopard"
+component = "wild"
+use       = "display"
+scope     = "India only (about 70% of Indian leopard habitat sampled); NOT a global count"
+notes     = """
+No global leopard population estimate exists (IUCN 2023 and San Diego Zoo fact sheet: 'population
+sizes difficult to quantify'). The only continental figure, ~700,000 (600,000-850,000) for
+sub-Saharan Africa from Martin & de Meulenaer 1988 (CITES; rainfall/habitat model, presented 1987),
+is widely judged a gross overestimate (IUCN 2008: 'calculation was reportedly flawed'), so it is
+left out. The points below are India's national camera-trap estimates, shipped for display only.
+"""
+
+[[point]]
+year  = 2018
+n     = 12852
+lo    = 12172
+hi    = 13535
+grade = "B"
+kind  = "estimate"
+cite  = "NTCA & WII, Status of Leopards in India 2018"
+url   = "https://indiaenvironmentportal.org.in/reports-and-documents/status-of-leopard-in-india-2022-summary-report"
+note  = "Comparison figure quoted with the 2022 summary report (similar sampled area: forested habitat in tiger-range states; Himalaya and semi-arid areas not sampled)."
+
+[[point]]
+year  = 2022
+n     = 13874
+lo    = 12616
+hi    = 15132
+grade = "B"
+kind  = "estimate"
+cite  = "NTCA & WII 2024, Status of Leopards in India 2022: summary report"
+url   = "https://indiaenvironmentportal.org.in/reports-and-documents/status-of-leopard-in-india-2022-summary-report"
+note  = "Fifth cycle of the national tiger/co-predator monitoring; ~70% of leopard habitat sampled."

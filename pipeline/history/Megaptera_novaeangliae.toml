@@ -1,0 +1,50 @@
+species   = "Megaptera novaeangliae"
+common    = "Humpback whale"
+component = "wild"
+use       = "counts"
+scope     = "global, all ages"
+notes     = "Hunted from the 19th century and heavily in the 20th; protected worldwide in 1966. Regional reconstructions show deep lows, e.g. western South Atlantic ~27,000 (1830) to ~450 (mid-1950s) to ~25,000, 93% recovered (Zerbini et al. 2019, R. Soc. Open Sci.). Genetic (Ne-based) pre-whaling numbers (Roman & Palumbi 2003, North Atlantic ~240,000) are 3-10x catch-based ones and are not used. IUCN 2018: Least Concern."
+
+[baseline]
+year  = 1850
+n     = 231700
+lo    = 231700
+hi    = 231700
+grade = "C"
+kind  = "reconstruction"
+cite  = "Christensen 2006, UBC Fisheries Centre Research Reports 14(9), as tabulated in Pershing et al. 2010, PLoS ONE 5:e12444, Table 1"
+url   = "https://doi.org/10.1371/journal.pone.0012444"
+note  = "Pre-whaling global abundance (catch-based reconstruction). The source gives no single year; 1850 (19th-century whaling on humpbacks) is chosen here."
+
+[[point]]
+year  = 1966
+n     = 5000
+lo    = 5000
+hi    = 5000
+grade = "D"
+kind  = "estimate"
+cite  = "Baker et al. 1993, PNAS 90:8239-8243"
+url   = "https://doi.org/10.1073/pnas.90.17.8239"
+note  = "Hunting had reduced the worldwide population to perhaps fewer than 5,000 before protection in 1966, some subpopulations to under 200. A stated upper bound without a method, hence D."
+
+[[point]]
+year  = 2001
+n     = 42070
+lo    = 42070
+hi    = 42070
+grade = "C"
+kind  = "reconstruction"
+cite  = "Christensen 2006, UBC Fisheries Centre Research Reports 14(9), as tabulated in Pershing et al. 2010, PLoS ONE 5:e12444, Table 1"
+url   = "https://doi.org/10.1371/journal.pone.0012444"
+note  = "2001 global abundance in Christensen's compilation."
+
+[[point]]
+year  = 2018
+n     = 135000
+lo    = 135000
+hi    = 135000
+grade = "C"
+kind  = "estimate"
+cite  = "Cooke 2018, IUCN Red List: Megaptera novaeangliae, e.T13006A50362794"
+url   = "https://doi.org/10.2305/IUCN.UK.2018-2.RLTS.T13006A50362794.en"
+note  = "Worldwide ~135,000 whales, of which ~84,000 mature (2018)."

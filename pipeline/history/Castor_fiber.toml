@@ -1,0 +1,55 @@
+species   = "Castor fiber"
+common    = "Eurasian beaver"
+component = "wild"
+use       = "counts"
+scope     = "global, all ages; minimum estimates (sum of national estimates, lower limits)"
+notes     = """
+Overhunting left ~1,200 animals in 8 refugia from France to Mongolia around 1900. All later totals
+are 'minimum population estimates' from summing national figures with the same method, so they
+understate the true number. No sourced pre-decline level exists, so there is no baseline.
+Introduced North American beavers in Finland and Russia are excluded.
+"""
+
+[[point]]
+year  = 1900
+n     = 1200
+lo    = 1200
+hi    = 1200
+grade = "C"
+kind  = "estimate"
+cite  = "Halley, Saveljev & Rosell 2021, Population and distribution of beavers Castor fiber and Castor canadensis in Eurasia, Mammal Review 51:1-24"
+url   = "https://doi.org/10.1111/mam.12216"
+note  = "'A century ago, overhunting had reduced Eurasian beaver populations to c. 1200 animals in scattered refugia.'"
+
+[[point]]
+year  = 1998
+n     = 423000
+lo    = 423000
+hi    = 423000
+grade = "C"
+kind  = "estimate"
+cite  = "Nolet & Rosell 1998, Biological Conservation 83:165-173; value via Halley et al. 2021 (current minimum is 3.5x the 1998 estimate)"
+url   = "https://doi.org/10.1111/mam.12216"
+note  = "First modern estimate; n = 1,479,863 / 3.5 as stated by Halley et al. 2021, not read from the 1998 paper."
+
+[[point]]
+year  = 2002
+n     = 592000
+lo    = 592000
+hi    = 592000
+grade = "C"
+kind  = "estimate"
+cite  = "Halley & Rosell 2002; value via Halley et al. 2021 (current minimum is 2.5x the 2002 estimate)"
+url   = "https://doi.org/10.1111/mam.12216"
+note  = "n = 1,479,863 / 2.5 as stated by Halley et al. 2021 (other summaries give ~593,000)."
+
+[[point]]
+year  = 2020
+n     = 1479863
+lo    = 1479863
+hi    = 1479863
+grade = "C"
+kind  = "estimate"
+cite  = "Halley, Saveljev & Rosell 2021, Mammal Review 51:1-24"
+url   = "https://doi.org/10.1111/mam.12216"
+note  = "'Minimum population estimate' (c. 1.5 million); about half in Russia (~700,000)."

@@ -1,0 +1,39 @@
+species   = "Pongo abelii"
+common    = "Sumatran orangutan"
+component = "wild"
+use       = "counts"
+scope     = "global (northern Sumatra), all ages; excludes the Tapanuli orangutan (Pongo tapanuliensis, described 2017) where the source allows"
+notes     = "Survey coverage changed a lot: Wich et al. 2008 (Oryx 42:329-339) gave c. 6,600 (6,624) for 2004, and Wich et al. 2016 (Science Advances 2:e1500789) gave 14,613 for 2015 (13,846 after the Tapanuli split); the authors say the rise reflects wider survey effort, not growth. The 2004 point is left out as not comparable. Singleton et al. 2008 (IUCN) report a decline of over 80% in 75 years. The 2016 PHVA gave 14,470, including Tapanuli."
+
+[baseline]
+year  = 1900
+n     = 89286
+lo    = 89286
+hi    = 89286
+grade = "D"
+kind  = "unverified"
+cite  = "San Diego Zoo Wildlife Alliance orangutan fact sheet ('Population in 2000 estimated at 12,500 individuals; approximately 14% of the estimated population from 1900')"
+url   = "https://ielc.libguides.com/sdzg/factsheets/orangutans/population"
+note  = "Derived: 12,500 / 0.14 = 89,286. The fact sheet gives no source for its 1900 estimate; a 1900 figure of ~85,000 is often attributed to Rijksen & Meijaard 1999 (Our Vanishing Relative) but was not traced."
+
+[[point]]
+year  = 2000
+n     = 12500
+lo    = 12500
+hi    = 12500
+grade = "C"
+kind  = "estimate"
+cite  = "San Diego Zoo Wildlife Alliance orangutan fact sheet"
+url   = "https://ielc.libguides.com/sdzg/factsheets/orangutans/population"
+note  = "'Population in 2000 estimated at 12,500 individuals' (no inline source; probably the Singleton et al. 2004 PHVA). Likely includes Tapanuli orangutans."
+
+[[point]]
+year  = 2015
+n     = 13846
+lo    = 13846
+hi    = 13846
+grade = "B"
+kind  = "estimate"
+cite  = "Wich et al. 2016, Science Advances 2:e1500789; IUCN Red List 2017 (Singleton et al., doi:10.2305/IUCN.UK.2017-3.RLTS.T121097935A115575085.en)"
+url   = "https://doi.org/10.1126/sciadv.1500789"
+note  = "Transect-based density x forest area: 14,613 in 2015 in the paper; the IUCN Ape Populations portal gives 13,846 for P. abelii (citing Wich et al. 2016), apparently the total without the Batang Toru (Tapanuli) population."

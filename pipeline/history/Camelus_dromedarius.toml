@@ -1,0 +1,7 @@
+species   = "Camelus dromedarius"
+common    = "Dromedary"
+component = "domestic"
+use       = "counts"
+scope     = "global domestic stock"
+faostat_item = 1126
+notes     = "FAO item 1126 'Camels' covers all camels, dromedary and Bactrian (Camelus bactrianus) together; the series is attached to the dromedary, which is the large majority. No citable pre-1961 global figure was found: the UN Statistical Yearbooks 1948-1960 give world totals only for cattle, pigs, sheep, horses, mules and asses, and the FAO yearbooks of the period that would list world camels were not reachable online. The curve before 1961 is the model's domestication-growth shape, rescaled to FAOSTAT 1961."

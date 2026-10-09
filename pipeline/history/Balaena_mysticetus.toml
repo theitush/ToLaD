@@ -1,0 +1,39 @@
+species   = "Balaena mysticetus"
+common    = "Bowhead whale"
+component = "wild"
+use       = "counts"
+scope     = "global, all ages"
+notes     = "Commercial whaling from 1611 (Spitsbergen) through the 19th century (Davis Strait, Bering-Chukchi-Beaufort) left all stocks severely depleted; only aboriginal subsistence hunting continues. The Bering-Chukchi-Beaufort stock, the largest, was 12,505 in 2019 (Givens et al. 2021, J. Cetacean Res. Manage. 22:61-73, doi:10.47536/jcrm.v22i1.230) and grew ~3.7%/yr 1978-2011; the Svalbard and Okhotsk stocks remain small. A 'pre-whaling 50,000' figure on Wikipedia has no visible source and is not used."
+
+[baseline]
+year  = 1611
+n     = 89000
+lo    = 89000
+hi    = 89000
+grade = "C"
+kind  = "reconstruction"
+cite  = "Christensen 2006, UBC Fisheries Centre Research Reports 14(9), as tabulated in Pershing et al. 2010, PLoS ONE 5:e12444, Table 1"
+url   = "https://doi.org/10.1371/journal.pone.0012444"
+note  = "Pre-whaling global abundance (catch-based reconstruction). The source gives no single year; 1611, the start of Spitsbergen whaling, is chosen here."
+
+[[point]]
+year  = 2001
+n     = 9450
+lo    = 9450
+hi    = 9450
+grade = "C"
+kind  = "reconstruction"
+cite  = "Christensen 2006, UBC Fisheries Centre Research Reports 14(9), as tabulated in Pershing et al. 2010, PLoS ONE 5:e12444, Table 1"
+url   = "https://doi.org/10.1371/journal.pone.0012444"
+note  = "2001 global abundance in Christensen's compilation."
+
+[[point]]
+year  = 2018
+n     = 17500
+lo    = 10000
+hi    = 25000
+grade = "C"
+kind  = "estimate"
+cite  = "Cooke & Reeves 2018, IUCN Red List: Balaena mysticetus, e.T2467A50347659"
+url   = "https://doi.org/10.2305/IUCN.UK.2018-1.RLTS.T2467A50347659.en"
+note  = "Worldwide an estimated 10,000-25,000 (as quoted with this assessment and WDC). n is the midpoint, set here."

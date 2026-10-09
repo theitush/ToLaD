@@ -1,0 +1,127 @@
+species   = "Homo sapiens"
+common    = "Human"
+component = "total"
+use       = "display"
+scope     = "global, all ages"
+notes     = "World population benchmarks for display only; counts stay PRB + UN WPP. Pre-1800 values are HYDE reconstructions (3.2 for 10,000 BCE with its stated range, 3.3 for later dates), 1800 Gapminder, 1900 PRB, 1950 onward UN WPP 2024. Sources differ in method, so small steps at the joins are expected."
+
+[[point]]
+year  = -10000
+n     = 4.4e6
+lo    = 10000
+hi    = 8.9e6
+grade = "C"
+kind  = "reconstruction"
+cite  = "Klein Goldewijk, Beusen, Doelman & Stehfest 2017, ESSD 9:927-953 (HYDE 3.2)"
+url   = "https://doi.org/10.5194/essd-9-927-2017"
+note  = "Abstract: global population 4.4 million in 10,000 BCE, 'with a lower range < 0.01 and an upper range of 8.9 million'; lo set to 0.01 million. HYDE 3.3 (OWID) gives 4.50 M for the same date."
+
+[[point]]
+year  = -5000
+n     = 1.9156e7
+lo    = 1.9156e7
+hi    = 1.9156e7
+grade = "B"
+kind  = "reconstruction"
+cite  = "Klein Goldewijk et al. 2017, ESSD 9:927-953 (HYDE 3.2 method, doi:10.5194/essd-9-927-2017); HYDE 3.3 (2023) world total as compiled by Our World in Data"
+url   = "https://ourworldindata.org/grapher/population"
+note  = "HYDE 3.3 world population for 5000 BCE: 19,155,698, read from the OWID 'Population' grapher (HYDE 3.3 is OWID's source for 10,000 BCE to 1799). HYDE gives no uncertainty for this date."
+
+[[point]]
+year  = 1
+n     = 2.32269e8
+lo    = 2.32269e8
+hi    = 2.32269e8
+grade = "B"
+kind  = "reconstruction"
+cite  = "Klein Goldewijk et al. 2017, ESSD 9:927-953 (HYDE 3.2 method, doi:10.5194/essd-9-927-2017); HYDE 3.3 (2023) world total as compiled by Our World in Data"
+url   = "https://ourworldindata.org/grapher/population"
+note  = "HYDE 3.3 world population for year 0 CE (HYDE's time step; stored here as 1 CE): 232,268,832, read from the OWID 'Population' grapher (HYDE 3.3 is OWID's source for 10,000 BCE to 1799). HYDE gives no uncertainty for this date."
+
+[[point]]
+year  = 1000
+n     = 3.23463e8
+lo    = 3.23463e8
+hi    = 3.23463e8
+grade = "B"
+kind  = "reconstruction"
+cite  = "Klein Goldewijk et al. 2017, ESSD 9:927-953 (HYDE 3.2 method, doi:10.5194/essd-9-927-2017); HYDE 3.3 (2023) world total as compiled by Our World in Data"
+url   = "https://ourworldindata.org/grapher/population"
+note  = "HYDE 3.3 world population for 1000 CE: 323,462,624, read from the OWID 'Population' grapher (HYDE 3.3 is OWID's source for 10,000 BCE to 1799). HYDE gives no uncertainty for this date."
+
+[[point]]
+year  = 1500
+n     = 5.03051e8
+lo    = 5.03051e8
+hi    = 5.03051e8
+grade = "B"
+kind  = "reconstruction"
+cite  = "Klein Goldewijk et al. 2017, ESSD 9:927-953 (HYDE 3.2 method, doi:10.5194/essd-9-927-2017); HYDE 3.3 (2023) world total as compiled by Our World in Data"
+url   = "https://ourworldindata.org/grapher/population"
+note  = "HYDE 3.3 world population for 1500 CE: 503,051,104, read from the OWID 'Population' grapher (HYDE 3.3 is OWID's source for 10,000 BCE to 1799). HYDE gives no uncertainty for this date."
+
+[[point]]
+year  = 1700
+n     = 5.95457e8
+lo    = 5.95457e8
+hi    = 5.95457e8
+grade = "B"
+kind  = "reconstruction"
+cite  = "Klein Goldewijk et al. 2017, ESSD 9:927-953 (HYDE 3.2 method, doi:10.5194/essd-9-927-2017); HYDE 3.3 (2023) world total as compiled by Our World in Data"
+url   = "https://ourworldindata.org/grapher/population"
+note  = "HYDE 3.3 world population for 1700 CE: 595,456,896, read from the OWID 'Population' grapher (HYDE 3.3 is OWID's source for 10,000 BCE to 1799). HYDE gives no uncertainty for this date."
+
+[[point]]
+year  = 1800
+n     = 9.83105e8
+lo    = 9.83105e8
+hi    = 9.83105e8
+grade = "B"
+kind  = "estimate"
+cite  = "Gapminder 2022, Population v7, world total as compiled by Our World in Data"
+url   = "https://ourworldindata.org/grapher/population"
+note  = "World population 1800: 983,104,755 (OWID uses Gapminder v7 for 1800-1949). Commonly rounded to 'about 1 billion around 1800-1804' (UN 1999, The World at Six Billion)."
+
+[[point]]
+year  = 1900
+n     = 1.656e9
+lo    = 1.656e9
+hi    = 1.656e9
+grade = "B"
+kind  = "estimate"
+cite  = "Kaneda & Haub 2022, How Many People Have Ever Lived on Earth?, Population Reference Bureau, table 1"
+url   = "https://www.prb.org/articles/how-many-people-have-ever-lived-on-earth/"
+note  = "PRB benchmark population for 1900: 1,656,000,000. Gapminder v7 (via OWID) gives 1.627 billion."
+
+[[point]]
+year  = 1950
+n     = 2.49309e9
+lo    = 2.49309e9
+hi    = 2.49309e9
+grade = "A"
+kind  = "estimate"
+cite  = "UN DESA Population Division 2024, World Population Prospects 2024"
+url   = "https://population.un.org/wpp/"
+note  = "World total population, 1 July 1950: 2,493,092,852 (WPP 2024 estimates, as served by OWID grapher 'population-with-un-projections')."
+
+[[point]]
+year  = 2000
+n     = 6.1717e9
+lo    = 6.1717e9
+hi    = 6.1717e9
+grade = "A"
+kind  = "estimate"
+cite  = "UN DESA Population Division 2024, World Population Prospects 2024"
+url   = "https://population.un.org/wpp/"
+note  = "World total population, 1 July 2000: 6,171,702,992 (WPP 2024 estimates)."
+
+[[point]]
+year  = 2024
+n     = 8.16197e9
+lo    = 8.16197e9
+hi    = 8.16197e9
+grade = "A"
+kind  = "estimate"
+cite  = "UN DESA Population Division 2024, World Population Prospects 2024"
+url   = "https://population.un.org/wpp/"
+note  = "World total population, 1 July 2024: 8,161,972,574. WPP 2024 estimates end in 2023 (8,091,734,933); 2024 is the medium-variant figure."

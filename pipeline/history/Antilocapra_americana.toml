@@ -1,0 +1,67 @@
+species   = "Antilocapra americana"
+common    = "Pronghorn"
+component = "wild"
+use       = "counts"
+scope     = "global (USA, Canada, Mexico), all ages"
+notes     = """
+The original-number figure is Nelson's 1925 reasoning by analogy with bison (grade D); O'Gara 1990
+gives 35 million. Nelson's 1922-24 census is quoted as ~20,000 (body of the 1925 USDA press
+release, OCR) or ~30,000 (its headline; others 30,400-30,500). Recovery passed 1 million in the
+1980s, fell by about a third by 1997, then rose again. Sonoran and peninsular subspecies are tiny
+(hundreds) and included in the totals.
+"""
+
+[baseline]
+year  = 1800
+n     = 3.5e7
+lo    = 3.0e7
+hi    = 4.0e7
+grade = "D"
+kind  = "estimate"
+cite  = "Nelson 1925, Status of the Pronghorned Antelope 1922-1924, USDA Department Bulletin 1346 (as summarised in the Biological Survey press release of 2 Sep 1925); O'Gara 1990 in Horns, Pronghorns, and Antlers"
+url   = "https://www.fws.gov/sites/default/files/documents/historic-news-releases/1925/19250902A.PDF"
+note  = "'A conservative estimate to place its probable original numbers at not less than thirty to forty millions'; O'Gara 1990 (doi:10.1007/978-1-4613-8966-8_7): 'some 35 million'."
+
+[[point]]
+year  = 1924
+n     = 30000
+lo    = 20000
+hi    = 30500
+grade = "C"
+kind  = "census"
+cite  = "Nelson 1925, USDA Department Bulletin 1346, as summarised in the Biological Survey press release of 2 Sep 1925 ('Only 30,000 antelope survive in North America')"
+url   = "https://www.fws.gov/sites/default/files/documents/historic-news-releases/1925/19250902A.PDF"
+note  = "Census of 286 scattered bands in 16 western states, Canada and Mexico; the release body reads ~20,000 in the scanned text (lo), other sources 30,400-30,500."
+
+[[point]]
+year  = 1984
+n     = 1000000
+lo    = 1000000
+hi    = 1000000
+grade = "D"
+kind  = "estimate"
+cite  = "San Diego Zoo Wildlife Alliance, Pronghorn fact sheet ('reaching more than 1 million in 1984'; page reference O'Gara & Yoakum 2004)"
+url   = "https://ielc.libguides.com/sdzg/factsheets/pronghorn/population"
+note  = "Lower bound; no specific source attached to the figure on the page."
+
+[[point]]
+year  = 2000
+n     = 799200
+lo    = 799200
+hi    = 799200
+grade = "C"
+kind  = "estimate"
+cite  = "San Diego Zoo Wildlife Alliance, Pronghorn fact sheet (state and provincial totals for 2000; page reference O'Gara & Yoakum 2004)"
+url   = "https://ielc.libguides.com/sdzg/factsheets/pronghorn/population"
+note  = "USA 765,200 + Canada 32,000 + Mexico 1,200 = 799,200."
+
+[[point]]
+year  = 2016
+n     = 1000000
+lo    = 1000000
+hi    = 1000000
+grade = "C"
+kind  = "estimate"
+cite  = "IUCN SSC Antelope Specialist Group 2016, Antilocapra americana, IUCN Red List e.T1677A50181848"
+url   = "https://doi.org/10.2305/IUCN.UK.2016-3.RLTS.T1677A50181848.en"
+note  = "'About one million individuals', 750,000 mature (citing O'Gara 1999 and Byers 2011; quoted by San Diego Zoo Wildlife Alliance)."

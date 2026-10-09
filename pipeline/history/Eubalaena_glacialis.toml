@@ -1,0 +1,72 @@
+species   = "Eubalaena glacialis"
+common    = "North Atlantic right whale"
+component = "wild"
+use       = "counts"
+scope     = "global (western North Atlantic; the eastern population is functionally extinct), all ages"
+notes     = "Hunted from the 11th century (Basque whaling) into the 20th; protected 1935. No numeric estimate of the early-20th-century low was found with a traceable source. Modern numbers are photo-identification mark-recapture estimates (NARWC / NOAA). Christensen's 'right whale' figure (Pershing et al. 2010) lumps three Eubalaena species and is not used."
+
+[baseline]
+year  = 1600
+n     = 15200
+lo    = 9075
+hi    = 21328
+grade = "C"
+kind  = "reconstruction"
+cite  = "Monsarrat et al. 2016, Conservation Biology 30:783-791"
+url   = "https://doi.org/10.1111/cobi.12664"
+note  = "Pre-whaling North Atlantic carrying capacity 9,075-21,328, from a habitat model calibrated on North Pacific right whale catches. n is the midpoint, set here; the year is a nominal pre-industrial date chosen here."
+
+[[point]]
+year  = 1990
+n     = 270
+lo    = 270
+hi    = 270
+grade = "A"
+kind  = "census"
+cite  = "Pace, Corkeron & Kraus 2017, Ecology and Evolution 7:8730-8741"
+url   = "https://doi.org/10.1002/ece3.3406"
+note  = "Median of a state-space mark-recapture estimate; abundance grew ~2.8%/yr from 270 (1990) to 483 (2010)."
+
+[[point]]
+year  = 2010
+n     = 483
+lo    = 483
+hi    = 483
+grade = "A"
+kind  = "census"
+cite  = "Pace, Corkeron & Kraus 2017, Ecology and Evolution 7:8730-8741"
+url   = "https://doi.org/10.1002/ece3.3406"
+note  = "Median estimate at the 2010 peak."
+
+[[point]]
+year  = 2015
+n     = 458
+lo    = 444
+hi    = 471
+grade = "A"
+kind  = "census"
+cite  = "Pace, Corkeron & Kraus 2017, Ecology and Evolution 7:8730-8741"
+url   = "https://doi.org/10.1002/ece3.3406"
+note  = "95% credible interval 444-471; decline after 2010 with probability 99.99%."
+
+[[point]]
+year  = 2023
+n     = 376
+lo    = 373
+hi    = 380
+grade = "A"
+kind  = "census"
+cite  = "North Atlantic Right Whale Consortium 2025 Report Card"
+url   = "https://www.narwc.org/uploads/1/1/6/6/116623219/2025reportcardfinal.pdf"
+note  = "2023 estimate recalculated with updated data: 376 (+4/-3)."
+
+[[point]]
+year  = 2024
+n     = 384
+lo    = 375
+hi    = 394
+grade = "A"
+kind  = "census"
+cite  = "North Atlantic Right Whale Consortium 2025 Report Card"
+url   = "https://www.narwc.org/uploads/1/1/6/6/116623219/2025reportcardfinal.pdf"
+note  = "2024 estimate 384 (+10/-9), data as of 8 Sep 2025; +2.1% on 2023."

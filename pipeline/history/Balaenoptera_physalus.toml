@@ -1,0 +1,39 @@
+species   = "Balaenoptera physalus"
+common    = "Fin whale"
+component = "wild"
+use       = "counts"
+scope     = "global, all ages"
+notes     = "Most heavily exploited whale by numbers in the 20th century (mainly Southern Hemisphere, 1920s-1970s). No global estimate exists for the low point; 2001 is the earliest post-whaling global total. IUCN 2018: Vulnerable, increasing. Genetic (Ne-based) pre-whaling numbers (Roman & Palumbi 2003, North Atlantic ~360,000) are not comparable and are not used."
+
+[baseline]
+year  = 1900
+n     = 762400
+lo    = 762400
+hi    = 762400
+grade = "C"
+kind  = "reconstruction"
+cite  = "Christensen 2006, UBC Fisheries Centre Research Reports 14(9), as tabulated in Pershing et al. 2010, PLoS ONE 5:e12444, Table 1"
+url   = "https://doi.org/10.1371/journal.pone.0012444"
+note  = "Pre-whaling global abundance (catch-based reconstruction). The source gives no single year; 1900 is the approximate start of modern whaling on fin whales, chosen here."
+
+[[point]]
+year  = 2001
+n     = 109600
+lo    = 109600
+hi    = 109600
+grade = "C"
+kind  = "reconstruction"
+cite  = "Christensen 2006, UBC Fisheries Centre Research Reports 14(9), as tabulated in Pershing et al. 2010, PLoS ONE 5:e12444, Table 1"
+url   = "https://doi.org/10.1371/journal.pone.0012444"
+note  = "2001 global abundance in Christensen's compilation."
+
+[[point]]
+year  = 2018
+n     = 145000
+lo    = 100000
+hi    = 145000
+grade = "C"
+kind  = "estimate"
+cite  = "Cooke 2018, IUCN Red List: Balaenoptera physalus, e.T2478A50349982"
+url   = "https://doi.org/10.2305/IUCN.UK.2018-2.RLTS.T2478A50349982.en"
+note  = "n = 70,000 North Atlantic + 50,000 North Pacific + 25,000 Southern Hemisphere, the ocean totals the assessment gives (all oceans; summed here). lo is the 2018 global figure of 100,000-140,000 mature individuals, used as a floor."

@@ -1,0 +1,72 @@
+species   = "Eschrichtius robustus"
+common    = "Gray whale"
+component = "wild"
+use       = "counts"
+scope     = "global, all ages; points from 1968 are the eastern North Pacific stock, nearly the whole species"
+notes     = "The North Atlantic population was extinct by the 18th century. Eastern North Pacific (ENP) whales were hunted in the Baja lagoons from 1846 and again in the early 20th century; the western North Pacific remnant numbers only a few hundred, so ENP counts (NOAA shore-based counts off central California since 1967/68; each season Dec-Feb is dated by its January) are used as the species curve. ENP had unusual mortality events in 1999-2000 and 2019-2023."
+
+[baseline]
+year  = 1846
+n     = 24600
+lo    = 24600
+hi    = 24600
+grade = "C"
+kind  = "reconstruction"
+cite  = "Christensen 2006, UBC Fisheries Centre Research Reports 14(9), as tabulated in Pershing et al. 2010, PLoS ONE 5:e12444, Table 1"
+url   = "https://doi.org/10.1371/journal.pone.0012444"
+note  = "Pre-whaling global abundance (catch-based reconstruction). The source gives no single year; 1846, the start of lagoon whaling, is chosen here."
+
+[[point]]
+year  = 1968
+n     = 13426
+lo    = 10952
+hi    = 15900
+grade = "A"
+kind  = "census"
+cite  = "Eguchi, Lang & Weller 2023, NOAA Tech. Memo. NMFS-SWFSC-680 (series of Laake et al. 2012, J. Cetacean Res. Manage. 12:287-306)"
+url   = "https://repository.library.noaa.gov/view/noaa/50655"
+note  = "ENP 1967/68 migration count estimate, 95% CI 10,952-15,900 (CV 0.094); first year of the series."
+
+[[point]]
+year  = 2016
+n     = 27430
+lo    = 24930
+hi    = 30180
+grade = "A"
+kind  = "census"
+cite  = "Eguchi, Lang & Weller 2025, NOAA Tech. Memo. NMFS-SWFSC-724"
+url   = "https://doi.org/10.25923/jqea-s505"
+note  = "ENP 2015/16 peak, 95% CI 24,930-30,180 (re-estimated; earlier memos gave 26,960)."
+
+[[point]]
+year  = 2023
+n     = 14770
+lo    = 13410
+hi    = 16250
+grade = "A"
+kind  = "census"
+cite  = "Eguchi, Lang & Weller 2025, NOAA Tech. Memo. NMFS-SWFSC-724"
+url   = "https://doi.org/10.25923/jqea-s505"
+note  = "ENP 2022/23, 95% CI 13,410-16,250, after the 2019- unusual mortality event."
+
+[[point]]
+year  = 2025
+n     = 12950
+lo    = 11690
+hi    = 14450
+grade = "A"
+kind  = "census"
+cite  = "Eguchi, Lang & Weller 2025, NOAA Tech. Memo. NMFS-SWFSC-724"
+url   = "https://doi.org/10.25923/jqea-s505"
+note  = "ENP 2024/25, 95% credible interval 11,690-14,450 (CV 0.053); third lowest since 1967. The 2023/24 estimate of 19,260 is omitted here: the memo says its jump may reflect violated survey assumptions."
+
+[[point]]
+year  = 2026
+n     = 17750
+lo    = 15930
+hi    = 20530
+grade = "A"
+kind  = "census"
+cite  = "NOAA Fisheries 2026, 'West Coast gray whale estimate shows increase' (feature story, 15 July 2026; NOAA-TM-NMFS-SWFSC-737)"
+url   = "https://www.fisheries.noaa.gov/feature-story/west-coast-gray-whale-estimate-shows-increase-new-count-determines"
+note  = "ENP 2025/26, 15,930-20,530. NOAA says the increase likely exceeds the population's reproductive capacity and that single-year estimates are best read as trend indicators."

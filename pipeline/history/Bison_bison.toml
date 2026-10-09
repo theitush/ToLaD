@@ -1,0 +1,46 @@
+species   = "Bison bison"
+aliases   = ["Bos bison"]
+common    = "American bison"
+component = "wild"
+use       = "counts"
+scope     = "global (North America), all ages; conservation herds only, commercial herds excluded"
+notes     = """
+The pre-1800 level is a speculative range (grade D). The 1889 Hornaday total includes captive
+animals and estimated stragglers. The recent total counts only the 68 conservation herds (plains
+and wood bison) listed by the IUCN assessment. About 300,000 more bison are commercially propagated
+on ~4,000 farms and ranches in North America (2014 data, same assessment), ~97% of all living
+bison; those are managed as livestock and are NOT included here.
+"""
+
+[baseline]
+year  = 1800
+n     = 4.2e7
+lo    = 3.0e7
+hi    = 6.0e7
+grade = "D"
+kind  = "estimate"
+cite  = "US National Park Service, Theodore Roosevelt NP, 'Bison (Buffalo)': an estimated 30 to 60 million on the Great Plains"
+url   = "https://home.nps.gov/thro/learn/nature/bison-buffalo.htm"
+note  = "Pre-settlement numbers are speculative (a 1997 USFWS publication gives 30-75 M). n is the geometric midpoint of 30-60 M, not a source figure."
+
+[[point]]
+year  = 1889
+n     = 1091
+lo    = 1091
+hi    = 1091
+grade = "C"
+kind  = "census"
+cite  = "Hornaday 1889, The Extermination of the American Bison, Report of the US National Museum for 1886-87, pp. 369-548"
+url   = "https://www.gutenberg.org/ebooks/17748"
+note  = "All bison living on 1 Jan 1889: 85 wild in the US + 550 estimated in Athabasca + 256 in captivity + 200 protected in Yellowstone."
+
+[[point]]
+year  = 2017
+n     = 31000
+lo    = 31000
+hi    = 31000
+grade = "B"
+kind  = "estimate"
+cite  = "Aune, Jorgensen & Gates 2017, Bison bison, IUCN Red List e.T2815A45156541 (errata 2018)"
+url   = "https://doi.org/10.2305/IUCN.UK.2017-3.RLTS.T2815A45156541.en"
+note  = "~31,000 in 68 conservation herds (~20,000 plains, ~11,000 wood bison); 11,248-13,123 mature individuals. Excludes ~300,000 commercial bison (2014)."

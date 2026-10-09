@@ -1,0 +1,50 @@
+species   = "Enhydra lutris"
+common    = "Sea otter"
+component = "wild"
+use       = "counts"
+scope     = "global, all ages"
+notes     = "The maritime fur trade (1741-1911) reduced the species to 13 remnant colonies; protected by the 1911 Fur Seal Treaty. Recovery since, partly through translocations (e.g. British Columbia 1969-72), but the southwest Alaska / Aleutian population collapsed in the 1990s. California has a separate USGS annual index (2,962 in 2019). IUCN: Endangered."
+
+[baseline]
+year  = 1741
+n     = 225000
+lo    = 150000
+hi    = 300000
+grade = "D"
+kind  = "estimate"
+cite  = "COSEWIC 2007, Assessment and update status report on the sea otter Enhydra lutris in Canada, citing Kenyon 1969 and Johnson 1982"
+url   = "https://www.canada.ca/en/environment-climate-change/services/species-risk-public-registry/cosewic-assessments-status-reports/sea-otter-2007/chapter-9.html"
+note  = "Pre-fur-trade range-wide total 'estimated to have been 150 000 to 300 000'. A rough historical reasoning estimate, not a count. n is the midpoint, set here; 1741 is the start of the Russian trade (Bering expedition)."
+
+[[point]]
+year  = 1911
+n     = 1500
+lo    = 1000
+hi    = 2000
+grade = "C"
+kind  = "estimate"
+cite  = "COSEWIC 2007 (citing Kenyon 1969)"
+url   = "https://www.canada.ca/en/environment-climate-change/services/species-risk-public-registry/cosewic-assessments-status-reports/sea-otter-2007/chapter-9.html"
+note  = "'By 1911, the world population numbered fewer than 2000 animals scattered amongst 13 remnant colonies'; other accounts give 1,000-2,000 (Riedman). n is the midpoint, set here."
+
+[[point]]
+year  = 1998
+n     = 126000
+lo    = 126000
+hi    = 126000
+grade = "C"
+kind  = "estimate"
+cite  = "COSEWIC 2007 (citing Gorbics et al. 2000)"
+url   = "https://www.canada.ca/en/environment-climate-change/services/species-risk-public-registry/cosewic-assessments-status-reports/sea-otter-2007/chapter-9.html"
+note  = "'The most recent total population estimate (North America and Russia) of about 126 000 otters dates from the late 1990s', made while the western Alaska decline was underway."
+
+[[point]]
+year  = 2007
+n     = 102830
+lo    = 102830
+hi    = 102830
+grade = "C"
+kind  = "estimate"
+cite  = "Doroff et al. 2011, Status review: sea otter population status and trend, IUCN Otter Spec. Group Bull. 28A:22-30"
+url   = "https://www.iucnosgbull.org/Volume28A/Doroff_et_al_2011.html"
+note  = "Sum, made here, of the range-wide review's regional estimates c. 2004-2007: Alaska 73,329; Russia ~22,500; British Columbia 3,185 (minimum); Washington 790 (2006 count); California 3,026 (2007). Japan (a few animals) excluded. The paper itself gives no world total."

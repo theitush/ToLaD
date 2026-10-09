@@ -1,0 +1,33 @@
+species   = "Castor canadensis"
+common    = "American beaver"
+component = "wild"
+use       = "counts"
+scope     = "native range (North America), all ages; introduced Eurasian and Patagonian populations excluded"
+notes     = """
+The pre-European figure is Seton's 1929 guess (60-400 million), repeated as '60 million beavers';
+grade D. By 1900 the beaver was 'almost extinct in North America' (Naiman et al. 1988) but no
+count exists for the low point. The often-quoted current '10 to 15 million' could not be traced to
+any study and is left out, so the latest sourced point is 1988.
+"""
+
+[baseline]
+year  = 1600
+n     = 1.55e8
+lo    = 6.0e7
+hi    = 4.0e8
+grade = "D"
+kind  = "estimate"
+cite  = "Seton 1929, Lives of Game Animals vol. 4, as cited by Naiman, Johnston & Kelley 1988, BioScience 38:753-762"
+url   = "https://doi.org/10.2307/1310784"
+note  = "'Before the arrival of Europeans ... estimated to be 60-400 million individuals (Seton 1929)'. A guess from range and density; n is the geometric midpoint."
+
+[[point]]
+year  = 1988
+n     = 8.5e6
+lo    = 6.0e6
+hi    = 1.2e7
+grade = "C"
+kind  = "estimate"
+cite  = "Naiman, Johnston & Kelley 1988, Alteration of North American streams by beaver, BioScience 38:753-762"
+url   = "https://doi.org/10.2307/1310784"
+note  = "'The current population is thought to be between 6 and 12 million individuals' (n = geometric midpoint)."

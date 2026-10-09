@@ -1,0 +1,61 @@
+species   = "Saiga tatarica"
+common    = "Saiga antelope"
+component = "wild"
+use       = "counts"
+scope     = "global, all ages (Kazakhstan, Kalmykia in Russia, Mongolia, Uzbekistan); recent points are Kazakhstan only (~99% of the species)"
+notes     = "Poaching for horn and meat after the Soviet collapse drove steep declines (Milner-Gulland et al. 2001, Oryx 35:340-345, doi:10.1046/j.1365-3008.2001.00202.x); ~1.25 M (mid-1970s) to c. 50,000 (2008) is a ~96% fall. Kazakhstan fell to ~21,000 in 2003. A 2015 bacterial die-off killed over 200,000 (more than 60% of the world population). Kazakhstan's aerial censuses (Altyn Dala / Okhotzooprom) have since recorded rapid growth (~48%/yr), and culls began in 2024-25. Kalmykia: 380,000 (1980), 196,000 (1996), 26,000 (2000); Mongolian saiga ~750-5,200 (1998-2004)."
+
+[baseline]
+year  = 1975
+n     = 1.25e6
+lo    = 1.25e6
+hi    = 1.25e6
+grade = "C"
+kind  = "estimate"
+cite  = "Mallon 2008, IUCN Red List, Saiga tatarica, as quoted by the Japan Biodiversity Center ESABII threatened mammal database"
+url   = "https://www.esabii.biodic.go.jp/database/mammal/cetartiodactyla/saiga_tatarica.html"
+note  = "'The global population of Saiga is now estimated at c.50,000, down from 1,250,000 in the mid-1970s'. Year set to mid-1970s."
+
+[[point]]
+year  = 1993
+n     = 1.0e6
+lo    = 1.0e6
+hi    = 1.0e6
+grade = "C"
+kind  = "estimate"
+cite  = "Bekenov et al. 1998; Lushchekina et al. 1999; Sokolov & Zhirnov 1998; as quoted by the ESABII threatened mammal database"
+url   = "https://www.esabii.biodic.go.jp/database/mammal/cetartiodactyla/saiga_tatarica.html"
+note  = "'Between 1991 and 1994 the global population was relatively stable at just under one million animals', ~810,000-825,000 of them in Kazakhstan."
+
+[[point]]
+year  = 2008
+n     = 50000
+lo    = 50000
+hi    = 50000
+grade = "C"
+kind  = "estimate"
+cite  = "Mallon 2008, IUCN Red List, Saiga tatarica, as quoted by the ESABII threatened mammal database"
+url   = "https://www.esabii.biodic.go.jp/database/mammal/cetartiodactyla/saiga_tatarica.html"
+note  = "Global c. 50,000 at the 2008 assessment, near the low point (Kazakhstan ~21,000 in 2003)."
+
+[[point]]
+year  = 2024
+n     = 2833600
+lo    = 2833600
+hi    = 2833600
+grade = "B"
+kind  = "census"
+cite  = "Kazakhstan national saiga aerial census, April 2024, as reported by the Altyn Dala Conservation Initiative (3 June 2024)"
+url   = "https://altyndala.org/results-from-the-2024-saiga-aerial-census-in-kazakhstan-are-in/"
+note  = "Kazakhstan only, counted before calving: Ural 1,620,000; Betpak-Dala 1,150,000; Ustyurt 63,600. Russia and Mongolia add at most tens of thousands."
+
+[[point]]
+year  = 2026
+n     = 4.6e6
+lo    = 4.6e6
+hi    = 4.6e6
+grade = "B"
+kind  = "census"
+cite  = "Kazakhstan nationwide spring aerial census 2026, as reported by The Astana Times (June 2026)"
+url   = "https://astanatimes.com/2026/06/kazakhstans-saiga-population-surpasses-4-6-million/"
+note  = "'Above 4.6 million': Ural ~2.7 M, Betpak-Dala ~1.87 M, Ustyurt ~119,000. Kazakhstan only (~99% of the species). The ministry had given ~4.1 M for 2025."

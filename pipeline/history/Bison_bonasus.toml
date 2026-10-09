@@ -1,0 +1,55 @@
+species   = "Bison bonasus"
+aliases   = ["Bos bonasus"]
+common    = "European bison"
+component = "wild"
+use       = "counts"
+scope     = "global, all ages, all registered animals (free-ranging, semi-wild, enclosures and zoos)"
+notes     = """
+Extinct in the wild (Bialowieza 1919, Caucasus 1927). The species survived only in captivity, and
+every living animal descends from 12 founders. Counts are from the European Bison Pedigree Book,
+which registers all animals; in 2024 about 80% were free-ranging. No sourced pre-decline level was
+found (the decline ran over centuries), so there is no baseline.
+"""
+
+[[point]]
+year  = 1924
+n     = 66
+lo    = 54
+hi    = 66
+grade = "B"
+kind  = "census"
+cite  = "Raczynski 2008, The European Bison Pedigree Book - from the beginning until now, European Bison Conservation Newsletter 1:87-104"
+url   = "https://ojs.wisent.org/index.php/czasopismo/article/view/10"
+note  = "Groeben recorded 66 living individuals in 1924, all captive; 54 (29 m, 25 f) with proven pedigrees is the commonly quoted count (lo)."
+
+[[point]]
+year  = 2005
+n     = 3439
+lo    = 3439
+hi    = 3439
+grade = "B"
+kind  = "census"
+cite  = "Raczynski 2008, European Bison Conservation Newsletter 1:87-104 (Pedigree Book data)"
+url   = "https://ojs.wisent.org/index.php/czasopismo/article/view/10"
+note  = "World population in 2005; 62% living in the wild."
+
+[[point]]
+year  = 2023
+n     = 11180
+lo    = 11180
+hi    = 11180
+grade = "B"
+kind  = "census"
+cite  = "European Bison Pedigree Book 2023 (status 31 Dec 2023), as reported by the Prioksko-Terrasny Reserve"
+url   = "https://pt-zapovednik.org/digest-august-2024/"
+
+[[point]]
+year  = 2024
+n     = 12209
+lo    = 12209
+hi    = 12209
+grade = "B"
+kind  = "census"
+cite  = "European Bison Pedigree Book 2024 (status 31 Dec 2024), as reported from Belovezhskaya Pushcha NP"
+url   = "https://reform.news/en/belarus-is-home-to-24-of-the-world-s-european-bison-population/"
+note  = "9,762 in the wild, 722 semi-wild, 1,725 in enclosures."

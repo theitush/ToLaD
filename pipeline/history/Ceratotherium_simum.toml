@@ -1,0 +1,50 @@
+species   = "Ceratotherium simum"
+common    = "White rhinoceros"
+component = "wild"
+use       = "counts"
+scope     = "Africa (whole species range), all ages; southern and northern white rhino combined"
+notes     = "No baseline: no traceable pre-decline total for the species. The southern white rhino was reduced to fewer than ~50 animals in the Hluhluwe-iMfolozi area by the end of the 19th century (widely cited), but the northern subspecies then numbered far more and no species total exists for that date. The northern white rhino is now functionally extinct (2 females, captive in Kenya). AfRSG counts are continental, from national rhino surveys."
+
+[[point]]
+year  = 1999
+n     = 10400
+lo    = 10400
+hi    = 10400
+grade = "B"
+kind  = "census"
+cite  = "Emslie 2000, Pachyderm 29:53-56 ('African rhinos numbering 13,000 for first time since the mid-1980s')"
+url   = "https://pachydermjournal.org/index.php/pachyderm/article/view/1019"
+note  = "AfRSG continental total, ~10,400 white rhinos in the wild (southern 10,377). Kruger was taken at the lower 95% level of its sample estimate, so slightly conservative."
+
+[[point]]
+year  = 2015
+n     = 20584
+lo    = 19871
+hi    = 21292
+grade = "B"
+kind  = "census"
+cite  = "Knight 2017, African Rhino Specialist Group report, Pachyderm 58:17-35"
+url   = "https://doi.org/10.69649/pachyderm.v58i.414"
+note  = "Revised end-2015 estimate, 90% CI 19,871-21,292; numbers were levelling off after the poaching surge from 2008."
+
+[[point]]
+year  = 2023
+n     = 17464
+lo    = 17464
+hi    = 17464
+grade = "B"
+kind  = "census"
+cite  = "IUCN SSC AfRSG/AsRSG and TRAFFIC 2025, African and Asian Rhinoceroses - Status, Conservation and Trade (IUCN press release 7 Aug 2025)"
+url   = "https://iucn.org/press-release/202508/poaching-african-rhinos-down-drought-and-other-threats-drive-losses-globally"
+note  = "End-2023 white rhino total as quoted in the 2025 report."
+
+[[point]]
+year  = 2024
+n     = 15752
+lo    = 15752
+hi    = 15752
+grade = "B"
+kind  = "census"
+cite  = "IUCN SSC AfRSG/AsRSG and TRAFFIC 2025, African and Asian Rhinoceroses - Status, Conservation and Trade (IUCN press release 7 Aug 2025)"
+url   = "https://iucn.org/press-release/202508/poaching-african-rhinos-down-drought-and-other-threats-drive-losses-globally"
+note  = "End-2024 reported estimate, an 11.2% drop from 2023 (drought and poaching)."

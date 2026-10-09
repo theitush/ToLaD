@@ -1,0 +1,44 @@
+species   = "Ursus maritimus"
+common    = "Polar bear"
+component = "wild"
+use       = "counts"
+scope     = "global, all ages (19-20 subpopulations, about half data-deficient)"
+notes     = """
+The 1960s figures were openly guesses (the 1965 Fairbanks meeting noted 'no accurate or reliable
+figures'), so no baseline is set. The step from 20,000-25,000 to ~26,000 reflects better data,
+not shown growth. The official estimate was still ~26,000 (22,000-31,000) in 2023; the IUCN
+reassessment published 2025 (Aars, e.T22823A217912462) was not checked for a new total.
+"""
+
+[[point]]
+year  = 1965
+n     = 10000
+lo    = 5000
+hi    = 19000
+grade = "D"
+kind  = "estimate"
+cite  = "Estimates summarised at the 1965 First International Scientific Meeting on the Polar Bear, Fairbanks (Uspensky 5,000-8,000; Harington 1964 'well over 10,000'; Scott et al. 1959 17,000-19,000), as quoted by the Society of Environmental Journalists"
+url   = "https://www.sej.org/node/955"
+note  = "Guesses, not surveys; n is Harington's 'well over 10,000'. Ian Stirling judged 5,000 'almost certainly much too low'."
+
+[[point]]
+year  = 2005
+n     = 22500
+lo    = 20000
+hi    = 25000
+grade = "C"
+kind  = "estimate"
+cite  = "Schliebe et al. 2008, Ursus maritimus, IUCN Red List e.T22823A9391171 (PBSG 2005 range 20,000-25,000, as described by WWF Arctic 2016)"
+url   = "https://arcticwwf.org/newsroom/stories/polar-bears-and-the-numbers-game/"
+note  = "IUCN/PBSG figure used for about ten years before the 2015 update. n = midpoint."
+
+[[point]]
+year  = 2015
+n     = 26000
+lo    = 22000
+hi    = 31000
+grade = "B"
+kind  = "estimate"
+cite  = "Wiig et al. 2015, Ursus maritimus, IUCN Red List e.T22823A14871490"
+url   = "https://doi.org/10.2305/IUCN.UK.2015-4.RLTS.T22823A14871490.en"
+note  = "~26,000 (95% CI 22,000-31,000); sum of subpopulation estimates of very uneven age and quality."

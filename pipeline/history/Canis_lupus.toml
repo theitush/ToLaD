@@ -1,0 +1,23 @@
+species   = "Canis lupus"
+common    = "Gray wolf"
+component = "wild"
+use       = "counts"
+scope     = "global, wild wolves only (domestic dogs excluded)"
+notes     = """
+No global time series exists; the IUCN figure is the only species-wide estimate found. The wolf's
+historical collapse was regional (e.g. lower-48 USA down to a few hundred by 1960, now >6,000;
+Europe now ~17,000) while the large Canadian, Russian and Central Asian populations persisted, and
+no sourced pre-decline global total exists, so there is no baseline. Regional series (Yellowstone,
+Isle Royale, US states, LCIE Europe) are not merged into this global curve.
+"""
+
+[[point]]
+year  = 2018
+n     = 225000
+lo    = 200000
+hi    = 250000
+grade = "C"
+kind  = "estimate"
+cite  = "Boitani, Phillips & Jhala 2018, Canis lupus, IUCN Red List e.T3746A133234888"
+url   = "https://doi.org/10.2305/IUCN.UK.2018-2.RLTS.T3746A133234888.en"
+note  = "'In the order of 200-250 thousand individuals' (n = midpoint). Rough sum of national estimates; North America ~65,000+, Asia ~81,500, Europe ~17,000."
