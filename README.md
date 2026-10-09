@@ -1,4 +1,4 @@
-# ToLaD — Tree of Life and Dead
+# ToLaD — Tree of Life and Death
 
 A mobile-first, zoomable tree of life where every leaf is an individual organism, alive or dead.
 
