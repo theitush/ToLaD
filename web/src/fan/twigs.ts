@@ -24,7 +24,7 @@
 //   labels    plus handles (lion#…).
 
 import { Species, type Address } from '../../../packages/procgen/src/index.ts';
-import { strandAt, type FanBranch, type TimeScale, type WidthMode } from './layout';
+import { branchLeft, strandAt, type FanBranch, type TimeScale, type WidthMode } from './layout';
 import type { SpeciesRec } from './panthera';
 
 function keyOf(common: string): string {
@@ -141,7 +141,7 @@ export class TwigModel {
   row(g: number): { y: number; left: number; w: number; n: number } {
     const y = this.yOf((g + 0.5) * this.GL);
     const w = this.widthAt(y);
-    return { y, left: this.b.colX - w / 2, w, n: this.size(g) };
+    return { y, left: branchLeft(this.b), w, n: this.size(g) };
   }
 
   /**
@@ -151,7 +151,7 @@ export class TwigModel {
    */
   lanes(y: number): { left: number; w: number; gw: number } {
     const st = strandAt(this.b, this.time.ageAt(y), this.mode);
-    return { left: this.b.colX - st.w / 2, w: st.w, gw: st.w * st.f };
+    return { left: branchLeft(this.b), w: st.w, gw: st.w * st.f };
   }
 
   /** Fraction across its lane of individual (g, i): the centre of its equal share of its generation. */
@@ -439,7 +439,7 @@ function rgba(hex: string, a: number): string {
 export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: number; i: number } | null): TwigStats | null {
   const [, wyTop] = v.toWorld(0, 0);
   const [, wyBot] = v.toWorld(v.w, v.h);
-  // The visible x range at a height (the camera may shear x with height, view.ts).
+  // The visible x range at a height.
   const xr = (y: number): [number, number] => {
     const py = v.toScreen(0, y)[1];
     return [v.toWorld(0, py)[0], v.toWorld(v.w, py)[0]];

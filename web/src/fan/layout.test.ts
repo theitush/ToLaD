@@ -27,3 +27,26 @@ describe('fan strands', () => {
     });
   }
 });
+
+describe('fan packing', () => {
+  for (const mode of ['log', 'linear'] as WidthMode[]) {
+    it(`columns are packed by width, never overlapping, with small gaps (${mode})`, () => {
+      const fan = layoutFan(PANTHERA, mode);
+      const bs = fan.branches;
+      let total = 0;
+      for (let i = 0; i < bs.length; i++) {
+        const a = bs[i];
+        total += a.width;
+        if (i + 1 === bs.length) break;
+        const b = bs[i + 1];
+        const gap = b.colX - b.width / 2 - (a.colX + a.width / 2);
+        total += gap;
+        expect(gap).toBeGreaterThan(0);
+        // No gap is bigger than twice the two neighbours' widths (thin sisters get a few px).
+        expect(gap).toBeLessThan(2 * (a.width + b.width));
+      }
+      // The columns span little more than the stem they grow from: a fan, not scattered threads.
+      expect(total).toBeLessThan(1.5 * fan.trunkWidth);
+    });
+  }
+});

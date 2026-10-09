@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { layoutFan, remaining, strandAt } from './layout';
+import { branchLeft, layoutFan, remaining, strandAt } from './layout';
 import { PANTHERA } from './panthera';
 import { speciesModel, threadEnds, TwigModel, type TwigView } from './twigs';
 
@@ -62,7 +62,7 @@ describe('width = individuals', () => {
         const st = strandAt(b, f.time.ageAt(y), f.mode);
         expect(L.w).toBeCloseTo(st.w, 12);
         expect(L.gw).toBeCloseTo(st.w * st.f, 12);
-        expect(L.left).toBeCloseTo(b.colX - st.w / 2, 12);
+        expect(L.left).toBeCloseTo(branchLeft(b), 12);
         for (const alive of [false, true]) {
           const lo = alive ? L.left : L.left + L.gw;
           const hi = alive ? L.left + L.gw : L.left + L.w;
@@ -86,7 +86,7 @@ describe('width = individuals', () => {
         for (const y of [m.row(g).y, m.yOf(Math.min(m.T, (g + 2) * m.GL)), m.yOf((g + 0.9) * m.GL), f.time.y(0)]) {
           const st = strandAt(b, f.time.ageAt(y), f.mode);
           const gw = st.w * st.f;
-          const left = b.colX - st.w / 2;
+          const left = branchLeft(b);
           // The union of the slots' cells is exactly the branch: green lane, then gray lane.
           expect(m.xAt(m.u(g, 0), y, true) - gw / n / 2).toBeCloseTo(left, 9);
           expect(m.xAt(m.u(g, n - 1), y, true) + gw / n / 2).toBeCloseTo(left + gw, 9);
