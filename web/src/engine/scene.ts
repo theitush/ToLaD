@@ -35,6 +35,8 @@ export class Chunk {
   nodes: LNode[] = [];
   /** First instance index of each node in `nodes`. */
   nodeFirst: number[] = [];
+  /** Boundary nodes also get a flat "proxy" band in this chunk, drawn while their own chunk is too small to open. */
+  proxyFirst: number[] = [];
   data = new Float32Array(0);
   count = 0;
   boundary: LNode[] = [];
@@ -135,6 +137,12 @@ export class SceneBuilder {
   maxChunks = 900;
   /** LOD: skip chunks whose root band is smaller than this (px). Adapted by the engine. */
   minPx = 1.5;
+  /**
+   * A child chunk is only opened once its root covers this many px² (its
+   * internal detail is >= 1e-3 of the root, so below this it is sub-pixel).
+   * Until then the parent chunk's proxy band stands in for it.
+   */
+  chunkOpenArea = 32 * 32;
   readonly near = new InstanceBuf();
   nearNodes: LNode[] = [];
   draws: ChunkDraw[] = [];
@@ -204,16 +212,22 @@ export class SceneBuilder {
     return f.kt < this.minPx || f.kx < this.minPx * 0.25 || f.kx * f.kt < this.minPx * this.minPx * 2;
   }
 
+  private worthOpening(f: Frame): boolean {
+    return f.kx * f.kt >= this.chunkOpenArea;
+  }
+
   private visitNear(n: LNode, f: Frame): void {
     if (this.offscreen(f) || this.tooSmall(f)) return;
     const L = this.layout;
-    if (n.chunkRoot && f.kx <= GPU_MAX_PX && f.kt <= GPU_MAX_PX) {
+    const small = n.chunkRoot && f.kx <= GPU_MAX_PX && f.kt <= GPU_MAX_PX;
+    if (small && this.worthOpening(f)) {
       this.drawChunk(n, f);
       return;
     }
     const before = this.near.count;
     emitBand(this.near, f.ox, f.kx, f.oy, -f.kt, L.aliveFrac(n), n.alive, n.tint, this.clipPush);
     for (let i = before; i < this.near.count; i++) this.nearNodes.push(n);
+    if (small) return; // too small to open: drawn as a flat band
     const kids = L.children(n);
     for (const c of kids) {
       const fc = toChild(this.allocFrame(), f, L.x0(c), L.xs(c), c.t0, c.ts);
@@ -260,7 +274,7 @@ export class SceneBuilder {
     for (let i = 0; i < c.boundary.length; i++) {
       const o = i * 4;
       const fb = toChild(this.allocFrame(), f, br[o], br[o + 1], br[o + 2], br[o + 3]);
-      if (this.offscreen(fb) || this.tooSmall(fb)) {
+      if (this.offscreen(fb) || this.tooSmall(fb) || !this.worthOpening(fb)) {
         this.frameUsed--;
         continue;
       }
@@ -287,6 +301,7 @@ export class SceneBuilder {
     const buf = new InstanceBuf();
     const nodes: LNode[] = [];
     const first: number[] = [];
+    const proxyFirst: number[] = [];
     const boundary: LNode[] = [];
     const brel: number[] = [];
     // Iterative preorder DFS (parents before children = painter's order).
@@ -306,6 +321,8 @@ export class SceneBuilder {
         if (k.chunkRoot) {
           boundary.push(k);
           brel.push(x0, xs, t0, ts);
+          proxyFirst.push(buf.count);
+          emitBand(buf, x0, xs, t0, ts, L.aliveFrac(k), k.alive, k.tint, null);
         } else {
           stack.push({ n: k, x0, xs, t0, ts });
         }
@@ -313,6 +330,7 @@ export class SceneBuilder {
     }
     c.nodes = nodes;
     c.nodeFirst = first;
+    c.proxyFirst = proxyFirst.reverse();
     c.data = buf.data.slice(0, buf.count * INST_FLOATS);
     c.count = buf.count;
     // Boundary order: reverse of push order so child chunks draw left to right.

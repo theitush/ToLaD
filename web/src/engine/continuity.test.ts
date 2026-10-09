@@ -42,9 +42,16 @@ function edgesOf(f: Frame, n: LNode): Edges {
 /** Where the GPU would draw the node's body edges, or null if the scene does not draw it. */
 function drawnEdges(scene: SceneBuilder, n: LNode): Partial<Edges> | null {
   for (const d of scene.draws) {
+    // The node itself, or its proxy band if it is a not-yet-opened child chunk.
+    let first = -1;
     const idx = d.chunk.nodes.findIndex((c) => c.id === n.id);
-    if (idx < 0) continue;
-    const o = (d.chunk.nodeFirst[idx] + 1) * INST_FLOATS; // body is the 2nd trapezoid
+    if (idx >= 0) first = d.chunk.nodeFirst[idx];
+    else {
+      const b = d.chunk.boundary.findIndex((c) => c.id === n.id);
+      if (b >= 0) first = d.chunk.proxyFirst[b];
+    }
+    if (first < 0) continue;
+    const o = (first + 1) * INST_FLOATS; // body is the 2nd trapezoid
     const a = d.chunk.data;
     const X = (v: number) => fr(fr(d.f.ox) + fr(fr(d.f.kx) * v));
     const Y = (v: number) => fr(fr(d.f.oy) - fr(fr(d.f.kt) * v));
