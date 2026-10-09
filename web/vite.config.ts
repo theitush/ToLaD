@@ -4,6 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
+import { loadClade } from './src/fan/panthera-extract';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const DATA = resolve(here, '..', 'data', 'mammals');
@@ -53,6 +54,28 @@ function toladData(single: boolean): Plugin {
   };
 }
 
+const PANTHERA = 'virtual:panthera-data';
+
+/**
+ * The Panthera subtree, decoded from ../data/mammals at build time with the v1
+ * decoder (src/fan/panthera-extract.ts), so the fan's numbers and curated
+ * histories are always the dataset's own.
+ */
+function pantheraData(): Plugin {
+  return {
+    name: 'panthera-data',
+    resolveId(id) {
+      return id === PANTHERA ? '\0' + PANTHERA : null;
+    },
+    load(id) {
+      if (id !== '\0' + PANTHERA) return null;
+      for (const f of dataFiles()) this.addWatchFile(join(DATA, f));
+      const clade = loadClade((rel) => readFileSync(join(DATA, rel)), 'Panthera');
+      return `export default ${JSON.stringify(clade)};`;
+    },
+  };
+}
+
 /** Single-file build: inline the JS and CSS chunks into index.html. */
 function inlineAll(): Plugin {
   return {
@@ -88,7 +111,7 @@ export default defineConfig(({ mode }) => {
   const single = mode === 'single';
   return {
     base: './',
-    plugins: [react(), toladData(single), ...(single ? [inlineAll()] : [])],
+    plugins: [react(), toladData(single), pantheraData(), ...(single ? [inlineAll()] : [])],
     build: single
       ? { outDir: 'dist-single', assetsInlineLimit: 1e9, cssCodeSplit: false, modulePreload: false }
       : {},
