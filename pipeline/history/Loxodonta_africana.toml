@@ -1,0 +1,83 @@
+species   = "Loxodonta africana"
+common    = "African savanna elephant"
+component = "wild"
+use       = "counts"
+scope     = "global, all ages; points before 2014 are continental totals for both African elephant species, split to savanna by a stated regional assumption"
+notes     = "Savanna and forest elephants have been assessed as separate species only since 2021, so older continental totals combine both. Split assumption for all points before 2014 (1800, 1900, 1930, 1979, 1989): the savanna share is the non-Central-African share (55%) of the ITRG 1989 regional split (45% in the Central African rainforests, 31% Southern, 21% East, 3% West). This misplaces Central African savanna elephants (Chad, CAR, north Cameroon) and West African forest elephants, so those points are grade D. The 1800-1930 figures are also unverified popular figures. The 2015 point counts Eastern + Southern Africa as savanna. Edwards et al. 2024 (PNAS, doi:10.1073/pnas.2403816121) find savanna site densities fell ~70% over 1964-2016 (southern Africa +42%)."
+
+[baseline]
+year  = 1800
+n     = 1.43e7
+lo    = 1.43e7
+hi    = 1.43e7
+grade = "D"
+kind  = "unverified"
+cite  = "US Fish and Wildlife Service, African Elephant Conservation Fund, 'What we do'"
+url   = "https://www.fws.gov/program/african-elephant-conservation-fund/what-we-do"
+note  = "'During the eighteenth century, the African continent may have contained as many as 26 million elephants' (both species), times the assumed 55% savanna share: 2.6e7 x 0.55 = 1.43e7. Widely repeated (FWS, National Geographic education pages; 20-27 M variants elsewhere) with no stated method; research/05 traces it to carrying-capacity and ivory-export reasoning. 'As many as' makes it an upper-end figure."
+
+[[point]]
+year  = 1900
+n     = 5.5e6
+lo    = 5.5e6
+hi    = 5.5e6
+grade = "D"
+kind  = "unverified"
+cite  = "US Fish and Wildlife Service, African Elephant Conservation Fund, 'What we do'"
+url   = "https://www.fws.gov/program/african-elephant-conservation-fund/what-we-do"
+note  = "By the start of the 20th century numbers were 'reduced to 10 million' (both species), times the assumed 55% savanna share = 5.5e6. No stated method."
+
+[[point]]
+year  = 1930
+n     = 4.125e6
+lo    = 2.75e6
+hi    = 5.5e6
+grade = "D"
+kind  = "unverified"
+cite  = "American Museum of Natural History, Akeley Hall exhibit text 'African Elephants'"
+url   = "https://www.amnh.org/exhibitions/permanent/african-mammals/african-elephants"
+note  = "AMNH: 5-10 million elephants across Africa in 1930 (both species), down to 600,000 by 1989. n is the midpoint (7.5e6) times the assumed 55% savanna share; range 5e6-1e7 x 0.55. The lower '3-5 million in the 1930s/1940s' figure circulates on blogs and fact sites without a source. Page text seen via search (direct fetch blocked)."
+
+[[point]]
+year  = 1979
+n     = 7.15e5
+lo    = 6.05e5
+hi    = 9.9e5
+grade = "D"
+kind  = "estimate"
+cite  = "Douglas-Hamilton 1987, Oryx 21:11-24 (continental ~1.3 M in 1979); range 1.1-1.8 M from Milner-Gulland & Beddington 1993, Proc R Soc B 252:29-37"
+url   = "https://doi.org/10.1017/S0030605300020433"
+note  = "Combined continental figure 1.3 M (range 1.1-1.8 M) times an assumed savanna share of 55% (the ITRG 1989 non-Central-Africa share): 1.3e6 x 0.55 = 7.15e5, range 6.05e5-9.9e5. The share is an assumption, not a figure from the source."
+
+[[point]]
+year  = 1989
+n     = 3.44e5
+lo    = 3.44e5
+hi    = 3.44e5
+grade = "D"
+kind  = "estimate"
+cite  = "Ivory Trade Review Group 1989, Pachyderm 12:32-37 (interim report summary: ~625,000 elephants; 45% in Central African rainforests, 31% Southern, 21% East, 3% West)"
+url   = "https://pachydermjournal.org/index.php/pachyderm/article/view/690"
+note  = "625,000 x 0.55 (Southern + East + West share) = 343,750. Region used as a proxy for species. Oryx (1989) gave a maximum of 609,000 for the same period."
+
+[[point]]
+year  = 2014
+n     = 352271
+lo    = 352271
+hi    = 352271
+grade = "B"
+kind  = "census"
+cite  = "Chase et al. 2016, PeerJ 4:e2354 (Great Elephant Census)"
+url   = "https://doi.org/10.7717/peerj.2354"
+note  = "Aerial census (2014-15) of savanna elephants in 18 countries, ~93% of the savanna elephants in those countries; unsurveyed range is excluded, so this slightly undercounts the species. Populations fell ~30% over 2007-2014 in 15 countries with repeat counts."
+
+[[point]]
+year  = 2015
+n     = 380051
+lo    = 352819
+hi    = 435315
+grade = "C"
+kind  = "estimate"
+cite  = "African Elephant Database, African Elephant Status Report 2016, continental totals (Thouless et al. 2016, IUCN SSC AfESG)"
+url   = "https://africanelephantdatabase.org/report/2016/Africa"
+note  = "Eastern Africa 86,373 +/- 10,549 plus Southern Africa 293,678 +/- 16,683 'estimates' (regional proxy for savanna elephants). lo subtracts both 95% CLs; hi adds both CLs plus the regional 'guesses' (11,973-12,060 and 14,457-15,972). Values as shown on the AED web page; the printed report gives 415,428 +/- 20,111 for both species continent-wide."

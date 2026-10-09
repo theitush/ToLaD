@@ -167,8 +167,70 @@ def write_container(path: Path, kind: int, n: int, sections: list[tuple[str, byt
     return len(buf)
 
 
+HIST_PREAMBLE = struct.Struct("<IIII")  # nspecies, npoints, nsegments, reserved
+HIST_HEAD = struct.Struct("<IIIHHff")  # row, point0, seg0, npts, nseg, G, L  (24 B)
+HIST_POINT = struct.Struct("<iHHHBBHH")  # year, n, lo, hi, grade, kind, cite, flags  (16 B)
+HIST_SEG = struct.Struct("<ffHHBBH")  # year0, gens, start, end, grade, kind, reserved  (16 B)
+HP_BASELINE = 1  # point flag: the pre-decline baseline
+
+
+def hist_sources(root: Node) -> dict[tuple[str, str], int]:
+    """Global (cite, url) table for HIST points, in tree order."""
+    out: dict[tuple[str, str], int] = {}
+    for n in root.preorder():
+        rec = n.data.get("history")
+        if rec is not None:
+            for p in rec["curve"]:
+                out.setdefault((p["cite"], p["url"]), len(out))
+    assert len(out) < 65536
+    return out
+
+
+def hist_records(rows: list[tuple[Node, bool]]) -> list[tuple[int, dict]]:
+    return [(i, nd.data["history"]) for i, (nd, stub) in enumerate(rows)
+            if not stub and nd.data.get("history") is not None]
+
+
+def encode_hist(rows: list[tuple[Node, bool]], cites: dict[tuple[str, str], int]) -> tuple[bytes, int, list[dict]]:
+    """HIST section (FORMAT.md v1.1) + the per-species META entries aligned with it."""
+    from .history import GRADES, K
+    recs = hist_records(rows)
+    heads, pts, segs, meta = [], [], [], []
+    for row, rec in recs:
+        heads.append(HIST_HEAD.pack(row, len(pts), len(segs), len(rec["curve"]), len(rec["segments"]),
+                                    rec["G"], rec["L"]))
+        for p in rec["curve"]:
+            pts.append(HIST_POINT.pack(round(p["year"]), q_log16(p["n"]), q_log16(p["lo"]), q_log16(p["hi"]),
+                                       GRADES.index(p["grade"]), K[p["kind"]], cites[(p["cite"], p["url"])],
+                                       HP_BASELINE if p.get("baseline") else 0))
+        for s in rec["segments"]:
+            segs.append(HIST_SEG.pack(s["year0"], s["gens"], q_log16(s["start"]), q_log16(s["end"]),
+                                      s["grade"], s["kind"], 0))
+        meta.append({"species": rec["species"], "common": rec["common"], "component": rec["component"],
+                     "use": rec["use"], "scope": rec["scope"], "file": rec["file"], "notes": rec["notes"],
+                     "point_notes": [p["note"] for p in rec["curve"]]})
+    if not recs:
+        return b"", 0, []
+    blob = HIST_PREAMBLE.pack(len(recs), len(pts), len(segs), 0) + b"".join(heads) + b"".join(pts) + b"".join(segs)
+    return blob, len(recs), meta
+
+
+def hist_debug(rec: dict, tile: int, row: int, gid: int) -> dict:
+    from .history import KINDS
+    return {
+        "species": rec["species"], "common": rec["common"], "file": rec["file"], "use": rec["use"],
+        "component": rec["component"], "tile": tile, "row": row, "gid": gid, "G": rec["G"], "L": rec["L"],
+        "points": [{"year": round(p["year"]), "n": p["n"], "lo": p["lo"], "hi": p["hi"], "grade": p["grade"],
+                    "kind": p["kind"], "baseline": bool(p.get("baseline")), "cite": p["cite"], "url": p["url"]}
+                   for p in rec["curve"]],
+        "segments": [{"year0": s["year0"], "gens": s["gens"], "start": s["start"], "end": s["end"],
+                      "grade": "ABCD"[s["grade"]], "kind": KINDS[s["kind"]]} for s in rec["segments"]],
+    }
+
+
 def encode_rows(rows: list[tuple[Node, bool]], methods: dict[str, int], stub_tile: dict[int, int],
-                extra_meta: dict) -> tuple[list[tuple[str, bytes, int]], int]:
+                extra_meta: dict, cites: dict[tuple[str, str], int] | None = None
+                ) -> tuple[list[tuple[str, bytes, int]], int]:
     n = len(rows)
     chld = np.zeros(n, "<u2")
     t0 = np.zeros(n, "<u2")
@@ -225,6 +287,9 @@ def encode_rows(rows: list[tuple[Node, bool]], methods: dict[str, int], stub_til
     stub_arr = np.asarray(stubs, "<u4").reshape(-1).tobytes() if stubs else b""
     meta = dict(extra_meta)
     meta["stub_rep"] = stub_rep
+    hist_blob, n_hist, hist_meta = encode_hist(rows, cites or {})
+    if n_hist:
+        meta["hist"] = hist_meta
     secs = [
         ("CHLD", chld.tobytes(), n), ("T0__", t0.tobytes(), n), ("T1__", t1.tobytes(), n),
         ("EVER", ever.tobytes(), n), ("ALIV", aliv.tobytes(), n), ("GHST", ghst.tobytes(), n),
@@ -234,6 +299,8 @@ def encode_rows(rows: list[tuple[Node, bool]], methods: dict[str, int], stub_til
         ("PBDB", pbdb.tobytes(), n), ("STUB", stub_arr, len(stubs)), ("NAME", name_sec, n),
         ("META", json.dumps(meta, ensure_ascii=False, separators=(",", ":")).encode("utf-8"), 1),
     ]
+    if n_hist:
+        secs.append(("HIST", hist_blob, n_hist))
     return secs, n
 
 
@@ -291,6 +358,7 @@ def write_all(root: Node, out: Path, log: dict) -> None:
         methods.setdefault(n.data["method_key"], len(methods))
     assert len(methods) < 65536
 
+    cites = hist_sources(root)
     tile_roots = cut_tiles(root, TILE_BUDGET)
     tile_roots.sort(key=lambda t: t.data["gid"])
     tile_id = {id(t): i for i, t in enumerate(tile_roots)}
@@ -303,7 +371,7 @@ def write_all(root: Node, out: Path, log: dict) -> None:
             if not stub:
                 where[id(nd)] = (tile_id[id(t)], i)
         meta = {"tile": tile_id[id(t)], "root_gid": t.data["gid"], "root_name": representative(t)}
-        secs, n = encode_rows(rows, methods, tile_id, meta)
+        secs, n = encode_rows(rows, methods, tile_id, meta, cites)
         fn = tdir / f"{tile_id[id(t)]}.tld"
         size = write_container(fn, KIND_TILE, n, secs)
         files.append(fn)
@@ -334,14 +402,27 @@ def write_all(root: Node, out: Path, log: dict) -> None:
         "mock_individuals": mock,
         "tile": -1,
     }
-    secs, n = encode_rows(sk_rows, methods, tile_id, meta)
+    from .history import KINDS
+    hist_index = []
+    hist_dbg = []
+    for nd in root.preorder():
+        rec = nd.data.get("history")
+        if rec is not None:
+            t, r = where[id(nd)]
+            hist_index.append({"species": rec["species"], "gid": nd.data["gid"], "tile": t, "row": r})
+            hist_dbg.append(hist_debug(rec, t, r, nd.data["gid"]))
+    meta["hist_sources"] = [{"cite": c, "url": u} for (c, u) in cites]
+    meta["hist_kinds"] = KINDS
+    meta["hist_index"] = hist_index
+    log["history"]["hist_sources"] = len(cites)
+    secs, n = encode_rows(sk_rows, methods, tile_id, meta, cites)
     sk_size = write_container(out / "skeleton.tld", KIND_SKELETON, n, secs)
     files.append(out / "skeleton.tld")
-    write_debug_json(root, sk_rows, tile_id, out / "debug_top.json", meta)
+    write_debug_json(root, sk_rows, tile_id, out / "debug_top.json", meta, hist_dbg)
     sizes(files, log, sk_size, n, len(tile_roots))
 
 
-def write_debug_json(root: Node, sk_rows, tile_id, path: Path, meta: dict) -> None:
+def write_debug_json(root: Node, sk_rows, tile_id, path: Path, meta: dict, hist: list[dict] | None = None) -> None:
     nodes = []
     depth = {id(root): 0}
     for nd, stub in sk_rows:
@@ -383,7 +464,8 @@ def write_debug_json(root: Node, sk_rows, tile_id, path: Path, meta: dict) -> No
     head = {k: v for k, v in doc.items() if k != "nodes"}
     lines = json.dumps(head, indent=1, ensure_ascii=False)[:-2]
     body = ",\n".join(json.dumps(_round(nd), ensure_ascii=False, separators=(",", ":")) for nd in nodes)
-    path.write_text(lines + ',\n "nodes": [\n' + body + "\n]}\n")
+    hist_body = ",\n".join(json.dumps(_round(h), ensure_ascii=False, separators=(",", ":")) for h in (hist or []))
+    path.write_text(lines + ",\n \"history\": [\n" + hist_body + "\n],\n \"nodes\": [\n" + body + "\n]}\n")
 
 
 def _round(o):

@@ -1,0 +1,28 @@
+species   = "Connochaetes taurinus"
+common    = "Blue wildebeest"
+component = "wild"
+use       = "counts"
+scope     = "global, all ages, all subspecies (incl. white-bearded wildebeest, C. t. mearnsi / albojubatus)"
+notes     = "No baseline: there is no species-wide pre-decline total. The Serengeti-Mara migratory population (~70% of the species) grew strongly after rinderpest was controlled in the 1960s (Serengeti census series from 1958; not used here because it is regional). Totals come mainly from aerial surveys compiled by the IUCN SSC Antelope Specialist Group."
+
+[[point]]
+year  = 1998
+n     = 1298000
+lo    = 1298000
+hi    = 1298000
+grade = "B"
+kind  = "estimate"
+cite  = "East 1999, African Antelope Database 1998 (IUCN SSC Antelope Specialist Group), as quoted in the SANBI Red List of South African Species assessment"
+url   = "https://speciesstatus.sanbi.org/assessment/last-assessment/1993/"
+note  = "'A population estimate conducted during the late 1990s (mainly from aerial surveys) revealed an approximate global abundance of 1,298,000 C. taurinus'; the Serengeti-Mara makes up ~70%."
+
+[[point]]
+year  = 2008
+n     = 1550000
+lo    = 1550000
+hi    = 1550000
+grade = "C"
+kind  = "estimate"
+cite  = "Estes & East 2009 / IUCN SSC Antelope Specialist Group, IUCN Red List, as quoted in the SANBI Red List of South African Species assessment"
+url   = "https://speciesstatus.sanbi.org/assessment/last-assessment/1993/"
+note  = "~1.55 million, the increase mainly from the Serengeti-Mara population recovering to ~1.3 million."

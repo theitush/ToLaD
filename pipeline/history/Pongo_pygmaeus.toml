@@ -1,0 +1,39 @@
+species   = "Pongo pygmaeus"
+common    = "Bornean orangutan"
+component = "wild"
+use       = "counts"
+scope     = "global (Borneo), all ages"
+notes     = "IUCN 2016 (Ancrenaz et al.) moved the species to Critically Endangered: >60% decline 1950-2010, a projected 86% reduction 1973-2025 and ~47,000 projected for 2025, from habitat-loss models. Voigt et al. 2018 (Current Biology, doi:10.1016/j.cub.2018.01.053) infer a loss of ~148,500 individuals over 1999-2015 from 36,555 nest counts. Totals differ strongly by method: Wich et al. 2008 gave at least 54,000 for 2004, IUCN gave 104,700 for 2012, the 2016 PHVA gave 57,350. The 2004 figure is left out because it is not comparable with the IUCN modelled series."
+
+[baseline]
+year  = 1973
+n     = 288500
+lo    = 288500
+hi    = 288500
+grade = "C"
+kind  = "reconstruction"
+cite  = "Ancrenaz et al. 2016, IUCN Red List, Pongo pygmaeus (doi:10.2305/IUCN.UK.2016-1.RLTS.T17975A17966347.en), as reported by The Jakarta Post 2017"
+url   = "https://www.thejakartapost.com/life/2017/05/03/rare-albino-orangutan-rescued-on-borneo-island"
+note  = "Back-cast from habitat and density models in the IUCN assessment (288,500 in 1973). Figure confirmed in press coverage only; the assessment text was not read directly."
+
+[[point]]
+year  = 2012
+n     = 104700
+lo    = 104700
+hi    = 104700
+grade = "C"
+kind  = "reconstruction"
+cite  = "Ancrenaz et al. 2016, IUCN Red List, Pongo pygmaeus, as cited by Mongabay 2018 (Voigt et al. coverage)"
+url   = "https://news.mongabay.com/2018/02/borneo-ravaged-by-deforestation-loses-nearly-150000-orangutans-in-16-years-study-finds/"
+note  = "IUCN figure for 2012, same modelling framework as the 1973 baseline. The San Diego Zoo fact sheet quotes the assessment range as 55,000-104,000."
+
+[[point]]
+year  = 2016
+n     = 57350
+lo    = 57350
+hi    = 57350
+grade = "B"
+kind  = "estimate"
+cite  = "Utami-Atmoko et al. 2017, Orangutan Population and Habitat Viability Assessment 2016 (IUCN SSC CPSG / Indonesian Ministry of Environment and Forestry)"
+url   = "https://cpsg.org/documents/2016-orangutan-phva"
+note  = "57,350 orangutans across ~16 million ha of Borneo (Indonesia and Malaysia). Part of the drop from the IUCN 2012 figure is methodological; AP coverage gives 75,000-100,000 depending on animals in plantations and burnt forest."

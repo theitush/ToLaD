@@ -1,0 +1,28 @@
+species   = "Gorilla beringei"
+common    = "Eastern gorilla"
+component = "wild"
+use       = "counts"
+scope     = "global, all ages; sum of Grauer's gorilla (G. b. graueri) and mountain gorilla (G. b. beringei) figures from separate sources"
+notes     = "Whole-species totals are sums of subspecies figures from different surveys and years; the mountain gorilla adds only ~4% (1990s) to ~22% (2010s). Grauer's gorillas fell ~77% in one generation during the DRC wars (Plumptre et al. 2016). Mountain gorillas rose from ~620 (1989/1997) to 1,063 (2016/2018). No earlier species total is used: Emlen & Schaller's 1959 range-wide survey gave no comparable number here."
+
+[baseline]
+year  = 1995
+n     = 17516
+lo    = 17516
+hi    = 17516
+grade = "C"
+kind  = "estimate"
+cite  = "Hall et al. 1998, Oryx 32:122-130 (Grauer's gorilla c. 16,900, surveys 1994-95); Virunga mountain gorillas 324 (1989) and Bwindi 292 (1997 census), WCS publication summaries"
+url   = "https://www.cambridge.org/core/journals/oryx/article/distribution-abundance-and-conservation-status-of-grauers-gorilla/D89047D1D0EEBE7C6BADCF6E7B64D257"
+note  = "16,900 + 324 + 292 = 17,516. The 16,900 pre-war Grauer's figure is also the baseline used by Plumptre et al. 2016. Mountain gorilla figures are from different years (Virunga 1989, before war stopped censuses; Bwindi 1997 census) and are cited from WCS publication summaries, grade C."
+
+[[point]]
+year  = 2016
+n     = 4863
+lo    = 2343
+hi    = 10113
+grade = "C"
+kind  = "estimate"
+cite  = "Plumptre et al. 2016, PLoS ONE 11:e0162697 (Grauer's 3,800, 95% CL 1,280-9,050, 2015); mountain gorillas 1,063 (Virunga 604, 2015-16 census; Bwindi-Sarambwe 459, 2018 census; GVTC / Dian Fossey Gorilla Fund)"
+url   = "https://doi.org/10.1371/journal.pone.0162697"
+note  = "3,800 + 1,063 = 4,863; lo/hi add the mountain gorilla census count to the Grauer's 95% limits. Mountain gorilla source: https://gorillafund.org/bwindi-census/"

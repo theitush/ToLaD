@@ -1,0 +1,40 @@
+species   = "Physeter macrocephalus"
+aliases   = ["Physeter catodon"]
+common    = "Sperm whale"
+component = "wild"
+use       = "counts"
+scope     = "global, all ages"
+notes     = "Two whaling eras: open-boat (Yankee) whaling, c. 1712-1880s, and modern whaling, peaking 1950s-1970s. Whitehead & Shin 2022 supersede Whitehead 2002 (MEPS 242:295, ~1.1 M pre-whaling, ~360,000 c. 1999), mainly through a better ascertainment-bias correction; the older pair is not used. The paper's model trajectory has no stated minimum; a recovery from the 1990s is indicated. Overall decline 1711-2022 ~57%."
+
+[baseline]
+year  = 1710
+n     = 1949698
+lo    = 1949698
+hi    = 1949698
+grade = "B"
+kind  = "reconstruction"
+cite  = "Whitehead & Shin 2022, Scientific Reports 12:19468"
+url   = "https://doi.org/10.1038/s41598-022-24107-7"
+note  = "Pre-whaling population from a spatially structured theta-logistic model with catches (CV 0.178)."
+
+[[point]]
+year  = 1993
+n     = 736053
+lo    = 736053
+hi    = 736053
+grade = "B"
+kind  = "estimate"
+cite  = "Whitehead & Shin 2022, Scientific Reports 12:19468"
+url   = "https://doi.org/10.1038/s41598-022-24107-7"
+note  = "Global estimate from visual and acoustic surveys extrapolated with a habitat model (CV 0.218)."
+
+[[point]]
+year  = 2022
+n     = 844761
+lo    = 844761
+hi    = 844761
+grade = "B"
+kind  = "reconstruction"
+cite  = "Whitehead & Shin 2022, Scientific Reports 12:19468"
+url   = "https://doi.org/10.1038/s41598-022-24107-7"
+note  = "Model estimate for 2022 (CV 0.209); the authors stress large uncertainty."

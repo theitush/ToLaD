@@ -1,0 +1,39 @@
+species   = "Elephas maximus"
+common    = "Asian elephant"
+component = "wild"
+use       = "counts"
+scope     = "global wild population, all ages"
+notes     = "Range-wide totals are compilations of national figures; the ~40,000-50,000 figure has been called 'no more than a crude guess', unchanged for ~25 years (Blake & Hedges 2004; Hedges 2006). Only ~10% of the historical range is still occupied (CITES SC61 Doc. 44.2). India: 29,964 (2017) and 22,446 (2025, DNA-based, stated as not comparable)."
+
+[baseline]
+year  = 1900
+n     = 1.0e5
+lo    = 1.0e5
+hi    = 1.0e5
+grade = "D"
+kind  = "unverified"
+cite  = "WWF, 'Protecting, restoring, and coexisting with Asia's magnificent elephants'"
+url   = "https://www.worldwildlife.org/stories/protecting-restoring-and-coexisting-with-asia-s-magnificent-elephants"
+note  = "'A century ago, around 100,000 elephants roamed across the vast lands of Asia'; WWF factsheets say 'more than 100,000 may have existed at the start of the 20th century'. Widely repeated by WWF and fact sites, with no traceable primary estimate."
+
+[[point]]
+year  = 2003
+n     = 46878
+lo    = 41410
+hi    = 52345
+grade = "C"
+kind  = "estimate"
+cite  = "Sukumar 2003, The Living Elephants (Oxford University Press), as quoted in CITES SC61 Doc. 44.2 (Rev. 1) Annex 1"
+url   = "https://cites.org/sites/default/files/eng/com/sc/61/E61-44-02-A1.pdf"
+note  = "Range 41,410-52,345; n is the midpoint. A compilation of national figures."
+
+[[point]]
+year  = 2019
+n     = 50002
+lo    = 48323
+hi    = 51680
+grade = "C"
+kind  = "estimate"
+cite  = "Menon & Tiwari 2019; Williams et al. 2020; as summarised in the San Diego Zoo Wildlife Alliance Asian elephant fact sheet"
+url   = "https://ielc.libguides.com/sdzg/factsheets/asianelephant/population"
+note  = "48,323-51,680 wild individuals (fact sheet: 'approximately 48,000 to 52,000'); n is the midpoint. Still a compilation of national estimates of mixed quality."

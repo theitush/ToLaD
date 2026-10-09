@@ -1,0 +1,50 @@
+species   = "Eubalaena australis"
+common    = "Southern right whale"
+component = "wild"
+use       = "counts"
+scope     = "global (Southern Hemisphere), all ages"
+notes     = "Some 150,000 were killed 1770-1900 (open-boat whaling); illegal Soviet catches of 3,212 in the 1960s slowed recovery. Populations have grown ~7%/yr since. Figures here come mainly through the South African mammal Red List account (Vermeulen et al. 2016), which cites IWC 2001 (J. Cetacean Res. Manage. Special Issue 2:1-60). The widely quoted 2009 total could not be traced to its IWC primary report. Christensen's 'right whale' figure lumps three Eubalaena species and is not used."
+
+[baseline]
+year  = 1770
+n     = 62500
+lo    = 55000
+hi    = 70000
+grade = "C"
+kind  = "reconstruction"
+cite  = "Vermeulen et al. 2016, Red List of Mammals of South Africa, Swaziland and Lesotho: Eubalaena australis (SANBI & EWT), after IWC 2001"
+url   = "https://ewt.org/wp-content/uploads/2024/10/11.-Southern-Right-Whale-Eubalaena-australis_LC.pdf"
+note  = "'Estimated at 55,000-70,000 individuals in 1770' (catch-based). n is the midpoint, set here."
+
+[[point]]
+year  = 1920
+n     = 300
+lo    = 300
+hi    = 300
+grade = "D"
+kind  = "estimate"
+cite  = "Vermeulen et al. 2016, Red List of Mammals of South Africa, Swaziland and Lesotho: Eubalaena australis (SANBI & EWT), after IWC 2001"
+url   = "https://ewt.org/wp-content/uploads/2024/10/11.-Southern-Right-Whale-Eubalaena-australis_LC.pdf"
+note  = "'Believed to have dropped to only 300 by the 1920s' (elsewhere quoted as ~300 incl. ~60 breeding females in 1920, IWC 2001); depends heavily on assumed historical catches."
+
+[[point]]
+year  = 1997
+n     = 7500
+lo    = 7500
+hi    = 7500
+grade = "C"
+kind  = "estimate"
+cite  = "IWC 2001, J. Cetacean Res. Manage. (Special Issue) 2:1-60, as quoted in Vermeulen et al. 2016 (SANBI & EWT)"
+url   = "https://ewt.org/wp-content/uploads/2024/10/11.-Southern-Right-Whale-Eubalaena-australis_LC.pdf"
+note  = "1997 global abundance 7,500 incl. ~1,600 mature females, projected at 7.5%/yr from calving-ground surveys; under 10% of historic levels."
+
+[[point]]
+year  = 2009
+n     = 13611
+lo    = 13611
+hi    = 13611
+grade = "D"
+kind  = "unverified"
+cite  = "Wikipedia, 'Southern right whale' (citing a British Antarctic Survey press release)"
+url   = "https://en.wikipedia.org/wiki/Southern_right_whale"
+note  = "'Estimated at 13,611 in 2009' (also rounded to ~13,600). Commonly attributed to the IWC southern right whale assessment, but the primary report could not be checked."

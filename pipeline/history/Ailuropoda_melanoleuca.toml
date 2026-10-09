@@ -1,0 +1,50 @@
+species   = "Ailuropoda melanoleuca"
+common    = "Giant panda"
+component = "wild"
+use       = "counts"
+scope     = "global wild population (China), all ages"
+notes     = "Four national surveys by China's State Forestry Administration. Methods and survey area changed between rounds (the fourth searched ~72% more area than the third), so the rise from 1,114 to 1,864 partly reflects better and wider surveying, not only real growth. The 1985-88 low followed bamboo die-offs and poaching."
+
+[baseline]
+year  = 1976
+n     = 2459
+lo    = 2459
+hi    = 2459
+grade = "C"
+kind  = "census"
+cite  = "First national giant panda survey (1974-77), as reported in National Geographic 2015, 'Wild panda population up dramatically in China, government says'"
+url   = "https://www.nationalgeographic.com/animals/article/150302-giant-pandas-animals-science-conservation-china"
+note  = "Survey 1974-77, year set to its midpoint. Early survey methods were cruder than later rounds."
+
+[[point]]
+year  = 1986
+n     = 1114
+lo    = 1114
+hi    = 1114
+grade = "C"
+kind  = "census"
+cite  = "Second national giant panda survey (1985-88), as reported in National Geographic 2015"
+url   = "https://www.nationalgeographic.com/animals/article/150302-giant-pandas-animals-science-conservation-china"
+note  = "Survey 1985-88, year set to its midpoint."
+
+[[point]]
+year  = 2001
+n     = 1596
+lo    = 1596
+hi    = 1596
+grade = "B"
+kind  = "census"
+cite  = "Third national giant panda survey (published 2004), as reported in National Geographic 2015"
+url   = "https://www.nationalgeographic.com/animals/article/150302-giant-pandas-animals-science-conservation-china"
+note  = "Fieldwork dates are given variously as 1998-2002 or 2000-2002; year set to 2001."
+
+[[point]]
+year  = 2013
+n     = 1864
+lo    = 1864
+hi    = 1864
+grade = "B"
+kind  = "census"
+cite  = "Fourth national giant panda survey (2011-14), State Forestry Administration of China, announced 28 Feb 2015"
+url   = "https://www.giantpandaglobal.com/en/news/the-results-of-the-fourth-giant-panda-survey-2015-02-28"
+note  = "1,864 wild giant pandas, +16.8% over the third survey; the survey area was much larger, so the change is not fully comparable."

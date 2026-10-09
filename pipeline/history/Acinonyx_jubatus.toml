@@ -1,0 +1,55 @@
+species   = "Acinonyx jubatus"
+common    = "Cheetah"
+component = "wild"
+use       = "counts"
+scope     = "global wild cheetahs; 1975 figure is sub-Saharan Africa only; recent figures exclude cubs"
+notes     = """
+'100,000 cheetahs in 1900' is a popular figure with no traceable survey (grade D). Myers 1975 was
+the first continental survey (sub-Saharan Africa only; Asiatic cheetahs then numbered a few
+hundred). Modern figures: ~7,100 adults and adolescents (Durant et al. 2017) and 6,517 mature
+individuals (IUCN 2021/2022). Asiatic cheetah (Iran): fewer than 50 (Farhadinia et al. 2016).
+"""
+
+[baseline]
+year  = 1900
+n     = 100000
+lo    = 100000
+hi    = 100000
+grade = "D"
+kind  = "unverified"
+cite  = "San Diego Zoo Wildlife Alliance, Cheetah fact sheet: 'wild population in Asia and Africa estimated at 100,000 animals' (1900, no source given)"
+url   = "https://ielc.libguides.com/sdzg/factsheets/cheetah/population"
+note  = "Repeated by zoos, NGOs and press; no primary estimate traced."
+
+[[point]]
+year  = 1975
+n     = 15000
+lo    = 15000
+hi    = 15000
+grade = "D"
+kind  = "estimate"
+cite  = "Myers 1975, The Cheetah Acinonyx jubatus in Africa, IUCN Monograph 4 (figure as quoted by San Diego Zoo Wildlife Alliance)"
+url   = "https://portals.iucn.org/library/node/6331"
+note  = "Sub-Saharan Africa only; the scanned monograph could not be text-searched, so the number is taken from the fact sheet, which lists Myers 1975 among its references."
+
+[[point]]
+year  = 2016
+n     = 7100
+lo    = 7100
+hi    = 7100
+grade = "C"
+kind  = "estimate"
+cite  = "Durant et al. 2017, The global decline of cheetah Acinonyx jubatus and what it means for conservation, PNAS 114:528-533"
+url   = "https://doi.org/10.1073/pnas.1611122114"
+note  = "'Tentatively estimated at around 7,100 adult and adolescent cheetah'; 9% of historical range."
+
+[[point]]
+year  = 2021
+n     = 6517
+lo    = 6517
+hi    = 6517
+grade = "C"
+kind  = "estimate"
+cite  = "Durant et al. 2022, Acinonyx jubatus, IUCN Red List e.T219A124366642 (assessed May 2021)"
+url   = "https://doi.org/10.2305/IUCN.UK.2022-1.RLTS.T219A124366642.en"
+note  = "6,517 mature individuals (not all ages); decreasing."

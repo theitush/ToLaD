@@ -1,0 +1,7 @@
+species   = "Bubalus bubalis"
+common    = "Water buffalo"
+component = "domestic"
+use       = "counts"
+scope     = "global domestic stock"
+faostat_item = 946
+notes     = "FAO item 946 'Buffalo' (domestic water buffalo, river and swamp types). No citable pre-1961 global figure was found: the UN Statistical Yearbooks 1948-1960 give world totals only for cattle, pigs, sheep, horses, mules and asses, and the FAO yearbooks of the period that would list world buffalo were not reachable online. The curve before 1961 is the model's domestication-growth shape, rescaled to FAOSTAT 1961."

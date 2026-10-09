@@ -1,0 +1,17 @@
+species   = "Arctocephalus gazella"
+common    = "Antarctic fur seal"
+component = "wild"
+use       = "counts"
+scope     = "global, all ages (South Georgia holds ~98%)"
+notes     = "Sealed to commercial extinction by 1907; tens of animals were seen again at Bird Island, South Georgia, in the 1930s (Bonner 1968), and pup counts began in 1956. No numeric pre-sealing or low-point figure with a traceable source was found, so there is no baseline. Older totals of 4.5-6.2 million in 1999/2000 (SCAR Expert Group on Seals 2008) are judged inflated by Forcada et al. 2023 and not used. Since 2009 Bird Island has declined 7.2%/yr; IUCN (Forcada 2026, now Endangered) gives 2,187,000 mature seals in 1999 and 944,000 in 2025. Those are mature-only, so no all-age point is derived from them."
+
+[[point]]
+year  = 2008
+n     = 3510283
+lo    = 3140548
+hi    = 3919604
+grade = "B"
+kind  = "estimate"
+cite  = "Forcada et al. 2023, Global Change Biology 29:6867-6887"
+url   = "https://doi.org/10.1111/gcb.16947"
+note  = "South Georgia 2007-2009, 95% CI 3,140,548-3,919,604 (integrated population model applied to helicopter surveys); about 98% of the global population. Grade B because ~2% outside South Georgia is not included."

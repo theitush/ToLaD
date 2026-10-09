@@ -141,3 +141,56 @@ test('MOCK individuals are flagged as mock in data and name', () => {
     assert.equal(f.gid(x.index), x.species_gid);
   }
 });
+
+// ---- v1.1: HIST (curated population history) ------------------------------
+
+test('HIST round-trips against debug_top.json history', () => {
+  assert.ok(Array.isArray(dump.history) && dump.history.length >= 40, 'history list in debug_top.json');
+  assert.equal(sk.meta.hist_index.length, dump.history.length);
+  const files = new Map([[-1, sk]]);
+  for (const h of dump.history) {
+    const w = h.species;
+    if (!files.has(h.tile)) files.set(h.tile, load(`t/${h.tile}.tld`));
+    const f = files.get(h.tile);
+    assert.equal(f.gid(h.row), h.gid, `${w} gid`);
+    const got = f.history(h.row);
+    assert.ok(got, `${w}: no HIST entry at tile ${h.tile} row ${h.row}`);
+    assert.equal(got.species, h.species);
+    assert.ok(Math.abs(got.G / h.G - 1) < 1e-6, `${w} G`);
+    assert.equal(got.points.length, h.points.length, `${w} points`);
+    h.points.forEach((p, k) => {
+      const q = got.points[k];
+      assert.equal(q.year, p.year, `${w} point ${k} year`);
+      closeLog(q.n, p.n, LOG_TOL, `${w} point ${k} n`);
+      closeLog(q.lo, p.lo, LOG_TOL, `${w} point ${k} lo`);
+      closeLog(q.hi, p.hi, LOG_TOL, `${w} point ${k} hi`);
+      assert.equal(q.grade, p.grade);
+      assert.equal(q.kind, p.kind);
+      assert.equal(q.baseline, p.baseline);
+      assert.deepEqual(sk.meta.hist_sources[q.cite], { cite: p.cite, url: p.url }, `${w} point ${k} cite`);
+    });
+    assert.equal(got.segments.length, h.segments.length, `${w} segments`);
+    h.segments.forEach((s, k) => {
+      const q = got.segments[k];
+      assert.ok(Math.abs(q.year0 - s.year0) <= Math.abs(s.year0) * 1e-6 + 1e-3, `${w} seg ${k} year0`);
+      assert.ok(Math.abs(q.generations - s.gens) <= s.gens * 1e-6, `${w} seg ${k} gens`);
+      closeLog(q.startSize, s.start, LOG_TOL, `${w} seg ${k} start`);
+      closeLog(q.endSize, s.end, LOG_TOL, `${w} seg ${k} end`);
+      assert.equal(q.grade, s.grade);
+      assert.equal(q.kind, s.kind);
+    });
+  }
+});
+
+test('a v1.0 decoder (skips unknown sections) still decodes v1.1 files', async () => {
+  const old = await import('./fixtures/tolad-decoder-v1.0.js');
+  const paths = ['skeleton.tld', ...new Set(dump.history.filter((h) => h.tile >= 0).map((h) => `t/${h.tile}.tld`))];
+  for (const p of paths) {
+    const bytes = new Uint8Array(readFileSync(join(DATA, p)));
+    const a = old.decodeFile(bytes);
+    const b = load(p);
+    assert.equal(a.n, b.n, p);
+    for (const c of ['CHLD', 'EVER', 'ALIV', 'FLAG', 'GID_', 'PROF']) assert.deepEqual(a.col[c], b.col[c], `${p} ${c}`);
+    for (let i = 0; i < Math.min(a.n, 50); i++) assert.equal(a.name(i), b.name(i));
+  }
+});

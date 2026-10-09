@@ -1,0 +1,28 @@
+species   = "Sarcophilus harrisii"
+common    = "Tasmanian devil"
+component = "wild"
+use       = "counts"
+scope     = "global (Tasmania), all ages"
+notes     = "Devil facial tumour disease was found in north-east Tasmania in 1996 and now covers ~90% of the range. Older pre-disease estimates were much higher (130,000-170,000, or ~150,000, quoted by Obendorf et al. and in state reports) than the 53,000 peak from Cunningham et al.'s spatial model, which fits ~2,000 trap-nights plus spotlight and trapping records over 35 years. The model forecasts the decline to level off at ~12,000-13,000 within a decade (not used as a point)."
+
+[baseline]
+year  = 1996
+n     = 53000
+lo    = 53000
+hi    = 53000
+grade = "B"
+kind  = "reconstruction"
+cite  = "Cunningham et al. 2021, Ecology Letters 24:958-969"
+url   = "https://doi.org/10.1111/ele.13703"
+note  = "Modelled peak population in 1996, when the disease was discovered. Confidence limits not given in the press summaries consulted."
+
+[[point]]
+year  = 2020
+n     = 17000
+lo    = 17000
+hi    = 17000
+grade = "B"
+kind  = "reconstruction"
+cite  = "Cunningham et al. 2021, Ecology Letters 24:958-969"
+url   = "https://doi.org/10.1111/ele.13703"
+note  = "'An estimated 17,000 devils remain in the wild' (press coverage of the paper, data to ~2020); local populations fell ~82%."

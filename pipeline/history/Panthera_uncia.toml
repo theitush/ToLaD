@@ -1,0 +1,37 @@
+species   = "Panthera uncia"
+aliases   = ["Uncia uncia"]
+common    = "Snow leopard"
+component = "wild"
+use       = "counts"
+scope     = "global, all ages"
+notes     = """
+All global figures are compilations of national guesses: before PAWS, robust estimates covered
+<2% of the range (GSLEP 2018), and 63 of 69 inputs to the 2017 assessment were expert opinion or
+sign surveys. The rise from 2003 to 2017 is a change in guesses, not evidence of growth. PAWS
+(Population Assessment of the World's Snow Leopards) national estimates are still being released
+(Mongolia 953, Nepal 397, India 718) with no new global total yet. No sourced pre-decline level.
+The Fox 1994 / Nowell & Jackson 1996 range (4,510-7,350) could not be traced to the source and is
+left out.
+"""
+
+[[point]]
+year  = 2003
+n     = 5335
+lo    = 4080
+hi    = 6590
+grade = "C"
+kind  = "estimate"
+cite  = "McCarthy et al. 2003, Snow Leopard Survival Strategy, Table II (via Japan Ministry of the Environment ESABII database)"
+url   = "https://www.esabii.biodic.go.jp/database/mammal/carnivora/panthera_uncia.html"
+note  = "Sum of national estimates updating Fox 1994; 'many of the estimates are acknowledged to be rough and out of date'. n = midpoint."
+
+[[point]]
+year  = 2017
+n     = 7721
+lo    = 7446
+hi    = 7996
+grade = "C"
+kind  = "estimate"
+cite  = "McCarthy et al. 2017, Panthera uncia, IUCN Red List e.T22732A50664030 (figures as given by the IUCN SSC Cat Specialist Group)"
+url   = "https://doi.org/10.2305/IUCN.UK.2017-2.RLTS.T22732A50664030.en"
+note  = "7,446-7,996 individuals, 2,710-3,386 mature (n = midpoint). Range reflects compilation only, true uncertainty much wider."

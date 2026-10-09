@@ -1,0 +1,62 @@
+species   = "Equus asinus"
+common    = "Donkey"
+component = "domestic"
+use       = "counts"
+scope     = "global domestic stock"
+faostat_item = 1107
+notes     = "FAO item 1107 'Asses' (domestic donkeys). Pre-1961 points are world totals compiled by FAO and printed in the UN Statistical Yearbook (archive.org scans); FAOSTAT QCL World stocks are added from 1961 by the build. Graded C: agency aggregates of national counts with incomplete coverage and no stated range."
+
+[[point]]
+year  = 1939
+n     = 3.34e7
+lo    = 3.34e7
+hi    = 3.34e7
+grade = "C"
+kind  = "estimate"
+cite  = "UN Statistical Office, Statistical Yearbook 1957 (9th issue), table 29 'Livestock population', world row (data supplied by FAO)"
+url   = "https://archive.org/details/united-nations-statistical-yearbook_1957_9"
+note  = "Prewar (latest estimate up to 31 Dec 1939): 33.4 million head (OCR of the archive.org scan, thousand head). World total excluding the USSR (yearbook footnote 2); no allowance for countries with no information."
+
+[[point]]
+year  = 1950
+n     = 3.68e7
+lo    = 3.68e7
+hi    = 3.68e7
+grade = "C"
+kind  = "estimate"
+cite  = "UN Statistical Office, Statistical Yearbook 1960 (12th issue), table 31 'Livestock population', world row (data supplied by FAO)"
+url   = "https://archive.org/details/united-nations-statistical-yearbook_1960_12"
+note  = "Average 1947/48-1951/52 (counts nearest 1 Jan; centred on 1950): 36.8 million head (OCR of the archive.org scan, thousand head). World total excluding the USSR (yearbook footnote 2); no allowance for countries with no information."
+
+[[point]]
+year  = 1953
+n     = 3.8e7
+lo    = 3.8e7
+hi    = 3.8e7
+grade = "C"
+kind  = "estimate"
+cite  = "UN Statistical Office, Statistical Yearbook 1957 (9th issue), table 29 'Livestock population', world row (data supplied by FAO)"
+url   = "https://archive.org/details/united-nations-statistical-yearbook_1957_9"
+note  = "1952/53 (count or estimate nearest 1 Jan 1953): 38.0 million head (OCR of the archive.org scan, thousand head). World total excluding the USSR (yearbook footnote 2); no allowance for countries with no information."
+
+[[point]]
+year  = 1956
+n     = 3.91e7
+lo    = 3.91e7
+hi    = 3.91e7
+grade = "C"
+kind  = "estimate"
+cite  = "UN Statistical Office, Statistical Yearbook 1960 (12th issue), table 31 'Livestock population', world row (data supplied by FAO)"
+url   = "https://archive.org/details/united-nations-statistical-yearbook_1960_12"
+note  = "1955/56 (count or estimate nearest 1 Jan 1956): 39.1 million head (OCR of the archive.org scan, thousand head). World total excluding the USSR (yearbook footnote 2); no allowance for countries with no information."
+
+[[point]]
+year  = 1959
+n     = 3.95e7
+lo    = 3.95e7
+hi    = 3.95e7
+grade = "C"
+kind  = "estimate"
+cite  = "UN Statistical Office, Statistical Yearbook 1960 (12th issue), table 31 'Livestock population', world row (data supplied by FAO)"
+url   = "https://archive.org/details/united-nations-statistical-yearbook_1960_12"
+note  = "1958/59 (count or estimate nearest 1 Jan 1959): 39.5 million head (OCR of the archive.org scan, thousand head). World total excluding the USSR (yearbook footnote 2); no allowance for countries with no information."

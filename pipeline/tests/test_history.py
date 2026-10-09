@@ -1,0 +1,218 @@
+"""Tests for the curated population history (pipeline/history/, tolad_pipeline/history.py).
+
+    cd pipeline && uv run python -m unittest discover -s tests
+"""
+
+from __future__ import annotations
+
+import copy
+import json
+import math
+import unittest
+from pathlib import Path
+
+from tolad_pipeline import history as H
+from tolad_pipeline.anchors import NOW_YEAR, year_to_ma
+
+DATA = Path(__file__).resolve().parents[2] / "data" / "mammals"
+
+GOOD = {
+    "species": "Testus exemplaris", "common": "test", "component": "wild", "use": "counts",
+    "scope": "global", "notes": "",
+    "baseline": {"year": 1800, "n": 1e6, "lo": 5e5, "hi": 2e6, "grade": "D", "kind": "unverified",
+                 "cite": "Somebody 1900", "url": "https://example.org/a", "note": ""},
+    "point": [
+        {"year": 1950, "n": 2e4, "lo": 1e4, "hi": 3e4, "grade": "C", "kind": "estimate",
+         "cite": "X 1951", "url": "https://example.org/b"},
+        {"year": 2020, "n": 1e4, "lo": 9e3, "hi": 1.1e4, "grade": "B", "kind": "census",
+         "cite": "Y 2021", "url": "https://example.org/c", "note": "aerial count"},
+    ],
+}
+
+
+def _stats():
+    p = DATA / "stats.json"
+    if not p.exists():
+        return None
+    return json.loads(p.read_text()).get("history")
+
+
+class Schema(unittest.TestCase):
+    def test_all_files_validate(self):
+        recs = H.load_all()
+        self.assertGreaterEqual(len(recs), 40)
+        self.assertLessEqual(len(recs), 60)
+        for r in recs:
+            for p in H.curve_points(r):
+                self.assertTrue(p["cite"] and p["url"].startswith("http"), r["file"])
+
+    def test_required_flagships_present(self):
+        names = {r["species"] for r in H.load_all()}
+        for sp in ("Loxodonta africana", "Loxodonta cyclotis", "Elephas maximus", "Balaenoptera musculus",
+                   "Balaenoptera physalus", "Megaptera novaeangliae", "Eschrichtius robustus",
+                   "Eubalaena glacialis", "Physeter macrocephalus", "Bison bison", "Enhydra lutris",
+                   "Callorhinus ursinus", "Canis lupus", "Panthera leo", "Panthera tigris", "Panthera pardus",
+                   "Acinonyx jubatus", "Panthera uncia", "Ceratotherium simum", "Diceros bicornis",
+                   "Ailuropoda melanoleuca", "Gorilla beringei", "Pan troglodytes", "Phascolarctos cinereus",
+                   "Sarcophilus harrisii", "Saiga tatarica", "Connochaetes taurinus", "Ursus maritimus",
+                   "Ursus arctos", "Castor canadensis", "Homo sapiens", "Bos taurus", "Ovis aries",
+                   "Capra hircus", "Sus scrofa", "Bubalus bubalis", "Equus caballus", "Equus asinus",
+                   "Camelus dromedarius"):
+            self.assertIn(sp, names)
+        self.assertTrue(any(n.startswith("Pongo ") for n in names))
+
+    def test_good_doc(self):
+        r = H.validate(copy.deepcopy(GOOD))
+        self.assertEqual([p["year"] for p in r["points"]], [1950.0, 2020.0])
+        self.assertEqual(r["baseline"]["n"], 1e6)
+
+    def test_bad_docs_rejected(self):
+        def bad(mut):
+            d = copy.deepcopy(GOOD)
+            mut(d)
+            with self.assertRaises(H.HistoryError):
+                H.validate(d)
+        bad(lambda d: d.update(colour="green"))  # unknown key
+        bad(lambda d: d.pop("species"))
+        bad(lambda d: d.update(component="feral"))
+        bad(lambda d: d.update(use="maybe"))
+        bad(lambda d: d["point"][0].update(grade="E"))
+        bad(lambda d: d["point"][0].update(kind="guess"))
+        bad(lambda d: d["point"][0].update(lo=3e4))  # lo > n
+        bad(lambda d: d["point"][0].update(hi=1e3))  # hi < n
+        bad(lambda d: d["point"][0].update(n=0))
+        bad(lambda d: d["point"][0].pop("cite"))
+        bad(lambda d: d["point"][0].update(url="doi:10.1/x"))
+        bad(lambda d: d["point"][0].update(kind="unverified", grade="C"))  # unverified must be D
+        bad(lambda d: d["point"][1].update(year=1950))  # duplicate year
+        bad(lambda d: d["point"][1].update(year=2100))  # future
+        bad(lambda d: d["baseline"].update(year=1990))  # baseline after first point
+        bad(lambda d: d["point"][0].update(extra=1))
+        bad(lambda d: d.update(faostat_item=866))  # wild file
+        bad(lambda d: (d.pop("point"), d.pop("baseline")))  # no data at all
+
+
+class Curve(unittest.TestCase):
+    def test_interpolation_hits_every_point(self):
+        for r in H.load_all() + [H.validate(copy.deepcopy(GOOD)) | {"file": "GOOD"}]:
+            pts = H.curve_points(r)
+            for p in pts:
+                self.assertAlmostEqual(H.interp(pts, p["year"]) / p["n"], 1.0, places=12, msg=r["file"])
+            # log-linear between points: the midpoint is the geometric mean
+            for a, b in zip(pts, pts[1:]):
+                mid = H.interp(pts, (a["year"] + b["year"]) / 2)
+                self.assertAlmostEqual(mid / math.sqrt(a["n"] * b["n"]), 1.0, places=9)
+
+    def test_pieces_integrate_the_curve(self):
+        r = H.validate(copy.deepcopy(GOOD))
+        pts = H.curve_points(r)
+        L = 10.0
+        t0 = year_to_ma(1000)
+        pcs = H.curve_pieces(pts, L, t0)
+        # contiguous, from t0 to now
+        self.assertAlmostEqual(pcs[0][0], t0)
+        self.assertAlmostEqual(pcs[-1][1], 0.0, places=12)
+        for (o1, y1, _), (o2, y2, _) in zip(pcs, pcs[1:]):
+            self.assertAlmostEqual(y1, o2, places=12)
+        # analytic integral of the log-linear curve / L
+        def seg(a, b):
+            k = math.log(b["n"] / a["n"]) / (b["year"] - a["year"])
+            return (b["n"] - a["n"]) / k
+        want = (pts[0]["n"] * (1800 - 1000) + sum(seg(a, b) for a, b in zip(pts, pts[1:]))
+                + pts[-1]["n"] * (NOW_YEAR - 2020)) / L
+        self.assertAlmostEqual(H.pieces_births(pcs) / want, 1.0, places=6)
+
+
+class Segments(unittest.TestCase):
+    def _check(self, rec, G):
+        L = G / 2
+        pts = H.curve_points(rec)
+        t0 = year_to_ma(min(pts[0]["year"], 0) - 50000)
+        segs = H.compile_segments(pts, G, L, t0, rec["baseline"] is not None)
+        # alive now = last segment's end size * L / G (births per generation = N G / L)
+        self.assertAlmostEqual(segs[-1]["end"] * L / G / pts[-1]["n"], 1.0, delta=0.10, msg=rec["file"])
+        for s, nxt in zip(segs, segs[1:] + [None]):
+            self.assertGreaterEqual(s["gens"], 1)
+            if s["gens"] > 1:  # a one-generation span may have to change faster
+                self.assertLessEqual(max(s["start"], s["end"]) / min(s["start"], s["end"]),
+                                     H.SPLIT_RATIO + 1e-9, msg=f"{rec['file']} {s}")
+            if nxt is not None:  # contiguous, no jumps
+                self.assertAlmostEqual(s["year0"] + s["gens"] * G, nxt["year0"], places=6)
+                self.assertAlmostEqual(s["end"] / nxt["start"], 1.0, places=9)
+        # ever over the segments vs the births pieces over the same span, within 10%
+        pcs = H.curve_pieces(pts, L, t0)
+        span_years = sum(s["gens"] for s in segs) * G
+        self.assertAlmostEqual(segs[0]["year0"], NOW_YEAR - span_years, places=6)
+        want = H.pieces_births([p for p in pcs if p[1] < year_to_ma(segs[0]["year0"])])
+        self.assertAlmostEqual(H.segments_births(segs) / want, 1.0, delta=0.10, msg=rec["file"])
+
+    def test_segments_reproduce_alive_now(self):
+        for r in H.load_all():
+            if not r["points"]:
+                continue
+            for G in (4.0, 12.0, 30.0):
+                self._check(r, G)
+
+    def test_built_segments_match_alive(self):
+        st = _stats()
+        dbg = DATA / "debug_top.json"
+        if st is None or not dbg.exists():
+            self.skipTest("no build output")
+        hist = json.loads(dbg.read_text())["history"]
+        for h in hist:
+            s = st["species"][h["species"]]
+            if s["use"] != "counts" or s["component"] != "wild" or s["domestic_on_leaf"]:
+                continue
+            seg = h["segments"][-1]
+            alive_seg = seg["end"] * h["L"] / h["G"]
+            # wild alive (minus any domestic stock on the same leaf)
+            alive = h["points"][-1]["n"]
+            self.assertAlmostEqual(alive_seg / alive, 1.0, delta=0.10, msg=h["species"])
+            if s["alive_from"] == "history":
+                self.assertLessEqual(abs(s["alive_after"] - alive), 0.10 * alive + 1, h["species"])
+
+
+class Baseline(unittest.TestCase):
+    def test_baseline_raises_ever_synthetic(self):
+        r = H.validate(copy.deepcopy(GOOD))
+        L = 10.0
+        t0 = 1.0  # a 1 Myr band
+        before = 1e4 / L * 1e6  # today's count held over the band
+        after = H.pieces_births(H.curve_pieces(H.curve_points(r), L, t0))
+        # the deep past runs at the baseline (1e6), 100x today's 1e4
+        self.assertAlmostEqual(after / before, 100.0, delta=1.0)
+
+    def test_baseline_raises_ever_in_build(self):
+        st = _stats()
+        if st is None:
+            self.skipTest("no build output")
+        n = 0
+        for sp, s in st["species"].items():
+            b = s["baseline"]
+            if s["use"] != "counts" or s["component"] != "wild" or b is None or s["domestic_on_leaf"]:
+                continue
+            if b["n"] > 2 * s["alive_after"]:
+                n += 1
+                if b["n"] > 2 * s["alive_before"]:  # baseline above the model's count: ever rises
+                    self.assertGreater(s["ever_after"], s["ever_before"], sp)
+                # ever scales with the deep-past level: baseline / today's model count
+                want = b["n"] / s["alive_before"]
+                self.assertAlmostEqual(math.log10(s["ever_after"] / s["ever_before"]), math.log10(want),
+                                       delta=0.15, msg=sp)
+        self.assertGreaterEqual(n, 10)
+
+    def test_no_baseline_keeps_todays_level(self):
+        """Without a baseline the deep past runs at today's level, so a recorded
+        bottleneck is not held back over the whole band."""
+        st = _stats()
+        if st is None:
+            self.skipTest("no build output")
+        for sp, s in st["species"].items():
+            if s["use"] != "counts" or s["component"] != "wild" or s["baseline"] or s["domestic_on_leaf"]:
+                continue
+            self.assertAlmostEqual(math.log10(s["ever_after"] / s["ever_before"]),
+                                   math.log10(s["alive_after"] / s["alive_before"]), delta=0.1, msg=sp)
+
+
+if __name__ == "__main__":
+    unittest.main()

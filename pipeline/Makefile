@@ -10,4 +10,5 @@ build:
 	uv run python -I -m tolad_pipeline.build
 
 test:
+	uv run python -I -m unittest discover -s tests -t .
 	node --test decoder/test/roundtrip.test.mjs

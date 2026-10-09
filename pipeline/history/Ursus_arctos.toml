@@ -1,0 +1,23 @@
+species   = "Ursus arctos"
+common    = "Brown bear"
+component = "wild"
+use       = "counts"
+scope     = "global, all ages"
+notes     = """
+Only one species-wide estimate was found. The brown bear's losses were regional (e.g. grizzlies in
+the lower-48 USA, much of Europe, the Middle East and North Africa) while Russia (>100,000), Alaska
+and Canada kept large populations; no sourced pre-decline global total exists, so there is no
+baseline. Country breakdown in the source: Russia >100,000, USA ~33,000, Canada ~25,000, Europe
+~15,400.
+"""
+
+[[point]]
+year  = 2017
+n     = 200000
+lo    = 200000
+hi    = 200000
+grade = "C"
+kind  = "estimate"
+cite  = "McLellan, Proctor, Huber & Michel 2017, Ursus arctos, IUCN Red List e.T41688A121229971"
+url   = "https://doi.org/10.2305/IUCN.UK.2017-3.RLTS.T41688A121229971.en"
+note  = "Global population 'exceeds 200,000' (a lower bound; quoted by San Diego Zoo Wildlife Alliance and Cambridge-published papers)."

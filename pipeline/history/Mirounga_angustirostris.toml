@@ -1,0 +1,39 @@
+species   = "Mirounga angustirostris"
+common    = "Northern elephant seal"
+component = "wild"
+use       = "counts"
+scope     = "global (California and Baja California, Mexico), all ages"
+notes     = "Hunted for oil in the 19th century until commercially extinct by the mid-1800s and presumed extinct by 1892; a remnant survived on Guadalupe Island and was protected by Mexico in 1922. Recovery grew ~17%/yr 1958-1987 and ~3.8%/yr 1987-2010 (Lowry et al. 2014). California alone was 194,903 in 2023 (Lowry et al., NOAA tech. memo); no recent all-range total was found. No pre-exploitation figure was found, so there is no baseline."
+
+[[point]]
+year  = 1890
+n     = 100
+lo    = 100
+hi    = 100
+grade = "D"
+kind  = "estimate"
+cite  = "Bartholomew & Hubbs 1960, Mammalia 24:313-324, as cited in Lowry 2002, NOAA-TM-NMFS-SWFSC-345"
+url   = "https://swfsc-publications.fisheries.noaa.gov/publications/TM/SWFSC/NOAA-TM-NMFS-SWFSC-345.PDF"
+note  = "In 1890 found only at Guadalupe Island, 'estimated at that time to be less than 100 animals' (an upper bound). Popular accounts give 20-100."
+
+[[point]]
+year  = 1991
+n     = 127000
+lo    = 127000
+hi    = 127000
+grade = "B"
+kind  = "estimate"
+cite  = "Stewart et al. 1994, History and present status of the northern elephant seal population, in Le Boeuf & Laws (eds), Elephant Seals: Population Ecology, Behavior and Physiology, Univ. California Press, pp. 29-48"
+url   = "https://pubs.usgs.gov/publication/87343"
+note  = "~127,000 in 1991, ~25% in Mexico and 75% in the US, still increasing >6%/yr."
+
+[[point]]
+year  = 2010
+n     = 224500
+lo    = 210000
+hi    = 239000
+grade = "B"
+kind  = "estimate"
+cite  = "Lowry et al. 2014, Aquatic Mammals 40:20-31"
+url   = "https://doi.org/10.1578/AM.40.1.2014.20"
+note  = "2010 total 210,000-239,000 for California and Mexico, derived by the authors from pup production. n is the midpoint, set here."

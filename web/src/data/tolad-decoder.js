@@ -1,13 +1,15 @@
-// ToLaD tile decoder, format version 1 (see pipeline/FORMAT.md).
+// ToLaD tile decoder, format version 1.1 (see pipeline/FORMAT.md).
 // No dependencies; works in browsers, Web Workers and Node 18+.
 //
 //   import { decodeFile } from './tolad-decoder.js';
 //   const sk = decodeFile(arrayBuffer);          // skeleton.tld
 //   sk.meta.tiles                                // tile manifest
 //   sk.name(0), sk.ever(0), sk.profile(0) ...    // per-row accessors
+//   file.history(row)                            // curated population history (HIST, v1.1) or null
 //
 // All per-row columns are exposed as typed arrays (zero-copy views) in
-// `file.col`; the accessor methods dequantize one row at a time.
+// `file.col`; the accessor methods dequantize one row at a time. Unknown
+// sections are skipped.
 
 export const FORMAT_VERSION = 1;
 export const KIND_SKELETON = 0;
@@ -38,6 +40,10 @@ export const FLAG = Object.freeze({
 
 export const GRADES = ['A', 'B', 'C', 'D'];
 export const DATE_SOURCES = ['upham-calibrated', 'interpolated', 'fossil-range', 'anchored'];
+/** HIST point / segment kinds (same list as skeleton META.hist_kinds). */
+export const HIST_KINDS = ['census', 'estimate', 'index-scaled', 'reconstruction', 'unverified',
+  'model', 'interpolated', 'held', 'baseline'];
+export const HIST_POINT_BASELINE = 1;
 
 export function dqAge(q) {
   return q === 0 ? 0 : Math.pow(10, (q - 1) / Q.AGE_STEPS_PER_DEX + Q.AGE_MIN_LOG10);
@@ -69,6 +75,62 @@ function fourcc(u32) {
 }
 
 /**
+ * HIST section (v1.1): curated population history per species row.
+ * Returns Map(row -> { G, L, points, segments }); `meta` is the file's META.hist
+ * array, aligned with the species headers.
+ */
+function decodeHist(dv, off, meta) {
+  const ns = dv.getUint32(off, true);
+  const np = dv.getUint32(off + 4, true);
+  const heads = off + 16;
+  const pts = heads + 24 * ns;
+  const segs = pts + 16 * np;
+  const out = new Map();
+  for (let s = 0; s < ns; s++) {
+    const h = heads + 24 * s;
+    const row = dv.getUint32(h, true);
+    const p0 = dv.getUint32(h + 4, true);
+    const s0 = dv.getUint32(h + 8, true);
+    const npts = dv.getUint16(h + 12, true);
+    const nseg = dv.getUint16(h + 14, true);
+    const points = [];
+    for (let k = 0; k < npts; k++) {
+      const b = pts + 16 * (p0 + k);
+      points.push({
+        year: dv.getInt32(b, true),
+        n: dqLog16(dv.getUint16(b + 4, true)),
+        lo: dqLog16(dv.getUint16(b + 6, true)),
+        hi: dqLog16(dv.getUint16(b + 8, true)),
+        grade: GRADES[dv.getUint8(b + 10)],
+        kind: HIST_KINDS[dv.getUint8(b + 11)],
+        cite: dv.getUint16(b + 12, true), // index into skeleton META.hist_sources
+        baseline: (dv.getUint16(b + 14, true) & HIST_POINT_BASELINE) !== 0,
+      });
+    }
+    const segments = [];
+    for (let k = 0; k < nseg; k++) {
+      const b = segs + 16 * (s0 + k);
+      segments.push({
+        year0: dv.getFloat32(b, true), // calendar year the segment starts
+        generations: dv.getFloat32(b + 4, true),
+        startSize: dqLog16(dv.getUint16(b + 8, true)), // births per generation
+        endSize: dqLog16(dv.getUint16(b + 10, true)),
+        grade: GRADES[dv.getUint8(b + 12)],
+        kind: HIST_KINDS[dv.getUint8(b + 13)],
+      });
+    }
+    out.set(row, {
+      ...(meta && meta[s] ? meta[s] : {}),
+      G: dv.getFloat32(h + 16, true),
+      L: dv.getFloat32(h + 20, true),
+      points,
+      segments,
+    });
+  }
+  return out;
+}
+
+/**
  * Decode one .tld file (skeleton or tile).
  * @param {ArrayBuffer|ArrayBufferView} input
  */
@@ -93,6 +155,7 @@ export function decodeFile(input) {
   let meta = null;
   let nameOffsets = null;
   let nameBytes = null;
+  let histOff = -1;
   for (let s = 0; s < nsec; s++) {
     const base = 16 + 16 * s;
     const id = fourcc(dv.getUint32(base, true));
@@ -104,12 +167,16 @@ export function decodeFile(input) {
     } else if (id === 'NAME') {
       nameOffsets = new Uint32Array(buf, off, count + 1);
       nameBytes = new Uint8Array(buf, off + 4 * (count + 1), len - 4 * (count + 1));
+    } else if (id === 'HIST') {
+      if (len > 0) histOff = off;
     } else if (TYPES[id]) {
       const T = TYPES[id];
       col[id] = new T(buf, off, len / T.BYTES_PER_ELEMENT);
     }
   }
-  return new TileFile(kind, n, col, meta, nameOffsets, nameBytes);
+  const f = new TileFile(kind, n, col, meta, nameOffsets, nameBytes);
+  f.hist = histOff >= 0 ? decodeHist(dv, histOff, meta && meta.hist) : new Map();
+  return f;
 }
 
 export class TileFile {
@@ -172,6 +239,14 @@ export class TileFile {
     if (s && s.rep) return s.rep;
     return this.name(i);
   }
+  /**
+   * Curated population history of a species row (HIST, format v1.1), or null.
+   * { species, common, component, use, scope, notes, point_notes, G, L,
+   *   points: [{ year, n, lo, hi, grade, kind, cite, baseline }],
+   *   segments: [{ year0, generations, startSize, endSize, grade, kind }] }
+   * `cite` indexes skeleton META.hist_sources; segment sizes are births per generation.
+   */
+  history(i) { return (this.hist && this.hist.get(i)) || null; }
   /** Mean births/yr in each profile bin (bin 0 = youngest), see profileEdges(). */
   profile(i) {
     const k = Q.PROFILE_K;

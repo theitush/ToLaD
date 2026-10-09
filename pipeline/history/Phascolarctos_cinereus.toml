@@ -1,0 +1,39 @@
+species   = "Phascolarctos cinereus"
+common    = "Koala"
+component = "wild"
+use       = "counts"
+scope     = "global (Australia), all ages"
+notes     = "Recent national totals are not comparable over time: the CSIRO National Koala Monitoring Program (NKMP) estimate rose from 224,000-524,000 (2024 release; other outlets quote 287,830-628,010 for 2023) to 729,000-918,000 (2025), which CSIRO says may reflect more survey effort, more sensitive methods and model changes rather than real growth. The Australian Koala Foundation disputes these and holds that fewer than 100,000 remain. Historical context: a six-month open season in Queensland in 1919 produced about one million skins (a harvest, not a population)."
+
+[baseline]
+year  = 1788
+n     = 1.0e7
+lo    = 7.0e6
+hi    = 1.0e7
+grade = "D"
+kind  = "unverified"
+cite  = "EarthTalk, 'What is the status of Australia's koalas?' (ENN)"
+url   = "https://enn.com/articles/244"
+note  = "Pre-European-settlement population of 7-10 million (popularly '10 million') repeated in popular and advocacy sources with no traceable primary study; some historians argue koalas were patchily distributed and never that abundant."
+
+[[point]]
+year  = 2016
+n     = 329000
+lo    = 144000
+hi    = 605000
+grade = "C"
+kind  = "estimate"
+cite  = "Adams-Hosking et al. 2016, Diversity and Distributions 22:249-262"
+url   = "https://doi.org/10.1111/ddi.12400"
+note  = "Structured expert elicitation (15 experts, by bioregion in four states); average decline of 24% over three generations; losses of 53% Qld, 26% NSW, 14% Vic, 3% SA."
+
+[[point]]
+year  = 2025
+n     = 823500
+lo    = 729000
+hi    = 918000
+grade = "C"
+kind  = "estimate"
+cite  = "CSIRO National Koala Monitoring Program, 2025 national koala estimate"
+url   = "https://www.csiro.au/en/news/all/articles/2025/november/koala-recordings"
+note  = "729,000-918,000 (as of May 2025); n is the midpoint. Final national estimates are due in 2026. The jump from 2016 is largely methodological (see notes)."

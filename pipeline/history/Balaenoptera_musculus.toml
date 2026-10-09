@@ -1,0 +1,50 @@
+species   = "Balaenoptera musculus"
+common    = "Blue whale"
+component = "wild"
+use       = "counts"
+scope     = "global, all ages (1926 point: mature individuals only)"
+notes     = "Pre-whaling and 2001 global numbers are Christensen 2006's reconstruction as tabulated by Pershing et al. 2010 (CC BY). Modern whaling (from c. 1900) took the species to a few percent of its former level; the Antarctic stock fell from 239,000 (202,000-311,000) to a 1973 low of 360 (150-840) and was ~1,700 in 1996 (Branch, Matsuoka & Miyashita 2004, Mar. Mamm. Sci. 20:726-754). That regional low is not used as a global point. IUCN 2018: 5,000-15,000 mature, Endangered."
+
+[baseline]
+year  = 1900
+n     = 340280
+lo    = 340280
+hi    = 340280
+grade = "C"
+kind  = "reconstruction"
+cite  = "Christensen 2006, UBC Fisheries Centre Research Reports 14(9), as tabulated in Pershing et al. 2010, PLoS ONE 5:e12444, Table 1"
+url   = "https://doi.org/10.1371/journal.pone.0012444"
+note  = "Pre-whaling global abundance (catch-based reconstruction). The source gives no single year; 1900 is the approximate start of modern whaling on blue whales, chosen here."
+
+[[point]]
+year  = 1926
+n     = 140000
+lo    = 140000
+hi    = 140000
+grade = "C"
+kind  = "estimate"
+cite  = "Cooke 2018 (errata 2019), IUCN Red List: Balaenoptera musculus, e.T2477A156923585"
+url   = "https://doi.org/10.2305/IUCN.UK.2018-2.RLTS.T2477A156923585.en"
+note  = "'At least 140,000' mature individuals in 1926, the reference level for the IUCN 89-97% reduction. Mature only and a lower bound, so the all-age total was higher. Quoted via the NY DEC SWAP 2025 blue whale account."
+
+[[point]]
+year  = 2001
+n     = 4727
+lo    = 4727
+hi    = 4727
+grade = "C"
+kind  = "reconstruction"
+cite  = "Christensen 2006, UBC Fisheries Centre Research Reports 14(9), as tabulated in Pershing et al. 2010, PLoS ONE 5:e12444, Table 1"
+url   = "https://doi.org/10.1371/journal.pone.0012444"
+note  = "2001 global abundance in Christensen's compilation. Low relative to the later IUCN range."
+
+[[point]]
+year  = 2018
+n     = 17500
+lo    = 10000
+hi    = 25000
+grade = "C"
+kind  = "estimate"
+cite  = "Cooke 2018 (errata 2019), IUCN Red List: Balaenoptera musculus, e.T2477A156923585"
+url   = "https://doi.org/10.2305/IUCN.UK.2018-2.RLTS.T2477A156923585.en"
+note  = "Global 10,000-25,000 total (5,000-15,000 mature) as of 2015-2018, cited to Cooke 2018 and Jefferson et al., Marine Mammals of the World. n is the midpoint of the range, set here."
