@@ -21,7 +21,7 @@ Everything below species is generated on the fly from integer hashes and needs n
 | Layout | Vertical time river → braid → weave. Radial layout only as an optional "poster" skin | Only layouts with a time axis can show *when* lineages died. A portrait phone's long axis is time | 04 |
 | Width semantics | **Width = births per unit time, so area = individuals ever lived** (the "W2" option in 04). Total count shown on the label and in a ledger | Nests correctly and turns smoothly into the per-individual weave. **Needs your OK**, see below | 04 |
 | Log/linear | Nested **sibling shares** `g(n)/Σg`, with g = n (linear) or 1+log10 n (log). The toggle animates g | Absolute log widths can't nest. Under linear, deep zoom *is* the log axis | 04 |
-| Green | Split each band into a green and a gray lane, with a 1 px floor for any living clade. **Log-mode formula needs your OK** | True alive share is ~1e-8 to 1e-10 almost everywhere; humans are ~7% | 02, 04 |
+| Green | Split each band into a green and a gray lane, with a 1 px floor for any living clade | True alive share is ~1e-8 to 1e-10 almost everywhere; humans are ~7% | 02, 04 |
 | Renderer | Custom WebGL2 (twgl-level), instanced tapered quads, SDF text, shader-generated mesh edges. WebGPU later | Workload is ~100k instances per frame, so WebGL2 is enough and runs everywhere | 03 |
 | Deep zoom | Hierarchical local frames, with the camera re-anchored to a nearby node (OneZoom's method), plus separate X/Y scales | No float format spans ~133 bits of width or ~47 bits of time | 03, 04 |
 | Shell | React + Vite + TS. Camera state never goes through React | React costs startup bytes, not frame time | 03 |
@@ -38,12 +38,12 @@ Everything below species is generated on the fly from integer hashes and needs n
 - **Uniform vs separate X/Y zoom.** 03 generalizes OneZoom's uniform similarity frames. 04 needs separate width and time scales, because a clade can be 500 My long and 1e-20 wide. Resolution: per-chunk frames carry separate (sx, st) scales, and the re-anchoring logic is otherwise the same. This is the main thing to test in the spike.
 - **Green in log mode.** 02 suggests a log-scaled hue or a minimum sliver. 04 suggests green following the active width mode. Proposal: green lane width follows the active mode, there's a 1 px floor, and the true % is always in the ledger.
 
-## Open decisions (for the user)
+## Decisions confirmed by the user (2026-10-09)
 
-1. Width = births-rate river (area = individuals), or literal "width = total individuals" (constant-width flow-tree) as the default?
-2. In log mode, is the green share log-compressed too?
-3. Viruses: count particles or infections? Start with them off by default?
-4. First real-data slice: mammals (~27k tips, under 1 MB), or straight to the coarse all-life skeleton?
+1. **Width:** births-rate river, so area = individuals ever lived. The total count goes on the label and in the ledger.
+2. **Green in log mode:** follows the active width mode (log-compressed in log mode), with a 1 px floor. The true % is always shown in the ledger.
+3. **Viruses:** count particles, in a separate forest next to LUCA, off by default.
+4. **First real-data slice:** mammals (~27k tips including fossils).
 
 ## Proposed plan
 
