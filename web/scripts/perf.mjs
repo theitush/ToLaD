@@ -51,7 +51,7 @@ try {
   page.on('pageerror', (e) => errors.push(String(e)));
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
   const cdp = await context.newCDPSession(page);
-  await page.goto(`http://localhost:${PORT}/${SYNTH ? '?synthetic&debug' : ''}`);
+  await page.goto(`http://localhost:${PORT}/${SYNTH ? '?synthetic&debug' : '?river'}`);
   await page.waitForFunction(() => !!window.__tolad, null, { timeout: 20000 });
   await sleep(SYNTH ? 500 : 2500);
   const glInfo = await page.evaluate(() => {

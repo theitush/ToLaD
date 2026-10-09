@@ -1,8 +1,17 @@
 // OneZoom-style fan for one polytomy, in world units (y grows downwards, like
 // the screen). The parent branch comes up from the bottom to the fork at
 // (0, 0); each species branch leaves the fork side by side (their widths add up
-// to the trunk's width, so they nest), curves outwards and ends in a leaf on an
-// arc around the fork.
+// to the trunk's width, so they nest), curves outwards and ends in a leaf.
+//
+// Height = time: the fork is the clade's origin, a leaf's tip is the species'
+// last appearance (living species: the "now" line), on a log years-before-
+// present scale (TimeScale). Leaves are spread in tree order across the width.
+//
+// The stem is drawn as its children's strands side by side (view.drawStrand),
+// so each green lane runs unbroken from leaf to root; the stem's width and green
+// are the sums of its strands. In linear mode that equals the clade's own
+// alive/ever exactly; in log mode the stem's green is the sum of its children's
+// log lanes (that is what keeps strands continuous).
 //
 // Width = individuals (shares g/Σg, g = n linear or 1 + log10 n log, as in the
 // river's layout.ts). Green = alive: each branch is split into a green lane of
@@ -85,7 +94,6 @@ export interface FanBranch {
 export interface Fan {
   clade: CladeRec;
   trunkWidth: number;
-  trunkAliveFrac: number;
   trunkBottom: Pt;
   branches: FanBranch[];
   time: TimeScale;
@@ -150,11 +158,9 @@ export function layoutFan(clade: CladeRec, mode: WidthMode): Fan {
       dir,
     };
   });
-  const aliveSum = sp.reduce((a, s) => a + s.alive, 0);
   return {
     clade,
     trunkWidth: W,
-    trunkAliveFrac: aliveFrac(aliveSum, sp.reduce((a, s) => a + s.ever, 0), mode),
     trunkBottom: { x: 0, y: TRUNK_LENGTH },
     branches,
     time,
