@@ -14,3 +14,5 @@ pipeline/.venv/
 
 # agent worktrees
 .claude/worktrees/
+.claude/handoff/
+.claude/settings.local.json
