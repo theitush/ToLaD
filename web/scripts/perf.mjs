@@ -60,7 +60,7 @@ try {
     return gl ? (ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)) : 'no webgl2';
   });
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: THROTTLE });
-  await page.screenshot({ path: `${OUT}/0-${SYNTH ? 'root' : 'opening'}.png` });
+  await page.screenshot({ timeout: 120000, path: `${OUT}/0-${SYNTH ? 'root' : 'opening'}.png` });
 
   const W = 390;
   const H = 844;
@@ -139,12 +139,12 @@ try {
         await pan(200, 600, 140, 420);
       }
     });
-    await page.screenshot({ path: `${OUT}/1-shallow.png` });
+    await page.screenshot({ timeout: 120000, path: `${OUT}/1-shallow.png` });
 
     await phase('animated dive 0 -> ~60', async () => {
       await page.evaluate(() => window.__tolad.diveAnimated(60, 11));
     });
-    await page.screenshot({ path: `${OUT}/2-depth60.png` });
+    await page.screenshot({ timeout: 120000, path: `${OUT}/2-depth60.png` });
 
     await page.evaluate(() => window.__tolad.diveInstant(940, 12));
     await sleep(300);
@@ -156,12 +156,12 @@ try {
         await pinch(W / 2, H / 2, 260, 120);
       }
     });
-    await page.screenshot({ path: `${OUT}/3-depth1000.png` });
+    await page.screenshot({ timeout: 120000, path: `${OUT}/3-depth1000.png` });
 
     await phase('animated dive ~1000 -> ~1060', async () => {
       await page.evaluate(() => window.__tolad.diveAnimated(60, 13));
     });
-    await page.screenshot({ path: `${OUT}/4-depth1060.png` });
+    await page.screenshot({ timeout: 120000, path: `${OUT}/4-depth1060.png` });
 
     await phase('log/linear toggle + pinch deep', async () => {
       await page.evaluate(() => window.__tolad.setMode(1));
@@ -175,7 +175,7 @@ try {
       const ok = await page.evaluate((n) => window.__toladApp.flyToName(n), name);
       if (!ok) errors.push(`flyToName(${name}) failed`);
       await sleep(2200);
-      await page.screenshot({ path: `${OUT}/${file}` });
+      await page.screenshot({ timeout: 120000, path: `${OUT}/${file}` });
     };
     await phase('pinch+pan at root (Mammalia)', async () => {
       for (let i = 0; i < 3; i++) {
@@ -183,7 +183,7 @@ try {
         await pan(200, 600, 140, 420);
       }
     });
-    await page.screenshot({ path: `${OUT}/1-after-pinch.png` });
+    await page.screenshot({ timeout: 120000, path: `${OUT}/1-after-pinch.png` });
     await phase('fly to Primates', () => fly('Primates', '2-primates.png'));
     await phase('pinch+pan in Primates', async () => {
       for (let i = 0; i < 2; i++) {
@@ -196,12 +196,12 @@ try {
     await fly('Mammuthus', '4-mammuthus.png');
     await page.evaluate(() => window.__tolad.resetView());
     await sleep(1600);
-    await page.screenshot({ path: `${OUT}/5-root-linear.png` });
+    await page.screenshot({ timeout: 120000, path: `${OUT}/5-root-linear.png` });
     await phase('log/linear toggle at root', async () => {
       await page.evaluate(() => window.__tolad.setMode(1));
       await sleep(1000);
     });
-    await page.screenshot({ path: `${OUT}/6-root-log.png` });
+    await page.screenshot({ timeout: 120000, path: `${OUT}/6-root-log.png` });
     await fly('Primates', '7-primates-log.png');
     await page.evaluate(() => window.__tolad.setMode(0));
     await page.evaluate(() => window.__tolad.resetView());
@@ -209,7 +209,7 @@ try {
     await phase('animated dive root -> leaf', async () => {
       await page.evaluate(() => window.__tolad.diveAnimated(60, 11));
     });
-    await page.screenshot({ path: `${OUT}/8-dive-leaf.png` });
+    await page.screenshot({ timeout: 120000, path: `${OUT}/8-dive-leaf.png` });
     const tiles = await page.evaluate(() => [...window.__toladApp.source.files.keys()]);
     console.log(`tiles loaded: ${tiles.length - 1} of 15`);
   }
@@ -228,7 +228,7 @@ try {
     await p2.waitForFunction(() => !!window.__tolad, null, { timeout: 20000 });
     await sleep(2500);
     const labels = await p2.evaluate(() => window.__tolad.labels?.count ?? 0);
-    await p2.screenshot({ path: `${OUT}/9-single-file.png` });
+    await p2.screenshot({ timeout: 120000, path: `${OUT}/9-single-file.png` });
     console.log(`single-file from file://: ok, ${labels} labels, ${blocked.length} network requests blocked`);
     if (blocked.length) errors.push('single-file made network requests: ' + blocked.join(', '));
     await p2.close();
