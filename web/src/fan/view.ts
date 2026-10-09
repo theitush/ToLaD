@@ -4,7 +4,7 @@
 // visible (see mesh.ts), so Canvas 2D is enough and keeps the code small.
 // Gestures come from the shared engine/input.ts.
 
-import { formatCount } from '../data/names';
+import { formatAge, formatCount } from '../data/names';
 import { Input, type InputHandlers } from '../engine/input';
 import { bezier, bezierTangent, layoutFan, widthAt, type Fan, type FanBranch, type WidthMode } from './layout';
 import { drawMeshLeaf, drawPlainLeaf, worldToLocal, type MeshStats, type SelectedInd } from './leafdraw';
@@ -105,10 +105,15 @@ export class FanView implements InputHandlers {
       x1 = Math.max(x1, b.leaf.x + b.leafR);
       y0 = Math.min(y0, b.leaf.y - b.leafR);
     }
-    // Room for the radial labels (they have a fixed pixel size).
-    const s = Math.min((this.w - 140) / (x1 - x0), (this.h - 230) / (120 - y0));
-    y0 -= 130 / s;
-    return { cx: (x0 + x1) / 2, cy: y0 + this.h / 2 / s, s };
+    // Pixel margins: time labels on the left, leaf labels above "now", a bit of stem below the fork.
+    const left = 58;
+    const right = 14;
+    const top = 120;
+    const bottom = 110;
+    x0 -= 6;
+    x1 += 6;
+    const s = Math.min((this.w - left - right) / (x1 - x0), (this.h - top - bottom) / -y0);
+    return { cx: x0 + (this.w / 2 - left) / s, cy: y0 + (this.h / 2 - top) / s, s };
   }
 
   setMode(mode: WidthMode): void {
@@ -304,8 +309,8 @@ export class FanView implements InputHandlers {
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.fillStyle = BG;
     ctx.fillRect(0, 0, this.w, this.h);
-    this.drawTrunk();
-    for (const b of this.fan.branches) this.drawBranch(b);
+    this.drawTimeAxis();
+    for (const b of this.fan.branches) this.drawStrand(b);
     for (const b of this.fan.branches) this.drawLeaf(b);
     for (const b of this.fan.branches) this.drawLeafLabel(b);
     this.drawTrunkLabel();
@@ -336,14 +341,62 @@ export class FanView implements InputHandlers {
     const wmax = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 20;
     ctx.fillStyle = 'rgba(20,28,24,0.82)';
     ctx.beginPath();
-    ctx.roundRect(10, 10, Math.min(this.w - 20, wmax), 80, 8);
+    ctx.roundRect(10, 54, Math.min(this.w - 20, wmax), 80, 8);
     ctx.fill();
     ctx.textBaseline = 'top';
     ctx.fillStyle = '#eef4ef';
-    ctx.fillText(lines[0], 20, 17);
+    ctx.fillText(lines[0], 20, 61);
     ctx.font = `12px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
     ctx.fillStyle = '#b5c0b9';
-    for (let k = 1; k < lines.length; k++) ctx.fillText(lines[k], 20, 20 + 16 * k);
+    for (let k = 1; k < lines.length; k++) ctx.fillText(lines[k], 20, 64 + 16 * k);
+    ctx.restore();
+    this.drawTipPointer(best, m, st.g1);
+  }
+
+  /** When the leaf's tip (newest generation: the living) is off screen, point at it. */
+  private drawTipPointer(b: FanBranch, m: LeafMesh, gTop: number): void {
+    const tip = { x: b.base.x + b.dir.x * b.shape.L, y: b.base.y + b.dir.y * b.shape.L };
+    const [tx, ty] = this.toScreen(tip.x, tip.y);
+    const margin = 24;
+    if (tx > margin && tx < this.w - margin && ty > margin && ty < this.h - margin) return;
+    const cx = this.w / 2;
+    const cy = this.h / 2;
+    const dx = tx - cx;
+    const dy = ty - cy;
+    // Clamp the direction to a box inside the screen edges (below the HUD).
+    const bx = this.w / 2 - 40;
+    const byTop = cy - 160;
+    const byBot = this.h / 2 - 70;
+    const k = Math.min(Math.abs(dx) > 1e-9 ? bx / Math.abs(dx) : Infinity, dy < 0 ? byTop / -dy : byBot / Math.max(1e-9, dy));
+    const px = cx + dx * k;
+    const py = cy + dy * k;
+    const a = Math.atan2(dy, dx);
+    const ctx = this.ctx;
+    const living = !b.sp.extinct;
+    const col = living ? GREEN : '#b9b3a6';
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.save();
+    ctx.rotate(a);
+    ctx.beginPath();
+    ctx.moveTo(14, 0);
+    ctx.lineTo(-6, -9);
+    ctx.lineTo(-6, 9);
+    ctx.closePath();
+    ctx.fillStyle = col;
+    ctx.fill();
+    ctx.restore();
+    const gens = m.G - 1 - gTop;
+    const yrs = formatYearsAgo(gens * m.sp.generationYears).replace(' ago', '');
+    const later = gens < 1 ? 'just above' : `${yrs} later`;
+    const label = living ? `now: the living, ${later}` : `last generation, ${later}`;
+    ctx.font = `600 12px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
+    ctx.textAlign = px < this.w * 0.3 ? 'left' : px > this.w * 0.7 ? 'right' : 'center';
+    ctx.textBaseline = py < this.h / 2 ? 'top' : 'bottom';
+    ctx.fillStyle = col;
+    ctx.shadowColor = BG;
+    ctx.shadowBlur = 4;
+    ctx.fillText(label, 0, py < this.h / 2 ? 16 : -16);
     ctx.restore();
   }
 
@@ -381,20 +434,25 @@ export class FanView implements InputHandlers {
     }
   }
 
-  private drawTrunk(): void {
-    const f = this.fan;
+  /**
+   * One species' strand, drawn whole from the bottom of the parent stem through
+   * the fork to its leaf. The stem is just its children's strands side by side
+   * (in branch order, widths adding up to the stem's width), so each green lane
+   * runs unbroken from leaf to root. The same rule nests for a deeper tree: a
+   * strand passes through every ancestor stem at its offset there.
+   */
+  private drawStrand(b: FanBranch): void {
+    // Cull: the strand's box is the stem column plus the curve's control hull.
+    const xs = [b.p0.x, b.p1.x, b.p2.x, b.p3.x];
+    const ys = [this.fan.trunkBottom.y, b.p1.y, b.p2.y, b.p3.y];
+    const [ax, ay] = this.toScreen(Math.min(...xs) - b.width, Math.min(...ys));
+    const [bx, by] = this.toScreen(Math.max(...xs) + b.width, Math.max(...ys));
+    if (bx < 0 || ax > this.w || by < 0 || ay > this.h) return;
     const pts = [];
-    for (let i = 0; i <= 8; i++) {
-      const y = f.trunkBottom.y * (1 - i / 8);
-      // Left normal of an upward branch is (-1, 0).
-      pts.push({ x: 0, y, nx: -1, ny: 0, w: f.trunkWidth });
-    }
-    this.lanes(pts, f.trunkAliveFrac, false);
-  }
-
-  private drawBranch(b: FanBranch): void {
-    const pts = [];
-    const N = 36;
+    // Stem part, straight up to the fork. Left normal of an upward strand is (-1, 0).
+    const yb = this.fan.trunkBottom.y;
+    for (let i = 0; i < 8; i++) pts.push({ x: b.p0.x, y: yb * (1 - i / 8), nx: -1, ny: 0, w: b.width });
+    const N = 40;
     for (let i = 0; i <= N; i++) {
       const t = i / N;
       const p = bezier(b, t);
@@ -402,6 +460,50 @@ export class FanView implements InputHandlers {
       pts.push({ x: p.x, y: p.y, nx: d.y, ny: -d.x, w: widthAt(b, t) });
     }
     this.lanes(pts, b.aliveFrac, b.sp.extinct);
+  }
+
+  /** Light time axis: log years-before-present ticks across the screen, labels on the left. */
+  private drawTimeAxis(): void {
+    const ctx = this.ctx;
+    const ts = this.fan.time;
+    const cands: number[] = [ts.originMa];
+    for (let e = 7; e >= 3; e--) {
+      for (const m of [5, 2, 1]) {
+        const ma = (m * Math.pow(10, e)) / 1e6;
+        if (ma < ts.originMa * 0.97) cands.push(ma);
+      }
+    }
+    cands.push(0);
+    ctx.save();
+    ctx.font = `11px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    let lastY = Infinity;
+    const placed: [number, number][] = [];
+    // Always show origin and now; fill in between where there is room (≥ 26 px).
+    const must = new Set([ts.originMa, 0]);
+    for (const ma of cands) {
+      const [, sy] = this.toScreen(0, ts.y(ma));
+      if (sy < -10 || sy > this.h + 10) continue;
+      if (!must.has(ma) && (Math.abs(sy - lastY) < 26 || placed.some(([, y]) => Math.abs(y - sy) < 26))) continue;
+      placed.push([ma, sy]);
+      lastY = sy;
+    }
+    for (const [ma, sy] of placed) {
+      const now = ma === 0;
+      ctx.fillStyle = now ? 'rgba(51,189,102,0.35)' : 'rgba(220,235,225,0.07)';
+      ctx.fillRect(0, Math.round(sy), this.w, 1);
+      const label = now ? 'now' : ma === ts.originMa ? `${formatAge(ma)} (origin)` : formatAge(ma);
+      ctx.fillStyle = now ? '#7fd69e' : '#8d998f';
+      ctx.fillText(label, 6, sy - 7);
+    }
+    // Honest scale note under the axis labels.
+    const [, oy] = this.toScreen(0, ts.y(ts.originMa));
+    if (oy > 0 && oy < this.h - 20) {
+      ctx.fillStyle = '#6f7a72';
+      ctx.fillText('time, log scale', 6, oy + 9);
+    }
+    ctx.restore();
   }
 
   private drawLeaf(b: FanBranch): void {
@@ -462,25 +564,28 @@ export class FanView implements InputHandlers {
   private drawTrunkLabel(): void {
     const ctx = this.ctx;
     const f = this.fan;
-    const [sx, sy] = this.toScreen(-f.trunkWidth / 2, 60);
-    if (sy > this.h + 20 || sy < -80) return;
+    // Right of the stem, just below the fork (nothing else is drawn there).
+    const [sx, sy] = this.toScreen(f.trunkWidth / 2, 0);
+    if (sy > this.h + 20 || sy < -80 || sx > this.w) return;
     const font = (w: string, px: number) => `${w} ${px}px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
     ctx.save();
     ctx.textBaseline = 'top';
-    ctx.textAlign = 'right';
-    const x = sx - 10;
-    ctx.font = font('600', 15);
+    ctx.textAlign = 'left';
+    const x = sx + 10;
+    const y = sy + 6;
+    ctx.font = font('600', 14);
     ctx.fillStyle = '#eef4ef';
-    ctx.fillText(f.clade.common, x, sy);
+    ctx.fillText(f.clade.common, x, y);
     ctx.font = font('italic 400', 12);
     ctx.fillStyle = '#9faba3';
-    ctx.fillText(f.clade.sci, x, sy + 19);
+    ctx.fillText(f.clade.sci, x, y + 18);
     ctx.font = font('400', 12);
-    ctx.fillText(`${formatCount(f.clade.ever)} ever`, x, sy + 37);
+    ctx.fillText(`${formatCount(f.clade.ever)} ever`, x, y + 33);
     ctx.fillStyle = GREEN;
-    ctx.fillText(`${formatCount(f.clade.alive)} alive`, x, sy + 53);
+    ctx.fillText(`${formatCount(f.clade.alive)} alive`, x, y + 48);
     ctx.restore();
   }
+
 }
 
 export function fmtInt(n: number): string {

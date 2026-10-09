@@ -14,16 +14,43 @@ import type { CladeRec, SpeciesRec } from './panthera';
 
 export type WidthMode = 'log' | 'linear';
 
-export const TRUNK_WIDTH = 96;
+export const TRUNK_WIDTH = 72;
 export const TRUNK_LENGTH = 2400;
-/** Leaves sit on a tall half-ellipse (portrait phones), alternate ones a bit lower. */
-export const ARC_RX = 300;
-export const ARC_RY = 760;
-const STAGGER = 0.84;
-/** Half the fan's opening angle (radians, measured from straight up). */
-export const FAN_HALF_ANGLE = (52 * Math.PI) / 180;
+/** Height = time: the fork (the clade's origin) is at y = 0, "now" at y = −TIME_H. */
+export const TIME_H = 900;
+/** Horizontal spacing of the leaves. */
+export const COL_W = 46;
 /** Area of the biggest leaf (others scale by g/gmax: area = individuals). */
-export const LEAF_MAX_AREA = 4200;
+export const LEAF_MAX_AREA = 2300;
+/**
+ * Time axis offset (years). Height is log10(years before present + C), so the
+ * last ~10 kyr are not squashed against "now": the cave lion (extinct ~12 kya)
+ * and a 4.9 Myr old genus both read clearly. The axis is labelled as log.
+ */
+export const TIME_C = 1000;
+
+/** Time scale for a clade of age `originMa`: years before present ↔ height fraction (0 = origin, 1 = now). */
+export class TimeScale {
+  private readonly top: number;
+  private readonly span: number;
+  constructor(readonly originMa: number) {
+    this.top = Math.log10(originMa * 1e6 + TIME_C);
+    this.span = this.top - Math.log10(TIME_C);
+  }
+  /** Height fraction of an age given in Ma. */
+  frac(ageMa: number): number {
+    return (this.top - Math.log10(Math.max(0, ageMa) * 1e6 + TIME_C)) / this.span;
+  }
+  /** World y of an age in Ma. */
+  y(ageMa: number): number {
+    return -TIME_H * this.frac(ageMa);
+  }
+  /** Age in Ma at world y. */
+  ageAt(y: number): number {
+    const f = -y / TIME_H;
+    return Math.max(0, (Math.pow(10, this.top - f * this.span) - TIME_C) / 1e6);
+  }
+}
 
 export interface Pt {
   x: number;
@@ -61,6 +88,7 @@ export interface Fan {
   trunkAliveFrac: number;
   trunkBottom: Pt;
   branches: FanBranch[];
+  time: TimeScale;
 }
 
 export function g(n: number, mode: WidthMode): number {
@@ -84,25 +112,27 @@ export function layoutFan(clade: CladeRec, mode: WidthMode): Fan {
   const gMax = Math.max(...gs);
   const n = sp.length;
   const W = TRUNK_WIDTH;
+  const time = new TimeScale(clade.t0);
   let x = -W / 2;
   const branches: FanBranch[] = sp.map((s, i) => {
     const share = gs[i] / sum;
     const width = share * W;
     const x0 = x + width / 2;
     x += width;
-    const t = n === 1 ? 0.5 : i / (n - 1);
-    const a = -FAN_HALF_ANGLE + 2 * FAN_HALF_ANGLE * t;
-    const k = i % 2 ? STAGGER : 1;
-    const base = { x: ARC_RX * k * Math.sin(a), y: -ARC_RY * k * Math.cos(a) };
-    const R = Math.hypot(base.x, base.y);
-    const dir = { x: base.x / R, y: base.y / R };
+    // Height = time: the leaf's tip is the species' last appearance (now for the living).
     const shape = LeafShape.ofArea((LEAF_MAX_AREA * gs[i]) / gMax);
+    const tipX = (i - (n - 1) / 2) * COL_W;
+    const tipY = time.y(s.t1);
+    const dl = Math.hypot(tipX * 0.12, TIME_H);
+    const dir = { x: (tipX * 0.12) / dl, y: -TIME_H / dl };
+    const base = { x: tipX - dir.x * shape.L, y: tipY - dir.y * shape.L };
     const leafR = shape.L / 2;
     const leaf = { x: base.x + dir.x * leafR, y: base.y + dir.y * leafR };
     const end = base;
+    const R = Math.hypot(base.x - x0, base.y);
     const p0 = { x: x0, y: 0 };
-    const p1 = { x: x0, y: -R * 0.42 };
-    const p2 = { x: end.x - dir.x * R * 0.35, y: end.y - dir.y * R * 0.35 };
+    const p1 = { x: x0, y: Math.max(base.y * 0.5, -R * 0.45) };
+    const p2 = { x: end.x - dir.x * R * 0.3, y: end.y - dir.y * R * 0.3 };
     return {
       sp: s,
       share,
@@ -127,6 +157,7 @@ export function layoutFan(clade: CladeRec, mode: WidthMode): Fan {
     trunkAliveFrac: aliveFrac(aliveSum, sp.reduce((a, s) => a + s.ever, 0), mode),
     trunkBottom: { x: 0, y: TRUNK_LENGTH },
     branches,
+    time,
   };
 }
 
