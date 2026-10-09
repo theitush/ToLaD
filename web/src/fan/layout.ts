@@ -1,11 +1,20 @@
 // OneZoom-style fan for one polytomy, in world units (y grows downwards, like
 // the screen). The parent branch comes up from the bottom to the fork at
 // (0, 0); each species branch leaves the fork side by side (their widths add up
-// to the trunk's width, so they nest), curves outwards and ends in a leaf.
+// to the trunk's width, so they nest), curves out to its own column and then
+// runs straight up through time to its tip. There are no leaf blobs: a branch
+// is the bundle of its individuals' strands.
 //
-// Height = time: the fork is the clade's origin, a leaf's tip is the species'
+// Height = time: the fork is the clade's origin, a branch's tip is the species'
 // last appearance (living species: the "now" line), on a log years-before-
-// present scale (TimeScale). Leaves are spread in tree order across the width.
+// present scale (TimeScale). Branches are spread in tree order across the width.
+//
+// Width at any height = the individuals whose strands pass through it: every
+// individual's strand runs from the root up to its death, so at age τ the
+// branch holds everyone not yet dead by τ (those alive then plus everyone born
+// later). At the species' base that is everyone ever; at the tip only the
+// living (living species) or nobody (extinct). Dead strands peel off on the way
+// up, so the branch thins; the green (alive) lane keeps its width all the way.
 //
 // The stem is drawn as its children's strands side by side (view.drawStrand),
 // so each green lane runs unbroken from leaf to root; the stem's width and green
@@ -18,19 +27,16 @@
 // share f (alive share in the active mode) on its left and gray on its right.
 // Ribbon normals point to the branch's left: for a branch going up, (-1, 0).
 
-import { LeafShape } from './leafmesh';
 import type { CladeRec, SpeciesRec } from './panthera';
 
 export type WidthMode = 'log' | 'linear';
 
-export const TRUNK_WIDTH = 72;
+export const TRUNK_WIDTH = 110;
 export const TRUNK_LENGTH = 2400;
 /** Height = time: the fork (the clade's origin) is at y = 0, "now" at y = −TIME_H. */
 export const TIME_H = 900;
 /** Horizontal spacing of the leaves. */
 export const COL_W = 46;
-/** Area of the biggest leaf (others scale by g/gmax: area = individuals). */
-export const LEAF_MAX_AREA = 2300;
 /**
  * Time axis offset (years). Height is log10(years before present + C), so the
  * last ~10 kyr are not squashed against "now": the cave lion (extinct ~12 kya)
@@ -68,31 +74,26 @@ export interface Pt {
 
 export interface FanBranch {
   sp: SpeciesRec;
-  /** Width share among siblings and absolute width at the fork. */
+  /** Width share among siblings and absolute width at the fork (= individuals ever). */
   share: number;
   width: number;
-  /** Width where the branch meets its leaf. */
-  endWidth: number;
-  /** Alive lane fraction (0 if extinct). */
+  /** Alive lane fraction at the base (0 if extinct). */
   aliveFrac: number;
-  /** Cubic Bézier control points, fork → leaf. */
+  /** S-curve from the fork (p0) to the bottom of the column (p3). */
   p0: Pt;
   p1: Pt;
   p2: Pt;
   p3: Pt;
-  /** Leaf centre and radius. Leaf area holds the individuals. */
-  leaf: Pt;
-  /** Half the leaf's length (a rough radius for fitting and hit slop). */
-  leafR: number;
-  /** Stem end of the leaf; the leaf runs from here along `dir`. */
-  base: Pt;
-  shape: LeafShape;
-  /** Direction the branch arrives in at the leaf (unit vector). */
-  dir: Pt;
+  /** Column x and the tip (last appearance) height. */
+  colX: number;
+  tipY: number;
+  /** Tip point, for labels. */
+  tip: Pt;
 }
 
 export interface Fan {
   clade: CladeRec;
+  mode: WidthMode;
   trunkWidth: number;
   trunkBottom: Pt;
   branches: FanBranch[];
@@ -113,11 +114,30 @@ export function aliveFrac(alive: number, ever: number, mode: WidthMode): number 
   return ga / (ga + gd);
 }
 
+/**
+ * Individuals whose strands pass through age `ageMa` (not dead by then):
+ * everyone ever before the species' first appearance, the living at the tip.
+ * Births are spread evenly over the species' span (procgen's constant-size model).
+ */
+export function remaining(sp: SpeciesRec, ageMa: number): number {
+  if (ageMa >= sp.t0) return sp.ever;
+  if (ageMa <= sp.t1) return sp.alive;
+  const r = (ageMa - sp.t1) / (sp.t0 - sp.t1);
+  return sp.alive + (sp.ever - sp.alive) * r;
+}
+
+/** Strand width and green fraction of a branch at age `ageMa`. */
+export function strandAt(b: FanBranch, ageMa: number, mode: WidthMode): { w: number; f: number } {
+  const sp = b.sp;
+  const rem = remaining(sp, ageMa);
+  const w = rem > 0 ? (b.width * g(rem, mode)) / g(sp.ever, mode) : 0;
+  return { w, f: aliveFrac(sp.alive, rem, mode) };
+}
+
 export function layoutFan(clade: CladeRec, mode: WidthMode): Fan {
   const sp = clade.species;
   const gs = sp.map((s) => g(s.ever, mode));
   const sum = gs.reduce((a, b) => a + b, 0);
-  const gMax = Math.max(...gs);
   const n = sp.length;
   const W = TRUNK_WIDTH;
   const time = new TimeScale(clade.t0);
@@ -127,39 +147,27 @@ export function layoutFan(clade: CladeRec, mode: WidthMode): Fan {
     const width = share * W;
     const x0 = x + width / 2;
     x += width;
-    // Height = time: the leaf's tip is the species' last appearance (now for the living).
-    const shape = LeafShape.ofArea((LEAF_MAX_AREA * gs[i]) / gMax);
-    const tipX = (i - (n - 1) / 2) * COL_W;
+    const colX = (i - (n - 1) / 2) * COL_W;
     const tipY = time.y(s.t1);
-    const dl = Math.hypot(tipX * 0.12, TIME_H);
-    const dir = { x: (tipX * 0.12) / dl, y: -TIME_H / dl };
-    const base = { x: tipX - dir.x * shape.L, y: tipY - dir.y * shape.L };
-    const leafR = shape.L / 2;
-    const leaf = { x: base.x + dir.x * leafR, y: base.y + dir.y * leafR };
-    const end = base;
-    const R = Math.hypot(base.x - x0, base.y);
-    const p0 = { x: x0, y: 0 };
-    const p1 = { x: x0, y: Math.max(base.y * 0.5, -R * 0.45) };
-    const p2 = { x: end.x - dir.x * R * 0.3, y: end.y - dir.y * R * 0.3 };
+    // The curve takes the lower part of the branch (less for short extinct ones).
+    const yC = Math.max(tipY * 0.6, -0.1 * TIME_H);
     return {
       sp: s,
       share,
       width,
-      endWidth: Math.min(width, shape.width(0)),
       aliveFrac: aliveFrac(s.alive, s.ever, mode),
-      p0,
-      p1,
-      p2,
-      p3: end,
-      leaf,
-      leafR,
-      base,
-      shape,
-      dir,
+      p0: { x: x0, y: 0 },
+      p1: { x: x0, y: yC * 0.55 },
+      p2: { x: colX, y: yC * 0.45 },
+      p3: { x: colX, y: yC },
+      colX,
+      tipY,
+      tip: { x: colX, y: tipY },
     };
   });
   return {
     clade,
+    mode,
     trunkWidth: W,
     trunkBottom: { x: 0, y: TRUNK_LENGTH },
     branches,
@@ -185,10 +193,4 @@ export function bezierTangent(b: FanBranch, t: number): Pt {
   const y = 3 * u * u * (b.p1.y - b.p0.y) + 6 * u * t * (b.p2.y - b.p1.y) + 3 * t * t * (b.p3.y - b.p2.y);
   const l = Math.hypot(x, y) || 1;
   return { x: x / l, y: y / l };
-}
-
-/** Smooth taper from the fork width to the leaf width. */
-export function widthAt(b: FanBranch, t: number): number {
-  const s = t * t * (3 - 2 * t);
-  return b.width + (b.endWidth - b.width) * s;
 }

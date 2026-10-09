@@ -1,33 +1,16 @@
 // The fan view: one polytomy drawn OneZoom-style with Canvas 2D, and a camera
-// with uniform (isotropic) zoom in float64 world coordinates. The fan is a
-// handful of curves, and the individuals inside a leaf are limited to what is
-// visible (see mesh.ts), so Canvas 2D is enough and keeps the code small.
+// with uniform (isotropic) zoom in float64 world coordinates. Height = time.
+// Each species is a bundle of its individuals' strands (see layout.ts); zoomed
+// in far enough, a branch resolves into the individuals themselves (twigs.ts).
 // Gestures come from the shared engine/input.ts.
 
 import { formatAge, formatCount } from '../data/names';
 import { Input, type InputHandlers } from '../engine/input';
-import { bezier, bezierTangent, layoutFan, widthAt, type Fan, type FanBranch, type WidthMode } from './layout';
-import { drawMeshLeaf, drawPlainLeaf, worldToLocal, type MeshStats, type SelectedInd } from './leafdraw';
-import { LeafMesh } from './leafmesh';
+import { bezier, bezierTangent, layoutFan, strandAt, type Fan, type FanBranch, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
+import { drawTwigs, TwigModel, type IndInfo, type TwigStats } from './twigs';
 
-export interface IndInfo {
-  handle: string;
-  g: number;
-  i: number;
-  G: number;
-  sex: string;
-  bornYearsAgo: number;
-  lifespan: number;
-  alive: boolean;
-  parents: { handle: string; alive: boolean }[];
-  children: number;
-}
-
-export interface Selection {
-  sp: SpeciesRec;
-  ind?: IndInfo;
-}
+export type { IndInfo } from './twigs';
 
 export const GREEN = '#33bd66';
 export const GRAY = '#676e75';
@@ -42,6 +25,19 @@ export interface Camera {
   s: number;
 }
 
+export interface Selection {
+  sp: SpeciesRec;
+  ind?: IndInfo;
+}
+
+interface RibbonPt {
+  x: number;
+  y: number;
+  nx: number;
+  ny: number;
+  w: number;
+  f: number;
+}
 
 export class FanView implements InputHandlers {
   readonly ctx: CanvasRenderingContext2D;
@@ -53,11 +49,11 @@ export class FanView implements InputHandlers {
   h = 1;
   dpr = 1;
   selected: SpeciesRec | null = null;
-  selInd: SelectedInd | null = null;
+  selInd: { g: number; i: number } | null = null;
   onSelect: (sel: Selection | null) => void = () => {};
-  /** What each leaf's mesh drew last frame (HUD, tests). */
-  meshStats = new Map<number, MeshStats>();
-  private meshes = new WeakMap<FanBranch, LeafMesh>();
+  /** What each branch's individuals view drew last frame (HUD, tests). */
+  twigStats = new Map<number, TwigStats>();
+  private models = new Map<string, TwigModel>();
   private raf = 0;
   private anim: ((t: number) => boolean) | null = null;
   private ro: ResizeObserver;
@@ -95,25 +91,23 @@ export class FanView implements InputHandlers {
     this.request();
   }
 
-  /** The whole fan, trunk entering from the bottom edge. */
+  /** The whole fan: "now" near the top, the stem entering from the bottom edge. */
   homeCamera(): Camera {
     let x0 = Infinity;
     let x1 = -Infinity;
-    let y0 = Infinity;
     for (const b of this.fan.branches) {
-      x0 = Math.min(x0, b.leaf.x - b.leafR);
-      x1 = Math.max(x1, b.leaf.x + b.leafR);
-      y0 = Math.min(y0, b.leaf.y - b.leafR);
+      x0 = Math.min(x0, b.colX - b.width);
+      x1 = Math.max(x1, b.colX + b.width);
     }
-    // Pixel margins: time labels on the left, leaf labels above "now", a bit of stem below the fork.
+    const y0 = this.fan.time.y(0);
+    // Pixel margins: time labels on the left, species labels above "now", some stem below the fork.
     const left = 58;
     const right = 14;
     const top = 120;
     const bottom = 110;
-    x0 -= 6;
-    x1 += 6;
     const s = Math.min((this.w - left - right) / (x1 - x0), (this.h - top - bottom) / -y0);
-    return { cx: x0 + (this.w / 2 - left) / s, cy: y0 + (this.h / 2 - top) / s, s };
+    const cx = (x0 + x1) / 2 - (left - right) / 2 / s;
+    return { cx, cy: y0 + (this.h / 2 - top) / s, s };
   }
 
   setMode(mode: WidthMode): void {
@@ -124,6 +118,16 @@ export class FanView implements InputHandlers {
 
   resetView(): void {
     this.flyTo(this.homeCamera());
+  }
+
+  model(b: FanBranch): TwigModel {
+    const key = `${b.sp.gid}:${this.mode}`;
+    let m = this.models.get(key);
+    if (!m || m.b !== b) {
+      m = new TwigModel(b, this.fan.time, this.mode);
+      this.models.set(key, m);
+    }
+    return m;
   }
 
   // ---- camera helpers -------------------------------------------------------
@@ -145,7 +149,7 @@ export class FanView implements InputHandlers {
   /** Zoom about a screen point by factor f. */
   zoomAbout(px: number, py: number, f: number): void {
     const [wx, wy] = this.toWorld(px, py);
-    const s = Math.min(1e12, Math.max(this.homeCamera().s * 0.3, this.cam.s * f));
+    const s = Math.min(1e13, Math.max(this.homeCamera().s * 0.3, this.cam.s * f));
     this.cam.s = s;
     this.cam.cx = wx - (px - this.w / 2) / s;
     this.cam.cy = wy - (py - this.h / 2) / s;
@@ -168,63 +172,23 @@ export class FanView implements InputHandlers {
     this.request();
   }
 
-  mesh(b: FanBranch): LeafMesh {
-    let m = this.meshes.get(b);
-    if (!m) {
-      m = new LeafMesh(b.sp, b.shape);
-      this.meshes.set(b, m);
-    }
-    return m;
-  }
-
-  flyToLeaf(b: FanBranch): void {
-    const s = Math.min((this.h * 0.8) / b.shape.L, (this.w * 0.9) / b.shape.W);
-    this.flyTo({ cx: b.leaf.x, cy: b.leaf.y, s });
-  }
-
-  /** Leaf on screen length in px. */
-  leafPx(b: FanBranch): number {
-    return b.shape.L * this.cam.s;
-  }
-
-  hitLeaf(px: number, py: number): FanBranch | null {
+  /** Branch (column part) under a screen point, with a finger-sized slop. */
+  hitBranch(px: number, py: number): FanBranch | null {
     const [wx, wy] = this.toWorld(px, py);
-    const slop = 14 / this.cam.s;
+    const slop = 16 / this.cam.s;
     let best: FanBranch | null = null;
     let bd = Infinity;
     for (const b of this.fan.branches) {
-      const p = worldToLocal(b, wx, wy);
-      const y = Math.min(b.shape.L, Math.max(0, p.y));
-      const dy = Math.abs(p.y - y);
-      const dx = Math.max(0, Math.abs(p.x) - b.shape.width(y) / 2);
-      const d = Math.hypot(dx, dy);
+      if (wy > b.p3.y + slop || wy < b.tipY - slop) continue;
+      const age = this.fan.time.ageAt(Math.min(b.p3.y, Math.max(b.tipY, wy)));
+      const half = strandAt(b, age, this.mode).w / 2;
+      const d = Math.max(0, Math.abs(wx - b.colX) - half);
       if (d <= slop && d < bd) {
         bd = d;
         best = b;
       }
     }
     return best;
-  }
-
-  /** Details of one individual for the tap card. */
-  indInfo(b: FanBranch, g: number, i: number): IndInfo {
-    const m = this.mesh(b);
-    const sp = m.sp;
-    const a = { generation: g, index: BigInt(i) };
-    const at = sp.attributes(a);
-    const end = m.G * sp.generationYears;
-    return {
-      handle: sp.handle(a),
-      g,
-      i,
-      G: m.G,
-      sex: at.sex,
-      bornYearsAgo: end - at.birthTime + b.sp.t1 * 1e6,
-      lifespan: at.lifespan,
-      alive: at.alive,
-      parents: sp.parents(a).map((p) => ({ handle: sp.handle(p), alive: m.alive(p.generation, Number(p.index)) })),
-      children: Number(sp.children(a).count),
-    };
   }
 
   // ---- InputHandlers --------------------------------------------------------
@@ -262,30 +226,23 @@ export class FanView implements InputHandlers {
     this.request();
   }
   doubleTap(x: number, y: number): void {
-    const b = this.hitLeaf(x, y);
-    if (b) {
-      const zoomedIn = this.leafPx(b) > this.h * 0.6;
-      if (!zoomedIn) {
-        this.flyToLeaf(b);
-        return;
-      }
-    }
     const [wx, wy] = this.toWorld(x, y);
-    const s = this.cam.s * 3;
+    const s = this.cam.s * 4;
     this.flyTo({ s, cx: wx - (x - this.w / 2) / s, cy: wy - (y - this.h / 2) / s });
   }
   tap(x: number, y: number): void {
-    const b = this.hitLeaf(x, y);
+    const b = this.hitBranch(x, y);
     this.selected = b ? b.sp : null;
     this.selInd = null;
     let ind: IndInfo | undefined;
-    const st = b && this.meshStats.get(b.sp.gid);
-    if (b && st && st.mode !== 'texture' && st.mode !== 'stripes') {
+    const st = b && this.twigStats.get(b.sp.gid);
+    if (b && st && st.mode !== 'texture') {
       const [wx, wy] = this.toWorld(x, y);
-      const a = this.mesh(b).hit(worldToLocal(b, wx, wy));
+      const m = this.model(b);
+      const a = m.hit(wx, wy, 14 / this.cam.s);
       if (a) {
-        this.selInd = { g: a.generation, i: Number(a.index) };
-        ind = this.indInfo(b, this.selInd.g, this.selInd.i);
+        this.selInd = a;
+        ind = m.info(a.g, a.i);
       }
     }
     this.onSelect(b ? { sp: b.sp, ind } : null);
@@ -311,29 +268,157 @@ export class FanView implements InputHandlers {
     ctx.fillRect(0, 0, this.w, this.h);
     this.drawTimeAxis();
     for (const b of this.fan.branches) this.drawStrand(b);
-    for (const b of this.fan.branches) this.drawLeaf(b);
-    for (const b of this.fan.branches) this.drawLeafLabel(b);
+    for (const b of this.fan.branches) this.drawIndividuals(b);
+    for (const b of this.fan.branches) this.drawLabel(b);
     this.drawTrunkLabel();
     this.drawHud();
   }
 
-  /** When zoomed into a leaf: which species and which generations are on screen. */
+  /** Fill a ribbon between lane offsets a(p) and b(p) (fractions of the width along the left normal). */
+  private ribbon(pts: RibbonPt[], a: (p: RibbonPt) => number, bOff: (p: RibbonPt) => number, minPx = 0): void {
+    const ctx = this.ctx;
+    ctx.beginPath();
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i];
+      const [sx, sy] = this.toScreen(p.x, p.y);
+      const off = a(p) * p.w * this.cam.s;
+      ctx[i ? 'lineTo' : 'moveTo'](sx + p.nx * off, sy + p.ny * off);
+    }
+    for (let i = pts.length - 1; i >= 0; i--) {
+      const p = pts[i];
+      const [sx, sy] = this.toScreen(p.x, p.y);
+      const wpx = p.w * this.cam.s;
+      const ao = a(p) * wpx;
+      const bo = bOff(p) * wpx;
+      const off = minPx >= 0 ? Math.max(bo, ao + minPx) : Math.min(bo, ao + minPx);
+      ctx.lineTo(sx + p.nx * off, sy + p.ny * off);
+    }
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  /**
+   * One species' strand bundle, drawn whole from the bottom of the parent stem
+   * through the fork, out to its column and up through time to its tip. The
+   * stem is just its children's strands side by side (in branch order, widths
+   * adding up to the stem's width), so each green lane runs unbroken from the
+   * tip to the root. The same rule nests for a deeper tree.
+   */
+  private drawStrand(b: FanBranch): void {
+    const yb = this.fan.trunkBottom.y;
+    const [ax, ay] = this.toScreen(Math.min(b.p0.x, b.colX) - b.width, b.tipY);
+    const [bx, by] = this.toScreen(Math.max(b.p0.x, b.colX) + b.width, yb);
+    if (bx < 0 || ax > this.w || by < 0 || ay > this.h) return;
+    const time = this.fan.time;
+    const at = (y: number) => strandAt(b, time.ageAt(y), this.mode);
+    const pts: RibbonPt[] = [];
+    // Stem part, straight up to the fork. Left normal of an upward strand is (-1, 0).
+    const base = at(0);
+    for (let i = 0; i < 4; i++) pts.push({ x: b.p0.x, y: yb * (1 - i / 4), nx: -1, ny: 0, w: base.w, f: base.f });
+    const N = 32;
+    for (let i = 0; i <= N; i++) {
+      const t = i / N;
+      const p = bezier(b, t);
+      const d = bezierTangent(b, t);
+      const st = at(p.y);
+      pts.push({ x: p.x, y: p.y, nx: d.y, ny: -d.x, w: st.w, f: st.f });
+    }
+    // Column: sample the visible part finely (the taper follows log time).
+    const [, sTop] = this.toWorld(0, -20);
+    const [, sBot] = this.toWorld(0, this.h + 20);
+    const ya = Math.min(b.p3.y, sBot);
+    const yt = Math.max(b.tipY, sTop);
+    if (ya > yt) {
+      if (ya < b.p3.y) pts.push({ x: b.colX, y: ya, nx: -1, ny: 0, ...at(ya) });
+      const M = 80;
+      for (let i = 1; i <= M; i++) {
+        const y = ya + ((yt - ya) * i) / M;
+        pts.push({ x: b.colX, y, nx: -1, ny: 0, ...at(y) });
+      }
+      if (yt > b.tipY) pts.push({ x: b.colX, y: b.tipY, nx: -1, ny: 0, ...at(b.tipY) });
+    }
+    // Keep only points within a screen of the viewport: canvas paths with
+    // coordinates far beyond the screen (deep zoom) are not drawn reliably.
+    const mY = this.h / this.cam.s;
+    const kept = pts.filter((p) => p.y >= sTop - mY && p.y <= sBot + mY);
+    pts.length = 0;
+    pts.push(...kept);
+    if (pts.length < 2) return;
+    const ctx = this.ctx;
+    // When the individuals are drawn, they are the truth: the bundle becomes a dim backdrop.
+    const tw = this.twigStats.get(b.sp.gid);
+    const backdrop = !!tw && tw.mode !== 'texture';
+    ctx.fillStyle = backdrop ? '#1c2521' : b.sp.extinct ? WITHERED : GRAY;
+    this.ribbon(pts, () => -0.5, () => 0.5, 0.6);
+    if (!b.sp.extinct && !backdrop) {
+      // Green lane on the left, floored at 1 px all the way from the tip to the root.
+      ctx.fillStyle = GREEN;
+      this.ribbon(pts, () => 0.5, (p) => 0.5 - p.f, -1);
+    }
+    if (this.selected === b.sp && !this.selInd) {
+      const [tx, ty] = this.toScreen(b.colX, b.tipY);
+      ctx.beginPath();
+      ctx.arc(tx, ty, 7, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(232,240,234,0.9)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+  }
+
+  private drawIndividuals(b: FanBranch): void {
+    const st = drawTwigs(this, b, this.model(b), this.selected === b.sp ? this.selInd : null);
+    const prev = this.twigStats.get(b.sp.gid);
+    // The bundle under the twigs depends on the mode: redraw once when it changes.
+    if ((prev?.mode ?? null) !== (st?.mode ?? null)) this.request();
+    if (st) this.twigStats.set(b.sp.gid, st);
+    else this.twigStats.delete(b.sp.gid);
+  }
+
+  private drawLabel(b: FanBranch): void {
+    const ctx = this.ctx;
+    const [cx, cy] = this.toScreen(b.colX, b.tipY);
+    if (cx < -30 || cx > this.w + 30 || cy < -10 || cy > this.h + 200) return;
+    if (this.twigStats.has(b.sp.gid)) return; // Zoomed into the individuals: the HUD names it.
+    const name = b.sp.common;
+    const sub = `${formatCount(b.sp.ever)} ever${b.sp.extinct ? ` · extinct ${formatAge(b.sp.t1)}` : ''}`;
+    const fs = 15;
+    ctx.save();
+    ctx.textBaseline = 'middle';
+    ctx.font = `600 ${fs}px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
+    // Upright text running up from the tip.
+    ctx.translate(cx, cy - 8);
+    ctx.rotate(-Math.PI / 2);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = b.sp.extinct ? '#b9b3a6' : '#eef4ef';
+    ctx.shadowColor = BG;
+    ctx.shadowBlur = 3;
+    ctx.fillText(name, 0, -fs * 0.32);
+    ctx.font = `${fs * 0.72}px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
+    ctx.fillStyle = '#9faba3';
+    ctx.fillText(sub, 0, fs * 0.55);
+    ctx.restore();
+  }
+
+  /** When zoomed into a species' individuals: which species and generations are on screen. */
   private drawHud(): void {
     let best: FanBranch | null = null;
+    let bestN = -1;
     for (const b of this.fan.branches) {
-      if (this.meshStats.has(b.sp.gid) && (!best || this.leafPx(b) > this.leafPx(best))) best = b;
+      const st = this.twigStats.get(b.sp.gid);
+      if (st && st.drawn > bestN) {
+        best = b;
+        bestN = st.drawn;
+      }
     }
     if (!best) return;
-    const st = this.meshStats.get(best.sp.gid)!;
-    const m = this.mesh(best);
+    const st = this.twigStats.get(best.sp.gid)!;
+    const m = this.model(best);
     const ctx = this.ctx;
-    const GL = m.sp.generationYears;
-    const ago = (g: number) => formatYearsAgo((m.G - g) * GL + best!.sp.t1 * 1e6);
     const gens = st.g0 === st.g1 ? `generation ${fmtInt(st.g0 + 1)}` : `generations ${fmtInt(st.g0 + 1)}–${fmtInt(st.g1 + 1)}`;
     const lines = [
       `${best.sp.common}${best.sp.extinct ? ' (extinct)' : ''}`,
       `${gens} of ${fmtInt(m.G)}`,
-      st.g0 === st.g1 ? `born ~${ago(st.g0)}` : `born ~${ago(st.g0)} to ~${ago(st.g1)}`,
+      `born ~${formatYearsAgo(m.bornAgo(st.g1))}${st.g0 === st.g1 ? '' : ` to ~${formatYearsAgo(m.bornAgo(st.g0))}`}`,
       `${fmtInt(m.size(st.g0))} per generation · ${st.mode}`,
     ];
     ctx.save();
@@ -350,119 +435,8 @@ export class FanView implements InputHandlers {
     ctx.fillStyle = '#b5c0b9';
     for (let k = 1; k < lines.length; k++) ctx.fillText(lines[k], 20, 64 + 16 * k);
     ctx.restore();
-    this.drawTipPointer(best, m, st.g1);
   }
 
-  /** When the leaf's tip (newest generation: the living) is off screen, point at it. */
-  private drawTipPointer(b: FanBranch, m: LeafMesh, gTop: number): void {
-    const tip = { x: b.base.x + b.dir.x * b.shape.L, y: b.base.y + b.dir.y * b.shape.L };
-    const [tx, ty] = this.toScreen(tip.x, tip.y);
-    const margin = 24;
-    if (tx > margin && tx < this.w - margin && ty > margin && ty < this.h - margin) return;
-    const cx = this.w / 2;
-    const cy = this.h / 2;
-    const dx = tx - cx;
-    const dy = ty - cy;
-    // Clamp the direction to a box inside the screen edges (below the HUD).
-    const bx = this.w / 2 - 40;
-    const byTop = cy - 160;
-    const byBot = this.h / 2 - 70;
-    const k = Math.min(Math.abs(dx) > 1e-9 ? bx / Math.abs(dx) : Infinity, dy < 0 ? byTop / -dy : byBot / Math.max(1e-9, dy));
-    const px = cx + dx * k;
-    const py = cy + dy * k;
-    const a = Math.atan2(dy, dx);
-    const ctx = this.ctx;
-    const living = !b.sp.extinct;
-    const col = living ? GREEN : '#b9b3a6';
-    ctx.save();
-    ctx.translate(px, py);
-    ctx.save();
-    ctx.rotate(a);
-    ctx.beginPath();
-    ctx.moveTo(14, 0);
-    ctx.lineTo(-6, -9);
-    ctx.lineTo(-6, 9);
-    ctx.closePath();
-    ctx.fillStyle = col;
-    ctx.fill();
-    ctx.restore();
-    const gens = m.G - 1 - gTop;
-    const yrs = formatYearsAgo(gens * m.sp.generationYears).replace(' ago', '');
-    const later = gens < 1 ? 'just above' : `${yrs} later`;
-    const label = living ? `now: the living, ${later}` : `last generation, ${later}`;
-    ctx.font = `600 12px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
-    ctx.textAlign = px < this.w * 0.3 ? 'left' : px > this.w * 0.7 ? 'right' : 'center';
-    ctx.textBaseline = py < this.h / 2 ? 'top' : 'bottom';
-    ctx.fillStyle = col;
-    ctx.shadowColor = BG;
-    ctx.shadowBlur = 4;
-    ctx.fillText(label, 0, py < this.h / 2 ? 16 : -16);
-    ctx.restore();
-  }
-
-  /** Fill a ribbon given its centre line and half-widths, from lane offset a to b (in [-0.5, 0.5] of width). */
-  private ribbon(pts: { x: number; y: number; nx: number; ny: number; w: number }[], a: number, bOff: number, minPx = 0): void {
-    const ctx = this.ctx;
-    ctx.beginPath();
-    for (let i = 0; i < pts.length; i++) {
-      const p = pts[i];
-      const [sx, sy] = this.toScreen(p.x, p.y);
-      const wpx = p.w * this.cam.s;
-      const off = a * wpx;
-      ctx[i ? 'lineTo' : 'moveTo'](sx + p.nx * off, sy + p.ny * off);
-    }
-    for (let i = pts.length - 1; i >= 0; i--) {
-      const p = pts[i];
-      const [sx, sy] = this.toScreen(p.x, p.y);
-      const wpx = p.w * this.cam.s;
-      const off = minPx >= 0 ? Math.max(bOff * wpx, a * wpx + minPx) : Math.min(bOff * wpx, a * wpx + minPx);
-      ctx.lineTo(sx + p.nx * off, sy + p.ny * off);
-    }
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  /** Two lanes: green on the left (floor 1 px if anything is alive), gray for the rest. */
-  private lanes(pts: { x: number; y: number; nx: number; ny: number; w: number }[], f: number, extinct: boolean): void {
-    const ctx = this.ctx;
-    ctx.fillStyle = extinct ? WITHERED : GRAY;
-    this.ribbon(pts, -0.5, 0.5);
-    if (f > 0) {
-      // Offsets run along the left normal, so the green lane is [0.5 − f, 0.5].
-      ctx.fillStyle = GREEN;
-      this.ribbon(pts, 0.5, 0.5 - f, -1);
-    }
-  }
-
-  /**
-   * One species' strand, drawn whole from the bottom of the parent stem through
-   * the fork to its leaf. The stem is just its children's strands side by side
-   * (in branch order, widths adding up to the stem's width), so each green lane
-   * runs unbroken from leaf to root. The same rule nests for a deeper tree: a
-   * strand passes through every ancestor stem at its offset there.
-   */
-  private drawStrand(b: FanBranch): void {
-    // Cull: the strand's box is the stem column plus the curve's control hull.
-    const xs = [b.p0.x, b.p1.x, b.p2.x, b.p3.x];
-    const ys = [this.fan.trunkBottom.y, b.p1.y, b.p2.y, b.p3.y];
-    const [ax, ay] = this.toScreen(Math.min(...xs) - b.width, Math.min(...ys));
-    const [bx, by] = this.toScreen(Math.max(...xs) + b.width, Math.max(...ys));
-    if (bx < 0 || ax > this.w || by < 0 || ay > this.h) return;
-    const pts = [];
-    // Stem part, straight up to the fork. Left normal of an upward strand is (-1, 0).
-    const yb = this.fan.trunkBottom.y;
-    for (let i = 0; i < 8; i++) pts.push({ x: b.p0.x, y: yb * (1 - i / 8), nx: -1, ny: 0, w: b.width });
-    const N = 40;
-    for (let i = 0; i <= N; i++) {
-      const t = i / N;
-      const p = bezier(b, t);
-      const d = bezierTangent(b, t);
-      pts.push({ x: p.x, y: p.y, nx: d.y, ny: -d.x, w: widthAt(b, t) });
-    }
-    this.lanes(pts, b.aliveFrac, b.sp.extinct);
-  }
-
-  /** Light time axis: log years-before-present ticks across the screen, labels on the left. */
   private drawTimeAxis(): void {
     const ctx = this.ctx;
     const ts = this.fan.time;
@@ -506,61 +480,6 @@ export class FanView implements InputHandlers {
     ctx.restore();
   }
 
-  private drawLeaf(b: FanBranch): void {
-    const ctx = this.ctx;
-    const [cx, cy] = this.toScreen(b.leaf.x, b.leaf.y);
-    const r = b.leafR * this.cam.s;
-    if (cx + r < 0 || cx - r > this.w || cy + r < 0 || cy - r > this.h) {
-      this.meshStats.delete(b.sp.gid);
-      return;
-    }
-    const mesh = this.mesh(b);
-    if (this.leafPx(b) < 160) {
-      this.meshStats.delete(b.sp.gid);
-      drawPlainLeaf(this, b, mesh);
-    } else {
-      const st = drawMeshLeaf(this, b, mesh, this.selected === b.sp ? this.selInd : null);
-      if (st) this.meshStats.set(b.sp.gid, st);
-      else this.meshStats.delete(b.sp.gid);
-    }
-    if (this.selected === b.sp && !this.selInd) {
-      ctx.beginPath();
-      ctx.arc(cx, cy, r + 6, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(232,240,234,0.8)';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-    }
-  }
-
-  private drawLeafLabel(b: FanBranch): void {
-    const ctx = this.ctx;
-    const [cx, cy] = this.toScreen(b.leaf.x, b.leaf.y);
-    const r = b.leafR * this.cam.s;
-    if (this.leafPx(b) >= 160) return; // Zoomed into the leaf: the HUD names it.
-    const name = b.sp.common;
-    const sub = `${formatCount(b.sp.ever)} ever${b.sp.extinct ? ' · extinct' : ''}`;
-    ctx.save();
-    ctx.textBaseline = 'middle';
-    const fs = Math.max(11, Math.min(18, r * 0.5));
-    ctx.font = `600 ${fs}px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
-    {
-      // Radial, outward from the leaf, upright on both sides.
-      const a = Math.atan2(b.dir.y, b.dir.x);
-      const left = b.dir.x < 0;
-      ctx.translate(cx + b.dir.x * (r + 5), cy + b.dir.y * (r + 5));
-      ctx.rotate(left ? a + Math.PI : a);
-      ctx.textAlign = left ? 'right' : 'left';
-      ctx.fillStyle = b.sp.extinct ? '#b9b3a6' : '#eef4ef';
-      ctx.shadowColor = BG;
-      ctx.shadowBlur = 3;
-      ctx.fillText(name, 0, -fs * 0.32);
-      ctx.font = `${fs * 0.72}px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
-      ctx.fillStyle = '#9faba3';
-      ctx.fillText(sub, 0, fs * 0.55);
-    }
-    ctx.restore();
-  }
-
   private drawTrunkLabel(): void {
     const ctx = this.ctx;
     const f = this.fan;
@@ -588,6 +507,7 @@ export class FanView implements InputHandlers {
 
 }
 
+
 export function fmtInt(n: number): string {
   return Math.round(n).toLocaleString('en-US');
 }
@@ -595,6 +515,6 @@ export function fmtInt(n: number): string {
 export function formatYearsAgo(y: number): string {
   if (y < 1) return 'now';
   if (y < 1e4) return `${fmtInt(y)} years ago`;
-  if (y < 1e6) return `${(y / 1e3).toFixed(y < 1e5 ? 1 : 0)} thousand years ago`;
+  if (y < 999500) return `${(y / 1e3).toFixed(y < 1e5 ? 1 : 0)} thousand years ago`;
   return `${(y / 1e6).toFixed(2)} million years ago`;
 }
