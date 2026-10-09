@@ -69,11 +69,11 @@ describe('fan camera', () => {
           expect(yrs).toBeGreaterThanOrEqual(MIN_YEARS * 0.999);
           expect(k.sx).toBeGreaterThanOrEqual(sxMin * 0.999);
           expect(k.sy).toBeGreaterThanOrEqual(syMin * 0.999);
-          // Some of the fan's width stays on screen, and "now" / the stem's end stay in reach.
-          const [l] = c.toScreen(x1, 0);
-          const [r] = c.toScreen(x0, 0);
-          expect(l).toBeGreaterThan(0.3 * c.w - 1e-6);
-          expect(r).toBeLessThan(0.7 * c.w + 1e-6);
+          // Content stays near the centre, and "now" / the stem's end stay in reach.
+          const near = c.nearestContent(k.cx, Math.max(c.yNow, k.cy - c.h / 2 / k.sy), k.cy + c.h / 2 / k.sy);
+          expect(Math.abs(c.toScreen(near, 0)[0] - c.w / 2)).toBeLessThanOrEqual(0.4 * c.w + 1e-3);
+          expect(near).toBeGreaterThanOrEqual(x0 - 1e-9);
+          expect(near).toBeLessThanOrEqual(x1 + 1e-9);
           expect(c.toScreen(0, c.yNow)[1]).toBeLessThanOrEqual(0.4 * c.h + 1e-6);
           expect(c.toScreen(0, c.fan.trunkBottom.y)[1]).toBeGreaterThanOrEqual(0.6 * c.h - 1e-6);
         }

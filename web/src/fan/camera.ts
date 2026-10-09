@@ -16,7 +16,7 @@
 //   - zoom out: no further than the whole fan with a margin.
 //   - pan: some of the fan always stays on screen.
 
-import { strandAt, type Fan, type FanBranch, branchLeft } from './layout';
+import { bezier, branchLeft, strandAt, type Fan, type FanBranch } from './layout';
 
 /** The visible time span never drops below this (years). */
 export const MIN_YEARS = 10;
@@ -187,15 +187,66 @@ export class FanCamera {
     this.clampPan();
   }
 
-  /** Keep some of the fan on screen: 30% of the screen's width, "now" no lower than 40% down, the stem's end no higher than 60%. */
+  /**
+   * World x intervals holding drawn content at height y: the stem below the
+   * fork, else each branch's ribbon (its spine on the S-curve, its column above).
+   */
+  contentAt(y: number): [number, number][] {
+    const f = this.fan;
+    if (y >= 0) return [[-f.trunkWidth / 2, f.trunkWidth / 2]];
+    const out: [number, number][] = [];
+    for (const b of f.branches) {
+      if (y < b.tipY) continue;
+      let x = b.colX;
+      if (y > b.p3.y) {
+        // On the S-curve: its height falls monotonically from the fork to the column.
+        let lo = 0;
+        let hi = 1;
+        for (let k = 0; k < 50; k++) {
+          const t = (lo + hi) / 2;
+          if (bezier(b, t).y > y) lo = t;
+          else hi = t;
+        }
+        x = bezier(b, (lo + hi) / 2).x;
+      }
+      const left = x - b.width / 2;
+      out.push([left, left + strandAt(b, f.time.ageAt(y), f.mode).w]);
+    }
+    return out;
+  }
+
+  /** Nearest x holding content at height y, or anywhere in heights [y, y1] (x itself if it does). */
+  nearestContent(x: number, y: number, y1 = y): number {
+    const ys = [y, y1];
+    for (let k = 1; k < 8; k++) ys.push(y + ((y1 - y) * k) / 8);
+    for (const b of this.fan.branches) for (const v of [b.tipY, b.p3.y, 0]) if (v > y && v < y1) ys.push(v);
+    let best = x;
+    let bd = Infinity;
+    for (const h of ys) {
+      for (const [a, b] of this.contentAt(h)) {
+        const p = Math.min(b, Math.max(a, x));
+        if (Math.abs(p - x) < bd) {
+          bd = Math.abs(p - x);
+          best = p;
+        }
+      }
+    }
+    return best;
+  }
+
+  /**
+   * Keep the fan on screen: content within 40% of the screen's width of the
+   * centre (at some height on screen), "now" no lower than 40% down, the
+   * stem's end no higher than 60%.
+   */
   clampPan(): void {
     const c = this.cam;
-    const [x0, x1] = this.extent();
-    const m = (0.2 * this.w) / c.sx;
-    c.cx = Math.min(x1 + m, Math.max(x0 - m, c.cx));
     const yTop = this.yNow + (0.1 * this.h) / c.sy;
     const yBot = this.fan.trunkBottom.y - (0.1 * this.h) / c.sy;
     c.cy = yTop > yBot ? (yTop + yBot) / 2 : Math.min(yBot, Math.max(yTop, c.cy));
+    const p = this.nearestContent(c.cx, Math.max(this.yNow, c.cy - this.h / 2 / c.sy), c.cy + this.h / 2 / c.sy);
+    const m = (0.4 * this.w) / c.sx;
+    c.cx = Math.min(p + m, Math.max(p - m, c.cx));
   }
 
   /**
@@ -209,7 +260,12 @@ export class FanCamera {
     // The time zoom this lands on, for the slope limit.
     const sy = this.timeCap(wy, py, Math.min(TY_MAX, Math.max(this.minScale()[1], c.ty)));
     let sx = c.sx * fx;
-    if (fx > 1) sx = Math.min(sx, Math.max(c.sx, this.sxCap(wx, wy, sy)));
+    if (fx > 1) {
+      // No zooming into nothing: content stays within 30% of the screen of the fingers.
+      const d = Math.abs(this.nearestContent(wx, wy) - wx);
+      const cap = d > 0 ? (0.3 * this.w) / d : Infinity;
+      sx = Math.min(sx, Math.max(c.sx, Math.min(cap, this.sxCap(wx, wy, sy))));
+    }
     c.sx = sx;
     this.settle(px, py, wx, wy);
   }
