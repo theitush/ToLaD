@@ -31,7 +31,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import anchors
+from . import anchors, history
 from .anchors import year_to_ma
 from .load import load_combine, load_pantheria
 from .tree import D_ANCHOR, D_FOSSIL, D_INTERP, D_UPHAM, Node, ancestor_of_rank
@@ -55,6 +55,7 @@ SOURCES = [
     ("greenspoon-data", "Greenspoon et al. 2023 data release (Zenodo 10.5281/zenodo.7594807): per-species "
                         "population reports (IUCN Red List), dog and cat numbers; CC BY 4.0"),
     ("overrides", "ToLaD manual overrides (pipeline/overrides.toml): fossil dates and placements, with citations"),
+    ("history", history.HISTORY_SRC_LABEL),
 ]
 SRC = {k: i for i, (k, _) in enumerate(SOURCES)}
 
@@ -589,6 +590,7 @@ def assign_leaf_counts(root: Node, raw: Path, ctx: dict, log: dict) -> None:
             alive = 0.0
             D["rate_wild_now"] = 0.0
             D["meth"].append("wild ancestor modelled up to domestication; no wild population today")
+        D["n_wild_pieces"] = len(pieces)
         if n.name in dom_by_leaf:
             d = dom_by_leaf[n.name]
             dom_start = year_to_ma(d["dom_year"])
@@ -610,6 +612,8 @@ def assign_leaf_counts(root: Node, raw: Path, ctx: dict, log: dict) -> None:
         D["ever_med"] = sum((o - y) * 1e6 * rr for o, y, rr in pieces)
         D["grade_cap"] = cap
     log["anchors_found"] = dict(found)
+    # curated flagship histories: pre-decline baselines and dated curves (pipeline/history/)
+    ctx["history"] = history.apply(root, raw, log, SRC["history"])
     unverified = [n for n in root.preorder() if n.is_leaf and n.kind == "tree" and not n.extinct
                   and not n.upham and "iucn" not in n.data and id(n) not in ref and n.name != "Homo sapiens"]
     log["unverified_extant_tips"] = {

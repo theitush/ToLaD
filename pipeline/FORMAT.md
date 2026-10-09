@@ -1,8 +1,8 @@
-# ToLaD tile format, version 1
+# ToLaD tile format, version 1.1
 
 Binary columnar format for the river data. The decoder is `pipeline/decoder/tolad-decoder.js`; the round-trip test is `pipeline/decoder/test/roundtrip.test.mjs`. The writer is `pipeline/tolad_pipeline/tiles.py`.
 
-**Versioning:** the `version` field in the header is bumped on any incompatible change. Decoders must reject unknown versions. Additive changes (new sections) keep the version, and decoders must skip sections they do not know.
+**Versioning:** the `version` field in the header is bumped on any incompatible change. Decoders must reject unknown versions. Additive changes (new sections) keep the version, and decoders must skip sections they do not know. Minor revisions: **1.0** the base format; **1.1** adds the optional `HIST` section (curated population history) and the `hist*` META keys. The header `version` stays 1, and a 1.0 decoder reads 1.1 files unchanged (it skips `HIST`).
 
 ## Files
 
@@ -58,6 +58,7 @@ Rows are nodes in **preorder**. `CHLD[i]` is the number of children present *in 
 | `STUB` | u32[2k] | `(row index, tile id)` pairs for the k stubs in this file |
 | `NAME` | u32[n+1] offsets, then UTF-8 bytes | `"Primary name|alt1|alt2…"`. The offsets are relative to the start of the byte blob. An unnamed MRCA node has an empty primary name. Alt names come from collapsed unary ("knuckle") ancestors, nearest first |
 | `META` | UTF-8 JSON | see below |
+| `HIST` | blob, count = species (v1.1, optional) | curated population history of species rows, see below |
 
 ### Quantization
 
@@ -86,7 +87,7 @@ Bin 0 is the youngest (ends at `t1`) and bin 15 the oldest (starts at `t0`). Eac
 | 4–5 | date source: 0 = Upham-calibrated, 1 = interpolated, 2 = fossil range or fossil-constrained, 3 = anchored |
 | 6 | species tip (in the full tree) |
 | 7 | stub: children are in tile `STUB[...]` |
-| 8 | anchored count: humans, an IUCN census figure, or a domestic stock (FAOSTAT livestock, dogs, cats) |
+| 8 | anchored count: humans, an IUCN census figure, a domestic stock (FAOSTAT livestock, dogs, cats), or a curated history (`HIST`) |
 | 9 | PBDB fossil species graft |
 | 10 | created taxonomic group (genus, family or order from PBDB, or the "incertae sedis" bucket) |
 
@@ -101,6 +102,33 @@ Every file has `META.stub_rep` (representative names, aligned with the `STUB` pa
 - `tiles`: `[{id, file, nodes, root_gid, root_name, bytes}]`
 - `total_nodes`: rows across all files, not counting stub duplicates
 - `mock_individuals`: `[{mock: true, name: "MOCK …", species, species_gid, tile (−1 = skeleton), index, born, died, alive, note}]`. These are **placeholders**, clearly labelled. Real individual records come in a later phase.
+
+v1.1 adds, in the skeleton:
+
+- `hist_sources`: `[{cite, url}]`, the citation table that HIST points index into
+- `hist_kinds`: the HIST kind names, by code (see below)
+- `hist_index`: `[{species, gid, tile (−1 = skeleton), row}]`, where each curated species' HIST entry lives
+
+and, in every file that has a `HIST` section, `META.hist`: `[{species, common, component, use, scope, file, notes, point_notes}]`, aligned with the HIST species headers (`point_notes` aligned with that species' points).
+
+### HIST (v1.1): curated population history
+
+Present only in files that hold a curated species row (`pipeline/history/*.toml`, see its README for the curation rules). The section `count` is the number of species `s`. Layout, little-endian, read with a DataView:
+
+| part | size | fields |
+|---|---|---|
+| preamble | 16 B | `u32 s`, `u32 p` (points), `u32 g` (segments), `u32` reserved |
+| species headers | 24 B × s | `u32 row`, `u32 point0`, `u32 seg0`, `u16 npts`, `u16 nseg`, `f32 G` (generation length, yr), `f32 L` (= G/2, yr) |
+| points | 16 B × p | `i32 year` (calendar, negative = BCE), `u16 n`, `u16 lo`, `u16 hi` (LOG16, individuals alive), `u8 grade` (0–3 = A–D), `u8 kind`, `u16 cite` (index into skeleton `META.hist_sources`), `u16 flags` (bit 0 = the pre-decline baseline) |
+| segments | 16 B × g | `f32 year0` (calendar year the segment starts), `f32 generations`, `u16 startSize`, `u16 endSize` (LOG16, births per generation), `u8 grade`, `u8 kind`, `u16` reserved |
+
+A species' points are `point0 … point0+npts−1` (sorted by year) and its segments `seg0 … seg0+nseg−1` (oldest first, contiguous, the last one ending now).
+
+**Kinds** (`META.hist_kinds`): 0 `census`, 1 `estimate`, 2 `index-scaled`, 3 `reconstruction`, 4 `unverified` (always grade D), 5 `model` (the pipeline's own alive-now, added when the curve has no recent graded point), 6 `interpolated` (a span between two points), 7 `held` (a level held flat: before the first point when there is no baseline, or after the last point), 8 `baseline` (the pre-decline level held back to the band start).
+
+**Curve:** log-linear between points (so it passes through every point), flat outside them. **Segments** are the curve compiled for procgen's `Segment` (births per generation, linear ramps): births per generation = alive × G ÷ lifespan = `N(t) · G / L`. Boundaries are whole generations counted back from now. A span changing by more than 2× is split at log-even levels into sub-spans of at most ~1.41×. For wild species the first segment holds the baseline (or first point) back to the start of the species band; for domestic stocks and humans the segments cover the curated span only. Each segment's grade is the worse of its two end points.
+
+**Counts:** for `use = "counts"` species the curve replaces the leaf's births: rate = `N(t) / L`, the baseline (or first point) held from the band start, so `EVER` and the profiles use the pre-decline level, not today's count. `ALIV` is the latest point if it is from 2000 or later and graded A–C. The leaf's error is widened by the baseline's range and its grade is capped by the baseline's grade. Parents re-sum as usual. `use = "display"` species (humans; partial-scope files) ship the HIST entry only.
 
 ## Semantics of the counts
 
