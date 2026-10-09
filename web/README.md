@@ -6,25 +6,47 @@ The default page is a OneZoom-style fan of one polytomy, the big cats (Panthera)
 real numbers from `data/mammals` (tile 10, hard-coded in `panthera.ts`). The rules:
 width = individuals, green = alive, gray = dead, height = time.
 
-- **Height = time** on a log years-before-present axis (`TimeScale`, offset 1 kyr so
-  the last ~10 kyr are not squashed): the fork is Panthera's origin, living species reach
-  the "now" line, extinct ones stop at their last appearance.
+- **Height = time** on a log years-before-present axis (`TimeScale`, offset `TIME_C` =
+  10 yr, about a big cat's lifespan, so the taper has no kink near "now"): the fork is
+  Panthera's origin, living species reach the "now" line, extinct ones stop at their last
+  appearance. The axis is always shown.
 - **Width** at any height = the individuals whose strands pass through it (not yet dead),
-  as log or linear sibling shares. A branch is everyone ever at its base and thins as dead
-  strands peel off; at the tip only the living remain. The stem is drawn as its children's
-  strands side by side, so each green lane runs unbroken from now to the root (1 px floor).
-- **Individuals** (`twigs.ts`): zoomed in, a branch resolves into its procgen individuals
-  (`packages/procgen`; `speciesModel` builds a constant-size model from ever, alive, span
-  and generation length). Each is a vertical twig from birth to death; a generation splits
-  the branch width equally in index order; links to both parents converge on each twig's
-  base. Only visible generations and index ranges are generated. LOD: lanes, twigs, links,
-  handles. Tap a branch for the species card, a twig for the `lion#…` card.
+  as linear (default) or log sibling shares. A branch is everyone ever at its base and
+  thins as dead strands peel off; at the tip only the living remain. The green lane has
+  one width from base to tip (log mode: W·g(alive)/g(ever)), only the gray peels off. The
+  stem is drawn as its children's strands side by side, so each green lane runs unbroken
+  from now to the root (1 px floor).
+- **Individuals** (`twigs.ts`): zooming in, the same two lanes resolve into strands; there
+  is no switch to another picture. Procgen (`packages/procgen`; `speciesModel` builds a
+  constant-size model from ever, alive, span and generation length) gives the individuals.
+  - Green lane: one deep-green strand per index slot holding someone alive now, from now
+    all the way down: green lines all the way back.
+  - Gray lane: one strand slot per procgen index (procgen keeps children near their
+    parents in index space, so a slot is roughly a family line). Each dead individual's
+    life is drawn on its slot: pale green if it has a living descendant, gray if its line
+    ended. Dead tips stop 3 px short of "now".
+  - Threads: each child's mother thread (the line the strands and the lineage search
+    follow) and a thinner father thread (the interbreeding mesh) curve up from the parent's
+    strand into the child's base. Threads end exactly on procgen's `parents()`.
+  - Continuity: when strands are 1.5 px apart they appear as dark grooves in the lane; by
+    2–10 px apart they fade in as light strands while the lane dims under them. Then
+    individuals, threads, and `lion#…` handles appear. Only visible generations and index
+    ranges are computed.
+  - "Has a living descendant" is exact (children, then down the mother line) within a
+    lookup budget; past it, a critical-branching estimate decides, deterministically.
+- **Camera**: width and time zoom separately (pinch per axis, shift/alt+wheel). Deep in, the
+  camera shears to keep the strand under it upright. Double-tap fits a branch, then zooms
+  16× in width and 2× or more in time, stopping when strands are ~90 px apart. In the green
+  lane it lands on a living strand. Tap a branch for the species card, an individual for
+  the `lion#…` card.
 - `node scripts/fanshot.mjs [out] [prefix]` screenshots `dist-single` at 390×844
   (`STEPS_FILE` = JSON list of `[name, js]` steps run against `window.__fan`).
 
-Known limit: with log time, generations near "now" are far taller than one individual is
-wide, so there you see parallel twigs (green ones reaching now) and the parent links span
-several screens; the braid reads best around 0.3–3 Mya.
+Known limits: the green lane holds the living by index slot, and only ~⅓ of slots hold
+someone alive now, so deep in it the living strands are sparser than one per slot. The
+two greens (deep = alive, pale = dead with living descendants) appear only inside the
+mesh; in the fan's lanes the pale-green share is under a pixel in linear mode. Parent
+threads can be long, because procgen parents sit several slots away.
 
 The time river is still there at `?river`.
 

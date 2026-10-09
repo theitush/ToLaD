@@ -199,6 +199,26 @@ export class TwigModel {
     return this.sp.attributes({ generation: g, index: BigInt(i) }).alive;
   }
 
+  /** Does green-lane slot i hold a living strand (anyone at index i alive now)? */
+  livingSlot(i: number): boolean {
+    for (let g = this.aliveFrom; g < this.G; g++) if (i >= 0 && i < this.size(g) && this.alive(g, i)) return true;
+    return false;
+  }
+
+  /** World x of the living strand nearest x at height y (within `reach` slots), or null. */
+  nearestLiving(x: number, y: number, reach = 64): number | null {
+    if (this.aliveFrom >= this.G) return null;
+    const L = this.lanes(y);
+    const n = this.size(this.G - 1);
+    const c = Math.floor(((x - L.left) / Math.max(1e-300, L.gw)) * n);
+    for (let d = 0; d <= reach; d++) {
+      for (const i of d ? [c - d, c + d] : [c]) {
+        if (i >= 0 && i < n && this.livingSlot(i)) return this.xAt((i + 0.5) / n, y, true);
+      }
+    }
+    return null;
+  }
+
   parents(g: number, i: number): Address[] {
     return this.sp.parents({ generation: g, index: BigInt(i) });
   }
@@ -385,6 +405,17 @@ function twigPath(v: TwigView, m: TwigModel, t: Twig, path: Path2D | CanvasRende
   return strandPath(v, m, t.u, t.alive, t.yBirth, twigTop(v, t), path);
 }
 
+/**
+ * Screen ends of a parent thread: the point on the parent's strand where it
+ * leaves (a third of a generation before the child's birth, kept within the
+ * parent's own life) and the child's base. Returns [px, py, childY].
+ */
+export function threadEnds(v: TwigView, m: TwigModel, parent: Twig, child: Twig, genH: number): [number, number, number] {
+  const yJoin = Math.min(parent.yBirth, Math.max(twigTop(v, parent), child.yBirth + genH / 3));
+  const [px, py] = v.toScreen(m.xAt(parent.u, yJoin, parent.alive), yJoin);
+  return [px, py, v.toScreen(child.x, child.yBirth)[1]];
+}
+
 function rgba(hex: string, a: number): string {
   const n = parseInt(hex.slice(1), 16);
   return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a.toFixed(3)})`;
@@ -427,7 +458,7 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
   const cellGray = ((L.w - L.gw) / n) * v.sx;
   const cellGreen = (L.gw / n) * v.sx;
   const cellPx = Math.max(cellGray, cellGreen);
-  if (cellPx < 2) return null;
+  if (cellPx < 1.5) return null;
   const fade = meshFade(cellGray);
   const fadeGreen = meshFade(cellGreen);
   const gHi = m.generationAt(yTop);
@@ -442,7 +473,7 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
 
   // 1. Strand slots: lines from the tips all the way down, in both lanes.
   const slots = (alive: boolean, cell: number, color: string, alpha: number) => {
-    if (cell < 2) return;
+    if (cell < 1.5) return;
     const a = alpha * meshFade(cell);
     // Visible slots: the union of the index ranges at the top and the bottom of the screen.
     const [p0, p1] = m.indexRange(gm, ...xr(yTop), yTop, alive);
@@ -453,18 +484,22 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
     const path = new Path2D();
     for (let i = i0; i < i1; i++) {
       // In the green lane a slot is a strand only if someone in it is alive now.
-      if (alive) {
-        let any = false;
-        for (let g = m.aliveFrom; g < m.G && !any; g++) any = i < m.size(g) && m.alive(g, i);
-        if (!any) continue;
-      }
+      if (alive && !m.livingSlot(i)) continue;
       strandPath(v, m, (i + 0.5) / n, alive, alive ? yTop : Math.max(yTop, v.yNow + DEAD_GAP_PX / v.sy), yBot, path);
+    }
+    if (!alive) {
+      // While the lane is still a solid band (fade ≈ 0), the slots first show as
+      // dark grooves splitting it into strands; then the lane dims and they turn light.
+      const groove = Math.min(1, (cell - 1.5) / 2.5) * (1 - meshFade(cell));
+      ctx.strokeStyle = rgba('#1c2521', 0.55 * groove);
+      ctx.lineWidth = 1;
+      ctx.stroke(path);
     }
     ctx.strokeStyle = rgba(color, a);
     ctx.lineWidth = alive ? 1.5 : 1;
     ctx.stroke(path);
   };
-  slots(false, cellGray, ext ? TWIG_WITHERED : TWIG_GRAY, 0.22);
+  slots(false, cellGray, ext ? TWIG_WITHERED : TWIG_GRAY, 0.3);
   if (!ext) slots(true, cellGreen, LIVING, 0.9);
 
   if (rows * perRow > MAX_TWIGS) return stats;
@@ -502,35 +537,46 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
   const lw = Math.max(1, Math.min(4, cellPx * 0.12));
   const kinds = twigs.map(({ g, i, t }) => kind(g, i, t));
   if (showLinks) {
-    const green = new Path2D();
-    const gray = new Path2D();
-    const grayFar = new Path2D();
+    // The mother's thread carries the line (the strands' line, as in the lineage
+    // search); the father's is the thin mesh joining two lines at the child's birth.
+    const mk = () => ({ green: new Path2D(), gray: new Path2D(), far: new Path2D() });
+    const prim = mk();
+    const mesh = mk();
     for (let k = 0; k < twigs.length; k++) {
       const { g, i, t } = twigs[k];
       if (g === 0) continue;
-      const [cx, cy] = v.toScreen(t.x, t.yBirth);
-      for (const p of m.parents(g, i)) {
+      const cx = v.toScreen(t.x, t.yBirth)[0];
+      const ps = m.parents(g, i);
+      const mi = Math.max(0, ps.findIndex((p) => m.sp.sexOf(p) === 'female'));
+      const genH = m.row(g - 1).y - m.row(g).y;
+      ps.forEach((p, j) => {
         const pg = p.generation;
         const pi = Number(p.index);
         const pt = m.twig(pg, pi);
-        // From the parent's strand at the child's birth (or at its own death, if earlier) to the child's base.
-        const yl = Math.max(twigTop(v, pt), t.yBirth);
-        const [px, py] = v.toScreen(m.xAt(pt.u, yl, pt.alive), yl);
-        // Long links (the rare migrants) are drawn faint so the local braid reads.
-        const far = Math.abs(px - cx) > 8 * cellPx;
-        const pGreen = !ext && (pt.alive || kinds[k] !== 'dead' || m.knowsLineage(pg, pi) ? pt.alive || kinds[k] !== 'dead' || m.hasLivingDescendant(pg, pi) : false);
-        const path = pGreen ? green : far ? grayFar : gray;
+        // Leaves the parent's strand a little before the child's birth (or at the
+        // parent's death, if earlier) and curves up into the child's base, like a fork.
+        const [px, py, cy2] = threadEnds(v, m, pt, t, genH);
+        // Long threads (the rare migrants) are drawn faint so the local braid reads.
+        const far = Math.abs(px - cx) > 6 * cellPx;
+        const pGreen = !ext && (pt.alive || kinds[k] !== 'dead' || (m.knowsLineage(pg, pi) && m.hasLivingDescendant(pg, pi)));
+        const set = j === mi ? prim : mesh;
+        const path = pGreen ? set.green : far ? set.far : set.gray;
+        const dy = Math.max(3, (py - cy2) * 0.6);
         path.moveTo(px, py);
-        path.lineTo(cx, cy);
-      }
+        path.bezierCurveTo(px, py - dy, cx, cy2 + dy, cx, cy2);
+      });
     }
-    ctx.lineWidth = Math.max(0.75, lw * 0.6);
-    ctx.strokeStyle = rgba('#aab2ba', 0.14 * fade);
-    ctx.stroke(grayFar);
-    ctx.strokeStyle = rgba('#aab2ba', 0.45 * fade);
-    ctx.stroke(gray);
-    ctx.strokeStyle = rgba(LINEAGE, 0.75 * fade);
-    ctx.stroke(green);
+    const strokes = (s: ReturnType<typeof mk>, w: number, a: number) => {
+      ctx.lineWidth = w;
+      ctx.strokeStyle = rgba('#aab2ba', 0.12 * a * fade);
+      ctx.stroke(s.far);
+      ctx.strokeStyle = rgba('#aab2ba', 0.45 * a * fade);
+      ctx.stroke(s.gray);
+      ctx.strokeStyle = rgba(LINEAGE, 0.8 * a * fade);
+      ctx.stroke(s.green);
+    };
+    strokes(mesh, Math.max(0.6, lw * 0.3), 0.7);
+    strokes(prim, Math.max(0.9, lw * 0.6), 1);
   }
 
   const paths = { alive: new Path2D(), lineage: new Path2D(), dead: new Path2D() };
@@ -562,12 +608,12 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
     ctx.beginPath();
     twigPath(v, m, t, ctx);
     if (sel.g > 0) {
+      const genH = m.row(sel.g - 1).y - m.row(sel.g).y;
       for (const p of m.parents(sel.g, sel.i)) {
-        const pt = m.twig(p.generation, Number(p.index));
-        const yl = Math.max(twigTop(v, pt), t.yBirth);
-        const [px, py] = v.toScreen(m.xAt(pt.u, yl, pt.alive), yl);
+        const [px, py] = threadEnds(v, m, m.twig(p.generation, Number(p.index)), t, genH);
+        const dy = Math.max(3, (py - yb) * 0.6);
         ctx.moveTo(px, py);
-        ctx.lineTo(x, yb);
+        ctx.bezierCurveTo(px, py - dy, x, yb + dy, x, yb);
       }
     }
     ctx.stroke();
@@ -582,7 +628,8 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
     for (const { g, i, t } of twigs) {
       const top = twigTop(v, t);
       const [x, yd] = v.toScreen(m.xAt(t.u, top, t.alive), top);
-      const y = Math.min(v.h - 4, Math.max(16, yd - tipR - 3));
+      const y = Math.min(v.h - 4, yd - tipR - 3);
+      if (y < 14) continue; // tip above the screen: no label piled on the top edge
       ctx.fillText(m.sp.handle({ generation: g, index: BigInt(i) }), x, y, cellPx * 0.95);
     }
     ctx.restore();

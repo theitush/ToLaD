@@ -108,7 +108,7 @@ export class FanView implements InputHandlers {
     const left = 58;
     const right = 14;
     const top = 120;
-    const bottom = 110;
+    const bottom = 150; // room for the clade label below the fork, above the legend
     const s = Math.min((this.w - left - right) / (x1 - x0), (this.h - top - bottom) / -y0);
     const cx = (x0 + x1) / 2 - (left - right) / 2 / s;
     return { cx, cy: y0 + (this.h / 2 - top) / s, sx: s, sy: s };
@@ -313,8 +313,15 @@ export class FanView implements InputHandlers {
         const genH = Math.abs(m.yOf(g * m.GL) - m.yOf((g + 1) * m.GL));
         const L = m.lanes(wy);
         const cell = Math.max(L.gw, L.w - L.gw) / m.size(g);
+        // Stop widening once strands are ~90 px apart (handles legible); past that,
+        // width zoom only shows one empty strand.
+        sx = Math.max(this.cam.sx, Math.min(sx, 90 / Math.max(1e-300, cell)));
         sy = Math.max(this.cam.sy * 2, Math.min(this.cam.sy * 64, (2 * cell * sx) / Math.max(1e-300, genH)));
         cx = wx - (x - this.w / 2) / sx;
+        // In the green lane, land on a living strand rather than a vacant slot
+        // (only about a third of the index slots hold someone alive).
+        const slotPx = (L.gw / m.size(g)) * sx;
+        if (wx < L.left + L.gw && slotPx > 12) cx = m.nearestLiving(wx, wy, Math.ceil(this.w / slotPx)) ?? cx;
       }
     }
     sx = Math.min(1e15, sx);

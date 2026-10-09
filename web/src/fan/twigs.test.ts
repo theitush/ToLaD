@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { layoutFan, remaining, strandAt } from './layout';
 import { PANTHERA } from './panthera';
-import { speciesModel, TwigModel } from './twigs';
+import { speciesModel, threadEnds, TwigModel, type TwigView } from './twigs';
 
 const fanLin = layoutFan(PANTHERA, 'linear');
 const fanLog = layoutFan(PANTHERA, 'log');
@@ -179,6 +179,48 @@ describe('determinism and links', () => {
         expect(pt.yBirth).toBeGreaterThan(child.yBirth);
         const ch = m.sp.children(p);
         expect(BigInt(i) >= ch.start && BigInt(i) < ch.start + ch.count).toBe(true);
+      }
+    }
+  });
+
+  it("every parent thread (mother's line and father's mesh) ends on procgen's parents()", () => {
+    for (const f of [fanLin, fanLog]) {
+      const m = lion(f);
+      // World coordinates as "screen": the thread ends are then world points.
+      const v = { sx: 1, sy: 1, yNow: f.time.y(0), toScreen: (x: number, y: number) => [x, y] } as unknown as TwigView;
+      for (const g of [1, 1000, m.G - 300, m.G - 1]) {
+        const genH = m.row(g - 1).y - m.row(g).y;
+        for (const i of [0, 17, 4000, 70000]) {
+          const child = m.twig(g, i);
+          const ps = m.parents(g, i);
+          expect(ps).toEqual(m.sp.parents({ generation: g, index: BigInt(i) }));
+          for (const p of ps) {
+            const pt = m.twig(p.generation, Number(p.index));
+            const [px, py, cy] = threadEnds(v, m, pt, child, genH);
+            // Child end: the child's own birth. Parent end: on the parent's strand,
+            // within the parent's life, no later than the child's birth.
+            expect(cy).toBe(child.yBirth);
+            expect(py).toBeLessThanOrEqual(pt.yBirth);
+            expect(py).toBeGreaterThanOrEqual(Math.min(pt.yBirth, pt.yDeath));
+            expect(py).toBeGreaterThanOrEqual(child.yBirth);
+            expect(px).toBe(m.xAt(pt.u, py, pt.alive));
+          }
+        }
+      }
+    }
+  });
+
+  it('a double-tap in the green lane lands on a living strand', () => {
+    for (const f of [fanLin, fanLog]) {
+      const m = lion(f);
+      const y = m.row(m.G - 50).y;
+      const L = m.lanes(y);
+      for (const u of [0.1, 0.5, 0.9]) {
+        const x = m.nearestLiving(L.left + u * L.gw, y);
+        expect(x).not.toBeNull();
+        const i = Math.floor(((x! - L.left) / L.gw) * m.size(m.G - 1));
+        expect(m.livingSlot(i)).toBe(true);
+        expect(m.nearestLiving(L.left + u * L.gw, y)).toBe(x); // deterministic
       }
     }
   });
