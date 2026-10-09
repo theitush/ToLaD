@@ -5,13 +5,24 @@ import { Camera } from './camera';
 import { DiveDriver } from './dive';
 import { copyFrame, frame, toChild, toParent, type Frame } from './frame';
 import { Input } from './input';
+import { LabelPlacer } from './labels';
 import { Layout, type LNode } from './layout';
-import { Renderer } from './renderer';
+import { link, Renderer } from './renderer';
 import { INST_FLOATS, SceneBuilder } from './scene';
 import { RollingStats, summarize } from './stats';
-import { SyntheticTree } from './tree';
+import { GlyphAtlas, TextBatch, TextRenderer } from './text';
+import { SyntheticTree, type TreeSource } from './tree';
 
 export interface EngineOptions {
+  /** Data source; the synthetic infinite tree if omitted. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  source?: TreeSource<any> | null;
+  /** Node label text ('' = none). Enables SDF labels. */
+  labelOf?: ((n: LNode) => string) | null;
+  /** Age formatter for the time axis (enables it when the source has ages). */
+  formatAge?: ((ageMa: number, stepYears: number) => string) | null;
+  /** Start in log widths. */
+  log?: boolean;
   /** Max device pixel ratio for the backing store (fill rate is the mobile limit). */
   dprCap?: number;
   /** Resolution scale used during gestures when frames are slow. */
@@ -46,6 +57,8 @@ export class Engine {
   readonly opts: Required<EngineOptions>;
 
   debug = false;
+  /** Diagnostics: gl.finish() every frame so the cpu figure includes GPU time. */
+  syncGpu = false;
   private overlayEl: HTMLElement | null = null;
   private raf = 0;
   private lastNow = 0;
@@ -69,19 +82,46 @@ export class Engine {
   private inertia: { vx: number; vy: number; vz: number; px: number; py: number } | null = null;
   private dive: { driver: DiveDriver; until: number; resolve: () => void } | null = null;
   private debugBuf = { data: new Float32Array(INST_FLOATS * 64), count: 0 };
+  private text: TextRenderer | null = null;
+  private textBatch: TextBatch | null = null;
+  labels: LabelPlacer | null = null;
 
   constructor(
     readonly canvas: HTMLCanvasElement,
     options: EngineOptions = {},
   ) {
-    this.opts = { dprCap: 2, gestureScale: 0.75, seed: 1, ...options };
-    this.layout = new Layout(new SyntheticTree(this.opts.seed));
+    this.opts = { dprCap: 2, gestureScale: 0.75, seed: 1, source: null, labelOf: null, formatAge: null, log: false, ...options };
+    this.layout = new Layout(this.opts.source ?? new SyntheticTree(this.opts.seed));
+    if (this.opts.log) {
+      this.layout.setMix(1);
+      this.modeTarget = 1;
+    }
     this.cssW = Math.max(1, canvas.clientWidth);
     this.cssH = Math.max(1, canvas.clientHeight);
     this.cam = new Camera(this.layout, this.cssW, this.cssH);
     this.scene = new SceneBuilder(this.layout);
     this.renderer = new Renderer(canvas);
     this.scene.onEvict = (c) => this.renderer.release(c);
+    if (this.opts.labelOf || this.opts.formatAge) {
+      const atlas = new GlyphAtlas();
+      this.text = new TextRenderer(this.renderer.gl, atlas, link);
+      this.textBatch = new TextBatch(atlas);
+      const cache = new Map<string, string>();
+      const labelOf = this.opts.labelOf;
+      this.labels = new LabelPlacer(this.layout, {
+        budget: 36,
+        labelOf: (n) => {
+          if (!labelOf) return '';
+          let t = cache.get(n.id);
+          if (t === undefined) {
+            t = labelOf(n);
+            cache.set(n.id, t);
+          }
+          return t;
+        },
+        formatAge: this.opts.formatAge ?? ((a) => `${a} Ma`),
+      });
+    }
     this.input = new Input(canvas, {
       gestureStart: () => {
         this.flight = null;
@@ -115,6 +155,24 @@ export class Engine {
     cancelAnimationFrame(this.raf);
     this.ro.disconnect();
     this.input.destroy();
+  }
+
+  /** New data arrived (a tile): chunks rebuild and pending stubs gain children. */
+  dataChanged(): void {
+    this.layout.dataChanged();
+    this.requestFrame();
+  }
+
+  /** Fly to the node with these ids from the root down (ids of LNodes, root first). */
+  flyToPath(ids: string[]): LNode | null {
+    let n = this.layout.root;
+    for (const id of ids.slice(1)) {
+      const next = this.layout.children(n).find((c) => c.id === id);
+      if (!next) return null;
+      n = next;
+    }
+    this.flyTo(n);
+    return n;
   }
 
   setOverlay(el: HTMLElement | null): void {
@@ -251,7 +309,7 @@ export class Engine {
     if (this.dive) {
       const d = this.dive;
       d.driver.step();
-      if (d.driver.levels >= d.until) {
+      if (d.driver.levels >= d.until || d.driver.done) {
         this.dive = null;
         d.resolve();
       } else animating = true;
@@ -280,6 +338,11 @@ export class Engine {
     this.cam.normalize();
     this.scene.build(this.cam);
     this.renderer.render(this.scene, this.pxScale, this.debug ? this.buildDebug() : null);
+    if (this.labels && this.text && this.textBatch) {
+      this.labels.build(this.scene, this.cam, this.textBatch, !!this.opts.formatAge);
+      this.text.draw(this.textBatch, cw, ch);
+    }
+    if (this.syncGpu) this.renderer.gl.finish();
     this.frameNo++;
     if (this.frameNo % 120 === 0) this.layout.prune(this.cam.anchor);
 
@@ -327,7 +390,7 @@ export class Engine {
       const yb = cl(f.oy, H);
       const yt = cl(f.oy - f.kt, H);
       const o = n * INST_FLOATS;
-      b.data.set([x0, x1, x0, x1, x0, x0, yb, yt, 0, 2, 0, 0], o);
+      b.data.set([x0, x1, x0, x1, x0, x0, yb, yt, 0, 2, x1, x1], o);
       n++;
     }
     b.count = n;
@@ -391,7 +454,7 @@ export class Engine {
     const driver = new DiveDriver(this.cam, this.layout, seed);
     driver.preferAlive = preferAlive;
     let steps = 0;
-    while (driver.levels < levels) {
+    while (driver.levels < levels && !driver.done) {
       driver.step();
       if (++steps % 500 === 0) this.layout.prune(this.cam.anchor);
     }
