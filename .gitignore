@@ -6,3 +6,6 @@ dist/
 # large downloaded/derived datasets
 data/raw/
 data/build/
+
+# agent worktrees
+.claude/worktrees/
