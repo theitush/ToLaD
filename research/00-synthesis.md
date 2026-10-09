@@ -19,7 +19,7 @@ Everything below species is generated on the fly from integer hashes and needs n
 | Area | Proposal | Why | Source |
 |---|---|---|---|
 | Layout | Vertical time river → braid → weave. Radial layout only as an optional "poster" skin | Only layouts with a time axis can show *when* lineages died. A portrait phone's long axis is time | 04 |
-| Width semantics | **Width = births per unit time, so area = individuals ever lived** (the "W2" option in 04). Total count shown on the label and in a ledger | Nests correctly and turns smoothly into the per-individual weave. **Needs your OK**, see below | 04 |
+| Width semantics | **Width = births per unit time, so area = individuals ever lived** (the "W2" option in 04). Total count shown on the label and in a ledger | Nests correctly and turns smoothly into the per-individual weave | 04 |
 | Log/linear | Nested **sibling shares** `g(n)/Σg`, with g = n (linear) or 1+log10 n (log). The toggle animates g | Absolute log widths can't nest. Under linear, deep zoom *is* the log axis | 04 |
 | Green | Split each band into a green and a gray lane, with a 1 px floor for any living clade | True alive share is ~1e-8 to 1e-10 almost everywhere; humans are ~7% | 02, 04 |
 | Renderer | Custom WebGL2 (twgl-level), instanced tapered quads, SDF text, shader-generated mesh edges. WebGPU later | Workload is ~100k instances per frame, so WebGL2 is enough and runs everywhere | 03 |
