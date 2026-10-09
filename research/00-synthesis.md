@@ -50,6 +50,14 @@ After trying the time-river prototype on a phone, the user found it hard to read
 
 Superseded: the "Layout", "Width semantics" (births-rate river) and "Deep zoom (separate X/Y scales)" rows below now apply only to the deep-time view.
 
+## Recent population history (2026-10-09, decided with the user after research/05)
+
+- **Coverage:** start with 40–60 hand-curated flagship species (elephants, great whales, bison, sea otter, wolves, lions, tigers, rhinos, humans, livestock). Every point is cited and licence-clean, and no bulk LPD or IUCN data is shipped. Later, a modelled trend for all other species from PHYLACINE range loss, labelled as modelled.
+- **Pre-decline baselines:** real pre-decline levels *do* raise "ever lived" totals and widths. This can move elephants, rhinos and great whales by 10–50×. Each is shown with its grade and range.
+- **Unverified popular figures:** shown as grade D, marked as unverified (dotted edge, and said on the card).
+- **Format:** dated points per species, compiled at build time to procgen segments, with a grade and source per segment.
+- **Display tiers:** A (annual series) to D (constant); interpolated and modelled spans are drawn dashed or dotted.
+
 ## Decisions confirmed by the user (2026-10-09)
 
 1. **Width:** births-rate river, so area = individuals ever lived. The total count goes on the label and in the ledger.
