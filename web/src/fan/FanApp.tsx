@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { formatAge, formatCount } from '../data/names';
 import type { WidthMode } from './layout';
 import { PANTHERA, type SpeciesRec } from './panthera';
-import { FanView } from './view';
+import { FanView, fmtInt, formatYearsAgo, type IndInfo, type Selection } from './view';
 
 declare global {
   interface Window {
@@ -17,7 +17,7 @@ export function FanApp() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const viewRef = useRef<FanView | null>(null);
   const [mode, setMode] = useState<WidthMode>('log');
-  const [sel, setSel] = useState<SpeciesRec | null>(null);
+  const [sel, setSel] = useState<Selection | null>(null);
 
   useEffect(() => {
     const v = new FanView(canvasRef.current!, PANTHERA);
@@ -52,12 +52,16 @@ export function FanApp() {
         </button>
       </div>
       {sel ? (
-        <SpeciesCard sp={sel} onClose={() => viewRef.current?.tap(-1e6, -1e6)} />
+        sel.ind ? (
+          <IndCard sp={sel.sp} ind={sel.ind} onClose={() => viewRef.current?.tap(-1e6, -1e6)} />
+        ) : (
+          <SpeciesCard sp={sel.sp} onClose={() => viewRef.current?.tap(-1e6, -1e6)} />
+        )
       ) : (
         <div className="legend">
           <span className="dot alive" /> alive <span className="dot dead" /> dead
           <br />
-          width = individuals ever lived · tap a leaf
+          width = individuals ever lived · tap or zoom a leaf
         </div>
       )}
     </div>
@@ -89,6 +93,36 @@ function SpeciesCard({ sp, onClose }: { sp: SpeciesRec; onClose: () => void }) {
       </div>
       <div className="dim">
         generation ≈ {sp.genYears} y ({sp.genSource})
+      </div>
+    </div>
+  );
+}
+
+function IndCard({ sp, ind, onClose }: { sp: SpeciesRec; ind: IndInfo; onClose: () => void }) {
+  return (
+    <div className="card-sp" onPointerDown={(e) => e.stopPropagation()}>
+      <button type="button" className="x" onClick={onClose} aria-label="Close">
+        ×
+      </button>
+      <div className="t">
+        <span className={`dot ${ind.alive ? 'alive' : 'dead'}`} /> <span className="mono">{ind.handle}</span>
+      </div>
+      <div>
+        {ind.sex} {sp.common.toLowerCase()} · {ind.alive ? 'alive now' : 'dead'} · born ~{formatYearsAgo(ind.bornYearsAgo)}
+      </div>
+      <div className="dim">
+        lived {ind.lifespan.toFixed(1)} y · generation {fmtInt(ind.g + 1)} of {fmtInt(ind.G)} · {ind.children} children
+      </div>
+      <div className="dim">
+        parents:{' '}
+        {ind.parents.length === 0
+          ? 'none (founding generation)'
+          : ind.parents.map((p, k) => (
+              <span key={k} className="mono">
+                {k ? ' + ' : ''}
+                {p.handle}
+              </span>
+            ))}
       </div>
     </div>
   );

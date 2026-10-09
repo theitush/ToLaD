@@ -1,7 +1,7 @@
 // Screenshots of the fan view from the single-file build.
 //   npm run build:single && node scripts/fanshot.mjs [out-dir] [prefix]
 // Steps are evaluated against window.__fan (see src/fan/view.ts).
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { chromium } from 'playwright';
@@ -27,7 +27,7 @@ try {
     console.log('shot', name);
   };
   await shot('1-fan');
-  const steps = JSON.parse(process.env.STEPS || '[]');
+  const steps = JSON.parse(process.env.STEPS_FILE ? readFileSync(process.env.STEPS_FILE, 'utf8') : process.env.STEPS || '[]');
   for (const [name, code] of steps) {
     await page.evaluate(code);
     await shot(name);

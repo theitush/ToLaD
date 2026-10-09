@@ -7,14 +7,32 @@
 import { formatCount } from '../data/names';
 import { Input, type InputHandlers } from '../engine/input';
 import { bezier, bezierTangent, layoutFan, widthAt, type Fan, type FanBranch, type WidthMode } from './layout';
+import { drawMeshLeaf, drawPlainLeaf, worldToLocal, type MeshStats, type SelectedInd } from './leafdraw';
+import { LeafMesh } from './leafmesh';
 import type { CladeRec, SpeciesRec } from './panthera';
+
+export interface IndInfo {
+  handle: string;
+  g: number;
+  i: number;
+  G: number;
+  sex: string;
+  bornYearsAgo: number;
+  lifespan: number;
+  alive: boolean;
+  parents: { handle: string; alive: boolean }[];
+  children: number;
+}
+
+export interface Selection {
+  sp: SpeciesRec;
+  ind?: IndInfo;
+}
 
 export const GREEN = '#33bd66';
 export const GRAY = '#676e75';
 export const BG = '#0d1411';
 const WITHERED = '#6d675c';
-const WITHERED_EDGE = '#8a8170';
-const LEAF_DEAD = '#59606a';
 
 export interface Camera {
   /** World point at the screen centre. */
@@ -24,10 +42,6 @@ export interface Camera {
   s: number;
 }
 
-export interface LeafPainter {
-  /** Draw a leaf's inside. Return true if it drew something (the plain leaf is skipped). */
-  paint(ctx: CanvasRenderingContext2D, b: FanBranch, view: FanView): boolean;
-}
 
 export class FanView implements InputHandlers {
   readonly ctx: CanvasRenderingContext2D;
@@ -39,8 +53,11 @@ export class FanView implements InputHandlers {
   h = 1;
   dpr = 1;
   selected: SpeciesRec | null = null;
-  onSelect: (sp: SpeciesRec | null) => void = () => {};
-  leafPainter: LeafPainter | null = null;
+  selInd: SelectedInd | null = null;
+  onSelect: (sel: Selection | null) => void = () => {};
+  /** What each leaf's mesh drew last frame (HUD, tests). */
+  meshStats = new Map<number, MeshStats>();
+  private meshes = new WeakMap<FanBranch, LeafMesh>();
   private raf = 0;
   private anim: ((t: number) => boolean) | null = null;
   private ro: ResizeObserver;
@@ -106,6 +123,10 @@ export class FanView implements InputHandlers {
 
   // ---- camera helpers -------------------------------------------------------
 
+  get s(): number {
+    return this.cam.s;
+  }
+
   toScreen(x: number, y: number): [number, number] {
     const c = this.cam;
     return [(x - c.cx) * c.s + this.w / 2, (y - c.cy) * c.s + this.h / 2];
@@ -142,24 +163,63 @@ export class FanView implements InputHandlers {
     this.request();
   }
 
+  mesh(b: FanBranch): LeafMesh {
+    let m = this.meshes.get(b);
+    if (!m) {
+      m = new LeafMesh(b.sp, b.shape);
+      this.meshes.set(b, m);
+    }
+    return m;
+  }
+
   flyToLeaf(b: FanBranch): void {
-    const r = b.leafR * 1.15;
-    this.flyTo({ cx: b.leaf.x, cy: b.leaf.y, s: Math.min(this.w, this.h) / (2 * r) });
+    const s = Math.min((this.h * 0.8) / b.shape.L, (this.w * 0.9) / b.shape.W);
+    this.flyTo({ cx: b.leaf.x, cy: b.leaf.y, s });
+  }
+
+  /** Leaf on screen length in px. */
+  leafPx(b: FanBranch): number {
+    return b.shape.L * this.cam.s;
   }
 
   hitLeaf(px: number, py: number): FanBranch | null {
     const [wx, wy] = this.toWorld(px, py);
+    const slop = 14 / this.cam.s;
     let best: FanBranch | null = null;
     let bd = Infinity;
     for (const b of this.fan.branches) {
-      const d = Math.hypot(wx - b.leaf.x, wy - b.leaf.y);
-      const slop = Math.max(b.leafR, 18 / this.cam.s);
-      if (d < slop && d < bd) {
+      const p = worldToLocal(b, wx, wy);
+      const y = Math.min(b.shape.L, Math.max(0, p.y));
+      const dy = Math.abs(p.y - y);
+      const dx = Math.max(0, Math.abs(p.x) - b.shape.width(y) / 2);
+      const d = Math.hypot(dx, dy);
+      if (d <= slop && d < bd) {
         bd = d;
         best = b;
       }
     }
     return best;
+  }
+
+  /** Details of one individual for the tap card. */
+  indInfo(b: FanBranch, g: number, i: number): IndInfo {
+    const m = this.mesh(b);
+    const sp = m.sp;
+    const a = { generation: g, index: BigInt(i) };
+    const at = sp.attributes(a);
+    const end = m.G * sp.generationYears;
+    return {
+      handle: sp.handle(a),
+      g,
+      i,
+      G: m.G,
+      sex: at.sex,
+      bornYearsAgo: end - at.birthTime + b.sp.t1 * 1e6,
+      lifespan: at.lifespan,
+      alive: at.alive,
+      parents: sp.parents(a).map((p) => ({ handle: sp.handle(p), alive: m.alive(p.generation, Number(p.index)) })),
+      children: Number(sp.children(a).count),
+    };
   }
 
   // ---- InputHandlers --------------------------------------------------------
@@ -199,7 +259,7 @@ export class FanView implements InputHandlers {
   doubleTap(x: number, y: number): void {
     const b = this.hitLeaf(x, y);
     if (b) {
-      const zoomedIn = this.cam.s * b.leafR > Math.min(this.w, this.h) * 0.4;
+      const zoomedIn = this.leafPx(b) > this.h * 0.6;
       if (!zoomedIn) {
         this.flyToLeaf(b);
         return;
@@ -212,7 +272,18 @@ export class FanView implements InputHandlers {
   tap(x: number, y: number): void {
     const b = this.hitLeaf(x, y);
     this.selected = b ? b.sp : null;
-    this.onSelect(this.selected);
+    this.selInd = null;
+    let ind: IndInfo | undefined;
+    const st = b && this.meshStats.get(b.sp.gid);
+    if (b && st && st.mode !== 'texture' && st.mode !== 'stripes') {
+      const [wx, wy] = this.toWorld(x, y);
+      const a = this.mesh(b).hit(worldToLocal(b, wx, wy));
+      if (a) {
+        this.selInd = { g: a.generation, i: Number(a.index) };
+        ind = this.indInfo(b, this.selInd.g, this.selInd.i);
+      }
+    }
+    this.onSelect(b ? { sp: b.sp, ind } : null);
     this.request();
   }
 
@@ -238,6 +309,42 @@ export class FanView implements InputHandlers {
     for (const b of this.fan.branches) this.drawLeaf(b);
     for (const b of this.fan.branches) this.drawLeafLabel(b);
     this.drawTrunkLabel();
+    this.drawHud();
+  }
+
+  /** When zoomed into a leaf: which species and which generations are on screen. */
+  private drawHud(): void {
+    let best: FanBranch | null = null;
+    for (const b of this.fan.branches) {
+      if (this.meshStats.has(b.sp.gid) && (!best || this.leafPx(b) > this.leafPx(best))) best = b;
+    }
+    if (!best) return;
+    const st = this.meshStats.get(best.sp.gid)!;
+    const m = this.mesh(best);
+    const ctx = this.ctx;
+    const GL = m.sp.generationYears;
+    const ago = (g: number) => formatYearsAgo((m.G - g) * GL + best!.sp.t1 * 1e6);
+    const gens = st.g0 === st.g1 ? `generation ${fmtInt(st.g0 + 1)}` : `generations ${fmtInt(st.g0 + 1)}–${fmtInt(st.g1 + 1)}`;
+    const lines = [
+      `${best.sp.common}${best.sp.extinct ? ' (extinct)' : ''}`,
+      `${gens} of ${fmtInt(m.G)}`,
+      st.g0 === st.g1 ? `born ~${ago(st.g0)}` : `born ~${ago(st.g0)} to ~${ago(st.g1)}`,
+      `${fmtInt(m.size(st.g0))} per generation · ${st.mode}`,
+    ];
+    ctx.save();
+    ctx.font = `600 14px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
+    const wmax = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 20;
+    ctx.fillStyle = 'rgba(20,28,24,0.82)';
+    ctx.beginPath();
+    ctx.roundRect(10, 10, Math.min(this.w - 20, wmax), 80, 8);
+    ctx.fill();
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = '#eef4ef';
+    ctx.fillText(lines[0], 20, 17);
+    ctx.font = `12px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
+    ctx.fillStyle = '#b5c0b9';
+    for (let k = 1; k < lines.length; k++) ctx.fillText(lines[k], 20, 20 + 16 * k);
+    ctx.restore();
   }
 
   /** Fill a ribbon given its centre line and half-widths, from lane offset a to b (in [-0.5, 0.5] of width). */
@@ -297,58 +404,27 @@ export class FanView implements InputHandlers {
     this.lanes(pts, b.aliveFrac, b.sp.extinct);
   }
 
-  private leafPath(b: FanBranch, cx: number, cy: number, r: number): void {
-    const ctx = this.ctx;
-    ctx.beginPath();
-    if (!b.sp.extinct) {
-      ctx.arc(cx, cy, r, 0, Math.PI * 2);
-      return;
-    }
-    // Withered: shrunken, crinkled outline.
-    const seed = b.sp.gid * 0.37;
-    for (let i = 0; i <= 64; i++) {
-      const a = (i / 64) * Math.PI * 2;
-      const rr = r * (0.93 + 0.05 * Math.sin(7 * a + seed) + 0.03 * Math.sin(13 * a + 2 * seed));
-      const x = cx + rr * Math.cos(a);
-      const y = cy + rr * Math.sin(a);
-      ctx[i ? 'lineTo' : 'moveTo'](x, y);
-    }
-    ctx.closePath();
-  }
-
   private drawLeaf(b: FanBranch): void {
     const ctx = this.ctx;
     const [cx, cy] = this.toScreen(b.leaf.x, b.leaf.y);
     const r = b.leafR * this.cam.s;
-    if (cx + r < 0 || cx - r > this.w || cy + r < 0 || cy - r > this.h) return;
-    if (this.leafPainter && this.leafPainter.paint(ctx, b, this)) return;
-    // Area = individuals ever. Living individuals are the outer rim (the mesh
-    // puts the newest generation at the rim), so the rim is green, floored at
-    // 2 px so it reads at fan scale; the dead fill the inside in gray.
-    const rim = b.sp.extinct ? 0 : Math.max(2, r * (1 - Math.sqrt(1 - b.sp.alive / b.sp.ever)));
-    this.leafPath(b, cx, cy, r);
-    ctx.fillStyle = b.sp.extinct ? WITHERED : LEAF_DEAD;
-    ctx.fill();
-    if (b.sp.extinct) {
-      ctx.strokeStyle = WITHERED_EDGE;
-      ctx.lineWidth = 1;
-      ctx.stroke();
-      // A vein or two.
-      ctx.beginPath();
-      ctx.moveTo(cx - b.dir.x * r * 0.8, cy - b.dir.y * r * 0.8);
-      ctx.lineTo(cx + b.dir.x * r * 0.7, cy + b.dir.y * r * 0.7);
-      ctx.stroke();
-    } else {
-      ctx.beginPath();
-      ctx.arc(cx, cy, Math.max(0, r - rim / 2), 0, Math.PI * 2);
-      ctx.strokeStyle = GREEN;
-      ctx.lineWidth = rim;
-      ctx.stroke();
+    if (cx + r < 0 || cx - r > this.w || cy + r < 0 || cy - r > this.h) {
+      this.meshStats.delete(b.sp.gid);
+      return;
     }
-    if (this.selected === b.sp) {
+    const mesh = this.mesh(b);
+    if (this.leafPx(b) < 160) {
+      this.meshStats.delete(b.sp.gid);
+      drawPlainLeaf(this, b, mesh);
+    } else {
+      const st = drawMeshLeaf(this, b, mesh, this.selected === b.sp ? this.selInd : null);
+      if (st) this.meshStats.set(b.sp.gid, st);
+      else this.meshStats.delete(b.sp.gid);
+    }
+    if (this.selected === b.sp && !this.selInd) {
       ctx.beginPath();
-      ctx.arc(cx, cy, r + 4, 0, Math.PI * 2);
-      ctx.strokeStyle = '#e8f0ea';
+      ctx.arc(cx, cy, r + 6, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(232,240,234,0.8)';
       ctx.lineWidth = 1.5;
       ctx.stroke();
     }
@@ -358,24 +434,14 @@ export class FanView implements InputHandlers {
     const ctx = this.ctx;
     const [cx, cy] = this.toScreen(b.leaf.x, b.leaf.y);
     const r = b.leafR * this.cam.s;
-    const big = r > Math.min(this.w, this.h) * 0.25;
-    if (big) return; // Zoomed into the leaf: the leaf view labels itself.
+    if (this.leafPx(b) >= 160) return; // Zoomed into the leaf: the HUD names it.
     const name = b.sp.common;
     const sub = `${formatCount(b.sp.ever)} ever${b.sp.extinct ? ' · extinct' : ''}`;
     ctx.save();
     ctx.textBaseline = 'middle';
     const fs = Math.max(11, Math.min(18, r * 0.5));
     ctx.font = `600 ${fs}px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
-    const nameW = ctx.measureText(name).width;
-    if (nameW < r * 1.75 && r > 26) {
-      // Inside the leaf.
-      ctx.textAlign = 'center';
-      ctx.fillStyle = '#f2f6f3';
-      ctx.fillText(name, cx, cy - fs * 0.35);
-      ctx.font = `${fs * 0.7}px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
-      ctx.fillStyle = '#c9d3cc';
-      ctx.fillText(sub, cx, cy + fs * 0.6, r * 1.8);
-    } else {
+    {
       // Radial, outward from the leaf, upright on both sides.
       const a = Math.atan2(b.dir.y, b.dir.x);
       const left = b.dir.x < 0;
@@ -415,4 +481,15 @@ export class FanView implements InputHandlers {
     ctx.fillText(`${formatCount(f.clade.alive)} alive`, x, sy + 53);
     ctx.restore();
   }
+}
+
+export function fmtInt(n: number): string {
+  return Math.round(n).toLocaleString('en-US');
+}
+
+export function formatYearsAgo(y: number): string {
+  if (y < 1) return 'now';
+  if (y < 1e4) return `${fmtInt(y)} years ago`;
+  if (y < 1e6) return `${(y / 1e3).toFixed(y < 1e5 ? 1 : 0)} thousand years ago`;
+  return `${(y / 1e6).toFixed(2)} million years ago`;
 }

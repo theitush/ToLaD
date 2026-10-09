@@ -9,6 +9,7 @@
 // share f (alive share in the active mode) on its left and gray on its right.
 // Ribbon normals point to the branch's left: for a branch going up, (-1, 0).
 
+import { LeafShape } from './leafmesh';
 import type { CladeRec, SpeciesRec } from './panthera';
 
 export type WidthMode = 'log' | 'linear';
@@ -21,7 +22,8 @@ export const ARC_RY = 760;
 const STAGGER = 0.84;
 /** Half the fan's opening angle (radians, measured from straight up). */
 export const FAN_HALF_ANGLE = (52 * Math.PI) / 180;
-export const LEAF_MAX_R = 38;
+/** Area of the biggest leaf (others scale by g/gmax: area = individuals). */
+export const LEAF_MAX_AREA = 4200;
 
 export interface Pt {
   x: number;
@@ -44,7 +46,11 @@ export interface FanBranch {
   p3: Pt;
   /** Leaf centre and radius. Leaf area holds the individuals. */
   leaf: Pt;
+  /** Half the leaf's length (a rough radius for fitting and hit slop). */
   leafR: number;
+  /** Stem end of the leaf; the leaf runs from here along `dir`. */
+  base: Pt;
+  shape: LeafShape;
   /** Direction the branch arrives in at the leaf (unit vector). */
   dir: Pt;
 }
@@ -87,11 +93,13 @@ export function layoutFan(clade: CladeRec, mode: WidthMode): Fan {
     const t = n === 1 ? 0.5 : i / (n - 1);
     const a = -FAN_HALF_ANGLE + 2 * FAN_HALF_ANGLE * t;
     const k = i % 2 ? STAGGER : 1;
-    const leaf = { x: ARC_RX * k * Math.sin(a), y: -ARC_RY * k * Math.cos(a) };
-    const R = Math.hypot(leaf.x, leaf.y);
-    const leafR = LEAF_MAX_R * Math.sqrt(gs[i] / gMax);
-    const dir = { x: leaf.x / R, y: leaf.y / R };
-    const end = { x: leaf.x - dir.x * leafR * 0.9, y: leaf.y - dir.y * leafR * 0.9 };
+    const base = { x: ARC_RX * k * Math.sin(a), y: -ARC_RY * k * Math.cos(a) };
+    const R = Math.hypot(base.x, base.y);
+    const dir = { x: base.x / R, y: base.y / R };
+    const shape = LeafShape.ofArea((LEAF_MAX_AREA * gs[i]) / gMax);
+    const leafR = shape.L / 2;
+    const leaf = { x: base.x + dir.x * leafR, y: base.y + dir.y * leafR };
+    const end = base;
     const p0 = { x: x0, y: 0 };
     const p1 = { x: x0, y: -R * 0.42 };
     const p2 = { x: end.x - dir.x * R * 0.35, y: end.y - dir.y * R * 0.35 };
@@ -99,7 +107,7 @@ export function layoutFan(clade: CladeRec, mode: WidthMode): Fan {
       sp: s,
       share,
       width,
-      endWidth: Math.max(width * 0.45, Math.min(width, leafR * 0.5)),
+      endWidth: Math.min(width, shape.width(0)),
       aliveFrac: aliveFrac(s.alive, s.ever, mode),
       p0,
       p1,
@@ -107,6 +115,8 @@ export function layoutFan(clade: CladeRec, mode: WidthMode): Fan {
       p3: end,
       leaf,
       leafR,
+      base,
+      shape,
       dir,
     };
   });
