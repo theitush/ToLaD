@@ -105,15 +105,15 @@ export function g(n: number, mode: WidthMode): number {
   return mode === 'linear' ? n : 1 + Math.max(0, Math.log10(n));
 }
 
-/** Alive lane fraction: g(alive) / (g(alive) + g(dead)), floored by the renderer. */
+/**
+ * Alive lane fraction at the base (everyone ever present): g(alive) / g(ever).
+ * The living are present from the base to the tip, so their lane keeps this
+ * absolute width all the way up; only the gray (the dead) peels off.
+ */
 export function aliveFrac(alive: number, ever: number, mode: WidthMode): number {
-  if (!(alive > 0)) return 0;
-  if (mode === 'linear') return alive / ever;
-  const ga = g(alive, mode);
-  const gd = g(Math.max(0, ever - alive), mode);
-  return ga / (ga + gd);
+  if (!(alive > 0) || !(ever > 0)) return 0;
+  return Math.min(1, g(alive, mode) / g(ever, mode));
 }
-
 /**
  * Individuals whose strands pass through age `ageMa` (not dead by then):
  * everyone ever before the species' first appearance, the living at the tip.
@@ -126,12 +126,19 @@ export function remaining(sp: SpeciesRec, ageMa: number): number {
   return sp.alive + (sp.ever - sp.alive) * r;
 }
 
-/** Strand width and green fraction of a branch at age `ageMa`. */
+/**
+ * Strand width and green fraction of a branch at age `ageMa`. The green lane
+ * has the same absolute width along the whole strand (width · g(alive)/g(ever),
+ * in both modes): the gray around it thins as the dead peel off, so at the tip
+ * (only the living remain) the strand is exactly all green.
+ */
 export function strandAt(b: FanBranch, ageMa: number, mode: WidthMode): { w: number; f: number } {
   const sp = b.sp;
   const rem = remaining(sp, ageMa);
-  const w = rem > 0 ? (b.width * g(rem, mode)) / g(sp.ever, mode) : 0;
-  return { w, f: aliveFrac(sp.alive, rem, mode) };
+  const gEver = g(sp.ever, mode);
+  const w = rem > 0 ? (b.width * g(rem, mode)) / gEver : 0;
+  const green = sp.alive > 0 ? (b.width * g(sp.alive, mode)) / gEver : 0;
+  return { w, f: w > 0 ? Math.min(1, green / w) : 0 };
 }
 
 export function layoutFan(clade: CladeRec, mode: WidthMode): Fan {
