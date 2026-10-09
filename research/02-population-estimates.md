@@ -36,7 +36,7 @@ Confidence grades used below:
 | Bacteria | ~1e30 | ~1e39–1e40 | Derived split. Bacteria account for nearly all fast-turnover marine and surface cells. **B/C.** |
 | Archaea | ~1e29–3e29 | ~1e38–1e39 (derived) | Biomass ratio about 1:10 against bacteria (Bar-On 2018). Mostly slow subsurface cells, plus about 1e28 marine Thaumarchaeota/Nitrososphaerota turning over about 10 times a year. **C.** |
 | Cyanobacteria | ~4e27 (marine *Prochlorococcus* 2.9e27 + *Synechococcus* 7.0e26, plus freshwater and terrestrial) | ~1e39–1e40 (derived) | Flombaum et al. 2013, *PNAS* 110:9824 (alive, **A**). Ever lived: about 4e27 × ~300 divisions/yr × ~3e9 yr ≈ 4e39. This agrees with Crockford's statement that cyanobacteria probably dominate all cells ever. **B/C.** |
-| SAR11 (*Pelagibacter*) | ~2.4e28 | ~1e38–1e39 (derived) | Morris et al. 2002, *Nature* 420:806 (alive). Ever lived assumes about 0.1–0.5 divisions/day over about 1 Gyr of effective duration. **C.** |
+| SAR11 (*Pelagibacter*) | ~2.4e28 | ~1e38–1e39 (derived) | Morris et al. 2002, *Nature* 420:806–810 (alive: "2.4 × 10^28 SAR11 cells in the oceans", verified in the abstract). Ever lived assumes about 0.1–0.5 divisions/day over about 1 Gyr of effective duration. **C.** |
 | Subsurface prokaryotes (habitat, not clade) | ~7e29 | <1e37 | Turnover is about 1–2e3 yr (Whitman 1998), so they make up half of today's cells but less than 0.1% of cells ever lived. This matters for clades that live mainly in the subsurface, such as Bathyarchaeia, Atribacterota and Dehalococcoidia: their green share is about 1000x higher than for surface clades. **C.** |
 
 ### 2.2 Eukaryotes (non-animal)
@@ -60,14 +60,14 @@ Confidence grades used below:
 | Insecta | ~1e19 ("10 quintillion") | **~1e27–1e28.5** (derived) | Smithsonian "BugInfo" figure, origin unsourced (**C**). Ever lived: 1e19 × ~2/yr × ~3e8 yr effective ≈ 6e27. **C.** Springtails are Collembola, not Insecta, so keep Rosenberg's soil count separate. |
 | Formicidae (ants) | **≥2e16** (lower bound, excludes subterranean ants) | ~1e23–1e25 (derived; ~1e24) | Schultheiss et al. 2022, *PNAS* 119:e2201550119 (alive, **A/B**; 12 Mt C). Ever lived assumes worker turnover of about 1/yr, near-modern abundance since about 50 Ma, and low abundance from about 140 to 50 Ma. **C.** |
 | Antarctic krill (*Euphausia superba*) | ~3–5e14 | — | Popular sources, from biomass of about 130–500 Mt (**C**). |
-| Fish (non-tetrapod vertebrates) | ~1e14–1e16 post-larval (mesopelagic dominated; *Cyclothone* bristlemouths alone are about 1e14–1e15) | ~1e22–1e24 post-larval; **1e25–1e27 if hatched larvae count** (derived) | Bar-On 2018 gives fish ≈0.7 Gt C. Irigoien et al. 2014 (*Nat. Commun.*) put mesopelagic fish at about 10 Gt wet. Bristlemouth figures come from Wikipedia and WHOI (**C**). Annual wild catch is 1.1–2.2e12 individuals (Animal Welfare 2024, **B**). The census-stage choice changes the ever-lived figure by about 1000x (Section 5). |
+| Fish (non-tetrapod vertebrates) | ~1e14–1e16 post-larval (mesopelagic dominated; *Cyclothone* bristlemouths alone are about 1e14–1e15) | ~1e22–1e24 post-larval; **1e25–1e27 if hatched larvae count** (derived) | Bar-On 2018 gives fish ≈0.7 Gt C. Irigoien et al. 2014 (*Nat. Commun.* 5:3271) revise the ~1 Gt (1,000 Mt) mesopelagic fish estimate upward by "at least one order of magnitude", i.e. ≳10 Gt wet. Bristlemouth figures come from Wikipedia and WHOI (**C**). Annual wild catch is 1.1–2.2e12 individuals (Animal Welfare 2024, **B**). The census-stage choice changes the ever-lived figure by about 1000x (Section 5). |
 | Aves (wild) | **~5e10** (median of species sums; the mean across Monte Carlo is 4.3e11) | ~1e18–1e19 (derived; ~2.5e18) | Callaghan, Nakagawa & Cornwell 2021, *PNAS* 118:e2023170118, covering 9,700 species (**B**). Ever lived: 5e10 × ~0.5/yr × ~1e8 yr (Neornithes). **C.** Domestic poultry adds about 2.6e10 alive (FAOSTAT, 2018 poultry stocks) and about 1e12.5 ever (derived from slaughter of about 7e10/yr in recent decades). |
 | Non-avian Dinosauria | 0 | ~1e13–1e16 (illustrative) | Starrfelt & Liow 2016 (*Phil. Trans. R. Soc. B*) put true species richness at about 1.5–2.5e3. My figure uses about 2e3 species × about 2 Myr each × about 1e5–1e6 individuals per species / about 10 yr lifespan. **D.** |
 | *Tyrannosaurus rex* | 0 (about 2e4 alive at any one time) | **2.5e9** (95%: 1.4e8–4.2e10) | Marshall et al. 2021, *Science* 372:284 (Damuth's law, about 127,000 generations, Monte Carlo). **B.** This is the template for the methodology. |
 | Mammalia (wild) | ~1e11–1e12 (rodents and bats dominate counts) | ~1e19–1e20.5 (derived) | Greenspoon et al. 2023, *PNAS* 120:e2204892120 give biomass only: terrestrial wild mammals ≈20 Mt (13–38), marine ≈40 Mt. Dividing by an abundance-weighted mean mass of about 30–100 g gives about 2e11–7e11. Tomasik (reducing-suffering.org) gives 1e11–1e12 (**C**). Ever lived: 3e11 × ~1/yr × ~1.5e8 yr. **C.** |
-| Livestock mammals | ~4e9 (cattle ~1.5e9, sheep ~1.3e9, goats ~1.1e9, pigs ~1e9) | ~1e11.5 (derived) | FAOSTAT stocks (verify the latest year; **B**). Livestock biomass is ≈630 Mt (Greenspoon 2023). |
+| Livestock mammals | ~4.4e9 (FAOSTAT 2024 world stocks: cattle 1.58e9, sheep 1.36e9, goats 1.19e9, pigs 0.96e9, buffalo 0.21e9) | ~1e11.5 (derived) | FAOSTAT QCL "Stocks", World, 2024 (checked 2026-10-09 against the bulk download; **B**). Livestock biomass is ≈630 Mt (Greenspoon 2023). |
 | Reptiles / Amphibians | ~1e11–1e14 each | ~1e19–1e22 (derived) | Tomasik ranges (**D**). Use the allometric method instead (Section 3.3), with body masses from AmphiBIO and the Meiri reptile size data and densities from TetraDENSITY. |
-| ***Homo sapiens*** | **~8.3e9** (UN WPP 2024 projection for 2026) | **~1.17e11** (117,020,448,575 through 2022; about 1.18e11 by 2026) | PRB (Kaneda & Haub, updated 2022), counting births since 190,000 BCE. The living are 6.8% of everyone ever born. **B** (PRB itself notes there are no data for over 99% of the period). |
+| ***Homo sapiens*** | **~8.30e9** (UN WPP 2024 medium projection, 1 July 2026: 8,300,678,396) | **~1.17e11** (117,020,448,575 through 2022; about 1.176e11 by Oct 2026 adding WPP births of ~1.32e8/yr) | PRB (Kaneda, Greenbaum & Haub, Nov 2022), counting births since 190,000 BCE. The living are 6.8% of everyone ever born. **B** (PRB itself notes there are no data for over 99% of the period). |
 | Genus *Homo* (all species) | 8.3e9 | ~1.2e11–1.5e11 (derived) | PRB's *H. sapiens* figure plus archaic *Homo*: about 2 Myr × about 1e5 census population / 25 yr ≈ 1e10. **D.** |
 
 ### 2.4 Viruses (outside the LUCA tree)
@@ -156,7 +156,7 @@ L(M)  = L0 · M^0.25
 
 - `A_i` is geographic range area. For extant species use IUCN range maps. For fossils, estimate it from PBDB occurrence convex hulls, scaled up.
 - `τ_i` is species duration. Use the PBDB range-through duration, or the clade-typical 1–3 Myr.
-- `d0` and `L0` are group-specific intercepts. Fit them on extant data: TetraDENSITY (Santini et al. 2018, *GEB* 27:787) has about 18,000 density estimates for terrestrial vertebrates. Marshall et al. 2021 added an ectotherm/endotherm correction for theropods.
+- `d0` and `L0` are group-specific intercepts. Fit them on extant data: TetraDENSITY (Santini, Isaac & Ficetola 2018, *GEB* 27:787–791, doi:10.1111/geb.12756) has more than 18,000 density estimates for terrestrial vertebrates. Marshall et al. 2021 added an ectotherm/endotherm correction for theropods.
 - Combined: `N_ever(i) ∝ A_i · τ_i · M_i^(-1)`. Each 10x increase in body mass costs about 10x in individuals ever.
 
 For a clade, sum over species. Unknown or unsampled species are filled in with a true-richness estimate, e.g., Starrfelt & Liow's Poisson sampling model for dinosaurs:
@@ -276,10 +276,10 @@ green(c) = N_alive(c) / N_ever(c) ≈ L(c) / T_eff(c)     (for a clade at modern
 - Suttle CA (2007). Marine viruses — major players in the global ecosystem. *Nat Rev Microbiol* 5:801. https://bionumbers.hms.harvard.edu/bionumber.aspx?id=102753
 - van den Hoogen J et al. (2019). Soil nematode abundance and functional group composition at a global scale. *Nature* 572:194. https://hal.inrae.fr/hal-02627798
 - Rosenberg Y et al. (2023). The global biomass and number of terrestrial arthropods. *Science Advances*. https://pmc.ncbi.nlm.nih.gov/articles/instance/9897674
-- Schultheiss P et al. (2022). The abundance, biomass, and distribution of ants on Earth. *PNAS*. https://phys.org/news/2022-09-ants-earth-quadrillion.html
+- Schultheiss P et al. (2022). The abundance, biomass, and distribution of ants on Earth. *PNAS* 119:e2201550119. https://doi.org/10.1073/pnas.2201550119
 - Smithsonian BugInfo: Numbers of insects. https://www.si.edu/spotlight/buginfo/bugnos
 - Callaghan CT, Nakagawa S, Cornwell WK (2021). Global abundance estimates for 9,700 bird species. *PNAS* 118:e2023170118. https://www.sci.news/biology/bird-abundances-09669.html
-- Greenspoon L et al. (2023). The global biomass of wild mammals. *PNAS* 120:e2204892120. https://pmc.ncbi.nlm.nih.gov/articles/PMC10068772
+- Greenspoon L et al. (2023). The global biomass of wild mammals. *PNAS* 120:e2204892120. https://doi.org/10.1073/pnas.2204892120
 - Crowther TW et al. (2015). Mapping tree density at a global scale. *Nature* 525:201. https://environment.yale.edu/news/article/Yale-study-reveals-there-are-3-trillion-trees-on-earth
 - Marshall CR et al. (2021). Absolute abundance and preservation rate of *Tyrannosaurus rex*. *Science* 372:284. https://news.berkeley.edu/2021/04/15/how-many-t-rexes-were-there-billions
 - Population Reference Bureau (2022). How many people have ever lived on Earth? https://www.prb.org/articles/how-many-people-have-ever-lived-on-earth/
@@ -294,10 +294,13 @@ green(c) = N_alive(c) / N_ever(c) ≈ L(c) / T_eff(c)     (for a clade at modern
 - Tomasik B. How many wild animals are there? https://reducing-suffering.org/how-many-wild-animals-are-there
 - Bristlemouth abundance: https://twilightzone.whoi.edu/bristlemouth-dominance-how-do-we-know/
 
-**Verify before shipping:**
+**Citation checks (2026-10-09, data pipeline v0).** The figures this note had cited from memory were checked against the primary sources (Crossref metadata, publisher abstracts, or the pinned data files in `pipeline/SOURCES.md`):
 
-- The latest FAOSTAT livestock stocks.
-- The UN WPP figure for 2026.
-- The exact Schultheiss DOI.
-- Santini 2018 TetraDENSITY citation details, cited from memory.
-- Morris 2002 SAR11 and Irigoien 2014 mesopelagic fish figures, also cited from memory.
+- **FAOSTAT livestock stocks: fixed.** World stocks for 2024 (latest year in the bulk QCL file): cattle 1,578,614,149; sheep 1,362,590,940; goats 1,187,524,236; pigs 962,441,623; buffalo 212,008,800. The 2.3 row now uses these. The pipeline reads them straight from the pinned file.
+- **UN WPP figure for 2026: confirmed.** WPP 2024 medium variant, World, 1 July 2026: 8,300,678,396. Births are ~1.32e8 a year over 2022–2026.
+- **PRB total: confirmed.** Table 1 lists 117,020,448,575 born through 2022. The authors are Kaneda, Greenbaum & Haub (Nov 2022), not just Kaneda & Haub.
+- **Schultheiss DOI: confirmed.** It is 10.1073/pnas.2201550119 (*PNAS* 119:e2201550119, 2022). The source list now links the DOI instead of the press story.
+- **Santini 2018 TetraDENSITY: confirmed, with fuller details.** Santini, Isaac & Ficetola 2018, *Global Ecology and Biogeography* 27:787–791, doi:10.1111/geb.12756. The abstract says "> 18,000 records".
+- **Morris 2002 SAR11: confirmed.** *Nature* 420:806–810, doi:10.1038/nature01240. The abstract gives "2.4 × 10^28 SAR11 cells in the oceans".
+- **Irigoien 2014: wording fixed.** *Nat. Commun.* 5:3271, doi:10.1038/ncomms4271. The paper does not state "10 Gt" directly. It says the ~1,000 Mt estimate "needs to be revised to at least one order of magnitude higher". The fish row now says this.
+- **Still unchecked (flagged):** the bristlemouth abundance (Wikipedia/WHOI), the Smithsonian insect count, and Tomasik's ranges. These are secondary sources and stay grade C/D.
