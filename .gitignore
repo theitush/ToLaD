@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+.env*
+# large downloaded/derived datasets
+data/raw/
+data/build/
