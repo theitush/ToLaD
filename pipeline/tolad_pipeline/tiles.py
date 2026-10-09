@@ -90,7 +90,7 @@ def node_flags(n: Node, stub: bool) -> int:
         f |= F_SPECIES
     if stub:
         f |= F_STUB
-    if n.date_src == D_ANCHOR or n.data.get("grade_cap") == 1:
+    if n.date_src == D_ANCHOR or n.data.get("grade_cap") == 1 or n.data.get("anchored_count"):
         f |= F_ANCHORED
     if n.kind == "graft":
         f |= F_GRAFT

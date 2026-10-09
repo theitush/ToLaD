@@ -1,29 +1,266 @@
 {
  "anchors_found": {
-  "FAO:Bos taurus": 1,
-  "FAO:Bubalus bubalis": 1,
-  "FAO:Camelus dromedarius": 1,
-  "FAO:Capra aegagrus": 1,
-  "FAO:Equus asinus": 1,
-  "FAO:Equus caballus": 1,
-  "FAO:Ovis aries": 1,
-  "FAO:Sus scrofa": 1,
-  "Homo sapiens": 1
+  "Homo sapiens": 1,
+  "census": 479,
+  "domestic:Bos taurus": 1,
+  "domestic:Bubalus bubalis": 1,
+  "domestic:Camelus dromedarius": 1,
+  "domestic:Canis familiaris": 1,
+  "domestic:Capra hircus": 1,
+  "domestic:Equus asinus": 1,
+  "domestic:Equus caballus": 1,
+  "domestic:Felis catus": 1,
+  "domestic:Ovis aries": 1,
+  "domestic:Sus scrofa": 1,
+  "greenspoon model": 4348
+ },
+ "calibration_check": {
+  "Balaenoptera musculus": {
+   "domestic_alive": 0.0,
+   "ever": 26729516997.07247,
+   "method": "T:interpolated branch; N:census (IUCN report via Greenspoon 2023)",
+   "occupancy_model_only": 41033.480840952274,
+   "published": 27500.0,
+   "published_source": "IUCN population report (Greenspoon 2023 compilation)",
+   "wild_alive": 27500.0
+  },
+  "Canis lupus": {
+   "domestic_alive": 1000000000.0,
+   "ever": 303030381054.2409,
+   "method": "N:census (IUCN report via Greenspoon 2023); + domestic: 1e+09 (dogs; Greenspoon 2023 data, pets table), growth shaped like human births since domestication",
+   "occupancy_model_only": 27101.605856192895,
+   "published": 223607.0,
+   "published_source": "IUCN population report (Greenspoon 2023 compilation)",
+   "wild_alive": 223607.0
+  },
+  "Felis catus": {
+   "domestic_alive": 600000000.0,
+   "ever": 2166031637294.82,
+   "method": "wild ancestor modelled up to domestication; no wild population today; + domestic: 6e+08 (cats; Greenspoon 2023 data, pets table), growth shaped like human births since domestication",
+   "occupancy_model_only": null,
+   "published": null,
+   "published_source": "no published global estimate found",
+   "wild_alive": 0.0
+  },
+  "Gorilla gorilla": {
+   "domestic_alive": 0.0,
+   "ever": 33314860804.415817,
+   "method": "T:Upham branch; N:census (IUCN report via Greenspoon 2023)",
+   "occupancy_model_only": 8673.687282891955,
+   "published": 320000.0,
+   "published_source": "IUCN population report (Greenspoon 2023 compilation)",
+   "wild_alive": 320000.0
+  },
+  "Loxodonta africana": {
+   "domestic_alive": 0.0,
+   "ever": 164841731916.11826,
+   "method": "T:interpolated branch; N:census (IUCN report via Greenspoon 2023)",
+   "occupancy_model_only": 1219586.392926631,
+   "published": 441683.5,
+   "published_source": "IUCN population report (Greenspoon 2023 compilation)",
+   "wild_alive": 441683.5
+  },
+  "Macropus giganteus": {
+   "domestic_alive": 0.0,
+   "ever": 14134224854768.74,
+   "method": "T:Upham branch; N:census (IUCN report via Greenspoon 2023)",
+   "occupancy_model_only": 6449908.477613699,
+   "published": 22000000.0,
+   "published_source": "IUCN population report (Greenspoon 2023 compilation)",
+   "wild_alive": 22000000.0
+  },
+  "Mus musculus": {
+   "domestic_alive": 0.0,
+   "ever": 2278059200791435.5,
+   "method": "T:Upham branch; N:Greenspoon 2023 per-species model (no census report)",
+   "occupancy_model_only": 63196513.4396823,
+   "published": 701093572.3584137,
+   "published_source": "Greenspoon 2023 per-species model (no census exists)",
+   "wild_alive": 701093572.3584137
+  },
+  "Myotis lucifugus": {
+   "domestic_alive": 0.0,
+   "ever": 76617842004695.17,
+   "method": "T:Upham branch; N:Greenspoon 2023 per-species model (no census report)",
+   "occupancy_model_only": 14665879.3494366,
+   "published": 118276472.82772923,
+   "published_source": "Greenspoon 2023 per-species model (no census exists)",
+   "wild_alive": 118276472.82772923
+  },
+  "Odocoileus virginianus": {
+   "domestic_alive": 0.0,
+   "ever": 44090294238918.93,
+   "method": "T:interpolated branch; N:census (IUCN report via Greenspoon 2023)",
+   "occupancy_model_only": 5608360.202803267,
+   "published": 45000000.0,
+   "published_source": "IUCN population report (Greenspoon 2023 compilation)",
+   "wild_alive": 45000000.0
+  },
+  "Pan troglodytes": {
+   "domestic_alive": 0.0,
+   "ever": 56053875759.37378,
+   "method": "T:Upham branch; N:census (IUCN report via Greenspoon 2023)",
+   "occupancy_model_only": 47204.26856247009,
+   "published": 402679.0,
+   "published_source": "IUCN population report (Greenspoon 2023 compilation)",
+   "wild_alive": 402679.0
+  },
+  "Phoca vitulina": {
+   "domestic_alive": 0.0,
+   "ever": 176941498204.54843,
+   "method": "T:interpolated branch; N:census (IUCN report via Greenspoon 2023)",
+   "occupancy_model_only": 1532979.3889519095,
+   "published": 940000.0,
+   "published_source": "IUCN population report (Greenspoon 2023 compilation)",
+   "wild_alive": 940000.0
+  },
+  "Procyon lotor": {
+   "domestic_alive": 0.0,
+   "ever": 43766473773807.57,
+   "method": "T:interpolated branch; N:census (IUCN report via Greenspoon 2023)",
+   "occupancy_model_only": 26554048.125557713,
+   "published": 40000000.0,
+   "published_source": "IUCN population report (Greenspoon 2023 compilation)",
+   "wild_alive": 40000000.0
+  },
+  "Rattus norvegicus": {
+   "domestic_alive": 0.0,
+   "ever": 580991540300663.2,
+   "method": "T:interpolated branch; N:Greenspoon 2023 per-species model (no census report)",
+   "occupancy_model_only": 5929632.996798572,
+   "published": 95185459.32568434,
+   "published_source": "Greenspoon 2023 per-species model (no census exists)",
+   "wild_alive": 95185459.32568434
+  },
+  "Sus scrofa": {
+   "domestic_alive": 962441623.0,
+   "ever": 27613611716334.273,
+   "method": "N:Greenspoon 2023 per-species model (no census report); + domestic: FAOSTAT 2024 stock 9.62e+08, growth shaped like human births since domestication",
+   "occupancy_model_only": 9548877.91696823,
+   "published": 23058494.438916147,
+   "published_source": "Greenspoon 2023 per-species model (no census exists)",
+   "wild_alive": 23058494.438916206
+  },
+  "Tadarida brasiliensis": {
+   "domestic_alive": 0.0,
+   "ever": 378886276357501.94,
+   "method": "T:interpolated branch; N:Greenspoon 2023 per-species model (no census report)",
+   "occupancy_model_only": 139319074.4344709,
+   "published": 132086847.0806109,
+   "published_source": "Greenspoon 2023 per-species model (no census exists)",
+   "wild_alive": 132086847.0806109
+  },
+  "Ursus arctos": {
+   "domestic_alive": 0.0,
+   "ever": 45096825493.23851,
+   "method": "T:interpolated branch; N:census (IUCN report via Greenspoon 2023)",
+   "occupancy_model_only": 181981.96413424905,
+   "published": 220000.0,
+   "published_source": "IUCN population report (Greenspoon 2023 compilation)",
+   "wild_alive": 220000.0
+  },
+  "Vulpes vulpes": {
+   "domestic_alive": 0.0,
+   "ever": 2906697578610.9116,
+   "method": "T:interpolated branch; N:Greenspoon 2023 per-species model (no census report)",
+   "occupancy_model_only": 1027838.103688643,
+   "published": 3131769.8731068475,
+   "published_source": "Greenspoon 2023 per-species model (no census exists)",
+   "wild_alive": 3131769.8731068475
+  }
+ },
+ "census_anchors": {
+  "census_duplicates_skipped": 0,
+  "census_matched_extant_leaves": 479,
+  "census_reports": 484,
+  "census_unmatched_or_extinct": [
+   "Bdeogale omnivora",
+   "Eudorcas albonotata",
+   "Eudorcas tilonura",
+   "Eumops floridanus",
+   "Gazella marica"
+  ],
+  "source": "Greenspoon et al. 2023 PNAS 120:e2204892120; data doi:10.5281/zenodo.7594807",
+  "species_model_estimates": 4795,
+  "species_model_unmatched": 44,
+  "species_model_used": 4348
  },
  "counts": {
-  "internal": 6340,
-  "nodes": 25005,
-  "taxonomic_nodes": 13321,
-  "tips": 18665,
-  "tips_extant": 7329,
+  "internal": 6463,
+  "nodes": 25129,
+  "taxonomic_nodes": 13497,
+  "tips": 18666,
+  "tips_extant": 7330,
   "tips_extinct": 11336,
   "tips_extinct_in_opentree": 323,
   "tips_fossil_grafted": 11013
  },
  "dating": {
-  "calibrated_raised_by_fossils": 484,
+  "calibrated_raised_by_fossils": 404,
   "uncalibrated_internal": 8342,
   "upham_calibrated_nodes": 1655
+ },
+ "domestic_anchors": {
+  "Bos taurus": {
+   "alive_grade": "B",
+   "leaf": "Bos taurus",
+   "source": "FAOSTAT 2024 stock 1.58e+09",
+   "stock": 1578614149.0
+  },
+  "Bubalus bubalis": {
+   "alive_grade": "B",
+   "leaf": "Bubalus bubalis",
+   "source": "FAOSTAT 2024 stock 2.12e+08",
+   "stock": 212008800.0
+  },
+  "Camelus dromedarius": {
+   "alive_grade": "B",
+   "leaf": "Camelus dromedarius",
+   "source": "FAOSTAT 2024 stock 4.43e+07",
+   "stock": 44336084.0
+  },
+  "Canis familiaris": {
+   "alive_grade": "C",
+   "leaf": "Canis lupus",
+   "source": "1e+09 (dogs; Greenspoon 2023 data, pets table)",
+   "stock": 1000000000.0
+  },
+  "Capra hircus": {
+   "alive_grade": "B",
+   "leaf": "Capra aegagrus",
+   "source": "FAOSTAT 2024 stock 1.19e+09",
+   "stock": 1187524236.0
+  },
+  "Equus asinus": {
+   "alive_grade": "B",
+   "leaf": "Equus asinus",
+   "source": "FAOSTAT 2024 stock 5.39e+07",
+   "stock": 53946949.0
+  },
+  "Equus caballus": {
+   "alive_grade": "B",
+   "leaf": "Equus caballus",
+   "source": "FAOSTAT 2024 stock 5.62e+07",
+   "stock": 56211907.0
+  },
+  "Felis catus": {
+   "alive_grade": "C",
+   "leaf": "Felis catus",
+   "source": "6e+08 (cats; Greenspoon 2023 data, pets table)",
+   "stock": 600000000.0
+  },
+  "Ovis aries": {
+   "alive_grade": "B",
+   "leaf": "Ovis aries",
+   "source": "FAOSTAT 2024 stock 1.36e+09",
+   "stock": 1362590940.0
+  },
+  "Sus scrofa": {
+   "alive_grade": "B",
+   "leaf": "Sus scrofa",
+   "source": "FAOSTAT 2024 stock 9.62e+08",
+   "stock": 962441623.0
+  }
  },
  "extinct_flags": {
   "extinct": 240,
@@ -46,37 +283,66 @@
  },
  "ghost_lineages": {
   "T_eff_yr": 150000000.0,
-  "births_now_per_yr": 105136260305.59818,
+  "allocation": "crown membership: a ghost at time t is credited to the parent of each reconstructed lineage crossing t, in proportion to the present-day wild births of that lineage's extant descendants",
+  "births_now_note": "wild births only (no humans, no domestic stocks)",
+  "births_now_per_yr": 56420947927.83201,
+  "by_era": {
+   "Cretaceous 66-145 Ma": {
+    "ghost": 3.739279485959577e+18,
+    "ghost_share": 1.0,
+    "sampled": 158527769731450.66
+   },
+   "Holocene-Pleistocene 0-2.58 Ma": {
+    "ghost": 1.0059796703388512e+16,
+    "ghost_share": 0.0689,
+    "sampled": 1.3590687452061635e+17
+   },
+   "Jurassic and older >145 Ma": {
+    "ghost": 9.786953485321836e+17,
+    "ghost_share": 1.0,
+    "sampled": 14602062530122.459
+   },
+   "Neogene 2.58-23 Ma": {
+    "ghost": 8.907900557037569e+17,
+    "ghost_share": 0.7674,
+    "sampled": 2.700493935241239e+17
+   },
+   "Paleogene 23-66 Ma": {
+    "ghost": 2.408472188469593e+18,
+    "ghost_share": 0.9878,
+    "sampled": 2.980690125603499e+16
+   }
+  },
   "f_ramp_Ma": [
    208.64,
    91.36
   ],
-  "ghost_share": 0.944,
-  "max_multiplier": 319459.7368312078,
+  "ghost_share": 0.9485,
+  "max_multiplier": 109120.01823985326,
   "multiplier_at_Ma": {
-   "0.01": 1.014,
-   "1": 1.036,
-   "100": 102454.374,
-   "150": 128043.363,
-   "20": 7.493,
-   "200": 42934.832,
-   "5": 2.181,
-   "50": 256.106,
-   "66": 3360.275
+   "0.01": 1.0,
+   "1": 1.018,
+   "100": 82668.723,
+   "150": 52324.151,
+   "20": 12.23,
+   "200": 29809.75,
+   "5": 2.063,
+   "50": 253.945,
+   "66": 3704.685
   },
-  "sampled_sum": 8.83399430692771e+17,
-  "top_down_estimate": 1.5770439045839727e+19,
-  "with_ghosts": 1.577043904982807e+19
+  "sampled_sum": 4.359362991330368e+17,
+  "top_down_estimate": 8.463142189174799e+18,
+  "with_ghosts": 8.463233174501536e+18
  },
  "grid_cells": 1600,
- "knuckles_collapsed": 3657,
+ "knuckles_collapsed": 3709,
  "mammalia": {
-  "alive": 133253369650.52266,
-  "ever": 1.577043904982807e+19,
-  "ghost": 1.48870396191353e+19,
+  "alive": 99225333274.88243,
+  "ever": 8.463233174501535e+18,
+  "ghost": 8.027296875368498e+18,
   "grade": "D",
-  "hi": 1.386377025921144e+21,
-  "lo": 1.943307593783951e+17
+  "hi": 9.710841181456461e+20,
+  "lo": 1.0279161538963354e+17
  },
  "mass_sources": {
   "mass:combine": 183,
@@ -85,11 +351,340 @@
  },
  "mock_individuals": 7,
  "occupancy_calibration": {
-  "k_land": 0.01612,
-  "k_marine": 0.512,
-  "raw_land_biomass_Mt": 1240.52,
-  "raw_marine_biomass_Mt": 78.13,
-  "target": "Greenspoon et al. 2023: wild land 20 Mt, marine 40 Mt"
+  "land_groups": {
+   "Artiodactyla": {
+    "a": -1.109,
+    "b_per_dex_mass": -0.053,
+    "biomass_Mt": 14.63,
+    "census": 138,
+    "fit_on": 223,
+    "greenspoon_biomass_Mt": 10.923,
+    "greenspoon_individuals": 221689147.07307726,
+    "greenspoon_model": 85,
+    "individuals": 274545001.8765731,
+    "largest_unreferenced_Mt": [
+     [
+      "Rangifer montanus",
+      0.16
+     ],
+     [
+      "Bos frontalis",
+      0.108
+     ],
+     [
+      "Bos grunniens",
+      0.059
+     ],
+     [
+      "Capreolus sussenbornensis",
+      0.058
+     ]
+    ],
+    "resid_sd": 1.018,
+    "species": 429
+   },
+   "Carnivora": {
+    "a": -1.875,
+    "b_per_dex_mass": 0.181,
+    "biomass_Mt": 1.955,
+    "census": 46,
+    "fit_on": 217,
+    "greenspoon_biomass_Mt": 0.727,
+    "greenspoon_individuals": 420809703.0426512,
+    "greenspoon_model": 171,
+    "individuals": 554854889.1165451,
+    "largest_unreferenced_Mt": [
+     [
+      "Canis anthus",
+      0.095
+     ],
+     [
+      "Hyaena sinensis",
+      0.051
+     ],
+     [
+      "Hyaena colvini",
+      0.051
+     ],
+     [
+      "Hyaena chaeretis",
+      0.051
+     ]
+    ],
+    "resid_sd": 0.945,
+    "species": 467
+   },
+   "Chiroptera": {
+    "a": -1.915,
+    "b_per_dex_mass": 0.953,
+    "biomass_Mt": 1.896,
+    "census": 28,
+    "fit_on": 985,
+    "greenspoon_biomass_Mt": 1.59,
+    "greenspoon_individuals": 55808797423.925064,
+    "greenspoon_model": 957,
+    "individuals": 54073067657.33373,
+    "largest_unreferenced_Mt": [
+     [
+      "Hipposideros gigas",
+      0.035
+     ],
+     [
+      "Hipposideros commersoni",
+      0.026
+     ],
+     [
+      "Hipposideros vittatus",
+      0.025
+     ],
+     [
+      "Artibeus intermedius",
+      0.012
+     ]
+    ],
+    "resid_sd": 0.885,
+    "species": 1506
+   },
+   "Diprotodontia": {
+    "a": -1.139,
+    "b_per_dex_mass": 0.116,
+    "biomass_Mt": 1.868,
+    "census": 36,
+    "fit_on": 136,
+    "greenspoon_biomass_Mt": 1.589,
+    "greenspoon_individuals": 382991054.34692246,
+    "greenspoon_model": 100,
+    "individuals": 402870113.03317696,
+    "largest_unreferenced_Mt": [
+     [
+      "Macropus vishnu",
+      0.004
+     ],
+     [
+      "Macropus ualabatus",
+      0.004
+     ],
+     [
+      "Macropus siva",
+      0.004
+     ],
+     [
+      "Macropus rufiventer",
+      0.004
+     ]
+    ],
+    "resid_sd": 1.091,
+    "species": 172
+   },
+   "Lagomorpha": {
+    "a": -1.774,
+    "b_per_dex_mass": 0.329,
+    "biomass_Mt": 0.669,
+    "census": 4,
+    "fit_on": 84,
+    "greenspoon_biomass_Mt": 0.207,
+    "greenspoon_individuals": 544511646.4380195,
+    "greenspoon_model": 80,
+    "individuals": 759123559.6050671,
+    "largest_unreferenced_Mt": [
+     [
+      "Lepus microtis",
+      0.405
+     ],
+     [
+      "Ochotona pallasi",
+      0.016
+     ],
+     [
+      "Lepus zuluensis",
+      0.001
+     ],
+     [
+      "Lepus whitakeri",
+      0.001
+     ]
+    ],
+    "resid_sd": 1.01,
+    "species": 154
+   },
+   "Other": {
+    "a": -2.298,
+    "b_per_dex_mass": 0.58,
+    "biomass_Mt": 3.177,
+    "census": 25,
+    "fit_on": 722,
+    "greenspoon_biomass_Mt": 0.907,
+    "greenspoon_individuals": 3875043197.608577,
+    "greenspoon_model": 697,
+    "individuals": 4064762150.2790117,
+    "largest_unreferenced_Mt": [
+     [
+      "Priodontes maximus",
+      0.247
+     ],
+     [
+      "Procavia syriaca",
+      0.088
+     ],
+     [
+      "Procavia sharica",
+      0.088
+     ],
+     [
+      "Procavia ruwenzorii",
+      0.088
+     ]
+    ],
+    "resid_sd": 1.044,
+    "species": 1161
+   },
+   "Perissodactyla": {
+    "a": -1.741,
+    "b_per_dex_mass": 0.318,
+    "biomass_Mt": 0.826,
+    "census": 13,
+    "fit_on": "pooled land fit (15 < 20)",
+    "greenspoon_biomass_Mt": 0.304,
+    "greenspoon_individuals": 1190583.7800340669,
+    "greenspoon_model": 2,
+    "individuals": 2794650.757339205,
+    "largest_unreferenced_Mt": [
+     [
+      "Dicerorhinus steinheimensis",
+      0.046
+     ],
+     [
+      "Dicerorhinus mercki",
+      0.046
+     ],
+     [
+      "Dicerorhinus etruscus",
+      0.046
+     ],
+     [
+      "Tapirus robustus",
+      0.041
+     ]
+    ],
+    "resid_sd": 1.061,
+    "species": 35
+   },
+   "Primates": {
+    "a": -1.385,
+    "b_per_dex_mass": -0.311,
+    "biomass_Mt": 1.241,
+    "census": 56,
+    "fit_on": 328,
+    "greenspoon_biomass_Mt": 0.85,
+    "greenspoon_individuals": 662031424.1907389,
+    "greenspoon_model": 272,
+    "individuals": 773374564.9651073,
+    "largest_unreferenced_Mt": [
+     [
+      "Piliocolobus tholloni",
+      0.028
+     ],
+     [
+      "Papio kindae",
+      0.024
+     ],
+     [
+      "Sapajus cay",
+      0.023
+     ],
+     [
+      "Sapajus apella",
+      0.019
+     ]
+    ],
+    "resid_sd": 0.949,
+    "species": 556
+   },
+   "Proboscidea": {
+    "a": -1.741,
+    "b_per_dex_mass": 0.318,
+    "biomass_Mt": 3.112,
+    "census": 3,
+    "fit_on": "pooled land fit (3 < 20)",
+    "greenspoon_biomass_Mt": 1.746,
+    "greenspoon_individuals": 588241.06,
+    "greenspoon_model": 0,
+    "individuals": 673520.1420042265,
+    "largest_unreferenced_Mt": [
+     [
+      "Elephas zulu",
+      0.273
+     ],
+     [
+      "Elephas armeniacus",
+      0.273
+     ]
+    ],
+    "resid_sd": 1.061,
+    "species": 5
+   },
+   "Rodentia": {
+    "a": -1.61,
+    "b_per_dex_mass": 0.6,
+    "biomass_Mt": 4.762,
+    "census": 39,
+    "fit_on": 2023,
+    "greenspoon_biomass_Mt": 3.592,
+    "greenspoon_individuals": 25884455672.78283,
+    "greenspoon_model": 1984,
+    "individuals": 22878474364.733383,
+    "largest_unreferenced_Mt": [
+     [
+      "Erethizon dorsatus",
+      0.242
+     ],
+     [
+      "Thryonomys arkelli",
+      0.102
+     ],
+     [
+      "Ondatra obscurus",
+      0.065
+     ],
+     [
+      "Cavia patzelti",
+      0.061
+     ]
+    ],
+    "resid_sd": 1.045,
+    "species": 2682
+   }
+  },
+  "land_pooled": {
+   "a": -1.741,
+   "b_per_dex_mass": 0.318,
+   "n": 4736,
+   "resid_sd": 1.061
+  },
+  "land_total": {
+   "biomass_Mt": 34.14,
+   "greenspoon_biomass_Mt": 22.44,
+   "greenspoon_individuals": 87802108094.24791,
+   "individuals": 83784540471.84193,
+   "note": "individuals match Greenspoon closely; biomass is higher because census species use PHYLACINE adult masses and unverified Open Tree tips add modelled populations (Greenspoon's 95% CI for wild land biomass is 13-38 Mt)"
+  },
+  "marine": {
+   "biomass_Mt": 68.72,
+   "census_species": 91,
+   "fit": {
+    "a": -4.056,
+    "b_per_dex_mass": 0.672,
+    "resid_sd": 1.143
+   },
+   "greenspoon_biomass_Mt": 40.0,
+   "note": "computed with PHYLACINE adult masses; Greenspoon use population-mean masses (Trites & Pauly 1998), which are lower",
+   "order_effects_dex": {
+    "Artiodactyla": 0.1,
+    "Carnivora": -0.06,
+    "Sirenia": -0.78
+   },
+   "species": 162
+  }
  },
  "opentree": {
   "empty_higher_dropped": 8,
@@ -104,16 +699,95 @@
   "non-species tip": 551
  },
  "output": {
-  "brotli_bytes": 493947,
+  "brotli_bytes": 480700,
   "files": 16,
-  "raw_bytes": 1926648,
-  "skeleton_brotli": 27705,
-  "skeleton_nodes": 1147,
-  "skeleton_raw": 108672,
+  "raw_bytes": 1945696,
+  "skeleton_brotli": 27622,
+  "skeleton_nodes": 1156,
+  "skeleton_raw": 118992,
   "tiles": 15
  },
+ "overrides": {
+  "date": [
+   {
+    "fad_lad": [
+     0.3,
+     0.04
+    ],
+    "name": "Mammuthus lamarmorae",
+    "pbdb_fad_lad": [
+     8.36,
+     1.296
+    ]
+   },
+   {
+    "fad_lad": [
+     6.2,
+     3.75
+    ],
+    "name": "Mammuthus subplanifrons",
+    "pbdb_fad_lad": [
+     13.32,
+     1.806
+    ]
+   },
+   {
+    "fad_lad": [
+     2.6,
+     0.387
+    ],
+    "name": "Mammuthus meridionalis",
+    "pbdb_fad_lad": [
+     4.913,
+     0.387
+    ]
+   },
+   {
+    "fad_lad": [
+     0.6,
+     0.00585
+    ],
+    "name": "Mammuthus primigenius",
+    "pbdb_fad_lad": [
+     4.913,
+     0.006
+    ]
+   }
+  ],
+  "exclude": [
+   "Tikitherium copei"
+  ],
+  "file": "pipeline/overrides.toml",
+  "placement": [
+   {
+    "from_parent": "(unnamed)",
+    "leaves": 10,
+    "name": "Stagodontidae",
+    "to": "stem of Metatheria"
+   },
+   {
+    "from_parent": "(unnamed)",
+    "leaves": 12,
+    "name": "Pediomyidae",
+    "to": "stem of Metatheria"
+   },
+   {
+    "from_parent": "Didelphimorphia",
+    "leaves": 2,
+    "name": "Kokopellia",
+    "to": "stem of Metatheria"
+   },
+   {
+    "from_parent": "Didelphidae",
+    "leaves": 2,
+    "name": "Asiatherium",
+    "to": "stem of Metatheria"
+   }
+  ],
+  "version": 2
+ },
  "pbdb_graft": {
-  "excluded (see PBDB_EXCLUDE)": 1,
+  "excluded (overrides.toml)": 1,
   "grafted: MRCA of OT genus members": 153,
   "grafted: OT genus": 783,
   "grafted: PBDB genus (created)": 10077,
@@ -140,14 +814,14 @@
   "rate_species_or_genus": 0.2602,
   "species_used": 13483
  },
- "pieces": 24283,
+ "pieces": 24438,
  "spot_checks": {
   "Bos taurus": {
-   "alive": 1578614312.385115,
-   "ever": 315792666695.6812,
+   "alive": 1578614149.0,
+   "ever": 316284791927.03674,
    "ever_range": [
-    1959123373.7862072,
-    50902873026337.68
+    1962176434.0540938,
+    50982199086777.484
    ],
    "extinct(gray)": false,
    "ghost": 0.0,
@@ -156,16 +830,16 @@
    "t1_Ma": 0.0
   },
   "Hominidae": {
-   "alive": 8300765727.468964,
-   "ever": 4164669957918.5093,
+   "alive": 8301655792.633362,
+   "ever": 1094290247168.5402,
    "ever_range": [
-    83945202590.3667,
-    505942837826032.75
+    29479840858.6716,
+    66581529124130.414
    ],
    "extinct(gray)": false,
-   "ghost": 3589469798793.8633,
+   "ghost": 492516782894.328,
    "grade": "D",
-   "t0_Ma": 19.2152,
+   "t0_Ma": 14.805233333333334,
    "t1_Ma": 0.0
   },
   "Homo sapiens": {
@@ -182,54 +856,625 @@
    "t1_Ma": 0.0
   },
   "Mammalia": {
-   "alive": 133253369650.52266,
-   "ever": 1.577043904982807e+19,
+   "alive": 99225333274.88243,
+   "ever": 8.463233174501535e+18,
    "ever_range": [
-    1.943307593783951e+17,
-    1.386377025921144e+21
+    1.0279161538963354e+17,
+    9.710841181456461e+20
    ],
-   "extinct(gray)": false,
-   "ghost": 1.48870396191353e+19,
+   "extinct(gray)": 0.0,
+   "ghost": 8.027296875368498e+18,
    "grade": "D",
    "t0_Ma": 208.64140800000004,
    "t1_Ma": 0.0
   },
   "Mammuthus": {
    "alive": 0.0,
-   "ever": 25987728950.802044,
+   "ever": 143228415657.73743,
    "ever_range": [
-    171296393.1822839,
-    10316071043636.805
-   ],
-   "extinct(gray)": true,
-   "ghost": 16836591379.981178,
-   "grade": "D",
-   "t0_Ma": 13.32015,
-   "t1_Ma": 0.00585
-  },
-  "Mammuthus primigenius": {
-   "alive": 0.0,
-   "ever": 1435233366.5602906,
-   "ever_range": [
-    4861475.191984057,
-    423718055763.0912
+    1783170307.9907935,
+    112849822372395.11
    ],
    "extinct(gray)": true,
    "ghost": 0.0,
    "grade": "D",
-   "t0_Ma": 13.32005,
+   "t0_Ma": 6.42315,
+   "t1_Ma": 0.00585
+  },
+  "Mammuthus primigenius": {
+   "alive": 0.0,
+   "ever": 22185458444.426834,
+   "ever_range": [
+    75147399.97221462,
+    6549721834306.661
+   ],
+   "extinct(gray)": true,
+   "ghost": 0.0,
+   "grade": "D",
+   "t0_Ma": 6.31155,
    "t1_Ma": 0.00585
   }
  },
+ "stem_rehoming": {
+  "by_crown": {
+   "(unnamed clade)": 182,
+   "Ammospermophilus": 2,
+   "Ancodonta": 7,
+   "Anomaluridae": 2,
+   "Asellia": 1,
+   "Axis": 1,
+   "Berardius": 1,
+   "Bubalus": 1,
+   "Camelus": 1,
+   "Canidae": 29,
+   "Caniformia": 1,
+   "Carnivora": 4,
+   "Castoridae": 26,
+   "Cercopithecoidea": 1,
+   "Cetacea": 3,
+   "Chrysochloridae": 2,
+   "Cingulata (order in Deuterostomia)": 6,
+   "Conepatus": 1,
+   "Connochaetes": 1,
+   "Cricetidae": 4,
+   "Ctenodactylidae": 8,
+   "Ctenomys": 1,
+   "Cynomys": 2,
+   "Damaliscus": 2,
+   "Dasyproctidae": 3,
+   "Dermoptera": 5,
+   "Didelphimorphia": 1,
+   "Dipodoidea": 1,
+   "Eliomys": 2,
+   "Emballonuridae": 3,
+   "Equidae": 30,
+   "Erethizontidae": 4,
+   "Erinaceidae": 4,
+   "Erinaceus": 1,
+   "Eutheria (in Deuterostomia)": 2,
+   "Felidae": 14,
+   "Felis": 1,
+   "Gazella": 5,
+   "Geomyidae": 3,
+   "Giraffidae": 8,
+   "Gliridae": 4,
+   "Hyaenidae": 17,
+   "Hyracoidea": 6,
+   "Hystrix (genus in Opisthokonta)": 2,
+   "Kobus (genus in Opisthokonta)": 3,
+   "Lama": 2,
+   "Laurasiatheria": 1,
+   "Leopardus": 1,
+   "Lissodelphis": 2,
+   "Lontra": 1,
+   "Lorisiformes": 3,
+   "Lutra": 4,
+   "Lutreolina": 3,
+   "Lynx": 1,
+   "Macropodidae": 2,
+   "Marmota": 3,
+   "Martinae": 3,
+   "Megalonychidae": 5,
+   "Meles": 1,
+   "Mesocricetus": 1,
+   "Molossidae": 1,
+   "Monodontidae": 4,
+   "Muntiacinae": 4,
+   "Muntiacus": 1,
+   "Mustelidae": 20,
+   "Myomimus": 5,
+   "Natalidae": 2,
+   "Noctilionidae": 1,
+   "Ochotonidae": 10,
+   "Octodontidae": 2,
+   "Onychomys": 1,
+   "Oryx (genus in Deuterostomia)": 1,
+   "Otariidae": 3,
+   "Paucituberculata": 8,
+   "Pecora": 3,
+   "Peramelidae": 1,
+   "Perissodactyla": 48,
+   "Perognathinae": 2,
+   "Perognathus": 4,
+   "Philander": 1,
+   "Phocidae": 11,
+   "Phocoenidae": 5,
+   "Pholidota (order in Opisthokonta)": 1,
+   "Platyrrhini": 5,
+   "Proboscidea (order in Deuterostomia)": 19,
+   "Procyonidae": 2,
+   "Prototheria": 7,
+   "Ratufinae": 1,
+   "Rhinoceros": 3,
+   "Rhinocerotidae": 30,
+   "Rhinolophidae": 1,
+   "Rhinopomatidae": 1,
+   "Saimiriinae": 1,
+   "Scapanus": 2,
+   "Scapteromys": 1,
+   "Sciuridae": 3,
+   "Simiiformes": 1,
+   "Suidae": 5,
+   "Suina": 3,
+   "Sus": 3,
+   "Talpa": 3,
+   "Tamias": 2,
+   "Tapiridae": 7,
+   "Tapirus": 10,
+   "Tarsiiformes": 3,
+   "Tayassuidae": 22,
+   "Thryonomyidae": 1,
+   "Thylamys": 1,
+   "Tragulina": 5,
+   "Tylopoda": 28,
+   "Tympanoctomys": 1,
+   "Urocyon": 5,
+   "Ursidae": 17,
+   "Viverridae": 6,
+   "Vombatidae": 3
+  },
+  "largest_age_gaps": [
+   {
+    "crown": "Prototheria",
+    "crown_Ma": 50.26,
+    "fossil_Ma": 124.59,
+    "moved": "Teinolophos"
+   },
+   {
+    "crown": "Prototheria",
+    "crown_Ma": 50.26,
+    "fossil_Ma": 112.65,
+    "moved": "Kryoryctes"
+   },
+   {
+    "crown": "Prototheria",
+    "crown_Ma": 50.26,
+    "fossil_Ma": 112.65,
+    "moved": "Kollikodontidae"
+   },
+   {
+    "crown": "Proboscidea (order in Deuterostomia)",
+    "crown_Ma": 4.86,
+    "fossil_Ma": 58.62,
+    "moved": "Eritherium"
+   },
+   {
+    "crown": "Dermoptera",
+    "crown_Ma": 9.59,
+    "fossil_Ma": 62.15,
+    "moved": "Elpidophorus"
+   },
+   {
+    "crown": "Dermoptera",
+    "crown_Ma": 9.59,
+    "fossil_Ma": 58.62,
+    "moved": "Plagiomene"
+   },
+   {
+    "crown": "Proboscidea (order in Deuterostomia)",
+    "crown_Ma": 4.86,
+    "fossil_Ma": 53.03,
+    "moved": "Phosphatheriidae"
+   },
+   {
+    "crown": "Proboscidea (order in Deuterostomia)",
+    "crown_Ma": 4.86,
+    "fossil_Ma": 53.03,
+    "moved": "Numidotheriidae"
+   },
+   {
+    "crown": "Prototheria",
+    "crown_Ma": 50.26,
+    "fossil_Ma": 98.2,
+    "moved": "Steropodon"
+   },
+   {
+    "crown": "Prototheria",
+    "crown_Ma": 50.26,
+    "fossil_Ma": 98.2,
+    "moved": "Stirtodon"
+   },
+   {
+    "crown": "Dermoptera",
+    "crown_Ma": 9.59,
+    "fossil_Ma": 57.5,
+    "moved": "Planetetherium"
+   },
+   {
+    "crown": "Dermoptera",
+    "crown_Ma": 9.59,
+    "fossil_Ma": 57.5,
+    "moved": "Worlandia"
+   },
+   {
+    "crown": "Hyracoidea",
+    "crown_Ma": 10.01,
+    "fossil_Ma": 53.03,
+    "moved": "Pliohyracidae"
+   },
+   {
+    "crown": "(unnamed clade)",
+    "crown_Ma": 10.49,
+    "fossil_Ma": 53.03,
+    "moved": "Protosirenidae"
+   },
+   {
+    "crown": "Proboscidea (order in Deuterostomia)",
+    "crown_Ma": 4.86,
+    "fossil_Ma": 45.55,
+    "moved": "Saloumia"
+   },
+   {
+    "crown": "Proboscidea (order in Deuterostomia)",
+    "crown_Ma": 4.86,
+    "fossil_Ma": 45.55,
+    "moved": "Dagbatitherium"
+   },
+   {
+    "crown": "Natalidae",
+    "crown_Ma": 15.02,
+    "fossil_Ma": 54.55,
+    "moved": "Honrovits"
+   },
+   {
+    "crown": "Hyracoidea",
+    "crown_Ma": 10.01,
+    "fossil_Ma": 49.52,
+    "moved": "Titanohyracidae"
+   },
+   {
+    "crown": "Natalidae",
+    "crown_Ma": 15.02,
+    "fossil_Ma": 53.55,
+    "moved": "Ageina"
+   },
+   {
+    "crown": "Equidae",
+    "crown_Ma": 6.25,
+    "fossil_Ma": 43.89,
+    "moved": "Epihippus"
+   },
+   {
+    "crown": "Equidae",
+    "crown_Ma": 6.25,
+    "fossil_Ma": 42.89,
+    "moved": "Haplohippus"
+   },
+   {
+    "crown": "Paucituberculata",
+    "crown_Ma": 16.4,
+    "fossil_Ma": 53.03,
+    "moved": "Riolestes"
+   },
+   {
+    "crown": "Equidae",
+    "crown_Ma": 6.25,
+    "fossil_Ma": 42.8,
+    "moved": "Duchesnehippus"
+   },
+   {
+    "crown": "Ctenodactylidae",
+    "crown_Ma": 11.38,
+    "fossil_Ma": 47.86,
+    "moved": "Protataromys"
+   },
+   {
+    "crown": "Hyracoidea",
+    "crown_Ma": 10.01,
+    "fossil_Ma": 45.55,
+    "moved": "Namahyrax"
+   }
+  ],
+  "rule": "fossil-only subtrees older than the Upham 95% HPD upper bound of an enclosing crown node are moved to that crown's stem (inside a total-group node)",
+  "subtrees_moved": 782,
+  "total_groups": 115
+ },
+ "top_orders": {
+  "by_alive": [
+   {
+    "alive": 54073067657.33373,
+    "ever": 1.3668736303364237e+18,
+    "ghost": 1.1823622928117824e+18,
+    "ghost_share": 0.865,
+    "name": "Chiroptera",
+    "sampled": 1.8451133752464128e+17,
+    "t0_Ma": 69.1
+   },
+   {
+    "alive": 22879960668.500233,
+    "ever": 1.7846529756536799e+18,
+    "ghost": 1.6264756790492675e+18,
+    "ghost_share": 0.911,
+    "name": "Rodentia",
+    "sampled": 1.581772966044124e+17,
+    "t0_Ma": 72.45
+   },
+   {
+    "alive": 5652691147.645058,
+    "ever": 4794567610134914.0,
+    "ghost": 4220479814362578.0,
+    "ghost_share": 0.88,
+    "name": "Artiodactyla",
+    "sampled": 574087795772336.0,
+    "t0_Ma": 61.87
+   },
+   {
+    "alive": 2204768579.270433,
+    "ever": 1.9623078272353624e+16,
+    "ghost": 1.5011445852187656e+16,
+    "ghost_share": 0.765,
+    "name": "Carnivora",
+    "sampled": 4611632420165968.0,
+    "t0_Ma": 65.7
+   },
+   {
+    "alive": 1471200858.0422654,
+    "ever": 1.821159559953081e+17,
+    "ghost": 1.4134832326873669e+17,
+    "ghost_share": 0.776,
+    "name": "Eulipotyphla",
+    "sampled": 4.076763272657141e+16,
+    "t0_Ma": 75.11
+   },
+   {
+    "alive": 1192198078.6030855,
+    "ever": 7.825986726108498e+16,
+    "ghost": 6.2798389648247496e+16,
+    "ghost_share": 0.802,
+    "name": "Didelphimorphia",
+    "sampled": 1.546147761283748e+16,
+    "t0_Ma": 74.42
+   },
+   {
+    "alive": 759123559.6050671,
+    "ever": 4.0516224470053896e+16,
+    "ghost": 2.9045299820079124e+16,
+    "ghost_share": 0.717,
+    "name": "Lagomorpha",
+    "sampled": 1.1470924649974772e+16,
+    "t0_Ma": 72.45
+   },
+   {
+    "alive": 567561780.6198184,
+    "ever": 1.0887185558761054e+16,
+    "ghost": 8722284338364084.0,
+    "ghost_share": 0.801,
+    "name": "Hyracoidea",
+    "sampled": 2164901220396970.0,
+    "t0_Ma": 58.62
+   },
+   {
+    "alive": 402870113.033177,
+    "ever": 1.185003603129864e+16,
+    "ghost": 8958131894100848.0,
+    "ghost_share": 0.756,
+    "name": "Diprotodontia",
+    "sampled": 2891904137197792.0,
+    "t0_Ma": 61.06
+   },
+   {
+    "alive": 289642137.19190365,
+    "ever": 2.0369967626330936e+16,
+    "ghost": 1.3243490414695426e+16,
+    "ghost_share": 0.65,
+    "name": "Macroscelidea",
+    "sampled": 7126477211635510.0,
+    "t0_Ma": 65.7
+   }
+  ],
+  "by_ever": [
+   {
+    "alive": 22879960668.500233,
+    "ever": 1.7846529756536799e+18,
+    "ghost": 1.6264756790492675e+18,
+    "ghost_share": 0.911,
+    "name": "Rodentia",
+    "sampled": 1.581772966044124e+17,
+    "t0_Ma": 72.45
+   },
+   {
+    "alive": 54073067657.33373,
+    "ever": 1.3668736303364237e+18,
+    "ghost": 1.1823622928117824e+18,
+    "ghost_share": 0.865,
+    "name": "Chiroptera",
+    "sampled": 1.8451133752464128e+17,
+    "t0_Ma": 69.1
+   },
+   {
+    "alive": 1471200858.0422654,
+    "ever": 1.821159559953081e+17,
+    "ghost": 1.4134832326873669e+17,
+    "ghost_share": 0.776,
+    "name": "Eulipotyphla",
+    "sampled": 4.076763272657141e+16,
+    "t0_Ma": 75.11
+   },
+   {
+    "alive": 1192198078.6030855,
+    "ever": 7.825986726108498e+16,
+    "ghost": 6.2798389648247496e+16,
+    "ghost_share": 0.802,
+    "name": "Didelphimorphia",
+    "sampled": 1.546147761283748e+16,
+    "t0_Ma": 74.42
+   },
+   {
+    "alive": 759123559.6050671,
+    "ever": 4.0516224470053896e+16,
+    "ghost": 2.9045299820079124e+16,
+    "ghost_share": 0.717,
+    "name": "Lagomorpha",
+    "sampled": 1.1470924649974772e+16,
+    "t0_Ma": 72.45
+   },
+   {
+    "alive": 289642137.19190365,
+    "ever": 2.0369967626330936e+16,
+    "ghost": 1.3243490414695426e+16,
+    "ghost_share": 0.65,
+    "name": "Macroscelidea",
+    "sampled": 7126477211635510.0,
+    "t0_Ma": 65.7
+   },
+   {
+    "alive": 2204768579.270433,
+    "ever": 1.9623078272353624e+16,
+    "ghost": 1.5011445852187656e+16,
+    "ghost_share": 0.765,
+    "name": "Carnivora",
+    "sampled": 4611632420165968.0,
+    "t0_Ma": 65.7
+   },
+   {
+    "alive": 402870113.033177,
+    "ever": 1.185003603129864e+16,
+    "ghost": 8958131894100848.0,
+    "ghost_share": 0.756,
+    "name": "Diprotodontia",
+    "sampled": 2891904137197792.0,
+    "t0_Ma": 61.06
+   },
+   {
+    "alive": 567561780.6198184,
+    "ever": 1.0887185558761054e+16,
+    "ghost": 8722284338364084.0,
+    "ghost_share": 0.801,
+    "name": "Hyracoidea",
+    "sampled": 2164901220396970.0,
+    "t0_Ma": 58.62
+   },
+   {
+    "alive": 83194962.11135344,
+    "ever": 5526117365132785.0,
+    "ghost": 4717909320950661.0,
+    "ghost_share": 0.854,
+    "name": "Dasyuromorphia",
+    "sampled": 808208044182124.0,
+    "t0_Ma": 58.64
+   }
+  ],
+  "by_sampled_ever": [
+   {
+    "alive": 54073067657.33373,
+    "ever": 1.3668736303364237e+18,
+    "ghost": 1.1823622928117824e+18,
+    "ghost_share": 0.865,
+    "name": "Chiroptera",
+    "sampled": 1.8451133752464128e+17,
+    "t0_Ma": 69.1
+   },
+   {
+    "alive": 22879960668.500233,
+    "ever": 1.7846529756536799e+18,
+    "ghost": 1.6264756790492675e+18,
+    "ghost_share": 0.911,
+    "name": "Rodentia",
+    "sampled": 1.581772966044124e+17,
+    "t0_Ma": 72.45
+   },
+   {
+    "alive": 1471200858.0422654,
+    "ever": 1.821159559953081e+17,
+    "ghost": 1.4134832326873669e+17,
+    "ghost_share": 0.776,
+    "name": "Eulipotyphla",
+    "sampled": 4.076763272657141e+16,
+    "t0_Ma": 75.11
+   },
+   {
+    "alive": 1192198078.6030855,
+    "ever": 7.825986726108498e+16,
+    "ghost": 6.2798389648247496e+16,
+    "ghost_share": 0.802,
+    "name": "Didelphimorphia",
+    "sampled": 1.546147761283748e+16,
+    "t0_Ma": 74.42
+   },
+   {
+    "alive": 759123559.6050671,
+    "ever": 4.0516224470053896e+16,
+    "ghost": 2.9045299820079124e+16,
+    "ghost_share": 0.717,
+    "name": "Lagomorpha",
+    "sampled": 1.1470924649974772e+16,
+    "t0_Ma": 72.45
+   },
+   {
+    "alive": 289642137.19190365,
+    "ever": 2.0369967626330936e+16,
+    "ghost": 1.3243490414695426e+16,
+    "ghost_share": 0.65,
+    "name": "Macroscelidea",
+    "sampled": 7126477211635510.0,
+    "t0_Ma": 65.7
+   },
+   {
+    "alive": 2204768579.270433,
+    "ever": 1.9623078272353624e+16,
+    "ghost": 1.5011445852187656e+16,
+    "ghost_share": 0.765,
+    "name": "Carnivora",
+    "sampled": 4611632420165968.0,
+    "t0_Ma": 65.7
+   },
+   {
+    "alive": 402870113.033177,
+    "ever": 1.185003603129864e+16,
+    "ghost": 8958131894100848.0,
+    "ghost_share": 0.756,
+    "name": "Diprotodontia",
+    "sampled": 2891904137197792.0,
+    "t0_Ma": 61.06
+   },
+   {
+    "alive": 567561780.6198184,
+    "ever": 1.0887185558761054e+16,
+    "ghost": 8722284338364084.0,
+    "ghost_share": 0.801,
+    "name": "Hyracoidea",
+    "sampled": 2164901220396970.0,
+    "t0_Ma": 58.62
+   },
+   {
+    "alive": 109131399.45291981,
+    "ever": 4575505643291686.0,
+    "ghost": 2817943672264346.5,
+    "ghost_share": 0.616,
+    "name": "Scandentia",
+    "sampled": 1757561971027339.5,
+    "t0_Ma": 74.72
+   }
+  ]
+ },
  "trait_coverage_extant": {
-  "log_density_obs:no": 6122,
+  "log_density_obs:no": 6123,
   "log_density_obs:yes": 1207,
-  "log_gen_obs:no": 1731,
+  "log_gen_obs:no": 1732,
   "log_gen_obs:yes": 5598,
-  "log_mass:no": 1688,
+  "log_mass:no": 1689,
   "log_mass:yes": 5641,
-  "log_range_obs:no": 2698,
+  "log_range_obs:no": 2699,
   "log_range_obs:yes": 4631
+ },
+ "unverified_extant_tips": {
+  "alive": 6769273383.880412,
+  "examples": [
+   "Eliurus tsingimbato",
+   "Lophuromys nudicaudatus",
+   "Tachyoryctes daemon",
+   "Lepus veter",
+   "Avahi ramanantsoavani",
+   "Antilope villosa",
+   "Myotis delicatus",
+   "Desmodus dorbignyi",
+   "Conepatus calurus",
+   "Paradoxurus pallasii",
+   "Sorex batis",
+   "Elephantulus ocularis"
+  ],
+  "note": "Open Tree tips treated as living that no extant-species list (Upham, PHYLACINE, Greenspoon/IUCN) recognises: recent splits, synonyms, and some fossils without an extinct flag. Their counts come from the occupancy model only.",
+  "tips": 1628
  },
  "upham_match": {
   "exact": 5470,

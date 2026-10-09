@@ -121,8 +121,87 @@ def faostat_stocks(raw: Path) -> tuple[dict[str, tuple[float, int]], str]:
     return out, "FAOSTAT QCL stocks, World"
 
 
+# ------------------------------------------------------------------ Greenspoon 2023
+
+# Greenspoon et al. 2023, PNAS 120:e2204892120, data and code release
+# (Zenodo doi:10.5281/zenodo.7594807, v1.0, CC BY 4.0). Only CSV members are read.
+GREENSPOON_ZIP = "greenspoon/mammal_biomass-master.zip"
+GREENSPOON_PREFIX = "mammal_biomass-master/"
+GREENSPOON_CITE = "Greenspoon et al. 2023 PNAS 120:e2204892120; data doi:10.5281/zenodo.7594807"
+
+
+def _gs_rows(raw: Path, member: str) -> list[dict]:
+    with zipfile.ZipFile(raw / GREENSPOON_ZIP) as z, z.open(GREENSPOON_PREFIX + member) as fb:
+        return list(csv.DictReader(io.TextIOWrapper(fb, encoding="utf-8")))
+
+
+def greenspoon_census(raw: Path) -> dict[str, dict]:
+    """Global population reports for wild species (mostly IUCN Red List
+    assessments), as compiled by Greenspoon et al. 2023: 392 land species
+    (data/species_w_pop_reports.csv) and the marine species with a report
+    (data/marine_data/wild_marine_pop_error.csv). binomial -> {N, realm}."""
+    out: dict[str, dict] = {}
+    for r in _gs_rows(raw, "data/species_w_pop_reports.csv"):
+        n = float(r["total_pop"]) if r.get("total_pop") else 0.0
+        if n > 0:
+            out[r["binomial"].strip()] = {"N": n, "realm": "land"}
+    for r in _gs_rows(raw, "data/marine_data/wild_marine_pop_error.csv"):
+        n = float(r["population"]) if r.get("population") else 0.0
+        if n > 0:
+            out.setdefault(r["Binomial"].strip(), {"N": n, "realm": "marine"})
+    return out
+
+
+def greenspoon_pets(raw: Path) -> dict[str, float]:
+    """Domestic dogs and cats (data/domesticated_data/pets_rats_mouse.csv)."""
+    out = {}
+    for r in _gs_rows(raw, "data/domesticated_data/pets_rats_mouse.csv"):
+        if r["Item"] in ("Dog", "Cat"):
+            out[r["binomial"].strip()] = float(r["population"])
+    if set(out) != {"Canis familiaris", "Felis catus"}:
+        raise RuntimeError(f"Greenspoon pets table changed: {out}")
+    return out
+
+
+def greenspoon_order_targets(raw: Path) -> dict[str, dict]:
+    """Wild land mammal biomass and individuals by order (Greenspoon 2023,
+    results/results_grouped_by_order.csv): nine named orders plus 'Other'.
+    Census species and their model-inferred species together."""
+    out = {}
+    for r in _gs_rows(raw, "results/results_grouped_by_order.csv"):
+        name = r["Order_common"].split(" (")[0].strip()
+        out[name] = {"biomass_g": float(r["biomass_g"]), "individuals": float(r["total_pop"]),
+                     "species": int(r["n_species"])}
+    return out
+
+
+def greenspoon_species_model(raw: Path) -> dict[str, dict]:
+    """Per-species wild land biomass from Greenspoon's model (census species
+    and SVR-inferred ones), converted to individuals with their adult mass.
+    Comparison only."""
+    mass = {r["binomial"]: float(r["AdultBodyMass_g"]) for r in _gs_rows(raw, "data/all_species_list.csv")
+            if r.get("AdultBodyMass_g")}
+    out = {}
+    for r in _gs_rows(raw, "results/wild_land_mammal_biomass.csv"):
+        m = mass.get(r["binomial"])
+        if m:
+            out[r["binomial"]] = {"N": float(r["biomass_g"]) / m, "lo": float(r["lower"]) / m,
+                                  "hi": float(r["upper"]) / m}
+    return out
+
+
+def greenspoon_commensal(raw: Path) -> dict[str, float]:
+    """Order-of-magnitude guesses for commensal rodents etc.
+    (data/synanthrophic_species_estimates.csv, millions). Used only in the
+    comparison table, not as anchors: they are not census figures."""
+    return {r["binomial"].strip(): float(r["manual_pop_estimate_millions"]) * 1e6
+            for r in _gs_rows(raw, "data/synanthrophic_species_estimates.csv")}
+
+
 # Names the domestic form may carry in the Open Tree species list
 DOMESTIC_ALIASES = {
+    "Canis familiaris": ["Canis lupus"],
+    "Felis catus": ["Felis silvestris"],
     "Capra hircus": ["Capra aegagrus"],
     "Equus caballus": ["Equus ferus"],
     "Equus asinus": ["Equus africanus"],
@@ -135,6 +214,10 @@ DOMESTICATION_YEAR = {
     "Bos taurus": -8500, "Ovis aries": -9000, "Capra hircus": -8500, "Sus scrofa": -8500,
     "Bubalus bubalis": -5000, "Equus caballus": -3500, "Equus asinus": -4500,
     "Camelus dromedarius": -1000,
+    # dogs: domesticated from grey wolves by >= 15 ka (Frantz et al. 2016,
+    # Science 352:1228); cats: Near East, ~9.5 ka (Vigne et al. 2004, Science 304:259)
+    "Canis familiaris": -13000,
+    "Felis catus": -7500,
 }
 
 # ------------------------------------------------------------------ MOCK
