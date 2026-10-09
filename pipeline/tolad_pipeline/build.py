@@ -13,8 +13,9 @@ from collections import Counter
 from pathlib import Path
 
 from . import load
-from .merge import (assign_bands, build_leaf_index, calibrate, date_tree,
-                    graft_pbdb, match_upham, set_extinct_flags)
+from . import overrides as overrides_mod
+from .merge import (apply_placements, assign_bands, build_leaf_index, calibrate, date_tree,
+                    graft_pbdb, match_upham, rehome_stem_fossils, set_extinct_flags)
 from .tree import (clean_opentree, collapse_knuckles, drop_empty,
                    from_opentree)
 
@@ -66,17 +67,23 @@ def build_tree(raw: Path, work: Path, log: dict, t_start: float):
     pb_species, _pb_genera = load.load_pbdb(raw)
     pb_by_name = {load.norm_name(r["taxon_name"]): r for r in pb_species}
     set_extinct_flags(root, phy, pb_by_name, log)
-    graft_pbdb(root, pb_species, exact, syn, log)
+    ov = overrides_mod.load()
+    graft_pbdb(root, pb_species, exact, syn, log, ov)
     log_step(t_start, f"PBDB graft {log['pbdb_graft']}")
     n_drop = drop_empty(root)
     log["opentree"]["empty_higher_dropped"] = n_drop
 
     calibrate(root, up_root, log)
+    apply_placements(root, ov, log)
+    rehome_stem_fossils(root, log)
+    log_step(t_start, f"stem re-homing: {log['stem_rehoming']['subtrees_moved']} fossil subtrees")
+    ov.check_all_used()
+    log["overrides"] = ov.report()
     date_tree(root, log)
     assign_bands(root, ANCHOR_T0)
     n_k = collapse_knuckles(root)
     log["knuckles_collapsed"] = n_k
-    ctx = {"phy": phy, "phy_syn": phy_syn, "ott_syn": ott_syn}
+    ctx = {"phy": phy, "phy_syn": phy_syn, "ott_syn": ott_syn, "exact": exact, "syn": syn}
     return root, ctx
 
 
@@ -97,6 +104,8 @@ def main(argv: list[str] | None = None) -> int:
     log_step(t_start, "counts modelled")
     log["counts"] = counts(root)
     log["spot_checks"] = spot_checks(root)
+    log["calibration_check"] = calibration_report(root, a.raw)
+    log["top_orders"] = top_orders(root)
     tiles.write_all(root, a.out, log)
     log_step(t_start, "tiles written")
     (a.out / "stats.json").write_text(json.dumps(log, indent=1, default=_json_default, sort_keys=True) + "\n")
@@ -129,6 +138,50 @@ def counts(root) -> dict:
         "tips_fossil_grafted": sum(1 for n in leaves if n.kind == "graft"),
         "taxonomic_nodes": sum(1 for n in nodes if n.taxonomic),
     }
+
+
+CHECK_SPECIES = ["Canis lupus", "Vulpes vulpes", "Loxodonta africana", "Mus musculus", "Rattus norvegicus",
+                 "Odocoileus virginianus", "Pan troglodytes", "Balaenoptera musculus", "Phoca vitulina",
+                 "Myotis lucifugus", "Macropus giganteus", "Macropus rufus", "Sus scrofa", "Ursus arctos",
+                 "Felis catus", "Gorilla gorilla", "Procyon lotor", "Tadarida brasiliensis"]
+
+
+def calibration_report(root, raw: Path) -> dict:
+    """Wild alive counts of well-known species against published figures."""
+    from . import anchors
+    census = anchors.greenspoon_census(raw)
+    model = anchors.greenspoon_species_model(raw)
+    commensal = anchors.greenspoon_commensal(raw)
+    rows = {}
+    for n in root.preorder():
+        if not n.is_leaf or n.name not in CHECK_SPECIES or n.name in rows:
+            continue
+        D = n.data
+        dom = D.get("domestic", {}).get("stock", 0.0)
+        if n.name in census:
+            pub, src = census[n.name]["N"], "IUCN population report (Greenspoon 2023 compilation)"
+        elif n.name in model:
+            pub, src = model[n.name]["N"], "Greenspoon 2023 per-species model (no census exists)"
+        elif n.name in commensal:
+            pub, src = commensal[n.name], "Greenspoon 2023 order-of-magnitude guess"
+        else:
+            pub, src = None, "no published global estimate found"
+        rows[n.name] = {"wild_alive": D["alive"] - dom, "domestic_alive": dom, "ever": D["ever"],
+                        "occupancy_model_only": D.get("N_model_oos"), "published": pub, "published_source": src,
+                        "method": "; ".join(D["meth"][-2:])}
+    return {k: rows[k] for k in CHECK_SPECIES if k in rows}
+
+
+def top_orders(root, k: int = 10) -> dict:
+    orders = [n for n in root.preorder() if n.rank == "order" and not n.is_leaf and not n.data.get("crown_of")]
+
+    def row(n):
+        D = n.data
+        return {"name": n.name, "ever": D["ever"], "ghost": D["ghost"], "ghost_share": round(D["ghost"] / D["ever"], 3),
+                "sampled": D["ever"] - D["ghost"], "alive": D["alive"], "t0_Ma": round(n.t0, 2)}
+    return {"by_ever": [row(n) for n in sorted(orders, key=lambda n: -n.data["ever"])[:k]],
+            "by_alive": [row(n) for n in sorted(orders, key=lambda n: -n.data["alive"])[:k]],
+            "by_sampled_ever": [row(n) for n in sorted(orders, key=lambda n: -(n.data["ever"] - n.data["ghost"]))[:k]]}
 
 
 def spot_checks(root) -> dict:
