@@ -18,6 +18,7 @@ import datetime as _dt
 import hashlib
 import json
 import os
+import re
 import sys
 import tarfile
 import urllib.request
@@ -88,6 +89,13 @@ SOURCES: dict[str, list[tuple[str, str, dict | None]]] = {
          "https://population.un.org/wpp/assets/Excel%20Files/1_Indicator%20(Standard)/CSV_FILES/"
          "WPP2024_Demographic_Indicators_Medium.csv.gz", None),
     ],
+    # Greenspoon et al. 2023 PNAS data + code release, Zenodo v1.0 (CC BY 4.0).
+    # Per-species census anchors (IUCN Red List population reports) and the
+    # pet numbers. The zip is only opened with zipfile and read as CSV.
+    "greenspoon": [
+        ("greenspoon/mammal_biomass-master.zip",
+         "https://zenodo.org/api/records/7594807/files/mammal_biomass-master.zip/content", None),
+    ],
     "prb": [
         ("prb/how-many-people-have-ever-lived-on-earth.html",
          "https://www.prb.org/articles/how-many-people-have-ever-lived-on-earth/", None),
@@ -111,6 +119,25 @@ SOURCES: dict[str, list[tuple[str, str, dict | None]]] = {
 # Only these members are extracted from the OTT tarball (no paths from the
 # archive are trusted: we write to fixed names).
 OTT_MEMBERS = {"taxonomy.tsv", "synonyms.tsv", "version.txt"}
+
+
+PBDB_TIMER = re.compile(rb'^\{\s*"elapsed_time"\s*:\s*[0-9.eE+-]+\s*,')
+
+
+def normalize(rel: str, dest: Path) -> None:
+    """Strip volatile bytes so the pinned checksum covers content only.
+
+    PBDB JSON responses start with `"elapsed_time":<server seconds>`, which
+    changes on every request (same records, different bytes). We rewrite it to
+    0 before hashing. The records themselves are untouched."""
+    if not rel.startswith("pbdb/"):
+        return
+    b = dest.read_bytes()
+    nb = PBDB_TIMER.sub(b'{\n"elapsed_time":0,', b, count=1)
+    if nb != b:
+        tmp = dest.with_suffix(dest.suffix + ".part")
+        tmp.write_bytes(nb)
+        os.replace(tmp, dest)
 
 
 def sha256(path: Path) -> str:
@@ -178,6 +205,7 @@ def main(argv: list[str] | None = None) -> int:
                 fresh = True
             else:
                 fresh = False
+            normalize(rel, dest)
             digest = sha256(dest)
             rec = lock.get(rel)
             if rec is None or (a.refresh and fresh):
