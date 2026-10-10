@@ -103,9 +103,8 @@ function at(perBar: number, ago = 3000, sy = 40, at?: number) {
   const c = new FanCamera(f, (b) => new TwigModel(b, f.time, 'linear'));
   c.w = 390;
   c.h = 844;
-  const sumEver = f.branches.reduce((a, b) => a + b.sp.ever, 0);
-  // view.ts widthScale: px per individual = trunkWidth / Σ ever · sx; the bar is SCALE_BAR_PX long.
-  const sx = ((SCALE_BAR_PX / perBar) * sumEver) / f.trunkWidth;
+  // view.ts widthScale: px per individual = unit · sx; the bar is SCALE_BAR_PX long.
+  const sx = SCALE_BAR_PX / perBar / f.branches[0].unit;
   const b = f.branches[lionIdx];
   const y = f.time.y(ago * 1e-6);
   c.cam = { cx: 0, cy: y, sx, sy, ty: sy };
@@ -153,10 +152,11 @@ describe('the texture of lines, then the individuals on them', () => {
       const { lit, n } = shadeScreen(v, c, mi);
       expect(lit).toBeGreaterThan(1000);
       expect(lit).toBeLessThan(n * (lives ? 0.8 : 0.6));
-      // (The living's lane dims only once it is wide enough to hold lines.)
+      // (The living's lane dims fully once it is wide enough to hold lines; narrower, it is one
+      // line of its own width, modulated by the lives on it: never plain.)
       const gwPx = laneAt(b, c.cam.cy).gw * c.cam.sx;
       if (gwPx > 24) expect(st?.fadeGreen ?? 0).toBeGreaterThan(0.25);
-      if (gwPx < 6) expect(st?.fadeGreen ?? 1).toBe(0);
+      if (gwPx < 6 && !lives) expect(mi.some((x) => x.mode === 0 && (x.narG ?? 0) > 0.5)).toBe(true);
       expect(st?.texGray ?? 0).toBeGreaterThan(0.25);
     }
   });
@@ -176,7 +176,6 @@ describe('the texture of lines, then the individuals on them', () => {
         const [w0, w1] = lane === 'green' ? [Math.max(xL + 2, xG - 4 - SCALE_BAR_PX), xG - 4] : [xG + 4, xG + 4 + SCALE_BAR_PX];
         const pitchPx = m.pitch(c.cam.cy) * c.cam.sx;
         const inWindow = (w1 - w0) / pitchPx;
-        if (lane === 'green' && N > 2e4) expect(inWindow).toBeLessThan(N); // the living: ~23 thousand
         const row = c.h / 2;
         const here = mesh.filter((x) => x.alpha > 0.3 && x.y0 <= row && x.y1 > row);
         expect(here.length).toBeGreaterThan(0);
@@ -232,17 +231,24 @@ describe('the texture of lines, then the individuals on them', () => {
 });
 
 describe('the dead lane', () => {
-  it('shows real lives, gray and pale green mixed, once the bar reads under ~100 individuals', () => {
+  it('shows real lives once the bar reads under ~100 individuals: ended lines gray, green lanes green', () => {
     for (const ago of [2000, 2e5]) {
-      const { c, b, m } = at(20, ago, 5, 0.7);
-      const { v } = stubView(c);
-      const st = drawTwigs(v, b, m, null);
-      const insts = unpack(v.mesh!).filter((x) => x.alpha > 0.01);
-      expect(insts.length).toBeGreaterThan(0);
-      const { lit, colours } = shadeScreen(v, c, insts, 4);
-      expect(lit).toBeGreaterThan(100);
-      expect(colours.size).toBeGreaterThan(1);
-      expect(st?.texGray ?? 0).toBeGreaterThan(0.25);
+      const seen: Set<string>[] = [];
+      // (Well inside each lane: near now the crash narrows the green lane to a sixth of the column.)
+      for (const where of [0.95, 0.04]) {
+        const { c, b, m } = at(20, ago, 5, where);
+        const { v } = stubView(c);
+        const st = drawTwigs(v, b, m, null);
+        const insts = unpack(v.mesh!).filter((x) => x.alpha > 0.01);
+        expect(insts.length).toBeGreaterThan(0);
+        const { lit, colours } = shadeScreen(v, c, insts, 4);
+        expect(lit).toBeGreaterThan(100);
+        expect(st?.texGray ?? 0).toBeGreaterThan(0.25);
+        seen.push(colours);
+      }
+      // The gray lane is one colour (line ended); the green lane's colours are none of it.
+      expect(seen[0].size).toBe(1);
+      for (const k of seen[1]) expect(seen[0].has(k)).toBe(false);
     }
   });
 

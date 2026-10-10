@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { laneAt, layoutFan, leftAt, remaining, strandAt } from './layout';
+import { aliveAt, laneAt, layoutFan, leftAt, strandAt } from './layout';
 import { PANTHERA } from './panthera';
 import { speciesModel, threadEnds, TwigModel, type TwigView } from './twigs';
 
@@ -36,20 +36,43 @@ describe('species model', () => {
 });
 
 describe('width = individuals', () => {
-  it('branch width at the base is individuals ever; the generations sum to it', () => {
+  it('branch width is the individuals alive then; the generations sum to the total ever', () => {
     const b = fanLin.branches[lionIdx];
     const rec = b.sp;
-    expect(strandAt(b, rec.t0, 'linear').w).toBeCloseTo(b.width, 12);
-    // Linear widths: individuals per world unit is the same for every species.
-    const perUnit = rec.ever / b.width;
-    for (const o of fanLin.branches) expect(o.sp.ever / o.width).toBeCloseTo(perUnit, -3);
+    // Linear widths: one world width per individual, the same for every species.
+    for (const o of fanLin.branches) expect(o.unit).toBe(b.unit);
+    for (const a of [0, 30e-6, 60e-6, 1e-3, 1]) expect(strandAt(b, a, 'linear').w / b.unit).toBeCloseTo(aliveAt(rec, a), 6);
     const m = lion();
     let sum = 0;
     for (let g = 0; g < m.G; g++) sum += m.size(g);
     expect(sum).toBe(m.T);
-    // At the tip only the living remain: the width there is the alive count.
-    expect(remaining(rec, 0)).toBe(rec.alive);
-    expect(strandAt(b, 0, 'linear').w * perUnit).toBeCloseTo(rec.alive, 0);
+    // At the tip: the living.
+    expect(strandAt(b, 0, 'linear').w / b.unit / rec.alive).toBeCloseTo(1, 2);
+  });
+
+  it('slots at a height = the individuals alive there; each generation folds onto them', () => {
+    for (const f of [fanLin, fanLog]) {
+      const m = lion(f);
+      for (const g of [10, 5000, m.G - 60, m.G - 12, m.G - 1]) {
+        const y = m.row(g).y;
+        const n = m.size(g);
+        const S = m.stride(g);
+        // The stride is the alive at its births (world-fixed), about the slots drawn there.
+        expect(S).toBe(Math.max(1, Math.round(m.b.pop.stepAt(m.ageOf((g + 0.5) * m.GL)).n)));
+        expect(m.totalSlots(y) / S).toBeGreaterThan(0.9);
+        expect(m.totalSlots(y) / S).toBeLessThan(1.1);
+        // About births ÷ alive (≈ 2: a life is half a generation) of g share a slot.
+        expect(m.fold(g)).toBe(Math.ceil(n / S));
+        expect(m.fold(g)).toBeLessThanOrEqual(3);
+        // Every member is on one slot (K ≡ i mod S), and that slot holds it.
+        for (const i of [0, 1, S - 1, S, n - 1]) {
+          const K = m.slotOf(g, i, false, y)!;
+          expect(K).not.toBeNull();
+          expect(K % S).toBe(i % S);
+          expect(m.slotIndividuals(K, g, y).map((s) => s.i)).toContain(i);
+        }
+      }
+    }
   });
 
   it('the lanes partition the branch: green on the left, gray on the right, same as the fan', () => {
@@ -69,7 +92,7 @@ describe('width = individuals', () => {
         expect(Math.abs(m.greenSlots(y) * P - L.gw)).toBeLessThanOrEqual(P);
         expect(m.totalSlots(y) * P).toBeCloseTo(L.w, 9);
         for (const K of [0, 777, Math.floor(m.totalSlots(y)) - 1]) expect(m.slotAt(m.slotX(K, y), y)).toBe(K);
-        if (f === fanLin) expect(P).toBe(b.width / b.sp.ever); // linear: the fan's width per individual, everywhere
+        if (f === fanLin) expect(P).toBe(b.unit); // linear: the fan's width per individual, everywhere
       }
     }
   });

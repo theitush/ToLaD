@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { clipPoly, FanCamera, MAX_YEARS_FRAC, MIN_YEARS, MIN_ZOOM, STRAND_PX } from './camera';
-import { laneAt, layoutFan, leftAt, Steps, strandAt, type FanBranch, type WidthMode } from './layout';
+import { laneAt, layoutFan, leftAt, strandAt, type FanBranch, type WidthMode } from './layout';
 import { PANTHERA } from './panthera';
 import { TwigModel } from './twigs';
 
@@ -202,21 +202,11 @@ describe('fan camera', () => {
             return [leftAt(b, y), L.w, L.gw];
           }),
         );
-      const sy0 = c.cam.sy;
       const ref = sample();
       for (const g of gestures(11)) {
         g(c);
-        // Left edges and green lanes never depend on the camera; the gray edge only on the step grid
-        // (the time zoom), so at the same grid everything is identical.
-        const now = sample();
-        for (let i = 0; i < ref.length; i++) {
-          expect(now[i][0]).toBe(ref[i][0]);
-          expect(now[i][2]).toBe(ref[i][2]);
-        }
-        const sy = c.cam.sy;
-        f.steps.setScale(sy0);
+        // Nothing depends on the camera: left edges and both lanes' edges, at every zoom.
         expect(sample()).toEqual(ref);
-        f.steps.setScale(sy);
       }
       // Sideways pans don't even change the time zoom: nothing changes at all.
       c.cam = c.home();
@@ -226,7 +216,7 @@ describe('fan camera', () => {
       expect(sample()).toEqual(before);
     });
 
-    it(`scripted smooth pinches and pans never jump, and the step grid never flip-flops (${mode})`, () => {
+    it(`scripted smooth pinches and pans never jump (${mode})`, () => {
       const c = camera(mode);
       const f = c.fan;
       const lion = f.branches.find((b) => b.sp.common === 'Lion')!;
@@ -249,8 +239,6 @@ describe('fan camera', () => {
         c.cam = { ...c.cam, cx: wx - (px - c.w / 2) / c.cam.sx, cy: wy - (py - c.h / 2) / c.cam.sy };
         c.settle();
         // In, out, in again: 1.04× per frame, like a smooth pinch; then a pan sweep.
-        const lvl: number[] = [];
-        const dirs: number[] = [];
         for (const [step, n] of [
           [1.04, 260],
           [1 / 1.04, 260],
@@ -270,14 +258,7 @@ describe('fan camera', () => {
             // (Zooming out near "now", the pan clamp holds "now" at 40% down, which moves the
             // point by no more than the step itself would have moved the screen's edge.)
             expect(Math.hypot(sx2 - px, sy2 - py)).toBeLessThan(Math.max(2, Math.abs(1 - 1 / step) * c.h));
-            lvl.push(f.steps.k + f.steps.t);
-            dirs.push(step > 1 ? 1 : -1);
           }
-        }
-        // The step grid follows the zoom monotonically: finer zooming in, coarser zooming out, never back and forth.
-        for (let i = 1; i < lvl.length; i++) {
-          if (dirs[i] > 0) expect(lvl[i]).toBeGreaterThanOrEqual(lvl[i - 1] - 1e-12);
-          else expect(lvl[i]).toBeLessThanOrEqual(lvl[i - 1] + 1e-12);
         }
         // A pan sweep moves the camera by exactly what was asked (no snapping), until the clamp holds it.
         for (let k = 0; k < 60; k++) {
@@ -292,18 +273,37 @@ describe('fan camera', () => {
     });
   }
 
-  it('the gray edge morphs between step grids over a zoom, never pops', () => {
-    const f = layoutFan(PANTHERA, 'linear');
-    const lion = f.branches.find((b) => b.sp.common === 'Lion')!;
-    const ys = Array.from({ length: 50 }, (_, i) => lion.tipY * ((i + 0.5) / 50));
-    let prev: number[] | null = null;
-    for (let z = 0; z <= 2000; z++) {
-      f.steps.setScale(0.5 * Math.pow(1.005, z));
-      const w = ys.map((y) => laneAt(lion, y).w);
-      if (prev) for (let i = 0; i < w.length; i++) expect(Math.abs(w[i] - prev[i])).toBeLessThan(0.05 * lion.width);
-      prev = w;
+  it('the lane edges at fixed times are identical at every zoom (no level picked by the view)', () => {
+    for (const mode of ['linear', 'log'] as WidthMode[]) {
+      const c = camera(mode);
+      const f = c.fan;
+      const lion = f.branches.find((b) => b.sp.common === 'Lion')!;
+      // Fixed times: in the lion's recent crash, its deep past, the cave lion's span, the stem.
+      const ages = [0, 5e-6, 20e-6, 35e-6, 60e-6, 90e-6, 150e-6, 0.01, 0.5, 3, 4.5, 8];
+      const edges = () =>
+        f.branches.flatMap((b) =>
+          ages.map((a) => {
+            const y = f.time.y(a);
+            const L = laneAt(b, y);
+            return [leftAt(b, y), leftAt(b, y) + L.gw, leftAt(b, y) + L.w];
+          }),
+        );
+      c.cam = c.home();
+      c.settle();
+      const ref = edges();
+      // The lion's crash is there to see: its width changes between those times.
+      expect(new Set(ages.slice(0, 7).map((a) => laneAt(lion, f.time.y(a)).w)).size).toBeGreaterThan(3);
+      for (const [px, py, step, n] of [
+        [c.w / 2, c.h / 2, 1.1, 60],
+        [c.w / 2, c.h * 0.2, 1 / 1.1, 90],
+        [c.w * 0.3, c.h * 0.8, 1.2, 40],
+      ] as const) {
+        for (let k = 0; k < n; k++) {
+          c.zoomAbout(px, py, step);
+          if (k % 10 === 0) expect(edges()).toEqual(ref);
+        }
+      }
     }
-    expect(Steps.dy(3)).toBeCloseTo(Steps.dy(4) * 2, 12);
     void strandAt;
   });
 });

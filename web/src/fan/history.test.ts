@@ -4,7 +4,7 @@ import { dirname, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { decodeFile } from '../data/tolad-decoder.js';
 import { BirthCurve, historySpans, spanStyle } from './history';
-import { layoutFan, remaining, strandAt } from './layout';
+import { aliveAt, layoutFan, strandAt } from './layout';
 import { PANTHERA, type SpeciesRec } from './panthera';
 import { speciesModel, TwigModel } from './twigs';
 
@@ -100,39 +100,25 @@ describe('history-driven procgen', () => {
   });
 });
 
-describe('width = individuals with a varying population', () => {
+describe('width = individuals alive, with a varying population', () => {
   for (const mode of ['linear', 'log'] as const) {
-    it(`lion/tiger: base = ever, tip = alive, between = the births curve (${mode})`, () => {
+    it(`lion/tiger: tip = alive now, between = the births curve × lifespan ÷ generation (${mode})`, () => {
       const fan = layoutFan(PANTHERA, mode);
       for (const c of ['Lion', 'Tiger']) {
         const i = PANTHERA.species.findIndex((s) => s.common === c);
         const b = fan.branches[i];
         const sp: SpeciesRec = b.sp;
-        expect(remaining(sp, sp.t0)).toBe(sp.ever);
-        expect(remaining(sp, sp.t1)).toBe(sp.alive);
+        expect(aliveAt(sp, sp.t1) / sp.alive).toBeCloseTo(1, 2);
+        expect(strandAt(b, sp.t1, mode).f).toBe(1);
+        // The widest is the pre-decline baseline, held back to the first appearance (its founders below).
         expect(strandAt(b, sp.t0, mode).w).toBeCloseTo(b.width, 9);
-        expect(strandAt(b, sp.t1, mode).f).toBeCloseTo(1, 9);
-        // At each generation boundary the dead not yet peeled off are exactly
-        // the procgen births after it (the twig partition): births · (ever − alive)/ever.
+        // Alive in generation k = its procgen births × mean lifespan ÷ generation length.
         const m = new TwigModel(b, fan.time, mode);
-        const after = (k: number) => {
-          let n = 0;
-          for (let g = k; g < m.G; g++) n += m.size(g);
-          return n;
-        };
-        for (const back of [1, 5, 20, 40]) {
+        for (const back of [1, 5, 20, 40, 1000]) {
           const k = m.G - back;
-          const ageMa = (back * m.GL) / 1e6;
-          const share = (remaining(sp, ageMa) - sp.alive) / (sp.ever - sp.alive);
-          expect(share / (after(k) / m.T)).toBeCloseTo(1, 3);
-        }
-        // Monotone: never wider above than below.
-        let prev = Infinity;
-        for (let k = 0; k <= 200; k++) {
-          const a = sp.t1 + ((sp.t0 - sp.t1) * Math.pow(k / 200, 4)) * 1;
-          const r = remaining(sp, sp.t0 - (a - sp.t1));
-          expect(r).toBeLessThanOrEqual(prev * (1 + 1e-12));
-          prev = r;
+          const ageMa = ((back - 0.5) * m.GL) / 1e6;
+          const n = (m.size(k) * m.sp.lifespanYears) / m.GL;
+          expect(aliveAt(sp, ageMa) / n).toBeCloseTo(1, 2);
         }
       }
     });

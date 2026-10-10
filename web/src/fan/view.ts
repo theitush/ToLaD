@@ -8,10 +8,10 @@ import { formatAge, formatCount } from '../data/names';
 import { Input, type InputHandlers } from '../engine/input';
 import { clipPoly, FanCamera, STRAND_PX, type Camera } from './camera';
 import { EDGE_DASH, edgeMarks, edgeXAt, dotAlphas, GRADE_COLOR, historySpans, pointAgo, toScreenSpans, type ScreenSpan, type Span } from './history';
-import { JOG, laneAt, layoutFan, leftAt, STEM_FADE_MA, Steps, strandAt, type Fan, type FanBranch, type WidthMode } from './layout';
+import { JOG, laneAt, layoutFan, leftAt, STEM_FADE_MA, strandAt, type Fan, type FanBranch, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01 } from './meshgl';
-import { drawTwigs, kLogAt, LINEAGE, LIVING, TWIG_GRAY, TWIG_WITHERED, TwigModel, type IndInfo, type TwigStats } from './twigs';
+import { drawTwigs, kLogAt, laneDim, LINEAGE, LIVING, TWIG_GRAY, TWIG_WITHERED, TwigModel, type IndInfo, type TwigStats } from './twigs';
 import type { MeshBatch } from './meshgl';
 
 export type { IndInfo } from './twigs';
@@ -38,6 +38,8 @@ const LABEL_PX = 30;
 export interface Selection {
   sp: SpeciesRec;
   ind?: IndInfo;
+  /** The time touched (Ma), within the species' column: the card shows the population then. */
+  ageMa?: number;
 }
 
 interface RibbonPt {
@@ -338,7 +340,9 @@ export class FanView implements InputHandlers {
         ind = m.info(a.g, a.i);
       }
     }
-    this.onSelect(b ? { sp: b.sp, ind } : null);
+    // The time touched, kept within the column (from its tip down; below the fork, the founders).
+    const ageMa = b ? Math.max(b.sp.t1, this.fan.time.ageAt(this.toWorld(x, y)[1])) : undefined;
+    this.onSelect(b ? { sp: b.sp, ind, ageMa } : null);
     this.request();
   }
 
@@ -418,7 +422,8 @@ export class FanView implements InputHandlers {
     const l = Math.max(-8, x0);
     const r = Math.min(this.w + 8, x1);
     if (b <= t || r <= l) return;
-    this.under(l, t, r, b, rgb01(GRAY));
+    // (Between the stalks: a dark backdrop, so the stem reads as one without the gaps passing for lanes.)
+    this.under(l, t, r, b, rgb01(this.gl ? mix(GRAY, '#131c19', 0.86) : GRAY));
   }
 
   /** The stem fades out over its last stretch (from STEM_FADE_MA down to the bottom of the world): nothing ends abruptly. */
@@ -493,16 +498,18 @@ export class FanView implements InputHandlers {
     // As the strands fade in (twigs.ts), the lanes dim to a backdrop under them: the same
     // lanes, the same geometry, never a switch.
     const tw = this.twigStats.get(b.sp.gid);
-    // Under the mesh the lanes sink to a dark tint of themselves, so the individuals carry the colour.
-    const grayC = mix(b.sp.extinct ? WITHERED : GRAY, '#131c19', Math.max(tw?.fade ?? 0, tw?.texGray ?? 0) * 0.82);
+    // Under the mesh the lanes sink to a dark tint of themselves, so the individuals carry the colour:
+    // each stretch by its own lanes' widths (twigs.ts laneDim), as the mesh draws them.
+    const lives = tw?.fade ?? 0;
+    const grayBase = b.sp.extinct ? WITHERED : GRAY;
     const greenFade = tw?.fadeGreen ?? 0;
     const greenC = mix(GREEN, '#10291d', greenFade * 0.85);
+    const yT0 = this.toScreen(0, this.fan.time.y(b.sp.t0))[1];
+    const grayC = mix(grayBase, '#131c19', Math.max(lives, tw?.texGray ?? 0) * 0.82);
     if (this.gl) {
       // Each stretch of constant width is a rectangle: the whole lane gray (at least 0.6 px),
       // the green lane over its left edge (at least 1 px).
       const k = this.cam.sx;
-      const gc = rgb01(grayC);
-      const ec = rgb01(greenC);
       for (let i = 0; i + 1 < pts.length; i += 2) {
         const p = pts[i];
         const q = pts[i + 1];
@@ -510,11 +517,16 @@ export class FanView implements InputHandlers {
         const y0 = Math.max(-4, q.y);
         const y1 = Math.min(this.h + 4, p.y);
         if (!(y1 > y0) || x0 > this.w + 4) continue;
+        const gPx = p.w * p.f * k;
+        // (An extinct species' line ended: withered over its span; below it, its founders' ancestors.)
+        const base = b.sp.extinct && (p.y + q.y) / 2 < yT0 ? grayBase : GRAY;
+        const gc = rgb01(mix(base, '#131c19', laneDim(p.w * k - gPx, lives) * 0.82));
+        const ec = rgb01(mix(GREEN, '#10291d', laneDim(gPx, lives) * 0.85));
         this.gl.under.push(Math.max(-4, x0), y0, Math.min(this.w + 4, x0 + Math.max(0.6, p.w * k)), y1, gc[0], gc[1], gc[2], 1);
-        if (!b.sp.extinct) {
-          const x1 = x0 + Math.max(1, p.w * p.f * k);
+        if (gPx > 0) {
+          const x1 = x0 + Math.max(1, gPx);
           // The living glow faintly (fading as their lane resolves into individuals).
-          const glow = 1 - greenFade;
+          const glow = 1 - lives;
           if (glow > 0.01) {
             this.gl.under.push(Math.max(-8, x0 - 4), y0, Math.min(this.w + 8, x1 + 4), y1, ec[0], ec[1], ec[2], 0.06 * glow);
             this.gl.under.push(Math.max(-8, x0 - 1.5), y0, Math.min(this.w + 8, x1 + 1.5), y1, ec[0], ec[1], ec[2], 0.14 * glow);
@@ -525,8 +537,8 @@ export class FanView implements InputHandlers {
     } else {
       ctx.fillStyle = grayC;
       this.ribbon(pts, (p) => hw - p.w, () => hw, 0.6);
-      if (!b.sp.extinct) {
-        // Green lane on the left, floored at 1 px all the way from the tip to the root.
+      if (pts.some((p) => p.f > 0)) {
+        // Green lane on the left, floored at 1 px.
         ctx.fillStyle = greenC;
         this.ribbon(pts, () => hw, (p) => hw - p.w * p.f, -1);
       }
@@ -551,11 +563,15 @@ export class FanView implements InputHandlers {
   lanePoints(b: FanBranch, hw: number): RibbonPt[] {
     const yb = this.fan.trunkBottom.y;
     const steps = this.fan.steps;
-    const d = Steps.dy(steps.level);
     const [, sTop] = this.toWorld(0, -20);
     const [, sBot] = this.toWorld(0, this.h + 20);
-    const ys = new Set<number>([yb, 0, -JOG, b.tipY]);
-    for (const y of steps.lines(b, sTop - d, sBot + d) ?? []) ys.add(y);
+    const ys = new Set<number>([yb, 0, -JOG, b.tipY, this.fan.time.y(b.sp.t0)]);
+    // Every step line on screen and the nearest one beyond each edge (the stretches reaching off screen).
+    const all = steps.bounds(b);
+    for (let k = 0; k < all.length; k++) {
+      const y = all[k];
+      if ((y >= sTop && y <= sBot) || (y < sTop && !(all[k + 1] < sTop)) || (y > sBot && !(all[k - 1] > sBot))) ys.add(y);
+    }
     if (sBot < yb && sBot > 0) ys.add(sBot);
     const sorted = [...ys].filter((y) => y >= b.tipY && y <= yb).sort((p, q) => q - p);
     // Spine at left + hw: the ribbon spans offsets [hw - w, hw] to its left (nx = -1).
@@ -701,7 +717,7 @@ export class FanView implements InputHandlers {
     const cx = lead ? lx! : tx;
     let cy = ty - lead;
     const name = b.sp.common;
-    const sub = `${formatCount(b.sp.ever)} ever${b.sp.extinct ? ` · extinct ${formatAge(b.sp.t1)}` : ''}`;
+    const sub = b.sp.extinct ? `~${formatCount(b.pop.aliveAt(b.sp.t1))} alive · extinct ${formatAge(b.sp.t1)}` : `${formatCount(b.sp.alive)} alive now`;
     const fs = 16;
     ctx.save();
     ctx.textBaseline = 'middle';
@@ -748,28 +764,27 @@ export class FanView implements InputHandlers {
   }
 
   /**
-   * The width scale, like a map's: a bar and how many individuals its width
-   * holds at the current zoom (a round 1, 2 or 5 × 10^k). In log widths a
-   * width is 1 + log10(individuals), so the bar is the width that multiplies
-   * the individuals by 10 (or by 10^k, or by a factor, whichever fits).
+   * The width scale, like a map's: a bar and how many individuals alive at
+   * the time its width holds at the current zoom (a round 1, 2 or 5 × 10^k).
+   * In log widths a width is 1 + log10(individuals), so the bar is the width
+   * that multiplies the individuals by 10 (or by 10^k, or by a factor,
+   * whichever fits).
    */
   widthScale(): { px: number; label: string } {
-    const f = this.fan;
-    const sumG = f.branches.reduce((a, b) => a + g1(b.sp.ever, this.mode), 0);
-    const unitPx = (f.trunkWidth / sumG) * this.cam.sx; // px per individual (linear) or per decade (log)
+    const unitPx = this.fan.branches[0].unit * this.cam.sx; // px per individual (linear) or per decade (log)
     const target = 70;
     if (this.mode === 'linear') {
       const per = 1 / unitPx; // individuals per px
       const n = Math.max(1, niceStep(target * per));
       const px = n / per;
-      return { px, label: `${n === 1 ? '1 individual' : `${formatCount(n)} individuals`}` };
+      return { px, label: `${formatCount(n)} alive` };
     }
     if (unitPx < target * 2.5) {
       const k = Math.max(1, niceStep(target / unitPx));
-      return { px: k * unitPx, label: `×${k === 1 ? '10' : `10${sup(k)}`} individuals · log widths` };
+      return { px: k * unitPx, label: `×${k === 1 ? '10' : `10${sup(k)}`} alive · log widths` };
     }
     const fct = Math.pow(10, target / unitPx);
-    return { px: target, label: `×${fct < 1.1 ? fct.toFixed(4) : fct.toFixed(2)} individuals · log widths` };
+    return { px: target, label: `×${fct < 1.1 ? fct.toFixed(4) : fct.toFixed(2)} alive · log widths` };
   }
 
   private drawWidthScale(): void {
@@ -791,12 +806,11 @@ export class FanView implements InputHandlers {
     const [, yTop] = this.toWorld(0, 0);
     const [, yBot] = this.toWorld(0, this.h);
     const yrs = this.camera.years(yBot) - this.camera.years(yTop);
-    const sumG = this.fan.branches.reduce((a, b) => a + g1(b.sp.ever, this.mode), 0);
-    const perPx = sumG / this.fan.trunkWidth / c.sx;
+    const perPx = 1 / this.fan.branches[0].unit / c.sx;
     const lines = [
       `width ×${(c.sx / h.sx).toPrecision(4)}  time ×${(c.sy / h.sy).toPrecision(4)} (asked ×${(c.ty / h.sy).toPrecision(3)})`,
       `screen ${formatYearsAgo(yrs).replace(' ago', '')} · top ${formatYearsAgo(Math.max(0, this.camera.years(yTop)))}`,
-      `${this.mode === 'linear' ? `${perPx.toPrecision(3)} individuals/px` : `${perPx.toPrecision(3)} log units/px`} · steps L${this.fan.steps.k}+${this.fan.steps.t.toFixed(2)}`,
+      `${this.mode === 'linear' ? `${perPx.toPrecision(3)} individuals/px` : `${perPx.toPrecision(3)} log units/px`}`,
     ];
     const ctx = this.ctx;
     ctx.save();
@@ -816,13 +830,18 @@ export class FanView implements InputHandlers {
 
   /** When zoomed into a species' individuals: which species and generations are on screen. */
   private drawHud(): void {
+    // (The texture is everywhere: only once one species fills most of the screen's width.)
     let best: FanBranch | null = null;
     let bestN = -1;
     for (const b of this.fan.branches) {
       const st = this.twigStats.get(b.sp.gid);
-      if (st && st.drawn > bestN) {
+      if (!st) continue;
+      const wPx = laneAt(b, this.cam.cy).w * this.cam.sx;
+      if (!(st.drawn > 0) && wPx < this.w * 0.6) continue;
+      const score = st.drawn + wPx;
+      if (score > bestN) {
         best = b;
-        bestN = st.drawn;
+        bestN = score;
       }
     }
     if (!best) return;
@@ -830,11 +849,18 @@ export class FanView implements InputHandlers {
     const m = this.model(best);
     const ctx = this.ctx;
     const gens = st.g0 === st.g1 ? `generation ${fmtInt(st.g0 + 1)}` : `generations ${fmtInt(st.g0 + 1)}–${fmtInt(st.g1 + 1)}`;
+    // The headline is the population alive at the middle of the generations on screen (the column's width
+    // there), and its green share: the same time as the "born" line under it.
+    const sp = best.sp;
+    const ageMa = Math.min(Math.max(m.bornAgo((st.g0 + st.g1) / 2) / 1e6, sp.t1), sp.t0);
+    const yrs = ageMa * 1e6;
+    const when = yrs < 0.5 ? 'now' : formatYearsAgo(yrs);
     const lines = [
-      `${best.sp.common}${best.sp.extinct ? ' (extinct)' : ''}`,
+      `${sp.common}${sp.extinct ? ' (extinct)' : ''}`,
+      `~${formatCount(best.pop.stepAt(ageMa).n)} alive ${when}`,
+      `${Math.round(best.pop.stepAt(ageMa).q * 100)}% with living descendants`,
       `${gens} of ${fmtInt(m.G)}`,
       `born ~${formatYearsAgo(m.bornAgo(st.g1))}${st.g0 === st.g1 ? '' : ` to ~${formatYearsAgo(m.bornAgo(st.g0))}`}`,
-      `${fmtInt(m.size(st.g0))} per generation · ${st.mode}`,
     ];
     ctx.save();
     // Below the buttons, right of the axis: the species large, its generations quiet.
@@ -847,7 +873,7 @@ export class FanView implements InputHandlers {
     const wmax = Math.max(w0, ...lines.slice(1).map((l) => ctx.measureText(l).width)) + 24;
     ctx.fillStyle = 'rgba(12,23,20,0.84)';
     ctx.beginPath();
-    ctx.roundRect(x - 12, y - 8, Math.min(this.w - x, wmax), 88, 12);
+    ctx.roundRect(x - 12, y - 8, Math.min(this.w - x, wmax), 30 + 16 * (lines.length - 1), 12);
     ctx.fill();
     ctx.textBaseline = 'top';
     ctx.textAlign = 'left';
@@ -988,8 +1014,9 @@ export class FanView implements InputHandlers {
     const lines: [string, string, string][] = [
       [f.clade.common, font('650 17px'), INK],
       [f.clade.sci, font('italic 400 14px', SERIF), INK2],
-      [`${formatCount(f.clade.ever)} ever lived`, font('500 13px'), INK2],
+      // The living first; the total born only as an honest secondary line (a model figure, never bare).
       [`${formatCount(f.clade.alive)} alive now`, font('600 13px'), GREEN],
+      [`~${formatCount(f.clade.ever)} born in total (model, grade ${f.clade.grade})`, font('500 13px'), INK2],
     ];
     let wmax = 0;
     for (const [t, ft] of lines) {
@@ -1021,12 +1048,6 @@ export class FanView implements InputHandlers {
 /** x of the middle of a branch's tip (branches are left-aligned). */
 function tipX(b: FanBranch, _fan: Fan, _mode: WidthMode): number {
   return leftAt(b, b.tipY) + laneAt(b, b.tipY).w / 2;
-}
-
-/** Width units of n individuals: n (linear) or 1 + log10 n (log), as layout.ts g(). */
-function g1(n: number, mode: WidthMode): number {
-  if (!(n > 0)) return 0;
-  return mode === 'linear' ? n : 1 + Math.max(0, Math.log10(n));
 }
 
 function sup(k: number): string {
