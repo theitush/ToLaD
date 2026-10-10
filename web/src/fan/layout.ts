@@ -14,22 +14,26 @@
 //     neighbours (gapBetween): GAP_FRAC of the smaller one's base width, at
 //     least MIN_GAP_FRAC of the stem's. Positions never change with time or view.
 //
-// Inside a column the green (alive) lane is a straight band on its left edge,
-// constant width; the gray (dead) lane lies to its right and narrows as the
-// dead peel off. Its right edge is the only edge that is not one straight line:
-// a step function of height (Steps), all vertical and horizontal segments.
+// Inside a column, at every height, the lanes split the individuals alive
+// then (population.ts): the green lane on its left edge holds those with living
+// descendants today, the gray lane to its right those whose line ended (warm
+// gray for an extinct species, all of it). Both edges are step functions of
+// height (Steps), all vertical and horizontal segments.
 //
 // Height = time: the fork is the clade's origin, "now" is y = −TIME_H, on a
 // log years-before-present scale offset by TIME_C (TimeScale).
 //
-// Width = individuals: at height y a branch holds everyone whose strand passes
-// through it (everyone not yet dead by then, remaining()), times one fixed
-// world width per individual (linear) or per decade of individuals (log, g()).
-// The steps hold that width averaged over each step's height, so a step's
-// width is the individuals at some height inside it (exact there) and the
-// area under the edge is preserved step by step.
+// Width = individuals alive at that time (∝ births per unit time): N(t) times
+// one fixed world width per individual (linear) or per decade of individuals
+// (log, g()). A column's room is its widest N. Below a species' first
+// appearance its column holds its founders (constant), down to the fork and
+// through the stem, the clade's ancestors (the sum of the founders). The steps
+// hold the width (and the green lane's) averaged over each step's height, on
+// nested log-time grids fixed in the world: the area under each edge is
+// preserved step by step and a drop in N shows as a step.
 
 import type { CladeRec, SpeciesRec } from './panthera';
+import { population, type Population } from './population';
 
 export type WidthMode = 'log' | 'linear';
 
@@ -99,18 +103,23 @@ export interface FanBranch {
   sp: SpeciesRec;
   /** Index among its siblings (tree order, left to right). */
   index: number;
-  /** Width share among siblings and absolute width at the base (= individuals ever). */
+  /** Width share among siblings and the column's room (world): its widest, at the most alive. */
   share: number;
   width: number;
-  /** Alive lane fraction at the base (0 if extinct). */
-  aliveFrac: number;
+  /** World width per individual (linear) or per decade of individuals (log). */
+  unit: number;
+  /** The species' population through time (alive, and the share with living descendants). */
+  pop: Population;
+  /** Width and green share below its first appearance (its founders), down the stem. */
+  baseW: number;
+  baseQ: number;
   /** Left edge below the fork: its column, which goes straight on down (= colLeft). */
   baseLeft: number;
   /** Left edge of its column, from the bottom of the world to its tip. */
   colLeft: number;
   /** The tip (last appearance) height. */
   tipY: number;
-  /** The fan's step grids, which draw its gray edge. */
+  /** The fan's step grids, which draw its edges. */
   steps: Steps;
 }
 
@@ -168,7 +177,7 @@ export class Steps {
   /** Level shown and how far it has morphed into level k + 1 (0–1). */
   k = 0;
   t = 0;
-  private readonly cache = new Map<FanBranch, Map<number, number>>();
+  private readonly cache = new Map<FanBranch, Map<number, [number, number]>>();
 
   constructor(
     readonly time: TimeScale,
@@ -198,8 +207,11 @@ export class Steps {
     return this.t > 0 ? this.k + 1 : this.k;
   }
 
-  /** Mean exact width of branch b over step i of level k (0 if the branch isn't there). */
-  mean(b: FanBranch, k: number, i: number): number {
+  /**
+   * Mean exact width of branch b over step i of level k, and of its green
+   * lane (0 if the branch isn't there): [w, gw].
+   */
+  mean(b: FanBranch, k: number, i: number): [number, number] {
     let m = this.cache.get(b);
     if (!m) this.cache.set(b, (m = new Map()));
     const key = k * 2 ** 40 + i; // i < 2^k ≤ 2^36
@@ -208,16 +220,24 @@ export class Steps {
     const d = Steps.dy(k);
     const yLo = -i * d; // bottom of the step
     const yHi = Math.max(b.tipY, -(i + 1) * d); // top, clipped to the tip
-    let v = 0;
+    const v: [number, number] = [0, 0];
     if (yHi < yLo) {
       // Adaptive Simpson, split at the species' first appearance (where the width has a kink).
-      const f = (y: number) => strandAt(b, this.time.ageAt(y), this.mode).w;
       const cuts = [yHi, yLo];
       const y0 = this.time.y(b.sp.t0);
       if (y0 > yHi && y0 < yLo) cuts.splice(1, 0, y0);
-      let s = 0;
-      for (let c = 0; c + 1 < cuts.length; c++) s += integrate(f, cuts[c], cuts[c + 1], b.width * (yLo - yHi) * 1e-7);
-      v = s / (yLo - yHi);
+      for (const green of [false, true]) {
+        const f = green
+          ? (y: number) => {
+              const s = strandAt(b, this.time.ageAt(y), this.mode);
+              return s.w * s.f;
+            }
+          : (y: number) => strandAt(b, this.time.ageAt(y), this.mode).w;
+        let s = 0;
+        for (let c = 0; c + 1 < cuts.length; c++) s += integrate(f, cuts[c], cuts[c + 1], b.width * (yLo - yHi) * 1e-7);
+        v[green ? 1 : 0] = Math.max(0, s / (yLo - yHi));
+      }
+      v[1] = Math.min(v[1], v[0]);
     }
     if (m.size > 50000) m.clear();
     m.set(key, v);
@@ -229,14 +249,20 @@ export class Steps {
     return Math.max(0, Math.min(2 ** k - 1, Math.floor(-y / Steps.dy(k))));
   }
 
-  /** Stepped width of branch b at world y, at the current level (blended while morphing). */
-  widthAt(b: FanBranch, y: number): number {
-    if (y >= 0) return b.width;
-    if (y < b.tipY) return 0;
+  /** Stepped width of branch b at world y and of its green lane, at the current level (blended while morphing): [w, gw]. */
+  lanesAt(b: FanBranch, y: number): [number, number] {
+    if (y >= 0) return [b.baseW, b.baseW * b.baseQ];
+    if (y < b.tipY) return [0, 0];
     const a = this.mean(b, this.k, Steps.index(this.k, y));
     if (this.t <= 0) return a;
     const k1 = this.k + 1;
-    return a + (this.mean(b, k1, Steps.index(k1, y)) - a) * this.t;
+    const c = this.mean(b, k1, Steps.index(k1, y));
+    return [a[0] + (c[0] - a[0]) * this.t, a[1] + (c[1] - a[1]) * this.t];
+  }
+
+  /** Stepped width of branch b at world y (lanesAt's first). */
+  widthAt(b: FanBranch, y: number): number {
+    return this.lanesAt(b, y)[0];
   }
 
   /**
@@ -267,13 +293,12 @@ export function leftAt(b: FanBranch, _y?: number): number {
 }
 
 /**
- * A branch's lanes at world y, as drawn: total width w (stepped), the green
- * lane's width gw (constant from the root to the tip) and its fraction f.
+ * A branch's lanes at world y, as drawn: total width w (the individuals alive
+ * then, stepped), the green lane's width gw (those with living descendants
+ * today, stepped alike) and its fraction f.
  */
 export function laneAt(b: FanBranch, y: number): { w: number; gw: number; f: number } {
-  const w = b.steps.widthAt(b, y);
-  const green = b.sp.alive > 0 ? b.width * b.aliveFrac : 0;
-  const gw = Math.min(w, green);
+  const [w, gw] = b.steps.lanesAt(b, y);
   return { w, gw, f: w > 0 ? gw / w : 0 };
 }
 
@@ -287,66 +312,44 @@ export function g(n: number, mode: WidthMode): number {
   return mode === 'linear' ? n : 1 + Math.max(0, Math.log10(n));
 }
 
-/**
- * Alive lane fraction at the base (everyone ever present): g(alive) / g(ever).
- * The living are present from the base to the tip, so their lane keeps this
- * absolute width all the way up; only the gray (the dead) peels off.
- */
-export function aliveFrac(alive: number, ever: number, mode: WidthMode): number {
-  if (!(alive > 0) || !(ever > 0)) return 0;
-  return Math.min(1, g(alive, mode) / g(ever, mode));
-}
-/**
- * Individuals whose strands pass through age `ageMa` (not dead by then):
- * everyone ever before the species' first appearance, the living at the tip.
- * With a curated history that drives the counts, the dead peel off along its
- * real births curve (the share of all births after `ageMa`, procgen's own
- * ramps integrated); otherwise births are spread evenly over the species' span
- * (procgen's constant-size model). Either way the base is ever, the tip alive.
- */
-export function remaining(sp: SpeciesRec, ageMa: number): number {
-  if (ageMa >= sp.t0) return sp.ever;
-  if (ageMa <= sp.t1) return sp.alive;
-  const c = sp.births?.curve;
-  const r = c ? Math.min(1, c.bornAfter((ageMa - sp.t1) * 1e6) / c.total) : (ageMa - sp.t1) / (sp.t0 - sp.t1);
-  return sp.alive + (sp.ever - sp.alive) * r;
+/** Individuals alive at age `ageMa` in a species (population.ts): its founders before its first appearance, 0 after an extinct one's last. */
+export function aliveAt(sp: SpeciesRec, ageMa: number): number {
+  return population(sp).aliveAt(ageMa);
 }
 
 /**
  * Exact (unstepped) strand width and green fraction of a branch at age
- * `ageMa`. The green lane has the same absolute width along the whole strand
- * (width · g(alive)/g(ever), in both modes): the gray around it thins as the
- * dead peel off, so at the tip (only the living remain) the strand is all green.
+ * `ageMa`: w = the individuals alive then (g() in log widths) times the unit,
+ * f = the share of them with living descendants today (population.ts).
  */
 export function strandAt(b: FanBranch, ageMa: number, mode: WidthMode): { w: number; f: number } {
-  const sp = b.sp;
-  const rem = remaining(sp, ageMa);
-  const gEver = g(sp.ever, mode);
-  const w = rem > 0 ? (b.width * g(rem, mode)) / gEver : 0;
-  const green = sp.alive > 0 ? (b.width * g(sp.alive, mode)) / gEver : 0;
-  return { w, f: w > 0 ? Math.min(1, green / w) : 0 };
+  const n = b.pop.aliveAt(ageMa);
+  const w = n > 0 ? b.unit * g(n, mode) : 0;
+  return { w, f: w > 0 ? b.pop.greenAt(ageMa) : 0 };
 }
 
 export function layoutFan(clade: CladeRec, mode: WidthMode): Fan {
   const sp = clade.species;
-  const gs = sp.map((s) => g(s.ever, mode));
+  const pops = sp.map((s) => population(s));
+  const gs = pops.map((p) => g(p.max, mode));
   const sum = gs.reduce((a, b) => a + b, 0);
   const W = TRUNK_WIDTH;
+  const unit = W / sum;
   const time = new TimeScale(clade.t0);
   const steps = new Steps(time, mode);
-  let x = -W / 2;
   const branches: FanBranch[] = sp.map((s, i) => {
     const share = gs[i] / sum;
-    const width = share * W;
-    const baseLeft = x;
-    x += width;
+    const pop = pops[i];
     return {
       sp: s,
       index: i,
       share,
-      width,
-      aliveFrac: aliveFrac(s.alive, s.ever, mode),
-      baseLeft,
+      width: share * W,
+      unit,
+      pop,
+      baseW: unit * g(pop.founders, mode),
+      baseQ: pop.qBase,
+      baseLeft: 0,
       colLeft: 0,
       tipY: time.y(s.t1),
       steps,

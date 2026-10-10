@@ -76,8 +76,8 @@ flat in vec4 vTime;   // p0, T0, A, gBoff
 flat in vec4 vMisc;   // alpha, mode, lane, tipR
 flat in vec4 vLife;   // GL, Lm, nowRel, xG
 flat in uvec4 vIdx;   // B0, lvl, nA, nB
-flat in uvec4 vSeed;  // seedA, seedB, thrA, thrB
-flat in uvec4 vIdx2;  // latSeed, nG, fold, -
+flat in uvec4 vSeed;  // seedA, seedB, strideA, strideB
+flat in uvec4 vIdx2;  // latSeed, foldA, foldB, -
 flat in vec4 vNar;    // colL, colR, narG, narR
 uniform float uKLog;
 uniform float uNowPx;
@@ -93,30 +93,28 @@ float lineAA(float d, float lw) {
   float w = max(lw, 1.0);
   return clamp(w * 0.5 + 0.5 - d, 0.0, 1.0) * min(lw, 1.0);
 }
-// One individual: x = birth, y = life (years from its generation's start); z = alive, w = lineage.
-vec4 life(uint seed, uint i, float GL, float Lm, float nowRel, uint thr) {
+// One individual: x = birth, y = life (years from its generation's start); z = alive now.
+vec4 life(uint seed, uint i, float GL, float Lm, float nowRel) {
   uint h = mixh(seed, i);
   float birth = randFloat(h, 1u) * GL;
   float l = Lm * (randFloat(h, 2u) + randFloat(h, 3u));
   bool alive = birth <= nowRel && birth + l > nowRel;
-  bool lin = rand(h, 17u) < thr;
-  return vec4(birth, l, alive ? 1.0 : 0.0, lin ? 1.0 : 0.0);
+  return vec4(birth, l, alive ? 1.0 : 0.0, 0.0);
 }
 // mesh.ts latticeBit: which half's line is block idx's at level l.
 uint latBit(uint l, uint idx) { return lowbias32((idx * 0x9e3779b1u) ^ vIdx2.x ^ (l * 0x85ebca6bu)) >> 31u; }
-int code(float lane, bool alive, bool lin) {
+int code(float lane, bool alive) {
   if (lane < 0.5) return alive ? 0 : 1;
   if (alive) return -1;
-  if (lane > 1.5) return 3;
-  return lin ? 1 : 2;
+  return lane > 1.5 ? 3 : 2;
 }
+// mesh.ts slotBase: generation's first member on slot K (stride S, n members).
+uint slotBase(uint K, uint S, uint n) { return n == 0u ? 0u : (K % max(S, 1u)) % n; }
 // One lane's look at one slot: colour and coverage (not premultiplied). mesh.ts shadeLane.
 vec4 shadeLane(float lane, uint iA, uint iB, float d, vec2 p, float floorA, float lw, bool one) {
   float GL = vLife.x;
   float Lm = vLife.y;
   float nowRel = vLife.z;
-  uint nG = vIdx2.y;
-  uint fold = lane < 0.5 ? vIdx2.z : 1u;
   if (vMisc.y < 0.5) {
     float cov = 0.0;
     vec3 col = vec3(0.0);
@@ -128,12 +126,13 @@ vec4 shadeLane(float lane, uint iA, uint iB, float d, vec2 p, float floorA, floa
       uint i0 = s == 0 ? iA : iB;
       if (n == 0u) continue;
       float gOff = s == 0 ? 0.0 : vTime.w * GL;
+      uint fold = s == 0 ? vIdx2.y : vIdx2.z;
+      uint st = s == 0 ? vSeed.z : vSeed.w;
       for (uint c = 0u; c < fold; c++) {
-        uint i = i0 + c * nG;
+        uint i = i0 + c * st;
         if (c > 0u && i >= n) break;
-        vec4 L = life(s == 0 ? vSeed.x : vSeed.y, i, GL, Lm, nowRel - gOff, s == 0 ? vSeed.z : vSeed.w);
-        if (c > 0u && L.z < 0.5) continue;
-        int k = code(lane, L.z > 0.5, L.w > 0.5);
+        vec4 L = life(s == 0 ? vSeed.x : vSeed.y, i, GL, Lm, nowRel - gOff);
+        int k = code(lane, L.z > 0.5);
         if (k < 0) continue;
         float cv = max(0.0, min(L.x + L.y, nowRel - gOff) - L.x);
         cov += cv;
@@ -145,13 +144,12 @@ vec4 shadeLane(float lane, uint iA, uint iB, float d, vec2 p, float floorA, floa
   }
   float best = 0.0;
   int bc = -1;
-  for (uint c = 0u; c < fold; c++) {
-    uint i = iA + c * nG;
+  for (uint c = 0u; c < vIdx2.y; c++) {
+    uint i = iA + c * vSeed.z;
     if (c > 0u && i >= vIdx.z) break;
-    vec4 L = life(vSeed.x, i, GL, Lm, nowRel, vSeed.z);
+    vec4 L = life(vSeed.x, i, GL, Lm, nowRel);
     bool alive = L.z > 0.5;
-    if (c > 0u && !alive) continue;
-    int k = code(lane, alive, L.w > 0.5);
+    int k = code(lane, alive);
     if (k < 0) continue;
     float kl = LN2 * uKLog;
     float birthPx = vTime.x + log1ps((vTime.y - L.x) / vTime.z) / kl;
@@ -205,8 +203,8 @@ void main() {
     float d = abs(p.x - lineX);
     if (d > reach) continue;
     uint K = idx;
-    uint iA = vIdx.z > 0u ? K % vIdx.z : 0u;
-    uint iB = vIdx.w > 0u ? K % vIdx.w : 0u;
+    uint iA = slotBase(K, vSeed.z, vIdx.z);
+    uint iB = slotBase(K, vSeed.w, vIdx.w);
     float fine = (vSlot.w < 1.0 && latBit(L + 1u, B >> 1u) != (B & 1u)) ? vSlot.w : 1.0;
     // Where the lanes meet, the slot's colours blend by how much of it is in each.
     float wg = clamp((xG - lineX) / pp + 0.5, 0.0, 1.0);
@@ -227,8 +225,8 @@ void main() {
     float xGe = green ? max(xG, colL + 1.0) : colL;
     uint h = uint(int(floor(p.x - colL)));
     uint i = lowbias32((h * 0x2c1b3c6du) ^ vIdx2.x ^ 0x5bd1e995u);
-    uint iA = vIdx.z > 0u ? i % vIdx.z : 0u;
-    uint iB = vIdx.w > 0u ? i % vIdx.w : 0u;
+    uint iA = slotBase(i, vSeed.z, vIdx.z);
+    uint iB = slotBase(i, vSeed.w, vIdx.w);
     for (int k = 0; k < 2; k++) {
       float nar = k == 0 ? vNar.z : vNar.w;
       if (!(nar > 0.0) || (k == 0 && !green)) continue;

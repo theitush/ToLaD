@@ -76,7 +76,7 @@ export function FanApp() {
           <span className="li"><span className="dot alive" /> alive now</span> <span className="li"><span className="dot lineage" /> has living descendants</span>{' '}
           <span className="li"><span className="dot dead" /> line ended</span>
           <br />
-          <span className="dim">Width is everyone who ever lived. Tap or zoom a branch.</span>
+          <span className="dim">Width is how many were alive at the time. Tap or zoom a branch.</span>
         </div>
       )}
       </div>

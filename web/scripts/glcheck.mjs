@@ -1,5 +1,5 @@
 // GPU vs CPU: the real mesh shader (meshgl.ts) decides, for thousands of
-// sampled lion individuals, who is alive, who carries the living's line and who
+// sampled lion individuals, who is alive, which colour its lane gives it and who
 // was born by a given time; the CPU mirror (mesh.ts lifeGPU / colourCode)
 // decides the same from the same hashed inputs. Every pixel must agree.
 //   npm run build:single && node scripts/glcheck.mjs
@@ -45,7 +45,7 @@ try {
               // One slot (lattice level 0, slot i: index i of the generation), its line through the pixel's centre.
               x0: x + 1, y0: y + 1, x1: x + 2, y1: y + 2, xB0: x + 1.5 - 500, bw: 1000, lw: 4, fineA: 1, p0: 0, T0: 0, A: 1, gBoff: 0,
               alpha: 1, mode: 0, lane: lane === 0 ? 1 : lane, tipR: 0, GL: m.GL, Lm: m.sp.lifespanYears, nowRel, xG: lane === 0 ? 1e9 : -1e9,
-              B0: i, lvl: 0, latSeed: 0, nA: n, nB: 0, seedA: m.seedOf(g), seedB: 0, thrA: M.lineageThreshold(m.G, g, false), thrB: 0, nG: 1, fold: 1,
+              B0: i, lvl: 0, latSeed: 0, nA: n, nB: 0, seedA: m.seedOf(g), seedB: 0, sA: n, sB: 1, fA: 1, fB: 1,
             };
             const k = gl.mesh.next();
             M.packInst(inst, gl.mesh.f, gl.mesh.u, k);
@@ -68,8 +68,8 @@ try {
           // Premultiplied: divide by alpha to read the colour.
           const [r, g2, b2] = [R / Math.max(1, A), G / Math.max(1, A), B / Math.max(1, A)];
           const gpu = A < 2 ? -1 : r > 0.5 && g2 > 0.5 ? 3 : r > 0.5 ? 0 : g2 > 0.5 ? 1 : b2 > 0.5 ? 2 : -2;
-          const L = M.lifeGPU(c.seedA, c.B0, c.GL, c.Lm, c.nowRel, c.thrA);
-          const code = M.colourCode(lane, L.alive, L.lineage);
+          const L = M.lifeGPU(c.seedA, c.B0, c.GL, c.Lm, c.nowRel);
+          const code = M.colourCode(lane, L.alive);
           // Lit only if born by "now" (it covers some of the band).
           const cpu = code >= 0 && L.birth < c.nowRel ? code : -1;
           // Too faint to read back in 8 bits (a life a tiny share of the generation): not a decision.
@@ -82,8 +82,8 @@ try {
         });
       }
     }
-    // The nested lattice of lines (mesh.ts latticeRep) at several levels, and the living folded
-    // onto green slots (fold > 1): coverage per pixel, GPU against the CPU mirror (shadeMesh).
+    // The nested lattice of lines (mesh.ts latticeRep) at several levels, and a generation folded
+    // onto its slots (fold > 1): coverage per pixel, GPU against the CPU mirror (shadeMesh).
     {
       const S = 128;
       gl.begin();
@@ -109,7 +109,7 @@ try {
         const inst = {
           x0: 0, y0: q * h, x1: S, y1: (q + 1) * h, xB0: -bw * 1.3, bw, lw: 0.9, fineA, p0: 0, T0: 0, A: 1, gBoff: 0,
           alpha: 0.9, mode: 0, lane: 1, tipR: 0, GL: m.GL, Lm: m.sp.lifespanYears, nowRel, xG: gray ? -1e9 : 1e9,
-          B0, lvl, latSeed: m.latticeSeed, nA: n, nB: 0, seedA: m.seedOf(g), seedB: 0, thrA: M.lineageThreshold(m.G, g, false), thrB: 0, nG: fold > 1 ? Math.floor(n / 4) : 1, fold,
+          B0, lvl, latSeed: m.latticeSeed, nA: n, nB: 0, seedA: m.seedOf(g), seedB: 0, sA: fold > 1 ? Math.floor(n / 4) : n, sB: 1, fA: fold, fB: 1,
         };
         // A narrow green lane (1.3 px) beside a narrow gray one (2.6 px), each one line its own width.
         if (narrow) Object.assign(inst, { xB0: 40.2, xG: 41.5, colL: 40.2, colR: 44.1, narG: 1, narR: 0.7, B0: 0 });
