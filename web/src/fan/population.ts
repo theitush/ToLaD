@@ -135,6 +135,15 @@ export class Population {
     return this.nConst;
   }
 
+  /** The green share if it is one constant over ages [a0, a1] (Ma, a0 ≤ a1, not straddling the first appearance), else null. */
+  constantGreen(a0: number, a1: number): number | null {
+    const sp = this.sp;
+    if (a0 < sp.t0 && a1 > sp.t0) return null;
+    if (sp.extinct) return a0 >= sp.t0 ? this.qBase : 0;
+    if (a0 >= sp.t0 || a0 * 1e6 >= (this.h.length - 1) * this.GL) return this.qBase;
+    return null;
+  }
+
   /** Share of those alive at `ageMa` with living descendants today (0–1). */
   greenAt(ageMa: number): number {
     const sp = this.sp;

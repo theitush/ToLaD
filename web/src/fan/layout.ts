@@ -241,6 +241,12 @@ export class Steps {
               return s.w * s.f;
             }
           : (y: number) => strandAt(b, this.time.ageAt(y), this.mode).w;
+        // Where the green share is one constant (settled, or an extinct span) the green lane is exactly that share.
+        const q = green ? b.pop.constantGreen(this.time.ageAt(yHi), this.time.ageAt(yLo)) : null;
+        if (q !== null) {
+          v[1] = v[0] * q;
+          continue;
+        }
         let s = 0;
         for (let c = 0; c + 1 < cuts.length; c++) s += integrate(f, cuts[c], cuts[c + 1], b.width * (yLo - yHi) * 1e-7);
         v[green ? 1 : 0] = Math.max(0, s / (yLo - yHi));

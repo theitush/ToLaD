@@ -122,14 +122,14 @@ describe('no time-scale jumps', () => {
 });
 
 describe('the stem continues below the origin', () => {
-  it('each column goes straight down to the bottom of the world at its width at the fork', () => {
+  it('each column goes straight down to the bottom of the world at its founders\' width', () => {
     const c = camera();
     const f = c.fan;
     expect(f.time.ageAt(f.trunkBottom.y)).toBeGreaterThan(100 * f.time.originMa);
     for (const b of f.branches) {
       for (const y of [-1e-6, 0, 1e-6, 0.5, 10, f.trunkBottom.y]) {
         expect(leftAt(b, y)).toBe(b.colLeft);
-        if (y >= 0) expect(laneAt(b, y).w).toBe(b.width);
+        if (y >= 0) expect(laneAt(b, y).w).toBe(b.baseW);
       }
     }
     // Content below the fork spans the stalks.

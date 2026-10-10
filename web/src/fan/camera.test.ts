@@ -206,13 +206,10 @@ describe('fan camera', () => {
       const ref = sample();
       for (const g of gestures(11)) {
         g(c);
-        // Left edges and green lanes never depend on the camera; the gray edge only on the step grid
+        // Left edges never depend on the camera; the lanes' edges only on the step grid
         // (the time zoom), so at the same grid everything is identical.
         const now = sample();
-        for (let i = 0; i < ref.length; i++) {
-          expect(now[i][0]).toBe(ref[i][0]);
-          expect(now[i][2]).toBe(ref[i][2]);
-        }
+        for (let i = 0; i < ref.length; i++) expect(now[i][0]).toBe(ref[i][0]);
         const sy = c.cam.sy;
         f.steps.setScale(sy0);
         expect(sample()).toEqual(ref);

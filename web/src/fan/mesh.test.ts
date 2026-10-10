@@ -134,16 +134,17 @@ describe('one mesh for both lanes: the lane only colours', () => {
 
   it('every instance spans both lanes with one lattice: one pitch per individual, whichever lane', () => {
     for (const [, sp, ago, perBar, sy] of SCENES) {
-      const { insts, mm, c, xG } = scene(sp, ago, perBar, sy);
+      const { insts, mm, c } = scene(sp, ago, perBar, sy);
       const pitchPx = mm.pitch(c.cam.cy) * c.cam.sx;
       for (const x of insts) {
         // The lattice: blocks of 2^lvl individuals, the level of this zoom; the boundary inside the instance's span.
         expect(x.bw / 2 ** x.lvl / pitchPx, `${sp} ${perBar}`).toBeCloseTo(1, 5);
         expect(x.lvl).toBe(lineLevel(pitchPx).L);
         expect(x.latSeed).toBe(mm.latticeSeed);
-        if (x.x0 > 0 && x.x1 < c.w) {
-          expect(x.xG).toBeCloseTo(xG, 6);
-        }
+        // The lanes' boundary of the instance's own stretch (the lanes step with N(t) and q(t)).
+        const ym = c.toWorld(0, (x.y0 + x.y1) / 2)[1];
+        const L = mm.lanes(ym);
+        if (L.gw > 0 && x.x0 > 0 && x.x1 < c.w) expect(x.xG).toBeCloseTo(c.toScreen(L.left + L.gw, ym)[0], 2);
       }
     }
   });
