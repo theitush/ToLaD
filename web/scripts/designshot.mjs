@@ -12,7 +12,7 @@ const OUT = process.argv[2] || 'perf-out/design';
 const PREFIX = process.argv[3] || 'd';
 const ONLY = process.argv[4] ? new Set(process.argv[4].split(',')) : null;
 mkdirSync(OUT, { recursive: true });
-// [name, kind, args]: 'home' | 'far' | 'card' [species] | 'bar' [species, agoYears, perBar, sy, at?]
+// [name, kind, args]: 'home' | 'far' | 'card' [species] | 'touch' [species, agoYears] | 'scroll' [zoom, agoYears] | 'bar' [species, agoYears, perBar, sy, at?]
 const scenes = [
   ['home', 'home'],
   ['far', 'far'],
@@ -23,6 +23,10 @@ const scenes = [
   ['bar-35', 'bar', ['Lion', 3000, 35, 40]],
   ['deep', 'bar', ['Lion', 300, 4, 3000]],
   ['card', 'card', ['Tiger']],
+  // A tap on a column (the touch marker), columns whose tips are above the screen, the HUD near now.
+  ['touch', 'touch', ['Lion', 70]],
+  ['scrolled', 'scroll', [2.2, 2000]],
+  ['nearnow', 'bar', ['Lion', 25, 2e3, 900]],
 ];
 const browser = await chromium.launch({ headless: true });
 try {
@@ -47,6 +51,17 @@ try {
             f.selected = b.sp;
             f.onSelect({ sp: b.sp });
           }
+        } else if (kind === 'touch') {
+          f.cam = f.homeCamera();
+          f.camera.settle();
+          const b = fan.branches.find((b) => b.sp.common === args[0]);
+          const y = fan.time.y(args[1] / 1e6);
+          const [px, py] = f.toScreen(b.colLeft + 0.3 * f.model(b).lanes(y).w, y);
+          f.tap(px, py);
+        } else if (kind === 'scroll') {
+          const h = f.homeCamera();
+          f.cam = { ...h, sx: h.sx * args[0], sy: h.sy * args[0], ty: h.sy * args[0], cy: fan.time.y(args[1] / 1e6) };
+          f.camera.settle();
         } else if (kind === 'far') {
           const h = f.homeCamera();
           f.cam = { ...h, sx: h.sx / 6, sy: h.sy / 6, ty: h.sy / 6 };
