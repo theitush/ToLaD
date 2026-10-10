@@ -69,18 +69,15 @@ describe('the Panthera populations', () => {
     expect(p.greenAt(1)).toBeCloseTo(Q_STAR, 6);
   });
 
-  it('extinct species: gray (0% green) from their extinction down to the fork, their founders below their first appearance, nobody after it', () => {
+  it('extinct species: their whole span is gray (0% green), and nobody is alive after it or before it in their column', () => {
     for (const s of PANTHERA.species.filter((s) => s.extinct)) {
       const p = population(s);
-      for (const a of [s.t1, (s.t0 + s.t1) / 2, s.t0, s.t0 * 1.1, PANTHERA.t0]) {
+      for (const a of [s.t1, (s.t0 + s.t1) / 2, s.t0]) {
         expect(p.greenAt(a)).toBe(0);
         expect(p.aliveAt(a)).toBeGreaterThan(0);
-        expect(p.stepAt(a).q).toBe(0);
       }
       expect(p.aliveAt(s.t1 * 0.9)).toBe(0);
-      expect(p.aliveAt(PANTHERA.t0)).toBe(p.founders);
-      // One step: the modelled population, constant over the whole column.
-      expect(p.steps.n.length).toBe(1);
+      expect(p.aliveAt(s.t0 * 1.1)).toBe(0);
       // Its founders (its share of the stem) are ancestors of living species too: green by the rule.
       expect(p.qBase).toBeCloseTo(Q_STAR, 9);
     }

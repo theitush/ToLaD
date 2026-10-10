@@ -19,12 +19,8 @@ describe('fan strands: width = alive at the time', () => {
           else expect(s.f).toBeGreaterThan(0.3);
         }
         if (sp.extinct) {
-          // Its column runs from the fork to its extinction, all gray: its founders below its first appearance.
-          for (const a of [sp.t0 * 1.01, (sp.t0 + fan.clade.t0) / 2, fan.clade.t0 * 0.999]) {
-            expect(strandAt(b, a, mode).w).toBeCloseTo(strandAt(b, sp.t0, mode).w, 12);
-            expect(strandAt(b, a, mode).w).toBeGreaterThan(0);
-            expect(strandAt(b, a, mode).f).toBe(0);
-          }
+          // Its column starts at its first appearance: its founders' ancestors are the parent's.
+          expect(strandAt(b, sp.t0 * 1.01, mode).w).toBe(0);
           expect(strandAt(b, sp.t1 * 0.99, mode).w).toBe(0);
         } else {
           // Now: the living, all of them green.
@@ -38,30 +34,6 @@ describe('fan strands: width = alive at the time', () => {
         expect(b.baseQ).toBeCloseTo(0.797, 3);
         // Never wider than the column's room.
         for (const a of mid) expect(strandAt(b, a, mode).w).toBeLessThanOrEqual(b.width * (1 + 1e-12));
-      }
-    });
-  }
-});
-
-describe('extinct columns', () => {
-  for (const mode of ['log', 'linear'] as WidthMode[]) {
-    it(`run from the fork to the extinction at the modelled population, 0% green, no hairline (${mode})`, () => {
-      const fan = layoutFan(PANTHERA, mode);
-      const ext = fan.branches.filter((b) => b.sp.extinct);
-      expect(ext.length).toBeGreaterThan(0);
-      for (const b of ext) {
-        const w = b.unit * g(b.pop.aliveAt((b.sp.t0 + b.sp.t1) / 2), mode);
-        expect(w).toBeGreaterThan(0);
-        // Every height from just under the tip to just above the fork: the full width, no green.
-        for (let i = 0; i <= 200; i++) {
-          const y = b.tipY + ((0 - b.tipY) * (i + 0.5)) / 201;
-          const L = laneAt(b, y);
-          expect(L.w).toBeCloseTo(w, 9);
-          expect(L.gw).toBe(0);
-        }
-        // Below the fork, the stem: its founders, green by the rule (they are everybody's ancestors).
-        expect(laneAt(b, 1).w).toBeCloseTo(b.baseW, 12);
-        expect(laneAt(b, 1).gw).toBeGreaterThan(0);
       }
     });
   }

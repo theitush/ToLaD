@@ -694,13 +694,13 @@ interface Stretch {
   pitchPx: number;
   nT: number;
   nG: number;
-  /** The lane right of the green one: withered over an extinct species' column (down to the fork), else gray. */
+  /** The lane right of the green one: withered over an extinct species' span, else gray. */
   lane: Lane;
 }
 
 /** The column's stretches of constant width (the gray edge's step lines) between yTop < yBot. */
 function stretches(v: TwigView, m: TwigModel, yTop: number, yBot: number): Stretch[] {
-  // (Also cut at the fork and the species' first appearance; an extinct species' column is withered down to the fork.)
+  // (Also cut at the fork and the species' first appearance: below it, an extinct species' column is its founders' ancestors.)
   const y0 = m.time.y(m.rec.t0);
   const cuts = [yTop, ...(m.b.steps.lines(m.b, yTop, yBot, 2000) ?? []), ...[0, y0].filter((y) => y > yTop && y < yBot), yBot].sort((a, b) => a - b);
   const out: Stretch[] = [];
@@ -711,7 +711,7 @@ function stretches(v: TwigView, m: TwigModel, yTop: number, yBot: number): Stret
     const P = m.pitch(ym);
     const colX = v.toScreen(L.left, ym)[0];
     const green = L.gw > 0;
-    const lane = m.rec.extinct && ym < 0 ? Lane.Withered : Lane.Gray;
+    const lane = m.rec.extinct && ym < y0 ? Lane.Withered : Lane.Gray;
     out.push({ ya: cuts[c], yb: cuts[c + 1], colX, xG: green ? v.toScreen(L.left + L.gw, ym)[0] : -1e9, pitchPx: P * v.sx, nT: L.w / P, nG: green ? m.greenSlots(ym) : 0, lane });
   }
   return out;
