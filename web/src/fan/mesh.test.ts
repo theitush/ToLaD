@@ -1,7 +1,7 @@
 // The individuals mesh (mesh.ts): one function for both lanes, and the GPU's
 // decisions (the shader's integer hash, mirrored by lifeGPU) agree with procgen.
 import { describe, expect, it } from 'vitest';
-import { MESH_F, MESH_U, colourCode, Lane, latticeLines, latticeRep, latticeTop, lifeGPU, LINK_LEVELS, LINK_P, linkAt, linkPair, linkWeight, packInst, shadeLinks, shadeMesh, timeRank, timeRep, unpackInst, type MeshInst } from './mesh';
+import { MESH_F, MESH_U, colourCode, Lane, latticeLines, latticeRep, latticeTop, lifeGPU, LINK_LEVELS, LINK_P, linkAt, linkPair, linkWeight, packInst, shadeLinks, shadeMesh, timeRank, timeRep, unpackInst, warpInst, type MeshInst } from './mesh';
 import { layoutFan } from './layout';
 import { FanCamera } from './camera';
 import { MeshBatch } from './meshgl';
@@ -137,15 +137,20 @@ describe('one mesh for both lanes: the lane only colours', () => {
       const { insts, mm, c } = scene(sp, ago, perBar, sy);
       const pitchPx = mm.pitch(c.cam.cy) * c.cam.sx;
       for (const x of insts) {
-        // The lattice: blocks of 2^lvl individuals, the level of this zoom; the boundary inside the instance's span.
-        expect(x.bw / 2 ** x.lvl / pitchPx, `${sp} ${perBar}`).toBeCloseTo(1, 5);
+        // The lattice: blocks of 2^lvl individuals, the level of this zoom, one pitch at the instance's top
+        // (it slides and scales with the column below it: warpInst).
+        const p0 = mm.pitch(c.toWorld(0, x.y0)[1]) * c.cam.sx;
+        expect(x.bw / 2 ** x.lvl / p0, `${sp} ${perBar}`).toBeCloseTo(1, 3);
         expect(x.lvl).toBe(lineLevel(pitchPx).L);
         expect(x.latSeed).toBe(mm.latticeSeed);
-        // The lanes' boundary of the instance's own stretch (the lanes step with N(t) and q(t)).
-        const ym = c.toWorld(0, (x.y0 + x.y1) / 2)[1];
+        // The lanes' boundary at the instance's middle, where the warp puts it (straight between knots).
+        const pm = (x.y0 + x.y1) / 2;
+        const ym = c.toWorld(0, pm)[1];
         const L = mm.lanes(ym);
-        // (Zoomed out, a generation's step can be far under a pixel: its midpoint is its boundary, either side.)
-        if (L.gw > 0 && x.x0 > 0 && x.x1 < c.w && x.y1 - x.y0 > 1e-3) expect(x.xG).toBeCloseTo(c.toScreen(L.left + L.gw, ym)[0], 2);
+        const w = warpInst(x, (x.colL ?? 0) + 0.5, pm);
+        // (To a fraction of a pixel: a log width and the green share curve a little between knots.)
+        if (w && L.gw > 0 && x.x0 > 0 && x.x1 < c.w && x.y1 - x.y0 > 1e-3) expect(Math.abs(w.xG - c.toScreen(L.left + L.gw, ym)[0])).toBeLessThan(0.25);
+        if (w) expect(Math.abs(w.colL! - c.toScreen(L.left, ym)[0])).toBeLessThan(0.25);
       }
     }
   });
@@ -208,13 +213,18 @@ describe('GPU and CPU decide alike', () => {
     const u = new Uint32Array(MESH_U);
     const a: MeshInst = { x0: 1, y0: 2, x1: 3, y1: 4, xB0: 5, bw: 6, lw: 7, fineA: 0.5, p0: 9, T0: 10, A: 11, gBoff: 12, alpha: 0.25, mode: 1, lane: Lane.Gray, tipR: 16, GL: 17, Lm: 18, nowRel: 19, xG: 20, B0: 1, lvl: 2, latSeed: 9, nA: 3, nB: 4, seedA: 4294967295, seedB: 6, sA: 7, sB: 8, fA: 10, fB: 3 };
     packInst(a, f, u, 0);
-    expect([...f]).toEqual([1, 2, 3, 4, 5, 6, 7, 0.5, 9, 10, 11, 12, 0.25, 1, 1, 16, 17, 18, 19, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    expect([...f]).toEqual([1, 2, 3, 4, 5, 6, 7, 0.5, 9, 10, 11, 12, 0.25, 1, 1, 16, 17, 18, 19, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0]);
     expect([...u]).toEqual([1, 2, 3, 4, 4294967295, 6, 7, 8, 9, 10, 3, 0]);
     const b: MeshInst = { ...a, colL: 21, colR: 22, narG: 0.75, narR: 0.5, linkA: 0.5, lam: 2.25, tauC: 1.5, tauB: 2, gA: -12, baseA: 0.25 };
     packInst(b, f, u, 0);
-    expect([...f].slice(20)).toEqual([21, 22, 0.75, 0.5, 0.5, 2.25, 1.5, 2, 0.25, 0, 0, 0]);
+    expect([...f].slice(20)).toEqual([21, 22, 0.75, 0.5, 0.5, 2.25, 1.5, 2, 0.25, -1, 0, 0, 0, 0, 0, 0]);
     expect(u[11]).toBe(4294967284);
-    expect(unpackInst(f, u, 0)).toEqual(b);
+    expect(unpackInst(f, u, 0)).toEqual({ ...b, cPad: undefined, wL: 0, wP: 0, wR: 0, wG: 0 });
+    // The warp: the column's slide within the instance (its edges slant), and its clip.
+    const w = { ...b, cPad: 1.5, wL: 0.25, wP: 0.5, wR: -0.75, wG: 2 };
+    packInst(w, f, u, 0);
+    expect([...f].slice(28)).toEqual([0.25, 1.5, 0, 0, 0.25, 0.5, -0.75, 2]);
+    expect(unpackInst(f, u, 0)).toEqual(w);
   });
 });
 

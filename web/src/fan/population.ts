@@ -6,14 +6,23 @@
 // N(t), individuals alive at age t (the procgen model's own: births per
 // generation × mean lifespan ÷ generation length, i.e. births per unit time ×
 // lifespan):
-//   - a curated history that drives the counts (rec.births): its births curve,
-//     the compiled segments, so the recent declines are the real ones; before
-//     the history its modelled pre-decline baseline, held back to the species'
-//     first appearance (the baseline segment);
+//   - a curated history that drives the counts (rec.births): the compiled
+//     segments' points, so the recent declines are the real ones; before the
+//     history its modelled pre-decline baseline, held back to the species'
+//     first appearance (the baseline segment). Between two points N is
+//     linear in log time (log10(years + TIME_C), the fan's height): a ramp is
+//     a straight slanted edge, never a stair. Where two segments do not meet
+//     (a jump in the data), the older one's end is moved a generation back,
+//     so the jump is a one-generation ramp;
 //   - otherwise the dataset's constant-size model: the living species held at
 //     today's count (the pipeline's N_ever = alive ÷ lifespan × span), an extinct
 //     one at ever × lifespan ÷ span (lifespan = half a generation) until its
-//     last appearance, then 0.
+//     last appearance, then 0. Its end tapers: over the last TAPER_FRAC of
+//     its start's log depth (at most TAPER_MAX of its own log span), its
+//     drawn width falls linearly in log time to 0 at its last appearance (a
+//     straight pinch, not a cut): N itself in linear widths; 1 + log10 N in
+//     log widths (N = 10^(G − 1), then G below one individual). The model
+//     follows the drawing, so width = N holds in the taper too.
 //   - below its start (its split from its sister lineage in the dated tree,
 //     splits.ts; by default its first appearance) a species holds its
 //     founders: its N at its start, constant. A parent population is the sum
@@ -37,7 +46,12 @@
 // most), recovering over ~log2(n/n_s) generations further back; a decline
 // towards now (n_k < n_{k+1}) holds q below Q_STAR, growth above it.
 //
-// The steps (what the fan draws, fixed in the world, never depending on the view):
+// What the fan draws (greenAt, fixed in the world, never depending on the
+// view) is q interpolated, linearly in log time, between the generations'
+// midpoints: h_k at the middle of generation k, 1 over the newest half
+// generation, qBase past the last; so the green edge ramps too.
+//
+// The steps (strides of the mesh's slot lattice, twigs.ts):
 // generation k back from now, ages [k·GL, (k+1)·GL), holds n_k = N at its young
 // edge (the history's own points at the segment boundaries) and q = h_k; steps
 // with the same n and q merge, so a constant stretch is one step. Past the
@@ -49,6 +63,38 @@
 // extinct one's).
 
 import type { SpeciesRec } from './panthera';
+
+/**
+ * Time axis offset (years). The fan's height is log10(years before present +
+ * C). With C = 10 years the axis resolves the last decades and centuries; it
+ * is close to the mean lifespan of the living big cats (alive·span/ever ≈ 3–5
+ * years).
+ */
+export const TIME_C = 10;
+/** The fan's log time of an age in years before present: log10(years + TIME_C). Ramps are linear in it. */
+export function dex(years: number): number {
+  return Math.log10(Math.max(0, years) + TIME_C);
+}
+/** An extinct species' end tapers over this share of its start's log depth (dex(start) − dex(0)) ... */
+export const TAPER_FRAC = 0.05;
+/** ... but at most this share of its own log span (start to last appearance). */
+export const TAPER_MAX = 0.3;
+
+/** Linear interpolation of v over knots xs (ascending), clamped at the ends; xs in the same units as x. */
+function interp(xs: number[] | Float64Array, v: number[] | Float64Array, x: number): number {
+  const n = xs.length;
+  if (!(x > xs[0])) return v[0];
+  if (x >= xs[n - 1]) return v[n - 1];
+  let lo = 0;
+  let hi = n - 1;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    if (xs[mid] <= x) lo = mid;
+    else hi = mid;
+  }
+  const t = (x - xs[lo]) / (xs[hi] - xs[lo]);
+  return v[lo] + (v[hi] - v[lo]) * t;
+}
 
 /** The fixed point of q = 1 − e^(−2q): the share of a constant, well-mixed population with descendants far in the future. */
 export const Q_STAR = (() => {
@@ -94,6 +140,14 @@ export class Population {
   private readonly nConst: number;
   private readonly h: Float64Array;
   private readonly GL: number;
+  /** The history's points: log times (dex, ascending from now) and N there (alive). */
+  private readonly kx: number[] = [];
+  private readonly kn: number[] = [];
+  /** An extinct species' taper: log times of its last appearance and of the taper's start (dex). */
+  private readonly tx0: number = 0;
+  private readonly tx1: number = 0;
+  /** q's knots: the generations' midpoints (dex, ascending) and h there. */
+  private readonly qx: Float64Array;
 
   /**
    * @param startMa the species' start (Ma): its split in the dated tree, where
@@ -102,6 +156,8 @@ export class Population {
   constructor(
     readonly sp: SpeciesRec,
     readonly startMa = sp.t0,
+    /** The fan's width mode: the shape of an extinct species' taper (straight in the drawn width). */
+    readonly taper: 'linear' | 'log' = 'linear',
   ) {
     const GL = sp.genYears;
     this.GL = GL;
@@ -114,11 +170,35 @@ export class Population {
       let mx = 0;
       for (const s of c.segments) mx = Math.max(mx, s.startSize, s.endSize);
       this.max = mx * this.lg;
+      // The points, newest first: each segment's young end (endSize) and old end (startSize).
+      let x = 0;
+      const pts: [number, number][] = [];
+      for (let j = c.segments.length - 1; j >= 0; j--) {
+        const s = c.segments[j];
+        const len = s.generations * GL;
+        const last = pts[pts.length - 1];
+        if (!last) pts.push([x, s.endSize]);
+        else if (last[1] !== s.endSize) pts.push([x + Math.min(GL, len / 2), s.endSize]);
+        pts.push([x + len, s.startSize]);
+        x += len;
+      }
+      for (const [yrs, n] of pts) {
+        const d = dex(yrs);
+        if (this.kx.length && d <= this.kx[this.kx.length - 1]) continue;
+        this.kx.push(d);
+        this.kn.push(n * this.lg);
+      }
     } else {
       // procgen's constant-size model (twigs.ts speciesModel): N per generation over ~years/GL generations.
       this.lg = sp.alive > 0 ? (sp.alive * years) / sp.ever / GL : 0.5;
       this.nConst = sp.alive > 0 ? sp.alive : (sp.ever * GL * this.lg) / years;
       this.max = this.nConst;
+      if (sp.extinct || !(sp.alive > 0)) {
+        const a = dex(sp.t1 * 1e6);
+        const b = dex(startMa * 1e6);
+        this.tx0 = a;
+        this.tx1 = a + Math.min(TAPER_FRAC * (b - dex(0)), TAPER_MAX * (b - a));
+      }
     }
     this.founders = this.aliveAt(startMa);
     if (sp.extinct || !(sp.alive > 0)) {
@@ -136,6 +216,31 @@ export class Population {
       this.h = shareBack((k) => this.aliveAt(ago(k) / 1e6), varGens, Math.min(2e5, Math.ceil(own / GL)));
       this.qBase = this.h[this.h.length - 1];
     }
+    // q's knots: 1 over the newest half generation, h_k at the middle of generation k.
+    const qx = [dex(0)];
+    for (let k = 0; k < this.h.length; k++) qx.push(dex((k + 0.5) * GL));
+    this.qx = Float64Array.from(qx);
+    this.qv = Float64Array.from([this.h[0], ...this.h]);
+  }
+
+  private readonly qv: Float64Array;
+
+  /**
+   * Ages (Ma, ascending) where N or q has a knot, from the tip back to the
+   * start: between two of them both are linear in log time. Past the last,
+   * both are constant.
+   */
+  get knots(): number[] {
+    const sp = this.sp;
+    const out = new Set<number>();
+    const add = (d: number) => {
+      const a = (Math.pow(10, d) - TIME_C) / 1e6;
+      if (a > sp.t1 && a < this.startMa) out.add(a);
+    };
+    for (const d of this.kx) add(d);
+    if (this.tx1 > this.tx0) add(this.tx1);
+    if (!(sp.extinct || !(sp.alive > 0))) for (const d of this.qx) add(d);
+    return [...out].sort((p, q) => p - q);
   }
 
   /** Individuals alive at age `ageMa` (Ma): 0 after an extinct species' last appearance; its founders before its start. */
@@ -143,8 +248,16 @@ export class Population {
     const sp = this.sp;
     if (ageMa < sp.t1) return 0;
     const a = Math.min(ageMa, sp.t0, this.startMa);
-    const c = sp.births;
-    if (c) return c.curve.sizeAt(Math.min(a * 1e6, c.curve.years)) * this.lg;
+    if (this.kx.length) return interp(this.kx, this.kn, dex(a * 1e6));
+    if (this.tx1 > this.tx0) {
+      const d = dex(ageMa * 1e6);
+      if (d < this.tx1) {
+        const u = Math.max(0, d - this.tx0) / (this.tx1 - this.tx0);
+        if (this.taper === 'linear') return this.nConst * u;
+        const G = u * (this.nConst < 1 ? this.nConst : 1 + Math.log10(this.nConst));
+        return G < 1 ? G : Math.pow(10, G - 1);
+      }
+    }
     return this.nConst;
   }
 
@@ -205,21 +318,24 @@ export class Population {
     return { n: n[lo], q: q[lo] };
   }
 
-  /** Share of those alive at `ageMa` with living descendants today (0–1): h_k of its generation, as drawn. */
+  /**
+   * Share of those alive at `ageMa` with living descendants today (0–1), as
+   * drawn: h_k at the middle of generation k, linear in log time between.
+   */
   greenAt(ageMa: number): number {
     const sp = this.sp;
     if (sp.extinct) return ageMa > this.startMa ? this.qBase : 0;
     if (ageMa >= this.startMa) return this.qBase;
     if (ageMa < sp.t1) return 0;
-    return this.stepAt(ageMa).q;
+    return interp(this.qx, this.qv, dex(ageMa * 1e6));
   }
 }
 
 const cache = new Map<string, Population>();
-/** The population model of a species starting at `startMa` (by default its first appearance; cached by gid and start). */
-export function population(sp: SpeciesRec, startMa = sp.t0): Population {
-  const key = `${sp.gid}:${startMa}`;
+/** The population model of a species starting at `startMa` (by default its first appearance; cached by gid, start and taper). */
+export function population(sp: SpeciesRec, startMa = sp.t0, taper: 'linear' | 'log' = 'linear'): Population {
+  const key = `${sp.gid}:${startMa}:${taper}`;
   let p = cache.get(key);
-  if (!p || p.sp !== sp) cache.set(key, (p = new Population(sp, startMa)));
+  if (!p || p.sp !== sp) cache.set(key, (p = new Population(sp, startMa, taper)));
   return p;
 }

@@ -54,11 +54,13 @@ describe('the dated tree', () => {
         if (v.parent) expect(v.y).toBeLessThan(v.parent.y);
         for (const k of v.kids) {
           if (isNode(k)) continue;
-          // A species starts at the split that lists it: its own column from there up, its jog there.
+          // A species starts at the split that lists it: its own column from there up, out of its
+          // sub-interval of the parent (no jog), centred on its own line above its fork.
           expect(k.t0).toBe(v.split.ageMa);
           expect(k.splitY).toBe(v.y);
-          expect(leftAt(k, above(k.splitY))).toBe(k.colLeft);
-          expect(leftAt(k, below(k.splitY))).toBe(k.path[0].left);
+          expect(leftAt(k, above(k.splitY))).toBeCloseTo(k.path[0].left, 4);
+          expect(leftAt(k, below(k.splitY))).toBeCloseTo(k.path[0].left, 9);
+          expect(leftAt(k, k.forkY) + laneAt(k, k.forkY).w / 2).toBeCloseTo(k.xc, 9);
           expect(k.path[0].node).toBe(v);
         }
       }
@@ -91,12 +93,9 @@ describe('the dated tree', () => {
         expect(x).toBeCloseTo(v.left + v.width, 9);
         // And in counts: the parent is the sum of the daughters' founders.
         expect(v.n).toBeCloseTo(sum(v.strands.map((b) => b.pop.founders)), 6);
-        // Centred under its daughters: a sharp Y.
-        const first = v.kids[0];
-        const last = v.kids[v.kids.length - 1];
-        const lo = isNode(first) ? first.left : first.colLeft;
-        const hi = isNode(last) ? last.left + last.width : last.colLeft + last.baseW;
-        expect(v.left + v.width / 2).toBeCloseTo((lo + hi) / 2, 9);
+        // Centred on its daughters' width-weighted mean centre: the fork's V is balanced.
+        const kw = v.kids.map((k) => (isNode(k) ? k.width : k.baseW));
+        expect(v.left + v.width / 2).toBeCloseTo(v.kids.reduce((a, k, i) => a + kw[i] * k.xc, 0) / sum(kw), 9);
       }
       // The stem is everyone's founders.
       expect(f.root.strands.length).toBe(f.branches.length);
@@ -167,7 +166,11 @@ describe('the dated tree', () => {
       const a = camera(mode);
       const ref = sample(a.fan);
       const b = camera(mode);
-      for (let k = 0; k < 30; k++) b.zoomAbout(200, 500, 1.4, 1.2);
+      // Zoom in on the lion's column (zooming into a gap between branches is capped).
+      const lion = byName(b.fan, 'Lion');
+      const ly = b.fan.time.y(0.001);
+      const [px, py] = b.toScreen(leftAt(lion, ly) + laneAt(lion, ly).w / 2, ly);
+      for (let k = 0; k < 30; k++) b.zoomAbout(px, py, 1.4, 1.2);
       b.settle();
       expect(b.cam.sx).toBeGreaterThan(a.cam.sx * 10);
       expect(sample(b.fan)).toEqual(ref);

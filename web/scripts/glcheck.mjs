@@ -98,6 +98,9 @@ try {
         // Far out (beyond the lattice's walk depth), and lanes too narrow for lines (one line their width).
         [34, 1, 1, 0.8],
         [30, 0, 1, 1, 'narrow'],
+        // Slanted columns (#46): the lattice slides and scales with the edges within the instance (warpInst).
+        [0, 1, 1, 0.9, 'warp'],
+        [3, 0, 1, 0.6, 'warp'],
       ];
       bands.forEach(([lvl, gray, fold, fineA, narrow], q) => {
         const g = fold > 1 ? m.G - 1 : m.G - 400 + q * 37;
@@ -112,7 +115,8 @@ try {
           B0, lvl, latSeed: m.latticeSeed, nA: n, nB: 0, seedA: m.seedOf(g), seedB: 0, sA: fold > 1 ? Math.floor(n / 4) : n, sB: 1, fA: fold, fB: 1,
         };
         // A narrow green lane (1.3 px) beside a narrow gray one (2.6 px), each one line its own width.
-        if (narrow) Object.assign(inst, { xB0: 40.2, xG: 41.5, colL: 40.2, colR: 44.1, narG: 1, narR: 0.7, B0: 0 });
+        if (narrow === 'narrow') Object.assign(inst, { xB0: 40.2, xG: 41.5, colL: 40.2, colR: 44.1, narG: 1, narR: 0.7, B0: 0 });
+        if (narrow === 'warp') Object.assign(inst, { xB0: 20.3, xG: 52.7, colL: 20.3, colR: 96.1, B0: 0, cPad: 1, wL: 0.9, wP: 0.012, wR: -0.6, wG: 0.4 });
         insts.push(inst);
         const k = gl.mesh.next();
         M.packInst(inst, gl.mesh.f, gl.mesh.u, k);

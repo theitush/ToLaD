@@ -76,8 +76,12 @@ describe('the Panthera populations', () => {
         const p = population(s, start);
         for (const a of [s.t1, (start + s.t1) / 2, start]) {
           expect(p.greenAt(a)).toBe(0);
-          expect(p.aliveAt(a)).toBeGreaterThan(0);
+          // (Its end tapers to nobody at its last appearance: a pinch, not a cut.)
+          if (a > s.t1) expect(p.aliveAt(a)).toBeGreaterThan(0);
+          else expect(p.aliveAt(a)).toBe(0);
         }
+        expect(p.aliveAt(s.t1 * 1.001)).toBeGreaterThan(0);
+        expect(p.aliveAt(s.t1 * 1.001)).toBeLessThan(p.aliveAt((start + s.t1) / 2));
         expect(p.aliveAt(s.t1 * 0.9)).toBe(0);
         expect(p.aliveAt(start * 1.1)).toBe(p.founders);
         expect(p.stepAt(start * 1.1).n).toBe(p.founders);

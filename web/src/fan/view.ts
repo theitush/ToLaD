@@ -7,7 +7,7 @@
 import { formatCount } from '../data/names';
 import { Input, type InputHandlers } from '../engine/input';
 import { clipPoly, FanCamera, STRAND_PX, type Camera } from './camera';
-import { laneAt, layoutFan, leftAt, nodeQ, segAt, STEM_FADE_MA, type Fan, type FanBranch, type FanNode, type WidthMode } from './layout';
+import { laneAt, layoutFan, leftAt, nodeLeftAt, nodeQ, ownCentreAt, segAt, STEM_FADE_MA, type Fan, type FanBranch, type FanNode, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01 } from './meshgl';
 import { drawTwigs, kLogAt, laneDim, LINEAGE, LIVING, TWIG_GRAY, TWIG_WITHERED, TwigModel, type IndInfo, type TwigStats } from './twigs';
@@ -76,7 +76,8 @@ export function labelSpots(c: Screen, fan: Fan, top: number, measure: (text: str
     // On the tip; stuck under the top line once the tip is above it; never below its split (its own column).
     const y1 = Math.min(Math.max(ty - 4, top + len), fy - 4);
     const wy = Math.min(b.splitY, Math.max(b.tipY, c.toWorld(0, y1)[1]));
-    const left = c.toScreen(b.colLeft, wy)[0];
+    // Its room about its centre line there (over its fork, the centre slides out of the parent).
+    const left = c.toScreen(ownCentreAt(b, wy) - b.width / 2, wy)[0];
     const room = b.width * c.cam.sx;
     const lo = left + half;
     const x = Math.min(Math.max(lo, LABEL_AXIS_X + half), Math.max(lo, left + room - half));
@@ -444,7 +445,7 @@ export class FanView implements InputHandlers {
     const y = Math.min(this.fan.trunkBottom.y, Math.max(b.tipY, wy));
     if (y < b.splitY) return [leftAt(b, y), laneAt(b, y).w];
     const v = segAt(b, y).node;
-    return [v.left, v.width];
+    return [nodeLeftAt(v, y), v.width];
   }
 
   tap(x: number, y: number): void {
@@ -499,6 +500,37 @@ export class FanView implements InputHandlers {
     this.ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
   }
 
+  /**
+   * A flat trapezoid under everything else: [xl0, xr0] at screen y0 (top),
+   * [xl1, xr1] at y1, straight edges between; clipped to the screen's height
+   * (by interpolation, so the slopes stay exact).
+   */
+  private underTrap(y0: number, xl0: number, xr0: number, y1: number, xl1: number, xr1: number, rgb: [number, number, number], a = 1): void {
+    if (!(y1 > y0) || a <= 0) return;
+    const t = Math.max(-8, y0);
+    const b = Math.min(this.h + 8, y1);
+    if (!(b > t)) return;
+    const at = (x0: number, x1: number, y: number) => x0 + ((x1 - x0) * (y - y0)) / (y1 - y0);
+    const lt = at(xl0, xl1, t);
+    const rt = at(xr0, xr1, t);
+    const lb = at(xl0, xl1, b);
+    const rb = at(xr0, xr1, b);
+    if (Math.min(lt, lb) > this.w + 8 || Math.max(rt, rb) < -8) return;
+    if (this.gl) {
+      this.gl.under.trap(t, lt, rt, b, lb, rb, rgb[0], rgb[1], rgb[2], a);
+      return;
+    }
+    const ctx = this.ctx;
+    ctx.fillStyle = `rgba(${Math.round(rgb[0] * 255)},${Math.round(rgb[1] * 255)},${Math.round(rgb[2] * 255)},${a})`;
+    ctx.beginPath();
+    ctx.moveTo(lt, t);
+    ctx.lineTo(rt, t);
+    ctx.lineTo(rb, b);
+    ctx.lineTo(lb, b);
+    ctx.closePath();
+    ctx.fill();
+  }
+
   draw(): void {
     const t0 = performance.now();
     const ctx = this.ctx;
@@ -534,18 +566,19 @@ export class FanView implements InputHandlers {
   /**
    * The parent columns below each split (the stem below the oldest): their
    * daughters' strands side by side with no gaps; a dark backdrop under each,
-   * so a column reads as one without seams passing for lanes.
+   * so a column reads as one without seams passing for lanes. Its fork (out
+   * of its parent, at its bottom) is a slanted piece, the rest straight up.
    */
   private drawStem(): void {
+    const rgb = rgb01(this.gl ? mix(GRAY, '#131c19', 0.86) : GRAY);
     for (const v of this.fan.nodes) {
-      const [x0, y0] = this.toScreen(v.left, v.y);
-      const [x1, y1] = this.toScreen(v.left + v.width, v.yBot);
-      const t = Math.max(-8, y0);
-      const b = Math.min(this.h + 8, y1);
-      const l = Math.max(-8, x0);
-      const r = Math.min(this.w + 8, x1);
-      if (b <= t || r <= l) continue;
-      this.under(l, t, r, b, rgb01(this.gl ? mix(GRAY, '#131c19', 0.86) : GRAY));
+      const ys = v.parent ? [v.y, v.forkY, v.yBot] : [v.y, v.yBot];
+      for (let i = 0; i + 1 < ys.length; i++) {
+        const [xl0, y0] = this.toScreen(nodeLeftAt(v, ys[i]), ys[i]);
+        const [xl1, y1] = this.toScreen(nodeLeftAt(v, ys[i + 1]), ys[i + 1]);
+        const wk = v.width * this.cam.sx;
+        this.underTrap(y0, xl0, xl0 + wk, y1, xl1, xl1 + wk, rgb);
+      }
     }
   }
 
@@ -630,31 +663,33 @@ export class FanView implements InputHandlers {
     const yT0 = this.toScreen(0, b.splitY)[1];
     const grayC = mix(grayBase, '#131c19', Math.max(lives, tw?.texGray ?? 0) * 0.82);
     if (this.gl) {
-      // Each stretch of constant width is a rectangle: the whole lane gray (at least 0.6 px),
-      // the green lane over its left edge (at least 1 px).
+      // Each stretch between knots is a trapezoid (straight slanted edges): the whole lane gray
+      // (at least 0.6 px), the green lane over its left edge (at least 1 px). Its colours by its
+      // middle's lanes.
       const k = this.cam.sx;
-      for (let i = 0; i + 1 < pts.length; i += 2) {
+      for (let i = 0; i + 1 < pts.length; i++) {
         const p = pts[i];
         const q = pts[i + 1];
-        const x0 = p.x - hw * k;
-        const y0 = Math.max(-4, q.y);
-        const y1 = Math.min(this.h + 4, p.y);
-        if (!(y1 > y0) || x0 > this.w + 4) continue;
-        const gPx = p.w * p.f * k;
+        if (!(p.y > q.y) || p.y < -8 || q.y > this.h + 8) continue;
+        const pl = p.x - hw * k;
+        const ql = q.x - hw * k;
+        const wm = ((p.w + q.w) / 2) * k;
+        const gm = ((p.w * p.f + q.w * q.f) / 2) * k;
         // (An extinct species' line ended: withered over its own column; below its split, its ancestors.)
         const base = b.sp.extinct && (p.y + q.y) / 2 < yT0 ? grayBase : GRAY;
-        const gc = rgb01(mix(base, '#131c19', laneDim(p.w * k - gPx, lives) * 0.82));
-        const ec = rgb01(mix(GREEN, '#0d2318', laneDim(gPx, lives) * 0.9));
-        this.gl.under.push(Math.max(-4, x0), y0, Math.min(this.w + 4, x0 + Math.max(0.6, p.w * k)), y1, gc[0], gc[1], gc[2], 1);
-        if (gPx > 0) {
-          const x1 = x0 + Math.max(1, gPx);
+        const gc = rgb01(mix(base, '#131c19', laneDim(wm - gm, lives) * 0.82));
+        const ec = rgb01(mix(GREEN, '#0d2318', laneDim(gm, lives) * 0.9));
+        this.underTrap(q.y, ql, ql + Math.max(0.6, q.w * k), p.y, pl, pl + Math.max(0.6, p.w * k), gc);
+        if (p.f > 0 || q.f > 0) {
+          const qg = ql + Math.max(1, q.w * q.f * k);
+          const pg = pl + Math.max(1, p.w * p.f * k);
           // The living glow faintly (fading as their lane resolves into individuals).
           const glow = 1 - lives;
           if (glow > 0.01) {
-            this.gl.under.push(Math.max(-8, x0 - 4), y0, Math.min(this.w + 8, x1 + 4), y1, ec[0], ec[1], ec[2], 0.06 * glow);
-            this.gl.under.push(Math.max(-8, x0 - 1.5), y0, Math.min(this.w + 8, x1 + 1.5), y1, ec[0], ec[1], ec[2], 0.14 * glow);
+            this.underTrap(q.y, ql - 4, qg + 4, p.y, pl - 4, pg + 4, ec, 0.06 * glow);
+            this.underTrap(q.y, ql - 1.5, qg + 1.5, p.y, pl - 1.5, pg + 1.5, ec, 0.14 * glow);
           }
-          this.gl.under.push(Math.max(-4, x0), y0, Math.min(this.w + 4, x1), y1, ec[0], ec[1], ec[2], 1);
+          this.underTrap(q.y, ql, qg, p.y, pl, pg, ec);
         }
       }
     } else {
@@ -730,18 +765,17 @@ export class FanView implements InputHandlers {
   }
 
   /**
-   * A branch's lanes as screen points, bottom to top, two per stretch of
-   * constant width and left edge (so every edge is vertical or horizontal):
-   * breakpoints at the bottom of the world, the splits it passes (a jog: a
-   * horizontal edge), the step lines on screen (and one beyond each edge) and
-   * the tip.
+   * A branch's lanes as screen points, bottom to top, one per knot (its left
+   * edge and lanes are straight between knots, layout.ts Steps): the bottom of
+   * the world, the knots on screen (and one beyond each edge), the tip.
    */
   lanePoints(b: FanBranch, hw: number): RibbonPt[] {
     const yb = this.fan.trunkBottom.y;
     const steps = this.fan.steps;
     const [, sTop] = this.toWorld(0, -20);
     const [, sBot] = this.toWorld(0, this.h + 20);
-    const ys = new Set<number>([yb, b.tipY, ...b.path.map((s) => s.y)]);
+    // (A hair above its split too: its own column's lanes there, e.g. an extinct one's none green.)
+    const ys = new Set<number>([yb, b.tipY, b.splitY - 1e-9 * Math.max(1, Math.abs(b.splitY)), ...b.path.map((s) => s.y)]);
     // Every step line on screen and the nearest one beyond each edge (the stretches reaching off screen).
     const all = steps.bounds(b);
     for (let k = 0; k < all.length; k++) {
@@ -752,17 +786,10 @@ export class FanView implements InputHandlers {
     const sorted = [...ys].filter((y) => y >= b.tipY && y <= yb).sort((p, q) => q - p);
     // Spine at left + hw: the ribbon spans offsets [hw - w, hw] to its left (nx = -1).
     const pts: RibbonPt[] = [];
-    for (let i = 0; i + 1 < sorted.length; i++) {
-      const y0 = sorted[i];
-      const y1 = sorted[i + 1];
-      // Constant width and left edge between breakpoints: both at the middle.
-      const ym = (y0 + y1) / 2;
-      const L = laneAt(b, ym);
-      const left = leftAt(b, ym);
-      for (const y of [y0, y1]) {
-        const [px, py] = this.toScreen(left + hw, y);
-        pts.push({ x: px, y: py, nx: -1, ny: 0, w: L.w, f: L.f });
-      }
+    for (const y of sorted) {
+      const L = laneAt(b, y);
+      const [px, py] = this.toScreen(leftAt(b, y) + hw, y);
+      pts.push({ x: px, y: py, nx: -1, ny: 0, w: L.w, f: L.f });
     }
     return pts;
   }

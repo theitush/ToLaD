@@ -113,7 +113,7 @@ describe('the species card: the population at the time touched', () => {
     const lion = byName('Lion');
     const then = face(renderToStaticMarkup(<SpeciesCard sp={lion} ageMa={70e-6} onClose={() => {}} />));
     expect(then).toContain('Lion (Panthera leo)');
-    expect(then).toContain('352,000 alive 70 years ago');
+    expect(then).toContain('357,000 alive 70 years ago');
     expect(then).toContain('56% have descendants alive today');
     expect(then).toContain('23,500 alive today');
     expect(then).toContain('Roughly 600 billion lions have ever lived (rough estimate)');

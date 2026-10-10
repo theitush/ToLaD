@@ -220,7 +220,7 @@ export function linkWeight(l: number, lambda: number): number {
 }
 
 /** Floats and uints per instance (meshgl.ts attribute layout). */
-export const MESH_F = 32;
+export const MESH_F = 36;
 export const MESH_U = 12;
 /** Most members of a generation folded onto one slot (a generation up to this many times its slots). */
 export const MAX_FOLD = 8;
@@ -299,6 +299,40 @@ export interface MeshInst {
    * not as specks, while they are thin.
    */
   baseA?: number;
+  /**
+   * The column slides and narrows within the instance (its edges are straight
+   * slanted segments, layout.ts): per px of screen y below y0, the left edge
+   * moves wL px (the lattice with it), the pitch grows by wP of itself (the
+   * lattice scales about the left edge), the right edge moves wR px and the
+   * green lane's wG px. Drawn only within cPad px of the column at each height.
+   * All 0 (or absent): a rectangle, as before.
+   */
+  wL?: number;
+  wP?: number;
+  wR?: number;
+  wG?: number;
+  cPad?: number;
+}
+
+/**
+ * The instance as it stands at screen y py (warp: wL, wP, wR, wG about its
+ * top y0), and whether px is within cPad of its column there. The shader
+ * (meshgl.ts) computes the same at the top of its main().
+ */
+export function warpInst(m: MeshInst, px: number, py: number): MeshInst | null {
+  const wL = m.wL ?? 0;
+  const wP = m.wP ?? 0;
+  const wR = m.wR ?? 0;
+  const wG = m.wG ?? 0;
+  const dy = py - m.y0;
+  const k = 1 + wP * dy;
+  const colL = m.colL ?? 0;
+  const L = colL + wL * dy;
+  const R = (m.colR ?? 0) + wR * dy;
+  const pad = m.cPad ?? 0;
+  if (m.cPad !== undefined && (px < L - pad || px >= R + pad)) return null;
+  if (!wL && !wP && !wR && !wG) return m;
+  return { ...m, xB0: L + (m.xB0 - colL) * k, bw: m.bw * k, xG: m.xG + wG * dy, colL: L, colR: R };
 }
 
 export function packInst(m: MeshInst, f: Float32Array, u: Uint32Array, k: number): void {
@@ -332,9 +366,13 @@ export function packInst(m: MeshInst, f: Float32Array, u: Uint32Array, k: number
   f[o + 26] = m.tauC ?? 0;
   f[o + 27] = m.tauB ?? 0;
   f[o + 28] = m.baseA ?? 0;
-  f[o + 29] = 0;
+  f[o + 29] = m.cPad ?? -1;
   f[o + 30] = 0;
   f[o + 31] = 0;
+  f[o + 32] = m.wL ?? 0;
+  f[o + 33] = m.wP ?? 0;
+  f[o + 34] = m.wR ?? 0;
+  f[o + 35] = m.wG ?? 0;
   const q = k * MESH_U;
   u[q] = m.B0;
   u[q + 1] = m.lvl;
@@ -556,8 +594,11 @@ export function shadeLinks(m: MeshInst, px: number, py: number, kLog: number, pa
  * float64 here. kLog: log2 of (age + TIME_C) per screen px; nowPx: screen y of
  * "now" (dead lives stop DEAD_GAP px short of it).
  */
-export function shadeMesh(m: MeshInst, px: number, py: number, kLog: number, nowPx: number, pal: Palette, deadGap = 3): RGBA {
-  if (px < m.x0 || px >= m.x1 || py < m.y0 || py >= m.y1) return [0, 0, 0, 0];
+export function shadeMesh(m0: MeshInst, px: number, py: number, kLog: number, nowPx: number, pal: Palette, deadGap = 3): RGBA {
+  if (px < m0.x0 || px >= m0.x1 || py < m0.y0 || py >= m0.y1) return [0, 0, 0, 0];
+  // The column where it stands at this height (its edges slant within the instance).
+  const m = warpInst(m0, px, py);
+  if (!m) return [0, 0, 0, 0];
   // Nothing to draw this far from a line (only the living glow, and they are only in the green lane).
   const reach = m.mode === 0 ? Math.max(m.lw, 1) * 0.5 + 0.5 : Math.max(m.tipR, Math.max(m.lw, 1) * 0.5 + (m.xG > m.x0 ? 5 : 0)) + 0.5;
   const bf = Math.floor((px - m.xB0) / m.bw);
@@ -615,6 +656,7 @@ export function unpackInst(f: Float32Array, u: Uint32Array, k: number): MeshInst
     x0: f[o], y0: f[o + 1], x1: f[o + 2], y1: f[o + 3], xB0: f[o + 4], bw: f[o + 5], lw: f[o + 6], fineA: f[o + 7], p0: f[o + 8], T0: f[o + 9], A: f[o + 10], gBoff: f[o + 11],
     alpha: f[o + 12], mode: f[o + 13] as 0 | 1, lane: f[o + 14] as Lane, tipR: f[o + 15], GL: f[o + 16], Lm: f[o + 17], nowRel: f[o + 18], xG: f[o + 19],
     colL: f[o + 20], colR: f[o + 21], narG: f[o + 22], narR: f[o + 23], linkA: f[o + 24], lam: f[o + 25], tauC: f[o + 26], tauB: f[o + 27], baseA: f[o + 28],
+    cPad: f[o + 29] >= 0 ? f[o + 29] : undefined, wL: f[o + 32], wP: f[o + 33], wR: f[o + 34], wG: f[o + 35],
     B0: u[q], lvl: u[q + 1], nA: u[q + 2], nB: u[q + 3], seedA: u[q + 4], seedB: u[q + 5], sA: u[q + 6], sB: u[q + 7], latSeed: u[q + 8], fA: u[q + 9], fB: u[q + 10], gA: u[q + 11] | 0,
   };
 }

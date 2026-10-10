@@ -199,7 +199,7 @@ export class TwigModel {
     const lin = this.b.unit;
     if (this.mode === 'linear') return lin;
     const w = laneAt(this.b, y).w;
-    const n = this.b.pop.stepAt(Math.min(this.b.t0, this.time.ageAt(y))).n;
+    const n = this.b.pop.aliveAt(Math.min(this.b.t0, this.time.ageAt(y)));
     return w > 0 && n > 0 ? w / n : lin;
   }
 
@@ -557,23 +557,18 @@ function twigTop(v: TwigView, t: Twig): number {
 }
 
 /**
- * Trace the strand on slot K from y0 to y1 (world). With linear widths a slot
- * is one fixed x: a straight line. With log widths the lattice's pitch follows
- * the column (the width over the individuals passing): the strand drifts with
- * it and shifts at the gray edge's step lines, a shift left as a break (the
- * strand resumes at its new x), so neighbouring shifts don't line up into a bar.
+ * Trace the strand on slot K from y0 to y1 (world). A slot rides on the
+ * column's left edge (and, with log widths, its pitch): straight between the
+ * knots (layout.ts Steps), where the edges bend, so the strand is a polyline
+ * through them, sliding with the column, never a jump.
  */
 function strandPath(v: TwigView, m: TwigModel, K: number, y0: number, y1: number, path: Path2D | CanvasRenderingContext2D, move = true): [number, number] {
   const lo = Math.min(y0, y1);
   const hi = Math.max(y0, y1);
   const brk: [number, boolean][] = [];
-  if (m.mode !== 'linear') {
-    for (const y of m.b.steps.lines(m.b, lo, hi, 400) ?? []) brk.push([y, true]);
-    for (let k = 1; k < 8; k++) brk.push([lo + ((hi - lo) * k) / 8, false]);
-  } else {
-    // (Linear: a slot is one x within a column; it shifts only at the jogs, the splits.)
-    for (const sg of m.b.path) if (sg.y > lo && sg.y < hi) brk.push([sg.y, true]);
-  }
+  const ks = m.b.steps.lines(m.b, lo, hi, 400);
+  if (ks) for (const y of ks) brk.push([y, false]);
+  else for (let k = 1; k < 64; k++) brk.push([lo + ((hi - lo) * k) / 64, false]);
   brk.sort((a, b) => (y1 > y0 ? a[0] - b[0] : b[0] - a[0]));
   let p = v.toScreen(m.slotX(K, y0), y0);
   if (move) path.moveTo(p[0], p[1]);
@@ -690,37 +685,65 @@ export function kLogAt(v: TwigView, time: TimeScale, y: number): number {
 }
 
 /**
- * One stretch of constant column width between world heights ya < yb, as
- * the mesh sees it: screen x of the column's left edge, of the green lane's
- * right edge, px per individual (slot), and the column's slots.
+ * One stretch between knots, world heights ya < yb, as the mesh sees it: its
+ * screen heights, and at each end (ya, then yb) the screen x of the column's
+ * left edge, of the green lane's right edge, px per individual (slot), and the
+ * column's slots. Between the ends all are linear in y (layout.ts Steps: the
+ * edges are straight between knots), so a slot slides with the edges.
  */
 interface Stretch {
   ya: number;
   yb: number;
-  colX: number;
-  xG: number;
-  pitchPx: number;
-  nT: number;
+  pa: number;
+  pb: number;
+  colX: [number, number];
+  xG: [number, number];
+  pitchPx: [number, number];
+  nT: [number, number];
+  /** Green slots (the most of the two ends; 0: no green lane). */
   nG: number;
   /** The lane right of the green one: withered over an extinct species' span, else gray. */
   lane: Lane;
 }
 
-/** The column's stretches of constant width (the gray edge's step lines) between yTop < yBot. */
+/** A stretch's value at screen y (linear between its ends). */
+function atPy(S: Stretch, v: [number, number], py: number): number {
+  return S.pb > S.pa ? v[0] + ((v[1] - v[0]) * (py - S.pa)) / (S.pb - S.pa) : v[0];
+}
+
+/** The column's stretches between its knots (its edges and lanes straight between them) between yTop < yBot. */
 function stretches(v: TwigView, m: TwigModel, yTop: number, yBot: number): Stretch[] {
-  // (The step lines include the splits: below its own, a strand is a slice of the parent column.)
+  // (The knots include the splits: below its own, a strand is a slice of the parent column.)
   const y0 = m.b.splitY;
   const cuts = [yTop, ...(m.b.steps.lines(m.b, yTop, yBot, 2000) ?? []), yBot].sort((a, b) => a - b);
   const out: Stretch[] = [];
   for (let c = 0; c + 1 < cuts.length; c++) {
-    const ym = (cuts[c] + cuts[c + 1]) / 2;
-    const L = m.lanes(ym);
-    if (!(L.w > 0)) continue;
-    const P = m.pitch(ym);
-    const colX = v.toScreen(L.left, ym)[0];
-    const green = L.gw > 0;
+    const ya = cuts[c];
+    const yb = cuts[c + 1];
+    // Each end a hair inside, so a knot's jump in the lanes (the green at a split) stays on its side.
+    const e = (yb - ya) * 1e-7;
+    const ends = [ya + e, yb - e].map((y) => {
+      const L = m.lanes(y);
+      const P = m.pitch(y);
+      return { L, P, x: v.toScreen(L.left, y)[0], g: L.gw > 0 ? m.greenSlots(y) : 0, xg: v.toScreen(L.left + L.gw, y)[0] };
+    });
+    const [A, B] = ends;
+    if (!(A.L.w > 0) && !(B.L.w > 0)) continue;
+    const ym = (ya + yb) / 2;
     const lane = m.rec.extinct && ym < y0 ? Lane.Withered : Lane.Gray;
-    out.push({ ya: cuts[c], yb: cuts[c + 1], colX, xG: green ? v.toScreen(L.left + L.gw, ym)[0] : -1e9, pitchPx: P * v.sx, nT: L.w / P, nG: green ? m.greenSlots(ym) : 0, lane });
+    const nG = Math.max(A.g, B.g);
+    out.push({
+      ya,
+      yb,
+      pa: v.toScreen(0, ya)[1],
+      pb: v.toScreen(0, yb)[1],
+      colX: [A.x, B.x],
+      xG: nG > 0 ? [A.xg, B.xg] : [-1e9, -1e9],
+      pitchPx: [A.P * v.sx, B.P * v.sx],
+      nT: [A.L.w / A.P, B.L.w / B.P],
+      nG,
+      lane,
+    });
   }
   return out;
 }
@@ -773,10 +796,13 @@ export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: num
       const ya = Math.max(S.ya, yHi);
       const yb = Math.min(S.yb, yLo);
       if (!(yb > ya)) continue;
-      const lx0 = S.colX;
-      const lx1 = S.colX + S.nT * S.pitchPx;
       const [, py0] = v.toScreen(0, ya);
       const [, py1] = v.toScreen(0, yb);
+      // The column's edges at the instance's top and bottom (they slide linearly between).
+      const wR = [S.nT[0] * S.pitchPx[0], S.nT[1] * S.pitchPx[1]] as [number, number];
+      const right = [S.colX[0] + wR[0], S.colX[1] + wR[1]] as [number, number];
+      const lx0 = Math.min(atPy(S, S.colX, py0), atPy(S, S.colX, py1));
+      const lx1 = Math.max(atPy(S, right, py0), atPy(S, right, py1));
       // Room for the line caps and dots at the true ends (not at a step line, where strands break).
       // (A living strand's glow reaches 5 px past its edge.)
       const reach = Math.max(look.tipR, look.lw * 0.5 + 5) + 1;
@@ -788,16 +814,29 @@ export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: num
       const y0 = Math.max(-4, py0 - padT);
       const y1 = Math.min(v.h + 4, py1 + padB);
       if (!(x1 > x0) || !(y1 > y0)) continue;
-      // Lanes too narrow for their lines (texture only): each is one line its own width.
-      const wPx = S.nT * S.pitchPx;
-      const gPx = S.nG > 0 ? Math.max(0, S.xG - S.colX) : 0;
+      // Lanes too narrow for their lines (texture only): each is one line its own width (by the instance's middle).
+      const pm = (Math.max(py0, y0) + Math.min(py1, y1)) / 2;
+      const wPx = atPy(S, wR, pm);
+      const gPx = S.nG > 0 ? Math.max(0, atPy(S, S.xG, pm) - atPy(S, S.colX, pm)) : 0;
       const narG = mode || !(S.nG > 0) ? 0 : laneNarrow(gPx);
       const narR = mode ? 0 : laneNarrow(wPx - gPx);
-      // The slot lattice: one individual per slot; the nested subset of its lines drawn at this zoom.
-      const { L: lvl, fineA, lambda } = lineLevel(S.pitchPx);
-      const bw = 2 ** lvl * S.pitchPx;
-      const B0 = Math.max(0, Math.floor((x0 - lx0) / bw) - 1);
-      if (B0 * 2 ** lvl >= S.nT) continue;
+      // The slot lattice: one individual per slot; the nested subset of its lines drawn at this zoom
+      // (its level by the pitch at the middle). At the instance's top y0, and how it slides (per px of y):
+      // the left edge (dL), the pitch (relative, kP), the right edge (dR) and the green lane's (dG).
+      const { L: lvl, fineA, lambda } = lineLevel(atPy(S, S.pitchPx, pm));
+      const span = S.pb - S.pa;
+      const slope = (v2: [number, number]) => (span > 0 ? (v2[1] - v2[0]) / span : 0);
+      const col0 = atPy(S, S.colX, y0);
+      const P0 = atPy(S, S.pitchPx, y0);
+      const bw = 2 ** lvl * P0;
+      const kP = slope(S.pitchPx) / P0;
+      const dL = slope(S.colX);
+      // The first block left of x0 anywhere over the instance (the column slides under it).
+      const col1 = col0 + dL * (y1 - y0);
+      const bw1 = bw * (1 + kP * (y1 - y0));
+      const B0 = Math.max(0, Math.min(Math.floor((x0 - col0) / bw), bw1 > 0 ? Math.floor((x0 - col1) / bw1) : Infinity) - 1);
+      if (B0 * 2 ** lvl >= Math.max(S.nT[0], S.nT[1])) continue;
+      const wPx0 = atPy(S, wR, y0);
       // The time axis at the top of the instance, relative to generation gA's start.
       const [, wy0] = v.toWorld(0, y0);
       const age = time.ageAt(wy0) * 1e6;
@@ -806,7 +845,7 @@ export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: num
         y0,
         x1,
         y1,
-        xB0: lx0 + B0 * bw,
+        xB0: col0 + B0 * bw,
         bw,
         lw: look.lw,
         fineA,
@@ -821,7 +860,7 @@ export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: num
         GL: m.GL,
         Lm,
         nowRel: now - gA * m.GL,
-        xG: S.xG,
+        xG: S.nG > 0 ? atPy(S, S.xG, y0) : -1e9,
         B0,
         lvl,
         latSeed,
@@ -833,8 +872,13 @@ export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: num
         sB: gB !== NONE ? m.stride(gB) : 1,
         fA: m.fold(gA, nA),
         fB: gB !== NONE ? m.fold(gB, nB) : 1,
-        colL: lx0,
-        colR: lx0 + Math.max(0.6, wPx),
+        colL: col0,
+        colR: col0 + Math.max(0.6, wPx0),
+        wL: dL,
+        wP: kP,
+        wR: slope(right),
+        wG: S.nG > 0 ? slope(S.xG) : 0,
+        cPad: pad,
         narG,
         narR,
         linkA: look.linkA ?? 0,
