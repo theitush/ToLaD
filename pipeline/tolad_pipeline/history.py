@@ -13,6 +13,10 @@ design. In short:
               = N(t) * G / L (= 2 N(t)), boundaries snapped to whole
               generations counted back from now, spans changing > 2x split
               into sub-spans of <= ~1.41x (procgen ramps linearly)
+    deep      an optional [deep] genome-based Ne history (PSMC ...) rescaled to one
+              per-year mutation rate and the leaf's generation length, Ne -> N by
+              Ne/N = 0.1, steps in PSMC's blind spot (< 20 kyr) dropped; the
+              genomic points precede the cited ones and join them log-linearly
 
 `apply` rewrites the leaf's pieces / alive / error before sum_tree, so the
 existing sum-up and ghost allocation keep the totals consistent up the tree.
