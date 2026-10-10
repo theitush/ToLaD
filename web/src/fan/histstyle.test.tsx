@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { plainAgo, plainCount, roughCount, SpeciesCard } from './FanApp';
-import { popTicks, yearTicks } from './HistorySpark';
+import { fmtYear, popTicks, yearTicks } from './HistorySpark';
 import { GRADE_WORD, noDataSpans, styleBetween } from './history';
 import { PANTHERA } from './panthera';
 import { population } from './population';
@@ -73,18 +73,21 @@ describe('species card history', () => {
       expect(before, sp.common).toBeTruthy();
       expect(html).toContain('data-nodata="before"');
       expect(html).toContain('>no data</text>');
-      expect(html).toContain(`No data before ${before!.year}: held at `);
+      expect(html).toContain(`No data before ${fmtYear(before!.year)}: held at `);
       // A held stretch after the last figure is drawn faint too, never as a plain line.
       expect(html.includes('data-nodata="after"')).toBe(nd.some((s) => s.side === 'after'));
     }
-    // The snow leopard has no level before its first figure: held at today's count.
-    const snow = noDataSpans(byName('Snow leopard').history!).find((s) => s.side === 'before')!;
-    expect(snow.today).toBe(true);
-    expect(snow.level).toBeCloseTo(byName('Snow leopard').alive, -2);
-    // The leopard is held at its pre-decline (1998) level.
-    const leo = noDataSpans(byName('Leopard').history!).find((s) => s.side === 'before')!;
-    expect(leo.today).toBe(false);
-    expect(leo.year).toBe(1998);
+    // With a genomic deep past (ToLaD#60) every Panthera is held at its oldest genomic level, not at
+    // today's count (snow leopard, no cited baseline) or the pre-decline level (leopard, 1998).
+    for (const c of ['Snow leopard', 'Leopard']) {
+      const h = byName(c).history!;
+      const nd = noDataSpans(h).find((s) => s.side === 'before')!;
+      const p0 = h.points.slice().sort((a, b) => a.year - b.year)[0];
+      expect(p0.kind, c).toBe('genomic');
+      expect(nd.today, c).toBe(false);
+      expect(nd.year, c).toBe(p0.year);
+      expect(nd.level, c).toBe(p0.n);
+    }
   });
 
   it('the sparkline has 3–5 round year ticks and one or two population ticks', () => {
@@ -113,10 +116,10 @@ describe('the species card: the population at the time touched', () => {
     const lion = byName('Lion');
     const then = face(renderToStaticMarkup(<SpeciesCard sp={lion} ageMa={70e-6} onClose={() => {}} />));
     expect(then).toContain('Lion (Panthera leo)');
-    expect(then).toContain('352,000 alive 70 years ago');
+    expect(then).toContain('351,000 alive 70 years ago');
     expect(then).toContain('56% have descendants alive today');
     expect(then).toContain('23,500 alive today');
-    expect(then).toContain('Roughly 600 billion lions have ever lived (rough estimate)');
+    expect(then).toContain('Roughly 800 billion lions have ever lived (rough estimate)');
     const now = face(renderToStaticMarkup(<SpeciesCard sp={lion} onClose={() => {}} />));
     expect(now).toContain(`${plainCount(population(lion).aliveAt(0))} alive today`);
     // At now, "alive today" once and no trivial "100% have descendants".
