@@ -26,7 +26,7 @@
 
 import { mix } from '../../../packages/procgen/src/hash.ts';
 import { Species, type Address } from '../../../packages/procgen/src/index.ts';
-import { laneAt, leftAt, STEM_BOTTOM_MA, TIME_C, type FanBranch, type TimeScale, type WidthMode } from './layout';
+import { edgeSamples, laneAt, leftAt, STEM_BOTTOM_MA, TIME_C, type FanBranch, type TimeScale, type WidthMode } from './layout';
 import { attrSeed, Lane, linkWidth, MAX_FOLD, packInst, type MeshInst } from './mesh';
 import type { MeshBatch } from './meshgl';
 import type { SpeciesRec } from './panthera';
@@ -199,7 +199,7 @@ export class TwigModel {
     const lin = this.b.unit;
     if (this.mode === 'linear') return lin;
     const w = laneAt(this.b, y).w;
-    const n = this.b.pop.stepAt(Math.min(this.b.t0, this.time.ageAt(y))).n;
+    const n = this.b.pop.aliveAt(Math.min(this.b.t0, this.time.ageAt(y)));
     return w > 0 && n > 0 ? w / n : lin;
   }
 
@@ -557,23 +557,16 @@ function twigTop(v: TwigView, t: Twig): number {
 }
 
 /**
- * Trace the strand on slot K from y0 to y1 (world). With linear widths a slot
- * is one fixed x: a straight line. With log widths the lattice's pitch follows
- * the column (the width over the individuals passing): the strand drifts with
- * it and shifts at the gray edge's step lines, a shift left as a break (the
- * strand resumes at its new x), so neighbouring shifts don't line up into a bar.
+ * Trace the strand on slot K from y0 to y1 (world): its x follows the
+ * column's left edge and slot pitch (both continuous: it bends at the leans
+ * and slides as the width changes), in chords through the edges' kinks.
  */
 function strandPath(v: TwigView, m: TwigModel, K: number, y0: number, y1: number, path: Path2D | CanvasRenderingContext2D, move = true): [number, number] {
   const lo = Math.min(y0, y1);
   const hi = Math.max(y0, y1);
   const brk: [number, boolean][] = [];
-  if (m.mode !== 'linear') {
-    for (const y of m.b.steps.lines(m.b, lo, hi, 400) ?? []) brk.push([y, true]);
-    for (let k = 1; k < 8; k++) brk.push([lo + ((hi - lo) * k) / 8, false]);
-  } else {
-    // (Linear: a slot is one x within a column; it shifts only at the jogs, the splits.)
-    for (const sg of m.b.path) if (sg.y > lo && sg.y < hi) brk.push([sg.y, true]);
-  }
+  for (const y of m.b.steps.lines(m.b, lo, hi, 400) ?? []) brk.push([y, false]);
+  for (let k = 1; k < 8; k++) brk.push([lo + ((hi - lo) * k) / 8, false]);
   brk.sort((a, b) => (y1 > y0 ? a[0] - b[0] : b[0] - a[0]));
   let p = v.toScreen(m.slotX(K, y0), y0);
   if (move) path.moveTo(p[0], p[1]);
@@ -689,40 +682,62 @@ export function kLogAt(v: TwigView, time: TimeScale, y: number): number {
   return time.yearsPerUnit(y) / (time.ageAt(y) * 1e6 + TIME_C) / Math.LN2 / v.sy;
 }
 
+/** The column at one height, on screen: left edge, width, green lane's width, slot pitch (px) and slots. */
+interface Edge {
+  l: number;
+  w: number;
+  g: number;
+  P: number;
+  n: number;
+}
+
 /**
- * One stretch of constant column width between world heights ya < yb, as
- * the mesh sees it: screen x of the column's left edge, of the green lane's
- * right edge, px per individual (slot), and the column's slots.
+ * One piece of the column between world heights ya < yb where its edges are
+ * straight on screen (layout.ts edgeSamples: within a fraction of a pixel),
+ * as the mesh sees it: the column at both ends (screen py pa < pb), linear
+ * between.
  */
 interface Stretch {
   ya: number;
   yb: number;
-  colX: number;
-  xG: number;
-  pitchPx: number;
-  nT: number;
-  nG: number;
+  pa: number;
+  pb: number;
+  a: Edge;
+  b: Edge;
   /** The lane right of the green one: withered over an extinct species' span, else gray. */
   lane: Lane;
 }
 
-/** The column's stretches of constant width (the gray edge's step lines) between yTop < yBot. */
+/** The column's pieces of straight edges between yTop < yBot. */
 function stretches(v: TwigView, m: TwigModel, yTop: number, yBot: number): Stretch[] {
-  // (The step lines include the splits: below its own, a strand is a slice of the parent column.)
   const y0 = m.b.splitY;
-  const cuts = [yTop, ...(m.b.steps.lines(m.b, yTop, yBot, 2000) ?? []), yBot].sort((a, b) => a - b);
+  const cuts = edgeSamples(m.b, yTop, yBot, 0.25 / v.sx);
+  const at = (y: number): Edge => {
+    const L = m.lanes(y);
+    const P = m.pitch(y);
+    return { l: v.toScreen(L.left, y)[0], w: L.w * v.sx, g: L.gw * v.sx, P: P * v.sx, n: L.w / P };
+  };
   const out: Stretch[] = [];
+  // (Each piece's ends a hair inside it: at a split the green lane changes band.)
+  const eps = (y: number) => 1e-9 * Math.max(1, Math.abs(y));
   for (let c = 0; c + 1 < cuts.length; c++) {
-    const ym = (cuts[c] + cuts[c + 1]) / 2;
-    const L = m.lanes(ym);
-    if (!(L.w > 0)) continue;
-    const P = m.pitch(ym);
-    const colX = v.toScreen(L.left, ym)[0];
-    const green = L.gw > 0;
-    const lane = m.rec.extinct && ym < y0 ? Lane.Withered : Lane.Gray;
-    out.push({ ya: cuts[c], yb: cuts[c + 1], colX, xG: green ? v.toScreen(L.left + L.gw, ym)[0] : -1e9, pitchPx: P * v.sx, nT: L.w / P, nG: green ? m.greenSlots(ym) : 0, lane });
+    const A = at(cuts[c] + eps(cuts[c]));
+    const B = at(cuts[c + 1] - eps(cuts[c + 1]));
+    if (A.w > 0 || B.w > 0) {
+      const ym = (cuts[c] + cuts[c + 1]) / 2;
+      const lane = m.rec.extinct && ym < y0 ? Lane.Withered : Lane.Gray;
+      out.push({ ya: cuts[c], yb: cuts[c + 1], pa: v.toScreen(0, cuts[c])[1], pb: v.toScreen(0, cuts[c + 1])[1], a: A, b: B, lane });
+    }
   }
   return out;
+}
+
+/** A piece's column at screen height py (linear between its ends; beyond them, extended). */
+function edgeAt(S: Stretch, py: number): Edge {
+  const H = S.pb - S.pa;
+  const u = H > 0 ? (py - S.pa) / H : 0;
+  const f = (p: number, q: number) => p + (q - p) * u;
+  return { l: f(S.a.l, S.b.l), w: f(S.a.w, S.b.w), g: f(S.a.g, S.b.g), P: f(S.a.P, S.b.P), n: f(S.a.n, S.b.n) };
 }
 
 /**
@@ -773,8 +788,6 @@ export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: num
       const ya = Math.max(S.ya, yHi);
       const yb = Math.min(S.yb, yLo);
       if (!(yb > ya)) continue;
-      const lx0 = S.colX;
-      const lx1 = S.colX + S.nT * S.pitchPx;
       const [, py0] = v.toScreen(0, ya);
       const [, py1] = v.toScreen(0, yb);
       // Room for the line caps and dots at the true ends (not at a step line, where strands break).
@@ -783,21 +796,37 @@ export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: num
       const padT = mode && ya === yHi ? reach : 0;
       const padB = mode && yb === yLo ? reach : 0;
       const pad = mode ? reach : 1;
-      const x0 = Math.max(-4, lx0 - pad);
-      const x1 = Math.min(v.w + 4, lx1 + pad);
       const y0 = Math.max(-4, py0 - padT);
       const y1 = Math.min(v.h + 4, py1 + padB);
-      if (!(x1 > x0) || !(y1 > y0)) continue;
+      if (!(y1 > y0)) continue;
+      // The column at the instance's top and bottom (straight between): its bounding box.
+      const E0 = edgeAt(S, y0);
+      const E1 = edgeAt(S, y1);
+      const Em = edgeAt(S, (y0 + y1) / 2);
+      if (!(E0.P > 0)) continue;
+      const x0 = Math.max(-4, Math.min(E0.l, E1.l) - pad);
+      const x1 = Math.min(v.w + 4, Math.max(E0.l + E0.w, E1.l + E1.w) + pad);
+      if (!(x1 > x0)) continue;
+      // The shear (mesh.ts MeshInst): the lattice in the column's frame at y0, mapped through its left edge and pitch.
+      const dY = y1 - y0;
+      const lx0 = E0.l;
+      const kx = (E1.l - E0.l) / dY;
+      const s1 = E1.P / E0.P;
+      const ks = (s1 - 1) / dY;
+      const kc = ((E1.n - E0.n) * E0.P) / dY;
+      const kg = (E1.g / s1 - E0.g) / dY;
       // Lanes too narrow for their lines (texture only): each is one line its own width.
-      const wPx = S.nT * S.pitchPx;
-      const gPx = S.nG > 0 ? Math.max(0, S.xG - S.colX) : 0;
-      const narG = mode || !(S.nG > 0) ? 0 : laneNarrow(gPx);
+      const wPx = Em.w;
+      const gPx = Em.g;
+      const narG = mode || !(gPx > 0) ? 0 : laneNarrow(gPx);
       const narR = mode ? 0 : laneNarrow(wPx - gPx);
       // The slot lattice: one individual per slot; the nested subset of its lines drawn at this zoom.
-      const { L: lvl, fineA, lambda } = lineLevel(S.pitchPx);
-      const bw = 2 ** lvl * S.pitchPx;
-      const B0 = Math.max(0, Math.floor((x0 - lx0) / bw) - 1);
-      if (B0 * 2 ** lvl >= S.nT) continue;
+      const { L: lvl, fineA, lambda } = lineLevel(E0.P);
+      const bw = 2 ** lvl * E0.P;
+      // (The first block that can show: the box's left side in the frame, at its top and bottom.)
+      const refL = Math.min(x0, lx0 + (x0 - lx0 - kx * dY) / s1);
+      const B0 = Math.max(0, Math.floor((refL - lx0) / bw) - 1);
+      if (B0 * 2 ** lvl >= Math.max(E0.n, E1.n)) continue;
       // The time axis at the top of the instance, relative to generation gA's start.
       const [, wy0] = v.toWorld(0, y0);
       const age = time.ageAt(wy0) * 1e6;
@@ -821,7 +850,7 @@ export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: num
         GL: m.GL,
         Lm,
         nowRel: now - gA * m.GL,
-        xG: S.xG,
+        xG: E0.g > 0 || E1.g > 0 ? lx0 + E0.g : -1e9,
         B0,
         lvl,
         latSeed,
@@ -834,7 +863,12 @@ export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: num
         fA: m.fold(gA, nA),
         fB: gB !== NONE ? m.fold(gB, nB) : 1,
         colL: lx0,
-        colR: lx0 + Math.max(0.6, wPx),
+        colR: lx0 + Math.max(0.6, E0.w),
+        kx,
+        ks,
+        xr: lx0,
+        kc,
+        kg: E0.g > 0 || E1.g > 0 ? kg : 0,
         narG,
         narR,
         linkA: look.linkA ?? 0,

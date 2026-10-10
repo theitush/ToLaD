@@ -1,5 +1,5 @@
-// WebGL2 layer of the fan: the lanes (flat rectangles with anti-aliased
-// vertical edges) and the individuals mesh (mesh.ts), evaluated per pixel with
+// WebGL2 layer of the fan: the lanes (flat trapezoids: horizontal top and
+// bottom, anti-aliased left and right edges, vertical or slanted) and the individuals mesh (mesh.ts), evaluated per pixel with
 // procgen's hash (HASH_GLSL). Drawn on its own canvas under the Canvas 2D one,
 // which keeps the text, the history marks and the parent threads.
 
@@ -10,16 +10,22 @@ const RECT_VS = /* glsl */ `#version 300 es
 layout(location = 0) in vec2 corner;
 layout(location = 1) in vec4 aRect;
 layout(location = 2) in vec4 aColor;
+layout(location = 3) in vec4 aSlope;
 uniform vec2 uView;
 out vec2 vP;
 flat out vec4 vRect;
 flat out vec4 vColor;
+flat out vec4 vSlope;
 void main() {
-  // Grown by a pixel so the anti-aliased edges have room.
-  vec2 p = mix(aRect.xy - vec2(1.0, 0.0), aRect.zw + vec2(1.0, 0.0), corner);
+  // The bounding box of both slanted edges, grown by a pixel so the anti-aliased edges have room.
+  float h = aRect.w - aRect.y;
+  float xl = min(aRect.x, aRect.x + aSlope.x * h) - 1.0;
+  float xr = max(aRect.z, aRect.z + aSlope.y * h) + 1.0;
+  vec2 p = mix(vec2(xl, aRect.y), vec2(xr, aRect.w), corner);
   vP = p;
   vRect = aRect;
   vColor = aColor;
+  vSlope = aSlope;
   gl_Position = vec4(p.x / uView.x * 2.0 - 1.0, 1.0 - p.y / uView.y * 2.0, 0.0, 1.0);
 }`;
 
@@ -28,10 +34,12 @@ precision highp float;
 in vec2 vP;
 flat in vec4 vRect;
 flat in vec4 vColor;
+flat in vec4 vSlope;
 out vec4 o;
 void main() {
-  // Horizontal coverage of the pixel [x - .5, x + .5] by [x0, x1]: crisp vertical edges, hairlines stay visible.
-  float c = clamp(min(vP.x + 0.5, vRect.z) - max(vP.x - 0.5, vRect.x), 0.0, 1.0);
+  // Horizontal coverage of the pixel [x - .5, x + .5] by the edges at its height: crisp edges, hairlines stay visible.
+  float dy = vP.y - vRect.y;
+  float c = clamp(min(vP.x + 0.5, vRect.z + vSlope.y * dy) - max(vP.x - 0.5, vRect.x + vSlope.x * dy), 0.0, 1.0);
   float a = vColor.a * c;
   o = vec4(vColor.rgb * a, a);
 }`;
@@ -49,6 +57,7 @@ layout(location = 8) in uvec4 aIdx2;
 layout(location = 9) in vec4 aNar;
 layout(location = 10) in vec4 aLink;
 layout(location = 11) in vec4 aMore;
+layout(location = 12) in vec4 aShear;
 uniform vec2 uView;
 out vec2 vP;
 flat out vec4 vRect;
@@ -62,10 +71,11 @@ flat out uvec4 vIdx2;
 flat out vec4 vNar;
 flat out vec4 vLink;
 flat out vec4 vMore;
+flat out vec4 vShear;
 void main() {
   vec2 p = mix(aRect.xy, aRect.zw, corner);
   vP = p;
-  vRect = aRect; vSlot = aSlot; vTime = aTime; vMisc = aMisc; vLife = aLife; vIdx = aIdx; vSeed = aSeed; vIdx2 = aIdx2; vNar = aNar; vLink = aLink; vMore = aMore;
+  vRect = aRect; vSlot = aSlot; vTime = aTime; vMisc = aMisc; vLife = aLife; vIdx = aIdx; vSeed = aSeed; vIdx2 = aIdx2; vNar = aNar; vLink = aLink; vMore = aMore; vShear = aShear;
   gl_Position = vec4(p.x / uView.x * 2.0 - 1.0, 1.0 - p.y / uView.y * 2.0, 0.0, 1.0);
 }`;
 
@@ -84,7 +94,8 @@ flat in uvec4 vSeed;  // seedA, seedB, strideA, strideB
 flat in uvec4 vIdx2;  // latSeed, foldA, foldB, gA
 flat in vec4 vNar;    // colL, colR, narG, narR
 flat in vec4 vLink;   // linkA, lambda, tauC, tauB
-flat in vec4 vMore;   // baseA, -, -, -
+flat in vec4 vMore;   // baseA, kx, ks, xr (the shear: mesh.ts MeshInst)
+flat in vec4 vShear;  // kc, kg, -, -
 uniform float uKLog;
 uniform float uNowPx;
 uniform vec3 uPal[4];
@@ -300,13 +311,19 @@ vec4 shadeLinks(vec2 p) {
   return best;
 }
 void main() {
-  vec2 p = vP;
-  float xG = vLife.w;
+  // Into the column's frame at the instance's top (the shear, mesh.ts shadeMesh); sc: its distances back to screen px.
+  float dyM = vP.y - vRect.y;
+  float sM = 1.0 + vMore.z * dyM;
+  float sc = sM / sqrt(1.0 + vMore.y * vMore.y);
+  vec2 p = vec2(vMore.w + (vP.x - vMore.w - vMore.y * dyM) / sM, vP.y);
+  float xG = vLife.w + vShear.y * dyM;
+  float colRy = vNar.y + vShear.x * dyM;
   uint L = vIdx.y;
   float bw = vSlot.y;
   // Nothing to draw this far from a line (before any shading: most pixels stop here).
   // (Only the living glow, and they are only in the green lane.)
-  float reach = vMisc.y < 0.5 ? max(vSlot.z, 1.0) * 0.5 + 0.5 : max(vMisc.w, max(vSlot.z, 1.0) * 0.5 + (xG > vRect.x ? 5.0 : 0.0)) + 0.5;
+  float reach = vMisc.y < 0.5 ? max(vSlot.z, 1.0) * 0.5 + 0.5 : max(vMisc.w, max(vSlot.z, 1.0) * 0.5 + (vLife.w > vRect.x ? 5.0 : 0.0)) + 0.5;
+  float reachR = reach / sc;
   float bf = floor((p.x - vSlot.x) / bw);
   uint D = min(L, LAT_DEPTH);
   vec4 best = vec4(0.0);
@@ -322,7 +339,7 @@ void main() {
     bool far = false;
     for (uint l = L; l > L - D; l--) {
       // The line is inside the current sub-block: too far from it, it is too far from the line.
-      if (p.x < x0 - reach || p.x > x0 + sub + reach) { far = true; break; }
+      if (p.x < x0 - reachR || p.x > x0 + sub + reachR) { far = true; break; }
       uint bit = latBit(l, idx);
       idx = 2u * idx + bit;
       off = 2u * off + bit;
@@ -332,7 +349,9 @@ void main() {
     if (far) continue;
     float pp = bw / float(1u << D);
     float lineX = vSlot.x + bb * bw + (float(off) + 0.5) * pp;
-    float d = abs(p.x - lineX);
+    // (Past the column's right edge at this height: no slot there.)
+    if (vNar.y > vNar.x && lineX >= colRy) continue;
+    float d = abs(p.x - lineX) * sc;
     if (d > reach) continue;
     uint K = idx;
     uint iA = slotBase(K, vSeed.z, vIdx.z);
@@ -395,18 +414,26 @@ function compile(gl: WebGL2RenderingContext, vs: string, fs: string): WebGLProgr
 }
 
 /** Growable typed arrays for one frame's instances. */
+export const RECT_F = 12;
+
 export class RectBatch {
-  f = new Float32Array(8 * 256);
+  f = new Float32Array(RECT_F * 256);
   n = 0;
-  /** A rectangle [x0, x1] × [y0, y1] (CSS px) in colour (r, g, b 0–1, alpha). */
-  push(x0: number, y0: number, x1: number, y1: number, r: number, g: number, b: number, a: number): void {
-    if (!(x1 > x0) || !(y1 > y0) || a <= 0) return;
-    if ((this.n + 1) * 8 > this.f.length) {
+  /**
+   * A trapezoid from y0 down to y1 (CSS px), its edges [x0, x1] at y0 and
+   * moving kl, kr px sideways per px down, in colour (r, g, b 0–1, alpha); a
+   * rectangle by default.
+   */
+  push(x0: number, y0: number, x1: number, y1: number, r: number, g: number, b: number, a: number, kl = 0, kr = 0): void {
+    if (!(Math.max(x1 - x0, x1 + kr * (y1 - y0) - x0 - kl * (y1 - y0)) > 0) || !(y1 > y0) || a <= 0) return;
+    if ((this.n + 1) * RECT_F > this.f.length) {
       const nf = new Float32Array(this.f.length * 2);
       nf.set(this.f);
       this.f = nf;
     }
-    const o = this.n * 8;
+    const o = this.n * RECT_F;
+    this.f[o + 8] = kl;
+    this.f[o + 9] = kr;
     this.f[o] = x0;
     this.f[o + 1] = y0;
     this.f[o + 2] = x1;
@@ -475,9 +502,9 @@ export class FanGL {
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
     this.rectBuf = gl.createBuffer()!;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.rectBuf);
-    for (let k = 0; k < 2; k++) {
+    for (let k = 0; k < 3; k++) {
       gl.enableVertexAttribArray(1 + k);
-      gl.vertexAttribPointer(1 + k, 4, gl.FLOAT, false, 32, k * 16);
+      gl.vertexAttribPointer(1 + k, 4, gl.FLOAT, false, RECT_F * 4, k * 16);
       gl.vertexAttribDivisor(1 + k, 1);
     }
     // Mesh.
@@ -488,8 +515,8 @@ export class FanGL {
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
     this.meshFBuf = gl.createBuffer()!;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.meshFBuf);
-    // Floats: aRect, aSlot, aTime, aMisc, aLife (locations 1–5), aNar (9), aLink (10) and aMore (11).
-    for (let k = 0; k < 8; k++) {
+    // Floats: aRect, aSlot, aTime, aMisc, aLife (locations 1–5), aNar (9), aLink (10), aMore (11) and aShear (12).
+    for (let k = 0; k < 9; k++) {
       const loc = k < 5 ? 1 + k : 4 + k;
       gl.enableVertexAttribArray(loc);
       gl.vertexAttribPointer(loc, 4, gl.FLOAT, false, MESH_F * 4, k * 16);
@@ -518,7 +545,7 @@ export class FanGL {
     gl.uniform2f(this.u['r.uView'], w, h);
     gl.bindVertexArray(this.rectVao);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.rectBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, b.f.subarray(0, b.n * 8), gl.STREAM_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, b.f.subarray(0, b.n * RECT_F), gl.STREAM_DRAW);
     gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, b.n);
   }
 
@@ -555,6 +582,22 @@ export class FanGL {
     this.rects(this.over, w, h);
     gl.bindVertexArray(null);
   }
+}
+
+/**
+ * A trapezoid between screen heights yTop < yBot with its left and right
+ * edges at each (CSS px), clipped to the screen [-4, h + 4] in y (and skipped
+ * wholly off it in x).
+ */
+export function pushTrap(batch: RectBatch, yTop: number, yBot: number, lTop: number, lBot: number, rTop: number, rBot: number, w: number, h: number, c: number[], a: number): void {
+  const H = yBot - yTop;
+  if (!(H > 0)) return;
+  const kl = (lBot - lTop) / H;
+  const kr = (rBot - rTop) / H;
+  const y0 = Math.max(-4, yTop);
+  const y1 = Math.min(h + 4, yBot);
+  if (!(y1 > y0) || Math.min(lTop, lBot) > w + 4 || Math.max(rTop, rBot) < -4) return;
+  batch.push(lTop + kl * (y0 - yTop), y0, rTop + kr * (y0 - yTop), y1, c[0], c[1], c[2], a, kl, kr);
 }
 
 /** '#rrggbb' → [r, g, b] in 0–1. */

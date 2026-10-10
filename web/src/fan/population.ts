@@ -21,6 +21,14 @@
 //     ancestors) is the sum of everyone's founders. An extinct species holds
 //     its constant model from its last appearance back to its start, and the
 //     same founders below it.
+//   - an extinct species tapers to 0 at its last appearance: over the last
+//     TAPER_DEC decades of its age (log10 of years before present + TAPER_C,
+//     the fan's time axis), N falls linearly in that log age, so its column
+//     ends in a short straight point, not a cut (layout.ts draws the same N).
+//   - between the history's points N follows procgen's own ramps (linear in
+//     births per generation): continuous, no steps. Where the compiled
+//     segments jump (a modelled baseline meeting the first count), N ramps
+//     log-linearly over the generation before the jump instead (JUMP_GENS).
 //
 // q(t), alive at t with living descendants today through any mix of mothers and
 // fathers. A genealogy of whole generations counted back from now, mixed at
@@ -49,6 +57,16 @@
 // extinct one's).
 
 import type { SpeciesRec } from './panthera';
+
+/** A jump in the history's births between segments becomes a log-linear ramp over this many generations before it. */
+export const JUMP_GENS = 1;
+
+/** An extinct species' taper to 0 at its last appearance: this many decades of log age (the fan's time axis) ... */
+export const TAPER_DEC = 0.06;
+/** ... at most this share of its own span (from its start) in log age ... */
+export const TAPER_MAX_SHARE = 1 / 3;
+/** ... on the fan's axis: log10(years before present + TAPER_C) (layout.ts TIME_C). */
+export const TAPER_C = 10;
 
 /** The fixed point of q = 1 − e^(−2q): the share of a constant, well-mixed population with descendants far in the future. */
 export const Q_STAR = (() => {
@@ -94,6 +112,11 @@ export class Population {
   private readonly nConst: number;
   private readonly h: Float64Array;
   private readonly GL: number;
+  /** Jumps in the history (years before present, newer side's births there, older side's a ramp's length back). */
+  private readonly jumps: { at: number; a: number; b: number }[] = [];
+  /** Log10 of (years + TAPER_C) at the tip and the taper's length in it (0: none, a living species). */
+  private readonly tipLog: number;
+  readonly taperDec: number;
 
   /**
    * @param startMa the species' start (Ma): its split in the dated tree, where
@@ -105,6 +128,18 @@ export class Population {
   ) {
     const GL = sp.genYears;
     this.GL = GL;
+    this.tipLog = Math.log10(sp.t1 * 1e6 + TAPER_C);
+    if (sp.births) {
+      const cv = sp.births.curve;
+      for (const k of cv.knots) {
+        if (!(k < cv.years)) continue;
+        const e = 1e-7 * Math.max(1, k);
+        const a = cv.sizeAt(k - e);
+        const b = cv.sizeAt(k + e);
+        if (a > 0 && b > 0 && Math.abs(a - b) > 1e-9 * Math.max(a, b)) this.jumps.push({ at: k, a: cv.sizeAt(k), b: cv.sizeAt(Math.min(cv.years, k + JUMP_GENS * GL)) });
+      }
+    }
+    this.taperDec = sp.extinct ? Math.min(TAPER_DEC, TAPER_MAX_SHARE * (Math.log10(startMa * 1e6 + TAPER_C) - this.tipLog)) : 0;
     // (The constant model spreads the dataset's estimate over its own span, first to last appearance.)
     const years = Math.max(1, (sp.t0 - sp.t1) * 1e6);
     const c = sp.births;
@@ -144,8 +179,29 @@ export class Population {
     if (ageMa < sp.t1) return 0;
     const a = Math.min(ageMa, sp.t0, this.startMa);
     const c = sp.births;
-    if (c) return c.curve.sizeAt(Math.min(a * 1e6, c.curve.years)) * this.lg;
-    return this.nConst;
+    let n = c ? c.curve.sizeAt(Math.min(a * 1e6, c.curve.years)) * this.lg : this.nConst;
+    for (const j of this.jumps) {
+      const u = (a * 1e6 - j.at) / (JUMP_GENS * this.GL);
+      if (u > 0 && u < 1) n = j.a * Math.pow(j.b / j.a, u) * this.lg;
+    }
+    return n * this.taper(ageMa);
+  }
+
+  /** The extinct's taper at age `ageMa`: 0 at the tip, rising linearly in log age to 1 (1 for the living). */
+  taper(ageMa: number): number {
+    if (!(this.taperDec > 0)) return 1;
+    const u = (Math.log10(Math.max(0, ageMa) * 1e6 + TAPER_C) - this.tipLog) / this.taperDec;
+    return u <= 0 ? 0 : u >= 1 ? 1 : u;
+  }
+
+  /** Ages (Ma) where N(t)'s slope changes (the history's knots, the taper's start), ascending. */
+  get kinks(): number[] {
+    const out: number[] = [];
+    const c = this.sp.births;
+    if (c) for (const a of c.curve.knots) if (a / 1e6 > this.sp.t1 && a / 1e6 < this.startMa) out.push(a / 1e6);
+    for (const j of this.jumps) if ((j.at + JUMP_GENS * this.GL) / 1e6 < this.startMa) out.push((j.at + JUMP_GENS * this.GL) / 1e6);
+    if (this.taperDec > 0) out.push((Math.pow(10, this.tipLog + this.taperDec) - TAPER_C) / 1e6);
+    return out.sort((p, q) => p - q);
   }
 
   /**
@@ -205,14 +261,27 @@ export class Population {
     return { n: n[lo], q: q[lo] };
   }
 
-  /** Share of those alive at `ageMa` with living descendants today (0–1): h_k of its generation, as drawn. */
+  /**
+   * Share of those alive at `ageMa` with living descendants today (0–1), as
+   * drawn: h_k at the middle of generation k, linear between (no steps).
+   */
   greenAt(ageMa: number): number {
     const sp = this.sp;
     if (sp.extinct) return ageMa > this.startMa ? this.qBase : 0;
     if (ageMa >= this.startMa) return this.qBase;
     if (ageMa < sp.t1) return 0;
-    return this.stepAt(ageMa).q;
+    return lerpGen(this.h, (ageMa * 1e6) / this.GL);
   }
+}
+
+/** h at generation coordinate x (generations; h[k] at x = k + ½), linear between the middles, held past the ends. */
+export function lerpGen(h: ArrayLike<number>, x: number): number {
+  const u = x - 0.5;
+  if (!(u > 0)) return h[0];
+  const k = Math.floor(u);
+  if (k >= h.length - 1) return h[h.length - 1];
+  const f = u - k;
+  return h[k] * (1 - f) + h[k + 1] * f;
 }
 
 const cache = new Map<string, Population>();

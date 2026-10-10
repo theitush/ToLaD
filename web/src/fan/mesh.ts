@@ -220,7 +220,7 @@ export function linkWeight(l: number, lambda: number): number {
 }
 
 /** Floats and uints per instance (meshgl.ts attribute layout). */
-export const MESH_F = 32;
+export const MESH_F = 36;
 export const MESH_U = 12;
 /** Most members of a generation folded onto one slot (a generation up to this many times its slots). */
 export const MAX_FOLD = 8;
@@ -228,7 +228,15 @@ export const MAX_FOLD = 8;
 /**
  * One instance of the texture (mode 0) or the lives (mode 1): a screen
  * rectangle of one branch's column (both lanes) over one band (texture) or one
- * generation (lives), within one stretch of constant column width.
+ * generation (lives), within one piece of the column where its edges are
+ * straight (layout.ts edgeSamples).
+ *
+ * The column may lean and its width change within the piece: the lattice is
+ * laid out in the column's own frame at the instance's top (y0), and each
+ * pixel is mapped into it through the column's left edge and slot pitch at
+ * its height, both linear in y (the shear): x_ref = xr + (x − xr − kx·dy) ÷
+ * (1 + ks·dy), dy = y − y0. So the strands bend and slide with the edges and
+ * never jump between pieces.
  */
 export interface MeshInst {
   /** Screen rectangle (CSS px). */
@@ -299,6 +307,17 @@ export interface MeshInst {
    * not as specks, while they are thin.
    */
   baseA?: number;
+  /**
+   * The shear: the left edge's slope (px sideways per px down), the slot
+   * pitch's relative change per px down, the left edge at y0 (the frame's
+   * origin), and in that frame the right edge's (colR) and the green lane's
+   * (xG) slopes. All 0: a rectangle, as before.
+   */
+  kx?: number;
+  ks?: number;
+  xr?: number;
+  kc?: number;
+  kg?: number;
 }
 
 export function packInst(m: MeshInst, f: Float32Array, u: Uint32Array, k: number): void {
@@ -332,9 +351,13 @@ export function packInst(m: MeshInst, f: Float32Array, u: Uint32Array, k: number
   f[o + 26] = m.tauC ?? 0;
   f[o + 27] = m.tauB ?? 0;
   f[o + 28] = m.baseA ?? 0;
-  f[o + 29] = 0;
-  f[o + 30] = 0;
-  f[o + 31] = 0;
+  f[o + 29] = m.kx ?? 0;
+  f[o + 30] = m.ks ?? 0;
+  f[o + 31] = m.xr ?? 0;
+  f[o + 32] = m.kc ?? 0;
+  f[o + 33] = m.kg ?? 0;
+  f[o + 34] = 0;
+  f[o + 35] = 0;
   const q = k * MESH_U;
   u[q] = m.B0;
   u[q + 1] = m.lvl;
@@ -556,8 +579,19 @@ export function shadeLinks(m: MeshInst, px: number, py: number, kLog: number, pa
  * float64 here. kLog: log2 of (age + TIME_C) per screen px; nowPx: screen y of
  * "now" (dead lives stop DEAD_GAP px short of it).
  */
-export function shadeMesh(m: MeshInst, px: number, py: number, kLog: number, nowPx: number, pal: Palette, deadGap = 3): RGBA {
-  if (px < m.x0 || px >= m.x1 || py < m.y0 || py >= m.y1) return [0, 0, 0, 0];
+export function shadeMesh(m: MeshInst, sx: number, py: number, kLog: number, nowPx: number, pal: Palette, deadGap = 3): RGBA {
+  if (sx < m.x0 || sx >= m.x1 || py < m.y0 || py >= m.y1) return [0, 0, 0, 0];
+  // Into the column's frame at y0 (the shear): px from here on; sc turns its distances back into screen px.
+  const dyM = py - m.y0;
+  const kx = m.kx ?? 0;
+  const sM = 1 + (m.ks ?? 0) * dyM;
+  const sc = sM / Math.sqrt(1 + kx * kx);
+  const xr = m.xr ?? 0;
+  const px = xr + (sx - xr - kx * dyM) / sM;
+  const xG = m.xG + (m.kg ?? 0) * dyM;
+  const colL = m.colL ?? 0;
+  const colR = m.colR ?? 0;
+  const colRy = colR + (m.kc ?? 0) * dyM;
   // Nothing to draw this far from a line (only the living glow, and they are only in the green lane).
   const reach = m.mode === 0 ? Math.max(m.lw, 1) * 0.5 + 0.5 : Math.max(m.tipR, Math.max(m.lw, 1) * 0.5 + (m.xG > m.x0 ? 5 : 0)) + 0.5;
   const bf = Math.floor((px - m.xB0) / m.bw);
@@ -570,13 +604,15 @@ export function shadeMesh(m: MeshInst, px: number, py: number, kLog: number, now
     const { off, D, K } = latticeWalk(m.latSeed, m.lvl, B);
     const pp = m.bw / 2 ** D;
     const lineX = m.xB0 + bb * m.bw + (off + 0.5) * pp;
-    const d = Math.abs(px - lineX);
+    // (Past the column's right edge at this height: no slot there.)
+    if (colR > colL && lineX >= colRy) continue;
+    const d = Math.abs(px - lineX) * sc;
     if (d > reach) continue;
     const iA = slotBase(K, m.sA, m.nA);
     const iB = slotBase(K, m.sB, m.nB);
     const fine = m.fineA < 1 && !latticeTop(m.latSeed, m.lvl, B) ? m.fineA : 1;
     // Where the lanes meet, the slot's colours blend by how much of it is in each.
-    const wg = clamp01((m.xG - lineX) / pp + 0.5);
+    const wg = clamp01((xG - lineX) / pp + 0.5);
     const g = wg > 0 ? shadeLane(m, Lane.Green, iA, iB, d, py, kLog, nowPx, pal, deadGap) : ([0, 0, 0, 0] as RGBA);
     const r = wg < 1 ? shadeLane(m, m.lane, iA, iB, d, py, kLog, nowPx, pal, deadGap) : ([0, 0, 0, 0] as RGBA);
     const col = blend(g, r, wg);
@@ -587,14 +623,12 @@ export function shadeMesh(m: MeshInst, px: number, py: number, kLog: number, now
   if (lk[3] > best[3]) best = lk;
   // Lanes too narrow for their lines: the lane is one line its own width, lit by a representative's lives.
   if (m.mode === 0 && ((m.narG ?? 0) > 0 || (m.narR ?? 0) > 0)) {
-    const colL = m.colL ?? 0;
-    const colR = m.colR ?? 0;
-    const green = m.xG >= colL;
-    const xGe = green ? Math.max(m.xG, colL + 1) : colL;
+    const green = xG >= colL;
+    const xGe = green ? Math.max(xG, colL + 1) : colL;
     const i = narrowIndex(m.latSeed, Math.floor(px - colL));
     for (const [lane, a0, a1, nar] of [
       [Lane.Green, colL, xGe, m.narG ?? 0],
-      [m.lane, Math.max(colL, m.xG), colR, m.narR ?? 0],
+      [m.lane, Math.max(colL, xG), colR, m.narR ?? 0],
     ] as const) {
       if (!(nar > 0)) continue;
       const cx = Math.max(0, Math.min(px + 0.5, a1) - Math.max(px - 0.5, a0));
@@ -615,6 +649,7 @@ export function unpackInst(f: Float32Array, u: Uint32Array, k: number): MeshInst
     x0: f[o], y0: f[o + 1], x1: f[o + 2], y1: f[o + 3], xB0: f[o + 4], bw: f[o + 5], lw: f[o + 6], fineA: f[o + 7], p0: f[o + 8], T0: f[o + 9], A: f[o + 10], gBoff: f[o + 11],
     alpha: f[o + 12], mode: f[o + 13] as 0 | 1, lane: f[o + 14] as Lane, tipR: f[o + 15], GL: f[o + 16], Lm: f[o + 17], nowRel: f[o + 18], xG: f[o + 19],
     colL: f[o + 20], colR: f[o + 21], narG: f[o + 22], narR: f[o + 23], linkA: f[o + 24], lam: f[o + 25], tauC: f[o + 26], tauB: f[o + 27], baseA: f[o + 28],
+    kx: f[o + 29], ks: f[o + 30], xr: f[o + 31], kc: f[o + 32], kg: f[o + 33],
     B0: u[q], lvl: u[q + 1], nA: u[q + 2], nB: u[q + 3], seedA: u[q + 4], seedB: u[q + 5], sA: u[q + 6], sB: u[q + 7], latSeed: u[q + 8], fA: u[q + 9], fB: u[q + 10], gA: u[q + 11] | 0,
   };
 }

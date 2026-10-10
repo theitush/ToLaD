@@ -58,6 +58,11 @@ export class BirthCurve {
     this.total = n;
   }
 
+  /** Years before present of each segment's start, newest first (where the ramps' slopes change). */
+  get knots(): readonly number[] {
+    return this.ago;
+  }
+
   /** Span of the curve in years. */
   get years(): number {
     return this.ago[this.ago.length - 1] ?? 0;

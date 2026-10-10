@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PANTHERA } from './panthera';
-import { parentShare, population, Q_STAR, shareBack } from './population';
+import { parentShare, population, Q_STAR, shareBack, TAPER_C, TAPER_DEC } from './population';
 
 const sp = (name: string) => PANTHERA.species.find((s) => s.common === name)!;
 
@@ -74,10 +74,15 @@ describe('the Panthera populations', () => {
       // From its first appearance (the default start) or from a split in between (the dated tree's).
       for (const start of [s.t0, (s.t0 + s.t1) / 2]) {
         const p = population(s, start);
-        for (const a of [s.t1, (start + s.t1) / 2, start]) {
-          expect(p.greenAt(a)).toBe(0);
-          expect(p.aliveAt(a)).toBeGreaterThan(0);
-        }
+        for (const a of [s.t1, (start + s.t1) / 2, start]) expect(p.greenAt(a)).toBe(0);
+        for (const a of [(start + s.t1) / 2, start]) expect(p.aliveAt(a)).toBeGreaterThan(0);
+        // It tapers to 0 at its last appearance: linear in log age over a short stretch, no cut.
+        expect(p.aliveAt(s.t1)).toBe(0);
+        const full = p.aliveAt((start + s.t1) / 2);
+        const t9 = (Math.pow(10, Math.log10(s.t1 * 1e6 + TAPER_C) + 0.9 * p.taperDec) - TAPER_C) / 1e6;
+        expect(p.aliveAt(t9) / full).toBeCloseTo(0.9, 6);
+        expect(p.taperDec).toBeGreaterThan(0);
+        expect(p.taperDec).toBeLessThanOrEqual(TAPER_DEC);
         expect(p.aliveAt(s.t1 * 0.9)).toBe(0);
         expect(p.aliveAt(start * 1.1)).toBe(p.founders);
         expect(p.stepAt(start * 1.1).n).toBe(p.founders);

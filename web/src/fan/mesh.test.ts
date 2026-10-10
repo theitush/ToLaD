@@ -141,11 +141,20 @@ describe('one mesh for both lanes: the lane only colours', () => {
         expect(x.bw / 2 ** x.lvl / pitchPx, `${sp} ${perBar}`).toBeCloseTo(1, 5);
         expect(x.lvl).toBe(lineLevel(pitchPx).L);
         expect(x.latSeed).toBe(mm.latticeSeed);
-        // The lanes' boundary of the instance's own stretch (the lanes step with N(t) and q(t)).
-        const ym = c.toWorld(0, (x.y0 + x.y1) / 2)[1];
-        const L = mm.lanes(ym);
-        // (Zoomed out, a generation's step can be far under a pixel: its midpoint is its boundary, either side.)
-        if (L.gw > 0 && x.x0 > 0 && x.x1 < c.w && x.y1 - x.y0 > 1e-3) expect(x.xG).toBeCloseTo(c.toScreen(L.left + L.gw, ym)[0], 2);
+        // The lanes' boundary at the instance's top, in the column's frame there (the shear: within the
+        // chords' fraction of a pixel), and at its bottom through the shear's slopes.
+        const L = mm.lanes(c.toWorld(0, x.y0)[1]);
+        // (The lives reach past their piece by their caps: the texture only.)
+        if (x.mode === 0 && L.gw > 0 && x.x0 > 0 && x.x1 < c.w && x.y1 - x.y0 > 1e-3) {
+          expect(Math.abs(x.xG - c.toScreen(L.left + L.gw, c.toWorld(0, x.y0)[1])[0])).toBeLessThan(0.5);
+          const yb = c.toWorld(0, x.y1 - 0.05)[1];
+          const Lb = mm.lanes(yb);
+          const dy = x.y1 - 0.05 - x.y0;
+          const s = 1 + (x.ks ?? 0) * dy;
+          // Screen x of the frame's green edge at the bottom.
+          const xb = (x.xr ?? 0) + (x.kx ?? 0) * dy + (x.xG + (x.kg ?? 0) * dy - (x.xr ?? 0)) * s;
+          expect(Math.abs(xb - c.toScreen(Lb.left + Lb.gw, yb)[0])).toBeLessThan(0.5);
+        }
       }
     }
   });
@@ -208,11 +217,11 @@ describe('GPU and CPU decide alike', () => {
     const u = new Uint32Array(MESH_U);
     const a: MeshInst = { x0: 1, y0: 2, x1: 3, y1: 4, xB0: 5, bw: 6, lw: 7, fineA: 0.5, p0: 9, T0: 10, A: 11, gBoff: 12, alpha: 0.25, mode: 1, lane: Lane.Gray, tipR: 16, GL: 17, Lm: 18, nowRel: 19, xG: 20, B0: 1, lvl: 2, latSeed: 9, nA: 3, nB: 4, seedA: 4294967295, seedB: 6, sA: 7, sB: 8, fA: 10, fB: 3 };
     packInst(a, f, u, 0);
-    expect([...f]).toEqual([1, 2, 3, 4, 5, 6, 7, 0.5, 9, 10, 11, 12, 0.25, 1, 1, 16, 17, 18, 19, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    expect([...f]).toEqual([1, 2, 3, 4, 5, 6, 7, 0.5, 9, 10, 11, 12, 0.25, 1, 1, 16, 17, 18, 19, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
     expect([...u]).toEqual([1, 2, 3, 4, 4294967295, 6, 7, 8, 9, 10, 3, 0]);
-    const b: MeshInst = { ...a, colL: 21, colR: 22, narG: 0.75, narR: 0.5, linkA: 0.5, lam: 2.25, tauC: 1.5, tauB: 2, gA: -12, baseA: 0.25 };
+    const b: MeshInst = { ...a, colL: 21, colR: 22, narG: 0.75, narR: 0.5, linkA: 0.5, lam: 2.25, tauC: 1.5, tauB: 2, gA: -12, baseA: 0.25, kx: 0.5, ks: 0.25, xr: 30, kc: 1.5, kg: -0.5 };
     packInst(b, f, u, 0);
-    expect([...f].slice(20)).toEqual([21, 22, 0.75, 0.5, 0.5, 2.25, 1.5, 2, 0.25, 0, 0, 0]);
+    expect([...f].slice(20)).toEqual([21, 22, 0.75, 0.5, 0.5, 2.25, 1.5, 2, 0.25, 0.5, 0.25, 30, 1.5, -0.5, 0, 0]);
     expect(u[11]).toBe(4294967284);
     expect(unpackInst(f, u, 0)).toEqual(b);
   });

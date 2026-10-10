@@ -112,13 +112,14 @@ describe('width = individuals alive, with a varying population', () => {
         expect(strandAt(b, sp.t1, mode).f).toBe(1);
         // The widest is the pre-decline baseline, held back to the first appearance (its founders below).
         expect(strandAt(b, sp.t0, mode).w).toBeCloseTo(b.width, 9);
-        // Alive in generation k = its procgen births × mean lifespan ÷ generation length.
+        // Alive in generation k = its procgen births × mean lifespan ÷ generation length (within a few
+        // percent: in the generation before a jump in the history the width ramps, population.ts JUMP_GENS).
         const m = new TwigModel(b, fan.time, mode);
         for (const back of [1, 5, 20, 40, 1000]) {
           const k = m.G - back;
           const ageMa = ((back - 0.5) * m.GL) / 1e6;
           const n = (m.size(k) * m.sp.lifespanYears) / m.GL;
-          expect(aliveAt(sp, ageMa) / n).toBeCloseTo(1, 2);
+          expect(aliveAt(sp, ageMa) / n, `${c} ${back}`).toBeCloseTo(1, 1);
         }
       }
     });
