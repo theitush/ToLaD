@@ -11,8 +11,16 @@ width = individuals, green = alive, gray = dead, height = time.
   Panthera's origin, living species reach the "now" line, extinct ones stop at their last
   appearance. The axis is always shown.
 - **Width** at any height = the individuals whose strands pass through it (not yet dead),
-  as linear (default) or log sibling shares. A branch is everyone ever at its base and
-  thins as dead strands peel off; at the tip only the living remain. The green lane has
+  as linear (default) or log sibling shares, one fixed world width per individual (the
+  scale bar's number). A branch is everyone ever at its base and thins as dead strands
+  peel off; at the tip only the living remain. The gray edge is drawn as **steps**
+  (`layout.ts Steps`): grids of 2^k equal heights (equal log-time bands) from the fork to
+  "now", nested, each step holding the branch's exact width averaged over its height
+  (adaptive Simpson), so a step is the individuals at some height inside it and the area
+  is kept. The grid shown is the one whose steps are 22–44 px tall on screen (`STEP_PX`);
+  over the top 40% of each octave of time zoom the steps slide to their halves' widths
+  (`STEP_BLEND`), so zooming never pops. Step lines are fixed in world units; panning
+  never changes them. The green lane has
   one width from base to tip (log mode: W·g(alive)/g(ever)), only the gray peels off. The
   stem is drawn as its children's strands side by side, so each green lane runs unbroken
   from now to the root (1 px floor).
@@ -34,28 +42,34 @@ width = individuals, green = alive, gray = dead, height = time.
     bright as the share of its index slots holding someone alive now, with the lane dimmed
     under it. As strands get 2–10 px apart they fade in (the texture fades out) while the
     lane dims under them. Then individuals, threads, and `lion#…` handles appear. Every line
-    drawn is a real strand or individual (no flow lines or grooves). The gray lane has no
-    texture: its slots are all occupied, so it would be a flat fill anyway. Only visible
-    generations, index ranges and texture columns are computed.
+    drawn is a real strand or individual (no flow lines or grooves). The gray lane has a
+    texture of its own dead (`grayTexture`) from ~100 individuals per scale bar, or as
+    soon as its slots are pixels apart, until there are few enough lives on screen to draw
+    each (6000, fading over the last half): cells of a slot (every s-th index, s a power
+    of two, ≥2 px apart) by a band of t generations (t a power of two, ~6 px tall), each
+    as bright as the real lives on it cover the band (their own lifespans) and pale green
+    if they have living descendants. Finer slots fade in over the octave. Threads to the
+    parents fade in from 4 px strands (and as they get few enough), not at a switch.
+    Gray strands follow the stepped lane: straight within a step, resuming at their new x
+    after a step line. Only visible generations, index ranges and texture cells are
+    computed.
   - "Has a living descendant" is exact (children, then down the mother line) within a
     lookup budget; past it, a critical-branching estimate decides, deterministically.
-- **Layout**: at the fork the columns are slices of the stem; above it they are packed in
-  tree order at every height, `GAP_PX` (5 px) apart on screen, at every zoom, so whenever
-  neighbours would fit on screen next to the branch you look at, they are there. In the
-  whole-fan view the bundle is centred. Zoomed in (`PACK_FADE`, 5×–200× the home width
-  zoom) the packing is referenced to the point at the screen centre instead
-  (`Pack.setRef`, called by `camera.settle`): the branch under it keeps its left edge, and
-  so its living strands, upright, and its neighbours lean against its edges. The
-  reference moves continuously across a branch's gray lane and gap to the next branch,
-  so panning never jumps. Branches are left-aligned: the green lane runs along the left
-  edge, the gray lane narrows on its right. Labels go biggest species first; one that
-  would overlap waits for a closer zoom.
+- **Layout** (`layout.ts`): a rectangular tree, fixed in world units; nothing depends on
+  the camera but the step grid. Below the fork the stem is its children's slices side by
+  side (no gaps). Just above it each child jogs sideways over `JOG` (1 world unit; a
+  sheared band, so its horizontal width never changes) to its column: a straight vertical
+  band up to its tip. Columns sit in tree order with a fixed gap: 20% of the smaller
+  neighbour's base width, at least 2.5% of the stem's (`gapBetween`). The green lane runs
+  along each column's left edge, the gray lane steps narrower on its right; black space
+  opens near "now" as the gray lanes thin. Labels stand on the column tops, biggest
+  species first (one that would overlap waits for a closer zoom), kept on screen and clear
+  of the buttons (pushed down beside their tip if needed).
 - **Camera** (`camera.ts`): axis-aligned, never rotated or sheared. One uniform pinch
   (shift/alt+wheel zoom one axis). Limits: 10 years take at most 10% of the screen
   (`MAX_YEARS_FRAC`), so it always spans ~100 years or more (the camera keeps the requested
   time zoom `ty` and shows the capped one, so zooming out undoes a zoom-in; zooming in just
-  below "now" stops while "now" is on screen, pan down to go further); width zoom-in stops at ~90 px per strand and where the strands under the finger
-  would lean flatter than 1.5 (near "now" the gray lane closes within a few generations);
+  below "now" stops while "now" is on screen, pan down to go further); width zoom-in stops at ~90 px per strand (nothing leans, so there is no slope limit);
   zoom-out stops at the whole fan; panning keeps part of the fan on screen. Living strands
   are exactly vertical (left-aligned lanes). Double-tap fits a branch, then zooms 16× in
   width and 2× or more in time, stopping when the strands of the lane under the finger are
@@ -79,9 +93,14 @@ width = individuals, green = alive, gray = dead, height = time.
   kind, the citation linked to its source, and the note. The list scrolls (max 34% of the
   screen height), so the card stays under the width scale bar. A history shown only
   (`use = "display"`, the leopard) says it does not drive the widths.
-- **Ribbons** are built in screen space: the S-curve is sampled adaptively (to 0.3 px on
-  screen), its normal taken on screen, and each polygon is clipped to the screen in
-  float64 before it reaches the canvas.
+- **Ribbons** are built in screen space from the breakpoints (stem end, fork, jog, the
+  step lines on screen, tip) and clipped to the screen in float64 before they reach the
+  canvas.
+- **No flashing**: the old view-referenced packing (`Pack.setRef`) re-anchored the camera
+  every frame and changed the shapes under it; it is gone, and the camera keeps the point
+  under the fingers fixed in world units. Step grids morph, texture lattices and links
+  fade, so no level of detail switches back and forth (`camera.test.ts` scripts smooth
+  pinches and pans and checks for jumps and flip-flops).
 - `node scripts/fanshot.mjs [out] [prefix]` screenshots `dist-single` at 390×844
   (`STEPS_FILE` = JSON list of `[name, js]` steps run against `window.__fan`;
   `CLIP=x,y,w,h` keeps only part of the page).

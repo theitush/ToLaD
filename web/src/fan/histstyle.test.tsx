@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { FanCamera } from './camera';
 import { SpeciesCard } from './FanApp';
+import { popTicks, yearTicks } from './HistorySpark';
 import { dotAlphas, EDGE_DASH, edgeMarks, historySpans, styleBetween, toScreenSpans, type ScreenSpan, type SpanStyle } from './history';
 import { layoutFan, leftAt, strandAt } from './layout';
 import { PANTHERA } from './panthera';
@@ -135,5 +136,20 @@ describe('species card history', () => {
     const html = renderToStaticMarkup(<SpeciesCard sp={plain} onClose={() => {}} />);
     expect(html).not.toContain('<svg');
     expect(html).not.toContain('class="hist');
+  });
+
+  it('the sparkline has 3–5 round year ticks and one or two population ticks', () => {
+    for (const sp of PANTHERA.species.filter((s) => s.history && s.history.points.length > 1)) {
+      const html = renderToStaticMarkup(<SpeciesCard sp={sp} onClose={() => {}} />);
+      const xs = html.match(/data-tick="x"/g) ?? [];
+      const held = html.includes('>now</text>');
+      expect(xs.length + (held ? 1 : 0)).toBeGreaterThanOrEqual(3);
+      expect(xs.length).toBeLessThanOrEqual(5);
+      const ys = html.match(/data-tick="y"/g) ?? [];
+      expect(ys.length).toBeGreaterThanOrEqual(1);
+      expect(ys.length).toBeLessThanOrEqual(2);
+    }
+    expect(yearTicks(1750, 2024)).toEqual([1800, 1900, 2000]);
+    expect(popTicks(Math.log10(3000), Math.log10(2e6))).toEqual([1e4, 1e6]);
   });
 });

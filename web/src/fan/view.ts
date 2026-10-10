@@ -400,7 +400,7 @@ export class FanView implements InputHandlers {
     // As the strands fade in (twigs.ts), the lanes dim to a backdrop under them: the same
     // lanes, the same geometry, never a switch.
     const tw = this.twigStats.get(b.sp.gid);
-    ctx.fillStyle = mix(b.sp.extinct ? WITHERED : GRAY, '#1c2521', (tw?.fade ?? 0) * 0.85);
+    ctx.fillStyle = mix(b.sp.extinct ? WITHERED : GRAY, '#1c2521', Math.max(tw?.fade ?? 0, 0.6 * (tw?.texGray ?? 0)) * 0.85);
     this.ribbon(pts, (p) => hw - p.w, () => hw, 0.6);
     if (!b.sp.extinct) {
       // Green lane on the left, floored at 1 px all the way from the tip to the root.
@@ -521,7 +521,7 @@ export class FanView implements InputHandlers {
     const prev = this.twigStats.get(b.sp.gid);
     // The lanes under the strands depend on the fade: redraw once when it changes,
     // and keep drawing while lineage answers are still being worked out.
-    if ((prev?.fade ?? 0) !== (st?.fade ?? 0) || (prev?.fadeGreen ?? 0) !== (st?.fadeGreen ?? 0) || st?.pending) this.request();
+    if ((prev?.fade ?? 0) !== (st?.fade ?? 0) || (prev?.fadeGreen ?? 0) !== (st?.fadeGreen ?? 0) || (prev?.texGray ?? 0) !== (st?.texGray ?? 0) || st?.pending) this.request();
     if (st) this.twigStats.set(b.sp.gid, st);
     else this.twigStats.delete(b.sp.gid);
   }
@@ -535,7 +535,7 @@ export class FanView implements InputHandlers {
     const out = new Map<FanBranch, number>();
     const tips = this.fan.branches
       .map((b) => ({ b, p: this.toScreen(tipX(b, this.fan, this.mode), b.tipY) }))
-      .filter(({ b, p }) => p[0] > -30 && p[0] < this.w + 30 && p[1] > -10 && p[1] < this.h + 200 && !this.twigStats.has(b.sp.gid));
+      .filter(({ b, p }) => p[0] > -30 && p[0] < this.w + 30 && p[1] > -10 && p[1] < this.h + 200 && !this.twigStats.get(b.sp.gid)?.drawn);
     const groups = new Map<number, typeof tips>();
     for (const t of tips) {
       const k = Math.round(t.p[1] / 3);
@@ -571,7 +571,7 @@ export class FanView implements InputHandlers {
     const ctx = this.ctx;
     const [tx, ty] = this.toScreen(tipX(b, this.fan, this.mode), b.tipY);
     if (tx < -30 || tx > this.w + 30 || ty < -10 || ty > this.h + 200) return;
-    if (this.twigStats.has(b.sp.gid)) return; // Zoomed into the individuals: the HUD names it.
+    if (this.twigStats.get(b.sp.gid)?.drawn) return; // Zoomed into the individuals: the HUD names it.
     // Moved off its tip: a leader line from the tip up to the label.
     let lead = lx !== undefined && Math.abs(lx - tx) > 1.5 ? 14 : 0;
     const cx = lead ? lx! : tx;
