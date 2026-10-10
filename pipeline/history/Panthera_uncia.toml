@@ -9,10 +9,32 @@ All global figures are compilations of national guesses: before PAWS, robust est
 <2% of the range (GSLEP 2018), and 63 of 69 inputs to the 2017 assessment were expert opinion or
 sign surveys. The rise from 2003 to 2017 is a change in guesses, not evidence of growth. PAWS
 (Population Assessment of the World's Snow Leopards) national estimates are still being released
-(Mongolia 953, Nepal 397, India 718) with no new global total yet. No sourced pre-decline level.
-The Fox 1994 / Nowell & Jackson 1996 range (4,510-7,350) could not be traced to the source and is
-left out.
+(Mongolia 953, Nepal 397, India 718) with no new global total yet.
+Older totals grew with survey effort, not with snow leopards: Jackson 2002 (SLC / IUCN Cat
+Specialist Group, https://catsg.org/_files/ugd/7a07e2_a83bd42544f041faadcb62995196a733.pdf):
+"There is now general agreement that population estimates of around 2,000 made in the early
+1970's ... are too low"; Green 1988 gave 1,604-2,880 and Fox 1989 3,350-4,050. Those are left out
+as points (they would draw a false rise); Fox 1994 (4,510-7,350, Jackson 2002 Table 1) is kept.
+The 2017 Red List's ~10% decline over three generations is a projection (to ~2040), not a past
+decline, so it gives no earlier level. Range: Mahmood et al. 2019 (PLoS ONE 14:e0218460,
+doi:10.1371/journal.pone.0218460) reconstruct a historical range of ~10.47 million km2 against
+~3.20 million km2 now (~69% contraction), with no count attached. No sourced pre-decline count.
+Small for a long time: Solari et al. 2025 (PNAS 122:e2502584122, doi:10.1073/pnas.2502584122)
+find the lowest genetic diversity of any big cat, "likely due to a persistently small population
+size throughout their evolutionary history" (effective size, not a census: notes only).
 """
+
+
+[[point]]
+year  = 1994
+n     = 5930
+lo    = 4510
+hi    = 7350
+grade = "C"
+kind  = "estimate"
+cite  = "Fox 1994, Snow leopard conservation in the wild: a comprehensive perspective on a low density and highly fragmented population, Proc. 7th International Snow Leopard Symposium (as tabulated in Jackson 2002, Snow Leopard Status, Distribution and Protected Areas Coverage, SLC / IUCN Cat Specialist Group)"
+url   = "https://catsg.org/_files/ugd/7a07e2_a83bd42544f041faadcb62995196a733.pdf"
+note  = "'Between 4,510 and 7,350 snow leopards within a total potential habitat area of 1,835,000 km2 (Fox 1994)': a sum of national estimates (Table 1), n = midpoint."
 
 [[point]]
 year  = 2003
