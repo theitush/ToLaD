@@ -1,8 +1,11 @@
 .app {
   position: fixed;
   inset: 0;
-  font: 13px/1.3 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  color: #dfe7e2;
+  font: 13px/1.3 'Avenir Next', 'Segoe UI Variable Text', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-variant-numeric: tabular-nums;
+  color: #e4ece7;
+  /* Night soil, lit from above where the living are. */
+  background: radial-gradient(120% 70% at 50% 18%, #13241e 0%, #0e1a16 45%, #0b1311 100%);
 }
 
 .stage {
@@ -25,26 +28,30 @@
 .bar button {
   font: inherit;
   color: inherit;
-  background: rgba(20, 28, 24, 0.82);
-  border: 1px solid rgba(160, 190, 170, 0.35);
-  border-radius: 8px;
+  background: rgba(14, 24, 20, 0.78);
+  border: 1px solid rgba(190, 220, 200, 0.16);
+  border-radius: 10px;
+  backdrop-filter: blur(6px);
   padding: 7px 10px;
   min-height: 34px;
   touch-action: manipulation;
 }
 
 .bar button[aria-pressed='true'] {
-  border-color: #3dbb68;
+  border-color: rgba(63, 210, 134, 0.6);
+  box-shadow: 0 0 12px rgba(63, 210, 134, 0.18);
 }
 
 .legend {
   position: absolute;
   left: 10px;
   bottom: max(10px, env(safe-area-inset-bottom));
-  background: rgba(20, 28, 24, 0.7);
-  border-radius: 8px;
-  padding: 4px 8px;
+  background: rgba(14, 24, 20, 0.72);
+  border: 1px solid rgba(190, 220, 200, 0.1);
+  border-radius: 10px;
+  padding: 5px 9px;
   pointer-events: none;
+  backdrop-filter: blur(6px);
 }
 
 .dot {
@@ -55,10 +62,14 @@
   vertical-align: -1px;
 }
 .dot.alive {
-  background: #33bd66;
+  background: #3fd286;
+  box-shadow: 0 0 6px rgba(63, 210, 134, 0.55);
+}
+.dot.lineage {
+  background: #b4e2c4;
 }
 .dot.dead {
-  background: #676e75;
+  background: #6f7a84;
 }
 
 .card-sp {
@@ -67,10 +78,12 @@
   right: 10px;
   bottom: max(10px, env(safe-area-inset-bottom));
   max-width: 420px;
-  background: rgba(20, 28, 24, 0.92);
-  border: 1px solid rgba(160, 190, 170, 0.3);
-  border-radius: 10px;
-  padding: 10px 12px;
+  background: rgba(13, 22, 19, 0.9);
+  border: 1px solid rgba(190, 220, 200, 0.16);
+  border-radius: 12px;
+  padding: 11px 13px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
   line-height: 1.55;
 }
 .card-sp .t {
@@ -80,7 +93,7 @@
 }
 .card-sp .t i {
   font-weight: 400;
-  color: #9faba3;
+  color: #8a978f;
   font-size: 13px;
 }
 .card-sp .dim {
@@ -220,8 +233,9 @@
   align-items: center;
   gap: 7px;
   padding: 3px 8px;
-  border-radius: 6px;
-  background: rgba(13, 20, 17, 0.72);
+  border-radius: 8px;
+  background: rgba(14, 24, 20, 0.72);
+  border: 1px solid rgba(190, 220, 200, 0.1);
   color: #c9d4cd;
   font-size: 12px;
 }
@@ -282,4 +296,16 @@
   height: 8px;
   border-radius: 50%;
   vertical-align: 0;
+}
+
+.legend .dim {
+  color: #8a978f;
+}
+.legend .dot {
+  margin-left: 2px;
+}
+
+.wscale .wlab,
+.legend .li {
+  white-space: nowrap;
 }

@@ -26,7 +26,9 @@
 //   labels    plus handles (lion#…).
 
 import { Species, type Address } from '../../../packages/procgen/src/index.ts';
-import { JOG, laneAt, leftAt, remaining, type FanBranch, type TimeScale, type WidthMode } from './layout';
+import { JOG, laneAt, leftAt, remaining, TIME_C, type FanBranch, type TimeScale, type WidthMode } from './layout';
+import { attrSeed, F_LINEAGE, Lane, lineageThreshold, packInst, type MeshInst } from './mesh';
+import type { MeshBatch } from './meshgl';
 import type { SpeciesRec } from './panthera';
 
 function keyOf(common: string): string {
@@ -260,8 +262,35 @@ export class TwigModel {
     return null;
   }
 
+  private readonly seeds = new Map<number, number>();
+  /** procgen's attribute seed of generation g (mesh.ts: the GPU mixes the index into it). */
+  seedOf(g: number): number {
+    let v = this.seeds.get(g);
+    if (v === undefined) {
+      if (this.seeds.size > 50000) this.seeds.clear();
+      this.seeds.set(g, (v = attrSeed(this.sp, g)));
+    }
+    return v;
+  }
+
+  /**
+   * Does dead (g, i) carry the living's line? The hashed lineage model
+   * (mesh.ts lineageThreshold): the same decision the GPU draws.
+   */
+  lineage(g: number, i: number): boolean {
+    const thr = lineageThreshold(this.G, g, this.rec.extinct);
+    return this.sp.fieldHash({ generation: g, index: BigInt(i) }, F_LINEAGE) >>> 0 < thr;
+  }
+
+  private readonly parentCache = new Map<string, Address[]>();
   parents(g: number, i: number): Address[] {
-    return this.sp.parents({ generation: g, index: BigInt(i) });
+    const key = `${g}:${i}`;
+    let p = this.parentCache.get(key);
+    if (!p) {
+      if (this.parentCache.size > 20000) this.parentCache.clear();
+      this.parentCache.set(key, (p = this.sp.parents({ generation: g, index: BigInt(i) })));
+    }
+    return p;
   }
 
   // ---- living descendants ------------------------------------------------------
@@ -388,6 +417,8 @@ export interface TwigView {
   toWorld(px: number, py: number): [number, number];
   /** World y of "now". */
   readonly yNow: number;
+  /** Where the mesh instances go (the GPU layer); none: the mesh is not drawn. */
+  mesh?: MeshBatch;
 }
 
 export interface TwigStats {
@@ -403,19 +434,21 @@ export interface TwigStats {
   texGray: number;
   /** Lineage answers still being worked out (drawn gray until known): redraw. */
   pending: boolean;
+  /** Mesh instances sent to the GPU. */
+  instances?: number;
 }
 
 /** The living: a deep, saturated green. */
-export const LIVING = '#33bd66';
+export const LIVING = '#3fd286';
 /** Dead, with living descendants (their strands carry the living's): a paler green. */
-export const LINEAGE = '#86c49a';
-const TWIG_GRAY = '#9aa3ab';
-const TWIG_WITHERED = '#a39a88';
+export const LINEAGE = '#b4e2c4';
+/** Dead, line ended. */
+export const TWIG_GRAY = '#a3adb6';
+/** Dead, of an extinct species. */
+export const TWIG_WITHERED = '#a89c86';
+/** Most individuals enumerated on the CPU for links and labels. */
 const MAX_TWIGS = 6000;
 const MAX_LINKS = 2000;
-const MAX_STRANDS = 500;
-/** Milliseconds per frame spent working out who has living descendants. */
-const LINEAGE_MS = 8;
 
 /** Mesh fade-in by the on-screen strand spacing: none below 2 px, full from 10 px. */
 export function meshFade(cellPx: number): number {
@@ -492,169 +525,10 @@ export function textureFade(perBar: number): number {
   return Math.max(0, Math.min(1, Math.log(a / perBar) / Math.log(a / b)));
 }
 
-/** Most index slots read per texture column (more are sampled evenly). */
-const TEXTURE_SAMPLES = 32;
-
-/**
- * The green lane while its strands are still under a pixel apart: a texture of
- * the actual strands, not a flat fill. The lane is cut into columns ~1 px wide
- * (each keeps its fraction of the lane, like a strand); each column is drawn
- * with the share of its index slots that hold someone alive now, so its
- * brightness is the living strands' density there. As the strands separate
- * (meshFade) they take over from it. Only the columns on screen are read.
- */
-function livingTexture(v: TwigView, m: TwigModel, yTop: number, yBot: number, n: number, cell: number, alpha: number, xr: (y: number) => [number, number]): void {
-  const K = 12;
-  const ys: number[] = [];
-  const ls: { left: number; gw: number }[] = [];
-  let u0 = 1;
-  let u1 = 0;
-  for (let k = 0; k <= K; k++) {
-    const y = yTop + ((yBot - yTop) * k) / K;
-    const L = m.lanes(y);
-    ys.push(y);
-    ls.push(L);
-    const gw = Math.max(1e-300, L.gw);
-    const [x0, x1] = xr(y);
-    u0 = Math.min(u0, (x0 - L.left) / gw);
-    u1 = Math.max(u1, (x1 - L.left) / gw);
-  }
-  u0 = Math.max(0, u0);
-  u1 = Math.min(1, u1);
-  if (u1 <= u0) return;
-  const lanePx = ls[K >> 1].gw * v.sx;
-  const binPx = Math.max(1, cell);
-  const du = binPx / lanePx;
-  const b0 = Math.floor(u0 / du);
-  const b1 = Math.ceil(u1 / du);
-  if (b1 - b0 > 2000) return;
-  const LEVELS = 12;
-  const paths: Path2D[] = [];
-  for (let b = b0; b < b1; b++) {
-    const i0 = Math.max(0, Math.floor(b * du * n));
-    const i1 = Math.min(n, Math.max(i0 + 1, Math.floor((b + 1) * du * n)));
-    const cnt = i1 - i0;
-    const step = Math.max(1, cnt / TEXTURE_SAMPLES);
-    let live = 0;
-    let seen = 0;
-    for (let x = i0; x < i1; x += step) {
-      seen++;
-      if (m.livingSlot(Math.floor(x))) live++;
-    }
-    const lvl = Math.round((live / Math.max(1, seen)) * LEVELS);
-    if (lvl === 0) continue;
-    const path = (paths[lvl] ??= new Path2D());
-    const u = (b + 0.5) * du;
-    for (let k = 0; k <= K; k++) {
-      const [px, py] = v.toScreen(ls[k].left + u * ls[k].gw, ys[k]);
-      if (k) path.lineTo(px, py);
-      else path.moveTo(px, py);
-    }
-  }
-  const ctx = v.ctx;
-  ctx.lineWidth = binPx;
-  ctx.lineCap = 'butt';
-  for (let l = 1; l <= LEVELS; l++) {
-    if (!paths[l]) continue;
-    ctx.strokeStyle = rgba(LIVING, (alpha * l) / LEVELS);
-    ctx.stroke(paths[l]);
-  }
-}
-
-/** Most cells drawn per frame by the dead's texture (per branch). */
-const GRAY_TEXTURE_MAX = 4000;
-/** Target screen height (px) of one texture cell: a band of generations. */
-const GRAY_BAND_PX = 6;
-
-/**
- * The gray (dead) lane while there are too many lives on screen to draw each:
- * a texture of the actual dead, not a flat fill. The lane is cut into cells
- * fixed in the model: a slot (every s-th procgen index, ~2 px apart or more)
- * by a band of t generations (t a power of two, the band ~GRAY_BAND_PX tall),
- * so panning never reshuffles them. Each cell reads real individuals on its
- * slot (two generations of the band): its brightness is how much of the band
- * their lives cover (their own lifespans against the generation length), its
- * colour pale green if they have living descendants, gray if their line ended
- * (worked out progressively, a few ms per frame). Slots added by a finer
- * index lattice fade in over the octave, so zooming never pops. As there get
- * few enough lives to draw each (drawTwigs), they take over from it.
- */
-function grayTexture(v: TwigView, m: TwigModel, yTop: number, yBot: number, alpha: number, xr: (y: number) => [number, number], ext: boolean, stats: TwigStats): void {
-  const ym = (yTop + yBot) / 2;
-  const L = m.lanes(ym);
-  const lanePx = (L.w - L.gw) * v.sx;
-  if (!(lanePx > 0.5)) return;
-  const gTop = m.generationAt(yTop);
-  const gBot = Math.max(0, m.generationAt(yBot) - m.span);
-  const gm = m.generationAt(ym);
-  const n = m.size(gm);
-  const [x0, x1] = xr(ym);
-  const visU = Math.max(1e-12, Math.min(1, (Math.min(x1, L.left + L.w) - Math.max(x0, L.left + L.gw)) / Math.max(1e-300, L.w - L.gw)));
-  // Band of generations ~GRAY_BAND_PX tall at the middle of the screen.
-  const genPx = Math.abs(m.yOf((gm + 1) * m.GL) - m.yOf(gm * m.GL)) * v.sy;
-  const t = Math.pow(2, Math.max(0, Math.ceil(Math.log2(GRAY_BAND_PX / Math.max(1e-9, genPx)))));
-  const bands = Math.ceil((gTop - gBot + 1) / t) + 1;
-  // Slots at least 2 px apart, and few enough cells.
-  const sF = Math.max(1, (2 * n) / lanePx, (bands * n * visU) / GRAY_TEXTURE_MAX);
-  const sE = Math.log2(sF);
-  const s = Math.pow(2, Math.ceil(sE));
-  // Slots of the finer lattice (s / 2 apart) fade in as the stride approaches it.
-  const fineA = s > 1 ? smoothstep(Math.ceil(sE) - sE) : 0;
-  const iStep = s > 1 && fineA > 0.02 ? s / 2 : s;
-  const LEVELS = 6;
-  const paths = new Map<string, Path2D>();
-  const tEnd = performance.now() + LINEAGE_MS;
-  let cells = 0;
-  for (let g0 = Math.floor(gBot / t) * t; g0 <= gTop && cells <= GRAY_TEXTURE_MAX * 2; g0 += t) {
-    const samples = t > 1 ? [g0, g0 + t / 2] : [g0];
-    const yA = m.yOf(g0 * m.GL);
-    const yB = m.yOf(Math.min(m.T, (g0 + t) * m.GL) + m.GL);
-    if (yA < yTop || yB > yBot) continue;
-    const ng = m.size(g0);
-    const [i0, i1] = m.indexRange(g0, x0, x1, (yA + yB) / 2, false);
-    for (let i = Math.floor(i0 / iStep) * iStep; i < Math.min(ng, i1); i += iStep) {
-      let cover = 0;
-      let lin = 0;
-      let known = 0;
-      let u = -1;
-      for (const g of samples) {
-        if (g > gTop + m.span || i >= m.size(g)) continue;
-        const tw = m.twig(g, i);
-        if (u < 0) u = tw.u;
-        if (tw.alive) continue;
-        // Its own lifespan, against the generation length.
-        cover += Math.abs(m.time.ageAt(tw.yBirth) - m.time.ageAt(tw.yDeath)) * 1e6;
-        if (!ext) {
-          if (m.knowsLineage(g, i) || performance.now() < tEnd) {
-            known++;
-            if (m.hasLivingDescendant(g, i)) lin++;
-          } else stats.pending = true;
-        }
-      }
-      if (u < 0) continue;
-      const c = Math.min(1, cover / (samples.length * m.GL));
-      const lvl = Math.round(c * LEVELS);
-      if (lvl === 0) continue;
-      const green = known > 0 && lin * 2 >= known;
-      const fine = i % s !== 0;
-      const key = `${green ? 1 : 0}${fine ? 1 : 0}${lvl}`;
-      let path = paths.get(key);
-      if (!path) paths.set(key, (path = new Path2D()));
-      strandPath(v, m, u, false, Math.min(yA, yBot), Math.max(yB, yTop), path);
-      cells++;
-    }
-  }
-  const ctx = v.ctx;
-  ctx.lineWidth = 0.9; // just under a pixel: a texture, not yet strands
-  ctx.lineCap = 'butt';
-  const dead = ext ? TWIG_WITHERED : TWIG_GRAY;
-  for (const [key, path] of paths) {
-    const a = alpha * (key[0] === '1' ? 0.85 : 0.6) * (key[1] === '1' ? fineA : 1) * (Number(key.slice(2)) / LEVELS);
-    if (a <= 0.01) continue;
-    ctx.strokeStyle = rgba(key[0] === '1' ? LINEAGE : dead, a);
-    ctx.stroke(path);
-  }
-}
+/** Target screen height (px) of one texture band of generations. */
+const BAND_PX = 6;
+/** Most mesh instances per lane per frame. */
+const MAX_INST = 6000;
 
 const smoothstep = (t: number) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
 
@@ -663,20 +537,136 @@ function rgba(hex: string, a: number): string {
   return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a.toFixed(3)})`;
 }
 
+/** log2(years before present + TIME_C) per screen px, at world y (the axis is exponential in screen y). */
+export function kLogAt(v: TwigView, time: TimeScale, y: number): number {
+  return time.yearsPerUnit(y) / (time.ageAt(y) * 1e6 + TIME_C) / Math.LN2 / v.sy;
+}
+
+/** One lane of a branch as the mesh sees it: its kind and its left edge and width at height y (world). */
+export interface MeshLane {
+  lane: Lane;
+  at(y: number): { left: number; w: number };
+}
+
+export function meshLanes(m: TwigModel): MeshLane[] {
+  const out: MeshLane[] = [];
+  if (!m.rec.extinct && m.rec.alive > 0) out.push({ lane: Lane.Green, at: (y) => { const L = m.lanes(y); return { left: L.left, w: L.gw }; } });
+  out.push({ lane: m.rec.extinct ? Lane.Withered : Lane.Gray, at: (y) => { const L = m.lanes(y); return { left: L.left + L.gw, w: L.w - L.gw }; } });
+  return out;
+}
+
+/**
+ * The mesh instances of one lane between world heights yTop < yBot: the same
+ * lattice and the same individuals for either lane (mesh.ts). mode 0: the
+ * texture, bands of t generations, slots ≥ 2 px apart (a finer lattice fading
+ * in over each octave); mode 1: every life, one instance per generation. Each
+ * instance stays within one stretch of constant lane width (the gray lane
+ * steps), so strands keep their fraction of the lane, as the lanes do.
+ */
+export function laneInstances(v: TwigView, m: TwigModel, ln: MeshLane, yTop: number, yBot: number, mode: 0 | 1, alpha: number, look: { lw: number; tipR: number }, out: MeshInst[]): void {
+  if (!(alpha > 0.004) || !(yBot > yTop)) return;
+  const time = m.time;
+  // Stretches of constant width: the gray edge's step lines.
+  const cuts = [yTop, ...(ln.lane === Lane.Green ? [] : (m.b.steps.lines(m.b, yTop, yBot, 2000) ?? [])), yBot].sort((a, b) => a - b);
+  const ym = (yTop + yBot) / 2;
+  const gm = m.generationAt(ym);
+  const genPx = Math.abs(m.yOf((gm + 1) * m.GL) - m.yOf(gm * m.GL)) * v.sy;
+  const t = mode ? 1 : Math.pow(2, Math.max(0, Math.ceil(Math.log2(BAND_PX / Math.max(1e-9, genPx)))));
+  const gTop = m.generationAt(yTop);
+  const gBot = Math.max(0, m.generationAt(yBot) - (mode ? m.span : 0));
+  if ((gTop - gBot) / t > MAX_INST) return;
+  const Lm = m.sp.lifespanYears;
+  const now = m.sp.now;
+  const xL = -4;
+  const xR = v.w + 4;
+  for (let gA = Math.floor(gBot / t) * t; gA <= gTop; gA += t) {
+    const nA = m.size(gA);
+    const gB = t > 1 && gA + t / 2 < m.G ? gA + t / 2 : -1;
+    // World heights of the instance: a band of t generations, or one generation's lives (to their latest death).
+    const yLo = m.yOf(gA * m.GL);
+    const yHi = mode ? m.yOf(Math.min(now, (gA + 1) * m.GL + 2 * Lm)) : m.yOf(Math.min(m.T, (gA + t) * m.GL));
+    for (let c = 0; c + 1 < cuts.length; c++) {
+      const ya = Math.max(cuts[c], yHi);
+      const yb = Math.min(cuts[c + 1], yLo);
+      if (!(yb > ya)) continue;
+      const L = ln.at((cuts[c] + cuts[c + 1]) / 2);
+      if (!(L.w > 0)) continue;
+      const [lx0, py0] = v.toScreen(L.left, ya);
+      const [lx1, py1] = v.toScreen(L.left + L.w, yb);
+      const lanePx = lx1 - lx0;
+      // Room for the line caps and dots at the true ends (not at a step line, where strands break).
+      // (A living strand's glow reaches 5 px past its edge.)
+      const reach = Math.max(look.tipR, look.lw * 0.5 + 5) + 1;
+      const padT = mode && ya === yHi ? reach : 0;
+      const padB = mode && yb === yLo ? reach : 0;
+      const pad = mode ? reach : 1;
+      const x0 = Math.max(xL, lx0 - pad);
+      const x1 = Math.min(xR, lx1 + pad);
+      const y0 = Math.max(-4, py0 - padT);
+      const y1 = Math.min(v.h + 4, py1 + padB);
+      if (!(x1 > x0) || !(y1 > y0)) continue;
+      // The slot lattice: every s-th index, ≥ 2 px apart (texture) or every individual (lives).
+      let s = 1;
+      let fineA = 1;
+      if (!mode) {
+        const sE = Math.log2(Math.max(1, (2 * nA) / Math.max(1e-300, lanePx)));
+        s = Math.pow(2, Math.ceil(sE));
+        const f = s > 1 ? smoothstep(Math.ceil(sE) - sE) : 0;
+        if (f > 0.02 && f < 1) fineA = f;
+        else if (f >= 1) fineA = 1;
+      }
+      const iStep = fineA < 1 ? s / 2 : s;
+      const iL = ((x0 - lx0) / lanePx) * nA - 0.5;
+      const iBase = Math.max(0, Math.floor(iL / s) * s - s);
+      if (iBase >= nA) continue;
+      const slotX0 = lx0 + ((iBase + 0.5) / nA) * lanePx;
+      const slotDx = (iStep / nA) * lanePx;
+      // The time axis at the top of the instance, relative to generation gA's start.
+      const [, wy0] = v.toWorld(0, y0);
+      const age = time.ageAt(wy0) * 1e6;
+      out.push({
+        x0,
+        y0,
+        x1,
+        y1,
+        slotX0,
+        slotDx,
+        lw: look.lw,
+        fineA,
+        p0: y0,
+        T0: m.origin * 1e6 - age - gA * m.GL,
+        A: age + TIME_C,
+        gBoff: gB >= 0 ? gB - gA : 0,
+        alpha,
+        mode,
+        lane: ln.lane,
+        tipR: look.tipR,
+        GL: m.GL,
+        Lm,
+        nowRel: now - gA * m.GL,
+        iBase,
+        iStep,
+        nA,
+        nB: gB >= 0 ? m.size(gB) : 0,
+        seedA: m.seedOf(gA),
+        seedB: gB >= 0 ? m.seedOf(gB) : 0,
+        thrA: lineageThreshold(m.G, gA, m.rec.extinct),
+        thrB: gB >= 0 ? lineageThreshold(m.G, gB, m.rec.extinct) : 0,
+      });
+    }
+  }
+}
+
 /**
  * The inside of one branch: the same lanes as the zoomed-out branch, resolved
- * into strands. Every strand keeps its fraction of its lane from its tip all
- * the way down to the root, like the fan's lanes:
- *   - the green lane holds one deep-green strand per living individual, from
- *     "now" down to the base: green lines all the way back;
- *   - the gray lane holds the dead, one strand slot per procgen index (procgen
- *     keeps children right above their parents in index space, so a slot is
- *     roughly a family line); each individual's own life is drawn on its slot,
- *     pale green if it has living descendants, gray if its line ended.
- *   - links: threads to both parents (procgen parents()) at the child's birth,
- *     the mother's and the father's, green when that parent has living descendants.
- * Everything fades in from the lanes as strands become 2–10 px apart, so the
- * zoom is continuous. Only the visible generations and index ranges are touched.
+ * into individuals by one mesh (mesh.ts, drawn on the GPU by meshgl.ts) in
+ * both lanes, which differ only by the colour of who is in them:
+ *   - the texture fades in from ~100 individuals per width scale bar (or as
+ *     soon as a lane's slots are pixels apart), then every life fades in as
+ *     its strands get 2–10 px apart: no switch, a crossfade;
+ *   - links (Canvas 2D, on top): threads to both parents (procgen parents()) at
+ *     each child's birth, once few enough; labels (handles) when wide apart.
+ * Only the visible generations and index ranges are touched.
  */
 export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: number; i: number } | null): TwigStats | null {
   const [, wyTop] = v.toWorld(0, 0);
@@ -686,9 +676,11 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
     const py = v.toScreen(0, y)[1];
     return [v.toWorld(0, py)[0], v.toWorld(v.w, py)[0]];
   };
-  if (wyBot < b.tipY || wyTop > 0) return null;
+  // Individuals live from the species' first generation to its tip.
+  const yFirst = Math.min(0, m.yOf(0));
+  if (wyBot < b.tipY || wyTop > yFirst) return null;
   const yTop = Math.max(wyTop, b.tipY);
-  const yBot = Math.min(wyBot, 0);
+  const yBot = Math.min(wyBot, yFirst);
   // Off the branch's column entirely?
   const Lb = m.lanes(yBot);
   const [bx0, bx1] = xr(yBot);
@@ -697,66 +689,56 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
   const L = m.lanes(ym);
   const gm = m.generationAt(ym);
   const n = m.size(gm);
+  const ext = b.sp.extinct;
   const cellGray = ((L.w - L.gw) / n) * v.sx;
-  const nLive = m.nLive;
-  const cellGreen = (L.gw / nLive) * v.sx;
+  const cellGreen = (L.gw / n) * v.sx;
   const cellPx = Math.max(cellGray, cellGreen);
-  // The living's lane turns into a texture of its strands once the width scale
-  // reads ~100 individuals (textureFade), then into the strands themselves.
-  const tex = b.sp.extinct || !(L.gw > 0) ? 0 : textureFade((SCALE_BAR_PX * b.sp.alive) / (L.gw * v.sx));
-  const texA = tex * (1 - meshFade(cellGreen));
-  if (texA > 0.01) livingTexture(v, m, yTop, yBot, nLive, cellGreen, texA, xr);
-  const fade = meshFade(cellGray);
-  const fadeGreen = Math.max(meshFade(cellGreen), tex);
-  // The dead's lane likewise: a texture of their own lives from ~100 individuals per scale
-  // bar, or as soon as their slots are pixels apart (long before, deep in the past, where a
-  // slot holds a whole line of descendants), until each life can be drawn.
+  const genPx = Math.abs(m.yOf((gm + 1) * m.GL) - m.yOf(gm * m.GL)) * v.sy;
+  // Each lane by the same rules: the texture from ~100 individuals per scale bar (or once its
+  // slots are pixels apart), then every life as the strands get 2–10 px apart and the
+  // generations a few px tall.
   const dead = remaining(b.sp, m.time.ageAt(ym)) - b.sp.alive;
-  const texGray = L.w - L.gw > 0 && dead > 0 ? Math.max(meshFade(cellGray), textureFade((SCALE_BAR_PX * dead) / ((L.w - L.gw) * v.sx))) : 0;
+  const texOf = (count: number, laneW: number, cell: number) => (laneW > 0 && count > 0 ? Math.max(meshFade(cell), textureFade((SCALE_BAR_PX * count) / (laneW * v.sx))) : 0);
+  const livesOf = (cell: number) => meshFade(cell) * smoothstep((genPx - 0.5) / 2);
+  const texGreen = ext ? 0 : texOf(b.sp.alive, L.gw, cellGreen);
+  const texGray = texOf(dead, L.w - L.gw, cellGray);
+  const livesGreen = ext ? 0 : livesOf(cellGreen);
+  const livesGray = livesOf(cellGray);
+  const stats: TwigStats = { mode: 'texture', g0: gm, g1: gm, drawn: 0, cellPx, fade: livesGray, fadeGreen: Math.max(livesGreen, texGreen), texGray, pending: false };
+  if (!(texGreen > 0 || texGray > 0)) return null;
+  const lw = Math.max(1, Math.min(4, cellPx * 0.12));
+  // A death is a rounded end, a touch wider than the strand.
+  const tipR = lw * 0.5 + Math.min(1.2, 0.3 + cellPx * 0.02);
+  if (v.mesh) {
+    const insts: MeshInst[] = [];
+    for (const ln of meshLanes(m)) {
+      const green = ln.lane === Lane.Green;
+      const tex = green ? texGreen : texGray;
+      const lives = green ? livesGreen : livesGray;
+      if (tex * (1 - lives) > 0.02) laneInstances(v, m, ln, yTop, yBot, 0, tex * (1 - lives), { lw: 0.9, tipR: 0 }, insts);
+      // Line weight by the lane's own strand spacing: strands never run into each other.
+      const cell = green ? cellGreen : cellGray;
+      const lwL = Math.max(1, Math.min(3.5, cell * 0.22));
+      laneInstances(v, m, ln, yTop, yBot, 1, lives, { lw: lwL, tipR: lwL * 0.5 + Math.min(1, 0.25 + cell * 0.02) }, insts);
+    }
+    const batch = v.mesh;
+    for (const inst of insts) packInst(inst, batch.f, batch.u, batch.next());
+    stats.instances = insts.length;
+  }
+  if (cellPx < 1.5) return stats;
+  const ctx = v.ctx;
   const gHi = m.generationAt(yTop);
   const gLo = Math.max(0, m.generationAt(yBot) - m.span);
+  stats.g0 = gLo;
+  stats.g1 = gHi;
   const [mx0, mx1] = xr(ym);
   const visFrac = Math.min(1, (mx1 - mx0) / Math.max(1e-300, L.w - L.gw));
   const perRow = Math.max(1, n * visFrac);
   const rows = gHi - gLo + 1;
-  // Everyone's own life is drawn once there are few enough of them on screen (fading in
-  // from MAX_TWIGS to half that); until then the texture's lattice of real lives stands in.
-  const budget = cellPx < 1.5 ? 0 : Math.max(0, Math.min(1, (MAX_TWIGS - rows * perRow) / (MAX_TWIGS / 2)));
-  const livesA = fade * budget * budget * (3 - 2 * budget);
-  const texGA = texGray * (1 - livesA);
-  const pre: TwigStats = { mode: 'texture', g0: gm, g1: gm, drawn: 0, cellPx, fade: 0, fadeGreen, texGray, pending: false };
-  if (texGA > 0.01) grayTexture(v, m, yTop, yBot, texGA, xr, b.sp.extinct, pre);
-  if (cellPx < 1.5) return tex > 0 || texGray > 0 ? pre : null;
-  const ctx = v.ctx;
-  const ext = b.sp.extinct;
-  const stats: TwigStats = { mode: 'texture', g0: gLo, g1: gHi, drawn: 0, cellPx, fade, fadeGreen, texGray, pending: pre.pending };
-
-  // 1. Strand slots: lines from the tips all the way down, in both lanes.
-  const slots = (alive: boolean, cell: number, color: string, alpha: number) => {
-    if (cell < 1.5) return;
-    const a = alpha * meshFade(cell);
-    // Visible slots: the union of the index ranges at the top and the bottom of the screen.
-    const gg = alive ? m.G - 1 : gm;
-    const nn = m.size(gg);
-    const [p0, p1] = m.indexRange(gg, ...xr(yTop), yTop, alive);
-    const [q0, q1] = m.indexRange(gg, ...xr(yBot), yBot, alive);
-    const i0 = Math.min(p0, q0);
-    const i1 = Math.max(p1, q1);
-    if (i1 - i0 > MAX_STRANDS) return;
-    const path = new Path2D();
-    for (let i = i0; i < i1; i++) {
-      // In the green lane a slot is a strand only if someone in it is alive now.
-      if (alive && !m.livingSlot(i)) continue;
-      strandPath(v, m, (i + 0.5) / nn, alive, alive ? yTop : Math.max(yTop, v.yNow + DEAD_GAP_PX / v.sy), yBot, path);
-    }
-    ctx.strokeStyle = rgba(color, a);
-    ctx.lineWidth = alive ? 1.5 : 1;
-    ctx.stroke(path);
-  };
-  slots(false, cellGray, ext ? TWIG_WITHERED : TWIG_GRAY, 0.3);
-  if (!ext) slots(true, cellGreen, LIVING, 0.9);
-
+  const livesA = Math.max(livesGray, livesGreen);
   if (rows * perRow > MAX_TWIGS || livesA <= 0.01) return stats;
+  // The GPU draws the lives; the CPU only needs them for links, labels and the selection.
+  if (rows * perRow > MAX_LINKS && !sel) return stats;
   // Threads to the parents fade in (no switch) from 4 px strands and as they get few enough.
   const linkBudget = Math.max(0, Math.min(1, (MAX_LINKS - rows * perRow) / (MAX_LINKS / 2)));
   const linksA = Math.max(0, Math.min(1, (cellPx - 4) / 2)) * linkBudget;
@@ -764,7 +746,7 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
   const showLabels = cellPx >= 70;
   stats.mode = showLabels ? 'labels' : showLinks ? 'links' : 'twigs';
 
-  // 2. Individuals: each one's own life on its strand.
+  // The individuals on screen (the GPU draws their lives; links, labels and the selection are drawn here).
   const twigs: { g: number; i: number; t: Twig }[] = [];
   for (let g = gLo; g <= gHi; g++) {
     const yLow = Math.min(wyBot, m.row(g).y + m.GL);
@@ -778,34 +760,21 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
       }
     }
   }
-  // Who has living descendants: worked out progressively (a few ms per frame), cached.
-  const tEnd = performance.now() + LINEAGE_MS;
-  const lineage = (g: number, i: number): boolean | null => {
-    if (m.knowsLineage(g, i) || performance.now() < tEnd) return m.hasLivingDescendant(g, i);
-    stats.pending = true;
-    return null;
-  };
-  const kind = (g: number, i: number, t: Twig): 'alive' | 'lineage' | 'dead' => {
-    if (t.alive) return 'alive';
-    if (ext) return 'dead';
-    return lineage(g, i) ? 'lineage' : 'dead';
-  };
+  stats.drawn = twigs.length;
+  const lineage = (g: number, i: number, t: Twig) => !ext && (t.alive || m.lineage(g, i));
 
-  const lw = Math.max(1, Math.min(4, cellPx * 0.12));
-  const kinds = twigs.map(({ g, i, t }) => kind(g, i, t));
   if (showLinks) {
-    // The mother's thread carries the line (the strands' line, as in the lineage
-    // search); the father's is the thin mesh joining two lines at the child's birth.
+    // The mother's thread carries the line; the father's is the thin mesh joining two lines at the child's birth.
     const mk = () => ({ green: new Path2D(), gray: new Path2D(), far: new Path2D() });
     const prim = mk();
     const mesh = mk();
-    for (let k = 0; k < twigs.length; k++) {
-      const { g, i, t } = twigs[k];
+    for (const { g, i, t } of twigs) {
       if (g === 0) continue;
       const cx = v.toScreen(t.x, t.yBirth)[0];
       const ps = m.parents(g, i);
       const mi = Math.max(0, ps.findIndex((p) => m.sp.sexOf(p) === 'female'));
       const genH = m.row(g - 1).y - m.row(g).y;
+      const childGreen = lineage(g, i, t);
       ps.forEach((p, j) => {
         const pg = p.generation;
         const pi = Number(p.index);
@@ -815,7 +784,7 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
         const [px, py, cy2] = threadEnds(v, m, pt, t, genH);
         // Long threads (the rare migrants) are drawn faint so the local braid reads.
         const far = Math.abs(px - cx) > 6 * cellPx;
-        const pGreen = !ext && (pt.alive || kinds[k] !== 'dead' || (m.knowsLineage(pg, pi) && m.hasLivingDescendant(pg, pi)));
+        const pGreen = !ext && (childGreen || lineage(pg, pi, pt));
         const set = j === mi ? prim : mesh;
         const path = pGreen ? set.green : far ? set.far : set.gray;
         const dy = Math.max(3, (py - cy2) * 0.6);
@@ -827,35 +796,14 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
       ctx.lineWidth = w;
       ctx.strokeStyle = rgba('#aab2ba', 0.12 * a * livesA);
       ctx.stroke(s.far);
-      ctx.strokeStyle = rgba('#aab2ba', 0.45 * a * livesA);
+      ctx.strokeStyle = rgba('#aab2ba', 0.4 * a * livesA);
       ctx.stroke(s.gray);
-      ctx.strokeStyle = rgba(LINEAGE, 0.8 * a * livesA);
+      ctx.strokeStyle = rgba(LINEAGE, 0.7 * a * livesA);
       ctx.stroke(s.green);
     };
     strokes(mesh, Math.max(0.6, lw * 0.3), 0.7 * linksA);
     strokes(prim, Math.max(0.9, lw * 0.6), linksA);
   }
-
-  const paths = { alive: new Path2D(), lineage: new Path2D(), dead: new Path2D() };
-  const tipR = Math.max(1.2, Math.min(5, cellPx * 0.18));
-  for (let k = 0; k < twigs.length; k++) {
-    const path = paths[kinds[k]];
-    const [x, yd] = twigPath(v, m, twigs[k].t, path);
-    path.moveTo(x + tipR, yd);
-    path.arc(x, yd, tipR, 0, Math.PI * 2);
-  }
-  ctx.lineWidth = lw;
-  for (const [k, color] of [
-    ['dead', ext ? TWIG_WITHERED : TWIG_GRAY],
-    ['lineage', LINEAGE],
-    ['alive', LIVING],
-  ] as const) {
-    ctx.strokeStyle = rgba(color, livesA);
-    ctx.fillStyle = ctx.strokeStyle;
-    ctx.stroke(paths[k]);
-    ctx.fill(paths[k]);
-  }
-  stats.drawn = twigs.length;
 
   if (sel) {
     const t = m.twig(sel.g, sel.i);
@@ -876,7 +824,7 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
     ctx.stroke();
   }
 
-  if (showLabels) {
+  if (showLabels && twigs.length <= 400) {
     ctx.save();
     ctx.font = `12px ui-monospace, Menlo, Consolas, monospace`;
     ctx.textAlign = 'center';
