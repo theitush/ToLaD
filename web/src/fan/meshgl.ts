@@ -4,7 +4,7 @@
 // which keeps the text, the history marks and the parent threads.
 
 import { HASH_GLSL } from '../../../packages/procgen/src/glsl.ts';
-import { MESH_F, MESH_U, type Palette } from './mesh';
+import { LAT_DEPTH, MESH_F, MESH_U, NAR_FLOOR, TEX_FLOOR, type Palette } from './mesh';
 
 const RECT_VS = /* glsl */ `#version 300 es
 layout(location = 0) in vec2 corner;
@@ -46,6 +46,7 @@ layout(location = 5) in vec4 aLife;
 layout(location = 6) in uvec4 aIdx;
 layout(location = 7) in uvec4 aSeed;
 layout(location = 8) in uvec4 aIdx2;
+layout(location = 9) in vec4 aNar;
 uniform vec2 uView;
 out vec2 vP;
 flat out vec4 vRect;
@@ -56,10 +57,11 @@ flat out vec4 vLife;
 flat out uvec4 vIdx;
 flat out uvec4 vSeed;
 flat out uvec4 vIdx2;
+flat out vec4 vNar;
 void main() {
   vec2 p = mix(aRect.xy, aRect.zw, corner);
   vP = p;
-  vRect = aRect; vSlot = aSlot; vTime = aTime; vMisc = aMisc; vLife = aLife; vIdx = aIdx; vSeed = aSeed; vIdx2 = aIdx2;
+  vRect = aRect; vSlot = aSlot; vTime = aTime; vMisc = aMisc; vLife = aLife; vIdx = aIdx; vSeed = aSeed; vIdx2 = aIdx2; vNar = aNar;
   gl_Position = vec4(p.x / uView.x * 2.0 - 1.0, 1.0 - p.y / uView.y * 2.0, 0.0, 1.0);
 }`;
 
@@ -76,11 +78,15 @@ flat in vec4 vLife;   // GL, Lm, nowRel, xG
 flat in uvec4 vIdx;   // B0, lvl, nA, nB
 flat in uvec4 vSeed;  // seedA, seedB, thrA, thrB
 flat in uvec4 vIdx2;  // latSeed, nG, fold, -
+flat in vec4 vNar;    // colL, colR, narG, narR
 uniform float uKLog;
 uniform float uNowPx;
 uniform vec3 uPal[4];
 out vec4 o;
 const float LN2 = 0.6931471805599453;
+const float TEX_FLOOR = ${TEX_FLOOR.toFixed(4)};
+const float NAR_FLOOR = ${NAR_FLOOR.toFixed(4)};
+const uint LAT_DEPTH = ${LAT_DEPTH}u;
 float expm1s(float x) { return abs(x) < 1e-3 ? x * (1.0 + x * (0.5 + x / 6.0)) : exp(x) - 1.0; }
 float log1ps(float x) { return abs(x) < 1e-3 ? x * (1.0 - x * (0.5 - x / 3.0)) : log(1.0 + x); }
 float lineAA(float d, float lw) {
@@ -105,7 +111,7 @@ int code(float lane, bool alive, bool lin) {
   return lin ? 1 : 2;
 }
 // One lane's look at one slot: colour and coverage (not premultiplied). mesh.ts shadeLane.
-vec4 shadeLane(float lane, uint iA, uint iB, float d, vec2 p) {
+vec4 shadeLane(float lane, uint iA, uint iB, float d, vec2 p, float floorA, float lw, bool one) {
   float GL = vLife.x;
   float Lm = vLife.y;
   float nowRel = vLife.z;
@@ -116,7 +122,7 @@ vec4 shadeLane(float lane, uint iA, uint iB, float d, vec2 p) {
     vec3 col = vec3(0.0);
     float ns = 0.0;
     for (int s = 0; s < 2; s++) {
-      if (s == 1 && !(vTime.w > 0.0)) break;
+      if (s == 1 && (one || !(vTime.w > 0.0))) break;
       ns += 1.0;
       uint n = s == 0 ? vIdx.z : vIdx.w;
       uint i0 = s == 0 ? iA : iB;
@@ -135,7 +141,7 @@ vec4 shadeLane(float lane, uint iA, uint iB, float d, vec2 p) {
       }
     }
     if (!(cov > 0.0)) return vec4(0.0);
-    return vec4(col / cov, min(1.0, cov / (ns * GL)) * lineAA(d, vSlot.z));
+    return vec4(col / cov, (floorA + (1.0 - floorA) * min(1.0, cov / (ns * GL))) * lineAA(d, lw));
   }
   float best = 0.0;
   int bc = -1;
@@ -168,24 +174,33 @@ void main() {
   float xG = vLife.w;
   uint L = vIdx.y;
   float bw = vSlot.y;
-  float pp = bw / float(1u << L);
   // Nothing to draw this far from a line (before any shading: most pixels stop here).
   // (Only the living glow, and they are only in the green lane.)
   float reach = vMisc.y < 0.5 ? max(vSlot.z, 1.0) * 0.5 + 0.5 : max(vMisc.w, vSlot.z * 0.5 + (xG > vRect.x ? 5.0 : 0.0)) + 0.5;
   float bf = floor((p.x - vSlot.x) / bw);
+  uint D = min(L, LAT_DEPTH);
   vec4 best = vec4(0.0);
-  // The lines of this block and its neighbours (each block's line is anywhere in it): mesh.ts shadeMesh.
+  // The lines of this block and its neighbours (each block's line is anywhere in it): mesh.ts shadeMesh, latticeWalk.
   for (int c = -1; c <= 1; c++) {
     float bb = bf + float(c);
     if (bb < 0.0) continue;
     uint B = vIdx.x + uint(bb);
     uint idx = B;
     uint off = 0u;
-    for (uint l = L; l > 0u; l--) {
+    float x0 = vSlot.x + bb * bw;
+    float sub = bw;
+    bool far = false;
+    for (uint l = L; l > L - D; l--) {
+      // The line is inside the current sub-block: too far from it, it is too far from the line.
+      if (p.x < x0 - reach || p.x > x0 + sub + reach) { far = true; break; }
       uint bit = latBit(l, idx);
       idx = 2u * idx + bit;
       off = 2u * off + bit;
+      sub *= 0.5;
+      x0 += float(bit) * sub;
     }
+    if (far) continue;
+    float pp = bw / float(1u << D);
     float lineX = vSlot.x + bb * bw + (float(off) + 0.5) * pp;
     float d = abs(p.x - lineX);
     if (d > reach) continue;
@@ -195,8 +210,8 @@ void main() {
     float fine = (vSlot.w < 1.0 && latBit(L + 1u, B >> 1u) != (B & 1u)) ? vSlot.w : 1.0;
     // Where the lanes meet, the slot's colours blend by how much of it is in each.
     float wg = clamp((xG - lineX) / pp + 0.5, 0.0, 1.0);
-    vec4 g = wg > 0.0 ? shadeLane(0.0, iA, iB, d, p) : vec4(0.0);
-    vec4 r = wg < 1.0 ? shadeLane(vMisc.z, iA, iB, d, p) : vec4(0.0);
+    vec4 g = wg > 0.0 ? shadeLane(0.0, iA, iB, d, p, TEX_FLOOR, vSlot.z, false) : vec4(0.0);
+    vec4 r = wg < 1.0 ? shadeLane(vMisc.z, iA, iB, d, p, TEX_FLOOR, vSlot.z, false) : vec4(0.0);
     float ag = g.a * wg;
     float ar = r.a * (1.0 - wg);
     float a = ag + ar;
@@ -204,6 +219,27 @@ void main() {
     vec3 col = (g.rgb * ag + r.rgb * ar) / a;
     a *= vMisc.x * fine;
     if (a > best.a) best = vec4(col, a);
+  }
+  // Lanes too narrow for their lines: the lane is one line its own width, lit by a representative's lives.
+  if (vMisc.y < 0.5 && (vNar.z > 0.0 || vNar.w > 0.0)) {
+    float colL = vNar.x;
+    bool green = xG >= colL;
+    float xGe = green ? max(xG, colL + 1.0) : colL;
+    uint h = uint(int(floor(p.x - colL)));
+    uint i = lowbias32((h * 0x2c1b3c6du) ^ vIdx2.x ^ 0x5bd1e995u);
+    uint iA = vIdx.z > 0u ? i % vIdx.z : 0u;
+    uint iB = vIdx.w > 0u ? i % vIdx.w : 0u;
+    for (int k = 0; k < 2; k++) {
+      float nar = k == 0 ? vNar.z : vNar.w;
+      if (!(nar > 0.0) || (k == 0 && !green)) continue;
+      float a0 = k == 0 ? colL : max(colL, xG);
+      float a1 = k == 0 ? xGe : vNar.y;
+      float cx = max(0.0, min(p.x + 0.5, a1) - max(p.x - 0.5, a0));
+      if (!(cx > 0.0)) continue;
+      vec4 c = shadeLane(k == 0 ? 0.0 : vMisc.z, iA, iB, 0.0, p, NAR_FLOOR, 1.0, true);
+      c.a *= min(1.0, cx) * nar * vMisc.x;
+      if (c.a > best.a) best = c;
+    }
   }
   if (!(best.a > 0.0)) discard;
   o = vec4(best.rgb * best.a, best.a);
@@ -320,10 +356,12 @@ export class FanGL {
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
     this.meshFBuf = gl.createBuffer()!;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.meshFBuf);
-    for (let k = 0; k < 5; k++) {
-      gl.enableVertexAttribArray(1 + k);
-      gl.vertexAttribPointer(1 + k, 4, gl.FLOAT, false, MESH_F * 4, k * 16);
-      gl.vertexAttribDivisor(1 + k, 1);
+    // Floats: aRect, aSlot, aTime, aMisc, aLife (locations 1–5) and aNar (9).
+    for (let k = 0; k < 6; k++) {
+      const loc = k < 5 ? 1 + k : 9;
+      gl.enableVertexAttribArray(loc);
+      gl.vertexAttribPointer(loc, 4, gl.FLOAT, false, MESH_F * 4, k * 16);
+      gl.vertexAttribDivisor(loc, 1);
     }
     this.meshUBuf = gl.createBuffer()!;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.meshUBuf);

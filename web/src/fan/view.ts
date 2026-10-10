@@ -11,7 +11,7 @@ import { EDGE_DASH, edgeMarks, edgeXAt, dotAlphas, GRADE_COLOR, historySpans, po
 import { JOG, laneAt, layoutFan, leftAt, STEM_FADE_MA, Steps, strandAt, type Fan, type FanBranch, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01 } from './meshgl';
-import { drawTwigs, kLogAt, LINEAGE, LIVING, TWIG_GRAY, TWIG_WITHERED, TwigModel, type IndInfo, type TwigStats } from './twigs';
+import { drawTwigs, kLogAt, laneDim, LINEAGE, LIVING, TWIG_GRAY, TWIG_WITHERED, TwigModel, type IndInfo, type TwigStats } from './twigs';
 import type { MeshBatch } from './meshgl';
 
 export type { IndInfo } from './twigs';
@@ -408,7 +408,8 @@ export class FanView implements InputHandlers {
     const l = Math.max(-8, x0);
     const r = Math.min(this.w + 8, x1);
     if (b <= t || r <= l) return;
-    this.under(l, t, r, b, rgb01(GRAY));
+    // (Between the stalks: as dark as their lanes under the texture.)
+    this.under(l, t, r, b, rgb01(this.gl ? mix(GRAY, '#131c19', laneDim(1e3, 0) * 0.82) : GRAY));
   }
 
   /** The stem fades out over its last stretch (from STEM_FADE_MA down to the bottom of the world): nothing ends abruptly. */
@@ -483,16 +484,17 @@ export class FanView implements InputHandlers {
     // As the strands fade in (twigs.ts), the lanes dim to a backdrop under them: the same
     // lanes, the same geometry, never a switch.
     const tw = this.twigStats.get(b.sp.gid);
-    // Under the mesh the lanes sink to a dark tint of themselves, so the individuals carry the colour.
-    const grayC = mix(b.sp.extinct ? WITHERED : GRAY, '#131c19', Math.max(tw?.fade ?? 0, tw?.texGray ?? 0) * 0.82);
+    // Under the mesh the lanes sink to a dark tint of themselves, so the individuals carry the colour:
+    // each stretch by its own lanes' widths (twigs.ts laneDim), as the mesh draws them.
+    const lives = tw?.fade ?? 0;
+    const grayBase = b.sp.extinct ? WITHERED : GRAY;
     const greenFade = tw?.fadeGreen ?? 0;
     const greenC = mix(GREEN, '#10291d', greenFade * 0.85);
+    const grayC = mix(grayBase, '#131c19', Math.max(lives, tw?.texGray ?? 0) * 0.82);
     if (this.gl) {
       // Each stretch of constant width is a rectangle: the whole lane gray (at least 0.6 px),
       // the green lane over its left edge (at least 1 px).
       const k = this.cam.sx;
-      const gc = rgb01(grayC);
-      const ec = rgb01(greenC);
       for (let i = 0; i + 1 < pts.length; i += 2) {
         const p = pts[i];
         const q = pts[i + 1];
@@ -500,11 +502,14 @@ export class FanView implements InputHandlers {
         const y0 = Math.max(-4, q.y);
         const y1 = Math.min(this.h + 4, p.y);
         if (!(y1 > y0) || x0 > this.w + 4) continue;
+        const gPx = b.sp.extinct ? 0 : p.w * p.f * k;
+        const gc = rgb01(mix(grayBase, '#131c19', laneDim(p.w * k - gPx, lives) * 0.82));
+        const ec = rgb01(mix(GREEN, '#10291d', laneDim(gPx, lives) * 0.85));
         this.gl.under.push(Math.max(-4, x0), y0, Math.min(this.w + 4, x0 + Math.max(0.6, p.w * k)), y1, gc[0], gc[1], gc[2], 1);
         if (!b.sp.extinct) {
-          const x1 = x0 + Math.max(1, p.w * p.f * k);
+          const x1 = x0 + Math.max(1, gPx);
           // The living glow faintly (fading as their lane resolves into individuals).
-          const glow = 1 - greenFade;
+          const glow = 1 - lives;
           if (glow > 0.01) {
             this.gl.under.push(Math.max(-8, x0 - 4), y0, Math.min(this.w + 8, x1 + 4), y1, ec[0], ec[1], ec[2], 0.06 * glow);
             this.gl.under.push(Math.max(-8, x0 - 1.5), y0, Math.min(this.w + 8, x1 + 1.5), y1, ec[0], ec[1], ec[2], 0.14 * glow);
@@ -801,13 +806,18 @@ export class FanView implements InputHandlers {
 
   /** When zoomed into a species' individuals: which species and generations are on screen. */
   private drawHud(): void {
+    // (The texture is everywhere: only once one species fills most of the screen's width.)
     let best: FanBranch | null = null;
     let bestN = -1;
     for (const b of this.fan.branches) {
       const st = this.twigStats.get(b.sp.gid);
-      if (st && st.drawn > bestN) {
+      if (!st) continue;
+      const wPx = laneAt(b, this.cam.cy).w * this.cam.sx;
+      if (!(st.drawn > 0) && wPx < this.w * 0.6) continue;
+      const score = st.drawn + wPx;
+      if (score > bestN) {
         best = b;
-        bestN = st.drawn;
+        bestN = score;
       }
     }
     if (!best) return;

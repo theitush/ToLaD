@@ -86,8 +86,9 @@ describe('one mesh for both lanes: the lane only colours', () => {
       let n = 0;
       let differ = 0;
       for (const x of lit.slice(0, 400)) {
-        const allGreen = { ...x, xG: 1e9 };
-        const allGray = { ...x, xG: -1e9 };
+        // (The lines only: a lane too narrow for lines is one line its own width, tested below.)
+        const allGreen = { ...x, xG: 1e9, narG: 0, narR: 0 };
+        const allGray = { ...x, xG: -1e9, narG: 0, narR: 0 };
         for (let py = Math.max(0, x.y0) + 0.25; py < Math.min(c.h, x.y1); py += 1.7) {
           for (let px = Math.max(0, x.x0) + 0.25; px < Math.min(c.w, x.x1); px += 0.9) {
             const p = shade(allGreen, px, py, kLog, nowPx);
@@ -211,10 +212,52 @@ describe('GPU and CPU decide alike', () => {
     const u = new Uint32Array(MESH_U);
     const a: MeshInst = { x0: 1, y0: 2, x1: 3, y1: 4, xB0: 5, bw: 6, lw: 7, fineA: 0.5, p0: 9, T0: 10, A: 11, gBoff: 12, alpha: 0.25, mode: 1, lane: Lane.Gray, tipR: 16, GL: 17, Lm: 18, nowRel: 19, xG: 20, B0: 1, lvl: 2, latSeed: 9, nA: 3, nB: 4, seedA: 4294967295, seedB: 6, thrA: 7, thrB: 8, nG: 10, fold: 3 };
     packInst(a, f, u, 0);
-    expect([...f]).toEqual([1, 2, 3, 4, 5, 6, 7, 0.5, 9, 10, 11, 12, 0.25, 1, 1, 16, 17, 18, 19, 20]);
+    expect([...f]).toEqual([1, 2, 3, 4, 5, 6, 7, 0.5, 9, 10, 11, 12, 0.25, 1, 1, 16, 17, 18, 19, 20, 0, 0, 0, 0]);
     expect([...u]).toEqual([1, 2, 3, 4, 4294967295, 6, 7, 8, 9, 10, 3, 0]);
-    expect(unpackInst(f, u, 0)).toEqual(a);
+    const b: MeshInst = { ...a, colL: 21, colR: 22, narG: 0.75, narR: 0.5 };
+    packInst(b, f, u, 0);
+    expect([...f].slice(20)).toEqual([21, 22, 0.75, 0.5]);
+    expect(unpackInst(f, u, 0)).toEqual(b);
   });
+});
+
+describe('the texture at every zoom: never a plain lane', () => {
+  /** Mean coverage of the mesh over the screen columns [x0, x1) (CPU mirror), on rows a few px apart. */
+  function coverage(insts: MeshInst[], x0: number, x1: number, kLog: number, nowPx: number, h: number) {
+    let a = 0;
+    let n = 0;
+    for (let py = 60.5; py < h - 60; py += 3) {
+      for (let px = Math.floor(x0) + 0.5; px < x1; px += 1) {
+        let s = 0;
+        for (const x of insts) if (px >= x.x0 && px < x.x1 && py >= x.y0 && py < x.y1) s = Math.max(s, shade(x, px, py, kLog, nowPx)[3]);
+        a += s;
+        n++;
+      }
+    }
+    return n ? a / n : NaN;
+  }
+  // The overview (home and beyond), and down in the stem below the species' first generation.
+  for (const [name, sp, ago, perBar, sy] of [
+    ['overview', 'Lion', 2e5, 1e9, 0.7],
+    ['max zoom-out', 'Lion', 1e6, 1e11, 0.25],
+    ['the stem, below the species', 'Tiger', 2e7, 1e9, 0.7],
+  ] as const) {
+    it(`in both lanes the lines cover some of the lane, never none and never all (${name})`, () => {
+      const { insts, kLog, nowPx, c, mm } = scene(sp, ago, perBar, sy);
+      expect(insts.some((x) => x.mode === 0 && x.alpha > 0.5)).toBe(true);
+      const L = mm.lanes(c.cam.cy);
+      const [colL] = c.toScreen(L.left, c.cam.cy);
+      const gPx = Math.max(1, L.gw * c.cam.sx);
+      const wPx = L.w * c.cam.sx;
+      // Green lane (drawn at least 1 px), then the gray lane right of it (on screen).
+      const g = coverage(insts, colL, colL + gPx, kLog, nowPx, c.h);
+      const r = coverage(insts, colL + gPx + 1, Math.min(c.w, colL + wPx), kLog, nowPx, c.h);
+      for (const cov of [g, r]) {
+        expect(cov).toBeGreaterThan(0.03);
+        expect(cov).toBeLessThan(0.97);
+      }
+    });
+  }
 });
 
 describe('the drawn lines nest: a line seen at a coarse zoom stays, in place, at every finer one', () => {

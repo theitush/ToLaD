@@ -100,6 +100,33 @@ export function latticeRep(seed: number, L: number, B: number): number {
   return idx;
 }
 
+/**
+ * Levels of the lattice walked below a block to place its line (and pick its
+ * individual). Up to LAT_DEPTH the line is exactly its slot (latticeRep); far
+ * out, beyond it, the walk stops LAT_DEPTH levels down: the line's place in its
+ * block is then exact to 2^-LAT_DEPTH of the block (far below a pixel), and
+ * the individual drawn on it is the one of that sub-block's index. The nesting
+ * holds to the same precision. (The GPU's indices are 32-bit: wrapped alike.)
+ */
+export const LAT_DEPTH = 16;
+
+/**
+ * Block B's line at level L as drawn: its offset within the block in units of
+ * 2^-D of the block (D levels walked), and the index it stands for (the slot
+ * when D = L), wrapped to 32 bits as on the GPU.
+ */
+export function latticeWalk(seed: number, L: number, B: number): { off: number; D: number; K: number } {
+  const D = Math.min(L, LAT_DEPTH);
+  let idx = B >>> 0;
+  let off = 0;
+  for (let l = L; l > L - D; l--) {
+    const bit = latticeBit(seed, l, idx);
+    idx = (2 * idx + bit) >>> 0;
+    off = 2 * off + bit;
+  }
+  return { off, D, K: idx };
+}
+
 /** Whether block B's line at level L is also a line of level L + 1. */
 export function latticeTop(seed: number, L: number, B: number): boolean {
   return latticeBit(seed, L + 1, Math.floor(B / 2)) === B % 2;
@@ -117,7 +144,7 @@ export function latticeLines(seed: number, lambda: number, K0: number, K1: numbe
 }
 
 /** Floats and uints per instance (meshgl.ts attribute layout). */
-export const MESH_F = 20;
+export const MESH_F = 24;
 export const MESH_U = 12;
 /** Most living folded onto one green slot (generations up to this many times the living). */
 export const MAX_FOLD = 8;
@@ -168,6 +195,17 @@ export interface MeshInst {
   /** Green slots (the stride of the living folded onto them) and how many fold (1: none). */
   nG: number;
   fold: number;
+  /**
+   * Lanes too narrow for the lines to show them (texture only): the column's
+   * screen edges (the gray lane drawn at least 0.6 px, the green one 1 px, as
+   * view.ts draws the lanes) and how much each lane (green, gray) is drawn as
+   * one line its own width, brightening and dimming with the lives on it
+   * (0: not at all, wide enough for its lines).
+   */
+  colL?: number;
+  colR?: number;
+  narG?: number;
+  narR?: number;
 }
 
 export function packInst(m: MeshInst, f: Float32Array, u: Uint32Array, k: number): void {
@@ -192,6 +230,10 @@ export function packInst(m: MeshInst, f: Float32Array, u: Uint32Array, k: number
   f[o + 17] = m.Lm;
   f[o + 18] = m.nowRel;
   f[o + 19] = m.xG;
+  f[o + 20] = m.colL ?? 0;
+  f[o + 21] = m.colR ?? 0;
+  f[o + 22] = m.narG ?? 0;
+  f[o + 23] = m.narR ?? 0;
   const q = k * MESH_U;
   u[q] = m.B0;
   u[q + 1] = m.lvl;
@@ -220,17 +262,35 @@ export function lineAA(d: number, lw: number): number {
   return Math.max(0, Math.min(1, w * 0.5 + 0.5 - d)) * Math.min(lw, 1);
 }
 
+/**
+ * A texture line's opacity by the share of its band its lives cover: never
+ * below TEX_FLOOR, so a line reads as one thread from band to band (not as
+ * dashes) and its lives only brighten it.
+ */
+export const TEX_FLOOR = 0.55;
+export function texAlpha(share: number, floor = TEX_FLOOR): number {
+  return floor + (1 - floor) * Math.min(1, share);
+}
+
+/** A narrow lane's one line (no lines of its own to show): one life per band, a stronger beat, so even a hairline reads as lives. */
+export const NAR_FLOOR = 0.12;
+
+/** Index of a narrow lane's representative individual in screen column cx (mesh.ts / the shader alike). */
+export function narrowIndex(seed: number, cx: number): number {
+  return lowbias32((Math.imul(cx >>> 0, 0x2c1b3c6d) ^ seed ^ 0x5bd1e995) >>> 0) >>> 0;
+}
+
 type RGBA = [number, number, number, number];
 
 /** One lane's look at one slot (the shader's shadeLane): colour and coverage, not premultiplied. */
-function shadeLane(m: MeshInst, lane: Lane, iA: number, iB: number, d: number, py: number, kLog: number, nowPx: number, pal: Palette, deadGap: number): RGBA {
+function shadeLane(m: MeshInst, lane: Lane, iA: number, iB: number, d: number, py: number, kLog: number, nowPx: number, pal: Palette, deadGap: number, floor = TEX_FLOOR, lw = m.lw, one = false): RGBA {
   const fold = lane === Lane.Green ? m.fold : 1;
   if (m.mode === 0) {
     let cov = 0;
     let ns = 0;
     const col = [0, 0, 0];
     for (let s = 0; s < 2; s++) {
-      if (s === 1 && !(m.gBoff > 0)) break;
+      if (s === 1 && (one || !(m.gBoff > 0))) break;
       ns++;
       const n = s ? m.nB : m.nA;
       const i0 = s ? iB : iA;
@@ -249,7 +309,7 @@ function shadeLane(m: MeshInst, lane: Lane, iA: number, iB: number, d: number, p
       }
     }
     if (!(cov > 0)) return [0, 0, 0, 0];
-    return [col[0] / cov, col[1] / cov, col[2] / cov, Math.min(1, cov / (ns * m.GL)) * lineAA(d, m.lw)];
+    return [col[0] / cov, col[1] / cov, col[2] / cov, texAlpha(cov / (ns * m.GL), floor) * lineAA(d, lw)];
   }
   let best = 0;
   let bc = -1;
@@ -302,7 +362,6 @@ function blend(g: RGBA, r: RGBA, wg: number): RGBA {
  */
 export function shadeMesh(m: MeshInst, px: number, py: number, kLog: number, nowPx: number, pal: Palette, deadGap = 3): RGBA {
   if (px < m.x0 || px >= m.x1 || py < m.y0 || py >= m.y1) return [0, 0, 0, 0];
-  const pp = m.bw / 2 ** m.lvl;
   // Nothing to draw this far from a line (only the living glow, and they are only in the green lane).
   const reach = m.mode === 0 ? Math.max(m.lw, 1) * 0.5 + 0.5 : Math.max(m.tipR, m.lw * 0.5 + (m.xG > m.x0 ? 5 : 0)) + 0.5;
   const bf = Math.floor((px - m.xB0) / m.bw);
@@ -312,8 +371,9 @@ export function shadeMesh(m: MeshInst, px: number, py: number, kLog: number, now
     const bb = bf + c;
     if (bb < 0) continue;
     const B = m.B0 + bb;
-    const K = latticeRep(m.latSeed, m.lvl, B);
-    const lineX = m.xB0 + bb * m.bw + (K - B * 2 ** m.lvl + 0.5) * pp;
+    const { off, D, K } = latticeWalk(m.latSeed, m.lvl, B);
+    const pp = m.bw / 2 ** D;
+    const lineX = m.xB0 + bb * m.bw + (off + 0.5) * pp;
     const d = Math.abs(px - lineX);
     if (d > reach) continue;
     const iA = m.nA > 0 ? K % m.nA : 0;
@@ -327,6 +387,25 @@ export function shadeMesh(m: MeshInst, px: number, py: number, kLog: number, now
     col[3] *= m.alpha * fine;
     if (col[3] > best[3]) best = col;
   }
+  // Lanes too narrow for their lines: the lane is one line its own width, lit by a representative's lives.
+  if (m.mode === 0 && ((m.narG ?? 0) > 0 || (m.narR ?? 0) > 0)) {
+    const colL = m.colL ?? 0;
+    const colR = m.colR ?? 0;
+    const green = m.xG >= colL;
+    const xGe = green ? Math.max(m.xG, colL + 1) : colL;
+    const i = narrowIndex(m.latSeed, Math.floor(px - colL));
+    for (const [lane, a0, a1, nar] of [
+      [Lane.Green, colL, xGe, m.narG ?? 0],
+      [m.lane, Math.max(colL, m.xG), colR, m.narR ?? 0],
+    ] as const) {
+      if (!(nar > 0)) continue;
+      const cx = Math.max(0, Math.min(px + 0.5, a1) - Math.max(px - 0.5, a0));
+      if (!(cx > 0) || (lane === Lane.Green && !green)) continue;
+      const c = shadeLane(m, lane, m.nA > 0 ? i % m.nA : 0, m.nB > 0 ? i % m.nB : 0, 0, py, kLog, nowPx, pal, deadGap, NAR_FLOOR, 1, true);
+      c[3] *= Math.min(1, cx) * nar * m.alpha;
+      if (c[3] > best[3]) best = c;
+    }
+  }
   return best;
 }
 
@@ -337,6 +416,7 @@ export function unpackInst(f: Float32Array, u: Uint32Array, k: number): MeshInst
   return {
     x0: f[o], y0: f[o + 1], x1: f[o + 2], y1: f[o + 3], xB0: f[o + 4], bw: f[o + 5], lw: f[o + 6], fineA: f[o + 7], p0: f[o + 8], T0: f[o + 9], A: f[o + 10], gBoff: f[o + 11],
     alpha: f[o + 12], mode: f[o + 13] as 0 | 1, lane: f[o + 14] as Lane, tipR: f[o + 15], GL: f[o + 16], Lm: f[o + 17], nowRel: f[o + 18], xG: f[o + 19],
+    colL: f[o + 20], colR: f[o + 21], narG: f[o + 22], narR: f[o + 23],
     B0: u[q], lvl: u[q + 1], nA: u[q + 2], nB: u[q + 3], seedA: u[q + 4], seedB: u[q + 5], thrA: u[q + 6], thrB: u[q + 7], latSeed: u[q + 8], nG: u[q + 9], fold: u[q + 10],
   };
 }

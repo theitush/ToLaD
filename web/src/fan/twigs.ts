@@ -27,7 +27,7 @@
 
 import { mix, rand } from '../../../packages/procgen/src/hash.ts';
 import { Species, type Address } from '../../../packages/procgen/src/index.ts';
-import { laneAt, leftAt, remaining, TIME_C, type FanBranch, type TimeScale, type WidthMode } from './layout';
+import { laneAt, leftAt, remaining, STEM_BOTTOM_MA, TIME_C, type FanBranch, type TimeScale, type WidthMode } from './layout';
 import { attrSeed, F_LINEAGE, Lane, lineageThreshold, MAX_FOLD, packInst, type MeshInst } from './mesh';
 import type { MeshBatch } from './meshgl';
 import type { SpeciesRec } from './panthera';
@@ -157,6 +157,12 @@ export class TwigModel {
     const age = this.time.ageAt(y);
     const t = (this.origin - age) * 1e6;
     return Math.min(this.G - 1, Math.max(0, Math.floor(t / this.GL)));
+  }
+
+  /** Generation born at world height y, unclamped (negative below the species' first: its ancestors). */
+  generationAtRaw(y: number): number {
+    const age = this.time.ageAt(y);
+    return Math.floor(((this.origin - age) * 1e6) / this.GL);
   }
 
   /** Branch width at world height y (the fan's width function, layout.ts). */
@@ -632,10 +638,29 @@ export function lineLevel(pitchPx: number): { lambda: number; L: number; fineA: 
 const BAND_PX = 6;
 /** Most mesh instances per branch per frame. */
 const MAX_INST = 6000;
-/** The lanes dim this much (of their full dimming under the lives) under the texture of lines. */
-const TEXTURE_DIM = 0.6;
-
 const smoothstep = (t: number) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
+
+/**
+ * How much a lane `px` wide is drawn as one line its own width (mesh.ts
+ * narG / narR): 1 for a hairline, 0 once it is wide enough (~10 px, two
+ * lines' spacing) that its own lines show it. There is no plain lane: a lane
+ * too narrow for lines still brightens and dims along its length with the
+ * lives on it.
+ */
+export function laneNarrow(px: number): number {
+  return 1 - smoothstep((px - 2) / 8);
+}
+
+/** The lanes' fill dims towards a dark tint of itself under the texture (wide lanes: the lines carry the colour)... */
+const DIM_TEX = 0.6;
+/** ...less where a lane is too narrow for lines (its one modulated line rides on it)... */
+const DIM_NARROW = 0.3;
+
+/** ...and fully under the lives. A lane `px` wide, the lives faded in by `lives` (0–1): its dimming (0–1). */
+export function laneDim(px: number, lives: number): number {
+  const d = DIM_TEX + (DIM_NARROW - DIM_TEX) * laneNarrow(px);
+  return d + (1 - d) * lives;
+}
 
 function rgba(hex: string, a: number): string {
   const n = parseInt(hex.slice(1), 16);
@@ -686,11 +711,13 @@ function stretches(v: TwigView, m: TwigModel, yTop: number, yBot: number): Stret
  * life, one instance per generation. Each instance stays within one stretch
  * of constant column width (the gray edge steps).
  */
-export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: number, mode: 0 | 1, alpha: number, look: { lw: number; tipR: number }, out: MeshInst[]): void {
-  if (!(alpha > 0.004) || !(yBot > yTop)) return;
+export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: number, mode: 0 | 1, alpha: number, look: { lw: number; tipR: number }, out: MeshInst[], ancA = alpha): void {
+  if (!(Math.max(alpha, mode ? 0 : ancA) > 0.004) || !(yBot > yTop)) return;
   const time = m.time;
   const gTop = m.generationAt(yTop);
-  const gBot = Math.max(0, m.generationAt(yBot) - (mode ? m.span : 0));
+  // The texture goes on below the species' first generation, down its column through the stem
+  // to the bottom of the world: generations g < 0 (the ancestors), always texture (no lives there).
+  const gBot = mode ? Math.max(0, m.generationAt(yBot) - m.span) : Math.min(gTop, m.generationAtRaw(yBot));
   if (mode && gTop - gBot > MAX_INST) return;
   const Lm = m.sp.lifespanYears;
   const now = m.sp.now;
@@ -705,15 +732,20 @@ export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: num
   };
   const start = out.length;
   let count = 0;
-  for (let gA = mode ? gBot : gBot - (gBot % bandRaw(gBot)), t = 1; gA <= gTop; gA += t) {
-    if (!mode) for (t = bandRaw(gA); gA % t; ) t /= 2;
+  const floorMod = (a: number, t: number) => ((a % t) + t) % t;
+  const NONE = -Infinity;
+  for (let gA = mode ? gBot : gBot - floorMod(gBot, bandRaw(gBot)), t = 1; gA <= gTop; gA += t) {
+    if (!mode) for (t = bandRaw(gA); floorMod(gA, t); ) t /= 2;
     if (++count > MAX_INST) {
       out.length = start;
       return;
     }
-    const nA = m.size(gA);
-    const gB = t > 1 && gA + t / 2 < m.G ? gA + t / 2 : -1;
-    const nB = gB >= 0 ? m.size(gB) : 0;
+    // (The ancestors, g < 0: generation 0's size, their own hashed seeds.)
+    const nA = m.size(Math.max(0, gA));
+    const gB = t > 1 && gA + t / 2 < m.G ? gA + t / 2 : NONE;
+    const nB = gB !== NONE ? m.size(Math.max(0, gB)) : 0;
+    const instA = gA < 0 && !mode ? Math.max(alpha, ancA) : alpha;
+    if (!(instA > 0.004)) continue;
     // World heights of the instance: a band of t generations, or one generation's lives (to their latest death).
     const yLo = m.yOf(gA * m.GL);
     const yHi = mode ? m.yOf(Math.min(now, (gA + 1) * m.GL + 2 * Lm)) : m.yOf(Math.min(m.T, (gA + t) * m.GL));
@@ -736,6 +768,11 @@ export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: num
       const y0 = Math.max(-4, py0 - padT);
       const y1 = Math.min(v.h + 4, py1 + padB);
       if (!(x1 > x0) || !(y1 > y0)) continue;
+      // Lanes too narrow for their lines (texture only): each is one line its own width.
+      const wPx = S.nT * S.pitchPx;
+      const gPx = S.nG > 0 ? Math.max(0, S.xG - S.colX) : 0;
+      const narG = mode || !(S.nG > 0) ? 0 : laneNarrow(gPx);
+      const narR = mode ? 0 : laneNarrow(wPx - gPx);
       // The slot lattice: one individual per slot; the nested subset of its lines drawn at this zoom.
       const { L: lvl, fineA } = lineLevel(S.pitchPx);
       const bw = 2 ** lvl * S.pitchPx;
@@ -744,7 +781,7 @@ export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: num
       // The time axis at the top of the instance, relative to generation gA's start.
       const [, wy0] = v.toWorld(0, y0);
       const age = time.ageAt(wy0) * 1e6;
-      const gLate = Math.max(gA, gB);
+      const gLate = Math.max(gA, gB === NONE ? gA : gB);
       out.push({
         x0,
         y0,
@@ -757,8 +794,8 @@ export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: num
         p0: y0,
         T0: m.origin * 1e6 - age - gA * m.GL,
         A: age + TIME_C,
-        gBoff: gB >= 0 ? gB - gA : 0,
-        alpha,
+        gBoff: gB !== NONE ? gB - gA : 0,
+        alpha: instA,
         mode,
         lane,
         tipR: look.tipR,
@@ -772,11 +809,15 @@ export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: num
         nA,
         nB,
         seedA: m.seedOf(gA),
-        seedB: gB >= 0 ? m.seedOf(gB) : 0,
+        seedB: gB !== NONE ? m.seedOf(gB) : 0,
         thrA: lineageThreshold(m.G, gA, m.rec.extinct),
-        thrB: gB >= 0 ? lineageThreshold(m.G, gB, m.rec.extinct) : 0,
+        thrB: gB !== NONE ? lineageThreshold(m.G, gB, m.rec.extinct) : 0,
         nG: S.nG,
         fold: S.nG > 0 ? m.fold(gLate, S.nG, Math.max(nA, nB)) : 1,
+        colL: lx0,
+        colR: lx0 + Math.max(0.6, wPx),
+        narG,
+        narR,
       });
     }
   }
@@ -806,8 +847,9 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
     const py = v.toScreen(0, y)[1];
     return [v.toWorld(0, py)[0], v.toWorld(v.w, py)[0]];
   };
-  // Individuals live from the species' first generation to its tip.
-  const yFirst = Math.min(0, m.yOf(0));
+  // The texture runs down the whole column, from the tip through the stem to the bottom of the
+  // world (the ancestors below the species' first generation); the individuals from its first.
+  const yFirst = m.time.y(STEM_BOTTOM_MA);
   if (wyBot < b.tipY || wyTop > yFirst) return null;
   const yTop = Math.max(wyTop, b.tipY);
   const yBot = Math.min(wyBot, yFirst);
@@ -823,18 +865,15 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
   const cellPx = m.pitch(ym) * v.sx;
   const perBar = SCALE_BAR_PX / cellPx;
   const genPx = Math.abs(m.yOf((gm + 1) * m.GL) - m.yOf(gm * m.GL)) * v.sy;
-  // Both lanes by the same rules, on the same nested lines (mesh.ts latticeRep): above ~100
-  // individuals per scale bar the texture of lines (once the column is a few lines wide);
-  // then the individuals: every life once the generations are a few px tall.
+  // Both lanes by the same rules, on the same nested lines (mesh.ts latticeRep): at every zoom
+  // the texture of lines (never a plain lane); from ~100 individuals per scale bar the
+  // individuals on them: every life once the generations are a few px tall.
   const meshIn = smoothstep(textureFade(perBar));
-  const colA = smoothstep((L.w * v.sx - 12) / 28);
   const lives = meshIn * smoothstep((genPx - 0.5) / 2);
-  const dens = Math.max(meshIn, colA) - lives;
-  const dim = Math.max(meshIn, (1 - meshIn) * colA * TEXTURE_DIM);
-  // (A living's lane too narrow to hold lines stays bright: the lines cannot show it.)
-  const greenDim = dim * smoothstep((L.gw * v.sx - 6) / 18);
-  const stats: TwigStats = { mode: 'texture', g0: gm, g1: gm, drawn: 0, cellPx, fade: lives, fadeGreen: ext ? 0 : greenDim, texGray: dim, pending: false };
-  if (!(colA > 0.004 || meshIn > 0.004)) return null;
+  const dens = 1 - lives;
+  // How much the lanes' fill dims under it, here (view.ts dims each stretch by its own widths).
+  const gwPx = L.gw * v.sx;
+  const stats: TwigStats = { mode: 'texture', g0: gm, g1: gm, drawn: 0, cellPx, fade: lives, fadeGreen: ext || !(gwPx > 0) ? 0 : laneDim(gwPx, lives), texGray: laneDim(L.w * v.sx - gwPx, lives), pending: false };
   const lwL = Math.min(3.5, Math.max(Math.min(1, 0.6 * cellPx), cellPx * 0.22));
   // A death is a rounded end, a touch wider than the strand.
   const tipR = lwL * 0.5 + Math.min(1, 0.25 + cellPx * 0.02);
@@ -842,7 +881,7 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
   if (v.mesh) {
     const batch = v.mesh;
     const insts: MeshInst[] = [];
-    if (dens > 0.02) meshInstances(v, m, yTop, yBot, 0, dens, { lw: 0.9, tipR: 0 }, insts);
+    meshInstances(v, m, yTop, yBot, 0, dens > 0.02 ? dens : 0, { lw: 0.9, tipR: 0 }, insts, 1);
     meshInstances(v, m, yTop, yBot, 1, lives, { lw: lwL, tipR }, insts);
     for (const inst of insts) {
       // (next() first: it may grow the arrays.)

@@ -7,7 +7,8 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { chromium } from 'playwright';
 
-const browser = await chromium.launch({ headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+// Default headless (its software GL renders WebGL2): no GPU flags.
+const browser = await chromium.launch({ headless: true });
 let bad = 0;
 try {
   const page = await (await browser.newContext({ viewport: { width: 400, height: 400 } })).newPage();
@@ -94,9 +95,12 @@ try {
         [20, 1, 1, 1],
         [2, 0, 3, 1],
         [0, 0, 3, 1],
+        // Far out (beyond the lattice's walk depth), and lanes too narrow for lines (one line their width).
+        [34, 1, 1, 0.8],
+        [30, 0, 1, 1, 'narrow'],
       ];
-      bands.forEach(([lvl, gray, fold, fineA], q) => {
-        const g = fold > 1 ? m.G - 1 : m.G - 200 + q * 37;
+      bands.forEach(([lvl, gray, fold, fineA, narrow], q) => {
+        const g = fold > 1 ? m.G - 1 : m.G - 400 + q * 37;
         const n = m.size(g);
         const nowRel = fold > 1 ? m.GL * 0.9 : m.sp.now - g * m.GL;
         const bw = lvl === 0 ? 3.3 : 4.7;
@@ -107,6 +111,8 @@ try {
           alpha: 0.9, mode: 0, lane: 1, tipR: 0, GL: m.GL, Lm: m.sp.lifespanYears, nowRel, xG: gray ? -1e9 : 1e9,
           B0, lvl, latSeed: m.latticeSeed, nA: n, nB: 0, seedA: m.seedOf(g), seedB: 0, thrA: M.lineageThreshold(m.G, g, false), thrB: 0, nG: fold > 1 ? Math.floor(n / 4) : 1, fold,
         };
+        // A narrow green lane (1.3 px) beside a narrow gray one (2.6 px), each one line its own width.
+        if (narrow) Object.assign(inst, { xB0: 40.2, xG: 41.5, colL: 40.2, colR: 44.1, narG: 1, narR: 0.7, B0: 0 });
         insts.push(inst);
         const k = gl.mesh.next();
         M.packInst(inst, gl.mesh.f, gl.mesh.u, k);
