@@ -20,11 +20,13 @@ export function FanApp() {
   const [mode, setMode] = useState<WidthMode>('linear');
   const [sel, setSel] = useState<Selection | null>(null);
   const scaleRef = useRef<HTMLDivElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const v = new FanView(canvasRef.current!, PANTHERA);
     v.onSelect = setSel;
     v.scaleEl = scaleRef.current;
+    v.barEl = barRef.current;
     viewRef.current = v;
     window.__fan = v;
     v.request();
@@ -38,7 +40,7 @@ export function FanApp() {
   return (
     <div className="app">
       <canvas ref={canvasRef} className="stage" />
-      <div className="bar">
+      <div className="bar" ref={barRef}>
         <button
           type="button"
           aria-pressed={mode === 'linear'}

@@ -8,11 +8,11 @@ import { GRADE_COLOR, styleBetween, type SpanStyle } from './history';
 import type { HistoryRec } from './panthera';
 
 const W = 340;
-const H = 64;
-const L = 40; // left margin (n labels)
-const R = 8;
+const H = 76;
+const L = 34; // left margin (population ticks)
+const R = 14;
 const T = 6;
-const B = 14; // bottom margin (year labels)
+const B = 16; // bottom margin (year ticks)
 
 const DASH: Record<SpanStyle, string | undefined> = { solid: undefined, dashed: '4 3', dotted: '1.2 3' };
 const OPACITY: Record<SpanStyle, number> = { solid: 0.9, dashed: 0.75, dotted: 0.5 };
@@ -26,6 +26,46 @@ function fmtShort(n: number): string {
   if (n >= 1e6) return `${Number((n / 1e6).toPrecision(2))}M`;
   if (n >= 1e3) return `${Number((n / 1e3).toPrecision(2))}k`;
   return String(Math.round(n));
+}
+
+/** A round step (1, 2 or 5 × 10^k) near x. */
+function nice(x: number): number {
+  const e = Math.floor(Math.log10(x));
+  const f = x / Math.pow(10, e);
+  return (f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10) * Math.pow(10, e);
+}
+
+/** 3–5 round years in [x0, x1] (e.g. 1800, 1900, 2000). */
+export function yearTicks(x0: number, x1: number): number[] {
+  if (!(x1 > x0)) return [x0];
+  for (const div of [4, 3, 5, 2, 6]) {
+    const step = nice((x1 - x0) / div);
+    const out: number[] = [];
+    for (let y = Math.ceil(x0 / step) * step; y <= x1 + 1e-9; y += step) out.push(y);
+    if (out.length >= 3 && out.length <= 5) return out;
+  }
+  const step = nice((x1 - x0) / 4);
+  const out: number[] = [];
+  for (let y = Math.ceil(x0 / step) * step; y <= x1 + 1e-9; y += step) out.push(y);
+  return out;
+}
+
+/** One or two round populations (powers of ten, or 1/2/5 × 10^k) inside [10^lo, 10^hi]. */
+export function popTicks(lo: number, hi: number): number[] {
+  const out: number[] = [];
+  for (let e = Math.ceil(lo); e <= Math.floor(hi); e++) out.push(Math.pow(10, e));
+  if (out.length >= 3) return [out[0], out[out.length - 1]];
+  if (out.length) return out;
+  // Less than a decade: 1/2/5 round numbers inside (the outermost two), else a 2-figure one.
+  const c: number[] = [];
+  for (let e = Math.floor(lo); e <= Math.ceil(hi); e++) {
+    for (const m of [1, 2, 5]) {
+      const v = m * Math.pow(10, e);
+      if (Math.log10(v) >= lo && Math.log10(v) <= hi) c.push(v);
+    }
+  }
+  if (c.length) return c.length > 1 ? [c[0], c[c.length - 1]] : c;
+  return [Number(Math.pow(10, (lo + hi) / 2).toPrecision(2))];
 }
 
 export function fmtYear(y: number): string {
@@ -60,7 +100,9 @@ export function HistorySpark({ h, open: open0 = false }: { h: HistoryRec; open?:
     const p = pts[pts.length - 1];
     lines.push(<line key="held" x1={X(p.year)} y1={Y(p.n)} x2={X(h.nowYear)} y2={Y(p.n)} opacity={OPACITY.solid} data-style="solid" />);
   }
-  const nTicks = [Math.pow(10, hi), Math.pow(10, lo)];
+  const nTicks = popTicks(ylo, yhi);
+  // Year ticks; "now" at the right end if the history runs to it (a tick too close to it gives way).
+  const yTicks = yearTicks(x0, x1).filter((y) => !held || X(x1) - X(y) > 30);
   return (
     <div className="hist">
       <button
@@ -82,18 +124,32 @@ export function HistorySpark({ h, open: open0 = false }: { h: HistoryRec; open?:
               <circle cx={X(p.year)} cy={Y(p.n)} r="3.2" fill={GRADE_COLOR[p.grade]} stroke="#141c18" strokeWidth="1" />
             </g>
           ))}
-          <g fill="#9faba3" fontSize="10">
-            {nTicks.map((n, k) => (
-              <text key={k} x={L - 5} y={k ? H - B : T + 7} textAnchor="end">
+          <g stroke="#56625a" strokeWidth="1">
+            <line x1={L} x2={W - R} y1={H - B + 0.5} y2={H - B + 0.5} />
+            {yTicks.map((y) => (
+              <line key={y} x1={X(y)} x2={X(y)} y1={H - B} y2={H - B + 4} data-tick="x" />
+            ))}
+            {held && <line x1={X(x1)} x2={X(x1)} y1={H - B} y2={H - B + 4} />}
+            {nTicks.map((n) => (
+              <line key={n} x1={L - 3} x2={W - R} y1={Y(n)} y2={Y(n)} strokeOpacity="0.35" strokeDasharray="2 3" data-tick="y" />
+            ))}
+          </g>
+          <g fill="#9faba3" fontSize="11">
+            {nTicks.map((n) => (
+              <text key={n} x={L - 5} y={Y(n) + 3.5} textAnchor="end">
                 {fmtShort(n)}
               </text>
             ))}
-            <text x={L} y={H - 2}>
-              {fmtYear(x0)}
-            </text>
-            <text x={W - R} y={H - 2} textAnchor="end">
-              {held ? 'now' : fmtYear(x1)}
-            </text>
+            {yTicks.map((y) => (
+              <text key={y} x={X(y)} y={H - 2} textAnchor="middle">
+                {fmtYear(y)}
+              </text>
+            ))}
+            {held && (
+              <text x={X(x1)} y={H - 2} textAnchor="middle">
+                now
+              </text>
+            )}
           </g>
         </svg>
         <span className="dim small">

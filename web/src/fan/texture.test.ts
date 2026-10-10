@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FanCamera } from './camera';
-import { layoutFan, leftAt, strandAt } from './layout';
+import { laneAt, layoutFan, leftAt, strandAt } from './layout';
 import { PANTHERA } from './panthera';
 import { drawTwigs, SCALE_BAR_PX, TEXTURE_IND, textureFade, TwigModel, type TwigView } from './twigs';
 
@@ -94,5 +94,58 @@ describe('the living texture', () => {
       expect(tex.reduce((a, s) => a + s.pieces, 0)).toBeGreaterThan(100);
       expect(st?.fadeGreen ?? 0).toBeGreaterThan(0.25);
     }
+  });
+});
+
+/** A camera on the lion's gray (dead) lane `ago` years back, the width scale bar reading `perBar` individuals. */
+function atGray(perBar: number, ago: number, sy = 5) {
+  const f = layoutFan(PANTHERA, 'linear');
+  const c = new FanCamera(f, (b) => new TwigModel(b, f.time, 'linear'));
+  c.w = 390;
+  c.h = 844;
+  const sumEver = f.branches.reduce((a, b) => a + b.sp.ever, 0);
+  const sx = ((SCALE_BAR_PX / perBar) * sumEver) / f.trunkWidth;
+  const b = f.branches[lionIdx];
+  const y = f.time.y(ago * 1e-6);
+  c.cam = { cx: 0, cy: y, sx, sy, ty: sy };
+  c.settle();
+  // The lanes at the step grid of this time zoom.
+  const L = laneAt(b, y);
+  c.cam.cx = leftAt(b, y) + L.gw + (L.w - L.gw) / 2;
+  return { c, b, m: new TwigModel(b, f.time, 'linear') };
+}
+
+describe('the dead texture', () => {
+  it('shows real lives, not a flat fill, from ~100 individuals per scale bar or as soon as slots are pixels apart', () => {
+    for (const [perBar, shows] of [
+      [1e7, false],
+      [1000, true],
+      [100, true],
+    ] as const) {
+      // 2000 years ago, thousands of years on screen: far too many lives to draw them all.
+      const { c, b, m } = atGray(perBar, 2000);
+      const { v, strokes } = stubView(c);
+      const st = drawTwigs(v, b, m, null);
+      // Gray (line ended) and pale green (has living descendants) lives: the texture's (just under
+      // a pixel wide) while there are too many to draw each, then each one's own.
+      const tex = strokes.filter((s) => (s.style.startsWith('rgba(154,163,171,') || s.style.startsWith('rgba(134,196,154,')) && s.pieces > 0);
+      if (!shows) {
+        expect(tex.length).toBe(0);
+        expect(st?.texGray ?? 0).toBe(0);
+        continue;
+      }
+      // Lives are drawn across the screen, and the gray lane dims under them.
+      expect(tex.reduce((a, s) => a + s.pieces, 0)).toBeGreaterThan(100);
+      expect(st?.texGray ?? 0).toBeGreaterThan(0.25);
+    }
+  });
+
+  it('draws the real individuals: their own births, deaths and lifespans', () => {
+    const { c, m } = atGray(100, 2000, 50);
+    const g = m.generationAt(c.cam.cy);
+    const lives = Array.from({ length: 64 }, (_, k) => m.twig(g, k * 37)).filter((t) => !t.alive);
+    const spans = lives.map((t) => t.yBirth - t.yDeath);
+    // Lifespans differ (it is not one band of equal strands).
+    expect(Math.max(...spans) / Math.min(...spans)).toBeGreaterThan(1.5);
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { clipPoly, FanCamera, MAX_YEARS_FRAC, MIN_YEARS, MIN_ZOOM, STRAND_PX } from './camera';
-import { GAP_PX, layoutFan, leftAt, strandAt, type FanBranch, type WidthMode } from './layout';
+import { laneAt, layoutFan, leftAt, Steps, strandAt, type FanBranch, type WidthMode } from './layout';
 import { PANTHERA } from './panthera';
 import { TwigModel } from './twigs';
 
@@ -165,12 +165,11 @@ describe('fan camera', () => {
         for (const step of [1.03, 1.2]) {
           for (let k = 0; k < 300; k++) {
             const [wx, wy] = c.toWorld(px, py);
-            const a = f.pack.anchor(wx, wy);
             const before = { ...c.cam };
             c.zoomAbout(px, py, step);
             expect(c.cam.sx / before.sx).toBeLessThanOrEqual(step * (1 + 1e-9));
             expect(c.cam.sy / before.sy).toBeLessThanOrEqual(step * (1 + 1e-9));
-            const [qx, qy] = c.toScreen(f.pack.resolve(a, wx, wy), wy);
+            const [qx, qy] = c.toScreen(wx, wy);
             const moved = Math.hypot(qx - px, qy - py);
             worst = Math.max(worst, moved);
             // The point under the finger stays under it (clampPan only holds the view back, it never pulls).
@@ -192,62 +191,117 @@ describe('fan camera', () => {
   });
 
   for (const mode of ['linear', 'log'] as WidthMode[]) {
-    it(`zoomed in, neighbours that fit on screen are there, packed; the branch looked at stands upright (${mode})`, () => {
+    it(`the geometry is fixed in world units: panning and zooming never change a shape (${mode})`, () => {
+      const c = camera(mode);
+      const f = c.fan;
+      const sample = () =>
+        f.branches.flatMap((b) =>
+          [0.999, 0.9, 0.5, 0.1, 0.01, 0.0005].map((u) => {
+            const y = b.tipY * u;
+            const L = laneAt(b, y);
+            return [leftAt(b, y), L.w, L.gw];
+          }),
+        );
+      const sy0 = c.cam.sy;
+      const ref = sample();
+      for (const g of gestures(11)) {
+        g(c);
+        // Left edges and green lanes never depend on the camera; the gray edge only on the step grid
+        // (the time zoom), so at the same grid everything is identical.
+        const now = sample();
+        for (let i = 0; i < ref.length; i++) {
+          expect(now[i][0]).toBe(ref[i][0]);
+          expect(now[i][2]).toBe(ref[i][2]);
+        }
+        const sy = c.cam.sy;
+        f.steps.setScale(sy0);
+        expect(sample()).toEqual(ref);
+        f.steps.setScale(sy);
+      }
+      // Sideways pans don't even change the time zoom: nothing changes at all.
+      c.cam = c.home();
+      c.settle();
+      const before = sample();
+      for (let k = 0; k < 40; k++) c.pan(k % 2 ? 37 : -23, 0);
+      expect(sample()).toEqual(before);
+    });
+
+    it(`scripted smooth pinches and pans never jump, and the step grid never flip-flops (${mode})`, () => {
       const c = camera(mode);
       const f = c.fan;
       const lion = f.branches.find((b) => b.sp.common === 'Lion')!;
-      let fits = 0;
-      for (const [ago, px] of [
-        [30e-6, 40],
-        [200e-6, 40],
-        [200e-6, 150],
-        [0.01, 120],
-        [1, 200],
-      ]) {
-        const y = f.time.y(ago);
-        const w = strandAt(lion, ago, mode).w;
-        // The lion `px` wide on screen, centred.
-        const green = strandAt(lion, ago, mode).f > 0.5;
-        c.cam = { ...c.cam, sx: px / w, cx: leftAt(lion, y) + w / 2, cy: y };
+      const tiger = f.branches.find((b) => b.sp.common === 'Tiger')!;
+      // Overview, mid, deep, near "now", near the stem's base.
+      const places: [FanBranch, number][] = [
+        [lion, f.time.y(0.5)],
+        [lion, f.time.y(0.01)],
+        [tiger, f.time.y(1.5)],
+        [lion, f.time.y(20e-6)],
+        [lion, -3],
+      ];
+      for (const [b, wy] of places) {
+        c.cam = c.home();
         c.settle();
-        const yc = c.cam.cy;
-        const age = f.time.ageAt(yc);
-        const vis = f.branches.filter((b) => yc >= b.tipY);
-        const iv = vis.map((b) => {
-          const l = c.toScreen(leftAt(b, yc), yc)[0];
-          return [l, l + strandAt(b, age, mode).w * c.cam.sx];
-        });
-        // Packed: GAP_PX apart on screen, never overlapping.
-        for (let k = 1; k < iv.length; k++) {
-          expect(iv[k][0] - iv[k - 1][1]).toBeGreaterThanOrEqual(-1e-6);
-          expect(iv[k][0] - iv[k - 1][1]).toBeLessThanOrEqual(GAP_PX * 1.01);
+        const L = laneAt(b, wy);
+        const wx = leftAt(b, wy) + L.gw + (L.w - L.gw) * 0.5;
+        const px = c.w * 0.5;
+        const py = c.h * 0.5;
+        c.cam = { ...c.cam, cx: wx - (px - c.w / 2) / c.cam.sx, cy: wy - (py - c.h / 2) / c.cam.sy };
+        c.settle();
+        // In, out, in again: 1.04× per frame, like a smooth pinch; then a pan sweep.
+        const lvl: number[] = [];
+        const dirs: number[] = [];
+        for (const [step, n] of [
+          [1.04, 260],
+          [1 / 1.04, 260],
+          [1.04, 120],
+        ] as const) {
+          for (let k = 0; k < n; k++) {
+            const [qx, qy] = c.toWorld(px, py);
+            const before = { ...c.cam };
+            c.zoomAbout(px, py, step);
+            const after = c.cam;
+            // No camera jumps: the scale changes by at most the step, the point under the fingers stays.
+            for (const r of [after.sx / before.sx, after.sy / before.sy]) {
+              expect(r).toBeLessThanOrEqual(Math.max(step, 1 / step) * (1 + 1e-9));
+              expect(r).toBeGreaterThanOrEqual(Math.min(step, 1 / step) * (1 - 1e-9));
+            }
+            const [sx2, sy2] = c.toScreen(qx, qy);
+            expect(Math.hypot(sx2 - px, sy2 - py)).toBeLessThan(2);
+            lvl.push(f.steps.k + f.steps.t);
+            dirs.push(step > 1 ? 1 : -1);
+          }
         }
-        // Every neighbour whose packed run from the lion fits on screen is on screen.
-        const li = vis.indexOf(lion);
-        const L = iv[li];
-        expect(L[0]).toBeLessThanOrEqual(c.w / 2 + 1e-6);
-        expect(L[1]).toBeGreaterThanOrEqual(c.w / 2 - 1e-6);
-        for (let k = li + 1, x = L[1]; k < iv.length; k++) {
-          x += GAP_PX + (iv[k][1] - iv[k][0]);
-          if (x > c.w) break;
-          expect(iv[k][1]).toBeLessThanOrEqual(c.w + 1e-6);
-          fits++;
+        // The step grid follows the zoom monotonically: finer zooming in, coarser zooming out, never back and forth.
+        for (let i = 1; i < lvl.length; i++) {
+          if (dirs[i] > 0) expect(lvl[i]).toBeGreaterThanOrEqual(lvl[i - 1] - 1e-12);
+          else expect(lvl[i]).toBeLessThanOrEqual(lvl[i - 1] + 1e-12);
         }
-        for (let k = li - 1, x = L[0]; k >= 0; k--) {
-          x -= GAP_PX + (iv[k][1] - iv[k][0]);
-          if (x < 0) break;
-          expect(iv[k][0]).toBeGreaterThanOrEqual(-1e-6);
-          fits++;
-        }
-        // Deep in, with the centre in the lion's green lane, that lane (its left edge) is upright on screen.
-        if (green && f.pack.fade() === 0) {
-          const [, yTop] = c.toWorld(0, 0);
-          const [, yBot] = c.toWorld(0, c.h);
-          const xs = [yTop, yc, yBot].filter((v) => v >= lion.tipY && v < 0).map((v) => c.toScreen(leftAt(lion, v), v)[0]);
-          for (const x of xs) expect(x).toBeCloseTo(xs[0], 3);
+        // A pan sweep moves the camera by exactly what was asked (no snapping), until the clamp holds it.
+        for (let k = 0; k < 60; k++) {
+          const before = { ...c.cam };
+          c.pan(3, 0);
+          const moved = (before.cx - c.cam.cx) * c.cam.sx;
+          expect(moved).toBeLessThanOrEqual(3 + 1e-6);
+          expect(moved).toBeGreaterThanOrEqual(-1e-6);
+          expect(c.cam.sx).toBe(before.sx);
         }
       }
-      expect(fits).toBeGreaterThan(0);
     });
   }
+
+  it('the gray edge morphs between step grids over a zoom, never pops', () => {
+    const f = layoutFan(PANTHERA, 'linear');
+    const lion = f.branches.find((b) => b.sp.common === 'Lion')!;
+    const ys = Array.from({ length: 50 }, (_, i) => lion.tipY * ((i + 0.5) / 50));
+    let prev: number[] | null = null;
+    for (let z = 0; z <= 2000; z++) {
+      f.steps.setScale(0.5 * Math.pow(1.005, z));
+      const w = ys.map((y) => laneAt(lion, y).w);
+      if (prev) for (let i = 0; i < w.length; i++) expect(Math.abs(w[i] - prev[i])).toBeLessThan(0.05 * lion.width);
+      prev = w;
+    }
+    expect(Steps.dy(3)).toBeCloseTo(Steps.dy(4) * 2, 12);
+    void strandAt;
+  });
 });

@@ -15,13 +15,13 @@
 //     the limit there). Every path (pinch, wheel, double-tap, fly-to, resize)
 //     lands in settle(), which applies it. Zooming back out undoes a zoom-in
 //     exactly.
-//   - width, zooming in: up to ~STRAND_PX per strand of the thinnest lane, and
-//     never so far that the strands under the finger lie flatter than MAX_SLOPE
-//     (near "now" the dead's lane narrows to nothing within a few generations).
+//   - width, zooming in: up to ~STRAND_PX per strand of the thinnest lane. The
+//     geometry is fixed and every strand is vertical (the gray lane's edge is
+//     a step function), so nothing leans and there is no slope limit.
 //   - zoom out: no further than the whole fan with a margin.
 //   - pan: some of the fan always stays on screen.
 
-import { leftAt, strandAt, type Fan, type FanBranch } from './layout';
+import { laneAt, leftAt, strandAt, type Fan, type FanBranch } from './layout';
 
 /** A span of this many years ... */
 export const MIN_YEARS = 10;
@@ -29,8 +29,6 @@ export const MIN_YEARS = 10;
 export const MAX_YEARS_FRAC = 0.1;
 /** Width zoom stops when strands are this far apart (px): handles legible. */
 export const STRAND_PX = 90;
-/** Steepest on-screen lean (dx/dy) of the strands under the finger that zoom-in allows. */
-export const MAX_SLOPE = 1.5;
 /** Zoom out to this fraction of the home view at most. */
 export const MIN_ZOOM = 0.75;
 const SX_MAX = 1e14;
@@ -79,14 +77,11 @@ export class FanCamera {
     return [c.cx + (px - this.w / 2) / c.sx, c.cy + (py - this.h / 2) / c.sy];
   }
 
-  /**
-   * World x extent of the fan: the stem's width, plus a margin for the gaps
-   * between the siblings just above the fork (GAP_PX each on screen, so wider
-   * in world units the further out the camera is).
-   */
+  /** World x extent of the fan: its columns, with a small margin. */
   extent(): [number, number] {
-    const h = this.fan.trunkWidth / 2;
-    return [-h * 1.2, h * 1.2];
+    const f = this.fan;
+    const m = 0.04 * (f.x1 - f.x0);
+    return [f.x0 - m, f.x1 + m];
   }
 
   /** The whole fan: "now" near the top, the stem entering from the bottom edge. */
@@ -172,8 +167,8 @@ export class FanCamera {
     const m = this.model(b);
     const age = t.ageAt(y);
     const n = Math.max(1, m.size(m.generationAt(y)));
-    const st = strandAt(b, age, this.fan.mode);
-    const gw = st.w * st.f;
+    const st = laneAt(b, y);
+    const gw = st.gw;
     // The dead's lane closes at the tip; size its cells a couple of generations below it.
     const stF = strandAt(b, Math.max(age, b.sp.t1 + (2 * m.GL) / 1e6), this.fan.mode);
     let cell = Infinity;
@@ -182,27 +177,13 @@ export class FanCamera {
     return cell;
   }
 
-  /** The deepest width zoom allowed at world point (wx, wy) with time zoom sy. */
-  sxCap(wx: number, wy: number, sy: number): number {
+  /** The deepest width zoom allowed at world point (wx, wy) (time zoom sy: kept for callers, unused). */
+  sxCap(_wx: number, wy: number, _sy?: number): number {
     const bs = this.fan.branches;
     const span = bs.filter((b) => wy >= b.tipY && wy <= 0);
     let cell = Infinity;
     for (const b of span.length ? span : bs) cell = Math.min(cell, this.cellAt(b, Math.min(0, Math.max(b.tipY, wy))));
-    let cap = Math.min(SX_MAX, STRAND_PX / cell);
-    // The dead's lane narrows going up, and its strands keep their share of it,
-    // so they lean in proportion to how far across the lane they are.
-    const t = this.fan.time;
-    for (const b of span) {
-      const st = strandAt(b, t.ageAt(wy), this.fan.mode);
-      const left = leftAt(b, wy);
-      const gw = st.w * st.f;
-      if (wx < left + gw || wx > left + st.w) continue;
-      const u = (wx - left - gw) / Math.max(1e-300, st.w - gw);
-      const dy = 1 / sy;
-      const wAt = (y: number) => strandAt(b, t.ageAt(y), this.fan.mode).w;
-      const slope = (u * Math.abs(wAt(wy + dy) - wAt(wy - dy))) / (2 * dy);
-      if (slope > 0) cap = Math.min(cap, (MAX_SLOPE * sy) / slope);
-    }
+    const cap = Math.min(SX_MAX, STRAND_PX / cell);
     return cap;
   }
 
@@ -213,19 +194,13 @@ export class FanCamera {
   settle(px = this.w / 2, py = this.h / 2, wx = this.cam.cx, wy = this.cam.cy): void {
     const c = this.cam;
     const [sxMin, syMin] = this.minScale();
-    // The siblings' packing depends on the scale: keep (wx, wy) on the branch it was on.
-    const pack = this.fan.pack;
-    const a = pack.anchor(wx, wy);
     c.sx = Math.min(SX_MAX, Math.max(sxMin, c.sx));
     c.ty = Math.min(TY_MAX, Math.max(syMin, c.ty));
     c.sy = this.timeCap(wy, py, c.ty);
-    pack.setScale(c.sx, c.sy, this.home().sx);
-    c.cx = pack.resolve(a, wx, wy) - (px - this.w / 2) / c.sx;
+    // The geometry is fixed in world units: the point stays where it is.
+    c.cx = wx - (px - this.w / 2) / c.sx;
     c.cy = wy - (py - this.h / 2) / c.sy;
-    // Zoomed in, the packing stands the branch at the screen centre upright
-    // (layout.ts Pack.setRef); that shifts each height sideways, so re-resolve.
-    pack.setRef(c.cx, c.cy);
-    c.cx = pack.resolve(a, wx, wy) - (px - this.w / 2) / c.sx;
+    this.fan.steps.setScale(c.sy);
     this.clampPan();
   }
 
@@ -237,7 +212,7 @@ export class FanCamera {
     for (const b of f.branches) {
       if (y < b.tipY) continue;
       const left = leftAt(b, y);
-      out.push([left, left + strandAt(b, f.time.ageAt(y), f.mode).w]);
+      out.push([left, left + laneAt(b, y).w]);
     }
     return out;
   }
@@ -284,14 +259,12 @@ export class FanCamera {
     const c = this.cam;
     const [wx, wy] = this.toWorld(px, py);
     c.ty *= fy;
-    // The time zoom this lands on, for the slope limit.
-    const sy = this.timeCap(wy, py, Math.min(TY_MAX, Math.max(this.minScale()[1], c.ty)));
     let sx = c.sx * fx;
     if (fx > 1) {
       // No zooming into nothing: content stays within 30% of the screen of the fingers.
       const d = Math.abs(this.nearestContent(wx, wy) - wx);
       const cap = d > 0 ? (0.3 * this.w) / d : Infinity;
-      sx = Math.min(sx, Math.max(c.sx, Math.min(cap, this.sxCap(wx, wy, sy))));
+      sx = Math.min(sx, Math.max(c.sx, Math.min(cap, this.sxCap(wx, wy))));
     }
     c.sx = sx;
     this.settle(px, py, wx, wy);

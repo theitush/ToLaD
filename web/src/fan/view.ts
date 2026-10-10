@@ -8,7 +8,7 @@ import { formatAge, formatCount } from '../data/names';
 import { Input, type InputHandlers } from '../engine/input';
 import { clipPoly, FanCamera, STRAND_PX, type Camera } from './camera';
 import { EDGE_DASH, edgeMarks, edgeXAt, dotAlphas, GRADE_COLOR, historySpans, pointAgo, toScreenSpans, type ScreenSpan, type Span } from './history';
-import { layoutFan, leftAt, strandAt, type Fan, type FanBranch, type WidthMode } from './layout';
+import { JOG, laneAt, layoutFan, leftAt, Steps, strandAt, type Fan, type FanBranch, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { drawTwigs, TwigModel, type IndInfo, type TwigStats } from './twigs';
 
@@ -47,6 +47,8 @@ export class FanView implements InputHandlers {
   onSelect: (sel: Selection | null) => void = () => {};
   /** The width scale bar (a DOM element above the legend / cards): its bar and label are set each frame. */
   scaleEl: HTMLElement | null = null;
+  /** The buttons (a DOM element over the canvas): labels never go under them. */
+  barEl: HTMLElement | null = null;
   private scaleKey = '';
   /** `?debug`: a readout of the zooms, years on screen and individuals per px. */
   readonly debug = typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug');
@@ -117,7 +119,6 @@ export class FanView implements InputHandlers {
   setMode(mode: WidthMode): void {
     this.mode = mode;
     this.camera.fan = layoutFan(this.clade, mode);
-    this.camera.fan.pack.setScale(this.cam.sx, this.cam.sy, this.camera.home().sx);
     this.camera.settle();
     this.request();
   }
@@ -177,8 +178,6 @@ export class FanView implements InputHandlers {
       const [sx, cx] = axis(from.sx, to.sx, from.cx, to.cx, e);
       const [ty, cy] = axis(from.sy, to.ty, from.cy, to.cy, e);
       this.cam = { sx, sy: ty, ty, cx, cy };
-      // The targets are already at their scales' packing: no re-anchoring mid-flight.
-      this.fan.pack.setScale(sx, ty);
       this.camera.settle();
       return u < 1;
     };
@@ -195,9 +194,8 @@ export class FanView implements InputHandlers {
     for (const b of this.fan.branches) {
       if (wy > slopY || wy < b.tipY - slopY) continue;
       const yc = Math.min(0, Math.max(b.tipY, wy));
-      const age = this.fan.time.ageAt(yc);
       const left = leftAt(b, yc);
-      const d = Math.max(0, left - wx, wx - left - strandAt(b, age, this.mode).w);
+      const d = Math.max(0, left - wx, wx - left - laneAt(b, yc).w);
       if (d <= slop && d < bd) {
         bd = d;
         best = b;
@@ -252,8 +250,7 @@ export class FanView implements InputHandlers {
     let sy = this.cam.sy * 4;
     let framing = false;
     if (b) {
-      const age = this.fan.time.ageAt(Math.min(0, Math.max(b.tipY, wy)));
-      const bw = strandAt(b, age, this.mode).w;
+      const bw = laneAt(b, Math.min(0, Math.max(b.tipY, wy))).w;
       const wpx = bw * this.cam.sx;
       const frame = (this.w * 0.6) / Math.max(1e-300, bw);
       if (wpx < this.w * 0.45) {
@@ -273,26 +270,18 @@ export class FanView implements InputHandlers {
         sx = Math.min(sx, STRAND_PX / Math.max(1e-300, cell));
         sy = Math.max(this.cam.sy * 2, Math.min(this.cam.sy * 64, (2 * cell * sx) / Math.max(1e-300, genH)));
       }
-      // Time zooms in too where the strands would otherwise lean (the camera's slope limit).
-      sy = Math.max(sy, this.slopeSy(wx, wy, sx));
     }
     // Within the camera's limits: at least 10 years on screen, the width limit where the finger is.
     sy = this.camera.timeCap(wy, y, sy);
     let cx = wx - (x - this.w / 2) / sx;
     if (b) {
-      sx = Math.min(sx, Math.max(this.cam.sx, this.camera.sxCap(wx, wy, sy)));
+      sx = Math.min(sx, Math.max(this.cam.sx, this.camera.sxCap(wx, wy)));
     }
-    // The packing depends on the scale: aim at where the finger's point will be at the target scale.
-    const pack = this.fan.pack;
-    const anchor = pack.anchor(wx, wy);
-    const was = [pack.sx, pack.sy];
-    pack.setScale(sx, sy);
-    const wxT = pack.resolve(anchor, wx, wy);
+    const wxT = wx;
     cx = wxT - (x - this.w / 2) / sx;
     if (b) {
       const yc = Math.min(0, Math.max(b.tipY, wy));
-      const age = this.fan.time.ageAt(yc);
-      if (framing) cx = leftAt(b, yc) + strandAt(b, age, this.mode).w / 2;
+      if (framing) cx = leftAt(b, yc) + laneAt(b, yc).w / 2;
       // In the green lane, land on a living strand rather than a vacant slot
       // (only about a third of the index slots hold someone alive).
       const m = this.model(b);
@@ -300,16 +289,9 @@ export class FanView implements InputHandlers {
       const slotPx = (L.gw / m.nLive) * sx;
       if (wxT < L.left + L.gw && slotPx > 12) cx = m.nearestLiving(wxT, wy, Math.ceil(this.w / slotPx)) ?? cx;
     }
-    pack.setScale(was[0], was[1]);
     this.flyTo({ sx, sy, ty: sy, cx, cy: wy - (y - this.h / 2) / sy });
   }
 
-  /** The time zoom at which the width zoom sx is within the slope limit at (wx, wy). */
-  private slopeSy(wx: number, wy: number, sx: number): number {
-    let sy = this.cam.sy;
-    for (let k = 0; k < 40 && this.camera.sxCap(wx, wy, sy) < sx; k++) sy *= 1.5;
-    return sy;
-  }
   tap(x: number, y: number): void {
     const b = this.hitBranch(x, y);
     this.selected = b ? b.sp : null;
@@ -397,15 +379,13 @@ export class FanView implements InputHandlers {
 
   /**
    * One species' strand bundle, drawn whole from the bottom of the parent stem
-   * through the fork and up through time to its tip. The stem is just its
-   * children's strands side by side (in branch order, widths adding up to the
-   * stem's width), so each green lane runs unbroken from the tip to the root.
+   * through the fork and up its column to its tip. The stem is just its
+   * children's lanes side by side (widths adding up to the stem's width), so
+   * each green lane runs unbroken from the tip to the root.
    *
-   * Every edge is a function of height (layout.ts Pack: left edge; strandAt:
-   * widths), offset horizontally, so width = individuals at every height and
-   * the shape never depends on the ratio of the two zooms. The visible heights
-   * are sampled in screen space, finer wherever an edge would be off by more
-   * than a fraction of a pixel; outside them only the fork and the tip are
+   * All straight lines (layout.ts): the stem slice, the jog, the column; the
+   * gray edge steps at the step lines on screen (Steps.lines), the width
+   * constant between them. Off screen only the fork, the jog and the tip are
    * kept, whose chords stay off screen above or below it.
    */
   private drawStrand(b: FanBranch): void {
@@ -413,63 +393,14 @@ export class FanView implements InputHandlers {
     const [, ayTip] = this.toScreen(0, b.tipY);
     const [, byBot] = this.toScreen(0, yb);
     if (byBot < 0 || ayTip > this.h) return;
-    const time = this.fan.time;
     const hw = b.width / 2;
-    // Spine at left + hw: the ribbon spans offsets [hw - w, hw] to its left (nx = -1).
-    const pt = (y: number): RibbonPt => {
-      const st = strandAt(b, time.ageAt(y), this.mode);
-      const [px, py] = this.toScreen(leftAt(b, y) + hw, y);
-      return { x: px, y: py, nx: -1, ny: 0, w: st.w, f: st.f };
-    };
-    const pts: RibbonPt[] = [];
-    // The stem, straight up to the fork.
-    pts.push(pt(yb));
-    const [, sTop] = this.toWorld(0, -20);
-    const [, sBot] = this.toWorld(0, this.h + 20);
-    const ya = Math.min(0, sBot);
-    const yt = Math.max(b.tipY, sTop);
-    if (sBot < yb && sBot > 0) pts.push(pt(sBot));
-    pts.push(pt(0));
-    if (ya > yt) {
-      const sx = this.cam.sx;
-      const edges = (p: RibbonPt) => [p.x, p.x - p.w * sx, p.x - p.w * p.f * sx];
-      const refine = (y0: number, a: RibbonPt, y1: number, c: RibbonPt, depth: number): void => {
-        if (depth > 12 || pts.length > 8000) return;
-        const ym = (y0 + y1) / 2;
-        const m = pt(ym);
-        const ea = edges(a);
-        const em = edges(m);
-        const ec = edges(c);
-        let err = 0;
-        for (let e = 0; e < 3; e++) {
-          // Edges far off screen on one side don't matter.
-          if (Math.max(ea[e], em[e], ec[e]) < -50 || Math.min(ea[e], em[e], ec[e]) > this.w + 50) continue;
-          err = Math.max(err, Math.abs((ea[e] + ec[e]) / 2 - em[e]));
-        }
-        if (err < 0.3) return;
-        refine(y0, a, ym, m, depth + 1);
-        pts.push(m);
-        refine(ym, m, y1, c, depth + 1);
-      };
-      const M = 64;
-      let prevY = ya;
-      let prev = pt(ya);
-      if (ya < 0) pts.push(prev);
-      for (let i = 1; i <= M; i++) {
-        const y = ya + ((yt - ya) * i) / M;
-        const next = pt(y);
-        refine(prevY, prev, y, next, 0);
-        pts.push(next);
-        prevY = y;
-        prev = next;
-      }
-    }
-    if (pts[pts.length - 1].y > ayTip + 1e-9) pts.push(pt(b.tipY));
+    const pts = this.lanePoints(b, hw);
+    if (pts.length < 2) return;
     const ctx = this.ctx;
     // As the strands fade in (twigs.ts), the lanes dim to a backdrop under them: the same
     // lanes, the same geometry, never a switch.
     const tw = this.twigStats.get(b.sp.gid);
-    ctx.fillStyle = mix(b.sp.extinct ? WITHERED : GRAY, '#1c2521', (tw?.fade ?? 0) * 0.85);
+    ctx.fillStyle = mix(b.sp.extinct ? WITHERED : GRAY, '#1c2521', Math.max(tw?.fade ?? 0, 0.6 * (tw?.texGray ?? 0)) * 0.85);
     this.ribbon(pts, (p) => hw - p.w, () => hw, 0.6);
     if (!b.sp.extinct) {
       // Green lane on the left, floored at 1 px all the way from the tip to the root.
@@ -485,6 +416,37 @@ export class FanView implements InputHandlers {
       ctx.lineWidth = 1.5;
       ctx.stroke();
     }
+  }
+
+  /**
+   * A branch's lanes as screen points, bottom to top, two per stretch of
+   * constant width (so the gray edge is vertical and horizontal segments):
+   * breakpoints at the stem's end, the fork, the jog, the step lines on
+   * screen (and one beyond each edge) and the tip.
+   */
+  lanePoints(b: FanBranch, hw: number): RibbonPt[] {
+    const yb = this.fan.trunkBottom.y;
+    const steps = this.fan.steps;
+    const d = Steps.dy(steps.level);
+    const [, sTop] = this.toWorld(0, -20);
+    const [, sBot] = this.toWorld(0, this.h + 20);
+    const ys = new Set<number>([yb, 0, -JOG, b.tipY]);
+    for (const y of steps.lines(b, sTop - d, sBot + d) ?? []) ys.add(y);
+    if (sBot < yb && sBot > 0) ys.add(sBot);
+    const sorted = [...ys].filter((y) => y >= b.tipY && y <= yb).sort((p, q) => q - p);
+    // Spine at left + hw: the ribbon spans offsets [hw - w, hw] to its left (nx = -1).
+    const pts: RibbonPt[] = [];
+    for (let i = 0; i + 1 < sorted.length; i++) {
+      const y0 = sorted[i];
+      const y1 = sorted[i + 1];
+      // Constant width between breakpoints: the lanes at the middle.
+      const L = laneAt(b, (y0 + y1) / 2);
+      for (const y of [y0, y1]) {
+        const [px, py] = this.toScreen(leftAt(b, y) + hw, y);
+        pts.push({ x: px, y: py, nx: -1, ny: 0, w: L.w, f: L.f });
+      }
+    }
+    return pts;
   }
 
   /**
@@ -559,7 +521,7 @@ export class FanView implements InputHandlers {
     const prev = this.twigStats.get(b.sp.gid);
     // The lanes under the strands depend on the fade: redraw once when it changes,
     // and keep drawing while lineage answers are still being worked out.
-    if ((prev?.fade ?? 0) !== (st?.fade ?? 0) || (prev?.fadeGreen ?? 0) !== (st?.fadeGreen ?? 0) || st?.pending) this.request();
+    if ((prev?.fade ?? 0) !== (st?.fade ?? 0) || (prev?.fadeGreen ?? 0) !== (st?.fadeGreen ?? 0) || (prev?.texGray ?? 0) !== (st?.texGray ?? 0) || st?.pending) this.request();
     if (st) this.twigStats.set(b.sp.gid, st);
     else this.twigStats.delete(b.sp.gid);
   }
@@ -573,7 +535,7 @@ export class FanView implements InputHandlers {
     const out = new Map<FanBranch, number>();
     const tips = this.fan.branches
       .map((b) => ({ b, p: this.toScreen(tipX(b, this.fan, this.mode), b.tipY) }))
-      .filter(({ b, p }) => p[0] > -30 && p[0] < this.w + 30 && p[1] > -10 && p[1] < this.h + 200 && !this.twigStats.has(b.sp.gid));
+      .filter(({ b, p }) => p[0] > -30 && p[0] < this.w + 30 && p[1] > -10 && p[1] < this.h + 200 && !this.twigStats.get(b.sp.gid)?.drawn);
     const groups = new Map<number, typeof tips>();
     for (const t of tips) {
       const k = Math.round(t.p[1] / 3);
@@ -596,15 +558,24 @@ export class FanView implements InputHandlers {
     return out;
   }
 
+  /** The buttons' box in canvas px [x0, y0, x1, y1], if any. */
+  private barRect(): number[] | null {
+    if (!this.barEl) return null;
+    const r = this.barEl.getBoundingClientRect();
+    const c = this.canvas.getBoundingClientRect();
+    if (!(r.width > 0)) return null;
+    return [r.left - c.left, r.top - c.top, r.right - c.left, r.bottom - c.top];
+  }
+
   private drawLabel(b: FanBranch, placed: number[][], lx?: number): void {
     const ctx = this.ctx;
     const [tx, ty] = this.toScreen(tipX(b, this.fan, this.mode), b.tipY);
     if (tx < -30 || tx > this.w + 30 || ty < -10 || ty > this.h + 200) return;
-    if (this.twigStats.has(b.sp.gid)) return; // Zoomed into the individuals: the HUD names it.
+    if (this.twigStats.get(b.sp.gid)?.drawn) return; // Zoomed into the individuals: the HUD names it.
     // Moved off its tip: a leader line from the tip up to the label.
-    const lead = lx !== undefined && Math.abs(lx - tx) > 1.5 ? 14 : 0;
+    let lead = lx !== undefined && Math.abs(lx - tx) > 1.5 ? 14 : 0;
     const cx = lead ? lx! : tx;
-    const cy = ty - lead;
+    let cy = ty - lead;
     const name = b.sp.common;
     const sub = `${formatCount(b.sp.ever)} ever${b.sp.extinct ? ` · extinct ${formatAge(b.sp.t1)}` : ''}`;
     const fs = 15;
@@ -614,13 +585,23 @@ export class FanView implements InputHandlers {
     const subLen = ctx.measureText(sub).width;
     ctx.font = `600 ${fs}px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
     // Screen box of the upright two-line label (x0, y0, x1, y1).
-    const box = [cx - 13, cy - 8 - Math.max(subLen, ctx.measureText(name).width), cx + 14, cy - 8];
+    const len = Math.max(subLen, ctx.measureText(name).width);
+    // Kept on screen and clear of the buttons: pushed down (with a leader line) if needed.
+    const bar = this.barRect();
+    const under = bar && cx + 14 > bar[0] - 4 && cx - 13 < bar[2] + 4;
+    const minTop = (under ? bar![3] : 0) + 6;
+    if (cy - 8 - len < minTop) {
+      const d = minTop - (cy - 8 - len);
+      cy += d;
+      lead += d;
+    }
+    const box = [cx - 13, cy - 8 - len, cx + 14, cy - 8];
     if (placed.some((q) => box[0] < q[2] + 2 && q[0] < box[2] + 2 && box[1] < q[3] + 2 && q[1] < box[3] + 2)) {
       ctx.restore();
       return;
     }
     placed.push(box);
-    if (lead) {
+    if (lead && Math.abs(cx - tx) > 1.5) {
       ctx.beginPath();
       ctx.moveTo(tx, ty - 2);
       ctx.lineTo(cx, cy - 4);
@@ -691,7 +672,7 @@ export class FanView implements InputHandlers {
     const lines = [
       `width ×${(c.sx / h.sx).toPrecision(4)}  time ×${(c.sy / h.sy).toPrecision(4)} (asked ×${(c.ty / h.sy).toPrecision(3)})`,
       `screen ${formatYearsAgo(yrs).replace(' ago', '')} · top ${formatYearsAgo(Math.max(0, this.camera.years(yTop)))}`,
-      `${this.mode === 'linear' ? `${perPx.toPrecision(3)} individuals/px` : `${perPx.toPrecision(3)} log units/px`} · pack ${this.fan.pack.fade().toFixed(2)}`,
+      `${this.mode === 'linear' ? `${perPx.toPrecision(3)} individuals/px` : `${perPx.toPrecision(3)} log units/px`} · steps L${this.fan.steps.k}+${this.fan.steps.t.toFixed(2)}`,
     ];
     const ctx = this.ctx;
     ctx.save();
@@ -853,8 +834,8 @@ export class FanView implements InputHandlers {
 
 
 /** x of the middle of a branch's tip (branches are left-aligned). */
-function tipX(b: FanBranch, fan: Fan, mode: WidthMode): number {
-  return leftAt(b, b.tipY) + strandAt(b, fan.time.ageAt(b.tipY), mode).w / 2;
+function tipX(b: FanBranch, _fan: Fan, _mode: WidthMode): number {
+  return leftAt(b, b.tipY) + laneAt(b, b.tipY).w / 2;
 }
 
 /** Width units of n individuals: n (linear) or 1 + log10 n (log), as layout.ts g(). */

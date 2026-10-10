@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { layoutFan, leftAt, remaining, strandAt } from './layout';
+import { laneAt, layoutFan, leftAt, remaining, strandAt } from './layout';
 import { PANTHERA } from './panthera';
 import { speciesModel, threadEnds, TwigModel, type TwigView } from './twigs';
 
@@ -59,7 +59,7 @@ describe('width = individuals', () => {
       for (const g of [0, 1234, m.G >> 1, m.G - 1]) {
         const y = m.row(g).y;
         const L = m.lanes(y);
-        const st = strandAt(b, f.time.ageAt(y), f.mode);
+        const st = laneAt(b, y);
         expect(L.w).toBeCloseTo(st.w, 12);
         expect(L.gw).toBeCloseTo(st.w * st.f, 12);
         expect(L.left).toBeCloseTo(leftAt(b, y), 12);
@@ -84,7 +84,7 @@ describe('width = individuals', () => {
         const n = m.size(g);
         // Heights from the birth row up to "now".
         for (const y of [m.row(g).y, m.yOf(Math.min(m.T, (g + 2) * m.GL)), m.yOf((g + 0.9) * m.GL), f.time.y(0)]) {
-          const st = strandAt(b, f.time.ageAt(y), f.mode);
+          const st = laneAt(b, y);
           const gw = st.w * st.f;
           const left = leftAt(b, y);
           // The union of the slots' cells is exactly the branch: green lane, then gray lane.
