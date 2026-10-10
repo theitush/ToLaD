@@ -31,7 +31,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import anchors, history, ranges
+from . import anchors, diversity, history, ranges
 from .anchors import year_to_ma
 from .load import load_combine, load_pantheria
 from .tree import D_ANCHOR, D_FOSSIL, D_INTERP, D_UPHAM, Node, ancestor_of_rank
@@ -776,6 +776,8 @@ def assign_leaf_counts(root: Node, raw: Path, ctx: dict, log: dict) -> None:
     # curated flagship histories: pre-decline baselines and dated curves (pipeline/history/)
     ctx["history"] = history.apply(root, raw, log, SRC["history"])
     log["natural_baseline"] = natural_report(root)
+    # layer 2, genetic diversity: a cross-check written to stats.json only (ToLaD#63)
+    log["diversity_crosscheck"] = diversity.report(root, raw, ctx)
     unverified = [n for n in root.preorder() if n.is_leaf and n.kind == "tree" and not n.extinct
                   and not n.upham and "iucn" not in n.data and id(n) not in ref and n.name != "Homo sapiens"]
     log["unverified_extant_tips"] = {
