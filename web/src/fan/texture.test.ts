@@ -153,7 +153,10 @@ describe('the texture of lines, then the individuals on them', () => {
       const { lit, n } = shadeScreen(v, c, mi);
       expect(lit).toBeGreaterThan(1000);
       expect(lit).toBeLessThan(n * (lives ? 0.8 : 0.6));
-      expect(st?.fadeGreen ?? 0).toBeGreaterThan(0.25);
+      // (The living's lane dims only once it is wide enough to hold lines.)
+      const gwPx = laneAt(b, c.cam.cy).gw * c.cam.sx;
+      if (gwPx > 24) expect(st?.fadeGreen ?? 0).toBeGreaterThan(0.25);
+      if (gwPx < 6) expect(st?.fadeGreen ?? 1).toBe(0);
       expect(st?.texGray ?? 0).toBeGreaterThan(0.25);
     }
   });

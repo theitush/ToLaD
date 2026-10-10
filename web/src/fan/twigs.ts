@@ -266,7 +266,10 @@ export class TwigModel {
   }
 
   twig(g: number, i: number, K?: number): Twig {
-    const a = this.sp.attributes({ generation: g, index: BigInt(i) });
+    return this.twigOf(g, i, this.sp.attributes({ generation: g, index: BigInt(i) }), K);
+  }
+
+  private twigOf(g: number, i: number, a: { birthTime: number; deathTime: number; alive: boolean }, K?: number): Twig {
     const end = Math.min(a.deathTime, this.sp.now);
     const yBirth = this.yOf(a.birthTime);
     const k = K ?? this.slotOf(g, i, a.alive, yBirth) ?? i;
@@ -275,9 +278,9 @@ export class TwigModel {
 
   /** Individual (g, i) on its copy nearest slot `near` (parents next to their child). */
   twigNear(g: number, i: number, near: number): Twig {
-    const alive = this.alive(g, i);
-    const yBirth = this.yOf(this.sp.attributes({ generation: g, index: BigInt(i) }).birthTime);
-    return this.twig(g, i, this.slotOf(g, i, alive, yBirth, near) ?? undefined);
+    const a = this.sp.attributes({ generation: g, index: BigInt(i) });
+    const alive = g >= this.aliveFrom && a.alive;
+    return this.twigOf(g, i, a, this.slotOf(g, i, alive, this.yOf(a.birthTime), near) ?? undefined);
   }
 
   /** x of individual (g, i) at its birth. */
@@ -814,7 +817,9 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
   const lives = meshIn * smoothstep((genPx - 0.5) / 2);
   const dens = Math.max(meshIn, colA) - lives;
   const dim = Math.max(meshIn, (1 - meshIn) * colA * TEXTURE_DIM);
-  const stats: TwigStats = { mode: 'texture', g0: gm, g1: gm, drawn: 0, cellPx, fade: lives, fadeGreen: ext ? 0 : dim, texGray: dim, pending: false };
+  // (A living's lane too narrow to hold lines stays bright: the lines cannot show it.)
+  const greenDim = dim * smoothstep((L.gw * v.sx - 6) / 18);
+  const stats: TwigStats = { mode: 'texture', g0: gm, g1: gm, drawn: 0, cellPx, fade: lives, fadeGreen: ext ? 0 : greenDim, texGray: dim, pending: false };
   if (!(colA > 0.004 || meshIn > 0.004)) return null;
   const lwL = Math.min(3.5, Math.max(Math.min(1, 0.6 * cellPx), cellPx * 0.22));
   // A death is a rounded end, a touch wider than the strand.

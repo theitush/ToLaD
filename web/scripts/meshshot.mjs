@@ -2,7 +2,7 @@
 // the ?debug readout: the camera on a species' lane boundary (green lane left
 // of centre, gray lane right) at `ago` years, the bar reading `perBar`.
 //   npm run build:single && node scripts/meshshot.mjs [out-dir] [scenes.json]
-//   scenes: [[name, species, agoYears, perBar, sy], ...]
+//   scenes: [[name, species, agoYears, perBar, sy, at?, widthMode?], ...]
 import { mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -25,10 +25,11 @@ try {
   page.on('pageerror', (e) => console.log('pageerror', String(e)));
   await page.goto(pathToFileURL(resolve('dist-single/index.html')).href + '?debug');
   await page.waitForFunction(() => !!window.__fan, null, { timeout: 20000 });
-  for (const [name, sp, ago, perBar, sy, at] of scenes) {
+  for (const [name, sp, ago, perBar, sy, at, mode] of scenes) {
     const info = await page.evaluate(
-      ([sp, ago, perBar, sy, at]) => {
+      ([sp, ago, perBar, sy, at, mode]) => {
         const f = window.__fan;
+        f.setMode(mode || 'linear');
         const fan = f.fan;
         const b = fan.branches.find((b) => b.sp.common === sp);
         const sumEver = fan.branches.reduce((a, b) => a + b.sp.ever, 0);
@@ -42,7 +43,7 @@ try {
         f.request();
         return { sx: f.cam.sx, sy: f.cam.sy, bar: f.widthScale() };
       },
-      [sp, ago, perBar, sy, at],
+      [sp, ago, perBar, sy, at ?? undefined, mode],
     );
     await page.waitForTimeout(700);
     await page.screenshot({ path: `${OUT}/${name}.png` });
