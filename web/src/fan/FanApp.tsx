@@ -132,7 +132,7 @@ export function SpeciesCard({ sp, onClose, open, ageMa }: { sp: SpeciesRec; onCl
         <span>{sp.common}</span> <i>{sp.sci}</i>
       </div>
       <div className="stats">
-        <span className={`lane ${sp.extinct ? 'extinct' : 'lineage'}`} /> <b>{formatCount(at.alive)}</b> <span>alive {at.when}</span>
+        <span className={`lane ${sp.extinct ? 'extinct' : at.when === 'now' ? 'alive' : 'lineage'}`} /> <b>{formatCount(at.alive)}</b> <span>alive {at.when}</span>
         <span className="range">
           {pct(at.green)} have living descendants today · {pct(1 - at.green)} line ended
         </span>
