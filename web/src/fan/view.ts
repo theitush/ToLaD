@@ -29,6 +29,8 @@ const LABEL_PX = 30;
 export interface Selection {
   sp: SpeciesRec;
   ind?: IndInfo;
+  /** The time touched (Ma), within the species' column: the card shows the population then. */
+  ageMa?: number;
 }
 
 interface RibbonPt {
@@ -329,7 +331,9 @@ export class FanView implements InputHandlers {
         ind = m.info(a.g, a.i);
       }
     }
-    this.onSelect(b ? { sp: b.sp, ind } : null);
+    // The time touched, kept within the column (from its tip down; below the fork, the founders).
+    const ageMa = b ? Math.max(b.sp.t1, this.fan.time.ageAt(this.toWorld(x, y)[1])) : undefined;
+    this.onSelect(b ? { sp: b.sp, ind, ageMa } : null);
     this.request();
   }
 

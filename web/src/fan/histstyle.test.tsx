@@ -6,6 +6,8 @@ import { popTicks, yearTicks } from './HistorySpark';
 import { dotAlphas, EDGE_DASH, edgeMarks, historySpans, styleBetween, toScreenSpans, type ScreenSpan, type SpanStyle } from './history';
 import { layoutFan, leftAt, strandAt } from './layout';
 import { PANTHERA } from './panthera';
+import { population } from './population';
+import { formatCount } from '../data/names';
 import { TwigModel } from './twigs';
 
 const byName = (common: string) => PANTHERA.species.find((s) => s.common === common)!;
@@ -151,5 +153,25 @@ describe('species card history', () => {
     }
     expect(yearTicks(1750, 2024)).toEqual([1800, 1900, 2000]);
     expect(popTicks(Math.log10(3000), Math.log10(2e6))).toEqual([1e4, 1e6]);
+  });
+});
+
+describe('the species card: the population at the time touched', () => {
+  const text = (html: string) => html.replace(/<[^>]+>/g, '').replace(/&#x27;/g, "'");
+  it('shows those alive then and the shares, and "ever" only as an honest secondary line', () => {
+    const lion = byName('Lion');
+    const then = text(renderToStaticMarkup(<SpeciesCard sp={lion} ageMa={70e-6} onClose={() => {}} />));
+    expect(then).toContain('alive 70 years ago');
+    expect(then).toMatch(/\d+% have living descendants today/);
+    expect(then).toContain(`${formatCount(lion.alive)} alive now`);
+    expect(then).toContain(`~${formatCount(lion.ever)} born in total over ~3.8 Myr (model, grade ${lion.grade}`);
+    // Never "ever" as a bare headline number.
+    expect(then).not.toContain('ever lived');
+    const now = text(renderToStaticMarkup(<SpeciesCard sp={lion} onClose={() => {}} />));
+    expect(now).toContain(`${formatCount(population(lion).aliveAt(0))} alive now`);
+    expect(now).toContain('100% have living descendants today');
+    const cave = text(renderToStaticMarkup(<SpeciesCard sp={byName('Cave lion')} ageMa={0.05} onClose={() => {}} />));
+    expect(cave).toContain('alive 50.0 thousand years ago');
+    expect(cave).toContain('0% have living descendants today');
   });
 });

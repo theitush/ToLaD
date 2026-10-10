@@ -7,6 +7,7 @@ import { formatAge, formatCount } from '../data/names';
 import { HistorySpark } from './HistorySpark';
 import type { WidthMode } from './layout';
 import { PANTHERA, type SpeciesRec } from './panthera';
+import { population } from './population';
 import { FanView, fmtInt, formatYearsAgo, type IndInfo, type Selection } from './view';
 
 declare global {
@@ -69,7 +70,7 @@ export function FanApp() {
         sel.ind ? (
           <IndCard sp={sel.sp} ind={sel.ind} onClose={() => viewRef.current?.tap(-1e6, -1e6)} />
         ) : (
-          <SpeciesCard sp={sel.sp} onClose={() => viewRef.current?.tap(-1e6, -1e6)} />
+          <SpeciesCard sp={sel.sp} ageMa={sel.ageMa} onClose={() => viewRef.current?.tap(-1e6, -1e6)} />
         )
       ) : (
         <div className="legend">
@@ -84,8 +85,29 @@ export function FanApp() {
   );
 }
 
-export function SpeciesCard({ sp, onClose, open }: { sp: SpeciesRec; onClose: () => void; open?: boolean }) {
+/** A span of years as a duration: "~3.8 Myr", "~117 kyr", "~250 yr". */
+export function formatSpan(years: number): string {
+  if (years >= 1e6) return `~${(years / 1e6).toPrecision(2)} Myr`;
+  if (years >= 1e3) return `~${Math.round(years / 1e3)} kyr`;
+  return `~${Math.round(years)} yr`;
+}
+
+/**
+ * The population at a time (Ma) as the card words it: how many were alive, and
+ * the shares with living descendants today and whose line ended.
+ */
+export function populationAt(sp: SpeciesRec, ageMa: number): { when: string; alive: number; green: number } {
+  const p = population(sp);
+  const a = Math.min(Math.max(ageMa, sp.t1), sp.extinct ? sp.t0 : Infinity);
+  const yrs = a * 1e6;
+  const when = yrs < 0.5 ? 'now' : sp.extinct && Math.abs(a - sp.t1) < 1e-9 ? `at its end, ${formatYearsAgo(yrs)}` : formatYearsAgo(yrs);
+  return { when, alive: p.aliveAt(a), green: p.greenAt(a) };
+}
+
+export function SpeciesCard({ sp, onClose, open, ageMa }: { sp: SpeciesRec; onClose: () => void; open?: boolean; ageMa?: number }) {
   const span = `${formatAge(sp.t0)} – ${sp.extinct ? formatAge(sp.t1) : 'now'}`;
+  const at = populationAt(sp, ageMa ?? sp.t1);
+  const pct = (f: number) => `${Math.round(f * 100)}%`;
   return (
     <div className="card-sp" onPointerDown={(e) => e.stopPropagation()}>
       <button type="button" className="x" onClick={onClose} aria-label="Close">
@@ -95,13 +117,18 @@ export function SpeciesCard({ sp, onClose, open }: { sp: SpeciesRec; onClose: ()
         {sp.common} <i>{sp.sci}</i>
       </div>
       <div>
-        <span className="dot alive" /> <b>{formatCount(sp.alive)}</b> alive now
+        <b>{formatCount(at.alive)}</b> alive {at.when}
       </div>
       <div>
-        <span className="dot dead" /> <b>{formatCount(sp.ever)}</b> ever lived{' '}
-        <span className="dim">
-          (range {formatCount(sp.everLo)} – {formatCount(sp.everHi)})
-        </span>
+        <span className="dot lineage" /> {pct(at.green)} have living descendants today · <span className="dot dead" /> {pct(1 - at.green)} line ended
+      </div>
+      {at.when !== 'now' && !sp.extinct && (
+        <div>
+          <span className="dot alive" /> {formatCount(sp.alive)} alive now
+        </div>
+      )}
+      <div className="dim">
+        ~{formatCount(sp.ever)} born in total over {formatSpan((sp.t0 - sp.t1) * 1e6)} (model, grade {sp.grade}; range {formatCount(sp.everLo)} – {formatCount(sp.everHi)})
       </div>
       <div className="dim">
         grade {sp.grade} · {span}
