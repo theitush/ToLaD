@@ -96,7 +96,7 @@ export class BirthCurve {
   }
 }
 
-/** How well a span of the curve is known, as drawn on the branch edge. */
+/** How well a span of the curve is known (the card's sparkline draws it so). */
 export type SpanStyle = 'solid' | 'dashed' | 'dotted';
 
 /**
@@ -133,12 +133,7 @@ export function historySpans(h: HistoryRec): Span[] {
   return out;
 }
 
-/** A history point's age in years before present. */
-export function pointAgo(h: HistoryRec, year: number): number {
-  return Math.max(0, h.nowYear - year);
-}
-
-/** Point and span colours by grade (A best … D worst), shared by the fan's dots and the card's sparkline. */
+/** Point and span colours by grade (A best … D worst): the card's sparkline. */
 export const GRADE_COLOR: Record<string, string> = {
   A: '#5fb3ff',
   B: '#a99cff',
@@ -153,112 +148,6 @@ export const GRADE_WORD: Record<string, string> = {
   C: 'rough',
   D: 'guess',
 };
-
-/** Screen-space dash patterns (px, along screen y): dashed edges are subtle, dotted ones fainter. */
-export const EDGE_DASH: Record<Exclude<SpanStyle, 'solid'>, { period: number; on: number; alpha: number; lw: number }> = {
-  dashed: { period: 7, on: 4, alpha: 0.5, lw: 1 },
-  dotted: { period: 4, on: 1.2, alpha: 0.32, lw: 1.2 },
-};
-
-/** A span of a branch edge on screen: screen y range (either order) and its style. */
-export interface ScreenSpan {
-  y0: number;
-  y1: number;
-  style: SpanStyle;
-}
-
-/** History spans on screen, given the screen y of an age (years before present). */
-export function toScreenSpans(spans: Span[], sy: (agoYears: number) => number): ScreenSpan[] {
-  return spans.map((s) => ({ y0: sy(s.ago0), y1: sy(s.ago1), style: s.style }));
-}
-
-/** One dash (or dot) of a styled edge: a straight piece from (x0, y0) to (x1, y1) on screen. */
-export interface EdgeMark {
-  style: Exclude<SpanStyle, 'solid'>;
-  x0: number;
-  y0: number;
-  x1: number;
-  y1: number;
-}
-
-/**
- * Screen x of a polyline edge at screen y (the edge is a function of height:
- * `ys` monotonic, either direction), or NaN outside it.
- */
-export function edgeXAt(xs: ArrayLike<number>, ys: ArrayLike<number>, y: number): number {
-  const n = ys.length;
-  if (n === 0) return NaN;
-  const up = ys[n - 1] >= ys[0];
-  const lo = up ? ys[0] : ys[n - 1];
-  const hi = up ? ys[n - 1] : ys[0];
-  if (!(y >= lo && y <= hi)) return NaN;
-  let a = 0;
-  let b = n - 1;
-  while (b - a > 1) {
-    const m = (a + b) >> 1;
-    if (ys[m] >= y === up) b = m;
-    else a = m;
-  }
-  const dy = ys[b] - ys[a];
-  return dy === 0 ? xs[a] : xs[a] + ((xs[b] - xs[a]) * (y - ys[a])) / dy;
-}
-
-/**
- * The dashes and dots of a branch edge: every non-solid span, clipped to the
- * edge's extent and to [yMin, yMax], cut into its style's pattern. The pattern
- * is laid along screen y from `anchorY` (a fixed world height on screen), so
- * dashes move with the branch when it pans and never crawl along it; its pixel
- * sizes are the same at every zoom. Solid spans get no marks (drawn normally).
- */
-export function edgeMarks(
-  xs: ArrayLike<number>,
-  ys: ArrayLike<number>,
-  spans: ScreenSpan[],
-  anchorY: number,
-  yMin: number,
-  yMax: number,
-): EdgeMark[] {
-  const out: EdgeMark[] = [];
-  const n = ys.length;
-  if (n < 2) return out;
-  const eLo = Math.max(yMin, Math.min(ys[0], ys[n - 1]));
-  const eHi = Math.min(yMax, Math.max(ys[0], ys[n - 1]));
-  for (const s of spans) {
-    if (s.style === 'solid') continue;
-    const lo = Math.max(eLo, Math.min(s.y0, s.y1));
-    const hi = Math.min(eHi, Math.max(s.y0, s.y1));
-    if (!(hi > lo)) continue;
-    const { period, on } = EDGE_DASH[s.style];
-    for (let k = Math.floor((lo - anchorY) / period); ; k++) {
-      const d0 = anchorY + k * period;
-      if (d0 > hi) break;
-      const a = Math.max(lo, d0);
-      const b = Math.min(hi, d0 + on);
-      if (b <= a) continue;
-      out.push({ style: s.style, x0: edgeXAt(xs, ys, a), y0: a, x1: edgeXAt(xs, ys, b), y1: b });
-    }
-  }
-  return out;
-}
-
-/**
- * Opacity of each of a history's point dots on a branch edge, from their
- * screen y: going down the screen, a dot shows once it is `minPx` from the
- * last one shown and is fully shown from `minPx + fadePx`, so crowded points
- * (a census a year after the last) wait for a closer zoom and fade in with it.
- */
-export function dotAlphas(ys: number[], minPx = 9, fadePx = 12): number[] {
-  const order = ys.map((_, k) => k).sort((p, q) => ys[p] - ys[q]);
-  const out = ys.map(() => 0);
-  let last = -Infinity;
-  for (const k of order) {
-    const a = Math.max(0, Math.min(1, (ys[k] - last - minPx) / fadePx));
-    if (a <= 0) continue;
-    out[k] = a;
-    last = ys[k];
-  }
-  return out;
-}
 
 /** The style of the history between two calendar years (the compiled segment at their midpoint). */
 export function styleBetween(h: HistoryRec, year0: number, year1: number): SpanStyle {

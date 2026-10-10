@@ -7,8 +7,7 @@
 import { formatAge, formatCount } from '../data/names';
 import { Input, type InputHandlers } from '../engine/input';
 import { clipPoly, FanCamera, STRAND_PX, type Camera } from './camera';
-import { EDGE_DASH, edgeMarks, edgeXAt, dotAlphas, GRADE_COLOR, historySpans, pointAgo, toScreenSpans, type ScreenSpan, type Span } from './history';
-import { JOG, laneAt, layoutFan, leftAt, STEM_FADE_MA, strandAt, type Fan, type FanBranch, type WidthMode } from './layout';
+import { JOG, laneAt, layoutFan, leftAt, STEM_FADE_MA, type Fan, type FanBranch, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01 } from './meshgl';
 import { drawTwigs, kLogAt, laneDim, LINEAGE, LIVING, TWIG_GRAY, TWIG_WITHERED, TwigModel, type IndInfo, type TwigStats } from './twigs';
@@ -70,7 +69,6 @@ export class FanView implements InputHandlers {
   /** What each branch's individuals view drew last frame (HUD, tests). */
   twigStats = new Map<number, TwigStats>();
   private models = new Map<string, TwigModel>();
-  private spans = new Map<number, Span[]>();
   private raf = 0;
   private anim: ((t: number) => boolean) | null = null;
   private ro: ResizeObserver;
@@ -543,7 +541,6 @@ export class FanView implements InputHandlers {
         this.ribbon(pts, () => hw, (p) => hw - p.w * p.f, -1);
       }
     }
-    this.drawHistoryEdge(b, pts, hw, tw?.fade ?? 0);
     if (this.selected === b.sp && !this.selInd) {
       const [tx, ty] = this.toScreen(tipX(b, this.fan, this.mode), b.tipY);
       ctx.beginPath();
@@ -587,73 +584,6 @@ export class FanView implements InputHandlers {
       }
     }
     return pts;
-  }
-
-  /**
-   * How honestly a curated history knows the branch's outer (gray, right) edge:
-   * spans backed by real points are left as drawn; interpolated or modelled
-   * spans get a subtle dashed line on the edge, grade D or unverified ones a
-   * fainter dotted line. The patterns are screen-space (edgeMarks), so they
-   * look the same at every zoom. Then a dot at each data point's year, coloured
-   * by grade, once the points are far enough apart not to clutter.
-   * Only for histories that drive the counts: otherwise the edge isn't theirs.
-   * The green lane is left plain: its width is the living now, one number.
-   */
-  private drawHistoryEdge(b: FanBranch, pts: RibbonPt[], hw: number, fade: number): void {
-    const h = b.sp.history;
-    if (!h || !b.sp.births) return;
-    const sx = this.cam.sx;
-    const n = pts.length;
-    const xs = new Float64Array(n);
-    const ys = new Float64Array(n);
-    for (let i = 0; i < n; i++) {
-      xs[i] = pts[i].x - (hw - pts[i].w) * sx;
-      ys[i] = pts[i].y;
-    }
-    const sy = (agoYears: number) => this.toScreen(0, this.fan.time.y(agoYears / 1e6))[1];
-    const ctx = this.ctx;
-    const marks = edgeMarks(xs, ys, this.screenSpans(b, sy), sy(0), -10, this.h + 10);
-    ctx.lineCap = 'butt';
-    for (const style of ['dashed', 'dotted'] as const) {
-      const d = EDGE_DASH[style];
-      ctx.strokeStyle = `rgba(214,226,219,${d.alpha * (1 - 0.6 * fade)})`;
-      ctx.lineWidth = d.lw;
-      ctx.beginPath();
-      for (const m of marks) {
-        if (m.style !== style) continue;
-        ctx.moveTo(m.x0, m.y0);
-        ctx.lineTo(m.x1, m.y1);
-      }
-      ctx.stroke();
-    }
-    const pys = h.points.map((p) => sy(pointAgo(h, p.year)));
-    const alphas = dotAlphas(pys);
-    for (let k = 0; k < h.points.length; k++) {
-      const y = pys[k];
-      if (y < -6 || y > this.h + 6) continue;
-      const x = edgeXAt(xs, ys, y);
-      if (!Number.isFinite(x)) continue;
-      // Not on a hairline: a dot needs a branch a few px wide to sit on.
-      const wPx = strandAt(b, pointAgo(h, h.points[k].year) / 1e6, this.mode).w * sx;
-      const a = alphas[k] * Math.max(0, Math.min(1, (wPx - 3) / 9));
-      if (a <= 0.01) continue;
-      ctx.globalAlpha = a;
-      ctx.beginPath();
-      ctx.arc(x, y, 2.6, 0, Math.PI * 2);
-      ctx.fillStyle = GRADE_COLOR[h.points[k].grade] ?? '#ccc';
-      ctx.fill();
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = BG;
-      ctx.stroke();
-    }
-    ctx.globalAlpha = 1;
-  }
-
-  /** The branch's history spans on screen (spans cached per species). */
-  screenSpans(b: FanBranch, sy: (agoYears: number) => number): ScreenSpan[] {
-    let spans = this.spans.get(b.sp.gid);
-    if (!spans) this.spans.set(b.sp.gid, (spans = b.sp.history ? historySpans(b.sp.history) : []));
-    return toScreenSpans(spans, sy);
   }
 
   private drawIndividuals(b: FanBranch): void {
