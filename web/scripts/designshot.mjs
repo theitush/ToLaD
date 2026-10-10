@@ -12,7 +12,7 @@ const OUT = process.argv[2] || 'perf-out/design';
 const PREFIX = process.argv[3] || 'd';
 const ONLY = process.argv[4] ? new Set(process.argv[4].split(',')) : null;
 mkdirSync(OUT, { recursive: true });
-// [name, kind, args]: 'home' | 'far' | 'card' [species] | 'bar' [species, agoYears, perBar, sy, at?]
+// [name, kind, args]: 'home' | 'far' | 'card' [species] | 'touch' [species, agoYears] | 'scroll' [zoom, agoYears] | 'bar' [species, agoYears, perBar, sy, at?]
 const scenes = [
   ['home', 'home'],
   ['far', 'far'],
@@ -23,6 +23,13 @@ const scenes = [
   ['bar-35', 'bar', ['Lion', 3000, 35, 40]],
   ['deep', 'bar', ['Lion', 300, 4, 3000]],
   ['card', 'card', ['Tiger']],
+  // A tap on a column (the touch marker), columns whose tips are above the screen, near now.
+  ['touch', 'touch', ['Lion', 70]],
+  ['scrolled', 'scroll', [2.2, 2000]],
+  ['nearnow', 'bar', ['Lion', 25, 2e3, 900]],
+  // Sequences (#54): a slow pan down from home until "now" is above the screen, and a zoom from home into the lion.
+  ...[0, 60, 120, 180, 260, 360].map((dy, k) => [`pan${k + 1}`, 'pan', [1.5, dy]]),
+  ...[0, 0.2, 0.4, 0.6, 0.8, 1].map((t, k) => [`zoom${k + 1}`, 'zoomin', ['Lion', 300, t]]),
 ];
 const browser = await chromium.launch({ headless: true });
 try {
@@ -47,6 +54,38 @@ try {
             f.selected = b.sp;
             f.onSelect({ sp: b.sp });
           }
+        } else if (kind === 'touch') {
+          f.cam = f.homeCamera();
+          f.camera.settle();
+          const b = fan.branches.find((b) => b.sp.common === args[0]);
+          const y = fan.time.y(args[1] / 1e6);
+          const [px, py] = f.toScreen(b.colLeft + 0.3 * f.model(b).lanes(y).w, y);
+          f.tap(px, py);
+        } else if (kind === 'scroll') {
+          const h = f.homeCamera();
+          f.cam = { ...h, sx: h.sx * args[0], sy: h.sy * args[0], ty: h.sy * args[0], cy: fan.time.y(args[1] / 1e6) };
+          f.camera.settle();
+        } else if (kind === 'pan') {
+          // Zoom z with "now" at 160 px from the top, then the view moved down dy px (into the past).
+          const [z, dy] = args;
+          const h = f.homeCamera();
+          const sy = h.sy * z;
+          f.cam = { ...h, sx: h.sx * z, sy, ty: sy, cy: f.yNow + (f.h / 2 - (160 - dy)) / sy };
+          f.camera.settle();
+        } else if (kind === 'zoomin') {
+          // From home (t = 0) to the species' individuals (t = 1, 4 per 70 px bar) about a point on its column.
+          const [sp, ago, t] = args;
+          const b = fan.branches.find((b) => b.sp.common === sp);
+          const h = f.homeCamera();
+          f.cam = h;
+          const y = fan.time.y(ago / 1e6);
+          const [px, py] = f.toScreen(b.colLeft + 0.3 * b.width, y);
+          const F = Math.pow(70 / 4 / b.unit / h.sx, t);
+          const sx = h.sx * F;
+          const sy = h.sy * F;
+          const wx = b.colLeft + 0.3 * b.width;
+          f.cam = { cx: wx - (px - f.w / 2) / sx, cy: y - (py - f.h / 2) / sy, sx, sy, ty: sy };
+          f.camera.settle();
         } else if (kind === 'far') {
           const h = f.homeCamera();
           f.cam = { ...h, sx: h.sx / 6, sy: h.sy / 6, ty: h.sy / 6 };
@@ -54,8 +93,8 @@ try {
         } else {
           const [sp, ago, perBar, sy, at] = args;
           const b = fan.branches.find((b) => b.sp.common === sp);
-          const sumEver = fan.branches.reduce((a, b) => a + b.sp.ever, 0);
-          const sx = ((70 / perBar) * sumEver) / fan.trunkWidth;
+          // World width per individual (alive widths): the bar is 70 px.
+          const sx = 70 / perBar / b.unit;
           f.cam = { cx: 0, cy: fan.time.y(ago / 1e6), sx, sy, ty: sy };
           f.camera.settle();
           const L = f.model(b).lanes(f.cam.cy);

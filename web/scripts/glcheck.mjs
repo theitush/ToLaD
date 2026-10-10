@@ -134,10 +134,67 @@ try {
         }
       }
     }
+    // The cross-links (mesh.ts shadeLinks): texture bands (a band's representative generation)
+    // and lives (each generation's own), at several lattice and time levels, GPU against the CPU mirror.
+    {
+      const S = 160;
+      const insts = [];
+      // [lvl, lambda, tauB, tauC, mode]
+      const cases = [
+        [3, 3.4, 7, 6.6, 0],
+        [0, -0.5, 0, -1, 0],
+        [12, 12.9, 3, 2.2, 0],
+        [1, 1.2, 0, 0.7, 1],
+        [0, -0.8, 0, -0.5, 1],
+      ];
+      const h = S / cases.length;
+      // Years per px (linear here: A large), so that 2^tauC generations are ~6 px.
+      cases.forEach(([lvl, lam, tauB, tauC, mode], q) => {
+        const g0 = m.G - 900 + q * 61;
+        const t = 2 ** tauB;
+        const gA = Math.floor(g0 / t) * t;
+        const n = m.size(gA);
+        const ypp = (2 ** tauC * m.GL) / 6;
+        const inst = {
+          x0: 0, y0: q * h, x1: S, y1: (q + 1) * h, xB0: -7.3, bw: lvl === 0 ? 6.1 : 5.3, lw: mode ? 1.6 : 0.9, fineA: 1, p0: q * h, T0: h * ypp * 0.9, A: 1e9, gBoff: 0,
+          alpha: 0.95, mode, lane: 1, tipR: 1, GL: m.GL, Lm: m.sp.lifespanYears, nowRel: m.sp.now - gA * m.GL, xG: 70.5,
+          B0: Math.floor((2e5 + q * 7777) / 2 ** lvl), lvl, latSeed: m.latticeSeed, nA: n, nB: 0, seedA: m.seedOf(gA), seedB: 0, sA: n, sB: 1, fA: 1, fB: 1,
+          colL: 0, colR: S, linkA: 1, lam, tauC, tauB, gA,
+        };
+        inst.kLog = ypp / (1e9 * Math.LN2);
+        insts.push(inst);
+      });
+      // One kLog per draw: each case drawn alone.
+      results.links = { checked: 0, lit: 0, bad: 0, worst: 0 };
+      // (A warm-up draw at the new canvas size.)
+      gl.begin();
+      M.packInst(insts[0], gl.mesh.f, gl.mesh.u, gl.mesh.next());
+      gl.end(S, S, 1, [0, 0, 0], insts[0].kLog, -1e9, pal);
+      for (const inst of insts) {
+        gl.begin();
+        M.packInst(inst, gl.mesh.f, gl.mesh.u, gl.mesh.next());
+        gl.end(S, S, 1, [0, 0, 0], inst.kLog, -1e9, pal);
+        const px = new Uint8Array(S * S * 4);
+        gl.gl.readPixels(0, 0, S, S, gl.gl.RGBA, gl.gl.UNSIGNED_BYTE, px);
+        for (let y = Math.ceil(inst.y0); y < inst.y1; y++) {
+          for (let x = 0; x < S; x++) {
+            const a = M.shadeLinks(inst, x + 0.5, y + 0.5, inst.kLog, pal)[3];
+            const full = M.shadeMesh(inst, x + 0.5, y + 0.5, inst.kLog, -1e9, pal)[3];
+            const A = px[((S - 1 - y) * S + x) * 4 + 3] / 255;
+            const e = Math.abs(A - full);
+            results.links.checked++;
+            if (a > 0.05) results.links.lit++;
+            results.links.worst = Math.max(results.links.worst, e);
+            if (e > 0.06) results.links.bad++;
+          }
+        }
+      }
+    }
     f.request();
     return results;
   });
-  bad = (r.bad || 0) + r.lattice.bad;
+  bad = (r.bad || 0) + r.lattice.bad + r.links.bad;
+  console.log(`cross-links: ${r.links.checked} pixels (${r.links.lit} lit by links), ${r.links.bad} off by more than 0.06 (worst ${r.links.worst.toFixed(3)})`);
   console.log(`lattice of lines: ${r.lattice.checked} pixels (${r.lattice.lit} lit), ${r.lattice.bad} off by more than 0.06 in coverage (worst ${r.lattice.worst.toFixed(3)})`);
   console.log(`checked ${r.checked} individuals on the GPU: ${bad} disagree with the CPU mirror`);
   console.log(`  (none / alive / lineage / ended / withered: ${r.counts.join(' / ')})`);

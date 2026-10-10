@@ -4,11 +4,10 @@
 // in far enough, a branch resolves into the individuals themselves (twigs.ts).
 // Gestures come from the shared engine/input.ts.
 
-import { formatAge, formatCount } from '../data/names';
+import { formatCount } from '../data/names';
 import { Input, type InputHandlers } from '../engine/input';
 import { clipPoly, FanCamera, STRAND_PX, type Camera } from './camera';
-import { EDGE_DASH, edgeMarks, edgeXAt, dotAlphas, GRADE_COLOR, historySpans, pointAgo, toScreenSpans, type ScreenSpan, type Span } from './history';
-import { JOG, laneAt, layoutFan, leftAt, STEM_FADE_MA, strandAt, type Fan, type FanBranch, type WidthMode } from './layout';
+import { JOG, laneAt, layoutFan, leftAt, STEM_FADE_MA, type Fan, type FanBranch, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01 } from './meshgl';
 import { drawTwigs, kLogAt, laneDim, LINEAGE, LIVING, TWIG_GRAY, TWIG_WITHERED, TwigModel, type IndInfo, type TwigStats } from './twigs';
@@ -32,8 +31,94 @@ const INK3 = '#7d8e84';
 export const SANS = "'Sofia Sans Condensed', 'Avenir Next Condensed', 'Roboto Condensed', 'Arial Narrow', system-ui, sans-serif";
 export const SERIF = "'Newsreader', 'Iowan Old Style', Georgia, serif";
 const font = (spec: string, family = SANS) => `${spec} ${family}`;
-/** Least distance (px) between the labels of tips that end side by side. */
-const LABEL_PX = 30;
+/** A species' label: its name, upright on a dark pill LABEL_PILL px across, LABEL_PAD px past each end of the text. */
+const LABEL_FONT = '650 15px';
+const LABEL_PILL = 22;
+const LABEL_PAD = 8;
+/** Right edge (px) of the time axis's labels: species' labels keep right of it. */
+const LABEL_AXIS_X = 72;
+/** The scale bar and legend at the bottom (px): labels fade out over the 30 px above it. */
+const LABEL_BOTTOM_PX = 104;
+/** How long a label takes to fade in or out when another takes or gives up its place (ms). */
+const LABEL_FADE_MS = 180;
+
+/**
+ * Where a species' label goes. One rule at every zoom and scroll: the common
+ * name (the Latin name is on the card), upright on a dark pill at the left
+ * edge of its column (the columns are left-aligned, so that is where the tip
+ * and the narrowest times are), standing on the tip; when the tip scrolls up
+ * past the top line it sticks there, inside the column, until the column's
+ * fork pushes it off. Off the left (under the time axis) it slides along the
+ * column, never past its right edge (fading as that edge goes under the
+ * axis). All of it is a continuous function of the camera.
+ */
+export interface LabelSpot {
+  b: FanBranch;
+  text: string;
+  /** Centre x of the pill and its bottom (screen px): the text reads up from there. */
+  x: number;
+  y1: number;
+  /** The pill [x0, y0, x1, y1]. */
+  box: [number, number, number, number];
+  /** 0–1: fades with the column's width on screen (too narrow) and near the legend at the bottom. */
+  fit: number;
+}
+
+type Screen = Pick<FanCamera, 'toScreen' | 'toWorld' | 'w' | 'h'> & { cam: { sx: number } };
+
+export function labelSpots(c: Screen, fan: Fan, top: number, measure: (text: string) => number): LabelSpot[] {
+  const half = LABEL_PILL / 2;
+  return fan.branches.map((b) => {
+    const text = b.sp.common;
+    const len = measure(text) + 2 * LABEL_PAD;
+    const ty = c.toScreen(tipX(b, fan, fan.mode), b.tipY)[1];
+    const fy = c.toScreen(0, 0)[1];
+    // On the tip; stuck under the top line once the tip is above it; never below the fork.
+    const y1 = Math.min(Math.max(ty - 4, top + len), fy - 4);
+    const wy = Math.min(0, Math.max(b.tipY, c.toWorld(0, y1)[1]));
+    const left = c.toScreen(leftAt(b, wy), wy)[0];
+    const room = b.width * c.cam.sx;
+    const lo = left + half;
+    const x = Math.min(Math.max(lo, LABEL_AXIS_X + half), Math.max(lo, left + room - half));
+    // Fades: a column too narrow, one leaving under the time axis on the left, and near the legend.
+    const fit = clamp01((room - 3) / 6) * clamp01((left + room - LABEL_AXIS_X + 12) / LABEL_PILL) * clamp01((c.h - LABEL_BOTTOM_PX + 30 - y1) / 30);
+    return { b, text, x, y1, box: [x - half, y1 - len, x + half, y1], fit };
+  });
+}
+
+/**
+ * Which labels show. A fixed priority (the wider column first, then tree
+ * order) so the order never changes with the camera; a label shows unless it
+ * would meet one shown before it. Hysteresis: a shown label keeps
+ * its place until it overlaps, a hidden one waits for a clear gap.
+ */
+export function resolveLabels(spots: LabelSpot[], prev: Map<number, boolean>): Map<number, boolean> {
+  const out = new Map<number, boolean>();
+  const taken: number[][] = [];
+  const order = [...spots].sort((p, q) => q.b.width - p.b.width || p.b.index - q.b.index);
+  for (const s of order) {
+    const gid = s.b.sp.gid;
+    if (!(s.fit > 0)) {
+      out.set(gid, false);
+      continue;
+    }
+    const need = prev.get(gid) ? -1 : 5;
+    const on = !taken.some((q) => boxGap(s.box, q) < need);
+    out.set(gid, on);
+    if (on && s.fit > 0.3) taken.push(s.box);
+  }
+  return out;
+}
+
+/** Gap (px) between two boxes [x0, y0, x1, y1]: negative when they overlap. */
+export function boxGap(a: number[], b: number[]): number {
+  return Math.max(b[0] - a[2], a[0] - b[2], b[1] - a[3], a[1] - b[3]);
+}
+
+function clamp01(v: number): number {
+  return v < 0 ? 0 : v > 1 ? 1 : v;
+}
+
 
 export interface Selection {
   sp: SpeciesRec;
@@ -59,18 +144,22 @@ export class FanView implements InputHandlers {
   dpr = 1;
   selected: SpeciesRec | null = null;
   selInd: { g: number; i: number } | null = null;
+  /** The point touched on the selected column (world x, age in Ma): marked on the graph, the card's numbers are for it. */
+  touch: { x: number; ageMa: number } | null = null;
   onSelect: (sel: Selection | null) => void = () => {};
   /** The width scale bar (a DOM element above the legend / cards): its bar and label are set each frame. */
   scaleEl: HTMLElement | null = null;
   /** The buttons (a DOM element over the canvas): labels never go under them. */
   barEl: HTMLElement | null = null;
   private scaleKey = '';
+  /** Each species' label: shown or not, and its fade (0–1); when it was last drawn (ms). */
+  private labelState = new Map<number, { on: boolean; a: number }>();
+  private labelT = 0;
   /** `?debug`: a readout of the zooms, years on screen and individuals per px. */
   readonly debug = typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug');
-  /** What each branch's individuals view drew last frame (HUD, tests). */
+  /** What each branch's individuals view drew last frame (taps, tests). */
   twigStats = new Map<number, TwigStats>();
   private models = new Map<string, TwigModel>();
-  private spans = new Map<number, Span[]>();
   private raf = 0;
   private anim: ((t: number) => boolean) | null = null;
   private ro: ResizeObserver;
@@ -342,6 +431,7 @@ export class FanView implements InputHandlers {
     }
     // The time touched, kept within the column (from its tip down; below the fork, the founders).
     const ageMa = b ? Math.max(b.sp.t1, this.fan.time.ageAt(this.toWorld(x, y)[1])) : undefined;
+    this.touch = b && ageMa !== undefined ? { x: this.toWorld(x, y)[0], ageMa } : null;
     this.onSelect(b ? { sp: b.sp, ind, ageMa } : null);
     this.request();
   }
@@ -388,17 +478,14 @@ export class FanView implements InputHandlers {
     for (const b of this.fan.branches) this.drawStrand(b);
     for (const b of this.fan.branches) this.drawIndividuals(b);
     this.drawStemFade();
-    // Labels: tips side by side (the living all end at "now", packed hairlines in
-    // linear widths) are spread apart and joined to their tips by leader lines;
-    // then by size, one that would still overlap a bigger species' label waits for a closer zoom.
+    // Labels: one form everywhere (see labelSpots).
     this.drawGutter();
-    const lx = this.labelXs();
-    const placed: number[][] = [];
-    for (const b of [...this.fan.branches].sort((p, q) => q.sp.ever - p.sp.ever)) this.drawLabel(b, placed, lx.get(b));
+    this.drawTouch();
+    const spots = labelSpots(this.camera, this.fan, this.labelTop(), (t) => this.nameWidth(t));
+    this.drawLabels(spots);
     this.drawWidthScale();
     if (this.debug) this.drawDebug();
     this.drawTrunkLabel();
-    this.drawHud();
     this.drawTimeAxis(true);
     if (this.gl) {
       const pal = [LIVING, LINEAGE, TWIG_GRAY, TWIG_WITHERED].map(rgb01);
@@ -503,7 +590,7 @@ export class FanView implements InputHandlers {
     const lives = tw?.fade ?? 0;
     const grayBase = b.sp.extinct ? WITHERED : GRAY;
     const greenFade = tw?.fadeGreen ?? 0;
-    const greenC = mix(GREEN, '#10291d', greenFade * 0.85);
+    const greenC = mix(GREEN, '#0d2318', greenFade * 0.9);
     const yT0 = this.toScreen(0, this.fan.time.y(b.sp.t0))[1];
     const grayC = mix(grayBase, '#131c19', Math.max(lives, tw?.texGray ?? 0) * 0.82);
     if (this.gl) {
@@ -521,7 +608,7 @@ export class FanView implements InputHandlers {
         // (An extinct species' line ended: withered over its span; below it, its founders' ancestors.)
         const base = b.sp.extinct && (p.y + q.y) / 2 < yT0 ? grayBase : GRAY;
         const gc = rgb01(mix(base, '#131c19', laneDim(p.w * k - gPx, lives) * 0.82));
-        const ec = rgb01(mix(GREEN, '#10291d', laneDim(gPx, lives) * 0.85));
+        const ec = rgb01(mix(GREEN, '#0d2318', laneDim(gPx, lives) * 0.9));
         this.gl.under.push(Math.max(-4, x0), y0, Math.min(this.w + 4, x0 + Math.max(0.6, p.w * k)), y1, gc[0], gc[1], gc[2], 1);
         if (gPx > 0) {
           const x1 = x0 + Math.max(1, gPx);
@@ -543,15 +630,68 @@ export class FanView implements InputHandlers {
         this.ribbon(pts, () => hw, (p) => hw - p.w * p.f, -1);
       }
     }
-    this.drawHistoryEdge(b, pts, hw, tw?.fade ?? 0);
-    if (this.selected === b.sp && !this.selInd) {
-      const [tx, ty] = this.toScreen(tipX(b, this.fan, this.mode), b.tipY);
-      ctx.beginPath();
-      ctx.arc(tx, ty, 7, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(232,240,234,0.9)';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-    }
+  }
+
+  /**
+   * Where the card's numbers are from: on the selected column, a ring at the
+   * point touched and a thin line across the column at its time, labelled
+   * with that time ("70 yr ago").
+   */
+  private drawTouch(): void {
+    const b = this.fan.branches.find((x) => x.sp === this.selected);
+    const t = this.touch;
+    if (!b || !t || this.selInd) return;
+    const wy = this.fan.time.y(t.ageMa);
+    const [, y] = this.toScreen(0, wy);
+    if (y < -10 || y > this.h + 10) return;
+    const left = leftAt(b, wy);
+    const L = laneAt(b, wy);
+    const x0 = this.toScreen(left, wy)[0];
+    const x1 = x0 + Math.max(1, L.w * this.cam.sx);
+    if (x1 < 0 || x0 > this.w) return;
+    const rx = Math.min(Math.max(this.toScreen(t.x, wy)[0], x0), x1);
+    const ctx = this.ctx;
+    ctx.save();
+    // The line across the column (a little past its edges), on a dark halo so it reads over the mesh.
+    const lx0 = Math.max(-2, x0 - 6);
+    const lx1 = Math.min(this.w + 2, x1 + 6);
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(12,23,20,0.7)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(lx0, y);
+    ctx.lineTo(lx1, y);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(232,240,234,0.85)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    // The ring.
+    ctx.beginPath();
+    ctx.arc(rx, y, 6, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(12,23,20,0.8)';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    ctx.strokeStyle = INK;
+    ctx.lineWidth = 1.75;
+    ctx.stroke();
+    // Its time, on a pill above the line: right of the ring if there is room, else left of it.
+    const yrs = t.ageMa * 1e6;
+    const label = yrs < 0.5 ? 'now' : formatTick(yrs, 0);
+    ctx.font = font('650 12.5px');
+    const tw = ctx.measureText(label).width + 14;
+    let px = rx + 10;
+    if (px + tw > this.w - 6) px = rx - 10 - tw;
+    px = Math.max(this.w > 200 ? 70 : 4, px);
+    const py = y - 26;
+    ctx.fillStyle = 'rgba(12,23,20,0.86)';
+    ctx.beginPath();
+    ctx.roundRect(px, py, tw, 20, 10);
+    ctx.fill();
+    ctx.fillStyle = INK;
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    ctx.fillText(label, px + 7, py + 10.5);
+    ctx.restore();
   }
 
   /**
@@ -589,73 +729,6 @@ export class FanView implements InputHandlers {
     return pts;
   }
 
-  /**
-   * How honestly a curated history knows the branch's outer (gray, right) edge:
-   * spans backed by real points are left as drawn; interpolated or modelled
-   * spans get a subtle dashed line on the edge, grade D or unverified ones a
-   * fainter dotted line. The patterns are screen-space (edgeMarks), so they
-   * look the same at every zoom. Then a dot at each data point's year, coloured
-   * by grade, once the points are far enough apart not to clutter.
-   * Only for histories that drive the counts: otherwise the edge isn't theirs.
-   * The green lane is left plain: its width is the living now, one number.
-   */
-  private drawHistoryEdge(b: FanBranch, pts: RibbonPt[], hw: number, fade: number): void {
-    const h = b.sp.history;
-    if (!h || !b.sp.births) return;
-    const sx = this.cam.sx;
-    const n = pts.length;
-    const xs = new Float64Array(n);
-    const ys = new Float64Array(n);
-    for (let i = 0; i < n; i++) {
-      xs[i] = pts[i].x - (hw - pts[i].w) * sx;
-      ys[i] = pts[i].y;
-    }
-    const sy = (agoYears: number) => this.toScreen(0, this.fan.time.y(agoYears / 1e6))[1];
-    const ctx = this.ctx;
-    const marks = edgeMarks(xs, ys, this.screenSpans(b, sy), sy(0), -10, this.h + 10);
-    ctx.lineCap = 'butt';
-    for (const style of ['dashed', 'dotted'] as const) {
-      const d = EDGE_DASH[style];
-      ctx.strokeStyle = `rgba(214,226,219,${d.alpha * (1 - 0.6 * fade)})`;
-      ctx.lineWidth = d.lw;
-      ctx.beginPath();
-      for (const m of marks) {
-        if (m.style !== style) continue;
-        ctx.moveTo(m.x0, m.y0);
-        ctx.lineTo(m.x1, m.y1);
-      }
-      ctx.stroke();
-    }
-    const pys = h.points.map((p) => sy(pointAgo(h, p.year)));
-    const alphas = dotAlphas(pys);
-    for (let k = 0; k < h.points.length; k++) {
-      const y = pys[k];
-      if (y < -6 || y > this.h + 6) continue;
-      const x = edgeXAt(xs, ys, y);
-      if (!Number.isFinite(x)) continue;
-      // Not on a hairline: a dot needs a branch a few px wide to sit on.
-      const wPx = strandAt(b, pointAgo(h, h.points[k].year) / 1e6, this.mode).w * sx;
-      const a = alphas[k] * Math.max(0, Math.min(1, (wPx - 3) / 9));
-      if (a <= 0.01) continue;
-      ctx.globalAlpha = a;
-      ctx.beginPath();
-      ctx.arc(x, y, 2.6, 0, Math.PI * 2);
-      ctx.fillStyle = GRADE_COLOR[h.points[k].grade] ?? '#ccc';
-      ctx.fill();
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = BG;
-      ctx.stroke();
-    }
-    ctx.globalAlpha = 1;
-  }
-
-  /** The branch's history spans on screen (spans cached per species). */
-  screenSpans(b: FanBranch, sy: (agoYears: number) => number): ScreenSpan[] {
-    let spans = this.spans.get(b.sp.gid);
-    if (!spans) this.spans.set(b.sp.gid, (spans = b.sp.history ? historySpans(b.sp.history) : []));
-    return toScreenSpans(spans, sy);
-  }
-
   private drawIndividuals(b: FanBranch): void {
     const st = drawTwigs(this, b, this.model(b), this.selected === b.sp ? this.selInd : null);
     const prev = this.twigStats.get(b.sp.gid);
@@ -664,38 +737,6 @@ export class FanView implements InputHandlers {
     if ((prev?.fade ?? 0) !== (st?.fade ?? 0) || (prev?.fadeGreen ?? 0) !== (st?.fadeGreen ?? 0) || (prev?.texGray ?? 0) !== (st?.texGray ?? 0) || st?.pending) this.request();
     if (st) this.twigStats.set(b.sp.gid, st);
     else this.twigStats.delete(b.sp.gid);
-  }
-
-  /**
-   * Screen x of each label whose tip shares its height with others: in tip
-   * order, at least LABEL_PX apart, as close to their tips as that allows and
-   * kept on screen.
-   */
-  private labelXs(): Map<FanBranch, number> {
-    const out = new Map<FanBranch, number>();
-    const tips = this.fan.branches
-      .map((b) => ({ b, p: this.toScreen(tipX(b, this.fan, this.mode), b.tipY) }))
-      .filter(({ b, p }) => p[0] > -30 && p[0] < this.w + 30 && p[1] > -10 && p[1] < this.h + 200 && !this.twigStats.get(b.sp.gid)?.drawn);
-    const groups = new Map<number, typeof tips>();
-    for (const t of tips) {
-      const k = Math.round(t.p[1] / 3);
-      groups.set(k, [...(groups.get(k) ?? []), t]);
-    }
-    const D = LABEL_PX;
-    for (const g of groups.values()) {
-      g.sort((a, c) => a.p[0] - c.p[0]);
-      const x = g.map((t) => t.p[0]);
-      // Spread apart about the group's middle, then keep on screen.
-      for (let i = 1; i < x.length; i++) x[i] = Math.max(x[i], x[i - 1] + D);
-      const shift = (x[x.length - 1] - g[g.length - 1].p[0]) / 2;
-      for (let i = 0; i < x.length; i++) x[i] -= shift;
-      for (let i = x.length - 2; i >= 0; i--) x[i] = Math.min(x[i], x[i + 1] - D);
-      const lo = 14 - x[0];
-      const hi = this.w - 14 - x[x.length - 1];
-      const d = lo > 0 ? lo : hi < 0 ? hi : 0;
-      g.forEach((t, i) => out.set(t.b, x[i] + d));
-    }
-    return out;
   }
 
   /** The buttons' box in canvas px [x0, y0, x1, y1], if any. */
@@ -707,60 +748,68 @@ export class FanView implements InputHandlers {
     return [r.left - c.left, r.top - c.top, r.right - c.left, r.bottom - c.top];
   }
 
-  private drawLabel(b: FanBranch, placed: number[][], lx?: number): void {
+  /** The labels' top line (screen y): just under the buttons, the same for every label. */
+  private labelTop(): number {
+    const bar = this.barRect();
+    return (bar ? bar[3] : 44) + 8;
+  }
+
+  /** Length (px) of a species' name in the label font (not cached: the web font may arrive after the first frame). */
+  private nameWidth(text: string): number {
+    this.ctx.save();
+    this.ctx.font = font(LABEL_FONT);
+    const w = this.ctx.measureText(text).width;
+    this.ctx.restore();
+    return w;
+  }
+
+  /**
+   * The species' labels (see labelSpots for where): which show is decided by
+   * resolveLabels (a fixed priority, with hysteresis), and each fades in and
+   * out over LABEL_FADE_MS rather than popping.
+   */
+  private drawLabels(spots: LabelSpot[]): void {
     const ctx = this.ctx;
-    const [tx, ty] = this.toScreen(tipX(b, this.fan, this.mode), b.tipY);
-    if (tx < -30 || tx > this.w + 30 || ty < -10 || ty > this.h + 200) return;
-    if (this.twigStats.get(b.sp.gid)?.drawn) return; // Zoomed into the individuals: the HUD names it.
-    // Moved off its tip: a leader line from the tip up to the label.
-    let lead = lx !== undefined && Math.abs(lx - tx) > 1.5 ? 14 : 0;
-    const cx = lead ? lx! : tx;
-    let cy = ty - lead;
-    const name = b.sp.common;
-    const sub = b.sp.extinct ? `~${formatCount(b.pop.aliveAt(b.sp.t1))} alive · extinct ${formatAge(b.sp.t1)}` : `${formatCount(b.sp.alive)} alive now`;
-    const fs = 16;
+    const now = performance.now();
+    const dt = Math.min(100, Math.max(0, now - this.labelT));
+    this.labelT = now;
+    const prev = new Map<number, boolean>();
+    for (const [gid, st] of this.labelState) prev.set(gid, st.on);
+    const on = resolveLabels(spots, prev);
+    let moving = false;
     ctx.save();
     ctx.textBaseline = 'middle';
-    ctx.font = font('500 11.5px');
-    const subLen = ctx.measureText(sub).width;
-    ctx.font = font(`650 ${fs}px`);
-    // Screen box of the upright two-line label (x0, y0, x1, y1).
-    const len = Math.max(subLen, ctx.measureText(name).width);
-    // Kept on screen and clear of the buttons: pushed down (with a leader line) if needed.
-    const bar = this.barRect();
-    const under = bar && cx + 14 > bar[0] - 4 && cx - 13 < bar[2] + 4;
-    const minTop = (under ? bar![3] : 0) + 6;
-    if (cy - 8 - len < minTop) {
-      const d = minTop - (cy - 8 - len);
-      cy += d;
-      lead += d;
-    }
-    const box = [cx - 13, cy - 8 - len, cx + 14, cy - 8];
-    if (placed.some((q) => box[0] < q[2] + 2 && q[0] < box[2] + 2 && box[1] < q[3] + 2 && q[1] < box[3] + 2)) {
-      ctx.restore();
-      return;
-    }
-    placed.push(box);
-    if (lead && Math.abs(cx - tx) > 1.5) {
-      ctx.beginPath();
-      ctx.moveTo(tx, ty - 2);
-      ctx.lineTo(cx, cy - 4);
-      ctx.strokeStyle = 'rgba(200,214,205,0.55)';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-    }
-    // Upright text running up from the tip.
-    ctx.translate(cx, cy - 8);
-    ctx.rotate(-Math.PI / 2);
     ctx.textAlign = 'left';
-    ctx.fillStyle = b.sp.extinct ? '#cfc4b1' : INK;
-    ctx.shadowColor = BG;
-    ctx.shadowBlur = 4;
-    ctx.fillText(name, 0, -fs * 0.3);
-    ctx.font = font('500 11.5px');
-    ctx.fillStyle = b.sp.extinct ? '#a39a8a' : INK2;
-    ctx.fillText(sub, 0, fs * 0.58);
+    ctx.font = font(LABEL_FONT);
+    for (const s of spots) {
+      const gid = s.b.sp.gid;
+      const want = on.get(gid) ? 1 : 0;
+      let st = this.labelState.get(gid);
+      if (!st) this.labelState.set(gid, (st = { on: want === 1, a: want }));
+      st.on = want === 1;
+      if (st.a !== want) {
+        const step = dt / LABEL_FADE_MS;
+        st.a = want > st.a ? Math.min(want, st.a + step) : Math.max(want, st.a - step);
+        moving = true;
+      }
+      const alpha = st.a * s.fit;
+      const [x0, y0, x1, y1] = s.box;
+      if (alpha < 0.01 || x1 < 0 || x0 > this.w || y1 < 0 || y0 > this.h) continue;
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = 'rgba(12,23,20,0.8)';
+      ctx.beginPath();
+      ctx.roundRect(x0, y0, x1 - x0, y1 - y0, LABEL_PILL / 2);
+      ctx.fill();
+      // Upright, reading up the column.
+      ctx.save();
+      ctx.translate(s.x, y1 - LABEL_PAD);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillStyle = s.b.sp.extinct ? '#cfc4b1' : INK;
+      ctx.fillText(s.text, 0, 0.5);
+      ctx.restore();
+    }
     ctx.restore();
+    if (moving) this.request();
   }
 
   /**
@@ -777,14 +826,14 @@ export class FanView implements InputHandlers {
       const per = 1 / unitPx; // individuals per px
       const n = Math.max(1, niceStep(target * per));
       const px = n / per;
-      return { px, label: `${formatCount(n)} alive` };
+      return { px, label: `${formatCount(n)} ${n === 1 ? 'individual' : 'individuals'}` };
     }
     if (unitPx < target * 2.5) {
       const k = Math.max(1, niceStep(target / unitPx));
-      return { px: k * unitPx, label: `×${k === 1 ? '10' : `10${sup(k)}`} alive · log widths` };
+      return { px: k * unitPx, label: `×${k === 1 ? '10' : `10${sup(k)}`} individuals · log widths` };
     }
     const fct = Math.pow(10, target / unitPx);
-    return { px: target, label: `×${fct < 1.1 ? fct.toFixed(4) : fct.toFixed(2)} alive · log widths` };
+    return { px: target, label: `×${fct < 1.1 ? fct.toFixed(4) : fct.toFixed(2)} individuals · log widths` };
   }
 
   private drawWidthScale(): void {
@@ -825,64 +874,6 @@ export class FanView implements InputHandlers {
     ctx.textBaseline = 'top';
     ctx.textAlign = 'right';
     lines.forEach((l, k) => ctx.fillText(l, this.w - 14, top + 5 + k * 14));
-    ctx.restore();
-  }
-
-  /** When zoomed into a species' individuals: which species and generations are on screen. */
-  private drawHud(): void {
-    // (The texture is everywhere: only once one species fills most of the screen's width.)
-    let best: FanBranch | null = null;
-    let bestN = -1;
-    for (const b of this.fan.branches) {
-      const st = this.twigStats.get(b.sp.gid);
-      if (!st) continue;
-      const wPx = laneAt(b, this.cam.cy).w * this.cam.sx;
-      if (!(st.drawn > 0) && wPx < this.w * 0.6) continue;
-      const score = st.drawn + wPx;
-      if (score > bestN) {
-        best = b;
-        bestN = score;
-      }
-    }
-    if (!best) return;
-    const st = this.twigStats.get(best.sp.gid)!;
-    const m = this.model(best);
-    const ctx = this.ctx;
-    const gens = st.g0 === st.g1 ? `generation ${fmtInt(st.g0 + 1)}` : `generations ${fmtInt(st.g0 + 1)}–${fmtInt(st.g1 + 1)}`;
-    // The headline is the population alive at the middle of the generations on screen (the column's width
-    // there), and its green share: the same time as the "born" line under it.
-    const sp = best.sp;
-    const ageMa = Math.min(Math.max(m.bornAgo((st.g0 + st.g1) / 2) / 1e6, sp.t1), sp.t0);
-    const yrs = ageMa * 1e6;
-    const when = yrs < 0.5 ? 'now' : formatYearsAgo(yrs);
-    const lines = [
-      `${sp.common}${sp.extinct ? ' (extinct)' : ''}`,
-      `~${formatCount(best.pop.stepAt(ageMa).n)} alive ${when}`,
-      `${Math.round(best.pop.stepAt(ageMa).q * 100)}% with living descendants`,
-      `${gens} of ${fmtInt(m.G)}`,
-      `born ~${formatYearsAgo(m.bornAgo(st.g1))}${st.g0 === st.g1 ? '' : ` to ~${formatYearsAgo(m.bornAgo(st.g0))}`}`,
-    ];
-    ctx.save();
-    // Below the buttons, right of the axis: the species large, its generations quiet.
-    const bar = this.barRect();
-    const x = 66;
-    const y = (bar ? bar[3] : 44) + 12;
-    ctx.font = font('650 19px');
-    const w0 = ctx.measureText(lines[0]).width;
-    ctx.font = font('500 13px');
-    const wmax = Math.max(w0, ...lines.slice(1).map((l) => ctx.measureText(l).width)) + 24;
-    ctx.fillStyle = 'rgba(12,23,20,0.84)';
-    ctx.beginPath();
-    ctx.roundRect(x - 12, y - 8, Math.min(this.w - x, wmax), 30 + 16 * (lines.length - 1), 12);
-    ctx.fill();
-    ctx.textBaseline = 'top';
-    ctx.textAlign = 'left';
-    ctx.fillStyle = INK;
-    ctx.font = font('650 19px');
-    ctx.fillText(lines[0], x, y);
-    ctx.font = font('500 13px');
-    ctx.fillStyle = INK2;
-    for (let k = 1; k < lines.length; k++) ctx.fillText(lines[k], x, y + 10 + 16 * k);
     ctx.restore();
   }
 
@@ -1026,7 +1017,10 @@ export class FanView implements InputHandlers {
     // Right of the stem if it fits; else on the stem itself, just below the fork, on a halo.
     const onStem = sx + 10 + wmax > this.w - 6;
     const [stemL] = this.toScreen(f.x0, 0);
-    const x = onStem ? Math.max(66, stemL + 10) : sx + 10;
+    // (Clear of the axis's "time, log scale" note beside the fork.)
+    ctx.font = font('italic 400 12px', SERIF);
+    const noteR = 6 + ctx.measureText('time, log scale').width + 12;
+    const x = onStem ? Math.max(noteR, stemL + 10) : Math.max(noteR, sx + 10);
     const y = sy + 8;
     if (onStem) {
       ctx.shadowColor = 'rgba(12,23,20,0.95)';
