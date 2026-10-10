@@ -134,7 +134,8 @@ describe('the stem continues below the origin', () => {
         expect(leftAt(b, y)).toBe(s.left);
         expect(laneAt(b, y).w).toBe(b.baseW);
       }
-      expect(leftAt(b, -1e-6)).not.toBe(s.left);
+      // Above the fork it flows out of the stem: no jog.
+      expect(leftAt(b, -1e-6)).toBeCloseTo(s.left, 6);
     }
     // Content below the fork is the stem: its strands side by side, no gaps.
     expect(c.contentAt(1)).toEqual([f.stem]);

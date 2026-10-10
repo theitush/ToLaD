@@ -57,8 +57,11 @@ describe('the dated tree', () => {
           // A species starts at the split that lists it: its own column from there up, its jog there.
           expect(k.t0).toBe(v.split.ageMa);
           expect(k.splitY).toBe(v.y);
-          expect(leftAt(k, above(k.splitY))).toBe(k.colLeft);
+          // Its column grows out of its slice of the parent (no jog), and has peeled off to its own centre a fork span above.
           expect(leftAt(k, below(k.splitY))).toBe(k.path[0].left);
+          expect(leftAt(k, above(k.splitY))).toBeCloseTo(k.path[0].left, 5);
+          const yF = k.splitY - v.fork;
+          if (yF > k.tipY) expect(leftAt(k, yF) + laneAt(k, yF).w / 2).toBeCloseTo(k.cx, 9);
           expect(k.path[0].node).toBe(v);
         }
       }
@@ -95,8 +98,10 @@ describe('the dated tree', () => {
         const first = v.kids[0];
         const last = v.kids[v.kids.length - 1];
         const lo = isNode(first) ? first.left : first.colLeft;
-        const hi = isNode(last) ? last.left + last.width : last.colLeft + last.baseW;
-        expect(v.left + v.width / 2).toBeCloseTo((lo + hi) / 2, 9);
+        const hi = isNode(last) ? last.left + last.width : last.colLeft + last.width;
+        // Centred under its daughters' rooms.
+        expect(v.cx).toBeCloseTo((lo + hi) / 2, 9);
+        expect(v.left + v.width / 2).toBeCloseTo(v.cx, 9);
       }
       // The stem is everyone's founders.
       expect(f.root.strands.length).toBe(f.branches.length);

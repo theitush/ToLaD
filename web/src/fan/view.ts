@@ -7,11 +7,11 @@
 import { formatCount } from '../data/names';
 import { Input, type InputHandlers } from '../engine/input';
 import { clipPoly, FanCamera, STRAND_PX, type Camera } from './camera';
-import { laneAt, layoutFan, leftAt, nodeQ, segAt, STEM_FADE_MA, type Fan, type FanBranch, type FanNode, type WidthMode } from './layout';
+import { laneAt, layoutFan, leftAt, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type Fan, type FanBranch, type FanNode, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01 } from './meshgl';
 import { drawTwigs, kLogAt, laneDim, LINEAGE, LIVING, TWIG_GRAY, TWIG_WITHERED, TwigModel, type IndInfo, type TwigStats } from './twigs';
-import type { MeshBatch } from './meshgl';
+import type { MeshBatch, RectBatch } from './meshgl';
 
 export type { IndInfo } from './twigs';
 export type { Camera } from './camera';
@@ -444,7 +444,7 @@ export class FanView implements InputHandlers {
     const y = Math.min(this.fan.trunkBottom.y, Math.max(b.tipY, wy));
     if (y < b.splitY) return [leftAt(b, y), laneAt(b, y).w];
     const v = segAt(b, y).node;
-    return [v.left, v.width];
+    return [nodeLeftAt(v, y), v.width];
   }
 
   tap(x: number, y: number): void {
@@ -604,10 +604,10 @@ export class FanView implements InputHandlers {
    * to its tip. A parent column is just its daughters' strands side by side
    * (widths adding up to its width), its green one prefix across them.
    *
-   * All straight lines (layout.ts): its slices of the parent columns, the jogs, its column; the
-   * gray edge steps at the step lines on screen (Steps.lines), the width
-   * constant between them. Off screen only the splits and the tip are
-   * kept, whose chords stay off screen above or below it.
+   * Smooth curves (layout.ts): its slices of the parent columns, its peel off
+   * each fork along an S-curve, its column about its centre line; sampled
+   * at world-fixed heights a few px apart on screen (lanePoints), straight
+   * chords between them.
    */
   private drawStrand(b: FanBranch): void {
     const yb = this.fan.trunkBottom.y;
@@ -630,31 +630,48 @@ export class FanView implements InputHandlers {
     const yT0 = this.toScreen(0, b.splitY)[1];
     const grayC = mix(grayBase, '#131c19', Math.max(lives, tw?.texGray ?? 0) * 0.82);
     if (this.gl) {
-      // Each stretch of constant width is a rectangle: the whole lane gray (at least 0.6 px),
-      // the green lane over its left edge (at least 1 px).
+      // Between neighbouring samples each lane is a trapezoid (the curve's chord, a few px at most):
+      // the whole lane gray (at least 0.6 px), the green lane over its left edge (at least 1 px).
       const k = this.cam.sx;
-      for (let i = 0; i + 1 < pts.length; i += 2) {
+      const L = this.w;
+      const trap = (batch: RectBatch, l0: number, r0: number, l1: number, r1: number, y0: number, y1: number, c: [number, number, number], a: number) => {
+        // Lanes wholly off screen are dropped; an edge wholly off screen is pinned just outside it (float32 stays exact).
+        if ((r0 < -8 && r1 < -8) || (l0 > L + 8 && l1 > L + 8)) return;
+        if (l0 < -8 && l1 < -8) l0 = l1 = -8;
+        if (r0 > L + 8 && r1 > L + 8) r0 = r1 = L + 8;
+        batch.push(l0, y0, r0, y1, c[0], c[1], c[2], a, l1 - l0, r1 - r0);
+      };
+      for (let i = 0; i + 1 < pts.length; i++) {
+        // p below q on screen: the trapezoid from q's row (top) to p's.
         const p = pts[i];
         const q = pts[i + 1];
-        const x0 = p.x - hw * k;
-        const y0 = Math.max(-4, q.y);
-        const y1 = Math.min(this.h + 4, p.y);
-        if (!(y1 > y0) || x0 > this.w + 4) continue;
-        const gPx = p.w * p.f * k;
+        const y0 = q.y;
+        const y1 = p.y;
+        if (!(y1 > y0) || y1 < -4 || y0 > this.h + 4) continue;
+        const xq = q.x - hw * k;
+        const xp = p.x - hw * k;
+        const wq = q.w * k;
+        const wp = p.w * k;
+        if (!(wq > 0) && !(wp > 0)) continue;
+        const gq = wq * q.f;
+        const gp = wp * p.f;
         // (An extinct species' line ended: withered over its own column; below its split, its ancestors.)
         const base = b.sp.extinct && (p.y + q.y) / 2 < yT0 ? grayBase : GRAY;
-        const gc = rgb01(mix(base, '#131c19', laneDim(p.w * k - gPx, lives) * 0.82));
-        const ec = rgb01(mix(GREEN, '#0d2318', laneDim(gPx, lives) * 0.9));
-        this.gl.under.push(Math.max(-4, x0), y0, Math.min(this.w + 4, x0 + Math.max(0.6, p.w * k)), y1, gc[0], gc[1], gc[2], 1);
-        if (gPx > 0) {
-          const x1 = x0 + Math.max(1, gPx);
+        const wm = (wq + wp) / 2;
+        const gm = (gq + gp) / 2;
+        const gc = rgb01(mix(base, '#131c19', laneDim(wm - gm, lives) * 0.82));
+        const ec = rgb01(mix(GREEN, '#0d2318', laneDim(gm, lives) * 0.9));
+        trap(this.gl.under, xq, xq + Math.max(0.6, wq), xp, xp + Math.max(0.6, wp), y0, y1, gc, 1);
+        if (gq > 0 || gp > 0) {
+          const g1q = xq + Math.max(1, gq);
+          const g1p = xp + Math.max(1, gp);
           // The living glow faintly (fading as their lane resolves into individuals).
           const glow = 1 - lives;
           if (glow > 0.01) {
-            this.gl.under.push(Math.max(-8, x0 - 4), y0, Math.min(this.w + 8, x1 + 4), y1, ec[0], ec[1], ec[2], 0.06 * glow);
-            this.gl.under.push(Math.max(-8, x0 - 1.5), y0, Math.min(this.w + 8, x1 + 1.5), y1, ec[0], ec[1], ec[2], 0.14 * glow);
+            trap(this.gl.under, xq - 4, g1q + 4, xp - 4, g1p + 4, y0, y1, ec, 0.06 * glow);
+            trap(this.gl.under, xq - 1.5, g1q + 1.5, xp - 1.5, g1p + 1.5, y0, y1, ec, 0.14 * glow);
           }
-          this.gl.under.push(Math.max(-4, x0), y0, Math.min(this.w + 4, x1), y1, ec[0], ec[1], ec[2], 1);
+          trap(this.gl.under, xq, g1q, xp, g1p, y0, y1, ec, 1);
         }
       }
     } else {
@@ -730,38 +747,32 @@ export class FanView implements InputHandlers {
   }
 
   /**
-   * A branch's lanes as screen points, bottom to top, two per stretch of
-   * constant width and left edge (so every edge is vertical or horizontal):
-   * breakpoints at the bottom of the world, the splits it passes (a jog: a
-   * horizontal edge), the step lines on screen (and one beyond each edge) and
-   * the tip.
+   * A branch's lanes as screen points, bottom to top, one per sample height
+   * (layout.ts Tess.cuts: its features and a world-fixed grid a few px apart
+   * on screen) over the screen and a little beyond it, each exactly on the
+   * edges' curves: the lanes are drawn straight between them.
    */
   lanePoints(b: FanBranch, hw: number): RibbonPt[] {
     const yb = this.fan.trunkBottom.y;
-    const steps = this.fan.steps;
     const [, sTop] = this.toWorld(0, -20);
     const [, sBot] = this.toWorld(0, this.h + 20);
-    const ys = new Set<number>([yb, b.tipY, ...b.path.map((s) => s.y)]);
-    // Every step line on screen and the nearest one beyond each edge (the stretches reaching off screen).
-    const all = steps.bounds(b);
-    for (let k = 0; k < all.length; k++) {
-      const y = all[k];
-      if ((y >= sTop && y <= sBot) || (y < sTop && !(all[k + 1] < sTop)) || (y > sBot && !(all[k - 1] > sBot))) ys.add(y);
-    }
-    if (sBot < yb && sBot > 0) ys.add(sBot);
-    const sorted = [...ys].filter((y) => y >= b.tipY && y <= yb).sort((p, q) => q - p);
+    const ys = this.fan.tess.cuts(b, Math.max(b.tipY, sTop), Math.min(yb, sBot), this.cam.sy, 4);
     // Spine at left + hw: the ribbon spans offsets [hw - w, hw] to its left (nx = -1).
+    // (At a split the green lane changes, the strand leaving its parent's prefix: a point either side, the same edges.)
+    const splits = new Set(b.path.map((s) => s.y));
     const pts: RibbonPt[] = [];
-    for (let i = 0; i + 1 < sorted.length; i++) {
-      const y0 = sorted[i];
-      const y1 = sorted[i + 1];
-      // Constant width and left edge between breakpoints: both at the middle.
-      const ym = (y0 + y1) / 2;
-      const L = laneAt(b, ym);
-      const left = leftAt(b, ym);
-      for (const y of [y0, y1]) {
-        const [px, py] = this.toScreen(left + hw, y);
-        pts.push({ x: px, y: py, nx: -1, ny: 0, w: L.w, f: L.f });
+    const push = (y: number, ye: number) => {
+      const L = laneAt(b, ye);
+      const [px, py] = this.toScreen(leftAt(b, y) + hw, y);
+      pts.push({ x: px, y: py, nx: -1, ny: 0, w: L.w, f: L.f });
+    };
+    for (let i = ys.length - 1; i >= 0; i--) {
+      const y = ys[i];
+      if (!splits.has(y)) push(y, y);
+      else {
+        const e = 1e-9 * Math.max(1, Math.abs(y));
+        push(y, y + e);
+        push(y, y - e);
       }
     }
     return pts;
