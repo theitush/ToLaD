@@ -7,7 +7,8 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { chromium } from 'playwright';
 
-const browser = await chromium.launch({ headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+// Default headless (its software GL renders WebGL2): no GPU flags.
+const browser = await chromium.launch({ headless: true });
 let bad = 0;
 try {
   const page = await (await browser.newContext({ viewport: { width: 400, height: 400 } })).newPage();

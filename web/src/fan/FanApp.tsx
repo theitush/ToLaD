@@ -34,6 +34,12 @@ export function FanApp() {
     window.__fan = v;
     window.__fanMesh = MeshMirror;
     v.request();
+    // The canvas text waits for the faces (drawn in system type until then).
+    if (typeof document !== 'undefined' && document.fonts) {
+      Promise.all([document.fonts.load("600 16px 'Sofia Sans Condensed'"), document.fonts.load("italic 400 14px 'Newsreader'")])
+        .catch(() => undefined)
+        .then(() => v.request());
+    }
     return () => {
       v.destroy();
       viewRef.current = null;
@@ -42,7 +48,7 @@ export function FanApp() {
   }, []);
 
   return (
-    <div className="app">
+    <div className="app fan">
       <canvas ref={canvasRef} className="stage" />
       <div className="bar" ref={barRef}>
         <button
@@ -72,12 +78,20 @@ export function FanApp() {
           <SpeciesCard sp={sel.sp} onClose={() => viewRef.current?.tap(-1e6, -1e6)} />
         )
       ) : (
-        <div className="legend">
-          <span className="li"><span className="dot alive" /> alive now</span> <span className="li"><span className="dot lineage" /> has living descendants</span>{' '}
-          <span className="li"><span className="dot dead" /> line ended</span>
-          <br />
-          <span className="dim">Width is everyone who ever lived. Tap or zoom a branch.</span>
-        </div>
+        <ul className="key" aria-label="key">
+          <li>
+            <span className="lane alive" /> alive now
+          </li>
+          <li>
+            <span className="lane lineage" /> living descendants
+          </li>
+          <li>
+            <span className="lane dead" /> line ended
+          </li>
+          <li>
+            <span className="lane extinct" /> extinct
+          </li>
+        </ul>
       )}
       </div>
     </div>
@@ -92,24 +106,35 @@ export function SpeciesCard({ sp, onClose, open }: { sp: SpeciesRec; onClose: ()
         ×
       </button>
       <div className="t">
-        {sp.common} <i>{sp.sci}</i>
+        <span>{sp.common}</span> <i>{sp.sci}</i>
       </div>
-      <div>
-        <span className="dot alive" /> <b>{formatCount(sp.alive)}</b> alive now
-      </div>
-      <div>
-        <span className="dot dead" /> <b>{formatCount(sp.ever)}</b> ever lived{' '}
-        <span className="dim">
-          (range {formatCount(sp.everLo)} – {formatCount(sp.everHi)})
+      <div className="stats">
+        {!sp.extinct && (
+          <>
+            <span className="lane alive" /> <b>{formatCount(sp.alive)}</b> <span>alive now</span>
+          </>
+        )}
+        <span className={`lane ${sp.extinct ? 'extinct' : 'dead'}`} /> <b>{formatCount(sp.ever)}</b> <span>ever lived</span>
+        <span className="range">
+          range {formatCount(sp.everLo)} – {formatCount(sp.everHi)}
         </span>
       </div>
-      <div className="dim">
-        grade {sp.grade} · {span}
-        {sp.extinct && <> · extinct ~{formatAge(sp.t1)}</>}
-      </div>
-      <div className="dim">
-        generation ≈ {sp.genYears} y ({sp.genSource})
-      </div>
+      <dl className="meta">
+        <div>
+          <dt>lived</dt>
+          <dd>{span}</dd>
+        </div>
+        <div>
+          <dt>generation</dt>
+          <dd>
+            ≈ {sp.genYears} y <span className="dim">({sp.genSource})</span>
+          </dd>
+        </div>
+        <div>
+          <dt>data grade</dt>
+          <dd>{sp.grade}</dd>
+        </div>
+      </dl>
       {sp.history && sp.history.points.length > 0 && <HistorySpark key={sp.gid} h={sp.history} open={open} />}
     </div>
   );
