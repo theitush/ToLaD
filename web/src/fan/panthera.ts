@@ -88,7 +88,7 @@ export function speciesRec(r: RawSpecies, clade: number): SpeciesRec {
   const genYears = counts ? Math.round(h!.G * 1000) / 1000 : x.gen;
   let births: SpeciesRec['births'] = null;
   if (counts) {
-    const segments = procgenSegments(h!);
+    const segments = procgenSegments(h!, r.ever);
     births = { segments, curve: new BirthCurve(segments, genYears), lifespan: h!.L };
   }
   return {

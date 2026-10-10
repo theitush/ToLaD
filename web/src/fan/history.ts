@@ -14,12 +14,18 @@ export interface GenSegment {
 /**
  * procgen's segments for a history: whole generations, births per generation
  * rounded to integers (≥ 2: two parents). Oldest first, the last one ends now.
+ * With `ever`, the sizes are scaled so the births sum to it (the tiles' EVER is
+ * this integral, quantized: the scale is within ~0.1% of 1), which keeps
+ * width = individuals exact from the base (ever) to the tip.
  */
-export function procgenSegments(h: HistoryRec): GenSegment[] {
-  return h.segments.map((s) => ({
-    generations: Math.max(1, Math.round(s.generations)),
-    startSize: Math.max(2, Math.round(s.startSize)),
-    endSize: Math.max(2, Math.round(s.endSize)),
+export function procgenSegments(h: HistoryRec, ever?: number): GenSegment[] {
+  const gens = h.segments.map((s) => Math.max(1, Math.round(s.generations)));
+  const raw = h.segments.reduce((a, s, k) => a + (gens[k] * (s.startSize + s.endSize)) / 2, 0);
+  const k = ever && raw > 0 ? ever / raw : 1;
+  return h.segments.map((s, j) => ({
+    generations: gens[j],
+    startSize: Math.max(2, Math.round(s.startSize * k)),
+    endSize: Math.max(2, Math.round(s.endSize * k)),
   }));
 }
 

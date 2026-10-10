@@ -129,12 +129,16 @@ export function aliveFrac(alive: number, ever: number, mode: WidthMode): number 
 /**
  * Individuals whose strands pass through age `ageMa` (not dead by then):
  * everyone ever before the species' first appearance, the living at the tip.
- * Births are spread evenly over the species' span (procgen's constant-size model).
+ * With a curated history that drives the counts, the dead peel off along its
+ * real births curve (the share of all births after `ageMa`, procgen's own
+ * ramps integrated); otherwise births are spread evenly over the species' span
+ * (procgen's constant-size model). Either way the base is ever, the tip alive.
  */
 export function remaining(sp: SpeciesRec, ageMa: number): number {
   if (ageMa >= sp.t0) return sp.ever;
   if (ageMa <= sp.t1) return sp.alive;
-  const r = (ageMa - sp.t1) / (sp.t0 - sp.t1);
+  const c = sp.births?.curve;
+  const r = c ? Math.min(1, c.bornAfter((ageMa - sp.t1) * 1e6) / c.total) : (ageMa - sp.t1) / (sp.t0 - sp.t1);
   return sp.alive + (sp.ever - sp.alive) * r;
 }
 

@@ -166,7 +166,8 @@ describe('determinism and links', () => {
   it("a parent link ends at the twig of procgen's parents()", () => {
     const m = lion(fanLog);
     const g = m.G - 1;
-    for (const i of [0, 5, 4000, 70000]) {
+    for (const i0 of [0, 5, 4000, 70000]) {
+      const i = Math.min(i0, m.size(g) - 1);
       const ps = m.parents(g, i);
       expect(ps).toEqual(m.sp.parents({ generation: g, index: BigInt(i) }));
       expect(ps).toHaveLength(2);
@@ -190,7 +191,8 @@ describe('determinism and links', () => {
       const v = { sx: 1, sy: 1, yNow: f.time.y(0), toScreen: (x: number, y: number) => [x, y] } as unknown as TwigView;
       for (const g of [1, 1000, m.G - 300, m.G - 1]) {
         const genH = m.row(g - 1).y - m.row(g).y;
-        for (const i of [0, 17, 4000, 70000]) {
+        for (const i0 of [0, 17, 4000, 70000]) {
+          const i = Math.min(i0, m.size(g) - 1);
           const child = m.twig(g, i);
           const ps = m.parents(g, i);
           expect(ps).toEqual(m.sp.parents({ generation: g, index: BigInt(i) }));

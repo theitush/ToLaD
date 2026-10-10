@@ -37,20 +37,34 @@ function keyOf(common: string): string {
 }
 
 /**
- * procgen model of a species from its data: G = duration / generation length
- * generations of constant size N = ever / G. Mean lifespan L = alive·duration/ever
- * makes the number alive at the end ≈ N·L/GL = the data's alive count (the
- * pipeline's N_ever ≈ alive ÷ lifespan × T read backwards). Extinct species are
- * observed long after their last generation, so nobody is alive.
+ * procgen model of a species from its data. With a curated history that drives
+ * the counts (rec.births), procgen follows its compiled segments: births per
+ * generation ramp along the real population curve, counted back from now, so
+ * the number of strands per generation (and the mesh's width) follows it.
+ * Otherwise: G = duration / generation length generations of constant size
+ * N = ever / G. Mean lifespan L = alive·duration/ever makes the number alive at
+ * the end ≈ N·L/GL = the data's alive count (the pipeline's N_ever ≈ alive ÷
+ * lifespan × T read backwards). Extinct species are observed long after their
+ * last generation, so nobody is alive.
  */
 export function speciesModel(rec: SpeciesRec): Species {
-  const years = (rec.t0 - rec.t1) * 1e6;
+  const key = keyOf(rec.common);
   const GL = rec.genYears;
+  if (rec.births) {
+    return new Species({
+      key,
+      sexual: true,
+      segments: rec.births.segments,
+      generationYears: GL,
+      lifespanYears: rec.births.lifespan,
+    });
+  }
+  const years = (rec.t0 - rec.t1) * 1e6;
   const G = Math.max(1, Math.round(years / GL));
   const N = Math.max(2, Math.round(rec.ever / G));
   const lifespan = rec.alive > 0 ? (rec.alive * years) / rec.ever : GL * 0.5;
   return new Species({
-    key: keyOf(rec.common),
+    key,
     sexual: true,
     segments: [{ generations: G, startSize: N }],
     generationYears: GL,
@@ -92,6 +106,13 @@ export class TwigModel {
   readonly span: number;
   /** First generation in which anybody can still be alive (G if extinct). */
   readonly aliveFrom: number;
+  /**
+   * Age (Ma) of procgen's time 0, the start of generation 0. The species' first
+   * appearance, or with a history (counted back from now) the end of its last
+   * generation minus all its generations, so the generations land on their
+   * real calendar years and the last one ends at the tip.
+   */
+  readonly origin: number;
 
   constructor(
     readonly b: FanBranch,
@@ -105,15 +126,16 @@ export class TwigModel {
     this.GL = this.sp.generationYears;
     this.span = Math.ceil((2 * this.sp.lifespanYears) / this.GL) + 1;
     this.aliveFrom = this.rec.extinct ? this.G : Math.max(0, this.G - this.span);
+    this.origin = this.rec.births ? this.rec.t1 + (this.G * this.GL) / 1e6 : this.rec.t0;
   }
 
   size(g: number): number {
     return Number(this.sp.size(g));
   }
 
-  /** Age (Ma) of a moment `tYears` after the species' first appearance. */
+  /** Age (Ma) of a moment `tYears` after procgen's time 0 (the species' first appearance). */
   ageOf(tYears: number): number {
-    return Math.max(0, this.rec.t0 - tYears / 1e6);
+    return Math.max(0, this.origin - tYears / 1e6);
   }
 
   yOf(tYears: number): number {
@@ -128,7 +150,7 @@ export class TwigModel {
   /** Generation born at world height y (clamped). */
   generationAt(y: number): number {
     const age = this.time.ageAt(y);
-    const t = (this.rec.t0 - age) * 1e6;
+    const t = (this.origin - age) * 1e6;
     return Math.min(this.G - 1, Math.max(0, Math.floor(t / this.GL)));
   }
 

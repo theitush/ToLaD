@@ -1,0 +1,173 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
+import { decodeFile } from '../data/tolad-decoder.js';
+import { BirthCurve, historySpans, spanStyle } from './history';
+import { layoutFan, remaining, strandAt } from './layout';
+import { PANTHERA, type SpeciesRec } from './panthera';
+import { speciesModel, TwigModel } from './twigs';
+
+const DATA = resolve(dirname(fileURLToPath(import.meta.url)), '../../../data/mammals');
+const read = (rel: string) => readFileSync(resolve(DATA, rel));
+
+/** Every species row named `sci` across the tiles, decoded independently of panthera-extract. */
+function decoded(sci: string): { ever: number; alive: number; t0: number; t1: number; hist: any } {
+  const sk = decodeFile(read('skeleton.tld')) as any;
+  for (const t of sk.meta.tiles as { file: string }[]) {
+    const f = decodeFile(read(t.file)) as any;
+    for (let i = 0; i < f.n; i++) {
+      if (f.name(i) === sci && f.isSpecies(i) && !f.isStub(i)) {
+        return { ever: f.ever(i), alive: f.alive(i), t0: f.t0(i), t1: f.t1(i), hist: f.history(i) };
+      }
+    }
+  }
+  throw new Error(sci);
+}
+
+const byName = (common: string) => PANTHERA.species.find((s) => s.common === common)!;
+
+describe('Panthera data', () => {
+  it('numbers and histories are the decoded data/mammals values', () => {
+    expect(PANTHERA.species.length).toBeGreaterThanOrEqual(9);
+    for (const s of PANTHERA.species) {
+      const d = decoded(s.sci);
+      expect(s.ever).toBe(d.ever);
+      expect(s.alive).toBe(d.alive);
+      expect(s.t0).toBe(d.t0);
+      expect(s.t1).toBe(d.t1);
+      if (d.hist) {
+        expect(s.history).not.toBeNull();
+        expect(s.history!.points.map((p) => [p.year, p.n, p.grade])).toEqual(d.hist.points.map((p: any) => [p.year, p.n, p.grade]));
+        expect(s.history!.segments.length).toBe(d.hist.segments.length);
+      } else {
+        expect(s.history).toBeNull();
+      }
+    }
+    // Lion and tiger carry curated histories that drive their counts.
+    for (const c of ['Lion', 'Tiger']) {
+      expect(byName(c).births).not.toBeNull();
+      expect(byName(c).history!.points.some((p) => p.baseline)).toBe(true);
+    }
+  });
+});
+
+describe('history-driven procgen', () => {
+  for (const c of ['Lion', 'Tiger']) {
+    it(`${c}: generation sizes follow the history's segments`, () => {
+      const rec = byName(c);
+      const segs = rec.births!.segments;
+      const sp = speciesModel(rec);
+      expect(sp.generations).toBe(segs.reduce((a, s) => a + s.generations, 0));
+      expect(Number(sp.totalEver) / rec.ever).toBeCloseTo(1, 5);
+      let g0 = 0;
+      for (const s of segs) {
+        // The ramp's integral, generation by generation (procgen floors it).
+        const L = s.generations;
+        const C = (t: number) => s.startSize * t + ((s.endSize - s.startSize) * t * t) / (2 * L);
+        for (const t of [0, L >> 1, L - 1]) {
+          const exact = C(t + 1) - C(t);
+          expect(Math.abs(Number(sp.size(g0 + t)) - exact)).toBeLessThanOrEqual(1);
+        }
+        g0 += L;
+      }
+    });
+  }
+
+  it('lions and tigers thin over the last ~150 years', () => {
+    for (const c of ['Lion', 'Tiger']) {
+      const rec = byName(c);
+      const sp = speciesModel(rec);
+      const G = sp.generations;
+      const back = Math.round(150 / rec.genYears);
+      expect(Number(sp.size(G - 1)) * 3).toBeLessThan(Number(sp.size(G - back)));
+    }
+  });
+
+  it('the last generation ends at the tip, on its calendar years', () => {
+    const fan = layoutFan(PANTHERA, 'linear');
+    const i = PANTHERA.species.findIndex((s) => s.common === 'Lion');
+    const m = new TwigModel(fan.branches[i], fan.time, 'linear');
+    expect(m.ageOf(m.G * m.GL)).toBeCloseTo(0, 12);
+    // 100 years ago lies in the generation the history puts there.
+    const h = m.rec.history!;
+    const y = fan.time.y(100 / 1e6);
+    const g = m.generationAt(y);
+    let year = h.nowYear - (m.G - g) * m.GL;
+    expect(Math.abs(year - (h.nowYear - 100))).toBeLessThan(m.GL);
+    year = h.nowYear;
+    expect(m.generationAt(fan.time.y(0))).toBe(m.G - 1);
+  });
+});
+
+describe('width = individuals with a varying population', () => {
+  for (const mode of ['linear', 'log'] as const) {
+    it(`lion/tiger: base = ever, tip = alive, between = the births curve (${mode})`, () => {
+      const fan = layoutFan(PANTHERA, mode);
+      for (const c of ['Lion', 'Tiger']) {
+        const i = PANTHERA.species.findIndex((s) => s.common === c);
+        const b = fan.branches[i];
+        const sp: SpeciesRec = b.sp;
+        expect(remaining(sp, sp.t0)).toBe(sp.ever);
+        expect(remaining(sp, sp.t1)).toBe(sp.alive);
+        expect(strandAt(b, sp.t0, mode).w).toBeCloseTo(b.width, 9);
+        expect(strandAt(b, sp.t1, mode).f).toBeCloseTo(1, 9);
+        // At each generation boundary the dead not yet peeled off are exactly
+        // the procgen births after it (the twig partition): births · (ever − alive)/ever.
+        const m = new TwigModel(b, fan.time, mode);
+        const after = (k: number) => {
+          let n = 0;
+          for (let g = k; g < m.G; g++) n += m.size(g);
+          return n;
+        };
+        for (const back of [1, 5, 20, 40]) {
+          const k = m.G - back;
+          const ageMa = (back * m.GL) / 1e6;
+          const share = (remaining(sp, ageMa) - sp.alive) / (sp.ever - sp.alive);
+          expect(share / (after(k) / m.T)).toBeCloseTo(1, 3);
+        }
+        // Monotone: never wider above than below.
+        let prev = Infinity;
+        for (let k = 0; k <= 200; k++) {
+          const a = sp.t1 + ((sp.t0 - sp.t1) * Math.pow(k / 200, 4)) * 1;
+          const r = remaining(sp, sp.t0 - (a - sp.t1));
+          expect(r).toBeLessThanOrEqual(prev * (1 + 1e-12));
+          prev = r;
+        }
+      }
+    });
+  }
+
+  it('BirthCurve integrates its segments', () => {
+    const c = new BirthCurve(
+      [
+        { generations: 10, startSize: 100, endSize: 100 },
+        { generations: 4, startSize: 100, endSize: 20 },
+      ],
+      5,
+    );
+    expect(c.total).toBe(1000 + 240);
+    expect(c.years).toBe(70);
+    expect(c.bornAfter(20)).toBeCloseTo(240, 9);
+    expect(c.bornAfter(70)).toBe(1240);
+    expect(c.bornAfter(0)).toBe(0);
+    expect(c.sizeAt(20)).toBeCloseTo(100, 9);
+    expect(c.sizeAt(0)).toBeCloseTo(20, 9);
+  });
+});
+
+describe('honesty', () => {
+  it('interpolated and modelled spans are dashed, grade D / unverified dotted, measured solid', () => {
+    expect(spanStyle({ grade: 'B', kind: 'held' })).toBe('solid');
+    expect(spanStyle({ grade: 'C', kind: 'interpolated' })).toBe('dashed');
+    expect(spanStyle({ grade: 'C', kind: 'model' })).toBe('dashed');
+    expect(spanStyle({ grade: 'D', kind: 'interpolated' })).toBe('dotted');
+    expect(spanStyle({ grade: 'B', kind: 'unverified' })).toBe('dotted');
+    const spans = historySpans(byName('Tiger').history!);
+    expect(spans.some((s) => s.kind === 'interpolated' && s.style !== 'solid')).toBe(true);
+    for (const s of spans) {
+      expect(s.ago0).toBeGreaterThanOrEqual(s.ago1);
+      if (s.kind === 'interpolated') expect(s.style).not.toBe('solid');
+    }
+  });
+});
