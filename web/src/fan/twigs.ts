@@ -18,7 +18,9 @@
 // height via the time scale, index from x via the lanes.
 //
 // LOD by the on-screen spacing of strands (one procgen index slot):
-//   < 2 px    the branch's green/gray lanes stand in for everyone;
+//   < 2 px    the branch's green/gray lanes stand in for everyone; once the
+//             width scale reads ~100 individuals the green lane becomes a
+//             texture of its living strands' density (livingTexture);
 //   2–10 px   strands, then individuals, fade in over the lanes (no switch);
 //   links     plus threads to both parents and who has living descendants;
 //   labels    plus handles (lion#…).
@@ -133,6 +135,16 @@ export class TwigModel {
     return Number(this.sp.size(g));
   }
 
+  /**
+   * Index slots of the green lane: the living's generation's size (a slot is a
+   * living strand if anyone at that index is alive now). The green lane has one
+   * width all the way down, and so these slots: deep in the past, where a
+   * history's generations were bigger, it is not the size of the generation there.
+   */
+  get nLive(): number {
+    return this.size(this.G - 1);
+  }
+
   /** Age (Ma) of a moment `tYears` after procgen's time 0 (the species' first appearance). */
   ageOf(tYears: number): number {
     return Math.max(0, this.origin - tYears / 1e6);
@@ -223,9 +235,16 @@ export class TwigModel {
 
   /** Does green-lane slot i hold a living strand (anyone at index i alive now)? */
   livingSlot(i: number): boolean {
-    for (let g = this.aliveFrom; g < this.G; g++) if (i >= 0 && i < this.size(g) && this.alive(g, i)) return true;
-    return false;
+    if (!(i >= 0)) return false;
+    const c = this.slotCache.get(i);
+    if (c !== undefined) return c;
+    let r = false;
+    for (let g = this.aliveFrom; g < this.G && !r; g++) if (i < this.size(g) && this.alive(g, i)) r = true;
+    if (this.slotCache.size > 200000) this.slotCache.clear();
+    this.slotCache.set(i, r);
+    return r;
   }
+  private readonly slotCache = new Map<number, boolean>();
 
   /** World x of the living strand nearest x at height y (within `reach` slots), or null. */
   nearestLiving(x: number, y: number, reach = 64): number | null {
@@ -438,55 +457,88 @@ export function threadEnds(v: TwigView, m: TwigModel, parent: Twig, child: Twig,
   return [px, py, v.toScreen(child.x, child.yBirth)[1]];
 }
 
-/** Spacing (px) of the flow lines drawn over a lane too wide for the screen whose strands are still too fine to show. */
-const FLOW_PX = 16;
+/** The width scale bar's target length (px, view.ts widthScale): textures are tied to what it reads. */
+export const SCALE_BAR_PX = 70;
+/**
+ * The living's texture fades in as the width scale bar reads TEXTURE_IND[0]
+ * individuals down to TEXTURE_IND[1] (about 100: well under a pixel per
+ * individual, long before the strands themselves are pixels apart).
+ */
+export const TEXTURE_IND: [number, number] = [150, 50];
+
+/** Texture fade-in by individuals per scale-bar length in a lane (log-linear between TEXTURE_IND). */
+export function textureFade(perBar: number): number {
+  if (!(perBar > 0)) return 0;
+  const [a, b] = TEXTURE_IND;
+  return Math.max(0, Math.min(1, Math.log(a / perBar) / Math.log(a / b)));
+}
+
+/** Most index slots read per texture column (more are sampled evenly). */
+const TEXTURE_SAMPLES = 32;
 
 /**
- * Never a featureless fill: where a lane is wider than half the screen but its
- * strands are still under a pixel apart, faint lines every FLOW_PX follow the
- * strands' flow (each keeps its fraction of the lane, like a strand), so the
- * lane's lean and its edges always read. They are not individuals: the width
- * scale says how many individuals a line spacing holds.
+ * The green lane while its strands are still under a pixel apart: a texture of
+ * the actual strands, not a flat fill. The lane is cut into columns ~1 px wide
+ * (each keeps its fraction of the lane, like a strand); each column is drawn
+ * with the share of its index slots that hold someone alive now, so its
+ * brightness is the living strands' density there. As the strands separate
+ * (meshFade) they take over from it. Only the columns on screen are read.
  */
-function flowLines(
-  v: TwigView,
-  m: TwigModel,
-  yTop: number,
-  yBot: number,
-  L: { left: number; w: number; gw: number },
-  xr: (y: number) => [number, number],
-  alpha: [number, number],
-): void {
-  const ctx = v.ctx;
-  for (const alive of [false, true]) {
-    const a = alpha[alive ? 1 : 0];
-    if (a <= 0.01 || (alive && m.rec.extinct)) continue;
-    const lw = alive ? L.gw : L.w - L.gw;
-    const lanePx = lw * v.sx;
-    if (lanePx < 0.5 * v.w) continue;
-    const du = FLOW_PX / lanePx;
-    // Lane fractions on screen anywhere from the top to the bottom of the screen.
-    let u0 = 1;
-    let u1 = 0;
-    for (let k = 0; k <= 8; k++) {
-      const y = yTop + ((yBot - yTop) * k) / 8;
-      const Ly = m.lanes(y);
-      const l = alive ? Ly.left : Ly.left + Ly.gw;
-      const wy = Math.max(1e-300, alive ? Ly.gw : Ly.w - Ly.gw);
-      const [x0, x1] = xr(y);
-      u0 = Math.min(u0, (x0 - l) / wy);
-      u1 = Math.max(u1, (x1 - l) / wy);
+function livingTexture(v: TwigView, m: TwigModel, yTop: number, yBot: number, n: number, cell: number, alpha: number, xr: (y: number) => [number, number]): void {
+  const K = 12;
+  const ys: number[] = [];
+  const ls: { left: number; gw: number }[] = [];
+  let u0 = 1;
+  let u1 = 0;
+  for (let k = 0; k <= K; k++) {
+    const y = yTop + ((yBot - yTop) * k) / K;
+    const L = m.lanes(y);
+    ys.push(y);
+    ls.push(L);
+    const gw = Math.max(1e-300, L.gw);
+    const [x0, x1] = xr(y);
+    u0 = Math.min(u0, (x0 - L.left) / gw);
+    u1 = Math.max(u1, (x1 - L.left) / gw);
+  }
+  u0 = Math.max(0, u0);
+  u1 = Math.min(1, u1);
+  if (u1 <= u0) return;
+  const lanePx = ls[K >> 1].gw * v.sx;
+  const binPx = Math.max(1, cell);
+  const du = binPx / lanePx;
+  const b0 = Math.floor(u0 / du);
+  const b1 = Math.ceil(u1 / du);
+  if (b1 - b0 > 2000) return;
+  const LEVELS = 12;
+  const paths: Path2D[] = [];
+  for (let b = b0; b < b1; b++) {
+    const i0 = Math.max(0, Math.floor(b * du * n));
+    const i1 = Math.min(n, Math.max(i0 + 1, Math.floor((b + 1) * du * n)));
+    const cnt = i1 - i0;
+    const step = Math.max(1, cnt / TEXTURE_SAMPLES);
+    let live = 0;
+    let seen = 0;
+    for (let x = i0; x < i1; x += step) {
+      seen++;
+      if (m.livingSlot(Math.floor(x))) live++;
     }
-    u0 = Math.max(0, u0 - 3 * du);
-    u1 = Math.min(1, u1 + 3 * du);
-    const k0 = Math.ceil(u0 / du);
-    const k1 = Math.floor(u1 / du);
-    if (k1 - k0 > 400 || k1 < k0) continue;
-    const path = new Path2D();
-    for (let k = k0; k <= k1; k++) strandPath(v, m, k * du, alive, alive ? yTop : Math.max(yTop, v.yNow + DEAD_GAP_PX / v.sy), yBot, path);
-    ctx.strokeStyle = alive ? rgba('#123c22', 0.45 * a) : rgba('#1c2521', 0.32 * a);
-    ctx.lineWidth = 1;
-    ctx.stroke(path);
+    const lvl = Math.round((live / Math.max(1, seen)) * LEVELS);
+    if (lvl === 0) continue;
+    const path = (paths[lvl] ??= new Path2D());
+    const u = (b + 0.5) * du;
+    for (let k = 0; k <= K; k++) {
+      const [px, py] = v.toScreen(ls[k].left + u * ls[k].gw, ys[k]);
+      if (k) path.lineTo(px, py);
+      else path.moveTo(px, py);
+    }
+  }
+  const ctx = v.ctx;
+  ctx.lineWidth = binPx;
+  ctx.lineCap = 'butt';
+  for (let l = 1; l <= LEVELS; l++) {
+    if (!paths[l]) continue;
+    ctx.strokeStyle = rgba(LIVING, (alpha * l) / LEVELS);
+    ctx.stroke(paths[l]);
   }
 }
 
@@ -530,13 +582,17 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
   const gm = m.generationAt(ym);
   const n = m.size(gm);
   const cellGray = ((L.w - L.gw) / n) * v.sx;
-  const cellGreen = (L.gw / n) * v.sx;
+  const nLive = m.nLive;
+  const cellGreen = (L.gw / nLive) * v.sx;
   const cellPx = Math.max(cellGray, cellGreen);
-  // Until the strands themselves show, flow lines keep a wide lane from being a flat fill.
-  flowLines(v, m, yTop, yBot, L, xr, [1 - Math.min(1, 1.5 * meshFade(cellGray)), 1 - Math.min(1, 1.5 * meshFade(cellGreen))]);
-  if (cellPx < 1.5) return null;
+  // The living's lane turns into a texture of its strands once the width scale
+  // reads ~100 individuals (textureFade), then into the strands themselves.
+  const tex = b.sp.extinct || !(L.gw > 0) ? 0 : textureFade((SCALE_BAR_PX * b.sp.alive) / (L.gw * v.sx));
+  const texA = tex * (1 - meshFade(cellGreen));
+  if (texA > 0.01) livingTexture(v, m, yTop, yBot, nLive, cellGreen, texA, xr);
   const fade = meshFade(cellGray);
-  const fadeGreen = meshFade(cellGreen);
+  const fadeGreen = Math.max(meshFade(cellGreen), tex);
+  if (cellPx < 1.5) return tex > 0 ? { mode: 'texture', g0: gm, g1: gm, drawn: 0, cellPx, fade: 0, fadeGreen, pending: false } : null;
   const gHi = m.generationAt(yTop);
   const gLo = Math.max(0, m.generationAt(yBot) - m.span);
   const [mx0, mx1] = xr(ym);
@@ -552,8 +608,10 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
     if (cell < 1.5) return;
     const a = alpha * meshFade(cell);
     // Visible slots: the union of the index ranges at the top and the bottom of the screen.
-    const [p0, p1] = m.indexRange(gm, ...xr(yTop), yTop, alive);
-    const [q0, q1] = m.indexRange(gm, ...xr(yBot), yBot, alive);
+    const gg = alive ? m.G - 1 : gm;
+    const nn = m.size(gg);
+    const [p0, p1] = m.indexRange(gg, ...xr(yTop), yTop, alive);
+    const [q0, q1] = m.indexRange(gg, ...xr(yBot), yBot, alive);
     const i0 = Math.min(p0, q0);
     const i1 = Math.max(p1, q1);
     if (i1 - i0 > MAX_STRANDS) return;
@@ -561,15 +619,7 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
     for (let i = i0; i < i1; i++) {
       // In the green lane a slot is a strand only if someone in it is alive now.
       if (alive && !m.livingSlot(i)) continue;
-      strandPath(v, m, (i + 0.5) / n, alive, alive ? yTop : Math.max(yTop, v.yNow + DEAD_GAP_PX / v.sy), yBot, path);
-    }
-    if (!alive) {
-      // While the lane is still a solid band (fade ≈ 0), the slots first show as
-      // dark grooves splitting it into strands; then the lane dims and they turn light.
-      const groove = Math.min(1, (cell - 1.5) / 2.5) * (1 - meshFade(cell));
-      ctx.strokeStyle = rgba('#1c2521', 0.55 * groove);
-      ctx.lineWidth = 1;
-      ctx.stroke(path);
+      strandPath(v, m, (i + 0.5) / nn, alive, alive ? yTop : Math.max(yTop, v.yNow + DEAD_GAP_PX / v.sy), yBot, path);
     }
     ctx.strokeStyle = rgba(color, a);
     ctx.lineWidth = alive ? 1.5 : 1;

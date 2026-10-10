@@ -267,7 +267,7 @@ export class FanView implements InputHandlers {
         const genH = Math.abs(m.yOf(g * m.GL) - m.yOf((g + 1) * m.GL));
         const L = m.lanes(wy);
         // The strand spacing of the lane under the finger.
-        const cell = (wx < L.left + L.gw ? L.gw : L.w - L.gw) / m.size(g);
+        const cell = wx < L.left + L.gw ? L.gw / m.nLive : (L.w - L.gw) / m.size(g);
         sx = Math.min(sx, STRAND_PX / Math.max(1e-300, cell));
         sy = Math.max(this.cam.sy * 2, Math.min(this.cam.sy * 64, (2 * cell * sx) / Math.max(1e-300, genH)));
       }
@@ -295,7 +295,7 @@ export class FanView implements InputHandlers {
       // (only about a third of the index slots hold someone alive).
       const m = this.model(b);
       const L = m.lanes(wy);
-      const slotPx = (L.gw / m.size(m.generationAt(wy))) * sx;
+      const slotPx = (L.gw / m.nLive) * sx;
       if (wxT < L.left + L.gw && slotPx > 12) cx = m.nearestLiving(wxT, wy, Math.ceil(this.w / slotPx)) ?? cx;
     }
     pack.setScale(was[0], was[1]);

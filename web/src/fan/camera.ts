@@ -51,6 +51,8 @@ export interface CellModel {
   size(g: number): number;
   generationAt(y: number): number;
   readonly GL: number;
+  /** Index slots of the green lane (twigs.ts TwigModel.nLive). */
+  readonly nLive: number;
 }
 
 export class FanCamera {
@@ -175,7 +177,7 @@ export class FanCamera {
     // The dead's lane closes at the tip; size its cells a couple of generations below it.
     const stF = strandAt(b, Math.max(age, b.sp.t1 + (2 * m.GL) / 1e6), this.fan.mode);
     let cell = Infinity;
-    if (gw > 0) cell = Math.min(cell, gw / n);
+    if (gw > 0) cell = Math.min(cell, gw / Math.max(1, m.nLive));
     if (stF.w - gw > 0) cell = Math.min(cell, (stF.w - gw) / n);
     return cell;
   }

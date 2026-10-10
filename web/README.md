@@ -28,21 +28,33 @@ width = individuals, green = alive, gray = dead, height = time.
   - Threads: each child's mother thread (the line the strands and the lineage search
     follow) and a thinner father thread (the interbreeding mesh) curve up from the parent's
     strand into the child's base. Threads end exactly on procgen's `parents()`.
-  - Continuity: when strands are 1.5 px apart they appear as dark grooves in the lane; by
-    2–10 px apart they fade in as light strands while the lane dims under them. Then
-    individuals, threads, and `lion#…` handles appear. Only visible generations and index
-    ranges are computed.
+  - Continuity: the green lane turns into a texture of its strands once the width scale
+    bar reads ~100 individuals (`TEXTURE_IND`: from 150 down to 50, while strands are still
+    well under a pixel apart): ~1 px columns that keep their fraction of the lane, each as
+    bright as the share of its index slots holding someone alive now, with the lane dimmed
+    under it. As strands get 2–10 px apart they fade in (the texture fades out) while the
+    lane dims under them. Then individuals, threads, and `lion#…` handles appear. Every line
+    drawn is a real strand or individual (no flow lines or grooves). The gray lane has no
+    texture: its slots are all occupied, so it would be a flat fill anyway. Only visible
+    generations, index ranges and texture columns are computed.
   - "Has a living descendant" is exact (children, then down the mother line) within a
     lookup budget; past it, a critical-branching estimate decides, deterministically.
-- **Layout**: columns are packed in tree order by their base widths with small gaps
-  (`GAP_FRAC`, `GAP_MIN`), so the fan reads as one bundle splitting and zooming into a
-  species dives into it. Branches are left-aligned: the green lane runs straight along
-  the left edge, the gray lane narrows on its right. Labels go biggest species first; one
-  that would overlap waits for a closer zoom.
+- **Layout**: at the fork the columns are slices of the stem; above it they are packed in
+  tree order at every height, `GAP_PX` (5 px) apart on screen, at every zoom, so whenever
+  neighbours would fit on screen next to the branch you look at, they are there. In the
+  whole-fan view the bundle is centred. Zoomed in (`PACK_FADE`, 5×–200× the home width
+  zoom) the packing is referenced to the point at the screen centre instead
+  (`Pack.setRef`, called by `camera.settle`): the branch under it keeps its left edge, and
+  so its living strands, upright, and its neighbours lean against its edges. The
+  reference moves continuously across a branch's gray lane and gap to the next branch,
+  so panning never jumps. Branches are left-aligned: the green lane runs along the left
+  edge, the gray lane narrows on its right. Labels go biggest species first; one that
+  would overlap waits for a closer zoom.
 - **Camera** (`camera.ts`): axis-aligned, never rotated or sheared. One uniform pinch
-  (shift/alt+wheel zoom one axis). Limits: the screen spans at least 10 years (the camera
-  keeps the requested time zoom `ty` and shows the capped one, so zooming out undoes a
-  zoom-in); width zoom-in stops at ~90 px per strand and where the strands under the finger
+  (shift/alt+wheel zoom one axis). Limits: 10 years take at most 10% of the screen
+  (`MAX_YEARS_FRAC`), so it always spans ~100 years or more (the camera keeps the requested
+  time zoom `ty` and shows the capped one, so zooming out undoes a zoom-in; zooming in just
+  below "now" stops while "now" is on screen, pan down to go further); width zoom-in stops at ~90 px per strand and where the strands under the finger
   would lean flatter than 1.5 (near "now" the gray lane closes within a few generations);
   zoom-out stops at the whole fan; panning keeps part of the fan on screen. Living strands
   are exactly vertical (left-aligned lanes). Double-tap fits a branch, then zooms 16× in
