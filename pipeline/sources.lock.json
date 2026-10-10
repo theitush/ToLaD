@@ -61,17 +61,17 @@
   "url": "https://esapubs.org/archive/ecol/E090/184/PanTHERIA_1-0_WR05_Aug2008.txt"
  },
  "pbdb/mammalia_genera.json": {
-  "bytes": 3071929,
+  "bytes": 3071497,
   "post_body": null,
-  "retrieved": "2026-10-09",
-  "sha256": "49f271f778d1fb4e26b10dd1c1f19c8f64a7d0e377b07c513300c68c5b1760dd",
+  "retrieved": "2026-10-10",
+  "sha256": "daaafdd8624147bf38f8f69bf1d46f760b1c3c2cdaffb8a096bdb6117ba61175",
   "url": "https://paleobiodb.org/data1.2/taxa/list.json?base_name=Mammalia&rank=genus&taxon_status=accepted&pres=regular&show=app,parent,class&vocab=pbdb"
  },
  "pbdb/mammalia_species.json": {
-  "bytes": 6723171,
+  "bytes": 6722724,
   "post_body": null,
-  "retrieved": "2026-10-09",
-  "sha256": "2b305dfbc722e91e272ff03fdef972f3fbaca0fb512b371bbe589d160999e1bc",
+  "retrieved": "2026-10-10",
+  "sha256": "fc84e8cf4ed68ba7dcb117a33916b9cad09e32a949417784650536975da046d1",
   "url": "https://paleobiodb.org/data1.2/taxa/list.json?base_name=Mammalia&rank=species&taxon_status=accepted&pres=regular&show=app,parent,class&vocab=pbdb"
  },
  "phylacine/Synonymy_table_valid_species_only.csv": {
@@ -89,10 +89,10 @@
   "url": "https://raw.githubusercontent.com/MegaPast2Future/PHYLACINE_1.2/2fb87f0b994ee82daa6691931f15971535322a2e/Data/Traits/Trait_data.csv"
  },
  "prb/how-many-people-have-ever-lived-on-earth.html": {
-  "bytes": 487757,
+  "bytes": 487806,
   "post_body": null,
-  "retrieved": "2026-10-09",
-  "sha256": "3e39289adcb6759687d5a71b100a12e472799b57a31cbe1aa1fb8ebaef0ac1b4",
+  "retrieved": "2026-10-10",
+  "sha256": "eccf7be6a1e650d7202f47408858565f97cdaae8f373fac536b52cc7cb6040e6",
   "url": "https://www.prb.org/articles/how-many-people-have-ever-lived-on-earth/"
  },
  "upham/MamPhy_fullPosterior_BDvr_Completed_5911sp_topoCons_NDexp_MCC_v2_target.tre": {
