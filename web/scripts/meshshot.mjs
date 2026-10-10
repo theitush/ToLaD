@@ -18,7 +18,8 @@ const scenes = process.argv[3]
       ['bar-1e4', 'Lion', 3000, 1e4, 40],
       ['bar-5e4', 'Lion', 3000, 5e4, 40],
     ];
-const browser = await chromium.launch({ headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+// Default headless (its software GL renders WebGL2): no GPU flags.
+const browser = await chromium.launch({ headless: true });
 try {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
   const page = await ctx.newPage();
