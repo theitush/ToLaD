@@ -5,21 +5,28 @@
 // One pinch zooms both axes by the same factor. Width can go ~10^12 deeper
 // than time (a linear-width branch is that much thinner than it is tall), so
 // time stops at a floor and width keeps going:
-//   - time: the screen always spans at least MIN_YEARS. On the log axis that is
-//     a limit that depends on height (near "now" a year is tall, deep in the
-//     past it is tiny), so the camera keeps the time zoom the gestures asked for
-//     (`ty`) and shows sy = min(ty, the 10-year limit there). Zooming back out
-//     undoes a zoom-in exactly, and panning at the floor keeps ~10 years on screen.
+//   - time: MIN_YEARS (10 years) never takes more than MAX_YEARS_FRAC (30%) of
+//     the screen's height anywhere on screen, so the screen always shows at
+//     least ~33 years. On the log axis years are tallest at the top of the
+//     screen (the youngest), so the limit is measured there: the 30% of the
+//     screen below its top edge must span 10 years. That depends on height
+//     (near "now" a year is tall, deep in the past it is tiny), so the camera
+//     keeps the time zoom the gestures asked for (`ty`) and shows sy = min(ty,
+//     the limit there). Every path (pinch, wheel, double-tap, fly-to, resize)
+//     lands in settle(), which applies it. Zooming back out undoes a zoom-in
+//     exactly.
 //   - width, zooming in: up to ~STRAND_PX per strand of the thinnest lane, and
 //     never so far that the strands under the finger lie flatter than MAX_SLOPE
 //     (near "now" the dead's lane narrows to nothing within a few generations).
 //   - zoom out: no further than the whole fan with a margin.
 //   - pan: some of the fan always stays on screen.
 
-import { bezier, branchLeft, strandAt, type Fan, type FanBranch } from './layout';
+import { leftAt, strandAt, type Fan, type FanBranch } from './layout';
 
-/** The visible time span never drops below this (years). */
+/** A span of this many years ... */
 export const MIN_YEARS = 10;
+/** ... never takes more than this fraction of the screen's height (the screen shows ≥ ~33 years). */
+export const MAX_YEARS_FRAC = 0.3;
 /** Width zoom stops when strands are this far apart (px): handles legible. */
 export const STRAND_PX = 90;
 /** Steepest on-screen lean (dx/dy) of the strands under the finger that zoom-in allows. */
@@ -70,15 +77,14 @@ export class FanCamera {
     return [c.cx + (px - this.w / 2) / c.sx, c.cy + (py - this.h / 2) / c.sy];
   }
 
-  /** World x extent of the fan. */
+  /**
+   * World x extent of the fan: the stem's width, plus a margin for the gaps
+   * between the siblings just above the fork (GAP_PX each on screen, so wider
+   * in world units the further out the camera is).
+   */
   extent(): [number, number] {
-    let x0 = -this.fan.trunkWidth / 2;
-    let x1 = this.fan.trunkWidth / 2;
-    for (const b of this.fan.branches) {
-      x0 = Math.min(x0, b.colX - b.width / 2);
-      x1 = Math.max(x1, b.colX + b.width / 2);
-    }
-    return [x0, x1];
+    const h = this.fan.trunkWidth / 2;
+    return [-h * 1.2, h * 1.2];
   }
 
   /** The whole fan: "now" near the top, the stem entering from the bottom edge. */
@@ -119,14 +125,24 @@ export class FanCamera {
     return this.years(wy + (this.h - py) / sy) - this.years(wy - py / sy);
   }
 
-  /** The largest time zoom ≤ ty that keeps MIN_YEARS on screen, anchored at (wy, py). */
+  /**
+   * Years in the tallest MAX_YEARS_FRAC of the screen: the band just below its
+   * top edge (years only get shorter going up the log axis, and above "now"
+   * they keep the rate they have at "now").
+   */
+  bandYears(wy: number, py: number, sy: number): number {
+    const top = wy - py / sy;
+    return this.years(top + (MAX_YEARS_FRAC * this.h) / sy) - this.years(top);
+  }
+
+  /** The largest time zoom ≤ ty at which MIN_YEARS takes at most MAX_YEARS_FRAC of the screen, anchored at (wy, py). */
   timeCap(wy: number, py: number, ty: number): number {
-    if (this.spanYears(wy, py, ty) >= MIN_YEARS) return ty;
+    if (this.bandYears(wy, py, ty) >= MIN_YEARS) return ty;
     let lo = Math.log(Math.min(ty, 1e-3));
     let hi = Math.log(ty);
     for (let k = 0; k < 64; k++) {
       const mid = (lo + hi) / 2;
-      if (this.spanYears(wy, py, Math.exp(mid)) >= MIN_YEARS) lo = mid;
+      if (this.bandYears(wy, py, Math.exp(mid)) >= MIN_YEARS) lo = mid;
       else hi = mid;
     }
     return Math.exp(lo);
@@ -151,16 +167,16 @@ export class FanCamera {
   /** The deepest width zoom allowed at world point (wx, wy) with time zoom sy. */
   sxCap(wx: number, wy: number, sy: number): number {
     const bs = this.fan.branches;
-    const span = bs.filter((b) => wy >= b.tipY && wy <= b.p3.y);
+    const span = bs.filter((b) => wy >= b.tipY && wy <= 0);
     let cell = Infinity;
-    for (const b of span.length ? span : bs) cell = Math.min(cell, this.cellAt(b, Math.min(b.p3.y, Math.max(b.tipY, wy))));
+    for (const b of span.length ? span : bs) cell = Math.min(cell, this.cellAt(b, Math.min(0, Math.max(b.tipY, wy))));
     let cap = Math.min(SX_MAX, STRAND_PX / cell);
     // The dead's lane narrows going up, and its strands keep their share of it,
     // so they lean in proportion to how far across the lane they are.
     const t = this.fan.time;
     for (const b of span) {
       const st = strandAt(b, t.ageAt(wy), this.fan.mode);
-      const left = branchLeft(b);
+      const left = leftAt(b, wy);
       const gw = st.w * st.f;
       if (wx < left + gw || wx > left + st.w) continue;
       const u = (wx - left - gw) / Math.max(1e-300, st.w - gw);
@@ -179,37 +195,27 @@ export class FanCamera {
   settle(px = this.w / 2, py = this.h / 2, wx = this.cam.cx, wy = this.cam.cy): void {
     const c = this.cam;
     const [sxMin, syMin] = this.minScale();
+    // The siblings' packing depends on the scale: keep (wx, wy) on the branch it was on.
+    const pack = this.fan.pack;
+    const a = pack.anchor(wx, wy);
     c.sx = Math.min(SX_MAX, Math.max(sxMin, c.sx));
     c.ty = Math.min(TY_MAX, Math.max(syMin, c.ty));
     c.sy = this.timeCap(wy, py, c.ty);
+    pack.setScale(c.sx, c.sy, this.home().sx);
+    wx = pack.resolve(a, wx, wy);
     c.cx = wx - (px - this.w / 2) / c.sx;
     c.cy = wy - (py - this.h / 2) / c.sy;
     this.clampPan();
   }
 
-  /**
-   * World x intervals holding drawn content at height y: the stem below the
-   * fork, else each branch's ribbon (its spine on the S-curve, its column above).
-   */
+  /** World x intervals holding drawn content at height y: the stem below the fork, else each branch. */
   contentAt(y: number): [number, number][] {
     const f = this.fan;
     if (y >= 0) return [[-f.trunkWidth / 2, f.trunkWidth / 2]];
     const out: [number, number][] = [];
     for (const b of f.branches) {
       if (y < b.tipY) continue;
-      let x = b.colX;
-      if (y > b.p3.y) {
-        // On the S-curve: its height falls monotonically from the fork to the column.
-        let lo = 0;
-        let hi = 1;
-        for (let k = 0; k < 50; k++) {
-          const t = (lo + hi) / 2;
-          if (bezier(b, t).y > y) lo = t;
-          else hi = t;
-        }
-        x = bezier(b, (lo + hi) / 2).x;
-      }
-      const left = x - b.width / 2;
+      const left = leftAt(b, y);
       out.push([left, left + strandAt(b, f.time.ageAt(y), f.mode).w]);
     }
     return out;
@@ -219,7 +225,7 @@ export class FanCamera {
   nearestContent(x: number, y: number, y1 = y): number {
     const ys = [y, y1];
     for (let k = 1; k < 8; k++) ys.push(y + ((y1 - y) * k) / 8);
-    for (const b of this.fan.branches) for (const v of [b.tipY, b.p3.y, 0]) if (v > y && v < y1) ys.push(v);
+    for (const b of this.fan.branches) for (const v of [b.tipY, 0]) if (v > y && v < y1) ys.push(v);
     let best = x;
     let bd = Infinity;
     for (const h of ys) {

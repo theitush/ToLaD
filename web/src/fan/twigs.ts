@@ -24,7 +24,7 @@
 //   labels    plus handles (lion#…).
 
 import { Species, type Address } from '../../../packages/procgen/src/index.ts';
-import { branchLeft, strandAt, type FanBranch, type TimeScale, type WidthMode } from './layout';
+import { leftAt, strandAt, type FanBranch, type TimeScale, type WidthMode } from './layout';
 import type { SpeciesRec } from './panthera';
 
 function keyOf(common: string): string {
@@ -37,20 +37,34 @@ function keyOf(common: string): string {
 }
 
 /**
- * procgen model of a species from its data: G = duration / generation length
- * generations of constant size N = ever / G. Mean lifespan L = alive·duration/ever
- * makes the number alive at the end ≈ N·L/GL = the data's alive count (the
- * pipeline's N_ever ≈ alive ÷ lifespan × T read backwards). Extinct species are
- * observed long after their last generation, so nobody is alive.
+ * procgen model of a species from its data. With a curated history that drives
+ * the counts (rec.births), procgen follows its compiled segments: births per
+ * generation ramp along the real population curve, counted back from now, so
+ * the number of strands per generation (and the mesh's width) follows it.
+ * Otherwise: G = duration / generation length generations of constant size
+ * N = ever / G. Mean lifespan L = alive·duration/ever makes the number alive at
+ * the end ≈ N·L/GL = the data's alive count (the pipeline's N_ever ≈ alive ÷
+ * lifespan × T read backwards). Extinct species are observed long after their
+ * last generation, so nobody is alive.
  */
 export function speciesModel(rec: SpeciesRec): Species {
-  const years = (rec.t0 - rec.t1) * 1e6;
+  const key = keyOf(rec.common);
   const GL = rec.genYears;
+  if (rec.births) {
+    return new Species({
+      key,
+      sexual: true,
+      segments: rec.births.segments,
+      generationYears: GL,
+      lifespanYears: rec.births.lifespan,
+    });
+  }
+  const years = (rec.t0 - rec.t1) * 1e6;
   const G = Math.max(1, Math.round(years / GL));
   const N = Math.max(2, Math.round(rec.ever / G));
   const lifespan = rec.alive > 0 ? (rec.alive * years) / rec.ever : GL * 0.5;
   return new Species({
-    key: keyOf(rec.common),
+    key,
     sexual: true,
     segments: [{ generations: G, startSize: N }],
     generationYears: GL,
@@ -92,6 +106,13 @@ export class TwigModel {
   readonly span: number;
   /** First generation in which anybody can still be alive (G if extinct). */
   readonly aliveFrom: number;
+  /**
+   * Age (Ma) of procgen's time 0, the start of generation 0. The species' first
+   * appearance, or with a history (counted back from now) the end of its last
+   * generation minus all its generations, so the generations land on their
+   * real calendar years and the last one ends at the tip.
+   */
+  readonly origin: number;
 
   constructor(
     readonly b: FanBranch,
@@ -105,15 +126,16 @@ export class TwigModel {
     this.GL = this.sp.generationYears;
     this.span = Math.ceil((2 * this.sp.lifespanYears) / this.GL) + 1;
     this.aliveFrom = this.rec.extinct ? this.G : Math.max(0, this.G - this.span);
+    this.origin = this.rec.births ? this.rec.t1 + (this.G * this.GL) / 1e6 : this.rec.t0;
   }
 
   size(g: number): number {
     return Number(this.sp.size(g));
   }
 
-  /** Age (Ma) of a moment `tYears` after the species' first appearance. */
+  /** Age (Ma) of a moment `tYears` after procgen's time 0 (the species' first appearance). */
   ageOf(tYears: number): number {
-    return Math.max(0, this.rec.t0 - tYears / 1e6);
+    return Math.max(0, this.origin - tYears / 1e6);
   }
 
   yOf(tYears: number): number {
@@ -128,7 +150,7 @@ export class TwigModel {
   /** Generation born at world height y (clamped). */
   generationAt(y: number): number {
     const age = this.time.ageAt(y);
-    const t = (this.rec.t0 - age) * 1e6;
+    const t = (this.origin - age) * 1e6;
     return Math.min(this.G - 1, Math.max(0, Math.floor(t / this.GL)));
   }
 
@@ -141,7 +163,7 @@ export class TwigModel {
   row(g: number): { y: number; left: number; w: number; n: number } {
     const y = this.yOf((g + 0.5) * this.GL);
     const w = this.widthAt(y);
-    return { y, left: branchLeft(this.b), w, n: this.size(g) };
+    return { y, left: leftAt(this.b, y), w, n: this.size(g) };
   }
 
   /**
@@ -151,7 +173,7 @@ export class TwigModel {
    */
   lanes(y: number): { left: number; w: number; gw: number } {
     const st = strandAt(this.b, this.time.ageAt(y), this.mode);
-    return { left: branchLeft(this.b), w: st.w, gw: st.w * st.f };
+    return { left: leftAt(this.b, y), w: st.w, gw: st.w * st.f };
   }
 
   /** Fraction across its lane of individual (g, i): the centre of its equal share of its generation. */
@@ -416,6 +438,58 @@ export function threadEnds(v: TwigView, m: TwigModel, parent: Twig, child: Twig,
   return [px, py, v.toScreen(child.x, child.yBirth)[1]];
 }
 
+/** Spacing (px) of the flow lines drawn over a lane too wide for the screen whose strands are still too fine to show. */
+const FLOW_PX = 16;
+
+/**
+ * Never a featureless fill: where a lane is wider than half the screen but its
+ * strands are still under a pixel apart, faint lines every FLOW_PX follow the
+ * strands' flow (each keeps its fraction of the lane, like a strand), so the
+ * lane's lean and its edges always read. They are not individuals: the width
+ * scale says how many individuals a line spacing holds.
+ */
+function flowLines(
+  v: TwigView,
+  m: TwigModel,
+  yTop: number,
+  yBot: number,
+  L: { left: number; w: number; gw: number },
+  xr: (y: number) => [number, number],
+  alpha: [number, number],
+): void {
+  const ctx = v.ctx;
+  for (const alive of [false, true]) {
+    const a = alpha[alive ? 1 : 0];
+    if (a <= 0.01 || (alive && m.rec.extinct)) continue;
+    const lw = alive ? L.gw : L.w - L.gw;
+    const lanePx = lw * v.sx;
+    if (lanePx < 0.5 * v.w) continue;
+    const du = FLOW_PX / lanePx;
+    // Lane fractions on screen anywhere from the top to the bottom of the screen.
+    let u0 = 1;
+    let u1 = 0;
+    for (let k = 0; k <= 8; k++) {
+      const y = yTop + ((yBot - yTop) * k) / 8;
+      const Ly = m.lanes(y);
+      const l = alive ? Ly.left : Ly.left + Ly.gw;
+      const wy = Math.max(1e-300, alive ? Ly.gw : Ly.w - Ly.gw);
+      const [x0, x1] = xr(y);
+      u0 = Math.min(u0, (x0 - l) / wy);
+      u1 = Math.max(u1, (x1 - l) / wy);
+    }
+    u0 = Math.max(0, u0 - 3 * du);
+    u1 = Math.min(1, u1 + 3 * du);
+    const k0 = Math.ceil(u0 / du);
+    const k1 = Math.floor(u1 / du);
+    if (k1 - k0 > 400 || k1 < k0) continue;
+    const path = new Path2D();
+    for (let k = k0; k <= k1; k++) strandPath(v, m, k * du, alive, alive ? yTop : Math.max(yTop, v.yNow + DEAD_GAP_PX / v.sy), yBot, path);
+    ctx.strokeStyle = alive ? rgba('#123c22', 0.45 * a) : rgba('#1c2521', 0.32 * a);
+    ctx.lineWidth = 1;
+    ctx.stroke(path);
+  }
+}
+
 function rgba(hex: string, a: number): string {
   const n = parseInt(hex.slice(1), 16);
   return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a.toFixed(3)})`;
@@ -444,9 +518,9 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
     const py = v.toScreen(0, y)[1];
     return [v.toWorld(0, py)[0], v.toWorld(v.w, py)[0]];
   };
-  if (wyBot < b.tipY || wyTop > b.p3.y) return null;
+  if (wyBot < b.tipY || wyTop > 0) return null;
   const yTop = Math.max(wyTop, b.tipY);
-  const yBot = Math.min(wyBot, b.p3.y);
+  const yBot = Math.min(wyBot, 0);
   // Off the branch's column entirely?
   const Lb = m.lanes(yBot);
   const [bx0, bx1] = xr(yBot);
@@ -458,6 +532,8 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
   const cellGray = ((L.w - L.gw) / n) * v.sx;
   const cellGreen = (L.gw / n) * v.sx;
   const cellPx = Math.max(cellGray, cellGreen);
+  // Until the strands themselves show, flow lines keep a wide lane from being a flat fill.
+  flowLines(v, m, yTop, yBot, L, xr, [1 - Math.min(1, 1.5 * meshFade(cellGray)), 1 - Math.min(1, 1.5 * meshFade(cellGreen))]);
   if (cellPx < 1.5) return null;
   const fade = meshFade(cellGray);
   const fadeGreen = meshFade(cellGreen);

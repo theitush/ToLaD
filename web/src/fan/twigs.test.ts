@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { branchLeft, layoutFan, remaining, strandAt } from './layout';
+import { layoutFan, leftAt, remaining, strandAt } from './layout';
 import { PANTHERA } from './panthera';
 import { speciesModel, threadEnds, TwigModel, type TwigView } from './twigs';
 
@@ -62,7 +62,7 @@ describe('width = individuals', () => {
         const st = strandAt(b, f.time.ageAt(y), f.mode);
         expect(L.w).toBeCloseTo(st.w, 12);
         expect(L.gw).toBeCloseTo(st.w * st.f, 12);
-        expect(L.left).toBeCloseTo(branchLeft(b), 12);
+        expect(L.left).toBeCloseTo(leftAt(b, y), 12);
         for (const alive of [false, true]) {
           const lo = alive ? L.left : L.left + L.gw;
           const hi = alive ? L.left + L.gw : L.left + L.w;
@@ -86,7 +86,7 @@ describe('width = individuals', () => {
         for (const y of [m.row(g).y, m.yOf(Math.min(m.T, (g + 2) * m.GL)), m.yOf((g + 0.9) * m.GL), f.time.y(0)]) {
           const st = strandAt(b, f.time.ageAt(y), f.mode);
           const gw = st.w * st.f;
-          const left = branchLeft(b);
+          const left = leftAt(b, y);
           // The union of the slots' cells is exactly the branch: green lane, then gray lane.
           expect(m.xAt(m.u(g, 0), y, true) - gw / n / 2).toBeCloseTo(left, 9);
           expect(m.xAt(m.u(g, n - 1), y, true) + gw / n / 2).toBeCloseTo(left + gw, 9);
@@ -166,7 +166,8 @@ describe('determinism and links', () => {
   it("a parent link ends at the twig of procgen's parents()", () => {
     const m = lion(fanLog);
     const g = m.G - 1;
-    for (const i of [0, 5, 4000, 70000]) {
+    for (const i0 of [0, 5, 4000, 70000]) {
+      const i = Math.min(i0, m.size(g) - 1);
       const ps = m.parents(g, i);
       expect(ps).toEqual(m.sp.parents({ generation: g, index: BigInt(i) }));
       expect(ps).toHaveLength(2);
@@ -190,7 +191,8 @@ describe('determinism and links', () => {
       const v = { sx: 1, sy: 1, yNow: f.time.y(0), toScreen: (x: number, y: number) => [x, y] } as unknown as TwigView;
       for (const g of [1, 1000, m.G - 300, m.G - 1]) {
         const genH = m.row(g - 1).y - m.row(g).y;
-        for (const i of [0, 17, 4000, 70000]) {
+        for (const i0 of [0, 17, 4000, 70000]) {
+          const i = Math.min(i0, m.size(g) - 1);
           const child = m.twig(g, i);
           const ps = m.parents(g, i);
           expect(ps).toEqual(m.sp.parents({ generation: g, index: BigInt(i) }));
