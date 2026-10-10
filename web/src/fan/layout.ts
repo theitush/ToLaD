@@ -46,7 +46,10 @@
 // (warm gray for an extinct species, all of it). In a parent column the green
 // is the genealogy recurrence on the summed population (FanNode.q), drawn as
 // one green prefix across its strands, linear in log time between its
-// generations' midpoints.
+// generations' midpoints. Just below a split the lanes are still the
+// daughters' own (each slice green on its own left, with its own share scaled
+// to the column's), blending into the one prefix over FanNode.blend: the
+// green/gray boundary is as continuous as the edges.
 //
 // Height = time: the oldest split is at y = 0 ("the fork"), "now" at
 // y = −TIME_H, on a log years-before-present scale offset by TIME_C (TimeScale).
@@ -80,7 +83,7 @@ export const MIN_GAP_FRAC = 0.04;
 /** The fork span: this share of the split's height below now ... */
 export const FORK_FRAC = 0.07;
 /** ... at most this share of the gap from the split to a daughter's own split ... */
-export const FORK_NEST = 0.5;
+export const FORK_NEST = 0.85;
 /** ... and this share of a daughter species' own life (split to tip). */
 export const FORK_LEAF = 0.4;
 
@@ -185,6 +188,13 @@ export interface FanNode {
   forkY: number;
   /** The fork span of its daughters (world height above its split). */
   fork: number;
+  /**
+   * The lanes' blend below its split (world height): just below it each
+   * daughter's slice keeps its own green share on its own left (its lanes
+   * just above, scaled so the column's total is its recurrence share q);
+   * over this span they blend into one green prefix across the column.
+   */
+  blend: number;
   /**
    * Share with living descendants by generation below the split: q[k] at the
    * middle of generation k below it (ages ageMa + (k + ½)·GL), linear in log
@@ -312,6 +322,7 @@ export class Steps {
         const bot = Math.min(nd.yBot, this.bottom);
         if (s.y > b.tipY && s.y < bot) out.push(s.y);
         if (nd.parent && nd.forkY > s.y && nd.forkY < bot) out.push(nd.forkY);
+        if (nd.y + nd.blend < bot) out.push(nd.y + nd.blend);
         // Where the column's green prefix in the strand changes slope: around each generation midpoint where it moves.
         const cw = (k: number) => clampW(nd.q[Math.min(nd.q.length - 1, Math.max(0, k))] * nd.width - s.off, b.baseW);
         for (let k = 0; k < nd.q.length; k++) {
@@ -334,9 +345,47 @@ export class Steps {
       const w = b.unit * g(b.pop.aliveAt(age), this.mode);
       return [w, b.sp.extinct ? 0 : w * b.pop.greenAt(age)];
     }
-    // In a parent column: its founders, green as far as the column's green prefix reaches.
-    const s = segAt(b, y);
-    return [b.baseW, clampW(nodeQ(s.node, age) * s.node.width - s.off, b.baseW)];
+    // In a parent column: its founders, green by the column's lanes there.
+    let j = 0;
+    while (j + 1 < b.path.length && b.path[j + 1].y <= y) j++;
+    return [b.baseW, this.greenIn(b, j, y)];
+  }
+
+  /**
+   * Green width of strand b in its j-th parent column at height y. Below the
+   * blend: the column's green prefix (its recurrence share q from its left).
+   * At the split: the daughters' own lanes, each slice green on its own left
+   * with its own share, exactly as just above the split (g_i). Over the blend
+   * the one eases linearly in y into the other, so the green/gray boundary is
+   * as continuous as the edges; the drawn share eases from the daughters'
+   * (which is q[0], the recurrence's start) to the recurrence's own (which
+   * recovers within a few generations of the split: drawn at once, that is a
+   * sideways jump at every zoom but the deepest).
+   */
+  greenIn(b: FanBranch, j: number, y: number): number {
+    const s = b.path[j];
+    const v = s.node;
+    const W = v.width;
+    const q = nodeQ(v, this.time.ageAt(y));
+    const pre = clampW(q * W - s.off, b.baseW);
+    const u = v.blend > 0 ? (y - v.y) / v.blend : 1;
+    if (u >= 1) return pre;
+    const t = Math.max(0, u);
+    return (1 - t) * this.kidGreen(b, j) + t * pre;
+  }
+
+  private readonly kidG = new Map<FanBranch, number[]>();
+
+  /** Strand b's green just above the split of its j-th parent column: its own column's (j = 0) or the daughter column's at its bottom. */
+  kidGreen(b: FanBranch, j: number): number {
+    let a = this.kidG.get(b);
+    if (!a) this.kidG.set(b, (a = []));
+    let v = a[j];
+    if (v === undefined) {
+      v = j === 0 ? (b.sp.extinct ? 0 : b.baseW * b.pop.greenAt(Math.max(b.sp.t1, b.t0 - 1e-9))) : this.greenIn(b, j - 1, b.path[j].y);
+      a[j] = v;
+    }
+    return v;
   }
 
   /** Width of branch b at world y (lanesAt's first). */
@@ -465,7 +514,7 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = PANTHE
   const build = (s: Split, parent: FanNode | null): FanNode => {
     const y = time.y(s.ageMa);
     const yBot = parent ? parent.y : yBottom;
-    const v: FanNode = { split: s, name: s.name, ageMa: s.ageMa, y, yBot, parent, kids: [], strands: [], n: 0, genYears: 0, width: 0, xc: 0, left: 0, subOff: 0, forkY: yBot, fork: 0, q: new Float64Array([0]) };
+    const v: FanNode = { split: s, name: s.name, ageMa: s.ageMa, y, yBot, parent, kids: [], strands: [], n: 0, genYears: 0, width: 0, xc: 0, left: 0, subOff: 0, forkY: yBot, fork: 0, blend: 0, q: new Float64Array([0]) };
     nodes.push(v);
     for (const k of s.kids) {
       if (typeof k === 'string') {
@@ -558,6 +607,7 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = PANTHE
     let F = FORK_FRAC * (v.y - yNow);
     for (const k of v.kids) F = Math.min(F, isNode(k) ? FORK_NEST * (v.y - k.y) : FORK_LEAF * (v.y - k.tipY));
     v.fork = F;
+    v.blend = v.parent ? Math.min(F, 0.5 * (v.yBot - v.y)) : F;
     let off = 0;
     for (const k of v.kids) {
       k.subOff = off;

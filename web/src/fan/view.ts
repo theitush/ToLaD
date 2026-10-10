@@ -637,10 +637,10 @@ export class FanView implements InputHandlers {
    * to its tip. A parent column is just its daughters' strands side by side
    * (widths adding up to its width), its green one prefix across them.
    *
-   * All straight lines (layout.ts): its slices of the parent columns, the jogs, its column; the
-   * gray edge steps at the step lines on screen (Steps.lines), the width
-   * constant between them. Off screen only the splits and the tip are
-   * kept, whose chords stay off screen above or below it.
+   * Straight pieces between its knots (layout.ts Steps): its slices of the
+   * parent columns, sliding out of each split over the fork, its own
+   * column, ramps where its population changes; each piece a trapezoid.
+   * Off screen only the nearest knot beyond each edge is kept.
    */
   private drawStrand(b: FanBranch): void {
     const yb = this.fan.trunkBottom.y;

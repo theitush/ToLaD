@@ -2,7 +2,7 @@
 // home, the mesh at a range of individuals per scale bar, deep in the lives,
 // zoomed far out, and a species card open.
 //   npm run build:single && node scripts/designshot.mjs <out-dir> [prefix] [only,names]
-//   (DSF: device scale factor, default 2; CLIP=x,y,w,h; DEBUG=1: the ?debug readout)
+//   (DSF: device scale factor, default 2; CLIP=x,y,w,h; DEBUG=1: the ?debug readout; MODE=log: log widths)
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -36,8 +36,11 @@ const scenes = [
   ['split-lionleopard', 'split', [2.57, 5]],
   ['split-cavelion', 'split', [0.5, 5]],
   ['split-root', 'split', [4.6, 3]],
+  ['split-root-close', 'split', [4.6, 14]],
   ['mesh-split', 'bar', ['Lion', 499990, 100, 2e4, 1]],
   ['lineage', 'tapnode', [2.57, 1.2]],
+  // A species' recent past [species, years back]: its whole width, the last years filling the screen (the lion's decline).
+  ['decline', 'recent', ['Lion', 200]],
 ];
 const browser = await chromium.launch({ headless: true });
 try {
@@ -49,9 +52,9 @@ try {
   for (const [name, kind, args] of scenes) {
     if (ONLY && !ONLY.has(name)) continue;
     await page.evaluate(
-      ([kind, args]) => {
+      ([kind, args, mode]) => {
         const f = window.__fan;
-        f.setMode('linear');
+        f.setMode(mode);
         f.tap(-1e6, -1e6);
         const fan = f.fan;
         if (kind === 'home' || kind === 'card') {
@@ -115,6 +118,14 @@ try {
             f.cam = { cx: (lo + hi) / 2, cy: v.y, sx, sy, ty: sy };
             f.camera.settle();
           }
+        } else if (kind === 'recent') {
+          const b = fan.branches.find((b) => b.sp.common === args[0]);
+          const y0 = fan.time.y(0);
+          const y1 = fan.time.y(args[1] / 1e6);
+          const sx = (0.8 * f.w) / b.width;
+          const sy = (0.8 * f.h) / (y1 - y0);
+          f.cam = { cx: b.xc ?? b.colLeft + b.width / 2, cy: (y0 + y1) / 2, sx, sy, ty: sy };
+          f.camera.settle();
         } else if (kind === 'far') {
           const h = f.homeCamera();
           f.cam = { ...h, sx: h.sx / 6, sy: h.sy / 6, ty: h.sy / 6 };
@@ -132,7 +143,7 @@ try {
         }
         f.request();
       },
-      [kind, args ?? []],
+      [kind, args ?? [], process.env.MODE || 'linear'],
     );
     await page.waitForTimeout(900);
     // CLIP=x,y,w,h (CSS px): only that part of the page (with DSF=4–6, a close look).

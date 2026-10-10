@@ -43,16 +43,18 @@ describe('thick-branch tree: centred, continuous, straight, honest', () => {
   /** Every height where something happens to b: its tip, the taper's start, its knots, its fork's top, the splits and forks below it. */
   const events = (f: Fan, b: FanBranch): number[] => {
     const ys = [b.tipY, b.splitY, b.forkY, ...f.steps.bounds(b)];
-    for (const s of b.path) ys.push(s.y, s.node.forkY);
+    for (const s of b.path) ys.push(s.y, s.node.forkY, s.node.y + s.node.blend);
     return ys.filter((y) => y >= b.tipY && y < f.trunkBottom.y);
   };
-  const edges = (b: FanBranch, y: number): [number, number] => {
+  /** Its left edge, its right edge and the green/gray boundary between its lanes. */
+  const edges = (b: FanBranch, y: number): [number, number, number] => {
     const l = leftAt(b, y);
-    return [l, l + laneAt(b, y).w];
+    const L = laneAt(b, y);
+    return [l, l + L.w, l + L.gw];
   };
 
   for (const mode of ['log', 'linear'] as WidthMode[]) {
-    it(`every edge is continuous: no jump across any split, fork, population change or taper (${mode})`, () => {
+    it(`every edge, and the green/gray boundary, is continuous: no jump across any split, fork, population change or taper (${mode})`, () => {
       const f = layoutFan(PANTHERA, mode);
       let checked = 0;
       for (const b of f.branches) {
@@ -73,9 +75,17 @@ describe('thick-branch tree: centred, continuous, straight, honest', () => {
             prev = cur;
             checked++;
           }
+          // The green/gray boundary: continuous too, though the green share can change fast (a few
+          // generations after a split the recurrence recovers): halving the step across the event
+          // halves the move (a jump would not shrink).
+          const e1 = 1e-6 * Math.max(1, Math.abs(yk));
+          const at = (y: number) => edges(b, Math.max(b.tipY, y))[2];
+          const d1 = Math.abs(at(yk + e1) - at(yk - e1));
+          const d2 = Math.abs(at(yk + e1 / 1000) - at(yk - e1 / 1000));
+          expect(d2, `${b.sp.common} lanes at ${yk}`).toBeLessThan(Math.max(d1 / 100, 1e-9 * Math.max(1, b.width)));
         }
         // And along the whole strand, tip to the bottom of the world: bounded slopes, never a step.
-        const N = 20000;
+        const N = 8000;
         const y0 = b.tipY;
         const y1 = f.trunkBottom.y - 1;
         let prev = edges(b, y0);

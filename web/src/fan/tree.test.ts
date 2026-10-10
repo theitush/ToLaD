@@ -133,16 +133,28 @@ describe('the dated tree', () => {
           const y = f.time.y(v.ageMa + ((k + 0.5) * GL) / 1e6);
           if (y >= v.yBot) break;
           const green = sum(v.strands.map((b) => laneAt(b, y).gw));
-          expect(green / v.width).toBeCloseTo(h, 9);
-          // One contiguous prefix: green strands, then at most one part-green, then gray ones.
-          let seenGray = false;
+          // (Within the lanes' blend just below the split, the drawn share eases from the daughters'
+          // own into this: layout.ts Steps.greenIn.)
+          if (y >= v.y + v.blend) expect(green / v.width).toBeCloseTo(h, 9);
+          // One contiguous prefix below the lanes' blend (just below the split each daughter keeps its own
+          // green on its own left, layout.ts FanNode.blend): green strands, then at most one part-green, then gray ones.
+          let seenGray = y < v.y + v.blend ? null : false;
           for (const b of v.strands) {
             const L = laneAt(b, y);
+            if (seenGray === null) continue;
             if (seenGray) expect(L.gw).toBe(0);
             if (L.gw < L.w) seenGray = true;
           }
           h = parentShare(h, N, N);
         }
+        // Below the lanes' blend: the recurrence's share, one prefix (sampled down the column).
+        for (let i = 1; i <= 20; i++) {
+          const y = v.y + v.blend + ((Math.min(v.yBot, f.trunkBottom.y) - v.y - v.blend) * i) / 21;
+          const green = sum(v.strands.map((b) => laneAt(b, y).gw));
+          expect(green / v.width).toBeCloseTo(nodeQ(v, f.time.ageAt(y)), 9);
+        }
+        // At the split: the daughters' own lanes, which total the recurrence's start q[0] (linear widths: width ∝ count).
+        if (mode === 'linear') expect(sum(v.strands.map((b) => laneAt(b, below(v.y)).gw)) / v.width).toBeCloseTo(v.q[0], 6);
       }
       // Deep down the stem it settles to the constant-population share.
       expect(nodeQ(f.root, 100)).toBeCloseTo(Q_STAR, 9);
