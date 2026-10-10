@@ -3,6 +3,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { formatAge, formatCount } from '../data/names';
+import { HistorySpark } from './HistorySpark';
 import type { WidthMode } from './layout';
 import { PANTHERA, type SpeciesRec } from './panthera';
 import { FanView, fmtInt, formatYearsAgo, type IndInfo, type Selection } from './view';
@@ -76,7 +77,7 @@ export function FanApp() {
   );
 }
 
-function SpeciesCard({ sp, onClose }: { sp: SpeciesRec; onClose: () => void }) {
+export function SpeciesCard({ sp, onClose, open }: { sp: SpeciesRec; onClose: () => void; open?: boolean }) {
   const span = `${formatAge(sp.t0)} – ${sp.extinct ? formatAge(sp.t1) : 'now'}`;
   return (
     <div className="card-sp" onPointerDown={(e) => e.stopPropagation()}>
@@ -102,6 +103,7 @@ function SpeciesCard({ sp, onClose }: { sp: SpeciesRec; onClose: () => void }) {
       <div className="dim">
         generation ≈ {sp.genYears} y ({sp.genSource})
       </div>
+      {sp.history && sp.history.points.length > 0 && <HistorySpark key={sp.gid} h={sp.history} open={open} />}
     </div>
   );
 }

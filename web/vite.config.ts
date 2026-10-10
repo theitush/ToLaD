@@ -126,7 +126,7 @@ export default defineConfig(({ mode }) => {
       port: 4173,
     },
     test: {
-      include: ['src/**/*.test.ts'],
+      include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
       environment: 'node',
       testTimeout: 120_000,
     },

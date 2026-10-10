@@ -61,11 +61,30 @@ width = individuals, green = alive, gray = dead, height = time.
   width and 2× or more in time, stopping when the strands of the lane under the finger are
   ~90 px apart. In the green lane it lands on a living strand. Tap a branch for the
   species card, an individual for the `lion#…` card.
+- **How well the history is known** (`history.ts`, `view.drawHistoryEdge`): for species
+  whose curated history drives the counts (lion, tiger, snow leopard), the branch's outer
+  (gray, right) edge carries the history's honesty at each height. Spans held at a
+  measured level are drawn plain; interpolated or modelled spans get a subtle dashed line
+  on the edge, grade D or unverified spans a fainter dotted one (`spanStyle`,
+  `historySpans`, `EDGE_DASH`). The patterns are in screen pixels and anchored to the
+  "now" line, so they look the same at every zoom and move with the branch. The green lane
+  edge stays plain: its width is the number alive now, a single figure. A dot coloured by
+  grade (`GRADE_COLOR`: A blue, B violet, C amber, D red) marks each data point's year on
+  the edge; a dot shows once it is 9 px below the last one shown and the branch is a
+  few px wide there, fading in with zoom (a census a year after the last waits). Species without a history are drawn as before
+  (their even spread is a model too, but nothing marks it yet).
+- **Species card**: with a history, a sparkline of log(population) against year: points
+  coloured by grade with their ranges as bars, the spans between them solid, dashed or
+  dotted like the edge (`styleBetween`). Tap it for every point: year, n (range), grade,
+  kind, the citation linked to its source, and the note. The list scrolls (max 34% of the
+  screen height), so the card stays under the width scale bar. A history shown only
+  (`use = "display"`, the leopard) says it does not drive the widths.
 - **Ribbons** are built in screen space: the S-curve is sampled adaptively (to 0.3 px on
   screen), its normal taken on screen, and each polygon is clipped to the screen in
   float64 before it reaches the canvas.
 - `node scripts/fanshot.mjs [out] [prefix]` screenshots `dist-single` at 390×844
-  (`STEPS_FILE` = JSON list of `[name, js]` steps run against `window.__fan`).
+  (`STEPS_FILE` = JSON list of `[name, js]` steps run against `window.__fan`;
+  `CLIP=x,y,w,h` keeps only part of the page).
 
 Known limits: the green lane holds the living by index slot, and only ~⅓ of slots hold
 someone alive now, so deep in it the living strands are sparser than one per slot. The
