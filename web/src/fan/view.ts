@@ -534,18 +534,43 @@ export class FanView implements InputHandlers {
   /**
    * The parent columns below each split (the stem below the oldest): their
    * daughters' strands side by side with no gaps; a dark backdrop under each,
-   * so a column reads as one without seams passing for lanes.
+   * so a column reads as one without seams passing for lanes. It follows the
+   * column's curve where it peels off its parent (chords a few px tall).
    */
   private drawStem(): void {
+    const c = rgb01(this.gl ? mix(GRAY, '#131c19', 0.86) : GRAY);
+    const [, wTop] = this.toWorld(0, -8);
+    const [, wBot] = this.toWorld(0, this.h + 8);
     for (const v of this.fan.nodes) {
-      const [x0, y0] = this.toScreen(v.left, v.y);
-      const [x1, y1] = this.toScreen(v.left + v.width, v.yBot);
-      const t = Math.max(-8, y0);
-      const b = Math.min(this.h + 8, y1);
-      const l = Math.max(-8, x0);
-      const r = Math.min(this.w + 8, x1);
-      if (b <= t || r <= l) continue;
-      this.under(l, t, r, b, rgb01(this.gl ? mix(GRAY, '#131c19', 0.86) : GRAY));
+      const ya = Math.max(v.y, wTop);
+      const yb = Math.min(v.yBot, wBot);
+      if (!(yb > ya)) continue;
+      // Straight below its peel: one piece; the peel in chords.
+      const peel = v.parent ? v.yBot - v.parent.fork : v.yBot;
+      const ys = [ya];
+      if (peel > ya && peel < yb) ys.push(peel);
+      const p0 = Math.max(ya, peel);
+      if (yb > p0) {
+        const n = Math.min(400, Math.max(1, Math.ceil(((yb - p0) * this.cam.sy) / 4)));
+        for (let i = 1; i < n; i++) ys.push(p0 + ((yb - p0) * i) / n);
+      }
+      ys.push(yb);
+      for (let i = 0; i + 1 < ys.length; i++) {
+        const [l0, t] = this.toScreen(nodeLeftAt(v, ys[i]), ys[i]);
+        const [l1, b] = this.toScreen(nodeLeftAt(v, ys[i + 1]), ys[i + 1]);
+        const w = v.width * this.cam.sx;
+        if (!(b > t) || Math.max(l0, l1) > this.w + 8 || Math.min(l0, l1) + w < -8) continue;
+        if (this.gl) this.gl.under.push(l0, t, l0 + w, b, c[0], c[1], c[2], 1, l1 - l0, l1 - l0);
+        else {
+          this.ctx.fillStyle = `rgb(${Math.round(c[0] * 255)},${Math.round(c[1] * 255)},${Math.round(c[2] * 255)})`;
+          this.ctx.beginPath();
+          this.ctx.moveTo(l0, t);
+          this.ctx.lineTo(l0 + w, t);
+          this.ctx.lineTo(l1 + w, b);
+          this.ctx.lineTo(l1, b);
+          this.ctx.fill();
+        }
+      }
     }
   }
 
