@@ -34,6 +34,8 @@ const font = (spec: string, family = SANS) => `${spec} ${family}`;
 /** A species' label: its name, upright on a dark pill LABEL_PILL px across, LABEL_PAD px past each end of the text. */
 const LABEL_FONT = '650 15px';
 const LABEL_PILL = 22;
+/** A label hangs this share of the way down its own column from its widest (youngest) point to its split (alternating). */
+const LABEL_DROP = [0.05, 0.45];
 const LABEL_PAD = 8;
 /** Right edge (px) of the time axis's labels: species' labels keep right of it. */
 const LABEL_AXIS_X = 72;
@@ -75,20 +77,31 @@ export function labelSpots(c: Screen, fan: Fan, top: number, measure: (text: str
     // thin: a recent crash, an extinct species' pinch), so the labels sit where the columns spread.
     let kw = 0;
     for (let k = 1; k < b.kw.length; k++) if (b.kw[k] > b.kw[kw] * (1 + 1e-9)) kw = k;
-    const tipW = b.ky.length ? b.ky[kw] : b.tipY;
+    // Then some way down its own column, alternating between neighbours (the living, and the extinct,
+    // each in tree order): side by side without gaps, neighbouring pills stagger instead of colliding.
+    const rank = fan.steps.order.filter((o) => o.sp.extinct === b.sp.extinct && o.index < b.index).length;
+    const tipW0 = b.ky.length ? b.ky[kw] : b.tipY;
+    const tipW = tipW0 + (b.sp.extinct ? 0.9 : LABEL_DROP[rank % 2]) * (b.splitY - tipW0);
     const ty = c.toScreen(0, tipW)[1];
     const fy = c.toScreen(0, b.splitY)[1];
     // On the tip; stuck under the top line once the tip is above it; never below its split (its own column).
-    const y1 = Math.min(Math.max(ty - 4, top + len), fy - 4);
+    // (Its anchor below the screen: it waits above the legend, on its column.)
+    const y1 = Math.min(Math.max(Math.min(ty - 4, c.h - LABEL_BOTTOM_PX), top + len), fy - 4);
     const wy = Math.min(b.splitY, Math.max(tipW, c.toWorld(0, y1)[1]));
     const left = c.toScreen(leftAt(b, wy), wy)[0];
     // Placed inside the column as wide as it is there; faded by its room (its widest), steady.
     const w = laneAt(b, wy).w * c.cam.sx;
     const room = b.width * c.cam.sx;
-    const lo = left + half;
-    const x = Math.min(Math.max(lo, LABEL_AXIS_X + half), Math.max(lo, left + Math.min(w, room) - half));
+    // Centred on its column (side by side without gaps, neighbours' pills keep apart); off the time axis.
+    const mid = left + w / 2;
+    // (Within the column's part on screen, right of the axis: zoomed in, the column is wider than the screen.)
+    const inset = Math.min(half, w / 2);
+    const xl = Math.max(LABEL_AXIS_X + half, left + inset);
+    const xr = Math.min(c.w - half, left + w - inset);
+    const x = xr >= xl ? Math.min(Math.max(mid, xl), xr) : Math.max(mid, Math.min(xl, left + w - inset));
     // Fades: a column too narrow, one leaving under the time axis on the left, and near the legend.
-    const fit = clamp01((room - 3) / 6) * clamp01((left + room - LABEL_AXIS_X + 12) / LABEL_PILL) * clamp01((c.h - LABEL_BOTTOM_PX + 30 - y1) / 30);
+    // (Every column has its pill, even one narrower than it, as the snow leopard's in linear widths: it overhangs.)
+    const fit = clamp01(room / 0.5) * clamp01((left + room - LABEL_AXIS_X + 12) / LABEL_PILL) * clamp01((c.h - LABEL_BOTTOM_PX + 30 - y1) / 30);
     return { b, text, x, y1, box: [x - half, y1 - len, x + half, y1], fit };
   });
 }
@@ -102,7 +115,7 @@ export function labelSpots(c: Screen, fan: Fan, top: number, measure: (text: str
 export function resolveLabels(spots: LabelSpot[], prev: Map<number, boolean>): Map<number, boolean> {
   const out = new Map<number, boolean>();
   const taken: number[][] = [];
-  const order = [...spots].sort((p, q) => q.b.width - p.b.width || p.b.index - q.b.index);
+  const order = [...spots].sort((p, q) => Number(p.b.sp.extinct) - Number(q.b.sp.extinct) || q.b.width - p.b.width || p.b.index - q.b.index);
   for (const s of order) {
     const gid = s.b.sp.gid;
     if (!(s.fit > 0)) {
@@ -874,7 +887,11 @@ export class FanView implements InputHandlers {
    * resolveLabels (a fixed priority, with hysteresis), and each fades in and
    * out over LABEL_FADE_MS rather than popping.
    */
+  /** The last frame's label spots (scripts, tests). */
+  lastSpots: LabelSpot[] = [];
+
   private drawLabels(spots: LabelSpot[]): void {
+    this.lastSpots = spots;
     const ctx = this.ctx;
     const now = performance.now();
     const dt = Math.min(100, Math.max(0, now - this.labelT));

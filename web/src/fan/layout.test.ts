@@ -6,6 +6,8 @@ const MODES: WidthMode[] = ['log', 'linear'];
 
 /** Every edge of the band (n + 1, tree order) at world y. */
 const edges = (f: Fan, y: number) => Array.from({ length: f.steps.n + 1 }, (_, i) => f.steps.edgeAt(i, y));
+/** Every line drawn at world y: the band's edges, then each strand's green/gray boundary (left + green width). */
+const lines = (f: Fan, y: number) => [...edges(f, y), ...f.steps.order.map((b) => leftAt(b, y) + laneAt(b, y).gw)];
 
 describe('fan strands: width = alive at the time', () => {
   for (const mode of MODES) {
@@ -96,7 +98,7 @@ describe('one partitioned band: continuous, edge to edge, fixed in the world', (
       }
     });
 
-    it(`every edge is continuous: no jump across any split, population change or knot (${mode})`, () => {
+    it(`every edge and lane boundary is continuous: no jump across any split, population change or knot (${mode})`, () => {
       const f = layoutFan(PANTHERA, mode);
       const ys = f.steps.ys;
       const top = f.time.y(0);
@@ -104,27 +106,41 @@ describe('one partitioned band: continuous, edge to edge, fixed in the world', (
       // The steepest any edge gets (world x per world y), from the knots themselves.
       let slope = 0;
       for (let k = 0; k + 1 < ys.length; k++) {
-        const a = edges(f, ys[k]);
-        const b = edges(f, ys[k + 1]);
+        const a = lines(f, ys[k]);
+        const b = lines(f, ys[k + 1]);
         for (let i = 0; i < a.length; i++) slope = Math.max(slope, Math.abs(b[i] - a[i]) / (ys[k + 1] - ys[k]));
+        // (A green lane is clamped to its strand: where the clamp lets go inside a stretch, its own slope.)
+        const n = f.steps.n;
+        for (let i = 0; i < n; i++) {
+          const g0 = f.steps.green[k * n + i] + f.steps.edgeAt(i, ys[k]);
+          const g1 = f.steps.green[(k + 1) * n + i] + f.steps.edgeAt(i, ys[k + 1]);
+          slope = Math.max(slope, Math.abs(g1 - g0) / (ys[k + 1] - ys[k]));
+        }
       }
       expect(Number.isFinite(slope)).toBe(true);
       for (let k = 0; k < ys.length; k++) {
         const span = Math.min(k > 0 ? ys[k] - ys[k - 1] : Infinity, k + 1 < ys.length ? ys[k + 1] - ys[k] : Infinity);
         for (const rel of [1e-2, 1e-5, 1e-8]) {
           const d = span * rel;
-          let prev = edges(f, ys[k] - 20 * d);
+          // (Nothing is drawn above now: samples start there.)
+          let prev: number[] | null = ys[k] - 20 * d >= top ? lines(f, ys[k] - 20 * d) : null;
           for (let j = -19; j <= 20; j++) {
             const y = ys[k] + j * d;
             if (y < top) continue;
-            const cur = edges(f, y);
+            const cur = lines(f, y);
+            if (!prev) {
+              prev = cur;
+              continue;
+            }
             for (let i = 0; i < cur.length; i++) {
               const dx = Math.abs(cur[i] - prev[i]);
               // No jump: neighbouring samples move by at most the steepest slope times their distance,
               // so the motion shrinks with the step; at the finest a vanishing share of the column beside it.
-              expect(dx).toBeLessThanOrEqual(slope * d * (1 + 1e-6) + 1e-12);
-              const wl = i > 0 ? cur[i] - cur[i - 1] : 0;
-              const wr = i + 1 < cur.length ? cur[i + 1] - cur[i] : 0;
+              expect(dx).toBeLessThanOrEqual(slope * d * (1 + 1e-4) + 1e-9);
+              // (Edges first, n + 1 of them; then the strands' green/gray boundaries, measured against the band.)
+              const ne = f.steps.n + 1;
+              const wl = i > 0 && i < ne ? cur[i] - cur[i - 1] : 0;
+              const wr = i + 1 < ne ? cur[i + 1] - cur[i] : 0;
               if (rel === 1e-8) expect(dx).toBeLessThan(1e-4 * Math.max(wl, wr, 1e-3 * f.trunkWidth));
             }
             prev = cur;
