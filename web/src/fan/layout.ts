@@ -25,9 +25,9 @@
 // Width = individuals alive at that time (∝ births per unit time): N(t) times
 // one fixed world width per individual (linear) or per decade of individuals
 // (log, g()). A column's room is its widest N. Below a living species' first
-// appearance its column holds its founders (constant) down to the fork; an
-// extinct one's column starts at its first appearance (its founders' ancestors
-// are the parent's). Through the stem, the clade's ancestors, every column
+// appearance its column holds its founders (constant) down to the fork, living
+// or extinct (an extinct one's all gray: after the split its ancestors have no
+// living descendants). Through the stem, the clade's ancestors, every column
 // goes on at its founders' width (the stem is the sum of the founders). The
 // steps are the population's own (population.ts: a generation each where N or
 // q changes), fixed in the world: a drop in N shows as a step at every zoom.

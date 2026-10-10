@@ -504,7 +504,8 @@ export class FanView implements InputHandlers {
     const grayBase = b.sp.extinct ? WITHERED : GRAY;
     const greenFade = tw?.fadeGreen ?? 0;
     const greenC = mix(GREEN, '#10291d', greenFade * 0.85);
-    const yT0 = this.toScreen(0, this.fan.time.y(b.sp.t0))[1];
+    // (An extinct species' column is withered from its extinction down to the fork.)
+    const yT0 = this.toScreen(0, 0)[1];
     const grayC = mix(grayBase, '#131c19', Math.max(lives, tw?.texGray ?? 0) * 0.82);
     if (this.gl) {
       // Each stretch of constant width is a rectangle: the whole lane gray (at least 0.6 px),
@@ -518,7 +519,7 @@ export class FanView implements InputHandlers {
         const y1 = Math.min(this.h + 4, p.y);
         if (!(y1 > y0) || x0 > this.w + 4) continue;
         const gPx = p.w * p.f * k;
-        // (An extinct species' line ended: withered over its span; below it, its founders' ancestors.)
+        // (An extinct species' line ended: withered down to the fork; below it, the stem's ancestors.)
         const base = b.sp.extinct && (p.y + q.y) / 2 < yT0 ? grayBase : GRAY;
         const gc = rgb01(mix(base, '#131c19', laneDim(p.w * k - gPx, lives) * 0.82));
         const ec = rgb01(mix(GREEN, '#10291d', laneDim(gPx, lives) * 0.85));

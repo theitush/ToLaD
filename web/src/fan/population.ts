@@ -14,14 +14,12 @@
 //     today's count (the pipeline's N_ever = alive ÷ lifespan × span), an extinct
 //     one at ever × lifespan ÷ span (lifespan = half a generation) until its
 //     last appearance, then 0.
-//   - below its first appearance (down to the fork and through the stem) a
-//     living species' column holds its founders: its N at first appearance,
-//     constant (its own ancestors, green by the rule below). A parent
-//     population splits among its daughters in proportion to their founding
-//     sizes, so the stem (the clade's ancestors) is the sum of the founders.
-//     An extinct species' column starts at its first appearance (0 below it,
-//     down to the fork): its founders' ancestors belong to the parent, the
-//     stem, where its share is drawn (Population.founders).
+//   - below its first appearance (down to the fork and through the stem)
+//     every species' column, living or extinct, holds its founders: its N at
+//     first appearance, constant (its own ancestors). A parent population
+//     splits among its daughters in proportion to their founding sizes, so the
+//     stem (the clade's ancestors) is the sum of the founders. So an extinct
+//     species' column runs from the fork to its extinction like any other.
 //
 // q(t), alive at t with living descendants today through any mix of mothers and
 // fathers. A genealogy of whole generations counted back from now, mixed at
@@ -43,10 +41,12 @@
 // edge (the history's own points at the segment boundaries) and q = h_k; steps
 // with the same n and q merge, so a constant stretch is one step. Past the
 // last change (the baseline, settled q) one step runs on to the species'
-// first appearance and, for a living one, its founders below it. Extinct species: 0 over
-// their span. Below a species' first appearance its founders are part of the
-// ancestral population, green by the same rule through any living daughter:
-// the living species' own settled value, Q_STAR for an extinct one's founders.
+// first appearance and its founders below it. Extinct species: q = 0 from
+// their extinction all the way down to the fork (after the split their
+// ancestors are theirs alone, and none has living descendants), one step.
+// Below the fork, in the stem, the founders' ancestors are everybody's, green
+// by the same rule through any living daughter: the living species' own
+// settled value, Q_STAR for an extinct one's (qBase, drawn by the layout).
 
 import type { SpeciesRec } from './panthera';
 
@@ -129,12 +129,10 @@ export class Population {
     }
   }
 
-  /** Individuals alive at age `ageMa` (Ma): 0 after an extinct species' last appearance (and before its first); a living one's founders before its first. */
+  /** Individuals alive at age `ageMa` (Ma): 0 after an extinct species' last appearance; its founders before its first (down to the fork and through the stem). */
   aliveAt(ageMa: number): number {
     const sp = this.sp;
     if (ageMa < sp.t1) return 0;
-    // An extinct species' column starts at its first appearance: its founders' ancestors are the parent's (the stem).
-    if (sp.extinct && ageMa > sp.t0) return 0;
     const a = Math.min(ageMa, sp.t0);
     const c = sp.births;
     if (c) return c.curve.sizeAt(Math.min(a * 1e6, c.curve.years)) * this.lg;
@@ -163,7 +161,8 @@ export class Population {
       ages.push(a1);
     };
     if (sp.extinct || !(sp.alive > 0)) {
-      push(sp.t0 * 1e6, this.aliveAt((sp.t0 + sp.t1) / 2), 0);
+      // One step from its extinction down to the fork (its founders below its first appearance): nobody with living descendants.
+      push(Infinity, this.aliveAt((sp.t0 + sp.t1) / 2), 0);
     } else {
       const GL = this.GL;
       const span = (sp.t0 - sp.t1) * 1e6;
@@ -184,7 +183,6 @@ export class Population {
   stepAt(ageMa: number): { n: number; q: number } {
     const sp = this.sp;
     if (ageMa < sp.t1) return { n: 0, q: 0 };
-    if (sp.extinct && ageMa > sp.t0) return { n: 0, q: 0 };
     const { ages, n, q } = this.steps;
     const yrs = ageMa * 1e6;
     let lo = 0;
@@ -197,10 +195,14 @@ export class Population {
     return { n: n[lo], q: q[lo] };
   }
 
-  /** Share of those alive at `ageMa` with living descendants today (0–1): h_k of its generation, as drawn. */
+  /**
+   * Share of those alive at `ageMa` with living descendants today (0–1): h_k
+   * of its generation, as drawn. An extinct species': 0 over its whole column
+   * (down to the fork; the stem below it is the layout's, at qBase).
+   */
   greenAt(ageMa: number): number {
     const sp = this.sp;
-    if (sp.extinct) return ageMa > sp.t0 ? this.qBase : 0;
+    if (sp.extinct) return 0;
     if (ageMa >= sp.t0) return this.qBase;
     if (ageMa < sp.t1) return 0;
     return this.stepAt(ageMa).q;
