@@ -1,4 +1,18 @@
 {
+ "bergman/Bergman2023_SupplementaryData1.csv": {
+  "bytes": 32543,
+  "post_body": null,
+  "retrieved": "2026-10-11",
+  "sha256": "2cd7dcb6708ae90bfacd7077a5da5c03f48bb5a319d365b9bd9973f049fcacab",
+  "url": "https://static-content.springer.com/esm/art%3A10.1038%2Fs41467-023-43426-5/MediaObjects/41467_2023_43426_MOESM4_ESM.csv"
+ },
+ "bergman/Bergman2023_SupplementaryData3.txt": {
+  "bytes": 213281,
+  "post_body": null,
+  "retrieved": "2026-10-11",
+  "sha256": "69e601736635fdf3ce2badfd439a5441156b7438e591bf39344fb3723110a2d3",
+  "url": "https://static-content.springer.com/esm/art%3A10.1038%2Fs41467-023-43426-5/MediaObjects/41467_2023_43426_MOESM6_ESM.txt"
+ },
  "combine/trait_data_imputed.csv": {
   "bytes": 1891897,
   "post_body": null,

@@ -31,7 +31,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import anchors, diversity, history, ranges
+from . import anchors, diversity, genomic, history, ranges
 from .anchors import year_to_ma
 from .load import load_combine, load_pantheria
 from .tree import D_ANCHOR, D_FOSSIL, D_INTERP, D_UPHAM, Node, ancestor_of_rank
@@ -575,6 +575,23 @@ def rangeloss_points(n_nat: float, n_today: float) -> list[dict]:
     return [{"year": RANGELOSS_START_YEAR, "n": n_nat}, {"year": anchors.NOW_YEAR, "n": n_today}]
 
 
+def rangeloss_start(leaf: Node) -> dict | None:
+    """The first knot of the range-loss trend as a curve point: the natural level in 1500 CE (kind
+    `rangeloss`, its span to today's count kind `rangeloss`, grade D). None without the trend."""
+    return _rangeloss_p0(leaf) if leaf.data.get("rangeloss") else None
+
+
+def _rangeloss_p0(leaf: Node) -> dict:
+    D = leaf.data
+    nat = D["natural"]
+    p0 = rangeloss_points(nat["N"], D["rate_wild_now"] * D["L"])[0]
+    p0.update(lo=nat["lo"], hi=nat["hi"], grade="D", kind="rangeloss", span_kind="rangeloss",
+              cite=RANGELOSS_CITE, url=RANGELOSS_URL,
+              note="natural (pre-human) level from the PHYLACINE present-natural range; the modelled "
+                   "range-loss trend starts here")
+    return p0
+
+
 def rangeloss_record(leaf: Node) -> dict:
     """Layer 4 of the estimate stack (ToLaD#62): a modelled HIST record for a
     species with no history file whose natural baseline differs from today's
@@ -589,10 +606,7 @@ def rangeloss_record(leaf: Node) -> dict:
     n_now = D["rate_wild_now"] * L
     h = 1.96 * D.get("sd_today_count", 0.0)
     p0, p1 = rangeloss_points(nat["N"], n_now)
-    p0.update(lo=nat["lo"], hi=nat["hi"], grade="D", kind="rangeloss", span_kind="rangeloss",
-              cite=RANGELOSS_CITE, url=RANGELOSS_URL,
-              note="natural (pre-human) level from the PHYLACINE present-natural range; the modelled "
-                   "range-loss trend starts here")
+    p0 = _rangeloss_p0(leaf)
     p1.update(lo=n_now / 10 ** h, hi=n_now * 10 ** h, grade="ABCD"[min(3, D.get("grade_cap_today", 3))],
               kind="model", cite="ToLaD model (stats.json, this leaf)", url="https://github.com/theitush/ToLaD",
               note="the pipeline's alive-now for this leaf")
@@ -626,7 +640,8 @@ def rangeloss_report(root: Node) -> dict:
                 "factor": factor(n), "km2_nat": nat["km2_nat"], "km2_cur": nat["km2_cur"],
                 "method": nat["method"], "G_yr": 2 * D["L"], "segments": len(rec["segments"]) if rec else 0,
                 "from": ("flat" if not D.get("rangeloss") else
-                         "rangeloss" if rec.get("modelled") == "rangeloss" else "history")}
+                         "rangeloss" if rec.get("modelled") == "rangeloss" else
+                         "genomic" if rec.get("modelled") == "genomic" else "history")}
     by = sorted(recs, key=factor)
     return {
         "note": "Layer 4 of the estimate stack (ToLaD#62): an extant species whose natural baseline (layer 1, "
@@ -637,7 +652,9 @@ def rangeloss_report(root: Node) -> dict:
                 "factor shown is the model's, the curve is the history file's).",
         "start_year": RANGELOSS_START_YEAR, "end_year": anchors.NOW_YEAR,
         "species_with_trend": len(leaves), "hist_records": len(recs),
-        "replaced_by_history_file": len(leaves) - len(recs),
+        "replaced_by_history_file": sum((n.data.get("history") or {}).get("file") is not None for n in leaves),
+        "carried_by_genomic_record": sum((n.data.get("history") or {}).get("modelled") == "genomic"
+                                         for n in leaves),
         "declines": int(np.sum(lf > 0)), "rises": int(np.sum(lf < 0)),
         "log10_factor_histogram": dict(sorted(hist.items(), key=lambda kv: float(kv[0].split("..")[0]))),
         "log10_factor_p5_25_50_75_95": ([round(float(q), 3) for q in np.percentile(lf, [5, 25, 50, 75, 95])]
@@ -882,7 +899,15 @@ def assign_leaf_counts(root: Node, raw: Path, ctx: dict, log: dict) -> None:
         D["grade_cap"] = cap
     log["anchors_found"] = dict(found)
     # curated flagship histories: pre-decline baselines and dated curves (pipeline/history/)
-    ctx["history"] = history.apply(root, raw, log, SRC["history"])
+    # layer 3, bulk: genome Ne curves (genomic.py) become [deep] tables, of the history files that have
+    # none and of modelled records for the species with no file (ToLaD#64)
+    recs = history.load_all()
+    living = {}
+    for n in root.preorder():
+        if n.is_leaf and n.name and not n.extinct:
+            living.setdefault(n.name, n)
+    recs += genomic.attach(recs, living, genomic.load(raw), rangeloss_start, log)
+    ctx["history"] = history.apply(root, raw, log, SRC["history"], recs)
     # range-loss trend records for the species no history file covers (a history file wins)
     for n in root.preorder():
         if n.is_leaf and n.data.get("rangeloss") and n.data.get("history") is None:

@@ -146,8 +146,9 @@ test('MOCK individuals are flagged as mock in data and name', () => {
 
 test('HIST round-trips against debug_top.json history', () => {
   assert.ok(Array.isArray(dump.history) && dump.history.length >= 40, 'history list in debug_top.json');
-  // modelled range-loss records (v1.3) are not indexed; the dump keeps a sample of them
-  assert.equal(sk.meta.hist_index.length, dump.history.filter((h) => !h.modelled).length);
+  // modelled range-loss records (v1.3) are not indexed; the dump keeps a sample of them. Modelled
+  // genomic records (ToLaD#64, ~100) are indexed and all in the dump
+  assert.equal(sk.meta.hist_index.length, dump.history.filter((h) => h.modelled !== 'rangeloss').length);
   const files = new Map([[-1, sk]]);
   for (const h of dump.history) {
     const w = h.species;
@@ -257,7 +258,12 @@ test('HIST: wild species without a cited baseline start at the natural baseline 
     }
   }
   assert.ok(n >= 5, `${n} curated species start at the natural baseline`);
-  assert.equal(g, 5, 'the five Panthera start at their genomic deep past');
+  // the five Panthera (hand-written [deep]) and the bulk curves of ToLaD#64 (Bergman et al. 2023)
+  assert.ok(g >= 100, `${g} species start at their genomic deep past`);
+  for (const sp of ['Panthera leo', 'Panthera tigris', 'Panthera pardus', 'Panthera onca', 'Panthera uncia']) {
+    const h = dump.history.find((x) => x.species === sp);
+    assert.ok(h.points.some((p) => p.kind === 'genomic' && p.cite.startsWith('Armstrong')), `${sp}: Armstrong 2025`);
+  }
 });
 
 // ---- v1.3: modelled range-loss trend (HIST kind 11) -------------------------

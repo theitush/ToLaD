@@ -479,7 +479,7 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
     fao_items = {r["faostat_item"] for r in recs if r["faostat_item"] is not None}
     series = faostat_series(raw, fao_items) if fao_items else {}
     report = {}
-    missing = []
+    missing, empty = [], []
     for rec in recs:
         cands = [rec["species"]] + rec["aliases"] + DOMESTIC_ALIASES.get(rec["species"], [])
         # a domestic form may sit on a leaf flagged extinct in the wild (dromedary)
@@ -498,7 +498,10 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
         # point (or baseline) by the usual log-linear span across PSMC's blind spot
         deep_pts, rec["deep_dropped"] = (deep_points(rec["deep"], G, year_to_ma_inv(leaf.t0))
                                          if rec["deep"] else ([], []))
-        if deep_pts and deep_pts[-1]["year"] >= pts[0]["year"]:
+        if not deep_pts and not pts:  # a modelled genomic record whose steps all fell in the blind spot
+            empty.append(rec["species"])
+            continue
+        if deep_pts and pts and deep_pts[-1]["year"] >= pts[0]["year"]:
             raise HistoryError(f"{rec['file']}: genomic points reach the cited ones ({deep_pts[-1]['year']:.0f})")
         rec["deep_points"] = deep_pts
         pts = deep_pts + pts
@@ -581,14 +584,20 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
             # the deep-past level sets "ever": widen the error by its range, cap the grade by its grade
             D["sd_leaf"] = math.hypot(D["sd_leaf"], max(_sd_of(r) for r in refs))
             D["grade_cap"] = max([D["grade_cap"]] + [GRADES.index(r["grade"]) for r in refs])
-            D["meth"].append(f"H:curated history ({len(rec['points'])} points"
+            D["meth"].append((f"H:genomic deep past (modelled: {rec['deep']['method']} {len(deep_pts)} points, "
+                              f"{rec['deep']['grade']}; {rec['deep']['cite']}"
+                              + (", then the range-loss trend from 1500" if rec["points"] else "")
+                              + "; pipeline/tolad_pipeline/genomic.py)")
+                             if rec.get("modelled") == "genomic" else
+                             f"H:curated history ({len(rec['points'])} points"
                              + (f", baseline {base['n']:.3g} in {base['year']:.0f} ({base['grade']})"
                                 if rec["baseline"] else "")
                              + (f", deep past {rec['deep']['method']} {len(deep_pts)} points "
                                 f"({rec['deep']['grade']}; {rec['deep']['cite']})" if deep_pts else "")
                              + (f", natural baseline {base['n']:.3g} ({base['grade']}) before the first point"
                                 if base is nat_base else "")
-                             + f"; pipeline/history/{rec['file']})")
+                             + f"; pipeline/history/{rec['file']})"
+                             + (" + bulk genomic deep past (genomic.py)" if rec.get("deep_bulk") else ""))
             D["src"].add(src_bit)
             D["anchored_count"] = True
         D["history"] = rec
@@ -607,6 +616,7 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
             nxt = next(p for p in pts if p["kind"] != "genomic")
             deep_rep = {
                 "method": rec["deep"]["method"], "cite": rec["deep"]["cite"], "grade": rec["deep"]["grade"],
+                "bulk": bool(rec.get("deep_bulk")),
                 "points": len(deep_pts), "dropped_blind": sum(p["why"] == "blind" for p in rec["deep_dropped"]),
                 "dropped_before_band": sum(p["why"] != "blind" for p in rec["deep_dropped"]),
                 "oldest_n": deep_pts[0]["n"], "oldest_yr_ago": NOW_YEAR - deep_pts[0]["year"], "youngest_yr_ago": NOW_YEAR - deep_pts[-1]["year"],
@@ -616,7 +626,7 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
                          "ratio": deep_pts[-1]["n"] / nxt["n"]},
             }
         report[rec["species"]] = {
-            "file": rec["file"], "leaf": leaf.name, "use": rec["use"], "component": rec["component"],
+            "file": rec["file"], "modelled": rec.get("modelled"), "leaf": leaf.name, "use": rec["use"], "component": rec["component"],
             "points": len(rec["points"]), "grades": "".join(sorted({p["grade"] for p in rec["points"]})),
             "baseline": ({k: rec["baseline"][k] for k in ("year", "n", "lo", "hi", "grade", "kind")}
                          if rec["baseline"] else None),
@@ -643,5 +653,6 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
                 "else `baseline` (cited), else `natural` (the natural baseline), else `today`. deep_before / deep_after = the level at "
                 "the band start. Leaf values, before the tree sum.",
         "species": report,
+        "genomic_records_without_points": empty,
     }
     return [r for r in recs if "leaf" in r]

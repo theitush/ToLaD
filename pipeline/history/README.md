@@ -97,7 +97,8 @@ order of precedence:
    log-linearly, and its oldest level is held back to the band start. With
    a `[deep]` the natural baseline is not used at all (it is still reported
    in `stats.json`): the five *Panthera* run on their PSMC curves, not on
-   the natural baseline;
+   the natural baseline; the bulk curves of ToLaD#64 (see "Bulk genomic
+   deep past") give ~100 more species one;
 3. else the natural baseline, held from the band start to the first cited
    point (HIST segment kind `natural`, 10), then a step to the curve;
 4. else (no range map) today's level, as above (segment kind `model`).
@@ -199,8 +200,10 @@ the same way by code rather than by hand.
 
   The per-year rate is held fixed, so a longer generation means more
   mutations per generation. That is a simplification: per-generation rates
-  rise with parental age, but less than in proportion. #64 must choose `mu_y`
-  per clade before this is applied to all mammals.
+  rise with parental age, but less than in proportion. The bulk curves of
+  #64 (below) use the same `mu_y`; their sources' own per-year rates
+  (`mu / g`) run 0.35x..2.55x of it (median 1.45x), so a per-clade `mu_y`
+  is still open (see "Bulk genomic deep past").
 - **Ne to census N:** `N = Ne' / 0.1`. The ratio is from Frankham 1995
   (Genet Res 66:95-107): the mean Ne/N over comprehensive estimates is
   0.10-0.11. No felid-specific long-term ratio was found. `lo` uses Ne/N 0.3
@@ -245,6 +248,55 @@ the same way by code rather than by hand.
   capped by the worse of the two. `stats.json -> history.species.<sp>.deep`
   records the points kept and dropped, the span covered, the band start, the
   scale factors and the join.
+
+## Bulk genomic deep past (ToLaD#64, `tolad_pipeline/genomic.py`)
+
+Hand-written `[deep]` tables do not scale past a handful of species, so the
+build also reads one published table of PSMC curves and turns each into the
+same `[deep]` structure in memory. Nothing is written into these TOMLs.
+
+- **Source.** Bergman et al. 2023, *Nat Commun* 14:7679 (CC BY 4.0): PSMC on
+  one genome of each of 139 extant megafauna species (>= 44 kg).
+  Supplementary Data 3 lists every trajectory (sample, years ago, Ne, in the
+  paper's scaling); Supplementary Data 1 gives each sample's mutation rate
+  per generation and generation time (mostly modelled from mass, their
+  Supplementary Note 1). Both are pinned by `tolad-fetch` (`bergman/`).
+  Zoonomia (Wilder et al. 2023) was checked first: its supplement and its
+  code repository hold only the harmonic mean of each curve, not the curve.
+- **Per species.** One sample: the reference-genome sample (bare binomial or
+  DNA Zoo), else the nominate subspecies (the one their Supplementary Data 2
+  uses), else the first by name. PSMC steps are kept as they come (no
+  resampling); the first step (from 0, inside the blind spot) and the
+  open-ended last one are left out, and at most 30 steps are kept
+  (`STEP_CAP`; none of the 118 curves needs merging today, 22-29 steps
+  each). `mu` and `g` are the source's, grade D for all (one genome,
+  modelled rates). Then the conversion above applies unchanged
+  (`DEEP_MU_YEAR`, the leaf's `G`, Ne/N 0.1, the 20 kyr cutoff, steps older
+  than the band start dropped).
+- **Precedence.** A hand-written `[deep]` wins: the five *Panthera* keep
+  Armstrong et al. 2025. A wild `counts` history file without a `[deep]`
+  gets the bulk curve as its `[deep]` (18 files: Bison, Loxodonta, the great
+  apes, ...); its cited baseline and points stand as before, and the genomic
+  points precede them. Domestic history files (cattle, sheep, horse, ...)
+  get none. The 118 species give: 5 hand-written, 18 history files, 7
+  domestic files skipped, 88 modelled records.
+- **Species with no history file** get a modelled record
+  (`META.hist[].modelled = "genomic"`), which replaces the range-loss record
+  of ToLaD#62 and keeps its shape after the genomic stretch: the genomic
+  points; then, where the leaf has the range-loss trend, the natural level in
+  1500 CE (kind `rangeloss`) and the trend to today's count (49 species);
+  else straight on to today's count (39). Today's count is the model's
+  alive-now, unchanged.
+- **The join at the blind spot** is the #60 rule: the youngest genomic point
+  (>= 20 kyr ago) joins the next level (the 1500 natural level, the first
+  cited point, or today's count) by one log-linear span, kind
+  `interpolated`, grade D. The curve is not scaled to meet that level. The
+  mismatch is in `stats.json -> history.species.<sp>.deep.join.ratio`
+  (median 0.86 over the 106 bulk curves, but 0.001..316 at the extremes:
+  e.g. Addax, whose natural baseline is scaled from today's ~80 animals, so
+  is far below its genomic level).
+- **Reports.** `stats.json -> genomic`: the source, coverage and, per curve,
+  how it was used. `history.species.<sp>.deep.bulk` marks a bulk curve.
 
 ### Panthera sources (2026-10)
 

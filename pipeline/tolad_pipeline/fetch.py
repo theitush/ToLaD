@@ -109,6 +109,18 @@ SOURCES: dict[str, list[tuple[str, str, dict | None]]] = {
         ("zoonomia/Wilder2023_Table_S1.xlsx",
          "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC10184782/supplementaryFiles", None),
     ],
+    # Bergman et al. 2023, Nat Commun 14:7679 (CC BY 4.0, PMC10667484): PSMC Ne histories of 139
+    # extant megafauna. Supplementary Data 1 (per-sample generation time and mutation rate) and
+    # Supplementary Data 3 (each sample's PSMC steps, in years and Ne, in that scaling). Layer 3 of
+    # the estimate stack, the bulk genomic deep past (ToLaD#64, genomic.py).
+    "bergman": [
+        ("bergman/Bergman2023_SupplementaryData1.csv",
+         "https://static-content.springer.com/esm/art%3A10.1038%2Fs41467-023-43426-5/MediaObjects/"
+         "41467_2023_43426_MOESM4_ESM.csv", None),
+        ("bergman/Bergman2023_SupplementaryData3.txt",
+         "https://static-content.springer.com/esm/art%3A10.1038%2Fs41467-023-43426-5/MediaObjects/"
+         "41467_2023_43426_MOESM6_ESM.txt", None),
+    ],
     "prb": [
         ("prb/how-many-people-have-ever-lived-on-earth.html",
          "https://www.prb.org/articles/how-many-people-have-ever-lived-on-earth/", None),

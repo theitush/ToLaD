@@ -219,7 +219,7 @@ class Baseline(unittest.TestCase):
                 want = b["n"] / s["deep_before"]
                 self.assertAlmostEqual(math.log10(s["ever_after"] / s["ever_before"]), math.log10(want),
                                        delta=0.15, msg=sp)
-        self.assertGreaterEqual(n, 10)
+        self.assertGreaterEqual(n, 8)  # 10 before the bulk genomic deep pasts (ToLaD#64) took some over
 
     def test_no_baseline_keeps_the_model_level(self):
         """Without a cited baseline the deep past runs at the natural baseline
@@ -404,7 +404,9 @@ class DeepPast(unittest.TestCase):
             # segments: contiguous, no jumps, the oldest one held at the oldest genomic level
             segs = h["segments"]
             for a, b in zip(segs, segs[1:]):
-                self.assertAlmostEqual(a["year0"] + a["gens"] * h["G"], b["year0"], delta=1.0, msg=sp)
+                # G and year0 are float32 in the debug dump (as in HIST): allow their rounding
+                self.assertAlmostEqual(a["year0"] + a["gens"] * h["G"], b["year0"],
+                                       delta=max(1.0, a["gens"] * 2e-5 + abs(b["year0"]) * 1e-6), msg=sp)
                 self.assertAlmostEqual(a["end"] / b["start"], 1.0, delta=1e-6, msg=sp)
             self.assertEqual(segs[0]["kind"], "held", sp)
             self.assertAlmostEqual(segs[0]["start"] * h["L"] / h["G"] / gen[0]["n"], 1.0, delta=0.01, msg=sp)

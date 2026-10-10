@@ -103,7 +103,8 @@ class Build(unittest.TestCase):
     def test_coverage(self):
         # every extant species with both maps that differ, less those with a history file
         self.assertGreater(self.rl["hist_records"], 500)
-        self.assertEqual(self.rl["species_with_trend"], self.rl["hist_records"] + self.rl["replaced_by_history_file"])
+        self.assertEqual(self.rl["species_with_trend"], self.rl["hist_records"] + self.rl["replaced_by_history_file"]
+                         + self.rl["carried_by_genomic_record"])
         self.assertEqual(self.rl["declines"] + self.rl["rises"], self.rl["hist_records"])
         self.assertEqual(self.rl["start_year"], 1500)
 
