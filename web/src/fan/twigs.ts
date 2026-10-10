@@ -27,7 +27,7 @@
 import { mix } from '../../../packages/procgen/src/hash.ts';
 import { Species, type Address } from '../../../packages/procgen/src/index.ts';
 import { laneAt, leftAt, STEM_BOTTOM_MA, TIME_C, type FanBranch, type TimeScale, type WidthMode } from './layout';
-import { attrSeed, Lane, MAX_FOLD, packInst, type MeshInst } from './mesh';
+import { attrSeed, Lane, linkWidth, MAX_FOLD, packInst, type MeshInst } from './mesh';
 import type { MeshBatch } from './meshgl';
 import type { SpeciesRec } from './panthera';
 
@@ -643,6 +643,10 @@ export function lineLevel(pitchPx: number): { lambda: number; L: number; fineA: 
   return { lambda, L, fineA: lambda <= 0 ? 1 : smoothstep(1 - (lambda - L)) };
 }
 
+/** Opacity of the cross-links between neighbouring lines (mesh.ts shadeLinks): the lines interbreed. */
+const LINK_ALPHA = 0.7;
+/** Opacity of a slot's own thread under its packed lives (mode 1 baseA). */
+const LIVES_FLOOR = 0.35;
 /** Target screen height (px) of one texture band of generations. */
 const BAND_PX = 6;
 /** Most mesh instances per branch per frame. */
@@ -661,7 +665,7 @@ export function laneNarrow(px: number): number {
 }
 
 /** The lanes' fill dims towards a dark tint of itself under the texture (wide lanes: the lines carry the colour)... */
-const DIM_TEX = 0.6;
+const DIM_TEX = 0.72;
 /** ...less where a lane is too narrow for lines (its one modulated line rides on it)... */
 const DIM_NARROW = 0.3;
 
@@ -725,7 +729,7 @@ function stretches(v: TwigView, m: TwigModel, yTop: number, yBot: number): Stret
  * life, one instance per generation. Each instance stays within one stretch
  * of constant column width (the gray edge steps).
  */
-export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: number, mode: 0 | 1, alpha: number, look: { lw: number; tipR: number }, out: MeshInst[], ancA = alpha): void {
+export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: number, mode: 0 | 1, alpha: number, look: { lw: number; tipR: number; linkA?: number; baseA?: number }, out: MeshInst[], ancA = alpha): void {
   if (!(Math.max(alpha, mode ? 0 : ancA) > 0.004) || !(yBot > yTop)) return;
   const time = m.time;
   const gTop = m.generationAt(yTop);
@@ -739,10 +743,9 @@ export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: num
   const latSeed = m.latticeSeed;
   // Texture bands of t generations, t a power of two by the generations' local height on screen
   // (the time axis is logarithmic), aligned to multiples of t: fixed in the world.
-  const bandRaw = (g: number) => {
-    const genPx = Math.abs(m.yOf((g + 1) * m.GL) - m.yOf(g * m.GL)) * v.sy;
-    return Math.pow(2, Math.max(0, Math.min(40, Math.ceil(Math.log2(BAND_PX / Math.max(1e-12, genPx))))));
-  };
+  // (tauC: the continuous time level, log2 of BAND_PX over a generation's height: the cross-links' fade.)
+  const tauC = (g: number) => Math.log2(BAND_PX / Math.max(1e-12, Math.abs(m.yOf((g + 1) * m.GL) - m.yOf(g * m.GL)) * v.sy));
+  const bandRaw = (g: number) => Math.pow(2, Math.max(0, Math.min(24, Math.ceil(tauC(g)))));
   const start = out.length;
   let count = 0;
   const floorMod = (a: number, t: number) => ((a % t) + t) % t;
@@ -787,7 +790,7 @@ export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: num
       const narG = mode || !(S.nG > 0) ? 0 : laneNarrow(gPx);
       const narR = mode ? 0 : laneNarrow(wPx - gPx);
       // The slot lattice: one individual per slot; the nested subset of its lines drawn at this zoom.
-      const { L: lvl, fineA } = lineLevel(S.pitchPx);
+      const { L: lvl, fineA, lambda } = lineLevel(S.pitchPx);
       const bw = 2 ** lvl * S.pitchPx;
       const B0 = Math.max(0, Math.floor((x0 - lx0) / bw) - 1);
       if (B0 * 2 ** lvl >= S.nT) continue;
@@ -830,6 +833,12 @@ export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: num
         colR: lx0 + Math.max(0.6, wPx),
         narG,
         narR,
+        linkA: look.linkA ?? 0,
+        baseA: mode ? (look.baseA ?? 0) : 0,
+        lam: lambda,
+        tauC: tauC(gA),
+        tauB: mode ? 0 : Math.round(Math.log2(t)),
+        gA,
       });
     }
   }
@@ -886,15 +895,19 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
   // How much the lanes' fill dims under it, here (view.ts dims each stretch by its own widths).
   const gwPx = L.gw * v.sx;
   const stats: TwigStats = { mode: 'texture', g0: gm, g1: gm, drawn: 0, cellPx, fade: lives, fadeGreen: ext || !(gwPx > 0) ? 0 : laneDim(gwPx, lives), texGray: laneDim(L.w * v.sx - gwPx, lives), pending: false };
-  const lwL = Math.min(3.5, Math.max(Math.min(1, 0.6 * cellPx), cellPx * 0.22));
+  // Thin strands while they are packed (a dark gap between neighbours: hatching, not a fill).
+  const lwL = Math.min(3.5, Math.max(Math.min(0.8, 0.4 * cellPx), cellPx * 0.22));
   // A death is a rounded end, a touch wider than the strand.
-  const tipR = lwL * 0.5 + Math.min(1, 0.25 + cellPx * 0.02);
+  // (Only once strands are a few px apart: packed, the dots would read as a herringbone.)
+  const tipR = lwL * 0.5 + smoothstep((cellPx - 3) / 4) * Math.min(1, 0.25 + cellPx * 0.02);
+  // Under packed lives, the slot's own faint thread (as the texture's floor): strands, not specks.
+  const baseA = LIVES_FLOOR * (1 - smoothstep((cellPx - 3) / 6));
   const lw = Math.max(1, Math.min(4, cellPx * 0.12));
   if (v.mesh) {
     const batch = v.mesh;
     const insts: MeshInst[] = [];
-    meshInstances(v, m, yTop, yBot, 0, dens > 0.02 ? dens : 0, { lw: 0.9, tipR: 0 }, insts, 1);
-    meshInstances(v, m, yTop, yBot, 1, lives, { lw: lwL, tipR }, insts);
+    meshInstances(v, m, yTop, yBot, 0, dens > 0.02 ? dens : 0, { lw: 0.9, tipR: 0, linkA: LINK_ALPHA }, insts, 1);
+    meshInstances(v, m, yTop, yBot, 1, lives, { lw: lwL, tipR, linkA: LINK_ALPHA, baseA }, insts);
     for (const inst of insts) {
       // (next() first: it may grow the arrays.)
       const k = batch.next();
@@ -942,7 +955,7 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
 
   if (showLinks) {
     // The mother's thread carries the line; the father's is the thin mesh joining two lines at the child's birth.
-    const mk = () => ({ green: new Path2D(), gray: new Path2D(), far: new Path2D() });
+    const mk = () => ({ green: new Path2D(), gray: new Path2D(), far: new Path2D(), farGreen: new Path2D() });
     const prim = mk();
     const mesh = mk();
     for (const { g, i, t } of twigs) {
@@ -957,29 +970,33 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
         const pi = Number(p.index);
         const pt = m.twigNear(pg, pi, t.K);
         // Leaves the parent's strand a little before the child's birth (or at the
-        // parent's death, if earlier) and curves up into the child's base, like a fork.
+        // parent's death, if earlier) and runs straight up into the child's base:
+        // the texture's cross-links (mesh.ts shadeLinks), resolved.
         const [px, py, cy2] = threadEnds(v, m, pt, t, genH);
-        // Long threads (the rare migrants) are drawn faint so the local braid reads.
-        const far = Math.abs(px - cx) > 6 * cellPx;
+        // Long threads (mates from further along the range) are drawn faint, whatever their
+        // colour, so the local braid reads.
+        const far = Math.abs(px - cx) > 4 * cellPx;
         const pGreen = !ext && (childGreen || m.isGreen(pt));
         const set = j === mi ? prim : mesh;
-        const path = pGreen ? set.green : far ? set.far : set.gray;
-        const dy = Math.max(3, (py - cy2) * 0.6);
+        const path = far ? (pGreen ? set.farGreen : set.far) : pGreen ? set.green : set.gray;
         path.moveTo(px, py);
-        path.bezierCurveTo(px, py - dy, cx, cy2 + dy, cx, cy2);
+        path.lineTo(cx, cy2);
       });
     }
     const strokes = (s: ReturnType<typeof mk>, w: number, a: number) => {
       ctx.lineWidth = w;
-      ctx.strokeStyle = rgba('#aab2ba', 0.12 * a * livesA);
+      ctx.strokeStyle = rgba(TWIG_GRAY, 0.045 * a * livesA);
       ctx.stroke(s.far);
-      ctx.strokeStyle = rgba('#aab2ba', 0.4 * a * livesA);
+      ctx.strokeStyle = rgba(LINEAGE, 0.045 * a * livesA);
+      ctx.stroke(s.farGreen);
+      ctx.strokeStyle = rgba(TWIG_GRAY, 0.55 * a * livesA);
       ctx.stroke(s.gray);
-      ctx.strokeStyle = rgba(LINEAGE, 0.7 * a * livesA);
+      ctx.strokeStyle = rgba(LINEAGE, 0.6 * a * livesA);
       ctx.stroke(s.green);
     };
-    strokes(mesh, Math.max(0.6, lw * 0.3), 0.7 * linksA);
-    strokes(prim, Math.max(0.9, lw * 0.6), linksA);
+    // (As wide as the texture's cross-links, mesh.ts linkWidth; the mother's a little bolder.)
+    strokes(mesh, linkWidth(lwL), 0.8 * linksA);
+    strokes(prim, linkWidth(lwL) * 1.3, linksA);
   }
 
   if (sel) {
@@ -993,9 +1010,8 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
       const genH = m.row(sel.g - 1).y - m.row(sel.g).y;
       for (const p of m.parents(sel.g, sel.i)) {
         const [px, py] = threadEnds(v, m, m.twigNear(p.generation, Number(p.index), t.K), t, genH);
-        const dy = Math.max(3, (py - yb) * 0.6);
         ctx.moveTo(px, py);
-        ctx.bezierCurveTo(px, py - dy, x, yb + dy, x, yb);
+        ctx.lineTo(x, yb);
       }
     }
     ctx.stroke();

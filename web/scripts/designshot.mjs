@@ -54,8 +54,8 @@ try {
         } else {
           const [sp, ago, perBar, sy, at] = args;
           const b = fan.branches.find((b) => b.sp.common === sp);
-          const sumEver = fan.branches.reduce((a, b) => a + b.sp.ever, 0);
-          const sx = ((70 / perBar) * sumEver) / fan.trunkWidth;
+          // World width per individual (alive widths): the bar is 70 px.
+          const sx = 70 / perBar / b.unit;
           f.cam = { cx: 0, cy: fan.time.y(ago / 1e6), sx, sy, ty: sy };
           f.camera.settle();
           const L = f.model(b).lanes(f.cam.cy);

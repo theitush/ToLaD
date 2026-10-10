@@ -151,7 +151,8 @@ describe('the texture of lines, then the individuals on them', () => {
       // Lit, not a flat fill (some pixels dark), and the lanes dim under it.
       const { lit, n } = shadeScreen(v, c, mi);
       expect(lit).toBeGreaterThan(1000);
-      expect(lit).toBeLessThan(n * (lives ? 0.8 : 0.6));
+      // (The cross-links between the lines add some: still far from a fill.)
+      expect(lit).toBeLessThan(n * (lives ? 0.8 : 0.7));
       // (The living's lane dims fully once it is wide enough to hold lines; narrower, it is one
       // line of its own width, modulated by the lives on it: never plain.)
       const gwPx = laneAt(b, c.cam.cy).gw * c.cam.sx;

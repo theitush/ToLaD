@@ -4,7 +4,7 @@
 // which keeps the text, the history marks and the parent threads.
 
 import { HASH_GLSL } from '../../../packages/procgen/src/glsl.ts';
-import { LAT_DEPTH, MESH_F, MESH_U, NAR_FLOOR, TEX_FLOOR, type Palette } from './mesh';
+import { LAT_DEPTH, LINK_LEVELS, LINK_P, MESH_F, MESH_U, NAR_FLOOR, TEX_FLOOR, type Palette } from './mesh';
 
 const RECT_VS = /* glsl */ `#version 300 es
 layout(location = 0) in vec2 corner;
@@ -47,6 +47,8 @@ layout(location = 6) in uvec4 aIdx;
 layout(location = 7) in uvec4 aSeed;
 layout(location = 8) in uvec4 aIdx2;
 layout(location = 9) in vec4 aNar;
+layout(location = 10) in vec4 aLink;
+layout(location = 11) in vec4 aMore;
 uniform vec2 uView;
 out vec2 vP;
 flat out vec4 vRect;
@@ -58,10 +60,12 @@ flat out uvec4 vIdx;
 flat out uvec4 vSeed;
 flat out uvec4 vIdx2;
 flat out vec4 vNar;
+flat out vec4 vLink;
+flat out vec4 vMore;
 void main() {
   vec2 p = mix(aRect.xy, aRect.zw, corner);
   vP = p;
-  vRect = aRect; vSlot = aSlot; vTime = aTime; vMisc = aMisc; vLife = aLife; vIdx = aIdx; vSeed = aSeed; vIdx2 = aIdx2; vNar = aNar;
+  vRect = aRect; vSlot = aSlot; vTime = aTime; vMisc = aMisc; vLife = aLife; vIdx = aIdx; vSeed = aSeed; vIdx2 = aIdx2; vNar = aNar; vLink = aLink; vMore = aMore;
   gl_Position = vec4(p.x / uView.x * 2.0 - 1.0, 1.0 - p.y / uView.y * 2.0, 0.0, 1.0);
 }`;
 
@@ -77,8 +81,10 @@ flat in vec4 vMisc;   // alpha, mode, lane, tipR
 flat in vec4 vLife;   // GL, Lm, nowRel, xG
 flat in uvec4 vIdx;   // B0, lvl, nA, nB
 flat in uvec4 vSeed;  // seedA, seedB, strideA, strideB
-flat in uvec4 vIdx2;  // latSeed, foldA, foldB, -
+flat in uvec4 vIdx2;  // latSeed, foldA, foldB, gA
 flat in vec4 vNar;    // colL, colR, narG, narR
+flat in vec4 vLink;   // linkA, lambda, tauC, tauB
+flat in vec4 vMore;   // baseA, -, -, -
 uniform float uKLog;
 uniform float uNowPx;
 uniform vec3 uPal[4];
@@ -87,6 +93,8 @@ const float LN2 = 0.6931471805599453;
 const float TEX_FLOOR = ${TEX_FLOOR.toFixed(4)};
 const float NAR_FLOOR = ${NAR_FLOOR.toFixed(4)};
 const uint LAT_DEPTH = ${LAT_DEPTH}u;
+const int LINK_LEVELS = ${LINK_LEVELS};
+const uint LINK_P24 = ${Math.round(LINK_P * 16777216)}u;
 float expm1s(float x) { return abs(x) < 1e-3 ? x * (1.0 + x * (0.5 + x / 6.0)) : exp(x) - 1.0; }
 float log1ps(float x) { return abs(x) < 1e-3 ? x * (1.0 - x * (0.5 - x / 3.0)) : log(1.0 + x); }
 float lineAA(float d, float lw) {
@@ -164,8 +172,132 @@ vec4 shadeLane(float lane, uint iA, uint iB, float d, vec2 p, float floorA, floa
     if (k == 0) { float g = clamp(1.0 - dLine / 5.0, 0.0, 1.0); a = max(a, 0.35 * g * g); }
     if (a > best) { best = a; bc = k; }
   }
+  // The slot's own thread under its lives, over the generation's span (the dead stop short of now).
+  float baseA = vMore.x;
+  if (baseA > 0.0) {
+    float kl = LN2 * uKLog;
+    float y0 = vTime.x + log1ps((vTime.y - min(GL, nowRel)) / vTime.z) / kl;
+    float y1 = vTime.x + log1ps(vTime.y / vTime.z) / kl;
+    float top = lane < 0.5 ? y0 : max(y0, uNowPx + 3.0);
+    float a = p.y >= top && p.y < y1 ? baseA * lineAA(d, vSlot.z) : 0.0;
+    if (a > best) { best = a; bc = lane < 0.5 ? 1 : (lane > 1.5 ? 3 : 2); }
+  }
   if (bc < 0) return vec4(0.0);
   return vec4(uPal[bc], best);
+}
+// ---- cross-links (mesh.ts shadeLinks) ----
+uint linkPair(uint l, uint B) { return lowbias32((B * 0x27d4eb2du) ^ vIdx2.x ^ ((l + 1u) * 0x165667b1u)); }
+uint timeHash(uint P, int c, int a) { return lowbias32((uint(a) * 0x7feb352du) ^ P ^ (uint(c + 1) * 0x846ca68bu)); }
+int timeBit(uint P, int i, int idx) {
+  int c = (i - 1) / 5;
+  int d = 5 * c + 5 - i;
+  int pos = (1 << d) - 1 + (idx & ((1 << d) - 1));
+  return int((timeHash(P, c, idx >> d) >> uint(pos)) & 1u);
+}
+// The generation representing node band of level tau, if in [lo, hi]; else NONE.
+const int NONE = -2147483647 - 1;
+int timeRep(uint P, int tau, int band, int lo, int hi) {
+  int idx = band;
+  int i = tau;
+  while (i > 0) {
+    int c = (i - 1) / 5;
+    int top = 5 * c + 5;
+    uint h = timeHash(P, c, idx >> (top - i));
+    for (; i > 5 * c; i--) {
+      if ((idx << i) > hi || ((idx + 1) << i) <= lo) return NONE;
+      int d = top - i;
+      idx = 2 * idx + int((h >> uint((1 << d) - 1 + (idx & ((1 << d) - 1)))) & 1u);
+    }
+  }
+  return idx >= lo && idx <= hi ? idx : NONE;
+}
+int timeRank(uint P, int g, int from, int to) {
+  int r = from;
+  for (int i = from + 1; i <= to; i++) {
+    if (timeBit(P, i, g >> i) != ((g >> (i - 1)) & 1)) break;
+    r = i;
+  }
+  return r;
+}
+float smooth01(float t) { t = clamp(t, 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
+float linkWeight(float l, float lambda) {
+  float s = l - lambda;
+  return s < 0.0 ? smooth01(1.0 + s) : 1.0 - smooth01(s - 1.0);
+}
+float segDist(vec2 p, vec2 a, vec2 b) {
+  vec2 ab = b - a;
+  float t = clamp(dot(p - a, ab) / max(1e-9, dot(ab, ab)), 0.0, 1.0);
+  return length(p - a - t * ab);
+}
+// Block B's line at level l (dl above the instance's), as drawn (mesh.ts latticeWalk): screen x.
+float lineAt(uint l, uint B, uint dl) {
+  uint D = min(l, LAT_DEPTH);
+  uint idx = B;
+  uint off = 0u;
+  for (uint k = l; k > l - D; k--) {
+    uint bit = latBit(k, idx);
+    idx = 2u * idx + bit;
+    off = 2u * off + bit;
+  }
+  float bwl = vSlot.y * float(1u << dl);
+  return vSlot.x + float(int((B << dl) - vIdx.x)) * vSlot.y + (float(off) + 0.5) * bwl / float(1u << D);
+}
+vec4 shadeLinks(vec2 p) {
+  float linkA = vLink.x;
+  if (!(linkA > 0.0)) return vec4(0.0);
+  float k = LN2 * uKLog;
+  // The pixel's time (from generation gA's start) and years per px there.
+  float tp = vTime.y - vTime.z * expm1s(k * (p.y - vTime.x));
+  float dtdy = (vTime.y - tp + vTime.z) * k;
+  float lw = max(0.75, vSlot.z * 0.45);
+  float reachT = (lw * 0.5 + 1.0) * dtdy;
+  float GL = vLife.x;
+  int gA = int(vIdx2.w);
+  int lo = gA + int(floor((tp - reachT) / GL));
+  int hi = gA + int(floor((tp + reachT) / GL));
+  int tauB = int(vLink.w);
+  float tauC = vLink.z;
+  int top = min(tauB + 8, max(tauB, int(ceil(tauC)) + 1));
+  int bfL = int(floor((p.x - vSlot.x) / vSlot.y));
+  if (int(vIdx.x) + bfL < 0) return vec4(0.0);
+  uint BL = uint(int(vIdx.x) + bfL);
+  vec4 best = vec4(0.0);
+  for (int dl = 0; dl < LINK_LEVELS; dl++) {
+    uint l = vIdx.y + uint(dl);
+    float w = linkWeight(float(l), vLink.y);
+    if (!(w > 0.004)) continue;
+    uint Bl = BL >> uint(dl);
+    for (int c = -1; c <= 0; c++) {
+      if (c < 0 && Bl == 0u) continue;
+      uint Bp = c < 0 ? Bl - 1u : Bl;
+      uint P = linkPair(l, Bp);
+      int g = vMisc.y < 0.5 ? timeRep(P, tauB, gA >> tauB, lo, hi) : (gA >= lo && gA <= hi ? gA : NONE);
+      if (g == NONE) continue;
+      uint h = lowbias32(P ^ (uint(g) * 0x9e3779b9u) ^ 0x68e31da4u);
+      if ((h >> 8u) >= LINK_P24) continue;
+      float u = 0.4 + 0.6 * (float(h & 127u) + 0.5) / 128.0;
+      uint dir = (h >> 7u) & 1u;
+      float tb = (float(g - gA) + u) * GL;
+      float tpar = tb - GL / 3.0;
+      if (tp < tpar - reachT || tp > tb + reachT) continue;
+      float wt = smooth01(float(timeRank(P, g, tauB, top)) - tauC);
+      if (!(wt > 0.0)) continue;
+      // The pair's two lines, left and right.
+      float xa = lineAt(l, Bp, uint(dl));
+      float xb = lineAt(l, Bp + 1u, uint(dl));
+      if (vNar.y > vNar.x && (xa < vNar.x || xb > vNar.y)) continue;
+      float xC = dir == 0u ? xb : xa;
+      float xP = dir == 0u ? xa : xb;
+      float yC = p.y + (tp - tb) / dtdy;
+      float yP = p.y + (tp - tpar) / dtdy;
+      float a = lineAA(segDist(p, vec2(xP, yP), vec2(xC, yC)), lw) * w * wt * linkA * vMisc.x;
+      if (a > best.a) {
+        int cd = xC < vLife.w ? 1 : (vMisc.z > 1.5 ? 3 : 2);
+        best = vec4(uPal[cd], a);
+      }
+    }
+  }
+  return best;
 }
 void main() {
   vec2 p = vP;
@@ -174,7 +306,7 @@ void main() {
   float bw = vSlot.y;
   // Nothing to draw this far from a line (before any shading: most pixels stop here).
   // (Only the living glow, and they are only in the green lane.)
-  float reach = vMisc.y < 0.5 ? max(vSlot.z, 1.0) * 0.5 + 0.5 : max(vMisc.w, vSlot.z * 0.5 + (xG > vRect.x ? 5.0 : 0.0)) + 0.5;
+  float reach = vMisc.y < 0.5 ? max(vSlot.z, 1.0) * 0.5 + 0.5 : max(vMisc.w, max(vSlot.z, 1.0) * 0.5 + (xG > vRect.x ? 5.0 : 0.0)) + 0.5;
   float bf = floor((p.x - vSlot.x) / bw);
   uint D = min(L, LAT_DEPTH);
   vec4 best = vec4(0.0);
@@ -218,6 +350,8 @@ void main() {
     a *= vMisc.x * fine;
     if (a > best.a) best = vec4(col, a);
   }
+  vec4 lk = shadeLinks(p);
+  if (lk.a > best.a) best = lk;
   // Lanes too narrow for their lines: the lane is one line its own width, lit by a representative's lives.
   if (vMisc.y < 0.5 && (vNar.z > 0.0 || vNar.w > 0.0)) {
     float colL = vNar.x;
@@ -354,9 +488,9 @@ export class FanGL {
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
     this.meshFBuf = gl.createBuffer()!;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.meshFBuf);
-    // Floats: aRect, aSlot, aTime, aMisc, aLife (locations 1–5) and aNar (9).
-    for (let k = 0; k < 6; k++) {
-      const loc = k < 5 ? 1 + k : 9;
+    // Floats: aRect, aSlot, aTime, aMisc, aLife (locations 1–5), aNar (9), aLink (10) and aMore (11).
+    for (let k = 0; k < 8; k++) {
+      const loc = k < 5 ? 1 + k : 4 + k;
       gl.enableVertexAttribArray(loc);
       gl.vertexAttribPointer(loc, 4, gl.FLOAT, false, MESH_F * 4, k * 16);
       gl.vertexAttribDivisor(loc, 1);

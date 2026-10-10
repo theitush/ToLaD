@@ -503,7 +503,7 @@ export class FanView implements InputHandlers {
     const lives = tw?.fade ?? 0;
     const grayBase = b.sp.extinct ? WITHERED : GRAY;
     const greenFade = tw?.fadeGreen ?? 0;
-    const greenC = mix(GREEN, '#10291d', greenFade * 0.85);
+    const greenC = mix(GREEN, '#0d2318', greenFade * 0.9);
     const yT0 = this.toScreen(0, this.fan.time.y(b.sp.t0))[1];
     const grayC = mix(grayBase, '#131c19', Math.max(lives, tw?.texGray ?? 0) * 0.82);
     if (this.gl) {
@@ -521,7 +521,7 @@ export class FanView implements InputHandlers {
         // (An extinct species' line ended: withered over its span; below it, its founders' ancestors.)
         const base = b.sp.extinct && (p.y + q.y) / 2 < yT0 ? grayBase : GRAY;
         const gc = rgb01(mix(base, '#131c19', laneDim(p.w * k - gPx, lives) * 0.82));
-        const ec = rgb01(mix(GREEN, '#10291d', laneDim(gPx, lives) * 0.85));
+        const ec = rgb01(mix(GREEN, '#0d2318', laneDim(gPx, lives) * 0.9));
         this.gl.under.push(Math.max(-4, x0), y0, Math.min(this.w + 4, x0 + Math.max(0.6, p.w * k)), y1, gc[0], gc[1], gc[2], 1);
         if (gPx > 0) {
           const x1 = x0 + Math.max(1, gPx);
