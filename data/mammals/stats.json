@@ -288,29 +288,29 @@
   "births_now_per_yr": 56423434094.32093,
   "by_era": {
    "Cretaceous 66-145 Ma": {
-    "ghost": 3.739444252566448e+18,
+    "ghost": 3.7394442525663867e+18,
     "ghost_share": 1.0,
-    "sampled": 158538002289218.53
+    "sampled": 158538002350522.47
    },
    "Holocene-Pleistocene 0-2.58 Ma": {
-    "ghost": 9930554188552840.0,
+    "ghost": 9929780987751754.0,
     "ghost_share": 0.068,
-    "sampled": 1.3607817456014094e+17
+    "sampled": 1.3607908196333682e+17
    },
    "Jurassic and older >145 Ma": {
-    "ghost": 9.78738474708671e+17,
+    "ghost": 9.787384747086705e+17,
     "ghost_share": 1.0,
-    "sampled": 14602348303656.223
+    "sampled": 14602348304330.781
    },
    "Neogene 2.58-23 Ma": {
-    "ghost": 8.917629523605614e+17,
+    "ghost": 8.917625243403375e+17,
     "ghost_share": 0.7682,
-    "sampled": 2.6912764879304346e+17
+    "sampled": 2.6912807681326752e+17
    },
    "Paleogene 23-66 Ma": {
-    "ghost": 2.40960408453132e+18,
+    "ghost": 2.4096040843451643e+18,
     "ghost_share": 0.9882,
-    "sampled": 2.878244698651807e+16
+    "sampled": 2.8782447172673156e+16
    }
   },
   "f_ramp_Ma": [
@@ -318,7 +318,7 @@
    91.36
   ],
   "ghost_share": 0.9487,
-  "max_multiplier": 109122.92229222886,
+  "max_multiplier": 109122.92228848187,
   "multiplier_at_Ma": {
    "0.01": 1.0,
    "1": 1.017,
@@ -330,13 +330,13 @@
    "50": 253.949,
    "66": 3704.242
   },
-  "sampled_sum": 4.341614106902953e+17,
+  "sampled_sum": 4.3416274629993235e+17,
   "top_down_estimate": 8.46351511414814e+18,
-  "with_ghosts": 8.463641729045848e+18
+  "with_ghosts": 8.463641863248245e+18
  },
  "grid_cells": 1600,
  "history": {
-  "hist_sources": 127,
+  "hist_sources": 129,
   "note": "Curated flagship histories (pipeline/history/). ever_before = the model with today's count held over the whole band; ever_after = with the pre-decline baseline / curve. Leaf values, before the tree sum.",
   "species": {
    "Acinonyx jubatus": {
@@ -353,6 +353,7 @@
      "year": 1900.0
     },
     "component": "wild",
+    "deep": null,
     "domestic_on_leaf": false,
     "ever_after": 131972392856.1681,
     "ever_before": 13212050505.71918,
@@ -378,6 +379,7 @@
      "year": 1976.0
     },
     "component": "wild",
+    "deep": null,
     "domestic_on_leaf": false,
     "ever_after": 2252499093.039218,
     "ever_before": 1707470127.6847823,
@@ -403,6 +405,7 @@
      "year": 1800.0
     },
     "component": "wild",
+    "deep": null,
     "domestic_on_leaf": false,
     "ever_after": 153100115541179.25,
     "ever_before": 4374380778683.019,
@@ -421,6 +424,7 @@
     "alive_from": "history",
     "baseline": null,
     "component": "wild",
+    "deep": null,
     "domestic_on_leaf": false,
     "ever_after": 158871323596.91733,
     "ever_before": 38470010838.83543,
@@ -446,6 +450,7 @@
      "year": 1611.0
     },
     "component": "wild",
+    "deep": null,
     "domestic_on_leaf": false,
     "ever_after": 28297964561.921093,
     "ever_before": 11128758031.700035,
@@ -471,6 +476,7 @@
      "year": 1900.0
     },
     "component": "wild",
+    "deep": null,
     "domestic_on_leaf": false,
     "ever_after": 330743990909.86707,
     "ever_before": 26729516997.07247,
@@ -496,6 +502,7 @@
      "year": 1900.0
     },
     "component": "wild",
+    "deep": null,
     "domestic_on_leaf": false,
     "ever_after": 839156932151.2554,
     "ever_before": 159599181946.6885,
@@ -521,6 +528,7 @@
      "year": 1800.0
     },
     "component": "wild",
+    "deep": null,
     "domestic_on_leaf": false,
     "ever_after": 14586562763303.549,
     "ever_before": 10767425382.865904,
@@ -539,6 +547,7 @@
     "alive_from": "history",
     "baseline": null,
     "component": "wild",
+    "deep": null,
     "domestic_on_leaf": false,
     "ever_after": 9947356738.963697,
     "ever_before": 2169243101.1135964,
@@ -557,6 +566,7 @@
     "alive_from": "history",
     "baseline": null,
     "component": "domestic",
+    "deep": null,
     "domestic_on_leaf": true,
     "ever_after": 269299414560.9769,
     "ever_before": 316284791927.0368,
@@ -575,6 +585,7 @@
     "alive_from": "history",
     "baseline": null,
     "component": "domestic",
+    "deep": null,
     "domestic_on_leaf": true,
     "ever_after": 19371307016.291832,
     "ever_before": 36198296273.05347,
@@ -593,6 +604,7 @@
     "alive_from": "history",
     "baseline": null,
     "component": "wild",
+    "deep": null,
     "domestic_on_leaf": false,
     "ever_after": 1189174280817.5332,
     "ever_before": 1189174280817.5332,
@@ -611,6 +623,7 @@
     "alive_from": "history",
     "baseline": null,
     "component": "domestic",
+    "deep": null,
     "domestic_on_leaf": true,
     "ever_after": 1090167020.137921,
     "ever_before": 2959080748.0350165,
@@ -629,6 +642,7 @@
     "alive_from": "history",
     "baseline": null,
     "component": "wild",
+    "deep": null,
     "domestic_on_leaf": true,
     "ever_after": 303622243854.01904,
     "ever_before": 303030381054.24084,
@@ -647,6 +661,7 @@
     "alive_from": "history",
     "baseline": null,
     "component": "domestic",
+    "deep": null,
     "domestic_on_leaf": true,
     "ever_after": 172801201824.23605,
     "ever_before": 395986643025.7558,
@@ -672,6 +687,7 @@
      "year": 1600.0
     },
     "component": "wild",
+    "deep": null,
     "domestic_on_leaf": false,
     "ever_after": 645157360662893.5,
     "ever_before": 21488246181864.98,
@@ -690,6 +706,7 @@
     "alive_from": "history",
     "baseline": null,
     "component": "wild",
+    "deep": null,
     "domestic_on_leaf": false,
     "ever_after": 4969476618658.793,
     "ever_before": 6798261578804.607,
@@ -708,6 +725,7 @@
     "alive_from": "history",
     "baseline": null,
     "component": "wild",
+    "deep": null,
     "domestic_on_leaf": false,
     "ever_after": 22446760508.784714,
     "ever_before": 28742453712.718956,
@@ -726,6 +744,7 @@
     "alive_from": "history",
     "baseline": null,
     "component": "wild",
+    "deep": null,
     "domestic_on_leaf": false,
     "ever_after": 4929685736113.359,
     "ever_before": 4929686058189.863,
@@ -751,6 +770,7 @@
      "year": 1960.0
     },
     "component": "wild",
+    "deep": null,
     "domestic_on_leaf": false,
     "ever_after": 193544798284.29218,
     "ever_before": 9445016290.73328,
@@ -776,6 +796,7 @@
      "year": 1900.0
     },
     "component": "wild",
+    "deep": null,
     "domestic_on_leaf": false,
     "ever_after": 58430967300.72209,
     "ever_before": 27204214429.790665,
@@ -801,6 +822,7 @@
      "year": 1741.0
     },
     "component": "wild",
+    "deep": null,
     "domestic_on_leaf": false,
     "ever_after": 114792561277.5976,
     "ever_before": 64201433636.49409,
@@ -819,6 +841,7 @@
     "alive_from": "history",
     "baseline": null,
     "component": "domestic",
+    "deep": null,
     "domestic_on_leaf": true,
     "ever_after": 8482099721.824386,
     "ever_before": 7312941366.024204,
@@ -837,6 +860,7 @@
     "alive_from": "history",
     "baseline": null,
     "component": "domestic",
+    "deep": null,
     "domestic_on_leaf": true,
     "ever_after": 113535325835.01826,
     "ever_before": 95232683041.98706,
@@ -862,6 +886,7 @@
      "year": 1846.0
     },
     "component": "wild",
+    "deep": null,
     "domestic_on_leaf": false,
     "ever_after": 11575470880.337004,
     "ever_before": 8705186039.340117,
@@ -887,6 +912,7 @@
      "year": 1770.0
     },
     "component": "wild",
+    "deep": null,
     "domestic_on_leaf": false,
     "ever_after": 70766592474.56155,
     "ever_before": 55665077982.532524,
@@ -912,6 +938,7 @@
      "year": 1600.0
     },
     "component": "wild",
+    "deep": null,
     "domestic_on_leaf": false,
     "ever_after": 9850695768.34361,
     "ever_before": 31861680235.42564,
@@ -937,6 +964,7 @@
      "year": 1995.0
     },
     "component": "wild",
+    "deep": null,
     "domestic_on_leaf": false,
     "ever_after": 2005899716.5927901,
     "ever_before": 435175369.25768155,
@@ -955,6 +983,7 @@
     "alive_from": "history",
     "baseline": null,
     "component": "total",
+    "deep": null,
     "domestic_on_leaf": false,
     "ever_after": 117651866999.13,
     "ever_before": 117651866999.13,
@@ -980,6 +1009,7 @@
      "year": 1800.0
     },
     "component": "wild",
+    "deep": null,
     "domestic_on_leaf": false,
     "ever_after": 5336771167872.1875,
     "ever_before": 164841731916.11826,
@@ -1005,6 +1035,7 @@
      "year": 1800.0
     },
     "component": "wild",
+    "deep": null,
     "domestic_on_leaf": false,
     "ever_after": 5579404768937.071,
     "ever_before": 47688701276.27898,
@@ -1030,6 +1061,7 @@
      "year": 1850.0
     },
     "component": "wild",
+    "deep": null,
     "domestic_on_leaf": false,
     "ever_after": 285700831615.73627,
     "ever_before": 166465224084.68246,
@@ -1048,6 +1080,7 @@
     "alive_from": "history",
     "baseline": null,
     "component": "wild",
+    "deep": null,
     "domestic_on_leaf": false,
     "ever_after": 66729987106.64323,
     "ever_before": 66735009658.58401,
@@ -1066,6 +1099,7 @@
     "alive_from": "history",
     "baseline": null,
     "component": "domestic",
+    "deep": null,
     "domestic_on_leaf": true,
     "ever_after": 652368699289.8502,
     "ever_before": 629523854325.5166,
@@ -1091,6 +1125,7 @@
      "year": 1900.0
     },
     "component": "wild",
+    "deep": null,
     "domestic_on_leaf": false,
     "ever_after": 139194877514.54715,
     "ever_before": 56053875759.37378,
@@ -1116,15 +1151,34 @@
      "year": 1950.0
     },
     "component": "wild",
+    "deep": {
+     "band_start_yr_ago": 3761550.0,
+     "cite": "Armstrong et al. 2025, Genome Biol Evol 17(4):evaf060, Fig. 4 (green curve)",
+     "dropped_before_band": 0,
+     "dropped_blind": 8,
+     "grade": "D",
+     "join": {
+      "deep_n": 242259.15068493146,
+      "ratio": 0.4845183013698629,
+      "to_n": 500000.0,
+      "to_year": 1950.0
+     },
+     "method": "PSMC",
+     "ne_factor": 0.9039520547945205,
+     "oldest_yr_ago": 1340974.744609202,
+     "points": 14,
+     "time_factor": 1.0839999999999999,
+     "youngest_yr_ago": 23444.306326816324
+    },
     "domestic_on_leaf": false,
-    "ever_after": 627345291970.7738,
+    "ever_after": 824386105279.6287,
     "ever_before": 40150681643.83562,
-    "ever_ratio": 15.624773136749246,
+    "ever_ratio": 20.532306589275493,
     "file": "Panthera_leo.toml",
     "grades": "BCD",
     "leaf": "Panthera leo",
     "points": 4,
-    "segments": 12,
+    "segments": 42,
     "use": "counts"
    },
    "Panthera onca": {
@@ -1141,15 +1195,34 @@
      "year": 1995.0
     },
     "component": "wild",
+    "deep": {
+     "band_start_yr_ago": 3761550.0,
+     "cite": "Armstrong et al. 2025, Genome Biol Evol 17(4):evaf060, Fig. 4 (dark-blue curve)",
+     "dropped_before_band": 0,
+     "dropped_blind": 7,
+     "grade": "D",
+     "join": {
+      "deep_n": 327346.9915383306,
+      "ratio": 3.963038638478579,
+      "to_n": 82600.0,
+      "to_year": 1995.0
+     },
+     "method": "PSMC",
+     "ne_factor": 1.0197725593094413,
+     "oldest_yr_ago": 772341.0811293155,
+     "points": 15,
+     "time_factor": 2.0,
+     "youngest_yr_ago": 27643.704527432645
+    },
     "domestic_on_leaf": false,
-    "ever_after": 63369406391.40025,
+    "ever_after": 459347566141.3466,
     "ever_before": 49099846022.021484,
-    "ever_ratio": 1.2906233221786239,
+    "ever_ratio": 9.35537691778763,
     "file": "Panthera_onca.toml",
     "grades": "C",
     "leaf": "Panthera onca",
     "points": 1,
-    "segments": 5,
+    "segments": 38,
     "use": "counts"
    },
    "Panthera pardus": {
@@ -1166,15 +1239,34 @@
      "year": 1998.0
     },
     "component": "wild",
+    "deep": {
+     "band_start_yr_ago": 3956600.0000000005,
+     "cite": "Armstrong et al. 2025, Genome Biol Evol 17(4):evaf060, Fig. 4 (green curve)",
+     "dropped_before_band": 0,
+     "dropped_blind": 5,
+     "grade": "D",
+     "join": {
+      "deep_n": 579760.9159438871,
+      "ratio": 3.083834659275995,
+      "to_n": 188000.0,
+      "to_year": 1998.0
+     },
+     "method": "PSMC",
+     "ne_factor": 0.811990078352783,
+     "oldest_yr_ago": 1870440.0966821657,
+     "points": 18,
+     "time_factor": 1.5119999999999998,
+     "youngest_yr_ago": 20330.86274057252
+    },
     "domestic_on_leaf": false,
-    "ever_after": 159785846855.2064,
+    "ever_after": 408141585941.9815,
     "ever_before": 92421006260.30482,
-    "ever_ratio": 1.7288910099633379,
+    "ever_ratio": 4.416112769779264,
     "file": "Panthera_pardus.toml",
     "grades": "C",
     "leaf": "Panthera pardus",
     "points": 1,
-    "segments": 4,
+    "segments": 43,
     "use": "counts"
    },
    "Panthera tigris": {
@@ -1191,15 +1283,34 @@
      "year": 1900.0
     },
     "component": "wild",
+    "deep": {
+     "band_start_yr_ago": 3005903.9052387797,
+     "cite": "Armstrong et al. 2025, Genome Biol Evol 17(4):evaf060, Fig. 4 (green curve)",
+     "dropped_before_band": 0,
+     "dropped_blind": 5,
+     "grade": "D",
+     "join": {
+      "deep_n": 171467.36301369857,
+      "ratio": 1.7146736301369858,
+      "to_n": 100000.0,
+      "to_year": 1900.0
+     },
+     "method": "PSMC",
+     "ne_factor": 0.9318878424657533,
+     "oldest_yr_ago": 612403.8089902935,
+     "points": 9,
+     "time_factor": 1.49,
+     "youngest_yr_ago": 32234.103638537865
+    },
     "domestic_on_leaf": false,
-    "ever_after": 75196689820.07275,
+    "ever_after": 449172608538.6844,
     "ever_before": 2942539553.8582606,
-    "ever_ratio": 25.555031102801927,
+    "ever_ratio": 152.647942471913,
     "file": "Panthera_tigris.toml",
     "grades": "BC",
     "leaf": "Panthera tigris",
     "points": 4,
-    "segments": 14,
+    "segments": 32,
     "use": "counts"
    },
    "Panthera uncia": {
@@ -1209,15 +1320,34 @@
     "alive_from": "history",
     "baseline": null,
     "component": "wild",
+    "deep": {
+     "band_start_yr_ago": 3005903.9052387797,
+     "cite": "Armstrong et al. 2025, Genome Biol Evol 17(4):evaf060, Fig. 4 (green curve)",
+     "dropped_before_band": 0,
+     "dropped_blind": 3,
+     "grade": "D",
+     "join": {
+      "deep_n": 43922.56335616437,
+      "ratio": 7.40684036360276,
+      "to_n": 5930.0,
+      "to_year": 1994.0
+     },
+     "method": "PSMC",
+     "ne_factor": 0.45280993150684923,
+     "oldest_yr_ago": 80555.31495658869,
+     "points": 3,
+     "time_factor": 0.724,
+     "youngest_yr_ago": 32885.99435202773
+    },
     "domestic_on_leaf": false,
-    "ever_after": 5806110936.352457,
+    "ever_after": 32908755250.475376,
     "ever_before": 5639930144.118823,
-    "ever_ratio": 1.0294650444220348,
+    "ever_ratio": 5.83495795329873,
     "file": "Panthera_uncia.toml",
     "grades": "C",
     "leaf": "Panthera uncia",
     "points": 3,
-    "segments": 6,
+    "segments": 17,
     "use": "counts"
    },
    "Phascolarctos cinereus": {
@@ -1234,6 +1364,7 @@
      "year": 1788.0
     },
     "component": "wild",
+    "deep": null,
     "domestic_on_leaf": false,
     "ever_after": 45376649107346.414,
     "ever_before": 1923830675373.1282,
@@ -1259,6 +1390,7 @@
      "year": 1710.0
     },
     "component": "wild",
+    "deep": null,
     "domestic_on_leaf": false,
     "ever_after": 2582534879736.403,
     "ever_before": 476852743733.2137,
@@ -1284,6 +1416,7 @@
      "year": 1900.0
     },
     "component": "wild",
+    "deep": null,
     "domestic_on_leaf": false,
     "ever_after": 14463519374.96565,
     "ever_before": 2243013540.820662,
@@ -1309,6 +1442,7 @@
      "year": 1973.0
     },
     "component": "wild",
+    "deep": null,
     "domestic_on_leaf": false,
     "ever_after": 58419496971.89976,
     "ever_before": 21201386476.59282,
@@ -1334,6 +1468,7 @@
      "year": 1975.0
     },
     "component": "wild",
+    "deep": null,
     "domestic_on_leaf": false,
     "ever_after": 2261529984730.508,
     "ever_before": 90461507439.43015,
@@ -1359,6 +1494,7 @@
      "year": 1996.0
     },
     "component": "wild",
+    "deep": null,
     "domestic_on_leaf": false,
     "ever_after": 138922654476.41064,
     "ever_before": 62166722274.911606,
@@ -1377,6 +1513,7 @@
     "alive_from": "history",
     "baseline": null,
     "component": "domestic",
+    "deep": null,
     "domestic_on_leaf": true,
     "ever_after": 27528525164120.8,
     "ever_before": 27613611716334.27,
@@ -1395,6 +1532,7 @@
     "alive_from": "history",
     "baseline": null,
     "component": "wild",
+    "deep": null,
     "domestic_on_leaf": false,
     "ever_after": 40997114084.76229,
     "ever_before": 45096825493.23851,
@@ -1413,6 +1551,7 @@
     "alive_from": "history",
     "baseline": null,
     "component": "wild",
+    "deep": null,
     "domestic_on_leaf": false,
     "ever_after": 5817523031.411634,
     "ever_before": 5817581917.808218,
@@ -1438,6 +1577,7 @@
      "year": 1530.0
     },
     "component": "wild",
+    "deep": null,
     "domestic_on_leaf": false,
     "ever_after": 435612003301.17664,
     "ever_before": 114391700483.32764,
@@ -1454,11 +1594,11 @@
  "knuckles_collapsed": 3710,
  "mammalia": {
   "alive": 99232328723.32181,
-  "ever": 8.463641729045848e+18,
-  "ghost": 8.029480318355552e+18,
+  "ever": 8.463641863248243e+18,
+  "ghost": 8.02947911694831e+18,
   "grade": "D",
-  "hi": 9.711282805225765e+20,
-  "lo": 1.0279680738737358e+17
+  "hi": 9.711282903747023e+20,
+  "lo": 1.0279680932912995e+17
  },
  "mass_sources": {
   "mass:combine": 183,
@@ -1815,12 +1955,12 @@
   "non-species tip": 551
  },
  "output": {
-  "brotli_bytes": 517654,
+  "brotli_bytes": 520805,
   "files": 16,
-  "raw_bytes": 2066104,
-  "skeleton_brotli": 37444,
+  "raw_bytes": 2078088,
+  "skeleton_brotli": 37608,
   "skeleton_nodes": 1156,
-  "skeleton_raw": 158752,
+  "skeleton_raw": 159560,
   "tiles": 15
  },
  "overrides": {
@@ -1930,7 +2070,7 @@
   "rate_species_or_genus": 0.2601,
   "species_used": 13482
  },
- "pieces": 25772,
+ "pieces": 30798,
  "spot_checks": {
   "Bos taurus": {
    "alive": 1578614149.0,
@@ -1947,13 +2087,13 @@
   },
   "Hominidae": {
    "alive": 8301443026.633362,
-   "ever": 1196089967729.0923,
+   "ever": 1196088472198.549,
    "ever_range": [
-    14077946473.969858,
-    156632034407862.25
+    14077929584.371523,
+    156631918192106.66
    ],
    "extinct(gray)": false,
-   "ghost": 378320677763.64075,
+   "ghost": 378319182233.09735,
    "grade": "D",
    "t0_Ma": 14.805233333333334,
    "t1_Ma": 0.0
@@ -1973,13 +2113,13 @@
   },
   "Mammalia": {
    "alive": 99232328723.32181,
-   "ever": 8.463641729045848e+18,
+   "ever": 8.463641863248243e+18,
    "ever_range": [
-    1.0279680738737358e+17,
-    9.711282805225765e+20
+    1.0279680932912995e+17,
+    9.711282903747023e+20
    ],
    "extinct(gray)": 0.0,
-   "ghost": 8.029480318355552e+18,
+   "ghost": 8.02947911694831e+18,
    "grade": "D",
    "t0_Ma": 208.64140800000004,
    "t1_Ma": 0.0
@@ -2289,8 +2429,8 @@
   "by_alive": [
    {
     "alive": 54073067657.33373,
-    "ever": 1.367650804082138e+18,
-    "ghost": 1.1831394665574968e+18,
+    "ever": 1.3676502937919222e+18,
+    "ghost": 1.183138956267281e+18,
     "ghost_share": 0.865,
     "name": "Chiroptera",
     "sampled": 1.8451133752464128e+17,
@@ -2298,8 +2438,8 @@
    },
    {
     "alive": 22879416087.334225,
-    "ever": 1.786393524341327e+18,
-    "ghost": 1.627344705236859e+18,
+    "ever": 1.7863929489615196e+18,
+    "ghost": 1.6273441298570514e+18,
     "ghost_share": 0.911,
     "name": "Rodentia",
     "sampled": 1.5904881910446822e+17,
@@ -2307,26 +2447,26 @@
    },
    {
     "alive": 5657480700.384198,
-    "ever": 5069221533134751.0,
-    "ghost": 4322153526481385.5,
+    "ever": 5069219718074150.0,
+    "ghost": 4322151711420785.0,
     "ghost_share": 0.853,
     "name": "Artiodactyla",
-    "sampled": 747068006653365.5,
+    "sampled": 747068006653365.0,
     "t0_Ma": 61.87
    },
    {
     "alive": 2207399702.1966786,
-    "ever": 1.6787519197844864e+16,
-    "ghost": 1.5053356020450498e+16,
+    "ever": 1.6788849282132578e+16,
+    "ghost": 1.505335049516632e+16,
     "ghost_share": 0.897,
     "name": "Carnivora",
-    "sampled": 1734163177394366.0,
+    "sampled": 1735498786966258.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 1471200858.0422654,
-    "ever": 1.8218483214069536e+17,
-    "ghost": 1.4141719941412395e+17,
+    "ever": 1.8218478691626608e+17,
+    "ghost": 1.4141715418969467e+17,
     "ghost_share": 0.776,
     "name": "Eulipotyphla",
     "sampled": 4.076763272657141e+16,
@@ -2334,8 +2474,8 @@
    },
    {
     "alive": 1192198078.6030855,
-    "ever": 7.829552661150949e+16,
-    "ghost": 6.2834048998672e+16,
+    "ever": 7.829550319744261e+16,
+    "ghost": 6.283402558460512e+16,
     "ghost_share": 0.803,
     "name": "Didelphimorphia",
     "sampled": 1.5461477612837488e+16,
@@ -2343,8 +2483,8 @@
    },
    {
     "alive": 759123559.6050671,
-    "ever": 4.053700612078569e+16,
-    "ghost": 2.906608147081091e+16,
+    "ever": 4.053699247568589e+16,
+    "ghost": 2.906606782571111e+16,
     "ghost_share": 0.717,
     "name": "Lagomorpha",
     "sampled": 1.1470924649974776e+16,
@@ -2352,8 +2492,8 @@
    },
    {
     "alive": 567561780.6198184,
-    "ever": 1.0893426274740098e+16,
-    "ghost": 8728525054343127.0,
+    "ever": 1.0893422177125648e+16,
+    "ghost": 8728520956728677.0,
     "ghost_share": 0.801,
     "name": "Hyracoidea",
     "sampled": 2164901220396971.0,
@@ -2361,28 +2501,28 @@
    },
    {
     "alive": 403269648.033177,
-    "ever": 1.1908062522093404e+16,
-    "ghost": 8969574823125673.0,
+    "ever": 1.1908057872609712e+16,
+    "ghost": 8969570173641983.0,
     "ghost_share": 0.753,
     "name": "Diprotodontia",
-    "sampled": 2938487698967731.0,
+    "sampled": 2938487698967729.0,
     "t0_Ma": 61.06
    },
    {
     "alive": 289642137.19190365,
-    "ever": 2.037737496187549e+16,
-    "ghost": 1.3250897750239978e+16,
+    "ever": 2.0377370098185996e+16,
+    "ghost": 1.3250892886550484e+16,
     "ghost_share": 0.65,
     "name": "Macroscelidea",
-    "sampled": 7126477211635510.0,
+    "sampled": 7126477211635512.0,
     "t0_Ma": 65.7
    }
   ],
   "by_ever": [
    {
     "alive": 22879416087.334225,
-    "ever": 1.786393524341327e+18,
-    "ghost": 1.627344705236859e+18,
+    "ever": 1.7863929489615196e+18,
+    "ghost": 1.6273441298570514e+18,
     "ghost_share": 0.911,
     "name": "Rodentia",
     "sampled": 1.5904881910446822e+17,
@@ -2390,8 +2530,8 @@
    },
    {
     "alive": 54073067657.33373,
-    "ever": 1.367650804082138e+18,
-    "ghost": 1.1831394665574968e+18,
+    "ever": 1.3676502937919222e+18,
+    "ghost": 1.183138956267281e+18,
     "ghost_share": 0.865,
     "name": "Chiroptera",
     "sampled": 1.8451133752464128e+17,
@@ -2399,8 +2539,8 @@
    },
    {
     "alive": 1471200858.0422654,
-    "ever": 1.8218483214069536e+17,
-    "ghost": 1.4141719941412395e+17,
+    "ever": 1.8218478691626608e+17,
+    "ghost": 1.4141715418969467e+17,
     "ghost_share": 0.776,
     "name": "Eulipotyphla",
     "sampled": 4.076763272657141e+16,
@@ -2408,8 +2548,8 @@
    },
    {
     "alive": 1192198078.6030855,
-    "ever": 7.829552661150949e+16,
-    "ghost": 6.2834048998672e+16,
+    "ever": 7.829550319744261e+16,
+    "ghost": 6.283402558460512e+16,
     "ghost_share": 0.803,
     "name": "Didelphimorphia",
     "sampled": 1.5461477612837488e+16,
@@ -2417,8 +2557,8 @@
    },
    {
     "alive": 759123559.6050671,
-    "ever": 4.053700612078569e+16,
-    "ghost": 2.906608147081091e+16,
+    "ever": 4.053699247568589e+16,
+    "ghost": 2.906606782571111e+16,
     "ghost_share": 0.717,
     "name": "Lagomorpha",
     "sampled": 1.1470924649974776e+16,
@@ -2426,35 +2566,35 @@
    },
    {
     "alive": 289642137.19190365,
-    "ever": 2.037737496187549e+16,
-    "ghost": 1.3250897750239978e+16,
+    "ever": 2.0377370098185996e+16,
+    "ghost": 1.3250892886550484e+16,
     "ghost_share": 0.65,
     "name": "Macroscelidea",
-    "sampled": 7126477211635510.0,
+    "sampled": 7126477211635512.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 2207399702.1966786,
-    "ever": 1.6787519197844864e+16,
-    "ghost": 1.5053356020450498e+16,
+    "ever": 1.6788849282132578e+16,
+    "ghost": 1.505335049516632e+16,
     "ghost_share": 0.897,
     "name": "Carnivora",
-    "sampled": 1734163177394366.0,
+    "sampled": 1735498786966258.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 403269648.033177,
-    "ever": 1.1908062522093404e+16,
-    "ghost": 8969574823125673.0,
+    "ever": 1.1908057872609712e+16,
+    "ghost": 8969570173641983.0,
     "ghost_share": 0.753,
     "name": "Diprotodontia",
-    "sampled": 2938487698967731.0,
+    "sampled": 2938487698967729.0,
     "t0_Ma": 61.06
    },
    {
     "alive": 567561780.6198184,
-    "ever": 1.0893426274740098e+16,
-    "ghost": 8728525054343127.0,
+    "ever": 1.0893422177125648e+16,
+    "ghost": 8728520956728677.0,
     "ghost_share": 0.801,
     "name": "Hyracoidea",
     "sampled": 2164901220396971.0,
@@ -2462,8 +2602,8 @@
    },
    {
     "alive": 83188245.11135344,
-    "ever": 5529195252796271.0,
-    "ghost": 4720856133630639.0,
+    "ever": 5529193224307098.0,
+    "ghost": 4720854105141466.0,
     "ghost_share": 0.854,
     "name": "Dasyuromorphia",
     "sampled": 808339119165632.0,
@@ -2473,8 +2613,8 @@
   "by_sampled_ever": [
    {
     "alive": 54073067657.33373,
-    "ever": 1.367650804082138e+18,
-    "ghost": 1.1831394665574968e+18,
+    "ever": 1.3676502937919222e+18,
+    "ghost": 1.183138956267281e+18,
     "ghost_share": 0.865,
     "name": "Chiroptera",
     "sampled": 1.8451133752464128e+17,
@@ -2482,8 +2622,8 @@
    },
    {
     "alive": 22879416087.334225,
-    "ever": 1.786393524341327e+18,
-    "ghost": 1.627344705236859e+18,
+    "ever": 1.7863929489615196e+18,
+    "ghost": 1.6273441298570514e+18,
     "ghost_share": 0.911,
     "name": "Rodentia",
     "sampled": 1.5904881910446822e+17,
@@ -2491,8 +2631,8 @@
    },
    {
     "alive": 1471200858.0422654,
-    "ever": 1.8218483214069536e+17,
-    "ghost": 1.4141719941412395e+17,
+    "ever": 1.8218478691626608e+17,
+    "ghost": 1.4141715418969467e+17,
     "ghost_share": 0.776,
     "name": "Eulipotyphla",
     "sampled": 4.076763272657141e+16,
@@ -2500,8 +2640,8 @@
    },
    {
     "alive": 1192198078.6030855,
-    "ever": 7.829552661150949e+16,
-    "ghost": 6.2834048998672e+16,
+    "ever": 7.829550319744261e+16,
+    "ghost": 6.283402558460512e+16,
     "ghost_share": 0.803,
     "name": "Didelphimorphia",
     "sampled": 1.5461477612837488e+16,
@@ -2509,8 +2649,8 @@
    },
    {
     "alive": 759123559.6050671,
-    "ever": 4.053700612078569e+16,
-    "ghost": 2.906608147081091e+16,
+    "ever": 4.053699247568589e+16,
+    "ghost": 2.906606782571111e+16,
     "ghost_share": 0.717,
     "name": "Lagomorpha",
     "sampled": 1.1470924649974776e+16,
@@ -2518,26 +2658,26 @@
    },
    {
     "alive": 289642137.19190365,
-    "ever": 2.037737496187549e+16,
-    "ghost": 1.3250897750239978e+16,
+    "ever": 2.0377370098185996e+16,
+    "ghost": 1.3250892886550484e+16,
     "ghost_share": 0.65,
     "name": "Macroscelidea",
-    "sampled": 7126477211635510.0,
+    "sampled": 7126477211635512.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 403269648.033177,
-    "ever": 1.1908062522093404e+16,
-    "ghost": 8969574823125673.0,
+    "ever": 1.1908057872609712e+16,
+    "ghost": 8969570173641983.0,
     "ghost_share": 0.753,
     "name": "Diprotodontia",
-    "sampled": 2938487698967731.0,
+    "sampled": 2938487698967729.0,
     "t0_Ma": 61.06
    },
    {
     "alive": 567561780.6198184,
-    "ever": 1.0893426274740098e+16,
-    "ghost": 8728525054343127.0,
+    "ever": 1.0893422177125648e+16,
+    "ghost": 8728520956728677.0,
     "ghost_share": 0.801,
     "name": "Hyracoidea",
     "sampled": 2164901220396971.0,
@@ -2545,20 +2685,20 @@
    },
    {
     "alive": 109131399.45291981,
-    "ever": 4577532151746540.0,
-    "ghost": 2819970180719201.0,
+    "ever": 4577530821153502.0,
+    "ghost": 2819968850126162.5,
     "ghost_share": 0.616,
     "name": "Scandentia",
-    "sampled": 1757561971027339.0,
+    "sampled": 1757561971027339.5,
     "t0_Ma": 74.72
    },
    {
     "alive": 2207399702.1966786,
-    "ever": 1.6787519197844864e+16,
-    "ghost": 1.5053356020450498e+16,
+    "ever": 1.6788849282132578e+16,
+    "ghost": 1.505335049516632e+16,
     "ghost_share": 0.897,
     "name": "Carnivora",
-    "sampled": 1734163177394366.0,
+    "sampled": 1735498786966258.0,
     "t0_Ma": 65.7
    }
   ]
