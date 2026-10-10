@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { aliveAt, laneAt, layoutFan, leftAt, strandAt } from './layout';
+import { aliveAt, laneAt, layoutFan, leftAt, nAt, strandAt } from './layout';
 import { PANTHERA } from './panthera';
 import { speciesModel, threadEnds, TwigModel, type TwigView } from './twigs';
 
@@ -41,7 +41,8 @@ describe('width = individuals', () => {
     const rec = b.sp;
     // Linear widths: one world width per individual, the same for every species.
     for (const o of fanLin.branches) expect(o.unit).toBe(b.unit);
-    for (const a of [0, 30e-6, 60e-6, 1e-3, 1]) expect(strandAt(b, a, 'linear').w / b.unit).toBeCloseTo(aliveAt(rec, a), 6);
+    // (Exact at the population's points, the interpolant between them: within a thousandth.)
+    for (const a of [0, 30e-6, 60e-6, 1e-3, 1]) expect(Math.abs(strandAt(b, a, 'linear').w / b.unit / aliveAt(rec, a) - 1)).toBeLessThan(1e-3);
     const m = lion();
     let sum = 0;
     for (let g = 0; g < m.G; g++) sum += m.size(g);
@@ -58,7 +59,7 @@ describe('width = individuals', () => {
         const n = m.size(g);
         const S = m.stride(g);
         // The stride is the alive at its births (world-fixed), about the slots drawn there.
-        expect(S).toBe(Math.max(1, Math.round(m.b.pop.stepAt(m.ageOf((g + 0.5) * m.GL)).n)));
+        expect(S).toBe(Math.max(1, Math.round(nAt(m.b, m.yOf((g + 0.5) * m.GL)))));
         expect(m.totalSlots(y) / S).toBeGreaterThan(0.9);
         expect(m.totalSlots(y) / S).toBeLessThan(1.1);
         // About births ÷ alive (≈ 2: a life is half a generation) of g share a slot.

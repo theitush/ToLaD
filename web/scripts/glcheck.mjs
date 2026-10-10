@@ -113,6 +113,10 @@ try {
         };
         // A narrow green lane (1.3 px) beside a narrow gray one (2.6 px), each one line its own width.
         if (narrow) Object.assign(inst, { xB0: 40.2, xG: 41.5, colL: 40.2, colR: 44.1, narG: 1, narR: 0.7, B0: 0 });
+        // Every other band sheared (a slanting column, mesh.ts dX/dS/dR): the frame's mapping too. (Not the
+        // narrow lanes: their hashed index is floor(x - colL), which float32 and float64 may round apart
+        // where a sheared x lands on an integer.)
+        if (q % 2 && !narrow) Object.assign(inst, { dX: 0.35, dS: 0.004, dR: -0.03, xR: inst.x1 - 3 });
         insts.push(inst);
         const k = gl.mesh.next();
         M.packInst(inst, gl.mesh.f, gl.mesh.u, k);

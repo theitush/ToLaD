@@ -3,7 +3,7 @@
 // genealogy recurrence on the summed population, geometry fixed in the world.
 import { describe, expect, it } from 'vitest';
 import { FanCamera } from './camera';
-import { columnsAt, isNode, laneAt, layoutFan, leftAt, nodeQ, type Fan, type FanBranch, type FanNode, type WidthMode } from './layout';
+import { blendH, columnsAt, isNode, laneAt, layoutFan, leftAt, nodeQ, type Fan, type FanBranch, type FanNode, type WidthMode } from './layout';
 import { PANTHERA } from './panthera';
 import { parentShare, Q_STAR } from './population';
 import { allSplits, PANTHERA_TREE, speciesUnder } from './splits';
@@ -54,11 +54,10 @@ describe('the dated tree', () => {
         if (v.parent) expect(v.y).toBeLessThan(v.parent.y);
         for (const k of v.kids) {
           if (isNode(k)) continue;
-          // A species starts at the split that lists it: its own column from there up, its jog there.
+          // A species starts at the split that lists it: its own column from there up; nothing moves there.
           expect(k.t0).toBe(v.split.ageMa);
           expect(k.splitY).toBe(v.y);
-          expect(leftAt(k, above(k.splitY))).toBe(k.colLeft);
-          expect(leftAt(k, below(k.splitY))).toBe(k.path[0].left);
+          expect(leftAt(k, above(k.splitY))).toBeCloseTo(leftAt(k, below(k.splitY)), 5);
           expect(k.path[0].node).toBe(v);
         }
       }
@@ -91,17 +90,21 @@ describe('the dated tree', () => {
         expect(x).toBeCloseTo(v.left + v.width, 9);
         // And in counts: the parent is the sum of the daughters' founders.
         expect(v.n).toBeCloseTo(sum(v.strands.map((b) => b.pop.founders)), 6);
-        // Centred under its daughters: a sharp Y.
-        const first = v.kids[0];
-        const last = v.kids[v.kids.length - 1];
-        const lo = isNode(first) ? first.left : first.colLeft;
-        const hi = isNode(last) ? last.left + last.width : last.colLeft + last.baseW;
-        expect(v.left + v.width / 2).toBeCloseTo((lo + hi) / 2, 9);
+        // The daughters just above sit exactly on the parent column: no jog.
+        let xu = leftAt(v.strands[0], up);
+        expect(xu).toBeCloseTo(v.left, 5);
+        for (const b of v.strands) {
+          expect(leftAt(b, up)).toBeCloseTo(xu, 9);
+          xu += laneAt(b, up).w;
+        }
+        expect(xu).toBeCloseTo(v.left + v.width, 5);
       }
       // The stem is everyone's founders.
       expect(f.root.strands.length).toBe(f.branches.length);
       expect(f.stem[1] - f.stem[0]).toBeCloseTo(sum(f.branches.map((b) => b.baseW)), 9);
-      expect(columnsAt(f, 1)).toEqual([f.stem]);
+      const cols = columnsAt(f, 1).sort((p, q) => p[0] - q[0]);
+      expect(cols[0][0]).toBeCloseTo(f.stem[0], 9);
+      expect(cols[cols.length - 1][1]).toBeCloseTo(f.stem[1], 9);
     });
 
     it(`an extinct branch is 0% green above its split, its own column all line-ended (${mode})`, () => {
@@ -109,6 +112,7 @@ describe('the dated tree', () => {
       const extinct = f.branches.filter((b) => b.sp.extinct);
       expect(extinct.map((b) => b.sp.common).sort()).toEqual(['Cave lion', 'European jaguar', 'Longdan tiger', 'Yucatán cave cat']);
       for (const b of extinct) {
+        // (From its tip's pinch: the width ramps up from 0 at its last appearance.)
         for (let k = 1; k <= 200; k++) {
           const y = b.tipY + ((above(b.splitY) - b.tipY) * k) / 200;
           const L = laneAt(b, y);
@@ -129,20 +133,26 @@ describe('the dated tree', () => {
         let h = sum(parts.map(([q, n]) => q * n)) / N;
         const GL = v.genYears;
         expect(GL).toBeCloseTo(sum(v.strands.map((b) => b.pop.founders * b.sp.genYears)) / N, 9);
-        for (let k = 0; k < 60; k++) {
-          // Generation k below the split: the column's green share = h_k, drawn as one prefix across its strands.
-          const y = f.time.y(v.ageMa + ((k + 0.5) * GL) / 1e6);
-          if (y >= v.yBot) break;
+        for (let k = 0; k < 60 && k < v.q.length; k++) {
+          // Generation k below the split: the column's green share = h_k.
+          expect(v.q[k]).toBeCloseTo(h, 9);
+          h = parentShare(h, N, N);
+        }
+        // As drawn: past the blend below the split, one green prefix across its strands, as wide as
+        // the share (exact at the knots, linear between them).
+        const ys = Array.from(f.steps.ys).filter((y) => y >= v.y + blendH(v) && y < v.yBot);
+        for (let j = 0; j < 40; j++) ys.push(v.y + blendH(v) + ((v.yBot - v.y - blendH(v)) * (j + 0.5)) / 40);
+        for (const y of ys) {
           const green = sum(v.strands.map((b) => laneAt(b, y).gw));
-          expect(green / v.width).toBeCloseTo(h, 9);
+          const exact = f.steps.ys.includes(y);
+          expect(Math.abs(green / v.width - nodeQ(v, f.time.ageAt(y)))).toBeLessThan(exact ? 1e-9 : 0.03);
           // One contiguous prefix: green strands, then at most one part-green, then gray ones.
           let seenGray = false;
           for (const b of v.strands) {
             const L = laneAt(b, y);
-            if (seenGray) expect(L.gw).toBe(0);
-            if (L.gw < L.w) seenGray = true;
+            if (seenGray) expect(L.gw).toBeLessThan(1e-9);
+            if (L.gw < L.w - 1e-9) seenGray = true;
           }
-          h = parentShare(h, N, N);
         }
       }
       // Deep down the stem it settles to the constant-population share.

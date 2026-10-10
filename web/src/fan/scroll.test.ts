@@ -130,14 +130,17 @@ describe('the stem continues below the origin', () => {
       // Below the oldest split (the fork, y = 0): its place in the stem, at its founders' width.
       const s = b.path[b.path.length - 1];
       expect(s.node).toBe(f.root);
+      const left = leftAt(b, f.trunkBottom.y);
       for (const y of [0, 1e-6, 0.5, 10, f.trunkBottom.y]) {
-        expect(leftAt(b, y)).toBe(s.left);
-        expect(laneAt(b, y).w).toBe(b.baseW);
+        expect(leftAt(b, y)).toBeCloseTo(left, 9);
+        expect(laneAt(b, y).w).toBeCloseTo(b.baseW, 9);
       }
-      expect(leftAt(b, -1e-6)).not.toBe(s.left);
     }
     // Content below the fork is the stem: its strands side by side, no gaps.
-    expect(c.contentAt(1)).toEqual([f.stem]);
+    const cols = c.contentAt(1).sort((p, q) => p[0] - q[0]);
+    expect(cols[0][0]).toBeCloseTo(f.stem[0], 9);
+    expect(cols[cols.length - 1][1]).toBeCloseTo(f.stem[1], 9);
+    for (let i = 1; i < cols.length; i++) expect(cols[i][0]).toBeCloseTo(cols[i - 1][1], 9);
   });
 
   it('panning down reaches the stem far below the origin', () => {

@@ -10,16 +10,22 @@ const RECT_VS = /* glsl */ `#version 300 es
 layout(location = 0) in vec2 corner;
 layout(location = 1) in vec4 aRect;
 layout(location = 2) in vec4 aColor;
+layout(location = 3) in vec4 aSlant;
 uniform vec2 uView;
 out vec2 vP;
 flat out vec4 vRect;
 flat out vec4 vColor;
+flat out vec4 vSlant;
 void main() {
-  // Grown by a pixel so the anti-aliased edges have room.
-  vec2 p = mix(aRect.xy - vec2(1.0, 0.0), aRect.zw + vec2(1.0, 0.0), corner);
+  // A trapezoid: [x0, x1] at y0, [x0 + dL, x1 + dR] at y1 (aSlant.xy); grown by a pixel so the anti-aliased edges have room.
+  float y = mix(aRect.y, aRect.w, corner.y);
+  float l = aRect.x + aSlant.x * corner.y - 1.0;
+  float r = aRect.z + aSlant.y * corner.y + 1.0;
+  vec2 p = vec2(mix(l, r, corner.x), y);
   vP = p;
   vRect = aRect;
   vColor = aColor;
+  vSlant = aSlant;
   gl_Position = vec4(p.x / uView.x * 2.0 - 1.0, 1.0 - p.y / uView.y * 2.0, 0.0, 1.0);
 }`;
 
@@ -28,10 +34,12 @@ precision highp float;
 in vec2 vP;
 flat in vec4 vRect;
 flat in vec4 vColor;
+flat in vec4 vSlant;
 out vec4 o;
 void main() {
-  // Horizontal coverage of the pixel [x - .5, x + .5] by [x0, x1]: crisp vertical edges, hairlines stay visible.
-  float c = clamp(min(vP.x + 0.5, vRect.z) - max(vP.x - 0.5, vRect.x), 0.0, 1.0);
+  // Horizontal coverage of the pixel [x - .5, x + .5] by the trapezoid's span at its y: crisp edges, hairlines stay visible.
+  float t = clamp((vP.y - vRect.y) / max(vRect.w - vRect.y, 1e-6), 0.0, 1.0);
+  float c = clamp(min(vP.x + 0.5, vRect.z + vSlant.y * t) - max(vP.x - 0.5, vRect.x + vSlant.x * t), 0.0, 1.0);
   float a = vColor.a * c;
   o = vec4(vColor.rgb * a, a);
 }`;
@@ -49,6 +57,8 @@ layout(location = 8) in uvec4 aIdx2;
 layout(location = 9) in vec4 aNar;
 layout(location = 10) in vec4 aLink;
 layout(location = 11) in vec4 aMore;
+layout(location = 12) in vec4 aShear;
+layout(location = 13) in vec4 aShear2;
 uniform vec2 uView;
 out vec2 vP;
 flat out vec4 vRect;
@@ -62,10 +72,15 @@ flat out uvec4 vIdx2;
 flat out vec4 vNar;
 flat out vec4 vLink;
 flat out vec4 vMore;
+flat out vec4 vShear;
+flat out vec4 vShear2;
 void main() {
   vec2 p = mix(aRect.xy, aRect.zw, corner);
+  // The instance's frame onto the screen (mesh.ts MeshInst.dX/dS): its edges slant with the column's.
+  float r = p.y - aRect.y;
+  p.x = aSlot.x + aShear.x * r + (p.x - aSlot.x) * (1.0 + aShear.y * r);
   vP = p;
-  vRect = aRect; vSlot = aSlot; vTime = aTime; vMisc = aMisc; vLife = aLife; vIdx = aIdx; vSeed = aSeed; vIdx2 = aIdx2; vNar = aNar; vLink = aLink; vMore = aMore;
+  vRect = aRect; vSlot = aSlot; vTime = aTime; vMisc = aMisc; vLife = aLife; vIdx = aIdx; vSeed = aSeed; vIdx2 = aIdx2; vNar = aNar; vLink = aLink; vMore = aMore; vShear = aShear; vShear2 = aShear2;
   gl_Position = vec4(p.x / uView.x * 2.0 - 1.0, 1.0 - p.y / uView.y * 2.0, 0.0, 1.0);
 }`;
 
@@ -85,6 +100,12 @@ flat in uvec4 vIdx2;  // latSeed, foldA, foldB, gA
 flat in vec4 vNar;    // colL, colR, narG, narR
 flat in vec4 vLink;   // linkA, lambda, tauC, tauB
 flat in vec4 vMore;   // baseA, -, -, -
+flat in vec4 vShear;  // dX, dS, dG, dR
+flat in vec4 vShear2; // xR, -, -, -
+// Per pixel, in the instance's frame: the green lane's edge, the column's right edge, real px per frame px across a line.
+float gXG;
+float gColR;
+float gC;
 uniform float uKLog;
 uniform float uNowPx;
 uniform vec3 uPal[4];
@@ -285,14 +306,14 @@ vec4 shadeLinks(vec2 p) {
       // The pair's two lines, left and right.
       float xa = lineAt(l, Bp, uint(dl));
       float xb = lineAt(l, Bp + 1u, uint(dl));
-      if (vNar.y > vNar.x && (xa < vNar.x || xb > vNar.y)) continue;
+      if (gColR > vNar.x && (xa < vNar.x || xb > gColR)) continue;
       float xC = dir == 0u ? xb : xa;
       float xP = dir == 0u ? xa : xb;
       float yC = p.y + (tp - tb) / dtdy;
       float yP = p.y + (tp - tpar) / dtdy;
-      float a = lineAA(segDist(p, vec2(xP, yP), vec2(xC, yC)), lw) * w * wt * linkA * vMisc.x;
+      float a = lineAA(segDist(p, vec2(xP, yP), vec2(xC, yC)) * gC, lw) * w * wt * linkA * vMisc.x;
       if (a > best.a) {
-        int cd = xC < vLife.w ? 1 : (vMisc.z > 1.5 ? 3 : 2);
+        int cd = xC < gXG ? 1 : (vMisc.z > 1.5 ? 3 : 2);
         best = vec4(uPal[cd], a);
       }
     }
@@ -300,8 +321,16 @@ vec4 shadeLinks(vec2 p) {
   return best;
 }
 void main() {
-  vec2 p = vP;
-  float xG = vLife.w;
+  // Into the instance's frame (mesh.ts shadeMesh).
+  float r = vP.y - vRect.y;
+  float s = 1.0 + vShear.y * r;
+  vec2 p = vec2(vSlot.x + (vP.x - vSlot.x - vShear.x * r) / s, vP.y);
+  if (p.x < vRect.x || p.x >= vRect.z || p.x >= vShear2.x + vShear.w * r) discard;
+  float kk = vShear.x + (p.x - vSlot.x) * vShear.y;
+  gC = s * inversesqrt(1.0 + kk * kk);
+  gXG = vLife.w + vShear.z * r;
+  gColR = vNar.y + vShear.w * r;
+  float xG = gXG;
   uint L = vIdx.y;
   float bw = vSlot.y;
   // Nothing to draw this far from a line (before any shading: most pixels stop here).
@@ -322,7 +351,7 @@ void main() {
     bool far = false;
     for (uint l = L; l > L - D; l--) {
       // The line is inside the current sub-block: too far from it, it is too far from the line.
-      if (p.x < x0 - reach || p.x > x0 + sub + reach) { far = true; break; }
+      if (p.x < x0 - reach / gC || p.x > x0 + sub + reach / gC) { far = true; break; }
       uint bit = latBit(l, idx);
       idx = 2u * idx + bit;
       off = 2u * off + bit;
@@ -332,7 +361,7 @@ void main() {
     if (far) continue;
     float pp = bw / float(1u << D);
     float lineX = vSlot.x + bb * bw + (float(off) + 0.5) * pp;
-    float d = abs(p.x - lineX);
+    float d = abs(p.x - lineX) * gC;
     if (d > reach) continue;
     uint K = idx;
     uint iA = slotBase(K, vSeed.z, vIdx.z);
@@ -365,7 +394,7 @@ void main() {
       float nar = k == 0 ? vNar.z : vNar.w;
       if (!(nar > 0.0) || (k == 0 && !green)) continue;
       float a0 = k == 0 ? colL : max(colL, xG);
-      float a1 = k == 0 ? xGe : vNar.y;
+      float a1 = k == 0 ? xGe : gColR;
       float cx = max(0.0, min(p.x + 0.5, a1) - max(p.x - 0.5, a0));
       if (!(cx > 0.0)) continue;
       vec4 c = shadeLane(k == 0 ? 0.0 : vMisc.z, iA, iB, 0.0, p, NAR_FLOOR, 1.0, true);
@@ -394,19 +423,27 @@ function compile(gl: WebGL2RenderingContext, vs: string, fs: string): WebGLProgr
   return p;
 }
 
+/** Floats per lane trapezoid: x0, y0, x1, y1, colour, dL, dR, -, -. */
+const RECT_F = 12;
+
 /** Growable typed arrays for one frame's instances. */
 export class RectBatch {
-  f = new Float32Array(8 * 256);
+  f = new Float32Array(RECT_F * 256);
   n = 0;
-  /** A rectangle [x0, x1] × [y0, y1] (CSS px) in colour (r, g, b 0–1, alpha). */
-  push(x0: number, y0: number, x1: number, y1: number, r: number, g: number, b: number, a: number): void {
-    if (!(x1 > x0) || !(y1 > y0) || a <= 0) return;
-    if ((this.n + 1) * 8 > this.f.length) {
+  /**
+   * A rectangle [x0, x1] × [y0, y1] (CSS px) in colour (r, g, b 0–1, alpha);
+   * slanted into a trapezoid, its edges at y1 moved by dL and dR.
+   */
+  push(x0: number, y0: number, x1: number, y1: number, r: number, g: number, b: number, a: number, dL = 0, dR = 0): void {
+    if (!(Math.max(x1, x1 + dR) > Math.min(x0, x0 + dL)) || !(y1 > y0) || a <= 0) return;
+    if ((this.n + 1) * RECT_F > this.f.length) {
       const nf = new Float32Array(this.f.length * 2);
       nf.set(this.f);
       this.f = nf;
     }
-    const o = this.n * 8;
+    const o = this.n * RECT_F;
+    this.f[o + 8] = dL;
+    this.f[o + 9] = dR;
     this.f[o] = x0;
     this.f[o + 1] = y0;
     this.f[o + 2] = x1;
@@ -475,9 +512,9 @@ export class FanGL {
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
     this.rectBuf = gl.createBuffer()!;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.rectBuf);
-    for (let k = 0; k < 2; k++) {
+    for (let k = 0; k < 3; k++) {
       gl.enableVertexAttribArray(1 + k);
-      gl.vertexAttribPointer(1 + k, 4, gl.FLOAT, false, 32, k * 16);
+      gl.vertexAttribPointer(1 + k, 4, gl.FLOAT, false, RECT_F * 4, k * 16);
       gl.vertexAttribDivisor(1 + k, 1);
     }
     // Mesh.
@@ -488,8 +525,8 @@ export class FanGL {
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
     this.meshFBuf = gl.createBuffer()!;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.meshFBuf);
-    // Floats: aRect, aSlot, aTime, aMisc, aLife (locations 1–5), aNar (9), aLink (10) and aMore (11).
-    for (let k = 0; k < 8; k++) {
+    // Floats: aRect, aSlot, aTime, aMisc, aLife (locations 1–5), aNar (9), aLink (10), aMore (11), aShear (12) and aShear2 (13).
+    for (let k = 0; k < 10; k++) {
       const loc = k < 5 ? 1 + k : 4 + k;
       gl.enableVertexAttribArray(loc);
       gl.vertexAttribPointer(loc, 4, gl.FLOAT, false, MESH_F * 4, k * 16);
@@ -518,7 +555,7 @@ export class FanGL {
     gl.uniform2f(this.u['r.uView'], w, h);
     gl.bindVertexArray(this.rectVao);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.rectBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, b.f.subarray(0, b.n * 8), gl.STREAM_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, b.f.subarray(0, b.n * RECT_F), gl.STREAM_DRAW);
     gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, b.n);
   }
 

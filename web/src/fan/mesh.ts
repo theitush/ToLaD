@@ -220,7 +220,7 @@ export function linkWeight(l: number, lambda: number): number {
 }
 
 /** Floats and uints per instance (meshgl.ts attribute layout). */
-export const MESH_F = 32;
+export const MESH_F = 40;
 export const MESH_U = 12;
 /** Most members of a generation folded onto one slot (a generation up to this many times its slots). */
 export const MAX_FOLD = 8;
@@ -299,6 +299,20 @@ export interface MeshInst {
    * not as specks, while they are thin.
    */
   baseA?: number;
+  /**
+   * The shear (the column's edges slant: layout.ts, linear between knots).
+   * The instance is drawn in its own frame, the lattice as it lies at its
+   * top (y0); at screen y0 + r the lattice's block origin xB0 has moved by
+   * dX·r and its pitch is scaled by 1 + dS·r. A screen point maps back to
+   * the frame by x' = xB0 + (x − xB0 − dX·r) ÷ (1 + dS·r); in that frame
+   * the green lane's edge is xG + dG·r and the column's right edge (the
+   * clip) xR + dR·r, colR + dR·r for the narrow lanes. 0 / absent: none.
+   */
+  dX?: number;
+  dS?: number;
+  dG?: number;
+  dR?: number;
+  xR?: number;
 }
 
 export function packInst(m: MeshInst, f: Float32Array, u: Uint32Array, k: number): void {
@@ -335,6 +349,14 @@ export function packInst(m: MeshInst, f: Float32Array, u: Uint32Array, k: number
   f[o + 29] = 0;
   f[o + 30] = 0;
   f[o + 31] = 0;
+  f[o + 32] = m.dX ?? 0;
+  f[o + 33] = m.dS ?? 0;
+  f[o + 34] = m.dG ?? 0;
+  f[o + 35] = m.dR ?? 0;
+  f[o + 36] = m.xR ?? m.x1;
+  f[o + 37] = 0;
+  f[o + 38] = 0;
+  f[o + 39] = 0;
   const q = k * MESH_U;
   u[q] = m.B0;
   u[q + 1] = m.lvl;
@@ -492,7 +514,7 @@ function segDist(px: number, py: number, ax: number, ay: number, bx: number, by:
  * level and the two coarser ones, each pair's link in the generation it shows
  * here (texture: its band's representative; lives: the instance's generation).
  */
-export function shadeLinks(m: MeshInst, px: number, py: number, kLog: number, pal: Palette): RGBA {
+export function shadeLinks(m: MeshInst, px: number, py: number, kLog: number, pal: Palette, sc = 1): RGBA {
   const linkA = m.linkA ?? 0;
   if (!(linkA > 0)) return [0, 0, 0, 0];
   const k = Math.LN2 * kLog;
@@ -540,7 +562,7 @@ export function shadeLinks(m: MeshInst, px: number, py: number, kLog: number, pa
       const xP = xs[lk.dir];
       const yC = py + (tp - tb) / dtdy;
       const yP = py + (tp - tpar) / dtdy;
-      const a = lineAA(segDist(px, py, xP, yP, xC, yC), lw) * w * wt * linkA * m.alpha;
+      const a = lineAA(segDist(px, py, xP, yP, xC, yC) * sc, lw) * w * wt * linkA * m.alpha;
       if (a > best[3]) {
         const code = xC < m.xG ? 1 : m.lane === Lane.Withered ? 3 : 2;
         best = [pal[code][0], pal[code][1], pal[code][2], a];
@@ -556,8 +578,17 @@ export function shadeLinks(m: MeshInst, px: number, py: number, kLog: number, pa
  * float64 here. kLog: log2 of (age + TIME_C) per screen px; nowPx: screen y of
  * "now" (dead lives stop DEAD_GAP px short of it).
  */
-export function shadeMesh(m: MeshInst, px: number, py: number, kLog: number, nowPx: number, pal: Palette, deadGap = 3): RGBA {
-  if (px < m.x0 || px >= m.x1 || py < m.y0 || py >= m.y1) return [0, 0, 0, 0];
+export function shadeMesh(m0: MeshInst, sx: number, py: number, kLog: number, nowPx: number, pal: Palette, deadGap = 3): RGBA {
+  // Into the instance's own frame (its shear): x', and the real px across a line per frame px (sc).
+  const r = py - m0.y0;
+  const dS = m0.dS ?? 0;
+  const dX = m0.dX ?? 0;
+  const s = 1 + dS * r;
+  const px = m0.xB0 + (sx - m0.xB0 - dX * r) / s;
+  if (px < m0.x0 || px >= m0.x1 || py < m0.y0 || py >= m0.y1 || px >= (m0.xR ?? m0.x1) + (m0.dR ?? 0) * r) return [0, 0, 0, 0];
+  const kk = dX + (px - m0.xB0) * dS;
+  const sc = s / Math.sqrt(1 + kk * kk);
+  const m = m0.dG || m0.dR ? { ...m0, xG: m0.xG + (m0.dG ?? 0) * r, colR: (m0.colR ?? 0) + (m0.dR ?? 0) * r } : m0;
   // Nothing to draw this far from a line (only the living glow, and they are only in the green lane).
   const reach = m.mode === 0 ? Math.max(m.lw, 1) * 0.5 + 0.5 : Math.max(m.tipR, Math.max(m.lw, 1) * 0.5 + (m.xG > m.x0 ? 5 : 0)) + 0.5;
   const bf = Math.floor((px - m.xB0) / m.bw);
@@ -570,7 +601,7 @@ export function shadeMesh(m: MeshInst, px: number, py: number, kLog: number, now
     const { off, D, K } = latticeWalk(m.latSeed, m.lvl, B);
     const pp = m.bw / 2 ** D;
     const lineX = m.xB0 + bb * m.bw + (off + 0.5) * pp;
-    const d = Math.abs(px - lineX);
+    const d = Math.abs(px - lineX) * sc;
     if (d > reach) continue;
     const iA = slotBase(K, m.sA, m.nA);
     const iB = slotBase(K, m.sB, m.nB);
@@ -583,7 +614,7 @@ export function shadeMesh(m: MeshInst, px: number, py: number, kLog: number, now
     col[3] *= m.alpha * fine;
     if (col[3] > best[3]) best = col;
   }
-  const lk = shadeLinks(m, px, py, kLog, pal);
+  const lk = shadeLinks(m, px, py, kLog, pal, sc);
   if (lk[3] > best[3]) best = lk;
   // Lanes too narrow for their lines: the lane is one line its own width, lit by a representative's lives.
   if (m.mode === 0 && ((m.narG ?? 0) > 0 || (m.narR ?? 0) > 0)) {
@@ -615,6 +646,7 @@ export function unpackInst(f: Float32Array, u: Uint32Array, k: number): MeshInst
     x0: f[o], y0: f[o + 1], x1: f[o + 2], y1: f[o + 3], xB0: f[o + 4], bw: f[o + 5], lw: f[o + 6], fineA: f[o + 7], p0: f[o + 8], T0: f[o + 9], A: f[o + 10], gBoff: f[o + 11],
     alpha: f[o + 12], mode: f[o + 13] as 0 | 1, lane: f[o + 14] as Lane, tipR: f[o + 15], GL: f[o + 16], Lm: f[o + 17], nowRel: f[o + 18], xG: f[o + 19],
     colL: f[o + 20], colR: f[o + 21], narG: f[o + 22], narR: f[o + 23], linkA: f[o + 24], lam: f[o + 25], tauC: f[o + 26], tauB: f[o + 27], baseA: f[o + 28],
+    dX: f[o + 32], dS: f[o + 33], dG: f[o + 34], dR: f[o + 35], xR: f[o + 36],
     B0: u[q], lvl: u[q + 1], nA: u[q + 2], nB: u[q + 3], seedA: u[q + 4], seedB: u[q + 5], sA: u[q + 6], sB: u[q + 7], latSeed: u[q + 8], fA: u[q + 9], fB: u[q + 10], gA: u[q + 11] | 0,
   };
 }

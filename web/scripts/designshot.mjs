@@ -36,6 +36,8 @@ const scenes = [
   ['split-lionleopard', 'split', [2.57, 5]],
   ['split-cavelion', 'split', [0.5, 5]],
   ['split-root', 'split', [4.6, 3]],
+  // The lion's recent decline (the last 200 years), its column across half the screen.
+  ['decline', 'focus', ['Lion', 1, 200, 0.5]],
   ['mesh-split', 'bar', ['Lion', 499990, 100, 2e4, 1]],
   ['lineage', 'tapnode', [2.57, 1.2]],
 ];
@@ -103,18 +105,26 @@ try {
             const [px, py] = f.toScreen(v.left + 0.5 * v.width, y);
             f.tap(px, py);
           } else {
-            // The daughters' extent across 80% of the screen, the split mid-screen.
-            const isN = (k) => 'strands' in k;
-            const first = v.kids[0];
-            const last = v.kids[v.kids.length - 1];
-            const lo = isN(first) ? first.left : first.colLeft;
-            const hi = isN(last) ? last.left + last.width : last.colLeft + last.width;
+            // The parent column at the split (the daughters' extent) across 80% of the screen, the split mid-screen.
+            const lo = v.left;
+            const hi = v.left + v.width;
             const h = f.homeCamera();
             const sx = Math.max(h.sx, (0.8 * f.w) / (hi - lo));
             const sy = h.sy * args[1];
             f.cam = { cx: (lo + hi) / 2, cy: v.y, sx, sy, ty: sy };
             f.camera.settle();
           }
+        } else if (kind === 'focus') {
+          // [species, years ago at the top, at the bottom, share of the screen's width for its column at the bottom]
+          const [sp, top, bot, share] = args;
+          const b = fan.branches.find((b) => b.sp.common === sp);
+          const y0 = fan.time.y(top / 1e6);
+          const y1 = fan.time.y(bot / 1e6);
+          const sy = (0.8 * f.h) / (y1 - y0);
+          const L = f.model(b).lanes(y1);
+          const sx = (share * f.w) / L.w;
+          f.cam = { cx: L.left + L.w / 2, cy: (y0 + y1) / 2, sx, sy, ty: sy };
+          f.camera.settle();
         } else if (kind === 'far') {
           const h = f.homeCamera();
           f.cam = { ...h, sx: h.sx / 6, sy: h.sy / 6, ty: h.sy / 6 };
