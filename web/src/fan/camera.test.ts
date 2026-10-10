@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { clipPoly, FanCamera, MAX_YEARS_FRAC, MIN_YEARS, MIN_ZOOM, STRAND_PX } from './camera';
-import { layoutFan, leftAt, type FanBranch, type WidthMode } from './layout';
+import { GAP_PX, layoutFan, leftAt, strandAt, type FanBranch, type WidthMode } from './layout';
 import { PANTHERA } from './panthera';
 import { TwigModel } from './twigs';
 
@@ -76,8 +76,10 @@ describe('fan camera', () => {
       expect(y1 - y0).toBeCloseTo(50, 1);
       expect(x2 - x0).toBeCloseTo(50, 1);
       const [wx, wy] = c.toWorld(...c.toScreen(cx + 3 / c.cam.sx, cy - 7 / c.cam.sy));
-      expect((wx - cx) * c.cam.sx).toBeCloseTo(3, 2);
-      expect((wy - cy) * c.cam.sy).toBeCloseTo(-7, 2);
+      // Within float64 rounding of the world coordinates (a few ulps of |cx|, in px at sx).
+      const ulps = (v: number, s: number) => 8 * Number.EPSILON * Math.max(1, Math.abs(v)) * s;
+      expect(Math.abs((wx - cx) * c.cam.sx - 3)).toBeLessThanOrEqual(0.005 + ulps(cx, c.cam.sx));
+      expect(Math.abs((wy - cy) * c.cam.sy + 7)).toBeLessThanOrEqual(0.005 + ulps(cy, c.cam.sy));
     }
   });
 
@@ -120,7 +122,7 @@ describe('fan camera', () => {
     expect(c.toScreen(x1, 0)[0]).toBeLessThan(c.w);
   });
 
-  it('zooming in undoes zooming out, and 10 years stop at 30% of the screen', () => {
+  it('zooming in undoes zooming out, and 10 years stop at 10% of the screen', () => {
     const c = camera();
     // Near "now", inside the lion's green lane.
     const lion = c.fan.branches.find((b) => b.sp.common === 'Lion')!;
@@ -188,4 +190,64 @@ describe('fan camera', () => {
     for (const y of ys) expect(y > 100 && y < 103).toBe(true);
     expect(clipPoly([-5e9, -4e9, -4e9], [0, 0, 1e9], 0, 0, 390, 844)[0].length).toBe(0);
   });
+
+  for (const mode of ['linear', 'log'] as WidthMode[]) {
+    it(`zoomed in, neighbours that fit on screen are there, packed; the branch looked at stands upright (${mode})`, () => {
+      const c = camera(mode);
+      const f = c.fan;
+      const lion = f.branches.find((b) => b.sp.common === 'Lion')!;
+      let fits = 0;
+      for (const [ago, px] of [
+        [30e-6, 40],
+        [200e-6, 40],
+        [200e-6, 150],
+        [0.01, 120],
+        [1, 200],
+      ]) {
+        const y = f.time.y(ago);
+        const w = strandAt(lion, ago, mode).w;
+        // The lion `px` wide on screen, centred.
+        const green = strandAt(lion, ago, mode).f > 0.5;
+        c.cam = { ...c.cam, sx: px / w, cx: leftAt(lion, y) + w / 2, cy: y };
+        c.settle();
+        const yc = c.cam.cy;
+        const age = f.time.ageAt(yc);
+        const vis = f.branches.filter((b) => yc >= b.tipY);
+        const iv = vis.map((b) => {
+          const l = c.toScreen(leftAt(b, yc), yc)[0];
+          return [l, l + strandAt(b, age, mode).w * c.cam.sx];
+        });
+        // Packed: GAP_PX apart on screen, never overlapping.
+        for (let k = 1; k < iv.length; k++) {
+          expect(iv[k][0] - iv[k - 1][1]).toBeGreaterThanOrEqual(-1e-6);
+          expect(iv[k][0] - iv[k - 1][1]).toBeLessThanOrEqual(GAP_PX * 1.01);
+        }
+        // Every neighbour whose packed run from the lion fits on screen is on screen.
+        const li = vis.indexOf(lion);
+        const L = iv[li];
+        expect(L[0]).toBeLessThanOrEqual(c.w / 2 + 1e-6);
+        expect(L[1]).toBeGreaterThanOrEqual(c.w / 2 - 1e-6);
+        for (let k = li + 1, x = L[1]; k < iv.length; k++) {
+          x += GAP_PX + (iv[k][1] - iv[k][0]);
+          if (x > c.w) break;
+          expect(iv[k][1]).toBeLessThanOrEqual(c.w + 1e-6);
+          fits++;
+        }
+        for (let k = li - 1, x = L[0]; k >= 0; k--) {
+          x -= GAP_PX + (iv[k][1] - iv[k][0]);
+          if (x < 0) break;
+          expect(iv[k][0]).toBeGreaterThanOrEqual(-1e-6);
+          fits++;
+        }
+        // Deep in, with the centre in the lion's green lane, that lane (its left edge) is upright on screen.
+        if (green && f.pack.fade() === 0) {
+          const [, yTop] = c.toWorld(0, 0);
+          const [, yBot] = c.toWorld(0, c.h);
+          const xs = [yTop, yc, yBot].filter((v) => v >= lion.tipY && v < 0).map((v) => c.toScreen(leftAt(lion, v), v)[0]);
+          for (const x of xs) expect(x).toBeCloseTo(xs[0], 3);
+        }
+      }
+      expect(fits).toBeGreaterThan(0);
+    });
+  }
 });

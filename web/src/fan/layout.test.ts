@@ -72,14 +72,30 @@ describe('fan packing', () => {
       const span = leftAt(last, yNow) + strandAt(last, 0, mode).w - leftAt(vis[0], yNow);
       const sum = vis.reduce((a, b) => a + strandAt(b, 0, mode).w, 0);
       expect(span).toBeLessThanOrEqual((sum + (vis.length - 1) * (GAP_PX / sx)) * 1.01);
-      // Deep width zoom: the drift is damped (columns stand upright) but siblings never overlap.
+      // Deeper width zooms, referenced to a point in the lion's green lane (as the
+      // camera does with the screen centre): still packed at every height, and
+      // that green lane stands upright.
+      const lion = fan.branches.find((b) => b.sp.common === 'Lion')!;
       for (const [zx, zy] of [
         [1e6, 1],
         [1e9, 1e4],
         [30, 0.2],
+        [300, 2],
       ]) {
         fan.pack.setScale(zx, zy);
-        for (let k = 1; k <= 200; k++) for (const gap of gapsAt(fan, fan.time.y(0) * (k / 200))) expect(gap).toBeGreaterThanOrEqual(-1e-9);
+        const yr = fan.time.y(30e-6);
+        fan.pack.setRef(leftAt(lion, yr) + 1e-12, yr);
+        for (let k = 1; k <= 200; k++) {
+          const y = fan.time.y(0) * (k / 200);
+          if (y > -OPEN_PX / zy || fan.branches.some((b) => y < b.tipY && y > b.tipY - CLOSE_MAX_PX / zy)) continue;
+          for (const gap of gapsAt(fan, y)) {
+            expect(gap * zx).toBeGreaterThanOrEqual(-1e-6);
+            expect(gap * zx).toBeLessThanOrEqual(GAP_PX * 1.01);
+          }
+        }
+        if (fan.pack.fade() === 0) {
+          for (let k = 1; k <= 50; k++) expect((leftAt(lion, fan.time.y(0) * (k / 50)) - leftAt(lion, yr)) * zx).toBeCloseTo(0, 6);
+        }
       }
     });
   }
