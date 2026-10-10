@@ -103,9 +103,8 @@ function at(perBar: number, ago = 3000, sy = 40, at?: number) {
   const c = new FanCamera(f, (b) => new TwigModel(b, f.time, 'linear'));
   c.w = 390;
   c.h = 844;
-  const sumEver = f.branches.reduce((a, b) => a + b.sp.ever, 0);
-  // view.ts widthScale: px per individual = trunkWidth / Σ ever · sx; the bar is SCALE_BAR_PX long.
-  const sx = ((SCALE_BAR_PX / perBar) * sumEver) / f.trunkWidth;
+  // view.ts widthScale: px per individual = unit · sx; the bar is SCALE_BAR_PX long.
+  const sx = SCALE_BAR_PX / perBar / f.branches[0].unit;
   const b = f.branches[lionIdx];
   const y = f.time.y(ago * 1e-6);
   c.cam = { cx: 0, cy: y, sx, sy, ty: sy };

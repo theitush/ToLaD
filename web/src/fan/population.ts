@@ -15,9 +15,13 @@
 //     one at ever × lifespan ÷ span (lifespan = half a generation) until its
 //     last appearance, then 0.
 //   - below its first appearance (down to the fork and through the stem) a
-//     column holds its founders: its N at first appearance, constant. A parent
+//     living species' column holds its founders: its N at first appearance,
+//     constant (its own ancestors, green by the rule below). A parent
 //     population splits among its daughters in proportion to their founding
 //     sizes, so the stem (the clade's ancestors) is the sum of the founders.
+//     An extinct species' column starts at its first appearance (0 below it,
+//     down to the fork): its founders' ancestors belong to the parent, the
+//     stem, where its share is drawn (Population.founders).
 //
 // q(t), alive at t with living descendants today through any mix of mothers and
 // fathers. A genealogy of whole generations counted back from now, mixed at
@@ -119,10 +123,12 @@ export class Population {
     }
   }
 
-  /** Individuals alive at age `ageMa` (Ma): 0 after an extinct species' last appearance, its founders before its first. */
+  /** Individuals alive at age `ageMa` (Ma): 0 after an extinct species' last appearance (and before its first); a living one's founders before its first. */
   aliveAt(ageMa: number): number {
     const sp = this.sp;
     if (ageMa < sp.t1) return 0;
+    // An extinct species' column starts at its first appearance: its founders' ancestors are the parent's (the stem).
+    if (sp.extinct && ageMa > sp.t0) return 0;
     const a = Math.min(ageMa, sp.t0);
     const c = sp.births;
     if (c) return c.curve.sizeAt(Math.min(a * 1e6, c.curve.years)) * this.lg;
@@ -132,8 +138,9 @@ export class Population {
   /** Share of those alive at `ageMa` with living descendants today (0–1). */
   greenAt(ageMa: number): number {
     const sp = this.sp;
+    if (sp.extinct) return ageMa > sp.t0 ? this.qBase : 0;
     if (ageMa >= sp.t0) return this.qBase;
-    if (sp.extinct || ageMa < sp.t1) return 0;
+    if (ageMa < sp.t1) return 0;
     const x = Math.max(0, (ageMa * 1e6) / this.GL);
     const k = Math.floor(x);
     const h = this.h;

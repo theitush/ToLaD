@@ -1,7 +1,7 @@
 // The individuals mesh (mesh.ts): one function for both lanes, and the GPU's
 // decisions (the shader's integer hash, mirrored by lifeGPU) agree with procgen.
 import { describe, expect, it } from 'vitest';
-import { MESH_F, MESH_U, colourCode, Lane, latticeLines, latticeRep, latticeTop, lifeGPU, lineageThreshold, packInst, shadeMesh, unpackInst, type MeshInst } from './mesh';
+import { MESH_F, MESH_U, colourCode, Lane, latticeLines, latticeRep, latticeTop, lifeGPU, packInst, shadeMesh, unpackInst, type MeshInst } from './mesh';
 import { layoutFan } from './layout';
 import { FanCamera } from './camera';
 import { MeshBatch } from './meshgl';
@@ -30,9 +30,8 @@ function scene(sp: string, ago: number, perBar: number, sy: number) {
   const c = new FanCamera(f, (x) => new TwigModel(x, f.time, 'linear'));
   c.w = 390;
   c.h = 844;
-  const sumEver = f.branches.reduce((a, x) => a + x.sp.ever, 0);
   const y = f.time.y(ago * 1e-6);
-  c.cam = { cx: 0, cy: y, sx: ((SCALE_BAR_PX / perBar) * sumEver) / f.trunkWidth, sy, ty: sy };
+  c.cam = { cx: 0, cy: y, sx: SCALE_BAR_PX / perBar / b.unit, sy, ty: sy };
   c.settle();
   const L = mm.lanes(c.cam.cy);
   c.cam.cx = L.left + L.gw;
@@ -102,7 +101,7 @@ describe('one mesh for both lanes: the lane only colours', () => {
         }
       }
       expect(n).toBeGreaterThan(50);
-      // ...and the colour is the lane's (gray: some pale green lineage among the dead).
+      // ...and the colour is the lane's.
       expect(differ).toBeGreaterThan(0.3 * n);
     });
   }
@@ -149,13 +148,12 @@ describe('one mesh for both lanes: the lane only colours', () => {
     }
   });
 
-  it('the colour of an individual is what it is: alive, line carried on, or ended', () => {
-    expect(colourCode(Lane.Green, true, false)).toBe(0);
-    expect(colourCode(Lane.Green, false, false)).toBe(1);
-    expect(colourCode(Lane.Gray, true, true)).toBe(-1);
-    expect(colourCode(Lane.Gray, false, true)).toBe(1);
-    expect(colourCode(Lane.Gray, false, false)).toBe(2);
-    expect(colourCode(Lane.Withered, false, true)).toBe(3);
+  it('the lane colours who is in it: alive now, line carried on (green lane), or ended (gray lane)', () => {
+    expect(colourCode(Lane.Green, true)).toBe(0);
+    expect(colourCode(Lane.Green, false)).toBe(1);
+    expect(colourCode(Lane.Gray, true)).toBe(-1);
+    expect(colourCode(Lane.Gray, false)).toBe(2);
+    expect(colourCode(Lane.Withered, false)).toBe(3);
   });
 
   it('the living are all in the green lane: every living individual has a green slot that draws it', () => {
@@ -179,38 +177,34 @@ describe('one mesh for both lanes: the lane only colours', () => {
 });
 
 describe('GPU and CPU decide alike', () => {
-  it('the GPU mirror (24-bit floats from the shared hash) matches procgen: births, lifespans, alive, lineage', () => {
+  it('the GPU mirror (24-bit floats from the shared hash) matches procgen: births, lifespans, alive', () => {
     let alive = 0;
-    let lin = 0;
     for (const g of [0, 1000, m.G - 40, m.G - 3, m.G - 1]) {
       const n = m.size(g);
       for (let k = 0; k < 400; k++) {
         const i = Math.floor(((k * 2654435761) % 4294967296) / 4294967296 * n);
         const a = m.sp.attributes({ generation: g, index: BigInt(i) });
-        const l = lifeGPU(m.seedOf(g), i, m.GL, m.sp.lifespanYears, m.sp.now - g * m.GL, lineageThreshold(m.G, g, false));
+        const l = lifeGPU(m.seedOf(g), i, m.GL, m.sp.lifespanYears, m.sp.now - g * m.GL);
         expect(l.birth + g * m.GL).toBeCloseTo(a.birthTime, 3);
         expect(l.life).toBeCloseTo(a.lifespan, 3);
         // The same decision but within float rounding of a boundary (none of these samples are).
         expect(l.alive).toBe(a.alive);
-        expect(l.lineage).toBe(m.lineage(g, i));
         if (l.alive) alive++;
-        if (l.lineage) lin++;
       }
     }
     expect(alive).toBeGreaterThan(10);
-    expect(lin).toBeGreaterThan(10);
   });
 
   it('the shader uses procgen\'s own hash and the same fields', async () => {
     const { MESH_FS } = await import('./meshgl');
     expect(MESH_FS).toContain(HASH_GLSL);
-    for (const f of ['randFloat(h, 1u)', 'randFloat(h, 2u)', 'randFloat(h, 3u)', 'rand(h, 17u)', 'mixh(seed, i)']) expect(MESH_FS).toContain(f);
+    for (const f of ['randFloat(h, 1u)', 'randFloat(h, 2u)', 'randFloat(h, 3u)', 'mixh(seed, i)']) expect(MESH_FS).toContain(f);
   });
 
   it('instances pack into the attribute layout', () => {
     const f = new Float32Array(MESH_F);
     const u = new Uint32Array(MESH_U);
-    const a: MeshInst = { x0: 1, y0: 2, x1: 3, y1: 4, xB0: 5, bw: 6, lw: 7, fineA: 0.5, p0: 9, T0: 10, A: 11, gBoff: 12, alpha: 0.25, mode: 1, lane: Lane.Gray, tipR: 16, GL: 17, Lm: 18, nowRel: 19, xG: 20, B0: 1, lvl: 2, latSeed: 9, nA: 3, nB: 4, seedA: 4294967295, seedB: 6, thrA: 7, thrB: 8, nG: 10, fold: 3 };
+    const a: MeshInst = { x0: 1, y0: 2, x1: 3, y1: 4, xB0: 5, bw: 6, lw: 7, fineA: 0.5, p0: 9, T0: 10, A: 11, gBoff: 12, alpha: 0.25, mode: 1, lane: Lane.Gray, tipR: 16, GL: 17, Lm: 18, nowRel: 19, xG: 20, B0: 1, lvl: 2, latSeed: 9, nA: 3, nB: 4, seedA: 4294967295, seedB: 6, sA: 7, sB: 8, fA: 10, fB: 3 };
     packInst(a, f, u, 0);
     expect([...f]).toEqual([1, 2, 3, 4, 5, 6, 7, 0.5, 9, 10, 11, 12, 0.25, 1, 1, 16, 17, 18, 19, 20, 0, 0, 0, 0]);
     expect([...u]).toEqual([1, 2, 3, 4, 4294967295, 6, 7, 8, 9, 10, 3, 0]);

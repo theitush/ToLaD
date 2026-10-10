@@ -552,7 +552,7 @@ export class FanView implements InputHandlers {
     const d = Steps.dy(steps.level);
     const [, sTop] = this.toWorld(0, -20);
     const [, sBot] = this.toWorld(0, this.h + 20);
-    const ys = new Set<number>([yb, 0, -JOG, b.tipY]);
+    const ys = new Set<number>([yb, 0, -JOG, b.tipY, this.fan.time.y(b.sp.t0)]);
     for (const y of steps.lines(b, sTop - d, sBot + d) ?? []) ys.add(y);
     if (sBot < yb && sBot > 0) ys.add(sBot);
     const sorted = [...ys].filter((y) => y >= b.tipY && y <= yb).sort((p, q) => q - p);

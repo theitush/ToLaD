@@ -199,7 +199,7 @@ export class TwigModel {
     const lin = this.b.unit;
     if (this.mode === 'linear') return lin;
     const w = laneAt(this.b, y).w;
-    const n = this.b.pop.aliveAt(this.time.ageAt(y));
+    const n = this.b.pop.aliveAt(Math.min(this.rec.t0, this.time.ageAt(y)));
     return w > 0 && n > 0 ? w / n : lin;
   }
 
@@ -233,7 +233,7 @@ export class TwigModel {
     let v = this.strides.get(g);
     if (v === undefined) {
       if (this.strides.size > 50000) this.strides.clear();
-      this.strides.set(g, (v = Math.max(1, Math.round(this.b.pop.aliveAt(this.ageOf((g + 0.5) * this.GL))))));
+      this.strides.set(g, (v = Math.max(1, Math.round(this.b.pop.aliveAt(Math.min(this.rec.t0, this.ageOf((g + 0.5) * this.GL)))))));
     }
     return v;
   }

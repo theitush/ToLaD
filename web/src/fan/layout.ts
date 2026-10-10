@@ -25,11 +25,14 @@
 //
 // Width = individuals alive at that time (∝ births per unit time): N(t) times
 // one fixed world width per individual (linear) or per decade of individuals
-// (log, g()). A column's room is its widest N. Below a species' first
-// appearance its column holds its founders (constant), down to the fork and
-// through the stem, the clade's ancestors (the sum of the founders). The steps
-// hold the width (and the green lane's) averaged over each step's height, on
-// nested log-time grids fixed in the world: the area under each edge is
+// (log, g()). A column's room is its widest N. Below a living species' first
+// appearance its column holds its founders (constant) down to the fork; an
+// extinct one's column starts at its first appearance (its founders' ancestors
+// are the parent's). Through the stem, the clade's ancestors, every column
+// goes on at its founders' width (the stem is the sum of the founders). The
+// steps hold the width (and the green lane's) averaged over each step's
+// height, on nested log-time grids fixed in the world (a step holding the
+// species' first appearance is cut there): the area under each edge is
 // preserved step by step and a drop in N shows as a step.
 
 import type { CladeRec, SpeciesRec } from './panthera';
@@ -209,22 +212,27 @@ export class Steps {
 
   /**
    * Mean exact width of branch b over step i of level k, and of its green
-   * lane (0 if the branch isn't there): [w, gw].
+   * lane (0 if the branch isn't there): [w, gw]. A step that holds the
+   * species' first appearance is two steps, cut there (`side` 1: the part
+   * above it, 2: below; 0: the whole step): its span and its founders'
+   * ancestors are never averaged together.
    */
-  mean(b: FanBranch, k: number, i: number): [number, number] {
+  mean(b: FanBranch, k: number, i: number, side = 0): [number, number] {
     let m = this.cache.get(b);
     if (!m) this.cache.set(b, (m = new Map()));
-    const key = k * 2 ** 40 + i; // i < 2^k ≤ 2^36
+    const key = (k * 2 ** 40 + i) * 3 + side; // i < 2^k ≤ 2^36
     const hit = m.get(key);
     if (hit !== undefined) return hit;
     const d = Steps.dy(k);
-    const yLo = -i * d; // bottom of the step
-    const yHi = Math.max(b.tipY, -(i + 1) * d); // top, clipped to the tip
+    const y0 = this.time.y(b.sp.t0);
+    let yLo = -i * d; // bottom of the step
+    let yHi = Math.max(b.tipY, -(i + 1) * d); // top, clipped to the tip
+    if (side === 1) yLo = Math.min(yLo, y0);
+    if (side === 2) yHi = Math.max(yHi, y0);
     const v: [number, number] = [0, 0];
     if (yHi < yLo) {
       // Adaptive Simpson, split at the species' first appearance (where the width has a kink).
       const cuts = [yHi, yLo];
-      const y0 = this.time.y(b.sp.t0);
       if (y0 > yHi && y0 < yLo) cuts.splice(1, 0, y0);
       for (const green of [false, true]) {
         const f = green
@@ -253,10 +261,17 @@ export class Steps {
   lanesAt(b: FanBranch, y: number): [number, number] {
     if (y >= 0) return [b.baseW, b.baseW * b.baseQ];
     if (y < b.tipY) return [0, 0];
-    const a = this.mean(b, this.k, Steps.index(this.k, y));
+    // (Which side of the species' first appearance: a step holding it is cut there.)
+    const side = y < this.time.y(b.sp.t0) ? 1 : 2;
+    const at = (k: number) => {
+      const i = Steps.index(k, y);
+      const y0 = this.time.y(b.sp.t0);
+      return this.mean(b, k, i, y0 > -(i + 1) * Steps.dy(k) && y0 < -i * Steps.dy(k) ? side : 0);
+    };
+    const a = at(this.k);
     if (this.t <= 0) return a;
     const k1 = this.k + 1;
-    const c = this.mean(b, k1, Steps.index(k1, y));
+    const c = at(k1);
     return [a[0] + (c[0] - a[0]) * this.t, a[1] + (c[1] - a[1]) * this.t];
   }
 
