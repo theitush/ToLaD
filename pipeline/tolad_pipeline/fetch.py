@@ -101,6 +101,14 @@ SOURCES: dict[str, list[tuple[str, str, dict | None]]] = {
         ("greenspoon/mammal_biomass-master.zip",
          "https://zenodo.org/api/records/7594807/files/mammal_biomass-master.zip/content", None),
     ],
+    # Zoonomia: Wilder et al. 2023, Science 380:eabn5856 (CC BY 4.0, PMC10184782), Table S1:
+    # genome-wide heterozygosity for 209 placental mammals. Europe PMC serves the supplement only
+    # as a zip it rebuilds per request (fresh timestamps, so new bytes every time); we keep the one
+    # member we read, under a fixed name, and pin that member's checksum (see ZIP_MEMBERS).
+    "zoonomia": [
+        ("zoonomia/Wilder2023_Table_S1.xlsx",
+         "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC10184782/supplementaryFiles", None),
+    ],
     "prb": [
         ("prb/how-many-people-have-ever-lived-on-earth.html",
          "https://www.prb.org/articles/how-many-people-have-ever-lived-on-earth/", None),
@@ -124,6 +132,12 @@ SOURCES: dict[str, list[tuple[str, str, dict | None]]] = {
 # Only these members are extracted from the OTT tarball (no paths from the
 # archive are trusted: we write to fixed names).
 OTT_MEMBERS = {"taxonomy.tsv", "synonyms.tsv", "version.txt"}
+
+
+# Sources served inside a zip whose own bytes are not stable: rel path -> the member to keep.
+# Only that member is read (its name is fixed here, never taken from the archive), and the
+# lock pins the member's bytes.
+ZIP_MEMBERS = {"zoonomia/Wilder2023_Table_S1.xlsx": "NIHMS1893031-supplement-Table_S1.xlsx"}
 
 
 PBDB_TIMER = re.compile(rb'^\{\s*"elapsed_time"\s*:\s*[0-9.eE+-]+\s*,')
@@ -171,6 +185,19 @@ def download(url: str, body: dict | None, dest: Path) -> None:
     os.replace(tmp, dest)
 
 
+def extract_member(zpath: Path, member: str, dest: Path) -> None:
+    """Copy one named member out of a zip to dest (the archive's paths are never used)."""
+    import zipfile
+    tmp = dest.with_suffix(dest.suffix + ".part")
+    with zipfile.ZipFile(zpath) as zf, zf.open(member) as f, tmp.open("wb") as out:
+        while True:
+            chunk = f.read(1 << 20)
+            if not chunk:
+                break
+            out.write(chunk)
+    os.replace(tmp, dest)
+
+
 def extract_ott(tgz: Path, outdir: Path) -> None:
     """Pull taxonomy.tsv etc. out of the OTT tarball, Mammalia rows only."""
     outdir.mkdir(parents=True, exist_ok=True)
@@ -206,7 +233,13 @@ def main(argv: list[str] | None = None) -> int:
             dest = a.raw / rel
             if a.refresh or not dest.exists():
                 print(f"[fetch] {name}: {url}", file=sys.stderr)
-                download(url, body, dest)
+                if rel in ZIP_MEMBERS:
+                    zdest = dest.with_name(dest.name + ".download.zip")
+                    download(url, body, zdest)
+                    extract_member(zdest, ZIP_MEMBERS[rel], dest)
+                    zdest.unlink()
+                else:
+                    download(url, body, dest)
                 fresh = True
             else:
                 fresh = False

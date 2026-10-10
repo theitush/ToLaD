@@ -122,5 +122,12 @@
   "retrieved": "2026-10-09",
   "sha256": "286ac36bb1415e2e1ade03acfef0a29f0e4c087e2f78e38c48f50c5df89082bc",
   "url": "https://population.un.org/wpp/assets/Excel%20Files/1_Indicator%20(Standard)/CSV_FILES/WPP2024_Demographic_Indicators_Medium.csv.gz"
+ },
+ "zoonomia/Wilder2023_Table_S1.xlsx": {
+  "bytes": 145899,
+  "post_body": null,
+  "retrieved": "2026-10-11",
+  "sha256": "11f6b821452304516bbd66260861bbe8c36c14a9ae71b72575be50502d7bf379",
+  "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC10184782/supplementaryFiles"
  }
 }
