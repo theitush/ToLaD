@@ -123,7 +123,7 @@ describe('the dated tree', () => {
       }
     });
 
-    it(`a parent column is green by the genealogy recurrence on the summed population (${mode})`, () => {
+    it(`a parent column is green by the genealogy recurrence on the summed population, turning from its daughters' own shares (${mode})`, () => {
       const f = layoutFan(PANTHERA, mode);
       // The share with living descendants just above a split, weighted by size: what feeds the parent.
       const shareAbove = (k: FanNode | FanBranch, ageMa: number): [number, number] =>
@@ -136,18 +136,24 @@ describe('the dated tree', () => {
         expect(GL).toBeCloseTo(sum(v.strands.map((b) => b.pop.founders * b.sp.genYears)) / N, 9);
         for (let k = 0; k < 60; k++) {
           // Generation k below the split: the column's green share = h_k, drawn as one prefix across its strands.
-          const y = f.time.y(v.ageMa + ((k + 0.5) * GL) / 1e6);
-          if (y >= v.yBot) break;
+          const age = v.ageMa + ((k + 0.5) * GL) / 1e6;
+          expect(nodeQ(v, age)).toBeCloseTo(h, 9);
+          h = parentShare(h, N, N);
+        }
+        // Just below the split: the daughters side by side, each green by its own share just above it (no jump);
+        // then, past the blend, one contiguous prefix of the recurrence's share.
+        for (const b of v.strands) expect(laneAt(b, below(v.y)).gw).toBeCloseTo(laneAt(b, above(v.y)).gw, 5);
+        const y = v.y + v.blend * 1.001;
+        if (y < v.yBot) {
+          const age = f.time.ageAt(y);
           const green = sum(v.strands.map((b) => laneAt(b, y).gw));
-          expect(green / v.width).toBeCloseTo(h, 9);
-          // One contiguous prefix: green strands, then at most one part-green, then gray ones.
+          expect(green / v.width).toBeCloseTo(nodeQ(v, age), 9);
           let seenGray = false;
           for (const b of v.strands) {
             const L = laneAt(b, y);
             if (seenGray) expect(L.gw).toBe(0);
             if (L.gw < L.w) seenGray = true;
           }
-          h = parentShare(h, N, N);
         }
       }
       // Deep down the stem it settles to the constant-population share.

@@ -36,6 +36,7 @@ const scenes = [
   ['split-lionleopard', 'split', [2.57, 5]],
   ['split-cavelion', 'split', [0.5, 5]],
   ['split-root', 'split', [4.6, 3]],
+  ['decline', 'bar', ['Lion', 50, 1e5, 3.5, 0.5]],
   ['mesh-split', 'bar', ['Lion', 499990, 100, 2e4, 1]],
   ['lineage', 'tapnode', [2.57, 1.2]],
 ];

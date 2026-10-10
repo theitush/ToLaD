@@ -19,7 +19,7 @@ flat out vec2 vSkew;
 void main() {
   // A trapezoid: [x0, x1] at y0, shifted by (dl, dr) at y1 (a rectangle when 0).
   // Its bounding box, grown so the anti-aliased edges have room.
-  float g = 1.0 + 0.5 * max(abs(aSkew.x), abs(aSkew.y)) / max(1e-6, aRect.w - aRect.y);
+  float g = 2.5;
   vec2 lo = vec2(min(aRect.x, aRect.x + aSkew.x) - g, aRect.y);
   vec2 hi = vec2(max(aRect.z, aRect.z + aSkew.y) + g, aRect.w);
   vec2 p = mix(lo, hi, corner);
@@ -45,7 +45,8 @@ void main() {
   float t = clamp((vP.y - vRect.y) / H, 0.0, 1.0);
   float xl = vRect.x + vSkew.x * t;
   float xr = vRect.z + vSkew.y * t;
-  float hw = 0.5 * max(1.0, max(abs(vSkew.x), abs(vSkew.y)) / H);
+  // (At most 3 px: a sliver of a trapezoid, far under a pixel tall, would otherwise smear across its run.)
+  float hw = 0.5 * clamp(max(abs(vSkew.x), abs(vSkew.y)) / H, 1.0, 3.0);
   float c = clamp(min(vP.x + hw, xr) - max(vP.x - hw, xl), 0.0, 2.0 * hw) / (2.0 * hw);
   float a = vColor.a * c;
   o = vec4(vColor.rgb * a, a);
@@ -332,7 +333,7 @@ void main() {
     gColR = colL + (vNar.y + vWarp.y * dy - xl) / k;
     gXG = colL + (vLife.w + vWarp.z * dy - xl) / k;
     float pad = vMisc.y < 0.5 ? 1.0 : max(vMisc.w, max(vSlot.z, 1.0) * 0.5 + 5.0) + 1.0;
-    if (p.x < colL - pad || p.x > gColR + pad) discard;
+    if (vWarp != vec4(0.0) && (p.x < colL - pad || p.x > gColR + pad)) discard;
   }
   float xG = gXG;
   uint L = vIdx.y;

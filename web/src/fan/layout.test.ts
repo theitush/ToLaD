@@ -67,7 +67,7 @@ describe('river fan: fixed, smooth, honest', () => {
       }
     });
 
-    it(`every edge is a continuous function of time: no jog at a split, no step at a population change (${mode})`, () => {
+    it(`every edge is a continuous function of time: edges and the lanes' boundary, no jog at a split, no step at a population change (${mode})`, () => {
       const fan = layoutFan(PANTHERA, mode);
       const yb = fan.trunkBottom.y;
       const edges = (b: (typeof fan.branches)[0], y: number) => {
@@ -83,7 +83,7 @@ describe('river fan: fixed, smooth, honest', () => {
           const a = edges(b, y - 1e-7);
           const c = edges(b, y + 1e-7);
           const w = Math.max(laneAt(b, y - 1e-7).w, laneAt(b, y + 1e-7).w, 1e-9);
-          for (let k = 0; k < 2; k++) expect(Math.abs(a[k] - c[k]) / w).toBeLessThan(1e-4);
+          for (let k = 0; k < 3; k++) expect(Math.abs(a[k] - c[k]) / w).toBeLessThan(1e-4);
         }
         // Finely across its whole span (every feature interval cut in 16): the edges move at a bounded slope.
         const ys = [b.tipY, ...f, yb];
@@ -95,7 +95,7 @@ describe('river fan: fixed, smooth, honest', () => {
             const dy = (ys[i + 1] - ys[i]) / 16;
             // (Log widths close an extinct column over its last ~10 individuals steeply: the log of a smooth taper.)
             const last = mode === 'log' && y < b.splitY && b.pop.aliveAt(fan.time.ageAt(y - dy)) < 10;
-            if (!last) for (let k = 0; k < 2; k++) expect(Math.abs(e[k] - prev[k])).toBeLessThanOrEqual(12 * dy + 1e-9);
+            if (!last) for (let k = 0; k < 3; k++) expect(Math.abs(e[k] - prev[k])).toBeLessThanOrEqual(12 * dy + 1e-9);
             prev = e;
           }
         }

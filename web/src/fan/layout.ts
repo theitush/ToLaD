@@ -40,7 +40,11 @@
 // descendants today, the gray lane to its right those whose line ended (warm
 // gray for an extinct species, all of it). In a parent column the green is the
 // genealogy recurrence on the summed population (FanNode.q), drawn as one green
-// prefix across its strands.
+// prefix across its strands. Just below a split the parent column is drawn as
+// its daughters side by side, each with its own green share as just above
+// the split (PathSeg.gAbove), turning into the parent's own prefix deeper
+// down by a smootherstep over FanNode.blend: the lanes' boundary is as
+// continuous as the edges. The widths stay exact.
 //
 // Drawing: the edges are exact functions of the height (leftAt, laneAt); the
 // view samples them at world-fixed heights (Tess: the features of each strand
@@ -123,6 +127,9 @@ export interface PathSeg {
   left: number;
   off: number;
   node: FanNode;
+  /** The strand's width here (its founders), and its green just above the split (its own share there). */
+  w: number;
+  gAbove: number;
 }
 
 export interface FanBranch {
@@ -179,6 +186,8 @@ export interface FanNode {
   tile: number;
   /** Height over which its daughters peel off above it (world units). */
   fork: number;
+  /** Height below the split over which its strands' green turns from the daughters' own shares into its prefix. */
+  blend: number;
   /**
    * Share with living descendants by generation below the split: q[k] at the
    * middle of generation k below it (ages ageMa + (k + ½)·GL), linear in
@@ -257,7 +266,14 @@ export function lanesAt(b: FanBranch, y: number, mode: WidthMode = b.tess.mode):
     return [w, w * b.pop.greenAt(age)];
   }
   const s = segAt(b, y);
-  return [b.baseW, clampW(nodeQ(s.node, age) * s.node.width - s.off, b.baseW)];
+  return [b.baseW, segGreen(s, age, y)];
+}
+
+/** A strand's green in a parent column at height y: from its own share at the split into the column's prefix (see FanNode.blend). */
+function segGreen(s: PathSeg, age: number, y: number): number {
+  const gw = clampW(nodeQ(s.node, age) * s.node.width - s.off, s.w);
+  const u = s.node.blend > 0 ? smoother((y - s.node.y) / s.node.blend) : 1;
+  return u >= 1 ? gw : s.gAbove + (gw - s.gAbove) * u;
 }
 
 /**
@@ -449,7 +465,7 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = PANTHE
     return b;
   };
   const build = (s: Split, parent: FanNode | null): FanNode => {
-    const v: FanNode = { split: s, name: s.name, ageMa: s.ageMa, y: time.y(s.ageMa), yBot: parent ? parent.y : yBottom, parent, kids: [], strands: [], n: 0, genYears: 0, width: 0, left: 0, cx: 0, tile: 0, fork: 0, q: new Float64Array([0]) };
+    const v: FanNode = { split: s, name: s.name, ageMa: s.ageMa, y: time.y(s.ageMa), yBot: parent ? parent.y : yBottom, parent, kids: [], strands: [], n: 0, genYears: 0, width: 0, left: 0, cx: 0, tile: 0, fork: 0, blend: 0, q: new Float64Array([0]) };
     nodes.push(v);
     for (const k of s.kids) {
       if (typeof k === 'string') {
@@ -519,6 +535,7 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = PANTHE
     let run = Infinity;
     for (const k of v.kids) run = Math.min(run, v.y - (isNode(k) ? k.y : k.tipY));
     v.fork = Math.max(0, Math.min(FORK_MAX, FORK_FRAC * run));
+    v.blend = Math.max(0, Math.min(FORK_MAX, 0.45 * (v.yBot - v.y)));
     // Green: the daughters' shares just above the split, by their sizes; then the genealogy back, generation by generation.
     let qn = 0;
     for (const k of v.kids) {
@@ -543,7 +560,7 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = PANTHE
     for (const k of v.kids) {
       if (isNode(k)) k.tile = v.left + off;
       for (const b of isNode(k) ? k.strands : [k]) {
-        b.path.push({ y: v.y, left: v.left + off, off: 0, node: v });
+        b.path.push({ y: v.y, left: v.left + off, off: 0, node: v, w: b.baseW, gAbove: 0 });
         off += b.baseW;
       }
     }
@@ -553,7 +570,17 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = PANTHE
     }
   }
   root.tile = root.left;
-  for (const b of branches) b.path.sort((p, q) => p.y - q.y);
+  for (const b of branches) {
+    b.path.sort((p, q) => p.y - q.y);
+    // Each strand's green just above each split it passes: its own share (the species'), or its place in the daughter column's prefix.
+    b.path.forEach((s, k) => {
+      if (k === 0) s.gAbove = b.baseW * b.pop.greenAt(Math.max(b.sp.t1, b.t0 - 1e-9));
+      else {
+        const d = b.path[k - 1];
+        s.gAbove = segGreen(d, s.node.ageMa, s.node.y);
+      }
+    });
+  }
   // The branches in the dataset's order (callers index them by species); `index` is the tree's order.
   const rank = new Map(clade.species.map((s, i) => [s, i]));
   branches.sort((p, q) => rank.get(p.sp)! - rank.get(q.sp)!);

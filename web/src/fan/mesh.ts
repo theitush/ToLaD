@@ -643,8 +643,9 @@ export function meshFrame(m: MeshInst, px: number, py: number): [number, MeshIns
   const X = colL + (px - xl) / k;
   const colR = colL + ((m.colR ?? 0) + sR * dy - xl) / k;
   const pad = m.mode === 0 ? 1 : Math.max(m.tipR, Math.max(m.lw, 1) * 0.5 + 5) + 1;
-  if (X < colL - pad || X > colR + pad) return null;
+  // (A straight, constant column needs no clip: the instance's rectangle is it.)
   if (sL === 0 && sR === 0 && sG === 0 && sP === 0) return [X, m];
+  if (X < colL - pad || X > colR + pad) return null;
   return [X, { ...m, colR, xG: colL + (m.xG + sG * dy - xl) / k }];
 }
 
