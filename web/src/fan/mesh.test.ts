@@ -237,7 +237,8 @@ describe('the texture at every zoom: never a plain lane', () => {
   for (const [name, sp, ago, perBar, sy] of [
     ['overview', 'Lion', 2e5, 1e9, 0.7],
     ['max zoom-out', 'Lion', 1e6, 1e11, 0.25],
-    ['the stem, below the species', 'Tiger', 2e7, 1e9, 0.7],
+    // (Below its split: a slice of the parent column, here the lion + leopard ancestors', where the green prefix ends in the leopard's slice.)
+    ['the stem, below the species', 'Leopard', 1e6, 1e9, 0.7],
   ] as const) {
     it(`in both lanes the lines cover some of the lane, never none and never all (${name})`, () => {
       const { insts, kLog, nowPx, c, mm } = scene(sp, ago, perBar, sy);

@@ -14,14 +14,13 @@
 //     today's count (the pipeline's N_ever = alive ÷ lifespan × span), an extinct
 //     one at ever × lifespan ÷ span (lifespan = half a generation) until its
 //     last appearance, then 0.
-//   - below its first appearance (down to the fork and through the stem) a
-//     living species' column holds its founders: its N at first appearance,
-//     constant (its own ancestors, green by the rule below). A parent
-//     population splits among its daughters in proportion to their founding
-//     sizes, so the stem (the clade's ancestors) is the sum of the founders.
-//     An extinct species' column starts at its first appearance (0 below it,
-//     down to the fork): its founders' ancestors belong to the parent, the
-//     stem, where its share is drawn (Population.founders).
+//   - below its start (its split from its sister lineage in the dated tree,
+//     splits.ts; by default its first appearance) a species holds its
+//     founders: its N at its start, constant. A parent population is the sum
+//     of its daughters' founders (layout.ts), so the stem (the clade's
+//     ancestors) is the sum of everyone's founders. An extinct species holds
+//     its constant model from its last appearance back to its start, and the
+//     same founders below it.
 //
 // q(t), alive at t with living descendants today through any mix of mothers and
 // fathers. A genealogy of whole generations counted back from now, mixed at
@@ -43,10 +42,11 @@
 // edge (the history's own points at the segment boundaries) and q = h_k; steps
 // with the same n and q merge, so a constant stretch is one step. Past the
 // last change (the baseline, settled q) one step runs on to the species'
-// first appearance and, for a living one, its founders below it. Extinct species: 0 over
-// their span. Below a species' first appearance its founders are part of the
-// ancestral population, green by the same rule through any living daughter:
-// the living species' own settled value, Q_STAR for an extinct one's founders.
+// start and its founders below it. Extinct species: q = 0 from the tip back to
+// the start. Below its start a species' founders are part of the parent
+// population, whose green the layout works out on the summed column (layout.ts
+// FanNode); here they keep the species' own settled value (Q_STAR for an
+// extinct one's).
 
 import type { SpeciesRec } from './panthera';
 
@@ -83,7 +83,7 @@ export function shareBack(n: (k: number) => number, varGens: number, maxGens: nu
 }
 
 export class Population {
-  /** Individuals alive at the species' first appearance: its column below it, and its share of the stem. */
+  /** Individuals alive at the species' start (its split): its share of the parent column below it. */
   readonly founders: number;
   /** The most alive at any moment (the column's room). */
   readonly max: number;
@@ -95,9 +95,17 @@ export class Population {
   private readonly h: Float64Array;
   private readonly GL: number;
 
-  constructor(readonly sp: SpeciesRec) {
+  /**
+   * @param startMa the species' start (Ma): its split in the dated tree, where
+   * its own column begins (by default its first appearance).
+   */
+  constructor(
+    readonly sp: SpeciesRec,
+    readonly startMa = sp.t0,
+  ) {
     const GL = sp.genYears;
     this.GL = GL;
+    // (The constant model spreads the dataset's estimate over its own span, first to last appearance.)
     const years = Math.max(1, (sp.t0 - sp.t1) * 1e6);
     const c = sp.births;
     if (c) {
@@ -112,7 +120,7 @@ export class Population {
       this.nConst = sp.alive > 0 ? sp.alive : (sp.ever * GL * this.lg) / years;
       this.max = this.nConst;
     }
-    this.founders = this.aliveAt(sp.t0);
+    this.founders = this.aliveAt(startMa);
     if (sp.extinct || !(sp.alive > 0)) {
       this.h = new Float64Array([0]);
       this.qBase = Q_STAR;
@@ -124,18 +132,17 @@ export class Population {
         const segs = c.segments;
         for (let j = segs.length - 1; j > 0; j--) varGens += segs[j].generations;
       }
-      this.h = shareBack((k) => this.aliveAt(ago(k) / 1e6), varGens, Math.min(2e5, Math.ceil(years / GL)));
+      const own = Math.max(1, (startMa - sp.t1) * 1e6);
+      this.h = shareBack((k) => this.aliveAt(ago(k) / 1e6), varGens, Math.min(2e5, Math.ceil(own / GL)));
       this.qBase = this.h[this.h.length - 1];
     }
   }
 
-  /** Individuals alive at age `ageMa` (Ma): 0 after an extinct species' last appearance (and before its first); a living one's founders before its first. */
+  /** Individuals alive at age `ageMa` (Ma): 0 after an extinct species' last appearance; its founders before its start. */
   aliveAt(ageMa: number): number {
     const sp = this.sp;
     if (ageMa < sp.t1) return 0;
-    // An extinct species' column starts at its first appearance: its founders' ancestors are the parent's (the stem).
-    if (sp.extinct && ageMa > sp.t0) return 0;
-    const a = Math.min(ageMa, sp.t0);
+    const a = Math.min(ageMa, sp.t0, this.startMa);
     const c = sp.births;
     if (c) return c.curve.sizeAt(Math.min(a * 1e6, c.curve.years)) * this.lg;
     return this.nConst;
@@ -163,16 +170,18 @@ export class Population {
       ages.push(a1);
     };
     if (sp.extinct || !(sp.alive > 0)) {
-      push(sp.t0 * 1e6, this.aliveAt((sp.t0 + sp.t1) / 2), 0);
+      // Withered from its tip back to its start; its founders below.
+      push(this.startMa * 1e6, this.aliveAt((this.startMa + sp.t1) / 2), 0);
+      push(Infinity, this.founders, this.qBase);
     } else {
       const GL = this.GL;
-      const span = (sp.t0 - sp.t1) * 1e6;
+      const span = (this.startMa - sp.t1) * 1e6;
       const c = sp.births;
       let varGens = 0;
       if (c) for (let j = c.segments.length - 1; j > 0; j--) varGens += c.segments[j].generations;
       const K = Math.min(Math.floor(span / GL), Math.max(varGens, this.h.length - 1));
       for (let k = 0; k < K; k++) push((k + 1) * GL, this.aliveAt((k * GL) / 1e6), this.h[Math.min(k, this.h.length - 1)]);
-      // The baseline on to the first appearance (and its founders below, held constant).
+      // The baseline on to the start (and its founders below, held constant).
       push(Infinity, this.founders, this.qBase);
     }
     return (this._steps = { ages: Float64Array.from(ages), n: Float64Array.from(n), q: Float64Array.from(q) });
@@ -180,11 +189,10 @@ export class Population {
 
   private _steps?: { ages: Float64Array; n: Float64Array; q: Float64Array };
 
-  /** The step drawn at age `ageMa` (Ma): the individuals alive and the green share; 0 outside the column. */
+  /** The step at age `ageMa` (Ma): the individuals alive and the green share; 0 after the tip. */
   stepAt(ageMa: number): { n: number; q: number } {
     const sp = this.sp;
     if (ageMa < sp.t1) return { n: 0, q: 0 };
-    if (sp.extinct && ageMa > sp.t0) return { n: 0, q: 0 };
     const { ages, n, q } = this.steps;
     const yrs = ageMa * 1e6;
     let lo = 0;
@@ -200,17 +208,18 @@ export class Population {
   /** Share of those alive at `ageMa` with living descendants today (0–1): h_k of its generation, as drawn. */
   greenAt(ageMa: number): number {
     const sp = this.sp;
-    if (sp.extinct) return ageMa > sp.t0 ? this.qBase : 0;
-    if (ageMa >= sp.t0) return this.qBase;
+    if (sp.extinct) return ageMa > this.startMa ? this.qBase : 0;
+    if (ageMa >= this.startMa) return this.qBase;
     if (ageMa < sp.t1) return 0;
     return this.stepAt(ageMa).q;
   }
 }
 
-const cache = new Map<number, Population>();
-/** The population model of a species (cached by gid). */
-export function population(sp: SpeciesRec): Population {
-  let p = cache.get(sp.gid);
-  if (!p || p.sp !== sp) cache.set(sp.gid, (p = new Population(sp)));
+const cache = new Map<string, Population>();
+/** The population model of a species starting at `startMa` (by default its first appearance; cached by gid and start). */
+export function population(sp: SpeciesRec, startMa = sp.t0): Population {
+  const key = `${sp.gid}:${startMa}`;
+  let p = cache.get(key);
+  if (!p || p.sp !== sp) cache.set(key, (p = new Population(sp, startMa)));
   return p;
 }

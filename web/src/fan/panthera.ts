@@ -3,8 +3,8 @@
 // `virtual:panthera-data`): counts, ranges, grades, dates and the curated
 // population histories (HIST, format v1.1) are the dataset's own values
 // (EVER/ALIV are dequantized, so they are the numbers the river shows too).
-// Internal nodes of the subtree are flattened: this slice shows Panthera as one
-// polytomy, in the tree's left-to-right order so sisters stay adjacent.
+// The species are listed here flat; the fan's topology and split dates are the
+// curated dated tree of splits.ts (layout.ts), not the tiles' internal nodes.
 //
 // Added here (not in the tiles): common names, and generation lengths for
 // species without a curated history. Living species use the IUCN Red List

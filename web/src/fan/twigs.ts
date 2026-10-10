@@ -199,7 +199,7 @@ export class TwigModel {
     const lin = this.b.unit;
     if (this.mode === 'linear') return lin;
     const w = laneAt(this.b, y).w;
-    const n = this.b.pop.stepAt(Math.min(this.rec.t0, this.time.ageAt(y))).n;
+    const n = this.b.pop.stepAt(Math.min(this.b.t0, this.time.ageAt(y))).n;
     return w > 0 && n > 0 ? w / n : lin;
   }
 
@@ -234,7 +234,7 @@ export class TwigModel {
     let v = this.strides.get(g);
     if (v === undefined) {
       if (this.strides.size > 50000) this.strides.clear();
-      this.strides.set(g, (v = Math.max(1, Math.round(this.b.pop.stepAt(Math.min(this.rec.t0, this.ageOf((g + 0.5) * this.GL))).n))));
+      this.strides.set(g, (v = Math.max(1, Math.round(this.b.pop.stepAt(Math.min(this.b.t0, this.ageOf((g + 0.5) * this.GL))).n))));
     }
     return v;
   }
@@ -286,7 +286,8 @@ export class TwigModel {
 
   /** Is a twig in the green lane (alive now, or on a green slot at its birth: its line goes on)? */
   isGreen(t: Twig): boolean {
-    if (this.rec.extinct) return false;
+    // (An extinct species' own column is all line ended; below its split it is a slice of the parent's.)
+    if (this.rec.extinct && t.yBirth < this.b.splitY) return false;
     return t.alive || t.K < this.greenSlots(t.yBirth);
   }
 
@@ -569,6 +570,9 @@ function strandPath(v: TwigView, m: TwigModel, K: number, y0: number, y1: number
   if (m.mode !== 'linear') {
     for (const y of m.b.steps.lines(m.b, lo, hi, 400) ?? []) brk.push([y, true]);
     for (let k = 1; k < 8; k++) brk.push([lo + ((hi - lo) * k) / 8, false]);
+  } else {
+    // (Linear: a slot is one x within a column; it shifts only at the jogs, the splits.)
+    for (const sg of m.b.path) if (sg.y > lo && sg.y < hi) brk.push([sg.y, true]);
   }
   brk.sort((a, b) => (y1 > y0 ? a[0] - b[0] : b[0] - a[0]));
   let p = v.toScreen(m.slotX(K, y0), y0);
@@ -704,9 +708,9 @@ interface Stretch {
 
 /** The column's stretches of constant width (the gray edge's step lines) between yTop < yBot. */
 function stretches(v: TwigView, m: TwigModel, yTop: number, yBot: number): Stretch[] {
-  // (Also cut at the fork and the species' first appearance: below it, an extinct species' column is its founders' ancestors.)
-  const y0 = m.time.y(m.rec.t0);
-  const cuts = [yTop, ...(m.b.steps.lines(m.b, yTop, yBot, 2000) ?? []), ...[0, y0].filter((y) => y > yTop && y < yBot), yBot].sort((a, b) => a - b);
+  // (The step lines include the splits: below its own, a strand is a slice of the parent column.)
+  const y0 = m.b.splitY;
+  const cuts = [yTop, ...(m.b.steps.lines(m.b, yTop, yBot, 2000) ?? []), yBot].sort((a, b) => a - b);
   const out: Stretch[] = [];
   for (let c = 0; c + 1 < cuts.length; c++) {
     const ym = (cuts[c] + cuts[c + 1]) / 2;
