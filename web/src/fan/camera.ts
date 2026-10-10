@@ -237,7 +237,6 @@ export class FanCamera {
       this.clampPan();
     }
     c.ty = c.sy;
-    this.fan.steps.setScale(c.sy);
   }
 
   /** World x intervals holding drawn content at height y: the stem below the fork, else each branch. */

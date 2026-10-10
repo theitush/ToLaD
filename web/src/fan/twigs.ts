@@ -199,7 +199,7 @@ export class TwigModel {
     const lin = this.b.unit;
     if (this.mode === 'linear') return lin;
     const w = laneAt(this.b, y).w;
-    const n = this.b.pop.aliveAt(Math.min(this.rec.t0, this.time.ageAt(y)));
+    const n = this.b.pop.stepAt(Math.min(this.rec.t0, this.time.ageAt(y))).n;
     return w > 0 && n > 0 ? w / n : lin;
   }
 
@@ -226,14 +226,15 @@ export class TwigModel {
 
   /**
    * Generation g's stride: its slots, the individuals alive at the middle of
-   * its births (exact, so world-fixed: the same at every zoom). Its members
+   * its births (the population's step there, as the fan draws it: world-fixed,
+   * the same at every zoom). Its members
    * fold onto them (slot K holds K mod S + c·S).
    */
   stride(g: number): number {
     let v = this.strides.get(g);
     if (v === undefined) {
       if (this.strides.size > 50000) this.strides.clear();
-      this.strides.set(g, (v = Math.max(1, Math.round(this.b.pop.aliveAt(Math.min(this.rec.t0, this.ageOf((g + 0.5) * this.GL)))))));
+      this.strides.set(g, (v = Math.max(1, Math.round(this.b.pop.stepAt(Math.min(this.rec.t0, this.ageOf((g + 0.5) * this.GL))).n))));
     }
     return v;
   }

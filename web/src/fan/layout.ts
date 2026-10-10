@@ -1,7 +1,6 @@
 // The Panthera fan as a rectangular tree (a classic cladogram), fixed in world
 // units (y grows downwards, like the screen). Nothing here depends on the
-// camera except which step grid the gray edge is drawn on (Steps, below):
-// panning never changes a shape, and zooming only refines the steps.
+// camera: panning or zooming never changes a shape or a width.
 //
 //   - Each species is one straight vertical column (colLeft) from the bottom
 //     of the world up to its tip: "now" for the living, its last appearance
@@ -30,10 +29,8 @@
 // extinct one's column starts at its first appearance (its founders' ancestors
 // are the parent's). Through the stem, the clade's ancestors, every column
 // goes on at its founders' width (the stem is the sum of the founders). The
-// steps hold the width (and the green lane's) averaged over each step's
-// height, on nested log-time grids fixed in the world (a step holding the
-// species' first appearance is cut there): the area under each edge is
-// preserved step by step and a drop in N shows as a step.
+// steps are the population's own (population.ts: a generation each where N or
+// q changes), fixed in the world: a drop in N shows as a step at every zoom.
 
 import type { CladeRec, SpeciesRec } from './panthera';
 import { population, type Population } from './population';
@@ -53,16 +50,6 @@ export const JOG = 1;
 export const GAP_FRAC = 0.2;
 /** ... but at least this share of the stem's width. */
 export const MIN_GAP_FRAC = 0.025;
-/**
- * Steps of the gray edge: a step grid of level k cuts the time axis into 2^k
- * equal heights (equal log-time bands; the grids nest). The level shown is
- * the one whose steps are STEP_PX..2·STEP_PX tall on screen; over the top
- * STEP_BLEND of that octave the steps morph into the next grid's (each step
- * slides to its two halves' widths), so zooming never pops.
- */
-export const STEP_PX = 22;
-export const STEP_BLEND = 0.4;
-export const MAX_STEP_LEVEL = 36;
 /**
  * Time axis offset (years). Height is log10(years before present + C). With
  * C = 10 years the axis resolves the last decades and centuries; it is close
@@ -139,172 +126,67 @@ export interface Fan {
   x1: number;
 }
 
-const smooth = (t: number) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
-
-/** Adaptive Simpson's rule for ∫ f over [a, b] to about `tol`. */
-function integrate(f: (x: number) => number, a: number, b: number, tol: number): number {
-  const simpson = (fa: number, fm: number, fb: number, h: number) => (h / 6) * (fa + 4 * fm + fb);
-  const rec = (a: number, b: number, fa: number, fm: number, fb: number, whole: number, tol: number, depth: number): number => {
-    const m = (a + b) / 2;
-    const lm = (a + m) / 2;
-    const rm = (m + b) / 2;
-    const flm = f(lm);
-    const frm = f(rm);
-    const left = simpson(fa, flm, fm, m - a);
-    const right = simpson(fm, frm, fb, b - m);
-    if (depth <= 0 || Math.abs(left + right - whole) <= 15 * tol) return left + right + (left + right - whole) / 15;
-    return rec(a, m, fa, flm, fm, left, tol / 2, depth - 1) + rec(m, b, fm, frm, fb, right, tol / 2, depth - 1);
-  };
-  // Start from 8 panels so a narrow feature isn't missed.
-  let s = 0;
-  const n = 8;
-  for (let i = 0; i < n; i++) {
-    const x0 = a + ((b - a) * i) / n;
-    const x1 = a + ((b - a) * (i + 1)) / n;
-    const f0 = f(x0);
-    const f1 = f(x1);
-    const fm = f((x0 + x1) / 2);
-    s += rec(x0, x1, f0, fm, f1, simpson(f0, fm, f1, x1 - x0), tol / n, 14);
-  }
-  return s;
-}
-
 /**
- * The gray edge's step grids. Level k: steps of height TIME_H / 2^k from the
- * fork (y = 0) up to "now" (y = −TIME_H), so every grid's lines are lines of
- * the finer ones. A step's width is the branch's exact width averaged over the
- * step's height (clipped to the branch's span), cached forever: steps are
- * world-fixed. setScale picks the level for the time zoom on screen.
+ * The edges' steps, fixed in the world and never depending on the camera: each
+ * branch's population steps (population.ts Population.steps: a generation each
+ * where N or q changes, one step over each constant stretch). At every zoom a
+ * column's width at a height is the individuals alive then; steps that come out
+ * sub-pixel when zoomed out are drawn as they are, never averaged away.
  */
 export class Steps {
-  /** Level shown and how far it has morphed into level k + 1 (0–1). */
-  k = 0;
-  t = 0;
-  private readonly cache = new Map<FanBranch, Map<number, [number, number]>>();
+  /** Per branch: the step boundaries' world heights, ascending (top down), within its span. */
+  private readonly ys = new Map<FanBranch, Float64Array>();
 
   constructor(
     readonly time: TimeScale,
     readonly mode: WidthMode,
   ) {}
 
-  /** Pick the level for time zoom sy (px per world unit). */
-  setScale(sy: number): void {
-    const kf = Math.log2((TIME_H * sy) / STEP_PX);
-    if (!Number.isFinite(kf) || kf <= 0) {
-      this.k = 0;
-      this.t = 0;
-      return;
-    }
-    const k = Math.min(MAX_STEP_LEVEL, Math.floor(kf));
-    this.k = k;
-    this.t = k >= MAX_STEP_LEVEL ? 0 : smooth((kf - k - (1 - STEP_BLEND)) / STEP_BLEND);
-  }
-
-  /** Step height (world) of level k. */
-  static dy(k: number): number {
-    return TIME_H / Math.pow(2, k);
-  }
-
-  /** The finest level drawn right now (k, or k + 1 while morphing). */
-  get level(): number {
-    return this.t > 0 ? this.k + 1 : this.k;
-  }
-
-  /**
-   * Mean exact width of branch b over step i of level k, and of its green
-   * lane (0 if the branch isn't there): [w, gw]. A step that holds the
-   * species' first appearance is two steps, cut there (`side` 1: the part
-   * above it, 2: below; 0: the whole step): its span and its founders'
-   * ancestors are never averaged together.
-   */
-  mean(b: FanBranch, k: number, i: number, side = 0): [number, number] {
-    let m = this.cache.get(b);
-    if (!m) this.cache.set(b, (m = new Map()));
-    const key = (k * 2 ** 40 + i) * 3 + side; // i < 2^k ≤ 2^36
-    const hit = m.get(key);
-    if (hit !== undefined) return hit;
-    const d = Steps.dy(k);
-    const y0 = this.time.y(b.sp.t0);
-    let yLo = -i * d; // bottom of the step
-    let yHi = Math.max(b.tipY, -(i + 1) * d); // top, clipped to the tip
-    if (side === 1) yLo = Math.min(yLo, y0);
-    if (side === 2) yHi = Math.max(yHi, y0);
-    const v: [number, number] = [0, 0];
-    if (yHi < yLo) {
-      // Adaptive Simpson, split at the species' first appearance (where the width has a kink).
-      const cuts = [yHi, yLo];
-      if (y0 > yHi && y0 < yLo) cuts.splice(1, 0, y0);
-      for (const green of [false, true]) {
-        const f = green
-          ? (y: number) => {
-              const s = strandAt(b, this.time.ageAt(y), this.mode);
-              return s.w * s.f;
-            }
-          : (y: number) => strandAt(b, this.time.ageAt(y), this.mode).w;
-        // Where the green share is one constant (settled, or an extinct span) the green lane is exactly that share.
-        const q = green ? b.pop.constantGreen(this.time.ageAt(yHi), this.time.ageAt(yLo)) : null;
-        if (q !== null) {
-          v[1] = v[0] * q;
-          continue;
-        }
-        let s = 0;
-        for (let c = 0; c + 1 < cuts.length; c++) s += integrate(f, cuts[c], cuts[c + 1], b.width * (yLo - yHi) * 1e-7);
-        v[green ? 1 : 0] = Math.max(0, s / (yLo - yHi));
+  /** World heights of branch b's step boundaries (ascending), between its tip and the fork. */
+  bounds(b: FanBranch): Float64Array {
+    let v = this.ys.get(b);
+    if (!v) {
+      const out: number[] = [];
+      const ages = b.pop.steps.ages;
+      // (ages[0] is the tip; the last step runs on past its last boundary.)
+      for (let k = 1; k < ages.length; k++) {
+        if (!Number.isFinite(ages[k])) continue;
+        const y = this.time.y(ages[k] / 1e6);
+        if (y > b.tipY && y < 0) out.push(y);
       }
-      v[1] = Math.min(v[1], v[0]);
+      v = Float64Array.from(out.sort((p, q) => p - q));
+      this.ys.set(b, v);
     }
-    if (m.size > 50000) m.clear();
-    m.set(key, v);
     return v;
   }
 
-  /** Index of the level-k step holding world y (−TIME_H ≤ y < 0). */
-  static index(k: number, y: number): number {
-    return Math.max(0, Math.min(2 ** k - 1, Math.floor(-y / Steps.dy(k))));
-  }
-
-  /** Stepped width of branch b at world y and of its green lane, at the current level (blended while morphing): [w, gw]. */
+  /** Width of branch b at world y and of its green lane: [w, gw] (the step there). */
   lanesAt(b: FanBranch, y: number): [number, number] {
     if (y >= 0) return [b.baseW, b.baseW * b.baseQ];
     if (y < b.tipY) return [0, 0];
-    // (Which side of the species' first appearance: a step holding it is cut there.)
-    const side = y < this.time.y(b.sp.t0) ? 1 : 2;
-    const at = (k: number) => {
-      const i = Steps.index(k, y);
-      const y0 = this.time.y(b.sp.t0);
-      return this.mean(b, k, i, y0 > -(i + 1) * Steps.dy(k) && y0 < -i * Steps.dy(k) ? side : 0);
-    };
-    const a = at(this.k);
-    if (this.t <= 0) return a;
-    const k1 = this.k + 1;
-    const c = at(k1);
-    return [a[0] + (c[0] - a[0]) * this.t, a[1] + (c[1] - a[1]) * this.t];
+    const { n, q } = b.pop.stepAt(this.time.ageAt(y));
+    const w = n > 0 ? b.unit * g(n, this.mode) : 0;
+    return [w, w * q];
   }
 
-  /** Stepped width of branch b at world y (lanesAt's first). */
+  /** Width of branch b at world y (lanesAt's first). */
   widthAt(b: FanBranch, y: number): number {
     return this.lanesAt(b, y)[0];
   }
 
   /**
-   * World heights of the step lines drawn now, from y0 down to y1 (y0 < y1),
-   * within the branch's span; at most `max` of them (null if there are more).
+   * World heights of branch b's step lines from y0 down to y1 (y0 < y1),
+   * ascending; at most `max` of them (null if there are more).
    */
   lines(b: FanBranch, y0: number, y1: number, max = 4000): number[] | null {
-    const k = this.level;
-    const d = Steps.dy(k);
-    const lo = Math.max(y0, b.tipY);
-    const hi = Math.min(y1, 0);
+    const v = this.bounds(b);
     const out: number[] = [];
-    if (hi <= lo) return out;
-    const i0 = Math.ceil(-hi / d);
-    const i1 = Math.floor(-lo / d);
-    if (i1 - i0 + 1 > max) return null;
-    for (let i = i1; i >= i0; i--) {
-      const y = -i * d;
-      if (y > lo && y < hi) out.push(y);
+    for (const y of v) {
+      if (y <= y0) continue;
+      if (y >= y1) break;
+      out.push(y);
     }
-    return out;
+    return out.length > max ? null : out;
   }
 }
 

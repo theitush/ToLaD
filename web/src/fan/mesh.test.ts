@@ -144,7 +144,8 @@ describe('one mesh for both lanes: the lane only colours', () => {
         // The lanes' boundary of the instance's own stretch (the lanes step with N(t) and q(t)).
         const ym = c.toWorld(0, (x.y0 + x.y1) / 2)[1];
         const L = mm.lanes(ym);
-        if (L.gw > 0 && x.x0 > 0 && x.x1 < c.w) expect(x.xG).toBeCloseTo(c.toScreen(L.left + L.gw, ym)[0], 2);
+        // (Zoomed out, a generation's step can be far under a pixel: its midpoint is its boundary, either side.)
+        if (L.gw > 0 && x.x0 > 0 && x.x1 < c.w && x.y1 - x.y0 > 1e-3) expect(x.xG).toBeCloseTo(c.toScreen(L.left + L.gw, ym)[0], 2);
       }
     }
   });

@@ -1,23 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { g, gapBetween, GAP_FRAC, laneAt, layoutFan, leftAt, MIN_GAP_FRAC, Steps, strandAt, TIME_H, type FanBranch, type Fan, type WidthMode } from './layout';
+import { g, gapBetween, GAP_FRAC, laneAt, layoutFan, leftAt, MIN_GAP_FRAC, strandAt, type FanBranch, type Fan, type WidthMode } from './layout';
 import { PANTHERA } from './panthera';
 
 /** World y of a branch's first appearance. */
 const yFirst = (fan: Fan, b: FanBranch) => fan.time.y(b.sp.t0);
-
-/** The piece of level-k step i holding y: the step, cut at the species' first appearance. */
-function piece(fan: Fan, b: FanBranch, k: number, y: number): [number, number] {
-  const d = Steps.dy(k);
-  const i = Steps.index(k, y);
-  let lo = Math.max(b.tipY, -(i + 1) * d);
-  let hi = -i * d;
-  const y0 = yFirst(fan, b);
-  if (y0 > lo && y0 < hi) {
-    if (y < y0) hi = y0;
-    else lo = y0;
-  }
-  return [lo, hi];
-}
 
 describe('fan strands: width = alive at the time', () => {
   for (const mode of ['log', 'linear'] as WidthMode[]) {
@@ -60,7 +46,7 @@ describe('rectangular fan: fixed, straight, honest', () => {
   };
 
   for (const mode of ['log', 'linear'] as WidthMode[]) {
-    it(`width = individuals alive × one fixed scale, at random heights and zooms (${mode})`, () => {
+    it(`width = individuals alive × one fixed scale: the population's own steps, one per generation where N or q changes (${mode})`, () => {
       const fan = layoutFan(PANTHERA, mode);
       const rnd = seeded(5);
       // One width per individual (linear) or per decade of individuals (log), the same for every branch:
@@ -71,70 +57,48 @@ describe('rectangular fan: fixed, straight, honest', () => {
         expect(b.width / g(b.pop.max, mode)).toBeCloseTo(unit, 12);
       }
       for (let trial = 0; trial < 300; trial++) {
-        const sy = Math.exp(Math.log(0.3) + rnd() * Math.log(1e5 / 0.3));
-        fan.steps.setScale(sy);
-        if (fan.steps.t > 0) continue;
         const b = fan.branches[Math.floor(rnd() * fan.branches.length)];
         const y = b.tipY * (0.001 + 0.998 * rnd());
         const L = laneAt(b, y);
-        // The step's width is the branch's exact width (its individuals) at some height of its step (cut at the first appearance).
-        const [lo, hi] = piece(fan, b, fan.steps.k, y);
-        let mn = Infinity;
-        let mx = -Infinity;
-        for (let j = 0; j <= 400; j++) {
-          const w = strandAt(b, fan.time.ageAt(lo + ((hi - lo) * j) / 400), mode).w;
-          mn = Math.min(mn, w);
-          mx = Math.max(mx, w);
+        const age = fan.time.ageAt(y);
+        const st = b.pop.stepAt(age);
+        expect(L.w).toBeCloseTo(b.unit * g(st.n, mode), 12);
+        expect(L.gw).toBeCloseTo(L.w * st.q, 12);
+        if (b.sp.extinct) {
+          if (y < yFirst(fan, b)) expect(L.gw).toBe(0);
+          continue;
         }
-        expect(L.w).toBeGreaterThanOrEqual(mn * (1 - 1e-6) - 1e-12);
-        expect(L.w).toBeLessThanOrEqual(mx * (1 + 1e-6) + 1e-12);
-        expect(L.gw).toBeLessThanOrEqual(L.w * (1 + 1e-12));
-        if (b.sp.extinct && y < yFirst(fan, b)) expect(L.gw).toBe(0);
+        // A living species' step is its generation's: N at the generation's young edge (the history's
+        // own points at segment boundaries), and its genealogy share.
+        const GL = b.sp.genYears;
+        const k = Math.floor((age * 1e6) / GL);
+        if (age < b.sp.t0) expect(st.n).toBeCloseTo(b.pop.aliveAt((k * GL) / 1e6), 6);
+        expect(st.q).toBeCloseTo(b.pop.greenAt(age), 9);
       }
     });
 
-    it(`the steps keep the area: individuals × height summed over steps = the exact integral (${mode})`, () => {
+    it(`the steps are few and fixed: constant stretches are one step (${mode})`, () => {
       const fan = layoutFan(PANTHERA, mode);
-      for (const k of [2, 5, 9]) {
-        fan.steps.setScale((Math.pow(2, k) * 22 * 1.05) / TIME_H);
-        expect(fan.steps.k).toBe(k);
-        expect(fan.steps.t).toBe(0);
-        const d = Steps.dy(k);
-        for (const b of fan.branches) {
-          const y0 = yFirst(fan, b);
-          let stepped = 0;
-          let steppedG = 0;
-          for (let i = 0; -i * d > b.tipY; i++) {
-            const top = Math.max(b.tipY, -(i + 1) * d);
-            const cuts = [top, -i * d];
-            if (y0 > top && y0 < -i * d) cuts.splice(1, 0, y0);
-            for (let c = 0; c + 1 < cuts.length; c++) {
-              const L = laneAt(b, (cuts[c] + cuts[c + 1]) / 2);
-              stepped += L.w * (cuts[c + 1] - cuts[c]);
-              steppedG += L.gw * (cuts[c + 1] - cuts[c]);
-            }
-          }
-          let exact = 0;
-          let exactG = 0;
-          const N = 20000;
-          const h = -b.tipY / N;
-          for (let j = 0; j < N; j++) {
-            const s = strandAt(b, fan.time.ageAt(-(j + 0.5) * h), mode);
-            exact += s.w * h;
-            exactG += s.w * s.f * h;
-          }
-          expect(stepped / exact).toBeCloseTo(1, 3);
-          if (exactG > 0) expect(steppedG / exactG).toBeCloseTo(1, 2);
-          else expect(steppedG).toBe(0);
+      for (const b of fan.branches) {
+        const v = fan.steps.bounds(b);
+        expect(v.length).toBeLessThan(80);
+        for (let k = 1; k < v.length; k++) expect(v[k]).toBeGreaterThan(v[k - 1]);
+        // Neighbouring steps differ (else they would be one).
+        for (let k = 0; k < v.length; k++) {
+          const above = laneAt(b, k ? (v[k - 1] + v[k]) / 2 : (b.tipY + v[k]) / 2);
+          const below = laneAt(b, k + 1 < v.length ? (v[k] + v[k + 1]) / 2 : Math.min(0, v[k] + 1e-6) - 1e-9);
+          expect(above.w !== below.w || above.gw !== below.gw).toBe(true);
         }
       }
+      // The lion's recent crash is generation by generation, its deep past one step.
+      const lion = fan.branches.find((b) => b.sp.common === 'Lion')!;
+      expect(fan.steps.bounds(lion).length).toBeGreaterThan(10);
     });
 
     it(`the left edge is straight, the lanes' edges step; the gaps are fixed (${mode})`, () => {
       const fan = layoutFan(PANTHERA, mode);
       const W = fan.trunkWidth;
       const bs = fan.branches;
-      fan.steps.setScale(3);
       // The stem: the columns go straight on down below the fork (no jog), spanning the stalks.
       for (const b of bs) expect(b.baseLeft).toBe(b.colLeft);
       expect(bs[0].colLeft).toBeCloseTo(fan.x0, 9);
@@ -159,13 +123,10 @@ describe('rectangular fan: fixed, straight, honest', () => {
             expect(L.gw).toBeCloseTo(b.baseW * b.baseQ, 12);
           }
         }
-        // Both edges are constant within each step (vertical), changing only at step lines
-        // (and at the species' first appearance).
-        const d = Steps.dy(fan.steps.level);
-        const y0 = yFirst(fan, b);
-        for (let i = 0; -(i + 1) * d > b.tipY; i += 1) {
-          if (y0 > -(i + 1) * d && y0 < -i * d) continue;
-          const ls = [0.01, 0.3, 0.5, 0.7, 0.99].map((u) => laneAt(b, -(i + u) * d));
+        // Both edges are constant within each step (vertical), changing only at step lines.
+        const v = [b.tipY, ...fan.steps.bounds(b), 0];
+        for (let i = 0; i + 1 < v.length; i++) {
+          const ls = [0.01, 0.3, 0.5, 0.7, 0.99].map((u) => laneAt(b, v[i] + (v[i + 1] - v[i]) * u));
           for (const l of ls) {
             expect(l.w).toBe(ls[0].w);
             expect(l.gw).toBe(ls[0].gw);

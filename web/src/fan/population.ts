@@ -36,8 +36,14 @@
 // within a few generations; a bottleneck n_s ≪ n before it leaves only
 // ~2·n_s·q of the larger population green (the whole column narrows, the green
 // most), recovering over ~log2(n/n_s) generations further back; a decline
-// towards now (n_k < n_{k+1}) holds q below Q_STAR, growth above it. q(t) is
-// interpolated linearly between generation boundaries. Extinct species: 0 over
+// towards now (n_k < n_{k+1}) holds q below Q_STAR, growth above it.
+//
+// The steps (what the fan draws, fixed in the world, never depending on the view):
+// generation k back from now, ages [k·GL, (k+1)·GL), holds n_k = N at its young
+// edge (the history's own points at the segment boundaries) and q = h_k; steps
+// with the same n and q merge, so a constant stretch is one step. Past the
+// last change (the baseline, settled q) one step runs on to the species'
+// first appearance and, for a living one, its founders below it. Extinct species: 0 over
 // their span. Below a species' first appearance its founders are part of the
 // ancestral population, green by the same rule through any living daughter:
 // the living species' own settled value, Q_STAR for an extinct one's founders.
@@ -111,7 +117,7 @@ export class Population {
       this.h = new Float64Array([0]);
       this.qBase = Q_STAR;
     } else {
-      const ago = (k: number) => (k + 0.5) * GL;
+      const ago = (k: number) => k * GL;
       // Generations over which the size changes (the history's recent segments), counted back from now.
       let varGens = 0;
       if (c) {
@@ -135,26 +141,69 @@ export class Population {
     return this.nConst;
   }
 
-  /** The green share if it is one constant over ages [a0, a1] (Ma, a0 ≤ a1, not straddling the first appearance), else null. */
-  constantGreen(a0: number, a1: number): number | null {
+  /**
+   * The steps the fan draws: boundaries in years before present (ascending,
+   * from the tip; the last step runs on past the last boundary), with the
+   * individuals alive (n) and the share with living descendants (q) of each.
+   */
+  get steps(): { ages: Float64Array; n: Float64Array; q: Float64Array } {
+    if (this._steps) return this._steps;
     const sp = this.sp;
-    if (a0 < sp.t0 && a1 > sp.t0) return null;
-    if (sp.extinct) return a0 >= sp.t0 ? this.qBase : 0;
-    if (a0 >= sp.t0 || a0 * 1e6 >= (this.h.length - 1) * this.GL) return this.qBase;
-    return null;
+    const ages: number[] = [sp.t1 * 1e6];
+    const n: number[] = [];
+    const q: number[] = [];
+    const push = (a1: number, nn: number, qq: number) => {
+      const k = n.length - 1;
+      if (k >= 0 && Math.abs(n[k] - nn) <= 1e-12 * Math.max(nn, 1) && Math.abs(q[k] - qq) <= 1e-12) {
+        ages[k + 1] = a1;
+        return;
+      }
+      n.push(nn);
+      q.push(qq);
+      ages.push(a1);
+    };
+    if (sp.extinct || !(sp.alive > 0)) {
+      push(sp.t0 * 1e6, this.aliveAt((sp.t0 + sp.t1) / 2), 0);
+    } else {
+      const GL = this.GL;
+      const span = (sp.t0 - sp.t1) * 1e6;
+      const c = sp.births;
+      let varGens = 0;
+      if (c) for (let j = c.segments.length - 1; j > 0; j--) varGens += c.segments[j].generations;
+      const K = Math.min(Math.floor(span / GL), Math.max(varGens, this.h.length - 1));
+      for (let k = 0; k < K; k++) push((k + 1) * GL, this.aliveAt((k * GL) / 1e6), this.h[Math.min(k, this.h.length - 1)]);
+      // The baseline on to the first appearance (and its founders below, held constant).
+      push(Infinity, this.founders, this.qBase);
+    }
+    return (this._steps = { ages: Float64Array.from(ages), n: Float64Array.from(n), q: Float64Array.from(q) });
   }
 
-  /** Share of those alive at `ageMa` with living descendants today (0–1). */
+  private _steps?: { ages: Float64Array; n: Float64Array; q: Float64Array };
+
+  /** The step drawn at age `ageMa` (Ma): the individuals alive and the green share; 0 outside the column. */
+  stepAt(ageMa: number): { n: number; q: number } {
+    const sp = this.sp;
+    if (ageMa < sp.t1) return { n: 0, q: 0 };
+    if (sp.extinct && ageMa > sp.t0) return { n: 0, q: 0 };
+    const { ages, n, q } = this.steps;
+    const yrs = ageMa * 1e6;
+    let lo = 0;
+    let hi = n.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (ages[mid + 1] > yrs) hi = mid;
+      else lo = mid + 1;
+    }
+    return { n: n[lo], q: q[lo] };
+  }
+
+  /** Share of those alive at `ageMa` with living descendants today (0–1): h_k of its generation, as drawn. */
   greenAt(ageMa: number): number {
     const sp = this.sp;
     if (sp.extinct) return ageMa > sp.t0 ? this.qBase : 0;
     if (ageMa >= sp.t0) return this.qBase;
     if (ageMa < sp.t1) return 0;
-    const x = Math.max(0, (ageMa * 1e6) / this.GL);
-    const k = Math.floor(x);
-    const h = this.h;
-    if (k + 1 >= h.length) return h[h.length - 1];
-    return h[k] + (h[k + 1] - h[k]) * (x - k);
+    return this.stepAt(ageMa).q;
   }
 }
 

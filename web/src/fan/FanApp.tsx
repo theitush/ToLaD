@@ -101,7 +101,8 @@ export function populationAt(sp: SpeciesRec, ageMa: number): { when: string; ali
   const a = Math.min(Math.max(ageMa, sp.t1), sp.extinct ? sp.t0 : Infinity);
   const yrs = a * 1e6;
   const when = yrs < 0.5 ? 'now' : sp.extinct && Math.abs(a - sp.t1) < 1e-9 ? `at its end, ${formatYearsAgo(yrs)}` : formatYearsAgo(yrs);
-  return { when, alive: p.aliveAt(a), green: p.greenAt(a) };
+  const st = p.stepAt(a);
+  return { when, alive: st.n, green: st.q };
 }
 
 export function SpeciesCard({ sp, onClose, open, ageMa }: { sp: SpeciesRec; onClose: () => void; open?: boolean; ageMa?: number }) {

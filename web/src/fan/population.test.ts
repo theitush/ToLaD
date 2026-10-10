@@ -87,7 +87,9 @@ describe('the Panthera populations', () => {
     for (const s of PANTHERA.species.filter((s) => !s.extinct)) {
       const p = population(s);
       expect(p.greenAt(0)).toBe(1);
-      expect(p.greenAt((s.genYears * 0.5) / 1e6)).toBeLessThan(1);
+      // (The newest generation's step is the living's: all green; the one before it, less.)
+      expect(p.greenAt((s.genYears * 0.5) / 1e6)).toBe(1);
+      expect(p.greenAt((s.genYears * 1.5) / 1e6)).toBeLessThan(1);
       expect(p.greenAt(0.01)).toBeCloseTo(Q_STAR, 6);
     }
   });

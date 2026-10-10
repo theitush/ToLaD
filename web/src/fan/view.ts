@@ -8,7 +8,7 @@ import { formatAge, formatCount } from '../data/names';
 import { Input, type InputHandlers } from '../engine/input';
 import { clipPoly, FanCamera, STRAND_PX, type Camera } from './camera';
 import { EDGE_DASH, edgeMarks, edgeXAt, dotAlphas, GRADE_COLOR, historySpans, pointAgo, toScreenSpans, type ScreenSpan, type Span } from './history';
-import { JOG, laneAt, layoutFan, leftAt, STEM_FADE_MA, Steps, strandAt, type Fan, type FanBranch, type WidthMode } from './layout';
+import { JOG, laneAt, layoutFan, leftAt, STEM_FADE_MA, strandAt, type Fan, type FanBranch, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01 } from './meshgl';
 import { drawTwigs, kLogAt, laneDim, LINEAGE, LIVING, TWIG_GRAY, TWIG_WITHERED, TwigModel, type IndInfo, type TwigStats } from './twigs';
@@ -553,11 +553,15 @@ export class FanView implements InputHandlers {
   lanePoints(b: FanBranch, hw: number): RibbonPt[] {
     const yb = this.fan.trunkBottom.y;
     const steps = this.fan.steps;
-    const d = Steps.dy(steps.level);
     const [, sTop] = this.toWorld(0, -20);
     const [, sBot] = this.toWorld(0, this.h + 20);
     const ys = new Set<number>([yb, 0, -JOG, b.tipY, this.fan.time.y(b.sp.t0)]);
-    for (const y of steps.lines(b, sTop - d, sBot + d) ?? []) ys.add(y);
+    // Every step line on screen and the nearest one beyond each edge (the stretches reaching off screen).
+    const all = steps.bounds(b);
+    for (let k = 0; k < all.length; k++) {
+      const y = all[k];
+      if ((y >= sTop && y <= sBot) || (y < sTop && !(all[k + 1] < sTop)) || (y > sBot && !(all[k - 1] > sBot))) ys.add(y);
+    }
     if (sBot < yb && sBot > 0) ys.add(sBot);
     const sorted = [...ys].filter((y) => y >= b.tipY && y <= yb).sort((p, q) => q - p);
     // Spine at left + hw: the ribbon spans offsets [hw - w, hw] to its left (nx = -1).
@@ -796,7 +800,7 @@ export class FanView implements InputHandlers {
     const lines = [
       `width ×${(c.sx / h.sx).toPrecision(4)}  time ×${(c.sy / h.sy).toPrecision(4)} (asked ×${(c.ty / h.sy).toPrecision(3)})`,
       `screen ${formatYearsAgo(yrs).replace(' ago', '')} · top ${formatYearsAgo(Math.max(0, this.camera.years(yTop)))}`,
-      `${this.mode === 'linear' ? `${perPx.toPrecision(3)} individuals/px` : `${perPx.toPrecision(3)} log units/px`} · steps L${this.fan.steps.k}+${this.fan.steps.t.toFixed(2)}`,
+      `${this.mode === 'linear' ? `${perPx.toPrecision(3)} individuals/px` : `${perPx.toPrecision(3)} log units/px`}`,
     ];
     const ctx = this.ctx;
     ctx.save();
@@ -838,8 +842,8 @@ export class FanView implements InputHandlers {
     const when = yrs < 0.5 ? 'now' : formatYearsAgo(yrs);
     const lines = [
       `${sp.common}${sp.extinct ? ' (extinct)' : ''}`,
-      `~${formatCount(best.pop.aliveAt(ageMa))} alive ${when}`,
-      `${Math.round(best.pop.greenAt(ageMa) * 100)}% with living descendants`,
+      `~${formatCount(best.pop.stepAt(ageMa).n)} alive ${when}`,
+      `${Math.round(best.pop.stepAt(ageMa).q * 100)}% with living descendants`,
       `${gens} of ${fmtInt(m.G)}`,
       `born ~${formatYearsAgo(m.bornAgo(st.g1))}${st.g0 === st.g1 ? '' : ` to ~${formatYearsAgo(m.bornAgo(st.g0))}`}`,
     ];

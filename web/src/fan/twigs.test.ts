@@ -53,14 +53,12 @@ describe('width = individuals', () => {
   it('slots at a height = the individuals alive there; each generation folds onto them', () => {
     for (const f of [fanLin, fanLog]) {
       const m = lion(f);
-      // (Zoomed in on time: the steps resolve each generation.)
-      f.steps.setScale(1e6);
       for (const g of [10, 5000, m.G - 60, m.G - 12, m.G - 1]) {
         const y = m.row(g).y;
         const n = m.size(g);
         const S = m.stride(g);
         // The stride is the alive at its births (world-fixed), about the slots drawn there.
-        expect(S).toBe(Math.max(1, Math.round(aliveAt(m.rec, m.ageOf((g + 0.5) * m.GL)))));
+        expect(S).toBe(Math.max(1, Math.round(m.b.pop.stepAt(m.ageOf((g + 0.5) * m.GL)).n)));
         expect(m.totalSlots(y) / S).toBeGreaterThan(0.9);
         expect(m.totalSlots(y) / S).toBeLessThan(1.1);
         // About births ÷ alive (≈ 2: a life is half a generation) of g share a slot.
@@ -74,7 +72,6 @@ describe('width = individuals', () => {
           expect(m.slotIndividuals(K, g, y).map((s) => s.i)).toContain(i);
         }
       }
-      f.steps.setScale(0);
     }
   });
 
