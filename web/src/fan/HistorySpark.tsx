@@ -4,7 +4,7 @@
 // its source.
 
 import { useState } from 'react';
-import { GRADE_COLOR, styleBetween, type SpanStyle } from './history';
+import { GRADE_COLOR, GRADE_WORD, styleBetween, type SpanStyle } from './history';
 import type { HistoryRec } from './panthera';
 
 const W = 340;
@@ -103,6 +103,8 @@ export function HistorySpark({ h, open: open0 = false }: { h: HistoryRec; open?:
   const nTicks = popTicks(ylo, yhi);
   // Year ticks; "now" at the right end if the history runs to it (a tick too close to it gives way).
   const yTicks = yearTicks(x0, x1).filter((y) => !held || X(x1) - X(y) > 30);
+  // The dots' colours, in plain words: only the grades this history uses.
+  const grades = ['A', 'B', 'C', 'D'].filter((g) => pts.some((p) => p.grade === g));
   return (
     <div className="hist">
       <button
@@ -112,6 +114,7 @@ export function HistorySpark({ h, open: open0 = false }: { h: HistoryRec; open?:
         aria-label={`Population history, ${pts.length} points: ${open ? 'hide' : 'show'} sources`}
         onClick={() => setOpen(!open)}
       >
+        <span className="spark-h small">Population over time</span>
         <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-hidden="true">
           <g stroke="#c9d4cd" strokeWidth="1.3" fill="none">
             {lines}
@@ -152,10 +155,18 @@ export function HistorySpark({ h, open: open0 = false }: { h: HistoryRec; open?:
             )}
           </g>
         </svg>
-        <span className="dim small">
-          population (log) · {pts.length} points{h.use !== 'counts' && ' · not used for widths'} · {open ? 'hide sources ▴' : 'sources ▾'}
+        <span className="spark-foot small">
+          <span className="gkey" aria-label="dot colours: how each number was got">
+            {grades.map((g) => (
+              <span key={g} data-key={g}>
+                <span className="gdot" style={{ background: GRADE_COLOR[g] }} /> {GRADE_WORD[g]}
+              </span>
+            ))}
+          </span>
+          <span className="dim">{open ? 'hide sources ▴' : `${pts.length} sources ▾`}</span>
         </span>
       </button>
+      {open && h.use !== 'counts' && <div className="dim small">These numbers are shown for reference; the tree's widths use the model.</div>}
       {open && (
         <ol className="hist-list">
           {pts.map((p, k) => (

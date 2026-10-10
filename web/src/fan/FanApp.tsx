@@ -3,11 +3,12 @@
 
 import * as MeshMirror from './mesh';
 import { useEffect, useRef, useState } from 'react';
-import { formatAge, formatCount } from '../data/names';
+import { formatCount } from '../data/names';
 import { HistorySpark } from './HistorySpark';
 import type { WidthMode } from './layout';
 import { PANTHERA, type SpeciesRec } from './panthera';
 import { population } from './population';
+import { statusOf } from './status';
 import { FanView, fmtInt, formatYearsAgo, type IndInfo, type Selection } from './view';
 
 declare global {
@@ -106,62 +107,151 @@ export function formatSpan(years: number): string {
   return `~${Math.round(years)} yr`;
 }
 
+const WORDS: [number, string][] = [
+  [1e12, 'trillion'],
+  [1e9, 'billion'],
+  [1e6, 'million'],
+];
+
+/** A count in words to `sig` significant figures: "352,000", "1.4 million", "600 billion". */
+export function plainCount(n: number, sig = 3): string {
+  if (!(n > 0)) return '0';
+  const r = Number(n.toPrecision(sig));
+  for (const [v, w] of WORDS) if (r >= v) return `${Number((r / v).toPrecision(sig))} ${w}`;
+  return r.toLocaleString('en-US');
+}
+
+/** A rough count: one significant figure (two below 2 × 10^k): "600 billion", "1.4 trillion". */
+export function roughCount(n: number): string {
+  if (!(n > 0)) return '0';
+  const m = n / Math.pow(10, Math.floor(Math.log10(n)));
+  return plainCount(n, m < 2 ? 2 : 1);
+}
+
+/** Years before present in words: "70 years ago", "11,700 years ago", "3.8 million years ago". */
+export function plainAgo(years: number): string {
+  if (years < 0.5) return 'today';
+  if (years < 1e4) return `${Math.round(years).toLocaleString('en-US')} years ago`;
+  return `${plainCount(years, years < 1e6 ? 3 : 2)} years ago`;
+}
+
+/** "lions", "snow leopards", "Yucatán cave cats": the common name, plural, mid-sentence. */
+export function pluralName(sp: SpeciesRec): string {
+  // (Names starting with a proper noun or adjective keep their capital.)
+  const c = /^(Yucatán|Longdan|European)\b/.test(sp.common) ? sp.common : sp.common[0].toLowerCase() + sp.common.slice(1);
+  return `${c}s`;
+}
+
+/** How far off a data grade can be (research/02-population-estimates.md). */
+const GRADE_MEANS: Record<string, string> = {
+  A: 'a census with stated error, within about 2–3×',
+  B: 'a careful estimate, within about 10×',
+  C: 'a rough figure, within about 100×',
+  D: 'an illustrative model, could be off 1,000× or more',
+};
+
 /**
  * The population at a time (Ma) as the card words it: how many were alive, and
- * the shares with living descendants today and whose line ended.
+ * the share with living descendants today.
  */
-export function populationAt(sp: SpeciesRec, ageMa: number): { when: string; alive: number; green: number } {
+export function populationAt(sp: SpeciesRec, ageMa: number): { when: string; alive: number; green: number; now: boolean; end: boolean } {
   const p = population(sp);
   const a = Math.min(Math.max(ageMa, sp.t1), sp.extinct ? sp.t0 : Infinity);
   const yrs = a * 1e6;
-  const when = yrs < 0.5 ? 'now' : sp.extinct && Math.abs(a - sp.t1) < 1e-9 ? `at its end, ${formatYearsAgo(yrs)}` : formatYearsAgo(yrs);
+  const now = yrs < 0.5;
+  const end = sp.extinct && Math.abs(a - sp.t1) < 1e-9;
+  const when = now ? 'today' : end ? `at the end, ${plainAgo(yrs)}` : plainAgo(yrs);
   const st = p.stepAt(a);
-  return { when, alive: st.n, green: st.q };
+  return { when, alive: st.n, green: st.q, now, end };
+}
+
+export function StatusChip({ sp }: { sp: SpeciesRec }) {
+  const s = statusOf(sp);
+  if (!s) return null;
+  if (s.kind === 'prehistoric') return <span className="status prehistoric">{s.label}</span>;
+  return (
+    <span className={`status iucn-${s.code.toLowerCase()}`} title={`IUCN Red List: ${s.label} (${s.status.year} assessment)`}>
+      {s.label}
+    </span>
+  );
 }
 
 export function SpeciesCard({ sp, onClose, open, ageMa }: { sp: SpeciesRec; onClose: () => void; open?: boolean; ageMa?: number }) {
-  const span = `${formatAge(sp.t0)} – ${sp.extinct ? formatAge(sp.t1) : 'now'}`;
   const at = populationAt(sp, ageMa ?? sp.t1);
   const pct = (f: number) => `${Math.round(f * 100)}%`;
+  const st = statusOf(sp);
+  const lived = `from ${plainAgo(sp.t0 * 1e6)} to ${sp.extinct ? plainAgo(sp.t1 * 1e6) : 'today'}`;
   return (
     <div className="card-sp" onPointerDown={(e) => e.stopPropagation()}>
       <button type="button" className="x" onClick={onClose} aria-label="Close">
         ×
       </button>
       <div className="t">
-        <span>{sp.common}</span> <i>{sp.sci}</i>
+        <span>{sp.common}</span> <i>({sp.sci})</i>
       </div>
-      <div className="stats">
-        <span className={`lane ${sp.extinct ? 'extinct' : at.when === 'now' ? 'alive' : 'lineage'}`} /> <b>{formatCount(at.alive)}</b> <span>alive {at.when}</span>
-        <span className="range">
-          {pct(at.green)} have living descendants today · {pct(1 - at.green)} line ended
-        </span>
-        {at.when !== 'now' && !sp.extinct && (
-          <>
-            <span className="lane alive" /> <b>{formatCount(sp.alive)}</b> <span>alive now</span>
-          </>
+      <div className="facts">
+        <StatusChip sp={sp} />
+        <p className="lead">
+          <span className={`lane ${sp.extinct ? 'extinct' : at.now ? 'alive' : 'lineage'}`} />
+          <span>
+            <b>{plainCount(at.alive)}</b> alive {at.when}
+          </span>
+        </p>
+        {!sp.extinct && !at.now && <p className="sub">{pct(at.green)} have descendants alive today</p>}
+        {sp.extinct && !at.end && <p className="sub">Died out {plainAgo(sp.t1 * 1e6)}</p>}
+        {!sp.extinct && !at.now && (
+          <p className="lead">
+            <span className="lane alive" />
+            <span>
+              <b>{plainCount(sp.alive)}</b> alive today
+            </span>
+          </p>
         )}
-        <span className="range">
-          ~{formatCount(sp.ever)} born in total over {formatSpan((sp.t0 - sp.t1) * 1e6)} (model, grade {sp.grade}; range {formatCount(sp.everLo)} – {formatCount(sp.everHi)})
-        </span>
+        <p className="ever">
+          Roughly {roughCount(sp.ever)} {pluralName(sp)} have ever lived <span className="dim">(rough estimate)</span>
+        </p>
       </div>
-      <dl className="meta">
-        <div>
-          <dt>lived</dt>
-          <dd>{span}</dd>
-        </div>
-        <div>
-          <dt>generation</dt>
-          <dd>
-            ≈ {sp.genYears} y <span className="dim">({sp.genSource})</span>
-          </dd>
-        </div>
-        <div>
-          <dt>data grade</dt>
-          <dd>{sp.grade}</dd>
-        </div>
-      </dl>
       {sp.history && sp.history.points.length > 0 && <HistorySpark key={sp.gid} h={sp.history} open={open} />}
+      <details className="more" key={`more-${sp.gid}`}>
+        <summary>Details</summary>
+        <dl>
+          <dt>Lived</dt>
+          <dd>{lived}</dd>
+          <dt>Generation</dt>
+          <dd>
+            about {Number(sp.genYears.toPrecision(2))} years <span className="dim">({sp.genSource})</span>
+          </dd>
+          <dt>Ever lived</dt>
+          <dd>
+            ~{formatCount(sp.ever)}, range {formatCount(sp.everLo)} – {formatCount(sp.everHi)} over {plainAgo((sp.t0 - sp.t1) * 1e6).replace(/ ago$/, '')}
+          </dd>
+          <dt>Data grade</dt>
+          <dd>
+            {sp.grade}: {GRADE_MEANS[sp.grade] ?? 'unknown'}
+          </dd>
+          <dt>Method</dt>
+          <dd>
+            Modelled, not counted: births per generation × lifespan ÷ generation length gives those alive at a time
+            {sp.births ? ', following the population history (the chart and its sources), its earliest level held back to the species’ start' : ', held constant over the species’ span'}.
+            The share with descendants alive today comes from a randomly mixing family tree, counted back one generation at a time.
+          </dd>
+          <dt>Status</dt>
+          <dd>
+            {st?.kind === 'iucn' ? (
+              <>
+                IUCN Red List: {st.label} ({st.code}), {st.status.year} assessment ·{' '}
+                <a href={st.status.url} target="_blank" rel="noopener noreferrer">
+                  {st.status.cite}
+                </a>
+              </>
+            ) : st?.kind === 'prehistoric' ? (
+              'Known from fossils; died out before the Red List’s scope (extinctions since 1500 CE), so no IUCN category.'
+            ) : (
+              'No Red List category on file.'
+            )}
+          </dd>
+        </dl>
+      </details>
     </div>
   );
 }

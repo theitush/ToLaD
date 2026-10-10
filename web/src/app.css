@@ -462,45 +462,131 @@
   font-size: 17px;
   color: var(--ink-2);
 }
-.fan .card-sp .stats {
-  display: grid;
-  grid-template-columns: auto auto 1fr;
-  align-items: baseline;
-  gap: 3px 9px;
-  margin: 0 0 8px;
+.fan .card-sp .facts p {
+  margin: 0;
 }
-.fan .card-sp .stats .lane {
-  align-self: center;
+.fan .card-sp .lead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  color: var(--ink-2);
 }
-.fan .card-sp .stats b {
+.fan .card-sp .lead b {
+  color: var(--ink);
   font-size: 19px;
   font-weight: 650;
-  text-align: right;
 }
-.fan .card-sp .stats span {
+.fan .card-sp .facts .sub {
+  margin: -1px 0 4px;
+  padding-left: 12px;
+  font-size: 14px;
   color: var(--ink-2);
 }
-.fan .card-sp .stats .range {
-  grid-column: 3;
-  color: var(--ink-3);
-  font-size: 12.5px;
-  margin-top: -3px;
+.fan .card-sp .facts .ever {
+  margin-top: 5px;
+  font-size: 14px;
+  color: var(--ink-2);
 }
-.fan .card-sp .meta {
+/* Conservation status: a small chip, coloured along the Red List's own scale. */
+.fan .card-sp .status {
+  display: inline-block;
+  margin: 0 0 7px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  line-height: 1.5;
+  color: #10160f;
+  background: #a9b8ae;
+  white-space: nowrap;
+}
+.fan .card-sp .status.iucn-lc {
+  background: #6fbf73;
+}
+.fan .card-sp .status.iucn-nt {
+  background: #b9d36a;
+}
+.fan .card-sp .status.iucn-vu {
+  background: #f2c94c;
+}
+.fan .card-sp .status.iucn-en {
+  background: #f29a4a;
+}
+.fan .card-sp .status.iucn-cr {
+  background: #e8604f;
+}
+.fan .card-sp .status.iucn-ew,
+.fan .card-sp .status.iucn-ex {
+  background: #7c6c8c;
+  color: var(--ink);
+}
+.fan .card-sp .status.prehistoric {
+  background: none;
+  color: #cfc4b1;
+  border: 1px solid var(--withered);
+}
+.fan .card-sp .spark-h {
+  display: block;
+  color: var(--ink-3);
+  margin-bottom: 1px;
+}
+.fan .card-sp .spark-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 1px;
+}
+.fan .card-sp .gkey {
   display: flex;
   flex-wrap: wrap;
-  gap: 2px 16px;
-  margin: 0;
+  gap: 0 10px;
+  color: var(--ink-2);
+}
+.fan .card-sp .gkey > span,
+.fan .card-sp .spark-foot > .dim {
+  white-space: nowrap;
+}
+.fan .card-sp .more {
+  margin-top: 6px;
   font-size: 13px;
+  color: var(--ink-2);
+}
+.fan .card-sp .more summary {
+  cursor: pointer;
+  color: var(--ink-3);
+  padding: 2px 0;
+  list-style: none;
+}
+.fan .card-sp .more summary::-webkit-details-marker {
+  display: none;
+}
+.fan .card-sp .more summary::after {
+  content: ' ▾';
+}
+.fan .card-sp .more[open] summary::after {
+  content: ' ▴';
+}
+.fan .card-sp .more dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 10px;
+  margin: 4px 0 0;
+  max-height: 30vh;
+  overflow-y: auto;
+  line-height: 1.35;
+}
+.fan .card-sp .more dt {
   color: var(--ink-3);
 }
-.fan .card-sp .meta dt {
-  display: inline;
+.fan .card-sp .more dd {
+  margin: 0;
+  overflow-wrap: break-word;
 }
-.fan .card-sp .meta dd {
-  display: inline;
-  margin: 0 0 0 4px;
-  color: var(--ink-2);
+.fan .card-sp .more a {
+  color: #9fd3b3;
 }
 .fan .card-sp .dim {
   color: var(--ink-3);
