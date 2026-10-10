@@ -8,17 +8,21 @@ import { formatAge, formatCount } from '../data/names';
 import { Input, type InputHandlers } from '../engine/input';
 import { clipPoly, FanCamera, STRAND_PX, type Camera } from './camera';
 import { EDGE_DASH, edgeMarks, edgeXAt, dotAlphas, GRADE_COLOR, historySpans, pointAgo, toScreenSpans, type ScreenSpan, type Span } from './history';
-import { JOG, laneAt, layoutFan, leftAt, Steps, strandAt, type Fan, type FanBranch, type WidthMode } from './layout';
+import { JOG, laneAt, layoutFan, leftAt, STEM_FADE_MA, Steps, strandAt, type Fan, type FanBranch, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
-import { drawTwigs, TwigModel, type IndInfo, type TwigStats } from './twigs';
+import { FanGL, rgb01 } from './meshgl';
+import { drawTwigs, kLogAt, LINEAGE, LIVING, TWIG_GRAY, TWIG_WITHERED, TwigModel, type IndInfo, type TwigStats } from './twigs';
+import type { MeshBatch } from './meshgl';
 
 export type { IndInfo } from './twigs';
 export type { Camera } from './camera';
 
-export const GREEN = '#33bd66';
-export const GRAY = '#676e75';
-export const BG = '#0d1411';
-const WITHERED = '#6d675c';
+/** Alive now: the one luminous colour. */
+export const GREEN = '#3fd286';
+/** Line ended: a cool slate, darker than both greens (told apart by lightness too, not hue alone). */
+export const GRAY = '#6f7a84';
+export const BG = '#0b1311';
+const WITHERED = '#8b806d';
 /** Least distance (px) between the labels of tips that end side by side. */
 const LABEL_PX = 30;
 
@@ -59,6 +63,10 @@ export class FanView implements InputHandlers {
   private raf = 0;
   private anim: ((t: number) => boolean) | null = null;
   private ro: ResizeObserver;
+  /** The WebGL2 layer under the canvas: lanes and the individuals mesh (null: Canvas 2D only). */
+  readonly gl: FanGL | null = null;
+  /** Frame times (ms, CPU side of draw()), for perf runs. */
+  readonly frameMs: number[] = [];
 
   constructor(
     readonly canvas: HTMLCanvasElement,
@@ -67,6 +75,20 @@ export class FanView implements InputHandlers {
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('No 2D canvas context');
     this.ctx = ctx;
+    // The GPU layer sits right under the 2D canvas (same box) and takes no input.
+    if (canvas.parentElement && typeof document !== 'undefined' && !new URLSearchParams(location.search).has('nogl')) {
+      const glc = document.createElement('canvas');
+      glc.className = canvas.className;
+      glc.style.pointerEvents = 'none';
+      glc.setAttribute('aria-hidden', 'true');
+      canvas.parentElement.insertBefore(glc, canvas);
+      try {
+        this.gl = new FanGL(glc);
+      } catch (e) {
+        console.warn('fan: no WebGL2, drawing with Canvas 2D', e);
+        glc.remove();
+      }
+    }
     this.camera = new FanCamera(layoutFan(clade, this.mode), (b) => this.model(b));
     this.input = new Input(canvas, this);
     this.ro = new ResizeObserver(() => this.resize());
@@ -80,6 +102,7 @@ export class FanView implements InputHandlers {
     cancelAnimationFrame(this.raf);
     this.input.destroy();
     this.ro.disconnect();
+    this.gl?.canvas.remove();
   }
 
   resize(): void {
@@ -323,14 +346,36 @@ export class FanView implements InputHandlers {
     });
   }
 
+  /** Where drawTwigs sends the mesh (the GPU layer). */
+  get mesh(): MeshBatch | undefined {
+    return this.gl?.mesh;
+  }
+
+  /** A flat rectangle under everything else (the GPU layer, or the 2D canvas without it). */
+  private under(x0: number, y0: number, x1: number, y1: number, rgb: [number, number, number], a = 1): void {
+    if (this.gl) {
+      this.gl.under.push(x0, y0, x1, y1, rgb[0], rgb[1], rgb[2], a);
+      return;
+    }
+    this.ctx.fillStyle = `rgba(${Math.round(rgb[0] * 255)},${Math.round(rgb[1] * 255)},${Math.round(rgb[2] * 255)},${a})`;
+    this.ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+  }
+
   draw(): void {
+    const t0 = performance.now();
     const ctx = this.ctx;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    ctx.fillStyle = BG;
-    ctx.fillRect(0, 0, this.w, this.h);
+    this.gl?.begin();
+    if (this.gl) ctx.clearRect(0, 0, this.w, this.h);
+    else {
+      ctx.fillStyle = BG;
+      ctx.fillRect(0, 0, this.w, this.h);
+    }
     this.drawTimeAxis(false);
+    this.drawStem();
     for (const b of this.fan.branches) this.drawStrand(b);
     for (const b of this.fan.branches) this.drawIndividuals(b);
+    this.drawStemFade();
     // Labels: tips side by side (the living all end at "now", packed hairlines in
     // linear widths) are spread apart and joined to their tips by leader lines;
     // then by size, one that would still overlap a bigger species' label waits for a closer zoom.
@@ -342,6 +387,45 @@ export class FanView implements InputHandlers {
     this.drawTrunkLabel();
     this.drawHud();
     this.drawTimeAxis(true);
+    if (this.gl) {
+      const pal = [LIVING, LINEAGE, TWIG_GRAY, TWIG_WITHERED].map(rgb01);
+      this.gl.end(this.w, this.h, this.dpr, rgb01(BG), kLogAt(this, this.fan.time, this.cam.cy), this.toScreen(0, this.yNow)[1], pal);
+    }
+    this.frameMs.push(performance.now() - t0);
+    if (this.frameMs.length > 600) this.frameMs.shift();
+  }
+
+  /**
+   * The stem below the fork (the clade's ancestors): as wide as the stalks it
+   * carries, which go straight on down through it; this fills the gaps between
+   * them, so it reads as one stem down to the bottom of the world.
+   */
+  private drawStem(): void {
+    const f = this.fan;
+    const [x0, y0] = this.toScreen(f.x0, 0);
+    const [x1, y1] = this.toScreen(f.x1, f.trunkBottom.y);
+    const t = Math.max(-8, y0);
+    const b = Math.min(this.h + 8, y1);
+    const l = Math.max(-8, x0);
+    const r = Math.min(this.w + 8, x1);
+    if (b <= t || r <= l) return;
+    this.under(l, t, r, b, rgb01(GRAY));
+  }
+
+  /** The stem fades out over its last stretch (from STEM_FADE_MA down to the bottom of the world): nothing ends abruptly. */
+  private drawStemFade(): void {
+    const f = this.fan;
+    const [, ya] = this.toScreen(0, f.time.y(STEM_FADE_MA));
+    const [, yb] = this.toScreen(0, f.trunkBottom.y);
+    if (yb < 0 || ya > this.h) return;
+    const ctx = this.ctx;
+    const g = ctx.createLinearGradient(0, ya, 0, yb);
+    g.addColorStop(0, 'rgba(11,19,17,0)');
+    g.addColorStop(1, BG);
+    ctx.fillStyle = g;
+    const t = Math.max(-8, ya);
+    const b = Math.min(this.h + 8, yb + 2);
+    if (b > t) ctx.fillRect(0, t, this.w, b - t);
   }
 
   /**
@@ -400,12 +484,43 @@ export class FanView implements InputHandlers {
     // As the strands fade in (twigs.ts), the lanes dim to a backdrop under them: the same
     // lanes, the same geometry, never a switch.
     const tw = this.twigStats.get(b.sp.gid);
-    ctx.fillStyle = mix(b.sp.extinct ? WITHERED : GRAY, '#1c2521', Math.max(tw?.fade ?? 0, 0.6 * (tw?.texGray ?? 0)) * 0.85);
-    this.ribbon(pts, (p) => hw - p.w, () => hw, 0.6);
-    if (!b.sp.extinct) {
-      // Green lane on the left, floored at 1 px all the way from the tip to the root.
-      ctx.fillStyle = mix(GREEN, '#174a2b', (tw?.fadeGreen ?? 0) * 0.8);
-      this.ribbon(pts, () => hw, (p) => hw - p.w * p.f, -1);
+    // Under the mesh the lanes sink to a dark tint of themselves, so the individuals carry the colour.
+    const grayC = mix(b.sp.extinct ? WITHERED : GRAY, '#131c19', Math.max(tw?.fade ?? 0, tw?.texGray ?? 0) * 0.82);
+    const greenFade = tw?.fadeGreen ?? 0;
+    const greenC = mix(GREEN, '#10291d', greenFade * 0.85);
+    if (this.gl) {
+      // Each stretch of constant width is a rectangle: the whole lane gray (at least 0.6 px),
+      // the green lane over its left edge (at least 1 px).
+      const k = this.cam.sx;
+      const gc = rgb01(grayC);
+      const ec = rgb01(greenC);
+      for (let i = 0; i + 1 < pts.length; i += 2) {
+        const p = pts[i];
+        const q = pts[i + 1];
+        const x0 = p.x - hw * k;
+        const y0 = Math.max(-4, q.y);
+        const y1 = Math.min(this.h + 4, p.y);
+        if (!(y1 > y0) || x0 > this.w + 4) continue;
+        this.gl.under.push(Math.max(-4, x0), y0, Math.min(this.w + 4, x0 + Math.max(0.6, p.w * k)), y1, gc[0], gc[1], gc[2], 1);
+        if (!b.sp.extinct) {
+          const x1 = x0 + Math.max(1, p.w * p.f * k);
+          // The living glow faintly (fading as their lane resolves into individuals).
+          const glow = 1 - greenFade;
+          if (glow > 0.01) {
+            this.gl.under.push(Math.max(-8, x0 - 4), y0, Math.min(this.w + 8, x1 + 4), y1, ec[0], ec[1], ec[2], 0.06 * glow);
+            this.gl.under.push(Math.max(-8, x0 - 1.5), y0, Math.min(this.w + 8, x1 + 1.5), y1, ec[0], ec[1], ec[2], 0.14 * glow);
+          }
+          this.gl.under.push(Math.max(-4, x0), y0, Math.min(this.w + 4, x1), y1, ec[0], ec[1], ec[2], 1);
+        }
+      }
+    } else {
+      ctx.fillStyle = grayC;
+      this.ribbon(pts, (p) => hw - p.w, () => hw, 0.6);
+      if (!b.sp.extinct) {
+        // Green lane on the left, floored at 1 px all the way from the tip to the root.
+        ctx.fillStyle = greenC;
+        this.ribbon(pts, () => hw, (p) => hw - p.w * p.f, -1);
+      }
     }
     this.drawHistoryEdge(b, pts, hw, tw?.fade ?? 0);
     if (this.selected === b.sp && !this.selInd) {
@@ -581,9 +696,9 @@ export class FanView implements InputHandlers {
     const fs = 15;
     ctx.save();
     ctx.textBaseline = 'middle';
-    ctx.font = `${fs * 0.72}px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
+    ctx.font = `${fs * 0.72}px 'Avenir Next', 'Segoe UI Variable Text', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
     const subLen = ctx.measureText(sub).width;
-    ctx.font = `600 ${fs}px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
+    ctx.font = `600 ${fs}px 'Avenir Next', 'Segoe UI Variable Text', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
     // Screen box of the upright two-line label (x0, y0, x1, y1).
     const len = Math.max(subLen, ctx.measureText(name).width);
     // Kept on screen and clear of the buttons: pushed down (with a leader line) if needed.
@@ -617,7 +732,7 @@ export class FanView implements InputHandlers {
     ctx.shadowColor = BG;
     ctx.shadowBlur = 3;
     ctx.fillText(name, 0, -fs * 0.32);
-    ctx.font = `${fs * 0.72}px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
+    ctx.font = `${fs * 0.72}px 'Avenir Next', 'Segoe UI Variable Text', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
     ctx.fillStyle = '#9faba3';
     ctx.fillText(sub, 0, fs * 0.55);
     ctx.restore();
@@ -708,7 +823,7 @@ export class FanView implements InputHandlers {
       `${fmtInt(m.size(st.g0))} per generation · ${st.mode}`,
     ];
     ctx.save();
-    ctx.font = `600 14px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
+    ctx.font = `600 14px 'Avenir Next', 'Segoe UI Variable Text', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
     const wmax = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 20;
     ctx.fillStyle = 'rgba(20,28,24,0.82)';
     ctx.beginPath();
@@ -717,7 +832,7 @@ export class FanView implements InputHandlers {
     ctx.textBaseline = 'top';
     ctx.fillStyle = '#eef4ef';
     ctx.fillText(lines[0], 80, 61);
-    ctx.font = `12px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
+    ctx.font = `12px 'Avenir Next', 'Segoe UI Variable Text', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
     ctx.fillStyle = '#b5c0b9';
     for (let k = 1; k < lines.length; k++) ctx.fillText(lines[k], 80, 64 + 16 * k);
     ctx.restore();
@@ -732,16 +847,19 @@ export class FanView implements InputHandlers {
     const ctx = this.ctx;
     const ts = this.fan.time;
     const origin = ts.originMa * 1e6;
+    // The axis goes on below the origin, down the stem to the bottom of the world.
+    const bottom = ts.ageAt(this.fan.trunkBottom.y) * 1e6;
     const yrsAt = (py: number) => ts.ageAt(this.toWorld(0, py)[1]) * 1e6;
-    const aTop = Math.min(origin, yrsAt(-10));
-    const aBot = Math.min(origin, yrsAt(this.h + 10));
+    const aTop = Math.min(bottom, yrsAt(-10));
+    const aBot = Math.min(bottom, yrsAt(this.h + 10));
+    const clear = (yrs: number) => Math.abs(Math.log10(yrs / origin)) > 0.025 && yrs <= bottom * 1.0001;
     const syOf = (yrs: number) => this.toScreen(0, ts.y(yrs / 1e6))[1];
     // Candidates in priority order: origin and now, round log ticks, then linear steps.
     const cands: { yrs: number; step: number }[] = [{ yrs: origin, step: 0 }, { yrs: 0, step: 0 }];
     for (const m of [1, 5, 2]) {
-      for (let e = 7; e >= 0; e--) {
+      for (let e = 9; e >= 0; e--) {
         const yrs = m * Math.pow(10, e);
-        if (yrs < origin * 0.97 && yrs >= aTop && yrs <= aBot) cands.push({ yrs, step: yrs });
+        if (clear(yrs) && yrs >= aTop && yrs <= aBot) cands.push({ yrs, step: yrs });
       }
     }
     const span = aBot - aTop;
@@ -750,7 +868,7 @@ export class FanView implements InputHandlers {
         const step = niceStep(span / div);
         for (let k = Math.ceil(aTop / step); k * step <= aBot && k - Math.ceil(aTop / step) < 40; k++) {
           const yrs = k * step;
-          if (yrs > 0 && yrs < origin * 0.97) cands.push({ yrs, step });
+          if (yrs > 0 && clear(yrs)) cands.push({ yrs, step });
         }
       }
     }
@@ -764,7 +882,7 @@ export class FanView implements InputHandlers {
       placed.push({ ...c, sy });
     }
     ctx.save();
-    ctx.font = `11px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
+    ctx.font = `11px 'Avenir Next', 'Segoe UI Variable Text', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'left';
     ctx.lineJoin = 'round';
@@ -773,33 +891,42 @@ export class FanView implements InputHandlers {
     if (!labels) {
       // Grid lines go under the branches; the labels go on top of everything.
       for (const p of placed) {
-        ctx.fillStyle = p.yrs === 0 ? 'rgba(51,189,102,0.35)' : 'rgba(220,235,225,0.07)';
-        ctx.fillRect(0, Math.round(p.sy), this.w, 1);
+        const y = Math.round(p.sy);
+        if (p.yrs === 0) {
+          // "Now": a lit horizon.
+          this.under(0, y - 3, this.w, y + 4, rgb01(GREEN), 0.05);
+          this.under(0, y, this.w, y + 1, rgb01(GREEN), 0.4);
+        } else this.under(0, y, this.w, y + 1, [220 / 255, 235 / 255, 225 / 255], 0.06);
       }
       ctx.restore();
       return;
     }
+    // A gutter that fades out from the left edge: the labels read over branches without halos.
+    const gut = ctx.createLinearGradient(0, 0, 104, 0);
+    gut.addColorStop(0, 'rgba(11,19,17,0.82)');
+    gut.addColorStop(0.55, 'rgba(11,19,17,0.5)');
+    gut.addColorStop(1, 'rgba(11,19,17,0)');
+    ctx.fillStyle = gut;
+    ctx.fillRect(0, 0, 104, this.h);
+    ctx.font = `500 10.5px 'Avenir Next', 'Segoe UI Variable Text', 'Avenir Next', 'Segoe UI Variable Text', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
     for (const p of placed) {
       const now = p.yrs === 0;
       // A short tick at the edge, visible over the branches too.
       ctx.fillStyle = now ? '#7fd69e' : '#8d998f';
       ctx.fillRect(0, Math.round(p.sy), 4, 1);
-      const label = now ? 'now' : p.yrs === origin ? `${formatTick(origin, 0)} (origin)` : formatTick(p.yrs, p.step);
-      ctx.fillStyle = now ? '#7fd69e' : '#8d998f';
-      ctx.strokeText(label, 6, p.sy - 7);
+      const label = now ? 'now' : p.yrs === origin ? `${formatTick(origin, 0)} · Panthera begins` : formatTick(p.yrs, p.step);
+      ctx.fillStyle = now ? '#7fe0a8' : p.yrs === origin ? '#c9d4cd' : '#8a978f';
       ctx.fillText(label, 6, p.sy - 7);
     }
     if (syOf(0) < 0) {
       // "now" is above the screen: say how far.
-      ctx.fillStyle = '#7fd69e';
-      const label = `↑ now`;
-      ctx.strokeText(label, 6, 14);
-      ctx.fillText(label, 6, 14);
+      ctx.fillStyle = '#7fe0a8';
+      ctx.fillText('↑ now', 6, 14);
     }
     // Honest scale note under the axis labels.
     const oy = syOf(origin);
     if (oy > 0 && oy < this.h - 20) {
-      ctx.fillStyle = '#6f7a72';
+      ctx.fillStyle = '#5f6b64';
       ctx.fillText('time, log scale', 6, oy + 9);
     }
     ctx.restore();
@@ -809,9 +936,9 @@ export class FanView implements InputHandlers {
     const ctx = this.ctx;
     const f = this.fan;
     // Right of the stem, just below the fork (nothing else is drawn there).
-    const [sx, sy] = this.toScreen(f.trunkWidth / 2, 0);
+    const [sx, sy] = this.toScreen(f.x1, 0);
     if (sy > this.h + 20 || sy < -80 || sx > this.w) return;
-    const font = (w: string, px: number) => `${w} ${px}px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
+    const font = (w: string, px: number) => `${w} ${px}px 'Avenir Next', 'Segoe UI Variable Text', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
     ctx.save();
     ctx.textBaseline = 'top';
     ctx.textAlign = 'left';
@@ -860,7 +987,7 @@ export function niceStep(x: number): number {
 
 /** Compact tick label for `yrs` years ago, with as many decimals as the tick step needs. */
 export function formatTick(yrs: number, step: number): string {
-  const [div, unit] = yrs >= 1e6 ? [1e6, 'Mya'] : yrs >= 1e3 ? [1e3, 'kya'] : [1, 'yr ago'];
+  const [div, unit] = yrs >= 1e9 ? [1e9, 'Gya'] : yrs >= 1e6 ? [1e6, 'Mya'] : yrs >= 1e3 ? [1e3, 'kya'] : [1, 'yr ago'];
   const st = step > 0 ? step / div : yrs / div;
   const dec = Math.min(6, Math.max(0, -Math.floor(Math.log10(st) + 1e-9)));
   const v = yrs / div;
@@ -868,12 +995,12 @@ export function formatTick(yrs: number, step: number): string {
   return `${Number(v.toFixed(d)).toLocaleString('en-US', { maximumFractionDigits: d })} ${unit}`;
 }
 
-/** Mix two #rrggbb colours: t = 0 gives a, 1 gives b. */
+/** Mix two #rrggbb colours: t = 0 gives a, 1 gives b (#rrggbb). */
 function mix(a: string, b: string, t: number): string {
   const p = parseInt(a.slice(1), 16);
   const q = parseInt(b.slice(1), 16);
   const c = (sh: number) => Math.round(((p >> sh) & 255) * (1 - t) + ((q >> sh) & 255) * t);
-  return `rgb(${c(16)},${c(8)},${c(0)})`;
+  return `#${((c(16) << 16) | (c(8) << 8) | c(0)).toString(16).padStart(6, '0')}`;
 }
 
 export function fmtInt(n: number): string {

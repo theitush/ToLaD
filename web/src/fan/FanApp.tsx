@@ -1,6 +1,7 @@
 // The main view: one polytomy (Panthera), OneZoom-style. The time river is
 // still available at ?river (and the synthetic spike tree at ?synthetic).
 
+import * as MeshMirror from './mesh';
 import { useEffect, useRef, useState } from 'react';
 import { formatAge, formatCount } from '../data/names';
 import { HistorySpark } from './HistorySpark';
@@ -11,6 +12,8 @@ import { FanView, fmtInt, formatYearsAgo, type IndInfo, type Selection } from '.
 declare global {
   interface Window {
     __fan?: FanView;
+    /** The mesh's CPU mirror, for scripts/glcheck.mjs (GPU and CPU decisions compared). */
+    __fanMesh?: typeof MeshMirror;
   }
 }
 
@@ -29,6 +32,7 @@ export function FanApp() {
     v.barEl = barRef.current;
     viewRef.current = v;
     window.__fan = v;
+    window.__fanMesh = MeshMirror;
     v.request();
     return () => {
       v.destroy();
@@ -69,9 +73,10 @@ export function FanApp() {
         )
       ) : (
         <div className="legend">
-          <span className="dot alive" /> alive <span className="dot dead" /> dead
+          <span className="li"><span className="dot alive" /> alive now</span> <span className="li"><span className="dot lineage" /> has living descendants</span>{' '}
+          <span className="li"><span className="dot dead" /> line ended</span>
           <br />
-          width = individuals ever lived · tap or zoom a branch
+          <span className="dim">Width is everyone who ever lived. Tap or zoom a branch.</span>
         </div>
       )}
       </div>

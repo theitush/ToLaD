@@ -2,7 +2,47 @@ import { describe, expect, it } from 'vitest';
 import { FanCamera } from './camera';
 import { laneAt, layoutFan, leftAt, strandAt } from './layout';
 import { PANTHERA } from './panthera';
-import { drawTwigs, SCALE_BAR_PX, TEXTURE_IND, textureFade, TwigModel, type TwigView } from './twigs';
+import { MESH_F, shadeMesh, type MeshInst } from './mesh';
+import { MeshBatch, rgb01 } from './meshgl';
+import { drawTwigs, kLogAt, LINEAGE, LIVING, SCALE_BAR_PX, TEXTURE_IND, textureFade, TWIG_GRAY, TWIG_WITHERED, TwigModel, type TwigView } from './twigs';
+
+const PAL = [LIVING, LINEAGE, TWIG_GRAY, TWIG_WITHERED].map(rgb01);
+
+/** Unpack the batch's instances (meshgl.ts layout, mesh.ts packInst). */
+function unpack(b: MeshBatch): MeshInst[] {
+  const out: MeshInst[] = [];
+  for (let k = 0; k < b.n; k++) {
+    const f = b.f.subarray(k * MESH_F, (k + 1) * MESH_F);
+    const u = b.u.subarray(k * 8, (k + 1) * 8);
+    out.push({
+      x0: f[0], y0: f[1], x1: f[2], y1: f[3], slotX0: f[4], slotDx: f[5], lw: f[6], fineA: f[7], p0: f[8], T0: f[9], A: f[10], gBoff: f[11],
+      alpha: f[12], mode: f[13] as 0 | 1, lane: f[14], tipR: f[15], GL: f[16], Lm: f[17], nowRel: f[18],
+      iBase: u[0], iStep: u[1], nA: u[2], nB: u[3], seedA: u[4], seedB: u[5], thrA: u[6], thrB: u[7],
+    });
+  }
+  return out;
+}
+
+/** Shade a grid of screen points through the CPU mirror of the shader: lit pixels and their colours. */
+function shadeScreen(v: TwigView, c: FanCamera, insts: MeshInst[], step = 3) {
+  const kLog = kLogAt(v, c.fan.time, c.cam.cy);
+  const nowPx = c.toScreen(0, c.yNow)[1];
+  let lit = 0;
+  const colours = new Set<string>();
+  for (let py = 0.5; py < c.h; py += step) {
+    for (let px = 0.5; px < c.w; px += 1) {
+      for (const m of insts) {
+        const [r, g, b, a] = shadeMesh(m, px, py, kLog, nowPx, PAL);
+        if (a > 0.02) {
+          lit++;
+          colours.add([r, g, b].map((x) => Math.round(x * 20)).join(','));
+          break;
+        }
+      }
+    }
+  }
+  return { lit, colours };
+}
 
 const lionIdx = PANTHERA.species.findIndex((s) => s.common === 'Lion');
 
@@ -38,6 +78,7 @@ function stubView(c: FanCamera) {
     fillText() {},
   } as unknown as CanvasRenderingContext2D;
   const v: TwigView = {
+    mesh: new MeshBatch(),
     ctx,
     w: c.w,
     h: c.h,
@@ -80,18 +121,21 @@ describe('the living texture', () => {
       [60, true],
     ] as const) {
       const { c, b, m } = at(perBar);
-      const { v, strokes } = stubView(c);
+      const { v } = stubView(c);
       const st = drawTwigs(v, b, m, null);
-      const tex = strokes.filter((s) => s.style.startsWith('rgba(51,189,102,') && s.pieces > 0);
+      const insts = unpack(v.mesh!).filter((x) => x.lane === 0 && x.alpha > 0.01);
       if (!shows) {
-        expect(tex.length).toBe(0);
+        expect(insts.length).toBe(0);
         continue;
       }
-      // Under a pixel per individual, the strands themselves not yet shown...
+      // Under a pixel per individual, the lives themselves not yet shown...
       const L = m.lanes(c.cam.cy);
       expect((L.gw / m.size(m.generationAt(c.cam.cy))) * c.cam.sx).toBeLessThan(1.5);
-      // ...but the texture is drawn across the screen, and the lane dims under it.
-      expect(tex.reduce((a, s) => a + s.pieces, 0)).toBeGreaterThan(100);
+      expect(insts.every((x) => x.mode === 0)).toBe(true);
+      // ...but the texture of real lives is lit across the lane (not a flat fill: some pixels dark), and the lane dims under it.
+      const { lit } = shadeScreen(v, c, insts);
+      expect(lit).toBeGreaterThan(1000);
+      expect(lit).toBeLessThan((c.w * c.h) / 3);
       expect(st?.fadeGreen ?? 0).toBeGreaterThan(0.25);
     }
   });
@@ -124,18 +168,18 @@ describe('the dead texture', () => {
     ] as const) {
       // 2000 years ago, thousands of years on screen: far too many lives to draw them all.
       const { c, b, m } = atGray(perBar, 2000);
-      const { v, strokes } = stubView(c);
+      const { v } = stubView(c);
       const st = drawTwigs(v, b, m, null);
-      // Gray (line ended) and pale green (has living descendants) lives: the texture's (just under
-      // a pixel wide) while there are too many to draw each, then each one's own.
-      const tex = strokes.filter((s) => (s.style.startsWith('rgba(154,163,171,') || s.style.startsWith('rgba(134,196,154,')) && s.pieces > 0);
+      const insts = unpack(v.mesh!).filter((x) => x.lane !== 0 && x.alpha > 0.01);
       if (!shows) {
-        expect(tex.length).toBe(0);
+        expect(insts.length).toBe(0);
         expect(st?.texGray ?? 0).toBe(0);
         continue;
       }
-      // Lives are drawn across the screen, and the gray lane dims under them.
-      expect(tex.reduce((a, s) => a + s.pieces, 0)).toBeGreaterThan(100);
+      // Lives are lit across the screen, gray and pale green mixed, and the gray lane dims under them.
+      const { lit, colours } = shadeScreen(v, c, insts, 4);
+      expect(lit).toBeGreaterThan(100);
+      expect(colours.size).toBeGreaterThan(1);
       expect(st?.texGray ?? 0).toBeGreaterThan(0.25);
     }
   });

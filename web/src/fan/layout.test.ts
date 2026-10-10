@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { gapBetween, GAP_FRAC, JOG, laneAt, layoutFan, leftAt, MIN_GAP_FRAC, remaining, Steps, strandAt, TIME_H, type WidthMode } from './layout';
+import { gapBetween, GAP_FRAC, laneAt, layoutFan, leftAt, MIN_GAP_FRAC, remaining, Steps, strandAt, TIME_H, type WidthMode } from './layout';
 import { PANTHERA } from './panthera';
 
 describe('fan strands', () => {
@@ -101,9 +101,9 @@ describe('rectangular fan: fixed, straight, honest', () => {
       const W = fan.trunkWidth;
       const bs = fan.branches;
       fan.steps.setScale(3);
-      // The stem: the children's slices side by side, no gaps, adding up to the stem.
-      expect(bs[0].baseLeft).toBeCloseTo(-W / 2, 9);
-      for (let j = 1; j < bs.length; j++) expect(bs[j].baseLeft).toBeCloseTo(bs[j - 1].baseLeft + bs[j - 1].width, 9);
+      // The stem: the columns go straight on down below the fork (no jog), spanning the stalks.
+      for (const b of bs) expect(b.baseLeft).toBe(b.colLeft);
+      expect(bs[0].colLeft).toBeCloseTo(fan.x0, 9);
       // The columns: fixed gaps, at least GAP_FRAC of the smaller neighbour (or MIN_GAP_FRAC of the stem).
       for (let j = 1; j < bs.length; j++) {
         const gap = bs[j].colLeft - (bs[j - 1].colLeft + bs[j - 1].width);
@@ -114,9 +114,8 @@ describe('rectangular fan: fixed, straight, honest', () => {
         const green = b.sp.alive > 0 ? b.width * b.aliveFrac : 0;
         for (let k = 0; k <= 400; k++) {
           const y = b.tipY + ((fan.trunkBottom.y - b.tipY) * k) / 400;
-          // Left edge: the stem slice, the jog, then one vertical line.
-          if (y >= 0) expect(leftAt(b, y)).toBe(b.baseLeft);
-          else if (y <= -JOG) expect(leftAt(b, y)).toBe(b.colLeft);
+          // Left edge: one vertical line from the bottom of the world to the tip.
+          expect(leftAt(b, y)).toBe(b.colLeft);
           const L = laneAt(b, y);
           // The green lane: one width from the root to the tip (a vertical band).
           expect(L.gw).toBeCloseTo(green, 12);
