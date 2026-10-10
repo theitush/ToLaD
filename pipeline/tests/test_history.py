@@ -206,7 +206,8 @@ class Baseline(unittest.TestCase):
         n = 0
         for sp, s in st["species"].items():
             b = s["baseline"]
-            if s["use"] != "counts" or s["component"] != "wild" or b is None or s["domestic_on_leaf"]:
+            if (s["use"] != "counts" or s["component"] != "wild" or b is None or s["domestic_on_leaf"]
+                    or s.get("deep")):  # a genomic deep past sets its own level (DeepPast)
                 continue
             if b["n"] > 2 * s["alive_after"]:
                 n += 1
@@ -225,10 +226,136 @@ class Baseline(unittest.TestCase):
         if st is None:
             self.skipTest("no build output")
         for sp, s in st["species"].items():
-            if s["use"] != "counts" or s["component"] != "wild" or s["baseline"] or s["domestic_on_leaf"]:
+            if (s["use"] != "counts" or s["component"] != "wild" or s["baseline"] or s["domestic_on_leaf"]
+                    or s.get("deep")):
                 continue
             self.assertAlmostEqual(math.log10(s["ever_after"] / s["ever_before"]),
                                    math.log10(s["alive_after"] / s["alive_before"]), delta=0.1, msg=sp)
+
+
+DEEP = {"method": "PSMC", "cite": "Z 2020, Fig. 1", "url": "https://example.org/z", "mu": 1e-8, "g": 5.0,
+        "grade": "D", "steps": [[1000, 9000, 4000], [9000, 30000, 8000], [30000, 90000, 16000],
+                                [90000, 300000, 12000], [300000, 900000, 20000]]}
+
+
+def _with_deep(**kw):
+    d = copy.deepcopy(GOOD)
+    d["deep"] = {**copy.deepcopy(DEEP), **kw}
+    return d
+
+
+class DeepPast(unittest.TestCase):
+    def test_schema(self):
+        r = H.validate(_with_deep())
+        self.assertEqual(len(r["deep"]["steps"]), 5)
+
+        def bad(**kw):
+            with self.assertRaises(H.HistoryError):
+                H.validate(_with_deep(**kw))
+        bad(grade="B")  # genomic deep past: C or D only
+        bad(method="guess")
+        bad(mu=1e-3)
+        bad(g=0)
+        bad(url="doi:10.1/x")
+        bad(steps=[[1000, 9000, 4000], [5000, 30000, 8000], [30000, 90000, 1]])  # overlap
+        bad(steps=[[1000, 9000, 4000], [9000, 30000, 8000]])  # too few
+        bad(steps=[[1000, 900, 4000], [9000, 30000, 8000], [30000, 90000, 1]])  # from > to
+        bad(colour="green")
+        d = _with_deep()
+        d["component"] = "domestic"
+        with self.assertRaises(H.HistoryError):
+            H.validate(d)
+
+    def test_rescale_formula(self):
+        r = H.validate(_with_deep())
+        G = 10.0
+        kt, kn = H.deep_scale(r["deep"], G)
+        # mu 1e-8 per 5-yr generation = 2e-9 per year, twice DEEP_MU_YEAR: times double;
+        # per generation of 10 yr the target rate is 1e-8, the source's: Ne unchanged
+        self.assertAlmostEqual(kt, 2e-9 / H.DEEP_MU_YEAR)
+        self.assertAlmostEqual(kn, 1e-8 / (H.DEEP_MU_YEAR * G))
+        keep, drop = H.deep_points(r["deep"], G)
+        p = keep[-1]  # the youngest kept step: [9000, 30000] -> ~33 kyr ago
+        self.assertAlmostEqual(NOW_YEAR - p["year"], math.sqrt(9000 * 30000) * kt, places=3)
+        self.assertAlmostEqual(p["n"], 8000 * kn / H.DEEP_NE_N, places=6)
+        self.assertLess(p["lo"], p["n"])
+        self.assertGreater(p["hi"], p["n"])
+        self.assertGreater(p["hi"] / p["lo"], 3)  # a wide range: grade C/D territory
+        self.assertTrue(all(q["kind"] == "genomic" and q["grade"] == "D" for q in keep))
+        # the youngest step (~6 kyr after rescaling) is in PSMC's blind spot
+        self.assertEqual([q["why"] for q in drop], ["blind"])
+        # a band starting 1 Myr ago drops the oldest step (centred ~1.04 Myr ago)
+        keep2, drop2 = H.deep_points(r["deep"], G, start_year=NOW_YEAR - 1e6)
+        self.assertEqual(len(keep2), len(keep) - 1)
+        self.assertEqual(sorted(q["why"] for q in drop2), ["before band", "blind"])
+
+    def _deep_curve(self, G=10.0):
+        r = H.validate(_with_deep())
+        keep, _ = H.deep_points(r["deep"], G)
+        return r, keep + H.curve_points(r)
+
+    def test_join_has_no_jump(self):
+        """The deep curve meets the baseline by a log-linear span across the blind spot: the curve
+        passes through the youngest genomic point and the baseline, and the segments are contiguous."""
+        G, L = 10.0, 5.0
+        r, pts = self._deep_curve(G)
+        gen = [p for p in pts if p["kind"] == "genomic"]
+        self.assertTrue(all(p["year"] < r["baseline"]["year"] for p in gen))  # older than the baseline: allowed
+        for p in pts:
+            self.assertAlmostEqual(H.interp(pts, p["year"]) / p["n"], 1.0, places=9)
+        mid = (gen[-1]["year"] + r["baseline"]["year"]) / 2
+        lo, hi = sorted((gen[-1]["n"], r["baseline"]["n"]))
+        self.assertTrue(lo <= H.interp(pts, mid) <= hi)
+        t0 = year_to_ma(pts[0]["year"] - 1e6)
+        segs = H.compile_segments(pts, G, L, t0, False)
+        for s, nxt in zip(segs, segs[1:]):
+            self.assertAlmostEqual(s["year0"] + s["gens"] * G, nxt["year0"], places=3)
+            self.assertAlmostEqual(s["end"] / nxt["start"], 1.0, places=9)
+        kinds = {H.KINDS[s["kind"]] for s in segs}
+        self.assertTrue({"held", "genomic", "interpolated"} <= kinds, kinds)
+        self.assertEqual(H.KINDS[segs[0]["kind"]], "held")  # the oldest genomic level, held to the band start
+        # births: pieces integrate the curve, the deep spans in a bounded number of pieces
+        pcs = H.curve_pieces(pts, L, t0)
+        self.assertLess(len(pcs), 64 * len(pts) + 200)
+        y_old = NOW_YEAR - t0 * 1e6
+        hold = (pts[0]["year"] - y_old) * pts[0]["n"] / L
+        spans = sum((b["year"] - a["year"]) * H.mean_loglinear(a["n"], b["n"]) / L for a, b in zip(pts, pts[1:]))
+        tail = (NOW_YEAR - pts[-1]["year"]) * pts[-1]["n"] / L
+        self.assertAlmostEqual(H.pieces_births(pcs) / (hold + spans + tail), 1.0, delta=1e-6)
+
+    def test_built_deep_pasts(self):
+        st = _stats()
+        dbg = DATA / "debug_top.json"
+        if st is None or not dbg.exists():
+            self.skipTest("no build output")
+        hist = {h["species"]: h for h in json.loads(dbg.read_text())["history"]}
+        deep = {sp for sp, s in st["species"].items() if s.get("deep")}
+        self.assertTrue({"Panthera leo", "Panthera tigris", "Panthera pardus", "Panthera onca",
+                         "Panthera uncia"} <= deep, deep)
+        for sp in deep:
+            s, h = st["species"][sp], hist[sp]
+            d = s["deep"]
+            gen = [p for p in h["points"] if p["kind"] == "genomic"]
+            self.assertEqual(len(gen), d["points"], sp)
+            self.assertGreaterEqual(d["youngest_yr_ago"], H.DEEP_BLIND_YR, sp)
+            self.assertLessEqual(d["oldest_yr_ago"], d["band_start_yr_ago"], sp)
+            self.assertTrue(all(p["grade"] in "CD" for p in gen), sp)
+            # genomic points come first and are older than every cited point
+            n = len(gen)
+            self.assertTrue(all(p["kind"] == "genomic" for p in h["points"][:n]), sp)
+            # segments: contiguous, no jumps, the oldest one held at the oldest genomic level
+            segs = h["segments"]
+            for a, b in zip(segs, segs[1:]):
+                self.assertAlmostEqual(a["year0"] + a["gens"] * h["G"], b["year0"], delta=1.0, msg=sp)
+                self.assertAlmostEqual(a["end"] / b["start"], 1.0, delta=1e-6, msg=sp)
+            self.assertEqual(segs[0]["kind"], "held", sp)
+            self.assertAlmostEqual(segs[0]["start"] * h["L"] / h["G"] / gen[0]["n"], 1.0, delta=0.01, msg=sp)
+            self.assertIn("genomic", {x["kind"] for x in segs}, sp)
+            # ever follows the deep level: within the range the deep points span, over the band
+            band = d["band_start_yr_ago"]
+            lo = min(p["n"] for p in gen) / h["L"] * band * 0.5
+            hi = max(p["n"] for p in gen) / h["L"] * band * 1.5
+            self.assertTrue(lo <= s["ever_after"] <= hi, (sp, lo, s["ever_after"], hi))
 
 
 if __name__ == "__main__":

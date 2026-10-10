@@ -43,3 +43,38 @@ kind  = "estimate"
 cite  = "Slovikosky, Petracca, Hunter & Frair 2025, Spatially explicit estimates of global population potential for leopard (Panthera pardus), Biodiversity and Conservation 34:3785-3803"
 url   = "https://doi.org/10.1007/s10531-025-03131-9"
 note  = "'An expected value of 131,300 (42,692-428,498 95% CI) leopards globally': density studies published to May 2021, related to habitat and people, projected over the IUCN 2020 range map (dated 2020 here). Expected density from habitat, so it may overstate depleted areas (Central and West Africa lack estimates)."
+
+[deep]
+method = "PSMC"
+cite   = "Armstrong et al. 2025, Genome Biol Evol 17(4):evaf060, Fig. 4 (green curve)"
+url    = "https://doi.org/10.1093/gbe/evaf060"
+mu     = 7.56e-09   # the curve's mutation rate, per site per generation
+g      = 5.0       # the curve's generation time, years
+grade  = "D"
+note   = "Digitised from the published raster of Fig. 4 (PMC11997302, evaf060f4.jpg, 800x485 px): axes calibrated on the tick marks (x: 1e3-1e6 yr, log, ~60.5 px per decade; y: Ne 0-150,000, linear, ~49 px per 50,000), then every column of the panel scanned for the curve's colour; a column with one short run (<= 4 px) is on a step, neighbouring columns within 1.5 px make one step. Each step is [from, to] years ago and its Ne, in the figure's own scaling. Reading error ~1 px: ~4% in time, ~1,000 in Ne (so ~20% at Ne 5,000). PSMC run with -p 2+2+25*2+4+6 (Hilgers et al. 2025), g = 5 yr. Read: the green curve: the leopard pedigree rate (7.56e-9/gen, Fig. 2). Check: the dark-blue curve (1.0e-8/gen) of the same panel, rescaled by 10/7.56 on both axes, lands on these steps within a pixel (its peak 53,900 at 5,400-20,400 yr -> 71,300 at 7,100-27,000 yr; read here 71,400 at 7,300-24,700)."
+# [years ago from, to, Ne] as published (young to old); the build rescales and converts them
+steps  = [
+  [810, 910, 9300],
+  [1100, 1280, 9300],
+  [1380, 2730, 37000],
+  [2940, 4470, 35000],
+  [4820, 6790, 61100],
+  [7320, 24700, 71400],
+  [26650, 31030, 68300],
+  [33480, 37520, 57500],
+  [40480, 45370, 45200],
+  [48950, 59190, 38000],
+  [59190, 80220, 35000],
+  [80220, 97000, 38500],
+  [104660, 121840, 43700],
+  [126560, 141840, 49300],
+  [153040, 165130, 55000],
+  [185060, 199670, 59600],
+  [215440, 241450, 63700],
+  [260510, 516250, 69800],
+  [516250, 624260, 67300],
+  [624260, 726730, 63900],
+  [726730, 814470, 61100],
+  [878780, 984880, 60600],
+  [984880, 1553820, 57500],
+]

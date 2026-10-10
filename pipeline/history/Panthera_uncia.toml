@@ -57,3 +57,21 @@ kind  = "estimate"
 cite  = "McCarthy et al. 2017, Panthera uncia, IUCN Red List e.T22732A50664030 (figures as given by the IUCN SSC Cat Specialist Group)"
 url   = "https://doi.org/10.2305/IUCN.UK.2017-2.RLTS.T22732A50664030.en"
 note  = "7,446-7,996 individuals, 2,710-3,386 mature (n = midpoint). Range reflects compilation only, true uncertainty much wider."
+
+[deep]
+method = "PSMC"
+cite   = "Armstrong et al. 2025, Genome Biol Evol 17(4):evaf060, Fig. 4 (green curve)"
+url    = "https://doi.org/10.1093/gbe/evaf060"
+mu     = 3.62e-09   # the curve's mutation rate, per site per generation
+g      = 5.0       # the curve's generation time, years
+grade  = "D"
+note   = "Digitised from the published raster of Fig. 4 (PMC11997302, evaf060f4.jpg, 800x485 px): axes calibrated on the tick marks (x: 1e3-1e6 yr, log, ~60.5 px per decade; y: Ne 0-150,000, linear, ~49 px per 50,000), then every column of the panel scanned for the curve's colour; a column with one short run (<= 4 px) is on a step, neighbouring columns within 1.5 px make one step. Each step is [from, to] years ago and its Ne, in the figure's own scaling. Reading error ~1 px: ~4% in time, ~1,000 in Ne (so ~20% at Ne 5,000). PSMC run with -p 2+2+25*2+4+6 (Hilgers et al. 2025), g = 5 yr. Read: the green curve: the snow leopard pedigree rate (3.62e-9/gen, Fig. 2). The curve's oldest step (140,000-183,000 yr, off the top of the axis at > 150,000) is not used: a single huge oldest PSMC bin is the false-peak artefact Hilgers et al. 2025 describe, and its height cannot be read."
+# [years ago from, to, Ne] as published (young to old); the build rescales and converts them
+steps  = [
+  [730, 3210, 3600],
+  [3890, 5690, 5100],
+  [8330, 36830, 7700],
+  [36830, 56020, 9700],
+  [56020, 88510, 13000],
+  [95530, 129590, 9700],
+]

@@ -41,3 +41,37 @@ kind  = "estimate"
 cite  = "de la Torre, Gonzalez-Maya, Zarza, Ceballos & Medellin 2018, The jaguar's spots are darker than they appear: assessing the global conservation status of the jaguar Panthera onca, Oryx 52:300-315"
 url   = "https://doi.org/10.1017/S0030605316001046"
 note  = "'About 64,000 individuals with the largest subpopulation in the Amazon, comprising about 55,000-57,000' (as quoted in UNEP/CMS/COP13/Doc.27.1.2; the UNAM release: 64,000 in 34 subpopulations, 57,000 of them in Amazonia). Also the population figure in the IUCN report compiled by Greenspoon et al. 2023. No range given; published online January 2017 (dated 2016 here)."
+
+[deep]
+method = "PSMC"
+cite   = "Armstrong et al. 2025, Genome Biol Evol 17(4):evaf060, Fig. 4 (dark-blue curve)"
+url    = "https://doi.org/10.1093/gbe/evaf060"
+mu     = 1e-08   # the curve's mutation rate, per site per generation
+g      = 5.0       # the curve's generation time, years
+grade  = "D"
+note   = "Digitised from the published raster of Fig. 4 (PMC11997302, evaf060f4.jpg, 800x485 px): axes calibrated on the tick marks (x: 1e3-1e6 yr, log, ~60.5 px per decade; y: Ne 0-150,000, linear, ~49 px per 50,000), then every column of the panel scanned for the curve's colour; a column with one short run (<= 4 px) is on a step, neighbouring columns within 1.5 px make one step. Each step is [from, to] years ago and its Ne, in the figure's own scaling. Reading error ~1 px: ~4% in time, ~1,000 in Ne (so ~20% at Ne 5,000). PSMC run with -p 2+2+25*2+4+6 (Hilgers et al. 2025), g = 5 yr. Read: the dark-blue curve: the maximum previously used rate (1.0e-8/gen). The panel's green curve is not used: it matches the leopard panel's green curve step for step (a figure error, it seems): it is not the jaguar blue and pink curves rescaled to the jaguar rate (5.00e-9/gen), as every other panel's green curve is. The blue and pink curves agree with each other (pink = blue x 10/3.5 on both axes). The blue curve stops at ~0.45 Myr (as published), so older jaguar history is not covered."
+# [years ago from, to, Ne] as published (young to old); the build rescales and converts them
+steps  = [
+  [740, 1520, 3300],
+  [1520, 2490, 6400],
+  [2490, 2690, 11500],
+  [3650, 4580, 18500],
+  [4950, 5540, 27000],
+  [6210, 6710, 30800],
+  [7520, 9450, 31100],
+  [10590, 18040, 32100],
+  [18040, 26390, 28500],
+  [26390, 31930, 25900],
+  [31930, 37170, 23900],
+  [37170, 43290, 20800],
+  [43290, 52360, 18200],
+  [52360, 79580, 14100],
+  [85880, 120960, 13600],
+  [120960, 140850, 16200],
+  [140850, 151990, 19500],
+  [164010, 176980, 26200],
+  [190980, 206090, 36800],
+  [222390, 239970, 49700],
+  [258950, 351120, 61500],
+  [351120, 424720, 64100],
+]

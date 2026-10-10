@@ -33,12 +33,27 @@ HIST_DIR = Path(__file__).resolve().parents[1] / "history"
 
 GRADES = "ABCD"
 POINT_KINDS = ["census", "estimate", "index-scaled", "reconstruction", "unverified"]
-# point kinds, then span-only kinds; the index is the HIST kind code
-KINDS = POINT_KINDS + ["model", "interpolated", "held", "baseline"]
+# point kinds, then span-only kinds, then `genomic` (points compiled from [deep], and the spans
+# between two of them); the index is the HIST kind code, so new kinds are appended
+KINDS = POINT_KINDS + ["model", "interpolated", "held", "baseline", "genomic"]
 K = {k: i for i, k in enumerate(KINDS)}
 
 TOP_KEYS = {"species", "aliases", "common", "component", "use", "scope", "faostat_item", "notes",
-            "baseline", "point"}
+            "baseline", "point", "deep"}
+DEEP_KEYS = {"method", "cite", "url", "mu", "g", "grade", "note", "steps"}
+DEEP_METHODS = ("PSMC", "MSMC", "MSMC2", "SMC++")
+DEEP_GRADES = "CD"
+# Deep past (layer 3): a genome-based Ne history rescaled to one mutation rate per year and to the
+# pipeline's generation length, then Ne -> census N. See pipeline/history/README.md, "Deep past".
+DEEP_MU_YEAR = 1.0e-9  # per site per year: Pantherinae pedigree mean 5.5e-9/gen at parental age 5.5 yr
+DEEP_MU_YEAR_LO, DEEP_MU_YEAR_HI = 0.8e-9, 1.5e-9  # species pedigree rate / parental age: leopard, tiger
+DEEP_NE_N, DEEP_NE_N_LO, DEEP_NE_N_HI = 0.1, 0.05, 0.3  # Ne/N (Frankham 1995 mean ~0.1), a wide range
+DEEP_BLIND_YR = 20000.0  # PSMC resolves little in the last ~10-20 kyr: younger steps are dropped
+DEEP_STEP_MAX = 64  # births pieces per curve span at most (deep spans are 1e4-1e6 years long)
+DEEP_MU_CITE = ("Armstrong et al. 2025, Genome Biol Evol 17:evaf060 (Pantherinae pedigree rates)",
+                "https://doi.org/10.1093/gbe/evaf060")
+DEEP_NE_N_CITE = ("Frankham 1995, Genet Res 66:95-107 (Ne/N ~0.1 over comprehensive estimates)",
+                  "https://doi.org/10.1017/S0016672300034455")
 POINT_KEYS = {"year", "n", "lo", "hi", "grade", "kind", "cite", "url", "note"}
 POINT_REQUIRED = POINT_KEYS - {"note"}
 COMPONENTS = ("wild", "domestic", "total")
@@ -97,6 +112,51 @@ def _check_point(p: dict, where: str) -> dict:
             "note": str(p.get("note", "")).strip()}
 
 
+def _num(v) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
+def _check_deep(d: dict, where: str) -> dict:
+    """The [deep] table: one genome-based Ne history, as read from the source (in its own scaling)."""
+    if not isinstance(d, dict):
+        raise HistoryError(f"{where}: not a table")
+    extra = set(d) - DEEP_KEYS
+    if extra:
+        raise HistoryError(f"{where}: unknown keys {sorted(extra)}")
+    miss = (DEEP_KEYS - {"note"}) - set(d)
+    if miss:
+        raise HistoryError(f"{where}: missing {sorted(miss)}")
+    if d["method"] not in DEEP_METHODS:
+        raise HistoryError(f"{where}: method {d['method']!r} not in {DEEP_METHODS}")
+    if d["grade"] not in DEEP_GRADES:
+        raise HistoryError(f"{where}: grade {d['grade']!r}: a genomic deep past is graded C or D")
+    for k in ("cite", "url"):
+        if not isinstance(d[k], str) or not d[k].strip():
+            raise HistoryError(f"{where}: {k} must be a non-empty string")
+    if not d["url"].startswith(("http://", "https://")):
+        raise HistoryError(f"{where}: url must be http(s)")
+    if not _num(d["mu"]) or not 1e-10 <= d["mu"] <= 1e-7:
+        raise HistoryError(f"{where}: mu is the source's rate per site per generation (1e-10 .. 1e-7)")
+    if not _num(d["g"]) or not 0.1 <= d["g"] <= 100:
+        raise HistoryError(f"{where}: g is the source's generation time in years")
+    steps = d["steps"]
+    if not isinstance(steps, list) or len(steps) < 3:
+        raise HistoryError(f"{where}: steps must list at least 3 [from_yr, to_yr, ne] steps")
+    prev = 0.0
+    for i, st in enumerate(steps):
+        if not (isinstance(st, list) and len(st) == 3 and all(_num(v) for v in st)):
+            raise HistoryError(f"{where}: step {i + 1} must be [from_yr, to_yr, ne]")
+        a, b, ne = st
+        if not (0 < a < b and ne > 0):
+            raise HistoryError(f"{where}: step {i + 1} needs 0 < from_yr < to_yr and ne > 0")
+        if a < prev:
+            raise HistoryError(f"{where}: steps must run young to old without overlap (step {i + 1})")
+        prev = b
+    return {"method": d["method"], "cite": d["cite"].strip(), "url": d["url"].strip(), "mu": float(d["mu"]),
+            "g": float(d["g"]), "grade": d["grade"], "note": str(d.get("note", "")).strip(),
+            "steps": [[float(a), float(b), float(ne)] for a, b, ne in steps]}
+
+
 def validate(doc: dict, name: str = "<doc>") -> dict:
     """Check one parsed history file; return the normalised record."""
     extra = set(doc) - TOP_KEYS
@@ -127,6 +187,9 @@ def validate(doc: dict, name: str = "<doc>") -> dict:
     years = [p["year"] for p in points]
     if len(set(years)) != len(years):
         raise HistoryError(f"{name}: two points share a year")
+    deep = _check_deep(doc["deep"], f"{name} deep") if "deep" in doc else None
+    if deep is not None and (doc["component"] != "wild" or use != "counts"):
+        raise HistoryError(f"{name}: a deep past is for wild species with use = \"counts\"")
     aliases = doc.get("aliases", [])
     if not isinstance(aliases, list) or not all(isinstance(a, str) for a in aliases):
         raise HistoryError(f"{name}: aliases must be a list of strings")
@@ -134,7 +197,7 @@ def validate(doc: dict, name: str = "<doc>") -> dict:
         "species": doc["species"], "aliases": aliases, "common": str(doc.get("common", "")),
         "component": doc["component"], "use": use, "scope": str(doc.get("scope", "")),
         "faostat_item": fao, "notes": str(doc.get("notes", "")).strip(),
-        "baseline": base, "points": sorted(points, key=lambda p: p["year"]),
+        "baseline": base, "points": sorted(points, key=lambda p: p["year"]), "deep": deep,
     }
 
 
@@ -202,6 +265,46 @@ def curve_points(rec: dict) -> list[dict]:
     return sorted(pts, key=lambda p: p["year"])
 
 
+def deep_scale(deep: dict, G: float) -> tuple[float, float]:
+    """(time factor, Ne factor) taking the source's scaling to DEEP_MU_YEAR and generation length G.
+
+    PSMC infers theta = 4 Ne mu_gen and coalescent time in units of 2 Ne generations, so a curve
+    published with (mu per generation, g years) gives, for a per-year rate mu_y and generation G:
+        t' = t * (mu / g) / mu_y            (time scales with the per-year rate only)
+        Ne' = Ne * mu / (mu_y * G)          (Ne scales with the per-generation rate mu_y * G)
+    """
+    return (deep["mu"] / deep["g"]) / DEEP_MU_YEAR, deep["mu"] / (DEEP_MU_YEAR * G)
+
+
+def deep_points(deep: dict, G: float, start_year: float | None = None) -> tuple[list[dict], list[dict]]:
+    """[deep] steps -> dated `genomic` points (census N) and the steps dropped, oldest first.
+
+    Each step becomes one point at its log-midpoint in time. N = Ne' / DEEP_NE_N; lo / hi carry the
+    Ne/N range and the per-year mutation-rate range. Steps younger than DEEP_BLIND_YR (PSMC's blind
+    spot) or older than the species band start are dropped (returned with a `why`)."""
+    kt, kn = deep_scale(deep, G)
+    keep, drop = [], []
+    for a, b, ne in deep["steps"]:
+        ago = math.sqrt(a * b) * kt
+        ne2 = ne * kn
+        p = {"year": NOW_YEAR - ago, "n": ne2 / DEEP_NE_N,
+             "lo": ne2 * (DEEP_MU_YEAR / DEEP_MU_YEAR_HI) / DEEP_NE_N_HI,
+             "hi": ne2 * (DEEP_MU_YEAR / DEEP_MU_YEAR_LO) / DEEP_NE_N_LO,
+             "grade": deep["grade"], "kind": "genomic", "cite": deep["cite"], "url": deep["url"],
+             "ne": ne2, "ago": ago,
+             "note": (f"{deep['method']} step {a:.0f}-{b:.0f} yr ago, Ne {ne:.0f} as published "
+                      f"(mu {deep['mu']:.3g}/gen, g {deep['g']:g} yr); rescaled to {a * kt:.0f}-{b * kt:.0f} "
+                      f"yr ago, Ne {ne2:.0f}; N = Ne / {DEEP_NE_N:g}")}
+        if ago < DEEP_BLIND_YR:
+            drop.append({**p, "why": "blind"})
+        elif start_year is not None and p["year"] < start_year:
+            drop.append({**p, "why": "before band"})
+        else:
+            keep.append(p)
+    by_year = lambda p: p["year"]  # noqa: E731
+    return sorted(keep, key=by_year), sorted(drop, key=by_year)
+
+
 def interp(pts: list[dict], year: float) -> float:
     """Log-linear interpolation through the points, flat outside them."""
     if year <= pts[0]["year"]:
@@ -240,7 +343,8 @@ def curve_pieces(pts: list[dict], L: float, t0_ma: float, end_year: float = NOW_
             ya = year_to_ma_inv(t0_ma)
         if yb <= ya:
             continue
-        m = max(1, math.ceil((yb - ya) / step))
+        # pieces of at most `step` years; a deep (genomic) span is cut into DEEP_STEP_MAX pieces
+        m = max(1, math.ceil((yb - ya) / step)) if yb - ya <= 1e4 else DEEP_STEP_MAX
         for j in range(m):
             a = ya + (yb - ya) * j / m
             b = ya + (yb - ya) * (j + 1) / m
@@ -329,7 +433,8 @@ def _segments(pts: list[dict], G: float, L: float, t0_ma: float, has_baseline: b
             kind, gr = K["held"], GRADES.index(pts[-1]["grade"])
         else:
             a, b = next((a, b) for a, b in zip(pts, pts[1:]) if a["year"] <= mid <= b["year"])
-            kind, gr = K["interpolated"], max(GRADES.index(a["grade"]), GRADES.index(b["grade"]))
+            kind = K["genomic"] if a["kind"] == b["kind"] == "genomic" else K["interpolated"]
+            gr = max(GRADES.index(a["grade"]), GRADES.index(b["grade"]))
         segs.append({"year0": year_of(g0), "gens": g0 - g1, "start": level(g0) * bpg, "end": level(g1) * bpg,
                      "grade": gr, "kind": kind})
     return segs
@@ -373,6 +478,14 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
         L = D["L"]
         G = 2 * L
         pts = curve_points(rec)
+        # the deep past: genomic points older than the cited ones, joined to the first cited
+        # point (or baseline) by the usual log-linear span across PSMC's blind spot
+        deep_pts, rec["deep_dropped"] = (deep_points(rec["deep"], G, year_to_ma_inv(leaf.t0))
+                                         if rec["deep"] else ([], []))
+        if deep_pts and deep_pts[-1]["year"] >= pts[0]["year"]:
+            raise HistoryError(f"{rec['file']}: genomic points reach the cited ones ({deep_pts[-1]['year']:.0f})")
+        rec["deep_points"] = deep_pts
+        pts = deep_pts + pts
         rec["leaf"] = leaf
         rec["G"], rec["L"] = G, L
         before = {"alive": D["alive"], "ever": D["ever_med"], "grade_cap": D["grade_cap"],
@@ -397,8 +510,9 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
             if D.get("domestic") and nw == len(D["pieces"]):
                 raise HistoryError(f"{rec['file']}: domestic leaf without n_wild_pieces")
             n_now = pts[-1]["n"]
-            # no baseline: the deep past keeps the level of today's count (as the model had it)
-            pre = None if rec["baseline"] else n_now
+            # no baseline: the deep past keeps the level of today's count (as the model had it);
+            # with a genomic deep past the oldest genomic level is held back to the band start
+            pre = None if (rec["baseline"] or deep_pts) else n_now
             new = curve_pieces(pts, L, leaf.t0, pre_level=pre)
             D["pieces"] = new + D["pieces"][nw:]
             D["n_wild_pieces"] = len(new)
@@ -420,13 +534,16 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
         if rec["use"] == "counts":
             # the deep-past level: the baseline, else today's level (wild) or the first point (domestic)
             base = rec["baseline"] or (pts[-1] if rec["component"] == "wild" else pts[0])
+            refs = [base] + deep_pts[:1]  # the genomic deep past dominates "ever" when present
             D["ever_med"] = pieces_births(D["pieces"])
             # the deep-past level sets "ever": widen the error by its range, cap the grade by its grade
-            D["sd_leaf"] = math.hypot(D["sd_leaf"], _sd_of(base))
-            D["grade_cap"] = max(D["grade_cap"], GRADES.index(base["grade"]))
+            D["sd_leaf"] = math.hypot(D["sd_leaf"], max(_sd_of(r) for r in refs))
+            D["grade_cap"] = max([D["grade_cap"]] + [GRADES.index(r["grade"]) for r in refs])
             D["meth"].append(f"H:curated history ({len(rec['points'])} points"
                              + (f", baseline {base['n']:.3g} in {base['year']:.0f} ({base['grade']})"
                                 if rec["baseline"] else "")
+                             + (f", deep past {rec['deep']['method']} {len(deep_pts)} points "
+                                f"({rec['deep']['grade']}; {rec['deep']['cite']})" if deep_pts else "")
                              + f"; pipeline/history/{rec['file']})")
             D["src"].add(src_bit)
             D["anchored_count"] = True
@@ -435,9 +552,22 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
         # humans: segments cover the curated span only (before it the model's own shape stands)
         t0_seg = leaf.t0 if rec["component"] == "wild" else year_to_ma(pts[0]["year"])
         pre = (pts[-1]["n"] if rec["use"] == "counts" and rec["component"] == "wild" and not rec["baseline"]
-               else None)
-        rec["segments"] = compile_segments(pts, G, L, t0_seg, rec["baseline"] is not None, pre_level=pre,
-                                           pre_grade=min(3, D["grade_cap"]))
+               and not deep_pts else None)
+        rec["segments"] = compile_segments(pts, G, L, t0_seg, rec["baseline"] is not None and not deep_pts,
+                                           pre_level=pre, pre_grade=min(3, D["grade_cap"]))
+        deep_rep = None
+        if deep_pts:
+            nxt = next(p for p in pts if p["kind"] != "genomic")
+            deep_rep = {
+                "method": rec["deep"]["method"], "cite": rec["deep"]["cite"], "grade": rec["deep"]["grade"],
+                "points": len(deep_pts), "dropped_blind": sum(p["why"] == "blind" for p in rec["deep_dropped"]),
+                "dropped_before_band": sum(p["why"] != "blind" for p in rec["deep_dropped"]),
+                "oldest_yr_ago": NOW_YEAR - deep_pts[0]["year"], "youngest_yr_ago": NOW_YEAR - deep_pts[-1]["year"],
+                "band_start_yr_ago": leaf.t0 * 1e6,
+                "time_factor": deep_scale(rec["deep"], G)[0], "ne_factor": deep_scale(rec["deep"], G)[1],
+                "join": {"deep_n": deep_pts[-1]["n"], "to_year": nxt["year"], "to_n": nxt["n"],
+                         "ratio": deep_pts[-1]["n"] / nxt["n"]},
+            }
         report[rec["species"]] = {
             "file": rec["file"], "leaf": leaf.name, "use": rec["use"], "component": rec["component"],
             "points": len(rec["points"]), "grades": "".join(sorted({p["grade"] for p in rec["points"]})),
@@ -448,6 +578,7 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
             "ever_before": before["ever"], "ever_after": D["ever_med"],
             "ever_ratio": D["ever_med"] / before["ever"] if before["ever"] > 0 else None,
             "G_yr": G, "segments": len(rec["segments"]), "domestic_on_leaf": bool(D.get("domestic")),
+            "deep": deep_rep,
         }
     if missing:
         raise HistoryError(f"history species not found among living tree leaves: {missing}")

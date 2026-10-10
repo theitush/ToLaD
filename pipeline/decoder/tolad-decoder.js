@@ -42,7 +42,7 @@ export const GRADES = ['A', 'B', 'C', 'D'];
 export const DATE_SOURCES = ['upham-calibrated', 'interpolated', 'fossil-range', 'anchored'];
 /** HIST point / segment kinds (same list as skeleton META.hist_kinds). */
 export const HIST_KINDS = ['census', 'estimate', 'index-scaled', 'reconstruction', 'unverified',
-  'model', 'interpolated', 'held', 'baseline'];
+  'model', 'interpolated', 'held', 'baseline', 'genomic'];
 export const HIST_POINT_BASELINE = 1;
 
 export function dqAge(q) {
