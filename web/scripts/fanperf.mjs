@@ -10,7 +10,7 @@ import { chromium } from 'playwright';
 
 const page0 = resolve(process.argv[2] || 'dist-single/index.html');
 const THROTTLE = Number(process.env.PERF_THROTTLE || 4);
-const browser = await chromium.launch({ headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+const browser = await chromium.launch({ headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 try {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
   const page = await ctx.newPage();

@@ -8,7 +8,7 @@ import { chromium } from 'playwright';
 
 const OUT = process.argv[2] || 'perf-out';
 mkdirSync(OUT, { recursive: true });
-const browser = await chromium.launch({ headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+const browser = await chromium.launch({ headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 let code = 0;
 try {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
