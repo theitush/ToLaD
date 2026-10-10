@@ -129,8 +129,98 @@ export function latticeLines(seed: number, lambda: number, K0: number, K1: numbe
   return out;
 }
 
+// ---- cross-links: the lines interbreed ----------------------------------------
+//
+// Between neighbouring drawn lines, short links: a child's line meeting another
+// line at a birth (the parent's end a third of a generation below the child's,
+// as the real parent threads are drawn, twigs.ts). Fixed in the world and
+// hashed, and nested both ways:
+//   - across: a link joins the lines of two neighbouring blocks (B, B + 1) of
+//     lattice level l, which are lines at every finer level too, so a link seen
+//     at a coarse zoom stays where it was; as one zooms in, the links of the
+//     finer levels fade in between them (with their lines) and the coarse ones,
+//     grown long, fade out two octaves on (linkWeight): a constant density;
+//   - in time: a pair's candidate links are one per generation (LINK_P of them
+//     exist), shown by a hashed binary tree over the generations (timeRep): a
+//     band of 2^τ generations shows its representative's link, which is the
+//     representative of one of its halves, so finer bands keep it. The
+//     generation's rank (how many levels up it still represents) against the
+//     continuous τ (the generations' height on screen) fades them in.
+// At the finest level the links join neighbouring slots, then fade out as the
+// real parent threads (twigs.ts) fade in.
+
+/** Share of a pair's candidate links (one per generation) that exist. */
+export const LINK_P = 0.45;
+/** Lattice levels whose links can show at once (the current one and two coarser). */
+export const LINK_LEVELS = 3;
+/** Levels of the time tree resolved by one hash (2^5 − 1 = 31 bits: one subtree). */
+const TCH = 5;
+
+/** A pair's identity: blocks (B, B + 1) of lattice level l. */
+export function linkPair(seed: number, l: number, B: number): number {
+  return lowbias32((Math.imul(B >>> 0, 0x27d4eb2d) ^ seed ^ Math.imul(l + 1, 0x165667b1)) >>> 0);
+}
+
+/** One hash of the time tree: chunk c (levels 5c + 1 … 5c + 5) under its top node a. */
+function timeHash(P: number, c: number, a: number): number {
+  return lowbias32((Math.imul(a | 0, 0x7feb352d) ^ P ^ Math.imul(c + 1, 0x846ca68b)) >>> 0);
+}
+
+/** The time tree's bit at node idx of level i ≥ 1 (which half's generation represents it). */
+export function timeBit(P: number, i: number, idx: number): number {
+  const c = Math.floor((i - 1) / TCH);
+  const d = TCH * c + TCH - i;
+  const pos = (1 << d) - 1 + (idx & ((1 << d) - 1));
+  return (timeHash(P, c, idx >> d) >>> pos) & 1;
+}
+
+/**
+ * The generation representing node `band` of level τ (generations
+ * [band·2^τ, (band + 1)·2^τ)), if it lies in [lo, hi]; else NaN (the walk
+ * stops as soon as its node leaves [lo, hi]: most pixels stop at once).
+ */
+export function timeRep(P: number, tau: number, band: number, lo: number, hi: number): number {
+  let idx = band;
+  let i = tau;
+  while (i > 0) {
+    const c = Math.floor((i - 1) / TCH);
+    const top = TCH * c + TCH;
+    const h = timeHash(P, c, idx >> (top - i));
+    for (; i > TCH * c; i--) {
+      const n = 2 ** i;
+      if (idx * n > hi || (idx + 1) * n <= lo) return NaN;
+      const d = top - i;
+      idx = 2 * idx + ((h >>> ((1 << d) - 1 + (idx & ((1 << d) - 1)))) & 1);
+    }
+  }
+  return idx >= lo && idx <= hi ? idx : NaN;
+}
+
+/** How many levels above `from` generation g still represents its node (up to `to`). */
+export function timeRank(P: number, g: number, from: number, to: number): number {
+  let r = from;
+  for (let i = from + 1; i <= to; i++) {
+    if (timeBit(P, i, g >> i) !== ((g >> (i - 1)) & 1)) break;
+    r = i;
+  }
+  return r;
+}
+
+/** A pair's link in generation g: whether it exists, its child's birth (share of the generation), and which end is the child (0: right, 1: left). */
+export function linkAt(P: number, g: number): { on: boolean; u: number; dir: number } {
+  const h = lowbias32((P ^ Math.imul(g | 0, 0x9e3779b9) ^ 0x68e31da4) >>> 0);
+  return { on: h >>> 8 < LINK_P * 16777216, u: 0.4 + (0.6 * ((h & 127) + 0.5)) / 128, dir: (h >>> 7) & 1 };
+}
+
+const smooth = (t: number) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
+/** Weight of level l's links at continuous lattice level λ: fading in with their lines, out once two octaves long. */
+export function linkWeight(l: number, lambda: number): number {
+  const s = l - lambda;
+  return s < 0 ? smooth(1 + s) : 1 - smooth(s - 1);
+}
+
 /** Floats and uints per instance (meshgl.ts attribute layout). */
-export const MESH_F = 24;
+export const MESH_F = 32;
 export const MESH_U = 12;
 /** Most members of a generation folded onto one slot (a generation up to this many times its slots). */
 export const MAX_FOLD = 8;
@@ -192,6 +282,23 @@ export interface MeshInst {
   colR?: number;
   narG?: number;
   narR?: number;
+  /**
+   * The cross-links (0: none): their opacity (their width: linkWidth), the continuous
+   * lattice level λ, the generations' continuous time level τ (log2 of
+   * BAND_PX over a generation's height) and the band's (τb: gA is a multiple
+   * of 2^τb; 0 for the lives), and generation gA itself.
+   */
+  linkA?: number;
+  lam?: number;
+  tauC?: number;
+  tauB?: number;
+  gA?: number;
+  /**
+   * Lives only: the slot's own thread under its lives, over the generation's
+   * span (its opacity; 0: none): one life after another reads as one strand,
+   * not as specks, while they are thin.
+   */
+  baseA?: number;
 }
 
 export function packInst(m: MeshInst, f: Float32Array, u: Uint32Array, k: number): void {
@@ -220,6 +327,14 @@ export function packInst(m: MeshInst, f: Float32Array, u: Uint32Array, k: number
   f[o + 21] = m.colR ?? 0;
   f[o + 22] = m.narG ?? 0;
   f[o + 23] = m.narR ?? 0;
+  f[o + 24] = m.linkA ?? 0;
+  f[o + 25] = m.lam ?? 0;
+  f[o + 26] = m.tauC ?? 0;
+  f[o + 27] = m.tauB ?? 0;
+  f[o + 28] = m.baseA ?? 0;
+  f[o + 29] = 0;
+  f[o + 30] = 0;
+  f[o + 31] = 0;
   const q = k * MESH_U;
   u[q] = m.B0;
   u[q + 1] = m.lvl;
@@ -232,7 +347,7 @@ export function packInst(m: MeshInst, f: Float32Array, u: Uint32Array, k: number
   u[q + 8] = m.latSeed;
   u[q + 9] = m.fA;
   u[q + 10] = m.fB;
-  u[q + 11] = 0;
+  u[q + 11] = (m.gA ?? 0) >>> 0;
 }
 
 /** Colours (linear 0–1 RGB) by colour code: deep green, pale green, gray, withered. */
@@ -331,6 +446,19 @@ function shadeLane(m: MeshInst, lane: Lane, iA: number, iB: number, d: number, p
       bc = code;
     }
   }
+  // The slot's own thread under its lives, over the generation's span (the dead stop short of now).
+  const baseA = m.baseA ?? 0;
+  if (baseA > 0) {
+    const k = Math.LN2 * kLog;
+    const y0 = m.p0 + log1ps((m.T0 - Math.min(m.GL, m.nowRel)) / m.A) / k;
+    const y1 = m.p0 + log1ps(m.T0 / m.A) / k;
+    const top = lane === Lane.Green ? y0 : Math.max(y0, nowPx + deadGap);
+    const a = py >= top && py < y1 ? baseA * lineAA(d, m.lw) : 0;
+    if (a > best) {
+      best = a;
+      bc = lane === Lane.Green ? 1 : lane === Lane.Withered ? 3 : 2;
+    }
+  }
   if (bc < 0) return [0, 0, 0, 0];
   const p = pal[bc];
   return [p[0], p[1], p[2], best];
@@ -345,6 +473,83 @@ function blend(g: RGBA, r: RGBA, wg: number): RGBA {
   return [(g[0] * ag + r[0] * ar) / a, (g[1] * ag + r[1] * ar) / a, (g[2] * ag + r[2] * ar) / a, a];
 }
 
+/** A link's line width by its instance's line width. */
+export function linkWidth(lw: number): number {
+  return Math.max(0.75, lw * 0.45);
+}
+
+/** Distance from (px, py) to the segment (ax, ay)–(bx, by). */
+function segDist(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const t = clamp01(((px - ax) * dx + (py - ay) * dy) / Math.max(1e-9, dx * dx + dy * dy));
+  return Math.hypot(px - ax - t * dx, py - ay - t * dy);
+}
+
+/**
+ * The cross-links at (px, py) for one instance (the shader's shadeLinks):
+ * the pairs of neighbouring lines around the pixel at the current lattice
+ * level and the two coarser ones, each pair's link in the generation it shows
+ * here (texture: its band's representative; lives: the instance's generation).
+ */
+export function shadeLinks(m: MeshInst, px: number, py: number, kLog: number, pal: Palette): RGBA {
+  const linkA = m.linkA ?? 0;
+  if (!(linkA > 0)) return [0, 0, 0, 0];
+  const k = Math.LN2 * kLog;
+  // The pixel's time (from generation gA's start) and years per px there.
+  const tp = m.T0 - m.A * expm1s(k * (py - m.p0));
+  const dtdy = (m.T0 - tp + m.A) * k;
+  const lw = linkWidth(m.lw);
+  const reachT = (lw * 0.5 + 1) * dtdy;
+  const gA = m.gA ?? 0;
+  const lo = gA + Math.floor((tp - reachT) / m.GL);
+  const hi = gA + Math.floor((tp + reachT) / m.GL);
+  const tauB = m.tauB ?? 0;
+  const tauC = m.tauC ?? 0;
+  const top = Math.min(tauB + 8, Math.max(tauB, Math.ceil(tauC) + 1));
+  const bfL = Math.floor((px - m.xB0) / m.bw);
+  if (m.B0 + bfL < 0) return [0, 0, 0, 0];
+  const colL = m.colL ?? 0;
+  const colR = m.colR ?? 0;
+  let best: RGBA = [0, 0, 0, 0];
+  for (let dl = 0; dl < LINK_LEVELS; dl++) {
+    const l = m.lvl + dl;
+    const w = linkWeight(l, m.lam ?? 0);
+    if (!(w > 0.004)) continue;
+    const Bl = Math.floor((m.B0 + bfL) / 2 ** dl);
+    for (let c = -1; c <= 0; c++) {
+      const Bp = Bl + c;
+      if (Bp < 0) continue;
+      const P = linkPair(m.latSeed, l, Bp);
+      const g = m.mode === 0 ? timeRep(P, tauB, gA / 2 ** tauB, lo, hi) : gA >= lo && gA <= hi ? gA : NaN;
+      if (Number.isNaN(g)) continue;
+      const lk = linkAt(P, g);
+      if (!lk.on) continue;
+      const tb = (g - gA + lk.u) * m.GL;
+      const tpar = tb - m.GL / 3;
+      if (tp < tpar - reachT || tp > tb + reachT) continue;
+      const wt = smooth(timeRank(P, g, tauB, top) - tauC);
+      if (!(wt > 0)) continue;
+      // The pair's two lines (as drawn: latticeWalk), left and right.
+      const xs = [Bp, Bp + 1].map((B) => {
+        const { off, D } = latticeWalk(m.latSeed, l, B);
+        return m.xB0 + (B * 2 ** dl - m.B0) * m.bw + ((off + 0.5) * m.bw * 2 ** dl) / 2 ** D;
+      });
+      if (colR > colL && (xs[0] < colL || xs[1] > colR)) continue;
+      const xC = xs[1 - lk.dir];
+      const xP = xs[lk.dir];
+      const yC = py + (tp - tb) / dtdy;
+      const yP = py + (tp - tpar) / dtdy;
+      const a = lineAA(segDist(px, py, xP, yP, xC, yC), lw) * w * wt * linkA * m.alpha;
+      if (a > best[3]) {
+        const code = xC < m.xG ? 1 : m.lane === Lane.Withered ? 3 : 2;
+        best = [pal[code][0], pal[code][1], pal[code][2], a];
+      }
+    }
+  }
+  return best;
+}
+
 /**
  * The mesh at screen point (px, py) for one instance: [r, g, b, a] (not
  * premultiplied), exactly what the fragment shader computes (meshgl.ts), in
@@ -354,7 +559,7 @@ function blend(g: RGBA, r: RGBA, wg: number): RGBA {
 export function shadeMesh(m: MeshInst, px: number, py: number, kLog: number, nowPx: number, pal: Palette, deadGap = 3): RGBA {
   if (px < m.x0 || px >= m.x1 || py < m.y0 || py >= m.y1) return [0, 0, 0, 0];
   // Nothing to draw this far from a line (only the living glow, and they are only in the green lane).
-  const reach = m.mode === 0 ? Math.max(m.lw, 1) * 0.5 + 0.5 : Math.max(m.tipR, m.lw * 0.5 + (m.xG > m.x0 ? 5 : 0)) + 0.5;
+  const reach = m.mode === 0 ? Math.max(m.lw, 1) * 0.5 + 0.5 : Math.max(m.tipR, Math.max(m.lw, 1) * 0.5 + (m.xG > m.x0 ? 5 : 0)) + 0.5;
   const bf = Math.floor((px - m.xB0) / m.bw);
   let best: RGBA = [0, 0, 0, 0];
   // The lines of this block and its neighbours (each block's line is anywhere in it).
@@ -378,6 +583,8 @@ export function shadeMesh(m: MeshInst, px: number, py: number, kLog: number, now
     col[3] *= m.alpha * fine;
     if (col[3] > best[3]) best = col;
   }
+  const lk = shadeLinks(m, px, py, kLog, pal);
+  if (lk[3] > best[3]) best = lk;
   // Lanes too narrow for their lines: the lane is one line its own width, lit by a representative's lives.
   if (m.mode === 0 && ((m.narG ?? 0) > 0 || (m.narR ?? 0) > 0)) {
     const colL = m.colL ?? 0;
@@ -407,8 +614,8 @@ export function unpackInst(f: Float32Array, u: Uint32Array, k: number): MeshInst
   return {
     x0: f[o], y0: f[o + 1], x1: f[o + 2], y1: f[o + 3], xB0: f[o + 4], bw: f[o + 5], lw: f[o + 6], fineA: f[o + 7], p0: f[o + 8], T0: f[o + 9], A: f[o + 10], gBoff: f[o + 11],
     alpha: f[o + 12], mode: f[o + 13] as 0 | 1, lane: f[o + 14] as Lane, tipR: f[o + 15], GL: f[o + 16], Lm: f[o + 17], nowRel: f[o + 18], xG: f[o + 19],
-    colL: f[o + 20], colR: f[o + 21], narG: f[o + 22], narR: f[o + 23],
-    B0: u[q], lvl: u[q + 1], nA: u[q + 2], nB: u[q + 3], seedA: u[q + 4], seedB: u[q + 5], sA: u[q + 6], sB: u[q + 7], latSeed: u[q + 8], fA: u[q + 9], fB: u[q + 10],
+    colL: f[o + 20], colR: f[o + 21], narG: f[o + 22], narR: f[o + 23], linkA: f[o + 24], lam: f[o + 25], tauC: f[o + 26], tauB: f[o + 27], baseA: f[o + 28],
+    B0: u[q], lvl: u[q + 1], nA: u[q + 2], nB: u[q + 3], seedA: u[q + 4], seedB: u[q + 5], sA: u[q + 6], sB: u[q + 7], latSeed: u[q + 8], fA: u[q + 9], fB: u[q + 10], gA: u[q + 11] | 0,
   };
 }
 

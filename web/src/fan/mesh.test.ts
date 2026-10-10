@@ -1,7 +1,7 @@
 // The individuals mesh (mesh.ts): one function for both lanes, and the GPU's
 // decisions (the shader's integer hash, mirrored by lifeGPU) agree with procgen.
 import { describe, expect, it } from 'vitest';
-import { MESH_F, MESH_U, colourCode, Lane, latticeLines, latticeRep, latticeTop, lifeGPU, packInst, shadeMesh, unpackInst, type MeshInst } from './mesh';
+import { MESH_F, MESH_U, colourCode, Lane, latticeLines, latticeRep, latticeTop, lifeGPU, LINK_LEVELS, LINK_P, linkAt, linkPair, linkWeight, packInst, shadeLinks, shadeMesh, timeRank, timeRep, unpackInst, type MeshInst } from './mesh';
 import { layoutFan } from './layout';
 import { FanCamera } from './camera';
 import { MeshBatch } from './meshgl';
@@ -208,11 +208,12 @@ describe('GPU and CPU decide alike', () => {
     const u = new Uint32Array(MESH_U);
     const a: MeshInst = { x0: 1, y0: 2, x1: 3, y1: 4, xB0: 5, bw: 6, lw: 7, fineA: 0.5, p0: 9, T0: 10, A: 11, gBoff: 12, alpha: 0.25, mode: 1, lane: Lane.Gray, tipR: 16, GL: 17, Lm: 18, nowRel: 19, xG: 20, B0: 1, lvl: 2, latSeed: 9, nA: 3, nB: 4, seedA: 4294967295, seedB: 6, sA: 7, sB: 8, fA: 10, fB: 3 };
     packInst(a, f, u, 0);
-    expect([...f]).toEqual([1, 2, 3, 4, 5, 6, 7, 0.5, 9, 10, 11, 12, 0.25, 1, 1, 16, 17, 18, 19, 20, 0, 0, 0, 0]);
+    expect([...f]).toEqual([1, 2, 3, 4, 5, 6, 7, 0.5, 9, 10, 11, 12, 0.25, 1, 1, 16, 17, 18, 19, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
     expect([...u]).toEqual([1, 2, 3, 4, 4294967295, 6, 7, 8, 9, 10, 3, 0]);
-    const b: MeshInst = { ...a, colL: 21, colR: 22, narG: 0.75, narR: 0.5 };
+    const b: MeshInst = { ...a, colL: 21, colR: 22, narG: 0.75, narR: 0.5, linkA: 0.5, lam: 2.25, tauC: 1.5, tauB: 2, gA: -12, baseA: 0.25 };
     packInst(b, f, u, 0);
-    expect([...f].slice(20)).toEqual([21, 22, 0.75, 0.5]);
+    expect([...f].slice(20)).toEqual([21, 22, 0.75, 0.5, 0.5, 2.25, 1.5, 2, 0.25, 0, 0, 0]);
+    expect(u[11]).toBe(4294967284);
     expect(unpackInst(f, u, 0)).toEqual(b);
   });
 });
@@ -313,5 +314,85 @@ describe('the drawn lines nest: a line seen at a coarse zoom stays, in place, at
   it('the CPU mirror and the shader hash the lattice alike', async () => {
     const { MESH_FS } = await import('./meshgl');
     expect(MESH_FS).toContain('(idx * 0x9e3779b1u) ^ vIdx2.x ^ (l * 0x85ebca6bu)');
+  });
+});
+
+describe('the cross-links: the lines interbreed, nested like the lines', () => {
+  const ALL = [-Infinity, Infinity] as const;
+  it('in time: the generation shown by a band is the one shown by one of its halves', () => {
+    for (let k = 0; k < 400; k++) {
+      const P = linkPair(12345, k % 7, k * 31);
+      const tau = 1 + (k % 14);
+      const band = ((k * 7919) % 5000) - 2500;
+      const g = timeRep(P, tau, band, ...ALL);
+      expect(g).toBeGreaterThanOrEqual(band * 2 ** tau);
+      expect(g).toBeLessThan((band + 1) * 2 ** tau);
+      const half = Math.floor(g / 2 ** (tau - 1));
+      expect(timeRep(P, tau - 1, half, ...ALL)).toBe(g);
+      // Its rank: it represents its band, and its parent band exactly when it is the parent's.
+      expect(timeRank(P, g, 0, tau)).toBe(tau);
+      const up = timeRep(P, tau + 1, band >> 1, ...ALL) === g;
+      expect(timeRank(P, g, tau, tau + 1)).toBe(up ? tau + 1 : tau);
+      // The walk stops early outside [lo, hi], with the same answer inside.
+      expect(timeRep(P, tau, band, g, g)).toBe(g);
+      expect(timeRep(P, tau, band, g + 1, g + 5)).toBeNaN();
+    }
+  });
+
+  it('across: a link once fully shown stays an octave on, then fades (never pops), and the density stays constant', () => {
+    for (let lam = 0; lam < 12; lam += 0.0625) {
+      let sum = 0;
+      for (let l = Math.max(0, Math.floor(lam)); l < Math.floor(lam) + LINK_LEVELS; l++) {
+        const w = linkWeight(l, lam);
+        sum += w;
+        // Fully in as its own lines are (λ = l), still fully shown an octave finer (λ = l − 1).
+        if (lam === l) expect(linkWeight(l, lam - 1)).toBeGreaterThan(0.99);
+        // Continuous in the zoom.
+        expect(Math.abs(linkWeight(l, lam - 0.01) - w)).toBeLessThan(0.02);
+      }
+      // Beyond the levels drawn, nothing.
+      expect(linkWeight(Math.floor(lam) + LINK_LEVELS, lam)).toBeLessThan(1e-9);
+      if (lam >= 1) expect(sum).toBeCloseTo(2, 6);
+    }
+  });
+
+  it("about LINK_P of a pair's generations have a link, born late in the generation", () => {
+    let on = 0;
+    for (let g = 0; g < 20000; g++) {
+      const lk = linkAt(linkPair(7, 3, 99), g);
+      if (lk.on) on++;
+      expect(lk.u).toBeGreaterThanOrEqual(0.4);
+      expect(lk.u).toBeLessThan(1);
+    }
+    expect(on / 20000).toBeCloseTo(LINK_P, 1);
+  });
+
+  it('a texture band draws links between neighbouring lines: some of the band, never most of it', () => {
+    const g = m.G - 400;
+    const inst: MeshInst = {
+      x0: 0, y0: 0, x1: 300, y1: 6, xB0: -6, bw: 5, lw: 0.9, fineA: 1, p0: 0, T0: 128 * m.GL, A: 1e9, gBoff: 0,
+      alpha: 1, mode: 0, lane: Lane.Gray, tipR: 0, GL: m.GL, Lm: m.sp.lifespanYears, nowRel: m.sp.now - g * m.GL, xG: -1e9,
+      B0: 1000, lvl: 3, latSeed: m.latticeSeed, nA: m.size(g), nB: 0, seedA: m.seedOf(g), seedB: 0, sA: m.size(g), sB: 1, fA: 1, fB: 1,
+      // Bands of 2^7 generations, about 6 px tall.
+      linkA: 1, lam: 3, tauC: 6.9, tauB: 7, gA: Math.floor(g / 128) * 128,
+    };
+    // The band 6 px tall (A large: the axis is linear here, years per px = A·ln2·kLog).
+    const kLog = (128 * m.GL) / 6 / (1e9 * Math.LN2);
+    let lit = 0;
+    let n = 0;
+    for (let y = 0.5; y < 6; y += 0.25) {
+      for (let x = 0.5; x < 300; x++) {
+        n++;
+        if (shadeLinks(inst, x, y, kLog, PAL)[3] > 0.3) lit++;
+      }
+    }
+    expect(lit / n).toBeGreaterThan(0.01);
+    expect(lit / n).toBeLessThan(0.3);
+  });
+
+  it('the CPU mirror and the shader hash the links alike', async () => {
+    const { MESH_FS } = await import('./meshgl');
+    for (const f of ['(B * 0x27d4eb2du) ^ vIdx2.x ^ ((l + 1u) * 0x165667b1u)', '(uint(a) * 0x7feb352du) ^ P ^ (uint(c + 1) * 0x846ca68bu)', 'P ^ (uint(g) * 0x9e3779b9u) ^ 0x68e31da4u'])
+      expect(MESH_FS).toContain(f);
   });
 });
