@@ -64,6 +64,11 @@ SOURCES: dict[str, list[tuple[str, str, dict | None]]] = {
         ("phylacine/Trait_data.csv", f"{PHYLACINE}/Data/Traits/Trait_data.csv", None),
         ("phylacine/Synonymy_table_valid_species_only.csv",
          f"{PHYLACINE}/Data/Taxonomy/Synonymy_table_valid_species_only.csv", None),
+        # The v1.2.1 release asset (an uploaded file, so its bytes are fixed).
+        # Its Data/Ranges tree is identical (git tree 7555039) to the one at
+        # PHYLACINE_SHA. Read in place with zipfile; never extracted.
+        ("phylacine/PHYLACINE_1.2.1.zip",
+         "https://github.com/MegaPast2Future/PHYLACINE_1.2/releases/download/v1.2.1/PHYLACINE_1.2.1.zip", None),
     ],
     "pantheria": [
         (

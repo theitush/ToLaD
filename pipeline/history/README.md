@@ -78,11 +78,35 @@ also a point of the curve (at its `year`), and the build holds it constant
 before that year, back to the start of the species' band (unless a `[deep]`
 genomic history covers the deep past instead; see "Deep past"). So it raises the
 deep-past births rate and "individuals ever" (research/00-synthesis, "Recent
-population history"). A wild species with no known baseline keeps the
-model's level (today's count) before its first point, as before this
-history existed, with a step to the curve at the first point. This keeps a
+population history"). A wild species with no cited baseline keeps the
+model's level before its first point (its natural baseline, see below, or
+without one today's count), with a step to the curve at the first point. This keeps a
 recorded bottleneck (e.g. ~100 northern elephant seals in 1890) from being
 held back over the whole band.
+
+**Natural baseline (ToLaD#61).** Every species with a PHYLACINE range map
+also gets a modelled pre-human level: density × present-natural range ×
+occupancy, grade D, kind `reconstruction` (`pipeline/FORMAT.md`, "NATB";
+`model.natural_level`). The deep past of a wild `counts` species is, in
+order of precedence:
+
+1. a cited `[baseline]` here (it wins, whatever the natural baseline says;
+   it governs from its year on);
+2. a genomic `[deep]` curve (see "Deep past"): its points are all older than
+   the cited ones, it joins the first cited point (the baseline, if any)
+   log-linearly, and its oldest level is held back to the band start. With
+   a `[deep]` the natural baseline is not used at all (it is still reported
+   in `stats.json`): the five *Panthera* run on their PSMC curves, not on
+   the natural baseline;
+3. else the natural baseline, held from the band start to the first cited
+   point (HIST segment kind `natural`, 10), then a step to the curve;
+4. else (no range map) today's level, as above (segment kind `model`).
+
+A species with no history file runs at its natural baseline until 1500 CE,
+then steps to today's count (or, extinct, at the natural baseline over its
+whole band). That is a step, not a trend: the range-loss trend between the
+two levels is ToLaD#62. Where the natural and current ranges are the same
+map, the natural baseline equals today's count and nothing changes.
 
 ## How the build uses it (`tolad_pipeline/history.py`)
 
@@ -96,8 +120,10 @@ held back over the whole band.
 - **Alive now:** the latest point if it is from 2000 or later and graded A-C;
   otherwise the model's alive-now figure stays and is appended to the curve
   as a `model` point, so the curve and the green lane agree.
-- **Error and grade:** the leaf's log error is widened by the baseline's
-  (without one: the latest point's) 95% range, and its grade is capped by that point's grade,
+- **Error and grade:** the leaf's log error is widened by the deep-past
+  level's 95% range (the cited baseline, else the natural baseline, else the
+  latest point; with a `[deep]`, the wider of that and the oldest genomic
+  point's), and its grade is capped by that level's grade (the worse of the two),
   because the deep-past level dominates "ever".
 - **Births:** births/yr = `N(t) / L`, with `L = G / 2` the census-pool
   residence time (research/02 §3.1). Before the baseline year the rate is
@@ -111,8 +137,11 @@ held back over the whole band.
   segments cover the curated span only. Shipped in the tile `HIST` section
   (`pipeline/FORMAT.md`, v1.1).
 - **Report:** `data/mammals/stats.json -> history` lists, per species, the
-  leaf's alive and ever before (today's count held over the whole band) and
-  after (with the curve and baseline).
+  leaf's alive and ever before (the model alone: natural baseline before
+  1500 where it differs, else today's count) and after (with the curve and
+  baseline), the deep-past level before and after, and `deep_from`: what
+  sets the level at the band start (`genomic`, `baseline`, `natural` or
+  `today`, in that order of precedence).
 - **Domestic** (`component = "domestic"`): the curve is the domestic stock.
   With `faostat_item`, FAOSTAT World stocks (1961 to the latest year, every 5
   years plus the latest) are added as grade B census points. Before the first

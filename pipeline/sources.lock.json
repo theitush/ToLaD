@@ -74,6 +74,13 @@
   "sha256": "fc84e8cf4ed68ba7dcb117a33916b9cad09e32a949417784650536975da046d1",
   "url": "https://paleobiodb.org/data1.2/taxa/list.json?base_name=Mammalia&rank=species&taxon_status=accepted&pres=regular&show=app,parent,class&vocab=pbdb"
  },
+ "phylacine/PHYLACINE_1.2.1.zip": {
+  "bytes": 106362537,
+  "post_body": null,
+  "retrieved": "2026-10-11",
+  "sha256": "6f37526e6b5871d1a24fac5aa868835735359af902e1f555d1d7dfd1c8075e01",
+  "url": "https://github.com/MegaPast2Future/PHYLACINE_1.2/releases/download/v1.2.1/PHYLACINE_1.2.1.zip"
+ },
  "phylacine/Synonymy_table_valid_species_only.csv": {
   "bytes": 1415868,
   "post_body": null,

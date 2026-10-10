@@ -211,17 +211,18 @@ class Baseline(unittest.TestCase):
                 continue
             if b["n"] > 2 * s["alive_after"]:
                 n += 1
-                if b["n"] > 2 * s["alive_before"]:  # baseline above the model's count: ever rises
+                if b["n"] > 2 * s["deep_before"]:  # baseline above the model's deep past: ever rises
                     self.assertGreater(s["ever_after"], s["ever_before"], sp)
-                # ever scales with the deep-past level: baseline / today's model count
-                want = b["n"] / s["alive_before"]
+                # ever scales with the deep-past level: baseline / the model's (natural or today's) level
+                want = b["n"] / s["deep_before"]
                 self.assertAlmostEqual(math.log10(s["ever_after"] / s["ever_before"]), math.log10(want),
                                        delta=0.15, msg=sp)
         self.assertGreaterEqual(n, 10)
 
-    def test_no_baseline_keeps_todays_level(self):
-        """Without a baseline the deep past runs at today's level, so a recorded
-        bottleneck is not held back over the whole band."""
+    def test_no_baseline_keeps_the_model_level(self):
+        """Without a cited baseline the deep past runs at the natural baseline
+        (or, with no range map, today's level), so a recorded bottleneck is not
+        held back over the whole band."""
         st = _stats()
         if st is None:
             self.skipTest("no build output")
@@ -229,8 +230,63 @@ class Baseline(unittest.TestCase):
             if (s["use"] != "counts" or s["component"] != "wild" or s["baseline"] or s["domestic_on_leaf"]
                     or s.get("deep")):
                 continue
-            self.assertAlmostEqual(math.log10(s["ever_after"] / s["ever_before"]),
-                                   math.log10(s["alive_after"] / s["alive_before"]), delta=0.1, msg=sp)
+            want = s["deep_after"] / s["deep_before"]
+            if s["deep_from"] == "today":
+                self.assertAlmostEqual(math.log10(want), math.log10(s["alive_after"] / s["alive_before"]),
+                                       delta=1e-6, msg=sp)
+            self.assertAlmostEqual(math.log10(s["ever_after"] / s["ever_before"]), math.log10(want),
+                                   delta=0.1, msg=sp)
+
+    def test_precedence_cited_natural_today(self):
+        """Level at the band start: genomic deep past > cited baseline > natural baseline > today's level.
+
+        (The cited baseline still governs from its year on: genomic points are all older.)"""
+        st = _stats()
+        if st is None:
+            self.skipTest("no build output")
+        seen = set()
+        for sp, s in st["species"].items():
+            if s["use"] != "counts" or s["component"] != "wild":
+                continue
+            if s.get("deep"):
+                want, src = s["deep"]["oldest_n"], "genomic"
+            elif s["baseline"]:
+                want, src = s["baseline"]["n"], "baseline"
+            elif s["natural"]:
+                want, src = s["natural"]["N"], "natural"
+            else:
+                want, src = s["alive_after"], "today"
+            self.assertEqual(s["deep_from"], src, sp)
+            seen.add(src)
+            if not s["domestic_on_leaf"]:
+                self.assertAlmostEqual(s["deep_after"] / want, 1.0, delta=1e-6, msg=sp)
+        self.assertTrue({"genomic", "baseline", "natural"} <= seen)
+
+    def test_panthera_genomic_beats_natural(self):
+        """The five Panthera have a natural baseline, but their deep past is the genomic curve:
+        the oldest genomic level is held to the band start (segments: decoder/test/roundtrip.test.mjs)."""
+        st = _stats()
+        if st is None:
+            self.skipTest("no build output")
+        recs = {r["species"]: r for r in H.load_all()}
+        for sp in ("Panthera leo", "Panthera tigris", "Panthera pardus", "Panthera onca", "Panthera uncia"):
+            s = st["species"][sp]
+            self.assertIsNotNone(s["natural"], sp)  # reported, not used
+            self.assertEqual(s["deep_from"], "genomic", sp)
+            self.assertAlmostEqual(s["deep_after"] / s["deep"]["oldest_n"], 1.0, delta=1e-6, msg=sp)
+            if recs[sp]["baseline"] is not None:
+                self.assertEqual(s["baseline"]["n"], recs[sp]["baseline"]["n"], sp)
+
+    def test_natural_segment_kind(self):
+        """With no cited baseline, the held segment before the first point is kind `natural`, grade D."""
+        r = H.validate({k: v for k, v in copy.deepcopy(GOOD).items() if k != "baseline"})
+        pts = H.curve_points(r)
+        segs = H.compile_segments(pts, 10.0, 5.0, 0.01, False, pre_level=3e4, pre_grade=3, pre_kind="natural")
+        self.assertEqual(H.KINDS[segs[0]["kind"]], "natural")
+        self.assertEqual(segs[0]["grade"], 3)
+        self.assertAlmostEqual(segs[0]["start"], 3e4 * 10.0 / 5.0)
+        segs = H.compile_segments(pts, 10.0, 5.0, 0.01, False, pre_level=1e4)
+        self.assertEqual(H.KINDS[segs[0]["kind"]], "model")
 
 
 DEEP = {"method": "PSMC", "cite": "Z 2020, Fig. 1", "url": "https://example.org/z", "mu": 1e-8, "g": 5.0,
