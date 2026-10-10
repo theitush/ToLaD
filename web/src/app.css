@@ -1,11 +1,44 @@
+/* Type: Sofia Sans Condensed for everything read at a glance (axis, labels, numbers: narrow
+   enough to run up a branch), Newsreader italic for the Latin names. Latin subsets only. */
+@font-face {
+  font-family: 'Sofia Sans Condensed';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('@fontsource-variable/sofia-sans-condensed/files/sofia-sans-condensed-latin-wght-normal.woff2') format('woff2-variations');
+}
+@font-face {
+  font-family: 'Newsreader';
+  font-style: italic;
+  font-display: swap;
+  font-weight: 200 800;
+  src: url('@fontsource-variable/newsreader/files/newsreader-latin-wght-italic.woff2') format('woff2-variations');
+}
+
+:root {
+  /* The ground: spruce at night, lit from above where the living are. */
+  --ground: #0c1714;
+  --ground-lit: #16291f;
+  --ink: #e8f0ea;
+  --ink-2: #a9b8ae;
+  --ink-3: #75867c;
+  /* The lanes (view.ts GREEN, GRAY, WITHERED; twigs.ts LINEAGE). */
+  --living: #3fd286;
+  --lineage: #c8efc4;
+  --ended: #67737f;
+  --withered: #8b806d;
+  --sans: 'Sofia Sans Condensed', 'Avenir Next Condensed', 'Roboto Condensed', 'Arial Narrow', system-ui, sans-serif;
+  --serif: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+}
+
 .app {
   position: fixed;
   inset: 0;
-  font: 13px/1.3 'Avenir Next', 'Segoe UI Variable Text', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  font-variant-numeric: tabular-nums;
-  color: #e4ece7;
-  /* Night soil, lit from above where the living are. */
-  background: radial-gradient(120% 70% at 50% 18%, #13241e 0%, #0e1a16 45%, #0b1311 100%);
+  font: 14px/1.3 var(--sans);
+  /* (The face's default figures are tabular, wide for a condensed face: proportional reads better.) */
+  font-variant-numeric: proportional-nums;
+  color: var(--ink);
+  background: radial-gradient(120% 70% at 50% 18%, var(--ground-lit) 0%, #0f1f1a 45%, var(--ground) 100%);
 }
 
 .stage {
@@ -308,4 +341,187 @@
 .wscale .wlab,
 .legend .li {
   white-space: nowrap;
+}
+
+/* ---- The fan's chrome ----------------------------------------------------------
+   Quiet and low: the tree is the picture. The foot is a scrim, not a panel, so the
+   stem shows through; the key's swatches are short lanes, as the tree draws them. */
+.fan .bar button {
+  font: 500 14px/1 var(--sans);
+  letter-spacing: 0.01em;
+  background: rgba(12, 23, 20, 0.7);
+  border: 1px solid rgba(200, 230, 210, 0.14);
+  border-radius: 999px;
+  padding: 8px 13px;
+  min-height: 34px;
+}
+.fan .bar button[aria-pressed='true'] {
+  border-color: rgba(63, 210, 134, 0.45);
+  box-shadow: none;
+}
+.fan .bar button:focus-visible,
+.fan .card-sp .x:focus-visible,
+.fan .card-sp .spark:focus-visible {
+  outline: 2px solid var(--living);
+  outline-offset: 2px;
+}
+
+.fan .foot {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 28px 12px max(10px, env(safe-area-inset-bottom));
+  gap: 7px;
+  background: linear-gradient(to top, rgba(12, 23, 20, 0.94) 0%, rgba(12, 23, 20, 0.78) 55%, rgba(12, 23, 20, 0) 100%);
+}
+.fan .foot .legend,
+.fan .foot .wscale {
+  margin-left: 0;
+}
+.fan .wscale {
+  background: none;
+  border: 0;
+  padding: 0;
+  gap: 8px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 500;
+}
+.fan .wscale .wbar {
+  height: 7px;
+  border: 1.5px solid var(--ink);
+  border-top: none;
+}
+.fan .key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: var(--ink-2);
+  pointer-events: none;
+}
+.fan .key li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.fan .lane {
+  display: inline-block;
+  width: 4px;
+  height: 13px;
+  border-radius: 1px;
+  flex: none;
+}
+.fan .lane.alive {
+  background: var(--living);
+  box-shadow: 0 0 6px rgba(63, 210, 134, 0.6);
+}
+.fan .lane.lineage {
+  background: var(--lineage);
+}
+.fan .lane.dead {
+  background: var(--ended);
+}
+.fan .lane.extinct {
+  background: var(--withered);
+}
+
+/* The card: a sheet from the bottom edge, as wide as the phone. */
+.fan .card-sp {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 440px;
+  min-width: 0;
+  background: rgba(13, 25, 21, 0.96);
+  border: 1px solid rgba(200, 230, 210, 0.12);
+  border-radius: 16px;
+  padding: 14px 16px 12px;
+  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.35);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.fan .card-sp .t {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 9px;
+  padding-right: 34px;
+  font-size: 23px;
+  font-weight: 650;
+  line-height: 1.15;
+  letter-spacing: 0.005em;
+  margin-bottom: 9px;
+}
+.fan .card-sp .t i {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 17px;
+  color: var(--ink-2);
+}
+.fan .card-sp .stats {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: baseline;
+  gap: 3px 9px;
+  margin: 0 0 8px;
+}
+.fan .card-sp .stats .lane {
+  align-self: center;
+}
+.fan .card-sp .stats b {
+  font-size: 19px;
+  font-weight: 650;
+  text-align: right;
+}
+.fan .card-sp .stats span {
+  color: var(--ink-2);
+}
+.fan .card-sp .stats .range {
+  grid-column: 3;
+  color: var(--ink-3);
+  font-size: 12.5px;
+  margin-top: -3px;
+}
+.fan .card-sp .meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 16px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+.fan .card-sp .meta dt {
+  display: inline;
+}
+.fan .card-sp .meta dd {
+  display: inline;
+  margin: 0 0 0 4px;
+  color: var(--ink-2);
+}
+.fan .card-sp .dim {
+  color: var(--ink-3);
+}
+.fan .card-sp .mono {
+  font-family: var(--sans);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.fan .card-sp .x {
+  top: 8px;
+  right: 8px;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 50%;
+  color: var(--ink-2);
+  font-size: 22px;
+}
+.fan .card-sp .hist {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(200, 230, 210, 0.1);
 }
