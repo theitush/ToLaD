@@ -2,26 +2,21 @@ import { describe, expect, it } from 'vitest';
 import { FanCamera } from './camera';
 import { laneAt, layoutFan, leftAt } from './layout';
 import { PANTHERA } from './panthera';
-import { isTree, shadeMesh, shadeTree, unpackInst, type MeshInst, type TreeInst } from './mesh';
+import { latticeRep, latticeTop, shadeMesh, unpackInst, type MeshInst } from './mesh';
 import { MeshBatch, rgb01 } from './meshgl';
-import { drawTwigs, kLogAt, LINEAGE, LIVING, SCALE_BAR_PX, TEXTURE_IND, textureFade, treeLevel, TWIG_GRAY, TWIG_WITHERED, TwigModel, type TwigView } from './twigs';
+import { drawTwigs, kLogAt, LINEAGE, LIVING, SCALE_BAR_PX, TEXTURE_IND, textureFade, lineLevel, TWIG_GRAY, TWIG_WITHERED, TwigModel, type TwigView } from './twigs';
 
 const PAL = [LIVING, LINEAGE, TWIG_GRAY, TWIG_WITHERED].map(rgb01);
 
-/** Unpack the batch's instances (meshgl.ts layout, mesh.ts packInst / packTree). */
-function unpack(b: MeshBatch): { mesh: MeshInst[]; tree: TreeInst[] } {
+/** Unpack the batch's instances (meshgl.ts layout, mesh.ts packInst). */
+function unpack(b: MeshBatch): MeshInst[] {
   const mesh: MeshInst[] = [];
-  const tree: TreeInst[] = [];
-  for (let k = 0; k < b.n; k++) {
-    const x = unpackInst(b.f, b.u, k);
-    if (isTree(x)) tree.push(x);
-    else mesh.push(x);
-  }
-  return { mesh, tree };
+  for (let k = 0; k < b.n; k++) mesh.push(unpackInst(b.f, b.u, k));
+  return mesh;
 }
 
 /** Shade a grid of screen points through the CPU mirror of the shader: lit pixels and their colours. */
-function shadeScreen(v: TwigView, c: FanCamera, insts: (MeshInst | TreeInst)[], step = 3, x0 = 0, x1 = c.w) {
+function shadeScreen(v: TwigView, c: FanCamera, insts: MeshInst[], step = 3, x0 = 0, x1 = c.w) {
   const kLog = kLogAt(v, c.fan.time, c.cam.cy);
   const nowPx = c.toScreen(0, c.yNow)[1];
   // Each instance over its own rectangle only (a grid of rows `step` px apart, every px across).
@@ -39,7 +34,7 @@ function shadeScreen(v: TwigView, c: FanCamera, insts: (MeshInst | TreeInst)[], 
       for (let q = q0; q <= q1; q++) {
         if (hit[rr * cols + q]) continue;
         const px = x0 + q + 0.5;
-        const [r, g, b, a] = isTree(m) ? shadeTree(m, px, py, PAL) : shadeMesh(m, px, py, kLog, nowPx, PAL);
+        const [r, g, b, a] = shadeMesh(m, px, py, kLog, nowPx, PAL);
         if (a > 0.02) {
           hit[rr * cols + q] = 1;
           colours.add([r, g, b].map((x) => Math.round(x * 20)).join(','));
@@ -120,30 +115,44 @@ function at(perBar: number, ago = 3000, sy = 40, at?: number) {
   return { c, b, m: new TwigModel(b, f.time, 'linear') };
 }
 
-describe('the tree texture, then the individuals', () => {
-  it('the individuals fade in as the width scale bar reads ~100 individuals; above that, the tree', () => {
+/** The lines an instance draws with weight > minA whose centres fall in [w0, w1) (screen x). */
+function linesIn(x: MeshInst, w0: number, w1: number, minA = 0.3): number[] {
+  const pp = x.bw / 2 ** x.lvl;
+  const out: number[] = [];
+  for (let bb = Math.max(0, Math.floor((w0 - x.xB0) / x.bw) - 1); x.xB0 + bb * x.bw < w1; bb++) {
+    const B = x.B0 + bb;
+    const K = latticeRep(x.latSeed, x.lvl, B);
+    const lx = x.xB0 + bb * x.bw + (K - B * 2 ** x.lvl + 0.5) * pp;
+    const wgt = x.fineA < 1 && !latticeTop(x.latSeed, x.lvl, B) ? x.fineA : 1;
+    if (lx >= w0 && lx < w1 && wgt > minA) out.push(lx);
+  }
+  return out;
+}
+
+describe('the texture of lines, then the individuals on them', () => {
+  it('the individuals fade in as the width scale bar reads ~100 individuals; above that, lines', () => {
     expect(textureFade(1000)).toBe(0);
     expect(textureFade(TEXTURE_IND[0])).toBe(0);
     expect(textureFade(50)).toBeGreaterThan(0.25);
     expect(textureFade(TEXTURE_IND[1])).toBe(1);
     expect(TEXTURE_IND[0]).toBeLessThanOrEqual(120);
-    for (const [perBar, tree, mesh] of [
-      [1e6, true, false],
-      [1000, true, false],
-      [100, true, false],
-      [50, true, true],
-      [20, false, true],
+    for (const [perBar, lives] of [
+      [1e6, false],
+      [1000, false],
+      [100, false],
+      [50, true],
+      [20, true],
     ] as const) {
       const { c, b, m } = at(perBar);
       const { v } = stubView(c);
       const st = drawTwigs(v, b, m, null);
-      const { mesh: mi, tree: ti } = unpack(v.mesh!);
-      expect(ti.some((x) => x.alpha > 0.01)).toBe(tree);
-      expect(mi.some((x) => x.alpha > 0.01)).toBe(mesh);
+      const mi = unpack(v.mesh!);
+      if (perBar >= 100) expect(mi.some((x) => x.mode === 0 && x.alpha > 0.01)).toBe(true);
+      expect(mi.some((x) => x.mode === 1 && x.alpha > 0.01)).toBe(lives);
       // Lit, not a flat fill (some pixels dark), and the lanes dim under it.
-      const { lit, n } = shadeScreen(v, c, [...ti, ...mi]);
+      const { lit, n } = shadeScreen(v, c, mi);
       expect(lit).toBeGreaterThan(1000);
-      expect(lit).toBeLessThan(n * (mesh ? 0.8 : 0.45));
+      expect(lit).toBeLessThan(n * (lives ? 0.8 : 0.6));
       expect(st?.fadeGreen ?? 0).toBeGreaterThan(0.25);
       expect(st?.texGray ?? 0).toBeGreaterThan(0.25);
     }
@@ -151,11 +160,12 @@ describe('the tree texture, then the individuals', () => {
 
   it('density follows width = individuals: across the scale bar, about N individuals in either lane', () => {
     for (const N of [30, 1e2, 1e3, 1e4, 5e4]) {
+      const counts: number[] = [];
       for (const lane of ['green', 'gray'] as const) {
         const { c, b, m } = at(N);
         const { v } = stubView(c);
         drawTwigs(v, b, m, null);
-        const { mesh, tree } = unpack(v.mesh!);
+        const mesh = unpack(v.mesh!);
         const xG = c.toScreen(leftAt(b, c.cam.cy) + laneAt(b, c.cam.cy).gw, c.cam.cy)[0];
         // One scale bar's width inside the lane, clear of the boundary.
         // (A green lane narrower than the bar: the lane, and the individuals in it.)
@@ -164,24 +174,56 @@ describe('the tree texture, then the individuals', () => {
         const pitchPx = m.pitch(c.cam.cy) * c.cam.sx;
         const inWindow = (w1 - w0) / pitchPx;
         if (lane === 'green' && N > 2e4) expect(inWindow).toBeLessThan(N); // the living: ~23 thousand
+        const row = c.h / 2;
+        const here = mesh.filter((x) => x.alpha > 0.3 && x.y0 <= row && x.y1 > row);
+        expect(here.length).toBeGreaterThan(0);
+        const x = here[0];
+        expect(x.bw / 2 ** x.lvl).toBeCloseTo(pitchPx, 6);
         if (N < TEXTURE_IND[1]) {
-          // The individuals themselves: one slot (one life) per individual.
-          const lives = mesh.filter((x) => x.mode === 1 && x.alpha > 0.5);
-          expect(lives.length).toBeGreaterThan(0);
-          for (const x of lives) expect(x.slotDx).toBeCloseTo(pitchPx, 6);
-          const slots = Math.round(SCALE_BAR_PX / lives[0].slotDx);
+          // The individuals themselves: every slot (one life) per individual.
+          expect(x.lvl).toBe(0);
+          expect(x.fineA).toBe(1);
+          const slots = Math.round(SCALE_BAR_PX / x.bw);
           expect(slots).toBeGreaterThan(N * 0.8);
           expect(slots).toBeLessThan(N * 1.25);
           continue;
         }
-        // The tree: distinct strands across the bar, each standing for 2^L individuals.
-        const { L } = treeLevel(pitchPx);
-        const xs = new Set(tree.filter((t) => t.alpha > 0.3 && t.xm >= w0 && t.xm < w1).map((t) => t.xm.toFixed(3)));
-        const represented = xs.size * 2 ** L;
-        expect(xs.size).toBeGreaterThanOrEqual(4); // strands, not one fat line
+        // The texture: distinct lines across the window, each standing for 2^λ individuals.
+        const { lambda } = lineLevel(pitchPx);
+        const xs = linesIn(x, w0, w1);
+        const represented = xs.length * 2 ** lambda;
+        expect(xs.length).toBeGreaterThanOrEqual(4); // lines, not one fat line
         expect(represented).toBeGreaterThan(inWindow / 2.2);
         expect(represented).toBeLessThan(inWindow * 2.2);
+        counts.push(xs.length / (w1 - w0));
+        // ...and they are drawn: separate lit runs along the row.
+        const kLog = kLogAt(v, c.fan.time, c.cam.cy);
+        const nowPx = c.toScreen(0, c.yNow)[1];
+        let runs = 0;
+        let on = false;
+        for (let px = w0 + 0.5; px < w1; px += 0.5) {
+          let a = 0;
+          for (const y of here) a = Math.max(a, shadeMesh(y, px, row, kLog, nowPx, PAL)[3]);
+          if (a > 0.05 && !on) runs++;
+          on = a > 0.05;
+        }
+        expect(runs).toBeGreaterThanOrEqual(3);
       }
+      // The same density of lines in both lanes.
+      if (counts.length === 2 && N <= 1e4) expect(counts[0] / counts[1]).toBeGreaterThan(0.5), expect(counts[0] / counts[1]).toBeLessThan(2);
+    }
+  });
+
+  it('a line seen at a coarse zoom stays in place as one zooms in, until it is the slot\'s own life', () => {
+    // The lines drawn across the column at 1e4 per bar, by slot, are drawn at 1e3, 100 and 35 per bar too.
+    let prev: Set<number> | null = null;
+    for (const N of [1e4, 1e3, 100, 35]) {
+      const { m } = at(N);
+      const { L } = lineLevel(SCALE_BAR_PX / N);
+      const set = new Set<number>();
+      for (let B = Math.floor(5e5 / 2 ** L); B * 2 ** L < 5.2e5; B++) set.add(latticeRep(m.latticeSeed, L, B));
+      if (prev) for (const K of prev) if (K >= 5e5 && K < 5.2e5) expect(set.has(K)).toBe(true);
+      prev = set;
     }
   });
 });
@@ -192,7 +234,7 @@ describe('the dead lane', () => {
       const { c, b, m } = at(20, ago, 5, 0.7);
       const { v } = stubView(c);
       const st = drawTwigs(v, b, m, null);
-      const insts = unpack(v.mesh!).mesh.filter((x) => x.alpha > 0.01);
+      const insts = unpack(v.mesh!).filter((x) => x.alpha > 0.01);
       expect(insts.length).toBeGreaterThan(0);
       const { lit, colours } = shadeScreen(v, c, insts, 4);
       expect(lit).toBeGreaterThan(100);

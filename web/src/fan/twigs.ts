@@ -25,10 +25,10 @@
 //   links     plus threads to both parents and who has living descendants;
 //   labels    plus handles (lion#…).
 
-import { hashNum, mix, rand, randFloat } from '../../../packages/procgen/src/hash.ts';
+import { mix } from '../../../packages/procgen/src/hash.ts';
 import { Species, type Address } from '../../../packages/procgen/src/index.ts';
-import { laneAt, leftAt, remaining, TIME_C, TIME_H, type FanBranch, type TimeScale, type WidthMode } from './layout';
-import { attrSeed, F_LINEAGE, Lane, lineageThreshold, MAX_FOLD, packInst, packTree, type MeshInst, type TreeInst } from './mesh';
+import { laneAt, leftAt, remaining, TIME_C, type FanBranch, type TimeScale, type WidthMode } from './layout';
+import { attrSeed, F_LINEAGE, Lane, lineageThreshold, MAX_FOLD, packInst, type MeshInst } from './mesh';
 import type { MeshBatch } from './meshgl';
 import type { SpeciesRec } from './panthera';
 
@@ -323,6 +323,11 @@ export class TwigModel {
     return null;
   }
 
+  /** The seed of the column's nested lattice of drawn lines (mesh.ts latticeRep): one per branch, the same in both lanes. */
+  get latticeSeed(): number {
+    return mix(this.sp.seed, 0x1a77) >>> 0;
+  }
+
   private readonly seeds = new Map<number, number>();
   /** procgen's attribute seed of generation g (mesh.ts: the GPU mixes the index into it). */
   seedOf(g: number): number {
@@ -570,13 +575,13 @@ export function threadEnds(v: TwigView, m: TwigModel, parent: Twig, child: Twig,
 /** The width scale bar's target length (px, view.ts widthScale): textures are tied to what it reads. */
 export const SCALE_BAR_PX = 70;
 /**
- * The individuals mesh (lives, or the texture of their lives) fades in over
- * the tree texture as the width scale bar reads TEXTURE_IND[0] individuals
- * down to TEXTURE_IND[1] (about 100: one individual about a pixel wide).
+ * The lives (mode 1) fade in over the texture of lines (mode 0) as the width
+ * scale bar reads TEXTURE_IND[0] individuals down to TEXTURE_IND[1] (about
+ * 100: one individual about a pixel wide); by then the lines are every slot.
  */
 export const TEXTURE_IND: [number, number] = [80, 35];
 
-/** Mesh fade-in by individuals per scale-bar length (log-linear between TEXTURE_IND). */
+/** Lives fade-in by individuals per scale-bar length (log-linear between TEXTURE_IND). */
 export function textureFade(perBar: number): number {
   if (!(perBar > 0)) return 0;
   const [a, b] = TEXTURE_IND;
@@ -584,23 +589,34 @@ export function textureFade(perBar: number): number {
 }
 
 /**
- * The tree texture's strand spacing (px) by individuals per scale bar: a few
- * strands, pixels apart, just above the mesh; finer as the bar holds more.
+ * Typical px between the drawn lines by individuals per scale bar: every slot
+ * (2 px apart) at TEXTURE_IND[1]; 5 px by ~100 per bar; then slowly finer (a
+ * denser texture for wider spans), down to 4 px. px × individuals grows with the bar, so the
+ * level only rises as one zooms out: the line sets nest.
  */
-export function treeSpacing(perBar: number): number {
-  return Math.max(3, Math.min(8, 8 - 1.25 * Math.log10(Math.max(1, perBar) / 100)));
+export function lineSpacing(perBar: number): number {
+  const [, b] = TEXTURE_IND;
+  if (perBar <= 100) return 2 + 3 * smoothstep(Math.log(Math.max(b, perBar) / b) / Math.log(100 / b));
+  return Math.max(4, 5 - 0.25 * Math.log10(perBar / 100));
+}
+
+/**
+ * The lattice level at a pitch (px per individual): continuous λ (the drawn
+ * lines stand for 2^λ individuals each), its floor L, and the fade of the
+ * lines of level L that are not of L + 1 (mesh.ts latticeRep).
+ */
+export function lineLevel(pitchPx: number): { lambda: number; L: number; fineA: number } {
+  const lambda = Math.log2(lineSpacing(SCALE_BAR_PX / pitchPx) / pitchPx);
+  const L = Math.max(0, Math.floor(lambda));
+  return { lambda, L, fineA: lambda <= 0 ? 1 : smoothstep(1 - (lambda - L)) };
 }
 
 /** Target screen height (px) of one texture band of generations. */
 const BAND_PX = 6;
-/** Target screen height (px) of one tree epoch (the time over which side branches come and go). */
-const TREE_EPOCH_PX = 36;
 /** Most mesh instances per branch per frame. */
 const MAX_INST = 6000;
-/** Most tree segments per branch per frame. */
-const MAX_TREE = 20000;
-/** The lanes dim this much (of their full dimming under the mesh) under the tree texture. */
-const TREE_DIM = 0.6;
+/** The lanes dim this much (of their full dimming under the lives) under the texture of lines. */
+const TEXTURE_DIM = 0.6;
 
 const smoothstep = (t: number) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
 
@@ -656,18 +672,28 @@ function stretches(v: TwigView, m: TwigModel, yTop: number, yBot: number): Stret
 export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: number, mode: 0 | 1, alpha: number, look: { lw: number; tipR: number }, out: MeshInst[]): void {
   if (!(alpha > 0.004) || !(yBot > yTop)) return;
   const time = m.time;
-  const ym = (yTop + yBot) / 2;
-  const gm = m.generationAt(ym);
-  const genPx = Math.abs(m.yOf((gm + 1) * m.GL) - m.yOf(gm * m.GL)) * v.sy;
-  const t = mode ? 1 : Math.pow(2, Math.max(0, Math.ceil(Math.log2(BAND_PX / Math.max(1e-9, genPx)))));
   const gTop = m.generationAt(yTop);
   const gBot = Math.max(0, m.generationAt(yBot) - (mode ? m.span : 0));
-  if ((gTop - gBot) / t > MAX_INST) return;
+  if (mode && gTop - gBot > MAX_INST) return;
   const Lm = m.sp.lifespanYears;
   const now = m.sp.now;
   const lane = m.rec.extinct ? Lane.Withered : Lane.Gray;
   const st = stretches(v, m, yTop, yBot);
-  for (let gA = Math.floor(gBot / t) * t; gA <= gTop; gA += t) {
+  const latSeed = m.latticeSeed;
+  // Texture bands of t generations, t a power of two by the generations' local height on screen
+  // (the time axis is logarithmic), aligned to multiples of t: fixed in the world.
+  const bandRaw = (g: number) => {
+    const genPx = Math.abs(m.yOf((g + 1) * m.GL) - m.yOf(g * m.GL)) * v.sy;
+    return Math.pow(2, Math.max(0, Math.min(40, Math.ceil(Math.log2(BAND_PX / Math.max(1e-12, genPx))))));
+  };
+  const start = out.length;
+  let count = 0;
+  for (let gA = mode ? gBot : gBot - (gBot % bandRaw(gBot)), t = 1; gA <= gTop; gA += t) {
+    if (!mode) for (t = bandRaw(gA); gA % t; ) t /= 2;
+    if (++count > MAX_INST) {
+      out.length = start;
+      return;
+    }
     const nA = m.size(gA);
     const gB = t > 1 && gA + t / 2 < m.G ? gA + t / 2 : -1;
     const nB = gB >= 0 ? m.size(gB) : 0;
@@ -693,19 +719,11 @@ export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: num
       const y0 = Math.max(-4, py0 - padT);
       const y1 = Math.min(v.h + 4, py1 + padB);
       if (!(x1 > x0) || !(y1 > y0)) continue;
-      // The slot lattice: one individual per slot; the texture draws every s-th, ≥ 2 px apart.
-      let s = 1;
-      let fineA = 1;
-      if (!mode) {
-        const sE = Math.log2(Math.max(1, 2 / Math.max(1e-300, S.pitchPx)));
-        s = Math.pow(2, Math.ceil(sE));
-        const f = s > 1 ? smoothstep(Math.ceil(sE) - sE) : 0;
-        if (f > 0.02 && f < 1) fineA = f;
-      }
-      const iStep = fineA < 1 ? s / 2 : s;
-      const kL = (x0 - lx0) / S.pitchPx - 0.5;
-      const KBase = Math.max(0, Math.floor(kL / s) * s - s);
-      if (KBase >= S.nT) continue;
+      // The slot lattice: one individual per slot; the nested subset of its lines drawn at this zoom.
+      const { L: lvl, fineA } = lineLevel(S.pitchPx);
+      const bw = 2 ** lvl * S.pitchPx;
+      const B0 = Math.max(0, Math.floor((x0 - lx0) / bw) - 1);
+      if (B0 * 2 ** lvl >= S.nT) continue;
       // The time axis at the top of the instance, relative to generation gA's start.
       const [, wy0] = v.toWorld(0, y0);
       const age = time.ageAt(wy0) * 1e6;
@@ -715,8 +733,8 @@ export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: num
         y0,
         x1,
         y1,
-        slotX0: lx0 + (KBase + 0.5) * S.pitchPx,
-        slotDx: iStep * S.pitchPx,
+        xB0: lx0 + B0 * bw,
+        bw,
         lw: look.lw,
         fineA,
         p0: y0,
@@ -731,9 +749,9 @@ export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: num
         Lm,
         nowRel: now - gA * m.GL,
         xG: S.xG,
-        iBase: KBase % nA,
-        iBaseB: nB > 0 ? KBase % nB : 0,
-        iStep,
+        B0,
+        lvl,
+        latSeed,
         nA,
         nB,
         seedA: m.seedOf(gA),
@@ -747,158 +765,18 @@ export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: num
   }
 }
 
-/** Trailing zero bits of a non-negative integer Number (< 2^53); 64 for 0. */
-function tz(x: number): number {
-  if (x === 0) return 64;
-  let r = 0;
-  while (x % 2 === 0) {
-    x /= 2;
-    r++;
-  }
-  return r;
-}
-
-/** The tree texture's level of detail at a pitch (px per individual): continuous level λ, strands every 2^L individuals, the finest strands' fade. */
-export function treeLevel(pitchPx: number): { lambda: number; L: number; fineA: number } {
-  const lambda = Math.log2(treeSpacing(SCALE_BAR_PX / pitchPx) / pitchPx);
-  const L = Math.max(0, Math.floor(lambda));
-  return { lambda, L, fineA: L > 0 ? smoothstep(1 - (lambda - L)) : 1 };
-}
-
-/**
- * The tree texture of one branch between world heights yTop < yBot: strands
- * on the column's slot lattice every 2^L individuals (L by zoom, the finest
- * fading in over each octave). A strand on slot K of rank r (2^r divides K)
- * stands for the 2^r individuals around it: the higher its rank (relative to
- * the zoom, δ = r − λ), the longer it lasts. Time is cut into epochs (fixed in
- * the world, ~TREE_EPOCH_PX tall, nested levels crossfading by time zoom); in
- * each epoch a strand with δ < 3 is a side branch: it leaves its parent strand
- * (K ± 2^r, a higher rank: hashed side) somewhere in the lower half of the
- * parent's own stretch, and ends in a tip before the parent does. Going back
- * in time, lines merge into their parents: lineages coalescing. From δ ≥ 3 a
- * strand runs through. Every decision hashes (branch seed, slot, epoch): fixed
- * in the world, the same at every zoom, the same in both lanes (the lane only
- * colours). Drawn as cheap segment instances (mesh.ts TreeInst).
- */
-export function treeInstances(v: TwigView, m: TwigModel, yTop: number, yBot: number, alpha: number, out: TreeInst[]): void {
-  if (!(alpha > 0.004) || !(yBot > yTop)) return;
-  const seed = mix(m.sp.seed, 0x7ee5);
-  const aliveY = m.rec.extinct || m.aliveFrom >= m.G ? -1e9 : v.toScreen(0, m.yOf(m.aliveFrom * m.GL))[1];
-  const lane = m.rec.extinct ? Lane.Withered : Lane.Gray;
-  // Time levels: epochs of TIME_H / 2^q world, the level whose epochs are TREE_EPOCH_PX..2× tall;
-  // over the top of that octave the next (halved) level crossfades in.
-  const qf = Math.log2((TIME_H * v.sy) / TREE_EPOCH_PX);
-  const Q = Math.floor(qf);
-  const fq = smoothstep((qf - Q - 0.6) / 0.4);
-  const levels: [number, number][] = [];
-  if (fq < 0.99) levels.push([Q, 1 - fq]);
-  if (fq > 0.01) levels.push([Q + 1, fq]);
-  const start = out.length;
-  for (const S of stretches(v, m, yTop, yBot)) {
-    const { lambda, L, fineA } = treeLevel(S.pitchPx);
-    const step = Math.pow(2, L);
-    const stepPx = step * S.pitchPx;
-    const lw = Math.max(0.8, Math.min(1.3, stepPx * 0.16));
-    const colR = S.colX + S.nT * S.pitchPx;
-    const xa = Math.max(-4, S.colX);
-    const xb = Math.min(v.w + 4, colR);
-    const [, py0w] = v.toScreen(0, S.ya);
-    const [, py1w] = v.toScreen(0, S.yb);
-    const py0 = Math.max(-4, py0w);
-    const py1 = Math.min(v.h + 4, py1w);
-    if (!(xb > xa) || !(py1 > py0)) continue;
-    // Strands on screen, and those just off it whose side branches can reach in (2^ρ strands away).
-    const mv0 = Math.max(0, Math.floor((xa - S.colX) / stepPx));
-    const mv1 = Math.min(Math.floor(S.nT / step), Math.ceil((xb - S.colX) / stepPx));
-    const m0 = Math.max(0, mv0 - 16);
-    const m1 = Math.min(Math.floor(S.nT / step), mv1 + 16);
-    if (m1 - m0 > 4000) continue;
-    const xOf = (K: number) => S.colX + (K + 0.5) * S.pitchPx;
-    const box = (xm: number, xp: number, yA: number, yB: number, J: number, a: number) => {
-      const x0 = Math.max(xa, Math.min(xm, xp) - lw - 1);
-      const x1 = Math.min(xb, Math.max(xm, xp) + lw + 1);
-      const y0 = Math.max(py0, yB - lw - 1);
-      const y1 = Math.min(py1, yA);
-      if (!(x1 > x0) || !(y1 > y0)) return;
-      out.push({ x0, y0, x1, y1, xm, xp, lw, yA, yB, J: Math.max(0.5, J), alpha: a, lane, xG: S.xG, aliveY });
-    };
-    // The strands that run through: one line over the stretch.
-    for (let mm = m0; mm <= m1; mm++) {
-      const rho = tz(mm);
-      if (L + rho - lambda < 3) continue;
-      if (mm < mv0 || mm > mv1) continue;
-      const xm = xOf(mm * step);
-      box(xm, xm, py1w, py0w, 1, alpha);
-    }
-    for (const [q, wq] of levels) {
-      const Ew = TIME_H / Math.pow(2, q);
-      const Epx = Ew * v.sy;
-      // Epochs: time τ = −y grows upwards; epoch e spans τ ∈ [e·Ew, (e + 1)·Ew).
-      const e0 = Math.floor(-S.yb / Ew);
-      const e1 = Math.floor(-S.ya / Ew);
-      if (e1 - e0 > 400) continue;
-      for (let e = e0; e <= e1; e++) {
-        const memo = new Map<number, [number, number]>();
-        const eKey = e + 2 ** 51;
-        // A strand's stretch [a, b] of epoch e (fractions of it), nested inside its parent's.
-        const seg = (K: number, r: number): [number, number] => {
-          if (r - lambda >= 3 || r >= 60) return [0, 1];
-          const hit = memo.get(K);
-          if (hit) return hit;
-          const hK = hashNum(seed, K);
-          const Kp = rand(hK, 1) & 1 ? K + 2 ** r : K - 2 ** r;
-          const [ap, bp] = seg(Kp, tz(Kp));
-          const s = smoothstep((r - lambda - 1) / 2);
-          const he = hashNum(hK, eKey);
-          const h1 = randFloat(he, 2);
-          const h2 = randFloat(he, 3);
-          const a = ap + h1 * (bp - ap) * 0.5 * (1 - s);
-          const k = 0.25 + 0.75 * h2;
-          const res: [number, number] = [a, a + (bp - a) * (k + (1 - k) * s)];
-          memo.set(K, res);
-          return res;
-        };
-        const yOfTau = (u: number) => v.toScreen(0, -(e + u) * Ew)[1];
-        const yEb = yOfTau(0);
-        const yEt = yOfTau(1);
-        if (yEt > py1 || yEb < py0) continue;
-        for (let mm = m0; mm <= m1; mm++) {
-          const rho = tz(mm);
-          const r = L + rho;
-          const d = r - lambda;
-          if (d >= 3) continue;
-          // Strands off screen matter only through a side branch long enough to reach in.
-          if ((mm < mv0 && mv0 - mm > 2 ** rho) || (mm > mv1 && mm - mv1 > 2 ** rho)) continue;
-          const vis = rho === 0 ? fineA : 1;
-          if (vis < 0.01) continue;
-          const K = mm * step;
-          const [a, b] = seg(K, r);
-          const Kp = rand(hashNum(seed, K), 1) & 1 ? K + 2 ** r : K - 2 ** r;
-          const s = smoothstep((d - 1) / 2);
-          const xm = xOf(K);
-          const xp = xm + (xOf(Kp) - xm) * (1 - s);
-          const yA = yOfTau(a);
-          const yB = yOfTau(b);
-          box(xm, xp, yA, yB, Math.min(0.35, 0.6 * (b - a)) * Epx, alpha * wq * vis);
-        }
-        if (out.length - start > MAX_TREE) {
-          out.length = start;
-          return;
-        }
-      }
-    }
-  }
-}
-
 /**
  * The inside of one branch: the same lanes as the zoomed-out branch, resolved
  * into individuals on one slot lattice for both lanes (one individual per
  * slot, the same width in either), which differ only by the colour of who is
  * in them (mesh.ts, drawn on the GPU by meshgl.ts):
- *   - above ~100 individuals per width scale bar, the tree texture: strands
- *     each standing for 2^L individuals, branching and coalescing;
- *   - from ~100 per bar the individuals crossfade in (no switch): every life,
- *     or while generations are too thin on screen, the texture of their lives;
+ *   - above ~100 individuals per width scale bar, the texture of lines: a
+ *     nested, hashed subset of the slots' own lines (each standing for 2^λ
+ *     individuals), fixed in the world; more fade in between as one zooms in,
+ *     until every slot is drawn;
+ *   - from ~100 per bar the individuals crossfade in on those same lines (no
+ *     switch): every life, or while generations are too thin on screen, the
+ *     texture of their lives;
  *   - links (Canvas 2D, on top): threads to both parents (procgen parents()) at
  *     each child's birth, once few enough; labels (handles) when wide apart.
  * Only the visible generations and slots are touched.
@@ -928,37 +806,31 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
   const cellPx = m.pitch(ym) * v.sx;
   const perBar = SCALE_BAR_PX / cellPx;
   const genPx = Math.abs(m.yOf((gm + 1) * m.GL) - m.yOf(gm * m.GL)) * v.sy;
-  // Both lanes by the same rules: the tree above ~100 individuals per scale bar (once the
-  // column is a few strands wide), then the individuals: every life once the generations
-  // are a few px tall, else the texture of their lives.
+  // Both lanes by the same rules, on the same nested lines (mesh.ts latticeRep): above ~100
+  // individuals per scale bar the texture of lines (once the column is a few lines wide);
+  // then the individuals: every life once the generations are a few px tall.
   const meshIn = smoothstep(textureFade(perBar));
-  const treeA = (1 - meshIn) * smoothstep((L.w * v.sx - 12) / 28);
+  const colA = smoothstep((L.w * v.sx - 12) / 28);
   const lives = meshIn * smoothstep((genPx - 0.5) / 2);
-  const dens = meshIn - lives;
-  const dim = Math.max(meshIn, treeA * TREE_DIM);
+  const dens = Math.max(meshIn, colA) - lives;
+  const dim = Math.max(meshIn, (1 - meshIn) * colA * TEXTURE_DIM);
   const stats: TwigStats = { mode: 'texture', g0: gm, g1: gm, drawn: 0, cellPx, fade: lives, fadeGreen: ext ? 0 : dim, texGray: dim, pending: false };
-  if (!(treeA > 0.004 || meshIn > 0.004)) return null;
+  if (!(colA > 0.004 || meshIn > 0.004)) return null;
   const lwL = Math.min(3.5, Math.max(Math.min(1, 0.6 * cellPx), cellPx * 0.22));
   // A death is a rounded end, a touch wider than the strand.
   const tipR = lwL * 0.5 + Math.min(1, 0.25 + cellPx * 0.02);
   const lw = Math.max(1, Math.min(4, cellPx * 0.12));
   if (v.mesh) {
     const batch = v.mesh;
-    const trees: TreeInst[] = [];
-    treeInstances(v, m, yTop, yBot, treeA * 0.9, trees);
-    // (next() first: it may grow the arrays.)
-    for (const t of trees) {
-      const k = batch.next();
-      packTree(t, batch.f, batch.u, k);
-    }
     const insts: MeshInst[] = [];
     if (dens > 0.02) meshInstances(v, m, yTop, yBot, 0, dens, { lw: 0.9, tipR: 0 }, insts);
     meshInstances(v, m, yTop, yBot, 1, lives, { lw: lwL, tipR }, insts);
     for (const inst of insts) {
+      // (next() first: it may grow the arrays.)
       const k = batch.next();
       packInst(inst, batch.f, batch.u, k);
     }
-    stats.instances = insts.length + trees.length;
+    stats.instances = insts.length;
   }
   if (cellPx < 1.5) return stats;
   const ctx = v.ctx;

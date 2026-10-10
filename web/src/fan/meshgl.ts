@@ -69,13 +69,13 @@ precision highp int;
 ${HASH_GLSL}
 in vec2 vP;
 flat in vec4 vRect;
-flat in vec4 vSlot;   // slotX0, slotDx, lw, fineA          (tree: xm, xp, lw, -)
-flat in vec4 vTime;   // p0, T0, A, gBoff                   (tree: yA, yB, J, -)
+flat in vec4 vSlot;   // xB0, bw, lw, fineA
+flat in vec4 vTime;   // p0, T0, A, gBoff
 flat in vec4 vMisc;   // alpha, mode, lane, tipR
-flat in vec4 vLife;   // GL, Lm, nowRel, xG                 (tree: aliveY, -, -, xG)
-flat in uvec4 vIdx;   // iBase, iStep, nA, nB
+flat in vec4 vLife;   // GL, Lm, nowRel, xG
+flat in uvec4 vIdx;   // B0, lvl, nA, nB
 flat in uvec4 vSeed;  // seedA, seedB, thrA, thrB
-flat in uvec4 vIdx2;  // iBaseB, nG, fold, -
+flat in uvec4 vIdx2;  // latSeed, nG, fold, -
 uniform float uKLog;
 uniform float uNowPx;
 uniform vec3 uPal[4];
@@ -96,6 +96,8 @@ vec4 life(uint seed, uint i, float GL, float Lm, float nowRel, uint thr) {
   bool lin = rand(h, 17u) < thr;
   return vec4(birth, l, alive ? 1.0 : 0.0, lin ? 1.0 : 0.0);
 }
+// mesh.ts latticeBit: which half's line is block idx's at level l.
+uint latBit(uint l, uint idx) { return lowbias32((idx * 0x9e3779b1u) ^ vIdx2.x ^ (l * 0x85ebca6bu)) >> 31u; }
 int code(float lane, bool alive, bool lin) {
   if (lane < 0.5) return alive ? 0 : 1;
   if (alive) return -1;
@@ -164,49 +166,47 @@ vec4 shadeLane(float lane, uint iA, uint iB, float d, vec2 p) {
 void main() {
   vec2 p = vP;
   float xG = vLife.w;
-  if (vMisc.y > 1.5) {
-    // The tree texture: one strand segment (mesh.ts shadeTree).
-    float yA = vTime.x;
-    float yB = vTime.y;
-    float J = vTime.z;
-    if (p.y > yA) discard;
-    float yc = clamp(p.y, yB, yA);
-    float s = clamp((yA - yc) / J, 0.0, 1.0);
-    float xm = vSlot.x;
-    float xp = vSlot.y;
-    float xu = xp + (xm - xp) * s * s * (3.0 - 2.0 * s);
-    float slope = (xm - xp) * 6.0 * s * (1.0 - s) / J;
-    float dx = abs(p.x - xu);
-    float d = p.y < yB ? length(vec2(dx, yB - p.y)) : dx / sqrt(1.0 + slope * slope);
-    float a = lineAA(d, vSlot.z) * vMisc.x;
-    if (!(a > 0.0)) discard;
-    float wg = clamp(xG - p.x + 0.5, 0.0, 1.0);
-    vec3 c = mix(uPal[vMisc.z > 1.5 ? 3 : 2], uPal[p.y < vLife.x ? 0 : 1], wg);
-    o = vec4(c * a, a);
-    return;
-  }
-  float j = floor((p.x - vSlot.x) / vSlot.y + 0.5);
-  if (j < 0.0) discard;
-  float lineX = vSlot.x + j * vSlot.y;
-  float d = abs(p.x - lineX);
-  // Nothing to draw this far from the slot (before any hashing: most pixels stop here).
+  uint L = vIdx.y;
+  float bw = vSlot.y;
+  float pp = bw / float(1u << L);
+  // Nothing to draw this far from a line (before any shading: most pixels stop here).
   // (Only the living glow, and they are only in the green lane.)
   float reach = vMisc.y < 0.5 ? max(vSlot.z, 1.0) * 0.5 + 0.5 : max(vMisc.w, vSlot.z * 0.5 + (xG > vRect.x ? 5.0 : 0.0)) + 0.5;
-  if (d > reach) discard;
-  uint iA = vIdx.z > 0u ? (vIdx.x + uint(j) * vIdx.y) % vIdx.z : 0u;
-  uint iB = vIdx.w > 0u ? (vIdx2.x + uint(j) * vIdx.y) % vIdx.w : 0u;
-  float fine = (vSlot.w < 1.0 && (uint(j) & 1u) == 1u) ? vSlot.w : 1.0;
-  // Where the lanes meet, the slot's colours blend by how much of it is in each.
-  float wg = clamp((xG - lineX) / vSlot.y + 0.5, 0.0, 1.0);
-  vec4 g = wg > 0.0 ? shadeLane(0.0, iA, iB, d, p) : vec4(0.0);
-  vec4 r = wg < 1.0 ? shadeLane(vMisc.z, iA, iB, d, p) : vec4(0.0);
-  float ag = g.a * wg;
-  float ar = r.a * (1.0 - wg);
-  float a = ag + ar;
-  if (!(a > 0.0)) discard;
-  vec3 c = (g.rgb * ag + r.rgb * ar) / a;
-  a *= vMisc.x * (vMisc.y < 0.5 ? fine : 1.0);
-  o = vec4(c * a, a);
+  float bf = floor((p.x - vSlot.x) / bw);
+  vec4 best = vec4(0.0);
+  // The lines of this block and its neighbours (each block's line is anywhere in it): mesh.ts shadeMesh.
+  for (int c = -1; c <= 1; c++) {
+    float bb = bf + float(c);
+    if (bb < 0.0) continue;
+    uint B = vIdx.x + uint(bb);
+    uint idx = B;
+    uint off = 0u;
+    for (uint l = L; l > 0u; l--) {
+      uint bit = latBit(l, idx);
+      idx = 2u * idx + bit;
+      off = 2u * off + bit;
+    }
+    float lineX = vSlot.x + bb * bw + (float(off) + 0.5) * pp;
+    float d = abs(p.x - lineX);
+    if (d > reach) continue;
+    uint K = idx;
+    uint iA = vIdx.z > 0u ? K % vIdx.z : 0u;
+    uint iB = vIdx.w > 0u ? K % vIdx.w : 0u;
+    float fine = (vSlot.w < 1.0 && latBit(L + 1u, B >> 1u) != (B & 1u)) ? vSlot.w : 1.0;
+    // Where the lanes meet, the slot's colours blend by how much of it is in each.
+    float wg = clamp((xG - lineX) / pp + 0.5, 0.0, 1.0);
+    vec4 g = wg > 0.0 ? shadeLane(0.0, iA, iB, d, p) : vec4(0.0);
+    vec4 r = wg < 1.0 ? shadeLane(vMisc.z, iA, iB, d, p) : vec4(0.0);
+    float ag = g.a * wg;
+    float ar = r.a * (1.0 - wg);
+    float a = ag + ar;
+    if (!(a > 0.0)) continue;
+    vec3 col = (g.rgb * ag + r.rgb * ar) / a;
+    a *= vMisc.x * fine;
+    if (a > best.a) best = vec4(col, a);
+  }
+  if (!(best.a > 0.0)) discard;
+  o = vec4(best.rgb * best.a, best.a);
 }`;
 
 function compile(gl: WebGL2RenderingContext, vs: string, fs: string): WebGLProgram {

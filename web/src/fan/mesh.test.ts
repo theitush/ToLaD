@@ -1,12 +1,12 @@
 // The individuals mesh (mesh.ts): one function for both lanes, and the GPU's
 // decisions (the shader's integer hash, mirrored by lifeGPU) agree with procgen.
 import { describe, expect, it } from 'vitest';
-import { MESH_F, MESH_U, colourCode, isTree, Lane, lifeGPU, lineageThreshold, packInst, packTree, shadeMesh, shadeTree, unpackInst, type MeshInst, type TreeInst } from './mesh';
+import { MESH_F, MESH_U, colourCode, Lane, latticeLines, latticeRep, latticeTop, lifeGPU, lineageThreshold, packInst, shadeMesh, unpackInst, type MeshInst } from './mesh';
 import { layoutFan } from './layout';
 import { FanCamera } from './camera';
 import { MeshBatch } from './meshgl';
 import { PANTHERA } from './panthera';
-import { drawTwigs, kLogAt, SCALE_BAR_PX, TwigModel, type TwigView } from './twigs';
+import { drawTwigs, kLogAt, lineLevel, SCALE_BAR_PX, TwigModel, type TwigView } from './twigs';
 import { HASH_GLSL } from '../../../packages/procgen/src/glsl.ts';
 
 const fan = layoutFan(PANTHERA, 'linear');
@@ -53,25 +53,25 @@ function scene(sp: string, ago: number, perBar: number, sy: number) {
     bezierCurveTo() {}
   };
   drawTwigs(v, b, mm, null);
-  const insts: (MeshInst | TreeInst)[] = [];
+  const insts: MeshInst[] = [];
   for (let k = 0; k < v.mesh!.n; k++) insts.push(unpackInst(v.mesh!.f, v.mesh!.u, k));
   const xG = c.toScreen(L.left + L.gw, c.cam.cy)[0];
   return { c, v, mm, insts, xG, kLog: kLogAt(v, f.time, c.cam.cy), nowPx: c.toScreen(0, c.yNow)[1] };
 }
 
 /** Shade one instance at a point (CPU mirror of the shader). */
-function shade(x: MeshInst | TreeInst, px: number, py: number, kLog: number, nowPx: number) {
-  return isTree(x) ? shadeTree(x, px, py, PAL) : shadeMesh(x, px, py, kLog, nowPx, PAL);
+function shade(x: MeshInst, px: number, py: number, kLog: number, nowPx: number) {
+  return shadeMesh(x, px, py, kLog, nowPx, PAL);
 }
 
-// overview, mid, close and deep: the tree, the texture of lives, the lives.
+// overview, mid, close and deep: the texture of lines, the lives.
 const SCENES: [string, string, number, number, number][] = [
   ['overview', 'Lion', 2e5, 1e9, 0.7],
   ['mid', 'Lion', 3000, 1e4, 40],
   ['crossfade', 'Lion', 3000, 50, 40],
   ['close (texture of lives)', 'Lion', 3000, 20, 3],
   ['close (lives)', 'Lion', 3000, 10, 400],
-  ['deep (tree)', 'Tiger', 1.5e6, 1e4, 50],
+  ['deep (texture)', 'Tiger', 1.5e6, 1e4, 50],
   ['deep (lives)', 'Tiger', 1.5e6, 10, 3000],
 ];
 
@@ -137,10 +137,10 @@ describe('one mesh for both lanes: the lane only colours', () => {
       const { insts, mm, c, xG } = scene(sp, ago, perBar, sy);
       const pitchPx = mm.pitch(c.cam.cy) * c.cam.sx;
       for (const x of insts) {
-        if (isTree(x)) continue;
-        // The lattice: drawn slots a power of two of individuals apart; the boundary inside the instance's span.
-        const k = Math.log2(x.slotDx / pitchPx);
-        expect(Math.abs(k - Math.round(k)), `${sp} ${perBar}`).toBeLessThan(1e-5);
+        // The lattice: blocks of 2^lvl individuals, the level of this zoom; the boundary inside the instance's span.
+        expect(x.bw / 2 ** x.lvl / pitchPx, `${sp} ${perBar}`).toBeCloseTo(1, 5);
+        expect(x.lvl).toBe(lineLevel(pitchPx).L);
+        expect(x.latSeed).toBe(mm.latticeSeed);
         if (x.x0 > 0 && x.x1 < c.w) {
           expect(x.xG).toBeCloseTo(xG, 6);
         }
@@ -209,13 +209,70 @@ describe('GPU and CPU decide alike', () => {
   it('instances pack into the attribute layout', () => {
     const f = new Float32Array(MESH_F);
     const u = new Uint32Array(MESH_U);
-    const a: MeshInst = { x0: 1, y0: 2, x1: 3, y1: 4, slotX0: 5, slotDx: 6, lw: 7, fineA: 0.5, p0: 9, T0: 10, A: 11, gBoff: 12, alpha: 0.25, mode: 1, lane: Lane.Gray, tipR: 16, GL: 17, Lm: 18, nowRel: 19, xG: 20, iBase: 1, iBaseB: 9, iStep: 2, nA: 3, nB: 4, seedA: 4294967295, seedB: 6, thrA: 7, thrB: 8, nG: 10, fold: 3 };
+    const a: MeshInst = { x0: 1, y0: 2, x1: 3, y1: 4, xB0: 5, bw: 6, lw: 7, fineA: 0.5, p0: 9, T0: 10, A: 11, gBoff: 12, alpha: 0.25, mode: 1, lane: Lane.Gray, tipR: 16, GL: 17, Lm: 18, nowRel: 19, xG: 20, B0: 1, lvl: 2, latSeed: 9, nA: 3, nB: 4, seedA: 4294967295, seedB: 6, thrA: 7, thrB: 8, nG: 10, fold: 3 };
     packInst(a, f, u, 0);
     expect([...f]).toEqual([1, 2, 3, 4, 5, 6, 7, 0.5, 9, 10, 11, 12, 0.25, 1, 1, 16, 17, 18, 19, 20]);
     expect([...u]).toEqual([1, 2, 3, 4, 4294967295, 6, 7, 8, 9, 10, 3, 0]);
     expect(unpackInst(f, u, 0)).toEqual(a);
-    const t: TreeInst = { x0: 1, y0: 2, x1: 3, y1: 4, xm: 5, xp: 6, lw: 0.5, yA: 8, yB: 9, J: 10, alpha: 0.25, lane: Lane.Withered, xG: 13, aliveY: 14 };
-    packTree(t, f, u, 0);
-    expect(unpackInst(f, u, 0)).toEqual(t);
+  });
+});
+
+describe('the drawn lines nest: a line seen at a coarse zoom stays, in place, at every finer one', () => {
+  const seed = m.latticeSeed;
+  it('the lines of level l + 1 are lines of level l, one per block of 2^l, anywhere in it', () => {
+    for (const K0 of [0, 123457, 9e6]) {
+      let prev = new Set(latticeLines(seed, 0, K0, K0 + 4096));
+      expect(prev.size).toBe(4096);
+      for (let l = 1; l <= 10; l++) {
+        const cur = latticeLines(seed, l, K0, K0 + 4096);
+        for (const K of cur) expect(prev.has(K)).toBe(true);
+        expect(cur.length).toBeGreaterThanOrEqual(Math.floor(4096 / 2 ** l) - 1);
+        expect(cur.length).toBeLessThanOrEqual(Math.ceil(4096 / 2 ** l) + 1);
+        // Block B's line is in block B; a half's line is on top (of level l too) exactly when it is the block's.
+        for (let B = Math.ceil(K0 / 2 ** l); B < Math.ceil(K0 / 2 ** l) + 8; B++) {
+          const K = latticeRep(seed, l, B);
+          expect(Math.floor(K / 2 ** l)).toBe(B);
+          for (const h of [2 * B, 2 * B + 1]) expect(latticeTop(seed, l - 1, h)).toBe(latticeRep(seed, l - 1, h) === K);
+        }
+        prev = new Set(cur);
+      }
+    }
+  });
+
+  it('not a regular grid: the gaps between lines vary', () => {
+    const ks = latticeLines(seed, 4, 0, 4096);
+    const gaps = new Set(ks.slice(1).map((k, j) => k - ks[j]));
+    expect(gaps.size).toBeGreaterThan(8);
+  });
+
+  it('zooming out only raises the level (the sets nest), and the full mesh is every slot by ~35 per bar', () => {
+    let prev = -Infinity;
+    for (let perBar = 10; perBar < 1e8; perBar *= 1.07) {
+      const { lambda } = lineLevel(SCALE_BAR_PX / perBar);
+      expect(lambda).toBeGreaterThanOrEqual(prev - 1e-12);
+      prev = lambda;
+    }
+    expect(lineLevel(SCALE_BAR_PX / 35).lambda).toBeLessThanOrEqual(1e-9);
+    expect(lineLevel(SCALE_BAR_PX / 35).fineA).toBe(1);
+    expect(lineLevel(SCALE_BAR_PX / 100).L).toBeGreaterThanOrEqual(2);
+    // The fade is continuous across a level: fading lines are gone just as the level steps up.
+    const eps = 1e-6;
+    for (const L of [1, 2, 5]) {
+      // Find the pitch where λ crosses L.
+      let lo = 1e-9;
+      let hi = 2;
+      for (let k = 0; k < 200; k++) {
+        const mid = Math.sqrt(lo * hi);
+        if (lineLevel(mid).lambda > L) lo = mid;
+        else hi = mid;
+      }
+      expect(lineLevel(lo * (1 - eps)).fineA).toBeCloseTo(1, 3);
+      expect(lineLevel(hi * (1 + eps)).fineA).toBeLessThan(1e-3);
+    }
+  });
+
+  it('the CPU mirror and the shader hash the lattice alike', async () => {
+    const { MESH_FS } = await import('./meshgl');
+    expect(MESH_FS).toContain('(idx * 0x9e3779b1u) ^ vIdx2.x ^ (l * 0x85ebca6bu)');
   });
 });
