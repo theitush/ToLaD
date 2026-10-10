@@ -34,7 +34,7 @@ HIST_DIR = Path(__file__).resolve().parents[1] / "history"
 GRADES = "ABCD"
 POINT_KINDS = ["census", "estimate", "index-scaled", "reconstruction", "unverified"]
 # point kinds, then span-only kinds; the index is the HIST kind code
-KINDS = POINT_KINDS + ["model", "interpolated", "held", "baseline"]
+KINDS = POINT_KINDS + ["model", "interpolated", "held", "baseline", "natural"]
 K = {k: i for i, k in enumerate(KINDS)}
 
 TOP_KEYS = {"species", "aliases", "common", "component", "use", "scope", "faostat_item", "notes",
@@ -262,11 +262,12 @@ def pieces_births(pieces) -> float:
 
 def compile_segments(pts: list[dict], G: float, L: float, t0_ma: float, has_baseline: bool,
                      end_year: float = NOW_YEAR, pre_level: float | None = None,
-                     pre_grade: int = 3) -> list[dict]:
+                     pre_grade: int = 3, pre_kind: str = "model") -> list[dict]:
     """Curve -> procgen segments (see _segments). With `pre_level`, the span
     from the band start to the first point is one segment held at that level
-    (kind `model`: no baseline is known, so the model's level stands), and the
-    curve's segments follow it, with a step at the first point."""
+    (no cited baseline is known: kind `natural` for the natural baseline,
+    `model` for today's level), and the curve's segments follow it, with a
+    step at the first point."""
     if pre_level is None:
         return _segments(pts, G, L, t0_ma, has_baseline, end_year)
     segs = _segments(pts, G, L, year_to_ma(pts[0]["year"]), has_baseline, end_year)
@@ -275,7 +276,7 @@ def compile_segments(pts: list[dict], G: float, L: float, t0_ma: float, has_base
     if g_start > g_curve:
         bpg = G / L
         segs.insert(0, {"year0": end_year - g_start * G, "gens": g_start - g_curve, "start": pre_level * bpg,
-                        "end": pre_level * bpg, "grade": pre_grade, "kind": K["model"]})
+                        "end": pre_level * bpg, "grade": pre_grade, "kind": K[pre_kind]})
     return segs
 
 
@@ -376,8 +377,15 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
         rec["leaf"] = leaf
         rec["G"], rec["L"] = G, L
         before = {"alive": D["alive"], "ever": D["ever_med"], "grade_cap": D["grade_cap"],
-                  "sd_leaf": D["sd_leaf"]}
+                  "sd_leaf": D["sd_leaf"], "deep": D["pieces"][0][2] * L if D["pieces"] else 0.0}
         nw = D.get("n_wild_pieces", len(D["pieces"]))
+        # precedence for the deep-past level of a wild species: a cited baseline, else the
+        # natural (pre-human) baseline from model.natural_level, else today's level
+        nat = D.get("natural")
+        nat_base = None
+        if nat is not None and rec["baseline"] is None:
+            nat_base = {"n": nat["N"], "lo": nat["lo"], "hi": nat["hi"], "grade": nat["grade"],
+                        "kind": nat["kind"], "year": None}
         model_now = None
         if rec["use"] == "counts":
             if rec["component"] == "wild":
@@ -386,6 +394,15 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
                 model_now = D.get("domestic", {}).get("stock")
         last = pts[-1]
         alive_from_hist = last["year"] >= ALIVE_MIN_YEAR and GRADES.index(last["grade"]) <= ALIVE_MAX_GRADE
+        if (nat is not None and nat.get("scaled") and alive_from_hist and model_now
+                and rec["use"] == "counts" and rec["component"] == "wild"):
+            # the natural baseline scales today's count by the range ratio: use the curated today
+            s = last["n"] / model_now
+            for k in ("N", "lo", "hi"):
+                nat[k] *= s
+            nat["today_from"] = "history"
+            if nat_base is not None:
+                nat_base.update(n=nat["N"], lo=nat["lo"], hi=nat["hi"])
         if rec["use"] == "counts" and not alive_from_hist and model_now:
             # end the curve at the model's alive-now, so the green lane and the curve agree
             pts = pts + [{"year": NOW_YEAR, "n": model_now, "lo": model_now, "hi": model_now,
@@ -397,8 +414,8 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
             if D.get("domestic") and nw == len(D["pieces"]):
                 raise HistoryError(f"{rec['file']}: domestic leaf without n_wild_pieces")
             n_now = pts[-1]["n"]
-            # no baseline: the deep past keeps the level of today's count (as the model had it)
-            pre = None if rec["baseline"] else n_now
+            # no cited baseline: the deep past runs at the natural baseline, else at today's level
+            pre = None if rec["baseline"] else nat_base["n"] if nat_base else n_now
             new = curve_pieces(pts, L, leaf.t0, pre_level=pre)
             D["pieces"] = new + D["pieces"][nw:]
             D["n_wild_pieces"] = len(new)
@@ -418,8 +435,15 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
             D["pieces"] = D["pieces"][:nw] + early + new
             D["alive"] = D["alive"] - D["domestic"]["stock"] + pts[-1]["n"]
         if rec["use"] == "counts":
-            # the deep-past level: the baseline, else today's level (wild) or the first point (domestic)
-            base = rec["baseline"] or (pts[-1] if rec["component"] == "wild" else pts[0])
+            # the deep-past level: the cited baseline, else the natural baseline or today's level
+            # (wild), or the first point (domestic)
+            if rec["component"] == "wild":
+                base = rec["baseline"] or nat_base or pts[-1]
+                # the wild curve replaced the model's own deep past, natural widening included
+                D["sd_leaf"] = D.get("sd_leaf_today", D["sd_leaf"])
+                D["grade_cap"] = D.get("grade_cap_today", D["grade_cap"])
+            else:
+                base = pts[0]
             D["ever_med"] = pieces_births(D["pieces"])
             # the deep-past level sets "ever": widen the error by its range, cap the grade by its grade
             D["sd_leaf"] = math.hypot(D["sd_leaf"], _sd_of(base))
@@ -427,6 +451,8 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
             D["meth"].append(f"H:curated history ({len(rec['points'])} points"
                              + (f", baseline {base['n']:.3g} in {base['year']:.0f} ({base['grade']})"
                                 if rec["baseline"] else "")
+                             + (f", natural baseline {base['n']:.3g} ({base['grade']}) before the first point"
+                                if base is nat_base else "")
                              + f"; pipeline/history/{rec['file']})")
             D["src"].add(src_bit)
             D["anchored_count"] = True
@@ -434,16 +460,23 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
         # wild: the first segment holds the baseline back to the band start; domestic and
         # humans: segments cover the curated span only (before it the model's own shape stands)
         t0_seg = leaf.t0 if rec["component"] == "wild" else year_to_ma(pts[0]["year"])
-        pre = (pts[-1]["n"] if rec["use"] == "counts" and rec["component"] == "wild" and not rec["baseline"]
-               else None)
+        wild_counts = rec["use"] == "counts" and rec["component"] == "wild"
+        pre = ((nat_base["n"] if nat_base else pts[-1]["n"]) if wild_counts and not rec["baseline"] else None)
         rec["segments"] = compile_segments(pts, G, L, t0_seg, rec["baseline"] is not None, pre_level=pre,
-                                           pre_grade=min(3, D["grade_cap"]))
+                                           pre_grade=3 if nat_base else min(3, D["grade_cap"]),
+                                           pre_kind="natural" if nat_base else "model")
+        rec["natural"] = nat_base if wild_counts else None
         report[rec["species"]] = {
             "file": rec["file"], "leaf": leaf.name, "use": rec["use"], "component": rec["component"],
             "points": len(rec["points"]), "grades": "".join(sorted({p["grade"] for p in rec["points"]})),
             "baseline": ({k: rec["baseline"][k] for k in ("year", "n", "lo", "hi", "grade", "kind")}
                          if rec["baseline"] else None),
             "alive_before": before["alive"], "alive_after": D["alive"],
+            "deep_before": before["deep"], "deep_after": D["pieces"][0][2] * L if D["pieces"] else 0.0,
+            "deep_from": ("baseline" if rec["baseline"] else "natural" if nat_base else "today")
+                         if wild_counts else None,
+            "natural": ({k: nat[k] for k in ("N", "lo", "hi", "km2_cur", "km2_nat", "method")}
+                        if nat is not None else None),
             "alive_from": "history" if alive_from_hist else "model",
             "ever_before": before["ever"], "ever_after": D["ever_med"],
             "ever_ratio": D["ever_med"] / before["ever"] if before["ever"] > 0 else None,
@@ -452,9 +485,11 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
     if missing:
         raise HistoryError(f"history species not found among living tree leaves: {missing}")
     log["history"] = {
-        "note": "Curated flagship histories (pipeline/history/). ever_before = the model with today's count "
-                "held over the whole band; ever_after = with the pre-decline baseline / curve. Leaf values, "
-                "before the tree sum.",
+        "note": "Curated flagship histories (pipeline/history/). ever_before = the model alone (the natural "
+                "baseline before 1500 where it differs from today's count, else today's count, held over "
+                "the band); ever_after = with the curve, whose deep past is the cited baseline, else the "
+                "natural baseline, else today's level (deep_from). deep_before / deep_after = the level at "
+                "the band start. Leaf values, before the tree sum.",
         "species": report,
     }
     return [r for r in recs if "leaf" in r]

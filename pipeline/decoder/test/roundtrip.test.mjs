@@ -194,3 +194,56 @@ test('a v1.0 decoder (skips unknown sections) still decodes v1.1 files', async (
     for (let i = 0; i < Math.min(a.n, 50); i++) assert.equal(a.name(i), b.name(i));
   }
 });
+
+// ---- v1.2: NATB (natural, pre-human baseline) -------------------------------
+
+test('NATB round-trips against debug_top.json natural', () => {
+  assert.ok(Array.isArray(dump.natural) && dump.natural.length >= 30, 'natural list in debug_top.json');
+  const m = sk.meta.natural;
+  assert.equal(m.grade, 'D');
+  assert.equal(m.kind, 'reconstruction');
+  assert.deepEqual(m.fields, ['n', 'lo', 'hi', 'km2_natural', 'km2_current']);
+  const files = new Map([[-1, sk]]);
+  const names = new Set();
+  for (const h of dump.natural) {
+    const w = h.species;
+    names.add(w);
+    if (!files.has(h.tile)) files.set(h.tile, load(`t/${h.tile}.tld`));
+    const f = files.get(h.tile);
+    assert.equal(f.gid(h.row), h.gid, `${w} gid`);
+    assert.equal(f.name(h.row), w);
+    assert.equal(f.col.NATB.length, 5 * f.n, `${w}: NATB has 5 codes per row`);
+    const got = f.natural(h.row);
+    assert.ok(got, `${w}: no NATB entry at tile ${h.tile} row ${h.row}`);
+    closeLog(got.n, h.n, LOG_TOL, `${w} n`);
+    closeLog(got.lo, h.lo, LOG_TOL, `${w} lo`);
+    closeLog(got.hi, h.hi, LOG_TOL, `${w} hi`);
+    closeLog(got.km2Natural, h.km2_natural, LOG_TOL, `${w} km2 natural`);
+    if (h.km2_current > 0) closeLog(got.km2Current, h.km2_current, LOG_TOL, `${w} km2 current`);
+    else assert.equal(got.km2Current, 0);
+    assert.ok(got.lo <= got.n && got.n <= got.hi, `${w} lo <= n <= hi`);
+  }
+  for (const sp of ['Panthera leo', 'Panthera tigris', 'Panthera pardus', 'Panthera onca', 'Panthera uncia']) {
+    assert.ok(names.has(sp), `${sp} has a natural baseline`);
+  }
+  // internal nodes carry none
+  for (let i = 0; i < sk.n; i++) if (sk.col.CHLD[i] > 0) assert.equal(sk.natural(i), null);
+});
+
+test('HIST: wild species without a cited baseline start at the natural baseline where one exists', () => {
+  const nat = new Map(dump.natural.map((h) => [h.species, h]));
+  let n = 0;
+  for (const h of dump.history) {
+    if (h.use !== 'counts' || h.component !== 'wild') continue;
+    const first = h.segments[0];
+    const cited = h.points.some((p) => p.baseline);
+    if (cited) assert.notEqual(first.kind, 'natural', `${h.species}: a cited baseline wins`);
+    else if (nat.has(h.species)) {
+      assert.equal(first.kind, 'natural', `${h.species}: natural baseline before the first point`);
+      assert.equal(first.grade, 'D');
+      closeLog(first.start * h.L / h.G, nat.get(h.species).n, LOG_TOL, `${h.species} natural level`);
+      n++;
+    }
+  }
+  assert.ok(n >= 5, `${n} curated species start at the natural baseline`);
+});

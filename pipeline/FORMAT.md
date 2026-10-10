@@ -1,8 +1,8 @@
-# ToLaD tile format, version 1.1
+# ToLaD tile format, version 1.2
 
 Binary columnar format for the river data. The decoder is `pipeline/decoder/tolad-decoder.js`; the round-trip test is `pipeline/decoder/test/roundtrip.test.mjs`. The writer is `pipeline/tolad_pipeline/tiles.py`.
 
-**Versioning:** the `version` field in the header is bumped on any incompatible change. Decoders must reject unknown versions. Additive changes (new sections) keep the version, and decoders must skip sections they do not know. Minor revisions: **1.0** the base format; **1.1** adds the optional `HIST` section (curated population history) and the `hist*` META keys. The header `version` stays 1, and a 1.0 decoder reads 1.1 files unchanged (it skips `HIST`).
+**Versioning:** the `version` field in the header is bumped on any incompatible change. Decoders must reject unknown versions. Additive changes (new sections) keep the version, and decoders must skip sections they do not know. Minor revisions: **1.0** the base format; **1.1** adds the optional `HIST` section (curated population history) and the `hist*` META keys; **1.2** adds the `NATB` section (natural, pre-human baseline), the skeleton `META.natural` key and the HIST kind 9 `natural`. The header `version` stays 1, and a 1.0 decoder reads 1.1 and 1.2 files unchanged (it skips `HIST` and `NATB`).
 
 ## Files
 
@@ -59,6 +59,7 @@ Rows are nodes in **preorder**. `CHLD[i]` is the number of children present *in 
 | `NAME` | u32[n+1] offsets, then UTF-8 bytes | `"Primary name|alt1|alt2…"`. The offsets are relative to the start of the byte blob. An unnamed MRCA node has an empty primary name. Alt names come from collapsed unary ("knuckle") ancestors, nearest first |
 | `META` | UTF-8 JSON | see below |
 | `HIST` | blob, count = species (v1.1, optional) | curated population history of species rows, see below |
+| `NATB` | u16[5n] (v1.2) | natural (pre-human) baseline, 5 LOG16 codes per row: `n, lo, hi, km2_natural, km2_current`. All 0 = none (internal nodes, species without a PHYLACINE map). See "NATB" below |
 
 ### Quantization
 
@@ -124,17 +125,54 @@ Present only in files that hold a curated species row (`pipeline/history/*.toml`
 
 A species' points are `point0 … point0+npts−1` (sorted by year) and its segments `seg0 … seg0+nseg−1` (oldest first, contiguous, the last one ending now).
 
-**Kinds** (`META.hist_kinds`): 0 `census`, 1 `estimate`, 2 `index-scaled`, 3 `reconstruction`, 4 `unverified` (always grade D), 5 `model` (a point: the pipeline's own alive-now, added when the curve has no recent graded point; a segment: today's level held before the first point of a wild species with no known baseline), 6 `interpolated` (a span between two points), 7 `held` (a level held flat after the last point, or before the first point of a display-only species), 8 `baseline` (the pre-decline level held back to the band start).
+**Kinds** (`META.hist_kinds`): 0 `census`, 1 `estimate`, 2 `index-scaled`, 3 `reconstruction`, 4 `unverified` (always grade D), 5 `model` (a point: the pipeline's own alive-now, added when the curve has no recent graded point; a segment: today's level held before the first point of a wild species with no known baseline), 6 `interpolated` (a span between two points), 7 `held` (a level held flat after the last point, or before the first point of a display-only species), 8 `baseline` (the pre-decline level held back to the band start), 9 `natural` (v1.2, a segment only: the natural baseline from `NATB`, grade D, held from the band start to the first point of a wild species with no cited baseline).
 
-**Curve:** log-linear between points (so it passes through every point), flat outside them. **Segments** are the curve compiled for procgen's `Segment` (births per generation, linear ramps): births per generation = alive × G ÷ lifespan = `N(t) · G / L`. Boundaries are whole generations counted back from now. A span changing by more than 2× is split at log-even levels into sub-spans of at most ~1.41×. For wild species the first segment holds the baseline back to the start of the species band (with no known baseline: today's level, then a step to the curve at the first point); for domestic stocks and humans the segments cover the curated span only. Each segment's grade is the worse of its two end points.
+**Curve:** log-linear between points (so it passes through every point), flat outside them. **Segments** are the curve compiled for procgen's `Segment` (births per generation, linear ramps): births per generation = alive × G ÷ lifespan = `N(t) · G / L`. Boundaries are whole generations counted back from now. A span changing by more than 2× is split at log-even levels into sub-spans of at most ~1.41×. For wild species the first segment holds the baseline back to the start of the species band (with no cited baseline: the natural baseline, kind `natural`, or without one today's level, kind `model`; then a step to the curve at the first point); for domestic stocks and humans the segments cover the curated span only. Each segment's grade is the worse of its two end points.
 
-**Counts:** for `use = "counts"` species the curve replaces the leaf's births: rate = `N(t) / L`, the baseline (or, with none known, today's level) held from the band start, so `EVER` and the profiles use the pre-decline level, not today's count. `ALIV` is the latest point if it is from 2000 or later and graded A–C. The leaf's error is widened by the baseline's range and its grade is capped by the baseline's grade. Parents re-sum as usual. `use = "display"` species (humans; partial-scope files) ship the HIST entry only.
+**Counts:** for `use = "counts"` species the curve replaces the leaf's births: rate = `N(t) / L`, the cited baseline (or, with none, the natural baseline, or without that today's level) held from the band start, so `EVER` and the profiles use the pre-decline level, not today's count. `ALIV` is the latest point if it is from 2000 or later and graded A–C. The leaf's error is widened by the deep-past level's range (cited or natural baseline, else the latest point) and its grade is capped by that level's grade (the natural baseline is D). Parents re-sum as usual. `use = "display"` species (humans; partial-scope files) ship the HIST entry only.
+
+### NATB (v1.2): natural (pre-human) baseline
+
+Layer 1 of the estimate stack (ToLaD#61): how many individuals of a species would be alive with no human
+impact. Per row, five LOG16 codes:
+
+| code | meaning |
+|---|---|
+| `n` | natural baseline, individuals alive |
+| `lo`, `hi` | its 95% range (the model's error, see below) |
+| `km2_natural` | PHYLACINE 1.2.1 present-natural range area, km² (equal-area cells × 9,312 km²) |
+| `km2_current` | PHYLACINE current range area, km² (0 for extinct species) |
+
+It is always modelled: skeleton `META.natural` carries `grade` (`"D"`), `kind` (`"reconstruction"`),
+`step_year` (1500), the method strings, `cite` and `url`. Show it as modelled, never as a count.
+
+`N_nat` = density × present-natural range × occupancy, the same occupancy and area scale as today's count:
+
+- **Extant species with a current range map:** `N_nat = N_today × natural cells / current cells`. For a
+  modelled species `N_today = k · D · A`, so this is `k · D · A_nat`. For a census (or Greenspoon-estimate)
+  species the census fixes the species' own occupancy `k_i = N_today / (D · A)`, which then applies to the
+  natural range. A curated species whose alive-now comes from its history file uses that curated count as
+  `N_today`. Where the two maps are the same (4,824 of 5,831 PHYLACINE species), `N_nat = N_today`.
+  Error: today's (census 0.25 dex, Greenspoon estimate 0.5, model density + range + occupancy residual),
+  plus 0.2 dex where the natural range differs from the current one.
+- **No current range** (Late Quaternary extinct species, species extinct in the wild):
+  `N_nat = D · A_nat · k`, with `D` observed (COMBINE / PanTHERIA) or allometric, `A_nat` mapped from the
+  PHYLACINE grid onto PanTHERIA's range-area scale (the grid inflates small ranges; the fit is in `stats.json`
+  → `fits`), and `k` the fitted group occupancy. Error: density, area-fit residual and occupancy residual.
+
+**Where it drives the counts:** an extinct species runs at `N_nat` over its whole band. An extant species
+whose natural baseline differs from today's count runs at `N_nat` until 1500 CE (IUCN's "since 1500"
+window), then steps to today's count: a step, not a trend (the range-loss trend between them is ToLaD#62).
+Its leaf error is widened by the 0.2 dex and its grade capped at D. A domestic form with no wild population
+runs its wild ancestor at `N_nat` up to domestication. Curated species (`HIST`): a cited baseline wins; with
+none, the natural baseline is held before the first cited point (segment kind 9 `natural`). `ALIV` is
+always today's count. Report: `stats.json` → `natural_baseline` and `phylacine_ranges`.
 
 ## Semantics of the counts
 
 See research/02 §3 and `pipeline/tolad_pipeline/model.py`. In short:
 
-- **Species bands:** `rate = N_alive / L`, with `L = generation length / 2`. `N_alive` is the census figure where an IUCN population report exists (Greenspoon et al. 2023 compilation), else Greenspoon's per-species model estimate, else `k · density · range area` with `k` fitted per order group and body mass. Fossils use their PBDB first/last appearance (or a dated entry in `overrides.toml`); their body mass and range are imputed from relatives. Humans use PRB + UN WPP. Domestic stocks are added on top of the wild lineage and grow like human births since domestication: FAOSTAT livestock, plus Greenspoon's dog and cat numbers. Domestic forms with no wild population (cattle, sheep, cat, ...) have no wild band after domestication.
+- **Species bands:** `rate = N_alive / L`, with `L = generation length / 2`. `N_alive` is the census figure where an IUCN population report exists (Greenspoon et al. 2023 compilation), else Greenspoon's per-species model estimate, else `k · density · range area` with `k` fitted per order group and body mass. Fossils use their PBDB first/last appearance (or a dated entry in `overrides.toml`); their body mass and range are imputed from relatives. Humans use PRB + UN WPP. Domestic stocks are added on top of the wild lineage and grow like human births since domestication: FAOSTAT livestock, plus Greenspoon's dog and cat numbers. Domestic forms with no wild population (cattle, sheep, cat, ...) have no wild band after domestication. Before 1500 CE (extinct species: over the whole band) the rate uses the natural baseline (`NATB`) where a PHYLACINE map gives one.
 - **Internal bands:** the sum of the children, plus a *lineage fill* for any part of the band with no child (the stem before the first split, or gaps in fossil fans), plus *ghost lineages*. Ghosts are the 02 §2.3 top-down Mammalia total (wild births now × T_eff) minus what the sampled tree explains. At each time t they are split over the reconstructed lineages crossing t, weighted by the present-day wild births of each lineage's descendants. They are credited to the clade in whose crown the lineage runs, so a crown clade only collects ghosts after its own crown split. `GHST` lets the renderer draw them in a distinct style.
 - **Total groups:** when fossils predate a clade's molecular crown age (above the Upham 95% HPD), they move onto its stem. They sit in a node that carries the clade's name, next to the crown node, which is renamed "*name* (crown)". Such nodes have the `taxonomic` flag and date source 2.
 - **Uncertainty:** each leaf gets a log-normal error from its inputs. Sums use Fenton–Wilkinson, plus a shared systematic term: 0.6 dex for modelled species, 0.3 dex for species with a census or a Greenspoon estimate. Grade = the worse of the method cap and the 95% half-width (A ≤ 0.5 dex, B ≤ 1, C ≤ 2, D above).

@@ -31,7 +31,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import anchors, history
+from . import anchors, history, ranges
 from .anchors import year_to_ma
 from .load import load_combine, load_pantheria
 from .tree import D_ANCHOR, D_FOSSIL, D_INTERP, D_UPHAM, Node, ancestor_of_rank
@@ -43,7 +43,8 @@ SOURCES = [
     ("opentree", "Open Tree of Life synthesis v16.1 (topology), OTT 3.7.3; CC0"),
     ("upham", "Upham, Esselstyn & Jetz 2019, node-dated MCC mammal tree (MamPhy v1); CC0"),
     ("pbdb", "Paleobiology Database, fossil mammal species and first/last appearances; CC BY 4.0"),
-    ("phylacine", "PHYLACINE 1.2.1 (Faurby et al. 2018): body mass, extinction status; CC0"),
+    ("phylacine", "PHYLACINE 1.2.1 (Faurby et al. 2018): body mass, extinction status, current and "
+                  "present-natural range maps; CC0"),
     ("combine", "COMBINE (Soria et al. 2021): generation length (Pacifici et al. 2013), density, mass; CC BY 4.0"),
     ("pantheria", "PanTHERIA (Jones et al. 2009): density, geographic range area, mass"),
     ("greenspoon", "Greenspoon et al. 2023 PNAS 120:e2204892120: wild mammal biomass (occupancy calibration)"),
@@ -81,6 +82,12 @@ SD_GS_MODEL = 0.5  # dex, Greenspoon per-species model estimate (their SVR, CI ~
 LAND_GROUPS = ("Rodentia", "Chiroptera", "Artiodactyla", "Proboscidea", "Primates", "Diprotodontia",
                "Carnivora", "Perissodactyla", "Lagomorpha")
 SD_FILL = 1.0
+# Natural (pre-human) baseline, layer 1 of the estimate stack (ToLaD#61):
+# density x PHYLACINE present-natural range x occupancy. See natural_level().
+NATURAL_STEP_YEAR = 1500  # step from the natural level to today's count (IUCN's "since 1500" window)
+SD_NAT_RANGE = 0.2  # dex, a present-natural range that differs from the current one (reconstruction)
+NATURAL_METHOD_SCALED = "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
+NATURAL_METHOD_FIT = "N_nat: D x natural range (PHYLACINE, rescaled to PanTHERIA areas) x fitted occupancy"
 GRID_N = 1600
 GRID_MIN_MA = 1e-6
 PROFILE_K = 16
@@ -151,7 +158,10 @@ def resolve_traits(root: Node, raw: Path, ctx: dict, log: dict) -> None:
     phy, phy_syn, ott_syn = ctx["phy"], ctx["phy_syn"], ctx["ott_syn"]
     comb_rep, comb_imp = load_combine(raw)
     pan = load_pantheria(raw)
+    rng = ranges.load_ranges(raw)
+    rng_meta = ranges.load_spatial_metadata(raw)
     hits = Counter()
+    rng_used: Counter = Counter()
 
     def candidates(nd: Node) -> list[str]:
         c = [nd.name] + [a for a in nd.alt if " " in a] + nd.data.get("upham_names", [])
@@ -215,11 +225,22 @@ def resolve_traits(root: Node, raw: Path, ctx: dict, log: dict) -> None:
                     marine = True
                 p = p.parent
         D["marine"] = bool(marine)
+        for n in names:
+            r = rng.get(n)
+            if r is not None:
+                D["phy_range"] = {**r, "name": n, "certainty": rng_meta.get(n, {}).get("certainty", "")}
+                rng_used[n] += 1
+                break
         if nd.kind == "tree" and not nd.extinct:
-            for k in ("log_mass", "log_density_obs", "log_range_obs", "log_gen_obs"):
+            for k in ("log_mass", "log_density_obs", "log_range_obs", "log_gen_obs", "phy_range"):
                 hits[k + (":yes" if k in D else ":no")] += 1
     log["trait_coverage_extant"] = {k: v for k, v in sorted(hits.items()) if not k.startswith("mass:")}
     log["mass_sources"] = {k: v for k, v in hits.items() if k.startswith("mass:")}
+    shared = sorted(k for k, v in rng_used.items() if v > 1)
+    log["phylacine_ranges"] = {
+        "range_maps": len(rng), "maps_used": len(rng_used), "leaves_with_map": sum(rng_used.values()),
+        "maps_on_more_than_one_leaf": len(shared), "examples_shared": shared[:10],
+    }
 
 
 def model_leaves(root: Node, raw: Path, log: dict) -> None:
@@ -243,6 +264,27 @@ def model_leaves(root: Node, raw: Path, log: dict) -> None:
         if "log_mass" not in n.data:
             n.data["log_mass"], lvl = impute_from_clade(n, acc_m, gm_m)
             n.data["mass_src"] = f"{lvl} mean"
+    # PHYLACINE range cells (96.5 km Behrmann grid) -> PanTHERIA's range-area scale. Rasterising
+    # inflates small ranges (a 100 km2 range fills a 9,300 km2 cell), so an area taken from the
+    # maps alone is mapped onto the scale the occupancy fit was calibrated on.
+    pts = [(math.log10(n.data["phy_range"]["km2_cur"]), n.data["log_range_obs"]) for n in extant_obs
+           if "log_range_obs" in n.data and n.data.get("phy_range", {}).get("km2_cur", 0) > 0]
+    aA, aB, aS = _fit(*zip(*pts))
+    diff = np.array([x - y for x, y in pts])
+    log["fits"]["pantheria_range_log10 = a + b*log10(phylacine_current_km2)"] = {
+        "a": round(aA, 3), "b": round(aB, 3), "resid_sd": round(aS, 3), "n": len(pts)}
+    log["phylacine_ranges"]["current_vs_pantheria_dex"] = {
+        "median": round(float(np.median(diff)), 3),
+        "p5_25_75_95": [round(float(x), 3) for x in np.percentile(diff, [5, 25, 75, 95])], "n": len(pts),
+        "by_pantheria_area": {
+            f"{lo:.0e}-{hi:.0e} km2": {"n": int(m.sum()), "median": round(float(np.median(diff[m])), 2)}
+            for lo, hi in ((0, 1e3), (1e3, 1e4), (1e4, 1e5), (1e5, 1e6), (1e6, 1e7), (1e7, 1e9))
+            for m in [(np.array([y for _, y in pts]) >= math.log10(max(lo, 1e-9)))
+                      & (np.array([y for _, y in pts]) < math.log10(hi))] if m.any()},
+        "note": "log10(PHYLACINE current range area / PanTHERIA GR_Area_km2), extant leaves with both. "
+                "COMBINE carries no range area (only home range), so PanTHERIA is the model's only "
+                "observed range. Small ranges are inflated by the 96.5 km grid."}
+    area_fit = {"a": aA, "b": aB, "sd": aS}
     acc_r = clade_means(root, "log_range_obs")
     gm_r = np.mean([n.data["log_range_obs"] for n in leaves if "log_range_obs" in n.data])
 
@@ -280,6 +322,7 @@ def model_leaves(root: Node, raw: Path, log: dict) -> None:
             sdNA2 += dS ** 2 + (dB * msd) ** 2
             src.add(SRC["damuth"])
             meth.append("D:allometric(M)")
+        D["sd_density"] = math.sqrt(sdNA2)
         if "log_range_obs" in D:
             lr = D["log_range_obs"]
             sdNA2 += 0.2 ** 2
@@ -324,6 +367,7 @@ def model_leaves(root: Node, raw: Path, log: dict) -> None:
         D["dur_yr"] = dur * 1e6
         # raw (uncalibrated) standing population
         D["N_raw"] = 10 ** (ld + lr)
+    return area_fit
 
 
 def match_species(names, ctx: dict) -> tuple[dict[str, Node], list[str]]:
@@ -474,6 +518,92 @@ def fit_occupancy(root: Node, ref: dict[int, float], census: dict[int, float],
     log["occupancy_calibration"] = out
 
 
+def natural_level(D: dict, N_today: float, sd_today: float, extinct: bool, area_fit: dict) -> dict | None:
+    """Layer 1 of the estimate stack (ToLaD#61): the pre-human population,
+    density x present-natural range area x occupancy (PHYLACINE 1.2.1 maps).
+
+    An extant species with a current range map keeps the occupancy and the
+    area scale of today's count, so N_nat = N_today x natural cells / current
+    cells. For a modelled species N_today = k D A, so this is k D A_nat; for a
+    census (or Greenspoon-estimate) species the census fixes its own occupancy,
+    k_i = N_ref / (D A), and the same k_i applies to the natural range. A
+    species with no current range (extinct, or extinct in the wild) uses
+    D x A_nat x k: A_nat mapped from the PHYLACINE grid onto PanTHERIA's area
+    scale (area_fit), k the fitted group occupancy. Returns None without a
+    present-natural map."""
+    pr = D.get("phy_range")
+    if not pr or pr["cells_nat"] <= 0:
+        return None
+    if not extinct and pr["cells_cur"] > 0 and N_today > 0:
+        N = N_today * pr["cells_nat"] / pr["cells_cur"]
+        sd_x = 0.0 if pr["cells_nat"] == pr["cells_cur"] else SD_NAT_RANGE
+        sd = math.hypot(sd_today, sd_x)
+        how = NATURAL_METHOD_SCALED
+    else:
+        la = area_fit["a"] + area_fit["b"] * math.log10(pr["km2_nat"])
+        N = 10 ** (D["log_density"] + la + D["log_k"])
+        sd_x = math.hypot(D["sd_density"], area_fit["sd"])
+        sd = math.hypot(sd_x, D.get("k_sd", 0.0))
+        how = NATURAL_METHOD_FIT
+    h = 1.96 * sd
+    return {"N": N, "lo": N / 10 ** h, "hi": N * 10 ** h, "sd": sd, "sd_extra": sd_x, "method": how,
+            "grade": "D", "kind": "reconstruction", "map": pr["name"], "certainty": pr.get("certainty", ""),
+            "scaled": how == NATURAL_METHOD_SCALED,
+            "km2_cur": pr["km2_cur"], "km2_nat": pr["km2_nat"],
+            "cells_cur": pr["cells_cur"], "cells_nat": pr["cells_nat"]}
+
+
+NATURAL_SHOWCASE = ["Panthera leo", "Panthera tigris", "Panthera pardus", "Panthera onca", "Panthera uncia",
+                    "Loxodonta africana", "Elephas maximus", "Ursus arctos", "Canis lupus", "Gorilla gorilla",
+                    "Pan troglodytes", "Ceratotherium simum", "Bison bison", "Equus ferus", "Vulpes vulpes",
+                    "Rattus norvegicus", "Mammuthus primigenius", "Megaloceros giganteus", "Bos primigenius"]
+
+
+def natural_report(root: Node) -> dict:
+    """stats.json -> natural_baseline: coverage, N_nat / N_today, showcase and outliers."""
+    leaves = [n for n in root.preorder() if n.is_leaf and "natural" in n.data]
+    ext = [n for n in leaves if not n.extinct and n.data["alive"] > 0]
+    lr = np.array([round(math.log10(n.data["natural"]["N"] / n.data["rate_wild_now"] / n.data["L"]), 9)
+                   for n in ext if n.data["rate_wild_now"] > 0])
+
+    def row(n):
+        D, nat = n.data, n.data["natural"]
+        today = D["rate_wild_now"] * D["L"]
+        return {"leaf": n.name, "map": nat["map"], "extinct": bool(n.extinct), "today": today,
+                "natural": nat["N"], "lo": nat["lo"], "hi": nat["hi"],
+                "ratio": nat["N"] / today if today > 0 else None,
+                "km2_cur": round(nat["km2_cur"]), "km2_nat": round(nat["km2_nat"]),
+                "area_ratio": nat["cells_nat"] / nat["cells_cur"] if nat["cells_cur"] else None,
+                "method": nat["method"]}
+
+    by_name = {n.name: n for n in leaves}
+    ranked = sorted((n for n in ext if n.data["rate_wild_now"] > 0),
+                    key=lambda n: n.data["natural"]["N"] / (n.data["rate_wild_now"] * n.data["L"]))
+    extinct = [n for n in leaves if n.extinct]
+    return {
+        "note": "Layer 1 of the estimate stack (ToLaD#61): N_nat = density x PHYLACINE present-natural range "
+                "x occupancy, grade D, kind reconstruction. Extant species: today's count x natural/current "
+                "range cells (the same occupancy and area scale as today's count). No current range: density "
+                f"x natural area (rescaled to PanTHERIA areas) x fitted occupancy. Held before "
+                f"{NATURAL_STEP_YEAR} where it differs from today's count; extinct species: the whole band.",
+        "leaves": len(leaves), "extant": len(ext), "extinct": len(extinct),
+        "methods": dict(Counter(n.data["natural"]["method"] for n in leaves)),
+        "extant_log10_natural_over_today": {
+            "n": int(lr.size), "same": int((np.abs(lr) < 1e-9).sum()), "higher": int((lr > 1e-9).sum()),
+            "lower": int((lr < -1e-9).sum()),
+            "p5_25_50_75_95": [round(float(x), 3) for x in np.percentile(lr, [5, 25, 50, 75, 95])],
+            "histogram_dex": {f"{a:+.1f}..{a + 0.5:+.1f}": int(((lr >= a) & (lr < a + 0.5)).sum())
+                              for a in np.arange(-1.0, 2.5, 0.5)},
+        },
+        "extant_total": {"today": sum(n.data["rate_wild_now"] * n.data["L"] for n in ext),
+                         "natural": sum(n.data["natural"]["N"] for n in ext)},
+        "extinct_total_natural": sum(n.data["natural"]["N"] for n in extinct),
+        "showcase": [row(by_name[s]) for s in NATURAL_SHOWCASE if s in by_name],
+        "highest_ratio": [row(n) for n in ranked[::-1][:10]],
+        "lowest_ratio": [row(n) for n in ranked[:10]],
+    }
+
+
 def human_rate_at(pieces, age_ma: float) -> float:
     for old, young, r in pieces:
         if young <= age_ma <= old:
@@ -578,15 +708,46 @@ def assign_leaf_counts(root: Node, raw: Path, ctx: dict, log: dict) -> None:
             D["meth"].append("k:occupancy fitted by order group and mass on census + Greenspoon 2023 estimates"
                              if not D["marine"] else "k:occupancy fitted on marine census species (mass, order)")
         r = N / D["L"]
-        pieces = [(n.t0, n.t1, r)]
+        D["sd_leaf_today"] = D["sd_leaf"]
+        D["grade_cap_today"] = cap
+        # natural (pre-human) baseline: the level before NATURAL_STEP_YEAR (extinct: the whole band)
+        sd_today = (SD_CENSUS if id(n) in census else SD_GS_MODEL if id(n) in gs
+                    else math.hypot(D["sd_NA"], D.get("k_sd", 0.0)))
+        nat = natural_level(D, N, sd_today, n.extinct, ctx["area_fit"])
+        r_nat = r
+        if nat is not None:
+            D["natural"] = nat
+            D["src"].add(SRC["phylacine"])
+            r_nat = nat["N"] / D["L"]
+            if n.extinct:
+                # the natural range replaces the clade-mean range of an extinct species
+                D["sd_leaf"] = math.sqrt(max(D["sd_leaf"] ** 2 - D["sd_NA"] ** 2, 0.0) + nat["sd_extra"] ** 2)
+                D["meth"] = [m for m in D["meth"] if not m.startswith("A:")] + [nat["method"]]
+                cap = 3
+                found["natural: extinct, whole band"] += 1
+            elif nat["N"] != N:
+                D["sd_leaf"] = math.hypot(D["sd_leaf"], nat["sd_extra"])
+                D["meth"].append(f"{nat['method']}, held before {NATURAL_STEP_YEAR}")
+                cap = 3
+                found["natural: extant, differs from today"] += 1
+            else:
+                found["natural: extant, same as today"] += 1
+        step = year_to_ma(NATURAL_STEP_YEAR)
+        if n.extinct:
+            pieces = [(n.t0, n.t1, r_nat)]
+        elif r_nat != r and n.t0 > step:
+            pieces = [(n.t0, max(n.t1, step), r_nat), (step, n.t1, r)]
+        else:
+            pieces = [(n.t0, n.t1, r)]
         alive = 0.0 if n.extinct else N
         D["rate_wild_now"] = 0.0 if n.extinct else r
         dom = dom_by_leaf.get(n.name)
         if dom is not None and dom["species"] == n.name and id(n) not in census and id(n) not in gs:
             # a domestic form with no wild population of its own (cattle, sheep,
-            # horse, ...): the modelled wild lineage runs up to domestication only
+            # horse, ...): the modelled wild lineage runs up to domestication only,
+            # at its natural level where a range map gives one
             dom_start = year_to_ma(dom["dom_year"])
-            pieces = [(n.t0, max(n.t1, dom_start), r)] if n.t0 > dom_start else []
+            pieces = [(n.t0, max(n.t1, dom_start), r_nat)] if n.t0 > dom_start else []
             alive = 0.0
             D["rate_wild_now"] = 0.0
             D["meth"].append("wild ancestor modelled up to domestication; no wild population today")
@@ -614,6 +775,7 @@ def assign_leaf_counts(root: Node, raw: Path, ctx: dict, log: dict) -> None:
     log["anchors_found"] = dict(found)
     # curated flagship histories: pre-decline baselines and dated curves (pipeline/history/)
     ctx["history"] = history.apply(root, raw, log, SRC["history"])
+    log["natural_baseline"] = natural_report(root)
     unverified = [n for n in root.preorder() if n.is_leaf and n.kind == "tree" and not n.extinct
                   and not n.upham and "iucn" not in n.data and id(n) not in ref and n.name != "Homo sapiens"]
     log["unverified_extant_tips"] = {
@@ -945,7 +1107,7 @@ def finalize(root: Node) -> None:
 
 def run(root: Node, raw: Path, ctx: dict, log: dict) -> None:
     resolve_traits(root, raw, ctx, log)
-    model_leaves(root, raw, log)
+    ctx["area_fit"] = model_leaves(root, raw, log)
     assign_leaf_counts(root, raw, ctx, log)
     sum_tree(root, log)
     finalize(root)

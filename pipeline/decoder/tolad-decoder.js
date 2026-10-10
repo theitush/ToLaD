@@ -1,4 +1,4 @@
-// ToLaD tile decoder, format version 1.1 (see pipeline/FORMAT.md).
+// ToLaD tile decoder, format version 1.2 (see pipeline/FORMAT.md).
 // No dependencies; works in browsers, Web Workers and Node 18+.
 //
 //   import { decodeFile } from './tolad-decoder.js';
@@ -6,6 +6,7 @@
 //   sk.meta.tiles                                // tile manifest
 //   sk.name(0), sk.ever(0), sk.profile(0) ...    // per-row accessors
 //   file.history(row)                            // curated population history (HIST, v1.1) or null
+//   file.natural(row)                            // natural (pre-human) baseline (NATB, v1.2) or null
 //
 // All per-row columns are exposed as typed arrays (zero-copy views) in
 // `file.col`; the accessor methods dequantize one row at a time. Unknown
@@ -42,7 +43,7 @@ export const GRADES = ['A', 'B', 'C', 'D'];
 export const DATE_SOURCES = ['upham-calibrated', 'interpolated', 'fossil-range', 'anchored'];
 /** HIST point / segment kinds (same list as skeleton META.hist_kinds). */
 export const HIST_KINDS = ['census', 'estimate', 'index-scaled', 'reconstruction', 'unverified',
-  'model', 'interpolated', 'held', 'baseline'];
+  'model', 'interpolated', 'held', 'baseline', 'natural'];
 export const HIST_POINT_BASELINE = 1;
 
 export function dqAge(q) {
@@ -67,7 +68,7 @@ const TYPES = {
   ALIV: Uint16Array, GHST: Uint16Array, LOHI: Uint8Array, FLAG: Uint16Array,
   METH: Uint16Array, SRCM: Uint16Array, PPK_: Uint16Array, PROF: Uint8Array,
   NTIP: Uint32Array, GID_: Uint32Array, OTT_: Uint32Array, PBDB: Uint32Array,
-  STUB: Uint32Array,
+  STUB: Uint32Array, NATB: Uint16Array,
 };
 
 function fourcc(u32) {
@@ -247,6 +248,21 @@ export class TileFile {
    * `cite` indexes skeleton META.hist_sources; segment sizes are births per generation.
    */
   history(i) { return (this.hist && this.hist.get(i)) || null; }
+  /**
+   * Natural (pre-human) baseline of a species row (NATB, format v1.2), or null.
+   * { n, lo, hi, km2Natural, km2Current }: individuals alive with no human impact
+   * (95% range lo..hi) and the PHYLACINE present-natural and current range areas
+   * (km2Current = 0 for extinct species). Always modelled: grade and kind are in
+   * skeleton META.natural (grade D, kind reconstruction).
+   */
+  natural(i) {
+    const a = this.col.NATB;
+    if (!a || a[5 * i] === 0) return null;
+    return {
+      n: dqLog16(a[5 * i]), lo: dqLog16(a[5 * i + 1]), hi: dqLog16(a[5 * i + 2]),
+      km2Natural: dqLog16(a[5 * i + 3]), km2Current: dqLog16(a[5 * i + 4]),
+    };
+  }
   /** Mean births/yr in each profile bin (bin 0 = youngest), see profileEdges(). */
   profile(i) {
     const k = Q.PROFILE_K;
