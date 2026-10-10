@@ -1,5 +1,6 @@
 // Screenshots of the fan view from the single-file build.
 //   npm run build:single && node scripts/fanshot.mjs [out-dir] [prefix]
+//   (STEPS_FILE: JSON [name, js] steps; W, H: viewport; CLIP=x,y,w,h: a part of the page)
 // Steps are evaluated against window.__fan (see src/fan/view.ts).
 import { mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -23,7 +24,9 @@ try {
   const settle = () => page.waitForTimeout(900);
   const shot = async (name) => {
     await settle();
-    await page.screenshot({ path: `${OUT}/${PREFIX}-${name}.png` });
+    // CLIP=x,y,w,h (CSS px): only that part of the page, e.g. to look closely at an edge.
+    const clip = process.env.CLIP ? Object.fromEntries(['x', 'y', 'width', 'height'].map((k, i) => [k, Number(process.env.CLIP.split(',')[i])])) : undefined;
+    await page.screenshot({ path: `${OUT}/${PREFIX}-${name}.png`, clip });
     console.log('shot', name);
   };
   await shot('1-fan');

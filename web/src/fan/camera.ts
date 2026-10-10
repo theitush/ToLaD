@@ -5,10 +5,10 @@
 // One pinch zooms both axes by the same factor. Width can go ~10^12 deeper
 // than time (a linear-width branch is that much thinner than it is tall), so
 // time stops at a floor and width keeps going:
-//   - time: MIN_YEARS (10 years) never takes more than MAX_YEARS_FRAC (30%) of
+//   - time: MIN_YEARS (10 years) never takes more than MAX_YEARS_FRAC (10%) of
 //     the screen's height anywhere on screen, so the screen always shows at
-//     least ~33 years. On the log axis years are tallest at the top of the
-//     screen (the youngest), so the limit is measured there: the 30% of the
+//     least ~100 years. On the log axis years are tallest at the top of the
+//     screen (the youngest), so the limit is measured there: the 10% of the
 //     screen below its top edge must span 10 years. That depends on height
 //     (near "now" a year is tall, deep in the past it is tiny), so the camera
 //     keeps the time zoom the gestures asked for (`ty`) and shows sy = min(ty,
@@ -25,8 +25,8 @@ import { leftAt, strandAt, type Fan, type FanBranch } from './layout';
 
 /** A span of this many years ... */
 export const MIN_YEARS = 10;
-/** ... never takes more than this fraction of the screen's height (the screen shows ≥ ~33 years). */
-export const MAX_YEARS_FRAC = 0.3;
+/** ... never takes more than this fraction of the screen's height (the screen shows ≥ ~100 years). */
+export const MAX_YEARS_FRAC = 0.1;
 /** Width zoom stops when strands are this far apart (px): handles legible. */
 export const STRAND_PX = 90;
 /** Steepest on-screen lean (dx/dy) of the strands under the finger that zoom-in allows. */
@@ -51,6 +51,8 @@ export interface CellModel {
   size(g: number): number;
   generationAt(y: number): number;
   readonly GL: number;
+  /** Index slots of the green lane (twigs.ts TwigModel.nLive). */
+  readonly nLive: number;
 }
 
 export class FanCamera {
@@ -137,9 +139,25 @@ export class FanCamera {
 
   /** The largest time zoom ≤ ty at which MIN_YEARS takes at most MAX_YEARS_FRAC of the screen, anchored at (wy, py). */
   timeCap(wy: number, py: number, ty: number): number {
-    if (this.bandYears(wy, py, ty) >= MIN_YEARS) return ty;
+    // The allowed zooms need not be one interval: zooming in about a point
+    // just below "now", "now" first sits in the top band (capped at its rate),
+    // then leaves the screen, and only well past that are the years at the top
+    // short enough again. Keep to the first interval, so zooming in time stops
+    // smoothly instead of jumping across the gap (panning down reaches beyond).
+    const ok = (s: number) => this.bandYears(wy, py, s) >= MIN_YEARS;
     let lo = Math.log(Math.min(ty, 1e-3));
     let hi = Math.log(ty);
+    const K = 48;
+    let first = -1;
+    for (let k = 1; k <= K; k++) {
+      if (!ok(Math.exp(lo + ((hi - lo) * k) / K))) {
+        first = k;
+        break;
+      }
+    }
+    if (first < 0) return ty;
+    hi = lo + ((hi - lo) * first) / K;
+    lo = lo + ((hi - lo) * (first - 1)) / first;
     for (let k = 0; k < 64; k++) {
       const mid = (lo + hi) / 2;
       if (this.bandYears(wy, py, Math.exp(mid)) >= MIN_YEARS) lo = mid;
@@ -159,7 +177,7 @@ export class FanCamera {
     // The dead's lane closes at the tip; size its cells a couple of generations below it.
     const stF = strandAt(b, Math.max(age, b.sp.t1 + (2 * m.GL) / 1e6), this.fan.mode);
     let cell = Infinity;
-    if (gw > 0) cell = Math.min(cell, gw / n);
+    if (gw > 0) cell = Math.min(cell, gw / Math.max(1, m.nLive));
     if (stF.w - gw > 0) cell = Math.min(cell, (stF.w - gw) / n);
     return cell;
   }
@@ -202,9 +220,12 @@ export class FanCamera {
     c.ty = Math.min(TY_MAX, Math.max(syMin, c.ty));
     c.sy = this.timeCap(wy, py, c.ty);
     pack.setScale(c.sx, c.sy, this.home().sx);
-    wx = pack.resolve(a, wx, wy);
-    c.cx = wx - (px - this.w / 2) / c.sx;
+    c.cx = pack.resolve(a, wx, wy) - (px - this.w / 2) / c.sx;
     c.cy = wy - (py - this.h / 2) / c.sy;
+    // Zoomed in, the packing stands the branch at the screen centre upright
+    // (layout.ts Pack.setRef); that shifts each height sideways, so re-resolve.
+    pack.setRef(c.cx, c.cy);
+    c.cx = pack.resolve(a, wx, wy) - (px - this.w / 2) / c.sx;
     this.clampPan();
   }
 

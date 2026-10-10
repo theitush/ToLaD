@@ -9,13 +9,19 @@
 // present scale (TimeScale).
 //
 // Siblings are packed at every height (Pack), not just at the fork: at height
-// y they sit side by side in tree order, GAP_PX apart on screen, the bundle
-// centred, so as branches thin (and extinct ones end) their neighbours slide
-// in and the bundle narrows towards "now" like the stem does. Sideways moves
-// are shaped on screen, so they look the same at every zoom: gaps open over
-// OPEN_PX above the fork, an ended branch's slot closes above its tip over a
-// height in proportion to its width on screen, and no edge drifts sideways steeper than DRIFT_SLOPE on screen (deeper
-// width zooms damp the drift, so zoomed-in columns stand upright).
+// y they sit side by side in tree order, GAP_PX apart on screen, so as
+// branches thin (and extinct ones end) their neighbours slide in and the
+// bundle narrows towards "now" like the stem does. Sideways moves are shaped on
+// screen, so they look the same at every zoom: gaps open over OPEN_PX above the
+// fork, an ended branch's slot closes above its tip over a height in
+// proportion to its width on screen. Neighbours are packed at every zoom, so
+// whenever they would fit on screen next to the branch one looks at, they are
+// there. What a deeper width zoom changes is only which line stands upright:
+// in the whole-fan view the bundle is centred (both sides narrow towards
+// "now"); zooming in (PACK_FADE) the packing is referenced to the point at the
+// centre of the screen instead (Pack.setRef), so the branch one looks at keeps
+// its left edge, and so its living strands, upright, and its neighbours lean
+// against its edges.
 //
 // Width at any height = the individuals whose strands pass through it: every
 // individual's strand runs from the root up to its death, so at age τ the
@@ -54,15 +60,13 @@ export const OPEN_PX = 40;
  */
 export const CLOSE_K = 3;
 export const CLOSE_MAX_PX = 240;
-/** Steepest on-screen sideways drift (dx/dy) packing gives a branch; beyond it the drift is damped. */
-export const DRIFT_SLOPE = 3;
 /**
- * Width zooms (× the whole-fan view) over which the packing fades out: fully
- * packed up to the first, columns standing straight up from their slices of the
- * stem beyond the second. Zoomed in that far one looks at one branch, whose
- * strands then keep the lean of their own lane only (the living's exactly upright).
+ * Width zooms (× the whole-fan view) over which the packing's reference moves
+ * from the bundle's centre (up to the first) to the point at the centre of the
+ * screen (beyond the second). Zoomed in that far one looks at one branch, whose
+ * green lane then stands exactly upright; the siblings stay packed against it.
  */
-export const PACK_FADE: [number, number] = [20, 2000];
+export const PACK_FADE: [number, number] = [5, 200];
 /** Heights the packing is tabulated at, from the fork to "now". */
 const GRID = 4096;
 /**
@@ -137,11 +141,12 @@ const smooth = (t: number) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
 
 /**
  * Siblings packed at every height, for the screen scale (sx, sy px per world
- * unit) they are shown at. Left edges are tabulated from the fork up: at each
- * step every branch moves by the change of its packed position (the widths of
- * the siblings to its left, gaps, the bundle centred), scaled down uniformly
- * where the fastest of them would drift steeper than DRIFT_SLOPE on screen.
- * The uniform damping never makes siblings overlap (it only leaves wider gaps).
+ * unit) they are shown at. Packed positions are tabulated from the fork up: at
+ * each height the branches sit side by side in tree order (their widths there,
+ * GAP_PX apart on screen), the bundle centred. Then a common sideways shift per
+ * height (it never changes the gaps) moves the reference that stands upright:
+ * the bundle's centre in the whole-fan view, the screen centre's point (setRef)
+ * zoomed in, blended over PACK_FADE.
  */
 export class Pack {
   sx = 1;
@@ -152,7 +157,11 @@ export class Pack {
   private readonly dy: number;
   private readonly widths: Float64Array[];
   private readonly tipW: number[];
+  /** Packed, centred left edges per grid step, for the current scale. */
   private X: Float64Array[] | null = null;
+  /** The upright reference: sibling `refJ`, at fraction `refS` across its gray lane and gap. */
+  refJ = -1;
+  refS = 0;
 
   constructor(
     readonly branches: FanBranch[],
@@ -180,11 +189,30 @@ export class Pack {
     this.X = null;
   }
 
-  /** How much of the packing applies at the current width zoom (1 = all, 0 = none). */
+  /** How much the bundle stays centred at the current width zoom (1 = centred, 0 = referenced to setRef's point). */
   fade(): number {
     const z = Math.log(this.sx / this.sxHome);
     const [a, b] = PACK_FADE.map(Math.log);
     return 1 - smooth((z - a) / (b - a));
+  }
+
+  /**
+   * Reference the packing to world point (x, y) (the screen centre): the
+   * branch holding it (or nearest) and how far across it the point lies, 0 in
+   * its green lane rising to 1 across its gray lane and the gap after it, so
+   * the reference moves continuously from one branch to the next. Changing it
+   * shifts every branch at a height by the same amount (the gaps never change).
+   */
+  setRef(x: number, y: number): void {
+    const yc = Math.min(-1e-9, Math.max(this.time.y(0), y));
+    const a = this.anchor(x, yc);
+    if (!a) return;
+    const b = this.branches[a.j];
+    const st = strandAt(b, this.time.ageAt(yc), this.mode);
+    const gw = st.w * st.f;
+    const span = st.w + GAP_PX / this.sx - gw;
+    this.refJ = a.j;
+    this.refS = span > 0 ? Math.min(1, Math.max(0, (a.dx - gw) / span)) : 0;
   }
 
   private table(): Float64Array[] {
@@ -192,50 +220,70 @@ export class Pack {
     const bs = this.branches;
     const n = bs.length;
     const X = bs.map(() => new Float64Array(GRID + 1));
+    const S = bs.map(() => 0);
     const gapW = GAP_PX / this.sx;
-    const P = new Float64Array(n);
-    const prev = new Float64Array(n);
-    const fade = this.fade();
     for (let k = 0; k <= GRID; k++) {
       const y = -k * this.dy;
       const open = smooth((-y * this.sy) / OPEN_PX);
       let T = -gapW * open;
-      const slot = new Float64Array(n);
       for (let j = 0; j < n; j++) {
         const b = bs[j];
         const ramp = Math.min(CLOSE_MAX_PX, Math.max(OPEN_PX, CLOSE_K * (this.tipW[j] + gapW) * this.sx));
         const vis = y >= b.tipY ? 1 : 1 - smooth(((b.tipY - y) * this.sy) / ramp);
         const w = y >= b.tipY ? this.widths[j][k] : this.tipW[j];
-        slot[j] = (w + gapW * open) * vis;
-        T += slot[j];
+        S[j] = (w + gapW * open) * vis;
+        T += S[j];
       }
       let x = -T / 2;
       for (let j = 0; j < n; j++) {
-        P[j] = x;
-        x += slot[j];
+        X[j][k] = x;
+        x += S[j];
       }
-      if (k === 0) {
-        for (let j = 0; j < n; j++) X[j][0] = bs[j].baseLeft;
-      } else {
-        let m = 0;
-        for (let j = 0; j < n; j++) m = Math.max(m, Math.abs(P[j] - prev[j]));
-        const slope = (m * this.sx) / (this.dy * this.sy);
-        const lam = fade * (slope * fade > DRIFT_SLOPE ? DRIFT_SLOPE / (slope * fade) : 1);
-        for (let j = 0; j < n; j++) X[j][k] = X[j][k - 1] + lam * (P[j] - prev[j]);
-      }
-      prev.set(P);
     }
     return (this.X = X);
   }
 
-  /** Left edge of sibling j at world y. */
-  leftAt(j: number, y: number): number {
-    if (y >= 0) return this.branches[j].baseLeft;
+  /** Packed, centred left edge of sibling j at world y (tabulated: used in the whole-fan view). */
+  private centred(j: number, y: number): number {
     const X = this.table()[j];
     const f = Math.min(GRID, -y / this.dy);
     const k = Math.min(GRID - 1, Math.floor(f));
     const t = f - k;
     return X[k] + (X[k + 1] - X[k]) * t;
+  }
+
+  /** Slot of sibling j at world y (its width plus the gap after it), exactly. */
+  private slot(j: number, y: number): number {
+    const b = this.branches[j];
+    const gapW = GAP_PX / this.sx;
+    const open = smooth((-y * this.sy) / OPEN_PX);
+    if (y >= b.tipY) return strandAt(b, this.time.ageAt(y), this.mode).w + gapW * open;
+    const ramp = Math.min(CLOSE_MAX_PX, Math.max(OPEN_PX, CLOSE_K * (this.tipW[j] + gapW) * this.sx));
+    return (this.tipW[j] + gapW * open) * (1 - smooth(((b.tipY - y) * this.sy) / ramp));
+  }
+
+  /**
+   * Left edge of sibling j at world y packed against the reference point
+   * (which stays at its x at the fork), from the exact slots between them: at
+   * deep zooms only these relative positions matter, and they are exact.
+   */
+  private referenced(j: number, y: number): number {
+    const a = this.refJ;
+    const s = this.refS;
+    const b = this.branches[a];
+    let x = b.baseLeft + s * b.width - s * this.slot(a, y);
+    if (j >= a) for (let i = a; i < j; i++) x += this.slot(i, y);
+    else for (let i = j; i < a; i++) x -= this.slot(i, y);
+    return x;
+  }
+
+  /** Left edge of sibling j at world y. */
+  leftAt(j: number, y: number): number {
+    if (y >= 0) return this.branches[j].baseLeft;
+    const u = this.refJ < 0 ? 0 : 1 - this.fade();
+    if (u <= 0) return this.centred(j, y);
+    if (u >= 1) return this.referenced(j, y);
+    return (1 - u) * this.centred(j, y) + u * this.referenced(j, y);
   }
 
   /**

@@ -236,3 +236,50 @@
 .foot .wscale {
   margin-left: 50px;
 }
+
+/* Species card: population history sparkline and its sources. */
+.card-sp .hist {
+  margin-top: 4px;
+}
+.card-sp .spark {
+  display: block;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.card-sp .spark svg {
+  display: block;
+  max-height: 64px;
+}
+.card-sp .small {
+  font-size: 12px;
+}
+.card-sp .hist-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0 4px 0 0;
+  max-height: 34vh;
+  overflow-y: auto;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.card-sp .hist-list li {
+  padding: 5px 0;
+  border-top: 1px solid rgba(160, 190, 170, 0.18);
+}
+.card-sp .hist-list .cite a {
+  color: #9fd3b3;
+}
+.card-sp .gdot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  vertical-align: 0;
+}
