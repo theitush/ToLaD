@@ -101,12 +101,12 @@ export type SpanStyle = 'solid' | 'dashed' | 'dotted';
 
 /**
  * Spans backed by real points (held at a measured level) are solid; spans
- * interpolated between points, or a modelled level held where nothing was
- * measured, are dashed; grade D or unverified spans are dotted (and fainter).
+ * interpolated between points, a modelled level held where nothing was
+ * measured, or a genomic (PSMC) curve, are dashed; grade D or unverified spans are dotted (and fainter).
  */
 export function spanStyle(s: Pick<HistSegment, 'grade' | 'kind'>): SpanStyle {
   if (s.grade === 'D' || s.kind === 'unverified') return 'dotted';
-  if (s.kind === 'interpolated' || s.kind === 'model') return 'dashed';
+  if (s.kind === 'interpolated' || s.kind === 'model' || s.kind === 'genomic') return 'dashed';
   return 'solid';
 }
 
