@@ -37,6 +37,9 @@ const scenes = [
   ['split-cavelion', 'split', [0.5, 5]],
   ['split-root', 'split', [4.6, 3]],
   ['mesh-split', 'bar', ['Lion', 499990, 100, 2e4, 1]],
+  // Variant d: the mesh on the cave lion as it leans off the lion, and the lion's last 200 years.
+  ['mesh-lean', 'bar', ['Cave lion', 480000, 3e3, 60, 0]],
+  ['decline', 'decline', ['Lion', 200]],
   ['lineage', 'tapnode', [2.57, 1.2]],
 ];
 const browser = await chromium.launch({ headless: true });
@@ -103,18 +106,31 @@ try {
             const [px, py] = f.toScreen(v.left + 0.5 * v.width, y);
             f.tap(px, py);
           } else {
-            // The daughters' extent across 80% of the screen, the split mid-screen.
+            // The parent band and its daughters after their leans across 80% of the screen; the lean
+            // above the split and the lanes' blend below it in the middle third.
             const isN = (k) => 'strands' in k;
-            const first = v.kids[0];
-            const last = v.kids[v.kids.length - 1];
-            const lo = isN(first) ? first.left : first.colLeft;
-            const hi = isN(last) ? last.left + last.width : last.colLeft + last.width;
+            let lo = v.left;
+            let hi = v.left + v.width;
+            for (const k of v.kids) {
+              lo = Math.min(lo, isN(k) ? k.left : k.colLeft);
+              hi = Math.max(hi, isN(k) ? k.left + k.width : k.colLeft + k.width);
+            }
+            const H = Math.max(...v.kids.map((k) => v.y - k.leanY)) + v.blendH;
             const h = f.homeCamera();
             const sx = Math.max(h.sx, (0.8 * f.w) / (hi - lo));
-            const sy = h.sy * args[1];
-            f.cam = { cx: (lo + hi) / 2, cy: v.y, sx, sy, ty: sy };
+            const sy = Math.max(h.sy * args[1], f.h / 3 / H);
+            f.cam = { cx: (lo + hi) / 2, cy: v.y - (H - 2 * v.blendH) / 2, sx, sy, ty: sy };
             f.camera.settle();
           }
+        } else if (kind === 'decline') {
+          // The species' last `args[1]` years filling the screen, its column 60% of its width.
+          const b = fan.branches.find((b) => b.sp.common === args[0]);
+          const y0 = fan.time.y(args[1] / 1e6);
+          const y1 = fan.time.y(0);
+          const sy = (0.8 * f.h) / (y0 - y1);
+          const sx = (0.6 * f.w) / b.width;
+          f.cam = { cx: b.cx, cy: y1 + (f.h / 2 - 120) / sy, sx, sy, ty: sy };
+          f.camera.settle();
         } else if (kind === 'far') {
           const h = f.homeCamera();
           f.cam = { ...h, sx: h.sx / 6, sy: h.sy / 6, ty: h.sy / 6 };

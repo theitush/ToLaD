@@ -113,6 +113,10 @@ try {
         };
         // A narrow green lane (1.3 px) beside a narrow gray one (2.6 px), each one line its own width.
         if (narrow) Object.assign(inst, { xB0: 40.2, xG: 41.5, colL: 40.2, colR: 44.1, narG: 1, narR: 0.7, B0: 0 });
+        // Leaning, widening columns (the shear, mesh.ts MeshInst): the lattice mapped through a slanted left edge,
+        // a changing pitch, a moving right edge and green lane.
+        if (q === 1) Object.assign(inst, { kx: 0.45, ks: 0.004, xr: 6, colL: -bw * 1.3, colR: 90, kc: -0.3, xG: 50, kg: 0.2 });
+        if (q === 3) Object.assign(inst, { kx: -0.8, ks: -0.006, xr: 70, colL: -bw * 1.3, colR: 110, kc: 0.5, xG: 30, kg: -0.4 });
         insts.push(inst);
         const k = gl.mesh.next();
         M.packInst(inst, gl.mesh.f, gl.mesh.u, k);

@@ -51,10 +51,11 @@
 // prefix across its strands. The green share is linear between generations'
 // middles: no steps anywhere. Through a split the lanes are continuous too:
 // just below it the parent band shows its daughters' lanes side by side (each
-// strand green as far as it was just above), scaled so the band's green is the
-// recurrence's share; over FanNode.blendH (as far down as the daughters took
-// to lean out above) each strand's green moves linearly to its part of the
-// one prefix.
+// strand green as far as it was just above); over FanNode.blendH (as far down
+// as the daughters took to lean out above) each strand's green moves linearly
+// to its part of the one prefix, and the band's share from the daughters' to
+// the recurrence's with it (which settles within a few generations, far under
+// a pixel that deep: drawn as it is it would read as a jump).
 //
 // Height = time: the oldest split is at y = 0 ("the fork"), "now" at
 // y = −TIME_H, on a log years-before-present scale offset by TIME_C (TimeScale).
@@ -304,15 +305,10 @@ export class Steps {
     const pre = clampW(q * v.width - s.off, b.baseW);
     const beta = v.blendH > 0 ? clamp01((y - v.y) / v.blendH) : 1;
     if (beta >= 1) return [b.baseW, pre];
-    // ... from its own lane just above the split, linearly over blendH: the side-by-side lanes
-    // scaled from the daughters' share q0 towards the recurrence's (the green ones' gray, or the
-    // gray ones' green, shrinking first, so each stays within its strand), then into the prefix.
-    const q0 = v.q[0];
-    const qb = q0 + (q - q0) * beta;
-    const f0 = b.baseW > 0 ? this.sideGreen(b, v) / b.baseW : 0;
-    const f = qb <= q0 ? (q0 > 0 ? (f0 * qb) / q0 : 0) : 1 - ((1 - f0) * (1 - qb)) / (1 - q0);
-    const side = clampW(f * b.baseW, b.baseW);
-    return [b.baseW, side + (pre - side) * beta];
+    // ... from its own lane just above the split, linearly over blendH (the band's share moves
+    // from the daughters' to the recurrence's with it: the recurrence settles within a few
+    // generations below a split, far under a pixel there, so drawn as it is it would be a jump).
+    return [b.baseW, this.sideGreen(b, v) * (1 - beta) + pre * beta];
   }
 
   private readonly sides = new Map<FanBranch, Map<FanNode, number>>();
