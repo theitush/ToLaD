@@ -64,6 +64,7 @@ Superseded: the "Layout", "Width semantics" (births-rate river) and "Deep zoom (
 2. **Green in log mode:** follows the active width mode (log-compressed in log mode), with a 1 px floor. The true % is always shown in the ledger.
 3. **Viruses:** count particles, in a separate forest next to LUCA, off by default.
 4. **First real-data slice:** mammals (~27k tips including fossils).
+5. **(2026-10-10, ToLaD#42) Width = alive at t:** a column's width at time t is the number of individuals alive then (∝ births per unit time, so this is the births-rate river of 1). The total ever born becomes a secondary, model-graded line, never the headline. **Green** = alive at t and has any living descendants today, through any mix of mothers and fathers. It comes from a genealogy recurrence on N(t) and the generation time: 100% now, settling to ~80% (Q* ≈ 0.797) deep back for a well-mixed population. A crash leaves a gray band just before it. **Gray** = alive at t, line ended; extinct species are all warm gray.
 
 ## Proposed plan
 

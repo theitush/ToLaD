@@ -830,18 +830,24 @@ export class FanView implements InputHandlers {
     const m = this.model(best);
     const ctx = this.ctx;
     const gens = st.g0 === st.g1 ? `generation ${fmtInt(st.g0 + 1)}` : `generations ${fmtInt(st.g0 + 1)}–${fmtInt(st.g1 + 1)}`;
+    // The headline is the population alive at the screen's middle time (the column's width there), and its green share.
+    const sp = best.sp;
+    const ageMa = Math.min(Math.max(this.fan.time.ageAt(this.cam.cy), sp.t1), sp.t0);
+    const yrs = ageMa * 1e6;
+    const when = yrs < 0.5 ? 'now' : formatYearsAgo(yrs);
     const lines = [
-      `${best.sp.common}${best.sp.extinct ? ' (extinct)' : ''}`,
+      `${sp.common}${sp.extinct ? ' (extinct)' : ''}`,
+      `~${formatCount(best.pop.aliveAt(ageMa))} alive ${when}`,
+      `${Math.round(best.pop.greenAt(ageMa) * 100)}% with living descendants`,
       `${gens} of ${fmtInt(m.G)}`,
       `born ~${formatYearsAgo(m.bornAgo(st.g1))}${st.g0 === st.g1 ? '' : ` to ~${formatYearsAgo(m.bornAgo(st.g0))}`}`,
-      `${fmtInt(m.size(st.g0))} per generation · ${st.mode}`,
     ];
     ctx.save();
     ctx.font = `600 14px 'Avenir Next', 'Segoe UI Variable Text', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
     const wmax = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 20;
     ctx.fillStyle = 'rgba(20,28,24,0.82)';
     ctx.beginPath();
-    ctx.roundRect(70, 54, Math.min(this.w - 80, wmax), 80, 8);
+    ctx.roundRect(70, 54, Math.min(this.w - 80, wmax), 32 + 16 * (lines.length - 1), 8);
     ctx.fill();
     ctx.textBaseline = 'top';
     ctx.fillStyle = '#eef4ef';
@@ -965,9 +971,11 @@ export class FanView implements InputHandlers {
     ctx.fillStyle = '#9faba3';
     ctx.fillText(f.clade.sci, x, y + 18);
     ctx.font = font('400', 12);
-    ctx.fillText(`${formatCount(f.clade.ever)} ever`, x, y + 33);
+    // The living first; "ever" only as an honest secondary line (a model figure, never bare).
     ctx.fillStyle = GREEN;
-    ctx.fillText(`${formatCount(f.clade.alive)} alive`, x, y + 48);
+    ctx.fillText(`${formatCount(f.clade.alive)} alive now`, x, y + 33);
+    ctx.fillStyle = '#9faba3';
+    ctx.fillText(`~${formatCount(f.clade.ever)} born in total (model, grade ${f.clade.grade})`, x, y + 48);
     ctx.restore();
   }
 
