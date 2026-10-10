@@ -830,9 +830,10 @@ export class FanView implements InputHandlers {
     const m = this.model(best);
     const ctx = this.ctx;
     const gens = st.g0 === st.g1 ? `generation ${fmtInt(st.g0 + 1)}` : `generations ${fmtInt(st.g0 + 1)}–${fmtInt(st.g1 + 1)}`;
-    // The headline is the population alive at the screen's middle time (the column's width there), and its green share.
+    // The headline is the population alive at the middle of the generations on screen (the column's width
+    // there), and its green share: the same time as the "born" line under it.
     const sp = best.sp;
-    const ageMa = Math.min(Math.max(this.fan.time.ageAt(this.cam.cy), sp.t1), sp.t0);
+    const ageMa = Math.min(Math.max(m.bornAgo((st.g0 + st.g1) / 2) / 1e6, sp.t1), sp.t0);
     const yrs = ageMa * 1e6;
     const when = yrs < 0.5 ? 'now' : formatYearsAgo(yrs);
     const lines = [
