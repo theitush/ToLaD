@@ -267,7 +267,9 @@ describe('fan camera', () => {
               expect(r).toBeGreaterThanOrEqual(Math.min(step, 1 / step) * (1 - 1e-9));
             }
             const [sx2, sy2] = c.toScreen(qx, qy);
-            expect(Math.hypot(sx2 - px, sy2 - py)).toBeLessThan(2);
+            // (Zooming out near "now", the pan clamp holds "now" at 40% down, which moves the
+            // point by no more than the step itself would have moved the screen's edge.)
+            expect(Math.hypot(sx2 - px, sy2 - py)).toBeLessThan(Math.max(2, Math.abs(1 - 1 / step) * c.h));
             lvl.push(f.steps.k + f.steps.t);
             dirs.push(step > 1 ? 1 : -1);
           }

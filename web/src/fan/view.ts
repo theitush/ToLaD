@@ -8,7 +8,7 @@ import { formatAge, formatCount } from '../data/names';
 import { Input, type InputHandlers } from '../engine/input';
 import { clipPoly, FanCamera, STRAND_PX, type Camera } from './camera';
 import { EDGE_DASH, edgeMarks, edgeXAt, dotAlphas, GRADE_COLOR, historySpans, pointAgo, toScreenSpans, type ScreenSpan, type Span } from './history';
-import { JOG, laneAt, layoutFan, leftAt, Steps, strandAt, type Fan, type FanBranch, type WidthMode } from './layout';
+import { JOG, laneAt, layoutFan, leftAt, STEM_FADE_MA, Steps, strandAt, type Fan, type FanBranch, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { drawTwigs, TwigModel, type IndInfo, type TwigStats } from './twigs';
 
@@ -329,8 +329,10 @@ export class FanView implements InputHandlers {
     ctx.fillStyle = BG;
     ctx.fillRect(0, 0, this.w, this.h);
     this.drawTimeAxis(false);
+    this.drawStem();
     for (const b of this.fan.branches) this.drawStrand(b);
     for (const b of this.fan.branches) this.drawIndividuals(b);
+    this.drawStemFade();
     // Labels: tips side by side (the living all end at "now", packed hairlines in
     // linear widths) are spread apart and joined to their tips by leader lines;
     // then by size, one that would still overlap a bigger species' label waits for a closer zoom.
@@ -342,6 +344,40 @@ export class FanView implements InputHandlers {
     this.drawTrunkLabel();
     this.drawHud();
     this.drawTimeAxis(true);
+  }
+
+  /**
+   * The stem below the fork (the clade's ancestors): as wide as the stalks it
+   * carries, which go straight on down through it; this fills the gaps between
+   * them, so it reads as one stem down to the bottom of the world.
+   */
+  private drawStem(): void {
+    const f = this.fan;
+    const [x0, y0] = this.toScreen(f.x0, 0);
+    const [x1, y1] = this.toScreen(f.x1, f.trunkBottom.y);
+    const t = Math.max(-8, y0);
+    const b = Math.min(this.h + 8, y1);
+    const l = Math.max(-8, x0);
+    const r = Math.min(this.w + 8, x1);
+    if (b <= t || r <= l) return;
+    this.ctx.fillStyle = GRAY;
+    this.ctx.fillRect(l, t, r - l, b - t);
+  }
+
+  /** The stem fades out over its last stretch (from STEM_FADE_MA down to the bottom of the world): nothing ends abruptly. */
+  private drawStemFade(): void {
+    const f = this.fan;
+    const [, ya] = this.toScreen(0, f.time.y(STEM_FADE_MA));
+    const [, yb] = this.toScreen(0, f.trunkBottom.y);
+    if (yb < 0 || ya > this.h) return;
+    const ctx = this.ctx;
+    const g = ctx.createLinearGradient(0, ya, 0, yb);
+    g.addColorStop(0, 'rgba(13,20,17,0)');
+    g.addColorStop(1, BG);
+    ctx.fillStyle = g;
+    const t = Math.max(-8, ya);
+    const b = Math.min(this.h + 8, yb + 2);
+    if (b > t) ctx.fillRect(0, t, this.w, b - t);
   }
 
   /**
@@ -732,16 +768,19 @@ export class FanView implements InputHandlers {
     const ctx = this.ctx;
     const ts = this.fan.time;
     const origin = ts.originMa * 1e6;
+    // The axis goes on below the origin, down the stem to the bottom of the world.
+    const bottom = ts.ageAt(this.fan.trunkBottom.y) * 1e6;
     const yrsAt = (py: number) => ts.ageAt(this.toWorld(0, py)[1]) * 1e6;
-    const aTop = Math.min(origin, yrsAt(-10));
-    const aBot = Math.min(origin, yrsAt(this.h + 10));
+    const aTop = Math.min(bottom, yrsAt(-10));
+    const aBot = Math.min(bottom, yrsAt(this.h + 10));
+    const clear = (yrs: number) => Math.abs(Math.log10(yrs / origin)) > 0.025 && yrs <= bottom * 1.0001;
     const syOf = (yrs: number) => this.toScreen(0, ts.y(yrs / 1e6))[1];
     // Candidates in priority order: origin and now, round log ticks, then linear steps.
     const cands: { yrs: number; step: number }[] = [{ yrs: origin, step: 0 }, { yrs: 0, step: 0 }];
     for (const m of [1, 5, 2]) {
-      for (let e = 7; e >= 0; e--) {
+      for (let e = 9; e >= 0; e--) {
         const yrs = m * Math.pow(10, e);
-        if (yrs < origin * 0.97 && yrs >= aTop && yrs <= aBot) cands.push({ yrs, step: yrs });
+        if (clear(yrs) && yrs >= aTop && yrs <= aBot) cands.push({ yrs, step: yrs });
       }
     }
     const span = aBot - aTop;
@@ -750,7 +789,7 @@ export class FanView implements InputHandlers {
         const step = niceStep(span / div);
         for (let k = Math.ceil(aTop / step); k * step <= aBot && k - Math.ceil(aTop / step) < 40; k++) {
           const yrs = k * step;
-          if (yrs > 0 && yrs < origin * 0.97) cands.push({ yrs, step });
+          if (yrs > 0 && clear(yrs)) cands.push({ yrs, step });
         }
       }
     }
@@ -809,7 +848,7 @@ export class FanView implements InputHandlers {
     const ctx = this.ctx;
     const f = this.fan;
     // Right of the stem, just below the fork (nothing else is drawn there).
-    const [sx, sy] = this.toScreen(f.trunkWidth / 2, 0);
+    const [sx, sy] = this.toScreen(f.x1, 0);
     if (sy > this.h + 20 || sy < -80 || sx > this.w) return;
     const font = (w: string, px: number) => `${w} ${px}px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
     ctx.save();
@@ -860,7 +899,7 @@ export function niceStep(x: number): number {
 
 /** Compact tick label for `yrs` years ago, with as many decimals as the tick step needs. */
 export function formatTick(yrs: number, step: number): string {
-  const [div, unit] = yrs >= 1e6 ? [1e6, 'Mya'] : yrs >= 1e3 ? [1e3, 'kya'] : [1, 'yr ago'];
+  const [div, unit] = yrs >= 1e9 ? [1e9, 'Gya'] : yrs >= 1e6 ? [1e6, 'Mya'] : yrs >= 1e3 ? [1e3, 'kya'] : [1, 'yr ago'];
   const st = step > 0 ? step / div : yrs / div;
   const dec = Math.min(6, Math.max(0, -Math.floor(Math.log10(st) + 1e-9)));
   const v = yrs / div;

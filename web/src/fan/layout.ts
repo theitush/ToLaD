@@ -3,14 +3,13 @@
 // camera except which step grid the gray edge is drawn on (Steps, below):
 // panning never changes a shape, and zooming only refines the steps.
 //
-//   - The stem comes up from the bottom to the fork at y = 0. It is its
-//     children side by side, no gaps (each child's slice of it is baseLeft..
-//     baseLeft + width), so every green lane runs straight down to the root.
-//   - Just above the fork each child jogs sideways, over JOG world units of
-//     height, from its slice of the stem to its column (a sheared band: its
-//     horizontal width never changes). That is the cladogram's horizontal bar.
-//   - Each species is then a straight vertical column (colLeft) from the jog
-//     up to its tip: "now" for the living, its last appearance if extinct.
+//   - Each species is one straight vertical column (colLeft) from the bottom
+//     of the world up to its tip: "now" for the living, its last appearance
+//     if extinct. Below the fork (y = 0, the clade's origin) the columns keep
+//     their width at the fork and go on straight down, through the clade's
+//     ancestors, to the bottom of the world (STEM_BOTTOM_MA): the stem is as
+//     wide as the stalks it carries (its gaps filled), so nothing jogs or
+//     ends at the origin, and every green lane runs straight down to the root.
 //     Columns sit side by side in tree order with a fixed gap between
 //     neighbours (gapBetween): GAP_FRAC of the smaller one's base width, at
 //     least MIN_GAP_FRAC of the stem's. Positions never change with time or view.
@@ -35,10 +34,13 @@ import type { CladeRec, SpeciesRec } from './panthera';
 export type WidthMode = 'log' | 'linear';
 
 export const TRUNK_WIDTH = 110;
-export const TRUNK_LENGTH = 2400;
+/** The bottom of the world: the stem (the clade's ancestors) runs down to here (Ma, ~first life). */
+export const STEM_BOTTOM_MA = 4000;
+/** The stem fades out from here down to the bottom (Ma). */
+export const STEM_FADE_MA = 300;
 /** Height = time: the fork (the clade's origin) is at y = 0, "now" at y = −TIME_H. */
 export const TIME_H = 900;
-/** World height of the jog from the stem to the columns, just above the fork. */
+/** Kept for callers: the columns no longer jog at the fork (height 0 would divide by zero). */
 export const JOG = 1;
 /** Gap between neighbouring columns: this share of the smaller one's base width ... */
 export const GAP_FRAC = 0.2;
@@ -102,9 +104,9 @@ export interface FanBranch {
   width: number;
   /** Alive lane fraction at the base (0 if extinct). */
   aliveFrac: number;
-  /** Left edge of its slice of the stem (below the fork). */
+  /** Left edge below the fork: its column, which goes straight on down (= colLeft). */
   baseLeft: number;
-  /** Left edge of its column (above the jog). */
+  /** Left edge of its column, from the bottom of the world to its tip. */
   colLeft: number;
   /** The tip (last appearance) height. */
   tipY: number;
@@ -259,11 +261,9 @@ export class Steps {
   }
 }
 
-/** Left edge of a branch at world y: its stem slice below the fork, its column above the jog. */
-export function leftAt(b: FanBranch, y: number): number {
-  if (y >= 0) return b.baseLeft;
-  if (y <= -JOG) return b.colLeft;
-  return b.baseLeft + (b.colLeft - b.baseLeft) * (-y / JOG);
+/** Left edge of a branch at world y: one straight column from the bottom of the world to the tip. */
+export function leftAt(b: FanBranch, _y?: number): number {
+  return b.colLeft;
 }
 
 /**
@@ -359,13 +359,14 @@ export function layoutFan(clade: CladeRec, mode: WidthMode): Fan {
   for (let j = 0; j < branches.length; j++) {
     if (j) cx += gapBetween(branches[j - 1], branches[j], W);
     branches[j].colLeft = cx;
+    branches[j].baseLeft = cx;
     cx += branches[j].width;
   }
   return {
     clade,
     mode,
     trunkWidth: W,
-    trunkBottom: { x: 0, y: TRUNK_LENGTH },
+    trunkBottom: { x: 0, y: time.y(STEM_BOTTOM_MA) },
     branches,
     time,
     steps,
