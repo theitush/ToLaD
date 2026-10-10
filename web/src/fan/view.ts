@@ -31,8 +31,94 @@ const INK3 = '#7d8e84';
 export const SANS = "'Sofia Sans Condensed', 'Avenir Next Condensed', 'Roboto Condensed', 'Arial Narrow', system-ui, sans-serif";
 export const SERIF = "'Newsreader', 'Iowan Old Style', Georgia, serif";
 const font = (spec: string, family = SANS) => `${spec} ${family}`;
-/** Least distance (px) between the labels of tips that end side by side. */
-const LABEL_PX = 30;
+/** A species' label: its name, upright on a dark pill LABEL_PILL px across, LABEL_PAD px past each end of the text. */
+const LABEL_FONT = '650 15px';
+const LABEL_PILL = 22;
+const LABEL_PAD = 8;
+/** Right edge (px) of the time axis's labels: species' labels keep right of it. */
+const LABEL_AXIS_X = 72;
+/** The scale bar and legend at the bottom (px): labels fade out over the 30 px above it. */
+const LABEL_BOTTOM_PX = 104;
+/** How long a label takes to fade in or out when another takes or gives up its place (ms). */
+const LABEL_FADE_MS = 180;
+
+/**
+ * Where a species' label goes. One rule at every zoom and scroll: the common
+ * name (the Latin name is on the card), upright on a dark pill at the left
+ * edge of its column (the columns are left-aligned, so that is where the tip
+ * and the narrowest times are), standing on the tip; when the tip scrolls up
+ * past the top line it sticks there, inside the column, until the column's
+ * fork pushes it off. Off the left (under the time axis) it slides along the
+ * column, never past its right edge (fading as that edge goes under the
+ * axis). All of it is a continuous function of the camera.
+ */
+export interface LabelSpot {
+  b: FanBranch;
+  text: string;
+  /** Centre x of the pill and its bottom (screen px): the text reads up from there. */
+  x: number;
+  y1: number;
+  /** The pill [x0, y0, x1, y1]. */
+  box: [number, number, number, number];
+  /** 0–1: fades with the column's width on screen (too narrow) and near the legend at the bottom. */
+  fit: number;
+}
+
+type Screen = Pick<FanCamera, 'toScreen' | 'toWorld' | 'w' | 'h'> & { cam: { sx: number } };
+
+export function labelSpots(c: Screen, fan: Fan, top: number, measure: (text: string) => number): LabelSpot[] {
+  const half = LABEL_PILL / 2;
+  return fan.branches.map((b) => {
+    const text = b.sp.common;
+    const len = measure(text) + 2 * LABEL_PAD;
+    const ty = c.toScreen(tipX(b, fan, fan.mode), b.tipY)[1];
+    const fy = c.toScreen(0, 0)[1];
+    // On the tip; stuck under the top line once the tip is above it; never below the fork.
+    const y1 = Math.min(Math.max(ty - 4, top + len), fy - 4);
+    const wy = Math.min(0, Math.max(b.tipY, c.toWorld(0, y1)[1]));
+    const left = c.toScreen(leftAt(b, wy), wy)[0];
+    const room = b.width * c.cam.sx;
+    const lo = left + half;
+    const x = Math.min(Math.max(lo, LABEL_AXIS_X + half), Math.max(lo, left + room - half));
+    // Fades: a column too narrow, one leaving under the time axis on the left, and near the legend.
+    const fit = clamp01((room - 3) / 6) * clamp01((left + room - LABEL_AXIS_X + 12) / LABEL_PILL) * clamp01((c.h - LABEL_BOTTOM_PX + 30 - y1) / 30);
+    return { b, text, x, y1, box: [x - half, y1 - len, x + half, y1], fit };
+  });
+}
+
+/**
+ * Which labels show. A fixed priority (the wider column first, then tree
+ * order) so the order never changes with the camera; a label shows unless it
+ * would meet one shown before it. Hysteresis: a shown label keeps
+ * its place until it overlaps, a hidden one waits for a clear gap.
+ */
+export function resolveLabels(spots: LabelSpot[], prev: Map<number, boolean>): Map<number, boolean> {
+  const out = new Map<number, boolean>();
+  const taken: number[][] = [];
+  const order = [...spots].sort((p, q) => q.b.width - p.b.width || p.b.index - q.b.index);
+  for (const s of order) {
+    const gid = s.b.sp.gid;
+    if (!(s.fit > 0)) {
+      out.set(gid, false);
+      continue;
+    }
+    const need = prev.get(gid) ? -1 : 5;
+    const on = !taken.some((q) => boxGap(s.box, q) < need);
+    out.set(gid, on);
+    if (on && s.fit > 0.3) taken.push(s.box);
+  }
+  return out;
+}
+
+/** Gap (px) between two boxes [x0, y0, x1, y1]: negative when they overlap. */
+export function boxGap(a: number[], b: number[]): number {
+  return Math.max(b[0] - a[2], a[0] - b[2], b[1] - a[3], a[1] - b[3]);
+}
+
+function clamp01(v: number): number {
+  return v < 0 ? 0 : v > 1 ? 1 : v;
+}
+
 
 export interface Selection {
   sp: SpeciesRec;
@@ -66,9 +152,12 @@ export class FanView implements InputHandlers {
   /** The buttons (a DOM element over the canvas): labels never go under them. */
   barEl: HTMLElement | null = null;
   private scaleKey = '';
+  /** Each species' label: shown or not, and its fade (0–1); when it was last drawn (ms). */
+  private labelState = new Map<number, { on: boolean; a: number }>();
+  private labelT = 0;
   /** `?debug`: a readout of the zooms, years on screen and individuals per px. */
   readonly debug = typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug');
-  /** What each branch's individuals view drew last frame (HUD, tests). */
+  /** What each branch's individuals view drew last frame (taps, tests). */
   twigStats = new Map<number, TwigStats>();
   private models = new Map<string, TwigModel>();
   private raf = 0;
@@ -389,21 +478,14 @@ export class FanView implements InputHandlers {
     for (const b of this.fan.branches) this.drawStrand(b);
     for (const b of this.fan.branches) this.drawIndividuals(b);
     this.drawStemFade();
-    // Labels: tips side by side (the living all end at "now", packed hairlines in
-    // linear widths) are spread apart and joined to their tips by leader lines;
-    // then by size, one that would still overlap a bigger species' label waits for a closer zoom.
+    // Labels: one form everywhere (see labelSpots).
     this.drawGutter();
     this.drawTouch();
-    const lx = this.labelXs();
-    const hud = this.hudLayout();
-    const placed: number[][] = hud ? [hud.box] : [];
-    for (const b of [...this.fan.branches].sort((p, q) => q.sp.ever - p.sp.ever)) {
-      if (b !== hud?.b) this.drawLabel(b, placed, lx.get(b));
-    }
+    const spots = labelSpots(this.camera, this.fan, this.labelTop(), (t) => this.nameWidth(t));
+    this.drawLabels(spots);
     this.drawWidthScale();
     if (this.debug) this.drawDebug();
     this.drawTrunkLabel();
-    if (hud) this.drawHud(hud);
     this.drawTimeAxis(true);
     if (this.gl) {
       const pal = [LIVING, LINEAGE, TWIG_GRAY, TWIG_WITHERED].map(rgb01);
@@ -657,38 +739,6 @@ export class FanView implements InputHandlers {
     else this.twigStats.delete(b.sp.gid);
   }
 
-  /**
-   * Screen x of each label whose tip shares its height with others: in tip
-   * order, at least LABEL_PX apart, as close to their tips as that allows and
-   * kept on screen.
-   */
-  private labelXs(): Map<FanBranch, number> {
-    const out = new Map<FanBranch, number>();
-    const tips = this.fan.branches
-      .map((b) => ({ b, p: this.toScreen(tipX(b, this.fan, this.mode), b.tipY) }))
-      .filter(({ b, p }) => p[0] > -30 && p[0] < this.w + 30 && p[1] > -10 && p[1] < this.h + 200 && !this.twigStats.get(b.sp.gid)?.drawn);
-    const groups = new Map<number, typeof tips>();
-    for (const t of tips) {
-      const k = Math.round(t.p[1] / 3);
-      groups.set(k, [...(groups.get(k) ?? []), t]);
-    }
-    const D = LABEL_PX;
-    for (const g of groups.values()) {
-      g.sort((a, c) => a.p[0] - c.p[0]);
-      const x = g.map((t) => t.p[0]);
-      // Spread apart about the group's middle, then keep on screen.
-      for (let i = 1; i < x.length; i++) x[i] = Math.max(x[i], x[i - 1] + D);
-      const shift = (x[x.length - 1] - g[g.length - 1].p[0]) / 2;
-      for (let i = 0; i < x.length; i++) x[i] -= shift;
-      for (let i = x.length - 2; i >= 0; i--) x[i] = Math.min(x[i], x[i + 1] - D);
-      const lo = 14 - x[0];
-      const hi = this.w - 14 - x[x.length - 1];
-      const d = lo > 0 ? lo : hi < 0 ? hi : 0;
-      g.forEach((t, i) => out.set(t.b, x[i] + d));
-    }
-    return out;
-  }
-
   /** The buttons' box in canvas px [x0, y0, x1, y1], if any. */
   private barRect(): number[] | null {
     if (!this.barEl) return null;
@@ -698,134 +748,68 @@ export class FanView implements InputHandlers {
     return [r.left - c.left, r.top - c.top, r.right - c.left, r.bottom - c.top];
   }
 
-  /** A species' name and, after it, its Latin name in the serif italic, on one line from (0, 0) along +x; returns its length. */
-  private nameLine(b: FanBranch, draw: boolean, withSci = true): number {
-    const ctx = this.ctx;
-    const name = b.sp.common;
-    const sci = withSci && b.sp.sci && b.sp.sci !== name ? `(${b.sp.sci})` : '';
-    ctx.font = font('650 16px');
-    const nw = ctx.measureText(name).width;
-    if (draw) {
-      ctx.fillStyle = b.sp.extinct ? '#cfc4b1' : INK;
-      ctx.fillText(name, 0, 0);
-    }
-    if (!sci) return nw;
-    ctx.font = font('italic 400 14.5px', SERIF);
-    const sw = ctx.measureText(sci).width;
-    if (draw) {
-      ctx.fillStyle = b.sp.extinct ? '#a39a8a' : INK2;
-      ctx.fillText(sci, nw + 5, 0.5);
-    }
-    return nw + 5 + sw;
+  /** The labels' top line (screen y): just under the buttons, the same for every label. */
+  private labelTop(): number {
+    const bar = this.barRect();
+    return (bar ? bar[3] : 44) + 8;
   }
 
-  private drawLabel(b: FanBranch, placed: number[][], lx?: number): void {
-    const ctx = this.ctx;
-    const [tx, ty] = this.toScreen(tipX(b, this.fan, this.mode), b.tipY);
-    if (tx < -30 || tx > this.w + 30 || ty > this.h + 200) return;
-    // The tip above the screen: the name goes inside the column.
-    if (ty < -10) return this.drawColumnLabel(b, placed);
-    if (this.twigStats.get(b.sp.gid)?.drawn) return; // Zoomed into the individuals: the HUD names it.
-    // Moved off its tip: a leader line from the tip up to the label.
-    let lead = lx !== undefined && Math.abs(lx - tx) > 1.5 ? 14 : 0;
-    const cx = lead ? lx! : tx;
-    let cy = ty - lead;
-    ctx.save();
-    ctx.textBaseline = 'middle';
-    // Screen box of the upright one-line label (x0, y0, x1, y1).
-    // Kept on screen and clear of the buttons: the Latin name only if the whole line fits above
-    // the tip; else the name alone, pushed down (with a leader line) if even that does not fit.
-    const bar = this.barRect();
-    const under = bar && cx + 14 > bar[0] - 4 && cx - 13 < bar[2] + 4;
-    const minTop = (under ? bar![3] : 0) + 6;
-    const sci = cy - 8 - this.nameLine(b, false) >= minTop;
-    const len = this.nameLine(b, false, sci);
-    if (cy - 8 - len < minTop) {
-      const d = minTop - (cy - 8 - len);
-      cy += d;
-      lead += d;
-    }
-    const box = [cx - 10, cy - 8 - len, cx + 10, cy - 8];
-    if (placed.some((q) => box[0] < q[2] + 2 && q[0] < box[2] + 2 && box[1] < q[3] + 2 && q[1] < box[3] + 2)) {
-      ctx.restore();
-      return;
-    }
-    placed.push(box);
-    if (lead && Math.abs(cx - tx) > 1.5) {
-      ctx.beginPath();
-      ctx.moveTo(tx, ty - 2);
-      ctx.lineTo(cx, cy - 4);
-      ctx.strokeStyle = 'rgba(200,214,205,0.55)';
-      ctx.lineWidth = 1;
-      ctx.stroke();
-    }
-    // Upright text running up from the tip.
-    ctx.translate(cx, cy - 8);
-    ctx.rotate(-Math.PI / 2);
-    ctx.textAlign = 'left';
-    ctx.shadowColor = BG;
-    ctx.shadowBlur = 4;
-    this.nameLine(b, true, sci);
-    ctx.restore();
+  /** Length (px) of a species' name in the label font (not cached: the web font may arrive after the first frame). */
+  private nameWidth(text: string): number {
+    this.ctx.save();
+    this.ctx.font = font(LABEL_FONT);
+    const w = this.ctx.measureText(text).width;
+    this.ctx.restore();
+    return w;
   }
 
   /**
-   * The name of a column whose tip is above the screen, inside the column near
-   * the top, on a dark pill so it reads over the mesh: across the column if it
-   * is wide enough (else the Latin name is left off), else upright along it;
-   * not at all on a column too narrow for either.
+   * The species' labels (see labelSpots for where): which show is decided by
+   * resolveLabels (a fixed priority, with hysteresis), and each fades in and
+   * out over LABEL_FADE_MS rather than popping.
    */
-  private drawColumnLabel(b: FanBranch, placed: number[][]): void {
+  private drawLabels(spots: LabelSpot[]): void {
     const ctx = this.ctx;
-    const bar = this.barRect();
-    const top = (bar ? bar[3] : 44) + 14;
-    const wy = this.toWorld(0, top + 12)[1];
-    const L = laneAt(b, wy);
-    if (!(L.w > 0)) return;
-    const x0 = this.toScreen(leftAt(b, wy), wy)[0];
-    const x1 = x0 + L.w * this.cam.sx;
-    // The visible part of the column, clear of the time axis.
-    const v0 = Math.max(x0, 72);
-    const v1 = Math.min(x1, this.w - 6);
-    const room = v1 - v0;
-    if (!(room > 22)) return;
+    const now = performance.now();
+    const dt = Math.min(100, Math.max(0, now - this.labelT));
+    this.labelT = now;
+    const prev = new Map<number, boolean>();
+    for (const [gid, st] of this.labelState) prev.set(gid, st.on);
+    const on = resolveLabels(spots, prev);
+    let moving = false;
     ctx.save();
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'left';
-    const full = this.nameLine(b, false);
-    const short = this.nameLine(b, false, false);
-    const pad = 9;
-    let box: number[];
-    let across = true;
-    let sci = true;
-    if (room >= full + 2 * pad + 8) box = [(v0 + v1) / 2 - full / 2 - pad, top, (v0 + v1) / 2 + full / 2 + pad, top + 24];
-    else if (room >= short + 2 * pad + 8) {
-      sci = false;
-      box = [(v0 + v1) / 2 - short / 2 - pad, top, (v0 + v1) / 2 + short / 2 + pad, top + 24];
-    } else {
-      across = false;
-      const len = room >= 30 ? full : short;
-      sci = room >= 30;
-      const cx = (v0 + v1) / 2;
-      box = [cx - 12, top, cx + 12, top + len + 2 * pad];
-    }
-    if (box[3] > this.h - 120 || placed.some((q) => box[0] < q[2] + 2 && q[0] < box[2] + 2 && box[1] < q[3] + 2 && q[1] < box[3] + 2)) {
-      ctx.restore();
-      return;
-    }
-    placed.push(box);
-    ctx.fillStyle = 'rgba(12,23,20,0.8)';
-    ctx.beginPath();
-    ctx.roundRect(box[0], box[1], box[2] - box[0], box[3] - box[1], 12);
-    ctx.fill();
-    if (across) ctx.translate(box[0] + pad, top + 12);
-    else {
-      // Upright, reading up the column like the tip labels.
-      ctx.translate((box[0] + box[2]) / 2, box[3] - pad);
+    ctx.font = font(LABEL_FONT);
+    for (const s of spots) {
+      const gid = s.b.sp.gid;
+      const want = on.get(gid) ? 1 : 0;
+      let st = this.labelState.get(gid);
+      if (!st) this.labelState.set(gid, (st = { on: want === 1, a: want }));
+      st.on = want === 1;
+      if (st.a !== want) {
+        const step = dt / LABEL_FADE_MS;
+        st.a = want > st.a ? Math.min(want, st.a + step) : Math.max(want, st.a - step);
+        moving = true;
+      }
+      const alpha = st.a * s.fit;
+      const [x0, y0, x1, y1] = s.box;
+      if (alpha < 0.01 || x1 < 0 || x0 > this.w || y1 < 0 || y0 > this.h) continue;
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = 'rgba(12,23,20,0.8)';
+      ctx.beginPath();
+      ctx.roundRect(x0, y0, x1 - x0, y1 - y0, LABEL_PILL / 2);
+      ctx.fill();
+      // Upright, reading up the column.
+      ctx.save();
+      ctx.translate(s.x, y1 - LABEL_PAD);
       ctx.rotate(-Math.PI / 2);
+      ctx.fillStyle = s.b.sp.extinct ? '#cfc4b1' : INK;
+      ctx.fillText(s.text, 0, 0.5);
+      ctx.restore();
     }
-    this.nameLine(b, true, sci);
     ctx.restore();
+    if (moving) this.request();
   }
 
   /**
@@ -890,74 +874,6 @@ export class FanView implements InputHandlers {
     ctx.textBaseline = 'top';
     ctx.textAlign = 'right';
     lines.forEach((l, k) => ctx.fillText(l, this.w - 14, top + 5 + k * 14));
-    ctx.restore();
-  }
-
-  /** When zoomed into a species' individuals: which species and generations are on screen. */
-  /** The HUD's species, its lines and its box [x0, y0, x1, y1] (labels keep clear of it), or null. */
-  private hudLayout(): { b: FanBranch; lines: string[]; x: number; y: number; box: number[] } | null {
-    // (The texture is everywhere: only once one species fills most of the screen's width.)
-    let best: FanBranch | null = null;
-    let bestN = -1;
-    for (const b of this.fan.branches) {
-      const st = this.twigStats.get(b.sp.gid);
-      if (!st) continue;
-      const wPx = laneAt(b, this.cam.cy).w * this.cam.sx;
-      if (!(st.drawn > 0) && wPx < this.w * 0.6) continue;
-      const score = st.drawn + wPx;
-      if (score > bestN) {
-        best = b;
-        bestN = score;
-      }
-    }
-    if (!best) return null;
-    const st = this.twigStats.get(best.sp.gid)!;
-    const m = this.model(best);
-    const ctx = this.ctx;
-    const gens = st.g0 === st.g1 ? `generation ${fmtInt(st.g0 + 1)}` : `generations ${fmtInt(st.g0 + 1)}–${fmtInt(st.g1 + 1)}`;
-    // The headline is the population alive at the middle of the generations on screen (the column's width
-    // there), and its green share: the same time as the "born" line under it.
-    const sp = best.sp;
-    const ageMa = Math.min(Math.max(m.bornAgo((st.g0 + st.g1) / 2) / 1e6, sp.t1), sp.t0);
-    const yrs = ageMa * 1e6;
-    const when = yrs < 0.5 ? 'now' : formatYearsAgo(yrs);
-    const lines = [
-      `${sp.common}${sp.extinct ? ' (extinct)' : ''}`,
-      `~${formatCount(best.pop.stepAt(ageMa).n)} alive ${when}`,
-      `${Math.round(best.pop.stepAt(ageMa).q * 100)}% with living descendants`,
-      `${gens} of ${fmtInt(m.G)}`,
-      `born ~${formatYearsAgo(m.bornAgo(st.g1))}${st.g0 === st.g1 ? '' : ` to ~${formatYearsAgo(m.bornAgo(st.g0))}`}`,
-    ];
-    // Below the buttons, right of the axis: the species large, its generations quiet.
-    const bar = this.barRect();
-    const x = 66;
-    const y = (bar ? bar[3] : 44) + 12;
-    ctx.save();
-    ctx.font = font('650 19px');
-    const w0 = ctx.measureText(lines[0]).width;
-    ctx.font = font('500 13px');
-    const wmax = Math.max(w0, ...lines.slice(1).map((l) => ctx.measureText(l).width)) + 24;
-    ctx.restore();
-    const box = [x - 12, y - 8, x - 12 + Math.min(this.w - x, wmax), y - 8 + 30 + 16 * (lines.length - 1)];
-    return { b: best, lines, x, y, box };
-  }
-
-  private drawHud(hud: { lines: string[]; x: number; y: number; box: number[] }): void {
-    const ctx = this.ctx;
-    const { lines, x, y, box } = hud;
-    ctx.save();
-    ctx.fillStyle = 'rgba(12,23,20,0.84)';
-    ctx.beginPath();
-    ctx.roundRect(box[0], box[1], box[2] - box[0], box[3] - box[1], 12);
-    ctx.fill();
-    ctx.textBaseline = 'top';
-    ctx.textAlign = 'left';
-    ctx.fillStyle = INK;
-    ctx.font = font('650 19px');
-    ctx.fillText(lines[0], x, y);
-    ctx.font = font('500 13px');
-    ctx.fillStyle = INK2;
-    for (let k = 1; k < lines.length; k++) ctx.fillText(lines[k], x, y + 10 + 16 * k);
     ctx.restore();
   }
 

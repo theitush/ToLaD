@@ -23,10 +23,13 @@ const scenes = [
   ['bar-35', 'bar', ['Lion', 3000, 35, 40]],
   ['deep', 'bar', ['Lion', 300, 4, 3000]],
   ['card', 'card', ['Tiger']],
-  // A tap on a column (the touch marker), columns whose tips are above the screen, the HUD near now.
+  // A tap on a column (the touch marker), columns whose tips are above the screen, near now.
   ['touch', 'touch', ['Lion', 70]],
   ['scrolled', 'scroll', [2.2, 2000]],
   ['nearnow', 'bar', ['Lion', 25, 2e3, 900]],
+  // Sequences (#54): a slow pan down from home until "now" is above the screen, and a zoom from home into the lion.
+  ...[0, 60, 120, 180, 260, 360].map((dy, k) => [`pan${k + 1}`, 'pan', [1.5, dy]]),
+  ...[0, 0.2, 0.4, 0.6, 0.8, 1].map((t, k) => [`zoom${k + 1}`, 'zoomin', ['Lion', 300, t]]),
 ];
 const browser = await chromium.launch({ headless: true });
 try {
@@ -61,6 +64,27 @@ try {
         } else if (kind === 'scroll') {
           const h = f.homeCamera();
           f.cam = { ...h, sx: h.sx * args[0], sy: h.sy * args[0], ty: h.sy * args[0], cy: fan.time.y(args[1] / 1e6) };
+          f.camera.settle();
+        } else if (kind === 'pan') {
+          // Zoom z with "now" at 160 px from the top, then the view moved down dy px (into the past).
+          const [z, dy] = args;
+          const h = f.homeCamera();
+          const sy = h.sy * z;
+          f.cam = { ...h, sx: h.sx * z, sy, ty: sy, cy: f.yNow + (f.h / 2 - (160 - dy)) / sy };
+          f.camera.settle();
+        } else if (kind === 'zoomin') {
+          // From home (t = 0) to the species' individuals (t = 1, 4 per 70 px bar) about a point on its column.
+          const [sp, ago, t] = args;
+          const b = fan.branches.find((b) => b.sp.common === sp);
+          const h = f.homeCamera();
+          f.cam = h;
+          const y = fan.time.y(ago / 1e6);
+          const [px, py] = f.toScreen(b.colLeft + 0.3 * b.width, y);
+          const F = Math.pow(70 / 4 / b.unit / h.sx, t);
+          const sx = h.sx * F;
+          const sy = h.sy * F;
+          const wx = b.colLeft + 0.3 * b.width;
+          f.cam = { cx: wx - (px - f.w / 2) / sx, cy: y - (py - f.h / 2) / sy, sx, sy, ty: sy };
           f.camera.settle();
         } else if (kind === 'far') {
           const h = f.homeCamera();
