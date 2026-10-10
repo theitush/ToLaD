@@ -1,45 +1,34 @@
-// OneZoom-style fan for one polytomy, in world units (y grows downwards, like
-// the screen). The parent branch comes up from the bottom to the fork at
-// (0, 0); each species branch leaves the fork side by side (their widths add up
-// to the trunk's width, so they nest) and runs up through time to its tip.
-// There are no leaf blobs: a branch is the bundle of its individuals' strands.
+// The Panthera fan as a rectangular tree (a classic cladogram), fixed in world
+// units (y grows downwards, like the screen). Nothing here depends on the
+// camera except which step grid the gray edge is drawn on (Steps, below):
+// panning never changes a shape, and zooming only refines the steps.
 //
-// Height = time: the fork is the clade's origin, a branch's tip is the species'
-// last appearance (living species: the "now" line), on a log years-before-
-// present scale (TimeScale).
+//   - The stem comes up from the bottom to the fork at y = 0. It is its
+//     children side by side, no gaps (each child's slice of it is baseLeft..
+//     baseLeft + width), so every green lane runs straight down to the root.
+//   - Just above the fork each child jogs sideways, over JOG world units of
+//     height, from its slice of the stem to its column (a sheared band: its
+//     horizontal width never changes). That is the cladogram's horizontal bar.
+//   - Each species is then a straight vertical column (colLeft) from the jog
+//     up to its tip: "now" for the living, its last appearance if extinct.
+//     Columns sit side by side in tree order with a fixed gap between
+//     neighbours (gapBetween): GAP_FRAC of the smaller one's base width, at
+//     least MIN_GAP_FRAC of the stem's. Positions never change with time or view.
 //
-// Siblings are packed at every height (Pack), not just at the fork: at height
-// y they sit side by side in tree order, GAP_PX apart on screen, so as
-// branches thin (and extinct ones end) their neighbours slide in and the
-// bundle narrows towards "now" like the stem does. Sideways moves are shaped on
-// screen, so they look the same at every zoom: gaps open over OPEN_PX above the
-// fork, an ended branch's slot closes above its tip over a height in
-// proportion to its width on screen. Neighbours are packed at every zoom, so
-// whenever they would fit on screen next to the branch one looks at, they are
-// there. What a deeper width zoom changes is only which line stands upright:
-// in the whole-fan view the bundle is centred (both sides narrow towards
-// "now"); zooming in (PACK_FADE) the packing is referenced to the point at the
-// centre of the screen instead (Pack.setRef), so the branch one looks at keeps
-// its left edge, and so its living strands, upright, and its neighbours lean
-// against its edges.
+// Inside a column the green (alive) lane is a straight band on its left edge,
+// constant width; the gray (dead) lane lies to its right and narrows as the
+// dead peel off. Its right edge is the only edge that is not one straight line:
+// a step function of height (Steps), all vertical and horizontal segments.
 //
-// Width at any height = the individuals whose strands pass through it: every
-// individual's strand runs from the root up to its death, so at age τ the
-// branch holds everyone not yet dead by τ (those alive then plus everyone born
-// later). At the species' base that is everyone ever; at the tip only the
-// living (living species) or nobody (extinct). Dead strands peel off on the way
-// up, so the branch thins; the green (alive) lane keeps its width all the way.
+// Height = time: the fork is the clade's origin, "now" is y = −TIME_H, on a
+// log years-before-present scale offset by TIME_C (TimeScale).
 //
-// The stem is drawn as its children's strands side by side (view.drawStrand),
-// so each green lane runs unbroken from leaf to root; the stem's width and green
-// are the sums of its strands. In linear mode that equals the clade's own
-// alive/ever exactly; in log mode the stem's green is the sum of its children's
-// log lanes (that is what keeps strands continuous).
-//
-// Width = individuals (shares g/Σg, g = n linear or 1 + log10 n log, as in the
-// river's layout.ts). Green = alive: each branch is split into a green lane of
-// share f (alive share in the active mode) on its left and gray on its right.
-// Ribbon normals point to the branch's left: for a branch going up, (-1, 0).
+// Width = individuals: at height y a branch holds everyone whose strand passes
+// through it (everyone not yet dead by then, remaining()), times one fixed
+// world width per individual (linear) or per decade of individuals (log, g()).
+// The steps hold that width averaged over each step's height, so a step's
+// width is the individuals at some height inside it (exact there) and the
+// area under the edge is preserved step by step.
 
 import type { CladeRec, SpeciesRec } from './panthera';
 
@@ -49,32 +38,26 @@ export const TRUNK_WIDTH = 110;
 export const TRUNK_LENGTH = 2400;
 /** Height = time: the fork (the clade's origin) is at y = 0, "now" at y = −TIME_H. */
 export const TIME_H = 900;
-/** Gap between sibling branches on screen (px). */
-export const GAP_PX = 5;
-/** Height on screen (px) over which gaps open above the fork. */
-export const OPEN_PX = 40;
+/** World height of the jog from the stem to the columns, just above the fork. */
+export const JOG = 1;
+/** Gap between neighbouring columns: this share of the smaller one's base width ... */
+export const GAP_FRAC = 0.2;
+/** ... but at least this share of the stem's width. */
+export const MIN_GAP_FRAC = 0.025;
 /**
- * An ended branch's slot closes above its tip over CLOSE_K × its width on
- * screen (a sideways move's height in proportion to its size, so it is the
- * same S at every zoom), at least OPEN_PX and at most CLOSE_MAX_PX.
+ * Steps of the gray edge: a step grid of level k cuts the time axis into 2^k
+ * equal heights (equal log-time bands; the grids nest). The level shown is
+ * the one whose steps are STEP_PX..2·STEP_PX tall on screen; over the top
+ * STEP_BLEND of that octave the steps morph into the next grid's (each step
+ * slides to its two halves' widths), so zooming never pops.
  */
-export const CLOSE_K = 3;
-export const CLOSE_MAX_PX = 240;
-/**
- * Width zooms (× the whole-fan view) over which the packing's reference moves
- * from the bundle's centre (up to the first) to the point at the centre of the
- * screen (beyond the second). Zoomed in that far one looks at one branch, whose
- * green lane then stands exactly upright; the siblings stay packed against it.
- */
-export const PACK_FADE: [number, number] = [5, 200];
-/** Heights the packing is tabulated at, from the fork to "now". */
-const GRID = 4096;
+export const STEP_PX = 22;
+export const STEP_BLEND = 0.4;
+export const MAX_STEP_LEVEL = 36;
 /**
  * Time axis offset (years). Height is log10(years before present + C). With
  * C = 10 years the axis resolves the last decades and centuries; it is close
- * to the mean lifespan of the living big cats (alive·span/ever ≈ 3–5 years),
- * which keeps the log-width taper of a living branch (the dead peeling off at
- * a constant rate) smooth right up to "now", with no bend near the tip.
+ * to the mean lifespan of the living big cats (alive·span/ever ≈ 3–5 years).
  */
 export const TIME_C = 10;
 
@@ -114,17 +97,19 @@ export interface FanBranch {
   sp: SpeciesRec;
   /** Index among its siblings (tree order, left to right). */
   index: number;
-  /** Width share among siblings and absolute width at the fork (= individuals ever). */
+  /** Width share among siblings and absolute width at the base (= individuals ever). */
   share: number;
   width: number;
   /** Alive lane fraction at the base (0 if extinct). */
   aliveFrac: number;
-  /** Left edge at the fork (and down the stem): the siblings are slices of the stem there. */
+  /** Left edge of its slice of the stem (below the fork). */
   baseLeft: number;
+  /** Left edge of its column (above the jog). */
+  colLeft: number;
   /** The tip (last appearance) height. */
   tipY: number;
-  /** The siblings' packing, which places this branch at every height. */
-  pack: Pack;
+  /** The fan's step grids, which draw its gray edge. */
+  steps: Steps;
 }
 
 export interface Fan {
@@ -134,189 +119,167 @@ export interface Fan {
   trunkBottom: Pt;
   branches: FanBranch[];
   time: TimeScale;
-  pack: Pack;
+  steps: Steps;
+  /** World x extent of the columns. */
+  x0: number;
+  x1: number;
 }
 
 const smooth = (t: number) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
 
+/** Adaptive Simpson's rule for ∫ f over [a, b] to about `tol`. */
+function integrate(f: (x: number) => number, a: number, b: number, tol: number): number {
+  const simpson = (fa: number, fm: number, fb: number, h: number) => (h / 6) * (fa + 4 * fm + fb);
+  const rec = (a: number, b: number, fa: number, fm: number, fb: number, whole: number, tol: number, depth: number): number => {
+    const m = (a + b) / 2;
+    const lm = (a + m) / 2;
+    const rm = (m + b) / 2;
+    const flm = f(lm);
+    const frm = f(rm);
+    const left = simpson(fa, flm, fm, m - a);
+    const right = simpson(fm, frm, fb, b - m);
+    if (depth <= 0 || Math.abs(left + right - whole) <= 15 * tol) return left + right + (left + right - whole) / 15;
+    return rec(a, m, fa, flm, fm, left, tol / 2, depth - 1) + rec(m, b, fm, frm, fb, right, tol / 2, depth - 1);
+  };
+  // Start from 8 panels so a narrow feature isn't missed.
+  let s = 0;
+  const n = 8;
+  for (let i = 0; i < n; i++) {
+    const x0 = a + ((b - a) * i) / n;
+    const x1 = a + ((b - a) * (i + 1)) / n;
+    const f0 = f(x0);
+    const f1 = f(x1);
+    const fm = f((x0 + x1) / 2);
+    s += rec(x0, x1, f0, fm, f1, simpson(f0, fm, f1, x1 - x0), tol / n, 14);
+  }
+  return s;
+}
+
 /**
- * Siblings packed at every height, for the screen scale (sx, sy px per world
- * unit) they are shown at. Packed positions are tabulated from the fork up: at
- * each height the branches sit side by side in tree order (their widths there,
- * GAP_PX apart on screen), the bundle centred. Then a common sideways shift per
- * height (it never changes the gaps) moves the reference that stands upright:
- * the bundle's centre in the whole-fan view, the screen centre's point (setRef)
- * zoomed in, blended over PACK_FADE.
+ * The gray edge's step grids. Level k: steps of height TIME_H / 2^k from the
+ * fork (y = 0) up to "now" (y = −TIME_H), so every grid's lines are lines of
+ * the finer ones. A step's width is the branch's exact width averaged over the
+ * step's height (clipped to the branch's span), cached forever: steps are
+ * world-fixed. setScale picks the level for the time zoom on screen.
  */
-export class Pack {
-  sx = 1;
-  sy = 1;
-  /** Width zoom of the whole-fan view (PACK_FADE is relative to it). */
-  sxHome = 3;
-  /** World y of grid step k (k = 0 the fork, GRID "now") and the branches' widths there (scale-free). */
-  private readonly dy: number;
-  private readonly widths: Float64Array[];
-  private readonly tipW: number[];
-  /** Packed, centred left edges per grid step, for the current scale. */
-  private X: Float64Array[] | null = null;
-  /** The upright reference: sibling `refJ`, at fraction `refS` across its gray lane and gap. */
-  refJ = -1;
-  refS = 0;
+export class Steps {
+  /** Level shown and how far it has morphed into level k + 1 (0–1). */
+  k = 0;
+  t = 0;
+  private readonly cache = new Map<FanBranch, Map<number, number>>();
 
   constructor(
-    readonly branches: FanBranch[],
     readonly time: TimeScale,
     readonly mode: WidthMode,
-  ) {
-    this.dy = TIME_H / GRID;
-    this.widths = branches.map((b) => {
-      const a = new Float64Array(GRID + 1);
-      for (let k = 0; k <= GRID; k++) {
-        const y = -k * this.dy;
-        a[k] = y >= b.tipY ? strandAt(b, time.ageAt(y), mode).w : 0;
-      }
-      return a;
-    });
-    this.tipW = branches.map((b) => strandAt(b, time.ageAt(b.tipY + 1e-9), mode).w);
-  }
+  ) {}
 
-  /** Set the screen scale the packing is for (cheap if unchanged). */
-  setScale(sx: number, sy: number, sxHome = this.sxHome): void {
-    if (sx === this.sx && sy === this.sy && sxHome === this.sxHome && this.X) return;
-    this.sx = sx;
-    this.sy = sy;
-    this.sxHome = sxHome;
-    this.X = null;
-  }
-
-  /** How much the bundle stays centred at the current width zoom (1 = centred, 0 = referenced to setRef's point). */
-  fade(): number {
-    const z = Math.log(this.sx / this.sxHome);
-    const [a, b] = PACK_FADE.map(Math.log);
-    return 1 - smooth((z - a) / (b - a));
-  }
-
-  /**
-   * Reference the packing to world point (x, y) (the screen centre): the
-   * branch holding it (or nearest) and how far across it the point lies, 0 in
-   * its green lane rising to 1 across its gray lane and the gap after it, so
-   * the reference moves continuously from one branch to the next. Changing it
-   * shifts every branch at a height by the same amount (the gaps never change).
-   */
-  setRef(x: number, y: number): void {
-    const yc = Math.min(-1e-9, Math.max(this.time.y(0), y));
-    const a = this.anchor(x, yc);
-    if (!a) return;
-    const b = this.branches[a.j];
-    const st = strandAt(b, this.time.ageAt(yc), this.mode);
-    const gw = st.w * st.f;
-    const span = st.w + GAP_PX / this.sx - gw;
-    this.refJ = a.j;
-    this.refS = span > 0 ? Math.min(1, Math.max(0, (a.dx - gw) / span)) : 0;
-  }
-
-  private table(): Float64Array[] {
-    if (this.X) return this.X;
-    const bs = this.branches;
-    const n = bs.length;
-    const X = bs.map(() => new Float64Array(GRID + 1));
-    const S = bs.map(() => 0);
-    const gapW = GAP_PX / this.sx;
-    for (let k = 0; k <= GRID; k++) {
-      const y = -k * this.dy;
-      const open = smooth((-y * this.sy) / OPEN_PX);
-      let T = -gapW * open;
-      for (let j = 0; j < n; j++) {
-        const b = bs[j];
-        const ramp = Math.min(CLOSE_MAX_PX, Math.max(OPEN_PX, CLOSE_K * (this.tipW[j] + gapW) * this.sx));
-        const vis = y >= b.tipY ? 1 : 1 - smooth(((b.tipY - y) * this.sy) / ramp);
-        const w = y >= b.tipY ? this.widths[j][k] : this.tipW[j];
-        S[j] = (w + gapW * open) * vis;
-        T += S[j];
-      }
-      let x = -T / 2;
-      for (let j = 0; j < n; j++) {
-        X[j][k] = x;
-        x += S[j];
-      }
+  /** Pick the level for time zoom sy (px per world unit). */
+  setScale(sy: number): void {
+    const kf = Math.log2((TIME_H * sy) / STEP_PX);
+    if (!Number.isFinite(kf) || kf <= 0) {
+      this.k = 0;
+      this.t = 0;
+      return;
     }
-    return (this.X = X);
+    const k = Math.min(MAX_STEP_LEVEL, Math.floor(kf));
+    this.k = k;
+    this.t = k >= MAX_STEP_LEVEL ? 0 : smooth((kf - k - (1 - STEP_BLEND)) / STEP_BLEND);
   }
 
-  /** Packed, centred left edge of sibling j at world y (tabulated: used in the whole-fan view). */
-  private centred(j: number, y: number): number {
-    const X = this.table()[j];
-    const f = Math.min(GRID, -y / this.dy);
-    const k = Math.min(GRID - 1, Math.floor(f));
-    const t = f - k;
-    return X[k] + (X[k + 1] - X[k]) * t;
+  /** Step height (world) of level k. */
+  static dy(k: number): number {
+    return TIME_H / Math.pow(2, k);
   }
 
-  /** Slot of sibling j at world y (its width plus the gap after it), exactly. */
-  private slot(j: number, y: number): number {
-    const b = this.branches[j];
-    const gapW = GAP_PX / this.sx;
-    const open = smooth((-y * this.sy) / OPEN_PX);
-    if (y >= b.tipY) return strandAt(b, this.time.ageAt(y), this.mode).w + gapW * open;
-    const ramp = Math.min(CLOSE_MAX_PX, Math.max(OPEN_PX, CLOSE_K * (this.tipW[j] + gapW) * this.sx));
-    return (this.tipW[j] + gapW * open) * (1 - smooth(((b.tipY - y) * this.sy) / ramp));
+  /** The finest level drawn right now (k, or k + 1 while morphing). */
+  get level(): number {
+    return this.t > 0 ? this.k + 1 : this.k;
   }
 
-  /**
-   * Left edge of sibling j at world y packed against the reference point
-   * (which stays at its x at the fork), from the exact slots between them: at
-   * deep zooms only these relative positions matter, and they are exact.
-   */
-  private referenced(j: number, y: number): number {
-    const a = this.refJ;
-    const s = this.refS;
-    const b = this.branches[a];
-    let x = b.baseLeft + s * b.width - s * this.slot(a, y);
-    if (j >= a) for (let i = a; i < j; i++) x += this.slot(i, y);
-    else for (let i = j; i < a; i++) x -= this.slot(i, y);
-    return x;
-  }
-
-  /** Left edge of sibling j at world y. */
-  leftAt(j: number, y: number): number {
-    if (y >= 0) return this.branches[j].baseLeft;
-    const u = this.refJ < 0 ? 0 : 1 - this.fade();
-    if (u <= 0) return this.centred(j, y);
-    if (u >= 1) return this.referenced(j, y);
-    return (1 - u) * this.centred(j, y) + u * this.referenced(j, y);
-  }
-
-  /**
-   * Where world x lies at height y, relative to the branch holding it (or the
-   * nearest one): kept fixed while the scale (and so the packing) changes, so
-   * whatever is under the finger stays under it.
-   */
-  anchor(x: number, y: number): { j: number; dx: number } | null {
-    if (y >= 0) return null;
-    let best: { j: number; dx: number } | null = null;
-    let bd = Infinity;
-    for (const b of this.branches) {
-      if (y < b.tipY) continue;
-      const l = this.leftAt(b.index, y);
-      const w = strandAt(b, this.time.ageAt(y), this.mode).w;
-      const d = Math.max(0, l - x, x - l - w);
-      if (d < bd) {
-        bd = d;
-        best = { j: b.index, dx: x - l };
-      }
+  /** Mean exact width of branch b over step i of level k (0 if the branch isn't there). */
+  mean(b: FanBranch, k: number, i: number): number {
+    let m = this.cache.get(b);
+    if (!m) this.cache.set(b, (m = new Map()));
+    const key = k * 2 ** 40 + i; // i < 2^k ≤ 2^36
+    const hit = m.get(key);
+    if (hit !== undefined) return hit;
+    const d = Steps.dy(k);
+    const yLo = -i * d; // bottom of the step
+    const yHi = Math.max(b.tipY, -(i + 1) * d); // top, clipped to the tip
+    let v = 0;
+    if (yHi < yLo) {
+      // Adaptive Simpson, split at the species' first appearance (where the width has a kink).
+      const f = (y: number) => strandAt(b, this.time.ageAt(y), this.mode).w;
+      const cuts = [yHi, yLo];
+      const y0 = this.time.y(b.sp.t0);
+      if (y0 > yHi && y0 < yLo) cuts.splice(1, 0, y0);
+      let s = 0;
+      for (let c = 0; c + 1 < cuts.length; c++) s += integrate(f, cuts[c], cuts[c + 1], b.width * (yLo - yHi) * 1e-7);
+      v = s / (yLo - yHi);
     }
-    return best;
+    if (m.size > 50000) m.clear();
+    m.set(key, v);
+    return v;
   }
 
-  /** World x of an anchor at height y, at the current scale. */
-  resolve(a: { j: number; dx: number } | null, x: number, y: number): number {
-    return a ? this.leftAt(a.j, y) + a.dx : x;
+  /** Index of the level-k step holding world y (−TIME_H ≤ y < 0). */
+  static index(k: number, y: number): number {
+    return Math.max(0, Math.min(2 ** k - 1, Math.floor(-y / Steps.dy(k))));
+  }
+
+  /** Stepped width of branch b at world y, at the current level (blended while morphing). */
+  widthAt(b: FanBranch, y: number): number {
+    if (y >= 0) return b.width;
+    if (y < b.tipY) return 0;
+    const a = this.mean(b, this.k, Steps.index(this.k, y));
+    if (this.t <= 0) return a;
+    const k1 = this.k + 1;
+    return a + (this.mean(b, k1, Steps.index(k1, y)) - a) * this.t;
+  }
+
+  /**
+   * World heights of the step lines drawn now, from y0 down to y1 (y0 < y1),
+   * within the branch's span; at most `max` of them (null if there are more).
+   */
+  lines(b: FanBranch, y0: number, y1: number, max = 4000): number[] | null {
+    const k = this.level;
+    const d = Steps.dy(k);
+    const lo = Math.max(y0, b.tipY);
+    const hi = Math.min(y1, 0);
+    const out: number[] = [];
+    if (hi <= lo) return out;
+    const i0 = Math.ceil(-hi / d);
+    const i1 = Math.floor(-lo / d);
+    if (i1 - i0 + 1 > max) return null;
+    for (let i = i1; i >= i0; i--) {
+      const y = -i * d;
+      if (y > lo && y < hi) out.push(y);
+    }
+    return out;
   }
 }
 
-/** Left edge of a branch at world y (its green lane runs along it; the gray lies to its right). */
+/** Left edge of a branch at world y: its stem slice below the fork, its column above the jog. */
 export function leftAt(b: FanBranch, y: number): number {
-  return b.pack.leftAt(b.index, y);
+  if (y >= 0) return b.baseLeft;
+  if (y <= -JOG) return b.colLeft;
+  return b.baseLeft + (b.colLeft - b.baseLeft) * (-y / JOG);
+}
+
+/**
+ * A branch's lanes at world y, as drawn: total width w (stepped), the green
+ * lane's width gw (constant from the root to the tip) and its fraction f.
+ */
+export function laneAt(b: FanBranch, y: number): { w: number; gw: number; f: number } {
+  const w = b.steps.widthAt(b, y);
+  const green = b.sp.alive > 0 ? b.width * b.aliveFrac : 0;
+  const gw = Math.min(w, green);
+  return { w, gw, f: w > 0 ? gw / w : 0 };
+}
+
+/** Gap (world) between neighbouring columns a and b. */
+export function gapBetween(a: FanBranch, b: FanBranch, stem: number): number {
+  return Math.max(GAP_FRAC * Math.min(a.width, b.width), MIN_GAP_FRAC * stem);
 }
 
 export function g(n: number, mode: WidthMode): number {
@@ -350,10 +313,10 @@ export function remaining(sp: SpeciesRec, ageMa: number): number {
 }
 
 /**
- * Strand width and green fraction of a branch at age `ageMa`. The green lane
- * has the same absolute width along the whole strand (width · g(alive)/g(ever),
- * in both modes): the gray around it thins as the dead peel off, so at the tip
- * (only the living remain) the strand is exactly all green.
+ * Exact (unstepped) strand width and green fraction of a branch at age
+ * `ageMa`. The green lane has the same absolute width along the whole strand
+ * (width · g(alive)/g(ever), in both modes): the gray around it thins as the
+ * dead peel off, so at the tip (only the living remain) the strand is all green.
  */
 export function strandAt(b: FanBranch, ageMa: number, mode: WidthMode): { w: number; f: number } {
   const sp = b.sp;
@@ -364,13 +327,13 @@ export function strandAt(b: FanBranch, ageMa: number, mode: WidthMode): { w: num
   return { w, f: w > 0 ? Math.min(1, green / w) : 0 };
 }
 
-
 export function layoutFan(clade: CladeRec, mode: WidthMode): Fan {
   const sp = clade.species;
   const gs = sp.map((s) => g(s.ever, mode));
   const sum = gs.reduce((a, b) => a + b, 0);
   const W = TRUNK_WIDTH;
   const time = new TimeScale(clade.t0);
+  const steps = new Steps(time, mode);
   let x = -W / 2;
   const branches: FanBranch[] = sp.map((s, i) => {
     const share = gs[i] / sum;
@@ -384,12 +347,20 @@ export function layoutFan(clade: CladeRec, mode: WidthMode): Fan {
       width,
       aliveFrac: aliveFrac(s.alive, s.ever, mode),
       baseLeft,
+      colLeft: 0,
       tipY: time.y(s.t1),
-      pack: null as unknown as Pack,
+      steps,
     };
   });
-  const pack = new Pack(branches, time, mode);
-  for (const b of branches) b.pack = pack;
+  // Columns side by side with their gaps, centred on the stem.
+  let total = 0;
+  for (let j = 0; j < branches.length; j++) total += branches[j].width + (j ? gapBetween(branches[j - 1], branches[j], W) : 0);
+  let cx = -total / 2;
+  for (let j = 0; j < branches.length; j++) {
+    if (j) cx += gapBetween(branches[j - 1], branches[j], W);
+    branches[j].colLeft = cx;
+    cx += branches[j].width;
+  }
   return {
     clade,
     mode,
@@ -397,6 +368,8 @@ export function layoutFan(clade: CladeRec, mode: WidthMode): Fan {
     trunkBottom: { x: 0, y: TRUNK_LENGTH },
     branches,
     time,
-    pack,
+    steps,
+    x0: -total / 2,
+    x1: total / 2,
   };
 }

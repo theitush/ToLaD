@@ -26,7 +26,7 @@
 //   labels    plus handles (lion#…).
 
 import { Species, type Address } from '../../../packages/procgen/src/index.ts';
-import { leftAt, strandAt, type FanBranch, type TimeScale, type WidthMode } from './layout';
+import { JOG, laneAt, leftAt, type FanBranch, type TimeScale, type WidthMode } from './layout';
 import type { SpeciesRec } from './panthera';
 
 function keyOf(common: string): string {
@@ -168,7 +168,7 @@ export class TwigModel {
 
   /** Branch width at world height y (the fan's width function, layout.ts). */
   widthAt(y: number): number {
-    return strandAt(this.b, this.time.ageAt(y), this.mode).w;
+    return laneAt(this.b, y).w;
   }
 
   /** Branch width and left edge at the height of generation g's births (row centre). */
@@ -184,8 +184,8 @@ export class TwigModel {
    * the right (thinning as they peel off). World units.
    */
   lanes(y: number): { left: number; w: number; gw: number } {
-    const st = strandAt(this.b, this.time.ageAt(y), this.mode);
-    return { left: leftAt(this.b, y), w: st.w, gw: st.w * st.f };
+    const L = laneAt(this.b, y);
+    return { left: leftAt(this.b, y), w: L.w, gw: L.gw };
   }
 
   /** Fraction across its lane of individual (g, i): the centre of its equal share of its generation. */
@@ -426,18 +426,32 @@ function twigTop(v: TwigView, t: Twig): number {
   return Math.max(t.yDeath, v.yNow + DEAD_GAP_PX / v.sy);
 }
 
-/** Trace the strand at lane fraction u from y0 to y1 (world), following the lanes. */
+/**
+ * Trace the strand at lane fraction u from y0 to y1 (world), following the
+ * lanes exactly: straight up between the gray edge's steps (and the jog above
+ * the fork), a horizontal jog at each step line where its lane changes width.
+ */
 function strandPath(v: TwigView, m: TwigModel, u: number, alive: boolean, y0: number, y1: number, path: Path2D | CanvasRenderingContext2D, move = true): [number, number] {
-  const lenPx = Math.abs(y0 - y1) * v.sy;
-  const K = Math.max(1, Math.min(16, Math.ceil(lenPx / 50)));
+  const lo = Math.min(y0, y1);
+  const hi = Math.max(y0, y1);
+  const brk: number[] = [];
+  if (!alive) for (const y of m.b.steps.lines(m.b, lo, hi, 400) ?? []) brk.push(y);
+  for (const y of [0, -JOG]) if (y > lo && y < hi) brk.push(y);
+  brk.sort((a, b) => (y1 > y0 ? a - b : b - a));
   let p = v.toScreen(m.xAt(u, y0, alive), y0);
   if (move) path.moveTo(p[0], p[1]);
   else path.lineTo(p[0], p[1]);
-  for (let k = 1; k <= K; k++) {
-    const y = y0 + ((y1 - y0) * k) / K;
-    p = v.toScreen(m.xAt(u, y, alive), y);
+  // Width is constant within a step: x changes only at a line (a jog) or along the fork's jog.
+  const eps = (hi - lo) * 1e-9;
+  const dir = y1 > y0 ? 1 : -1;
+  for (const y of brk) {
+    p = v.toScreen(m.xAt(u, y - dir * eps, alive), y);
+    path.lineTo(p[0], p[1]);
+    p = v.toScreen(m.xAt(u, y + dir * eps, alive), y);
     path.lineTo(p[0], p[1]);
   }
+  p = v.toScreen(m.xAt(u, y1, alive), y1);
+  path.lineTo(p[0], p[1]);
   return p;
 }
 

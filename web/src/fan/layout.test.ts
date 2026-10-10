@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CLOSE_MAX_PX, GAP_PX, OPEN_PX, layoutFan, leftAt, strandAt, type WidthMode } from './layout';
+import { gapBetween, GAP_FRAC, JOG, laneAt, layoutFan, leftAt, MIN_GAP_FRAC, remaining, Steps, strandAt, TIME_H, type WidthMode } from './layout';
 import { PANTHERA } from './panthera';
 
 describe('fan strands', () => {
@@ -28,73 +28,107 @@ describe('fan strands', () => {
   }
 });
 
-describe('fan packing', () => {
-  /** Adjacent visible siblings' gaps (world) and the drawn widths at height y. */
-  const gapsAt = (fan: ReturnType<typeof layoutFan>, y: number) => {
-    const vis = fan.branches.filter((b) => y >= b.tipY);
-    const out: number[] = [];
-    for (let i = 0; i + 1 < vis.length; i++) {
-      const a = vis[i];
-      const b = vis[i + 1];
-      out.push(leftAt(b, y) - (leftAt(a, y) + strandAt(a, fan.time.ageAt(y), fan.mode).w));
-    }
-    return out;
+describe('rectangular fan: fixed, straight, honest', () => {
+  const seeded = (seed: number) => {
+    let s = seed;
+    return () => (s = (s * 1103515245 + 12345) % 2147483648) / 2147483648;
   };
 
   for (const mode of ['log', 'linear'] as WidthMode[]) {
-    it(`siblings are packed at every height: gaps of at most GAP_PX, never overlapping (${mode})`, () => {
+    it(`width = individuals × one fixed scale, at random heights and zooms (${mode})`, () => {
       const fan = layoutFan(PANTHERA, mode);
-      // At the fork the branches are exact slices of the stem: widths sum to it.
-      let x = -fan.trunkWidth / 2;
+      const rnd = seeded(5);
+      // One width per individual (linear) or per decade of individuals (log), the same for every branch:
+      // the number the scale bar shows (view.ts widthScale: trunkWidth / Σ g(ever)).
+      const sumG = fan.branches.reduce((a, b) => a + (mode === 'linear' ? b.sp.ever : 1 + Math.log10(b.sp.ever)), 0);
       for (const b of fan.branches) {
-        expect(leftAt(b, 0)).toBeCloseTo(x, 9);
-        expect(strandAt(b, fan.time.ageAt(0), mode).w).toBeCloseTo(b.width, 9);
-        x += b.width;
+        const gEver = mode === 'linear' ? b.sp.ever : 1 + Math.log10(b.sp.ever);
+        expect(b.width / gEver).toBeCloseTo(fan.trunkWidth / sumG, 12);
       }
-      expect(x).toBeCloseTo(fan.trunkWidth / 2, 9);
-      // Overview scale (~3 px per world unit of width, ~0.6 of time): fully packed.
-      const sx = 3;
-      const sy = 0.65;
-      fan.pack.setScale(sx, sy);
-      for (let k = 1; k <= 400; k++) {
-        const y = fan.time.y(0) * (k / 400);
-        // Skip where gaps are still opening (above the fork) or an ended branch's slot is closing.
-        if (y > -OPEN_PX / sy || fan.branches.some((b) => y < b.tipY && y > b.tipY - CLOSE_MAX_PX / sy)) continue;
-        for (const gap of gapsAt(fan, y)) {
-          expect(gap).toBeGreaterThanOrEqual(-1e-9);
-          expect(gap).toBeLessThanOrEqual((GAP_PX / sx) * 1.01);
+      for (let trial = 0; trial < 300; trial++) {
+        const sy = Math.exp(Math.log(0.3) + rnd() * Math.log(1e5 / 0.3));
+        fan.steps.setScale(sy);
+        const b = fan.branches[Math.floor(rnd() * fan.branches.length)];
+        const y = b.tipY * (0.001 + 0.998 * rnd());
+        const L = laneAt(b, y);
+        // The step's width is the branch's exact width (its individuals) at some height of its step.
+        const d = Steps.dy(fan.steps.k);
+        const i = Steps.index(fan.steps.k, y);
+        const lo = Math.max(b.tipY, -(i + 1) * d);
+        const hi = -i * d;
+        let mn = Infinity;
+        let mx = -Infinity;
+        for (let j = 0; j <= 400; j++) {
+          const w = strandAt(b, fan.time.ageAt(lo + ((hi - lo) * j) / 400), mode).w;
+          mn = Math.min(mn, w);
+          mx = Math.max(mx, w);
+        }
+        expect(L.w).toBeGreaterThanOrEqual(mn * (1 - 1e-6) - 1e-12);
+        expect(L.w).toBeLessThanOrEqual(mx * (1 + 1e-6) + 1e-12);
+        if (mode === 'linear') {
+          const ind = (L.w * sumG) / fan.trunkWidth;
+          // The dead peel off going up: the most individuals at the step's bottom (hi), the fewest at its top.
+          expect(ind).toBeGreaterThanOrEqual(remaining(b.sp, fan.time.ageAt(lo)) * (1 - 1e-6));
+          expect(ind).toBeLessThanOrEqual(remaining(b.sp, fan.time.ageAt(hi)) * (1 + 1e-6));
         }
       }
-      // The bundle narrows towards "now" (like the stem): at "now" it is the living's widths plus gaps.
-      const yNow = fan.time.y(0);
-      const vis = fan.branches.filter((b) => yNow >= b.tipY);
-      const last = vis[vis.length - 1];
-      const span = leftAt(last, yNow) + strandAt(last, 0, mode).w - leftAt(vis[0], yNow);
-      const sum = vis.reduce((a, b) => a + strandAt(b, 0, mode).w, 0);
-      expect(span).toBeLessThanOrEqual((sum + (vis.length - 1) * (GAP_PX / sx)) * 1.01);
-      // Deeper width zooms, referenced to a point in the lion's green lane (as the
-      // camera does with the screen centre): still packed at every height, and
-      // that green lane stands upright.
-      const lion = fan.branches.find((b) => b.sp.common === 'Lion')!;
-      for (const [zx, zy] of [
-        [1e6, 1],
-        [1e9, 1e4],
-        [30, 0.2],
-        [300, 2],
-      ]) {
-        fan.pack.setScale(zx, zy);
-        const yr = fan.time.y(30e-6);
-        fan.pack.setRef(leftAt(lion, yr) + 1e-12, yr);
-        for (let k = 1; k <= 200; k++) {
-          const y = fan.time.y(0) * (k / 200);
-          if (y > -OPEN_PX / zy || fan.branches.some((b) => y < b.tipY && y > b.tipY - CLOSE_MAX_PX / zy)) continue;
-          for (const gap of gapsAt(fan, y)) {
-            expect(gap * zx).toBeGreaterThanOrEqual(-1e-6);
-            expect(gap * zx).toBeLessThanOrEqual(GAP_PX * 1.01);
+    });
+
+    it(`the steps keep the area: individuals × height summed over steps = the exact integral (${mode})`, () => {
+      const fan = layoutFan(PANTHERA, mode);
+      for (const k of [2, 5, 9]) {
+        fan.steps.setScale((Math.pow(2, k) * 22 * 1.05) / TIME_H);
+        expect(fan.steps.k).toBe(k);
+        expect(fan.steps.t).toBe(0);
+        const d = Steps.dy(k);
+        for (const b of fan.branches) {
+          let stepped = 0;
+          for (let i = 0; -i * d > b.tipY; i++) {
+            const top = Math.max(b.tipY, -(i + 1) * d);
+            stepped += laneAt(b, (top - i * d) / 2).w * (-i * d - top);
           }
+          let exact = 0;
+          const N = 20000;
+          const h = -b.tipY / N;
+          for (let j = 0; j < N; j++) exact += strandAt(b, fan.time.ageAt(-(j + 0.5) * h), mode).w * h;
+          expect(stepped / exact).toBeCloseTo(1, 3);
         }
-        if (fan.pack.fade() === 0) {
-          for (let k = 1; k <= 50; k++) expect((leftAt(lion, fan.time.y(0) * (k / 50)) - leftAt(lion, yr)) * zx).toBeCloseTo(0, 6);
+      }
+    });
+
+    it(`every edge is straight but the gray one, which steps; the gaps are fixed (${mode})`, () => {
+      const fan = layoutFan(PANTHERA, mode);
+      const W = fan.trunkWidth;
+      const bs = fan.branches;
+      fan.steps.setScale(3);
+      // The stem: the children's slices side by side, no gaps, adding up to the stem.
+      expect(bs[0].baseLeft).toBeCloseTo(-W / 2, 9);
+      for (let j = 1; j < bs.length; j++) expect(bs[j].baseLeft).toBeCloseTo(bs[j - 1].baseLeft + bs[j - 1].width, 9);
+      // The columns: fixed gaps, at least GAP_FRAC of the smaller neighbour (or MIN_GAP_FRAC of the stem).
+      for (let j = 1; j < bs.length; j++) {
+        const gap = bs[j].colLeft - (bs[j - 1].colLeft + bs[j - 1].width);
+        expect(gap).toBeCloseTo(gapBetween(bs[j - 1], bs[j], W), 9);
+        expect(gap).toBeGreaterThanOrEqual(Math.max(GAP_FRAC * Math.min(bs[j].width, bs[j - 1].width), MIN_GAP_FRAC * W) * (1 - 1e-9));
+      }
+      for (const b of bs) {
+        const green = b.sp.alive > 0 ? b.width * b.aliveFrac : 0;
+        for (let k = 0; k <= 400; k++) {
+          const y = b.tipY + ((fan.trunkBottom.y - b.tipY) * k) / 400;
+          // Left edge: the stem slice, the jog, then one vertical line.
+          if (y >= 0) expect(leftAt(b, y)).toBe(b.baseLeft);
+          else if (y <= -JOG) expect(leftAt(b, y)).toBe(b.colLeft);
+          const L = laneAt(b, y);
+          // The green lane: one width from the root to the tip (a vertical band).
+          expect(L.gw).toBeCloseTo(green, 12);
+          // Never wider than its base: neighbours never touch.
+          expect(L.w).toBeLessThanOrEqual(b.width * (1 + 1e-12));
+        }
+        // The gray edge is constant within each step (vertical), changing only at step lines.
+        // (While morphing between grids the finer grid's steps are the ones drawn.)
+        const d = Steps.dy(fan.steps.level);
+        for (let i = 0; -(i + 1) * d > b.tipY; i += 1) {
+          const ws = [0.01, 0.3, 0.5, 0.7, 0.99].map((u) => laneAt(b, -(i + u) * d).w);
+          for (const w of ws) expect(w).toBe(ws[0]);
         }
       }
     });
