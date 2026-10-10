@@ -146,6 +146,14 @@ export const GRADE_COLOR: Record<string, string> = {
   D: '#e8706a',
 };
 
+/** The grades in plain words, for the sparkline's key (pipeline/history/README.md). */
+export const GRADE_WORD: Record<string, string> = {
+  A: 'counted',
+  B: 'estimated',
+  C: 'rough',
+  D: 'guess',
+};
+
 /** Screen-space dash patterns (px, along screen y): dashed edges are subtle, dotted ones fainter. */
 export const EDGE_DASH: Record<Exclude<SpanStyle, 'solid'>, { period: number; on: number; alpha: number; lw: number }> = {
   dashed: { period: 7, on: 4, alpha: 0.5, lw: 1 },
