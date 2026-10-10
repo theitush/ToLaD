@@ -1,34 +1,45 @@
 species   = "Panthera pardus"
 common    = "Leopard"
 component = "wild"
-use       = "display"
-scope     = "India only (about 70% of Indian leopard habitat sampled); NOT a global count"
+use       = "counts"
+scope     = "global, all ages (modelled expected density over the contemporary range)"
 notes     = """
-No global leopard population estimate exists (IUCN 2023 and San Diego Zoo fact sheet: 'population
-sizes difficult to quantify'). The only continental figure, ~700,000 (600,000-850,000) for
-sub-Saharan Africa from Martin & de Meulenaer 1988 (CITES; rainfall/habitat model, presented 1987),
-is widely judged a gross overestimate (IUCN 2008: 'calculation was reportedly flawed'), so it is
-left out. The points below are India's national camera-trap estimates, shipped for display only.
+No leopard census exists anywhere near range-wide. The one global figure with a stated error is the
+density model of Slovikosky et al. 2025 (2020 point). The Red List's suspected >30% decline over three
+generations (22 years) is carried back from it as the baseline: the leopard's level before the
+decline the Red List describes, grade D. Range loss since 1750 is far larger (Jacobson et al. 2016,
+PeerJ 4:e1974, doi:10.7717/peerj.1974: 63-75% of the historic range lost; 48-67% in Africa, 83-87%
+in Asia), so the level before 1998 was higher still, but no source turns that into a count; the
+baseline is held back unchanged, a floor rather than an estimate of the deep past.
+Other figures, left out of the curve: Pranzini, Bertolino & Santini 2023 (Global Ecology and
+Conservation 48:e02677, doi:10.1016/j.gecco.2023.e02677), a second global density model, 261,636
+(IQR 146,768-461,512), with a 'marginal, yet uncertain' recent increase of 21% (IQR -5% to 57%);
+Patowary, Uzal & Fattebert 2026 (Journal of Applied Ecology 63:e70447, doi:10.1111/1365-2664.70447),
+sub-Saharan Africa only, 44,800-142,600; India's national camera-trap estimates (NTCA & WII 2024,
+forested habitat in tiger-range states only, ~70% of leopard habitat): 12,852 (12,172-13,535) in
+2018 and 13,874 (12,616-15,132) in 2022. The old ~700,000 for sub-Saharan Africa (Martin & de
+Meulenaer 1988, CITES) is judged a gross overestimate (Henschel et al. 2008, IUCN: 'calculation
+was reportedly flawed') and stays out.
 """
 
-[[point]]
-year  = 2018
-n     = 12852
-lo    = 12172
-hi    = 13535
-grade = "B"
-kind  = "estimate"
-cite  = "NTCA & WII, Status of Leopards in India 2018"
-url   = "https://indiaenvironmentportal.org.in/reports-and-documents/status-of-leopard-in-india-2022-summary-report"
-note  = "Comparison figure quoted with the 2022 summary report (similar sampled area: forested habitat in tiger-range states; Himalaya and semi-arid areas not sampled)."
+[baseline]
+year  = 1998
+n     = 188000
+lo    = 61000
+hi    = 612000
+grade = "D"
+kind  = "reconstruction"
+cite  = "Stein et al. 2025, Panthera pardus, IUCN Red List e.T15954A286153337 (assessed 2023): suspected decline of more than 30% over three generations (22 years), applied to Slovikosky et al. 2025"
+url   = "https://doi.org/10.2305/IUCN.UK.2025-2.RLTS.T15954A286153337.en"
+note  = "Derived, not measured: the 2020 global estimate divided by (1 - 0.30), dated 22 years (three generations) before it; lo and hi are its 95% CI divided the same way. The decline is a minimum ('more than 30%'). Quoted from the assessment by National Geographic (Guynup, 4 July 2024): 'declined by more than 30 percent over the last 22 years, which is three generations'; the assessors: 'We suspect that suitable leopard range has been reduced by more than 30 percent worldwide over its last three generations'. The 2016 assessment (Stein et al. 2016, e.T15954A50659089) gave the same >30% over three generations (as quoted in CITES AC30 Inf. 18)."
 
 [[point]]
-year  = 2022
-n     = 13874
-lo    = 12616
-hi    = 15132
-grade = "B"
+year  = 2020
+n     = 131300
+lo    = 42692
+hi    = 428498
+grade = "C"
 kind  = "estimate"
-cite  = "NTCA & WII 2024, Status of Leopards in India 2022: summary report"
-url   = "https://indiaenvironmentportal.org.in/reports-and-documents/status-of-leopard-in-india-2022-summary-report"
-note  = "Fifth cycle of the national tiger/co-predator monitoring; ~70% of leopard habitat sampled."
+cite  = "Slovikosky, Petracca, Hunter & Frair 2025, Spatially explicit estimates of global population potential for leopard (Panthera pardus), Biodiversity and Conservation 34:3785-3803"
+url   = "https://doi.org/10.1007/s10531-025-03131-9"
+note  = "'An expected value of 131,300 (42,692-428,498 95% CI) leopards globally': density studies published to May 2021, related to habitat and people, projected over the IUCN 2020 range map (dated 2020 here). Expected density from habitat, so it may overstate depleted areas (Central and West Africa lack estimates)."

@@ -1,10 +1,11 @@
 // The species card's population history: a tiny log(population)-vs-year chart
 // (points coloured by grade, their ranges as bars, the spans between them drawn
 // solid, dashed or dotted as on the fan's edge) and, on tap, every point with
-// its source.
+// its source. Stretches held flat for want of figures (before the first point,
+// after the last) are drawn faint and labelled "no data".
 
 import { useState } from 'react';
-import { GRADE_COLOR, GRADE_WORD, styleBetween, type SpanStyle } from './history';
+import { GRADE_COLOR, GRADE_WORD, noDataSpans, styleBetween, type SpanStyle } from './history';
 import type { HistoryRec } from './panthera';
 
 const W = 340;
@@ -16,6 +17,9 @@ const B = 16; // bottom margin (year ticks)
 
 const DASH: Record<SpanStyle, string | undefined> = { solid: undefined, dashed: '4 3', dotted: '1.2 3' };
 const OPACITY: Record<SpanStyle, number> = { solid: 0.9, dashed: 0.75, dotted: 0.5 };
+/** A stretch held flat for want of figures: faint, finely dashed. */
+const NODATA = { dash: '2 2.5', opacity: 0.4 };
+const STUB = 40; // px of chart left of the first point for a "no data" lead-in
 
 /** A dequantized count to 3 significant figures (the data's own precision). */
 export function fmtN(n: number): string {
@@ -76,16 +80,20 @@ export function HistorySpark({ h, open: open0 = false }: { h: HistoryRec; open?:
   const [open, setOpen] = useState(open0);
   const pts = h.points.slice().sort((a, b) => a.year - b.year);
   if (pts.length === 0) return null;
-  const last = h.segments[h.segments.length - 1];
-  const held = last && last.kind === 'held' && pts[pts.length - 1].year < h.nowYear;
+  const nd = noDataSpans(h);
+  const before = nd.find((s) => s.side === 'before');
+  const after = nd.find((s) => s.side === 'after');
+  const held = !!after;
   const x0 = pts[0].year;
   const x1 = Math.max(pts[pts.length - 1].year, held ? h.nowYear : -Infinity);
-  const lo = Math.log10(Math.max(1, Math.min(...pts.map((p) => Math.min(p.lo, p.n)))));
-  const hi = Math.log10(Math.max(...pts.map((p) => Math.max(p.hi, p.n))));
+  const ns = pts.flatMap((p) => [p.lo, p.n, p.hi]).concat(before ? [before.level] : []);
+  const lo = Math.log10(Math.max(1, Math.min(...ns)));
+  const hi = Math.log10(Math.max(...ns));
   const pad = Math.max(0.08, (hi - lo) * 0.08);
   const ylo = lo - pad;
   const yhi = hi + pad;
-  const X = (y: number) => L + ((W - L - R) * (y - x0)) / (x1 - x0 || 1);
+  const left = L + (before ? STUB : 0);
+  const X = (y: number) => left + ((W - left - R) * (y - x0)) / (x1 - x0 || 1);
   const Y = (n: number) => T + ((H - T - B) * (yhi - Math.log10(Math.max(1, n)))) / (yhi - ylo);
   const lines = [];
   for (let k = 1; k < pts.length; k++) {
@@ -96,9 +104,25 @@ export function HistorySpark({ h, open: open0 = false }: { h: HistoryRec; open?:
       <line key={k} x1={X(a.year)} y1={Y(a.n)} x2={X(b.year)} y2={Y(b.n)} strokeDasharray={DASH[st]} opacity={OPACITY[st]} data-style={st} />,
     );
   }
-  if (held) {
+  if (after) {
     const p = pts[pts.length - 1];
-    lines.push(<line key="held" x1={X(p.year)} y1={Y(p.n)} x2={X(h.nowYear)} y2={Y(p.n)} opacity={OPACITY.solid} data-style="solid" />);
+    lines.push(
+      <line key="held" x1={X(p.year)} y1={Y(after.level)} x2={X(h.nowYear)} y2={Y(after.level)} strokeDasharray={NODATA.dash} opacity={NODATA.opacity} data-nodata="after" />,
+    );
+  }
+  if (before) {
+    // Held flat from the species' start to the first figure: a faint lead-in at the held level
+    // (with a step if the first figure differs), labelled.
+    const p = pts[0];
+    lines.push(
+      <path
+        key="nodata"
+        d={`M${L} ${Y(before.level)} H${X(p.year)}${Math.abs(Y(before.level) - Y(p.n)) > 0.5 ? ` V${Y(p.n)}` : ''}`}
+        strokeDasharray={NODATA.dash}
+        opacity={NODATA.opacity}
+        data-nodata="before"
+      />,
+    );
   }
   const nTicks = popTicks(ylo, yhi);
   // Year ticks; "now" at the right end if the history runs to it (a tick too close to it gives way).
@@ -154,6 +178,19 @@ export function HistorySpark({ h, open: open0 = false }: { h: HistoryRec; open?:
               </text>
             )}
           </g>
+          {before && (
+            <text
+              x={(L + X(x0)) / 2}
+              y={Y(before.level) + (Y(before.level) < T + 12 ? 10 : -4)}
+              textAnchor="middle"
+              fontSize="9"
+              fill="#9faba3"
+              opacity="0.8"
+              data-nodata-label=""
+            >
+              no data
+            </text>
+          )}
         </svg>
         <span className="spark-foot small">
           <span className="gkey" aria-label="dot colours: how each number was got">
@@ -167,6 +204,11 @@ export function HistorySpark({ h, open: open0 = false }: { h: HistoryRec; open?:
         </span>
       </button>
       {open && h.use !== 'counts' && <div className="dim small">These numbers are shown for reference; the tree's widths use the model.</div>}
+      {open && before && (
+        <div className="dim small" data-nodata-note="">
+          No data before {fmtYear(before.year)}: held at {before.today ? "today's level" : `the ${fmtYear(before.year)} level`}.
+        </div>
+      )}
       {open && (
         <ol className="hist-list">
           {pts.map((p, k) => (

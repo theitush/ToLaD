@@ -18,6 +18,10 @@ const scenes = [
   ['cave-lion', 'Cave lion', 5e4],
   ['tiger-now', 'Tiger', 0.2],
   ['jaguar-now', 'Jaguar', 0.2],
+  ['jaguar-details', 'Jaguar', 0.2, true],
+  ['leopard-now', 'Leopard', 0.2],
+  ['leopard-details', 'Leopard', 0.2, true],
+  ['snow-leopard-details', 'Snow leopard', 0.2, true],
 ];
 const browser = await chromium.launch({ headless: true });
 try {

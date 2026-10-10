@@ -61,6 +61,23 @@ class Schema(unittest.TestCase):
             self.assertIn(sp, names)
         self.assertTrue(any(n.startswith("Pongo ") for n in names))
 
+    def test_leopard_and_jaguar_have_global_dated_history(self):
+        """The leopard and jaguar curves are global (they drive counts), with a recent cited
+        point after 2000 and a cited earlier level from the Red List's decline (ToLaD#51)."""
+        recs = {r["species"]: r for r in H.load_all()}
+        for sp in ("Panthera pardus", "Panthera onca"):
+            r = recs[sp]
+            self.assertEqual(r["use"], "counts", sp)
+            pts = H.curve_points(r)
+            self.assertGreaterEqual(len(pts), 2, sp)
+            for p in pts:
+                self.assertTrue(p["cite"] and p["url"].startswith("https://doi.org/"), sp)
+            self.assertGreaterEqual(pts[-1]["year"], 2000, sp)
+            self.assertIn(pts[-1]["grade"], "ABC", sp)
+            # the earlier level is higher: the Red List's three-generation decline
+            self.assertGreater(pts[0]["n"], pts[-1]["n"], sp)
+            self.assertLess(pts[0]["year"], pts[-1]["year"] - 15, sp)
+
     def test_good_doc(self):
         r = H.validate(copy.deepcopy(GOOD))
         self.assertEqual([p["year"] for p in r["points"]], [1950.0, 2020.0])

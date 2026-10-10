@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { plainAgo, plainCount, roughCount, SpeciesCard } from './FanApp';
 import { popTicks, yearTicks } from './HistorySpark';
-import { GRADE_WORD, styleBetween } from './history';
+import { GRADE_WORD, noDataSpans, styleBetween } from './history';
 import { PANTHERA } from './panthera';
 import { population } from './population';
 import { RED_LIST } from './status';
@@ -41,6 +41,50 @@ describe('species card history', () => {
     const html = renderToStaticMarkup(<SpeciesCard sp={plain} onClose={() => {}} />);
     expect(html).not.toContain('<svg');
     expect(html).not.toContain('class="hist');
+  });
+
+  it('the leopard and the jaguar have dated, cited history that drives their counts (ToLaD#51)', () => {
+    for (const common of ['Leopard', 'Jaguar']) {
+      const h = byName(common).history;
+      expect(h, common).toBeTruthy();
+      expect(h!.use).toBe('counts');
+      const pts = h!.points.slice().sort((a, b) => a.year - b.year);
+      expect(pts.length).toBeGreaterThanOrEqual(2);
+      for (const p of pts) {
+        expect(p.cite.length).toBeGreaterThan(20);
+        expect(p.url).toMatch(/^https:\/\/doi\.org\//);
+      }
+      // the Red List's decline: the earlier level is higher than the latest figure
+      expect(pts[0].n).toBeGreaterThan(pts[pts.length - 1].n);
+      expect(pts[pts.length - 1].year).toBeGreaterThanOrEqual(2015);
+    }
+  });
+
+  it('no living species shows a flat assumed stretch without a "no data" mark', () => {
+    const living = PANTHERA.species.filter((s) => !s.extinct);
+    expect(living.length).toBe(5);
+    for (const sp of living) {
+      const h = sp.history;
+      expect(h, `${sp.common} has a history`).toBeTruthy();
+      const nd = noDataSpans(h!);
+      const html = renderToStaticMarkup(<SpeciesCard sp={sp} onClose={() => {}} open />);
+      // Every species' curve is held back to its start before the first figure: marked and labelled.
+      const before = nd.find((s) => s.side === 'before');
+      expect(before, sp.common).toBeTruthy();
+      expect(html).toContain('data-nodata="before"');
+      expect(html).toContain('>no data</text>');
+      expect(html).toContain(`No data before ${before!.year}: held at `);
+      // A held stretch after the last figure is drawn faint too, never as a plain line.
+      expect(html.includes('data-nodata="after"')).toBe(nd.some((s) => s.side === 'after'));
+    }
+    // The snow leopard has no level before its first figure: held at today's count.
+    const snow = noDataSpans(byName('Snow leopard').history!).find((s) => s.side === 'before')!;
+    expect(snow.today).toBe(true);
+    expect(snow.level).toBeCloseTo(byName('Snow leopard').alive, -2);
+    // The leopard is held at its pre-decline (1998) level.
+    const leo = noDataSpans(byName('Leopard').history!).find((s) => s.side === 'before')!;
+    expect(leo.today).toBe(false);
+    expect(leo.year).toBe(1998);
   });
 
   it('the sparkline has 3–5 round year ticks and one or two population ticks', () => {

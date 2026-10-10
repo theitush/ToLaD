@@ -1,0 +1,43 @@
+species   = "Panthera onca"
+common    = "Jaguar"
+component = "wild"
+use       = "counts"
+scope     = "global, all ages (sum of mapped subpopulations, 2016)"
+notes     = """
+Global jaguar figures disagree by a factor of ~3. The point below is ~64,000 (de la Torre et al.
+2018), the figure the Red List population report carries (Greenspoon et al. 2023's IUCN
+compilation, which the model already used for today's count). The other: Jedrzejewski et al. 2018
+(PLoS ONE 13:e0194719, doi:10.1371/journal.pone.0194719), a range-wide density model over the 2014
+IUCN range, 173,000 (95% CI 138,000-208,000), which the CMS COP13 listing proposal notes 'has been
+criticized for overestimating populations'; and Polisar et al. (as quoted there) 40,000-80,000,
+mean 60,000. The Red List's suspected 20-25% loss over three generations (21 years) is carried
+back from the 2016 point as the baseline, grade D: the level before the decline the Red List
+describes. The range had shrunk long before: about 46% of the early-20th-century range remained
+by 2002 (Sanderson et al. 2002, Conservation Biology 16:58-72), and the 'known' range shrank from
+8.77 to 7.02 million km2 (-20%) over 2002-2015 (Quigley et al. 2017); no source turns that into a
+count, so the baseline is held back unchanged, a floor rather than an estimate of the deep past.
+Regional: Mexico ~4,000 (2010) and ~4,800 (2018), national jaguar census (as quoted in Wikipedia's
+Jaguar article; not traced further).
+"""
+
+[baseline]
+year  = 1995
+n     = 82600
+lo    = 80000
+hi    = 85300
+grade = "D"
+kind  = "reconstruction"
+cite  = "Quigley et al. 2017, Panthera onca, IUCN Red List e.T15953A50658693: suspected 20-25% loss in mature individuals over three generations (21 years), applied to the 2016 global figure"
+url   = "https://doi.org/10.2305/IUCN.UK.2017-3.RLTS.T15953A50658693.en"
+note  = "Derived, not measured: 64,000 divided by (1 - 0.225), the middle of the stated 20-25%, dated 21 years before it; lo = 64,000 / 0.80, hi = 64,000 / 0.75. The assessment: 'With a generation duration of 6.84 years, we suspect at least a 20-25% loss in mature individuals in the last 21 years (three generations)', and 'our minimal assessment of population decline could be a significant underestimate' (quoted in UNEP/CMS/COP13/Doc.27.1.2, https://www.cms.int/sites/default/files/document/cms_cop13_doc.27.1.2_proposal-jaguar_e.pdf)."
+
+[[point]]
+year  = 2016
+n     = 64000
+lo    = 64000
+hi    = 64000
+grade = "C"
+kind  = "estimate"
+cite  = "de la Torre, Gonzalez-Maya, Zarza, Ceballos & Medellin 2018, The jaguar's spots are darker than they appear: assessing the global conservation status of the jaguar Panthera onca, Oryx 52:300-315"
+url   = "https://doi.org/10.1017/S0030605316001046"
+note  = "'About 64,000 individuals with the largest subpopulation in the Amazon, comprising about 55,000-57,000' (as quoted in UNEP/CMS/COP13/Doc.27.1.2; the UNAM release: 64,000 in 34 subpopulations, 57,000 of them in Amazonia). Also the population figure in the IUCN report compiled by Greenspoon et al. 2023. No range given; published online January 2017 (dated 2016 here)."

@@ -149,6 +149,42 @@ export const GRADE_WORD: Record<string, string> = {
   D: 'guess',
 };
 
+/** A stretch of a history held flat for want of figures, as the card's sparkline marks it. */
+export interface NoDataSpan {
+  /** Before the first point (back to the species' start) or after the last (to now). */
+  side: 'before' | 'after';
+  /** The calendar year the held stretch meets the data: the first or the last point's. */
+  year: number;
+  /** Individuals alive over the stretch (the level it is held at). */
+  level: number;
+  /** Held at today's count (no earlier level is known), not at the adjoining point's. */
+  today: boolean;
+}
+
+const HELD_KINDS = new Set(['held', 'baseline', 'model']);
+
+/**
+ * The stretches of a history that no figure covers but that the curve holds
+ * flat: from the species' start to the first point (at the baseline or first
+ * point's level, or at today's count where no earlier level is known), and
+ * from the last point to now.
+ */
+export function noDataSpans(h: HistoryRec): NoDataSpan[] {
+  const pts = h.points.slice().sort((a, b) => a.year - b.year);
+  const out: NoDataSpan[] = [];
+  if (pts.length === 0 || h.segments.length === 0) return out;
+  const first = h.segments[0];
+  const p0 = pts[0];
+  if (first.year0 < p0.year - 0.5 && HELD_KINDS.has(first.kind)) {
+    const today = first.kind === 'model';
+    out.push({ side: 'before', year: p0.year, level: today ? (first.startSize * h.L) / h.G : p0.n, today });
+  }
+  const last = h.segments[h.segments.length - 1];
+  const p1 = pts[pts.length - 1];
+  if (last.kind === 'held' && p1.year < h.nowYear - 0.5) out.push({ side: 'after', year: p1.year, level: p1.n, today: false });
+  return out;
+}
+
 /** The style of the history between two calendar years (the compiled segment at their midpoint). */
 export function styleBetween(h: HistoryRec, year0: number, year1: number): SpanStyle {
   const mid = (year0 + year1) / 2;

@@ -24,7 +24,8 @@ describe('fan strands: width = alive at the time', () => {
           expect(strandAt(b, sp.t1 * 0.99, mode).w).toBe(0);
         } else {
           // Now: the living, all of them green.
-          expect(b.pop.aliveAt(0)).toBeCloseTo(sp.alive, -2);
+          // (to procgen's integer rounding and EVER's quantization: ~0.1-0.2%)
+          expect(Math.abs(b.pop.aliveAt(0) - sp.alive)).toBeLessThanOrEqual(Math.max(50, 2e-3 * sp.alive));
           expect(strandAt(b, 0, mode).f).toBe(1);
           // Below the first appearance: the founders, constant.
           expect(strandAt(b, sp.t0 * 1.2, mode).w).toBeCloseTo(strandAt(b, sp.t0, mode).w, 12);
