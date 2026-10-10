@@ -20,6 +20,10 @@ design. In short:
     natural   with no cited baseline and no [deep], the natural (pre-human) baseline
               (model.natural_level, NATB) is held from the band start to the first
               point. Precedence before the cited points: genomic > natural > today
+    rangeloss a species with no history file whose natural baseline differs from
+              today's count gets a modelled two-point record instead (model.py,
+              rangeloss_record): a log-linear decline from 1500 CE to now. A history
+              file always replaces it
 
 `apply` rewrites the leaf's pieces / alive / error before sum_tree, so the
 existing sum-up and ghost allocation keep the totals consistent up the tree.
@@ -42,8 +46,10 @@ GRADES = "ABCD"
 POINT_KINDS = ["census", "estimate", "index-scaled", "reconstruction", "unverified"]
 # point kinds, then span-only kinds, then kinds appended later (the index is the HIST kind code, so
 # new kinds are only ever appended): `genomic` (points compiled from [deep], and the spans between two
-# of them; ToLaD#60) and `natural` (the natural baseline held before the first point; ToLaD#61)
-KINDS = POINT_KINDS + ["model", "interpolated", "held", "baseline", "genomic", "natural"]
+# of them; ToLaD#60), `natural` (the natural baseline held before the first point; ToLaD#61) and
+# `rangeloss` (the modelled decline from the natural baseline to today's count of a species with no
+# history file, and its start point; ToLaD#62, see model.rangeloss_record)
+KINDS = POINT_KINDS + ["model", "interpolated", "held", "baseline", "genomic", "natural", "rangeloss"]
 K = {k: i for i, k in enumerate(KINDS)}
 
 TOP_KEYS = {"species", "aliases", "common", "component", "use", "scope", "faostat_item", "notes",
@@ -442,7 +448,8 @@ def _segments(pts: list[dict], G: float, L: float, t0_ma: float, has_baseline: b
             kind, gr = K["held"], GRADES.index(pts[-1]["grade"])
         else:
             a, b = next((a, b) for a, b in zip(pts, pts[1:]) if a["year"] <= mid <= b["year"])
-            kind = K["genomic"] if a["kind"] == b["kind"] == "genomic" else K["interpolated"]
+            kind = (K[a["span_kind"]] if a.get("span_kind")
+                    else K["genomic"] if a["kind"] == b["kind"] == "genomic" else K["interpolated"])
             gr = max(GRADES.index(a["grade"]), GRADES.index(b["grade"]))
         segs.append({"year0": year_of(g0), "gens": g0 - g1, "start": level(g0) * bpg, "end": level(g1) * bpg,
                      "grade": gr, "kind": kind})
@@ -630,7 +637,7 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
         raise HistoryError(f"history species not found among living tree leaves: {missing}")
     log["history"] = {
         "note": "Curated flagship histories (pipeline/history/). ever_before = the model alone (the natural "
-                "baseline before 1500 where it differs from today's count, else today's count, held over "
+                "baseline before 1500 and the range-loss trend after it where it differs from today's count, else today's count, over "
                 "the band); ever_after = with the curve. deep_from = what sets the level at the band start: "
                 "`genomic` (a [deep] genome-based curve, older than any cited point, baseline included), "
                 "else `baseline` (cited), else `natural` (the natural baseline), else `today`. deep_before / deep_after = the level at "

@@ -177,6 +177,8 @@ class Segments(unittest.TestCase):
             self.skipTest("no build output")
         hist = json.loads(dbg.read_text())["history"]
         for h in hist:
+            if h.get("modelled"):  # range-loss records (test_rangeloss.py)
+                continue
             s = st["species"][h["species"]]
             if s["use"] != "counts" or s["component"] != "wild" or s["domestic_on_leaf"]:
                 continue

@@ -110,7 +110,7 @@ v1.1 adds, in the skeleton:
 - `hist_kinds`: the HIST kind names, by code (see below)
 - `hist_index`: `[{species, gid, tile (−1 = skeleton), row}]`, where each curated species' HIST entry lives
 
-and, in every file that has a `HIST` section, `META.hist`: `[{species, common, component, use, scope, file, notes, point_notes}]`, aligned with the HIST species headers (`point_notes` aligned with that species' points).
+and, in every file that has a `HIST` section, `META.hist`: `[{species, common, component, use, scope, file, notes, point_notes, modelled}]`, aligned with the HIST species headers (`point_notes` aligned with that species' points). `modelled` is null for a curated history file. v1.3: `modelled = "rangeloss"` marks a modelled range-loss record (see NATB); its META entry carries only `species`, `component`, `use` and `modelled` (the shared notes, cite and timing are in skeleton `META.natural.trend`), and it is **not** listed in `hist_index` (find it with `file.history(row)`).
 
 ### HIST (v1.1): curated population history
 
@@ -125,7 +125,7 @@ Present only in files that hold a curated species row (`pipeline/history/*.toml`
 
 A species' points are `point0 … point0+npts−1` (sorted by year) and its segments `seg0 … seg0+nseg−1` (oldest first, contiguous, the last one ending now).
 
-**Kinds** (`META.hist_kinds`): 0 `census`, 1 `estimate`, 2 `index-scaled`, 3 `reconstruction`, 4 `unverified` (always grade D), 5 `model` (a point: the pipeline's own alive-now, added when the curve has no recent graded point; a segment: today's level held before the first point of a wild species with no known baseline), 6 `interpolated` (a span between two points), 7 `held` (a level held flat after the last point, or before the first point of a display-only species), 8 `baseline` (the pre-decline level held back to the band start), 9 `genomic` (a point compiled from a genome-based Ne history, see `pipeline/history/README.md`, "Deep past"; a segment: the curve between two such points), 10 `natural` (v1.2, a segment only: the natural baseline from `NATB`, grade D, held from the band start to the first point of a wild species with no cited baseline and no genomic deep past). With a deep past, the first segment holds the oldest genomic level back to the band start (kind `held`).
+**Kinds** (`META.hist_kinds`): 0 `census`, 1 `estimate`, 2 `index-scaled`, 3 `reconstruction`, 4 `unverified` (always grade D), 5 `model` (a point: the pipeline's own alive-now, added when the curve has no recent graded point; a segment: today's level held before the first point of a wild species with no known baseline), 6 `interpolated` (a span between two points), 7 `held` (a level held flat after the last point, or before the first point of a display-only species), 8 `baseline` (the pre-decline level held back to the band start), 9 `genomic` (a point compiled from a genome-based Ne history, see `pipeline/history/README.md`, "Deep past"; a segment: the curve between two such points), 10 `natural` (v1.2, a segment only: the natural baseline from `NATB`, grade D, held from the band start to the first point of a wild species with no cited baseline and no genomic deep past), 11 `rangeloss` (v1.3: the modelled range-loss trend of a species with no history file, see NATB; a point: the natural level in 1500 CE where the trend starts; a segment: the log-linear change from it to today's count; always grade D). With a deep past, the first segment holds the oldest genomic level back to the band start (kind `held`).
 
 **Curve:** log-linear between points (so it passes through every point), flat outside them. **Segments** are the curve compiled for procgen's `Segment` (births per generation, linear ramps): births per generation = alive × G ÷ lifespan = `N(t) · G / L`. Boundaries are whole generations counted back from now. A span changing by more than 2× is split at log-even levels into sub-spans of at most ~1.41×. For wild species the first segment holds the baseline back to the start of the species band (with no cited baseline: the natural baseline, kind `natural`, or without one today's level, kind `model`; then a step to the curve at the first point); for domestic stocks and humans the segments cover the curated span only. Each segment's grade is the worse of its two end points.
 
@@ -162,7 +162,11 @@ It is always modelled: skeleton `META.natural` carries `grade` (`"D"`), `kind` (
 
 **Where it drives the counts:** an extinct species runs at `N_nat` over its whole band. An extant species
 whose natural baseline differs from today's count runs at `N_nat` until 1500 CE (IUCN's "since 1500"
-window), then steps to today's count: a step, not a trend (the range-loss trend between them is ToLaD#62).
+window), then (v1.3, ToLaD#62) changes log-linearly to today's count now, if it has both range maps (with no
+current map it still steps at 1500). That trend ships as a HIST record (`META.hist[].modelled = "rangeloss"`,
+two points, segments `natural` then kind 11 `rangeloss`, grade D) for every such species without a history
+file; skeleton `META.natural.trend` gives its shape, years, kind, cite and the timing assumption (one date,
+1500 CE, for every species and region). Show it as modelled, never as a count.
 Its leaf error is widened by the 0.2 dex and its grade capped at D. A domestic form with no wild population
 runs its wild ancestor at `N_nat` up to domestication. Curated species (`HIST`): a cited baseline wins; with
 none, the natural baseline is held before the first cited point (segment kind 10 `natural`; with a genomic deep past, the genomic curve instead, see "HIST"). `ALIV` is

@@ -102,11 +102,32 @@ order of precedence:
    point (HIST segment kind `natural`, 10), then a step to the curve;
 4. else (no range map) today's level, as above (segment kind `model`).
 
-A species with no history file runs at its natural baseline until 1500 CE,
-then steps to today's count (or, extinct, at the natural baseline over its
-whole band). That is a step, not a trend: the range-loss trend between the
-two levels is ToLaD#62. Where the natural and current ranges are the same
-map, the natural baseline equals today's count and nothing changes.
+**Range-loss trend (ToLaD#62, layer 4 of the estimate stack).** A species
+with no history file whose natural baseline differs from today's count, and
+which has both PHYLACINE maps (current and present-natural), runs at its
+natural baseline until 1500 CE and then changes **log-linearly** to today's
+count now (`model.rangeloss_record`). The factor `N_nat / N_today` is the
+range ratio (natural ÷ current cells). It ships as a modelled HIST record
+of two points (the natural level in 1500, kind `rangeloss`, grade D; today's
+count, kind `model`) and segments `natural` (held from the band start) then
+`rangeloss` (HIST kind 11, grade D); the births pieces follow the same curve
+in 25-year steps.
+
+- **Timing, an assumption:** 1500 CE for every species and region, the start
+  of the IUCN Red List's "since 1500" window (IUCN 2012, Categories and
+  Criteria v3.1), already the step year of the natural baseline. Real range
+  loss was mostly later and uneven (19th-20th century land conversion;
+  Australia's mammal collapse after 1788), so the trend spreads over five
+  centuries a decline that was often concentrated in one or two. No
+  per-region start is modelled.
+- **Precedence:** a history file replaces it entirely (cited baseline,
+  genomic or natural baseline before the first cited point, as below).
+  Species whose two maps agree stay flat at today's count. Extant species
+  with no current map (their natural level comes from density x area x
+  occupancy, not from a range ratio) keep the #61 step. Extinct species run
+  at the natural baseline over their whole band.
+- **Report:** `stats.json -> rangeloss` (factor histogram, largest declines,
+  rises, showcase).
 
 ## How the build uses it (`tolad_pipeline/history.py`)
 

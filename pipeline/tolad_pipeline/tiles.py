@@ -210,9 +210,14 @@ def encode_hist(rows: list[tuple[Node, bool]], cites: dict[tuple[str, str], int]
         for s in rec["segments"]:
             segs.append(HIST_SEG.pack(s["year0"], s["gens"], q_log16(s["start"]), q_log16(s["end"]),
                                       s["grade"], s["kind"], 0))
+        if rec.get("modelled"):
+            # modelled records are many: their notes live once in skeleton META.natural.trend
+            meta.append({"species": rec["species"], "component": rec["component"], "use": rec["use"],
+                         "modelled": rec["modelled"]})
+            continue
         meta.append({"species": rec["species"], "common": rec["common"], "component": rec["component"],
                      "use": rec["use"], "scope": rec["scope"], "file": rec["file"], "notes": rec["notes"],
-                     "point_notes": [p["note"] for p in rec["curve"]]})
+                     "point_notes": [p["note"] for p in rec["curve"]], "modelled": rec.get("modelled")})
     if not recs:
         return b"", 0, []
     blob = HIST_PREAMBLE.pack(len(recs), len(pts), len(segs), 0) + b"".join(heads) + b"".join(pts) + b"".join(segs)
@@ -223,7 +228,7 @@ def hist_debug(rec: dict, tile: int, row: int, gid: int) -> dict:
     from .history import KINDS
     return {
         "species": rec["species"], "common": rec["common"], "file": rec["file"], "use": rec["use"],
-        "component": rec["component"], "tile": tile, "row": row, "gid": gid, "G": rec["G"], "L": rec["L"],
+        "component": rec["component"], "modelled": rec.get("modelled"), "tile": tile, "row": row, "gid": gid, "G": rec["G"], "L": rec["L"],
         "points": [{"year": round(p["year"]), "n": p["n"], "lo": p["lo"], "hi": p["hi"], "grade": p["grade"],
                     "kind": p["kind"], "baseline": bool(p.get("baseline")), "cite": p["cite"], "url": p["url"]}
                    for p in rec["curve"]],
@@ -416,12 +421,23 @@ def write_all(root: Node, out: Path, log: dict) -> None:
     from .history import KINDS
     hist_index = []
     hist_dbg = []
+    from .model import (RANGELOSS_CITE, RANGELOSS_NOTE, RANGELOSS_SHOWCASE, RANGELOSS_START_YEAR,
+                        RANGELOSS_URL)
+    n_rl = 0
     for nd in root.preorder():
         rec = nd.data.get("history")
-        if rec is not None:
-            t, r = where[id(nd)]
-            hist_index.append({"species": rec["species"], "gid": nd.data["gid"], "tile": t, "row": r})
-            hist_dbg.append(hist_debug(rec, t, r, nd.data["gid"]))
+        if rec is None:
+            continue
+        t, r = where[id(nd)]
+        if rec.get("modelled") == "rangeloss":
+            # modelled range-loss records (ToLaD#62) are not indexed (file.history(row) finds them);
+            # the debug dump keeps the showcase and every 40th, for the decoder round-trip test
+            if nd.name in RANGELOSS_SHOWCASE or n_rl % 40 == 0:
+                hist_dbg.append(hist_debug(rec, t, r, nd.data["gid"]))
+            n_rl += 1
+            continue
+        hist_index.append({"species": rec["species"], "gid": nd.data["gid"], "tile": t, "row": r})
+        hist_dbg.append(hist_debug(rec, t, r, nd.data["gid"]))
     # natural baselines for the debug dump: curated species, Panthera and the showcase list
     from .model import NATURAL_SHOWCASE
     nat_dbg = []
@@ -443,6 +459,12 @@ def write_all(root: Node, out: Path, log: dict) -> None:
         "cite": "PHYLACINE 1.2.1 present-natural ranges (Faurby et al. 2018, Ecology 99:2626; "
                 "Faurby & Svenning 2015, Diversity Distrib. 21:1155); CC0",
         "url": "https://github.com/MegaPast2Future/PHYLACINE_1.2",
+        # layer 4 (ToLaD#62): where N_nat differs from today's count, a log-linear trend between them
+        "trend": {"shape": "log-linear", "from_year": RANGELOSS_START_YEAR, "to_year": anchors.NOW_YEAR,
+                  "kind": "rangeloss", "grade": "D", "records": n_rl,
+                  "label": "modelled range-loss trend: natural level held to 1500 CE, then log-linear to "
+                           "today's count; the timing is an assumption (IUCN's 1500 CE window)",
+                  "notes": RANGELOSS_NOTE, "cite": RANGELOSS_CITE, "url": RANGELOSS_URL},
     }
     log["history"]["hist_sources"] = len(cites)
     secs, n = encode_rows(sk_rows, methods, tile_id, meta, cites)

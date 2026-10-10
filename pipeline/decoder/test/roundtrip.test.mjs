@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { decodeFile, describe, profileEdges, Q, KIND_SKELETON, KIND_TILE } from '../tolad-decoder.js';
+import { decodeFile, describe, profileEdges, Q, KIND_SKELETON, KIND_TILE, HIST_KINDS } from '../tolad-decoder.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const DATA = process.env.TOLAD_DATA || join(here, '..', '..', '..', 'data', 'mammals');
@@ -146,7 +146,8 @@ test('MOCK individuals are flagged as mock in data and name', () => {
 
 test('HIST round-trips against debug_top.json history', () => {
   assert.ok(Array.isArray(dump.history) && dump.history.length >= 40, 'history list in debug_top.json');
-  assert.equal(sk.meta.hist_index.length, dump.history.length);
+  // modelled range-loss records (v1.3) are not indexed; the dump keeps a sample of them
+  assert.equal(sk.meta.hist_index.length, dump.history.filter((h) => !h.modelled).length);
   const files = new Map([[-1, sk]]);
   for (const h of dump.history) {
     const w = h.species;
@@ -156,6 +157,7 @@ test('HIST round-trips against debug_top.json history', () => {
     const got = f.history(h.row);
     assert.ok(got, `${w}: no HIST entry at tile ${h.tile} row ${h.row}`);
     assert.equal(got.species, h.species);
+    assert.equal(got.modelled ?? null, h.modelled ?? null, `${w} modelled`);
     assert.ok(Math.abs(got.G / h.G - 1) < 1e-6, `${w} G`);
     assert.equal(got.points.length, h.points.length, `${w} points`);
     h.points.forEach((p, k) => {
@@ -256,4 +258,35 @@ test('HIST: wild species without a cited baseline start at the natural baseline 
   }
   assert.ok(n >= 5, `${n} curated species start at the natural baseline`);
   assert.equal(g, 5, 'the five Panthera start at their genomic deep past');
+});
+
+// ---- v1.3: modelled range-loss trend (HIST kind 11) -------------------------
+
+test('HIST: modelled range-loss records run natural -> log-linear -> today, grade D', () => {
+  assert.equal(HIST_KINDS[11], 'rangeloss');
+  assert.deepEqual(sk.meta.hist_kinds, HIST_KINDS);
+  const t = sk.meta.natural.trend;
+  assert.equal(t.kind, 'rangeloss');
+  assert.equal(t.from_year, 1500);
+  const rl = dump.history.filter((h) => h.modelled === 'rangeloss');
+  assert.ok(rl.length >= 10, `${rl.length} range-loss records in the dump`);
+  for (const h of rl) {
+    const w = h.species;
+    assert.equal(h.points.length, 2, `${w}: two points`);
+    assert.equal(h.points[0].kind, 'rangeloss');
+    assert.equal(h.points[0].year, 1500);
+    assert.equal(h.points[0].grade, 'D');
+    assert.equal(h.segments[0].kind, 'natural', `${w}: natural level held first`);
+    closeLog(h.segments[0].start * h.L / h.G, h.points[0].n, LOG_TOL, `${w} natural level`);
+    const trend = h.segments.filter((s) => s.kind === 'rangeloss');
+    assert.ok(trend.length >= 1, `${w}: a rangeloss span`);
+    assert.ok(trend.every((s) => s.grade === 'D'), `${w}: the trend is grade D`);
+    const i = h.segments.findIndex((s) => s.kind === 'rangeloss');
+    assert.ok(h.segments.slice(0, i).every((s) => s.kind === 'natural'), `${w}: natural, then the trend`);
+    assert.equal(h.segments.length - i, trend.length, `${w}: only rangeloss segments after it`);
+    const last = h.segments[h.segments.length - 1];
+    closeLog(last.end * h.L / h.G, h.points[1].n, 0.05, `${w} ends at today's count`);
+    const f = h.tile < 0 ? sk : load(`t/${h.tile}.tld`);
+    assert.equal(f.history(h.row).modelled, 'rangeloss', `${w}: META.hist marks it modelled`);
+  }
 });
