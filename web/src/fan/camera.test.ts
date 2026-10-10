@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { clipPoly, FanCamera, MIN_YEARS, MIN_ZOOM, STRAND_PX } from './camera';
-import { layoutFan, type FanBranch, type WidthMode } from './layout';
+import { clipPoly, FanCamera, MAX_YEARS_FRAC, MIN_YEARS, MIN_ZOOM, STRAND_PX } from './camera';
+import { layoutFan, leftAt, type FanBranch, type WidthMode } from './layout';
 import { PANTHERA } from './panthera';
 import { TwigModel } from './twigs';
 
@@ -20,6 +20,29 @@ function camera(mode: WidthMode = 'linear'): FanCamera {
   return c;
 }
 
+/**
+ * Screen height (px) of the tallest 10-year span on screen, measured
+ * independently of the camera: scan the screen in 1 px steps for the shortest
+ * pixel run holding 10 years (years are tallest at the top, but scan anyway).
+ */
+function tallestTenYears(c: FanCamera): number {
+  const yrs = (py: number) => c.years(c.toWorld(0, py)[1]);
+  let best = 0;
+  for (let p0 = 0; p0 < c.h; p0 += 4) {
+    const y0 = yrs(p0);
+    let lo = p0;
+    let hi = p0 + 4 * c.h;
+    if (yrs(Math.min(hi, c.h)) - y0 < MIN_YEARS && hi > c.h) continue;
+    for (let k = 0; k < 40; k++) {
+      const m = (lo + hi) / 2;
+      if (yrs(m) - y0 >= MIN_YEARS) hi = m;
+      else lo = m;
+    }
+    if (hi <= c.h) best = Math.max(best, hi - p0);
+  }
+  return best;
+}
+
 /** A pseudo-random gesture sequence: pinches, pans and fingers anywhere. */
 function* gestures(seed: number): Generator<(c: FanCamera) => void> {
   let s = seed;
@@ -28,9 +51,13 @@ function* gestures(seed: number): Generator<(c: FanCamera) => void> {
     const px = rnd() * 390;
     const py = rnd() * 844;
     const r = rnd();
-    if (r < 0.6) {
+    if (r < 0.5) {
       const f = Math.exp((rnd() - 0.25) * 3);
       yield (c) => c.zoomAbout(px, py, f);
+    } else if (r < 0.6) {
+      // Time-only zoom (wheel with a modifier), hard.
+      const f = Math.exp(rnd() * 4);
+      yield (c) => c.zoomAbout(px, py, 1, f);
     } else yield (c) => c.pan((rnd() - 0.5) * 900, (rnd() - 0.5) * 1800);
   }
 }
@@ -65,8 +92,9 @@ describe('fan camera', () => {
           g(c);
           const k = c.cam;
           for (const v of [k.cx, k.cy, k.sx, k.sy, k.ty]) expect(Number.isFinite(v)).toBe(true);
+          expect(tallestTenYears(c)).toBeLessThanOrEqual(MAX_YEARS_FRAC * c.h * 1.001);
           const yrs = c.years(c.toWorld(0, c.h)[1]) - c.years(c.toWorld(0, 0)[1]);
-          expect(yrs).toBeGreaterThanOrEqual(MIN_YEARS * 0.999);
+          expect(yrs).toBeGreaterThanOrEqual((MIN_YEARS / MAX_YEARS_FRAC) * 0.999);
           expect(k.sx).toBeGreaterThanOrEqual(sxMin * 0.999);
           expect(k.sy).toBeGreaterThanOrEqual(syMin * 0.999);
           // Content stays near the centre, and "now" / the stem's end stay in reach.
@@ -92,20 +120,65 @@ describe('fan camera', () => {
     expect(c.toScreen(x1, 0)[0]).toBeLessThan(c.w);
   });
 
-  it('zooming in undoes zooming out, and the time zoom stops at 10 years', () => {
+  it('zooming in undoes zooming out, and 10 years stop at 30% of the screen', () => {
     const c = camera();
     // Near "now", inside the lion's green lane.
     const lion = c.fan.branches.find((b) => b.sp.common === 'Lion')!;
-    c.cam = { ...c.cam, cx: lion.colX - lion.width / 2 + 1e-9, cy: c.yNow + 3 };
+    c.cam = { ...c.cam, cx: leftAt(lion, c.yNow + 3) + 1e-9, cy: c.yNow + 3 };
     c.settle();
     for (let k = 0; k < 120; k++) c.zoomAbout(c.w / 2, c.h / 2, 1.5);
-    const yrs = c.years(c.toWorld(0, c.h)[1]) - c.years(c.toWorld(0, 0)[1]);
-    expect(yrs).toBeCloseTo(MIN_YEARS, 3);
+    expect(tallestTenYears(c) / (MAX_YEARS_FRAC * c.h)).toBeCloseTo(1, 3);
     // The width stops at the strands' legible spacing (never further than STRAND_PX per thinnest cell).
     const cap = c.sxCap(c.cam.cx, c.cam.cy, c.cam.sy);
     expect(c.cam.sx).toBeLessThanOrEqual(cap * (1 + 1e-9));
     expect(STRAND_PX / c.cam.sx).toBeGreaterThan(0);
   });
+
+  for (const mode of ['linear', 'log'] as WidthMode[]) {
+    it(`a smooth zoom-in never jumps: the point under the finger stays under it (${mode})`, () => {
+      const c = camera(mode);
+      const f = c.fan;
+      const at = (common: string) => f.branches.find((b) => b.sp.common === common)!;
+      // Start points: lion's green and gray lanes near "now", mid-way, near the fork; the tiger deep in the past.
+      const starts: [FanBranch, number, number][] = [];
+      for (const [b, y] of [
+        [at('Lion'), f.time.y(50e-6)],
+        [at('Lion'), f.time.y(0.05)],
+        [at('Lion'), -20],
+        [at('Tiger'), f.time.y(1.5)],
+      ] as const) {
+        for (const u of [0.5, 2]) starts.push([b, y, u]);
+      }
+      let worst = 0;
+      for (const [b, wy0, u] of starts) {
+        c.cam = c.home();
+        c.settle();
+        const L = new TwigModel(b, f.time, mode).lanes(wy0);
+        // u < 1: across the green lane; u ≥ 1: into the gray lane.
+        const wx0 = u < 1 ? L.left + L.gw * u : L.left + L.gw + (L.w - L.gw) * (u - 1.7);
+        const px = c.w * 0.4;
+        const py = c.h * 0.55;
+        c.cam = { ...c.cam, cx: wx0 - (px - c.w / 2) / c.cam.sx, cy: wy0 - (py - c.h / 2) / c.cam.sy };
+        c.settle();
+        for (const step of [1.03, 1.2]) {
+          for (let k = 0; k < 300; k++) {
+            const [wx, wy] = c.toWorld(px, py);
+            const a = f.pack.anchor(wx, wy);
+            const before = { ...c.cam };
+            c.zoomAbout(px, py, step);
+            expect(c.cam.sx / before.sx).toBeLessThanOrEqual(step * (1 + 1e-9));
+            expect(c.cam.sy / before.sy).toBeLessThanOrEqual(step * (1 + 1e-9));
+            const [qx, qy] = c.toScreen(f.pack.resolve(a, wx, wy), wy);
+            const moved = Math.hypot(qx - px, qy - py);
+            worst = Math.max(worst, moved);
+            // The point under the finger stays under it (clampPan only holds the view back, it never pulls).
+            expect(moved).toBeLessThan(2);
+          }
+        }
+      }
+      expect(worst).toBeLessThan(2);
+    });
+  }
 
   it('clips ribbons to the screen in float64 (no far-off coordinates reach the canvas)', () => {
     // A thin sliver from far left to far right through the screen, and one entirely off screen.

@@ -7,7 +7,7 @@
 import { formatAge, formatCount } from '../data/names';
 import { Input, type InputHandlers } from '../engine/input';
 import { clipPoly, FanCamera, STRAND_PX, type Camera } from './camera';
-import { bezier, bezierTangent, branchLeft, layoutFan, strandAt, type Fan, type FanBranch, type WidthMode } from './layout';
+import { layoutFan, leftAt, strandAt, type Fan, type FanBranch, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { drawTwigs, TwigModel, type IndInfo, type TwigStats } from './twigs';
 
@@ -108,6 +108,7 @@ export class FanView implements InputHandlers {
   setMode(mode: WidthMode): void {
     this.mode = mode;
     this.camera.fan = layoutFan(this.clade, mode);
+    this.camera.fan.pack.setScale(this.cam.sx, this.cam.sy, this.camera.home().sx);
     this.camera.settle();
     this.request();
   }
@@ -167,6 +168,8 @@ export class FanView implements InputHandlers {
       const [sx, cx] = axis(from.sx, to.sx, from.cx, to.cx, e);
       const [ty, cy] = axis(from.sy, to.ty, from.cy, to.cy, e);
       this.cam = { sx, sy: ty, ty, cx, cy };
+      // The targets are already at their scales' packing: no re-anchoring mid-flight.
+      this.fan.pack.setScale(sx, ty);
       this.camera.settle();
       return u < 1;
     };
@@ -181,9 +184,10 @@ export class FanView implements InputHandlers {
     let best: FanBranch | null = null;
     let bd = Infinity;
     for (const b of this.fan.branches) {
-      if (wy > b.p3.y + slopY || wy < b.tipY - slopY) continue;
-      const age = this.fan.time.ageAt(Math.min(b.p3.y, Math.max(b.tipY, wy)));
-      const left = branchLeft(b);
+      if (wy > slopY || wy < b.tipY - slopY) continue;
+      const yc = Math.min(0, Math.max(b.tipY, wy));
+      const age = this.fan.time.ageAt(yc);
+      const left = leftAt(b, yc);
       const d = Math.max(0, left - wx, wx - left - strandAt(b, age, this.mode).w);
       if (d <= slop && d < bd) {
         bd = d;
@@ -239,7 +243,7 @@ export class FanView implements InputHandlers {
     let sy = this.cam.sy * 4;
     let framing = false;
     if (b) {
-      const age = this.fan.time.ageAt(Math.min(b.p3.y, Math.max(b.tipY, wy)));
+      const age = this.fan.time.ageAt(Math.min(0, Math.max(b.tipY, wy)));
       const bw = strandAt(b, age, this.mode).w;
       const wpx = bw * this.cam.sx;
       const frame = (this.w * 0.6) / Math.max(1e-300, bw);
@@ -268,15 +272,26 @@ export class FanView implements InputHandlers {
     let cx = wx - (x - this.w / 2) / sx;
     if (b) {
       sx = Math.min(sx, Math.max(this.cam.sx, this.camera.sxCap(wx, wy, sy)));
-      const age = this.fan.time.ageAt(Math.min(b.p3.y, Math.max(b.tipY, wy)));
-      cx = framing ? branchLeft(b) + strandAt(b, age, this.mode).w / 2 : wx - (x - this.w / 2) / sx;
+    }
+    // The packing depends on the scale: aim at where the finger's point will be at the target scale.
+    const pack = this.fan.pack;
+    const anchor = pack.anchor(wx, wy);
+    const was = [pack.sx, pack.sy];
+    pack.setScale(sx, sy);
+    const wxT = pack.resolve(anchor, wx, wy);
+    cx = wxT - (x - this.w / 2) / sx;
+    if (b) {
+      const yc = Math.min(0, Math.max(b.tipY, wy));
+      const age = this.fan.time.ageAt(yc);
+      if (framing) cx = leftAt(b, yc) + strandAt(b, age, this.mode).w / 2;
       // In the green lane, land on a living strand rather than a vacant slot
       // (only about a third of the index slots hold someone alive).
       const m = this.model(b);
       const L = m.lanes(wy);
       const slotPx = (L.gw / m.size(m.generationAt(wy))) * sx;
-      if (wx < L.left + L.gw && slotPx > 12) cx = m.nearestLiving(wx, wy, Math.ceil(this.w / slotPx)) ?? cx;
+      if (wxT < L.left + L.gw && slotPx > 12) cx = m.nearestLiving(wxT, wy, Math.ceil(this.w / slotPx)) ?? cx;
     }
+    pack.setScale(was[0], was[1]);
     this.flyTo({ sx, sy, ty: sy, cx, cy: wy - (y - this.h / 2) / sy });
   }
 
@@ -368,89 +383,74 @@ export class FanView implements InputHandlers {
 
   /**
    * One species' strand bundle, drawn whole from the bottom of the parent stem
-   * through the fork, out to its column and up through time to its tip. The
-   * stem is just its children's strands side by side (in branch order, widths
-   * adding up to the stem's width), so each green lane runs unbroken from the
-   * tip to the root. The same rule nests for a deeper tree.
+   * through the fork and up through time to its tip. The stem is just its
+   * children's strands side by side (in branch order, widths adding up to the
+   * stem's width), so each green lane runs unbroken from the tip to the root.
    *
-   * The spine is sampled in screen space: the S-curve adaptively (finer
-   * wherever an edge on screen would be off by more than a fraction of a
-   * pixel), its normal taken on screen so the bundle keeps its width-zoomed
-   * thickness through the bend whatever the two axes' zooms. Nothing is
-   * dropped: a skipped sample would let the outline cut a chord across the screen.
+   * Every edge is a function of height (layout.ts Pack: left edge; strandAt:
+   * widths), offset horizontally, so width = individuals at every height and
+   * the shape never depends on the ratio of the two zooms. The visible heights
+   * are sampled in screen space, finer wherever an edge would be off by more
+   * than a fraction of a pixel; outside them only the fork and the tip are
+   * kept, whose chords stay off screen above or below it.
    */
   private drawStrand(b: FanBranch): void {
     const yb = this.fan.trunkBottom.y;
-    const [ax, ay] = this.toScreen(Math.min(b.p0.x, b.colX) - b.width, b.tipY);
-    const [bx, by] = this.toScreen(Math.max(b.p0.x, b.colX) + b.width, yb);
-    if (bx < 0 || ax > this.w || by < 0 || ay > this.h) return;
+    const [, ayTip] = this.toScreen(0, b.tipY);
+    const [, byBot] = this.toScreen(0, yb);
+    if (byBot < 0 || ayTip > this.h) return;
     const time = this.fan.time;
-    const at = (y: number) => strandAt(b, time.ageAt(y), this.mode);
-    // Left-aligned (layout.ts branchLeft): the ribbon spans the left normal offsets [hw - w, hw] from the spine.
     const hw = b.width / 2;
-    const up = (x: number, y: number, st = at(y)): RibbonPt => {
-      const [px, py] = this.toScreen(x, y);
+    // Spine at left + hw: the ribbon spans offsets [hw - w, hw] to its left (nx = -1).
+    const pt = (y: number): RibbonPt => {
+      const st = strandAt(b, time.ageAt(y), this.mode);
+      const [px, py] = this.toScreen(leftAt(b, y) + hw, y);
       return { x: px, y: py, nx: -1, ny: 0, w: st.w, f: st.f };
     };
     const pts: RibbonPt[] = [];
-    // Stem part, straight up to the fork.
-    const base = at(0);
-    for (let i = 0; i < 4; i++) pts.push(up(b.p0.x, yb * (1 - i / 4), base));
-    // The S-curve.
-    const curve = (t: number): RibbonPt => {
-      const p = bezier(b, t);
-      const d = bezierTangent(b, t);
-      const st = at(p.y);
-      const [px, py] = this.toScreen(p.x, p.y);
-      const tx = d.x * this.cam.sx;
-      const ty = d.y * this.cam.sy;
-      const l = Math.hypot(tx, ty) || 1;
-      return { x: px, y: py, nx: ty / l, ny: -tx / l, w: st.w, f: st.f };
-    };
-    const offs = (p: RibbonPt) => [hw, hw - p.w, hw - p.w * p.f];
-    const edge = (p: RibbonPt, o: number): [number, number] => [p.x + p.nx * o * this.cam.sx, p.y + p.ny * o * this.cam.sx];
-    const refine = (t0: number, a: RibbonPt, t1: number, c: RibbonPt, depth: number): void => {
-      if (depth > 48 || pts.length > 6000) return;
-      const tm = (t0 + t1) / 2;
-      const m = curve(tm);
-      const oa = offs(a);
-      const om = offs(m);
-      const oc = offs(c);
-      let err = 0;
-      for (let e = 0; e < 3; e++) {
-        const [x0, y0] = edge(a, oa[e]);
-        const [x1, y1] = edge(m, om[e]);
-        const [x2, y2] = edge(c, oc[e]);
-        const pad = 0.5 * (Math.abs(x2 - x0) + Math.abs(y2 - y0)) + 2;
-        if (Math.max(x0, x1, x2) < -pad || Math.min(x0, x1, x2) > this.w + pad) continue;
-        if (Math.max(y0, y1, y2) < -pad || Math.min(y0, y1, y2) > this.h + pad) continue;
-        err = Math.max(err, Math.hypot((x0 + x2) / 2 - x1, (y0 + y2) / 2 - y1), Math.hypot(x2 - x0, y2 - y0) / 64);
-      }
-      if (err < 0.3) return;
-      refine(t0, a, tm, m, depth + 1);
-      pts.push(m);
-      refine(tm, m, t1, c, depth + 1);
-    };
-    const N = 32;
-    let prev = curve(0);
-    pts.push(prev);
-    for (let i = 1; i <= N; i++) {
-      const next = curve(i / N);
-      refine((i - 1) / N, prev, i / N, next, 0);
-      pts.push(next);
-      prev = next;
-    }
-    // Column: sample the visible part finely (the taper follows log time).
+    // The stem, straight up to the fork.
+    pts.push(pt(yb));
     const [, sTop] = this.toWorld(0, -20);
     const [, sBot] = this.toWorld(0, this.h + 20);
-    const ya = Math.min(b.p3.y, sBot);
+    const ya = Math.min(0, sBot);
     const yt = Math.max(b.tipY, sTop);
+    if (sBot < yb && sBot > 0) pts.push(pt(sBot));
+    pts.push(pt(0));
     if (ya > yt) {
-      if (ya < b.p3.y) pts.push(up(b.colX, ya));
-      const M = 80;
-      for (let i = 1; i <= M; i++) pts.push(up(b.colX, ya + ((yt - ya) * i) / M));
+      const sx = this.cam.sx;
+      const edges = (p: RibbonPt) => [p.x, p.x - p.w * sx, p.x - p.w * p.f * sx];
+      const refine = (y0: number, a: RibbonPt, y1: number, c: RibbonPt, depth: number): void => {
+        if (depth > 12 || pts.length > 8000) return;
+        const ym = (y0 + y1) / 2;
+        const m = pt(ym);
+        const ea = edges(a);
+        const em = edges(m);
+        const ec = edges(c);
+        let err = 0;
+        for (let e = 0; e < 3; e++) {
+          // Edges far off screen on one side don't matter.
+          if (Math.max(ea[e], em[e], ec[e]) < -50 || Math.min(ea[e], em[e], ec[e]) > this.w + 50) continue;
+          err = Math.max(err, Math.abs((ea[e] + ec[e]) / 2 - em[e]));
+        }
+        if (err < 0.3) return;
+        refine(y0, a, ym, m, depth + 1);
+        pts.push(m);
+        refine(ym, m, y1, c, depth + 1);
+      };
+      const M = 64;
+      let prevY = ya;
+      let prev = pt(ya);
+      if (ya < 0) pts.push(prev);
+      for (let i = 1; i <= M; i++) {
+        const y = ya + ((yt - ya) * i) / M;
+        const next = pt(y);
+        refine(prevY, prev, y, next, 0);
+        pts.push(next);
+        prevY = y;
+        prev = next;
+      }
     }
-    if (pts[pts.length - 1].y > this.toScreen(0, b.tipY)[1] + 1e-9) pts.push(up(b.colX, b.tipY));
+    if (pts[pts.length - 1].y > ayTip + 1e-9) pts.push(pt(b.tipY));
     const ctx = this.ctx;
     // As the strands fade in (twigs.ts), the lanes dim to a backdrop under them: the same
     // lanes, the same geometry, never a switch.
@@ -666,7 +666,7 @@ export class FanView implements InputHandlers {
 
 /** x of the middle of a branch's tip (branches are left-aligned). */
 function tipX(b: FanBranch, fan: Fan, mode: WidthMode): number {
-  return branchLeft(b) + strandAt(b, fan.time.ageAt(b.tipY), mode).w / 2;
+  return leftAt(b, b.tipY) + strandAt(b, fan.time.ageAt(b.tipY), mode).w / 2;
 }
 
 /** A round step (1, 2 or 5 × 10^k) near `x`. */

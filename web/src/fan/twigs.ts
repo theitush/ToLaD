@@ -24,7 +24,7 @@
 //   labels    plus handles (lion#…).
 
 import { Species, type Address } from '../../../packages/procgen/src/index.ts';
-import { branchLeft, strandAt, type FanBranch, type TimeScale, type WidthMode } from './layout';
+import { leftAt, strandAt, type FanBranch, type TimeScale, type WidthMode } from './layout';
 import type { SpeciesRec } from './panthera';
 
 function keyOf(common: string): string {
@@ -163,7 +163,7 @@ export class TwigModel {
   row(g: number): { y: number; left: number; w: number; n: number } {
     const y = this.yOf((g + 0.5) * this.GL);
     const w = this.widthAt(y);
-    return { y, left: branchLeft(this.b), w, n: this.size(g) };
+    return { y, left: leftAt(this.b, y), w, n: this.size(g) };
   }
 
   /**
@@ -173,7 +173,7 @@ export class TwigModel {
    */
   lanes(y: number): { left: number; w: number; gw: number } {
     const st = strandAt(this.b, this.time.ageAt(y), this.mode);
-    return { left: branchLeft(this.b), w: st.w, gw: st.w * st.f };
+    return { left: leftAt(this.b, y), w: st.w, gw: st.w * st.f };
   }
 
   /** Fraction across its lane of individual (g, i): the centre of its equal share of its generation. */
@@ -466,9 +466,9 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
     const py = v.toScreen(0, y)[1];
     return [v.toWorld(0, py)[0], v.toWorld(v.w, py)[0]];
   };
-  if (wyBot < b.tipY || wyTop > b.p3.y) return null;
+  if (wyBot < b.tipY || wyTop > 0) return null;
   const yTop = Math.max(wyTop, b.tipY);
-  const yBot = Math.min(wyBot, b.p3.y);
+  const yBot = Math.min(wyBot, 0);
   // Off the branch's column entirely?
   const Lb = m.lanes(yBot);
   const [bx0, bx1] = xr(yBot);
