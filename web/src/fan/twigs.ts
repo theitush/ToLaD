@@ -25,7 +25,7 @@
 //   links     plus threads to both parents and who has living descendants;
 //   labels    plus handles (lion#…).
 
-import { mix } from '../../../packages/procgen/src/hash.ts';
+import { mix, rand } from '../../../packages/procgen/src/hash.ts';
 import { Species, type Address } from '../../../packages/procgen/src/index.ts';
 import { laneAt, leftAt, remaining, TIME_C, type FanBranch, type TimeScale, type WidthMode } from './layout';
 import { attrSeed, F_LINEAGE, Lane, lineageThreshold, MAX_FOLD, packInst, type MeshInst } from './mesh';
@@ -266,7 +266,7 @@ export class TwigModel {
   }
 
   twig(g: number, i: number, K?: number): Twig {
-    return this.twigOf(g, i, this.sp.attributes({ generation: g, index: BigInt(i) }), K);
+    return this.twigOf(g, i, this.attrs(g, i), K);
   }
 
   private twigOf(g: number, i: number, a: { birthTime: number; deathTime: number; alive: boolean }, K?: number): Twig {
@@ -278,7 +278,7 @@ export class TwigModel {
 
   /** Individual (g, i) on its copy nearest slot `near` (parents next to their child). */
   twigNear(g: number, i: number, near: number): Twig {
-    const a = this.sp.attributes({ generation: g, index: BigInt(i) });
+    const a = this.attrs(g, i);
     const alive = g >= this.aliveFrom && a.alive;
     return this.twigOf(g, i, a, this.slotOf(g, i, alive, this.yOf(a.birthTime), near) ?? undefined);
   }
@@ -290,7 +290,7 @@ export class TwigModel {
 
   alive(g: number, i: number): boolean {
     if (g < this.aliveFrom) return false;
-    return this.sp.attributes({ generation: g, index: BigInt(i) }).alive;
+    return this.attrs(g, i).alive;
   }
 
   /** Does green slot k at height y hold a living strand (anyone alive now on it)? */
@@ -348,12 +348,26 @@ export class TwigModel {
    */
   lineage(g: number, i: number): boolean {
     const thr = lineageThreshold(this.G, g, this.rec.extinct);
-    return this.sp.fieldHash({ generation: g, index: BigInt(i) }, F_LINEAGE) >>> 0 < thr;
+    // (procgen's fieldHash of (g, i), as the GPU computes it: mix the index into g's seed, no BigInt.)
+    return rand(mix(this.seedOf(g), i >>> 0), F_LINEAGE) >>> 0 < thr;
   }
 
-  private readonly parentCache = new Map<string, Address[]>();
+  /** Birth, death and alive of (g, i) (procgen attributes; cached: the links redraw the same individuals every frame). */
+  attrs(g: number, i: number): { birthTime: number; deathTime: number; alive: boolean } {
+    const key = g * 4294967296 + i;
+    let a = this.attrCache.get(key);
+    if (!a) {
+      if (this.attrCache.size > 50000) this.attrCache.clear();
+      const x = this.sp.attributes({ generation: g, index: BigInt(i) });
+      this.attrCache.set(key, (a = { birthTime: x.birthTime, deathTime: x.deathTime, alive: x.alive }));
+    }
+    return a;
+  }
+  private readonly attrCache = new Map<number, { birthTime: number; deathTime: number; alive: boolean }>();
+
+  private readonly parentCache = new Map<number, Address[]>();
   parents(g: number, i: number): Address[] {
-    const key = `${g}:${i}`;
+    const key = g * 4294967296 + i;
     let p = this.parentCache.get(key);
     if (!p) {
       if (this.parentCache.size > 20000) this.parentCache.clear();
