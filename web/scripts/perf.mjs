@@ -36,7 +36,7 @@ await new Promise((resolve, reject) => {
 
 const browser = await chromium.launch({
   headless: true,
-  args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
+  args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
 });
 let exitCode = 0;
 try {

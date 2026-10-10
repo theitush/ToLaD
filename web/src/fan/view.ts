@@ -20,9 +20,18 @@ export type { Camera } from './camera';
 /** Alive now: the one luminous colour. */
 export const GREEN = '#3fd286';
 /** Line ended: a cool slate, darker than both greens (told apart by lightness too, not hue alone). */
-export const GRAY = '#6f7a84';
-export const BG = '#0b1311';
+export const GRAY = '#67737f';
+/** The ground (app.css --ground): spruce at night. */
+export const BG = '#0c1714';
 const WITHERED = '#8b806d';
+/** Text on the canvas (app.css --ink, --ink-2, --ink-3). */
+const INK = '#e8f0ea';
+const INK2 = '#a9b8ae';
+const INK3 = '#7d8e84';
+/** Type (app.css): a condensed sans for all that is read at a glance, a serif italic for Latin names. */
+export const SANS = "'Sofia Sans Condensed', 'Avenir Next Condensed', 'Roboto Condensed', 'Arial Narrow', system-ui, sans-serif";
+export const SERIF = "'Newsreader', 'Iowan Old Style', Georgia, serif";
+const font = (spec: string, family = SANS) => `${spec} ${family}`;
 /** Least distance (px) between the labels of tips that end side by side. */
 const LABEL_PX = 30;
 
@@ -382,6 +391,7 @@ export class FanView implements InputHandlers {
     // Labels: tips side by side (the living all end at "now", packed hairlines in
     // linear widths) are spread apart and joined to their tips by leader lines;
     // then by size, one that would still overlap a bigger species' label waits for a closer zoom.
+    this.drawGutter();
     const lx = this.labelXs();
     const placed: number[][] = [];
     for (const b of [...this.fan.branches].sort((p, q) => q.sp.ever - p.sp.ever)) this.drawLabel(b, placed, lx.get(b));
@@ -708,12 +718,12 @@ export class FanView implements InputHandlers {
     let cy = ty - lead;
     const name = b.sp.common;
     const sub = b.sp.extinct ? `~${formatCount(b.pop.aliveAt(b.sp.t1))} alive · extinct ${formatAge(b.sp.t1)}` : `${formatCount(b.sp.alive)} alive now`;
-    const fs = 15;
+    const fs = 16;
     ctx.save();
     ctx.textBaseline = 'middle';
-    ctx.font = `${fs * 0.72}px 'Avenir Next', 'Segoe UI Variable Text', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
+    ctx.font = font('500 11.5px');
     const subLen = ctx.measureText(sub).width;
-    ctx.font = `600 ${fs}px 'Avenir Next', 'Segoe UI Variable Text', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
+    ctx.font = font(`650 ${fs}px`);
     // Screen box of the upright two-line label (x0, y0, x1, y1).
     const len = Math.max(subLen, ctx.measureText(name).width);
     // Kept on screen and clear of the buttons: pushed down (with a leader line) if needed.
@@ -743,13 +753,13 @@ export class FanView implements InputHandlers {
     ctx.translate(cx, cy - 8);
     ctx.rotate(-Math.PI / 2);
     ctx.textAlign = 'left';
-    ctx.fillStyle = b.sp.extinct ? '#b9b3a6' : '#eef4ef';
+    ctx.fillStyle = b.sp.extinct ? '#cfc4b1' : INK;
     ctx.shadowColor = BG;
-    ctx.shadowBlur = 3;
-    ctx.fillText(name, 0, -fs * 0.32);
-    ctx.font = `${fs * 0.72}px 'Avenir Next', 'Segoe UI Variable Text', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
-    ctx.fillStyle = '#9faba3';
-    ctx.fillText(sub, 0, fs * 0.55);
+    ctx.shadowBlur = 4;
+    ctx.fillText(name, 0, -fs * 0.3);
+    ctx.font = font('500 11.5px');
+    ctx.fillStyle = b.sp.extinct ? '#a39a8a' : INK2;
+    ctx.fillText(sub, 0, fs * 0.58);
     ctx.restore();
   }
 
@@ -804,12 +814,17 @@ export class FanView implements InputHandlers {
     ];
     const ctx = this.ctx;
     ctx.save();
-    ctx.font = `11px ui-monospace, Menlo, monospace`;
-    ctx.fillStyle = 'rgba(10,16,13,0.8)';
-    ctx.fillRect(60, this.h * 0.5 - 4, this.w - 66, 46);
+    // Under the buttons, right-aligned: clear of the axis and of the species' labels at the top.
+    ctx.font = font('500 12px');
+    const bw = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 12;
+    const bar = this.barRect();
+    const top = (bar ? bar[3] : 40) + 8;
+    ctx.fillStyle = 'rgba(10,16,13,0.85)';
+    ctx.fillRect(this.w - 8 - bw, top, bw, 50);
     ctx.fillStyle = '#ffd479';
     ctx.textBaseline = 'top';
-    lines.forEach((l, k) => ctx.fillText(l, 64, this.h * 0.5 + k * 14));
+    ctx.textAlign = 'right';
+    lines.forEach((l, k) => ctx.fillText(l, this.w - 14, top + 5 + k * 14));
     ctx.restore();
   }
 
@@ -848,18 +863,26 @@ export class FanView implements InputHandlers {
       `born ~${formatYearsAgo(m.bornAgo(st.g1))}${st.g0 === st.g1 ? '' : ` to ~${formatYearsAgo(m.bornAgo(st.g0))}`}`,
     ];
     ctx.save();
-    ctx.font = `600 14px 'Avenir Next', 'Segoe UI Variable Text', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
-    const wmax = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 20;
-    ctx.fillStyle = 'rgba(20,28,24,0.82)';
+    // Below the buttons, right of the axis: the species large, its generations quiet.
+    const bar = this.barRect();
+    const x = 66;
+    const y = (bar ? bar[3] : 44) + 12;
+    ctx.font = font('650 19px');
+    const w0 = ctx.measureText(lines[0]).width;
+    ctx.font = font('500 13px');
+    const wmax = Math.max(w0, ...lines.slice(1).map((l) => ctx.measureText(l).width)) + 24;
+    ctx.fillStyle = 'rgba(12,23,20,0.84)';
     ctx.beginPath();
-    ctx.roundRect(70, 54, Math.min(this.w - 80, wmax), 32 + 16 * (lines.length - 1), 8);
+    ctx.roundRect(x - 12, y - 8, Math.min(this.w - x, wmax), 30 + 16 * (lines.length - 1), 12);
     ctx.fill();
     ctx.textBaseline = 'top';
-    ctx.fillStyle = '#eef4ef';
-    ctx.fillText(lines[0], 80, 61);
-    ctx.font = `12px 'Avenir Next', 'Segoe UI Variable Text', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
-    ctx.fillStyle = '#b5c0b9';
-    for (let k = 1; k < lines.length; k++) ctx.fillText(lines[k], 80, 64 + 16 * k);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = INK;
+    ctx.font = font('650 19px');
+    ctx.fillText(lines[0], x, y);
+    ctx.font = font('500 13px');
+    ctx.fillStyle = INK2;
+    for (let k = 1; k < lines.length; k++) ctx.fillText(lines[k], x, y + 10 + 16 * k);
     ctx.restore();
   }
 
@@ -907,7 +930,7 @@ export class FanView implements InputHandlers {
       placed.push({ ...c, sy });
     }
     ctx.save();
-    ctx.font = `11px 'Avenir Next', 'Segoe UI Variable Text', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
+    ctx.font = font('500 12px');
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'left';
     ctx.lineJoin = 'round';
@@ -926,35 +949,57 @@ export class FanView implements InputHandlers {
       ctx.restore();
       return;
     }
-    // A gutter that fades out from the left edge: the labels read over branches without halos.
-    const gut = ctx.createLinearGradient(0, 0, 104, 0);
-    gut.addColorStop(0, 'rgba(11,19,17,0.82)');
-    gut.addColorStop(0.55, 'rgba(11,19,17,0.5)');
-    gut.addColorStop(1, 'rgba(11,19,17,0)');
-    ctx.fillStyle = gut;
-    ctx.fillRect(0, 0, 104, this.h);
-    ctx.font = `500 10.5px 'Avenir Next', 'Segoe UI Variable Text', 'Avenir Next', 'Segoe UI Variable Text', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
+    // A gutter that fades out from the left edge, and a halo of the ground round each label:
+    // the labels read over the branches and the stem.
+    // (The gutter itself is drawn under the species' labels: drawGutter.)
+    ctx.font = font('500 12px');
+    ctx.lineWidth = 3.5;
+    ctx.strokeStyle = 'rgba(12,23,20,0.9)';
+    // "now" above the screen: a marker pinned at the top, and no tick label under it.
+    const nowAbove = syOf(0) < 0;
+    const nowY = Math.max(12, (this.barRect()?.[1] ?? 10) + 8);
     for (const p of placed) {
       const now = p.yrs === 0;
+      if (nowAbove && !now && p.sy - 7 < nowY + 16) continue;
+      // (Not under the foot: the scale bar and the key sit there.)
+      if (!now && p.sy - 7 > this.h - 74) continue;
       // A short tick at the edge, visible over the branches too.
-      ctx.fillStyle = now ? '#7fd69e' : '#8d998f';
-      ctx.fillRect(0, Math.round(p.sy), 4, 1);
-      const label = now ? 'now' : p.yrs === origin ? `${formatTick(origin, 0)} · Panthera begins` : formatTick(p.yrs, p.step);
-      ctx.fillStyle = now ? '#7fe0a8' : p.yrs === origin ? '#c9d4cd' : '#8a978f';
+      ctx.fillStyle = now ? GREEN : '#8d9e93';
+      ctx.fillRect(0, Math.round(p.sy), now ? 6 : 4, 1);
+      const label = now ? 'now' : p.yrs === origin ? `${formatTick(origin, 0)}, Panthera begins` : formatTick(p.yrs, p.step);
+      ctx.fillStyle = now ? GREEN : p.yrs === origin ? INK : INK3;
+      if (now || p.yrs === origin) ctx.font = font('650 12.5px');
+      ctx.strokeText(label, 6, p.sy - 7);
       ctx.fillText(label, 6, p.sy - 7);
+      ctx.font = font('500 12px');
     }
-    if (syOf(0) < 0) {
-      // "now" is above the screen: say how far.
-      ctx.fillStyle = '#7fe0a8';
-      ctx.fillText('↑ now', 6, 14);
+    if (nowAbove) {
+      ctx.font = font('650 12.5px');
+      ctx.fillStyle = GREEN;
+      ctx.strokeText('↑ now', 6, nowY);
+      ctx.fillText('↑ now', 6, nowY);
+      ctx.font = font('500 12px');
     }
     // Honest scale note under the axis labels.
     const oy = syOf(origin);
     if (oy > 0 && oy < this.h - 20) {
-      ctx.fillStyle = '#5f6b64';
+      ctx.fillStyle = INK3;
+      ctx.font = font('italic 400 12px', SERIF);
+      ctx.strokeText('time, log scale', 6, oy + 9);
       ctx.fillText('time, log scale', 6, oy + 9);
     }
     ctx.restore();
+  }
+
+  /** The time axis's gutter: the branches fade under it at the left edge; the labels go over it. */
+  private drawGutter(): void {
+    const ctx = this.ctx;
+    const gut = ctx.createLinearGradient(0, 0, 96, 0);
+    gut.addColorStop(0, 'rgba(12,23,20,0.86)');
+    gut.addColorStop(0.55, 'rgba(12,23,20,0.5)');
+    gut.addColorStop(1, 'rgba(12,23,20,0)');
+    ctx.fillStyle = gut;
+    ctx.fillRect(0, 0, 96, this.h);
   }
 
   private drawTrunkLabel(): void {
@@ -963,24 +1008,37 @@ export class FanView implements InputHandlers {
     // Right of the stem, just below the fork (nothing else is drawn there).
     const [sx, sy] = this.toScreen(f.x1, 0);
     if (sy > this.h + 20 || sy < -80 || sx > this.w) return;
-    const font = (w: string, px: number) => `${w} ${px}px 'Avenir Next', 'Segoe UI Variable Text', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
     ctx.save();
     ctx.textBaseline = 'top';
     ctx.textAlign = 'left';
-    const x = sx + 10;
-    const y = sy + 6;
-    ctx.font = font('600', 14);
-    ctx.fillStyle = '#eef4ef';
-    ctx.fillText(f.clade.common, x, y);
-    ctx.font = font('italic 400', 12);
-    ctx.fillStyle = '#9faba3';
-    ctx.fillText(f.clade.sci, x, y + 18);
-    ctx.font = font('400', 12);
-    // The living first; "ever" only as an honest secondary line (a model figure, never bare).
-    ctx.fillStyle = GREEN;
-    ctx.fillText(`${formatCount(f.clade.alive)} alive now`, x, y + 33);
-    ctx.fillStyle = '#9faba3';
-    ctx.fillText(`~${formatCount(f.clade.ever)} born in total (model, grade ${f.clade.grade})`, x, y + 48);
+    const lines: [string, string, string][] = [
+      [f.clade.common, font('650 17px'), INK],
+      [f.clade.sci, font('italic 400 14px', SERIF), INK2],
+      // The living first; the total born only as an honest secondary line (a model figure, never bare).
+      [`${formatCount(f.clade.alive)} alive now`, font('600 13px'), GREEN],
+      [`~${formatCount(f.clade.ever)} born in total (model, grade ${f.clade.grade})`, font('500 13px'), INK2],
+    ];
+    let wmax = 0;
+    for (const [t, ft] of lines) {
+      ctx.font = ft;
+      wmax = Math.max(wmax, ctx.measureText(t).width);
+    }
+    // Right of the stem if it fits; else on the stem itself, just below the fork, on a halo.
+    const onStem = sx + 10 + wmax > this.w - 6;
+    const [stemL] = this.toScreen(f.x0, 0);
+    const x = onStem ? Math.max(66, stemL + 10) : sx + 10;
+    const y = sy + 8;
+    if (onStem) {
+      ctx.shadowColor = 'rgba(12,23,20,0.95)';
+      ctx.shadowBlur = 7;
+    }
+    const dy = [0, 21, 39, 55];
+    lines.forEach(([t, ft, c], k) => {
+      ctx.font = ft;
+      ctx.fillStyle = c;
+      ctx.fillText(t, x, y + dy[k]);
+      if (onStem) ctx.fillText(t, x, y + dy[k]);
+    });
     ctx.restore();
   }
 

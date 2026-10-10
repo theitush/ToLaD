@@ -540,9 +540,9 @@ export interface TwigStats {
 /** The living: a deep, saturated green. */
 export const LIVING = '#3fd286';
 /** Dead, with living descendants (their strands carry the living's): a paler green. */
-export const LINEAGE = '#b4e2c4';
+export const LINEAGE = '#c8efc4';
 /** Dead, line ended. */
-export const TWIG_GRAY = '#a3adb6';
+export const TWIG_GRAY = '#95a2b0';
 /** Dead, of an extinct species. */
 export const TWIG_WITHERED = '#a89c86';
 /** Most individuals enumerated on the CPU for links and labels. */
@@ -1003,7 +1003,7 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
 
   if (showLabels && twigs.length <= 400) {
     ctx.save();
-    ctx.font = `12px ui-monospace, Menlo, Consolas, monospace`;
+    ctx.font = `600 12.5px 'Sofia Sans Condensed', 'Roboto Condensed', system-ui, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     ctx.fillStyle = '#dfe7e2';

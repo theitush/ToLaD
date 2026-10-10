@@ -35,6 +35,12 @@ export function FanApp() {
     window.__fan = v;
     window.__fanMesh = MeshMirror;
     v.request();
+    // The canvas text waits for the faces (drawn in system type until then).
+    if (typeof document !== 'undefined' && document.fonts) {
+      Promise.all([document.fonts.load("600 16px 'Sofia Sans Condensed'"), document.fonts.load("italic 400 14px 'Newsreader'")])
+        .catch(() => undefined)
+        .then(() => v.request());
+    }
     return () => {
       v.destroy();
       viewRef.current = null;
@@ -43,7 +49,7 @@ export function FanApp() {
   }, []);
 
   return (
-    <div className="app">
+    <div className="app fan">
       <canvas ref={canvasRef} className="stage" />
       <div className="bar" ref={barRef}>
         <button
@@ -73,12 +79,20 @@ export function FanApp() {
           <SpeciesCard sp={sel.sp} ageMa={sel.ageMa} onClose={() => viewRef.current?.tap(-1e6, -1e6)} />
         )
       ) : (
-        <div className="legend">
-          <span className="li"><span className="dot alive" /> alive now</span> <span className="li"><span className="dot lineage" /> has living descendants</span>{' '}
-          <span className="li"><span className="dot dead" /> line ended</span>
-          <br />
-          <span className="dim">Width is how many were alive at the time. Tap or zoom a branch.</span>
-        </div>
+        <ul className="key" aria-label="key">
+          <li>
+            <span className="lane alive" /> alive now
+          </li>
+          <li>
+            <span className="lane lineage" /> living descendants
+          </li>
+          <li>
+            <span className="lane dead" /> line ended
+          </li>
+          <li>
+            <span className="lane extinct" /> extinct
+          </li>
+        </ul>
       )}
       </div>
     </div>
@@ -115,29 +129,38 @@ export function SpeciesCard({ sp, onClose, open, ageMa }: { sp: SpeciesRec; onCl
         ×
       </button>
       <div className="t">
-        {sp.common} <i>{sp.sci}</i>
+        <span>{sp.common}</span> <i>{sp.sci}</i>
       </div>
-      <div>
-        <b>{formatCount(at.alive)}</b> alive {at.when}
+      <div className="stats">
+        <span className={`lane ${sp.extinct ? 'extinct' : 'lineage'}`} /> <b>{formatCount(at.alive)}</b> <span>alive {at.when}</span>
+        <span className="range">
+          {pct(at.green)} have living descendants today · {pct(1 - at.green)} line ended
+        </span>
+        {at.when !== 'now' && !sp.extinct && (
+          <>
+            <span className="lane alive" /> <b>{formatCount(sp.alive)}</b> <span>alive now</span>
+          </>
+        )}
+        <span className="range">
+          ~{formatCount(sp.ever)} born in total over {formatSpan((sp.t0 - sp.t1) * 1e6)} (model, grade {sp.grade}; range {formatCount(sp.everLo)} – {formatCount(sp.everHi)})
+        </span>
       </div>
-      <div>
-        <span className="dot lineage" /> {pct(at.green)} have living descendants today · <span className="dot dead" /> {pct(1 - at.green)} line ended
-      </div>
-      {at.when !== 'now' && !sp.extinct && (
+      <dl className="meta">
         <div>
-          <span className="dot alive" /> {formatCount(sp.alive)} alive now
+          <dt>lived</dt>
+          <dd>{span}</dd>
         </div>
-      )}
-      <div className="dim">
-        ~{formatCount(sp.ever)} born in total over {formatSpan((sp.t0 - sp.t1) * 1e6)} (model, grade {sp.grade}; range {formatCount(sp.everLo)} – {formatCount(sp.everHi)})
-      </div>
-      <div className="dim">
-        grade {sp.grade} · {span}
-        {sp.extinct && <> · extinct ~{formatAge(sp.t1)}</>}
-      </div>
-      <div className="dim">
-        generation ≈ {sp.genYears} y ({sp.genSource})
-      </div>
+        <div>
+          <dt>generation</dt>
+          <dd>
+            ≈ {sp.genYears} y <span className="dim">({sp.genSource})</span>
+          </dd>
+        </div>
+        <div>
+          <dt>data grade</dt>
+          <dd>{sp.grade}</dd>
+        </div>
+      </dl>
       {sp.history && sp.history.points.length > 0 && <HistorySpark key={sp.gid} h={sp.history} open={open} />}
     </div>
   );
