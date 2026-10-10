@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GAP_PX, OPEN_PX, layoutFan, leftAt, strandAt, type WidthMode } from './layout';
+import { CLOSE_MAX_PX, GAP_PX, OPEN_PX, layoutFan, leftAt, strandAt, type WidthMode } from './layout';
 import { PANTHERA } from './panthera';
 
 describe('fan strands', () => {
@@ -59,8 +59,7 @@ describe('fan packing', () => {
       for (let k = 1; k <= 400; k++) {
         const y = fan.time.y(0) * (k / 400);
         // Skip where gaps are still opening (above the fork) or an ended branch's slot is closing.
-        const ramp = OPEN_PX / sy;
-        if (y > -ramp || fan.branches.some((b) => y < b.tipY && y > b.tipY - ramp)) continue;
+        if (y > -OPEN_PX / sy || fan.branches.some((b) => y < b.tipY && y > b.tipY - CLOSE_MAX_PX / sy)) continue;
         for (const gap of gapsAt(fan, y)) {
           expect(gap).toBeGreaterThanOrEqual(-1e-9);
           expect(gap).toBeLessThanOrEqual((GAP_PX / sx) * 1.01);

@@ -13,8 +13,8 @@
 // centred, so as branches thin (and extinct ones end) their neighbours slide
 // in and the bundle narrows towards "now" like the stem does. Sideways moves
 // are shaped on screen, so they look the same at every zoom: gaps open over
-// OPEN_PX above the fork, an ended branch's slot closes over OPEN_PX above its
-// tip, and no edge drifts sideways steeper than DRIFT_SLOPE on screen (deeper
+// OPEN_PX above the fork, an ended branch's slot closes above its tip over a
+// height in proportion to its width on screen, and no edge drifts sideways steeper than DRIFT_SLOPE on screen (deeper
 // width zooms damp the drift, so zoomed-in columns stand upright).
 //
 // Width at any height = the individuals whose strands pass through it: every
@@ -45,8 +45,15 @@ export const TRUNK_LENGTH = 2400;
 export const TIME_H = 900;
 /** Gap between sibling branches on screen (px). */
 export const GAP_PX = 5;
-/** Height on screen (px) over which gaps open above the fork, and an ended branch's slot closes above its tip. */
+/** Height on screen (px) over which gaps open above the fork. */
 export const OPEN_PX = 40;
+/**
+ * An ended branch's slot closes above its tip over CLOSE_K × its width on
+ * screen (a sideways move's height in proportion to its size, so it is the
+ * same S at every zoom), at least OPEN_PX and at most CLOSE_MAX_PX.
+ */
+export const CLOSE_K = 3;
+export const CLOSE_MAX_PX = 240;
 /** Steepest on-screen sideways drift (dx/dy) packing gives a branch; beyond it the drift is damped. */
 export const DRIFT_SLOPE = 3;
 /**
@@ -196,7 +203,8 @@ export class Pack {
       const slot = new Float64Array(n);
       for (let j = 0; j < n; j++) {
         const b = bs[j];
-        const vis = y >= b.tipY ? 1 : 1 - smooth(((b.tipY - y) * this.sy) / OPEN_PX);
+        const ramp = Math.min(CLOSE_MAX_PX, Math.max(OPEN_PX, CLOSE_K * (this.tipW[j] + gapW) * this.sx));
+        const vis = y >= b.tipY ? 1 : 1 - smooth(((b.tipY - y) * this.sy) / ramp);
         const w = y >= b.tipY ? this.widths[j][k] : this.tipW[j];
         slot[j] = (w + gapW * open) * vis;
         T += slot[j];

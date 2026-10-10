@@ -18,6 +18,8 @@ export const GREEN = '#33bd66';
 export const GRAY = '#676e75';
 export const BG = '#0d1411';
 const WITHERED = '#6d675c';
+/** Least distance (px) between the labels of tips that end side by side. */
+const LABEL_PX = 30;
 
 export interface Selection {
   sp: SpeciesRec;
@@ -42,6 +44,11 @@ export class FanView implements InputHandlers {
   selected: SpeciesRec | null = null;
   selInd: { g: number; i: number } | null = null;
   onSelect: (sel: Selection | null) => void = () => {};
+  /** The width scale bar (a DOM element above the legend / cards): its bar and label are set each frame. */
+  scaleEl: HTMLElement | null = null;
+  private scaleKey = '';
+  /** `?debug`: a readout of the zooms, years on screen and individuals per px. */
+  readonly debug = typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug');
   /** What each branch's individuals view drew last frame (HUD, tests). */
   twigStats = new Map<number, TwigStats>();
   private models = new Map<string, TwigModel>();
@@ -340,9 +347,14 @@ export class FanView implements InputHandlers {
     this.drawTimeAxis(false);
     for (const b of this.fan.branches) this.drawStrand(b);
     for (const b of this.fan.branches) this.drawIndividuals(b);
-    // Labels by size: one that would overlap a bigger species' label waits for a closer zoom.
+    // Labels: tips side by side (the living all end at "now", packed hairlines in
+    // linear widths) are spread apart and joined to their tips by leader lines;
+    // then by size, one that would still overlap a bigger species' label waits for a closer zoom.
+    const lx = this.labelXs();
     const placed: number[][] = [];
-    for (const b of [...this.fan.branches].sort((p, q) => q.sp.ever - p.sp.ever)) this.drawLabel(b, placed);
+    for (const b of [...this.fan.branches].sort((p, q) => q.sp.ever - p.sp.ever)) this.drawLabel(b, placed, lx.get(b));
+    this.drawWidthScale();
+    if (this.debug) this.drawDebug();
     this.drawTrunkLabel();
     this.drawHud();
     this.drawTimeAxis(true);
@@ -482,11 +494,47 @@ export class FanView implements InputHandlers {
     else this.twigStats.delete(b.sp.gid);
   }
 
-  private drawLabel(b: FanBranch, placed: number[][]): void {
+  /**
+   * Screen x of each label whose tip shares its height with others: in tip
+   * order, at least LABEL_PX apart, as close to their tips as that allows and
+   * kept on screen.
+   */
+  private labelXs(): Map<FanBranch, number> {
+    const out = new Map<FanBranch, number>();
+    const tips = this.fan.branches
+      .map((b) => ({ b, p: this.toScreen(tipX(b, this.fan, this.mode), b.tipY) }))
+      .filter(({ b, p }) => p[0] > -30 && p[0] < this.w + 30 && p[1] > -10 && p[1] < this.h + 200 && !this.twigStats.has(b.sp.gid));
+    const groups = new Map<number, typeof tips>();
+    for (const t of tips) {
+      const k = Math.round(t.p[1] / 3);
+      groups.set(k, [...(groups.get(k) ?? []), t]);
+    }
+    const D = LABEL_PX;
+    for (const g of groups.values()) {
+      g.sort((a, c) => a.p[0] - c.p[0]);
+      const x = g.map((t) => t.p[0]);
+      // Spread apart about the group's middle, then keep on screen.
+      for (let i = 1; i < x.length; i++) x[i] = Math.max(x[i], x[i - 1] + D);
+      const shift = (x[x.length - 1] - g[g.length - 1].p[0]) / 2;
+      for (let i = 0; i < x.length; i++) x[i] -= shift;
+      for (let i = x.length - 2; i >= 0; i--) x[i] = Math.min(x[i], x[i + 1] - D);
+      const lo = 14 - x[0];
+      const hi = this.w - 14 - x[x.length - 1];
+      const d = lo > 0 ? lo : hi < 0 ? hi : 0;
+      g.forEach((t, i) => out.set(t.b, x[i] + d));
+    }
+    return out;
+  }
+
+  private drawLabel(b: FanBranch, placed: number[][], lx?: number): void {
     const ctx = this.ctx;
-    const [cx, cy] = this.toScreen(tipX(b, this.fan, this.mode), b.tipY);
-    if (cx < -30 || cx > this.w + 30 || cy < -10 || cy > this.h + 200) return;
+    const [tx, ty] = this.toScreen(tipX(b, this.fan, this.mode), b.tipY);
+    if (tx < -30 || tx > this.w + 30 || ty < -10 || ty > this.h + 200) return;
     if (this.twigStats.has(b.sp.gid)) return; // Zoomed into the individuals: the HUD names it.
+    // Moved off its tip: a leader line from the tip up to the label.
+    const lead = lx !== undefined && Math.abs(lx - tx) > 1.5 ? 14 : 0;
+    const cx = lead ? lx! : tx;
+    const cy = ty - lead;
     const name = b.sp.common;
     const sub = `${formatCount(b.sp.ever)} ever${b.sp.extinct ? ` · extinct ${formatAge(b.sp.t1)}` : ''}`;
     const fs = 15;
@@ -502,6 +550,14 @@ export class FanView implements InputHandlers {
       return;
     }
     placed.push(box);
+    if (lead) {
+      ctx.beginPath();
+      ctx.moveTo(tx, ty - 2);
+      ctx.lineTo(cx, cy - 4);
+      ctx.strokeStyle = 'rgba(200,214,205,0.55)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
     // Upright text running up from the tip.
     ctx.translate(cx, cy - 8);
     ctx.rotate(-Math.PI / 2);
@@ -513,6 +569,68 @@ export class FanView implements InputHandlers {
     ctx.font = `${fs * 0.72}px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif`;
     ctx.fillStyle = '#9faba3';
     ctx.fillText(sub, 0, fs * 0.55);
+    ctx.restore();
+  }
+
+  /**
+   * The width scale, like a map's: a bar and how many individuals its width
+   * holds at the current zoom (a round 1, 2 or 5 × 10^k). In log widths a
+   * width is 1 + log10(individuals), so the bar is the width that multiplies
+   * the individuals by 10 (or by 10^k, or by a factor, whichever fits).
+   */
+  widthScale(): { px: number; label: string } {
+    const f = this.fan;
+    const sumG = f.branches.reduce((a, b) => a + g1(b.sp.ever, this.mode), 0);
+    const unitPx = (f.trunkWidth / sumG) * this.cam.sx; // px per individual (linear) or per decade (log)
+    const target = 70;
+    if (this.mode === 'linear') {
+      const per = 1 / unitPx; // individuals per px
+      const n = Math.max(1, niceStep(target * per));
+      const px = n / per;
+      return { px, label: `${n === 1 ? '1 individual' : `${formatCount(n)} individuals`}` };
+    }
+    if (unitPx < target * 2.5) {
+      const k = Math.max(1, niceStep(target / unitPx));
+      return { px: k * unitPx, label: `×${k === 1 ? '10' : `10${sup(k)}`} individuals · log widths` };
+    }
+    const fct = Math.pow(10, target / unitPx);
+    return { px: target, label: `×${fct < 1.1 ? fct.toFixed(4) : fct.toFixed(2)} individuals · log widths` };
+  }
+
+  private drawWidthScale(): void {
+    const el = this.scaleEl;
+    if (!el) return;
+    const { px, label } = this.widthScale();
+    const key = `${px.toFixed(1)}|${label}`;
+    if (key === this.scaleKey) return;
+    this.scaleKey = key;
+    const bar = el.firstElementChild as HTMLElement | null;
+    const lab = el.lastElementChild as HTMLElement | null;
+    if (bar) bar.style.width = `${px.toFixed(1)}px`;
+    if (lab) lab.textContent = label;
+  }
+
+  private drawDebug(): void {
+    const c = this.cam;
+    const h = this.homeCamera();
+    const [, yTop] = this.toWorld(0, 0);
+    const [, yBot] = this.toWorld(0, this.h);
+    const yrs = this.camera.years(yBot) - this.camera.years(yTop);
+    const sumG = this.fan.branches.reduce((a, b) => a + g1(b.sp.ever, this.mode), 0);
+    const perPx = sumG / this.fan.trunkWidth / c.sx;
+    const lines = [
+      `width ×${(c.sx / h.sx).toPrecision(4)}  time ×${(c.sy / h.sy).toPrecision(4)} (asked ×${(c.ty / h.sy).toPrecision(3)})`,
+      `screen ${formatYearsAgo(yrs).replace(' ago', '')} · top ${formatYearsAgo(Math.max(0, this.camera.years(yTop)))}`,
+      `${this.mode === 'linear' ? `${perPx.toPrecision(3)} individuals/px` : `${perPx.toPrecision(3)} log units/px`} · pack ${this.fan.pack.fade().toFixed(2)}`,
+    ];
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.font = `11px ui-monospace, Menlo, monospace`;
+    ctx.fillStyle = 'rgba(10,16,13,0.8)';
+    ctx.fillRect(60, this.h * 0.5 - 4, this.w - 66, 46);
+    ctx.fillStyle = '#ffd479';
+    ctx.textBaseline = 'top';
+    lines.forEach((l, k) => ctx.fillText(l, 64, this.h * 0.5 + k * 14));
     ctx.restore();
   }
 
@@ -667,6 +785,19 @@ export class FanView implements InputHandlers {
 /** x of the middle of a branch's tip (branches are left-aligned). */
 function tipX(b: FanBranch, fan: Fan, mode: WidthMode): number {
   return leftAt(b, b.tipY) + strandAt(b, fan.time.ageAt(b.tipY), mode).w / 2;
+}
+
+/** Width units of n individuals: n (linear) or 1 + log10 n (log), as layout.ts g(). */
+function g1(n: number, mode: WidthMode): number {
+  if (!(n > 0)) return 0;
+  return mode === 'linear' ? n : 1 + Math.max(0, Math.log10(n));
+}
+
+function sup(k: number): string {
+  return String(k)
+    .split('')
+    .map((d) => '⁰¹²³⁴⁵⁶⁷⁸⁹'[Number(d)] ?? d)
+    .join('');
 }
 
 /** A round step (1, 2 or 5 × 10^k) near `x`. */

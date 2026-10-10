@@ -18,10 +18,12 @@ export function FanApp() {
   const viewRef = useRef<FanView | null>(null);
   const [mode, setMode] = useState<WidthMode>('linear');
   const [sel, setSel] = useState<Selection | null>(null);
+  const scaleRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const v = new FanView(canvasRef.current!, PANTHERA);
     v.onSelect = setSel;
+    v.scaleEl = scaleRef.current;
     viewRef.current = v;
     window.__fan = v;
     v.request();
@@ -51,6 +53,11 @@ export function FanApp() {
           Big cats
         </button>
       </div>
+      <div className="foot">
+        <div className="wscale" ref={scaleRef} aria-label="width scale">
+          <span className="wbar" />
+          <span className="wlab" />
+        </div>
       {sel ? (
         sel.ind ? (
           <IndCard sp={sel.sp} ind={sel.ind} onClose={() => viewRef.current?.tap(-1e6, -1e6)} />
@@ -64,6 +71,7 @@ export function FanApp() {
           width = individuals ever lived · tap or zoom a branch
         </div>
       )}
+      </div>
     </div>
   );
 }

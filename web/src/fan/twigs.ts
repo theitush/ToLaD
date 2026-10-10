@@ -438,6 +438,58 @@ export function threadEnds(v: TwigView, m: TwigModel, parent: Twig, child: Twig,
   return [px, py, v.toScreen(child.x, child.yBirth)[1]];
 }
 
+/** Spacing (px) of the flow lines drawn over a lane too wide for the screen whose strands are still too fine to show. */
+const FLOW_PX = 16;
+
+/**
+ * Never a featureless fill: where a lane is wider than half the screen but its
+ * strands are still under a pixel apart, faint lines every FLOW_PX follow the
+ * strands' flow (each keeps its fraction of the lane, like a strand), so the
+ * lane's lean and its edges always read. They are not individuals: the width
+ * scale says how many individuals a line spacing holds.
+ */
+function flowLines(
+  v: TwigView,
+  m: TwigModel,
+  yTop: number,
+  yBot: number,
+  L: { left: number; w: number; gw: number },
+  xr: (y: number) => [number, number],
+  alpha: [number, number],
+): void {
+  const ctx = v.ctx;
+  for (const alive of [false, true]) {
+    const a = alpha[alive ? 1 : 0];
+    if (a <= 0.01 || (alive && m.rec.extinct)) continue;
+    const lw = alive ? L.gw : L.w - L.gw;
+    const lanePx = lw * v.sx;
+    if (lanePx < 0.5 * v.w) continue;
+    const du = FLOW_PX / lanePx;
+    // Lane fractions on screen anywhere from the top to the bottom of the screen.
+    let u0 = 1;
+    let u1 = 0;
+    for (let k = 0; k <= 8; k++) {
+      const y = yTop + ((yBot - yTop) * k) / 8;
+      const Ly = m.lanes(y);
+      const l = alive ? Ly.left : Ly.left + Ly.gw;
+      const wy = Math.max(1e-300, alive ? Ly.gw : Ly.w - Ly.gw);
+      const [x0, x1] = xr(y);
+      u0 = Math.min(u0, (x0 - l) / wy);
+      u1 = Math.max(u1, (x1 - l) / wy);
+    }
+    u0 = Math.max(0, u0 - 3 * du);
+    u1 = Math.min(1, u1 + 3 * du);
+    const k0 = Math.ceil(u0 / du);
+    const k1 = Math.floor(u1 / du);
+    if (k1 - k0 > 400 || k1 < k0) continue;
+    const path = new Path2D();
+    for (let k = k0; k <= k1; k++) strandPath(v, m, k * du, alive, alive ? yTop : Math.max(yTop, v.yNow + DEAD_GAP_PX / v.sy), yBot, path);
+    ctx.strokeStyle = alive ? rgba('#123c22', 0.45 * a) : rgba('#1c2521', 0.32 * a);
+    ctx.lineWidth = 1;
+    ctx.stroke(path);
+  }
+}
+
 function rgba(hex: string, a: number): string {
   const n = parseInt(hex.slice(1), 16);
   return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a.toFixed(3)})`;
@@ -480,6 +532,8 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
   const cellGray = ((L.w - L.gw) / n) * v.sx;
   const cellGreen = (L.gw / n) * v.sx;
   const cellPx = Math.max(cellGray, cellGreen);
+  // Until the strands themselves show, flow lines keep a wide lane from being a flat fill.
+  flowLines(v, m, yTop, yBot, L, xr, [1 - Math.min(1, 1.5 * meshFade(cellGray)), 1 - Math.min(1, 1.5 * meshFade(cellGreen))]);
   if (cellPx < 1.5) return null;
   const fade = meshFade(cellGray);
   const fadeGreen = meshFade(cellGreen);
