@@ -21,7 +21,7 @@
 //   - zoom out: no further than the whole fan with a margin.
 //   - pan: some of the fan always stays on screen.
 
-import { laneAt, leftAt, strandAt, type Fan, type FanBranch } from './layout';
+import { laneAt, leftAt, type Fan, type FanBranch } from './layout';
 
 /** A span of this many years ... */
 export const MIN_YEARS = 10;
@@ -49,8 +49,8 @@ export interface CellModel {
   size(g: number): number;
   generationAt(y: number): number;
   readonly GL: number;
-  /** Index slots of the green lane (twigs.ts TwigModel.nLive). */
-  readonly nLive: number;
+  /** World width of one individual (one slot, either lane) at height y (twigs.ts TwigModel.pitch). */
+  pitch(y: number): number;
 }
 
 export class FanCamera {
@@ -183,20 +183,9 @@ export class FanCamera {
     return Math.exp(lo);
   }
 
-  /** On-screen spacing cell (world) of the thinnest lane of a branch at height y. */
+  /** World width of one individual of a branch at height y: one slot, the same in both lanes. */
   cellAt(b: FanBranch, y: number): number {
-    const t = this.fan.time;
-    const m = this.model(b);
-    const age = t.ageAt(y);
-    const n = Math.max(1, m.size(m.generationAt(y)));
-    const st = laneAt(b, y);
-    const gw = st.gw;
-    // The dead's lane closes at the tip; size its cells a couple of generations below it.
-    const stF = strandAt(b, Math.max(age, b.sp.t1 + (2 * m.GL) / 1e6), this.fan.mode);
-    let cell = Infinity;
-    if (gw > 0) cell = Math.min(cell, gw / Math.max(1, m.nLive));
-    if (stF.w - gw > 0) cell = Math.min(cell, (stF.w - gw) / n);
-    return cell;
+    return this.model(b).pitch(y);
   }
 
   /** The deepest width zoom allowed at world point (wx, wy) (time zoom sy: kept for callers, unused). */
