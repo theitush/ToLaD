@@ -1,47 +1,54 @@
 import { describe, expect, it } from 'vitest';
 import { FanCamera } from './camera';
-import { laneAt, layoutFan, leftAt, strandAt } from './layout';
+import { laneAt, layoutFan, leftAt } from './layout';
 import { PANTHERA } from './panthera';
-import { MESH_F, shadeMesh, type MeshInst } from './mesh';
+import { isTree, shadeMesh, shadeTree, unpackInst, type MeshInst, type TreeInst } from './mesh';
 import { MeshBatch, rgb01 } from './meshgl';
-import { drawTwigs, kLogAt, LINEAGE, LIVING, SCALE_BAR_PX, TEXTURE_IND, textureFade, TWIG_GRAY, TWIG_WITHERED, TwigModel, type TwigView } from './twigs';
+import { drawTwigs, kLogAt, LINEAGE, LIVING, SCALE_BAR_PX, TEXTURE_IND, textureFade, treeLevel, TWIG_GRAY, TWIG_WITHERED, TwigModel, type TwigView } from './twigs';
 
 const PAL = [LIVING, LINEAGE, TWIG_GRAY, TWIG_WITHERED].map(rgb01);
 
-/** Unpack the batch's instances (meshgl.ts layout, mesh.ts packInst). */
-function unpack(b: MeshBatch): MeshInst[] {
-  const out: MeshInst[] = [];
+/** Unpack the batch's instances (meshgl.ts layout, mesh.ts packInst / packTree). */
+function unpack(b: MeshBatch): { mesh: MeshInst[]; tree: TreeInst[] } {
+  const mesh: MeshInst[] = [];
+  const tree: TreeInst[] = [];
   for (let k = 0; k < b.n; k++) {
-    const f = b.f.subarray(k * MESH_F, (k + 1) * MESH_F);
-    const u = b.u.subarray(k * 8, (k + 1) * 8);
-    out.push({
-      x0: f[0], y0: f[1], x1: f[2], y1: f[3], slotX0: f[4], slotDx: f[5], lw: f[6], fineA: f[7], p0: f[8], T0: f[9], A: f[10], gBoff: f[11],
-      alpha: f[12], mode: f[13] as 0 | 1, lane: f[14], tipR: f[15], GL: f[16], Lm: f[17], nowRel: f[18],
-      iBase: u[0], iStep: u[1], nA: u[2], nB: u[3], seedA: u[4], seedB: u[5], thrA: u[6], thrB: u[7],
-    });
+    const x = unpackInst(b.f, b.u, k);
+    if (isTree(x)) tree.push(x);
+    else mesh.push(x);
   }
-  return out;
+  return { mesh, tree };
 }
 
 /** Shade a grid of screen points through the CPU mirror of the shader: lit pixels and their colours. */
-function shadeScreen(v: TwigView, c: FanCamera, insts: MeshInst[], step = 3) {
+function shadeScreen(v: TwigView, c: FanCamera, insts: (MeshInst | TreeInst)[], step = 3, x0 = 0, x1 = c.w) {
   const kLog = kLogAt(v, c.fan.time, c.cam.cy);
   const nowPx = c.toScreen(0, c.yNow)[1];
-  let lit = 0;
+  // Each instance over its own rectangle only (a grid of rows `step` px apart, every px across).
+  const rows = Math.ceil(c.h / step);
+  const cols = Math.ceil(x1 - x0);
+  const hit = new Uint8Array(rows * cols);
   const colours = new Set<string>();
-  for (let py = 0.5; py < c.h; py += step) {
-    for (let px = 0.5; px < c.w; px += 1) {
-      for (const m of insts) {
-        const [r, g, b, a] = shadeMesh(m, px, py, kLog, nowPx, PAL);
+  for (const m of insts) {
+    const r0 = Math.max(0, Math.ceil((m.y0 - 0.5) / step));
+    const r1 = Math.min(rows - 1, Math.floor((m.y1 - 0.5) / step));
+    const q0 = Math.max(0, Math.ceil(m.x0 - x0 - 0.5));
+    const q1 = Math.min(cols - 1, Math.floor(m.x1 - x0 - 0.5));
+    for (let rr = r0; rr <= r1; rr++) {
+      const py = rr * step + 0.5;
+      for (let q = q0; q <= q1; q++) {
+        if (hit[rr * cols + q]) continue;
+        const px = x0 + q + 0.5;
+        const [r, g, b, a] = isTree(m) ? shadeTree(m, px, py, PAL) : shadeMesh(m, px, py, kLog, nowPx, PAL);
         if (a > 0.02) {
-          lit++;
+          hit[rr * cols + q] = 1;
           colours.add([r, g, b].map((x) => Math.round(x * 20)).join(','));
-          break;
         }
       }
     }
   }
-  return { lit, colours };
+  const lit = hit.reduce((a, b) => a + b, 0);
+  return { lit, n: rows * cols, colours };
 }
 
 const lionIdx = PANTHERA.species.findIndex((s) => s.common === 'Lion');
@@ -91,8 +98,12 @@ function stubView(c: FanCamera) {
   return { v, strokes };
 }
 
-/** A camera on the lion's green lane 40 years ago, the width scale bar reading `perBar` individuals. */
-function at(perBar: number) {
+/**
+ * A camera on the lion `ago` years back, the width scale bar reading `perBar`
+ * individuals, time zoom sy; centred on the boundary of its lanes (green left
+ * of the middle, gray right), or `at` of the way across its column.
+ */
+function at(perBar: number, ago = 3000, sy = 40, at?: number) {
   const f = layoutFan(PANTHERA, 'linear');
   const c = new FanCamera(f, (b) => new TwigModel(b, f.time, 'linear'));
   c.w = 390;
@@ -101,82 +112,88 @@ function at(perBar: number) {
   // view.ts widthScale: px per individual = trunkWidth / Σ ever · sx; the bar is SCALE_BAR_PX long.
   const sx = ((SCALE_BAR_PX / perBar) * sumEver) / f.trunkWidth;
   const b = f.branches[lionIdx];
-  const age = 40e-6;
-  const y = f.time.y(age);
-  const st = strandAt(b, age, 'linear');
-  c.cam = { cx: leftAt(b, y) + (st.w * st.f) / 2, cy: y, sx, sy: 50, ty: 50 };
+  const y = f.time.y(ago * 1e-6);
+  c.cam = { cx: 0, cy: y, sx, sy, ty: sy };
   c.settle();
+  const L = laneAt(b, c.cam.cy);
+  c.cam.cx = leftAt(b, y) + (at === undefined ? L.gw : L.w * at);
   return { c, b, m: new TwigModel(b, f.time, 'linear') };
 }
 
-describe('the living texture', () => {
-  it('fades in as the width scale bar reads ~100 individuals, while the strands are still sub-pixel', () => {
+describe('the tree texture, then the individuals', () => {
+  it('the individuals fade in as the width scale bar reads ~100 individuals; above that, the tree', () => {
     expect(textureFade(1000)).toBe(0);
     expect(textureFade(TEXTURE_IND[0])).toBe(0);
-    expect(textureFade(100)).toBeGreaterThan(0.25);
+    expect(textureFade(50)).toBeGreaterThan(0.25);
     expect(textureFade(TEXTURE_IND[1])).toBe(1);
-    for (const [perBar, shows] of [
-      [1000, false],
-      [100, true],
-      [60, true],
+    expect(TEXTURE_IND[0]).toBeLessThanOrEqual(120);
+    for (const [perBar, tree, mesh] of [
+      [1e6, true, false],
+      [1000, true, false],
+      [100, true, false],
+      [50, true, true],
+      [20, false, true],
     ] as const) {
       const { c, b, m } = at(perBar);
       const { v } = stubView(c);
       const st = drawTwigs(v, b, m, null);
-      const insts = unpack(v.mesh!).filter((x) => x.lane === 0 && x.alpha > 0.01);
-      if (!shows) {
-        expect(insts.length).toBe(0);
-        continue;
-      }
-      // Under a pixel per individual, the lives themselves not yet shown...
-      const L = m.lanes(c.cam.cy);
-      expect((L.gw / m.size(m.generationAt(c.cam.cy))) * c.cam.sx).toBeLessThan(1.5);
-      expect(insts.every((x) => x.mode === 0)).toBe(true);
-      // ...but the texture of real lives is lit across the lane (not a flat fill: some pixels dark), and the lane dims under it.
-      const { lit } = shadeScreen(v, c, insts);
+      const { mesh: mi, tree: ti } = unpack(v.mesh!);
+      expect(ti.some((x) => x.alpha > 0.01)).toBe(tree);
+      expect(mi.some((x) => x.alpha > 0.01)).toBe(mesh);
+      // Lit, not a flat fill (some pixels dark), and the lanes dim under it.
+      const { lit, n } = shadeScreen(v, c, [...ti, ...mi]);
       expect(lit).toBeGreaterThan(1000);
-      expect(lit).toBeLessThan((c.w * c.h) / 3);
+      expect(lit).toBeLessThan(n * (mesh ? 0.8 : 0.45));
       expect(st?.fadeGreen ?? 0).toBeGreaterThan(0.25);
+      expect(st?.texGray ?? 0).toBeGreaterThan(0.25);
+    }
+  });
+
+  it('density follows width = individuals: across the scale bar, about N individuals in either lane', () => {
+    for (const N of [30, 1e2, 1e3, 1e4, 5e4]) {
+      for (const lane of ['green', 'gray'] as const) {
+        const { c, b, m } = at(N);
+        const { v } = stubView(c);
+        drawTwigs(v, b, m, null);
+        const { mesh, tree } = unpack(v.mesh!);
+        const xG = c.toScreen(leftAt(b, c.cam.cy) + laneAt(b, c.cam.cy).gw, c.cam.cy)[0];
+        // One scale bar's width inside the lane, clear of the boundary.
+        // (A green lane narrower than the bar: the lane, and the individuals in it.)
+        const xL = c.toScreen(leftAt(b, c.cam.cy), c.cam.cy)[0];
+        const [w0, w1] = lane === 'green' ? [Math.max(xL + 2, xG - 4 - SCALE_BAR_PX), xG - 4] : [xG + 4, xG + 4 + SCALE_BAR_PX];
+        const pitchPx = m.pitch(c.cam.cy) * c.cam.sx;
+        const inWindow = (w1 - w0) / pitchPx;
+        if (lane === 'green' && N > 2e4) expect(inWindow).toBeLessThan(N); // the living: ~23 thousand
+        if (N < TEXTURE_IND[1]) {
+          // The individuals themselves: one slot (one life) per individual.
+          const lives = mesh.filter((x) => x.mode === 1 && x.alpha > 0.5);
+          expect(lives.length).toBeGreaterThan(0);
+          for (const x of lives) expect(x.slotDx).toBeCloseTo(pitchPx, 6);
+          const slots = Math.round(SCALE_BAR_PX / lives[0].slotDx);
+          expect(slots).toBeGreaterThan(N * 0.8);
+          expect(slots).toBeLessThan(N * 1.25);
+          continue;
+        }
+        // The tree: distinct strands across the bar, each standing for 2^L individuals.
+        const { L } = treeLevel(pitchPx);
+        const xs = new Set(tree.filter((t) => t.alpha > 0.3 && t.xm >= w0 && t.xm < w1).map((t) => t.xm.toFixed(3)));
+        const represented = xs.size * 2 ** L;
+        expect(xs.size).toBeGreaterThanOrEqual(4); // strands, not one fat line
+        expect(represented).toBeGreaterThan(inWindow / 2.2);
+        expect(represented).toBeLessThan(inWindow * 2.2);
+      }
     }
   });
 });
 
-/** A camera on the lion's gray (dead) lane `ago` years back, the width scale bar reading `perBar` individuals. */
-function atGray(perBar: number, ago: number, sy = 5) {
-  const f = layoutFan(PANTHERA, 'linear');
-  const c = new FanCamera(f, (b) => new TwigModel(b, f.time, 'linear'));
-  c.w = 390;
-  c.h = 844;
-  const sumEver = f.branches.reduce((a, b) => a + b.sp.ever, 0);
-  const sx = ((SCALE_BAR_PX / perBar) * sumEver) / f.trunkWidth;
-  const b = f.branches[lionIdx];
-  const y = f.time.y(ago * 1e-6);
-  c.cam = { cx: 0, cy: y, sx, sy, ty: sy };
-  c.settle();
-  // The lanes at the step grid of this time zoom.
-  const L = laneAt(b, y);
-  c.cam.cx = leftAt(b, y) + L.gw + (L.w - L.gw) / 2;
-  return { c, b, m: new TwigModel(b, f.time, 'linear') };
-}
-
-describe('the dead texture', () => {
-  it('shows real lives, not a flat fill, from ~100 individuals per scale bar or as soon as slots are pixels apart', () => {
-    for (const [perBar, shows] of [
-      [1e7, false],
-      [1000, true],
-      [100, true],
-    ] as const) {
-      // 2000 years ago, thousands of years on screen: far too many lives to draw them all.
-      const { c, b, m } = atGray(perBar, 2000);
+describe('the dead lane', () => {
+  it('shows real lives, gray and pale green mixed, once the bar reads under ~100 individuals', () => {
+    for (const ago of [2000, 2e5]) {
+      const { c, b, m } = at(20, ago, 5, 0.7);
       const { v } = stubView(c);
       const st = drawTwigs(v, b, m, null);
-      const insts = unpack(v.mesh!).filter((x) => x.lane !== 0 && x.alpha > 0.01);
-      if (!shows) {
-        expect(insts.length).toBe(0);
-        expect(st?.texGray ?? 0).toBe(0);
-        continue;
-      }
-      // Lives are lit across the screen, gray and pale green mixed, and the gray lane dims under them.
+      const insts = unpack(v.mesh!).mesh.filter((x) => x.alpha > 0.01);
+      expect(insts.length).toBeGreaterThan(0);
       const { lit, colours } = shadeScreen(v, c, insts, 4);
       expect(lit).toBeGreaterThan(100);
       expect(colours.size).toBeGreaterThan(1);
@@ -185,7 +202,7 @@ describe('the dead texture', () => {
   });
 
   it('draws the real individuals: their own births, deaths and lifespans', () => {
-    const { c, m } = atGray(100, 2000, 50);
+    const { c, m } = at(100, 2000, 50);
     const g = m.generationAt(c.cam.cy);
     const lives = Array.from({ length: 64 }, (_, k) => m.twig(g, k * 37)).filter((t) => !t.alive);
     const spans = lives.map((t) => t.yBirth - t.yDeath);

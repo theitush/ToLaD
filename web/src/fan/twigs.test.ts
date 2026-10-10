@@ -63,15 +63,13 @@ describe('width = individuals', () => {
         expect(L.w).toBeCloseTo(st.w, 12);
         expect(L.gw).toBeCloseTo(st.w * st.f, 12);
         expect(L.left).toBeCloseTo(leftAt(b, y), 12);
-        for (const alive of [false, true]) {
-          const lo = alive ? L.left : L.left + L.gw;
-          const hi = alive ? L.left + L.gw : L.left + L.w;
-          expect(m.indexRange(g, lo - 1, hi + 1, y, alive)).toEqual([0, m.size(g)]);
-          const x = m.xAt(m.u(g, 777), y, alive);
-          const [i0, i1] = m.indexRange(g, x - 1e-15, x + 1e-15, y, alive);
-          expect(i0).toBeLessThanOrEqual(777);
-          expect(i1).toBeGreaterThan(777);
-        }
+        // One lattice of slots, one individual wide, across the column: green lane first.
+        const P = m.pitch(y);
+        expect(m.slotX(0, y) - P / 2).toBeCloseTo(L.left, 12);
+        expect(Math.abs(m.greenSlots(y) * P - L.gw)).toBeLessThanOrEqual(P);
+        expect(m.totalSlots(y) * P).toBeCloseTo(L.w, 9);
+        for (const K of [0, 777, Math.floor(m.totalSlots(y)) - 1]) expect(m.slotAt(m.slotX(K, y), y)).toBe(K);
+        if (f === fanLin) expect(P).toBe(b.width / b.sp.ever); // linear: the fan's width per individual, everywhere
       }
     }
   });
@@ -87,22 +85,22 @@ describe('width = individuals', () => {
           const st = laneAt(b, y);
           const gw = st.w * st.f;
           const left = leftAt(b, y);
-          // The union of the slots' cells is exactly the branch: green lane, then gray lane.
-          expect(m.xAt(m.u(g, 0), y, true) - gw / n / 2).toBeCloseTo(left, 9);
-          expect(m.xAt(m.u(g, n - 1), y, true) + gw / n / 2).toBeCloseTo(left + gw, 9);
-          expect(m.xAt(m.u(g, 0), y, false) - (st.w - gw) / n / 2).toBeCloseTo(left + gw, 9);
-          expect(m.xAt(m.u(g, n - 1), y, false) + (st.w - gw) / n / 2).toBeCloseTo(left + st.w, 9);
-          for (const i of [1, 77, n >> 1, n - 2]) {
+          for (const i of [0, 1, 77, n >> 1, n - 2, n - 1]) {
             for (const alive of [false, true]) {
-              const x = m.xAt(m.u(g, i), y, alive);
+              const K = m.slotOf(g, i, alive, y);
+              if (K === null) continue;
+              const x = m.slotX(K, y);
               expect(x).toBeGreaterThanOrEqual(left);
               expect(x).toBeLessThanOrEqual(left + st.w);
+              // The living are in the green lane.
+              if (alive) expect(x).toBeLessThan(left + gw);
             }
           }
         }
       }
     }
   });
+
 
   it('a dead individual with a living descendant is green; a line that ended is gray', () => {
     const m = lion(fanLin);
@@ -159,7 +157,7 @@ describe('determinism and links', () => {
       expect(a.sp.handle(ad)).toBe(b.sp.handle(ad));
       const t = a.twig(g, i);
       const ym = (t.yBirth + t.yDeath) / 2;
-      expect(a.hit(a.xAt(t.u, ym, t.alive), ym, 1e-9)).toEqual({ g, i });
+      expect(a.hit(a.slotX(t.K, ym), ym, 1e-12)).toEqual({ g, i });
     }
   });
 
@@ -176,7 +174,7 @@ describe('determinism and links', () => {
         expect(p.generation).toBe(g - 1);
         const pt = m.twig(p.generation, Number(p.index));
         // The link's parent end is on the parent's twig, at x(parent) and below the child's birth.
-        expect(pt.x).toBe(m.xAt(m.u(p.generation, Number(p.index)), pt.yBirth, pt.alive));
+        expect(pt.x).toBe(m.slotX(pt.K, pt.yBirth));
         expect(pt.yBirth).toBeGreaterThan(child.yBirth);
         const ch = m.sp.children(p);
         expect(BigInt(i) >= ch.start && BigInt(i) < ch.start + ch.count).toBe(true);
@@ -205,7 +203,7 @@ describe('determinism and links', () => {
             expect(py).toBeLessThanOrEqual(pt.yBirth);
             expect(py).toBeGreaterThanOrEqual(Math.min(pt.yBirth, pt.yDeath));
             expect(py).toBeGreaterThanOrEqual(child.yBirth);
-            expect(px).toBe(m.xAt(pt.u, py, pt.alive));
+            expect(px).toBe(m.slotX(pt.K, py));
           }
         }
       }
@@ -220,8 +218,7 @@ describe('determinism and links', () => {
       for (const u of [0.1, 0.5, 0.9]) {
         const x = m.nearestLiving(L.left + u * L.gw, y);
         expect(x).not.toBeNull();
-        const i = Math.floor(((x! - L.left) / L.gw) * m.size(m.G - 1));
-        expect(m.livingSlot(i)).toBe(true);
+        expect(m.livingSlot(m.slotAt(x!, y), y)).toBe(true);
         expect(m.nearestLiving(L.left + u * L.gw, y)).toBe(x); // deterministic
       }
     }

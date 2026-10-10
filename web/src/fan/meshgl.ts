@@ -45,6 +45,7 @@ layout(location = 4) in vec4 aMisc;
 layout(location = 5) in vec4 aLife;
 layout(location = 6) in uvec4 aIdx;
 layout(location = 7) in uvec4 aSeed;
+layout(location = 8) in uvec4 aIdx2;
 uniform vec2 uView;
 out vec2 vP;
 flat out vec4 vRect;
@@ -54,10 +55,11 @@ flat out vec4 vMisc;
 flat out vec4 vLife;
 flat out uvec4 vIdx;
 flat out uvec4 vSeed;
+flat out uvec4 vIdx2;
 void main() {
   vec2 p = mix(aRect.xy, aRect.zw, corner);
   vP = p;
-  vRect = aRect; vSlot = aSlot; vTime = aTime; vMisc = aMisc; vLife = aLife; vIdx = aIdx; vSeed = aSeed;
+  vRect = aRect; vSlot = aSlot; vTime = aTime; vMisc = aMisc; vLife = aLife; vIdx = aIdx; vSeed = aSeed; vIdx2 = aIdx2;
   gl_Position = vec4(p.x / uView.x * 2.0 - 1.0, 1.0 - p.y / uView.y * 2.0, 0.0, 1.0);
 }`;
 
@@ -67,12 +69,13 @@ precision highp int;
 ${HASH_GLSL}
 in vec2 vP;
 flat in vec4 vRect;
-flat in vec4 vSlot;   // slotX0, slotDx, lw, fineA
-flat in vec4 vTime;   // p0, T0, A, gBoff
+flat in vec4 vSlot;   // slotX0, slotDx, lw, fineA          (tree: xm, xp, lw, -)
+flat in vec4 vTime;   // p0, T0, A, gBoff                   (tree: yA, yB, J, -)
 flat in vec4 vMisc;   // alpha, mode, lane, tipR
-flat in vec4 vLife;   // GL, Lm, nowRel, -
+flat in vec4 vLife;   // GL, Lm, nowRel, xG                 (tree: aliveY, -, -, xG)
 flat in uvec4 vIdx;   // iBase, iStep, nA, nB
 flat in uvec4 vSeed;  // seedA, seedB, thrA, thrB
+flat in uvec4 vIdx2;  // iBaseB, nG, fold, -
 uniform float uKLog;
 uniform float uNowPx;
 uniform vec3 uPal[4];
@@ -99,20 +102,13 @@ int code(float lane, bool alive, bool lin) {
   if (lane > 1.5) return 3;
   return lin ? 1 : 2;
 }
-void main() {
-  vec2 p = vP;
-  float j = floor((p.x - vSlot.x) / vSlot.y + 0.5);
-  if (j < 0.0) discard;
-  float d = abs(p.x - (vSlot.x + j * vSlot.y));
-  // Nothing to draw this far from the strand (before any hashing: most pixels stop here).
-  // (Only the living glow, and they are only in the green lane.)
-  float reach = vMisc.y < 0.5 ? max(vSlot.z, 1.0) * 0.5 + 0.5 : max(vMisc.w, vSlot.z * 0.5 + (vMisc.z < 0.5 ? 5.0 : 0.0)) + 0.5;
-  if (d > reach) discard;
-  uint i = vIdx.x + uint(j) * vIdx.y;
-  float fine = (vSlot.w < 1.0 && (uint(j) & 1u) == 1u) ? vSlot.w : 1.0;
+// One lane's look at one slot: colour and coverage (not premultiplied). mesh.ts shadeLane.
+vec4 shadeLane(float lane, uint iA, uint iB, float d, vec2 p) {
   float GL = vLife.x;
   float Lm = vLife.y;
   float nowRel = vLife.z;
+  uint nG = vIdx2.y;
+  uint fold = lane < 0.5 ? vIdx2.z : 1u;
   if (vMisc.y < 0.5) {
     float cov = 0.0;
     vec3 col = vec3(0.0);
@@ -121,38 +117,96 @@ void main() {
       if (s == 1 && !(vTime.w > 0.0)) break;
       ns += 1.0;
       uint n = s == 0 ? vIdx.z : vIdx.w;
-      if (i >= n) continue;
+      uint i0 = s == 0 ? iA : iB;
+      if (n == 0u) continue;
       float gOff = s == 0 ? 0.0 : vTime.w * GL;
-      vec4 L = life(s == 0 ? vSeed.x : vSeed.y, i, GL, Lm, nowRel - gOff, s == 0 ? vSeed.z : vSeed.w);
-      int c = code(vMisc.z, L.z > 0.5, L.w > 0.5);
-      if (c < 0) continue;
-      float cv = max(0.0, min(L.x + L.y, nowRel - gOff) - L.x);
-      cov += cv;
-      col += cv * uPal[c];
+      for (uint c = 0u; c < fold; c++) {
+        uint i = i0 + c * nG;
+        if (c > 0u && i >= n) break;
+        vec4 L = life(s == 0 ? vSeed.x : vSeed.y, i, GL, Lm, nowRel - gOff, s == 0 ? vSeed.z : vSeed.w);
+        if (c > 0u && L.z < 0.5) continue;
+        int k = code(lane, L.z > 0.5, L.w > 0.5);
+        if (k < 0) continue;
+        float cv = max(0.0, min(L.x + L.y, nowRel - gOff) - L.x);
+        cov += cv;
+        col += cv * uPal[k];
+      }
     }
-    if (!(cov > 0.0)) discard;
-    float a = min(1.0, cov / (ns * GL)) * vMisc.x * fine * lineAA(d, vSlot.z);
-    o = vec4(col / cov * a, a);
+    if (!(cov > 0.0)) return vec4(0.0);
+    return vec4(col / cov, min(1.0, cov / (ns * GL)) * lineAA(d, vSlot.z));
+  }
+  float best = 0.0;
+  int bc = -1;
+  for (uint c = 0u; c < fold; c++) {
+    uint i = iA + c * nG;
+    if (c > 0u && i >= vIdx.z) break;
+    vec4 L = life(vSeed.x, i, GL, Lm, nowRel, vSeed.z);
+    bool alive = L.z > 0.5;
+    if (c > 0u && !alive) continue;
+    int k = code(lane, alive, L.w > 0.5);
+    if (k < 0) continue;
+    float kl = LN2 * uKLog;
+    float birthPx = vTime.x + log1ps((vTime.y - L.x) / vTime.z) / kl;
+    float topPx = vTime.x + log1ps((vTime.y - min(L.x + L.y, nowRel)) / vTime.z) / kl;
+    if (!alive) topPx = max(topPx, uNowPx + 3.0);
+    if (topPx > birthPx) continue;
+    float dy = max(0.0, max(topPx - p.y, p.y - birthPx));
+    float dLine = length(vec2(d, dy)) - vSlot.z * 0.5;
+    float dDot = length(vec2(d, p.y - topPx)) - vMisc.w;
+    float a = clamp(0.5 - min(dLine, dDot), 0.0, 1.0);
+    // The living glow softly.
+    if (k == 0) { float g = clamp(1.0 - dLine / 5.0, 0.0, 1.0); a = max(a, 0.35 * g * g); }
+    if (a > best) { best = a; bc = k; }
+  }
+  if (bc < 0) return vec4(0.0);
+  return vec4(uPal[bc], best);
+}
+void main() {
+  vec2 p = vP;
+  float xG = vLife.w;
+  if (vMisc.y > 1.5) {
+    // The tree texture: one strand segment (mesh.ts shadeTree).
+    float yA = vTime.x;
+    float yB = vTime.y;
+    float J = vTime.z;
+    if (p.y > yA) discard;
+    float yc = clamp(p.y, yB, yA);
+    float s = clamp((yA - yc) / J, 0.0, 1.0);
+    float xm = vSlot.x;
+    float xp = vSlot.y;
+    float xu = xp + (xm - xp) * s * s * (3.0 - 2.0 * s);
+    float slope = (xm - xp) * 6.0 * s * (1.0 - s) / J;
+    float dx = abs(p.x - xu);
+    float d = p.y < yB ? length(vec2(dx, yB - p.y)) : dx / sqrt(1.0 + slope * slope);
+    float a = lineAA(d, vSlot.z) * vMisc.x;
+    if (!(a > 0.0)) discard;
+    float wg = clamp(xG - p.x + 0.5, 0.0, 1.0);
+    vec3 c = mix(uPal[vMisc.z > 1.5 ? 3 : 2], uPal[p.y < vLife.x ? 0 : 1], wg);
+    o = vec4(c * a, a);
     return;
   }
-  if (i >= vIdx.z) discard;
-  vec4 L = life(vSeed.x, i, GL, Lm, nowRel, vSeed.z);
-  bool alive = L.z > 0.5;
-  int c = code(vMisc.z, alive, L.w > 0.5);
-  if (c < 0) discard;
-  float k = LN2 * uKLog;
-  float birthPx = vTime.x + log1ps((vTime.y - L.x) / vTime.z) / k;
-  float topPx = vTime.x + log1ps((vTime.y - min(L.x + L.y, nowRel)) / vTime.z) / k;
-  if (!alive) topPx = max(topPx, uNowPx + 3.0);
-  if (topPx > birthPx) discard;
-  float dy = max(0.0, max(topPx - p.y, p.y - birthPx));
-  float dLine = length(vec2(d, dy)) - vSlot.z * 0.5;
-  float dDot = length(vec2(d, p.y - topPx)) - vMisc.w;
-  float a = clamp(0.5 - min(dLine, dDot), 0.0, 1.0);
-  // The living glow softly.
-  if (c == 0) { float g = clamp(1.0 - dLine / 5.0, 0.0, 1.0); a = max(a, 0.35 * g * g); }
-  a *= vMisc.x;
-  o = vec4(uPal[c] * a, a);
+  float j = floor((p.x - vSlot.x) / vSlot.y + 0.5);
+  if (j < 0.0) discard;
+  float lineX = vSlot.x + j * vSlot.y;
+  float d = abs(p.x - lineX);
+  // Nothing to draw this far from the slot (before any hashing: most pixels stop here).
+  // (Only the living glow, and they are only in the green lane.)
+  float reach = vMisc.y < 0.5 ? max(vSlot.z, 1.0) * 0.5 + 0.5 : max(vMisc.w, vSlot.z * 0.5 + (xG > vRect.x ? 5.0 : 0.0)) + 0.5;
+  if (d > reach) discard;
+  uint iA = vIdx.z > 0u ? (vIdx.x + uint(j) * vIdx.y) % vIdx.z : 0u;
+  uint iB = vIdx.w > 0u ? (vIdx2.x + uint(j) * vIdx.y) % vIdx.w : 0u;
+  float fine = (vSlot.w < 1.0 && (uint(j) & 1u) == 1u) ? vSlot.w : 1.0;
+  // Where the lanes meet, the slot's colours blend by how much of it is in each.
+  float wg = clamp((xG - lineX) / vSlot.y + 0.5, 0.0, 1.0);
+  vec4 g = wg > 0.0 ? shadeLane(0.0, iA, iB, d, p) : vec4(0.0);
+  vec4 r = wg < 1.0 ? shadeLane(vMisc.z, iA, iB, d, p) : vec4(0.0);
+  float ag = g.a * wg;
+  float ar = r.a * (1.0 - wg);
+  float a = ag + ar;
+  if (!(a > 0.0)) discard;
+  vec3 c = (g.rgb * ag + r.rgb * ar) / a;
+  a *= vMisc.x * (vMisc.y < 0.5 ? fine : 1.0);
+  o = vec4(c * a, a);
 }`;
 
 function compile(gl: WebGL2RenderingContext, vs: string, fs: string): WebGLProgram {
@@ -273,7 +327,7 @@ export class FanGL {
     }
     this.meshUBuf = gl.createBuffer()!;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.meshUBuf);
-    for (let k = 0; k < 2; k++) {
+    for (let k = 0; k < 3; k++) {
       gl.enableVertexAttribArray(6 + k);
       gl.vertexAttribIPointer(6 + k, 4, gl.UNSIGNED_INT, MESH_U * 4, k * 16);
       gl.vertexAttribDivisor(6 + k, 1);
