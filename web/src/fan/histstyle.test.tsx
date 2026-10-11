@@ -213,9 +213,8 @@ describe('the species card: the population at the time touched', () => {
         for (const jargon of ['grade', 'model', 'generation', 'range', 'Myr', 'kyr', '≈', 'lineage', 'curated', ' × 10', 'born in total', 'line ended'])
           expect(f, `${sp.common}: "${jargon}" on the face`).not.toContain(jargon);
         // A few short lines: the face stays tight.
-        // (Under 250: every cat now carries its status chip, ToLaD#48, up to "Critically Endangered" long; since ToLaD#145
-        // the data's fossil cats have no English name, so a long binomial like Amphimachairodus giganteus is the title.)
-        expect(f.replace(/Population over time[\s\S]*$/, '').length, sp.common).toBeLessThan(250);
+        // (Under 230: every cat now carries its status chip, ToLaD#48, up to "Critically Endangered" long.)
+        expect(f.replace(/Population over time[\s\S]*$/, '').length, sp.common).toBeLessThan(230);
         const d = details(html);
         expect(d).toContain('Generation');
         expect(d).toContain(`Data grade${sp.grade}`);

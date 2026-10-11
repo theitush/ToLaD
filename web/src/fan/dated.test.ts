@@ -41,6 +41,10 @@ describe('the dated tree from the data', () => {
     // southern tiger cat Upham lacks
     const living = FELIDAE.species.filter((s) => !s.extinct);
     expect(living.length).toBeGreaterThanOrEqual(38);
+    // FAN_PLACEMENT (phylogeny+overrides): the fan's fossils are the overrides' [[dated_fossil]] cats only; the ~98 the data
+    // grafts by taxonomy (PBDB genus at first appearance) stay in the data and the tiles
+    expect(FELIDAE.species.filter((s) => s.extinct).map((s) => s.sci).sort()).toEqual(['Panthera balamoides', 'Panthera gombaszoegensis', 'Panthera spelaea', 'Panthera zdanskyi']);
+    expect(clade('Felidae').raw.species.filter((s) => s.extinct).length).toBeGreaterThan(90);
     for (const s of ['Panthera leo', 'Panthera tigris', 'Felis catus', 'Neofelis diardi', 'Lynx pardinus', 'Leopardus guttulus']) expect(sp).toContain(s);
     // no synonym rows (#116): none of Open Tree's extra Felis names
     for (const s of ['Felis affinis', 'Felis haussa', 'Lynx vulgaris', 'Puma yaguarondi']) expect(sp).not.toContain(s);
@@ -69,5 +73,8 @@ describe('the dated tree from the data', () => {
     for (const s of splits) bySource[s.source!] = (bySource[s.source!] ?? 0) + 1;
     console.log(`Carnivora: ${rec.species.length} species (${living} living), ${splits.length} splits, root ${tree.ageMa} Ma, by source ${JSON.stringify(bySource)}`);
     expect(living).toBeGreaterThan(250);
+    // the same rule: every living carnivoran, and only the fossils a phylogeny (Upham's extinct tips with data) or an override places
+    expect(living).toBe(clade('Carnivora').raw.species.filter((s) => !s.extinct).length);
+    expect(rec.species.length - living).toBeLessThan(20);
   });
 });

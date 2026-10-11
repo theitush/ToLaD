@@ -137,6 +137,7 @@ def leaf_row(n, census: dict, gs_model: dict, deep_reports: dict | None = None) 
         "alive": float(D.get("alive", 0.0)), "today_src": _today_src(n),
         "domestic": bool(D.get("domestic")), "G": 2 * D["L"] if D.get("L") else None,
         "phylacine": D.get("iucn"), "upham": bool(n.upham), "dated": D.get("dleaf") is not None,
+        "graft": D.get("dleaf") is not None and D["dleaf"].graft,
         "red_list": rl.get("category"), "red_list_year": rl.get("year"),
         "natural": {k: nat[k] for k in ("N", "lo", "hi")} if nat else None,
         "census": (census.get(n.name) or {}).get("N"), "gs_model": (gs_model.get(n.name) or {}).get("N"),
@@ -375,8 +376,10 @@ def load_reviewed(path: Path = REVIEWED) -> dict[tuple[str, str], dict]:
 
 def fan_placed(rows: list[dict]) -> set[str]:
     """The species the Felidae view places: the fan draws the dated tree (ToLaD#145) induced on the
-    Felidae rows, so every Felidae leaf the dated tree holds (the snapshot's `dated`)."""
-    return {r["name"] for r in rows if _clean(r.get("family")) == "Felidae" and r.get("dated")}
+    Felidae rows, so every Felidae leaf the dated tree holds (the snapshot's `dated`), less the fossils it
+    grafts by taxonomy only (FAN_PLACEMENT in web/src/fan/panthera-extract.ts)."""
+    return {r["name"] for r in rows if _clean(r.get("family")) == "Felidae" and r.get("dated")
+            and not (r["extinct"] and r.get("graft"))}
 
 
 def _clean(x: str | None) -> str | None:

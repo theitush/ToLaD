@@ -189,6 +189,8 @@ export interface DatedFile {
   names?: Record<string, string>;
   loose?: Record<string, number>;
   notes?: Record<string, number>;
+  /** Rows of the species placed by taxonomy only (grafts); absent in data older than ToLaD#145's rule. */
+  grafts?: number[];
   common: Record<string, string>;
   gen: Record<string, [number, number]>;
   // skeleton.json only
@@ -198,6 +200,23 @@ export interface DatedFile {
   gen_how?: string[];
   common_source?: string;
   overrides?: { name: string; cite: string; reason: string }[];
+}
+
+/**
+ * Which species the fan draws (ToLaD#145): those whose place in the tree is dated by a phylogeny
+ * (Upham et al. 2019, its ages redated with Álvarez-Carretero et al. 2022), plus the hand-placed
+ * `[[dated_fossil]]` / `[[dated_clade]]` entries of overrides.toml, plus every living species (one
+ * Upham lacks, like the southern tiger cat, is still a living cat and stays). Fossils the data grafts
+ * on by taxonomy only (PBDB genus at first appearance, the `grafts` rows) stay in the data and the
+ * tiles but are not drawn: where they sit inside a split is not known, and ~98 of them in Felidae
+ * (a 9-species *Pseudaelurus* polytomy 0.04 Myr after the root) crowd the stem past the layout's
+ * peel and lean limits. Carnivora takes the same rule. Drawing them is a backlog issue.
+ */
+export const FAN_PLACEMENT = 'phylogeny+overrides' as const;
+
+/** Whether the fan draws a species row under FAN_PLACEMENT: not a fossil placed by taxonomy only. */
+export function onFan(grafts: ReadonlySet<number>, row: number, extinct: boolean): boolean {
+  return !(extinct && grafts.has(row));
 }
 
 /**
@@ -344,6 +363,7 @@ export function extractClade(
   };
   const species: RawSpecies[] = [];
   const rows = new Map<number, string>();
+  const grafts = new Set(dated?.file.grafts ?? []);
   for (let i = root + 1; i < f.n && inside(i); i++) {
     if (!f.isSpecies(i)) continue;
     const h = f.history(i);
@@ -400,7 +420,7 @@ export function extractClade(
       common: dated?.file.common[i] ?? null,
       gen: g ? { years: g[0], how: dated!.sk.gen_how?.[g[1]] ?? '' } : null,
     });
-    rows.set(i, f.name(i));
+    if (onFan(grafts, i, f.extinct(i))) rows.set(i, f.name(i));
   }
   const nm = sk.meta.natural;
   const naturalMeta: NaturalMeta | null = nm ? { label: nm.label ?? '', grade: nm.grade ?? 'D', kind: nm.kind ?? '', cite: nm.cite ?? '', url: nm.url ?? '' } : null;

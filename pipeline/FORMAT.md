@@ -227,6 +227,9 @@ The sidecars are JSON, one per data file, read at build time by the fan (they ar
   clade's matched species (the outermost such name; " (crown)" dropped).
 - `loose`: `{node index: k}`, the number of daughters of that split grafted by taxonomy only.
 - `notes`: `{node index: k}`, a split from `overrides.toml`: `k` indexes the skeleton's `overrides`.
+- `grafts`: the rows of the species placed by taxonomy only (grafts, Upham's no-data extinct tips among them),
+  sorted; every other species row is placed by Upham's phylogeny or an override. The fan leaves out the
+  grafted fossils (`FAN_PLACEMENT` in `web/src/fan/panthera-extract.ts`, ToLaD#145).
 - `common`: `{row: name}`, the species' English common name (IUCN Red List 2026-1's preferred English
   vernacular name; a `[[dated_fossil]]` entry's `common`).
 - `gen`: `{row: [years, how]}`, the species' generation length as the model uses it; `how` indexes

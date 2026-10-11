@@ -54,6 +54,7 @@ class DNode:
     cand: dict | None = None  # {"alvarez"|"ensemble": (age, lo, hi, src)}: both ages rules, before fossil floors
     loose: int = 0  # daughters placed by taxonomy only (where inside the split is not known)
     imputed: bool = False  # a leaf Upham placed without genetic data
+    graft: bool = False  # a leaf placed by taxonomy only (a graft), not by a phylogeny or an override
     anchor: "DNode | None" = None  # a graft's stem node: the crown it sits above
     children: list["DNode"] = field(default_factory=list)
     parent: "DNode | None" = None
@@ -479,7 +480,7 @@ def _sub(nd: Node, skip: set[int]) -> DNode | None:
     if nd.is_leaf:
         if id(nd) in skip or not eligible(nd):
             return None
-        return DNode(leaf=nd)
+        return DNode(leaf=nd, graft=True)
     kids = [k for k in (_sub(c, skip) for c in nd.children) if k is not None]
     if not kids:
         return None
@@ -702,13 +703,15 @@ def file_meta(droot: DNode | None, rows: list[tuple[Node, bool]]) -> dict | None
             keep[id(d)] = d
             kids_of[id(d)] = ks
     top = keep[id(droot)]
-    nodes, names, loose, notes = [], {}, {}, {}
+    nodes, names, loose, notes, grafts = [], {}, {}, {}, []
     st = [(top, -1)]
     while st:
         d, par = st.pop()
         i = len(nodes)
         if d.leaf is not None:
             nodes.append([par, row_of[id(d.leaf)]])
+            if d.graft:
+                grafts.append(row_of[id(d.leaf)])
             continue
         nodes.append([par, _r(d.age), _r(d.lo), _r(d.hi), d.src])
         if d.name:
@@ -718,7 +721,7 @@ def file_meta(droot: DNode | None, rows: list[tuple[Node, bool]]) -> dict | None
         if d.note >= 0:
             notes[str(i)] = d.note
         st.extend((c, i) for c in reversed(kids_of[id(d)]))
-    out.update({"nodes": nodes, "names": names, "loose": loose, "notes": notes})
+    out.update({"nodes": nodes, "names": names, "loose": loose, "notes": notes, "grafts": sorted(grafts)})
     return out
 
 
