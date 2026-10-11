@@ -20,8 +20,20 @@
 # of fossils older than a molecular crown age without entries here; it is a
 # rule, not an override, and its moves are listed in stats.json ->
 # stem_rehoming.
+#
+# The dated tree (format 1.6, ToLaD#145) is Upham et al. 2019's MCC topology
+# and node ages, with every other dated species grafted on by a rule
+# (tolad_pipeline/dated.py). Its only hand values are these two sections, at
+# the end of the file:
+#   [[dated_clade]]   replace the dated subtree over the species in `tree` with
+#                     `tree`: Newick with each split's age and 95% interval in
+#                     Ma, `(a,b)age[lo,hi]`; the species must be exactly the
+#                     dated tree's under their common ancestor
+#   [[dated_fossil]]  a fossil species branches off `sister`'s lineage at `age`
+#                     (default: its own first appearance) instead of by the
+#                     rule; `common` names it where the literature does
 
-version = 2
+version = 3
 
 [[exclude]]
 name = "Tikitherium copei"
@@ -110,3 +122,70 @@ stem_of = "Metatheria"
 reason = "Late Cretaceous Mongolian metatherian (Asiatheriidae), outside crown Marsupialia."
 citation = """Williamson, T.E., Brusatte, S.L. & Wilson, G.P. (2014). ZooKeys 465: 1-76. \
 doi:10.3897/zookeys.465.8178"""
+
+# --- The dated tree (ToLaD#145) ---------------------------------------------------
+
+[[dated_clade]]
+name = "Panthera"
+tree = "((Panthera tigris,Panthera uncia)3.47[2.55,4.43],(Panthera onca,(Panthera leo,Panthera pardus)2.57[1.89,3.28])3.65[2.69,4.66])4.58[3.37,5.84]"
+reason = """Upham's tree puts the snow leopard with the lion and leopard and the tiger outside the \
+rest (2.34, 1.90 and 4.91 Ma); the genome-wide species tree (64% of windows) has tiger + snow \
+leopard vs jaguar + (lion, leopard). Node ages and 95% HPDs are read from Fig. 1A's labels (the \
+figure is 313 px wide, so the last digit is +-0.02; research/panthera-split-dates.md)."""
+citation = """Figueiró, H.V. et al. (2017). Genome-wide signatures of complex introgression and \
+adaptive evolution in the big cats. Science Advances 3: e1700299, Fig. 1A. doi:10.1126/sciadv.1700299"""
+
+[[dated_clade]]
+name = "Felis catus"
+tree = "(Felis silvestris,Felis catus)0.0095[0.0095,0.0115]"
+reason = """The domestic cat is the wildcat's tamed form (from the Near Eastern wildcat), so it parts \
+from the wildcat at domestication, not at Upham's 0.94 Ma speciation; the earliest tamed cat was \
+buried with a person on Cyprus ~9,500 years ago (Vigne et al. 2004, Science 304: 259)."""
+citation = """Driscoll, C.A. et al. (2007). The Near Eastern origin of cat domestication. \
+Science 317: 519-523. doi:10.1126/science.1139518"""
+
+[[dated_fossil]]
+name = "Panthera spelaea"
+sister = "Panthera leo"
+age = 0.5
+lo = 0.392
+hi = 0.578
+common = "Cave lion"
+reason = """The cave lion's nuclear genome dates its split from the lion at 470 ka (392-529 ka; \
+X-chromosome PSMC 495 ka, 460-578 ka). The mitogenomes give 1.89 Ma (Barnett et al. 2016)."""
+citation = """de Manuel, M. et al. (2020). The evolutionary history of extinct and living lions. \
+PNAS 117: 10927-10934, SI Table S3. doi:10.1073/pnas.1919423117"""
+
+[[dated_fossil]]
+name = "Panthera zdanskyi"
+sister = "Panthera tigris"
+common = "Longdan tiger"
+reason = """The most primitive member of the tiger lineage (2.55-2.16 Ma); it branches off at its \
+first appearance. Several later studies treat it as a synonym of P. palaeosinensis."""
+citation = """Mazák, J.H., Christiansen, P. & Kitchener, A.C. (2011). Oldest known pantherine skull \
+and evolution of the tiger. PLoS ONE 6: e25483. doi:10.1371/journal.pone.0025483"""
+
+[[dated_fossil]]
+name = "Panthera gombaszoegensis"
+sister = "Panthera onca"
+age = 2.0
+lo = 1.5
+hi = 2.7
+common = "European jaguar"
+reason = """Treated as the jaguar's ancestor ("P. onca gombaszoegensis", Hemmer 1971); first \
+appearance ~1.9-2.0 Ma (O'Regan 2002; records from ~1.5 Ma to a doubtful >2.7 Ma). Contested: the \
+first phylogenetic analysis places it closer to the tiger. The dataset's first appearance (3.96 Ma) \
+sits on the old crown date and is not used."""
+citation = """Chatar, N., Michaud, M. & Fischer, V. (2022). Not a jaguar after all? Phylogenetic \
+affinities and morphology of the Pleistocene felid Panthera gombaszoegensis. Papers in \
+Palaeontology 8: e1464. doi:10.1002/spp2.1464"""
+
+[[dated_fossil]]
+name = "Panthera balamoides"
+sister = "Panthera onca"
+common = "Yucatán cave cat"
+reason = """Described from Yucatán caves and compared with the jaguar; it branches off the jaguar's \
+lineage at its first appearance. Contested: Blaine et al. 2019 and Ruiz-Ramoni et al. 2019 argue it \
+is a short-faced bear (Arctotherium)."""
+citation = """Stinnesbeck, S.R. et al. (2020). Panthera balamoides and other Pleistocene felids from \
+the submerged caves of Yucatán. Historical Biology 32: 930-939. doi:10.1080/08912963.2018.1556649"""

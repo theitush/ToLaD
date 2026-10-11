@@ -1,8 +1,8 @@
-# ToLaD tile format, version 1.5
+# ToLaD tile format, version 1.6
 
 Binary columnar format for the river data. The decoder is `pipeline/decoder/tolad-decoder.js`; the round-trip test is `pipeline/decoder/test/roundtrip.test.mjs`. The writer is `pipeline/tolad_pipeline/tiles.py`.
 
-**Versioning:** the `version` field in the header is bumped on any incompatible change. Decoders must reject unknown versions. Additive changes (new sections) keep the version, and decoders must skip sections they do not know. Minor revisions: **1.0** the base format; **1.1** adds the optional `HIST` section (curated population history) and the `hist*` META keys; **1.2** adds the `NATB` section (natural, pre-human baseline), the skeleton `META.natural` key and the HIST kind 10 `natural` (kind 9 `genomic` came with the optional `[deep]` history, no new section). **1.3** adds HIST kind 11 `rangeloss` (modelled range-loss records); **1.4** adds the `RLST` section (IUCN Red List status per species row) and the skeleton `META.red_list` key; **1.5** adds `events` to a history file's `META.hist` entry (curated bottlenecks, ToLaD#141; no new section). The header `version` stays 1, and a 1.0 decoder reads 1.1 to 1.5 files unchanged (it skips `HIST`, `NATB` and `RLST`).
+**Versioning:** the `version` field in the header is bumped on any incompatible change. Decoders must reject unknown versions. Additive changes (new sections) keep the version, and decoders must skip sections they do not know. Minor revisions: **1.0** the base format; **1.1** adds the optional `HIST` section (curated population history) and the `hist*` META keys; **1.2** adds the `NATB` section (natural, pre-human baseline), the skeleton `META.natural` key and the HIST kind 10 `natural` (kind 9 `genomic` came with the optional `[deep]` history, no new section). **1.3** adds HIST kind 11 `rangeloss` (modelled range-loss records); **1.4** adds the `RLST` section (IUCN Red List status per species row) and the skeleton `META.red_list` key; **1.5** adds `events` to a history file's `META.hist` entry (curated bottlenecks, ToLaD#141; no new section); **1.6** adds the dated tree's JSON sidecars `dated/<id>.json` (ToLaD#145, "Dated tree" below; the `.tld` files are unchanged). The header `version` stays 1, and a 1.0 decoder reads 1.1 to 1.6 files unchanged (it skips `HIST`, `NATB` and `RLST`).
 
 ## Files
 
@@ -10,6 +10,7 @@ Binary columnar format for the river data. The decoder is `pipeline/decoder/tola
 data/mammals/
   skeleton.tld      top of the tree (kind 0) + global tables in META
   t/<id>.tld        subtree tiles (kind 1), loaded on zoom
+  dated/<id>.json   the dated tree over each file's species rows (1.6; `skeleton.json` for the skeleton)
   debug_top.json    human-readable dump of the skeleton rows (unquantized), one node per line
   stats.json        build report (counts, match rates, fits, sizes, spot checks)
 ```
@@ -199,6 +200,44 @@ Sources, in order (`pipeline/tolad_pipeline/redlist.py`):
 
 Every living species row (`T1 = 0`) has a status. A fossil has none; a species that ended after 1500 CE
 carries the Red List's `EX` or `EW` where the list has it. Report: `stats.json` → `red_list`.
+
+## Dated tree (v1.6)
+
+ToLaD#145. The rows' own topology is Open Tree's, dated with Upham ages only where a clade is
+concordant and interpolated elsewhere. The dated tree is a proper dated phylogeny of the species rows,
+built by rule (`pipeline/tolad_pipeline/dated.py`): Upham et al. 2019's node-dated MCC tree (topology,
+node heights, 95% HPDs) over the species matched to its tips; then the hand values in
+`overrides.toml` (`[[dated_clade]]`, `[[dated_fossil]]`); then every other species row the data
+defines grafted on (a fossil with a first or last appearance, a living species a Red List knows or a
+curated history covers; a name no species list knows is left out). A graft hangs from the Upham node
+that is the common ancestor of the matched species under its Open Tree parent: older than that node (or
+on a total group's stem), it branches off the node's stem at its band start; younger, it joins that
+node's split (`loose`: where inside is not known). A fossil-only subtree keeps the merged tree's shape
+and ages. Extinct tips Upham placed with no genetic data are grafted like any fossil.
+
+The sidecars are JSON, one per data file, read at build time by the fan (they are not served):
+`dated/<tile id>.json` for a tile, `dated/skeleton.json` for the skeleton. Each has
+
+- `tile`: the file's tile id (−1: the skeleton); rows below index that file's rows.
+- `nodes`: the dated tree induced on the file's species rows, in preorder. A split is
+  `[parent, age, lo, hi, source]` (Ma; `lo`–`hi` its 95% interval, equal to `age` when there is none;
+  `source` an index into `sources`); a species is `[parent, row]`. `parent` is an index into `nodes`
+  (−1 for the root). Absent when the file has no dated species.
+- `names`: `{node index: name}`, the Open Tree clade name of a split whose species are exactly that
+  clade's matched species (the outermost such name; " (crown)" dropped).
+- `loose`: `{node index: k}`, the number of daughters of that split grafted by taxonomy only.
+- `notes`: `{node index: k}`, a split from `overrides.toml`: `k` indexes the skeleton's `overrides`.
+- `common`: `{row: name}`, the species' English common name (IUCN Red List 2026-1's preferred English
+  vernacular name; a `[[dated_fossil]]` entry's `common`).
+- `gen`: `{row: [years, how]}`, the species' generation length as the model uses it; `how` indexes
+  `gen_how`: `COMBINE reported`, `COMBINE imputed` (Soria et al. 2021, Pacifici et al. 2013's values),
+  or `allometric` (the model's mass fit, for fossils and species COMBINE lacks).
+
+`skeleton.json` adds the shared tables: `sources` (`upham`, `upham-imputed`: a split that joins a tip
+Upham placed with no genetic data, `fossil`: a graft's first appearance or a fossil subtree's
+fossil-range age, `interpolated`: an Open Tree node's interpolated age, `override`), `upham` (the
+citation), `gen_how`, `common_source`, and `overrides`: `[{name, cite, reason}]`.
+Report: `stats.json` → `dated_tree`.
 
 ## Semantics of the counts
 

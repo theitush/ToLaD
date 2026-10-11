@@ -388,6 +388,9 @@ def model_leaves(root: Node, raw: Path, log: dict) -> None:
             sd2 += gS ** 2 + (gB * msd) ** 2
             src.add(SRC["damuth"])
             meth.append("G:allometric(M)")
+        # the leaf's generation length and where it came from (the dated tree's per-species field, ToLaD#145)
+        D["gen_yr"] = 10 ** lg
+        D["gen_how"] = f"COMBINE {D['gen_src']}" if "log_gen_obs" in D else "allometric"
         L = max(10 ** lg / 2.0, 0.05)  # residence time ~ G/2, years
         dur = n.t0 - n.t1
         if n.date_src == D_UPHAM or (n.parent is not None and n.parent.date_src == D_UPHAM and n.kind == "tree"):

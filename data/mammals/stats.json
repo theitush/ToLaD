@@ -869,6 +869,31 @@
   "tips_extinct_in_opentree": 323,
   "tips_fossil_grafted": 11012
  },
+ "dated_tree": {
+  "clamped_below_parent": 175,
+  "grafts": {
+   "joins a split (loose)": 2224,
+   "on a stem (fossil)": 1197,
+   "on a stem (living, interpolated)": 65
+  },
+  "living": 5870,
+  "named_splits": 690,
+  "species": 17205,
+  "species_rows_left_out": 1459,
+  "splits": 8243,
+  "splits_by_source": {
+   "fossil": 2411,
+   "interpolated": 178,
+   "override": 9,
+   "upham": 4230,
+   "upham-imputed": 1415
+  },
+  "upham_tips_dropped": {
+   "extinct, placed without data (grafted instead)": 44,
+   "unmatched tip": 217
+  },
+  "zero_length_spliced": 1163
+ },
  "dating": {
   "calibrated_raised_by_fossils": 401,
   "uncalibrated_internal": 8342,
@@ -19272,6 +19297,7 @@
  },
  "output": {
   "brotli_bytes": 782665,
+  "dated_sidecar_raw": 918447,
   "files": 16,
   "raw_bytes": 3195672,
   "skeleton_brotli": 56554,
@@ -19326,6 +19352,42 @@
     ]
    }
   ],
+  "dated_clade": [
+   {
+    "age": 4.58,
+    "name": "Panthera",
+    "replaced_age": 3.716,
+    "species": 5
+   },
+   {
+    "age": 0.0095,
+    "name": "Felis catus",
+    "replaced_age": 0.9384,
+    "species": 2
+   }
+  ],
+  "dated_fossil": [
+   {
+    "age": 2.58,
+    "name": "Panthera zdanskyi",
+    "sister": "Panthera tigris"
+   },
+   {
+    "age": 2.0,
+    "name": "Panthera gombaszoegensis",
+    "sister": "Panthera onca"
+   },
+   {
+    "age": 0.5,
+    "name": "Panthera spelaea",
+    "sister": "Panthera leo"
+   },
+   {
+    "age": 0.129,
+    "name": "Panthera balamoides",
+    "sister": "Panthera onca"
+   }
+  ],
   "exclude": [
    "Tikitherium copei"
   ],
@@ -19356,7 +19418,7 @@
     "to": "stem of Metatheria"
    }
   ],
-  "version": 2
+  "version": 3
  },
  "pbdb_graft": {
   "excluded (overrides.toml)": 1,
