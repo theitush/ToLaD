@@ -405,6 +405,126 @@
   border-color: rgba(63, 210, 134, 0.45);
   box-shadow: none;
 }
+/* With every toggle shown (a split design and its window) the buttons wrap rather than run off the left edge. */
+.fan .bar {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+/* The search (ToLaD#157): a magnifier in the bar; open, a field over the bar and the matches under it. */
+.fan .bar button.icon {
+  width: 34px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+}
+.fan .search {
+  position: absolute;
+  top: max(10px, env(safe-area-inset-top));
+  left: 10px;
+  right: 10px;
+  max-width: 440px;
+  margin-left: auto;
+  z-index: 3;
+  font: 500 15px/1.25 var(--sans);
+}
+.fan .search-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 4px 0 13px;
+  background: rgba(12, 23, 20, 0.95);
+  border: 1px solid rgba(63, 210, 134, 0.45);
+  border-radius: 999px;
+  backdrop-filter: blur(6px);
+  color: var(--ink-2);
+}
+.fan .search-field input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: none;
+  background: none;
+  color: var(--ink);
+  /* 16 px: phones do not zoom the page into a field this size. */
+  font: 500 16px/1 var(--sans);
+  letter-spacing: 0.01em;
+}
+.fan .search-field input::placeholder {
+  color: var(--ink-3);
+}
+.fan .search-field input::-webkit-search-cancel-button {
+  display: none;
+}
+.fan .search-x {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--ink-2);
+  font: 400 22px/1 var(--sans);
+  touch-action: manipulation;
+}
+.fan .search-list {
+  /* About eight rows, the rest scrolled. */
+  max-height: calc(8 * 44px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: 6px 0 0;
+  padding: 4px 0;
+  list-style: none;
+  background: rgba(13, 25, 21, 0.97);
+  border: 1px solid rgba(200, 230, 210, 0.12);
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+.fan .search-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 11px 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.fan .search-list li.on {
+  background: rgba(63, 210, 134, 0.12);
+}
+.fan .search-list .nm {
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 16px;
+  flex: none;
+}
+.fan .search-list i {
+  font: italic 400 14px/1.2 var(--serif);
+  color: var(--ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.fan .search-list .ext {
+  margin-left: auto;
+  flex: none;
+  align-self: center;
+  padding: 1px 7px;
+  border: 1px solid rgba(160, 175, 185, 0.35);
+  border-radius: 999px;
+  color: #a6b0b8;
+  font-size: 12px;
+  letter-spacing: 0.03em;
+}
+.fan .search-list .search-none {
+  color: var(--ink-3);
+  cursor: default;
+}
+.fan .search-x:focus-visible,
 .fan .bar button:focus-visible,
 .fan .card-sp .x:focus-visible,
 .fan .card-sp .spark:focus-visible {
