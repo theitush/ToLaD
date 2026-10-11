@@ -30,8 +30,8 @@
   },
   "Canis lupus": {
    "domestic_alive": 1000000000.0,
-   "ever": 325662071908.6662,
-   "method": "+ domestic: 1e+09 (dogs; Greenspoon 2023 data, pets table), growth shaped like human births since domestication; H:curated history (1 points, natural baseline 2.77e+05 (D) before the first point; pipeline/history/Canis_lupus.toml)",
+   "ever": 325658550395.43536,
+   "method": "+ domestic: 1e+09 (dogs; Greenspoon 2023 data, pets table), growth shaped like human births since domestication; H:curated history (1 points, natural baseline 2.77e+05 (D) before the first point, then the range-loss trend from 1500 to the first cited point; pipeline/history/Canis_lupus.toml)",
    "occupancy_model_only": 31767.05919993856,
    "published": 223607.0,
    "published_source": "IUCN population report (Greenspoon 2023 compilation)",
@@ -156,8 +156,8 @@
   },
   "Ursus arctos": {
    "domestic_alive": 0.0,
-   "ever": 513826562596.0754,
-   "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count, held before 1500, then log-linear to today's count (range loss, modelled); H:curated history (1 points, deep past PSMC 15 points (D; Bergman et al. 2023, Nat Commun 14:7679, Supplementary Data 3 (PSMC Ne trajectory)); pipeline/history/Ursus_arctos.toml) + bulk genomic deep past (genomic.py)",
+   "ever": 63018150343.79093,
+   "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count, held before 1500, then log-linear to today's count (range loss, modelled); H:curated history (1 points, deep past PSMC 15 points (D; Bergman et al. 2023, Nat Commun 14:7679, Supplementary Data 3 (PSMC Ne trajectory)), then the range-loss trend from 1500 to the first cited point; pipeline/history/Ursus_arctos.toml) + bulk genomic deep past (genomic.py)",
    "occupancy_model_only": 227302.10928610698,
    "published": 220000.0,
    "published_source": "IUCN population report (Greenspoon 2023 compilation)",
@@ -6420,29 +6420,29 @@
   "births_now_per_yr": 57053193202.98615,
   "by_era": {
    "Cretaceous 66-145 Ma": {
-    "ghost": 3.7811679173573304e+18,
+    "ghost": 3.7811679173572465e+18,
     "ghost_share": 1.0,
-    "sampled": 173717327377706.4
+    "sampled": 173717327460785.9
    },
    "Holocene-Pleistocene 0-2.58 Ma": {
-    "ghost": 1.1024388391578942e+16,
-    "ghost_share": 0.0747,
-    "sampled": 1.3648746577571811e+17
+    "ghost": 1.1026627424038126e+16,
+    "ghost_share": 0.0748,
+    "sampled": 1.3648519980985552e+17
    },
    "Jurassic and older >145 Ma": {
-    "ghost": 9.896611003182107e+17,
+    "ghost": 9.89661100318209e+17,
     "ghost_share": 1.0,
-    "sampled": 16137511757207.25
+    "sampled": 16137511758927.47
    },
    "Neogene 2.58-23 Ma": {
-    "ghost": 8.959050973180399e+17,
+    "ghost": 8.959124094207153e+17,
     "ghost_share": 0.7632,
-    "sampled": 2.7794255691067933e+17
+    "sampled": 2.7793524480800397e+17
    },
    "Paleogene 23-66 Ma": {
-    "ghost": 2.4350786934324265e+18,
+    "ghost": 2.4350786885203656e+18,
     "ghost_share": 0.9876,
-    "sampled": 3.052341177954259e+16
+    "sampled": 3.0523416691603732e+16
    }
   },
   "f_ramp_Ma": [
@@ -6450,7 +6450,7 @@
    91.36
   ],
   "ghost_share": 0.948,
-  "max_multiplier": 99864.04321063698,
+  "max_multiplier": 99864.04320272093,
   "multiplier_at_Ma": {
    "0.01": 1.012,
    "1": 1.023,
@@ -6462,16 +6462,20 @@
    "50": 242.775,
    "66": 3400.715
   },
-  "sampled_sum": 4.4514328930507494e+17,
+  "sampled_sum": 4.45133716148683e+17,
   "top_down_estimate": 8.557978980447922e+18,
-  "with_ghosts": 8.55798048612266e+18
+  "with_ghosts": 8.557980459189258e+18
  },
  "grid_cells": 1600,
  "history": {
   "deep_join": {
    "by_rule": {
-    "absolute": 86,
-    "scaled": 25
+    "absolute": 101,
+    "scaled": 10
+   },
+   "cited_late": {
+    "to_natural_1500": 15,
+    "to_the_point": 0
    },
    "flagged": {
     "Addax nasomaculatus": {
@@ -6487,10 +6491,10 @@
      "to_kind": "model"
     },
     "Ailuropoda melanoleuca": {
-     "factor": 0.012663215933717416,
-     "ratio": 78.9688816201399,
-     "rule": "scaled",
-     "to_kind": "census"
+     "factor": 1.0,
+     "ratio": 12.836880574573417,
+     "rule": "absolute",
+     "to_kind": "rangeloss"
     },
     "Alces alces": {
      "factor": 1.0,
@@ -6529,10 +6533,10 @@
      "to_kind": "estimate"
     },
     "Bison bonasus": {
-     "factor": 0.0036522384173183885,
-     "ratio": 273.80468790266923,
-     "rule": "scaled",
-     "to_kind": "census"
+     "factor": 1.0,
+     "ratio": 0.002593714773608508,
+     "rule": "absolute",
+     "to_kind": "rangeloss"
     },
     "Bos indicus": {
      "factor": 1.0,
@@ -6563,12 +6567,6 @@
      "ratio": 0.07862465019226551,
      "rule": "absolute",
      "to_kind": "rangeloss"
-    },
-    "Elaphurus davidianus": {
-     "factor": 0.04256362090889769,
-     "ratio": 23.49424176435505,
-     "rule": "scaled",
-     "to_kind": "estimate"
     },
     "Equus grevyi": {
      "factor": 1.0,
@@ -6636,12 +6634,6 @@
      "rule": "absolute",
      "to_kind": "model"
     },
-    "Oryx dammah": {
-     "factor": 0.0034640912322296403,
-     "ratio": 288.6759998397491,
-     "rule": "scaled",
-     "to_kind": "estimate"
-    },
     "Osphranter rufus": {
      "factor": 1.0,
      "ratio": 0.09988628586019675,
@@ -6672,6 +6664,12 @@
      "rule": "absolute",
      "to_kind": "rangeloss"
     },
+    "Ursus arctos": {
+     "factor": 1.0,
+     "ratio": 0.06735320847558111,
+     "rule": "absolute",
+     "to_kind": "rangeloss"
+    },
     "Vicugna vicugna": {
      "factor": 29.77122116205785,
      "ratio": 0.03358948544826429,
@@ -6680,10 +6678,10 @@
     }
    },
    "flagged_by_rule": {
-    "absolute": 25,
-    "scaled": 9
+    "absolute": 28,
+    "scaled": 5
    },
-   "note": "How each genomic deep past meets the next level across PSMC's blind spot (ToLaD#77, #80): a cited next level (a history file's baseline or first point) scales the curve to meet it (rule `scaled`, factor = 1 / ratio); a modelled one (the natural level in 1500 CE, today's modelled count) keeps the genomic level (rule `absolute`). ratio = genomic level at the blind spot / next level, before scaling; flagged when beyond 10x either way. Per species: history.species[<sp>].deep.join (its `note` is the card's sentence)."
+   "note": "How each genomic deep past meets the next level across PSMC's blind spot (ToLaD#77, #80, #71): a cited next level (a history file's baseline or first point) dated 1900 or earlier scales the curve to meet it (rule `scaled`, factor = 1 / ratio); a modelled one (the natural level in 1500 CE, today's modelled count) keeps the genomic level (rule `absolute`). A first cited point after 1900 (a crash or a modern count, not a historical level) is not the deep past's level: the curve is kept, joins the natural level in 1500 CE where the range-loss trend applies (the trend then runs to that point), else that point itself (`cited_late` counts them). ratio = genomic level at the blind spot / next level, before scaling; flagged when beyond 10x either way. Per species: history.species[<sp>].deep.join (its `note` is the card's sentence)."
   },
   "genomic_records_without_points": [],
   "hist_sources": 137,
@@ -6711,6 +6709,7 @@
      "dropped_blind": 5,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 100000.0,
       "deep_n_raw": 99918.82145684169,
       "factor": 1.0008124449625677,
@@ -6752,6 +6751,7 @@
     },
     "points": 3,
     "segments": 46,
+    "trend_1500": false,
     "use": "counts"
    },
    "Addax nasomaculatus": {
@@ -6769,6 +6769,7 @@
      "dropped_blind": 3,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 157074.57039157825,
       "deep_n_raw": 157074.57039157825,
       "factor": 1.0,
@@ -6810,6 +6811,7 @@
     },
     "points": 1,
     "segments": 62,
+    "trend_1500": false,
     "use": "counts"
    },
    "Aepyceros melampus": {
@@ -6827,6 +6829,7 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 111374.60046531261,
       "deep_n_raw": 111374.60046531261,
       "factor": 1.0,
@@ -6868,6 +6871,7 @@
     },
     "points": 0,
     "segments": 52,
+    "trend_1500": false,
     "use": "counts"
    },
    "Ailuropoda melanoleuca": {
@@ -6892,33 +6896,38 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
-      "deep_n": 2458.9999999999995,
+      "cited_late": {
+       "kind": "census",
+       "n": 2459.0,
+       "year": 1976.0
+      },
+      "deep_n": 194184.479903924,
       "deep_n_raw": 194184.479903924,
-      "factor": 0.012663215933717416,
+      "factor": 1.0,
       "flag": true,
-      "next": "cited",
-      "note": "Genomic curve scaled x0.013 to meet the cited 1976 baseline (2,459), keeping its shape; before scaling it was 79x above that level (flagged: beyond 10x).",
-      "ratio": 78.9688816201399,
-      "rule": "scaled",
-      "to_kind": "census",
-      "to_n": 2459.0,
-      "to_year": 1976.0
+      "next": "modelled",
+      "note": "First cited point (1976 baseline, 2,459) is after 1900, so not used as the deep past's level. Genomic curve kept at its own level; the modelled natural level in 1500 CE is 13x lower (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr, then the range-loss trend runs to the cited point.",
+      "ratio": 12.836880574573417,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
+      "to_n": 15127.076923076924,
+      "to_year": 1500
      },
      "method": "PSMC",
      "ne_factor": 0.675267439584394,
-     "oldest_n": 4520.451467111848,
+     "oldest_n": 356974.99677594326,
      "oldest_yr_ago": 5076862.053827958,
      "points": 19,
      "time_factor": 0.8083333333333331,
      "youngest_yr_ago": 29197.77675134754
     },
-    "deep_after": 4520.451467111848,
+    "deep_after": 356974.99677594326,
     "deep_before": 15127.076923076922,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 4688958536.8446045,
+    "ever_after": 369773386709.4527,
     "ever_before": 13856131941.815397,
-    "ever_ratio": 0.33840313851906556,
+    "ever_ratio": 26.686624251429137,
     "file": "Ailuropoda_melanoleuca.toml",
     "grades": "BC",
     "leaf": "Ailuropoda melanoleuca",
@@ -6932,7 +6941,8 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 3,
-    "segments": 43,
+    "segments": 57,
+    "trend_1500": true,
     "use": "counts"
    },
    "Alces alces": {
@@ -6950,6 +6960,7 @@
      "dropped_blind": 5,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 15721.171369493199,
       "deep_n_raw": 15721.171369493199,
       "factor": 1.0,
@@ -6991,6 +7002,7 @@
     },
     "points": 1,
     "segments": 50,
+    "trend_1500": false,
     "use": "counts"
    },
    "Alces americanus": {
@@ -7008,6 +7020,7 @@
      "dropped_blind": 7,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 10076.68847092324,
       "deep_n_raw": 10076.68847092324,
       "factor": 1.0,
@@ -7042,6 +7055,7 @@
     "natural": null,
     "points": 0,
     "segments": 41,
+    "trend_1500": false,
     "use": "counts"
    },
    "Ammotragus lervia": {
@@ -7059,6 +7073,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 281877.22702118935,
       "deep_n_raw": 281877.22702118935,
       "factor": 1.0,
@@ -7100,6 +7115,7 @@
     },
     "points": 1,
     "segments": 47,
+    "trend_1500": false,
     "use": "counts"
    },
    "Antidorcas marsupialis": {
@@ -7117,6 +7133,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 3093901.152999635,
       "deep_n_raw": 3093901.152999635,
       "factor": 1.0,
@@ -7158,6 +7175,7 @@
     },
     "points": 0,
     "segments": 51,
+    "trend_1500": false,
     "use": "counts"
    },
    "Antilocapra americana": {
@@ -7182,6 +7200,7 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 35000000.00000001,
       "deep_n_raw": 47911.00097441775,
       "factor": 730.5211598206513,
@@ -7223,6 +7242,7 @@
     },
     "points": 4,
     "segments": 87,
+    "trend_1500": false,
     "use": "counts"
    },
    "Arctocephalus gazella": {
@@ -7254,6 +7274,7 @@
     },
     "points": 1,
     "segments": 3,
+    "trend_1500": false,
     "use": "counts"
    },
    "Axis porcinus": {
@@ -7271,6 +7292,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 245017.14822415757,
       "deep_n_raw": 245017.14822415757,
       "factor": 1.0,
@@ -7312,6 +7334,7 @@
     },
     "points": 1,
     "segments": 45,
+    "trend_1500": false,
     "use": "counts"
    },
    "Babyrousa celebensis": {
@@ -7329,6 +7352,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 444108.5991072495,
       "deep_n_raw": 444108.5991072495,
       "factor": 1.0,
@@ -7370,6 +7394,7 @@
     },
     "points": 1,
     "segments": 42,
+    "trend_1500": false,
     "use": "counts"
    },
    "Balaena mysticetus": {
@@ -7408,6 +7433,7 @@
     },
     "points": 2,
     "segments": 10,
+    "trend_1500": false,
     "use": "counts"
    },
    "Balaenoptera musculus": {
@@ -7446,6 +7472,7 @@
     },
     "points": 3,
     "segments": 6,
+    "trend_1500": false,
     "use": "counts"
    },
    "Balaenoptera physalus": {
@@ -7484,6 +7511,7 @@
     },
     "points": 2,
     "segments": 6,
+    "trend_1500": false,
     "use": "counts"
    },
    "Beatragus hunteri": {
@@ -7501,6 +7529,7 @@
      "dropped_blind": 11,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 61575.76829072401,
       "deep_n_raw": 61575.76829072401,
       "factor": 1.0,
@@ -7542,6 +7571,7 @@
     },
     "points": 1,
     "segments": 45,
+    "trend_1500": false,
     "use": "counts"
    },
    "Bison bison": {
@@ -7566,6 +7596,7 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 42000000.0,
       "deep_n_raw": 42823.11330558427,
       "factor": 980.7787607661646,
@@ -7607,6 +7638,7 @@
     },
     "points": 2,
     "segments": 56,
+    "trend_1500": false,
     "use": "counts"
    },
    "Bison bonasus": {
@@ -7624,33 +7656,38 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
-      "deep_n": 66.0,
+      "cited_late": {
+       "kind": "census",
+       "n": 66.0,
+       "year": 1924.0
+      },
+      "deep_n": 18071.10940157617,
       "deep_n_raw": 18071.10940157617,
-      "factor": 0.0036522384173183885,
+      "factor": 1.0,
       "flag": true,
-      "next": "cited",
-      "note": "Genomic curve scaled x0.0037 to meet the cited 1924 count (66), keeping its shape; before scaling it was 274x above that level (flagged: beyond 10x).",
-      "ratio": 273.80468790266923,
-      "rule": "scaled",
-      "to_kind": "census",
-      "to_n": 66.0,
-      "to_year": 1924.0
+      "next": "modelled",
+      "note": "First cited point (1924 census, 66) is after 1900, so not used as the deep past's level. Genomic curve kept at its own level; the modelled natural level in 1500 CE is 386x higher (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr, then the range-loss trend runs to the cited point.",
+      "ratio": 0.002593714773608508,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
+      "to_n": 6967269.333333334,
+      "to_year": 1500
      },
      "method": "PSMC",
      "ne_factor": 0.8818022267775141,
-     "oldest_n": 2987.386367454467,
+     "oldest_n": 817960.391985559,
      "oldest_yr_ago": 3968863.89119472,
      "points": 19,
      "time_factor": 1.4466666666666668,
      "youngest_yr_ago": 20582.77975208922
     },
-    "deep_after": 2987.386367454467,
+    "deep_after": 817960.391985559,
     "deep_before": 113114.4705612593,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 2149016019.7855706,
+    "ever_after": 593130029308.322,
     "ever_before": 92152421674.77307,
-    "ever_ratio": 0.02332023381186811,
+    "ever_ratio": 6.436401979772309,
     "file": "Bison_bonasus.toml",
     "grades": "B",
     "leaf": "Bison bonasus",
@@ -7664,7 +7701,8 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 4,
-    "segments": 56,
+    "segments": 107,
+    "trend_1500": true,
     "use": "counts"
    },
    "Bos gaurus": {
@@ -7682,6 +7720,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 65034.20033268868,
       "deep_n_raw": 65034.20033268868,
       "factor": 1.0,
@@ -7723,6 +7762,7 @@
     },
     "points": 1,
     "segments": 37,
+    "trend_1500": false,
     "use": "counts"
    },
    "Bos grunniens": {
@@ -7740,6 +7780,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 124363.5313660188,
       "deep_n_raw": 124363.5313660188,
       "factor": 1.0,
@@ -7781,6 +7822,7 @@
     },
     "points": 1,
     "segments": 48,
+    "trend_1500": false,
     "use": "counts"
    },
    "Bos indicus": {
@@ -7798,6 +7840,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 46099.21574576605,
       "deep_n_raw": 46099.21574576605,
       "factor": 1.0,
@@ -7832,6 +7875,7 @@
     "natural": null,
     "points": 0,
     "segments": 46,
+    "trend_1500": false,
     "use": "counts"
    },
    "Bos javanicus": {
@@ -7849,6 +7893,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 107278.3969554797,
       "deep_n_raw": 107278.3969554797,
       "factor": 1.0,
@@ -7890,6 +7935,7 @@
     },
     "points": 1,
     "segments": 45,
+    "trend_1500": false,
     "use": "counts"
    },
    "Bos mutus": {
@@ -7907,6 +7953,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 74506.02925894543,
       "deep_n_raw": 74506.02925894543,
       "factor": 1.0,
@@ -7948,6 +7995,7 @@
     },
     "points": 1,
     "segments": 49,
+    "trend_1500": false,
     "use": "counts"
    },
    "Bos taurus": {
@@ -7979,6 +8027,7 @@
     },
     "points": 19,
     "segments": 11,
+    "trend_1500": false,
     "use": "counts"
    },
    "Bubalus bubalis": {
@@ -8010,6 +8059,7 @@
     },
     "points": 14,
     "segments": 8,
+    "trend_1500": false,
     "use": "counts"
    },
    "Budorcas taxicolor": {
@@ -8027,6 +8077,7 @@
      "dropped_blind": 5,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 63963.377045510984,
       "deep_n_raw": 63963.377045510984,
       "factor": 1.0,
@@ -8068,6 +8119,7 @@
     },
     "points": 0,
     "segments": 33,
+    "trend_1500": false,
     "use": "counts"
    },
    "Callorhinus ursinus": {
@@ -8099,6 +8151,7 @@
     },
     "points": 5,
     "segments": 9,
+    "trend_1500": false,
     "use": "display"
    },
    "Camelus bactrianus": {
@@ -8116,6 +8169,7 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 36156.81281940566,
       "deep_n_raw": 36156.81281940566,
       "factor": 1.0,
@@ -8157,6 +8211,7 @@
     },
     "points": 1,
     "segments": 39,
+    "trend_1500": false,
     "use": "counts"
    },
    "Camelus dromedarius": {
@@ -8188,6 +8243,7 @@
     },
     "points": 14,
     "segments": 5,
+    "trend_1500": false,
     "use": "counts"
    },
    "Camelus ferus": {
@@ -8205,6 +8261,7 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 52596.98771197309,
       "deep_n_raw": 52596.98771197309,
       "factor": 1.0,
@@ -8246,6 +8303,7 @@
     },
     "points": 1,
     "segments": 42,
+    "trend_1500": false,
     "use": "counts"
    },
    "Canis lupus": {
@@ -8260,9 +8318,9 @@
     "deep_before": 275158.75114433933,
     "deep_from": "natural",
     "domestic_on_leaf": true,
-    "ever_after": 325662071908.66614,
+    "ever_after": 325658550395.4353,
     "ever_before": 324930313667.5019,
-    "ever_ratio": 1.00225204670166,
+    "ever_ratio": 1.0022412089525097,
     "file": "Canis_lupus.toml",
     "grades": "C",
     "leaf": "Canis lupus",
@@ -8276,7 +8334,8 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 3,
+    "segments": 5,
+    "trend_1500": true,
     "use": "counts"
    },
    "Canis rufus": {
@@ -8291,9 +8350,9 @@
     "deep_before": 34836.77431372678,
     "deep_from": "natural",
     "domestic_on_leaf": false,
-    "ever_after": 16861674130.64836,
+    "ever_after": 16861290549.328264,
     "ever_before": 224388493567.7487,
-    "ever_ratio": 0.07514500348279839,
+    "ever_ratio": 0.07514329403097225,
     "file": "Canis_rufus.toml",
     "grades": "B",
     "leaf": "Canis rufus",
@@ -8307,7 +8366,8 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 2,
+    "segments": 16,
+    "trend_1500": true,
     "use": "counts"
    },
    "Capra aegagrus": {
@@ -8325,6 +8385,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 431842.3694477321,
       "deep_n_raw": 431842.3694477321,
       "factor": 1.0,
@@ -8366,6 +8427,7 @@
     },
     "points": 1,
     "segments": 40,
+    "trend_1500": false,
     "use": "counts"
    },
    "Capra hircus": {
@@ -8397,6 +8459,7 @@
     },
     "points": 14,
     "segments": 12,
+    "trend_1500": false,
     "use": "counts"
    },
    "Capra ibex": {
@@ -8414,6 +8477,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 114941.28497048539,
       "deep_n_raw": 114941.28497048539,
       "factor": 1.0,
@@ -8455,6 +8519,7 @@
     },
     "points": 1,
     "segments": 31,
+    "trend_1500": false,
     "use": "counts"
    },
    "Capra sibirica": {
@@ -8472,6 +8537,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 212636.33674821715,
       "deep_n_raw": 212636.33674821715,
       "factor": 1.0,
@@ -8513,6 +8579,7 @@
     },
     "points": 0,
     "segments": 33,
+    "trend_1500": false,
     "use": "counts"
    },
    "Castor canadensis": {
@@ -8551,6 +8618,7 @@
     },
     "points": 1,
     "segments": 13,
+    "trend_1500": false,
     "use": "counts"
    },
    "Castor fiber": {
@@ -8565,9 +8633,9 @@
     "deep_before": 8343163.835669191,
     "deep_from": "natural",
     "domestic_on_leaf": false,
-    "ever_after": 20480241998695.066,
+    "ever_after": 20479764394903.465,
     "ever_before": 28016624630210.5,
-    "ever_ratio": 0.7310031907487918,
+    "ever_ratio": 0.7309861435920446,
     "file": "Castor_fiber.toml",
     "grades": "C",
     "leaf": "Castor fiber",
@@ -8581,7 +8649,8 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 4,
-    "segments": 16,
+    "segments": 41,
+    "trend_1500": true,
     "use": "counts"
    },
    "Catagonus wagneri": {
@@ -8599,6 +8668,7 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 93858.2412046211,
       "deep_n_raw": 93858.2412046211,
       "factor": 1.0,
@@ -8640,6 +8710,7 @@
     },
     "points": 1,
     "segments": 47,
+    "trend_1500": false,
     "use": "counts"
    },
    "Ceratotherium simum": {
@@ -8657,33 +8728,38 @@
      "dropped_blind": 5,
      "grade": "D",
      "join": {
-      "deep_n": 10400.0,
+      "cited_late": {
+       "kind": "census",
+       "n": 10400.0,
+       "year": 1999.0
+      },
+      "deep_n": 46167.23743012304,
       "deep_n_raw": 46167.23743012304,
-      "factor": 0.22526797311060776,
+      "factor": 1.0,
       "flag": false,
-      "next": "cited",
-      "note": "Genomic curve scaled x0.23 to meet the cited 1999 count (10,400), keeping its shape.",
-      "ratio": 4.439157445204138,
-      "rule": "scaled",
-      "to_kind": "census",
-      "to_n": 10400.0,
-      "to_year": 1999.0
+      "next": "modelled",
+      "note": "First cited point (1999 census, 10,400) is after 1900, so not used as the deep past's level. Genomic curve kept at its own level; the modelled natural level in 1500 CE is 2.2x lower; the two are joined log-linearly across PSMC's last 20 kyr, then the range-loss trend runs to the cited point.",
+      "ratio": 2.2255521572679675,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
+      "to_n": 20744.172307692304,
+      "to_year": 1500
      },
      "method": "PSMC",
      "ne_factor": 0.5086109279852755,
-     "oldest_n": 54159.8842341031,
+     "oldest_n": 240424.25332921298,
      "oldest_yr_ago": 2269033.0795780104,
      "points": 17,
      "time_factor": 0.354074074074074,
      "youngest_yr_ago": 22836.34710417863
     },
-    "deep_after": 54159.8842341031,
+    "deep_after": 240424.25332921295,
     "deep_before": 26562.338461538464,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 72381133156.54189,
+    "ever_after": 321275269308.80096,
     "ever_before": 37851413225.644516,
-    "ever_ratio": 1.9122438764717857,
+    "ever_ratio": 8.48780116593204,
     "file": "Ceratotherium_simum.toml",
     "grades": "B",
     "leaf": "Ceratotherium simum",
@@ -8697,7 +8773,8 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 4,
-    "segments": 43,
+    "segments": 47,
+    "trend_1500": true,
     "use": "counts"
    },
    "Cervus canadensis": {
@@ -8715,6 +8792,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 20720.572772924043,
       "deep_n_raw": 20720.572772924043,
       "factor": 1.0,
@@ -8756,6 +8834,7 @@
     },
     "points": 1,
     "segments": 57,
+    "trend_1500": false,
     "use": "counts"
    },
    "Cervus elaphus": {
@@ -8773,6 +8852,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 196298.96932865813,
       "deep_n_raw": 196298.96932865813,
       "factor": 1.0,
@@ -8814,6 +8894,7 @@
     },
     "points": 1,
     "segments": 54,
+    "trend_1500": false,
     "use": "counts"
    },
    "Cervus hanglu": {
@@ -8831,6 +8912,7 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 45559.991496925766,
       "deep_n_raw": 45559.991496925766,
       "factor": 1.0,
@@ -8865,6 +8947,7 @@
     "natural": null,
     "points": 0,
     "segments": 47,
+    "trend_1500": false,
     "use": "counts"
    },
    "Cervus nippon": {
@@ -8882,6 +8965,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 137912.4148172502,
       "deep_n_raw": 137912.4148172502,
       "factor": 1.0,
@@ -8923,6 +9007,7 @@
     },
     "points": 1,
     "segments": 55,
+    "trend_1500": false,
     "use": "counts"
    },
    "Connochaetes taurinus": {
@@ -8940,33 +9025,38 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
-      "deep_n": 1298000.0000000002,
+      "cited_late": {
+       "kind": "estimate",
+       "n": 1298000.0,
+       "year": 1998.0
+      },
+      "deep_n": 214975.97558647124,
       "deep_n_raw": 214975.97558647124,
-      "factor": 6.0378839842868715,
+      "factor": 1.0,
       "flag": false,
-      "next": "cited",
-      "note": "Genomic curve scaled x6 to meet the cited 1998 count (1,298,000), keeping its shape.",
-      "ratio": 0.16562093650729678,
-      "rule": "scaled",
-      "to_kind": "estimate",
-      "to_n": 1298000.0,
-      "to_year": 1998.0
+      "next": "modelled",
+      "note": "First cited point (1998 estimate, 1,298,000) is after 1900, so not used as the deep past's level. Genomic curve kept at its own level; the modelled natural level in 1500 CE is 7.2x higher; the two are joined log-linearly across PSMC's last 20 kyr, then the range-loss trend runs to the cited point.",
+      "ratio": 0.1386941777977234,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
+      "to_n": 1550000.0,
+      "to_year": 1500
      },
      "method": "PSMC",
      "ne_factor": 1.1184928957792721,
-     "oldest_n": 3542251.5680682324,
+     "oldest_n": 586671.0220479012,
      "oldest_yr_ago": 7156167.285511835,
      "points": 25,
      "time_factor": 1.2013333333333331,
      "youngest_yr_ago": 54830.504236666944
     },
-    "deep_after": 3542251.5680682324,
+    "deep_after": 586671.0220479012,
     "deep_before": 1550000.0,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 11818922856665.33,
+    "ever_after": 1963832039811.052,
     "ever_before": 4929686058189.863,
-    "ever_ratio": 2.397500107949092,
+    "ever_ratio": 0.3983685810069929,
     "file": "Connochaetes_taurinus.toml",
     "grades": "BC",
     "leaf": "Connochaetes taurinus",
@@ -8980,7 +9070,8 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 2,
-    "segments": 54,
+    "segments": 61,
+    "trend_1500": true,
     "use": "counts"
    },
    "Crocuta crocuta": {
@@ -8998,6 +9089,7 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 97055.52260007923,
       "deep_n_raw": 97055.52260007923,
       "factor": 1.0,
@@ -9039,6 +9131,7 @@
     },
     "points": 1,
     "segments": 46,
+    "trend_1500": false,
     "use": "counts"
    },
    "Dicerorhinus sumatrensis": {
@@ -9056,6 +9149,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 14273.215781006224,
       "deep_n_raw": 14273.215781006224,
       "factor": 1.0,
@@ -9097,6 +9191,7 @@
     },
     "points": 1,
     "segments": 62,
+    "trend_1500": false,
     "use": "counts"
    },
    "Diceros bicornis": {
@@ -9121,33 +9216,38 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
-      "deep_n": 99999.99999999999,
+      "cited_late": {
+       "kind": "unverified",
+       "n": 100000.0,
+       "year": 1960.0
+      },
+      "deep_n": 38558.191776216874,
       "deep_n_raw": 38558.191776216874,
-      "factor": 2.5934826140286256,
+      "factor": 1.0,
       "flag": false,
-      "next": "cited",
-      "note": "Genomic curve scaled x2.6 to meet the cited 1960 baseline (100,000), keeping its shape.",
-      "ratio": 0.38558191776216877,
-      "rule": "scaled",
-      "to_kind": "unverified",
-      "to_n": 100000.0,
-      "to_year": 1960.0
+      "next": "modelled",
+      "note": "First cited point (1960 baseline, 100,000) is after 1900, so not used as the deep past's level. Genomic curve kept at its own level; the modelled natural level in 1500 CE is 3.2x lower; the two are joined log-linearly across PSMC's last 20 kyr, then the range-loss trend runs to the cited point.",
+      "ratio": 3.2268046120474283,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
+      "to_n": 11949.341968911918,
+      "to_year": 1500
      },
      "method": "PSMC",
      "ne_factor": 0.6298428686543112,
-     "oldest_n": 478555.1330934278,
+     "oldest_n": 184522.2059730938,
      "oldest_yr_ago": 6388192.221295957,
      "points": 21,
      "time_factor": 0.4458333333333333,
      "youngest_yr_ago": 24259.29071602936
     },
-    "deep_after": 478555.1330934278,
+    "deep_after": 184522.2059730938,
     "deep_before": 8590.569948186529,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 961007225852.5061,
+    "ever_after": 370502999778.339,
     "ever_before": 16626528481.986233,
-    "ever_ratio": 57.79963188910392,
+    "ever_ratio": 22.28384597420652,
     "file": "Diceros_bicornis.toml",
     "grades": "BC",
     "leaf": "Diceros bicornis",
@@ -9161,7 +9261,8 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 5,
-    "segments": 49,
+    "segments": 60,
+    "trend_1500": true,
     "use": "counts"
    },
    "Elaphurus davidianus": {
@@ -9179,33 +9280,38 @@
      "dropped_blind": 5,
      "grade": "D",
      "join": {
-      "deep_n": 2420.0,
-      "deep_n_raw": 56856.06506973923,
-      "factor": 0.04256362090889769,
-      "flag": true,
-      "next": "cited",
-      "note": "Genomic curve scaled x0.043 to meet the cited 2020 count (2,420), keeping its shape; before scaling it was 23x above that level (flagged: beyond 10x).",
-      "ratio": 23.49424176435505,
-      "rule": "scaled",
-      "to_kind": "estimate",
-      "to_n": 2420.0,
-      "to_year": 2020.0
+      "cited_late": {
+       "kind": "estimate",
+       "n": 2420.0,
+       "year": 2020.0
+      },
+      "deep_n": 56856.06506973922,
+      "deep_n_raw": 56856.06506973922,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "First cited point (2020 estimate, 2,420) is after 1900, so not used as the deep past's level. Genomic curve kept at its own level; the modelled natural level in 1500 CE is 2.7x higher; the two are joined log-linearly across PSMC's last 20 kyr, then the range-loss trend runs to the cited point.",
+      "ratio": 0.3759078682296808,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
+      "to_n": 151250.0,
+      "to_year": 1500
      },
      "method": "PSMC",
      "ne_factor": 0.8979564669395156,
-     "oldest_n": 30484.068289800638,
+     "oldest_n": 716200.0703616856,
      "oldest_yr_ago": 2186512.263982951,
      "points": 17,
      "time_factor": 1.4466666666666668,
      "youngest_yr_ago": 21795.86893430824
     },
-    "deep_after": 30484.068289800638,
+    "deep_after": 716200.0703616856,
     "deep_before": 22211.745517994506,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 11023230162.292036,
+    "ever_after": 259154469283.116,
     "ever_before": 11168777327.12544,
-    "ever_ratio": 0.9869683886990999,
+    "ever_ratio": 23.20347713027741,
     "file": "Elaphurus_davidianus.toml",
     "grades": "C",
     "leaf": "Elaphurus davidianus",
@@ -9219,7 +9325,8 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 36,
+    "segments": 51,
+    "trend_1500": true,
     "use": "counts"
    },
    "Elephas maximus": {
@@ -9244,6 +9351,7 @@
      "dropped_blind": 7,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 100000.0,
       "deep_n_raw": 11874.759140587557,
       "factor": 8.421223438394057,
@@ -9285,6 +9393,7 @@
     },
     "points": 2,
     "segments": 41,
+    "trend_1500": false,
     "use": "counts"
    },
    "Enhydra lutris": {
@@ -9323,6 +9432,7 @@
     },
     "points": 3,
     "segments": 21,
+    "trend_1500": false,
     "use": "counts"
    },
    "Equus asinus": {
@@ -9354,6 +9464,7 @@
     },
     "points": 19,
     "segments": 9,
+    "trend_1500": false,
     "use": "counts"
    },
    "Equus burchellii": {
@@ -9371,6 +9482,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 459142.20137251995,
       "deep_n_raw": 459142.20137251995,
       "factor": 1.0,
@@ -9405,6 +9517,7 @@
     "natural": null,
     "points": 0,
     "segments": 41,
+    "trend_1500": false,
     "use": "counts"
    },
    "Equus caballus": {
@@ -9436,6 +9549,7 @@
     },
     "points": 19,
     "segments": 12,
+    "trend_1500": false,
     "use": "counts"
    },
    "Equus ferus": {
@@ -9450,9 +9564,9 @@
     "deep_before": 3521685.632487397,
     "deep_from": "natural",
     "domestic_on_leaf": false,
-    "ever_after": 710035507701.0226,
+    "ever_after": 709956805957.6368,
     "ever_before": 3574752084906.098,
-    "ever_ratio": 0.19862510485665577,
+    "ever_ratio": 0.1986030888562405,
     "file": "Equus_ferus.toml",
     "grades": "C",
     "leaf": "Equus ferus",
@@ -9466,7 +9580,8 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 2,
+    "segments": 21,
+    "trend_1500": true,
     "use": "counts"
    },
    "Equus grevyi": {
@@ -9484,6 +9599,7 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 219093.29973065242,
       "deep_n_raw": 219093.29973065242,
       "factor": 1.0,
@@ -9525,6 +9641,7 @@
     },
     "points": 1,
     "segments": 56,
+    "trend_1500": false,
     "use": "counts"
    },
    "Equus hemionus": {
@@ -9542,6 +9659,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 193704.75489433805,
       "deep_n_raw": 193704.75489433805,
       "factor": 1.0,
@@ -9583,6 +9701,7 @@
     },
     "points": 1,
     "segments": 61,
+    "trend_1500": false,
     "use": "counts"
    },
    "Equus kiang": {
@@ -9600,6 +9719,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 34731.07485358972,
       "deep_n_raw": 34731.07485358972,
       "factor": 1.0,
@@ -9641,6 +9761,7 @@
     },
     "points": 0,
     "segments": 55,
+    "trend_1500": false,
     "use": "counts"
    },
    "Equus zebra": {
@@ -9658,6 +9779,7 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 202293.79990441407,
       "deep_n_raw": 202293.79990441407,
       "factor": 1.0,
@@ -9699,6 +9821,7 @@
     },
     "points": 1,
     "segments": 51,
+    "trend_1500": false,
     "use": "counts"
    },
    "Eschrichtius robustus": {
@@ -9737,6 +9860,7 @@
     },
     "points": 5,
     "segments": 6,
+    "trend_1500": false,
     "use": "counts"
    },
    "Eubalaena australis": {
@@ -9775,6 +9899,7 @@
     },
     "points": 3,
     "segments": 11,
+    "trend_1500": false,
     "use": "counts"
    },
    "Eubalaena glacialis": {
@@ -9813,6 +9938,7 @@
     },
     "points": 5,
     "segments": 15,
+    "trend_1500": false,
     "use": "counts"
    },
    "Giraffa camelopardalis": {
@@ -9830,6 +9956,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 336618.3676072787,
       "deep_n_raw": 336618.3676072787,
       "factor": 1.0,
@@ -9871,6 +9998,7 @@
     },
     "points": 1,
     "segments": 47,
+    "trend_1500": false,
     "use": "counts"
    },
    "Giraffa tippelskirchi": {
@@ -9888,6 +10016,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 43064.547945618186,
       "deep_n_raw": 43064.547945618186,
       "factor": 1.0,
@@ -9922,6 +10051,7 @@
     "natural": null,
     "points": 0,
     "segments": 51,
+    "trend_1500": false,
     "use": "counts"
    },
    "Gorilla beringei": {
@@ -9946,33 +10076,38 @@
      "dropped_blind": 3,
      "grade": "D",
      "join": {
-      "deep_n": 17516.000000000004,
+      "cited_late": {
+       "kind": "estimate",
+       "n": 17516.0,
+       "year": 1995.0
+      },
+      "deep_n": 23467.257114270687,
       "deep_n_raw": 23467.257114270687,
-      "factor": 0.7464016742437418,
+      "factor": 1.0,
       "flag": false,
-      "next": "cited",
-      "note": "Genomic curve scaled x0.75 to meet the cited 1995 baseline (17,516), keeping its shape.",
-      "ratio": 1.3397611962931426,
-      "rule": "scaled",
-      "to_kind": "estimate",
-      "to_n": 17516.0,
-      "to_year": 1995.0
+      "next": "modelled",
+      "note": "First cited point (1995 baseline, 17,516) is after 1900, so not used as the deep past's level. Genomic curve kept at its own level; the modelled natural level in 1500 CE is 4.8x lower; the two are joined log-linearly across PSMC's last 20 kyr, then the range-loss trend runs to the cited point.",
+      "ratio": 4.825674915539931,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
+      "to_n": 4863.0,
+      "to_year": 1500
      },
      "method": "PSMC",
      "ne_factor": 0.5653869863013699,
-     "oldest_n": 218093.49047368023,
+     "oldest_n": 292193.1957007649,
      "oldest_yr_ago": 959083.7026173619,
      "points": 14,
      "time_factor": 0.565,
      "youngest_yr_ago": 23997.72929688985
     },
-    "deep_after": 218093.49047368023,
+    "deep_after": 292193.1957007649,
     "deep_before": 3800.0,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 24655684357.597023,
+    "ever_after": 33004691294.08605,
     "ever_before": 435175369.25768155,
-    "ever_ratio": 56.65689305820428,
+    "ever_ratio": 75.84227790829516,
     "file": "Gorilla_beringei.toml",
     "grades": "C",
     "leaf": "Gorilla beringei",
@@ -9986,7 +10121,8 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 33,
+    "segments": 42,
+    "trend_1500": true,
     "use": "counts"
    },
    "Gorilla gorilla": {
@@ -10004,6 +10140,7 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 96930.8821995234,
       "deep_n_raw": 96930.8821995234,
       "factor": 1.0,
@@ -10045,6 +10182,7 @@
     },
     "points": 1,
     "segments": 36,
+    "trend_1500": false,
     "use": "counts"
    },
    "Helarctos malayanus": {
@@ -10062,6 +10200,7 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 161541.37471248896,
       "deep_n_raw": 161541.37471248896,
       "factor": 1.0,
@@ -10103,6 +10242,7 @@
     },
     "points": 1,
     "segments": 44,
+    "trend_1500": false,
     "use": "counts"
    },
    "Hemitragus hylocrius": {
@@ -10120,6 +10260,7 @@
      "dropped_blind": 9,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 43202.740048132146,
       "deep_n_raw": 43202.740048132146,
       "factor": 1.0,
@@ -10161,6 +10302,7 @@
     },
     "points": 1,
     "segments": 38,
+    "trend_1500": false,
     "use": "counts"
    },
    "Hexaprotodon liberiensis": {
@@ -10178,6 +10320,7 @@
      "dropped_blind": 4,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 18877.94605537044,
       "deep_n_raw": 18877.94605537044,
       "factor": 1.0,
@@ -10219,6 +10362,7 @@
     },
     "points": 1,
     "segments": 49,
+    "trend_1500": false,
     "use": "counts"
    },
    "Hippopotamus amphibius": {
@@ -10236,6 +10380,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 78735.85928470675,
       "deep_n_raw": 78735.85928470675,
       "factor": 1.0,
@@ -10277,6 +10422,7 @@
     },
     "points": 1,
     "segments": 53,
+    "trend_1500": false,
     "use": "counts"
    },
    "Hippotragus niger": {
@@ -10294,6 +10440,7 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 171915.35052643326,
       "deep_n_raw": 171915.35052643326,
       "factor": 1.0,
@@ -10335,6 +10482,7 @@
     },
     "points": 0,
     "segments": 43,
+    "trend_1500": false,
     "use": "counts"
    },
    "Homo sapiens": {
@@ -10359,6 +10507,7 @@
     "natural": null,
     "points": 11,
     "segments": 31,
+    "trend_1500": false,
     "use": "display"
    },
    "Hyaena hyaena": {
@@ -10376,6 +10525,7 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 31462.742249401883,
       "deep_n_raw": 31462.742249401883,
       "factor": 1.0,
@@ -10417,6 +10567,7 @@
     },
     "points": 1,
     "segments": 53,
+    "trend_1500": false,
     "use": "counts"
    },
    "Hydrochoerus hydrochaeris": {
@@ -10434,6 +10585,7 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 245151.9544491072,
       "deep_n_raw": 245151.9544491072,
       "factor": 1.0,
@@ -10475,6 +10627,7 @@
     },
     "points": 0,
     "segments": 59,
+    "trend_1500": false,
     "use": "counts"
    },
    "Kobus ellipsiprymnus": {
@@ -10492,6 +10645,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 123558.39444797355,
       "deep_n_raw": 123558.39444797355,
       "factor": 1.0,
@@ -10533,6 +10687,7 @@
     },
     "points": 0,
     "segments": 49,
+    "trend_1500": false,
     "use": "counts"
    },
    "Kobus leche": {
@@ -10550,6 +10705,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 58856.685793644145,
       "deep_n_raw": 58856.685793644145,
       "factor": 1.0,
@@ -10591,6 +10747,7 @@
     },
     "points": 1,
     "segments": 57,
+    "trend_1500": false,
     "use": "counts"
    },
    "Lama glama": {
@@ -10608,6 +10765,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 190175.4790663263,
       "deep_n_raw": 190175.4790663263,
       "factor": 1.0,
@@ -10649,6 +10807,7 @@
     },
     "points": 0,
     "segments": 43,
+    "trend_1500": false,
     "use": "counts"
    },
    "Lama guanicoe": {
@@ -10666,6 +10825,7 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 40786.00663949532,
       "deep_n_raw": 40786.00663949532,
       "factor": 1.0,
@@ -10707,6 +10867,7 @@
     },
     "points": 0,
     "segments": 49,
+    "trend_1500": false,
     "use": "counts"
    },
    "Litocranius walleri": {
@@ -10724,6 +10885,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 460623.1892751342,
       "deep_n_raw": 460623.1892751342,
       "factor": 1.0,
@@ -10765,6 +10927,7 @@
     },
     "points": 0,
     "segments": 47,
+    "trend_1500": false,
     "use": "counts"
    },
    "Loxodonta africana": {
@@ -10789,6 +10952,7 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 14300000.0,
       "deep_n_raw": 17045.63601480735,
       "factor": 838.924401974661,
@@ -10830,6 +10994,7 @@
     },
     "points": 6,
     "segments": 57,
+    "trend_1500": false,
     "use": "counts"
    },
    "Loxodonta cyclotis": {
@@ -10854,6 +11019,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 11700000.0,
       "deep_n_raw": 49380.938572202846,
       "factor": 236.93352816477403,
@@ -10888,6 +11054,7 @@
     "natural": null,
     "points": 5,
     "segments": 51,
+    "trend_1500": false,
     "use": "counts"
    },
    "Macropus fuliginosus": {
@@ -10905,6 +11072,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 77741.3625688412,
       "deep_n_raw": 77741.3625688412,
       "factor": 1.0,
@@ -10946,6 +11114,7 @@
     },
     "points": 0,
     "segments": 53,
+    "trend_1500": false,
     "use": "counts"
    },
    "Macropus giganteus": {
@@ -10963,6 +11132,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 82704.66558326154,
       "deep_n_raw": 82704.66558326154,
       "factor": 1.0,
@@ -11004,6 +11174,7 @@
     },
     "points": 0,
     "segments": 58,
+    "trend_1500": false,
     "use": "counts"
    },
    "Megaptera novaeangliae": {
@@ -11042,6 +11213,7 @@
     },
     "points": 3,
     "segments": 10,
+    "trend_1500": false,
     "use": "counts"
    },
    "Mirounga angustirostris": {
@@ -11073,6 +11245,7 @@
     },
     "points": 3,
     "segments": 16,
+    "trend_1500": false,
     "use": "counts"
    },
    "Mustela nigripes": {
@@ -11087,9 +11260,9 @@
     "deep_before": 9274.703579960153,
     "deep_from": "natural",
     "domestic_on_leaf": false,
-    "ever_after": 89833596900.24036,
+    "ever_after": 89823155704.1923,
     "ever_before": 16202002770.964258,
-    "ever_ratio": 5.544598292578488,
+    "ever_ratio": 5.543953853974468,
     "file": "Mustela_nigripes.toml",
     "grades": "C",
     "leaf": "Mustela nigripes",
@@ -11103,7 +11276,8 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 2,
-    "segments": 3,
+    "segments": 19,
+    "trend_1500": true,
     "use": "counts"
    },
    "Myrmecophaga tridactyla": {
@@ -11121,6 +11295,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 294315.7902281838,
       "deep_n_raw": 294315.7902281838,
       "factor": 1.0,
@@ -11162,6 +11337,7 @@
     },
     "points": 1,
     "segments": 49,
+    "trend_1500": false,
     "use": "counts"
    },
    "Nanger granti": {
@@ -11179,6 +11355,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 215430.79249893114,
       "deep_n_raw": 215430.79249893114,
       "factor": 1.0,
@@ -11220,6 +11397,7 @@
     },
     "points": 0,
     "segments": 34,
+    "trend_1500": false,
     "use": "counts"
    },
    "Odocoileus hemionus": {
@@ -11237,6 +11415,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 199300.68369408188,
       "deep_n_raw": 199300.68369408188,
       "factor": 1.0,
@@ -11278,6 +11457,7 @@
     },
     "points": 1,
     "segments": 48,
+    "trend_1500": false,
     "use": "counts"
    },
    "Odocoileus virginianus": {
@@ -11295,6 +11475,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 1085295.1547210342,
       "deep_n_raw": 1085295.1547210342,
       "factor": 1.0,
@@ -11336,6 +11517,7 @@
     },
     "points": 0,
     "segments": 43,
+    "trend_1500": false,
     "use": "counts"
    },
    "Okapia johnstoni": {
@@ -11353,6 +11535,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 77711.4132656247,
       "deep_n_raw": 77711.4132656247,
       "factor": 1.0,
@@ -11394,6 +11577,7 @@
     },
     "points": 0,
     "segments": 41,
+    "trend_1500": false,
     "use": "counts"
    },
    "Oreamnos americanus": {
@@ -11411,6 +11595,7 @@
      "dropped_blind": 6,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 22113.152470491586,
       "deep_n_raw": 22113.152470491586,
       "factor": 1.0,
@@ -11452,6 +11637,7 @@
     },
     "points": 1,
     "segments": 42,
+    "trend_1500": false,
     "use": "counts"
    },
    "Orycteropus afer": {
@@ -11469,6 +11655,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 136304.67295180453,
       "deep_n_raw": 136304.67295180453,
       "factor": 1.0,
@@ -11510,6 +11697,7 @@
     },
     "points": 0,
     "segments": 52,
+    "trend_1500": false,
     "use": "counts"
    },
    "Oryx dammah": {
@@ -11527,33 +11715,38 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
-      "deep_n": 650.0,
+      "cited_late": {
+       "kind": "estimate",
+       "n": 650.0,
+       "year": 2026.0
+      },
+      "deep_n": 187639.39989583692,
       "deep_n_raw": 187639.39989583692,
-      "factor": 0.0034640912322296403,
-      "flag": true,
-      "next": "cited",
-      "note": "Genomic curve scaled x0.0035 to meet the cited 2026 count (650), keeping its shape; before scaling it was 289x above that level (flagged: beyond 10x).",
-      "ratio": 288.6759998397491,
-      "rule": "scaled",
-      "to_kind": "estimate",
-      "to_n": 650.0,
-      "to_year": 2026.0
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "First cited point (2026 estimate, 650) is after 1900, so not used as the deep past's level. Genomic curve kept at its own level; the modelled natural level in 1500 CE is 1.2x higher; the two are joined log-linearly across PSMC's last 20 kyr, then the range-loss trend runs to the cited point.",
+      "ratio": 0.8278640316523591,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
+      "to_n": 226654.85239323866,
+      "to_year": 1500
      },
      "method": "PSMC",
      "ne_factor": 0.9819951427367715,
-     "oldest_n": 2072.4751349005214,
+     "oldest_n": 598273.831710427,
      "oldest_yr_ago": 1857502.8334911033,
      "points": 16,
      "time_factor": 1.4080645161290322,
      "youngest_yr_ago": 28349.0403675304
     },
-    "deep_after": 2072.4751349005214,
+    "deep_after": 598273.831710427,
     "deep_before": 226654.85239323866,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 660949968.1322649,
+    "ever_after": 190900985069.81754,
     "ever_before": 101634377367.2517,
-    "ever_ratio": 0.006503212645697125,
+    "ever_ratio": 1.8783111582413161,
     "file": "Oryx_dammah.toml",
     "grades": "C",
     "leaf": "Oryx dammah",
@@ -11567,7 +11760,8 @@
      "method": "N_nat: D x natural range (PHYLACINE, rescaled to PanTHERIA areas) x fitted occupancy"
     },
     "points": 1,
-    "segments": 34,
+    "segments": 52,
+    "trend_1500": true,
     "use": "counts"
    },
    "Oryx gazella": {
@@ -11585,6 +11779,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 145737.24233389765,
       "deep_n_raw": 145737.24233389765,
       "factor": 1.0,
@@ -11626,6 +11821,7 @@
     },
     "points": 0,
     "segments": 43,
+    "trend_1500": false,
     "use": "counts"
    },
    "Osphranter rufus": {
@@ -11643,6 +11839,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 1198635.430322361,
       "deep_n_raw": 1198635.430322361,
       "factor": 1.0,
@@ -11684,6 +11881,7 @@
     },
     "points": 0,
     "segments": 53,
+    "trend_1500": false,
     "use": "counts"
    },
    "Ovibos moschatus": {
@@ -11701,6 +11899,7 @@
      "dropped_blind": 9,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 12219.247668366897,
       "deep_n_raw": 12219.247668366897,
       "factor": 1.0,
@@ -11742,6 +11941,7 @@
     },
     "points": 1,
     "segments": 49,
+    "trend_1500": false,
     "use": "counts"
    },
    "Ovis ammon": {
@@ -11759,6 +11959,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 81200.20271887656,
       "deep_n_raw": 81200.20271887656,
       "factor": 1.0,
@@ -11800,6 +12001,7 @@
     },
     "points": 1,
     "segments": 41,
+    "trend_1500": false,
     "use": "counts"
    },
    "Ovis aries": {
@@ -11831,6 +12033,7 @@
     },
     "points": 19,
     "segments": 11,
+    "trend_1500": false,
     "use": "counts"
    },
    "Ovis canadensis": {
@@ -11848,6 +12051,7 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 37508.98336673165,
       "deep_n_raw": 37508.98336673165,
       "factor": 1.0,
@@ -11889,6 +12093,7 @@
     },
     "points": 1,
     "segments": 51,
+    "trend_1500": false,
     "use": "counts"
    },
    "Ovis dalli": {
@@ -11906,6 +12111,7 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 110505.2433925007,
       "deep_n_raw": 110505.2433925007,
       "factor": 1.0,
@@ -11947,6 +12153,7 @@
     },
     "points": 0,
     "segments": 49,
+    "trend_1500": false,
     "use": "counts"
    },
    "Ovis nivicola": {
@@ -11964,6 +12171,7 @@
      "dropped_blind": 5,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 271475.70240255474,
       "deep_n_raw": 271475.70240255474,
       "factor": 1.0,
@@ -12005,6 +12213,7 @@
     },
     "points": 0,
     "segments": 40,
+    "trend_1500": false,
     "use": "counts"
    },
    "Ovis orientalis": {
@@ -12022,6 +12231,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 437608.83659876,
       "deep_n_raw": 437608.83659876,
       "factor": 1.0,
@@ -12063,6 +12273,7 @@
     },
     "points": 1,
     "segments": 39,
+    "trend_1500": false,
     "use": "counts"
    },
    "Ovis vignei": {
@@ -12080,6 +12291,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 306509.90361545177,
       "deep_n_raw": 306509.90361545177,
       "factor": 1.0,
@@ -12114,6 +12326,7 @@
     "natural": null,
     "points": 0,
     "segments": 35,
+    "trend_1500": false,
     "use": "counts"
    },
    "Pan paniscus": {
@@ -12131,6 +12344,7 @@
      "dropped_blind": 3,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 67025.22878169395,
       "deep_n_raw": 67025.22878169395,
       "factor": 1.0,
@@ -12172,6 +12386,7 @@
     },
     "points": 0,
     "segments": 36,
+    "trend_1500": false,
     "use": "counts"
    },
    "Pan troglodytes": {
@@ -12196,6 +12411,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 1000000.0,
       "deep_n_raw": 130290.46092445317,
       "factor": 7.6751589709996795,
@@ -12237,6 +12453,7 @@
     },
     "points": 2,
     "segments": 38,
+    "trend_1500": false,
     "use": "counts"
    },
    "Panthera leo": {
@@ -12261,33 +12478,38 @@
      "dropped_blind": 8,
      "grade": "D",
      "join": {
-      "deep_n": 500000.00000000006,
+      "cited_late": {
+       "kind": "unverified",
+       "n": 500000.0,
+       "year": 1950.0
+      },
+      "deep_n": 242259.15068493146,
       "deep_n_raw": 242259.15068493146,
-      "factor": 2.0639055267318747,
+      "factor": 1.0,
       "flag": false,
-      "next": "cited",
-      "note": "Genomic curve scaled x2.1 to meet the cited 1950 baseline (500,000), keeping its shape.",
-      "ratio": 0.4845183013698629,
-      "rule": "scaled",
-      "to_kind": "unverified",
-      "to_n": 500000.0,
-      "to_year": 1950.0
+      "next": "modelled",
+      "note": "First cited point (1950 baseline, 500,000) is after 1900, so not used as the deep past's level. Genomic curve kept at its own level; the modelled natural level in 1500 CE is 1.6x lower; the two are joined log-linearly across PSMC's last 20 kyr, then the range-loss trend runs to the cited point.",
+      "ratio": 1.6150392970487764,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
+      "to_n": 150002.01612903224,
+      "to_year": 1500
      },
      "method": "PSMC",
      "ne_factor": 0.9039520547945205,
-     "oldest_n": 1311567.1641791046,
+     "oldest_n": 635478.2945205478,
      "oldest_yr_ago": 1340974.744609202,
      "points": 14,
      "time_factor": 1.0839999999999999,
      "youngest_yr_ago": 23444.306326816324
     },
-    "deep_after": 1311567.1641791046,
+    "deep_after": 635478.2945205478,
     "deep_before": 204258.06451612903,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 1699626155437.6614,
+    "ever_after": 823128463675.327,
     "ever_before": 256264829675.55167,
-    "ever_ratio": 6.632303611812441,
+    "ever_ratio": 3.212022752858683,
     "file": "Panthera_leo.toml",
     "grades": "BCD",
     "leaf": "Panthera leo",
@@ -12301,7 +12523,8 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 4,
-    "segments": 40,
+    "segments": 45,
+    "trend_1500": true,
     "use": "counts"
    },
    "Panthera onca": {
@@ -12326,33 +12549,38 @@
      "dropped_blind": 7,
      "grade": "D",
      "join": {
-      "deep_n": 82600.0,
+      "cited_late": {
+       "kind": "reconstruction",
+       "n": 82600.0,
+       "year": 1995.0
+      },
+      "deep_n": 327346.9915383306,
       "deep_n_raw": 327346.9915383306,
-      "factor": 0.2523316301513282,
+      "factor": 1.0,
       "flag": false,
-      "next": "cited",
-      "note": "Genomic curve scaled x0.25 to meet the cited 1995 baseline (82,600), keeping its shape.",
-      "ratio": 3.963038638478579,
-      "rule": "scaled",
-      "to_kind": "reconstruction",
-      "to_n": 82600.0,
-      "to_year": 1995.0
+      "next": "modelled",
+      "note": "First cited point (1995 baseline, 82,600) is after 1900, so not used as the deep past's level. Genomic curve kept at its own level; the modelled natural level in 1500 CE is 2.9x lower; the two are joined log-linearly across PSMC's last 20 kyr, then the range-loss trend runs to the cited point.",
+      "ratio": 2.8945402208743594,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
+      "to_n": 113091.1877394636,
+      "to_year": 1500
      },
      "method": "PSMC",
      "ne_factor": 1.0197725593094413,
-     "oldest_n": 164942.6791277259,
+     "oldest_n": 653674.2105173519,
      "oldest_yr_ago": 772341.0811293155,
      "points": 15,
      "time_factor": 2.0,
      "youngest_yr_ago": 27643.704527432645
     },
-    "deep_after": 164942.6791277259,
+    "deep_after": 653674.2105173519,
     "deep_before": 113091.1877394636,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 116120857129.186,
+    "ever_after": 459471340541.3518,
     "ever_before": 86758987517.9911,
-    "ever_ratio": 1.3384302935198058,
+    "ever_ratio": 5.295950928957899,
     "file": "Panthera_onca.toml",
     "grades": "C",
     "leaf": "Panthera onca",
@@ -12366,7 +12594,8 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 35,
+    "segments": 40,
+    "trend_1500": true,
     "use": "counts"
    },
    "Panthera pardus": {
@@ -12391,33 +12620,38 @@
      "dropped_blind": 5,
      "grade": "D",
      "join": {
-      "deep_n": 188000.0,
+      "cited_late": {
+       "kind": "reconstruction",
+       "n": 188000.0,
+       "year": 1998.0
+      },
+      "deep_n": 579760.9159438871,
       "deep_n_raw": 579760.9159438871,
-      "factor": 0.32427160029220703,
+      "factor": 1.0,
       "flag": false,
-      "next": "cited",
-      "note": "Genomic curve scaled x0.32 to meet the cited 1998 baseline (188,000), keeping its shape.",
-      "ratio": 3.083834659275995,
-      "rule": "scaled",
-      "to_kind": "reconstruction",
-      "to_n": 188000.0,
-      "to_year": 1998.0
+      "next": "modelled",
+      "note": "First cited point (1998 baseline, 188,000) is after 1900, so not used as the deep past's level. Genomic curve kept at its own level; the modelled natural level in 1500 CE is 1.5x lower; the two are joined log-linearly across PSMC's last 20 kyr, then the range-loss trend runs to the cited point.",
+      "ratio": 1.4537554880542698,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
+      "to_n": 398802.2199798183,
+      "to_year": 1500
      },
      "method": "PSMC",
      "ne_factor": 0.811990078352783,
-     "oldest_n": 151400.56022408963,
+     "oldest_n": 466894.2950528502,
      "oldest_yr_ago": 1870440.0966821657,
      "points": 18,
      "time_factor": 1.5119999999999998,
      "youngest_yr_ago": 20330.86274057252
     },
-    "deep_after": 151400.56022408963,
+    "deep_after": 466894.2950528502,
     "deep_before": 330280.14329036226,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 132677298630.54646,
+    "ever_after": 408712004265.76984,
     "ever_before": 280698842823.38275,
-    "ever_ratio": 0.4726677790903034,
+    "ever_ratio": 1.4560516180073235,
     "file": "Panthera_pardus.toml",
     "grades": "C",
     "leaf": "Panthera pardus",
@@ -12431,7 +12665,8 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 40,
+    "segments": 44,
+    "trend_1500": true,
     "use": "counts"
    },
    "Panthera tigris": {
@@ -12456,6 +12691,7 @@
      "dropped_blind": 5,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 99999.99999999999,
       "deep_n_raw": 171467.36301369857,
       "factor": 0.5832013640520672,
@@ -12497,6 +12733,7 @@
     },
     "points": 4,
     "segments": 32,
+    "trend_1500": false,
     "use": "counts"
    },
    "Panthera uncia": {
@@ -12514,33 +12751,38 @@
      "dropped_blind": 3,
      "grade": "D",
      "join": {
-      "deep_n": 5930.0,
+      "cited_late": {
+       "kind": "estimate",
+       "n": 5930.0,
+       "year": 1994.0
+      },
+      "deep_n": 43922.56335616437,
       "deep_n_raw": 43922.56335616437,
-      "factor": 0.13501033516450597,
+      "factor": 1.0,
       "flag": false,
-      "next": "cited",
-      "note": "Genomic curve scaled x0.14 to meet the cited 1994 count (5,930), keeping its shape.",
-      "ratio": 7.40684036360276,
-      "rule": "scaled",
-      "to_kind": "estimate",
-      "to_n": 5930.0,
-      "to_year": 1994.0
+      "next": "modelled",
+      "note": "First cited point (1994 estimate, 5,930) is after 1900, so not used as the deep past's level. Genomic curve kept at its own level; the modelled natural level in 1500 CE is 5.7x lower; the two are joined log-linearly across PSMC's last 20 kyr, then the range-loss trend runs to the cited point.",
+      "ratio": 5.688714331843591,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
+      "to_n": 7721.000000000001,
+      "to_year": 1500
      },
      "method": "PSMC",
      "ne_factor": 0.45280993150684923,
-     "oldest_n": 5930.0,
+     "oldest_n": 43922.56335616437,
      "oldest_yr_ago": 80555.31495658869,
      "points": 3,
      "time_factor": 0.724,
      "youngest_yr_ago": 32885.99435202773
     },
-    "deep_after": 5930.0,
+    "deep_after": 43922.56335616437,
     "deep_before": 7500.0,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 4470753436.978591,
+    "ever_after": 32922226770.94571,
     "ever_before": 5639930144.118823,
-    "ever_ratio": 0.7926965977833218,
+    "ever_ratio": 5.837346550342681,
     "file": "Panthera_uncia.toml",
     "grades": "C",
     "leaf": "Panthera uncia",
@@ -12554,7 +12796,8 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 3,
-    "segments": 12,
+    "segments": 19,
+    "trend_1500": true,
     "use": "counts"
    },
    "Parahyaena brunnea": {
@@ -12572,6 +12815,7 @@
      "dropped_blind": 5,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 48935.010690002004,
       "deep_n_raw": 48935.010690002004,
       "factor": 1.0,
@@ -12613,6 +12857,7 @@
     },
     "points": 1,
     "segments": 50,
+    "trend_1500": false,
     "use": "counts"
    },
    "Phacochoerus africanus": {
@@ -12630,6 +12875,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 2233391.5131919216,
       "deep_n_raw": 2233391.5131919216,
       "factor": 1.0,
@@ -12671,6 +12917,7 @@
     },
     "points": 0,
     "segments": 44,
+    "trend_1500": false,
     "use": "counts"
    },
    "Phascolarctos cinereus": {
@@ -12709,6 +12956,7 @@
     },
     "points": 2,
     "segments": 14,
+    "trend_1500": false,
     "use": "counts"
    },
    "Physeter macrocephalus": {
@@ -12747,6 +12995,7 @@
     },
     "points": 2,
     "segments": 7,
+    "trend_1500": false,
     "use": "counts"
    },
    "Pongo abelii": {
@@ -12771,6 +13020,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 89286.0,
       "deep_n_raw": 69503.17268818223,
       "factor": 1.2846320037873824,
@@ -12812,6 +13062,7 @@
     },
     "points": 2,
     "segments": 36,
+    "trend_1500": false,
     "use": "counts"
    },
    "Pongo pygmaeus": {
@@ -12836,33 +13087,38 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
-      "deep_n": 288500.0,
+      "cited_late": {
+       "kind": "reconstruction",
+       "n": 288500.0,
+       "year": 1973.0
+      },
+      "deep_n": 73292.39337652603,
       "deep_n_raw": 73292.39337652603,
-      "factor": 3.936288429249198,
+      "factor": 1.0,
       "flag": false,
-      "next": "cited",
-      "note": "Genomic curve scaled x3.9 to meet the cited 1973 baseline (288,500), keeping its shape.",
-      "ratio": 0.25404642418206597,
-      "rule": "scaled",
-      "to_kind": "reconstruction",
-      "to_n": 288500.0,
-      "to_year": 1973.0
+      "next": "modelled",
+      "note": "First cited point (1973 baseline, 288,500) is after 1900, so not used as the deep past's level. Genomic curve kept at its own level; the modelled natural level in 1500 CE is 1.2x higher; the two are joined log-linearly across PSMC's last 20 kyr, then the range-loss trend runs to the cited point.",
+      "ratio": 0.831310105082443,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
+      "to_n": 88164.92537313432,
+      "to_year": 1500
      },
      "method": "PSMC",
      "ne_factor": 0.8305684931506848,
-     "oldest_n": 1984926.6007069247,
+     "oldest_n": 504263.50517345767,
      "oldest_yr_ago": 1824369.8334619042,
      "points": 15,
      "time_factor": 0.6639999999999999,
      "youngest_yr_ago": 23165.339889774667
     },
-    "deep_after": 1984926.6007069247,
+    "deep_after": 504263.50517345767,
     "deep_before": 160956.71641791044,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 363633159425.6209,
+    "ever_after": 92401158693.07933,
     "ever_before": 32591587547.446293,
-    "ever_ratio": 11.157270534804411,
+    "ever_ratio": 2.835122976398841,
     "file": "Pongo_pygmaeus.toml",
     "grades": "BC",
     "leaf": "Pongo pygmaeus",
@@ -12876,7 +13132,8 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 2,
-    "segments": 43,
+    "segments": 48,
+    "trend_1500": true,
     "use": "counts"
    },
    "Pongo tapanuliensis": {
@@ -12894,6 +13151,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 22089.578600978464,
       "deep_n_raw": 22089.578600978464,
       "factor": 1.0,
@@ -12928,6 +13186,7 @@
     "natural": null,
     "points": 0,
     "segments": 42,
+    "trend_1500": false,
     "use": "counts"
    },
    "Pseudois nayaur": {
@@ -12945,6 +13204,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 256710.25291605116,
       "deep_n_raw": 256710.25291605116,
       "factor": 1.0,
@@ -12986,6 +13246,7 @@
     },
     "points": 0,
     "segments": 31,
+    "trend_1500": false,
     "use": "counts"
    },
    "Puma concolor": {
@@ -13003,6 +13264,7 @@
      "dropped_blind": 3,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 39778.069521214544,
       "deep_n_raw": 39778.069521214544,
       "factor": 1.0,
@@ -13044,6 +13306,7 @@
     },
     "points": 1,
     "segments": 48,
+    "trend_1500": false,
     "use": "counts"
    },
    "Rangifer tarandus": {
@@ -13061,6 +13324,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 3784230.6298088157,
       "deep_n_raw": 3784230.6298088157,
       "factor": 1.0,
@@ -13102,6 +13366,7 @@
     },
     "points": 1,
     "segments": 49,
+    "trend_1500": false,
     "use": "counts"
    },
    "Redunca redunca": {
@@ -13119,6 +13384,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 282182.30558830866,
       "deep_n_raw": 282182.30558830866,
       "factor": 1.0,
@@ -13160,6 +13426,7 @@
     },
     "points": 0,
     "segments": 43,
+    "trend_1500": false,
     "use": "counts"
    },
    "Rhinoceros unicornis": {
@@ -13177,6 +13444,7 @@
      "dropped_blind": 9,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 24387.44086852208,
       "deep_n_raw": 24387.44086852208,
       "factor": 1.0,
@@ -13218,6 +13486,7 @@
     },
     "points": 1,
     "segments": 41,
+    "trend_1500": false,
     "use": "counts"
    },
    "Saiga tatarica": {
@@ -13256,6 +13525,7 @@
     },
     "points": 4,
     "segments": 11,
+    "trend_1500": false,
     "use": "counts"
    },
    "Sarcophilus harrisii": {
@@ -13294,6 +13564,7 @@
     },
     "points": 1,
     "segments": 7,
+    "trend_1500": false,
     "use": "counts"
    },
    "Sus scrofa": {
@@ -13325,6 +13596,7 @@
     },
     "points": 18,
     "segments": 13,
+    "trend_1500": false,
     "use": "counts"
    },
    "Syncerus caffer": {
@@ -13342,6 +13614,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 241898.88560854894,
       "deep_n_raw": 241898.88560854894,
       "factor": 1.0,
@@ -13383,6 +13656,7 @@
     },
     "points": 1,
     "segments": 45,
+    "trend_1500": false,
     "use": "counts"
    },
    "Tapirus indicus": {
@@ -13400,6 +13674,7 @@
      "dropped_blind": 4,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 63724.62285104446,
       "deep_n_raw": 63724.62285104446,
       "factor": 1.0,
@@ -13441,6 +13716,7 @@
     },
     "points": 1,
     "segments": 46,
+    "trend_1500": false,
     "use": "counts"
    },
    "Tapirus terrestris": {
@@ -13458,6 +13734,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 486599.07267597975,
       "deep_n_raw": 486599.07267597975,
       "factor": 1.0,
@@ -13499,6 +13776,7 @@
     },
     "points": 1,
     "segments": 31,
+    "trend_1500": false,
     "use": "counts"
    },
    "Tragelaphus eurycerus": {
@@ -13516,6 +13794,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 106039.4833921405,
       "deep_n_raw": 106039.4833921405,
       "factor": 1.0,
@@ -13557,6 +13836,7 @@
     },
     "points": 0,
     "segments": 42,
+    "trend_1500": false,
     "use": "counts"
    },
    "Tragelaphus oryx": {
@@ -13574,6 +13854,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 151658.63650601465,
       "deep_n_raw": 151658.63650601465,
       "factor": 1.0,
@@ -13615,6 +13896,7 @@
     },
     "points": 0,
     "segments": 45,
+    "trend_1500": false,
     "use": "counts"
    },
    "Tragelaphus scriptus": {
@@ -13632,6 +13914,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 311185.679368852,
       "deep_n_raw": 311185.679368852,
       "factor": 1.0,
@@ -13673,6 +13956,7 @@
     },
     "points": 0,
     "segments": 43,
+    "trend_1500": false,
     "use": "counts"
    },
    "Tragelaphus spekii": {
@@ -13690,6 +13974,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 23693.141721380798,
       "deep_n_raw": 23693.141721380798,
       "factor": 1.0,
@@ -13731,6 +14016,7 @@
     },
     "points": 0,
     "segments": 56,
+    "trend_1500": false,
     "use": "counts"
    },
    "Tragelaphus strepsiceros": {
@@ -13748,6 +14034,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 160032.5618270805,
       "deep_n_raw": 160032.5618270805,
       "factor": 1.0,
@@ -13789,6 +14076,7 @@
     },
     "points": 0,
     "segments": 54,
+    "trend_1500": false,
     "use": "counts"
    },
    "Tremarctos ornatus": {
@@ -13806,6 +14094,7 @@
      "dropped_blind": 3,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 19979.877692825303,
       "deep_n_raw": 19979.877692825303,
       "factor": 1.0,
@@ -13847,6 +14136,7 @@
     },
     "points": 1,
     "segments": 47,
+    "trend_1500": false,
     "use": "counts"
    },
    "Ursus americanus": {
@@ -13864,6 +14154,7 @@
      "dropped_blind": 5,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 16225.289455496924,
       "deep_n_raw": 16225.289455496924,
       "factor": 1.0,
@@ -13905,6 +14196,7 @@
     },
     "points": 1,
     "segments": 49,
+    "trend_1500": false,
     "use": "counts"
    },
    "Ursus arctos": {
@@ -13922,33 +14214,38 @@
      "dropped_blind": 3,
      "grade": "D",
      "join": {
-      "deep_n": 200000.0,
+      "cited_late": {
+       "kind": "estimate",
+       "n": 200000.0,
+       "year": 2017.0
+      },
+      "deep_n": 24401.909159455965,
       "deep_n_raw": 24401.909159455965,
-      "factor": 8.196080015423636,
-      "flag": false,
-      "next": "cited",
-      "note": "Genomic curve scaled x8.2 to meet the cited 2017 count (200,000), keeping its shape.",
-      "ratio": 0.12200954579727982,
-      "rule": "scaled",
-      "to_kind": "estimate",
-      "to_n": 200000.0,
-      "to_year": 2017.0
+      "factor": 1.0,
+      "flag": true,
+      "next": "modelled",
+      "note": "First cited point (2017 estimate, 200,000) is after 1900, so not used as the deep past's level. Genomic curve kept at its own level; the modelled natural level in 1500 CE is 15x higher (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr, then the range-loss trend runs to the cited point.",
+      "ratio": 0.06735320847558111,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
+      "to_n": 362297.6501305483,
+      "to_year": 1500
      },
      "method": "PSMC",
      "ne_factor": 0.5769420944546153,
-     "oldest_n": 3175481.8240415053,
+     "oldest_n": 387439.0950388217,
      "oldest_yr_ago": 1469479.019898501,
      "points": 15,
      "time_factor": 0.944,
      "youngest_yr_ago": 25713.714767879752
     },
-    "deep_after": 3175481.8240415053,
+    "deep_after": 387439.0950388217,
     "deep_before": 398527.4151436031,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 513826562596.0754,
+    "ever_after": 63018150343.79094,
     "ever_before": 81686056093.73222,
-    "ever_ratio": 6.290260384299559,
+    "ever_ratio": 0.7714676574846454,
     "file": "Ursus_arctos.toml",
     "grades": "C",
     "leaf": "Ursus arctos",
@@ -13962,7 +14259,8 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 32,
+    "segments": 41,
+    "trend_1500": true,
     "use": "counts"
    },
    "Ursus maritimus": {
@@ -13980,33 +14278,38 @@
      "dropped_blind": 4,
      "grade": "D",
      "join": {
-      "deep_n": 10000.000000000002,
-      "deep_n_raw": 27964.125472350268,
-      "factor": 0.35760102742664257,
+      "cited_late": {
+       "kind": "estimate",
+       "n": 10000.0,
+       "year": 1965.0
+      },
+      "deep_n": 27964.125472350264,
+      "deep_n_raw": 27964.125472350264,
+      "factor": 1.0,
       "flag": false,
-      "next": "cited",
-      "note": "Genomic curve scaled x0.36 to meet the cited 1965 count (10,000), keeping its shape.",
-      "ratio": 2.7964125472350263,
-      "rule": "scaled",
-      "to_kind": "estimate",
-      "to_n": 10000.0,
-      "to_year": 1965.0
+      "next": "modelled",
+      "note": "First cited point (1965 estimate, 10,000) is after 1900, so not used as the deep past's level. Genomic curve kept at its own level; the modelled natural level in 1500 CE is 1.1x lower; the two are joined log-linearly across PSMC's last 20 kyr, then the range-loss trend runs to the cited point.",
+      "ratio": 1.075543287398087,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
+      "to_n": 26000.0,
+      "to_year": 1500
      },
      "method": "PSMC",
      "ne_factor": 0.6297643835616438,
-     "oldest_n": 154861.4627047824,
+     "oldest_n": 433056.53739082254,
      "oldest_yr_ago": 1241287.0631887894,
      "points": 21,
      "time_factor": 0.944,
      "youngest_yr_ago": 22620.201207941052
     },
-    "deep_after": 154861.4627047824,
+    "deep_after": 433056.53739082254,
     "deep_before": 26000.0,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 25207303714.311485,
+    "ever_after": 70486115100.64352,
     "ever_before": 5817581917.808218,
-    "ever_ratio": 4.332952087386914,
+    "ever_ratio": 12.116050293142974,
     "file": "Ursus_maritimus.toml",
     "grades": "BCD",
     "leaf": "Ursus maritimus",
@@ -14020,7 +14323,8 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 3,
-    "segments": 51,
+    "segments": 55,
+    "trend_1500": true,
     "use": "counts"
    },
    "Ursus thibetanus": {
@@ -14038,6 +14342,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 282420.1687378581,
       "deep_n_raw": 282420.1687378581,
       "factor": 1.0,
@@ -14079,6 +14384,7 @@
     },
     "points": 1,
     "segments": 41,
+    "trend_1500": false,
     "use": "counts"
    },
    "Vicugna pacos": {
@@ -14096,6 +14402,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 202272.52135129974,
       "deep_n_raw": 202272.52135129974,
       "factor": 1.0,
@@ -14130,6 +14437,7 @@
     "natural": null,
     "points": 0,
     "segments": 29,
+    "trend_1500": false,
     "use": "counts"
    },
    "Vicugna vicugna": {
@@ -14154,6 +14462,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "cited_late": null,
       "deep_n": 2000000.0,
       "deep_n_raw": 67178.97089652858,
       "factor": 29.77122116205785,
@@ -14195,6 +14504,7 @@
     },
     "points": 3,
     "segments": 60,
+    "trend_1500": false,
     "use": "counts"
    }
   }
@@ -14202,11 +14512,11 @@
  "knuckles_collapsed": 3710,
  "mammalia": {
   "alive": 99887540952.51947,
-  "ever": 8.55798048612266e+18,
-  "ghost": 8.112837196817585e+18,
+  "ever": 8.557980459189256e+18,
+  "ghost": 8.112846743040573e+18,
   "grade": "D",
-  "hi": 3.6664310465867343e+22,
-  "lo": 1735264649568884.0
+  "hi": 3.1997841938304117e+22,
+  "lo": 1989039485453661.0
  },
  "mass_sources": {
   "mass:combine": 183,
@@ -15152,12 +15462,12 @@
   "non-species tip": 551
  },
  "output": {
-  "brotli_bytes": 676131,
+  "brotli_bytes": 675920,
   "files": 16,
-  "raw_bytes": 2724064,
-  "skeleton_brotli": 51276,
+  "raw_bytes": 2721448,
+  "skeleton_brotli": 51286,
   "skeleton_nodes": 1156,
-  "skeleton_raw": 242728,
+  "skeleton_raw": 243968,
   "tiles": 15
  },
  "overrides": {
@@ -15322,7 +15632,7 @@
   "maps_used": 5613,
   "range_maps": 5831
  },
- "pieces": 303566,
+ "pieces": 305527,
  "rangeloss": {
   "carried_by_genomic_record": 48,
   "declines": 583,
@@ -15773,7 +16083,7 @@
     "leaf": "Equus ferus",
     "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count",
     "natural": 699417.7777777778,
-    "segments": 2,
+    "segments": 21,
     "today": 1360.0
    },
    {
@@ -15785,7 +16095,7 @@
     "leaf": "Ceratotherium simum",
     "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count",
     "natural": 20744.172307692304,
-    "segments": 43,
+    "segments": 47,
     "today": 15752.0
    },
    {
@@ -15797,7 +16107,7 @@
     "leaf": "Mustela nigripes",
     "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count",
     "natural": 51418.666666666664,
-    "segments": 3,
+    "segments": 19,
     "today": 496.0
    },
    {
@@ -15821,7 +16131,7 @@
     "leaf": "Ursus arctos",
     "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count",
     "natural": 362297.6501305483,
-    "segments": 32,
+    "segments": 41,
     "today": 200000.0
    },
    {
@@ -15833,7 +16143,7 @@
     "leaf": "Canis lupus",
     "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count",
     "natural": 276872.9020445529,
-    "segments": 3,
+    "segments": 5,
     "today": 225000.0
    },
    {
@@ -15916,13 +16226,13 @@
   },
   "Hominidae": {
    "alive": 8301443760.715325,
-   "ever": 2233316904338.464,
+   "ever": 1943030969713.6646,
    "ever_range": [
-    36081627797.38731,
-    296119501971859.5
+    28190247374.82404,
+    251399382599416.94
    ],
    "extinct(gray)": false,
-   "ghost": 374602032255.0176,
+   "ghost": 374612265488.95026,
    "grade": "D",
    "t0_Ma": 14.805233333333334,
    "t1_Ma": 0.0
@@ -15942,13 +16252,13 @@
   },
   "Mammalia": {
    "alive": 99887540952.51947,
-   "ever": 8.55798048612266e+18,
+   "ever": 8.557980459189256e+18,
    "ever_range": [
-    1735264649568884.0,
-    3.6664310465867343e+22
+    1989039485453661.0,
+    3.1997841938304117e+22
    ],
    "extinct(gray)": 0.0,
-   "ghost": 8.112837196817585e+18,
+   "ghost": 8.112846743040573e+18,
    "grade": "D",
    "t0_Ma": 208.64140800000004,
    "t1_Ma": 0.0
@@ -16258,8 +16568,8 @@
   "by_alive": [
    {
     "alive": 54318491455.12063,
-    "ever": 1.390206092463892e+18,
-    "ghost": 1.2006083470177505e+18,
+    "ever": 1.3902101706241828e+18,
+    "ghost": 1.2006124251780413e+18,
     "ghost_share": 0.864,
     "name": "Chiroptera",
     "sampled": 1.8959774544614144e+17,
@@ -16267,53 +16577,53 @@
    },
    {
     "alive": 23133449903.122658,
-    "ever": 1.7936524148292854e+18,
-    "ghost": 1.634248495699657e+18,
+    "ever": 1.7936569630563832e+18,
+    "ghost": 1.634253044582052e+18,
     "ghost_share": 0.911,
     "name": "Rodentia",
-    "sampled": 1.594039191296284e+17,
+    "sampled": 1.5940391847433114e+17,
     "t0_Ma": 72.45
    },
    {
     "alive": 5654779269.41726,
-    "ever": 8704543474508339.0,
-    "ghost": 4312350074865836.0,
-    "ghost_share": 0.495,
+    "ever": 8695842095347042.0,
+    "ghost": 4312364336260189.5,
+    "ghost_share": 0.496,
     "name": "Artiodactyla",
-    "sampled": 4392193399642503.0,
+    "sampled": 4383477759086852.5,
     "t0_Ma": 61.87
    },
    {
     "alive": 2226019086.255797,
-    "ever": 1.711104496482647e+16,
-    "ghost": 1.5298096112590922e+16,
+    "ever": 1.7110844227519254e+16,
+    "ghost": 1.5298140320510486e+16,
     "ghost_share": 0.894,
     "name": "Carnivora",
-    "sampled": 1812948852235548.0,
+    "sampled": 1812703907008768.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 1492362384.468411,
-    "ever": 1.832570089165219e+17,
-    "ghost": 1.4215454181999688e+17,
+    "ever": 1.83257366739296e+17,
+    "ghost": 1.42154899642771e+17,
     "ghost_share": 0.776,
     "name": "Eulipotyphla",
-    "sampled": 4.110246709652501e+16,
+    "sampled": 4.110246709652499e+16,
     "t0_Ma": 75.11
    },
    {
     "alive": 1195648666.3005614,
-    "ever": 7.820197360347805e+16,
-    "ghost": 6.268838625521876e+16,
+    "ever": 7.820215752080109e+16,
+    "ghost": 6.268857017254179e+16,
     "ghost_share": 0.802,
     "name": "Didelphimorphia",
-    "sampled": 1.5513587348259288e+16,
+    "sampled": 1.5513587348259296e+16,
     "t0_Ma": 74.42
    },
    {
     "alive": 751328331.2713387,
-    "ever": 4.005810598122769e+16,
-    "ghost": 2.8658714326482244e+16,
+    "ever": 4.005821195784913e+16,
+    "ghost": 2.8658820303103684e+16,
     "ghost_share": 0.715,
     "name": "Lagomorpha",
     "sampled": 1.1399391654745444e+16,
@@ -16321,8 +16631,8 @@
    },
    {
     "alive": 619434015.7798252,
-    "ever": 1.1869576793660038e+16,
-    "ghost": 9506589525595082.0,
+    "ever": 1.1869611947932064e+16,
+    "ghost": 9506624679867108.0,
     "ghost_share": 0.801,
     "name": "Hyracoidea",
     "sampled": 2362987268064956.0,
@@ -16330,8 +16640,8 @@
    },
    {
     "alive": 408303737.17517364,
-    "ever": 1.2131207935357496e+16,
-    "ghost": 9095427329809824.0,
+    "ever": 1.2131245081891824e+16,
+    "ghost": 9095464476344152.0,
     "ghost_share": 0.75,
     "name": "Diprotodontia",
     "sampled": 3035780605547672.0,
@@ -16339,28 +16649,28 @@
    },
    {
     "alive": 290577780.41253823,
-    "ever": 2.036127606079529e+16,
-    "ghost": 1.3221477177726952e+16,
+    "ever": 2.0361314267705884e+16,
+    "ghost": 1.3221515384637546e+16,
     "ghost_share": 0.649,
     "name": "Macroscelidea",
-    "sampled": 7139798883068336.0,
+    "sampled": 7139798883068338.0,
     "t0_Ma": 65.7
    }
   ],
   "by_ever": [
    {
     "alive": 23133449903.122658,
-    "ever": 1.7936524148292854e+18,
-    "ghost": 1.634248495699657e+18,
+    "ever": 1.7936569630563832e+18,
+    "ghost": 1.634253044582052e+18,
     "ghost_share": 0.911,
     "name": "Rodentia",
-    "sampled": 1.594039191296284e+17,
+    "sampled": 1.5940391847433114e+17,
     "t0_Ma": 72.45
    },
    {
     "alive": 54318491455.12063,
-    "ever": 1.390206092463892e+18,
-    "ghost": 1.2006083470177505e+18,
+    "ever": 1.3902101706241828e+18,
+    "ghost": 1.2006124251780413e+18,
     "ghost_share": 0.864,
     "name": "Chiroptera",
     "sampled": 1.8959774544614144e+17,
@@ -16368,26 +16678,26 @@
    },
    {
     "alive": 1492362384.468411,
-    "ever": 1.832570089165219e+17,
-    "ghost": 1.4215454181999688e+17,
+    "ever": 1.83257366739296e+17,
+    "ghost": 1.42154899642771e+17,
     "ghost_share": 0.776,
     "name": "Eulipotyphla",
-    "sampled": 4.110246709652501e+16,
+    "sampled": 4.110246709652499e+16,
     "t0_Ma": 75.11
    },
    {
     "alive": 1195648666.3005614,
-    "ever": 7.820197360347805e+16,
-    "ghost": 6.268838625521876e+16,
+    "ever": 7.820215752080109e+16,
+    "ghost": 6.268857017254179e+16,
     "ghost_share": 0.802,
     "name": "Didelphimorphia",
-    "sampled": 1.5513587348259288e+16,
+    "sampled": 1.5513587348259296e+16,
     "t0_Ma": 74.42
    },
    {
     "alive": 751328331.2713387,
-    "ever": 4.005810598122769e+16,
-    "ghost": 2.8658714326482244e+16,
+    "ever": 4.005821195784913e+16,
+    "ghost": 2.8658820303103684e+16,
     "ghost_share": 0.715,
     "name": "Lagomorpha",
     "sampled": 1.1399391654745444e+16,
@@ -16395,26 +16705,26 @@
    },
    {
     "alive": 290577780.41253823,
-    "ever": 2.036127606079529e+16,
-    "ghost": 1.3221477177726952e+16,
+    "ever": 2.0361314267705884e+16,
+    "ghost": 1.3221515384637546e+16,
     "ghost_share": 0.649,
     "name": "Macroscelidea",
-    "sampled": 7139798883068336.0,
+    "sampled": 7139798883068338.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 2226019086.255797,
-    "ever": 1.711104496482647e+16,
-    "ghost": 1.5298096112590922e+16,
+    "ever": 1.7110844227519254e+16,
+    "ghost": 1.5298140320510486e+16,
     "ghost_share": 0.894,
     "name": "Carnivora",
-    "sampled": 1812948852235548.0,
+    "sampled": 1812703907008768.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 408303737.17517364,
-    "ever": 1.2131207935357496e+16,
-    "ghost": 9095427329809824.0,
+    "ever": 1.2131245081891824e+16,
+    "ghost": 9095464476344152.0,
     "ghost_share": 0.75,
     "name": "Diprotodontia",
     "sampled": 3035780605547672.0,
@@ -16422,8 +16732,8 @@
    },
    {
     "alive": 619434015.7798252,
-    "ever": 1.1869576793660038e+16,
-    "ghost": 9506589525595082.0,
+    "ever": 1.1869611947932064e+16,
+    "ghost": 9506624679867108.0,
     "ghost_share": 0.801,
     "name": "Hyracoidea",
     "sampled": 2362987268064956.0,
@@ -16431,19 +16741,19 @@
    },
    {
     "alive": 5654779269.41726,
-    "ever": 8704543474508339.0,
-    "ghost": 4312350074865836.0,
-    "ghost_share": 0.495,
+    "ever": 8695842095347042.0,
+    "ghost": 4312364336260189.5,
+    "ghost_share": 0.496,
     "name": "Artiodactyla",
-    "sampled": 4392193399642503.0,
+    "sampled": 4383477759086852.5,
     "t0_Ma": 61.87
    }
   ],
   "by_sampled_ever": [
    {
     "alive": 54318491455.12063,
-    "ever": 1.390206092463892e+18,
-    "ghost": 1.2006083470177505e+18,
+    "ever": 1.3902101706241828e+18,
+    "ghost": 1.2006124251780413e+18,
     "ghost_share": 0.864,
     "name": "Chiroptera",
     "sampled": 1.8959774544614144e+17,
@@ -16451,35 +16761,35 @@
    },
    {
     "alive": 23133449903.122658,
-    "ever": 1.7936524148292854e+18,
-    "ghost": 1.634248495699657e+18,
+    "ever": 1.7936569630563832e+18,
+    "ghost": 1.634253044582052e+18,
     "ghost_share": 0.911,
     "name": "Rodentia",
-    "sampled": 1.594039191296284e+17,
+    "sampled": 1.5940391847433114e+17,
     "t0_Ma": 72.45
    },
    {
     "alive": 1492362384.468411,
-    "ever": 1.832570089165219e+17,
-    "ghost": 1.4215454181999688e+17,
+    "ever": 1.83257366739296e+17,
+    "ghost": 1.42154899642771e+17,
     "ghost_share": 0.776,
     "name": "Eulipotyphla",
-    "sampled": 4.110246709652501e+16,
+    "sampled": 4.110246709652499e+16,
     "t0_Ma": 75.11
    },
    {
     "alive": 1195648666.3005614,
-    "ever": 7.820197360347805e+16,
-    "ghost": 6.268838625521876e+16,
+    "ever": 7.820215752080109e+16,
+    "ghost": 6.268857017254179e+16,
     "ghost_share": 0.802,
     "name": "Didelphimorphia",
-    "sampled": 1.5513587348259288e+16,
+    "sampled": 1.5513587348259296e+16,
     "t0_Ma": 74.42
    },
    {
     "alive": 751328331.2713387,
-    "ever": 4.005810598122769e+16,
-    "ghost": 2.8658714326482244e+16,
+    "ever": 4.005821195784913e+16,
+    "ghost": 2.8658820303103684e+16,
     "ghost_share": 0.715,
     "name": "Lagomorpha",
     "sampled": 1.1399391654745444e+16,
@@ -16487,26 +16797,26 @@
    },
    {
     "alive": 290577780.41253823,
-    "ever": 2.036127606079529e+16,
-    "ghost": 1.3221477177726952e+16,
+    "ever": 2.0361314267705884e+16,
+    "ghost": 1.3221515384637546e+16,
     "ghost_share": 0.649,
     "name": "Macroscelidea",
-    "sampled": 7139798883068336.0,
+    "sampled": 7139798883068338.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 5654779269.41726,
-    "ever": 8704543474508339.0,
-    "ghost": 4312350074865836.0,
-    "ghost_share": 0.495,
+    "ever": 8695842095347042.0,
+    "ghost": 4312364336260189.5,
+    "ghost_share": 0.496,
     "name": "Artiodactyla",
-    "sampled": 4392193399642503.0,
+    "sampled": 4383477759086852.5,
     "t0_Ma": 61.87
    },
    {
     "alive": 408303737.17517364,
-    "ever": 1.2131207935357496e+16,
-    "ghost": 9095427329809824.0,
+    "ever": 1.2131245081891824e+16,
+    "ghost": 9095464476344152.0,
     "ghost_share": 0.75,
     "name": "Diprotodontia",
     "sampled": 3035780605547672.0,
@@ -16514,8 +16824,8 @@
    },
    {
     "alive": 619434015.7798252,
-    "ever": 1.1869576793660038e+16,
-    "ghost": 9506589525595082.0,
+    "ever": 1.1869611947932064e+16,
+    "ghost": 9506624679867108.0,
     "ghost_share": 0.801,
     "name": "Hyracoidea",
     "sampled": 2362987268064956.0,
@@ -16523,11 +16833,11 @@
    },
    {
     "alive": 2226019086.255797,
-    "ever": 1.711104496482647e+16,
-    "ghost": 1.5298096112590922e+16,
+    "ever": 1.7110844227519254e+16,
+    "ghost": 1.5298140320510486e+16,
     "ghost_share": 0.894,
     "name": "Carnivora",
-    "sampled": 1812948852235548.0,
+    "sampled": 1812703907008768.0,
     "t0_Ma": 65.7
    }
   ]
