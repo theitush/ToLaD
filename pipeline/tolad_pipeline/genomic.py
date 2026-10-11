@@ -12,7 +12,11 @@ Precedence: a hand-written [deep] in pipeline/history/*.toml wins (the five Pant
 2025). A wild `counts` history file without one gets the bulk curve as its [deep]. A species with no
 history file gets a modelled record (`modelled = "genomic"`): the genomic points, then (when it has
 the range-loss trend of ToLaD#62) the natural level in 1500 CE and the trend to today's count, else
-today's count. See pipeline/history/README.md, "Bulk genomic deep past".
+today's count. A domestic history file does not block it (ToLaD#76): the curve is the deep past of the
+wild population living on the leaf today, so a leaf with a domestic file and a wild population (the wild
+boar beside the pig) gets a modelled wild record beside the file; a domestic form with no wild
+population of its own, or whose wild ancestor is another leaf (anchors.DOMESTIC_FORMS), gets none.
+See pipeline/history/README.md, "Bulk genomic deep past".
 """
 
 from __future__ import annotations
@@ -21,6 +25,8 @@ import csv
 import math
 from collections import defaultdict
 from pathlib import Path
+
+from .anchors import DOMESTIC_ALIASES, DOMESTIC_FORMS
 
 CITE = "Bergman et al. 2023, Nat Commun 14:7679, Supplementary Data 3 (PSMC Ne trajectory)"
 URL = "https://doi.org/10.1038/s41467-023-43426-5"
@@ -123,6 +129,11 @@ def load(raw: Path) -> dict[str, dict]:
     return out
 
 
+def _domestic_leaf_names(rec: dict) -> list[str]:
+    """The leaf names a domestic history file may sit on (as history.apply looks it up)."""
+    return [rec["species"]] + rec["aliases"] + DOMESTIC_ALIASES.get(rec["species"], [])
+
+
 def attach(recs: list[dict], leaves: dict, curves: dict[str, dict], start_point, log: dict) -> list[dict]:
     """Give the bulk curves to the history records (in place) and return the new modelled records.
 
@@ -135,33 +146,58 @@ def attach(recs: list[dict], leaves: dict, curves: dict[str, dict], start_point,
     rows, new = {}, []
     for sp, c in curves.items():
         rec = next((by_name[n] for n in c["names"] if n in by_name), None)
+        beside = None  # a domestic history file on the same leaf (the wild record goes next to it)
         if rec is not None:
-            if rec["deep"] is not None:
-                why = "hand-written [deep] wins"
-            elif rec["component"] != "wild" or rec["use"] != "counts":
-                why = f"history file is {rec['component']} / {rec['use']}"
+            if rec["component"] == "domestic" and rec["use"] == "counts" and rec["deep"] is None:
+                beside = rec
             else:
-                rec["deep"] = c["deep"]
-                rec["deep_bulk"] = True
-                why = "history file"
-            rows[sp] = {"used": why == "history file", "how": why, "leaf": rec["species"], "sample": c["sample"]}
-            continue
-        leaf = next((leaves[n] for n in c["names"] if n in leaves), None)
+                if rec["deep"] is not None:
+                    why = "hand-written [deep] wins"
+                elif rec["component"] != "wild" or rec["use"] != "counts":
+                    why = f"history file is {rec['component']} / {rec['use']}"
+                else:
+                    rec["deep"] = c["deep"]
+                    rec["deep_bulk"] = True
+                    why = "history file"
+                rows[sp] = {"used": why == "history file", "how": why, "leaf": rec["species"],
+                            "sample": c["sample"]}
+                continue
+        # the genome's curve (older than PSMC's ~20 kyr blind spot, so older than any domestication)
+        # is the deep past of a wild population: it goes on a leaf only as the deep past of the wild
+        # population living on it today (ToLaD#76)
+        cands = c["names"] + (_domestic_leaf_names(beside) if beside else [])
+        leaf = next((leaves[n] for n in cands if n in leaves), None)
         if leaf is None:
-            rows[sp] = {"used": False, "how": "no living tree leaf of this name", "sample": c["sample"]}
+            rows[sp] = {"used": False, "sample": c["sample"],
+                        "how": ("history file is domestic and the leaf has no wild population today" if beside
+                                else "no living tree leaf of this name")}
+            continue
+        form = next((n for n in c["names"] + [leaf.name] if n in DOMESTIC_FORMS), None)
+        if form is not None:
+            rows[sp] = {"used": False, "how": "domestic form (its wild ancestor is another leaf)", "leaf": leaf.name,
+                        "ancestor": DOMESTIC_FORMS[form], "sample": c["sample"]}
             continue
         D = leaf.data
         if D.get("rate_wild_now", 0.0) <= 0:
-            rows[sp] = {"used": False, "how": "no wild population today (domestic form)", "leaf": leaf.name,
+            rows[sp] = {"used": False, "how": ("history file is domestic and the leaf has no wild population today"
+                                               if beside else "no wild population today (domestic form)"),
+                        "leaf": leaf.name, "sample": c["sample"]}
+            continue
+        if any(r["component"] == "wild" and r["use"] == "counts" for r in (by_name.get(leaf.name),) if r):
+            rows[sp] = {"used": False, "how": "the leaf has a wild history file of another name", "leaf": leaf.name,
                         "sample": c["sample"]}
             continue
         p0 = start_point(leaf)
         new.append({"species": leaf.name, "aliases": [], "common": "", "component": "wild", "use": "counts",
                     "scope": "global; deep past from one genome (PSMC), modelled", "faostat_item": None,
                     "file": None, "notes": NOTE, "points": [p0] if p0 else [], "baseline": None,
-                    "deep": c["deep"], "deep_bulk": True, "modelled": "genomic"})
-        rows[sp] = {"used": True, "how": "modelled record" + (" + range-loss trend" if p0 else ""),
+                    "deep": c["deep"], "deep_bulk": True, "modelled": "genomic",
+                    "beside": beside["file"] if beside else None})
+        rows[sp] = {"used": True, "how": ("modelled wild record beside the domestic history file" if beside
+                                          else "modelled record") + (" + range-loss trend" if p0 else ""),
                     "leaf": leaf.name, "sample": c["sample"]}
+        if beside:
+            rows[sp]["beside"] = beside["file"]
     log["genomic"] = {
         "note": "Layer 3 of the estimate stack, bulk (ToLaD#64): PSMC Ne histories from Bergman et al. 2023, "
                 "rescaled and converted as pipeline/history/README.md 'Deep past' says. used = the curve became "

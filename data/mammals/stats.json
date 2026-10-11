@@ -138,8 +138,8 @@
   },
   "Sus scrofa": {
    "domestic_alive": 962441623.0,
-   "ever": 31635573715073.043,
-   "method": "+ domestic: FAOSTAT 2024 stock 9.62e+08, growth shaped like human births since domestication; H:curated history (18 points; pipeline/history/Sus_scrofa.toml)",
+   "ever": 1874078337979.599,
+   "method": "H:curated history (18 points; pipeline/history/Sus_scrofa.toml); H:genomic deep past (modelled: PSMC 18 points, D; Bergman et al. 2023, Nat Commun 14:7679, Supplementary Data 3 (PSMC Ne trajectory), then the range-loss trend from 1500; pipeline/tolad_pipeline/genomic.py)",
    "occupancy_model_only": 9100178.676883586,
    "published": 23058494.438916147,
    "published_source": "Greenspoon 2023 per-species model (no census exists)",
@@ -7165,11 +7165,13 @@
  },
  "genomic": {
   "by_how": {
+   "domestic form (its wild ancestor is another leaf)": 5,
    "hand-written [deep] wins": 5,
    "history file": 21,
-   "history file is domestic / counts": 7,
-   "modelled record": 38,
-   "modelled record + range-loss trend": 47
+   "history file is domestic and the leaf has no wild population today": 4,
+   "modelled record": 35,
+   "modelled record + range-loss trend": 45,
+   "modelled wild record beside the domestic history file + range-loss trend": 3
   },
   "curves": 118,
   "note": "Layer 3 of the estimate stack, bulk (ToLaD#64): PSMC Ne histories from Bergman et al. 2023, rescaled and converted as pipeline/history/README.md 'Deep past' says. used = the curve became the leaf's deep past (a history file's [deep], or a modelled record). Per-species points, drops and the join to the next level are in history.species[<leaf>].deep.",
@@ -7274,16 +7276,18 @@
     "used": true
    },
    "Bos grunniens": {
-    "how": "modelled record + range-loss trend",
+    "ancestor": "Bos mutus",
+    "how": "domestic form (its wild ancestor is another leaf)",
     "leaf": "Bos grunniens",
     "sample": "Bos_grunniens",
-    "used": true
+    "used": false
    },
    "Bos indicus": {
-    "how": "modelled record",
+    "ancestor": "Bos primigenius",
+    "how": "domestic form (its wild ancestor is another leaf)",
     "leaf": "Bos indicus",
     "sample": "Bos_indicus",
-    "used": true
+    "used": false
    },
    "Bos javanicus": {
     "how": "modelled record + range-loss trend",
@@ -7298,16 +7302,17 @@
     "used": true
    },
    "Bos taurus": {
-    "how": "history file is domestic / counts",
+    "how": "history file is domestic and the leaf has no wild population today",
     "leaf": "Bos taurus",
     "sample": "Bos_taurus",
     "used": false
    },
    "Bubalus bubalis": {
-    "how": "history file is domestic / counts",
+    "beside": "Bubalus_bubalis.toml",
+    "how": "modelled wild record beside the domestic history file + range-loss trend",
     "leaf": "Bubalus bubalis",
     "sample": "Bubalus_bubalis",
-    "used": false
+    "used": true
    },
    "Budorcas taxicolor": {
     "how": "modelled record",
@@ -7316,14 +7321,14 @@
     "used": true
    },
    "Camelus bactrianus": {
-    "how": "modelled record + range-loss trend",
+    "ancestor": "Camelus ferus",
+    "how": "domestic form (its wild ancestor is another leaf)",
     "leaf": "Camelus bactrianus",
     "sample": "Camelus_bactrianus",
-    "used": true
+    "used": false
    },
    "Camelus dromedarius": {
-    "how": "history file is domestic / counts",
-    "leaf": "Camelus dromedarius",
+    "how": "history file is domestic and the leaf has no wild population today",
     "sample": "Camelus_dromedarius",
     "used": false
    },
@@ -7424,13 +7429,14 @@
     "used": true
    },
    "Equus asinus": {
-    "how": "history file is domestic / counts",
+    "beside": "Equus_asinus.toml",
+    "how": "modelled wild record beside the domestic history file + range-loss trend",
     "leaf": "Equus asinus",
     "sample": "Equus_asinus",
-    "used": false
+    "used": true
    },
    "Equus caballus": {
-    "how": "history file is domestic / counts",
+    "how": "history file is domestic and the leaf has no wild population today",
     "leaf": "Equus caballus",
     "sample": "Equus_caballus",
     "used": false
@@ -7544,10 +7550,11 @@
     "used": true
    },
    "Lama glama": {
-    "how": "modelled record",
+    "ancestor": "Lama guanicoe",
+    "how": "domestic form (its wild ancestor is another leaf)",
     "leaf": "Lama glama",
     "sample": "Lama_glama_dnaZoo",
-    "used": true
+    "used": false
    },
    "Lama guanicoe": {
     "how": "modelled record",
@@ -7658,7 +7665,7 @@
     "used": true
    },
    "Ovis aries": {
-    "how": "history file is domestic / counts",
+    "how": "history file is domestic and the leaf has no wild population today",
     "leaf": "Ovis aries",
     "sample": "Ovis_aries",
     "used": false
@@ -7796,10 +7803,11 @@
     "used": true
    },
    "Sus scrofa": {
-    "how": "history file is domestic / counts",
+    "beside": "Sus_scrofa.toml",
+    "how": "modelled wild record beside the domestic history file + range-loss trend",
     "leaf": "Sus scrofa",
     "sample": "Sus_scrofa_scrofa",
-    "used": false
+    "used": true
    },
    "Syncerus caffer": {
     "how": "modelled record + range-loss trend",
@@ -7880,10 +7888,11 @@
     "used": true
    },
    "Vicugna pacos": {
-    "how": "modelled record",
+    "ancestor": "Vicugna vicugna",
+    "how": "domestic form (its wild ancestor is another leaf)",
     "leaf": "Vicugna pacos",
     "sample": "Vicugna_pacos_dnaZoo",
-    "used": true
+    "used": false
    },
    "Vicugna vicugna": {
     "how": "history file",
@@ -7892,7 +7901,7 @@
     "used": true
    }
   },
-  "used": 106
+  "used": 104
  },
  "ghost_lineages": {
   "T_eff_yr": 150000000.0,
@@ -7901,29 +7910,29 @@
   "births_now_per_yr": 57053102497.61591,
   "by_era": {
    "Cretaceous 66-145 Ma": {
-    "ghost": 3.78116173873273e+18,
+    "ghost": 3.7811617387335014e+18,
     "ghost_share": 1.0,
-    "sampled": 173884228992342.47
+    "sampled": 173884228220860.34
    },
    "Holocene-Pleistocene 0-2.58 Ma": {
-    "ghost": 1.132979614929782e+16,
-    "ghost_share": 0.0768,
-    "sampled": 1.3618047736078718e+17
+    "ghost": 1.1350003478880418e+16,
+    "ghost_share": 0.0769,
+    "sampled": 1.3616027003116243e+17
    },
    "Jurassic and older >145 Ma": {
-    "ghost": 9.896595266545249e+17,
+    "ghost": 9.896595266545318e+17,
     "ghost_share": 1.0,
-    "sampled": 16137748343789.125
+    "sampled": 16137748336923.848
    },
    "Neogene 2.58-23 Ma": {
-    "ghost": 8.973654669214047e+17,
+    "ghost": 8.973790742079254e+17,
     "ghost_share": 0.7645,
-    "sampled": 2.7648032107897386e+17
+    "sampled": 2.7646671379245312e+17
    },
    "Paleogene 23-66 Ma": {
-    "ghost": 2.4350724658703447e+18,
+    "ghost": 2.435072461773668e+18,
     "ghost_share": 0.9876,
-    "sampled": 3.0525719432163612e+16
+    "sampled": 3.0525723528840216e+16
    }
   },
   "f_ramp_Ma": [
@@ -7931,10 +7940,10 @@
    91.36
   ],
   "ghost_share": 0.9482,
-  "max_multiplier": 99862.79574984833,
+  "max_multiplier": 99862.7957814395,
   "multiplier_at_Ma": {
    "0.01": 1.012,
-   "1": 1.027,
+   "1": 1.028,
    "100": 74197.878,
    "150": 48170.861,
    "20": 12.18,
@@ -7943,15 +7952,15 @@
    "50": 242.708,
    "66": 3397.345
   },
-  "sampled_sum": 4.433765398492608e+17,
+  "sampled_sum": 4.4334272932901357e+17,
   "top_down_estimate": 8.557965374642387e+18,
-  "with_ghosts": 8.557965534177563e+18
+  "with_ghosts": 8.557965534177522e+18
  },
  "grid_cells": 1600,
  "history": {
   "deep_join": {
    "by_rule": {
-    "absolute": 101,
+    "absolute": 99,
     "scaled": 10
    },
    "cited_late": {
@@ -8018,12 +8027,6 @@
      "ratio": 0.0030691575378106774,
      "rule": "absolute",
      "to_kind": "rangeloss"
-    },
-    "Bos indicus": {
-     "factor": 1.0,
-     "ratio": 19.308287995930403,
-     "rule": "absolute",
-     "to_kind": "model"
     },
     "Cervus canadensis": {
      "factor": 1.0,
@@ -8145,6 +8148,12 @@
      "rule": "absolute",
      "to_kind": "model"
     },
+    "Sus scrofa": {
+     "factor": 1.0,
+     "ratio": 0.0038234135356013973,
+     "rule": "absolute",
+     "to_kind": "rangeloss"
+    },
     "Ursus americanus": {
      "factor": 1.0,
      "ratio": 0.01578556798710601,
@@ -8174,10 +8183,10 @@
   "hist_sources": 148,
   "mutation_rate": {
    "deep_by_clade": {
-    "Artiodactyla": 67,
+    "Artiodactyla": 64,
     "Carnivora": 17,
     "Mammalia (fit only)": 8,
-    "Perissodactyla": 11,
+    "Perissodactyla": 12,
     "Primates": 7,
     "Rodentia": 1
    },
@@ -8272,18 +8281,6 @@
      "mu_year": 9.06e-10,
      "vs_flat": 0.906
     },
-    "Bos grunniens": {
-     "G": 9.99,
-     "clade": "Artiodactyla",
-     "mu_year": 8.35e-10,
-     "vs_flat": 0.835
-    },
-    "Bos indicus": {
-     "G": 14.29,
-     "clade": "Artiodactyla",
-     "mu_year": 6.33e-10,
-     "vs_flat": 0.633
-    },
     "Bos javanicus": {
      "G": 8.99,
      "clade": "Artiodactyla",
@@ -8296,17 +8293,17 @@
      "mu_year": 8.35e-10,
      "vs_flat": 0.835
     },
+    "Bubalus bubalis": {
+     "G": 8.99,
+     "clade": "Artiodactyla",
+     "mu_year": 9.06e-10,
+     "vs_flat": 0.906
+    },
     "Budorcas taxicolor": {
      "G": 7.99,
      "clade": "Artiodactyla",
      "mu_year": 9.93e-10,
      "vs_flat": 0.993
-    },
-    "Camelus bactrianus": {
-     "G": 15.99,
-     "clade": "Artiodactyla",
-     "mu_year": 5.81e-10,
-     "vs_flat": 0.581
     },
     "Camelus ferus": {
      "G": 15.99,
@@ -8403,6 +8400,12 @@
      "clade": "Mammalia (fit only)",
      "mu_year": 4.56e-10,
      "vs_flat": 0.456
+    },
+    "Equus asinus": {
+     "G": 10.31,
+     "clade": "Perissodactyla",
+     "mu_year": 5.83e-10,
+     "vs_flat": 0.583
     },
     "Equus burchellii": {
      "G": 12.31,
@@ -8511,12 +8514,6 @@
      "clade": "Artiodactyla",
      "mu_year": 1.07e-09,
      "vs_flat": 1.067
-    },
-    "Lama glama": {
-     "G": 11.13,
-     "clade": "Artiodactyla",
-     "mu_year": 7.69e-10,
-     "vs_flat": 0.769
     },
     "Lama guanicoe": {
      "G": 11.13,
@@ -8758,6 +8755,12 @@
      "mu_year": 3.67e-10,
      "vs_flat": 0.367
     },
+    "Sus scrofa": {
+     "G": 7.27,
+     "clade": "Artiodactyla",
+     "mu_year": 1.07e-09,
+     "vs_flat": 1.068
+    },
     "Syncerus caffer": {
      "G": 11.42,
      "clade": "Artiodactyla",
@@ -8836,12 +8839,6 @@
      "mu_year": 8.42e-10,
      "vs_flat": 0.842
     },
-    "Vicugna pacos": {
-     "G": 9.22,
-     "clade": "Artiodactyla",
-     "mu_year": 8.89e-10,
-     "vs_flat": 0.889
-    },
     "Vicugna vicugna": {
      "G": 10.06,
      "clade": "Artiodactyla",
@@ -8851,9 +8848,9 @@
    },
    "deep_vs_flat": {
     "max": 1.704,
-    "median": 0.881,
+    "median": 0.889,
     "min": 0.349,
-    "n": 111
+    "n": 109
    },
    "flat_cite": [
     "Armstrong et al. 2025, Genome Biol Evol 17:evaf060 (Pantherinae pedigree rates)",
@@ -8965,6 +8962,7 @@
      "n": 100000.0,
      "year": 1900.0
     },
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 3956550.0,
@@ -9012,6 +9010,7 @@
     "ever_ratio": 6.533544679097289,
     "file": "Acinonyx_jubatus.toml",
     "grades": "CD",
+    "hist_row": true,
     "leaf": "Acinonyx jubatus",
     "modelled": null,
     "natural": {
@@ -9034,6 +9033,7 @@
     "alive_before": 78.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 3956900.000000001,
@@ -9081,6 +9081,7 @@
     "ever_ratio": 1460.906444173355,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Addax nasomaculatus",
     "modelled": "genomic",
     "natural": {
@@ -9103,6 +9104,7 @@
     "alive_before": 3000000.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 9753140.699348386,
@@ -9150,6 +9152,7 @@
     "ever_ratio": 0.2387377856521138,
     "file": null,
     "grades": "",
+    "hist_row": true,
     "leaf": "Aepyceros melampus",
     "modelled": "genomic",
     "natural": {
@@ -9179,6 +9182,7 @@
      "n": 2459.0,
      "year": 1976.0
     },
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 6579200.714612558,
@@ -9230,6 +9234,7 @@
     "ever_ratio": 44.634355854262004,
     "file": "Ailuropoda_melanoleuca.toml",
     "grades": "BC",
+    "hist_row": true,
     "leaf": "Ailuropoda melanoleuca",
     "modelled": null,
     "natural": {
@@ -9252,6 +9257,7 @@
     "alive_before": 1350000.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 1677000.0,
@@ -9299,6 +9305,7 @@
     "ever_ratio": 0.18882452708613537,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Alces alces",
     "modelled": "genomic",
     "natural": {
@@ -9321,6 +9328,7 @@
     "alive_before": 76978.41873015686,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 1677000.0,
@@ -9368,6 +9376,7 @@
     "ever_ratio": 3.0622883366912665,
     "file": null,
     "grades": "",
+    "hist_row": true,
     "leaf": "Alces americanus",
     "modelled": "genomic",
     "natural": null,
@@ -9383,6 +9392,7 @@
     "alive_before": 10607.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 2366417.014172416,
@@ -9430,6 +9440,7 @@
     "ever_ratio": 26.987100504716228,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Ammotragus lervia",
     "modelled": "genomic",
     "natural": {
@@ -9452,6 +9463,7 @@
     "alive_before": 2236068.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 12810099.999999998,
@@ -9499,6 +9511,7 @@
     "ever_ratio": 0.45260636075932403,
     "file": null,
     "grades": "",
+    "hist_row": true,
     "leaf": "Antidorcas marsupialis",
     "modelled": "genomic",
     "natural": {
@@ -9528,6 +9541,7 @@
      "n": 35000000.0,
      "year": 1800.0
     },
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 9897549.999999998,
@@ -9575,6 +9589,7 @@
     "ever_ratio": 213.77864078500355,
     "file": "Antilocapra_americana.toml",
     "grades": "CD",
+    "hist_row": true,
     "leaf": "Antilocapra americana",
     "modelled": null,
     "natural": {
@@ -9597,6 +9612,7 @@
     "alive_before": 850000.0,
     "alive_from": "history",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": null,
     "deep_after": 3510283.0,
@@ -9608,6 +9624,7 @@
     "ever_ratio": 4.129744705882353,
     "file": "Arctocephalus_gazella.toml",
     "grades": "B",
+    "hist_row": true,
     "leaf": "Arctocephalus gazella",
     "modelled": null,
     "natural": {
@@ -9630,6 +9647,7 @@
     "alive_before": 8448.622034154445,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 2500248.64821213,
@@ -9677,6 +9695,7 @@
     "ever_ratio": 62.8228371779816,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Axis porcinus",
     "modelled": "genomic",
     "natural": {
@@ -9699,6 +9718,7 @@
     "alive_before": 27331.624761007373,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 2295849.9999999995,
@@ -9746,6 +9766,7 @@
     "ever_ratio": 28.70076786979751,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Babyrousa celebensis",
     "modelled": "genomic",
     "natural": {
@@ -9775,6 +9796,7 @@
      "n": 89000.0,
      "year": 1611.0
     },
+    "beside": null,
     "component": "wild",
     "deep": null,
     "deep_after": 89000.0,
@@ -9786,6 +9808,7 @@
     "ever_ratio": 2.542778311947742,
     "file": "Balaena_mysticetus.toml",
     "grades": "C",
+    "hist_row": true,
     "leaf": "Balaena mysticetus",
     "modelled": null,
     "natural": {
@@ -9815,6 +9838,7 @@
      "n": 340280.0,
      "year": 1900.0
     },
+    "beside": null,
     "component": "wild",
     "deep": null,
     "deep_after": 340280.0,
@@ -9826,6 +9850,7 @@
     "ever_ratio": 12.373736156403108,
     "file": "Balaenoptera_musculus.toml",
     "grades": "C",
+    "hist_row": true,
     "leaf": "Balaenoptera musculus",
     "modelled": null,
     "natural": {
@@ -9855,6 +9880,7 @@
      "n": 762400.0,
      "year": 1900.0
     },
+    "beside": null,
     "component": "wild",
     "deep": null,
     "deep_after": 762400.0,
@@ -9866,6 +9892,7 @@
     "ever_ratio": 5.257902464885829,
     "file": "Balaenoptera_physalus.toml",
     "grades": "C",
+    "hist_row": true,
     "leaf": "Balaenoptera physalus",
     "modelled": null,
     "natural": {
@@ -9888,6 +9915,7 @@
     "alive_before": 335.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 4815222.351916013,
@@ -9935,6 +9963,7 @@
     "ever_ratio": 81.10833148021491,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Beatragus hunteri",
     "modelled": "genomic",
     "natural": {
@@ -9964,6 +9993,7 @@
      "n": 42000000.0,
      "year": 1800.0
     },
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 2038914.9727819369,
@@ -10011,6 +10041,7 @@
     "ever_ratio": 1952.510069543198,
     "file": "Bison_bison.toml",
     "grades": "BC",
+    "hist_row": true,
     "leaf": "Bison bison",
     "modelled": null,
     "natural": {
@@ -10033,6 +10064,7 @@
     "alive_before": 198.21460962837494,
     "alive_from": "history",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 4010099.9999999995,
@@ -10084,6 +10116,7 @@
     "ever_ratio": 7.426388631855749,
     "file": "Bison_bonasus.toml",
     "grades": "B",
+    "hist_row": true,
     "leaf": "Bison bonasus",
     "modelled": null,
     "natural": {
@@ -10106,6 +10139,7 @@
     "alive_before": 22913.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 2067664.9727819369,
@@ -10153,6 +10187,7 @@
     "ever_ratio": 22.476075611772195,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Bos gaurus",
     "modelled": "genomic",
     "natural": {
@@ -10169,143 +10204,13 @@
     "trend_held": null,
     "use": "counts"
    },
-   "Bos grunniens": {
-    "G_yr": 9.993155373032168,
-    "alive_after": 87032.97048960661,
-    "alive_before": 87032.97048960661,
-    "alive_from": "model",
-    "baseline": null,
-    "component": "wild",
-    "deep": {
-     "band_start_yr_ago": 2038914.9727819369,
-     "bulk": true,
-     "cite": "Bergman et al. 2023, Nat Commun 14:7679, Supplementary Data 3 (PSMC Ne trajectory)",
-     "dropped_before_band": 6,
-     "dropped_blind": 1,
-     "grade": "D",
-     "join": {
-      "cited_late": null,
-      "deep_n": 148889.0945449768,
-      "deep_n_raw": 148889.0945449768,
-      "factor": 1.0,
-      "flag": false,
-      "next": "modelled",
-      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 4x higher; the two are joined log-linearly across PSMC's last 20 kyr.",
-      "ratio": 0.24736446873999918,
-      "rule": "absolute",
-      "to_kind": "rangeloss",
-      "to_n": 601901.7011754899,
-      "to_year": 1500
-     },
-     "method": "PSMC",
-     "mu": {
-      "G": 9.993155373032168,
-      "clade": "Artiodactyla",
-      "hi": 1.454889993082392e-09,
-      "lo": 4.795458718697516e-10,
-      "mu_year": 8.352762957293069e-10,
-      "vs_flat": 0.8352762957293068
-     },
-     "ne_factor": 1.039888866700745,
-     "oldest_n": 732780.7581559407,
-     "oldest_yr_ago": 1735830.3281885306,
-     "points": 15,
-     "time_factor": 1.731961835937814,
-     "youngest_yr_ago": 28266.294217008617
-    },
-    "deep_after": 732780.7581559407,
-    "deep_before": 601901.7011754899,
-    "deep_from": "genomic",
-    "domestic_on_leaf": false,
-    "ever_after": 202265769896.9086,
-    "ever_before": 245578004463.7348,
-    "ever_ratio": 0.8236314581128448,
-    "file": null,
-    "grades": "D",
-    "leaf": "Bos grunniens",
-    "modelled": "genomic",
-    "natural": {
-     "N": 601901.7011754899,
-     "hi": 101966592.08638436,
-     "km2_cur": 884675.0062310884,
-     "km2_nat": 6118226.095724475,
-     "lo": 3552.9838789848595,
-     "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
-    },
-    "points": 1,
-    "segments": 116,
-    "trend_1500": false,
-    "trend_held": null,
-    "use": "counts"
-   },
-   "Bos indicus": {
-    "G_yr": 14.287692109972337,
-    "alive_after": 3769.557924817489,
-    "alive_before": 3769.5579248174895,
-    "alive_from": "model",
-    "baseline": null,
-    "component": "wild",
-    "deep": {
-     "band_start_yr_ago": 4010199.9999999995,
-     "bulk": true,
-     "cite": "Bergman et al. 2023, Nat Commun 14:7679, Supplementary Data 3 (PSMC Ne trajectory)",
-     "dropped_before_band": 6,
-     "dropped_blind": 0,
-     "grade": "D",
-     "join": {
-      "cited_late": null,
-      "deep_n": 72783.71002971784,
-      "deep_n_raw": 72783.71002971784,
-      "factor": 1.0,
-      "flag": true,
-      "next": "modelled",
-      "note": "Genomic curve kept at its own level; today's modelled count is 19x lower (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr.",
-      "ratio": 19.308287995930403,
-      "rule": "absolute",
-      "to_kind": "model",
-      "to_n": 3769.557924817489,
-      "to_year": 2026.77
-     },
-     "method": "PSMC",
-     "mu": {
-      "G": 14.287692109972337,
-      "clade": "Artiodactyla",
-      "hi": 1.1032129416204952e-09,
-      "lo": 3.6362970015797854e-10,
-      "mu_year": 6.333727111044982e-10,
-      "vs_flat": 0.6333727111044982
-     },
-     "ne_factor": 0.959175979912318,
-     "oldest_n": 1510312.2219687097,
-     "oldest_yr_ago": 3828963.0709579606,
-     "points": 16,
-     "time_factor": 2.2840685133780347,
-     "youngest_yr_ago": 39352.54826806474
-    },
-    "deep_after": 1510312.2219687097,
-    "deep_before": 3769.557924817489,
-    "deep_from": "genomic",
-    "domestic_on_leaf": false,
-    "ever_after": 738713373837.9215,
-    "ever_before": 2116042405.4143984,
-    "ever_ratio": 349.1014036144774,
-    "file": null,
-    "grades": "",
-    "leaf": "Bos indicus",
-    "modelled": "genomic",
-    "natural": null,
-    "points": 0,
-    "segments": 149,
-    "trend_1500": false,
-    "trend_held": null,
-    "use": "counts"
-   },
    "Bos javanicus": {
     "G_yr": 8.993839835728952,
     "alive_after": 8000.0,
     "alive_before": 8000.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 2067664.9727819369,
@@ -10353,6 +10258,7 @@
     "ever_ratio": 29.655146988011325,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Bos javanicus",
     "modelled": "genomic",
     "natural": {
@@ -10375,6 +10281,7 @@
     "alive_before": 12990.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 4010199.9999999995,
@@ -10422,6 +10329,7 @@
     "ever_ratio": 8.26748550710801,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Bos mutus",
     "modelled": "genomic",
     "natural": {
@@ -10444,6 +10352,7 @@
     "alive_before": 1578614149.0,
     "alive_from": "history",
     "baseline": null,
+    "beside": null,
     "component": "domestic",
     "deep": null,
     "deep_after": 342606.269238904,
@@ -10455,6 +10364,7 @@
     "ever_ratio": 0.9276808374018936,
     "file": "Bos_taurus.toml",
     "grades": "BC",
+    "hist_row": true,
     "leaf": "Bos taurus",
     "modelled": null,
     "natural": {
@@ -10475,8 +10385,80 @@
     "G_yr": 8.993839835728952,
     "alive_after": 212016021.6516642,
     "alive_before": 212016021.6516642,
+    "alive_from": "model",
+    "baseline": null,
+    "beside": "Bubalus_bubalis.toml",
+    "component": "wild",
+    "deep": {
+     "band_start_yr_ago": 2290000.0,
+     "bulk": true,
+     "cite": "Bergman et al. 2023, Nat Commun 14:7679, Supplementary Data 3 (PSMC Ne trajectory)",
+     "dropped_before_band": 7,
+     "dropped_blind": 0,
+     "grade": "D",
+     "join": {
+      "cited_late": null,
+      "deep_n": 255224.60827205746,
+      "deep_n_raw": 255224.60827205746,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 1.8x lower; the two are joined log-linearly across PSMC's last 20 kyr.",
+      "ratio": 1.8439087258342322,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
+      "to_n": 138414.9902303799,
+      "to_year": 1500
+     },
+     "method": "PSMC",
+     "mu": {
+      "G": 8.993839835728952,
+      "clade": "Artiodactyla",
+      "hi": 1.5785067903103717e-09,
+      "lo": 5.202911688243651e-10,
+      "mu_year": 9.062467340232352e-10,
+      "vs_flat": 0.9062467340232352
+     },
+     "ne_factor": 1.064947311364662,
+     "oldest_n": 1335360.9349204102,
+     "oldest_yr_ago": 2184283.1958253947,
+     "points": 18,
+     "time_factor": 1.5963275919839903,
+     "youngest_yr_ago": 37254.76165460839
+    },
+    "deep_after": 1335360.9349204102,
+    "deep_before": 138414.9902303799,
+    "deep_from": "genomic",
+    "domestic_on_leaf": true,
+    "ever_after": 595832347117.2476,
+    "ever_before": 86168857218.17299,
+    "ever_ratio": 6.914706384101688,
+    "file": null,
+    "grades": "D",
+    "hist_row": true,
+    "leaf": "Bubalus bubalis",
+    "modelled": "genomic",
+    "natural": {
+     "N": 138414.9902303799,
+     "hi": 1572806.982697853,
+     "km2_cur": 223496.84367943287,
+     "km2_nat": 4283689.5038557965,
+     "lo": 12181.22104697998,
+     "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
+    },
+    "points": 1,
+    "segments": 156,
+    "trend_1500": false,
+    "trend_held": null,
+    "use": "counts"
+   },
+   "Bubalus bubalis (domestic)": {
+    "G_yr": 8.993839835728952,
+    "alive_after": 212016021.6516642,
+    "alive_before": 212016021.6516642,
     "alive_from": "history",
     "baseline": null,
+    "beside": null,
     "component": "domestic",
     "deep": null,
     "deep_after": 138414.9902303799,
@@ -10488,6 +10470,7 @@
     "ever_ratio": 0.8366245840713907,
     "file": "Bubalus_bubalis.toml",
     "grades": "B",
+    "hist_row": false,
     "leaf": "Bubalus bubalis",
     "modelled": null,
     "natural": {
@@ -10510,6 +10493,7 @@
     "alive_before": 39293.05803108451,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 2115523.0789870443,
@@ -10557,6 +10541,7 @@
     "ever_ratio": 10.365478067003322,
     "file": null,
     "grades": "",
+    "hist_row": true,
     "leaf": "Budorcas taxicolor",
     "modelled": "genomic",
     "natural": {
@@ -10579,6 +10564,7 @@
     "alive_before": 1650000.0,
     "alive_from": "history",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": null,
     "deep_after": 1650000.0,
@@ -10590,6 +10576,7 @@
     "ever_ratio": 1.0,
     "file": "Callorhinus_ursinus.toml",
     "grades": "BCD",
+    "hist_row": true,
     "leaf": "Callorhinus ursinus",
     "modelled": null,
     "natural": {
@@ -10606,81 +10593,13 @@
     "trend_held": null,
     "use": "display"
    },
-   "Camelus bactrianus": {
-    "G_yr": 15.989048596851472,
-    "alive_after": 14787.904648388121,
-    "alive_before": 14787.904648388121,
-    "alive_from": "model",
-    "baseline": null,
-    "component": "wild",
-    "deep": {
-     "band_start_yr_ago": 863577.4820587083,
-     "bulk": true,
-     "cite": "Bergman et al. 2023, Nat Commun 14:7679, Supplementary Data 3 (PSMC Ne trajectory)",
-     "dropped_before_band": 9,
-     "dropped_blind": 1,
-     "grade": "D",
-     "join": {
-      "cited_late": null,
-      "deep_n": 36210.654067284726,
-      "deep_n_raw": 36210.654067284726,
-      "factor": 1.0,
-      "flag": false,
-      "next": "modelled",
-      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 4.8x higher; the two are joined log-linearly across PSMC's last 20 kyr.",
-      "ratio": 0.20821998273805986,
-      "rule": "absolute",
-      "to_kind": "rangeloss",
-      "to_n": 173905.7586650443,
-      "to_year": 1500
-     },
-     "method": "PSMC",
-     "mu": {
-      "G": 15.989048596851472,
-      "clade": "Artiodactyla",
-      "hi": 1.0112098473052445e-09,
-      "lo": 3.3330458672129314e-10,
-      "mu_year": 5.805522200840992e-10,
-      "vs_flat": 0.5805522200840992
-     },
-     "ne_factor": 0.9060081056051997,
-     "oldest_n": 372226.3216647129,
-     "oldest_yr_ago": 782576.5380597962,
-     "points": 12,
-     "time_factor": 2.897241525932576,
-     "youngest_yr_ago": 33175.5421654299
-    },
-    "deep_after": 372226.3216647129,
-    "deep_before": 173905.7586650443,
-    "deep_from": "genomic",
-    "domestic_on_leaf": false,
-    "ever_after": 34871028764.06441,
-    "ever_before": 18778290087.144234,
-    "ever_ratio": 1.8569863710827106,
-    "file": null,
-    "grades": "D",
-    "leaf": "Camelus bactrianus",
-    "modelled": "genomic",
-    "natural": {
-     "N": 173905.7586650443,
-     "hi": 29460919.48343186,
-     "km2_cur": 465618.4243321518,
-     "km2_nat": 5475672.670146105,
-     "lo": 1026.5535980257748,
-     "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
-    },
-    "points": 1,
-    "segments": 80,
-    "trend_1500": false,
-    "trend_held": null,
-    "use": "counts"
-   },
    "Camelus dromedarius": {
     "G_yr": 15.989048596851472,
     "alive_after": 44336084.0,
     "alive_before": 44336084.0,
     "alive_from": "history",
     "baseline": null,
+    "beside": null,
     "component": "domestic",
     "deep": null,
     "deep_after": 24196.422280659695,
@@ -10692,6 +10611,7 @@
     "ever_ratio": 0.8467726368326002,
     "file": "Camelus_dromedarius.toml",
     "grades": "B",
+    "hist_row": true,
     "leaf": "Camelus dromedarius",
     "modelled": null,
     "natural": {
@@ -10714,6 +10634,7 @@
     "alive_before": 1425.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 863577.4820587083,
@@ -10761,6 +10682,7 @@
     "ever_ratio": 20.103970213150387,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Camelus ferus",
     "modelled": "genomic",
     "natural": {
@@ -10783,6 +10705,7 @@
     "alive_before": 1000223607.0,
     "alive_from": "history",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": null,
     "deep_after": 276872.9020445529,
@@ -10794,6 +10717,7 @@
     "ever_ratio": 1.0022412089525097,
     "file": "Canis_lupus.toml",
     "grades": "C",
+    "hist_row": true,
     "leaf": "Canis lupus",
     "modelled": null,
     "natural": {
@@ -10816,6 +10740,7 @@
     "alive_before": 492.3925698053256,
     "alive_from": "history",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": null,
     "deep_after": 2617.7499999999995,
@@ -10827,6 +10752,7 @@
     "ever_ratio": 0.07514329403097225,
     "file": "Canis_rufus.toml",
     "grades": "B",
+    "hist_row": true,
     "leaf": "Canis rufus",
     "modelled": null,
     "natural": {
@@ -10849,6 +10775,7 @@
     "alive_before": 1187578434.6502137,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 3003749.5954635255,
@@ -10896,6 +10823,7 @@
     "ever_ratio": 5.342624557875863,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Capra aegagrus",
     "modelled": "genomic",
     "natural": {
@@ -10918,6 +10846,7 @@
     "alive_before": 1187578434.6502137,
     "alive_from": "history",
     "baseline": null,
+    "beside": null,
     "component": "domestic",
     "deep": null,
     "deep_after": 58056.20538904263,
@@ -10929,6 +10858,7 @@
     "ever_ratio": 0.44206807024448175,
     "file": "Capra_hircus.toml",
     "grades": "B",
+    "hist_row": false,
     "leaf": "Capra aegagrus",
     "modelled": null,
     "natural": {
@@ -10951,6 +10881,7 @@
     "alive_before": 47130.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 1356304.7516976832,
@@ -10998,6 +10929,7 @@
     "ever_ratio": 12.112868323872647,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Capra ibex",
     "modelled": "genomic",
     "natural": {
@@ -11020,6 +10952,7 @@
     "alive_before": 244428.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 2453999.7303090175,
@@ -11067,6 +11000,7 @@
     "ever_ratio": 2.827590775001742,
     "file": null,
     "grades": "",
+    "hist_row": true,
     "leaf": "Capra sibirica",
     "modelled": "genomic",
     "natural": {
@@ -11096,6 +11030,7 @@
      "n": 155000000.0,
      "year": 1600.0
     },
+    "beside": null,
     "component": "wild",
     "deep": null,
     "deep_after": 155000000.0,
@@ -11107,6 +11042,7 @@
     "ever_ratio": 30.023732751506472,
     "file": "Castor_canadensis.toml",
     "grades": "C",
+    "hist_row": true,
     "leaf": "Castor canadensis",
     "modelled": null,
     "natural": {
@@ -11129,6 +11065,7 @@
     "alive_before": 2024444.1660079656,
     "alive_from": "history",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": null,
     "deep_after": 6098829.333333332,
@@ -11140,6 +11077,7 @@
     "ever_ratio": 0.7309861435920446,
     "file": "Castor_fiber.toml",
     "grades": "C",
+    "hist_row": true,
     "leaf": "Castor fiber",
     "modelled": null,
     "natural": {
@@ -11162,6 +11100,7 @@
     "alive_before": 15094.148754435058,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 3703113.545561673,
@@ -11209,6 +11148,7 @@
     "ever_ratio": 14.402124345470892,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Catagonus wagneri",
     "modelled": "genomic",
     "natural": {
@@ -11231,6 +11171,7 @@
     "alive_before": 20170.0,
     "alive_from": "history",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 13392453.646184044,
@@ -11282,6 +11223,7 @@
     "ever_ratio": 20.500980066896314,
     "file": "Ceratotherium_simum.toml",
     "grades": "B",
+    "hist_row": true,
     "leaf": "Ceratotherium simum",
     "modelled": null,
     "natural": {
@@ -11304,6 +11246,7 @@
     "alive_before": 1300000.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 2436866.666666667,
@@ -11351,6 +11294,7 @@
     "ever_ratio": 0.23862174995106789,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Cervus canadensis",
     "modelled": "genomic",
     "natural": {
@@ -11373,6 +11317,7 @@
     "alive_before": 2435500.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 3956600.0000000005,
@@ -11420,6 +11365,7 @@
     "ever_ratio": 0.07331141203327682,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Cervus elaphus",
     "modelled": "genomic",
     "natural": {
@@ -11442,6 +11388,7 @@
     "alive_before": 2700.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 3956600.0000000005,
@@ -11489,6 +11436,7 @@
     "ever_ratio": 153.2289168767179,
     "file": null,
     "grades": "",
+    "hist_row": true,
     "leaf": "Cervus hanglu",
     "modelled": "genomic",
     "natural": null,
@@ -11504,6 +11452,7 @@
     "alive_before": 461594.94067869097,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 3196733.3333333335,
@@ -11551,6 +11500,7 @@
     "ever_ratio": 0.3036193765548884,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Cervus nippon",
     "modelled": "genomic",
     "natural": {
@@ -11573,6 +11523,7 @@
     "alive_before": 1550000.0,
     "alive_from": "history",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 12809999.999999998,
@@ -11624,6 +11575,7 @@
     "ever_ratio": 0.40389500309902066,
     "file": "Connochaetes_taurinus.toml",
     "grades": "BC",
+    "hist_row": true,
     "leaf": "Connochaetes taurinus",
     "modelled": null,
     "natural": {
@@ -11646,6 +11598,7 @@
     "alive_before": 35623.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 5001550.0,
@@ -11693,6 +11646,7 @@
     "ever_ratio": 3.008147856881281,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Crocuta crocuta",
     "modelled": "genomic",
     "natural": {
@@ -11715,6 +11669,7 @@
     "alive_before": 235.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 13889953.646184046,
@@ -11762,6 +11717,7 @@
     "ever_ratio": 69.20486026500508,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Dicerorhinus sumatrensis",
     "modelled": "genomic",
     "natural": {
@@ -11791,6 +11747,7 @@
      "n": 100000.0,
      "year": 1960.0
     },
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 16440099.999999998,
@@ -11842,6 +11799,7 @@
     "ever_ratio": 59.34928192622113,
     "file": "Diceros_bicornis.toml",
     "grades": "BC",
+    "hist_row": true,
     "leaf": "Diceros bicornis",
     "modelled": null,
     "natural": {
@@ -11870,6 +11828,7 @@
     "alive_before": 355.38792828791213,
     "alive_from": "history",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 2430687.4499533214,
@@ -11921,6 +11880,7 @@
     "ever_ratio": 24.728837318962515,
     "file": "Elaphurus_davidianus.toml",
     "grades": "C",
+    "hist_row": true,
     "leaf": "Elaphurus davidianus",
     "modelled": null,
     "natural": {
@@ -11950,6 +11910,7 @@
      "n": 100000.0,
      "year": 1900.0
     },
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 6423050.0,
@@ -11997,6 +11958,7 @@
     "ever_ratio": 2.8953498767715473,
     "file": "Elephas_maximus.toml",
     "grades": "C",
+    "hist_row": true,
     "leaf": "Elephas maximus",
     "modelled": null,
     "natural": {
@@ -12026,6 +11988,7 @@
      "n": 225000.0,
      "year": 1741.0
     },
+    "beside": null,
     "component": "wild",
     "deep": null,
     "deep_after": 225000.0,
@@ -12037,6 +12000,7 @@
     "ever_ratio": 0.9529069847502203,
     "file": "Enhydra_lutris.toml",
     "grades": "C",
+    "hist_row": true,
     "leaf": "Enhydra lutris",
     "modelled": null,
     "natural": {
@@ -12057,8 +12021,80 @@
     "G_yr": 10.310751540041068,
     "alive_after": 53947154.0,
     "alive_before": 53947154.0,
+    "alive_from": "model",
+    "baseline": null,
+    "beside": "Equus_asinus.toml",
+    "component": "wild",
+    "deep": {
+     "band_start_yr_ago": 8094999.999999999,
+     "bulk": true,
+     "cite": "Bergman et al. 2023, Nat Commun 14:7679, Supplementary Data 3 (PSMC Ne trajectory)",
+     "dropped_before_band": 0,
+     "dropped_blind": 1,
+     "grade": "D",
+     "join": {
+      "cited_late": null,
+      "deep_n": 49450.78742190952,
+      "deep_n_raw": 49450.78742190952,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 5x lower; the two are joined log-linearly across PSMC's last 20 kyr.",
+      "ratio": 4.988804143210859,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
+      "to_n": 9912.35294117647,
+      "to_year": 1500
+     },
+     "method": "PSMC",
+     "mu": {
+      "G": 10.310751540041068,
+      "clade": "Perissodactyla",
+      "hi": 1.0158118878659362e-09,
+      "lo": 3.3482146398593173e-10,
+      "mu_year": 5.831943273297382e-10,
+      "vs_flat": 0.5831943273297382
+     },
+     "ne_factor": 1.515007435324331,
+     "oldest_n": 1538873.9949569467,
+     "oldest_yr_ago": 6701852.513869336,
+     "points": 21,
+     "time_factor": 1.952608155868002,
+     "youngest_yr_ago": 26768.038453779005
+    },
+    "deep_after": 1538873.9949569467,
+    "deep_before": 9912.35294117647,
+    "deep_from": "genomic",
+    "domestic_on_leaf": true,
+    "ever_after": 1269817162625.32,
+    "ever_before": 23723882757.19276,
+    "ever_ratio": 53.524845642744914,
+    "file": null,
+    "grades": "D",
+    "hist_row": true,
+    "leaf": "Equus asinus",
+    "modelled": "genomic",
+    "natural": {
+     "N": 9912.35294117647,
+     "hi": 42041.95785184633,
+     "km2_cur": 158310.2642729316,
+     "km2_nat": 7654766.896020575,
+     "lo": 2337.0638726363413,
+     "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
+    },
+    "points": 1,
+    "segments": 158,
+    "trend_1500": false,
+    "trend_held": null,
+    "use": "counts"
+   },
+   "Equus asinus (domestic)": {
+    "G_yr": 10.310751540041068,
+    "alive_after": 53947154.0,
+    "alive_before": 53947154.0,
     "alive_from": "history",
     "baseline": null,
+    "beside": null,
     "component": "domestic",
     "deep": null,
     "deep_after": 9912.35294117647,
@@ -12070,6 +12106,7 @@
     "ever_ratio": 1.051836517041547,
     "file": "Equus_asinus.toml",
     "grades": "BC",
+    "hist_row": false,
     "leaf": "Equus asinus",
     "modelled": null,
     "natural": {
@@ -12092,6 +12129,7 @@
     "alive_before": 500000.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 3782941.0385001665,
@@ -12139,6 +12177,7 @@
     "ever_ratio": 1.532525764794391,
     "file": null,
     "grades": "",
+    "hist_row": true,
     "leaf": "Equus burchellii",
     "modelled": "genomic",
     "natural": null,
@@ -12154,6 +12193,7 @@
     "alive_before": 56211907.0,
     "alive_from": "history",
     "baseline": null,
+    "beside": null,
     "component": "domestic",
     "deep": null,
     "deep_after": 3521685.632487397,
@@ -12165,6 +12205,7 @@
     "ever_ratio": 1.0051136588348117,
     "file": "Equus_caballus.toml",
     "grades": "BC",
+    "hist_row": true,
     "leaf": "Equus caballus",
     "modelled": null,
     "natural": {
@@ -12187,6 +12228,7 @@
     "alive_before": 6847.827739523944,
     "alive_from": "history",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": null,
     "deep_after": 699417.7777777778,
@@ -12198,6 +12240,7 @@
     "ever_ratio": 0.1986030888562405,
     "file": "Equus_ferus.toml",
     "grades": "C",
+    "hist_row": true,
     "leaf": "Equus ferus",
     "modelled": null,
     "natural": {
@@ -12220,6 +12263,7 @@
     "alive_before": 2680.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 8094999.999999999,
@@ -12267,6 +12311,7 @@
     "ever_ratio": 60.56474445092716,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Equus grevyi",
     "modelled": "genomic",
     "natural": {
@@ -12289,6 +12334,7 @@
     "alive_before": 55000.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 8094999.999999999,
@@ -12336,6 +12382,7 @@
     "ever_ratio": 2.3754119092855426,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Equus hemionus",
     "modelled": "genomic",
     "natural": {
@@ -12358,6 +12405,7 @@
     "alive_before": 97211.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 8094999.999999999,
@@ -12405,6 +12453,7 @@
     "ever_ratio": 8.21650697827358,
     "file": null,
     "grades": "",
+    "hist_row": true,
     "leaf": "Equus kiang",
     "modelled": "genomic",
     "natural": {
@@ -12427,6 +12476,7 @@
     "alive_before": 20673.65166213852,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 3782941.0385001665,
@@ -12474,6 +12524,7 @@
     "ever_ratio": 10.80350670600365,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Equus zebra",
     "modelled": "genomic",
     "natural": {
@@ -12503,6 +12554,7 @@
      "n": 24600.0,
      "year": 1846.0
     },
+    "beside": null,
     "component": "wild",
     "deep": null,
     "deep_after": 24600.0,
@@ -12514,6 +12566,7 @@
     "ever_ratio": 1.2379751619304664,
     "file": "Eschrichtius_robustus.toml",
     "grades": "A",
+    "hist_row": true,
     "leaf": "Eschrichtius robustus",
     "modelled": null,
     "natural": {
@@ -12543,6 +12596,7 @@
      "n": 62500.0,
      "year": 1770.0
     },
+    "beside": null,
     "component": "wild",
     "deep": null,
     "deep_after": 62499.99999999999,
@@ -12554,6 +12608,7 @@
     "ever_ratio": 4.764541096649589,
     "file": "Eubalaena_australis.toml",
     "grades": "CD",
+    "hist_row": true,
     "leaf": "Eubalaena australis",
     "modelled": null,
     "natural": {
@@ -12583,6 +12638,7 @@
      "n": 15200.0,
      "year": 1600.0
     },
+    "beside": null,
     "component": "wild",
     "deep": null,
     "deep_after": 15200.0,
@@ -12594,6 +12650,7 @@
     "ever_ratio": 5.006123849508674,
     "file": "Eubalaena_glacialis.toml",
     "grades": "A",
+    "hist_row": true,
     "leaf": "Eubalaena glacialis",
     "modelled": null,
     "natural": {
@@ -12616,6 +12673,7 @@
     "alive_before": 600000000.0,
     "alive_from": "history",
     "baseline": null,
+    "beside": null,
     "component": "domestic",
     "deep": null,
     "deep_after": 1586203.1337839758,
@@ -12627,6 +12685,7 @@
     "ever_ratio": 0.9947379339315321,
     "file": "Felis_catus.toml",
     "grades": "C",
+    "hist_row": true,
     "leaf": "Felis catus",
     "modelled": null,
     "natural": null,
@@ -12642,6 +12701,7 @@
     "alive_before": 97562.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 8362908.424025708,
@@ -12689,6 +12749,7 @@
     "ever_ratio": 2.3374423021389883,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Giraffa camelopardalis",
     "modelled": "genomic",
     "natural": {
@@ -12711,6 +12772,7 @@
     "alive_before": 31895.780542730496,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 8362908.424025708,
@@ -12758,6 +12820,7 @@
     "ever_ratio": 24.800318435278943,
     "file": null,
     "grades": "",
+    "hist_row": true,
     "leaf": "Giraffa tippelskirchi",
     "modelled": "genomic",
     "natural": null,
@@ -12780,6 +12843,7 @@
      "n": 17516.0,
      "year": 1995.0
     },
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 1144414.494607542,
@@ -12831,6 +12895,7 @@
     "ever_ratio": 126.64214806290423,
     "file": "Gorilla_beringei.toml",
     "grades": "C",
+    "hist_row": true,
     "leaf": "Gorilla beringei",
     "modelled": null,
     "natural": {
@@ -12859,6 +12924,7 @@
     "alive_before": 320000.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 1144414.494607542,
@@ -12906,6 +12972,7 @@
     "ever_ratio": 0.710340502981791,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Gorilla gorilla",
     "modelled": "genomic",
     "natural": {
@@ -12928,6 +12995,7 @@
     "alive_before": 44931.630618439085,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 4466600.0,
@@ -12975,6 +13043,7 @@
     "ever_ratio": 8.169905209075388,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Helarctos malayanus",
     "modelled": "genomic",
     "natural": {
@@ -12997,6 +13066,7 @@
     "alive_before": 1897.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 1904249.8651545085,
@@ -13044,6 +13114,7 @@
     "ever_ratio": 136.22740594397902,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Hemitragus hylocrius",
     "modelled": "genomic",
     "natural": {
@@ -13066,6 +13137,7 @@
     "alive_before": 3353.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 7615100.0,
@@ -13113,6 +13185,7 @@
     "ever_ratio": 95.20035453021957,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Hexaprotodon liberiensis",
     "modelled": "genomic",
     "natural": {
@@ -13135,6 +13208,7 @@
     "alive_before": 122270.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 4690567.116345728,
@@ -13182,6 +13256,7 @@
     "ever_ratio": 1.9781260318581604,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Hippopotamus amphibius",
     "modelled": "genomic",
     "natural": {
@@ -13204,6 +13279,7 @@
     "alive_before": 75000.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 4956500.0,
@@ -13251,6 +13327,7 @@
     "ever_ratio": 10.882894396756905,
     "file": null,
     "grades": "",
+    "hist_row": true,
     "leaf": "Hippotragus niger",
     "modelled": "genomic",
     "natural": {
@@ -13273,6 +13350,7 @@
     "alive_before": 8300678396.0,
     "alive_from": "history",
     "baseline": null,
+    "beside": null,
     "component": "total",
     "deep": null,
     "deep_after": 532728.6935112936,
@@ -13284,6 +13362,7 @@
     "ever_ratio": 1.0,
     "file": "Homo_sapiens.toml",
     "grades": "ABC",
+    "hist_row": true,
     "leaf": "Homo sapiens",
     "modelled": null,
     "natural": null,
@@ -13299,6 +13378,7 @@
     "alive_before": 10606.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 3956600.0000000005,
@@ -13346,6 +13426,7 @@
     "ever_ratio": 24.437669018294176,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Hyaena hyaena",
     "modelled": "genomic",
     "natural": {
@@ -13368,6 +13449,7 @@
     "alive_before": 5803301.510167481,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 2699873.9166464335,
@@ -13415,6 +13497,7 @@
     "ever_ratio": 0.13026280287580377,
     "file": null,
     "grades": "",
+    "hist_row": true,
     "leaf": "Hydrochoerus hydrochaeris",
     "modelled": "genomic",
     "natural": {
@@ -13437,6 +13520,7 @@
     "alive_before": 200000.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 4212414.586790299,
@@ -13484,6 +13568,7 @@
     "ever_ratio": 3.313980835403369,
     "file": null,
     "grades": "",
+    "hist_row": true,
     "leaf": "Kobus ellipsiprymnus",
     "modelled": "genomic",
     "natural": {
@@ -13506,6 +13591,7 @@
     "alive_before": 158750.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 4212414.586790299,
@@ -13553,6 +13639,7 @@
     "ever_ratio": 5.209705079815801,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Kobus leche",
     "modelled": "genomic",
     "natural": {
@@ -13569,81 +13656,13 @@
     "trend_held": null,
     "use": "counts"
    },
-   "Lama glama": {
-    "G_yr": 11.127022587268993,
-    "alive_after": 78162.81460950739,
-    "alive_before": 78162.81460950739,
-    "alive_from": "model",
-    "baseline": null,
-    "component": "wild",
-    "deep": {
-     "band_start_yr_ago": 3956500.0,
-     "bulk": true,
-     "cite": "Bergman et al. 2023, Nat Commun 14:7679, Supplementary Data 3 (PSMC Ne trajectory)",
-     "dropped_before_band": 4,
-     "dropped_blind": 0,
-     "grade": "D",
-     "join": {
-      "cited_late": null,
-      "deep_n": 102739.22078743906,
-      "deep_n_raw": 102739.22078743906,
-      "factor": 1.0,
-      "flag": false,
-      "next": "modelled",
-      "note": "Genomic curve kept at its own level; today's modelled count is 1.3x lower; the two are joined log-linearly across PSMC's last 20 kyr.",
-      "ratio": 1.3144258084961835,
-      "rule": "absolute",
-      "to_kind": "model",
-      "to_n": 78162.81460950739,
-      "to_year": 2026.77
-     },
-     "method": "PSMC",
-     "mu": {
-      "G": 11.127022587268993,
-      "clade": "Artiodactyla",
-      "hi": 1.3387598447535346e-09,
-      "lo": 4.4126824710395127e-10,
-      "mu_year": 7.68604065815131e-10,
-      "vs_flat": 0.768604065815131
-     },
-     "ne_factor": 0.9833640985232085,
-     "oldest_n": 420998.47734373226,
-     "oldest_yr_ago": 3811815.6831104876,
-     "points": 18,
-     "time_factor": 2.1883829071554306,
-     "youngest_yr_ago": 23653.18069301259
-    },
-    "deep_after": 420998.47734373226,
-    "deep_before": 78162.81460950739,
-    "deep_from": "genomic",
-    "domestic_on_leaf": false,
-    "ever_after": 440315558824.3317,
-    "ever_before": 55585611258.90881,
-    "ever_ratio": 7.921394563305473,
-    "file": null,
-    "grades": "",
-    "leaf": "Lama glama",
-    "modelled": "genomic",
-    "natural": {
-     "N": 78162.81460950739,
-     "hi": 21593835.813657824,
-     "km2_cur": 2607463.17626005,
-     "km2_nat": 2607463.17626005,
-     "lo": 282.9245179226605,
-     "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
-    },
-    "points": 0,
-    "segments": 146,
-    "trend_1500": false,
-    "trend_held": null,
-    "use": "counts"
-   },
    "Lama guanicoe": {
     "G_yr": 11.127022587268993,
     "alive_after": 1816590.0000000002,
     "alive_before": 1816590.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 3956500.0,
@@ -13691,6 +13710,7 @@
     "ever_ratio": 0.33437506050630095,
     "file": null,
     "grades": "",
+    "hist_row": true,
     "leaf": "Lama guanicoe",
     "modelled": "genomic",
     "natural": {
@@ -13713,6 +13733,7 @@
     "alive_before": 95000.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 12810199.999999998,
@@ -13760,6 +13781,7 @@
     "ever_ratio": 5.3325975443311595,
     "file": null,
     "grades": "",
+    "hist_row": true,
     "leaf": "Litocranius walleri",
     "modelled": "genomic",
     "natural": {
@@ -13789,6 +13811,7 @@
      "n": 14300000.0,
      "year": 1800.0
     },
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 4661961.107324266,
@@ -13836,6 +13859,7 @@
     "ever_ratio": 242.05285093760034,
     "file": "Loxodonta_africana.toml",
     "grades": "BCD",
+    "hist_row": true,
     "leaf": "Loxodonta africana",
     "modelled": null,
     "natural": {
@@ -13865,6 +13889,7 @@
      "n": 11700000.0,
      "year": 1800.0
     },
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 4661961.107324266,
@@ -13912,6 +13937,7 @@
     "ever_ratio": 1346.1161139823655,
     "file": "Loxodonta_cyclotis.toml",
     "grades": "D",
+    "hist_row": true,
     "leaf": "Loxodonta cyclotis",
     "modelled": null,
     "natural": null,
@@ -13927,6 +13953,7 @@
     "alive_before": 213008.97071612848,
     "alive_from": "history",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": null,
     "deep_after": 218444.83985765127,
@@ -13938,6 +13965,7 @@
     "ever_ratio": 0.7417521654934479,
     "file": "Lynx_canadensis.toml",
     "grades": "C",
+    "hist_row": true,
     "leaf": "Lynx canadensis",
     "modelled": null,
     "natural": {
@@ -13960,6 +13988,7 @@
     "alive_before": 434508.78261008585,
     "alive_from": "history",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": null,
     "deep_after": 113023.53342428379,
@@ -13971,6 +14000,7 @@
     "ever_ratio": 0.15972049343694575,
     "file": "Lynx_lynx.toml",
     "grades": "C",
+    "hist_row": true,
     "leaf": "Lynx lynx",
     "modelled": null,
     "natural": {
@@ -13993,6 +14023,7 @@
     "alive_before": 159.35319530322184,
     "alive_from": "history",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": null,
     "deep_after": 61225.49999999999,
@@ -14004,6 +14035,7 @@
     "ever_ratio": 15.067023609915188,
     "file": "Lynx_pardinus.toml",
     "grades": "BC",
+    "hist_row": true,
     "leaf": "Lynx pardinus",
     "modelled": null,
     "natural": {
@@ -14026,6 +14058,7 @@
     "alive_before": 5000000.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 2788210.0158392475,
@@ -14073,6 +14106,7 @@
     "ever_ratio": 0.14351838147663723,
     "file": null,
     "grades": "",
+    "hist_row": true,
     "leaf": "Macropus fuliginosus",
     "modelled": "genomic",
     "natural": {
@@ -14095,6 +14129,7 @@
     "alive_before": 22000000.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 2788210.0158392475,
@@ -14142,6 +14177,7 @@
     "ever_ratio": 0.023905393023304005,
     "file": null,
     "grades": "",
+    "hist_row": true,
     "leaf": "Macropus giganteus",
     "modelled": "genomic",
     "natural": {
@@ -14171,6 +14207,7 @@
      "n": 231700.0,
      "year": 1850.0
     },
+    "beside": null,
     "component": "wild",
     "deep": null,
     "deep_after": 231700.0,
@@ -14182,6 +14219,7 @@
     "ever_ratio": 1.7162793801929315,
     "file": "Megaptera_novaeangliae.toml",
     "grades": "CD",
+    "hist_row": true,
     "leaf": "Megaptera novaeangliae",
     "modelled": null,
     "natural": {
@@ -14204,6 +14242,7 @@
     "alive_before": 224500.0,
     "alive_from": "history",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": null,
     "deep_after": 224500.0,
@@ -14215,6 +14254,7 @@
     "ever_ratio": 0.9999247388744458,
     "file": "Mirounga_angustirostris.toml",
     "grades": "BD",
+    "hist_row": true,
     "leaf": "Mirounga angustirostris",
     "modelled": null,
     "natural": {
@@ -14237,6 +14277,7 @@
     "alive_before": 89.46659401890822,
     "alive_from": "history",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": null,
     "deep_after": 51418.666666666664,
@@ -14248,6 +14289,7 @@
     "ever_ratio": 5.543953853974468,
     "file": "Mustela_nigripes.toml",
     "grades": "C",
+    "hist_row": true,
     "leaf": "Mustela nigripes",
     "modelled": null,
     "natural": {
@@ -14270,6 +14312,7 @@
     "alive_before": 743771.9433854164,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 9505128.62036703,
@@ -14317,6 +14360,7 @@
     "ever_ratio": 0.5588945676142263,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Myrmecophaga tridactyla",
     "modelled": "genomic",
     "natural": {
@@ -14339,6 +14383,7 @@
     "alive_before": 811221.1574850454,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 3090100.0,
@@ -14386,6 +14431,7 @@
     "ever_ratio": 0.6452967764305901,
     "file": null,
     "grades": "",
+    "hist_row": true,
     "leaf": "Nanger granti",
     "modelled": "genomic",
     "natural": {
@@ -14408,6 +14454,7 @@
     "alive_before": 7500000.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 3640000.0,
@@ -14455,6 +14502,7 @@
     "ever_ratio": 0.08811685659242319,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Odocoileus hemionus",
     "modelled": "genomic",
     "natural": {
@@ -14477,6 +14525,7 @@
     "alive_before": 45000000.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 3640000.0,
@@ -14524,6 +14573,7 @@
     "ever_ratio": 0.0468594902650432,
     "file": null,
     "grades": "",
+    "hist_row": true,
     "leaf": "Odocoileus virginianus",
     "modelled": "genomic",
     "natural": {
@@ -14546,6 +14596,7 @@
     "alive_before": 41833.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 5700408.424025708,
@@ -14593,6 +14644,7 @@
     "ever_ratio": 11.27302634189635,
     "file": null,
     "grades": "",
+    "hist_row": true,
     "leaf": "Okapia johnstoni",
     "modelled": "genomic",
     "natural": {
@@ -14615,6 +14667,7 @@
     "alive_before": 97570.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 2728097.219614684,
@@ -14662,6 +14715,7 @@
     "ever_ratio": 2.296003575862761,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Oreamnos americanus",
     "modelled": "genomic",
     "natural": {
@@ -14684,6 +14738,7 @@
     "alive_before": 4228520.589308582,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 33370957.01943097,
@@ -14731,6 +14786,7 @@
     "ever_ratio": 0.12932132919522119,
     "file": null,
     "grades": "",
+    "hist_row": true,
     "leaf": "Orycteropus afer",
     "modelled": "genomic",
     "natural": {
@@ -14753,6 +14809,7 @@
     "alive_before": 50.0,
     "alive_from": "history",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 1993725.0000000002,
@@ -14804,6 +14861,7 @@
     "ever_ratio": 1.977736080715381,
     "file": "Oryx_dammah.toml",
     "grades": "C",
+    "hist_row": true,
     "leaf": "Oryx dammah",
     "modelled": null,
     "natural": {
@@ -14826,6 +14884,7 @@
     "alive_before": 373000.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 3956600.0000000005,
@@ -14873,6 +14932,7 @@
     "ever_ratio": 2.139808799465672,
     "file": null,
     "grades": "",
+    "hist_row": true,
     "leaf": "Oryx gazella",
     "modelled": "genomic",
     "natural": {
@@ -14895,6 +14955,7 @@
     "alive_before": 12000000.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 2084017.267583068,
@@ -14942,6 +15003,7 @@
     "ever_ratio": 0.06825187657880956,
     "file": null,
     "grades": "",
+    "hist_row": true,
     "leaf": "Osphranter rufus",
     "modelled": "genomic",
     "natural": {
@@ -14964,6 +15026,7 @@
     "alive_before": 203109.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 5163416.804445653,
@@ -15011,6 +15074,7 @@
     "ever_ratio": 0.3887444329855538,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Ovibos moschatus",
     "modelled": "genomic",
     "natural": {
@@ -15033,6 +15097,7 @@
     "alive_before": 93187.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 4010000.0,
@@ -15080,6 +15145,7 @@
     "ever_ratio": 12.558838746680822,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Ovis ammon",
     "modelled": "genomic",
     "natural": {
@@ -15102,6 +15168,7 @@
     "alive_before": 1362590940.0,
     "alive_from": "history",
     "baseline": null,
+    "beside": null,
     "component": "domestic",
     "deep": null,
     "deep_after": 404161.0155613369,
@@ -15113,6 +15180,7 @@
     "ever_ratio": 1.0334018561838576,
     "file": "Ovis_aries.toml",
     "grades": "BC",
+    "hist_row": true,
     "leaf": "Ovis aries",
     "modelled": null,
     "natural": {
@@ -15135,6 +15203,7 @@
     "alive_before": 62900.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 4010000.0,
@@ -15182,6 +15251,7 @@
     "ever_ratio": 5.579943908543262,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Ovis canadensis",
     "modelled": "genomic",
     "natural": {
@@ -15204,6 +15274,7 @@
     "alive_before": 113973.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 4010000.0,
@@ -15251,6 +15322,7 @@
     "ever_ratio": 13.111634474754961,
     "file": null,
     "grades": "",
+    "hist_row": true,
     "leaf": "Ovis dalli",
     "modelled": "genomic",
     "natural": {
@@ -15273,6 +15345,7 @@
     "alive_before": 89861.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 4010000.0,
@@ -15320,6 +15393,7 @@
     "ever_ratio": 8.485819243904068,
     "file": null,
     "grades": "",
+    "hist_row": true,
     "leaf": "Ovis nivicola",
     "modelled": "genomic",
     "natural": {
@@ -15342,6 +15416,7 @@
     "alive_before": 342401.5794755595,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 4010000.0,
@@ -15389,6 +15464,7 @@
     "ever_ratio": 3.152326233156758,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Ovis orientalis",
     "modelled": "genomic",
     "natural": {
@@ -15411,6 +15487,7 @@
     "alive_before": 202134.0649939634,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 4010000.0,
@@ -15458,6 +15535,7 @@
     "ever_ratio": 5.677732269009084,
     "file": null,
     "grades": "",
+    "hist_row": true,
     "leaf": "Ovis vignei",
     "modelled": "genomic",
     "natural": null,
@@ -15473,6 +15551,7 @@
     "alive_before": 130290.29868140283,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 1391071.0261127693,
@@ -15520,6 +15599,7 @@
     "ever_ratio": 1.8059942035357928,
     "file": null,
     "grades": "",
+    "hist_row": true,
     "leaf": "Pan paniscus",
     "modelled": "genomic",
     "natural": {
@@ -15549,6 +15629,7 @@
      "n": 1000000.0,
      "year": 1900.0
     },
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 1391071.0261127693,
@@ -15596,6 +15677,7 @@
     "ever_ratio": 8.002112992855436,
     "file": "Pan_troglodytes.toml",
     "grades": "C",
+    "hist_row": true,
     "leaf": "Pan troglodytes",
     "modelled": null,
     "natural": {
@@ -15625,6 +15707,7 @@
      "n": 500000.0,
      "year": 1950.0
     },
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 3761550.0,
@@ -15676,6 +15759,7 @@
     "ever_ratio": 2.737681337920237,
     "file": "Panthera_leo.toml",
     "grades": "BCD",
+    "hist_row": true,
     "leaf": "Panthera leo",
     "modelled": null,
     "natural": {
@@ -15711,6 +15795,7 @@
      "n": 82600.0,
      "year": 1995.0
     },
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 3761550.0,
@@ -15762,6 +15847,7 @@
     "ever_ratio": 3.714131276203261,
     "file": "Panthera_onca.toml",
     "grades": "C",
+    "hist_row": true,
     "leaf": "Panthera onca",
     "modelled": null,
     "natural": {
@@ -15791,6 +15877,7 @@
      "n": 188000.0,
      "year": 1998.0
     },
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 3956600.0000000005,
@@ -15842,6 +15929,7 @@
     "ever_ratio": 1.6557598943374316,
     "file": "Panthera_pardus.toml",
     "grades": "C",
+    "hist_row": true,
     "leaf": "Panthera pardus",
     "modelled": null,
     "natural": {
@@ -15871,6 +15959,7 @@
      "n": 100000.0,
      "year": 1900.0
     },
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 3005903.9052387797,
@@ -15918,6 +16007,7 @@
     "ever_ratio": 9.441600713022893,
     "file": "Panthera_tigris.toml",
     "grades": "BC",
+    "hist_row": true,
     "leaf": "Panthera tigris",
     "modelled": null,
     "natural": {
@@ -15940,6 +16030,7 @@
     "alive_before": 7500.0,
     "alive_from": "history",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 3005903.9052387797,
@@ -15991,6 +16082,7 @@
     "ever_ratio": 15.27238000897753,
     "file": "Panthera_uncia.toml",
     "grades": "C",
+    "hist_row": true,
     "leaf": "Panthera uncia",
     "modelled": null,
     "natural": {
@@ -16013,6 +16105,7 @@
     "alive_before": 2335.3078777091964,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 12810199.999999998,
@@ -16060,6 +16153,7 @@
     "ever_ratio": 85.74485641304582,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Parahyaena brunnea",
     "modelled": "genomic",
     "natural": {
@@ -16082,6 +16176,7 @@
     "alive_before": 3781259.4455944924,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 4194093.955963444,
@@ -16129,6 +16224,7 @@
     "ever_ratio": 0.2086035690712307,
     "file": null,
     "grades": "",
+    "hist_row": true,
     "leaf": "Phacochoerus africanus",
     "modelled": "genomic",
     "natural": {
@@ -16158,6 +16254,7 @@
      "n": 10000000.0,
      "year": 1788.0
     },
+    "beside": null,
     "component": "wild",
     "deep": null,
     "deep_after": 10000000.0,
@@ -16169,6 +16266,7 @@
     "ever_ratio": 18.88933906791618,
     "file": "Phascolarctos_cinereus.toml",
     "grades": "C",
+    "hist_row": true,
     "leaf": "Phascolarctos cinereus",
     "modelled": null,
     "natural": {
@@ -16198,6 +16296,7 @@
      "n": 1949698.0,
      "year": 1710.0
     },
+    "beside": null,
     "component": "wild",
     "deep": null,
     "deep_after": 1949698.0000000002,
@@ -16209,6 +16308,7 @@
     "ever_ratio": 5.4157911717527245,
     "file": "Physeter_macrocephalus.toml",
     "grades": "B",
+    "hist_row": true,
     "leaf": "Physeter catodon",
     "modelled": null,
     "natural": {
@@ -16238,6 +16338,7 @@
      "n": 89286.0,
      "year": 1900.0
     },
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 2023579.2663256458,
@@ -16285,6 +16386,7 @@
     "ever_ratio": 1.478554992370793,
     "file": "Pongo_abelii.toml",
     "grades": "BC",
+    "hist_row": true,
     "leaf": "Pongo abelii",
     "modelled": null,
     "natural": {
@@ -16314,6 +16416,7 @@
      "n": 288500.0,
      "year": 1973.0
     },
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 2023579.2663256458,
@@ -16365,6 +16468,7 @@
     "ever_ratio": 3.986009858478781,
     "file": "Pongo_pygmaeus.toml",
     "grades": "BC",
+    "hist_row": true,
     "leaf": "Pongo pygmaeus",
     "modelled": null,
     "natural": {
@@ -16393,6 +16497,7 @@
     "alive_before": 2815.4166437936556,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 2023579.2663256458,
@@ -16440,6 +16545,7 @@
     "ever_ratio": 400.8248161831893,
     "file": null,
     "grades": "",
+    "hist_row": true,
     "leaf": "Pongo tapanuliensis",
     "modelled": "genomic",
     "natural": null,
@@ -16455,6 +16561,7 @@
     "alive_before": 209238.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 1776448.9383594033,
@@ -16502,6 +16609,7 @@
     "ever_ratio": 5.89238175074298,
     "file": null,
     "grades": "",
+    "hist_row": true,
     "leaf": "Pseudois nayaur",
     "modelled": "genomic",
     "natural": {
@@ -16524,6 +16632,7 @@
     "alive_before": 776691.1305531737,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 3071499.6304827756,
@@ -16575,6 +16684,7 @@
     "ever_ratio": 0.40409381230999264,
     "file": "Puma_concolor.toml",
     "grades": "D",
+    "hist_row": true,
     "leaf": "Puma concolor",
     "modelled": null,
     "natural": {
@@ -16597,6 +16707,7 @@
     "alive_before": 2890410.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 5725425.6368418075,
@@ -16644,6 +16755,7 @@
     "ever_ratio": 0.13510975220900961,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Rangifer tarandus",
     "modelled": "genomic",
     "natural": {
@@ -16666,6 +16778,7 @@
     "alive_before": 2476545.6074902443,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 5333000.0,
@@ -16713,6 +16826,7 @@
     "ever_ratio": 0.29924513852236745,
     "file": null,
     "grades": "",
+    "hist_row": true,
     "leaf": "Redunca redunca",
     "modelled": "genomic",
     "natural": {
@@ -16735,6 +16849,7 @@
     "alive_before": 2575.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 4868051.982339753,
@@ -16782,6 +16897,7 @@
     "ever_ratio": 20.658923546019338,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Rhinoceros unicornis",
     "modelled": "genomic",
     "natural": {
@@ -16811,6 +16927,7 @@
      "n": 1250000.0,
      "year": 1975.0
     },
+    "beside": null,
     "component": "wild",
     "deep": null,
     "deep_after": 1250000.0,
@@ -16822,6 +16939,7 @@
     "ever_ratio": 2.559976126555897,
     "file": "Saiga_tatarica.toml",
     "grades": "BC",
+    "hist_row": true,
     "leaf": "Saiga tatarica",
     "modelled": null,
     "natural": {
@@ -16851,6 +16969,7 @@
      "n": 53000.0,
      "year": 1996.0
     },
+    "beside": null,
     "component": "wild",
     "deep": null,
     "deep_after": 53000.0,
@@ -16862,6 +16981,7 @@
     "ever_ratio": 0.1036768220082366,
     "file": "Sarcophilus_harrisii.toml",
     "grades": "B",
+    "hist_row": true,
     "leaf": "Sarcophilus harrisii",
     "modelled": null,
     "natural": {
@@ -16882,8 +17002,80 @@
     "G_yr": 7.2719233401779615,
     "alive_after": 985500117.4389162,
     "alive_before": 985500117.4389162,
+    "alive_from": "model",
+    "baseline": null,
+    "beside": "Sus_scrofa.toml",
+    "component": "wild",
+    "deep": {
+     "band_start_yr_ago": 4320000.0,
+     "bulk": true,
+     "cite": "Bergman et al. 2023, Nat Commun 14:7679, Supplementary Data 3 (PSMC Ne trajectory)",
+     "dropped_before_band": 3,
+     "dropped_blind": 1,
+     "grade": "D",
+     "join": {
+      "cited_late": null,
+      "deep_n": 101379.49041394432,
+      "deep_n_raw": 101379.49041394432,
+      "factor": 1.0,
+      "flag": true,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 262x higher (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr.",
+      "ratio": 0.0038234135356013973,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
+      "to_n": 26515439.533275075,
+      "to_year": 1500
+     },
+     "method": "PSMC",
+     "mu": {
+      "G": 7.2719233401779615,
+      "clade": "Artiodactyla",
+      "hi": 1.8607303784936864e-09,
+      "lo": 6.13314804495157e-10,
+      "mu_year": 1.0682759420224976e-09,
+      "vs_flat": 1.0682759420224976
+     },
+     "ne_factor": 1.0825881171427982,
+     "oldest_n": 1102267.539715515,
+     "oldest_yr_ago": 4221898.71637943,
+     "points": 18,
+     "time_factor": 1.5744995593700057,
+     "youngest_yr_ago": 28860.74451062137
+    },
+    "deep_after": 1102267.539715515,
+    "deep_before": 26515439.533275075,
+    "deep_from": "genomic",
+    "domestic_on_leaf": true,
+    "ever_after": 1874078337979.599,
+    "ever_before": 31635573715073.03,
+    "ever_ratio": 0.05923958752442915,
+    "file": null,
+    "grades": "D",
+    "hist_row": true,
+    "leaf": "Sus scrofa",
+    "modelled": "genomic",
+    "natural": {
+     "N": 26515439.533275075,
+     "hi": 301294450.67926204,
+     "km2_cur": 35219377.616483964,
+     "km2_nat": 40499490.548410565,
+     "lo": 2333493.139544102,
+     "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
+    },
+    "points": 1,
+    "segments": 169,
+    "trend_1500": false,
+    "trend_held": null,
+    "use": "counts"
+   },
+   "Sus scrofa (domestic)": {
+    "G_yr": 7.2719233401779615,
+    "alive_after": 985500117.4389162,
+    "alive_before": 985500117.4389162,
     "alive_from": "history",
     "baseline": null,
+    "beside": null,
     "component": "domestic",
     "deep": null,
     "deep_after": 26515439.533275075,
@@ -16895,6 +17087,7 @@
     "ever_ratio": 0.997317629850813,
     "file": "Sus_scrofa.toml",
     "grades": "BC",
+    "hist_row": false,
     "leaf": "Sus scrofa",
     "modelled": null,
     "natural": {
@@ -16917,6 +17110,7 @@
     "alive_before": 570996.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 5143450.95492259,
@@ -16964,6 +17158,7 @@
     "ever_ratio": 1.5710973394822179,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Syncerus caffer",
     "modelled": "genomic",
     "natural": {
@@ -16986,6 +17181,7 @@
     "alive_before": 3750.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 12825099.999999998,
@@ -17033,6 +17229,7 @@
     "ever_ratio": 74.06861134370814,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Tapirus indicus",
     "modelled": "genomic",
     "natural": {
@@ -17055,6 +17252,7 @@
     "alive_before": 368329.00066460436,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 1677000.0,
@@ -17102,6 +17300,7 @@
     "ever_ratio": 2.607592778210221,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Tapirus terrestris",
     "modelled": "genomic",
     "natural": {
@@ -17124,6 +17323,7 @@
     "alive_before": 28000.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 3956500.0,
@@ -17171,6 +17371,7 @@
     "ever_ratio": 32.484151280306484,
     "file": null,
     "grades": "",
+    "hist_row": true,
     "leaf": "Tragelaphus eurycerus",
     "modelled": "genomic",
     "natural": {
@@ -17193,6 +17394,7 @@
     "alive_before": 136000.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 8383266.666666668,
@@ -17240,6 +17442,7 @@
     "ever_ratio": 7.075608326747699,
     "file": null,
     "grades": "",
+    "hist_row": true,
     "leaf": "Tragelaphus oryx",
     "modelled": "genomic",
     "natural": {
@@ -17262,6 +17465,7 @@
     "alive_before": 1340000.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 3956600.0000000005,
@@ -17309,6 +17513,7 @@
     "ever_ratio": 0.7448749552662113,
     "file": null,
     "grades": "",
+    "hist_row": true,
     "leaf": "Tragelaphus scriptus",
     "modelled": "genomic",
     "natural": {
@@ -17331,6 +17536,7 @@
     "alive_before": 155885.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 3956500.0,
@@ -17378,6 +17584,7 @@
     "ever_ratio": 10.365647713102563,
     "file": null,
     "grades": "",
+    "hist_row": true,
     "leaf": "Tragelaphus spekii",
     "modelled": "genomic",
     "natural": {
@@ -17400,6 +17607,7 @@
     "alive_before": 482000.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 12810033.333333334,
@@ -17447,6 +17655,7 @@
     "ever_ratio": 1.8791248965670546,
     "file": null,
     "grades": "",
+    "hist_row": true,
     "leaf": "Tragelaphus strepsiceros",
     "modelled": "genomic",
     "natural": {
@@ -17469,6 +17678,7 @@
     "alive_before": 15297.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 5504127.002488252,
@@ -17516,6 +17726,7 @@
     "ever_ratio": 10.920319043171851,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Tremarctos ornatus",
     "modelled": "genomic",
     "natural": {
@@ -17538,6 +17749,7 @@
     "alive_before": 898610.0,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 4466500.0,
@@ -17585,6 +17797,7 @@
     "ever_ratio": 0.41439632787350233,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Ursus americanus",
     "modelled": "genomic",
     "natural": {
@@ -17607,6 +17820,7 @@
     "alive_before": 220000.0,
     "alive_from": "history",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 1677000.0,
@@ -17658,6 +17872,7 @@
     "ever_ratio": 1.0751680669120296,
     "file": "Ursus_arctos.toml",
     "grades": "C",
+    "hist_row": true,
     "leaf": "Ursus arctos",
     "modelled": null,
     "natural": {
@@ -17680,6 +17895,7 @@
     "alive_before": 26000.0,
     "alive_from": "history",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 1677000.0,
@@ -17731,6 +17947,7 @@
     "ever_ratio": 14.851935729915482,
     "file": "Ursus_maritimus.toml",
     "grades": "BCD",
+    "hist_row": true,
     "leaf": "Ursus maritimus",
     "modelled": null,
     "natural": {
@@ -17753,6 +17970,7 @@
     "alive_before": 111522.36905579644,
     "alive_from": "model",
     "baseline": null,
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 4466500.0,
@@ -17800,6 +18018,7 @@
     "ever_ratio": 4.190432328752935,
     "file": null,
     "grades": "D",
+    "hist_row": true,
     "leaf": "Ursus thibetanus",
     "modelled": "genomic",
     "natural": {
@@ -17812,68 +18031,6 @@
     },
     "points": 1,
     "segments": 83,
-    "trend_1500": false,
-    "trend_held": null,
-    "use": "counts"
-   },
-   "Vicugna pacos": {
-    "G_yr": 9.2159903323568,
-    "alive_after": 137680.49917461412,
-    "alive_before": 137680.49917461412,
-    "alive_from": "model",
-    "baseline": null,
-    "component": "wild",
-    "deep": {
-     "band_start_yr_ago": 1096110.289354467,
-     "bulk": true,
-     "cite": "Bergman et al. 2023, Nat Commun 14:7679, Supplementary Data 3 (PSMC Ne trajectory)",
-     "dropped_before_band": 10,
-     "dropped_blind": 0,
-     "grade": "D",
-     "join": {
-      "cited_late": null,
-      "deep_n": 227453.38484258146,
-      "deep_n_raw": 227453.38484258146,
-      "factor": 1.0,
-      "flag": false,
-      "next": "modelled",
-      "note": "Genomic curve kept at its own level; today's modelled count is 1.7x lower; the two are joined log-linearly across PSMC's last 20 kyr.",
-      "ratio": 1.6520377700992523,
-      "rule": "absolute",
-      "to_kind": "model",
-      "to_n": 137680.49917461412,
-      "to_year": 2026.77
-     },
-     "method": "PSMC",
-     "mu": {
-      "G": 9.2159903323568,
-      "clade": "Artiodactyla",
-      "hi": 1.5489752690723115e-09,
-      "lo": 5.105572926089257e-10,
-      "mu_year": 8.892922015264395e-10,
-      "vs_flat": 0.8892922015264395
-     },
-     "ne_factor": 1.1518223462452535,
-     "oldest_n": 1654471.6407147767,
-     "oldest_yr_ago": 1074572.9330388037,
-     "points": 12,
-     "time_factor": 2.1230367215177566,
-     "youngest_yr_ago": 47676.45989149242
-    },
-    "deep_after": 1654471.6407147767,
-    "deep_before": 137680.49917461412,
-    "deep_from": "genomic",
-    "domestic_on_leaf": false,
-    "ever_after": 441788845891.0903,
-    "ever_before": 32750253927.43893,
-    "ever_ratio": 13.489631160415193,
-    "file": null,
-    "grades": "",
-    "leaf": "Vicugna pacos",
-    "modelled": "genomic",
-    "natural": null,
-    "points": 0,
-    "segments": 100,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -17891,6 +18048,7 @@
      "n": 2000000.0,
      "year": 1530.0
     },
+    "beside": null,
     "component": "wild",
     "deep": {
      "band_start_yr_ago": 1096110.289354467,
@@ -17938,6 +18096,7 @@
     "ever_ratio": 96.93991906992414,
     "file": "Vicugna_vicugna.toml",
     "grades": "C",
+    "hist_row": true,
     "leaf": "Vicugna vicugna",
     "modelled": null,
     "natural": {
@@ -17992,11 +18151,11 @@
  "knuckles_collapsed": 3710,
  "mammalia": {
   "alive": 99887123076.41296,
-  "ever": 8.557965534177562e+18,
-  "ghost": 8.114588994328301e+18,
+  "ever": 8.557965534177522e+18,
+  "ghost": 8.114622804848508e+18,
   "grade": "D",
-  "hi": 3.474595861335661e+22,
-  "lo": 1831299633247987.0
+  "hi": 3.4586601991470334e+22,
+  "lo": 1839758827292305.0
  },
  "mass_sources": {
   "mass:combine": 183,
@@ -18942,12 +19101,12 @@
   "non-species tip": 551
  },
  "output": {
-  "brotli_bytes": 779813,
+  "brotli_bytes": 777969,
   "files": 16,
-  "raw_bytes": 3189608,
-  "skeleton_brotli": 56697,
+  "raw_bytes": 3178376,
+  "skeleton_brotli": 56568,
   "skeleton_nodes": 1156,
-  "skeleton_raw": 267104,
+  "skeleton_raw": 265296,
   "tiles": 15
  },
  "overrides": {
@@ -19112,12 +19271,12 @@
   "maps_used": 5613,
   "range_maps": 5831
  },
- "pieces": 289655,
+ "pieces": 288715,
  "rangeloss": {
-  "carried_by_genomic_record": 47,
-  "declines": 580,
+  "carried_by_genomic_record": 48,
+  "declines": 582,
   "end_year": 2026.77,
-  "hist_records": 600,
+  "hist_records": 602,
   "largest_declines": [
    {
     "G_yr": 4.329639972621492,
@@ -19242,8 +19401,8 @@
   ],
   "log10_factor_histogram": {
    "+0.0..+0.5": 458,
-   "+0.5..+1.0": 83,
-   "+1.0..+1.5": 30,
+   "+0.5..+1.0": 84,
+   "+1.0..+1.5": 31,
    "+1.5..+2.0": 7,
    "+2.0..+2.5": 2,
    "-0.5..+0.0": 17,
@@ -19252,12 +19411,12 @@
   "log10_factor_p5_25_50_75_95": [
    0.007,
    0.097,
-   0.236,
-   0.442,
-   1.08
+   0.238,
+   0.451,
+   1.079
   ],
   "note": "Layer 4 of the estimate stack (ToLaD#62): an extant species whose natural baseline (layer 1, PHYLACINE present-natural vs current range) differs from today's count changes log-linearly from N_nat in 1500 CE to today's count in 2026.77 (IUCN's 'since 1500' window, one date for all). factor = N_nat / N_today (> 1 = decline). HIST kind 11 `rangeloss`, grade D. A history file replaces it (showcase rows with from=history: the factor shown is the model's, the curve is the history file's).",
-  "replaced_by_history_file": 35,
+  "replaced_by_history_file": 32,
   "rises": 20,
   "rises_list": [
    {
@@ -19506,8 +19665,8 @@
    "5": 74,
    "6": 52,
    "7": 24,
-   "8": 28,
-   "9": 12,
+   "8": 29,
+   "9": 13,
    "10": 12,
    "11": 5,
    "12": 9,
@@ -19890,13 +20049,13 @@
   },
   "Hominidae": {
    "alive": 8301443760.715325,
-   "ever": 2636313647513.677,
+   "ever": 2636355550689.5923,
    "ever_range": [
-    42346747039.12134,
-    310839282081665.8
+    42347520937.34932,
+    310841455019062.1
    ],
    "extinct(gray)": false,
-   "ghost": 376778645186.7464,
+   "ghost": 376820548362.6623,
    "grade": "D",
    "t0_Ma": 14.805233333333334,
    "t1_Ma": 0.0
@@ -19916,13 +20075,13 @@
   },
   "Mammalia": {
    "alive": 99887123076.41296,
-   "ever": 8.557965534177562e+18,
+   "ever": 8.557965534177522e+18,
    "ever_range": [
-    1831299633247987.0,
-    3.474595861335661e+22
+    1839758827292305.0,
+    3.4586601991470334e+22
    ],
    "extinct(gray)": 0.0,
-   "ghost": 8.114588994328301e+18,
+   "ghost": 8.114622804848508e+18,
    "grade": "D",
    "t0_Ma": 208.64140800000004,
    "t1_Ma": 0.0
@@ -20232,8 +20391,8 @@
   "by_alive": [
    {
     "alive": 54318491455.12063,
-    "ever": 1.3909601688679762e+18,
-    "ghost": 1.2013624234218348e+18,
+    "ever": 1.3909746127943572e+18,
+    "ghost": 1.2013768673482158e+18,
     "ghost_share": 0.864,
     "name": "Chiroptera",
     "sampled": 1.8959774544614144e+17,
@@ -20241,8 +20400,8 @@
    },
    {
     "alive": 23133449903.122658,
-    "ever": 1.7944920848813391e+18,
-    "ghost": 1.6350894628137165e+18,
+    "ever": 1.7945081959986844e+18,
+    "ghost": 1.6351055739310618e+18,
     "ghost_share": 0.911,
     "name": "Rodentia",
     "sampled": 1.5940262206762266e+17,
@@ -20250,17 +20409,17 @@
    },
    {
     "alive": 5654779269.41726,
-    "ever": 6937906567037398.0,
-    "ghost": 4314986962537214.5,
-    "ghost_share": 0.622,
+    "ever": 6902891198908376.0,
+    "ghost": 4315037473189266.0,
+    "ghost_share": 0.625,
     "name": "Artiodactyla",
-    "sampled": 2622919604500183.5,
+    "sampled": 2587853725719110.0,
     "t0_Ma": 61.87
    },
    {
     "alive": 2225601210.1492753,
-    "ever": 1.711382538085201e+16,
-    "ghost": 1.5301014367333206e+16,
+    "ever": 1.7113981901599232e+16,
+    "ghost": 1.5301170888080428e+16,
     "ghost_share": 0.894,
     "name": "Carnivora",
     "sampled": 1812811013518804.0,
@@ -20268,8 +20427,8 @@
    },
    {
     "alive": 1492362384.468411,
-    "ever": 1.8332315751867987e+17,
-    "ghost": 1.4222069042215488e+17,
+    "ever": 1.8332442484641107e+17,
+    "ghost": 1.4222195774988608e+17,
     "ghost_share": 0.776,
     "name": "Eulipotyphla",
     "sampled": 4.110246709652499e+16,
@@ -20277,26 +20436,26 @@
    },
    {
     "alive": 1195648666.3005614,
-    "ever": 7.82359759581902e+16,
-    "ghost": 6.272238860993092e+16,
+    "ever": 7.823662735195338e+16,
+    "ghost": 6.272304000369408e+16,
     "ghost_share": 0.802,
     "name": "Didelphimorphia",
-    "sampled": 1.5513587348259288e+16,
+    "sampled": 1.5513587348259296e+16,
     "t0_Ma": 74.42
    },
    {
     "alive": 751328331.2713387,
-    "ever": 4.007770460223816e+16,
-    "ghost": 2.867831294749271e+16,
+    "ever": 4.0078079947551624e+16,
+    "ghost": 2.867868829280618e+16,
     "ghost_share": 0.716,
     "name": "Lagomorpha",
-    "sampled": 1.1399391654745448e+16,
+    "sampled": 1.1399391654745444e+16,
     "t0_Ma": 72.45
    },
    {
     "alive": 619434015.7798252,
-    "ever": 1.187607799406602e+16,
-    "ghost": 9513090726001064.0,
+    "ever": 1.1876202502576234e+16,
+    "ghost": 9513215234511278.0,
     "ghost_share": 0.801,
     "name": "Hyracoidea",
     "sampled": 2362987268064956.0,
@@ -20304,8 +20463,8 @@
    },
    {
     "alive": 408303737.17517364,
-    "ever": 1.2138182264896912e+16,
-    "ghost": 9102298058350482.0,
+    "ever": 1.2138313829526916e+16,
+    "ghost": 9102429622980486.0,
     "ghost_share": 0.75,
     "name": "Diprotodontia",
     "sampled": 3035884206546430.0,
@@ -20313,19 +20472,19 @@
    },
    {
     "alive": 290577780.41253823,
-    "ever": 2.03683396392092e+16,
-    "ghost": 1.322854075614086e+16,
+    "ever": 2.036847495948673e+16,
+    "ghost": 1.322867607641839e+16,
     "ghost_share": 0.649,
     "name": "Macroscelidea",
-    "sampled": 7139798883068340.0,
+    "sampled": 7139798883068338.0,
     "t0_Ma": 65.7
    }
   ],
   "by_ever": [
    {
     "alive": 23133449903.122658,
-    "ever": 1.7944920848813391e+18,
-    "ghost": 1.6350894628137165e+18,
+    "ever": 1.7945081959986844e+18,
+    "ghost": 1.6351055739310618e+18,
     "ghost_share": 0.911,
     "name": "Rodentia",
     "sampled": 1.5940262206762266e+17,
@@ -20333,8 +20492,8 @@
    },
    {
     "alive": 54318491455.12063,
-    "ever": 1.3909601688679762e+18,
-    "ghost": 1.2013624234218348e+18,
+    "ever": 1.3909746127943572e+18,
+    "ghost": 1.2013768673482158e+18,
     "ghost_share": 0.864,
     "name": "Chiroptera",
     "sampled": 1.8959774544614144e+17,
@@ -20342,8 +20501,8 @@
    },
    {
     "alive": 1492362384.468411,
-    "ever": 1.8332315751867987e+17,
-    "ghost": 1.4222069042215488e+17,
+    "ever": 1.8332442484641107e+17,
+    "ghost": 1.4222195774988608e+17,
     "ghost_share": 0.776,
     "name": "Eulipotyphla",
     "sampled": 4.110246709652499e+16,
@@ -20351,35 +20510,35 @@
    },
    {
     "alive": 1195648666.3005614,
-    "ever": 7.82359759581902e+16,
-    "ghost": 6.272238860993092e+16,
+    "ever": 7.823662735195338e+16,
+    "ghost": 6.272304000369408e+16,
     "ghost_share": 0.802,
     "name": "Didelphimorphia",
-    "sampled": 1.5513587348259288e+16,
+    "sampled": 1.5513587348259296e+16,
     "t0_Ma": 74.42
    },
    {
     "alive": 751328331.2713387,
-    "ever": 4.007770460223816e+16,
-    "ghost": 2.867831294749271e+16,
+    "ever": 4.0078079947551624e+16,
+    "ghost": 2.867868829280618e+16,
     "ghost_share": 0.716,
     "name": "Lagomorpha",
-    "sampled": 1.1399391654745448e+16,
+    "sampled": 1.1399391654745444e+16,
     "t0_Ma": 72.45
    },
    {
     "alive": 290577780.41253823,
-    "ever": 2.03683396392092e+16,
-    "ghost": 1.322854075614086e+16,
+    "ever": 2.036847495948673e+16,
+    "ghost": 1.322867607641839e+16,
     "ghost_share": 0.649,
     "name": "Macroscelidea",
-    "sampled": 7139798883068340.0,
+    "sampled": 7139798883068338.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 2225601210.1492753,
-    "ever": 1.711382538085201e+16,
-    "ghost": 1.5301014367333206e+16,
+    "ever": 1.7113981901599232e+16,
+    "ghost": 1.5301170888080428e+16,
     "ghost_share": 0.894,
     "name": "Carnivora",
     "sampled": 1812811013518804.0,
@@ -20387,8 +20546,8 @@
    },
    {
     "alive": 408303737.17517364,
-    "ever": 1.2138182264896912e+16,
-    "ghost": 9102298058350482.0,
+    "ever": 1.2138313829526916e+16,
+    "ghost": 9102429622980486.0,
     "ghost_share": 0.75,
     "name": "Diprotodontia",
     "sampled": 3035884206546430.0,
@@ -20396,8 +20555,8 @@
    },
    {
     "alive": 619434015.7798252,
-    "ever": 1.187607799406602e+16,
-    "ghost": 9513090726001064.0,
+    "ever": 1.1876202502576234e+16,
+    "ghost": 9513215234511278.0,
     "ghost_share": 0.801,
     "name": "Hyracoidea",
     "sampled": 2362987268064956.0,
@@ -20405,19 +20564,19 @@
    },
    {
     "alive": 5654779269.41726,
-    "ever": 6937906567037398.0,
-    "ghost": 4314986962537214.5,
-    "ghost_share": 0.622,
+    "ever": 6902891198908376.0,
+    "ghost": 4315037473189266.0,
+    "ghost_share": 0.625,
     "name": "Artiodactyla",
-    "sampled": 2622919604500183.5,
+    "sampled": 2587853725719110.0,
     "t0_Ma": 61.87
    }
   ],
   "by_sampled_ever": [
    {
     "alive": 54318491455.12063,
-    "ever": 1.3909601688679762e+18,
-    "ghost": 1.2013624234218348e+18,
+    "ever": 1.3909746127943572e+18,
+    "ghost": 1.2013768673482158e+18,
     "ghost_share": 0.864,
     "name": "Chiroptera",
     "sampled": 1.8959774544614144e+17,
@@ -20425,8 +20584,8 @@
    },
    {
     "alive": 23133449903.122658,
-    "ever": 1.7944920848813391e+18,
-    "ghost": 1.6350894628137165e+18,
+    "ever": 1.7945081959986844e+18,
+    "ghost": 1.6351055739310618e+18,
     "ghost_share": 0.911,
     "name": "Rodentia",
     "sampled": 1.5940262206762266e+17,
@@ -20434,8 +20593,8 @@
    },
    {
     "alive": 1492362384.468411,
-    "ever": 1.8332315751867987e+17,
-    "ghost": 1.4222069042215488e+17,
+    "ever": 1.8332442484641107e+17,
+    "ghost": 1.4222195774988608e+17,
     "ghost_share": 0.776,
     "name": "Eulipotyphla",
     "sampled": 4.110246709652499e+16,
@@ -20443,35 +20602,35 @@
    },
    {
     "alive": 1195648666.3005614,
-    "ever": 7.82359759581902e+16,
-    "ghost": 6.272238860993092e+16,
+    "ever": 7.823662735195338e+16,
+    "ghost": 6.272304000369408e+16,
     "ghost_share": 0.802,
     "name": "Didelphimorphia",
-    "sampled": 1.5513587348259288e+16,
+    "sampled": 1.5513587348259296e+16,
     "t0_Ma": 74.42
    },
    {
     "alive": 751328331.2713387,
-    "ever": 4.007770460223816e+16,
-    "ghost": 2.867831294749271e+16,
+    "ever": 4.0078079947551624e+16,
+    "ghost": 2.867868829280618e+16,
     "ghost_share": 0.716,
     "name": "Lagomorpha",
-    "sampled": 1.1399391654745448e+16,
+    "sampled": 1.1399391654745444e+16,
     "t0_Ma": 72.45
    },
    {
     "alive": 290577780.41253823,
-    "ever": 2.03683396392092e+16,
-    "ghost": 1.322854075614086e+16,
+    "ever": 2.036847495948673e+16,
+    "ghost": 1.322867607641839e+16,
     "ghost_share": 0.649,
     "name": "Macroscelidea",
-    "sampled": 7139798883068340.0,
+    "sampled": 7139798883068338.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 408303737.17517364,
-    "ever": 1.2138182264896912e+16,
-    "ghost": 9102298058350482.0,
+    "ever": 1.2138313829526916e+16,
+    "ghost": 9102429622980486.0,
     "ghost_share": 0.75,
     "name": "Diprotodontia",
     "sampled": 3035884206546430.0,
@@ -20479,17 +20638,17 @@
    },
    {
     "alive": 5654779269.41726,
-    "ever": 6937906567037398.0,
-    "ghost": 4314986962537214.5,
-    "ghost_share": 0.622,
+    "ever": 6902891198908376.0,
+    "ghost": 4315037473189266.0,
+    "ghost_share": 0.625,
     "name": "Artiodactyla",
-    "sampled": 2622919604500183.5,
+    "sampled": 2587853725719110.0,
     "t0_Ma": 61.87
    },
    {
     "alive": 619434015.7798252,
-    "ever": 1.187607799406602e+16,
-    "ghost": 9513090726001064.0,
+    "ever": 1.1876202502576234e+16,
+    "ghost": 9513215234511278.0,
     "ghost_share": 0.801,
     "name": "Hyracoidea",
     "sampled": 2362987268064956.0,
@@ -20497,8 +20656,8 @@
    },
    {
     "alive": 2225601210.1492753,
-    "ever": 1.711382538085201e+16,
-    "ghost": 1.5301014367333206e+16,
+    "ever": 1.7113981901599232e+16,
+    "ghost": 1.5301170888080428e+16,
     "ghost_share": 0.894,
     "name": "Carnivora",
     "sampled": 1812811013518804.0,

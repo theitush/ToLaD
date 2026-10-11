@@ -753,7 +753,8 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
             new = curve_pieces(pts, L, leaf.t0, pre_level=pre)
             D["pieces"] = new + D["pieces"][nw:]
             D["n_wild_pieces"] = len(new)
-            D["alive"] = n_now + (D["domestic"]["stock"] if D.get("domestic") else 0.0)
+            # a domestic stock on the leaf keeps its own count (its history file's, else the model's)
+            D["alive"] = n_now + (D.get("domestic_now", D["domestic"]["stock"]) if D.get("domestic") else 0.0)
             D["rate_wild_now"] = n_now / L
         elif rec["use"] == "counts" and rec["component"] == "domestic":
             if not D.get("domestic"):
@@ -777,6 +778,7 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
             new = curve_pieces(pts, L, a_first)
             D["pieces"] = D["pieces"][:nw] + early + new
             D["alive"] = D["alive"] - D["domestic"]["stock"] + pts[-1]["n"]
+            D["domestic_now"] = pts[-1]["n"]
         if rec["use"] == "counts":
             # the deep-past level: the cited baseline, else the natural baseline or today's level
             # (wild), or the first point (domestic); a genomic deep past is also a deep-past level
@@ -811,8 +813,19 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
                              + (" + bulk genomic deep past (genomic.py)" if rec.get("deep_bulk") else ""))
             D["src"].add(src_bit)
             D["anchored_count"] = True
-        D["history"] = rec
-        D["alive_from_history"] = rec["use"] == "counts" and alive_from_hist
+        # a leaf can carry a wild record and a domestic one (wild boar and the pig, the bezoar and the
+        # goat; ToLaD#76): both shape its births pieces above, but HIST holds one record per row, and
+        # the wild one holds it (the species' own past over its whole band; the domestic stock's
+        # count still rides in the leaf's alive and EVER). The other is kept as `history_beside`.
+        prev = D.get("history")
+        if prev is not None and prev["component"] == "wild" and rec["component"] != "wild":
+            D["history_beside"] = rec
+        else:
+            if prev is not None:
+                D["history_beside"] = prev
+            D["history"] = rec
+        D["alive_from_history"] = (rec["use"] == "counts" and alive_from_hist) or (
+            prev is not None and D.get("alive_from_history", False))
         # wild: the first segment holds the baseline back to the band start; domestic and
         # humans: segments cover the curated span only (before it the model's own shape stands)
         t0_seg = leaf.t0 if rec["component"] == "wild" else year_to_ma(pts[0]["year"])
@@ -853,7 +866,7 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
                        "clade": mu["clade"] or "Mammalia (fit only)", "vs_flat": mu["vs_flat"]},
                 "join": rec["deep_join"],
             }
-        report[rec["species"]] = {
+        entry = {
             "file": rec["file"], "modelled": rec.get("modelled"), "leaf": leaf.name, "use": rec["use"], "component": rec["component"],
             "points": len(rec["points"]), "grades": "".join(sorted({p["grade"] for p in rec["points"]})),
             "baseline": ({k: rec["baseline"][k] for k in ("year", "n", "lo", "hi", "grade", "kind")}
@@ -872,7 +885,22 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
             "trend_held": held,
             "G_yr": G, "segments": len(rec["segments"]), "domestic_on_leaf": bool(D.get("domestic")),
             "deep": deep_rep,
+            "hist_row": D["history"] is rec,  # this record is the leaf's HIST record (see history_beside)
+            "beside": rec.get("beside"),
         }
+        key = rec["species"]
+        if key in report:
+            # two records of one name on one leaf (the wild boar beside the pig file, ToLaD#76): the
+            # one in HIST keeps the name, the other takes its component as a suffix
+            if D["history"] is rec:
+                other = report.pop(key)
+                report[f"{key} ({other['component']})"] = other
+            else:
+                key = f"{key} ({rec['component']})"
+        report[key] = rec["report"] = entry
+    for rec in recs:  # a later record on the same leaf may have taken the HIST row
+        if "leaf" in rec:
+            rec["report"]["hist_row"] = rec["leaf"].data.get("history") is rec
     if missing:
         raise HistoryError(f"history species not found among living tree leaves: {missing}")
     log["history"] = {
