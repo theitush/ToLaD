@@ -63,7 +63,13 @@ KINDS = POINT_KINDS + ["model", "interpolated", "held", "baseline", "genomic", "
 K = {k: i for i, k in enumerate(KINDS)}
 
 TOP_KEYS = {"species", "aliases", "common", "component", "use", "scope", "faostat_item", "notes",
-            "baseline", "point", "deep"}
+            "baseline", "point", "deep", "event"}
+# A curated event in a species' past (ToLaD#141): today only a population bottleneck, marked on the fan's
+# column over its window and explained on the card with the source quoted verbatim.
+EVENT_KINDS = ("bottleneck",)
+EVENT_KEYS = {"kind", "from_ya", "to_ya", "title", "summary", "quote", "cite", "url", "grade", "region"}
+EVENT_REQUIRED = EVENT_KEYS - {"region"}
+EVENT_TITLE_MAX = 40  # characters: the title is the label on the fan
 DEEP_KEYS = {"method", "cite", "url", "mu", "g", "grade", "note", "steps"}
 DEEP_METHODS = ("PSMC", "MSMC", "MSMC2", "SMC++")
 DEEP_GRADES = "CD"
@@ -154,6 +160,38 @@ def _check_point(p: dict, where: str) -> dict:
             "note": str(p.get("note", "")).strip()}
 
 
+def _check_event(e: dict, where: str) -> dict:
+    """One [[event]] (ToLaD#141): a dated window in years before present, explained and sourced."""
+    if not isinstance(e, dict):
+        raise HistoryError(f"{where}: not a table")
+    extra = set(e) - EVENT_KEYS
+    if extra:
+        raise HistoryError(f"{where}: unknown keys {sorted(extra)}")
+    miss = EVENT_REQUIRED - set(e)
+    if miss:
+        raise HistoryError(f"{where}: missing {sorted(miss)}")
+    if e["kind"] not in EVENT_KINDS:
+        raise HistoryError(f"{where}: kind {e['kind']!r} not in {EVENT_KINDS}")
+    for k in ("from_ya", "to_ya"):
+        if not _num(e[k]) or not math.isfinite(e[k]):
+            raise HistoryError(f"{where}: {k} must be a number (years before present)")
+    if not e["from_ya"] > e["to_ya"] >= 0:
+        raise HistoryError(f"{where}: need from_ya > to_ya >= 0 (older end first), got {e['from_ya']} {e['to_ya']}")
+    for k in ("title", "summary", "quote", "cite", "url") + (("region",) if "region" in e else ()):
+        if not isinstance(e[k], str) or not e[k].strip():
+            raise HistoryError(f"{where}: {k} must be a non-empty string")
+    if len(e["title"].strip()) > EVENT_TITLE_MAX:
+        raise HistoryError(f"{where}: title longer than {EVENT_TITLE_MAX} characters (it is the fan's label)")
+    if not e["url"].startswith(("http://", "https://")):
+        raise HistoryError(f"{where}: url must be http(s)")
+    if e["grade"] not in GRADES:
+        raise HistoryError(f"{where}: grade {e['grade']!r} not in A-D")
+    return {"kind": e["kind"], "from_ya": float(e["from_ya"]), "to_ya": float(e["to_ya"]),
+            "title": e["title"].strip(), "summary": " ".join(e["summary"].split()),
+            "quote": " ".join(e["quote"].split()), "cite": e["cite"].strip(), "url": e["url"].strip(),
+            "grade": e["grade"], "region": str(e.get("region", "")).strip()}
+
+
 def _num(v) -> bool:
     return isinstance(v, (int, float)) and not isinstance(v, bool)
 
@@ -232,6 +270,11 @@ def validate(doc: dict, name: str = "<doc>") -> dict:
     deep = _check_deep(doc["deep"], f"{name} deep") if "deep" in doc else None
     if deep is not None and (doc["component"] != "wild" or use != "counts"):
         raise HistoryError(f"{name}: a deep past is for wild species with use = \"counts\"")
+    evs = doc.get("event", [])
+    if not isinstance(evs, list):
+        raise HistoryError(f"{name}: event must be an array of tables ([[event]])")
+    events = sorted((_check_event(e, f"{name} event {i + 1}") for i, e in enumerate(evs)),
+                    key=lambda e: (-e["from_ya"], -e["to_ya"]))
     aliases = doc.get("aliases", [])
     if not isinstance(aliases, list) or not all(isinstance(a, str) for a in aliases):
         raise HistoryError(f"{name}: aliases must be a list of strings")
@@ -240,6 +283,7 @@ def validate(doc: dict, name: str = "<doc>") -> dict:
         "component": doc["component"], "use": use, "scope": str(doc.get("scope", "")),
         "faostat_item": fao, "notes": str(doc.get("notes", "")).strip(),
         "baseline": base, "points": sorted(points, key=lambda p: p["year"]), "deep": deep,
+        "events": events,
     }
 
 
@@ -885,6 +929,7 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
             "trend_held": held,
             "G_yr": G, "segments": len(rec["segments"]), "domestic_on_leaf": bool(D.get("domestic")),
             "deep": deep_rep,
+            "events": [f"{e['kind']} {e['from_ya']:g}-{e['to_ya']:g} ya: {e['title']}" for e in rec.get("events", [])],
             "hist_row": D["history"] is rec,  # this record is the leaf's HIST record (see history_beside)
             "beside": rec.get("beside"),
         }

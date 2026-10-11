@@ -162,6 +162,8 @@ test('HIST round-trips against debug_top.json history', () => {
     // the genomic deep past's join, as a sentence for the card (ToLaD#80)
     assert.equal(got.deep_join ?? null, h.deep_join ?? null, `${w} deep_join`);
     if (h.points.some((p) => p.kind === 'genomic')) assert.match(got.deep_join, /^(First cited point \([^)]*\) is after 1900, so not used as the deep past's level\. )?Genomic curve /, `${w} deep_join`);
+    // curated events (v1.5, ToLaD#141): carried whole, oldest first; [] when there are none
+    assert.deepEqual(got.events, h.events ?? [], `${w} events`);
     assert.ok(Math.abs(got.G / h.G - 1) < 1e-6, `${w} G`);
     assert.equal(got.points.length, h.points.length, `${w} points`);
     h.points.forEach((p, k) => {
@@ -352,4 +354,24 @@ test('RLST: every living species row has a status, fossils none, internal nodes 
     assert.equal(by.get(sp).source, 0, `${sp} from the 2026-1 list`);
   }
   assert.equal(by.get('Panthera tigris').assessment, 214862019);
+});
+
+// ---- v1.5: curated events (bottlenecks, ToLaD#141) --------------------------
+
+test('HIST: the cougar and the cheetah carry their sourced bottlenecks', () => {
+  for (const sp of ['Puma concolor', 'Acinonyx jubatus']) {
+    const e = sk.meta.hist_index.find((x) => x.species === sp);
+    assert.ok(e, `${sp} indexed`);
+    const f = e.tile < 0 ? sk : load(`t/${e.tile}.tld`);
+    const evs = f.history(e.row).events;
+    assert.ok(evs.length >= 1, `${sp}: at least one event`);
+    for (const ev of evs) {
+      assert.equal(ev.kind, 'bottleneck');
+      assert.ok(ev.from_ya > ev.to_ya && ev.to_ya >= 0, `${sp} window`);
+      for (const k of ['title', 'summary', 'quote', 'cite', 'url']) assert.ok(ev[k].length > 0, `${sp} ${k}`);
+      assert.match(ev.url, /^https?:\/\//);
+      assert.match(ev.grade, /^[ABCD]$/);
+    }
+    evs.slice(1).forEach((ev, k) => assert.ok(ev.from_ya <= evs[k].from_ya, `${sp} oldest first`));
+  }
 });

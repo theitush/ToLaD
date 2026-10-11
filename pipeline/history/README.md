@@ -56,7 +56,41 @@ steps  = [             # [years ago from, years ago to, Ne] as published, young 
   [19670, 23780, 26800],
   # ...
 ]
+
+[[event]]              # optional, any number: a dated event in the species' past (see "Events")
+kind    = "bottleneck"                 # only kind for now
+from_ya = 25000                        # window start, years before present (older end)
+to_ya   = 10000                        # window end, years before present (younger end)
+title   = "North American refounding"  # 2-5 words, at most 40 characters: the label on the fan
+summary = "One or two plain sentences: what happened, where, roughly how small."
+quote   = "Verbatim sentence(s) copied from the source."
+cite    = "Authors (year). Title. Journal vol:pages"
+url     = "https://doi.org/..."
+grade   = "C"                          # A | B | C | D, as for points
+region  = "North America"              # optional: when it concerns part of the species
 ```
+
+### Events (`[[event]]`, ToLaD#141)
+
+Population bottlenecks are what the site is for, so each one with evidence is
+marked: the fan tints its window on the species' column and names it beside
+the column (where there is room), and a tap inside the window opens the card's
+section on it: the title, the summary, the source's own words quoted, the
+source linked and the grade. The card's population chart shows the window as a
+labelled band.
+
+- **Evidence:** every event is backed by a source that was actually read, and
+  `quote` is copied from it verbatim (whitespace is normalised, nothing else).
+  The window is the source's dating; where the curve in this file does not show
+  the dip (PSMC's blind spot under ~20 kyr, or no figure there), the file's
+  `notes` say so, and the mark stands on the source alone.
+- **Validation** (`history._check_event`): the build fails on an unknown key, a
+  missing field, a kind other than `bottleneck`, not `from_ya > to_ya >= 0`, an
+  empty `title`, `summary`, `quote` or `cite`, a title over 40 characters, a
+  non-http(s) `url`, or a grade outside A-D.
+- **Build:** the events ride in the species' `META.hist` entry, oldest first
+  (`pipeline/FORMAT.md` v1.5); they do not change any count. Report:
+  `stats.json -> history.species[<sp>].events`.
 
 **kind** is one of:
 

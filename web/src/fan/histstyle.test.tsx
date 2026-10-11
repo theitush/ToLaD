@@ -58,6 +58,7 @@ describe('species card history', () => {
       scope: '',
       notes: 'Modelled, not counted (grade D).',
       modelled: 'rangeloss',
+      events: [],
       G,
       L: G / 2,
       nowYear: 2027,
