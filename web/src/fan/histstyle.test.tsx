@@ -5,7 +5,7 @@ import { fmtYear, HistorySpark, popTicks, yearTicks } from './HistorySpark';
 import { GRADE_WORD, MODELLED_KINDS, noDataSpans, styleBetween } from './history';
 import { PANTHERA, type HistoryRec } from './panthera';
 import { population } from './population';
-import { RED_LIST } from './status';
+import { RED_LIST, redListOf } from './status';
 import { formatCount } from '../data/names';
 
 const byName = (common: string) => PANTHERA.species.find((s) => s.common === common)!;
@@ -191,9 +191,12 @@ describe('the species card: the population at the time touched', () => {
       if (sp.extinct) {
         expect(chip![1]).toBe('Extinct (prehistoric)');
         expect(RED_LIST[sp.sci]).toBeUndefined();
+        expect(sp.redList).toBeNull(); // fossils carry no status in the data
       } else {
         expect(chip![1]).toBe(want[sp.common]);
-        const s = RED_LIST[sp.sci];
+        // the data's status (ToLaD#48), or the curated one where that is the newer assessment
+        expect(sp.redList?.source).toBe('iucn-2026-1');
+        const s = redListOf(sp)!;
         expect(s.year).toBeGreaterThanOrEqual(2017);
         expect(s.url).toMatch(/^https:\/\/www\.iucnredlist\.org\/species\/\d+\/\d+$/);
         expect(details(html)).toContain(`${s.year} assessment`);

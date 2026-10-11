@@ -1,16 +1,19 @@
 // Conservation status of the fan's living species: the IUCN Red List category
-// of each one's current global assessment, curated by hand (keyed by
-// scientific name). Fossil species get no IUCN category (the Red List's EX is
-// for extinctions since 1500 CE); the card calls them prehistoric extinctions.
+// of each one's current global assessment. It comes from the data (format v1.4
+// RLST, ToLaD#48: the Red List 2026-1 via GBIF, else PHYLACINE 1.2's IUCN
+// 2016-3 status, else NE), which every living species has. Fossil species get
+// no IUCN category (the Red List's EX is for extinctions since 1500 CE); the
+// card calls them prehistoric extinctions.
 //
-// Checked 2026-10-10 against the assessments' own citations (authors, year,
-// assessment id) as given in each species' Wikipedia infobox; the IUCN site
-// itself refused automated reads (HTTP 403), so the ids below are the ones to
-// open by hand. Pipeline-wide status is ToLaD#48.
+// RED_LIST below is the hand-curated status of the five living Panthera,
+// checked 2026-10-10 against the assessments' own citations (authors, year,
+// assessment id) as given in each species' Wikipedia infobox (the IUCN site
+// refuses automated reads, HTTP 403). It overrides the data only where it is
+// the newer assessment, and stands in when the data carries no status.
 
 import type { SpeciesRec } from './panthera';
 
-export type RedListCategory = 'LC' | 'NT' | 'VU' | 'EN' | 'CR' | 'EW' | 'EX' | 'DD';
+export type RedListCategory = 'LC' | 'NT' | 'VU' | 'EN' | 'CR' | 'EW' | 'EX' | 'DD' | 'NE';
 
 export const CATEGORY_NAME: Record<RedListCategory, string> = {
   LC: 'Least Concern',
@@ -21,6 +24,7 @@ export const CATEGORY_NAME: Record<RedListCategory, string> = {
   EW: 'Extinct in the Wild',
   EX: 'Extinct',
   DD: 'Data Deficient',
+  NE: 'Not Evaluated',
 };
 
 export interface RedListStatus {
@@ -29,7 +33,10 @@ export interface RedListStatus {
   year: number;
   /** The assessment's citation, short. */
   cite: string;
+  /** The assessment's page ('' when there is none, e.g. NE). */
   url: string;
+  /** Where it came from: 'curated' (RED_LIST) or the data's source key ('iucn-2026-1', ...). */
+  source?: string;
 }
 
 export const RED_LIST: Record<string, RedListStatus> = {
@@ -68,8 +75,19 @@ export const RED_LIST: Record<string, RedListStatus> = {
 /** The card's status chip: a Red List category, prehistoric extinction, or none known. */
 export type StatusChip = { kind: 'iucn'; label: string; code: RedListCategory; status: RedListStatus } | { kind: 'prehistoric'; label: string } | null;
 
+/** The status the card shows: the data's, unless the curated entry is a newer assessment. */
+export function redListOf(sp: SpeciesRec): RedListStatus | null {
+  const d = sp.redList;
+  const fromData: RedListStatus | null =
+    d && d.category in CATEGORY_NAME ? { category: d.category as RedListCategory, year: d.year, cite: d.cite, url: d.url, source: d.source } : null;
+  const cur = RED_LIST[sp.sci];
+  if (cur && (!fromData || cur.year > fromData.year)) return { ...cur, source: 'curated' };
+  return fromData;
+}
+
 export function statusOf(sp: SpeciesRec): StatusChip {
-  if (sp.extinct) return { kind: 'prehistoric', label: 'Extinct (prehistoric)' };
-  const s = RED_LIST[sp.sci];
+  const s = redListOf(sp);
+  // a fossil has no Red List status; one that ended since 1500 CE keeps the list's EX/EW
+  if (sp.extinct && !(s && (s.category === 'EX' || s.category === 'EW'))) return { kind: 'prehistoric', label: 'Extinct (prehistoric)' };
   return s ? { kind: 'iucn', label: CATEGORY_NAME[s.category], code: s.category, status: s } : null;
 }
