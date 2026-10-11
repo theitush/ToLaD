@@ -163,7 +163,9 @@ in 25-year steps.
   1500 where it differs, else today's count) and after (with the curve and
   baseline), the deep-past level before and after, and `deep_from`: what
   sets the level at the band start (`genomic`, `baseline`, `natural` or
-  `today`, in that order of precedence).
+  `today`, in that order of precedence). With a genomic deep past,
+  `deep.join` says how it met the next level, and `history.deep_join` sums
+  the rules and lists the flagged species (see "Joining" below).
 - **Domestic** (`component = "domestic"`): the curve is the domestic stock.
   With `faostat_item`, FAOSTAT World stocks (1961 to the latest year, every 5
   years plus the latest) are added as grade B census points. Before the first
@@ -226,18 +228,46 @@ the same way by code rather than by hand.
 
   Hence grade C at best, and D when the curve was digitised or the Ne/N ratio
   is generic. Steps older than the species band start are dropped as well.
-- **Joining.** Genomic points are older than every cited point (the 20 kyr
-  cutoff ensures it), so the baseline is no longer the oldest point. The curve
-  passes through every point. The youngest genomic point is therefore joined
-  to the first cited point (the baseline, if any) by the usual log-linear
-  span, which is continuous by construction. That span crosses the blind spot,
-  so it is marked `interpolated` and carries the worse grade of its two ends
-  (D).
+- **Joining** (ToLaD#77, decided by Ita 2026-10-11; built in #80, `history.deep_join`).
+  Genomic points are older than every cited point (the 20 kyr cutoff ensures
+  it), so the baseline is no longer the oldest point. The curve passes through
+  every point, so the youngest genomic point is joined to the **next level**
+  (the first non-genomic point) by the usual log-linear span, marked
+  `interpolated`, grade D (the worse of its two ends), across the blind spot.
+  What happens to the genomic level depends on what that next level is:
 
-  The deep curve is not scaled to meet the baseline. Scaling it would let one
-  recent figure, often a grade D guess, set the level of a million years.
-  Instead the mismatch is reported in `stats.json -> history.species.<sp>.deep.join`:
-  `ratio` = the genomic level at the cutoff ÷ the first cited level.
+  - **Cited** (a history file's baseline or first point: any point kind, i.e.
+    `census`, `estimate`, `index-scaled`, `reconstruction`, `unverified`): the
+    genomic curve is **scaled** (its `n`, `lo`, `hi` and Ne, all by one factor)
+    so its youngest point meets the cited level. The PSMC shape is kept; the
+    cited count is better evidence of the level than the generic Ne/N = 0.1.
+    The join span is then flat. E.g. *Bison bison*: x981 to meet the 1800
+    baseline of 42 million.
+  - **Modelled** (the natural level in 1500 CE of the range-loss trend, or
+    today's modelled count): the genomic curve **keeps its own level** and
+    joins the modelled level log-linearly (the #60 rule).
+  - **Flag.** Either way, a species whose genomic / next-level ratio (before
+    any scaling) is beyond `DEEP_JOIN_FLAG` = 10x either way is flagged: the
+    build prints the list, and `stats.json -> history.deep_join` holds the
+    counts per rule and the flagged species, worst first.
+
+  Per species, `stats.json -> history.species.<sp>.deep.join` records `rule`
+  (`scaled` / `absolute`), `next` (`cited` / `modelled`), `to_kind`,
+  `to_year`, `to_n`, `deep_n_raw` (the genomic level at the cutoff as
+  converted), `deep_n` (as built), `ratio` (= `deep_n_raw` ÷ `to_n`),
+  `factor` (the scale applied, 1 when kept), `flag` and `note`: one sentence
+  for the species card, e.g. "Genomic curve scaled x981 to meet the cited 1800
+  baseline (42,000,000), keeping its shape; before scaling it was 981x below
+  that level (flagged: beyond 10x)." or "Genomic curve kept at its own level;
+  the modelled natural level in 1500 CE is 316x lower (flagged: beyond 10x);
+  the two are joined log-linearly across PSMC's last 20 kyr." The same
+  sentence ships in the tiles as `META.hist[].deep_join` (`pipeline/FORMAT.md`),
+  which `file.history(row)` returns; a scaled curve's point notes say so too.
+
+  A cited first point need not be a pre-decline level: where a history file
+  has no baseline, the first point can be a bottleneck or a recent count
+  (*Bison bonasus* 1924, 66 animals; *Oryx dammah* 2026, 650). The rule still
+  scales the deep past to it, and the flag shows how far it moved.
 
   Before the oldest genomic point, the oldest genomic level is held back to
   the band start (a `held` segment). It replaces the baseline hold, or
@@ -287,14 +317,17 @@ same `[deep]` structure in memory. Nothing is written into these TOMLs.
   1500 CE (kind `rangeloss`) and the trend to today's count (49 species);
   else straight on to today's count (39). Today's count is the model's
   alive-now, unchanged.
-- **The join at the blind spot** is the #60 rule: the youngest genomic point
-  (>= 20 kyr ago) joins the next level (the 1500 natural level, the first
-  cited point, or today's count) by one log-linear span, kind
-  `interpolated`, grade D. The curve is not scaled to meet that level. The
-  mismatch is in `stats.json -> history.species.<sp>.deep.join.ratio`
-  (median 0.86 over the 106 bulk curves, but 0.001..316 at the extremes:
-  e.g. Addax, whose natural baseline is scaled from today's ~80 animals, so
-  is far below its genomic level).
+- **The join at the blind spot** follows "Joining" above (#80): the youngest
+  genomic point (>= 20 kyr ago) joins the next level by one log-linear span,
+  kind `interpolated`, grade D. A history file's cited baseline or first
+  point scales the curve to meet it; a modelled record's next level (the 1500
+  natural level, or today's modelled count) is modelled, so its curve keeps
+  its own level. Every modelled record is therefore `absolute`; scaling
+  happens only in history files (bulk or hand-written `[deep]`). Before
+  #80 the ratio genomic / next level had a median of 0.86 over the 106 bulk
+  curves, but 0.001..316 at the extremes (Bison 0.001 against its 1800
+  baseline, now scaled; Addax 316 against a natural baseline scaled from
+  today's ~80 animals, kept and flagged).
 - **Reports.** `stats.json -> genomic`: the source, coverage and, per curve,
   how it was used. `history.species.<sp>.deep.bulk` marks a bulk curve.
 

@@ -214,10 +214,13 @@ def encode_hist(rows: list[tuple[Node, bool]], cites: dict[tuple[str, str], int]
             # modelled records are many: their notes live once in skeleton META.natural.trend
             meta.append({"species": rec["species"], "component": rec["component"], "use": rec["use"],
                          "modelled": rec["modelled"]})
-            continue
-        meta.append({"species": rec["species"], "common": rec["common"], "component": rec["component"],
-                     "use": rec["use"], "scope": rec["scope"], "file": rec["file"], "notes": rec["notes"],
-                     "point_notes": [p["note"] for p in rec["curve"]], "modelled": rec.get("modelled")})
+        else:
+            meta.append({"species": rec["species"], "common": rec["common"], "component": rec["component"],
+                         "use": rec["use"], "scope": rec["scope"], "file": rec["file"], "notes": rec["notes"],
+                         "point_notes": [p["note"] for p in rec["curve"]], "modelled": rec.get("modelled")})
+        if rec.get("deep_join"):
+            # how the genomic deep past meets the next level, for the species card (ToLaD#80)
+            meta[-1]["deep_join"] = rec["deep_join"]["note"]
     if not recs:
         return b"", 0, []
     blob = HIST_PREAMBLE.pack(len(recs), len(pts), len(segs), 0) + b"".join(heads) + b"".join(pts) + b"".join(segs)
@@ -229,6 +232,7 @@ def hist_debug(rec: dict, tile: int, row: int, gid: int) -> dict:
     return {
         "species": rec["species"], "common": rec["common"], "file": rec["file"], "use": rec["use"],
         "component": rec["component"], "modelled": rec.get("modelled"), "tile": tile, "row": row, "gid": gid, "G": rec["G"], "L": rec["L"],
+        "deep_join": rec["deep_join"]["note"] if rec.get("deep_join") else None,
         "points": [{"year": round(p["year"]), "n": p["n"], "lo": p["lo"], "hi": p["hi"], "grade": p["grade"],
                     "kind": p["kind"], "baseline": bool(p.get("baseline")), "cite": p["cite"], "url": p["url"]}
                    for p in rec["curve"]],

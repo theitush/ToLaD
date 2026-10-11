@@ -159,6 +159,9 @@ test('HIST round-trips against debug_top.json history', () => {
     assert.ok(got, `${w}: no HIST entry at tile ${h.tile} row ${h.row}`);
     assert.equal(got.species, h.species);
     assert.equal(got.modelled ?? null, h.modelled ?? null, `${w} modelled`);
+    // the genomic deep past's join, as a sentence for the card (ToLaD#80)
+    assert.equal(got.deep_join ?? null, h.deep_join ?? null, `${w} deep_join`);
+    if (h.points.some((p) => p.kind === 'genomic')) assert.match(got.deep_join, /^Genomic curve /, `${w} deep_join`);
     assert.ok(Math.abs(got.G / h.G - 1) < 1e-6, `${w} G`);
     assert.equal(got.points.length, h.points.length, `${w} points`);
     h.points.forEach((p, k) => {

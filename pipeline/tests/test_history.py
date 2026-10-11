@@ -418,5 +418,113 @@ class DeepPast(unittest.TestCase):
             self.assertTrue(lo <= s["ever_after"] <= hi, (sp, lo, s["ever_after"], hi))
 
 
+class DeepJoin(unittest.TestCase):
+    """ToLaD#77/#80: a cited next level scales the genomic curve to meet it; a modelled one keeps the
+    genomic level; a mismatch beyond 10x is flagged either way; each species gets a sentence."""
+
+    def _gen(self, G=10.0):
+        r = H.validate(_with_deep())
+        keep, _ = H.deep_points(r["deep"], G)
+        return r, keep  # youngest n = 8000 / 0.1 = 8e4
+
+    @staticmethod
+    def _nxt(n, kind, year=1500, **kw):
+        return {"year": year, "n": n, "lo": n / 2, "hi": n * 2, "grade": "D", "kind": kind, **kw}
+
+    def test_cited_scales_to_meet(self):
+        _, gen = self._gen()
+        nxt = self._nxt(2e5, "census", year=1900)  # 2.5x above the genomic level: scaled, not flagged
+        out, j = H.deep_join(gen, nxt)
+        self.assertEqual((j["rule"], j["next"], j["flag"]), ("scaled", "cited", False))
+        self.assertAlmostEqual(j["ratio"], 8e4 / 2e5)
+        self.assertAlmostEqual(j["factor"], 2.5)
+        self.assertAlmostEqual(out[-1]["n"] / nxt["n"], 1.0, places=12)  # meets it: no jump, no slope
+        self.assertAlmostEqual(j["deep_n"], nxt["n"])
+        self.assertAlmostEqual(j["deep_n_raw"], 8e4)
+        for a, b in zip(gen, out):  # the shape (and each point's range) is kept
+            self.assertEqual(a["year"], b["year"])
+            for k in ("n", "lo", "hi", "ne"):
+                self.assertAlmostEqual(b[k] / a[k], 2.5, places=12)
+            self.assertIn("scaled x2.5 to meet the cited 1900 count", b["note"])
+        self.assertEqual(gen[-1]["n"], 8e4)  # the input is not touched
+        self.assertEqual(j["note"], "Genomic curve scaled x2.5 to meet the cited 1900 count (200,000), keeping its shape.")
+        # a baseline says so; the curve still passes through every point
+        r, gen = self._gen()
+        pts = H.curve_points(r)
+        out, j = H.deep_join(gen, pts[0])
+        self.assertIn("the cited 1800 baseline (1,000,000)", j["note"])
+        curve = out + pts
+        for p in curve:
+            self.assertAlmostEqual(H.interp(curve, p["year"]) / p["n"], 1.0, places=9)
+
+    def test_modelled_keeps_absolute(self):
+        _, gen = self._gen()
+        for kind, what in (("rangeloss", "the modelled natural level in 1500 CE"), ("model", "today's modelled count")):
+            nxt = self._nxt(4e4, kind)
+            out, j = H.deep_join(gen, nxt)
+            self.assertEqual((j["rule"], j["next"], j["flag"], j["factor"]), ("absolute", "modelled", False, 1.0))
+            self.assertEqual([p["n"] for p in out], [p["n"] for p in gen])
+            self.assertEqual([p["note"] for p in out], [p["note"] for p in gen])
+            self.assertAlmostEqual(j["ratio"], 2.0)
+            self.assertEqual(j["note"], f"Genomic curve kept at its own level; {what} is 2x lower; the two are "
+                                        "joined log-linearly across PSMC's last 20 kyr.")
+
+    def test_flag_beyond_10x(self):
+        _, gen = self._gen()
+        # modelled, 316x below the genomic level (the Addax case): kept, flagged
+        out, j = H.deep_join(gen, self._nxt(8e4 / 316, "rangeloss"))
+        self.assertTrue(j["flag"])
+        self.assertEqual(j["rule"], "absolute")
+        self.assertEqual(out[-1]["n"], gen[-1]["n"])
+        self.assertIn("is 316x lower (flagged: beyond 10x)", j["note"])
+        # cited, 1000x above it (the Bison case, inverted): scaled, and says how far it moved
+        out, j = H.deep_join(gen, self._nxt(8e7, "estimate", year=1800))
+        self.assertTrue(j["flag"])
+        self.assertEqual(j["rule"], "scaled")
+        self.assertAlmostEqual(out[-1]["n"], 8e7)
+        self.assertEqual(j["note"], "Genomic curve scaled x1,000 to meet the cited 1800 count (80,000,000), keeping "
+                                    "its shape; before scaling it was 1,000x below that level (flagged: beyond 10x).")
+        # within 10x either way: not flagged
+        for n in (8e4 / 9.9, 8e4 * 9.9):
+            self.assertFalse(H.deep_join(gen, self._nxt(n, "model"))[1]["flag"])
+            self.assertFalse(H.deep_join(gen, self._nxt(n, "census"))[1]["flag"])
+        # the summary lists the flagged species, worst first
+        rep = {sp: {"deep": {"join": H.deep_join(gen, self._nxt(n, k))[1]}}
+               for sp, n, k in (("a", 8e4 / 316, "rangeloss"), ("b", 8e4 * 2, "census"), ("c", 8e7, "estimate"))}
+        rep["d"] = {"deep": None}
+        s = H.deep_join_summary(rep)
+        self.assertEqual(s["by_rule"], {"scaled": 2, "absolute": 1})
+        self.assertEqual(list(s["flagged"]), ["c", "a"])
+        self.assertEqual(s["flagged_by_rule"], {"scaled": 1, "absolute": 1})
+
+    def test_built_joins(self):
+        st = _stats()
+        dbg = DATA / "debug_top.json"
+        if st is None or not dbg.exists() or "deep_join" not in st:
+            self.skipTest("no build output")
+        hist = {h["species"]: h for h in json.loads(dbg.read_text())["history"]}
+        n = {"scaled": 0, "absolute": 0}
+        for sp, s in st["species"].items():
+            if not s.get("deep"):
+                continue
+            j, h = s["deep"]["join"], hist[sp]
+            n[j["rule"]] += 1
+            cited = j["to_kind"] in H.POINT_KINDS
+            self.assertEqual(j["rule"], "scaled" if cited else "absolute", sp)
+            self.assertEqual(j["flag"], max(j["ratio"], 1 / j["ratio"]) > H.DEEP_JOIN_FLAG, sp)
+            gen = [p for p in h["points"] if p["kind"] == "genomic"]
+            nxt = h["points"][len(gen)]
+            self.assertAlmostEqual(nxt["n"] / j["to_n"], 1.0, places=6, msg=sp)
+            if cited:  # the youngest genomic point sits on the cited level
+                self.assertAlmostEqual(gen[-1]["n"] / nxt["n"], 1.0, places=6, msg=sp)
+            else:
+                self.assertAlmostEqual(j["factor"], 1.0, msg=sp)
+            self.assertEqual(h["deep_join"], j["note"], sp)  # the card's sentence
+            self.assertEqual(sp in st["deep_join"]["flagged"], j["flag"], sp)
+        self.assertEqual(n, st["deep_join"]["by_rule"])
+        self.assertGreater(n["scaled"], 5)  # the history files' cited baselines, Panthera included
+        self.assertGreater(n["absolute"], 50)  # the modelled records
+
+
 if __name__ == "__main__":
     unittest.main()
