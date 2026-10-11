@@ -62,7 +62,7 @@ try {
   page.on('pageerror', (e) => console.log('pageerror', String(e)));
   const q = [process.env.DEBUG ? 'debug' : '', process.env.EDGE ? `edge=${process.env.EDGE}` : ''].filter(Boolean).join('&');
   await page.goto(pathToFileURL(resolve('dist-single/index.html')).href + (q ? `?${q}` : ''));
-  await page.waitForFunction(() => !!window.__fan, null, { timeout: 20000 });
+  await page.waitForFunction(() => !!window.__fan, null, { timeout: Number(process.env.LOAD_MS || 20000) });
   for (const [name, kind, args] of scenes) {
     if (ONLY && !ONLY.has(name)) continue;
     await page.evaluate(

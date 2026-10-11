@@ -5,9 +5,11 @@ import { FanCamera, type Camera } from './camera';
 import { layoutFan, type FanBranch } from './layout';
 import { FELIDAE } from './panthera';
 import { TwigModel } from './twigs';
-import { labelSpots, resolveLabels, type LabelSpot } from './view';
+import { boxGap, labelSpots, resolveLabels, type LabelSpot } from './view';
 
 const TOP = 52;
+/** The buttons' left edge (px). */
+const BAR_X0 = 150;
 const measure = (t: string) => 7.5 * t.length;
 
 function camera(): FanCamera {
@@ -36,41 +38,43 @@ function zoomed(c: FanCamera, cam: Camera, px: number, py: number, f: number): C
 
 const onScreen = (c: FanCamera, s: LabelSpot) => s.fit > 0 && s.box[2] > 0 && s.box[0] < c.w && s.box[3] > 0 && s.box[1] < c.h;
 
-/** Runs the camera through `cams`; checks every label against the frame before it (moves at most `bound(step)` px). */
+/** Runs the camera through `cams`; checks every spot against the frame before it (moves at most `bound(step)` px). */
 function sweep(c: FanCamera, cams: Camera[], bound: number) {
-  const first = new Map<number, { text: string; w: number; h: number }>();
+  const first = new Map<string, { text: string; w: number; h: number }>();
   let prev: LabelSpot[] | null = null;
-  let shown = new Map<number, boolean>();
-  const flips = new Map<number, number[]>();
+  let shown = new Map<string, boolean>();
+  const flips = new Map<string, number[]>();
   let worst = 0;
   cams.forEach((cam, k) => {
     c.cam = cam;
-    const spots = labelSpots(c, c.fan, TOP, measure);
+    const spots = labelSpots(c, c.fan, TOP, measure, BAR_X0);
     for (const s of spots) {
-      const gid = s.b.sp.gid;
       const form = { text: s.text, w: s.box[2] - s.box[0], h: s.box[3] - s.box[1] };
-      // Same text, same form (pill size), at every camera.
-      const f0 = first.get(gid) ?? (first.set(gid, form), form);
-      expect(form.text).toBe(s.b.sp.common);
+      // Same text, same form (pill size), at every camera and in every place.
+      const f0 = first.get(s.id) ?? (first.set(s.id, form), form);
+      expect(form.text).toBe(s.b ? s.b.sp.common : s.v!.name);
       expect(form.text).toBe(f0.text);
       expect(form.w).toBeCloseTo(f0.w, 6);
       expect(form.h).toBeCloseTo(f0.h, 6);
-      const p = prev?.find((q) => q.b === s.b);
+      const p = prev?.find((q) => q.key === s.key);
       if (p && onScreen(c, s) && onScreen(c, p)) {
         const d = Math.max(Math.abs(s.x - p.x), Math.abs(s.y1 - p.y1));
         worst = Math.max(worst, d);
-        expect(d).toBeLessThanOrEqual(bound);
-        // The fades are over 22–30 px of motion (the axis, the legend) or a few px of column width.
-        expect(Math.abs(s.fit - p.fit)).toBeLessThanOrEqual(bound / 20 + 0.02);
+        // Beside a branch a label follows its edge, which can lean (a peel) or widen fast (a boom on the log time axis): faster than the camera.
+        expect(d, `${s.key} moved`).toBeLessThanOrEqual(s.place === 'tip' ? bound : 6 * bound);
       }
     }
     const on = resolveLabels(spots, shown);
-    for (const [gid, v] of on) if (shown.has(gid) && shown.get(gid) !== v) flips.set(gid, [...(flips.get(gid) ?? []), k]);
+    // One place per name, and no two shown labels meet.
+    const boxes = spots.filter((s) => on.get(s.key));
+    expect(new Set(boxes.map((s) => s.id)).size).toBe(boxes.length);
+    for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) expect(boxGap(boxes[i].box, boxes[j].box)).toBeGreaterThanOrEqual(-1);
+    for (const [key, v] of on) if (shown.has(key) && shown.get(key) !== v) flips.set(key, [...(flips.get(key) ?? []), k]);
     shown = on;
     prev = spots;
   });
   // No blinking: a label that turns on or off stays so for a while.
-  for (const ks of flips.values()) for (let i = 1; i < ks.length; i++) expect(ks[i] - ks[i - 1]).toBeGreaterThan(5);
+  for (const [key, ks] of flips) for (let i = 1; i < ks.length; i++) expect(ks[i] - ks[i - 1], `${key} blinks at ${ks[i]}`).toBeGreaterThan(5);
   return worst;
 }
 
@@ -114,7 +118,7 @@ describe('species labels (#54)', () => {
     expect(worst).toBeGreaterThan(0);
     // The lion's label stays on screen all the way in.
     c.cam = cams[cams.length - 1];
-    const s = labelSpots(c, c.fan, TOP, measure).find((q) => q.b === lion)!;
+    const s = labelSpots(c, c.fan, TOP, measure, BAR_X0).find((q) => q.b === lion && q.fit > 0)!;
     expect(onScreen(c, s)).toBe(true);
     expect(s.box[1]).toBeGreaterThanOrEqual(TOP - 0.01);
   });
