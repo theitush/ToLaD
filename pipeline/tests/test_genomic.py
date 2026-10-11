@@ -89,6 +89,32 @@ class Build(unittest.TestCase):
             self.assertEqual(self.h[leaf]["deep_from"], "genomic", leaf)
             self.assertIn("Bergman", d["cite"], leaf)
 
+    def test_domestic_forms(self):
+        """ToLaD#76: a genome's curve is the deep past of the wild population living on a leaf today."""
+        from tolad_pipeline.anchors import DOMESTIC_FORMS
+        rows = self.g["species"]
+        # the wild boar: a modelled wild record beside the pig's domestic file, holding the HIST row
+        boar = rows["Sus scrofa"]
+        self.assertTrue(boar["used"])
+        self.assertEqual(boar["beside"], "Sus_scrofa.toml")
+        wild, dom = self.h["Sus scrofa"], self.h["Sus scrofa (domestic)"]
+        self.assertEqual((wild["component"], wild["modelled"], wild["deep_from"]), ("wild", "genomic", "genomic"))
+        self.assertTrue(wild["hist_row"])
+        self.assertEqual((dom["component"], dom["file"], dom["hist_row"]), ("domestic", "Sus_scrofa.toml", False))
+        self.assertEqual(self.dbg["Sus scrofa"]["points"][0]["kind"], "genomic")
+        # the genome sets the past only: the leaf's alive (wild + the domestic file's count) is unchanged
+        self.assertAlmostEqual(wild["alive_after"], dom["alive_after"], delta=1e-6 * dom["alive_after"])
+        # domestic forms with their wild ancestor on another leaf get none
+        for sp in DOMESTIC_FORMS:
+            if sp in rows:
+                self.assertFalse(rows[sp]["used"], sp)
+                self.assertEqual(rows[sp]["how"], "domestic form (its wild ancestor is another leaf)", sp)
+                self.assertNotEqual((self.h.get(sp) or {}).get("modelled"), "genomic", sp)
+        # domestic files on leaves with no wild population today get none
+        for sp in ("Bos taurus", "Ovis aries", "Equus caballus", "Camelus dromedarius"):
+            self.assertFalse(rows[sp]["used"], sp)
+            self.assertIn("no wild population today", rows[sp]["how"], sp)
+
     def test_modelled_records(self):
         recs = {sp: s for sp, s in self.h.items() if s["modelled"] == "genomic"}
         self.assertGreaterEqual(len(recs), 80)

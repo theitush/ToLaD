@@ -209,6 +209,18 @@ DOMESTIC_ALIASES = {
     "Bubalus bubalis": ["Bubalus arnee"],
 }
 
+# Domestic forms the tree carries as species of their own, their wild ancestor on another leaf (or
+# extinct). A genome of one is a domestic genome: its PSMC curve (older than ~20 kyr) is the ancestor's
+# deep past, which the ancestor's leaf carries from its own genome, so the form gets no genomic deep
+# past (genomic.attach, ToLaD#76). The model still counts them as wild species from their range maps.
+DOMESTIC_FORMS = {
+    "Lama glama": "Lama guanicoe",  # llama <- guanaco
+    "Vicugna pacos": "Vicugna vicugna",  # alpaca <- vicuna
+    "Bos indicus": "Bos primigenius",  # zebu <- (Indian) aurochs, extinct
+    "Bos grunniens": "Bos mutus",  # domestic yak <- wild yak
+    "Camelus bactrianus": "Camelus ferus",  # Bactrian camel <- wild Bactrian camel
+}
+
 # Domestication start (calendar year) for the domestic boom component.
 DOMESTICATION_YEAR = {
     "Bos taurus": -8500, "Ovis aries": -9000, "Capra hircus": -8500, "Sus scrofa": -8500,

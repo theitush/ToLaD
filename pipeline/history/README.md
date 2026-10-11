@@ -376,9 +376,37 @@ same `[deep]` structure in memory. Nothing is written into these TOMLs.
   written by hand with the ToLaD#66 cross-check). A wild `counts` history file without a `[deep]`
   gets the bulk curve as its `[deep]` (18 files: Bison, Loxodonta, the great
   apes, ...); its cited baseline and points stand as before, and the genomic
-  points precede them. Domestic history files (cattle, sheep, horse, ...)
-  get none. The 118 species give: 5 hand-written, 18 history files, 7
-  domestic files skipped, 88 modelled records.
+  points precede them. The 118 species give (before ToLaD#76): 5
+  hand-written, 18 history files, 7 domestic files skipped, 88 modelled
+  records.
+- **Domestic forms (ToLaD#76).** A PSMC curve only covers the time before
+  its ~20 kyr blind spot, so even a domestic genome's curve is the past of
+  wild animals, older than any domestication. The rule: **a genome's curve
+  goes on a leaf only as the deep past of the wild population living on
+  that leaf today** (the model's wild alive-now > 0).
+  - A leaf with a domestic history file *and* a wild population today gets
+    a modelled wild record **beside** the domestic file
+    (`stats.json -> genomic.species.<sp>.beside`): the wild boar beside the
+    pig (`Sus_scrofa.toml`, the sample is a wild boar), the African wild ass
+    beside the donkey (domestic donkey genome) and the wild water buffalo
+    beside the domestic buffalo (domestic genome); the bezoar beside the
+    goat file already worked this way. The wild record sets the wild
+    births pieces, the domestic file the domestic ones; the leaf's alive is
+    the wild count plus the domestic file's last count.
+  - A leaf whose domestic form has no wild population of its own (cattle,
+    sheep, horse, dromedary) gets none: its wild lineage runs only to
+    domestication, modelled.
+  - Domestic forms the tree carries as species of their own, with the wild
+    ancestor on another leaf (`anchors.DOMESTIC_FORMS`: llama -> guanaco,
+    alpaca -> vicuna, domestic yak -> wild yak, Bactrian camel -> wild
+    Bactrian camel, zebu -> aurochs) get none, though the model counts them
+    as wild species: their curve is the ancestor's past, and the ancestor
+    carries its own genome's (the aurochs is extinct).
+  - **HIST holds one record per row**, so where a leaf carries a wild and a
+    domestic record, the wild one is the row's record (the species' own
+    past over its whole band, as for the wolf and its dogs) and the
+    domestic one is in `stats.json` only (`history.species["<sp>
+    (domestic)"]` where the names clash; `hist_row` says which is shown).
 - **Species with no history file** get a modelled record
   (`META.hist[].modelled = "genomic"`), which replaces the range-loss record
   of ToLaD#62 and keeps its shape after the genomic stretch: the genomic
