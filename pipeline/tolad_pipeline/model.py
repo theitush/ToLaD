@@ -101,8 +101,23 @@ RANGELOSS_NOTE = ("Modelled, not counted (grade D). The natural (pre-human) leve
 RANGELOSS_SHOWCASE = ["Bison bison", "Elephas maximus", "Ursus arctos", "Canis lupus", "Equus ferus",
                       "Gorilla gorilla", "Ceratotherium simum", "Vulpes vulpes", "Rattus norvegicus",
                       "Canis latrans", "Lynx canadensis", "Mustela nigripes", "Procyon lotor", "Sorex araneus"]
+# Near-extinct species (ToLaD#68). PHYLACINE's current range is the IUCN range without the parts coded
+# "possibly extinct" or "extinct", so a living species whose map exists but is empty and that IUCN lists
+# as Critically Endangered or Extinct in the Wild survives, if at all, in numbers too small to map. Its
+# modelled count (density x a range nobody has seen it in) is capped at CR criterion D's threshold.
+NEAR_EXTINCT_STATUS = ("CR", "EW")
+NEAR_EXTINCT_CAP = 50.0  # IUCN Categories and Criteria v3.1, CR criterion D: < 50 mature individuals
+SD_NEAR_EXTINCT = 1.0  # dex: anything from a last few to the cap, or none
+NEAR_EXTINCT_METHOD = ("N:capped at 50 (no current range in PHYLACINE/IUCN and IUCN {status}: possibly "
+                       "extinct; IUCN 2012 Categories and Criteria v3.1, CR criterion D < 50 mature)")
+IUCN_CRITERIA_CITE = ("IUCN 2012, IUCN Red List Categories and Criteria v3.1, 2nd ed.",
+                      "https://portals.iucn.org/library/node/10315")
+# CR/EW species whose today's count is still modelled and above any IUCN population threshold
+# (criterion C covers only species below 10,000 mature individuals): listed for a census anchor
+CHECK_CR_ABOVE = 10000.0
 SD_NAT_RANGE = 0.2  # dex, a present-natural range that differs from the current one (reconstruction)
 NATURAL_METHOD_SCALED = "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
+METHOD_A_PHYLACINE = "A:PHYLACINE current (rescaled to PanTHERIA areas)"
 NATURAL_METHOD_FIT = "N_nat: D x natural range (PHYLACINE, rescaled to PanTHERIA areas) x fitted occupancy"
 GRID_N = 1600
 GRID_MIN_MA = 1e-6
@@ -259,6 +274,15 @@ def resolve_traits(root: Node, raw: Path, ctx: dict, log: dict) -> None:
     }
 
 
+def phylacine_area(km2: float, area_fit: dict) -> float:
+    """log10 range area on PanTHERIA's scale from a PHYLACINE grid area (ToLaD#67): the fitted map
+    log10 A_pan = a + b log10 A_phy, never above the grid area itself (the grid only inflates: the
+    median PHYLACINE/PanTHERIA ratio is > 1 in every area class, so the fit's b > 1 must not grow
+    the large ranges past their own maps)."""
+    x = math.log10(km2)
+    return min(area_fit["a"] + area_fit["b"] * x, x)
+
+
 def model_leaves(root: Node, raw: Path, log: dict) -> None:
     leaves = [n for n in root.preorder() if n.is_leaf]
     extant_obs = [n for n in leaves if n.kind == "tree" and not n.extinct]
@@ -344,6 +368,12 @@ def model_leaves(root: Node, raw: Path, log: dict) -> None:
             sdNA2 += 0.2 ** 2
             src.add(SRC["pantheria"])
             meth.append("A:obs(PanTHERIA)")
+        elif not n.extinct and D.get("phy_range", {}).get("km2_cur", 0) > 0:
+            # no PanTHERIA area: the PHYLACINE current range, mapped onto PanTHERIA's scale (ToLaD#67)
+            lr = phylacine_area(D["phy_range"]["km2_cur"], area_fit)
+            sdNA2 += aS ** 2
+            src.add(SRC["phylacine"])
+            meth.append(METHOD_A_PHYLACINE)
         else:
             lr, lvl = impute_from_clade(n, acc_r, gm_r)
             sdNA2 += 0.6 ** 2 if n.kind == "tree" else 0.8 ** 2
@@ -534,6 +564,58 @@ def fit_occupancy(root: Node, ref: dict[int, float], census: dict[int, float],
     log["occupancy_calibration"] = out
 
 
+def near_extinct(n: Node) -> bool:
+    """A living leaf with a PHYLACINE map but an empty current range, IUCN CR or EW (ToLaD#68)."""
+    pr = n.data.get("phy_range")
+    return (not n.extinct and pr is not None and pr["cells_cur"] == 0
+            and n.data.get("iucn") in NEAR_EXTINCT_STATUS)
+
+
+def count_flags(root: Node, ref: dict[int, float]) -> dict:
+    """ToLaD#68: the living species whose today's count cannot be trusted as modelled. Listed in
+    stats.json -> count_flags, with what was done (after history files: `today` is the shipped count)."""
+    no_cur, check = [], []
+    area_with_map: Counter = Counter()
+    for n in root.preorder():
+        if not n.is_leaf or n.extinct or n.name == "Homo sapiens":
+            continue
+        D = n.data
+        if D.get("phy_range", {}).get("cells_cur", 0) > 0:
+            area_with_map[next((m.split(" mean")[0] + " mean" if " mean" in m else m
+                                for m in D["meth"] if m.startswith("A:")), "none (census, estimate or cap)")] += 1
+        today_from = ("history file" if D.get("alive_from_history")
+                      else "census" if D.get("census_N") is not None
+                      else "Greenspoon model" if id(n) in ref else "capped" if D.get("near_extinct_cap")
+                      else "model")
+        row = {"leaf": n.name, "iucn": D.get("iucn"), "today": D["alive"], "today_from": today_from,
+               "natural": D["natural"]["N"] if D.get("natural") else None,
+               "area": next((m for m in D["meth"] if m.startswith("A:")), None)}
+        pr = D.get("phy_range")
+        if pr is not None and pr["cells_cur"] == 0 and not D.get("domestic"):
+            row["action"] = ("cited count (history file)" if today_from == "history file"
+                             else "capped: possibly extinct" if D.get("near_extinct_cap")
+                             else "flagged: no current map, IUCN " + str(D.get("iucn")))
+            no_cur.append(row)
+        elif D.get("iucn") in NEAR_EXTINCT_STATUS and D["alive"] > CHECK_CR_ABOVE and today_from in (
+                "model", "Greenspoon model"):
+            row["action"] = "flagged: modelled count above IUCN criterion C ceiling"
+            check.append(row)
+    key = lambda r: -r["today"]
+    return {
+        "note": "ToLaD#68. no_current_range: living leaves with a PHYLACINE map but an empty current range "
+                "(PHYLACINE's current range is IUCN's without 'possibly extinct' areas). IUCN CR/EW ones are "
+                f"capped at {NEAR_EXTINCT_CAP:.0f} (CR criterion D, IUCN Categories and Criteria v3.1) unless a "
+                "history file gives a cited count; the rest (DD/LC/unassessed: unmapped, mostly taxonomic) are "
+                "flagged only. Their natural baseline takes the density route. cr_modelled_above_10k: IUCN CR/EW "
+                f"species whose today's count is still modelled and above {CHECK_CR_ABOVE:.0f} (the ceiling of "
+                "IUCN criterion C): candidates for a census anchor, not changed. today = the shipped alive count.",
+        "cite": " ".join(IUCN_CRITERIA_CITE),
+        "area_method_with_current_map": dict(sorted(area_with_map.items())),
+        "no_current_range": sorted(no_cur, key=key),
+        "cr_modelled_above_10k": sorted(check, key=key),
+    }
+
+
 def natural_level(D: dict, N_today: float, sd_today: float, extinct: bool, area_fit: dict) -> dict | None:
     """Layer 1 of the estimate stack (ToLaD#61): the pre-human population,
     density x present-natural range area x occupancy (PHYLACINE 1.2.1 maps).
@@ -557,7 +639,7 @@ def natural_level(D: dict, N_today: float, sd_today: float, extinct: bool, area_
         sd = math.hypot(sd_today, sd_x)
         how = NATURAL_METHOD_SCALED
     else:
-        la = area_fit["a"] + area_fit["b"] * math.log10(pr["km2_nat"])
+        la = phylacine_area(pr["km2_nat"], area_fit)
         N = 10 ** (D["log_density"] + la + D["log_k"])
         sd_x = math.hypot(D["sd_density"], area_fit["sd"])
         sd = math.hypot(sd_x, D.get("k_sd", 0.0))
@@ -821,11 +903,20 @@ def assign_leaf_counts(root: Node, raw: Path, ctx: dict, log: dict) -> None:
             D["src"].add(SRC["greenspoon"])
             D["meth"].append("k:occupancy fitted by order group and mass on census + Greenspoon 2023 estimates"
                              if not D["marine"] else "k:occupancy fitted on marine census species (mass, order)")
+            if near_extinct(n) and N > NEAR_EXTINCT_CAP:
+                N = NEAR_EXTINCT_CAP
+                D["sd_leaf"] = math.sqrt(max(D["sd_leaf"] ** 2 - D["sd_NA"] ** 2, 0.0) + SD_NEAR_EXTINCT ** 2)
+                D["meth"] = [m for m in D["meth"] if not m.startswith(("D:", "A:", "k:"))]
+                D["meth"].append(NEAR_EXTINCT_METHOD.format(status=D["iucn"]))
+                D["near_extinct_cap"] = True
+                cap = 3
+                found["near-extinct cap"] += 1
         r = N / D["L"]
         D["sd_leaf_today"] = D["sd_leaf"]
         D["grade_cap_today"] = cap
         # natural (pre-human) baseline: the level before NATURAL_STEP_YEAR (extinct: the whole band)
         sd_today = (SD_CENSUS if id(n) in census else SD_GS_MODEL if id(n) in gs
+                    else SD_NEAR_EXTINCT if D.get("near_extinct_cap")
                     else math.hypot(D["sd_NA"], D.get("k_sd", 0.0)))
         D["sd_today_count"] = sd_today
         nat = natural_level(D, N, sd_today, n.extinct, ctx["area_fit"])
@@ -914,6 +1005,7 @@ def assign_leaf_counts(root: Node, raw: Path, ctx: dict, log: dict) -> None:
             n.data["history"] = rangeloss_record(n)
     log["rangeloss"] = rangeloss_report(root)
     log["natural_baseline"] = natural_report(root)
+    log["count_flags"] = count_flags(root, ref)
     # layer 2, genetic diversity: a cross-check written to stats.json only (ToLaD#63)
     log["diversity_crosscheck"] = diversity.report(root, raw, ctx)
     unverified = [n for n in root.preorder() if n.is_leaf and n.kind == "tree" and not n.extinct

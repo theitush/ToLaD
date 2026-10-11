@@ -601,6 +601,7 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
             D["src"].add(src_bit)
             D["anchored_count"] = True
         D["history"] = rec
+        D["alive_from_history"] = rec["use"] == "counts" and alive_from_hist
         # wild: the first segment holds the baseline back to the band start; domestic and
         # humans: segments cover the curated span only (before it the model's own shape stands)
         t0_seg = leaf.t0 if rec["component"] == "wild" else year_to_ma(pts[0]["year"])
