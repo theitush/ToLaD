@@ -16,6 +16,17 @@ al., via the SSA), not counted. Added for ToLaD#68/#72: the model's own count (1
 density x a clade-mean range) was about 300x too high.
 """
 
+[[event]]
+kind    = "bottleneck"
+from_ya = 45
+to_ya   = 35
+title   = "Eighteen survivors"
+summary = "The last wild black-footed ferrets, at Meeteetse, Wyoming (129 at their 1984 peak), were hit by distemper and plague and the 18 survivors taken into captivity in 1985-87. Fifteen of them, the genetic equivalent of seven founders, are the ancestors of every ferret alive; releases began in 1991."
+quote   = "In 1981, a remnant population was discovered near Meeteetse, Wyoming (Clark et al. 1986, Lockhart et al. 2006). At its peak in 1984, the Meeteetse population numbered 129 animals ... all surviving wild ferrets at Meeteetse were removed during 1985–1987. These ferrets were used to initiate a captive breeding program. Of the 18 remaining ferrets captured from Meeteetse, 15 individuals, representing the genetic equivalent of seven distinct founders, produced a captive population lineage that is the foundation of present recovery efforts"
+cite    = "U.S. Fish and Wildlife Service (2019). Species Status Assessment Report for the Black-footed Ferret (Mustela nigripes), version 1.0"
+url     = "https://iris.fws.gov/APPS/ServCat/DownloadFile/169265"
+grade   = "A"
+
 [[point]]
 year  = 2019
 n     = 340

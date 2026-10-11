@@ -5,6 +5,17 @@ use       = "counts"
 scope     = "global, all ages (South Georgia holds ~98%)"
 notes     = "Sealed to commercial extinction by 1907; tens of animals were seen again at Bird Island, South Georgia, in the 1930s (Bonner 1968), and pup counts began in 1956. No numeric pre-sealing or low-point figure with a traceable source was found, so there is no baseline. Older totals of 4.5-6.2 million in 1999/2000 (SCAR Expert Group on Seals 2008) are judged inflated by Forcada et al. 2023 and not used. Since 2009 Bird Island has declined 7.2%/yr; IUCN (Forcada 2026, now Endangered) gives 2,187,000 mature seals in 1999 and 944,000 in 2025. Those are mature-only, so no all-age point is derived from them."
 
+[[event]]
+kind    = "bottleneck"
+from_ya = 251
+to_ya   = 96
+title   = "Sealing near-extinction"
+summary = "Sealers hunted Antarctic fur seals almost to extinction from 1775 (South Georgia) through the 19th century; at least four relict colonies survived, each with an effective size of around 150-200. Breeding numbers stayed tiny into the early 20th century."
+quote   = "a species that was hunted to the brink of extinction by 18th and 19th century sealers. ... show that at least four relict populations around Antarctica survived commercial hunting. Coalescent simulations suggest that all of these populations experienced severe bottlenecks down to effective population sizes of around 150-200."
+cite    = "Paijmans AJ, Stoffel MA, Bester MN, et al. (2020). The genetic legacy of extreme exploitation in a polar vertebrate. Sci Rep 10:5089"
+url     = "https://doi.org/10.1038/s41598-020-61560-8"
+grade   = "C"
+
 [[point]]
 year  = 2008
 n     = 3510283

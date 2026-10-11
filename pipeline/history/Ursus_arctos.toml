@@ -11,6 +11,18 @@ baseline. Country breakdown in the source: Russia >100,000, USA ~33,000, Canada 
 ~15,400.
 """
 
+[[event]]
+kind    = "bottleneck"
+from_ya = 146
+to_ya   = 96
+title   = "Scandinavian hunting low"
+summary = "Intense hunting cut the Scandinavian brown bear to a small remnant around 100 years ago; protected, it has recovered to thousands. Museum and modern DNA show a fall in effective size across the bottleneck."
+quote   = "The Scandinavian brown bear went through a major decline in population size approximately 100 years ago, due to intense hunting. After being protected, the population subsequently recovered and today numbers in the thousands. ... Approximate Bayesian computations provided clear support for a decline in effective population size during the bottleneck, in both the southern and northern subpopulations."
+cite    = "Xenikoudakis G, Ersmark E, Tison JL, et al. (2015). Consequences of a demographic bottleneck on genetic structure and variation in the Scandinavian brown bear. Mol Ecol 24:3441-3454"
+url     = "https://doi.org/10.1111/mec.13239"
+grade   = "C"
+region  = "Scandinavia"
+
 [[point]]
 year  = 2017
 n     = 200000

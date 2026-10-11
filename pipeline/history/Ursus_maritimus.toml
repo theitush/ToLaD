@@ -10,6 +10,17 @@ not shown growth. The official estimate was still ~26,000 (22,000-31,000) in 202
 reassessment published 2025 (Aars, e.T22823A217912462) was not checked for a new total.
 """
 
+[[event]]
+kind    = "bottleneck"
+from_ya = 500000
+to_ya   = 20000
+title   = "Long Pleistocene decline"
+summary = "Read from polar bear genomes: the species' effective population size fell, slowly but steeply, over roughly the last 500,000 years, tracking climate. A long decline rather than a crash; PSMC cannot see the last ~20,000 years."
+quote   = "We also provide paleodemographic estimates that suggest bear evolution has tracked key climate events, and that PB in particular experienced a prolonged and dramatic decline in its effective population size during the last ca. 500,000 years."
+cite    = "Miller W, Schuster SC, Welch AJ, et al. (2012). Polar and brown bear genomes reveal ancient admixture and demographic footprints of past climate change. PNAS 109:E2382-E2390"
+url     = "https://doi.org/10.1073/pnas.1210506109"
+grade   = "C"
+
 [[point]]
 year  = 1965
 n     = 10000

@@ -5,6 +5,17 @@ use       = "counts"
 scope     = "global, all ages"
 notes     = "The maritime fur trade (1741-1911) reduced the species to 13 remnant colonies; protected by the 1911 Fur Seal Treaty. Recovery since, partly through translocations (e.g. British Columbia 1969-72), but the southwest Alaska / Aleutian population collapsed in the 1990s. California has a separate USGS annual index (2,962 in 2019). IUCN: Endangered."
 
+[[event]]
+kind    = "bottleneck"
+from_ya = 285
+to_ya   = 115
+title   = "Fur-trade crash"
+summary = "The fur trade (1741 to the 1911 treaty) cut every sea otter population, from Russia to California, to fewer than 100 animals each, almost at the same time. All surviving populations still show the genetic signal of it."
+quote   = "Their dramatic decline from thousands to fewer than 100 individuals per population occurred range-wide and nearly simultaneously due to the 18th-19th century fur trade. ... We detect signals of extreme population decline in every surviving sea otter population"
+cite    = "Beichman AC, Kalhori P, Kyriazis CC, et al. (2023). Genomic analyses reveal range-wide devastation of sea otter populations. Mol Ecol 32:281-298"
+url     = "https://doi.org/10.1111/mec.16334"
+grade   = "B"
+
 [baseline]
 year  = 1741
 n     = 225000
