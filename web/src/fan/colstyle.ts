@@ -6,7 +6,7 @@
 // "not from a source").
 
 import { noDataSpans } from './history';
-import type { SpeciesRec } from './panthera';
+import type { HistEvent, SpeciesRec } from './panthera';
 
 export type ColumnStyle = 'held';
 
@@ -46,4 +46,59 @@ export function columnSpans(sp: SpeciesRec, startMa: number): ColumnSpan[] {
     if (ago0 > ago1) out.push({ ago0, ago1, style: 'held' });
   }
   return out;
+}
+
+/**
+ * The second per-span style (ToLaD#141): a curated event on the column (a
+ * bottleneck), tinted over its window, lanes and individuals alike, and named
+ * by a label beside it. A tint, not a fade: drawn over the held fade, so an
+ * event inside a held stretch still shows. No dots or lines on the column.
+ */
+export const EVENT_TINT = { rgb: [0.93, 0.62, 0.27] as [number, number, number], a: 0.5, css: '#eea045' };
+
+/** An event's window on a species' column, years before present, clipped to the column (`ago0` older). */
+export interface EventSpan {
+  ago0: number;
+  ago1: number;
+  /** Index into `sp.history.events`. */
+  k: number;
+  ev: HistEvent;
+}
+
+/** The species' curated events as spans of its own column (above its split at `startMa`), oldest first. */
+export function eventSpans(sp: SpeciesRec, startMa: number): EventSpan[] {
+  const evs = sp.history?.events ?? [];
+  const top = sp.t1 * 1e6;
+  const start = startMa * 1e6;
+  const out: EventSpan[] = [];
+  evs.forEach((ev, k) => {
+    const ago0 = Math.min(start, ev.fromYa);
+    const ago1 = Math.max(top, ev.toYa);
+    if (ago0 > ago1) out.push({ ago0, ago1, k, ev });
+  });
+  return out;
+}
+
+/** A window's length in log time (a window reaching now counts from 1 year). */
+const spanOf = (s: EventSpan) => Math.log(Math.max(1, s.ago0) / Math.max(1, s.ago1));
+
+/**
+ * The event a touch hits: the span containing `ago` (years before present), else the nearest one
+ * overlapping [agoLo, agoHi] (the touch's reach, a few px, so a window thinner than a finger still
+ * answers). Null outside them all: the card is as without events.
+ */
+export function eventAt(spans: EventSpan[], ago: number, agoLo = ago, agoHi = ago): EventSpan | null {
+  let best: EventSpan | null = null;
+  let bestD = Infinity;
+  for (const s of spans) {
+    if (s.ago1 > agoHi || s.ago0 < agoLo) continue;
+    // Distance in log time from the touch to the window (0 inside it).
+    const d = ago > s.ago0 ? Math.log(ago / s.ago0) : ago < s.ago1 ? Math.log(Math.max(1e-9, s.ago1) / Math.max(1e-9, ago)) : 0;
+    // Overlapping windows both holding the touch: the narrower (the more specific) one.
+    if (d < bestD || (d === bestD && best && spanOf(s) < spanOf(best))) {
+      best = s;
+      bestD = d;
+    }
+  }
+  return best;
 }

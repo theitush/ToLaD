@@ -21,6 +21,7 @@ NATB_PER_ROW = 5
 NATB_FIELDS = ["n", "lo", "hi", "km2_natural", "km2_current"]
 # RLST (v1.4, ToLaD#48): per row u32 x 3: category | source << 8 | year << 16, IUCN taxon id, assessment id
 RLST_PER_ROW = 3
+# v1.5 (ToLaD#141): META.hist[].events, a history file's curated events (bottlenecks); no new section
 MAGIC = b"TLAD"
 KIND_SKELETON, KIND_TILE = 0, 1
 TILE_BUDGET = 2500
@@ -223,6 +224,9 @@ def encode_hist(rows: list[tuple[Node, bool]], cites: dict[tuple[str, str], int]
         if rec.get("deep_join"):
             # how the genomic deep past meets the next level, for the species card (ToLaD#80)
             meta[-1]["deep_join"] = rec["deep_join"]["note"]
+        if rec.get("events"):
+            # curated events (v1.5, ToLaD#141): bottlenecks, marked on the fan and quoted on the card
+            meta[-1]["events"] = [dict(e) for e in rec["events"]]
     if not recs:
         return b"", 0, []
     blob = HIST_PREAMBLE.pack(len(recs), len(pts), len(segs), 0) + b"".join(heads) + b"".join(pts) + b"".join(segs)
@@ -240,6 +244,7 @@ def hist_debug(rec: dict, tile: int, row: int, gid: int) -> dict:
                    for p in rec["curve"]],
         "segments": [{"year0": s["year0"], "gens": s["gens"], "start": s["start"], "end": s["end"],
                       "grade": "ABCD"[s["grade"]], "kind": KINDS[s["kind"]]} for s in rec["segments"]],
+        "events": [dict(e) for e in rec.get("events", [])],
     }
 
 

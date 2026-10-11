@@ -15,6 +15,7 @@ import { approxCountsIn, formatCount } from '../data/count';
 import { GRADE_COLOR, GRADE_WORD, MODELLED_KINDS, noDataSpans, styleBetween, type SpanStyle } from './history';
 import type { HistoryRec, HistPoint, NaturalMeta, NaturalRec } from './panthera';
 import { TIME_C } from './population';
+import { EVENT_TINT } from './colstyle';
 
 const W = 340;
 const H = 90;
@@ -191,9 +192,12 @@ export function HistorySpark({
   open: open0 = false,
   natural = null,
   naturalMeta = null,
+  activeEvent,
 }: {
   h: HistoryRec;
   open?: boolean;
+  /** The curated event the card is on (its index in h.events): its band drawn stronger. */
+  activeEvent?: number;
   /** The species' natural (pre-human) baseline, drawn as a faint level and listed with the sources. */
   natural?: NaturalRec | null;
   naturalMeta?: NaturalMeta | null;
@@ -232,6 +236,26 @@ export function HistorySpark({
     ? (y: number) => left + ((W - left - R) * (sAgo(x0) - sAgo(y))) / (sAgo(x0) - sAgo(x1) || 1)
     : (y: number) => left + ((W - left - R) * (y - x0)) / (x1 - x0 || 1);
   const Y = (n: number) => T + ((H - T - B) * (yhi - Math.log10(Math.max(1, n)))) / (yhi - ylo);
+  // Curated events (ToLaD#141): each window a labelled band over the plot, at least 3 px wide; labels
+  // alternate between two rows so neighbouring windows keep both names.
+  const evBands = (h.events ?? []).flatMap((ev, k) => {
+    const ya = Math.max(x0, h.nowYear - ev.fromYa);
+    const yb = Math.min(x1, h.nowYear - ev.toYa);
+    if (!(yb > ya)) return [];
+    let xa = X(ya);
+    let xb = X(yb);
+    if (xb - xa < 3) [xa, xb] = [(xa + xb) / 2 - 1.5, (xa + xb) / 2 + 1.5];
+    const mid = (xa + xb) / 2;
+    const anchor: 'start' | 'middle' | 'end' = mid > W - R - 50 ? 'end' : mid < left + 50 ? 'start' : 'middle';
+    const tx = anchor === 'end' ? xb : anchor === 'start' ? xa : mid;
+    const on = activeEvent === undefined || activeEvent === k;
+    // Its name: only the active event's when the card is on one (neighbouring windows' names would collide).
+    const named = activeEvent === undefined || activeEvent === k;
+    const tw = ev.title.length * 4.4; // ~px at 9px type
+    const lx0 = anchor === 'end' ? tx - tw : anchor === 'start' ? tx : tx - tw / 2;
+    const ty = TOP + 9 + (activeEvent === undefined ? (k % 2) * 10 : 0);
+    return [{ k, ev, xa, xb, tx, anchor, ty, on, named, lx0, lx1: lx0 + tw }];
+  });
   const lines = [];
   for (let k = 1; k < pts.length; k++) {
     const a = pts[k - 1];
@@ -331,6 +355,8 @@ export function HistorySpark({
     for (let k = 1; k < pts.length; k++) segs.push([X(pts[k - 1].year), Y(pts[k - 1].n), X(pts[k].year), Y(pts[k].n)]);
     if (after) segs.push([X(pts[pts.length - 1].year), Y(after.level), X(h.nowYear), Y(after.level)]);
     if (before) segs.push([L, Y(before.level), X(x0), Y(before.level)]);
+    // The events' names (ToLaD#141).
+    for (const e of evBands) if (e.named) segs.push([e.lx0, e.ty - 3, e.lx1, e.ty - 3]);
     // A cited dot (r 3.2) and its bar.
     for (const p of cited) segs.push([X(p.year), Math.max(TOP, Math.min(Y(p.hi), Y(p.n) - 4)), X(p.year), Math.min(BOT, Math.max(Y(p.lo), Y(p.n) + 4))]);
     const free = (x: number, y: number) =>
@@ -371,6 +397,16 @@ export function HistorySpark({
               <rect x="0" y={TOP} width={W} height={BOT - TOP} />
             </clipPath>
           </defs>
+          {evBands.map((e) => (
+            <g key={`ev${e.k}`} data-event={e.k}>
+              <rect x={e.xa} y={TOP} width={e.xb - e.xa} height={BOT - TOP} fill={EVENT_TINT.css} opacity={e.on ? 0.3 : 0.14} />
+              {e.named && (
+                <text x={e.tx} y={e.ty} textAnchor={e.anchor} fontSize="9" fill={EVENT_TINT.css} opacity={e.on ? 1 : 0.6}>
+                  {e.ev.title}
+                </text>
+              )}
+            </g>
+          ))}
           <g clipPath={`url(#${clipId})`}>
             {bands.map((b, k) => (
               <polygon key={k} points={b} fill={GRADE_COLOR.D} opacity="0.13" data-band="" />

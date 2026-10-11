@@ -21,7 +21,7 @@ import { BirthCurve, procgenSegments, type GenSegment } from './history';
 import { FELIDAE_TREE, speciesUnder } from './splits';
 import type { Grade, HistoryRec, NaturalMeta, NaturalRec, RawSpecies, RedListRec } from './panthera-extract';
 
-export type { Grade, HistoryRec, HistPoint, HistSegment, NaturalMeta, NaturalRec } from './panthera-extract';
+export type { Grade, HistEvent, HistoryRec, HistPoint, HistSegment, NaturalMeta, NaturalRec } from './panthera-extract';
 
 export interface SpeciesRec {
   gid: number;

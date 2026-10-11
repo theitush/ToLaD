@@ -28,3 +28,16 @@ kind  = "estimate"
 cite  = "Breitenmoser et al. 2015 (errata 2017), Lynx lynx, IUCN Red List e.T12519A121707666, national figures as quoted in UNEP/CMS/COP14/Doc.31.4.1 (2023), proposal to list the Eurasian lynx in CMS Appendix II, section 4.2 and Table 2"
 url   = "https://www.cms.int/sites/default/files/document/cms_cop14_doc.31.4.1_listing-proposal-lynx-lynx_e.pdf"
 note  = "Sum of: Europe excluding Russia and Belarus 9,000-10,000 (Breitenmoser et al. 2015); Russia 22,510 in 2013 (CentrOkhotControl, winter tracking and expert opinion; Table 2 gives 22,700); China ~27,000 (State Forestry Administration 2009); Mongolia 10,000 (2003); Georgia 160, Pakistan 80-120, Uzbekistan 130. n = midpoints summed, lo/hi = the stated ends summed; dated to the latest component (2013). Rough national estimates with countries missing, so a floor: grade C. Wikipedia's list of carnivorans by population carries the same sum (>69,510)."
+
+# Bottlenecks (ToLaD#141): each window in years before present (2026), quoted from a source that was read.
+[[event]]
+kind = "bottleneck"
+from_ya = 136
+to_ya = 61
+title = "European extirpation"
+summary = "Historical record: extermination policies around 1900 wiped the lynx out of most of central, western and southern Europe; the remnants (Norway, NE Poland, Carpathians, Balkans) passed through extreme bottlenecks, Norway's down to a few survivors from 1926 to 1965."
+quote = "The remnant central European populations recovered from their rather extreme bottlenecks following legal protection enacted during the 20th century, but have remained relatively isolated until today. ... In Norway, the population was restricted to a few survivors in the central region from 1926 to 1965, although it has steadily recovered since then, apparently with little contribution of immigrants from outside Scandinavia (Linnell, Broseth, Odden, & Nilsen, 2010)."
+cite = "Lucena-Perez M, Marmesat E, Kleinman-Ruiz D, et al. (2020). Genomic patterns in the widespread Eurasian lynx shaped by Late Quaternary climatic fluctuations and anthropogenic impacts. Mol Ecol 29:812–828"
+url = "https://doi.org/10.1111/mec.15366"
+grade = "C"
+region = "Europe"

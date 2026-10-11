@@ -53,7 +53,8 @@ function sweep(c: FanCamera, cams: Camera[], bound: number) {
       const form = { text: s.text, w: s.box[2] - s.box[0], h: s.box[3] - s.box[1] };
       // Same text, same form (pill size), at every camera and in every place.
       const f0 = first.get(s.id) ?? (first.set(s.id, form), form);
-      expect(form.text).toBe(s.b ? s.b.sp.common : s.v!.name);
+      // (An event's label, ToLaD#141, carries its title.)
+      expect(form.text).toBe(s.ev !== undefined ? s.b!.sp.history!.events[s.ev].title : s.b ? s.b.sp.common : s.v!.name);
       expect(form.text).toBe(f0.text);
       expect(form.w).toBeCloseTo(f0.w, 6);
       expect(form.h).toBeCloseTo(f0.h, 6);

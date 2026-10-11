@@ -30,7 +30,37 @@ extinctions (~10-12 kyr ago; Culver et al. 2000, J Hered 91:186), and North and 
 lineages split 300-100 kyr ago (Saremi et al. 2019), so one genome samples one region's ancestry;
 the rest is the generic Ne/N ratio of 0.1, which a species with long-range dispersal and strong
 structure need not follow.
+
+Bottlenecks ([[event]], ToLaD#141): the last-glacial low (Saremi et al. 2019, 25-20 kyr ago) is where
+the curve's last genomic points are (~37,000 at 23.5 kyr ago); the North American refounding (Culver
+et al. 2000, ~10 kyr ago) falls in PSMC's blind spot (< 20 kyr), so the curve cannot show it: the
+mark stands on the source alone. Saremi et al. 2019 read their genomes as pumas persisting in North
+America, not a late-Pleistocene replacement, so that event is graded D.
 """
+
+[[event]]
+kind    = "bottleneck"
+from_ya = 25000
+to_ya   = 20000
+title   = "Last-glacial low"
+summary = "Puma numbers in both Americas fell from a peak about 130,000 years ago through the last ice age, reaching their small present-day size by its coldest point, 25,000-20,000 years ago. Read from ten puma genomes."
+quote   = "Populations on both continents were largest around 130 kya, during the warmest part of Marine Isotope Stage (MIS) 5, and then declined throughout the colder MIS 4–2, with populations reaching their current small sizes by the peak of the last ice age 25–20 kya."
+cite    = "Saremi NF, Supple MA, Byrne A, et al. (2019). Puma genomes from North and South America provide insights into the genomic consequences of inbreeding. Nat Commun 10:4769"
+url     = "https://doi.org/10.1038/s41467-019-12741-1"
+grade   = "C"
+region  = "North and South America"
+
+[[event]]
+kind    = "bottleneck"
+from_ya = 12000
+to_ya   = 9000
+title   = "North American refounding"
+summary = "North American pumas are genetically near-uniform: they look descended from a few founders from South America who recolonised the continent around 10,000 years ago, after the late-Pleistocene extinctions. Contested: whole genomes (Saremi et al. 2019) fit pumas persisting in North America better."
+quote   = "The marked uniformity of mtDNA and a reduction in microsatellite allele size expansion indicates that North American pumas derive from a recent (late Pleistocene circa 10,000 years ago) replacement and recolonization by a small number of founders who themselves originated from a centrum of puma genetic diversity in eastern South America 200,000-300,000 years ago."
+cite    = "Culver M, Johnson WE, Pecon-Slattery J, O'Brien SJ (2000). Genomic ancestry of the American puma (Puma concolor). J Hered 91:186–197"
+url     = "https://doi.org/10.1093/jhered/91.3.186"
+grade   = "D"
+region  = "North America"
 
 [[point]]
 year  = 2023

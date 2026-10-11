@@ -9,7 +9,33 @@ historical collapse was regional (e.g. lower-48 USA down to a few hundred by 196
 Europe now ~17,000) while the large Canadian, Russian and Central Asian populations persisted, and
 no sourced pre-decline global total exists, so there is no baseline. Regional series (Yellowstone,
 Isle Royale, US states, LCIE Europe) are not merged into this global curve.
+
+Bottlenecks ([[event]], ToLaD#147): two regional founder events (Isle Royale 1940s, Robinson et al. 2019; Scandinavia 1983-91, Viluma et al. 2022), each a few wolves in a global column of ~225,000 with one point: not visible in the data, marked on the sources alone (region set).
 """
+
+[[event]]
+kind    = "bottleneck"
+from_ya = 86
+to_ya   = 76
+title   = "Isle Royale founders"
+summary = "Two or three wolves crossed the ice of Lake Superior to Isle Royale in the 1940s and founded a population that peaked near 50; after disease in the early 1980s it crashed to 14 and became severely inbred."
+quote   = "The island was colonized by two to three mainland wolves that crossed frozen Lake Superior in the 1940s, establishing a population that, at its peak, included approximately 50 individuals ( 23 ). Following a disease outbreak in the early 1980s, the population crashed to 14 individuals"
+cite    = "Robinson JA, Räikkönen J, Vucetich LM, et al. (2019). Genomic signatures of extensive inbreeding in Isle Royale wolves, a population on the threshold of extinction. Sci Adv 5:eaau0757"
+url     = "https://doi.org/10.1126/sciadv.aau0757"
+grade   = "B"
+region  = "Isle Royale (Lake Superior, USA)"
+
+[[event]]
+kind    = "bottleneck"
+from_ya = 61
+to_ya   = 35
+title   = "Scandinavian refounding"
+summary = "Wolves were functionally extinct in Scandinavia by the late 1960s; today's population descends from three immigrants, a pair that bred in 1983 and a male in 1991, and is highly inbred."
+quote   = "After functional extinction in the late 1960s, a wolf population was reestablished in Scandinavia by breeding three immigrant founders: a pair in 1983, and a second male in 1991"
+cite    = "Viluma A, Flagstad Ø, Åkesson M, et al. (2022). Whole-genome resequencing of temporally stratified samples reveals substantial loss of haplotype diversity in the highly inbred Scandinavian wolf population. Genome Res 32:449-458"
+url     = "https://doi.org/10.1101/gr.276070.121"
+grade   = "A"
+region  = "Scandinavia"
 
 [[point]]
 year  = 2018

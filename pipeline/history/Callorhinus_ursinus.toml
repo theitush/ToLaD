@@ -3,7 +3,19 @@ common    = "Northern fur seal"
 component = "wild"
 use       = "display"
 scope     = "Eastern Pacific stock (Pribilof Islands, plus Bogoslof since the 1980s), all ages; roughly half the world population"
-notes     = "Regional only, so display. Most of the world population breeds on the Pribilofs; the rest in Russia (Commander, Kuril, Robben, Tyuleniy islands) and California. Worldwide ~1.1 million, about half on the Pribilofs (Encyclopedia of Marine Mammals, 2nd ed. 2008, Northern fur seal, pp. 788-791). Pelagic and land sealing cut the herd to an extreme low c. 1911 (~70,000 pups per year by one account); the 1911 Fur Seal Treaty let it grow ~8.6%/yr 1912-1924. NOAA designated the stock depleted in 1988 (below 50% of late-1950s levels). No traceable pre-exploitation (pre-1786) figure was found, so there is no baseline."
+notes     = "Regional only, so display. Most of the world population breeds on the Pribilofs; the rest in Russia (Commander, Kuril, Robben, Tyuleniy islands) and California. Worldwide ~1.1 million, about half on the Pribilofs (Encyclopedia of Marine Mammals, 2nd ed. 2008, Northern fur seal, pp. 788-791). Pelagic and land sealing cut the herd to an extreme low c. 1911 (~70,000 pups per year by one account); the 1911 Fur Seal Treaty let it grow ~8.6%/yr 1912-1924. NOAA designated the stock depleted in 1988 (below 50% of late-1950s levels). No traceable pre-exploitation (pre-1786) figure was found, so there is no baseline. Bottlenecks ([[event]], ToLaD#147): the pelagic-sealing crash (NOAA stock assessment) is partly in the data: the 1912 point (216,000) is the curve's first and lowest, then 1.8 million in 1957. No earlier count is cited, so the fall itself is a step at the first point. Genetics show no lasting mark: Dickerson et al. 2010 (PLoS ONE 5:e10671, abstract read) find only weak structure, from rapid expansion after glaciation and after the harvest ended."
+
+[[event]]
+kind    = "bottleneck"
+from_ya = 140
+to_ya   = 114
+title   = "Pelagic sealing crash"
+summary = "Hunting at sea cut the Pribilof fur seal herds until the 1911 treaty ended it; with the harvest stopped, the population grew about 8.6% a year from 1912 to 1924, the fastest rate recorded for the species. The source dates the end of the crash, not its start (pelagic sealing grew in the 1880s)."
+quote   = "Pelagic sealing led to a decrease in the northern fur seal population; however, a moratorium on northern fur seal harvesting and termination of pelagic sealing resulted in a steady increase in the northern fur seal population from 1912 to 1924. During this period, the rate of population growth was approximately 8.6% (SE = 1.47) per year"
+cite    = "Young NC, et al. (2026). Northern fur seal (Callorhinus ursinus): Eastern Pacific stock. Alaska Marine Mammal Stock Assessments 2024, NOAA-TM-AFSC-503"
+url     = "https://www.fisheries.noaa.gov/s3/2026-04/northern-fur-seal-callorhinus-ursinus-eastern-pacific-stock.pdf"
+grade   = "C"
+region  = "Pribilof Islands (eastern Pacific stock)"
 
 [[point]]
 year  = 1912
