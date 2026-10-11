@@ -212,13 +212,25 @@ DOMESTIC_ALIASES = {
 # Domestic forms the tree carries as species of their own, their wild ancestor on another leaf (or
 # extinct). A genome of one is a domestic genome: its PSMC curve (older than ~20 kyr) is the ancestor's
 # deep past, which the ancestor's leaf carries from its own genome, so the form gets no genomic deep
-# past (genomic.attach, ToLaD#76). The model still counts them as wild species from their range maps.
+# past (genomic.attach, ToLaD#76). None has a wild population of its own (ToLaD#135): the model runs the
+# leaf's wild lineage up to domestication only (DOMESTICATION_YEAR), like the other domestic forms, and its
+# alive count is a domestic stock where a pinned source splits one out (DOMESTIC_FORM_NO_STOCK says why not).
 DOMESTIC_FORMS = {
     "Lama glama": "Lama guanicoe",  # llama <- guanaco
     "Vicugna pacos": "Vicugna vicugna",  # alpaca <- vicuna
     "Bos indicus": "Bos primigenius",  # zebu <- (Indian) aurochs, extinct
     "Bos grunniens": "Bos mutus",  # domestic yak <- wild yak
     "Camelus bactrianus": "Camelus ferus",  # Bactrian camel <- wild Bactrian camel
+}
+
+# Why a domestic form has no stock of its own: FAOSTAT QCL (the pinned livestock source) has no item for it.
+DOMESTIC_FORM_NO_STOCK = {
+    "Lama glama": "FAOSTAT lumps llamas with alpacas and guanacos in 'Camelids, other' (item 1157)",
+    "Vicugna pacos": "FAOSTAT lumps alpacas with llamas and guanacos in 'Camelids, other' (item 1157)",
+    "Bos indicus": "FAOSTAT counts zebu and taurine cattle together as 'Cattle' (item 866, on Bos taurus)",
+    "Bos grunniens": "FAOSTAT has no yak item (yaks are in 'Cattle' where reported at all)",
+    "Camelus bactrianus": "FAOSTAT counts Bactrian camels and dromedaries together as 'Camels' "
+                          "(item 1126, on Camelus dromedarius)",
 }
 
 # Domestication start (calendar year) for the domestic boom component.
@@ -230,6 +242,13 @@ DOMESTICATION_YEAR = {
     # Science 352:1228); cats: Near East, ~9.5 ka (Vigne et al. 2004, Science 304:259)
     "Canis familiaris": -13000,
     "Felis catus": -7500,
+    # the domestic forms with a wild ancestor on another leaf (DOMESTIC_FORMS): llama and alpaca in the
+    # central Andes ~6-7 ka (Wheeler 1995, J. Biogeogr. 22:2/3; Kadwell et al. 2001, Proc. R. Soc. B
+    # 268:2575); zebu in the Indus valley ~8 ka (Meadow 1996, Mehrgarh; Chen et al. 2010, MBE 27:1);
+    # yak on the Qinghai-Tibetan plateau ~7.3 ka (Qiu et al. 2015, Nat. Commun. 6:10283); Bactrian camel
+    # in Central Asia ~4.5 ka (Ming et al. 2020, MBE 37:3)
+    "Lama glama": -4500, "Vicugna pacos": -4500, "Bos indicus": -6000, "Bos grunniens": -5300,
+    "Camelus bactrianus": -2500,
 }
 
 # ------------------------------------------------------------------ MOCK

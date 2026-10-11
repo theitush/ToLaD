@@ -3,7 +3,18 @@ common    = "Northern elephant seal"
 component = "wild"
 use       = "counts"
 scope     = "global (California and Baja California, Mexico), all ages"
-notes     = "Hunted for oil in the 19th century until commercially extinct by the mid-1800s and presumed extinct by 1892; a remnant survived on Guadalupe Island and was protected by Mexico in 1922. Recovery grew ~17%/yr 1958-1987 and ~3.8%/yr 1987-2010 (Lowry et al. 2014). California alone was 194,903 in 2023 (Lowry et al., NOAA tech. memo); no recent all-range total was found. No pre-exploitation figure was found, so there is no baseline."
+notes     = "Hunted for oil in the 19th century until commercially extinct by the mid-1800s and presumed extinct by 1892; a remnant survived on Guadalupe Island and was protected by Mexico in 1922. Recovery grew ~17%/yr 1958-1987 and ~3.8%/yr 1987-2010 (Lowry et al. 2014). California alone was 194,903 in 2023 (Lowry et al., NOAA tech. memo); no recent all-range total was found. No pre-exploitation figure was found, so there is no baseline. Bottlenecks ([[event]], ToLaD#147): the 19th-century hunting crash (Hoelzel et al. 2024) is in the data: the 1890 point (100) is the curve's low. With no baseline the build holds the modelled level before 1890, so the fall into the crash is a step at the first point, not a dated decline. Hoffman et al. 2024 (Nat Ecol Evol 8:2309) read an effective size of about six during the bottleneck from today's genomes."
+
+[[event]]
+kind    = "bottleneck"
+from_ya = 216
+to_ya   = 134
+title   = "Hunted to a few dozen"
+summary = "Sealers and specimen collectors killed northern elephant seals from the early 1800s until 1892, leaving perhaps 20-100 animals; their genomes still show an effective size of about six during the crash (Hoffman et al. 2024). The population has since regrown to over 200,000."
+quote   = "The northern elephant seal was hunted extensively and taken by collectors between the early 1800s and 1892, suffering an extreme population bottleneck as a consequence. Recovery was rapid and now there are over 200,000 individuals."
+cite    = "Hoelzel AR, Gkafas GA, Kang H, et al. (2024). Genomics of post-bottleneck recovery in the northern elephant seal. Nat Ecol Evol 8:686-694"
+url     = "https://doi.org/10.1038/s41559-024-02337-4"
+grade   = "B"
 
 [[point]]
 year  = 1890
