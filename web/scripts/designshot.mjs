@@ -70,6 +70,11 @@ const scenes = [
   ['stem-leopardcat', 'about', ['Leopard cat', 1.2e7, 9, 1]],
   ['forks-base', 'about', ['Leopard cat', 1.2e7, 12, 0.5]],
   ['peel-domestic', 'about', ['Domestic cat', 1e4, 3, 0.5]],
+  // Held (no-data) stretches drawn faint (ToLaD#55): the leopard's and jaguar's columns since their last
+  // figure, the snow leopard's from its split to its oldest genomic point.
+  ['held-leopard', 'about', ['Leopard', 6, 6, 0.4]],
+  ['held-jaguar', 'about', ['Jaguar', 10, 7, 0.4]],
+  ['held-snow', 'about', ['Snow leopard', 1e6, 1, 0.3]],
 ];
 const browser = await chromium.launch({ headless: true });
 try {

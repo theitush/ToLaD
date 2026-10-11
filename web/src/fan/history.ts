@@ -197,7 +197,10 @@ export function noDataSpans(h: HistoryRec): NoDataSpan[] {
   if (pts.length === 0 || h.segments.length === 0) return out;
   const first = h.segments[0];
   const p0 = pts[0];
-  if (first.year0 < p0.year - 0.5 && HELD_KINDS.has(first.kind)) {
+  // A model that changes before the first point (the domestic cat's growth since domestication) is a
+  // modelled curve, not a level held for want of figures.
+  const flat = h.segments.every((s) => s.year0 >= p0.year - 0.5 || s.kind !== 'model' || (s.startSize === first.startSize && s.endSize === first.startSize));
+  if (first.year0 < p0.year - 0.5 && HELD_KINDS.has(first.kind) && flat) {
     const today = first.kind === 'model';
     out.push({ side: 'before', year: p0.year, level: today ? (first.startSize * h.L) / h.G : p0.n, today });
   }

@@ -10,6 +10,7 @@ import { clipPoly, FanCamera, STRAND_PX, type Camera } from './camera';
 import { laneAt, layoutFan, leftAt, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type EdgeStyle, type Fan, type FanBranch, type FanNode, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01 } from './meshgl';
+import { COLUMN_DIM, columnSpans } from './colstyle';
 import { bridgeInstances, type SplitStyle, type SplitWindow } from './gradual';
 import { drawTwigs, kLogAt, laneDim, LINEAGE, LIVING, TWIG_GRAY, TwigModel, type IndInfo, type TwigStats } from './twigs';
 import type { MeshBatch, RectBatch } from './meshgl';
@@ -108,6 +109,17 @@ interface ColBox {
 }
 
 /** The fan's columns as ColBoxes: the leaf columns above their splits, the parent columns over their spans (the stem below the root). Kept per fan. */
+/** Each branch's styled column spans (colstyle.ts) in world y: [top, bottom, dim]; world-fixed, so built once per layout. */
+const colSpanCache = new WeakMap<FanBranch, [number, number, number][]>();
+export function colSpansY(fan: Fan, b: FanBranch): [number, number, number][] {
+  let out = colSpanCache.get(b);
+  if (!out) {
+    out = columnSpans(b.sp, b.t0).map((s) => [fan.time.y(s.ago1 / 1e6), fan.time.y(s.ago0 / 1e6), COLUMN_DIM[s.style]]);
+    colSpanCache.set(b, out);
+  }
+  return out;
+}
+
 const colBoxCache = new WeakMap<Fan, Map<FanBranch | FanNode, ColBox>>();
 function colBoxes(fan: Fan): Map<FanBranch | FanNode, ColBox> {
   let out = colBoxCache.get(fan);
@@ -388,6 +400,8 @@ export class FanView implements InputHandlers {
   readonly debug = typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug');
   /** What each branch's individuals view drew last frame (taps, tests). */
   twigStats = new Map<number, TwigStats>();
+  /** Without the GPU layer: this frame's styled column stretches, faded once the individuals are drawn. */
+  private heldRuns: { run: RibbonPt[]; hw: number; d: number }[] = [];
   private models = new Map<string, TwigModel>();
   private raf = 0;
   private anim: ((t: number) => boolean) | null = null;
@@ -742,6 +756,7 @@ export class FanView implements InputHandlers {
     this.drawStem();
     for (const b of this.fan.branches) this.drawStrand(b);
     for (const b of this.fan.branches) this.drawIndividuals(b);
+    this.drawHeld();
     if (this.gl) this.bridges = bridgeInstances(this, this.fan, this.split, this.splitWindow, this.gl.bridge);
     this.drawStemFade();
     // Labels: one form everywhere (see labelSpots).
@@ -879,6 +894,13 @@ export class FanView implements InputHandlers {
     const pts = this.lanePoints(b, hw);
     if (pts.length < 2) return;
     const ctx = this.ctx;
+    // The column's styled spans on screen ([top, bottom, dim]), clipped to it: none for most strands.
+    const held: [number, number, number][] = [];
+    for (const [t, bt, d] of colSpansY(this.fan, b)) {
+      const st = this.toScreen(0, t)[1];
+      const sb = this.toScreen(0, bt)[1];
+      if (sb > -20 && st < this.h + 20) held.push([st, sb, d]);
+    }
     // As the strands fade in (twigs.ts), the lanes dim to a backdrop under them: the same
     // lanes, the same geometry, never a switch.
     const tw = this.twigStats.get(b.sp.gid);
@@ -922,17 +944,22 @@ export class FanView implements InputHandlers {
         const gm = (gq + gp) / 2;
         const gc = mix01(GRAY, '#131c19', laneDim(wm - gm, lives) * 0.82);
         const ec = mix01(GREEN, '#0d2318', laneDim(gm, lives) * 0.9);
+        // A styled stretch of the column (held flat for want of figures: colstyle.ts) fades towards the
+        // background: the background over the whole lane, lanes and individuals alike (drawn after the mesh).
+        const dim = held.length ? dimAt(held, (y0 + y1) / 2) : 0;
         // The least widths across the lane, not along the row: a thin branch-out leaning s px per px
         // is √(1 + s²) px of the row per px across (else a hairline lean breaks into dashes).
         const sq = Math.sqrt(1 + ((xp + wp / 2 - xq - wq / 2) / (y1 - y0)) ** 2);
         const xa = Math.min(xq, xp);
-        trap(this.gl.under, xq, xq + Math.max(0.6 * sq, wq), xp, xp + Math.max(0.6 * sq, wp), y0, y1, gc, 1, xa - 0.5, Math.max(xq + Math.max(0.6, wq), xp + Math.max(0.6, wp)) + 0.5);
+        const xr = Math.max(xq + Math.max(0.6, wq), xp + Math.max(0.6, wp)) + 0.5;
+        trap(this.gl.under, xq, xq + Math.max(0.6 * sq, wq), xp, xp + Math.max(0.6 * sq, wp), y0, y1, gc, 1, xa - 0.5, xr);
+        if (dim > 0) trap(this.gl.over, xq, xq + Math.max(sq, wq), xp, xp + Math.max(sq, wp), y0, y1, BG01, dim, xa - 0.5, xr + 0.5);
         if (gq > 0 || gp > 0) {
           const g1q = xq + Math.max(sq, gq);
           const g1p = xp + Math.max(sq, gp);
           const xb = Math.max(xq + Math.max(1, gq), xp + Math.max(1, gp));
           // The living glow faintly (fading as their lane resolves into individuals).
-          const glow = 1 - lives;
+          const glow = (1 - lives) * (1 - dim);
           if (glow > 0.01) {
             trap(this.gl.under, xq - 4 * sq, g1q + 4 * sq, xp - 4 * sq, g1p + 4 * sq, y0, y1, ec, 0.06 * glow, xa - 4, xb + 4);
             trap(this.gl.under, xq - 1.5 * sq, g1q + 1.5 * sq, xp - 1.5 * sq, g1p + 1.5 * sq, y0, y1, ec, 0.14 * glow, xa - 1.5, xb + 1.5);
@@ -948,7 +975,24 @@ export class FanView implements InputHandlers {
         ctx.fillStyle = greenC;
         this.ribbon(pts, () => hw, (p) => hw - p.w * p.f, -1);
       }
+      // Its styled stretches: faded over the individuals too, once they are drawn (drawHeld).
+      for (const [t, bt, d] of held) {
+        const run = pts.filter((p) => p.y >= t - 0.5 && p.y <= bt + 0.5);
+        if (run.length > 1) this.heldRuns.push({ run, hw, d });
+      }
     }
+  }
+
+  /**
+   * Without the GPU layer: the styled stretches of the columns (colstyle.ts) faded towards the
+   * background over their lanes and individuals, as the GPU path does with its overlay.
+   */
+  private drawHeld(): void {
+    for (const { run, hw, d } of this.heldRuns) {
+      this.ctx.fillStyle = `rgba(12,23,20,${d})`;
+      this.ribbon(run, (p) => hw - p.w, () => hw, 0.6);
+    }
+    this.heldRuns.length = 0;
   }
 
   /**
@@ -1392,6 +1436,13 @@ function mix(a: string, b: string, t: number): string {
   const q = parseInt(b.slice(1), 16);
   const c = (sh: number) => Math.round(((p >> sh) & 255) * (1 - t) + ((q >> sh) & 255) * t);
   return `#${((c(16) << 16) | (c(8) << 8) | c(0)).toString(16).padStart(6, '0')}`;
+}
+
+const BG01 = rgb01(BG);
+/** The dim of the styled span (screen [top, bottom, dim]) a screen y falls in; 0 in none. */
+function dimAt(spans: [number, number, number][], y: number): number {
+  for (const s of spans) if (y >= s[0] && y <= s[1]) return s[2];
+  return 0;
 }
 
 const rgbParsed = new Map<string, [number, number, number]>();
