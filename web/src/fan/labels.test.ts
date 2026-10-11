@@ -144,7 +144,8 @@ describe('labels on "now", else beside their branch (#97)', () => {
     const spots = labelSpots(c, c.fan, TOP, measure, BAR_X0);
     const on = resolveLabels(spots, new Map());
     const shown = spots.filter((s) => on.get(s.key));
-    expect(shown.length).toBeGreaterThan(3);
+    // (Packed close (#99): the linear home is the domestic cat beside a narrow bundle of the wild cats.)
+    expect(shown.length).toBeGreaterThanOrEqual(2);
     for (const s of shown) {
       expect(s.place).toBe('tip');
       expect(s.b).toBeDefined();
@@ -159,7 +160,10 @@ describe('labels on "now", else beside their branch (#97)', () => {
     let n = 0;
     for (const z of [3, 8]) {
       for (const ago of [6, 10.5]) {
-        c.cam = { ...h, sx: h.sx * z, sy: h.sy * z, ty: h.sy * z, cy: c.fan.time.y(ago) };
+        // (Centred on the columns there: packed close (#99), the wild cats are a narrow bundle off the home centre.)
+        const cs = columnsAt(c.fan, c.fan.time.y(ago));
+        const cx = (Math.min(...cs.map((q) => q[0])) + Math.max(...cs.map((q) => q[1]))) / 2;
+        c.cam = { ...h, sx: h.sx * z, sy: h.sy * z, ty: h.sy * z, cx, cy: c.fan.time.y(ago) };
         const spots = labelSpots(c, c.fan, TOP, measure, BAR_X0);
         const on = resolveLabels(spots, new Map());
         for (const s of spots.filter((q) => on.get(q.key))) {

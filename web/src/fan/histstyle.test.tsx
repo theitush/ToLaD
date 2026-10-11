@@ -169,7 +169,7 @@ describe('the species card: the population at the time touched', () => {
     expect(then).toContain('~400k alive 70 years ago');
     expect(then).toContain('58% have descendants alive today');
     expect(then).toContain('~23k alive today');
-    expect(then).toContain('Roughly 900 billion lions have ever lived (rough estimate)'); // (its genomic deep past, ToLaD#60/#66)
+    expect(then).toContain('Roughly 700 billion lions have ever lived (rough estimate)'); // (its genomic deep past, ToLaD#60/#66)
     const now = face(renderToStaticMarkup(<SpeciesCard sp={lion} onClose={() => {}} />));
     expect(now).toContain(`${formatCount(population(lion).aliveAt(0))} alive today`);
     // At now, "alive today" once and no trivial "100% have descendants".
