@@ -251,6 +251,8 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
         inst = Math.max(inst, gl.mesh.n);
         rects = Math.max(rects, gl.under.n);
       }
+      // (FANPERF_TIMES=1: every frame's time, to see where the slow ones fall.)
+      if (process.env.FANPERF_TIMES) out(`  ${times.map((x) => x.toFixed(0)).join(' ')}`);
       const f = (x: number) => x.toFixed(1).padStart(6);
       const top = Object.entries(acc)
         .sort((a, b) => b[1] - a[1])

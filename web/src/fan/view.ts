@@ -1357,7 +1357,15 @@ export function formatTick(yrs: number, step: number): string {
   const dec = Math.min(6, Math.max(0, -Math.floor(Math.log10(st) + 1e-9)));
   const v = yrs / div;
   const d = step > 0 ? dec : v >= 100 ? 0 : v >= 10 ? 1 : 2;
-  return `${Number(v.toFixed(d)).toLocaleString('en-US', { maximumFractionDigits: d })} ${unit}`;
+  return `${tickFormat(d).format(Number(v.toFixed(d)))} ${unit}`;
+}
+
+/** en-US number formats by decimals (made once: toLocaleString makes one per call, the axis's ticks every frame). */
+const tickFormats = new Map<number, Intl.NumberFormat>();
+function tickFormat(d: number): Intl.NumberFormat {
+  let f = tickFormats.get(d);
+  if (!f) tickFormats.set(d, (f = new Intl.NumberFormat('en-US', { maximumFractionDigits: d })));
+  return f;
 }
 
 /** Mix two #rrggbb colours: t = 0 gives a, 1 gives b (#rrggbb). */

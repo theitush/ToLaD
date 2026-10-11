@@ -126,6 +126,15 @@ export interface Twig {
   alive: boolean;
 }
 
+/** A thread from a child to one parent (TwigModel.threads); yJ, xJ: where it last left the parent's strand (world). */
+interface Thread {
+  pt: Twig;
+  mother: boolean;
+  green: boolean;
+  yJ: number;
+  xJ: number;
+}
+
 export class TwigModel {
   readonly sp: Species;
   readonly rec: SpeciesRec;
@@ -357,8 +366,42 @@ export class TwigModel {
   }
 
   twig(g: number, i: number, K?: number): Twig {
-    return this.twigOf(g, i, this.attrs(g, i), K);
+    if (K === undefined) return this.twigOf(g, i, this.attrs(g, i));
+    // (On a given slot, kept: the links and labels ask for the same individuals every frame.)
+    const key = g * 4294967296 + i;
+    let t = this.twigCache.get(key);
+    if (t && t.K === K) return t;
+    if (this.twigCache.size > 50000) this.twigCache.clear();
+    this.twigCache.set(key, (t = this.twigOf(g, i, this.attrs(g, i), K)));
+    return t;
   }
+  private readonly twigCache = new Map<number, Twig>();
+
+  /**
+   * The threads from child (g, i), twig t, to its parents as drawTwigs draws
+   * them: each parent's twig (the copy nearest the child), whether it is the
+   * mother (her thread carries the line) and green (either end's line goes
+   * on); and a generation's height there. Kept (#38): the links redraw the
+   * same individuals every frame.
+   */
+  threads(g: number, i: number, t: Twig): { genH: number; th: Thread[] } {
+    const key = g * 4294967296 + i;
+    let c = this.threadCache.get(key);
+    if (c && c.K === t.K) return c;
+    if (this.threadCache.size > 20000) this.threadCache.clear();
+    const ps = this.parents(g, i);
+    const mi = Math.max(0, ps.findIndex((p) => this.sp.sexOf(p) === 'female'));
+    const childGreen = this.isGreen(t);
+    const ext = this.rec.extinct;
+    const th = ps.map((p, j) => {
+      const pt = this.twigNear(p.generation, Number(p.index), t.K);
+      return { pt, mother: j === mi, green: !ext && (childGreen || this.isGreen(pt)), yJ: NaN, xJ: 0 };
+    });
+    c = { K: t.K, genH: this.row(g - 1).y - this.row(g).y, th };
+    this.threadCache.set(key, c);
+    return c;
+  }
+  private readonly threadCache = new Map<number, { K: number; genH: number; th: Thread[] }>();
 
   private twigOf(g: number, i: number, a: { birthTime: number; deathTime: number; alive: boolean }, K?: number): Twig {
     const end = Math.min(a.deathTime, this.sp.now);
@@ -1035,6 +1078,24 @@ export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: num
   const now = m.sp.now;
   const st = stretches(v, m, yTop, yBot);
   const latSeed = m.latticeSeed;
+  // Screen y of world y: py = y·syv + oy.
+  const syv = v.sy;
+  const oy = v.toScreen(0, 0)[1];
+  // Per stretch, its edges, pitch, slots and green edge as lines in screen y from its top row pa
+  // (the same for every band over it); and how far it leans (q).
+  const SP = st.map((S) => {
+    const pa = S.ya * syv + oy;
+    const span = Math.max(1e-9, S.yb * syv + oy - pa);
+    const sL = (S.colX[1] - S.colX[0]) / span;
+    const sR = (S.colX[1] + Math.max(0, S.nT[1]) * S.pitchPx[1] - S.colX[0] - Math.max(0, S.nT[0]) * S.pitchPx[0]) / span;
+    return { pa, sL, sR, sPx: (S.pitchPx[1] - S.pitchPx[0]) / span, sN: (S.nT[1] - S.nT[0]) / span, sG: (S.xG[1] - S.xG[0]) / span, q: Math.sqrt(1 + ((sL + sR) / 2) ** 2) };
+  });
+  // (A living strand's glow reaches 5 px past its edge.)
+  const reach = Math.max(look.tipR, look.lw * 0.5 + 5) + 1;
+  const padX = mode ? reach : 1 + 1.5;
+  // (The lattice level by the pitch across the column: the same for most instances.)
+  let lvlAt = NaN;
+  let lvlOf = lineLevel(1);
   // Texture bands of t generations, t a power of two by the generations' local height on screen
   // (the time axis is logarithmic), aligned to multiples of t: fixed in the world.
   // (tauC: the continuous time level, log2 of BAND_PX over a generation's height: the cross-links' fade.)
@@ -1067,49 +1128,53 @@ export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: num
       if (st[h].yb <= yHi) s0 = h + 1;
       else z = h;
     }
+    // (Per band: the generations' sizes, seeds, strides and folds, the same in each of its stretches.)
+    const seedA = m.seedOf(gA);
+    const seedB = gB !== NONE ? m.seedOf(gB) : 0;
+    const sA = m.stride(gA);
+    const sB = gB !== NONE ? m.stride(gB) : 1;
+    const fA = m.fold(gA, nA);
+    const fB = gB !== NONE ? m.fold(gB, nB) : 1;
+    const tauA = tauC(gA);
+    const tauB = mode ? 0 : Math.round(Math.log2(t));
+    const T0g = m.origin * 1e6 - gA * m.GL;
     for (let si = s0; si < st.length && st[si].ya < yLo; si++) {
       const S = st[si];
+      const D = SP[si];
       const ya = Math.max(S.ya, yHi);
       const yb = Math.min(S.yb, yLo);
       if (!(yb > ya)) continue;
-      // The chord's ends on screen, and its edges, pitch and green edge as lines in screen y.
-      const [, pa] = v.toScreen(0, S.ya);
-      const [, pb] = v.toScreen(0, S.yb);
-      const span = Math.max(1e-9, pb - pa);
-      const lin = (e: [number, number], py: number) => e[0] + ((e[1] - e[0]) * (py - pa)) / span;
-      const slope = (e: [number, number]) => (e[1] - e[0]) / span;
-      const [, py0] = v.toScreen(0, ya);
-      const [, py1] = v.toScreen(0, yb);
+      const py0 = ya * syv + oy;
+      const py1 = yb * syv + oy;
       // Room for the line caps and dots at the true ends (not at a chord's end, where the strands go on).
-      // (A living strand's glow reaches 5 px past its edge.)
-      const reach = Math.max(look.tipR, look.lw * 0.5 + 5) + 1;
       const padT = mode && ya === yHi ? reach : 0;
       const padB = mode && yb === yLo ? reach : 0;
-      const pad = mode ? reach : 1;
       const y0 = Math.max(-4, py0 - padT);
       const y1 = Math.min(v.h + 4, py1 + padB);
       if (!(y1 > y0)) continue;
       // At the instance's top row: the column's left edge, pitch, slots, width and green edge; and how they move down it.
-      const lx0 = lin(S.colX, y0);
-      const P0 = Math.max(1e-12, lin(S.pitchPx, y0));
-      const nT0 = Math.max(0, lin(S.nT, y0));
+      const d0 = y0 - D.pa;
+      const d1 = y1 - D.pa;
+      const lx0 = S.colX[0] + D.sL * d0;
+      const pP0 = S.pitchPx[0] + D.sPx * d0;
+      const P0 = Math.max(1e-12, pP0);
+      const nT0 = Math.max(0, S.nT[0] + D.sN * d0);
+      const nT1 = S.nT[0] + D.sN * d1;
       const wPx = nT0 * P0;
-      const xG0 = lin(S.xG, y0);
-      const sL = slope(S.colX);
-      const sP = slope(S.pitchPx) / P0;
-      const right = (py: number) => lin(S.colX, py) + Math.max(0, lin(S.nT, py)) * lin(S.pitchPx, py);
-      const sR = (right(pb) - right(pa)) / span;
-      const sG = slope(S.xG);
-      const lx1a = right(y0);
-      const lx1b = right(y1);
+      const xG0 = S.xG[0] + D.sG * d0;
+      const sL = D.sL;
+      const sP = D.sPx / P0;
+      const sR = D.sR;
+      const sG = D.sG;
+      const lx1a = lx0 + nT0 * pP0;
+      const lx1b = S.colX[0] + sL * d1 + Math.max(0, nT1) * (S.pitchPx[0] + D.sPx * d1);
       // Where the column leans (a branch-out peeling off), the texture is measured across it, not
       // along the row (mesh.ts perpScale): q px of the row per px across, its pitch, widths and
       // level of detail by that.
-      const q = Math.sqrt(1 + ((sL + sR) / 2) ** 2);
+      const q = D.q;
       // (Along the row only as far as the chord reaches, and 1.5 px past it: no further than
       // the column goes, however steep.)
-      const padX = mode ? pad : pad + 1.5;
-      const x0 = Math.max(-4, Math.min(lx0, lin(S.colX, y1)) - padX);
+      const x0 = Math.max(-4, Math.min(lx0, S.colX[0] + sL * d1) - padX);
       const x1 = Math.min(v.w + 4, Math.max(lx1a, lx1b) + padX);
       if (!(x1 > x0)) continue;
       // Lanes too narrow for their lines (texture only): each is one line its own width.
@@ -1118,16 +1183,20 @@ export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: num
       const narG = mode || !(nGm > 0) ? 0 : laneNarrow(gPx / q);
       const narR = mode ? 0 : laneNarrow((wPx - gPx) / q);
       // The slot lattice: one individual per slot; the nested subset of its lines drawn at this zoom.
-      const { L: lvl, fineA, lambda } = lineLevel(mode ? P0 : P0 / q);
+      const pq = mode ? P0 : P0 / q;
+      if (pq !== lvlAt) {
+        lvlAt = pq;
+        lvlOf = lineLevel(pq);
+      }
+      const { L: lvl, fineA, lambda } = lvlOf;
       const bw = 2 ** lvl * P0;
       // (The lattice's own x, the column's frame at the top row, of the leftmost pixel over the instance.)
       const kB = 1 + sP * (y1 - y0);
       const xMin = Math.min(x0, lx0 + (x0 - lx0 - sL * (y1 - y0)) / Math.max(1e-6, kB));
       const B0 = Math.max(0, Math.floor((xMin - lx0) / bw) - 1);
-      if (B0 * 2 ** lvl >= Math.max(nT0, lin(S.nT, y1))) continue;
+      if (B0 * 2 ** lvl >= Math.max(nT0, nT1)) continue;
       // The time axis at the top of the instance, relative to generation gA's start.
-      const [, wy0] = v.toWorld(0, y0);
-      const age = time.ageAt(wy0) * 1e6;
+      const age = time.ageAt((y0 - oy) / syv) * 1e6;
       out.push({
         x0,
         y0,
@@ -1138,7 +1207,7 @@ export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: num
         lw: look.lw,
         fineA,
         p0: y0,
-        T0: m.origin * 1e6 - age - gA * m.GL,
+        T0: T0g - age,
         A: age + TIME_C,
         gBoff: gB !== NONE ? gB - gA : 0,
         alpha: instA,
@@ -1158,12 +1227,12 @@ export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: num
         latSeed,
         nA,
         nB,
-        seedA: m.seedOf(gA),
-        seedB: gB !== NONE ? m.seedOf(gB) : 0,
-        sA: m.stride(gA),
-        sB: gB !== NONE ? m.stride(gB) : 1,
-        fA: m.fold(gA, nA),
-        fB: gB !== NONE ? m.fold(gB, nB) : 1,
+        seedA,
+        seedB,
+        sA,
+        sB,
+        fA,
+        fB,
         colL: lx0,
         colR: lx0 + Math.max(0.6, wPx),
         narG,
@@ -1171,8 +1240,8 @@ export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: num
         linkA: look.linkA ?? 0,
         baseA: mode ? (look.baseA ?? 0) : 0,
         lam: lambda,
-        tauC: tauC(gA),
-        tauB: mode ? 0 : Math.round(Math.log2(t)),
+        tauC: tauA,
+        tauB,
         gA,
       });
     }
@@ -1219,15 +1288,17 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
   // (Between samples, the span of the two: a steep lean can cross the screen in under a sample.)
   let pl = NaN;
   let pr = NaN;
+  // (Worked out, not remembered: these heights move with the camera.)
+  const Lb = new Float64Array(4);
   for (let i = 0; i <= nS && !onScreen; i++) {
     const y = yTop + ((yBot - yTop) * i) / nS;
-    const Lb = m.lanes(y);
+    m.sample(y, Lb, 0);
     const [bx0, bx1] = xr(y);
-    const l = Lb.left;
-    const r = Lb.left + Lb.w;
+    const l = Lb[0];
+    const r = Lb[0] + Lb[1];
     onScreen = !(bx1 < (pl < l ? pl : l) || bx0 > (pr > r ? pr : r));
-    pl = Lb.w > 0 ? l : NaN;
-    pr = Lb.w > 0 ? r : NaN;
+    pl = Lb[1] > 0 ? l : NaN;
+    pr = Lb[1] > 0 ? r : NaN;
   }
   if (!onScreen) return null;
   const ym = (yTop + yBot) / 2;
@@ -1294,12 +1365,21 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
     const [x0, x1] = xr(yLow);
     const K0 = Math.max(0, m.slotAt(x0, yLow));
     const K1 = Math.min(m.totalSlots(yLow), m.slotAt(x1, yLow) + 1);
+    // (TwigModel.slotIndividuals, unrolled over the slots: members K mod S + c·S; in a gray slot only the dead.)
+    const n = m.size(g);
+    if (!(n > 0)) continue;
+    const S = m.stride(g);
+    const nGs = m.greenSlots(yLow);
+    const F = m.fold(g, n);
     for (let K = K0; K < K1; K++) {
-      for (const s of m.slotIndividuals(K, g, yLow)) {
-        const t = m.twig(g, s.i, K);
-        if (s.deadOnly && t.alive) continue;
+      const base = (K % S) % n;
+      for (let c = 0; c < F; c++) {
+        const i = base + c * S;
+        if (c > 0 && i >= n) break;
+        const t = m.twig(g, i, K);
+        if (!(K < nGs) && t.alive) continue;
         if (t.yBirth < wyTop || t.yDeath > wyBot) continue; // whole twig off screen vertically
-        twigs.push({ g, i: s.i, t });
+        twigs.push({ g, i, t });
       }
     }
   }
@@ -1313,27 +1393,28 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
     for (const { g, i, t } of twigs) {
       if (g === 0) continue;
       const cx = v.toScreen(t.x, t.yBirth)[0];
-      const ps = m.parents(g, i);
-      const mi = Math.max(0, ps.findIndex((p) => m.sp.sexOf(p) === 'female'));
-      const genH = m.row(g - 1).y - m.row(g).y;
-      const childGreen = m.isGreen(t);
-      ps.forEach((p, j) => {
-        const pg = p.generation;
-        const pi = Number(p.index);
-        const pt = m.twigNear(pg, pi, t.K);
+      const { genH, th } = m.threads(g, i, t);
+      for (const T of th) {
+        const { pt, mother, green: pGreen } = T;
         // Leaves the parent's strand a little before the child's birth (or at the
         // parent's death, if earlier) and runs straight up into the child's base:
         // the texture's cross-links (mesh.ts shadeLinks), resolved.
-        const [px, py, cy2] = threadEnds(v, m, pt, t, genH);
+        // (threadEnds, its world point kept while the height it leaves at stays.)
+        const yJoin = Math.min(pt.yBirth, Math.max(twigTop(v, pt), t.yBirth + genH / 3));
+        if (T.yJ !== yJoin) {
+          T.yJ = yJoin;
+          T.xJ = m.slotX(pt.K, yJoin);
+        }
+        const [px, py] = v.toScreen(T.xJ, yJoin);
+        const cy2 = v.toScreen(t.x, t.yBirth)[1];
         // Long threads (mates from further along the range) are drawn faint, whatever their
         // colour, so the local braid reads.
         const far = Math.abs(px - cx) > 4 * cellPx;
-        const pGreen = !ext && (childGreen || m.isGreen(pt));
-        const set = j === mi ? prim : mesh;
+        const set = mother ? prim : mesh;
         const path = far ? (pGreen ? set.farGreen : set.far) : pGreen ? set.green : set.gray;
         path.moveTo(px, py);
         path.lineTo(cx, cy2);
-      });
+      }
     }
     const strokes = (s: ReturnType<typeof mk>, w: number, a: number) => {
       ctx.lineWidth = w;
