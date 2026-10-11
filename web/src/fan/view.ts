@@ -41,70 +41,270 @@ const LABEL_BOTTOM_PX = 104;
 /** How long a label takes to fade in or out when another takes or gives up its place (ms). */
 const LABEL_FADE_MS = 180;
 
+/** Gap (px) a label keeps from the column it sits beside. */
+const LABEL_GAP = 3;
+/** Highest a label standing on "now" may reach where the buttons are not above it (px from the top). */
+const LABEL_CEIL = 6;
+
 /**
- * Where a species' label goes. One rule at every zoom and scroll: the common
- * name (the Latin name is on the card), upright on a dark pill at the left
- * edge of its column (the columns are left-aligned, so that is where the tip
- * and the narrowest times are), standing on the tip; when the tip scrolls up
- * past the top line it sticks there, inside the column, until the column's
- * split (its start) pushes it off. Off the left (under the time axis) it slides along the
- * column, never past its right edge (fading as that edge goes under the
- * axis). All of it is a continuous function of the camera.
+ * Where a label goes (#97). One pill everywhere (#54): the name upright on a
+ * dark pill, the same text and size at every zoom. Two places for it:
+ *
+ *  - On its tip (`tip`): standing on the "now" line at the top of its column
+ *    for a living species (an extinct one: on its own tip), centred on the
+ *    column and sliding along it to stay on screen. The space above "now" is
+ *    empty, so a pill reaches up from the line as far as the buttons allow.
+ *  - Beside its branch (`right`, `left`): when the tip is off screen (above
+ *    the top line), next to the top of its column's part on screen, a gap
+ *    clear of it, where no other column is in the way. A parent column (a
+ *    lineage: "Small cat ancestors") is labelled this way too, but only while
+ *    "now" is off screen: at home the species name the tree.
+ *  - In its column (`in`), at the top line, where the column is wider on
+ *    screen than the pill (zoomed into it): nothing is beside it then.
+ *
+ * Every spot is a continuous function of the camera; its `fit` (0–1) fades
+ * it in and out over a few px of motion (the tip leaving the top, no room
+ * beside the column, the time axis on the left, the legend at the bottom),
+ * so a label moves from its tip to beside its branch by a cross-fade, never a
+ * jump. resolveLabels picks one spot per name and never lets two meet.
  */
 export interface LabelSpot {
-  b: FanBranch;
+  /** The spot's key: the name's id and the place (`tip`, `in`, `right`, `left`). */
+  key: string;
+  /** The name's id: a species' gid, or `n<index>` for a lineage. Place: see labelSpots. */
+  id: string;
+  place: 'tip' | 'in' | 'right' | 'left';
+  /** The species (b) or the lineage (v) it names. */
+  b?: FanBranch;
+  v?: FanNode;
   text: string;
+  rank: Rank;
   /** Centre x of the pill and its bottom (screen px): the text reads up from there. */
   x: number;
   y1: number;
   /** The pill [x0, y0, x1, y1]. */
   box: [number, number, number, number];
-  /** 0–1: fades with the column's width on screen (too narrow) and near the legend at the bottom. */
+  /** 0–1: how fully this spot is there (see above). */
   fit: number;
 }
 
-type Screen = Pick<FanCamera, 'toScreen' | 'toWorld' | 'w' | 'h'> & { cam: { sx: number } };
+/** Priority: species before lineages, then the wider column first, then tree order. */
+type Rank = [number, number, number];
 
-export function labelSpots(c: Screen, fan: Fan, top: number, measure: (text: string) => number): LabelSpot[] {
-  const half = LABEL_PILL / 2;
-  return fan.branches.map((b) => {
-    const text = b.sp.common;
-    const len = measure(text) + 2 * LABEL_PAD;
-    const ty = c.toScreen(tipX(b, fan, fan.mode), b.tipY)[1];
-    const fy = c.toScreen(0, b.splitY)[1];
-    // On the tip; stuck under the top line once the tip is above it; never below its split (its own column).
-    const y1 = Math.min(Math.max(ty - 4, top + len), fy - 4);
-    const wy = Math.min(b.splitY, Math.max(b.tipY, c.toWorld(0, y1)[1]));
-    const left = c.toScreen(b.colLeft, wy)[0];
-    const room = b.width * c.cam.sx;
-    const lo = left + half;
-    const x = Math.min(Math.max(lo, LABEL_AXIS_X + half), Math.max(lo, left + room - half));
-    // Fades: a column too narrow, one leaving under the time axis on the left, and near the legend.
-    const fit = clamp01((room - 3) / 6) * clamp01((left + room - LABEL_AXIS_X + 12) / LABEL_PILL) * clamp01((c.h - LABEL_BOTTOM_PX + 30 - y1) / 30);
-    return { b, text, x, y1, box: [x - half, y1 - len, x + half, y1], fit };
-  });
+type Screen = Pick<FanCamera, 'toScreen' | 'toWorld' | 'w' | 'h'> & { cam: { sx: number; sy: number } };
+
+/** A column's world span: x (its widest reach, peel included) and y. */
+interface ColBox {
+  x0: number;
+  x1: number;
+  y0: number;
+  y1: number;
+  /** Where its peel ends (world y). */
+  lean: number;
+  own: FanBranch | FanNode;
+  /** Its edges [left, right] at world y (in its span). */
+  at: (y: number) => [number, number];
+}
+
+/** The fan's columns as ColBoxes: the leaf columns above their splits, the parent columns over their spans (the stem below the root). Kept per fan. */
+const colBoxCache = new WeakMap<Fan, Map<FanBranch | FanNode, ColBox>>();
+function colBoxes(fan: Fan): Map<FanBranch | FanNode, ColBox> {
+  let out = colBoxCache.get(fan);
+  if (out) return out;
+  out = new Map();
+  // Edges are pure functions of the height, and most heights asked for are on a grid fixed in the world: memoised.
+  const memo = (f: (y: number) => [number, number]) => {
+    const m = new Map<number, [number, number]>();
+    return (y: number) => {
+      let r = m.get(y);
+      if (!r) {
+        if (m.size > 4096) m.clear();
+        m.set(y, (r = f(y)));
+      }
+      return r;
+    };
+  };
+  for (const b of fan.branches) {
+    const at = memo((y) => {
+      const l = leftAt(b, y);
+      return [l, l + laneAt(b, y).w];
+    });
+    out.set(b, { x0: Math.min(b.x0, b.colLeft), x1: Math.max(b.x0, b.colLeft) + b.width, y0: b.tipY, y1: b.splitY, lean: b.leanY, own: b, at });
+  }
+  for (const v of fan.nodes) {
+    const at = memo((y) => {
+      const l = nodeLeftAt(v, y);
+      return [l, l + v.width];
+    });
+    out.set(v, { x0: Math.min(v.tile, v.left), x1: Math.max(v.tile, v.left) + v.width, y0: v.y, y1: v.parent ? v.yBot : Infinity, lean: v.leanY, own: v, at });
+  }
+  colBoxCache.set(fan, out);
+  return out;
 }
 
 /**
- * Which labels show. A fixed priority (the wider column first, then tree
- * order) so the order never changes with the camera; a label shows unless it
- * would meet one shown before it. Hysteresis: a shown label keeps
- * its place until it overlaps, a hidden one waits for a clear gap.
+ * The species' and lineages' label spots. `top` is the labels' top line
+ * (under the buttons); `barX0` the buttons' left edge: left of it a label on
+ * "now" may reach higher, up to LABEL_CEIL.
  */
-export function resolveLabels(spots: LabelSpot[], prev: Map<number, boolean>): Map<number, boolean> {
-  const out = new Map<number, boolean>();
-  const taken: number[][] = [];
-  const order = [...spots].sort((p, q) => q.b.width - p.b.width || p.b.index - q.b.index);
-  for (const s of order) {
-    const gid = s.b.sp.gid;
-    if (!(s.fit > 0)) {
-      out.set(gid, false);
-      continue;
+export function labelSpots(c: Screen, fan: Fan, top: number, measure: (text: string) => number, barX0?: number): LabelSpot[] {
+  const half = LABEL_PILL / 2;
+  const X = (x: number) => c.toScreen(x, 0)[0];
+  const Y = (y: number) => c.toScreen(0, y)[1];
+  const bottom = c.h - LABEL_BOTTOM_PX + 30;
+  const botFit = (y1: number) => clamp01((bottom - y1) / 30);
+  const nowY = fan.time.y(0);
+  const nowS = Y(nowY);
+  /** "now" on screen (below the top line): 1, fading over 24 px as it goes above. */
+  const nowOn = clamp01((nowS - top) / 24);
+
+  // Heights (world) to measure a column's edge at between wa < wb: both ends, its own ends and peel's end
+  // (`at`) and a grid fixed in the world, at most 8 px apart. Points only enter at the ends, where the edge
+  // is measured exactly, so what is measured changes continuously as the camera moves.
+  const grid = 2 ** -Math.ceil(Math.log2(Math.max(1e-12, c.cam.sy) / 8));
+  const heights = (wa: number, wb: number, at: number[]): number[] => {
+    const ys = [wa, wb];
+    for (const y of at) if (y > wa && y < wb) ys.push(y);
+    for (let y = Math.ceil(wa / grid) * grid; y < wb; y += grid) ys.push(y);
+    return ys;
+  };
+  // What a label beside a branch must clear: the columns near it (their widest reach within CLEAR px).
+  // A gap of CLEAR px or more counts as clear (clearFit is 1 from there).
+  const CLEAR = 6;
+  const boxes = colBoxes(fan);
+  const cols = [...boxes.values()];
+  /** Least gap (px, up to CLEAR) between the strip [xa, xb] × [ya, yb] and any column but `own`'s (negative: they overlap). */
+  const clearance = (xa: number, xb: number, ya: number, yb: number, own: FanBranch | FanNode) => {
+    let gap = CLEAR;
+    if (!(yb > ya)) return gap;
+    const [wxa, wya] = c.toWorld(xa - CLEAR, ya);
+    const [wxb, wyb] = c.toWorld(xb + CLEAR, yb);
+    for (const q of cols) {
+      if (q.own === own || q.x1 < wxa || q.x0 > wxb || q.y1 <= wya || q.y0 > wyb) continue;
+      for (const wy of heights(Math.max(wya, q.y0), Math.min(wyb, q.y1 - 1e-9), [q.lean])) {
+        const [l, r] = q.at(wy);
+        gap = Math.min(gap, Math.max(X(l) - xb, xa - X(r)));
+      }
+      // Hidden from here on whatever else is near.
+      if (gap <= -1) return gap;
     }
-    const need = prev.get(gid) ? -1 : 5;
-    const on = !taken.some((q) => boxGap(s.box, q) < need);
-    out.set(gid, on);
-    if (on && s.fit > 0.3) taken.push(s.box);
+    return gap;
+  };
+  const clearFit = (gap: number) => clamp01((gap + 1) / 6);
+
+  /** The spots beside a column on screen from y0 down (its own edge from `edge`, its bottom at screen yBot). */
+  const beside = (id: string, text: string, rank: Rank, len: number, own: FanBranch | FanNode, yTop: number, yBot: number, fit0: number, ref: { b?: FanBranch; v?: FanNode }): LabelSpot[] => {
+    const y0 = Math.max(top, yTop);
+    const y1 = y0 + len;
+    if (!(fit0 > 0) || y0 > bottom) return [];
+    // Its widest (l, r) and narrowest (il, ir) along the pill.
+    let l = Infinity;
+    let r = -Infinity;
+    let il = -Infinity;
+    let ir = Infinity;
+    const wTop = c.toWorld(0, y0)[1];
+    const wBot = c.toWorld(0, Math.min(y1, yBot))[1] - 1e-9;
+    if (!(wBot >= wTop)) return [];
+    const ob = boxes.get(own)!;
+    for (const wy of heights(wTop, wBot, [ob.lean])) {
+      const [a, b] = ob.at(wy);
+      l = Math.min(l, X(a));
+      r = Math.max(r, X(b));
+      il = Math.max(il, X(a));
+      ir = Math.min(ir, X(b));
+    }
+    if (!(r >= l)) return [];
+    // Fades: the column's part on screen too short to stand beside, and the legend.
+    const f = fit0 * clamp01((yBot - y0 - 12) / 24) * botFit(y1);
+    const out: LabelSpot[] = [];
+    // Inside it, at the top line, when it is wide enough on screen (zoomed into it): centred on its part on screen.
+    {
+      const a = Math.max(il, LABEL_AXIS_X) + half + 4;
+      const b = Math.min(ir, c.w) - half - 4;
+      const mid = (il + ir) / 2;
+      const x = a <= b ? Math.min(Math.max(mid, a), b) : Math.min(Math.max(mid, b), a);
+      const fit = f * clamp01((b - a) / 8) * clamp01((yBot - y1) / 12);
+      out.push({ key: `${id}:in`, id, place: 'in', ...ref, text, rank, x, y1, box: [x - half, y0, x + half, y1], fit });
+    }
+    for (const place of ['right', 'left'] as const) {
+      const x = place === 'right' ? r + LABEL_GAP + half : l - LABEL_GAP - half;
+      const xa = x - half;
+      const xb = x + half;
+      // Clear of the other columns and the time axis (past the screen's right edge it is only cut off).
+      const fit = f > 0 && xa < c.w && xb > 0 ? f * clearFit(Math.min(xa - LABEL_AXIS_X, clearance(xa, xb, y0, y1, own))) : 0;
+      out.push({ key: `${id}:${place}`, id, place, ...ref, text, rank, x, y1, box: [xa, y0, xb, y1], fit });
+    }
+    return out;
+  };
+
+  const out: LabelSpot[] = [];
+  for (const b of fan.branches) {
+    const text = b.sp.common;
+    const id = String(b.sp.gid);
+    const len = measure(text) + 2 * LABEL_PAD;
+    const rank: Rank = [0, b.width, b.index];
+    // On its tip: centred on the column there, kept on screen (right of the time axis) while the column is.
+    const tl = X(leftAt(b, b.tipY));
+    const tw = laneAt(b, b.tipY).w * c.cam.sx;
+    const room = b.width * c.cam.sx;
+    const left = X(b.colLeft);
+    const cx = tl + tw / 2;
+    const lo = Math.max(left, LABEL_AXIS_X) + half;
+    const hi = Math.min(left + room, c.w) - half;
+    const x = lo <= hi ? Math.min(Math.max(cx, lo), hi) : Math.min(Math.max(cx, hi), lo);
+    const ceil = barX0 === undefined ? top : LABEL_CEIL + (top - LABEL_CEIL) * clamp01((x + half - (barX0 - 68)) / 60);
+    const ty = Y(b.tipY);
+    const y1 = Math.max(ty - 4, ceil + len);
+    // The tip on screen (below the top line) and its column right of the axis and left of the screen's edge.
+    const tipOn = clamp01((ty - top) / 24) * clamp01((left + room - LABEL_AXIS_X + 12) / LABEL_PILL) * clamp01((c.w + 12 - left) / LABEL_PILL);
+    // Above the tip, clear of the other columns (an extinct tip has its neighbours around it; above "now" there are none).
+    const f = tipOn * botFit(y1);
+    const tipFit = f > 0 && b.tipY > nowY ? f * clearFit(clearance(x - half, x + half, y1 - len, Math.min(y1, ty - 2), b)) : f;
+    out.push({ key: `${id}:tip`, id, place: 'tip', b, text, rank, x, y1, box: [x - half, y1 - len, x + half, y1], fit: tipFit });
+    // Beside its branch: once the tip is off screen.
+    out.push(...beside(id, text, rank, len, b, ty, Y(b.splitY), 1 - clamp01((ty - top) / 24), { b }));
+  }
+  // The lineages (parent columns, not the stem below the root: the clade's own label is there), while "now" is off screen.
+  if (nowOn < 1) {
+    for (const v of fan.nodes) {
+      if (!v.parent) continue;
+      const text = v.name;
+      const id = `n${fan.nodes.indexOf(v)}`;
+      const len = measure(text) + 2 * LABEL_PAD;
+      const rank: Rank = [1, v.width, fan.nodes.indexOf(v)];
+      out.push(...beside(id, text, rank, len, v, Y(v.y), Y(v.yBot), 1 - nowOn, { v }));
+    }
+  }
+  return out;
+}
+
+/**
+ * Which spots show: at most one per name, never two meeting. A fixed priority
+ * (species first, the wider column first, then tree order) so the order never
+ * changes with the camera; a name takes the first of its spots (on its tip,
+ * in its column, right, left)
+ * that meets none shown before it. Hysteresis: the spots shown last frame go
+ * first, each keeping its place while it fits and meets no other; a hidden
+ * one waits for a clear gap and a fit over 0.6, so a newcomer never pushes a
+ * shown label off.
+ */
+export function resolveLabels(spots: LabelSpot[], prev: Map<string, boolean>): Map<string, boolean> {
+  const out = new Map<string, boolean>();
+  const taken: number[][] = [];
+  const done = new Set<string>();
+  const placeOrder = { tip: 0, in: 1, right: 2, left: 3 };
+  const order = [...spots].sort((p, q) => p.rank[0] - q.rank[0] || q.rank[1] - p.rank[1] || p.rank[2] - q.rank[2] || placeOrder[p.place] - placeOrder[q.place]);
+  for (const s of spots) out.set(s.key, false);
+  // The spots shown last frame first (each keeps its place while it fits and meets no other), then the rest.
+  for (const pass of [true, false]) {
+    for (const s of order) {
+      if (done.has(s.id) || !!prev.get(s.key) !== pass) continue;
+      if (!(s.fit > (pass ? 0 : 0.6))) continue;
+      if (taken.some((q) => boxGap(s.box, q) < (pass ? -1 : 5))) continue;
+      out.set(s.key, true);
+      done.add(s.id);
+      taken.push(s.box);
+    }
   }
   return out;
 }
@@ -175,7 +375,7 @@ export class FanView implements InputHandlers {
   barEl: HTMLElement | null = null;
   private scaleKey = '';
   /** Each species' label: shown or not, and its fade (0–1); when it was last drawn (ms). */
-  private labelState = new Map<number, { on: boolean; a: number }>();
+  private labelState = new Map<string, { on: boolean; a: number }>();
   private labelT = 0;
   /** `?debug`: a readout of the zooms, years on screen and individuals per px. */
   readonly debug = typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug');
@@ -530,7 +730,7 @@ export class FanView implements InputHandlers {
     // Labels: one form everywhere (see labelSpots).
     this.drawGutter();
     this.drawTouch();
-    const spots = labelSpots(this.camera, this.fan, this.labelTop(), (t) => this.nameWidth(t));
+    const spots = labelSpots(this.camera, this.fan, this.labelTop(), (t) => this.nameWidth(t), this.barRect()?.[0]);
     this.drawLabels(spots);
     this.drawWidthScale();
     if (this.debug) this.drawDebug();
@@ -856,8 +1056,8 @@ export class FanView implements InputHandlers {
     const now = performance.now();
     const dt = Math.min(100, Math.max(0, now - this.labelT));
     this.labelT = now;
-    const prev = new Map<number, boolean>();
-    for (const [gid, st] of this.labelState) prev.set(gid, st.on);
+    const prev = new Map<string, boolean>();
+    for (const [key, st] of this.labelState) prev.set(key, st.on);
     const on = resolveLabels(spots, prev);
     let moving = false;
     ctx.save();
@@ -865,10 +1065,9 @@ export class FanView implements InputHandlers {
     ctx.textAlign = 'left';
     ctx.font = font(LABEL_FONT);
     for (const s of spots) {
-      const gid = s.b.sp.gid;
-      const want = on.get(gid) ? 1 : 0;
-      let st = this.labelState.get(gid);
-      if (!st) this.labelState.set(gid, (st = { on: want === 1, a: want }));
+      const want = on.get(s.key) ? 1 : 0;
+      let st = this.labelState.get(s.key);
+      if (!st) this.labelState.set(s.key, (st = { on: want === 1, a: want }));
       st.on = want === 1;
       if (st.a !== want) {
         const step = dt / LABEL_FADE_MS;
@@ -887,7 +1086,8 @@ export class FanView implements InputHandlers {
       ctx.save();
       ctx.translate(s.x, y1 - LABEL_PAD);
       ctx.rotate(-Math.PI / 2);
-      ctx.fillStyle = INK;
+      // A lineage's name in the second ink: the species' are the tree's names.
+      ctx.fillStyle = s.v ? INK2 : INK;
       ctx.fillText(s.text, 0, 0.5);
       ctx.restore();
     }
@@ -1121,11 +1321,6 @@ export class FanView implements InputHandlers {
 
 }
 
-
-/** x of the middle of a branch's tip (branches are left-aligned). */
-function tipX(b: FanBranch, _fan: Fan, _mode: WidthMode): number {
-  return leftAt(b, b.tipY) + laneAt(b, b.tipY).w / 2;
-}
 
 function sup(k: number): string {
   return String(k)
