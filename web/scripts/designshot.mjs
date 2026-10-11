@@ -58,7 +58,7 @@ const scenes = [
   ['card-sandcat', 'card', ['Sand cat']],
   ['card-domestic', 'card', ['Domestic cat']],
   // The Red List chip on a small cat (Least Concern, gray) and on the leopard (ToLaD#98).
-  ['card-leopardcat', 'card', ['Leopard cat']],
+  ['card-leopardcat', 'card', ['Mainland leopard cat']],
   ['card-leopard', 'card', ['Leopard']],
   // The merged data (ToLaD#70): the lion's column from its split down past its genomic deep past, a
   // range-loss trend (the Eurasian lynx, modelled, dashed) on its card, and the lion's card.
@@ -67,8 +67,8 @@ const scenes = [
   ['card-lynx', 'card', ['Eurasian lynx']],
   // Texture at every zoom, branch-outs as lines (#100, #101): zoomed 2^k × home (time 2^(k·r)) about a
   // column `ago` years back: the leopard cat's stem below its start, the river forks at the Felidae base.
-  ['stem-leopardcat', 'about', ['Leopard cat', 1.2e7, 9, 1]],
-  ['forks-base', 'about', ['Leopard cat', 1.2e7, 12, 0.5]],
+  ['stem-leopardcat', 'about', ['Mainland leopard cat', 1.2e7, 9, 1]],
+  ['forks-base', 'about', ['Mainland leopard cat', 1.2e7, 12, 0.5]],
   ['peel-domestic', 'about', ['Domestic cat', 1e4, 3, 0.5]],
   // Held (no-data) stretches drawn faint (ToLaD#55): the leopard's and jaguar's columns since their last
   // figure, the snow leopard's from its split to its oldest genomic point.
@@ -77,14 +77,14 @@ const scenes = [
   ['held-snow', 'about', ['Snow leopard', 1e6, 1, 0.3]],
   // Curated bottlenecks (ToLaD#141): the puma's and the cheetah's windows tinted and named on their columns,
   // a little zoomed and further in, and a tap inside each window at home opening the card's section on it.
-  ['bneck-puma', 'about', ['Cougar', 16000, 2, 0.5]],
-  ['bneck-puma-in', 'about', ['Cougar', 16000, 5, 0.6]],
+  ['bneck-puma', 'about', ['Puma', 16000, 2, 0.5]],
+  ['bneck-puma-in', 'about', ['Puma', 16000, 5, 0.6]],
   ['bneck-cheetah', 'about', ['Cheetah', 11800, 2, 0.5]],
   ['bneck-cheetah-in', 'about', ['Cheetah', 11800, 5, 0.6]],
-  ['bneck-puma-deep', 'about', ['Cougar', 16000, 8, 0.5]],
+  ['bneck-puma-deep', 'about', ['Puma', 16000, 8, 0.5]],
   ['bneck-tiger', 'about', ['Tiger', 2000, 6, 0.3]],
   ['bneck-iberian', 'about', ['Iberian lynx', 3000, 7, 0.3]],
-  ['bneck-tap-puma', 'touch', ['Cougar', 22000]],
+  ['bneck-tap-puma', 'touch', ['Puma', 22000]],
   ['bneck-tap-cheetah', 'touch', ['Cheetah', 11800]],
 ];
 const browser = await chromium.launch({ headless: true });

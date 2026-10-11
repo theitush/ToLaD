@@ -1,8 +1,11 @@
 // The fan's dated tree of splits, from the data (ToLaD#145): the pipeline's dated
 // tree (pipeline/FORMAT.md, "Dated tree"; tolad_pipeline/dated.py) induced on the
-// clade's species. Its topology and split dates are Upham et al. 2019's node-dated
-// MCC tree, with every other dated species (fossils, living species Upham lacks)
-// grafted on by a rule, and the few hand values in ONE table, pipeline/overrides.toml
+// clade's species. Its topology is Upham et al. 2019's node-dated MCC tree; a split
+// whose species are a clade of Álvarez-Carretero et al. 2022 too is dated by the
+// geometric mean of the two trees' ages (they err in opposite directions below
+// ~25 Ma: research/dated-tree-sources.md), the rest interpolated in Upham's shape and
+// no crown younger than a fossil of its genus. Every other dated species (fossils,
+// living species Upham lacks) is grafted on by a rule, and the few hand values in ONE table, pipeline/overrides.toml
 // (Panthera's living five from Figueiró et al. 2017, the domestic cat at
 // domestication, the placement of four Panthera fossils), each cited there. No split
 // is typed here: pointing the fan at another clade needs no hand table.
@@ -27,7 +30,7 @@ export interface Split {
   hi: number;
   cite: string;
   confidence: Confidence;
-  /** Where the date comes from (DatedSplit.source): an interpolated or fossil date is not as solid as Upham's. */
+  /** Where the date comes from (DatedSplit.source): an interpolated or fossil date is not as solid as a dated clade's. */
   source?: string;
   note?: string;
   /** Daughters, left to right: species (scientific names) or splits. */
@@ -42,11 +45,18 @@ function datedSpecies(t: DatedSplit): string[] {
 /** Four significant digits (a domestication date is 0.0095 Ma). */
 const r3 = (x: number) => Number(x.toPrecision(4));
 
+/** The two dated trees' citations (DatedMeta). */
+export interface Cites {
+  upham: string;
+  alvarez: string;
+}
+
 /**
  * A dated split as the fan's Split. `common` names a species (its English name, or
- * null); `upham` is the Upham citation, `extinct` tells fossils apart.
+ * null); `cites` are the dated trees' citations, `extinct` tells fossils apart.
  */
-export function splitFrom(t: DatedSplit, common: (sci: string) => string | null, extinct: (sci: string) => boolean, upham: string): Split {
+export function splitFrom(t: DatedSplit, common: (sci: string) => string | null, extinct: (sci: string) => boolean, cites: Cites): Split {
+  const { upham, alvarez } = cites;
   const sp = datedSpecies(t);
   const label = (s: string) => common(s) ?? s;
   const living = sp.filter((s) => !extinct(s));
@@ -68,9 +78,25 @@ export function splitFrom(t: DatedSplit, common: (sci: string) => string | null,
       confidence = 'medium';
       if (t.override) notes.push(t.override.reason);
       break;
+    case 'ensemble':
+      cite = `The geometric mean of ${alvarez} and ${upham}: below ~25 Ma the first runs old and the second young (research/dated-tree-sources.md). Range: the union of their 95% intervals`;
+      confidence = 'medium';
+      break;
+    case 'alvarez':
+      cite = alvarez;
+      confidence = 'medium';
+      break;
     case 'upham':
       cite = upham;
       confidence = 'medium';
+      break;
+    case 'upham-interp':
+      cite = `Not a clade of both dated trees: its age is interpolated in the shape of ${upham}, between the dated splits around it`;
+      confidence = 'low';
+      break;
+    case 'fossil-floor':
+      cite = 'Fossil minimum: raised to the first appearance (Paleobiology Database) of a fossil species of this genus, since a crown is no younger than its oldest fossil';
+      confidence = 'low';
       break;
     case 'upham-imputed':
       cite = `${upham}. A daughter here was placed with no genetic data (imputed under taxonomic constraints), so the date is weak`;
@@ -96,7 +122,7 @@ export function splitFrom(t: DatedSplit, common: (sci: string) => string | null,
     confidence,
     source: t.source,
     ...(notes.length ? { note: notes.join('. ') } : {}),
-    kids: t.kids.map((k) => (typeof k === 'string' ? k : splitFrom(k, common, extinct, upham))),
+    kids: t.kids.map((k) => (typeof k === 'string' ? k : splitFrom(k, common, extinct, cites))),
   };
 }
 
@@ -108,7 +134,7 @@ export const FELIDAE_TREE: Split = splitFrom(
   raw.dated,
   (s) => bySci.get(s)?.common ?? null,
   (s) => !!bySci.get(s)?.extinct,
-  raw.datedMeta?.upham ?? 'Upham et al. 2019',
+  { upham: raw.datedMeta?.upham || 'Upham et al. 2019', alvarez: raw.datedMeta?.alvarez || 'Álvarez-Carretero et al. 2022' },
 );
 
 /** Every split in the tree, parents before their daughters. */

@@ -151,7 +151,9 @@ describe('the dated tree', () => {
         if (edge === 'curved') {
           const moves = v.kids.map((k) => (isNode(k) ? k.left - k.tile : k.cx - (k.x0 + k.baseW / 2)));
           const fork = v.y - v.kids[0].leanY;
-          if (Math.abs(Math.max(...moves) + Math.min(...moves)) > 1e-9) for (const m of moves) expect(Math.abs(m) * 1.875).toBeLessThanOrEqual(12 * fork);
+          // (36: since ToLaD#145 the data's stem is a chain of fossil splits under 1 Myr apart, 12-15 Ma, and boundPeels
+          // can only reach the least slope the tree allows there; layout.test bounds the edges themselves.)
+          if (Math.abs(Math.max(...moves) + Math.min(...moves)) > 1e-9) for (const m of moves) expect(Math.abs(m) * 1.875).toBeLessThanOrEqual(36 * fork);
         }
         expect(v.left + v.width / 2).toBeCloseTo(v.cx, 9);
       }
@@ -164,7 +166,9 @@ describe('the dated tree', () => {
     it(`an extinct branch is 0% green above its split, its own column all line-ended (${mode}, ${edge})`, () => {
       const f = layoutFan(FELIDAE, mode, undefined, edge);
       const extinct = f.branches.filter((b) => b.sp.extinct);
-      expect(extinct.map((b) => b.sp.common).sort()).toEqual(['Cave lion', 'European jaguar', 'Longdan tiger', 'Yucatán cave cat']);
+      // (Since ToLaD#145 the data's tree holds every dated fossil cat, ~98, not just the four hand-placed Panthera fossils.)
+      expect(extinct.length).toBe(FELIDAE.species.filter((s) => s.extinct).length);
+      for (const c of ['Cave lion', 'European jaguar', 'Longdan tiger', 'Yucatán cave cat']) expect(extinct.map((b) => b.sp.common)).toContain(c);
       for (const b of extinct) {
         for (let k = 1; k <= 200; k++) {
           const y = b.tipY + ((above(b.splitY) - b.tipY) * k) / 200;

@@ -63,7 +63,8 @@ function sweep(c: FanCamera, cams: Camera[], bound: number) {
         const d = Math.max(Math.abs(s.x - p.x), Math.abs(s.y1 - p.y1));
         worst = Math.max(worst, d);
         // Beside a branch a label follows its edge, which can lean (a peel) or widen fast (a boom on the log time axis): faster than the camera.
-        expect(d, `${s.key} moved`).toBeLessThanOrEqual(s.place === 'tip' ? bound : 6 * bound);
+        // (7, not 6: since ToLaD#145 the data's crowded fossil splits lean an edge a little faster.)
+        expect(d, `${s.key} moved`).toBeLessThanOrEqual(s.place === 'tip' ? bound : 7 * bound);
       }
     }
     const on = resolveLabels(spots, shown);
@@ -198,7 +199,8 @@ describe('labels on "now", else beside their branch (#97)', () => {
     const h = c.home();
     let n = 0;
     for (const z of [3, 8]) {
-      for (const ago of [6, 10.5]) {
+      for (const ago of [6, 10.5, 15]) {
+        // (15 Ma too: since ToLaD#145 the family's root is ~19.5 Ma and many fossil columns crowd 6-10 Ma, leaving fewer labels room there.)
         // (Centred on the columns there: packed close (#99), the wild cats are a narrow bundle off the home centre.)
         const cs = columnsAt(c.fan, c.fan.time.y(ago));
         const cx = (Math.min(...cs.map((q) => q[0])) + Math.max(...cs.map((q) => q[1]))) / 2;
@@ -206,7 +208,11 @@ describe('labels on "now", else beside their branch (#97)', () => {
         const spots = labelSpots(c, c.fan, TOP, measure, BAR_X0);
         const on = resolveLabels(spots, new Map());
         for (const s of spots.filter((q) => on.get(q.key))) {
-          expect(s.place).not.toBe('tip');
+          // (A tip in the deep past is a fossil's last appearance: since ToLaD#145 the data holds the fossil cats.)
+          if (s.place === 'tip') {
+            expect(s.b?.sp.extinct, s.key).toBe(true);
+            continue;
+          }
           if (s.place === 'in') continue;
           n++;
           // Its own column too: the pill is LABEL_GAP past its widest reach along the pill.

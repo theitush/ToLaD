@@ -109,7 +109,8 @@ function focus(f: Fan, sp: string, ago: number): [number, number] {
 }
 
 const FOCI: [string, string, number][] = [
-  ['Felidae base', 'Leopard cat', 1.2e7],
+  // ('Mainland leopard cat': the Red List's name, ToLaD#145.)
+  ['Felidae base', 'Mainland leopard cat', 1.2e7],
   ['Panthera splits', 'Lion', 2.5e6],
   ['lion', 'Lion', 3000],
   ['domestic cat peel', 'Domestic cat', 1e4],

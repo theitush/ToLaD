@@ -17,7 +17,7 @@ const read = (rel: string) => new Uint8Array(readFileSync(resolve(DATA, rel)));
 function clade(name: string) {
   const raw = loadClade(read, name);
   const by = new Map(raw.species.map((s) => [s.sci, s]));
-  const tree = splitFrom(raw.dated!, (s) => by.get(s)?.common ?? null, (s) => !!by.get(s)?.extinct, raw.datedMeta!.upham);
+  const tree = splitFrom(raw.dated!, (s) => by.get(s)?.common ?? null, (s) => !!by.get(s)?.extinct, raw.datedMeta!);
   const placed = new Set(speciesUnder(tree));
   const species = raw.species.filter((s) => placed.has(s.sci)).map((s, i) => speciesRec(s, i));
   const sum = (f: (s: (typeof species)[number]) => number) => species.reduce((a, s) => a + f(s), 0);
@@ -33,7 +33,8 @@ describe('the dated tree from the data', () => {
     for (const s of allSplits()) {
       expect(s.lo).toBeLessThanOrEqual(s.ageMa);
       expect(s.hi).toBeGreaterThanOrEqual(s.ageMa);
-      expect(s.source).toMatch(/^(upham|upham-imputed|fossil|interpolated|override)$/);
+      // the ages rule (ToLaD#145): ensemble / alvarez dated clades, upham-interp and fossil-floor beside the old tags
+      expect(s.source).toMatch(/^(ensemble|alvarez|upham|upham-interp|upham-imputed|fossil-floor|fossil|interpolated|override)$/);
       for (const k of s.kids) if (typeof k !== 'string') expect(k.ageMa).toBeLessThan(s.ageMa);
     }
     // the living cats: Upham's 40 matched (the Red List's, less the Sunda leopard cat and Chinese mountain cat it lumps), plus the

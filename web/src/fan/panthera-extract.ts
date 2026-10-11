@@ -139,7 +139,7 @@ export interface DatedSplit {
   age: number;
   lo: number;
   hi: number;
-  /** 'upham' | 'upham-imputed' | 'fossil' | 'interpolated' | 'override'. */
+  /** 'ensemble' | 'alvarez' | 'upham-interp' | 'upham-imputed' | 'fossil-floor' | 'fossil' | 'interpolated' | 'override' | 'upham' (dated.py SRC_NAMES). */
   source: string;
   /** Open Tree name of the clade it founds, '' if none. */
   name: string;
@@ -154,6 +154,8 @@ export interface DatedSplit {
 /** The dated tree's shared tables (dated/skeleton.json). */
 export interface DatedMeta {
   upham: string;
+  /** Álvarez-Carretero et al. 2022's citation (the ages' other source). */
+  alvarez: string;
   genHow: string[];
   commonSource: string;
 }
@@ -192,6 +194,7 @@ export interface DatedFile {
   // skeleton.json only
   sources?: string[];
   upham?: string;
+  alvarez?: string;
   gen_how?: string[];
   common_source?: string;
   overrides?: { name: string; cite: string; reason: string }[];
@@ -403,7 +406,7 @@ export function extractClade(
   const naturalMeta: NaturalMeta | null = nm ? { label: nm.label ?? '', grade: nm.grade ?? 'D', kind: nm.kind ?? '', cite: nm.cite ?? '', url: nm.url ?? '' } : null;
   const tree = dated ? datedTree(dated.file, dated.sk, rows) : null;
   const datedMeta: DatedMeta | null = dated
-    ? { upham: dated.sk.upham ?? '', genHow: dated.sk.gen_how ?? [], commonSource: dated.sk.common_source ?? '' }
+    ? { upham: dated.sk.upham ?? '', alvarez: dated.sk.alvarez ?? '', genHow: dated.sk.gen_how ?? [], commonSource: dated.sk.common_source ?? '' }
     : null;
   return { ...node(f, root), tile: tileId, species, naturalMeta, dated: tree, datedMeta };
 }
