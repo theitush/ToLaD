@@ -70,10 +70,10 @@ describe('the Panthera populations', () => {
     expect(Math.abs(p.aliveAt(0) / sp('Lion').alive - 1)).toBeLessThan(2.5e-3);
     expect(p.aliveAt(200e-6)).toBeGreaterThan(4.9e5);
     // The most alive at once: the deep curve's peak, on one of its points (ToLaD#60: a Middle
-    // Pleistocene high near 900 thousand, not the held oldest level).
+    // Pleistocene high near 700 thousand at the lion's own mutation rate, ToLaD#74, not the held oldest level).
     const h = sp('Lion').history!;
     const peak = Math.max(...h.points.map((q) => p.aliveAt((h.nowYear - q.year) / 1e6)));
-    expect(peak).toBeGreaterThan(8e5);
+    expect(peak).toBeGreaterThan(6.5e5);
     expect(p.max / peak).toBeCloseTo(1, 4);
     expect(p.greenAt(0)).toBe(1);
     // During the crash (1950s–2000s) far fewer of those alive have descendants today.
