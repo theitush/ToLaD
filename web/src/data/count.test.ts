@@ -65,4 +65,8 @@ describe('approxCountsIn: the counts inside a pipeline sentence', () => {
     expect(approxCountsIn('2015 census, 3,890; 1,234,567 born')).toBe('2015 census, ~4k; ~1.2 million born');
     expect(approxCountsIn('held from 11,700 years ago; 1924 census, 66')).toBe('held from 11,700 years ago; 1924 census, 66');
   });
+
+  it('keeps one tilde where a note already says "~" before a count', () => {
+    expect(approxCountsIn("CatSG dates the ~3,200 in-situ estimate to 2009")).toBe('CatSG dates the ~3k in-situ estimate to 2009');
+  });
 });
