@@ -7912,27 +7912,27 @@
    "Cretaceous 66-145 Ma": {
     "ghost": 3.7811617387335014e+18,
     "ghost_share": 1.0,
-    "sampled": 173884228220860.34
+    "sampled": 173884228220826.22
    },
    "Holocene-Pleistocene 0-2.58 Ma": {
-    "ghost": 1.1350003478880418e+16,
+    "ghost": 1.1350005636300124e+16,
     "ghost_share": 0.0769,
-    "sampled": 1.3616027003116243e+17
+    "sampled": 1.3616026787374274e+17
    },
    "Jurassic and older >145 Ma": {
     "ghost": 9.896595266545318e+17,
     "ghost_share": 1.0,
-    "sampled": 16137748336923.848
+    "sampled": 16137748336923.508
    },
    "Neogene 2.58-23 Ma": {
-    "ghost": 8.973790742079254e+17,
+    "ghost": 8.973790742623174e+17,
     "ghost_share": 0.7645,
-    "sampled": 2.7646671379245312e+17
+    "sampled": 2.7646671373806096e+17
    },
    "Paleogene 23-66 Ma": {
-    "ghost": 2.435072461773668e+18,
+    "ghost": 2.43507246177376e+18,
     "ghost_share": 0.9876,
-    "sampled": 3.0525723528840216e+16
+    "sampled": 3.052572352874796e+16
    }
   },
   "f_ramp_Ma": [
@@ -7940,7 +7940,7 @@
    91.36
   ],
   "ghost_share": 0.9482,
-  "max_multiplier": 99862.7957814395,
+  "max_multiplier": 99862.79578144109,
   "multiplier_at_Ma": {
    "0.01": 1.012,
    "1": 1.028,
@@ -7952,13 +7952,39 @@
    "50": 242.708,
    "66": 3397.345
   },
-  "sampled_sum": 4.4334272932901357e+17,
+  "sampled_sum": 4.433427271171094e+17,
   "top_down_estimate": 8.557965374642387e+18,
-  "with_ghosts": 8.557965534177522e+18
+  "with_ghosts": 8.55796553417752e+18
  },
  "grid_cells": 1600,
  "history": {
   "deep_join": {
+   "blind": {
+    "against": {
+     "Antilocapra americana": 0.4975908554472435,
+     "Babyrousa celebensis": 1.9335042043015418,
+     "Bison bison": 2.6409363674893243,
+     "Bison bonasus": 0.6474053120099436,
+     "Elaphurus davidianus": 0.22325573616205885,
+     "Elephas maximus": 0.48706794709590034,
+     "Loxodonta africana": 2.274205986232105,
+     "Macropus fuliginosus": 0.6416816850341281,
+     "Oryx dammah": 0.48039168821730566,
+     "Oryx gazella": 0.2789542510998169,
+     "Osphranter rufus": 0.2552314900711306,
+     "Ovibos moschatus": 0.5657635864099735,
+     "Ovis dalli": 0.4784422262639475,
+     "Panthera tigris": 0.6111398588978104,
+     "Puma concolor": 0.581755151826723,
+     "Rangifer tarandus": 0.17482992739360928,
+     "Ursus maritimus": 2.2879874021326905
+    },
+    "kept": [
+     "Panthera leo",
+     "Panthera pardus"
+    ],
+    "note": "Steps younger than 20000 yr (rescaled) are dropped unless the file's [deep.blind] cites a source dating a decline there, which keeps them (grade D). `against`: dropped steps whose mean level is beyond 1.5x from the youngest resolved step, the other way from the join (or the join is flat): said on the card, not drawn."
+   },
    "by_rule": {
     "absolute": 99,
     "scaled": 10
@@ -8124,6 +8150,12 @@
      "rule": "absolute",
      "to_kind": "rangeloss"
     },
+    "Panthera leo": {
+     "factor": 1.0,
+     "ratio": 0.08241554951521561,
+     "rule": "absolute",
+     "to_kind": "rangeloss"
+    },
     "Parahyaena brunnea": {
      "factor": 1.0,
      "ratio": 16.22668507775126,
@@ -8174,7 +8206,7 @@
     }
    },
    "flagged_by_rule": {
-    "absolute": 29,
+    "absolute": 30,
     "scaled": 5
    },
    "note": "How each genomic deep past meets the next level across PSMC's blind spot (ToLaD#77, #80, #71): a cited next level (a history file's baseline or first point) dated 1900 or earlier scales the curve to meet it (rule `scaled`, factor = 1 / ratio); a modelled one (the natural level in 1500 CE, today's modelled count) keeps the genomic level (rule `absolute`). A first cited point after 1900 (a crash or a modern count, not a historical level) is not the deep past's level: the curve is kept, joins the natural level in 1500 CE where the range-loss trend applies (the trend then runs to that point), else that point itself (`cited_late` counts them). ratio = genomic level at the blind spot / next level, before scaling; flagged when beyond 10x either way. Per species: history.species[<sp>].deep.join (its `note` is the card's sentence)."
@@ -8972,6 +9004,22 @@
      "dropped_blind": 6,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 10448.650468277874,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 61902.09129776643,
+       "resolved_ago": 21381.04186506534,
+       "resolved_n": 90674.82322035103,
+       "steps": 6,
+       "url": null,
+       "vs_resolved": 0.682682238567333,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 99999.99999999999,
       "deep_n_raw": 90674.82322035103,
@@ -8985,6 +9033,7 @@
       "to_n": 100000.0,
       "to_year": 1900.0
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 5.9958932238193015,
@@ -8999,6 +9048,7 @@
      "oldest_yr_ago": 1629485.7411177373,
      "points": 16,
      "time_factor": 2.042050255253065,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 21381.04186506534
     },
     "deep_after": 368913.22078516555,
@@ -9043,6 +9093,22 @@
      "dropped_blind": 3,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 12130.642529669749,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 66733.12660695278,
+       "resolved_ago": 24901.686071555763,
+       "resolved_n": 142686.07999664592,
+       "steps": 3,
+       "url": null,
+       "vs_resolved": 0.4676919192714626,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 142686.07999664592,
       "deep_n_raw": 142686.07999664592,
@@ -9056,6 +9122,7 @@
       "to_n": 497.25,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 6.9952087611225195,
@@ -9070,6 +9137,7 @@
      "oldest_yr_ago": 3106191.231013714,
      "points": 18,
      "time_factor": 1.1849238291303243,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 24901.686071555763
     },
     "deep_after": 1149741.2229736543,
@@ -9114,6 +9182,22 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 12735.452369875167,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 90887.28120947405,
+       "resolved_ago": 23796.516783153835,
+       "resolved_n": 104804.11382971222,
+       "steps": 2,
+       "url": null,
+       "vs_resolved": 0.8672110081208213,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 104804.11382971222,
       "deep_n_raw": 104804.11382971222,
@@ -9127,6 +9211,7 @@
       "to_n": 3000000.0,
       "to_year": 2026.77
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 7.321319644079399,
@@ -9141,6 +9226,7 @@
      "oldest_yr_ago": 5968620.771755386,
      "points": 20,
      "time_factor": 1.4214136013182015,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 23796.516783153835
     },
     "deep_after": 631302.9467767869,
@@ -9192,6 +9278,22 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 15486.970743851136,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 22430.09495481923,
+       "resolved_ago": 30070.986136305884,
+       "resolved_n": 112647.38067163639,
+       "steps": 1,
+       "url": null,
+       "vs_resolved": 0.19911776750674975,
+       "window": null
+      },
       "cited_late": {
        "kind": "census",
        "n": 2459.0,
@@ -9209,6 +9311,7 @@
       "to_n": 15127.076923076924,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 14.364678986995207,
@@ -9223,6 +9326,7 @@
      "oldest_yr_ago": 5977091.412619575,
      "points": 19,
      "time_factor": 1.2712692266422714,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 30070.986136305884
     },
     "deep_after": 589629.3661309996,
@@ -9267,6 +9371,22 @@
      "dropped_blind": 4,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 10225.959696335607,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 115539.87176808911,
+       "resolved_ago": 20344.84118572401,
+       "resolved_n": 22978.39278297991,
+       "steps": 4,
+       "url": null,
+       "vs_resolved": 5.028196395601239,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 22978.39278297991,
       "deep_n_raw": 22978.39278297991,
@@ -9280,6 +9400,7 @@
       "to_n": 1557128.3095723013,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 9.763657768651608,
@@ -9294,6 +9415,7 @@
      "oldest_yr_ago": 1448297.5687630463,
      "points": 16,
      "time_factor": 1.49671729270458,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 20344.84118572401
     },
     "deep_after": 432538.39232047106,
@@ -9338,6 +9460,22 @@
      "dropped_blind": 5,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 11150.400009179404,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 26908.95307214057,
+       "resolved_ago": 23201.45232405865,
+       "resolved_n": 22900.50074493411,
+       "steps": 5,
+       "url": null,
+       "vs_resolved": 1.1750377588618093,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 22900.50074493411,
       "deep_n_raw": 22900.50074493411,
@@ -9351,6 +9489,7 @@
       "to_n": 76978.41873015686,
       "to_year": 2026.77
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 13.713597881898842,
@@ -9365,6 +9504,7 @@
      "oldest_yr_ago": 1378078.389479496,
      "points": 15,
      "time_factor": 1.9468605991366794,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 23201.45232405865
     },
     "deep_after": 367076.74332343583,
@@ -9402,6 +9542,22 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 12803.758735726431,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 67003.12432271287,
+       "resolved_ago": 23821.699403891886,
+       "resolved_n": 400170.70780829847,
+       "steps": 2,
+       "url": null,
+       "vs_resolved": 0.16743635407419846,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 400170.70780829847,
       "deep_n_raw": 400170.70780829847,
@@ -9415,6 +9571,7 @@
       "to_n": 29967.349514563106,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 4.996577686516085,
@@ -9429,6 +9586,7 @@
      "oldest_yr_ago": 2089549.3911201057,
      "points": 17,
      "time_factor": 1.177602226349371,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 23821.699403891886
     },
     "deep_after": 814444.8670367468,
@@ -9473,6 +9631,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "blind": null,
       "cited_late": null,
       "deep_n": 2817429.693389528,
       "deep_n_raw": 2817429.693389528,
@@ -9486,6 +9645,7 @@
       "to_n": 2236068.0,
       "to_year": 2026.77
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 7.017530458590008,
@@ -9500,6 +9660,7 @@
      "oldest_yr_ago": 9952955.443897987,
      "points": 25,
      "time_factor": 1.5098408774665817,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 126919.94716178162
     },
     "deep_after": 823929.6316296572,
@@ -9551,19 +9712,36 @@
      "dropped_blind": 3,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": true,
+       "ago": 10904.235272933654,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 33032.120829547755,
+       "resolved_ago": 21067.432157817326,
+       "resolved_n": 66384.09944221724,
+       "steps": 3,
+       "url": null,
+       "vs_resolved": 0.4975908554472435,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 35000000.00000001,
       "deep_n_raw": 66384.09944221724,
       "factor": 527.2346886390329,
       "flag": true,
       "next": "cited",
-      "note": "Genomic curve scaled x527 to meet the cited 1800 baseline (35,000,000), keeping its shape; before scaling it was 527x below that level (flagged: beyond 10x).",
+      "note": "PSMC's 3 steps in its blind spot (the last 20 kyr) average 2x below its youngest resolved step (~21 kya) but are not drawn: PSMC resolves little there and no source in this file dates a change, so the join stays flat instead (flagged). Genomic curve scaled x527 to meet the cited 1800 baseline (35,000,000), keeping its shape; before scaling it was 527x below that level (flagged: beyond 10x).",
       "ratio": 0.001896688555491921,
       "rule": "scaled",
       "to_kind": "estimate",
       "to_n": 35000000.0,
       "to_year": 1800.0
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 4.525234770704997,
@@ -9578,6 +9756,7 @@
      "oldest_yr_ago": 2906813.0759636164,
      "points": 19,
      "time_factor": 1.0906671050381855,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 21067.432157817326
     },
     "deep_after": 420707888.2594159,
@@ -9657,6 +9836,22 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 13313.261563108148,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 154416.34693330998,
+       "resolved_ago": 27792.405557033395,
+       "resolved_n": 403808.67432312184,
+       "steps": 2,
+       "url": null,
+       "vs_resolved": 0.3823997768055578,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 403808.67432312184,
       "deep_n_raw": 403808.67432312184,
@@ -9670,6 +9865,7 @@
       "to_n": 12588.446830890123,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 6.9952087611225195,
@@ -9684,6 +9880,7 @@
      "oldest_yr_ago": 2084645.9870610572,
      "points": 16,
      "time_factor": 1.527923876895265,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 27792.405557033395
     },
     "deep_after": 809593.631428865,
@@ -9728,19 +9925,36 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": true,
+       "ago": 15081.896942368694,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 692298.2186582013,
+       "resolved_ago": 27396.295330533718,
+       "resolved_n": 358053.64018243074,
+       "steps": 1,
+       "url": null,
+       "vs_resolved": 1.9335042043015418,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 358053.64018243074,
       "deep_n_raw": 358053.64018243074,
       "factor": 1.0,
       "flag": true,
       "next": "modelled",
-      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 11x lower (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr.",
+      "note": "PSMC's 1 step in its blind spot (the last 20 kyr) sits 1.9x above its youngest resolved step (~27 kya) but is not drawn: PSMC resolves little there and no source in this file dates a change, so the join falls instead (flagged). Genomic curve kept at its own level; the modelled natural level in 1500 CE is 11x lower (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 10.807782403478962,
       "rule": "absolute",
       "to_kind": "rangeloss",
       "to_n": 33129.24213455439,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 5.9958932238193015,
@@ -9755,6 +9969,7 @@
      "oldest_yr_ago": 2070993.8240574992,
      "points": 17,
      "time_factor": 1.3560787248828066,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 27396.295330533718
     },
     "deep_after": 269459.26729025174,
@@ -9925,6 +10140,22 @@
      "dropped_blind": 12,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 10172.13061883856,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 22058.510875918168,
+       "resolved_ago": 21959.014253486694,
+       "resolved_n": 52890.51935386919,
+       "steps": 12,
+       "url": null,
+       "vs_resolved": 0.41705982745855724,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 52890.51935386919,
       "deep_n_raw": 52890.51935386919,
@@ -9938,6 +10169,7 @@
       "to_n": 837.5,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 6.171044490075292,
@@ -9952,6 +10184,7 @@
      "oldest_yr_ago": 262734.39767574787,
      "points": 13,
      "time_factor": 1.1794228749822602,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 21959.014253486694
     },
     "deep_after": 68968.9120801695,
@@ -10003,19 +10236,36 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": true,
+       "ago": 12572.160072545656,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 88871.64305362373,
+       "resolved_ago": 21835.82134094336,
+       "resolved_n": 33651.565462787694,
+       "steps": 1,
+       "url": null,
+       "vs_resolved": 2.6409363674893243,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 42000000.0,
       "deep_n_raw": 33651.565462787694,
       "factor": 1248.0845815759776,
       "flag": true,
       "next": "cited",
-      "note": "Genomic curve scaled x1,248 to meet the cited 1800 baseline (42,000,000), keeping its shape; before scaling it was 1,248x below that level (flagged: beyond 10x).",
+      "note": "PSMC's 1 step in its blind spot (the last 20 kyr) sits 2.6x above its youngest resolved step (~22 kya) but is not drawn: PSMC resolves little there and no source in this file dates a change, so the join stays flat instead (flagged). Genomic curve scaled x1,248 to meet the cited 1800 baseline (42,000,000), keeping its shape; before scaling it was 1,248x below that level (flagged: beyond 10x).",
       "ratio": 0.0008012277491139927,
       "rule": "scaled",
       "to_kind": "estimate",
       "to_n": 42000000.0,
       "to_year": 1800.0
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 11.74029295003422,
@@ -10030,6 +10280,7 @@
      "oldest_yr_ago": 1777274.981013823,
      "points": 16,
      "time_factor": 1.9620043663585156,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 21835.82134094336
     },
     "deep_after": 1621527496.8734338,
@@ -10074,6 +10325,22 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": true,
+       "ago": 12893.281619332494,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 13843.886782478548,
+       "resolved_ago": 24355.721094703797,
+       "resolved_n": 21383.647192357173,
+       "steps": 2,
+       "url": null,
+       "vs_resolved": 0.6474053120099436,
+       "window": null
+      },
       "cited_late": {
        "kind": "census",
        "n": 66.0,
@@ -10084,13 +10351,14 @@
       "factor": 1.0,
       "flag": true,
       "next": "modelled",
-      "note": "First cited point (1924 census, 66) is after 1900, so not used as the deep past's level. Genomic curve kept at its own level; the modelled natural level in 1500 CE is 326x higher (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr, then the range-loss trend runs to the cited point.",
+      "note": "PSMC's 2 steps in its blind spot (the last 20 kyr) average 1.5x below its youngest resolved step (~24 kya) but are not drawn: PSMC resolves little there and no source in this file dates a change, so the join rises instead (flagged). First cited point (1924 census, 66) is after 1900, so not used as the deep past's level. Genomic curve kept at its own level; the modelled natural level in 1500 CE is 326x higher (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr, then the range-loss trend runs to the cited point.",
       "ratio": 0.0030691575378106774,
       "rule": "absolute",
       "to_kind": "rangeloss",
       "to_n": 6967269.333333334,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 9.84347707049966,
@@ -10105,6 +10373,7 @@
      "oldest_yr_ago": 3487186.088614472,
      "points": 18,
      "time_factor": 1.711848947261933,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 24355.721094703797
     },
     "deep_after": 1014093.1082478523,
@@ -10149,6 +10418,22 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 14967.337143978402,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 41009.51286444526,
+       "resolved_ago": 26898.09076148985,
+       "resolved_n": 71762.13484816957,
+       "steps": 1,
+       "url": null,
+       "vs_resolved": 0.5714645049399794,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 71762.13484816957,
       "deep_n_raw": 71762.13484816957,
@@ -10162,6 +10447,7 @@
       "to_n": 41391.22580645161,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 8.993839835728952,
@@ -10176,6 +10462,7 @@
      "oldest_yr_ago": 1726321.3751273106,
      "points": 16,
      "time_factor": 1.5963275919839903,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 26898.09076148985
     },
     "deep_after": 730591.5969368231,
@@ -10220,6 +10507,22 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 15218.540599861954,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 29331.98345313627,
+       "resolved_ago": 28536.302203638934,
+       "resolved_n": 118376.58876763376,
+       "steps": 1,
+       "url": null,
+       "vs_resolved": 0.24778534132887725,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 118376.58876763376,
       "deep_n_raw": 118376.58876763376,
@@ -10233,6 +10536,7 @@
       "to_n": 40602.15053763441,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 8.993839835728952,
@@ -10247,6 +10551,7 @@
      "oldest_yr_ago": 1683143.019590136,
      "points": 15,
      "time_factor": 1.5963275919839903,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 28536.302203638934
     },
     "deep_after": 2597576.06751403,
@@ -10291,6 +10596,22 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 15568.62186839271,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 139909.38635654646,
+       "resolved_ago": 30447.647728203363,
+       "resolved_n": 89199.26213623935,
+       "steps": 1,
+       "url": null,
+       "vs_resolved": 1.5685038531244182,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 89199.26213623935,
       "deep_n_raw": 89199.26213623935,
@@ -10304,6 +10625,7 @@
       "to_n": 89836.1052631579,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 9.993155373032168,
@@ -10318,6 +10640,7 @@
      "oldest_yr_ago": 3199770.9409962604,
      "points": 17,
      "time_factor": 1.731961835937814,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 30447.647728203363
     },
     "deep_after": 1048995.5461896458,
@@ -10397,6 +10720,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "blind": null,
       "cited_late": null,
       "deep_n": 255224.60827205746,
       "deep_n_raw": 255224.60827205746,
@@ -10410,6 +10734,7 @@
       "to_n": 138414.9902303799,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 8.993839835728952,
@@ -10424,6 +10749,7 @@
      "oldest_yr_ago": 2184283.1958253947,
      "points": 18,
      "time_factor": 1.5963275919839903,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 37254.76165460839
     },
     "deep_after": 1335360.9349204102,
@@ -10503,6 +10829,22 @@
      "dropped_blind": 5,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 10082.232789224041,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 22973.610552338338,
+       "resolved_ago": 20440.7461726078,
+       "resolved_n": 64430.70421184157,
+       "steps": 5,
+       "url": null,
+       "vs_resolved": 0.3565630832902812,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 64430.70421184157,
       "deep_n_raw": 64430.70421184157,
@@ -10516,6 +10858,7 @@
       "to_n": 39293.05803108451,
       "to_year": 2026.77
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 7.994524298425737,
@@ -10530,6 +10873,7 @@
      "oldest_yr_ago": 1627930.8729269935,
      "points": 16,
      "time_factor": 1.4572362560971504,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 20440.7461726078
     },
     "deep_after": 616661.0978676534,
@@ -10644,6 +10988,22 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 14780.987107458315,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 24888.466397070515,
+       "resolved_ago": 26243.421333625014,
+       "resolved_n": 52734.403166615375,
+       "steps": 1,
+       "url": null,
+       "vs_resolved": 0.47195881440878207,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 52734.403166615375,
       "deep_n_raw": 52734.403166615375,
@@ -10657,6 +11017,7 @@
       "to_n": 16758.0,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 15.989048596851472,
@@ -10671,6 +11032,7 @@
      "oldest_yr_ago": 660501.6722511437,
      "points": 12,
      "time_factor": 2.897241525932576,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 26243.421333625014
     },
     "deep_after": 315189.6880886344,
@@ -10785,6 +11147,22 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 15284.044560062213,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 112054.4705803755,
+       "resolved_ago": 28864.350646858267,
+       "resolved_n": 336665.33632654214,
+       "steps": 1,
+       "url": null,
+       "vs_resolved": 0.33283637633454016,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 336665.33632654214,
       "deep_n_raw": 336665.33632654214,
@@ -10798,6 +11176,7 @@
       "to_n": 58056.20538904263,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 5.741286789869952,
@@ -10812,6 +11191,7 @@
      "oldest_yr_ago": 2966598.406674918,
      "points": 17,
      "time_factor": 1.353389720907448,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 28864.350646858267
     },
     "deep_after": 844192.829685063,
@@ -10891,6 +11271,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "blind": null,
       "cited_late": null,
       "deep_n": 116974.12516164147,
       "deep_n_raw": 116974.12516164147,
@@ -10904,6 +11285,7 @@
       "to_n": 58912.5,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 8.10111704312115,
@@ -10918,6 +11300,7 @@
      "oldest_yr_ago": 1313560.1382575985,
      "points": 14,
      "time_factor": 1.7667027242017794,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 23513.000997803218
     },
     "deep_after": 513703.0745188298,
@@ -10962,6 +11345,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "blind": null,
       "cited_late": null,
       "deep_n": 211643.47455629357,
       "deep_n_raw": 211643.47455629357,
@@ -10975,6 +11359,7 @@
       "to_n": 244428.0,
       "to_year": 2026.77
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 7.87194250513347,
@@ -10989,6 +11374,7 @@
      "oldest_yr_ago": 2173620.914636259,
      "points": 16,
      "time_factor": 1.7278941005496151,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 21485.24161081064
     },
     "deep_after": 733076.1577524514,
@@ -11110,6 +11496,22 @@
      "dropped_blind": 3,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 11623.542735983037,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 127816.53645712517,
+       "resolved_ago": 22359.78838246708,
+       "resolved_n": 152794.03889608942,
+       "steps": 3,
+       "url": null,
+       "vs_resolved": 0.8365282924685911,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 152794.03889608942,
       "deep_n_raw": 152794.03889608942,
@@ -11123,6 +11525,7 @@
       "to_n": 38993.2176156239,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 4.027241615331964,
@@ -11137,6 +11540,7 @@
      "oldest_yr_ago": 2551917.5687546656,
      "points": 19,
      "time_factor": 0.9965565327196189,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 22359.78838246708
     },
     "deep_after": 612998.690619694,
@@ -11181,6 +11585,22 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 13122.708518188712,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 9516.610904930187,
+       "resolved_ago": 26160.473895639378,
+       "resolved_n": 25812.199837350072,
+       "steps": 2,
+       "url": null,
+       "vs_resolved": 0.36868654996075606,
+       "window": null
+      },
       "cited_late": {
        "kind": "census",
        "n": 10400.0,
@@ -11198,6 +11618,7 @@
       "to_n": 20744.172307692304,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 18.796292950034225,
@@ -11212,6 +11633,7 @@
      "oldest_yr_ago": 6192595.518475639,
      "points": 20,
      "time_factor": 0.96633122895119,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 26160.473895639378
     },
     "deep_after": 656160.6206182895,
@@ -11256,6 +11678,22 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 15825.50322614441,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 231600.1487717115,
+       "resolved_ago": 31926.47563211384,
+       "resolved_n": 32670.363157898646,
+       "steps": 1,
+       "url": null,
+       "vs_resolved": 7.088998296479542,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 32670.363157898646,
       "deep_n_raw": 32670.363157898646,
@@ -11269,6 +11707,7 @@
       "to_n": 2184661.7548559946,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 14.262702258726902,
@@ -11283,6 +11722,7 @@
      "oldest_yr_ago": 1964983.128031052,
      "points": 15,
      "time_factor": 2.1898769345441726,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 31926.47563211384
     },
     "deep_after": 465955.3131573183,
@@ -11327,6 +11767,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "blind": null,
       "cited_late": null,
       "deep_n": 109322.29281972972,
       "deep_n_raw": 109322.29281972972,
@@ -11340,6 +11781,7 @@
       "to_n": 5357254.340277778,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 14.262702258726902,
@@ -11354,6 +11796,7 @@
      "oldest_yr_ago": 3269615.678205775,
      "points": 18,
      "time_factor": 2.1898769345441726,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 20708.824237929555
     },
     "deep_after": 465054.0030347425,
@@ -11398,6 +11841,22 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 15637.393119131757,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 19406.094632294313,
+       "resolved_ago": 30637.210227873435,
+       "resolved_n": 107335.81437686036,
+       "steps": 1,
+       "url": null,
+       "vs_resolved": 0.18079794470239666,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 107335.81437686036,
       "deep_n_raw": 107335.81437686036,
@@ -11411,6 +11870,7 @@
       "to_n": 2700.0,
       "to_year": 2026.77
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 14.262702258726902,
@@ -11425,6 +11885,7 @@
      "oldest_yr_ago": 3667750.777833249,
      "points": 18,
      "time_factor": 1.6793227692333024,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 30637.210227873435
     },
     "deep_after": 508621.6593631222,
@@ -11462,6 +11923,22 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 15288.31141189621,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 120080.76043355794,
+       "resolved_ago": 28723.06263052385,
+       "resolved_n": 159805.20851349225,
+       "steps": 1,
+       "url": null,
+       "vs_resolved": 0.7514195660488725,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 159805.20851349225,
       "deep_n_raw": 159805.20851349225,
@@ -11475,6 +11952,7 @@
       "to_n": 1754060.7745790256,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 9.580303901437372,
@@ -11489,6 +11967,7 @@
      "oldest_yr_ago": 2582239.227446264,
      "points": 17,
      "time_factor": 1.6093669216442401,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 28723.06263052385
     },
     "deep_after": 448923.2109901068,
@@ -11533,6 +12012,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "blind": null,
       "cited_late": {
        "kind": "estimate",
        "n": 1298000.0,
@@ -11550,6 +12030,7 @@
       "to_n": 1550000.0,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 8.055482546201231,
@@ -11564,6 +12045,7 @@
      "oldest_yr_ago": 7250957.380959589,
      "points": 25,
      "time_factor": 1.2172461113313802,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 55556.785292248846
     },
     "deep_after": 594442.0257091682,
@@ -11608,6 +12090,22 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 13524.145706304127,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 122078.15732309548,
+       "resolved_ago": 23455.663735111273,
+       "resolved_n": 89285.62835401371,
+       "steps": 1,
+       "url": null,
+       "vs_resolved": 1.3672766779336625,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 89285.62835401371,
       "deep_n_raw": 89285.62835401371,
@@ -11621,6 +12119,7 @@
       "to_n": 106342.15244596131,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 13.838223134839154,
@@ -11635,6 +12134,7 @@
      "oldest_yr_ago": 4238602.923114735,
      "points": 19,
      "time_factor": 2.210368330599005,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 23455.663735111273
     },
     "deep_after": 258182.76516403444,
@@ -11679,6 +12179,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "blind": null,
       "cited_late": null,
       "deep_n": 40849.70187420423,
       "deep_n_raw": 40849.70187420423,
@@ -11692,6 +12193,7 @@
       "to_n": 15181.0,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 19.98631074606434,
@@ -11706,6 +12208,7 @@
      "oldest_yr_ago": 11025435.788519256,
      "points": 18,
      "time_factor": 2.5519349012413626,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 59237.7292323377
     },
     "deep_after": 1669690.9827006564,
@@ -11757,6 +12260,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "blind": null,
       "cited_late": {
        "kind": "unverified",
        "n": 100000.0,
@@ -11774,6 +12278,7 @@
       "to_n": 100000.0,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 16.988364134154686,
@@ -11788,6 +12293,7 @@
      "oldest_yr_ago": 16121865.142691491,
      "points": 22,
      "time_factor": 1.1251484969653085,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 32991.03495163379
     },
     "deep_after": 465678.2415865785,
@@ -11838,6 +12344,22 @@
      "dropped_blind": 5,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": true,
+       "ago": 11272.59991426444,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 14810.649497084396,
+       "resolved_ago": 25431.317874549026,
+       "resolved_n": 66339.39065437275,
+       "steps": 5,
+       "url": null,
+       "vs_resolved": 0.22325573616205885,
+       "window": null
+      },
       "cited_late": {
        "kind": "estimate",
        "n": 2420.0,
@@ -11848,13 +12370,14 @@
       "factor": 1.0,
       "flag": false,
       "next": "modelled",
-      "note": "First cited point (2020 estimate, 2,420) is after 1900, so not used as the deep past's level. Genomic curve kept at its own level; the modelled natural level in 1500 CE is 2.3x higher; the two are joined log-linearly across PSMC's last 20 kyr, then the range-loss trend runs to the cited point.",
+      "note": "PSMC's 5 steps in its blind spot (the last 20 kyr) average 4.5x below its youngest resolved step (~25 kya) but are not drawn: PSMC resolves little there and no source in this file dates a change, so the join rises instead (flagged). First cited point (2020 estimate, 2,420) is after 1900, so not used as the deep past's level. Genomic curve kept at its own level; the modelled natural level in 1500 CE is 2.3x higher; the two are joined log-linearly across PSMC's last 20 kyr, then the range-loss trend runs to the cited point.",
       "ratio": 0.43860754151651404,
       "rule": "absolute",
       "to_kind": "rangeloss",
       "to_n": 151250.0,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 9.666392881587951,
@@ -11869,6 +12392,7 @@
      "oldest_yr_ago": 1907051.1290301315,
      "points": 16,
      "time_factor": 1.6879638967090311,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 25431.317874549026
     },
     "deep_after": 670658.8975130919,
@@ -11920,19 +12444,36 @@
      "dropped_blind": 4,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": true,
+       "ago": 12071.245627498127,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 26598.032255865022,
+       "resolved_ago": 22861.201059594365,
+       "resolved_n": 54608.4635920993,
+       "steps": 4,
+       "url": null,
+       "vs_resolved": 0.48706794709590034,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 100000.0,
       "deep_n_raw": 54608.4635920993,
       "factor": 1.831217972857744,
       "flag": false,
       "next": "cited",
-      "note": "Genomic curve scaled x1.8 to meet the cited 1900 baseline (100,000), keeping its shape.",
+      "note": "PSMC's 4 steps in its blind spot (the last 20 kyr) average 2.1x below its youngest resolved step (~23 kya) but are not drawn: PSMC resolves little there and no source in this file dates a change, so the join stays flat instead (flagged). Genomic curve scaled x1.8 to meet the cited 1900 baseline (100,000), keeping its shape.",
       "ratio": 0.546084635920993,
       "rule": "scaled",
       "to_kind": "unverified",
       "to_n": 100000.0,
       "to_year": 1900.0
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 21.98494182067077,
@@ -11947,6 +12488,7 @@
      "oldest_yr_ago": 1715864.116130166,
      "points": 21,
      "time_factor": 0.7857172413181907,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 22861.201059594365
     },
     "deep_after": 626701.5910110598,
@@ -12033,6 +12575,22 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 14936.30803737442,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 53382.7832754488,
+       "resolved_ago": 26768.038453779005,
+       "resolved_n": 49450.78742190952,
+       "steps": 1,
+       "url": null,
+       "vs_resolved": 1.0795133112844464,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 49450.78742190952,
       "deep_n_raw": 49450.78742190952,
@@ -12046,6 +12604,7 @@
       "to_n": 9912.35294117647,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 10.310751540041068,
@@ -12060,6 +12619,7 @@
      "oldest_yr_ago": 6701852.513869336,
      "points": 21,
      "time_factor": 1.952608155868002,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 26768.038453779005
     },
     "deep_after": 1538873.9949569467,
@@ -12139,6 +12699,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "blind": null,
       "cited_late": null,
       "deep_n": 1031010.6129061163,
       "deep_n_raw": 1031010.6129061163,
@@ -12152,6 +12713,7 @@
       "to_n": 499999.99999999994,
       "to_year": 2026.77
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 12.307281173677358,
@@ -12166,6 +12728,7 @@
      "oldest_yr_ago": 3013484.0456155688,
      "points": 17,
      "time_factor": 2.239308212873741,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 26979.628498483056
     },
     "deep_after": 320694.5516333106,
@@ -12273,6 +12836,22 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 12507.128519472362,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 62517.372199059035,
+       "resolved_ago": 23147.969135637446,
+       "resolved_n": 246938.046004101,
+       "steps": 2,
+       "url": null,
+       "vs_resolved": 0.25317027169649176,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 246938.046004101,
       "deep_n_raw": 246938.046004101,
@@ -12286,6 +12865,7 @@
       "to_n": 14215.652173913044,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 5.9958932238193015,
@@ -12300,6 +12880,7 @@
      "oldest_yr_ago": 3642174.228946448,
      "points": 20,
      "time_factor": 1.2834746668787718,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 23147.969135637446
     },
     "deep_after": 1161539.1703231337,
@@ -12344,6 +12925,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "blind": null,
       "cited_late": null,
       "deep_n": 189588.90058505634,
       "deep_n_raw": 189588.90058505634,
@@ -12357,6 +12939,7 @@
       "to_n": 612236.8421052631,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 4.996577686516085,
@@ -12371,6 +12954,7 @@
      "oldest_yr_ago": 6862253.30898306,
      "points": 22,
      "time_factor": 1.1145537478364889,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 20318.38609352272
     },
     "deep_after": 1776194.7236388903,
@@ -12415,6 +12999,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "blind": null,
       "cited_late": null,
       "deep_n": 58797.60883990623,
       "deep_n_raw": 58797.60883990623,
@@ -12428,6 +13013,7 @@
       "to_n": 97211.0,
       "to_year": 2026.77
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 10.14205338809035,
@@ -12442,6 +13028,7 @@
      "oldest_yr_ago": 5958355.417416878,
      "points": 25,
      "time_factor": 1.927834866864848,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 34743.676082577695
     },
     "deep_after": 1066954.4053370215,
@@ -12486,6 +13073,22 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 14205.2752280085,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 57202.41063297813,
+       "resolved_ago": 24474.62630988413,
+       "resolved_n": 227090.668833021,
+       "steps": 1,
+       "url": null,
+       "vs_resolved": 0.25189238697887173,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 227090.668833021,
       "deep_n_raw": 227090.668833021,
@@ -12499,6 +13102,7 @@
       "to_n": 24584.883057678242,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 11.01902532511978,
@@ -12513,6 +13117,7 @@
      "oldest_yr_ago": 3165152.724557558,
      "points": 19,
      "time_factor": 2.055640721128658,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 24474.62630988413
     },
     "deep_after": 225765.38978256428,
@@ -12711,6 +13316,22 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 16423.537015280985,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 166364.4662578931,
+       "resolved_ago": 34996.952247597925,
+       "resolved_n": 534024.3573887725,
+       "steps": 1,
+       "url": null,
+       "vs_resolved": 0.3115297344701056,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 534024.3573887725,
       "deep_n_raw": 534024.3573887725,
@@ -12724,6 +13345,7 @@
       "to_n": 224253.88625592418,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 14.376487337440109,
@@ -12738,6 +13360,7 @@
      "oldest_yr_ago": 7762360.227111824,
      "points": 20,
      "time_factor": 1.602302942636567,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 34996.952247597925
     },
     "deep_after": 335548.90263202257,
@@ -12782,6 +13405,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "blind": null,
       "cited_late": null,
       "deep_n": 70237.71391992774,
       "deep_n_raw": 70237.71391992774,
@@ -12795,6 +13419,7 @@
       "to_n": 31895.780542730496,
       "to_year": 2026.77
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 14.900190752029056,
@@ -12809,6 +13434,7 @@
      "oldest_yr_ago": 7978300.163995741,
      "points": 25,
      "time_factor": 1.6472967775886098,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 37397.555231466904
     },
     "deep_after": 592569.597448409,
@@ -12853,6 +13479,22 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 13285.746677872572,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 7181.3600590297465,
+       "resolved_ago": 23103.819536672083,
+       "resolved_n": 44901.33149148982,
+       "steps": 1,
+       "url": null,
+       "vs_resolved": 0.15993646113569782,
+       "window": null
+      },
       "cited_late": {
        "kind": "estimate",
        "n": 17516.0,
@@ -12870,6 +13512,7 @@
       "to_n": 17516.0,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 19.98631074606434,
@@ -12884,6 +13527,7 @@
      "oldest_yr_ago": 1080303.744999136,
      "points": 14,
      "time_factor": 1.162292693480648,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 23103.819536672083
     },
     "deep_after": 711851.7899990971,
@@ -12934,6 +13578,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "blind": null,
       "cited_late": null,
       "deep_n": 57575.775890355224,
       "deep_n_raw": 57575.775890355224,
@@ -12947,6 +13592,7 @@
       "to_n": 328807.3394495413,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 21.98494182067077,
@@ -12961,6 +13607,7 @@
      "oldest_yr_ago": 1071695.029739219,
      "points": 14,
      "time_factor": 1.251276954604685,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 20326.971499818144
     },
     "deep_after": 216965.64906936555,
@@ -13005,6 +13652,22 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 13307.457744169285,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 91718.91420391388,
+       "resolved_ago": 23026.332688807615,
+       "resolved_n": 224843.2120512528,
+       "steps": 1,
+       "url": null,
+       "vs_resolved": 0.4079238744508179,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 224843.2120512528,
       "deep_n_raw": 224843.2120512528,
@@ -13018,6 +13681,7 @@
       "to_n": 51805.87122303398,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 9.993155373032168,
@@ -13032,6 +13696,7 @@
      "oldest_yr_ago": 3697205.549684278,
      "points": 19,
      "time_factor": 1.7180599658298876,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 23026.332688807615
     },
     "deep_after": 570581.0868756371,
@@ -13076,6 +13741,22 @@
      "dropped_blind": 10,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 10344.439661677665,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 16702.57372794205,
+       "resolved_ago": 25880.80521401227,
+       "resolved_n": 60835.664261693506,
+       "steps": 10,
+       "url": null,
+       "vs_resolved": 0.2745523358813588,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 60835.664261693506,
       "deep_n_raw": 60835.664261693506,
@@ -13089,6 +13770,7 @@
       "to_n": 3794.0,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 6.30466803559206,
@@ -13103,6 +13785,7 @@
      "oldest_yr_ago": 837621.1196034552,
      "points": 12,
      "time_factor": 0.9851365121136252,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 25880.80521401227
     },
     "deep_after": 574707.3624619815,
@@ -13147,6 +13830,22 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 13289.320665568574,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 7641.633882061103,
+       "resolved_ago": 22261.952886528412,
+       "resolved_n": 16378.948147727371,
+       "steps": 2,
+       "url": null,
+       "vs_resolved": 0.4665521749711017,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 16378.948147727371,
       "deep_n_raw": 16378.948147727371,
@@ -13160,6 +13859,7 @@
       "to_n": 4077.972972972973,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 13.861571526351813,
@@ -13174,6 +13874,7 @@
      "oldest_yr_ago": 2380402.774140239,
      "points": 23,
      "time_factor": 1.1539351193247076,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 22261.952886528412
     },
     "deep_after": 424909.4267823665,
@@ -13218,6 +13919,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "blind": null,
       "cited_late": null,
       "deep_n": 94263.2511987664,
       "deep_n_raw": 94263.2511987664,
@@ -13231,6 +13933,7 @@
       "to_n": 534855.960591133,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 9.993155373032168,
@@ -13245,6 +13948,7 @@
      "oldest_yr_ago": 3818293.2356027532,
      "points": 17,
      "time_factor": 0.7381752768914299,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 30210.316392615692
     },
     "deep_after": 1028024.1068653452,
@@ -13289,6 +13993,22 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 12007.649829282576,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 95555.71349067432,
+       "resolved_ago": 22349.851442912135,
+       "resolved_n": 179261.67660998824,
+       "steps": 2,
+       "url": null,
+       "vs_resolved": 0.5330515439648079,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 179261.67660998824,
       "deep_n_raw": 179261.67660998824,
@@ -13302,6 +14022,7 @@
       "to_n": 75000.0,
       "to_year": 2026.77
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 8.359630390143739,
@@ -13316,6 +14037,7 @@
      "oldest_yr_ago": 4633435.2085034475,
      "points": 20,
      "time_factor": 1.0439735766368439,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 22349.851442912135
     },
     "deep_after": 913190.1113930567,
@@ -13388,6 +14110,22 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 13944.592998032052,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 21047.473293772295,
+       "resolved_ago": 23131.246595457094,
+       "resolved_n": 34973.65802131582,
+       "steps": 2,
+       "url": null,
+       "vs_resolved": 0.6018093183430865,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 34973.65802131582,
       "deep_n_raw": 34973.65802131582,
@@ -13401,6 +14139,7 @@
       "to_n": 11153.501918381584,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 9.174655715263519,
@@ -13415,6 +14154,7 @@
      "oldest_yr_ago": 1874265.447057246,
      "points": 23,
      "time_factor": 1.6080996649870443,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 23131.246595457094
     },
     "deep_after": 317461.37344334857,
@@ -13459,6 +14199,22 @@
      "dropped_blind": 4,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 11714.687781222978,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 233999.42025417284,
+       "resolved_ago": 23990.19442263968,
+       "resolved_n": 257995.90375257123,
+       "steps": 4,
+       "url": null,
+       "vs_resolved": 0.9069888973066331,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 257995.90375257123,
       "deep_n_raw": 257995.90375257123,
@@ -13472,6 +14228,7 @@
       "to_n": 5803301.510167481,
       "to_year": 2026.77
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 5.558806297056811,
@@ -13486,6 +14243,7 @@
      "oldest_yr_ago": 1129888.776798284,
      "points": 18,
      "time_factor": 0.8989074368129575,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 23990.19442263968
     },
     "deep_after": 889173.5343439565,
@@ -13530,6 +14288,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "blind": null,
       "cited_late": null,
       "deep_n": 153273.38799816056,
       "deep_n_raw": 153273.38799816056,
@@ -13543,6 +14302,7 @@
       "to_n": 200000.0,
       "to_year": 2026.77
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 10.462395619438743,
@@ -13557,6 +14317,7 @@
      "oldest_yr_ago": 3746417.7413181094,
      "points": 20,
      "time_factor": 1.5602263603451993,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 60335.50759747288
     },
     "deep_after": 625796.6111055374,
@@ -13601,6 +14362,22 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 14753.2611138982,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 92826.92549873525,
+       "resolved_ago": 22444.57746729673,
+       "resolved_n": 55171.55665089436,
+       "steps": 1,
+       "url": null,
+       "vs_resolved": 1.6825141637041425,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 55171.55665089436,
       "deep_n_raw": 55171.55665089436,
@@ -13614,6 +14391,7 @@
       "to_n": 163789.68253968254,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 7.284977412731005,
@@ -13628,6 +14406,7 @@
      "oldest_yr_ago": 3797313.0903328126,
      "points": 24,
      "time_factor": 1.2859792946176931,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 22444.57746729673
     },
     "deep_after": 872499.3819481594,
@@ -13672,6 +14451,22 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 14397.224472536464,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 54217.45805238324,
+       "resolved_ago": 24984.84611624116,
+       "resolved_n": 24592.188017155047,
+       "steps": 1,
+       "url": null,
+       "vs_resolved": 2.2046618224682635,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 24592.188017155047,
       "deep_n_raw": 24592.188017155047,
@@ -13685,6 +14480,7 @@
       "to_n": 1816590.0000000002,
       "to_year": 2026.77
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 11.127022587268993,
@@ -13699,6 +14495,7 @@
      "oldest_yr_ago": 3500033.5626555076,
      "points": 18,
      "time_factor": 2.1883829071554306,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 24984.84611624116
     },
     "deep_after": 497669.01728102216,
@@ -13743,6 +14540,22 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 12359.21584337773,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 551563.1239468354,
+       "resolved_ago": 21412.63087116642,
+       "resolved_n": 418428.75692337943,
+       "steps": 1,
+       "url": null,
+       "vs_resolved": 1.3181769054363415,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 418428.75692337943,
       "deep_n_raw": 418428.75692337943,
@@ -13756,6 +14569,7 @@
       "to_n": 95000.0,
       "to_year": 2026.77
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 6.9952087611225195,
@@ -13770,6 +14584,7 @@
      "oldest_yr_ago": 6376092.107181238,
      "points": 21,
      "time_factor": 1.6370895077627239,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 21412.63087116642
     },
     "deep_after": 493752.91811544675,
@@ -13821,19 +14636,36 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": true,
+       "ago": 15910.30956353551,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 118960.77037466886,
+       "resolved_ago": 32468.975951784734,
+       "resolved_n": 52308.70514581775,
+       "steps": 1,
+       "url": null,
+       "vs_resolved": 2.274205986232105,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 14300000.0,
       "deep_n_raw": 52308.70514581775,
       "factor": 273.37705951880804,
       "flag": true,
       "next": "cited",
-      "note": "Genomic curve scaled x273 to meet the cited 1800 baseline (14,300,000), keeping its shape; before scaling it was 273x below that level (flagged: beyond 10x).",
+      "note": "PSMC's 1 step in its blind spot (the last 20 kyr) sits 2.3x above its youngest resolved step (~32 kya) but is not drawn: PSMC resolves little there and no source in this file dates a change, so the join stays flat instead (flagged). Genomic curve scaled x273 to meet the cited 1800 baseline (14,300,000), keeping its shape; before scaling it was 273x below that level (flagged: beyond 10x).",
       "ratio": 0.0036579514087984443,
       "rule": "scaled",
       "to_kind": "unverified",
       "to_n": 14300000.0,
       "to_year": 1800.0
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 24.982888432580427,
@@ -13848,6 +14680,7 @@
      "oldest_yr_ago": 3815392.2424055873,
      "points": 17,
      "time_factor": 0.8674345075786617,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 32468.975951784734
     },
     "deep_after": 500506330.0964296,
@@ -13899,6 +14732,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "blind": null,
       "cited_late": null,
       "deep_n": 11700000.000000002,
       "deep_n_raw": 98954.39674461265,
@@ -13912,6 +14746,7 @@
       "to_n": 11700000.0,
       "to_year": 1800.0
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 19.551637945918188,
@@ -13926,6 +14761,7 @@
      "oldest_yr_ago": 3977061.5405690623,
      "points": 15,
      "time_factor": 0.7175250048638234,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 53752.26473445639
     },
     "deep_after": 158164496.62684694,
@@ -14068,19 +14904,36 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": true,
+       "ago": 16486.549696748814,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 47333.641708673655,
+       "resolved_ago": 34878.03827702666,
+       "resolved_n": 73764.98786334565,
+       "steps": 1,
+       "url": null,
+       "vs_resolved": 0.6416816850341281,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 73764.98786334565,
       "deep_n_raw": 73764.98786334565,
       "factor": 1.0,
       "flag": true,
       "next": "modelled",
-      "note": "Genomic curve kept at its own level; today's modelled count is 68x higher (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr.",
+      "note": "PSMC's 1 step in its blind spot (the last 20 kyr) sits 1.6x below its youngest resolved step (~35 kya) but is not drawn: PSMC resolves little there and no source in this file dates a change, so the join rises instead (flagged). Genomic curve kept at its own level; today's modelled count is 68x higher (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.014752997572669131,
       "rule": "absolute",
       "to_kind": "model",
       "to_n": 5000000.0,
       "to_year": 2026.77
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 7.442228610540724,
@@ -14095,6 +14948,7 @@
      "oldest_yr_ago": 2483870.1257772357,
      "points": 17,
      "time_factor": 1.1527260270619355,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 34878.03827702666
     },
     "deep_after": 304695.8826157441,
@@ -14139,6 +14993,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "blind": null,
       "cited_late": null,
       "deep_n": 88396.23756272027,
       "deep_n_raw": 88396.23756272027,
@@ -14152,6 +15007,7 @@
       "to_n": 22000000.0,
       "to_year": 2026.77
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 8.679728952772074,
@@ -14166,6 +15022,7 @@
      "oldest_yr_ago": 2693556.090391782,
      "points": 18,
      "time_factor": 1.1339299306963542,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 22348.36992939584
     },
     "deep_after": 345436.1935751819,
@@ -14322,6 +15179,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "blind": null,
       "cited_late": null,
       "deep_n": 385627.86092993757,
       "deep_n_raw": 385627.86092993757,
@@ -14335,6 +15193,7 @@
       "to_n": 793562.0596782981,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 11.292342231348393,
@@ -14349,6 +15208,7 @@
      "oldest_yr_ago": 8289624.643134531,
      "points": 21,
      "time_factor": 1.1142939810774501,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 44031.0976408169
     },
     "deep_after": 342403.00701095583,
@@ -14393,6 +15253,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "blind": null,
       "cited_late": null,
       "deep_n": 162923.89981635512,
       "deep_n_raw": 162923.89981635512,
@@ -14406,6 +15267,7 @@
       "to_n": 811221.1574850454,
       "to_year": 2026.77
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 5.520265571526352,
@@ -14420,6 +15282,7 @@
      "oldest_yr_ago": 2722409.7694193064,
      "points": 16,
      "time_factor": 1.4535514250990285,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 26506.67809224892
     },
     "deep_after": 618992.716859268,
@@ -14464,6 +15327,22 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 16000.505413689123,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 224549.67402391403,
+       "resolved_ago": 32734.948048933296,
+       "resolved_n": 189889.9198550061,
+       "steps": 1,
+       "url": null,
+       "vs_resolved": 1.182525508438642,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 189889.9198550061,
       "deep_n_raw": 189889.9198550061,
@@ -14477,6 +15356,7 @@
       "to_n": 9293680.29739777,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 7.439904175222453,
@@ -14491,6 +15371,7 @@
      "oldest_yr_ago": 3261948.589529233,
      "points": 17,
      "time_factor": 1.6025777698102526,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 32734.948048933296
     },
     "deep_after": 1083294.295675066,
@@ -14535,6 +15416,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "blind": null,
       "cited_late": null,
       "deep_n": 1033005.3186696705,
       "deep_n_raw": 1033005.3186696705,
@@ -14548,6 +15430,7 @@
       "to_n": 45000000.0,
       "to_year": 2026.77
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 7.430206707734428,
@@ -14562,6 +15445,7 @@
      "oldest_yr_ago": 3599598.035903181,
      "points": 16,
      "time_factor": 1.6009607510401165,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 74632.8196842271
     },
     "deep_after": 681789.7592433152,
@@ -14606,6 +15490,22 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 16822.470534199292,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 144930.44487553491,
+       "resolved_ago": 37082.69145155494,
+       "resolved_n": 114342.25727209392,
+       "steps": 1,
+       "url": null,
+       "vs_resolved": 1.267514288533346,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 114342.25727209392,
       "deep_n_raw": 114342.25727209392,
@@ -14619,6 +15519,7 @@
       "to_n": 41833.0,
       "to_year": 2026.77
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 13.043767282683092,
@@ -14633,6 +15534,7 @@
      "oldest_yr_ago": 4454782.678052708,
      "points": 18,
      "time_factor": 1.675522809288472,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 37082.69145155494
     },
     "deep_after": 534930.7745835711,
@@ -14677,6 +15579,22 @@
      "dropped_blind": 6,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 10885.67426144471,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 22847.280213126247,
+       "resolved_ago": 22481.354183533742,
+       "resolved_n": 21943.979049083566,
+       "steps": 6,
+       "url": null,
+       "vs_resolved": 1.0411639640204817,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 21943.979049083566,
       "deep_n_raw": 21943.979049083566,
@@ -14690,6 +15608,7 @@
       "to_n": 129303.93203883494,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 7.841494866529774,
@@ -14704,6 +15623,7 @@
      "oldest_yr_ago": 1922415.705652592,
      "points": 16,
      "time_factor": 1.4355991560544412,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 22481.354183533742
     },
     "deep_after": 331701.6870723671,
@@ -14748,6 +15668,22 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 15159.993348274164,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 120444.43610850035,
+       "resolved_ago": 28104.190005164455,
+       "resolved_n": 161604.39075955038,
+       "steps": 1,
+       "url": null,
+       "vs_resolved": 0.7453042305497037,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 161604.39075955038,
       "deep_n_raw": 161604.39075955038,
@@ -14761,6 +15697,7 @@
       "to_n": 4228520.589308582,
       "to_year": 2026.77
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 9.924202600958248,
@@ -14775,6 +15712,7 @@
      "oldest_yr_ago": 8122446.03915402,
      "points": 21,
      "time_factor": 1.128127327031979,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 28104.190005164455
     },
     "deep_after": 567106.1244519555,
@@ -14819,6 +15757,22 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": true,
+       "ago": 11750.760848110576,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 79771.15767257978,
+       "resolved_ago": 20366.8250284483,
+       "resolved_n": 166054.40857772547,
+       "steps": 1,
+       "url": null,
+       "vs_resolved": 0.48039168821730566,
+       "window": null
+      },
       "cited_late": {
        "kind": "estimate",
        "n": 650.0,
@@ -14829,13 +15783,14 @@
       "factor": 1.0,
       "flag": false,
       "next": "modelled",
-      "note": "First cited point (2026 estimate, 650) is after 1900, so not used as the deep past's level. Genomic curve kept at its own level; the modelled natural level in 1500 CE is 1.4x higher; the two are joined log-linearly across PSMC's last 20 kyr, then the range-loss trend runs to the cited point.",
+      "note": "PSMC's 1 step in its blind spot (the last 20 kyr) sits 2.1x below its youngest resolved step (~20 kya) but is not drawn: PSMC resolves little there and no source in this file dates a change, so the join rises instead (flagged). First cited point (2026 estimate, 650) is after 1900, so not used as the deep past's level. Genomic curve kept at its own level; the modelled natural level in 1500 CE is 1.4x higher; the two are joined log-linearly across PSMC's last 20 kyr, then the range-loss trend runs to the cited point.",
       "ratio": 0.732631165070433,
       "rule": "absolute",
       "to_kind": "rangeloss",
       "to_n": 226654.85239323866,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 8.890064339493497,
@@ -14850,6 +15805,7 @@
      "oldest_yr_ago": 1530044.2050977338,
      "points": 16,
      "time_factor": 1.539837705892078,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 20366.8250284483
     },
     "deep_after": 662593.4068359582,
@@ -14894,19 +15850,36 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": true,
+       "ago": 11637.05311382644,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 40369.692041550865,
+       "resolved_ago": 20165.66994638612,
+       "resolved_n": 144717.9667719262,
+       "steps": 1,
+       "url": null,
+       "vs_resolved": 0.2789542510998169,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 144717.9667719262,
       "deep_n_raw": 144717.9667719262,
       "factor": 1.0,
       "flag": false,
       "next": "modelled",
-      "note": "Genomic curve kept at its own level; today's modelled count is 2.6x higher; the two are joined log-linearly across PSMC's last 20 kyr.",
+      "note": "PSMC's 1 step in its blind spot (the last 20 kyr) sits 3.6x below its youngest resolved step (~20 kya) but is not drawn: PSMC resolves little there and no source in this file dates a change, so the join rises instead (flagged). Genomic curve kept at its own level; today's modelled count is 2.6x higher; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.38798382512580754,
       "rule": "absolute",
       "to_kind": "model",
       "to_n": 373000.0,
       "to_year": 2026.77
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 7.848197125256673,
@@ -14921,6 +15894,7 @@
      "oldest_yr_ago": 3489827.1442433423,
      "points": 19,
      "time_factor": 1.67023621561805,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 20165.66994638612
     },
     "deep_after": 1001167.8684500934,
@@ -14965,19 +15939,36 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": true,
+       "ago": 13502.667453790627,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 337260.57428073714,
+       "resolved_ago": 22757.81507225699,
+       "resolved_n": 1321390.9231448902,
+       "steps": 1,
+       "url": null,
+       "vs_resolved": 0.2552314900711306,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 1321390.9231448902,
       "deep_n_raw": 1321390.9231448902,
       "factor": 1.0,
       "flag": false,
       "next": "modelled",
-      "note": "Genomic curve kept at its own level; today's modelled count is 9.1x higher; the two are joined log-linearly across PSMC's last 20 kyr.",
+      "note": "PSMC's 1 step in its blind spot (the last 20 kyr) sits 3.9x below its youngest resolved step (~23 kya) but is not drawn: PSMC resolves little there and no source in this file dates a change, so the join rises instead (flagged). Genomic curve kept at its own level; today's modelled count is 9.1x higher; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.11011591026207418,
       "rule": "absolute",
       "to_kind": "model",
       "to_n": 12000000.0,
       "to_year": 2026.77
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 9.033812457221082,
@@ -14992,6 +15983,7 @@
      "oldest_yr_ago": 1949317.4146673016,
      "points": 21,
      "time_factor": 1.1367099857957925,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 22757.81507225699
     },
     "deep_after": 471236.4295651096,
@@ -15036,19 +16028,36 @@
      "dropped_blind": 9,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": true,
+       "ago": 10664.118311328948,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 8131.184103395632,
+       "resolved_ago": 24045.744700711413,
+       "resolved_n": 14372.05274201488,
+       "steps": 9,
+       "url": null,
+       "vs_resolved": 0.5657635864099735,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 14372.05274201488,
       "deep_n_raw": 14372.05274201488,
       "factor": 1.0,
       "flag": true,
       "next": "modelled",
-      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 38x higher (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr.",
+      "note": "PSMC's 9 steps in its blind spot (the last 20 kyr) average 1.8x below its youngest resolved step (~24 kya) but are not drawn: PSMC resolves little there and no source in this file dates a change, so the join rises instead (flagged). Genomic curve kept at its own level; the modelled natural level in 1500 CE is 38x higher (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.026535110597046805,
       "rule": "absolute",
       "to_kind": "rangeloss",
       "to_n": 541624.0,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 9.766976043805613,
@@ -15063,6 +16072,7 @@
      "oldest_yr_ago": 526488.3038163467,
      "points": 16,
      "time_factor": 1.1103153120944398,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 24045.744700711413
     },
     "deep_after": 209019.5678697338,
@@ -15107,6 +16117,22 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 12403.482624928509,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 86408.8004252235,
+       "resolved_ago": 21595.07584942179,
+       "resolved_n": 81793.4650260728,
+       "steps": 1,
+       "url": null,
+       "vs_resolved": 1.0564267010534338,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 81793.4650260728,
       "deep_n_raw": 81793.4650260728,
@@ -15120,6 +16146,7 @@
       "to_n": 95459.85365853658,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 7.994524298425737,
@@ -15134,6 +16161,7 @@
      "oldest_yr_ago": 3526273.724849549,
      "points": 18,
      "time_factor": 2.57198841513921,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 21595.07584942179
     },
     "deep_after": 1192223.0228936598,
@@ -15213,6 +16241,22 @@
      "dropped_blind": 3,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 12378.63542927767,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 38654.91575649365,
+       "resolved_ago": 25805.941896422057,
+       "resolved_n": 55542.44293217763,
+       "steps": 3,
+       "url": null,
+       "vs_resolved": 0.6959527474096667,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 55542.44293217763,
       "deep_n_raw": 55542.44293217763,
@@ -15226,6 +16270,7 @@
       "to_n": 97947.60147601477,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 7.212873374401096,
@@ -15240,6 +16285,7 @@
      "oldest_yr_ago": 1660283.834011924,
      "points": 19,
      "time_factor": 2.3751079060614164,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 25805.941896422057
     },
     "deep_after": 669843.8384290802,
@@ -15284,19 +16330,36 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": true,
+       "ago": 14271.630203895993,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 44852.37542479129,
+       "resolved_ago": 23984.152579205096,
+       "resolved_n": 93746.69074474016,
+       "steps": 2,
+       "url": null,
+       "vs_resolved": 0.4784422262639475,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 93746.69074474016,
       "deep_n_raw": 93746.69074474016,
       "factor": 1.0,
       "flag": false,
       "next": "modelled",
-      "note": "Genomic curve kept at its own level; today's modelled count is 1.2x higher; the two are joined log-linearly across PSMC's last 20 kyr.",
+      "note": "PSMC's 2 steps in its blind spot (the last 20 kyr) average 2.1x below its youngest resolved step (~24 kya) but are not drawn: PSMC resolves little there and no source in this file dates a change, so the join rises instead (flagged). Genomic curve kept at its own level; today's modelled count is 1.2x higher; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.8225342032300647,
       "rule": "absolute",
       "to_kind": "model",
       "to_n": 113973.0,
       "to_year": 2026.77
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 6.403613963039015,
@@ -15311,6 +16374,7 @@
      "oldest_yr_ago": 1771885.798232603,
      "points": 23,
      "time_factor": 2.1661103402852726,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 23984.152579205096
     },
     "deep_after": 2125326.9626104413,
@@ -15355,6 +16419,22 @@
      "dropped_blind": 5,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 11142.893288462375,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 80489.14645703783,
+       "resolved_ago": 22715.868585816355,
+       "resolved_n": 257762.1448293075,
+       "steps": 5,
+       "url": null,
+       "vs_resolved": 0.3122613156029505,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 257762.1448293075,
       "deep_n_raw": 257762.1448293075,
@@ -15368,6 +16448,7 @@
       "to_n": 89861.0,
       "to_year": 2026.77
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 7.406669404517453,
@@ -15382,6 +16463,7 @@
      "oldest_yr_ago": 2187231.2722019134,
      "points": 17,
      "time_factor": 2.424352053018103,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 22715.868585816355
     },
     "deep_after": 865044.699367761,
@@ -15426,6 +16508,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "blind": null,
       "cited_late": null,
       "deep_n": 440806.0801936912,
       "deep_n_raw": 440806.0801936912,
@@ -15439,6 +16522,7 @@
       "to_n": 404161.0155613369,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 7.994524298425737,
@@ -15453,6 +16537,7 @@
      "oldest_yr_ago": 3649464.5704284734,
      "points": 17,
      "time_factor": 2.57198841513921,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 35669.97436442617
     },
     "deep_after": 850799.6675913717,
@@ -15497,6 +16582,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "blind": null,
       "cited_late": null,
       "deep_n": 308749.31640641426,
       "deep_n_raw": 308749.31640641426,
@@ -15510,6 +16596,7 @@
       "to_n": 202134.0649939634,
       "to_year": 2026.77
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 7.994524298425737,
@@ -15524,6 +16611,7 @@
      "oldest_yr_ago": 3676252.882155123,
      "points": 17,
      "time_factor": 2.57198841513921,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 37024.67483855544
     },
     "deep_after": 759147.7501390919,
@@ -15561,6 +16649,22 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 13498.232327772344,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 248646.26031660353,
+       "resolved_ago": 23553.47728803145,
+       "resolved_n": 237196.3806701264,
+       "steps": 1,
+       "url": null,
+       "vs_resolved": 1.048271730007553,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 237196.3806701264,
       "deep_n_raw": 237196.3806701264,
@@ -15574,6 +16678,7 @@
       "to_n": 130290.29868140283,
       "to_year": 2026.77
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 24.982888432580427,
@@ -15588,6 +16693,7 @@
      "oldest_yr_ago": 1223565.3724703796,
      "points": 14,
      "time_factor": 1.0562316008281063,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 23553.47728803145
     },
     "deep_after": 106534.22247529944,
@@ -15639,6 +16745,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "blind": null,
       "cited_late": null,
       "deep_n": 1000000.0,
       "deep_n_raw": 268027.70046498725,
@@ -15652,6 +16759,7 @@
       "to_n": 1000000.0,
       "to_year": 1900.0
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 19.98631074606434,
@@ -15666,6 +16774,7 @@
      "oldest_yr_ago": 1382473.4362905116,
      "points": 12,
      "time_factor": 1.0285776048501307,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 49505.155669750726
     },
     "deep_after": 3011269.4288009987,
@@ -15714,26 +16823,46 @@
      "bulk": false,
      "cite": "Armstrong et al. 2025, Genome Biol Evol 17(4):evaf060, Fig. 4 (green curve)",
      "dropped_before_band": 1,
-     "dropped_blind": 4,
+     "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 3782.3754307444133,
+       "cite": "Figueiro et al. 2017, Sci Adv 3:e1700299, Results (PSMC, Fig. 1B)",
+       "kept": true,
+       "min_ago": 6923.982856567776,
+       "min_n": 41207.7747576078,
+       "min_vs_resolved": 0.2835820895522388,
+       "n": 41207.7747576078,
+       "resolved_ago": 22546.23038336786,
+       "resolved_n": 145311.62677682753,
+       "steps": 4,
+       "url": "https://doi.org/10.1126/sciadv.1700299",
+       "vs_resolved": 0.2835820895522388,
+       "window": [
+        10000.0,
+        20000.0
+       ]
+      },
       "cited_late": {
        "kind": "unverified",
        "n": 500000.0,
        "year": 1950.0
       },
-      "deep_n": 145311.62677682753,
-      "deep_n_raw": 145311.62677682753,
+      "deep_n": 41207.7747576078,
+      "deep_n_raw": 41207.7747576078,
       "factor": 1.0,
-      "flag": false,
+      "flag": true,
       "next": "modelled",
-      "note": "First cited point (1950 baseline, 500,000) is after 1900, so not used as the deep past's level. Genomic curve kept at its own level; that point's level, held back to 1500 CE because the modelled natural level there (150,002) is below it (evidently an underestimate), is 3.4x higher; the two are joined log-linearly across PSMC's last 20 kyr, then that level is held flat to the cited point, with no range-loss trend rising to it.",
-      "ratio": 0.29062325355365504,
+      "note": "PSMC's 4 steps in its blind spot (the last 20 kyr, where it resolves little) are kept, grade D, because Figueiro et al. 2017, Sci Adv 3:e1700299, Results (PSMC, Fig. 1B) dates a decline there: from the youngest resolved step (~23 kya) to the youngest kept (~3.8 kya) the genomic level falls 3.5x. First cited point (1950 baseline, 500,000) is after 1900, so not used as the deep past's level. Genomic curve kept at its own level; that point's level, held back to 1500 CE because the modelled natural level there (150,002) is below it (evidently an underestimate), is 12x higher (flagged: beyond 10x); the two are joined log-linearly from the youngest kept step, then that level is held flat to the cited point, with no range-loss trend rising to it.",
+      "ratio": 0.08241554951521561,
       "rule": "absolute",
       "to_kind": "rangeloss",
       "to_n": 500000.0,
       "to_year": 1500
      },
+     "kept_blind": 4,
      "method": "PSMC",
      "mu": {
       "G": 5.9958932238193015,
@@ -15748,15 +16877,16 @@
      "oldest_yr_ago": 3272149.805382122,
      "points": 17,
      "time_factor": 4.334691533996715,
+     "youngest_blind_yr_ago": 3782.3754307444133,
      "youngest_yr_ago": 22546.23038336786
     },
     "deep_after": 623177.2252817181,
     "deep_before": 204258.06451612903,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 701571441768.0659,
+    "ever_after": 700132580195.584,
     "ever_before": 256264829675.55167,
-    "ever_ratio": 2.737681337920237,
+    "ever_ratio": 2.7320665933050527,
     "file": "Panthera_leo.toml",
     "grades": "BCD",
     "hist_row": true,
@@ -15771,7 +16901,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 4,
-    "segments": 80,
+    "segments": 116,
     "trend_1500": true,
     "trend_held": {
      "baseline": true,
@@ -15805,6 +16935,22 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 13038.629994702671,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 53207.83042114406,
+       "resolved_ago": 22397.631962788928,
+       "resolved_n": 60846.23052499065,
+       "steps": 1,
+       "url": null,
+       "vs_resolved": 0.8744638733091386,
+       "window": null
+      },
       "cited_late": {
        "kind": "reconstruction",
        "n": 82600.0,
@@ -15822,6 +16968,7 @@
       "to_n": 113091.1877394636,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 9.806108145106094,
@@ -15836,6 +16983,7 @@
      "oldest_yr_ago": 3173159.449546499,
      "points": 20,
      "time_factor": 1.968540800891171,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 22397.631962788928
     },
     "deep_after": 800566.5622637296,
@@ -15884,26 +17032,46 @@
      "bulk": false,
      "cite": "Armstrong et al. 2025, Genome Biol Evol 17(4):evaf060, Fig. 4 (green curve)",
      "dropped_before_band": 5,
-     "dropped_blind": 3,
+     "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 7297.407714839741,
+       "cite": "Figueiro et al. 2017, Sci Adv 3:e1700299, Results (PSMC, Fig. 1B)",
+       "kept": true,
+       "min_ago": 10085.715963473158,
+       "min_n": 84901.87502854646,
+       "min_vs_resolved": 0.2657142857142857,
+       "n": 84901.87502854646,
+       "resolved_ago": 30812.91831676278,
+       "resolved_n": 319523.1855913039,
+       "steps": 3,
+       "url": "https://doi.org/10.1126/sciadv.1700299",
+       "vs_resolved": 0.2657142857142857,
+       "window": [
+        10000.0,
+        20000.0
+       ]
+      },
       "cited_late": {
        "kind": "reconstruction",
        "n": 188000.0,
        "year": 1998.0
       },
-      "deep_n": 319523.1855913039,
-      "deep_n_raw": 319523.1855913039,
+      "deep_n": 84901.87502854646,
+      "deep_n_raw": 84901.87502854646,
       "factor": 1.0,
       "flag": false,
       "next": "modelled",
-      "note": "First cited point (1998 baseline, 188,000) is after 1900, so not used as the deep past's level. Genomic curve kept at its own level; the modelled natural level in 1500 CE is 1.2x higher; the two are joined log-linearly across PSMC's last 20 kyr, then the range-loss trend runs to the cited point.",
-      "ratio": 0.8012071387352698,
+      "note": "PSMC's 3 steps in its blind spot (the last 20 kyr, where it resolves little) are kept, grade D, because Figueiro et al. 2017, Sci Adv 3:e1700299, Results (PSMC, Fig. 1B) dates a decline there: from the youngest resolved step (~31 kya) to the youngest kept (~7.3 kya) the genomic level falls 3.8x. First cited point (1998 baseline, 188,000) is after 1900, so not used as the deep past's level. Genomic curve kept at its own level; the modelled natural level in 1500 CE is 4.7x higher; the two are joined log-linearly from the youngest kept step, then the range-loss trend runs to the cited point.",
+      "ratio": 0.21289218257822884,
       "rule": "absolute",
       "to_kind": "rangeloss",
       "to_n": 398802.2199798183,
       "to_year": 1500
      },
+     "kept_blind": 3,
      "method": "PSMC",
      "mu": {
       "G": 9.310458590006844,
@@ -15918,15 +17086,16 @@
      "oldest_yr_ago": 3117077.7681955057,
      "points": 15,
      "time_factor": 8.49973539427116,
+     "youngest_blind_yr_ago": 7297.407714839741,
      "youngest_yr_ago": 30812.91831676278
     },
     "deep_after": 637220.5244078004,
     "deep_before": 330280.14329036226,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 464769886333.88354,
+    "ever_after": 464051328200.9955,
     "ever_before": 280698842823.38275,
-    "ever_ratio": 1.6557598943374316,
+    "ever_ratio": 1.6532000044367092,
     "file": "Panthera_pardus.toml",
     "grades": "C",
     "hist_row": true,
@@ -15941,7 +17110,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 73,
+    "segments": 112,
     "trend_1500": true,
     "trend_held": null,
     "use": "counts"
@@ -15969,19 +17138,36 @@
      "dropped_blind": 3,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": true,
+       "ago": 12791.573285776347,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 68288.4090274921,
+       "resolved_ago": 24552.306283373768,
+       "resolved_n": 111739.41289093813,
+       "steps": 3,
+       "url": null,
+       "vs_resolved": 0.6111398588978104,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 100000.0,
       "deep_n_raw": 111739.41289093813,
       "factor": 0.8949393719976296,
       "flag": false,
       "next": "cited",
-      "note": "Genomic curve scaled x0.89 to meet the cited 1900 baseline (100,000), keeping its shape.",
+      "note": "PSMC's 3 steps in its blind spot (the last 20 kyr) average 1.6x below its youngest resolved step (~25 kya) but are not drawn: PSMC resolves little there and no source in this file dates a change, so the join stays flat instead (flagged). Genomic curve scaled x0.89 to meet the cited 1900 baseline (100,000), keeping its shape.",
       "ratio": 1.1173941289093812,
       "rule": "scaled",
       "to_kind": "unverified",
       "to_n": 100000.0,
       "to_year": 1900.0
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 7.994524298425737,
@@ -15996,6 +17182,7 @@
      "oldest_yr_ago": 2014427.3292261423,
      "points": 10,
      "time_factor": 7.444195428736924,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 24552.306283373768
     },
     "deep_after": 342500.00000000006,
@@ -16040,6 +17227,22 @@
      "dropped_blind": 10,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 10301.302884217217,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 24475.63417272791,
+       "resolved_ago": 24250.46285647097,
+       "resolved_n": 39770.981770772625,
+       "steps": 10,
+       "url": null,
+       "vs_resolved": 0.6154143821190469,
+       "window": null
+      },
       "cited_late": {
        "kind": "estimate",
        "n": 5930.0,
@@ -16057,6 +17260,7 @@
       "to_n": 7721.000000000001,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 7.994524298425737,
@@ -16071,6 +17275,7 @@
      "oldest_yr_ago": 629448.7514758386,
      "points": 17,
      "time_factor": 0.7234359047524205,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 24250.46285647097
     },
     "deep_after": 120851.29955601103,
@@ -16115,6 +17320,22 @@
      "dropped_blind": 5,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 11775.838283983745,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 24710.111999224282,
+       "resolved_ago": 23706.89139175262,
+       "resolved_n": 51247.53694997511,
+       "steps": 5,
+       "url": null,
+       "vs_resolved": 0.48217169975105084,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 51247.53694997511,
       "deep_n_raw": 51247.53694997511,
@@ -16128,6 +17349,7 @@
       "to_n": 3158.2258917591034,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 8.494516084873373,
@@ -16142,6 +17364,7 @@
      "oldest_yr_ago": 1038770.8890465084,
      "points": 20,
      "time_factor": 1.5150319251783593,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 23706.89139175262
     },
     "deep_after": 280033.48853697954,
@@ -16186,6 +17409,22 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 14563.991851618517,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 2756134.882372892,
+       "resolved_ago": 25207.988682005194,
+       "resolved_n": 1810992.724880613,
+       "steps": 1,
+       "url": null,
+       "vs_resolved": 1.5218917472761169,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 1810992.724880613,
       "deep_n_raw": 1810992.724880613,
@@ -16199,6 +17438,7 @@
       "to_n": 3781259.4455944924,
       "to_year": 2026.77
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 6.0405256673511305,
@@ -16213,6 +17453,7 @@
      "oldest_yr_ago": 4108563.1633855957,
      "points": 19,
      "time_factor": 1.363885259372091,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 25207.988682005194
     },
     "deep_after": 652121.3751675762,
@@ -16348,6 +17589,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "blind": null,
       "cited_late": null,
       "deep_n": 89285.99999999999,
       "deep_n_raw": 169933.905905257,
@@ -16361,6 +17603,7 @@
       "to_n": 89286.0,
       "to_year": 1900.0
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 24.982888432580427,
@@ -16375,6 +17618,7 @@
      "oldest_yr_ago": 1577954.1853904778,
      "points": 10,
      "time_factor": 1.623467090161719,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 102292.94281742541
     },
     "deep_after": 647397.1064923749,
@@ -16426,6 +17670,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "blind": null,
       "cited_late": {
        "kind": "reconstruction",
        "n": 288500.0,
@@ -16443,6 +17688,7 @@
       "to_n": 288500.0,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 19.98631074606434,
@@ -16457,6 +17703,7 @@
      "oldest_yr_ago": 1516483.7447329066,
      "points": 12,
      "time_factor": 1.3659510592409736,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 47654.699638727245
     },
     "deep_after": 668025.2266824924,
@@ -16507,6 +17754,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "blind": null,
       "cited_late": null,
       "deep_n": 54008.59020215223,
       "deep_n_raw": 54008.59020215223,
@@ -16520,6 +17768,7 @@
       "to_n": 2815.4166437936556,
       "to_year": 2026.77
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 24.982888432580427,
@@ -16534,6 +17783,7 @@
      "oldest_yr_ago": 1562366.838289121,
      "points": 11,
      "time_factor": 1.623467090161719,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 72361.85272539599
     },
     "deep_after": 871891.6129711022,
@@ -16571,6 +17821,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "blind": null,
       "cited_late": null,
       "deep_n": 247005.10549541324,
       "deep_n_raw": 247005.10549541324,
@@ -16584,6 +17835,7 @@
       "to_n": 209238.0,
       "to_year": 2026.77
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 7.53500616016427,
@@ -16598,6 +17850,7 @@
      "oldest_yr_ago": 1618211.8897443793,
      "points": 14,
      "time_factor": 1.6184105727134661,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 39190.683221031875
     },
     "deep_after": 757077.433808046,
@@ -16642,6 +17895,22 @@
      "dropped_blind": 3,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": true,
+       "ago": 12035.141938873252,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 21724.042237263642,
+       "resolved_ago": 23477.51254509866,
+       "resolved_n": 37342.24298495631,
+       "steps": 3,
+       "url": null,
+       "vs_resolved": 0.581755151826723,
+       "window": null
+      },
       "cited_late": {
        "kind": "estimate",
        "n": 776691.0,
@@ -16652,13 +17921,14 @@
       "factor": 1.0,
       "flag": true,
       "next": "modelled",
-      "note": "First cited point (2023 estimate, 776,691) is after 1900, so not used as the deep past's level. Genomic curve kept at its own level; the modelled natural level in 1500 CE is 27x higher (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr, then the range-loss trend runs to the cited point.",
+      "note": "PSMC's 3 steps in its blind spot (the last 20 kyr) average 1.7x below its youngest resolved step (~23 kya) but are not drawn: PSMC resolves little there and no source in this file dates a change, so the join rises instead (flagged). First cited point (2023 estimate, 776,691) is after 1900, so not used as the deep past's level. Genomic curve kept at its own level; the modelled natural level in 1500 CE is 27x higher (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr, then the range-loss trend runs to the cited point.",
       "ratio": 0.03661893241873984,
       "rule": "absolute",
       "to_kind": "rangeloss",
       "to_n": 1019752.366288164,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 7.375195071868582,
@@ -16673,6 +17943,7 @@
      "oldest_yr_ago": 2504667.891882811,
      "points": 18,
      "time_factor": 1.5790020344551592,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 23477.51254509866
     },
     "deep_after": 309845.7303145977,
@@ -16717,19 +17988,36 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": true,
+       "ago": 12315.338264777649,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 624871.8513576764,
+       "resolved_ago": 22718.213599616218,
+       "resolved_n": 3574169.8270619884,
+       "steps": 2,
+       "url": null,
+       "vs_resolved": 0.17482992739360928,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 3574169.8270619884,
       "deep_n_raw": 3574169.8270619884,
       "factor": 1.0,
       "flag": false,
       "next": "modelled",
-      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 1.2x higher; the two are joined log-linearly across PSMC's last 20 kyr.",
+      "note": "PSMC's 2 steps in its blind spot (the last 20 kyr) average 5.7x below its youngest resolved step (~23 kya) but are not drawn: PSMC resolves little there and no source in this file dates a change, so the join rises instead (flagged). Genomic curve kept at its own level; the modelled natural level in 1500 CE is 1.2x higher; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.8032642464480814,
       "rule": "absolute",
       "to_kind": "rangeloss",
       "to_n": 4449556.721672167,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 4.996577686516085,
@@ -16744,6 +18032,7 @@
      "oldest_yr_ago": 3051546.055387078,
      "points": 20,
      "time_factor": 0.5901013364584073,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 22718.213599616218
     },
     "deep_after": 730138.7424878842,
@@ -16788,6 +18077,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "blind": null,
       "cited_late": null,
       "deep_n": 233249.4372844558,
       "deep_n_raw": 233249.4372844558,
@@ -16801,6 +18091,7 @@
       "to_n": 2476545.6074902443,
       "to_year": 2026.77
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 6.192251882272416,
@@ -16815,6 +18106,7 @@
      "oldest_yr_ago": 4332169.250579139,
      "points": 18,
      "time_factor": 1.7574905382428236,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 25489.577112200463
     },
     "deep_after": 764313.8345473784,
@@ -16859,6 +18151,22 @@
      "dropped_blind": 5,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 11694.59161030523,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 12500.11950382993,
+       "resolved_ago": 24841.054518363493,
+       "resolved_n": 13067.897832727409,
+       "steps": 5,
+       "url": null,
+       "vs_resolved": 0.9565516706539037,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 13067.897832727409,
       "deep_n_raw": 13067.897832727409,
@@ -16872,6 +18180,7 @@
       "to_n": 21392.30769230769,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 18.7597234770705,
@@ -16886,6 +18195,7 @@
      "oldest_yr_ago": 1693923.5563261886,
      "points": 20,
      "time_factor": 2.2027628679834823,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 24841.054518363493
     },
     "deep_after": 507196.75937041343,
@@ -17014,6 +18324,22 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 15269.392370367827,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 146452.8223697719,
+       "resolved_ago": 28860.74451062137,
+       "resolved_n": 101379.49041394432,
+       "steps": 1,
+       "url": null,
+       "vs_resolved": 1.4446001037467033,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 101379.49041394432,
       "deep_n_raw": 101379.49041394432,
@@ -17027,6 +18353,7 @@
       "to_n": 26515439.533275075,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 7.2719233401779615,
@@ -17041,6 +18368,7 @@
      "oldest_yr_ago": 4221898.71637943,
      "points": 18,
      "time_factor": 1.5744995593700057,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 28860.74451062137
     },
     "deep_after": 1102267.539715515,
@@ -17120,6 +18448,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "blind": null,
       "cited_late": null,
       "deep_n": 321036.92976466275,
       "deep_n_raw": 321036.92976466275,
@@ -17133,6 +18462,7 @@
       "to_n": 784802.842945874,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 11.416180698151951,
@@ -17147,6 +18477,7 @@
      "oldest_yr_ago": 5045228.440951648,
      "points": 17,
      "time_factor": 1.5943536241890464,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 58191.7170879821
     },
     "deep_after": 600198.3632223322,
@@ -17191,6 +18522,22 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 13062.133369947753,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 40759.66567166649,
+       "resolved_ago": 25678.81138944201,
+       "resolved_n": 32884.81862590844,
+       "steps": 2,
+       "url": null,
+       "vs_resolved": 1.2394675529563,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 32884.81862590844,
       "deep_n_raw": 32884.81862590844,
@@ -17204,6 +18551,7 @@
       "to_n": 9246.575342465754,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 10.992470910335388,
@@ -17218,6 +18566,7 @@
      "oldest_yr_ago": 6195973.240840853,
      "points": 20,
      "time_factor": 1.5103826045494855,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 25678.81138944201
     },
     "deep_after": 805093.7810036003,
@@ -17262,6 +18611,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "blind": null,
       "cited_late": null,
       "deep_n": 876756.6296407337,
       "deep_n_raw": 876756.6296407337,
@@ -17275,6 +18625,7 @@
       "to_n": 413031.7209487533,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 10.992470910335388,
@@ -17289,6 +18640,7 @@
      "oldest_yr_ago": 1340864.0367589744,
      "points": 12,
      "time_factor": 1.3985438610096872,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 49930.12132173184
     },
     "deep_after": 1149145.2812544291,
@@ -17333,6 +18685,22 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 11526.094888049027,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 25961.66708862329,
+       "resolved_ago": 20002.79596159107,
+       "resolved_n": 96325.95634274099,
+       "steps": 1,
+       "url": null,
+       "vs_resolved": 0.26951891343022966,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 96325.95634274099,
       "deep_n_raw": 96325.95634274099,
@@ -17346,6 +18714,7 @@
       "to_n": 28000.0,
       "to_year": 2026.77
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 6.9952087611225195,
@@ -17360,6 +18729,7 @@
      "oldest_yr_ago": 3731610.6345812236,
      "points": 19,
      "time_factor": 1.527923876895265,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 20002.79596159107
     },
     "deep_after": 1433884.0640802814,
@@ -17404,6 +18774,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "blind": null,
       "cited_late": null,
       "deep_n": 172095.72974969773,
       "deep_n_raw": 172095.72974969773,
@@ -17417,6 +18788,7 @@
       "to_n": 136000.0,
       "to_year": 2026.77
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 9.324854209445586,
@@ -17431,6 +18803,7 @@
      "oldest_yr_ago": 6603642.111771355,
      "points": 19,
      "time_factor": 1.9154701539596715,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 32204.532208582455
     },
     "deep_after": 946307.2556816824,
@@ -17475,6 +18848,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "blind": null,
       "cited_late": null,
       "deep_n": 226096.61139007725,
       "deep_n_raw": 226096.61139007725,
@@ -17488,6 +18862,7 @@
       "to_n": 1340000.0,
       "to_year": 2026.77
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 5.24174674880219,
@@ -17502,6 +18877,7 @@
      "oldest_yr_ago": 3726501.5645517185,
      "points": 19,
      "time_factor": 1.2023937807003724,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 21181.080345492723
     },
     "deep_after": 1120962.776716443,
@@ -17546,6 +18922,22 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 15204.00322157846,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 15178.57121661132,
+       "resolved_ago": 23033.881600137065,
+       "resolved_n": 22761.105601867843,
+       "steps": 1,
+       "url": null,
+       "vs_resolved": 0.6668644081755731,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 22761.105601867843,
       "deep_n_raw": 22761.105601867843,
@@ -17559,6 +18951,7 @@
       "to_n": 155885.0,
       "to_year": 2026.77
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 7.519509924709106,
@@ -17573,6 +18966,7 @@
      "oldest_yr_ago": 3335380.440214036,
      "points": 24,
      "time_factor": 1.7312803523518308,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 23033.881600137065
     },
     "deep_after": 2306051.6495893584,
@@ -17617,6 +19011,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "blind": null,
       "cited_late": null,
       "deep_n": 168843.65299267572,
       "deep_n_raw": 168843.65299267572,
@@ -17630,6 +19025,7 @@
       "to_n": 482000.0,
       "to_year": 2026.77
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 8.487520876112251,
@@ -17644,6 +19040,7 @@
      "oldest_yr_ago": 4845223.12643454,
      "points": 25,
      "time_factor": 1.4311352815676273,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 25409.307790881343
     },
     "deep_after": 973499.2379987915,
@@ -17688,6 +19085,22 @@
      "dropped_blind": 3,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 13089.829254772105,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 23893.631607358726,
+       "resolved_ago": 23865.136658665855,
+       "resolved_n": 23728.08386144293,
+       "steps": 3,
+       "url": null,
+       "vs_resolved": 1.0069768695560286,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 23728.08386144293,
       "deep_n_raw": 23728.08386144293,
@@ -17701,6 +19114,7 @@
       "to_n": 18872.922077922078,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 9.993155373032168,
@@ -17715,6 +19129,7 @@
      "oldest_yr_ago": 1565130.566454944,
      "points": 22,
      "time_factor": 1.7180599658298876,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 23865.136658665855
     },
     "deep_after": 206208.96233131707,
@@ -17759,6 +19174,22 @@
      "dropped_blind": 4,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 11494.777505487653,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 17778.51931776432,
+       "resolved_ago": 23623.564509643486,
+       "resolved_n": 17610.86423117702,
+       "steps": 4,
+       "url": null,
+       "vs_resolved": 1.0095199806429995,
+       "window": null
+      },
       "cited_late": null,
       "deep_n": 17610.86423117702,
       "deep_n_raw": 17610.86423117702,
@@ -17772,6 +19203,7 @@
       "to_n": 1115630.6979617048,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 12.961196440793975,
@@ -17786,6 +19218,7 @@
      "oldest_yr_ago": 3559586.728979718,
      "points": 18,
      "time_factor": 2.101143802927476,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 23623.564509643486
     },
     "deep_after": 539860.1713018445,
@@ -17830,6 +19263,22 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": false,
+       "ago": 11972.581949162439,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 41685.84221085281,
+       "resolved_ago": 20851.41696433181,
+       "resolved_n": 24249.63358583652,
+       "steps": 1,
+       "url": null,
+       "vs_resolved": 1.7190297768128033,
+       "window": null
+      },
       "cited_late": {
        "kind": "estimate",
        "n": 200000.0,
@@ -17847,6 +19296,7 @@
       "to_n": 362297.6501305483,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 16.3621273100616,
@@ -17861,6 +19311,7 @@
      "oldest_yr_ago": 1390345.1382374545,
      "points": 15,
      "time_factor": 1.6420409151080289,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 20851.41696433181
     },
     "deep_after": 594170.114911913,
@@ -17905,6 +19356,22 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "blind": {
+       "against": true,
+       "ago": 12286.243189733621,
+       "cite": null,
+       "kept": false,
+       "min_ago": null,
+       "min_n": null,
+       "min_vs_resolved": null,
+       "n": 107028.25690434084,
+       "resolved_ago": 20520.75376450484,
+       "resolved_n": 46778.34187573634,
+       "steps": 2,
+       "url": null,
+       "vs_resolved": 2.2879874021326905,
+       "window": null
+      },
       "cited_late": {
        "kind": "estimate",
        "n": 10000.0,
@@ -17915,13 +19382,14 @@
       "factor": 1.0,
       "flag": false,
       "next": "modelled",
-      "note": "First cited point (1965 estimate, 10,000) is after 1900, so not used as the deep past's level. Genomic curve kept at its own level; the modelled natural level in 1500 CE is 1.8x lower; the two are joined log-linearly across PSMC's last 20 kyr, then the range-loss trend runs to the cited point.",
+      "note": "PSMC's 2 steps in its blind spot (the last 20 kyr) average 2.3x above its youngest resolved step (~21 kya) but are not drawn: PSMC resolves little there and no source in this file dates a change, so the join falls instead (flagged). First cited point (1965 estimate, 10,000) is after 1900, so not used as the deep past's level. Genomic curve kept at its own level; the modelled natural level in 1500 CE is 1.8x lower; the two are joined log-linearly across PSMC's last 20 kyr, then the range-loss trend runs to the cited point.",
       "ratio": 1.7991669952206284,
       "rule": "absolute",
       "to_kind": "rangeloss",
       "to_n": 26000.0,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 14.989733059548257,
@@ -17936,6 +19404,7 @@
      "oldest_yr_ago": 1396271.860474978,
      "points": 21,
      "time_factor": 1.5343925177343825,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 20520.75376450484
     },
     "deep_after": 740482.9025917603,
@@ -17980,6 +19449,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "blind": null,
       "cited_late": null,
       "deep_n": 335401.9254272596,
       "deep_n_raw": 335401.9254272596,
@@ -17993,6 +19463,7 @@
       "to_n": 156318.52449187776,
       "to_year": 1500
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 9.993155373032168,
@@ -18007,6 +19478,7 @@
      "oldest_yr_ago": 3866296.448092938,
      "points": 18,
      "time_factor": 1.7180599658298876,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 26216.890993103418
     },
     "deep_after": 507622.40538386436,
@@ -18058,6 +19530,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "blind": null,
       "cited_late": null,
       "deep_n": 2000000.0000000002,
       "deep_n_raw": 80850.68462779462,
@@ -18071,6 +19544,7 @@
       "to_n": 2000000.0,
       "to_year": 1530.0
      },
+     "kept_blind": 0,
      "method": "PSMC",
      "mu": {
       "G": 10.06118275154004,
@@ -18085,6 +19559,7 @@
      "oldest_yr_ago": 985078.3783217078,
      "points": 12,
      "time_factor": 2.0243068586657635,
+     "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 40334.908926403456
     },
     "deep_after": 25386753.569531363,
@@ -18151,11 +19626,11 @@
  "knuckles_collapsed": 3710,
  "mammalia": {
   "alive": 99887123076.41296,
-  "ever": 8.557965534177522e+18,
-  "ghost": 8.114622804848508e+18,
+  "ever": 8.55796553417752e+18,
+  "ghost": 8.11462280706041e+18,
   "grade": "D",
-  "hi": 3.4586601991470334e+22,
-  "lo": 1839758827292305.0
+  "hi": 3.4586601988674097e+22,
+  "lo": 1839758827441405.0
  },
  "mass_sources": {
   "mass:combine": 183,
@@ -19101,12 +20576,12 @@
   "non-species tip": 551
  },
  "output": {
-  "brotli_bytes": 777969,
+  "brotli_bytes": 779962,
   "files": 16,
-  "raw_bytes": 3178376,
-  "skeleton_brotli": 56568,
+  "raw_bytes": 3187704,
+  "skeleton_brotli": 56691,
   "skeleton_nodes": 1156,
-  "skeleton_raw": 265296,
+  "skeleton_raw": 265752,
   "tiles": 15
  },
  "overrides": {
@@ -19271,7 +20746,7 @@
   "maps_used": 5613,
   "range_maps": 5831
  },
- "pieces": 288715,
+ "pieces": 296255,
  "rangeloss": {
   "carried_by_genomic_record": 48,
   "declines": 582,
@@ -20049,13 +21524,13 @@
   },
   "Hominidae": {
    "alive": 8301443760.715325,
-   "ever": 2636355550689.5923,
+   "ever": 2636355553426.3154,
    "ever_range": [
-    42347520937.34932,
-    310841455019062.1
+    42347520988.05073,
+    310841455128835.2
    ],
    "extinct(gray)": false,
-   "ghost": 376820548362.6623,
+   "ghost": 376820551099.3854,
    "grade": "D",
    "t0_Ma": 14.805233333333334,
    "t1_Ma": 0.0
@@ -20075,13 +21550,13 @@
   },
   "Mammalia": {
    "alive": 99887123076.41296,
-   "ever": 8.557965534177522e+18,
+   "ever": 8.55796553417752e+18,
    "ever_range": [
-    1839758827292305.0,
-    3.4586601991470334e+22
+    1839758827441405.0,
+    3.4586601988674097e+22
    ],
    "extinct(gray)": 0.0,
-   "ghost": 8.114622804848508e+18,
+   "ghost": 8.11462280706041e+18,
    "grade": "D",
    "t0_Ma": 208.64140800000004,
    "t1_Ma": 0.0
@@ -20391,8 +21866,8 @@
   "by_alive": [
    {
     "alive": 54318491455.12063,
-    "ever": 1.3909746127943572e+18,
-    "ghost": 1.2013768673482158e+18,
+    "ever": 1.3909746137392876e+18,
+    "ghost": 1.201376868293146e+18,
     "ghost_share": 0.864,
     "name": "Chiroptera",
     "sampled": 1.8959774544614144e+17,
@@ -20400,8 +21875,8 @@
    },
    {
     "alive": 23133449903.122658,
-    "ever": 1.7945081959986844e+18,
-    "ghost": 1.6351055739310618e+18,
+    "ever": 1.7945081970526833e+18,
+    "ghost": 1.6351055749850606e+18,
     "ghost_share": 0.911,
     "name": "Rodentia",
     "sampled": 1.5940262206762266e+17,
@@ -20409,26 +21884,26 @@
    },
    {
     "alive": 5654779269.41726,
-    "ever": 6902891198908376.0,
-    "ghost": 4315037473189266.0,
+    "ever": 6902891202212812.0,
+    "ghost": 4315037476493702.5,
     "ghost_share": 0.625,
     "name": "Artiodactyla",
-    "sampled": 2587853725719110.0,
+    "sampled": 2587853725719109.5,
     "t0_Ma": 61.87
    },
    {
     "alive": 2225601210.1492753,
-    "ever": 1.7113981901599232e+16,
-    "ghost": 1.5301170888080428e+16,
+    "ever": 1.7113979699934752e+16,
+    "ghost": 1.5301170898320106e+16,
     "ghost_share": 0.894,
     "name": "Carnivora",
-    "sampled": 1812811013518804.0,
+    "sampled": 1812808801614646.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 1492362384.468411,
-    "ever": 1.8332442484641107e+17,
-    "ghost": 1.4222195774988608e+17,
+    "ever": 1.833244249293204e+17,
+    "ghost": 1.422219578327954e+17,
     "ghost_share": 0.776,
     "name": "Eulipotyphla",
     "sampled": 4.110246709652499e+16,
@@ -20436,26 +21911,26 @@
    },
    {
     "alive": 1195648666.3005614,
-    "ever": 7.823662735195338e+16,
-    "ghost": 6.272304000369408e+16,
+    "ever": 7.823662739456794e+16,
+    "ghost": 6.272304004630863e+16,
     "ghost_share": 0.802,
     "name": "Didelphimorphia",
-    "sampled": 1.5513587348259296e+16,
+    "sampled": 1.5513587348259304e+16,
     "t0_Ma": 74.42
    },
    {
     "alive": 751328331.2713387,
-    "ever": 4.0078079947551624e+16,
-    "ghost": 2.867868829280618e+16,
+    "ever": 4.007807997210694e+16,
+    "ghost": 2.8678688317361496e+16,
     "ghost_share": 0.716,
     "name": "Lagomorpha",
-    "sampled": 1.1399391654745444e+16,
+    "sampled": 1.1399391654745448e+16,
     "t0_Ma": 72.45
    },
    {
     "alive": 619434015.7798252,
-    "ever": 1.1876202502576234e+16,
-    "ghost": 9513215234511278.0,
+    "ever": 1.1876202510721656e+16,
+    "ghost": 9513215242656700.0,
     "ghost_share": 0.801,
     "name": "Hyracoidea",
     "sampled": 2362987268064956.0,
@@ -20463,28 +21938,28 @@
    },
    {
     "alive": 408303737.17517364,
-    "ever": 1.2138313829526916e+16,
-    "ghost": 9102429622980486.0,
+    "ever": 1.2138313838133956e+16,
+    "ghost": 9102429631587524.0,
     "ghost_share": 0.75,
     "name": "Diprotodontia",
-    "sampled": 3035884206546430.0,
+    "sampled": 3035884206546432.0,
     "t0_Ma": 61.06
    },
    {
     "alive": 290577780.41253823,
-    "ever": 2.036847495948673e+16,
-    "ghost": 1.322867607641839e+16,
+    "ever": 2.0368474968339464e+16,
+    "ghost": 1.3228676085271124e+16,
     "ghost_share": 0.649,
     "name": "Macroscelidea",
-    "sampled": 7139798883068338.0,
+    "sampled": 7139798883068340.0,
     "t0_Ma": 65.7
    }
   ],
   "by_ever": [
    {
     "alive": 23133449903.122658,
-    "ever": 1.7945081959986844e+18,
-    "ghost": 1.6351055739310618e+18,
+    "ever": 1.7945081970526833e+18,
+    "ghost": 1.6351055749850606e+18,
     "ghost_share": 0.911,
     "name": "Rodentia",
     "sampled": 1.5940262206762266e+17,
@@ -20492,8 +21967,8 @@
    },
    {
     "alive": 54318491455.12063,
-    "ever": 1.3909746127943572e+18,
-    "ghost": 1.2013768673482158e+18,
+    "ever": 1.3909746137392876e+18,
+    "ghost": 1.201376868293146e+18,
     "ghost_share": 0.864,
     "name": "Chiroptera",
     "sampled": 1.8959774544614144e+17,
@@ -20501,8 +21976,8 @@
    },
    {
     "alive": 1492362384.468411,
-    "ever": 1.8332442484641107e+17,
-    "ghost": 1.4222195774988608e+17,
+    "ever": 1.833244249293204e+17,
+    "ghost": 1.422219578327954e+17,
     "ghost_share": 0.776,
     "name": "Eulipotyphla",
     "sampled": 4.110246709652499e+16,
@@ -20510,53 +21985,53 @@
    },
    {
     "alive": 1195648666.3005614,
-    "ever": 7.823662735195338e+16,
-    "ghost": 6.272304000369408e+16,
+    "ever": 7.823662739456794e+16,
+    "ghost": 6.272304004630863e+16,
     "ghost_share": 0.802,
     "name": "Didelphimorphia",
-    "sampled": 1.5513587348259296e+16,
+    "sampled": 1.5513587348259304e+16,
     "t0_Ma": 74.42
    },
    {
     "alive": 751328331.2713387,
-    "ever": 4.0078079947551624e+16,
-    "ghost": 2.867868829280618e+16,
+    "ever": 4.007807997210694e+16,
+    "ghost": 2.8678688317361496e+16,
     "ghost_share": 0.716,
     "name": "Lagomorpha",
-    "sampled": 1.1399391654745444e+16,
+    "sampled": 1.1399391654745448e+16,
     "t0_Ma": 72.45
    },
    {
     "alive": 290577780.41253823,
-    "ever": 2.036847495948673e+16,
-    "ghost": 1.322867607641839e+16,
+    "ever": 2.0368474968339464e+16,
+    "ghost": 1.3228676085271124e+16,
     "ghost_share": 0.649,
     "name": "Macroscelidea",
-    "sampled": 7139798883068338.0,
+    "sampled": 7139798883068340.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 2225601210.1492753,
-    "ever": 1.7113981901599232e+16,
-    "ghost": 1.5301170888080428e+16,
+    "ever": 1.7113979699934752e+16,
+    "ghost": 1.5301170898320106e+16,
     "ghost_share": 0.894,
     "name": "Carnivora",
-    "sampled": 1812811013518804.0,
+    "sampled": 1812808801614646.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 408303737.17517364,
-    "ever": 1.2138313829526916e+16,
-    "ghost": 9102429622980486.0,
+    "ever": 1.2138313838133956e+16,
+    "ghost": 9102429631587524.0,
     "ghost_share": 0.75,
     "name": "Diprotodontia",
-    "sampled": 3035884206546430.0,
+    "sampled": 3035884206546432.0,
     "t0_Ma": 61.06
    },
    {
     "alive": 619434015.7798252,
-    "ever": 1.1876202502576234e+16,
-    "ghost": 9513215234511278.0,
+    "ever": 1.1876202510721656e+16,
+    "ghost": 9513215242656700.0,
     "ghost_share": 0.801,
     "name": "Hyracoidea",
     "sampled": 2362987268064956.0,
@@ -20564,19 +22039,19 @@
    },
    {
     "alive": 5654779269.41726,
-    "ever": 6902891198908376.0,
-    "ghost": 4315037473189266.0,
+    "ever": 6902891202212812.0,
+    "ghost": 4315037476493702.5,
     "ghost_share": 0.625,
     "name": "Artiodactyla",
-    "sampled": 2587853725719110.0,
+    "sampled": 2587853725719109.5,
     "t0_Ma": 61.87
    }
   ],
   "by_sampled_ever": [
    {
     "alive": 54318491455.12063,
-    "ever": 1.3909746127943572e+18,
-    "ghost": 1.2013768673482158e+18,
+    "ever": 1.3909746137392876e+18,
+    "ghost": 1.201376868293146e+18,
     "ghost_share": 0.864,
     "name": "Chiroptera",
     "sampled": 1.8959774544614144e+17,
@@ -20584,8 +22059,8 @@
    },
    {
     "alive": 23133449903.122658,
-    "ever": 1.7945081959986844e+18,
-    "ghost": 1.6351055739310618e+18,
+    "ever": 1.7945081970526833e+18,
+    "ghost": 1.6351055749850606e+18,
     "ghost_share": 0.911,
     "name": "Rodentia",
     "sampled": 1.5940262206762266e+17,
@@ -20593,8 +22068,8 @@
    },
    {
     "alive": 1492362384.468411,
-    "ever": 1.8332442484641107e+17,
-    "ghost": 1.4222195774988608e+17,
+    "ever": 1.833244249293204e+17,
+    "ghost": 1.422219578327954e+17,
     "ghost_share": 0.776,
     "name": "Eulipotyphla",
     "sampled": 4.110246709652499e+16,
@@ -20602,53 +22077,53 @@
    },
    {
     "alive": 1195648666.3005614,
-    "ever": 7.823662735195338e+16,
-    "ghost": 6.272304000369408e+16,
+    "ever": 7.823662739456794e+16,
+    "ghost": 6.272304004630863e+16,
     "ghost_share": 0.802,
     "name": "Didelphimorphia",
-    "sampled": 1.5513587348259296e+16,
+    "sampled": 1.5513587348259304e+16,
     "t0_Ma": 74.42
    },
    {
     "alive": 751328331.2713387,
-    "ever": 4.0078079947551624e+16,
-    "ghost": 2.867868829280618e+16,
+    "ever": 4.007807997210694e+16,
+    "ghost": 2.8678688317361496e+16,
     "ghost_share": 0.716,
     "name": "Lagomorpha",
-    "sampled": 1.1399391654745444e+16,
+    "sampled": 1.1399391654745448e+16,
     "t0_Ma": 72.45
    },
    {
     "alive": 290577780.41253823,
-    "ever": 2.036847495948673e+16,
-    "ghost": 1.322867607641839e+16,
+    "ever": 2.0368474968339464e+16,
+    "ghost": 1.3228676085271124e+16,
     "ghost_share": 0.649,
     "name": "Macroscelidea",
-    "sampled": 7139798883068338.0,
+    "sampled": 7139798883068340.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 408303737.17517364,
-    "ever": 1.2138313829526916e+16,
-    "ghost": 9102429622980486.0,
+    "ever": 1.2138313838133956e+16,
+    "ghost": 9102429631587524.0,
     "ghost_share": 0.75,
     "name": "Diprotodontia",
-    "sampled": 3035884206546430.0,
+    "sampled": 3035884206546432.0,
     "t0_Ma": 61.06
    },
    {
     "alive": 5654779269.41726,
-    "ever": 6902891198908376.0,
-    "ghost": 4315037473189266.0,
+    "ever": 6902891202212812.0,
+    "ghost": 4315037476493702.5,
     "ghost_share": 0.625,
     "name": "Artiodactyla",
-    "sampled": 2587853725719110.0,
+    "sampled": 2587853725719109.5,
     "t0_Ma": 61.87
    },
    {
     "alive": 619434015.7798252,
-    "ever": 1.1876202502576234e+16,
-    "ghost": 9513215234511278.0,
+    "ever": 1.1876202510721656e+16,
+    "ghost": 9513215242656700.0,
     "ghost_share": 0.801,
     "name": "Hyracoidea",
     "sampled": 2362987268064956.0,
@@ -20656,11 +22131,11 @@
    },
    {
     "alive": 2225601210.1492753,
-    "ever": 1.7113981901599232e+16,
-    "ghost": 1.5301170888080428e+16,
+    "ever": 1.7113979699934752e+16,
+    "ghost": 1.5301170898320106e+16,
     "ghost_share": 0.894,
     "name": "Carnivora",
-    "sampled": 1812811013518804.0,
+    "sampled": 1812808801614646.0,
     "t0_Ma": 65.7
    }
   ]
