@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { aliveAt, laneAt, layoutFan, leftAt, strandAt } from './layout';
-import { PANTHERA } from './panthera';
+import { FELIDAE } from './panthera';
 import { speciesModel, threadEnds, TwigModel, type TwigView } from './twigs';
 
-const fanLin = layoutFan(PANTHERA, 'linear');
-const fanLog = layoutFan(PANTHERA, 'log');
-const lionIdx = PANTHERA.species.findIndex((s) => s.common === 'Lion');
-const caveIdx = PANTHERA.species.findIndex((s) => s.common === 'Cave lion');
+const fanLin = layoutFan(FELIDAE, 'linear');
+const fanLog = layoutFan(FELIDAE, 'log');
+const lionIdx = FELIDAE.species.findIndex((s) => s.common === 'Lion');
+const caveIdx = FELIDAE.species.findIndex((s) => s.common === 'Cave lion');
 const lion = (f = fanLin) => new TwigModel(f.branches[lionIdx], f.time, f.mode);
 
 describe('species model', () => {
   it('matches the data: total ever and alive at the end', () => {
-    const rec = PANTHERA.species[lionIdx];
+    const rec = FELIDAE.species[lionIdx];
     const sp = speciesModel(rec);
     expect(Number(sp.totalEver) / rec.ever).toBeCloseTo(1, 4);
     const m = lion();
@@ -171,8 +171,8 @@ describe('width = individuals', () => {
 
 describe('determinism and links', () => {
   it('the same individual is at the same place with the same handle every time', () => {
-    const a = lion(layoutFan(PANTHERA, 'log'));
-    const b = lion(layoutFan(PANTHERA, 'log'));
+    const a = lion(layoutFan(FELIDAE, 'log'));
+    const b = lion(layoutFan(FELIDAE, 'log'));
     for (const [g, i] of [
       [0, 0],
       [1000, 17],

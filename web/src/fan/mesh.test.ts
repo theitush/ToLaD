@@ -5,11 +5,12 @@ import { MESH_F, MESH_U, colourCode, Lane, latticeLines, latticeRep, latticeTop,
 import { layoutFan } from './layout';
 import { FanCamera } from './camera';
 import { MeshBatch } from './meshgl';
-import { PANTHERA } from './panthera';
+import { FELIDAE } from './panthera';
 import { drawTwigs, kLogAt, lineLevel, SCALE_BAR_PX, TwigModel, type TwigView } from './twigs';
 import { HASH_GLSL } from '../../../packages/procgen/src/glsl.ts';
+import { assertColumnOnScreen } from './scenecheck';
 
-const fan = layoutFan(PANTHERA, 'linear');
+const fan = layoutFan(FELIDAE, 'linear');
 const lion = fan.branches.find((b) => b.sp.common === 'Lion')!;
 const m = new TwigModel(lion, fan.time, 'linear');
 const PAL: [number, number, number][] = [
@@ -24,7 +25,7 @@ const PAL: [number, number, number][] = [
  * time zoom; centred on the boundary of the species' lanes (green left, gray right).
  */
 function scene(sp: string, ago: number, perBar: number, sy: number) {
-  const f = layoutFan(PANTHERA, 'linear');
+  const f = layoutFan(FELIDAE, 'linear');
   const b = f.branches.find((x) => x.sp.common === sp)!;
   const mm = new TwigModel(b, f.time, 'linear');
   const c = new FanCamera(f, (x) => new TwigModel(x, f.time, 'linear'));
@@ -35,6 +36,7 @@ function scene(sp: string, ago: number, perBar: number, sy: number) {
   c.settle();
   const L = mm.lanes(c.cam.cy);
   c.cam.cx = L.left + L.gw;
+  assertColumnOnScreen(c, b, mm, `${sp}, ${ago} years ago, ${perBar} per bar`);
   const v: TwigView = {
     mesh: new MeshBatch(),
     ctx: { save() {}, restore() {}, stroke() {}, beginPath() {}, moveTo() {}, lineTo() {}, bezierCurveTo() {}, fillText() {} } as unknown as CanvasRenderingContext2D,
@@ -65,13 +67,16 @@ function shade(x: MeshInst, px: number, py: number, kLog: number, nowPx: number)
 
 // overview, mid, close and deep: the texture of lines, the lives.
 const SCENES: [string, string, number, number, number][] = [
-  ['overview', 'Lion', 2e5, 1e9, 0.7],
+  // (Overview: in linear widths only the domestic cat's hundreds of millions fill pixels at home; every
+  // wild cat is a fraction of one; its screen stops short of the living, a century from now. Deep: well
+  // above the tiger's split, clear of its lean.)
+  ['overview', 'Domestic cat', 2000, 1e9, 2],
   ['mid', 'Lion', 3000, 1e4, 40],
   ['crossfade', 'Lion', 3000, 50, 40],
   ['close (texture of lives)', 'Lion', 3000, 20, 3],
   ['close (lives)', 'Lion', 3000, 10, 400],
-  ['deep (texture)', 'Tiger', 1.5e6, 1e4, 50],
-  ['deep (lives)', 'Tiger', 1.5e6, 10, 3000],
+  ['deep (texture)', 'Tiger', 6e5, 1e4, 50],
+  ['deep (lives)', 'Tiger', 6e5, 10, 3000],
 ];
 
 describe('one mesh for both lanes: the lane only colours', () => {
@@ -84,7 +89,8 @@ describe('one mesh for both lanes: the lane only colours', () => {
       // (Nobody here is alive: the living, in the green lane only, are the one difference.)
       let n = 0;
       let differ = 0;
-      for (const x of lit.slice(0, 400)) {
+      // (400 spread over the whole scene: near a split the chords cut the first ones sub-pixel thin.)
+      for (const x of lit.filter((_, k) => k % Math.ceil(lit.length / 400) === 0)) {
         // (The lines only: a lane too narrow for lines is one line its own width, tested below.)
         const allGreen = { ...x, xG: 1e9, narG: 0, narR: 0 };
         const allGray = { ...x, xG: -1e9, narG: 0, narR: 0 };
@@ -236,10 +242,12 @@ describe('the texture at every zoom: never a plain lane', () => {
   }
   // The overview (home and beyond), and down in the stem below the species' first generation.
   for (const [name, sp, ago, perBar, sy] of [
-    ['overview', 'Lion', 2e5, 1e9, 0.7],
-    ['max zoom-out', 'Lion', 1e6, 1e11, 0.25],
-    // (Below its split: a slice of the parent column, here the lion + leopard ancestors', where the green prefix ends in the leopard's slice.)
-    ['the stem, below the species', 'Leopard', 1e6, 1e9, 0.7],
+    ['overview', 'Domestic cat', 2000, 1e9, 2],
+    ['max zoom-out', 'Domestic cat', 3000, 1e11, 0.25],
+    // (Below its split, domestication: a slice of the parent column, the wildcat + domestic cat ancestors'.
+    // The domestic stock's founders are none, so the stem is the wildcat's; a wild cat's column is
+    // under a pixel at home in linear widths, so zoomed in to a few tens of px.)
+    ['the stem, below the species', 'Wildcat', 2e5, 1e6, 5],
   ] as const) {
     it(`in both lanes the lines cover some of the lane, never none and never all (${name})`, () => {
       const { insts, kLog, nowPx, c, mm } = scene(sp, ago, perBar, sy);

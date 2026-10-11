@@ -2,7 +2,8 @@
 // home, the mesh at a range of individuals per scale bar, deep in the lives,
 // zoomed far out, and a species card open.
 //   npm run build:single && node scripts/designshot.mjs <out-dir> [prefix] [only,names]
-//   (DSF: device scale factor, default 2; CLIP=x,y,w,h; DEBUG=1: the ?debug readout; EDGE=curved|straight: the fan's edges)
+//   (DSF: device scale factor, default 2; CLIP=x,y,w,h; DEBUG=1: the ?debug readout; EDGE=curved|straight: the fan's edges;
+//   WIDTH=linear|log: the widths, default linear)
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -46,6 +47,13 @@ const scenes = [
   ['tip-cave', 'bar', ['Cave lion', 16000, 1e4, 30, 0.5]],
   ['mesh-split', 'bar', ['Lion', 499990, 100, 2e4, 1]],
   ['lineage', 'tapnode', [2.57, 1.2]],
+  // The cat family: Pantherinae vs Felinae, the crowded base (13.8–10.3 Ma), the lynxes, the domestic cat.
+  ['split-felidae', 'split', [13.8, 2]],
+  ['base-felinae', 'split', [10.65, 6]],
+  ['split-lynx', 'split', [2.68, 4]],
+  ['domestic-boom', 'split', [0.0095, 3]],
+  ['card-sandcat', 'card', ['Sand cat']],
+  ['card-domestic', 'card', ['Domestic cat']],
 ];
 const browser = await chromium.launch({ headless: true });
 try {
@@ -58,9 +66,9 @@ try {
   for (const [name, kind, args] of scenes) {
     if (ONLY && !ONLY.has(name)) continue;
     await page.evaluate(
-      ([kind, args]) => {
+      ([kind, args, width]) => {
         const f = window.__fan;
-        f.setMode('linear');
+        f.setMode(width);
         f.tap(-1e6, -1e6);
         const fan = f.fan;
         if (kind === 'home' || kind === 'card') {
@@ -154,7 +162,7 @@ try {
         }
         f.request();
       },
-      [kind, args ?? []],
+      [kind, args ?? [], process.env.WIDTH || 'linear'],
     );
     await page.waitForTimeout(900);
     // CLIP=x,y,w,h (CSS px): only that part of the page (with DSF=4–6, a close look).

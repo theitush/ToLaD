@@ -3,12 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { plainAgo, plainCount, roughCount, SpeciesCard } from './FanApp';
 import { fmtYear, HistorySpark, popTicks, yearTicks } from './HistorySpark';
 import { GRADE_WORD, MODELLED_KINDS, noDataSpans, styleBetween } from './history';
-import { PANTHERA, type HistoryRec } from './panthera';
+import { FELIDAE, type HistoryRec } from './panthera';
 import { population } from './population';
 import { RED_LIST } from './status';
 import { formatCount } from '../data/names';
 
-const byName = (common: string) => PANTHERA.species.find((s) => s.common === common)!;
+const byName = (common: string) => FELIDAE.species.find((s) => s.common === common)!;
 
 describe('species card history', () => {
   it('lists every point with its year, numbers, grade, kind, citation link and note', () => {
@@ -66,7 +66,7 @@ describe('species card history', () => {
     const lion = renderToStaticMarkup(<SpeciesCard sp={byName('Lion')} onClose={() => {}} />);
     expect(lion).toContain('<svg');
     expect(lion).not.toContain('<li>');
-    const plain = PANTHERA.species.find((s) => !s.history)!;
+    const plain = FELIDAE.species.find((s) => !s.history)!;
     const html = renderToStaticMarkup(<SpeciesCard sp={plain} onClose={() => {}} />);
     expect(html).not.toContain('<svg');
     expect(html).not.toContain('class="hist');
@@ -91,8 +91,9 @@ describe('species card history', () => {
   });
 
   it('no living species shows a flat assumed stretch without a "no data" mark', () => {
-    const living = PANTHERA.species.filter((s) => !s.extinct);
-    expect(living.length).toBe(5);
+    // (The wild species with a curated history; the rest show the constant model, the domestic cat its growth since domestication.)
+    const living = FELIDAE.species.filter((s) => !s.extinct && s.history?.component === 'wild');
+    expect(living.length).toBeGreaterThanOrEqual(6);
     for (const sp of living) {
       const h = sp.history;
       expect(h, `${sp.common} has a history`).toBeTruthy();
@@ -121,7 +122,7 @@ describe('species card history', () => {
   });
 
   it('the sparkline has 3–5 round year ticks and one or two population ticks', () => {
-    for (const sp of PANTHERA.species.filter((s) => s.history && s.history.points.length > 1)) {
+    for (const sp of FELIDAE.species.filter((s) => s.history && s.history.points.length > 1)) {
       const html = renderToStaticMarkup(<SpeciesCard sp={sp} onClose={() => {}} />);
       const xs = html.match(/data-tick="x"/g) ?? [];
       const held = html.includes('>now</text>');
@@ -163,7 +164,7 @@ describe('the species card: the population at the time touched', () => {
   });
 
   it('has no jargon on its face: the method, grade, range and generation length are tucked into the details', () => {
-    for (const sp of PANTHERA.species) {
+    for (const sp of FELIDAE.species) {
       for (const ageMa of [undefined, 70e-6, (sp.t0 + sp.t1) / 2]) {
         const html = renderToStaticMarkup(<SpeciesCard sp={sp} ageMa={ageMa} onClose={() => {}} />);
         const f = face(html);
@@ -184,13 +185,20 @@ describe('the species card: the population at the time touched', () => {
 
   it('shows the conservation status: the Red List category by its full name, or a prehistoric extinction', () => {
     const want: Record<string, string> = { Tiger: 'Endangered', Lion: 'Vulnerable', Leopard: 'Vulnerable', Jaguar: 'Near Threatened', 'Snow leopard': 'Vulnerable' };
-    for (const sp of PANTHERA.species) {
+    for (const sp of FELIDAE.species) {
       const html = renderToStaticMarkup(<SpeciesCard sp={sp} onClose={() => {}} />);
       const chip = html.match(/<span class="status[^"]*"[^>]*>([^<]*)<\/span>/);
+      if (!sp.extinct && !RED_LIST[sp.sci]) {
+        expect(chip, sp.common).toBeNull();
+        continue;
+      }
       expect(chip, sp.common).not.toBeNull();
       if (sp.extinct) {
         expect(chip![1]).toBe('Extinct (prehistoric)');
         expect(RED_LIST[sp.sci]).toBeUndefined();
+      } else if (!RED_LIST[sp.sci]) {
+        // (Only the big cats' statuses are curated so far: the rest show none.)
+        expect(want[sp.common]).toBeUndefined();
       } else {
         expect(chip![1]).toBe(want[sp.common]);
         const s = RED_LIST[sp.sci];
@@ -203,7 +211,7 @@ describe('the species card: the population at the time touched', () => {
   });
 
   it('says what the sparkline dots\' colours mean, in plain words', () => {
-    for (const sp of PANTHERA.species.filter((s) => s.history && s.history.points.length > 0)) {
+    for (const sp of FELIDAE.species.filter((s) => s.history && s.history.points.length > 0)) {
       const html = renderToStaticMarkup(<SpeciesCard sp={sp} onClose={() => {}} />);
       const grades = new Set(sp.history!.points.map((p) => p.grade));
       for (const g of ['A', 'B', 'C', 'D']) {
@@ -231,7 +239,7 @@ describe('the species card across species', () => {
   it('its keyed children have distinct keys, so switching species shows exactly one sparkline (no stale one kept by React)', () => {
     type El = { key: string | null; props: { children?: unknown } };
     const kids = (el: El) => ([] as unknown[]).concat(el.props.children ?? []).filter((c): c is El => !!c && typeof c === 'object' && 'props' in c);
-    for (const sp of PANTHERA.species) {
+    for (const sp of FELIDAE.species) {
       const card = SpeciesCard({ sp, onClose: () => {} }) as unknown as El;
       const keys = kids(card)
         .map((c) => c.key)

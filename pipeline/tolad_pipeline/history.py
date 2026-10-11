@@ -728,6 +728,15 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
             r_at = next((r for o, y, r in dom if y <= a_first <= o), dom[-1][2] if dom else 0.0)
             s = (pts[0]["n"] / L) / r_at if r_at > 0 else 1.0
             early = [(o, max(y, a_first), r * s) for o, y, r in dom if o > a_first]
+            # the same growth for procgen's segments, from domestication: the pieces' level at
+            # their starts, kept where it has changed by SUB_RATIO since the last one kept
+            rec["early"] = []
+            for o, y, r in early:
+                yr = year_to_ma_inv(o)
+                if r > 0 and yr < pts[0]["year"] - G and (
+                        not rec["early"] or max(r * L, rec["early"][-1]["n"]) / min(r * L, rec["early"][-1]["n"]) >= SUB_RATIO):
+                    rec["early"].append({"year": yr, "n": r * L, "lo": r * L, "hi": r * L, "grade": "D",
+                                         "kind": "model", "note": ""})
             new = curve_pieces(pts, L, a_first)
             D["pieces"] = D["pieces"][:nw] + early + new
             D["alive"] = D["alive"] - D["domestic"]["stock"] + pts[-1]["n"]
@@ -770,11 +779,20 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
         # wild: the first segment holds the baseline back to the band start; domestic and
         # humans: segments cover the curated span only (before it the model's own shape stands)
         t0_seg = leaf.t0 if rec["component"] == "wild" else year_to_ma(pts[0]["year"])
-        pre = ((nat_base["n"] if nat_base else pts[-1]["n"]) if wild_counts and not rec["baseline"]
-               and not deep_pts else None)
-        rec["segments"] = compile_segments(pts, G, L, t0_seg, rec["baseline"] is not None and not deep_pts,
-                                           pre_level=pre, pre_grade=3 if nat_base else min(3, D["grade_cap"]),
-                                           pre_kind="natural" if nat_base else "model")
+        early = rec.get("early") or []
+        if early:
+            # domestic: the segments start at domestication, the growth before the first point
+            # (shaped like human births, as the leaf's own births) as `model` segments, grade D
+            rec["segments"] = compile_segments(early + pts, G, L, year_to_ma(early[0]["year"]), False)
+            for sg in rec["segments"]:
+                if sg["year0"] + sg["gens"] * G / 2 < pts[0]["year"]:
+                    sg["kind"], sg["grade"] = K["model"], 3
+        else:
+            pre = ((nat_base["n"] if nat_base else pts[-1]["n"]) if wild_counts and not rec["baseline"]
+                   and not deep_pts else None)
+            rec["segments"] = compile_segments(pts, G, L, t0_seg, rec["baseline"] is not None and not deep_pts,
+                                               pre_level=pre, pre_grade=3 if nat_base else min(3, D["grade_cap"]),
+                                               pre_kind="natural" if nat_base else "model")
         if trend and not deep_pts and held is None:
             # the generation that straddles 1500 can fall before the trend's first knot: it holds the
             # natural level (as in model.rangeloss_record); a held knot (ToLaD#93) is the cited level

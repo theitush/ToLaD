@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { FanCamera, type Camera } from './camera';
 import { layoutFan, type FanBranch } from './layout';
-import { PANTHERA } from './panthera';
+import { FELIDAE } from './panthera';
 import { TwigModel } from './twigs';
 import { labelSpots, resolveLabels, type LabelSpot } from './view';
 
@@ -11,7 +11,7 @@ const TOP = 52;
 const measure = (t: string) => 7.5 * t.length;
 
 function camera(): FanCamera {
-  const fan = layoutFan(PANTHERA, 'linear');
+  const fan = layoutFan(FELIDAE, 'linear');
   const models = new Map<FanBranch, TwigModel>();
   const model = (b: FanBranch) => {
     let m = models.get(b);

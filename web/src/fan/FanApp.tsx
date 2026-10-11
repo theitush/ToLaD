@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { formatCount } from '../data/names';
 import { HistorySpark } from './HistorySpark';
 import type { EdgeStyle, WidthMode } from './layout';
-import { PANTHERA, type SpeciesRec } from './panthera';
+import { FELIDAE, type SpeciesRec } from './panthera';
 import { population } from './population';
 import { statusOf } from './status';
 import { FanView, fmtInt, formatYearsAgo, type IndInfo, type Lineage, type Selection } from './view';
@@ -48,7 +48,7 @@ export function FanApp() {
   const barRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const v = new FanView(canvasRef.current!, PANTHERA, edge);
+    const v = new FanView(canvasRef.current!, FELIDAE, edge);
     v.onSelect = setSel;
     v.scaleEl = scaleRef.current;
     v.barEl = barRef.current;
@@ -101,7 +101,7 @@ export function FanApp() {
           {edge}
         </button>
         <button type="button" onClick={() => viewRef.current?.resetView()}>
-          Big cats
+          All cats
         </button>
       </div>
       <div className="foot">
@@ -217,6 +217,8 @@ export function SpeciesCard({ sp, onClose, open, ageMa, startMa }: { sp: Species
   const at = populationAt(sp, ageMa ?? sp.t1, startMa);
   const pct = (f: number) => `${Math.round(f * 100)}%`;
   const st = statusOf(sp);
+  // A domestic stock: the years its own births span (its curated segments, from domestication).
+  const domestic = sp.history?.component === 'domestic' && sp.births ? sp.history.segments.reduce((a, s) => a + s.generations, 0) * sp.history.G : 0;
   const lived = `from ${plainAgo(sp.t0 * 1e6)} to ${sp.extinct ? plainAgo(sp.t1 * 1e6) : 'today'}`;
   return (
     <div className="card-sp" onPointerDown={(e) => e.stopPropagation()}>
@@ -245,7 +247,15 @@ export function SpeciesCard({ sp, onClose, open, ageMa, startMa }: { sp: Species
           </p>
         )}
         <p className="ever">
-          Roughly {roughCount(sp.ever)} {pluralName(sp)} have ever lived <span className="dim">(rough estimate)</span>
+          {domestic ? (
+            <>
+              Roughly {roughCount(sp.ever)} {pluralName(sp)} born since domestication <span className="dim">(rough estimate)</span>
+            </>
+          ) : (
+            <>
+              Roughly {roughCount(sp.ever)} {pluralName(sp)} have ever lived <span className="dim">(rough estimate)</span>
+            </>
+          )}
         </p>
       </div>
       {sp.history && sp.history.points.length > 0 && <HistorySpark key={sp.gid} h={sp.history} open={open} />}
@@ -260,7 +270,9 @@ export function SpeciesCard({ sp, onClose, open, ageMa, startMa }: { sp: Species
           </dd>
           <dt>Ever lived</dt>
           <dd>
-            ~{formatCount(sp.ever)}, range {formatCount(sp.everLo)} – {formatCount(sp.everHi)} over {plainAgo((sp.t0 - sp.t1) * 1e6).replace(/ ago$/, '')}
+            {domestic
+              ? `~${formatCount(sp.ever)} since domestication, ${plainAgo(domestic).replace(/ ago$/, '')} (the model's births; its wild ancestors are the wildcat's)`
+              : `~${formatCount(sp.ever)}, range ${formatCount(sp.everLo)} – ${formatCount(sp.everHi)} over ${plainAgo((sp.t0 - sp.t1) * 1e6).replace(/ ago$/, '')}`}
           </dd>
           <dt>Data grade</dt>
           <dd>

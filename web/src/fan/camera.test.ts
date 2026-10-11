@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { clipPoly, FanCamera, MAX_YEARS_FRAC, MIN_YEARS, MIN_ZOOM, STRAND_PX } from './camera';
 import { laneAt, layoutFan, leftAt, strandAt, type FanBranch, type WidthMode } from './layout';
-import { PANTHERA } from './panthera';
+import { FELIDAE } from './panthera';
 import { TwigModel } from './twigs';
 
 function camera(mode: WidthMode = 'linear'): FanCamera {
-  const fan = layoutFan(PANTHERA, mode);
+  const fan = layoutFan(FELIDAE, mode);
   const models = new Map<FanBranch, TwigModel>();
   const model = (b: FanBranch) => {
     let m = models.get(b);

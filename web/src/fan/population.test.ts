@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { PANTHERA, type SpeciesRec } from './panthera';
+import { FELIDAE, type SpeciesRec } from './panthera';
 import { parentShare, population, Q_STAR, shareBack } from './population';
 
-const sp = (name: string) => PANTHERA.species.find((s) => s.common === name)!;
+const sp = (name: string) => FELIDAE.species.find((s) => s.common === name)!;
 /** An age inside the flat stretch held before a history's oldest point (back to the species' start). */
 const heldAge = (s: SpeciesRec) => {
   const h = s.history!;
@@ -83,7 +83,7 @@ describe('the Panthera populations', () => {
   });
 
   it('extinct species: their whole span is gray (0% green), nobody is alive after it, and its founders before its start', () => {
-    for (const s of PANTHERA.species.filter((s) => s.extinct)) {
+    for (const s of FELIDAE.species.filter((s) => s.extinct)) {
       // From its first appearance (the default start) or from a split in between (the dated tree's).
       for (const start of [s.t0, (s.t0 + s.t1) / 2]) {
         const p = population(s, start);
@@ -105,7 +105,7 @@ describe('the Panthera populations', () => {
   });
 
   it('living species are all green now and settle to ~0.797 within a few generations', () => {
-    for (const s of PANTHERA.species.filter((s) => !s.extinct)) {
+    for (const s of FELIDAE.species.filter((s) => !s.extinct)) {
       const p = population(s);
       expect(p.greenAt(0)).toBe(1);
       // (The newest generation's step is the living's: all green; the one before it, less.)

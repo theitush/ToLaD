@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { FanCamera } from './camera';
 import { laneAt, layoutFan, leftAt } from './layout';
-import { PANTHERA } from './panthera';
+import { FELIDAE } from './panthera';
 import { latticeRep, latticeTop, shadeMesh, unpackInst, type MeshInst } from './mesh';
 import { MeshBatch, rgb01 } from './meshgl';
+import { assertColumnOnScreen } from './scenecheck';
 import { drawTwigs, kLogAt, LINEAGE, LIVING, SCALE_BAR_PX, TEXTURE_IND, textureFade, lineLevel, TWIG_GRAY, TwigModel, type TwigView } from './twigs';
 
 const PAL = [LIVING, LINEAGE, TWIG_GRAY].map(rgb01);
@@ -46,7 +47,7 @@ function shadeScreen(v: TwigView, c: FanCamera, insts: MeshInst[], step = 3, x0 
   return { lit, n: rows * cols, colours };
 }
 
-const lionIdx = PANTHERA.species.findIndex((s) => s.common === 'Lion');
+const lionIdx = FELIDAE.species.findIndex((s) => s.common === 'Lion');
 
 /** Strokes drawn through a stub canvas: colour, width and the number of path pieces. */
 function stubView(c: FanCamera) {
@@ -99,7 +100,7 @@ function stubView(c: FanCamera) {
  * of the middle, gray right), or `at` of the way across its column.
  */
 function at(perBar: number, ago = 3000, sy = 40, at?: number) {
-  const f = layoutFan(PANTHERA, 'linear');
+  const f = layoutFan(FELIDAE, 'linear');
   const c = new FanCamera(f, (b) => new TwigModel(b, f.time, 'linear'));
   c.w = 390;
   c.h = 844;
@@ -111,7 +112,9 @@ function at(perBar: number, ago = 3000, sy = 40, at?: number) {
   c.settle();
   const L = laneAt(b, c.cam.cy);
   c.cam.cx = leftAt(b, y) + (at === undefined ? L.gw : L.w * at);
-  return { c, b, m: new TwigModel(b, f.time, 'linear') };
+  const m = new TwigModel(b, f.time, 'linear');
+  assertColumnOnScreen(c, b, m, `the lion, ${ago} years ago, ${perBar} per bar`);
+  return { c, b, m };
 }
 
 /** The lines an instance draws with weight > minA whose centres fall in [w0, w1) (screen x). */
@@ -233,13 +236,14 @@ describe('the texture of lines, then the individuals on them', () => {
 
 describe('the dead lane', () => {
   it('shows real lives once the bar reads under ~100 individuals: ended lines gray, green lanes green', () => {
-    // (Times whose screen stays above the lion's split from the cave lion, 0.5 Ma: below it the lion is a
-    // slice of the parent column, shifted sideways, its lanes the parent's.)
+    // (Times and a time zoom whose screen stays above the lion's lean off its split from the cave lion,
+    // 0.5 Ma: there it moves sideways, and below it the lion is a slice of the parent column, its
+    // lanes the parent's.)
     for (const ago of [2000, 1e5]) {
       const seen: Set<string>[] = [];
       // (Well inside each lane: near now the crash narrows the green lane to a sixth of the column.)
       for (const where of [0.95, 0.04]) {
-        const { c, b, m } = at(20, ago, 5, where);
+        const { c, b, m } = at(20, ago, 20, where);
         const { v } = stubView(c);
         const st = drawTwigs(v, b, m, null);
         const insts = unpack(v.mesh!).filter((x) => x.alpha > 0.01);
