@@ -3,7 +3,7 @@
 // genealogy recurrence on the summed population, geometry fixed in the world.
 import { describe, expect, it } from 'vitest';
 import { FanCamera } from './camera';
-import { columnsAt, isNode, laneAt, layoutFan, leftAt, nodeQ, type Fan, type FanBranch, type EdgeStyle, type FanNode, type WidthMode } from './layout';
+import { columnsAt, isNode, laneAt, layoutFan, leftAt, nodeQ, PEEL_SLOPE, type Fan, type FanBranch, type EdgeStyle, type FanNode, type WidthMode } from './layout';
 import { FELIDAE } from './panthera';
 import { parentShare, Q_STAR } from './population';
 import { allSplits, FELIDAE_TREE, speciesUnder, type Split } from './splits';
@@ -128,6 +128,7 @@ describe('the dated tree', () => {
 
     it(`widths add up at every split: the parent just below = the daughters just above (${mode}, ${edge})`, () => {
       const f = layoutFan(FELIDAE, mode, undefined, edge);
+      let offCentre = 0;
       for (const v of f.nodes) {
         const up = above(v.y);
         const dn = below(v.y);
@@ -149,10 +150,22 @@ describe('the dated tree', () => {
         const last = v.kids[v.kids.length - 1];
         const lo = isNode(first) ? first.left : first.colLeft;
         const hi = isNode(last) ? last.left + last.width : last.colLeft + last.width;
-        // Centred under its daughters' rooms (curved; straight: the larger daughter runs straight on).
-        if (edge === 'curved') expect(v.cx).toBeCloseTo((lo + hi) / 2, 9);
+        // Centred under its daughters' rooms (curved; straight: the larger daughter runs straight on),
+        // unless two splits close in time would make a peel run steeper than PEEL_SLOPE: then off
+        // centre, inside its leaves' rooms, and every peel off it under the edges' limit (12, layout.test;
+        // PEEL_SLOPE where the tree allows, the least it can elsewhere: 8.7 for the cats in log widths).
+        if (edge === 'curved' && Math.abs(v.cx - (lo + hi) / 2) > 1e-9) {
+          offCentre++;
+          const fork = v.y - v.kids[0].leanY;
+          for (const k of v.kids) {
+            const move = isNode(k) ? k.left - k.tile : k.cx - (k.x0 + k.baseW / 2);
+            expect(Math.abs(move) * 1.875).toBeLessThanOrEqual(Math.max(PEEL_SLOPE, 12) * fork * (1 + 1e-9) + 1e-9);
+          }
+        }
         expect(v.left + v.width / 2).toBeCloseTo(v.cx, 9);
       }
+      // (Off centre only near the close splits: most columns are a sharp Y.)
+      expect(offCentre).toBeLessThanOrEqual(f.nodes.length / 4);
       // The stem is everyone's founders.
       expect(f.root.strands.length).toBe(f.branches.length);
       expect(f.stem[1] - f.stem[0]).toBeCloseTo(sum(f.branches.map((b) => b.baseW)), 9);

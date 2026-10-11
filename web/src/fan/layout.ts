@@ -694,6 +694,85 @@ function placeRiver(root: FanNode, W: number, time: TimeScale, mode: WidthMode):
     v.blend = Math.max(0, Math.min(FORK_MAX, 0.45 * (v.yBot - v.y)));
   };
   place(root);
+  boundPeels(root);
+}
+
+/** Curved: the steepest a peeling edge may run (world units sideways per height), where the tree allows. */
+export const PEEL_SLOPE = 8;
+
+/**
+ * Curved, where two splits come close in time (Felinae's 10.65 and 10.32 Ma):
+ * centred under their daughters, a parent's daughters would have to fly apart
+ * over the short fork before the next split. But a parent column may sit
+ * anywhere inside its leaves' rooms (no two subtrees' rooms overlap, so
+ * nothing can meet): this moves each one off the centre, as little as needed,
+ * so that every peel's edge runs at most PEEL_SLOPE (the smootherstep's
+ * steepest is 1.875 times its mean) — or, if the tree cannot, at the least
+ * slope it can. The leaves stay in their rooms.
+ */
+function boundPeels(root: FanNode): void {
+  type Iv = [number, number];
+  const ext = new Map<FanNode, Iv>();
+  const extOf = (k: Kid): Iv => (isNode(k) ? ext.get(k)! : [k.colLeft, k.colLeft + k.width]);
+  const fill = (v: FanNode): void => {
+    for (const k of v.kids) if (isNode(k)) fill(k);
+    ext.set(v, [Math.min(...v.kids.map((k) => extOf(k)[0])), Math.max(...v.kids.map((k) => extOf(k)[1]))]);
+  };
+  fill(root);
+  const offs = (v: FanNode) => {
+    let o = 0;
+    return v.kids.map((k) => ((o += isNode(k) ? k.width : k.baseW), o - (isNode(k) ? k.width : k.baseW)));
+  };
+  const fork = (v: FanNode) => v.y - v.kids[0].leanY;
+  // Where each column's left may be with every peel below it at most `s` steep (empty: lo > hi).
+  const feasible = (s: number) => {
+    const iv = new Map<FanNode, Iv>();
+    const go = (v: FanNode): Iv => {
+      const m = (s * fork(v)) / 1.875;
+      const [e0, e1] = ext.get(v)!;
+      let lo = e0;
+      let hi = e1 - v.width;
+      const off = offs(v);
+      v.kids.forEach((k, i) => {
+        const [a, b] = isNode(k) ? go(k) : [k.cx - k.baseW / 2, k.cx - k.baseW / 2];
+        lo = Math.max(lo, a - off[i] - m);
+        hi = Math.min(hi, b - off[i] + m);
+      });
+      iv.set(v, [lo, hi]);
+      return [lo, hi];
+    };
+    const r = go(root);
+    return { iv, ok: [...iv.values()].every(([a, b]) => a <= b + 1e-9) && r[0] <= r[1] + 1e-9 };
+  };
+  let slope = PEEL_SLOPE;
+  let f = feasible(slope);
+  if (!f.ok) {
+    let lo = PEEL_SLOPE;
+    let hi = PEEL_SLOPE * 2;
+    while (!feasible(hi).ok && hi < 1e6) hi *= 2;
+    for (let it = 0; it < 40; it++) {
+      const mid = (lo + hi) / 2;
+      if (feasible(mid).ok) hi = mid;
+      else lo = mid;
+    }
+    slope = hi;
+    f = feasible(slope);
+    if (!f.ok) return;
+  }
+  const clamp = (x: number, [a, b]: Iv) => Math.min(b, Math.max(a, x));
+  // Top down: each column as near its centred place as its own peel and its daughters' allow.
+  const set = (v: FanNode, at: Iv): void => {
+    v.left = clamp(v.left, at);
+    v.cx = v.left + v.width / 2;
+    const off = offs(v);
+    v.kids.forEach((k, i) => {
+      if (!isNode(k)) return;
+      const mk = (slope * fork(v)) / 1.875;
+      const [a, b] = f.iv.get(k)!;
+      set(k, [Math.max(a, v.left + off[i] - mk), Math.min(b, v.left + off[i] + mk)]);
+    });
+  };
+  set(root, f.iv.get(root)!);
 }
 
 /** One choice of sides for a subtree (each daughter's slot and straight-design lean, its extent, the leans' total run). */
