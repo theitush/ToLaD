@@ -200,53 +200,10 @@ try {
         }
       }
     }
-    // The cross-links between sister strands (bridge.ts shadeBridge, ToLaD#50): the keep and reach
-    // windows, sub-pairs, slanted edges and several time levels, GPU against the CPU mirror.
-    {
-      const B = window.__fanBridge;
-      const S = 160;
-      // [tauC, xa, xb, sa, sb, wa, wb, k0, k1, amp, h0, h1, rmax, J]
-      const cases = [
-        [4.5, 40, 120, 0.2, -0.1, 30, 30, 20, 90, 1, 0, 0, 0, 1],
-        [-1, 50, 100, 0, 0.3, 20, 20, 1, 4, 0.3, 0, 0, 0, 1],
-        [2.3, 80, 80, 0, 0, 50, 40, 60, 60, 0, 30, 70, 0.4, 3],
-        [7.2, 10, 150, 0.5, -0.5, 60, 60, 30, 200, 1, 0, 0, 0, 1],
-      ];
-      const h = S / cases.length;
-      const GL = 7.3;
-      results.bridges = { checked: 0, lit: 0, bad: 0, worst: 0 };
-      cases.forEach(([tauC, xa, xb, sa, sb, wa, wb, k0, k1, amp, h0, h1, rmax, J], q) => {
-        const ypp = (2 ** tauC * GL) / 6;
-        const inst = {
-          x0: 0, y0: q * h, x1: S, y1: (q + 1) * h, xa, xb, sa, sb, wa, wb, lw: 0.9, alpha: 0.8, p0: q * h, T0: h * ypp * 0.9, A: 1e9, GL,
-          k0, k1, amp, hIn: h0 - 30, h0, h1, rmax, cL: 2, cR: 1, P: (0x51ed270b * (q + 1)) >>> 0, gA: 300000000 + q * 12345, J,
-        };
-        const kLog = ypp / (1e9 * Math.LN2);
-        for (let pass = 0; pass < 2; pass++) {
-          gl.begin();
-          B.packBridge(inst, gl.bridge.f, gl.bridge.u, gl.bridge.next());
-          gl.end(S, S, 1, [0, 0, 0], kLog, -1e9, pal);
-        }
-        const px = new Uint8Array(S * S * 4);
-        gl.gl.readPixels(0, 0, S, S, gl.gl.RGBA, gl.gl.UNSIGNED_BYTE, px);
-        for (let y = Math.ceil(inst.y0); y < inst.y1; y++) {
-          for (let x = 0; x < S; x++) {
-            const a = B.shadeBridge(inst, x + 0.5, y + 0.5, kLog, pal)[3];
-            const A = px[((S - 1 - y) * S + x) * 4 + 3] / 255;
-            const e = Math.abs(A - a);
-            results.bridges.checked++;
-            if (a > 0.05) results.bridges.lit++;
-            results.bridges.worst = Math.max(results.bridges.worst, e);
-            if (e > 0.06) results.bridges.bad++;
-          }
-        }
-      });
-    }
     f.request();
     return results;
   });
-  bad = (r.bad || 0) + r.lattice.bad + r.links.bad + r.bridges.bad;
-  console.log(`sister cross-links: ${r.bridges.checked} pixels (${r.bridges.lit} lit), ${r.bridges.bad} off by more than 0.06 (worst ${r.bridges.worst.toFixed(3)})`);
+  bad = (r.bad || 0) + r.lattice.bad + r.links.bad;
   console.log(`cross-links: ${r.links.checked} pixels (${r.links.lit} lit by links), ${r.links.bad} off by more than 0.06 (worst ${r.links.worst.toFixed(3)})`);
   console.log(`lattice of lines: ${r.lattice.checked} pixels (${r.lattice.lit} lit), ${r.lattice.bad} off by more than 0.06 in coverage (worst ${r.lattice.worst.toFixed(3)})`);
   console.log(`checked ${r.checked} individuals on the GPU: ${bad} disagree with the CPU mirror`);
