@@ -127,6 +127,15 @@ SOURCES: dict[str, list[tuple[str, str, dict | None]]] = {
          "https://static-content.springer.com/esm/art%3A10.1038%2Fs41467-023-43426-5/MediaObjects/"
          "41467_2023_43426_MOESM6_ESM.txt", None),
     ],
+    # Bergeron et al. 2023, Nature 615:285-291 (CC BY 4.0, PMC9995274): pedigree (trio) germline
+    # mutation rates of 68 vertebrates. Supplementary Tables 1-9; Table 9 has each species' rate per
+    # generation modelled at its generation time, and per year. The per-lineage mutation rate of the
+    # genetic layers 2 and 3 (ToLaD#74, #75, mutation.py).
+    "bergeron": [
+        ("bergeron/Bergeron2023_SupplementaryTables.xlsx",
+         "https://static-content.springer.com/esm/art%3A10.1038%2Fs41586-023-05752-y/MediaObjects/"
+         "41586_2023_5752_MOESM5_ESM.xlsx", None),
+    ],
     "prb": [
         ("prb/how-many-people-have-ever-lived-on-earth.html",
          "https://www.prb.org/articles/how-many-people-have-ever-lived-on-earth/", None),

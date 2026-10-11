@@ -42,9 +42,13 @@ import io
 import math
 import tomllib
 import zipfile
+from collections import Counter
 from pathlib import Path
 
+import numpy as np
+
 from .anchors import DOMESTIC_ALIASES, NOW_YEAR, year_to_ma
+from . import mutation
 
 HIST_DIR = Path(__file__).resolve().parents[1] / "history"
 
@@ -63,8 +67,11 @@ TOP_KEYS = {"species", "aliases", "common", "component", "use", "scope", "faosta
 DEEP_KEYS = {"method", "cite", "url", "mu", "g", "grade", "note", "steps"}
 DEEP_METHODS = ("PSMC", "MSMC", "MSMC2", "SMC++")
 DEEP_GRADES = "CD"
-# Deep past (layer 3): a genome-based Ne history rescaled to one mutation rate per year and to the
+# Deep past (layer 3): a genome-based Ne history rescaled to the lineage's mutation rate per year
+# (mutation.py: a pedigree fit on generation length with per-order offsets, ToLaD#74/#75) and to the
 # pipeline's generation length, then Ne -> census N. See pipeline/history/README.md, "Deep past".
+# The flat rate below is the fallback (no rate table on disk) and the reference the per-lineage
+# factor (`mu.vs_flat`) is quoted against.
 DEEP_MU_YEAR = 1.0e-9  # per site per year: Pantherinae pedigree mean 5.5e-9/gen at parental age 5.5 yr
 DEEP_MU_YEAR_LO, DEEP_MU_YEAR_HI = 0.8e-9, 1.5e-9  # species pedigree rate / parental age: leopard, tiger
 DEEP_NE_N, DEEP_NE_N_LO, DEEP_NE_N_HI = 0.1, 0.05, 0.3  # Ne/N (Frankham 1995 mean ~0.1), a wide range
@@ -300,35 +307,40 @@ def curve_points(rec: dict) -> list[dict]:
     return sorted(pts, key=lambda p: p["year"])
 
 
-def deep_scale(deep: dict, G: float) -> tuple[float, float]:
-    """(time factor, Ne factor) taking the source's scaling to DEEP_MU_YEAR and generation length G.
+def deep_scale(deep: dict, G: float, mu_y: float = DEEP_MU_YEAR) -> tuple[float, float]:
+    """(time factor, Ne factor) taking the source's scaling to the per-year rate mu_y (the lineage's,
+    mutation.rate; DEEP_MU_YEAR by default) and generation length G.
 
     PSMC infers theta = 4 Ne mu_gen and coalescent time in units of 2 Ne generations, so a curve
     published with (mu per generation, g years) gives, for a per-year rate mu_y and generation G:
         t' = t * (mu / g) / mu_y            (time scales with the per-year rate only)
         Ne' = Ne * mu / (mu_y * G)          (Ne scales with the per-generation rate mu_y * G)
     """
-    return (deep["mu"] / deep["g"]) / DEEP_MU_YEAR, deep["mu"] / (DEEP_MU_YEAR * G)
+    return (deep["mu"] / deep["g"]) / mu_y, deep["mu"] / (mu_y * G)
 
 
-def deep_points(deep: dict, G: float, start_year: float | None = None) -> tuple[list[dict], list[dict]]:
+def deep_points(deep: dict, G: float, start_year: float | None = None,
+                mu: dict | None = None) -> tuple[list[dict], list[dict]]:
     """[deep] steps -> dated `genomic` points (census N) and the steps dropped, oldest first.
 
     Each step becomes one point at its log-midpoint in time. N = Ne' / DEEP_NE_N; lo / hi carry the
     Ne/N range and the per-year mutation-rate range. Steps younger than DEEP_BLIND_YR (PSMC's blind
-    spot) or older than the species band start are dropped (returned with a `why`)."""
-    kt, kn = deep_scale(deep, G)
+    spot) or older than the species band start are dropped (returned with a `why`). `mu` is the
+    lineage's rate (mutation.rate: mu, lo, hi); None takes the flat DEEP_MU_YEAR and its range."""
+    mu = mu or {"mu": DEEP_MU_YEAR, "lo": DEEP_MU_YEAR_LO, "hi": DEEP_MU_YEAR_HI}
+    kt, kn = deep_scale(deep, G, mu["mu"])
     keep, drop = [], []
     for a, b, ne in deep["steps"]:
         ago = math.sqrt(a * b) * kt
         ne2 = ne * kn
         p = {"year": NOW_YEAR - ago, "n": ne2 / DEEP_NE_N,
-             "lo": ne2 * (DEEP_MU_YEAR / DEEP_MU_YEAR_HI) / DEEP_NE_N_HI,
-             "hi": ne2 * (DEEP_MU_YEAR / DEEP_MU_YEAR_LO) / DEEP_NE_N_LO,
+             "lo": ne2 * (mu["mu"] / mu["hi"]) / DEEP_NE_N_HI,
+             "hi": ne2 * (mu["mu"] / mu["lo"]) / DEEP_NE_N_LO,
              "grade": deep["grade"], "kind": "genomic", "cite": deep["cite"], "url": deep["url"],
              "ne": ne2, "ago": ago,
              "note": (f"{deep['method']} step {a:.0f}-{b:.0f} yr ago, Ne {ne:.0f} as published "
-                      f"(mu {deep['mu']:.3g}/gen, g {deep['g']:g} yr); rescaled to {a * kt:.0f}-{b * kt:.0f} "
+                      f"(mu {deep['mu']:.3g}/gen, g {deep['g']:g} yr); rescaled (mu {mu['mu']:.3g}/yr, G {G:.3g} yr) "
+                      f"to {a * kt:.0f}-{b * kt:.0f} "
                       f"yr ago, Ne {ne2:.0f}; N = Ne / {DEEP_NE_N:g}")}
         if ago < DEEP_BLIND_YR:
             drop.append({**p, "why": "blind"})
@@ -587,6 +599,22 @@ def deep_join_summary(report: dict) -> dict:
     }
 
 
+def mutation_summary(raw: Path, report: dict) -> dict:
+    """stats.json -> history.mutation_rate: the per-lineage rate model (mutation.py, ToLaD#74/#75) and the
+    factor each genomic deep past took on the flat DEEP_MU_YEAR (times and Ne both scale by 1 / factor)."""
+    mus = {sp: s["deep"]["mu"] for sp, s in sorted(report.items()) if s.get("deep")}
+    f = np.array([m["vs_flat"] for m in mus.values()]) if mus else np.array([])
+    return {
+        **mutation.summary(raw),
+        "flat_mu_year": DEEP_MU_YEAR, "flat_cite": list(DEEP_MU_CITE),
+        "deep_vs_flat": ({"n": int(f.size), "min": round(float(f.min()), 3), "median": round(float(np.median(f)), 3),
+                          "max": round(float(f.max()), 3)} if f.size else {"n": 0}),
+        "deep_by_clade": dict(Counter(m["clade"] for m in mus.values())),
+        "deep_species": {sp: {"G": round(m["G"], 2), "mu_year": float(f"{m['mu_year']:.3g}"),
+                              "vs_flat": round(m["vs_flat"], 3), "clade": m["clade"]} for sp, m in mus.items()},
+    }
+
+
 def _sd_of(p: dict) -> float:
     """95% range -> log10 sd."""
     return math.log10(p["hi"] / p["lo"]) / (2 * 1.96)
@@ -627,7 +655,8 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
         pts = curve_points(rec)
         # the deep past: genomic points older than the cited ones, joined to the first cited
         # point (or baseline) by the usual log-linear span across PSMC's blind spot
-        deep_pts, rec["deep_dropped"] = (deep_points(rec["deep"], G, year_to_ma_inv(leaf.t0))
+        mu = mutation.for_leaf(raw, leaf, G) if rec["deep"] else None
+        deep_pts, rec["deep_dropped"] = (deep_points(rec["deep"], G, year_to_ma_inv(leaf.t0), mu)
                                          if rec["deep"] else ([], []))
         if not deep_pts and not pts:  # a modelled genomic record whose steps all fell in the blind spot
             empty.append(rec["species"])
@@ -817,7 +846,11 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
                 "dropped_before_band": sum(p["why"] != "blind" for p in rec["deep_dropped"]),
                 "oldest_n": deep_pts[0]["n"], "oldest_yr_ago": NOW_YEAR - deep_pts[0]["year"], "youngest_yr_ago": NOW_YEAR - deep_pts[-1]["year"],
                 "band_start_yr_ago": leaf.t0 * 1e6,
-                "time_factor": deep_scale(rec["deep"], G)[0], "ne_factor": deep_scale(rec["deep"], G)[1],
+                "time_factor": deep_scale(rec["deep"], G, mu["mu"])[0],
+                "ne_factor": deep_scale(rec["deep"], G, mu["mu"])[1],
+                # the lineage's per-year rate (mutation.py) and its factor on the flat DEEP_MU_YEAR
+                "mu": {"G": G, "mu_year": mu["mu"], "lo": mu["lo"], "hi": mu["hi"],
+                       "clade": mu["clade"] or "Mammalia (fit only)", "vs_flat": mu["vs_flat"]},
                 "join": rec["deep_join"],
             }
         report[rec["species"]] = {
@@ -852,6 +885,7 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
         "species": report,
         "genomic_records_without_points": empty,
         "deep_join": deep_join_summary(report),
+        "mutation_rate": mutation_summary(raw, report),
         "trend_held": {
             "note": "Species whose modelled natural level in 1500 CE is below their first cited point (ToLaD#93): "
                     "the range-loss trend would rise from 1500 to that point, contradicting its meaning (range "
