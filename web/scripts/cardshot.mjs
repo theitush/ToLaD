@@ -40,7 +40,7 @@ try {
   const page = await ctx.newPage();
   page.on('pageerror', (e) => console.log('pageerror', String(e)));
   await page.goto(pathToFileURL(resolve('dist-single/index.html')).href);
-  await page.waitForFunction(() => !!window.__fan, null, { timeout: 20000 });
+  await page.waitForFunction(() => !!window.__fan, null, { timeout: 90000 }); // (a cold software-GL start can take a while)
   for (const [name, sp, ago, open] of scenes) {
     if (ONLY && !ONLY.has(name)) continue;
     await page.evaluate(
