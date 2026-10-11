@@ -181,6 +181,34 @@ describe('fan camera', () => {
     });
   }
 
+  it('a pinch anywhere keeps zooming in: between the columns it pulls the nearest one in (#36)', () => {
+    // From home, pinching near "now" in the gap beside a column (the dispatcher's case: it stalled at sx 3.758).
+    for (const [px, py] of [
+      [195, 120],
+      [20, 300],
+      [380, 700],
+    ]) {
+      const c = camera();
+      let last = c.cam.sx;
+      let grew = 0;
+      for (let k = 0; k < 40; k++) {
+        const [wx, wy] = c.toWorld(px, py);
+        const fingerContent = Math.abs(c.nearestContent(wx, wy) - wx) * c.cam.sx;
+        c.zoomAbout(px, py, 1.25, 1.12);
+        if (c.cam.sx > last * 1.2) grew++;
+        expect(c.cam.sx).toBeGreaterThanOrEqual(last);
+        last = c.cam.sx;
+        // Content stays within 30% of the screen of the fingers (or no further out than it was).
+        const [wx2, wy2] = c.toWorld(px, py);
+        const d = Math.abs(c.nearestContent(wx2, wy2) - wx2) * c.cam.sx;
+        expect(d).toBeLessThanOrEqual(Math.max(0.3 * c.w, fingerContent) + 1);
+      }
+      // Every pinch zoomed the full step (none stalled) until the width limit.
+      expect(grew).toBeGreaterThan(30);
+      expect(last).toBeGreaterThan(1000);
+    }
+  });
+
   it('clips ribbons to the screen in float64 (no far-off coordinates reach the canvas)', () => {
     // A thin sliver from far left to far right through the screen, and one entirely off screen.
     const [xs, ys] = clipPoly([-1e12, 1e12, 1e12, -1e12], [100, 101, 103, 102], 0, 0, 390, 844);
