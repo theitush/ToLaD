@@ -575,8 +575,11 @@ export function shadeMesh(m0: MeshInst, px0: number, py: number, kLog: number, n
   const fr = meshFrame(m0, px0, py);
   if (!fr) return [0, 0, 0, 0];
   const [px, m] = fr;
+  // The texture is measured across the column, not along the row: where it leans (a branch-out),
+  // a line and a narrow lane keep their width and read as lines, not as a row's dashes.
+  const ks = m.mode === 0 ? perpScale(m0, px, py) : 1;
   // Nothing to draw this far from a line (only the living glow, and they are only in the green lane).
-  const reach = m.mode === 0 ? Math.max(m.lw, 1) * 0.5 + 0.5 : Math.max(m.tipR, Math.max(m.lw, 1) * 0.5 + (m.xG > m.x0 ? 5 : 0)) + 0.5;
+  const reach = m.mode === 0 ? (Math.max(m.lw, 1) * 0.5 + 0.5) / ks : Math.max(m.tipR, Math.max(m.lw, 1) * 0.5 + (m.xG > m.x0 ? 5 : 0)) + 0.5;
   const bf = Math.floor((px - m.xB0) / m.bw);
   let best: RGBA = [0, 0, 0, 0];
   // The lines of this block and its neighbours (each block's line is anywhere in it).
@@ -589,13 +592,16 @@ export function shadeMesh(m0: MeshInst, px0: number, py: number, kLog: number, n
     const lineX = m.xB0 + bb * m.bw + (off + 0.5) * pp;
     const d = Math.abs(px - lineX);
     if (d > reach) continue;
+    // (Only the column's own lines: on a steep lean the pad around it reaches far along the row.)
+    if ((m.colR ?? 0) > (m.colL ?? 0) && (lineX < (m.colL ?? 0) - 1 || lineX > (m.colR ?? 0) + 1)) continue;
+    const dp = d * ks;
     const iA = slotBase(K, m.sA, m.nA);
     const iB = slotBase(K, m.sB, m.nB);
     const fine = m.fineA < 1 && !latticeTop(m.latSeed, m.lvl, B) ? m.fineA : 1;
     // Where the lanes meet, the slot's colours blend by how much of it is in each.
     const wg = clamp01((m.xG - lineX) / pp + 0.5);
-    const g = wg > 0 ? shadeLane(m, Lane.Green, iA, iB, d, py, kLog, nowPx, pal, deadGap) : ([0, 0, 0, 0] as RGBA);
-    const r = wg < 1 ? shadeLane(m, m.lane, iA, iB, d, py, kLog, nowPx, pal, deadGap) : ([0, 0, 0, 0] as RGBA);
+    const g = wg > 0 ? shadeLane(m, Lane.Green, iA, iB, dp, py, kLog, nowPx, pal, deadGap) : ([0, 0, 0, 0] as RGBA);
+    const r = wg < 1 ? shadeLane(m, m.lane, iA, iB, dp, py, kLog, nowPx, pal, deadGap) : ([0, 0, 0, 0] as RGBA);
     const col = blend(g, r, wg);
     col[3] *= m.alpha * fine;
     if (col[3] > best[3]) best = col;
@@ -607,14 +613,14 @@ export function shadeMesh(m0: MeshInst, px0: number, py: number, kLog: number, n
     const colL = m.colL ?? 0;
     const colR = m.colR ?? 0;
     const green = m.xG >= colL;
-    const xGe = green ? Math.max(m.xG, colL + 1) : colL;
     const i = narrowIndex(m.latSeed, Math.floor(px - colL));
-    for (const [lane, a0, a1, nar] of [
-      [Lane.Green, colL, xGe, m.narG ?? 0],
-      [m.lane, Math.max(colL, m.xG), colR, m.narR ?? 0],
+    // (Each lane from its left edge, at least `min` px across the column: the green 1, the gray 0.6.)
+    for (const [lane, a0, a1, min, nar] of [
+      [Lane.Green, colL, m.xG, 1, m.narG ?? 0],
+      [m.lane, Math.max(colL, m.xG), colR, 0.6, m.narR ?? 0],
     ] as const) {
       if (!(nar > 0)) continue;
-      const cx = Math.max(0, Math.min(px + 0.5, a1) - Math.max(px - 0.5, a0));
+      const cx = narrowCover(px, a0, a1, min, ks);
       if (!(cx > 0) || (lane === Lane.Green && !green)) continue;
       const c = shadeLane(m, lane, slotBase(i, m.sA, m.nA), slotBase(i, m.sB, m.nB), 0, py, kLog, nowPx, pal, deadGap, NAR_FLOOR, 1, true);
       c[3] *= Math.min(1, cx) * nar * m.alpha;
@@ -622,6 +628,31 @@ export function shadeMesh(m0: MeshInst, px0: number, py: number, kLog: number, n
     }
   }
   return best;
+}
+
+/**
+ * Screen px across the column per unit of the frame's x on screen row py: the
+ * frame's scale k down the instance, over the stretch of a row along a column
+ * whose middle leans by s px per px (√(1 + s²)). 1 upright. (By the column's
+ * lean, not each line's: a column widening both ways, its lattice riding the
+ * left edge, is upright.)
+ */
+export function perpScale(m: MeshInst, _X: number, py: number): number {
+  const sP = m.sP ?? 0;
+  const k = Math.max(1e-6, 1 + sP * (py - m.y0));
+  const s = ((m.sL ?? 0) + (m.sR ?? 0)) / 2;
+  return k / Math.sqrt(1 + s * s);
+}
+
+/**
+ * A narrow lane's coverage of the pixel at frame x px: the lane [a0, a1] of
+ * the frame, at least `min` screen px across the column from its left edge,
+ * measured across the column (ks: perpScale).
+ */
+export function narrowCover(px: number, a0: number, a1: number, min: number, ks: number): number {
+  const w = Math.max(min, (a1 - a0) * ks);
+  const d = (px - a0) * ks - w * 0.5;
+  return Math.max(0, Math.min(d + 0.5, w * 0.5) - Math.max(d - 0.5, -w * 0.5));
 }
 
 /**
@@ -641,7 +672,7 @@ export function meshFrame(m: MeshInst, px: number, py: number): [number, MeshIns
   const xl = colL + sL * dy;
   const X = colL + (px - xl) / k;
   const colR = colL + ((m.colR ?? 0) + sR * dy - xl) / k;
-  const pad = m.mode === 0 ? 1 : Math.max(m.tipR, Math.max(m.lw, 1) * 0.5 + 5) + 1;
+  const pad = m.mode === 0 ? 1 + 1.5 / perpScale(m, X, py) : Math.max(m.tipR, Math.max(m.lw, 1) * 0.5 + 5) + 1;
   // (A straight, constant column needs no clip: the instance's rectangle is it.)
   if (sL === 0 && sR === 0 && sG === 0 && sP === 0) return [X, m];
   if (X < colL - pad || X > colR + pad) return null;

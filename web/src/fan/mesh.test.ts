@@ -147,7 +147,9 @@ describe('one mesh for both lanes: the lane only colours', () => {
         // The lattice: blocks of 2^lvl individuals at the instance's top row, the level of this zoom.
         const pitchPx = mm.pitch(c.toWorld(0, x.y0)[1]) * c.cam.sx;
         expect(x.bw / 2 ** x.lvl / pitchPx, `${sp} ${perBar}`).toBeCloseTo(1, 4);
-        expect(x.lvl).toBe(lineLevel(x.bw / 2 ** x.lvl).L);
+        // (The texture's level by the pitch across the column, where it leans: mesh.ts perpScale.)
+        const q = x.mode === 0 ? Math.hypot(1, ((x.sL ?? 0) + (x.sR ?? 0)) / 2) : 1;
+        expect(x.lvl).toBe(lineLevel(x.bw / 2 ** x.lvl / q).L);
         expect(x.latSeed).toBe(mm.latticeSeed);
         // The lanes' boundary of the instance's own stretch (the lanes step with N(t) and q(t)).
         const ym = c.toWorld(0, (x.y0 + x.y1) / 2)[1];
