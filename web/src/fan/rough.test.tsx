@@ -126,14 +126,14 @@ describe('the card (ToLaD#164)', () => {
 
   it('the details list which stretches are genome, model or counted', () => {
     const rows = basisRows(sp('Leopard').history!);
-    expect(rows.map((r) => r.split(':')[0])).toEqual(['genome (rough)', 'model (rough)', 'counted']);
-    expect(rows[2]).toBe('counted: 1998 – 2020');
+    expect(rows.map((r) => r.split(' ')[0])).toEqual(['genome', 'model', 'counted']);
+    expect(rows[2]).toBe('counted 1998 – 2020');
     const lion = basisRows(sp('Lion').history!);
-    expect(lion.map((r) => r.split(':')[0])).toEqual(['genome (rough)', 'flagged join (rough)', 'counted']);
+    expect(lion.map((r) => r.replace(/ [~\d].*/, ''))).toEqual(['genome', 'flagged join', 'counted']);
     expect(lion[2]).toMatch(/– now$/);
     const html = renderToStaticMarkup(<SpeciesCard sp={sp('Leopard')} onClose={() => {}} open />);
     expect(html).toContain('data-basis-note=""');
     for (const r of rows) expect(html).toContain(r);
-    expect(basisRows(sp('Sand cat').history!)).toEqual([expect.stringMatching(/^model \(rough\): .* – now$/)]);
+    expect(basisRows(sp('Sand cat').history!)).toEqual([expect.stringMatching(/^model .* – now$/)]);
   });
 });

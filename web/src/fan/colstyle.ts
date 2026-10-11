@@ -23,13 +23,15 @@ type Tint = { rgb: readonly [number, number, number]; a: number };
 const BG_RGB = [12 / 255, 23 / 255, 20 / 255] as const;
 
 /**
- * The rough look's options (ToLaD#164), `?rough=a|b`: `a` fades the stretch a little towards the
+ * The rough look's options (ToLaD#164), `?rough=a|b|c`: `a` fades the stretch a little towards the
  * background (#55's no-data fade, lighter); `b` washes it towards a mid gray-green, a fog: the dark
- * gaps lift and the bright individuals sink, so the texture flattens without going dark.
+ * gaps lift and the bright individuals sink, so the texture flattens without going dark; `c` a
+ * paler, thinner haze (a sketch on paper rather than a fog).
  */
-export const ROUGH_LOOKS: Record<'a' | 'b', Tint> = {
+export const ROUGH_LOOKS: Record<'a' | 'b' | 'c', Tint> = {
   a: { rgb: BG_RGB, a: 0.36 },
-  b: { rgb: [0.33, 0.38, 0.36], a: 0.4 },
+  b: { rgb: [0.3, 0.35, 0.33], a: 0.5 },
+  c: { rgb: [0.55, 0.6, 0.58], a: 0.32 },
 };
 export type RoughLook = keyof typeof ROUGH_LOOKS;
 export const ROUGH_DEFAULT: RoughLook = 'b';

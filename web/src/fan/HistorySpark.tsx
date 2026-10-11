@@ -114,14 +114,14 @@ export const GENOME_NOTE =
 /** What each basis is called in the card's list of stretches. */
 const BASIS_WORD: Record<Exclude<Basis, 'held'>, string> = {
   count: 'counted',
-  genome: 'genome (rough)',
-  model: 'model (rough)',
-  flagged: 'flagged join (rough)',
+  genome: 'genome',
+  model: 'model',
+  flagged: 'flagged join',
 };
 
 /**
  * The card's list of which stretches are counted and which are genome, model or a flagged join
- * (ToLaD#164), oldest first: "genome (rough): 3.1 million – 10,100 years ago". Held stretches (no
+ * (ToLaD#164), oldest first: "genome ~3 million years ago – 8059 BCE". Held stretches (no
  * data) are said by their own note.
  */
 export function basisRows(h: HistoryRec): string[] {
@@ -134,7 +134,7 @@ export function basisRows(h: HistoryRec): string[] {
   };
   return basisSpans(h)
     .filter((s): s is typeof s & { basis: Exclude<Basis, 'held'> } => s.basis !== 'held' && s.ago0 - s.ago1 >= 1)
-    .map((s) => `${BASIS_WORD[s.basis]}: ${when(s.ago0)} – ${when(s.ago1)}`);
+    .map((s) => `${BASIS_WORD[s.basis]} ${when(s.ago0)} – ${when(s.ago1)}`);
 }
 
 /** Round "years ago" ticks of a log-time axis: powers of ten from 100 years, below agoMax. */
@@ -289,6 +289,8 @@ export function HistorySpark({
     return [{ k, ev, xa, xb, tx, anchor, ty, on, named, lx0, lx1: lx0 + tw }];
   });
   const lines = [];
+  // Along a run of rough lines, the dash pattern carries on from one to the next (a curve of many short steps still reads dashed).
+  let dashAt = 0;
   for (let k = 1; k < pts.length; k++) {
     const a = pts[k - 1];
     const b = pts[k];
@@ -296,7 +298,11 @@ export function HistorySpark({
     // genome, a model or a flagged join rough: the guessed curve, dashed in the guess colour.
     const basis = basisBetween(h, a.year, b.year);
     const rough = ROUGH_BASES.has(basis) || (CURVE_KINDS.has(a.kind) && CURVE_KINDS.has(b.kind));
-    const st: SpanStyle = rough ? 'dashed' : styleBetween(h, a.year, b.year) === 'dotted' ? 'dotted' : 'solid';
+    // (A guessed figure's line is fainter, still solid: its dot's colour says the grade.)
+    const st: SpanStyle = rough ? 'dashed' : 'solid';
+    const faint = !rough && styleBetween(h, a.year, b.year) === 'dotted';
+    const offset = dashAt;
+    dashAt = rough ? dashAt + Math.hypot(X(b.year) - X(a.year), Y(b.n) - Y(a.n)) : 0;
     lines.push(
       <line
         key={k}
@@ -306,7 +312,8 @@ export function HistorySpark({
         y2={Y(b.n)}
         stroke={rough ? GRADE_COLOR.D : undefined}
         strokeDasharray={rough ? ROUGH.dash : DASH[st]}
-        opacity={rough ? ROUGH.opacity : OPACITY[st]}
+        strokeDashoffset={rough && offset ? offset.toFixed(1) : undefined}
+        opacity={rough ? ROUGH.opacity : faint ? 0.6 : OPACITY.solid}
         data-style={st}
         data-basis={rough ? 'rough' : 'count'}
         data-curve={rough ? '' : undefined}
@@ -528,7 +535,7 @@ export function HistorySpark({
             ))}
             {reconstructed && (
               <span data-key="reconstructed">
-                <span className="gdash" style={{ borderColor: GRADE_COLOR.D }} /> rough estimate
+                <span className="gdash" style={{ borderColor: GRADE_COLOR.D }} /> not counted
               </span>
             )}
           </span>
@@ -553,7 +560,7 @@ export function HistorySpark({
       )}
       {open && (
         <div className="dim small" data-basis-note="">
-          Drawn solid where counted, rough where not: {basisRows(h).join('; ')}.
+          Solid where counted, dashed and faint where from the genome or a model: {basisRows(h).join('; ')}.
         </div>
       )}
       {open && (

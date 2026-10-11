@@ -97,7 +97,7 @@ const scenes = [
   ['bfit-iberian', 'frame', ['Iberian lynx', 2000, 1.6]],
   ['bfit-tiger', 'frame', ['Tiger', 2000, 1.6]],
   // Rough stretches (ToLaD#164): genome, model and flagged joins drawn rough, counts solid (ROUGH=a|b picks the look).
-  ['rough-leopard', 'frame', ['Leopard', 20000, 1.0]],
+  ['rough-leopard', 'frame', ['Leopard', 5000, 1.4]],
   ['rough-lion', 'frame', ['Lion', 2000, 1.6]],
   // The search (ToLaD#157): its button at home, "li" typed with the list open, the lion picked (flown there, card open).
   ['search-home', 'home'],
