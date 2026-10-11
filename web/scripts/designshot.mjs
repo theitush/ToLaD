@@ -40,6 +40,8 @@ const scenes = [
   // The lion's last 200 years filling the screen; the mesh on the cave lion as it peels off the lion.
   ['last200', 'decline', ['Lion', 200]],
   ['mesh-lean', 'bar', ['Cave lion', 480000, 3e3, 60, 0]],
+  // An extinct column's tip (its taper to nobody).
+  ['tip-cave', 'bar', ['Cave lion', 16000, 1e4, 30, 0.5]],
   ['mesh-split', 'bar', ['Lion', 499990, 100, 2e4, 1]],
   ['lineage', 'tapnode', [2.57, 1.2]],
 ];
