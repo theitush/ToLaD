@@ -105,7 +105,12 @@ order of precedence:
    cited point is after 1500, it is held to 1500 only, and the trend runs
    from there to the first cited point (ToLaD#71): the history file gains
    the trend's first knot (kind `rangeloss`, grade D) and the span to the
-   first point is kind `rangeloss`, not a step;
+   first point is kind `rangeloss`, not a step. The trend never runs
+   upward (ToLaD#93): where the natural level is below the first cited
+   point, the natural level is evidently an underestimate there, so the
+   knot takes the cited level instead and the span from 1500 to the point
+   is a `held` one (grade D, flat); the knot's note says so, and
+   `stats.json -> history.trend_held` lists those species;
 4. else (no range map) today's level, as above (segment kind `model`).
 
 **Range-loss trend (ToLaD#62, layer 4 of the estimate stack).** A species
@@ -287,6 +292,15 @@ the same way by code rather than by hand.
     1900, so not used as the deep past's level. Genomic curve kept at its own
     level; ...". `deep.join.cited_late` records that point;
     `stats.json -> history.deep_join.cited_late` counts both cases.
+    Where the natural level in 1500 is below the cited point, the trend
+    would rise (lion 150,000 in 1500 -> 500,000 in 1950), so the cited level
+    is held back to 1500 instead and the genomic curve joins that (ToLaD#93;
+    the join's ratio and flag are taken against it). The card sentence ends
+    "... that point's level, held back to 1500 CE because the modelled
+    natural level there (150,002) is below it (evidently an underestimate),
+    is 2.1x higher; ..., then that level is held flat to the cited point,
+    with no range-loss trend rising to it." In the 2026-10-11 build:
+    *Panthera leo*, *Pongo pygmaeus*, *Diceros bicornis*, *Gorilla beringei*.
 
   Before the oldest genomic point, the oldest genomic level is held back to
   the band start (a `held` segment). It replaces the baseline hold, or

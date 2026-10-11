@@ -28,7 +28,8 @@ design. In short:
               rangeloss_record): a log-linear decline from 1500 CE to now. A history
               file replaces it, but where its deep past ends at the natural level (or
               at an unscaled genomic curve) the trend fills the gap from 1500 to its
-              first cited point (ToLaD#71)
+              first cited point (ToLaD#71); never upward: where the natural level is
+              below that point, the cited level is held back to 1500 instead (ToLaD#93)
 
 `apply` rewrites the leaf's pieces / alive / error before sum_tree, so the
 existing sum-up and ghost allocation keep the totals consistent up the tree.
@@ -380,7 +381,10 @@ def deep_join(deep_pts: list[dict], nxt: dict, skipped: dict | None = None) -> t
         deep_pts = [{**p, "n": p["n"] * f, "lo": p["lo"] * f, "hi": p["hi"] * f, "ne": p["ne"] * f,
                      "note": p["note"] + f"; scaled x{_x(f)} to meet {what}"} for p in deep_pts]
     else:
+        held = nxt.get("held_from") is not None
         what = ("that point" if nxt is late else
+                (f"that point's level, held back to 1500 CE because the modelled natural level there "
+                 f"({nxt['held_from']:,.0f}) is below it (evidently an underestimate),") if held else
                 "the modelled natural level in 1500 CE" if nxt["kind"] == "rangeloss" else
                 "the modelled natural baseline" if nxt["kind"] == "natural" else "today's modelled count")
         rel = ("about the same" if off < 1.05 else
@@ -390,7 +394,9 @@ def deep_join(deep_pts: list[dict], nxt: dict, skipped: dict | None = None) -> t
                 + f"Genomic curve kept at its own level; {what} is {rel}"
                 + (f" (flagged: beyond {DEEP_JOIN_FLAG:g}x)" if flag else "")
                 + "; the two are joined log-linearly across PSMC's last 20 kyr"
-                + (", then the range-loss trend runs to the cited point" if skipped is not None else "")
+                + ((", then that level is held flat to the cited point, with no range-loss trend rising to it"
+                    if held else ", then the range-loss trend runs to the cited point")
+                   if skipped is not None else "")
                 + ".")
     join = {"rule": "scaled" if cited else "absolute", "next": "cited" if cited_kind else "modelled",
             "to_kind": nxt["kind"], "to_year": nxt["year"], "to_n": nxt["n"],
@@ -674,9 +680,23 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
         trend = (start is not None and first is not None and first["kind"] in POINT_KINDS
                  and first["year"] > start["year"]
                  and (first["year"] > DEEP_JOIN_CITED_MAX_YEAR if deep_pts else nat_base is not None))
+        held = None
+        if trend and start["n"] < first["n"]:
+            # the trend would rise from 1500 to the first cited point (ToLaD#93): a population the record
+            # says was larger after 1500 than the natural level contradicts the trend's meaning (range
+            # loss). The natural level is evidently an underestimate there: the cited level is held flat
+            # back to 1500 instead (a `held` span, grade D: no figure covers it)
+            held = {"natural_n": start["n"], "year": first["year"], "n": first["n"], "kind": first["kind"],
+                    "baseline": bool(first.get("baseline"))}
+            start = {**start, "n": first["n"], "lo": first["lo"], "hi": first["hi"], "span_kind": "held",
+                     "held_from": start["n"], "cite": first["cite"], "url": first["url"],
+                     "note": f"the {_cited_txt(first)} held back to 1500: the modelled natural (pre-human) "
+                             f"level ({start['n']:,.0f}) is below it, evidently an underestimate here, so no "
+                             "range-loss trend runs up to the cited point"}
         if trend:
             pts = pts[:n_deep] + [start] + pts[n_deep:]
         rec["trend_1500"] = trend
+        rec["trend_held"] = held
         rec["deep_join"] = None
         if deep_pts:
             # the join across the blind spot: a cited next level scales the curve, a modelled one does not
@@ -738,7 +758,9 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
                                 f"({rec['deep']['grade']}; {rec['deep']['cite']})" if deep_pts else "")
                              + (f", natural baseline {base['n']:.3g} ({base['grade']}) before the first point"
                                 if base is nat_base else "")
-                             + (", then the range-loss trend from 1500 to the first cited point" if trend else "")
+                             + ((", then the first cited level held back to 1500 (the natural level is below it)"
+                                 if held else ", then the range-loss trend from 1500 to the first cited point")
+                                if trend else "")
                              + f"; pipeline/history/{rec['file']})"
                              + (" + bulk genomic deep past (genomic.py)" if rec.get("deep_bulk") else ""))
             D["src"].add(src_bit)
@@ -753,9 +775,9 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
         rec["segments"] = compile_segments(pts, G, L, t0_seg, rec["baseline"] is not None and not deep_pts,
                                            pre_level=pre, pre_grade=3 if nat_base else min(3, D["grade_cap"]),
                                            pre_kind="natural" if nat_base else "model")
-        if trend and not deep_pts:
+        if trend and not deep_pts and held is None:
             # the generation that straddles 1500 can fall before the trend's first knot: it holds the
-            # natural level (as in model.rangeloss_record)
+            # natural level (as in model.rangeloss_record); a held knot (ToLaD#93) is the cited level
             for sg in rec["segments"]:
                 if sg["kind"] == K["held"] and sg["year0"] < start["year"]:
                     sg["kind"] = K["natural"]
@@ -788,6 +810,7 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
             "ever_before": before["ever"], "ever_after": D["ever_med"],
             "ever_ratio": D["ever_med"] / before["ever"] if before["ever"] > 0 else None,
             "trend_1500": trend,
+            "trend_held": held,
             "G_yr": G, "segments": len(rec["segments"]), "domestic_on_leaf": bool(D.get("domestic")),
             "deep": deep_rep,
         }
@@ -803,5 +826,13 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
         "species": report,
         "genomic_records_without_points": empty,
         "deep_join": deep_join_summary(report),
+        "trend_held": {
+            "note": "Species whose modelled natural level in 1500 CE is below their first cited point (ToLaD#93): "
+                    "the range-loss trend would rise from 1500 to that point, contradicting its meaning (range "
+                    "loss), so the cited level is held flat back to 1500 instead (a `held` span, grade D) and the "
+                    "natural level is taken as an underestimate there. natural_n = that natural level; year, n, "
+                    "kind = the first cited point. Per species: history.species[<sp>].trend_held.",
+            "species": {sp: r["trend_held"] for sp, r in sorted(report.items()) if r.get("trend_held")},
+        },
     }
     return [r for r in recs if "leaf" in r]

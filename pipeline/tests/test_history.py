@@ -675,5 +675,72 @@ class GapTrend(unittest.TestCase):
             self.assertAlmostEqual(H.interp(c, p["year"]) / p["n"], 1.0, places=9)
 
 
+def _no_rise(tc, rec):
+    """From the 1500 knot to the first cited point the curve never rises (ToLaD#93)."""
+    c = rec["curve"]
+    i = next(i for i, p in enumerate(c) if p["kind"] == "rangeloss")
+    a, b = c[i], c[i + 1]
+    tc.assertEqual(a["year"], 1500)
+    tc.assertLessEqual(b["n"], a["n"])
+    for y in range(1500, int(b["year"]) + 1, 5):
+        tc.assertLessEqual(H.interp(c, y), a["n"] * (1 + 1e-9))
+    lo = H.year_to_ma(b["year"])
+    for s in rec["segments"]:  # the births segments between the knot and the point never rise either
+        if 1500 <= s["year0"] and H.year_to_ma(s["year0"]) > lo:
+            tc.assertLessEqual(s["end"], s["start"] * (1 + 1e-9))
+
+
+class TrendNeverRises(unittest.TestCase):
+    """ToLaD#93: where the natural level in 1500 is below the first cited point, the range-loss trend
+    would run upward; the cited level is held flat back to 1500 instead, and the card says so."""
+
+    NOB = GapTrend.NOB  # 1950: 2e4, 2020: 1e4
+
+    def test_trend_down_is_unchanged(self):
+        rec, rep, _ = _gap_apply(self.NOB)  # natural 1e5 > 2e4: the trend as before
+        _no_rise(self, rec)
+        self.assertIsNone(rep["trend_held"])
+        self.assertEqual(rec["curve"][0]["n"], 1e5)
+
+    def test_natural_below_first_point_is_held(self):
+        rec, rep, D = _gap_apply(self.NOB, n_nat=5e3)
+        _no_rise(self, rec)
+        c = rec["curve"]
+        self.assertEqual([(p["year"], p["kind"], p["n"]) for p in c[:2]], [(1500, "rangeloss", 2e4),
+                                                                           (1950, "estimate", 2e4)])
+        self.assertEqual(rep["trend_held"], {"natural_n": 5e3, "year": 1950, "n": 2e4, "kind": "estimate",
+                                             "baseline": False})
+        self.assertIn("held back to 1500", c[0]["note"])
+        self.assertIn("5,000", c[0]["note"])
+        kinds = [H.KINDS[s["kind"]] for s in rec["segments"]]
+        self.assertNotIn("rangeloss", kinds)
+        self.assertIn("held", kinds)
+        self.assertIn("first cited level held back to 1500", D["meth"][-1])
+        self.assertEqual(rep["deep_from"], "natural")
+
+    def test_genomic_joins_the_held_level(self):
+        doc = _with_deep()
+        del doc["baseline"]
+        doc["point"][0].update(year=1950, n=5e5, lo=4e5, hi=6e5)  # Panthera leo: 150k natural, 500k in 1950
+        rec, rep, _ = _gap_apply(doc, n_nat=1.5e5)
+        _no_rise(self, rec)
+        n = len(rec["deep_points"])
+        c = rec["curve"]
+        self.assertEqual((c[n]["year"], c[n]["n"]), (1500, 5e5))
+        j = rec["deep_join"]
+        self.assertEqual((j["rule"], j["to_kind"], j["to_n"]), ("absolute", "rangeloss", 5e5))
+        self.assertAlmostEqual(j["ratio"], j["deep_n_raw"] / 5e5)
+        self.assertIn("held back to 1500 CE because the modelled natural level there (150,000) is below it",
+                      j["note"])
+        self.assertIn("then that level is held flat to the cited point", j["note"])
+        self.assertNotIn("range-loss trend runs", j["note"])  # the #71 wording
+        self.assertEqual(rep["trend_held"]["natural_n"], 1.5e5)
+        log = {}
+        root, _ = _gap_leaf(n_nat=1.5e5)
+        from tolad_pipeline import model as M
+        H.apply(root, Path("."), log, 0, [{**H.validate(copy.deepcopy(doc)), "file": "t.toml"}], M.rangeloss_start)
+        self.assertEqual(list(log["history"]["trend_held"]["species"]), ["Testus exemplaris"])
+
+
 if __name__ == "__main__":
     unittest.main()
