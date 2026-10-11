@@ -137,8 +137,8 @@ export function colEventsY(fan: Fan, b: FanBranch): EventY[] {
   return out;
 }
 /** An event's tint is at least this tall and this wide on screen (px), so a short window on a thin column still reads. */
-const EVENT_MIN_PX = 3;
-const EVENT_MIN_W = 6;
+const EVENT_MIN_PX = 2;
+const EVENT_MIN_W = 3;
 /** How far (px) above or below a window a touch still opens it. */
 const EVENT_REACH_PX = 10;
 

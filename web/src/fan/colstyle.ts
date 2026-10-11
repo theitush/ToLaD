@@ -79,6 +79,9 @@ export function eventSpans(sp: SpeciesRec, startMa: number): EventSpan[] {
   return out;
 }
 
+/** A window's length in log time (a window reaching now counts from 1 year). */
+const spanOf = (s: EventSpan) => Math.log(Math.max(1, s.ago0) / Math.max(1, s.ago1));
+
 /**
  * The event a touch hits: the span containing `ago` (years before present), else the nearest one
  * overlapping [agoLo, agoHi] (the touch's reach, a few px, so a window thinner than a finger still
@@ -91,7 +94,8 @@ export function eventAt(spans: EventSpan[], ago: number, agoLo = ago, agoHi = ag
     if (s.ago1 > agoHi || s.ago0 < agoLo) continue;
     // Distance in log time from the touch to the window (0 inside it).
     const d = ago > s.ago0 ? Math.log(ago / s.ago0) : ago < s.ago1 ? Math.log(Math.max(1e-9, s.ago1) / Math.max(1e-9, ago)) : 0;
-    if (d < bestD) {
+    // Overlapping windows both holding the touch: the narrower (the more specific) one.
+    if (d < bestD || (d === bestD && best && spanOf(s) < spanOf(best))) {
       best = s;
       bestD = d;
     }

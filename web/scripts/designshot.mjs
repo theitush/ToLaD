@@ -81,6 +81,9 @@ const scenes = [
   ['bneck-puma-in', 'about', ['Cougar', 16000, 5, 0.6]],
   ['bneck-cheetah', 'about', ['Cheetah', 11800, 2, 0.5]],
   ['bneck-cheetah-in', 'about', ['Cheetah', 11800, 5, 0.6]],
+  ['bneck-puma-deep', 'about', ['Cougar', 16000, 8, 0.5]],
+  ['bneck-tiger', 'about', ['Tiger', 2000, 6, 0.3]],
+  ['bneck-iberian', 'about', ['Iberian lynx', 3000, 7, 0.3]],
   ['bneck-tap-puma', 'touch', ['Cougar', 22000]],
   ['bneck-tap-cheetah', 'touch', ['Cheetah', 11800]],
 ];
