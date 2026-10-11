@@ -14,11 +14,13 @@
 //
 // The tree is splits.ts's: each split is one date where a parent population
 // divides into its daughters.
-//   - Centres. Each species has a world-fixed centre line (FanBranch.cx): the
-//     middle of its room, the leaf rooms side by side in one order for both
-//     designs (chooseSides) with a fixed gap between neighbours (gapBetween: GAP_FRAC of the smaller room,
-//     at least MIN_GAP_FRAC of the stem's). Its column is symmetric about it:
-//     [cx − w/2, cx + w/2], w = the individuals alive then.
+//   - Centres. Each species has a world-fixed centre line (FanBranch.cx), the
+//     species in one left-to-right order for both designs (chooseSides),
+//     packed as close as their columns allow at every height (Packer: by a gap
+//     that is a share of the facing columns' widths there, not of their widest
+//     ever, so the columns part as the zoom allows). Its column is symmetric
+//     about it: [cx − w/2, cx + w/2], w = the individuals alive then; its
+//     room (FanBranch.width, colLeft) is its widest.
 //   - Parent columns (FanNode). Below a split its daughters' strands sit side
 //     by side, with no gaps, in the parent's column: as wide as the sum of its
 //     strands' founders (constant), centred under its daughters' rooms
@@ -87,16 +89,16 @@ export const STEM_BOTTOM_MA = 4000;
 export const STEM_FADE_MA = 300;
 /** Height = time: the oldest split (the fork) is at y = 0, "now" at y = −TIME_H. */
 export const TIME_H = 900;
-/** Gap between neighbouring leaf columns: this share of the smaller one's room ... */
-export const GAP_FRAC = 0.2;
-/** ... but at least this share of the stem's width. */
-export const MIN_GAP_FRAC = 0.025;
+/** Curved: gap between neighbouring columns at a height, this share of the narrower facing one there (Packer) ... */
+export const GAP_FRAC = 0.3;
+/** ... but at least this share of the stem's width (both designs; a hair: the gap goes by the columns, so they part as the zoom allows). */
+export const MIN_GAP_FRAC = 0.001;
 /** A split's fork span: this share of the shortest run of its daughters (to their own split or tip) ... */
 export const FORK_FRAC = 0.85;
 /** ... at most this (world units of height: ~0.4 decades of time). */
 export const FORK_MAX = 60;
-/** Straight: gap between a leaning daughter's subtree and its neighbour's, this share of the smaller band (at least MIN_GAP_FRAC of the stem) ... */
-export const LEAN_GAP_FRAC = 0.6;
+/** Straight: gap between a leaning daughter's subtree and its neighbour's at a height, this share of the narrower facing column there ... */
+export const LEAN_GAP_FRAC = 0.45;
 /** ... its slope, world heights per world unit sideways (steeper than 45° on screen at the home view) ... */
 export const LEAN_RISE = 2;
 /** ... taking at most this share of the height to the next event of either daughter. */
@@ -434,14 +436,127 @@ export function columnsAt(fan: Fan, y: number): [number, number][] {
   return out;
 }
 
-/** Gap (world) between neighbouring columns a and b (curved). */
-export function gapBetween(a: FanBranch, b: FanBranch, stem: number): number {
-  return Math.max(GAP_FRAC * Math.min(a.width, b.width), MIN_GAP_FRAC * stem);
+/** Packing (both designs): the heights from now (−TIME_H) down to the oldest split (0), in this many cells. */
+const CELLS = 1024;
+const CELL_H = TIME_H / CELLS;
+
+/**
+ * A subtree's outline, cell by cell of height: its leftmost and rightmost
+ * edge there (L, R; empty: +∞, −∞) and the widths of the columns on those
+ * edges (lw, rw; the gap goes by them).
+ */
+interface Contour {
+  L: Float64Array;
+  R: Float64Array;
+  lw: Float64Array;
+  rw: Float64Array;
 }
 
-/** Gap (world) between a leaning daughter's subtree and its neighbour's, by their widths (straight). */
-export function leanGap(wa: number, wb: number, stem: number): number {
-  return Math.max(LEAN_GAP_FRAC * Math.min(wa, wb), MIN_GAP_FRAC * stem);
+/**
+ * Packs subtrees side by side as close as their columns allow at every height
+ * (no wider than they are there, not their widest ever): the least shift that
+ * keeps one subtree's outline clear of another's by the gap at every height
+ * both have columns. Fixed in the world: it depends only on the tree and the
+ * widths, never on the camera.
+ */
+class Packer {
+  private readonly leaves = new Map<FanBranch, Contour>();
+  constructor(
+    readonly time: TimeScale,
+    readonly mode: WidthMode,
+    readonly W: number,
+  ) {}
+  private empty(): Contour {
+    return { L: new Float64Array(CELLS).fill(Infinity), R: new Float64Array(CELLS).fill(-Infinity), lw: new Float64Array(CELLS), rw: new Float64Array(CELLS) };
+  }
+  /** The cells over heights [y0, y1] (y0 above), clipped to the grid. */
+  private cells(y0: number, y1: number): [number, number] {
+    return [Math.max(0, Math.floor((y0 + TIME_H) / CELL_H)), Math.min(CELLS - 1, Math.floor((y1 + TIME_H) / CELL_H))];
+  }
+  /** A species' column about its centre line at 0, from its tip down to its split: its widest in each cell. */
+  leaf(b: FanBranch): Contour {
+    let c = this.leaves.get(b);
+    if (c) return c;
+    c = this.empty();
+    const [j0, j1] = this.cells(b.tipY, b.splitY);
+    for (let j = j0; j <= j1; j++) {
+      const a = Math.max(b.tipY, -TIME_H + j * CELL_H);
+      const z = Math.min(b.splitY, -TIME_H + (j + 1) * CELL_H);
+      let w = 0;
+      for (let k = 0; k <= 6; k++) {
+        const n = b.pop.aliveAt(this.time.ageAt(a + ((z - a) * k) / 6));
+        if (n > 0) w = Math.max(w, b.unit * g(n, this.mode));
+      }
+      c.L[j] = -w / 2;
+      c.R[j] = w / 2;
+      c.lw[j] = c.rw[j] = w;
+    }
+    this.leaves.set(b, c);
+    return c;
+  }
+  shift(c: Contour, dx: number): Contour {
+    return { L: c.L.map((v) => v + dx), R: c.R.map((v) => v + dx), lw: c.lw.slice(), rw: c.rw.slice() };
+  }
+  copy(c: Contour): Contour {
+    return { L: c.L.slice(), R: c.R.slice(), lw: c.lw.slice(), rw: c.rw.slice() };
+  }
+  /** Adds c into `into` (the outline of both). */
+  union(into: Contour, c: Contour): void {
+    for (let j = 0; j < CELLS; j++) {
+      if (c.L[j] < into.L[j]) {
+        into.L[j] = c.L[j];
+        into.lw[j] = c.lw[j];
+      }
+      if (c.R[j] > into.R[j]) {
+        into.R[j] = c.R[j];
+        into.rw[j] = c.rw[j];
+      }
+    }
+  }
+  /** Adds a band [x0, x1] over heights [y0, y1] (each cell's outline spans to cover it), its facing columns w wide. */
+  bar(into: Contour, x0: number, x1: number, y0: number, y1: number, w = x1 - x0): void {
+    const [j0, j1] = this.cells(y0, y1);
+    for (let j = j0; j <= j1; j++) {
+      if (x0 < into.L[j]) {
+        into.L[j] = x0;
+        into.lw[j] = w;
+      }
+      if (x1 > into.R[j]) {
+        into.R[j] = x1;
+        into.rw[j] = w;
+      }
+    }
+  }
+  /** Gap (world) between two facing columns of widths wa and wb: `frac` of the narrower, at least MIN_GAP_FRAC of the stem. */
+  gap(frac: number, wa: number, wb: number): number {
+    return Math.max(frac * Math.min(wa, wb), MIN_GAP_FRAC * this.W);
+  }
+  /** The least shift that puts c to the right of `acc` by the gap wherever both have columns (−∞: nowhere). */
+  right(acc: Contour, c: Contour, frac: number): number {
+    let d = -Infinity;
+    for (let j = 0; j < CELLS; j++) if (acc.R[j] > -Infinity && c.L[j] < Infinity) d = Math.max(d, acc.R[j] + this.gap(frac, acc.rw[j], c.lw[j]) - c.L[j]);
+    return d;
+  }
+  /** The least shift (most negative) that puts c to the left of `acc` by the gap (+∞: nowhere). */
+  left(acc: Contour, c: Contour, frac: number): number {
+    let d = Infinity;
+    for (let j = 0; j < CELLS; j++) if (acc.L[j] < Infinity && c.R[j] > -Infinity) d = Math.min(d, acc.L[j] - this.gap(frac, acc.lw[j], c.rw[j]) - c.R[j]);
+    return d;
+  }
+  /** Whether a lies inside b at every height (never makes a neighbour move further). */
+  inside(a: Contour, b: Contour): boolean {
+    for (let j = 0; j < CELLS; j++) if (a.L[j] < b.L[j] - 1e-12 || a.R[j] > b.R[j] + 1e-12) return false;
+    return true;
+  }
+  extent(c: Contour): [number, number] {
+    let a = Infinity;
+    let b = -Infinity;
+    for (let j = 0; j < CELLS; j++) {
+      a = Math.min(a, c.L[j]);
+      b = Math.max(b, c.R[j]);
+    }
+    return [a, b];
+  }
 }
 
 export function g(n: number, mode: WidthMode): number {
@@ -475,19 +590,21 @@ const under = (v: FanNode): FanBranch[] => v.kids.flatMap((k) => (isNode(k) ? un
 /**
  * A daughter that grows out of nobody at its split (a domestic stock,
  * population.ts emergeAges): the longest fork (or lean) span over which its
- * move off its slot (ease) stays ahead of its width's share of its room at
- * every height of its ramp, else Infinity. Its sibling's column stays where
- * its founders were while the stock moves out of the way at least as fast as
- * it grows, so it never spills into its sibling's column. (The log widths
- * jump to one unit at the first individual: the ramp in N alone is not
- * enough.)
+ * move off its slot (ease) stays ahead of its width's share of its reach at
+ * every height of its ramp, else Infinity. `reach`: twice the room it moves
+ * into (how much further its centre ends from its neighbour's than it
+ * starts). Its sibling's column stays where its founders were while the
+ * stock moves out of the way at least as fast as it grows, so it never spills
+ * into its sibling's column. (The log widths jump to one unit at the first
+ * individual: the ramp in N alone is not enough.)
  */
-function emergeRun(k: Kid, time: TimeScale, mode: WidthMode, edge: EdgeStyle): number {
+function emergeRun(k: Kid, time: TimeScale, mode: WidthMode, edge: EdgeStyle, reach: number): number {
   const e = isNode(k) ? null : k.pop.emergeAges();
   if (isNode(k) || !e || !(k.width > 0)) return Infinity;
+  if (!(reach > 0)) return 0;
   const E = Math.abs(time.y(e[1]) - time.y(e[0]));
   const xs = Array.from({ length: 96 }, (_, i) => (E * (i + 1)) / 96);
-  const share = xs.map((x) => (k.unit * g(k.pop.aliveAt(time.ageAt(k.splitY - x)), mode)) / k.width);
+  const share = xs.map((x) => (k.unit * g(k.pop.aliveAt(time.ageAt(k.splitY - x)), mode)) / reach);
   const ok = (F: number) => xs.every((x, i) => ease(edge, x / F) >= share[i]);
   if (ok(E)) return E;
   let lo = 0;
@@ -599,9 +716,10 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = FELIDA
   if (!byTree) SIDES.set(clade, (byTree = new Map()));
   let byMode = byTree.get(tree);
   if (!byMode) byTree.set(tree, (byMode = new Map()));
-  const { plans, sides } = chooseSides(root, W, byMode.get(mode));
+  const P = new Packer(time, mode, W);
+  const { plans, sides } = chooseSides(root, P, byMode.get(mode));
   byMode.set(mode, sides);
-  if (edge === 'curved') placeRiver(root, W, time, mode);
+  if (edge === 'curved') placeRiver(root, P, time, mode);
   else placeLean(root, nodes, plans, time, mode);
   // Each strand's place in its ancestors' columns (offsets in the column's order), each column's tile in its parent, each leaf's slot.
   for (const v of nodes) v.strands = under(v);
@@ -661,62 +779,108 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = FELIDA
 }
 
 /**
- * Curved (the river): the leaf rooms side by side in the shared order
- * (chooseSides) with their gaps, centred; each parent column centred under its daughters' rooms; all
- * the daughters of a split peel off together over its fork span (FORK_FRAC of
- * their shortest run, at most FORK_MAX); the lanes blend below a split over
- * at most FORK_MAX.
+ * Curved (the river): bottom up, each split's daughters side by side in the
+ * shared order (chooseSides), each as close to the ones before it as their
+ * columns allow at every height (Packer: by the gap, GAP_FRAC of the narrower
+ * facing column there, at least MIN_GAP_FRAC of the stem's), so the columns
+ * stand apart by what they are at each height, not by their widest ever. Each
+ * parent column sits where its daughters' peels are the shortest (the middle
+ * of the least and the most any daughter moves off its slot); all the
+ * daughters of a split peel off together over its fork span (FORK_FRAC of
+ * their shortest run, at most FORK_MAX); the lanes blend below a split over at
+ * most FORK_MAX. A subtree's outline covers its columns' places above its
+ * fork and the hull of its column and its daughters' over the fork (every
+ * column there is a blend of its slot and its place), so nothing ever meets.
  */
-function placeRiver(root: FanNode, W: number, time: TimeScale, mode: WidthMode): void {
-  const leaves = under(root);
-  let total = 0;
-  for (let j = 0; j < leaves.length; j++) total += leaves[j].width + (j ? gapBetween(leaves[j - 1], leaves[j], W) : 0);
-  let cx = -total / 2;
-  for (let j = 0; j < leaves.length; j++) {
-    if (j) cx += gapBetween(leaves[j - 1], leaves[j], W);
-    leaves[j].colLeft = cx;
-    leaves[j].cx = cx + leaves[j].width / 2;
-    cx += leaves[j].width;
-  }
-  const place = (v: FanNode): void => {
-    for (const k of v.kids) if (isNode(k)) place(k);
-    const first = v.kids[0];
-    const last = v.kids[v.kids.length - 1];
-    const lo = isNode(first) ? first.left : first.colLeft;
-    const hi = isNode(last) ? last.left + last.width : last.colLeft + last.width;
-    v.cx = (lo + hi) / 2;
-    v.left = v.cx - v.width / 2;
-    // The fork span: a share of the shortest run of a daughter before it splits again or ends.
+function placeRiver(root: FanNode, P: Packer, time: TimeScale, mode: WidthMode): void {
+  const pack = (v: FanNode): Contour => {
+    let acc: Contour | null = null;
+    for (const k of v.kids) {
+      let c: Contour;
+      if (isNode(k)) c = pack(k);
+      else {
+        k.cx = 0;
+        k.colLeft = -k.width / 2;
+        c = P.leaf(k);
+      }
+      if (!acc) acc = P.copy(c);
+      else {
+        const dx = P.right(acc, c, GAP_FRAC);
+        move(k, dx);
+        P.union(acc, P.shift(c, dx));
+      }
+    }
+    // Its column: where the farthest peels left and right are equal.
+    let o = 0;
+    let d0 = Infinity;
+    let d1 = -Infinity;
+    for (const k of v.kids) {
+      const d = (isNode(k) ? k.left : k.cx - k.baseW / 2) - o;
+      d0 = Math.min(d0, d);
+      d1 = Math.max(d1, d);
+      o += bandW(k);
+    }
+    const [e0, e1] = span(v);
+    v.left = Math.min(e1 - v.width, Math.max(e0, (d0 + d1) / 2));
+    v.cx = v.left + v.width / 2;
+    // The fork span: a share of the shortest run of a daughter before it splits again or ends; slower for one that grows out of nobody.
     let run = Infinity;
     for (const k of v.kids) run = Math.min(run, v.y - (isNode(k) ? k.y : k.tipY));
-    const fork = Math.max(0, Math.min(FORK_MAX, FORK_FRAC * run, ...v.kids.map((k) => emergeRun(k, time, mode, 'curved'))));
+    const emerge = v.kids.map((k, i) => {
+      // Its reach: twice the least room it moves into from either neighbour (centres ending further apart than they start).
+      let r = Infinity;
+      for (const n of [v.kids[i - 1], v.kids[i + 1]]) if (n) r = Math.min(r, 2 * (Math.abs(n.cx - k.cx) - (bandW(n) + bandW(k)) / 2));
+      return emergeRun(k, time, mode, 'curved', r);
+    });
+    const fork = Math.max(0, Math.min(FORK_MAX, FORK_FRAC * run, ...emerge));
     for (const k of v.kids) k.leanY = v.y - fork;
     v.blend = Math.max(0, Math.min(FORK_MAX, 0.45 * (v.yBot - v.y)));
+    // Its outline: the daughters', and over its fork and down to its parent's split the whole band its column may take (boundPeels).
+    const out = acc!;
+    P.bar(out, e0, e1, v.y - fork, v.yBot, v.width);
+    return out;
   };
-  place(root);
+  const [a, b] = P.extent(pack(root));
+  move(root, -(a + b) / 2);
   boundPeels(root);
 }
+
+/** Where a parent column may sit: between its outermost daughters' places (a species': its founders' width about its centre line; a split's: its own span). */
+function span(k: Kid): [number, number] {
+  if (!isNode(k)) return [k.cx - k.baseW / 2, k.cx + k.baseW / 2];
+  let a = Infinity;
+  let b = -Infinity;
+  for (const c of k.kids) {
+    const [p, q] = span(c);
+    a = Math.min(a, p);
+    b = Math.max(b, q);
+  }
+  return [a, b];
+}
+
+/** A daughter's band in its parent column (a split's: its column; a species': its founders). */
+const bandW = (k: Kid) => (isNode(k) ? k.width : k.baseW);
 
 /** Curved: the steepest a peeling edge may run (world units sideways per height), where the tree allows. */
 export const PEEL_SLOPE = 8;
 
 /**
  * Curved, where two splits come close in time (Felinae's 10.65 and 10.32 Ma):
- * centred under their daughters, a parent's daughters would have to fly apart
- * over the short fork before the next split. But a parent column may sit
- * anywhere inside its leaves' rooms (no two subtrees' rooms overlap, so
- * nothing can meet): this moves each one off the centre, as little as needed,
+ * where its daughters' peels are the shortest, a parent's daughters would
+ * have to fly apart over the short fork before the next split. But a parent
+ * column may sit anywhere between its outermost daughters (span: the packing
+ * keeps that whole band clear, so nothing can meet): this moves each one off
+ * its place, as little as needed,
  * so that every peel's edge runs at most PEEL_SLOPE (the smootherstep's
  * steepest is 1.875 times its mean) — or, if the tree cannot, at the least
- * slope it can. The leaves stay in their rooms.
+ * slope it can. The species stay where they are.
  */
 function boundPeels(root: FanNode): void {
   type Iv = [number, number];
   const ext = new Map<FanNode, Iv>();
-  const extOf = (k: Kid): Iv => (isNode(k) ? ext.get(k)! : [k.colLeft, k.colLeft + k.width]);
   const fill = (v: FanNode): void => {
     for (const k of v.kids) if (isNode(k)) fill(k);
-    ext.set(v, [Math.min(...v.kids.map((k) => extOf(k)[0])), Math.max(...v.kids.map((k) => extOf(k)[1]))]);
+    ext.set(v, span(v));
   };
   fill(root);
   const offs = (v: FanNode) => {
@@ -775,14 +939,27 @@ function boundPeels(root: FanNode): void {
   set(root, f.iv.get(root)!);
 }
 
+/** Moves a subtree sideways, whole. */
+function move(k: Kid, dx: number): void {
+  if (isNode(k)) {
+    k.left += dx;
+    k.cx += dx;
+    for (const c of k.kids) move(c, dx);
+  } else {
+    k.cx += dx;
+    k.colLeft += dx;
+  }
+}
+
 /** One choice of sides for a subtree (each daughter's slot and straight-design lean, its extent, the leans' total run). */
 interface Plan {
   order: Kid[];
   off: number[];
   dx: number[];
-  /** Extent relative to the band's left edge after its lean (a species: its room's left). */
+  /** Extent relative to the band's left edge after its lean, and its outline. */
   a: number;
   b: number;
+  out: Contour;
   cost: number;
 }
 
@@ -816,19 +993,18 @@ const SIDES = new WeakMap<CladeRec, Map<Split, Map<WidthMode, Map<Split, boolean
  * other design's layout), only planned. Sets each node's kids in that order;
  * returns each node's plan and the sides.
  */
-function chooseSides(root: FanNode, W: number, known?: Map<Split, boolean>): { plans: Map<FanNode, Plan>; sides: Map<Split, boolean> } {
-  const bandW = (k: Kid) => (isNode(k) ? k.width : k.baseW);
-  // A daughter's left edge after its lean, relative to its slot's left, before any lean (a species: its room centred on its slot).
-  const nat = (k: Kid) => (isNode(k) ? 0 : k.baseW / 2 - k.width / 2);
+function chooseSides(root: FanNode, P: Packer, known?: Map<Split, boolean>): { plans: Map<FanNode, Plan>; sides: Map<Split, boolean> } {
   const better = (p: Cand, q: Cand) => (Math.abs(p.cost - q.cost) > 1e-9 ? p.cost - q.cost : p.flips - q.flips);
   // One choice at v: its daughters (table order), their candidates, mirrored or not.
   const plan = (v: FanNode, kc: (Cand | null)[], flip: boolean): Cand => {
     const idx = v.kids.map((_, i) => i);
     if (flip) idx.reverse();
     const order = idx.map((i) => v.kids[i]);
-    const ext = idx.map((i): [number, number, number] => {
+    // Each daughter's outline relative to its slot's left, before any lean (a species: its column centred on its slot).
+    const outl = idx.map((i): Contour => {
       const c = kc[i];
-      return c ? [c.a, c.b, c.cost] : [0, (v.kids[i] as FanBranch).width, 0];
+      const k = v.kids[i];
+      return c ? c.out : P.shift(P.leaf(k as FanBranch), (k as FanBranch).baseW / 2);
     });
     const off: number[] = [];
     let o = 0;
@@ -837,27 +1013,32 @@ function chooseSides(root: FanNode, W: number, known?: Map<Split, boolean>): { p
       o += bandW(k);
     }
     const dx = order.map(() => 0);
-    // The larger daughter runs straight on (the first of equals in the table).
+    // The larger daughter runs straight on (the first of equals in the table); each other leans out just clear of the ones nearer it.
     const main = v.kids.reduce((m, k) => (bandW(k) > bandW(m) ? k : m), v.kids[0]);
     const im = order.indexOf(main);
-    const base = (i: number) => off[i] + nat(order[i]);
-    let lo = base(im) + ext[im][0];
-    let hi = base(im) + ext[im][1];
+    const out = P.shift(outl[im], off[im]);
     let prev = 0;
     for (let i = im + 1; i < order.length; i++) {
-      dx[i] = Math.max(prev, hi + leanGap(order[i - 1].width, order[i].width, W) - (base(i) + ext[i][0]), 0);
+      const c = P.shift(outl[i], off[i]);
+      dx[i] = Math.max(prev, P.right(out, c, LEAN_GAP_FRAC), 0);
       prev = dx[i];
-      hi = base(i) + dx[i] + ext[i][1];
+      P.union(out, P.shift(c, dx[i]));
     }
     prev = 0;
     for (let i = im - 1; i >= 0; i--) {
-      dx[i] = Math.min(prev, lo - leanGap(order[i + 1].width, order[i].width, W) - (base(i) + ext[i][1]), 0);
+      const c = P.shift(outl[i], off[i]);
+      dx[i] = Math.min(prev, P.left(out, c, LEAN_GAP_FRAC), 0);
       prev = dx[i];
-      lo = base(i) + dx[i] + ext[i][0];
+      P.union(out, P.shift(c, dx[i]));
     }
-    const cost = ext.reduce((c, e) => c + e[2], 0) + dx.reduce((c, d) => c + Math.abs(d), 0);
+    // Its outline: the daughters' after their leans, their hull with its band over the leans (at most LEAN_MAX_FRAC of the
+    // height to a daughter's next event), its band down to its parent's split.
+    const room = Math.min(...order.map((k) => v.y - (isNode(k) ? k.y : k.tipY)));
+    P.bar(out, 0, v.width, v.y - LEAN_MAX_FRAC * room, v.yBot);
+    const [a, b] = P.extent(out);
+    const cost = kc.reduce((n, c) => n + (c ? c.cost : 0), 0) + dx.reduce((c, d) => c + Math.abs(d), 0);
     const flips = (flip ? 1 : 0) + kc.reduce((n, c) => n + (c ? c.flips : 0), 0);
-    return { order, off, dx, a: Math.min(lo, 0), b: Math.max(hi, v.width), cost, flip, flips, kids: kc };
+    return { order, off, dx, a, b, out, cost, flip, flips, kids: kc };
   };
   const cands = (v: FanNode): Cand[] => {
     const fronts = v.kids.map((k) => (isNode(k) ? cands(k) : [null]));
@@ -873,7 +1054,7 @@ function chooseSides(root: FanNode, W: number, known?: Map<Split, boolean>): { p
     // Keep those no kept one beats on all of left, right, run and mirrored splits.
     const keep: Cand[] = [];
     for (const c of all) {
-      if (keep.some((k) => k.a >= c.a - 1e-12 && k.b <= c.b + 1e-12 && k.cost <= c.cost + 1e-9 && k.flips <= c.flips)) continue;
+      if (keep.some((k) => k.cost <= c.cost + 1e-9 && k.flips <= c.flips && P.inside(k.out, c.out))) continue;
       keep.push(c);
       if (keep.length >= MAX_CANDS) break;
     }
@@ -909,7 +1090,7 @@ function chooseSides(root: FanNode, W: number, known?: Map<Split, boolean>): { p
  * leans towards, along a straight diagonal (LEAN_RISE heights per unit
  * sideways, at most LEAN_MAX_FRAC of the height to either daughter's next
  * event, so leans end before anything else starts and never meet), just far
- * enough to clear its sibling's whole subtree by a gap (leanGap). Which side
+ * enough to clear its sibling's subtree by a gap at every height (Packer, LEAN_GAP_FRAC). Which side
  * each daughter is on is the shared order's (chooseSides: the leans' least
  * total sideways run). A species' column is centred on its slot's centre plus
  * its lean. The lanes blend below a split as far down as its daughters lean
@@ -923,7 +1104,9 @@ function placeLean(root: FanNode, nodes: FanNode[], plans: Map<FanNode, Plan>, t
     const p = plans.get(v)!;
     v.cx = v.left + v.width / 2;
     const room = Math.min(...p.order.map((k) => v.y - nextEvent(k)));
-    const emerge = Math.min(...p.order.map((k) => emergeRun(k, time, mode, 'straight')));
+    // (A stock growing out of nobody: its reach is its own lean, or its sibling's away from it if it runs straight on.)
+    const far = Math.max(...p.dx.map(Math.abs));
+    const emerge = Math.min(...p.order.map((k, i) => emergeRun(k, time, mode, 'straight', 2 * (p.dx[i] ? Math.abs(p.dx[i]) : far))));
     p.order.forEach((k, i) => {
       const x0 = v.left + p.off[i];
       const d = p.dx[i];
