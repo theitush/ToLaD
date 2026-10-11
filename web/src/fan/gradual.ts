@@ -20,7 +20,7 @@
 // the clean split.
 
 import { lowbias32 } from '../../../packages/procgen/src/hash.ts';
-import { BRIDGE_J, packBridge, type BridgeInst } from './bridge';
+import { BRIDGE_GAP1, BRIDGE_J, packBridge, type BridgeInst } from './bridge';
 import type { BridgeLayer } from './bridgegl';
 import { isNode, laneAt, leftAt, STEM_BOTTOM_MA, TIME_C, type Fan, type FanBranch, type FanNode } from './layout';
 import type { TwigView } from './twigs';
@@ -147,6 +147,8 @@ export function bridgeInstances(v: TwigView, fan: Fan, style: SplitStyle, win: S
       const xbT = xb0 + sb * (y0 - pya);
       const xaB = xa0 + sa * (y1 - pya);
       const xbB = xb0 + sb * (y1 - pya);
+      // (Every link here too long to show: bridge.ts BRIDGE_GAP1.)
+      if (Math.min(xbT - xaT, xbB - xaB) >= BRIDGE_GAP1 * (wa + wb)) continue;
       const x0 = Math.max(-4, Math.min(xaT, xaB) - s.rmax * wa - 3);
       const x1 = Math.min(v.w + 4, Math.max(xbT, xbB) + s.rmax * wb + 3);
       if (!(x1 > x0)) continue;

@@ -2,7 +2,7 @@
 // shadeBridge it mirrors line for line), drawn over the mesh by FanGL.
 
 import { HASH_GLSL } from '../../../packages/procgen/src/glsl.ts';
-import { BRIDGE_BAND_PX, BRIDGE_F, BRIDGE_J, BRIDGE_P, BRIDGE_U } from './bridge';
+import { BRIDGE_BAND_PX, BRIDGE_F, BRIDGE_GAP0, BRIDGE_GAP1, BRIDGE_J, BRIDGE_P, BRIDGE_U } from './bridge';
 import type { Palette } from './mesh';
 
 const BRIDGE_VS = /* glsl */ `#version 300 es
@@ -115,6 +115,9 @@ void main() {
   float tauC = log2(BAND_PX * dtdy / GL);
   int tauB = max(0, int(ceil(tauC)));
   int top = tauB + 1;
+  float gap = vEdge.y + vEdge.w * (p.y - vRect.y) - (vEdge.x + vEdge.z * (p.y - vRect.y));
+  float gapA = 1.0 - smooth01((gap / max(1e-6, vW.x + vW.y) - ${BRIDGE_GAP0.toFixed(6)}) / ${(BRIDGE_GAP1 - BRIDGE_GAP0).toFixed(6)});
+  if (!(gapA > 0.0)) discard;
   vec4 best = vec4(0.0);
   for (int j = 0; j < ${BRIDGE_J}; j++) {
     if (j >= int(vIdx.z)) break;
@@ -146,7 +149,7 @@ void main() {
       float yR = dir == 0u ? yC : yP;
       float xL = vEdge.x + vEdge.z * (yL - vRect.y) - r * ra * vW.x;
       float xR = vEdge.y + vEdge.w * (yR - vRect.y) + r * rb * vW.y;
-      float a = lineAA(segDist(p, vec2(xL, yL), vec2(xR, yR)), lw) * wt * vW.w;
+      float a = lineAA(segDist(p, vec2(xL, yL), vec2(xR, yR)), lw) * wt * gapA * vW.w;
       if (a > best.a) {
         int cd = int(dir == 0u ? vReach.w : vReach.z);
         best = vec4(uPal[cd], a);

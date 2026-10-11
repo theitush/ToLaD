@@ -17,7 +17,8 @@
 //   keep(g) = 1 below k0, then amp · (1 − smoothstep((g − k0) ÷ (k1 − k0))),
 // and, for the hybrid zone, reaches into both strands by a hashed share of
 // their widths times reach(g) (0 below hIn, rmax at h0, 0 again at h1), J links per generation
-// (sub-pairs of P): a strip of shared mesh that narrows to nothing.
+// (sub-pairs of P): a strip of shared mesh that narrows to nothing. Links
+// fade out once the gap they span is wider than the strands themselves.
 
 import { lowbias32 } from '../../../packages/procgen/src/hash.ts';
 import { lineAA, linkWidth, timeRank, timeRep, type Palette } from './mesh';
@@ -29,6 +30,9 @@ export const BRIDGE_P = 0.85;
 /** Most links per generation (the hybrid zone's sub-pairs). */
 export const BRIDGE_J = 3;
 export const BRIDGE_F = 28;
+/** Links fade out as the gap they span grows from GAP0 to GAP1 times the two strands' widths (a world ratio: the same at every zoom). */
+export const BRIDGE_GAP0 = 0.6;
+export const BRIDGE_GAP1 = 1.5;
 export const BRIDGE_U = 4;
 
 export interface BridgeInst {
@@ -114,6 +118,10 @@ export function shadeBridge(m: BridgeInst, px: number, py: number, kLog: number,
   const tauC = Math.log2((BRIDGE_BAND_PX * dtdy) / m.GL);
   const tauB = Math.max(0, Math.ceil(tauC));
   const top = tauB + 1;
+  // The gap at this row, against the strands' widths: links far too long to read as a mesh fade out.
+  const gap = m.xb + m.sb * (py - m.y0) - (m.xa + m.sa * (py - m.y0));
+  const gapA = 1 - smooth((gap / Math.max(1e-6, m.wa + m.wb) - BRIDGE_GAP0) / (BRIDGE_GAP1 - BRIDGE_GAP0));
+  if (!(gapA > 0)) return [0, 0, 0, 0];
   let best: RGBA = [0, 0, 0, 0];
   for (let j = 0; j < Math.min(m.J, BRIDGE_J); j++) {
     const P = subPair(m.P, j);
@@ -143,7 +151,7 @@ export function shadeBridge(m: BridgeInst, px: number, py: number, kLog: number,
       const yR = dir === 0 ? yC : yP;
       const xL = m.xa + m.sa * (yL - m.y0) - r * ra * m.wa;
       const xR = m.xb + m.sb * (yR - m.y0) + r * rb * m.wb;
-      const a = lineAA(segDist(px, py, xL, yL, xR, yR), lw) * wt * m.alpha;
+      const a = lineAA(segDist(px, py, xL, yL, xR, yR), lw) * wt * gapA * m.alpha;
       if (a > best[3]) {
         const code = dir === 0 ? m.cR : m.cL;
         best = [pal[code][0], pal[code][1], pal[code][2], a];
