@@ -33,7 +33,7 @@ export const SPLIT_LABEL: Record<SplitStyle, string> = { clean: 'clean', fading:
 export const SPLIT_NAME: Record<SplitStyle, string> = { clean: 'clean split', fading: 'fading links', hybrid: 'hybrid zone', late: 'late gene flow' };
 
 /** The window's height in fork spans (short, long). */
-export const WINDOW_SPANS: Record<SplitWindow, number> = { short: 0.5, long: 1.2 };
+export const WINDOW_SPANS: Record<SplitWindow, number> = { short: 0.4, long: 0.9 };
 /** Late gene flow: the share of the links still there just after the split, and how much longer its window is. */
 export const LATE_AMP = 0.3;
 export const LATE_STRETCH = 2;
@@ -148,7 +148,7 @@ export function bridgeInstances(v: TwigView, fan: Fan, style: SplitStyle, win: S
       const xaB = xa0 + sa * (y1 - pya);
       const xbB = xb0 + sb * (y1 - pya);
       // (Every link here too long to show: bridge.ts BRIDGE_GAP1.)
-      if (Math.min(xbT - xaT, xbB - xaB) >= BRIDGE_GAP1 * (wa + wb)) continue;
+      if (Math.min(xbT - xaT, xbB - xaB) >= BRIDGE_GAP1 * 2 * Math.min(wa, wb)) continue;
       const x0 = Math.max(-4, Math.min(xaT, xaB) - s.rmax * wa - 3);
       const x1 = Math.min(v.w + 4, Math.max(xbT, xbB) + s.rmax * wb + 3);
       if (!(x1 > x0)) continue;

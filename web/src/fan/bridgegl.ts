@@ -116,7 +116,7 @@ void main() {
   int tauB = max(0, int(ceil(tauC)));
   int top = tauB + 1;
   float gap = vEdge.y + vEdge.w * (p.y - vRect.y) - (vEdge.x + vEdge.z * (p.y - vRect.y));
-  float gapA = 1.0 - smooth01((gap / max(1e-6, vW.x + vW.y) - ${BRIDGE_GAP0.toFixed(6)}) / ${(BRIDGE_GAP1 - BRIDGE_GAP0).toFixed(6)});
+  float gapA = 1.0 - smooth01((gap / max(1e-6, 2.0 * min(vW.x, vW.y)) - ${BRIDGE_GAP0.toFixed(6)}) / ${(BRIDGE_GAP1 - BRIDGE_GAP0).toFixed(6)});
   if (!(gapA > 0.0)) discard;
   vec4 best = vec4(0.0);
   for (int j = 0; j < ${BRIDGE_J}; j++) {

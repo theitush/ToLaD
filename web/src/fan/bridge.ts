@@ -30,7 +30,7 @@ export const BRIDGE_P = 0.85;
 /** Most links per generation (the hybrid zone's sub-pairs). */
 export const BRIDGE_J = 3;
 export const BRIDGE_F = 28;
-/** Links fade out as the gap they span grows from GAP0 to GAP1 times the two strands' widths (a world ratio: the same at every zoom). */
+/** Links fade out as the gap they span grows from GAP0 to GAP1 times twice the narrower strand's width (a world ratio: the same at every zoom). */
 export const BRIDGE_GAP0 = 0.6;
 export const BRIDGE_GAP1 = 1.5;
 export const BRIDGE_U = 4;
@@ -120,7 +120,7 @@ export function shadeBridge(m: BridgeInst, px: number, py: number, kLog: number,
   const top = tauB + 1;
   // The gap at this row, against the strands' widths: links far too long to read as a mesh fade out.
   const gap = m.xb + m.sb * (py - m.y0) - (m.xa + m.sa * (py - m.y0));
-  const gapA = 1 - smooth((gap / Math.max(1e-6, m.wa + m.wb) - BRIDGE_GAP0) / (BRIDGE_GAP1 - BRIDGE_GAP0));
+  const gapA = 1 - smooth((gap / Math.max(1e-6, 2 * Math.min(m.wa, m.wb)) - BRIDGE_GAP0) / (BRIDGE_GAP1 - BRIDGE_GAP0));
   if (!(gapA > 0)) return [0, 0, 0, 0];
   let best: RGBA = [0, 0, 0, 0];
   for (let j = 0; j < Math.min(m.J, BRIDGE_J); j++) {
