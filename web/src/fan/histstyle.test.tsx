@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { bandEdge, CURVE_KINDS, fmtWhen, HistorySpark, isNaturalStart, popTicks, sourceRows, yearTicks } from './HistorySpark';
-import { basisBetween, GRADE_WORD, MODELLED_KINDS, noDataSpans, ROUGH_BASES } from './history';
+import { GRADE_WORD, MODELLED_KINDS, noDataSpans, styleBetween } from './history';
 import { FELIDAE, NATURAL_META, type HistoryRec } from './panthera';
 import { loadClade } from './panthera-extract';
 import { population } from './population';
@@ -46,17 +46,7 @@ describe('species card history', () => {
       expect(html).toContain('data-band=""');
       expect(html).toContain('data-curve=""');
       const pts = h.points.slice().sort((a, b) => a.year - b.year);
-      // Two looks (ToLaD#164): a line between two cited figures solid, every other one rough (dashed).
-      const lines = [...html.matchAll(/data-style="(\w+)" data-basis="(\w+)"/g)].map((m) => [m[1], m[2]]);
-      expect(lines.length, common).toBe(pts.length - 1);
-      lines.forEach(([st, basis], j) => {
-        const a = pts[j];
-        const b = pts[j + 1];
-        const rough = ROUGH_BASES.has(basisBetween(h, a.year, b.year)) || (CURVE_KINDS.has(a.kind) && CURVE_KINDS.has(b.kind));
-        expect(basis, `${common} ${a.year}-${b.year}`).toBe(rough ? 'rough' : 'count');
-        expect(st, `${common} ${a.year}-${b.year}`).toBe(rough ? 'dashed' : 'solid');
-      });
-      expect(lines.some(([, x]) => x === 'count'), common).toBe(common !== 'Puma');
+      for (let k = 1; k < pts.length; k++) expect(html).toContain(`data-style="${styleBetween(h, pts[k - 1].year, pts[k].year)}"`);
     }
   });
 

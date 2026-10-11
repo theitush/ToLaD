@@ -3,7 +3,7 @@
 // zoomed far out, and a species card open.
 //   npm run build:single && node scripts/designshot.mjs <out-dir> [prefix] [only,names]
 //   (DSF: device scale factor, default 2; CLIP=x,y,w,h; DEBUG=1: the ?debug readout; EDGE=curved|straight: the fan's edges;
-//   WIDTH=linear|log: the widths, default linear; SPLIT=clean|fading|hybrid|late, WIN=short|long: the split's design, ToLaD#50)
+//   WIDTH=linear|log: the widths, default linear)
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -99,9 +99,6 @@ const scenes = [
   ['bfit-puma', 'frame', ['Puma', 2000, 1.6]],
   ['bfit-iberian', 'frame', ['Iberian lynx', 2000, 1.6]],
   ['bfit-tiger', 'frame', ['Tiger', 2000, 1.6]],
-  // Rough stretches (ToLaD#164): genome, model and flagged joins drawn rough, counts solid (ROUGH=a|b picks the look).
-  ['rough-leopard', 'frame', ['Leopard', 5000, 1.4]],
-  ['rough-lion', 'frame', ['Lion', 2000, 1.6]],
   // The search (ToLaD#157): its button at home, "li" typed with the list open, the lion picked (flown there, card open).
   ['search-home', 'home'],
   ['search-li', 'search', ['li']],
@@ -117,7 +114,7 @@ try {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: Number(process.env.DSF || 2), isMobile: true, hasTouch: true });
   const page = await ctx.newPage();
   page.on('pageerror', (e) => console.log('pageerror', String(e)));
-  const q = [process.env.DEBUG ? 'debug' : '', process.env.EDGE ? `edge=${process.env.EDGE}` : '', process.env.SPLIT ? `split=${process.env.SPLIT}` : '', process.env.WIN ? `win=${process.env.WIN}` : '', process.env.ROUGH ? `rough=${process.env.ROUGH}` : ''].filter(Boolean).join('&');
+  const q = [process.env.DEBUG ? 'debug' : '', process.env.EDGE ? `edge=${process.env.EDGE}` : ''].filter(Boolean).join('&');
   await page.goto(pathToFileURL(resolve('dist-single/index.html')).href + (q ? `?${q}` : ''));
   await page.waitForFunction(() => !!window.__fan, null, { timeout: Number(process.env.LOAD_MS || 20000) });
   for (const [name, kind, args] of scenes) {

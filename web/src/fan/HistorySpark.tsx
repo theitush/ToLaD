@@ -12,7 +12,7 @@
 
 import { useId, useState } from 'react';
 import { approxCountsIn, formatCount } from '../data/count';
-import { basisBetween, basisSpans, GRADE_COLOR, GRADE_WORD, MODELLED_KINDS, noDataSpans, ROUGH_BASES, styleBetween, type Basis, type SpanStyle } from './history';
+import { basisSpans, GRADE_COLOR, GRADE_WORD, MODELLED_KINDS, noDataSpans, styleBetween, type Basis, type SpanStyle } from './history';
 import type { HistoryRec, HistPoint, NaturalMeta, NaturalRec } from './panthera';
 import { TIME_C } from './population';
 import { EVENT_TINT } from './colstyle';
@@ -32,8 +32,6 @@ const BOT = H - B;
 
 const DASH: Record<SpanStyle, string | undefined> = { solid: undefined, dashed: '4 3', dotted: '1.2 3' };
 const OPACITY: Record<SpanStyle, number> = { solid: 0.9, dashed: 0.75, dotted: 0.5 };
-/** The rough look (ToLaD#164): the genome, a model, a flagged join; dashed in the guess colour, softer. */
-const ROUGH = { dash: '4 3', opacity: 0.7 };
 /** A stretch held flat for want of figures: faint, finely dashed. */
 const NODATA = { dash: '2 2.5', opacity: 0.4 };
 const STUB = 40; // px of chart left of the first point for a "no data" lead-in
@@ -289,20 +287,12 @@ export function HistorySpark({
     return [{ k, ev, xa, xb, tx, anchor, ty, on, named, lx0, lx1: lx0 + tw }];
   });
   const lines = [];
-  // Along a run of rough lines, the dash pattern carries on from one to the next (a curve of many short steps still reads dashed).
-  let dashAt = 0;
   for (let k = 1; k < pts.length; k++) {
     const a = pts[k - 1];
     const b = pts[k];
-    // Two looks (ToLaD#164): counted (cited figures and the line between two of them) solid; the
-    // genome, a model or a flagged join rough: the guessed curve, dashed in the guess colour.
-    const basis = basisBetween(h, a.year, b.year);
-    const rough = ROUGH_BASES.has(basis) || (CURVE_KINDS.has(a.kind) && CURVE_KINDS.has(b.kind));
-    // (A guessed figure's line is fainter, still solid: its dot's colour says the grade.)
-    const st: SpanStyle = rough ? 'dashed' : 'solid';
-    const faint = !rough && styleBetween(h, a.year, b.year) === 'dotted';
-    const offset = dashAt;
-    dashAt = rough ? dashAt + Math.hypot(X(b.year) - X(a.year), Y(b.n) - Y(a.n)) : 0;
+    const st = styleBetween(h, a.year, b.year);
+    // Between two reconstructed points: the guessed curve, in the guess colour.
+    const curve = CURVE_KINDS.has(a.kind) && CURVE_KINDS.has(b.kind);
     lines.push(
       <line
         key={k}
@@ -310,13 +300,11 @@ export function HistorySpark({
         y1={Y(a.n)}
         x2={X(b.year)}
         y2={Y(b.n)}
-        stroke={rough ? GRADE_COLOR.D : undefined}
-        strokeDasharray={rough ? ROUGH.dash : DASH[st]}
-        strokeDashoffset={rough && offset ? offset.toFixed(1) : undefined}
-        opacity={rough ? ROUGH.opacity : faint ? 0.6 : OPACITY.solid}
+        stroke={curve ? GRADE_COLOR.D : undefined}
+        strokeDasharray={curve ? DASH.dashed : DASH[st]}
+        opacity={curve ? 0.8 : OPACITY[st]}
         data-style={st}
-        data-basis={rough ? 'rough' : 'count'}
-        data-curve={rough ? '' : undefined}
+        data-curve={curve ? '' : undefined}
       />,
     );
   }
@@ -535,7 +523,7 @@ export function HistorySpark({
             ))}
             {reconstructed && (
               <span data-key="reconstructed">
-                <span className="gdash" style={{ borderColor: GRADE_COLOR.D }} /> not counted
+                <span className="gdash" style={{ borderColor: GRADE_COLOR.D }} /> reconstructed guess
               </span>
             )}
           </span>
@@ -560,7 +548,7 @@ export function HistorySpark({
       )}
       {open && (
         <div className="dim small" data-basis-note="">
-          Solid where counted, dashed and faint where from the genome or a model: {basisRows(h).join('; ')}.
+          Where these numbers come from: {basisRows(h).join('; ')}.
         </div>
       )}
       {open && (
