@@ -400,6 +400,8 @@ export class FanView implements InputHandlers {
   readonly debug = typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug');
   /** What each branch's individuals view drew last frame (taps, tests). */
   twigStats = new Map<number, TwigStats>();
+  /** Without the GPU layer: this frame's styled column stretches, faded once the individuals are drawn. */
+  private heldRuns: { run: RibbonPt[]; hw: number; d: number }[] = [];
   private models = new Map<string, TwigModel>();
   private raf = 0;
   private anim: ((t: number) => boolean) | null = null;
@@ -751,6 +753,7 @@ export class FanView implements InputHandlers {
     this.drawStem();
     for (const b of this.fan.branches) this.drawStrand(b);
     for (const b of this.fan.branches) this.drawIndividuals(b);
+    this.drawHeld();
     if (this.gl) this.bridges = bridgeInstances(this, this.fan, this.split, this.splitWindow, this.gl.bridge);
     this.drawStemFade();
     // Labels: one form everywhere (see labelSpots).
@@ -936,19 +939,18 @@ export class FanView implements InputHandlers {
         const gp = wp * p.f;
         const wm = (wq + wp) / 2;
         const gm = (gq + gp) / 2;
-        let gc = mix01(GRAY, '#131c19', laneDim(wm - gm, lives) * 0.82);
-        let ec = mix01(GREEN, '#0d2318', laneDim(gm, lives) * 0.9);
-        // A styled stretch of the column (held flat for want of figures: colstyle.ts) fades towards the background.
+        const gc = mix01(GRAY, '#131c19', laneDim(wm - gm, lives) * 0.82);
+        const ec = mix01(GREEN, '#0d2318', laneDim(gm, lives) * 0.9);
+        // A styled stretch of the column (held flat for want of figures: colstyle.ts) fades towards the
+        // background: the background over the whole lane, lanes and individuals alike (drawn after the mesh).
         const dim = held.length ? dimAt(held, (y0 + y1) / 2) : 0;
-        if (dim > 0) {
-          gc = fade01(gc, dim);
-          ec = fade01(ec, dim);
-        }
         // The least widths across the lane, not along the row: a thin branch-out leaning s px per px
         // is √(1 + s²) px of the row per px across (else a hairline lean breaks into dashes).
         const sq = Math.sqrt(1 + ((xp + wp / 2 - xq - wq / 2) / (y1 - y0)) ** 2);
         const xa = Math.min(xq, xp);
-        trap(this.gl.under, xq, xq + Math.max(0.6 * sq, wq), xp, xp + Math.max(0.6 * sq, wp), y0, y1, gc, 1, xa - 0.5, Math.max(xq + Math.max(0.6, wq), xp + Math.max(0.6, wp)) + 0.5);
+        const xr = Math.max(xq + Math.max(0.6, wq), xp + Math.max(0.6, wp)) + 0.5;
+        trap(this.gl.under, xq, xq + Math.max(0.6 * sq, wq), xp, xp + Math.max(0.6 * sq, wp), y0, y1, gc, 1, xa - 0.5, xr);
+        if (dim > 0) trap(this.gl.over, xq, xq + Math.max(sq, wq), xp, xp + Math.max(sq, wp), y0, y1, BG01, dim, xa - 0.5, xr + 0.5);
         if (gq > 0 || gp > 0) {
           const g1q = xq + Math.max(sq, gq);
           const g1p = xp + Math.max(sq, gp);
@@ -963,18 +965,31 @@ export class FanView implements InputHandlers {
         }
       }
     } else {
-      // The whole strand, then each styled stretch over it, faded as the GPU path fades it.
-      for (const [run, d] of [[pts, 0] as [RibbonPt[], number]].concat(held.map(([t, bt, d]) => [pts.filter((p) => p.y >= t - 0.5 && p.y <= bt + 0.5), d]))) {
-        if (run.length < 2) continue;
-        ctx.fillStyle = d ? mix(grayC, BG, d) : grayC;
-        this.ribbon(run, (p) => hw - p.w, () => hw, 0.6);
-        if (run.some((p) => p.f > 0)) {
-          // Green lane on the left, floored at 1 px.
-          ctx.fillStyle = d ? mix(greenC, BG, d) : greenC;
-          this.ribbon(run, () => hw, (p) => hw - p.w * p.f, -1);
-        }
+      ctx.fillStyle = grayC;
+      this.ribbon(pts, (p) => hw - p.w, () => hw, 0.6);
+      if (pts.some((p) => p.f > 0)) {
+        // Green lane on the left, floored at 1 px.
+        ctx.fillStyle = greenC;
+        this.ribbon(pts, () => hw, (p) => hw - p.w * p.f, -1);
+      }
+      // Its styled stretches: faded over the individuals too, once they are drawn (drawHeld).
+      for (const [t, bt, d] of held) {
+        const run = pts.filter((p) => p.y >= t - 0.5 && p.y <= bt + 0.5);
+        if (run.length > 1) this.heldRuns.push({ run, hw, d });
       }
     }
+  }
+
+  /**
+   * Without the GPU layer: the styled stretches of the columns (colstyle.ts) faded towards the
+   * background over their lanes and individuals, as the GPU path does with its overlay.
+   */
+  private drawHeld(): void {
+    for (const { run, hw, d } of this.heldRuns) {
+      this.ctx.fillStyle = `rgba(12,23,20,${d})`;
+      this.ribbon(run, (p) => hw - p.w, () => hw, 0.6);
+    }
+    this.heldRuns.length = 0;
   }
 
   /**
@@ -1413,11 +1428,6 @@ function mix(a: string, b: string, t: number): string {
 }
 
 const BG01 = rgb01(BG);
-/** A 0–1 colour faded towards the background by t. */
-function fade01(c: [number, number, number], t: number): [number, number, number] {
-  return [c[0] + (BG01[0] - c[0]) * t, c[1] + (BG01[1] - c[1]) * t, c[2] + (BG01[2] - c[2]) * t];
-}
-
 /** The dim of the styled span (screen [top, bottom, dim]) a screen y falls in; 0 in none. */
 function dimAt(spans: [number, number, number][], y: number): number {
   for (const s of spans) if (y >= s[0] && y <= s[1]) return s[2];
