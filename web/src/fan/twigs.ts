@@ -902,10 +902,16 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
   if (wyBot < b.tipY || wyTop > yFirst) return null;
   const yTop = Math.max(wyTop, b.tipY);
   const yBot = Math.min(wyBot, yFirst);
-  // Off the branch's column entirely?
-  const Lb = m.lanes(yBot);
-  const [bx0, bx1] = xr(yBot);
-  if (bx1 < Lb.left || bx0 > Lb.left + Lb.w) return null;
+  // Off the branch's column entirely? (At several heights: near a split the column leans, and
+  // zoomed in it can cross the screen while off it at the bottom row.)
+  let onScreen = false;
+  for (let i = 0; i <= 8 && !onScreen; i++) {
+    const y = yTop + ((yBot - yTop) * i) / 8;
+    const Lb = m.lanes(y);
+    const [bx0, bx1] = xr(y);
+    onScreen = !(bx1 < Lb.left || bx0 > Lb.left + Lb.w);
+  }
+  if (!onScreen) return null;
   const ym = (yTop + yBot) / 2;
   const L = m.lanes(ym);
   const gm = m.generationAt(ym);
