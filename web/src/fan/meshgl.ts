@@ -109,7 +109,7 @@ float gColR;
 float gXG;
 uniform float uKLog;
 uniform float uNowPx;
-uniform vec3 uPal[4];
+uniform vec3 uPal[3];
 out vec4 o;
 const float LN2 = 0.6931471805599453;
 const float TEX_FLOOR = ${TEX_FLOOR.toFixed(4)};
@@ -135,8 +135,7 @@ vec4 life(uint seed, uint i, float GL, float Lm, float nowRel) {
 uint latBit(uint l, uint idx) { return lowbias32((idx * 0x9e3779b1u) ^ vIdx2.x ^ (l * 0x85ebca6bu)) >> 31u; }
 int code(float lane, bool alive) {
   if (lane < 0.5) return alive ? 0 : 1;
-  if (alive) return -1;
-  return lane > 1.5 ? 3 : 2;
+  return alive ? -1 : 2;
 }
 // mesh.ts slotBase: generation's first member on slot K (stride S, n members).
 uint slotBase(uint K, uint S, uint n) { return n == 0u ? 0u : (K % max(S, 1u)) % n; }
@@ -202,7 +201,7 @@ vec4 shadeLane(float lane, uint iA, uint iB, float d, vec2 p, float floorA, floa
     float y1 = vTime.x + log1ps(vTime.y / vTime.z) / kl;
     float top = lane < 0.5 ? y0 : max(y0, uNowPx + 3.0);
     float a = p.y >= top && p.y < y1 ? baseA * lineAA(d, vSlot.z) : 0.0;
-    if (a > best) { best = a; bc = lane < 0.5 ? 1 : (lane > 1.5 ? 3 : 2); }
+    if (a > best) { best = a; bc = lane < 0.5 ? 1 : 2; }
   }
   if (bc < 0) return vec4(0.0);
   return vec4(uPal[bc], best);
@@ -314,7 +313,7 @@ vec4 shadeLinks(vec2 p) {
       float yP = p.y + (tp - tpar) / dtdy;
       float a = lineAA(segDist(p, vec2(xP, yP), vec2(xC, yC)), lw) * w * wt * linkA * vMisc.x;
       if (a > best.a) {
-        int cd = xC < gXG ? 1 : (vMisc.z > 1.5 ? 3 : 2);
+        int cd = xC < gXG ? 1 : 2;
         best = vec4(uPal[cd], a);
       }
     }

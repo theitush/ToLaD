@@ -26,12 +26,11 @@ try {
       [1, 0, 0],
       [0, 1, 0],
       [0, 0, 1],
-      [1, 1, 1],
     ];
-    const results = { checked: 0, mismatches: [], counts: [0, 0, 0, 0, 0] };
+    const results = { checked: 0, mismatches: [], counts: [0, 0, 0, 0] };
     // The first pass after the canvas is resized is a warm-up (SwiftShader drops a few of its pixels).
     let warm = true;
-    for (const lane of [1, 1, 0, 2]) {
+    for (const lane of [1, 1, 0]) {
       for (const g of [3, 5000, m.G - 30, m.G - 4, m.G - 1]) {
         const n = m.size(g);
         // nowRel inside the generation for the last ones (some alive, some not yet born), the real "now" otherwise.
@@ -68,7 +67,7 @@ try {
           const [R, G, B, A] = px.slice(o, o + 4);
           // Premultiplied: divide by alpha to read the colour.
           const [r, g2, b2] = [R / Math.max(1, A), G / Math.max(1, A), B / Math.max(1, A)];
-          const gpu = A < 2 ? -1 : r > 0.5 && g2 > 0.5 ? 3 : r > 0.5 ? 0 : g2 > 0.5 ? 1 : b2 > 0.5 ? 2 : -2;
+          const gpu = A < 2 ? -1 : r > 0.5 ? 0 : g2 > 0.5 ? 1 : b2 > 0.5 ? 2 : -2;
           const L = M.lifeGPU(c.seedA, c.B0, c.GL, c.Lm, c.nowRel);
           const code = M.colourCode(lane, L.alive);
           // Lit only if born by "now" (it covers some of the band).
@@ -202,7 +201,7 @@ try {
   console.log(`cross-links: ${r.links.checked} pixels (${r.links.lit} lit by links), ${r.links.bad} off by more than 0.06 (worst ${r.links.worst.toFixed(3)})`);
   console.log(`lattice of lines: ${r.lattice.checked} pixels (${r.lattice.lit} lit), ${r.lattice.bad} off by more than 0.06 in coverage (worst ${r.lattice.worst.toFixed(3)})`);
   console.log(`checked ${r.checked} individuals on the GPU: ${bad} disagree with the CPU mirror`);
-  console.log(`  (none / alive / lineage / ended / withered: ${r.counts.join(' / ')})`);
+  console.log(`  (none / alive / lineage / ended: ${r.counts.join(' / ')})`);
   for (const mm of r.mismatches) console.log('  mismatch', JSON.stringify(mm));
 } finally {
   await browser.close();

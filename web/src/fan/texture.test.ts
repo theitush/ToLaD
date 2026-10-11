@@ -4,9 +4,9 @@ import { laneAt, layoutFan, leftAt } from './layout';
 import { PANTHERA } from './panthera';
 import { latticeRep, latticeTop, shadeMesh, unpackInst, type MeshInst } from './mesh';
 import { MeshBatch, rgb01 } from './meshgl';
-import { drawTwigs, kLogAt, LINEAGE, LIVING, SCALE_BAR_PX, TEXTURE_IND, textureFade, lineLevel, TWIG_GRAY, TWIG_WITHERED, TwigModel, type TwigView } from './twigs';
+import { drawTwigs, kLogAt, LINEAGE, LIVING, SCALE_BAR_PX, TEXTURE_IND, textureFade, lineLevel, TWIG_GRAY, TwigModel, type TwigView } from './twigs';
 
-const PAL = [LIVING, LINEAGE, TWIG_GRAY, TWIG_WITHERED].map(rgb01);
+const PAL = [LIVING, LINEAGE, TWIG_GRAY].map(rgb01);
 
 /** Unpack the batch's instances (meshgl.ts layout, mesh.ts packInst). */
 function unpack(b: MeshBatch): MeshInst[] {

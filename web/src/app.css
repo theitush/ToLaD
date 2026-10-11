@@ -22,11 +22,10 @@
   --ink: #e8f0ea;
   --ink-2: #a9b8ae;
   --ink-3: #75867c;
-  /* The lanes (view.ts GREEN, GRAY, WITHERED; twigs.ts LINEAGE). */
+  /* The lanes (view.ts GREEN, GRAY; twigs.ts LINEAGE). */
   --living: #3fd286;
   --lineage: #c8efc4;
   --ended: #67737f;
-  --withered: #8b806d;
   --sans: 'Sofia Sans Condensed', 'Avenir Next Condensed', 'Roboto Condensed', 'Arial Narrow', system-ui, sans-serif;
   --serif: 'Newsreader', 'Iowan Old Style', Georgia, serif;
 }
@@ -426,9 +425,6 @@
 .fan .lane.dead {
   background: var(--ended);
 }
-.fan .lane.extinct {
-  background: var(--withered);
-}
 
 /* The card: a sheet from the bottom edge, as wide as the phone. */
 .fan .card-sp {
@@ -525,7 +521,7 @@
 .fan .card-sp .status.prehistoric {
   background: none;
   color: #cfc4b1;
-  border: 1px solid var(--withered);
+  border: 1px solid #8b806d;
 }
 .fan .card-sp .spark-h {
   display: block;

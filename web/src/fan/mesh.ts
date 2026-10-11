@@ -18,7 +18,7 @@
 // colours who is in it, by what it is:
 //   - green lane (alive at t with living descendants today, population.ts):
 //     deep green if alive now, else pale green (their line goes on);
-//   - gray lane (line ended): gray, or withered for extinct species; the
+//   - gray lane (line ended, an extinct species' own all of it): gray; the
 //     living are never in it.
 // Which slots are drawn: a nested, hashed subset of the lattice (the mesh's
 // own lines, fixed in the world). The slots are grouped in blocks of 2^l;
@@ -56,14 +56,13 @@ export function attrSeed(sp: Species, g: number): number {
 export const enum Lane {
   Green = 0,
   Gray = 1,
-  Withered = 2,
 }
 
-/** Colour of an individual by its lane: 0 deep green (alive now), 1 pale green (its line goes on), 2 gray, 3 withered; -1 not in this lane. */
+/** Colour of an individual by its lane: 0 deep green (alive now), 1 pale green (its line goes on), 2 gray; -1 not in this lane. */
 export function colourCode(lane: Lane, alive: boolean): number {
   if (lane === Lane.Green) return alive ? 0 : 1;
   if (alive) return -1; // the living are in the green lane
-  return lane === Lane.Withered ? 3 : 2;
+  return 2;
 }
 
 /** One individual as the GPU sees it: birth and life (years, from the start of its generation), alive now. */
@@ -249,7 +248,7 @@ export interface MeshInst {
   gBoff: number;
   alpha: number;
   mode: 0 | 1;
-  /** The lane right of xG: Gray or Withered. */
+  /** The lane right of xG (Gray). */
   lane: Lane;
   tipR: number;
   GL: number;
@@ -365,7 +364,7 @@ export function packInst(m: MeshInst, f: Float32Array, u: Uint32Array, k: number
   u[q + 11] = (m.gA ?? 0) >>> 0;
 }
 
-/** Colours (linear 0–1 RGB) by colour code: deep green, pale green, gray, withered. */
+/** Colours (linear 0–1 RGB) by colour code: deep green, pale green, gray. */
 export type Palette = [number, number, number][];
 
 const expm1s = (x: number) => (Math.abs(x) < 1e-3 ? x * (1 + x * (0.5 + x / 6)) : Math.exp(x) - 1);
@@ -471,7 +470,7 @@ function shadeLane(m: MeshInst, lane: Lane, iA: number, iB: number, d: number, p
     const a = py >= top && py < y1 ? baseA * lineAA(d, m.lw) : 0;
     if (a > best) {
       best = a;
-      bc = lane === Lane.Green ? 1 : lane === Lane.Withered ? 3 : 2;
+      bc = lane === Lane.Green ? 1 : 2;
     }
   }
   if (bc < 0) return [0, 0, 0, 0];
@@ -557,7 +556,7 @@ export function shadeLinks(m: MeshInst, px: number, py: number, kLog: number, pa
       const yP = py + (tp - tpar) / dtdy;
       const a = lineAA(segDist(px, py, xP, yP, xC, yC), lw) * w * wt * linkA * m.alpha;
       if (a > best[3]) {
-        const code = xC < m.xG ? 1 : m.lane === Lane.Withered ? 3 : 2;
+        const code = xC < m.xG ? 1 : 2;
         best = [pal[code][0], pal[code][1], pal[code][2], a];
       }
     }

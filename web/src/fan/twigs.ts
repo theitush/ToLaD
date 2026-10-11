@@ -546,8 +546,6 @@ export const LIVING = '#3fd286';
 export const LINEAGE = '#c8efc4';
 /** Dead, line ended. */
 export const TWIG_GRAY = '#95a2b0';
-/** Dead, of an extinct species. */
-export const TWIG_WITHERED = '#a89c86';
 /** Most individuals enumerated on the CPU for links and labels. */
 const MAX_TWIGS = 6000;
 const MAX_LINKS = 2000;
@@ -691,13 +689,10 @@ interface Stretch {
   pitchPx: [number, number];
   nT: [number, number];
   nG: number;
-  /** The lane right of the green one: withered over an extinct species' span, else gray. */
-  lane: Lane;
 }
 
 /** The column's chords between yTop < yBot. */
 function stretches(v: TwigView, m: TwigModel, yTop: number, yBot: number): Stretch[] {
-  const y0 = m.b.splitY;
   const cuts = m.b.tess.cuts(m.b, yTop, yBot, v.sy, 4);
   const at = (y: number) => {
     const L = m.lanes(y);
@@ -716,7 +711,6 @@ function stretches(v: TwigView, m: TwigModel, yTop: number, yBot: number): Stret
     // (A green lane that starts within the chord starts at the column's left edge.)
     const xGa = a.L.gw > 0 ? a.xG : a.colX;
     const xGb = B.L.gw > 0 ? B.xG : B.colX;
-    const lane = m.rec.extinct && ym < y0 ? Lane.Withered : Lane.Gray;
     out.push({
       ya: cuts[c],
       yb: cuts[c + 1],
@@ -725,7 +719,6 @@ function stretches(v: TwigView, m: TwigModel, yTop: number, yBot: number): Stret
       pitchPx: [a.P * v.sx, B.P * v.sx],
       nT: [a.L.w / a.P, B.L.w / B.P],
       nG: green ? m.greenSlots(ym) : 0,
-      lane,
     });
   }
   return out;
@@ -843,7 +836,7 @@ export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: num
         gBoff: gB !== NONE ? gB - gA : 0,
         alpha: instA,
         mode,
-        lane: S.lane,
+        lane: Lane.Gray,
         tipR: look.tipR,
         GL: m.GL,
         Lm,
