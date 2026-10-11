@@ -57,3 +57,42 @@ kind  = "estimate"
 cite  = "McCarthy et al. 2017, Panthera uncia, IUCN Red List e.T22732A50664030 (figures as given by the IUCN SSC Cat Specialist Group)"
 url   = "https://doi.org/10.2305/IUCN.UK.2017-2.RLTS.T22732A50664030.en"
 note  = "7,446-7,996 individuals, 2,710-3,386 mature (n = midpoint). Range reflects compilation only, true uncertainty much wider."
+
+[deep]
+method = "PSMC"
+cite   = "Solari et al. 2025, PNAS 122:e2502584122, Fig. 3B (Mongolia, 29x, the thick green curve)"
+url    = "https://doi.org/10.1073/pnas.2502584122"
+mu     = 3.62e-09   # the curve's mutation rate, per site per generation (Armstrong et al. 2025 snow leopard pedigree rate)
+g      = 5.0       # the curve's generation time, years
+grade  = "D"
+note   = "Digitised from the article PDF's raster of Fig. 3 (1028x1625 px; PMC12541318 open-access package): x calibrated on the tick marks (1e3, 1e4, 1e5, 1e6 yr at 124, 380.5, 637, 894 px: 256.7 px per decade), y on the grid lines (Ne 0-30,000 at 1539.5-933.5 px: 202 px per 10,000). Every column scanned for the curve's legend colour (111,203,42), within RGB distance 40; inside the grey LGM band (40-100 kyr) the colour is overlaid, so there by green dominance (G - max(R, B) > 10). A column whose matched pixels span <= 9 px is on a step; neighbouring columns within 2 px make one step; steps within 1.5 px in Ne and 3% in time merged. Reading error ~1 px: ~1% in time, ~50 in Ne. 316-560 kyr (the steep rise) is hidden under the other populations' curves; the build interpolates across it. The oldest bin (0.98-1.26 Myr, a drop from ~26,700 to ~19,000) is left out (Hilgers et al. 2025). Mongolia is the deepest-covered wild genome; captive (28x), India (12x) and Afghanistan (9x) agree with it (level x1.03, x0.89, x0.80 over 20-670 kyr after the rescale; log-residual <= x1.11). ToLaD#66 replaced Armstrong et al. 2025 Fig. 4 (green curve, same rate and g): it is the captive genome (SRR12437590), its time axis is in generations (g = 1; see Panthera_leo.toml), and it reaches only ~130,000 generations with a false oldest peak, so it gave three points. Agreeing (level of the other curve against this one after the same rescale, 20 kyr to the older end; log-residual): Cho et al. 2013 Fig. 4b (6.5e-9/gen) x0.93, x1.10; Figueiro et al. 2017 Fig. 1B (1.0e-8/gen) x0.82, x1.14; Bergman et al. 2023 Supplementary Data 3 (9.01e-9/gen, DNA Zoo = the captive genome) x0.88, x1.18; Armstrong 2025 green x0.83, x1.17 over 20-94 kyr as published (g = 5), x0.57, x1.23 over 20-470 kyr read as g = 1: this panel alone does not show the time offset of the others (its curve rises steadily over the short span it covers, so time and level trade off). Cross-check charts: .claude/handoff/previews/psmc66-shots/Panthera_uncia.png (local)."
+# [years ago from, to, Ne] as published (young to old); the build rescales and converts them
+steps  = [
+  [700, 3030, 1410],
+  [3080, 4960, 3690],
+  [5100, 7290, 4480],
+  [7560, 9810, 5960],
+  [10170, 10350, 5950],
+  [13070, 13300, 7300],
+  [14420, 17730, 7650],
+  [17890, 22790, 7350],
+  [22790, 23200, 7480],
+  [24270, 28520, 7670],
+  [32050, 35060, 8790],
+  [38350, 39040, 11080],
+  [39040, 43090, 10450],
+  [48420, 52490, 12160],
+  [59520, 63380, 13490],
+  [69950, 71220, 13970],
+  [72500, 75150, 14440],
+  [86750, 99250, 14930],
+  [101000, 126500, 15120],
+  [126500, 181000, 15300],
+  [181000, 214700, 15470],
+  [218600, 256900, 15870],
+  [256900, 266300, 16000],
+  [276000, 315700, 16610],
+  [560600, 635600, 24800],
+  [670800, 760600, 26910],
+  [817100, 926500, 26710],
+]

@@ -1,11 +1,14 @@
-// ToLaD tile decoder, format version 1.1 (see pipeline/FORMAT.md).
+// ToLaD tile decoder, format version 1.4 (see pipeline/FORMAT.md).
 // No dependencies; works in browsers, Web Workers and Node 18+.
 //
 //   import { decodeFile } from './tolad-decoder.js';
 //   const sk = decodeFile(arrayBuffer);          // skeleton.tld
 //   sk.meta.tiles                                // tile manifest
 //   sk.name(0), sk.ever(0), sk.profile(0) ...    // per-row accessors
-//   file.history(row)                            // curated population history (HIST, v1.1) or null
+//   file.history(row)                            // curated population history (HIST, v1.1) or null;
+//                                                // .modelled === 'rangeloss': a modelled range-loss trend
+//   file.natural(row)                            // natural (pre-human) baseline (NATB, v1.2) or null
+//   file.redList(row)                            // IUCN Red List status (RLST, v1.4) or null
 //
 // All per-row columns are exposed as typed arrays (zero-copy views) in
 // `file.col`; the accessor methods dequantize one row at a time. Unknown
@@ -42,8 +45,10 @@ export const GRADES = ['A', 'B', 'C', 'D'];
 export const DATE_SOURCES = ['upham-calibrated', 'interpolated', 'fossil-range', 'anchored'];
 /** HIST point / segment kinds (same list as skeleton META.hist_kinds). */
 export const HIST_KINDS = ['census', 'estimate', 'index-scaled', 'reconstruction', 'unverified',
-  'model', 'interpolated', 'held', 'baseline'];
+  'model', 'interpolated', 'held', 'baseline', 'genomic', 'natural', 'rangeloss'];
 export const HIST_POINT_BASELINE = 1;
+/** RLST category codes (same list as skeleton META.red_list.categories; 0 = none). */
+export const RED_LIST_CATEGORIES = ['', 'LC', 'NT', 'VU', 'EN', 'CR', 'EW', 'EX', 'DD', 'NE'];
 
 export function dqAge(q) {
   return q === 0 ? 0 : Math.pow(10, (q - 1) / Q.AGE_STEPS_PER_DEX + Q.AGE_MIN_LOG10);
@@ -67,7 +72,7 @@ const TYPES = {
   ALIV: Uint16Array, GHST: Uint16Array, LOHI: Uint8Array, FLAG: Uint16Array,
   METH: Uint16Array, SRCM: Uint16Array, PPK_: Uint16Array, PROF: Uint8Array,
   NTIP: Uint32Array, GID_: Uint32Array, OTT_: Uint32Array, PBDB: Uint32Array,
-  STUB: Uint32Array,
+  STUB: Uint32Array, NATB: Uint16Array, RLST: Uint32Array,
 };
 
 function fourcc(u32) {
@@ -247,6 +252,37 @@ export class TileFile {
    * `cite` indexes skeleton META.hist_sources; segment sizes are births per generation.
    */
   history(i) { return (this.hist && this.hist.get(i)) || null; }
+  /**
+   * Natural (pre-human) baseline of a species row (NATB, format v1.2), or null.
+   * { n, lo, hi, km2Natural, km2Current }: individuals alive with no human impact
+   * (95% range lo..hi) and the PHYLACINE present-natural and current range areas
+   * (km2Current = 0 for extinct species). Always modelled: grade and kind are in
+   * skeleton META.natural (grade D, kind reconstruction).
+   */
+  natural(i) {
+    const a = this.col.NATB;
+    if (!a || a[5 * i] === 0) return null;
+    return {
+      n: dqLog16(a[5 * i]), lo: dqLog16(a[5 * i + 1]), hi: dqLog16(a[5 * i + 2]),
+      km2Natural: dqLog16(a[5 * i + 3]), km2Current: dqLog16(a[5 * i + 4]),
+    };
+  }
+  /**
+   * IUCN Red List status of a species row (RLST, format v1.4), or null (fossils, internal nodes).
+   * { category, source, year, taxon, assessment }: the category code ('LC' ... 'NE'), the index
+   * into skeleton META.red_list.sources it came from, the assessment year (the source's vintage
+   * when there is no assessment), and the IUCN taxon and assessment ids (0 = none); the
+   * assessment's page is iucnredlist.org/species/<taxon>/<assessment>.
+   */
+  redList(i) {
+    const a = this.col.RLST;
+    if (!a || (a[3 * i] & 255) === 0) return null;
+    const w = a[3 * i];
+    return {
+      category: RED_LIST_CATEGORIES[w & 255], source: (w >>> 8) & 255, year: w >>> 16,
+      taxon: a[3 * i + 1], assessment: a[3 * i + 2],
+    };
+  }
   /** Mean births/yr in each profile bin (bin 0 = youngest), see profileEdges(). */
   profile(i) {
     const k = Q.PROFILE_K;

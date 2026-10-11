@@ -102,6 +102,15 @@ def main(argv: list[str] | None = None) -> int:
     from . import model, tiles
     model.run(root, a.raw, ctx, log)
     log_step(t_start, "counts modelled")
+    from . import redlist
+    redlist.attach(root, a.raw, ctx, log)
+    log_step(t_start, f"Red List status: {log['red_list']['living_by_source']}")
+    dj = log.get("history", {}).get("deep_join")
+    if dj:  # the genomic deep past's join (ToLaD#80): rules applied and species beyond the flag
+        log_step(t_start, f"genomic join: {dj['by_rule']}, flagged {dj['flagged_by_rule']}")
+        for sp, f in dj["flagged"].items():
+            print(f"    flagged {sp}: genomic/next {f['ratio']:.3g} ({f['to_kind']}), {f['rule']}"
+                  + (f" x{f['factor']:.3g}" if f["rule"] == "scaled" else ""), file=sys.stderr)
     log["counts"] = counts(root)
     log["spot_checks"] = spot_checks(root)
     log["calibration_check"] = calibration_report(root, a.raw)

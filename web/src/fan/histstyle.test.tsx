@@ -1,11 +1,11 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { plainAgo, plainCount, SpeciesCard } from './FanApp';
-import { popTicks, yearTicks } from './HistorySpark';
-import { GRADE_WORD, noDataSpans, styleBetween } from './history';
-import { FELIDAE } from './panthera';
+import { fmtYear, HistorySpark, popTicks, yearTicks } from './HistorySpark';
+import { GRADE_WORD, MODELLED_KINDS, noDataSpans, styleBetween } from './history';
+import { FELIDAE, type HistoryRec } from './panthera';
 import { population } from './population';
-import { RED_LIST } from './status';
+import { RED_LIST, redListOf } from './status';
 import { approxCountsIn, formatCount } from '../data/count';
 
 const byName = (common: string) => FELIDAE.species.find((s) => s.common === common)!;
@@ -33,6 +33,36 @@ describe('species card history', () => {
     }
   });
 
+  it('a modelled range-loss trend (format v1.3, ToLaD#73) draws dashed with a hollow start, never like a cited point', () => {
+    // As the pipeline ships it for a species with no history file (Lynx lynx): natural held to 1500 CE, then log-linear to today.
+    const G = 9.14;
+    const h: HistoryRec = {
+      use: 'counts',
+      component: 'wild',
+      scope: '',
+      notes: 'Modelled, not counted (grade D).',
+      modelled: 'rangeloss',
+      G,
+      L: G / 2,
+      nowYear: 2027,
+      points: [
+        { year: 1500, n: 707946, lo: 62230, hi: 8035261, grade: 'D', kind: 'rangeloss', baseline: false, cite: 'ToLaD range-loss trend (ToLaD#62)', url: '', note: '' },
+        { year: 2027, n: 434510, lo: 45499, hi: 4149540, grade: 'C', kind: 'model', baseline: false, cite: 'ToLaD model', url: '', note: '' },
+      ],
+      segments: [
+        { year0: 1500 - 1000 * G, generations: 1000, startSize: 1.5e5, endSize: 1.5e5, grade: 'D', kind: 'natural' },
+        { year0: 1500, generations: 57.6, startSize: 1.5e5, endSize: 9.5e4, grade: 'D', kind: 'rangeloss' },
+      ] as HistoryRec['segments'],
+    };
+    const html = renderToStaticMarkup(<HistorySpark h={h} open />);
+    expect(html).toContain('data-style="dashed"');
+    expect(html).not.toContain('data-style="dotted"');
+    // The trend's start is hollow (the model's), today's count a filled dot.
+    expect((html.match(/data-modelled=""/g) ?? []).length).toBe(1);
+    expect(html).toContain('data-modelled-note=""');
+    expect(html).toContain('Modelled, not counted');
+  });
+
   it('collapsed, the card shows the sparkline but not the list; species without history show neither', () => {
     const lion = renderToStaticMarkup(<SpeciesCard sp={byName('Lion')} onClose={() => {}} />);
     expect(lion).toContain('<svg');
@@ -52,7 +82,8 @@ describe('species card history', () => {
       expect(pts.length).toBeGreaterThanOrEqual(2);
       for (const p of pts) {
         expect(p.cite.length).toBeGreaterThan(20);
-        expect(p.url).toMatch(/^https:\/\/doi\.org\//);
+        // A modelled point (the range-loss trend's start, ToLaD#62) cites the model's README, not a paper.
+        if (!MODELLED_KINDS.has(p.kind)) expect(p.url).toMatch(/^https:\/\/doi\.org\//);
       }
       // the Red List's decline: the earlier level is higher than the latest figure
       expect(pts[0].n).toBeGreaterThan(pts[pts.length - 1].n);
@@ -61,8 +92,9 @@ describe('species card history', () => {
   });
 
   it('no living species shows a flat assumed stretch without a "no data" mark', () => {
-    // (The wild species with a curated history; the rest show the constant model, the domestic cat its growth since domestication.)
-    const living = FELIDAE.species.filter((s) => !s.extinct && s.history?.component === 'wild');
+    // (The wild species with a curated or genomic history; the rest show the constant model, the domestic cat its growth since
+    // domestication, a range-loss trend (ToLaD#62) its modelled natural level, dashed as modelled, not held.)
+    const living = FELIDAE.species.filter((s) => !s.extinct && s.history?.component === 'wild' && s.history.modelled !== 'rangeloss');
     expect(living.length).toBeGreaterThanOrEqual(6);
     for (const sp of living) {
       const h = sp.history;
@@ -74,18 +106,21 @@ describe('species card history', () => {
       expect(before, sp.common).toBeTruthy();
       expect(html).toContain('data-nodata="before"');
       expect(html).toContain('>no data</text>');
-      expect(html).toContain(`No data before ${before!.year}: held at `);
+      expect(html).toContain(`No data before ${fmtYear(before!.year)}: held at `);
       // A held stretch after the last figure is drawn faint too, never as a plain line.
       expect(html.includes('data-nodata="after"')).toBe(nd.some((s) => s.side === 'after'));
     }
-    // The snow leopard has no level before its first figure: held at today's count.
-    const snow = noDataSpans(byName('Snow leopard').history!).find((s) => s.side === 'before')!;
-    expect(snow.today).toBe(true);
-    expect(snow.level).toBeCloseTo(byName('Snow leopard').alive, -2);
-    // The leopard is held at its pre-decline (1998) level.
-    const leo = noDataSpans(byName('Leopard').history!).find((s) => s.side === 'before')!;
-    expect(leo.today).toBe(false);
-    expect(leo.year).toBe(1998);
+    // With a genomic deep past (ToLaD#60) every Panthera is held at its oldest genomic level, not at
+    // today's count (snow leopard, no cited baseline) or the pre-decline level (leopard, 1998).
+    for (const c of ['Snow leopard', 'Leopard']) {
+      const h = byName(c).history!;
+      const nd = noDataSpans(h).find((s) => s.side === 'before')!;
+      const p0 = h.points.slice().sort((a, b) => a.year - b.year)[0];
+      expect(p0.kind, c).toBe('genomic');
+      expect(nd.today, c).toBe(false);
+      expect(nd.year, c).toBe(p0.year);
+      expect(nd.level, c).toBe(p0.n);
+    }
   });
 
   it('the sparkline has 3–5 round year ticks and one or two population ticks', () => {
@@ -117,7 +152,7 @@ describe('the species card: the population at the time touched', () => {
     expect(then).toContain('~400k alive 70 years ago');
     expect(then).toContain('58% have descendants alive today');
     expect(then).toContain('~23k alive today');
-    expect(then).toContain('Roughly 600 billion lions have ever lived (rough estimate)');
+    expect(then).toContain('Roughly 900 billion lions have ever lived (rough estimate)'); // (its genomic deep past, ToLaD#60/#66)
     const now = face(renderToStaticMarkup(<SpeciesCard sp={lion} onClose={() => {}} />));
     expect(now).toContain(`${formatCount(population(lion).aliveAt(0))} alive today`);
     // At now, "alive today" once and no trivial "100% have descendants".
@@ -138,7 +173,8 @@ describe('the species card: the population at the time touched', () => {
         for (const jargon of ['grade', 'model', 'generation', 'range', 'Myr', 'kyr', '≈', 'lineage', 'curated', ' × 10', 'born in total', 'line ended'])
           expect(f, `${sp.common}: "${jargon}" on the face`).not.toContain(jargon);
         // A few short lines: the face stays tight.
-        expect(f.replace(/Population over time[\s\S]*$/, '').length, sp.common).toBeLessThan(200);
+        // (Under 230: every cat now carries its status chip, ToLaD#48, up to "Critically Endangered" long.)
+        expect(f.replace(/Population over time[\s\S]*$/, '').length, sp.common).toBeLessThan(230);
         const d = details(html);
         expect(d).toContain('Generation');
         expect(d).toContain(`Data grade${sp.grade}`);
@@ -155,21 +191,21 @@ describe('the species card: the population at the time touched', () => {
     for (const sp of FELIDAE.species) {
       const html = renderToStaticMarkup(<SpeciesCard sp={sp} onClose={() => {}} />);
       const chip = html.match(/<span class="status[^"]*"[^>]*>([^<]*)<\/span>/);
-      if (!sp.extinct && !RED_LIST[sp.sci]) {
-        expect(chip, sp.common).toBeNull();
-        continue;
-      }
+      // (Every cat has a status in the data, ToLaD#48: the living their category, the domestic cat Not Evaluated.)
       expect(chip, sp.common).not.toBeNull();
       if (sp.extinct) {
         expect(chip![1]).toBe('Extinct (prehistoric)');
         expect(RED_LIST[sp.sci]).toBeUndefined();
-      } else if (!RED_LIST[sp.sci]) {
-        // (Only the big cats' statuses are curated so far: the rest show none.)
-        expect(want[sp.common]).toBeUndefined();
+        expect(sp.redList).toBeNull(); // fossils carry no status in the data
+      } else if (sp.sci === 'Felis catus') {
+        expect(chip![1]).toBe('Not Evaluated');
+        expect(sp.redList?.source).toBe('not-listed');
       } else {
-        expect(chip![1]).toBe(want[sp.common]);
-        const s = RED_LIST[sp.sci];
-        expect(s.year).toBeGreaterThanOrEqual(2017);
+        if (want[sp.common]) expect(chip![1]).toBe(want[sp.common]);
+        // the data's status (ToLaD#48), or the curated one where that is the newer assessment
+        expect(sp.redList?.source).toBe('iucn-2026-1');
+        const s = redListOf(sp)!;
+        expect(s.year).toBeGreaterThanOrEqual(2015); // (the Panthera since 2017; a few small cats were last assessed in 2015)
         expect(s.url).toMatch(/^https:\/\/www\.iucnredlist\.org\/species\/\d+\/\d+$/);
         expect(details(html)).toContain(`${s.year} assessment`);
         expect(html).toContain(`href="${s.url}"`);

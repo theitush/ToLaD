@@ -1,0 +1,39 @@
+species   = "Mustela nigripes"
+common    = "Black-footed ferret"
+component = "wild"
+use       = "counts"
+scope     = "global, wild (reintroduction sites), all ages; the ~300 animals in captive breeding facilities are not counted"
+notes     = """
+The last wild population (Meeteetse, Wyoming) was taken into captivity in 1985-87, and no wild
+ferret has been found since 1987 (USFWS 2019 SSA). Every living ferret descends from seven
+founders. Reintroductions began in 1991: 34 sites so far, most lost to sylvatic plague, and the
+wild population needs plague management and captive-reared releases to persist. Between 1987 and
+1991 the species was extinct in the wild (the curve cannot show a zero, so it runs log-linear from
+the modelled natural level to the 2019 count).
+No sourced pre-settlement count: large historical numbers are inferred from prairie-dog colony
+area and the Meeteetse density of one adult ferret per 40-60 ha of prairie-dog colony (Forrest et
+al., via the SSA), not counted. Added for ToLaD#68/#72: the model's own count (161,078, from
+density x a clade-mean range) was about 300x too high.
+"""
+
+[[point]]
+year  = 2019
+n     = 340
+lo    = 340
+hi    = 340
+grade = "C"
+kind  = "estimate"
+cite  = "U.S. Fish and Wildlife Service 2019, Species Status Assessment Report for the Black-footed Ferret (Mustela nigripes), version 1.0, December 12, 2019"
+url   = "https://iris.fws.gov/APPS/ServCat/DownloadFile/169265"
+note  = "'As of 2019, 14 of 29 reintroduction sites are active, with an estimated wild population of approximately 340 individuals.'"
+
+[[point]]
+year  = 2025
+n     = 496
+lo    = 496
+hi    = 496
+grade = "C"
+kind  = "estimate"
+cite  = "U.S. Fish and Wildlife Service 2025, 5-Year Status Review for Black-footed Ferret (Mustela nigripes), Mountain-Prairie Region"
+url   = "https://ecosphere-documents-production-public.s3.amazonaws.com/sams/public_docs/species_nonpublish/23838.pdf"
+note  = "'As of January 30, 2025, 20 of 34 reintroduction sites are active, with an estimated wild population of approximately 496.' The captive population (~300 in 6 facilities) is not counted."

@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { decodeFile, describe, profileEdges, Q, KIND_SKELETON, KIND_TILE } from '../tolad-decoder.js';
+import { decodeFile, describe, profileEdges, Q, KIND_SKELETON, KIND_TILE, HIST_KINDS, RED_LIST_CATEGORIES, FLAG } from '../tolad-decoder.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const DATA = process.env.TOLAD_DATA || join(here, '..', '..', '..', 'data', 'mammals');
@@ -146,7 +146,9 @@ test('MOCK individuals are flagged as mock in data and name', () => {
 
 test('HIST round-trips against debug_top.json history', () => {
   assert.ok(Array.isArray(dump.history) && dump.history.length >= 40, 'history list in debug_top.json');
-  assert.equal(sk.meta.hist_index.length, dump.history.length);
+  // modelled range-loss records (v1.3) are not indexed; the dump keeps a sample of them. Modelled
+  // genomic records (ToLaD#64, ~100) are indexed and all in the dump
+  assert.equal(sk.meta.hist_index.length, dump.history.filter((h) => h.modelled !== 'rangeloss').length);
   const files = new Map([[-1, sk]]);
   for (const h of dump.history) {
     const w = h.species;
@@ -156,6 +158,10 @@ test('HIST round-trips against debug_top.json history', () => {
     const got = f.history(h.row);
     assert.ok(got, `${w}: no HIST entry at tile ${h.tile} row ${h.row}`);
     assert.equal(got.species, h.species);
+    assert.equal(got.modelled ?? null, h.modelled ?? null, `${w} modelled`);
+    // the genomic deep past's join, as a sentence for the card (ToLaD#80)
+    assert.equal(got.deep_join ?? null, h.deep_join ?? null, `${w} deep_join`);
+    if (h.points.some((p) => p.kind === 'genomic')) assert.match(got.deep_join, /^(First cited point \([^)]*\) is after 1900, so not used as the deep past's level\. )?Genomic curve /, `${w} deep_join`);
     assert.ok(Math.abs(got.G / h.G - 1) < 1e-6, `${w} G`);
     assert.equal(got.points.length, h.points.length, `${w} points`);
     h.points.forEach((p, k) => {
@@ -193,4 +199,157 @@ test('a v1.0 decoder (skips unknown sections) still decodes v1.1 files', async (
     for (const c of ['CHLD', 'EVER', 'ALIV', 'FLAG', 'GID_', 'PROF']) assert.deepEqual(a.col[c], b.col[c], `${p} ${c}`);
     for (let i = 0; i < Math.min(a.n, 50); i++) assert.equal(a.name(i), b.name(i));
   }
+});
+
+// ---- v1.2: NATB (natural, pre-human baseline) -------------------------------
+
+test('NATB round-trips against debug_top.json natural', () => {
+  assert.ok(Array.isArray(dump.natural) && dump.natural.length >= 30, 'natural list in debug_top.json');
+  const m = sk.meta.natural;
+  assert.equal(m.grade, 'D');
+  assert.equal(m.kind, 'reconstruction');
+  assert.deepEqual(m.fields, ['n', 'lo', 'hi', 'km2_natural', 'km2_current']);
+  const files = new Map([[-1, sk]]);
+  const names = new Set();
+  for (const h of dump.natural) {
+    const w = h.species;
+    names.add(w);
+    if (!files.has(h.tile)) files.set(h.tile, load(`t/${h.tile}.tld`));
+    const f = files.get(h.tile);
+    assert.equal(f.gid(h.row), h.gid, `${w} gid`);
+    assert.equal(f.name(h.row), w);
+    assert.equal(f.col.NATB.length, 5 * f.n, `${w}: NATB has 5 codes per row`);
+    const got = f.natural(h.row);
+    assert.ok(got, `${w}: no NATB entry at tile ${h.tile} row ${h.row}`);
+    closeLog(got.n, h.n, LOG_TOL, `${w} n`);
+    closeLog(got.lo, h.lo, LOG_TOL, `${w} lo`);
+    closeLog(got.hi, h.hi, LOG_TOL, `${w} hi`);
+    closeLog(got.km2Natural, h.km2_natural, LOG_TOL, `${w} km2 natural`);
+    if (h.km2_current > 0) closeLog(got.km2Current, h.km2_current, LOG_TOL, `${w} km2 current`);
+    else assert.equal(got.km2Current, 0);
+    assert.ok(got.lo <= got.n && got.n <= got.hi, `${w} lo <= n <= hi`);
+  }
+  for (const sp of ['Panthera leo', 'Panthera tigris', 'Panthera pardus', 'Panthera onca', 'Panthera uncia']) {
+    assert.ok(names.has(sp), `${sp} has a natural baseline`);
+  }
+  // internal nodes carry none
+  for (let i = 0; i < sk.n; i++) if (sk.col.CHLD[i] > 0) assert.equal(sk.natural(i), null);
+});
+
+test('HIST: wild species without a cited baseline start at the natural baseline where one exists', () => {
+  const nat = new Map(dump.natural.map((h) => [h.species, h]));
+  let n = 0;
+  let g = 0;
+  for (const h of dump.history) {
+    if (h.use !== 'counts' || h.component !== 'wild') continue;
+    const first = h.segments[0];
+    const cited = h.points.some((p) => p.baseline);
+    const genomic = h.points.some((p) => p.kind === 'genomic');
+    if (genomic) {
+      // a genomic deep past beats the natural baseline: its oldest level is held to the band start
+      assert.ok(h.segments.every((s) => s.kind !== 'natural'), `${h.species}: genomic beats natural`);
+      assert.equal(first.kind, 'held', `${h.species}: oldest genomic level held to the band start`);
+      const oldest = h.points.find((p) => p.kind === 'genomic');
+      closeLog(first.start * h.L / h.G, oldest.n, LOG_TOL, `${h.species} genomic level`);
+      g++;
+    } else if (cited) assert.notEqual(first.kind, 'natural', `${h.species}: a cited baseline wins`);
+    else if (nat.has(h.species)) {
+      assert.equal(first.kind, 'natural', `${h.species}: natural baseline before the first point`);
+      assert.equal(first.grade, 'D');
+      closeLog(first.start * h.L / h.G, nat.get(h.species).n, LOG_TOL, `${h.species} natural level`);
+      n++;
+    }
+  }
+  assert.ok(n >= 5, `${n} curated species start at the natural baseline`);
+  // the five Panthera (hand-written [deep]) and the bulk curves of ToLaD#64 (Bergman et al. 2023)
+  assert.ok(g >= 100, `${g} species start at their genomic deep past`);
+  // ToLaD#66: the jaguar's hand-written curve is the Bergman table, the snow leopard's Solari et al. 2025
+  const src = { 'Panthera onca': 'Bergman', 'Panthera uncia': 'Solari' };
+  for (const sp of ['Panthera leo', 'Panthera tigris', 'Panthera pardus', 'Panthera onca', 'Panthera uncia']) {
+    const h = dump.history.find((x) => x.species === sp);
+    const want = src[sp] ?? 'Armstrong';
+    assert.ok(h.points.some((p) => p.kind === 'genomic' && p.cite.startsWith(want)), `${sp}: ${want}`);
+  }
+});
+
+// ---- v1.3: modelled range-loss trend (HIST kind 11) -------------------------
+
+test('HIST: modelled range-loss records run natural -> log-linear -> today, grade D', () => {
+  assert.equal(HIST_KINDS[11], 'rangeloss');
+  assert.deepEqual(sk.meta.hist_kinds, HIST_KINDS);
+  const t = sk.meta.natural.trend;
+  assert.equal(t.kind, 'rangeloss');
+  assert.equal(t.from_year, 1500);
+  const rl = dump.history.filter((h) => h.modelled === 'rangeloss');
+  assert.ok(rl.length >= 10, `${rl.length} range-loss records in the dump`);
+  for (const h of rl) {
+    const w = h.species;
+    assert.equal(h.points.length, 2, `${w}: two points`);
+    assert.equal(h.points[0].kind, 'rangeloss');
+    assert.equal(h.points[0].year, 1500);
+    assert.equal(h.points[0].grade, 'D');
+    assert.equal(h.segments[0].kind, 'natural', `${w}: natural level held first`);
+    closeLog(h.segments[0].start * h.L / h.G, h.points[0].n, LOG_TOL, `${w} natural level`);
+    const trend = h.segments.filter((s) => s.kind === 'rangeloss');
+    assert.ok(trend.length >= 1, `${w}: a rangeloss span`);
+    assert.ok(trend.every((s) => s.grade === 'D'), `${w}: the trend is grade D`);
+    const i = h.segments.findIndex((s) => s.kind === 'rangeloss');
+    assert.ok(h.segments.slice(0, i).every((s) => s.kind === 'natural'), `${w}: natural, then the trend`);
+    assert.equal(h.segments.length - i, trend.length, `${w}: only rangeloss segments after it`);
+    const last = h.segments[h.segments.length - 1];
+    closeLog(last.end * h.L / h.G, h.points[1].n, 0.05, `${w} ends at today's count`);
+    const f = h.tile < 0 ? sk : load(`t/${h.tile}.tld`);
+    assert.equal(f.history(h.row).modelled, 'rangeloss', `${w}: META.hist marks it modelled`);
+  }
+});
+
+// ---- v1.4: RLST (IUCN Red List status, ToLaD#48) ---------------------------
+
+test('RLST round-trips against debug_top.json red_list', () => {
+  assert.ok(Array.isArray(dump.red_list) && dump.red_list.length >= 100, 'red_list in debug_top.json');
+  const m = sk.meta.red_list;
+  assert.deepEqual(m.categories, RED_LIST_CATEGORIES);
+  assert.equal(m.sources[0].key, 'iucn-2026-1');
+  const files = new Map([[-1, sk]]);
+  for (const h of dump.red_list) {
+    const w = h.species;
+    if (!files.has(h.tile)) files.set(h.tile, load(`t/${h.tile}.tld`));
+    const f = files.get(h.tile);
+    assert.equal(f.gid(h.row), h.gid, `${w} gid`);
+    assert.equal(f.name(h.row), w);
+    assert.equal(f.col.RLST.length, 3 * f.n, `${w}: RLST has 3 words per row`);
+    const got = f.redList(h.row);
+    assert.deepEqual(got, { category: h.category, source: h.source, year: h.year, taxon: h.taxon, assessment: h.assessment }, w);
+    assert.equal(f.extinct(h.row), !h.living, `${w}: living rows are the unended ones`);
+    if (h.source === 0) assert.ok(got.taxon > 0 && got.assessment > 0 && got.year >= 1996, `${w}: an assessment`);
+  }
+});
+
+test('RLST: every living species row has a status, fossils none, internal nodes none', () => {
+  let living = 0;
+  const seen = new Set();
+  for (const t of [{ file: null }, ...sk.meta.tiles]) {
+    const f = t.file ? load(t.file) : sk;
+    for (let i = 0; i < f.n; i++) {
+      const s = f.redList(i);
+      if (!f.isSpecies(i)) { assert.equal(s, null, `internal ${f.name(i)}`); continue; }
+      if (seen.has(f.gid(i))) continue;
+      seen.add(f.gid(i));
+      // PBDB fossil grafts (some reach T1 = 0, a Holocene last appearance) and unnamed tips are no species
+      if (f.flags(i) & FLAG.GRAFT || !f.name(i)) { assert.equal(s, null, `fossil ${f.name(i)}`); continue; }
+      if (!f.extinct(i)) {
+        living++;
+        assert.ok(s && s.category && s.year > 0, `${f.name(i)}: living without a status`);
+      } else if (s) assert.ok(['EX', 'EW'].includes(s.category) && s.source === 0, `${f.name(i)}: ended, ${s.category}`);
+    }
+  }
+  assert.ok(living > 5000, `${living} living species rows`);
+  const by = new Map(dump.red_list.map((h) => [h.species, h]));
+  const want = { 'Panthera tigris': 'EN', 'Panthera leo': 'VU', 'Panthera pardus': 'VU', 'Panthera onca': 'NT',
+    'Panthera uncia': 'VU', 'Prionailurus bengalensis': 'LC', 'Acinonyx jubatus': 'VU', 'Lynx pardinus': 'VU' };
+  for (const [sp, c] of Object.entries(want)) {
+    assert.equal(by.get(sp)?.category, c, sp);
+    assert.equal(by.get(sp).source, 0, `${sp} from the 2026-1 list`);
+  }
+  assert.equal(by.get('Panthera tigris').assessment, 214862019);
 });

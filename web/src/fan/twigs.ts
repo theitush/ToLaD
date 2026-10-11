@@ -30,6 +30,7 @@ import { laneAt, leftAt, STEM_BOTTOM_MA, TIME_C, type FanBranch, type TimeScale,
 import { attrSeed, Lane, linkWidth, MAX_FOLD, packInst, type MeshInst } from './mesh';
 import type { MeshBatch } from './meshgl';
 import type { SpeciesRec } from './panthera';
+import type { GenSegment } from './history';
 
 function keyOf(common: string): string {
   return common
@@ -50,15 +51,20 @@ function keyOf(common: string): string {
  * the end ≈ N·L/GL = the data's alive count (the pipeline's N_ever ≈ alive ÷
  * lifespan × T read backwards). Extinct species are observed long after their
  * last generation, so nobody is alive.
+ *
+ * `startMa` is the species' start in the fan (its split): a history that runs
+ * on below it (a genomic deep past from its first appearance, ToLaD#60) is
+ * clipped there, since below its split its births are the parent column's
+ * (whose width is the sum of its daughters' founders), not its own.
  */
-export function speciesModel(rec: SpeciesRec): Species {
+export function speciesModel(rec: SpeciesRec, startMa = rec.t0): Species {
   const key = keyOf(rec.common);
   const GL = rec.genYears;
   if (rec.births) {
     return new Species({
       key,
       sexual: true,
-      segments: rec.births.segments,
+      segments: startMa < rec.t0 ? ownSegments(rec.births.segments, Math.floor(((startMa - rec.t1) * 1e6) / GL)) : rec.births.segments,
       generationYears: GL,
       lifespanYears: rec.births.lifespan,
     });
@@ -75,6 +81,26 @@ export function speciesModel(rec: SpeciesRec): Species {
     lifespanYears: lifespan,
     now: rec.extinct ? (G + 1000) * GL : undefined,
   });
+}
+
+/** procgen segments (oldest first) clipped to their newest `keep` generations; a cut segment starts at its ramp's value there. */
+export function ownSegments(segs: readonly GenSegment[], keep: number): GenSegment[] {
+  let drop = segs.reduce((a, s) => a + s.generations, 0) - Math.max(1, keep);
+  if (drop <= 0) return segs.slice();
+  const out: GenSegment[] = [];
+  for (const s of segs) {
+    if (drop >= s.generations) {
+      drop -= s.generations;
+      continue;
+    }
+    if (drop > 0) {
+      const B = s.endSize;
+      const A = Math.max(2, Math.round(s.startSize + ((B - s.startSize) * drop) / s.generations));
+      out.push({ generations: s.generations - drop, startSize: A, endSize: B });
+      drop = 0;
+    } else out.push(s);
+  }
+  return out;
 }
 
 export interface IndInfo {
@@ -124,7 +150,7 @@ export class TwigModel {
     readonly mode: WidthMode,
   ) {
     this.rec = b.sp;
-    this.sp = speciesModel(b.sp);
+    this.sp = speciesModel(b.sp, b.t0);
     this.G = this.sp.generations;
     this.T = Number(this.sp.totalEver);
     this.GL = this.sp.generationYears;

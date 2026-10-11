@@ -1,4 +1,18 @@
 {
+ "bergman/Bergman2023_SupplementaryData1.csv": {
+  "bytes": 32543,
+  "post_body": null,
+  "retrieved": "2026-10-11",
+  "sha256": "2cd7dcb6708ae90bfacd7077a5da5c03f48bb5a319d365b9bd9973f049fcacab",
+  "url": "https://static-content.springer.com/esm/art%3A10.1038%2Fs41467-023-43426-5/MediaObjects/41467_2023_43426_MOESM4_ESM.csv"
+ },
+ "bergman/Bergman2023_SupplementaryData3.txt": {
+  "bytes": 213281,
+  "post_body": null,
+  "retrieved": "2026-10-11",
+  "sha256": "69e601736635fdf3ce2badfd439a5441156b7438e591bf39344fb3723110a2d3",
+  "url": "https://static-content.springer.com/esm/art%3A10.1038%2Fs41467-023-43426-5/MediaObjects/41467_2023_43426_MOESM6_ESM.txt"
+ },
  "combine/trait_data_imputed.csv": {
   "bytes": 1891897,
   "post_body": null,
@@ -74,6 +88,13 @@
   "sha256": "fc84e8cf4ed68ba7dcb117a33916b9cad09e32a949417784650536975da046d1",
   "url": "https://paleobiodb.org/data1.2/taxa/list.json?base_name=Mammalia&rank=species&taxon_status=accepted&pres=regular&show=app,parent,class&vocab=pbdb"
  },
+ "phylacine/PHYLACINE_1.2.1.zip": {
+  "bytes": 106362537,
+  "post_body": null,
+  "retrieved": "2026-10-11",
+  "sha256": "6f37526e6b5871d1a24fac5aa868835735359af902e1f555d1d7dfd1c8075e01",
+  "url": "https://github.com/MegaPast2Future/PHYLACINE_1.2/releases/download/v1.2.1/PHYLACINE_1.2.1.zip"
+ },
  "phylacine/Synonymy_table_valid_species_only.csv": {
   "bytes": 1415868,
   "post_body": null,
@@ -95,6 +116,13 @@
   "sha256": "eccf7be6a1e650d7202f47408858565f97cdaae8f373fac536b52cc7cb6040e6",
   "url": "https://www.prb.org/articles/how-many-people-have-ever-lived-on-earth/"
  },
+ "redlist/iucn-2026-1.zip": {
+  "bytes": 21140648,
+  "post_body": null,
+  "retrieved": "2026-10-11",
+  "sha256": "2ed2c5f75667fa2dee9dc718406b5ba094fa9312e548934916b16c0c509ccb7d",
+  "url": "https://hosted-datasets.gbif.org/datasets/iucn/iucn-2026-1.zip"
+ },
  "upham/MamPhy_fullPosterior_BDvr_Completed_5911sp_topoCons_NDexp_MCC_v2_target.tre": {
   "bytes": 4430334,
   "post_body": null,
@@ -115,5 +143,12 @@
   "retrieved": "2026-10-09",
   "sha256": "286ac36bb1415e2e1ade03acfef0a29f0e4c087e2f78e38c48f50c5df89082bc",
   "url": "https://population.un.org/wpp/assets/Excel%20Files/1_Indicator%20(Standard)/CSV_FILES/WPP2024_Demographic_Indicators_Medium.csv.gz"
+ },
+ "zoonomia/Wilder2023_Table_S1.xlsx": {
+  "bytes": 145899,
+  "post_body": null,
+  "retrieved": "2026-10-11",
+  "sha256": "11f6b821452304516bbd66260861bbe8c36c14a9ae71b72575be50502d7bf379",
+  "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC10184782/supplementaryFiles"
  }
 }

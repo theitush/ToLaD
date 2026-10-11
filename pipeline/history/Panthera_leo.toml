@@ -65,3 +65,37 @@ kind  = "estimate"
 cite  = "Nicholson, Bauer et al. 2025, Panthera leo, IUCN Red List e.T15951A280792135 (as quoted by San Diego Zoo Wildlife Alliance)"
 url   = "https://doi.org/10.2305/IUCN.UK.2025-2.RLTS.T15951A280792135.en"
 note  = "'Roughly 22,000 to 25,000 subadults and adults' in Africa (n = midpoint); cubs and ~891 Asiatic lions not included. Reported 25% continent-wide decline 2006-2018."
+
+[deep]
+method = "PSMC"
+cite   = "Armstrong et al. 2025, Genome Biol Evol 17(4):evaf060, Fig. 4 (green curve)"
+url    = "https://doi.org/10.1093/gbe/evaf060"
+mu     = 5.42e-09   # the curve's mutation rate, per site per generation
+g      = 1.0       # the curve's generation time as plotted: g = 1, so its time axis is in generations (ToLaD#66)
+grade  = "D"
+note   = "Digitised from the published raster of Fig. 4 (PMC11997302, evaf060f4.jpg, 800x485 px): axes calibrated on the tick marks (x: 1e3-1e6 yr, log, ~60.5 px per decade; y: Ne 0-150,000, linear, ~49 px per 50,000), then every column of the panel scanned for the curve's colour; a column with one short run (<= 4 px) is on a step, neighbouring columns within 1.5 px make one step. Each step is [from, to] years ago and its Ne, in the figure's own scaling. Reading error ~1 px: ~4% in time, ~1,000 in Ne (so ~20% at Ne 5,000). PSMC run with -p 2+2+25*2+4+6 (Hilgers et al. 2025), g = 5 yr. Read: the green curve: the lion pedigree rate (5.42e-9/gen, Fig. 2). Time axis in generations (ToLaD#66): the methods give generation time five years, 'provided as a g = 1 for this particular scaling script' (psmcr), and other genomes' PSMC curves line up with this figure's only when its times are multiplied by ~5 (lion: x4.4-5.3 against five curves; jaguar, the same genome in Bergman et al. 2023: x5.5; tiger x6-9), so g = 1 here; Ne does not depend on g. Cross-check after the same rescale (level of the other curve against this one, 20 kyr to the older end, and the log-residual left after that level): Bergman et al. 2023 Supplementary Data 3 (PanLeo reference lion, 8.41e-9/gen) x1.25, residual x1.13; Cho et al. 2013 Fig. 4b African lion (4.5e-9/gen) x1.17, x1.12, and white lion x1.05, x1.14; Figueiro et al. 2017 Fig. 1B (1.0e-8/gen) x0.84, x1.25; de Manuel et al. 2020 Fig. 3A southern lineage (4.5e-9/gen) x1.17, x1.17: all agree (read as g = 5 they sit x0.5-0.75 below with residual x1.4). de Manuel's northern (Barbary) lion disagrees in shape (x0.67, residual x2.2: a deep bottleneck ~30-60 kyr ago, as published; another lineage). Kept as the best curve: the same shape as the others, and the deepest pedigree-based rate."
+# [years ago from, to, Ne] as published (young to old); the build rescales and converts them
+steps  = [
+  [810, 940, 5700],
+  [1050, 2430, 5700],
+  [2830, 3430, 9300],
+  [3700, 4820, 14400],
+  [5010, 5400, 20100],
+  [5830, 6790, 20300],
+  [6790, 15660, 22600],
+  [15660, 19670, 25000],
+  [19670, 23780, 26800],
+  [23780, 32230, 29100],
+  [32230, 80220, 30900],
+  [80220, 100760, 34400],
+  [104660, 121840, 39100],
+  [131460, 153040, 45500],
+  [165130, 185060, 53400],
+  [192230, 223780, 63700],
+  [260510, 291970, 76200],
+  [353060, 411010, 96000],
+  [426920, 497000, 99300],
+  [516250, 600990, 96500],
+  [648440, 878780, 86200],
+  [1146540, 1334730, 70300],
+]
