@@ -1,0 +1,21 @@
+# Audit flags checked by hand and accepted as real, not bugs (ToLaD#113; `make -C pipeline audit`).
+# One entry per (species, class); `reason` says why the flagged value stands, `issue` where it was settled.
+# A reviewed flag stays in the report, marked, and no longer counts toward the species' state.
+
+[[reviewed]]
+species = "Panthera leo"
+class = "units"
+reason = "Armstrong 2025 Fig. 4 is plotted with g = 1 (time in generations), so the large time rescale is the source's own scaling; cross-checked against five other lion PSMC curves (Panthera_leo.toml [deep] note)"
+issue = 66
+
+[[reviewed]]
+species = "Panthera pardus"
+class = "units"
+reason = "Armstrong 2025 Fig. 4 is plotted with g = 1 (time in generations), so the time rescale by the per-generation rate is the source's own scaling (ToLaD#66)"
+issue = 66
+
+[[reviewed]]
+species = "Panthera tigris"
+class = "units"
+reason = "Armstrong 2025 Fig. 4 is plotted with g = 1 (time in generations), so the time rescale by the per-generation rate is the source's own scaling (ToLaD#66)"
+issue = 66
