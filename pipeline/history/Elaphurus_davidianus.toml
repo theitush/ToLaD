@@ -1,0 +1,24 @@
+species   = "Elaphurus davidianus"
+common    = "Pere David's deer (milu)"
+component = "wild"
+use       = "counts"
+scope     = "China, free-living (wild) animals, all ages; semi-free reserve herds and captives not counted"
+notes     = """
+Extinct in the wild in China by the late 19th century; the last herd in the Nanyuan imperial park
+was lost around 1900, and every living milu descends from the few animals gathered at Woburn
+Abbey. Reintroduced to China in 1985-86 (Beijing Nanhaizi, Dafeng), with free-living herds since
+1998. Zhang et al. 2021 give more than 8,000 in China, at least 2,420 of them living in the wild.
+IUCN still lists it Extinct in the Wild (2016 assessment). No sourced pre-decline count. Added for
+ToLaD#72: the model's own count (7,753, from density x a clade-mean range) had no anchor.
+"""
+
+[[point]]
+year  = 2020
+n     = 2420
+lo    = 2420
+hi    = 2420
+grade = "C"
+kind  = "estimate"
+cite  = "Zhang, Bai, Zhu, Chen, Xue, Zhong & Cheng 2021, Reversing extinction in China's Pere David's deer, Science 371:685"
+url   = "https://doi.org/10.1126/science.abg6237"
+note  = "'The population has grown more than 8000 individuals with at least 2420 living in the wild in China.' A lower bound (n = the figure); letter published February 2021, figure dated 2020."

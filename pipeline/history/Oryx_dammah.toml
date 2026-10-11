@@ -1,0 +1,22 @@
+species   = "Oryx dammah"
+common    = "Scimitar-horned oryx"
+component = "wild"
+use       = "counts"
+scope     = "global, wild (reintroduced, Ouadi Rime-Ouadi Achim Faunal Reserve, Chad), all ages; captive herds not counted"
+notes     = """
+Hunted out of the Sahel in the 20th century and listed Extinct in the Wild. Reintroduced to Chad
+from 2016 (the first 25 animals from Abu Dhabi); IUCN downlisted it to Endangered in 2023.
+PHYLACINE 1.2.1 (built on the 2016 Red List) has no current range for it, so without this file the
+build would cap it at 50 as possibly extinct (ToLaD#68). No sourced pre-decline count.
+"""
+
+[[point]]
+year  = 2026
+n     = 650
+lo    = 650
+hi    = 650
+grade = "C"
+kind  = "estimate"
+cite  = "Sahara Conservation, The scimitar-horned oryx reintroduction (programme page, mid 2026)"
+url   = "https://saharaconservation.org/species-recovery/the-scimitar-horned-oryx-reintroduction/"
+note  = "'The wild population now exceeding more than 650 individuals (mid 2026).' A lower bound (n = the figure)."
