@@ -3,7 +3,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { EVENT_TINT, eventAt, eventSpans } from './colstyle';
-import { SpeciesCard } from './FanApp';
+import { SpeciesCard, unshownSentence } from './FanApp';
 import { HistorySpark } from './HistorySpark';
 import { layoutFan } from './layout';
 import { RectBatch, MeshBatch } from './meshgl';
@@ -43,12 +43,10 @@ describe('marker spans', () => {
   const fan = layoutFan(FELIDAE, 'log');
   const cougar = fan.branches.find((b) => b.sp.common === 'Cougar')!;
 
-  it('each window is a span of its own column, clipped to it, world-fixed', () => {
+  it('each species-wide window is a span of its own column, clipped to it, world-fixed', () => {
+    // The North American refounding (12-9 kya) is regional (ToLaD#149): not on the column.
     const spans = eventSpans(cougar.sp, cougar.t0);
-    expect(spans.map((s) => [s.ago0, s.ago1])).toEqual([
-      [25000, 20000],
-      [12000, 9000],
-    ]);
+    expect(spans.map((s) => [s.ago0, s.ago1])).toEqual([[25000, 20000]]);
     const ys = colEventsY(fan, cougar);
     expect(colEventsY(fan, cougar)).toBe(ys); // built once per layout
     for (const s of ys) {
@@ -140,9 +138,9 @@ describe('the fan: marks and tap', () => {
     }
     expect(tints.length).toBeGreaterThan(2);
     // Within the windows on screen, and on the cougar's column.
-    const [w0, w1] = colEventsY(fan, b);
-    const sTop = Math.min(v.toScreen(0, w0.top)[1], v.toScreen(0, w1.top)[1]);
-    const sBot = Math.max(v.toScreen(0, w0.bot)[1], v.toScreen(0, w1.bot)[1]);
+    const ws = colEventsY(fan, b);
+    const sTop = Math.min(...ws.map((w) => v.toScreen(0, w.top)[1]));
+    const sBot = Math.max(...ws.map((w) => v.toScreen(0, w.bot)[1]));
     for (const r of tints) {
       expect(r[1]).toBeGreaterThanOrEqual(sTop - 1);
       expect(r[3]).toBeLessThanOrEqual(sBot + 1);
@@ -152,12 +150,12 @@ describe('the fan: marks and tap', () => {
     (v as unknown as { gl: unknown }).gl = undefined;
   });
 
-  it('a tap inside a window opens its event; outside it the card is as before', () => {
+  it('a tap inside a species-wide window opens its event; inside a regional one or outside, the card is as before', () => {
     let sel: Selection | null = null;
     v.onSelect = (s) => (sel = s);
     for (const [ago, title] of [
       [22000, 'Last-glacial low'],
-      [10500, 'North American refounding'],
+      [10500, undefined], // the North American refounding: regional (ToLaD#149)
       [15500, undefined],
     ] as const) {
       const wy = fan.time.y(ago / 1e6);
@@ -194,5 +192,67 @@ describe('the card', () => {
     expect(one.match(/data-event="/g)?.length).toBe(h.events.length);
     expect(one).toContain(h.events[1].title);
     expect(one).not.toContain(h.events[0].title);
+  });
+});
+
+// ToLaD#149: a mark on a column has to look like what it says. Regional events (a subpopulation) are
+// not on the column; a species-wide one the curve doesn't show keeps its tint and says why on the card.
+describe('honest marks (ToLaD#149)', () => {
+  const lion = sp('Lion');
+  const evs = lion.history!.events;
+  const kOf = (title: string) => evs.findIndex((e) => e.title === title);
+
+  it('carries scope, shown and why from the data', () => {
+    expect(evs.find((e) => e.title === 'Post-glacial decline')).toMatchObject({ scope: 'species', shown: true, why: '' });
+    expect(evs.find((e) => e.title === 'Gir founder event')).toMatchObject({ scope: 'regional', region: 'India (Gir)' });
+    expect(evs.find((e) => e.title === 'Asiatic lion near-extinction')).toMatchObject({ scope: 'regional', region: 'India (Kathiawar)' });
+    const ch = sp('Cheetah').history!.events[0];
+    expect(ch).toMatchObject({ scope: 'species', shown: false });
+    expect(ch.why).not.toBe('');
+  });
+
+  it('regional: no tint or label on the column; a section titled with its region on the card; an outlined band on the sparkline', () => {
+    const fan = layoutFan(FELIDAE, 'log');
+    const b = fan.branches.find((x) => x.sp.common === 'Lion')!;
+    const titles = eventSpans(lion, b.t0).map((s) => s.ev.title);
+    expect(titles).toEqual(['Post-glacial decline']);
+    expect(colEventsY(fan, b).every((s) => s.ev.scope === 'species')).toBe(true);
+    // On the card, touched in 1850 (inside the Asiatic window): listed, titled with the region, that one open.
+    const html = renderToStaticMarkup(<SpeciesCard sp={lion} onClose={() => {}} ageMa={176e-6} />);
+    const gir = kOf('Gir founder event');
+    const asia = kOf('Asiatic lion near-extinction');
+    expect(html).toContain('Bottleneck in India (Gir) · 4,000–1,000 years ago');
+    expect(html).toContain('Bottleneck in India (Kathiawar)');
+    expect(html).toMatch(new RegExp(`<details class="event regional" data-event="${asia}" data-regional="" open`));
+    expect(html).toMatch(new RegExp(`<details class="event regional" data-event="${gir}" data-regional="">`));
+    expect(html).toContain(evs[asia].quote.slice(0, 30));
+    // Not the touched section at the top: a regional index passed as the event is ignored there.
+    expect(renderToStaticMarkup(<SpeciesCard sp={lion} onClose={() => {}} ageMa={176e-6} event={asia} />)).not.toContain('<section class="event"');
+    // The sparkline: every event banded, the regional ones outlined.
+    const spark = renderToStaticMarkup(<HistorySpark h={lion.history!} />);
+    expect(spark.match(/data-event="/g)?.length).toBe(evs.length);
+    expect(spark.match(/data-regional=""/g)?.length).toBe(2);
+  });
+
+  it('species-wide and shown: tinted, its section has no caveat', () => {
+    const k = kOf('Post-glacial decline');
+    const html = renderToStaticMarkup(<SpeciesCard sp={lion} onClose={() => {}} ageMa={0.015} event={k} />);
+    expect(html).toContain(`<section class="event" data-event="${k}"`);
+    expect(html).not.toContain('ev-unshown');
+  });
+
+  it('species-wide, not shown: still tinted; its section says plainly that our curve does not show it, and why', () => {
+    const c = sp('Cheetah');
+    const fan = layoutFan(FELIDAE, 'log');
+    const b = fan.branches.find((x) => x.sp.common === 'Cheetah')!;
+    expect(eventSpans(c, b.t0).map((s) => s.ev.title)).toEqual(['Late-Pleistocene crash']);
+    const html = renderToStaticMarkup(<SpeciesCard sp={c} onClose={() => {}} ageMa={0.0118} event={0} />);
+    expect(html).toContain(`data-unshown="${c.history!.events[0].why}"`);
+    expect(html).toContain('Our population curve doesn’t show this bottleneck: ');
+    // Each reason in words.
+    expect(unshownSentence('blind spot')).toMatch(/can’t see the last ~20,000 years/);
+    expect(unshownSentence('before the data')).toMatch(/no figures from before it/);
+    expect(unshownSentence('data too shallow')).toMatch(/too little/);
+    expect(unshownSentence('joined across')).toMatch(/straight between them/);
   });
 });

@@ -69,8 +69,13 @@ TOP_KEYS = {"species", "aliases", "common", "component", "use", "scope", "faosta
 # A curated event in a species' past (ToLaD#141): today only a population bottleneck, marked on the fan's
 # column over its window and explained on the card with the source quoted verbatim.
 EVENT_KINDS = ("bottleneck",)
-EVENT_KEYS = {"kind", "from_ya", "to_ya", "title", "summary", "quote", "cite", "url", "grade", "region"}
-EVENT_REQUIRED = EVENT_KEYS - {"region"}
+EVENT_KEYS = {"kind", "from_ya", "to_ya", "title", "summary", "quote", "cite", "url", "grade", "region", "scope",
+              "scope_why"}
+EVENT_REQUIRED = EVENT_KEYS - {"region", "scope", "scope_why"}
+# Whom an event concerns (ToLaD#149): "species" (the whole species: tinted on the fan's column, which must fall
+# through its window) or "regional" (a subpopulation named by `region`: on the card and its sparkline only, since
+# the column is the whole species and cannot narrow for a few % of it). `scope_why` says why, in one line.
+EVENT_SCOPES = ("species", "regional")
 EVENT_TITLE_MAX = 40  # characters: the title is the label on the fan
 DEEP_KEYS = {"method", "cite", "url", "mu", "g", "grade", "note", "steps", "blind"}
 # [deep.blind]: a source dating a decline inside PSMC's blind spot, which keeps the blind steps (ToLaD#143)
@@ -185,6 +190,13 @@ def _check_event(e: dict, where: str) -> dict:
             raise HistoryError(f"{where}: {k} must be a non-empty string")
     if len(e["title"].strip()) > EVENT_TITLE_MAX:
         raise HistoryError(f"{where}: title longer than {EVENT_TITLE_MAX} characters (it is the fan's label)")
+    scope = e.get("scope", "species")
+    if scope not in EVENT_SCOPES:
+        raise HistoryError(f"{where}: scope {scope!r} not in {EVENT_SCOPES}")
+    if scope == "regional" and not str(e.get("region", "")).strip():
+        raise HistoryError(f"{where}: a regional event names its region")
+    if "scope_why" in e and (not isinstance(e["scope_why"], str) or not e["scope_why"].strip()):
+        raise HistoryError(f"{where}: scope_why must be a non-empty string")
     if not e["url"].startswith(("http://", "https://")):
         raise HistoryError(f"{where}: url must be http(s)")
     if e["grade"] not in GRADES:
@@ -192,7 +204,8 @@ def _check_event(e: dict, where: str) -> dict:
     return {"kind": e["kind"], "from_ya": float(e["from_ya"]), "to_ya": float(e["to_ya"]),
             "title": e["title"].strip(), "summary": " ".join(e["summary"].split()),
             "quote": " ".join(e["quote"].split()), "cite": e["cite"].strip(), "url": e["url"].strip(),
-            "grade": e["grade"], "region": str(e.get("region", "")).strip()}
+            "grade": e["grade"], "region": str(e.get("region", "")).strip(), "scope": scope,
+            "scope_why": " ".join(str(e.get("scope_why", "")).split())}
 
 
 def _num(v) -> bool:
@@ -293,8 +306,12 @@ def validate(doc: dict, name: str = "<doc>") -> dict:
     years = [p["year"] for p in points]
     if len(set(years)) != len(years):
         raise HistoryError(f"{name}: two points share a year")
-    deep = _check_deep(doc["deep"], f"{name} deep") if "deep" in doc else None
-    if deep is not None and (doc["component"] != "wild" or use != "counts"):
+    # a blind-only [deep] (just [deep.blind], ToLaD#149) dates a decline in the blind spot of the bulk
+    # curve (genomic.py) the file gets as its deep past; genomic.attach carries it over
+    blind_only = isinstance(doc.get("deep"), dict) and set(doc["deep"]) == {"blind"}
+    deep = _check_deep(doc["deep"], f"{name} deep") if "deep" in doc and not blind_only else None
+    deep_blind = _check_blind(doc["deep"]["blind"], f"{name} deep.blind") if blind_only else None
+    if (deep is not None or blind_only) and (doc["component"] != "wild" or use != "counts"):
         raise HistoryError(f"{name}: a deep past is for wild species with use = \"counts\"")
     evs = doc.get("event", [])
     if not isinstance(evs, list):
@@ -309,7 +326,7 @@ def validate(doc: dict, name: str = "<doc>") -> dict:
         "component": doc["component"], "use": use, "scope": str(doc.get("scope", "")),
         "faostat_item": fao, "notes": str(doc.get("notes", "")).strip(),
         "baseline": base, "points": sorted(points, key=lambda p: p["year"]), "deep": deep,
-        "events": events,
+        "deep_blind": deep_blind, "events": events,
     }
 
 
@@ -616,6 +633,64 @@ def interp(pts: list[dict], year: float) -> float:
     raise AssertionError
 
 
+# A species-wide event must look like one (ToLaD#149): the drawn curve falls through its window by at least
+# this factor, its lowest level inside the window (its young end included) at most 1/1.5 of its level at the
+# window's old end. 1.5x is the pipeline's own "worth telling the reader" ratio (BLIND_AGAINST, #143): a column
+# a third narrower is plainly narrower at any zoom, while the 1.1-1.3x wobbles of a log-linear join are not
+EVENT_FALL = 1.5
+
+
+def _seg_level(knots: list[tuple[float, float]], year: float) -> float:
+    """The column's level at `year`: log-linear between the segments' ends, flat outside them."""
+    if year <= knots[0][0]:
+        return knots[0][1]
+    for (ya, na), (yb, nb) in zip(knots, knots[1:]):
+        if ya <= year <= yb and yb > ya:
+            f = (year - ya) / (yb - ya)
+            return math.exp(math.log(max(na, 1e-12)) * (1 - f) + math.log(max(nb, 1e-12)) * f)
+    return knots[-1][1]
+
+
+def event_fall(rec: dict, ev: dict) -> dict:
+    """How the species' column moves through an event's window, read off the segments the fan draws
+    (rec["segments"]: births per generation, so the column's N up to a constant): `fall` = the level at the
+    window's old end / the lowest level inside it (every segment end in it, and its young end), `end` = old
+    end / young end; `shown` when fall >= EVENT_FALL. When not shown, `why` says why the column misses it:
+      not drawn      the record does not drive the column (use = "display"): the column is the model's
+      blind spot     the window lies where PSMC's dropped blind-spot steps are and the curve is a join there
+      joined across  the window spans a join between sources (a genome to a count, a modelled span, a held level)
+      before the data   the window is older than the curve's first point: the column holds a modelled level
+      data rises / data too shallow   one source's own points span the window and do not fall (enough)"""
+    out = {"fall": 1.0, "end": 1.0, "shown": False, "why": "not drawn"}
+    segs, G, pts = rec.get("segments") or [], rec.get("G") or 0.0, rec.get("curve") or []
+    if rec.get("use") != "counts" or rec.get("component") != "wild" or not segs or not pts:
+        return out
+    y0, y1 = NOW_YEAR - ev["from_ya"], NOW_YEAR - ev["to_ya"]
+    knots = [(sg["year0"] + j * sg["gens"] * G, sg[k]) for sg in segs for j, k in ((0, "start"), (1, "end"))]
+    lv = [_seg_level(knots, y0)] + [n for y, n in knots if y0 < y < y1] + [_seg_level(knots, y1)]
+    fall, end = lv[0] / min(lv[1:]), lv[0] / lv[-1]
+    out = {"fall": round(fall, 3), "end": round(end, 3), "shown": fall >= EVENT_FALL, "why": ""}
+    if out["shown"]:
+        return out
+    a = max((i for i, p in enumerate(pts) if p["year"] <= y0), default=None)
+    b = min((i for i, p in enumerate(pts) if p["year"] >= y1), default=len(pts) - 1)
+    if a is None:
+        out["why"] = "before the data"
+        return out
+    seg = pts[a:b + 1]
+    src = {"genomic" if p["kind"] == "genomic" else "cited" if p["kind"] in POINT_KINDS and not p.get("span_kind")
+           else "modelled" for p in seg}
+    blind = any(d.get("why") == "blind" and d["span_ago"][0] < ev["from_ya"] and d["span_ago"][1] > ev["to_ya"]
+                for d in rec.get("deep_dropped") or ())
+    if blind and src != {"genomic"}:
+        out["why"] = "blind spot"
+    elif len(src) > 1 or src == {"modelled"}:
+        out["why"] = "joined across"
+    else:
+        out["why"] = "data rises" if end < 1 else "data too shallow"
+    return out
+
+
 def mean_loglinear(n0: float, n1: float) -> float:
     """Mean of a log-linear ramp from n0 to n1."""
     if n0 <= 0 or n1 <= 0:
@@ -857,6 +932,8 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
         pts = curve_points(rec)
         # the deep past: genomic points older than the cited ones, joined to the first cited
         # point (or baseline) by the usual log-linear span across PSMC's blind spot
+        if rec.get("deep_blind") and not rec["deep"]:
+            raise HistoryError(f"{rec['file']}: a blind-only [deep] needs a bulk genomic curve to apply to")
         mu = mutation.for_leaf(raw, leaf, G) if rec["deep"] else None
         deep_pts, rec["deep_dropped"] = (deep_points(rec["deep"], G, year_to_ma_inv(leaf.t0), mu)
                                          if rec["deep"] else ([], []))
@@ -1064,6 +1141,8 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
                 if sg["kind"] == K["held"] and sg["year0"] < start["year"]:
                     sg["kind"] = K["natural"]
         rec["natural"] = nat_base if wild_counts else None
+        for ev in rec.get("events", []):  # does the column fall through each event's window (ToLaD#149)
+            ev.update(event_fall(rec, ev))
         deep_rep = None
         if deep_pts:
             resolved = [p for p in deep_pts if not p.get("blind")]
@@ -1103,7 +1182,9 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
             "trend_held": held,
             "G_yr": G, "segments": len(rec["segments"]), "domestic_on_leaf": bool(D.get("domestic")),
             "deep": deep_rep,
-            "events": [f"{e['kind']} {e['from_ya']:g}-{e['to_ya']:g} ya: {e['title']}" for e in rec.get("events", [])],
+            "events": [{"what": f"{e['kind']} {e['from_ya']:g}-{e['to_ya']:g} ya: {e['title']}",
+                        **{k: e[k] for k in ("scope", "region", "fall", "end", "shown", "why") if k in e}}
+                       for e in rec.get("events", [])],
             "hist_row": D["history"] is rec,  # this record is the leaf's HIST record (see history_beside)
             "beside": rec.get("beside"),
         }

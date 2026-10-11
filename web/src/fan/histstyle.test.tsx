@@ -220,7 +220,7 @@ describe('the species card: the population at the time touched', () => {
         expect(d).toContain(formatCount(sp.everLo, { tilde: false }));
         expect(d).toContain('Method');
         // Collapsed by default.
-        expect(html).not.toMatch(/<details[^>]* open/);
+        expect(html).not.toMatch(/<details class="more"[^>]* open/); // (a regional event touched inside its window opens, ToLaD#149)
       }
     }
   });
