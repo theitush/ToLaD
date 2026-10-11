@@ -128,9 +128,6 @@ export function FanApp() {
           <li>
             <span className="lane dead" /> line ended
           </li>
-          <li>
-            <span className="lane extinct" /> extinct
-          </li>
         </ul>
       )}
       </div>
@@ -232,7 +229,7 @@ export function SpeciesCard({ sp, onClose, open, ageMa, startMa }: { sp: Species
       <div className="facts">
         <StatusChip sp={sp} />
         <p className="lead">
-          <span className={`lane ${sp.extinct ? 'extinct' : at.now ? 'alive' : 'lineage'}`} />
+          <span className={`lane ${sp.extinct ? 'dead' : at.now ? 'alive' : 'lineage'}`} />
           <span>
             <b>{plainCount(at.alive)}</b> alive {at.when}
           </span>

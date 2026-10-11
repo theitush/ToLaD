@@ -10,7 +10,7 @@ import { clipPoly, FanCamera, STRAND_PX, type Camera } from './camera';
 import { laneAt, layoutFan, leftAt, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type EdgeStyle, type Fan, type FanBranch, type FanNode, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01 } from './meshgl';
-import { drawTwigs, kLogAt, laneDim, LINEAGE, LIVING, TWIG_GRAY, TWIG_WITHERED, TwigModel, type IndInfo, type TwigStats } from './twigs';
+import { drawTwigs, kLogAt, laneDim, LINEAGE, LIVING, TWIG_GRAY, TwigModel, type IndInfo, type TwigStats } from './twigs';
 import type { MeshBatch, RectBatch } from './meshgl';
 
 export type { IndInfo } from './twigs';
@@ -22,7 +22,6 @@ export const GREEN = '#3fd286';
 export const GRAY = '#67737f';
 /** The ground (app.css --ground): spruce at night. */
 export const BG = '#0c1714';
-const WITHERED = '#8b806d';
 /** Text on the canvas (app.css --ink, --ink-2, --ink-3). */
 const INK = '#e8f0ea';
 const INK2 = '#a9b8ae';
@@ -538,7 +537,7 @@ export class FanView implements InputHandlers {
     this.drawTrunkLabel();
     this.drawTimeAxis(true);
     if (this.gl) {
-      const pal = [LIVING, LINEAGE, TWIG_GRAY, TWIG_WITHERED].map(rgb01);
+      const pal = [LIVING, LINEAGE, TWIG_GRAY].map(rgb01);
       this.gl.end(this.w, this.h, this.dpr, rgb01(BG), kLogAt(this, this.fan.time, this.cam.cy), this.toScreen(0, this.yNow)[1], pal);
     }
     this.frameMs.push(performance.now() - t0);
@@ -663,11 +662,9 @@ export class FanView implements InputHandlers {
     // Under the mesh the lanes sink to a dark tint of themselves, so the individuals carry the colour:
     // each stretch by its own lanes' widths (twigs.ts laneDim), as the mesh draws them.
     const lives = tw?.fade ?? 0;
-    const grayBase = b.sp.extinct ? WITHERED : GRAY;
     const greenFade = tw?.fadeGreen ?? 0;
     const greenC = mix(GREEN, '#0d2318', greenFade * 0.9);
-    const yT0 = this.toScreen(0, b.splitY)[1];
-    const grayC = mix(grayBase, '#131c19', Math.max(lives, tw?.texGray ?? 0) * 0.82);
+    const grayC = mix(GRAY, '#131c19', Math.max(lives, tw?.texGray ?? 0) * 0.82);
     if (this.gl) {
       // Between neighbouring samples each lane is a trapezoid (the curve's chord, a few px at most):
       // the whole lane gray (at least 0.6 px), the green lane over its left edge (at least 1 px).
@@ -694,11 +691,9 @@ export class FanView implements InputHandlers {
         if (!(wq > 0) && !(wp > 0)) continue;
         const gq = wq * q.f;
         const gp = wp * p.f;
-        // (An extinct species' line ended: withered over its own column; below its split, its ancestors.)
-        const base = b.sp.extinct && (p.y + q.y) / 2 < yT0 ? grayBase : GRAY;
         const wm = (wq + wp) / 2;
         const gm = (gq + gp) / 2;
-        const gc = rgb01(mix(base, '#131c19', laneDim(wm - gm, lives) * 0.82));
+        const gc = rgb01(mix(GRAY, '#131c19', laneDim(wm - gm, lives) * 0.82));
         const ec = rgb01(mix(GREEN, '#0d2318', laneDim(gm, lives) * 0.9));
         trap(this.gl.under, xq, xq + Math.max(0.6, wq), xp, xp + Math.max(0.6, wp), y0, y1, gc, 1);
         if (gq > 0 || gp > 0) {
@@ -892,7 +887,7 @@ export class FanView implements InputHandlers {
       ctx.save();
       ctx.translate(s.x, y1 - LABEL_PAD);
       ctx.rotate(-Math.PI / 2);
-      ctx.fillStyle = s.b.sp.extinct ? '#cfc4b1' : INK;
+      ctx.fillStyle = INK;
       ctx.fillText(s.text, 0, 0.5);
       ctx.restore();
     }

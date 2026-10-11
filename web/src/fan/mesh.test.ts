@@ -157,7 +157,6 @@ describe('one mesh for both lanes: the lane only colours', () => {
     expect(colourCode(Lane.Green, false)).toBe(1);
     expect(colourCode(Lane.Gray, true)).toBe(-1);
     expect(colourCode(Lane.Gray, false)).toBe(2);
-    expect(colourCode(Lane.Withered, false)).toBe(3);
   });
 
   it('the living are all in the green lane: every living individual has a green slot that draws it', () => {

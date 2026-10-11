@@ -24,6 +24,7 @@ const scenes = [
   ['bar-35', 'bar', ['Lion', 3000, 35, 40]],
   ['deep', 'bar', ['Lion', 300, 4, 3000]],
   ['card', 'card', ['Tiger']],
+  ['card-cave', 'card', ['Cave lion']],
   // A tap on a column (the touch marker), columns whose tips are above the screen, near now.
   ['touch', 'touch', ['Lion', 70]],
   ['scrolled', 'scroll', [2.2, 2000]],
@@ -35,6 +36,7 @@ const scenes = [
   // right edge just above its split from the cave lion), and a tap on a parent column [split Ma, age Ma].
   ['split-lionleopard', 'split', [2.57, 5]],
   ['split-cavelion', 'split', [0.5, 5]],
+  ['split-eurojag', 'split', [2.0, 5]],
   ['split-root', 'split', [4.6, 3]],
   ['decline', 'bar', ['Lion', 50, 1e5, 3.5, 0.5]],
   // The lion's last 200 years filling the screen; the mesh on the cave lion as it peels off the lion.
