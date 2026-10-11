@@ -19,3 +19,9 @@ species = "Panthera tigris"
 class = "units"
 reason = "Armstrong 2025 Fig. 4 is plotted with g = 1 (time in generations), so the time rescale by the per-generation rate is the source's own scaling (ToLaD#66)"
 issue = 66
+
+[[reviewed]]
+species = "Lynx pardinus"
+class = "join"
+reason = "A real collapse, not a unit or join error: the modelled 1500 level (~61,000, the 2024 census x the PHYLACINE range ratio) falls ~54x to the cited 1988 estimate (1,136), while the range fell ~89x, from the 950,000 km2 present-natural map to the 10,669 km2 of stable presence Rodriguez & Delibes 1992 mapped (Guzman et al. 2004, Table 1); the same 1988 density over the natural range would give ~100,000 (Lynx_pardinus.toml)"
+issue = 94

@@ -4,7 +4,7 @@ import { plainAgo, plainCount, SpeciesCard } from './FanApp';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CURVE_KINDS, fmtWhen, HistorySpark, popTicks, sourceRows, yearTicks } from './HistorySpark';
+import { bandEdge, CURVE_KINDS, fmtWhen, HistorySpark, isNaturalStart, popTicks, sourceRows, yearTicks } from './HistorySpark';
 import { GRADE_WORD, MODELLED_KINDS, noDataSpans, styleBetween } from './history';
 import { FELIDAE, NATURAL_META, type HistoryRec } from './panthera';
 import { loadClade } from './panthera-extract';
@@ -21,7 +21,7 @@ describe('species card history', () => {
       const html = renderToStaticMarkup(<SpeciesCard sp={sp} onClose={() => {}} open />);
       const h = sp.history!;
       expect(html).toContain('<svg');
-      const rows = sourceRows(h.points.slice().sort((a, b) => a.year - b.year), !!sp.natural);
+      const rows = sourceRows(h.points.slice().sort((a, b) => a.year - b.year), sp.natural);
       expect((html.match(/<li[ >]/g) ?? []).length, common).toBe(rows.length);
       const genomic = h.points.filter((p) => p.kind === 'genomic');
       expect(genomic.length, common).toBeGreaterThan(2); // every one of these has a genomic deep past (ToLaD#60/#64)
@@ -31,7 +31,8 @@ describe('species card history', () => {
       for (const p of h.points) {
         expect(html).toContain(esc(p.cite));
         if (p.url) expect(html).toContain(`href="${p.url}"`);
-        if (p.note && p.kind !== 'genomic') expect(html).toContain(esc(approxCountsIn(p.note)));
+        // (A range-loss start that is the natural level is folded into the natural row, which says so itself.)
+        if (p.note && p.kind !== 'genomic' && !isNaturalStart(p, sp.natural)) expect(html).toContain(esc(approxCountsIn(p.note)));
         expect(html).toContain(`grade ${p.grade}`);
         if (p.kind !== 'genomic') expect(html).toContain(p.kind);
       }
@@ -108,10 +109,27 @@ describe('species card history', () => {
     }
   });
 
+  it('the lynxes show their cited counts, joined to the natural level in 1500 (#94, #110)', () => {
+    for (const [c, today] of [['Iberian lynx', 2401], ['Eurasian lynx', 69400], ['Canada lynx', 158000]] as const) {
+      const h = byName(c).history!;
+      const pts = h.points.slice().sort((a, b) => a.year - b.year);
+      expect(Math.abs(pts.at(-1)!.n / today - 1), c).toBeLessThan(0.01); // stored at reduced precision
+      expect(pts[0].year, c).toBe(1500);
+      expect(MODELLED_KINDS.has(h.segments[0].kind), c).toBe(true);
+    }
+  });
+
   it('no living species shows a flat assumed stretch without a "no data" mark', () => {
     // (The wild species with a curated or genomic history; the rest show the constant model, the domestic cat its growth since
-    // domestication, a range-loss trend (ToLaD#62) its modelled natural level, dashed as modelled, not held.)
-    const living = FELIDAE.species.filter((s) => !s.extinct && s.history?.component === 'wild' && s.history.modelled !== 'rangeloss');
+    // domestication, a range-loss trend (ToLaD#62) its modelled natural level, dashed as modelled, not held; so does a
+    // history file whose first cited point is joined to the natural level in 1500 by that trend, e.g. the lynxes, #94.)
+    const living = FELIDAE.species.filter(
+      (s) =>
+        !s.extinct &&
+        s.history?.component === 'wild' &&
+        s.history.modelled !== 'rangeloss' &&
+        !MODELLED_KINDS.has(s.history.segments[0]?.kind ?? ''),
+    );
     expect(living.length).toBeGreaterThanOrEqual(6);
     for (const sp of living) {
       const h = sp.history;
@@ -153,6 +171,8 @@ describe('species card history', () => {
     }
     expect(yearTicks(1750, 2024)).toEqual([1800, 1900, 2000]);
     expect(popTicks(Math.log10(3000), Math.log10(2e6))).toEqual([1e4, 1e6]);
+    // One power of ten inside: two round ticks still, to read the scale by (the lynx, ToLaD#57).
+    expect(popTicks(Math.log10(2.5e5), Math.log10(1.3e6))).toEqual([5e5, 1e6]);
   });
 });
 
@@ -362,10 +382,88 @@ describe('the card shows the deep past and the natural level (ToLaD#69)', () => 
       expect(row).toContain('km² today');
       expect(html).toContain(`href="${NATURAL_META!.url}"`);
     }
+    // The natural level is listed once: a range-loss trend starting at it (the lynx's 1500 point) is not a row of its
+    // own but the natural row, in its place in time, which says where the trend starts (ToLaD#123).
+    const lynx = byName('Eurasian lynx');
+    const lx = text(spark(lynx));
+    expect(lx.split(`${formatCount(lynx.natural!.n)} (`).length - 1).toBe(1);
+    expect(sourceRows(lynx.history!.points.slice().sort((a, b) => a.year - b.year), lynx.natural).map((r) => r.kind)).toEqual(['natural', 'point']);
+    expect(lx).toContain('held to 1500, where the rangeloss trend starts');
+    expect(lx).toContain('ToLaD range-loss trend');
     // A living cat with a natural level but no history carries it in its details.
     for (const sp of FELIDAE.species.filter((s) => s.natural && !(s.history && s.history.points.length))) {
       const html = renderToStaticMarkup(<SpeciesCard sp={sp} onClose={() => {}} />);
       expect(html, sp.common).toContain('<dd data-natural="">');
+    }
+  });
+});
+
+describe('the sparkline y axis follows the central values, not the ranges (ToLaD#57, ToLaD#123)', () => {
+  const svgOf = (common: string) => {
+    const sp = byName(common);
+    return renderToStaticMarkup(<HistorySpark h={sp.history!} natural={sp.natural} naturalMeta={NATURAL_META} />);
+  };
+  const num = (html: string, re: RegExp) => [...html.matchAll(re)].map((m) => Number(m[1]));
+
+  it("a 30% fall reads as a slope: the leopard's 1998 -> 2020 estimates drop at least 8 px (3.4 when the ranges set the axis); on every Panthera a 30% fall is at least 4-5", () => {
+    const leo = [...svgOf('Leopard').matchAll(/<circle cx="([\d.]+)" cy="([\d.]+)" r="3.2"/g)].map((m) => Number(m[2]));
+    expect(leo.length).toBe(2); // 1998 (188k), 2020 (131k)
+    expect(leo[1] - leo[0]).toBeGreaterThan(8);
+    for (const common of ['Lion', 'Leopard', 'Tiger', 'Snow leopard', 'Jaguar']) {
+      const html = svgOf(common);
+      // px per decade, from the two y ticks and their labels
+      const ys = num(html, /<line x1="31" x2="326" y1="([\d.]+)"/g);
+      const vs = [...html.matchAll(/text-anchor="end">([^<]+)</g)].map((m) => m[1]);
+      expect(ys.length, common).toBe(2);
+      const v = (t: string) => Number(t.replace(/k$/, 'e3').replace(/M$/, 'e6'));
+      const perDecade = (ys[0] - ys[1]) / Math.log10(v(vs[1]) / v(vs[0]));
+      // (The tiger's own figures span two decades, its fall from 100k to 3k, so its 30% is a little smaller; it was 2.8 px.)
+      expect(perDecade * Math.log10(1 / 0.7), common).toBeGreaterThan(common === 'Tiger' ? 4 : 5);
+    }
+  });
+
+  it('range bars and bands that run past the plot are clipped at its edge, with a marker', () => {
+    const leo = svgOf('Leopard');
+    // Both estimates' 95% ranges run off the bottom (to 61k and 43k): two bar markers; the bars end at the plot's edges.
+    expect((leo.match(/data-clip="bar-bottom"/g) ?? []).length).toBe(2);
+    expect(leo).not.toContain('data-clip="bar-top"');
+    for (const m of leo.matchAll(/y1="([\d.]+)" y2="([\d.]+)" stroke="[^"]+" stroke-width="2"/g)) {
+      expect(Number(m[1])).toBeGreaterThanOrEqual(6);
+      expect(Number(m[2])).toBeLessThanOrEqual(90 - 16);
+    }
+    expect(leo).toMatch(/<g clip-path="url\(#spark-clip[^"]*\)"><polygon/);
+    expect(leo).toContain('data-clip="band-top"');
+    // The lion's estimates are tight: nothing clipped there.
+    expect(svgOf('Lion')).not.toContain('data-clip="bar-');
+  });
+
+  it("a single much wider point flares the band near it, not across the whole span (the leopard's 1500)", () => {
+    const leo = byName('Leopard');
+    const run = leo.history!.points.filter((p) => CURVE_KINDS.has(p.kind)).sort((a, b) => a.year - b.year);
+    const X = (y: number) => y; // a linear stand-in axis: 1 px a year
+    const hi = bandEdge(run, 'hi', (y) => X(y));
+    expect(hi.length).toBe(run.length + 1); // one extra vertex, before the 1500 point
+    const [xv, nv] = hi[hi.length - 2];
+    const a = run[run.length - 2];
+    const b = run[run.length - 1];
+    expect(b.year - xv).toBeCloseTo(14, 5); // TAPER px short of it
+    // ... on the straight centre line, at the genomic step's width, not the 1500 point's
+    const f = (xv - a.year) / (b.year - a.year);
+    const centre = Math.log10(a.n) + f * (Math.log10(b.n) - Math.log10(a.n));
+    expect(Math.log10(nv) - centre).toBeCloseTo(Math.log10(a.hi / a.n), 6);
+    expect(Math.log10(b.hi / b.n)).toBeGreaterThan(Math.log10(a.hi / a.n) + 0.3);
+    expect(hi[hi.length - 1][1]).toBe(b.hi); // and the point's own range at the point
+  });
+
+  it('the "no data" label clears the natural line (the cougar)', () => {
+    for (const common of ['Cougar', 'Leopard', 'Lion', 'Tiger', 'Snow leopard', 'Jaguar']) {
+      const html = svgOf(common);
+      const lab = /<text x="[\d.]+" y="([\d.-]+)"[^>]*data-nodata-label=""/.exec(html);
+      const nat = /y1="([\d.-]+)"[^>]*data-natural=""/.exec(html);
+      if (!lab || !nat) continue;
+      const base = Number(lab[1]);
+      const ny = Number(nat[1]);
+      expect(ny > base + 1 || ny < base - 8, common).toBe(true);
     }
   });
 });
