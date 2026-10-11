@@ -4,12 +4,14 @@
 import * as BridgeMirror from './bridge';
 import * as MeshMirror from './mesh';
 import { useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { formatCount } from '../data/count';
 import { SPLIT_LABEL, SPLIT_NAME, SPLIT_STYLES, type SplitStyle, type SplitWindow } from './gradual';
 import { HistorySpark } from './HistorySpark';
 import type { EdgeStyle, WidthMode } from './layout';
 import { FELIDAE, NATURAL_META, type HistEvent, type SpeciesRec } from './panthera';
 import { population } from './population';
+import { MagnifierIcon, SearchPanel } from './SearchPanel';
 import { statusOf } from './status';
 import { FanView, fmtInt, formatYearsAgo, type IndInfo, type Lineage, type Selection } from './view';
 
@@ -77,6 +79,7 @@ export function FanApp() {
   const [split, setSplit] = useState<SplitStyle>(() => initialPick('split', SPLIT_KEY, SPLIT_STYLES, 'clean'));
   const [win, setWin] = useState<SplitWindow>(() => initialPick<SplitWindow>('win', WIN_KEY, ['short', 'long'], 'short'));
   const [sel, setSel] = useState<Selection | null>(null);
+  const [searching, setSearching] = useState(false);
   const scaleRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
 
@@ -165,7 +168,31 @@ export function FanApp() {
         <button type="button" onClick={() => viewRef.current?.resetView()}>
           All cats
         </button>
+        <button
+          type="button"
+          className="icon"
+          aria-label="Find a species"
+          title="Find a species"
+          aria-expanded={searching}
+          onClick={() => {
+            // Opened synchronously inside the tap, so the field's focus brings the phone's keyboard up.
+            flushSync(() => setSearching(true));
+          }}
+        >
+          <MagnifierIcon />
+        </button>
       </div>
+      {searching && (
+        <SearchPanel
+          species={viewRef.current?.fan.branches.map((b) => b.sp) ?? []}
+          onClose={() => setSearching(false)}
+          onPick={(sp) => {
+            setSearching(false);
+            (document.activeElement as HTMLElement | null)?.blur?.();
+            viewRef.current?.flyToSpecies(sp);
+          }}
+        />
+      )}
       <div className="foot">
         <div className="wscale" ref={scaleRef} aria-label="width scale">
           <span className="wbar" />
