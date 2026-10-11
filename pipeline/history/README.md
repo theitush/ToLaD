@@ -433,6 +433,56 @@ the same way by code rather than by hand.
     holds `by_next` (cited / natural / modelled), the factor spread
     (`factor`: min, p10, p25, median, p75, p90, max, `beyond_flag` up /
     down) and the flagged species, worst first.
+  - **A flagged join meets the long-run level** (ToLaD#172, a
+    data-plausibility fix within #143's rule). The young end is the least
+    certain part of a PSMC curve: it sits at the edge of the blind spot,
+    and it carries the sampled genome's own regional or founder history.
+    The cougar's (one North American genome, ~37k at 21 kya) met its
+    1.02M anchor at ×27 and drew 21M cougars at 95-134 kya, ~27x today's
+    density over today's range. So where a join is flagged (beyond 10x
+    either way) and its young end sits below the **median of its resolved
+    steps** (the blind spot is already left out), that median meets the
+    anchor instead. The young steps the scaled curve then puts below the
+    anchor are **held at it**: the oldest of them becomes a point at the
+    anchor (kind `genomic`, `span_kind` `held`, so the span from it to the
+    anchor compiles to a `held` segment; its note says so) and the younger
+    ones are dropped. The curve falls to the anchor where the genome
+    falls below it and holds there, with no pinch. Above it the genome's
+    shape is untouched, so the deep past peaks at the genome's own
+    resolved max / median above the anchor and no higher. The cougar is
+    now ×2.2: from 680k at 2.5 Mya up to 1.72M at 97 kya, 1.38M at 72 kya, 1.02M from
+    61 kya, flat to 1500, then down to 777k today.
+    - **Why the median.** It is the genome's level over its whole resolved
+      span, the part PSMC resolves best, and it does not move with either
+      end. The mean of log N would do much the same. The maximum would put
+      the whole curve at or below the anchor, which reads as a rise to the
+      anchor that the genome does not show. The young end is what #172
+      replaces. Across the 33 joins it now sets, the peak is 1.4-16x the
+      anchor (the African savanna elephant's own range is 16x, its PSMC
+      curve's ancient hump), against 3-58x before.
+    - **Not changed.** A flagged join whose young end is at or above its
+      median (*Beatragus hunteri*) already peaks within the genome's own
+      range: its young end still meets the anchor. So does a young end
+      kept by a cited `[deep.blind]` window (the lion, Figueiró et al.
+      2017): that decline is the cited shape, and it keeps its 20-10 kya
+      fall (`test_event_falls`). Unflagged joins (10x or less) are
+      unchanged, though many of them meet the anchor below their median
+      too; `make audit` lists those (below).
+    - **The audit** (`check_deep_peak`, class `deep`) flags any deep past
+      whose peak over its anchor exceeds the genome's own resolved max /
+      median (by over 1%), i.e. inflation the join adds, except a young
+      end kept by `[deep.blind]`. After #172 no flagged join trips it. 63
+      unflagged ones do (the jaguar 5.3x, the sitatunga 37x).
+    - **Recorded.** `deep.join` adds `meet` (`median` or `young`),
+      `res_median_raw` and `res_max_raw` (the resolved steps' median and
+      max before scaling), `held` (`{steps, ago, year, min_n}`: the young
+      steps held at the anchor, when they were, and the lowest of them as
+      scaled; else null), `peak_n` and `peak_ago` (the deep past's peak as
+      built). `factor` is `to_n / res_median_raw` when `meet` is
+      `median`, else 1 / `ratio`. `ratio` still measures the young end,
+      and the flag still uses it: 35 of 108 joins are flagged, while the
+      factor spread in `stats.json -> history.deep_join.factor` counts the
+      factors as applied (12 beyond 10x up, 10 down; median 1.23).
 
   In the 2026-10-12 build (108 genomic species: 12 anchored on a cited
   count, 14 on the natural level above their first count, 82 on a modelled

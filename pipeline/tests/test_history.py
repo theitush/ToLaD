@@ -661,13 +661,19 @@ class DeepJoin(unittest.TestCase):
             self.assertEqual((j["rule"], j["next"]), ("scaled", "cited"), year)
             self.assertAlmostEqual(out[-1]["n"], 2e5)
             self.assertNotIn("cited_late", j)
-        # a 1924 census of 66 (the wisent): scaled to it too, and flagged, as it is 1,212x off
+        # a 1924 census of 66 (the wisent): met too, and flagged, as it is 1,212x off; the young end (8e4) is
+        # below the median of the resolved steps (1.4e5), so that median meets it (ToLaD#172)
         out, j = H.deep_join(gen, self._nxt(66, "census", year=1924))
         self.assertTrue(j["flag"])
+        self.assertEqual(j["meet"], "median")
         self.assertAlmostEqual(out[-1]["n"], 66)
-        self.assertEqual(j["note"], "The genome gives the shape, not the number: its curve is scaled ×0.00083 "
-                                    "to meet the cited 1924 census (66), then held flat to it (flagged: beyond "
-                                    "10×).")
+        self.assertEqual(j["note"], "The genome gives the shape, not the number: its curve is scaled ×0.00047 to "
+                                    "meet the cited 1924 census (66) at its long-run level (the median of its "
+                                    "resolved steps), then held flat to it. Its young end (~33 kya), the least "
+                                    "certain part of the curve (the edge of PSMC's blind spot, and the sampled "
+                                    "genome's own regional history), sits 1.8x below that level: meeting the anchor "
+                                    "there would scale the whole curve ×0.00083 (flagged: beyond 10×), so instead "
+                                    "the curve falls to the anchor by ~33 kya and holds there.")
 
     def test_natural_anchor_sentence(self):
         """ToLaD#143: a first cited count below the natural level is not the anchor; the genome meets the
@@ -705,13 +711,16 @@ class DeepJoin(unittest.TestCase):
         out, j = H.deep_join(gen, self._nxt(8e4 / 316, "rangeloss"))
         self.assertTrue(j["flag"])
         self.assertAlmostEqual(out[-1]["n"], 8e4 / 316)
-        self.assertIn("scaled ×0.0032 to meet the modelled natural level", j["note"])
-        self.assertIn("(flagged: beyond 10×)", j["note"])
-        # cited, 1000x above it (the Bison case, inverted): scaled up, flagged
-        out, j = H.deep_join(gen, self._nxt(8e7, "estimate", year=1800))
+        self.assertIn("scaled ×0.0018 to meet the modelled natural level in 1500 CE (253; no cited count) at its "
+                      "long-run level", j["note"])
+        self.assertIn("would scale the whole curve ×0.0032 (flagged: beyond 10×)", j["note"])
+        # flagged, with the young end at or above the median of the resolved steps: the young end meets it
+        young = gen[:-1]  # 2e5, 1.2e5, 1.6e5: median 1.6e5, the young end
+        out, j = H.deep_join(young, self._nxt(8e7, "estimate", year=1800))
         self.assertTrue(j["flag"])
+        self.assertEqual((j["meet"], j["held"]), ("young", None))
         self.assertAlmostEqual(out[-1]["n"], 8e7)
-        self.assertEqual(j["note"], "The genome gives the shape, not the number: its curve is scaled ×1,000 to "
+        self.assertEqual(j["note"], "The genome gives the shape, not the number: its curve is scaled ×500 to "
                                     "meet the cited 1800 estimate (80,000,000), then held flat to it (flagged: "
                                     "beyond 10×).")
         # within 10x either way: not flagged
@@ -729,9 +738,62 @@ class DeepJoin(unittest.TestCase):
         f = s["factor"]
         self.assertEqual(f["n"], 3)
         self.assertAlmostEqual(f["median"], 2.0)
-        self.assertAlmostEqual(f["min"], 1 / 316)
-        self.assertAlmostEqual(f["max"], 1000)
+        self.assertAlmostEqual(f["min"], 8e4 / 316 / 1.4e5)  # the flagged ones meet at the median (ToLaD#172)
+        self.assertAlmostEqual(f["max"], 8e7 / 1.4e5)
         self.assertEqual(f["beyond_flag"], {"up": 1, "down": 1})
+
+    def test_flagged_meets_median(self):
+        """ToLaD#172: a flagged join whose young end sits below the median of the resolved steps is not
+        scaled by that end (the cougar's ~37k at 21 kya made it x27, a 21M deep past): the median meets the
+        anchor, and the young steps that then sit below it are held at it (the oldest of them, where the
+        curve has fallen to it; the younger ones dropped). The genome's own shape is kept above that, so the
+        deep past peaks at its resolved max / median above the anchor and no higher. Unflagged joins and
+        a young end kept by a cited [deep.blind] window are scaled by the young end as before."""
+        _, gen = self._gen()  # oldest first: 2e5, 1.2e5, 1.6e5, 8e4 (young end); median 1.4e5
+        nxt = self._nxt(8e6, "rangeloss")  # 100x the young end: flagged
+        out, j = H.deep_join(gen, nxt)
+        f = 8e6 / 1.4e5
+        self.assertTrue(j["flag"])
+        self.assertEqual(j["meet"], "median")
+        self.assertAlmostEqual(j["factor"], f)
+        self.assertAlmostEqual(j["ratio"], 0.01)  # the flag's measure is still the young end's
+        self.assertEqual((j["res_median_raw"], j["res_max_raw"]), (1.4e5, 2e5))
+        self.assertEqual(len(out), 4)
+        for a, b in zip(gen[:3], out[:3]):  # the shape above the anchor, scaled as one (1.2e5 is older: kept)
+            for k in ("n", "lo", "hi", "ne"):
+                self.assertAlmostEqual(b[k] / a[k], f, places=9)
+        h = out[-1]  # the young end, held at the anchor
+        self.assertEqual((h["year"], h["n"], h["span_kind"], h["held_genomic"]), (gen[-1]["year"], 8e6, "held", 1))
+        self.assertAlmostEqual(h["lo"] / h["n"], gen[-1]["lo"] / gen[-1]["n"])
+        self.assertEqual(j["held"]["steps"], 1)
+        self.assertAlmostEqual(j["held"]["min_n"], 8e4 * f)
+        self.assertAlmostEqual(j["peak_n"] / nxt["n"], 2e5 / 1.4e5)
+        self.assertEqual(gen[-1]["n"], 8e4)  # the input is not touched
+        # two young steps below the anchor: the older one is held, the younger dropped
+        two = gen[:2] + [{**gen[2], "n": 9e4}, gen[3]]  # 2e5, 1.2e5, 9e4, 8e4: median 1.05e5
+        out, j = H.deep_join(two, nxt)
+        self.assertEqual([p["year"] for p in out], [p["year"] for p in two[:3]])
+        self.assertEqual((out[-1]["n"], out[-1]["held_genomic"], j["held"]["steps"]), (8e6, 2, 2))
+        # the drawn curve: falls from the last step above to the held one, then flat (held) to the anchor
+        segs = H.compile_segments(out + [nxt, self._nxt(5e6, "model", year=H.NOW_YEAR)], 10.0, 5.0,
+                                  H.year_to_ma(gen[0]["year"]), False)
+        held = [x for x in segs if x["kind"] == H.K["held"] and x["year0"] > gen[0]["year"]]
+        self.assertEqual(len(held), 1)
+        x = held[0]
+        self.assertAlmostEqual(x["start"] / x["end"], 1.0, places=9)
+        self.assertLess(abs(x["year0"] - out[-1]["year"]), 10)  # from the held step (G = 10 yr)
+        self.assertLess(abs(x["year0"] + x["gens"] * 10 - nxt["year"]), 10)  # to the anchor
+        # unflagged: the young end meets it, whatever the median
+        out, j = H.deep_join(gen, self._nxt(4e5, "rangeloss"))
+        self.assertEqual((j["flag"], j["meet"], j["held"]), (False, "young", None))
+        self.assertAlmostEqual(out[-1]["n"], 4e5)
+        # a young end kept by a cited [deep.blind] window (the lion's decline): the young end meets it
+        bl = [{**gen[-1], "blind": True, "year": H.NOW_YEAR - 15000, "ago": 15000, "n": 4e4}]
+        src = {"cite": "F 2017", "url": "https://example.org/f", "window": [10000, 20000], "quote": "q"}
+        out, j = H.deep_join(gen + bl, nxt, None, src)
+        self.assertEqual((j["meet"], j["held"]), ("young", None))
+        self.assertAlmostEqual(out[-1]["n"], 8e6)
+        self.assertAlmostEqual(j["factor"], 8e6 / 4e4)
 
     def test_built_joins(self):
         st = _stats()
@@ -749,7 +811,18 @@ class DeepJoin(unittest.TestCase):
             self.assertEqual(j["next"], "cited" if j["to_kind"] in H.POINT_KINDS else
                              "natural" if j["below"] else "modelled", sp)
             self.assertEqual(j["flag"], max(j["ratio"], 1 / j["ratio"]) > H.DEEP_JOIN_FLAG, sp)
-            self.assertAlmostEqual(j["factor"] * j["ratio"], 1.0, places=9, msg=sp)
+            if j["meet"] == "median":  # ToLaD#172: a flagged join whose young end is below the median
+                self.assertTrue(j["flag"] and j["res_median_raw"] > j["deep_n_raw"], sp)
+                self.assertFalse((j["blind"] or {}).get("kept"), sp)
+                self.assertAlmostEqual(j["factor"] * j["res_median_raw"] / j["to_n"], 1.0, places=9, msg=sp)
+                self.assertIsNotNone(j["held"], sp)
+                self.assertLessEqual(j["peak_n"] / j["to_n"], j["res_max_raw"] / j["res_median_raw"] * (1 + 1e-9),
+                                     sp)
+            else:
+                self.assertFalse(j["flag"] and j["res_median_raw"] > j["deep_n_raw"]
+                                 and not (j["blind"] or {}).get("kept"), sp)
+                self.assertAlmostEqual(j["factor"] * j["ratio"], 1.0, places=9, msg=sp)
+                self.assertIsNone(j["held"], sp)
             gen = [p for p in h["points"] if p["kind"] == "genomic"]
             nxt = h["points"][len(gen)]
             if j["below"]:  # the natural level, above the first cited count, which the trend runs down to
