@@ -1,9 +1,13 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { plainAgo, plainCount, SpeciesCard } from './FanApp';
-import { fmtYear, HistorySpark, popTicks, yearTicks } from './HistorySpark';
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { fmtWhen, HistorySpark, popTicks, sourceRows, yearTicks } from './HistorySpark';
 import { GRADE_WORD, MODELLED_KINDS, noDataSpans, styleBetween } from './history';
-import { FELIDAE, type HistoryRec } from './panthera';
+import { FELIDAE, NATURAL_META, type HistoryRec } from './panthera';
+import { loadClade } from './panthera-extract';
 import { population } from './population';
 import { RED_LIST, redListOf } from './status';
 import { approxCountsIn, formatCount } from '../data/count';
@@ -11,23 +15,30 @@ import { approxCountsIn, formatCount } from '../data/count';
 const byName = (common: string) => FELIDAE.species.find((s) => s.common === common)!;
 
 describe('species card history', () => {
-  it('lists every point with its year, numbers, grade, kind, citation link and note', () => {
-    for (const common of ['Lion', 'Tiger', 'Snow leopard', 'Leopard']) {
+  it('lists every point with its year, numbers, grade, kind, citation link and note; the genomic curve as one row', () => {
+    for (const common of ['Lion', 'Tiger', 'Snow leopard', 'Leopard', 'Cougar']) {
       const sp = byName(common);
       const html = renderToStaticMarkup(<SpeciesCard sp={sp} onClose={() => {}} open />);
       const h = sp.history!;
       expect(html).toContain('<svg');
-      expect((html.match(/<li>/g) ?? []).length).toBe(h.points.length);
+      const rows = sourceRows(h.points.slice().sort((a, b) => a.year - b.year), !!sp.natural);
+      expect((html.match(/<li[ >]/g) ?? []).length, common).toBe(rows.length);
+      const genomic = h.points.filter((p) => p.kind === 'genomic');
+      expect(genomic.length, common).toBeGreaterThan(2); // every one of these has a genomic deep past (ToLaD#60/#64)
+      expect(rows.filter((r) => r.kind === 'genomic').length, common).toBe(1);
+      expect((html.match(/data-row="genomic"/g) ?? []).length).toBe(1);
       const esc = (t: string) => renderToStaticMarkup(<>{t}</>);
       for (const p of h.points) {
         expect(html).toContain(esc(p.cite));
         if (p.url) expect(html).toContain(`href="${p.url}"`);
-        if (p.note) expect(html).toContain(esc(approxCountsIn(p.note)));
+        if (p.note && p.kind !== 'genomic') expect(html).toContain(esc(approxCountsIn(p.note)));
         expect(html).toContain(`grade ${p.grade}`);
-        expect(html).toContain(p.kind);
+        if (p.kind !== 'genomic') expect(html).toContain(p.kind);
       }
-      // Sparkline markers: one per point, coloured by grade; the spans between them styled like the edge.
-      expect((html.match(/<circle /g) ?? []).length).toBe(h.points.length);
+      // Sparkline markers: one per cited or modelled point, coloured by grade (the genomic steps are a band, no dots);
+      // the spans between them styled like the edge.
+      expect((html.match(/<circle /g) ?? []).length).toBe(h.points.length - genomic.length);
+      expect(html).toContain('data-band="genomic"');
       const pts = h.points.slice().sort((a, b) => a.year - b.year);
       for (let k = 1; k < pts.length; k++) expect(html).toContain(`data-style="${styleBetween(h, pts[k - 1].year, pts[k].year)}"`);
     }
@@ -106,7 +117,7 @@ describe('species card history', () => {
       expect(before, sp.common).toBeTruthy();
       expect(html).toContain('data-nodata="before"');
       expect(html).toContain('>no data</text>');
-      expect(html).toContain(`No data before ${fmtYear(before!.year)}: held at `);
+      expect(html).toContain(`No data before ${fmtWhen(before!.year, h!.nowYear)}: held at `);
       // A held stretch after the last figure is drawn faint too, never as a plain line.
       expect(html.includes('data-nodata="after"')).toBe(nd.some((s) => s.side === 'after'));
     }
@@ -198,8 +209,11 @@ describe('the species card: the population at the time touched', () => {
         expect(RED_LIST[sp.sci]).toBeUndefined();
         expect(sp.redList).toBeNull(); // fossils carry no status in the data
       } else if (sp.sci === 'Felis catus') {
-        expect(chip![1]).toBe('Not Evaluated');
+        // IUCN does not assess domestic forms: NE in the data, "Domesticated" in gray on the card (ToLaD#98)
+        expect(chip![1]).toBe('Domesticated');
+        expect(html).toContain('class="status domestic"');
         expect(sp.redList?.source).toBe('not-listed');
+        expect(html).not.toContain('href=""');
       } else {
         if (want[sp.common]) expect(chip![1]).toBe(want[sp.common]);
         // the data's status (ToLaD#48), or the curated one where that is the newer assessment
@@ -214,18 +228,18 @@ describe('the species card: the population at the time touched', () => {
   });
 
   it('shows the chip even when the species is in no danger: Least Concern in gray (ToLaD#98)', () => {
-    // A stubbed LC status for a small cat (the pipeline's statuses are ToLaD#48).
+    // The leopard cat's own status from the data (ToLaD#48): Least Concern.
     const sp = byName('Leopard cat');
-    const had = RED_LIST[sp.sci];
-    RED_LIST[sp.sci] = { category: 'LC', year: 2022, cite: 'stub', url: 'https://www.iucnredlist.org/species/1/2' };
-    try {
-      const html = renderToStaticMarkup(<SpeciesCard sp={sp} onClose={() => {}} />);
-      expect(html).toMatch(/<span class="status iucn-lc"[^>]*>Least Concern<\/span>/);
-      expect(details(html)).toContain('IUCN Red List: Least Concern (LC)');
-    } finally {
-      if (had) RED_LIST[sp.sci] = had;
-      else delete RED_LIST[sp.sci];
-    }
+    expect(RED_LIST[sp.sci]).toBeUndefined();
+    const html = renderToStaticMarkup(<SpeciesCard sp={sp} onClose={() => {}} />);
+    expect(html).toMatch(/<span class="status iucn-lc"[^>]*>Least Concern<\/span>/);
+    expect(details(html)).toContain('IUCN Red List: Least Concern (LC)');
+    // A Not Evaluated species has no assessment page: no link on its Status line.
+    const ne = { ...sp, redList: { ...sp.redList!, category: 'NE', source: 'not-listed', sourceLabel: 'not listed', cite: 'not listed', url: '' } };
+    const neHtml = renderToStaticMarkup(<SpeciesCard sp={ne} onClose={() => {}} />);
+    expect(neHtml).toMatch(/<span class="status iucn-ne"[^>]*>Not Evaluated<\/span>/);
+    expect(details(neHtml)).toContain('Not Evaluated (NE)');
+    expect(neHtml).not.toContain('href=""');
     // Threatened categories keep their colours.
     expect(renderToStaticMarkup(<SpeciesCard sp={byName('Tiger')} onClose={() => {}} />)).toContain('class="status iucn-en"');
   });
@@ -241,6 +255,14 @@ describe('the species card: the population at the time touched', () => {
         } else expect(html).not.toContain(`data-key="${g}"`);
       }
     }
+  });
+
+  it('names the species mid-sentence with its capital and plural (ToLaD#107)', () => {
+    const ever = (common: string) => face(renderToStaticMarkup(<SpeciesCard sp={byName(common)} onClose={() => {}} />));
+    expect(ever('Eurasian lynx')).toContain('Eurasian lynxes have ever lived');
+    expect(ever('Iberian lynx')).toContain('Iberian lynxes have ever lived');
+    expect(ever('Snow leopard')).toContain('snow leopards have ever lived');
+    expect(ever('Bobcat')).toContain('bobcats have ever lived');
   });
 
   it('rounds in words', () => {
@@ -265,6 +287,77 @@ describe('the species card across species', () => {
       // One sparkline at most.
       const html = renderToStaticMarkup(<SpeciesCard sp={sp} onClose={() => {}} />);
       expect((html.match(/class="hist"/g) ?? []).length).toBe(sp.history && sp.history.points.length ? 1 : 0);
+    }
+  });
+});
+
+describe('the card shows the deep past and the natural level (ToLaD#69)', () => {
+  const DATA = resolve(dirname(fileURLToPath(import.meta.url)), '../../../data/mammals');
+  const read = (rel: string) => new Uint8Array(readFileSync(resolve(DATA, rel)));
+  const text = (html: string) => html.replace(/<[^>]+>/g, '').replace(/&#x27;/g, "'").replace(/&amp;/g, '&');
+  const spark = (sp: { history: HistoryRec | null; natural?: unknown }, open = true) =>
+    renderToStaticMarkup(<HistorySpark h={sp.history!} open={open} natural={sp.natural as never} naturalMeta={NATURAL_META} />);
+
+  it('a genomic deep past takes a log-time axis in years ago, with round ticks and "now"', () => {
+    const html = spark(byName('Lion'), false);
+    expect(html).toContain('data-axis="log"');
+    expect(text(html)).toContain('Population over time, years ago');
+    const ticks = [...html.matchAll(/<text[^>]*text-anchor="middle"[^>]*>([^<]+)<\/text>/g)].map((m) => m[1]);
+    for (const t of ['1k', '10k', '100k', '1M', 'now']) expect(ticks).toContain(t);
+    // The last century is not squashed into the corner: 1950 and 2024 are well apart.
+    const xs = [...html.matchAll(/<circle cx="([\d.]+)"/g)].map((m) => Number(m[1]));
+    expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(40);
+    // Only recent history: a linear calendar axis as before.
+    expect(spark(byName('Eurasian lynx'), false)).toContain('data-axis="linear"');
+  });
+
+  it('the genomic curve is one modelled source row, with its Ne/N ratio and the per-species join rule (ToLaD#80)', () => {
+    const lion = byName('Lion');
+    const html = spark(lion);
+    const row = text(html.match(/<li data-row="genomic">[\s\S]*?<\/li>/)![0]);
+    expect(row).toContain('Armstrong et al. 2025');
+    expect(row).toContain('Ne/N 0.1');
+    expect(row).toContain('genomic curve, modelled');
+    expect(row).toContain('million years ago');
+    expect(lion.history!.deepJoin).toBeTruthy();
+    expect(html).toContain('data-deep-join=""');
+    expect(row).toContain('First cited point');
+  });
+
+  it('says the deep-past join for a scaled curve (Bison bison) and a kept, flagged one (Addax)', () => {
+    const bovids = loadClade(read, 'Bovidae').species;
+    const bison = bovids.find((s) => s.sci === 'Bison bison')!;
+    const b = text(spark(bison));
+    expect(b).toContain('Genomic curve scaled x981 to meet the cited 1800 baseline (~40 million)');
+    expect(b).toContain('flagged');
+    const addax = bovids.find((s) => s.sci === 'Addax nasomaculatus')!;
+    const a = spark(addax);
+    expect(a).toContain('data-axis="log"');
+    expect(text(a)).toContain('Genomic curve kept at its own level');
+    expect(text(a)).toContain('flagged: beyond 10x');
+    expect((a.match(/data-row="genomic"/g) ?? []).length).toBe(1);
+  });
+
+  it('shows the natural (pre-human) level: a faint line and a modelled source row, with its range areas and citation', () => {
+    expect(NATURAL_META).toBeTruthy();
+    for (const common of ['Lion', 'Eurasian lynx']) {
+      const sp = byName(common);
+      expect(sp.natural, common).toBeTruthy();
+      const html = spark(sp);
+      expect(html).toContain('data-natural=""');
+      expect(html).toContain('data-key="reconstructed"');
+      const row = text(html.match(/<li data-row="natural">[\s\S]*?<\/li>/)![0]);
+      expect(row).toContain('Natural (pre-human) baseline');
+      expect(row).toContain(`${formatCount(sp.natural!.n)} (${formatCount(sp.natural!.lo)} – ${formatCount(sp.natural!.hi)})`);
+      expect(row).toContain('grade D · modelled');
+      expect(row).toContain('PHYLACINE');
+      expect(row).toContain('km² today');
+      expect(html).toContain(`href="${NATURAL_META!.url}"`);
+    }
+    // A living cat with a natural level but no history carries it in its details.
+    for (const sp of FELIDAE.species.filter((s) => s.natural && !(s.history && s.history.points.length))) {
+      const html = renderToStaticMarkup(<SpeciesCard sp={sp} onClose={() => {}} />);
+      expect(html, sp.common).toContain('<dd data-natural="">');
     }
   });
 });

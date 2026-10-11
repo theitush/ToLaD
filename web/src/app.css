@@ -329,6 +329,12 @@
   border-radius: 50%;
   vertical-align: 0;
 }
+/* A reconstructed (modelled) level: hollow, as its points on the sparkline. */
+.card-sp .gdot.ring {
+  box-sizing: border-box;
+  border: 1.5px solid;
+  background: none;
+}
 
 .legend .dim {
   color: #8a978f;
@@ -499,7 +505,8 @@
   background: #a9b8ae;
   white-space: nowrap;
 }
-.fan .card-sp .status.iucn-lc {
+.fan .card-sp .status.iucn-lc,
+.fan .card-sp .status.domestic {
   background: #3d4642;
   color: #c3ccc6;
 }

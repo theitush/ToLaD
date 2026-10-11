@@ -63,5 +63,9 @@ export function formatCount(n: number, style: CountStyle = {}): string {
  * Years ("11,700 years ago", "1,500 BCE") are left as they are.
  */
 export function approxCountsIn(text: string): string {
-  return text.replace(/(?<![\d.,])\d{1,3}(?:,\d{3})+(?:\.\d+)?(?![\d,]|\.\d|\s*(?:yr|years?|y\b|BCE|CE|BC|AD|kya|Mya|ya)\b)/g, (m) => formatCount(Number(m.replace(/,/g, ''))));
+  return text.replace(/(?<![\d.,])\d{1,3}(?:,\d{3})+(?:\.\d+)?(?![\d,]|\.\d|\s*(?:yr|years?|y\b|BCE|CE|BC|AD|kya|Mya|ya)\b)/g, (m, at: number, all: string) => {
+    // ("about ~3,000" in a note: one tilde, not two)
+    const f = formatCount(Number(m.replace(/,/g, '')));
+    return all[at - 1] === '~' ? f.replace(/^~/, '') : f;
+  });
 }
