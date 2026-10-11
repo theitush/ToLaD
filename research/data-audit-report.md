@@ -6,7 +6,7 @@
 
 | class | species flagged |
 |---|---|
-| join | 68 |
+| join | 71 |
 | deep | 64 |
 | ceiling | 60 |
 | today | 4 |
@@ -18,7 +18,7 @@ In the fan's order of visibility: the cats the Felidae view places first, then t
 
 | cat | in fan | state | sev | alive (source) | Red List | causes |
 |---|---|---|---|---|---|---|
-| *Puma concolor* | yes | flagged | 1.32 | 777k (greenspoon model) | LC | **deep**: PSMC's 3 blind-spot steps average 1.7x below the youngest resolved step but are not drawn (no [deep.blind] source), and the curve is held flat across them; **deep**: genomic level 37.3k is 20.8x below the next level (estimate, 777k); genome curve scaled x20.8 to meet it |
+| *Puma concolor* | yes | flagged | 1.44 | 777k (greenspoon model) | LC | **deep**: PSMC's 3 blind-spot steps average 1.7x below the youngest resolved step but are not drawn (no [deep.blind] source), and the curve is held flat across them; **deep**: genomic level 37.3k is 27.3x below the next level (rangeloss, 1.02M); genome curve scaled x27.3 to meet it |
 | *Panthera leo* | yes | flagged | 1.08 | 23.5k (history) | VU | **deep**: genomic level 41.2k is 12.1x below the next level (unverified, 500k); genome curve scaled x12.1 to meet it; **units**: the curve's time is rescaled x4.33 from its source (Armstrong et al. 2025, Genome Biol Evol 17(4):evaf060, Fig. 4 (green curve): 5.42e-09/yr, g = 1), more than the lineage's 95% rate band spans (3x; Carnivora) *(reviewed, #66: Armstrong 2025 Fig. 4 is plotted with g = 1 (time in generations), so the large time rescale is the source's own scaling; cross-checked against five other lion PSMC curves (Panthera_leo.toml [deep] note))* |
 | *Panthera tigris* | yes | flagged | 0.21 | 5.57e+03 (history) | EN | **deep**: PSMC's 3 blind-spot steps average 1.6x below the youngest resolved step but are not drawn (no [deep.blind] source), and the curve is held flat across them; **units**: the curve's time is rescaled x7.44 from its source (Armstrong et al. 2025, Genome Biol Evol 17(4):evaf060, Fig. 4 (green curve): 7.45e-09/yr, g = 1), more than the lineage's 95% rate band spans (3x; Carnivora) *(reviewed, #66: Armstrong 2025 Fig. 4 is plotted with g = 1 (time in generations), so the time rescale by the per-generation rate is the source's own scaling (ToLaD#66))* |
 | *Panthera uncia* | yes | flagged | 0.21 | 7.72e+03 (history) | VU | **deep**: PSMC's 10 blind-spot steps average 1.6x below the youngest resolved step but are not drawn (no [deep.blind] source), and the curve is held flat across them |
@@ -70,16 +70,17 @@ Ranked: the rest of Carnivora first, then by severity.
 | *Canis rufus* | Canidae | 1.85 | 37 (history) | **join**: falls 70.7x from modelled rangeloss 2.62e+03 (1500) to cited census 37 (2026) |
 | *Ursus americanus* | Ursidae | 1.80 | 899k (census) | **deep**: genomic level 17.6k is 63.3x below the next level (rangeloss, 1.12M); genome curve scaled x63.3 to meet it |
 | *Lutrogale perspicillata* | Mustelidae | 1.73 | 1.93M (model) | **today**: today 1.93M (model) is 53.2x above Greenspoon 2023 per-species model 36.3k |
-| *Ailuropoda melanoleuca* | Ursidae | 1.66 | 1.86e+03 (history) | **deep**: PSMC's 1 blind-spot steps average 5x below the youngest resolved step but are not drawn (no [deep.blind] source), and the curve is held flat across them; **deep**: genomic level 113k is 45.8x above the next level (census, 2.46e+03); genome curve scaled x0.0218 to meet it |
 | *Lutra lutra* | Mustelidae | 1.30 | 1.74M (model) | **today**: today 1.74M (model) is 20.2x above Greenspoon 2023 per-species model 86.3k |
 | *Parahyaena brunnea* | Hyaenidae | 1.21 | 2.34e+03 (model) | **deep**: PSMC's 5 blind-spot steps average 2.1x below the youngest resolved step but are not drawn (no [deep.blind] source), and the curve is held flat across them; **deep**: genomic level 51.2k is 16.2x above the next level (rangeloss, 3.16e+03); genome curve scaled x0.0617 to meet it |
+| *Ursus arctos* | Ursidae | 1.17 | 200k (history) | **deep**: PSMC's 1 blind-spot steps average 1.7x above the youngest resolved step but are not drawn (no [deep.blind] source), and the curve is held flat across them; **deep**: genomic level 24.2k is 14.9x below the next level (rangeloss, 362k); genome curve scaled x14.9 to meet it |
 | *Cuon alpinus* | Canidae | 1.07 | 6.87e+03 (census) | **join**: falls 11.7x from modelled rangeloss 80.4k (1500) to cited census 6.87e+03 (2027) |
 | *Canis simensis* | Canidae | 1.02 | 296 (census) | **join**: falls 10.5x from modelled rangeloss 3.12e+03 (1500) to cited census 296 (2027) |
 | *Aonyx capensis* | Mustelidae | 1.00 | 401k (model) | **today**: today 401k (model) is 10.1x above Greenspoon 2023 per-species model 39.7k |
+| *Ailuropoda melanoleuca* | Ursidae | 0.70 | 1.86e+03 (history) | **deep**: PSMC's 1 blind-spot steps average 5x below the youngest resolved step but are not drawn (no [deep.blind] source), and the curve is held flat across them |
 | *Helarctos malayanus* | Ursidae | 0.39 | 44.9k (greenspoon model) | **deep**: PSMC's 1 blind-spot steps average 2.5x below the youngest resolved step but are not drawn (no [deep.blind] source), and the curve is held flat across them |
 | *Ursus maritimus* | Ursidae | 0.36 | 26k (history) | **deep**: PSMC's 2 blind-spot steps average 2.3x above the youngest resolved step but are not drawn (no [deep.blind] source), and the curve is held flat across them |
-| *Ursus arctos* | Ursidae | 0.23 | 200k (history) | **deep**: PSMC's 1 blind-spot steps average 1.7x above the youngest resolved step but are not drawn (no [deep.blind] source), and the curve is held flat across them |
 | *Hyaena hyaena* | Hyaenidae | 0.22 | 10.6k (census) | **deep**: PSMC's 2 blind-spot steps average 1.7x below the youngest resolved step but are not drawn (no [deep.blind] source), and the curve is held flat across them |
+| *Bison bonasus* | Bovidae | 5.02 | 12.2k (history) | **join**: falls 1.06e+05x from modelled rangeloss 6.97M (1500) to cited census 66 (1924); **deep**: PSMC's 2 blind-spot steps average 1.5x below the youngest resolved step but are not drawn (no [deep.blind] source), and the curve is held flat across them; **deep**: genomic level 21.4k is 326x below the next level (rangeloss, 6.97M); genome curve scaled x326 to meet it |
 | *Mystacina robusta* | Mystacinidae | 4.73 | 50 (cap) | **join**: falls 5.37e+04x from modelled natural 2.69M (1500) to modelled model 50 (1500) within 0 yr (IUCN A window 11) |
 | *Eudiscoderma thongareeae* | Megadermatidae | 3.79 | 61.1M (model) | **ceiling**: IUCN CR but modelled at 61.1M (model), above 10k (criterion C's widest bound; CR C bound 250) |
 | *Castor fiber* | Castoridae | 3.71 | 1.48M (history) | **join**: falls 5.08e+03x from modelled rangeloss 6.1M (1500) to cited estimate 1.2e+03 (1900) |
@@ -98,12 +99,11 @@ Ranked: the rest of Carnivora first, then by severity.
 | *Equus ferus* | Equidae | 2.71 | 1.36e+03 (history) | **join**: falls 514x from modelled rangeloss 699k (1500) to cited estimate 1.36e+03 (2022) |
 | *Peromyscus guardia* | Cricetidae | 2.61 | 50 (cap) | **join**: falls 405x from modelled natural 20.3k (1500) to modelled model 50 (1500) within 0 yr (IUCN A window 10) |
 | *Pteropus tuberculatus* | Pteropodidae | 2.57 | 50 (cap) | **join**: falls 375x from modelled natural 18.7k (1500) to modelled model 50 (1500) within 0 yr (IUCN A window 17) |
-| *Bison bonasus* | Bovidae | 2.51 | 12.2k (history) | **deep**: PSMC's 2 blind-spot steps average 1.5x below the youngest resolved step but are not drawn (no [deep.blind] source), and the curve is held flat across them; **deep**: genomic level 21.4k is 324x above the next level (census, 66); genome curve scaled x0.00309 to meet it |
+| *Oryx dammah* | Bovidae | 2.54 | 650 (history) | **join**: falls 347x from modelled rangeloss 226k (1500) to cited estimate 650 (2026); **deep**: PSMC's 1 blind-spot steps average 2.1x below the youngest resolved step but are not drawn (no [deep.blind] source), and the curve is held flat across them |
 | *Makalata obscura* | Echimyidae | 2.47 | 8.62M (model) | **join**: rises 296x from modelled natural 29.1k (1500) to modelled model 8.62M (1500) within 0 yr (IUCN A window 10) |
 | *Addax nasomaculatus* | Bovidae | 2.46 | 78 (census) | **deep**: PSMC's 3 blind-spot steps average 2.1x below the youngest resolved step but are not drawn (no [deep.blind] source), and the curve is held flat across them; **deep**: genomic level 143k is 287x above the next level (rangeloss, 497); genome curve scaled x0.00348 to meet it |
 | *Loxodonta africana* | Elephantidae | 2.44 | 380k (history) | **deep**: PSMC's 1 blind-spot steps average 2.3x above the youngest resolved step but are not drawn (no [deep.blind] source), and the curve is held flat across them; **deep**: genomic level 52.3k is 273x below the next level (unverified, 14.3M); genome curve scaled x273 to meet it |
 | *Sus scrofa* | Suidae | 2.42 | 986M (history) | **deep**: genomic level 101k is 262x below the next level (rangeloss, 26.5M); genome curve scaled x262 to meet it |
-| *Oryx dammah* | Bovidae | 2.41 | 650 (history) | **deep**: PSMC's 1 blind-spot steps average 2.1x below the youngest resolved step but are not drawn (no [deep.blind] source), and the curve is held flat across them; **deep**: genomic level 166k is 255x above the next level (estimate, 650); genome curve scaled x0.00391 to meet it |
 | *Macropus giganteus* | Macropodidae | 2.40 | 22M (census) | **deep**: genomic level 88.4k is 249x below the next level (model, 22M); genome curve scaled x249 to meet it |
 | *Lipotes vexillifer* | - | 2.20 | 50 (cap) | **join**: falls 159x from modelled natural 7.96e+03 (1500) to modelled model 50 (1500) within 0 yr (IUCN A window 40) |
 | *Lagorchestes hirsutus* | Macropodidae | 2.20 | 6e+03 (census) | **join**: falls 159x from modelled rangeloss 954k (1500) to cited census 6e+03 (2027) |
