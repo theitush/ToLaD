@@ -3,14 +3,14 @@
 // genealogy recurrence on the summed population, geometry fixed in the world.
 import { describe, expect, it } from 'vitest';
 import { FanCamera } from './camera';
-import { columnsAt, isNode, laneAt, layoutFan, leftAt, nodeQ, type Fan, type FanBranch, type FanNode, type WidthMode } from './layout';
+import { columnsAt, isNode, laneAt, layoutFan, leftAt, nodeQ, type Fan, type FanBranch, type EdgeStyle, type FanNode, type WidthMode } from './layout';
 import { PANTHERA } from './panthera';
 import { parentShare, Q_STAR } from './population';
 import { allSplits, PANTHERA_TREE, speciesUnder } from './splits';
 import { TwigModel } from './twigs';
 
-function camera(mode: WidthMode): FanCamera {
-  const fan = layoutFan(PANTHERA, mode);
+function camera(mode: WidthMode, edge: EdgeStyle): FanCamera {
+  const fan = layoutFan(PANTHERA, mode, undefined, edge);
   const models = new Map<FanBranch, TwigModel>();
   const model = (b: FanBranch) => {
     let m = models.get(b);
@@ -26,6 +26,7 @@ function camera(mode: WidthMode): FanCamera {
 }
 
 const MODES: WidthMode[] = ['log', 'linear'];
+const EDGES: EdgeStyle[] = ['curved', 'straight'];
 /** A hair above / below a height (relative, so it survives the log axis). */
 const above = (y: number) => y - 1e-7 * Math.max(1, Math.abs(y));
 const below = (y: number) => y + 1e-7 * Math.max(1, Math.abs(y));
@@ -33,7 +34,7 @@ const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 const byName = (f: Fan, name: string) => f.branches.find((b) => b.sp.common === name)!;
 
 describe('the dated tree', () => {
-  it('every species of the clade is placed once, in the table\'s left-to-right order', () => {
+  it('every species of the clade is placed once, in the table\'s left-to-right order (curved)', () => {
     const f = layoutFan(PANTHERA, 'linear');
     expect([...f.branches].sort((p, q) => p.index - q.index).map((b) => b.sp.sci)).toEqual(speciesUnder(PANTHERA_TREE));
     expect(f.branches.map((b) => b.sp)).toEqual(PANTHERA.species);
@@ -41,9 +42,24 @@ describe('the dated tree', () => {
     expect(f.nodes.length).toBe(allSplits().length);
   });
 
-  for (const mode of MODES) {
-    it(`each split is at its table date (${mode})`, () => {
-      const f = layoutFan(PANTHERA, mode);
+  it('every species is placed once, under its own splits, sides chosen for the shortest leans (straight)', () => {
+    const f = layoutFan(PANTHERA, 'linear', undefined, 'straight');
+    const drawn = [...f.branches].sort((p, q) => p.index - q.index);
+    expect(drawn.map((b) => b.sp.sci).sort()).toEqual(speciesUnder(PANTHERA_TREE).sort());
+    expect(drawn).toEqual(f.root.strands);
+    // Each split's daughters are its table's, maybe mirrored; every column holds exactly its split's species.
+    for (const v of f.nodes) {
+      expect(v.strands.map((b) => b.sp.sci).sort()).toEqual(speciesUnder(v.split).filter((n) => f.branches.some((b) => b.sp.sci === n)).sort());
+      const names = v.kids.map((k) => (isNode(k) ? k.split.name + k.ageMa : k.sp.sci));
+      const table = v.split.kids.map((k) => (typeof k === 'string' ? k : k.name + k.ageMa)).filter((n) => names.includes(n));
+      expect([table, [...table].reverse()]).toContainEqual(names);
+    }
+    expect(f.branches.map((b) => b.sp)).toEqual(PANTHERA.species);
+  });
+
+  for (const edge of EDGES) for (const mode of MODES) {
+    it(`each split is at its table date (${mode}, ${edge})`, () => {
+      const f = layoutFan(PANTHERA, mode, undefined, edge);
       // The oldest split is the fork, y = 0; the stem below it.
       expect(f.root.ageMa).toBe(PANTHERA_TREE.ageMa);
       expect(f.root.y).toBeCloseTo(0, 12);
@@ -59,8 +75,9 @@ describe('the dated tree', () => {
           expect(k.splitY).toBe(v.y);
           // Its column grows out of its slice of the parent (no jog), and has peeled off to its own centre a fork span above.
           expect(leftAt(k, below(k.splitY))).toBe(k.path[0].left);
-          expect(leftAt(k, above(k.splitY))).toBeCloseTo(k.path[0].left, 5);
-          const yF = k.splitY - v.fork;
+          // (A straight lean leaves at its slope: a hair above, a hair aside.)
+          expect(leftAt(k, above(k.splitY))).toBeCloseTo(k.path[0].left, edge === 'curved' ? 5 : 3);
+          const yF = k.leanY;
           if (yF > k.tipY) expect(leftAt(k, yF) + laneAt(k, yF).w / 2).toBeCloseTo(k.cx, 9);
           expect(k.path[0].node).toBe(v);
         }
@@ -76,8 +93,8 @@ describe('the dated tree', () => {
       expect(start('Yucatán cave cat')).toBe(0.129);
     });
 
-    it(`widths add up at every split: the parent just below = the daughters just above (${mode})`, () => {
-      const f = layoutFan(PANTHERA, mode);
+    it(`widths add up at every split: the parent just below = the daughters just above (${mode}, ${edge})`, () => {
+      const f = layoutFan(PANTHERA, mode, undefined, edge);
       for (const v of f.nodes) {
         const up = above(v.y);
         const dn = below(v.y);
@@ -99,8 +116,8 @@ describe('the dated tree', () => {
         const last = v.kids[v.kids.length - 1];
         const lo = isNode(first) ? first.left : first.colLeft;
         const hi = isNode(last) ? last.left + last.width : last.colLeft + last.width;
-        // Centred under its daughters' rooms.
-        expect(v.cx).toBeCloseTo((lo + hi) / 2, 9);
+        // Centred under its daughters' rooms (curved; straight: the larger daughter runs straight on).
+        if (edge === 'curved') expect(v.cx).toBeCloseTo((lo + hi) / 2, 9);
         expect(v.left + v.width / 2).toBeCloseTo(v.cx, 9);
       }
       // The stem is everyone's founders.
@@ -109,8 +126,8 @@ describe('the dated tree', () => {
       expect(columnsAt(f, 1)).toEqual([f.stem]);
     });
 
-    it(`an extinct branch is 0% green above its split, its own column all line-ended (${mode})`, () => {
-      const f = layoutFan(PANTHERA, mode);
+    it(`an extinct branch is 0% green above its split, its own column all line-ended (${mode}, ${edge})`, () => {
+      const f = layoutFan(PANTHERA, mode, undefined, edge);
       const extinct = f.branches.filter((b) => b.sp.extinct);
       expect(extinct.map((b) => b.sp.common).sort()).toEqual(['Cave lion', 'European jaguar', 'Longdan tiger', 'Yucatán cave cat']);
       for (const b of extinct) {
@@ -123,8 +140,8 @@ describe('the dated tree', () => {
       }
     });
 
-    it(`a parent column is green by the genealogy recurrence on the summed population, turning from its daughters' own shares (${mode})`, () => {
-      const f = layoutFan(PANTHERA, mode);
+    it(`a parent column is green by the genealogy recurrence on the summed population, turning from its daughters' own shares (${mode}, ${edge})`, () => {
+      const f = layoutFan(PANTHERA, mode, undefined, edge);
       // The share with living descendants just above a split, weighted by size: what feeds the parent.
       const shareAbove = (k: FanNode | FanBranch, ageMa: number): [number, number] =>
         isNode(k) ? [nodeQ(k, ageMa), k.n] : [k.sp.extinct ? 0 : k.pop.greenAt(ageMa - 1e-9), k.pop.founders];
@@ -166,7 +183,7 @@ describe('the dated tree', () => {
       expect(nodeQ(v, v.ageMa)).toBeCloseTo((lion.pop.greenAt(v.ageMa - 1e-9) * lion.pop.founders) / (lion.pop.founders + cave.pop.founders), 12);
     });
 
-    it(`geometry is identical for two cameras at two zooms (${mode})`, () => {
+    it(`geometry is identical for two cameras at two zooms (${mode}, ${edge})`, () => {
       const sample = (f: Fan) =>
         f.branches.flatMap((b) =>
           [0, 1e-4, 0.01, 0.1, 0.3, 0.5, 1, 2, 2.3, 2.575, 3, 3.55, 4, 4.6, 5, 100].map((a) => {
@@ -175,9 +192,9 @@ describe('the dated tree', () => {
             return [leftAt(b, y), L.w, L.gw];
           }),
         );
-      const a = camera(mode);
+      const a = camera(mode, edge);
       const ref = sample(a.fan);
-      const b = camera(mode);
+      const b = camera(mode, edge);
       for (let k = 0; k < 30; k++) b.zoomAbout(200, 500, 1.4, 1.2);
       b.settle();
       expect(b.cam.sx).toBeGreaterThan(a.cam.sx * 10);

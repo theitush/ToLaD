@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { columnsAt, g, gapBetween, GAP_FRAC, laneAt, layoutFan, leftAt, MIN_GAP_FRAC, nodeLeftAt, segAt, strandAt, TIME_H, type WidthMode } from './layout';
+import { columnsAt, g, gapBetween, GAP_FRAC, isNode, laneAt, layoutFan, leanGap, LEAN_MAX_FRAC, leftAt, MIN_GAP_FRAC, nodeLeftAt, segAt, strandAt, TIME_H, type EdgeStyle, type WidthMode } from './layout';
 import { PANTHERA } from './panthera';
 
 describe('fan strands: width = alive at the time', () => {
@@ -38,15 +38,15 @@ describe('fan strands: width = alive at the time', () => {
   }
 });
 
-describe('river fan: fixed, smooth, honest', () => {
+describe('the fan, both designs: fixed, continuous, honest', () => {
   const seeded = (seed: number) => {
     let s = seed;
     return () => (s = (s * 1103515245 + 12345) % 2147483648) / 2147483648;
   };
 
-  for (const mode of ['log', 'linear'] as WidthMode[]) {
-    it(`width = N(t) × one fixed scale, exactly, at every height; green = its share (${mode})`, () => {
-      const fan = layoutFan(PANTHERA, mode);
+  for (const edge of ['curved', 'straight'] as EdgeStyle[]) for (const mode of ['log', 'linear'] as WidthMode[]) {
+    it(`width = N(t) × one fixed scale, exactly, at every height; green = its share (${mode}, ${edge})`, () => {
+      const fan = layoutFan(PANTHERA, mode, undefined, edge);
       const rnd = seeded(5);
       // One width per individual (linear) or per decade of individuals (log), the same for every branch:
       // the number the scale bar shows (view.ts widthScale).
@@ -67,8 +67,8 @@ describe('river fan: fixed, smooth, honest', () => {
       }
     });
 
-    it(`every edge is a continuous function of time: edges and the lanes' boundary, no jog at a split, no step at a population change (${mode})`, () => {
-      const fan = layoutFan(PANTHERA, mode);
+    it(`every edge is a continuous function of time: edges and the lanes' boundary, no jog at a split, no step at a population change (${mode}, ${edge})`, () => {
+      const fan = layoutFan(PANTHERA, mode, undefined, edge);
       const yb = fan.trunkBottom.y;
       const edges = (b: (typeof fan.branches)[0], y: number) => {
         const l = leftAt(b, y);
@@ -102,12 +102,12 @@ describe('river fan: fixed, smooth, honest', () => {
       }
     });
 
-    it(`columns are symmetric about fixed centres in fixed rooms with fixed gaps, and never overlap (${mode})`, () => {
-      const fan = layoutFan(PANTHERA, mode);
+    it(`columns are symmetric about fixed centres in fixed rooms with fixed gaps, and never overlap (${mode}, ${edge})`, () => {
+      const fan = layoutFan(PANTHERA, mode, undefined, edge);
       const W = fan.trunkWidth;
       const bs = [...fan.branches].sort((p, q) => p.index - q.index);
-      expect(bs[0].colLeft).toBeCloseTo(fan.x0, 9);
-      for (let j = 1; j < bs.length; j++) {
+      if (edge === 'curved') expect(bs[0].colLeft).toBeCloseTo(fan.x0, 9);
+      if (edge === 'curved') for (let j = 1; j < bs.length; j++) {
         const gap = bs[j].colLeft - (bs[j - 1].colLeft + bs[j - 1].width);
         expect(gap).toBeCloseTo(gapBetween(bs[j - 1], bs[j], W), 9);
         expect(gap).toBeGreaterThanOrEqual(Math.max(GAP_FRAC * Math.min(bs[j].width, bs[j - 1].width), MIN_GAP_FRAC * W) * (1 - 1e-9));
@@ -124,13 +124,44 @@ describe('river fan: fixed, smooth, honest', () => {
             expect(L.w).toBe(b.baseW);
             const s = segAt(b, y);
             expect(leftAt(b, y)).toBeCloseTo(nodeLeftAt(s.node, y) + s.off, 12);
-          } else if (y <= b.splitY - b.node.fork) {
+          } else if (y <= b.leanY) {
             // Peeled off: about its centre, inside its room.
             expect(leftAt(b, y) + L.w / 2).toBeCloseTo(b.cx, 9);
           }
         }
       }
       // At every height the columns there are disjoint (daughters touch only at their split).
+      for (let k = 0; k <= 3000; k++) {
+        const y = -TIME_H + ((fan.trunkBottom.y + TIME_H) * k) / 3000;
+        const cs = columnsAt(fan, y).sort((p, q) => p[0] - q[0]);
+        for (let i = 1; i < cs.length; i++) expect(cs[i][0]).toBeGreaterThanOrEqual(cs[i - 1][1] - 1e-9);
+      }
+    });
+  }
+});
+
+describe('straight: lines that lean', () => {
+  for (const mode of ['log', 'linear'] as WidthMode[]) {
+    it(`the larger daughter runs straight on; each other leans out to clear its sibling's subtree, ending before either daughter's next event (${mode})`, () => {
+      const fan = layoutFan(PANTHERA, mode, undefined, 'straight');
+      const W = fan.trunkWidth;
+      const bandW = (k: (typeof fan.nodes)[0]['kids'][0]) => (isNode(k) ? k.width : k.baseW);
+      for (const v of fan.nodes) {
+        const room = Math.min(...v.kids.map((k) => v.y - (isNode(k) ? k.y : k.tipY)));
+        const main = v.kids.reduce((m, k) => (bandW(k) > bandW(m) ? k : m), v.kids[0]);
+        for (const k of v.kids) {
+          const leans = isNode(k) ? k.left !== k.tile : Math.abs(k.cx - (k.x0 + k.baseW / 2)) > 1e-12;
+          expect(leans).toBe(k !== main);
+          if (k === main) expect(k.leanY).toBe(v.y);
+          else {
+            expect(k.leanY).toBeLessThan(v.y);
+            expect(v.y - k.leanY).toBeLessThanOrEqual(LEAN_MAX_FRAC * room * (1 + 1e-12));
+          }
+        }
+      }
+      // Neighbouring leaf columns are at least the smallest gap apart, and nothing ever overlaps.
+      const bs = [...fan.branches].sort((p, q) => p.index - q.index);
+      for (let j = 1; j < bs.length; j++) expect(bs[j].colLeft - (bs[j - 1].colLeft + bs[j - 1].width)).toBeGreaterThanOrEqual(leanGap(0, 0, W) - 1e-9);
       for (let k = 0; k <= 3000; k++) {
         const y = -TIME_H + ((fan.trunkBottom.y + TIME_H) * k) / 3000;
         const cs = columnsAt(fan, y).sort((p, q) => p[0] - q[0]);

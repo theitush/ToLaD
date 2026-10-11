@@ -5,7 +5,7 @@ import * as MeshMirror from './mesh';
 import { useEffect, useRef, useState } from 'react';
 import { formatCount } from '../data/names';
 import { HistorySpark } from './HistorySpark';
-import type { WidthMode } from './layout';
+import type { EdgeStyle, WidthMode } from './layout';
 import { PANTHERA, type SpeciesRec } from './panthera';
 import { population } from './population';
 import { statusOf } from './status';
@@ -19,16 +19,36 @@ declare global {
   }
 }
 
+/** The edges' design this viewer chose last (remembered on this device); ?edge=curved|straight overrides it. */
+const EDGE_KEY = 'tolad.fan.edge';
+function initialEdge(): EdgeStyle {
+  const isEdge = (v: unknown): v is EdgeStyle => v === 'curved' || v === 'straight';
+  try {
+    const q = new URLSearchParams(window.location.search).get('edge');
+    if (isEdge(q)) return q;
+  } catch {
+    /* no URL */
+  }
+  try {
+    const v = window.localStorage.getItem(EDGE_KEY);
+    if (isEdge(v)) return v;
+  } catch {
+    /* no storage */
+  }
+  return 'curved';
+}
+
 export function FanApp() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const viewRef = useRef<FanView | null>(null);
   const [mode, setMode] = useState<WidthMode>('linear');
+  const [edge, setEdge] = useState<EdgeStyle>(initialEdge);
   const [sel, setSel] = useState<Selection | null>(null);
   const scaleRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const v = new FanView(canvasRef.current!, PANTHERA);
+    const v = new FanView(canvasRef.current!, PANTHERA, edge);
     v.onSelect = setSel;
     v.scaleEl = scaleRef.current;
     v.barEl = barRef.current;
@@ -63,6 +83,22 @@ export function FanApp() {
           }}
         >
           {mode === 'log' ? 'log widths' : 'linear widths'}
+        </button>
+        <button
+          type="button"
+          aria-label="branch shape"
+          onClick={() => {
+            const next = edge === 'curved' ? 'straight' : 'curved';
+            setEdge(next);
+            viewRef.current?.setEdge(next);
+            try {
+              window.localStorage.setItem(EDGE_KEY, next);
+            } catch {
+              /* not remembered */
+            }
+          }}
+        >
+          {edge}
         </button>
         <button type="button" onClick={() => viewRef.current?.resetView()}>
           Big cats

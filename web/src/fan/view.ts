@@ -7,7 +7,7 @@
 import { formatCount } from '../data/names';
 import { Input, type InputHandlers } from '../engine/input';
 import { clipPoly, FanCamera, STRAND_PX, type Camera } from './camera';
-import { laneAt, layoutFan, leftAt, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type Fan, type FanBranch, type FanNode, type WidthMode } from './layout';
+import { laneAt, layoutFan, leftAt, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type EdgeStyle, type Fan, type FanBranch, type FanNode, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01 } from './meshgl';
 import { drawTwigs, kLogAt, laneDim, LINEAGE, LIVING, TWIG_GRAY, TWIG_WITHERED, TwigModel, type IndInfo, type TwigStats } from './twigs';
@@ -163,6 +163,7 @@ export class FanView implements InputHandlers {
   readonly input: Input;
   readonly camera: FanCamera;
   mode: WidthMode = 'linear';
+  edge: EdgeStyle = 'curved';
   dpr = 1;
   selected: SpeciesRec | null = null;
   selInd: { g: number; i: number } | null = null;
@@ -193,7 +194,9 @@ export class FanView implements InputHandlers {
   constructor(
     readonly canvas: HTMLCanvasElement,
     readonly clade: CladeRec,
+    edge: EdgeStyle = 'curved',
   ) {
+    this.edge = edge;
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('No 2D canvas context');
     this.ctx = ctx;
@@ -211,7 +214,7 @@ export class FanView implements InputHandlers {
         glc.remove();
       }
     }
-    this.camera = new FanCamera(layoutFan(clade, this.mode), (b) => this.model(b));
+    this.camera = new FanCamera(layoutFan(clade, this.mode, undefined, this.edge), (b) => this.model(b));
     this.input = new Input(canvas, this);
     this.ro = new ResizeObserver(() => this.resize());
     this.ro.observe(canvas);
@@ -263,7 +266,18 @@ export class FanView implements InputHandlers {
 
   setMode(mode: WidthMode): void {
     this.mode = mode;
-    this.camera.fan = layoutFan(this.clade, mode);
+    this.relayout();
+  }
+
+  /** The edges' design (the toggle): curved or straight. Same data, the camera stays put. */
+  setEdge(edge: EdgeStyle): void {
+    if (edge === this.edge) return;
+    this.edge = edge;
+    this.relayout();
+  }
+
+  private relayout(): void {
+    this.camera.fan = layoutFan(this.clade, this.mode, undefined, this.edge);
     this.camera.settle();
     this.request();
   }
@@ -546,7 +560,7 @@ export class FanView implements InputHandlers {
       const yb = Math.min(v.yBot, wBot);
       if (!(yb > ya)) continue;
       // Straight below its peel: one piece; the peel in chords.
-      const peel = v.parent ? v.yBot - v.parent.fork : v.yBot;
+      const peel = v.leanY;
       const ys = [ya];
       if (peel > ya && peel < yb) ys.push(peel);
       const p0 = Math.max(ya, peel);

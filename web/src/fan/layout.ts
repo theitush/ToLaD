@@ -1,6 +1,16 @@
-// The Panthera fan as a smooth, river-like dated tree, fixed in world units (y
-// grows downwards, like the screen). Nothing here depends on the camera:
-// panning or zooming never changes a shape or a width.
+// The Panthera fan as a dated tree, fixed in world units (y grows downwards,
+// like the screen). Nothing here depends on the camera: panning or zooming
+// never changes a shape or a width.
+//
+// Two designs share everything but the edges' geometry (EdgeStyle, the
+// viewer's toggle): 'curved', a smooth river (#46 variant C, described just
+// below), and 'straight', lines that lean (#46 variant D, Ita's sketch; see
+// placeLean). Shared: the population (population.ts: N(t), the green share, the
+// extinct taper), the parent columns and their green (FanNode.q), the lanes'
+// blend below a split (segGreen), the tessellation (Tess) and the mesh's
+// shear (mesh.ts). Per design: where the columns sit (placeRiver, placeLean)
+// and how a column moves from its slot in the parent to its own place above a
+// split (ease: a smootherstep S-curve, or a straight line).
 //
 // The tree is splits.ts's: each split is one date where a parent population
 // divides into its daughters.
@@ -67,6 +77,8 @@ import { PANTHERA_TREE, type Split } from './splits';
 export { TIME_C };
 
 export type WidthMode = 'log' | 'linear';
+/** The edges' design: smooth S-curved forks (a river), or straight lines whose daughters lean out. */
+export type EdgeStyle = 'curved' | 'straight';
 
 export const TRUNK_WIDTH = 110;
 /** The bottom of the world: the stem (the clade's ancestors) runs down to here (Ma, ~first life). */
@@ -83,6 +95,12 @@ export const MIN_GAP_FRAC = 0.025;
 export const FORK_FRAC = 0.85;
 /** ... at most this (world units of height: ~0.4 decades of time). */
 export const FORK_MAX = 60;
+/** Straight: gap between a leaning daughter's subtree and its neighbour's, this share of the smaller band (at least MIN_GAP_FRAC of the stem) ... */
+export const LEAN_GAP_FRAC = 0.6;
+/** ... its slope, world heights per world unit sideways (steeper than 45° on screen at the home view) ... */
+export const LEAN_RISE = 2;
+/** ... taking at most this share of the height to the next event of either daughter. */
+export const LEAN_MAX_FRAC = 0.5;
 /* Time axis offset TIME_C (years, population.ts): height is log10(years before present + C). With
  * C = 10 years the axis resolves the last decades and centuries; it is close
  * to the mean lifespan of the living big cats (alive·span/ever ≈ 3–5 years). */
@@ -151,6 +169,9 @@ export interface FanBranch {
   /** Left edge of its room, and its centre line (the column is symmetric about it once it has peeled off). */
   colLeft: number;
   cx: number;
+  /** Left edge of its founders' slot in the parent column at its split (where it peels off from), and where its peel ends (world y; its split's if it does not move). */
+  x0: number;
+  leanY: number;
   /** The split it starts at (its parent column). */
   node: FanNode;
   /** Its place in each ancestral column, the parent's first (ascending y, down to the root). */
@@ -184,8 +205,9 @@ export interface FanNode {
   cx: number;
   /** Its left edge where it starts: its tile in the parent column at the parent's split (the root: left). */
   tile: number;
-  /** Height over which its daughters peel off above it (world units). */
-  fork: number;
+  /** Where its peel from the tile to its own place ends (world y, above yBot; yBot if it does not move), and the edges' design. */
+  leanY: number;
+  edge: EdgeStyle;
   /** Height below the split over which its strands' green turns from the daughters' own shares into its prefix. */
   blend: number;
   /**
@@ -202,6 +224,7 @@ export interface FanNode {
 export interface Fan {
   clade: CladeRec;
   mode: WidthMode;
+  edge: EdgeStyle;
   trunkWidth: number;
   trunkBottom: Pt;
   /** One per species, in the dataset's order (clade.species). */
@@ -238,15 +261,21 @@ export function segAt(b: FanBranch, y: number): PathSeg {
   return s;
 }
 
-/** How far the daughters of split v have peeled off at height y (0 at the split, 1 a fork span above it): smootherstep. */
-export function forkU(v: FanNode, y: number): number {
-  return v.fork > 0 ? smoother((v.y - y) / v.fork) : 1;
+const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
+
+/** The one per-design curve: a column's move from its slot (u = 0) to its own place (u = 1). Curved: smootherstep (C2, flat at both ends); straight: a line. */
+export function ease(edge: EdgeStyle, u: number): number {
+  return edge === 'curved' ? smoother(u) : clamp01(u);
 }
 
-/** A parent column's left edge at height y (in its span): from its tile in the parent along the fork's S-curve to its own. */
+/** How far a column has moved at height y: 0 at its bottom (yBot), 1 from its peel's end (leanY) up. */
+export function peelU(edge: EdgeStyle, yBot: number, leanY: number, y: number): number {
+  return leanY < yBot ? ease(edge, (yBot - y) / (yBot - leanY)) : 1;
+}
+
+/** A parent column's left edge at height y (in its span): from its tile in the parent to its own left (peelU). */
 export function nodeLeftAt(v: FanNode, y: number): number {
-  if (!v.parent) return v.left;
-  return v.tile + (v.left - v.tile) * forkU(v.parent, y);
+  return v.tile + (v.left - v.tile) * peelU(v.edge, v.yBot, v.leanY, y);
 }
 
 const clampW = (v: number, w: number) => Math.min(w, Math.max(0, v));
@@ -294,6 +323,7 @@ export class Tess {
     readonly time: TimeScale,
     readonly mode: WidthMode,
     readonly bottom = Infinity,
+    readonly edge: EdgeStyle = 'curved',
   ) {}
 
   /** World heights of branch b's features, ascending, from its tip down to the bottom of the world. */
@@ -304,14 +334,15 @@ export class Tess {
     const add = (y: number) => {
       if (y >= b.tipY && y <= this.bottom) out.push(y);
     };
-    const peel = (v: FanNode) => {
-      for (let i = 0; i <= 48; i++) add(v.y - (v.fork * i) / 48);
+    // A peel: its ends (a straight one's kinks) and samples along it (a curved one's S).
+    const peel = (yBot: number, leanY: number) => {
+      if (leanY < yBot) for (let i = 0; i <= 48; i++) add(yBot - ((yBot - leanY) * i) / 48);
     };
-    // Its own fork, and each ancestral column's (where its column peels off the one below).
-    peel(b.node);
+    // Its own peel, and each ancestral column's (where its column peels off the one below).
+    peel(b.splitY, b.leanY);
     for (const s of b.path) {
       add(s.y);
-      if (s.node.parent) peel(s.node.parent);
+      if (s.node.parent) peel(s.node.yBot, s.node.leanY);
       // Where the column's green share still moves (its first generations below the split).
       const q = s.node.q;
       const n = Math.min(q.length, 64);
@@ -365,8 +396,8 @@ export class Tess {
 /** Left edge of a branch at world y: its own column (about its centre, peeling off its parent) above its split, then its place in each parent column below. */
 export function leftAt(b: FanBranch, y: number): number {
   if (y < b.splitY) {
-    const tc = b.path[0].left + b.baseW / 2;
-    const c = tc + (b.cx - tc) * forkU(b.node, y);
+    const tc = b.x0 + b.baseW / 2;
+    const c = tc + (b.cx - tc) * peelU(b.tess.edge, b.splitY, b.leanY, y);
     return c - lanesAt(b, y)[0] / 2;
   }
   const s = segAt(b, y);
@@ -403,9 +434,14 @@ export function columnsAt(fan: Fan, y: number): [number, number][] {
   return out;
 }
 
-/** Gap (world) between neighbouring columns a and b. */
+/** Gap (world) between neighbouring columns a and b (curved). */
 export function gapBetween(a: FanBranch, b: FanBranch, stem: number): number {
   return Math.max(GAP_FRAC * Math.min(a.width, b.width), MIN_GAP_FRAC * stem);
+}
+
+/** Gap (world) between a leaning daughter's subtree and its neighbour's, by their widths (straight). */
+export function leanGap(wa: number, wb: number, stem: number): number {
+  return Math.max(LEAN_GAP_FRAC * Math.min(wa, wb), MIN_GAP_FRAC * stem);
 }
 
 export function g(n: number, mode: WidthMode): number {
@@ -433,11 +469,14 @@ export function strandAt(b: FanBranch, ageMa: number, mode: WidthMode): { w: num
 /** Generations a parent column's green recurrence runs before it is taken as settled, at most. */
 const MAX_Q_GENS = 5000;
 
-export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = PANTHERA_TREE): Fan {
+type Kid = FanNode | FanBranch;
+const under = (v: FanNode): FanBranch[] => v.kids.flatMap((k) => (isNode(k) ? under(k) : [k]));
+
+export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = PANTHERA_TREE, edge: EdgeStyle = 'curved'): Fan {
   const W = TRUNK_WIDTH;
   const time = new TimeScale(tree.ageMa);
   const yBottom = time.y(STEM_BOTTOM_MA);
-  const tess = new Tess(time, mode, yBottom);
+  const tess = new Tess(time, mode, yBottom, edge);
   const bySci = new Map(clade.species.map((s) => [s.sci, s]));
   const placed = new Set<string>();
   const branches: FanBranch[] = [];
@@ -456,6 +495,8 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = PANTHE
       baseW: 0,
       colLeft: 0,
       cx: 0,
+      x0: 0,
+      leanY: v.y,
       node: v,
       path: [],
       tipY: time.y(sp.t1),
@@ -465,32 +506,23 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = PANTHE
     return b;
   };
   const build = (s: Split, parent: FanNode | null): FanNode => {
-    const v: FanNode = { split: s, name: s.name, ageMa: s.ageMa, y: time.y(s.ageMa), yBot: parent ? parent.y : yBottom, parent, kids: [], strands: [], n: 0, genYears: 0, width: 0, left: 0, cx: 0, tile: 0, fork: 0, blend: 0, q: new Float64Array([0]) };
+    const yBot = parent ? parent.y : yBottom;
+    const v: FanNode = { split: s, name: s.name, ageMa: s.ageMa, y: time.y(s.ageMa), yBot, parent, kids: [], strands: [], n: 0, genYears: 0, width: 0, left: 0, cx: 0, tile: 0, leanY: yBot, edge, blend: 0, q: new Float64Array([0]) };
     nodes.push(v);
     for (const k of s.kids) {
       if (typeof k === 'string') {
         const sp = bySci.get(k);
-        if (!sp) continue;
-        const b = strand(sp, v);
-        v.kids.push(b);
-        v.strands.push(b);
+        if (sp) v.kids.push(strand(sp, v));
       } else {
         const c = build(k, v);
-        if (!c.strands.length) continue;
-        v.kids.push(c);
-        v.strands.push(...c.strands);
+        if (c.kids.length) v.kids.push(c);
       }
     }
     return v;
   };
   const root = build(tree, null);
   // Species the tree does not place (none today): off the stem, at the oldest split.
-  for (const sp of clade.species) {
-    if (placed.has(sp.sci)) continue;
-    const b = strand(sp, root);
-    root.kids.push(b);
-    root.strands.push(b);
-  }
+  for (const sp of clade.species) if (!placed.has(sp.sci)) root.kids.push(strand(sp, root));
   // Widths: one unit for all (the leaf columns' rooms add up to the trunk's width).
   const gs = branches.map((b) => g(b.pop.max, mode));
   const sum = gs.reduce((a, b) => a + b, 0);
@@ -501,23 +533,13 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = PANTHE
     b.unit = unit;
     b.baseW = unit * g(b.pop.founders, mode);
   });
-  // Leaf rooms side by side with their gaps, centred; each column's centre line in the middle of its room.
-  let total = 0;
-  for (let j = 0; j < branches.length; j++) total += branches[j].width + (j ? gapBetween(branches[j - 1], branches[j], W) : 0);
-  let cx = -total / 2;
-  for (let j = 0; j < branches.length; j++) {
-    if (j) cx += gapBetween(branches[j - 1], branches[j], W);
-    branches[j].colLeft = cx;
-    branches[j].cx = cx + branches[j].width / 2;
-    cx += branches[j].width;
-  }
-  // Parent columns, daughters first: the sum of the strands' founders, centred under the daughters' rooms.
-  const place = (v: FanNode): void => {
-    for (const k of v.kids) if (isNode(k)) place(k);
+  // Parent columns, daughters first: the sum of the strands' founders; green by the genealogy.
+  const sizes = (v: FanNode): void => {
+    for (const k of v.kids) if (isNode(k)) sizes(k);
     let n = 0;
     let gl = 0;
     let w = 0;
-    for (const b of v.strands) {
+    for (const b of under(v)) {
       n += b.pop.founders;
       gl += b.pop.founders * b.sp.genYears;
       w += b.baseW;
@@ -525,17 +547,6 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = PANTHE
     v.n = n;
     v.genYears = n > 0 ? gl / n : 7;
     v.width = w;
-    const first = v.kids[0];
-    const last = v.kids[v.kids.length - 1];
-    const lo = isNode(first) ? first.left : first.colLeft;
-    const hi = isNode(last) ? last.left + last.width : last.colLeft + last.width;
-    v.cx = (lo + hi) / 2;
-    v.left = v.cx - w / 2;
-    // The fork span: a share of the shortest run of a daughter before it splits again or ends.
-    let run = Infinity;
-    for (const k of v.kids) run = Math.min(run, v.y - (isNode(k) ? k.y : k.tipY));
-    v.fork = Math.max(0, Math.min(FORK_MAX, FORK_FRAC * run));
-    v.blend = Math.max(0, Math.min(FORK_MAX, 0.45 * (v.yBot - v.y)));
     // Green: the daughters' shares just above the split, by their sizes; then the genealogy back, generation by generation.
     let qn = 0;
     for (const k of v.kids) {
@@ -553,23 +564,26 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = PANTHE
     }
     v.q = Float64Array.from(q);
   };
-  place(root);
-  // Each strand's place in its ancestors' columns (offsets in the column's order), and each column's tile in its parent.
+  sizes(root);
+  // Where everything sits (per design): each node's left and peel end, each leaf's centre and peel end, the lanes' blend.
+  if (edge === 'curved') placeRiver(root, W);
+  else placeLean(root, nodes, W);
+  // Each strand's place in its ancestors' columns (offsets in the column's order), each column's tile in its parent, each leaf's slot.
+  for (const v of nodes) v.strands = under(v);
   for (const v of nodes) {
     let off = 0;
     for (const k of v.kids) {
       if (isNode(k)) k.tile = v.left + off;
+      else k.x0 = v.left + off;
       for (const b of isNode(k) ? k.strands : [k]) {
-        b.path.push({ y: v.y, left: v.left + off, off: 0, node: v, w: b.baseW, gAbove: 0 });
+        b.path.push({ y: v.y, left: v.left + off, off, node: v, w: b.baseW, gAbove: 0 });
         off += b.baseW;
       }
     }
-    for (const b of v.strands) {
-      const s = b.path[b.path.length - 1];
-      s.off = s.left - v.left;
-    }
   }
   root.tile = root.left;
+  root.leanY = root.yBot;
+  root.strands.forEach((b, i) => (b.index = i));
   for (const b of branches) {
     b.path.sort((p, q) => p.y - q.y);
     // Each strand's green just above each split it passes: its own share (the species'), or its place in the daughter column's prefix.
@@ -581,7 +595,7 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = PANTHE
       }
     });
   }
-  // The branches in the dataset's order (callers index them by species); `index` is the tree's order.
+  // The branches in the dataset's order (callers index them by species); `index` is the drawn order.
   const rank = new Map(clade.species.map((s, i) => [s, i]));
   branches.sort((p, q) => rank.get(p.sp)! - rank.get(q.sp)!);
   let x0 = Infinity;
@@ -591,12 +605,13 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = PANTHE
     x1 = Math.max(x1, b.colLeft + b.width);
   }
   for (const v of nodes) {
-    x0 = Math.min(x0, v.left);
-    x1 = Math.max(x1, v.left + v.width);
+    x0 = Math.min(x0, v.left, v.tile);
+    x1 = Math.max(x1, v.left + v.width, v.tile + v.width);
   }
   return {
     clade,
     mode,
+    edge,
     trunkWidth: W,
     trunkBottom: { x: root.left + root.width / 2, y: yBottom },
     branches,
@@ -608,4 +623,148 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = PANTHE
     x0,
     x1,
   };
+}
+
+/**
+ * Curved (the river): the leaf rooms side by side in tree order with their
+ * gaps, centred; each parent column centred under its daughters' rooms; all
+ * the daughters of a split peel off together over its fork span (FORK_FRAC of
+ * their shortest run, at most FORK_MAX); the lanes blend below a split over
+ * at most FORK_MAX.
+ */
+function placeRiver(root: FanNode, W: number): void {
+  const leaves = under(root);
+  let total = 0;
+  for (let j = 0; j < leaves.length; j++) total += leaves[j].width + (j ? gapBetween(leaves[j - 1], leaves[j], W) : 0);
+  let cx = -total / 2;
+  for (let j = 0; j < leaves.length; j++) {
+    if (j) cx += gapBetween(leaves[j - 1], leaves[j], W);
+    leaves[j].colLeft = cx;
+    leaves[j].cx = cx + leaves[j].width / 2;
+    cx += leaves[j].width;
+  }
+  const place = (v: FanNode): void => {
+    for (const k of v.kids) if (isNode(k)) place(k);
+    const first = v.kids[0];
+    const last = v.kids[v.kids.length - 1];
+    const lo = isNode(first) ? first.left : first.colLeft;
+    const hi = isNode(last) ? last.left + last.width : last.colLeft + last.width;
+    v.cx = (lo + hi) / 2;
+    v.left = v.cx - v.width / 2;
+    // The fork span: a share of the shortest run of a daughter before it splits again or ends.
+    let run = Infinity;
+    for (const k of v.kids) run = Math.min(run, v.y - (isNode(k) ? k.y : k.tipY));
+    const fork = Math.max(0, Math.min(FORK_MAX, FORK_FRAC * run));
+    for (const k of v.kids) k.leanY = v.y - fork;
+    v.blend = Math.max(0, Math.min(FORK_MAX, 0.45 * (v.yBot - v.y)));
+  };
+  place(root);
+}
+
+/** Straight: one choice of sides for a subtree (each daughter's slot and lean, its extent, the leans' total run). */
+interface Plan {
+  order: Kid[];
+  off: number[];
+  dx: number[];
+  /** Extent relative to the band's left edge after its lean (a species: its room's left). */
+  a: number;
+  b: number;
+  cost: number;
+}
+
+/**
+ * Straight (lines that lean, Ita's sketch):
+ *
+ *     |  |  |        read upwards: the right line is the parent, running
+ *     \ _|  |        straight on through the split; the daughter peels off
+ *         \ |        its side and leans out "for a bit" to its own column,
+ *          \|        then runs straight up.
+ *
+ * At a split the larger daughter continues straight (the most ink stays put);
+ * each other one leaves from its own part of the parent's band, on the side it
+ * leans towards, along a straight diagonal (LEAN_RISE heights per unit
+ * sideways, at most LEAN_MAX_FRAC of the height to either daughter's next
+ * event, so leans end before anything else starts and never meet), just far
+ * enough to clear its sibling's whole subtree by a gap (leanGap). Which side
+ * each daughter is on is chosen once for the whole tree to make the leans'
+ * total sideways run the least (all orders tried; ties keep the table's). A
+ * species' column is centred on its slot's centre plus its lean. The lanes
+ * blend below a split as far down as its daughters lean out above it (at most
+ * half its band).
+ */
+function placeLean(root: FanNode, nodes: FanNode[], W: number): void {
+  const bandW = (k: Kid) => (isNode(k) ? k.width : k.baseW);
+  const main = new Map<FanNode, Kid>();
+  for (const v of nodes) main.set(v, v.kids.reduce((m, k) => (bandW(k) > bandW(m) ? k : m), v.kids[0]));
+  const flippable = nodes.filter((v) => v.kids.length > 1);
+  // A daughter's left edge after its lean, relative to its slot's left, before any lean (a species: its room centred on its slot).
+  const nat = (k: Kid) => (isNode(k) ? 0 : k.baseW / 2 - k.width / 2);
+  const plan = (v: FanNode, flip: Set<FanNode>, plans: Map<FanNode, Plan>): Plan => {
+    const order = flip.has(v) ? [...v.kids].reverse() : [...v.kids];
+    const ext = order.map((k): [number, number, number] => {
+      if (!isNode(k)) return [0, k.width, 0];
+      const p = plan(k, flip, plans);
+      return [p.a, p.b, p.cost];
+    });
+    const off: number[] = [];
+    let o = 0;
+    for (const k of order) {
+      off.push(o);
+      o += bandW(k);
+    }
+    const dx = order.map(() => 0);
+    const im = order.indexOf(main.get(v)!);
+    const base = (i: number) => off[i] + nat(order[i]);
+    let lo = base(im) + ext[im][0];
+    let hi = base(im) + ext[im][1];
+    let prev = 0;
+    for (let i = im + 1; i < order.length; i++) {
+      dx[i] = Math.max(prev, hi + leanGap(order[i - 1].width, order[i].width, W) - (base(i) + ext[i][0]), 0);
+      prev = dx[i];
+      hi = base(i) + dx[i] + ext[i][1];
+    }
+    prev = 0;
+    for (let i = im - 1; i >= 0; i--) {
+      dx[i] = Math.min(prev, lo - leanGap(order[i + 1].width, order[i].width, W) - (base(i) + ext[i][1]), 0);
+      prev = dx[i];
+      lo = base(i) + dx[i] + ext[i][0];
+    }
+    const cost = ext.reduce((c, e) => c + e[2], 0) + dx.reduce((c, d) => c + Math.abs(d), 0);
+    const p: Plan = { order, off, dx, a: Math.min(lo, 0), b: Math.max(hi, v.width), cost };
+    plans.set(v, p);
+    return p;
+  };
+  let best: { cost: number; flips: number; plans: Map<FanNode, Plan> } | null = null;
+  for (let mask = 0; mask < 1 << flippable.length; mask++) {
+    const flip = new Set(flippable.filter((_, i) => mask & (1 << i)));
+    const plans = new Map<FanNode, Plan>();
+    const cost = plan(root, flip, plans).cost;
+    // (Equal runs within a hair: the fewer flips, the table's order.)
+    if (!best || cost < best.cost - 1e-9 || (Math.abs(cost - best.cost) <= 1e-9 && flip.size < best.flips)) best = { cost, flips: flip.size, plans };
+  }
+  const plans = best!.plans;
+  const rp = plans.get(root)!;
+  // Place it: the whole centred on 0, then each daughter from its slot in its parent's band.
+  const nextEvent = (k: Kid) => (isNode(k) ? k.y : k.tipY);
+  const place = (v: FanNode): void => {
+    const p = plans.get(v)!;
+    v.kids = p.order;
+    v.cx = v.left + v.width / 2;
+    const room = Math.min(...p.order.map((k) => v.y - nextEvent(k)));
+    p.order.forEach((k, i) => {
+      const x0 = v.left + p.off[i];
+      const d = p.dx[i];
+      k.leanY = d ? v.y - Math.min(Math.abs(d) * LEAN_RISE, LEAN_MAX_FRAC * room) : v.y;
+      if (isNode(k)) {
+        k.left = x0 + d;
+        place(k);
+      } else {
+        k.cx = x0 + k.baseW / 2 + d;
+        k.colLeft = k.cx - k.width / 2;
+      }
+    });
+  };
+  root.left = -(rp.a + rp.b) / 2;
+  place(root);
+  for (const v of nodes) v.blend = Math.min(Math.max(0, ...v.kids.map((k) => v.y - k.leanY)), 0.5 * (v.yBot - v.y));
 }
