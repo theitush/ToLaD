@@ -3,9 +3,10 @@ import { FELIDAE, type SpeciesRec } from './panthera';
 import { parentShare, population, Q_STAR, shareBack } from './population';
 
 const sp = (name: string) => FELIDAE.species.find((s) => s.common === name)!;
-/** An age inside the flat stretch held before a history's oldest point (back to the species' start). */
+/** An age inside the flat stretch held before a history's oldest point (back to the species' start); without a history, the middle of its span (held throughout). */
 const heldAge = (s: SpeciesRec) => {
-  const h = s.history!;
+  const h = s.history;
+  if (!h) return s.t0 / 2;
   const oldest = Math.max(...h.points.map((q) => (h.nowYear - q.year) / 1e6));
   return (s.t0 + oldest) / 2;
 };

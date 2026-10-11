@@ -120,6 +120,86 @@ export function shareBack(n: (k: number) => number, varGens: number, maxGens: nu
   return Float64Array.from(out);
 }
 
+/** The settled share for a steady ratio r = n_child / n_parent per generation: the root of q = 1 − e^(−2qr) (0 when 2r ≤ 1). */
+export function settledShare(r: number): number {
+  if (!(2 * r > 1)) return 0;
+  // f(q) = q − 1 + e^(−2qr) is convex with f(0) = 0: Newton from q = 1 falls monotonically onto the other root.
+  let q = 1;
+  for (let i = 0; i < 60; i++) {
+    const e = Math.exp(-2 * q * r);
+    const dq = (q - 1 + e) / (1 - 2 * r * e);
+    q -= dq;
+    if (Math.abs(dq) < 1e-15) break;
+  }
+  return q;
+}
+
+/** Most samples one species' genealogy keeps (it needs a few hundred; the cap only guards the worst case). */
+export const MAX_SHARE_SAMPLES = 4000;
+/** A jump over settled generations is taken when the settled share moves less than this over it ... */
+const JUMP_TOL = 2e-5;
+/** ... and is linear across it within this (the share is interpolated linearly between samples). */
+const JUMP_LIN = 2e-7;
+/** The longest jump, in decades of the time axis (log10 of years + TIME_C). */
+const JUMP_AXIS = 0.01;
+
+/**
+ * The share with living descendants back from now, sampled: generation k
+ * (counted back, k = 0 the newest, h = 1) at the generations `k` with shares
+ * `h`, linear in between. Exactly the per-generation genealogy (shareBack)
+ * while the share still moves from one generation to the next; once it has
+ * settled onto the steady share of the local size ratio (a slow log-linear
+ * change, a long fillet, a held stretch), it follows that steady share in
+ * jumps that double while the share stays within JUMP_TOL and linear across
+ * them (and never over JUMP_AXIS of the time axis), so a deep past of 10⁵–10⁶ generations is a few hundred samples, not
+ * one per generation. Stops at `maxGens`, or once the size is constant past
+ * `varGens` and the share has settled (the held stretch before the history).
+ */
+export function shareBackSampled(n: (k: number) => number, varGens: number, maxGens: number, genYears = 1): { k: Float64Array; h: Float64Array } {
+  const ks: number[] = [0];
+  const hs: number[] = [1];
+  const r = (k: number) => {
+    const a = n(k - 1);
+    const b = n(k);
+    return a > 0 && b > 0 ? a / b : 0;
+  };
+  let h = 1;
+  let k = 0;
+  let J = 2;
+  while (k < maxGens && ks.length < MAX_SHARE_SAMPLES) {
+    const settled = k > 0 && Math.abs(h - settledShare(r(k))) < 1e-10;
+    if (settled && k > varGens + 2 && r(k) === 1) {
+      // Constant from here to the start: the share holds.
+      break;
+    }
+    let jumped = false;
+    if (settled) {
+      // (At most JUMP_AXIS of the time axis at a time, so a turn of the size, a fillet, is never jumped over.)
+      const far = Math.floor(((k * genYears + TIME_C) * (Math.pow(10, JUMP_AXIS) - 1)) / genYears);
+      for (let j = Math.min(J, far, maxGens - k); j >= 2; j >>= 1) {
+        const qEnd = settledShare(r(k + j));
+        if (Math.abs(qEnd - h) > JUMP_TOL) continue;
+        const qMid = settledShare(r(k + (j >> 1)));
+        if (Math.abs(qMid - (h + qEnd) / 2) > JUMP_LIN) continue;
+        k += j;
+        h = qEnd;
+        J = Math.min(j * 2, 1 << 30);
+        jumped = true;
+        break;
+      }
+    }
+    if (!jumped) {
+      // One generation exactly (the share still moves, or the size turns too fast to jump).
+      h = parentShare(h, n(k), n(k + 1));
+      k += 1;
+      J = 2;
+    }
+    ks.push(k);
+    hs.push(h);
+  }
+  return { k: Float64Array.from(ks), h: Float64Array.from(hs) };
+}
+
 /** One history point: age (years before present), ln N, its corner's half-window (years) and the slope of ln N (per year) on to the next older point. */
 interface Knot {
   ago: number;
@@ -138,6 +218,8 @@ export class Population {
   /** Mean lifespan ÷ generation length (alive per birth per generation). */
   private readonly lg: number;
   private readonly nConst: number;
+  /** The genealogy's samples: generations back (k, ascending from 0) and the share h there (shareBackSampled). */
+  private readonly hk: Float64Array;
   private readonly h: Float64Array;
   private readonly GL: number;
   /** The history's points, newest first (none without a history). */
@@ -193,12 +275,18 @@ export class Population {
       const s0 = axisS(end);
       this.emerge = [s0, s0 - EMERGE_FRAC * Math.max(0, s0 - axisS(sp.t1 * 1e6))];
     }
-    // The room: the most alive (a fillet never rises above its corner).
+    // The room: the most alive over its own span (a fillet never rises above its corner; log-linear
+    // between points, so the most is at a point inside the span or at its ends).
     let mx = this.nConst;
-    for (const p of this.knots) mx = Math.max(mx, Math.exp(p.ln));
+    if (this.knots.length) {
+      const lo = sp.t1 * 1e6;
+      for (const p of this.knots) if (p.ago >= lo && p.ago <= end) mx = Math.max(mx, Math.exp(p.ln));
+      mx = Math.max(mx, Math.exp(this.lnHistory(end)), Math.exp(this.lnHistory(lo)));
+    }
     this.max = mx;
     this.founders = this.aliveAt(startMa);
     if (sp.extinct || !(sp.alive > 0)) {
+      this.hk = new Float64Array([0]);
       this.h = new Float64Array([0]);
       this.qBase = Q_STAR;
     } else {
@@ -210,7 +298,10 @@ export class Population {
         for (let j = segs.length - 1; j > 0; j--) varGens += segs[j].generations;
       }
       const own = Math.max(1, (startMa - sp.t1) * 1e6);
-      this.h = shareBack((k) => this.aliveAt(ago(k) / 1e6), varGens, Math.min(2e5, Math.ceil(own / GL)));
+      // Sampled (bounded: per generation only where the share moves, ToLaD#70), back to the species' start.
+      const g = shareBackSampled((k) => this.aliveAt(ago(k) / 1e6), varGens, Math.ceil(own / GL), GL);
+      this.hk = g.k;
+      this.h = g.h;
       this.qBase = this.h[this.h.length - 1];
     }
   }
@@ -273,7 +364,12 @@ export class Population {
     return { n: this.aliveAt(ageMa), q: this.greenAt(ageMa) };
   }
 
-  /** Share of those alive at `ageMa` with living descendants today (0–1): h_k at the middle of generation k, linear in between. */
+  /** The genealogy's samples (how many steps of the green share the fan keeps for this species). */
+  get shareSamples(): number {
+    return this.h.length;
+  }
+
+  /** Share of those alive at `ageMa` with living descendants today (0–1): h_k at the middle of generation k, linear in between (and between samples). */
   greenAt(ageMa: number): number {
     const sp = this.sp;
     if (sp.extinct) return ageMa > this.startMa ? this.qBase : 0;
@@ -281,10 +377,21 @@ export class Population {
     if (ageMa < sp.t1) return 0;
     const x = (ageMa * 1e6) / this.GL - 0.5;
     const h = this.h;
+    const K = this.hk;
     if (x <= 0) return h[0];
-    const k = Math.floor(x);
-    if (k + 1 >= h.length) return this.qBase;
-    return h[k] + (h[k + 1] - h[k]) * (x - k);
+    if (x >= K[K.length - 1]) return this.qBase;
+    // The sample at or below x (per generation near now: start from its floor).
+    let a = Math.min(Math.floor(x), K.length - 1);
+    if (K[a] > x) {
+      let z = a;
+      a = 0;
+      while (z - a > 1) {
+        const m = (a + z) >> 1;
+        if (K[m] <= x) a = m;
+        else z = m;
+      }
+    }
+    return h[a] + ((h[a + 1] - h[a]) * (x - K[a])) / (K[a + 1] - K[a]);
   }
 
   /**
@@ -317,12 +424,11 @@ export class Population {
       const [s0, s1] = this.emerge;
       for (let i = 0; i <= 48; i++) out.push(yrs(s1 + ((s0 - s1) * i) / 48));
     }
-    // The green share: every generation middle while it moves (its kinks).
+    // The green share: its samples (every generation middle while it moves; bounded, see shareBackSampled).
     const h = this.h;
     let last = h.length - 1;
     while (last > 0 && Math.abs(h[last] - h[last - 1]) < 1e-5) last--;
-    const stride = Math.max(1, Math.ceil(last / 20000));
-    for (let k = 0; k <= last + 1; k += stride) out.push((k + 0.5) * this.GL);
+    for (let k = 0; k <= Math.min(last + 1, h.length - 1); k++) out.push((this.hk[k] + 0.5) * this.GL);
     const lo = this.sp.t1 * 1e6;
     const hi = Math.min(this.sp.t0, this.startMa) * 1e6;
     return out.filter((a) => a >= lo && a <= hi).sort((p, q) => p - q);
