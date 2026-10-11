@@ -281,7 +281,8 @@ export class FanCamera {
 
   /**
    * Zoom about a screen point by factors fx (width) and fy (time). Zooming in
-   * stops at the width limit where the fingers are (it never pushes out).
+   * stops at the width limit where the fingers are; between the columns it
+   * zooms about the nearest one, kept within 30% of the screen of the fingers.
    */
   zoomAbout(px: number, py: number, fx: number, fy = fx): void {
     const c = this.cam;
@@ -289,10 +290,18 @@ export class FanCamera {
     c.ty *= fy;
     let sx = c.sx * fx;
     if (fx > 1) {
-      // No zooming into nothing: content stays within 30% of the screen of the fingers.
-      const d = Math.abs(this.nearestContent(wx, wy) - wx);
-      const cap = d > 0 ? (0.3 * this.w) / d : Infinity;
-      sx = Math.min(sx, Math.max(c.sx, Math.min(cap, this.sxCap(wx, wy))));
+      sx = Math.min(sx, Math.max(c.sx, this.sxCap(wx, wy)));
+      // No zooming into nothing: the nearest content stays within 30% of the screen of the fingers.
+      // Past that the zoom goes on about the content instead of stopping (#36): it is pulled in
+      // towards the fingers (never pushed further out than it is), so a pinch anywhere keeps zooming.
+      const p = this.nearestContent(wx, wy);
+      const off = (p - wx) * sx;
+      const reach = Math.max(0.3 * this.w, Math.abs(p - wx) * c.sx);
+      if (Math.abs(off) > reach) {
+        c.sx = sx;
+        this.settle(px + Math.sign(off) * reach, py, p, wy);
+        return;
+      }
     }
     c.sx = sx;
     this.settle(px, py, wx, wy);
