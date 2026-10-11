@@ -6,7 +6,7 @@ import { FanCamera } from './camera';
 import { columnsAt, isNode, laneAt, layoutFan, leftAt, nodeQ, type Fan, type FanBranch, type EdgeStyle, type FanNode, type WidthMode } from './layout';
 import { PANTHERA } from './panthera';
 import { parentShare, Q_STAR } from './population';
-import { allSplits, PANTHERA_TREE, speciesUnder } from './splits';
+import { allSplits, PANTHERA_TREE, speciesUnder, type Split } from './splits';
 import { TwigModel } from './twigs';
 
 function camera(mode: WidthMode, edge: EdgeStyle): FanCamera {
@@ -34,27 +34,60 @@ const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 const byName = (f: Fan, name: string) => f.branches.find((b) => b.sp.common === name)!;
 
 describe('the dated tree', () => {
-  it('every species of the clade is placed once, in the table\'s left-to-right order (curved)', () => {
-    const f = layoutFan(PANTHERA, 'linear');
-    expect([...f.branches].sort((p, q) => p.index - q.index).map((b) => b.sp.sci)).toEqual(speciesUnder(PANTHERA_TREE));
-    expect(f.branches.map((b) => b.sp)).toEqual(PANTHERA.species);
-    expect(new Set(f.branches.map((b) => b.sp.sci)).size).toBe(PANTHERA.species.length);
-    expect(f.nodes.length).toBe(allSplits().length);
-  });
+  for (const edge of EDGES) {
+    it(`every species is placed once, under its own splits, sides chosen for the shortest leans (${edge})`, () => {
+      const f = layoutFan(PANTHERA, 'linear', undefined, edge);
+      const drawn = [...f.branches].sort((p, q) => p.index - q.index);
+      expect(drawn.map((b) => b.sp.sci).sort()).toEqual(speciesUnder(PANTHERA_TREE).sort());
+      expect(drawn).toEqual(f.root.strands);
+      expect(new Set(f.branches.map((b) => b.sp.sci)).size).toBe(PANTHERA.species.length);
+      expect(f.nodes.length).toBe(allSplits().length);
+      // Each split's daughters are its table's, maybe mirrored; every column holds exactly its split's species.
+      for (const v of f.nodes) {
+        expect(v.strands.map((b) => b.sp.sci).sort()).toEqual(speciesUnder(v.split).filter((n) => f.branches.some((b) => b.sp.sci === n)).sort());
+        const names = v.kids.map((k) => (isNode(k) ? k.split.name + k.ageMa : k.sp.sci));
+        const table = v.split.kids.map((k) => (typeof k === 'string' ? k : k.name + k.ageMa)).filter((n) => names.includes(n));
+        expect([table, [...table].reverse()]).toContainEqual(names);
+      }
+      expect(f.branches.map((b) => b.sp)).toEqual(PANTHERA.species);
+    });
+  }
 
-  it('every species is placed once, under its own splits, sides chosen for the shortest leans (straight)', () => {
-    const f = layoutFan(PANTHERA, 'linear', undefined, 'straight');
-    const drawn = [...f.branches].sort((p, q) => p.index - q.index);
-    expect(drawn.map((b) => b.sp.sci).sort()).toEqual(speciesUnder(PANTHERA_TREE).sort());
-    expect(drawn).toEqual(f.root.strands);
-    // Each split's daughters are its table's, maybe mirrored; every column holds exactly its split's species.
-    for (const v of f.nodes) {
-      expect(v.strands.map((b) => b.sp.sci).sort()).toEqual(speciesUnder(v.split).filter((n) => f.branches.some((b) => b.sp.sci === n)).sort());
-      const names = v.kids.map((k) => (isNode(k) ? k.split.name + k.ageMa : k.sp.sci));
-      const table = v.split.kids.map((k) => (typeof k === 'string' ? k : k.name + k.ageMa)).filter((n) => names.includes(n));
-      expect([table, [...table].reverse()]).toContainEqual(names);
-    }
-    expect(f.branches.map((b) => b.sp)).toEqual(PANTHERA.species);
+  for (const mode of MODES) {
+    it(`the toggle keeps every species in its left-to-right place: one order for both designs (${mode})`, () => {
+      const [c, s] = EDGES.map((e) => layoutFan(PANTHERA, mode, undefined, e));
+      // Left to right as drawn, by the columns' centres once they have peeled off.
+      const ltr = (f: Fan) => [...f.branches].sort((p, q) => p.cx - q.cx).map((b) => b.sp.sci);
+      expect(ltr(s)).toEqual(ltr(c));
+      expect(ltr(c)).toEqual(c.root.strands.map((b) => b.sp.sci));
+      expect(s.branches.map((b) => b.index)).toEqual(c.branches.map((b) => b.index));
+      // And every parent column holds its daughters in the same order.
+      const kids = (f: Fan) => f.nodes.map((v) => v.kids.map((k) => (isNode(k) ? k.split.name + k.ageMa : k.sp.sci)));
+      expect(kids(s)).toEqual(kids(c));
+    });
+  }
+
+  it('one order for both designs on any tree: a random 40-species one, toggled either way round', () => {
+    // Panthera's records, cloned, on a random binary tree (Felidae's size).
+    const species = Array.from({ length: 40 }, (_, i) => ({ ...PANTHERA.species[i % PANTHERA.species.length], sci: `S${i}`, common: `S${i}` }));
+    let seed = 7;
+    const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+    const build = (names: string[], age: number): Split | string => {
+      if (names.length === 1) return names[0];
+      const cut = 1 + Math.floor(rnd() * (names.length - 1));
+      const a = age * (0.5 + 0.4 * rnd());
+      return { name: `n${names.length}`, ageMa: age, lo: age, hi: age, kids: [build(names.slice(0, cut), a), build(names.slice(cut), a * 0.98)] } as Split;
+    };
+    const tree = build(species.map((s) => s.sci), 4.6) as Split;
+    const ltr = (f: Fan) => [...f.branches].sort((p, q) => p.cx - q.cx).map((b) => b.sp.sci);
+    // Curved first, then straight (sides reused); and straight first on a fresh clade (sides searched).
+    const c1 = layoutFan({ ...PANTHERA, species }, 'log', tree, 'curved');
+    const s1 = layoutFan(c1.clade, 'log', tree, 'straight');
+    const s2 = layoutFan({ ...PANTHERA, species }, 'log', tree, 'straight');
+    expect(ltr(c1)).toEqual(c1.root.strands.map((b) => b.sp.sci));
+    expect(ltr(s1)).toEqual(ltr(c1));
+    expect(ltr(s2)).toEqual(ltr(c1));
+    expect(s2.branches.map((b) => b.cx)).toEqual(s1.branches.map((b) => b.cx));
   });
 
   for (const edge of EDGES) for (const mode of MODES) {

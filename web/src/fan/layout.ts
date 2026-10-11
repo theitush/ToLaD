@@ -15,8 +15,8 @@
 // The tree is splits.ts's: each split is one date where a parent population
 // divides into its daughters.
 //   - Centres. Each species has a world-fixed centre line (FanBranch.cx): the
-//     middle of its room, the leaf rooms side by side in tree order with a
-//     fixed gap between neighbours (gapBetween: GAP_FRAC of the smaller room,
+//     middle of its room, the leaf rooms side by side in one order for both
+//     designs (chooseSides) with a fixed gap between neighbours (gapBetween: GAP_FRAC of the smaller room,
 //     at least MIN_GAP_FRAC of the stem's). Its column is symmetric about it:
 //     [cx − w/2, cx + w/2], w = the individuals alive then.
 //   - Parent columns (FanNode). Below a split its daughters' strands sit side
@@ -566,8 +566,15 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = PANTHE
   };
   sizes(root);
   // Where everything sits (per design): each node's left and peel end, each leaf's centre and peel end, the lanes' blend.
+  // One left-to-right order for both designs (chooseSides), then where everything sits per design.
+  let byTree = SIDES.get(clade);
+  if (!byTree) SIDES.set(clade, (byTree = new Map()));
+  let byMode = byTree.get(tree);
+  if (!byMode) byTree.set(tree, (byMode = new Map()));
+  const { plans, sides } = chooseSides(root, W, byMode.get(mode));
+  byMode.set(mode, sides);
   if (edge === 'curved') placeRiver(root, W);
-  else placeLean(root, nodes, W);
+  else placeLean(root, nodes, plans);
   // Each strand's place in its ancestors' columns (offsets in the column's order), each column's tile in its parent, each leaf's slot.
   for (const v of nodes) v.strands = under(v);
   for (const v of nodes) {
@@ -626,8 +633,8 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = PANTHE
 }
 
 /**
- * Curved (the river): the leaf rooms side by side in tree order with their
- * gaps, centred; each parent column centred under its daughters' rooms; all
+ * Curved (the river): the leaf rooms side by side in the shared order
+ * (chooseSides) with their gaps, centred; each parent column centred under its daughters' rooms; all
  * the daughters of a split peel off together over its fork span (FORK_FRAC of
  * their shortest run, at most FORK_MAX); the lanes blend below a split over
  * at most FORK_MAX.
@@ -661,7 +668,7 @@ function placeRiver(root: FanNode, W: number): void {
   place(root);
 }
 
-/** Straight: one choice of sides for a subtree (each daughter's slot and lean, its extent, the leans' total run). */
+/** One choice of sides for a subtree (each daughter's slot and straight-design lean, its extent, the leans' total run). */
 interface Plan {
   order: Kid[];
   off: number[];
@@ -672,39 +679,49 @@ interface Plan {
   cost: number;
 }
 
+/** A candidate for a subtree's sides: its plan, how many splits it mirrors, and the daughters' own candidates (table order). */
+interface Cand extends Plan {
+  flip: boolean;
+  flips: number;
+  kids: (Cand | null)[];
+}
+
 /**
- * Straight (lines that lean, Ita's sketch):
- *
- *     |  |  |        read upwards: the right line is the parent, running
- *     \ _|  |        straight on through the split; the daughter peels off
- *         \ |        its side and leans out "for a bit" to its own column,
- *          \|        then runs straight up.
- *
- * At a split the larger daughter continues straight (the most ink stays put);
- * each other one leaves from its own part of the parent's band, on the side it
- * leans towards, along a straight diagonal (LEAN_RISE heights per unit
- * sideways, at most LEAN_MAX_FRAC of the height to either daughter's next
- * event, so leans end before anything else starts and never meet), just far
- * enough to clear its sibling's whole subtree by a gap (leanGap). Which side
- * each daughter is on is chosen once for the whole tree to make the leans'
- * total sideways run the least (all orders tried; ties keep the table's). A
- * species' column is centred on its slot's centre plus its lean. The lanes
- * blend below a split as far down as its daughters lean out above it (at most
- * half its band).
+ * Most candidates kept per subtree, the least-run ones (Panthera's subtrees
+ * never come near it; on a random 40-species tree it finds the same least run
+ * as 256, in a fraction of the time).
  */
-function placeLean(root: FanNode, nodes: FanNode[], W: number): void {
+const MAX_CANDS = 16;
+
+/** The sides chosen (mirrored or not, per split) per clade, tree and width mode: the toggle reuses them, no search. */
+const SIDES = new WeakMap<CladeRec, Map<Split, Map<WidthMode, Map<Split, boolean>>>>();
+
+/**
+ * The species' left-to-right order, the same in both designs (the toggle only
+ * reshapes the edges): each split's daughters on the sides that make the
+ * straight design's leans (placeLean) the least total sideways run; equal runs
+ * keep the table's order (the fewer mirrored splits). It depends only on the
+ * tree and the widths. Exact for any tree: per subtree, every choice of sides
+ * not beaten on all of its extent's left, its right, its run and its mirrored
+ * splits is kept (a wider or longer-run subtree never makes its parent's leans
+ * shorter) and combined at its parent, both ways round, keeping at most
+ * MAX_CANDS. `known`: sides already chosen for the same tree and widths (the
+ * other design's layout), only planned. Sets each node's kids in that order;
+ * returns each node's plan and the sides.
+ */
+function chooseSides(root: FanNode, W: number, known?: Map<Split, boolean>): { plans: Map<FanNode, Plan>; sides: Map<Split, boolean> } {
   const bandW = (k: Kid) => (isNode(k) ? k.width : k.baseW);
-  const main = new Map<FanNode, Kid>();
-  for (const v of nodes) main.set(v, v.kids.reduce((m, k) => (bandW(k) > bandW(m) ? k : m), v.kids[0]));
-  const flippable = nodes.filter((v) => v.kids.length > 1);
   // A daughter's left edge after its lean, relative to its slot's left, before any lean (a species: its room centred on its slot).
   const nat = (k: Kid) => (isNode(k) ? 0 : k.baseW / 2 - k.width / 2);
-  const plan = (v: FanNode, flip: Set<FanNode>, plans: Map<FanNode, Plan>): Plan => {
-    const order = flip.has(v) ? [...v.kids].reverse() : [...v.kids];
-    const ext = order.map((k): [number, number, number] => {
-      if (!isNode(k)) return [0, k.width, 0];
-      const p = plan(k, flip, plans);
-      return [p.a, p.b, p.cost];
+  const better = (p: Cand, q: Cand) => (Math.abs(p.cost - q.cost) > 1e-9 ? p.cost - q.cost : p.flips - q.flips);
+  // One choice at v: its daughters (table order), their candidates, mirrored or not.
+  const plan = (v: FanNode, kc: (Cand | null)[], flip: boolean): Cand => {
+    const idx = v.kids.map((_, i) => i);
+    if (flip) idx.reverse();
+    const order = idx.map((i) => v.kids[i]);
+    const ext = idx.map((i): [number, number, number] => {
+      const c = kc[i];
+      return c ? [c.a, c.b, c.cost] : [0, (v.kids[i] as FanBranch).width, 0];
     });
     const off: number[] = [];
     let o = 0;
@@ -713,7 +730,9 @@ function placeLean(root: FanNode, nodes: FanNode[], W: number): void {
       o += bandW(k);
     }
     const dx = order.map(() => 0);
-    const im = order.indexOf(main.get(v)!);
+    // The larger daughter runs straight on (the first of equals in the table).
+    const main = v.kids.reduce((m, k) => (bandW(k) > bandW(m) ? k : m), v.kids[0]);
+    const im = order.indexOf(main);
     const base = (i: number) => off[i] + nat(order[i]);
     let lo = base(im) + ext[im][0];
     let hi = base(im) + ext[im][1];
@@ -730,25 +749,71 @@ function placeLean(root: FanNode, nodes: FanNode[], W: number): void {
       lo = base(i) + dx[i] + ext[i][0];
     }
     const cost = ext.reduce((c, e) => c + e[2], 0) + dx.reduce((c, d) => c + Math.abs(d), 0);
-    const p: Plan = { order, off, dx, a: Math.min(lo, 0), b: Math.max(hi, v.width), cost };
-    plans.set(v, p);
-    return p;
+    const flips = (flip ? 1 : 0) + kc.reduce((n, c) => n + (c ? c.flips : 0), 0);
+    return { order, off, dx, a: Math.min(lo, 0), b: Math.max(hi, v.width), cost, flip, flips, kids: kc };
   };
-  let best: { cost: number; flips: number; plans: Map<FanNode, Plan> } | null = null;
-  for (let mask = 0; mask < 1 << flippable.length; mask++) {
-    const flip = new Set(flippable.filter((_, i) => mask & (1 << i)));
-    const plans = new Map<FanNode, Plan>();
-    const cost = plan(root, flip, plans).cost;
-    // (Equal runs within a hair: the fewer flips, the table's order.)
-    if (!best || cost < best.cost - 1e-9 || (Math.abs(cost - best.cost) <= 1e-9 && flip.size < best.flips)) best = { cost, flips: flip.size, plans };
-  }
-  const plans = best!.plans;
+  const cands = (v: FanNode): Cand[] => {
+    const fronts = v.kids.map((k) => (isNode(k) ? cands(k) : [null]));
+    // Every combination of the daughters' candidates, each both ways round (one daughter: no sides to choose).
+    let combos: (Cand | null)[][] = [[]];
+    for (const f of fronts) combos = combos.flatMap((c) => f.map((x) => [...c, x]));
+    const all: Cand[] = [];
+    for (const kc of combos) {
+      all.push(plan(v, kc, false));
+      if (v.kids.length > 1) all.push(plan(v, kc, true));
+    }
+    all.sort(better);
+    // Keep those no kept one beats on all of left, right, run and mirrored splits.
+    const keep: Cand[] = [];
+    for (const c of all) {
+      if (keep.some((k) => k.a >= c.a - 1e-12 && k.b <= c.b + 1e-12 && k.cost <= c.cost + 1e-9 && k.flips <= c.flips)) continue;
+      keep.push(c);
+      if (keep.length >= MAX_CANDS) break;
+    }
+    return keep;
+  };
+  const fixed = (v: FanNode, sides: Map<Split, boolean>): Cand =>
+    plan(v, v.kids.map((k) => (isNode(k) ? fixed(k, sides) : null)), v.kids.length > 1 && !!sides.get(v.split));
+  const plans = new Map<FanNode, Plan>();
+  const sides = new Map<Split, boolean>();
+  const apply = (v: FanNode, c: Cand): void => {
+    // (The daughters' candidates are in table order: read them before reordering.)
+    v.kids.forEach((k, i) => {
+      if (isNode(k)) apply(k, c.kids[i]!);
+    });
+    v.kids = c.order;
+    plans.set(v, c);
+    sides.set(v.split, c.flip);
+  };
+  apply(root, known ? fixed(root, known) : cands(root)[0]);
+  return { plans, sides };
+}
+
+/**
+ * Straight (lines that lean, Ita's sketch):
+ *
+ *     |  |  |        read upwards: the right line is the parent, running
+ *     \ _|  |        straight on through the split; the daughter peels off
+ *         \ |        its side and leans out "for a bit" to its own column,
+ *          \|        then runs straight up.
+ *
+ * At a split the larger daughter continues straight (the most ink stays put);
+ * each other one leaves from its own part of the parent's band, on the side it
+ * leans towards, along a straight diagonal (LEAN_RISE heights per unit
+ * sideways, at most LEAN_MAX_FRAC of the height to either daughter's next
+ * event, so leans end before anything else starts and never meet), just far
+ * enough to clear its sibling's whole subtree by a gap (leanGap). Which side
+ * each daughter is on is the shared order's (chooseSides: the leans' least
+ * total sideways run). A species' column is centred on its slot's centre plus
+ * its lean. The lanes blend below a split as far down as its daughters lean
+ * out above it (at most half its band).
+ */
+function placeLean(root: FanNode, nodes: FanNode[], plans: Map<FanNode, Plan>): void {
   const rp = plans.get(root)!;
   // Place it: the whole centred on 0, then each daughter from its slot in its parent's band.
   const nextEvent = (k: Kid) => (isNode(k) ? k.y : k.tipY);
   const place = (v: FanNode): void => {
     const p = plans.get(v)!;
-    v.kids = p.order;
     v.cx = v.left + v.width / 2;
     const room = Math.min(...p.order.map((k) => v.y - nextEvent(k)));
     p.order.forEach((k, i) => {
