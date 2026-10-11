@@ -72,8 +72,12 @@ export const RED_LIST: Record<string, RedListStatus> = {
   },
 };
 
-/** The card's status chip: a Red List category, prehistoric extinction, or none known. */
-export type StatusChip = { kind: 'iucn'; label: string; code: RedListCategory; status: RedListStatus } | { kind: 'prehistoric'; label: string } | null;
+/** The card's status chip: a Red List category, prehistoric extinction, a domestic form, or none known. */
+export type StatusChip =
+  | { kind: 'iucn'; label: string; code: RedListCategory; status: RedListStatus }
+  | { kind: 'prehistoric'; label: string }
+  | { kind: 'domestic'; label: string }
+  | null;
 
 /** The status the card shows: the data's, unless the curated entry is a newer assessment. */
 export function redListOf(sp: SpeciesRec): RedListStatus | null {
@@ -89,5 +93,7 @@ export function statusOf(sp: SpeciesRec): StatusChip {
   const s = redListOf(sp);
   // a fossil has no Red List status; one that ended since 1500 CE keeps the list's EX/EW
   if (sp.extinct && !(s && (s.category === 'EX' || s.category === 'EW'))) return { kind: 'prehistoric', label: 'Extinct (prehistoric)' };
+  // a domestic form is not assessed (IUCN lists wild species): NE in the data, "Domesticated" on the card (ToLaD#98)
+  if (sp.history?.component === 'domestic' && (!s || s.category === 'NE')) return { kind: 'domestic', label: 'Domesticated' };
   return s ? { kind: 'iucn', label: CATEGORY_NAME[s.category], code: s.category, status: s } : null;
 }

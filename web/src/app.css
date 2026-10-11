@@ -329,6 +329,15 @@
   border-radius: 50%;
   vertical-align: 0;
 }
+/* The reconstructed (guessed) curve's key: a short dashed stroke over a faint band, as on the sparkline. */
+.card-sp .gdash {
+  display: inline-block;
+  width: 14px;
+  height: 7px;
+  border-top: 1.5px dashed;
+  background: rgba(232, 112, 106, 0.16);
+  vertical-align: 1px;
+}
 
 .legend .dim {
   color: #8a978f;
@@ -499,7 +508,8 @@
   background: #a9b8ae;
   white-space: nowrap;
 }
-.fan .card-sp .status.iucn-lc {
+.fan .card-sp .status.iucn-lc,
+.fan .card-sp .status.domestic {
   background: #3d4642;
   color: #c3ccc6;
 }

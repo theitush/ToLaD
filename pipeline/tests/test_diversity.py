@@ -25,9 +25,9 @@ class Level(unittest.TestCase):
         lv = V.level(1e-3, 10.0)
         self.assertAlmostEqual(lv["ne"], 25000.0, places=6)
         self.assertAlmostEqual(lv["N"], 250000.0, places=4)
-        # lo uses the high Ne/N (0.3), hi the low one (0.05)
-        self.assertAlmostEqual(lv["lo"], 25000.0 / 0.3, places=4)
-        self.assertAlmostEqual(lv["hi"], 500000.0, places=4)
+        # lo uses the high Ne/N (0.3) and the fastest rate, hi the low Ne/N (0.05) and the slowest
+        self.assertAlmostEqual(lv["lo"], 25000.0 * (H.DEEP_MU_YEAR / H.DEEP_MU_YEAR_HI) / 0.3, places=4)
+        self.assertAlmostEqual(lv["hi"], 500000.0 * (H.DEEP_MU_YEAR / H.DEEP_MU_YEAR_LO), places=4)
         self.assertLess(lv["lo"], lv["N"])
         self.assertLess(lv["N"], lv["hi"])
 
@@ -83,7 +83,10 @@ class Build(unittest.TestCase):
         for r in rows:
             self.assertLessEqual(r["lo"], r["N"])
             self.assertLessEqual(r["N"], r["hi"])
-            self.assertAlmostEqual(r["N"] / V.level(r["het"], r["G"])["N"], 1.0, delta=1e-3)
+            mu = {"mu": r["mu_year"], "lo": r["mu_year"], "hi": r["mu_year"]}
+            self.assertAlmostEqual(r["N"] / V.level(r["het"], r["G"], mu)["N"], 1.0, delta=1e-3)
+            self.assertAlmostEqual(r["N_flat"] / V.level(r["het"], r["G"])["N"], 1.0, delta=1e-3)
+            self.assertAlmostEqual(r["N"] * r["mu_vs_flat"] / r["N_flat"], 1.0, delta=2e-3)
             if r["natural"]:
                 self.assertAlmostEqual(r["dex_vs_natural"], math.log10(r["N"] / r["natural"]), delta=2e-3)
 
@@ -95,6 +98,22 @@ class Build(unittest.TestCase):
         flagged = self.d["disagree_natural_10x"]
         self.assertEqual(len(flagged), self.d["vs_natural"]["div_higher_10x"] + self.d["vs_natural"]["div_lower_10x"])
         self.assertTrue(all(abs(f["dex_vs_natural"]) > 1.0 for f in flagged))
+
+    def test_mu_effect(self):
+        """ToLaD#74: the flat and per-lineage slopes and 10x counts are both reported and add up."""
+        e = self.d["mu_effect"]
+        for key in ("vs_natural_10x", "vs_today_10x"):
+            for k in ("flat", "lineage"):
+                s = e[key][k]
+                self.assertEqual(s["within_10x"] + s["div_higher_10x"] + s["div_lower_10x"], s["n"])
+        self.assertEqual(e["vs_natural_10x"]["lineage"]["within_10x"], self.d["vs_natural"]["within_10x"])
+        self.assertEqual(e["slope_log_div_on_log_natural"]["lineage"], self.d["slope_log_div_on_log_natural"])
+        rows = {r["leaf"]: r for r in self.d["species"]}
+        # the generation-time effect: a short-lived rodent mutates faster per year than a great ape
+        mice = [r for r in rows.values() if r["mu_clade"] == "Rodentia" and r["G"] < 2]
+        self.assertTrue(mice and all(r["mu_vs_flat"] > 1.5 for r in mice))
+        apes = [r for r in rows.values() if r["mu_clade"] == "Primates" and r["G"] > 20]
+        self.assertTrue(apes and all(r["mu_vs_flat"] < 0.6 for r in apes))
 
     def test_panthera_within_10x(self):
         """Leopard and jaguar: the diversity size sits within 10x of the natural baseline."""
