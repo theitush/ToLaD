@@ -527,9 +527,8 @@ def fit_occupancy(root: Node, ref: dict[int, float], census: dict[int, float],
     out["land_total"] = {"individuals": N_all, "biomass_Mt": round(B_all, 2),
                          "greenspoon_individuals": sum(t["individuals"] for t in targets.values()),
                          "greenspoon_biomass_Mt": round(sum(t["biomass_g"] for t in targets.values()) / 1e12, 2),
-                         "note": "individuals match Greenspoon closely; biomass is higher because census species use "
-                                 "PHYLACINE adult masses and unverified Open Tree tips add modelled populations "
-                                 "(Greenspoon's 95% CI for wild land biomass is 13-38 Mt)"}
+                         "note": "individuals within ~0.05 dex of Greenspoon; biomass is higher because census species "
+                                 "use PHYLACINE adult masses (Greenspoon's 95% CI for wild land biomass is 13-38 Mt)"}
 
     # ---- marine
     mar_all = [n for n in every if n.data["marine"]]
@@ -973,6 +972,22 @@ def assign_leaf_counts(root: Node, raw: Path, ctx: dict, log: dict) -> None:
             alive = 0.0
             D["rate_wild_now"] = 0.0
             D["meth"].append("wild ancestor modelled up to domestication; no wild population today")
+        elif n.name in anchors.DOMESTIC_FORMS and n.name not in dom_by_leaf:
+            # a domestic form whose wild ancestor is another leaf (llama, alpaca, zebu, yak, Bactrian
+            # camel; ToLaD#135): its range map and census are the ancestor's, so it has no wild population
+            # today and, with no pinned stock of its own, no alive count
+            dom_start = year_to_ma(anchors.DOMESTICATION_YEAR[n.name])
+            pieces = [(n.t0, max(n.t1, dom_start), r_nat)] if n.t0 > dom_start else []
+            D.pop("rangeloss", None)
+            alive = 0.0
+            D["rate_wild_now"] = 0.0
+            for k in ("census_N", "anchored_count", "near_extinct_cap"):
+                D.pop(k, None)
+            D["meth"] = [m for m in D["meth"] if not m.startswith("N:")]
+            D["meth"].append(f"domestic form of {anchors.DOMESTIC_FORMS[n.name]}: wild lineage modelled up to "
+                             f"domestication; no wild population today; no domestic stock: "
+                             f"{anchors.DOMESTIC_FORM_NO_STOCK[n.name]}")
+            found["domestic form, no stock"] += 1
         D["n_wild_pieces"] = len(pieces)
         if n.name in dom_by_leaf:
             d = dom_by_leaf[n.name]
@@ -1017,9 +1032,9 @@ def assign_leaf_counts(root: Node, raw: Path, ctx: dict, log: dict) -> None:
     unverified = [n for n in root.preorder() if n.is_leaf and n.kind == "tree" and not n.extinct
                   and not n.upham and "iucn" not in n.data and id(n) not in ref and n.name != "Homo sapiens"]
     log["unverified_extant_tips"] = {
-        "note": "Open Tree tips treated as living that no extant-species list (Upham, PHYLACINE, Greenspoon/IUCN) "
-                "recognises: recent splits, synonyms, and some fossils without an extinct flag. Their counts "
-                "come from the occupancy model only.",
+        "note": "living Open Tree tips that only the IUCN Red List 2026-1 (or a domestic table) recognises, not "
+                "Upham, PHYLACINE or Greenspoon/IUCN: mostly recent splits. Their counts come from the occupancy "
+                "model only. Tips no list recognises are dropped (ToLaD#116, stats.json -> unrecognised_tips).",
         "tips": len(unverified),
         "alive": sum(n.data["alive"] for n in unverified),
         "examples": [n.name for n in unverified[::max(1, len(unverified) // 12)]][:12],
