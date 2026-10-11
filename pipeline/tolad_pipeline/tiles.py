@@ -10,7 +10,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import anchors
+from . import anchors, redlist
 from .model import (NATURAL_METHOD_FIT, NATURAL_METHOD_SCALED, NATURAL_STEP_YEAR, PROFILE_K, PROFILE_RANGE,
                     SOURCES)
 from .tree import D_ANCHOR, DATE_SRC_NAMES, Node
@@ -19,6 +19,8 @@ FORMAT_VERSION = 1
 # NATB (v1.2): per row, LOG16 natural baseline N, lo, hi, natural range km2, current range km2
 NATB_PER_ROW = 5
 NATB_FIELDS = ["n", "lo", "hi", "km2_natural", "km2_current"]
+# RLST (v1.4, ToLaD#48): per row u32 x 3: category | source << 8 | year << 16, IUCN taxon id, assessment id
+RLST_PER_ROW = 3
 MAGIC = b"TLAD"
 KIND_SKELETON, KIND_TILE = 0, 1
 TILE_BUDGET = 2500
@@ -262,6 +264,7 @@ def encode_rows(rows: list[tuple[Node, bool]], methods: dict[str, int], stub_til
     ott = np.zeros(n, "<u4")
     pbdb = np.zeros(n, "<u4")
     natb = np.zeros(NATB_PER_ROW * n, "<u2")
+    rlst = np.zeros(RLST_PER_ROW * n, "<u4")
     names = []
     stubs = []
     stub_rep = []
@@ -293,6 +296,10 @@ def encode_rows(rows: list[tuple[Node, bool]], methods: dict[str, int], stub_til
             natb[NATB_PER_ROW * i:NATB_PER_ROW * (i + 1)] = [
                 q_log16(nat["N"]), q_log16(nat["lo"]), q_log16(nat["hi"]),
                 q_log16(nat["km2_nat"]), q_log16(nat["km2_cur"])]
+        rl = D.get("red_list")
+        if rl is not None and not stub:
+            rlst[RLST_PER_ROW * i:RLST_PER_ROW * (i + 1)] = [
+                redlist.CODE[rl["category"]] | rl["source"] << 8 | rl["year"] << 16, rl["taxon"], rl["assessment"]]
         names.append("|".join([nd.name or ""] + [a for a in nd.alt if a]))
         if stub:
             stubs.append((i, stub_tile[id(nd)]))
@@ -321,6 +328,7 @@ def encode_rows(rows: list[tuple[Node, bool]], methods: dict[str, int], stub_til
     if n_hist:
         secs.append(("HIST", hist_blob, n_hist))
     secs.append(("NATB", natb.tobytes(), NATB_PER_ROW * n))
+    secs.append(("RLST", rlst.tobytes(), RLST_PER_ROW * n))
     return secs, n
 
 
@@ -470,16 +478,34 @@ def write_all(root: Node, out: Path, log: dict) -> None:
                            "today's count; the timing is an assumption (IUCN's 1500 CE window)",
                   "notes": RANGELOSS_NOTE, "cite": RANGELOSS_CITE, "url": RANGELOSS_URL},
     }
+    meta["red_list"] = {
+        "fields": ["category", "source", "year", "taxon", "assessment"],
+        "categories": redlist.CATEGORIES, "sources": redlist.SOURCES, "version": redlist.VERSION,
+        "url": "https://www.iucnredlist.org/species/{taxon}/{assessment}",
+        "label": "IUCN Red List category of the species' current global assessment",
+    }
+    # Red List rows for the debug dump: every cat, plus every 50th other species with a status
+    rl_dbg = []
+    k = 0
+    for nd in root.preorder():
+        rl = nd.data.get("red_list")
+        if rl is None:
+            continue
+        if redlist._under(nd, "Felidae") or k % 50 == 0:
+            t, r = where[id(nd)]
+            rl_dbg.append({"species": nd.name, "gid": nd.data["gid"], "tile": t, "row": r, "living": nd.t1 == 0,
+                           **{f: rl[f] for f in ("category", "source", "year", "taxon", "assessment")}})
+        k += 1
     log["history"]["hist_sources"] = len(cites)
     secs, n = encode_rows(sk_rows, methods, tile_id, meta, cites)
     sk_size = write_container(out / "skeleton.tld", KIND_SKELETON, n, secs)
     files.append(out / "skeleton.tld")
-    write_debug_json(root, sk_rows, tile_id, out / "debug_top.json", meta, hist_dbg, nat_dbg)
+    write_debug_json(root, sk_rows, tile_id, out / "debug_top.json", meta, hist_dbg, nat_dbg, rl_dbg)
     sizes(files, log, sk_size, n, len(tile_roots))
 
 
 def write_debug_json(root: Node, sk_rows, tile_id, path: Path, meta: dict, hist: list[dict] | None = None,
-                     natural: list[dict] | None = None) -> None:
+                     natural: list[dict] | None = None, red_list: list[dict] | None = None) -> None:
     nodes = []
     depth = {id(root): 0}
     for nd, stub in sk_rows:
@@ -524,8 +550,9 @@ def write_debug_json(root: Node, sk_rows, tile_id, path: Path, meta: dict, hist:
     hist_body = ",\n".join(json.dumps(_round(h), ensure_ascii=False, separators=(",", ":")) for h in (hist or []))
     nat_body = ",\n".join(json.dumps(_round(h), ensure_ascii=False, separators=(",", ":"))
                           for h in (natural or []))
+    rl_body = ",\n".join(json.dumps(h, ensure_ascii=False, separators=(",", ":")) for h in (red_list or []))
     path.write_text(lines + ",\n \"history\": [\n" + hist_body + "\n],\n \"natural\": [\n" + nat_body
-                    + "\n],\n \"nodes\": [\n" + body + "\n]}\n")
+                    + "\n],\n \"red_list\": [\n" + rl_body + "\n],\n \"nodes\": [\n" + body + "\n]}\n")
 
 
 def _round(o):

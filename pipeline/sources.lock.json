@@ -116,6 +116,13 @@
   "sha256": "eccf7be6a1e650d7202f47408858565f97cdaae8f373fac536b52cc7cb6040e6",
   "url": "https://www.prb.org/articles/how-many-people-have-ever-lived-on-earth/"
  },
+ "redlist/iucn-2026-1.zip": {
+  "bytes": 21140648,
+  "post_body": null,
+  "retrieved": "2026-10-11",
+  "sha256": "2ed2c5f75667fa2dee9dc718406b5ba094fa9312e548934916b16c0c509ccb7d",
+  "url": "https://hosted-datasets.gbif.org/datasets/iucn/iucn-2026-1.zip"
+ },
  "upham/MamPhy_fullPosterior_BDvr_Completed_5911sp_topoCons_NDexp_MCC_v2_target.tre": {
   "bytes": 4430334,
   "post_body": null,

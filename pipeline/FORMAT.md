@@ -1,8 +1,8 @@
-# ToLaD tile format, version 1.2
+# ToLaD tile format, version 1.4
 
 Binary columnar format for the river data. The decoder is `pipeline/decoder/tolad-decoder.js`; the round-trip test is `pipeline/decoder/test/roundtrip.test.mjs`. The writer is `pipeline/tolad_pipeline/tiles.py`.
 
-**Versioning:** the `version` field in the header is bumped on any incompatible change. Decoders must reject unknown versions. Additive changes (new sections) keep the version, and decoders must skip sections they do not know. Minor revisions: **1.0** the base format; **1.1** adds the optional `HIST` section (curated population history) and the `hist*` META keys; **1.2** adds the `NATB` section (natural, pre-human baseline), the skeleton `META.natural` key and the HIST kind 10 `natural` (kind 9 `genomic` came with the optional `[deep]` history, no new section). The header `version` stays 1, and a 1.0 decoder reads 1.1 and 1.2 files unchanged (it skips `HIST` and `NATB`).
+**Versioning:** the `version` field in the header is bumped on any incompatible change. Decoders must reject unknown versions. Additive changes (new sections) keep the version, and decoders must skip sections they do not know. Minor revisions: **1.0** the base format; **1.1** adds the optional `HIST` section (curated population history) and the `hist*` META keys; **1.2** adds the `NATB` section (natural, pre-human baseline), the skeleton `META.natural` key and the HIST kind 10 `natural` (kind 9 `genomic` came with the optional `[deep]` history, no new section). **1.3** adds HIST kind 11 `rangeloss` (modelled range-loss records); **1.4** adds the `RLST` section (IUCN Red List status per species row) and the skeleton `META.red_list` key. The header `version` stays 1, and a 1.0 decoder reads 1.1 to 1.4 files unchanged (it skips `HIST`, `NATB` and `RLST`).
 
 ## Files
 
@@ -59,6 +59,7 @@ Rows are nodes in **preorder**. `CHLD[i]` is the number of children present *in 
 | `NAME` | u32[n+1] offsets, then UTF-8 bytes | `"Primary name|alt1|alt2…"`. The offsets are relative to the start of the byte blob. An unnamed MRCA node has an empty primary name. Alt names come from collapsed unary ("knuckle") ancestors, nearest first |
 | `META` | UTF-8 JSON | see below |
 | `HIST` | blob, count = species (v1.1, optional) | curated population history of species rows, see below |
+| `RLST` | u32[3n] (v1.4) | IUCN Red List status, 3 words per row: `category | source << 8 | year << 16`, IUCN taxon id, assessment id. All 0 = none (internal nodes, fossils). See "RLST" below |
 | `NATB` | u16[5n] (v1.2) | natural (pre-human) baseline, 5 LOG16 codes per row: `n, lo, hi, km2_natural, km2_current`. All 0 = none (internal nodes, species without a PHYLACINE map). See "NATB" below |
 
 ### Quantization
@@ -171,6 +172,33 @@ Its leaf error is widened by the 0.2 dex and its grade capped at D. A domestic f
 runs its wild ancestor at `N_nat` up to domestication. Curated species (`HIST`): a cited baseline wins; with
 none, the natural baseline is held before the first cited point (segment kind 10 `natural`; with a genomic deep past, the genomic curve instead, see "HIST"). `ALIV` is
 always today's count. Report: `stats.json` → `natural_baseline` and `phylacine_ranges`.
+
+### RLST (v1.4): IUCN Red List status
+
+ToLaD#48. Per row, three u32 words:
+
+| word | bits | meaning |
+|---|---|---|
+| 0 | 0–7 | category code, an index into skeleton `META.red_list.categories`: `["", "LC", "NT", "VU", "EN", "CR", "EW", "EX", "DD", "NE"]` (0 = none) |
+| 0 | 8–15 | source, an index into `META.red_list.sources` (`{key, label, vintage, cite, url, license}`) |
+| 0 | 16–31 | year of the species' current assessment (its citation's year); for a source with no assessment, the source's vintage |
+| 1 | | IUCN taxon id (0 = none) |
+| 2 | | IUCN assessment id (0 = none). The assessment's page is `META.red_list.url` with `{taxon}` and `{assessment}` filled in, `https://www.iucnredlist.org/species/<taxon>/<assessment>` |
+
+Sources, in order (`pipeline/tolad_pipeline/redlist.py`):
+
+0. `iucn-2026-1`: the IUCN Red List of Threatened Species version 2026-1, GBIF's Darwin Core checklist
+   (doi:10.15468/0qnb58, CC BY 4.0). A leaf matches by its own name, then its alt names and Open Tree
+   synonyms, then PHYLACINE 1.2's synonymy (IUCN 2016-3 names) and COMBINE's IUCN 2020 binomials, then a
+   Latin gender-ending variant. A synonym that is another leaf's own name is never taken.
+1. `phylacine-1.2`: PHYLACINE 1.2's status column (IUCN Red List 2016-3), year 2016, for a living leaf the
+   2026-1 list does not have, and for the few names the list has re-pointed at a different, extinct taxon
+   (`redlist.REDEFINED`).
+2. `not-listed`: neither has it (a domestic form, a recent split, an Open Tree tip no species list
+   recognises): category `NE`, Not Evaluated, year 2026.
+
+Every living species row (`T1 = 0`) has a status. A fossil has none; a species that ended after 1500 CE
+carries the Red List's `EX` or `EW` where the list has it. Report: `stats.json` → `red_list`.
 
 ## Semantics of the counts
 

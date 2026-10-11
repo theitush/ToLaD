@@ -84,6 +84,12 @@ SOURCES: dict[str, list[tuple[str, str, dict | None]]] = {
         ("combine/trait_data_reported.csv", "https://ndownloader.figshare.com/files/27703263", None),
         ("combine/trait_data_imputed.csv", "https://ndownloader.figshare.com/files/27703266", None),
     ],
+    # The IUCN Red List of Threatened Species, version 2026-1, as GBIF's Darwin Core checklist
+    # (doi:10.15468/0qnb58, CC BY 4.0). The versioned file is fixed (iucn-latest.zip moves).
+    # Read in place with zipfile: the mammal rows' category, assessment citation and ids (ToLaD#48).
+    "redlist": [
+        ("redlist/iucn-2026-1.zip", "https://hosted-datasets.gbif.org/datasets/iucn/iucn-2026-1.zip", None),
+    ],
     # Count anchors (see pipeline/tolad_pipeline/anchors.py)
     "faostat": [
         ("faostat/Production_Crops_Livestock_E_All_Data_(Normalized).zip",
