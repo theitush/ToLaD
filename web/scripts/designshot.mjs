@@ -15,7 +15,7 @@ const ONLY = process.argv[4] ? new Set(process.argv[4].split(',')) : null;
 mkdirSync(OUT, { recursive: true });
 // [name, kind, args]: 'home' | 'far' | 'card' [species] | 'touch' [species, agoYears] | 'scroll' [zoom, agoYears] | 'bar' [species, agoYears, perBar, sy, at?]
 //   | 'split' [splitMa, time zoom × home] | 'tapnode' [splitMa, ageMa] | 'pan' [zoom, px down from "now" at 160, px across]
-//   | 'about' [species, agoYears, k, r]
+//   | 'about' [species, agoYears, k, r] | 'search' [query, pick?]: from home, the search opened, the query typed, and the row named `pick` tapped
 const scenes = [
   ['home', 'home'],
   ['far', 'far'],
@@ -86,6 +86,15 @@ const scenes = [
   ['bneck-iberian', 'about', ['Iberian lynx', 3000, 7, 0.3]],
   ['bneck-tap-puma', 'touch', ['Puma', 22000]],
   ['bneck-tap-cheetah', 'touch', ['Cheetah', 11800]],
+  // The search (ToLaD#157): its button at home, "li" typed with the list open, the lion picked (flown there, card open).
+  ['search-home', 'home'],
+  ['search-li', 'search', ['li']],
+  ['search-lion', 'search', ['li', 'Lion']],
+  ['search-cave', 'search', ['cave', 'Cave lion']],
+  // PSMC's blind spot (ToLaD#143): the lion's and leopard's columns about 15 kya, 50 kya -> now, their
+  // post-glacial decline (20-10 kya, Figueiro et al. 2017), then flat to the next level (the genome scaled to meet it).
+  ['blind-lion', 'about', ['Lion', 15000, 10, 0.1]],
+  ['blind-leopard', 'about', ['Leopard', 15000, 10, 0.1]],
 ];
 const browser = await chromium.launch({ headless: true });
 try {
@@ -97,13 +106,15 @@ try {
   await page.waitForFunction(() => !!window.__fan, null, { timeout: Number(process.env.LOAD_MS || 20000) });
   for (const [name, kind, args] of scenes) {
     if (ONLY && !ONLY.has(name)) continue;
+    // A search left open by the last scene closed.
+    if (await page.$('.search-x')) await page.click('.search-x');
     await page.evaluate(
       ([kind, args, width]) => {
         const f = window.__fan;
         f.setMode(width);
         f.tap(-1e6, -1e6);
         const fan = f.fan;
-        if (kind === 'home' || kind === 'card') {
+        if (kind === 'home' || kind === 'card' || kind === 'search') {
           f.cam = f.homeCamera();
           f.camera.settle();
           if (kind === 'card') {
@@ -205,6 +216,15 @@ try {
       },
       [kind, args ?? [], process.env.WIDTH || 'linear'],
     );
+    if (kind === 'search') {
+      await page.click('button[aria-label="Find a species"]');
+      await page.keyboard.type(args[0], { delay: 40 });
+      if (args[1]) {
+        await page.click(`.search-list li:has(.nm:text-is("${args[1]}"))`);
+        // The flight (~0.7 s), then the card.
+        await page.waitForTimeout(1200);
+      }
+    }
     await page.waitForTimeout(900);
     // CLIP=x,y,w,h (CSS px): only that part of the page (with DSF=4–6, a close look).
     const clip = process.env.CLIP ? Object.fromEntries(['x', 'y', 'width', 'height'].map((k, i) => [k, Number(process.env.CLIP.split(',')[i])])) : undefined;

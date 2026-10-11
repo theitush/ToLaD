@@ -2,7 +2,7 @@
 // One rule now (labelSpots): the same text in the same pill, moving continuously.
 import { describe, expect, it } from 'vitest';
 import { FanCamera, type Camera } from './camera';
-import { columnsAt, layoutFan, type FanBranch } from './layout';
+import { columnsAt, laneAt, layoutFan, leftAt, type FanBranch } from './layout';
 import { FELIDAE } from './panthera';
 import { TwigModel } from './twigs';
 import { boxGap, labelSpots, resolveLabels, type LabelSpot } from './view';
@@ -120,7 +120,9 @@ describe('species labels (#54)', () => {
     let cam = c.home();
     c.cam = cam;
     const y = c.fan.time.y(300 / 1e6);
-    const [px, py] = c.toScreen(lion.colLeft + 0.3 * lion.width, y);
+    // Into its lane at that time, not its column: since ToLaD#143 the deep past is scaled to the 1950 level
+    // (x12), so the column (its widest, ~50 kya) is ~4x the lane 300 years ago, and 0.3 of the column missed it.
+    const [px, py] = c.toScreen(leftAt(lion, y) + 0.3 * laneAt(lion, y).w, y);
     const f = 1.02;
     const cams: Camera[] = [];
     while (cam.sx < c.home().sx * 3e4) {

@@ -159,9 +159,9 @@ test('HIST round-trips against debug_top.json history', () => {
     assert.ok(got, `${w}: no HIST entry at tile ${h.tile} row ${h.row}`);
     assert.equal(got.species, h.species);
     assert.equal(got.modelled ?? null, h.modelled ?? null, `${w} modelled`);
-    // the genomic deep past's join, as a sentence for the card (ToLaD#80)
+    // the genomic deep past scaled to the next level, as a sentence for the card (ToLaD#80, #143)
     assert.equal(got.deep_join ?? null, h.deep_join ?? null, `${w} deep_join`);
-    if (h.points.some((p) => p.kind === 'genomic')) assert.match(got.deep_join, /^(First cited point \([^)]*\) is after 1900, so not used as the deep past's level\. )?Genomic curve /, `${w} deep_join`);
+    if (h.points.some((p) => p.kind === 'genomic')) assert.match(got.deep_join, /^(PSMC's \d+ steps? in its blind spot \(the last 20 kyr[^)]*\) [\s\S]*?\. )?The genome gives the shape, not the number: its curve is scaled ×[\d.,e+-]+ to meet /, `${w} deep_join`);
     // curated events (v1.5, ToLaD#141): carried whole, oldest first; [] when there are none
     assert.deepEqual(got.events, h.events ?? [], `${w} events`);
     assert.ok(Math.abs(got.G / h.G - 1) < 1e-6, `${w} G`);

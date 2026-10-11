@@ -588,7 +588,8 @@ export class FanView implements InputHandlers {
     this.camera.zoomAbout(px, py, fx, fy);
   }
 
-  flyTo(to: Camera, ms = 650): void {
+  /** Animate the camera to `to` over `ms`; `done` runs when it lands (not if a gesture takes over first). */
+  flyTo(to: Camera, ms = 650, done?: () => void): void {
     const from = { ...this.cam };
     const t0 = performance.now();
     // Interpolate log-zoom, and each centre coordinate so it moves at constant screen speed.
@@ -604,9 +605,47 @@ export class FanView implements InputHandlers {
       const [ty, cy] = axis(from.sy, to.ty, from.cy, to.cy, e);
       this.cam = { sx, sy: ty, ty, cx, cy };
       this.camera.settle();
+      if (u >= 1) done?.();
       return u < 1;
     };
     this.request();
+  }
+
+  /**
+   * Where a search pick lands (ToLaD#157): the species' column centred, its tip (now for the living,
+   * the last appearance for a fossil) at a fifth of the way down so its label stands above it, and
+   * its own stretch (tip to split) filling the band above the card. Width and time are framed apart
+   * (#138): the column about half the screen wide, within the width limit.
+   */
+  speciesCamera(b: FanBranch): Camera {
+    const h = this.homeCamera();
+    const tipPx = Math.max(this.labelTop() + 150, 0.2 * this.h);
+    const band = Math.max(80, 0.52 * this.h - tipPx);
+    const sy = Math.max(h.sy, band / Math.max(1e-300, b.splitY - b.tipY));
+    const cyAt = (s: number) => b.tipY + (this.h / 2 - tipPx) / s;
+    const sx = Math.min(Math.max(h.sx, (0.5 * this.w) / Math.max(1e-300, b.width)), Math.max(h.sx, this.camera.sxCap(b.cx, b.tipY)));
+    // Within the time limit (MIN_YEARS on screen) about the tip, where it will sit.
+    const s = this.camera.timeCap(b.tipY, tipPx, sy, h.sy);
+    return { cx: b.cx, cy: cyAt(s), sx, sy: s, ty: s };
+  }
+
+  /** A search pick: fly to the species' column, then open its card at its tip, as a tap there would. */
+  flyToSpecies(sp: SpeciesRec, ms = 700): void {
+    const b = this.fan.branches.find((x) => x.sp === sp);
+    if (!b) return;
+    // The card open now closes for the flight (the column stays in view under it).
+    this.selected = null;
+    this.selInd = null;
+    this.touch = null;
+    this.onSelect(null);
+    this.flyTo(this.speciesCamera(b), ms, () => {
+      const wy = b.tipY;
+      this.selected = sp;
+      this.selInd = null;
+      this.touch = { x: leftAt(b, wy) + laneAt(b, wy).w / 2, ageMa: sp.t1 };
+      this.onSelect({ sp, ageMa: sp.t1, startMa: b.t0 });
+      this.request();
+    });
   }
 
   /** Branch (column part) under a screen point, with a finger-sized slop. */

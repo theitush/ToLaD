@@ -139,11 +139,13 @@ def main(argv: list[str] | None = None) -> int:
     redlist.attach(root, a.raw, ctx, log)
     log_step(t_start, f"Red List status: {log['red_list']['living_by_source']}")
     dj = log.get("history", {}).get("deep_join")
-    if dj:  # the genomic deep past's join (ToLaD#80): rules applied and species beyond the flag
-        log_step(t_start, f"genomic join: {dj['by_rule']}, flagged {dj['flagged_by_rule']}")
+    if dj:  # the genomic deep past scaled to the next level (ToLaD#143): factors and species beyond the flag
+        fq = dj["factor"]
+        log_step(t_start, f"genomic scale: next {dj['by_next']}, factor median {fq['median']:.3g} "
+                          f"(p10 {fq['p10']:.3g}, p90 {fq['p90']:.3g}), flagged {dj['flagged_by_next']}")
         for sp, f in dj["flagged"].items():
-            print(f"    flagged {sp}: genomic/next {f['ratio']:.3g} ({f['to_kind']}), {f['rule']}"
-                  + (f" x{f['factor']:.3g}" if f["rule"] == "scaled" else ""), file=sys.stderr)
+            print(f"    flagged {sp}: scaled x{f['factor']:.3g} to the {f['to_kind']} level ({f['next']})",
+                  file=sys.stderr)
     from . import dated  # the dated tree (format 1.6, ToLaD#145): Upham topology + grafts, per file META
     droot = dated.build(root, *ctx["upham"], ctx["overrides"], log, ac=dated.load_alvarez(a.raw),
                         names=(ctx["exact"], ctx["syn"]))
