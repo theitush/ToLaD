@@ -137,6 +137,43 @@ describe('species labels (#54)', () => {
   });
 });
 
+describe('labels when width and time zoom separately (#138)', () => {
+  /** Zoom width by fx and time by ft about screen point (px, py), that point staying put. */
+  const zoomedAxes = (c: FanCamera, cam: Camera, px: number, py: number, fx: number, ft: number): Camera => {
+    const wx = cam.cx + (px - c.w / 2) / cam.sx;
+    const wy = cam.cy + (py - c.h / 2) / cam.sy;
+    const sx = cam.sx * fx;
+    const sy = cam.sy * ft;
+    return { cx: wx - (px - c.w / 2) / sx, cy: wy - (py - c.h / 2) / sy, sx, sy, ty: sy };
+  };
+  for (const [name, fx, ft] of [
+    ['width alone', 1.02, 1],
+    ['time alone', 1, 1.02],
+  ] as const) {
+    it(`${name}, on the lion from home: labels move continuously and keep clear of each other`, () => {
+      const c = camera();
+      const lion = c.fan.branches.find((b) => b.sp.common === 'Lion')!;
+      let cam = c.home();
+      c.cam = cam;
+      const [px, py] = c.toScreen(lion.colLeft + 0.3 * lion.width, c.fan.time.y(300 / 1e6));
+      const cams: Camera[] = [];
+      for (let k = 0; k < 250; k++) {
+        cams.push(cam);
+        cam = zoomedAxes(c, cam, px, py, fx, ft);
+      }
+      sweep(c, cams, 0.02 * Math.hypot(c.w, c.h) + 1);
+      c.cam = cams[cams.length - 1];
+      const spots = labelSpots(c, c.fan, TOP, measure, BAR_X0);
+      for (const q of spots) expect(q.box.every(Number.isFinite)).toBe(true);
+      if (fx === 1) return; // time alone at home width: the columns stay too close for a label beside them
+      // Width alone: the lion's label is still placed, on screen, below the buttons.
+      const s = spots.find((q) => q.b === lion && q.fit > 0)!;
+      expect(s && onScreen(c, s)).toBe(true);
+      expect(s.box[1]).toBeGreaterThanOrEqual(TOP - 0.01);
+    });
+  }
+});
+
 describe('labels on "now", else beside their branch (#97)', () => {
   it('at home: every label shown stands on the "now" line, at its column; no lineages', () => {
     const c = camera();
