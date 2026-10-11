@@ -364,16 +364,63 @@ export class Tess {
   }
 
   /**
+   * World x that branch b's strand stays within between heights y0 < y1
+   * (for culling: conservative, not tight). Its own column: about its centre
+   * (which moves monotonically along its peel), at most its widest ever
+   * (Population.max); each parent column's slice: its place at both ends of
+   * the stretch (nodeLeftAt is monotonic too).
+   */
+  xRange(b: FanBranch, y0: number, y1: number): [number, number] {
+    const lo = Math.max(y0, b.tipY);
+    const hi = Math.min(y1, this.bottom);
+    let L = Infinity;
+    let R = -Infinity;
+    if (!(hi >= lo)) return [L, R];
+    if (lo < b.splitY) {
+      const tc = b.x0 + b.baseW / 2;
+      const c = (y: number) => tc + (b.cx - tc) * peelU(this.edge, b.splitY, b.leanY, y);
+      const ca = c(lo);
+      const cb = c(Math.min(hi, b.splitY));
+      const hw = (b.unit * g(b.pop.max, this.mode)) / 2;
+      L = Math.min(ca, cb) - hw;
+      R = Math.max(ca, cb) + hw;
+    }
+    const p = b.path;
+    for (let k = 0; k < p.length; k++) {
+      const a = Math.max(lo, p[k].y);
+      const z = Math.min(hi, k + 1 < p.length ? p[k + 1].y : this.bottom);
+      if (!(z >= a)) continue;
+      for (const y of [a, z]) {
+        const x = nodeLeftAt(p[k].node, y) + p[k].off;
+        L = Math.min(L, x);
+        R = Math.max(R, x + b.baseW);
+      }
+    }
+    // (A hair of slack for rounding.)
+    const pad = 1e-6 * Math.max(1, Math.abs(L), Math.abs(R)) + (R - L) * 1e-3;
+    return [L - pad, R + pad];
+  }
+
+  private readonly splits = new Map<FanBranch, Set<number>>();
+  /** The heights of the splits branch b passes (a cut always falls on each). */
+  private splitYs(b: FanBranch): Set<number> {
+    let v = this.splits.get(b);
+    if (!v) this.splits.set(b, (v = new Set(b.path.map((s) => s.y))));
+    return v;
+  }
+
+  /**
    * The heights to draw branch b at between y0 < y1 (world), ascending,
-   * y0 and y1 included: its features there and the dyadic grid at the
-   * finest spacing over `maxPx` screen px (sy: px per world unit of height).
+   * y0 and y1 included: its features there (thinned to a few per px) and
+   * the dyadic grid at the finest spacing over `maxPx` screen px (sy: px per
+   * world unit of height).
    */
   cuts(b: FanBranch, y0: number, y1: number, sy: number, maxPx = 6): number[] {
     const lo = Math.max(y0, b.tipY);
     const hi = Math.min(y1, this.bottom);
     if (!(hi > lo)) return [];
     const f = this.bounds(b);
-    const out: number[] = [lo];
+    const feat: number[] = [];
     // Features (bisect to the first above lo).
     let a = 0;
     let z = f.length;
@@ -382,25 +429,43 @@ export class Tess {
       if (f[m] <= lo) a = m + 1;
       else z = m;
     }
-    for (let k = a; k < f.length && f[k] < hi; k++) out.push(f[k]);
-    // The grid.
+    // Features closer on screen than a quarter of maxPx are thinned (a history can hold thousands, most
+    // sub-pixel when zoomed out): at most one per cell of a dyadic grid that fine, so the same ones at
+    // every pan; the splits (the green lane steps there) are always kept.
+    const cell = Math.pow(2, Math.floor(Math.log2(Math.max(1e-12, maxPx / 4 / Math.max(1e-12, sy)))));
+    const keep = this.splitYs(b);
+    let last = NaN;
+    for (let k = a; k < f.length && f[k] < hi; k++) {
+      const c = Math.floor(f[k] / cell);
+      if (c === last && !keep.has(f[k])) continue;
+      last = c;
+      feat.push(f[k]);
+    }
+    // The grid, merged with the features (both ascending) and deduplicated.
     const step = Math.pow(2, Math.floor(Math.log2(Math.max(1e-9, maxPx / Math.max(1e-12, sy)))));
-    if ((hi - lo) / step < 20000) for (let y = Math.floor(lo / step + 1) * step; y < hi; y += step) out.push(y);
-    out.push(hi);
-    out.sort((p, q) => p - q);
-    const u: number[] = [];
-    for (const y of out) if (!u.length || y - u[u.length - 1] > 1e-9 * Math.max(1, Math.abs(y))) u.push(y);
+    const u: number[] = [lo];
+    const put = (y: number) => {
+      if (y - u[u.length - 1] > 1e-9 * Math.max(1, Math.abs(y))) u.push(y);
+    };
+    let j = 0;
+    if ((hi - lo) / step < 20000)
+      for (let y = Math.floor(lo / step + 1) * step; y < hi; y += step) {
+        while (j < feat.length && feat[j] <= y) put(feat[j++]);
+        put(y);
+      }
+    while (j < feat.length) put(feat[j++]);
+    put(hi);
     if (u[u.length - 1] < hi) u.push(hi);
     return u;
   }
 }
 
-/** Left edge of a branch at world y: its own column (about its centre, peeling off its parent) above its split, then its place in each parent column below. */
-export function leftAt(b: FanBranch, y: number): number {
+/** Left edge of a branch at world y: its own column (about its centre, peeling off its parent) above its split, then its place in each parent column below. (w: its width there, if known: lanesAt(b, y)[0].) */
+export function leftAt(b: FanBranch, y: number, w?: number): number {
   if (y < b.splitY) {
     const tc = b.x0 + b.baseW / 2;
     const c = tc + (b.cx - tc) * peelU(b.tess.edge, b.splitY, b.leanY, y);
-    return c - lanesAt(b, y)[0] / 2;
+    return c - (w ?? lanesAt(b, y)[0]) / 2;
   }
   const s = segAt(b, y);
   return nodeLeftAt(s.node, y) + s.off;
