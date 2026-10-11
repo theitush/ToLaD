@@ -81,15 +81,23 @@ describe('the Panthera populations', () => {
     expect(p.greenAt(heldAge(sp('Lion')))).toBeCloseTo(Q_STAR, 6);
   });
 
-  it('extinct species: their whole span is gray (0% green), and nobody is alive after it or before it in their column', () => {
+  it('extinct species: their whole span is gray (0% green), nobody is alive after it, and its founders before its start', () => {
     for (const s of PANTHERA.species.filter((s) => s.extinct)) {
-      const p = population(s);
-      for (const a of [s.t1, (s.t0 + s.t1) / 2, s.t0]) {
-        expect(p.greenAt(a)).toBe(0);
-        expect(p.aliveAt(a)).toBeGreaterThan(0);
+      // From its first appearance (the default start) or from a split in between (the dated tree's).
+      for (const start of [s.t0, (s.t0 + s.t1) / 2]) {
+        const p = population(s, start);
+        for (const a of [s.t1 + (start - s.t1) * 0.01, (start + s.t1) / 2, start]) {
+          expect(p.greenAt(a)).toBe(0);
+          expect(p.aliveAt(a)).toBeGreaterThan(0);
+        }
+        // It tapers smoothly to nobody at its last appearance.
+        expect(p.aliveAt(s.t1)).toBe(0);
+        expect(p.aliveAt(s.t1 + (start - s.t1) * 1e-4)).toBeLessThan(1e-3 * p.founders);
+        expect(p.aliveAt(s.t1 * 0.9)).toBe(0);
+        expect(p.aliveAt(start * 1.1)).toBe(p.founders);
+        expect(p.stepAt(start * 1.1).n).toBe(p.founders);
       }
-      expect(p.aliveAt(s.t1 * 0.9)).toBe(0);
-      expect(p.aliveAt(s.t0 * 1.1)).toBe(0);
+      const p = population(s);
       // Its founders (its share of the stem) are ancestors of living species too: green by the rule.
       expect(p.qBase).toBeCloseTo(Q_STAR, 9);
     }
