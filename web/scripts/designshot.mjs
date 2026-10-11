@@ -54,6 +54,9 @@ const scenes = [
   ['domestic-boom', 'split', [0.0095, 3]],
   ['card-sandcat', 'card', ['Sand cat']],
   ['card-domestic', 'card', ['Domestic cat']],
+  // The Red List chip on a small cat (Least Concern, gray) and on the leopard (ToLaD#98).
+  ['card-leopardcat', 'card', ['Leopard cat']],
+  ['card-leopard', 'card', ['Leopard']],
 ];
 const browser = await chromium.launch({ headless: true });
 try {
