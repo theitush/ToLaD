@@ -71,6 +71,9 @@ try {
     if (open === 'sources' || open === 'both') await page.evaluate(() => document.querySelector('.card-sp .spark')?.click());
     await page.waitForTimeout(200);
     await page.screenshot({ path: `${OUT}/${name}.png` });
+    // SPARK=1: the sparkline alone too, as <name>-spark.png (cheap to compare before/after).
+    const spark = process.env.SPARK && (await page.$('.card-sp .hist .spark'));
+    if (spark) await spark.screenshot({ path: `${OUT}/${name}-spark.png` });
     const card = await page.evaluate(() => {
       const c = document.querySelector('.card-sp');
       if (!c) return null;
