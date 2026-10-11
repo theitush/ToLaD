@@ -7166,10 +7166,10 @@
  "genomic": {
   "by_how": {
    "hand-written [deep] wins": 5,
-   "history file": 20,
+   "history file": 21,
    "history file is domestic / counts": 7,
    "modelled record": 38,
-   "modelled record + range-loss trend": 48
+   "modelled record + range-loss trend": 47
   },
   "curves": 118,
   "note": "Layer 3 of the estimate stack, bulk (ToLaD#64): PSMC Ne histories from Bergman et al. 2023, rescaled and converted as pipeline/history/README.md 'Deep past' says. used = the curve became the leaf's deep past (a history file's [deep], or a modelled record). Per-species points, drops and the join to the next level are in history.species[<leaf>].deep.",
@@ -7772,7 +7772,7 @@
     "used": true
    },
    "Puma concolor": {
-    "how": "modelled record + range-loss trend",
+    "how": "history file",
     "leaf": "Puma concolor",
     "sample": "Puma_concolor_dnaZoo",
     "used": true
@@ -7898,32 +7898,32 @@
   "T_eff_yr": 150000000.0,
   "allocation": "crown membership: a ghost at time t is credited to the parent of each reconstructed lineage crossing t, in proportion to the present-day wild births of that lineage's extant descendants",
   "births_now_note": "wild births only (no humans, no domestic stocks)",
-  "births_now_per_yr": 57053193202.98615,
+  "births_now_per_yr": 57053102497.61591,
   "by_era": {
    "Cretaceous 66-145 Ma": {
-    "ghost": 3.7811677504557153e+18,
+    "ghost": 3.78116173873273e+18,
     "ghost_share": 1.0,
-    "sampled": 173884228992063.47
+    "sampled": 173884228992342.47
    },
    "Holocene-Pleistocene 0-2.58 Ma": {
-    "ghost": 1.1329720311684998e+16,
+    "ghost": 1.132979614929782e+16,
     "ghost_share": 0.0768,
-    "sampled": 1.361807877183176e+17
+    "sampled": 1.3618047736078718e+17
    },
    "Jurassic and older >145 Ma": {
-    "ghost": 9.89661100081624e+17,
+    "ghost": 9.896595266545249e+17,
     "ghost_share": 1.0,
-    "sampled": 16137748343786.318
+    "sampled": 16137748343789.125
    },
    "Neogene 2.58-23 Ma": {
-    "ghost": 8.973671728850077e+17,
+    "ghost": 8.973654669214047e+17,
     "ghost_share": 0.7645,
-    "sampled": 2.7648048134371142e+17
+    "sampled": 2.7648032107897386e+17
    },
    "Paleogene 23-66 Ma": {
-    "ghost": 2.43507638578056e+18,
+    "ghost": 2.4350724658703447e+18,
     "ghost_share": 0.9876,
-    "sampled": 3.0525719431408976e+16
+    "sampled": 3.0525719432163612e+16
    }
   },
   "f_ramp_Ma": [
@@ -7931,21 +7931,21 @@
    91.36
   ],
   "ghost_share": 0.9482,
-  "max_multiplier": 99862.95451584352,
+  "max_multiplier": 99862.79574984833,
   "multiplier_at_Ma": {
    "0.01": 1.012,
    "1": 1.027,
-   "100": 74197.996,
-   "150": 48170.938,
+   "100": 74197.878,
+   "150": 48170.861,
    "20": 12.18,
-   "200": 27136.087,
+   "200": 27136.044,
    "5": 2.029,
    "50": 242.708,
-   "66": 3397.351
+   "66": 3397.345
   },
-  "sampled_sum": 4.433770104707739e+17,
-  "top_down_estimate": 8.557978980447922e+18,
-  "with_ghosts": 8.557979139985366e+18
+  "sampled_sum": 4.433765398492608e+17,
+  "top_down_estimate": 8.557965374642387e+18,
+  "with_ghosts": 8.557965534177563e+18
  },
  "grid_cells": 1600,
  "history": {
@@ -7955,7 +7955,7 @@
     "scaled": 10
    },
    "cited_late": {
-    "to_natural_1500": 15,
+    "to_natural_1500": 16,
     "to_the_point": 0
    },
    "flagged": {
@@ -8171,7 +8171,7 @@
    "note": "How each genomic deep past meets the next level across PSMC's blind spot (ToLaD#77, #80, #71): a cited next level (a history file's baseline or first point) dated 1900 or earlier scales the curve to meet it (rule `scaled`, factor = 1 / ratio); a modelled one (the natural level in 1500 CE, today's modelled count) keeps the genomic level (rule `absolute`). A first cited point after 1900 (a crash or a modern count, not a historical level) is not the deep past's level: the curve is kept, joins the natural level in 1500 CE where the range-loss trend applies (the trend then runs to that point), else that point itself (`cited_late` counts them). ratio = genomic level at the blind spot / next level, before scaling; flagged when beyond 10x either way. Per species: history.species[<sp>].deep.join (its `note` is the card's sentence)."
   },
   "genomic_records_without_points": [],
-  "hist_sources": 139,
+  "hist_sources": 148,
   "mutation_rate": {
    "deep_by_clade": {
     "Artiodactyla": 67,
@@ -13921,6 +13921,105 @@
     "trend_held": null,
     "use": "counts"
    },
+   "Lynx canadensis": {
+    "G_yr": 9.286674880219026,
+    "alive_after": 158000.0,
+    "alive_before": 213008.97071612848,
+    "alive_from": "history",
+    "baseline": null,
+    "component": "wild",
+    "deep": null,
+    "deep_after": 218444.83985765127,
+    "deep_before": 294498.1676982773,
+    "deep_from": "natural",
+    "domestic_on_leaf": false,
+    "ever_after": 186138352825.0507,
+    "ever_before": 250944131320.76648,
+    "ever_ratio": 0.7417521654934479,
+    "file": "Lynx_canadensis.toml",
+    "grades": "C",
+    "leaf": "Lynx canadensis",
+    "modelled": null,
+    "natural": {
+     "N": 218444.83985765127,
+     "hi": 2482184.688887979,
+     "km2_cur": 10467102.178986773,
+     "km2_nat": 14471420.628243277,
+     "lo": 19224.253648028374,
+     "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
+    },
+    "points": 1,
+    "segments": 5,
+    "trend_1500": true,
+    "trend_held": null,
+    "use": "counts"
+   },
+   "Lynx lynx": {
+    "G_yr": 9.139600273785081,
+    "alive_after": 69400.0,
+    "alive_before": 434508.78261008585,
+    "alive_from": "history",
+    "baseline": null,
+    "component": "wild",
+    "deep": null,
+    "deep_after": 113023.53342428379,
+    "deep_before": 707632.8229751568,
+    "deep_from": "natural",
+    "domestic_on_leaf": false,
+    "ever_after": 97854655099.15996,
+    "ever_before": 612661863192.8463,
+    "ever_ratio": 0.15972049343694575,
+    "file": "Lynx_lynx.toml",
+    "grades": "C",
+    "leaf": "Lynx lynx",
+    "modelled": null,
+    "natural": {
+     "N": 113023.53342428379,
+     "hi": 1284284.3270300739,
+     "km2_cur": 27303864.40283738,
+     "km2_nat": 44466559.523720495,
+     "lo": 9946.64408717888,
+     "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
+    },
+    "points": 1,
+    "segments": 5,
+    "trend_1500": true,
+    "trend_held": null,
+    "use": "counts"
+   },
+   "Lynx pardinus": {
+    "G_yr": 4.321259411362081,
+    "alive_after": 2401.0,
+    "alive_before": 159.35319530322184,
+    "alive_from": "history",
+    "baseline": null,
+    "component": "wild",
+    "deep": null,
+    "deep_after": 61225.49999999999,
+    "deep_before": 4063.5064802321567,
+    "deep_from": "natural",
+    "domestic_on_leaf": false,
+    "ever_after": 112106181432.70811,
+    "ever_before": 7440499486.50337,
+    "ever_ratio": 15.067023609915188,
+    "file": "Lynx_pardinus.toml",
+    "grades": "BC",
+    "leaf": "Lynx pardinus",
+    "modelled": null,
+    "natural": {
+     "N": 61225.49999999999,
+     "hi": 9400358.098005624,
+     "km2_cur": 37249.47394657214,
+     "km2_nat": 949861.5856375897,
+     "lo": 398.76798427980015,
+     "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
+    },
+    "points": 6,
+    "segments": 23,
+    "trend_1500": true,
+    "trend_held": null,
+    "use": "counts"
+   },
    "Macropus fuliginosus": {
     "G_yr": 7.442228610540724,
     "alive_after": 5000000.0,
@@ -16434,13 +16533,17 @@
      "dropped_blind": 3,
      "grade": "D",
      "join": {
-      "cited_late": null,
+      "cited_late": {
+       "kind": "estimate",
+       "n": 776691.0,
+       "year": 2023.0
+      },
       "deep_n": 37342.24298495631,
       "deep_n_raw": 37342.24298495631,
       "factor": 1.0,
       "flag": true,
       "next": "modelled",
-      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 27x higher (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr.",
+      "note": "First cited point (2023 estimate, 776,691) is after 1900, so not used as the deep past's level. Genomic curve kept at its own level; the modelled natural level in 1500 CE is 27x higher (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr, then the range-loss trend runs to the cited point.",
       "ratio": 0.03661893241873984,
       "rule": "absolute",
       "to_kind": "rangeloss",
@@ -16467,13 +16570,13 @@
     "deep_before": 1019752.366288164,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 343221705092.9929,
+    "ever_after": 343221586467.63135,
     "ever_before": 849361153306.4893,
-    "ever_ratio": 0.404093951974211,
-    "file": null,
+    "ever_ratio": 0.40409381230999264,
+    "file": "Puma_concolor.toml",
     "grades": "D",
     "leaf": "Puma concolor",
-    "modelled": "genomic",
+    "modelled": null,
     "natural": {
      "N": 1019752.366288164,
      "hi": 11587427.341873685,
@@ -16483,8 +16586,8 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 120,
-    "trend_1500": false,
+    "segments": 121,
+    "trend_1500": true,
     "trend_held": null,
     "use": "counts"
    },
@@ -17888,12 +17991,12 @@
  },
  "knuckles_collapsed": 3710,
  "mammalia": {
-  "alive": 99887540952.51947,
-  "ever": 8.557979139985366e+18,
-  "ghost": 8.114602129514592e+18,
+  "alive": 99887123076.41296,
+  "ever": 8.557965534177562e+18,
+  "ghost": 8.114588994328301e+18,
   "grade": "D",
-  "hi": 3.474601348687484e+22,
-  "lo": 1831302564205868.8
+  "hi": 3.474595861335661e+22,
+  "lo": 1831299633247987.0
  },
  "mass_sources": {
   "mass:combine": 183,
@@ -17926,8 +18029,8 @@
    "same": 4681
   },
   "extant_total": {
-   "natural": 74731499857.2646,
-   "today": 75174595464.57831
+   "natural": 74730886356.64073,
+   "today": 75174177588.47179
   },
   "extinct": 233,
   "extinct_total_natural": 659742590.3835498,
@@ -18839,12 +18942,12 @@
   "non-species tip": 551
  },
  "output": {
-  "brotli_bytes": 776582,
+  "brotli_bytes": 779661,
   "files": 16,
-  "raw_bytes": 3171616,
-  "skeleton_brotli": 55824,
+  "raw_bytes": 3189536,
+  "skeleton_brotli": 56630,
   "skeleton_nodes": 1156,
-  "skeleton_raw": 262688,
+  "skeleton_raw": 267104,
   "tiles": 15
  },
  "overrides": {
@@ -19009,12 +19112,12 @@
   "maps_used": 5613,
   "range_maps": 5831
  },
- "pieces": 289400,
+ "pieces": 289655,
  "rangeloss": {
-  "carried_by_genomic_record": 48,
-  "declines": 583,
+  "carried_by_genomic_record": 47,
+  "declines": 580,
   "end_year": 2026.77,
-  "hist_records": 603,
+  "hist_records": 600,
   "largest_declines": [
    {
     "G_yr": 4.329639972621492,
@@ -19138,9 +19241,9 @@
    }
   ],
   "log10_factor_histogram": {
-   "+0.0..+0.5": 460,
+   "+0.0..+0.5": 458,
    "+0.5..+1.0": 83,
-   "+1.0..+1.5": 31,
+   "+1.0..+1.5": 30,
    "+1.5..+2.0": 7,
    "+2.0..+2.5": 2,
    "-0.5..+0.0": 17,
@@ -19149,12 +19252,12 @@
   "log10_factor_p5_25_50_75_95": [
    0.007,
    0.097,
-   0.234,
-   0.444,
-   1.089
+   0.236,
+   0.442,
+   1.08
   ],
   "note": "Layer 4 of the estimate stack (ToLaD#62): an extant species whose natural baseline (layer 1, PHYLACINE present-natural vs current range) differs from today's count changes log-linearly from N_nat in 1500 CE to today's count in 2026.77 (IUCN's 'since 1500' window, one date for all). factor = N_nat / N_today (> 1 = decline). HIST kind 11 `rangeloss`, grade D. A history file replaces it (showcase rows with from=history: the factor shown is the model's, the curve is the history file's).",
-  "replaced_by_history_file": 31,
+  "replaced_by_history_file": 35,
   "rises": 20,
   "rises_list": [
    {
@@ -19399,7 +19502,7 @@
    }
   ],
   "segments_per_record": {
-   "3": 377,
+   "3": 375,
    "5": 74,
    "6": 52,
    "7": 24,
@@ -19407,7 +19510,7 @@
    "9": 12,
    "10": 12,
    "11": 5,
-   "12": 10,
+   "12": 9,
    "13": 2,
    "14": 3,
    "15": 1,
@@ -19550,14 +19653,14 @@
    {
     "G_yr": 9.286674880219026,
     "factor": 1.3825622775800712,
-    "from": "rangeloss",
+    "from": "history",
     "km2_cur": 10467102.178986773,
     "km2_nat": 14471420.628243277,
     "leaf": "Lynx canadensis",
     "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count",
-    "natural": 294498.1676982773,
-    "segments": 3,
-    "today": 213008.97071612848
+    "natural": 218444.83985765127,
+    "segments": 5,
+    "today": 158000.0
    },
    {
     "G_yr": 1.4367748117727586,
@@ -19787,13 +19890,13 @@
   },
   "Hominidae": {
    "alive": 8301443760.715325,
-   "ever": 2636313721739.331,
+   "ever": 2636313647513.677,
    "ever_range": [
-    42346747354.06755,
-    310839298519584.5
+    42346747039.12134,
+    310839282081665.8
    ],
    "extinct(gray)": false,
-   "ghost": 376778719412.40063,
+   "ghost": 376778645186.7464,
    "grade": "D",
    "t0_Ma": 14.805233333333334,
    "t1_Ma": 0.0
@@ -19812,14 +19915,14 @@
    "t1_Ma": 0.0
   },
   "Mammalia": {
-   "alive": 99887540952.51947,
-   "ever": 8.557979139985366e+18,
+   "alive": 99887123076.41296,
+   "ever": 8.557965534177562e+18,
    "ever_range": [
-    1831302564205868.8,
-    3.474601348687484e+22
+    1831299633247987.0,
+    3.474595861335661e+22
    ],
    "extinct(gray)": 0.0,
-   "ghost": 8.114602129514592e+18,
+   "ghost": 8.114588994328301e+18,
    "grade": "D",
    "t0_Ma": 208.64140800000004,
    "t1_Ma": 0.0
@@ -20129,8 +20232,8 @@
   "by_alive": [
    {
     "alive": 54318491455.12063,
-    "ever": 1.390960268594419e+18,
-    "ghost": 1.2013625231482775e+18,
+    "ever": 1.3909601688679762e+18,
+    "ghost": 1.2013624234218348e+18,
     "ghost_share": 0.864,
     "name": "Chiroptera",
     "sampled": 1.8959774544614144e+17,
@@ -20138,8 +20241,8 @@
    },
    {
     "alive": 23133449903.122658,
-    "ever": 1.7944921963887788e+18,
-    "ghost": 1.635089574321156e+18,
+    "ever": 1.7944920848813391e+18,
+    "ghost": 1.6350894628137165e+18,
     "ghost_share": 0.911,
     "name": "Rodentia",
     "sampled": 1.5940262206762266e+17,
@@ -20147,26 +20250,26 @@
    },
    {
     "alive": 5654779269.41726,
-    "ever": 6937906915989270.0,
-    "ghost": 4314987311489087.0,
+    "ever": 6937906567037398.0,
+    "ghost": 4314986962537214.5,
     "ghost_share": 0.622,
     "name": "Artiodactyla",
-    "sampled": 2622919604500183.0,
+    "sampled": 2622919604500183.5,
     "t0_Ma": 61.87
    },
    {
-    "alive": 2226019086.255797,
-    "ever": 1.7119551857942406e+16,
-    "ghost": 1.5306270222910242e+16,
+    "alive": 2225601210.1492753,
+    "ever": 1.711382538085201e+16,
+    "ghost": 1.5301014367333206e+16,
     "ghost_share": 0.894,
     "name": "Carnivora",
-    "sampled": 1813281635032164.0,
+    "sampled": 1812811013518804.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 1492362384.468411,
-    "ever": 1.8332316629361818e+17,
-    "ghost": 1.4222069919709318e+17,
+    "ever": 1.8332315751867987e+17,
+    "ghost": 1.4222069042215488e+17,
     "ghost_share": 0.776,
     "name": "Eulipotyphla",
     "sampled": 4.110246709652499e+16,
@@ -20174,17 +20277,17 @@
    },
    {
     "alive": 1195648666.3005614,
-    "ever": 7.823598046516845e+16,
-    "ghost": 6.272239311690915e+16,
+    "ever": 7.82359759581902e+16,
+    "ghost": 6.272238860993092e+16,
     "ghost_share": 0.802,
     "name": "Didelphimorphia",
-    "sampled": 1.5513587348259296e+16,
+    "sampled": 1.5513587348259288e+16,
     "t0_Ma": 74.42
    },
    {
     "alive": 751328331.2713387,
-    "ever": 4.007770718805199e+16,
-    "ghost": 2.8678315533306544e+16,
+    "ever": 4.007770460223816e+16,
+    "ghost": 2.867831294749271e+16,
     "ghost_share": 0.716,
     "name": "Lagomorpha",
     "sampled": 1.1399391654745448e+16,
@@ -20192,8 +20295,8 @@
    },
    {
     "alive": 619434015.7798252,
-    "ever": 1.1876078851825038e+16,
-    "ghost": 9513091583760082.0,
+    "ever": 1.187607799406602e+16,
+    "ghost": 9513090726001064.0,
     "ghost_share": 0.801,
     "name": "Hyracoidea",
     "sampled": 2362987268064956.0,
@@ -20201,8 +20304,8 @@
    },
    {
     "alive": 408303737.17517364,
-    "ever": 1.2138183165009176e+16,
-    "ghost": 9102298958462746.0,
+    "ever": 1.2138182264896912e+16,
+    "ghost": 9102298058350482.0,
     "ghost_share": 0.75,
     "name": "Diprotodontia",
     "sampled": 3035884206546430.0,
@@ -20210,19 +20313,19 @@
    },
    {
     "alive": 290577780.41253823,
-    "ever": 2.0368340575590956e+16,
-    "ghost": 1.3228541692522618e+16,
+    "ever": 2.03683396392092e+16,
+    "ghost": 1.322854075614086e+16,
     "ghost_share": 0.649,
     "name": "Macroscelidea",
-    "sampled": 7139798883068338.0,
+    "sampled": 7139798883068340.0,
     "t0_Ma": 65.7
    }
   ],
   "by_ever": [
    {
     "alive": 23133449903.122658,
-    "ever": 1.7944921963887788e+18,
-    "ghost": 1.635089574321156e+18,
+    "ever": 1.7944920848813391e+18,
+    "ghost": 1.6350894628137165e+18,
     "ghost_share": 0.911,
     "name": "Rodentia",
     "sampled": 1.5940262206762266e+17,
@@ -20230,8 +20333,8 @@
    },
    {
     "alive": 54318491455.12063,
-    "ever": 1.390960268594419e+18,
-    "ghost": 1.2013625231482775e+18,
+    "ever": 1.3909601688679762e+18,
+    "ghost": 1.2013624234218348e+18,
     "ghost_share": 0.864,
     "name": "Chiroptera",
     "sampled": 1.8959774544614144e+17,
@@ -20239,8 +20342,8 @@
    },
    {
     "alive": 1492362384.468411,
-    "ever": 1.8332316629361818e+17,
-    "ghost": 1.4222069919709318e+17,
+    "ever": 1.8332315751867987e+17,
+    "ghost": 1.4222069042215488e+17,
     "ghost_share": 0.776,
     "name": "Eulipotyphla",
     "sampled": 4.110246709652499e+16,
@@ -20248,17 +20351,17 @@
    },
    {
     "alive": 1195648666.3005614,
-    "ever": 7.823598046516845e+16,
-    "ghost": 6.272239311690915e+16,
+    "ever": 7.82359759581902e+16,
+    "ghost": 6.272238860993092e+16,
     "ghost_share": 0.802,
     "name": "Didelphimorphia",
-    "sampled": 1.5513587348259296e+16,
+    "sampled": 1.5513587348259288e+16,
     "t0_Ma": 74.42
    },
    {
     "alive": 751328331.2713387,
-    "ever": 4.007770718805199e+16,
-    "ghost": 2.8678315533306544e+16,
+    "ever": 4.007770460223816e+16,
+    "ghost": 2.867831294749271e+16,
     "ghost_share": 0.716,
     "name": "Lagomorpha",
     "sampled": 1.1399391654745448e+16,
@@ -20266,26 +20369,26 @@
    },
    {
     "alive": 290577780.41253823,
-    "ever": 2.0368340575590956e+16,
-    "ghost": 1.3228541692522618e+16,
+    "ever": 2.03683396392092e+16,
+    "ghost": 1.322854075614086e+16,
     "ghost_share": 0.649,
     "name": "Macroscelidea",
-    "sampled": 7139798883068338.0,
+    "sampled": 7139798883068340.0,
     "t0_Ma": 65.7
    },
    {
-    "alive": 2226019086.255797,
-    "ever": 1.7119551857942406e+16,
-    "ghost": 1.5306270222910242e+16,
+    "alive": 2225601210.1492753,
+    "ever": 1.711382538085201e+16,
+    "ghost": 1.5301014367333206e+16,
     "ghost_share": 0.894,
     "name": "Carnivora",
-    "sampled": 1813281635032164.0,
+    "sampled": 1812811013518804.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 408303737.17517364,
-    "ever": 1.2138183165009176e+16,
-    "ghost": 9102298958462746.0,
+    "ever": 1.2138182264896912e+16,
+    "ghost": 9102298058350482.0,
     "ghost_share": 0.75,
     "name": "Diprotodontia",
     "sampled": 3035884206546430.0,
@@ -20293,8 +20396,8 @@
    },
    {
     "alive": 619434015.7798252,
-    "ever": 1.1876078851825038e+16,
-    "ghost": 9513091583760082.0,
+    "ever": 1.187607799406602e+16,
+    "ghost": 9513090726001064.0,
     "ghost_share": 0.801,
     "name": "Hyracoidea",
     "sampled": 2362987268064956.0,
@@ -20302,19 +20405,19 @@
    },
    {
     "alive": 5654779269.41726,
-    "ever": 6937906915989270.0,
-    "ghost": 4314987311489087.0,
+    "ever": 6937906567037398.0,
+    "ghost": 4314986962537214.5,
     "ghost_share": 0.622,
     "name": "Artiodactyla",
-    "sampled": 2622919604500183.0,
+    "sampled": 2622919604500183.5,
     "t0_Ma": 61.87
    }
   ],
   "by_sampled_ever": [
    {
     "alive": 54318491455.12063,
-    "ever": 1.390960268594419e+18,
-    "ghost": 1.2013625231482775e+18,
+    "ever": 1.3909601688679762e+18,
+    "ghost": 1.2013624234218348e+18,
     "ghost_share": 0.864,
     "name": "Chiroptera",
     "sampled": 1.8959774544614144e+17,
@@ -20322,8 +20425,8 @@
    },
    {
     "alive": 23133449903.122658,
-    "ever": 1.7944921963887788e+18,
-    "ghost": 1.635089574321156e+18,
+    "ever": 1.7944920848813391e+18,
+    "ghost": 1.6350894628137165e+18,
     "ghost_share": 0.911,
     "name": "Rodentia",
     "sampled": 1.5940262206762266e+17,
@@ -20331,8 +20434,8 @@
    },
    {
     "alive": 1492362384.468411,
-    "ever": 1.8332316629361818e+17,
-    "ghost": 1.4222069919709318e+17,
+    "ever": 1.8332315751867987e+17,
+    "ghost": 1.4222069042215488e+17,
     "ghost_share": 0.776,
     "name": "Eulipotyphla",
     "sampled": 4.110246709652499e+16,
@@ -20340,17 +20443,17 @@
    },
    {
     "alive": 1195648666.3005614,
-    "ever": 7.823598046516845e+16,
-    "ghost": 6.272239311690915e+16,
+    "ever": 7.82359759581902e+16,
+    "ghost": 6.272238860993092e+16,
     "ghost_share": 0.802,
     "name": "Didelphimorphia",
-    "sampled": 1.5513587348259296e+16,
+    "sampled": 1.5513587348259288e+16,
     "t0_Ma": 74.42
    },
    {
     "alive": 751328331.2713387,
-    "ever": 4.007770718805199e+16,
-    "ghost": 2.8678315533306544e+16,
+    "ever": 4.007770460223816e+16,
+    "ghost": 2.867831294749271e+16,
     "ghost_share": 0.716,
     "name": "Lagomorpha",
     "sampled": 1.1399391654745448e+16,
@@ -20358,17 +20461,17 @@
    },
    {
     "alive": 290577780.41253823,
-    "ever": 2.0368340575590956e+16,
-    "ghost": 1.3228541692522618e+16,
+    "ever": 2.03683396392092e+16,
+    "ghost": 1.322854075614086e+16,
     "ghost_share": 0.649,
     "name": "Macroscelidea",
-    "sampled": 7139798883068338.0,
+    "sampled": 7139798883068340.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 408303737.17517364,
-    "ever": 1.2138183165009176e+16,
-    "ghost": 9102298958462746.0,
+    "ever": 1.2138182264896912e+16,
+    "ghost": 9102298058350482.0,
     "ghost_share": 0.75,
     "name": "Diprotodontia",
     "sampled": 3035884206546430.0,
@@ -20376,29 +20479,29 @@
    },
    {
     "alive": 5654779269.41726,
-    "ever": 6937906915989270.0,
-    "ghost": 4314987311489087.0,
+    "ever": 6937906567037398.0,
+    "ghost": 4314986962537214.5,
     "ghost_share": 0.622,
     "name": "Artiodactyla",
-    "sampled": 2622919604500183.0,
+    "sampled": 2622919604500183.5,
     "t0_Ma": 61.87
    },
    {
     "alive": 619434015.7798252,
-    "ever": 1.1876078851825038e+16,
-    "ghost": 9513091583760082.0,
+    "ever": 1.187607799406602e+16,
+    "ghost": 9513090726001064.0,
     "ghost_share": 0.801,
     "name": "Hyracoidea",
     "sampled": 2362987268064956.0,
     "t0_Ma": 58.62
    },
    {
-    "alive": 2226019086.255797,
-    "ever": 1.7119551857942406e+16,
-    "ghost": 1.5306270222910242e+16,
+    "alive": 2225601210.1492753,
+    "ever": 1.711382538085201e+16,
+    "ghost": 1.5301014367333206e+16,
     "ghost_share": 0.894,
     "name": "Carnivora",
-    "sampled": 1813281635032164.0,
+    "sampled": 1812811013518804.0,
     "t0_Ma": 65.7
    }
   ]
