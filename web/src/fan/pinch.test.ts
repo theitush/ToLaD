@@ -1,6 +1,6 @@
 // Issue #138: width and time zoom separately. A sideways pinch zooms width
-// only, an upright one time only, a diagonal one both; shift+wheel width only,
-// alt+wheel time only. Driven through the real gesture handler (engine/input.ts)
+// only, an upright one time only, a diagonal one both; wheel time only (#168),
+// shift+wheel width only, alt+wheel time only. Driven through the real gesture handler (engine/input.ts)
 // with synthetic pointer and wheel events, into the fan's camera.
 import { describe, expect, it } from 'vitest';
 import { Input, PINCH_DEAD_PX } from '../engine/input';
@@ -139,11 +139,11 @@ describe('width and time zoom separately (#138)', () => {
     expect(rel(r.c.cam.sy, c0.sy)).toBeLessThan(1e-9);
   });
 
-  it('wheel: both axes; shift+wheel width only; alt+wheel time only', () => {
+  it('wheel: time only (#168); shift+wheel width only; alt+wheel time only', () => {
     const r = rig();
     let c0 = start(r);
     r.wheel(195, 420, -100);
-    expect(r.c.cam.sx / c0.sx).toBeGreaterThan(1.1);
+    expect(rel(r.c.cam.sx, c0.sx)).toBeLessThan(1e-9);
     expect(r.c.cam.sy / c0.sy).toBeGreaterThan(1.1);
     c0 = { ...r.c.cam };
     r.wheel(195, 420, -100, { shiftKey: true });
