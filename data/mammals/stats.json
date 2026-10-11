@@ -57,7 +57,7 @@
   },
   "Loxodonta africana": {
    "domestic_alive": 0.0,
-   "ever": 162713706152.62384,
+   "ever": 133559856471109.4,
    "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count, held before 1500, then log-linear to today's count (range loss, modelled); H:curated history (6 points, baseline 1.43e+07 in 1800 (D), deep past PSMC 19 points (D; Bergman et al. 2023, Nat Commun 14:7679, Supplementary Data 3 (PSMC Ne trajectory)); pipeline/history/Loxodonta_africana.toml) + bulk genomic deep past (genomic.py)",
    "occupancy_model_only": 1371714.3437588762,
    "published": 441683.5,
@@ -102,7 +102,7 @@
   },
   "Pan troglodytes": {
    "domestic_alive": 0.0,
-   "ever": 47957146755.72713,
+   "ever": 362593614558.6454,
    "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count, held before 1500, then log-linear to today's count (range loss, modelled); H:curated history (2 points, baseline 1e+06 in 1900 (D), deep past PSMC 14 points (D; Bergman et al. 2023, Nat Commun 14:7679, Supplementary Data 3 (PSMC Ne trajectory)); pipeline/history/Pan_troglodytes.toml) + bulk genomic deep past (genomic.py)",
    "occupancy_model_only": 63608.21890763576,
    "published": 402679.0,
@@ -156,7 +156,7 @@
   },
   "Ursus arctos": {
    "domestic_alive": 0.0,
-   "ever": 62877549103.31574,
+   "ever": 513826562596.0754,
    "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count, held before 1500, then log-linear to today's count (range loss, modelled); H:curated history (1 points, deep past PSMC 15 points (D; Bergman et al. 2023, Nat Commun 14:7679, Supplementary Data 3 (PSMC Ne trajectory)); pipeline/history/Ursus_arctos.toml) + bulk genomic deep past (genomic.py)",
    "occupancy_model_only": 227302.10928610698,
    "published": 220000.0,
@@ -6420,54 +6420,271 @@
   "births_now_per_yr": 57053193202.98615,
   "by_era": {
    "Cretaceous 66-145 Ma": {
-    "ghost": 3.781167930482044e+18,
+    "ghost": 3.7811679173573304e+18,
     "ghost_share": 1.0,
-    "sampled": 173704202663889.6
+    "sampled": 173717327377706.4
    },
    "Holocene-Pleistocene 0-2.58 Ma": {
-    "ghost": 1.2059562250943978e+16,
-    "ghost_share": 0.0818,
-    "sampled": 1.3545094750517422e+17
+    "ghost": 1.1024388391578942e+16,
+    "ghost_share": 0.0747,
+    "sampled": 1.3648746577571811e+17
    },
    "Jurassic and older >145 Ma": {
-    "ghost": 9.896611005934221e+17,
+    "ghost": 9.896611003182107e+17,
     "ghost_share": 1.0,
-    "sampled": 16137236545862.549
+    "sampled": 16137511757207.25
    },
    "Neogene 2.58-23 Ma": {
-    "ghost": 8.988847546902668e+17,
-    "ghost_share": 0.7658,
-    "sampled": 2.7496289953845254e+17
+    "ghost": 8.959050973180399e+17,
+    "ghost_share": 0.7632,
+    "sampled": 2.7794255691067933e+17
    },
    "Paleogene 23-66 Ma": {
-    "ghost": 2.435078882348223e+18,
+    "ghost": 2.4350786934324265e+18,
     "ghost_share": 0.9876,
-    "sampled": 3.0523222863746156e+16
+    "sampled": 3.052341177954259e+16
    }
   },
   "f_ramp_Ma": [
    208.64,
    91.36
   ],
-  "ghost_share": 0.9485,
-  "max_multiplier": 99865.30968774437,
+  "ghost_share": 0.948,
+  "max_multiplier": 99864.04321063698,
   "multiplier_at_Ma": {
-   "0.01": 1.013,
-   "1": 1.032,
-   "100": 74203.685,
-   "150": 48172.377,
+   "0.01": 1.012,
+   "1": 1.023,
+   "100": 74200.626,
+   "150": 48171.603,
    "20": 12.18,
-   "200": 27136.928,
-   "5": 2.043,
-   "50": 242.781,
-   "66": 3400.819
+   "200": 27136.476,
+   "5": 2.014,
+   "50": 242.775,
+   "66": 3400.715
   },
-  "sampled_sum": 4.4112691134658266e+17,
+  "sampled_sum": 4.4514328930507494e+17,
   "top_down_estimate": 8.557978980447922e+18,
-  "with_ghosts": 8.557979141711481e+18
+  "with_ghosts": 8.55798048612266e+18
  },
  "grid_cells": 1600,
  "history": {
+  "deep_join": {
+   "by_rule": {
+    "absolute": 86,
+    "scaled": 25
+   },
+   "flagged": {
+    "Addax nasomaculatus": {
+     "factor": 1.0,
+     "ratio": 315.88651662459176,
+     "rule": "absolute",
+     "to_kind": "rangeloss"
+    },
+    "Aepyceros melampus": {
+     "factor": 1.0,
+     "ratio": 0.03712486682177087,
+     "rule": "absolute",
+     "to_kind": "model"
+    },
+    "Ailuropoda melanoleuca": {
+     "factor": 0.012663215933717416,
+     "ratio": 78.9688816201399,
+     "rule": "scaled",
+     "to_kind": "census"
+    },
+    "Alces alces": {
+     "factor": 1.0,
+     "ratio": 0.010096259423740973,
+     "rule": "absolute",
+     "to_kind": "rangeloss"
+    },
+    "Antilocapra americana": {
+     "factor": 730.5211598206513,
+     "ratio": 0.0013688857421262212,
+     "rule": "scaled",
+     "to_kind": "estimate"
+    },
+    "Axis porcinus": {
+     "factor": 1.0,
+     "ratio": 19.463651991040148,
+     "rule": "absolute",
+     "to_kind": "rangeloss"
+    },
+    "Babyrousa celebensis": {
+     "factor": 1.0,
+     "ratio": 13.405335301770647,
+     "rule": "absolute",
+     "to_kind": "rangeloss"
+    },
+    "Beatragus hunteri": {
+     "factor": 1.0,
+     "ratio": 73.52330542176001,
+     "rule": "absolute",
+     "to_kind": "rangeloss"
+    },
+    "Bison bison": {
+     "factor": 980.7787607661646,
+     "ratio": 0.0010195979358472447,
+     "rule": "scaled",
+     "to_kind": "estimate"
+    },
+    "Bison bonasus": {
+     "factor": 0.0036522384173183885,
+     "ratio": 273.80468790266923,
+     "rule": "scaled",
+     "to_kind": "census"
+    },
+    "Bos indicus": {
+     "factor": 1.0,
+     "ratio": 12.229342714768878,
+     "rule": "absolute",
+     "to_kind": "model"
+    },
+    "Cervus canadensis": {
+     "factor": 1.0,
+     "ratio": 0.009484567909364932,
+     "rule": "absolute",
+     "to_kind": "rangeloss"
+    },
+    "Cervus elaphus": {
+     "factor": 1.0,
+     "ratio": 0.03664171175387575,
+     "rule": "absolute",
+     "to_kind": "rangeloss"
+    },
+    "Cervus hanglu": {
+     "factor": 1.0,
+     "ratio": 16.874070924787322,
+     "rule": "absolute",
+     "to_kind": "model"
+    },
+    "Cervus nippon": {
+     "factor": 1.0,
+     "ratio": 0.07862465019226551,
+     "rule": "absolute",
+     "to_kind": "rangeloss"
+    },
+    "Elaphurus davidianus": {
+     "factor": 0.04256362090889769,
+     "ratio": 23.49424176435505,
+     "rule": "scaled",
+     "to_kind": "estimate"
+    },
+    "Equus grevyi": {
+     "factor": 1.0,
+     "ratio": 15.412117365442272,
+     "rule": "absolute",
+     "to_kind": "rangeloss"
+    },
+    "Hemitragus hylocrius": {
+     "factor": 1.0,
+     "ratio": 11.387121783904098,
+     "rule": "absolute",
+     "to_kind": "rangeloss"
+    },
+    "Hydrochoerus hydrochaeris": {
+     "factor": 1.0,
+     "ratio": 0.04224353224101778,
+     "rule": "absolute",
+     "to_kind": "model"
+    },
+    "Lama guanicoe": {
+     "factor": 1.0,
+     "ratio": 0.02245196034300272,
+     "rule": "absolute",
+     "to_kind": "model"
+    },
+    "Loxodonta africana": {
+     "factor": 838.924401974661,
+     "ratio": 0.0011920025185179965,
+     "rule": "scaled",
+     "to_kind": "unverified"
+    },
+    "Loxodonta cyclotis": {
+     "factor": 236.93352816477403,
+     "ratio": 0.004220593040359218,
+     "rule": "scaled",
+     "to_kind": "unverified"
+    },
+    "Macropus fuliginosus": {
+     "factor": 1.0,
+     "ratio": 0.01554827251376824,
+     "rule": "absolute",
+     "to_kind": "model"
+    },
+    "Macropus giganteus": {
+     "factor": 1.0,
+     "ratio": 0.0037593029810573425,
+     "rule": "absolute",
+     "to_kind": "model"
+    },
+    "Odocoileus hemionus": {
+     "factor": 1.0,
+     "ratio": 0.02144475356548321,
+     "rule": "absolute",
+     "to_kind": "rangeloss"
+    },
+    "Odocoileus virginianus": {
+     "factor": 1.0,
+     "ratio": 0.02411767010491187,
+     "rule": "absolute",
+     "to_kind": "model"
+    },
+    "Orycteropus afer": {
+     "factor": 1.0,
+     "ratio": 0.032234600748176113,
+     "rule": "absolute",
+     "to_kind": "model"
+    },
+    "Oryx dammah": {
+     "factor": 0.0034640912322296403,
+     "ratio": 288.6759998397491,
+     "rule": "scaled",
+     "to_kind": "estimate"
+    },
+    "Osphranter rufus": {
+     "factor": 1.0,
+     "ratio": 0.09988628586019675,
+     "rule": "absolute",
+     "to_kind": "model"
+    },
+    "Ovibos moschatus": {
+     "factor": 1.0,
+     "ratio": 0.022560388144481962,
+     "rule": "absolute",
+     "to_kind": "rangeloss"
+    },
+    "Parahyaena brunnea": {
+     "factor": 1.0,
+     "ratio": 15.494461880541941,
+     "rule": "absolute",
+     "to_kind": "rangeloss"
+    },
+    "Puma concolor": {
+     "factor": 1.0,
+     "ratio": 0.03900757756121152,
+     "rule": "absolute",
+     "to_kind": "rangeloss"
+    },
+    "Ursus americanus": {
+     "factor": 1.0,
+     "ratio": 0.014543602542616548,
+     "rule": "absolute",
+     "to_kind": "rangeloss"
+    },
+    "Vicugna vicugna": {
+     "factor": 29.77122116205785,
+     "ratio": 0.03358948544826429,
+     "rule": "scaled",
+     "to_kind": "unverified"
+    }
+   },
+   "flagged_by_rule": {
+    "absolute": 25,
+    "scaled": 9
+   },
+   "note": "How each genomic deep past meets the next level across PSMC's blind spot (ToLaD#77, #80): a cited next level (a history file's baseline or first point) scales the curve to meet it (rule `scaled`, factor = 1 / ratio); a modelled one (the natural level in 1500 CE, today's modelled count) keeps the genomic level (rule `absolute`). ratio = genomic level at the blind spot / next level, before scaling; flagged when beyond 10x either way. Per species: history.species[<sp>].deep.join (its `note` is the card's sentence)."
+  },
   "genomic_records_without_points": [],
   "hist_sources": 137,
   "note": "Curated flagship histories (pipeline/history/). ever_before = the model alone (the natural baseline before 1500 and the range-loss trend after it where it differs from today's count, else today's count, over the band); ever_after = with the curve. deep_from = what sets the level at the band start: `genomic` (a [deep] genome-based curve, older than any cited point, baseline included), else `baseline` (cited), else `natural` (the natural baseline), else `today`. deep_before / deep_after = the level at the band start. Leaf values, before the tree sum.",
@@ -6494,26 +6711,33 @@
      "dropped_blind": 5,
      "grade": "D",
      "join": {
-      "deep_n": 99918.82145684169,
+      "deep_n": 100000.0,
+      "deep_n_raw": 99918.82145684169,
+      "factor": 1.0008124449625677,
+      "flag": false,
+      "next": "cited",
+      "note": "Genomic curve scaled x1 to meet the cited 1900 baseline (100,000), keeping its shape.",
       "ratio": 0.9991882145684169,
+      "rule": "scaled",
+      "to_kind": "unverified",
       "to_n": 100000.0,
       "to_year": 1900.0
      },
      "method": "PSMC",
      "ne_factor": 1.277541095890411,
-     "oldest_n": 418265.48261315917,
+     "oldest_n": 418605.3002975242,
      "oldest_yr_ago": 2037472.020232762,
      "points": 17,
      "time_factor": 2.5533333333333337,
      "youngest_yr_ago": 21311.339597720762
     },
-    "deep_after": 418265.48261315917,
+    "deep_after": 418605.3002975242,
     "deep_before": 49122.941379310345,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 462118325521.62476,
+    "ever_after": 462493483167.3102,
     "ever_before": 64825854164.0193,
-    "ever_ratio": 7.128611438769397,
+    "ever_ratio": 7.134398599625562,
     "file": "Acinonyx_jubatus.toml",
     "grades": "CD",
     "leaf": "Acinonyx jubatus",
@@ -6546,7 +6770,14 @@
      "grade": "D",
      "join": {
       "deep_n": 157074.57039157825,
+      "deep_n_raw": 157074.57039157825,
+      "factor": 1.0,
+      "flag": true,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 316x lower (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 315.88651662459176,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 497.25,
       "to_year": 1500
      },
@@ -6597,7 +6828,14 @@
      "grade": "D",
      "join": {
       "deep_n": 111374.60046531261,
+      "deep_n_raw": 111374.60046531261,
+      "factor": 1.0,
+      "flag": true,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; today's modelled count is 27x higher (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.03712486682177087,
+      "rule": "absolute",
+      "to_kind": "model",
       "to_n": 3000000.0,
       "to_year": 2026.77
      },
@@ -6654,26 +6892,33 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
-      "deep_n": 194184.479903924,
+      "deep_n": 2458.9999999999995,
+      "deep_n_raw": 194184.479903924,
+      "factor": 0.012663215933717416,
+      "flag": true,
+      "next": "cited",
+      "note": "Genomic curve scaled x0.013 to meet the cited 1976 baseline (2,459), keeping its shape; before scaling it was 79x above that level (flagged: beyond 10x).",
       "ratio": 78.9688816201399,
+      "rule": "scaled",
+      "to_kind": "census",
       "to_n": 2459.0,
       "to_year": 1976.0
      },
      "method": "PSMC",
      "ne_factor": 0.675267439584394,
-     "oldest_n": 356974.99677594326,
+     "oldest_n": 4520.451467111848,
      "oldest_yr_ago": 5076862.053827958,
      "points": 19,
      "time_factor": 0.8083333333333331,
      "youngest_yr_ago": 29197.77675134754
     },
-    "deep_after": 356974.99677594326,
+    "deep_after": 4520.451467111848,
     "deep_before": 15127.076923076922,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 369670957925.27216,
+    "ever_after": 4688958536.8446045,
     "ever_before": 13856131941.815397,
-    "ever_ratio": 26.679231944210166,
+    "ever_ratio": 0.33840313851906556,
     "file": "Ailuropoda_melanoleuca.toml",
     "grades": "BC",
     "leaf": "Ailuropoda melanoleuca",
@@ -6687,7 +6932,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 3,
-    "segments": 55,
+    "segments": 43,
     "use": "counts"
    },
    "Alces alces": {
@@ -6706,7 +6951,14 @@
      "grade": "D",
      "join": {
       "deep_n": 15721.171369493199,
+      "deep_n_raw": 15721.171369493199,
+      "factor": 1.0,
+      "flag": true,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 99x higher (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.010096259423740973,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 1557128.3095723013,
       "to_year": 1500
      },
@@ -6757,7 +7009,14 @@
      "grade": "D",
      "join": {
       "deep_n": 10076.68847092324,
+      "deep_n_raw": 10076.68847092324,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; today's modelled count is 7.6x higher; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.13090277297389616,
+      "rule": "absolute",
+      "to_kind": "model",
       "to_n": 76978.41873015686,
       "to_year": 2026.77
      },
@@ -6801,7 +7060,14 @@
      "grade": "D",
      "join": {
       "deep_n": 281877.22702118935,
+      "deep_n_raw": 281877.22702118935,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 9.4x lower; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 9.406144740435142,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 29967.349514563106,
       "to_year": 1500
      },
@@ -6852,7 +7118,14 @@
      "grade": "D",
      "join": {
       "deep_n": 3093901.152999635,
+      "deep_n_raw": 3093901.152999635,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; today's modelled count is 1.4x lower; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 1.383634644831747,
+      "rule": "absolute",
+      "to_kind": "model",
       "to_n": 2236068.0,
       "to_year": 2026.77
      },
@@ -6909,26 +7182,33 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
-      "deep_n": 47911.000974417744,
+      "deep_n": 35000000.00000001,
+      "deep_n_raw": 47911.00097441775,
+      "factor": 730.5211598206513,
+      "flag": true,
+      "next": "cited",
+      "note": "Genomic curve scaled x731 to meet the cited 1800 baseline (35,000,000), keeping its shape; before scaling it was 731x below that level (flagged: beyond 10x).",
       "ratio": 0.0013688857421262212,
+      "rule": "scaled",
+      "to_kind": "estimate",
       "to_n": 35000000.0,
       "to_year": 1800.0
      },
      "method": "PSMC",
      "ne_factor": 1.858467113008987,
-     "oldest_n": 1230581.7085800716,
+     "oldest_n": 898965977.0059927,
      "oldest_yr_ago": 4482815.674173675,
      "points": 20,
      "time_factor": 1.6820000000000002,
      "youngest_yr_ago": 23368.05232592619
     },
-    "deep_after": 1230581.7085800716,
+    "deep_after": 898965977.0059927,
     "deep_before": 1850543.4782608696,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 4940964568911.526,
+    "ever_after": 3570016160910649.5,
     "ever_before": 8094872719195.825,
-    "ever_ratio": 0.6103819961485917,
+    "ever_ratio": 441.0219017335344,
     "file": "Antilocapra_americana.toml",
     "grades": "CD",
     "leaf": "Antilocapra americana",
@@ -6942,7 +7222,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 4,
-    "segments": 106,
+    "segments": 87,
     "use": "counts"
    },
    "Arctocephalus gazella": {
@@ -6992,7 +7272,14 @@
      "grade": "D",
      "join": {
       "deep_n": 245017.14822415757,
+      "deep_n_raw": 245017.14822415757,
+      "factor": 1.0,
+      "flag": true,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 19x lower (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 19.463651991040148,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 12588.446830890123,
       "to_year": 1500
      },
@@ -7043,7 +7330,14 @@
      "grade": "D",
      "join": {
       "deep_n": 444108.5991072495,
+      "deep_n_raw": 444108.5991072495,
+      "factor": 1.0,
+      "flag": true,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 13x lower (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 13.405335301770647,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 33129.24213455439,
       "to_year": 1500
      },
@@ -7208,7 +7502,14 @@
      "grade": "D",
      "join": {
       "deep_n": 61575.76829072401,
+      "deep_n_raw": 61575.76829072401,
+      "factor": 1.0,
+      "flag": true,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 74x lower (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 73.52330542176001,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 837.5,
       "to_year": 1500
      },
@@ -7265,26 +7566,33 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
-      "deep_n": 42823.11330558427,
+      "deep_n": 42000000.0,
+      "deep_n_raw": 42823.11330558427,
+      "factor": 980.7787607661646,
+      "flag": true,
+      "next": "cited",
+      "note": "Genomic curve scaled x981 to meet the cited 1800 baseline (42,000,000), keeping its shape; before scaling it was 981x below that level (flagged: beyond 10x).",
       "ratio": 0.0010195979358472447,
+      "rule": "scaled",
+      "to_kind": "estimate",
       "to_n": 42000000.0,
       "to_year": 1800.0
      },
      "method": "PSMC",
      "ne_factor": 0.7393341918248044,
-     "oldest_n": 787955.2644680704,
+     "oldest_n": 772809787.8241695,
      "oldest_yr_ago": 1754781.5188375202,
      "points": 16,
      "time_factor": 1.4466666666666668,
      "youngest_yr_ago": 24572.558296373612
     },
-    "deep_after": 787955.2644680704,
+    "deep_after": 772809787.8241695,
     "deep_before": 421146.34146341466,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 222124259481.34418,
+    "ever_after": 193193272236249.9,
     "ever_before": 146255039873.22632,
-    "ever_ratio": 1.5187460184201598,
+    "ever_ratio": 1320.9341189452998,
     "file": "Bison_bison.toml",
     "grades": "BC",
     "leaf": "Bison bison",
@@ -7298,7 +7606,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 2,
-    "segments": 75,
+    "segments": 56,
     "use": "counts"
    },
    "Bison bonasus": {
@@ -7316,26 +7624,33 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
-      "deep_n": 18071.10940157617,
+      "deep_n": 66.0,
+      "deep_n_raw": 18071.10940157617,
+      "factor": 0.0036522384173183885,
+      "flag": true,
+      "next": "cited",
+      "note": "Genomic curve scaled x0.0037 to meet the cited 1924 count (66), keeping its shape; before scaling it was 274x above that level (flagged: beyond 10x).",
       "ratio": 273.80468790266923,
+      "rule": "scaled",
+      "to_kind": "census",
       "to_n": 66.0,
       "to_year": 1924.0
      },
      "method": "PSMC",
      "ne_factor": 0.8818022267775141,
-     "oldest_n": 817960.391985559,
+     "oldest_n": 2987.386367454467,
      "oldest_yr_ago": 3968863.89119472,
      "points": 19,
      "time_factor": 1.4466666666666668,
      "youngest_yr_ago": 20582.77975208922
     },
-    "deep_after": 817960.391985559,
+    "deep_after": 2987.386367454467,
     "deep_before": 113114.4705612593,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 588335909539.3035,
+    "ever_after": 2149016019.7855706,
     "ever_before": 92152421674.77307,
-    "ever_ratio": 6.384378173106239,
+    "ever_ratio": 0.02332023381186811,
     "file": "Bison_bonasus.toml",
     "grades": "B",
     "leaf": "Bison bonasus",
@@ -7349,7 +7664,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 4,
-    "segments": 72,
+    "segments": 56,
     "use": "counts"
    },
    "Bos gaurus": {
@@ -7368,7 +7683,14 @@
      "grade": "D",
      "join": {
       "deep_n": 65034.20033268868,
+      "deep_n_raw": 65034.20033268868,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 1.6x lower; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 1.571207401220571,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 41391.22580645161,
       "to_year": 1500
      },
@@ -7419,7 +7741,14 @@
      "grade": "D",
      "join": {
       "deep_n": 124363.5313660188,
+      "deep_n_raw": 124363.5313660188,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 4.8x higher; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.20661767714419446,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 601901.7011754899,
       "to_year": 1500
      },
@@ -7470,7 +7799,14 @@
      "grade": "D",
      "join": {
       "deep_n": 46099.21574576605,
+      "deep_n_raw": 46099.21574576605,
+      "factor": 1.0,
+      "flag": true,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; today's modelled count is 12x lower (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 12.229342714768878,
+      "rule": "absolute",
+      "to_kind": "model",
       "to_n": 3769.557924817489,
       "to_year": 2026.77
      },
@@ -7514,7 +7850,14 @@
      "grade": "D",
      "join": {
       "deep_n": 107278.3969554797,
+      "deep_n_raw": 107278.3969554797,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 2.6x lower; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 2.6421850945073126,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 40602.15053763441,
       "to_year": 1500
      },
@@ -7565,7 +7908,14 @@
      "grade": "D",
      "join": {
       "deep_n": 74506.02925894543,
+      "deep_n_raw": 74506.02925894543,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 1.2x higher; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.8293550687743431,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 89836.1052631579,
       "to_year": 1500
      },
@@ -7678,7 +8028,14 @@
      "grade": "D",
      "join": {
       "deep_n": 63963.377045510984,
+      "deep_n_raw": 63963.377045510984,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; today's modelled count is 1.6x lower; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 1.627854390842014,
+      "rule": "absolute",
+      "to_kind": "model",
       "to_n": 39293.05803108451,
       "to_year": 2026.77
      },
@@ -7760,7 +8117,14 @@
      "grade": "D",
      "join": {
       "deep_n": 36156.81281940566,
+      "deep_n_raw": 36156.81281940566,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 4.8x higher; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.20791038259432473,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 173905.7586650443,
       "to_year": 1500
      },
@@ -7842,7 +8206,14 @@
      "grade": "D",
      "join": {
       "deep_n": 52596.98771197309,
+      "deep_n_raw": 52596.98771197309,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 3.1x lower; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 3.13861962716154,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 16758.0,
       "to_year": 1500
      },
@@ -7955,7 +8326,14 @@
      "grade": "D",
      "join": {
       "deep_n": 431842.3694477321,
+      "deep_n_raw": 431842.3694477321,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 7.4x lower; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 7.438349898239075,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 58056.20538904263,
       "to_year": 1500
      },
@@ -8037,7 +8415,14 @@
      "grade": "D",
      "join": {
       "deep_n": 114941.28497048539,
+      "deep_n_raw": 114941.28497048539,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 2x lower; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 1.9510508800421877,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 58912.5,
       "to_year": 1500
      },
@@ -8088,7 +8473,14 @@
      "grade": "D",
      "join": {
       "deep_n": 212636.33674821715,
+      "deep_n_raw": 212636.33674821715,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; today's modelled count is 1.1x higher; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.8699344459236141,
+      "rule": "absolute",
+      "to_kind": "model",
       "to_n": 244428.0,
       "to_year": 2026.77
      },
@@ -8208,7 +8600,14 @@
      "grade": "D",
      "join": {
       "deep_n": 93858.2412046211,
+      "deep_n_raw": 93858.2412046211,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 2.4x lower; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 2.4070401711864307,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 38993.2176156239,
       "to_year": 1500
      },
@@ -8258,26 +8657,33 @@
      "dropped_blind": 5,
      "grade": "D",
      "join": {
-      "deep_n": 46167.23743012304,
+      "deep_n": 10400.0,
+      "deep_n_raw": 46167.23743012304,
+      "factor": 0.22526797311060776,
+      "flag": false,
+      "next": "cited",
+      "note": "Genomic curve scaled x0.23 to meet the cited 1999 count (10,400), keeping its shape.",
       "ratio": 4.439157445204138,
+      "rule": "scaled",
+      "to_kind": "census",
       "to_n": 10400.0,
       "to_year": 1999.0
      },
      "method": "PSMC",
      "ne_factor": 0.5086109279852755,
-     "oldest_n": 240424.25332921298,
+     "oldest_n": 54159.8842341031,
      "oldest_yr_ago": 2269033.0795780104,
      "points": 17,
      "time_factor": 0.354074074074074,
      "youngest_yr_ago": 22836.34710417863
     },
-    "deep_after": 240424.25332921295,
+    "deep_after": 54159.8842341031,
     "deep_before": 26562.338461538464,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 321257276649.0202,
+    "ever_after": 72381133156.54189,
     "ever_before": 37851413225.644516,
-    "ever_ratio": 8.487325816182917,
+    "ever_ratio": 1.9122438764717857,
     "file": "Ceratotherium_simum.toml",
     "grades": "B",
     "leaf": "Ceratotherium simum",
@@ -8291,7 +8697,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 4,
-    "segments": 47,
+    "segments": 43,
     "use": "counts"
    },
    "Cervus canadensis": {
@@ -8310,7 +8716,14 @@
      "grade": "D",
      "join": {
       "deep_n": 20720.572772924043,
+      "deep_n_raw": 20720.572772924043,
+      "factor": 1.0,
+      "flag": true,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 105x higher (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.009484567909364932,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 2184661.7548559946,
       "to_year": 1500
      },
@@ -8361,7 +8774,14 @@
      "grade": "D",
      "join": {
       "deep_n": 196298.96932865813,
+      "deep_n_raw": 196298.96932865813,
+      "factor": 1.0,
+      "flag": true,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 27x higher (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.03664171175387575,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 5357254.340277778,
       "to_year": 1500
      },
@@ -8412,7 +8832,14 @@
      "grade": "D",
      "join": {
       "deep_n": 45559.991496925766,
+      "deep_n_raw": 45559.991496925766,
+      "factor": 1.0,
+      "flag": true,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; today's modelled count is 17x lower (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 16.874070924787322,
+      "rule": "absolute",
+      "to_kind": "model",
       "to_n": 2700.0,
       "to_year": 2026.77
      },
@@ -8456,7 +8883,14 @@
      "grade": "D",
      "join": {
       "deep_n": 137912.4148172502,
+      "deep_n_raw": 137912.4148172502,
+      "factor": 1.0,
+      "flag": true,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 13x higher (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.07862465019226551,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 1754060.7745790256,
       "to_year": 1500
      },
@@ -8506,26 +8940,33 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
-      "deep_n": 214975.97558647124,
+      "deep_n": 1298000.0000000002,
+      "deep_n_raw": 214975.97558647124,
+      "factor": 6.0378839842868715,
+      "flag": false,
+      "next": "cited",
+      "note": "Genomic curve scaled x6 to meet the cited 1998 count (1,298,000), keeping its shape.",
       "ratio": 0.16562093650729678,
+      "rule": "scaled",
+      "to_kind": "estimate",
       "to_n": 1298000.0,
       "to_year": 1998.0
      },
      "method": "PSMC",
      "ne_factor": 1.1184928957792721,
-     "oldest_n": 586671.0220479012,
+     "oldest_n": 3542251.5680682324,
      "oldest_yr_ago": 7156167.285511835,
      "points": 25,
      "time_factor": 1.2013333333333331,
      "youngest_yr_ago": 54830.504236666944
     },
-    "deep_after": 586671.0220479012,
+    "deep_after": 3542251.5680682324,
     "deep_before": 1550000.0,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 1962740425684.974,
+    "ever_after": 11818922856665.33,
     "ever_before": 4929686058189.863,
-    "ever_ratio": 0.39814714416229474,
+    "ever_ratio": 2.397500107949092,
     "file": "Connochaetes_taurinus.toml",
     "grades": "BC",
     "leaf": "Connochaetes taurinus",
@@ -8539,7 +8980,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 2,
-    "segments": 59,
+    "segments": 54,
     "use": "counts"
    },
    "Crocuta crocuta": {
@@ -8558,7 +8999,14 @@
      "grade": "D",
      "join": {
       "deep_n": 97055.52260007923,
+      "deep_n_raw": 97055.52260007923,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 1.1x higher; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.9126721659071066,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 106342.15244596131,
       "to_year": 1500
      },
@@ -8609,7 +9057,14 @@
      "grade": "D",
      "join": {
       "deep_n": 14273.215781006224,
+      "deep_n_raw": 14273.215781006224,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 1.1x higher; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.9402026072726581,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 15181.0,
       "to_year": 1500
      },
@@ -8666,26 +9121,33 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
-      "deep_n": 38558.191776216874,
+      "deep_n": 99999.99999999999,
+      "deep_n_raw": 38558.191776216874,
+      "factor": 2.5934826140286256,
+      "flag": false,
+      "next": "cited",
+      "note": "Genomic curve scaled x2.6 to meet the cited 1960 baseline (100,000), keeping its shape.",
       "ratio": 0.38558191776216877,
+      "rule": "scaled",
+      "to_kind": "unverified",
       "to_n": 100000.0,
       "to_year": 1960.0
      },
      "method": "PSMC",
      "ne_factor": 0.6298428686543112,
-     "oldest_n": 184522.2059730938,
+     "oldest_n": 478555.1330934278,
      "oldest_yr_ago": 6388192.221295957,
      "points": 21,
      "time_factor": 0.4458333333333333,
      "youngest_yr_ago": 24259.29071602936
     },
-    "deep_after": 184522.2059730938,
+    "deep_after": 478555.1330934278,
     "deep_before": 8590.569948186529,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 370620918210.6772,
+    "ever_after": 961007225852.5061,
     "ever_before": 16626528481.986233,
-    "ever_ratio": 22.290938160195072,
+    "ever_ratio": 57.79963188910392,
     "file": "Diceros_bicornis.toml",
     "grades": "BC",
     "leaf": "Diceros bicornis",
@@ -8699,7 +9161,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 5,
-    "segments": 51,
+    "segments": 49,
     "use": "counts"
    },
    "Elaphurus davidianus": {
@@ -8717,26 +9179,33 @@
      "dropped_blind": 5,
      "grade": "D",
      "join": {
-      "deep_n": 56856.06506973922,
+      "deep_n": 2420.0,
+      "deep_n_raw": 56856.06506973923,
+      "factor": 0.04256362090889769,
+      "flag": true,
+      "next": "cited",
+      "note": "Genomic curve scaled x0.043 to meet the cited 2020 count (2,420), keeping its shape; before scaling it was 23x above that level (flagged: beyond 10x).",
       "ratio": 23.49424176435505,
+      "rule": "scaled",
+      "to_kind": "estimate",
       "to_n": 2420.0,
       "to_year": 2020.0
      },
      "method": "PSMC",
      "ne_factor": 0.8979564669395156,
-     "oldest_n": 716200.0703616856,
+     "oldest_n": 30484.068289800638,
      "oldest_yr_ago": 2186512.263982951,
      "points": 17,
      "time_factor": 1.4466666666666668,
      "youngest_yr_ago": 21795.86893430824
     },
-    "deep_after": 716200.0703616856,
+    "deep_after": 30484.068289800638,
     "deep_before": 22211.745517994506,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 258803779810.2925,
+    "ever_after": 11023230162.292036,
     "ever_before": 11168777327.12544,
-    "ever_ratio": 23.172078037740057,
+    "ever_ratio": 0.9869683886990999,
     "file": "Elaphurus_davidianus.toml",
     "grades": "C",
     "leaf": "Elaphurus davidianus",
@@ -8750,7 +9219,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 45,
+    "segments": 36,
     "use": "counts"
    },
    "Elephas maximus": {
@@ -8775,26 +9244,33 @@
      "dropped_blind": 7,
      "grade": "D",
      "join": {
-      "deep_n": 11874.759140587557,
+      "deep_n": 100000.0,
+      "deep_n_raw": 11874.759140587557,
+      "factor": 8.421223438394057,
+      "flag": false,
+      "next": "cited",
+      "note": "Genomic curve scaled x8.4 to meet the cited 1900 baseline (100,000), keeping its shape.",
       "ratio": 0.11874759140587557,
+      "rule": "scaled",
+      "to_kind": "unverified",
       "to_n": 100000.0,
       "to_year": 1900.0
      },
      "method": "PSMC",
      "ne_factor": 0.5048910336239104,
-     "oldest_n": 155960.9086878282,
+     "oldest_n": 1313381.659715174,
      "oldest_yr_ago": 781948.0369993674,
      "points": 18,
      "time_factor": 0.35806451612903223,
      "youngest_yr_ago": 22233.347349689873
     },
-    "deep_after": 155960.9086878282,
+    "deep_after": 1313381.659715174,
     "deep_before": 191271.5044585987,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 86339404416.5602,
+    "ever_after": 726578426078.9148,
     "ever_before": 111758278934.56377,
-    "ever_ratio": 0.7725548857737267,
+    "ever_ratio": 6.501338719651704,
     "file": "Elephas_maximus.toml",
     "grades": "C",
     "leaf": "Elephas maximus",
@@ -8808,7 +9284,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 2,
-    "segments": 47,
+    "segments": 41,
     "use": "counts"
    },
    "Enhydra lutris": {
@@ -8896,7 +9372,14 @@
      "grade": "D",
      "join": {
       "deep_n": 459142.20137251995,
+      "deep_n_raw": 459142.20137251995,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; today's modelled count is 1.1x higher; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.91828440274504,
+      "rule": "absolute",
+      "to_kind": "model",
       "to_n": 499999.99999999994,
       "to_year": 2026.77
      },
@@ -9002,7 +9485,14 @@
      "grade": "D",
      "join": {
       "deep_n": 219093.29973065242,
+      "deep_n_raw": 219093.29973065242,
+      "factor": 1.0,
+      "flag": true,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 15x lower (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 15.412117365442272,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 14215.652173913044,
       "to_year": 1500
      },
@@ -9053,7 +9543,14 @@
      "grade": "D",
      "join": {
       "deep_n": 193704.75489433805,
+      "deep_n_raw": 193704.75489433805,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 3.2x higher; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.31638859600192765,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 612236.8421052631,
       "to_year": 1500
      },
@@ -9104,7 +9601,14 @@
      "grade": "D",
      "join": {
       "deep_n": 34731.07485358972,
+      "deep_n_raw": 34731.07485358972,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; today's modelled count is 2.8x higher; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.35727515254024467,
+      "rule": "absolute",
+      "to_kind": "model",
       "to_n": 97211.0,
       "to_year": 2026.77
      },
@@ -9155,7 +9659,14 @@
      "grade": "D",
      "join": {
       "deep_n": 202293.79990441407,
+      "deep_n_raw": 202293.79990441407,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 8.2x lower; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 8.228381620925976,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 24584.883057678242,
       "to_year": 1500
      },
@@ -9320,7 +9831,14 @@
      "grade": "D",
      "join": {
       "deep_n": 336618.3676072787,
+      "deep_n_raw": 336618.3676072787,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 1.5x lower; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 1.5010592379349954,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 224253.88625592418,
       "to_year": 1500
      },
@@ -9371,7 +9889,14 @@
      "grade": "D",
      "join": {
       "deep_n": 43064.547945618186,
+      "deep_n_raw": 43064.547945618186,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; today's modelled count is 1.4x lower; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 1.3501644171374014,
+      "rule": "absolute",
+      "to_kind": "model",
       "to_n": 31895.780542730496,
       "to_year": 2026.77
      },
@@ -9421,26 +9946,33 @@
      "dropped_blind": 3,
      "grade": "D",
      "join": {
-      "deep_n": 23467.257114270687,
+      "deep_n": 17516.000000000004,
+      "deep_n_raw": 23467.257114270687,
+      "factor": 0.7464016742437418,
+      "flag": false,
+      "next": "cited",
+      "note": "Genomic curve scaled x0.75 to meet the cited 1995 baseline (17,516), keeping its shape.",
       "ratio": 1.3397611962931426,
+      "rule": "scaled",
+      "to_kind": "estimate",
       "to_n": 17516.0,
       "to_year": 1995.0
      },
      "method": "PSMC",
      "ne_factor": 0.5653869863013699,
-     "oldest_n": 292193.1957007649,
+     "oldest_n": 218093.49047368023,
      "oldest_yr_ago": 959083.7026173619,
      "points": 14,
      "time_factor": 0.565,
      "youngest_yr_ago": 23997.72929688985
     },
-    "deep_after": 292193.1957007649,
+    "deep_after": 218093.49047368023,
     "deep_before": 3800.0,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 33025236688.432316,
+    "ever_after": 24655684357.597023,
     "ever_before": 435175369.25768155,
-    "ever_ratio": 75.88948966658312,
+    "ever_ratio": 56.65689305820428,
     "file": "Gorilla_beringei.toml",
     "grades": "C",
     "leaf": "Gorilla beringei",
@@ -9473,7 +10005,14 @@
      "grade": "D",
      "join": {
       "deep_n": 96930.8821995234,
+      "deep_n_raw": 96930.8821995234,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 3.4x higher; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.2947953727608273,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 328807.3394495413,
       "to_year": 1500
      },
@@ -9524,7 +10063,14 @@
      "grade": "D",
      "join": {
       "deep_n": 161541.37471248896,
+      "deep_n_raw": 161541.37471248896,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 3.1x lower; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 3.1182059272205476,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 51805.87122303398,
       "to_year": 1500
      },
@@ -9575,7 +10121,14 @@
      "grade": "D",
      "join": {
       "deep_n": 43202.740048132146,
+      "deep_n_raw": 43202.740048132146,
+      "factor": 1.0,
+      "flag": true,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 11x lower (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 11.387121783904098,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 3794.0,
       "to_year": 1500
      },
@@ -9626,7 +10179,14 @@
      "grade": "D",
      "join": {
       "deep_n": 18877.94605537044,
+      "deep_n_raw": 18877.94605537044,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 4.6x lower; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 4.629247466936451,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 4077.972972972973,
       "to_year": 1500
      },
@@ -9677,7 +10237,14 @@
      "grade": "D",
      "join": {
       "deep_n": 78735.85928470675,
+      "deep_n_raw": 78735.85928470675,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 6.8x higher; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.14720946401660437,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 534855.960591133,
       "to_year": 1500
      },
@@ -9728,7 +10295,14 @@
      "grade": "D",
      "join": {
       "deep_n": 171915.35052643326,
+      "deep_n_raw": 171915.35052643326,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; today's modelled count is 2.3x lower; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 2.292204673685777,
+      "rule": "absolute",
+      "to_kind": "model",
       "to_n": 75000.0,
       "to_year": 2026.77
      },
@@ -9803,7 +10377,14 @@
      "grade": "D",
      "join": {
       "deep_n": 31462.742249401883,
+      "deep_n_raw": 31462.742249401883,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 2.8x lower; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 2.8208846405046613,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 11153.501918381584,
       "to_year": 1500
      },
@@ -9854,7 +10435,14 @@
      "grade": "D",
      "join": {
       "deep_n": 245151.9544491072,
+      "deep_n_raw": 245151.9544491072,
+      "factor": 1.0,
+      "flag": true,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; today's modelled count is 24x higher (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.04224353224101778,
+      "rule": "absolute",
+      "to_kind": "model",
       "to_n": 5803301.510167481,
       "to_year": 2026.77
      },
@@ -9905,7 +10493,14 @@
      "grade": "D",
      "join": {
       "deep_n": 123558.39444797355,
+      "deep_n_raw": 123558.39444797355,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; today's modelled count is 1.6x higher; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.6177919722398677,
+      "rule": "absolute",
+      "to_kind": "model",
       "to_n": 200000.0,
       "to_year": 2026.77
      },
@@ -9956,7 +10551,14 @@
      "grade": "D",
      "join": {
       "deep_n": 58856.685793644145,
+      "deep_n_raw": 58856.685793644145,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 2.8x higher; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.3593430604481726,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 163789.68253968254,
       "to_year": 1500
      },
@@ -10007,7 +10609,14 @@
      "grade": "D",
      "join": {
       "deep_n": 190175.4790663263,
+      "deep_n_raw": 190175.4790663263,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; today's modelled count is 2.4x lower; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 2.4330684612167763,
+      "rule": "absolute",
+      "to_kind": "model",
       "to_n": 78162.81460950739,
       "to_year": 2026.77
      },
@@ -10058,7 +10667,14 @@
      "grade": "D",
      "join": {
       "deep_n": 40786.00663949532,
+      "deep_n_raw": 40786.00663949532,
+      "factor": 1.0,
+      "flag": true,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; today's modelled count is 45x higher (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.02245196034300272,
+      "rule": "absolute",
+      "to_kind": "model",
       "to_n": 1816590.0000000002,
       "to_year": 2026.77
      },
@@ -10109,7 +10725,14 @@
      "grade": "D",
      "join": {
       "deep_n": 460623.1892751342,
+      "deep_n_raw": 460623.1892751342,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; today's modelled count is 4.8x lower; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 4.84866515026457,
+      "rule": "absolute",
+      "to_kind": "model",
       "to_n": 95000.0,
       "to_year": 2026.77
      },
@@ -10166,26 +10789,33 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
-      "deep_n": 17045.63601480735,
+      "deep_n": 14300000.0,
+      "deep_n_raw": 17045.63601480735,
+      "factor": 838.924401974661,
+      "flag": true,
+      "next": "cited",
+      "note": "Genomic curve scaled x839 to meet the cited 1800 baseline (14,300,000), keeping its shape; before scaling it was 839x below that level (flagged: beyond 10x).",
       "ratio": 0.0011920025185179965,
+      "rule": "scaled",
+      "to_kind": "unverified",
       "to_n": 14300000.0,
       "to_year": 1800.0
      },
      "method": "PSMC",
      "ne_factor": 0.44430410958904104,
-     "oldest_n": 341938.7746707755,
+     "oldest_n": 286860782.0526287,
      "oldest_yr_ago": 3830938.919446396,
      "points": 19,
      "time_factor": 0.35806451612903223,
      "youngest_yr_ago": 20500.922745015185
     },
-    "deep_after": 341938.7746707755,
+    "deep_after": 286860782.0526287,
     "deep_before": 1320301.2150537635,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 162713706152.6238,
+    "ever_after": 133559856471109.4,
     "ever_before": 492730862808.5327,
-    "ever_ratio": 0.3302283628534382,
+    "ever_ratio": 271.060464347265,
     "file": "Loxodonta_africana.toml",
     "grades": "BCD",
     "leaf": "Loxodonta africana",
@@ -10199,7 +10829,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 6,
-    "segments": 76,
+    "segments": 57,
     "use": "counts"
    },
    "Loxodonta cyclotis": {
@@ -10224,33 +10854,40 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
-      "deep_n": 49380.938572202846,
+      "deep_n": 11700000.0,
+      "deep_n_raw": 49380.938572202846,
+      "factor": 236.93352816477403,
+      "flag": true,
+      "next": "cited",
+      "note": "Genomic curve scaled x237 to meet the cited 1800 baseline (11,700,000), keeping its shape; before scaling it was 237x below that level (flagged: beyond 10x).",
       "ratio": 0.004220593040359218,
+      "rule": "scaled",
+      "to_kind": "unverified",
       "to_n": 11700000.0,
       "to_year": 1800.0
      },
      "method": "PSMC",
      "ne_factor": 0.5677273704997875,
-     "oldest_n": 339732.5380841101,
+     "oldest_n": 80494028.88064167,
      "oldest_yr_ago": 4577441.364341422,
      "points": 18,
      "time_factor": 0.35806451612903223,
      "youngest_yr_ago": 26823.843813827156
     },
-    "deep_after": 339732.5380841102,
+    "deep_after": 80494028.88064167,
     "deep_before": 100000.0,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 233240154715.16888,
+    "ever_after": 53897541614872.55,
     "ever_before": 47688701276.27898,
-    "ever_ratio": 4.890889214279898,
+    "ever_ratio": 1130.1952070915786,
     "file": "Loxodonta_cyclotis.toml",
     "grades": "D",
     "leaf": "Loxodonta cyclotis",
     "modelled": null,
     "natural": null,
     "points": 5,
-    "segments": 66,
+    "segments": 51,
     "use": "counts"
    },
    "Macropus fuliginosus": {
@@ -10269,7 +10906,14 @@
      "grade": "D",
      "join": {
       "deep_n": 77741.3625688412,
+      "deep_n_raw": 77741.3625688412,
+      "factor": 1.0,
+      "flag": true,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; today's modelled count is 64x higher (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.01554827251376824,
+      "rule": "absolute",
+      "to_kind": "model",
       "to_n": 5000000.0,
       "to_year": 2026.77
      },
@@ -10320,7 +10964,14 @@
      "grade": "D",
      "join": {
       "deep_n": 82704.66558326154,
+      "deep_n_raw": 82704.66558326154,
+      "factor": 1.0,
+      "flag": true,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; today's modelled count is 266x higher (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.0037593029810573425,
+      "rule": "absolute",
+      "to_kind": "model",
       "to_n": 22000000.0,
       "to_year": 2026.77
      },
@@ -10471,7 +11122,14 @@
      "grade": "D",
      "join": {
       "deep_n": 294315.7902281838,
+      "deep_n_raw": 294315.7902281838,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 2.7x higher; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.3708793617823619,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 793562.0596782981,
       "to_year": 1500
      },
@@ -10522,7 +11180,14 @@
      "grade": "D",
      "join": {
       "deep_n": 215430.79249893114,
+      "deep_n_raw": 215430.79249893114,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; today's modelled count is 3.8x higher; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.2655635772208056,
+      "rule": "absolute",
+      "to_kind": "model",
       "to_n": 811221.1574850454,
       "to_year": 2026.77
      },
@@ -10573,7 +11238,14 @@
      "grade": "D",
      "join": {
       "deep_n": 199300.68369408188,
+      "deep_n_raw": 199300.68369408188,
+      "factor": 1.0,
+      "flag": true,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 47x higher (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.02144475356548321,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 9293680.29739777,
       "to_year": 1500
      },
@@ -10624,7 +11296,14 @@
      "grade": "D",
      "join": {
       "deep_n": 1085295.1547210342,
+      "deep_n_raw": 1085295.1547210342,
+      "factor": 1.0,
+      "flag": true,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; today's modelled count is 41x higher (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.02411767010491187,
+      "rule": "absolute",
+      "to_kind": "model",
       "to_n": 45000000.0,
       "to_year": 2026.77
      },
@@ -10675,7 +11354,14 @@
      "grade": "D",
      "join": {
       "deep_n": 77711.4132656247,
+      "deep_n_raw": 77711.4132656247,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; today's modelled count is 1.9x lower; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 1.8576581470519613,
+      "rule": "absolute",
+      "to_kind": "model",
       "to_n": 41833.0,
       "to_year": 2026.77
      },
@@ -10726,7 +11412,14 @@
      "grade": "D",
      "join": {
       "deep_n": 22113.152470491586,
+      "deep_n_raw": 22113.152470491586,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 5.8x higher; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.1710168602131152,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 129303.93203883494,
       "to_year": 1500
      },
@@ -10777,7 +11470,14 @@
      "grade": "D",
      "join": {
       "deep_n": 136304.67295180453,
+      "deep_n_raw": 136304.67295180453,
+      "factor": 1.0,
+      "flag": true,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; today's modelled count is 31x higher (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.032234600748176113,
+      "rule": "absolute",
+      "to_kind": "model",
       "to_n": 4228520.589308582,
       "to_year": 2026.77
      },
@@ -10827,26 +11527,33 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
-      "deep_n": 187639.39989583692,
+      "deep_n": 650.0,
+      "deep_n_raw": 187639.39989583692,
+      "factor": 0.0034640912322296403,
+      "flag": true,
+      "next": "cited",
+      "note": "Genomic curve scaled x0.0035 to meet the cited 2026 count (650), keeping its shape; before scaling it was 289x above that level (flagged: beyond 10x).",
       "ratio": 288.6759998397491,
+      "rule": "scaled",
+      "to_kind": "estimate",
       "to_n": 650.0,
       "to_year": 2026.0
      },
      "method": "PSMC",
      "ne_factor": 0.9819951427367715,
-     "oldest_n": 598273.831710427,
+     "oldest_n": 2072.4751349005214,
      "oldest_yr_ago": 1857502.8334911033,
      "points": 16,
      "time_factor": 1.4080645161290322,
      "youngest_yr_ago": 28349.0403675304
     },
-    "deep_after": 598273.831710427,
+    "deep_after": 2072.4751349005214,
     "deep_before": 226654.85239323866,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 189814183679.97363,
+    "ever_after": 660949968.1322649,
     "ever_before": 101634377367.2517,
-    "ever_ratio": 1.867617912333814,
+    "ever_ratio": 0.006503212645697125,
     "file": "Oryx_dammah.toml",
     "grades": "C",
     "leaf": "Oryx dammah",
@@ -10860,7 +11567,7 @@
      "method": "N_nat: D x natural range (PHYLACINE, rescaled to PanTHERIA areas) x fitted occupancy"
     },
     "points": 1,
-    "segments": 50,
+    "segments": 34,
     "use": "counts"
    },
    "Oryx gazella": {
@@ -10879,7 +11586,14 @@
      "grade": "D",
      "join": {
       "deep_n": 145737.24233389765,
+      "deep_n_raw": 145737.24233389765,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; today's modelled count is 2.6x higher; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.3907164673831036,
+      "rule": "absolute",
+      "to_kind": "model",
       "to_n": 373000.0,
       "to_year": 2026.77
      },
@@ -10930,7 +11644,14 @@
      "grade": "D",
      "join": {
       "deep_n": 1198635.430322361,
+      "deep_n_raw": 1198635.430322361,
+      "factor": 1.0,
+      "flag": true,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; today's modelled count is 10x higher (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.09988628586019675,
+      "rule": "absolute",
+      "to_kind": "model",
       "to_n": 12000000.0,
       "to_year": 2026.77
      },
@@ -10981,7 +11702,14 @@
      "grade": "D",
      "join": {
       "deep_n": 12219.247668366897,
+      "deep_n_raw": 12219.247668366897,
+      "factor": 1.0,
+      "flag": true,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 44x higher (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.022560388144481962,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 541624.0,
       "to_year": 1500
      },
@@ -11032,7 +11760,14 @@
      "grade": "D",
      "join": {
       "deep_n": 81200.20271887656,
+      "deep_n_raw": 81200.20271887656,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 1.2x higher; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.8506214875347776,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 95459.85365853658,
       "to_year": 1500
      },
@@ -11114,7 +11849,14 @@
      "grade": "D",
      "join": {
       "deep_n": 37508.98336673165,
+      "deep_n_raw": 37508.98336673165,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 2.6x higher; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.3829494832082926,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 97947.60147601477,
       "to_year": 1500
      },
@@ -11165,7 +11907,14 @@
      "grade": "D",
      "join": {
       "deep_n": 110505.2433925007,
+      "deep_n_raw": 110505.2433925007,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; today's modelled count is about the same; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.9695738762031421,
+      "rule": "absolute",
+      "to_kind": "model",
       "to_n": 113973.0,
       "to_year": 2026.77
      },
@@ -11216,7 +11965,14 @@
      "grade": "D",
      "join": {
       "deep_n": 271475.70240255474,
+      "deep_n_raw": 271475.70240255474,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; today's modelled count is 3x lower; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 3.021062556643647,
+      "rule": "absolute",
+      "to_kind": "model",
       "to_n": 89861.0,
       "to_year": 2026.77
      },
@@ -11267,7 +12023,14 @@
      "grade": "D",
      "join": {
       "deep_n": 437608.83659876,
+      "deep_n_raw": 437608.83659876,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 1.1x lower; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 1.0827586524914274,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 404161.0155613369,
       "to_year": 1500
      },
@@ -11318,7 +12081,14 @@
      "grade": "D",
      "join": {
       "deep_n": 306509.90361545177,
+      "deep_n_raw": 306509.90361545177,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; today's modelled count is 1.5x lower; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 1.5163693641871077,
+      "rule": "absolute",
+      "to_kind": "model",
       "to_n": 202134.0649939634,
       "to_year": 2026.77
      },
@@ -11362,7 +12132,14 @@
      "grade": "D",
      "join": {
       "deep_n": 67025.22878169395,
+      "deep_n_raw": 67025.22878169395,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; today's modelled count is 1.9x higher; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.514429926556465,
+      "rule": "absolute",
+      "to_kind": "model",
       "to_n": 130290.29868140283,
       "to_year": 2026.77
      },
@@ -11419,26 +12196,33 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
-      "deep_n": 130290.46092445317,
+      "deep_n": 1000000.0,
+      "deep_n_raw": 130290.46092445317,
+      "factor": 7.6751589709996795,
+      "flag": false,
+      "next": "cited",
+      "note": "Genomic curve scaled x7.7 to meet the cited 1900 baseline (1,000,000), keeping its shape.",
       "ratio": 0.13029046092445318,
+      "rule": "scaled",
+      "to_kind": "unverified",
       "to_n": 1000000.0,
       "to_year": 1900.0
      },
      "method": "PSMC",
      "ne_factor": 0.6254280821917807,
-     "oldest_n": 117830.77504424517,
+     "oldest_n": 904369.9301406834,
      "oldest_yr_ago": 1181577.2785350154,
      "points": 14,
      "time_factor": 0.4999999999999999,
      "youngest_yr_ago": 24064.861725705123
     },
-    "deep_after": 117830.77504424517,
+    "deep_after": 904369.9301406835,
     "deep_before": 485612.88833746896,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 47957146755.72712,
+    "ever_after": 362593614558.6454,
     "ever_before": 67596216483.458855,
-    "ever_ratio": 0.7094649560373321,
+    "ever_ratio": 5.36411109114922,
     "file": "Pan_troglodytes.toml",
     "grades": "C",
     "leaf": "Pan troglodytes",
@@ -11452,7 +12236,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 2,
-    "segments": 43,
+    "segments": 38,
     "use": "counts"
    },
    "Panthera leo": {
@@ -11477,26 +12261,33 @@
      "dropped_blind": 8,
      "grade": "D",
      "join": {
-      "deep_n": 242259.15068493146,
+      "deep_n": 500000.00000000006,
+      "deep_n_raw": 242259.15068493146,
+      "factor": 2.0639055267318747,
+      "flag": false,
+      "next": "cited",
+      "note": "Genomic curve scaled x2.1 to meet the cited 1950 baseline (500,000), keeping its shape.",
       "ratio": 0.4845183013698629,
+      "rule": "scaled",
+      "to_kind": "unverified",
       "to_n": 500000.0,
       "to_year": 1950.0
      },
      "method": "PSMC",
      "ne_factor": 0.9039520547945205,
-     "oldest_n": 635478.2945205478,
+     "oldest_n": 1311567.1641791046,
      "oldest_yr_ago": 1340974.744609202,
      "points": 14,
      "time_factor": 1.0839999999999999,
      "youngest_yr_ago": 23444.306326816324
     },
-    "deep_after": 635478.2945205478,
+    "deep_after": 1311567.1641791046,
     "deep_before": 204258.06451612903,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 824386105279.6287,
+    "ever_after": 1699626155437.6614,
     "ever_before": 256264829675.55167,
-    "ever_ratio": 3.2169303385226775,
+    "ever_ratio": 6.632303611812441,
     "file": "Panthera_leo.toml",
     "grades": "BCD",
     "leaf": "Panthera leo",
@@ -11510,7 +12301,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 4,
-    "segments": 42,
+    "segments": 40,
     "use": "counts"
    },
    "Panthera onca": {
@@ -11535,26 +12326,33 @@
      "dropped_blind": 7,
      "grade": "D",
      "join": {
-      "deep_n": 327346.9915383306,
+      "deep_n": 82600.0,
+      "deep_n_raw": 327346.9915383306,
+      "factor": 0.2523316301513282,
+      "flag": false,
+      "next": "cited",
+      "note": "Genomic curve scaled x0.25 to meet the cited 1995 baseline (82,600), keeping its shape.",
       "ratio": 3.963038638478579,
+      "rule": "scaled",
+      "to_kind": "reconstruction",
       "to_n": 82600.0,
       "to_year": 1995.0
      },
      "method": "PSMC",
      "ne_factor": 1.0197725593094413,
-     "oldest_n": 653674.2105173519,
+     "oldest_n": 164942.6791277259,
      "oldest_yr_ago": 772341.0811293155,
      "points": 15,
      "time_factor": 2.0,
      "youngest_yr_ago": 27643.704527432645
     },
-    "deep_after": 653674.2105173519,
+    "deep_after": 164942.6791277259,
     "deep_before": 113091.1877394636,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 459347566141.3466,
+    "ever_after": 116120857129.186,
     "ever_before": 86758987517.9911,
-    "ever_ratio": 5.294524282525684,
+    "ever_ratio": 1.3384302935198058,
     "file": "Panthera_onca.toml",
     "grades": "C",
     "leaf": "Panthera onca",
@@ -11568,7 +12366,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 38,
+    "segments": 35,
     "use": "counts"
    },
    "Panthera pardus": {
@@ -11593,26 +12391,33 @@
      "dropped_blind": 5,
      "grade": "D",
      "join": {
-      "deep_n": 579760.9159438871,
+      "deep_n": 188000.0,
+      "deep_n_raw": 579760.9159438871,
+      "factor": 0.32427160029220703,
+      "flag": false,
+      "next": "cited",
+      "note": "Genomic curve scaled x0.32 to meet the cited 1998 baseline (188,000), keeping its shape.",
       "ratio": 3.083834659275995,
+      "rule": "scaled",
+      "to_kind": "reconstruction",
       "to_n": 188000.0,
       "to_year": 1998.0
      },
      "method": "PSMC",
      "ne_factor": 0.811990078352783,
-     "oldest_n": 466894.2950528502,
+     "oldest_n": 151400.56022408963,
      "oldest_yr_ago": 1870440.0966821657,
      "points": 18,
      "time_factor": 1.5119999999999998,
      "youngest_yr_ago": 20330.86274057252
     },
-    "deep_after": 466894.2950528502,
+    "deep_after": 151400.56022408963,
     "deep_before": 330280.14329036226,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 408141585941.9815,
+    "ever_after": 132677298630.54646,
     "ever_before": 280698842823.38275,
-    "ever_ratio": 1.4540194816506116,
+    "ever_ratio": 0.4726677790903034,
     "file": "Panthera_pardus.toml",
     "grades": "C",
     "leaf": "Panthera pardus",
@@ -11626,7 +12431,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 43,
+    "segments": 40,
     "use": "counts"
    },
    "Panthera tigris": {
@@ -11651,26 +12456,33 @@
      "dropped_blind": 5,
      "grade": "D",
      "join": {
-      "deep_n": 171467.36301369857,
+      "deep_n": 99999.99999999999,
+      "deep_n_raw": 171467.36301369857,
+      "factor": 0.5832013640520672,
+      "flag": false,
+      "next": "cited",
+      "note": "Genomic curve scaled x0.58 to meet the cited 1900 baseline (100,000), keeping its shape.",
       "ratio": 1.7146736301369858,
+      "rule": "scaled",
+      "to_kind": "unverified",
       "to_n": 100000.0,
       "to_year": 1900.0
      },
      "method": "PSMC",
      "ne_factor": 0.9318878424657533,
-     "oldest_n": 660708.4803082191,
+     "oldest_n": 385326.0869565218,
      "oldest_yr_ago": 612403.8089902935,
      "points": 9,
      "time_factor": 1.49,
      "youngest_yr_ago": 32234.103638537865
     },
-    "deep_after": 660708.4803082191,
+    "deep_after": 385326.0869565218,
     "deep_before": 29016.578635014837,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 449172608538.6844,
+    "ever_after": 262140772912.29852,
     "ever_before": 21818024153.757103,
-    "ever_ratio": 20.587226660546897,
+    "ever_ratio": 12.014872248051729,
     "file": "Panthera_tigris.toml",
     "grades": "BC",
     "leaf": "Panthera tigris",
@@ -11702,26 +12514,33 @@
      "dropped_blind": 3,
      "grade": "D",
      "join": {
-      "deep_n": 43922.56335616437,
+      "deep_n": 5930.0,
+      "deep_n_raw": 43922.56335616437,
+      "factor": 0.13501033516450597,
+      "flag": false,
+      "next": "cited",
+      "note": "Genomic curve scaled x0.14 to meet the cited 1994 count (5,930), keeping its shape.",
       "ratio": 7.40684036360276,
+      "rule": "scaled",
+      "to_kind": "estimate",
       "to_n": 5930.0,
       "to_year": 1994.0
      },
      "method": "PSMC",
      "ne_factor": 0.45280993150684923,
-     "oldest_n": 43922.56335616437,
+     "oldest_n": 5930.0,
      "oldest_yr_ago": 80555.31495658869,
      "points": 3,
      "time_factor": 0.724,
      "youngest_yr_ago": 32885.99435202773
     },
-    "deep_after": 43922.56335616437,
+    "deep_after": 5930.0,
     "deep_before": 7500.0,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 32908755250.475376,
+    "ever_after": 4470753436.978591,
     "ever_before": 5639930144.118823,
-    "ever_ratio": 5.83495795329873,
+    "ever_ratio": 0.7926965977833218,
     "file": "Panthera_uncia.toml",
     "grades": "C",
     "leaf": "Panthera uncia",
@@ -11735,7 +12554,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 3,
-    "segments": 17,
+    "segments": 12,
     "use": "counts"
    },
    "Parahyaena brunnea": {
@@ -11754,7 +12573,14 @@
      "grade": "D",
      "join": {
       "deep_n": 48935.010690002004,
+      "deep_n_raw": 48935.010690002004,
+      "factor": 1.0,
+      "flag": true,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 15x lower (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 15.494461880541941,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 3158.2258917591034,
       "to_year": 1500
      },
@@ -11805,7 +12631,14 @@
      "grade": "D",
      "join": {
       "deep_n": 2233391.5131919216,
+      "deep_n_raw": 2233391.5131919216,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; today's modelled count is 1.7x higher; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.5906475197818081,
+      "rule": "absolute",
+      "to_kind": "model",
       "to_n": 3781259.4455944924,
       "to_year": 2026.77
      },
@@ -11938,26 +12771,33 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
-      "deep_n": 69503.17268818223,
+      "deep_n": 89286.0,
+      "deep_n_raw": 69503.17268818223,
+      "factor": 1.2846320037873824,
+      "flag": false,
+      "next": "cited",
+      "note": "Genomic curve scaled x1.3 to meet the cited 1900 baseline (89,286), keeping its shape.",
       "ratio": 0.778433043121903,
+      "rule": "scaled",
+      "to_kind": "unverified",
       "to_n": 89286.0,
       "to_year": 1900.0
      },
      "method": "PSMC",
      "ne_factor": 0.6644547945205479,
-     "oldest_n": 393590.71796584065,
+     "oldest_n": 505619.23269257235,
      "oldest_yr_ago": 1637286.7116494596,
      "points": 13,
      "time_factor": 0.6639999999999999,
      "youngest_yr_ago": 41837.937117656315
     },
-    "deep_after": 393590.71796584065,
+    "deep_after": 505619.2326925724,
     "deep_before": 453950.99999999994,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 76417607500.22105,
+    "ever_after": 98127746100.56772,
     "ever_before": 73524975663.68584,
-    "ever_ratio": 1.0393421665281,
+    "ever_ratio": 1.3346178657633103,
     "file": "Pongo_abelii.toml",
     "grades": "BC",
     "leaf": "Pongo abelii",
@@ -11996,26 +12836,33 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
-      "deep_n": 73292.39337652603,
+      "deep_n": 288500.0,
+      "deep_n_raw": 73292.39337652603,
+      "factor": 3.936288429249198,
+      "flag": false,
+      "next": "cited",
+      "note": "Genomic curve scaled x3.9 to meet the cited 1973 baseline (288,500), keeping its shape.",
       "ratio": 0.25404642418206597,
+      "rule": "scaled",
+      "to_kind": "reconstruction",
       "to_n": 288500.0,
       "to_year": 1973.0
      },
      "method": "PSMC",
      "ne_factor": 0.8305684931506848,
-     "oldest_n": 504263.50517345767,
+     "oldest_n": 1984926.6007069247,
      "oldest_yr_ago": 1824369.8334619042,
      "points": 15,
      "time_factor": 0.6639999999999999,
      "youngest_yr_ago": 23165.339889774667
     },
-    "deep_after": 504263.50517345767,
+    "deep_after": 1984926.6007069247,
     "deep_before": 160956.71641791044,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 92574030656.65742,
+    "ever_after": 363633159425.6209,
     "ever_before": 32591587547.446293,
-    "ever_ratio": 2.8404271661173204,
+    "ever_ratio": 11.157270534804411,
     "file": "Pongo_pygmaeus.toml",
     "grades": "BC",
     "leaf": "Pongo pygmaeus",
@@ -12029,7 +12876,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 2,
-    "segments": 46,
+    "segments": 43,
     "use": "counts"
    },
    "Pongo tapanuliensis": {
@@ -12048,7 +12895,14 @@
      "grade": "D",
      "join": {
       "deep_n": 22089.578600978464,
+      "deep_n_raw": 22089.578600978464,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; today's modelled count is 7.8x lower; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 7.845935929118358,
+      "rule": "absolute",
+      "to_kind": "model",
       "to_n": 2815.4166437936556,
       "to_year": 2026.77
      },
@@ -12092,7 +12946,14 @@
      "grade": "D",
      "join": {
       "deep_n": 256710.25291605116,
+      "deep_n_raw": 256710.25291605116,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; today's modelled count is 1.2x lower; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 1.2268816033227767,
+      "rule": "absolute",
+      "to_kind": "model",
       "to_n": 209238.0,
       "to_year": 2026.77
      },
@@ -12143,7 +13004,14 @@
      "grade": "D",
      "join": {
       "deep_n": 39778.069521214544,
+      "deep_n_raw": 39778.069521214544,
+      "factor": 1.0,
+      "flag": true,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 26x higher (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.03900757756121152,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 1019752.366288164,
       "to_year": 1500
      },
@@ -12194,7 +13062,14 @@
      "grade": "D",
      "join": {
       "deep_n": 3784230.6298088157,
+      "deep_n_raw": 3784230.6298088157,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 1.2x higher; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.8504736238954341,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 4449556.721672167,
       "to_year": 1500
      },
@@ -12245,7 +13120,14 @@
      "grade": "D",
      "join": {
       "deep_n": 282182.30558830866,
+      "deep_n_raw": 282182.30558830866,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; today's modelled count is 8.8x higher; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.11394189742957125,
+      "rule": "absolute",
+      "to_kind": "model",
       "to_n": 2476545.6074902443,
       "to_year": 2026.77
      },
@@ -12296,7 +13178,14 @@
      "grade": "D",
      "join": {
       "deep_n": 24387.44086852208,
+      "deep_n_raw": 24387.44086852208,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 1.1x lower; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 1.1400098212541785,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 21392.30769230769,
       "to_year": 1500
      },
@@ -12454,7 +13343,14 @@
      "grade": "D",
      "join": {
       "deep_n": 241898.88560854894,
+      "deep_n_raw": 241898.88560854894,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 3.2x higher; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.30822886000329147,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 784802.842945874,
       "to_year": 1500
      },
@@ -12505,7 +13401,14 @@
      "grade": "D",
      "join": {
       "deep_n": 63724.62285104446,
+      "deep_n_raw": 63724.62285104446,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 6.9x lower; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 6.891699952779623,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 9246.575342465754,
       "to_year": 1500
      },
@@ -12556,7 +13459,14 @@
      "grade": "D",
      "join": {
       "deep_n": 486599.07267597975,
+      "deep_n_raw": 486599.07267597975,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 1.2x lower; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 1.1781155005679438,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 413031.7209487533,
       "to_year": 1500
      },
@@ -12607,7 +13517,14 @@
      "grade": "D",
      "join": {
       "deep_n": 106039.4833921405,
+      "deep_n_raw": 106039.4833921405,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; today's modelled count is 3.8x lower; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 3.7871244068621603,
+      "rule": "absolute",
+      "to_kind": "model",
       "to_n": 28000.0,
       "to_year": 2026.77
      },
@@ -12658,7 +13575,14 @@
      "grade": "D",
      "join": {
       "deep_n": 151658.63650601465,
+      "deep_n_raw": 151658.63650601465,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; today's modelled count is 1.1x lower; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 1.1151370331324606,
+      "rule": "absolute",
+      "to_kind": "model",
       "to_n": 136000.0,
       "to_year": 2026.77
      },
@@ -12709,7 +13633,14 @@
      "grade": "D",
      "join": {
       "deep_n": 311185.679368852,
+      "deep_n_raw": 311185.679368852,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; today's modelled count is 4.3x higher; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.23222811893197912,
+      "rule": "absolute",
+      "to_kind": "model",
       "to_n": 1340000.0,
       "to_year": 2026.77
      },
@@ -12760,7 +13691,14 @@
      "grade": "D",
      "join": {
       "deep_n": 23693.141721380798,
+      "deep_n_raw": 23693.141721380798,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; today's modelled count is 6.6x higher; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.15199115836277255,
+      "rule": "absolute",
+      "to_kind": "model",
       "to_n": 155885.0,
       "to_year": 2026.77
      },
@@ -12811,7 +13749,14 @@
      "grade": "D",
      "join": {
       "deep_n": 160032.5618270805,
+      "deep_n_raw": 160032.5618270805,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; today's modelled count is 3x higher; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.33201776312672304,
+      "rule": "absolute",
+      "to_kind": "model",
       "to_n": 482000.0,
       "to_year": 2026.77
      },
@@ -12862,7 +13807,14 @@
      "grade": "D",
      "join": {
       "deep_n": 19979.877692825303,
+      "deep_n_raw": 19979.877692825303,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 1.1x lower; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 1.0586531121324432,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 18872.922077922078,
       "to_year": 1500
      },
@@ -12913,7 +13865,14 @@
      "grade": "D",
      "join": {
       "deep_n": 16225.289455496924,
+      "deep_n_raw": 16225.289455496924,
+      "factor": 1.0,
+      "flag": true,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 69x higher (flagged: beyond 10x); the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 0.014543602542616548,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 1115630.6979617048,
       "to_year": 1500
      },
@@ -12963,26 +13922,33 @@
      "dropped_blind": 3,
      "grade": "D",
      "join": {
-      "deep_n": 24401.909159455965,
+      "deep_n": 200000.0,
+      "deep_n_raw": 24401.909159455965,
+      "factor": 8.196080015423636,
+      "flag": false,
+      "next": "cited",
+      "note": "Genomic curve scaled x8.2 to meet the cited 2017 count (200,000), keeping its shape.",
       "ratio": 0.12200954579727982,
+      "rule": "scaled",
+      "to_kind": "estimate",
       "to_n": 200000.0,
       "to_year": 2017.0
      },
      "method": "PSMC",
      "ne_factor": 0.5769420944546153,
-     "oldest_n": 387439.0950388217,
+     "oldest_n": 3175481.8240415053,
      "oldest_yr_ago": 1469479.019898501,
      "points": 15,
      "time_factor": 0.944,
      "youngest_yr_ago": 25713.714767879752
     },
-    "deep_after": 387439.0950388217,
+    "deep_after": 3175481.8240415053,
     "deep_before": 398527.4151436031,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 62877549103.31575,
+    "ever_after": 513826562596.0754,
     "ever_before": 81686056093.73222,
-    "ever_ratio": 0.769746418301377,
+    "ever_ratio": 6.290260384299559,
     "file": "Ursus_arctos.toml",
     "grades": "C",
     "leaf": "Ursus arctos",
@@ -12996,7 +13962,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 38,
+    "segments": 32,
     "use": "counts"
    },
    "Ursus maritimus": {
@@ -13014,26 +13980,33 @@
      "dropped_blind": 4,
      "grade": "D",
      "join": {
-      "deep_n": 27964.125472350264,
+      "deep_n": 10000.000000000002,
+      "deep_n_raw": 27964.125472350268,
+      "factor": 0.35760102742664257,
+      "flag": false,
+      "next": "cited",
+      "note": "Genomic curve scaled x0.36 to meet the cited 1965 count (10,000), keeping its shape.",
       "ratio": 2.7964125472350263,
+      "rule": "scaled",
+      "to_kind": "estimate",
       "to_n": 10000.0,
       "to_year": 1965.0
      },
      "method": "PSMC",
      "ne_factor": 0.6297643835616438,
-     "oldest_n": 433056.53739082254,
+     "oldest_n": 154861.4627047824,
      "oldest_yr_ago": 1241287.0631887894,
      "points": 21,
      "time_factor": 0.944,
      "youngest_yr_ago": 22620.201207941052
     },
-    "deep_after": 433056.53739082254,
+    "deep_after": 154861.4627047824,
     "deep_before": 26000.0,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 70458152762.33205,
+    "ever_after": 25207303714.311485,
     "ever_before": 5817581917.808218,
-    "ever_ratio": 12.11124377065536,
+    "ever_ratio": 4.332952087386914,
     "file": "Ursus_maritimus.toml",
     "grades": "BCD",
     "leaf": "Ursus maritimus",
@@ -13047,7 +14020,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 3,
-    "segments": 53,
+    "segments": 51,
     "use": "counts"
    },
    "Ursus thibetanus": {
@@ -13066,7 +14039,14 @@
      "grade": "D",
      "join": {
       "deep_n": 282420.1687378581,
+      "deep_n_raw": 282420.1687378581,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; the modelled natural level in 1500 CE is 1.8x lower; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 1.8066967408749597,
+      "rule": "absolute",
+      "to_kind": "rangeloss",
       "to_n": 156318.52449187776,
       "to_year": 1500
      },
@@ -13117,7 +14097,14 @@
      "grade": "D",
      "join": {
       "deep_n": 202272.52135129974,
+      "deep_n_raw": 202272.52135129974,
+      "factor": 1.0,
+      "flag": false,
+      "next": "modelled",
+      "note": "Genomic curve kept at its own level; today's modelled count is 1.5x lower; the two are joined log-linearly across PSMC's last 20 kyr.",
       "ratio": 1.469144305576394,
+      "rule": "absolute",
+      "to_kind": "model",
       "to_n": 137680.49917461412,
       "to_year": 2026.77
      },
@@ -13167,26 +14154,33 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
-      "deep_n": 67178.97089652858,
+      "deep_n": 2000000.0,
+      "deep_n_raw": 67178.97089652858,
+      "factor": 29.77122116205785,
+      "flag": true,
+      "next": "cited",
+      "note": "Genomic curve scaled x30 to meet the cited 1530 baseline (2,000,000), keeping its shape; before scaling it was 30x below that level (flagged: beyond 10x).",
       "ratio": 0.03358948544826429,
+      "rule": "scaled",
+      "to_kind": "unverified",
       "to_n": 2000000.0,
       "to_year": 1530.0
      },
      "method": "PSMC",
      "ne_factor": 0.8358858205525291,
-     "oldest_n": 676678.1490027971,
+     "oldest_n": 20145534.829494208,
      "oldest_yr_ago": 1065231.3259327163,
      "points": 13,
      "time_factor": 1.6820000000000002,
      "youngest_yr_ago": 33514.34419331399
     },
-    "deep_after": 676678.1490027972,
+    "deep_after": 20145534.829494208,
     "deep_before": 525000.0,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "ever_after": 338673775892.9191,
+    "ever_after": 9983658250089.045,
     "ever_before": 114391700483.32764,
-    "ever_ratio": 2.960649893846802,
+    "ever_ratio": 87.27607167221143,
     "file": "Vicugna_vicugna.toml",
     "grades": "C",
     "leaf": "Vicugna vicugna",
@@ -13200,7 +14194,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 3,
-    "segments": 69,
+    "segments": 60,
     "use": "counts"
    }
   }
@@ -13208,11 +14202,11 @@
  "knuckles_collapsed": 3710,
  "mammalia": {
   "alive": 99887540952.51947,
-  "ever": 8.557979141711481e+18,
-  "ghost": 8.116852230364898e+18,
+  "ever": 8.55798048612266e+18,
+  "ghost": 8.112837196817585e+18,
   "grade": "D",
-  "hi": 3.231457444281459e+22,
-  "lo": 1969485512901781.0
+  "hi": 3.6664310465867343e+22,
+  "lo": 1735264649568884.0
  },
  "mass_sources": {
   "mass:combine": 183,
@@ -14158,12 +15152,12 @@
   "non-species tip": 551
  },
  "output": {
-  "brotli_bytes": 673588,
+  "brotli_bytes": 676131,
   "files": 16,
-  "raw_bytes": 2687696,
-  "skeleton_brotli": 51114,
+  "raw_bytes": 2724064,
+  "skeleton_brotli": 51276,
   "skeleton_nodes": 1156,
-  "skeleton_raw": 242224,
+  "skeleton_raw": 242728,
   "tiles": 15
  },
  "overrides": {
@@ -14767,7 +15761,7 @@
     "leaf": "Bison bison",
     "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count",
     "natural": 421146.34146341466,
-    "segments": 75,
+    "segments": 56,
     "today": 31000.0
    },
    {
@@ -14791,7 +15785,7 @@
     "leaf": "Ceratotherium simum",
     "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count",
     "natural": 20744.172307692304,
-    "segments": 47,
+    "segments": 43,
     "today": 15752.0
    },
    {
@@ -14827,7 +15821,7 @@
     "leaf": "Ursus arctos",
     "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count",
     "natural": 362297.6501305483,
-    "segments": 38,
+    "segments": 32,
     "today": 200000.0
    },
    {
@@ -14899,7 +15893,7 @@
     "leaf": "Elephas maximus",
     "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count",
     "natural": 205422.22929936307,
-    "segments": 47,
+    "segments": 41,
     "today": 50002.00000000001
    }
   ],
@@ -14922,13 +15916,13 @@
   },
   "Hominidae": {
    "alive": 8301443760.715325,
-   "ever": 1487530083996.2185,
+   "ever": 2233316904338.464,
    "ever_range": [
-    45709951662.90855,
-    94230641039646.38
+    36081627797.38731,
+    296119501971859.5
    ],
    "extinct(gray)": false,
-   "ghost": 379532950203.6622,
+   "ghost": 374602032255.0176,
    "grade": "D",
    "t0_Ma": 14.805233333333334,
    "t1_Ma": 0.0
@@ -14948,13 +15942,13 @@
   },
   "Mammalia": {
    "alive": 99887540952.51947,
-   "ever": 8.557979141711481e+18,
+   "ever": 8.55798048612266e+18,
    "ever_range": [
-    1969485512901781.0,
-    3.231457444281459e+22
+    1735264649568884.0,
+    3.6664310465867343e+22
    ],
    "extinct(gray)": 0.0,
-   "ghost": 8.116852230364898e+18,
+   "ghost": 8.112837196817585e+18,
    "grade": "D",
    "t0_Ma": 208.64140800000004,
    "t1_Ma": 0.0
@@ -15264,8 +16258,8 @@
   "by_alive": [
    {
     "alive": 54318491455.12063,
-    "ever": 1.3919213101109686e+18,
-    "ghost": 1.2023235646648271e+18,
+    "ever": 1.390206092463892e+18,
+    "ghost": 1.2006083470177505e+18,
     "ghost_share": 0.864,
     "name": "Chiroptera",
     "sampled": 1.8959774544614144e+17,
@@ -15273,8 +16267,8 @@
    },
    {
     "alive": 23133449903.122658,
-    "ever": 1.795565617328645e+18,
-    "ghost": 1.6361616981990167e+18,
+    "ever": 1.7936524148292854e+18,
+    "ghost": 1.634248495699657e+18,
     "ghost_share": 0.911,
     "name": "Rodentia",
     "sampled": 1.594039191296284e+17,
@@ -15282,26 +16276,26 @@
    },
    {
     "alive": 5654779269.41726,
-    "ever": 4883707673367079.0,
-    "ghost": 4318348229070864.5,
-    "ghost_share": 0.884,
+    "ever": 8704543474508339.0,
+    "ghost": 4312350074865836.0,
+    "ghost_share": 0.495,
     "name": "Artiodactyla",
-    "sampled": 565359444296214.5,
+    "sampled": 4392193399642503.0,
     "t0_Ma": 61.87
    },
    {
     "alive": 2226019086.255797,
-    "ever": 1.7129595199553236e+16,
-    "ghost": 1.5316689400498496e+16,
+    "ever": 1.711104496482647e+16,
+    "ghost": 1.5298096112590922e+16,
     "ghost_share": 0.894,
     "name": "Carnivora",
-    "sampled": 1812905799054740.0,
+    "sampled": 1812948852235548.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 1492362384.468411,
-    "ever": 1.8340750477914394e+17,
-    "ghost": 1.4230503768261893e+17,
+    "ever": 1.832570089165219e+17,
+    "ghost": 1.4215454181999688e+17,
     "ghost_share": 0.776,
     "name": "Eulipotyphla",
     "sampled": 4.110246709652501e+16,
@@ -15309,8 +16303,8 @@
    },
    {
     "alive": 1195648666.3005614,
-    "ever": 7.827932687889885e+16,
-    "ghost": 6.276573953063956e+16,
+    "ever": 7.820197360347805e+16,
+    "ghost": 6.268838625521876e+16,
     "ghost_share": 0.802,
     "name": "Didelphimorphia",
     "sampled": 1.5513587348259288e+16,
@@ -15318,17 +16312,17 @@
    },
    {
     "alive": 751328331.2713387,
-    "ever": 4.010267806169209e+16,
-    "ghost": 2.870328640694664e+16,
-    "ghost_share": 0.716,
+    "ever": 4.005810598122769e+16,
+    "ghost": 2.8658714326482244e+16,
+    "ghost_share": 0.715,
     "name": "Lagomorpha",
-    "sampled": 1.1399391654745448e+16,
+    "sampled": 1.1399391654745444e+16,
     "t0_Ma": 72.45
    },
    {
     "alive": 619434015.7798252,
-    "ever": 1.188436212102852e+16,
-    "ghost": 9521374852963564.0,
+    "ever": 1.1869576793660038e+16,
+    "ghost": 9506589525595082.0,
     "ghost_share": 0.801,
     "name": "Hyracoidea",
     "sampled": 2362987268064956.0,
@@ -15336,8 +16330,8 @@
    },
    {
     "alive": 408303737.17517364,
-    "ever": 1.2146831086736576e+16,
-    "ghost": 9111050481188904.0,
+    "ever": 1.2131207935357496e+16,
+    "ghost": 9095427329809824.0,
     "ghost_share": 0.75,
     "name": "Diprotodontia",
     "sampled": 3035780605547672.0,
@@ -15345,19 +16339,19 @@
    },
    {
     "alive": 290577780.41253823,
-    "ever": 2.0377345400761988e+16,
-    "ghost": 1.323754651769365e+16,
-    "ghost_share": 0.65,
+    "ever": 2.036127606079529e+16,
+    "ghost": 1.3221477177726952e+16,
+    "ghost_share": 0.649,
     "name": "Macroscelidea",
-    "sampled": 7139798883068338.0,
+    "sampled": 7139798883068336.0,
     "t0_Ma": 65.7
    }
   ],
   "by_ever": [
    {
     "alive": 23133449903.122658,
-    "ever": 1.795565617328645e+18,
-    "ghost": 1.6361616981990167e+18,
+    "ever": 1.7936524148292854e+18,
+    "ghost": 1.634248495699657e+18,
     "ghost_share": 0.911,
     "name": "Rodentia",
     "sampled": 1.594039191296284e+17,
@@ -15365,8 +16359,8 @@
    },
    {
     "alive": 54318491455.12063,
-    "ever": 1.3919213101109686e+18,
-    "ghost": 1.2023235646648271e+18,
+    "ever": 1.390206092463892e+18,
+    "ghost": 1.2006083470177505e+18,
     "ghost_share": 0.864,
     "name": "Chiroptera",
     "sampled": 1.8959774544614144e+17,
@@ -15374,8 +16368,8 @@
    },
    {
     "alive": 1492362384.468411,
-    "ever": 1.8340750477914394e+17,
-    "ghost": 1.4230503768261893e+17,
+    "ever": 1.832570089165219e+17,
+    "ghost": 1.4215454181999688e+17,
     "ghost_share": 0.776,
     "name": "Eulipotyphla",
     "sampled": 4.110246709652501e+16,
@@ -15383,8 +16377,8 @@
    },
    {
     "alive": 1195648666.3005614,
-    "ever": 7.827932687889885e+16,
-    "ghost": 6.276573953063956e+16,
+    "ever": 7.820197360347805e+16,
+    "ghost": 6.268838625521876e+16,
     "ghost_share": 0.802,
     "name": "Didelphimorphia",
     "sampled": 1.5513587348259288e+16,
@@ -15392,35 +16386,35 @@
    },
    {
     "alive": 751328331.2713387,
-    "ever": 4.010267806169209e+16,
-    "ghost": 2.870328640694664e+16,
-    "ghost_share": 0.716,
+    "ever": 4.005810598122769e+16,
+    "ghost": 2.8658714326482244e+16,
+    "ghost_share": 0.715,
     "name": "Lagomorpha",
-    "sampled": 1.1399391654745448e+16,
+    "sampled": 1.1399391654745444e+16,
     "t0_Ma": 72.45
    },
    {
     "alive": 290577780.41253823,
-    "ever": 2.0377345400761988e+16,
-    "ghost": 1.323754651769365e+16,
-    "ghost_share": 0.65,
+    "ever": 2.036127606079529e+16,
+    "ghost": 1.3221477177726952e+16,
+    "ghost_share": 0.649,
     "name": "Macroscelidea",
-    "sampled": 7139798883068338.0,
+    "sampled": 7139798883068336.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 2226019086.255797,
-    "ever": 1.7129595199553236e+16,
-    "ghost": 1.5316689400498496e+16,
+    "ever": 1.711104496482647e+16,
+    "ghost": 1.5298096112590922e+16,
     "ghost_share": 0.894,
     "name": "Carnivora",
-    "sampled": 1812905799054740.0,
+    "sampled": 1812948852235548.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 408303737.17517364,
-    "ever": 1.2146831086736576e+16,
-    "ghost": 9111050481188904.0,
+    "ever": 1.2131207935357496e+16,
+    "ghost": 9095427329809824.0,
     "ghost_share": 0.75,
     "name": "Diprotodontia",
     "sampled": 3035780605547672.0,
@@ -15428,28 +16422,28 @@
    },
    {
     "alive": 619434015.7798252,
-    "ever": 1.188436212102852e+16,
-    "ghost": 9521374852963564.0,
+    "ever": 1.1869576793660038e+16,
+    "ghost": 9506589525595082.0,
     "ghost_share": 0.801,
     "name": "Hyracoidea",
     "sampled": 2362987268064956.0,
     "t0_Ma": 58.62
    },
    {
-    "alive": 83946369.13395886,
-    "ever": 5670299422202225.0,
-    "ghost": 4741441231476645.0,
-    "ghost_share": 0.836,
-    "name": "Dasyuromorphia",
-    "sampled": 928858190725580.0,
-    "t0_Ma": 58.64
+    "alive": 5654779269.41726,
+    "ever": 8704543474508339.0,
+    "ghost": 4312350074865836.0,
+    "ghost_share": 0.495,
+    "name": "Artiodactyla",
+    "sampled": 4392193399642503.0,
+    "t0_Ma": 61.87
    }
   ],
   "by_sampled_ever": [
    {
     "alive": 54318491455.12063,
-    "ever": 1.3919213101109686e+18,
-    "ghost": 1.2023235646648271e+18,
+    "ever": 1.390206092463892e+18,
+    "ghost": 1.2006083470177505e+18,
     "ghost_share": 0.864,
     "name": "Chiroptera",
     "sampled": 1.8959774544614144e+17,
@@ -15457,8 +16451,8 @@
    },
    {
     "alive": 23133449903.122658,
-    "ever": 1.795565617328645e+18,
-    "ghost": 1.6361616981990167e+18,
+    "ever": 1.7936524148292854e+18,
+    "ghost": 1.634248495699657e+18,
     "ghost_share": 0.911,
     "name": "Rodentia",
     "sampled": 1.594039191296284e+17,
@@ -15466,8 +16460,8 @@
    },
    {
     "alive": 1492362384.468411,
-    "ever": 1.8340750477914394e+17,
-    "ghost": 1.4230503768261893e+17,
+    "ever": 1.832570089165219e+17,
+    "ghost": 1.4215454181999688e+17,
     "ghost_share": 0.776,
     "name": "Eulipotyphla",
     "sampled": 4.110246709652501e+16,
@@ -15475,8 +16469,8 @@
    },
    {
     "alive": 1195648666.3005614,
-    "ever": 7.827932687889885e+16,
-    "ghost": 6.276573953063956e+16,
+    "ever": 7.820197360347805e+16,
+    "ghost": 6.268838625521876e+16,
     "ghost_share": 0.802,
     "name": "Didelphimorphia",
     "sampled": 1.5513587348259288e+16,
@@ -15484,26 +16478,35 @@
    },
    {
     "alive": 751328331.2713387,
-    "ever": 4.010267806169209e+16,
-    "ghost": 2.870328640694664e+16,
-    "ghost_share": 0.716,
+    "ever": 4.005810598122769e+16,
+    "ghost": 2.8658714326482244e+16,
+    "ghost_share": 0.715,
     "name": "Lagomorpha",
-    "sampled": 1.1399391654745448e+16,
+    "sampled": 1.1399391654745444e+16,
     "t0_Ma": 72.45
    },
    {
     "alive": 290577780.41253823,
-    "ever": 2.0377345400761988e+16,
-    "ghost": 1.323754651769365e+16,
-    "ghost_share": 0.65,
+    "ever": 2.036127606079529e+16,
+    "ghost": 1.3221477177726952e+16,
+    "ghost_share": 0.649,
     "name": "Macroscelidea",
-    "sampled": 7139798883068338.0,
+    "sampled": 7139798883068336.0,
     "t0_Ma": 65.7
    },
    {
+    "alive": 5654779269.41726,
+    "ever": 8704543474508339.0,
+    "ghost": 4312350074865836.0,
+    "ghost_share": 0.495,
+    "name": "Artiodactyla",
+    "sampled": 4392193399642503.0,
+    "t0_Ma": 61.87
+   },
+   {
     "alive": 408303737.17517364,
-    "ever": 1.2146831086736576e+16,
-    "ghost": 9111050481188904.0,
+    "ever": 1.2131207935357496e+16,
+    "ghost": 9095427329809824.0,
     "ghost_share": 0.75,
     "name": "Diprotodontia",
     "sampled": 3035780605547672.0,
@@ -15511,8 +16514,8 @@
    },
    {
     "alive": 619434015.7798252,
-    "ever": 1.188436212102852e+16,
-    "ghost": 9521374852963564.0,
+    "ever": 1.1869576793660038e+16,
+    "ghost": 9506589525595082.0,
     "ghost_share": 0.801,
     "name": "Hyracoidea",
     "sampled": 2362987268064956.0,
@@ -15520,21 +16523,12 @@
    },
    {
     "alive": 2226019086.255797,
-    "ever": 1.7129595199553236e+16,
-    "ghost": 1.5316689400498496e+16,
+    "ever": 1.711104496482647e+16,
+    "ghost": 1.5298096112590922e+16,
     "ghost_share": 0.894,
     "name": "Carnivora",
-    "sampled": 1812905799054740.0,
+    "sampled": 1812948852235548.0,
     "t0_Ma": 65.7
-   },
-   {
-    "alive": 109970983.57691984,
-    "ever": 4610598011218010.0,
-    "ghost": 2838325771013911.0,
-    "ghost_share": 0.616,
-    "name": "Scandentia",
-    "sampled": 1772272240204099.0,
-    "t0_Ma": 74.72
    }
   ]
  },
