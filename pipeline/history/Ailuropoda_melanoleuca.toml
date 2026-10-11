@@ -3,7 +3,7 @@ common    = "Giant panda"
 component = "wild"
 use       = "counts"
 scope     = "global wild population (China), all ages"
-notes     = "Four national surveys by China's State Forestry Administration. Methods and survey area changed between rounds (the fourth searched ~72% more area than the third), so the rise from 1,114 to 1,864 partly reflects better and wider surveying, not only real growth. The 1985-88 low followed bamboo die-offs and poaching."
+notes     = "Four national surveys by China's State Forestry Administration. Methods and survey area changed between rounds (the fourth searched ~72% more area than the third), so the rise from 1,114 to 1,864 partly reflects better and wider surveying, not only real growth. The 1985-88 low followed bamboo die-offs and poaching. Bottlenecks ([[event]], ToLaD#147): the late-glacial decline of the Sichuan populations (Lan et al. 2024, 30-10 kya) is in the data as a join: the build keeps PSMC to ~30 kya (112,647) and joins log-linearly down to the natural level in 1500 (15,127), so the column falls through the window without a dated low; the dropped blind PSMC step (22,430 at 11-24 kya) agrees with the source. Zhao et al. 2013's 3,000 years of human pressure lie on the same smooth join and the range-loss trend; the censuses since 1976 do not show a low (2,459, 1,114, 1,596, 1,864; the 1986 dip is a survey difference as much as a decline)."
 
 [[event]]
 kind    = "bottleneck"

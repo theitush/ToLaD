@@ -14,6 +14,8 @@ No sourced pre-settlement count: large historical numbers are inferred from prai
 area and the Meeteetse density of one adult ferret per 40-60 ha of prairie-dog colony (Forrest et
 al., via the SSA), not counted. Added for ToLaD#68/#72: the model's own count (161,078, from
 density x a clade-mean range) was about 300x too high.
+
+Bottlenecks ([[event]], ToLaD#147): the Meeteetse low (18 ferrets captured 1985-87, USFWS 2019 SSA) is not in the data: the first point is 2019 (340), so the column runs on the modelled level before it. The 1985-87 count of 18 could become a point (grade A) in a later pass.
 """
 
 [[event]]

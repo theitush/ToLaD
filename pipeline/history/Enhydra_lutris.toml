@@ -3,7 +3,7 @@ common    = "Sea otter"
 component = "wild"
 use       = "counts"
 scope     = "global, all ages"
-notes     = "The maritime fur trade (1741-1911) reduced the species to 13 remnant colonies; protected by the 1911 Fur Seal Treaty. Recovery since, partly through translocations (e.g. British Columbia 1969-72), but the southwest Alaska / Aleutian population collapsed in the 1990s. California has a separate USGS annual index (2,962 in 2019). IUCN: Endangered."
+notes     = "The maritime fur trade (1741-1911) reduced the species to 13 remnant colonies; protected by the 1911 Fur Seal Treaty. Recovery since, partly through translocations (e.g. British Columbia 1969-72), but the southwest Alaska / Aleutian population collapsed in the 1990s. California has a separate USGS annual index (2,962 in 2019). IUCN: Endangered. Bottlenecks ([[event]], ToLaD#147): the fur-trade crash (Beichman et al. 2023) is in the data: baseline 225,000 (1741), low 1,500 (1911), then 126,000 (1998)."
 
 [[event]]
 kind    = "bottleneck"

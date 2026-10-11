@@ -3,7 +3,7 @@ common    = "Antarctic fur seal"
 component = "wild"
 use       = "counts"
 scope     = "global, all ages (South Georgia holds ~98%)"
-notes     = "Sealed to commercial extinction by 1907; tens of animals were seen again at Bird Island, South Georgia, in the 1930s (Bonner 1968), and pup counts began in 1956. No numeric pre-sealing or low-point figure with a traceable source was found, so there is no baseline. Older totals of 4.5-6.2 million in 1999/2000 (SCAR Expert Group on Seals 2008) are judged inflated by Forcada et al. 2023 and not used. Since 2009 Bird Island has declined 7.2%/yr; IUCN (Forcada 2026, now Endangered) gives 2,187,000 mature seals in 1999 and 944,000 in 2025. Those are mature-only, so no all-age point is derived from them."
+notes     = "Sealed to commercial extinction by 1907; tens of animals were seen again at Bird Island, South Georgia, in the 1930s (Bonner 1968), and pup counts began in 1956. No numeric pre-sealing or low-point figure with a traceable source was found, so there is no baseline. Older totals of 4.5-6.2 million in 1999/2000 (SCAR Expert Group on Seals 2008) are judged inflated by Forcada et al. 2023 and not used. Since 2009 Bird Island has declined 7.2%/yr; IUCN (Forcada 2026, now Endangered) gives 2,187,000 mature seals in 1999 and 944,000 in 2025. Those are mature-only, so no all-age point is derived from them. Bottlenecks ([[event]], ToLaD#147): the sealing near-extinction (Paijmans et al. 2020, 1775 to the early 20th century) is not in the data: the file's one point is 2008, so the column runs on the modelled level before it. The mark stands on the source alone."
 
 [[event]]
 kind    = "bottleneck"

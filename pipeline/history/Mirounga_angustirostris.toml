@@ -3,7 +3,7 @@ common    = "Northern elephant seal"
 component = "wild"
 use       = "counts"
 scope     = "global (California and Baja California, Mexico), all ages"
-notes     = "Hunted for oil in the 19th century until commercially extinct by the mid-1800s and presumed extinct by 1892; a remnant survived on Guadalupe Island and was protected by Mexico in 1922. Recovery grew ~17%/yr 1958-1987 and ~3.8%/yr 1987-2010 (Lowry et al. 2014). California alone was 194,903 in 2023 (Lowry et al., NOAA tech. memo); no recent all-range total was found. No pre-exploitation figure was found, so there is no baseline."
+notes     = "Hunted for oil in the 19th century until commercially extinct by the mid-1800s and presumed extinct by 1892; a remnant survived on Guadalupe Island and was protected by Mexico in 1922. Recovery grew ~17%/yr 1958-1987 and ~3.8%/yr 1987-2010 (Lowry et al. 2014). California alone was 194,903 in 2023 (Lowry et al., NOAA tech. memo); no recent all-range total was found. No pre-exploitation figure was found, so there is no baseline. Bottlenecks ([[event]], ToLaD#147): the 19th-century hunting crash (Hoelzel et al. 2024) is in the data: the 1890 point (100) is the curve's low. With no baseline the build holds the modelled level before 1890, so the fall into the crash is a step at the first point, not a dated decline. Hoffman et al. 2024 (Nat Ecol Evol 8:2309) read an effective size of about six during the bottleneck from today's genomes."
 
 [[event]]
 kind    = "bottleneck"

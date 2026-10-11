@@ -10,6 +10,8 @@ population grew to over a hundred and then collapsed to a few dozen (gunshot, ve
 coyote hybridisation). 1980-1987: none in the wild (the curve cannot show a zero). No sourced
 pre-decline count. Added for ToLaD#72: the model's own count (188,562, from density x a clade-mean
 range) was about 5,000x too high.
+
+Bottlenecks ([[event]], ToLaD#147): the 14 founders (1973-80, Hinton et al. 2013) are not in the data: the file's one point is 2026 (37).
 """
 
 [[event]]
