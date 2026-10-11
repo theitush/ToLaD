@@ -83,7 +83,9 @@ describe('the fan, both designs: fixed, continuous, honest', () => {
           const a = edges(b, y - 1e-7);
           const c = edges(b, y + 1e-7);
           const w = Math.max(laneAt(b, y - 1e-7).w, laneAt(b, y + 1e-7).w, 1e-9);
-          for (let k = 0; k < 3; k++) expect(Math.abs(a[k] - c[k]) / w).toBeLessThan(1e-4);
+          // (A hair of the column's own width, plus the hair of movement any edge may make at the
+          // bounded slope below: a column far narrower than the rest still moves sideways with them.)
+          for (let k = 0; k < 3; k++) expect(Math.abs(a[k] - c[k])).toBeLessThan(1e-4 * w + 12 * 2e-7);
         }
         // Finely across its whole span (every feature interval cut in 16): the edges move at a bounded slope.
         const ys = [b.tipY, ...f, yb];

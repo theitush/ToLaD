@@ -239,6 +239,17 @@ export class Population {
    * appearance, tapering smoothly to it; its founders before its start.
    * Smooth in time (see the header): the fan's width is exactly this.
    */
+  /**
+   * A domestic stock's ramp up from nobody: the ages (Ma) of its split and of
+   * the ramp's end, or null. (The layout's fork must open no slower than it
+   * grows, or the stock would spill into its wild sibling's column.)
+   */
+  emergeAges(): [number, number] | null {
+    if (!this.emerge) return null;
+    const ma = (s: number) => Math.max(0, Math.pow(10, s) - TIME_C) * 1e-6;
+    return [ma(this.emerge[0]), ma(this.emerge[1])];
+  }
+
   aliveAt(ageMa: number): number {
     const sp = this.sp;
     if (ageMa < sp.t1) return 0;

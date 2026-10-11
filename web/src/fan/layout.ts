@@ -472,6 +472,34 @@ const MAX_Q_GENS = 5000;
 type Kid = FanNode | FanBranch;
 const under = (v: FanNode): FanBranch[] => v.kids.flatMap((k) => (isNode(k) ? under(k) : [k]));
 
+/**
+ * A daughter that grows out of nobody at its split (a domestic stock,
+ * population.ts emergeAges): the longest fork (or lean) span over which its
+ * move off its slot (ease) stays ahead of its width's share of its room at
+ * every height of its ramp, else Infinity. Its sibling's column stays where
+ * its founders were while the stock moves out of the way at least as fast as
+ * it grows, so it never spills into its sibling's column. (The log widths
+ * jump to one unit at the first individual: the ramp in N alone is not
+ * enough.)
+ */
+function emergeRun(k: Kid, time: TimeScale, mode: WidthMode, edge: EdgeStyle): number {
+  const e = isNode(k) ? null : k.pop.emergeAges();
+  if (isNode(k) || !e || !(k.width > 0)) return Infinity;
+  const E = Math.abs(time.y(e[1]) - time.y(e[0]));
+  const xs = Array.from({ length: 96 }, (_, i) => (E * (i + 1)) / 96);
+  const share = xs.map((x) => (k.unit * g(k.pop.aliveAt(time.ageAt(k.splitY - x)), mode)) / k.width);
+  const ok = (F: number) => xs.every((x, i) => ease(edge, x / F) >= share[i]);
+  if (ok(E)) return E;
+  let lo = 0;
+  let hi = E;
+  for (let it = 0; it < 40; it++) {
+    const mid = (lo + hi) / 2;
+    if (ok(mid)) lo = mid;
+    else hi = mid;
+  }
+  return lo;
+}
+
 export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = FELIDAE_TREE, edge: EdgeStyle = 'curved'): Fan {
   const W = TRUNK_WIDTH;
   const time = new TimeScale(tree.ageMa);
@@ -573,8 +601,8 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = FELIDA
   if (!byMode) byTree.set(tree, (byMode = new Map()));
   const { plans, sides } = chooseSides(root, W, byMode.get(mode));
   byMode.set(mode, sides);
-  if (edge === 'curved') placeRiver(root, W);
-  else placeLean(root, nodes, plans);
+  if (edge === 'curved') placeRiver(root, W, time, mode);
+  else placeLean(root, nodes, plans, time, mode);
   // Each strand's place in its ancestors' columns (offsets in the column's order), each column's tile in its parent, each leaf's slot.
   for (const v of nodes) v.strands = under(v);
   for (const v of nodes) {
@@ -639,7 +667,7 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = FELIDA
  * their shortest run, at most FORK_MAX); the lanes blend below a split over
  * at most FORK_MAX.
  */
-function placeRiver(root: FanNode, W: number): void {
+function placeRiver(root: FanNode, W: number, time: TimeScale, mode: WidthMode): void {
   const leaves = under(root);
   let total = 0;
   for (let j = 0; j < leaves.length; j++) total += leaves[j].width + (j ? gapBetween(leaves[j - 1], leaves[j], W) : 0);
@@ -661,7 +689,7 @@ function placeRiver(root: FanNode, W: number): void {
     // The fork span: a share of the shortest run of a daughter before it splits again or ends.
     let run = Infinity;
     for (const k of v.kids) run = Math.min(run, v.y - (isNode(k) ? k.y : k.tipY));
-    const fork = Math.max(0, Math.min(FORK_MAX, FORK_FRAC * run));
+    const fork = Math.max(0, Math.min(FORK_MAX, FORK_FRAC * run, ...v.kids.map((k) => emergeRun(k, time, mode, 'curved'))));
     for (const k of v.kids) k.leanY = v.y - fork;
     v.blend = Math.max(0, Math.min(FORK_MAX, 0.45 * (v.yBot - v.y)));
   };
@@ -808,7 +836,7 @@ function chooseSides(root: FanNode, W: number, known?: Map<Split, boolean>): { p
  * its lean. The lanes blend below a split as far down as its daughters lean
  * out above it (at most half its band).
  */
-function placeLean(root: FanNode, nodes: FanNode[], plans: Map<FanNode, Plan>): void {
+function placeLean(root: FanNode, nodes: FanNode[], plans: Map<FanNode, Plan>, time: TimeScale, mode: WidthMode): void {
   const rp = plans.get(root)!;
   // Place it: the whole centred on 0, then each daughter from its slot in its parent's band.
   const nextEvent = (k: Kid) => (isNode(k) ? k.y : k.tipY);
@@ -816,10 +844,11 @@ function placeLean(root: FanNode, nodes: FanNode[], plans: Map<FanNode, Plan>): 
     const p = plans.get(v)!;
     v.cx = v.left + v.width / 2;
     const room = Math.min(...p.order.map((k) => v.y - nextEvent(k)));
+    const emerge = Math.min(...p.order.map((k) => emergeRun(k, time, mode, 'straight')));
     p.order.forEach((k, i) => {
       const x0 = v.left + p.off[i];
       const d = p.dx[i];
-      k.leanY = d ? v.y - Math.min(Math.abs(d) * LEAN_RISE, LEAN_MAX_FRAC * room) : v.y;
+      k.leanY = d ? v.y - Math.min(Math.abs(d) * LEAN_RISE, LEAN_MAX_FRAC * room, emerge) : v.y;
       if (isNode(k)) {
         k.left = x0 + d;
         place(k);
