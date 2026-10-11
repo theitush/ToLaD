@@ -83,6 +83,40 @@ class Schema(unittest.TestCase):
         self.assertEqual([p["year"] for p in r["points"]], [1950.0, 2020.0])
         self.assertEqual(r["baseline"]["n"], 1e6)
 
+    def test_events(self):
+        """[[event]] (ToLaD#141): validated, normalised and sorted oldest first; bad ones rejected."""
+        ev = {"kind": "bottleneck", "from_ya": 25000, "to_ya": 10000, "title": "A refounding",
+              "summary": "Few founders.", "quote": "a  small number\n of founders", "cite": "Z 2000",
+              "url": "https://doi.org/10.1/x", "grade": "C"}
+        d = copy.deepcopy(GOOD)
+        d["event"] = [dict(ev, from_ya=12600, to_ya=11000, region="Africa"), dict(ev)]
+        r = H.validate(d)
+        self.assertEqual([e["from_ya"] for e in r["events"]], [25000.0, 12600.0])
+        self.assertEqual(r["events"][0]["quote"], "a small number of founders")
+        self.assertEqual((r["events"][0]["region"], r["events"][1]["region"]), ("", "Africa"))
+        self.assertEqual(H.validate(copy.deepcopy(GOOD))["events"], [])
+        for mut in (dict(kind="decline"), dict(from_ya=10000, to_ya=25000), dict(to_ya=-1), dict(quote=" "),
+                    dict(cite=""), dict(url="doi:10.1/x"), dict(grade="E"), dict(title="x" * 41),
+                    dict(colour="red"), dict(from_ya="25 kya")):
+            d = copy.deepcopy(GOOD)
+            d["event"] = [dict(ev, **mut)]
+            with self.assertRaises(H.HistoryError, msg=str(mut)):
+                H.validate(d)
+        d = copy.deepcopy(GOOD)
+        d["event"] = [{k: v for k, v in ev.items() if k != "quote"}]
+        with self.assertRaises(H.HistoryError):
+            H.validate(d)
+
+    def test_seeded_bottlenecks(self):
+        """The cougar's and the cheetah's bottlenecks are in their files, each quoting its source."""
+        recs = {r["species"]: r for r in H.load_all()}
+        for sp in ("Puma concolor", "Acinonyx jubatus"):
+            evs = recs[sp]["events"]
+            self.assertTrue(evs, sp)
+            for e in evs:
+                self.assertEqual(e["kind"], "bottleneck")
+                self.assertTrue(e["url"].startswith("https://doi.org/"), sp)
+
     def test_bad_docs_rejected(self):
         def bad(mut):
             d = copy.deepcopy(GOOD)
