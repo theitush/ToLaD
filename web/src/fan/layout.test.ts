@@ -101,9 +101,7 @@ describe('the fan, both designs: fixed, continuous, honest', () => {
             const dy = (ys[i + 1] - ys[i]) / 16;
             // (Log widths close an extinct column over its last ~10 individuals steeply: the log of a smooth taper.)
             const last = mode === 'log' && y < b.splitY && b.pop.aliveAt(fan.time.ageAt(y - dy)) < 10;
-            // (13: boundPeels holds a peel to PEEL_SLOPE where the tree allows, else to the least slope it can; the data's
-            // tree, ToLaD#145, has splits close enough in time that a curved peel's edge runs just over 12.)
-            if (!last) for (let k = 0; k < 3; k++) expect(Math.abs(e[k] - prev[k])).toBeLessThanOrEqual(13 * dy + 1e-9);
+            if (!last) for (let k = 0; k < 3; k++) expect(Math.abs(e[k] - prev[k])).toBeLessThanOrEqual(12 * dy + 1e-9);
             prev = e;
           }
         }

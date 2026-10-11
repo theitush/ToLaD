@@ -63,8 +63,7 @@ function sweep(c: FanCamera, cams: Camera[], bound: number) {
         const d = Math.max(Math.abs(s.x - p.x), Math.abs(s.y1 - p.y1));
         worst = Math.max(worst, d);
         // Beside a branch a label follows its edge, which can lean (a peel) or widen fast (a boom on the log time axis): faster than the camera.
-        // (7, not 6: since ToLaD#145 the data's crowded fossil splits lean an edge a little faster.)
-        expect(d, `${s.key} moved`).toBeLessThanOrEqual(s.place === 'tip' ? bound : 7 * bound);
+        expect(d, `${s.key} moved`).toBeLessThanOrEqual(s.place === 'tip' ? bound : 6 * bound);
       }
     }
     const on = resolveLabels(spots, shown);

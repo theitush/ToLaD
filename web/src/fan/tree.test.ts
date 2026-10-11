@@ -151,9 +151,7 @@ describe('the dated tree', () => {
         if (edge === 'curved') {
           const moves = v.kids.map((k) => (isNode(k) ? k.left - k.tile : k.cx - (k.x0 + k.baseW / 2)));
           const fork = v.y - v.kids[0].leanY;
-          // (36: since ToLaD#145 the data's stem is a chain of fossil splits under 1 Myr apart, 12-15 Ma, and boundPeels
-          // can only reach the least slope the tree allows there; layout.test bounds the edges themselves.)
-          if (Math.abs(Math.max(...moves) + Math.min(...moves)) > 1e-9) for (const m of moves) expect(Math.abs(m) * 1.875).toBeLessThanOrEqual(36 * fork);
+          if (Math.abs(Math.max(...moves) + Math.min(...moves)) > 1e-9) for (const m of moves) expect(Math.abs(m) * 1.875).toBeLessThanOrEqual(12 * fork);
         }
         expect(v.left + v.width / 2).toBeCloseTo(v.cx, 9);
       }
