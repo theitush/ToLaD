@@ -23,6 +23,7 @@ const scenes = [
   ['leopard-details', 'Leopard', 0.2, true],
   ['snow-leopard-details', 'Snow leopard', 0.2, true],
   ['lion-now', 'Lion', 0.2],
+  ['snow-leopard-now', 'Snow leopard', 0.2],
   ['lion-sources', 'Lion', 0.2, 'sources'],
   ['leopard-sources', 'Leopard', 0.2, 'sources'],
   ['snow-leopard-sources', 'Snow leopard', 0.2, 'sources'],

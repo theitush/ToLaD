@@ -329,11 +329,14 @@
   border-radius: 50%;
   vertical-align: 0;
 }
-/* A reconstructed (modelled) level: hollow, as its points on the sparkline. */
-.card-sp .gdot.ring {
-  box-sizing: border-box;
-  border: 1.5px solid;
-  background: none;
+/* The reconstructed (guessed) curve's key: a short dashed stroke over a faint band, as on the sparkline. */
+.card-sp .gdash {
+  display: inline-block;
+  width: 14px;
+  height: 7px;
+  border-top: 1.5px dashed;
+  background: rgba(232, 112, 106, 0.16);
+  vertical-align: 1px;
 }
 
 .legend .dim {

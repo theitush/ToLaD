@@ -4,7 +4,7 @@ import { plainAgo, plainCount, SpeciesCard } from './FanApp';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { fmtWhen, HistorySpark, popTicks, sourceRows, yearTicks } from './HistorySpark';
+import { CURVE_KINDS, fmtWhen, HistorySpark, popTicks, sourceRows, yearTicks } from './HistorySpark';
 import { GRADE_WORD, MODELLED_KINDS, noDataSpans, styleBetween } from './history';
 import { FELIDAE, NATURAL_META, type HistoryRec } from './panthera';
 import { loadClade } from './panthera-extract';
@@ -35,10 +35,14 @@ describe('species card history', () => {
         expect(html).toContain(`grade ${p.grade}`);
         if (p.kind !== 'genomic') expect(html).toContain(p.kind);
       }
-      // Sparkline markers: one per cited or modelled point, coloured by grade (the genomic steps are a band, no dots);
-      // the spans between them styled like the edge.
-      expect((html.match(/<circle /g) ?? []).length).toBe(h.points.length - genomic.length);
-      expect(html).toContain('data-band="genomic"');
+      // Sparkline markers: a dot per cited figure only, coloured by grade; the reconstructed points (genomic steps,
+      // range-loss trend, the model's count) are one guessed curve over a faint band, no dots or bars (Ita, #69).
+      const cited = h.points.filter((p) => !CURVE_KINDS.has(p.kind));
+      expect((html.match(/<g data-grade=/g) ?? []).length, common).toBe(cited.length);
+      expect((html.match(/<circle /g) ?? []).length, common).toBe(cited.length + (html.match(/data-modelled=""/g) ?? []).length);
+      expect((html.match(/data-modelled=""/g) ?? []).length, common).toBeLessThanOrEqual(1);
+      expect(html).toContain('data-band=""');
+      expect(html).toContain('data-curve=""');
       const pts = h.points.slice().sort((a, b) => a.year - b.year);
       for (let k = 1; k < pts.length; k++) expect(html).toContain(`data-style="${styleBetween(h, pts[k - 1].year, pts[k].year)}"`);
     }
@@ -68,8 +72,10 @@ describe('species card history', () => {
     const html = renderToStaticMarkup(<HistorySpark h={h} open />);
     expect(html).toContain('data-style="dashed"');
     expect(html).not.toContain('data-style="dotted"');
-    // The trend's start is hollow (the model's), today's count a filled dot.
-    expect((html.match(/data-modelled=""/g) ?? []).length).toBe(1);
+    // The trend and today's modelled count are one guessed curve over a band: no dots, no bars.
+    expect(html).not.toContain('<circle');
+    expect((html.match(/data-band=""/g) ?? []).length).toBe(1);
+    expect(html).toContain('data-key="reconstructed"');
     expect(html).toContain('data-modelled-note=""');
     expect(html).toContain('Modelled, not counted');
   });
@@ -247,7 +253,8 @@ describe('the species card: the population at the time touched', () => {
   it('says what the sparkline dots\' colours mean, in plain words', () => {
     for (const sp of FELIDAE.species.filter((s) => s.history && s.history.points.length > 0)) {
       const html = renderToStaticMarkup(<SpeciesCard sp={sp} onClose={() => {}} />);
-      const grades = new Set(sp.history!.points.map((p) => p.grade));
+      // (only the cited figures' grades: the reconstructed curve has its own key)
+      const grades = new Set(sp.history!.points.filter((p) => !CURVE_KINDS.has(p.kind)).map((p) => p.grade));
       for (const g of ['A', 'B', 'C', 'D']) {
         if (grades.has(g as never)) {
           expect(html).toContain(`data-key="${g}"`);
@@ -304,9 +311,9 @@ describe('the card shows the deep past and the natural level (ToLaD#69)', () => 
     expect(text(html)).toContain('Population over time, years ago');
     const ticks = [...html.matchAll(/<text[^>]*text-anchor="middle"[^>]*>([^<]+)<\/text>/g)].map((m) => m[1]);
     for (const t of ['1k', '10k', '100k', '1M', 'now']) expect(ticks).toContain(t);
-    // The last century is not squashed into the corner: 1950 and 2024 are well apart.
+    // The last century is not squashed into the corner: 1950 and 2024 are well apart (on a linear axis, under 7 px).
     const xs = [...html.matchAll(/<circle cx="([\d.]+)"/g)].map((m) => Number(m[1]));
-    expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(40);
+    expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(30);
     // Only recent history: a linear calendar axis as before.
     expect(spark(byName('Eurasian lynx'), false)).toContain('data-axis="linear"');
   });

@@ -81,6 +81,13 @@ export function fmtYear(y: number): string {
   return y < 0 ? `${Math.round(-y)} BCE` : String(Math.round(y));
 }
 
+/**
+ * Kinds that are the pipeline's reconstruction, not a cited figure: the genomic (PSMC) curve, the
+ * natural level, the range-loss trend and the model's count today. The sparkline draws them as one
+ * guessed curve (a line over a faint lo–hi band), never as dots; dots are for cited figures only.
+ */
+export const CURVE_KINDS = new Set(['genomic', 'natural', 'rangeloss', 'model']);
+
 /** A history spanning more than this many years draws its time axis in log years ago. */
 export const DEEP_YEARS = 5000;
 
@@ -166,8 +173,21 @@ export function HistorySpark({
     const a = pts[k - 1];
     const b = pts[k];
     const st = styleBetween(h, a.year, b.year);
+    // Between two reconstructed points: the guessed curve, in the guess colour.
+    const curve = CURVE_KINDS.has(a.kind) && CURVE_KINDS.has(b.kind);
     lines.push(
-      <line key={k} x1={X(a.year)} y1={Y(a.n)} x2={X(b.year)} y2={Y(b.n)} strokeDasharray={DASH[st]} opacity={OPACITY[st]} data-style={st} />,
+      <line
+        key={k}
+        x1={X(a.year)}
+        y1={Y(a.n)}
+        x2={X(b.year)}
+        y2={Y(b.n)}
+        stroke={curve ? GRADE_COLOR.D : undefined}
+        strokeDasharray={curve ? DASH.dashed : DASH[st]}
+        opacity={curve ? 0.8 : OPACITY[st]}
+        data-style={st}
+        data-curve={curve ? '' : undefined}
+      />,
     );
   }
   if (after) {
@@ -190,15 +210,24 @@ export function HistorySpark({
       />,
     );
   }
-  // The genomic curve: one faint band (its lo–hi) under its dashed line, no dot per step.
-  const genomic = pts.filter((p) => p.kind === 'genomic');
-  const band =
-    genomic.length > 1
-      ? genomic
-          .map((p) => `${X(p.year).toFixed(1)},${Y(p.hi).toFixed(1)}`)
-          .concat(genomic.slice().reverse().map((p) => `${X(p.year).toFixed(1)},${Y(p.lo).toFixed(1)}`))
-          .join(' ')
-      : '';
+  // The reconstructed curve (genomic steps, the range-loss trend and today's modelled count): each run
+  // of consecutive reconstructed points one faint band (their lo–hi) under its dashed line, no dots.
+  const runs: HistPoint[][] = [];
+  pts.forEach((p, k) => {
+    if (!CURVE_KINDS.has(p.kind)) return;
+    if (k > 0 && CURVE_KINDS.has(pts[k - 1].kind)) runs[runs.length - 1].push(p);
+    else runs.push([p]);
+  });
+  const bands = runs
+    .filter((r) => r.length > 1)
+    .map((r) =>
+      r
+        .map((p) => `${X(p.year).toFixed(1)},${Y(p.hi).toFixed(1)}`)
+        .concat(r.slice().reverse().map((p) => `${X(p.year).toFixed(1)},${Y(p.lo).toFixed(1)}`))
+        .join(' '),
+    );
+  // A lone reconstructed point (no neighbour to draw a curve to): a small hollow ring.
+  const lone = runs.filter((r) => r.length === 1).map((r) => r[0]);
   const nTicks = popTicks(ylo, yhi);
   // Time ticks: round years ago on a deep (log) axis, round calendar years otherwise; "now" at the
   // right end if the history runs to it (a tick too close to it gives way).
@@ -207,8 +236,9 @@ export function HistorySpark({
     : yearTicks(x0, x1).map((y) => ({ x: X(y), label: fmtYear(y) }));
   const ticks = tTicks.filter((t) => (!toNow || X(x1) - t.x > 30) && t.x - L > 14);
   // The dots' colours, in plain words: only the grades this history uses.
-  const grades = ['A', 'B', 'C', 'D'].filter((g) => pts.some((p) => p.grade === g));
-  const reconstructed = pts.some((p) => MODELLED_KINDS.has(p.kind) || p.kind === 'genomic') || !!natural;
+  const cited = pts.filter((p) => !CURVE_KINDS.has(p.kind));
+  const grades = ['A', 'B', 'C', 'D'].filter((g) => cited.some((p) => p.grade === g));
+  const reconstructed = runs.length > 0 || !!natural;
   const rows = sourceRows(pts, !!natural);
   const natY = natural ? Y(natural.n) : 0;
   const metaHead = naturalMeta?.label.split(':')[0] || 'natural (pre-human) level';
@@ -224,30 +254,25 @@ export function HistorySpark({
       >
         <span className="spark-h small">Population over time{deep ? ', years ago' : ''}</span>
         <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-hidden="true" data-axis={deep ? 'log' : 'linear'}>
-          {band && <polygon points={band} fill={GRADE_COLOR.D} opacity="0.13" data-band="genomic" />}
+          {bands.map((b, k) => (
+            <polygon key={k} points={b} fill={GRADE_COLOR.D} opacity="0.13" data-band="" />
+          ))}
           {natural && (
             <line x1={L} x2={W - R} y1={natY} y2={natY} stroke={GRADE_COLOR.D} strokeWidth="1" strokeDasharray="1.5 3" opacity="0.6" data-natural="" />
           )}
           <g stroke="#c9d4cd" strokeWidth="1.3" fill="none">
             {lines}
           </g>
-          {pts.map((p, k) => {
-            if (p.kind === 'genomic') return null;
-            // A modelled point (the range-loss trend's start) is the model's, not a cited figure: a hollow ring.
-            const mod = MODELLED_KINDS.has(p.kind);
-            return (
-              <g key={k} data-grade={p.grade} data-modelled={mod ? '' : undefined}>
-                {p.hi > p.lo && (
-                  <line x1={X(p.year)} x2={X(p.year)} y1={Y(p.hi)} y2={Y(p.lo)} stroke={GRADE_COLOR[p.grade]} strokeWidth="2" opacity={mod ? 0.25 : 0.45} strokeDasharray={mod ? DASH.dashed : undefined} />
-                )}
-                {mod ? (
-                  <circle cx={X(p.year)} cy={Y(p.n)} r="2.8" fill="#141c18" stroke={GRADE_COLOR[p.grade]} strokeWidth="1.4" />
-                ) : (
-                  <circle cx={X(p.year)} cy={Y(p.n)} r="3.2" fill={GRADE_COLOR[p.grade]} stroke="#141c18" strokeWidth="1" />
-                )}
-              </g>
-            );
-          })}
+          {lone.map((p, k) => (
+            <circle key={`r${k}`} cx={X(p.year)} cy={Y(p.n)} r="2.6" fill="#141c18" stroke={GRADE_COLOR.D} strokeWidth="1.3" data-modelled="" />
+          ))}
+          {cited.map((p, k) => (
+            // A cited figure: a dot coloured by its grade, its range as a bar.
+            <g key={k} data-grade={p.grade}>
+              {p.hi > p.lo && <line x1={X(p.year)} x2={X(p.year)} y1={Y(p.hi)} y2={Y(p.lo)} stroke={GRADE_COLOR[p.grade]} strokeWidth="2" opacity="0.45" />}
+              <circle cx={X(p.year)} cy={Y(p.n)} r="3.2" fill={GRADE_COLOR[p.grade]} stroke="#141c18" strokeWidth="1" />
+            </g>
+          ))}
           <g stroke="#56625a" strokeWidth="1">
             <line x1={L} x2={W - R} y1={H - B + 0.5} y2={H - B + 0.5} />
             {ticks.map((t) => (
@@ -303,7 +328,7 @@ export function HistorySpark({
             ))}
             {reconstructed && (
               <span data-key="reconstructed">
-                <span className="gdot ring" style={{ borderColor: GRADE_COLOR.D }} /> reconstructed
+                <span className="gdash" style={{ borderColor: GRADE_COLOR.D }} /> reconstructed guess
               </span>
             )}
           </span>
