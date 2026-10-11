@@ -433,19 +433,33 @@ def blind_points(drop: list[dict], src: dict, before_year: float | None = None) 
     resolves little in the last ~20 kyr, so the steps there are weak evidence alone, but they are the
     genome's record of the decline the source dates (lion and leopard after the last glacial maximum,
     Figueiro et al. 2017), and joining across them drew the opposite whenever the next level was higher.
-    Kept steps are graded D and their notes quote the source. Not kept: a step starting at 0 (no
-    log-midpoint) and any step not older than `before_year`, which the curve must reach after them."""
+    Kept steps are graded D and their notes quote the source. Only the steps the source's `window`
+    ([young, old] years ago) dates are kept: a step whose span overlaps the window, at its log-midpoint
+    clamped into the window. So the step that overlaps the window's young edge (the genome's level when
+    the dated decline ends) is kept, dated at that edge if its midpoint is younger, and the join to the
+    next level starts there; steps wholly younger than the window are evidence of nothing the source
+    dates and stay dropped. Not kept either: a step starting at 0 (no log-midpoint) and any step not
+    older than `before_year`, which the curve must reach after them."""
+    young, old = src["window"]
     out = []
     for p in drop:
         if p.get("why") != "blind" or p["span_ago"][0] <= 0:
             continue
-        if before_year is not None and p["year"] >= before_year:
+        a, b = p["span_ago"]
+        if b <= young or a >= old:
+            continue
+        ago = min(max(p["ago"], young), old)
+        year = NOW_YEAR - ago
+        if before_year is not None and year >= before_year:
             continue
         q = {k: v for k, v in p.items() if k != "why"}
-        out.append({**q, "grade": "D", "blind": True,
+        moved = (f"; dated at the cited window's {'young' if ago == young else 'old'} edge "
+                 f"({ago:.0f} yr ago), not its midpoint ({p['ago']:.0f}), since the source dates the "
+                 f"decline to {young:.0f}-{old:.0f} yr ago" if ago != p["ago"] else "")
+        out.append({**q, "year": year, "ago": ago, "grade": "D", "blind": True,
                     "note": q["note"] + f"; in PSMC's blind spot (< {DEEP_BLIND_YR / 1000:g} kyr ago after "
                             f"rescaling, where it resolves little), kept because {src['cite']} dates a "
-                            f"decline here: \"{src['quote']}\" (ToLaD#143)"})
+                            f"decline here: \"{src['quote']}\"{moved} (ToLaD#143)"})
     return sorted(out, key=lambda p: p["year"])
 
 
@@ -536,7 +550,9 @@ def deep_join(deep_pts: list[dict], nxt: dict, skipped: dict | None = None, drop
             blind_txt = (f"PSMC's {k} in its blind spot (the last {DEEP_BLIND_YR / 1000:g} kyr, where it resolves "
                          f"little) {'is' if one else 'are'} kept, grade D, because {bl['cite']} dates a decline there: from the youngest "
                          f"resolved step (~{bl['resolved_ago'] / 1000:.0f} kya) to the youngest kept "
-                         f"(~{bl['ago'] / 1000:.1f} kya) the genomic level "
+                         f"(~{bl['ago'] / 1000:.1f} kya"
+                         + (", the young edge of the window it dates" if bl["window"] and bl["ago"] == bl["window"][0]
+                            else "") + ") the genomic level "
                          + ("holds" if max(r, 1 / r) < 1.05 else f"{'falls' if r < 1 else 'rises'} {_x(max(r, 1 / r))}x")
                          + ". ")
             bl["against"] = False
@@ -584,6 +600,18 @@ def deep_join(deep_pts: list[dict], nxt: dict, skipped: dict | None = None, drop
                     if held else ", then the range-loss trend runs to the cited point")
                    if skipped is not None else "")
                 + ".")
+        if bl is not None and bl["kept"] and raw < 1 / BLIND_AGAINST:
+            # a rise after a dated decline, which no source dates: said plainly (ToLaD#143). The #77 rule
+            # stands (only a cited level from DEEP_JOIN_CITED_MAX_YEAR or earlier rescales the curve)
+            note += (f" So after the decline the curve rises {_x(off)}x, from {deep_pts[-1]['n']:,.0f} at "
+                     f"~{bl['ago'] / 1000:.0f} kya to {nxt['n']:,.0f} in {_year_txt(nxt['year'])}, a rise no "
+                     "source here dates"
+                     + (f": that level is the {_cited_txt(late)} (grade {late.get('grade', '?')}"
+                        + (", unverified" if late["kind"] == "unverified" else "") + f"), which is after {DEEP_JOIN_CITED_MAX_YEAR} and so "
+                        "may not rescale the genomic curve (ToLaD#77), and the two disagree by "
+                        f"{_x(off)}x" if late is not None and (held or nxt is late) else
+                        ": it is the model's natural level before range loss, not a dated recovery")
+                     + (" (flagged)." if flag else "."))
     join = {"rule": "scaled" if cited else "absolute", "next": "cited" if cited_kind else "modelled",
             "to_kind": nxt["kind"], "to_year": nxt["year"], "to_n": nxt["n"],
             "deep_n_raw": deep_pts[-1]["n"] / f, "deep_n": deep_pts[-1]["n"],

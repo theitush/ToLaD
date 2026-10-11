@@ -487,9 +487,18 @@ class BlindSpot(unittest.TestCase):
         self.assertEqual(len(bp), 1)
         p = bp[0]
         self.assertTrue(p["blind"] and p["grade"] == "D" and p["kind"] == "genomic")
-        self.assertAlmostEqual(NOW_YEAR - p["year"], 6000, places=3)
+        # the step spans 2-18 kya, overlapping the window's young edge: kept, dated at that edge (10 kya),
+        # not at its midpoint (6 kya), which the source does not date
+        self.assertAlmostEqual(NOW_YEAR - p["year"], 10000, places=3)
+        self.assertAlmostEqual(p["ago"], 10000, places=3)
         self.assertIn('"a second round of decline"', p["note"])
-        self.assertEqual(H.blind_points(drop, r["deep"]["blind"], NOW_YEAR - 7000), [])  # not before the next point
+        self.assertIn("dated at the cited window's young edge (10000 yr ago), not its midpoint (6000)", p["note"])
+        self.assertEqual(H.blind_points(drop, r["deep"]["blind"], NOW_YEAR - 11000), [])  # not before the next point
+        # a window the step does not reach keeps nothing (the step ends 18 kya)
+        self.assertEqual(H.blind_points(drop, {**r["deep"]["blind"], "window": [18500.0, 19500.0]}, 1500), [])
+        # a step inside the window keeps its midpoint
+        self.assertAlmostEqual(H.blind_points(drop, {**r["deep"]["blind"], "window": [5000.0, 15000.0]},
+                                              1500)[0]["ago"], 6000, places=3)
         out, j = H.deep_join(keep + bp, {"year": 1500, "n": 4e5, "lo": 2e5, "hi": 8e5, "grade": "D",
                                          "kind": "rangeloss"}, None, drop, r["deep"]["blind"])
         self.assertAlmostEqual(j["ratio"], 4e4 / 4e5)  # the join starts from the youngest kept step
@@ -499,6 +508,10 @@ class BlindSpot(unittest.TestCase):
         self.assertIn("is kept, grade D, because F 2017, Results dates a decline there", j["note"])
         self.assertIn("the genomic level falls 2x", j["note"])
         self.assertIn("joined log-linearly from the youngest kept step", j["note"])
+        self.assertIn("(~10.0 kya, the young edge of the window it dates)", j["note"])
+        # the join then rises 10x to a modelled level: said plainly, as no source dates it
+        self.assertIn("So after the decline the curve rises 10x, from 40,000 at ~10 kya to 400,000 in 1500", j["note"])
+        self.assertIn("the model's natural level before range loss, not a dated recovery", j["note"])
 
     def test_dropped_join_against_is_flagged(self):
         _, keep, drop = self._gen()

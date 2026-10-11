@@ -309,9 +309,23 @@ the same way by code rather than by hand.
     - **Kept where a source dates a decline there.** A `[deep.blind]` table
       (`cite`, `url`, `quote`, `window` = [from, to] years before present as
       the source dates it, reaching into the last 20 kyr; optional `note`)
-      keeps every blind step older than the next point and than 1500 CE, as
-      `genomic` points graded D whose notes quote the source. The join then
-      starts from the youngest kept step. Lion and leopard have one
+      keeps the blind steps the window dates, older than the next point and
+      than 1500 CE, as `genomic` points graded D whose notes quote the
+      source: a step is kept when its span overlaps the window, at its
+      log-midpoint clamped into the window. So the step overlapping the
+      window's young edge is kept (it is the genome's level when the dated
+      decline ends; without it the curve would stop part-way down), dated
+      at that edge when its midpoint is younger, and the join to the next
+      level starts there; steps wholly younger than the window stay dropped,
+      since the source dates nothing there. Lion: its 16-21, 12-15 and
+      4.6-10.5 kyr steps are kept, the last dated at 10 kya (midpoint 6.9);
+      its 3.5-4.1 kyr step is dropped. Leopard: its 12-23 and 9.4-10.9 kyr
+      steps are kept (the second's midpoint, 10.1 kya, is inside the
+      window); its 6.9-7.7 kyr step is dropped. Where the join then rises
+      (both, by 1500 CE) the card says so plainly: no source dates that
+      rise, and for the lion it runs to its 1950 figure (500,000, grade D,
+      unverified), 12x the genome's level, which the #77 rule keeps from
+      rescaling the curve (flagged). Lion and leopard have one
       (Figueiró et al. 2017: "a second round of decline (most notably for
       the lion and leopard) between 10,000 and 20,000 years ago, following
       the last glacial maximum").
