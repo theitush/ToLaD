@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { PANTHERA } from './panthera';
+import { PANTHERA, type SpeciesRec } from './panthera';
 import { parentShare, population, Q_STAR, shareBack } from './population';
 
 const sp = (name: string) => PANTHERA.species.find((s) => s.common === name)!;
+/** An age inside the flat stretch held before a history's oldest point (back to the species' start). */
+const heldAge = (s: SpeciesRec) => {
+  const h = s.history!;
+  const oldest = Math.max(...h.points.map((q) => (h.nowYear - q.year) / 1e6));
+  return (s.t0 + oldest) / 2;
+};
 
 describe('who has living descendants: the genealogy back from now', () => {
   it('a constant, well-mixed population settles to the identical-ancestors share, ~0.797', () => {
@@ -61,31 +67,29 @@ describe('the Panthera populations', () => {
     const p = population(sp('Lion'));
     expect(p.aliveAt(0)).toBeCloseTo(sp('Lion').alive, -2);
     expect(p.aliveAt(200e-6)).toBeGreaterThan(4.9e5);
-    expect(p.max).toBeCloseTo(p.aliveAt(1), -3);
+    // The most alive at once: the deep curve's peak, on one of its points (ToLaD#60: a Middle
+    // Pleistocene high near 900 thousand, not the held oldest level).
+    const h = sp('Lion').history!;
+    const peak = Math.max(...h.points.map((q) => p.aliveAt((h.nowYear - q.year) / 1e6)));
+    expect(peak).toBeGreaterThan(8e5);
+    expect(p.max / peak).toBeCloseTo(1, 4);
     expect(p.greenAt(0)).toBe(1);
     // During the crash (1950s–2000s) far fewer of those alive have descendants today.
     expect(p.greenAt(50e-6)).toBeLessThan(0.6);
-    // Long before it: the settled share.
-    expect(p.greenAt(1)).toBeCloseTo(Q_STAR, 6);
+    // Long before it, where the population is constant: the settled share. (1 Ma ago the lion's
+    // genomic curve is still changing, ToLaD#60; its oldest level is held from ~1.3 Ma back.)
+    expect(p.greenAt(heldAge(sp('Lion')))).toBeCloseTo(Q_STAR, 6);
   });
 
-  it('extinct species: their whole span is gray (0% green), nobody is alive after it, and its founders before its start', () => {
+  it('extinct species: their whole span is gray (0% green), and nobody is alive after it or before it in their column', () => {
     for (const s of PANTHERA.species.filter((s) => s.extinct)) {
-      // From its first appearance (the default start) or from a split in between (the dated tree's).
-      for (const start of [s.t0, (s.t0 + s.t1) / 2]) {
-        const p = population(s, start);
-        for (const a of [s.t1 + (start - s.t1) * 0.01, (start + s.t1) / 2, start]) {
-          expect(p.greenAt(a)).toBe(0);
-          expect(p.aliveAt(a)).toBeGreaterThan(0);
-        }
-        // It tapers smoothly to nobody at its last appearance.
-        expect(p.aliveAt(s.t1)).toBe(0);
-        expect(p.aliveAt(s.t1 + (start - s.t1) * 1e-4)).toBeLessThan(1e-3 * p.founders);
-        expect(p.aliveAt(s.t1 * 0.9)).toBe(0);
-        expect(p.aliveAt(start * 1.1)).toBe(p.founders);
-        expect(p.stepAt(start * 1.1).n).toBe(p.founders);
-      }
       const p = population(s);
+      for (const a of [s.t1, (s.t0 + s.t1) / 2, s.t0]) {
+        expect(p.greenAt(a)).toBe(0);
+        expect(p.aliveAt(a)).toBeGreaterThan(0);
+      }
+      expect(p.aliveAt(s.t1 * 0.9)).toBe(0);
+      expect(p.aliveAt(s.t0 * 1.1)).toBe(0);
       // Its founders (its share of the stem) are ancestors of living species too: green by the rule.
       expect(p.qBase).toBeCloseTo(Q_STAR, 9);
     }
@@ -98,7 +102,14 @@ describe('the Panthera populations', () => {
       // (The newest generation's step is the living's: all green; the one before it, less.)
       expect(p.greenAt((s.genYears * 0.5) / 1e6)).toBe(1);
       expect(p.greenAt((s.genYears * 1.5) / 1e6)).toBeLessThan(1);
-      expect(p.greenAt(0.01)).toBeCloseTo(Q_STAR, 5);
+      // Settled: the share no longer moves from one generation to the next ...
+      const back = (k: number) => p.greenAt(0.01 + (k * s.genYears) / 1e6);
+      expect(back(0)).toBeCloseTo(back(3), 6);
+      // ... at Q* for a constant population; 10 kyr ago a genomic deep past (ToLaD#60) is a slow
+      // log-linear change (~1e-4 per generation), which shifts the settled share by about as much.
+      expect(Math.abs(back(0) - Q_STAR)).toBeLessThan(1e-3);
+      // Where the population is held constant (before its oldest point), exactly Q*.
+      expect(p.greenAt(heldAge(s))).toBeCloseTo(Q_STAR, 6);
     }
   });
 });

@@ -11,10 +11,14 @@ from pathlib import Path
 import numpy as np
 
 from . import anchors
-from .model import PROFILE_K, PROFILE_RANGE, SOURCES
+from .model import (NATURAL_METHOD_FIT, NATURAL_METHOD_SCALED, NATURAL_STEP_YEAR, PROFILE_K, PROFILE_RANGE,
+                    SOURCES)
 from .tree import D_ANCHOR, DATE_SRC_NAMES, Node
 
 FORMAT_VERSION = 1
+# NATB (v1.2): per row, LOG16 natural baseline N, lo, hi, natural range km2, current range km2
+NATB_PER_ROW = 5
+NATB_FIELDS = ["n", "lo", "hi", "km2_natural", "km2_current"]
 MAGIC = b"TLAD"
 KIND_SKELETON, KIND_TILE = 0, 1
 TILE_BUDGET = 2500
@@ -206,9 +210,17 @@ def encode_hist(rows: list[tuple[Node, bool]], cites: dict[tuple[str, str], int]
         for s in rec["segments"]:
             segs.append(HIST_SEG.pack(s["year0"], s["gens"], q_log16(s["start"]), q_log16(s["end"]),
                                       s["grade"], s["kind"], 0))
-        meta.append({"species": rec["species"], "common": rec["common"], "component": rec["component"],
-                     "use": rec["use"], "scope": rec["scope"], "file": rec["file"], "notes": rec["notes"],
-                     "point_notes": [p["note"] for p in rec["curve"]]})
+        if rec.get("modelled"):
+            # modelled records are many: their notes live once in skeleton META.natural.trend
+            meta.append({"species": rec["species"], "component": rec["component"], "use": rec["use"],
+                         "modelled": rec["modelled"]})
+        else:
+            meta.append({"species": rec["species"], "common": rec["common"], "component": rec["component"],
+                         "use": rec["use"], "scope": rec["scope"], "file": rec["file"], "notes": rec["notes"],
+                         "point_notes": [p["note"] for p in rec["curve"]], "modelled": rec.get("modelled")})
+        if rec.get("deep_join"):
+            # how the genomic deep past meets the next level, for the species card (ToLaD#80)
+            meta[-1]["deep_join"] = rec["deep_join"]["note"]
     if not recs:
         return b"", 0, []
     blob = HIST_PREAMBLE.pack(len(recs), len(pts), len(segs), 0) + b"".join(heads) + b"".join(pts) + b"".join(segs)
@@ -219,7 +231,8 @@ def hist_debug(rec: dict, tile: int, row: int, gid: int) -> dict:
     from .history import KINDS
     return {
         "species": rec["species"], "common": rec["common"], "file": rec["file"], "use": rec["use"],
-        "component": rec["component"], "tile": tile, "row": row, "gid": gid, "G": rec["G"], "L": rec["L"],
+        "component": rec["component"], "modelled": rec.get("modelled"), "tile": tile, "row": row, "gid": gid, "G": rec["G"], "L": rec["L"],
+        "deep_join": rec["deep_join"]["note"] if rec.get("deep_join") else None,
         "points": [{"year": round(p["year"]), "n": p["n"], "lo": p["lo"], "hi": p["hi"], "grade": p["grade"],
                     "kind": p["kind"], "baseline": bool(p.get("baseline")), "cite": p["cite"], "url": p["url"]}
                    for p in rec["curve"]],
@@ -248,6 +261,7 @@ def encode_rows(rows: list[tuple[Node, bool]], methods: dict[str, int], stub_til
     gid = np.zeros(n, "<u4")
     ott = np.zeros(n, "<u4")
     pbdb = np.zeros(n, "<u4")
+    natb = np.zeros(NATB_PER_ROW * n, "<u2")
     names = []
     stubs = []
     stub_rep = []
@@ -274,6 +288,11 @@ def encode_rows(rows: list[tuple[Node, bool]], methods: dict[str, int], stub_til
         gid[i] = D["gid"]
         ott[i] = nd.ott or 0
         pbdb[i] = nd.pbdb or 0
+        nat = D.get("natural")
+        if nat is not None and not stub:
+            natb[NATB_PER_ROW * i:NATB_PER_ROW * (i + 1)] = [
+                q_log16(nat["N"]), q_log16(nat["lo"]), q_log16(nat["hi"]),
+                q_log16(nat["km2_nat"]), q_log16(nat["km2_cur"])]
         names.append("|".join([nd.name or ""] + [a for a in nd.alt if a]))
         if stub:
             stubs.append((i, stub_tile[id(nd)]))
@@ -301,6 +320,7 @@ def encode_rows(rows: list[tuple[Node, bool]], methods: dict[str, int], stub_til
     ]
     if n_hist:
         secs.append(("HIST", hist_blob, n_hist))
+    secs.append(("NATB", natb.tobytes(), NATB_PER_ROW * n))
     return secs, n
 
 
@@ -405,24 +425,61 @@ def write_all(root: Node, out: Path, log: dict) -> None:
     from .history import KINDS
     hist_index = []
     hist_dbg = []
+    from .model import (RANGELOSS_CITE, RANGELOSS_NOTE, RANGELOSS_SHOWCASE, RANGELOSS_START_YEAR,
+                        RANGELOSS_URL)
+    n_rl = 0
     for nd in root.preorder():
         rec = nd.data.get("history")
-        if rec is not None:
+        if rec is None:
+            continue
+        t, r = where[id(nd)]
+        if rec.get("modelled") == "rangeloss":
+            # modelled range-loss records (ToLaD#62) are not indexed (file.history(row) finds them);
+            # the debug dump keeps the showcase and every 40th, for the decoder round-trip test
+            if nd.name in RANGELOSS_SHOWCASE or n_rl % 40 == 0:
+                hist_dbg.append(hist_debug(rec, t, r, nd.data["gid"]))
+            n_rl += 1
+            continue
+        hist_index.append({"species": rec["species"], "gid": nd.data["gid"], "tile": t, "row": r})
+        hist_dbg.append(hist_debug(rec, t, r, nd.data["gid"]))
+    # natural baselines for the debug dump: curated species, Panthera and the showcase list
+    from .model import NATURAL_SHOWCASE
+    nat_dbg = []
+    for nd in root.preorder():
+        nat = nd.data.get("natural")
+        if nat is not None and (nd.data.get("history") is not None or nd.name in NATURAL_SHOWCASE
+                                or (nd.name or "").startswith("Panthera ")):
             t, r = where[id(nd)]
-            hist_index.append({"species": rec["species"], "gid": nd.data["gid"], "tile": t, "row": r})
-            hist_dbg.append(hist_debug(rec, t, r, nd.data["gid"]))
+            nat_dbg.append({"species": nd.name, "gid": nd.data["gid"], "tile": t, "row": r, "n": nat["N"],
+                            "lo": nat["lo"], "hi": nat["hi"], "km2_natural": nat["km2_nat"],
+                            "km2_current": nat["km2_cur"], "method": nat["method"]})
     meta["hist_sources"] = [{"cite": c, "url": u} for (c, u) in cites]
     meta["hist_kinds"] = KINDS
     meta["hist_index"] = hist_index
+    meta["natural"] = {
+        "fields": NATB_FIELDS, "grade": "D", "kind": "reconstruction", "step_year": NATURAL_STEP_YEAR,
+        "methods": [NATURAL_METHOD_SCALED, NATURAL_METHOD_FIT],
+        "label": "natural (pre-human) baseline: individuals alive with no human impact, modelled",
+        "cite": "PHYLACINE 1.2.1 present-natural ranges (Faurby et al. 2018, Ecology 99:2626; "
+                "Faurby & Svenning 2015, Diversity Distrib. 21:1155); CC0",
+        "url": "https://github.com/MegaPast2Future/PHYLACINE_1.2",
+        # layer 4 (ToLaD#62): where N_nat differs from today's count, a log-linear trend between them
+        "trend": {"shape": "log-linear", "from_year": RANGELOSS_START_YEAR, "to_year": anchors.NOW_YEAR,
+                  "kind": "rangeloss", "grade": "D", "records": n_rl,
+                  "label": "modelled range-loss trend: natural level held to 1500 CE, then log-linear to "
+                           "today's count; the timing is an assumption (IUCN's 1500 CE window)",
+                  "notes": RANGELOSS_NOTE, "cite": RANGELOSS_CITE, "url": RANGELOSS_URL},
+    }
     log["history"]["hist_sources"] = len(cites)
     secs, n = encode_rows(sk_rows, methods, tile_id, meta, cites)
     sk_size = write_container(out / "skeleton.tld", KIND_SKELETON, n, secs)
     files.append(out / "skeleton.tld")
-    write_debug_json(root, sk_rows, tile_id, out / "debug_top.json", meta, hist_dbg)
+    write_debug_json(root, sk_rows, tile_id, out / "debug_top.json", meta, hist_dbg, nat_dbg)
     sizes(files, log, sk_size, n, len(tile_roots))
 
 
-def write_debug_json(root: Node, sk_rows, tile_id, path: Path, meta: dict, hist: list[dict] | None = None) -> None:
+def write_debug_json(root: Node, sk_rows, tile_id, path: Path, meta: dict, hist: list[dict] | None = None,
+                     natural: list[dict] | None = None) -> None:
     nodes = []
     depth = {id(root): 0}
     for nd, stub in sk_rows:
@@ -465,7 +522,10 @@ def write_debug_json(root: Node, sk_rows, tile_id, path: Path, meta: dict, hist:
     lines = json.dumps(head, indent=1, ensure_ascii=False)[:-2]
     body = ",\n".join(json.dumps(_round(nd), ensure_ascii=False, separators=(",", ":")) for nd in nodes)
     hist_body = ",\n".join(json.dumps(_round(h), ensure_ascii=False, separators=(",", ":")) for h in (hist or []))
-    path.write_text(lines + ",\n \"history\": [\n" + hist_body + "\n],\n \"nodes\": [\n" + body + "\n]}\n")
+    nat_body = ",\n".join(json.dumps(_round(h), ensure_ascii=False, separators=(",", ":"))
+                          for h in (natural or []))
+    path.write_text(lines + ",\n \"history\": [\n" + hist_body + "\n],\n \"natural\": [\n" + nat_body
+                    + "\n],\n \"nodes\": [\n" + body + "\n]}\n")
 
 
 def _round(o):

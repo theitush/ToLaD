@@ -110,16 +110,22 @@ describe('width = individuals alive, with a varying population', () => {
         const sp: SpeciesRec = b.sp;
         expect(aliveAt(sp, sp.t1) / sp.alive).toBeCloseTo(1, 2);
         expect(strandAt(b, sp.t1, mode).f).toBe(1);
-        // The widest is the pre-decline baseline, held back to the first appearance (its founders below).
-        expect(strandAt(b, sp.t0, mode).w).toBeCloseTo(b.width, 9);
-        // Alive in generation k ≈ its procgen births × mean lifespan ÷ generation length: the same points,
-        // log-linear between them (procgen's ramps are linear), corners filleted: within a few %.
+        // The widest is the curve's highest level: the pre-decline baseline, or (lion: a genomic deep
+        // past, ToLaD#60) a Middle Pleistocene peak. Either way the curve's peak sits on a point (it
+        // is log-linear between points), and the oldest level is held back to the first appearance.
+        const h = sp.history!;
+        const ages = [sp.t0, ...h.points.map((p) => (h.nowYear - p.year) / 1e6).filter((a) => a < sp.t0 && a > sp.t1)];
+        // (segment ends snap to whole generations, so a point's year is within a generation of the peak)
+        expect(Math.max(...ages.map((a) => strandAt(b, a, mode).w)) / b.width).toBeCloseTo(1, 4);
+        const oldest = Math.max(...ages.slice(1));
+        expect(strandAt(b, sp.t0, mode).w).toBeCloseTo(strandAt(b, (sp.t0 + oldest) / 2, mode).w, 9);
+        // Alive in generation k = its procgen births × mean lifespan ÷ generation length.
         const m = new TwigModel(b, fan.time, mode);
         for (const back of [1, 5, 20, 40, 1000]) {
           const k = m.G - back;
           const ageMa = ((back - 0.5) * m.GL) / 1e6;
           const n = (m.size(k) * m.sp.lifespanYears) / m.GL;
-          expect(Math.abs(aliveAt(sp, ageMa) / n - 1)).toBeLessThan(0.06);
+          expect(aliveAt(sp, ageMa) / n).toBeCloseTo(1, 2);
         }
       }
     });
@@ -150,6 +156,8 @@ describe('honesty', () => {
     expect(spanStyle({ grade: 'C', kind: 'model' })).toBe('dashed');
     expect(spanStyle({ grade: 'D', kind: 'interpolated' })).toBe('dotted');
     expect(spanStyle({ grade: 'B', kind: 'unverified' })).toBe('dotted');
+    expect(spanStyle({ grade: 'C', kind: 'genomic' })).toBe('dashed');
+    expect(spanStyle({ grade: 'D', kind: 'natural' })).toBe('dashed');
     const spans = historySpans(byName('Tiger').history!);
     expect(spans.some((s) => s.kind === 'interpolated' && s.style !== 'solid')).toBe(true);
     for (const s of spans) {
