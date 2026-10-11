@@ -10,6 +10,7 @@ import { clipPoly, FanCamera, STRAND_PX, type Camera } from './camera';
 import { laneAt, layoutFan, leftAt, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type EdgeStyle, type Fan, type FanBranch, type FanNode, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01 } from './meshgl';
+import { bridgeInstances, type SplitStyle, type SplitWindow } from './gradual';
 import { drawTwigs, kLogAt, laneDim, LINEAGE, LIVING, TWIG_GRAY, TwigModel, type IndInfo, type TwigStats } from './twigs';
 import type { MeshBatch, RectBatch } from './meshgl';
 
@@ -363,6 +364,12 @@ export class FanView implements InputHandlers {
   readonly camera: FanCamera;
   mode: WidthMode = 'linear';
   edge: EdgeStyle = 'curved';
+  /** How a split is drawn (gradual.ts, ToLaD#50): the clean split by default, and its window. */
+  split: SplitStyle = 'clean';
+  splitWindow: SplitWindow = 'short';
+  /** Instances of the sister cross-links last frame (debug, scripts). */
+  bridges = 0;
+  kLogNow = 0;
   dpr = 1;
   selected: SpeciesRec | null = null;
   selInd: { g: number; i: number } | null = null;
@@ -469,6 +476,12 @@ export class FanView implements InputHandlers {
   }
 
   /** The edges' design (the toggle): curved or straight. Same data, the camera stays put. */
+  setSplit(style: SplitStyle, win: SplitWindow): void {
+    this.split = style;
+    this.splitWindow = win;
+    this.request();
+  }
+
   setEdge(edge: EdgeStyle): void {
     if (edge === this.edge) return;
     this.edge = edge;
@@ -726,6 +739,7 @@ export class FanView implements InputHandlers {
     this.drawStem();
     for (const b of this.fan.branches) this.drawStrand(b);
     for (const b of this.fan.branches) this.drawIndividuals(b);
+    if (this.gl) this.bridges = bridgeInstances(this, this.fan, this.split, this.splitWindow, this.gl.bridge);
     this.drawStemFade();
     // Labels: one form everywhere (see labelSpots).
     this.drawGutter();
@@ -738,7 +752,8 @@ export class FanView implements InputHandlers {
     this.drawTimeAxis(true);
     if (this.gl) {
       const pal = [LIVING, LINEAGE, TWIG_GRAY].map(rgb01);
-      this.gl.end(this.w, this.h, this.dpr, rgb01(BG), kLogAt(this, this.fan.time, this.cam.cy), this.toScreen(0, this.yNow)[1], pal);
+      this.kLogNow = kLogAt(this, this.fan.time, this.cam.cy);
+      this.gl.end(this.w, this.h, this.dpr, rgb01(BG), this.kLogNow, this.toScreen(0, this.yNow)[1], pal);
     }
     this.frameMs.push(performance.now() - t0);
     if (this.frameMs.length > 600) this.frameMs.shift();
