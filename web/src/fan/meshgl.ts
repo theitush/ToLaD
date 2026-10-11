@@ -18,8 +18,9 @@ flat out vec4 vColor;
 flat out vec2 vSkew;
 void main() {
   // A trapezoid: [x0, x1] at y0, shifted by (dl, dr) at y1 (a rectangle when 0).
-  // Its bounding box, grown so the anti-aliased edges have room.
-  float g = 2.5;
+  // Its bounding box, grown so the anti-aliased edges have room (RECT_FS's filter, hw).
+  float sk = max(abs(aSkew.x), abs(aSkew.y));
+  float g = 2.5 + 0.5 * clamp(sk / max(1e-6, aRect.w - aRect.y), 1.0, max(3.0, sk));
   vec2 lo = vec2(min(aRect.x, aRect.x + aSkew.x) - g, aRect.y);
   vec2 hi = vec2(max(aRect.z, aRect.z + aSkew.y) + g, aRect.w);
   vec2 p = mix(lo, hi, corner);
@@ -45,8 +46,11 @@ void main() {
   float t = clamp((vP.y - vRect.y) / H, 0.0, 1.0);
   float xl = vRect.x + vSkew.x * t;
   float xr = vRect.z + vSkew.y * t;
-  // (At most 3 px: a sliver of a trapezoid, far under a pixel tall, would otherwise smear across its run.)
-  float hw = 0.5 * clamp(max(abs(vSkew.x), abs(vSkew.y)) / H, 1.0, 3.0);
+  // A lane leaning s px per px covers s px of a row per px down: filtered over that run, a thin
+  // lean is a continuous faint line, not a row of dashes. (A sliver of a trapezoid, far under a
+  // pixel tall, filtered over at most its own run, 3 px at least, so it does not smear.)
+  float sk = max(abs(vSkew.x), abs(vSkew.y));
+  float hw = 0.5 * clamp(sk / H, 1.0, max(3.0, sk));
   float c = clamp(min(vP.x + hw, xr) - max(vP.x - hw, xl), 0.0, 2.0 * hw) / (2.0 * hw);
   float a = vColor.a * c;
   o = vec4(vColor.rgb * a, a);
@@ -323,6 +327,9 @@ vec4 shadeLinks(vec2 p) {
 void main() {
   // The pixel in the column's frame at the top row: the lattice rides the left edge and scales with the pitch (mesh.ts meshFrame).
   vec2 p = vP;
+  // Screen px across the column per unit of the frame's x (mesh.ts perpScale): the texture is
+  // measured across a leaning column, not along the row.
+  float ks = 1.0;
   {
     float dy = p.y - vRect.y;
     float k = max(1e-6, 1.0 + vWarp.w * dy);
@@ -331,7 +338,9 @@ void main() {
     p.x = colL + (vP.x - xl) / k;
     gColR = colL + (vNar.y + vWarp.y * dy - xl) / k;
     gXG = colL + (vLife.w + vWarp.z * dy - xl) / k;
-    float pad = vMisc.y < 0.5 ? 1.0 : max(vMisc.w, max(vSlot.z, 1.0) * 0.5 + 5.0) + 1.0;
+    float sl = vWarp.x + (p.x - colL) * vWarp.w;
+    if (vMisc.y < 0.5) ks = k / sqrt(1.0 + sl * sl);
+    float pad = vMisc.y < 0.5 ? 1.0 + 1.5 / ks : max(vMisc.w, max(vSlot.z, 1.0) * 0.5 + 5.0) + 1.0;
     if (vWarp != vec4(0.0) && (p.x < colL - pad || p.x > gColR + pad)) discard;
   }
   float xG = gXG;
@@ -339,7 +348,7 @@ void main() {
   float bw = vSlot.y;
   // Nothing to draw this far from a line (before any shading: most pixels stop here).
   // (Only the living glow, and they are only in the green lane.)
-  float reach = vMisc.y < 0.5 ? max(vSlot.z, 1.0) * 0.5 + 0.5 : max(vMisc.w, max(vSlot.z, 1.0) * 0.5 + (xG > vRect.x ? 5.0 : 0.0)) + 0.5;
+  float reach = vMisc.y < 0.5 ? (max(vSlot.z, 1.0) * 0.5 + 0.5) / ks : max(vMisc.w, max(vSlot.z, 1.0) * 0.5 + (xG > vRect.x ? 5.0 : 0.0)) + 0.5;
   float bf = floor((p.x - vSlot.x) / bw);
   uint D = min(L, LAT_DEPTH);
   vec4 best = vec4(0.0);
@@ -367,14 +376,17 @@ void main() {
     float lineX = vSlot.x + bb * bw + (float(off) + 0.5) * pp;
     float d = abs(p.x - lineX);
     if (d > reach) continue;
+    // (Only the column's own lines: on a steep lean the pad around it reaches far along the row.)
+    if (gColR > vNar.x && (lineX < vNar.x - 1.0 || lineX > gColR + 1.0)) continue;
     uint K = idx;
     uint iA = slotBase(K, vSeed.z, vIdx.z);
     uint iB = slotBase(K, vSeed.w, vIdx.w);
     float fine = (vSlot.w < 1.0 && latBit(L + 1u, B >> 1u) != (B & 1u)) ? vSlot.w : 1.0;
     // Where the lanes meet, the slot's colours blend by how much of it is in each.
     float wg = clamp((xG - lineX) / pp + 0.5, 0.0, 1.0);
-    vec4 g = wg > 0.0 ? shadeLane(0.0, iA, iB, d, p, TEX_FLOOR, vSlot.z, false) : vec4(0.0);
-    vec4 r = wg < 1.0 ? shadeLane(vMisc.z, iA, iB, d, p, TEX_FLOOR, vSlot.z, false) : vec4(0.0);
+    float dp = d * ks;
+    vec4 g = wg > 0.0 ? shadeLane(0.0, iA, iB, dp, p, TEX_FLOOR, vSlot.z, false) : vec4(0.0);
+    vec4 r = wg < 1.0 ? shadeLane(vMisc.z, iA, iB, dp, p, TEX_FLOOR, vSlot.z, false) : vec4(0.0);
     float ag = g.a * wg;
     float ar = r.a * (1.0 - wg);
     float a = ag + ar;
@@ -389,7 +401,6 @@ void main() {
   if (vMisc.y < 0.5 && (vNar.z > 0.0 || vNar.w > 0.0)) {
     float colL = vNar.x;
     bool green = xG >= colL;
-    float xGe = green ? max(xG, colL + 1.0) : colL;
     uint h = uint(int(floor(p.x - colL)));
     uint i = lowbias32((h * 0x2c1b3c6du) ^ vIdx2.x ^ 0x5bd1e995u);
     uint iA = slotBase(i, vSeed.z, vIdx.z);
@@ -397,9 +408,12 @@ void main() {
     for (int k = 0; k < 2; k++) {
       float nar = k == 0 ? vNar.z : vNar.w;
       if (!(nar > 0.0) || (k == 0 && !green)) continue;
+      // (Each lane from its left edge, at least 1 px (green) or 0.6 px (gray) across the column: mesh.ts narrowCover.)
       float a0 = k == 0 ? colL : max(colL, xG);
-      float a1 = k == 0 ? xGe : gColR;
-      float cx = max(0.0, min(p.x + 0.5, a1) - max(p.x - 0.5, a0));
+      float a1 = k == 0 ? xG : gColR;
+      float wn = max(k == 0 ? 1.0 : 0.6, (a1 - a0) * ks);
+      float dn = (p.x - a0) * ks - wn * 0.5;
+      float cx = max(0.0, min(dn + 0.5, wn * 0.5) - max(dn - 0.5, -wn * 0.5));
       if (!(cx > 0.0)) continue;
       vec4 c = shadeLane(k == 0 ? 0.0 : vMisc.z, iA, iB, 0.0, p, NAR_FLOOR, 1.0, true);
       c.a *= min(1.0, cx) * nar * vMisc.x;

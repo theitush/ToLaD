@@ -695,15 +695,18 @@ export class FanView implements InputHandlers {
         const gm = (gq + gp) / 2;
         const gc = rgb01(mix(GRAY, '#131c19', laneDim(wm - gm, lives) * 0.82));
         const ec = rgb01(mix(GREEN, '#0d2318', laneDim(gm, lives) * 0.9));
-        trap(this.gl.under, xq, xq + Math.max(0.6, wq), xp, xp + Math.max(0.6, wp), y0, y1, gc, 1);
+        // The least widths across the lane, not along the row: a thin branch-out leaning s px per px
+        // is √(1 + s²) px of the row per px across (else a hairline lean breaks into dashes).
+        const sq = Math.sqrt(1 + ((xp + wp / 2 - xq - wq / 2) / (y1 - y0)) ** 2);
+        trap(this.gl.under, xq, xq + Math.max(0.6 * sq, wq), xp, xp + Math.max(0.6 * sq, wp), y0, y1, gc, 1);
         if (gq > 0 || gp > 0) {
-          const g1q = xq + Math.max(1, gq);
-          const g1p = xp + Math.max(1, gp);
+          const g1q = xq + Math.max(sq, gq);
+          const g1p = xp + Math.max(sq, gp);
           // The living glow faintly (fading as their lane resolves into individuals).
           const glow = 1 - lives;
           if (glow > 0.01) {
-            trap(this.gl.under, xq - 4, g1q + 4, xp - 4, g1p + 4, y0, y1, ec, 0.06 * glow);
-            trap(this.gl.under, xq - 1.5, g1q + 1.5, xp - 1.5, g1p + 1.5, y0, y1, ec, 0.14 * glow);
+            trap(this.gl.under, xq - 4 * sq, g1q + 4 * sq, xp - 4 * sq, g1p + 4 * sq, y0, y1, ec, 0.06 * glow);
+            trap(this.gl.under, xq - 1.5 * sq, g1q + 1.5 * sq, xp - 1.5 * sq, g1p + 1.5 * sq, y0, y1, ec, 0.14 * glow);
           }
           trap(this.gl.under, xq, g1q, xp, g1p, y0, y1, ec, 1);
         }
