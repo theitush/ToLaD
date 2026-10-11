@@ -145,8 +145,11 @@ def main(argv: list[str] | None = None) -> int:
             print(f"    flagged {sp}: genomic/next {f['ratio']:.3g} ({f['to_kind']}), {f['rule']}"
                   + (f" x{f['factor']:.3g}" if f["rule"] == "scaled" else ""), file=sys.stderr)
     from . import dated  # the dated tree (format 1.6, ToLaD#145): Upham topology + grafts, per file META
-    droot = dated.build(root, *ctx["upham"], ctx["overrides"], log)
+    droot = dated.build(root, *ctx["upham"], ctx["overrides"], log, ac=dated.load_alvarez(a.raw),
+                        names=(ctx["exact"], ctx["syn"]))
     log_step(t_start, f"dated tree: {log['dated_tree']['species']} species, {log['dated_tree']['splits']} splits")
+    for rule, b in log["dated_tree"].get("benchmark", {}).items():
+        log_step(t_start, f"dates benchmark, {rule}: {b['inside']}/{b['of']} inside, x{b['median_factor_off']} off")
     log["counts"] = counts(root)
     log["spot_checks"] = spot_checks(root)
     log["calibration_check"] = calibration_report(root, a.raw)

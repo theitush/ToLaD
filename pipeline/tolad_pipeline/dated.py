@@ -31,8 +31,12 @@ from dataclasses import dataclass, field
 
 from .tree import D_INTERP, D_UPHAM, Node
 
-SRC_NAMES = ["upham", "upham-imputed", "fossil", "interpolated", "override"]
-S_UPHAM, S_IMPUTED, S_FOSSIL, S_INTERP, S_OVERRIDE = range(5)
+SRC_NAMES = ["upham", "upham-imputed", "fossil", "interpolated", "override", "alvarez", "ensemble", "upham-interp",
+             "fossil-floor"]
+S_UPHAM, S_IMPUTED, S_FOSSIL, S_INTERP, S_OVERRIDE, S_ALVAREZ, S_ENSEMBLE, S_UPINTERP, S_FLOOR = range(9)
+# The ages rule the build applies (research/dated-tree-sources.md §5): "alvarez" (candidate A: Álvarez-Carretero
+# ages on the clades both trees share) or "ensemble" (candidate B: their geometric mean). The build scores both.
+AGES = "ensemble"
 GEN_HOW = ["COMBINE reported", "COMBINE imputed", "allometric"]
 EPS = 1e-4  # Ma
 
@@ -46,6 +50,8 @@ class DNode:
     leaf: Node | None = None
     name: str | None = None
     note: int = -1  # index into the dated overrides list (its citation)
+    h: float = 0.0  # Upham's own height (Ma): the shape that unshared splits are interpolated in
+    cand: dict | None = None  # {"alvarez"|"ensemble": (age, lo, hi, src)}: both ages rules, before fossil floors
     loose: int = 0  # daughters placed by taxonomy only (where inside the split is not known)
     imputed: bool = False  # a leaf Upham placed without genetic data
     anchor: "DNode | None" = None  # a graft's stem node: the crown it sits above
@@ -103,7 +109,8 @@ def from_upham(up_root, up_tax: dict[str, dict], log: dict) -> DNode:
             out[id(u)] = kids[0]
         else:
             lo, hi = u.hpd if u.hpd else (u.height, u.height)
-            d = DNode(age=u.height, lo=lo, hi=hi, src=S_IMPUTED if any(k.imputed for k in kids) else S_UPHAM)
+            d = DNode(age=u.height, lo=lo, hi=hi, src=S_IMPUTED if any(k.imputed for k in kids) else S_UPHAM,
+                      h=u.height)
             for k in kids:
                 d.add(k)
             out[id(u)] = d
@@ -111,6 +118,207 @@ def from_upham(up_root, up_tax: dict[str, dict], log: dict) -> DNode:
     root.parent = None
     log["upham_tips_dropped"] = dict(dropped)
     return root
+
+
+# ------------------------------------------------------------------ 1b. ages: Álvarez-Carretero et al. 2022
+
+AC_FILE = ("alvarez", "4705sp_mammal-time.tree")
+AC_CITE = ("Álvarez-Carretero, S., Tamuri, A.U., Battini, M. et al. (2022). A species-level timeline of mammal "
+           "evolution integrating phylogenomic data. Nature 602: 263-267. 4,705-species timetree (mean ages, 95% CIs)")
+RULES = ("alvarez", "ensemble")
+
+# The benchmark (research/dated-tree-sources.md §3): each node is the MRCA of its species; the consensus range in Ma
+BENCH = [
+    ("Homo-Pan", ["Homo sapiens", "Pan troglodytes"], 6, 8),
+    ("crown Panthera", ["Panthera tigris", "Panthera leo"], 4, 6.5),
+    ("crown Felidae", ["Panthera leo", "Felis catus"], 11, 16),
+    ("crown Canidae", ["Canis lupus", "Urocyon cinereoargenteus", "Vulpes vulpes"], 9, 14),
+    ("crown Ursidae", ["Ailuropoda melanoleuca", "Ursus arctos"], 17, 22),
+    ("crown Pinnipedia", ["Phoca vitulina", "Zalophus californianus"], 22, 27),
+    ("Caniformia", ["Canis lupus", "Ursus arctos"], 42, 50),
+    ("crown Carnivora", ["Canis lupus", "Felis catus"], 50, 60),
+    ("Mus-Rattus", ["Mus musculus", "Rattus norvegicus"], 10.4, 14),
+    ("Whippomorpha", ["Tursiops truncatus", "Hippopotamus amphibius"], 52, 58),
+    ("crown Cetacea", ["Eubalaena glacialis", "Tursiops truncatus"], 34, 38),  # same node; no rorqual is in it (a bug)
+    ("crown Primates", ["Homo sapiens", "Lemur catta"], 65, 75),
+    ("Euarchontoglires", ["Homo sapiens", "Mus musculus"], 76, 90),
+    ("crown Placentalia", ["Homo sapiens", "Dasypus novemcinctus", "Loxodonta africana"], 85, 100),
+    ("Theria", ["Homo sapiens", "Macropus giganteus"], 157, 170),
+]
+
+
+def load_alvarez(raw) -> list[tuple[set[str], float, float, float]]:
+    """A-C's timetree as clades, postorder: (the binomials under it, mean age, 95% lo, hi), ages in Ma.
+
+    Tips are `genus_species[_subspecies]`: a species with several subspecies tips is all of them."""
+    from .newick import parse_comment, parse_nexus_tree
+    t = parse_nexus_tree((raw / AC_FILE[0] / AC_FILE[1]).read_text())
+    height: dict[int, float] = {}
+    tips: dict[int, set[str]] = {}
+    out = []
+    for u in t.iter_postorder():
+        if not u.children:
+            b = (u.label or "").split("_")
+            height[id(u)], tips[id(u)] = 0.0, {f"{b[0].capitalize()} {b[1]}"} if len(b) >= 2 else set()
+            continue
+        c = u.children[0]
+        h = height[id(u)] = height[id(c)] + (c.length or 0.0)
+        tips[id(u)] = set().union(*(tips.pop(id(c)) for c in u.children))
+        ci = parse_comment(u.comment).get("95%")
+        lo, hi = (float(x) for x in ci.strip("{}").split(",")) if ci else (h, h)
+        out.append((tips[id(u)], h * 100, lo * 100, hi * 100))  # units of 100 Myr
+    return out
+
+
+def redate(droot: DNode, ac, exact: dict, syn: dict, log: dict) -> None:
+    """Both ages rules on every Upham split (d.cand), then the chosen one (AGES) applied.
+
+    A split whose shared species (in both trees) are exactly an A-C clade is dated: by A-C ("alvarez"), or by the
+    geometric mean of the two ages with the union of their 95% ranges ("ensemble"). Nested Upham splits over the
+    same shared species: only the youngest is dated. Every other split is interpolated linearly in Upham's height
+    between its nearest dated ancestor and the oldest dated split below it (a tip counts as 0): `upham-interp`,
+    or `upham-imputed` where a daughter was placed with no genetic data."""
+    import math
+    key: dict[str, int] = {}
+    for d in droot.preorder():
+        if d.leaf is not None:
+            for n in (d.leaf.name, *d.leaf.data.get("upham_names", [])):
+                key.setdefault(n, id(d))
+
+    def lookup(b: str) -> int | None:
+        if b in key:
+            return key[b]
+        for nd in ([exact[b]] if b in exact else []) + list(syn.get(b, [])):
+            dl = nd.data.get("dleaf")
+            if dl is not None:
+                return id(dl)
+        return None
+
+    kmap = {b: lookup(b) for b in ac[-1][0]}
+    clade: dict[frozenset, tuple[float, float, float]] = {}
+    for s, age, lo, hi in ac:  # postorder: of nested A-C clades over the same shared species, the youngest
+        f = frozenset(kmap[b] for b in s if kmap[b] is not None)
+        if len(f) >= 2:
+            clade.setdefault(f, (age, lo, hi))
+    shared = {v for v in kmap.values() if v is not None}
+    post = list(reversed(list(droot.preorder())))
+    S: dict[int, frozenset] = {}
+    matched: dict[int, tuple[float, float, float]] = {}
+    for d in post:
+        if d.leaf is not None:
+            S[id(d)] = frozenset([id(d)]) if id(d) in shared else frozenset()
+            continue
+        f = frozenset().union(*(S[id(c)] for c in d.children))
+        S[id(d)] = f
+        if len(f) >= 2 and f in clade and all(S[id(c)] != f for c in d.children):
+            matched[id(d)] = clade[f]
+    del S
+    for rule in RULES:
+        new: dict[int, tuple[float, float, float]] = {}
+        for d in post:
+            if id(d) in matched:
+                a, lo, hi = matched[id(d)]
+                new[id(d)] = (a, lo, hi) if rule == "alvarez" else (math.sqrt(a * d.h), min(lo, d.lo), max(hi, d.hi))
+        below: dict[int, tuple[float, float]] = {}  # the oldest dated split below: (new age, Upham height)
+        for d in post:
+            if d.leaf is not None:
+                below[id(d)] = (0.0, 0.0)
+                continue
+            below[id(d)] = max(((new[id(c)][0], c.h) if id(c) in new else below[id(c)] for c in d.children))
+        anc: dict[int, tuple[float, float] | None] = {}
+        for d in droot.preorder():
+            p = d.parent
+            anc[id(d)] = None if p is None else (new[id(p)][0], p.h) if id(p) in new else anc[id(p)]
+            if d.leaf is not None:
+                continue
+            if id(d) in new:
+                d.cand = {**(d.cand or {}), rule: (*new[id(d)], S_ALVAREZ if rule == "alvarez" else S_ENSEMBLE)}
+                continue
+            A, (dn, dh) = anc[id(d)], below[id(d)]
+
+            def f(x: float) -> float:
+                if A is None:
+                    return x * dn / dh if dh > 0 else x
+                an, ah = A
+                if ah - dh <= EPS:
+                    return (an + dn) / 2
+                return dn + (an - dn) * min(1.0, max(0.0, (x - dh) / (ah - dh)))
+
+            age = f(d.h)
+            d.cand = {**(d.cand or {}), rule: (age, min(f(d.lo), age), max(f(d.hi), age),
+                                               S_IMPUTED if d.src == S_IMPUTED else S_UPINTERP)}
+    for d in droot.preorder():
+        if d.leaf is None:
+            d.age, d.lo, d.hi, d.src = d.cand[AGES]
+            if d.parent is not None and d.age >= d.parent.age:
+                d.age = d.parent.age * (1 - 2e-3)
+                d.lo = min(d.lo, d.age)
+    log["ages"] = {
+        "rule": AGES,
+        "alvarez_binomials": len(kmap),
+        "alvarez_binomials_matched": sum(1 for v in kmap.values() if v is not None),
+        "shared_species": len(shared),
+        "splits_dated": len(matched),
+        "splits_interpolated": sum(1 for d in post if d.leaf is None) - len(matched),
+    }
+
+
+def fossil_floors(root: Node, m: dict, k: dict, skip: set[int]) -> dict[int, tuple[float, str, DNode]]:
+    """The fossil floor: a fossil species of a living genus is inside that genus's crown, so the crown is no
+    younger than its first appearance. {id(crown): (oldest first appearance, that fossil, crown)}."""
+    out: dict[int, tuple[float, str, DNode]] = {}
+    for nd in root.preorder():
+        p = nd.parent
+        if p is None or k[id(nd)] > 0 or k[id(p)] == 0 or p.rank != "genus" or p.data.get("total_group_of"):
+            continue
+        A = m[id(p)]
+        if A is None or A.leaf is not None or not nd.is_leaf or not nd.name:
+            continue
+        gw = nd.name.split()[0]  # the fossil's genus is the crown's only genus (Open Tree has odd "genus" nodes)
+        if any(x.leaf.name.split()[0] != gw for x in A.preorder() if x.leaf is not None):
+            continue
+        sub = _sub(nd, skip)
+        if sub is None or not all(x.leaf.extinct or x.leaf.t1 > 0 for x in sub.preorder() if x.leaf is not None):
+            continue
+        g = max(nd.t0, sub.age)
+        if id(A) not in out or g > out[id(A)][0]:
+            out[id(A)] = (g, nd.name or "?", A)
+    return out
+
+
+def _floored(age: float, parent_age: float | None, floor: float | None) -> float:
+    """A crown's age under its fossil floor; never up to its parent's split (the backbone keeps its order)."""
+    if floor is None or floor <= age:
+        return age
+    return min(floor, parent_age * (1 - 2e-3)) if parent_age is not None else floor
+
+
+def benchmark(droot: DNode, floors: dict, rule: str) -> dict:
+    """The 15 benchmark nodes under one ages rule (with fossil floors), and its score."""
+    import math
+    by: dict[str, DNode] = {}
+    for d in droot.preorder():
+        if d.leaf is not None:
+            for n in (d.leaf.name, *d.leaf.data.get("upham_names", [])):
+                by.setdefault(n, d)
+
+    def age_of(d: DNode) -> float:
+        return d.cand[rule][0] if d.cand else d.age
+
+    rows, offs = {}, []
+    for name, sps, lo, hi in BENCH:
+        if any(s not in by for s in sps):
+            rows[name] = None
+            continue
+        d = _mrca([by[s] for s in sps])
+        fl = floors.get(id(d))
+        a = _floored(age_of(d), age_of(d.parent) if d.parent is not None else None, fl[0] if fl else None)
+        rows[name] = [round(a, 2), lo <= a <= hi]
+        offs.append(abs(math.log(a / math.sqrt(lo * hi))))
+    offs.sort()
+    med = (offs[len(offs) // 2] + offs[(len(offs) - 1) // 2]) / 2 if offs else 0.0
+    return {"inside": sum(1 for r in rows.values() if r and r[1]), "of": len(BENCH),
+            "median_factor_off": round(math.exp(med), 3), "nodes": rows}
 
 
 # ------------------------------------------------------------------ 2. overrides
@@ -207,6 +415,10 @@ def apply_overrides(root: DNode, merged: Node, ov, notes: list[dict]) -> tuple[D
 
         new = build(t)
         new.name = m.name
+        for sci, cn in e.get("common", {}).items():
+            if sci not in names:
+                raise RuntimeError(f"overrides.toml dated_clade {e['name']}: common name for {sci!r}, not in its tree")
+            by_name[sci].leaf.data["common_override"] = cn
         root = _replace(m, new, root)
         ov.applied["dated_clade"].append({"name": e["name"], "species": len(names),
                                           "replaced_age": round(m.age, 4), "age": t[1]})
@@ -280,22 +492,9 @@ def _sub(nd: Node, skip: set[int]) -> DNode | None:
     return d
 
 
-def build(root: Node, up_root, up_tax: dict[str, dict], ov, log: dict) -> DNode:
-    """The whole dated tree; sets n.data["dleaf"] on every species leaf in it."""
-    rep: dict = {}
-    droot = from_upham(up_root, up_tax, rep)
-    for d in droot.preorder():
-        if d.leaf is not None:
-            d.leaf.data["dleaf"] = d
-    notes: list[dict] = []
-    droot, placed = apply_overrides(droot, root, ov, notes)
-    ov.check_all_used(dated=True)
-
-    # the dated tree's MRCA of the matched species under every merged node (before grafting)
+def _mrca_map(root: Node, droot: DNode) -> tuple[dict, dict, dict]:
+    """The dated tree's MRCA of the matched species under every merged node, and how many there are."""
     dep = _depths(droot)
-    nleaf: dict[int, int] = {}
-    for d in reversed(list(droot.preorder())):
-        nleaf[id(d)] = 1 if d.leaf is not None else sum(nleaf[id(c)] for c in d.children)
     m: dict[int, DNode | None] = {}
     k: dict[int, int] = {}
     for nd in root.postorder():
@@ -309,6 +508,39 @@ def build(root: Node, up_root, up_tax: dict[str, dict], ov, log: dict) -> DNode:
                 mm = m[id(c)] if mm is None else _lca(mm, m[id(c)], dep)
                 kk += k[id(c)]
         m[id(nd)], k[id(nd)] = mm, kk
+    return m, k, dep
+
+
+def _label(d: DNode) -> str:
+    if d.name:
+        return d.name
+    sp = [x.leaf.name for x in d.preorder() if x.leaf is not None]
+    return f"{sp[0]} + {sp[-1]}" if len(sp) > 1 else sp[0]
+
+
+def build(root: Node, up_root, up_tax: dict[str, dict], ov, log: dict, ac=None, names=({}, {})) -> DNode:
+    """The whole dated tree; sets n.data["dleaf"] on every species leaf in it.
+
+    `ac`: load_alvarez()'s clades (None keeps Upham's own ages); `names`: the merged tree's (exact, synonym) index."""
+    rep: dict = {}
+    droot = from_upham(up_root, up_tax, rep)
+    for d in droot.preorder():
+        if d.leaf is not None:
+            d.leaf.data["dleaf"] = d
+    if ac is not None:
+        redate(droot, ac, *names, rep)
+        m, k, _ = _mrca_map(root, droot)
+        fl = fossil_floors(root, m, k, set())
+        rep["benchmark"] = {r: benchmark(droot, fl, r) for r in RULES}
+    notes: list[dict] = []
+    droot, placed = apply_overrides(droot, root, ov, notes)
+    ov.check_all_used(dated=True)
+
+    # the dated tree's MRCA of the matched species under every merged node (before grafting)
+    m, k, dep = _mrca_map(root, droot)
+    nleaf: dict[int, int] = {}
+    for d in reversed(list(droot.preorder())):
+        nleaf[id(d)] = 1 if d.leaf is not None else sum(nleaf[id(c)] for c in d.children)
     # names: the outermost named merged clade with exactly the same species
     named = 0
     for nd in root.preorder():
@@ -317,6 +549,18 @@ def build(root: Node, up_root, up_tax: dict[str, dict], ov, log: dict) -> DNode:
             continue
         d.name = nd.name.removesuffix(" (crown)")
         named += 1
+
+    # fossil floors: no crown younger than a fossil of its genus (capped below the crown's parent split)
+    if ac is not None:
+        floors = []
+        for g, fossil, A in sorted(fossil_floors(root, m, k, placed).values(), key=lambda x: -x[0]):
+            new = _floored(A.age, A.parent.age if A.parent is not None else None, g)
+            if A.src == S_OVERRIDE or new <= A.age:
+                continue
+            floors.append({"clade": _label(A), "from": round(A.age, 3), "to": round(new, 3), "fossil": fossil,
+                           "first_appearance": round(g, 3), "capped": new < g})
+            A.age, A.lo, A.hi, A.src = new, max(A.lo, new), max(A.hi, new), S_FLOOR
+        rep["fossil_floors"] = floors
 
     # grafts
     how = Counter()
@@ -484,6 +728,8 @@ def skeleton_meta(droot: DNode | None) -> dict:
         "upham": "Upham, N.S., Esselstyn, J.A. & Jetz, W. (2019). Inferring the mammal tree: species-level "
                  "sets of phylogenies for questions in ecology, evolution, and conservation. PLoS Biology 17: "
                  "e3000494. Node-dated MCC tree of the completed 5,911-species posterior (topology-constrained, birth-death); node heights and 95% HPDs",
+        "alvarez": AC_CITE,
+        "ages": AGES,
         "gen_how": GEN_HOW,
         "common_source": "IUCN Red List 2026-1 (GBIF checklist doi:10.15468/0qnb58), preferred English name",
         "overrides": getattr(droot, "data_notes", []) if droot is not None else [],

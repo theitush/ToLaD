@@ -235,8 +235,14 @@ The sidecars are JSON, one per data file, read at build time by the fan (they ar
 
 `skeleton.json` adds the shared tables: `sources` (`upham`, `upham-imputed`: a split that joins a tip
 Upham placed with no genetic data, `fossil`: a graft's first appearance or a fossil subtree's
-fossil-range age, `interpolated`: an Open Tree node's interpolated age, `override`), `upham` (the
-citation), `gen_how`, `common_source`, and `overrides`: `[{name, cite, reason}]`.
+fossil-range age, `interpolated`: an Open Tree node's interpolated age, `override`, and since #145's ages
+rule: `ensemble`: a clade of both Upham and Álvarez-Carretero 2022 dated by the geometric mean of their ages
+(interval: the union of their 95% ranges), `alvarez`: the same clade dated by A-C alone (the rule not chosen,
+dated.AGES), `upham-interp`: any other Upham split, interpolated in Upham's height between the dated splits
+around it, `fossil-floor`: a crown raised to the first appearance of a fossil of its genus), `upham` and
+`alvarez` (the citations), `ages` (the rule applied), `gen_how`, `common_source`, and `overrides`:
+`[{name, cite, reason}]`. Report: `stats.json` → `dated_tree.ages`, `.benchmark` (both rules on 15 nodes,
+research/dated-tree-sources.md §5), `.fossil_floors`.
 Report: `stats.json` → `dated_tree`.
 
 ## Semantics of the counts

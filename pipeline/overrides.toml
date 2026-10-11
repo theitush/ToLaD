@@ -26,6 +26,8 @@
 # (tolad_pipeline/dated.py). Its only hand values are these two sections, at
 # the end of the file:
 #   [[dated_clade]]   replace the dated subtree over the species in `tree` with
+#                     `tree` (`common`: English names for its species, where the
+#                     Red List has none);
 #                     `tree`: Newick with each split's age and 95% interval in
 #                     Ma, `(a,b)age[lo,hi]`; the species must be exactly the
 #                     dated tree's under their common ancestor
@@ -138,6 +140,7 @@ adaptive evolution in the big cats. Science Advances 3: e1700299, Fig. 1A. doi:1
 [[dated_clade]]
 name = "Felis catus"
 tree = "(Felis silvestris,Felis catus)0.0095[0.0095,0.0115]"
+common = { "Felis catus" = "Domestic cat" }  # the Red List lists no domestic form, so it has no English name there
 reason = """The domestic cat is the wildcat's tamed form (from the Near Eastern wildcat), so it parts \
 from the wildcat at domestication, not at Upham's 0.94 Ma speciation; the earliest tamed cat was \
 buried with a person on Cyprus ~9,500 years ago (Vigne et al. 2004, Science 304: 259)."""
