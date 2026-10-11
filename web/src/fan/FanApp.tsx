@@ -285,6 +285,8 @@ export function midName(sp: SpeciesRec): string {
 export function pluralName(sp: SpeciesRec): string {
   if (sp.common === sp.sci) return `${sp.sci} individuals`;
   const c = midName(sp);
+  // (The carnivores bring a -f plural, ToLaD#146: "grey wolves".)
+  if (/wolf$/.test(c)) return `${c.slice(0, -1)}ves`;
   return /(s|x|z|ch|sh)$/.test(c) ? `${c}es` : `${c}s`;
 }
 

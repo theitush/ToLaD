@@ -12,7 +12,7 @@ import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01 } from './meshgl';
 import { COLUMN_DIM, columnSpans, EVENT_TINT, eventAt, eventSpans, type EventSpan } from './colstyle';
 import { bridgeInstances, type SplitStyle, type SplitWindow } from './gradual';
-import { drawTwigs, kLogAt, laneDim, LINEAGE, LIVING, TWIG_GRAY, TwigModel, type IndInfo, type TwigStats } from './twigs';
+import { drawTwigs, kLogAt, laneDim, LINEAGE, LIVING, TEX_HAIR_PX, TWIG_GRAY, TwigModel, type IndInfo, type TwigStats } from './twigs';
 import type { MeshBatch, RectBatch } from './meshgl';
 import { familyLabel, FELIDAE_TREE, type Split } from './splits';
 
@@ -385,6 +385,8 @@ export function labelSpots(c: Screen, fan: Fan, top: number, measure: (text: str
   // centred on the window, while the window is on screen. After the species' names, before the lineages'.
   for (const b of fan.branches) {
     if (!near(boxes.get(b)!)) continue;
+    // (A hairline column, ToLaD#146: its events tinted on it, their titles only once it has a few px of room.)
+    if (b.width * c.cam.sx < TEX_HAIR_PX[1]) continue;
     for (const s of colEventsY(fan, b)) {
       const text = s.ev.title;
       const len = measure(text) + 2 * LABEL_PAD;
@@ -1659,6 +1661,13 @@ export class FanView implements InputHandlers {
     // (On the stem: kept on screen, the text clear of its right edge where the stem is far right.)
     const x = onStem ? Math.max(noteR, Math.min(stemL + 10, this.w - 6 - wmax)) : Math.max(noteR, sx + 10);
     const y = sy + 8;
+    // Fading out as it nears the width scale and legend at the bottom (a level framed inside the fan puts the fork low).
+    const fade = Math.max(0, Math.min(1, (this.h - 46 - (y + 68)) / 16));
+    if (!(fade > 0)) {
+      ctx.restore();
+      return;
+    }
+    ctx.globalAlpha = fade;
     if (onStem) {
       ctx.shadowColor = 'rgba(12,23,20,0.95)';
       ctx.shadowBlur = 7;
