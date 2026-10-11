@@ -136,3 +136,60 @@ The fetch is wired up: `pipeline/tolad_pipeline/fetch.py` source `alvarez` → `
 - **A side effect.** At 19.9 Ma the crown is as old as *Pseudaelurus*/*Styriofelis*, so the stem-rehoming rule will treat those fossils differently.
 - **A possible fix.** If the shallow ages matter, test a second rule: a per-clade A-C/Upham geometric mean below ~20 Ma.
   It cancels the opposite biases at Homo–Pan, Felidae and Panthera (6.2, 12.0, 6.2). Benchmark it before adopting it.
+
+## 5. The switch: rule A against rule B, scored (2026-10-11, tree145b)
+
+`dated.py` now dates the Upham topology with both trees. A split whose shared species (in both trees: 3,786, matched by
+binomial, then by the pipeline's name and synonym index) are exactly an A-C clade is dated (2,289 splits; of nested
+Upham splits over the same shared species only the youngest). Every other split (3,360) is interpolated in Upham's
+height between its nearest dated ancestor and the oldest dated split below it, as §4 says. Two rules for the dated splits:
+
+- **A (`alvarez`):** A-C's mean age and 95% CI.
+- **B (`ensemble`):** the geometric mean of A-C's and Upham's ages; interval the union of their 95% ranges.
+
+Both get the **fossil floor**: a crown whose genus has a dated fossil species is raised to that fossil's first
+appearance (source `fossil-floor`), capped just below the crown's parent split so the backbone keeps its order. Only a
+fossil of the crown's own genus counts (all the crown's species share the fossil's genus word); a family-level fossil
+says nothing about the crown (*Proailurus*, *Pseudaelurus* stay stem). 33 crowns are floored, none of them a benchmark
+node (the fossil minima of §1 are hominins, early whales and *P. blytheae*, which overrides.toml already places).
+
+The build scores both rules on the 15 nodes of §3 (`stats.json` → `dated_tree.benchmark`; crown Cetacea is measured
+with the North Atlantic right whale, because no rorqual reaches the dated tree: a data bug, #160):
+
+| Node | Consensus | A: alvarez | B: ensemble |
+|---|---|---|---|
+| Homo–Pan | 6–8 | 9.07 | **6.15** ✓ |
+| Crown Panthera | 4–6.5 | 10.31 | **6.19** ✓ |
+| Crown Felidae | 11–16 | 19.88 | **11.97** ✓ |
+| Crown Canidae | 9–14 | 27.0 | 15.74 |
+| Crown Ursidae | 17–22 | 23.64 | 15.43 |
+| Crown Pinnipedia | 22–27 | **26.36** ✓ | 19.1 |
+| Caniformia | 42–50 | **46.18** ✓ | 39.93 |
+| Crown Carnivora | 50–60 | **51.73** ✓ | 45.62 |
+| Mus–Rattus | 10.4–14 | **11.61** ✓ | 17.46 |
+| Whippomorpha | 52–58 | 48.13 | 43.5 |
+| Crown Cetacea | 34–38 | 28.8 | 21.99 |
+| Crown Primates | 65–75 | 63.09 | **65.08** ✓ |
+| Euarchontoglires | 76–90 | 69.81 | 73.32 |
+| Crown Placentalia | 85–100 | 80.28 | **85.86** ✓ |
+| Theria | 157–170 | 141.83 | 150.45 |
+| **Inside the range** | | 4 / 15 | **5 / 15** |
+| **Median factor off** | | **×1.15** | ×1.20 |
+
+(Crown Cetacea is 28.8 under A, not §3's 33.6: in Upham's topology the whale–dolphin split is not an exact A-C clade, so
+it is interpolated.)
+
+**Choice: B, `ensemble`** (`dated.AGES`). It has more nodes inside the consensus range, and it is right exactly where the
+fan is now: crown Felidae 11.97 Ma (in Johnson 2006 / Li 2016's 11–16), crown Panthera 6.19 (the fan keeps Figueiró's
+override there), Homo–Pan 6.15. A is closer on the median, because it is right at 25–55 Ma (Carnivora, Caniformia,
+Pinnipedia), where B halves its way back towards Upham's young ages. Neither rule gets Whippomorpha, crown Cetacea or the
+deep nodes right.
+
+**The obvious next rule** (not built; scored by hand from the table): B below ~20 Ma, A above (blended smoothly so nested
+splits stay ordered) would get Homo–Pan, Panthera, Felidae, Pinnipedia, Caniformia, Carnivora and Mus–Rattus: 7 / 15.
+
+**What moved under the stem-rehoming rule.** Older crowns keep more fossils inside them. Across mammals, grafts that join
+a crown's split by taxonomy ("loose") went from 1,832 to 2,039, and fossil stem grafts from 1,339 to 1,179. In the cat
+family the crown moved from 7.2 Ma (Upham) to 11.97: the fossil cats with first appearances between those dates now join
+the crown split, see research/felidae-dated-tree-diff.md; *Pseudaelurus*, *Styriofelis* and the other early-Miocene
+cats stay on the stem (the family's root split is still ~19.5 Ma, a fossil one).
