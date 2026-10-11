@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { approxCountsIn, formatCount, meaningful } from './count';
+import { approxCountsIn, approxMa, formatCount, meaningful } from './count';
 
 describe('formatCount: a population count with only the digits it means (ToLaD#96)', () => {
   it('rounds to one significant figure, two when the leading digit is 1 or 2, with a "~"', () => {
@@ -68,5 +68,11 @@ describe('approxCountsIn: the counts inside a pipeline sentence', () => {
 
   it('keeps one tilde where a note already says "~" before a count', () => {
     expect(approxCountsIn("CatSG dates the ~3,200 in-situ estimate to 2009")).toBe('CatSG dates the ~3k in-situ estimate to 2009');
+  });
+});
+
+describe('approxMa: a split card\'s dates, two significant figures (ToLaD#145)', () => {
+  it('rounds the date and both ends of the range the same way', () => {
+    expect([3.629, 15.24, 3.37, 5.84, 11.97, 4.58, 0.0095, 0.129, 2].map(approxMa)).toEqual(['3.6', '15', '3.4', '5.8', '12', '4.6', '0.0095', '0.13', '2']);
   });
 });

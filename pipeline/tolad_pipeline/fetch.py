@@ -26,7 +26,10 @@ from pathlib import Path
 
 UPHAM_SHA = "740b70189c77fc168be17bd6ade204c755bcb19b"
 PHYLACINE_SHA = "2fb87f0b994ee82daa6691931f15971535322a2e"
+ALVAREZ_SHA = "4c564448c0a99f84aa78f34f05dc24b926cdcbf6"
 UPHAM = f"https://raw.githubusercontent.com/n8upham/MamPhy_v1/{UPHAM_SHA}/_DATA"
+ALVAREZ = (f"https://raw.githubusercontent.com/sabifo4/mammals_dating/{ALVAREZ_SHA}"
+           "/02_SeqBayes_S2/03_Generate_final_mammal_tree")
 PHYLACINE = f"https://raw.githubusercontent.com/MegaPast2Future/PHYLACINE_1.2/{PHYLACINE_SHA}"
 
 PBDB_BASE = "https://paleobiodb.org/data1.2/taxa/list.json"
@@ -59,6 +62,14 @@ SOURCES: dict[str, list[tuple[str, str, dict | None]]] = {
             f"{UPHAM}/taxonomy_mamPhy_5911species_toPublish.csv",
             None,
         ),
+    ],
+    # Alvarez-Carretero et al. 2022, Nature 602:263 (4,705-taxon mammal timetree, MCMCtree, ages in
+    # units of 100 Myr, 95% CIs in [&95%={lo, hi}] comments). The file is byte-identical to
+    # timetrees/01_step2/4705sp_mammal-time.tree in the authors' CC BY 4.0 figshare deposit
+    # (doi:10.6084/m9.figshare.14885691, a 465 MB zip); the commit-pinned GitHub copy is the small one.
+    # The recommended age source for the dated tree (research/dated-tree-sources.md, ToLaD#145).
+    "alvarez": [
+        ("alvarez/4705sp_mammal-time.tree", f"{ALVAREZ}/4705sp.tree", None),
     ],
     "phylacine": [
         ("phylacine/Trait_data.csv", f"{PHYLACINE}/Data/Traits/Trait_data.csv", None),

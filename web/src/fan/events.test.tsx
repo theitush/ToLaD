@@ -14,7 +14,8 @@ const sp = (common: string) => FELIDAE.species.find((s) => s.common === common)!
 
 describe('events carried to the web', () => {
   it('the cougar and the cheetah carry their sourced bottlenecks, oldest first', () => {
-    for (const name of ['Cougar', 'Cheetah']) {
+    // 'Puma': the Red List's English name for Puma concolor (the data's names since ToLaD#145; the hand table said Cougar).
+    for (const name of ['Puma', 'Cheetah']) {
       const evs = sp(name).history!.events;
       expect(evs.length, name).toBeGreaterThanOrEqual(1);
       for (const e of evs) {
@@ -41,7 +42,7 @@ describe('events carried to the web', () => {
 
 describe('marker spans', () => {
   const fan = layoutFan(FELIDAE, 'log');
-  const cougar = fan.branches.find((b) => b.sp.common === 'Cougar')!;
+  const cougar = fan.branches.find((b) => b.sp.common === 'Puma')!;
 
   it('each species-wide window is a span of its own column, clipped to it, world-fixed', () => {
     // The North American refounding (12-9 kya) is regional (ToLaD#149): not on the column.
@@ -115,7 +116,7 @@ function stubView(): FanView {
 describe('the fan: marks and tap', () => {
   const v = stubView();
   const fan = v.fan;
-  const b = fan.branches.find((x) => x.sp.common === 'Cougar')!;
+  const b = fan.branches.find((x) => x.sp.common === 'Puma')!;
   // Zoomed onto the cougar's column about 16 kyr ago, both windows on screen.
   const home = v.homeCamera();
   const y = fan.time.y(0.016);
@@ -161,7 +162,7 @@ describe('the fan: marks and tap', () => {
       const wy = fan.time.y(ago / 1e6);
       const [px, py] = v.toScreen(b.colLeft + b.width / 2, wy);
       v.tap(px, py);
-      expect(sel!.sp.common).toBe('Cougar');
+      expect(sel!.sp.common).toBe('Puma');
       expect(sel!.event?.ev.title).toBe(title);
     }
   });
@@ -183,7 +184,7 @@ describe('the card', () => {
   });
 
   it('the sparkline shows each window as a labelled band', () => {
-    const h = sp('Cougar').history!;
+    const h = sp('Puma').history!;
     const all = renderToStaticMarkup(<HistorySpark h={h} />);
     expect(all.match(/data-event="/g)?.length).toBe(h.events.length);
     for (const e of h.events) expect(all).toContain(e.title);

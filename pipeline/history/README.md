@@ -102,7 +102,7 @@ labelled band.
   (the pipeline's "worth telling the reader" ratio, as `BLIND_AGAINST`). Each
   event gets `fall`, `shown` and, when not shown, `why` (blind spot, joined
   across, before the data, data rises / too shallow, not drawn), in
-  `stats.json`; `shown`, `scope` and `why` ship in META (FORMAT v1.6). `make audit`
+  `stats.json`; `shown`, `scope` and `why` ship in META (FORMAT v1.7). `make audit`
   lists unshown species-wide events as class `event`, and
   `tests/test_history.py` holds the list of the ones the curve cannot resolve
   (the card says so; the fan still tints them).

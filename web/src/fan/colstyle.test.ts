@@ -74,7 +74,8 @@ describe('held (no-data) stretches on the fan columns (ToLaD#55)', () => {
   });
 
   it('every Panthera is held before its oldest genomic point, back to its start; held to now after its last figure where it has one', () => {
-    for (const c of ['Lion', 'Tiger', 'Leopard', 'Jaguar', 'Snow leopard', 'Cougar', 'Cheetah']) {
+    // 'Puma': the Red List's English name for Puma concolor (the data's names since ToLaD#145; the hand table said Cougar).
+    for (const c of ['Lion', 'Tiger', 'Leopard', 'Jaguar', 'Snow leopard', 'Puma', 'Cheetah']) {
       const b = byName(c);
       const h = b.sp.history!;
       const spans = heldOnly(columnSpans(b.sp, b.t0));
@@ -88,7 +89,7 @@ describe('held (no-data) stretches on the fan columns (ToLaD#55)', () => {
       if (after) expect(spans[spans.length - 1], c).toEqual({ ago0: h.nowYear - after.year, ago1: 0, style: 'held' });
     }
     // Held in the deep past: tiger, snow leopard, cougar, cheetah; held to now: all but the lion and cougar (no figure since).
-    for (const c of ['Tiger', 'Snow leopard', 'Cougar', 'Cheetah']) expect(heldOnly(columnSpans(byName(c).sp, byName(c).t0))[0].ago0, c).toBeGreaterThan(1e5);
+    for (const c of ['Tiger', 'Snow leopard', 'Puma', 'Cheetah']) expect(heldOnly(columnSpans(byName(c).sp, byName(c).t0))[0].ago0, c).toBeGreaterThan(1e5);
     for (const c of ['Tiger', 'Snow leopard', 'Leopard', 'Jaguar', 'Cheetah']) expect(heldOnly(columnSpans(byName(c).sp, byName(c).t0)).at(-1)!.ago1, c).toBe(0);
   });
 

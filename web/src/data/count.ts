@@ -26,6 +26,14 @@ export function meaningful(n: number): number {
   return Number(n.toPrecision(lead < 3 ? 2 : 1));
 }
 
+/**
+ * A split's date or one end of its range, in millions of years: two significant figures, one rule for
+ * every split card (ToLaD#145): "12", "4.6", "3.6–15", "0.0095".
+ */
+export function approxMa(ma: number): string {
+  return Number(ma.toPrecision(2)).toLocaleString('en-US', { maximumFractionDigits: 6 });
+}
+
 const WORDS: [number, string, string][] = [
   [1e12, ' trillion', 'T'],
   [1e9, ' billion', 'B'],

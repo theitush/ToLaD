@@ -95,9 +95,21 @@ def load_redlist(raw: Path) -> dict[str, dict]:
                 if cat is None:
                     raise ValueError(f"unknown Red List status {r[5]!r} for {rec['name']}")
                 rec["category"] = cat
-    for rec in recs.values():
+        # English common names (ToLaD#145): the checklist's preferred English name, else its first English one
+        eng: dict[str, tuple[bool, str]] = {}
+        with z.open("vernacularname.txt") as f:
+            for line in io.TextIOWrapper(f, encoding="utf-8"):
+                r = line.rstrip("\n").split("\t")
+                if len(r) < 4 or r[0] not in recs or r[1] != "eng" or not r[2].strip():
+                    continue
+                pref = r[3].strip().lower() == "true"
+                if r[0] not in eng or (pref and not eng[r[0]][0]):
+                    eng[r[0]] = (pref, r[2].strip())
+    for tid, rec in recs.items():
         if "category" in rec:
             out[rec["name"]] = {k: rec[k] for k in ("category", "year", "taxon", "assessment")}
+            if tid in eng:
+                out[rec["name"]]["common"] = eng[tid][1]
     return out
 
 

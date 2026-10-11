@@ -41,7 +41,7 @@ const scenes = [
   ['split-lionleopard', 'split', [2.57, 5]],
   ['split-cavelion', 'split', [0.5, 5]],
   ['split-eurojag', 'split', [2.0, 5]],
-  ['split-root', 'split', [4.6, 3]],
+  ['split-root', 'split', [4.58, 3]],
   ['decline', 'bar', ['Lion', 50, 1e5, 3.5, 0.5]],
   // The lion's last 200 years filling the screen; the mesh on the cave lion as it peels off the lion.
   ['last200', 'decline', ['Lion', 200]],
@@ -50,15 +50,18 @@ const scenes = [
   ['tip-cave', 'bar', ['Cave lion', 16000, 1e4, 30, 0.5]],
   ['mesh-split', 'bar', ['Lion', 499990, 100, 2e4, 1]],
   ['lineage', 'tapnode', [2.57, 1.2]],
-  // The cat family: Pantherinae vs Felinae, the crowded base (13.8–10.3 Ma), the lynxes, the domestic cat.
-  ['split-felidae', 'split', [13.8, 2]],
-  ['base-felinae', 'split', [10.65, 6]],
-  ['split-lynx', 'split', [2.68, 4]],
+  // The cat family (the data's dated tree, ToLaD#145): Pantherinae vs Felinae (11.97 Ma), the crowded Felinae base
+  // (10.4–7.5 Ma), the lynxes, the domestic cat; a tap on Panthera's stem opens its split card (date and source).
+  ['split-felidae', 'split', [11.97, 2]],
+  ['base-felinae', 'split', [10.42, 6]],
+  ['split-lynx', 'split', [2.201, 4]],
+  ['tap-panthera', 'tapnode', [4.58, 6]],
+  ['tap-pantherinae', 'tapnode', [8.162, 9]],
   ['domestic-boom', 'split', [0.0095, 3]],
   ['card-sandcat', 'card', ['Sand cat']],
   ['card-domestic', 'card', ['Domestic cat']],
   // The Red List chip on a small cat (Least Concern, gray) and on the leopard (ToLaD#98).
-  ['card-leopardcat', 'card', ['Leopard cat']],
+  ['card-leopardcat', 'card', ['Mainland leopard cat']],
   ['card-leopard', 'card', ['Leopard']],
   // The merged data (ToLaD#70): the lion's column from its split down past its genomic deep past, a
   // range-loss trend (the Eurasian lynx, modelled, dashed) on its card, and the lion's card.
@@ -67,8 +70,8 @@ const scenes = [
   ['card-lynx', 'card', ['Eurasian lynx']],
   // Texture at every zoom, branch-outs as lines (#100, #101): zoomed 2^k × home (time 2^(k·r)) about a
   // column `ago` years back: the leopard cat's stem below its start, the river forks at the Felidae base.
-  ['stem-leopardcat', 'about', ['Leopard cat', 1.2e7, 9, 1]],
-  ['forks-base', 'about', ['Leopard cat', 1.2e7, 12, 0.5]],
+  ['stem-leopardcat', 'about', ['Mainland leopard cat', 1.2e7, 9, 1]],
+  ['forks-base', 'about', ['Mainland leopard cat', 1.2e7, 12, 0.5]],
   ['peel-domestic', 'about', ['Domestic cat', 1e4, 3, 0.5]],
   // Held (no-data) stretches drawn faint (ToLaD#55): the leopard's and jaguar's columns since their last
   // figure, the snow leopard's from its split to its oldest genomic point.
@@ -78,14 +81,14 @@ const scenes = [
   // Curated bottlenecks (ToLaD#141): the puma's and the cheetah's windows tinted and named on their columns,
   // a little zoomed and further in, and a tap inside each window at home opening the card's section on it.
   // (#149: 'frame', so the column is the picture, not a thread among the big cats in linear widths.)
-  ['bneck-puma', 'frame', ['Cougar', 16000, 2]],
-  ['bneck-puma-in', 'about', ['Cougar', 16000, 5, 0.6]],
+  ['bneck-puma', 'frame', ['Puma', 16000, 2]],
+  ['bneck-puma-in', 'about', ['Puma', 16000, 5, 0.6]],
   ['bneck-cheetah', 'frame', ['Cheetah', 11800, 2]],
   ['bneck-cheetah-in', 'about', ['Cheetah', 11800, 5, 0.6]],
-  ['bneck-puma-deep', 'about', ['Cougar', 16000, 8, 0.5]],
+  ['bneck-puma-deep', 'about', ['Puma', 16000, 8, 0.5]],
   ['bneck-tiger', 'about', ['Tiger', 2000, 6, 0.3]],
   ['bneck-iberian', 'about', ['Iberian lynx', 3000, 7, 0.3]],
-  ['bneck-tap-puma', 'touch', ['Cougar', 22000]],
+  ['bneck-tap-puma', 'touch', ['Puma', 22000]],
   ['bneck-tap-cheetah', 'touch', ['Cheetah', 11800]],
   // Honest marks (ToLaD#149): only species-wide windows tinted (the lion's Gir and Asiatic events are
   // regional: on its card, not its column), each column framed from ~50 kya to now; the lion's card
@@ -93,7 +96,7 @@ const scenes = [
   ['bfit-lion', 'frame', ['Lion', 2000, 1.6]],
   ['bfit-lion-card', 'touch', ['Lion', 176]],
   ['bfit-cheetah', 'frame', ['Cheetah', 2000, 1.6]],
-  ['bfit-puma', 'frame', ['Cougar', 2000, 1.6]],
+  ['bfit-puma', 'frame', ['Puma', 2000, 1.6]],
   ['bfit-iberian', 'frame', ['Iberian lynx', 2000, 1.6]],
   ['bfit-tiger', 'frame', ['Tiger', 2000, 1.6]],
   // Rough stretches (ToLaD#164): genome, model and flagged joins drawn rough, counts solid (ROUGH=a|b picks the look).
@@ -249,6 +252,11 @@ try {
       }
     }
     await page.waitForTimeout(900);
+    // DETAILS=1: the card's Details opened and scrolled into view (a split's date source, ToLaD#145).
+    if (process.env.DETAILS) {
+      await page.evaluate(() => document.querySelectorAll('details').forEach((d) => { d.open = true; d.scrollIntoView({ block: 'end' }); }));
+      await page.waitForTimeout(300);
+    }
     // CLIP=x,y,w,h (CSS px): only that part of the page (with DSF=4–6, a close look).
     const clip = process.env.CLIP ? Object.fromEntries(['x', 'y', 'width', 'height'].map((k, i) => [k, Number(process.env.CLIP.split(',')[i])])) : undefined;
     await page.screenshot({ path: `${OUT}/${PREFIX}-${name}.png`, clip });

@@ -254,7 +254,8 @@ describe('the texture at every zoom: never a plain lane', () => {
     // (Below its split, domestication: a slice of the parent column, the wildcat + domestic cat ancestors'.
     // The domestic stock's founders are none, so the stem is the wildcat's; a wild cat's column is
     // under a pixel at home in linear widths, so zoomed in to a few tens of px.)
-    ['the stem, below the species', 'Wildcat', 2e5, 1e6, 5],
+    // ('European wildcat': the Red List's name for Felis silvestris, ToLaD#145.)
+    ['the stem, below the species', 'European wildcat', 2e5, 1e6, 5],
   ] as const) {
     it(`in both lanes the lines cover some of the lane, never none and never all (${name})`, () => {
       const { insts, kLog, nowPx, c, mm } = scene(sp, ago, perBar, sy);

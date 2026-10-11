@@ -47,7 +47,7 @@ describe('the matcher', () => {
     expect(names('balam')).toEqual(['Yucatán cave cat']);
     // A genus lists all its species; a common-name prefix ranks with a scientific one.
     expect(names('lynx').slice(0, 4).sort()).toEqual(['Bobcat', 'Canada lynx', 'Eurasian lynx', 'Iberian lynx']);
-    expect(names('felis')).toContain('Wildcat');
+    expect(names('felis')).toContain('European wildcat'); // the Red List's name for Felis silvestris (ToLaD#145)
   });
 
   it('lists each species once, nothing for an empty query or no match', () => {

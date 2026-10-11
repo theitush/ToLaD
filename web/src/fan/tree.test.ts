@@ -166,6 +166,7 @@ describe('the dated tree', () => {
     it(`an extinct branch is 0% green above its split, its own column all line-ended (${mode}, ${edge})`, () => {
       const f = layoutFan(FELIDAE, mode, undefined, edge);
       const extinct = f.branches.filter((b) => b.sp.extinct);
+      // (The overrides' four Panthera fossils: the fossils the data grafts by taxonomy are not drawn, FAN_PLACEMENT, ToLaD#145.)
       expect(extinct.map((b) => b.sp.common).sort()).toEqual(['Cave lion', 'European jaguar', 'Longdan tiger', 'Yucatán cave cat']);
       for (const b of extinct) {
         for (let k = 1; k <= 200; k++) {

@@ -115,8 +115,9 @@ class Loader(unittest.TestCase):
         self.assertNotIn("Homo sapiens", self.rl)
 
     def test_known_assessments(self):
-        self.assertEqual(self.rl["Panthera tigris"], rec("EN", 2022, 15955, 214862019))
-        self.assertEqual(self.rl["Panthera pardus"], rec("VU", 2025, 15954, 286153337))
+        # (Each record also carries its English name since ToLaD#145.)
+        self.assertEqual(self.rl["Panthera tigris"], {**rec("EN", 2022, 15955, 214862019), "common": "Tiger"})
+        self.assertEqual(self.rl["Panthera pardus"], {**rec("VU", 2025, 15954, 286153337), "common": "Leopard"})
         self.assertEqual(self.rl["Prionailurus bengalensis"]["category"], "LC")
         self.assertEqual(self.rl["Thylacinus cynocephalus"]["category"], "EX")
 

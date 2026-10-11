@@ -1,8 +1,8 @@
-# ToLaD tile format, version 1.6
+# ToLaD tile format, version 1.7
 
 Binary columnar format for the river data. The decoder is `pipeline/decoder/tolad-decoder.js`; the round-trip test is `pipeline/decoder/test/roundtrip.test.mjs`. The writer is `pipeline/tolad_pipeline/tiles.py`.
 
-**Versioning:** the `version` field in the header is bumped on any incompatible change. Decoders must reject unknown versions. Additive changes (new sections) keep the version, and decoders must skip sections they do not know. Minor revisions: **1.0** the base format; **1.1** adds the optional `HIST` section (curated population history) and the `hist*` META keys; **1.2** adds the `NATB` section (natural, pre-human baseline), the skeleton `META.natural` key and the HIST kind 10 `natural` (kind 9 `genomic` came with the optional `[deep]` history, no new section). **1.3** adds HIST kind 11 `rangeloss` (modelled range-loss records); **1.4** adds the `RLST` section (IUCN Red List status per species row) and the skeleton `META.red_list` key; **1.5** adds `events` to a history file's `META.hist` entry (curated bottlenecks, ToLaD#141; no new section).; **1.6** adds `scope`, `shown` and `why` to each event (ToLaD#149). The header `version` stays 1, and a 1.0 decoder reads 1.1 to 1.6 files unchanged (it skips `HIST`, `NATB` and `RLST`).
+**Versioning:** the `version` field in the header is bumped on any incompatible change. Decoders must reject unknown versions. Additive changes (new sections) keep the version, and decoders must skip sections they do not know. Minor revisions: **1.0** the base format; **1.1** adds the optional `HIST` section (curated population history) and the `hist*` META keys; **1.2** adds the `NATB` section (natural, pre-human baseline), the skeleton `META.natural` key and the HIST kind 10 `natural` (kind 9 `genomic` came with the optional `[deep]` history, no new section). **1.3** adds HIST kind 11 `rangeloss` (modelled range-loss records); **1.4** adds the `RLST` section (IUCN Red List status per species row) and the skeleton `META.red_list` key; **1.5** adds `events` to a history file's `META.hist` entry (curated bottlenecks, ToLaD#141; no new section); **1.6** adds the dated tree's JSON sidecars `dated/<id>.json` (ToLaD#145, "Dated tree" below; the `.tld` files are unchanged); **1.7** adds `scope`, `shown` and `why` to each event (ToLaD#149). The header `version` stays 1, and a 1.0 decoder reads 1.1 to 1.7 files unchanged (it skips `HIST`, `NATB` and `RLST`).
 
 ## Files
 
@@ -10,6 +10,7 @@ Binary columnar format for the river data. The decoder is `pipeline/decoder/tola
 data/mammals/
   skeleton.tld      top of the tree (kind 0) + global tables in META
   t/<id>.tld        subtree tiles (kind 1), loaded on zoom
+  dated/<id>.json   the dated tree over each file's species rows (1.6; `skeleton.json` for the skeleton)
   debug_top.json    human-readable dump of the skeleton rows (unquantized), one node per line
   stats.json        build report (counts, match rates, fits, sizes, spot checks)
 ```
@@ -111,7 +112,7 @@ v1.1 adds, in the skeleton:
 - `hist_kinds`: the HIST kind names, by code (see below)
 - `hist_index`: `[{species, gid, tile (−1 = skeleton), row}]`, where each curated species' HIST entry lives
 
-and, in every file that has a `HIST` section, `META.hist`: `[{species, common, component, use, scope, file, notes, point_notes, modelled}]`, aligned with the HIST species headers (`point_notes` aligned with that species' points). `modelled` is null for a curated history file. v1.3: `modelled = "rangeloss"` marks a modelled range-loss record (see NATB); its META entry carries only `species`, `component`, `use` and `modelled` (the shared notes, cite and timing are in skeleton `META.natural.trend`), and it is **not** listed in `hist_index` (find it with `file.history(row)`). `modelled = "genomic"` (ToLaD#64) marks a modelled record whose deep past is a bulk PSMC curve (Bergman et al. 2023; `pipeline/history/README.md`, "Bulk genomic deep past"): `genomic` points, then the range-loss start point (kind `rangeloss`, 1500 CE) where the leaf has that trend, then today's count (kind `model`). Its META entry is as short as a range-loss one, but it **is** listed in `hist_index`; the source's cite and url are in `META.hist_sources` like any point's. Any record with a genomic deep past (modelled or a history file) also carries `deep_join` (ToLaD#80): one plain sentence for the species card saying how the genomic curve meets the next level: since ToLaD#143 the genome gives the shape and the whole curve is scaled to meet its anchor, the higher of the first cited count (any year) and the modelled natural level (then held flat to 1500 CE, with the range-loss trend down to the count), else the modelled level, with the factor ("... its curve is scaled ×12 to meet the cited 1950 baseline (500,000), then held flat to it"), flagged when beyond 10x (`pipeline/history/README.md`, "Deep past", "The genome gives the shape"); it may open with a sentence on PSMC's blind spot (its steps kept because a cited source dates a decline there, or dropped while the flat span runs against them). Before ToLaD#143 (#80, #71) it said whether the curve was scaled to a cited level dated 1900 or earlier or kept at its own level; the field and its encoding are unchanged. Absent when there is no deep past. v1.5 (ToLaD#141): a history file's entry may carry `events`, its curated `[[event]]` list oldest first: `{kind ("bottleneck"), from_ya, to_ya (years before present, from_ya > to_ya >= 0), title (the fan's label), summary, quote (verbatim from the source), cite, url, grade (A-D), region ("" = the whole species)}` (`pipeline/history/README.md`, "Events"). The fan marks each window on the species' column and the card quotes it. Absent when there are none. v1.6 (ToLaD#149): each event also carries `scope` ("species": the whole species, tinted on its column; "regional": a subpopulation named by `region`, on the card and its sparkline only, never on the column) and `shown` (the build's check: the column falls through the window by at least 1.5x, `history.EVENT_FALL`; a species event not shown is still tinted, and the card says the curve does not resolve it), and `why`, empty when shown, else the check's reason in its own words ("not drawn", "blind spot", "joined across", "before the data", "data rises", "data too shallow"; `pipeline/history/README.md`, "Events"), which the card puts in plain words.
+and, in every file that has a `HIST` section, `META.hist`: `[{species, common, component, use, scope, file, notes, point_notes, modelled}]`, aligned with the HIST species headers (`point_notes` aligned with that species' points). `modelled` is null for a curated history file. v1.3: `modelled = "rangeloss"` marks a modelled range-loss record (see NATB); its META entry carries only `species`, `component`, `use` and `modelled` (the shared notes, cite and timing are in skeleton `META.natural.trend`), and it is **not** listed in `hist_index` (find it with `file.history(row)`). `modelled = "genomic"` (ToLaD#64) marks a modelled record whose deep past is a bulk PSMC curve (Bergman et al. 2023; `pipeline/history/README.md`, "Bulk genomic deep past"): `genomic` points, then the range-loss start point (kind `rangeloss`, 1500 CE) where the leaf has that trend, then today's count (kind `model`). Its META entry is as short as a range-loss one, but it **is** listed in `hist_index`; the source's cite and url are in `META.hist_sources` like any point's. Any record with a genomic deep past (modelled or a history file) also carries `deep_join` (ToLaD#80): one plain sentence for the species card saying how the genomic curve meets the next level: since ToLaD#143 the genome gives the shape and the whole curve is scaled to meet its anchor, the higher of the first cited count (any year) and the modelled natural level (then held flat to 1500 CE, with the range-loss trend down to the count), else the modelled level, with the factor ("... its curve is scaled ×12 to meet the cited 1950 baseline (500,000), then held flat to it"), flagged when beyond 10x (`pipeline/history/README.md`, "Deep past", "The genome gives the shape"); it may open with a sentence on PSMC's blind spot (its steps kept because a cited source dates a decline there, or dropped while the flat span runs against them). Before ToLaD#143 (#80, #71) it said whether the curve was scaled to a cited level dated 1900 or earlier or kept at its own level; the field and its encoding are unchanged. Absent when there is no deep past. v1.5 (ToLaD#141): a history file's entry may carry `events`, its curated `[[event]]` list oldest first: `{kind ("bottleneck"), from_ya, to_ya (years before present, from_ya > to_ya >= 0), title (the fan's label), summary, quote (verbatim from the source), cite, url, grade (A-D), region ("" = the whole species)}` (`pipeline/history/README.md`, "Events"). The fan marks each window on the species' column and the card quotes it. Absent when there are none. v1.7 (ToLaD#149): each event also carries `scope` ("species": the whole species, tinted on its column; "regional": a subpopulation named by `region`, on the card and its sparkline only, never on the column) and `shown` (the build's check: the column falls through the window by at least 1.5x, `history.EVENT_FALL`; a species event not shown is still tinted, and the card says the curve does not resolve it), and `why`, empty when shown, else the check's reason in its own words ("not drawn", "blind spot", "joined across", "before the data", "data rises", "data too shallow"; `pipeline/history/README.md`, "Events"), which the card puts in plain words.
 
 ### HIST (v1.1): curated population history
 
@@ -199,6 +200,58 @@ Sources, in order (`pipeline/tolad_pipeline/redlist.py`):
 
 Every living species row (`T1 = 0`) has a status. A fossil has none; a species that ended after 1500 CE
 carries the Red List's `EX` or `EW` where the list has it. Report: `stats.json` → `red_list`.
+
+## Dated tree (v1.6)
+
+ToLaD#145. The rows' own topology is Open Tree's, dated with Upham ages only where a clade is
+concordant and interpolated elsewhere. The dated tree is a proper dated phylogeny of the species rows,
+built by rule (`pipeline/tolad_pipeline/dated.py`): Upham et al. 2019's node-dated MCC tree (topology,
+node heights, 95% HPDs) over the species matched to its tips; then the hand values in
+`overrides.toml` (`[[dated_clade]]`, `[[dated_fossil]]`); then every other species row the data
+defines grafted on (a fossil with a first or last appearance, a living species a Red List knows or a
+curated history covers; a name no species list knows is left out). A graft hangs from the Upham node
+that is the common ancestor of the matched species under its Open Tree parent: older than that node (or
+on a total group's stem), it branches off the node's stem at its band start; younger, it joins that
+node's split (`loose`: where inside is not known). A fossil-only subtree keeps the merged tree's shape
+and ages. Extinct tips Upham placed with no genetic data are grafted like any fossil.
+
+The sidecars are JSON, one per data file, read at build time by the fan (they are not served):
+`dated/<tile id>.json` for a tile, `dated/skeleton.json` for the skeleton. Each has
+
+- `tile`: the file's tile id (−1: the skeleton); rows below index that file's rows.
+- `nodes`: the dated tree induced on the file's species rows, in preorder. A split is
+  `[parent, age, lo, hi, source]` (Ma; `lo`–`hi` its 95% interval, equal to `age` when there is none;
+  `source` an index into `sources`); a species is `[parent, row]`. `parent` is an index into `nodes`
+  (−1 for the root). Absent when the file has no dated species.
+- `names`: `{node index: name}`, the Open Tree clade name of a split whose species are exactly that
+  clade's matched species (the outermost such name; " (crown)" dropped), or the taxon an
+  `overrides.toml` `[[dated_name]]` entry names (a subfamily Open Tree's NCBI-derived taxonomy
+  circumscribes differently, e.g. Pantherinae = Panthera + Neofelis after Kitchener et al. 2017).
+- `names_en`: `{node index: English}`, the well-established English form of that split's taxon, from
+  its `[[dated_name]]` entry (`"small cat"` for Felinae); the fan titles the split "Small cat ancestors".
+  Absent where there is none (the fan uses the Latin name).
+- `loose`: `{node index: k}`, the number of daughters of that split grafted by taxonomy only.
+- `notes`: `{node index: k}`, a split from `overrides.toml`: `k` indexes the skeleton's `overrides`.
+- `grafts`: the rows of the species placed by taxonomy only (grafts, Upham's no-data extinct tips among them),
+  sorted; every other species row is placed by Upham's phylogeny or an override. The fan leaves out the
+  grafted fossils (`FAN_PLACEMENT` in `web/src/fan/panthera-extract.ts`, ToLaD#145).
+- `common`: `{row: name}`, the species' English common name (IUCN Red List 2026-1's preferred English
+  vernacular name; a `[[dated_fossil]]` entry's `common`).
+- `gen`: `{row: [years, how]}`, the species' generation length as the model uses it; `how` indexes
+  `gen_how`: `COMBINE reported`, `COMBINE imputed` (Soria et al. 2021, Pacifici et al. 2013's values),
+  or `allometric` (the model's mass fit, for fossils and species COMBINE lacks).
+
+`skeleton.json` adds the shared tables: `sources` (`upham`, `upham-imputed`: a split that joins a tip
+Upham placed with no genetic data, `fossil`: a graft's first appearance or a fossil subtree's
+fossil-range age, `interpolated`: an Open Tree node's interpolated age, `override`, and since #145's ages
+rule: `ensemble`: a clade of both Upham and Álvarez-Carretero 2022 dated by the geometric mean of their ages
+(interval: the union of their 95% ranges), `alvarez`: the same clade dated by A-C alone (the rule not chosen,
+dated.AGES), `upham-interp`: any other Upham split, interpolated in Upham's height between the dated splits
+around it, `fossil-floor`: a crown raised to the first appearance of a fossil of its genus), `upham` and
+`alvarez` (the citations), `ages` (the rule applied), `gen_how`, `common_source`, and `overrides`:
+`[{name, cite, reason}]`. Report: `stats.json` → `dated_tree.ages`, `.benchmark` (both rules on 15 nodes,
+research/dated-tree-sources.md §5), `.fossil_floors`.
+Report: `stats.json` → `dated_tree`.
 
 ## Semantics of the counts
 
