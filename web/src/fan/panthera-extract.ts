@@ -39,6 +39,12 @@ export interface HistoryRec {
   use: string;
   scope: string;
   notes: string;
+  /**
+   * Null for a curated history file; "rangeloss" for a modelled range-loss trend
+   * (format v1.3: its notes are the shared skeleton META.natural.trend's), "genomic"
+   * for a modelled bulk genomic deep past (ToLaD#64).
+   */
+  modelled: string | null;
   /** Generation length and mean lifespan (years) the segments were compiled with. */
   G: number;
   L: number;
@@ -133,6 +139,7 @@ export function extractClade(skeleton: ArrayBuffer | Uint8Array, tile: ArrayBuff
   const sk = decodeFile(skeleton) as unknown as Tile;
   const f = decodeFile(tile) as unknown as Tile;
   const sources = (sk.meta.hist_sources ?? []) as { cite: string; url: string }[];
+  const trend = (sk.meta.natural?.trend ?? null) as { notes?: string } | null;
   let root = -1;
   for (let i = 0; i < f.n && root < 0; i++) if (f.name(i) === name) root = i;
   if (root < 0) throw new Error(`${name} not in tile ${tileId}`);
@@ -152,7 +159,8 @@ export function extractClade(skeleton: ArrayBuffer | Uint8Array, tile: ArrayBuff
       history = {
         use: h.use ?? 'display',
         scope: h.scope ?? '',
-        notes: (h.notes ?? '').trim(),
+        notes: (h.notes ?? (h.modelled === 'rangeloss' ? trend?.notes : '') ?? '').trim(),
+        modelled: h.modelled ?? null,
         G: h.G,
         L: h.L,
         nowYear: last ? last.year0 + last.generations * h.G : new Date().getFullYear(),

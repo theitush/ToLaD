@@ -1,11 +1,12 @@
-// ToLaD tile decoder, format version 1.2 (see pipeline/FORMAT.md).
+// ToLaD tile decoder, format version 1.3 (see pipeline/FORMAT.md).
 // No dependencies; works in browsers, Web Workers and Node 18+.
 //
 //   import { decodeFile } from './tolad-decoder.js';
 //   const sk = decodeFile(arrayBuffer);          // skeleton.tld
 //   sk.meta.tiles                                // tile manifest
 //   sk.name(0), sk.ever(0), sk.profile(0) ...    // per-row accessors
-//   file.history(row)                            // curated population history (HIST, v1.1) or null
+//   file.history(row)                            // curated population history (HIST, v1.1) or null;
+//                                                // .modelled === 'rangeloss': a modelled range-loss trend
 //   file.natural(row)                            // natural (pre-human) baseline (NATB, v1.2) or null
 //
 // All per-row columns are exposed as typed arrays (zero-copy views) in
@@ -43,7 +44,7 @@ export const GRADES = ['A', 'B', 'C', 'D'];
 export const DATE_SOURCES = ['upham-calibrated', 'interpolated', 'fossil-range', 'anchored'];
 /** HIST point / segment kinds (same list as skeleton META.hist_kinds). */
 export const HIST_KINDS = ['census', 'estimate', 'index-scaled', 'reconstruction', 'unverified',
-  'model', 'interpolated', 'held', 'baseline', 'genomic', 'natural'];
+  'model', 'interpolated', 'held', 'baseline', 'genomic', 'natural', 'rangeloss'];
 export const HIST_POINT_BASELINE = 1;
 
 export function dqAge(q) {

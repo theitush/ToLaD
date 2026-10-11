@@ -1,9 +1,9 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { plainAgo, plainCount, roughCount, SpeciesCard } from './FanApp';
-import { fmtYear, popTicks, yearTicks } from './HistorySpark';
-import { GRADE_WORD, noDataSpans, styleBetween } from './history';
-import { PANTHERA } from './panthera';
+import { fmtYear, HistorySpark, popTicks, yearTicks } from './HistorySpark';
+import { GRADE_WORD, MODELLED_KINDS, noDataSpans, styleBetween } from './history';
+import { PANTHERA, type HistoryRec } from './panthera';
 import { population } from './population';
 import { RED_LIST } from './status';
 import { formatCount } from '../data/names';
@@ -33,6 +33,35 @@ describe('species card history', () => {
     }
   });
 
+  it('a modelled range-loss trend (format v1.3, ToLaD#73) draws dashed with a hollow start, never like a cited point', () => {
+    // As the pipeline ships it for a species with no history file (Lynx lynx): natural held to 1500 CE, then log-linear to today.
+    const G = 9.14;
+    const h: HistoryRec = {
+      use: 'counts',
+      scope: '',
+      notes: 'Modelled, not counted (grade D).',
+      modelled: 'rangeloss',
+      G,
+      L: G / 2,
+      nowYear: 2027,
+      points: [
+        { year: 1500, n: 707946, lo: 62230, hi: 8035261, grade: 'D', kind: 'rangeloss', baseline: false, cite: 'ToLaD range-loss trend (ToLaD#62)', url: '', note: '' },
+        { year: 2027, n: 434510, lo: 45499, hi: 4149540, grade: 'C', kind: 'model', baseline: false, cite: 'ToLaD model', url: '', note: '' },
+      ],
+      segments: [
+        { year0: 1500 - 1000 * G, generations: 1000, startSize: 1.5e5, endSize: 1.5e5, grade: 'D', kind: 'natural' },
+        { year0: 1500, generations: 57.6, startSize: 1.5e5, endSize: 9.5e4, grade: 'D', kind: 'rangeloss' },
+      ] as HistoryRec['segments'],
+    };
+    const html = renderToStaticMarkup(<HistorySpark h={h} open />);
+    expect(html).toContain('data-style="dashed"');
+    expect(html).not.toContain('data-style="dotted"');
+    // The trend's start is hollow (the model's), today's count a filled dot.
+    expect((html.match(/data-modelled=""/g) ?? []).length).toBe(1);
+    expect(html).toContain('data-modelled-note=""');
+    expect(html).toContain('Modelled, not counted');
+  });
+
   it('collapsed, the card shows the sparkline but not the list; species without history show neither', () => {
     const lion = renderToStaticMarkup(<SpeciesCard sp={byName('Lion')} onClose={() => {}} />);
     expect(lion).toContain('<svg');
@@ -52,7 +81,8 @@ describe('species card history', () => {
       expect(pts.length).toBeGreaterThanOrEqual(2);
       for (const p of pts) {
         expect(p.cite.length).toBeGreaterThan(20);
-        expect(p.url).toMatch(/^https:\/\/doi\.org\//);
+        // A modelled point (the range-loss trend's start, ToLaD#62) cites the model's README, not a paper.
+        if (!MODELLED_KINDS.has(p.kind)) expect(p.url).toMatch(/^https:\/\/doi\.org\//);
       }
       // the Red List's decline: the earlier level is higher than the latest figure
       expect(pts[0].n).toBeGreaterThan(pts[pts.length - 1].n);
@@ -116,10 +146,10 @@ describe('the species card: the population at the time touched', () => {
     const lion = byName('Lion');
     const then = face(renderToStaticMarkup(<SpeciesCard sp={lion} ageMa={70e-6} onClose={() => {}} />));
     expect(then).toContain('Lion (Panthera leo)');
-    expect(then).toContain('351,000 alive 70 years ago');
-    expect(then).toContain('56% have descendants alive today');
+    expect(then).toContain('389,000 alive 70 years ago');
+    expect(then).toContain('58% have descendants alive today');
     expect(then).toContain('23,500 alive today');
-    expect(then).toContain('Roughly 800 billion lions have ever lived (rough estimate)');
+    expect(then).toContain('Roughly 900 billion lions have ever lived (rough estimate)');
     const now = face(renderToStaticMarkup(<SpeciesCard sp={lion} onClose={() => {}} />));
     expect(now).toContain(`${plainCount(population(lion).aliveAt(0))} alive today`);
     // At now, "alive today" once and no trivial "100% have descendants".

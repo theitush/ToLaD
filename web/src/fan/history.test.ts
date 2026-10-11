@@ -158,6 +158,7 @@ describe('honesty', () => {
     expect(spanStyle({ grade: 'B', kind: 'unverified' })).toBe('dotted');
     expect(spanStyle({ grade: 'C', kind: 'genomic' })).toBe('dashed');
     expect(spanStyle({ grade: 'D', kind: 'natural' })).toBe('dashed');
+    expect(spanStyle({ grade: 'D', kind: 'rangeloss' })).toBe('dashed');
     const spans = historySpans(byName('Tiger').history!);
     expect(spans.some((s) => s.kind === 'interpolated' && s.style !== 'solid')).toBe(true);
     for (const s of spans) {
