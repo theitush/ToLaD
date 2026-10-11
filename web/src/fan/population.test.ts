@@ -123,3 +123,17 @@ describe('the Panthera populations', () => {
     }
   });
 });
+
+describe('the steps a species costs the fan are bounded (ToLaD#70)', () => {
+  it('a few hundred green-share samples and a few thousand features per species, however many generations it spans', () => {
+    // (Per generation, a genomic deep past was 78k-200k steps per Panthera species and ~100 s to load.)
+    let gens = 0;
+    for (const s of FELIDAE.species) {
+      const p = population(s);
+      gens = Math.max(gens, Math.max(0, (s.t0 - s.t1) * 1e6) / s.genYears);
+      expect(p.shareSamples, s.common).toBeLessThanOrEqual(1500);
+      expect(p.features().length, s.common).toBeLessThanOrEqual(8000);
+    }
+    expect(gens).toBeGreaterThan(5e5);
+  });
+});
