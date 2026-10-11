@@ -226,7 +226,8 @@ export class TwigModel {
     if (this.mode === 'linear') return lin;
     const w = laneAt(this.b, y).w;
     const n = this.b.pop.stepAt(Math.min(this.b.t0, this.time.ageAt(y))).n;
-    return w > 0 && n > 0 ? w / n : lin;
+    // (Never wider than the column: one slot at least, where the steps count under one alive.)
+    return w > 0 && n > 0 ? w / Math.max(1, n) : lin;
   }
 
   /** Green slots at height y (those alive then with living descendants today). */
@@ -761,9 +762,12 @@ function stretches(v: TwigView, m: TwigModel, yTop: number, yBot: number): Stret
 export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: number, mode: 0 | 1, alpha: number, look: { lw: number; tipR: number; linkA?: number; baseA?: number }, out: MeshInst[], ancA = alpha): void {
   if (!(Math.max(alpha, mode ? 0 : ancA) > 0.004) || !(yBot > yTop)) return;
   const time = m.time;
-  const gTop = m.generationAt(yTop);
   // The texture goes on below the species' first generation, down its column through the stem
   // to the bottom of the world: generations g < 0 (the ancestors), always texture (no lives there).
+  // (Its top unclamped: looking at the stem far below generation 0, the bands stop at the
+  // screen's top, not at generation 0 — the bands up to it, off screen and ever thinner towards
+  // "now", would overrun MAX_INST and drop the whole column's texture.)
+  const gTop = mode ? m.generationAt(yTop) : Math.min(m.G - 1, m.generationAtRaw(yTop));
   const gBot = mode ? Math.max(0, m.generationAt(yBot) - m.span) : Math.min(gTop, m.generationAtRaw(yBot));
   if (mode && gTop - gBot > MAX_INST) return;
   const Lm = m.sp.lifespanYears;
@@ -793,7 +797,8 @@ export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: num
     if (!(instA > 0.004)) continue;
     // World heights of the instance: a band of t generations, or one generation's lives (to their latest death).
     const yLo = m.yOf(gA * m.GL);
-    const yHi = mode ? m.yOf(Math.min(now, (gA + 1) * m.GL + 2 * Lm)) : m.yOf(Math.min(m.T, (gA + t) * m.GL));
+    // (The texture's last band reaches the tip: the last generation can end a little short of it.)
+    const yHi = mode ? m.yOf(Math.min(now, (gA + 1) * m.GL + 2 * Lm)) : gA + t >= m.G ? Math.min(m.b.tipY, m.yOf((gA + t) * m.GL)) : m.yOf((gA + t) * m.GL);
     for (const S of st) {
       const ya = Math.max(S.ya, yHi);
       const yb = Math.min(S.yb, yLo);
@@ -828,16 +833,23 @@ export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: num
       const sG = slope(S.xG);
       const lx1a = right(y0);
       const lx1b = right(y1);
-      const x0 = Math.max(-4, Math.min(lx0, lin(S.colX, y1)) - pad);
-      const x1 = Math.min(v.w + 4, Math.max(lx1a, lx1b) + pad);
+      // Where the column leans (a branch-out peeling off), the texture is measured across it, not
+      // along the row (mesh.ts perpScale): q px of the row per px across, its pitch, widths and
+      // level of detail by that.
+      const q = Math.sqrt(1 + ((sL + sR) / 2) ** 2);
+      // (Along the row only as far as the chord reaches, and 1.5 px past it: no further than
+      // the column goes, however steep.)
+      const padX = mode ? pad : pad + 1.5;
+      const x0 = Math.max(-4, Math.min(lx0, lin(S.colX, y1)) - padX);
+      const x1 = Math.min(v.w + 4, Math.max(lx1a, lx1b) + padX);
       if (!(x1 > x0)) continue;
       // Lanes too narrow for their lines (texture only): each is one line its own width.
       const nGm = S.nG;
       const gPx = nGm > 0 ? Math.max(0, xG0 - lx0) : 0;
-      const narG = mode || !(nGm > 0) ? 0 : laneNarrow(gPx);
-      const narR = mode ? 0 : laneNarrow(wPx - gPx);
+      const narG = mode || !(nGm > 0) ? 0 : laneNarrow(gPx / q);
+      const narR = mode ? 0 : laneNarrow((wPx - gPx) / q);
       // The slot lattice: one individual per slot; the nested subset of its lines drawn at this zoom.
-      const { L: lvl, fineA, lambda } = lineLevel(P0);
+      const { L: lvl, fineA, lambda } = lineLevel(mode ? P0 : P0 / q);
       const bw = 2 ** lvl * P0;
       // (The lattice's own x, the column's frame at the top row, of the leftmost pixel over the instance.)
       const kB = 1 + sP * (y1 - y0);
@@ -928,14 +940,22 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
   if (wyBot < b.tipY || wyTop > yFirst) return null;
   const yTop = Math.max(wyTop, b.tipY);
   const yBot = Math.min(wyBot, yFirst);
-  // Off the branch's column entirely? (At several heights: near a split the column leans, and
-  // zoomed in it can cross the screen while off it at the bottom row.)
+  // Off the branch's column entirely? (Every few px down the screen: near a split the column
+  // leans, and zoomed in it can cross the screen in a short stretch while off it elsewhere.)
   let onScreen = false;
-  for (let i = 0; i <= 8 && !onScreen; i++) {
-    const y = yTop + ((yBot - yTop) * i) / 8;
+  const nS = Math.max(8, Math.ceil(((yBot - yTop) * v.sy) / 4));
+  // (Between samples, the span of the two: a steep lean can cross the screen in under a sample.)
+  let pl = NaN;
+  let pr = NaN;
+  for (let i = 0; i <= nS && !onScreen; i++) {
+    const y = yTop + ((yBot - yTop) * i) / nS;
     const Lb = m.lanes(y);
     const [bx0, bx1] = xr(y);
-    onScreen = !(bx1 < Lb.left || bx0 > Lb.left + Lb.w);
+    const l = Lb.left;
+    const r = Lb.left + Lb.w;
+    onScreen = !(bx1 < (pl < l ? pl : l) || bx0 > (pr > r ? pr : r));
+    pl = Lb.w > 0 ? l : NaN;
+    pr = Lb.w > 0 ? r : NaN;
   }
   if (!onScreen) return null;
   const ym = (yTop + yBot) / 2;
