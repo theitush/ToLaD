@@ -568,7 +568,7 @@ export function FamilyCard({ fam, onClose }: { fam: Family; onClose: () => void 
           </span>
         </p>
         <p className="sub">
-          ~{formatCount(fam.ever)} ever lived <span className="dim">(model; {formatCount(fam.everLo)}–{formatCount(fam.everHi)})</span>
+          {formatCount(fam.ever)} ever lived <span className="dim">(model; range {formatCount(fam.everLo).replace(/^~/, '')} to {formatCount(fam.everHi).replace(/^~/, '')})</span>
         </p>
         <p className="sub">
           {fam.species} species{ext ? ` (${fam.living} living, ${ext} known only as fossils)` : ''} · most alive: {fam.top.join(', ')}

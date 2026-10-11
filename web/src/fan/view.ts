@@ -442,15 +442,17 @@ export interface Family {
 export function familyOf(u: FoldUnit): Family {
   const sp = u.strands.map((b) => b.sp);
   const sum = (f: (s: SpeciesRec) => number) => sp.reduce((a, s) => a + f(s), 0);
-  const top = sp
-    .filter((s) => !s.extinct)
-    .sort((a, b) => b.alive - a.alive)
+  // Alive now as the column draws it (each living species' population now: its curve's, as its width).
+  const now = (b: FanBranch) => (b.sp.extinct ? 0 : b.pop.aliveAt(0));
+  const top = u.strands
+    .filter((b) => !b.sp.extinct)
+    .sort((a, b) => now(b) - now(a))
     .slice(0, 3)
-    .map((s) => s.common);
+    .map((b) => b.sp.common);
   return {
     taxon: u.taxon,
     label: u.label,
-    alive: sum((s) => s.alive),
+    alive: u.strands.reduce((a, b) => a + now(b), 0),
     ever: sum((s) => s.ever),
     everLo: sum((s) => s.everLo),
     everHi: sum((s) => s.everHi),
@@ -1033,6 +1035,7 @@ export class FanView implements InputHandlers {
     this.drawTimeAxis(false);
     this.drawStem();
     for (const b of this.fan.branches) this.drawStrand(b);
+    for (const u of this.folds) if (u.e === 0) this.drawClosed(u);
     for (const b of this.fan.branches) this.drawIndividuals(b);
     this.drawHeld();
     this.drawEvents();
@@ -1281,6 +1284,58 @@ export class FanView implements InputHandlers {
   }
 
   /**
+   * A family wholly closed (fold.ts): its one column above its crown, from its grid (its species' widths
+   * and greens summed), its gray lane and the green prefix over its left, as a strand's lanes are drawn.
+   * (Its strands draw only their parts below the crown: lanePoints.)
+   */
+  private drawClosed(u: FoldUnit): void {
+    const [, sTop] = this.toWorld(0, -8);
+    const [, sBot] = this.toWorld(0, this.h + 8);
+    const ya = Math.max(u.yTop, sTop);
+    const yb = Math.min(u.yBot, sBot);
+    if (!(yb > ya)) return;
+    const c0 = this.toScreen(u.cx, 0)[0];
+    const k = this.cam.sx;
+    if (c0 + (u.x1 - u.x0) * k < -8 || c0 - (u.x1 - u.x0) * k > this.w + 8) return;
+    const n = Math.min(600, Math.max(2, Math.ceil(((yb - ya) * this.cam.sy) / 3)));
+    const gray = rgb01(GRAY);
+    const ctx = this.ctx;
+    let p = closedAt(u, ya);
+    let py = this.toScreen(0, ya)[1];
+    for (let i = 1; i <= n; i++) {
+      const y = ya + ((yb - ya) * i) / n;
+      const q = closedAt(u, y);
+      const qy = this.toScreen(0, y)[1];
+      const xp = this.toScreen(p.left, 0)[0];
+      const xq = this.toScreen(q.left, 0)[0];
+      const wp = p.w * k;
+      const wq = q.w * k;
+      if (wp > 0 || wq > 0) {
+        const gp = p.gw * k;
+        const gq = q.gw * k;
+        const green = rgb01(mix(GREEN, '#0d2318', laneDim((gp + gq) / 2, 0) * 0.9));
+        const quad = (l0: number, r0: number, l1: number, r1: number, c: [number, number, number]) => {
+          if ((r0 < -8 && r1 < -8) || (l0 > this.w + 8 && l1 > this.w + 8)) return;
+          if (this.gl) this.gl.under.push(l0, py, r0, qy, c[0], c[1], c[2], 1, l1 - l0, r1 - r0, -8, this.w + 8);
+          else {
+            ctx.fillStyle = `rgb(${Math.round(c[0] * 255)},${Math.round(c[1] * 255)},${Math.round(c[2] * 255)})`;
+            ctx.beginPath();
+            ctx.moveTo(l0, py);
+            ctx.lineTo(r0, py);
+            ctx.lineTo(r1, qy);
+            ctx.lineTo(l1, qy);
+            ctx.fill();
+          }
+        };
+        quad(xp, xp + Math.max(0.6, wp), xq, xq + Math.max(0.6, wq), gray);
+        if (gp > 0 || gq > 0) quad(xp, xp + Math.max(1, gp), xq, xq + Math.max(1, gq), green);
+      }
+      p = q;
+      py = qy;
+    }
+  }
+
+  /**
    * Without the GPU layer: the styled stretches of the columns (colstyle.ts) faded towards the
    * background over their lanes and individuals, as the GPU path does with its overlay.
    */
@@ -1446,10 +1501,13 @@ export class FanView implements InputHandlers {
     const push = (y: number, o: number) => put(y, vals[o], vals[o + 1], vals[o + 2]);
     // Folded, the kept samples are not enough (they keep the open column's chords, which the stack bends):
     // its chords above the crown are cut every few px, the open lanes linear along each (within the path's tolerance).
+    // Wholly closed, it stops at the crown: above it the family's column is drawn whole (drawClosed).
     const cut = fo ? fo[0].node.y : -Infinity;
+    const closed = !!fo && fo[0].e === 0;
     for (let i = i1; i >= i0; i--) {
       const y = ys[i];
       const o = 8 * i;
+      if (closed && y < cut) break;
       push(y, o);
       if (P.steps[i]) push(y, o + 4);
       if (i > i0 && ys[i - 1] < cut) {
@@ -1457,6 +1515,11 @@ export class FanView implements InputHandlers {
         const z = o - 8;
         const yA = ys[i];
         const yB = ys[i - 1];
+        if (closed) {
+          const t = (yA - cut) / (yA - yB);
+          put(cut, vals[a] + (vals[z] - vals[a]) * t, vals[a + 1] + (vals[z + 1] - vals[a + 1]) * t, vals[a + 2] + (vals[z + 2] - vals[a + 2]) * t);
+          break;
+        }
         const m = Math.min(96, Math.ceil(((yA - yB) * this.cam.sy) / 4));
         for (let j = 1; j < m; j++) {
           const t = j / m;

@@ -109,7 +109,8 @@ const scenes = [
   ['blind-lion', 'about', ['Lion', 15000, 10, 0.1]],
   ['blind-leopard', 'about', ['Leopard', 15000, 10, 0.1]],
   // The carnivores (ToLaD#146): home, a family opened across the screen ('family' [taxon, opening 0-1 or 1]), the
-  // deep past (~40 Ma), a family's closed column tapped ('famtap' [taxon]), the domestic dog's card, "wol" searched.
+  // deep past (~40 Ma), a family's closed column tapped ('famtap' [taxon]), the grey wolf's (and dog's) card, "wol"
+  // searched and the grey wolf picked (its family opens on the way).
   ['carn-home', 'home'],
   ['carn-dogs', 'family', ['Canidae']],
   ['carn-bears', 'family', ['Ursidae']],
@@ -118,8 +119,9 @@ const scenes = [
   ...[0, 0.25, 0.5, 0.75, 1].map((t, k) => [`carn-open${k + 1}`, 'family', ['Canidae', t]]),
   ['carn-deep', 'scroll', [3, 4e7]],
   ['carn-famcard', 'famtap', ['Canidae']],
-  ['carn-dogcard', 'card', ['Domestic dog']],
+  ['carn-dogcard', 'card', ['Grey wolf']],
   ['carn-search-wol', 'search', ['wol']],
+  ['carn-search-wolf', 'search', ['wol', 'Grey wolf']],
 ];
 const browser = await chromium.launch({ headless: true });
 try {
