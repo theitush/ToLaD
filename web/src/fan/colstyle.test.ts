@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { columnSpans, COLUMN_DIM } from './colstyle';
+import { columnSpans, COLUMN_DIM, COLUMN_STYLES, type ColumnSpan } from './colstyle';
 import { MODELLED_KINDS, noDataSpans } from './history';
 import { layoutFan, type FanBranch } from './layout';
 import { FELIDAE } from './panthera';
@@ -8,6 +8,8 @@ import { colSpansY } from './view';
 const fan = layoutFan(FELIDAE, 'log');
 const living = fan.branches.filter((b) => !b.sp.extinct);
 const byName = (common: string) => fan.branches.find((b) => b.sp.common === common)!;
+/** The held (no-data) spans alone; the rough ones (ToLaD#164) have their own tests (rough.test.ts). */
+const heldOnly = (spans: ColumnSpan[]) => spans.filter((s) => s.style === 'held');
 
 /** Ages (years before present) down a column, log-spaced from its start to a year ago. */
 function ages(b: FanBranch): number[] {
@@ -25,7 +27,7 @@ describe('held (no-data) stretches on the fan columns (ToLaD#55)', () => {
     expect(living.length).toBeGreaterThanOrEqual(38);
     let marked = 0;
     for (const b of living) {
-      const spans = columnSpans(b.sp, b.t0);
+      const spans = heldOnly(columnSpans(b.sp, b.t0));
       const inHeld = (a: number) => spans.some((s) => a <= s.ago0 + 1e-6 && a >= s.ago1 - 1e-6);
       const h = b.sp.history;
       if (spans.length) marked++;
@@ -75,7 +77,7 @@ describe('held (no-data) stretches on the fan columns (ToLaD#55)', () => {
     for (const c of ['Lion', 'Tiger', 'Leopard', 'Jaguar', 'Snow leopard', 'Cougar', 'Cheetah']) {
       const b = byName(c);
       const h = b.sp.history!;
-      const spans = columnSpans(b.sp, b.t0);
+      const spans = heldOnly(columnSpans(b.sp, b.t0));
       const nd = noDataSpans(h);
       const p0 = h.points.slice().sort((a, x) => a.year - x.year)[0];
       // (Only where the column is older than the genomic curve: the lion's, leopard's and jaguar's columns start after it.)
@@ -86,12 +88,12 @@ describe('held (no-data) stretches on the fan columns (ToLaD#55)', () => {
       if (after) expect(spans[spans.length - 1], c).toEqual({ ago0: h.nowYear - after.year, ago1: 0, style: 'held' });
     }
     // Held in the deep past: tiger, snow leopard, cougar, cheetah; held to now: all but the lion and cougar (no figure since).
-    for (const c of ['Tiger', 'Snow leopard', 'Cougar', 'Cheetah']) expect(columnSpans(byName(c).sp, byName(c).t0)[0].ago0, c).toBeGreaterThan(1e5);
-    for (const c of ['Tiger', 'Snow leopard', 'Leopard', 'Jaguar', 'Cheetah']) expect(columnSpans(byName(c).sp, byName(c).t0).at(-1)!.ago1, c).toBe(0);
+    for (const c of ['Tiger', 'Snow leopard', 'Cougar', 'Cheetah']) expect(heldOnly(columnSpans(byName(c).sp, byName(c).t0))[0].ago0, c).toBeGreaterThan(1e5);
+    for (const c of ['Tiger', 'Snow leopard', 'Leopard', 'Jaguar', 'Cheetah']) expect(heldOnly(columnSpans(byName(c).sp, byName(c).t0)).at(-1)!.ago1, c).toBe(0);
   });
 
   it('modelled curves are not held: range-loss cats none, the domestic cat only after its last count', () => {
-    for (const b of living.filter((x) => x.sp.history?.modelled === 'rangeloss')) expect(columnSpans(b.sp, b.t0), b.sp.common).toEqual([]);
+    for (const b of living.filter((x) => x.sp.history?.modelled === 'rangeloss')) expect(heldOnly(columnSpans(b.sp, b.t0)), b.sp.common).toEqual([]);
     const dom = byName('Domestic cat');
     const nd = noDataSpans(dom.sp.history!);
     expect(nd.map((s) => s.side)).toEqual(['after']);
@@ -99,11 +101,11 @@ describe('held (no-data) stretches on the fan columns (ToLaD#55)', () => {
     expect(alive(dom, 5000) / alive(dom, 500)).toBeLessThan(0.5);
   });
 
-  it('the view draws them world-fixed: one [top, bottom, dim] per span, in world y', () => {
+  it('the view draws them world-fixed: one [top, bottom, dim, style] per span, in world y', () => {
     const b = byName('Leopard');
     const ys = colSpansY(fan, b);
     const spans = columnSpans(b.sp, b.t0);
-    expect(ys).toEqual(spans.map((s) => [fan.time.y(s.ago1 / 1e6), fan.time.y(s.ago0 / 1e6), COLUMN_DIM.held]));
+    expect(ys).toEqual(spans.map((s) => [fan.time.y(s.ago1 / 1e6), fan.time.y(s.ago0 / 1e6), COLUMN_DIM[s.style], COLUMN_STYLES.indexOf(s.style)]));
     for (const [t, bt, d] of ys) {
       expect(bt).toBeGreaterThan(t);
       expect(d).toBeGreaterThan(0);

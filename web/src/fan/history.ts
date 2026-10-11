@@ -217,3 +217,86 @@ export function styleBetween(h: HistoryRec, year0: number, year1: number): SpanS
   for (const s of h.segments) if (s.year0 <= mid) seg = s;
   return seg ? spanStyle(seg) : 'dashed';
 }
+
+/**
+ * What a stretch of a species' curve rests on (ToLaD#164, #119):
+ * - `count`: cited figures, and the interpolation between two of them;
+ * - `genome`: the genomic (PSMC) deep past, its kept blind-spot steps ([deep.blind]) included;
+ * - `model`: the natural level, the range-loss trend, a modelled count, a level held flat between
+ *   the genome curve and the next figure (an unflagged join);
+ * - `flagged`: that join where the pipeline flags it (history.deepJoin: beyond 10x, or blind-spot
+ *   steps not drawn; the audit's deep class, ToLaD#113);
+ * - `held`: held flat for want of any figure, before the first point or after the last (noDataSpans).
+ * The fan and the card draw `count` solid, genome, model and flagged in one rough style; held keeps
+ * its no-data fade (ToLaD#55).
+ */
+export type Basis = 'count' | 'genome' | 'model' | 'flagged' | 'held';
+
+/** The bases drawn rough: a reconstruction, not a count. */
+export const ROUGH_BASES: ReadonlySet<Basis> = new Set<Basis>(['genome', 'model', 'flagged']);
+
+/** Point kinds that are the pipeline's reconstruction, not a cited figure. */
+const RECON_KINDS = new Set(['genomic', 'natural', 'rangeloss', 'model']);
+
+export interface BasisSpan {
+  /** Years before present: from `ago0` (older) up to `ago1`. */
+  ago0: number;
+  ago1: number;
+  basis: Basis;
+}
+
+type PointKind = { year: number; kind: string };
+
+/** One compiled segment's basis, from its kind or else the points either side of its midpoint. */
+function segBasis(h: HistoryRec, s: HistSegment, pts: PointKind[], flaggedJoin: boolean): Basis {
+  if (s.kind === 'genomic') return 'genome';
+  if (RECON_KINDS.has(s.kind)) return 'model';
+  const mid = s.year0 + (s.generations * h.G) / 2;
+  let a: PointKind | undefined;
+  let b: PointKind | undefined;
+  for (const p of pts) {
+    if (p.year <= mid) a = p;
+    else if (!b) b = p;
+  }
+  if (!a || !b) return 'held';
+  const ga = a.kind === 'genomic';
+  const gb = b.kind === 'genomic';
+  if (ga && gb) return 'genome';
+  // The genome curve held flat to the next level: the join.
+  if (ga || gb) return flaggedJoin ? 'flagged' : 'model';
+  if (RECON_KINDS.has(a.kind) || RECON_KINDS.has(b.kind)) return 'model';
+  return 'count';
+}
+
+/** Whether the pipeline flags the history's genome join (history.deepJoin says "flagged"). */
+export function joinFlagged(h: HistoryRec): boolean {
+  return /\bflagged\b/.test(h.deepJoin ?? '');
+}
+
+/**
+ * The history's stretches by basis, oldest first, consecutive segments of one basis merged. A
+ * history the pipeline modelled whole (`modelled`: a range-loss trend, a bulk genomic past) has no
+ * count in it.
+ */
+export function basisSpans(h: HistoryRec): BasisSpan[] {
+  const pts = h.points.slice().sort((a, b) => a.year - b.year);
+  const flagged = joinFlagged(h);
+  const out: BasisSpan[] = [];
+  for (const s of h.segments) {
+    const ago0 = h.nowYear - s.year0;
+    const ago1 = Math.max(0, ago0 - s.generations * h.G);
+    let basis = segBasis(h, s, pts, flagged);
+    if (h.modelled && basis === 'count') basis = 'model';
+    const prev = out[out.length - 1];
+    if (prev && prev.basis === basis) prev.ago1 = ago1;
+    else out.push({ ago0, ago1, basis });
+  }
+  return out;
+}
+
+/** The basis of the history between two calendar years (at their midpoint). */
+export function basisBetween(h: HistoryRec, year0: number, year1: number): Basis {
+  const ago = h.nowYear - (year0 + year1) / 2;
+  for (const s of basisSpans(h)) if (ago <= s.ago0 && ago >= s.ago1) return s.basis;
+  return 'model';
+}
