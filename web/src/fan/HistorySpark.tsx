@@ -276,7 +276,7 @@ export function HistorySpark({
             )}
           </g>
           {natural && (
-            <text x={W - R} y={natY + (natY < T + 12 ? 10 : -3)} textAnchor="end" fontSize="9" fill={GRADE_COLOR.D} opacity="0.85" data-natural-label="">
+            <text x={W - R - 8} y={natY + (natY < T + 12 ? 10 : -3)} textAnchor="end" fontSize="9" fill={GRADE_COLOR.D} opacity="0.85" data-natural-label="">
               natural
             </text>
           )}
@@ -307,7 +307,7 @@ export function HistorySpark({
               </span>
             )}
           </span>
-          <span className="dim">{open ? 'hide sources ▴' : `${rows.length} sources ▾`}</span>
+          <span className="dim">{open ? 'hide sources ▴' : `${rows.length} source${rows.length === 1 ? '' : 's'} ▾`}</span>
         </span>
       </button>
       {open && h.use !== 'counts' && <div className="dim small">These numbers are shown for reference; the tree's widths use the model.</div>}

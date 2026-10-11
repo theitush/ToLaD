@@ -294,7 +294,7 @@ export function SpeciesCard({ sp, onClose, open, ageMa, startMa }: { sp: Species
             <>
               <dt>Natural level</dt>
               <dd data-natural="">
-                {formatCount(nat.n)} without people <span className="dim">({formatCount(nat.lo)} – {formatCount(nat.hi)})</span>: {NATURAL_META?.label ?? 'modelled'}, grade{' '}
+                {formatCount(nat.n)} with no human impact <span className="dim">({formatCount(nat.lo)} – {formatCount(nat.hi)})</span>: modelled, grade{' '}
                 {NATURAL_META?.grade ?? 'D'}; its natural range {formatCount(nat.km2Natural)} km²
                 {nat.km2Current > 0 ? `, ${formatCount(nat.km2Current)} km² today` : ''} ·{' '}
                 {NATURAL_META?.url ? (
