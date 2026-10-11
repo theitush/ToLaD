@@ -90,3 +90,37 @@ steps  = [
   [232450, 315020, 41100],
   [353060, 478470, 70900],
 ]
+
+# Bottlenecks (ToLaD#141): each window in years before present (2026), quoted from a source that was read.
+[[event]]
+kind = "bottleneck"
+from_ya = 250000
+to_ya = 220000
+title = "Ancestral bottleneck"
+summary = "Genetic (site-frequency model of 65 genomes): a very strong bottleneck around 234,000 years ago, after which the surviving lineages coalesce quickly; the authors read it as the species' origin."
+quote = "Demogenetic analyses supported a very strong bottleneck for the species occurring around 234,000 years ago, with most remaining lineages coalescing rapidly, which is consistent with a speciation event."
+cite = "Armstrong EE, Khan A, Taylor RW, et al. (2021). Recent evolutionary history of tigers highlights contrasting roles of genetic drift and selection. Mol Biol Evol 38:2366–2379"
+url = "https://doi.org/10.1093/molbev/msab032"
+grade = "C"
+
+[[event]]
+kind = "bottleneck"
+from_ya = 120000
+to_ya = 100000
+title = "Late Pleistocene bottleneck"
+summary = "Genetic (mitochondrial and earlier genetic studies): all living tigers coalesce to a bottleneck around 110,000 years ago. A later genome-wide model dates the species' deep bottleneck older, about 234,000 years ago."
+quote = "The recent coalescence to a late Pleistocene bottleneck (circa 110 kya) [5, 8, 9] poses challenges for detecting tiger subspecific morphological traits, suggesting that elucidating intraspecific evolution in the tiger requires analyses at the genomic scale."
+cite = "Liu YC, Sun X, Driscoll C, et al. (2018). Genome-wide evolutionary analysis of natural history and adaptation in the world's tigers. Curr Biol 28:3840–3849"
+url = "https://doi.org/10.1016/j.cub.2018.09.019"
+grade = "D"
+
+[[event]]
+kind = "bottleneck"
+from_ya = 126
+to_ya = 16
+title = "20th-century crash"
+summary = "Census estimates: from an estimated 100,000 wild tigers around 1900 to about 3,200 in 2009, a fall of about 97%; numbers have since risen to over 5,000."
+quote = "In 2009, the in-situ population was estimated at around 3,200 individuals, with likely fewer than 2,500 mature individuals. This represents a dramatic decline from an estimated 100,000 at the start of the 20th century."
+cite = "IUCN SSC Cat Specialist Group, Tiger (Panthera tigris) species page, after IUCN SSC Cat Specialist Group 2022, Panthera tigris, IUCN Red List"
+url = "https://www.catsg.org/living-species-tiger"
+grade = "C"

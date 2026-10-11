@@ -1,4 +1,4 @@
-// ToLaD tile decoder, format version 1.4 (see pipeline/FORMAT.md).
+// ToLaD tile decoder, format version 1.5 (see pipeline/FORMAT.md).
 // No dependencies; works in browsers, Web Workers and Node 18+.
 //
 //   import { decodeFile } from './tolad-decoder.js';
@@ -7,6 +7,7 @@
 //   sk.name(0), sk.ever(0), sk.profile(0) ...    // per-row accessors
 //   file.history(row)                            // curated population history (HIST, v1.1) or null;
 //                                                // .modelled === 'rangeloss': a modelled range-loss trend
+//                                                // .events: curated bottlenecks (v1.5), [] if none
 //   file.natural(row)                            // natural (pre-human) baseline (NATB, v1.2) or null
 //   file.redList(row)                            // IUCN Red List status (RLST, v1.4) or null
 //
@@ -126,6 +127,8 @@ function decodeHist(dv, off, meta) {
     }
     out.set(row, {
       ...(meta && meta[s] ? meta[s] : {}),
+      // curated events (v1.5, ToLaD#141): [{kind, from_ya, to_ya, title, summary, quote, cite, url, grade, region}]
+      events: (meta && meta[s] && meta[s].events) || [],
       G: dv.getFloat32(h + 16, true),
       L: dv.getFloat32(h + 20, true),
       points,
