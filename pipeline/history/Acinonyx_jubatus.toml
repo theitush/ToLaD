@@ -11,11 +11,22 @@ individuals (IUCN 2021/2022). Asiatic cheetah (Iran): fewer than 50 (Farhadinia 
 
 Bottleneck ([[event]], ToLaD#141): the late-Pleistocene crash, 12,589-11,084 years ago in Africa
 (Dobrynin et al. 2015, from whole genomes; Menotti-Raymond & O'Brien 1993 had put it near the end of
-the last ice age, ~10,000 years ago). It falls in PSMC's blind spot (< 20 kyr), so the bulk genomic
-curve (Bergman et al. 2023, whose last point is ~21 kyr ago) cannot show it: the mark stands on the
-source alone. The older bottleneck Dobrynin et al. date to more than 100,000 years ago has no dated
-window, so it is not marked.
+the last ice age, ~10,000 years ago). It falls in PSMC's blind spot (< 20 kyr), where the bulk
+genomic curve (Bergman et al. 2023) drops its steps; the [deep.blind] below keeps the two steps that
+overlap Dobrynin's window (ToLaD#149), so the curve follows the genome's own fall there. The older
+bottleneck Dobrynin et al. date to more than 100,000 years ago has no dated window, so it is not marked.
 """
+
+# Blind-only [deep] (ToLaD#149): the deep past is the bulk PSMC curve (genomic.py, Bergman et al. 2023);
+# this dates a decline in its blind spot, so the steps overlapping the window are kept (the blind-spot
+# rule, README). The magnitude is the genome's own: its steps fall from Ne ~9,100 (19-24 kyr) through
+# ~7,000 (11.6-15.1 kyr) to ~5,700 (8.6-11.6 kyr), after rescaling.
+[deep.blind]
+cite   = "Dobrynin et al. 2015, Genome Biol 16:277, Abstract"
+url    = "https://doi.org/10.1186/s13059-015-0837-4"
+quote  = "a second 11,084–12,589 years ago in Africa coincident with late Pleistocene large mammal extinctions"
+window = [11084, 12589]   # years before present, as the source dates it
+note   = "The same quote as the cheetah's [[event]] below."
 
 [[event]]
 kind    = "bottleneck"

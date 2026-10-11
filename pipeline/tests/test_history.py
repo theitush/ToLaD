@@ -130,7 +130,8 @@ class Schema(unittest.TestCase):
         if st is None:
             self.skipTest("no build")
         unresolved = {
-            ("Acinonyx jubatus", "Late-Pleistocene crash"),  # PSMC blind spot; bulk deep, no [deep.blind] yet
+            # blind-only [deep] keeps the bulk PSMC's two steps in Dobrynin's window (#149): they fall 1.2x through it
+            ("Acinonyx jubatus", "Late-Pleistocene crash"),
             ("Arctocephalus gazella", "Sealing near-extinction"),  # one point (2008): Ne 150-200 is not a count
             ("Canis rufus", "Fourteen founders"),  # the trend from 1500 already reaches the low; no earlier count
             ("Lynx pardinus", "Ancient lynx decline"), ("Lynx pardinus", "Glacial bottleneck"),  # no [deep]
@@ -149,6 +150,21 @@ class Schema(unittest.TestCase):
                 self.assertEqual(e["shown"], key not in unresolved, f"{key}: fall {e['fall']} ({e['why']})")
                 self.assertEqual(e["shown"], e["fall"] >= H.EVENT_FALL)
         self.assertLessEqual(unresolved, seen)
+
+    def test_blind_only_deep_on_bulk(self):
+        """A blind-only [deep] (just [deep.blind]) applies to the bulk curve (ToLaD#149): the cheetah keeps
+        the bulk PSMC's blind steps that overlap Dobrynin et al.'s window, dated inside it."""
+        rec = next(r for r in H.load_all() if r["species"] == "Acinonyx jubatus")
+        self.assertIsNone(rec["deep"])
+        self.assertEqual(rec["deep_blind"]["window"], [11084.0, 12589.0])
+        st = _stats()
+        if st is None:
+            self.skipTest("no build")
+        bl = st["species"]["Acinonyx jubatus"]["deep"]["join"]["blind"]
+        self.assertTrue(bl["kept"])
+        self.assertEqual(bl["steps"], 2)
+        self.assertTrue(11084 <= bl["min_ago"] <= 12589)
+        self.assertLess(bl["vs_resolved"], 1)  # the genome's own steps fall there
 
     def test_seeded_bottlenecks(self):
         """The cougar's and the cheetah's bottlenecks are in their files, each quoting its source."""

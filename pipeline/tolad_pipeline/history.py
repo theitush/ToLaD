@@ -306,8 +306,12 @@ def validate(doc: dict, name: str = "<doc>") -> dict:
     years = [p["year"] for p in points]
     if len(set(years)) != len(years):
         raise HistoryError(f"{name}: two points share a year")
-    deep = _check_deep(doc["deep"], f"{name} deep") if "deep" in doc else None
-    if deep is not None and (doc["component"] != "wild" or use != "counts"):
+    # a blind-only [deep] (just [deep.blind], ToLaD#149) dates a decline in the blind spot of the bulk
+    # curve (genomic.py) the file gets as its deep past; genomic.attach carries it over
+    blind_only = isinstance(doc.get("deep"), dict) and set(doc["deep"]) == {"blind"}
+    deep = _check_deep(doc["deep"], f"{name} deep") if "deep" in doc and not blind_only else None
+    deep_blind = _check_blind(doc["deep"]["blind"], f"{name} deep.blind") if blind_only else None
+    if (deep is not None or blind_only) and (doc["component"] != "wild" or use != "counts"):
         raise HistoryError(f"{name}: a deep past is for wild species with use = \"counts\"")
     evs = doc.get("event", [])
     if not isinstance(evs, list):
@@ -322,7 +326,7 @@ def validate(doc: dict, name: str = "<doc>") -> dict:
         "component": doc["component"], "use": use, "scope": str(doc.get("scope", "")),
         "faostat_item": fao, "notes": str(doc.get("notes", "")).strip(),
         "baseline": base, "points": sorted(points, key=lambda p: p["year"]), "deep": deep,
-        "events": events,
+        "deep_blind": deep_blind, "events": events,
     }
 
 
@@ -928,6 +932,8 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
         pts = curve_points(rec)
         # the deep past: genomic points older than the cited ones, joined to the first cited
         # point (or baseline) by the usual log-linear span across PSMC's blind spot
+        if rec.get("deep_blind") and not rec["deep"]:
+            raise HistoryError(f"{rec['file']}: a blind-only [deep] needs a bulk genomic curve to apply to")
         mu = mutation.for_leaf(raw, leaf, G) if rec["deep"] else None
         deep_pts, rec["deep_dropped"] = (deep_points(rec["deep"], G, year_to_ma_inv(leaf.t0), mu)
                                          if rec["deep"] else ([], []))

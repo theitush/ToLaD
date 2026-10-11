@@ -156,7 +156,8 @@ def attach(recs: list[dict], leaves: dict, curves: dict[str, dict], start_point,
                 elif rec["component"] != "wild" or rec["use"] != "counts":
                     why = f"history file is {rec['component']} / {rec['use']}"
                 else:
-                    rec["deep"] = c["deep"]
+                    # a blind-only [deep] in the file (ToLaD#149) dates a decline in this curve's blind spot
+                    rec["deep"] = {**c["deep"], "blind": rec.get("deep_blind")}
                     rec["deep_bulk"] = True
                     why = "history file"
                 rows[sp] = {"used": why == "history file", "how": why, "leaf": rec["species"],

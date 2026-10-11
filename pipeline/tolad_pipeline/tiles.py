@@ -23,7 +23,7 @@ NATB_FIELDS = ["n", "lo", "hi", "km2_natural", "km2_current"]
 RLST_PER_ROW = 3
 # v1.5 (ToLaD#141): META.hist[].events, a history file's curated events (bottlenecks); no new section
 # v1.6 (ToLaD#149): META.hist[].events[].scope ("species" | "regional") and .shown (the column falls through it)
-EVENT_BUILD_ONLY = {"scope_why", "fall", "end", "why"}  # in stats.json, not shipped
+EVENT_BUILD_ONLY = {"scope_why", "fall", "end"}  # in stats.json, not shipped (`why` ships, v1.6: the card says it)
 MAGIC = b"TLAD"
 KIND_SKELETON, KIND_TILE = 0, 1
 TILE_BUDGET = 2500
