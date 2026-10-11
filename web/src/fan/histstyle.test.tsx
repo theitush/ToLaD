@@ -407,12 +407,14 @@ describe('the sparkline y axis follows the central values, not the ranges (ToLaD
   };
   const num = (html: string, re: RegExp) => [...html.matchAll(re)].map((m) => Number(m[1]));
 
-  it("a 30% fall reads as a slope: the leopard's 1998 -> 2020 estimates drop at least 7 px (3.4 when the ranges set the axis); on every Panthera a 30% fall is at least 4-5", () => {
+  it("a 30% fall reads as a slope: the leopard's 1998 -> 2020 estimates drop at least 5.5 px (3.4 when the ranges set the axis); on every Panthera a 30% fall is at least 4-5", () => {
     const leo = [...svgOf('Leopard').matchAll(/<circle cx="([\d.]+)" cy="([\d.]+)" r="3.2"/g)].map((m) => Number(m[2]));
     expect(leo.length).toBe(2); // 1998 (188k), 2020 (131k)
     // (6.5, was 8: since ToLaD#143 the leopard's genomic deep past is scaled x2.2 to meet its 1998 level, so
-    // the axis reaches up to ~1.2M at 50 kya and the same fall is 6.9 px; still twice the 3.4.)
-    expect(leo[1] - leo[0]).toBeGreaterThan(6.5);
+    // the axis reaches up to ~1.2M at 50 kya and the same fall is 6.9 px; still twice the 3.4. 5.5: since
+    // ToLaD#143's natural anchor its deep past meets its natural level, 399k in 1500, above the 1998 count,
+    // x4.7, so the axis reaches higher still and the fall is 5.7 px; still well above the 3.4.)
+    expect(leo[1] - leo[0]).toBeGreaterThan(5.5);
     for (const common of ['Lion', 'Leopard', 'Tiger', 'Snow leopard', 'Jaguar']) {
       const html = svgOf(common);
       // px per decade, from the two y ticks and their labels
