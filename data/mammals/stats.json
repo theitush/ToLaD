@@ -7912,27 +7912,27 @@
    "Cretaceous 66-145 Ma": {
     "ghost": 3.7811617387335014e+18,
     "ghost_share": 1.0,
-    "sampled": 173884228220826.22
+    "sampled": 173884228220830.88
    },
    "Holocene-Pleistocene 0-2.58 Ma": {
-    "ghost": 1.1350005636300124e+16,
+    "ghost": 1.1350005282126216e+16,
     "ghost_share": 0.0769,
-    "sampled": 1.3616026787374274e+17
+    "sampled": 1.3616026822791664e+17
    },
    "Jurassic and older >145 Ma": {
     "ghost": 9.896595266545318e+17,
     "ghost_share": 1.0,
-    "sampled": 16137748336923.508
+    "sampled": 16137748336923.55
    },
    "Neogene 2.58-23 Ma": {
-    "ghost": 8.973790742623174e+17,
+    "ghost": 8.973790742533217e+17,
     "ghost_share": 0.7645,
-    "sampled": 2.7646671373806096e+17
+    "sampled": 2.7646671374705677e+17
    },
    "Paleogene 23-66 Ma": {
-    "ghost": 2.43507246177376e+18,
+    "ghost": 2.435072461773747e+18,
     "ghost_share": 0.9876,
-    "sampled": 3.052572352874796e+16
+    "sampled": 3.0525723528760676e+16
    }
   },
   "f_ramp_Ma": [
@@ -7940,7 +7940,7 @@
    91.36
   ],
   "ghost_share": 0.9482,
-  "max_multiplier": 99862.79578144109,
+  "max_multiplier": 99862.7957814409,
   "multiplier_at_Ma": {
    "0.01": 1.012,
    "1": 1.028,
@@ -7952,7 +7952,7 @@
    "50": 242.708,
    "66": 3397.345
   },
-  "sampled_sum": 4.433427271171094e+17,
+  "sampled_sum": 4.4334272748029184e+17,
   "top_down_estimate": 8.557965374642387e+18,
   "with_ghosts": 8.55796553417752e+18
  },
@@ -16940,21 +16940,21 @@
      "bulk": false,
      "cite": "Armstrong et al. 2025, Genome Biol Evol 17(4):evaf060, Fig. 4 (green curve)",
      "dropped_before_band": 1,
-     "dropped_blind": 0,
+     "dropped_blind": 1,
      "grade": "D",
      "join": {
       "blind": {
        "against": false,
-       "ago": 3782.3754307444133,
+       "ago": 10000.0,
        "cite": "Figueiro et al. 2017, Sci Adv 3:e1700299, Results (PSMC, Fig. 1B)",
        "kept": true,
-       "min_ago": 6923.982856567776,
+       "min_ago": 10000.0,
        "min_n": 41207.7747576078,
        "min_vs_resolved": 0.2835820895522388,
        "n": 41207.7747576078,
        "resolved_ago": 22546.23038336786,
        "resolved_n": 145311.62677682753,
-       "steps": 4,
+       "steps": 3,
        "url": "https://doi.org/10.1126/sciadv.1700299",
        "vs_resolved": 0.2835820895522388,
        "window": [
@@ -16972,14 +16972,14 @@
       "factor": 1.0,
       "flag": true,
       "next": "modelled",
-      "note": "PSMC's 4 steps in its blind spot (the last 20 kyr, where it resolves little) are kept, grade D, because Figueiro et al. 2017, Sci Adv 3:e1700299, Results (PSMC, Fig. 1B) dates a decline there: from the youngest resolved step (~23 kya) to the youngest kept (~3.8 kya) the genomic level falls 3.5x. First cited point (1950 baseline, 500,000) is after 1900, so not used as the deep past's level. Genomic curve kept at its own level; that point's level, held back to 1500 CE because the modelled natural level there (150,002) is below it (evidently an underestimate), is 12x higher (flagged: beyond 10x); the two are joined log-linearly from the youngest kept step, then that level is held flat to the cited point, with no range-loss trend rising to it.",
+      "note": "PSMC's 3 steps in its blind spot (the last 20 kyr, where it resolves little) are kept, grade D, because Figueiro et al. 2017, Sci Adv 3:e1700299, Results (PSMC, Fig. 1B) dates a decline there: from the youngest resolved step (~23 kya) to the youngest kept (~10.0 kya, the young edge of the window it dates) the genomic level falls 3.5x. First cited point (1950 baseline, 500,000) is after 1900, so not used as the deep past's level. Genomic curve kept at its own level; that point's level, held back to 1500 CE because the modelled natural level there (150,002) is below it (evidently an underestimate), is 12x higher (flagged: beyond 10x); the two are joined log-linearly from the youngest kept step, then that level is held flat to the cited point, with no range-loss trend rising to it. So after the decline the curve rises 12x, from 41,208 at ~10 kya to 500,000 in 1500, a rise no source here dates: that level is the 1950 baseline, 500,000 (grade D, unverified), which is after 1900 and so may not rescale the genomic curve (ToLaD#77), and the two disagree by 12x (flagged).",
       "ratio": 0.08241554951521561,
       "rule": "absolute",
       "to_kind": "rangeloss",
       "to_n": 500000.0,
       "to_year": 1500
      },
-     "kept_blind": 4,
+     "kept_blind": 3,
      "method": "PSMC",
      "mu": {
       "G": 5.9958932238193015,
@@ -16994,7 +16994,7 @@
      "oldest_yr_ago": 3272149.805382122,
      "points": 17,
      "time_factor": 4.334691533996715,
-     "youngest_blind_yr_ago": 3782.3754307444133,
+     "youngest_blind_yr_ago": 10000.0,
      "youngest_yr_ago": 22546.23038336786
     },
     "deep_after": 623177.2252817181,
@@ -17006,9 +17006,9 @@
      "bottleneck 4000-1000 ya: Gir founder event",
      "bottleneck 226-116 ya: Asiatic lion near-extinction"
     ],
-    "ever_after": 700132580195.584,
+    "ever_after": 700416069799.3188,
     "ever_before": 256264829675.55167,
-    "ever_ratio": 2.7320665933050527,
+    "ever_ratio": 2.733172830177642,
     "file": "Panthera_leo.toml",
     "grades": "BCD",
     "hist_row": true,
@@ -17023,7 +17023,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 4,
-    "segments": 116,
+    "segments": 114,
     "trend_1500": true,
     "trend_held": {
      "baseline": true,
@@ -17157,12 +17157,12 @@
      "bulk": false,
      "cite": "Armstrong et al. 2025, Genome Biol Evol 17(4):evaf060, Fig. 4 (green curve)",
      "dropped_before_band": 5,
-     "dropped_blind": 0,
+     "dropped_blind": 1,
      "grade": "D",
      "join": {
       "blind": {
        "against": false,
-       "ago": 7297.407714839741,
+       "ago": 10085.715963473158,
        "cite": "Figueiro et al. 2017, Sci Adv 3:e1700299, Results (PSMC, Fig. 1B)",
        "kept": true,
        "min_ago": 10085.715963473158,
@@ -17171,7 +17171,7 @@
        "n": 84901.87502854646,
        "resolved_ago": 30812.91831676278,
        "resolved_n": 319523.1855913039,
-       "steps": 3,
+       "steps": 2,
        "url": "https://doi.org/10.1126/sciadv.1700299",
        "vs_resolved": 0.2657142857142857,
        "window": [
@@ -17189,14 +17189,14 @@
       "factor": 1.0,
       "flag": false,
       "next": "modelled",
-      "note": "PSMC's 3 steps in its blind spot (the last 20 kyr, where it resolves little) are kept, grade D, because Figueiro et al. 2017, Sci Adv 3:e1700299, Results (PSMC, Fig. 1B) dates a decline there: from the youngest resolved step (~31 kya) to the youngest kept (~7.3 kya) the genomic level falls 3.8x. First cited point (1998 baseline, 188,000) is after 1900, so not used as the deep past's level. Genomic curve kept at its own level; the modelled natural level in 1500 CE is 4.7x higher; the two are joined log-linearly from the youngest kept step, then the range-loss trend runs to the cited point.",
+      "note": "PSMC's 2 steps in its blind spot (the last 20 kyr, where it resolves little) are kept, grade D, because Figueiro et al. 2017, Sci Adv 3:e1700299, Results (PSMC, Fig. 1B) dates a decline there: from the youngest resolved step (~31 kya) to the youngest kept (~10.1 kya) the genomic level falls 3.8x. First cited point (1998 baseline, 188,000) is after 1900, so not used as the deep past's level. Genomic curve kept at its own level; the modelled natural level in 1500 CE is 4.7x higher; the two are joined log-linearly from the youngest kept step, then the range-loss trend runs to the cited point. So after the decline the curve rises 4.7x, from 84,902 at ~10 kya to 398,802 in 1500, a rise no source here dates: it is the model's natural level before range loss, not a dated recovery.",
       "ratio": 0.21289218257822884,
       "rule": "absolute",
       "to_kind": "rangeloss",
       "to_n": 398802.2199798183,
       "to_year": 1500
      },
-     "kept_blind": 3,
+     "kept_blind": 2,
      "method": "PSMC",
      "mu": {
       "G": 9.310458590006844,
@@ -17211,7 +17211,7 @@
      "oldest_yr_ago": 3117077.7681955057,
      "points": 15,
      "time_factor": 8.49973539427116,
-     "youngest_blind_yr_ago": 7297.407714839741,
+     "youngest_blind_yr_ago": 10085.715963473158,
      "youngest_yr_ago": 30812.91831676278
     },
     "deep_after": 637220.5244078004,
@@ -17221,9 +17221,9 @@
     "events": [
      "bottleneck 20000-10000 ya: Post-glacial decline"
     ],
-    "ever_after": 464051328200.9955,
+    "ever_after": 464122012504.72156,
     "ever_before": 280698842823.38275,
-    "ever_ratio": 1.6532000044367092,
+    "ever_ratio": 1.6534518198806742,
     "file": "Panthera_pardus.toml",
     "grades": "C",
     "hist_row": true,
@@ -17238,7 +17238,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 112,
+    "segments": 110,
     "trend_1500": true,
     "trend_held": null,
     "use": "counts"
@@ -19797,10 +19797,10 @@
  "mammalia": {
   "alive": 99887123076.41296,
   "ever": 8.55796553417752e+18,
-  "ghost": 8.11462280706041e+18,
+  "ghost": 8.114622806697227e+18,
   "grade": "D",
-  "hi": 3.4586601988674097e+22,
-  "lo": 1839758827441405.0
+  "hi": 3.458660198913358e+22,
+  "lo": 1839758827416911.0
  },
  "mass_sources": {
   "mass:combine": 183,
@@ -20746,10 +20746,10 @@
   "non-species tip": 551
  },
  "output": {
-  "brotli_bytes": 784345,
+  "brotli_bytes": 784864,
   "files": 16,
-  "raw_bytes": 3205000,
-  "skeleton_brotli": 56633,
+  "raw_bytes": 3204584,
+  "skeleton_brotli": 56755,
   "skeleton_nodes": 1156,
   "skeleton_raw": 265752,
   "tiles": 15
@@ -20916,7 +20916,7 @@
   "maps_used": 5613,
   "range_maps": 5831
  },
- "pieces": 296255,
+ "pieces": 296253,
  "rangeloss": {
   "carried_by_genomic_record": 48,
   "declines": 582,
@@ -21694,13 +21694,13 @@
   },
   "Hominidae": {
    "alive": 8301443760.715325,
-   "ever": 2636355553426.3154,
+   "ever": 2636355552976.811,
    "ever_range": [
-    42347520988.05073,
-    310841455128835.2
+    42347520979.72132,
+    310841455110821.4
    ],
    "extinct(gray)": false,
-   "ghost": 376820551099.3854,
+   "ghost": 376820550649.8807,
    "grade": "D",
    "t0_Ma": 14.805233333333334,
    "t1_Ma": 0.0
@@ -21722,11 +21722,11 @@
    "alive": 99887123076.41296,
    "ever": 8.55796553417752e+18,
    "ever_range": [
-    1839758827441405.0,
-    3.4586601988674097e+22
+    1839758827416911.0,
+    3.458660198913358e+22
    ],
    "extinct(gray)": 0.0,
-   "ghost": 8.11462280706041e+18,
+   "ghost": 8.114622806697227e+18,
    "grade": "D",
    "t0_Ma": 208.64140800000004,
    "t1_Ma": 0.0
@@ -22036,8 +22036,8 @@
   "by_alive": [
    {
     "alive": 54318491455.12063,
-    "ever": 1.3909746137392876e+18,
-    "ghost": 1.201376868293146e+18,
+    "ever": 1.3909746135841352e+18,
+    "ghost": 1.2013768681379937e+18,
     "ghost_share": 0.864,
     "name": "Chiroptera",
     "sampled": 1.8959774544614144e+17,
@@ -22045,8 +22045,8 @@
    },
    {
     "alive": 23133449903.122658,
-    "ever": 1.7945081970526833e+18,
-    "ghost": 1.6351055749850606e+18,
+    "ever": 1.7945081968796227e+18,
+    "ghost": 1.635105574812e+18,
     "ghost_share": 0.911,
     "name": "Rodentia",
     "sampled": 1.5940262206762266e+17,
@@ -22054,8 +22054,8 @@
    },
    {
     "alive": 5654779269.41726,
-    "ever": 6902891202212812.0,
-    "ghost": 4315037476493702.5,
+    "ever": 6902891201670242.0,
+    "ghost": 4315037475951132.5,
     "ghost_share": 0.625,
     "name": "Artiodactyla",
     "sampled": 2587853725719109.5,
@@ -22063,17 +22063,17 @@
    },
    {
     "alive": 2225601210.1492753,
-    "ever": 1.7113979699934752e+16,
-    "ghost": 1.5301170898320106e+16,
+    "ever": 1.7113980061435878e+16,
+    "ghost": 1.5301170896638808e+16,
     "ghost_share": 0.894,
     "name": "Carnivora",
-    "sampled": 1812808801614646.0,
+    "sampled": 1812809164797070.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 1492362384.468411,
-    "ever": 1.833244249293204e+17,
-    "ghost": 1.422219578327954e+17,
+    "ever": 1.8332442491570714e+17,
+    "ghost": 1.4222195781918214e+17,
     "ghost_share": 0.776,
     "name": "Eulipotyphla",
     "sampled": 4.110246709652499e+16,
@@ -22081,17 +22081,17 @@
    },
    {
     "alive": 1195648666.3005614,
-    "ever": 7.823662739456794e+16,
-    "ghost": 6.272304004630863e+16,
+    "ever": 7.823662738757085e+16,
+    "ghost": 6.272304003931156e+16,
     "ghost_share": 0.802,
     "name": "Didelphimorphia",
-    "sampled": 1.5513587348259304e+16,
+    "sampled": 1.5513587348259288e+16,
     "t0_Ma": 74.42
    },
    {
     "alive": 751328331.2713387,
-    "ever": 4.007807997210694e+16,
-    "ghost": 2.8678688317361496e+16,
+    "ever": 4.0078079968075096e+16,
+    "ghost": 2.867868831332965e+16,
     "ghost_share": 0.716,
     "name": "Lagomorpha",
     "sampled": 1.1399391654745448e+16,
@@ -22099,8 +22099,8 @@
    },
    {
     "alive": 619434015.7798252,
-    "ever": 1.1876202510721656e+16,
-    "ghost": 9513215242656700.0,
+    "ever": 1.1876202509384226e+16,
+    "ghost": 9513215241319270.0,
     "ghost_share": 0.801,
     "name": "Hyracoidea",
     "sampled": 2362987268064956.0,
@@ -22108,8 +22108,8 @@
    },
    {
     "alive": 408303737.17517364,
-    "ever": 1.2138313838133956e+16,
-    "ghost": 9102429631587524.0,
+    "ever": 1.2138313836720728e+16,
+    "ghost": 9102429630174296.0,
     "ghost_share": 0.75,
     "name": "Diprotodontia",
     "sampled": 3035884206546432.0,
@@ -22117,19 +22117,19 @@
    },
    {
     "alive": 290577780.41253823,
-    "ever": 2.0368474968339464e+16,
-    "ghost": 1.3228676085271124e+16,
+    "ever": 2.0368474966885892e+16,
+    "ghost": 1.3228676083817554e+16,
     "ghost_share": 0.649,
     "name": "Macroscelidea",
-    "sampled": 7139798883068340.0,
+    "sampled": 7139798883068338.0,
     "t0_Ma": 65.7
    }
   ],
   "by_ever": [
    {
     "alive": 23133449903.122658,
-    "ever": 1.7945081970526833e+18,
-    "ghost": 1.6351055749850606e+18,
+    "ever": 1.7945081968796227e+18,
+    "ghost": 1.635105574812e+18,
     "ghost_share": 0.911,
     "name": "Rodentia",
     "sampled": 1.5940262206762266e+17,
@@ -22137,8 +22137,8 @@
    },
    {
     "alive": 54318491455.12063,
-    "ever": 1.3909746137392876e+18,
-    "ghost": 1.201376868293146e+18,
+    "ever": 1.3909746135841352e+18,
+    "ghost": 1.2013768681379937e+18,
     "ghost_share": 0.864,
     "name": "Chiroptera",
     "sampled": 1.8959774544614144e+17,
@@ -22146,8 +22146,8 @@
    },
    {
     "alive": 1492362384.468411,
-    "ever": 1.833244249293204e+17,
-    "ghost": 1.422219578327954e+17,
+    "ever": 1.8332442491570714e+17,
+    "ghost": 1.4222195781918214e+17,
     "ghost_share": 0.776,
     "name": "Eulipotyphla",
     "sampled": 4.110246709652499e+16,
@@ -22155,17 +22155,17 @@
    },
    {
     "alive": 1195648666.3005614,
-    "ever": 7.823662739456794e+16,
-    "ghost": 6.272304004630863e+16,
+    "ever": 7.823662738757085e+16,
+    "ghost": 6.272304003931156e+16,
     "ghost_share": 0.802,
     "name": "Didelphimorphia",
-    "sampled": 1.5513587348259304e+16,
+    "sampled": 1.5513587348259288e+16,
     "t0_Ma": 74.42
    },
    {
     "alive": 751328331.2713387,
-    "ever": 4.007807997210694e+16,
-    "ghost": 2.8678688317361496e+16,
+    "ever": 4.0078079968075096e+16,
+    "ghost": 2.867868831332965e+16,
     "ghost_share": 0.716,
     "name": "Lagomorpha",
     "sampled": 1.1399391654745448e+16,
@@ -22173,26 +22173,26 @@
    },
    {
     "alive": 290577780.41253823,
-    "ever": 2.0368474968339464e+16,
-    "ghost": 1.3228676085271124e+16,
+    "ever": 2.0368474966885892e+16,
+    "ghost": 1.3228676083817554e+16,
     "ghost_share": 0.649,
     "name": "Macroscelidea",
-    "sampled": 7139798883068340.0,
+    "sampled": 7139798883068338.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 2225601210.1492753,
-    "ever": 1.7113979699934752e+16,
-    "ghost": 1.5301170898320106e+16,
+    "ever": 1.7113980061435878e+16,
+    "ghost": 1.5301170896638808e+16,
     "ghost_share": 0.894,
     "name": "Carnivora",
-    "sampled": 1812808801614646.0,
+    "sampled": 1812809164797070.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 408303737.17517364,
-    "ever": 1.2138313838133956e+16,
-    "ghost": 9102429631587524.0,
+    "ever": 1.2138313836720728e+16,
+    "ghost": 9102429630174296.0,
     "ghost_share": 0.75,
     "name": "Diprotodontia",
     "sampled": 3035884206546432.0,
@@ -22200,8 +22200,8 @@
    },
    {
     "alive": 619434015.7798252,
-    "ever": 1.1876202510721656e+16,
-    "ghost": 9513215242656700.0,
+    "ever": 1.1876202509384226e+16,
+    "ghost": 9513215241319270.0,
     "ghost_share": 0.801,
     "name": "Hyracoidea",
     "sampled": 2362987268064956.0,
@@ -22209,8 +22209,8 @@
    },
    {
     "alive": 5654779269.41726,
-    "ever": 6902891202212812.0,
-    "ghost": 4315037476493702.5,
+    "ever": 6902891201670242.0,
+    "ghost": 4315037475951132.5,
     "ghost_share": 0.625,
     "name": "Artiodactyla",
     "sampled": 2587853725719109.5,
@@ -22220,8 +22220,8 @@
   "by_sampled_ever": [
    {
     "alive": 54318491455.12063,
-    "ever": 1.3909746137392876e+18,
-    "ghost": 1.201376868293146e+18,
+    "ever": 1.3909746135841352e+18,
+    "ghost": 1.2013768681379937e+18,
     "ghost_share": 0.864,
     "name": "Chiroptera",
     "sampled": 1.8959774544614144e+17,
@@ -22229,8 +22229,8 @@
    },
    {
     "alive": 23133449903.122658,
-    "ever": 1.7945081970526833e+18,
-    "ghost": 1.6351055749850606e+18,
+    "ever": 1.7945081968796227e+18,
+    "ghost": 1.635105574812e+18,
     "ghost_share": 0.911,
     "name": "Rodentia",
     "sampled": 1.5940262206762266e+17,
@@ -22238,8 +22238,8 @@
    },
    {
     "alive": 1492362384.468411,
-    "ever": 1.833244249293204e+17,
-    "ghost": 1.422219578327954e+17,
+    "ever": 1.8332442491570714e+17,
+    "ghost": 1.4222195781918214e+17,
     "ghost_share": 0.776,
     "name": "Eulipotyphla",
     "sampled": 4.110246709652499e+16,
@@ -22247,17 +22247,17 @@
    },
    {
     "alive": 1195648666.3005614,
-    "ever": 7.823662739456794e+16,
-    "ghost": 6.272304004630863e+16,
+    "ever": 7.823662738757085e+16,
+    "ghost": 6.272304003931156e+16,
     "ghost_share": 0.802,
     "name": "Didelphimorphia",
-    "sampled": 1.5513587348259304e+16,
+    "sampled": 1.5513587348259288e+16,
     "t0_Ma": 74.42
    },
    {
     "alive": 751328331.2713387,
-    "ever": 4.007807997210694e+16,
-    "ghost": 2.8678688317361496e+16,
+    "ever": 4.0078079968075096e+16,
+    "ghost": 2.867868831332965e+16,
     "ghost_share": 0.716,
     "name": "Lagomorpha",
     "sampled": 1.1399391654745448e+16,
@@ -22265,17 +22265,17 @@
    },
    {
     "alive": 290577780.41253823,
-    "ever": 2.0368474968339464e+16,
-    "ghost": 1.3228676085271124e+16,
+    "ever": 2.0368474966885892e+16,
+    "ghost": 1.3228676083817554e+16,
     "ghost_share": 0.649,
     "name": "Macroscelidea",
-    "sampled": 7139798883068340.0,
+    "sampled": 7139798883068338.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 408303737.17517364,
-    "ever": 1.2138313838133956e+16,
-    "ghost": 9102429631587524.0,
+    "ever": 1.2138313836720728e+16,
+    "ghost": 9102429630174296.0,
     "ghost_share": 0.75,
     "name": "Diprotodontia",
     "sampled": 3035884206546432.0,
@@ -22283,8 +22283,8 @@
    },
    {
     "alive": 5654779269.41726,
-    "ever": 6902891202212812.0,
-    "ghost": 4315037476493702.5,
+    "ever": 6902891201670242.0,
+    "ghost": 4315037475951132.5,
     "ghost_share": 0.625,
     "name": "Artiodactyla",
     "sampled": 2587853725719109.5,
@@ -22292,8 +22292,8 @@
    },
    {
     "alive": 619434015.7798252,
-    "ever": 1.1876202510721656e+16,
-    "ghost": 9513215242656700.0,
+    "ever": 1.1876202509384226e+16,
+    "ghost": 9513215241319270.0,
     "ghost_share": 0.801,
     "name": "Hyracoidea",
     "sampled": 2362987268064956.0,
@@ -22301,11 +22301,11 @@
    },
    {
     "alive": 2225601210.1492753,
-    "ever": 1.7113979699934752e+16,
-    "ghost": 1.5301170898320106e+16,
+    "ever": 1.7113980061435878e+16,
+    "ghost": 1.5301170896638808e+16,
     "ghost_share": 0.894,
     "name": "Carnivora",
-    "sampled": 1812808801614646.0,
+    "sampled": 1812809164797070.0,
     "t0_Ma": 65.7
    }
   ]
