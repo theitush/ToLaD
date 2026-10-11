@@ -15,7 +15,7 @@ const ONLY = process.argv[4] ? new Set(process.argv[4].split(',')) : null;
 mkdirSync(OUT, { recursive: true });
 // [name, kind, args]: 'home' | 'far' | 'card' [species] | 'touch' [species, agoYears] | 'scroll' [zoom, agoYears] | 'bar' [species, agoYears, perBar, sy, at?]
 //   | 'split' [splitMa, time zoom × home] | 'tapnode' [splitMa, ageMa] | 'pan' [zoom, px down from "now" at 160, px across]
-//   | 'about' [species, agoYears, k, r] | 'search' [query, pick?]: from home, the search opened, the query typed, and the row named `pick` tapped
+//   | 'about' [species, agoYears, k, r] | 'frame' [species, agoYears, time zoom × home, width filled?] | 'search' [query, pick?]: from home, the search opened, the query typed, and the row named `pick` tapped
 const scenes = [
   ['home', 'home'],
   ['far', 'far'],
@@ -77,15 +77,25 @@ const scenes = [
   ['held-snow', 'about', ['Snow leopard', 1e6, 1, 0.3]],
   // Curated bottlenecks (ToLaD#141): the puma's and the cheetah's windows tinted and named on their columns,
   // a little zoomed and further in, and a tap inside each window at home opening the card's section on it.
-  ['bneck-puma', 'about', ['Cougar', 16000, 2, 0.5]],
+  // (#149: 'frame', so the column is the picture, not a thread among the big cats in linear widths.)
+  ['bneck-puma', 'frame', ['Cougar', 16000, 2]],
   ['bneck-puma-in', 'about', ['Cougar', 16000, 5, 0.6]],
-  ['bneck-cheetah', 'about', ['Cheetah', 11800, 2, 0.5]],
+  ['bneck-cheetah', 'frame', ['Cheetah', 11800, 2]],
   ['bneck-cheetah-in', 'about', ['Cheetah', 11800, 5, 0.6]],
   ['bneck-puma-deep', 'about', ['Cougar', 16000, 8, 0.5]],
   ['bneck-tiger', 'about', ['Tiger', 2000, 6, 0.3]],
   ['bneck-iberian', 'about', ['Iberian lynx', 3000, 7, 0.3]],
   ['bneck-tap-puma', 'touch', ['Cougar', 22000]],
   ['bneck-tap-cheetah', 'touch', ['Cheetah', 11800]],
+  // Honest marks (ToLaD#149): only species-wide windows tinted (the lion's Gir and Asiatic events are
+  // regional: on its card, not its column), each column framed from ~50 kya to now; the lion's card
+  // touched in 1850, its India section open under the sparkline.
+  ['bfit-lion', 'frame', ['Lion', 2000, 1.6]],
+  ['bfit-lion-card', 'touch', ['Lion', 176]],
+  ['bfit-cheetah', 'frame', ['Cheetah', 2000, 1.6]],
+  ['bfit-puma', 'frame', ['Cougar', 2000, 1.6]],
+  ['bfit-iberian', 'frame', ['Iberian lynx', 2000, 1.6]],
+  ['bfit-tiger', 'frame', ['Tiger', 2000, 1.6]],
   // The search (ToLaD#157): its button at home, "li" typed with the list open, the lion picked (flown there, card open).
   ['search-home', 'home'],
   ['search-li', 'search', ['li']],
@@ -148,6 +158,16 @@ try {
           const L = f.model(b).lanes(y);
           const sy = h.sy * 2 ** (k * r);
           f.cam = { cx: L.left + L.w / 2, cy: y, sx: h.sx * 2 ** k, sy, ty: sy };
+          f.camera.settle();
+        } else if (kind === 'frame') {
+          // The species' column at `ago` years filling `fill` of the screen's width (ToLaD#149), time zoomed tz × home.
+          const [sp, ago, tz, fill = 0.4] = args;
+          const b = fan.branches.find((b) => b.sp.common === sp);
+          const h = f.homeCamera();
+          const y = fan.time.y(ago / 1e6);
+          const L = f.model(b).lanes(y);
+          const sy = h.sy * tz;
+          f.cam = { cx: L.left + L.w / 2, cy: y, sx: (fill * f.w) / L.w, sy, ty: sy };
           f.camera.settle();
         } else if (kind === 'zoomin') {
           // From home (t = 0) to the species' individuals (t = 1, 4 per 70 px bar) about a point on its column.
