@@ -121,7 +121,7 @@ def _knots_from_pieces(n) -> list[dict]:
     return out
 
 
-def leaf_row(n, census: dict, gs_model: dict) -> dict:
+def leaf_row(n, census: dict, gs_model: dict, deep_reports: dict | None = None) -> dict:
     D = n.data
     rec = D.get("history") or {}
     deep = rec.get("deep_join") if isinstance(rec.get("deep_join"), dict) else None
@@ -146,26 +146,31 @@ def leaf_row(n, census: dict, gs_model: dict) -> dict:
                  if deep else None),
         "deep_factors": None,
     }
-    if rec.get("deep") and D.get("L"):
-        from .history import deep_scale
-        tf, nf = deep_scale(rec["deep"], 2 * D["L"])
-        row["deep_factors"] = {"time": tf, "ne": nf, "cite": rec["deep"].get("cite")}
+    rep = (deep_reports or {}).get(n.name)
+    if rec.get("deep") and rep and rep.get("mu"):
+        # the source's own rates against the lineage's per-year rate band (mutation.py, #74/#75)
+        mu = rep["mu"]
+        row["deep_factors"] = {"time": rep["time_factor"], "ne": rep["ne_factor"], "cite": rec["deep"].get("cite"),
+                               "src_mu_gen": rec["deep"]["mu"], "src_g": rec["deep"]["g"], "G": mu["G"],
+                               "mu_year": mu["mu_year"], "lo": mu["lo"], "hi": mu["hi"], "clade": mu.get("clade")}
     return row
 
 
-def snapshot(root, raw: Path, work: Path) -> Path:
+def snapshot(root, raw: Path, work: Path, log: dict | None = None) -> Path:
     """Write the per-leaf rows the audit checks (every species leaf that is living, or carries a
     Red List status, or is a graft ending at the present)."""
     from . import anchors
     census = anchors.greenspoon_census(raw)
     gs_model = anchors.greenspoon_species_model(raw)
+    deep = {r["leaf"]: r["deep"] for r in ((log or {}).get("history", {}).get("species", {})).values()
+            if r.get("deep")}
     rows = []
     for n in root.preorder():
         if not n.is_leaf or not n.name or n.data.get("empty_higher"):
             continue
         if n.extinct and not n.data.get("red_list") and n.t1 > 0:
             continue
-        rows.append(leaf_row(n, census, gs_model))
+        rows.append(leaf_row(n, census, gs_model, deep))
     work.mkdir(parents=True, exist_ok=True)
     path = work / SNAPSHOT.name
     path.write_text(json.dumps({"version": 1, "rows": rows}, separators=(",", ":")))
@@ -200,6 +205,9 @@ def _what(k: dict) -> str:
 def check_join(row: dict) -> list[dict]:
     out = []
     c = row["curve"]
+    if c and row["today_src"] == "census" and c[-1]["kind"] == "model":
+        # a modelled record ends at the shipped count, which a census sets here: that end is cited
+        c = c[:-1] + [{**c[-1], "src": "cited", "kind": "census"}]
     G = row.get("G") or 1.0
     window = max(IUCN_A_YEARS, IUCN_A_GENS * G)
     for a, b in zip(c, c[1:]):
@@ -313,7 +321,22 @@ def check_units(row: dict) -> list[dict]:
     if not f:
         return []
     out = []
-    for k in ("time", "ne"):
+    if f.get("lo"):
+        # the lineage's per-year rate has a 95% band (mutation.py: Bergeron 2023 pedigree fit), hi / lo wide.
+        # Rescaling a source's curve to any rate inside the band moves it by less than that width; a
+        # bigger rescale is more than the rate's uncertainty explains (a time axis read in the wrong unit,
+        # a generation length mixed up: the g = 1 figures of #66)
+        width = f["hi"] / f["lo"]
+        for k, v in (("time", f["time"]), ("Ne", f["ne"])):
+            if v <= 0 or max(v, 1 / v) <= width:
+                continue
+            src = f["src_mu_gen"] / f["src_g"] if k == "time" else f["src_mu_gen"]
+            out.append(_flag("units", math.log10(max(v, 1 / v) / width),
+                             f"the curve's {k} is rescaled x{v:.3g} from its source ({f.get('cite')}: "
+                             f"{src:.3g}{'/yr' if k == 'time' else '/gen'}, g = {f['src_g']:g}), more than the "
+                             f"lineage's 95% rate band spans ({width:.2g}x; {f.get('clade')})", factor=v))
+        return out
+    for k in ("time", "ne"):  # a snapshot without the lineage band: the #75 spread
         v = f[k]
         if v > 0 and max(v, 1 / v) > DEEP_FACTOR_FLAG:
             out.append(_flag("units", abs(math.log10(v)),

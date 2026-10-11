@@ -86,6 +86,11 @@ class Guards(unittest.TestCase):
     def test_units(self):
         self.assertEqual(classes(row(deep_factors={"time": 5.4, "ne": 1.1, "cite": "x"})), ["units"])
         self.assertEqual(classes(row(deep_factors={"time": 2.5, "ne": 0.4, "cite": "x"})), [])
+        # with the lineage's rate band (#74/#75): a rescale wider than the band (g = 1 read as years, #66)
+        band = {"cite": "x", "src_mu_gen": 5.42e-9, "src_g": 1.0, "G": 6.0, "mu_year": 1.25e-9,
+                "lo": 7.2e-10, "hi": 2.2e-9, "clade": "Carnivora"}
+        self.assertEqual(classes(row(deep_factors={**band, "time": 4.33, "ne": 0.72})), ["units"])
+        self.assertEqual(classes(row(deep_factors={**band, "src_g": 5.0, "time": 0.87, "ne": 0.72})), [])
 
     def test_reviewed_and_ranking(self):
         r = row(name="Panthera leo", deep_factors={"time": 5.4, "ne": 1.0, "cite": "x"})

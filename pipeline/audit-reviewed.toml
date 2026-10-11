@@ -5,7 +5,7 @@
 [[reviewed]]
 species = "Panthera leo"
 class = "units"
-reason = "Armstrong 2025 Fig. 4 is plotted with g = 1 (time in generations), so the x5.42 time rescale is the source's own scaling; cross-checked against five other lion PSMC curves (Panthera_leo.toml [deep] note)"
+reason = "Armstrong 2025 Fig. 4 is plotted with g = 1 (time in generations), so the large time rescale is the source's own scaling; cross-checked against five other lion PSMC curves (Panthera_leo.toml [deep] note)"
 issue = 66
 
 [[reviewed]]

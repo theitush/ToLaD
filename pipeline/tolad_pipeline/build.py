@@ -116,7 +116,7 @@ def main(argv: list[str] | None = None) -> int:
     log["calibration_check"] = calibration_report(root, a.raw)
     log["top_orders"] = top_orders(root)
     from . import audit  # the data audit's per-leaf snapshot (ToLaD#113): `make audit` checks it
-    log_step(t_start, f"audit snapshot {audit.snapshot(root, a.raw, a.work)}")
+    log_step(t_start, f"audit snapshot {audit.snapshot(root, a.raw, a.work, log)}")
     tiles.write_all(root, a.out, log)
     log_step(t_start, "tiles written")
     (a.out / "stats.json").write_text(json.dumps(log, indent=1, default=_json_default, sort_keys=True) + "\n")
