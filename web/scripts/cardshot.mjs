@@ -10,7 +10,7 @@ import { chromium } from 'playwright';
 const OUT = process.argv[2] || 'perf-out/card';
 const ONLY = process.argv[3] ? new Set(process.argv[3].split(',')) : null;
 mkdirSync(OUT, { recursive: true });
-// [name, species | null (home), agoYears, open details?]
+// [name, species | null (home), agoYears, open: true (details) | 'sources' (the sparkline's) | 'both']
 const scenes = [
   ['home', null],
   ['lion-70y', 'Lion', 70],
@@ -22,6 +22,17 @@ const scenes = [
   ['leopard-now', 'Leopard', 0.2],
   ['leopard-details', 'Leopard', 0.2, true],
   ['snow-leopard-details', 'Snow leopard', 0.2, true],
+  ['lion-now', 'Lion', 0.2],
+  ['snow-leopard-now', 'Snow leopard', 0.2],
+  ['lion-sources', 'Lion', 0.2, 'sources'],
+  ['leopard-sources', 'Leopard', 0.2, 'sources'],
+  ['snow-leopard-sources', 'Snow leopard', 0.2, 'sources'],
+  ['cougar-now', 'Cougar', 0.2],
+  ['cougar-sources', 'Cougar', 0.2, 'sources'],
+  ['eurasian-lynx-now', 'Eurasian lynx', 0.2],
+  ['eurasian-lynx-sources', 'Eurasian lynx', 0.2, 'sources'],
+  ['leopard-cat-details', 'Leopard cat', 0.2, true],
+  ['domestic-cat-details', 'Domestic cat', 0.2, true],
 ];
 const browser = await chromium.launch({ headless: true });
 try {
@@ -29,7 +40,7 @@ try {
   const page = await ctx.newPage();
   page.on('pageerror', (e) => console.log('pageerror', String(e)));
   await page.goto(pathToFileURL(resolve('dist-single/index.html')).href);
-  await page.waitForFunction(() => !!window.__fan, null, { timeout: 20000 });
+  await page.waitForFunction(() => !!window.__fan, null, { timeout: 90000 }); // (a cold software-GL start can take a while)
   for (const [name, sp, ago, open] of scenes) {
     if (ONLY && !ONLY.has(name)) continue;
     await page.evaluate(
@@ -51,7 +62,8 @@ try {
       [sp, ago],
     );
     await page.waitForTimeout(700);
-    if (open) await page.evaluate(() => document.querySelector('.card-sp details')?.setAttribute('open', ''));
+    if (open === true || open === 'both') await page.evaluate(() => document.querySelector('.card-sp details')?.setAttribute('open', ''));
+    if (open === 'sources' || open === 'both') await page.evaluate(() => document.querySelector('.card-sp .spark')?.click());
     await page.waitForTimeout(200);
     await page.screenshot({ path: `${OUT}/${name}.png` });
     const card = await page.evaluate(() => {

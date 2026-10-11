@@ -200,25 +200,56 @@ the same way by code rather than by hand.
   Otherwise digitise the figure and state how in `note`: the axis
   calibration, how the curve was traced, and the reading error. Each PSMC
   step is one `[from, to, Ne]` row.
-- **Rescale** to one per-year mutation rate, `DEEP_MU_YEAR` = 1.0e-9 per site
-  per year, and to the pipeline's generation length `G` (= 2L, from COMBINE /
-  Pacifici et al. 2013). The rate is the Pantherinae pedigree mean, 5.5e-9 per
-  generation at mean parental age 5.5 yr (Armstrong et al. 2025, GBE
-  17:evaf060). PSMC infers theta = 4 Ne mu (per generation) and time in units
-  of 2 Ne generations. So a curve published with (`mu` per generation, `g`
-  years) becomes:
+- **Rescale** to the lineage's per-year mutation rate `mu_y` (ToLaD#74,
+  #75; `mutation.py`) and to the pipeline's generation length `G` (= 2L,
+  from COMBINE / Pacifici et al. 2013). PSMC infers theta = 4 Ne mu (per
+  generation) and time in units of 2 Ne generations. So a curve published
+  with (`mu` per generation, `g` years) becomes:
 
   ```
   t'  = t  * (mu / g) / mu_y           time depends on the per-year rate only
   Ne' = Ne * mu / (mu_y * G)           Ne depends on the per-generation rate mu_y * G
   ```
 
-  The per-year rate is held fixed, so a longer generation means more
-  mutations per generation. That is a simplification: per-generation rates
-  rise with parental age, but less than in proportion. The bulk curves of
-  #64 (below) use the same `mu_y`; their sources' own per-year rates
-  (`mu / g`) run 0.35x..2.55x of it (median 1.45x), so a per-clade `mu_y`
-  is still open (see "Bulk genomic deep past").
+  **The per-year rate, per lineage.** Per-year rates fall with generation
+  time (short-lived mammals copy their germline more often per year), so
+  one rate for all mammals is wrong by up to ~3x either way. `mu_y` comes
+  from the pedigree (trio) rates of Bergeron et al. 2023 (Nature
+  615:285-291, Supplementary Table 9, CC BY 4.0; pinned in
+  `pipeline/SOURCES.md`): the 32 mammals with a rate per generation
+  modelled at their generation time, divided by it. Over them
+
+  ```
+  log10 mu_y = a + b log10 G + offset[order]
+  ```
+
+  with a = -8.30, b = -0.77 (so the rate per generation rises as
+  G^0.23), r = -0.94 and a residual scatter of 0.12 dex. The **per-clade
+  table** is the order offset, the mean residual of the order's pedigree
+  species, for orders with at least two of them:
+
+  | order | offset (dex) | pedigree species |
+  |---|---|---|
+  | Artiodactyla (incl. whales, pig, alpaca) | -0.002 | 11 |
+  | Carnivora | +0.002 | 8 |
+  | Primates | -0.004 | 6 |
+  | Perissodactyla | -0.147 | 2 |
+  | Rodentia | +0.111 | 2 |
+
+  Every other order takes the mammal-wide fit (offset 0). The rate is
+  evaluated at the pipeline's own `G`: 5.0e-9 per year at G = 1 yr, 1.4e-9
+  at 5, 8.4e-10 at 10, 4.9e-10 at 20 (great apes ~0.4e-9, as their
+  pedigrees say). Pantherines (G 6-10) get 0.85-1.25e-9, close to the
+  Pantherinae pedigree mean of 1.0e-9 the build used before for every
+  mammal (Armstrong et al. 2025, GBE 17:evaf060: 5.5e-9 per generation at
+  mean parental age 5.5 yr). That flat rate, `DEEP_MU_YEAR`, stays as the
+  fallback when the table is not on disk and as the reference the factor
+  is quoted against: `history.species.<sp>.deep.mu` gives each species'
+  `G`, `mu_year`, `lo` / `hi`, its clade and `vs_flat` (= mu_y / 1e-9; the
+  curve's times and Ne both scale by 1 / vs_flat), and
+  `history.mutation_rate` has the fit and the factor for every curve
+  (0.35x..1.70x over the 111 used today, median 0.88x). The power law is
+  extrapolated below G = 0.7 yr, the shortest generation in the table.
 - **Ne to census N:** `N = Ne' / 0.1`. The ratio is from Frankham 1995
   (Genet Res 66:95-107): the mean Ne/N over comprehensive estimates is
   0.10-0.11. No felid- or carnivore-specific long-term ratio was found
@@ -226,9 +257,9 @@ the same way by code rather than by hand.
   give 0.10-0.11 after the same corrections; Clarke et al. 2024, Mol Ecol
   e17353, and Waples 2024, Evol Appl 17:e13695, give Ne, or reviews, not a
   felid ratio). `lo` uses Ne/N 0.3
-  and the fastest per-year rate (1.5e-9: tiger, 7.45e-9 per generation at
-  parental age 5). `hi` uses Ne/N 0.05 and the slowest rate (0.8e-9: leopard,
-  7.56e-9 at 9.4). So `lo`..`hi` is about 0.22x..2.5x of `n`, an 11x range.
+  and the fastest per-year rate, `hi` Ne/N 0.05 and the slowest: the rate
+  fit's 95% prediction band, `mu_y` x/ 10^0.24 (x/ 1.74). So `lo`..`hi` is
+  about 0.19x..3.5x of `n`, an 18x range.
   Each step becomes one `genomic` point at its log-midpoint in time, graded
   as in the `[deep]` table (C or D).
 - **PSMC's blind spots.**
@@ -338,7 +369,7 @@ same `[deep]` structure in memory. Nothing is written into these TOMLs.
   (`STEP_CAP`; none of the 118 curves needs merging today, 22-29 steps
   each). `mu` and `g` are the source's, grade D for all (one genome,
   modelled rates). Then the conversion above applies unchanged
-  (`DEEP_MU_YEAR`, the leaf's `G`, Ne/N 0.1, the 20 kyr cutoff, steps older
+  (the lineage's `mu_y`, the leaf's `G`, Ne/N 0.1, the 20 kyr cutoff, steps older
   than the band start dropped).
 - **Precedence.** A hand-written `[deep]` wins: the five *Panthera* keep
   theirs (see "Panthera sources"; the jaguar's is this table's own curve,
@@ -373,11 +404,11 @@ same `[deep]` structure in memory. Nothing is written into these TOMLs.
 
 | species | curve used | mu / gen as published | g | time x / Ne x | G (pipeline) | span kept |
 |---|---|---|---|---|---|---|
-| lion | Armstrong et al. 2025 Fig. 4, green (species pedigree rate) | 5.42e-9 | 1 | 5.42 / 0.90 | 6.0 | 23 kyr - 3.0 Myr |
-| leopard | Armstrong et al. 2025 Fig. 4, green (African, Namibia) | 7.56e-9 | 1 | 7.56 / 0.81 | 9.3 | 27 kyr - 2.8 Myr |
-| tiger | Armstrong et al. 2025 Fig. 4, green (Amur) | 7.45e-9 | 1 | 7.45 / 0.93 | 8.0 | 25 kyr - 2.0 Myr |
+| lion | Armstrong et al. 2025 Fig. 4, green (species pedigree rate) | 5.42e-9 | 1 | 4.33 / 0.72 | 6.0 | 23 kyr - 3.3 Myr |
+| leopard | Armstrong et al. 2025 Fig. 4, green (African, Namibia) | 7.56e-9 | 1 | 8.50 / 0.91 | 9.3 | 31 kyr - 3.1 Myr |
+| tiger | Armstrong et al. 2025 Fig. 4, green (Amur) | 7.45e-9 | 1 | 7.44 / 0.93 | 8.0 | 25 kyr - 2.0 Myr |
 | snow leopard | Solari et al. 2025 Fig. 3B, Mongolia | 3.62e-9 | 5 | 0.72 / 0.45 | 8.0 | 24 - 630 kyr |
-| jaguar | Bergman et al. 2023 Supplementary Data 3 (DNA Zoo jaguar) | 8.41e-9 | 5 | 1.68 / 0.86 | 9.8 | 29 kyr - 3.4 Myr |
+| jaguar | Bergman et al. 2023 Supplementary Data 3 (DNA Zoo jaguar) | 8.41e-9 | 5 | 1.97 / 1.00 | 9.8 | 22 kyr - 3.2 Myr |
 
 **Armstrong et al. 2025 Fig. 4 is plotted in generations.** Its methods set
 the generation time to five years, "provided as a g = 1 for this particular

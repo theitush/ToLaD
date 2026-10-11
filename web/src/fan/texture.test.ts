@@ -239,9 +239,11 @@ describe('the dead lane', () => {
     // (Times and a time zoom whose screen stays above the lion's lean off its split from the cave lion,
     // 0.5 Ma: there it moves sideways, and below it the lion is a slice of the parent column, its
     // lanes the parent's.)
-    for (const ago of [2000, 1e5]) {
+    for (const ago of [2000, 8e4]) {
       const seen: Set<string>[] = [];
-      // (Well inside each lane: near now the crash narrows the green lane to a sixth of the column.)
+      // (Well inside each lane: near now the crash narrows the green lane to a sixth of the column.
+      // 80 kyr, not 100: since ToLaD#74 a step of the deep curve sits near 100 kyr and leans the
+      // column off the top of the screen at this zoom.)
       for (const where of [0.95, 0.04]) {
         const { c, b, m } = at(20, ago, 20, where);
         const { v } = stubView(c);
