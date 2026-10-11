@@ -87,7 +87,7 @@ const scenes = [
   ['bneck-tap-puma', 'touch', ['Cougar', 22000]],
   ['bneck-tap-cheetah', 'touch', ['Cheetah', 11800]],
   // PSMC's blind spot (ToLaD#143): the lion's and leopard's columns about 15 kya, 50 kya -> now, their
-  // post-glacial decline (20-10 kya, Figueiro et al. 2017) then the rise to 1500 CE.
+  // post-glacial decline (20-10 kya, Figueiro et al. 2017), then flat to the next level (the genome scaled to meet it).
   ['blind-lion', 'about', ['Lion', 15000, 10, 0.1]],
   ['blind-leopard', 'about', ['Leopard', 15000, 10, 0.1]],
 ];
