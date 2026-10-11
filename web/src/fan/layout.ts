@@ -866,6 +866,8 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = FELIDA
  * column there is a blend of its slot and its place), so nothing ever meets.
  */
 function placeRiver(root: FanNode, P: Packer, time: TimeScale, mode: WidthMode): void {
+  // Each column's band (span), relative to its left: a subtree moves whole, so it holds through the packing.
+  const bands = new Map<FanNode, [number, number]>();
   const pack = (v: FanNode): Contour => {
     let acc: Contour | null = null;
     for (const k of v.kids) {
@@ -896,6 +898,7 @@ function placeRiver(root: FanNode, P: Packer, time: TimeScale, mode: WidthMode):
     const [e0, e1] = span(v);
     v.left = Math.min(e1 - v.width, Math.max(e0, (d0 + d1) / 2));
     v.cx = v.left + v.width / 2;
+    bands.set(v, [e0 - v.left, e1 - v.left]);
     // The fork span: a share of the shortest run of a daughter before it splits again or ends; slower for one that grows out of nobody.
     let run = Infinity;
     for (const k of v.kids) run = Math.min(run, v.y - (isNode(k) ? k.y : k.tipY));
@@ -915,16 +918,25 @@ function placeRiver(root: FanNode, P: Packer, time: TimeScale, mode: WidthMode):
   };
   const [a, b] = P.extent(pack(root));
   move(root, -(a + b) / 2);
-  boundPeels(root);
+  const ext = new Map<FanNode, [number, number]>();
+  for (const [v, [e0, e1]] of bands) ext.set(v, [v.left + e0, v.left + e1]);
+  boundPeels(root, ext);
 }
 
-/** Where a parent column may sit: between its outermost daughters' places (a species': its founders' width about its centre line; a split's: its own span). */
+/**
+ * Where a parent column may sit (its band): between its outermost daughters' places at the end of its fork (a
+ * species': its founders' width about its centre line; a split's: its column). Not its species' places further up:
+ * a chain of splits close in time (the data's fossil stem, ToLaD#145) would hold each of its columns' bands as wide
+ * as the whole fan, and each fossil twig off the chain would have to stand outside all of it, peeling off steeply.
+ * A daughter column moves only inside its own band, which overlaps its parent's (both hold the daughter's column as
+ * packed), and the two bars cover the parent's fork: a peel there stays inside them.
+ */
 function span(k: Kid): [number, number] {
   if (!isNode(k)) return [k.cx - k.baseW / 2, k.cx + k.baseW / 2];
   let a = Infinity;
   let b = -Infinity;
   for (const c of k.kids) {
-    const [p, q] = span(c);
+    const [p, q] = isNode(c) ? [c.left, c.left + c.width] : span(c);
     a = Math.min(a, p);
     b = Math.max(b, q);
   }
@@ -948,14 +960,8 @@ export const PEEL_SLOPE = 8;
  * steepest is 1.875 times its mean) — or, if the tree cannot, at the least
  * slope it can. The species stay where they are.
  */
-function boundPeels(root: FanNode): void {
+function boundPeels(root: FanNode, ext: Map<FanNode, [number, number]>): void {
   type Iv = [number, number];
-  const ext = new Map<FanNode, Iv>();
-  const fill = (v: FanNode): void => {
-    for (const k of v.kids) if (isNode(k)) fill(k);
-    ext.set(v, span(v));
-  };
-  fill(root);
   const offs = (v: FanNode) => {
     let o = 0;
     return v.kids.map((k) => ((o += isNode(k) ? k.width : k.baseW), o - (isNode(k) ? k.width : k.baseW)));
@@ -1119,7 +1125,11 @@ function chooseSides(root: FanNode, P: Packer, known?: Map<Split, boolean>): { p
     return { order, off, dx, a, b, out, cost, flip, flips, kids: kc };
   };
   const cands = (v: FanNode): Cand[] => {
-    const fronts = v.kids.map((k) => (isNode(k) ? cands(k) : [null]));
+    // Each daughter's best candidates: all MAX_CANDS of them when two daughters are splits (MAX_CANDS² combinations); a
+    // polytomy (the data's tree has some, ToLaD#145) keeps fewer each, so the combinations stay within that budget.
+    const nNodes = v.kids.filter(isNode).length;
+    const per = nNodes <= 2 ? MAX_CANDS : Math.max(1, Math.floor(Math.pow(MAX_CANDS * MAX_CANDS, 1 / nNodes)));
+    const fronts = v.kids.map((k) => (isNode(k) ? cands(k).slice(0, per) : [null]));
     // Every combination of the daughters' candidates, each both ways round (one daughter: no sides to choose).
     let combos: (Cand | null)[][] = [[]];
     for (const f of fronts) combos = combos.flatMap((c) => f.map((x) => [...c, x]));

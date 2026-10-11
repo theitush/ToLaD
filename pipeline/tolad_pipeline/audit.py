@@ -43,7 +43,6 @@ from __future__ import annotations
 import argparse
 import json
 import math
-import re
 import sys
 from pathlib import Path
 
@@ -66,7 +65,6 @@ SNAPSHOT = ROOT / "data" / "build" / "audit_leaves.json"
 REPORT_MD = ROOT / "research" / "data-audit-report.md"
 REPORT_JSON = ROOT / "data" / "build" / "audit.json"
 REVIEWED = ROOT / "pipeline" / "audit-reviewed.toml"  # flags checked and accepted, each with its reason
-FAN_SPLITS = ROOT / "web" / "src" / "fan" / "splits.ts"  # the species the Felidae view places
 
 
 # ------------------------------------------------------------------ snapshot (from the build)
@@ -142,7 +140,8 @@ def leaf_row(n, census: dict, gs_model: dict, deep_reports: dict | None = None) 
         "extinct": bool(n.extinct), "extinct_by": D.get("extinct_by"), "t1_ma": n.t1,
         "alive": float(D.get("alive", 0.0)), "today_src": _today_src(n),
         "domestic": bool(D.get("domestic")), "G": 2 * D["L"] if D.get("L") else None,
-        "phylacine": D.get("iucn"), "upham": bool(n.upham),
+        "phylacine": D.get("iucn"), "upham": bool(n.upham), "dated": D.get("dleaf") is not None,
+        "graft": D.get("dleaf") is not None and D["dleaf"].graft,
         "red_list": rl.get("category"), "red_list_year": rl.get("year"),
         "natural": {k: nat[k] for k in ("N", "lo", "hi")} if nat else None,
         "census": (census.get(n.name) or {}).get("N"), "gs_model": (gs_model.get(n.name) or {}).get("N"),
@@ -396,11 +395,12 @@ def load_reviewed(path: Path = REVIEWED) -> dict[tuple[str, str], dict]:
     return out
 
 
-def fan_placed(path: Path = FAN_SPLITS) -> set[str]:
-    """The species the Felidae view places (web/src/fan/splits.ts names them as quoted binomials)."""
-    if not path.exists():
-        return set()
-    return set(re.findall(r"'([A-Z][a-z]+ [a-z]+)'", path.read_text()))
+def fan_placed(rows: list[dict]) -> set[str]:
+    """The species the Felidae view places: the fan draws the dated tree (ToLaD#145) induced on the
+    Felidae rows, so every Felidae leaf the dated tree holds (the snapshot's `dated`), less the fossils it
+    grafts by taxonomy only (FAN_PLACEMENT in web/src/fan/panthera-extract.ts)."""
+    return {r["name"] for r in rows if _clean(r.get("family")) == "Felidae" and r.get("dated")
+            and not (r["extinct"] and r.get("graft"))}
 
 
 def _clean(x: str | None) -> str | None:
@@ -521,7 +521,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"audit: no snapshot at {a.snapshot}; run `make build` first", file=sys.stderr)
         return 2
     rows = json.loads(a.snapshot.read_text())["rows"]
-    rep = run(rows, load_reviewed(), fan_placed())
+    rep = run(rows, load_reviewed(), fan_placed(rows))
     a.md.write_text(render_md(rep))
     a.json.write_text(json.dumps(rep, indent=1, default=str) + "\n")
     cats = rep["cats"]

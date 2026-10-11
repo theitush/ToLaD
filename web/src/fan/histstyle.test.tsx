@@ -16,7 +16,8 @@ const byName = (common: string) => FELIDAE.species.find((s) => s.common === comm
 
 describe('species card history', () => {
   it('lists every point with its year, numbers, grade, kind, citation link and note; the genomic curve as one row', () => {
-    for (const common of ['Lion', 'Tiger', 'Snow leopard', 'Leopard', 'Cougar']) {
+    // 'Puma': the Red List's English name for Puma concolor (the data's names since ToLaD#145; the hand table said Cougar).
+    for (const common of ['Lion', 'Tiger', 'Snow leopard', 'Leopard', 'Puma']) {
       const sp = byName(common);
       const html = renderToStaticMarkup(<SpeciesCard sp={sp} onClose={() => {}} open />);
       const h = sp.history!;
@@ -256,8 +257,8 @@ describe('the species card: the population at the time touched', () => {
   });
 
   it('shows the chip even when the species is in no danger: Least Concern in gray (ToLaD#98)', () => {
-    // The leopard cat's own status from the data (ToLaD#48): Least Concern.
-    const sp = byName('Leopard cat');
+    // The leopard cat's own status from the data (ToLaD#48): Least Concern. ('Mainland leopard cat': the Red List's name, ToLaD#145.)
+    const sp = byName('Mainland leopard cat');
     expect(RED_LIST[sp.sci]).toBeUndefined();
     const html = renderToStaticMarkup(<SpeciesCard sp={sp} onClose={() => {}} />);
     expect(html).toMatch(/<span class="status iucn-lc"[^>]*>Least Concern<\/span>/);
@@ -470,7 +471,7 @@ describe('the sparkline y axis follows the central values, not the ranges (ToLaD
   });
 
   it('the "no data" label clears the natural line (the cougar)', () => {
-    for (const common of ['Cougar', 'Leopard', 'Lion', 'Tiger', 'Snow leopard', 'Jaguar']) {
+    for (const common of ['Puma', 'Leopard', 'Lion', 'Tiger', 'Snow leopard', 'Jaguar']) {
       const html = svgOf(common);
       const lab = /<text x="[\d.]+" y="([\d.-]+)"[^>]*data-nodata-label=""/.exec(html);
       const nat = /y1="([\d.-]+)"[^>]*data-natural=""/.exec(html);

@@ -90,7 +90,7 @@ def build_tree(raw: Path, work: Path, log: dict, t_start: float):
     assign_bands(root, ANCHOR_T0)
     n_k = collapse_knuckles(root)
     log["knuckles_collapsed"] = n_k
-    ctx.update(exact=exact, syn=syn)
+    ctx.update(exact=exact, syn=syn, upham=(up_root, up_tax), overrides=ov)
     return root, ctx
 
 
@@ -146,13 +146,19 @@ def main(argv: list[str] | None = None) -> int:
         for sp, f in dj["flagged"].items():
             print(f"    flagged {sp}: scaled x{f['factor']:.3g} to the {f['to_kind']} level ({f['next']})",
                   file=sys.stderr)
+    from . import dated  # the dated tree (format 1.6, ToLaD#145): Upham topology + grafts, per file META
+    droot = dated.build(root, *ctx["upham"], ctx["overrides"], log, ac=dated.load_alvarez(a.raw),
+                        names=(ctx["exact"], ctx["syn"]))
+    log_step(t_start, f"dated tree: {log['dated_tree']['species']} species, {log['dated_tree']['splits']} splits")
+    for rule, b in log["dated_tree"].get("benchmark", {}).items():
+        log_step(t_start, f"dates benchmark, {rule}: {b['inside']}/{b['of']} inside, x{b['median_factor_off']} off")
     log["counts"] = counts(root)
     log["spot_checks"] = spot_checks(root)
     log["calibration_check"] = calibration_report(root, a.raw)
     log["top_orders"] = top_orders(root)
     from . import audit  # the data audit's per-leaf snapshot (ToLaD#113): `make audit` checks it
     log_step(t_start, f"audit snapshot {audit.snapshot(root, a.raw, a.work, log)}")
-    tiles.write_all(root, a.out, log)
+    tiles.write_all(root, a.out, log, droot)
     log_step(t_start, "tiles written")
     (a.out / "stats.json").write_text(json.dumps(log, indent=1, default=_json_default, sort_keys=True) + "\n")
     print(json.dumps({k: log[k] for k in ("counts", "spot_checks", "output", "upham_match", "pbdb_match")},

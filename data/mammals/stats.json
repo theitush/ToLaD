@@ -834,6 +834,446 @@
   "tips_extinct_in_opentree": 327,
   "tips_fossil_grafted": 11015
  },
+ "dated_tree": {
+  "ages": {
+   "alvarez_binomials": 4052,
+   "alvarez_binomials_matched": 3817,
+   "rule": "ensemble",
+   "shared_species": 3786,
+   "splits_dated": 2289,
+   "splits_interpolated": 3360
+  },
+  "benchmark": {
+   "alvarez": {
+    "inside": 4,
+    "median_factor_off": 1.152,
+    "nodes": {
+     "Caniformia": [
+      46.18,
+      true
+     ],
+     "Euarchontoglires": [
+      69.81,
+      false
+     ],
+     "Homo-Pan": [
+      9.07,
+      false
+     ],
+     "Mus-Rattus": [
+      11.61,
+      true
+     ],
+     "Theria": [
+      141.83,
+      false
+     ],
+     "Whippomorpha": [
+      48.13,
+      false
+     ],
+     "crown Canidae": [
+      27.0,
+      false
+     ],
+     "crown Carnivora": [
+      51.73,
+      true
+     ],
+     "crown Cetacea": [
+      28.8,
+      false
+     ],
+     "crown Felidae": [
+      19.88,
+      false
+     ],
+     "crown Panthera": [
+      10.31,
+      false
+     ],
+     "crown Pinnipedia": [
+      26.36,
+      true
+     ],
+     "crown Placentalia": [
+      80.28,
+      false
+     ],
+     "crown Primates": [
+      63.09,
+      false
+     ],
+     "crown Ursidae": [
+      23.64,
+      false
+     ]
+    },
+    "of": 15
+   },
+   "ensemble": {
+    "inside": 5,
+    "median_factor_off": 1.201,
+    "nodes": {
+     "Caniformia": [
+      39.93,
+      false
+     ],
+     "Euarchontoglires": [
+      73.32,
+      false
+     ],
+     "Homo-Pan": [
+      6.15,
+      true
+     ],
+     "Mus-Rattus": [
+      17.46,
+      false
+     ],
+     "Theria": [
+      150.45,
+      false
+     ],
+     "Whippomorpha": [
+      43.5,
+      false
+     ],
+     "crown Canidae": [
+      15.74,
+      false
+     ],
+     "crown Carnivora": [
+      45.62,
+      false
+     ],
+     "crown Cetacea": [
+      21.99,
+      false
+     ],
+     "crown Felidae": [
+      11.97,
+      true
+     ],
+     "crown Panthera": [
+      6.19,
+      true
+     ],
+     "crown Pinnipedia": [
+      19.1,
+      false
+     ],
+     "crown Placentalia": [
+      85.86,
+      true
+     ],
+     "crown Primates": [
+      65.08,
+      true
+     ],
+     "crown Ursidae": [
+      15.43,
+      false
+     ]
+    },
+    "of": 15
+   }
+  },
+  "clamped_below_parent": 103,
+  "ended_before_split": [],
+  "fossil_floors": [
+   {
+    "capped": false,
+    "clade": "Mystacinidae",
+    "first_appearance": 18.3,
+    "fossil": "Mystacina miocenalis",
+    "from": 7.03,
+    "to": 18.3
+   },
+   {
+    "capped": true,
+    "clade": "Apodemus",
+    "first_appearance": 15.483,
+    "fossil": "Apodemus atavus",
+    "from": 10.137,
+    "to": 12.455
+   },
+   {
+    "capped": false,
+    "clade": "Aotus (genus in Opisthokonta)",
+    "first_appearance": 13.4,
+    "fossil": "Aotus dindensis",
+    "from": 12.085,
+    "to": 13.4
+   },
+   {
+    "capped": false,
+    "clade": "Thylamys",
+    "first_appearance": 12.725,
+    "fossil": "Thylamys colombianus",
+    "from": 10.963,
+    "to": 12.725
+   },
+   {
+    "capped": false,
+    "clade": "Dryomys",
+    "first_appearance": 9.482,
+    "fossil": "Dryomys apulus",
+    "from": 7.476,
+    "to": 9.482
+   },
+   {
+    "capped": false,
+    "clade": "Neotoma",
+    "first_appearance": 9.312,
+    "fossil": "Neotoma bunkeri",
+    "from": 9.085,
+    "to": 9.312
+   },
+   {
+    "capped": true,
+    "clade": "Arvicanthis",
+    "first_appearance": 7.907,
+    "fossil": "Arvicanthis broekhuisi",
+    "from": 5.156,
+    "to": 5.994
+   },
+   {
+    "capped": false,
+    "clade": "Anourosorex",
+    "first_appearance": 7.907,
+    "fossil": "Anourosorex oblongus",
+    "from": 6.966,
+    "to": 7.907
+   },
+   {
+    "capped": true,
+    "clade": "Oligoryzomys",
+    "first_appearance": 7.758,
+    "fossil": "Oligoryzomys victus",
+    "from": 5.857,
+    "to": 7.545
+   },
+   {
+    "capped": false,
+    "clade": "Dendrohyrax",
+    "first_appearance": 7.246,
+    "fossil": "Dendrohyrax samueli",
+    "from": 6.236,
+    "to": 7.246
+   },
+   {
+    "capped": false,
+    "clade": "Baiomys",
+    "first_appearance": 7.05,
+    "fossil": "Baiomys kolbi",
+    "from": 4.756,
+    "to": 7.05
+   },
+   {
+    "capped": true,
+    "clade": "Pelomys",
+    "first_appearance": 6.965,
+    "fossil": "Pelomys europeus",
+    "from": 2.037,
+    "to": 5.402
+   },
+   {
+    "capped": false,
+    "clade": "Hystrix (genus in Opisthokonta)",
+    "first_appearance": 6.29,
+    "fossil": "Hystrix depereti",
+    "from": 5.034,
+    "to": 6.29
+   },
+   {
+    "capped": false,
+    "clade": "Raphicerus",
+    "first_appearance": 5.333,
+    "fossil": "Raphicerus paralius",
+    "from": 4.794,
+    "to": 5.333
+   },
+   {
+    "capped": false,
+    "clade": "Redunca",
+    "first_appearance": 5.333,
+    "fossil": "Redunca khroumirensis",
+    "from": 5.165,
+    "to": 5.333
+   },
+   {
+    "capped": false,
+    "clade": "Erinaceus",
+    "first_appearance": 5.333,
+    "fossil": "Erinaceus mongolicus",
+    "from": 4.095,
+    "to": 5.333
+   },
+   {
+    "capped": false,
+    "clade": "Pseudocheirus",
+    "first_appearance": 5.333,
+    "fossil": "Pseudocheirus stirtoni",
+    "from": 4.535,
+    "to": 5.333
+   },
+   {
+    "capped": false,
+    "clade": "Trichosurus",
+    "first_appearance": 5.333,
+    "fossil": "Trichosurus hamiltonensis",
+    "from": 4.283,
+    "to": 5.333
+   },
+   {
+    "capped": false,
+    "clade": "Stylodipus",
+    "first_appearance": 5.09,
+    "fossil": "Stylodipus perfectus",
+    "from": 3.745,
+    "to": 5.09
+   },
+   {
+    "capped": false,
+    "clade": "Notomys",
+    "first_appearance": 4.793,
+    "fossil": "Notomys longicaudatus",
+    "from": 3.178,
+    "to": 4.793
+   },
+   {
+    "capped": false,
+    "clade": "Ammospermophilus",
+    "first_appearance": 4.05,
+    "fossil": "Ammospermophilus hanfordi",
+    "from": 3.525,
+    "to": 4.05
+   },
+   {
+    "capped": false,
+    "clade": "Procyon",
+    "first_appearance": 4.05,
+    "fossil": "Procyon gipsoni",
+    "from": 1.48,
+    "to": 4.05
+   },
+   {
+    "capped": false,
+    "clade": "Notiosorex",
+    "first_appearance": 4.05,
+    "fossil": "Notiosorex repenningi",
+    "from": 0.743,
+    "to": 4.05
+   },
+   {
+    "capped": false,
+    "clade": "Nesoryzomys",
+    "first_appearance": 3.958,
+    "fossil": "Nesoryzomys darwini",
+    "from": 3.184,
+    "to": 3.958
+   },
+   {
+    "capped": false,
+    "clade": "Graomys",
+    "first_appearance": 3.8,
+    "fossil": "Graomys dorae",
+    "from": 2.581,
+    "to": 3.8
+   },
+   {
+    "capped": false,
+    "clade": "Damaliscus",
+    "first_appearance": 3.6,
+    "fossil": "Damaliscus hadari",
+    "from": 3.351,
+    "to": 3.6
+   },
+   {
+    "capped": false,
+    "clade": "Gazella",
+    "first_appearance": 3.054,
+    "fossil": "Gazella bondi",
+    "from": 2.762,
+    "to": 3.054
+   },
+   {
+    "capped": false,
+    "clade": "Geocapromys",
+    "first_appearance": 2.746,
+    "fossil": "Geocapromys thoracatus",
+    "from": 2.577,
+    "to": 2.746
+   },
+   {
+    "capped": false,
+    "clade": "Arvicola",
+    "first_appearance": 2.58,
+    "fossil": "Arvicola jacobaeus",
+    "from": 2.318,
+    "to": 2.58
+   },
+   {
+    "capped": false,
+    "clade": "Juscelinomys",
+    "first_appearance": 2.516,
+    "fossil": "Juscelinomys candango",
+    "from": 1.003,
+    "to": 2.516
+   },
+   {
+    "capped": true,
+    "clade": "Solomys",
+    "first_appearance": 2.055,
+    "fossil": "Solomys spriggsarum",
+    "from": 1.387,
+    "to": 1.723
+   },
+   {
+    "capped": false,
+    "clade": "Lutreolina",
+    "first_appearance": 1.677,
+    "fossil": "Lutreolina tonnii",
+    "from": 1.353,
+    "to": 1.677
+   },
+   {
+    "capped": false,
+    "clade": "Zalophus",
+    "first_appearance": 1.355,
+    "fossil": "Zalophus japonicus",
+    "from": 1.256,
+    "to": 1.355
+   }
+  ],
+  "grafts": {
+   "joins a split (loose)": 2039,
+   "on a stem (fossil)": 1179,
+   "on a stem (living, interpolated)": 70,
+   "on a stem, joins a graft of the same age": 160
+  },
+  "living": 5852,
+  "named_splits": 690,
+  "species": 17194,
+  "species_rows_left_out": 0,
+  "splits": 8615,
+  "splits_by_source": {
+   "ensemble": 2264,
+   "fossil": 2718,
+   "fossil-floor": 33,
+   "interpolated": 243,
+   "override": 9,
+   "upham": 1,
+   "upham-imputed": 1387,
+   "upham-interp": 1960
+  },
+  "upham_tips_dropped": {
+   "extinct, placed without data (grafted instead)": 44,
+   "unmatched tip": 217
+  },
+  "zero_length_spliced": 795
+ },
  "dating": {
   "calibrated_raised_by_fossils": 400,
   "uncalibrated_internal": 8308,
@@ -20843,6 +21283,7 @@
  },
  "output": {
   "brotli_bytes": 755167,
+  "dated_sidecar_raw": 960283,
   "files": 14,
   "raw_bytes": 3095992,
   "skeleton_brotli": 91151,
@@ -20897,6 +21338,59 @@
     ]
    }
   ],
+  "dated_clade": [
+   {
+    "age": 4.58,
+    "name": "Panthera",
+    "replaced_age": 6.189,
+    "species": 5
+   },
+   {
+    "age": 0.0095,
+    "name": "Felis catus",
+    "replaced_age": 1.1907,
+    "species": 2
+   }
+  ],
+  "dated_fossil": [
+   {
+    "age": 2.58,
+    "name": "Panthera zdanskyi",
+    "sister": "Panthera tigris"
+   },
+   {
+    "age": 2.0,
+    "name": "Panthera gombaszoegensis",
+    "sister": "Panthera onca"
+   },
+   {
+    "age": 0.5,
+    "name": "Panthera spelaea",
+    "sister": "Panthera leo"
+   },
+   {
+    "age": 0.129,
+    "name": "Panthera balamoides",
+    "sister": "Panthera onca"
+   }
+  ],
+  "dated_name": [
+   {
+    "common": "cat",
+    "name": "Felidae",
+    "species": 41
+   },
+   {
+    "common": "big cat",
+    "name": "Pantherinae",
+    "species": 11
+   },
+   {
+    "common": "small cat",
+    "name": "Felinae",
+    "species": 30
+   }
+  ],
   "exclude": [
    "Tikitherium copei"
   ],
@@ -20927,7 +21421,7 @@
     "to": "stem of Metatheria"
    }
   ],
-  "version": 2
+  "version": 3
  },
  "pbdb_graft": {
   "excluded (overrides.toml)": 1,

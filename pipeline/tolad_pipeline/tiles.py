@@ -10,7 +10,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import anchors, redlist
+from . import anchors, dated, redlist
 from .model import (NATURAL_METHOD_FIT, NATURAL_METHOD_SCALED, NATURAL_STEP_YEAR, PROFILE_K, PROFILE_RANGE,
                     SOURCES)
 from .tree import D_ANCHOR, DATE_SRC_NAMES, Node
@@ -377,11 +377,19 @@ def mock_individuals(root: Node, where: dict[int, tuple[int, int]]) -> list[dict
     return out
 
 
-def write_all(root: Node, out: Path, log: dict) -> None:
+def write_dated(path: Path, d: dict) -> None:
+    path.write_text(json.dumps(d, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
+
+
+def write_all(root: Node, out: Path, log: dict, droot=None) -> None:
     out.mkdir(parents=True, exist_ok=True)
     tdir = out / "t"
     tdir.mkdir(exist_ok=True)
     for old in tdir.glob("*.tld"):
+        old.unlink()
+    ddir = out / "dated"  # the dated tree's sidecars (format 1.6, ToLaD#145; FORMAT.md, "Dated tree")
+    ddir.mkdir(exist_ok=True)
+    for old in ddir.glob("*.json"):
         old.unlink()
     # global ids, tip counts, method keys
     for i, n in enumerate(root.preorder()):
@@ -407,6 +415,7 @@ def write_all(root: Node, out: Path, log: dict) -> None:
             if not stub:
                 where[id(nd)] = (tile_id[id(t)], i)
         meta = {"tile": tile_id[id(t)], "root_gid": t.data["gid"], "root_name": representative(t)}
+        write_dated(ddir / f"{tile_id[id(t)]}.json", {"tile": tile_id[id(t)], **dated.file_meta(droot, rows)})
         secs, n = encode_rows(rows, methods, tile_id, meta, cites)
         fn = tdir / f"{tile_id[id(t)]}.tld"
         size = write_container(fn, KIND_TILE, n, secs)
@@ -505,11 +514,13 @@ def write_all(root: Node, out: Path, log: dict) -> None:
                            **{f: rl[f] for f in ("category", "source", "year", "taxon", "assessment")}})
         k += 1
     log["history"]["hist_sources"] = len(cites)
+    write_dated(ddir / "skeleton.json", {"tile": -1, **dated.skeleton_meta(droot), **dated.file_meta(droot, sk_rows)})
     secs, n = encode_rows(sk_rows, methods, tile_id, meta, cites)
     sk_size = write_container(out / "skeleton.tld", KIND_SKELETON, n, secs)
     files.append(out / "skeleton.tld")
     write_debug_json(root, sk_rows, tile_id, out / "debug_top.json", meta, hist_dbg, nat_dbg, rl_dbg)
     sizes(files, log, sk_size, n, len(tile_roots))
+    log["output"]["dated_sidecar_raw"] = sum(f.stat().st_size for f in ddir.glob("*.json"))
 
 
 def write_debug_json(root: Node, sk_rows, tile_id, path: Path, meta: dict, hist: list[dict] | None = None,
