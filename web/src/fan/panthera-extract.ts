@@ -133,12 +133,41 @@ export interface RawNode {
   dateSource: string;
 }
 
+/** One split of the dated tree (pipeline/FORMAT.md, "Dated tree", format 1.6, ToLaD#145). */
+export interface DatedSplit {
+  /** Ma, and its 95% interval (lo = hi = age: none). */
+  age: number;
+  lo: number;
+  hi: number;
+  /** 'upham' | 'upham-imputed' | 'fossil' | 'interpolated' | 'override'. */
+  source: string;
+  /** Open Tree name of the clade it founds, '' if none. */
+  name: string;
+  /** Daughters grafted by taxonomy only (where inside the split is not known). */
+  loose: number;
+  /** The overrides.toml entry that set it. */
+  override: { name: string; cite: string; reason: string } | null;
+  /** Daughters, left to right: species (scientific names) or splits. */
+  kids: (string | DatedSplit)[];
+}
+
+/** The dated tree's shared tables (dated/skeleton.json). */
+export interface DatedMeta {
+  upham: string;
+  genHow: string[];
+  commonSource: string;
+}
+
 export interface RawSpecies extends RawNode {
   /** gid of the parent node in the tree (species sharing it are sisters). */
   parentGid: number;
   history: HistoryRec | null;
   redList: RedListRec | null;
   natural: NaturalRec | null;
+  /** English common name from the data (IUCN Red List 2026-1; an override for a few fossils), or null. */
+  common?: string | null;
+  /** Generation length (years) the model uses, and where it came from (DatedMeta.genHow). */
+  gen?: { years: number; how: string } | null;
 }
 
 export interface RawClade extends RawNode {
@@ -146,6 +175,57 @@ export interface RawClade extends RawNode {
   species: RawSpecies[];
   /** What the species' natural baselines are (null: data older than v1.2). */
   naturalMeta: NaturalMeta | null;
+  /** The dated tree over the clade's species (null: data older than 1.6). */
+  dated?: DatedSplit | null;
+  datedMeta?: DatedMeta | null;
+}
+
+/** A dated sidecar (dated/<tile>.json, pipeline/FORMAT.md "Dated tree"). */
+export interface DatedFile {
+  tile: number;
+  nodes?: number[][];
+  names?: Record<string, string>;
+  loose?: Record<string, number>;
+  notes?: Record<string, number>;
+  common: Record<string, string>;
+  gen: Record<string, [number, number]>;
+  // skeleton.json only
+  sources?: string[];
+  upham?: string;
+  gen_how?: string[];
+  common_source?: string;
+  overrides?: { name: string; cite: string; reason: string }[];
+}
+
+/**
+ * A file's dated tree induced on `rows` (species row index -> scientific name): a split left
+ * with fewer than two branches collapses; null if no row is in it.
+ */
+export function datedTree(file: DatedFile, sk: DatedFile, rows: Map<number, string>): DatedSplit | null {
+  const nodes = file.nodes ?? [];
+  const kids: number[][] = nodes.map(() => []);
+  nodes.forEach((n, i) => n[0] >= 0 && kids[n[0]].push(i));
+  const src = sk.sources ?? [];
+  const build = (i: number): string | DatedSplit | null => {
+    const n = nodes[i];
+    if (n.length === 2) return rows.get(n[1]) ?? null;
+    const ks = kids[i].map(build).filter((k): k is string | DatedSplit => k !== null);
+    if (ks.length === 0) return null;
+    if (ks.length === 1) return ks[0];
+    const note = file.notes?.[i];
+    return {
+      age: n[1],
+      lo: n[2],
+      hi: n[3],
+      source: src[n[4]] ?? '',
+      name: file.names?.[i] ?? '',
+      loose: file.loose?.[i] ?? 0,
+      override: note !== undefined ? (sk.overrides?.[note] ?? null) : null,
+      kids: ks,
+    };
+  };
+  const t = nodes.length ? build(0) : null;
+  return t && typeof t !== 'string' ? t : null;
 }
 
 interface Tile {
@@ -220,7 +300,18 @@ export function loadClade(read: (rel: string) => Uint8Array, name: string): RawC
     const bytes = read(t.file);
     const f = decodeFile(bytes) as unknown as Tile & { isStub(i: number): boolean };
     for (let i = 0; i < f.n; i++) {
-      if (f.name(i) === name && !f.isStub(i)) return extractClade(skBytes, bytes, t.id, name);
+      if (f.name(i) === name && !f.isStub(i)) {
+        const json = (rel: string): DatedFile | null => {
+          try {
+            return JSON.parse(new TextDecoder().decode(read(rel))) as DatedFile;
+          } catch {
+            return null;
+          }
+        };
+        const sk = json('dated/skeleton.json');
+        const file = json(`dated/${t.id}.json`);
+        return extractClade(skBytes, bytes, t.id, name, sk && file ? { sk, file } : undefined);
+      }
     }
   }
   throw new Error(`${name} not found in any tile`);
@@ -230,7 +321,13 @@ export function loadClade(read: (rel: string) => Uint8Array, name: string): RawC
  * Panthera (or any genus row named `name`) from a tile: the node, its species
  * in preorder, and each species' curated history with its citations resolved.
  */
-export function extractClade(skeleton: ArrayBuffer | Uint8Array, tile: ArrayBuffer | Uint8Array, tileId: number, name: string): RawClade {
+export function extractClade(
+  skeleton: ArrayBuffer | Uint8Array,
+  tile: ArrayBuffer | Uint8Array,
+  tileId: number,
+  name: string,
+  dated?: { sk: DatedFile; file: DatedFile },
+): RawClade {
   const sk = decodeFile(skeleton) as unknown as Tile;
   const f = decodeFile(tile) as unknown as Tile;
   const sources = (sk.meta.hist_sources ?? []) as { cite: string; url: string }[];
@@ -243,6 +340,7 @@ export function extractClade(skeleton: ArrayBuffer | Uint8Array, tile: ArrayBuff
     return false;
   };
   const species: RawSpecies[] = [];
+  const rows = new Map<number, string>();
   for (let i = root + 1; i < f.n && inside(i); i++) {
     if (!f.isSpecies(i)) continue;
     const h = f.history(i);
@@ -289,9 +387,23 @@ export function extractClade(skeleton: ArrayBuffer | Uint8Array, tile: ArrayBuff
       };
     }
     const nat = f.natural ? f.natural(i) : null;
-    species.push({ ...node(f, i), parentGid: f.gid(f.parent[i]), history, redList: redListOf(f, i, sk.meta), natural: nat ? { ...nat } : null });
+    const g = dated?.file.gen[i];
+    species.push({
+      ...node(f, i),
+      parentGid: f.gid(f.parent[i]),
+      history,
+      redList: redListOf(f, i, sk.meta),
+      natural: nat ? { ...nat } : null,
+      common: dated?.file.common[i] ?? null,
+      gen: g ? { years: g[0], how: dated!.sk.gen_how?.[g[1]] ?? '' } : null,
+    });
+    rows.set(i, f.name(i));
   }
   const nm = sk.meta.natural;
   const naturalMeta: NaturalMeta | null = nm ? { label: nm.label ?? '', grade: nm.grade ?? 'D', kind: nm.kind ?? '', cite: nm.cite ?? '', url: nm.url ?? '' } : null;
-  return { ...node(f, root), tile: tileId, species, naturalMeta };
+  const tree = dated ? datedTree(dated.file, dated.sk, rows) : null;
+  const datedMeta: DatedMeta | null = dated
+    ? { upham: dated.sk.upham ?? '', genHow: dated.sk.gen_how ?? [], commonSource: dated.sk.common_source ?? '' }
+    : null;
+  return { ...node(f, root), tile: tileId, species, naturalMeta, dated: tree, datedMeta };
 }

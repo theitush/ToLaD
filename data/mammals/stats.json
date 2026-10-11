@@ -870,7 +870,29 @@
   "tips_fossil_grafted": 11012
  },
  "dated_tree": {
-  "clamped_below_parent": 175,
+  "clamped_below_parent": 392,
+  "ended_before_split": [
+   "Acheronictis webbi",
+   "Acrotitan ulanshirehensis",
+   "Adelpharctos ginsburgi",
+   "Adelpharctos mirus",
+   "Aegicetus gehennae",
+   "Aegyptocetus tarfa",
+   "Aelurocyon spissidens",
+   "Aelurodon asthenostylus",
+   "Aelurodon brachygnathus",
+   "Aelurodon compressus",
+   "Aelurodon ferox",
+   "Aelurodon mcgrewi",
+   "Ageina tobieni",
+   "Aglaocetus latifrons",
+   "Aglaocetus longifrons",
+   "Aglaocetus rotundus",
+   "Aguascalientia minuta",
+   "Aguascalientia panamaensis",
+   "Aguascalientia wilsoni",
+   "Aivukus cedrosensis"
+  ],
   "grafts": {
    "joins a split (loose)": 2224,
    "on a stem (fossil)": 1197,
@@ -880,10 +902,10 @@
   "named_splits": 690,
   "species": 17205,
   "species_rows_left_out": 1459,
-  "splits": 8243,
+  "splits": 8464,
   "splits_by_source": {
-   "fossil": 2411,
-   "interpolated": 178,
+   "fossil": 2599,
+   "interpolated": 211,
    "override": 9,
    "upham": 4230,
    "upham-imputed": 1415
@@ -892,7 +914,7 @@
    "extinct, placed without data (grafted instead)": 44,
    "unmatched tip": 217
   },
-  "zero_length_spliced": 1163
+  "zero_length_spliced": 942
  },
  "dating": {
   "calibrated_raised_by_fossils": 401,
@@ -19297,7 +19319,7 @@
  },
  "output": {
   "brotli_bytes": 782665,
-  "dated_sidecar_raw": 918447,
+  "dated_sidecar_raw": 925535,
   "files": 16,
   "raw_bytes": 3195672,
   "skeleton_brotli": 56554,
