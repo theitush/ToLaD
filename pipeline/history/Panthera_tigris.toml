@@ -64,3 +64,29 @@ kind  = "estimate"
 cite  = "Global Tiger Forum, global wild tiger estimate released July 2023 (reported by WWF)"
 url   = "https://www.worldwildlife.org/news/stories/new-tiger-population-estimate-of-5574-wild-tigers-announced-by-global-tiger-forum"
 note  = "Sum of national estimates, ~74% above the 2010 figure; India 3,682 of these (AITE 2022)."
+
+[deep]
+method = "PSMC"
+cite   = "Armstrong et al. 2025, Genome Biol Evol 17(4):evaf060, Fig. 4 (green curve)"
+url    = "https://doi.org/10.1093/gbe/evaf060"
+mu     = 7.45e-09   # the curve's mutation rate, per site per generation
+g      = 1.0       # the curve's generation time as plotted: g = 1, so its time axis is in generations (ToLaD#66)
+grade  = "D"
+note   = "Digitised from the published raster of Fig. 4 (PMC11997302, evaf060f4.jpg, 800x485 px): axes calibrated on the tick marks (x: 1e3-1e6 yr, log, ~60.5 px per decade; y: Ne 0-150,000, linear, ~49 px per 50,000), then every column of the panel scanned for the curve's colour; a column with one short run (<= 4 px) is on a step, neighbouring columns within 1.5 px make one step. Each step is [from, to] years ago and its Ne, in the figure's own scaling. Reading error ~1 px: ~4% in time, ~1,000 in Ne (so ~20% at Ne 5,000). PSMC run with -p 2+2+25*2+4+6 (Hilgers et al. 2025), g = 5 yr. Read: the green curve: the tiger pedigree rate (7.45e-9/gen, Fig. 2). Time axis in generations (ToLaD#66): the methods give generation time five years, 'provided as a g = 1 for this particular scaling script' (psmcr), and other genomes' PSMC curves line up with this figure's only when its times are multiplied by ~5 (lion: x4.4-5.3 against five curves; jaguar, the same genome in Bergman et al. 2023: x5.5; tiger x6-9), so g = 1 here; Ne does not depend on g. Cross-check after the same rescale (level of the other curve against this one, 20 kyr to the older end; log-residual): Bergman et al. 2023 Supplementary Data 3 (8.41e-9/gen) Amur tiger x1.47, x1.35; DNA Zoo tiger x1.31, x1.27; Malayan tiger x1.53, x1.28; Cho et al. 2013 Fig. 4b (5.5e-9/gen) Amur tiger x1.34, x1.25, white Bengal tiger x1.26, x1.18; Figueiro et al. 2017 Fig. 1B (1.0e-8/gen, Amur) x0.69, x1.64 (a rough reading: its grey bundle is overlaid by the other species). All agree within x1.5 in level; their features still sit ~1.3-2x older than this curve's. Armstrong et al. 2021 (Mol Biol Evol 38:2366) Supplementary Fig. 9 is an EMF in the supplement and was not digitised (they call it consistent with Liu et al. 2018). Kept as the best curve (Amur tiger, pedigree rate)."
+# [years ago from, to, Ne] as published (young to old); the build rescales and converts them
+steps  = [
+  [750, 1320, 5600],
+  [1320, 2340, 7700],
+  [2340, 2940, 9900],
+  [2940, 3700, 12000],
+  [4140, 6060, 17600],
+  [6060, 77230, 18400],
+  [77230, 93390, 20900],
+  [93390, 112930, 24000],
+  [112930, 126560, 26000],
+  [131460, 153040, 30100],
+  [165130, 185060, 34700],
+  [192230, 232450, 38300],
+  [232450, 315020, 41100],
+  [353060, 478470, 70900],
+]

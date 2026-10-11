@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { columnsAt, g, gapBetween, GAP_FRAC, isNode, laneAt, layoutFan, leanGap, LEAN_MAX_FRAC, leftAt, MIN_GAP_FRAC, nodeLeftAt, segAt, strandAt, TIME_H, type EdgeStyle, type WidthMode } from './layout';
+import { columnsAt, g, GAP_FRAC, isNode, laneAt, layoutFan, LEAN_MAX_FRAC, leftAt, MIN_GAP_FRAC, nodeLeftAt, segAt, strandAt, TIME_H, type EdgeStyle, type WidthMode } from './layout';
 import { FELIDAE } from './panthera';
 
 describe('fan strands: width = alive at the time', () => {
@@ -22,8 +22,9 @@ describe('fan strands: width = alive at the time', () => {
           expect(strandAt(b, b.t0 * 1.01, mode).w).toBeCloseTo(b.baseW, 12);
         } else {
           // Now: the living, all of them green.
-          // (to procgen's integer rounding and EVER's quantization: ~0.1-0.2%)
-          expect(Math.abs(b.pop.aliveAt(0) - sp.alive)).toBeLessThanOrEqual(Math.max(50, 2e-3 * sp.alive));
+          // (to procgen's integer rounding and the quantization of both EVER, which scales the curve, and
+          // ALIV: LOG16 steps of 0.23%, so up to two half-steps, 0.23%, apart)
+          expect(Math.abs(b.pop.aliveAt(0) - sp.alive)).toBeLessThanOrEqual(Math.max(50, 2.5e-3 * sp.alive));
           expect(strandAt(b, 0, mode).f).toBe(1);
           // Below its start: the founders, constant.
           expect(strandAt(b, b.t0 * 1.2, mode).w).toBeCloseTo(strandAt(b, b.t0, mode).w, 12);
@@ -106,15 +107,32 @@ describe('the fan, both designs: fixed, continuous, honest', () => {
       }
     });
 
-    it(`columns are symmetric about fixed centres in fixed rooms with fixed gaps, and never overlap (${mode}, ${edge})`, () => {
+    it(`columns are symmetric about fixed centres, sister species packed as close as the gap allows at some height, and never overlap (${mode}, ${edge})`, () => {
       const fan = layoutFan(FELIDAE, mode, undefined, edge);
       const W = fan.trunkWidth;
       const bs = [...fan.branches].sort((p, q) => p.index - q.index);
-      if (edge === 'curved') expect(bs[0].colLeft).toBeCloseTo(fan.x0, 9);
-      if (edge === 'curved') for (let j = 1; j < bs.length; j++) {
-        const gap = bs[j].colLeft - (bs[j - 1].colLeft + bs[j - 1].width);
-        expect(gap).toBeCloseTo(gapBetween(bs[j - 1], bs[j], W), 9);
-        expect(gap).toBeGreaterThanOrEqual(Math.max(GAP_FRAC * Math.min(bs[j].width, bs[j - 1].width), MIN_GAP_FRAC * W) * (1 - 1e-9));
+      // Curved: two sister species as close as the gap lets them be at their closest height (their columns at their own
+      // places: GAP_FRAC of the narrower there, at least MIN_GAP_FRAC of the stem's; a hair more for the packing's cells).
+      if (edge === 'curved') for (const v of fan.nodes) for (let i = 1; i < v.kids.length; i++) {
+        const p = v.kids[i - 1];
+        const q = v.kids[i];
+        if (isNode(p) || isNode(q)) continue;
+        let best = Infinity;
+        let allow = 0;
+        const y0 = Math.max(-TIME_H, Math.min(p.tipY, q.tipY));
+        for (let k = 0; k <= 4000; k++) {
+          const y = y0 + ((v.y - y0) * k) / 4000;
+          if (y < p.tipY || y < q.tipY) continue;
+          const wp = laneAt(p, Math.min(y, v.y - 1e-9)).w;
+          const wq = laneAt(q, Math.min(y, v.y - 1e-9)).w;
+          const c = q.cx - p.cx - (wp + wq) / 2;
+          if (c < best) {
+            best = c;
+            allow = Math.max(GAP_FRAC * Math.min(wp, wq), MIN_GAP_FRAC * W);
+          }
+        }
+        expect(best).toBeGreaterThanOrEqual(0.9 * allow);
+        expect(best).toBeLessThanOrEqual(allow + 0.01 * W);
       }
       for (const b of bs) {
         expect(b.cx).toBeCloseTo(b.colLeft + b.width / 2, 12);
@@ -148,7 +166,6 @@ describe('straight: lines that lean', () => {
   for (const mode of ['log', 'linear'] as WidthMode[]) {
     it(`the larger daughter runs straight on; each other leans out to clear its sibling's subtree, ending before either daughter's next event (${mode})`, () => {
       const fan = layoutFan(FELIDAE, mode, undefined, 'straight');
-      const W = fan.trunkWidth;
       const bandW = (k: (typeof fan.nodes)[0]['kids'][0]) => (isNode(k) ? k.width : k.baseW);
       for (const v of fan.nodes) {
         const room = Math.min(...v.kids.map((k) => v.y - (isNode(k) ? k.y : k.tipY)));
@@ -163,9 +180,7 @@ describe('straight: lines that lean', () => {
           }
         }
       }
-      // Neighbouring leaf columns are at least the smallest gap apart, and nothing ever overlaps.
-      const bs = [...fan.branches].sort((p, q) => p.index - q.index);
-      for (let j = 1; j < bs.length; j++) expect(bs[j].colLeft - (bs[j - 1].colLeft + bs[j - 1].width)).toBeGreaterThanOrEqual(leanGap(0, 0, W) - 1e-9);
+      // Nothing ever overlaps.
       for (let k = 0; k <= 3000; k++) {
         const y = -TIME_H + ((fan.trunkBottom.y + TIME_H) * k) / 3000;
         const cs = columnsAt(fan, y).sort((p, q) => p[0] - q[0]);
