@@ -136,7 +136,7 @@ export function redListOf(f: Tile, i: number, meta: any): RedListRec | null {
     year: r.year,
     source: src?.key ?? '',
     sourceLabel: src?.label ?? '',
-    cite: assessed ? `${src?.label ?? 'IUCN Red List'}: ${r.year} assessment, e.T${r.taxon}A${r.assessment}` : (src?.label ?? ''),
+    cite: assessed ? `${src?.label ?? 'IUCN Red List'}, e.T${r.taxon}A${r.assessment}` : (src?.label ?? ''),
     url: assessed ? String(m.url).replace('{taxon}', String(r.taxon)).replace('{assessment}', String(r.assessment)) : (src?.url ?? ''),
   };
 }

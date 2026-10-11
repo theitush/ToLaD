@@ -19,7 +19,7 @@ describe('Red List status from the data (ToLaD#48)', () => {
       expect(s.redList, s.sci).toBeTruthy();
       expect(s.redList!.source).toBe('iucn-2026-1');
       expect(s.redList!.url).toMatch(/^https:\/\/www\.iucnredlist\.org\/species\/\d+\/\d+$/);
-      expect(s.redList!.cite).toContain(`${s.redList!.year} assessment`);
+      expect(s.redList!.cite).toMatch(/^IUCN Red List 2026-1, e\.T\d+A\d+$/);
     }
     expect(sp('Panthera tigris').redList).toMatchObject({ category: 'EN', year: 2022, url: 'https://www.iucnredlist.org/species/15955/214862019' });
   });
