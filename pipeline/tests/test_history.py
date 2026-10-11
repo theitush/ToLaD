@@ -610,6 +610,22 @@ class DeepJoin(unittest.TestCase):
                                     "to meet the cited 1924 census (66), then held flat to it (flagged: beyond "
                                     "10×).")
 
+    def test_natural_anchor_sentence(self):
+        """ToLaD#143: a first cited count below the natural level is not the anchor; the genome meets the
+        natural level in 1500 CE (`nxt`) and the sentence names the count it sits above (`below`)."""
+        _, gen = self._gen()
+        below = self._nxt(66, "census", year=1924)
+        out, j = H.deep_join(gen, self._nxt(4e4, "rangeloss"), below=below)
+        self.assertEqual((j["rule"], j["next"], j["to_kind"], j["flag"]), ("scaled", "natural", "rangeloss", False))
+        self.assertEqual(j["below"], {"year": 1924, "n": 66, "kind": "census"})
+        self.assertAlmostEqual(out[-1]["n"], 4e4)
+        self.assertAlmostEqual(j["factor"], 0.5)
+        self.assertEqual(j["note"], "The genome gives the shape, not the number: its curve is scaled ×0.5 to meet "
+                                    "the modelled natural level in 1500 CE (40,000), which is above the first "
+                                    "cited count (1924 census, 66), taken after the decline, then held flat to "
+                                    "1500; the range-loss trend runs from there down to the count.")
+        self.assertIsNone(H.deep_join(gen, below)[1]["below"])
+
     def test_modelled_scales_too(self):
         _, gen = self._gen()
         for kind, what in (("rangeloss", "the modelled natural level in 1500 CE"), ("model", "today's modelled count"),
@@ -648,9 +664,9 @@ class DeepJoin(unittest.TestCase):
                for sp, n, k in (("a", 8e4 / 316, "rangeloss"), ("b", 8e4 * 2, "census"), ("c", 8e7, "estimate"))}
         rep["d"] = {"deep": None}
         s = H.deep_join_summary(rep)
-        self.assertEqual(s["by_next"], {"cited": 2, "modelled": 1})
+        self.assertEqual(s["by_next"], {"cited": 2, "natural": 0, "modelled": 1})
         self.assertEqual(list(s["flagged"]), ["c", "a"])
-        self.assertEqual(s["flagged_by_next"], {"cited": 1, "modelled": 1})
+        self.assertEqual(s["flagged_by_next"], {"cited": 1, "natural": 0, "modelled": 1})
         f = s["factor"]
         self.assertEqual(f["n"], 3)
         self.assertAlmostEqual(f["median"], 2.0)
@@ -664,18 +680,26 @@ class DeepJoin(unittest.TestCase):
         if st is None or not dbg.exists() or "by_next" not in st.get("deep_join", {}):
             self.skipTest("no build output")
         hist = {h["species"]: h for h in json.loads(dbg.read_text())["history"]}
-        n = {"cited": 0, "modelled": 0}
+        n = {"cited": 0, "natural": 0, "modelled": 0}
         for sp, s in st["species"].items():
             if not s.get("deep"):
                 continue
             j, h = s["deep"]["join"], hist[sp]
             n[j["next"]] += 1
             self.assertEqual(j["rule"], "scaled", sp)
-            self.assertEqual(j["next"], "cited" if j["to_kind"] in H.POINT_KINDS else "modelled", sp)
+            self.assertEqual(j["next"], "cited" if j["to_kind"] in H.POINT_KINDS else
+                             "natural" if j["below"] else "modelled", sp)
             self.assertEqual(j["flag"], max(j["ratio"], 1 / j["ratio"]) > H.DEEP_JOIN_FLAG, sp)
             self.assertAlmostEqual(j["factor"] * j["ratio"], 1.0, places=9, msg=sp)
             gen = [p for p in h["points"] if p["kind"] == "genomic"]
             nxt = h["points"][len(gen)]
+            if j["below"]:  # the natural level, above the first cited count, which the trend runs down to
+                self.assertEqual(j["to_kind"], "rangeloss", sp)
+                self.assertGreater(j["to_n"], j["below"]["n"], sp)
+                after = h["points"][len(gen) + 1]
+                self.assertEqual((after["year"], after["n"]), (j["below"]["year"], j["below"]["n"]), sp)
+            elif j["next"] == "cited" and s.get("natural") and j["to_year"] > 1500:  # the count is the higher
+                self.assertGreaterEqual(j["to_n"] * 1.000001, s["natural"]["N"], sp)
             self.assertAlmostEqual(nxt["n"] / j["to_n"], 1.0, places=6, msg=sp)
             # the youngest genomic point sits on the next level: no join rises or falls between them
             self.assertAlmostEqual(gen[-1]["n"] / nxt["n"], 1.0, places=6, msg=sp)
@@ -686,14 +710,30 @@ class DeepJoin(unittest.TestCase):
         self.assertGreater(n["modelled"], 50)  # the modelled records
 
     def test_built_big_cats(self):
-        """Lion and leopard meet their first cited count (1950, any year now); the cougar stays flagged."""
+        """The lion and tiger meet their first cited count (above their natural level); the cougar stays
+        flagged. The wisent's 1924 census of 66 is below its natural level, which is the
+        anchor instead, and the range-loss trend runs down from it in 1500 to the census (ToLaD#143)."""
         st = _stats()
-        if st is None or "by_next" not in st.get("deep_join", {}):
+        dbg = DATA / "debug_top.json"
+        if st is None or "by_next" not in st.get("deep_join", {}) or not dbg.exists():
             self.skipTest("no build output")
-        for sp in ("Panthera leo", "Panthera pardus", "Bison bonasus", "Panthera tigris"):
+        for sp in ("Panthera leo", "Panthera tigris"):
             j = st["species"][sp]["deep"]["join"]
             self.assertEqual(j["next"], "cited", sp)
+        lion = st["species"]["Panthera leo"]["deep"]["join"]
+        self.assertEqual((lion["to_kind"], lion["to_year"], lion["to_n"], lion["below"]),
+                         ("unverified", 1950, 500000, None))
         self.assertTrue(st["species"]["Puma concolor"]["deep"]["join"]["flag"])
+        w = st["species"]["Bison bonasus"]["deep"]["join"]
+        self.assertEqual((w["next"], w["to_kind"], w["to_year"]), ("natural", "rangeloss", 1500))
+        self.assertEqual((w["below"]["year"], w["below"]["n"]), (1924, 66))
+        self.assertGreater(w["to_n"], 1000)  # a pre-modern level, not the crash
+        self.assertIn("which is above the first cited count (1924 census, 66)", w["note"])
+        h = next(h for h in json.loads(dbg.read_text())["history"] if h["species"] == "Bison bonasus")
+        i = sum(p["kind"] == "genomic" for p in h["points"])
+        self.assertEqual([(p["year"], p["kind"]) for p in h["points"][i - 1:i + 2]][1:],
+                         [(1500, "rangeloss"), (1924, "census")])
+        self.assertAlmostEqual(h["points"][i - 1]["n"] / w["to_n"], 1.0, places=6)
 
 
 def _gap_leaf(n_nat=1e5, n_now=1e4, L=5.0, t0=1.0, rangeloss=True):
@@ -764,11 +804,13 @@ class GapTrend(unittest.TestCase):
         self.assertNotIn("rangeloss", [p["kind"] for p in rec["curve"]])
         self.assertEqual(rep["deep_from"], "baseline")
 
-    def test_genomic_scaled_to_1800_point(self):
+    def test_genomic_anchored_on_count_above_natural(self):
+        """ToLaD#143, (a) >= (b): a first cited count at or above the natural level is the anchor; the
+        genome meets it, flat between, no range-loss trend (the lion: 500,000 in 1950 vs 150,000)."""
         doc = _with_deep()
         del doc["baseline"]
         doc["point"][0]["year"] = 1800
-        rec, rep, _ = _gap_apply(doc)
+        rec, rep, _ = _gap_apply(doc, n_nat=1.5e4)
         kinds = [p["kind"] for p in rec["curve"]]
         self.assertNotIn("rangeloss", kinds)
         j = rec["deep_join"]
@@ -776,9 +818,11 @@ class GapTrend(unittest.TestCase):
         self.assertAlmostEqual(rec["deep_points"][-1]["n"], 2e4)
         self.assertEqual(rep["deep_from"], "genomic")
 
-    def test_genomic_scaled_to_1924_point_no_trend(self):
-        """ToLaD#143 replaces #71 here: the genomic curve meets its first cited point whatever its year,
-        so no range-loss trend runs between them (it would set a second, modelled number)."""
+    def test_genomic_anchored_on_natural_above_count(self):
+        """ToLaD#143, (b) > (a): a first count taken after a crash (the wisent's 1924 census of 66) is below
+        the natural level, so the genome's pre-modern young end meets the natural level, held flat to 1500
+        CE, and the range-loss trend runs from there down to the count (#71's path), with or without the
+        model's own trend on the leaf (the scimitar oryx has no current map)."""
         doc = _with_deep()
         del doc["baseline"]
         doc["point"][0].update(year=1924, n=66, lo=60, hi=70, kind="census")
@@ -787,19 +831,32 @@ class GapTrend(unittest.TestCase):
             rec, rep, _ = _gap_apply(doc, rangeloss=rangeloss)
             c = rec["curve"]
             n = len(rec["deep_points"])
-            self.assertEqual([p["kind"] for p in c[n:]], ["census", "census"])
-            self.assertFalse(rep["trend_1500"])
+            self.assertEqual([(p["year"], p["kind"]) for p in c[n:]],
+                             [(1500, "rangeloss"), (1924, "census"), (2020, "census")])
+            self.assertTrue(rep["trend_1500"])
             j = rec["deep_join"]
-            self.assertEqual((j["rule"], j["next"], j["to_kind"], j["to_year"], j["flag"]),
-                             ("scaled", "cited", "census", 1924, True))
-            self.assertAlmostEqual(c[n - 1]["n"], 66)
+            self.assertEqual((j["rule"], j["next"], j["to_kind"], j["to_year"], j["to_n"], j["flag"]),
+                             ("scaled", "natural", "rangeloss", 1500, 1e5, False))
+            self.assertEqual(j["below"], {"year": 1924, "n": 66, "kind": "census"})
+            self.assertAlmostEqual(c[n - 1]["n"], 1e5)  # flat from the genome's young end to 1500
             for a, b in zip(raw, rec["deep_points"]):  # the shape is the genome's
                 self.assertAlmostEqual(b["n"] / a["n"], j["factor"], places=9)
-            self.assertIn("to meet the cited 1924 census (66)", j["note"])
+            self.assertIn("which is above the first cited count (1924 census, 66)", j["note"])
             self.assertEqual(rep["deep_from"], "genomic")
-            self.assertNotIn("rangeloss", [H.KINDS[s["kind"]] for s in rec["segments"]])
+            kinds = [H.KINDS[s["kind"]] for s in rec["segments"]]
+            self.assertIn("rangeloss", kinds)  # the trend down to the count, not a step
+            for a, b in zip(rec["segments"], rec["segments"][1:]):
+                self.assertAlmostEqual(a["end"], b["start"], delta=1e-9 * a["end"])
             for p in c:  # the curve passes through every point
                 self.assertAlmostEqual(H.interp(c, p["year"]) / p["n"], 1.0, places=9)
+            for y in range(1500, 1925, 5):  # the trend falls from the natural level to the count
+                self.assertLessEqual(H.interp(c, y), 1e5 * (1 + 1e-9))
+                self.assertGreaterEqual(H.interp(c, y), 66 * (1 - 1e-9))
+        # a first count before 1500 is itself pre-modern: it is the anchor, whatever the natural level
+        doc["point"][0]["year"] = 1400
+        rec, rep, _ = _gap_apply(doc)
+        self.assertEqual((rec["deep_join"]["next"], rec["deep_join"]["to_year"]), ("cited", 1400))
+        self.assertFalse(rep["trend_1500"])
 
 
 def _no_rise(tc, rec):
