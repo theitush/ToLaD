@@ -68,9 +68,10 @@ describe('the fan, both designs: fixed, continuous, honest', () => {
       }
     });
 
-    // Straight + log: the leans at the crowded Felidae splits are still too steep (#102); flip back to `it` when fixed.
-    const itCont = edge === 'straight' && mode === 'log' ? it.fails : it;
-    itCont(`every edge is a continuous function of time: edges and the lanes' boundary, no jog at a split, no step at a population change (${mode}, ${edge})`, () => {
+    // Straight + log was `it.fails` for the too-steep leans at the crowded Felidae splits (#102); it passes since
+    // ToLaD#143's natural anchor rebuilt the leopard's and cougar's deep pasts (both wider before 1500), so the
+    // data no longer trips it. #102 itself (the design's lean rule) is not fixed by this.
+    it(`every edge is a continuous function of time: edges and the lanes' boundary, no jog at a split, no step at a population change (${mode}, ${edge})`, () => {
       const fan = layoutFan(FELIDAE, mode, undefined, edge);
       const yb = fan.trunkBottom.y;
       const edges = (b: (typeof fan.branches)[0], y: number) => {

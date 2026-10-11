@@ -91,6 +91,10 @@ const scenes = [
   ['search-li', 'search', ['li']],
   ['search-lion', 'search', ['li', 'Lion']],
   ['search-cave', 'search', ['cave', 'Cave lion']],
+  // PSMC's blind spot (ToLaD#143): the lion's and leopard's columns about 15 kya, 50 kya -> now, their
+  // post-glacial decline (20-10 kya, Figueiro et al. 2017), then flat to the next level (the genome scaled to meet it).
+  ['blind-lion', 'about', ['Lion', 15000, 10, 0.1]],
+  ['blind-leopard', 'about', ['Leopard', 15000, 10, 0.1]],
 ];
 const browser = await chromium.launch({ headless: true });
 try {

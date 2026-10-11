@@ -113,11 +113,15 @@ describe('the Panthera populations', () => {
       expect(p.greenAt((s.genYears * 0.5) / 1e6)).toBe(1);
       expect(p.greenAt((s.genYears * 1.5) / 1e6)).toBeLessThan(1);
       // Settled: the share no longer moves from one generation to the next ...
-      const back = (k: number) => p.greenAt(0.01 + (k * s.genYears) / 1e6);
+      // (5 kyr ago, was 10: since ToLaD#143 the lion's curve turns at 10 kya, the young edge of its dated
+      // post-glacial decline, and a share read across a turn is not settled. At 5 kya every cat is on a
+      // smooth log-linear stretch.)
+      const back = (k: number) => p.greenAt(0.005 + (k * s.genYears) / 1e6);
       expect(back(0)).toBeCloseTo(back(3), 6);
-      // ... at Q* for a constant population; 10 kyr ago a genomic deep past (ToLaD#60) is a slow
-      // log-linear change (~1e-4 per generation), which shifts the settled share by about as much.
-      expect(Math.abs(back(0) - Q_STAR)).toBeLessThan(1e-3);
+      // ... at Q* for a constant population; a log-linear change shifts the settled share by about its
+      // rate per generation: ~1e-4 for most, but the lion and leopard rise 12x and 4.7x from 10 kya to
+      // 1500 CE (~1.6e-3 per generation, ToLaD#143), which moves theirs by ~1.1e-3.
+      expect(Math.abs(back(0) - Q_STAR), s.common).toBeLessThan(['Lion', 'Leopard'].includes(s.common) ? 1.5e-3 : 1e-3);
       // Where the population is held constant (before its oldest point), exactly Q*.
       expect(p.greenAt(heldAge(s))).toBeCloseTo(Q_STAR, 6);
     }

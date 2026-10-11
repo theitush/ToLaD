@@ -238,8 +238,10 @@ describe('the dead lane', () => {
   it('shows real lives once the bar reads under ~100 individuals: ended lines gray, green lanes green', () => {
     // (Times and a time zoom whose screen stays above the lion's lean off its split from the cave lion,
     // 0.5 Ma: there it moves sideways, and below it the lion is a slice of the parent column, its
-    // lanes the parent's.)
-    for (const ago of [2000, 8e4]) {
+    // lanes the parent's. 500 years, was 2000: since ToLaD#143 the lion's curve rises 12x from 10 kya
+    // to 1500 CE, so a screen of ~1.4-2.8 kyr holds a column ~20% narrower at its foot, and a camera 4%
+    // or 95% across it leaves the column there; around 1500 CE, where the curve turns flat, it holds.)
+    for (const ago of [500, 8e4]) {
       const seen: Set<string>[] = [];
       // (Well inside each lane: near now the crash narrows the green lane to a sixth of the column.
       // 80 kyr, not 100: since ToLaD#74 a step of the deep curve sits near 100 kyr and leans the
