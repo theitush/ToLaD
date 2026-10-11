@@ -3,7 +3,7 @@
 
 import * as MeshMirror from './mesh';
 import { useEffect, useRef, useState } from 'react';
-import { formatCount } from '../data/names';
+import { formatCount } from '../data/count';
 import { HistorySpark } from './HistorySpark';
 import type { EdgeStyle, WidthMode } from './layout';
 import { FELIDAE, type SpeciesRec } from './panthera';
@@ -148,19 +148,12 @@ const WORDS: [number, string][] = [
   [1e6, 'million'],
 ];
 
-/** A count in words to `sig` significant figures: "352,000", "1.4 million", "600 billion". */
+/** A number in words to `sig` significant figures (years ago; population counts go through formatCount): "352,000", "1.4 million". */
 export function plainCount(n: number, sig = 3): string {
   if (!(n > 0)) return '0';
   const r = Number(n.toPrecision(sig));
   for (const [v, w] of WORDS) if (r >= v) return `${Number((r / v).toPrecision(sig))} ${w}`;
   return r.toLocaleString('en-US');
-}
-
-/** A rough count: one significant figure (two below 2 × 10^k): "600 billion", "1.4 trillion". */
-export function roughCount(n: number): string {
-  if (!(n > 0)) return '0';
-  const m = n / Math.pow(10, Math.floor(Math.log10(n)));
-  return plainCount(n, m < 2 ? 2 : 1);
 }
 
 /** Years before present in words: "70 years ago", "11,700 years ago", "3.8 million years ago". */
@@ -233,7 +226,7 @@ export function SpeciesCard({ sp, onClose, open, ageMa, startMa }: { sp: Species
         <p className="lead">
           <span className={`lane ${sp.extinct ? 'dead' : at.now ? 'alive' : 'lineage'}`} />
           <span>
-            <b>{plainCount(at.alive)}</b> alive {at.when}
+            <b>{formatCount(at.alive)}</b> alive {at.when}
           </span>
         </p>
         {!sp.extinct && !at.now && <p className="sub">{pct(at.green)} have descendants alive today</p>}
@@ -242,18 +235,18 @@ export function SpeciesCard({ sp, onClose, open, ageMa, startMa }: { sp: Species
           <p className="lead">
             <span className="lane alive" />
             <span>
-              <b>{plainCount(sp.alive)}</b> alive today
+              <b>{formatCount(sp.alive)}</b> alive today
             </span>
           </p>
         )}
         <p className="ever">
           {domestic ? (
             <>
-              Roughly {roughCount(sp.ever)} {pluralName(sp)} born since domestication <span className="dim">(rough estimate)</span>
+              Roughly {formatCount(sp.ever, { tilde: false })} {pluralName(sp)} born since domestication <span className="dim">(rough estimate)</span>
             </>
           ) : (
             <>
-              Roughly {roughCount(sp.ever)} {pluralName(sp)} have ever lived <span className="dim">(rough estimate)</span>
+              Roughly {formatCount(sp.ever, { tilde: false })} {pluralName(sp)} have ever lived <span className="dim">(rough estimate)</span>
             </>
           )}
         </p>
@@ -271,8 +264,8 @@ export function SpeciesCard({ sp, onClose, open, ageMa, startMa }: { sp: Species
           <dt>Ever lived</dt>
           <dd>
             {domestic
-              ? `~${formatCount(sp.ever)} since domestication, ${plainAgo(domestic).replace(/ ago$/, '')} (the model's births; its wild ancestors are the wildcat's)`
-              : `~${formatCount(sp.ever)}, range ${formatCount(sp.everLo)} – ${formatCount(sp.everHi)} over ${plainAgo((sp.t0 - sp.t1) * 1e6).replace(/ ago$/, '')}`}
+              ? `${formatCount(sp.ever)} since domestication, ${plainAgo(domestic).replace(/ ago$/, '')} (the model's births; its wild ancestors are the wildcat's)`
+              : `${formatCount(sp.ever)}, range ${formatCount(sp.everLo, { tilde: false })} – ${formatCount(sp.everHi, { tilde: false })} over ${plainAgo((sp.t0 - sp.t1) * 1e6).replace(/ ago$/, '')}`}
           </dd>
           <dt>Data grade</dt>
           <dd>
@@ -322,7 +315,7 @@ export function LineageCard({ lin, onClose }: { lin: Lineage; onClose: () => voi
         <p className="lead">
           <span className="lane lineage" />
           <span>
-            <b>{plainCount(lin.alive)}</b> alive {plainAgo(lin.ageMa * 1e6)} <span className="dim">(model)</span>
+            <b>{formatCount(lin.alive)}</b> alive {plainAgo(lin.ageMa * 1e6)} <span className="dim">(model)</span>
           </span>
         </p>
         <p className="sub">{Math.round(lin.green * 100)}% have descendants alive today</p>

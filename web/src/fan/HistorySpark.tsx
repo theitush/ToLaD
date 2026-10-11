@@ -5,6 +5,7 @@
 // after the last) are drawn faint and labelled "no data".
 
 import { useState } from 'react';
+import { approxCountsIn, formatCount } from '../data/count';
 import { GRADE_COLOR, GRADE_WORD, noDataSpans, styleBetween, type SpanStyle } from './history';
 import type { HistoryRec } from './panthera';
 
@@ -21,15 +22,12 @@ const OPACITY: Record<SpanStyle, number> = { solid: 0.9, dashed: 0.75, dotted: 0
 const NODATA = { dash: '2 2.5', opacity: 0.4 };
 const STUB = 40; // px of chart left of the first point for a "no data" lead-in
 
-/** A dequantized count to 3 significant figures (the data's own precision). */
-export function fmtN(n: number): string {
-  return Number(n.toPrecision(3)).toLocaleString('en-US');
-}
+/** Kinds whose figures are cited from a source (a census, an agency estimate), not modelled. */
+const CITED = new Set(['census', 'estimate', 'index-scaled', 'unverified']);
 
-function fmtShort(n: number): string {
-  if (n >= 1e6) return `${Number((n / 1e6).toPrecision(2))}M`;
-  if (n >= 1e3) return `${Number((n / 1e3).toPrecision(2))}k`;
-  return String(Math.round(n));
+/** A point's count, approximately; a small cited count exactly (37 red wolves). */
+export function fmtN(n: number, kind = ''): string {
+  return formatCount(n, { cited: CITED.has(kind) });
 }
 
 /** A round step (1, 2 or 5 × 10^k) near x. */
@@ -164,7 +162,7 @@ export function HistorySpark({ h, open: open0 = false }: { h: HistoryRec; open?:
           <g fill="#9faba3" fontSize="11">
             {nTicks.map((n) => (
               <text key={n} x={L - 5} y={Y(n) + 3.5} textAnchor="end">
-                {fmtShort(n)}
+                {formatCount(n, { exact: true, short: true })}
               </text>
             ))}
             {yTicks.map((y) => (
@@ -214,11 +212,11 @@ export function HistorySpark({ h, open: open0 = false }: { h: HistoryRec; open?:
           {pts.map((p, k) => (
             <li key={k}>
               <div>
-                <b>{fmtYear(p.year)}</b> · {fmtN(p.n)}
+                <b>{fmtYear(p.year)}</b> · {fmtN(p.n, p.kind)}
                 {p.hi > p.lo && (
                   <span className="dim">
                     {' '}
-                    ({fmtN(p.lo)} – {fmtN(p.hi)})
+                    ({fmtN(p.lo, p.kind)} – {fmtN(p.hi, p.kind)})
                   </span>
                 )}{' '}
                 · <span className="gdot" style={{ background: GRADE_COLOR[p.grade] }} /> grade {p.grade} · {p.kind}
@@ -233,7 +231,7 @@ export function HistorySpark({ h, open: open0 = false }: { h: HistoryRec; open?:
                   p.cite
                 )}
               </div>
-              {p.note && <div className="dim">{p.note}</div>}
+              {p.note && <div className="dim">{approxCountsIn(p.note)}</div>}
             </li>
           ))}
         </ol>
