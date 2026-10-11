@@ -5,7 +5,7 @@ import { fmtYear, HistorySpark, popTicks, yearTicks } from './HistorySpark';
 import { GRADE_WORD, MODELLED_KINDS, noDataSpans, styleBetween } from './history';
 import { FELIDAE, type HistoryRec } from './panthera';
 import { population } from './population';
-import { RED_LIST } from './status';
+import { RED_LIST, redListOf } from './status';
 import { approxCountsIn, formatCount } from '../data/count';
 
 const byName = (common: string) => FELIDAE.species.find((s) => s.common === common)!;
@@ -173,7 +173,8 @@ describe('the species card: the population at the time touched', () => {
         for (const jargon of ['grade', 'model', 'generation', 'range', 'Myr', 'kyr', '≈', 'lineage', 'curated', ' × 10', 'born in total', 'line ended'])
           expect(f, `${sp.common}: "${jargon}" on the face`).not.toContain(jargon);
         // A few short lines: the face stays tight.
-        expect(f.replace(/Population over time[\s\S]*$/, '').length, sp.common).toBeLessThan(200);
+        // (Under 230: every cat now carries its status chip, ToLaD#48, up to "Critically Endangered" long.)
+        expect(f.replace(/Population over time[\s\S]*$/, '').length, sp.common).toBeLessThan(230);
         const d = details(html);
         expect(d).toContain('Generation');
         expect(d).toContain(`Data grade${sp.grade}`);
@@ -190,21 +191,21 @@ describe('the species card: the population at the time touched', () => {
     for (const sp of FELIDAE.species) {
       const html = renderToStaticMarkup(<SpeciesCard sp={sp} onClose={() => {}} />);
       const chip = html.match(/<span class="status[^"]*"[^>]*>([^<]*)<\/span>/);
-      if (!sp.extinct && !RED_LIST[sp.sci]) {
-        expect(chip, sp.common).toBeNull();
-        continue;
-      }
+      // (Every cat has a status in the data, ToLaD#48: the living their category, the domestic cat Not Evaluated.)
       expect(chip, sp.common).not.toBeNull();
       if (sp.extinct) {
         expect(chip![1]).toBe('Extinct (prehistoric)');
         expect(RED_LIST[sp.sci]).toBeUndefined();
-      } else if (!RED_LIST[sp.sci]) {
-        // (Only the big cats' statuses are curated so far: the rest show none.)
-        expect(want[sp.common]).toBeUndefined();
+        expect(sp.redList).toBeNull(); // fossils carry no status in the data
+      } else if (sp.sci === 'Felis catus') {
+        expect(chip![1]).toBe('Not Evaluated');
+        expect(sp.redList?.source).toBe('not-listed');
       } else {
-        expect(chip![1]).toBe(want[sp.common]);
-        const s = RED_LIST[sp.sci];
-        expect(s.year).toBeGreaterThanOrEqual(2017);
+        if (want[sp.common]) expect(chip![1]).toBe(want[sp.common]);
+        // the data's status (ToLaD#48), or the curated one where that is the newer assessment
+        expect(sp.redList?.source).toBe('iucn-2026-1');
+        const s = redListOf(sp)!;
+        expect(s.year).toBeGreaterThanOrEqual(2015); // (the Panthera since 2017; a few small cats were last assessed in 2015)
         expect(s.url).toMatch(/^https:\/\/www\.iucnredlist\.org\/species\/\d+\/\d+$/);
         expect(details(html)).toContain(`${s.year} assessment`);
         expect(html).toContain(`href="${s.url}"`);

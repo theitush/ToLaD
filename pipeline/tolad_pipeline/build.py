@@ -102,6 +102,9 @@ def main(argv: list[str] | None = None) -> int:
     from . import model, tiles
     model.run(root, a.raw, ctx, log)
     log_step(t_start, "counts modelled")
+    from . import redlist
+    redlist.attach(root, a.raw, ctx, log)
+    log_step(t_start, f"Red List status: {log['red_list']['living_by_source']}")
     dj = log.get("history", {}).get("deep_join")
     if dj:  # the genomic deep past's join (ToLaD#80): rules applied and species beyond the flag
         log_step(t_start, f"genomic join: {dj['by_rule']}, flagged {dj['flagged_by_rule']}")

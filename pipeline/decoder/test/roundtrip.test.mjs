@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { decodeFile, describe, profileEdges, Q, KIND_SKELETON, KIND_TILE, HIST_KINDS } from '../tolad-decoder.js';
+import { decodeFile, describe, profileEdges, Q, KIND_SKELETON, KIND_TILE, HIST_KINDS, RED_LIST_CATEGORIES, FLAG } from '../tolad-decoder.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const DATA = process.env.TOLAD_DATA || join(here, '..', '..', '..', 'data', 'mammals');
@@ -301,4 +301,55 @@ test('HIST: modelled range-loss records run natural -> log-linear -> today, grad
     const f = h.tile < 0 ? sk : load(`t/${h.tile}.tld`);
     assert.equal(f.history(h.row).modelled, 'rangeloss', `${w}: META.hist marks it modelled`);
   }
+});
+
+// ---- v1.4: RLST (IUCN Red List status, ToLaD#48) ---------------------------
+
+test('RLST round-trips against debug_top.json red_list', () => {
+  assert.ok(Array.isArray(dump.red_list) && dump.red_list.length >= 100, 'red_list in debug_top.json');
+  const m = sk.meta.red_list;
+  assert.deepEqual(m.categories, RED_LIST_CATEGORIES);
+  assert.equal(m.sources[0].key, 'iucn-2026-1');
+  const files = new Map([[-1, sk]]);
+  for (const h of dump.red_list) {
+    const w = h.species;
+    if (!files.has(h.tile)) files.set(h.tile, load(`t/${h.tile}.tld`));
+    const f = files.get(h.tile);
+    assert.equal(f.gid(h.row), h.gid, `${w} gid`);
+    assert.equal(f.name(h.row), w);
+    assert.equal(f.col.RLST.length, 3 * f.n, `${w}: RLST has 3 words per row`);
+    const got = f.redList(h.row);
+    assert.deepEqual(got, { category: h.category, source: h.source, year: h.year, taxon: h.taxon, assessment: h.assessment }, w);
+    assert.equal(f.extinct(h.row), !h.living, `${w}: living rows are the unended ones`);
+    if (h.source === 0) assert.ok(got.taxon > 0 && got.assessment > 0 && got.year >= 1996, `${w}: an assessment`);
+  }
+});
+
+test('RLST: every living species row has a status, fossils none, internal nodes none', () => {
+  let living = 0;
+  const seen = new Set();
+  for (const t of [{ file: null }, ...sk.meta.tiles]) {
+    const f = t.file ? load(t.file) : sk;
+    for (let i = 0; i < f.n; i++) {
+      const s = f.redList(i);
+      if (!f.isSpecies(i)) { assert.equal(s, null, `internal ${f.name(i)}`); continue; }
+      if (seen.has(f.gid(i))) continue;
+      seen.add(f.gid(i));
+      // PBDB fossil grafts (some reach T1 = 0, a Holocene last appearance) and unnamed tips are no species
+      if (f.flags(i) & FLAG.GRAFT || !f.name(i)) { assert.equal(s, null, `fossil ${f.name(i)}`); continue; }
+      if (!f.extinct(i)) {
+        living++;
+        assert.ok(s && s.category && s.year > 0, `${f.name(i)}: living without a status`);
+      } else if (s) assert.ok(['EX', 'EW'].includes(s.category) && s.source === 0, `${f.name(i)}: ended, ${s.category}`);
+    }
+  }
+  assert.ok(living > 5000, `${living} living species rows`);
+  const by = new Map(dump.red_list.map((h) => [h.species, h]));
+  const want = { 'Panthera tigris': 'EN', 'Panthera leo': 'VU', 'Panthera pardus': 'VU', 'Panthera onca': 'NT',
+    'Panthera uncia': 'VU', 'Prionailurus bengalensis': 'LC', 'Acinonyx jubatus': 'VU', 'Lynx pardinus': 'VU' };
+  for (const [sp, c] of Object.entries(want)) {
+    assert.equal(by.get(sp)?.category, c, sp);
+    assert.equal(by.get(sp).source, 0, `${sp} from the 2026-1 list`);
+  }
+  assert.equal(by.get('Panthera tigris').assessment, 214862019);
 });
