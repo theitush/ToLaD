@@ -335,7 +335,8 @@ describe('the card shows the deep past and the natural level (ToLaD#69)', () => 
     const bovids = loadClade(read, 'Bovidae').species;
     const bison = bovids.find((s) => s.sci === 'Bison bison')!;
     const b = text(spark(bison));
-    expect(b).toContain('Genomic curve scaled x981 to meet the cited 1800 baseline (~40 million)');
+    // (The factor follows the data: ~981 at the flat mutation rate, ~1.2k with the per-lineage one, #74/#75.)
+    expect(b).toMatch(/Genomic curve scaled x~?[\d.,]+k? to meet the cited 1800 baseline \(~40 million\)/);
     expect(b).toContain('flagged');
     const addax = bovids.find((s) => s.sci === 'Addax nasomaculatus')!;
     const a = spark(addax);
