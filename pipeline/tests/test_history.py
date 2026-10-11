@@ -151,8 +151,10 @@ class Segments(unittest.TestCase):
         for s, nxt in zip(segs, segs[1:] + [None]):
             self.assertGreaterEqual(s["gens"], 1)
             if s["gens"] > 1:  # a one-generation span may have to change faster
+                # (a genomic span finely: procgen's linear ramps then overcount its log-linear births by <= 0.02%)
                 self.assertLessEqual(max(s["start"], s["end"]) / min(s["start"], s["end"]),
-                                     H.SPLIT_RATIO + 1e-9, msg=f"{rec['file']} {s}")
+                                     (H.DEEP_SUB_RATIO if s["kind"] == H.K["genomic"] else H.SPLIT_RATIO) + 1e-9,
+                                     msg=f"{rec['file']} {s}")
             if nxt is not None:  # contiguous, no jumps
                 self.assertAlmostEqual(s["year0"] + s["gens"] * G, nxt["year0"], places=6)
                 self.assertAlmostEqual(s["end"] / nxt["start"], 1.0, places=9)

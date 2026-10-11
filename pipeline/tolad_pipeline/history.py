@@ -95,6 +95,11 @@ STEP_YR = 5.0  # piecewise-constant births pieces along the curve
 FAO_EVERY = 5
 SPLIT_RATIO = 2.0
 SUB_RATIO = math.sqrt(2.0)
+# a genomic deep past (log-linear over 10^4-10^6 years) holds most of a species' births, and procgen ramps
+# linearly: a linear ramp over a ratio r overcounts the log-linear curve by ~ln(r)^2/24 (2% at r = 2), which
+# rescaled to EVER put today's count 0.8% low (the jaguar, ToLaD#70). Split genomic spans to at most this
+# ratio (<= 0.02% each); 75-150 segments for a Panthera species.
+DEEP_SUB_RATIO = 1.05
 FAO_CITE = "FAOSTAT QCL, Crops and livestock products: Stocks, World (FAO 2025); CC BY 4.0"
 FAO_URL = "https://www.fao.org/faostat/en/#data/QCL"
 HISTORY_SRC_LABEL = ("ToLaD curated population history (pipeline/history/*.toml): dated points with "
@@ -515,11 +520,14 @@ def _segments(pts: list[dict], G: float, L: float, t0_ma: float, has_baseline: b
         base |= {min(max(math.floor(x + 1e-9), 0), g_start), min(max(math.ceil(x - 1e-9), 0), g_start)}
     base = sorted(base, reverse=True)
     lev = {g: interp(pts, year_of(g)) for g in base}
-    # between base knots the curve is one log-linear piece: split big changes
+    # between base knots the curve is one log-linear piece: split big changes (genomic spans finely)
     for ga, gb in zip(base, base[1:]):
         ratio = max(lev[ga], lev[gb]) / min(lev[ga], lev[gb])
-        if ratio > SPLIT_RATIO and ga - gb >= 2:
-            m = min(math.ceil(math.log(ratio) / math.log(SUB_RATIO) - 1e-9), ga - gb)
+        mid = (year_of(ga) + year_of(gb)) / 2
+        deep = any(a["kind"] == b["kind"] == "genomic" and a["year"] <= mid <= b["year"] for a, b in zip(pts, pts[1:]))
+        split, sub = (DEEP_SUB_RATIO, DEEP_SUB_RATIO) if deep else (SPLIT_RATIO, SUB_RATIO)
+        if ratio > split and ga - gb >= 2:
+            m = min(math.ceil(math.log(ratio) / math.log(sub) - 1e-9), ga - gb)
             for j in range(1, m):
                 g = round(ga - (ga - gb) * j / m)
                 if ga > g > gb:
