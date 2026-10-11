@@ -8,3 +8,9 @@ declare module 'virtual:panthera-data' {
   const data: import('./fan/panthera-extract').RawClade;
   export default data;
 }
+
+declare module 'virtual:carnivora-data' {
+  /** The Carnivora subtree of data/mammals (ToLaD#146): only the species the fan draws. */
+  const data: import('./fan/panthera-extract').RawClade;
+  export default data;
+}

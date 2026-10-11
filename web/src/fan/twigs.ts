@@ -644,7 +644,16 @@ export interface TwigStats {
   pending: boolean;
   /** Mesh instances sent to the GPU. */
   instances?: number;
+  /** How much of the texture is drawn at all (0–1, TEX_HAIR_PX): a hairline column is a plain lane (absent: 1). */
+  tex?: number;
 }
+
+/**
+ * Level of detail (ToLaD#146): a column whose widest is under TEX_HAIR_PX[0] px on screen is a plain lane, no
+ * texture, no mesh (291 hairlines at Carnivora's home would otherwise send ~40k instances a frame for detail
+ * no pixel shows); the texture fades in by TEX_HAIR_PX[1] px. Its lanes then draw undimmed (laneDim's `tex`).
+ */
+export const TEX_HAIR_PX: [number, number] = [1.5, 4];
 
 /** The living: a deep, saturated green. */
 export const LIVING = '#3fd286';
@@ -766,8 +775,8 @@ const DIM_TEX = 0.72;
 const DIM_NARROW = 0.3;
 
 /** ...and fully under the lives. A lane `px` wide, the lives faded in by `lives` (0–1): its dimming (0–1). */
-export function laneDim(px: number, lives: number): number {
-  const d = DIM_TEX + (DIM_NARROW - DIM_TEX) * laneNarrow(px);
+export function laneDim(px: number, lives: number, tex = 1): number {
+  const d = (DIM_TEX + (DIM_NARROW - DIM_TEX) * laneNarrow(px)) * tex;
   return d + (1 - d) * lives;
 }
 
@@ -1293,6 +1302,9 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
   // Wholly left or right of the screen (zoomed in, most columns are): nothing to sample.
   const xrB = b.tess.xRange(b, yTop, yBot);
   if (xrB[1] < xr(yTop)[0] || xrB[0] > xr(yTop)[1]) return null;
+  // A hairline column (its widest on screen under TEX_HAIR_PX): a plain lane, nothing to sample.
+  const tex = sel ? 1 : smoothstep((b.width * v.sx - TEX_HAIR_PX[0]) / (TEX_HAIR_PX[1] - TEX_HAIR_PX[0]));
+  if (!(tex > 0)) return { mode: 'texture', g0: 0, g1: 0, drawn: 0, cellPx: 0, fade: 0, fadeGreen: 0, texGray: 0, pending: false, instances: 0, tex: 0 };
   // Off the branch's column entirely? (Every few px down the screen: near a split the column
   // leans, and zoomed in it can cross the screen in a short stretch while off it elsewhere.)
   let onScreen = false;
@@ -1329,7 +1341,7 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
   const dens = 1 - lives;
   // How much the lanes' fill dims under it, here (view.ts dims each stretch by its own widths).
   const gwPx = L.gw * v.sx;
-  const stats: TwigStats = { mode: 'texture', g0: gm, g1: gm, drawn: 0, cellPx, fade: lives, fadeGreen: ext || !(gwPx > 0) ? 0 : laneDim(gwPx, lives), texGray: laneDim(L.w * v.sx - gwPx, lives), pending: false };
+  const stats: TwigStats = { mode: 'texture', g0: gm, g1: gm, drawn: 0, cellPx, fade: lives, fadeGreen: ext || !(gwPx > 0) ? 0 : laneDim(gwPx, lives, tex), texGray: laneDim(L.w * v.sx - gwPx, lives, tex), pending: false, tex };
   // Thin strands while they are packed (a dark gap between neighbours: hatching, not a fill).
   const lwL = Math.min(3.5, Math.max(Math.min(0.8, 0.4 * cellPx), cellPx * 0.22));
   // A death is a rounded end, a touch wider than the strand.
@@ -1341,8 +1353,8 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
   if (v.mesh) {
     const batch = v.mesh;
     const n0 = batch.n;
-    meshInstances(v, m, yTop, yBot, 0, dens > 0.02 ? dens : 0, { lw: 0.9, tipR: 0, linkA: LINK_ALPHA }, batch, 1);
-    meshInstances(v, m, yTop, yBot, 1, lives, { lw: lwL, tipR, linkA: LINK_ALPHA, baseA }, batch);
+    meshInstances(v, m, yTop, yBot, 0, dens > 0.02 ? dens * tex : 0, { lw: 0.9, tipR: 0, linkA: LINK_ALPHA }, batch, tex);
+    meshInstances(v, m, yTop, yBot, 1, lives * tex, { lw: lwL, tipR, linkA: LINK_ALPHA, baseA }, batch);
     stats.instances = batch.n - n0;
   }
   if (cellPx < 1.5) return stats;

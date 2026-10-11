@@ -108,6 +108,17 @@ const scenes = [
   // post-glacial decline (20-10 kya, Figueiro et al. 2017), then flat to the next level (the genome scaled to meet it).
   ['blind-lion', 'about', ['Lion', 15000, 10, 0.1]],
   ['blind-leopard', 'about', ['Leopard', 15000, 10, 0.1]],
+  // One level up, the carnivores (ToLaD#146): home, a family framed as home frames the order ('level' [taxon]), the
+  // cats as the level button frames them, a busy deep past (~40 Ma: ['level', [taxon, Ma, time zoom, width zoom]]),
+  // the wolf's card (the domestic dog is in its count), the search with "wol" typed.
+  ['carn-home', 'home'],
+  ['carn-dogs', 'level', ['Canidae']],
+  ['carn-bears', 'level', ['Ursidae']],
+  ['carn-seals', 'level', ['Phocidae']],
+  ['carn-cats', 'level', ['Felidae']],
+  ['carn-deep40', 'level', ['Carnivora', 40, 4, 3]],
+  ['carn-card-dog', 'card', ['Grey wolf']],
+  ['carn-search-wol', 'search', ['wol']],
 ];
 const browser = await chromium.launch({ headless: true });
 try {
@@ -211,6 +222,12 @@ try {
             f.cam = { cx: (lo + hi) / 2, cy: v.y - (H - 2 * v.blend) / 2, sx, sy, ty: sy };
             f.camera.settle();
           }
+        } else if (kind === 'level') {
+          // A level (ToLaD#146): the split founding taxon args[0] framed as home frames the fan; with args[1] (Ma),
+          // centred on that time, time zoomed args[2] and width args[3] × the frame.
+          const h = f.levelCamera(args[0]) ?? f.homeCamera();
+          f.cam = args[1] === undefined ? h : { ...h, cy: fan.time.y(args[1]), sy: h.sy * (args[2] ?? 1), ty: h.sy * (args[2] ?? 1), sx: h.sx * (args[3] ?? 1) };
+          f.camera.settle();
         } else if (kind === 'decline') {
           // The species' last `args[1]` years filling the screen, its column 60% of its width.
           const b = fan.branches.find((b) => b.sp.common === args[0]);

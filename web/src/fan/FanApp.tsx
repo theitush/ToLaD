@@ -9,7 +9,8 @@ import { approxMa, formatCount } from '../data/count';
 import { SPLIT_LABEL, SPLIT_NAME, SPLIT_STYLES, type SplitStyle, type SplitWindow } from './gradual';
 import { HistorySpark } from './HistorySpark';
 import type { EdgeStyle, WidthMode } from './layout';
-import { FELIDAE, NATURAL_META, type HistEvent, type SpeciesRec } from './panthera';
+import { CARNIVORA, NATURAL_META, type HistEvent, type SpeciesRec } from './panthera';
+import { CARNIVORA_TREE } from './splits';
 import { population } from './population';
 import { MagnifierIcon, SearchPanel } from './SearchPanel';
 import { statusOf } from './status';
@@ -71,6 +72,15 @@ function remember(key: string, v: string): void {
   }
 }
 
+/**
+ * The levels the button moves between (ToLaD#146), by taxon: the order the fan shows (its home), and the family
+ * inside it the fan grew from. The button names the level it goes to.
+ */
+const LEVELS = [
+  { taxon: CARNIVORA.sci, label: 'All carnivores' },
+  { taxon: 'Felidae', label: 'Cats' },
+];
+
 export function FanApp() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const viewRef = useRef<FanView | null>(null);
@@ -80,11 +90,12 @@ export function FanApp() {
   const [win, setWin] = useState<SplitWindow>(() => initialPick<SplitWindow>('win', WIN_KEY, ['short', 'long'], 'short'));
   const [sel, setSel] = useState<Selection | null>(null);
   const [searching, setSearching] = useState(false);
+  const [levelAt, setLevelAt] = useState(0);
   const scaleRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const v = new FanView(canvasRef.current!, FELIDAE, edge);
+    const v = new FanView(canvasRef.current!, CARNIVORA, edge, CARNIVORA_TREE);
     v.setSplit(split, win);
     v.onSelect = setSel;
     v.scaleEl = scaleRef.current;
@@ -165,8 +176,17 @@ export function FanApp() {
             {win}
           </button>
         ) : null}
-        <button type="button" onClick={() => viewRef.current?.resetView()}>
-          All cats
+        <button
+          type="button"
+          aria-label={`Show the ${LEVELS[(levelAt + 1) % LEVELS.length].label.toLowerCase()}`}
+          onClick={() => {
+            // The levels in turn (ToLaD#146): the whole order, then the cat family inside it, and back.
+            const next = (levelAt + 1) % LEVELS.length;
+            setLevelAt(next);
+            viewRef.current?.flyToLevel(LEVELS[next].taxon);
+          }}
+        >
+          {LEVELS[(levelAt + 1) % LEVELS.length].label}
         </button>
         <button
           type="button"

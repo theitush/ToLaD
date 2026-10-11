@@ -1056,6 +1056,15 @@ interface Cand extends Plan {
  */
 const MAX_CANDS = 16;
 
+/**
+ * A tree of more species than BIG_TREE keeps only MAX_CANDS_BIG candidates per subtree (ToLaD#146): the search
+ * costs ~MAX_CANDS² plans per split, so at Carnivora's 291 species the full one took ~1.5 s (a phone: several)
+ * for a total sideways run within 0.5% of what 4 find (measured: 202.1 vs 203.3 linear, 236.4 vs 237.5 log). A
+ * family (the cats: 42) is searched in full, as before.
+ */
+const BIG_TREE = 64;
+const MAX_CANDS_BIG = 4;
+
 /** The sides chosen (mirrored or not, per split) per clade, tree and width mode: the toggle reuses them, no search. */
 const SIDES = new WeakMap<CladeRec, Map<Split, Map<WidthMode, Map<Split, boolean>>>>();
 
@@ -1074,6 +1083,8 @@ const SIDES = new WeakMap<CladeRec, Map<Split, Map<WidthMode, Map<Split, boolean
  */
 function chooseSides(root: FanNode, P: Packer, known?: Map<Split, boolean>): { plans: Map<FanNode, Plan>; sides: Map<Split, boolean> } {
   const better = (p: Cand, q: Cand) => (Math.abs(p.cost - q.cost) > 1e-9 ? p.cost - q.cost : p.flips - q.flips);
+  const count = (v: FanNode): number => v.kids.reduce((n, k) => n + (isNode(k) ? count(k) : 1), 0);
+  const big = count(root) > BIG_TREE;
   // One choice at v: its daughters (table order), their candidates, mirrored or not.
   // A species' outline on its slot (read only: the same for every plan).
   const leaves = new Map<FanBranch, Contour>();
@@ -1128,7 +1139,8 @@ function chooseSides(root: FanNode, P: Packer, known?: Map<Split, boolean>): { p
     // Each daughter's best candidates: all MAX_CANDS of them when two daughters are splits (MAX_CANDS² combinations); a
     // polytomy (the data's tree has some, ToLaD#145) keeps fewer each, so the combinations stay within that budget.
     const nNodes = v.kids.filter(isNode).length;
-    const per = nNodes <= 2 ? MAX_CANDS : Math.max(1, Math.floor(Math.pow(MAX_CANDS * MAX_CANDS, 1 / nNodes)));
+    const cap = big ? MAX_CANDS_BIG : MAX_CANDS;
+    const per = nNodes <= 2 ? cap : Math.max(1, Math.floor(Math.pow(cap * cap, 1 / nNodes)));
     const fronts = v.kids.map((k) => (isNode(k) ? cands(k).slice(0, per) : [null]));
     // Every combination of the daughters' candidates, each both ways round (one daughter: no sides to choose).
     let combos: (Cand | null)[][] = [[]];
@@ -1144,7 +1156,7 @@ function chooseSides(root: FanNode, P: Packer, known?: Map<Split, boolean>): { p
     for (const c of all) {
       if (keep.some((k) => k.cost <= c.cost + 1e-9 && k.flips <= c.flips && P.inside(k.out, c.out))) continue;
       keep.push(c);
-      if (keep.length >= MAX_CANDS) break;
+      if (keep.length >= cap) break;
     }
     return keep;
   };

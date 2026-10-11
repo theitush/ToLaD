@@ -90,7 +90,16 @@ export class FanCamera {
   /** The whole fan: "now" near the top, the stem entering from the bottom edge. */
   home(): Camera {
     const [x0, x1] = this.extent();
-    const y0 = this.yNow;
+    return this.frame(x0, x1, 0);
+  }
+
+  /**
+   * A part of the fan framed as home frames the whole (ToLaD#146: a level, as the cats inside the carnivores):
+   * the world x span [x0, x1] across the screen, "now" near the top and world y `yFork` (its oldest split) near the bottom.
+   * `stretch`: the span fills the screen however narrow (home keeps a narrow fan within 4x its time scale).
+   */
+  frame(x0: number, x1: number, yFork: number, stretch = false): Camera {
+    const y0 = this.yNow - yFork;
     // Pixel margins: time labels on the left, species labels above "now", some stem below the fork.
     const left = 58;
     const right = 14;
@@ -98,9 +107,9 @@ export class FanCamera {
     const bottom = 150; // room for the clade label below the fork, above the legend
     // Width and time each fill the screen (a narrow fan is not stretched past its height).
     const sy = (this.h - top - bottom) / -y0;
-    const sx = Math.min((this.w - left - right) / (x1 - x0), 4 * sy);
+    const sx = Math.min((this.w - left - right) / (x1 - x0), stretch ? Infinity : 4 * sy);
     const cx = (x0 + x1) / 2 - (left - right) / 2 / sx;
-    return { cx, cy: y0 + (this.h / 2 - top) / sy, sx, sy, ty: sy };
+    return { cx, cy: this.yNow + (this.h / 2 - top) / sy, sx, sy, ty: sy };
   }
 
   /** Zoom-out bounds (px per world unit) for width and time. */
@@ -252,7 +261,13 @@ export class FanCamera {
   nearestContent(x: number, y: number, y1 = y): number {
     const ys = [y, y1];
     for (let k = 1; k < 8; k++) ys.push(y + ((y1 - y) * k) / 8);
-    for (const b of this.fan.branches) for (const v of [b.tipY, b.splitY]) if (v > y && v < y1) ys.push(v);
+    // The tips and splits in [y, y1] (where content starts or ends), at most 24 of them evenly picked: with
+    // hundreds of species (ToLaD#146) each height costs a pass over every column.
+    const ev: number[] = [];
+    for (const b of this.fan.branches) for (const v of [b.tipY, b.splitY]) if (v > y && v < y1) ev.push(v);
+    ev.sort((a, b) => a - b);
+    const step = Math.max(1, ev.length / 24);
+    for (let k = 0; k < ev.length; k += step) ys.push(ev[Math.floor(k)]);
     let best = x;
     let bd = Infinity;
     for (const h of ys) {
@@ -263,6 +278,8 @@ export class FanCamera {
           best = p;
         }
       }
+      // On content already: nothing nearer.
+      if (bd === 0) return x;
     }
     return best;
   }

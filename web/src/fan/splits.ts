@@ -17,7 +17,8 @@
 // event, or fossils join it by taxonomy only).
 
 import raw from 'virtual:panthera-data';
-import type { DatedSplit } from './panthera-extract';
+import carnivora from 'virtual:carnivora-data';
+import type { DatedSplit, RawClade } from './panthera-extract';
 
 export type Confidence = 'high' | 'medium' | 'low';
 
@@ -30,6 +31,8 @@ export interface Split {
   hi: number;
   cite: string;
   confidence: Confidence;
+  /** The Latin taxon the data names the split by (DatedSplit.name), '' if none: a family ends in -idae. */
+  taxon?: string;
   /** Where the date comes from (DatedSplit.source): an interpolated or fossil date is not as solid as a dated clade's. */
   source?: string;
   note?: string;
@@ -182,25 +185,63 @@ export function splitFrom(
     cite,
     confidence,
     source: t.source,
+    taxon: t.name,
     ...(notes.length ? { note: notes.join('. ') } : {}),
     kids: t.kids.map((k) => (typeof k === 'string' ? k : splitFrom(k, common, extinct, cites, alive, below))),
   };
 }
 
-const bySci = new Map(raw.species.map((s) => [s.sci, s]));
-if (!raw.dated) throw new Error('data/mammals has no dated tree (format 1.6): rebuild it with `make -C pipeline build`');
+/** A clade's dated tree, from the data: any clade, no hand table. */
+export function treeOf(raw: RawClade): Split {
+  const bySci = new Map(raw.species.map((s) => [s.sci, s]));
+  if (!raw.dated) throw new Error('data/mammals has no dated tree (format 1.6): rebuild it with `make -C pipeline build`');
+  return splitFrom(
+    raw.dated,
+    (s) => {
+      const c = bySci.get(s)?.common;
+      return c ? sentenceCase(c) : null;
+    },
+    (s) => !!bySci.get(s)?.extinct,
+    { upham: raw.datedMeta?.upham || 'Upham et al. 2019', alvarez: raw.datedMeta?.alvarez || 'Álvarez-Carretero et al. 2022' },
+    (s) => bySci.get(s)?.alive ?? 0,
+  );
+}
 
 /** The cat family's dated tree, from the data. */
-export const FELIDAE_TREE: Split = splitFrom(
-  raw.dated,
-  (s) => {
-    const c = bySci.get(s)?.common;
-    return c ? sentenceCase(c) : null;
-  },
-  (s) => !!bySci.get(s)?.extinct,
-  { upham: raw.datedMeta?.upham || 'Upham et al. 2019', alvarez: raw.datedMeta?.alvarez || 'Álvarez-Carretero et al. 2022' },
-  (s) => bySci.get(s)?.alive ?? 0,
-);
+export const FELIDAE_TREE: Split = treeOf(raw);
+
+/** The order the cats sit in (ToLaD#146): cats, dogs, bears, seals, weasels and the rest. */
+export const CARNIVORA_TREE: Split = treeOf(carnivora);
+
+/**
+ * The plain English name of a family ("Dogs" for Canidae): the level a reader knows the order by. A rule (a split whose
+ * taxon ends in -idae is a family) and this small name map; a family not in it keeps its Latin name. Subfamilies and
+ * genera get no label of their own here: the species and the split cards name them.
+ */
+export const FAMILY_EN: Record<string, string> = {
+  Felidae: 'Cats',
+  Canidae: 'Dogs',
+  Ursidae: 'Bears',
+  Phocidae: 'Seals',
+  Otariidae: 'Sea lions',
+  Odobenidae: 'Walrus',
+  Mustelidae: 'Weasels',
+  Mephitidae: 'Skunks',
+  Procyonidae: 'Raccoons',
+  Ailuridae: 'Red panda',
+  Hyaenidae: 'Hyenas',
+  Herpestidae: 'Mongooses',
+  Viverridae: 'Civets',
+  Eupleridae: 'Malagasy carnivores',
+  Prionodontidae: 'Linsangs',
+  Nandiniidae: 'Palm civet',
+};
+
+/** A split's family label, or null when it founds no family (FAMILY_EN). */
+export function familyLabel(t: Split): string | null {
+  const x = t.taxon ?? '';
+  return /idae$/.test(x) ? (FAMILY_EN[x] ?? x) : null;
+}
 
 /** Every split in the tree, parents before their daughters. */
 export function allSplits(t: Split = FELIDAE_TREE): Split[] {

@@ -8,7 +8,8 @@ import { appendFileSync, writeFileSync } from 'node:fs';
 import { Session } from 'node:inspector/promises';
 import { describe, it } from 'vitest';
 import { MeshBatch, RectBatch } from './meshgl';
-import { FELIDAE } from './panthera';
+import { CARNIVORA, FELIDAE } from './panthera';
+import { CARNIVORA_TREE, FELIDAE_TREE } from './splits';
 import { SCALE_BAR_PX } from './twigs';
 import { FanView } from './view';
 
@@ -136,7 +137,9 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
     }
     const t0 = performance.now();
     const { canvas, calls } = stubs();
-    const v = new FanView(canvas as unknown as HTMLCanvasElement, FELIDAE);
+    // FANPERF_CLADE=carnivora: the order (ToLaD#146) instead of the cats.
+    const carn = process.env.FANPERF_CLADE === 'carnivora';
+    const v = new FanView(canvas as unknown as HTMLCanvasElement, carn ? CARNIVORA : FELIDAE, 'curved', carn ? CARNIVORA_TREE : FELIDAE_TREE);
     const tNew = performance.now() - t0;
     const gl = { under: new RectBatch(), mesh: new MeshBatch(), over: new RectBatch(), begin() {}, end() {} };
     gl.begin = () => {

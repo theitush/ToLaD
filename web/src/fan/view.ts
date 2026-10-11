@@ -14,6 +14,7 @@ import { COLUMN_DIM, columnSpans, EVENT_TINT, eventAt, eventSpans, type EventSpa
 import { bridgeInstances, type SplitStyle, type SplitWindow } from './gradual';
 import { drawTwigs, kLogAt, laneDim, LINEAGE, LIVING, TWIG_GRAY, TwigModel, type IndInfo, type TwigStats } from './twigs';
 import type { MeshBatch, RectBatch } from './meshgl';
+import { familyLabel, FELIDAE_TREE, type Split } from './splits';
 
 export type { IndInfo } from './twigs';
 export type { Camera } from './camera';
@@ -28,6 +29,8 @@ export const BG = '#0c1714';
 const INK = '#e8f0ea';
 const INK2 = '#a9b8ae';
 const INK3 = '#7d8e84';
+/** A family's label (ToLaD#146): a pale green, the level above the species. */
+const FAMILY_INK = '#b9e6c9';
 /** Type (app.css): a condensed sans for all that is read at a glance, a serif italic for Latin names. */
 export const SANS = "'Sofia Sans Condensed', 'Avenir Next Condensed', 'Roboto Condensed', 'Arial Narrow', system-ui, sans-serif";
 export const SERIF = "'Newsreader', 'Iowan Old Style', Georgia, serif";
@@ -75,7 +78,9 @@ export interface LabelSpot {
   key: string;
   /** The name's id: a species' gid, or `n<index>` for a lineage. Place: see labelSpots. */
   id: string;
-  place: 'tip' | 'in' | 'right' | 'left';
+  place: 'tip' | 'in' | 'right' | 'left' | 'fam';
+  /** A family's label (`fam`, ToLaD#146): the screen x span of its species, bracketed under the pill. */
+  span?: [number, number];
   /** The species (b) or the lineage (v) it names. */
   b?: FanBranch;
   v?: FanNode;
@@ -177,6 +182,39 @@ function colBoxes(fan: Fan): Map<FanBranch | FanNode, ColBox> {
   return out;
 }
 
+/** A lineage's species' rooms, side by side above its split: their world x span [x0, x1]. */
+const spanCache = new WeakMap<FanNode, [number, number]>();
+export function familySpan(v: FanNode): [number, number] {
+  let s = spanCache.get(v);
+  if (!s) {
+    s = [Infinity, -Infinity];
+    for (const b of v.strands) {
+      s[0] = Math.min(s[0], b.colLeft);
+      s[1] = Math.max(s[1], b.colLeft + b.width);
+    }
+    spanCache.set(v, s);
+  }
+  return s;
+}
+
+/** The fan's families (splits founding a taxon ending in -idae, splits.ts familyLabel; not the root: the clade's own label names it), with their labels. */
+const famCache = new WeakMap<Fan, { v: FanNode; vi: number; text: string }[]>();
+export function families(fan: Fan): { v: FanNode; vi: number; text: string }[] {
+  let out = famCache.get(fan);
+  if (!out) {
+    out = [];
+    fan.nodes.forEach((v, vi) => {
+      const text = v.parent ? familyLabel(v.split) : null;
+      if (text) out!.push({ v, vi, text });
+    });
+    famCache.set(fan, out);
+  }
+  return out;
+}
+
+/** A family's label stands on "now" over its species (its bracket under it) while its span on screen is under this many screens. */
+const FAMILY_MAX_SCREENS = 1.6;
+
 /**
  * The species' and lineages' label spots. `top` is the labels' top line
  * (under the buttons); `barX0` the buttons' left edge: left of it a label on
@@ -207,14 +245,35 @@ export function labelSpots(c: Screen, fan: Fan, top: number, measure: (text: str
   // A gap of CLEAR px or more counts as clear (clearFit is 1 from there).
   const CLEAR = 6;
   const boxes = colBoxes(fan);
-  const cols = [...boxes.values()];
+  // Only the columns near the screen can meet a label on it (with hundreds of species, ToLaD#146, the rest are most).
+  const [vx0, vy0] = c.toWorld(-60, -60);
+  const [vx1, vy1] = c.toWorld(c.w + 60, c.h + 60);
+  const near = (q: ColBox) => !(q.x1 < vx0 || q.x0 > vx1 || q.y1 <= vy0 || q.y0 > vy1);
+  const cols = [...boxes.values()].filter(near);
+  // ...and those in the strip's own few px across: the columns bucketed by their world x span.
+  const NB = 64;
+  const bw = Math.max(1e-12, (vx1 - vx0) / NB);
+  const buckets: number[][] = Array.from({ length: NB }, () => []);
+  cols.forEach((q, i) => {
+    const k0 = Math.max(0, Math.floor((q.x0 - vx0) / bw));
+    const k1 = Math.min(NB - 1, Math.floor((q.x1 - vx0) / bw));
+    for (let k = k0; k <= k1; k++) buckets[k].push(i);
+  });
+  const seen = new Int32Array(cols.length);
+  let stamp = 0;
   /** Least gap (px, up to CLEAR) between the strip [xa, xb] × [ya, yb] and any column but `own`'s (negative: they overlap). */
   const clearance = (xa: number, xb: number, ya: number, yb: number, own: FanBranch | FanNode) => {
     let gap = CLEAR;
     if (!(yb > ya)) return gap;
     const [wxa, wya] = c.toWorld(xa - CLEAR, ya);
     const [wxb, wyb] = c.toWorld(xb + CLEAR, yb);
-    for (const q of cols) {
+    stamp++;
+    const k0 = Math.max(0, Math.min(NB - 1, Math.floor((wxa - vx0) / bw)));
+    const k1 = Math.max(0, Math.min(NB - 1, Math.floor((wxb - vx0) / bw)));
+    for (let k = k0; k <= k1; k++) for (const qi of buckets[k]) {
+      if (seen[qi] === stamp) continue;
+      seen[qi] = stamp;
+      const q = cols[qi];
       if (q.own === own || q.x1 < wxa || q.x0 > wxb || q.y1 <= wya || q.y0 > wyb) continue;
       for (const wy of heights(Math.max(wya, q.y0), Math.min(wyb, q.y1 - 1e-9), [q.lean])) {
         const [l, r] = q.at(wy);
@@ -273,7 +332,30 @@ export function labelSpots(c: Screen, fan: Fan, top: number, measure: (text: str
   };
 
   const out: LabelSpot[] = [];
+  // The families (ToLaD#146), first of all: standing on "now" over their species while "now" is on screen, the
+  // span they name bracketed under the pill; at its left end, else its middle, else its right end (whichever
+  // meets no other label: the left end clears the middle of a family's one big column). The same name (`n<i>`)
+  // as its lineage's label beside its parent column, so once "now" is off screen the one becomes the other.
+  for (const { v, vi, text } of families(fan)) {
+    const [wa, wb] = familySpan(v);
+    const sa = X(wa);
+    const sb = X(wb);
+    const len = measure(text) + 2 * LABEL_PAD;
+    const lo = Math.max(sa, LABEL_AXIS_X) + half;
+    const hi = Math.min(sb, c.w) - half;
+    // Its span on screen right of the axis (fading over a pill's width), and not so wide that the screen is inside it.
+    const onX = clamp01((Math.min(sb, c.w) - Math.max(sa, LABEL_AXIS_X) + 12) / LABEL_PILL);
+    const fit0 = nowOn * onX * clamp01((FAMILY_MAX_SCREENS * c.w - (sb - sa)) / (0.4 * c.w));
+    if (!(fit0 > 0)) continue;
+    const y1 = Math.max(nowS - 4, top + len);
+    const fit = fit0 * botFit(y1);
+    const xs = lo <= hi - LABEL_PILL ? [lo, (lo + hi) / 2, hi] : [Math.min(Math.max((sa + sb) / 2, LABEL_AXIS_X + half), c.w - half)];
+    xs.forEach((x, k) => {
+      out.push({ key: `n${vi}:fam${k}`, id: `n${vi}`, place: 'fam', v, text, rank: [-1, wb - wa, vi], x, y1, box: [x - half, y1 - len, x + half, y1], fit, span: [sa, sb] });
+    });
+  }
   for (const b of fan.branches) {
+    if (!near(boxes.get(b)!)) continue;
     const text = b.sp.common;
     const id = String(b.sp.gid);
     const len = measure(text) + 2 * LABEL_PAD;
@@ -302,6 +384,7 @@ export function labelSpots(c: Screen, fan: Fan, top: number, measure: (text: str
   // Curated events (ToLaD#141): the title beside its window (or in the column when zoomed into it),
   // centred on the window, while the window is on screen. After the species' names, before the lineages'.
   for (const b of fan.branches) {
+    if (!near(boxes.get(b)!)) continue;
     for (const s of colEventsY(fan, b)) {
       const text = s.ev.title;
       const len = measure(text) + 2 * LABEL_PAD;
@@ -314,12 +397,13 @@ export function labelSpots(c: Screen, fan: Fan, top: number, measure: (text: str
   }
   // The lineages (parent columns, not the stem below the root: the clade's own label is there), while "now" is off screen.
   if (nowOn < 1) {
-    for (const v of fan.nodes) {
-      if (!v.parent) continue;
-      const text = v.name;
-      const id = `n${fan.nodes.indexOf(v)}`;
+    for (let vi = 0; vi < fan.nodes.length; vi++) {
+      const v = fan.nodes[vi];
+      if (!v.parent || !near(boxes.get(v)!)) continue;
+      const text = familyLabel(v.split) ?? v.name;
+      const id = `n${vi}`;
       const len = measure(text) + 2 * LABEL_PAD;
-      const rank: Rank = [1, v.width, fan.nodes.indexOf(v)];
+      const rank: Rank = [1, v.width, vi];
       out.push(...beside(id, text, rank, len, v, Y(v.y), Y(v.yBot), 1 - nowOn, { v }));
     }
   }
@@ -340,7 +424,7 @@ export function resolveLabels(spots: LabelSpot[], prev: Map<string, boolean>): M
   const out = new Map<string, boolean>();
   const taken: number[][] = [];
   const done = new Set<string>();
-  const placeOrder = { tip: 0, in: 1, right: 2, left: 3 };
+  const placeOrder = { fam: 0, tip: 0, in: 1, right: 2, left: 3 };
   const order = [...spots].sort((p, q) => p.rank[0] - q.rank[0] || q.rank[1] - p.rank[1] || p.rank[2] - q.rank[2] || placeOrder[p.place] - placeOrder[q.place]);
   for (const s of spots) out.set(s.key, false);
   // The spots shown last frame first (each keeps its place while it fits and meets no other), then the rest.
@@ -454,6 +538,7 @@ export class FanView implements InputHandlers {
     readonly canvas: HTMLCanvasElement,
     readonly clade: CladeRec,
     edge: EdgeStyle = 'curved',
+    readonly tree: Split = FELIDAE_TREE,
   ) {
     this.edge = edge;
     const ctx = canvas.getContext('2d');
@@ -473,7 +558,7 @@ export class FanView implements InputHandlers {
         glc.remove();
       }
     }
-    this.camera = new FanCamera(layoutFan(clade, this.mode, undefined, this.edge), (b) => this.model(b));
+    this.camera = new FanCamera(layoutFan(clade, this.mode, tree, this.edge), (b) => this.model(b));
     // Width and time zoom separately (#138): a sideways pinch zooms width, an upright one time, a diagonal both.
     this.input = new Input(canvas, this, true);
     this.ro = new ResizeObserver(() => this.resize());
@@ -543,13 +628,30 @@ export class FanView implements InputHandlers {
   }
 
   private relayout(): void {
-    this.camera.fan = layoutFan(this.clade, this.mode, undefined, this.edge);
+    this.camera.fan = layoutFan(this.clade, this.mode, this.tree, this.edge);
     this.camera.settle();
     this.request();
   }
 
   resetView(): void {
     this.flyTo(this.homeCamera());
+  }
+
+  /**
+   * A level inside the fan (ToLaD#146): the split founding taxon `name` ("Felidae") framed as home frames the
+   * whole fan, its species across the screen and its split near the bottom. Null if the tree has no such split.
+   */
+  levelCamera(name: string): Camera | null {
+    if (this.fan.root.split.taxon === name) return this.homeCamera();
+    const v = this.fan.nodes.find((n) => n.split.taxon === name);
+    if (!v) return null;
+    const [x0, x1] = familySpan(v);
+    return this.camera.frame(x0, x1, v.y, true);
+  }
+
+  /** Fly to a level (levelCamera), or home if the tree has no such split. */
+  flyToLevel(name: string): void {
+    this.flyTo(this.levelCamera(name) ?? this.homeCamera());
   }
 
   model(b: FanBranch): TwigModel {
@@ -1008,6 +1110,7 @@ export class FanView implements InputHandlers {
     // each stretch by its own lanes' widths (twigs.ts laneDim), as the mesh draws them.
     const lives = tw?.fade ?? 0;
     const greenFade = tw?.fadeGreen ?? 0;
+    const tex = tw?.tex ?? 1;
     const greenC = mix(GREEN, '#0d2318', greenFade * 0.9);
     const grayC = mix(GRAY, '#131c19', Math.max(lives, tw?.texGray ?? 0) * 0.82);
     if (this.gl) {
@@ -1042,8 +1145,8 @@ export class FanView implements InputHandlers {
         const gp = wp * p.f;
         const wm = (wq + wp) / 2;
         const gm = (gq + gp) / 2;
-        const gc = mix01(GRAY, '#131c19', laneDim(wm - gm, lives) * 0.82);
-        const ec = mix01(GREEN, '#0d2318', laneDim(gm, lives) * 0.9);
+        const gc = mix01(GRAY, '#131c19', laneDim(wm - gm, lives, tex) * 0.82);
+        const ec = mix01(GREEN, '#0d2318', laneDim(gm, lives, tex) * 0.9);
         // A styled stretch of the column (held flat for want of figures: colstyle.ts) fades towards the
         // background: the background over the whole lane, lanes and individuals alike (drawn after the mesh).
         const dim = held.length ? dimAt(held, (y0 + y1) / 2) : 0;
@@ -1317,12 +1420,27 @@ export class FanView implements InputHandlers {
       ctx.beginPath();
       ctx.roundRect(x0, y0, x1 - x0, y1 - y0, LABEL_PILL / 2);
       ctx.fill();
+      if (s.span) {
+        // A family (ToLaD#146): an outlined pill, and a bracket over the species it names, just above "now".
+        ctx.strokeStyle = FAMILY_INK;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        const a = Math.max(-2, s.span[0]);
+        const b = Math.min(this.w + 2, s.span[1]);
+        const y = y1 + 2.5;
+        ctx.beginPath();
+        ctx.moveTo(a + 0.5, y + 3);
+        ctx.lineTo(a + 0.5, y);
+        ctx.lineTo(b - 0.5, y);
+        ctx.lineTo(b - 0.5, y + 3);
+        ctx.stroke();
+      }
       // Upright, reading up the column.
       ctx.save();
       ctx.translate(s.x, y1 - LABEL_PAD);
       ctx.rotate(-Math.PI / 2);
-      // A lineage's name in the second ink: the species' are the tree's names. An event's title in its tint.
-      ctx.fillStyle = s.ev !== undefined ? EVENT_TINT.css : s.v ? INK2 : INK;
+      // A lineage's name in the second ink: the species' are the tree's names. An event's title in its tint. A family's in its own.
+      ctx.fillStyle = s.ev !== undefined ? EVENT_TINT.css : s.span ? FAMILY_INK : s.v ? INK2 : INK;
       ctx.fillText(s.text, 0, 0.5);
       ctx.restore();
     }
@@ -1475,7 +1593,7 @@ export class FanView implements InputHandlers {
       // A short tick at the edge, visible over the branches too.
       ctx.fillStyle = now ? GREEN : '#8d9e93';
       ctx.fillRect(0, Math.round(p.sy), now ? 6 : 4, 1);
-      const label = now ? 'now' : p.yrs === origin ? `${formatTick(origin, 0)}, the cats begin` : formatTick(p.yrs, p.step);
+      const label = now ? 'now' : p.yrs === origin ? `${formatTick(origin, 0)}, the ${this.clade.common.toLowerCase()} begin` : formatTick(p.yrs, p.step);
       ctx.fillStyle = now ? GREEN : p.yrs === origin ? INK : INK3;
       if (now || p.yrs === origin) ctx.font = font('650 12.5px');
       ctx.strokeText(label, 6, p.sy - 7);
@@ -1538,7 +1656,8 @@ export class FanView implements InputHandlers {
     // (Clear of the axis's "time, log scale" note beside the fork.)
     ctx.font = font('italic 400 12px', SERIF);
     const noteR = 6 + ctx.measureText('time, log scale').width + 12;
-    const x = onStem ? Math.max(noteR, stemL + 10) : Math.max(noteR, sx + 10);
+    // (On the stem: kept on screen, the text clear of its right edge where the stem is far right.)
+    const x = onStem ? Math.max(noteR, Math.min(stemL + 10, this.w - 6 - wmax)) : Math.max(noteR, sx + 10);
     const y = sy + 8;
     if (onStem) {
       ctx.shadowColor = 'rgba(12,23,20,0.95)';
