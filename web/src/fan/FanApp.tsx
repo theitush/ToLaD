@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { formatCount } from '../data/names';
 import { HistorySpark } from './HistorySpark';
 import type { EdgeStyle, WidthMode } from './layout';
-import { PANTHERA, type SpeciesRec } from './panthera';
+import { FELIDAE, type SpeciesRec } from './panthera';
 import { population } from './population';
 import { statusOf } from './status';
 import { FanView, fmtInt, formatYearsAgo, type IndInfo, type Lineage, type Selection } from './view';
@@ -48,7 +48,7 @@ export function FanApp() {
   const barRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const v = new FanView(canvasRef.current!, PANTHERA, edge);
+    const v = new FanView(canvasRef.current!, FELIDAE, edge);
     v.onSelect = setSel;
     v.scaleEl = scaleRef.current;
     v.barEl = barRef.current;
@@ -101,7 +101,7 @@ export function FanApp() {
           {edge}
         </button>
         <button type="button" onClick={() => viewRef.current?.resetView()}>
-          Big cats
+          All cats
         </button>
       </div>
       <div className="foot">

@@ -72,7 +72,7 @@
 
 import type { CladeRec, SpeciesRec } from './panthera';
 import { parentShare, population, smoother, TIME_C, type Population } from './population';
-import { PANTHERA_TREE, type Split } from './splits';
+import { FELIDAE_TREE, type Split } from './splits';
 
 export { TIME_C };
 
@@ -472,7 +472,7 @@ const MAX_Q_GENS = 5000;
 type Kid = FanNode | FanBranch;
 const under = (v: FanNode): FanBranch[] => v.kids.flatMap((k) => (isNode(k) ? under(k) : [k]));
 
-export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = PANTHERA_TREE, edge: EdgeStyle = 'curved'): Fan {
+export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = FELIDAE_TREE, edge: EdgeStyle = 'curved'): Fan {
   const W = TRUNK_WIDTH;
   const time = new TimeScale(tree.ageMa);
   const yBottom = time.y(STEM_BOTTOM_MA);

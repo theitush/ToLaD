@@ -1,0 +1,17 @@
+species   = "Felis catus"
+common    = "Domestic cat"
+component = "domestic"
+use       = "counts"
+scope     = "global, pet and free-ranging domestic cats"
+notes     = "No census of the world's cats exists; the one global figure is the rounded estimate Greenspoon et al. 2023 use for their biomass total (the dataset's own domestic anchor for cats). Before it the build keeps the model's growth since domestication (~9.5 ka, Vigne et al. 2004), shaped like human births and rescaled to meet it, as grade D model segments."
+
+[[point]]
+year  = 2020
+n     = 6.0e8
+lo    = 6.0e8
+hi    = 6.0e8
+grade = "C"
+kind  = "estimate"
+cite  = "Greenspoon et al. 2023, PNAS 120:e2204892120, data release (data/domesticated_data/pets_rats_mouse.csv, Cat: population 600000000)"
+url   = "https://doi.org/10.5281/zenodo.7594807"
+note  = "600 million cats, a rounded figure used for the pets' biomass (2.25 Mt at 3.75 kg); no range given. Dated 2020, the paper's reference period."

@@ -5,11 +5,11 @@ import { MESH_F, MESH_U, colourCode, Lane, latticeLines, latticeRep, latticeTop,
 import { layoutFan } from './layout';
 import { FanCamera } from './camera';
 import { MeshBatch } from './meshgl';
-import { PANTHERA } from './panthera';
+import { FELIDAE } from './panthera';
 import { drawTwigs, kLogAt, lineLevel, SCALE_BAR_PX, TwigModel, type TwigView } from './twigs';
 import { HASH_GLSL } from '../../../packages/procgen/src/glsl.ts';
 
-const fan = layoutFan(PANTHERA, 'linear');
+const fan = layoutFan(FELIDAE, 'linear');
 const lion = fan.branches.find((b) => b.sp.common === 'Lion')!;
 const m = new TwigModel(lion, fan.time, 'linear');
 const PAL: [number, number, number][] = [
@@ -24,7 +24,7 @@ const PAL: [number, number, number][] = [
  * time zoom; centred on the boundary of the species' lanes (green left, gray right).
  */
 function scene(sp: string, ago: number, perBar: number, sy: number) {
-  const f = layoutFan(PANTHERA, 'linear');
+  const f = layoutFan(FELIDAE, 'linear');
   const b = f.branches.find((x) => x.sp.common === sp)!;
   const mm = new TwigModel(b, f.time, 'linear');
   const c = new FanCamera(f, (x) => new TwigModel(x, f.time, 'linear'));

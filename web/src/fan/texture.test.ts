@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { FanCamera } from './camera';
 import { laneAt, layoutFan, leftAt } from './layout';
-import { PANTHERA } from './panthera';
+import { FELIDAE } from './panthera';
 import { latticeRep, latticeTop, shadeMesh, unpackInst, type MeshInst } from './mesh';
 import { MeshBatch, rgb01 } from './meshgl';
 import { drawTwigs, kLogAt, LINEAGE, LIVING, SCALE_BAR_PX, TEXTURE_IND, textureFade, lineLevel, TWIG_GRAY, TwigModel, type TwigView } from './twigs';
@@ -46,7 +46,7 @@ function shadeScreen(v: TwigView, c: FanCamera, insts: MeshInst[], step = 3, x0 
   return { lit, n: rows * cols, colours };
 }
 
-const lionIdx = PANTHERA.species.findIndex((s) => s.common === 'Lion');
+const lionIdx = FELIDAE.species.findIndex((s) => s.common === 'Lion');
 
 /** Strokes drawn through a stub canvas: colour, width and the number of path pieces. */
 function stubView(c: FanCamera) {
@@ -99,7 +99,7 @@ function stubView(c: FanCamera) {
  * of the middle, gray right), or `at` of the way across its column.
  */
 function at(perBar: number, ago = 3000, sy = 40, at?: number) {
-  const f = layoutFan(PANTHERA, 'linear');
+  const f = layoutFan(FELIDAE, 'linear');
   const c = new FanCamera(f, (b) => new TwigModel(b, f.time, 'linear'));
   c.w = 390;
   c.h = 844;

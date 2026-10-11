@@ -50,7 +50,10 @@
 //     fan's height) below the point, at most under half the way to its
 //     neighbours. So N(t) is C2 in time; the fan's widths are this N, exactly.
 //   - an extinct species tapers smoothly to nobody at its last appearance: its
-//     constant N times a smoothstep over the last TAPER_FRAC of its span in s.
+//     constant N times a smoothstep over the last TAPER_FRAC of its span in s;
+//     a domestic stock grows out of nobody at its split, domestication, over
+//     the first EMERGE_FRAC (its founders are 0: the tamed few are counted in
+//     the wild column below).
 //   - q is h_k at the middle of generation k, linear in between (h_0 = 1 for
 //     the newest half generation; the settled value past the last).
 // Below its start a species' founders are part of the parent population, whose
@@ -68,6 +71,15 @@ export const TIME_C = 10;
 export const CORNER_HALF = 0.08;
 /** An extinct species tapers to nobody over this share of its span (on the time axis) before its last appearance. */
 export const TAPER_FRAC = 0.35;
+/**
+ * A domestic stock (a tamed form, its curated history `component = "domestic"`)
+ * grows out of its wild founders: N ramps up from nobody at its split
+ * (domestication) over this share of its span on the time axis, as
+ * N^e − 1 with e a smootherstep from 0 to 1 (a ramp in log N). Its births model starts at a level already far above any founding
+ * group (the pipeline shapes it like human births and has no founding count),
+ * so without the ramp the tamed stock would sit in its wild ancestors' column.
+ */
+export const EMERGE_FRAC = 0.1;
 
 /** The time axis's coordinate of an age in years: log10(years + TIME_C). */
 export const axisS = (years: number) => Math.log10(Math.max(0, years) + TIME_C);
@@ -132,6 +144,8 @@ export class Population {
   private readonly knots: Knot[] = [];
   /** An extinct species' taper: the axis coordinates of its last appearance and of the taper's start. */
   private readonly taper: [number, number] | null = null;
+  /** A domestic stock's ramp up from its split: the axis coordinates of the split and of the ramp's end. */
+  private readonly emerge: [number, number] | null = null;
 
   /**
    * @param startMa the species' start (Ma): its split in the dated tree, where
@@ -174,6 +188,10 @@ export class Population {
     if (sp.extinct || !(sp.alive > 0)) {
       const s1 = axisS(sp.t1 * 1e6);
       this.taper = [s1, s1 + TAPER_FRAC * Math.max(0, axisS(end) - s1)];
+    }
+    if (c && sp.history?.component === 'domestic' && !sp.extinct) {
+      const s0 = axisS(end);
+      this.emerge = [s0, s0 - EMERGE_FRAC * Math.max(0, s0 - axisS(sp.t1 * 1e6))];
     }
     // The room: the most alive (a fillet never rises above its corner).
     let mx = this.nConst;
@@ -230,6 +248,11 @@ export class Population {
       const [s1, s2] = this.taper;
       if (s2 > s1) n *= smooth3((axisS(a * 1e6) - s1) / (s2 - s1));
     }
+    if (this.emerge) {
+      const [s0, s1] = this.emerge;
+      // (In log N: N^e − 1, e a smootherstep, so the log widths too leave nobody at the split with zero slope.)
+      n = s0 > s1 && n > 1 ? Math.pow(n, smoother((s0 - axisS(a * 1e6)) / (s0 - s1))) - 1 : 0;
+    }
     return n;
   }
 
@@ -278,6 +301,10 @@ export class Population {
     if (this.taper) {
       const [s1, s2] = this.taper;
       for (let i = 0; i <= 48; i++) out.push(yrs(s1 + ((s2 - s1) * i) / 48));
+    }
+    if (this.emerge) {
+      const [s0, s1] = this.emerge;
+      for (let i = 0; i <= 48; i++) out.push(yrs(s1 + ((s0 - s1) * i) / 48));
     }
     // The green share: every generation middle while it moves (its kinks).
     const h = this.h;

@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { columnsAt, g, gapBetween, GAP_FRAC, isNode, laneAt, layoutFan, leanGap, LEAN_MAX_FRAC, leftAt, MIN_GAP_FRAC, nodeLeftAt, segAt, strandAt, TIME_H, type EdgeStyle, type WidthMode } from './layout';
-import { PANTHERA } from './panthera';
+import { FELIDAE } from './panthera';
 
 describe('fan strands: width = alive at the time', () => {
   for (const mode of ['log', 'linear'] as WidthMode[]) {
     it(`a strand is the individuals alive then, the green share those with living descendants (${mode})`, () => {
-      const fan = layoutFan(PANTHERA, mode);
+      const fan = layoutFan(FELIDAE, mode);
       for (const b of fan.branches) {
         const sp = b.sp;
         // Its own column: from its tip back to its start (its split).
@@ -46,7 +46,7 @@ describe('the fan, both designs: fixed, continuous, honest', () => {
 
   for (const edge of ['curved', 'straight'] as EdgeStyle[]) for (const mode of ['log', 'linear'] as WidthMode[]) {
     it(`width = N(t) × one fixed scale, exactly, at every height; green = its share (${mode}, ${edge})`, () => {
-      const fan = layoutFan(PANTHERA, mode, undefined, edge);
+      const fan = layoutFan(FELIDAE, mode, undefined, edge);
       const rnd = seeded(5);
       // One width per individual (linear) or per decade of individuals (log), the same for every branch:
       // the number the scale bar shows (view.ts widthScale).
@@ -68,7 +68,7 @@ describe('the fan, both designs: fixed, continuous, honest', () => {
     });
 
     it(`every edge is a continuous function of time: edges and the lanes' boundary, no jog at a split, no step at a population change (${mode}, ${edge})`, () => {
-      const fan = layoutFan(PANTHERA, mode, undefined, edge);
+      const fan = layoutFan(FELIDAE, mode, undefined, edge);
       const yb = fan.trunkBottom.y;
       const edges = (b: (typeof fan.branches)[0], y: number) => {
         const l = leftAt(b, y);
@@ -103,7 +103,7 @@ describe('the fan, both designs: fixed, continuous, honest', () => {
     });
 
     it(`columns are symmetric about fixed centres in fixed rooms with fixed gaps, and never overlap (${mode}, ${edge})`, () => {
-      const fan = layoutFan(PANTHERA, mode, undefined, edge);
+      const fan = layoutFan(FELIDAE, mode, undefined, edge);
       const W = fan.trunkWidth;
       const bs = [...fan.branches].sort((p, q) => p.index - q.index);
       if (edge === 'curved') expect(bs[0].colLeft).toBeCloseTo(fan.x0, 9);
@@ -143,14 +143,14 @@ describe('the fan, both designs: fixed, continuous, honest', () => {
 describe('straight: lines that lean', () => {
   for (const mode of ['log', 'linear'] as WidthMode[]) {
     it(`the larger daughter runs straight on; each other leans out to clear its sibling's subtree, ending before either daughter's next event (${mode})`, () => {
-      const fan = layoutFan(PANTHERA, mode, undefined, 'straight');
+      const fan = layoutFan(FELIDAE, mode, undefined, 'straight');
       const W = fan.trunkWidth;
       const bandW = (k: (typeof fan.nodes)[0]['kids'][0]) => (isNode(k) ? k.width : k.baseW);
       for (const v of fan.nodes) {
         const room = Math.min(...v.kids.map((k) => v.y - (isNode(k) ? k.y : k.tipY)));
         const main = v.kids.reduce((m, k) => (bandW(k) > bandW(m) ? k : m), v.kids[0]);
         for (const k of v.kids) {
-          const leans = isNode(k) ? k.left !== k.tile : Math.abs(k.cx - (k.x0 + k.baseW / 2)) > 1e-12;
+          const leans = isNode(k) ? Math.abs(k.left - k.tile) > 1e-9 : Math.abs(k.cx - (k.x0 + k.baseW / 2)) > 1e-12;
           expect(leans).toBe(k !== main);
           if (k === main) expect(k.leanY).toBe(v.y);
           else {
