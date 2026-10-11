@@ -20,7 +20,7 @@ try {
   page.on('pageerror', (e) => console.log('pageerror', String(e)));
   page.on('console', (m) => m.type() === 'error' && console.log('console', m.text()));
   await page.goto(url);
-  await page.waitForFunction(() => !!window.__fan, null, { timeout: 20000 });
+  await page.waitForFunction(() => !!window.__fan, null, { timeout: 90000 });
   const settle = () => page.waitForTimeout(900);
   const shot = async (name) => {
     await settle();

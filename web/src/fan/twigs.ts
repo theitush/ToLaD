@@ -199,7 +199,7 @@ export class TwigModel {
   row(g: number): { y: number; left: number; w: number; n: number } {
     const y = this.yOf((g + 0.5) * this.GL);
     const w = this.widthAt(y);
-    return { y, left: leftAt(this.b, y), w, n: this.size(g) };
+    return { y, left: leftAt(this.b, y, w), w, n: this.size(g) };
   }
 
   /**
@@ -209,7 +209,7 @@ export class TwigModel {
    */
   lanes(y: number): { left: number; w: number; gw: number } {
     const L = laneAt(this.b, y);
-    return { left: leftAt(this.b, y), w: L.w, gw: L.gw };
+    return { left: leftAt(this.b, y, L.w), w: L.w, gw: L.gw };
   }
 
   // ---- the slot lattice ----------------------------------------------------------
@@ -799,7 +799,15 @@ export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: num
     const yLo = m.yOf(gA * m.GL);
     // (The texture's last band reaches the tip: the last generation can end a little short of it.)
     const yHi = mode ? m.yOf(Math.min(now, (gA + 1) * m.GL + 2 * Lm)) : gA + t >= m.G ? Math.min(m.b.tipY, m.yOf((gA + t) * m.GL)) : m.yOf((gA + t) * m.GL);
-    for (const S of st) {
+    // (The stretches are ascending and abut: only those over [yHi, yLo], from the first ending below yHi.)
+    let s0 = 0;
+    for (let z = st.length; s0 < z; ) {
+      const h = (s0 + z) >> 1;
+      if (st[h].yb <= yHi) s0 = h + 1;
+      else z = h;
+    }
+    for (let si = s0; si < st.length && st[si].ya < yLo; si++) {
+      const S = st[si];
       const ya = Math.max(S.ya, yHi);
       const yb = Math.min(S.yb, yLo);
       if (!(yb > ya)) continue;

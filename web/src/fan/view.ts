@@ -867,6 +867,11 @@ export class FanView implements InputHandlers {
     const [, ayTip] = this.toScreen(0, b.tipY);
     const [, byBot] = this.toScreen(0, yb);
     if (byBot < 0 || ayTip > this.h) return;
+    // Wholly left or right of the screen (zoomed in, most strands are): nothing to sample.
+    const [, sTop] = this.toWorld(0, -20);
+    const [, sBot] = this.toWorld(0, this.h + 20);
+    const xr = this.fan.tess.xRange(b, sTop, sBot);
+    if (this.toScreen(xr[1], 0)[0] < -12 || this.toScreen(xr[0], 0)[0] > this.w + 12) return;
     const hw = b.width / 2;
     const pts = this.lanePoints(b, hw);
     if (pts.length < 2) return;
@@ -912,8 +917,8 @@ export class FanView implements InputHandlers {
         const gp = wp * p.f;
         const wm = (wq + wp) / 2;
         const gm = (gq + gp) / 2;
-        const gc = rgb01(mix(GRAY, '#131c19', laneDim(wm - gm, lives) * 0.82));
-        const ec = rgb01(mix(GREEN, '#0d2318', laneDim(gm, lives) * 0.9));
+        const gc = mix01(GRAY, '#131c19', laneDim(wm - gm, lives) * 0.82);
+        const ec = mix01(GREEN, '#0d2318', laneDim(gm, lives) * 0.9);
         // The least widths across the lane, not along the row: a thin branch-out leaning s px per px
         // is √(1 + s²) px of the row per px across (else a hairline lean breaks into dashes).
         const sq = Math.sqrt(1 + ((xp + wp / 2 - xq - wq / 2) / (y1 - y0)) ** 2);
@@ -1021,7 +1026,7 @@ export class FanView implements InputHandlers {
     const pts: RibbonPt[] = [];
     const push = (y: number, ye: number) => {
       const L = laneAt(b, ye);
-      const [px, py] = this.toScreen(leftAt(b, y) + hw, y);
+      const [px, py] = this.toScreen(leftAt(b, y, ye === y ? L.w : undefined) + hw, y);
       pts.push({ x: px, y: py, nx: -1, ny: 0, w: L.w, f: L.f });
     };
     for (let i = ys.length - 1; i >= 0; i--) {
@@ -1376,6 +1381,17 @@ function mix(a: string, b: string, t: number): string {
   const q = parseInt(b.slice(1), 16);
   const c = (sh: number) => Math.round(((p >> sh) & 255) * (1 - t) + ((q >> sh) & 255) * t);
   return `#${((c(16) << 16) | (c(8) << 8) | c(0)).toString(16).padStart(6, '0')}`;
+}
+
+const rgbParsed = new Map<string, [number, number, number]>();
+/** mix() straight to 0–1 channels, as rgb01(mix(a, b, t)) gives them (no strings: it runs per chord, per frame). */
+function mix01(a: string, b: string, t: number): [number, number, number] {
+  let A = rgbParsed.get(a);
+  if (!A) rgbParsed.set(a, (A = rgb01(a)));
+  let B = rgbParsed.get(b);
+  if (!B) rgbParsed.set(b, (B = rgb01(b)));
+  const c = (k: number) => Math.round((A[k] * (1 - t) + B[k] * t) * 255) / 255;
+  return [c(0), c(1), c(2)];
 }
 
 export function fmtInt(n: number): string {

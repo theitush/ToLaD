@@ -33,6 +33,11 @@ const scenes = [
   ['eurasian-lynx-sources', 'Eurasian lynx', 0.2, 'sources'],
   ['leopard-cat-details', 'Leopard cat', 0.2, true],
   ['domestic-cat-details', 'Domestic cat', 0.2, true],
+  ['cougar-30k', 'Cougar', 3e4],
+  ['cougar-details', 'Cougar', 0.2, true],
+  ['iberian-lynx-details', 'Iberian lynx', 0.2, true],
+  ['eurasian-lynx-details', 'Eurasian lynx', 0.2, true],
+  ['canada-lynx-details', 'Canada lynx', 0.2, true],
 ];
 const browser = await chromium.launch({ headless: true });
 try {
@@ -66,6 +71,9 @@ try {
     if (open === 'sources' || open === 'both') await page.evaluate(() => document.querySelector('.card-sp .spark')?.click());
     await page.waitForTimeout(200);
     await page.screenshot({ path: `${OUT}/${name}.png` });
+    // SPARK=1: the sparkline alone too, as <name>-spark.png (cheap to compare before/after).
+    const spark = process.env.SPARK && (await page.$('.card-sp .hist .spark'));
+    if (spark) await spark.screenshot({ path: `${OUT}/${name}-spark.png` });
     const card = await page.evaluate(() => {
       const c = document.querySelector('.card-sp');
       if (!c) return null;
