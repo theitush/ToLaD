@@ -86,3 +86,48 @@ kind  = "census"
 cite  = "MITECO 2025, La poblacion de linces ibericos crecio un 19% en 2024 respecto al ano anterior (annual census, LIFE Lynxconnect and the regional governments)"
 url   = "https://www.miteco.gob.es/es/prensa/ultimas-noticias/2025/mayo/la-poblacion-de-linces-ibericos-crecio-un-19--en-2024-respecto-a.html"
 note  = "'El censo total de linces alcanza los 2.401 individuos': Spain 2,047, Portugal 354; 1,557 adults or subadults, 470 breeding or territorial females, 844 cubs born in 2024. A direct count with no stated error (B, not A)."
+
+# Bottlenecks (ToLaD#141): each window in years before present (2026), quoted from a source that was read.
+[[event]]
+kind = "bottleneck"
+from_ya = 700000
+to_ya = 100000
+title = "Ancient lynx decline"
+summary = "Genetic (PSMC): the deepest and most drastic fall in effective size, shared with the Eurasian lynx, between about 700,000 and 100,000 years ago; it may be what split the two species."
+quote = "PSMC inferred a first and most drastic population decline that affected both Iberian and Eurasian lynx 700–100 thousand years ago (kya; Fig. 1b); this contraction may have separated the two species, resulting in the onset of the population structure detected by CoalHMM (312.2 kya; 95% confidence interval 323.1–179.4 kya)."
+cite = "Abascal F, Corvelo A, Cruz F, et al. (2016). Extreme genomic erosion after recurrent demographic bottlenecks in the highly endangered Iberian lynx. Genome Biol 17:251"
+url = "https://doi.org/10.1186/s13059-016-1090-1"
+grade = "C"
+
+[[event]]
+kind = "bottleneck"
+from_ya = 50000
+to_ya = 44000
+title = "Glacial bottleneck"
+summary = "Genetic (allele-frequency model): an abrupt bottleneck around 47,000 years ago, in the last glaciation, cut the population to about a tenth of its size."
+quote = "Based on the allele frequency spectrum, ∂a∂i infers a model with two successive abrupt bottlenecks, one around 47 kya, coincident with the last important decline observed in PSMC output, and a second one at 315 years ago, both reducing to approximately one-tenth the previous population size."
+cite = "Abascal F, Corvelo A, Cruz F, et al. (2016). Extreme genomic erosion after recurrent demographic bottlenecks in the highly endangered Iberian lynx. Genome Biol 17:251, Fig. 1c"
+url = "https://doi.org/10.1186/s13059-016-1090-1"
+grade = "C"
+
+[[event]]
+kind = "bottleneck"
+from_ya = 360
+to_ya = 290
+title = "Early-modern bottleneck"
+summary = "Genetic (allele-frequency model): about 315 years before the 2016 study (around 1700) the effective size fell to under 300, in a time of spreading farming, forest loss and persecution."
+quote = "The analysis with ∂a∂i was able to capture a third, more recent decline that reduced the Iberian lynx effective population size to less than 300 individuals around 315 years ago (Fig. 1c)."
+cite = "Abascal F, Corvelo A, Cruz F, et al. (2016). Extreme genomic erosion after recurrent demographic bottlenecks in the highly endangered Iberian lynx. Genome Biol 17:251"
+url = "https://doi.org/10.1186/s13059-016-1090-1"
+grade = "C"
+
+[[event]]
+kind = "bottleneck"
+from_ya = 76
+to_ya = 24
+title = "Fewer than 100 left"
+summary = "Census: a steep decline in the second half of the 20th century left under 100 lynx (under 62 mature) in two isolated Andalusian populations by 2002; conservation has since brought numbers back above 2,000."
+quote = "a steep decline during the second half of the 20th century left less than 100 lynx (less than 62 mature) distributed in the two isolated populations of Doñana and Andújar (Sierra Morena) in Andalusia, southern Spain, leading to its recognition as the most endangered felid in the world [8] and to its classification as “critically endangered” in the 2002, 2006, and 2008 IUCN red lists."
+cite = "Abascal F, Corvelo A, Cruz F, et al. (2016). Extreme genomic erosion after recurrent demographic bottlenecks in the highly endangered Iberian lynx. Genome Biol 17:251"
+url = "https://doi.org/10.1186/s13059-016-1090-1"
+grade = "B"
