@@ -62,24 +62,74 @@ export interface Cites {
   alvarez: string;
 }
 
+/** Upper-case the first letter ("small cat" -> "Small cat"). */
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** The genus of a binomial. */
+const genus = (sci: string) => sci.split(' ')[0];
+
+/** What naming a split needs from the whole tree: each genus's species count, the species already naming a split above. */
+interface Naming {
+  perGenus: Map<string, number>;
+  above: ReadonlySet<string>;
+}
+
+/**
+ * A split's title, from the data (ToLaD#145), in order:
+ * (a) the smallest named taxon holding exactly its species: a genus ("Lynx ancestors"; every species of
+ *     the genus the tree draws, and no other), else the taxon the data names the split by, in its English
+ *     form where the data gives one ("Small cat ancestors", overrides.toml [[dated_name]]), else Latin;
+ * (b) else "<best-known species> lineage": its living species with the most individuals alive, passing
+ *     over one that already titles a split above it (so nested splits on one line read apart); when
+ *     every one does (a species and its fossil or tamed offshoot), "<that species> ancestors";
+ * (c) short: under ~24 characters where a species' name allows (the next best-known one whose name
+ *     fits), never a list of species.
+ */
+export function splitTitle(
+  t: DatedSplit,
+  sp: string[],
+  label: (sci: string) => string,
+  extinct: (sci: string) => boolean,
+  alive: (sci: string) => number,
+  naming: Naming,
+): { name: string; best: string | null } {
+  const g = genus(sp[0]);
+  if (sp.length >= 2 && sp.every((s) => genus(s) === g) && naming.perGenus.get(g) === sp.length) return { name: `${g} ancestors`, best: null };
+  if (t.name) return { name: `${cap(t.nameEn || t.name)} ancestors`, best: null };
+  const living = sp.filter((s) => !extinct(s));
+  const pool = living.length ? living : sp;
+  const order = [...pool].sort((a, b) => alive(b) - alive(a));
+  const fresh = order.filter((s) => !naming.above.has(s));
+  const best = fresh.find((s) => label(s).length + ' lineage'.length <= 24) ?? fresh[0];
+  if (best) return { name: `${cap(label(best))} lineage`, best };
+  // every living species here already titles a split above (a species and its fossil or tamed offshoot): its ancestors
+  return { name: `${cap(label(order[0]))} ancestors`, best: null };
+}
+
 /**
  * A dated split as the fan's Split. `common` names a species (its English name, or
- * null); `cites` are the dated trees' citations, `extinct` tells fossils apart.
+ * null); `cites` are the dated trees' citations, `extinct` tells fossils apart, `alive`
+ * counts a species' individuals alive today (the split's best-known species).
  */
-export function splitFrom(t: DatedSplit, common: (sci: string) => string | null, extinct: (sci: string) => boolean, cites: Cites): Split {
+export function splitFrom(
+  t: DatedSplit,
+  common: (sci: string) => string | null,
+  extinct: (sci: string) => boolean,
+  cites: Cites,
+  alive: (sci: string) => number = () => 0,
+  naming?: Naming,
+): Split {
   const { upham, alvarez } = cites;
   const sp = datedSpecies(t);
   const label = (s: string) => common(s) ?? s;
-  const living = sp.filter((s) => !extinct(s));
-  const named = (living.length ? living : sp).map(label);
   const daughters = t.kids.map((k) => (typeof k === 'string' ? label(k) : `the ${k.name || 'lineage'} of ${datedSpecies(k).length} species`));
-  // a title from the data: two or three species by name, else the clade's name, else its first two living species
-  const name =
-    sp.length <= 3
-      ? `${sp.map(label).join(' + ')} ancestors`
-      : t.name
-        ? `${t.name} ancestors`
-        : `${named.slice(0, 2).join(', ')} + ${sp.length - 2} more: ancestors`;
+  if (!naming) {
+    const perGenus = new Map<string, number>();
+    for (const s of sp) perGenus.set(genus(s), (perGenus.get(genus(s)) ?? 0) + 1);
+    naming = { perGenus, above: new Set() };
+  }
+  const { name, best } = splitTitle(t, sp, label, extinct, alive, naming);
+  const below: Naming = best ? { ...naming, above: new Set([...naming.above, best]) } : naming;
   let cite: string;
   let confidence: Confidence;
   const notes: string[] = [];
@@ -133,7 +183,7 @@ export function splitFrom(t: DatedSplit, common: (sci: string) => string | null,
     confidence,
     source: t.source,
     ...(notes.length ? { note: notes.join('. ') } : {}),
-    kids: t.kids.map((k) => (typeof k === 'string' ? k : splitFrom(k, common, extinct, cites))),
+    kids: t.kids.map((k) => (typeof k === 'string' ? k : splitFrom(k, common, extinct, cites, alive, below))),
   };
 }
 
@@ -149,6 +199,7 @@ export const FELIDAE_TREE: Split = splitFrom(
   },
   (s) => !!bySci.get(s)?.extinct,
   { upham: raw.datedMeta?.upham || 'Upham et al. 2019', alvarez: raw.datedMeta?.alvarez || 'Álvarez-Carretero et al. 2022' },
+  (s) => bySci.get(s)?.alive ?? 0,
 );
 
 /** Every split in the tree, parents before their daughters. */

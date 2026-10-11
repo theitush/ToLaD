@@ -5,7 +5,7 @@ import * as BridgeMirror from './bridge';
 import * as MeshMirror from './mesh';
 import { useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
-import { formatCount } from '../data/count';
+import { approxMa, formatCount } from '../data/count';
 import { SPLIT_LABEL, SPLIT_NAME, SPLIT_STYLES, type SplitStyle, type SplitWindow } from './gradual';
 import { HistorySpark } from './HistorySpark';
 import type { EdgeStyle, WidthMode } from './layout';
@@ -464,7 +464,8 @@ export function SpeciesCard({ sp, onClose, open, ageMa, startMa, event }: { sp: 
 export function LineageCard({ lin, onClose }: { lin: Lineage; onClose: () => void }) {
   const s = lin.node.split;
   const of = lin.of.length > 1 ? `${lin.of.slice(0, -1).join(', ')} and ${lin.of[lin.of.length - 1]}` : lin.of[0];
-  const range = s.lo === s.hi ? 'no range found' : `range ${s.lo}–${s.hi} million`;
+  const [lo, hi] = [approxMa(s.lo), approxMa(s.hi)];
+  const range = s.lo === s.hi ? 'no range found' : lo === hi ? `range ~${lo} million` : `range ${lo}–${hi} million`;
   return (
     <div className="card-sp" onPointerDown={(e) => e.stopPropagation()}>
       <button type="button" className="x" onClick={onClose} aria-label="Close">
@@ -483,7 +484,7 @@ export function LineageCard({ lin, onClose }: { lin: Lineage; onClose: () => voi
         <p className="sub">{Math.round(lin.green * 100)}% have descendants alive today</p>
         <p className="sub">Ancestors of {of}</p>
         <p className="sub">
-          Split ~{s.ageMa} million years ago <span className="dim">({range}; {s.confidence} confidence)</span>
+          Split ~{approxMa(s.ageMa)} million years ago <span className="dim">({range}; {s.confidence} confidence)</span>
         </p>
       </div>
       <details className="more">

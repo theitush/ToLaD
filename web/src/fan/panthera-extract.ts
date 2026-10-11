@@ -141,8 +141,10 @@ export interface DatedSplit {
   hi: number;
   /** 'ensemble' | 'alvarez' | 'upham-interp' | 'upham-imputed' | 'fossil-floor' | 'fossil' | 'interpolated' | 'override' | 'upham' (dated.py SRC_NAMES). */
   source: string;
-  /** Open Tree name of the clade it founds, '' if none. */
+  /** Open Tree name of the clade it founds (or an overrides.toml [[dated_name]]), '' if none. */
   name: string;
+  /** That name's well-established English form ("small cat"), '' if none (absent in data before it). */
+  nameEn?: string;
   /** Daughters grafted by taxonomy only (where inside the split is not known). */
   loose: number;
   /** The overrides.toml entry that set it. */
@@ -187,6 +189,8 @@ export interface DatedFile {
   tile: number;
   nodes?: number[][];
   names?: Record<string, string>;
+  /** English form of a split's taxon name (dated/<id>.json `names_en`, an overrides.toml [[dated_name]]). */
+  names_en?: Record<string, string>;
   loose?: Record<string, number>;
   notes?: Record<string, number>;
   /** Rows of the species placed by taxonomy only (grafts); absent in data older than ToLaD#145's rule. */
@@ -241,6 +245,7 @@ export function datedTree(file: DatedFile, sk: DatedFile, rows: Map<number, stri
       hi: n[3],
       source: src[n[4]] ?? '',
       name: file.names?.[i] ?? '',
+      nameEn: file.names_en?.[i] ?? '',
       loose: file.loose?.[i] ?? 0,
       override: note !== undefined ? (sk.overrides?.[note] ?? null) : null,
       kids: ks,

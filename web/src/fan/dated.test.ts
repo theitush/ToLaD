@@ -17,7 +17,7 @@ const read = (rel: string) => new Uint8Array(readFileSync(resolve(DATA, rel)));
 function clade(name: string) {
   const raw = loadClade(read, name);
   const by = new Map(raw.species.map((s) => [s.sci, s]));
-  const tree = splitFrom(raw.dated!, (s) => by.get(s)?.common ?? null, (s) => !!by.get(s)?.extinct, raw.datedMeta!);
+  const tree = splitFrom(raw.dated!, (s) => by.get(s)?.common ?? null, (s) => !!by.get(s)?.extinct, raw.datedMeta!, (s) => by.get(s)?.alive ?? 0);
   const placed = new Set(speciesUnder(tree));
   const species = raw.species.filter((s) => placed.has(s.sci)).map((s, i) => speciesRec(s, i));
   const sum = (f: (s: (typeof species)[number]) => number) => species.reduce((a, s) => a + f(s), 0);
@@ -60,6 +60,21 @@ describe('the dated tree from the data', () => {
     expect(big.cite).toMatch(/Figueiró/);
     const cat = allSplits().find((s) => s.kids.includes('Felis catus'))!;
     expect(cat.ageMa).toBeCloseTo(0.0095, 4);
+  });
+
+  it('Felidae: split titles are short, from the taxon or the best-known species (ToLaD#145)', () => {
+    const names = allSplits().map((s) => s.name);
+    for (const n of names) {
+      expect(n).not.toMatch(/\+|more/);
+      expect(n.length).toBeLessThanOrEqual(28); // "Mainland leopard cat lineage": the Red List name, no shorter species to take
+      expect(n).toMatch(/ (ancestors|lineage)$/);
+    }
+    const by = (sp: string[]) => allSplits().find((s) => [...speciesUnder(s)].sort().join() === [...sp].sort().join())?.name;
+    expect(FELIDAE_TREE.name).toBe('Cat ancestors');
+    expect(by(['Panthera tigris', 'Panthera zdanskyi', 'Panthera uncia', 'Panthera onca', 'Panthera balamoides', 'Panthera gombaszoegensis', 'Panthera leo', 'Panthera spelaea', 'Panthera pardus', 'Neofelis diardi', 'Neofelis nebulosa'])).toBe('Big cat ancestors');
+    expect(by(['Lynx lynx', 'Lynx pardinus', 'Lynx canadensis', 'Lynx rufus'])).toBe('Lynx ancestors');
+    expect(by(['Neofelis diardi', 'Neofelis nebulosa'])).toBe('Neofelis ancestors');
+    expect(FELIDAE_TREE.kids.map((k) => (typeof k === 'string' ? k : k.name)).sort()).toEqual(['Big cat ancestors', 'Small cat ancestors']);
   });
 
   it('Carnivora builds and lays out by the same path', { timeout: 600_000 }, () => {
