@@ -1,9 +1,11 @@
 // The main view: the dated Panthera tree, OneZoom-style. The time river is
 // still available at ?river (and the synthetic spike tree at ?synthetic).
 
+import * as BridgeMirror from './bridge';
 import * as MeshMirror from './mesh';
 import { useEffect, useRef, useState } from 'react';
 import { formatCount } from '../data/count';
+import { SPLIT_LABEL, SPLIT_NAME, SPLIT_STYLES, type SplitStyle, type SplitWindow } from './gradual';
 import { HistorySpark } from './HistorySpark';
 import type { EdgeStyle, WidthMode } from './layout';
 import { FELIDAE, type SpeciesRec } from './panthera';
@@ -16,6 +18,8 @@ declare global {
     __fan?: FanView;
     /** The mesh's CPU mirror, for scripts/glcheck.mjs (GPU and CPU decisions compared). */
     __fanMesh?: typeof MeshMirror;
+    /** The sister strands' cross-links' CPU mirror (bridge.ts), for scripts/glcheck.mjs. */
+    __fanBridge?: typeof BridgeMirror;
   }
 }
 
@@ -38,23 +42,54 @@ function initialEdge(): EdgeStyle {
   return 'curved';
 }
 
+/** The split's design (gradual.ts, ToLaD#50) and its window, remembered like the edges; ?split=…&win=short|long override them. */
+const SPLIT_KEY = 'tolad.fan.split';
+const WIN_KEY = 'tolad.fan.splitwin';
+function initialPick<T extends string>(param: string, key: string, all: readonly T[], dflt: T): T {
+  const is = (v: unknown): v is T => all.includes(v as T);
+  try {
+    const q = new URLSearchParams(window.location.search).get(param);
+    if (is(q)) return q;
+  } catch {
+    /* no URL */
+  }
+  try {
+    const v = window.localStorage.getItem(key);
+    if (is(v)) return v;
+  } catch {
+    /* no storage */
+  }
+  return dflt;
+}
+function remember(key: string, v: string): void {
+  try {
+    window.localStorage.setItem(key, v);
+  } catch {
+    /* not remembered */
+  }
+}
+
 export function FanApp() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const viewRef = useRef<FanView | null>(null);
   const [mode, setMode] = useState<WidthMode>('linear');
   const [edge, setEdge] = useState<EdgeStyle>(initialEdge);
+  const [split, setSplit] = useState<SplitStyle>(() => initialPick('split', SPLIT_KEY, SPLIT_STYLES, 'clean'));
+  const [win, setWin] = useState<SplitWindow>(() => initialPick<SplitWindow>('win', WIN_KEY, ['short', 'long'], 'short'));
   const [sel, setSel] = useState<Selection | null>(null);
   const scaleRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const v = new FanView(canvasRef.current!, FELIDAE, edge);
+    v.setSplit(split, win);
     v.onSelect = setSel;
     v.scaleEl = scaleRef.current;
     v.barEl = barRef.current;
     viewRef.current = v;
     window.__fan = v;
     window.__fanMesh = MeshMirror;
+    window.__fanBridge = BridgeMirror;
     v.request();
     // The canvas text waits for the faces (drawn in system type until then).
     if (typeof document !== 'undefined' && document.fonts) {
@@ -100,6 +135,33 @@ export function FanApp() {
         >
           {edge}
         </button>
+        <button
+          type="button"
+          aria-label="how a split is drawn"
+          title={SPLIT_NAME[split]}
+          onClick={() => {
+            const next = SPLIT_STYLES[(SPLIT_STYLES.indexOf(split) + 1) % SPLIT_STYLES.length];
+            setSplit(next);
+            viewRef.current?.setSplit(next, win);
+            remember(SPLIT_KEY, next);
+          }}
+        >
+          {SPLIT_LABEL[split]}
+        </button>
+        {split !== 'clean' ? (
+          <button
+            type="button"
+            aria-label="split window"
+            onClick={() => {
+              const next = win === 'short' ? 'long' : 'short';
+              setWin(next);
+              viewRef.current?.setSplit(split, next);
+              remember(WIN_KEY, next);
+            }}
+          >
+            {win}
+          </button>
+        ) : null}
         <button type="button" onClick={() => viewRef.current?.resetView()}>
           All cats
         </button>
