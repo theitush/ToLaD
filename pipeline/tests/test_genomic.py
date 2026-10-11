@@ -76,10 +76,12 @@ class Build(unittest.TestCase):
     def test_coverage(self):
         self.assertGreaterEqual(self.g["used"], 100)
         rows = self.g["species"]
+        # ToLaD#66: the jaguar takes the Bergman table by hand, the snow leopard Solari et al. 2025
+        cites = {"Panthera onca": "Bergman", "Panthera uncia": "Solari"}
         for sp in PANTHERA:
             self.assertEqual(rows[sp]["how"], "hand-written [deep] wins", sp)
             self.assertFalse(self.h[sp]["deep"]["bulk"], sp)
-            self.assertIn("Armstrong", self.h[sp]["deep"]["cite"], sp)
+            self.assertIn(cites.get(sp, "Armstrong"), self.h[sp]["deep"]["cite"], sp)
         used = [r["leaf"] for r in rows.values() if r["used"]]
         for leaf in used:
             d = self.h[leaf]["deep"]
