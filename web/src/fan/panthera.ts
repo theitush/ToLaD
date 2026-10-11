@@ -16,7 +16,9 @@
 
 import raw from 'virtual:panthera-data';
 import { BirthCurve, procgenSegments, type GenSegment } from './history';
-import { FELIDAE_TREE, speciesUnder } from './splits';
+import { FELIDAE_TREE, sentenceCase, speciesUnder } from './splits';
+
+export { sentenceCase };
 import type { Grade, HistoryRec, NaturalMeta, NaturalRec, RawSpecies, RedListRec } from './panthera-extract';
 
 export type { Grade, HistEvent, HistoryRec, HistPoint, HistSegment, NaturalMeta, NaturalRec } from './panthera-extract';
@@ -68,17 +70,6 @@ export interface CladeRec {
   t0: number;
   t1: number;
   species: SpeciesRec[];
-}
-
-/**
- * The Red List's Title Case English name in the fan's sentence case: words after the first lowercased, except a
- * possessive or a word from a place or people (Pallas's, Asian, Iberian, Chinese): "Asian Golden Cat" -> "Asian golden cat".
- */
-export function sentenceCase(name: string): string {
-  return name
-    .split(' ')
-    .map((w, i) => (i === 0 || /'s$|(an|ese|ish|ic)$/.test(w) || !/^[A-Z][a-z-]+$/.test(w) ? w : w.toLowerCase()))
-    .join(' ');
 }
 
 export function speciesRec(r: RawSpecies, clade: number): SpeciesRec {

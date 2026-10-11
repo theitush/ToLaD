@@ -18,44 +18,44 @@ In the fan's order of visibility: the cats the Felidae view places first, then t
 
 | cat | in fan | state | sev | alive (source) | Red List | causes |
 |---|---|---|---|---|---|---|
-| *Puma concolor* | no | flagged | 1.44 | 777k (greenspoon model) | LC | **join**: rises 27.3x from genomic 37.3k (21 kya) to modelled rangeloss 1.02M (1500); **deep**: genomic level 37.3k is 27.3x below the next level (rangeloss, 1.02M); rule absolute |
-| *Panthera pardus* | no | reviewed | 0.00 | 131k (history) | VU | **units**: the curve's time is rescaled x8.5 from its source (Armstrong et al. 2025, Genome Biol Evol 17(4):evaf060, Fig. 4 (green curve): 7.56e-09/yr, g = 1), more than the lineage's 95% rate band spans (3x; Carnivora) *(reviewed, #66: Armstrong 2025 Fig. 4 is plotted with g = 1 (time in generations), so the time rescale by the per-generation rate is the source's own scaling (ToLaD#66))* |
-| *Panthera leo* | no | reviewed | 0.00 | 23.5k (history) | VU | **units**: the curve's time is rescaled x4.33 from its source (Armstrong et al. 2025, Genome Biol Evol 17(4):evaf060, Fig. 4 (green curve): 5.42e-09/yr, g = 1), more than the lineage's 95% rate band spans (3x; Carnivora) *(reviewed, #66: Armstrong 2025 Fig. 4 is plotted with g = 1 (time in generations), so the large time rescale is the source's own scaling; cross-checked against five other lion PSMC curves (Panthera_leo.toml [deep] note))* |
-| *Panthera tigris* | no | reviewed | 0.00 | 5.57e+03 (history) | EN | **units**: the curve's time is rescaled x7.44 from its source (Armstrong et al. 2025, Genome Biol Evol 17(4):evaf060, Fig. 4 (green curve): 7.45e-09/yr, g = 1), more than the lineage's 95% rate band spans (3x; Carnivora) *(reviewed, #66: Armstrong 2025 Fig. 4 is plotted with g = 1 (time in generations), so the time rescale by the per-generation rate is the source's own scaling (ToLaD#66))* |
-| *Lynx pardinus* | no | reviewed | 0.00 | 2.4e+03 (history) | VU | **join**: falls 53.9x from modelled rangeloss 61.2k (1500) to cited estimate 1.14e+03 (1988) *(reviewed, #94: A real collapse, not a unit or join error: the modelled 1500 level (~61,000, the 2024 census x the PHYLACINE range ratio) falls ~54x to the cited 1988 estimate (1,136), while the range fell ~89x, from the 950,000 km2 present-natural map to the 10,669 km2 of stable presence Rodriguez & Delibes 1992 mapped (Guzman et al. 2004, Table 1); the same 1988 density over the natural range would give ~100,000 (Lynx_pardinus.toml))* |
-| *Felis silvestris* | no | unanchored | 0.00 | 1.07M (greenspoon model) | LC | today's count modelled, no published figure |
-| *Caracal caracal* | no | unanchored | 0.00 | 616k (greenspoon model) | LC | today's count modelled, no published figure |
-| *Leopardus pardalis* | no | unanchored | 0.00 | 559k (greenspoon model) | LC | today's count modelled, no published figure |
-| *Leptailurus serval* | no | unanchored | 0.00 | 434k (greenspoon model) | LC | today's count modelled, no published figure |
-| *Catopuma temminckii* | no | unanchored | 0.00 | 408k (model) | VU | today's count modelled, no published figure |
-| *Prionailurus bengalensis* | no | unanchored | 0.00 | 331k (greenspoon model) | LC | today's count modelled, no published figure |
-| *Leopardus wiedii* | no | unanchored | 0.00 | 291k (greenspoon model) | NT | today's count modelled, no published figure |
-| *Felis chaus* | no | unanchored | 0.00 | 190k (greenspoon model) | LC | today's count modelled, no published figure |
-| *Leopardus geoffroyi* | no | unanchored | 0.00 | 166k (greenspoon model) | LC | today's count modelled, no published figure |
-| *Puma yagouaroundi* | no | unanchored | 0.00 | 155k (model) | NT | today's count modelled, no published figure |
-| *Leopardus colocolo* | no | unanchored | 0.00 | 121k (greenspoon model) | NT | today's count modelled, no published figure |
-| *Pardofelis marmorata* | no | unanchored | 0.00 | 75.1k (greenspoon model) | NT | today's count modelled, no published figure |
-| *Catopuma badia* | no | unanchored | 0.00 | 71k (model) | EN | today's count modelled, no published figure |
-| *Prionailurus rubiginosus* | no | unanchored | 0.00 | 61.9k (greenspoon model) | NT | today's count modelled, no published figure |
-| *Profelis aurata* | no | unanchored | 0.00 | 51.7k (greenspoon model) | VU | today's count modelled, no published figure |
-| *Neofelis nebulosa* | no | unanchored | 0.00 | 32.4k (greenspoon model) | VU | today's count modelled, no published figure |
-| *Prionailurus viverrinus* | no | unanchored | 0.00 | 23.4k (greenspoon model) | VU | today's count modelled, no published figure |
-| *Felis catus* | no | clean | 0.00 | 600M (history) | NE |  |
-| *Lynx rufus* | no | clean | 0.00 | 3.5M (census) | LC |  |
-| *Lynx canadensis* | no | clean | 0.00 | 158k (history) | LC |  |
-| *Lynx lynx* | no | clean | 0.00 | 69.4k (history) | LC |  |
-| *Panthera onca* | no | clean | 0.00 | 64k (history) | NT |  |
-| *Felis margarita* | no | clean | 0.00 | 40.9k (census) | LC |  |
-| *Leopardus guigna* | no | clean | 0.00 | 35.2k (census) | LC |  |
-| *Otocolobus manul* | no | clean | 0.00 | 20.5k (census) | LC |  |
-| *Leopardus tigrinus* | no | clean | 0.00 | 14.3k (census) | VU |  |
-| *Felis nigripes* | no | clean | 0.00 | 13.9k (census) | VU |  |
-| *Leopardus guttulus* | no | clean | 0.00 | 9.07e+03 (census) | VU |  |
-| *Panthera uncia* | no | clean | 0.00 | 7.72e+03 (history) | VU |  |
-| *Neofelis diardi* | no | clean | 0.00 | 6.75e+03 (census) | VU |  |
-| *Acinonyx jubatus* | no | clean | 0.00 | 6.52e+03 (history) | VU |  |
-| *Prionailurus planiceps* | no | clean | 0.00 | 3.75e+03 (census) | EN |  |
-| *Leopardus jacobita* | no | clean | 0.00 | 2.76e+03 (census) | EN |  |
+| *Puma concolor* | yes | flagged | 1.44 | 777k (greenspoon model) | LC | **join**: rises 27.3x from genomic 37.3k (21 kya) to modelled rangeloss 1.02M (1500); **deep**: genomic level 37.3k is 27.3x below the next level (rangeloss, 1.02M); rule absolute |
+| *Panthera pardus* | yes | reviewed | 0.00 | 131k (history) | VU | **units**: the curve's time is rescaled x8.5 from its source (Armstrong et al. 2025, Genome Biol Evol 17(4):evaf060, Fig. 4 (green curve): 7.56e-09/yr, g = 1), more than the lineage's 95% rate band spans (3x; Carnivora) *(reviewed, #66: Armstrong 2025 Fig. 4 is plotted with g = 1 (time in generations), so the time rescale by the per-generation rate is the source's own scaling (ToLaD#66))* |
+| *Panthera leo* | yes | reviewed | 0.00 | 23.5k (history) | VU | **units**: the curve's time is rescaled x4.33 from its source (Armstrong et al. 2025, Genome Biol Evol 17(4):evaf060, Fig. 4 (green curve): 5.42e-09/yr, g = 1), more than the lineage's 95% rate band spans (3x; Carnivora) *(reviewed, #66: Armstrong 2025 Fig. 4 is plotted with g = 1 (time in generations), so the large time rescale is the source's own scaling; cross-checked against five other lion PSMC curves (Panthera_leo.toml [deep] note))* |
+| *Panthera tigris* | yes | reviewed | 0.00 | 5.57e+03 (history) | EN | **units**: the curve's time is rescaled x7.44 from its source (Armstrong et al. 2025, Genome Biol Evol 17(4):evaf060, Fig. 4 (green curve): 7.45e-09/yr, g = 1), more than the lineage's 95% rate band spans (3x; Carnivora) *(reviewed, #66: Armstrong 2025 Fig. 4 is plotted with g = 1 (time in generations), so the time rescale by the per-generation rate is the source's own scaling (ToLaD#66))* |
+| *Lynx pardinus* | yes | reviewed | 0.00 | 2.4e+03 (history) | VU | **join**: falls 53.9x from modelled rangeloss 61.2k (1500) to cited estimate 1.14e+03 (1988) *(reviewed, #94: A real collapse, not a unit or join error: the modelled 1500 level (~61,000, the 2024 census x the PHYLACINE range ratio) falls ~54x to the cited 1988 estimate (1,136), while the range fell ~89x, from the 950,000 km2 present-natural map to the 10,669 km2 of stable presence Rodriguez & Delibes 1992 mapped (Guzman et al. 2004, Table 1); the same 1988 density over the natural range would give ~100,000 (Lynx_pardinus.toml))* |
+| *Felis silvestris* | yes | unanchored | 0.00 | 1.07M (greenspoon model) | LC | today's count modelled, no published figure |
+| *Caracal caracal* | yes | unanchored | 0.00 | 616k (greenspoon model) | LC | today's count modelled, no published figure |
+| *Leopardus pardalis* | yes | unanchored | 0.00 | 559k (greenspoon model) | LC | today's count modelled, no published figure |
+| *Leptailurus serval* | yes | unanchored | 0.00 | 434k (greenspoon model) | LC | today's count modelled, no published figure |
+| *Catopuma temminckii* | yes | unanchored | 0.00 | 408k (model) | VU | today's count modelled, no published figure |
+| *Prionailurus bengalensis* | yes | unanchored | 0.00 | 331k (greenspoon model) | LC | today's count modelled, no published figure |
+| *Leopardus wiedii* | yes | unanchored | 0.00 | 291k (greenspoon model) | NT | today's count modelled, no published figure |
+| *Felis chaus* | yes | unanchored | 0.00 | 190k (greenspoon model) | LC | today's count modelled, no published figure |
+| *Leopardus geoffroyi* | yes | unanchored | 0.00 | 166k (greenspoon model) | LC | today's count modelled, no published figure |
+| *Puma yagouaroundi* | yes | unanchored | 0.00 | 155k (model) | NT | today's count modelled, no published figure |
+| *Leopardus colocolo* | yes | unanchored | 0.00 | 121k (greenspoon model) | NT | today's count modelled, no published figure |
+| *Pardofelis marmorata* | yes | unanchored | 0.00 | 75.1k (greenspoon model) | NT | today's count modelled, no published figure |
+| *Catopuma badia* | yes | unanchored | 0.00 | 71k (model) | EN | today's count modelled, no published figure |
+| *Prionailurus rubiginosus* | yes | unanchored | 0.00 | 61.9k (greenspoon model) | NT | today's count modelled, no published figure |
+| *Profelis aurata* | yes | unanchored | 0.00 | 51.7k (greenspoon model) | VU | today's count modelled, no published figure |
+| *Neofelis nebulosa* | yes | unanchored | 0.00 | 32.4k (greenspoon model) | VU | today's count modelled, no published figure |
+| *Prionailurus viverrinus* | yes | unanchored | 0.00 | 23.4k (greenspoon model) | VU | today's count modelled, no published figure |
+| *Felis catus* | yes | clean | 0.00 | 600M (history) | NE |  |
+| *Lynx rufus* | yes | clean | 0.00 | 3.5M (census) | LC |  |
+| *Lynx canadensis* | yes | clean | 0.00 | 158k (history) | LC |  |
+| *Lynx lynx* | yes | clean | 0.00 | 69.4k (history) | LC |  |
+| *Panthera onca* | yes | clean | 0.00 | 64k (history) | NT |  |
+| *Felis margarita* | yes | clean | 0.00 | 40.9k (census) | LC |  |
+| *Leopardus guigna* | yes | clean | 0.00 | 35.2k (census) | LC |  |
+| *Otocolobus manul* | yes | clean | 0.00 | 20.5k (census) | LC |  |
+| *Leopardus tigrinus* | yes | clean | 0.00 | 14.3k (census) | VU |  |
+| *Felis nigripes* | yes | clean | 0.00 | 13.9k (census) | VU |  |
+| *Leopardus guttulus* | yes | clean | 0.00 | 9.07e+03 (census) | VU |  |
+| *Panthera uncia* | yes | clean | 0.00 | 7.72e+03 (history) | VU |  |
+| *Neofelis diardi* | yes | clean | 0.00 | 6.75e+03 (census) | VU |  |
+| *Acinonyx jubatus* | yes | clean | 0.00 | 6.52e+03 (history) | VU |  |
+| *Prionailurus planiceps* | yes | clean | 0.00 | 3.75e+03 (census) | EN |  |
+| *Leopardus jacobita* | yes | clean | 0.00 | 2.76e+03 (census) | EN |  |
 
 ## Beyond the cats: the 60 most visible of 166 flagged (the name-only class summarised below)
 

@@ -42,6 +42,17 @@ function datedSpecies(t: DatedSplit): string[] {
   return t.kids.flatMap((k) => (typeof k === 'string' ? [k] : datedSpecies(k)));
 }
 
+/**
+ * The Red List's Title Case English name in the fan's sentence case: words after the first lowercased, except a
+ * possessive or a word from a place or people (Pallas's, Asian, Iberian, Chinese): "Asian Golden Cat" -> "Asian golden cat".
+ */
+export function sentenceCase(name: string): string {
+  return name
+    .split(' ')
+    .map((w, i) => (i === 0 || /'s$|(an|ese|ish|ic)$/.test(w) || !/^[A-Z][a-z-]+$/.test(w) ? w : w.toLowerCase()))
+    .join(' ');
+}
+
 /** Four significant digits (a domestication date is 0.0095 Ma). */
 const r3 = (x: number) => Number(x.toPrecision(4));
 
@@ -132,7 +143,10 @@ if (!raw.dated) throw new Error('data/mammals has no dated tree (format 1.6): re
 /** The cat family's dated tree, from the data. */
 export const FELIDAE_TREE: Split = splitFrom(
   raw.dated,
-  (s) => bySci.get(s)?.common ?? null,
+  (s) => {
+    const c = bySci.get(s)?.common;
+    return c ? sentenceCase(c) : null;
+  },
   (s) => !!bySci.get(s)?.extinct,
   { upham: raw.datedMeta?.upham || 'Upham et al. 2019', alvarez: raw.datedMeta?.alvarez || 'Álvarez-Carretero et al. 2022' },
 );
