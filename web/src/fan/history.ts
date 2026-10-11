@@ -227,13 +227,10 @@ export function styleBetween(h: HistoryRec, year0: number, year1: number): SpanS
  * - `flagged`: that join where the pipeline flags it (history.deepJoin: beyond 10x, or blind-spot
  *   steps not drawn; the audit's deep class, ToLaD#113);
  * - `held`: held flat for want of any figure, before the first point or after the last (noDataSpans).
- * The fan and the card draw `count` solid, genome, model and flagged in one rough style; held keeps
- * its no-data fade (ToLaD#55).
+ * The card lists the stretches by basis (HistorySpark basisRows); held keeps its no-data fade on the
+ * fan (ToLaD#55).
  */
 export type Basis = 'count' | 'genome' | 'model' | 'flagged' | 'held';
-
-/** The bases drawn rough: a reconstruction, not a count. */
-export const ROUGH_BASES: ReadonlySet<Basis> = new Set<Basis>(['genome', 'model', 'flagged']);
 
 /** Point kinds that are the pipeline's reconstruction, not a cited figure. */
 const RECON_KINDS = new Set(['genomic', 'natural', 'rangeloss', 'model']);
@@ -292,11 +289,4 @@ export function basisSpans(h: HistoryRec): BasisSpan[] {
     else out.push({ ago0, ago1, basis });
   }
   return out;
-}
-
-/** The basis of the history between two calendar years (at their midpoint). */
-export function basisBetween(h: HistoryRec, year0: number, year1: number): Basis {
-  const ago = h.nowYear - (year0 + year1) / 2;
-  for (const s of basisSpans(h)) if (ago <= s.ago0 && ago >= s.ago1) return s.basis;
-  return 'model';
 }

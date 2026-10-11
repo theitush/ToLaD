@@ -1,15 +1,14 @@
-// Per-span styles on a species' column in the fan (ToLaD#55, #164): stretches of
-// the column drawn differently from a counted span, world-fixed (in years before
-// present, so they hold still under zoom). Two styles: `held`, where the column
-// is held flat for want of any figure (cited or modelled), drawn faint; and
-// `rough`, where it rests on the genome or a model, or on a join the audit flags
-// (history.ts basisSpans, ToLaD#119), drawn as a rough estimate: lower contrast,
-// its width and texture still read.
+// Per-span styles on a species' column in the fan (ToLaD#55): stretches of the
+// column drawn differently from a measured span, world-fixed (in years before
+// present, so they hold still under zoom). Today one style: `held`, where the
+// column is held flat for want of any figure (cited or modelled), drawn faint.
+// The same mechanism can carry other per-span styles later (e.g. ToLaD#119's
+// "not from a source").
 
-import { basisSpans, noDataSpans, ROUGH_BASES } from './history';
+import { noDataSpans } from './history';
 import type { HistEvent, SpeciesRec } from './panthera';
 
-export type ColumnStyle = 'held' | 'rough';
+export type ColumnStyle = 'held';
 
 export interface ColumnSpan {
   /** Years before present: the span runs from `ago0` (older) up to `ago1`. */
@@ -18,46 +17,13 @@ export interface ColumnSpan {
   style: ColumnStyle;
 }
 
-type Tint = { rgb: readonly [number, number, number]; a: number };
-/** The background, 0–1 (view.ts BG #0c1714). */
-const BG_RGB = [12 / 255, 23 / 255, 20 / 255] as const;
-
 /**
- * The rough look's options (ToLaD#164), `?rough=a|b|c`: `a` fades the stretch a little towards the
- * background (#55's no-data fade, lighter); `b` washes it towards a mid gray-green, a fog: the dark
- * gaps lift and the bright individuals sink, so the texture flattens without going dark; `c` a
- * paler, thinner haze (a sketch on paper rather than a fog).
+ * How far each style fades its stretch of the lanes towards the background (0: as measured, 1: gone).
+ * Faint, not hidden: the column keeps its width and colour, it only reads as not measured.
  */
-export const ROUGH_LOOKS: Record<'a' | 'b' | 'c', Tint> = {
-  a: { rgb: BG_RGB, a: 0.36 },
-  b: { rgb: [0.3, 0.35, 0.33], a: 0.5 },
-  c: { rgb: [0.55, 0.6, 0.58], a: 0.32 },
-};
-export type RoughLook = keyof typeof ROUGH_LOOKS;
-export const ROUGH_DEFAULT: RoughLook = 'b';
-
-function roughFromUrl(): RoughLook {
-  if (typeof location === 'undefined') return ROUGH_DEFAULT;
-  const q = new URLSearchParams(location.search).get('rough');
-  return q && q in ROUGH_LOOKS ? (q as RoughLook) : ROUGH_DEFAULT;
-}
-
-/**
- * Each style's overlay over its stretch of the lanes, individuals included: a colour (0–1) and how
- * far it covers (0: as counted, 1: the colour alone). Faint, not hidden: the column keeps its width
- * and texture, it only reads as not measured (held) or not counted (rough).
- */
-export const COLUMN_TINT: Record<ColumnStyle, Tint> = {
-  held: { rgb: BG_RGB, a: 0.55 },
-  rough: ROUGH_LOOKS[roughFromUrl()],
-};
-/** How far each style covers its stretch (COLUMN_TINT's alpha). */
 export const COLUMN_DIM: Record<ColumnStyle, number> = {
-  held: COLUMN_TINT.held.a,
-  rough: COLUMN_TINT.rough.a,
+  held: 0.55,
 };
-/** The styles in the order view.ts indexes them. */
-export const COLUMN_STYLES: readonly ColumnStyle[] = ['held', 'rough'];
 
 /**
  * The styled spans of a living species' column, oldest first, clipped to its
@@ -65,38 +31,21 @@ export const COLUMN_STYLES: readonly ColumnStyle[] = ['held', 'rough'];
  * point back to its start (population.ts holds the oldest level there) and
  * after its last point to now (history.ts
  * noDataSpans); a living species whose counts no history drives is the Red
- * List count held flat over its whole column. Rough (ToLaD#164): between
- * those, every stretch history.ts basisSpans puts on the genome, a model or a
- * flagged join. Extinct species: none.
+ * List count held flat over its whole column. Extinct species: none.
  */
 export function columnSpans(sp: SpeciesRec, startMa: number): ColumnSpan[] {
   if (sp.extinct) return [];
   const start = startMa * 1e6;
   const h = sp.history;
   if (!sp.births || !h) return start > 0 ? [{ ago0: start, ago1: 0, style: 'held' }] : [];
-  const held: ColumnSpan[] = [];
-  let hi = start; // the rough stretches lie below the held lead-in ...
-  let lo = 0; // ... and above the held tail
+  const out: ColumnSpan[] = [];
   for (const s of noDataSpans(h)) {
     // (Before: the column holds the first level back to its start, which may be older than the history's.)
     const ago0 = s.side === 'before' ? start : Math.min(start, h.nowYear - s.year);
     const ago1 = s.side === 'before' ? Math.max(0, h.nowYear - s.year) : 0;
-    if (s.side === 'before') hi = Math.min(hi, ago1);
-    else lo = Math.max(lo, ago0);
-    if (ago0 > ago1) held.push({ ago0, ago1, style: 'held' });
+    if (ago0 > ago1) out.push({ ago0, ago1, style: 'held' });
   }
-  // Rough (ToLaD#164): the genome, model and flagged stretches between them, merged where they meet.
-  const rough: ColumnSpan[] = [];
-  for (const b of basisSpans(h)) {
-    if (!ROUGH_BASES.has(b.basis)) continue;
-    const ago0 = Math.min(b.ago0, hi);
-    const ago1 = Math.max(b.ago1, lo);
-    if (!(ago0 > ago1)) continue;
-    const prev = rough[rough.length - 1];
-    if (prev && prev.ago1 <= ago0 + 1) prev.ago1 = ago1;
-    else rough.push({ ago0, ago1, style: 'rough' });
-  }
-  return held.concat(rough).sort((a, b) => b.ago0 - a.ago0);
+  return out;
 }
 
 /**
