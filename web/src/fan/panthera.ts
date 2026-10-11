@@ -70,9 +70,20 @@ export interface CladeRec {
   species: SpeciesRec[];
 }
 
+/**
+ * The Red List's Title Case English name in the fan's sentence case: words after the first lowercased, except a
+ * possessive or a word from a place or people (Pallas's, Asian, Iberian, Chinese): "Asian Golden Cat" -> "Asian golden cat".
+ */
+export function sentenceCase(name: string): string {
+  return name
+    .split(' ')
+    .map((w, i) => (i === 0 || /'s$|(an|ese|ish|ic)$/.test(w) || !/^[A-Z][a-z-]+$/.test(w) ? w : w.toLowerCase()))
+    .join(' ');
+}
+
 export function speciesRec(r: RawSpecies, clade: number): SpeciesRec {
   // generation length: the model's (COMBINE, else its mass fit); a curated history's own wins below
-  const x = { common: r.common ?? r.sci, gen: r.gen?.years ?? 7, src: r.gen?.how ?? 'assumed' };
+  const x = { common: r.common ? sentenceCase(r.common) : r.sci, gen: r.gen?.years ?? 7, src: r.gen?.how ?? 'assumed' };
   const h = r.history;
   const counts = !!h && h.use === 'counts' && h.segments.length > 0 && !r.extinct;
   const genYears = counts ? Math.round(h!.G * 1000) / 1000 : x.gen;
