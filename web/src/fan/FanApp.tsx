@@ -1,4 +1,4 @@
-// The main view: one polytomy (Panthera), OneZoom-style. The time river is
+// The main view: the dated Panthera tree, OneZoom-style. The time river is
 // still available at ?river (and the synthetic spike tree at ?synthetic).
 
 import * as MeshMirror from './mesh';
@@ -9,7 +9,7 @@ import type { WidthMode } from './layout';
 import { PANTHERA, type SpeciesRec } from './panthera';
 import { population } from './population';
 import { statusOf } from './status';
-import { FanView, fmtInt, formatYearsAgo, type IndInfo, type Selection } from './view';
+import { FanView, fmtInt, formatYearsAgo, type IndInfo, type Lineage, type Selection } from './view';
 
 declare global {
   interface Window {
@@ -74,10 +74,12 @@ export function FanApp() {
           <span className="wlab" />
         </div>
       {sel ? (
-        sel.ind ? (
+        sel.lineage ? (
+          <LineageCard lin={sel.lineage} onClose={() => viewRef.current?.tap(-1e6, -1e6)} />
+        ) : sel.ind ? (
           <IndCard sp={sel.sp} ind={sel.ind} onClose={() => viewRef.current?.tap(-1e6, -1e6)} />
         ) : (
-          <SpeciesCard sp={sel.sp} ageMa={sel.ageMa} onClose={() => viewRef.current?.tap(-1e6, -1e6)} />
+          <SpeciesCard sp={sel.sp} ageMa={sel.ageMa} startMa={sel.startMa} onClose={() => viewRef.current?.tap(-1e6, -1e6)} />
         )
       ) : (
         <ul className="key" aria-label="key">
@@ -152,11 +154,13 @@ const GRADE_MEANS: Record<string, string> = {
 
 /**
  * The population at a time (Ma) as the card words it: how many were alive, and
- * the share with living descendants today.
+ * the share with living descendants today. The species' column as the fan
+ * draws it, from its start (its split in the dated tree; by default its first
+ * appearance) up to its tip.
  */
-export function populationAt(sp: SpeciesRec, ageMa: number): { when: string; alive: number; green: number; now: boolean; end: boolean } {
-  const p = population(sp);
-  const a = Math.min(Math.max(ageMa, sp.t1), sp.extinct ? sp.t0 : Infinity);
+export function populationAt(sp: SpeciesRec, ageMa: number, startMa = sp.t0): { when: string; alive: number; green: number; now: boolean; end: boolean } {
+  const p = population(sp, startMa);
+  const a = Math.min(Math.max(ageMa, sp.t1), startMa);
   const yrs = a * 1e6;
   const now = yrs < 0.5;
   const end = sp.extinct && Math.abs(a - sp.t1) < 1e-9;
@@ -176,8 +180,8 @@ export function StatusChip({ sp }: { sp: SpeciesRec }) {
   );
 }
 
-export function SpeciesCard({ sp, onClose, open, ageMa }: { sp: SpeciesRec; onClose: () => void; open?: boolean; ageMa?: number }) {
-  const at = populationAt(sp, ageMa ?? sp.t1);
+export function SpeciesCard({ sp, onClose, open, ageMa, startMa }: { sp: SpeciesRec; onClose: () => void; open?: boolean; ageMa?: number; startMa?: number }) {
+  const at = populationAt(sp, ageMa ?? sp.t1, startMa);
   const pct = (f: number) => `${Math.round(f * 100)}%`;
   const st = statusOf(sp);
   const lived = `from ${plainAgo(sp.t0 * 1e6)} to ${sp.extinct ? plainAgo(sp.t1 * 1e6) : 'today'}`;
@@ -249,6 +253,54 @@ export function SpeciesCard({ sp, onClose, open, ageMa }: { sp: SpeciesRec; onCl
             ) : (
               'No Red List category on file.'
             )}
+          </dd>
+        </dl>
+      </details>
+    </div>
+  );
+}
+
+/** A parent column touched: the daughters' shared ancestors at that time, and their split. */
+export function LineageCard({ lin, onClose }: { lin: Lineage; onClose: () => void }) {
+  const s = lin.node.split;
+  const of = lin.of.length > 1 ? `${lin.of.slice(0, -1).join(', ')} and ${lin.of[lin.of.length - 1]}` : lin.of[0];
+  const range = s.lo === s.hi ? 'no range found' : `range ${s.lo}–${s.hi} million`;
+  return (
+    <div className="card-sp" onPointerDown={(e) => e.stopPropagation()}>
+      <button type="button" className="x" onClick={onClose} aria-label="Close">
+        ×
+      </button>
+      <div className="t">
+        <span>{lin.name}</span>
+      </div>
+      <div className="facts">
+        <p className="lead">
+          <span className="lane lineage" />
+          <span>
+            <b>{plainCount(lin.alive)}</b> alive {plainAgo(lin.ageMa * 1e6)} <span className="dim">(model)</span>
+          </span>
+        </p>
+        <p className="sub">{Math.round(lin.green * 100)}% have descendants alive today</p>
+        <p className="sub">Ancestors of {of}</p>
+        <p className="sub">
+          Split ~{s.ageMa} million years ago <span className="dim">({range}; {s.confidence} confidence)</span>
+        </p>
+      </div>
+      <details className="more">
+        <summary>Details</summary>
+        <dl>
+          <dt>Split date</dt>
+          <dd>{s.cite}</dd>
+          {s.note && (
+            <>
+              <dt>Note</dt>
+              <dd>{s.note}</dd>
+            </>
+          )}
+          <dt>Method</dt>
+          <dd>
+            Modelled, not counted: the daughters’ populations at the split, added up. The share with descendants alive today comes from a randomly mixing
+            family tree, counted back one generation at a time from the daughters’ shares at the split.
           </dd>
         </dl>
       </details>

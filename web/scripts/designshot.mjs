@@ -13,6 +13,7 @@ const PREFIX = process.argv[3] || 'd';
 const ONLY = process.argv[4] ? new Set(process.argv[4].split(',')) : null;
 mkdirSync(OUT, { recursive: true });
 // [name, kind, args]: 'home' | 'far' | 'card' [species] | 'touch' [species, agoYears] | 'scroll' [zoom, agoYears] | 'bar' [species, agoYears, perBar, sy, at?]
+//   | 'split' [splitMa, time zoom × home] | 'tapnode' [splitMa, ageMa]
 const scenes = [
   ['home', 'home'],
   ['far', 'far'],
@@ -30,6 +31,14 @@ const scenes = [
   // Sequences (#54): a slow pan down from home until "now" is above the screen, and a zoom from home into the lion.
   ...[0, 60, 120, 180, 260, 360].map((dy, k) => [`pan${k + 1}`, 'pan', [1.5, dy]]),
   ...[0, 0.2, 0.4, 0.6, 0.8, 1].map((t, k) => [`zoom${k + 1}`, 'zoomin', ['Lion', 300, t]]),
+  // The dated tree (#46): onto a split [its date Ma, time zoom × home], the mesh across one (the lion's
+  // right edge just above its split from the cave lion), and a tap on a parent column [split Ma, age Ma].
+  ['split-lionleopard', 'split', [2.57, 5]],
+  ['split-cavelion', 'split', [0.5, 5]],
+  ['split-root', 'split', [4.6, 3]],
+  ['decline', 'bar', ['Lion', 50, 1e5, 3.5, 0.5]],
+  ['mesh-split', 'bar', ['Lion', 499990, 100, 2e4, 1]],
+  ['lineage', 'tapnode', [2.57, 1.2]],
 ];
 const browser = await chromium.launch({ headless: true });
 try {
@@ -86,6 +95,27 @@ try {
           const wx = b.colLeft + 0.3 * b.width;
           f.cam = { cx: wx - (px - f.w / 2) / sx, cy: y - (py - f.h / 2) / sy, sx, sy, ty: sy };
           f.camera.settle();
+        } else if (kind === 'split' || kind === 'tapnode') {
+          const v = fan.nodes.find((n) => Math.abs(n.ageMa - args[0]) < 1e-9);
+          if (kind === 'tapnode') {
+            f.cam = f.homeCamera();
+            f.camera.settle();
+            const y = fan.time.y(args[1]);
+            const [px, py] = f.toScreen(v.left + 0.5 * v.width, y);
+            f.tap(px, py);
+          } else {
+            // The daughters' extent across 80% of the screen, the split mid-screen.
+            const isN = (k) => 'strands' in k;
+            const first = v.kids[0];
+            const last = v.kids[v.kids.length - 1];
+            const lo = isN(first) ? first.left : first.colLeft;
+            const hi = isN(last) ? last.left + last.width : last.colLeft + last.width;
+            const h = f.homeCamera();
+            const sx = Math.max(h.sx, (0.8 * f.w) / (hi - lo));
+            const sy = h.sy * args[1];
+            f.cam = { cx: (lo + hi) / 2, cy: v.y, sx, sy, ty: sy };
+            f.camera.settle();
+          }
         } else if (kind === 'far') {
           const h = f.homeCamera();
           f.cam = { ...h, sx: h.sx / 6, sy: h.sy / 6, ty: h.sy / 6 };

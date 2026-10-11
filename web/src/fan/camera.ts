@@ -21,7 +21,7 @@
 //   - zoom out: no further than the whole fan with a margin.
 //   - pan: some of the fan always stays on screen.
 
-import { laneAt, leftAt, type Fan, type FanBranch } from './layout';
+import { columnsAt, type Fan, type FanBranch } from './layout';
 
 /** A span of this many years ... */
 export const MIN_YEARS = 10;
@@ -191,9 +191,10 @@ export class FanCamera {
   /** The deepest width zoom allowed at world point (wx, wy) (time zoom sy: kept for callers, unused). */
   sxCap(_wx: number, wy: number, _sy?: number): number {
     const bs = this.fan.branches;
-    const span = bs.filter((b) => wy >= b.tipY && wy <= 0);
+    const yb = this.fan.trunkBottom.y;
+    const span = bs.filter((b) => wy >= b.tipY && wy <= yb);
     let cell = Infinity;
-    for (const b of span.length ? span : bs) cell = Math.min(cell, this.cellAt(b, Math.min(0, Math.max(b.tipY, wy))));
+    for (const b of span.length ? span : bs) cell = Math.min(cell, this.cellAt(b, Math.min(yb, Math.max(b.tipY, wy))));
     const cap = Math.min(SX_MAX, STRAND_PX / cell);
     return cap;
   }
@@ -239,24 +240,16 @@ export class FanCamera {
     c.ty = c.sy;
   }
 
-  /** World x intervals holding drawn content at height y: the stem below the fork, else each branch. */
+  /** World x intervals holding drawn content at height y: the columns there (layout.ts columnsAt). */
   contentAt(y: number): [number, number][] {
-    const f = this.fan;
-    if (y >= 0) return [[f.x0, f.x1]];
-    const out: [number, number][] = [];
-    for (const b of f.branches) {
-      if (y < b.tipY) continue;
-      const left = leftAt(b, y);
-      out.push([left, left + laneAt(b, y).w]);
-    }
-    return out;
+    return columnsAt(this.fan, y);
   }
 
   /** Nearest x holding content at height y, or anywhere in heights [y, y1] (x itself if it does). */
   nearestContent(x: number, y: number, y1 = y): number {
     const ys = [y, y1];
     for (let k = 1; k < 8; k++) ys.push(y + ((y1 - y) * k) / 8);
-    for (const b of this.fan.branches) for (const v of [b.tipY, 0]) if (v > y && v < y1) ys.push(v);
+    for (const b of this.fan.branches) for (const v of [b.tipY, b.splitY]) if (v > y && v < y1) ys.push(v);
     let best = x;
     let bd = Infinity;
     for (const h of ys) {

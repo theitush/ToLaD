@@ -135,17 +135,19 @@ describe('one mesh for both lanes: the lane only colours', () => {
   it('every instance spans both lanes with one lattice: one pitch per individual, whichever lane', () => {
     for (const [, sp, ago, perBar, sy] of SCENES) {
       const { insts, mm, c } = scene(sp, ago, perBar, sy);
-      const pitchPx = mm.pitch(c.cam.cy) * c.cam.sx;
       for (const x of insts) {
-        // The lattice: blocks of 2^lvl individuals, the level of this zoom; the boundary inside the instance's span.
-        expect(x.bw / 2 ** x.lvl / pitchPx, `${sp} ${perBar}`).toBeCloseTo(1, 5);
-        expect(x.lvl).toBe(lineLevel(pitchPx).L);
+        // The lattice: blocks of 2^lvl individuals at the instance's top row, the level of this zoom.
+        const pitchPx = mm.pitch(c.toWorld(0, x.y0)[1]) * c.cam.sx;
+        expect(x.bw / 2 ** x.lvl / pitchPx, `${sp} ${perBar}`).toBeCloseTo(1, 4);
+        expect(x.lvl).toBe(lineLevel(x.bw / 2 ** x.lvl).L);
         expect(x.latSeed).toBe(mm.latticeSeed);
         // The lanes' boundary of the instance's own stretch (the lanes step with N(t) and q(t)).
         const ym = c.toWorld(0, (x.y0 + x.y1) / 2)[1];
         const L = mm.lanes(ym);
         // (Zoomed out, a generation's step can be far under a pixel: its midpoint is its boundary, either side.)
-        if (L.gw > 0 && x.x0 > 0 && x.x1 < c.w && x.y1 - x.y0 > 1e-3) expect(x.xG).toBeCloseTo(c.toScreen(L.left + L.gw, ym)[0], 2);
+        // (The instance's green edge is a chord of the curve, from its top row down: within half a px of it.)
+        const xGm = x.xG + (x.sG ?? 0) * ((x.y1 - x.y0) / 2);
+        if (L.gw > 0 && x.x0 > 0 && x.x1 < c.w && x.y1 - x.y0 > 1e-3) expect(xGm).toBeCloseTo(c.toScreen(L.left + L.gw, ym)[0], 0);
       }
     }
   });
@@ -208,11 +210,11 @@ describe('GPU and CPU decide alike', () => {
     const u = new Uint32Array(MESH_U);
     const a: MeshInst = { x0: 1, y0: 2, x1: 3, y1: 4, xB0: 5, bw: 6, lw: 7, fineA: 0.5, p0: 9, T0: 10, A: 11, gBoff: 12, alpha: 0.25, mode: 1, lane: Lane.Gray, tipR: 16, GL: 17, Lm: 18, nowRel: 19, xG: 20, B0: 1, lvl: 2, latSeed: 9, nA: 3, nB: 4, seedA: 4294967295, seedB: 6, sA: 7, sB: 8, fA: 10, fB: 3 };
     packInst(a, f, u, 0);
-    expect([...f]).toEqual([1, 2, 3, 4, 5, 6, 7, 0.5, 9, 10, 11, 12, 0.25, 1, 1, 16, 17, 18, 19, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    expect([...f]).toEqual([1, 2, 3, 4, 5, 6, 7, 0.5, 9, 10, 11, 12, 0.25, 1, 1, 16, 17, 18, 19, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
     expect([...u]).toEqual([1, 2, 3, 4, 4294967295, 6, 7, 8, 9, 10, 3, 0]);
-    const b: MeshInst = { ...a, colL: 21, colR: 22, narG: 0.75, narR: 0.5, linkA: 0.5, lam: 2.25, tauC: 1.5, tauB: 2, gA: -12, baseA: 0.25 };
+    const b: MeshInst = { ...a, colL: 21, colR: 22, narG: 0.75, narR: 0.5, linkA: 0.5, lam: 2.25, tauC: 1.5, tauB: 2, gA: -12, baseA: 0.25, sL: 0.5, sR: -0.25, sG: 0.125, sP: 0.0625 };
     packInst(b, f, u, 0);
-    expect([...f].slice(20)).toEqual([21, 22, 0.75, 0.5, 0.5, 2.25, 1.5, 2, 0.25, 0, 0, 0]);
+    expect([...f].slice(20)).toEqual([21, 22, 0.75, 0.5, 0.5, 2.25, 1.5, 2, 0.25, 0, 0, 0, 0.5, -0.25, 0.125, 0.0625]);
     expect(u[11]).toBe(4294967284);
     expect(unpackInst(f, u, 0)).toEqual(b);
   });
@@ -237,7 +239,8 @@ describe('the texture at every zoom: never a plain lane', () => {
   for (const [name, sp, ago, perBar, sy] of [
     ['overview', 'Lion', 2e5, 1e9, 0.7],
     ['max zoom-out', 'Lion', 1e6, 1e11, 0.25],
-    ['the stem, below the species', 'Tiger', 2e7, 1e9, 0.7],
+    // (Below its split: a slice of the parent column, here the lion + leopard ancestors', where the green prefix ends in the leopard's slice.)
+    ['the stem, below the species', 'Leopard', 1e6, 1e9, 0.7],
   ] as const) {
     it(`in both lanes the lines cover some of the lane, never none and never all (${name})`, () => {
       const { insts, kLog, nowPx, c, mm } = scene(sp, ago, perBar, sy);

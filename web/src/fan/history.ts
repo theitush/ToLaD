@@ -84,6 +84,22 @@ export class BirthCurve {
     return this.after[k] - before;
   }
 
+  /**
+   * The history's points, newest first: years before present and births per
+   * generation there, both ends of every segment (where neighbouring
+   * segments meet at different sizes, two points at the same age).
+   */
+  points(): { ago: number; size: number }[] {
+    const out: { ago: number; size: number }[] = [];
+    this.segs.forEach((s, k) => {
+      const a0 = k ? this.ago[k - 1] : 0;
+      const last = out[out.length - 1];
+      if (!last || last.ago !== a0 || last.size !== s.endSize) out.push({ ago: a0, size: s.endSize });
+      out.push({ ago: this.ago[k], size: s.startSize });
+    });
+    return out;
+  }
+
   private segIndex(agoYears: number): number {
     let lo = 0;
     let hi = this.ago.length - 1;
