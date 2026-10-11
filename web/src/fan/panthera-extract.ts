@@ -50,6 +50,12 @@ export interface HistEvent {
   grade: Grade;
   /** The part of the species' range it concerns ('' = the whole species). */
   region: string;
+  /** v1.6 (ToLaD#149): "species" (tinted on the column) or "regional" (a subpopulation: card and sparkline only). */
+  scope: 'species' | 'regional';
+  /** v1.6: the drawn column falls >= 1.5x through the window (the pipeline's check); true in older data. */
+  shown: boolean;
+  /** v1.6: why the column doesn't fall through it, in the check's words ('' when shown). */
+  why: string;
 }
 
 export interface HistoryRec {
@@ -269,6 +275,9 @@ export function extractClade(skeleton: ArrayBuffer | Uint8Array, tile: ArrayBuff
           url: e.url,
           grade: e.grade,
           region: e.region ?? '',
+          scope: e.scope === 'regional' ? 'regional' : 'species',
+          shown: e.shown ?? true,
+          why: e.why ?? '',
         })),
         G: h.G,
         L: h.L,

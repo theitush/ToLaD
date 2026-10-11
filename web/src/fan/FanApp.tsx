@@ -314,6 +314,7 @@ const fmtYa = (ya: number) => Math.round(ya).toLocaleString('en-US');
  */
 export function EventSection({ ev, k }: { ev: HistEvent; k: number }) {
   const kind = ev.kind === 'bottleneck' ? 'Bottleneck' : ev.kind;
+  const unshown = ev.scope === 'species' && !ev.shown ? unshownSentence(ev.why) : '';
   return (
     <section className="event" data-event={k}>
       <p className="ev-k">
@@ -321,6 +322,65 @@ export function EventSection({ ev, k }: { ev: HistEvent; k: number }) {
       </p>
       <p className="ev-t">{ev.title}</p>
       <p className="ev-s">{ev.summary}</p>
+      {unshown && (
+        <p className="ev-unshown" data-unshown={ev.why}>
+          {unshown}
+        </p>
+      )}
+      <EventSource ev={ev} />
+    </section>
+  );
+}
+
+/**
+ * Why our curve doesn't show a species-wide bottleneck (ToLaD#149), from the pipeline's check
+ * (`history.event_fall`'s `why`): one plain sentence. The fan still tints it: it is evidenced and species-wide.
+ */
+export function unshownSentence(why: string): string {
+  const head = 'Our population curve doesn’t show this bottleneck: ';
+  switch (why) {
+    case 'blind spot':
+      return `${head}the genome method it is drawn from can’t see the last ~20,000 years, so the curve runs straight across it.`;
+    case 'before the data':
+      return `${head}we have no figures from before it, so the curve holds a modelled level there.`;
+    case 'joined across':
+      return `${head}it falls between two different sources (the genome’s deep past and later figures), and the curve is drawn straight between them.`;
+    case 'data rises':
+      return `${head}the figures it is drawn from rise through this window.`;
+    case 'data too shallow':
+      return `${head}the figures it is drawn from fall too little here to show at this scale.`;
+    case 'not drawn':
+      return `${head}this species’ column is drawn from our model, not from its figures.`;
+    default:
+      return `${head}the curve doesn’t fall through this window.`;
+  }
+}
+
+/**
+ * A regional event on the card (ToLaD#149): a subpopulation's bottleneck, e.g. India's lions. Not on
+ * the column (it can't narrow the whole species), so it is listed here, titled with its region, and
+ * banded (outlined) on the sparkline. Open when the touch is inside its window.
+ */
+export function RegionalEvent({ ev, k, open }: { ev: HistEvent; k: number; open: boolean }) {
+  const kind = ev.kind === 'bottleneck' ? 'Bottleneck' : ev.kind;
+  return (
+    <details className="event regional" data-event={k} data-regional="" open={open}>
+      <summary>
+        <span className="ev-k">
+          {kind} in {ev.region || 'part of its range'} · {fmtYa(ev.fromYa)}–{fmtYa(ev.toYa)} years ago
+        </span>
+        <span className="ev-t">{ev.title}</span>
+      </summary>
+      <p className="ev-s">{ev.summary}</p>
+      <EventSource ev={ev} />
+    </details>
+  );
+}
+
+/** An event's quote and its source, linked with its grade. */
+function EventSource({ ev }: { ev: HistEvent }) {
+  return (
+    <>
       <blockquote className="ev-q">“{ev.quote}”</blockquote>
       <p className="ev-src">
         {ev.url ? (
@@ -334,13 +394,17 @@ export function EventSection({ ev, k }: { ev: HistEvent; k: number }) {
           · grade {ev.grade}: {GRADE_MEANS[ev.grade] ?? 'unknown'}
         </span>
       </p>
-    </section>
+    </>
   );
 }
 
 export function SpeciesCard({ sp, onClose, open, ageMa, startMa, event }: { sp: SpeciesRec; onClose: () => void; open?: boolean; ageMa?: number; startMa?: number; event?: number }) {
   const at = populationAt(sp, ageMa ?? sp.t1, startMa);
-  const ev = event !== undefined ? sp.history?.events[event] : undefined;
+  const ev0 = event !== undefined ? sp.history?.events[event] : undefined;
+  const ev = ev0?.scope === 'regional' ? undefined : ev0;
+  // Regional events (ToLaD#149): listed under the sparkline, the one the touch is inside open.
+  const touchAgo = (ageMa ?? sp.t1) * 1e6;
+  const regional = (sp.history?.events ?? []).map((e, k) => ({ e, k })).filter(({ e }) => e.scope === 'regional');
   const pct = (f: number) => `${Math.round(f * 100)}%`;
   const st = statusOf(sp);
   // A domestic stock: the years its own births span (its curated segments, from domestication).
@@ -389,6 +453,9 @@ export function SpeciesCard({ sp, onClose, open, ageMa, startMa, event }: { sp: 
         </p>
       </div>
       {spark && <HistorySpark key={sp.gid} h={sp.history!} open={open} natural={sp.natural} naturalMeta={NATURAL_META} activeEvent={ev ? event : undefined} />}
+      {regional.map(({ e, k }) => (
+        <RegionalEvent key={`rg${sp.gid}-${k}`} ev={e} k={k} open={touchAgo <= e.fromYa && touchAgo >= e.toYa} />
+      ))}
       <details className="more" key={`more-${sp.gid}`}>
         <summary>Details</summary>
         <dl>
