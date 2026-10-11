@@ -233,7 +233,9 @@ describe('the texture of lines, then the individuals on them', () => {
 
 describe('the dead lane', () => {
   it('shows real lives once the bar reads under ~100 individuals: ended lines gray, green lanes green', () => {
-    for (const ago of [2000, 2e5]) {
+    // (Times whose screen stays above the lion's split from the cave lion, 0.5 Ma: below it the lion is a
+    // slice of the parent column, shifted sideways, its lanes the parent's.)
+    for (const ago of [2000, 1e5]) {
       const seen: Set<string>[] = [];
       // (Well inside each lane: near now the crash narrows the green lane to a sixth of the column.)
       for (const where of [0.95, 0.04]) {

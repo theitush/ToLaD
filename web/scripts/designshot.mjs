@@ -2,7 +2,7 @@
 // home, the mesh at a range of individuals per scale bar, deep in the lives,
 // zoomed far out, and a species card open.
 //   npm run build:single && node scripts/designshot.mjs <out-dir> [prefix] [only,names]
-//   (DSF: device scale factor, default 2; CLIP=x,y,w,h; DEBUG=1: the ?debug readout)
+//   (DSF: device scale factor, default 2; CLIP=x,y,w,h; DEBUG=1: the ?debug readout; EDGE=curved|straight: the fan's edges)
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -13,6 +13,7 @@ const PREFIX = process.argv[3] || 'd';
 const ONLY = process.argv[4] ? new Set(process.argv[4].split(',')) : null;
 mkdirSync(OUT, { recursive: true });
 // [name, kind, args]: 'home' | 'far' | 'card' [species] | 'touch' [species, agoYears] | 'scroll' [zoom, agoYears] | 'bar' [species, agoYears, perBar, sy, at?]
+//   | 'split' [splitMa, time zoom × home] | 'tapnode' [splitMa, ageMa]
 const scenes = [
   ['home', 'home'],
   ['far', 'far'],
@@ -30,13 +31,27 @@ const scenes = [
   // Sequences (#54): a slow pan down from home until "now" is above the screen, and a zoom from home into the lion.
   ...[0, 60, 120, 180, 260, 360].map((dy, k) => [`pan${k + 1}`, 'pan', [1.5, dy]]),
   ...[0, 0.2, 0.4, 0.6, 0.8, 1].map((t, k) => [`zoom${k + 1}`, 'zoomin', ['Lion', 300, t]]),
+  // The dated tree (#46): onto a split [its date Ma, time zoom × home], the mesh across one (the lion's
+  // right edge just above its split from the cave lion), and a tap on a parent column [split Ma, age Ma].
+  ['split-lionleopard', 'split', [2.57, 5]],
+  ['split-cavelion', 'split', [0.5, 5]],
+  ['split-root', 'split', [4.6, 3]],
+  ['decline', 'bar', ['Lion', 50, 1e5, 3.5, 0.5]],
+  // The lion's last 200 years filling the screen; the mesh on the cave lion as it peels off the lion.
+  ['last200', 'decline', ['Lion', 200]],
+  ['mesh-lean', 'bar', ['Cave lion', 480000, 3e3, 60, 0]],
+  // An extinct column's tip (its taper to nobody).
+  ['tip-cave', 'bar', ['Cave lion', 16000, 1e4, 30, 0.5]],
+  ['mesh-split', 'bar', ['Lion', 499990, 100, 2e4, 1]],
+  ['lineage', 'tapnode', [2.57, 1.2]],
 ];
 const browser = await chromium.launch({ headless: true });
 try {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: Number(process.env.DSF || 2), isMobile: true, hasTouch: true });
   const page = await ctx.newPage();
   page.on('pageerror', (e) => console.log('pageerror', String(e)));
-  await page.goto(pathToFileURL(resolve('dist-single/index.html')).href + (process.env.DEBUG ? '?debug' : ''));
+  const q = [process.env.DEBUG ? 'debug' : '', process.env.EDGE ? `edge=${process.env.EDGE}` : ''].filter(Boolean).join('&');
+  await page.goto(pathToFileURL(resolve('dist-single/index.html')).href + (q ? `?${q}` : ''));
   await page.waitForFunction(() => !!window.__fan, null, { timeout: 20000 });
   for (const [name, kind, args] of scenes) {
     if (ONLY && !ONLY.has(name)) continue;
@@ -85,6 +100,40 @@ try {
           const sy = h.sy * F;
           const wx = b.colLeft + 0.3 * b.width;
           f.cam = { cx: wx - (px - f.w / 2) / sx, cy: y - (py - f.h / 2) / sy, sx, sy, ty: sy };
+          f.camera.settle();
+        } else if (kind === 'split' || kind === 'tapnode') {
+          const v = fan.nodes.find((n) => Math.abs(n.ageMa - args[0]) < 1e-9);
+          if (kind === 'tapnode') {
+            f.cam = f.homeCamera();
+            f.camera.settle();
+            const y = fan.time.y(args[1]);
+            const [px, py] = f.toScreen(v.left + 0.5 * v.width, y);
+            f.tap(px, py);
+          } else {
+            // The parent column and its daughters after their peels across 80% of the screen; the peel
+            // above the split and the lanes' blend below it in the middle third.
+            const isN = (k) => 'strands' in k;
+            let lo = v.left;
+            let hi = v.left + v.width;
+            for (const k of v.kids) {
+              lo = Math.min(lo, isN(k) ? k.left : k.colLeft);
+              hi = Math.max(hi, isN(k) ? k.left + k.width : k.colLeft + k.width);
+            }
+            const H = Math.max(...v.kids.map((k) => v.y - k.leanY)) + v.blend;
+            const h = f.homeCamera();
+            const sx = Math.max(h.sx, (0.8 * f.w) / (hi - lo));
+            const sy = Math.max(h.sy * args[1], f.h / 3 / H);
+            f.cam = { cx: (lo + hi) / 2, cy: v.y - (H - 2 * v.blend) / 2, sx, sy, ty: sy };
+            f.camera.settle();
+          }
+        } else if (kind === 'decline') {
+          // The species' last `args[1]` years filling the screen, its column 60% of its width.
+          const b = fan.branches.find((b) => b.sp.common === args[0]);
+          const y0 = fan.time.y(args[1] / 1e6);
+          const y1 = fan.time.y(0);
+          const sy = (0.8 * f.h) / (y0 - y1);
+          const sx = (0.6 * f.w) / b.width;
+          f.cam = { cx: b.cx, cy: y1 + (f.h / 2 - 120) / sy, sx, sy, ty: sy };
           f.camera.settle();
         } else if (kind === 'far') {
           const h = f.homeCamera();

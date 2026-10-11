@@ -58,7 +58,7 @@ describe('width = individuals', () => {
         const n = m.size(g);
         const S = m.stride(g);
         // The stride is the alive at its births (world-fixed), about the slots drawn there.
-        expect(S).toBe(Math.max(1, Math.round(m.b.pop.stepAt(m.ageOf((g + 0.5) * m.GL)).n)));
+        expect(S).toBe(Math.max(1, Math.round(m.b.pop.aliveAt(m.ageOf((g + 0.5) * m.GL)))));
         expect(m.totalSlots(y) / S).toBeGreaterThan(0.9);
         expect(m.totalSlots(y) / S).toBeLessThan(1.1);
         // About births ÷ alive (≈ 2: a life is half a generation) of g share a slot.
@@ -180,7 +180,12 @@ describe('determinism and links', () => {
       expect(a.sp.handle(ad)).toBe(b.sp.handle(ad));
       const t = a.twig(g, i);
       const ym = (t.yBirth + t.yDeath) / 2;
-      expect(a.hit(a.slotX(t.K, ym), ym, 1e-12)).toEqual({ g, i });
+      // (A slot may hold two of a generation at once, where procgen's births outnumber the fan's N a little: either is it.)
+      const h = a.hit(a.slotX(t.K, ym), ym, 1e-12)!;
+      expect(h.g).toBe(g);
+      const th = a.twig(h.g, h.i, t.K);
+      expect(th.K).toBe(t.K);
+      expect(th.yDeath <= ym && ym <= th.yBirth).toBe(true);
     }
   });
 

@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { g, gapBetween, GAP_FRAC, laneAt, layoutFan, leftAt, MIN_GAP_FRAC, strandAt, type FanBranch, type Fan, type WidthMode } from './layout';
+import { columnsAt, g, gapBetween, GAP_FRAC, isNode, laneAt, layoutFan, leanGap, LEAN_MAX_FRAC, leftAt, MIN_GAP_FRAC, nodeLeftAt, segAt, strandAt, TIME_H, type EdgeStyle, type WidthMode } from './layout';
 import { PANTHERA } from './panthera';
-
-/** World y of a branch's first appearance. */
-const yFirst = (fan: Fan, b: FanBranch) => fan.time.y(b.sp.t0);
 
 describe('fan strands: width = alive at the time', () => {
   for (const mode of ['log', 'linear'] as WidthMode[]) {
@@ -11,28 +8,29 @@ describe('fan strands: width = alive at the time', () => {
       const fan = layoutFan(PANTHERA, mode);
       for (const b of fan.branches) {
         const sp = b.sp;
-        const mid = Array.from({ length: 9 }, (_, i) => sp.t1 + ((sp.t0 - sp.t1) * (i + 1)) / 10);
-        for (const a of [sp.t1, ...mid, sp.t0]) {
+        // Its own column: from its tip back to its start (its split).
+        const mid = Array.from({ length: 9 }, (_, i) => sp.t1 + ((b.t0 - sp.t1) * (i + 1)) / 10);
+        for (const a of [sp.t1, ...mid]) {
           const s = strandAt(b, a, mode);
           expect(s.w).toBeCloseTo(b.unit * g(b.pop.aliveAt(a), mode), 12);
           if (sp.extinct) expect(s.f).toBe(0);
           else expect(s.f).toBeGreaterThan(0.3);
         }
         if (sp.extinct) {
-          // Its column starts at its first appearance: its founders' ancestors are the parent's.
-          expect(strandAt(b, sp.t0 * 1.01, mode).w).toBe(0);
+          // Nobody after its last appearance; its founders before its start (in the parent column).
           expect(strandAt(b, sp.t1 * 0.99, mode).w).toBe(0);
+          expect(strandAt(b, b.t0 * 1.01, mode).w).toBeCloseTo(b.baseW, 12);
         } else {
           // Now: the living, all of them green.
           // (to procgen's integer rounding and EVER's quantization: ~0.1-0.2%)
           expect(Math.abs(b.pop.aliveAt(0) - sp.alive)).toBeLessThanOrEqual(Math.max(50, 2e-3 * sp.alive));
           expect(strandAt(b, 0, mode).f).toBe(1);
-          // Below the first appearance: the founders, constant.
-          expect(strandAt(b, sp.t0 * 1.2, mode).w).toBeCloseTo(strandAt(b, sp.t0, mode).w, 12);
+          // Below its start: the founders, constant.
+          expect(strandAt(b, b.t0 * 1.2, mode).w).toBeCloseTo(strandAt(b, b.t0, mode).w, 12);
         }
-        // The stem: the founders, at the green share the genealogy settles to.
+        // Below its split: the founders.
         expect(b.baseW).toBeCloseTo(b.unit * g(b.pop.founders, mode), 12);
-        expect(b.baseQ).toBeCloseTo(0.797, 3);
+        expect(b.pop.founders).toBeCloseTo(b.pop.aliveAt(b.t0), 6);
         // Never wider than the column's room.
         for (const a of mid) expect(strandAt(b, a, mode).w).toBeLessThanOrEqual(b.width * (1 + 1e-12));
       }
@@ -40,15 +38,15 @@ describe('fan strands: width = alive at the time', () => {
   }
 });
 
-describe('rectangular fan: fixed, straight, honest', () => {
+describe('the fan, both designs: fixed, continuous, honest', () => {
   const seeded = (seed: number) => {
     let s = seed;
     return () => (s = (s * 1103515245 + 12345) % 2147483648) / 2147483648;
   };
 
-  for (const mode of ['log', 'linear'] as WidthMode[]) {
-    it(`width = individuals alive × one fixed scale: the population's own steps, one per generation where N or q changes (${mode})`, () => {
-      const fan = layoutFan(PANTHERA, mode);
+  for (const edge of ['curved', 'straight'] as EdgeStyle[]) for (const mode of ['log', 'linear'] as WidthMode[]) {
+    it(`width = N(t) × one fixed scale, exactly, at every height; green = its share (${mode}, ${edge})`, () => {
+      const fan = layoutFan(PANTHERA, mode, undefined, edge);
       const rnd = seeded(5);
       // One width per individual (linear) or per decade of individuals (log), the same for every branch:
       // the number the scale bar shows (view.ts widthScale).
@@ -57,82 +55,117 @@ describe('rectangular fan: fixed, straight, honest', () => {
         expect(b.unit).toBe(unit);
         expect(b.width / g(b.pop.max, mode)).toBeCloseTo(unit, 12);
       }
-      for (let trial = 0; trial < 300; trial++) {
+      for (let trial = 0; trial < 2000; trial++) {
         const b = fan.branches[Math.floor(rnd() * fan.branches.length)];
-        const y = b.tipY * (0.001 + 0.998 * rnd());
+        // Within its own column, tip to split, on the log axis and near now.
+        const y = trial % 2 ? b.tipY + (b.splitY - b.tipY) * rnd() : b.tipY + Math.min(b.splitY - b.tipY, 300) * rnd();
         const L = laneAt(b, y);
         const age = fan.time.ageAt(y);
-        const st = b.pop.stepAt(age);
-        expect(L.w).toBeCloseTo(b.unit * g(st.n, mode), 12);
-        expect(L.gw).toBeCloseTo(L.w * st.q, 12);
-        if (b.sp.extinct) {
-          if (y < yFirst(fan, b)) expect(L.gw).toBe(0);
-          continue;
-        }
-        // A living species' step is its generation's: N at the generation's young edge (the history's
-        // own points at segment boundaries), and its genealogy share.
-        const GL = b.sp.genYears;
-        const k = Math.floor((age * 1e6) / GL);
-        if (age < b.sp.t0) expect(st.n).toBeCloseTo(b.pop.aliveAt((k * GL) / 1e6), 6);
-        expect(st.q).toBeCloseTo(b.pop.greenAt(age), 9);
+        expect(L.w).toBeCloseTo(b.unit * g(b.pop.aliveAt(age), mode), 12);
+        expect(L.gw).toBeCloseTo(L.w * b.pop.greenAt(age), 12);
+        if (b.sp.extinct) expect(L.gw).toBe(0);
       }
     });
 
-    it(`the steps are few and fixed: constant stretches are one step (${mode})`, () => {
-      const fan = layoutFan(PANTHERA, mode);
+    it(`every edge is a continuous function of time: edges and the lanes' boundary, no jog at a split, no step at a population change (${mode}, ${edge})`, () => {
+      const fan = layoutFan(PANTHERA, mode, undefined, edge);
+      const yb = fan.trunkBottom.y;
+      const edges = (b: (typeof fan.branches)[0], y: number) => {
+        const l = leftAt(b, y);
+        const L = laneAt(b, y);
+        return [l, l + L.w, l + L.gw];
+      };
       for (const b of fan.branches) {
-        const v = fan.steps.bounds(b);
-        expect(v.length).toBeLessThan(80);
-        for (let k = 1; k < v.length; k++) expect(v[k]).toBeGreaterThan(v[k - 1]);
-        // Neighbouring steps differ (else they would be one).
-        for (let k = 0; k < v.length; k++) {
-          const above = laneAt(b, k ? (v[k - 1] + v[k]) / 2 : (b.tipY + v[k]) / 2);
-          const below = laneAt(b, k + 1 < v.length ? (v[k] + v[k + 1]) / 2 : Math.min(0, v[k] + 1e-6) - 1e-9);
-          expect(above.w !== below.w || above.gw !== below.gw).toBe(true);
+        const f = fan.tess.bounds(b);
+        // Straddling every feature (splits, fork ends, history points, corner windows, taper): a hair apart, a hair of movement.
+        for (const y of f) {
+          if (!(y > b.tipY + 1e-6) || !(y < yb - 1e-6)) continue;
+          const a = edges(b, y - 1e-7);
+          const c = edges(b, y + 1e-7);
+          const w = Math.max(laneAt(b, y - 1e-7).w, laneAt(b, y + 1e-7).w, 1e-9);
+          for (let k = 0; k < 3; k++) expect(Math.abs(a[k] - c[k]) / w).toBeLessThan(1e-4);
+        }
+        // Finely across its whole span (every feature interval cut in 16): the edges move at a bounded slope.
+        const ys = [b.tipY, ...f, yb];
+        for (let i = 0; i + 1 < ys.length; i++) {
+          let prev = edges(b, ys[i]);
+          for (let j = 1; j <= 16; j++) {
+            const y = ys[i] + ((ys[i + 1] - ys[i]) * j) / 16;
+            const e = edges(b, y);
+            const dy = (ys[i + 1] - ys[i]) / 16;
+            // (Log widths close an extinct column over its last ~10 individuals steeply: the log of a smooth taper.)
+            const last = mode === 'log' && y < b.splitY && b.pop.aliveAt(fan.time.ageAt(y - dy)) < 10;
+            if (!last) for (let k = 0; k < 3; k++) expect(Math.abs(e[k] - prev[k])).toBeLessThanOrEqual(12 * dy + 1e-9);
+            prev = e;
+          }
         }
       }
-      // The lion's recent crash is generation by generation, its deep past one step.
-      const lion = fan.branches.find((b) => b.sp.common === 'Lion')!;
-      expect(fan.steps.bounds(lion).length).toBeGreaterThan(10);
     });
 
-    it(`the left edge is straight, the lanes' edges step; the gaps are fixed (${mode})`, () => {
-      const fan = layoutFan(PANTHERA, mode);
+    it(`columns are symmetric about fixed centres in fixed rooms with fixed gaps, and never overlap (${mode}, ${edge})`, () => {
+      const fan = layoutFan(PANTHERA, mode, undefined, edge);
       const W = fan.trunkWidth;
-      const bs = fan.branches;
-      // The stem: the columns go straight on down below the fork (no jog), spanning the stalks.
-      for (const b of bs) expect(b.baseLeft).toBe(b.colLeft);
-      expect(bs[0].colLeft).toBeCloseTo(fan.x0, 9);
-      // The columns: fixed gaps, at least GAP_FRAC of the smaller neighbour (or MIN_GAP_FRAC of the stem).
-      for (let j = 1; j < bs.length; j++) {
+      const bs = [...fan.branches].sort((p, q) => p.index - q.index);
+      if (edge === 'curved') expect(bs[0].colLeft).toBeCloseTo(fan.x0, 9);
+      if (edge === 'curved') for (let j = 1; j < bs.length; j++) {
         const gap = bs[j].colLeft - (bs[j - 1].colLeft + bs[j - 1].width);
         expect(gap).toBeCloseTo(gapBetween(bs[j - 1], bs[j], W), 9);
         expect(gap).toBeGreaterThanOrEqual(Math.max(GAP_FRAC * Math.min(bs[j].width, bs[j - 1].width), MIN_GAP_FRAC * W) * (1 - 1e-9));
       }
       for (const b of bs) {
+        expect(b.cx).toBeCloseTo(b.colLeft + b.width / 2, 12);
         for (let k = 0; k <= 400; k++) {
           const y = b.tipY + ((fan.trunkBottom.y - b.tipY) * k) / 400;
-          // Left edge: one vertical line from the bottom of the world to the tip.
-          expect(leftAt(b, y)).toBe(b.colLeft);
           const L = laneAt(b, y);
           expect(L.gw).toBeLessThanOrEqual(L.w * (1 + 1e-12));
-          // Never wider than its room: neighbours never touch.
           expect(L.w).toBeLessThanOrEqual(b.width * (1 + 1e-12));
-          // Below the fork: the founders.
-          if (y > 0) {
+          if (y >= b.splitY) {
+            // Below its split: the founders, at its offset in the parent column.
             expect(L.w).toBe(b.baseW);
-            expect(L.gw).toBeCloseTo(b.baseW * b.baseQ, 12);
+            const s = segAt(b, y);
+            expect(leftAt(b, y)).toBeCloseTo(nodeLeftAt(s.node, y) + s.off, 12);
+          } else if (y <= b.leanY) {
+            // Peeled off: about its centre, inside its room.
+            expect(leftAt(b, y) + L.w / 2).toBeCloseTo(b.cx, 9);
           }
         }
-        // Both edges are constant within each step (vertical), changing only at step lines.
-        const v = [b.tipY, ...fan.steps.bounds(b), 0];
-        for (let i = 0; i + 1 < v.length; i++) {
-          const ls = [0.01, 0.3, 0.5, 0.7, 0.99].map((u) => laneAt(b, v[i] + (v[i + 1] - v[i]) * u));
-          for (const l of ls) {
-            expect(l.w).toBe(ls[0].w);
-            expect(l.gw).toBe(ls[0].gw);
+      }
+      // At every height the columns there are disjoint (daughters touch only at their split).
+      for (let k = 0; k <= 3000; k++) {
+        const y = -TIME_H + ((fan.trunkBottom.y + TIME_H) * k) / 3000;
+        const cs = columnsAt(fan, y).sort((p, q) => p[0] - q[0]);
+        for (let i = 1; i < cs.length; i++) expect(cs[i][0]).toBeGreaterThanOrEqual(cs[i - 1][1] - 1e-9);
+      }
+    });
+  }
+});
+
+describe('straight: lines that lean', () => {
+  for (const mode of ['log', 'linear'] as WidthMode[]) {
+    it(`the larger daughter runs straight on; each other leans out to clear its sibling's subtree, ending before either daughter's next event (${mode})`, () => {
+      const fan = layoutFan(PANTHERA, mode, undefined, 'straight');
+      const W = fan.trunkWidth;
+      const bandW = (k: (typeof fan.nodes)[0]['kids'][0]) => (isNode(k) ? k.width : k.baseW);
+      for (const v of fan.nodes) {
+        const room = Math.min(...v.kids.map((k) => v.y - (isNode(k) ? k.y : k.tipY)));
+        const main = v.kids.reduce((m, k) => (bandW(k) > bandW(m) ? k : m), v.kids[0]);
+        for (const k of v.kids) {
+          const leans = isNode(k) ? k.left !== k.tile : Math.abs(k.cx - (k.x0 + k.baseW / 2)) > 1e-12;
+          expect(leans).toBe(k !== main);
+          if (k === main) expect(k.leanY).toBe(v.y);
+          else {
+            expect(k.leanY).toBeLessThan(v.y);
+            expect(v.y - k.leanY).toBeLessThanOrEqual(LEAN_MAX_FRAC * room * (1 + 1e-12));
           }
         }
+      }
+      // Neighbouring leaf columns are at least the smallest gap apart, and nothing ever overlaps.
+      const bs = [...fan.branches].sort((p, q) => p.index - q.index);
+      for (let j = 1; j < bs.length; j++) expect(bs[j].colLeft - (bs[j - 1].colLeft + bs[j - 1].width)).toBeGreaterThanOrEqual(leanGap(0, 0, W) - 1e-9);
+      for (let k = 0; k <= 3000; k++) {
+        const y = -TIME_H + ((fan.trunkBottom.y + TIME_H) * k) / 3000;
+        const cs = columnsAt(fan, y).sort((p, q) => p[0] - q[0]);
+        for (let i = 1; i < cs.length; i++) expect(cs[i][0]).toBeGreaterThanOrEqual(cs[i - 1][1] - 1e-9);
       }
     });
   }

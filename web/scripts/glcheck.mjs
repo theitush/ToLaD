@@ -3,6 +3,7 @@
 // was born by a given time; the CPU mirror (mesh.ts lifeGPU / colourCode)
 // decides the same from the same hashed inputs. Every pixel must agree.
 //   npm run build:single && node scripts/glcheck.mjs
+//   (EDGE=curved|straight: the fan's edges, ?edge=; default the app's)
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { chromium } from 'playwright';
@@ -12,7 +13,7 @@ const browser = await chromium.launch({ headless: true });
 let bad = 0;
 try {
   const page = await (await browser.newContext({ viewport: { width: 400, height: 400 } })).newPage();
-  await page.goto(pathToFileURL(resolve('dist-single/index.html')).href);
+  await page.goto(pathToFileURL(resolve('dist-single/index.html')).href + (process.env.EDGE ? `?edge=${process.env.EDGE}` : ''));
   await page.waitForFunction(() => !!window.__fan && !!window.__fanMesh && !!window.__fan.gl);
   const r = await page.evaluate(() => {
     const f = window.__fan;
@@ -113,6 +114,10 @@ try {
         };
         // A narrow green lane (1.3 px) beside a narrow gray one (2.6 px), each one line its own width.
         if (narrow) Object.assign(inst, { xB0: 40.2, xG: 41.5, colL: 40.2, colR: 44.1, narG: 1, narR: 0.7, B0: 0 });
+        // Leaning, widening columns (the shear, mesh.ts meshFrame): the lattice mapped through a moving left
+        // edge, a changing pitch, a moving right edge and green lane (a straight lean, a curve's chord).
+        if (q === 1) Object.assign(inst, { sL: 0.45, sP: 0.004, colL: -bw * 1.3, colR: 90, sR: 0.15, xG: 50, sG: 0.6 });
+        if (q === 3) Object.assign(inst, { sL: -0.8, sP: -0.006, colL: -bw * 1.3, colR: 110, sR: -0.3, xG: 30, sG: -0.9 });
         insts.push(inst);
         const k = gl.mesh.next();
         M.packInst(inst, gl.mesh.f, gl.mesh.u, k);
