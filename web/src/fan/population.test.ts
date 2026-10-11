@@ -65,7 +65,8 @@ describe('who has living descendants: the genealogy back from now', () => {
 describe('the Panthera populations', () => {
   it('lions: ~500 thousand before the decline, the living now; the crash leaves a gray band before it', () => {
     const p = population(sp('Lion'));
-    expect(p.aliveAt(0)).toBeCloseTo(sp('Lion').alive, -2);
+    // (EVER and ALIV are LOG16-quantized, 0.23% steps: today's count to within two half-steps)
+    expect(Math.abs(p.aliveAt(0) / sp('Lion').alive - 1)).toBeLessThan(2.5e-3);
     expect(p.aliveAt(200e-6)).toBeGreaterThan(4.9e5);
     // The most alive at once: the deep curve's peak, on one of its points (ToLaD#60: a Middle
     // Pleistocene high near 900 thousand, not the held oldest level).

@@ -22,8 +22,9 @@ describe('fan strands: width = alive at the time', () => {
           expect(strandAt(b, b.t0 * 1.01, mode).w).toBeCloseTo(b.baseW, 12);
         } else {
           // Now: the living, all of them green.
-          // (to procgen's integer rounding and EVER's quantization: ~0.1-0.2%)
-          expect(Math.abs(b.pop.aliveAt(0) - sp.alive)).toBeLessThanOrEqual(Math.max(50, 2e-3 * sp.alive));
+          // (to procgen's integer rounding and the quantization of both EVER, which scales the curve, and
+          // ALIV: LOG16 steps of 0.23%, so up to two half-steps, 0.23%, apart)
+          expect(Math.abs(b.pop.aliveAt(0) - sp.alive)).toBeLessThanOrEqual(Math.max(50, 2.5e-3 * sp.alive));
           expect(strandAt(b, 0, mode).f).toBe(1);
           // Below its start: the founders, constant.
           expect(strandAt(b, b.t0 * 1.2, mode).w).toBeCloseTo(strandAt(b, b.t0, mode).w, 12);

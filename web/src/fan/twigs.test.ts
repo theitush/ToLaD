@@ -41,7 +41,10 @@ describe('width = individuals', () => {
     const rec = b.sp;
     // Linear widths: one world width per individual, the same for every species.
     for (const o of fanLin.branches) expect(o.unit).toBe(b.unit);
-    for (const a of [0, 30e-6, 60e-6, 1e-3, 1]) expect(strandAt(b, a, 'linear').w / b.unit).toBeCloseTo(aliveAt(rec, a), 6);
+    // Its own column (the lion splits from the cave lion 0.5 Ma; its genomic deep past runs on below, ToLaD#60/#66) ...
+    for (const a of [0, 30e-6, 60e-6, 1e-3, 0.3]) expect(strandAt(b, a, 'linear').w / b.unit).toBeCloseTo(aliveAt(rec, a), 6);
+    // ... and below its split its founders, held.
+    for (const a of [b.t0, 1]) expect(strandAt(b, a, 'linear').w / b.unit).toBeCloseTo(b.pop.founders, 6);
     const m = lion();
     let sum = 0;
     for (let g = 0; g < m.G; g++) sum += m.size(g);
