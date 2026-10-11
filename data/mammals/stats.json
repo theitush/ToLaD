@@ -157,8 +157,8 @@
   },
   "Ursus arctos": {
    "domestic_alive": 0.0,
-   "ever": 722154937957.7048,
-   "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count, held before 1500, then log-linear to today's count (range loss, modelled); H:curated history (1 points, deep past PSMC 15 points (D; Bergman et al. 2023, Nat Commun 14:7679, Supplementary Data 3 (PSMC Ne trajectory)); pipeline/history/Ursus_arctos.toml) + bulk genomic deep past (genomic.py)",
+   "ever": 1308169358411.1438,
+   "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count, held before 1500, then log-linear to today's count (range loss, modelled); H:curated history (1 points, deep past PSMC 15 points (D; Bergman et al. 2023, Nat Commun 14:7679, Supplementary Data 3 (PSMC Ne trajectory)), then the range-loss trend from 1500 to the first cited point; pipeline/history/Ursus_arctos.toml) + bulk genomic deep past (genomic.py)",
    "occupancy_model_only": 227844.6383424438,
    "published": 220000.0,
    "published_source": "IUCN population report (Greenspoon 2023 compilation)",
@@ -7817,51 +7817,51 @@
   "births_now_per_yr": 52688585543.22378,
   "by_era": {
    "Cretaceous 66-145 Ma": {
-    "ghost": 3.4918869353076214e+18,
+    "ghost": 3.4918869351028096e+18,
     "ghost_share": 0.9999,
-    "sampled": 179520611816258.6
+    "sampled": 179520816629352.3
    },
    "Holocene-Pleistocene 0-2.58 Ma": {
-    "ghost": 9893217956180538.0,
-    "ghost_share": 0.0726,
-    "sampled": 1.2633459977737296e+17
+    "ghost": 9766736841274204.0,
+    "ghost_share": 0.0717,
+    "sampled": 1.264674199611603e+17
    },
    "Jurassic and older >145 Ma": {
-    "ghost": 9.139499452713701e+17,
+    "ghost": 9.139499452670106e+17,
     "ghost_share": 1.0,
-    "sampled": 16318107844944.434
+    "sampled": 16318112204480.316
    },
    "Neogene 2.58-23 Ma": {
-    "ghost": 8.277787911252113e+17,
-    "ghost_share": 0.7636,
-    "sampled": 2.5626872790664736e+17
+    "ghost": 8.276815759231948e+17,
+    "ghost_share": 0.7635,
+    "sampled": 2.5636594310866384e+17
    },
    "Paleogene 23-66 Ma": {
-    "ghost": 2.247052758141864e+18,
+    "ghost": 2.2470527510515108e+18,
     "ghost_share": 0.9869,
-    "sampled": 2.9929127408655052e+16
+    "sampled": 2.992913449900812e+16
    }
   },
   "f_ramp_Ma": [
    208.64,
    91.36
   ],
-  "ghost_share": 0.9478,
-  "max_multiplier": 91390.23025205995,
+  "ghost_share": 0.9477,
+  "max_multiplier": 91390.21216373197,
   "multiplier_at_Ma": {
    "0.01": 1.013,
-   "1": 1.023,
-   "100": 67489.75,
-   "150": 43926.822,
+   "1": 1.022,
+   "100": 67489.707,
+   "150": 43926.811,
    "20": 11.934,
-   "200": 24829.295,
+   "200": 24829.288,
    "5": 2.033,
    "50": 194.752,
-   "66": 3018.632
+   "66": 3018.63
   },
-  "sampled_sum": 4.127282938123366e+17,
+  "sampled_sum": 4.129583364976662e+17,
   "top_down_estimate": 7.903287831483567e+18,
-  "with_ghosts": 7.903289941614585e+18
+  "with_ghosts": 7.903296280683465e+18
  },
  "grid_cells": 1600,
  "history": {
@@ -7925,22 +7925,23 @@
     "note": "Steps younger than 20000 yr (rescaled) are dropped unless the file's [deep.blind] cites a source dating a decline there, which keeps them (grade D). `against`: dropped steps whose mean level is beyond 1.5x from the youngest resolved step, which the flat span to the next level runs against: said on the card, not drawn."
    },
    "by_next": {
-    "cited": 26,
-    "modelled": 82
+    "cited": 12,
+    "modelled": 82,
+    "natural": 14
    },
    "factor": {
     "beyond_flag": {
-     "down": 14,
-     "up": 23
+     "down": 10,
+     "up": 25
     },
     "max": 1248.0845815759776,
-    "median": 1.1285730545088317,
-    "min": 0.0030864706757596228,
+    "median": 1.230251203394819,
+    "min": 0.0034849229862624915,
     "n": 108,
-    "p10": 0.06217714560086036,
-    "p25": 0.33680610808654526,
-    "p75": 5.934724084111575,
-    "p90": 52.927991005654775
+    "p10": 0.12588222180065928,
+    "p25": 0.3853981804186502,
+    "p75": 6.91456646480771,
+    "p90": 64.38532971282926
    },
    "flagged": {
     "Addax nasomaculatus": {
@@ -7956,13 +7957,6 @@
      "ratio": 0.034934704609904076,
      "to_kind": "model",
      "to_year": 2026.77
-    },
-    "Ailuropoda melanoleuca": {
-     "factor": 0.02182918045087891,
-     "next": "cited",
-     "ratio": 45.81024020806685,
-     "to_kind": "census",
-     "to_year": 1976.0
     },
     "Alces alces": {
      "factor": 67.76489218713617,
@@ -8014,11 +8008,11 @@
      "to_year": 1800.0
     },
     "Bison bonasus": {
-     "factor": 0.0030864706757596228,
-     "next": "cited",
-     "ratio": 323.99465442965413,
-     "to_kind": "census",
-     "to_year": 1924.0
+     "factor": 325.8223104159489,
+     "next": "natural",
+     "ratio": 0.0030691575378106774,
+     "to_kind": "rangeloss",
+     "to_year": 1500
     },
     "Cervus canadensis": {
      "factor": 66.86983380923373,
@@ -8047,13 +8041,6 @@
      "ratio": 0.09110585609660275,
      "to_kind": "rangeloss",
      "to_year": 1500
-    },
-    "Elaphurus davidianus": {
-     "factor": 0.03647908092204471,
-     "next": "cited",
-     "ratio": 27.41297134478213,
-     "to_kind": "estimate",
-     "to_year": 2020.0
     },
     "Equus grevyi": {
      "factor": 0.057567687134273994,
@@ -8132,13 +8119,6 @@
      "to_kind": "model",
      "to_year": 2026.77
     },
-    "Oryx dammah": {
-     "factor": 0.003914379663673626,
-     "next": "cited",
-     "ratio": 255.46832088880842,
-     "to_kind": "estimate",
-     "to_year": 2026.0
-    },
     "Ovibos moschatus": {
      "factor": 37.68591792156668,
      "next": "modelled",
@@ -8168,11 +8148,11 @@
      "to_year": 2026.77
     },
     "Puma concolor": {
-     "factor": 20.79925944225947,
-     "next": "cited",
-     "ratio": 0.04807863485601908,
-     "to_kind": "estimate",
-     "to_year": 2023.0
+     "factor": 27.30827836718274,
+     "next": "natural",
+     "ratio": 0.03661893241873984,
+     "to_kind": "rangeloss",
+     "to_year": 1500
     },
     "Redunca redunca": {
      "factor": 10.617584489475147,
@@ -8195,6 +8175,13 @@
      "to_kind": "rangeloss",
      "to_year": 1500
     },
+    "Ursus arctos": {
+     "factor": 14.940335030140636,
+     "next": "natural",
+     "ratio": 0.06693290331057501,
+     "to_kind": "rangeloss",
+     "to_year": 1500
+    },
     "Vicugna vicugna": {
      "factor": 24.73695812481031,
      "next": "cited",
@@ -8204,10 +8191,11 @@
     }
    },
    "flagged_by_next": {
-    "cited": 11,
-    "modelled": 26
+    "cited": 6,
+    "modelled": 26,
+    "natural": 3
    },
-   "note": "How each genomic deep past meets the next level (ToLaD#143, replacing #77/#80/#71): the genome gives the shape, the next level the number. The whole genomic curve is scaled by one factor so its young end meets the first cited count (a history file's baseline or first point, any year; `next` cited), else the modelled level (the natural level in 1500 CE, the natural baseline, today's modelled count; `next` modelled), and is held flat to it. ratio = genomic level at its young end / next level, before scaling; factor = 1 / ratio; flagged when beyond 10x either way. Per species: history.species[<sp>].deep.join (its `note` is the card's sentence)."
+   "note": "How each genomic deep past meets its anchor (ToLaD#143, replacing #77/#80/#71): the genome gives the shape, the anchor the number. The whole genomic curve is scaled by one factor so its young end (pre-modern) meets the higher of the first cited count (a history file's baseline or first point, any year) and the modelled natural level: the count when it is the higher (`next` cited), else the natural level in 1500 CE, from which the range-loss trend runs down to the count (`next` natural); with no cited count, the modelled level (the natural level in 1500 CE, the natural baseline, today's modelled count; `next` modelled). It is held flat to it. ratio = genomic level at its young end / anchor, before scaling; factor = 1 / ratio; flagged when beyond 10x either way. Per species: history.species[<sp>].deep.join (its `note` is the card's sentence)."
   },
   "genomic_records_without_points": [],
   "hist_sources": 148,
@@ -8996,6 +8984,7 @@
      "dropped_blind": 6,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": false,
        "ago": 10448.650468277874,
@@ -9087,6 +9076,7 @@
      "dropped_blind": 3,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": true,
        "ago": 12130.642529669749,
@@ -9176,6 +9166,7 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": false,
        "ago": 12735.452369875167,
@@ -9272,6 +9263,11 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "below": {
+       "kind": "census",
+       "n": 2459.0,
+       "year": 1976.0
+      },
       "blind": {
        "against": true,
        "ago": 15486.970743851136,
@@ -9288,17 +9284,17 @@
        "vs_resolved": 0.19911776750674975,
        "window": null
       },
-      "deep_n": 2459.0,
+      "deep_n": 15127.076923076924,
       "deep_n_raw": 112647.38067163639,
-      "factor": 0.02182918045087891,
-      "flag": true,
-      "next": "cited",
-      "note": "PSMC's 1 step in its blind spot (the last 20 kyr) sits 5x below its youngest resolved step (~30 kya) but is not drawn: PSMC resolves little there and no source in this file dates a change, so the curve stays flat from that step instead (flagged). The genome gives the shape, not the number: its curve is scaled \u00d70.022 to meet the cited 1976 baseline (2,459), then held flat to it (flagged: beyond 10\u00d7).",
-      "ratio": 45.81024020806685,
+      "factor": 0.13428698326481184,
+      "flag": false,
+      "next": "natural",
+      "note": "PSMC's 1 step in its blind spot (the last 20 kyr) sits 5x below its youngest resolved step (~30 kya) but is not drawn: PSMC resolves little there and no source in this file dates a change, so the curve stays flat from that step instead (flagged). The genome gives the shape, not the number: its curve is scaled \u00d70.13 to meet the modelled natural level in 1500 CE (15,127), which is above the first cited count (1976 baseline, 2,459), taken after the decline, then held flat to 1500; the range-loss trend runs from there down to the count.",
+      "ratio": 7.446738140122007,
       "rule": "scaled",
-      "to_kind": "census",
-      "to_n": 2459.0,
-      "to_year": 1976.0
+      "to_kind": "rangeloss",
+      "to_n": 15127.076923076924,
+      "to_year": 1500
      },
      "kept_blind": 0,
      "method": "PSMC",
@@ -9311,14 +9307,14 @@
       "vs_flat": 0.6358474793481287
      },
      "ne_factor": 1.0619959369449392,
-     "oldest_n": 12871.12583241094,
+     "oldest_n": 79179.54882207516,
      "oldest_yr_ago": 5977091.412619575,
      "points": 19,
      "time_factor": 1.2712692266422714,
      "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 30070.986136305884
     },
-    "deep_after": 12871.12583241094,
+    "deep_after": 79179.54882207516,
     "deep_before": 15127.076923076922,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
@@ -9326,9 +9322,9 @@
      "bottleneck 30000-10000 ya: Late-glacial decline",
      "bottleneck 3000-0 ya: Human pressure, 3,000 years"
     ],
-    "ever_after": 13506382399.196728,
+    "ever_after": 83086868409.17766,
     "ever_before": 13856131941.815397,
-    "ever_ratio": 0.9747585008509347,
+    "ever_ratio": 5.996397028988728,
     "file": "Ailuropoda_melanoleuca.toml",
     "grades": "BC",
     "hist_row": true,
@@ -9343,8 +9339,8 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 3,
-    "segments": 151,
-    "trend_1500": false,
+    "segments": 158,
+    "trend_1500": true,
     "trend_held": null,
     "use": "counts"
    },
@@ -9364,6 +9360,7 @@
      "dropped_blind": 4,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": true,
        "ago": 10225.959696335607,
@@ -9453,6 +9450,7 @@
      "dropped_blind": 5,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": false,
        "ago": 11149.617419144326,
@@ -9535,6 +9533,7 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": true,
        "ago": 12803.758735726431,
@@ -9624,6 +9623,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": null,
       "deep_n": 2236068.0,
       "deep_n_raw": 2817429.693389528,
@@ -9705,6 +9705,7 @@
      "dropped_blind": 3,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": true,
        "ago": 10904.235272933654,
@@ -9832,6 +9833,7 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": true,
        "ago": 13313.261563108148,
@@ -9921,6 +9923,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": true,
        "ago": 15081.896942368694,
@@ -10139,6 +10142,7 @@
      "dropped_blind": 12,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": true,
        "ago": 10172.13061883856,
@@ -10235,6 +10239,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": true,
        "ago": 12572.160072545656,
@@ -10324,6 +10329,11 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "below": {
+       "kind": "census",
+       "n": 66.0,
+       "year": 1924.0
+      },
       "blind": {
        "against": true,
        "ago": 12893.281619332494,
@@ -10340,17 +10350,17 @@
        "vs_resolved": 0.6474053120099436,
        "window": null
       },
-      "deep_n": 66.0,
+      "deep_n": 6967269.333333333,
       "deep_n_raw": 21383.647192357173,
-      "factor": 0.0030864706757596228,
+      "factor": 325.8223104159489,
       "flag": true,
-      "next": "cited",
-      "note": "PSMC's 2 steps in its blind spot (the last 20 kyr) average 1.5x below its youngest resolved step (~24 kya) but are not drawn: PSMC resolves little there and no source in this file dates a change, so the curve stays flat from that step instead (flagged). The genome gives the shape, not the number: its curve is scaled \u00d70.0031 to meet the cited 1924 census (66), then held flat to it (flagged: beyond 10\u00d7).",
-      "ratio": 323.99465442965413,
+      "next": "natural",
+      "note": "PSMC's 2 steps in its blind spot (the last 20 kyr) average 1.5x below its youngest resolved step (~24 kya) but are not drawn: PSMC resolves little there and no source in this file dates a change, so the curve stays flat from that step instead (flagged). The genome gives the shape, not the number: its curve is scaled \u00d7326 to meet the modelled natural level in 1500 CE (6,967,269), which is above the first cited count (1924 census, 66), taken after the decline, then held flat to 1500; the range-loss trend runs from there down to the count (flagged: beyond 10\u00d7).",
+      "ratio": 0.0030691575378106774,
       "rule": "scaled",
-      "to_kind": "census",
-      "to_n": 66.0,
-      "to_year": 1924.0
+      "to_kind": "rangeloss",
+      "to_n": 6967269.333333334,
+      "to_year": 1500
      },
      "kept_blind": 0,
      "method": "PSMC",
@@ -10363,21 +10373,21 @@
       "vs_flat": 0.8450901400971039
      },
      "ne_factor": 1.0434416223057479,
-     "oldest_n": 3129.968641096925,
+     "oldest_n": 330414159.5062062,
      "oldest_yr_ago": 3487186.088614472,
      "points": 18,
      "time_factor": 1.711848947261933,
      "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 24355.721094703797
     },
-    "deep_after": 3129.9686410969252,
+    "deep_after": 330414159.5062062,
     "deep_before": 112954.84119191462,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
     "events": [],
-    "ever_after": 2094530475.9858987,
+    "ever_after": 221102912198158.3,
     "ever_before": 92022374361.79411,
-    "ever_ratio": 0.022761100118445832,
+    "ever_ratio": 2402.7081862599266,
     "file": "Bison_bonasus.toml",
     "grades": "B",
     "hist_row": true,
@@ -10392,8 +10402,8 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 4,
-    "segments": 148,
-    "trend_1500": false,
+    "segments": 182,
+    "trend_1500": true,
     "trend_held": null,
     "use": "counts"
    },
@@ -10413,6 +10423,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": true,
        "ago": 14967.337143978402,
@@ -10502,6 +10513,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": true,
        "ago": 15218.540599861954,
@@ -10591,6 +10603,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": true,
        "ago": 15568.62186839271,
@@ -10716,6 +10729,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": null,
       "deep_n": 138414.9902303799,
       "deep_n_raw": 255224.60827205746,
@@ -10826,6 +10840,7 @@
      "dropped_blind": 5,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": true,
        "ago": 10082.232789224041,
@@ -10989,6 +11004,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": true,
        "ago": 14780.987107458315,
@@ -11155,6 +11171,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": true,
        "ago": 15284.044560062213,
@@ -11280,6 +11297,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": null,
       "deep_n": 58912.5,
       "deep_n_raw": 116974.12516164147,
@@ -11354,6 +11372,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": null,
       "deep_n": 244428.0,
       "deep_n_raw": 211643.47455629357,
@@ -11507,6 +11526,7 @@
      "dropped_blind": 3,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": false,
        "ago": 11623.542735983037,
@@ -11596,6 +11616,11 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "below": {
+       "kind": "census",
+       "n": 10400.0,
+       "year": 1999.0
+      },
       "blind": {
        "against": true,
        "ago": 13122.708518188712,
@@ -11612,17 +11637,17 @@
        "vs_resolved": 0.36868654996075606,
        "window": null
       },
-      "deep_n": 10399.999999999998,
+      "deep_n": 20744.172307692304,
       "deep_n_raw": 25812.199837350072,
-      "factor": 0.4029102542802753,
+      "factor": 0.8036576672428993,
       "flag": false,
-      "next": "cited",
-      "note": "PSMC's 2 steps in its blind spot (the last 20 kyr) average 2.7x below its youngest resolved step (~26 kya) but are not drawn: PSMC resolves little there and no source in this file dates a change, so the curve stays flat from that step instead (flagged). The genome gives the shape, not the number: its curve is scaled \u00d70.4 to meet the cited 1999 census (10,400), then held flat to it.",
-      "ratio": 2.4819422920528917,
+      "next": "natural",
+      "note": "PSMC's 2 steps in its blind spot (the last 20 kyr) average 2.7x below its youngest resolved step (~26 kya) but are not drawn: PSMC resolves little there and no source in this file dates a change, so the curve stays flat from that step instead (flagged). The genome gives the shape, not the number: its curve is scaled \u00d70.8 to meet the modelled natural level in 1500 CE (20,744), which is above the first cited count (1999 census, 10,400), taken after the decline, then held flat to 1500; the range-loss trend runs from there down to the count.",
+      "ratio": 1.2443109059491593,
       "rule": "scaled",
-      "to_kind": "census",
-      "to_n": 10400.0,
-      "to_year": 1999.0
+      "to_kind": "rangeloss",
+      "to_n": 20744.172307692304,
+      "to_year": 1500
      },
      "kept_blind": 0,
      "method": "PSMC",
@@ -11635,21 +11660,21 @@
       "vs_flat": 0.36641067106810693
      },
      "ne_factor": 1.388089835109461,
-     "oldest_n": 264373.84250201826,
+     "oldest_n": 527328.5137027475,
      "oldest_yr_ago": 6192595.518475639,
      "points": 20,
      "time_factor": 0.96633122895119,
      "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 26160.473895639378
     },
-    "deep_after": 264373.84250201826,
+    "deep_after": 527328.5137027475,
     "deep_before": 26562.338461538464,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
     "events": [],
-    "ever_after": 312657904998.6969,
+    "ever_after": 623637093890.5488,
     "ever_before": 37851413225.644516,
-    "ever_ratio": 8.260138218217692,
+    "ever_ratio": 16.475926279762565,
     "file": "Ceratotherium_simum.toml",
     "grades": "B",
     "hist_row": true,
@@ -11664,8 +11689,8 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 4,
-    "segments": 196,
-    "trend_1500": false,
+    "segments": 198,
+    "trend_1500": true,
     "trend_held": null,
     "use": "counts"
    },
@@ -11685,6 +11710,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": true,
        "ago": 15825.50322614441,
@@ -11774,6 +11800,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": null,
       "deep_n": 5357254.340277779,
       "deep_n_raw": 109322.29281972972,
@@ -11848,6 +11875,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": true,
        "ago": 15637.393119131757,
@@ -11930,6 +11958,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": false,
        "ago": 15288.31141189621,
@@ -12019,18 +12048,23 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "below": {
+       "kind": "estimate",
+       "n": 1298000.0,
+       "year": 1998.0
+      },
       "blind": null,
-      "deep_n": 1297999.9999999998,
-      "deep_n_raw": 217823.53244642215,
-      "factor": 5.958952117899693,
+      "deep_n": 1550000.0,
+      "deep_n_raw": 217823.53244642218,
+      "factor": 7.115851912746167,
       "flag": false,
-      "next": "cited",
-      "note": "The genome gives the shape, not the number: its curve is scaled \u00d76 to meet the cited 1998 estimate (1,298,000), then held flat to it.",
-      "ratio": 0.16781473994331447,
+      "next": "natural",
+      "note": "The genome gives the shape, not the number: its curve is scaled \u00d77.1 to meet the modelled natural level in 1500 CE (1,550,000), which is above the first cited count (1998 estimate, 1,298,000), taken after the decline, then held flat to 1500; the range-loss trend runs from there down to the count.",
+      "ratio": 0.14053131125575624,
       "rule": "scaled",
-      "to_kind": "estimate",
-      "to_n": 1298000.0,
-      "to_year": 1998.0
+      "to_kind": "rangeloss",
+      "to_n": 1550000.0,
+      "to_year": 1500
      },
      "kept_blind": 0,
      "method": "PSMC",
@@ -12043,21 +12077,21 @@
       "vs_flat": 0.9869272303686868
      },
      "ne_factor": 1.1333083750880357,
-     "oldest_n": 3542251.5680682315,
+     "oldest_n": 4229961.4256592905,
      "oldest_yr_ago": 7250957.380959589,
      "points": 25,
      "time_factor": 1.2172461113313802,
      "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 55556.785292248846
     },
-    "deep_after": 3542251.5680682315,
+    "deep_after": 4229961.4256592905,
     "deep_before": 1550000.0,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
     "events": [],
-    "ever_after": 11826247770567.172,
+    "ever_after": 14122234604273.758,
     "ever_before": 4929686058189.863,
-    "ever_ratio": 2.398985986322558,
+    "ever_ratio": 2.8647330555283506,
     "file": "Connochaetes_taurinus.toml",
     "grades": "BC",
     "hist_row": true,
@@ -12072,8 +12106,8 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 2,
-    "segments": 101,
-    "trend_1500": false,
+    "segments": 103,
+    "trend_1500": true,
     "trend_held": null,
     "use": "counts"
    },
@@ -12093,6 +12127,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": false,
        "ago": 13524.145706304127,
@@ -12182,6 +12217,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": null,
       "deep_n": 15181.0,
       "deep_n_raw": 40849.70187420423,
@@ -12263,6 +12299,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": null,
       "deep_n": 100000.0,
       "deep_n_raw": 108965.81667955517,
@@ -12337,6 +12374,11 @@
      "dropped_blind": 5,
      "grade": "D",
      "join": {
+      "below": {
+       "kind": "estimate",
+       "n": 2420.0,
+       "year": 2020.0
+      },
       "blind": {
        "against": true,
        "ago": 11272.59991426444,
@@ -12353,17 +12395,17 @@
        "vs_resolved": 0.22325573616205885,
        "window": null
       },
-      "deep_n": 2420.0,
+      "deep_n": 151250.0,
       "deep_n_raw": 66339.39065437275,
-      "factor": 0.03647908092204471,
-      "flag": true,
-      "next": "cited",
-      "note": "PSMC's 5 steps in its blind spot (the last 20 kyr) average 4.5x below its youngest resolved step (~25 kya) but are not drawn: PSMC resolves little there and no source in this file dates a change, so the curve stays flat from that step instead (flagged). The genome gives the shape, not the number: its curve is scaled \u00d70.036 to meet the cited 2020 estimate (2,420), then held flat to it (flagged: beyond 10\u00d7).",
-      "ratio": 27.41297134478213,
+      "factor": 2.2799425576277943,
+      "flag": false,
+      "next": "natural",
+      "note": "PSMC's 5 steps in its blind spot (the last 20 kyr) average 4.5x below its youngest resolved step (~25 kya) but are not drawn: PSMC resolves little there and no source in this file dates a change, so the curve stays flat from that step instead (flagged). The genome gives the shape, not the number: its curve is scaled \u00d72.3 to meet the modelled natural level in 1500 CE (151,250), which is above the first cited count (2020 estimate, 2,420), taken after the decline, then held flat to 1500; the range-loss trend runs from there down to the count.",
+      "ratio": 0.43860754151651404,
       "rule": "scaled",
-      "to_kind": "estimate",
-      "to_n": 2420.0,
-      "to_year": 2020.0
+      "to_kind": "rangeloss",
+      "to_n": 151250.0,
+      "to_year": 1500
      },
      "kept_blind": 0,
      "method": "PSMC",
@@ -12376,21 +12418,21 @@
       "vs_flat": 0.8570483465239903
      },
      "ne_factor": 1.0477314034633403,
-     "oldest_n": 24465.020193469365,
+     "oldest_n": 1529063.7620918353,
      "oldest_yr_ago": 1907051.1290301315,
      "points": 16,
      "time_factor": 1.6879638967090311,
      "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 25431.317874549026
     },
-    "deep_after": 24465.020193469365,
+    "deep_after": 1529063.7620918353,
     "deep_before": 22020.909296174585,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
     "events": [],
-    "ever_after": 10068415383.919365,
+    "ever_after": 629263352426.3287,
     "ever_before": 11072818760.26135,
-    "ever_ratio": 0.9092910849451781,
+    "ever_ratio": 56.829554068441766,
     "file": "Elaphurus_davidianus.toml",
     "grades": "C",
     "hist_row": true,
@@ -12405,8 +12447,8 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 112,
-    "trend_1500": false,
+    "segments": 125,
+    "trend_1500": true,
     "trend_held": null,
     "use": "counts"
    },
@@ -12433,6 +12475,11 @@
      "dropped_blind": 4,
      "grade": "D",
      "join": {
+      "below": {
+       "kind": "unverified",
+       "n": 100000.0,
+       "year": 1900.0
+      },
       "blind": {
        "against": true,
        "ago": 12071.245627498127,
@@ -12449,17 +12496,17 @@
        "vs_resolved": 0.48706794709590034,
        "window": null
       },
-      "deep_n": 100000.0,
+      "deep_n": 205422.22929936307,
       "deep_n_raw": 54608.4635920993,
-      "factor": 1.831217972857744,
+      "factor": 3.761728783174983,
       "flag": false,
-      "next": "cited",
-      "note": "PSMC's 4 steps in its blind spot (the last 20 kyr) average 2.1x below its youngest resolved step (~23 kya) but are not drawn: PSMC resolves little there and no source in this file dates a change, so the curve stays flat from that step instead (flagged). The genome gives the shape, not the number: its curve is scaled \u00d71.8 to meet the cited 1900 baseline (100,000), then held flat to it.",
-      "ratio": 0.546084635920993,
+      "next": "natural",
+      "note": "PSMC's 4 steps in its blind spot (the last 20 kyr) average 2.1x below its youngest resolved step (~23 kya) but are not drawn: PSMC resolves little there and no source in this file dates a change, so the curve stays flat from that step instead (flagged). The genome gives the shape, not the number: its curve is scaled \u00d73.8 to meet the modelled natural level in 1500 CE (205,422), which is above the first cited count (1900 baseline, 100,000), taken after the decline, then held flat to 1500; the range-loss trend runs from there down to the count.",
+      "ratio": 0.26583522035737456,
       "rule": "scaled",
-      "to_kind": "unverified",
-      "to_n": 100000.0,
-      "to_year": 1900.0
+      "to_kind": "rangeloss",
+      "to_n": 205422.22929936307,
+      "to_year": 1500
      },
      "kept_blind": 0,
      "method": "PSMC",
@@ -12472,21 +12519,21 @@
       "vs_flat": 0.45571676081373835
      },
      "ne_factor": 1.1079053417354352,
-     "oldest_n": 626701.5910110598,
+     "oldest_n": 1287384.379309496,
      "oldest_yr_ago": 1715864.116130166,
      "points": 21,
      "time_factor": 0.7857172413181907,
      "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 22861.201059594365
     },
-    "deep_after": 626701.5910110598,
+    "deep_after": 1287384.379309496,
     "deep_before": 191271.5044585987,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
     "events": [],
-    "ever_after": 323579319141.3894,
+    "ever_after": 664700900492.4082,
     "ever_before": 111758278934.56377,
-    "ever_ratio": 2.8953498767715473,
+    "ever_ratio": 5.947665862692831,
     "file": "Elephas_maximus.toml",
     "grades": "C",
     "hist_row": true,
@@ -12501,8 +12548,8 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 2,
-    "segments": 113,
-    "trend_1500": false,
+    "segments": 115,
+    "trend_1500": true,
     "trend_held": null,
     "use": "counts"
    },
@@ -12567,6 +12614,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": false,
        "ago": 14936.30803737442,
@@ -12692,6 +12740,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": null,
       "deep_n": 500000.0,
       "deep_n_raw": 1031178.5699863401,
@@ -12831,6 +12880,7 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": true,
        "ago": 12507.128519472362,
@@ -12920,6 +12970,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": null,
       "deep_n": 612236.8421052631,
       "deep_n_raw": 189588.90058505634,
@@ -12994,6 +13045,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": null,
       "deep_n": 97211.0,
       "deep_n_raw": 58797.60883990623,
@@ -13068,6 +13120,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": true,
        "ago": 14205.2752280085,
@@ -13315,6 +13368,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": true,
        "ago": 16423.537015280985,
@@ -13411,6 +13465,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": true,
        "ago": 13285.746677872572,
@@ -13500,6 +13555,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": null,
       "deep_n": 328807.3394495413,
       "deep_n_raw": 57575.77589035523,
@@ -13574,6 +13630,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": true,
        "ago": 13307.457744169285,
@@ -13663,6 +13720,7 @@
      "dropped_blind": 10,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": true,
        "ago": 10344.439661677665,
@@ -13752,6 +13810,7 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": true,
        "ago": 13289.320665568574,
@@ -13841,6 +13900,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": null,
       "deep_n": 534855.960591133,
       "deep_n_raw": 94263.2511987664,
@@ -13915,6 +13975,7 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": true,
        "ago": 12007.649829282576,
@@ -14033,6 +14094,7 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": true,
        "ago": 13944.592998032052,
@@ -14122,6 +14184,7 @@
      "dropped_blind": 4,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": false,
        "ago": 11714.687781222978,
@@ -14211,6 +14274,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": null,
       "deep_n": 200000.00000000003,
       "deep_n_raw": 153273.38799816056,
@@ -14285,6 +14349,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": true,
        "ago": 14753.2611138982,
@@ -14374,6 +14439,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": true,
        "ago": 14397.224472536464,
@@ -14463,6 +14529,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": false,
        "ago": 12359.21584337773,
@@ -14559,6 +14626,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": true,
        "ago": 15910.30956353551,
@@ -14655,6 +14723,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": null,
       "deep_n": 11699999.999999998,
       "deep_n_raw": 98985.6796599373,
@@ -14837,6 +14906,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": true,
        "ago": 16486.549696748814,
@@ -14926,6 +14996,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": null,
       "deep_n": 22000000.0,
       "deep_n_raw": 88396.23756272027,
@@ -15119,6 +15190,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": null,
       "deep_n": 793562.059678298,
       "deep_n_raw": 385627.86092993757,
@@ -15193,6 +15265,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": null,
       "deep_n": 811221.1574850454,
       "deep_n_raw": 162923.89981635512,
@@ -15267,6 +15340,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": false,
        "ago": 16000.505413689123,
@@ -15356,6 +15430,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": null,
       "deep_n": 45000000.0,
       "deep_n_raw": 1033005.3186696705,
@@ -15430,6 +15505,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": false,
        "ago": 16822.470534199292,
@@ -15519,6 +15595,7 @@
      "dropped_blind": 6,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": false,
        "ago": 10885.67426144471,
@@ -15608,6 +15685,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": false,
        "ago": 15159.993348274164,
@@ -15697,6 +15775,11 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "below": {
+       "kind": "estimate",
+       "n": 650.0,
+       "year": 2026.0
+      },
       "blind": {
        "against": true,
        "ago": 11750.760848110576,
@@ -15713,17 +15796,17 @@
        "vs_resolved": 0.48039168821730566,
        "window": null
       },
-      "deep_n": 650.0,
+      "deep_n": 225560.42207840452,
       "deep_n_raw": 166054.40857772547,
-      "factor": 0.003914379663673626,
-      "flag": true,
-      "next": "cited",
-      "note": "PSMC's 1 step in its blind spot (the last 20 kyr) sits 2.1x below its youngest resolved step (~20 kya) but is not drawn: PSMC resolves little there and no source in this file dates a change, so the curve stays flat from that step instead (flagged). The genome gives the shape, not the number: its curve is scaled \u00d70.0039 to meet the cited 2026 estimate (650), then held flat to it (flagged: beyond 10\u00d7).",
-      "ratio": 255.46832088880842,
+      "factor": 1.3583525063282251,
+      "flag": false,
+      "next": "natural",
+      "note": "PSMC's 1 step in its blind spot (the last 20 kyr) sits 2.1x below its youngest resolved step (~20 kya) but is not drawn: PSMC resolves little there and no source in this file dates a change, so the curve stays flat from that step instead (flagged). The genome gives the shape, not the number: its curve is scaled \u00d71.4 to meet the modelled natural level in 1500 CE (225,560), which is above the first cited count (2026 estimate, 650), taken after the decline, then held flat to 1500; the range-loss trend runs from there down to the count.",
+      "ratio": 0.7361859276890569,
       "rule": "scaled",
-      "to_kind": "estimate",
-      "to_n": 650.0,
-      "to_year": 2026.0
+      "to_kind": "rangeloss",
+      "to_n": 225560.42207840452,
+      "to_year": 1500
      },
      "kept_blind": 0,
      "method": "PSMC",
@@ -15736,21 +15819,21 @@
       "vs_flat": 0.9144239751638596
      },
      "ne_factor": 1.073894789953209,
-     "oldest_n": 2593.6421570029006,
+     "oldest_n": 900035.4148521812,
      "oldest_yr_ago": 1530044.2050977338,
      "points": 16,
      "time_factor": 1.539837705892078,
      "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 20366.8250284483
     },
-    "deep_after": 2593.6421570029006,
+    "deep_after": 900035.4148521812,
     "deep_before": 225560.42207840452,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
     "events": [],
-    "ever_after": 786370863.327503,
+    "ever_after": 272861117710.5105,
     "ever_before": 101143623536.21472,
-    "ever_ratio": 0.007774794256268078,
+    "ever_ratio": 2.6977589705673526,
     "file": "Oryx_dammah.toml",
     "grades": "C",
     "hist_row": true,
@@ -15765,8 +15848,8 @@
      "method": "N_nat: D x natural range (PHYLACINE, rescaled to PanTHERIA areas) x fitted occupancy"
     },
     "points": 1,
-    "segments": 91,
-    "trend_1500": false,
+    "segments": 109,
+    "trend_1500": true,
     "trend_held": null,
     "use": "counts"
    },
@@ -15786,6 +15869,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": true,
        "ago": 11637.05311382644,
@@ -15875,6 +15959,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": true,
        "ago": 13502.667453790627,
@@ -15964,6 +16049,7 @@
      "dropped_blind": 9,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": true,
        "ago": 10664.118311328948,
@@ -16053,6 +16139,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": false,
        "ago": 12403.482624928509,
@@ -16178,6 +16265,7 @@
      "dropped_blind": 3,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": false,
        "ago": 12378.63542927767,
@@ -16267,6 +16355,7 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": true,
        "ago": 14271.630203895993,
@@ -16356,6 +16445,7 @@
      "dropped_blind": 5,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": true,
        "ago": 11142.893288462375,
@@ -16445,6 +16535,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": null,
       "deep_n": 402816.5225352495,
       "deep_n_raw": 440806.0801936912,
@@ -16519,6 +16610,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": null,
       "deep_n": 201046.75486856446,
       "deep_n_raw": 308749.31640641426,
@@ -16586,6 +16678,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": false,
        "ago": 13498.232327772344,
@@ -16682,6 +16775,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": null,
       "deep_n": 1000000.0,
       "deep_n_raw": 268027.70046498725,
@@ -16763,6 +16857,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": false,
        "ago": 10000.0,
@@ -16866,6 +16961,11 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "below": {
+       "kind": "reconstruction",
+       "n": 82600.0,
+       "year": 1995.0
+      },
       "blind": {
        "against": false,
        "ago": 13038.629994702671,
@@ -16882,17 +16982,17 @@
        "vs_resolved": 0.8744638733091386,
        "window": null
       },
-      "deep_n": 82600.0,
+      "deep_n": 113091.18773946361,
       "deep_n_raw": 60846.23052499065,
-      "factor": 1.357520413135119,
+      "factor": 1.8586391755692246,
       "flag": false,
-      "next": "cited",
-      "note": "The genome gives the shape, not the number: its curve is scaled \u00d71.4 to meet the cited 1995 baseline (82,600), then held flat to it.",
-      "ratio": 0.736637173426037,
+      "next": "natural",
+      "note": "The genome gives the shape, not the number: its curve is scaled \u00d71.9 to meet the modelled natural level in 1500 CE (113,091), which is above the first cited count (1995 baseline, 82,600), taken after the decline, then held flat to 1500; the range-loss trend runs from there down to the count.",
+      "ratio": 0.5380280439282903,
       "rule": "scaled",
-      "to_kind": "reconstruction",
-      "to_n": 82600.0,
-      "to_year": 1995.0
+      "to_kind": "rangeloss",
+      "to_n": 113091.1877394636,
+      "to_year": 1500
      },
      "kept_blind": 0,
      "method": "PSMC",
@@ -16905,23 +17005,23 @@
       "vs_flat": 0.8544399990279845
      },
      "ne_factor": 1.0037319453149234,
-     "oldest_n": 1086785.4503464203,
+     "oldest_n": 1487964.375274147,
      "oldest_yr_ago": 3173159.449546499,
      "points": 20,
      "time_factor": 1.968540800891171,
      "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 22397.631962788928
     },
-    "deep_after": 1086785.4503464203,
+    "deep_after": 1487964.375274147,
     "deep_before": 113091.1877394636,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
     "events": [
      "bottleneck 300000-30000 ya: Pleistocene decline"
     ],
-    "ever_after": 437292529258.99133,
+    "ever_after": 598714091225.7803,
     "ever_before": 86758987517.9911,
-    "ever_ratio": 5.040313882965848,
+    "ever_ratio": 6.900888407689471,
     "file": "Panthera_onca.toml",
     "grades": "C",
     "hist_row": true,
@@ -16936,8 +17036,8 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 133,
-    "trend_1500": false,
+    "segments": 135,
+    "trend_1500": true,
     "trend_held": null,
     "use": "counts"
    },
@@ -16964,6 +17064,11 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "below": {
+       "kind": "reconstruction",
+       "n": 188000.0,
+       "year": 1998.0
+      },
       "blind": {
        "against": false,
        "ago": 10085.715963473158,
@@ -16983,17 +17088,17 @@
         20000.0
        ]
       },
-      "deep_n": 188000.0,
+      "deep_n": 398802.2199798183,
       "deep_n_raw": 84901.87502854646,
-      "factor": 2.214320943286458,
+      "factor": 4.6972133400555585,
       "flag": false,
-      "next": "cited",
-      "note": "PSMC's 2 steps in its blind spot (the last 20 kyr, where it resolves little) are kept, grade D, because Figueiro et al. 2017, Sci Adv 3:e1700299, Results (PSMC, Fig. 1B) dates a decline there: from the youngest resolved step (~31 kya) to the youngest kept (~10.1 kya) the genomic level falls 3.8x. The genome gives the shape, not the number: its curve is scaled \u00d72.2 to meet the cited 1998 baseline (188,000), then held flat to it.",
-      "ratio": 0.4516057182369493,
+      "next": "natural",
+      "note": "PSMC's 2 steps in its blind spot (the last 20 kyr, where it resolves little) are kept, grade D, because Figueiro et al. 2017, Sci Adv 3:e1700299, Results (PSMC, Fig. 1B) dates a decline there: from the youngest resolved step (~31 kya) to the youngest kept (~10.1 kya) the genomic level falls 3.8x. The genome gives the shape, not the number: its curve is scaled \u00d74.7 to meet the modelled natural level in 1500 CE (398,802), which is above the first cited count (1998 baseline, 188,000), taken after the decline, then held flat to 1500; the range-loss trend runs from there down to the count.",
+      "ratio": 0.21289218257822884,
       "rule": "scaled",
-      "to_kind": "reconstruction",
-      "to_n": 188000.0,
-      "to_year": 1998.0
+      "to_kind": "rangeloss",
+      "to_n": 398802.2199798183,
+      "to_year": 1500
      },
      "kept_blind": 2,
      "method": "PSMC",
@@ -17006,23 +17111,23 @@
       "vs_flat": 0.8894394530323207
      },
      "ne_factor": 0.9129233874037256,
-     "oldest_n": 1411010.752688172,
+     "oldest_n": 2993160.7478055186,
      "oldest_yr_ago": 3117077.7681955057,
      "points": 15,
      "time_factor": 8.49973539427116,
      "youngest_blind_yr_ago": 10085.715963473158,
      "youngest_yr_ago": 30812.91831676278
     },
-    "deep_after": 1411010.752688172,
+    "deep_after": 2993160.7478055186,
     "deep_before": 330280.14329036226,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
     "events": [
      "bottleneck 20000-10000 ya: Post-glacial decline"
     ],
-    "ever_after": 1027131087190.0137,
+    "ever_after": 2178827538135.1902,
     "ever_before": 280698842823.38275,
-    "ever_ratio": 3.6591924528748065,
+    "ever_ratio": 7.7621536170924665,
     "file": "Panthera_pardus.toml",
     "grades": "C",
     "hist_row": true,
@@ -17037,8 +17142,8 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 102,
-    "trend_1500": false,
+    "segments": 106,
+    "trend_1500": true,
     "trend_held": null,
     "use": "counts"
    },
@@ -17065,6 +17170,7 @@
      "dropped_blind": 3,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": true,
        "ago": 12791.573285776347,
@@ -17158,6 +17264,11 @@
      "dropped_blind": 10,
      "grade": "D",
      "join": {
+      "below": {
+       "kind": "estimate",
+       "n": 5930.0,
+       "year": 1994.0
+      },
       "blind": {
        "against": true,
        "ago": 10301.302884217217,
@@ -17174,17 +17285,17 @@
        "vs_resolved": 0.6154143821190469,
        "window": null
       },
-      "deep_n": 5930.0,
+      "deep_n": 7721.000000000002,
       "deep_n_raw": 39770.981770772625,
-      "factor": 0.149103686556662,
+      "factor": 0.19413652005126267,
       "flag": false,
-      "next": "cited",
-      "note": "PSMC's 10 steps in its blind spot (the last 20 kyr) average 1.6x below its youngest resolved step (~24 kya) but are not drawn: PSMC resolves little there and no source in this file dates a change, so the curve stays flat from that step instead (flagged). The genome gives the shape, not the number: its curve is scaled \u00d70.15 to meet the cited 1994 estimate (5,930), then held flat to it.",
-      "ratio": 6.7067422884945405,
+      "next": "natural",
+      "note": "PSMC's 10 steps in its blind spot (the last 20 kyr) average 1.6x below its youngest resolved step (~24 kya) but are not drawn: PSMC resolves little there and no source in this file dates a change, so the curve stays flat from that step instead (flagged). The genome gives the shape, not the number: its curve is scaled \u00d70.19 to meet the modelled natural level in 1500 CE (7,721), which is above the first cited count (1994 estimate, 5,930), taken after the decline, then held flat to 1500; the range-loss trend runs from there down to the count.",
+      "ratio": 5.151014346687297,
       "rule": "scaled",
-      "to_kind": "estimate",
-      "to_n": 5930.0,
-      "to_year": 1994.0
+      "to_kind": "rangeloss",
+      "to_n": 7721.000000000001,
+      "to_year": 1500
      },
      "kept_blind": 0,
      "method": "PSMC",
@@ -17197,14 +17308,14 @@
       "vs_flat": 1.0007797446102327
      },
      "ne_factor": 0.45245713049798214,
-     "oldest_n": 18019.374288964736,
+     "oldest_n": 23461.650739476685,
      "oldest_yr_ago": 629448.7514758386,
      "points": 17,
      "time_factor": 0.7234359047524205,
      "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 24250.46285647097
     },
-    "deep_after": 18019.374288964736,
+    "deep_after": 23461.650739476685,
     "deep_before": 7500.0,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
@@ -17212,9 +17323,9 @@
      "bottleneck 75000-30000 ya: Glacial decline",
      "bottleneck 9000-7000 ya: Holocene bottleneck"
     ],
-    "ever_after": 12861615337.531183,
+    "ever_after": 16745994929.958452,
     "ever_before": 5639930144.118823,
-    "ever_ratio": 2.280456496600929,
+    "ever_ratio": 2.969184812939705,
     "file": "Panthera_uncia.toml",
     "grades": "C",
     "hist_row": true,
@@ -17229,8 +17340,8 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 3,
-    "segments": 59,
-    "trend_1500": false,
+    "segments": 61,
+    "trend_1500": true,
     "trend_held": null,
     "use": "counts"
    },
@@ -17250,6 +17361,7 @@
      "dropped_blind": 5,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": true,
        "ago": 11775.838283983745,
@@ -17339,6 +17451,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": true,
        "ago": 14563.991851618517,
@@ -17521,18 +17634,23 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "below": {
+       "kind": "unverified",
+       "n": 89286.0,
+       "year": 1900.0
+      },
       "blind": null,
-      "deep_n": 89285.99999999999,
+      "deep_n": 453951.0,
       "deep_n_raw": 169933.905905257,
-      "factor": 0.5254160405739128,
+      "factor": 2.6713385865036883,
       "flag": false,
-      "next": "cited",
-      "note": "The genome gives the shape, not the number: its curve is scaled \u00d70.53 to meet the cited 1900 baseline (89,286), then held flat to it.",
-      "ratio": 1.9032536557271802,
+      "next": "natural",
+      "note": "The genome gives the shape, not the number: its curve is scaled \u00d72.7 to meet the modelled natural level in 1500 CE (453,951), which is above the first cited count (1900 baseline, 89,286), taken after the decline, then held flat to 1500; the range-loss trend runs from there down to the count.",
+      "ratio": 0.37434416028438533,
       "rule": "scaled",
-      "to_kind": "unverified",
-      "to_n": 89286.0,
-      "to_year": 1900.0
+      "to_kind": "rangeloss",
+      "to_n": 453951.0,
+      "to_year": 1500
      },
      "kept_blind": 0,
      "method": "PSMC",
@@ -17545,21 +17663,21 @@
       "vs_flat": 0.40900120736901213
      },
      "ne_factor": 1.6245790539221034,
-     "oldest_n": 647397.1064923749,
+     "oldest_n": 3291518.9826996406,
      "oldest_yr_ago": 1577954.1853904778,
      "points": 10,
      "time_factor": 1.623467090161719,
      "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 102292.94281742541
     },
-    "deep_after": 647397.1064923749,
+    "deep_after": 3291518.9826996406,
     "deep_before": 453950.99999999994,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
     "events": [],
-    "ever_after": 108710719831.48375,
+    "ever_after": 552702088880.3131,
     "ever_before": 73524975663.68584,
-    "ever_ratio": 1.478554992370793,
+    "ever_ratio": 7.5172019288854255,
     "file": "Pongo_abelii.toml",
     "grades": "BC",
     "hist_row": true,
@@ -17574,8 +17692,8 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 2,
-    "segments": 84,
-    "trend_1500": false,
+    "segments": 90,
+    "trend_1500": true,
     "trend_held": null,
     "use": "counts"
    },
@@ -17602,6 +17720,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": null,
       "deep_n": 288500.0,
       "deep_n_raw": 150773.8288659215,
@@ -17676,6 +17795,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": null,
       "deep_n": 2819.6055342008162,
       "deep_n_raw": 54008.59020215222,
@@ -17743,6 +17863,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": null,
       "deep_n": 209238.0,
       "deep_n_raw": 247005.10549541324,
@@ -17817,6 +17938,11 @@
      "dropped_blind": 3,
      "grade": "D",
      "join": {
+      "below": {
+       "kind": "estimate",
+       "n": 776691.0,
+       "year": 2023.0
+      },
       "blind": {
        "against": true,
        "ago": 12035.141938873252,
@@ -17833,17 +17959,17 @@
        "vs_resolved": 0.581755151826723,
        "window": null
       },
-      "deep_n": 776691.0,
+      "deep_n": 1019752.3662881639,
       "deep_n_raw": 37342.24298495631,
-      "factor": 20.79925944225947,
+      "factor": 27.30827836718274,
       "flag": true,
-      "next": "cited",
-      "note": "PSMC's 3 steps in its blind spot (the last 20 kyr) average 1.7x below its youngest resolved step (~23 kya) but are not drawn: PSMC resolves little there and no source in this file dates a change, so the curve stays flat from that step instead (flagged). The genome gives the shape, not the number: its curve is scaled \u00d721 to meet the cited 2023 estimate (776,691), then held flat to it (flagged: beyond 10\u00d7).",
-      "ratio": 0.04807863485601908,
+      "next": "natural",
+      "note": "PSMC's 3 steps in its blind spot (the last 20 kyr) average 1.7x below its youngest resolved step (~23 kya) but are not drawn: PSMC resolves little there and no source in this file dates a change, so the curve stays flat from that step instead (flagged). The genome gives the shape, not the number: its curve is scaled \u00d727 to meet the modelled natural level in 1500 CE (1,019,752), which is above the first cited count (2023 estimate, 776,691), taken after the decline, then held flat to 1500; the range-loss trend runs from there down to the count (flagged: beyond 10\u00d7).",
+      "ratio": 0.03661893241873984,
       "rule": "scaled",
-      "to_kind": "estimate",
-      "to_n": 776691.0,
-      "to_year": 2023.0
+      "to_kind": "rangeloss",
+      "to_n": 1019752.366288164,
+      "to_year": 1500
      },
      "kept_blind": 0,
      "method": "PSMC",
@@ -17856,14 +17982,14 @@
       "vs_flat": 1.0652297864710356
      },
      "ne_factor": 1.070481539178531,
-     "oldest_n": 6444561.731889677,
+     "oldest_n": 8461353.454314066,
      "oldest_yr_ago": 2504667.891882811,
      "points": 18,
      "time_factor": 1.5790020344551592,
      "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 23477.51254509866
     },
-    "deep_after": 6444561.731889677,
+    "deep_after": 8461353.454314066,
     "deep_before": 1019752.366288164,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
@@ -17871,9 +17997,9 @@
      "bottleneck 25000-20000 ya: Last-glacial low",
      "bottleneck 12000-9000 ya: North American refounding"
     ],
-    "ever_after": 7102596387339.346,
+    "ever_after": 9325298330670.68,
     "ever_before": 849361153306.4893,
-    "ever_ratio": 8.362280709083002,
+    "ever_ratio": 10.97919100063395,
     "file": "Puma_concolor.toml",
     "grades": "D",
     "hist_row": true,
@@ -17888,8 +18014,8 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 110,
-    "trend_1500": false,
+    "segments": 112,
+    "trend_1500": true,
     "trend_held": null,
     "use": "counts"
    },
@@ -17909,6 +18035,7 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": true,
        "ago": 12315.338264777649,
@@ -17998,6 +18125,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": null,
       "deep_n": 2476545.6074902443,
       "deep_n_raw": 233249.43728445584,
@@ -18072,6 +18200,7 @@
      "dropped_blind": 5,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": false,
        "ago": 11694.59161030523,
@@ -18247,6 +18376,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": false,
        "ago": 15269.392370367827,
@@ -18372,6 +18502,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": null,
       "deep_n": 784802.842945874,
       "deep_n_raw": 321036.92976466275,
@@ -18446,6 +18577,7 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": false,
        "ago": 13062.133369947753,
@@ -18535,6 +18667,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": null,
       "deep_n": 413031.72094875335,
       "deep_n_raw": 876756.6296407337,
@@ -18609,6 +18742,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": true,
        "ago": 11526.094888049027,
@@ -18698,6 +18832,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": null,
       "deep_n": 135999.99999999997,
       "deep_n_raw": 172095.7297496977,
@@ -18772,6 +18907,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": null,
       "deep_n": 1339999.9999999998,
       "deep_n_raw": 226096.61139007722,
@@ -18846,6 +18982,7 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": false,
        "ago": 15204.00322157846,
@@ -18935,6 +19072,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": null,
       "deep_n": 482000.0,
       "deep_n_raw": 168843.65299267572,
@@ -19009,6 +19147,7 @@
      "dropped_blind": 3,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": false,
        "ago": 13089.829254772105,
@@ -19098,6 +19237,7 @@
      "dropped_blind": 4,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": {
        "against": false,
        "ago": 11494.777505487653,
@@ -19187,6 +19327,11 @@
      "dropped_blind": 1,
      "grade": "D",
      "join": {
+      "below": {
+       "kind": "estimate",
+       "n": 200000.0,
+       "year": 2017.0
+      },
       "blind": {
        "against": true,
        "ago": 11972.581949162439,
@@ -19203,17 +19348,17 @@
        "vs_resolved": 1.7190297768128033,
        "window": null
       },
-      "deep_n": 200000.0,
+      "deep_n": 362297.6501305482,
       "deep_n_raw": 24249.63358583652,
-      "factor": 8.247547299717302,
-      "flag": false,
-      "next": "cited",
-      "note": "PSMC's 1 step in its blind spot (the last 20 kyr) sits 1.7x above its youngest resolved step (~21 kya) but is not drawn: PSMC resolves little there and no source in this file dates a change, so the curve stays flat from that step instead (flagged). The genome gives the shape, not the number: its curve is scaled \u00d78.2 to meet the cited 2017 estimate (200,000), then held flat to it.",
-      "ratio": 0.1212481679291826,
+      "factor": 14.940335030140636,
+      "flag": true,
+      "next": "natural",
+      "note": "PSMC's 1 step in its blind spot (the last 20 kyr) sits 1.7x above its youngest resolved step (~21 kya) but is not drawn: PSMC resolves little there and no source in this file dates a change, so the curve stays flat from that step instead (flagged). The genome gives the shape, not the number: its curve is scaled \u00d715 to meet the modelled natural level in 1500 CE (362,298), which is above the first cited count (2017 estimate, 200,000), taken after the decline, then held flat to 1500; the range-loss trend runs from there down to the count (flagged: beyond 10\u00d7).",
+      "ratio": 0.06693290331057501,
       "rule": "scaled",
-      "to_kind": "estimate",
-      "to_n": 200000.0,
-      "to_year": 2017.0
+      "to_kind": "rangeloss",
+      "to_n": 362297.6501305483,
+      "to_year": 1500
      },
      "kept_blind": 0,
      "method": "PSMC",
@@ -19226,23 +19371,23 @@
       "vs_flat": 0.5748943228603379
      },
      "ne_factor": 1.0035619965493636,
-     "oldest_n": 4900446.126814468,
+     "oldest_n": 8877100.581681142,
      "oldest_yr_ago": 1390345.1382374545,
      "points": 15,
      "time_factor": 1.6420409151080289,
      "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 20851.41696433181
     },
-    "deep_after": 4900446.126814468,
+    "deep_after": 8877100.581681142,
     "deep_before": 398527.4151436031,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
     "events": [
      "bottleneck 146-96 ya: Scandinavian hunting low"
     ],
-    "ever_after": 722154937957.7048,
+    "ever_after": 1308169358411.1438,
     "ever_before": 81686056093.73222,
-    "ever_ratio": 8.840614573545507,
+    "ever_ratio": 16.01459809627802,
     "file": "Ursus_arctos.toml",
     "grades": "C",
     "hist_row": true,
@@ -19257,8 +19402,8 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 92,
-    "trend_1500": false,
+    "segments": 94,
+    "trend_1500": true,
     "trend_held": null,
     "use": "counts"
    },
@@ -19278,6 +19423,11 @@
      "dropped_blind": 2,
      "grade": "D",
      "join": {
+      "below": {
+       "kind": "estimate",
+       "n": 10000.0,
+       "year": 1965.0
+      },
       "blind": {
        "against": true,
        "ago": 12286.243189733621,
@@ -19294,17 +19444,17 @@
        "vs_resolved": 2.2879874021326905,
        "window": null
       },
-      "deep_n": 10000.0,
+      "deep_n": 26000.0,
       "deep_n_raw": 46778.34187573634,
-      "factor": 0.21377414416621174,
+      "factor": 0.5558127748321505,
       "flag": false,
-      "next": "cited",
-      "note": "PSMC's 2 steps in its blind spot (the last 20 kyr) average 2.3x above its youngest resolved step (~21 kya) but are not drawn: PSMC resolves little there and no source in this file dates a change, so the curve stays flat from that step instead (flagged). The genome gives the shape, not the number: its curve is scaled \u00d70.21 to meet the cited 1965 estimate (10,000), then held flat to it.",
-      "ratio": 4.677834187573634,
+      "next": "natural",
+      "note": "PSMC's 2 steps in its blind spot (the last 20 kyr) average 2.3x above its youngest resolved step (~21 kya) but are not drawn: PSMC resolves little there and no source in this file dates a change, so the curve stays flat from that step instead (flagged). The genome gives the shape, not the number: its curve is scaled \u00d70.56 to meet the modelled natural level in 1500 CE (26,000), which is above the first cited count (1965 estimate, 10,000), taken after the decline, then held flat to 1500; the range-loss trend runs from there down to the count.",
+      "ratio": 1.7991669952206284,
       "rule": "scaled",
-      "to_kind": "estimate",
-      "to_n": 10000.0,
-      "to_year": 1965.0
+      "to_kind": "rangeloss",
+      "to_n": 26000.0,
+      "to_year": 1500
      },
      "kept_blind": 0,
      "method": "PSMC",
@@ -19317,23 +19467,23 @@
       "vs_flat": 0.6152271919273105
      },
      "ne_factor": 1.0236289810091015,
-     "oldest_n": 158296.09877126588,
+     "oldest_n": 411569.8568052913,
      "oldest_yr_ago": 1396271.860474978,
      "points": 21,
      "time_factor": 1.5343925177343825,
      "youngest_blind_yr_ago": null,
      "youngest_yr_ago": 20520.75376450484
     },
-    "deep_after": 158296.09877126588,
+    "deep_after": 411569.8568052913,
     "deep_before": 26000.0,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
     "events": [
      "bottleneck 500000-20000 ya: Long Pleistocene decline"
     ],
-    "ever_after": 18477610946.63051,
+    "ever_after": 48040965621.64177,
     "ever_before": 5817581917.808218,
-    "ever_ratio": 3.1761668692740943,
+    "ever_ratio": 8.257892419973222,
     "file": "Ursus_maritimus.toml",
     "grades": "BCD",
     "hist_row": true,
@@ -19348,8 +19498,8 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 3,
-    "segments": 120,
-    "trend_1500": false,
+    "segments": 124,
+    "trend_1500": true,
     "trend_held": null,
     "use": "counts"
    },
@@ -19369,6 +19519,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": null,
       "deep_n": 156318.52449187776,
       "deep_n_raw": 335401.9254272596,
@@ -19450,6 +19601,7 @@
      "dropped_blind": 0,
      "grade": "D",
      "join": {
+      "below": null,
       "blind": null,
       "deep_n": 2000000.0000000002,
       "deep_n_raw": 80850.68462779462,
@@ -19517,11 +19669,11 @@
  "knuckles_collapsed": 3787,
  "mammalia": {
   "alive": 93325167849.64867,
-  "ever": 7.903289941614584e+18,
-  "ghost": 7.490561647802247e+18,
+  "ever": 7.903296280683465e+18,
+  "ghost": 7.490337944185799e+18,
   "grade": "D",
-  "hi": 3.5440875032297676e+22,
-  "lo": 1530854948721170.2
+  "hi": 3.603639359195313e+22,
+  "lo": 1505508598306841.8
  },
  "mass_sources": {
   "mass:combine": 181,
@@ -20446,12 +20598,12 @@
   "non-species tip": 551
  },
  "output": {
-  "brotli_bytes": 753330,
+  "brotli_bytes": 754680,
   "files": 14,
-  "raw_bytes": 3074392,
-  "skeleton_brotli": 91079,
+  "raw_bytes": 3091968,
+  "skeleton_brotli": 91378,
   "skeleton_nodes": 2371,
-  "skeleton_raw": 426344,
+  "skeleton_raw": 428432,
   "tiles": 13
  },
  "overrides": {
@@ -20616,7 +20768,7 @@
   "maps_used": 5613,
   "range_maps": 5831
  },
- "pieces": 290163,
+ "pieces": 293362,
  "rangeloss": {
   "carried_by_genomic_record": 48,
   "declines": 579,
@@ -21067,7 +21219,7 @@
     "leaf": "Ceratotherium simum",
     "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count",
     "natural": 20744.172307692304,
-    "segments": 196,
+    "segments": 198,
     "today": 15752.0
    },
    {
@@ -21103,7 +21255,7 @@
     "leaf": "Ursus arctos",
     "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count",
     "natural": 362297.6501305483,
-    "segments": 92,
+    "segments": 94,
     "today": 200000.0
    },
    {
@@ -21175,7 +21327,7 @@
     "leaf": "Elephas maximus",
     "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count",
     "natural": 205422.22929936307,
-    "segments": 113,
+    "segments": 115,
     "today": 50002.00000000001
    }
   ],
@@ -21361,13 +21513,13 @@
   },
   "Hominidae": {
    "alive": 8301443764.904216,
-   "ever": 2601050152972.5947,
+   "ever": 3089604877568.3613,
    "ever_range": [
-    40490901328.23127,
-    306098052271120.6
+    54106912057.79398,
+    365051197461960.8
    ],
    "extinct(gray)": false,
-   "ghost": 376531050143.6433,
+   "ghost": 376231217795.599,
    "grade": "D",
    "t0_Ma": 14.805233333333334,
    "t1_Ma": 0.0
@@ -21387,13 +21539,13 @@
   },
   "Mammalia": {
    "alive": 93325167849.64867,
-   "ever": 7.903289941614584e+18,
+   "ever": 7.903296280683465e+18,
    "ever_range": [
-    1530854948721170.2,
-    3.5440875032297676e+22
+    1505508598306841.8,
+    3.603639359195313e+22
    ],
    "extinct(gray)": 0.0,
-   "ghost": 7.490561647802247e+18,
+   "ghost": 7.490337944185799e+18,
    "grade": "D",
    "t0_Ma": 208.64140800000004,
    "t1_Ma": 0.0
@@ -21703,8 +21855,8 @@
   "by_alive": [
    {
     "alive": 50367382572.592575,
-    "ever": 1.215047726831486e+18,
-    "ghost": 1.0490592480624943e+18,
+    "ever": 1.214957253988856e+18,
+    "ghost": 1.0489687752198644e+18,
     "ghost_share": 0.863,
     "name": "Chiroptera",
     "sampled": 1.659884787689916e+17,
@@ -21712,8 +21864,8 @@
    },
    {
     "alive": 21966955920.92067,
-    "ever": 1.7485291873277082e+18,
-    "ghost": 1.5927502770098273e+18,
+    "ever": 1.7484166333282826e+18,
+    "ghost": 1.5926377230104018e+18,
     "ghost_share": 0.911,
     "name": "Rodentia",
     "sampled": 1.5577891031788083e+17,
@@ -21721,35 +21873,35 @@
    },
    {
     "alive": 5578617042.535016,
-    "ever": 6596834334060648.0,
-    "ghost": 3359186202977761.0,
-    "ghost_share": 0.509,
+    "ever": 6820935442619739.0,
+    "ghost": 3358904143145594.0,
+    "ghost_share": 0.492,
     "name": "Artiodactyla",
-    "sampled": 3237648131082887.0,
+    "sampled": 3462031299474145.0,
     "t0_Ma": 61.87
    },
    {
     "alive": 2017527491.9104786,
-    "ever": 1.225274646331994e+16,
-    "ghost": 1.0861810482985982e+16,
+    "ever": 1.2256447097818968e+16,
+    "ghost": 1.0861013590921566e+16,
     "ghost_share": 0.886,
     "name": "Carnivora",
-    "sampled": 1390935980333958.0,
+    "sampled": 1395433506897402.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 1282257610.2534523,
-    "ever": 1.7379630462592064e+17,
-    "ghost": 1.3401189080134968e+17,
+    "ever": 1.7378774101483872e+17,
+    "ghost": 1.3400332719026774e+17,
     "ghost_share": 0.771,
     "name": "Eulipotyphla",
-    "sampled": 3.978441382457096e+16,
+    "sampled": 3.978441382457098e+16,
     "t0_Ma": 75.11
    },
    {
     "alive": 1114427328.725424,
-    "ever": 7.613163976170758e+16,
-    "ghost": 6.026396337209513e+16,
+    "ever": 7.6127150953487e+16,
+    "ghost": 6.025947456387455e+16,
     "ghost_share": 0.792,
     "name": "Didelphimorphia",
     "sampled": 1.5867676389612456e+16,
@@ -21757,17 +21909,17 @@
    },
    {
     "alive": 736462366.2633649,
-    "ever": 3.970020808620878e+16,
-    "ghost": 2.838160947344942e+16,
+    "ever": 3.969754348845176e+16,
+    "ghost": 2.8378944875692388e+16,
     "ghost_share": 0.715,
     "name": "Lagomorpha",
-    "sampled": 1.1318598612759364e+16,
+    "sampled": 1.1318598612759372e+16,
     "t0_Ma": 72.45
    },
    {
     "alive": 310814089.12791497,
-    "ever": 8163826090040934.0,
-    "ghost": 6072082507654405.0,
+    "ever": 8163196511469820.0,
+    "ghost": 6071452929083291.0,
     "ghost_share": 0.744,
     "name": "Diprotodontia",
     "sampled": 2091743582386529.0,
@@ -21775,8 +21927,8 @@
    },
    {
     "alive": 226037157.53161967,
-    "ever": 1.842333181212416e+16,
-    "ghost": 1.104036204826688e+16,
+    "ever": 1.8422521821771252e+16,
+    "ghost": 1.1039552057913972e+16,
     "ghost_share": 0.599,
     "name": "Macroscelidea",
     "sampled": 7382969763857280.0,
@@ -21784,8 +21936,8 @@
    },
    {
     "alive": 145006443.2142533,
-    "ever": 4118326092112211.5,
-    "ghost": 2908719870242865.5,
+    "ever": 4118088680582588.0,
+    "ghost": 2908482458713242.0,
     "ghost_share": 0.706,
     "name": "Pilosa (order in Deuterostomia)",
     "sampled": 1209606221869346.0,
@@ -21795,8 +21947,8 @@
   "by_ever": [
    {
     "alive": 21966955920.92067,
-    "ever": 1.7485291873277082e+18,
-    "ghost": 1.5927502770098273e+18,
+    "ever": 1.7484166333282826e+18,
+    "ghost": 1.5926377230104018e+18,
     "ghost_share": 0.911,
     "name": "Rodentia",
     "sampled": 1.5577891031788083e+17,
@@ -21804,8 +21956,8 @@
    },
    {
     "alive": 50367382572.592575,
-    "ever": 1.215047726831486e+18,
-    "ghost": 1.0490592480624943e+18,
+    "ever": 1.214957253988856e+18,
+    "ghost": 1.0489687752198644e+18,
     "ghost_share": 0.863,
     "name": "Chiroptera",
     "sampled": 1.659884787689916e+17,
@@ -21813,17 +21965,17 @@
    },
    {
     "alive": 1282257610.2534523,
-    "ever": 1.7379630462592064e+17,
-    "ghost": 1.3401189080134968e+17,
+    "ever": 1.7378774101483872e+17,
+    "ghost": 1.3400332719026774e+17,
     "ghost_share": 0.771,
     "name": "Eulipotyphla",
-    "sampled": 3.978441382457096e+16,
+    "sampled": 3.978441382457098e+16,
     "t0_Ma": 75.11
    },
    {
     "alive": 1114427328.725424,
-    "ever": 7.613163976170758e+16,
-    "ghost": 6.026396337209513e+16,
+    "ever": 7.6127150953487e+16,
+    "ghost": 6.025947456387455e+16,
     "ghost_share": 0.792,
     "name": "Didelphimorphia",
     "sampled": 1.5867676389612456e+16,
@@ -21831,17 +21983,17 @@
    },
    {
     "alive": 736462366.2633649,
-    "ever": 3.970020808620878e+16,
-    "ghost": 2.838160947344942e+16,
+    "ever": 3.969754348845176e+16,
+    "ghost": 2.8378944875692388e+16,
     "ghost_share": 0.715,
     "name": "Lagomorpha",
-    "sampled": 1.1318598612759364e+16,
+    "sampled": 1.1318598612759372e+16,
     "t0_Ma": 72.45
    },
    {
     "alive": 226037157.53161967,
-    "ever": 1.842333181212416e+16,
-    "ghost": 1.104036204826688e+16,
+    "ever": 1.8422521821771252e+16,
+    "ghost": 1.1039552057913972e+16,
     "ghost_share": 0.599,
     "name": "Macroscelidea",
     "sampled": 7382969763857280.0,
@@ -21849,17 +22001,17 @@
    },
    {
     "alive": 2017527491.9104786,
-    "ever": 1.225274646331994e+16,
-    "ghost": 1.0861810482985982e+16,
+    "ever": 1.2256447097818968e+16,
+    "ghost": 1.0861013590921566e+16,
     "ghost_share": 0.886,
     "name": "Carnivora",
-    "sampled": 1390935980333958.0,
+    "sampled": 1395433506897402.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 310814089.12791497,
-    "ever": 8163826090040934.0,
-    "ghost": 6072082507654405.0,
+    "ever": 8163196511469820.0,
+    "ghost": 6071452929083291.0,
     "ghost_share": 0.744,
     "name": "Diprotodontia",
     "sampled": 2091743582386529.0,
@@ -21867,17 +22019,17 @@
    },
    {
     "alive": 5578617042.535016,
-    "ever": 6596834334060648.0,
-    "ghost": 3359186202977761.0,
-    "ghost_share": 0.509,
+    "ever": 6820935442619739.0,
+    "ghost": 3358904143145594.0,
+    "ghost_share": 0.492,
     "name": "Artiodactyla",
-    "sampled": 3237648131082887.0,
+    "sampled": 3462031299474145.0,
     "t0_Ma": 61.87
    },
    {
     "alive": 76858606.79902251,
-    "ever": 5399985009445835.0,
-    "ghost": 4509940591117765.0,
+    "ever": 5399597522809649.0,
+    "ghost": 4509553104481579.0,
     "ghost_share": 0.835,
     "name": "Dasyuromorphia",
     "sampled": 890044418328070.0,
@@ -21887,8 +22039,8 @@
   "by_sampled_ever": [
    {
     "alive": 50367382572.592575,
-    "ever": 1.215047726831486e+18,
-    "ghost": 1.0490592480624943e+18,
+    "ever": 1.214957253988856e+18,
+    "ghost": 1.0489687752198644e+18,
     "ghost_share": 0.863,
     "name": "Chiroptera",
     "sampled": 1.659884787689916e+17,
@@ -21896,8 +22048,8 @@
    },
    {
     "alive": 21966955920.92067,
-    "ever": 1.7485291873277082e+18,
-    "ghost": 1.5927502770098273e+18,
+    "ever": 1.7484166333282826e+18,
+    "ghost": 1.5926377230104018e+18,
     "ghost_share": 0.911,
     "name": "Rodentia",
     "sampled": 1.5577891031788083e+17,
@@ -21905,17 +22057,17 @@
    },
    {
     "alive": 1282257610.2534523,
-    "ever": 1.7379630462592064e+17,
-    "ghost": 1.3401189080134968e+17,
+    "ever": 1.7378774101483872e+17,
+    "ghost": 1.3400332719026774e+17,
     "ghost_share": 0.771,
     "name": "Eulipotyphla",
-    "sampled": 3.978441382457096e+16,
+    "sampled": 3.978441382457098e+16,
     "t0_Ma": 75.11
    },
    {
     "alive": 1114427328.725424,
-    "ever": 7.613163976170758e+16,
-    "ghost": 6.026396337209513e+16,
+    "ever": 7.6127150953487e+16,
+    "ghost": 6.025947456387455e+16,
     "ghost_share": 0.792,
     "name": "Didelphimorphia",
     "sampled": 1.5867676389612456e+16,
@@ -21923,17 +22075,17 @@
    },
    {
     "alive": 736462366.2633649,
-    "ever": 3.970020808620878e+16,
-    "ghost": 2.838160947344942e+16,
+    "ever": 3.969754348845176e+16,
+    "ghost": 2.8378944875692388e+16,
     "ghost_share": 0.715,
     "name": "Lagomorpha",
-    "sampled": 1.1318598612759364e+16,
+    "sampled": 1.1318598612759372e+16,
     "t0_Ma": 72.45
    },
    {
     "alive": 226037157.53161967,
-    "ever": 1.842333181212416e+16,
-    "ghost": 1.104036204826688e+16,
+    "ever": 1.8422521821771252e+16,
+    "ghost": 1.1039552057913972e+16,
     "ghost_share": 0.599,
     "name": "Macroscelidea",
     "sampled": 7382969763857280.0,
@@ -21941,17 +22093,17 @@
    },
    {
     "alive": 5578617042.535016,
-    "ever": 6596834334060648.0,
-    "ghost": 3359186202977761.0,
-    "ghost_share": 0.509,
+    "ever": 6820935442619739.0,
+    "ghost": 3358904143145594.0,
+    "ghost_share": 0.492,
     "name": "Artiodactyla",
-    "sampled": 3237648131082887.0,
+    "sampled": 3462031299474145.0,
     "t0_Ma": 61.87
    },
    {
     "alive": 310814089.12791497,
-    "ever": 8163826090040934.0,
-    "ghost": 6072082507654405.0,
+    "ever": 8163196511469820.0,
+    "ghost": 6071452929083291.0,
     "ghost_share": 0.744,
     "name": "Diprotodontia",
     "sampled": 2091743582386529.0,
@@ -21959,20 +22111,20 @@
    },
    {
     "alive": 101350585.2545455,
-    "ever": 4306981727996685.0,
-    "ghost": 2619083221191833.5,
+    "ever": 4306734579566749.0,
+    "ghost": 2618836072761898.0,
     "ghost_share": 0.608,
     "name": "Scandentia",
-    "sampled": 1687898506804851.5,
+    "sampled": 1687898506804851.0,
     "t0_Ma": 74.72
    },
    {
     "alive": 2017527491.9104786,
-    "ever": 1.225274646331994e+16,
-    "ghost": 1.0861810482985982e+16,
+    "ever": 1.2256447097818968e+16,
+    "ghost": 1.0861013590921566e+16,
     "ghost_share": 0.886,
     "name": "Carnivora",
-    "sampled": 1390935980333958.0,
+    "sampled": 1395433506897402.0,
     "t0_Ma": 65.7
    }
   ]
