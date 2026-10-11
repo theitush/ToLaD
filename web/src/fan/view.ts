@@ -1040,7 +1040,7 @@ export class FanView implements InputHandlers {
       // A short tick at the edge, visible over the branches too.
       ctx.fillStyle = now ? GREEN : '#8d9e93';
       ctx.fillRect(0, Math.round(p.sy), now ? 6 : 4, 1);
-      const label = now ? 'now' : p.yrs === origin ? `${formatTick(origin, 0)}, Panthera begins` : formatTick(p.yrs, p.step);
+      const label = now ? 'now' : p.yrs === origin ? `${formatTick(origin, 0)}, the cats begin` : formatTick(p.yrs, p.step);
       ctx.fillStyle = now ? GREEN : p.yrs === origin ? INK : INK3;
       if (now || p.yrs === origin) ctx.font = font('650 12.5px');
       ctx.strokeText(label, 6, p.sy - 7);

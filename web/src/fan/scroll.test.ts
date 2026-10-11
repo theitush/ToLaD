@@ -3,11 +3,11 @@
 import { describe, expect, it } from 'vitest';
 import { FanCamera, MAX_YEARS_FRAC, MIN_YEARS } from './camera';
 import { laneAt, layoutFan, leftAt, type FanBranch } from './layout';
-import { PANTHERA } from './panthera';
+import { FELIDAE } from './panthera';
 import { TwigModel } from './twigs';
 
 function camera(): FanCamera {
-  const fan = layoutFan(PANTHERA, 'linear');
+  const fan = layoutFan(FELIDAE, 'linear');
   const models = new Map<FanBranch, TwigModel>();
   const model = (b: FanBranch) => {
     let m = models.get(b);

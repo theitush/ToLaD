@@ -37,6 +37,8 @@ export interface HistSegment {
 export interface HistoryRec {
   /** "counts": the curve is the species' births (EVER, procgen); "display": shown only. */
   use: string;
+  /** "wild", "domestic" (a tamed stock: its segments start at domestication) or "total" (humans). */
+  component: string;
   scope: string;
   notes: string;
   /** Generation length and mean lifespan (years) the segments were compiled with. */
@@ -151,6 +153,7 @@ export function extractClade(skeleton: ArrayBuffer | Uint8Array, tile: ArrayBuff
       const last = segs[segs.length - 1];
       history = {
         use: h.use ?? 'display',
+        component: h.component ?? 'wild',
         scope: h.scope ?? '',
         notes: (h.notes ?? '').trim(),
         G: h.G,

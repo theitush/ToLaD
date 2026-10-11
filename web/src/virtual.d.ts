@@ -4,7 +4,7 @@ declare module 'virtual:tolad-data' {
 }
 
 declare module 'virtual:panthera-data' {
-  /** The Panthera subtree of data/mammals, decoded at build time (fan/panthera-extract.ts). */
+  /** The Felidae subtree of data/mammals, decoded at build time (fan/panthera-extract.ts). */
   const data: import('./fan/panthera-extract').RawClade;
   export default data;
 }

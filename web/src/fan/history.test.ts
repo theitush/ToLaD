@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { decodeFile } from '../data/tolad-decoder.js';
 import { BirthCurve, historySpans, spanStyle } from './history';
 import { aliveAt, layoutFan, strandAt } from './layout';
-import { PANTHERA, type SpeciesRec } from './panthera';
+import { FELIDAE, type SpeciesRec } from './panthera';
 import { speciesModel, TwigModel } from './twigs';
 
 const DATA = resolve(dirname(fileURLToPath(import.meta.url)), '../../../data/mammals');
@@ -25,14 +25,19 @@ function decoded(sci: string): { ever: number; alive: number; t0: number; t1: nu
   throw new Error(sci);
 }
 
-const byName = (common: string) => PANTHERA.species.find((s) => s.common === common)!;
+const byName = (common: string) => FELIDAE.species.find((s) => s.common === common)!;
 
 describe('Panthera data', () => {
   it('numbers and histories are the decoded data/mammals values', () => {
-    expect(PANTHERA.species.length).toBeGreaterThanOrEqual(9);
-    for (const s of PANTHERA.species) {
+    expect(FELIDAE.species.length).toBeGreaterThanOrEqual(9);
+    for (const s of FELIDAE.species) {
       const d = decoded(s.sci);
-      expect(s.ever).toBe(d.ever);
+      // (A domestic stock counts its own births since domestication, the model's segments: the
+      // dataset's total for the leaf also holds its wild ancestors, the wildcat's.)
+      if (s.history?.component === 'domestic') {
+        expect(s.ever).toBe(Math.round(s.births!.curve.total));
+        expect(s.ever).toBeLessThan(d.ever);
+      } else expect(s.ever).toBe(d.ever);
       expect(s.alive).toBe(d.alive);
       expect(s.t0).toBe(d.t0);
       expect(s.t1).toBe(d.t1);
@@ -85,8 +90,8 @@ describe('history-driven procgen', () => {
   });
 
   it('the last generation ends at the tip, on its calendar years', () => {
-    const fan = layoutFan(PANTHERA, 'linear');
-    const i = PANTHERA.species.findIndex((s) => s.common === 'Lion');
+    const fan = layoutFan(FELIDAE, 'linear');
+    const i = FELIDAE.species.findIndex((s) => s.common === 'Lion');
     const m = new TwigModel(fan.branches[i], fan.time, 'linear');
     expect(m.ageOf(m.G * m.GL)).toBeCloseTo(0, 12);
     // 100 years ago lies in the generation the history puts there.
@@ -103,9 +108,9 @@ describe('history-driven procgen', () => {
 describe('width = individuals alive, with a varying population', () => {
   for (const mode of ['linear', 'log'] as const) {
     it(`lion/tiger: tip = alive now, between = the births curve × lifespan ÷ generation (${mode})`, () => {
-      const fan = layoutFan(PANTHERA, mode);
+      const fan = layoutFan(FELIDAE, mode);
       for (const c of ['Lion', 'Tiger']) {
-        const i = PANTHERA.species.findIndex((s) => s.common === c);
+        const i = FELIDAE.species.findIndex((s) => s.common === c);
         const b = fan.branches[i];
         const sp: SpeciesRec = b.sp;
         expect(aliveAt(sp, sp.t1) / sp.alive).toBeCloseTo(1, 2);
