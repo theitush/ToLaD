@@ -24,6 +24,8 @@ export type Confidence = 'high' | 'medium' | 'low';
 export interface Split {
   /** Short name for the lineage below the split (the card's title). */
   name: string;
+  /** The taxon the data names the split by (Open Tree: "Felidae"), if any. */
+  taxon?: string;
   /** Date of the split, Ma, and its range. */
   ageMa: number;
   lo: number;
@@ -176,6 +178,7 @@ export function splitFrom(
   if (t.kids.length > 2) notes.push(`${t.kids.length} daughters part at one date: ${daughters.join('; ')}`);
   return {
     name,
+    ...(t.name ? { taxon: t.name } : {}),
     ageMa: r3(t.age),
     lo: r3(Math.min(t.lo, t.age)),
     hi: r3(Math.max(t.hi, t.age)),
@@ -190,17 +193,35 @@ export function splitFrom(
 const bySci = new Map(raw.species.map((s) => [s.sci, s]));
 if (!raw.dated) throw new Error('data/mammals has no dated tree (format 1.6): rebuild it with `make -C pipeline build`');
 
-/** The cat family's dated tree, from the data. */
-export const FELIDAE_TREE: Split = splitFrom(
-  raw.dated,
-  (s) => {
-    const c = bySci.get(s)?.common;
-    return c ? sentenceCase(c) : null;
-  },
-  (s) => !!bySci.get(s)?.extinct,
-  { upham: raw.datedMeta?.upham || 'Upham et al. 2019', alvarez: raw.datedMeta?.alvarez || 'Álvarez-Carretero et al. 2022' },
-  (s) => bySci.get(s)?.alive ?? 0,
-);
+/** The dated split named `name` (an Open Tree name: "Felidae"), or null. */
+export function findDated(t: DatedSplit, name: string): DatedSplit | null {
+  if (t.name === name) return t;
+  for (const k of t.kids) {
+    const f = typeof k === 'string' ? null : findDated(k, name);
+    if (f) return f;
+  }
+  return null;
+}
+
+const treeOf = (t: DatedSplit): Split =>
+  splitFrom(
+    t,
+    (s) => {
+      const c = bySci.get(s)?.common;
+      return c ? sentenceCase(c) : null;
+    },
+    (s) => !!bySci.get(s)?.extinct,
+    { upham: raw.datedMeta?.upham || 'Upham et al. 2019', alvarez: raw.datedMeta?.alvarez || 'Álvarez-Carretero et al. 2022' },
+    (s) => bySci.get(s)?.alive ?? 0,
+  );
+
+/** The carnivores' dated tree, from the data (ToLaD#146): the order the fan opens on. */
+export const CARNIVORA_TREE: Split = treeOf(raw.dated);
+
+const felidae = findDated(raw.dated, 'Felidae');
+if (!felidae) throw new Error('data/mammals: no dated split named Felidae under Carnivora');
+/** The cat family's dated tree, from the data: the level below (the same subtree, titled on its own). */
+export const FELIDAE_TREE: Split = treeOf(felidae);
 
 /** Every split in the tree, parents before their daughters. */
 export function allSplits(t: Split = FELIDAE_TREE): Split[] {

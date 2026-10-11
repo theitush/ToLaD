@@ -9,6 +9,8 @@ import { Input, type InputHandlers } from '../engine/input';
 import { clipPoly, FanCamera, STRAND_PX, type Camera } from './camera';
 import { laneAt, layoutFan, leftAt, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type EdgeStyle, type Fan, type FanBranch, type FanNode, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
+import type { Split } from './splits';
+import { closedAt, FOLD_HI_PX, foldUnits, openness, stackAt, unitIndex, type FoldUnit } from './fold';
 import { FanGL, rgb01 } from './meshgl';
 import { COLUMN_DIM, columnSpans, EVENT_TINT, eventAt, eventSpans, type EventSpan } from './colstyle';
 import { bridgeInstances, type SplitStyle, type SplitWindow } from './gradual';
@@ -79,6 +81,8 @@ export interface LabelSpot {
   /** The species (b) or the lineage (v) it names. */
   b?: FanBranch;
   v?: FanNode;
+  /** A family drawn as one column (fold.ts): its name on the column's top. */
+  u?: FoldUnit;
   /** A curated event's label (ToLaD#141): its index in `b.sp.history.events`. */
   ev?: number;
   text: string;
@@ -182,7 +186,14 @@ function colBoxes(fan: Fan): Map<FanBranch | FanNode, ColBox> {
  * (under the buttons); `barX0` the buttons' left edge: left of it a label on
  * "now" may reach higher, up to LABEL_CEIL.
  */
-export function labelSpots(c: Screen, fan: Fan, top: number, measure: (text: string) => number, barX0?: number): LabelSpot[] {
+export function labelSpots(
+  c: Screen,
+  fan: Fan,
+  top: number,
+  measure: (text: string) => number,
+  barX0?: number,
+  folds: { units: FoldUnit[]; of: (b: FanBranch) => [FoldUnit, number] | null } = { units: [], of: () => null },
+): LabelSpot[] {
   const half = LABEL_PILL / 2;
   const X = (x: number) => c.toScreen(x, 0)[0];
   const Y = (y: number) => c.toScreen(0, y)[1];
@@ -273,7 +284,27 @@ export function labelSpots(c: Screen, fan: Fan, top: number, measure: (text: str
   };
 
   const out: LabelSpot[] = [];
+  // A family drawn as one column (fold.ts): its name on its top, centred on it, fading out as it opens
+  // into its species (whose names fade in). Ranked with the species, by its span.
+  for (const u of folds.units) {
+    if (u.e >= 1) continue;
+    const text = u.label;
+    const id = `f${u.taxon}`;
+    const len = measure(text) + 2 * LABEL_PAD;
+    const cx = X(u.cx);
+    const x = Math.max(cx, LABEL_AXIS_X + half);
+    const ceil = barX0 === undefined ? top : LABEL_CEIL + (top - LABEL_CEIL) * clamp01((x + half - (barX0 - 68)) / 60);
+    const ty = Y(u.yTop);
+    const y1 = Math.max(ty - 4, ceil + len);
+    const on = clamp01((ty - top) / 24) * clamp01((cx - LABEL_AXIS_X + 12) / LABEL_PILL) * clamp01((c.w + 12 - cx) / LABEL_PILL);
+    const fit = (1 - u.e) * on * botFit(y1);
+    out.push({ key: `${id}:tip`, id, place: 'tip', u, text, rank: [0, u.x1 - u.x0, -1], x, y1, box: [x - half, y1 - len, x + half, y1], fit });
+  }
   for (const b of fan.branches) {
+    const fo = folds.of(b);
+    // Folded: its name fades in over the second half of the opening (none while its family is one column).
+    const open = fo ? clamp01(2 * fo[0].e - 1) : 1;
+    if (!(open > 0)) continue;
     const text = b.sp.common;
     const id = String(b.sp.gid);
     const len = measure(text) + 2 * LABEL_PAD;
@@ -295,13 +326,14 @@ export function labelSpots(c: Screen, fan: Fan, top: number, measure: (text: str
     // Above the tip, clear of the other columns (an extinct tip has its neighbours around it; above "now" there are none).
     const f = tipOn * botFit(y1);
     const tipFit = f > 0 && b.tipY > nowY ? f * clearFit(clearance(x - half, x + half, y1 - len, Math.min(y1, ty - 2), b)) : f;
-    out.push({ key: `${id}:tip`, id, place: 'tip', b, text, rank, x, y1, box: [x - half, y1 - len, x + half, y1], fit: tipFit });
+    out.push({ key: `${id}:tip`, id, place: 'tip', b, text, rank, x, y1, box: [x - half, y1 - len, x + half, y1], fit: tipFit * open });
     // Beside its branch: once the tip is off screen.
-    out.push(...beside(id, text, rank, len, b, ty, Y(b.splitY), 1 - clamp01((ty - top) / 24), { b }));
+    out.push(...beside(id, text, rank, len, b, ty, Y(b.splitY), (1 - clamp01((ty - top) / 24)) * open, { b }));
   }
   // Curated events (ToLaD#141): the title beside its window (or in the column when zoomed into it),
   // centred on the window, while the window is on screen. After the species' names, before the lineages'.
   for (const b of fan.branches) {
+    if (folds.of(b)) continue;
     for (const s of colEventsY(fan, b)) {
       const text = s.ev.title;
       const len = measure(text) + 2 * LABEL_PAD;
@@ -316,6 +348,9 @@ export function labelSpots(c: Screen, fan: Fan, top: number, measure: (text: str
   if (nowOn < 1) {
     for (const v of fan.nodes) {
       if (!v.parent) continue;
+      // (Inside a family not fully open: it is part of the family's column.)
+      const fo = folds.of(v.strands[0]);
+      if (fo && v !== fo[0].node) continue;
       const text = v.name;
       const id = `n${fan.nodes.indexOf(v)}`;
       const len = measure(text) + 2 * LABEL_PAD;
@@ -362,6 +397,11 @@ export function boxGap(a: number[], b: number[]): number {
   return Math.max(b[0] - a[2], a[0] - b[2], b[1] - a[3], a[1] - b[3]);
 }
 
+/** How much of a folded family's mesh shows at openness e (fold.ts): none until 70% open, all when open. */
+function meshFade(e: number): number {
+  return clamp01((e - 0.7) / 0.3) ** 2;
+}
+
 function clamp01(v: number): number {
   return v < 0 ? 0 : v > 1 ? 1 : v;
 }
@@ -378,6 +418,47 @@ export interface Selection {
   lineage?: Lineage;
   /** A curated event touched (its window on the column, or its label): the card explains it (ToLaD#141). */
   event?: EventSpan;
+  /** A family's closed column touched (fold.ts, ToLaD#146): the card is the family's (`sp` is its best-known species). */
+  family?: Family;
+}
+
+/** A family as its card tells it: the sums over its species. */
+export interface Family {
+  taxon: string;
+  label: string;
+  /** Individuals alive now and ever lived (central, and its range). */
+  alive: number;
+  ever: number;
+  everLo: number;
+  everHi: number;
+  species: number;
+  living: number;
+  /** Its crown split (Ma): when its living lines last shared an ancestor. */
+  ageMa: number;
+  /** Its living species with the most individuals alive, best known first (a few). */
+  top: string[];
+}
+
+export function familyOf(u: FoldUnit): Family {
+  const sp = u.strands.map((b) => b.sp);
+  const sum = (f: (s: SpeciesRec) => number) => sp.reduce((a, s) => a + f(s), 0);
+  const top = sp
+    .filter((s) => !s.extinct)
+    .sort((a, b) => b.alive - a.alive)
+    .slice(0, 3)
+    .map((s) => s.common);
+  return {
+    taxon: u.taxon,
+    label: u.label,
+    alive: sum((s) => s.alive),
+    ever: sum((s) => s.ever),
+    everLo: sum((s) => s.everLo),
+    everHi: sum((s) => s.everHi),
+    species: sp.length,
+    living: sp.filter((s) => !s.extinct).length,
+    ageMa: u.node.ageMa,
+    top,
+  };
 }
 
 /** A parent column at a time: the daughters' shared ancestors. */
@@ -449,11 +530,16 @@ export class FanView implements InputHandlers {
   readonly gl: FanGL | null = null;
   /** Frame times (ms, CPU side of draw()), for perf runs. */
   readonly frameMs: number[] = [];
+  /** The families drawn as one column until zoomed into (fold.ts, ToLaD#146), and each strand's. */
+  folds: FoldUnit[] = [];
+  private foldOf = new Map<FanBranch, [FoldUnit, number]>();
 
   constructor(
     readonly canvas: HTMLCanvasElement,
     readonly clade: CladeRec,
     edge: EdgeStyle = 'curved',
+    /** The clade's dated tree (layout.ts's default: the cats'). */
+    readonly tree?: Split,
   ) {
     this.edge = edge;
     const ctx = canvas.getContext('2d');
@@ -473,7 +559,8 @@ export class FanView implements InputHandlers {
         glc.remove();
       }
     }
-    this.camera = new FanCamera(layoutFan(clade, this.mode, undefined, this.edge), (b) => this.model(b));
+    this.camera = new FanCamera(layoutFan(clade, this.mode, this.tree, this.edge), (b) => this.model(b));
+    this.refold();
     // Width and time zoom separately (#138): a sideways pinch zooms width, an upright one time, a diagonal both.
     this.input = new Input(canvas, this, true);
     this.ro = new ResizeObserver(() => this.resize());
@@ -543,9 +630,48 @@ export class FanView implements InputHandlers {
   }
 
   private relayout(): void {
-    this.camera.fan = layoutFan(this.clade, this.mode, undefined, this.edge);
+    this.camera.fan = layoutFan(this.clade, this.mode, this.tree, this.edge);
+    this.refold();
     this.camera.settle();
     this.request();
+  }
+
+  private refold(): void {
+    this.folds = foldUnits(this.fan);
+    this.foldOf = unitIndex(this.folds);
+    this.setOpenness();
+  }
+
+  /** Each fold unit's openness at the current width zoom. */
+  setOpenness(): void {
+    for (const u of this.folds) u.e = openness(u, this.cam.sx);
+  }
+
+  /** Strand b's fold unit and index in it, if it is in one that is not fully open. */
+  folded(b: FanBranch): [FoldUnit, number] | null {
+    const f = this.foldOf.get(b);
+    return f && f[0].e < 1 ? f : null;
+  }
+
+  /** The fold unit named `taxon` ("Felidae"), if any. */
+  unit(taxon: string): FoldUnit | undefined {
+    return this.folds.find((u) => u.taxon === taxon);
+  }
+
+  /** A family filling the screen right of the time axis, the whole of time as at home: open (fold.ts), the level below the order. */
+  familyCamera(u: FoldUnit): Camera {
+    const h = this.homeCamera();
+    const room = this.w - LABEL_AXIS_X - 12;
+    const span = Math.max(1e-300, u.x1 - u.x0);
+    // (At least fully open: wider than the screen for a family too crowded to open across it.)
+    const sx = Math.max(h.sx, (0.92 * room) / span, (FOLD_HI_PX * 1.02 * u.strands.length) / span);
+    return { ...h, sx, cx: (u.x0 + u.x1) / 2 - (LABEL_AXIS_X + 12) / 2 / sx };
+  }
+
+  /** Fly to the family named `taxon` ("Felidae"). */
+  flyToFamily(taxon: string): void {
+    const u = this.unit(taxon);
+    if (u) this.flyTo(this.familyCamera(u));
   }
 
   resetView(): void {
@@ -623,7 +749,10 @@ export class FanView implements InputHandlers {
     const band = Math.max(80, 0.52 * this.h - tipPx);
     const sy = Math.max(h.sy, band / Math.max(1e-300, b.splitY - b.tipY));
     const cyAt = (s: number) => b.tipY + (this.h / 2 - tipPx) / s;
-    const sx = Math.min(Math.max(h.sx, (0.5 * this.w) / Math.max(1e-300, b.width)), Math.max(h.sx, this.camera.sxCap(b.cx, b.tipY)));
+    let sx = Math.min(Math.max(h.sx, (0.5 * this.w) / Math.max(1e-300, b.width)), Math.max(h.sx, this.camera.sxCap(b.cx, b.tipY)));
+    // Its family open (fold.ts): the pick lands on its own column, not the family's.
+    const fu = this.foldOf.get(b)?.[0];
+    if (fu) sx = Math.max(sx, (FOLD_HI_PX * 1.02 * fu.strands.length) / Math.max(1e-300, fu.x1 - fu.x0));
     // Within the time limit (MIN_YEARS on screen) about the tip, where it will sit.
     const s = this.camera.timeCap(b.tipY, tipPx, sy, h.sy);
     return { cx: b.cx, cy: cyAt(s), sx, sy: s, ty: s };
@@ -648,6 +777,33 @@ export class FanView implements InputHandlers {
     });
   }
 
+  /** Strand b's left edge at world y as drawn: in a family not fully open, blended from its place in the closed column (fold.ts). */
+  drawnLeft(b: FanBranch, y: number): number {
+    const l = leftAt(b, y);
+    const fo = this.folded(b);
+    if (!fo || y >= fo[0].node.y) return l;
+    const st = stackAt(fo[0], fo[1], y, laneAt(b, y).w).left;
+    return st + (l - st) * fo[0].e;
+  }
+
+  /** A family's closed column (mostly closed: under half open) under a screen point, with a finger-sized slop. */
+  hitFamily(px: number, py: number): FoldUnit | null {
+    const [wx, wy] = this.toWorld(px, py);
+    const slop = 16 / this.cam.sx;
+    let best: FoldUnit | null = null;
+    let bd = Infinity;
+    for (const u of this.folds) {
+      if (u.e >= 0.5 || wy < u.yTop - 16 / this.cam.sy || wy >= u.yBot) continue;
+      const c = closedAt(u, Math.max(u.yTop, wy));
+      const d = Math.max(0, c.left - wx, wx - c.left - c.w);
+      if (d <= slop && d < bd) {
+        bd = d;
+        best = u;
+      }
+    }
+    return best;
+  }
+
   /** Branch (column part) under a screen point, with a finger-sized slop. */
   hitBranch(px: number, py: number): FanBranch | null {
     const [wx, wy] = this.toWorld(px, py);
@@ -659,7 +815,10 @@ export class FanView implements InputHandlers {
     for (const b of this.fan.branches) {
       if (wy > yb + slopY || wy < b.tipY - slopY) continue;
       const yc = Math.min(yb, Math.max(b.tipY, wy));
-      const left = leftAt(b, yc);
+      // (A mostly closed family's strands are its column: hitFamily's.)
+      const fo = this.folded(b);
+      if (fo && fo[0].e < 0.5 && yc < fo[0].node.y) continue;
+      const left = this.drawnLeft(b, yc);
       const d = Math.max(0, left - wx, wx - left - laneAt(b, yc).w);
       if (d <= slop && d < bd) {
         bd = d;
@@ -711,6 +870,13 @@ export class FanView implements InputHandlers {
    * individuals. Off a branch: 4× on both axes.
    */
   doubleTap(x: number, y: number): void {
+    // On a family drawn as one column: open it (the family across the screen).
+    const fu = this.hitFamily(x, y);
+    if (fu) {
+      const c = this.familyCamera(fu);
+      this.flyTo({ ...c, sy: this.cam.sy, ty: this.cam.sy, cy: this.cam.cy });
+      return;
+    }
     const [wx, wy] = this.toWorld(x, y);
     const b = this.hitBranch(x, y);
     let sx = this.cam.sx * 4;
@@ -782,7 +948,19 @@ export class FanView implements InputHandlers {
       this.request();
       return;
     }
-    const b = this.hitBranch(x, y);
+    const fu = this.hitFamily(x, y);
+    const b = fu ? null : this.hitBranch(x, y);
+    if (fu) {
+      // A family drawn as one column: its card (the sums over its species).
+      const fam = familyOf(fu);
+      const best = fu.strands.map((s) => s.sp).sort((p, q) => q.alive - p.alive)[0];
+      this.selected = null;
+      this.selInd = null;
+      this.touch = null;
+      this.onSelect({ sp: best, family: fam });
+      this.request();
+      return;
+    }
     this.selected = b ? b.sp : null;
     this.selInd = null;
     let ind: IndInfo | undefined;
@@ -851,6 +1029,7 @@ export class FanView implements InputHandlers {
       ctx.fillStyle = BG;
       ctx.fillRect(0, 0, this.w, this.h);
     }
+    this.setOpenness();
     this.drawTimeAxis(false);
     this.drawStem();
     for (const b of this.fan.branches) this.drawStrand(b);
@@ -862,7 +1041,7 @@ export class FanView implements InputHandlers {
     // Labels: one form everywhere (see labelSpots).
     this.drawGutter();
     this.drawTouch();
-    const spots = labelSpots(this.camera, this.fan, this.labelTop(), (t) => this.nameWidth(t), this.barRect()?.[0]);
+    const spots = labelSpots(this.camera, this.fan, this.labelTop(), (t) => this.nameWidth(t), this.barRect()?.[0], { units: this.folds, of: (b) => this.folded(b) });
     this.drawLabels(spots);
     this.drawWidthScale();
     if (this.debug) this.drawDebug();
@@ -891,19 +1070,29 @@ export class FanView implements InputHandlers {
       const ya = Math.max(v.y, wTop);
       const yb = Math.min(v.yBot, wBot);
       if (!(yb > ya)) continue;
+      // A parent column inside a family not fully open (fold.ts) moves with its strands: its place in the family's stack blended to its own.
+      const f0 = this.folded(v.strands[0]);
+      const fo = f0 && v !== f0[0].node ? f0 : null;
+      const leftAt = (y: number) => {
+        const l = nodeLeftAt(v, y);
+        if (!fo) return l;
+        const st = stackAt(fo[0], fo[1], y, 0).left;
+        return st + (l - st) * fo[0].e;
+      };
       // Straight below its peel: one piece; the peel in chords.
       const peel = v.leanY;
       const ys = [ya];
       if (peel > ya && peel < yb) ys.push(peel);
-      const p0 = Math.max(ya, peel);
+      // (Folded, its place in the stack changes all along it: chords all the way.)
+      const p0 = fo ? ya : Math.max(ya, peel);
       if (yb > p0) {
         const n = Math.min(400, Math.max(1, Math.ceil(((yb - p0) * this.cam.sy) / 4)));
         for (let i = 1; i < n; i++) ys.push(p0 + ((yb - p0) * i) / n);
       }
       ys.push(yb);
       for (let i = 0; i + 1 < ys.length; i++) {
-        const [l0, t] = this.toScreen(nodeLeftAt(v, ys[i]), ys[i]);
-        const [l1, b] = this.toScreen(nodeLeftAt(v, ys[i + 1]), ys[i + 1]);
+        const [l0, t] = this.toScreen(leftAt(ys[i]), ys[i]);
+        const [l1, b] = this.toScreen(leftAt(ys[i + 1]), ys[i + 1]);
         const w = v.width * this.cam.sx;
         if (!(b > t) || Math.max(l0, l1) > this.w + 8 || Math.min(l0, l1) + w < -8) continue;
         if (this.gl) this.gl.under.push(l0, t, l0 + w, b, c[0], c[1], c[2], 1, l1 - l0, l1 - l0);
@@ -989,6 +1178,10 @@ export class FanView implements InputHandlers {
     const [, sTop] = this.toWorld(0, -20);
     const [, sBot] = this.toWorld(0, this.h + 20);
     const xr = this.fan.tess.xRange(b, sTop, sBot);
+    const fo = this.folded(b);
+    // (Folded, it moves towards its family's closed column, within the family's span.)
+    if (fo) xr[0] = Math.min(xr[0], fo[0].x0);
+    if (fo) xr[1] = Math.max(xr[1], fo[0].x1);
     if (this.toScreen(xr[1], 0)[0] < -12 || this.toScreen(xr[0], 0)[0] > this.w + 12) return;
     const hw = b.width / 2;
     const pts = this.lanePoints(b, hw);
@@ -1007,9 +1200,12 @@ export class FanView implements InputHandlers {
     // Under the mesh the lanes sink to a dark tint of themselves, so the individuals carry the colour:
     // each stretch by its own lanes' widths (twigs.ts laneDim), as the mesh draws them.
     const lives = tw?.fade ?? 0;
+    // (The gray lane sinks under its mesh: a folded family's comes in late in its opening (drawIndividuals),
+    // so till then it stays the gray of "line ended". The green keeps its tint: undimmed it would read as "alive now".)
+    const mf = fo ? meshFade(fo[0].e) : 1;
     const greenFade = tw?.fadeGreen ?? 0;
     const greenC = mix(GREEN, '#0d2318', greenFade * 0.9);
-    const grayC = mix(GRAY, '#131c19', Math.max(lives, tw?.texGray ?? 0) * 0.82);
+    const grayC = mix(GRAY, '#131c19', Math.max(lives, tw?.texGray ?? 0) * 0.82 * mf);
     if (this.gl) {
       // Between neighbouring samples each lane is a trapezoid (the curve's chord, a few px at most):
       // the whole lane gray (at least 0.6 px), the green lane over its left edge (at least 1 px).
@@ -1042,7 +1238,7 @@ export class FanView implements InputHandlers {
         const gp = wp * p.f;
         const wm = (wq + wp) / 2;
         const gm = (gq + gp) / 2;
-        const gc = mix01(GRAY, '#131c19', laneDim(wm - gm, lives) * 0.82);
+        const gc = mix01(GRAY, '#131c19', laneDim(wm - gm, lives) * 0.82 * mf);
         const ec = mix01(GREEN, '#0d2318', laneDim(gm, lives) * 0.9);
         // A styled stretch of the column (held flat for want of figures: colstyle.ts) fades towards the
         // background: the background over the whole lane, lanes and individuals alike (drawn after the mesh).
@@ -1059,7 +1255,8 @@ export class FanView implements InputHandlers {
           const g1p = xp + Math.max(sq, gp);
           const xb = Math.max(xq + Math.max(1, gq), xp + Math.max(1, gp));
           // The living glow faintly (fading as their lane resolves into individuals).
-          const glow = (1 - lives) * (1 - dim);
+          // (A folded family's strands, stacked, would pile their glows up: theirs comes in as it opens.)
+          const glow = (1 - lives) * (1 - dim) * (fo ? fo[0].e : 1);
           if (glow > 0.01) {
             trap(this.gl.under, xq - 4 * sq, g1q + 4 * sq, xp - 4 * sq, g1p + 4 * sq, y0, y1, ec, 0.06 * glow, xa - 4, xb + 4);
             trap(this.gl.under, xq - 1.5 * sq, g1q + 1.5 * sq, xp - 1.5 * sq, g1p + 1.5 * sq, y0, y1, ec, 0.14 * glow, xa - 1.5, xb + 1.5);
@@ -1104,6 +1301,8 @@ export class FanView implements InputHandlers {
   private drawEvents(): void {
     const [r, g, bl] = EVENT_TINT.rgb;
     for (const b of this.fan.branches) {
+      // Only on a species' own column: not while its family is (even partly) one column.
+      if (this.folded(b)) continue;
       for (const s of colEventsY(this.fan, b)) {
         let st = this.toScreen(0, s.top)[1];
         let sb = this.toScreen(0, s.bot)[1];
@@ -1231,22 +1430,50 @@ export class FanView implements InputHandlers {
     // Spine at left + hw: the ribbon spans offsets [hw - w, hw] to its left (nx = -1).
     // (Where the lanes step, as at a split, where the strand leaves its parent's prefix: a point either side.)
     const pts: RibbonPt[] = [];
-    const push = (y: number, o: number) => {
-      const w = vals[o + 1];
-      const [px, py] = this.toScreen(vals[o] + hw, y);
-      pts.push({ x: px, y: py, nx: -1, ny: 0, w, f: w > 0 ? vals[o + 2] / w : 0 });
+    // In a family not fully open (fold.ts): above its crown, from its place in the closed column's stack to its own.
+    const fo = this.folded(b);
+    const put = (y: number, left: number, w: number, gw: number) => {
+      let f = w > 0 ? gw / w : 0;
+      if (fo && y < fo[0].node.y) {
+        const e = fo[0].e;
+        const st = stackAt(fo[0], fo[1], y, w);
+        left = st.left + (left - st.left) * e;
+        f = st.f + (f - st.f) * e;
+      }
+      const [px, py] = this.toScreen(left + hw, y);
+      pts.push({ x: px, y: py, nx: -1, ny: 0, w, f });
     };
+    const push = (y: number, o: number) => put(y, vals[o], vals[o + 1], vals[o + 2]);
+    // Folded, the kept samples are not enough (they keep the open column's chords, which the stack bends):
+    // its chords above the crown are cut every few px, the open lanes linear along each (within the path's tolerance).
+    const cut = fo ? fo[0].node.y : -Infinity;
     for (let i = i1; i >= i0; i--) {
       const y = ys[i];
       const o = 8 * i;
       push(y, o);
       if (P.steps[i]) push(y, o + 4);
+      if (i > i0 && ys[i - 1] < cut) {
+        const a = o + 4;
+        const z = o - 8;
+        const yA = ys[i];
+        const yB = ys[i - 1];
+        const m = Math.min(96, Math.ceil(((yA - yB) * this.cam.sy) / 4));
+        for (let j = 1; j < m; j++) {
+          const t = j / m;
+          const yy = yA + (yB - yA) * t;
+          if (yy >= cut) continue;
+          put(yy, vals[a] + (vals[z] - vals[a]) * t, vals[a + 1] + (vals[z + 1] - vals[a + 1]) * t, vals[a + 2] + (vals[z + 2] - vals[a + 2]) * t);
+        }
+      }
     }
     return pts;
   }
 
   private drawIndividuals(b: FanBranch): void {
-    const st = drawTwigs(this, b, this.model(b), this.selected === b.sp ? this.selInd : null);
+    // A folded family's individuals come in over the last stretch of its opening (they are drawn where the open strand is).
+    const fo = this.folded(b);
+    const fade = fo ? meshFade(fo[0].e) : 1;
+    const st = fade > 0 ? drawTwigs(this, b, this.model(b), this.selected === b.sp ? this.selInd : null, fade) : null;
     const prev = this.twigStats.get(b.sp.gid);
     // The lanes under the strands depend on the fade: redraw once when it changes,
     // and keep drawing while lineage answers are still being worked out.
@@ -1475,7 +1702,7 @@ export class FanView implements InputHandlers {
       // A short tick at the edge, visible over the branches too.
       ctx.fillStyle = now ? GREEN : '#8d9e93';
       ctx.fillRect(0, Math.round(p.sy), now ? 6 : 4, 1);
-      const label = now ? 'now' : p.yrs === origin ? `${formatTick(origin, 0)}, the cats begin` : formatTick(p.yrs, p.step);
+      const label = now ? 'now' : p.yrs === origin ? `${formatTick(origin, 0)}, the ${this.clade.common.toLowerCase()} begin` : formatTick(p.yrs, p.step);
       ctx.fillStyle = now ? GREEN : p.yrs === origin ? INK : INK3;
       if (now || p.yrs === origin) ctx.font = font('650 12.5px');
       ctx.strokeText(label, 6, p.sy - 7);

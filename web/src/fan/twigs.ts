@@ -1274,9 +1274,10 @@ export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: num
  *     texture of their lives;
  *   - links (Canvas 2D, on top): threads to both parents (procgen parents()) at
  *     each child's birth, once few enough; labels (handles) when wide apart.
- * Only the visible generations and slots are touched.
+ * Only the visible generations and slots are touched. `fade` (0–1) scales the mesh: a folded family's
+ * individuals come in as it opens (fold.ts).
  */
-export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: number; i: number } | null): TwigStats | null {
+export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: number; i: number } | null, fade = 1): TwigStats | null {
   const [, wyTop] = v.toWorld(0, 0);
   const [, wyBot] = v.toWorld(v.w, v.h);
   // The visible x range at a height.
@@ -1341,8 +1342,8 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
   if (v.mesh) {
     const batch = v.mesh;
     const n0 = batch.n;
-    meshInstances(v, m, yTop, yBot, 0, dens > 0.02 ? dens : 0, { lw: 0.9, tipR: 0, linkA: LINK_ALPHA }, batch, 1);
-    meshInstances(v, m, yTop, yBot, 1, lives, { lw: lwL, tipR, linkA: LINK_ALPHA, baseA }, batch);
+    meshInstances(v, m, yTop, yBot, 0, dens > 0.02 ? dens * fade : 0, { lw: 0.9, tipR: 0, linkA: LINK_ALPHA }, batch, 1);
+    meshInstances(v, m, yTop, yBot, 1, lives * fade, { lw: lwL, tipR, linkA: LINK_ALPHA, baseA }, batch);
     stats.instances = batch.n - n0;
   }
   if (cellPx < 1.5) return stats;

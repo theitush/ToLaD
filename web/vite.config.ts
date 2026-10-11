@@ -57,7 +57,7 @@ function toladData(single: boolean): Plugin {
 const PANTHERA = 'virtual:panthera-data';
 
 /**
- * The cat family (Felidae) subtree, decoded from ../data/mammals at build time with the v1
+ * The carnivores (Carnivora) subtree, with the cat family's own row (ToLaD#146), decoded from ../data/mammals at build time with the v1
  * decoder (src/fan/panthera-extract.ts), so the fan's numbers and curated
  * histories are always the dataset's own.
  */
@@ -70,7 +70,7 @@ function pantheraData(): Plugin {
     load(id) {
       if (id !== '\0' + PANTHERA) return null;
       for (const f of dataFiles()) this.addWatchFile(join(DATA, f));
-      const clade = loadClade((rel) => readFileSync(join(DATA, rel)), 'Felidae');
+      const clade = loadClade((rel) => readFileSync(join(DATA, rel)), 'Carnivora', ['Felidae']);
       return `export default ${JSON.stringify(clade)};`;
     },
   };

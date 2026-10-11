@@ -188,6 +188,8 @@ export interface RawClade extends RawNode {
   /** The dated tree over the clade's species (null: data older than 1.6). */
   dated?: DatedSplit | null;
   datedMeta?: DatedMeta | null;
+  /** Named clades inside it (their tile rows: counts, grade, dates), by name: the levels the fan moves between (ToLaD#146). */
+  subs?: Record<string, RawNode>;
 }
 
 /** A dated sidecar (dated/<tile>.json, pipeline/FORMAT.md "Dated tree"). */
@@ -326,7 +328,7 @@ function node(f: Tile, i: number): RawNode {
  * Find the tile that holds `name` with its subtree (not as a stub) and extract
  * it. `read` returns a data file's bytes by its path under data/mammals.
  */
-export function loadClade(read: (rel: string) => Uint8Array, name: string): RawClade {
+export function loadClade(read: (rel: string) => Uint8Array, name: string, subs: string[] = []): RawClade {
   const skBytes = read('skeleton.tld');
   const sk = decodeFile(skBytes) as unknown as Tile;
   for (const t of sk.meta.tiles as { id: number; file: string }[]) {
@@ -343,7 +345,10 @@ export function loadClade(read: (rel: string) => Uint8Array, name: string): RawC
         };
         const sk = json('dated/skeleton.json');
         const file = json(`dated/${t.id}.json`);
-        return extractClade(skBytes, bytes, t.id, name, sk && file ? { sk, file } : undefined);
+        const c = extractClade(skBytes, bytes, t.id, name, sk && file ? { sk, file } : undefined);
+        const rows: Record<string, RawNode> = {};
+        for (let j = 0; j < f.n; j++) if (subs.includes(f.name(j)) && !f.isStub(j)) rows[f.name(j)] = node(f, j);
+        return { ...c, subs: rows };
       }
     }
   }

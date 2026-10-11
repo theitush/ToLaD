@@ -108,6 +108,18 @@ const scenes = [
   // post-glacial decline (20-10 kya, Figueiro et al. 2017), then flat to the next level (the genome scaled to meet it).
   ['blind-lion', 'about', ['Lion', 15000, 10, 0.1]],
   ['blind-leopard', 'about', ['Leopard', 15000, 10, 0.1]],
+  // The carnivores (ToLaD#146): home, a family opened across the screen ('family' [taxon, opening 0-1 or 1]), the
+  // deep past (~40 Ma), a family's closed column tapped ('famtap' [taxon]), the domestic dog's card, "wol" searched.
+  ['carn-home', 'home'],
+  ['carn-dogs', 'family', ['Canidae']],
+  ['carn-bears', 'family', ['Ursidae']],
+  ['carn-seals', 'family', ['Phocidae']],
+  ['carn-cats', 'family', ['Felidae']],
+  ...[0, 0.25, 0.5, 0.75, 1].map((t, k) => [`carn-open${k + 1}`, 'family', ['Canidae', t]]),
+  ['carn-deep', 'scroll', [3, 4e7]],
+  ['carn-famcard', 'famtap', ['Canidae']],
+  ['carn-dogcard', 'card', ['Domestic dog']],
+  ['carn-search-wol', 'search', ['wol']],
 ];
 const browser = await chromium.launch({ headless: true });
 try {
@@ -220,6 +232,27 @@ try {
           const sx = (0.6 * f.w) / b.width;
           f.cam = { cx: b.cx, cy: y1 + (f.h / 2 - 120) / sy, sx, sy, ty: sy };
           f.camera.settle();
+        } else if (kind === 'family' || kind === 'famtap') {
+          // The family fitted across the screen (t = 1), or t of the way there from home in log zoom; or its closed column tapped.
+          const [taxon, t = 1] = args;
+          const h = f.homeCamera();
+          const u = f.unit(taxon);
+          if (kind === 'famtap') {
+            f.cam = h;
+            f.camera.settle();
+            f.draw();
+            const y = (u.yTop + u.yBot) / 2;
+            const c = f.toScreen(u.cx, Math.min(y, fan.time.y(0.05)));
+            f.tap(c[0], c[1]);
+          } else {
+            const c = f.familyCamera(u);
+            const k = (a, b) => a * Math.pow(b / a, t);
+            const sx = k(h.sx, c.sx);
+            // (About the family's middle, where the family camera puts it on screen.)
+            const mid = (u.x0 + u.x1) / 2;
+            f.cam = { ...h, sx, cx: mid - ((mid - c.cx) * c.sx) / sx };
+            f.camera.settle();
+          }
         } else if (kind === 'far') {
           const h = f.homeCamera();
           f.cam = { ...h, sx: h.sx / 6, sy: h.sy / 6, ty: h.sy / 6 };

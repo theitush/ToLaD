@@ -9,11 +9,13 @@ import { approxMa, formatCount } from '../data/count';
 import { SPLIT_LABEL, SPLIT_NAME, SPLIT_STYLES, type SplitStyle, type SplitWindow } from './gradual';
 import { HistorySpark } from './HistorySpark';
 import type { EdgeStyle, WidthMode } from './layout';
-import { FELIDAE, NATURAL_META, type HistEvent, type SpeciesRec } from './panthera';
+import { CARNIVORA, NATURAL_META, type HistEvent, type SpeciesRec } from './panthera';
 import { population } from './population';
 import { MagnifierIcon, SearchPanel } from './SearchPanel';
 import { statusOf } from './status';
-import { FanView, fmtInt, formatYearsAgo, type IndInfo, type Lineage, type Selection } from './view';
+import { CARNIVORA_TREE } from './splits';
+import { FAMILY_EN } from './fold';
+import { FanView, type Family, fmtInt, formatYearsAgo, type IndInfo, type Lineage, type Selection } from './view';
 
 declare global {
   interface Window {
@@ -71,6 +73,9 @@ function remember(key: string, v: string): void {
   }
 }
 
+/** The family the level button moves to from the order's home (and back): the cat family, the fan's first level (ToLaD#47). */
+const LEVEL_FAMILY = 'Felidae';
+
 export function FanApp() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const viewRef = useRef<FanView | null>(null);
@@ -80,11 +85,13 @@ export function FanApp() {
   const [win, setWin] = useState<SplitWindow>(() => initialPick<SplitWindow>('win', WIN_KEY, ['short', 'long'], 'short'));
   const [sel, setSel] = useState<Selection | null>(null);
   const [searching, setSearching] = useState(false);
+  /** The level the button moves to next (ToLaD#146): the cat family from the order's home, and back. */
+  const [atFamily, setAtFamily] = useState(false);
   const scaleRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const v = new FanView(canvasRef.current!, FELIDAE, edge);
+    const v = new FanView(canvasRef.current!, CARNIVORA, edge, CARNIVORA_TREE);
     v.setSplit(split, win);
     v.onSelect = setSel;
     v.scaleEl = scaleRef.current;
@@ -165,8 +172,17 @@ export function FanApp() {
             {win}
           </button>
         ) : null}
-        <button type="button" onClick={() => viewRef.current?.resetView()}>
-          All cats
+        <button
+          type="button"
+          onClick={() => {
+            const v = viewRef.current;
+            if (!v) return;
+            if (atFamily) v.resetView();
+            else v.flyToFamily(LEVEL_FAMILY);
+            setAtFamily(!atFamily);
+          }}
+        >
+          {atFamily ? `All ${CARNIVORA.common.toLowerCase()}` : (FAMILY_EN[LEVEL_FAMILY] ?? LEVEL_FAMILY)}
         </button>
         <button
           type="button"
@@ -199,7 +215,9 @@ export function FanApp() {
           <span className="wlab" />
         </div>
       {sel ? (
-        sel.lineage ? (
+        sel.family ? (
+          <FamilyCard fam={sel.family} onClose={() => viewRef.current?.tap(-1e6, -1e6)} />
+        ) : sel.lineage ? (
           <LineageCard lin={sel.lineage} onClose={() => viewRef.current?.tap(-1e6, -1e6)} />
         ) : sel.ind ? (
           <IndCard sp={sel.sp} ind={sel.ind} onClose={() => viewRef.current?.tap(-1e6, -1e6)} />
@@ -528,6 +546,40 @@ export function SpeciesCard({ sp, onClose, open, ageMa, startMa, event }: { sp: 
 }
 
 /** A parent column touched: the daughters' shared ancestors at that time, and their split. */
+/**
+ * A family drawn as one column, tapped (ToLaD#146): its species added up. Alive now and ever lived are
+ * the sums of its species' figures (each modelled or counted as its own card says).
+ */
+export function FamilyCard({ fam, onClose }: { fam: Family; onClose: () => void }) {
+  const ext = fam.species - fam.living;
+  return (
+    <div className="card-sp" onPointerDown={(e) => e.stopPropagation()}>
+      <button type="button" className="x" onClick={onClose} aria-label="Close">
+        ×
+      </button>
+      <div className="t">
+        <span>{fam.label}</span> <i>({fam.taxon})</i>
+      </div>
+      <div className="facts">
+        <p className="lead">
+          <span className="lane alive" />
+          <span>
+            <b>{formatCount(fam.alive)}</b> alive now
+          </span>
+        </p>
+        <p className="sub">
+          ~{formatCount(fam.ever)} ever lived <span className="dim">(model; {formatCount(fam.everLo)}–{formatCount(fam.everHi)})</span>
+        </p>
+        <p className="sub">
+          {fam.species} species{ext ? ` (${fam.living} living, ${ext} known only as fossils)` : ''} · most alive: {fam.top.join(', ')}
+        </p>
+        <p className="sub">Their last common ancestor lived ~{approxMa(fam.ageMa)} million years ago</p>
+        <p className="sub dim">Zoom in to open the family into its species.</p>
+      </div>
+    </div>
+  );
+}
+
 export function LineageCard({ lin, onClose }: { lin: Lineage; onClose: () => void }) {
   const s = lin.node.split;
   const of = lin.of.length > 1 ? `${lin.of.slice(0, -1).join(', ')} and ${lin.of[lin.of.length - 1]}` : lin.of[0];
