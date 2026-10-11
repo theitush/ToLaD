@@ -21,6 +21,7 @@ import zipfile
 from collections import Counter
 from pathlib import Path
 
+from .anchors import DOMESTIC_FORMS
 from .load import NA, norm_name
 from .tree import Node
 
@@ -113,45 +114,85 @@ def _bridges(raw: Path, phy_syn: dict[str, str]) -> dict[str, list[str]]:
     return rev
 
 
+def load_all(raw: Path, ctx: dict) -> tuple[dict[str, dict], dict[str, list[str]]]:
+    """The Red List and the bridge map, loaded once per build (kept in ctx["red_list_src"])."""
+    if "red_list_src" not in ctx:
+        ctx["red_list_src"] = (load_redlist(raw), _bridges(raw, ctx["phy_syn"]))
+    return ctx["red_list_src"]
+
+
 def attach(root: Node, raw: Path, ctx: dict, log: dict) -> None:
     """Set n.data["red_list"] = {category, year, source, taxon, assessment, via} on every species leaf
     that has one: every living leaf (NE when no list has it); a leaf that ended since 1500 CE only
     where the Red List lists it."""
-    rl = load_redlist(raw)
-    log["red_list"] = assign(root, rl, _bridges(raw, ctx["phy_syn"]), ctx)
+    rl, rev = load_all(raw, ctx)
+    log["red_list"] = assign(root, rl, rev, ctx)
+
+
+class Matcher:
+    """A leaf's Red List record: by its own name, alt names, Open Tree synonyms, PHYLACINE/COMBINE
+    bridges, then a Latin gender ending. A synonym that is another leaf's own name is that leaf's record
+    (Bos taurus is not the aurochs); a name the list re-pointed at another taxon (REDEFINED) has none."""
+
+    def __init__(self, root: Node, rl: dict[str, dict], rev: dict[str, list[str]], ctx: dict):
+        self.rl, self.rev = rl, rev
+        self.phy_syn, self.ott_syn = ctx["phy_syn"], ctx.get("ott_syn", {})
+        self.leaf_names = {n.name for n in root.preorder() if n.is_leaf and n.name}
+        self.variants: dict[tuple[str, str], list[str]] = {}
+        for nm in rl:
+            g, e = nm.split(" ", 1)
+            self.variants.setdefault((g, _stem(e)), []).append(nm)
+
+    def __call__(self, nd: Node) -> tuple[dict | None, str | None]:
+        rl, leaf_names = self.rl, self.leaf_names
+        if nd.name in REDEFINED or nd.name in DOMESTIC_FORMS:
+            return None, None
+        cands = [(nd.name, "name")] + [(a, "alt name") for a in nd.alt if a]
+        cands += [(norm_name(s), "Open Tree synonym") for s in self.ott_syn.get(nd.ott, [])]
+        own = self.phy_syn.get(nd.name, nd.name)
+        cands += [(own, "PHYLACINE synonym")] + [(s, "PHYLACINE/COMBINE synonym") for s in self.rev.get(own, [])]
+        for c, how in cands:
+            if c in rl and (c == nd.name or c not in leaf_names):
+                return rl[c], how if c != nd.name else "name"
+        if " " in nd.name:  # Latin gender ending only (Erethizon dorsatus / dorsatum)
+            g, e = nd.name.split(" ", 1)
+            vs = [v for v in self.variants.get((g, _stem(e)), []) if v not in leaf_names]
+            if len(vs) == 1:
+                return rl[vs[0]], "spelling variant"
+        return None, None
+
+
+def flag_extinct(root: Node, raw: Path, ctx: dict, log: dict) -> None:
+    """ToLaD#105: a living-looking Open Tree leaf that the Red List 2026-1 assesses EX is extinct (it ended
+    after 1500 CE, the Red List's window). Runs before dating, so the leaf's band ends at its extinction
+    (merge.assign_bands) and the model gives it no alive count."""
+    rl, rev = load_all(raw, ctx)
+    match = Matcher(root, rl, rev, ctx)
+    out = []
+    for nd in root.preorder():
+        if not nd.is_leaf or not nd.name or nd.kind != "tree" or nd.extinct or nd.data.get("empty_higher"):
+            continue
+        hit, via = match(nd)
+        if hit is not None and hit["category"] == "EX":
+            nd.extinct = True
+            nd.data["extinct_by"] = f"IUCN Red List {VERSION} EX"
+            nd.data["red_list_ex"] = True
+            out.append(nd.name)
+    log["red_list_extinct_flags"] = {"note": f"Open Tree leaves no other source marks extinct that the IUCN Red "
+                                             f"List {VERSION} assesses EX (ToLaD#105)", "leaves": sorted(out)}
 
 
 def assign(root: Node, rl: dict[str, dict], rev: dict[str, list[str]], ctx: dict) -> dict:
     """attach()'s matching, on a loaded list (`rl`) and bridge map (`rev`); returns the report."""
-    phy, phy_syn, ott_syn = ctx["phy"], ctx["phy_syn"], ctx.get("ott_syn", {})
+    phy, phy_syn = ctx["phy"], ctx["phy_syn"]
     by = Counter()
     used: Counter = Counter()
-    leaf_names = {n.name for n in root.preorder() if n.is_leaf and n.name}
-    variants: dict[tuple[str, str], list[str]] = {}
-    for nm in rl:
-        g, e = nm.split(" ", 1)
-        variants.setdefault((g, _stem(e)), []).append(nm)
+    match = Matcher(root, rl, rev, ctx)
     for nd in root.preorder():
         if not nd.is_leaf or not nd.name or nd.kind != "tree":
             continue
         living = nd.t1 == 0
-        hit, via = None, None
-        cands = [(nd.name, "name")] + [(a, "alt name") for a in nd.alt if a]
-        cands += [(norm_name(s), "Open Tree synonym") for s in ott_syn.get(nd.ott, [])]
-        own = phy_syn.get(nd.name, nd.name)
-        cands += [(own, "PHYLACINE synonym")] + [(s, "PHYLACINE/COMBINE synonym") for s in rev.get(own, [])]
-        for c, how in cands:
-            # a synonym that is another leaf's own name is that leaf's record (Bos taurus is not the aurochs)
-            if c in rl and (c == nd.name or c not in leaf_names):
-                hit, via = rl[c], how if c != nd.name else "name"
-                break
-        if hit is None and " " in nd.name:  # Latin gender ending only (Erethizon dorsatus / dorsatum)
-            g, e = nd.name.split(" ", 1)
-            vs = [v for v in variants.get((g, _stem(e)), []) if v not in leaf_names]
-            if len(vs) == 1:
-                hit, via = rl[vs[0]], "spelling variant"
-        if hit is not None and nd.name in REDEFINED:
-            hit, via = None, None
+        hit, via = match(nd)
         if hit is not None and (living or hit["category"] in ("EX", "EW")):
             nd.data["red_list"] = {**hit, "source": SRC_IUCN, "via": via}
             used[(hit["taxon"])] += 1
@@ -159,9 +200,10 @@ def assign(root: Node, rl: dict[str, dict], rev: dict[str, list[str]], ctx: dict
             continue
         if not living:
             continue
+        own = phy_syn.get(nd.name, nd.name)
         p = phy.get(nd.name) or phy.get(own)
         st = p["iucn"] if p else None
-        if st in PHYLACINE_LIVING:
+        if st in PHYLACINE_LIVING and nd.name not in DOMESTIC_FORMS:
             nd.data["red_list"] = {"category": st, "year": SOURCES[SRC_PHYLACINE]["vintage"], "taxon": 0,
                                    "assessment": 0, "source": SRC_PHYLACINE, "via": "PHYLACINE 1.2"}
             by["phylacine"] += 1

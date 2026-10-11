@@ -3,7 +3,30 @@ common    = "Giant panda"
 component = "wild"
 use       = "counts"
 scope     = "global wild population (China), all ages"
-notes     = "Four national surveys by China's State Forestry Administration. Methods and survey area changed between rounds (the fourth searched ~72% more area than the third), so the rise from 1,114 to 1,864 partly reflects better and wider surveying, not only real growth. The 1985-88 low followed bamboo die-offs and poaching."
+notes     = "Four national surveys by China's State Forestry Administration. Methods and survey area changed between rounds (the fourth searched ~72% more area than the third), so the rise from 1,114 to 1,864 partly reflects better and wider surveying, not only real growth. The 1985-88 low followed bamboo die-offs and poaching. Bottlenecks ([[event]], ToLaD#147): the late-glacial decline of the Sichuan populations (Lan et al. 2024, 30-10 kya) is in the data as a join: the build keeps PSMC to ~30 kya (112,647) and joins log-linearly down to the natural level in 1500 (15,127), so the column falls through the window without a dated low; the dropped blind PSMC step (22,430 at 11-24 kya) agrees with the source. Zhao et al. 2013's 3,000 years of human pressure lie on the same smooth join and the range-loss trend; the censuses since 1976 do not show a low (2,459, 1,114, 1,596, 1,864; the 1986 dip is a survey difference as much as a decline)."
+
+[[event]]
+kind    = "bottleneck"
+from_ya = 3000
+to_ya   = 0
+title   = "Human pressure, 3,000 years"
+summary = "Whole genomes of 34 pandas: after millions of years of climate-driven swings, human activity drove the recent divergence and serious decline of the panda, and has weighed on all three populations for 3,000 years."
+quote   = "Evidence indicated that, whereas global changes in climate were the primary drivers of population fluctuation for millions of years, human activities likely underlie recent population divergence and serious decline. We identified three distinct panda populations that show genetic adaptation to their environments. However, in all three populations, anthropogenic activities have negatively affected pandas for 3,000 years."
+cite    = "Zhao S, Zheng P, Dong S, et al. (2013). Whole-genome sequencing of giant pandas provides insights into demographic history and local adaptation. Nat Genet 45:67-71"
+url     = "https://doi.org/10.1038/ng.2494"
+grade   = "C"
+
+[[event]]
+kind    = "bottleneck"
+from_ya = 30000
+to_ya   = 10000
+title   = "Late-glacial decline"
+summary = "Genomes of 612 giant pandas show the three Sichuan populations declining continuously from 30,000 to 10,000 years ago, before they split; they then diverged in their histories over the last 10,000 years."
+quote   = "The three Sichuan populations (MSH, LSH, and QX) underwent a similar demographic history characterized by a continuous decline before their separation from 30 kya to 10 kya"
+cite    = "Lan T, Yang S, Li H, et al. (2024). Large-scale genome sequencing of giant pandas improves the understanding of population structure and future conservation initiatives. PNAS 121:e2406343121"
+url     = "https://doi.org/10.1073/pnas.2406343121"
+grade   = "C"
+region  = "Sichuan (Minshan, Liangshan, Qionglai-Xiaoxiangling)"
 
 [baseline]
 year  = 1976

@@ -117,7 +117,10 @@ class Build(unittest.TestCase):
 
     def test_greenspoon_land_total(self):
         t = self.st["occupancy_calibration"]["land_total"]
-        self.assertLess(abs(math.log10(t["individuals"] / t["greenspoon_individuals"])), 0.05)
+        # within 0.07 dex (17%) of Greenspoon's land total; their 95% CI on land biomass spans 13-38 Mt
+        # (+-0.23 dex). The fit is per species and not held to the total: dropping the unrecognised Open Tree
+        # tips (ToLaD#116, ~6e9 double-counted individuals) moved it from 0.017 to 0.052 dex below
+        self.assertLess(abs(math.log10(t["individuals"] / t["greenspoon_individuals"])), 0.07)
         self.assertLess(t["biomass_Mt"], 38)  # Greenspoon's 95% CI for wild land biomass is 13-38 Mt
 
 

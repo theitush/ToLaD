@@ -64,3 +64,164 @@ Quote verified in the PMC full text (PMC3935880). Window: the historical specime
 2. **Genetic dates shift on the fan.** The build rescales each genomic curve's time by the lineage mutation rate (tiger ×7.4, leopard ×8.5), so a dip the source dates at time *t* lies at a different time on the column. The event windows here are the sources' dates, not the build's; marking them on the column will not always land on the curve's own dip (the jaguar's and snow leopard's are close; the tiger's 234 kya bottleneck has no dip near it).
 3. **Iberian lynx and snow leopard recent bottlenecks fall on smooth trends.** The build's range-loss trend (1500 onwards) and the deep-past join are log-linear, so a bottleneck within them (c. 1700 lynx, 8 kya snow leopard) is a stretch of steady decline on the column, not a low point.
 4. **Regional events on global columns.** The Asiatic lion's near-extinction, the Gir founder event, the European lynx crash and the Amur leopard genomes concern part of the species; each event has `region` set so the card can say so.
+
+# Carnivore bottlenecks other than cats, quoted (ToLaD#147)
+
+The #141 method run over the Carnivora outside Felidae. Same rules as above: every source was fetched (Europe PMC full text or abstract, NCBI PMC, or the agency PDF), every quote was checked by script as an exact substring of the downloaded text after collapsing whitespace (`...` joins two passages of the same source), and every citation's volume and pages were checked against Europe PMC's record. Present = 2026. "In the data?" compares the event with the build that was on `main` when this was written (`data/mammals/stats.json`, and the bulk PSMC curves of ToLaD#64 placed by `time_factor`).
+
+Searched: Europe PMC (title/abstract/full-text queries per family, `bottleneck`, `population decline`, `founder`, `genome`/`PSMC`), then the sources named in the brief. Done in this pass: Canidae, Ursidae, Phocidae, Otariidae, Odobenidae, Mustelidae (partly), Ailuridae, Hyaenidae (one species), and one quick search each for the small families (below).
+
+## Events in history files
+
+| Species | Window (ya) | Title | Source | In the data? |
+|---|---|---|---|---|
+| Northern elephant seal *Mirounga angustirostris* | 216–134 (1810–1892) | Hunted to a few dozen (B) | Hoelzel et al. 2024, Nat Ecol Evol 8:686, abstract | **y.** The 1890 point (100) is the curve's low; with no baseline the fall into it is a step at the first point. |
+| Sea otter *Enhydra lutris* | 285–115 (1741–1911) | Fur-trade crash (B) | Beichman et al. 2023, Mol Ecol 32:281, abstract | **y.** Baseline 225,000 (1741), low 1,500 (1911), 126,000 (1998). |
+| Antarctic fur seal *Arctocephalus gazella* | 251–96 (1775–1930) | Sealing near-extinction (C) | Paijmans et al. 2020, Sci Rep 10:5089, abstract (full text read for 1775) | **n.** One point (2008). |
+| Northern fur seal *Callorhinus ursinus* | 140–114 (1886–1912) | Pelagic sealing crash (C) | NOAA stock assessment (Young et al. 2026), PDF | **Partly.** The 1912 point (216,000) is the curve's first and lowest. The source dates only the end (1912), and the summary says so. |
+| Black-footed ferret *Mustela nigripes* | 45–35 (1981–1991) | Eighteen survivors (A) | USFWS 2019 Species Status Assessment, PDF | **n.** First point 2019 (340); the count of 18 (1985–87) could become a point. |
+| Red wolf *Canis rufus* | 53–39 (1973–1987) | Fourteen founders (A) | Hinton et al. 2013, Animals 3:722, full text | **n.** One point (2026). |
+| Grey wolf *Canis lupus* (Scandinavia) | 61–35 (1965–1991) | Scandinavian refounding (A) | Viluma et al. 2022, Genome Res 32:449, full text | **n.** Regional, on a global column with one point. |
+| Grey wolf (Isle Royale) | 86–76 (1940s) | Isle Royale founders (B) | Robinson et al. 2019, Sci Adv 5:eaau0757, full text | **n.** As above. |
+| Brown bear *Ursus arctos* (Scandinavia) | 146–96 (1880–1930; source: "approximately 100 years ago", in 2015) | Scandinavian hunting low (C) | Xenikoudakis et al. 2015, Mol Ecol 24:3441, abstract | **n.** Regional; global column, one point (2017). |
+| Polar bear *Ursus maritimus* | 500,000–20,000 | Long Pleistocene decline (C) | Miller et al. 2012, PNAS 109:E2382, abstract | **Partly.** The bulk PSMC (time ×1.53) falls ~15× between 1.5 Mya and ~400 kya, rebounds to ~84,500 at 130–160 kya and falls to ~43,000 by 24 kya: the decline is there, but mostly older than 500 kya on the build's time scale. |
+| Giant panda *Ailuropoda melanoleuca* (Sichuan) | 30,000–10,000 | Late-glacial decline (C) | Lan et al. 2024, PNAS 121:e2406343121, full text | **y, as a join.** PSMC kept to ~30 kya (112,647), then a log-linear join down to 15,127 in 1500: the column falls through the window; the dropped blind step (22,430 at 11–24 kya) agrees. |
+| Giant panda | 3,000–0 | Human pressure, 3,000 years (C) | Zhao et al. 2013, Nat Genet 45:67, abstract | **Partly.** The same smooth join and the range-loss trend fall through it; the censuses since 1976 show no low. |
+
+Quotes are in the files. Two elephant-seal sources were read; Hoffman et al. 2024 (Nat Ecol Evol 8:2309, full text) give the bottleneck effective size (6, 95% CI 5.0–7.5), and the file's notes cite it rather than marking the same window twice.
+
+## Ready to paste (species with no history file)
+
+The loader still rejects a history file with no `[[point]]` (`history.validate`: "no points"), and a file with points would change the species' counts, which is outside this task. These events are verified and ready for when each species gets a file. Name check against the tree (Upham taxonomy): the brown hyena is `Hyaena brunnea` there (Bergman's PSMC has it as *Parahyaena brunnea*), the Hawaiian monk seal is listed under both *Monachus* and *Neomonachus schauinslandi*.
+
+| Species | Window (ya) | Title | Source | In the data? |
+|---|---|---|---|---|
+| Ethiopian wolf *Canis simensis* | 40,500–27,000 | Ancient contraction (C) | Mooney et al. 2023, Mol Biol Evol 40:msac277, full text | No file and no bulk curve. |
+| Guadalupe fur seal *Arctocephalus townsendi* | 246–196 (1780–1830) | Sealers' near-extermination (C) | Weber et al. 2004, J Hered 95:144, abstract | No file. |
+| Hawaiian monk seal *Neomonachus schauinslandi* | 156–126 (1870–1900; source: "late 19th century") | Late-1800s bottleneck (C) | Mohr et al. 2022, Genes 13:1270, abstract | No file. |
+| Walrus *Odobenus rosmarus* (Pacific) | 226–76 (1800–1950; source: "nineteenth and twentieth centuries") | Commercial overhunting (D) | Mills et al. 2024, Sci Rep 14:8257, abstract | No file. A census crash with no genetic trace: the source finds mtDNA diversity unchanged. Grade D: no figures or years. |
+| Brown hyena *Hyaena (Parahyaena) brunnea* | 1,000,000–11,700 | Million-year decline (C) | Westbury et al. 2018, Mol Biol Evol 35:1225, abstract | **y.** The bulk PSMC (time ×1.52) falls steadily from ~124,000 at 310–370 kya to ~51,000 at 21–27 kya, and the dropped blind steps go on down to ~17,000 at 9–12 kya. |
+| Red panda *Ailurus fulgens* (Chinese, *A. styani*) | 330,000–270,000 | Penultimate-glacial bottleneck (C) | Hu et al. 2020, Sci Adv 6:eaax5751, full text | No file and no bulk curve. |
+| Red panda (Chinese) | 25,000–15,000 | Last-glacial bottleneck (C) | Hu et al. 2020 | As above. Hu et al. also give the Himalayan red panda three bottlenecks (~250 kya, ~90 kya, and a third); not drawn here. |
+
+**Ethiopian wolf (`Canis_simensis.toml`)**
+
+```toml
+[[event]]
+kind    = "bottleneck"
+from_ya = 40500
+to_ya   = 27000
+title   = "Ancient contraction"
+summary = "Whole genomes of ten Bale Mountains wolves: the species has lived at a small size since an ancient contraction 27,000-40,500 years ago (for a 2- or 3-year generation) and has kept declining since, with recent crashes from farming and dog-borne disease."
+quote   = "the Ethiopian wolf has persisted for about 13,500 generations since an ancient contraction (or ∼27,000 or 40,500 years ago, assuming a 2- or 3-year generation time). Throughout the years, the population has continued declining and experiencing both recent crashes and sub-population extinction due to anthropogenic forces."
+cite    = "Mooney JA, Marsden CD, Yohannes A, Wayne RK, Lohmueller KE (2023). Long-term small population size, deleterious variation, and altitude adaptation in the Ethiopian wolf, a severely endangered canid. Mol Biol Evol 40:msac277"
+url     = "https://doi.org/10.1093/molbev/msac277"
+grade   = "C"
+```
+
+**Guadalupe fur seal (`Arctocephalus_townsendi.toml`)**
+
+```toml
+[[event]]
+kind    = "bottleneck"
+from_ya = 246
+to_ya   = 196
+title   = "Sealers' near-extermination"
+summary = "Commercial sealers nearly wiped out the Guadalupe fur seal in the late 18th and early 19th centuries. Bones of 26 pre-bottleneck seals carry 25 mitochondrial types; 32 living seals carry 7."
+quote   = "The Guadalupe fur seal was nearly exterminated by commercial sealers during the late 18th and early 19th centuries. ... We found 25 different mtDNA genotypes in the prebottleneck fur seals and only 7 genotypes among 32 extant fur seals, including only one of the ancient genotypes."
+cite    = "Weber DS, Stewart BS, Lehman N (2004). Genetic consequences of a severe population bottleneck in the Guadalupe fur seal (Arctocephalus townsendi). J Hered 95:144-153"
+url     = "https://doi.org/10.1093/jhered/esh018"
+grade   = "C"
+```
+
+**Hawaiian monk seal (`Neomonachus_schauinslandi.toml`, or the tree's name)**
+
+```toml
+[[event]]
+kind    = "bottleneck"
+from_ya = 156
+to_ya   = 126
+title   = "Late-1800s bottleneck"
+summary = "Hawaiian monk seals went through a severe bottleneck in the late 19th century and kept declining until recovery work began in 1976, with fewer than 1,000 left. Their genomes show a long history of small numbers before it."
+quote   = "The species survived a severe bottleneck in the late 19th century and experienced subsequent population declines until becoming the subject of a NOAA-led species recovery effort beginning in 1976 when the population was fewer than 1000 animals."
+cite    = "Mohr DW, Gaughran SJ, Paschall J, et al. (2022). A chromosome-length assembly of the Hawaiian monk seal (Neomonachus schauinslandi): a history of genetic purging and genomic stability. Genes 13:1270"
+url     = "https://doi.org/10.3390/genes13071270"
+grade   = "C"
+```
+
+**Walrus (`Odobenus_rosmarus.toml`)**
+
+```toml
+[[event]]
+kind    = "bottleneck"
+from_ya = 226
+to_ya   = 76
+title   = "Commercial overhunting"
+summary = "Pacific walruses were decimated by commercial hunting in the 19th and 20th centuries (the source gives no figures or exact years). Mitochondrial DNA from before the hunting matches today's: no genetic bottleneck followed."
+quote   = "Like many other marine mammal species, their population sizes were decimated by historical overhunting in the nineteenth and twentieth centuries. ... We found that genetic variation was unchanged over this period"
+cite    = "Mills KK, Hildebrandt KPB, Everson KM, et al. (2024). Ancient DNA indicates a century of overhunting did not reduce genetic diversity in Pacific walruses (Odobenus rosmarus divergens). Sci Rep 14:8257"
+url     = "https://doi.org/10.1038/s41598-024-57414-2"
+grade   = "D"
+region  = "Pacific (O. r. divergens)"
+```
+
+**Brown hyena (`Hyaena_brunnea.toml`, alias *Parahyaena brunnea*)**
+
+```toml
+[[event]]
+kind    = "bottleneck"
+from_ya = 1000000
+to_ya   = 11700
+title   = "Million-year decline"
+summary = "Brown hyena genomes show a continuous fall in effective population size that began about a million years ago and sped up sharply towards the end of the Pleistocene, leaving the species with extremely low genetic diversity."
+quote   = "We find that brown hyena harbor extremely low genetic diversity on both the mitochondrial and nuclear level, most likely resulting from a continuous and ongoing decline in effective population size that started ∼1 Ma and dramatically accelerated towards the end of the Pleistocene."
+cite    = "Westbury MV, Hartmann S, Barlow A, et al. (2018). Extended and continuous decline in effective population size results in low genomic diversity in the world's rarest hyena species, the brown hyena. Mol Biol Evol 35:1225-1237"
+url     = "https://doi.org/10.1093/molbev/msy037"
+grade   = "C"
+```
+
+**Red panda (`Ailurus_fulgens.toml`)**
+
+```toml
+[[event]]
+kind    = "bottleneck"
+from_ya = 330000
+to_ya   = 270000
+title   = "Penultimate-glacial bottleneck"
+summary = "Genomes of Chinese red pandas: a decline from about 800,000 years ago ended in a first bottleneck about 300,000 years ago, during the Penultimate Glaciation. Himalayan red pandas had their first about 250,000 years ago."
+quote   = "This species suffered from an obvious population decline approximately 0.8 Ma ago, which coincided with the occurrence of the Naynayxungla Glaciation (0.78 to 0.5 Ma ago). The population decline resulted in the first bottleneck approximately 0.3 Ma ago, mostly likely caused by the Penultimate Glaciation (0.3 to 0.13 Ma ago)"
+cite    = "Hu Y, Thapa A, Fan H, et al. (2020). Genomic evidence for two phylogenetic species and long-term population bottlenecks in red pandas. Sci Adv 6:eaax5751"
+url     = "https://doi.org/10.1126/sciadv.aax5751"
+grade   = "C"
+region  = "Chinese red panda (A. styani)"
+
+[[event]]
+kind    = "bottleneck"
+from_ya = 25000
+to_ya   = 15000
+title   = "Last-glacial bottleneck"
+summary = "After a peak around 50,000 years ago, Chinese red pandas declined fast with the last glaciation, to a second bottleneck at the Last Glacial Maximum, about 20,000 years ago."
+quote   = "After the glaciations, the populations started to expand and reached a climax approximately 50 thousand years (ka) ago. Then, the arrival of the last glaciations again resulted in rapid population decline, and the second bottleneck occurred during the Last Glacial Maximum (~20 ka ago)"
+cite    = "Hu Y, Thapa A, Fan H, et al. (2020). Genomic evidence for two phylogenetic species and long-term population bottlenecks in red pandas. Sci Adv 6:eaax5751"
+url     = "https://doi.org/10.1126/sciadv.aax5751"
+grade   = "C"
+region  = "Chinese red panda (A. styani)"
+```
+
+## Families and species checked, nothing evidenced found
+
+- **Northern fur seal, genetics**: Dickerson et al. 2010 (PLoS ONE 5:e10671, abstract) find only weak structure and no bottleneck signal; the census crash is the event above.
+- **Island fox** *Urocyon littoralis*: Robinson et al. 2016 (Curr Biol 26:1183, abstract) describe island populations that "have persisted for thousands of years at extremely small population sizes", with San Nicolas "genetic flatlining", but no dated bottleneck. The 1990s crashes (eagle predation on the northern islands, distemper on Catalina) were not found in a source read here.
+- **African wild dog, dhole, Darwin's fox**: one search each turned up no paper with a dated bottleneck in its abstract (Meiring et al. 2022, Sci Rep 12:14979, abstract: Kruger wild dogs "are currently not inbred but have low genomic diversity"). A deeper look could find more.
+- **Mediterranean monk seal** *Monachus monachus*: Salmona et al. 2022 (Proc R Soc B, abstract) support "a major effective population size decline in all populations during Antiquity", with no years in the abstract; the full text was not retrievable (Europe PMC error 500), so no window is drawn. Worth a second try: it is the clearest case left in Phocidae.
+- **Hyaenidae** other than the brown hyena: Westbury et al. 2020 (cave and spotted hyena palaeogenomes) is about gene flow, not a bottleneck; striped hyena and aardwolf: nothing found.
+- **Procyonidae**: Flores-Manzanero et al. 2022 (Conserv Genet, abstract) report "historical and contemporary bottleneck signals" in the Cozumel pygmy raccoon *Procyon pygmaeus*, but no date; not made an event. Raccoon, coatis, kinkajou: nothing.
+- **Herpestidae, Viverridae, Mephitidae, Eupleridae (fossa), Nandiniidae, Prionodontidae**: one Europe PMC search each (family or genus names AND bottleneck / genetic diversity) found no dated bottleneck. This is a light check, not a literature review.
+
+## Not done in this pass
+
+- **Mustelidae** beyond the sea otter and black-footed ferret: sea mink (extinct), European mink, Eurasian otter (the 1950s–70s crash in Britain and Europe), wolverine, giant otter, marten reintroductions.
+- **Phocidae** beyond the elephant seal and Hawaiian monk seal: Saimaa ringed seal, grey seal (McCarthy et al. 2025 found in a search, not read), harbour seal die-offs, Caspian and Baikal seals.
+- **Otariidae** beyond the three fur seals: Juan Fernández fur seal, Steller sea lion decline, New Zealand sea lion.
+- **Canidae** for the species listed above as a light check, plus the Mexican grey wolf founders (Loera et al. 2026 found in a search).
+- The **Himalayan red panda**'s three bottlenecks, and the giant panda's two ancient ones (Zhao et al. 2013 name them in the abstract without dates; the paper is not open).
