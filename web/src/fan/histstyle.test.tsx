@@ -1,12 +1,12 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { plainAgo, plainCount, roughCount, SpeciesCard } from './FanApp';
+import { plainAgo, plainCount, SpeciesCard } from './FanApp';
 import { popTicks, yearTicks } from './HistorySpark';
 import { GRADE_WORD, noDataSpans, styleBetween } from './history';
 import { FELIDAE } from './panthera';
 import { population } from './population';
 import { RED_LIST } from './status';
-import { formatCount } from '../data/names';
+import { approxCountsIn, formatCount } from '../data/count';
 
 const byName = (common: string) => FELIDAE.species.find((s) => s.common === common)!;
 
@@ -22,7 +22,7 @@ describe('species card history', () => {
       for (const p of h.points) {
         expect(html).toContain(esc(p.cite));
         if (p.url) expect(html).toContain(`href="${p.url}"`);
-        if (p.note) expect(html).toContain(esc(p.note));
+        if (p.note) expect(html).toContain(esc(approxCountsIn(p.note)));
         expect(html).toContain(`grade ${p.grade}`);
         expect(html).toContain(p.kind);
       }
@@ -114,12 +114,12 @@ describe('the species card: the population at the time touched', () => {
     const lion = byName('Lion');
     const then = face(renderToStaticMarkup(<SpeciesCard sp={lion} ageMa={70e-6} onClose={() => {}} />));
     expect(then).toContain('Lion (Panthera leo)');
-    expect(then).toContain('390,000 alive 70 years ago');
+    expect(then).toContain('~400k alive 70 years ago');
     expect(then).toContain('58% have descendants alive today');
-    expect(then).toContain('23,500 alive today');
+    expect(then).toContain('~23k alive today');
     expect(then).toContain('Roughly 600 billion lions have ever lived (rough estimate)');
     const now = face(renderToStaticMarkup(<SpeciesCard sp={lion} onClose={() => {}} />));
-    expect(now).toContain(`${plainCount(population(lion).aliveAt(0))} alive today`);
+    expect(now).toContain(`${formatCount(population(lion).aliveAt(0))} alive today`);
     // At now, "alive today" once and no trivial "100% have descendants".
     expect(now.match(/alive today/g)!.length).toBe(1);
     expect(now).not.toContain('have descendants');
@@ -142,7 +142,7 @@ describe('the species card: the population at the time touched', () => {
         const d = details(html);
         expect(d).toContain('Generation');
         expect(d).toContain(`Data grade${sp.grade}`);
-        expect(d).toContain(formatCount(sp.everLo));
+        expect(d).toContain(formatCount(sp.everLo, { tilde: false }));
         expect(d).toContain('Method');
         // Collapsed by default.
         expect(html).not.toMatch(/<details[^>]* open/);
@@ -177,6 +177,23 @@ describe('the species card: the population at the time touched', () => {
     }
   });
 
+  it('shows the chip even when the species is in no danger: Least Concern in gray (ToLaD#98)', () => {
+    // A stubbed LC status for a small cat (the pipeline's statuses are ToLaD#48).
+    const sp = byName('Leopard cat');
+    const had = RED_LIST[sp.sci];
+    RED_LIST[sp.sci] = { category: 'LC', year: 2022, cite: 'stub', url: 'https://www.iucnredlist.org/species/1/2' };
+    try {
+      const html = renderToStaticMarkup(<SpeciesCard sp={sp} onClose={() => {}} />);
+      expect(html).toMatch(/<span class="status iucn-lc"[^>]*>Least Concern<\/span>/);
+      expect(details(html)).toContain('IUCN Red List: Least Concern (LC)');
+    } finally {
+      if (had) RED_LIST[sp.sci] = had;
+      else delete RED_LIST[sp.sci];
+    }
+    // Threatened categories keep their colours.
+    expect(renderToStaticMarkup(<SpeciesCard sp={byName('Tiger')} onClose={() => {}} />)).toContain('class="status iucn-en"');
+  });
+
   it('says what the sparkline dots\' colours mean, in plain words', () => {
     for (const sp of FELIDAE.species.filter((s) => s.history && s.history.points.length > 0)) {
       const html = renderToStaticMarkup(<SpeciesCard sp={sp} onClose={() => {}} />);
@@ -193,9 +210,6 @@ describe('the species card: the population at the time touched', () => {
   it('rounds in words', () => {
     expect(plainCount(351822)).toBe('352,000');
     expect(plainCount(1.234e6)).toBe('1.23 million');
-    expect(roughCount(6.28e11)).toBe('600 billion');
-    expect(roughCount(1.4e11)).toBe('140 billion');
-    expect(roughCount(5.81e9)).toBe('6 billion');
     expect(plainAgo(70)).toBe('70 years ago');
     expect(plainAgo(11699.48)).toBe('11,700 years ago');
     expect(plainAgo(3.76e6)).toBe('3.8 million years ago');
