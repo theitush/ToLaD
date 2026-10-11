@@ -1,0 +1,27 @@
+species   = "Equus ferus"
+aliases   = ["Equus przewalskii"]
+common    = "Przewalski's horse"
+component = "wild"
+use       = "counts"
+scope     = "global, free-ranging (reintroduced: Mongolia and China), all ages; zoo and breeding-centre animals not counted"
+notes     = """
+The tree's Equus ferus is the wild horse; its one living form is Przewalski's horse (the domestic
+horse is its own leaf, Equus caballus). Last seen in the wild in Mongolia in the late 1960s and
+listed Extinct in the Wild; reintroduced from 1992 (Hustai, Takhin Tal and Khomiin Tal in Mongolia;
+Kalamaili in Xinjiang) and downlisted to Endangered in 2011. Turghan et al. 2022 give nearly 2,500
+horses worldwide, about 1,360 of them living in the wild in China and Mongolia. Between the
+extinction in the wild and 1992 there were none (the curve cannot show a zero). No sourced
+pre-decline count. Added for ToLaD#72: the model's own count (85,052, from density x a genus-mean
+range) was about 60x too high.
+"""
+
+[[point]]
+year  = 2022
+n     = 1360
+lo    = 1360
+hi    = 1360
+grade = "C"
+kind  = "estimate"
+cite  = "Turghan, Jiang & Niu 2022, An Update on Status and Conservation of the Przewalski's Horse (Equus ferus przewalskii): Captive Breeding and Reintroduction Projects, Animals 12:3158"
+url   = "https://doi.org/10.3390/ani12223158"
+note  = "'Approximately 1360 horses live in the wild in China and Mongolia' (section 3; no survey year given, dated to publication). Of a world population of 'nearly 2500'."

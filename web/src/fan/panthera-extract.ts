@@ -41,6 +41,12 @@ export interface HistoryRec {
   component: string;
   scope: string;
   notes: string;
+  /**
+   * Null for a curated history file; "rangeloss" for a modelled range-loss trend
+   * (format v1.3: its notes are the shared skeleton META.natural.trend's), "genomic"
+   * for a modelled bulk genomic deep past (ToLaD#64).
+   */
+  modelled: string | null;
   /** Generation length and mean lifespan (years) the segments were compiled with. */
   G: number;
   L: number;
@@ -48,6 +54,23 @@ export interface HistoryRec {
   nowYear: number;
   points: HistPoint[];
   segments: HistSegment[];
+}
+
+/**
+ * A species' IUCN Red List status from the data (format v1.4 RLST, ToLaD#48), its source resolved
+ * from skeleton META.red_list. Every living species has one; fossils none.
+ */
+export interface RedListRec {
+  /** 'LC' 'NT' 'VU' 'EN' 'CR' 'EW' 'EX' 'DD', or 'NE' (on no list: not evaluated). */
+  category: string;
+  /** Year of the current assessment; the source's vintage when there is no assessment. */
+  year: number;
+  /** Source key: 'iucn-2026-1', 'phylacine-1.2' (IUCN 2016-3) or 'not-listed'. */
+  source: string;
+  sourceLabel: string;
+  /** Short citation of the assessment (or the source), and its page ('' = none). */
+  cite: string;
+  url: string;
 }
 
 export interface RawNode {
@@ -68,6 +91,7 @@ export interface RawSpecies extends RawNode {
   /** gid of the parent node in the tree (species sharing it are sisters). */
   parentGid: number;
   history: HistoryRec | null;
+  redList: RedListRec | null;
 }
 
 export interface RawClade extends RawNode {
@@ -91,7 +115,32 @@ interface Tile {
   dateSource(i: number): string;
   isSpecies(i: number): boolean;
   history(i: number): any;
+  redList?(i: number): { category: string; source: number; year: number; taxon: number; assessment: number } | null;
   meta: any;
+}
+
+interface RedListSource {
+  key: string;
+  label: string;
+  cite: string;
+  url: string;
+}
+
+/** Row `i`'s Red List status with its source resolved, or null (none, or data older than v1.4). */
+export function redListOf(f: Tile, i: number, meta: any): RedListRec | null {
+  const r = f.redList ? f.redList(i) : null;
+  const m = meta?.red_list;
+  if (!r || !m) return null;
+  const src = (m.sources as RedListSource[])[r.source];
+  const assessed = r.taxon > 0 && r.assessment > 0;
+  return {
+    category: r.category,
+    year: r.year,
+    source: src?.key ?? '',
+    sourceLabel: src?.label ?? '',
+    cite: assessed ? `${src?.label ?? 'IUCN Red List'}, e.T${r.taxon}A${r.assessment}` : (src?.label ?? ''),
+    url: assessed ? String(m.url).replace('{taxon}', String(r.taxon)).replace('{assessment}', String(r.assessment)) : (src?.url ?? ''),
+  };
 }
 
 function node(f: Tile, i: number): RawNode {
@@ -135,6 +184,7 @@ export function extractClade(skeleton: ArrayBuffer | Uint8Array, tile: ArrayBuff
   const sk = decodeFile(skeleton) as unknown as Tile;
   const f = decodeFile(tile) as unknown as Tile;
   const sources = (sk.meta.hist_sources ?? []) as { cite: string; url: string }[];
+  const trend = (sk.meta.natural?.trend ?? null) as { notes?: string } | null;
   let root = -1;
   for (let i = 0; i < f.n && root < 0; i++) if (f.name(i) === name) root = i;
   if (root < 0) throw new Error(`${name} not in tile ${tileId}`);
@@ -155,7 +205,8 @@ export function extractClade(skeleton: ArrayBuffer | Uint8Array, tile: ArrayBuff
         use: h.use ?? 'display',
         component: h.component ?? 'wild',
         scope: h.scope ?? '',
-        notes: (h.notes ?? '').trim(),
+        notes: (h.notes ?? (h.modelled === 'rangeloss' ? trend?.notes : '') ?? '').trim(),
+        modelled: h.modelled ?? null,
         G: h.G,
         L: h.L,
         nowYear: last ? last.year0 + last.generations * h.G : new Date().getFullYear(),
@@ -174,7 +225,7 @@ export function extractClade(skeleton: ArrayBuffer | Uint8Array, tile: ArrayBuff
         segments: segs.map((s) => ({ ...s })),
       };
     }
-    species.push({ ...node(f, i), parentGid: f.gid(f.parent[i]), history });
+    species.push({ ...node(f, i), parentGid: f.gid(f.parent[i]), history, redList: redListOf(f, i, sk.meta) });
   }
   return { ...node(f, root), tile: tileId, species };
 }

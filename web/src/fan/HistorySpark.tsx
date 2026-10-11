@@ -6,7 +6,7 @@
 
 import { useState } from 'react';
 import { approxCountsIn, formatCount } from '../data/count';
-import { GRADE_COLOR, GRADE_WORD, noDataSpans, styleBetween, type SpanStyle } from './history';
+import { GRADE_COLOR, GRADE_WORD, MODELLED_KINDS, noDataSpans, styleBetween, type SpanStyle } from './history';
 import type { HistoryRec } from './panthera';
 
 const W = 340;
@@ -141,14 +141,22 @@ export function HistorySpark({ h, open: open0 = false }: { h: HistoryRec; open?:
           <g stroke="#c9d4cd" strokeWidth="1.3" fill="none">
             {lines}
           </g>
-          {pts.map((p, k) => (
-            <g key={k} data-grade={p.grade}>
-              {p.hi > p.lo && (
-                <line x1={X(p.year)} x2={X(p.year)} y1={Y(p.hi)} y2={Y(p.lo)} stroke={GRADE_COLOR[p.grade]} strokeWidth="2" opacity="0.45" />
-              )}
-              <circle cx={X(p.year)} cy={Y(p.n)} r="3.2" fill={GRADE_COLOR[p.grade]} stroke="#141c18" strokeWidth="1" />
-            </g>
-          ))}
+          {pts.map((p, k) => {
+            // A modelled point (the range-loss trend's start) is the model's, not a cited figure: a hollow ring.
+            const mod = MODELLED_KINDS.has(p.kind);
+            return (
+              <g key={k} data-grade={p.grade} data-modelled={mod ? '' : undefined}>
+                {p.hi > p.lo && (
+                  <line x1={X(p.year)} x2={X(p.year)} y1={Y(p.hi)} y2={Y(p.lo)} stroke={GRADE_COLOR[p.grade]} strokeWidth="2" opacity={mod ? 0.25 : 0.45} strokeDasharray={mod ? DASH.dashed : undefined} />
+                )}
+                {mod ? (
+                  <circle cx={X(p.year)} cy={Y(p.n)} r="2.8" fill="#141c18" stroke={GRADE_COLOR[p.grade]} strokeWidth="1.4" />
+                ) : (
+                  <circle cx={X(p.year)} cy={Y(p.n)} r="3.2" fill={GRADE_COLOR[p.grade]} stroke="#141c18" strokeWidth="1" />
+                )}
+              </g>
+            );
+          })}
           <g stroke="#56625a" strokeWidth="1">
             <line x1={L} x2={W - R} y1={H - B + 0.5} y2={H - B + 0.5} />
             {yTicks.map((y) => (
@@ -202,6 +210,11 @@ export function HistorySpark({ h, open: open0 = false }: { h: HistoryRec; open?:
         </span>
       </button>
       {open && h.use !== 'counts' && <div className="dim small">These numbers are shown for reference; the tree's widths use the model.</div>}
+      {open && h.modelled === 'rangeloss' && (
+        <div className="dim small" data-modelled-note="">
+          Modelled, not counted: the natural level held to 1500 CE, then a steady change to today's count.
+        </div>
+      )}
       {open && before && (
         <div className="dim small" data-nodata-note="">
           No data before {fmtYear(before.year)}: held at {before.today ? "today's level" : `the ${fmtYear(before.year)} level`}.

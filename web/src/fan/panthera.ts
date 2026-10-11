@@ -19,7 +19,7 @@
 import raw from 'virtual:panthera-data';
 import { BirthCurve, procgenSegments, type GenSegment } from './history';
 import { FELIDAE_TREE, speciesUnder } from './splits';
-import type { Grade, HistoryRec, RawSpecies } from './panthera-extract';
+import type { Grade, HistoryRec, RawSpecies, RedListRec } from './panthera-extract';
 
 export type { Grade, HistoryRec, HistPoint, HistSegment } from './panthera-extract';
 
@@ -52,6 +52,8 @@ export interface SpeciesRec {
    * are spread evenly over the species' span.
    */
   births: { segments: GenSegment[]; curve: BirthCurve; lifespan: number } | null;
+  /** IUCN Red List status from the data (ToLaD#48); null for fossils. status.ts reads it. */
+  redList?: RedListRec | null;
 }
 
 export interface CladeRec {
@@ -150,6 +152,7 @@ export function speciesRec(r: RawSpecies, clade: number): SpeciesRec {
     clade,
     history: h,
     births,
+    redList: r.redList ?? null,
   };
 }
 

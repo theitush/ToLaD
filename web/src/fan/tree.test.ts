@@ -27,9 +27,9 @@ function camera(mode: WidthMode, edge: EdgeStyle): FanCamera {
 
 const MODES: WidthMode[] = ['log', 'linear'];
 const EDGES: EdgeStyle[] = ['curved', 'straight'];
-/** A hair above / below a height (relative, so it survives the log axis). */
-const above = (y: number) => y - 1e-7 * Math.max(1, Math.abs(y));
-const below = (y: number) => y + 1e-7 * Math.max(1, Math.abs(y));
+/** A hair above / below a height (relative, so it survives the log axis; small, since a genomic deep past still slopes at a split: the sums agree in the limit). */
+const above = (y: number) => y - 1e-9 * Math.max(1, Math.abs(y));
+const below = (y: number) => y + 1e-9 * Math.max(1, Math.abs(y));
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 const byName = (f: Fan, name: string) => f.branches.find((b) => b.sp.common === name)!;
 
