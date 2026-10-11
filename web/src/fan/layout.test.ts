@@ -189,3 +189,60 @@ describe('straight: lines that lean', () => {
     });
   }
 });
+
+describe('Tess: culling and thinning (the draw path, #32)', () => {
+  for (const mode of ['log', 'linear'] as WidthMode[]) {
+    it(`xRange holds the strand at every height in the range (${mode})`, () => {
+      const fan = layoutFan(FELIDAE, mode);
+      const yb = fan.trunkBottom.y;
+      // Ranges from the whole world down to a few years near now, and about each split.
+      const ranges: [number, number][] = [
+        [-TIME_H, yb],
+        [-TIME_H, -TIME_H + 2],
+        [-TIME_H + 0.01, -TIME_H + 0.05],
+        [-800, -600],
+        [-300, 50],
+      ];
+      for (const v of fan.nodes) ranges.push([v.y - 3, v.y + 3]);
+      for (const b of fan.branches) {
+        for (const [y0, y1] of ranges) {
+          const [L, R] = fan.tess.xRange(b, y0, y1);
+          for (let k = 0; k <= 400; k++) {
+            const y = y0 + ((y1 - y0) * k) / 400;
+            if (y < b.tipY || y > yb) continue;
+            const w = laneAt(b, y).w;
+            if (!(w > 0)) continue;
+            const x = leftAt(b, y);
+            expect(x).toBeGreaterThanOrEqual(L);
+            expect(x + w).toBeLessThanOrEqual(R);
+          }
+        }
+      }
+    });
+  }
+
+  it('cuts: ascending, at most maxPx apart, every split kept, sub-px features thinned', () => {
+    const fan = layoutFan(FELIDAE, 'linear');
+    const yb = fan.trunkBottom.y;
+    let thinned = 0;
+    for (const b of fan.branches) {
+      for (const sy of [0.7, 5, 300]) {
+        // (A screen's height or so: the whole world at 0.7 px per unit.)
+        const u = fan.tess.cuts(b, -TIME_H, Math.min(yb, -TIME_H + 1300 / sy), sy, 4);
+        if (u.length < 2) continue;
+        const a = u[0];
+        const z = u[u.length - 1];
+        for (let k = 1; k < u.length; k++) {
+          expect(u[k]).toBeGreaterThan(u[k - 1]);
+          expect((u[k] - u[k - 1]) * sy).toBeLessThanOrEqual(4 + 1e-9);
+        }
+        const set = new Set(u);
+        for (const s of b.path) if (s.y > a && s.y < z) expect(set.has(s.y)).toBe(true);
+        // At most the grid (2–4 px apart), a feature per dyadic cell (½–1 px), and the splits.
+        expect(u.length).toBeLessThanOrEqual((z - a) * sy * 2.5 + b.path.length + 4);
+        thinned += fan.tess.bounds(b).filter((y) => y > a && y < z && !set.has(y)).length;
+      }
+    }
+    expect(thinned).toBeGreaterThan(0);
+  });
+});

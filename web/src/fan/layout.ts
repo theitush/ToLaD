@@ -364,16 +364,63 @@ export class Tess {
   }
 
   /**
+   * World x that branch b's strand stays within between heights y0 < y1
+   * (for culling: conservative, not tight). Its own column: about its centre
+   * (which moves monotonically along its peel), at most its widest ever
+   * (Population.max); each parent column's slice: its place at both ends of
+   * the stretch (nodeLeftAt is monotonic too).
+   */
+  xRange(b: FanBranch, y0: number, y1: number): [number, number] {
+    const lo = Math.max(y0, b.tipY);
+    const hi = Math.min(y1, this.bottom);
+    let L = Infinity;
+    let R = -Infinity;
+    if (!(hi >= lo)) return [L, R];
+    if (lo < b.splitY) {
+      const tc = b.x0 + b.baseW / 2;
+      const c = (y: number) => tc + (b.cx - tc) * peelU(this.edge, b.splitY, b.leanY, y);
+      const ca = c(lo);
+      const cb = c(Math.min(hi, b.splitY));
+      const hw = (b.unit * g(b.pop.max, this.mode)) / 2;
+      L = Math.min(ca, cb) - hw;
+      R = Math.max(ca, cb) + hw;
+    }
+    const p = b.path;
+    for (let k = 0; k < p.length; k++) {
+      const a = Math.max(lo, p[k].y);
+      const z = Math.min(hi, k + 1 < p.length ? p[k + 1].y : this.bottom);
+      if (!(z >= a)) continue;
+      for (const y of [a, z]) {
+        const x = nodeLeftAt(p[k].node, y) + p[k].off;
+        L = Math.min(L, x);
+        R = Math.max(R, x + b.baseW);
+      }
+    }
+    // (A hair of slack for rounding.)
+    const pad = 1e-6 * Math.max(1, Math.abs(L), Math.abs(R)) + (R - L) * 1e-3;
+    return [L - pad, R + pad];
+  }
+
+  private readonly splits = new Map<FanBranch, Set<number>>();
+  /** The heights of the splits branch b passes (a cut always falls on each). */
+  private splitYs(b: FanBranch): Set<number> {
+    let v = this.splits.get(b);
+    if (!v) this.splits.set(b, (v = new Set(b.path.map((s) => s.y))));
+    return v;
+  }
+
+  /**
    * The heights to draw branch b at between y0 < y1 (world), ascending,
-   * y0 and y1 included: its features there and the dyadic grid at the
-   * finest spacing over `maxPx` screen px (sy: px per world unit of height).
+   * y0 and y1 included: its features there (thinned to a few per px) and
+   * the dyadic grid at the finest spacing over `maxPx` screen px (sy: px per
+   * world unit of height).
    */
   cuts(b: FanBranch, y0: number, y1: number, sy: number, maxPx = 6): number[] {
     const lo = Math.max(y0, b.tipY);
     const hi = Math.min(y1, this.bottom);
     if (!(hi > lo)) return [];
     const f = this.bounds(b);
-    const out: number[] = [lo];
+    const feat: number[] = [];
     // Features (bisect to the first above lo).
     let a = 0;
     let z = f.length;
@@ -382,25 +429,43 @@ export class Tess {
       if (f[m] <= lo) a = m + 1;
       else z = m;
     }
-    for (let k = a; k < f.length && f[k] < hi; k++) out.push(f[k]);
-    // The grid.
+    // Features closer on screen than a quarter of maxPx are thinned (a history can hold thousands, most
+    // sub-pixel when zoomed out): at most one per cell of a dyadic grid that fine, so the same ones at
+    // every pan; the splits (the green lane steps there) are always kept.
+    const cell = Math.pow(2, Math.floor(Math.log2(Math.max(1e-12, maxPx / 4 / Math.max(1e-12, sy)))));
+    const keep = this.splitYs(b);
+    let last = NaN;
+    for (let k = a; k < f.length && f[k] < hi; k++) {
+      const c = Math.floor(f[k] / cell);
+      if (c === last && !keep.has(f[k])) continue;
+      last = c;
+      feat.push(f[k]);
+    }
+    // The grid, merged with the features (both ascending) and deduplicated.
     const step = Math.pow(2, Math.floor(Math.log2(Math.max(1e-9, maxPx / Math.max(1e-12, sy)))));
-    if ((hi - lo) / step < 20000) for (let y = Math.floor(lo / step + 1) * step; y < hi; y += step) out.push(y);
-    out.push(hi);
-    out.sort((p, q) => p - q);
-    const u: number[] = [];
-    for (const y of out) if (!u.length || y - u[u.length - 1] > 1e-9 * Math.max(1, Math.abs(y))) u.push(y);
+    const u: number[] = [lo];
+    const put = (y: number) => {
+      if (y - u[u.length - 1] > 1e-9 * Math.max(1, Math.abs(y))) u.push(y);
+    };
+    let j = 0;
+    if ((hi - lo) / step < 20000)
+      for (let y = Math.floor(lo / step + 1) * step; y < hi; y += step) {
+        while (j < feat.length && feat[j] <= y) put(feat[j++]);
+        put(y);
+      }
+    while (j < feat.length) put(feat[j++]);
+    put(hi);
     if (u[u.length - 1] < hi) u.push(hi);
     return u;
   }
 }
 
-/** Left edge of a branch at world y: its own column (about its centre, peeling off its parent) above its split, then its place in each parent column below. */
-export function leftAt(b: FanBranch, y: number): number {
+/** Left edge of a branch at world y: its own column (about its centre, peeling off its parent) above its split, then its place in each parent column below. (w: its width there, if known: lanesAt(b, y)[0].) */
+export function leftAt(b: FanBranch, y: number, w?: number): number {
   if (y < b.splitY) {
     const tc = b.x0 + b.baseW / 2;
     const c = tc + (b.cx - tc) * peelU(b.tess.edge, b.splitY, b.leanY, y);
-    return c - lanesAt(b, y)[0] / 2;
+    return c - (w ?? lanesAt(b, y)[0]) / 2;
   }
   const s = segAt(b, y);
   return nodeLeftAt(s.node, y) + s.off;
@@ -495,20 +560,28 @@ class Packer {
     return c;
   }
   shift(c: Contour, dx: number): Contour {
-    return { L: c.L.map((v) => v + dx), R: c.R.map((v) => v + dx), lw: c.lw.slice(), rw: c.rw.slice() };
+    const L = new Float64Array(CELLS);
+    const R = new Float64Array(CELLS);
+    for (let j = 0; j < CELLS; j++) {
+      L[j] = c.L[j] + dx;
+      R[j] = c.R[j] + dx;
+    }
+    return { L, R, lw: c.lw.slice(), rw: c.rw.slice() };
   }
   copy(c: Contour): Contour {
     return { L: c.L.slice(), R: c.R.slice(), lw: c.lw.slice(), rw: c.rw.slice() };
   }
-  /** Adds c into `into` (the outline of both). */
-  union(into: Contour, c: Contour): void {
+  /** Adds c, shifted by a then b, into `into` (the outline of both). (The shifts in place, no copy: shift(shift(c, a), b), to the bit.) */
+  union(into: Contour, c: Contour, a = 0, b = 0): void {
     for (let j = 0; j < CELLS; j++) {
-      if (c.L[j] < into.L[j]) {
-        into.L[j] = c.L[j];
+      const l = c.L[j] + a + b;
+      const r = c.R[j] + a + b;
+      if (l < into.L[j]) {
+        into.L[j] = l;
         into.lw[j] = c.lw[j];
       }
-      if (c.R[j] > into.R[j]) {
-        into.R[j] = c.R[j];
+      if (r > into.R[j]) {
+        into.R[j] = r;
         into.rw[j] = c.rw[j];
       }
     }
@@ -531,16 +604,16 @@ class Packer {
   gap(frac: number, wa: number, wb: number): number {
     return Math.max(frac * Math.min(wa, wb), MIN_GAP_FRAC * this.W);
   }
-  /** The least shift that puts c to the right of `acc` by the gap wherever both have columns (−∞: nowhere). */
-  right(acc: Contour, c: Contour, frac: number): number {
+  /** The least shift that puts c (shifted by a) to the right of `acc` by the gap wherever both have columns (−∞: nowhere). */
+  right(acc: Contour, c: Contour, frac: number, a = 0): number {
     let d = -Infinity;
-    for (let j = 0; j < CELLS; j++) if (acc.R[j] > -Infinity && c.L[j] < Infinity) d = Math.max(d, acc.R[j] + this.gap(frac, acc.rw[j], c.lw[j]) - c.L[j]);
+    for (let j = 0; j < CELLS; j++) if (acc.R[j] > -Infinity && c.L[j] < Infinity) d = Math.max(d, acc.R[j] + this.gap(frac, acc.rw[j], c.lw[j]) - (c.L[j] + a));
     return d;
   }
-  /** The least shift (most negative) that puts c to the left of `acc` by the gap (+∞: nowhere). */
-  left(acc: Contour, c: Contour, frac: number): number {
+  /** The least shift (most negative) that puts c (shifted by a) to the left of `acc` by the gap (+∞: nowhere). */
+  left(acc: Contour, c: Contour, frac: number, a = 0): number {
     let d = Infinity;
-    for (let j = 0; j < CELLS; j++) if (acc.L[j] < Infinity && c.R[j] > -Infinity) d = Math.min(d, acc.L[j] - this.gap(frac, acc.lw[j], c.rw[j]) - c.R[j]);
+    for (let j = 0; j < CELLS; j++) if (acc.L[j] < Infinity && c.R[j] > -Infinity) d = Math.min(d, acc.L[j] - this.gap(frac, acc.lw[j], c.rw[j]) - (c.R[j] + a));
     return d;
   }
   /** Whether a lies inside b at every height (never makes a neighbour move further). */
@@ -807,7 +880,7 @@ function placeRiver(root: FanNode, P: Packer, time: TimeScale, mode: WidthMode):
       else {
         const dx = P.right(acc, c, GAP_FRAC);
         move(k, dx);
-        P.union(acc, P.shift(c, dx));
+        P.union(acc, c, dx);
       }
     }
     // Its column: where the farthest peels left and right are equal.
@@ -996,6 +1069,13 @@ const SIDES = new WeakMap<CladeRec, Map<Split, Map<WidthMode, Map<Split, boolean
 function chooseSides(root: FanNode, P: Packer, known?: Map<Split, boolean>): { plans: Map<FanNode, Plan>; sides: Map<Split, boolean> } {
   const better = (p: Cand, q: Cand) => (Math.abs(p.cost - q.cost) > 1e-9 ? p.cost - q.cost : p.flips - q.flips);
   // One choice at v: its daughters (table order), their candidates, mirrored or not.
+  // A species' outline on its slot (read only: the same for every plan).
+  const leaves = new Map<FanBranch, Contour>();
+  const leafOut = (b: FanBranch): Contour => {
+    let c = leaves.get(b);
+    if (!c) leaves.set(b, (c = P.shift(P.leaf(b), b.baseW / 2)));
+    return c;
+  };
   const plan = (v: FanNode, kc: (Cand | null)[], flip: boolean): Cand => {
     const idx = v.kids.map((_, i) => i);
     if (flip) idx.reverse();
@@ -1004,7 +1084,7 @@ function chooseSides(root: FanNode, P: Packer, known?: Map<Split, boolean>): { p
     const outl = idx.map((i): Contour => {
       const c = kc[i];
       const k = v.kids[i];
-      return c ? c.out : P.shift(P.leaf(k as FanBranch), (k as FanBranch).baseW / 2);
+      return c ? c.out : leafOut(k as FanBranch);
     });
     const off: number[] = [];
     let o = 0;
@@ -1019,17 +1099,15 @@ function chooseSides(root: FanNode, P: Packer, known?: Map<Split, boolean>): { p
     const out = P.shift(outl[im], off[im]);
     let prev = 0;
     for (let i = im + 1; i < order.length; i++) {
-      const c = P.shift(outl[i], off[i]);
-      dx[i] = Math.max(prev, P.right(out, c, LEAN_GAP_FRAC), 0);
+      dx[i] = Math.max(prev, P.right(out, outl[i], LEAN_GAP_FRAC, off[i]), 0);
       prev = dx[i];
-      P.union(out, P.shift(c, dx[i]));
+      P.union(out, outl[i], off[i], dx[i]);
     }
     prev = 0;
     for (let i = im - 1; i >= 0; i--) {
-      const c = P.shift(outl[i], off[i]);
-      dx[i] = Math.min(prev, P.left(out, c, LEAN_GAP_FRAC), 0);
+      dx[i] = Math.min(prev, P.left(out, outl[i], LEAN_GAP_FRAC, off[i]), 0);
       prev = dx[i];
-      P.union(out, P.shift(c, dx[i]));
+      P.union(out, outl[i], off[i], dx[i]);
     }
     // Its outline: the daughters' after their leans, their hull with its band over the leans (at most LEAN_MAX_FRAC of the
     // height to a daughter's next event), its band down to its parent's split.
