@@ -407,9 +407,11 @@ export class Population {
     for (let k = 0; k < K.length; k++) {
       const c = K[k];
       out.push(c.ago);
-      if (c.H > 0) for (let i = -16; i <= 16; i++) out.push(c.ago + (c.H * i) / 16);
-      if (k + 1 < K.length) {
-        // Along the stretch to the next point: ~every 0.005 of the axis.
+      // (A corner where the slope hardly turns, as between the sub-spans of one log-linear stretch, needs no fillet samples.)
+      const turn = k > 0 && k + 1 < K.length ? Math.abs(c.m - K[k - 1].m) : k > 0 ? Math.abs(K[k - 1].m) : 0;
+      if (c.H > 0 && turn * c.H > 1e-4) for (let i = -16; i <= 16; i++) out.push(c.ago + (c.H * i) / 16);
+      if (k + 1 < K.length && Math.abs(c.m * (K[k + 1].ago - c.ago)) > 1e-6) {
+        // Along the stretch to the next point (a held one is flat): ~every 0.005 of the axis.
         const s0 = axisS(c.ago);
         const s1 = axisS(K[k + 1].ago);
         const n = Math.min(400, Math.ceil((s1 - s0) / 0.005));
