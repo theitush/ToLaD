@@ -4,7 +4,7 @@ import { createElement } from 'react';
 import { describe, expect, it } from 'vitest';
 import { FELIDAE, type SpeciesRec } from './panthera';
 import { fold, matchRank, searchSpecies } from './search';
-import { SearchPanel } from './Search';
+import { SearchPanel } from './SearchPanel';
 import { FanView, type Selection } from './view';
 
 const names = (q: string, all: { common: string; sci: string }[] = FELIDAE.species) => searchSpecies(all, q).map((s) => s.common);

@@ -11,7 +11,7 @@ import { HistorySpark } from './HistorySpark';
 import type { EdgeStyle, WidthMode } from './layout';
 import { FELIDAE, NATURAL_META, type HistEvent, type SpeciesRec } from './panthera';
 import { population } from './population';
-import { MagnifierIcon, SearchPanel } from './Search';
+import { MagnifierIcon, SearchPanel } from './SearchPanel';
 import { statusOf } from './status';
 import { FanView, fmtInt, formatYearsAgo, type IndInfo, type Lineage, type Selection } from './view';
 
