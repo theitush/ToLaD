@@ -1004,24 +1004,24 @@ export class FanView implements InputHandlers {
     const yb = this.fan.trunkBottom.y;
     const [, sTop] = this.toWorld(0, -20);
     const [, sBot] = this.toWorld(0, this.h + 20);
-    const ys = this.fan.tess.cuts(b, Math.max(b.tipY, sTop), Math.min(yb, sBot), this.cam.sy, 4);
+    // The column's kept samples (twigs.ts ColumnPath: those where its chords run straight on screen dropped).
+    const P = this.model(b).path;
+    const [i0, i1] = P.span(this.cam.sx, this.cam.sy, sTop, Math.min(yb, sBot));
+    const ys = P.ys;
+    const vals = P.vals;
     // Spine at left + hw: the ribbon spans offsets [hw - w, hw] to its left (nx = -1).
-    // (At a split the green lane changes, the strand leaving its parent's prefix: a point either side, the same edges.)
-    const splits = new Set(b.path.map((s) => s.y));
+    // (Where the lanes step, as at a split, where the strand leaves its parent's prefix: a point either side.)
     const pts: RibbonPt[] = [];
-    const push = (y: number, ye: number) => {
-      const L = laneAt(b, ye);
-      const [px, py] = this.toScreen(leftAt(b, y, ye === y ? L.w : undefined) + hw, y);
-      pts.push({ x: px, y: py, nx: -1, ny: 0, w: L.w, f: L.f });
+    const push = (y: number, o: number) => {
+      const w = vals[o + 1];
+      const [px, py] = this.toScreen(vals[o] + hw, y);
+      pts.push({ x: px, y: py, nx: -1, ny: 0, w, f: w > 0 ? vals[o + 2] / w : 0 });
     };
-    for (let i = ys.length - 1; i >= 0; i--) {
+    for (let i = i1; i >= i0; i--) {
       const y = ys[i];
-      if (!splits.has(y)) push(y, y);
-      else {
-        const e = 1e-9 * Math.max(1, Math.abs(y));
-        push(y, y + e);
-        push(y, y - e);
-      }
+      const o = 8 * i;
+      push(y, o);
+      if (P.steps[i]) push(y, o + 4);
     }
     return pts;
   }

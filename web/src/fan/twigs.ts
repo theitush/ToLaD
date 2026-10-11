@@ -192,14 +192,14 @@ export class TwigModel {
 
   /** Branch width at world height y (the fan's width function, layout.ts). */
   widthAt(y: number): number {
-    return laneAt(this.b, y).w;
+    return this.at(y)[1];
   }
 
   /** Branch width and left edge at the height of generation g's births (row centre). */
   row(g: number): { y: number; left: number; w: number; n: number } {
     const y = this.yOf((g + 0.5) * this.GL);
-    const w = this.widthAt(y);
-    return { y, left: leftAt(this.b, y, w), w, n: this.size(g) };
+    const r = this.at(y);
+    return { y, left: r[0], w: r[1], n: this.size(g) };
   }
 
   /**
@@ -208,8 +208,37 @@ export class TwigModel {
    * the right (thinning as they peel off). World units.
    */
   lanes(y: number): { left: number; w: number; gw: number } {
+    const r = this.at(y);
+    return { left: r[0], w: r[1], gw: r[2] };
+  }
+
+  /** [left, w, gw, pitch] at y into out[o..o + 3], worked out (not remembered: at()). */
+  sample(y: number, out: Float64Array, o: number): void {
     const L = laneAt(this.b, y);
-    return { left: leftAt(this.b, y, L.w), w: L.w, gw: L.gw };
+    out[o] = leftAt(this.b, y, L.w);
+    out[o + 1] = L.w;
+    out[o + 2] = L.gw;
+    out[o + 3] = this.pitchOf(y, L.w);
+  }
+
+  /** The lanes at the fan's sample heights (CutMemo), kept from frame to frame. */
+  readonly cutMemo = new CutMemo(this);
+  /** The column's edges as drawn (ColumnPath). */
+  readonly path: ColumnPath = new ColumnPath(this);
+
+  private readonly atMemo = new Map<number, Float64Array>();
+  /**
+   * lanes() and pitch() at y: [left, w, gw, pitch], remembered (#32: the fan
+   * samples at world-fixed heights, mostly the same ones frame after frame).
+   */
+  at(y: number): Float64Array {
+    let r = this.atMemo.get(y);
+    if (r) return r;
+    if (this.atMemo.size >= 1 << 15) this.atMemo.clear();
+    r = new Float64Array(4);
+    this.sample(y, r, 0);
+    this.atMemo.set(y, r);
+    return r;
   }
 
   // ---- the slot lattice ----------------------------------------------------------
@@ -222,9 +251,13 @@ export class TwigModel {
    * column's width over the individuals alive there.
    */
   pitch(y: number): number {
+    return this.mode === 'linear' ? this.b.unit : this.at(y)[3];
+  }
+
+  /** pitch(y), the column's width there w. */
+  private pitchOf(y: number, w: number): number {
     const lin = this.b.unit;
     if (this.mode === 'linear') return lin;
-    const w = laneAt(this.b, y).w;
     const n = this.b.pop.stepAt(Math.min(this.b.t0, this.time.ageAt(y))).n;
     // (Never wider than the column: one slot at least, where the steps count under one alive.)
     return w > 0 && n > 0 ? w / Math.max(1, n) : lin;
@@ -232,23 +265,26 @@ export class TwigModel {
 
   /** Green slots at height y (those alive then with living descendants today). */
   greenSlots(y: number): number {
-    const L = laneAt(this.b, y);
-    return L.gw > 0 ? Math.max(1, Math.round(L.gw / this.pitch(y))) : 0;
+    const r = this.at(y);
+    return r[2] > 0 ? Math.max(1, Math.round(r[2] / r[3])) : 0;
   }
 
   /** All the column's slots at height y (not an integer: the last one may be cut). */
   totalSlots(y: number): number {
-    return laneAt(this.b, y).w / this.pitch(y);
+    const r = this.at(y);
+    return r[1] / r[3];
   }
 
   /** x of slot K's centre at height y. */
   slotX(K: number, y: number): number {
-    return leftAt(this.b, y) + (K + 0.5) * this.pitch(y);
+    const r = this.at(y);
+    return r[0] + (K + 0.5) * r[3];
   }
 
   /** The slot under x at height y (may be outside the column). */
   slotAt(x: number, y: number): number {
-    return Math.floor((x - leftAt(this.b, y)) / this.pitch(y));
+    const r = this.at(y);
+    return Math.floor((x - r[0]) / r[3]);
   }
 
   /**
@@ -718,34 +754,259 @@ interface Stretch {
   nG: number;
 }
 
-/** The column's chords between yTop < yBot. */
+/**
+ * A column's lanes at the fan's sample heights (Tess.cuts), just below and
+ * just above each (a split steps the green lane there; each chord takes its
+ * ends from inside it), kept from frame to frame (#32): the samples are
+ * world-fixed, mostly the same ones as last frame, so each frame walks the
+ * last one's (both ascending) and works out only the new heights.
+ * Per sample k: below at [8k .. 8k + 3], above at [8k + 4 .. 8k + 7] (TwigModel.sample).
+ */
+export class CutMemo {
+  private ys = new Float64Array(0);
+  private v = new Float64Array(0);
+  /** The heights of the last update(), and their values. */
+  n = 0;
+  constructor(private readonly m: { sample(y: number, out: Float64Array, o: number): void }) {}
+  update(cuts: ArrayLike<number>): Float64Array {
+    const n = cuts.length;
+    const ys = new Float64Array(n);
+    const v = new Float64Array(8 * n);
+    const oy = this.ys;
+    const ov = this.v;
+    let j = 0;
+    for (let k = 0; k < n; k++) {
+      const y = cuts[k];
+      ys[k] = y;
+      while (j < this.n && oy[j] < y) j++;
+      if (j < this.n && oy[j] === y) {
+        for (let i = 0; i < 8; i++) v[8 * k + i] = ov[8 * j + i];
+        continue;
+      }
+      const e = 1e-9 * Math.max(1, Math.abs(y));
+      this.m.sample(y + e, v, 8 * k);
+      this.m.sample(y - e, v, 8 * k + 4);
+    }
+    this.ys = ys;
+    this.v = v;
+    this.n = n;
+    return v;
+  }
+}
+
+/** How far (screen px) a merged chord may stray from the samples it drops (Sleeve). */
+export const CHORD_TOL_PX = 0.2;
+
+/**
+ * Merging a polyline's samples into longer chords (#32): a run from its first
+ * sample may end at a later one while every sample in between stays within
+ * its tolerance of the straight chord, value by value (the sleeve: the
+ * slopes from the run's start that keep them all in). Screen px, y monotone.
+ */
+export class Sleeve {
+  private y0 = 0;
+  private readonly v0: Float64Array;
+  private readonly lo: Float64Array;
+  private readonly hi: Float64Array;
+  private n = 0;
+  constructor(readonly k: number) {
+    this.v0 = new Float64Array(k);
+    this.lo = new Float64Array(k);
+    this.hi = new Float64Array(k);
+  }
+  /** A new run from (y, v). */
+  start(y: number, v: ArrayLike<number>): void {
+    this.y0 = y;
+    for (let i = 0; i < this.k; i++) {
+      this.v0[i] = v[i];
+      this.lo[i] = -Infinity;
+      this.hi[i] = Infinity;
+    }
+    this.n = 0;
+  }
+  /** Take (y, v) in as a sample the run passes (within tol[i] of value i). */
+  pass(y: number, v: ArrayLike<number>, tol: ArrayLike<number>): void {
+    const du = Math.abs(y - this.y0);
+    for (let i = 0; i < this.k; i++) {
+      this.lo[i] = Math.max(this.lo[i], (v[i] - tol[i] - this.v0[i]) / du);
+      this.hi[i] = Math.min(this.hi[i], (v[i] + tol[i] - this.v0[i]) / du);
+    }
+    this.n++;
+  }
+  /** Can the run end at (y, v), keeping every sample passed within its tolerance? */
+  fits(y: number, v: ArrayLike<number>): boolean {
+    const du = Math.abs(y - this.y0);
+    if (!(du > 0)) return false;
+    for (let i = 0; i < this.k; i++) {
+      const s = (v[i] - this.v0[i]) / du;
+      if (!(s >= this.lo[i] && s <= this.hi[i])) return false;
+    }
+    return true;
+  }
+}
+
+/**
+ * A column's edges as drawn (#32): the fan's samples (Tess.cuts) with those
+ * dropped where the chords either side of them run straight on screen (within
+ * CHORD_TOL_PX at its left and right edges and its green lane's, its pitch
+ * across the slots: Sleeve), over the screen and a screen beyond it either
+ * way, kept while the zoom stays within PATH_ZOOM of the one it was made at
+ * (the dropped samples stay within the tolerance, scaled) and the cuts' grid
+ * is the same: a pinch or a pan mostly redraws the same few chords instead
+ * of sampling the column anew every frame. Per kept sample k, in world units:
+ * the lanes just below it at vals[8k .. 8k + 3] (the chord from it down),
+ * just above it at [8k + 4 .. 8k + 7] (the chord up to it): CutMemo.
+ */
+export class ColumnPath {
+  ys = new Float64Array(0);
+  vals = new Float64Array(0);
+  /** Per kept sample: 1 where the lanes step (left, width or green width differ just below and just above: a split). */
+  steps = new Uint8Array(0);
+  n = 0;
+  private sxRef = 0;
+  private grid = NaN;
+  private yLo = 0;
+  private yHi = 0;
+  constructor(private readonly m: TwigModel) {}
+
+  /** The kept samples over [lo, hi] (world): [i0, i1], the last at or above lo and the first at or below hi. */
+  span(sx: number, sy: number, lo: number, hi: number): [number, number] {
+    const b = this.m.b;
+    lo = Math.max(lo, b.tipY);
+    hi = Math.min(hi, b.tess.bottom);
+    if (!(hi > lo)) return [0, -1];
+    const grid = Math.floor(Math.log2(4 / Math.max(1e-12, sy)));
+    const z = Math.abs(Math.log(sx / this.sxRef));
+    if (!(z < Math.log(PATH_ZOOM)) || grid !== this.grid || lo < this.yLo || hi > this.yHi) this.build(sx, sy, lo, hi, grid);
+    // (Bisect: the last kept at or above lo, the first at or below hi.)
+    const ys = this.ys;
+    let a = 0;
+    let e = this.n;
+    while (a < e) {
+      const h = (a + e) >> 1;
+      if (ys[h] <= lo) a = h + 1;
+      else e = h;
+    }
+    const i0 = Math.max(0, a - 1);
+    a = i0;
+    e = this.n;
+    while (a < e) {
+      const h = (a + e) >> 1;
+      if (ys[h] < hi) a = h + 1;
+      else e = h;
+    }
+    return [i0, Math.min(this.n - 1, a)];
+  }
+
+  private build(sx: number, sy: number, lo: number, hi: number, grid: number): void {
+    const b = this.m.b;
+    const d = hi - lo;
+    const A = Math.max(b.tipY, lo - d);
+    const B = Math.min(b.tess.bottom, hi + d);
+    const cuts = b.tess.cuts(b, A, B, sy, 4);
+    const v = this.m.cutMemo.update(cuts);
+    const n = cuts.length;
+    const ys = new Float64Array(n);
+    const out = new Float64Array(8 * n);
+    const steps = new Uint8Array(n);
+    // In world units: the tolerance at this zoom, a little under CHORD_TOL_PX (the zoom moves on).
+    const tolX = CHORD_TOL_PX / PATH_ZOOM / sx;
+    // The lanes step at the splits (the green lane: the strand leaves its parent's prefix there).
+    const splits = b.path;
+    let sp = 0;
+    const isSplit = (y: number) => {
+      while (sp < splits.length && splits[sp].y < y) sp++;
+      return sp < splits.length && splits[sp].y === y;
+    };
+    let k = 0;
+    const keep = (i: number) => {
+      ys[k] = cuts[i];
+      for (let j = 0; j < 8; j++) out[8 * k + j] = v[8 * i + j];
+      steps[k] = isSplit(cuts[i]) ? 1 : 0;
+      k++;
+    };
+    const val = new Float64Array(4);
+    const tol = new Float64Array(4);
+    // Per sample, from the lanes at offset o: left, right and green edges, and the pitch.
+    const ends = (o: number) => {
+      val[0] = v[o];
+      val[1] = v[o] + v[o + 1];
+      val[2] = v[o + 2] > 0 ? v[o] + v[o + 2] : 0;
+      val[3] = v[o + 3];
+      return val;
+    };
+    const sl = new Sleeve(4);
+    keep(0);
+    sl.start(cuts[0], ends(0));
+    for (let i = 1; i + 1 < n; i++) {
+      const y = cuts[i];
+      const o = 8 * i;
+      // A sample may go only where the lanes go on through it (not at a split, where the green lane
+      // steps), its chords both drawn or both not (a column of no width), green or not alike.
+      const w0 = v[o + 1] > 0;
+      const g0 = v[o + 2] > 0;
+      // (Elsewhere both the lanes just below it and just above it stay within the tolerance.)
+      const soft =
+        !isSplit(y) &&
+        w0 === v[o - 8 + 1] > 0 &&
+        w0 === v[o + 8 + 4 + 1] > 0 &&
+        g0 === v[o - 8 + 2] > 0 &&
+        g0 === v[o + 8 + 4 + 2] > 0;
+      if (soft) {
+        tol[0] = tol[1] = tol[2] = tolX;
+        // (The pitch within the tolerance over all the column's slots: its lines stay within it.)
+        tol[3] = (tolX * v[o + 3]) / Math.max(v[o + 3], v[o + 1]);
+        sl.pass(y, ends(o), tol);
+        sl.pass(y, ends(o + 4), tol);
+        if (sl.fits(cuts[i + 1], ends(8 * (i + 1) + 4))) continue;
+      }
+      keep(i);
+      sl.start(y, ends(o));
+    }
+    if (n > 1) keep(n - 1);
+    this.ys = ys;
+    this.vals = out;
+    this.steps = steps;
+    this.n = k;
+    this.sxRef = sx;
+    this.grid = grid;
+    this.yLo = A;
+    this.yHi = B;
+  }
+}
+
+/** How far the zoom may move from the one a ColumnPath was made at (either way) before it is made again. */
+const PATH_ZOOM = 1.4;
+
+/** The column's chords between yTop < yBot (ColumnPath): over the screen, the first and last reaching a little past it. */
 function stretches(v: TwigView, m: TwigModel, yTop: number, yBot: number): Stretch[] {
-  const cuts = m.b.tess.cuts(m.b, yTop, yBot, v.sy, 4);
-  const at = (y: number) => {
-    const L = m.lanes(y);
-    const P = m.pitch(y);
-    return { L, P, colX: v.toScreen(L.left, y)[0], xG: L.gw > 0 ? v.toScreen(L.left + L.gw, y)[0] : -1e9 };
+  const P = m.path;
+  const [i0, i1] = P.span(v.sx, v.sy, yTop, yBot);
+  const ys = P.ys;
+  const vals = P.vals;
+  const at = (y: number, o: number) => {
+    const L = { left: vals[o], w: vals[o + 1], gw: vals[o + 2] };
+    return { L, P: vals[o + 3], colX: v.toScreen(L.left, y)[0], xG: L.gw > 0 ? v.toScreen(L.left + L.gw, y)[0] : -1e9 };
   };
   const out: Stretch[] = [];
-  // (Each chord's ends from inside it: the green lane changes at a split, where the strand leaves its parent's prefix.)
-  const eps = (y: number) => 1e-9 * Math.max(1, Math.abs(y));
-  for (let c = 0; c + 1 < cuts.length; c++) {
-    const a = at(cuts[c] + eps(cuts[c]));
-    const B = at(cuts[c + 1] - eps(cuts[c + 1]));
+  for (let c = i0; c < i1; c++) {
+    const a = at(ys[c], 8 * c);
+    const B = at(ys[c + 1], 8 * (c + 1) + 4);
     if (!(a.L.w > 0) && !(B.L.w > 0)) continue;
-    const ym = (cuts[c] + cuts[c + 1]) / 2;
+    const ym = (ys[c] + ys[c + 1]) / 2;
     const green = a.L.gw > 0 || B.L.gw > 0;
     // (A green lane that starts within the chord starts at the column's left edge.)
     const xGa = a.L.gw > 0 ? a.xG : a.colX;
     const xGb = B.L.gw > 0 ? B.xG : B.colX;
     out.push({
-      ya: cuts[c],
-      yb: cuts[c + 1],
+      ya: ys[c],
+      yb: ys[c + 1],
       colX: [a.colX, B.colX],
       xG: green ? [xGa, xGb] : [-1e9, -1e9],
       pitchPx: [a.P * v.sx, B.P * v.sx],
       nT: [a.L.w / a.P, B.L.w / B.P],
-      nG: green ? m.greenSlots(ym) : 0,
+      // (Only whether the chord has a green lane matters to the mesh: counted only where it starts or ends in the chord.)
+      nG: !green ? 0 : a.L.gw > 0 && B.L.gw > 0 ? 1 : m.greenSlots(ym),
     });
   }
   return out;
@@ -948,6 +1209,9 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
   if (wyBot < b.tipY || wyTop > yFirst) return null;
   const yTop = Math.max(wyTop, b.tipY);
   const yBot = Math.min(wyBot, yFirst);
+  // Wholly left or right of the screen (zoomed in, most columns are): nothing to sample.
+  const xrB = b.tess.xRange(b, yTop, yBot);
+  if (xrB[1] < xr(yTop)[0] || xrB[0] > xr(yTop)[1]) return null;
   // Off the branch's column entirely? (Every few px down the screen: near a split the column
   // leans, and zoomed in it can cross the screen in a short stretch while off it elsewhere.)
   let onScreen = false;

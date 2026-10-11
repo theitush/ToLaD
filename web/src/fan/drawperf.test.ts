@@ -114,6 +114,12 @@ function stubs() {
   return { canvas, calls };
 }
 
+const CPU = !!process.env.FANPERF_CPU;
+const cpuMs = () => {
+  const u = (process as unknown as { cpuUsage(): { user: number; system: number } }).cpuUsage();
+  return (u.user + u.system) / 1000;
+};
+
 function q(a: number[], p: number) {
   const s = [...a].sort((x, y) => x - y);
   return s[Math.min(s.length - 1, Math.floor(p * s.length))];
@@ -211,7 +217,7 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
         },
       ]);
     }
-    out('scene                 p50    p95    max   (ms, node)');
+    out(`scene                 p50    p95    max   (ms, node${CPU ? ' CPU time' : ''})`);
     const only = process.env.FANPERF_ONLY ? new RegExp(process.env.FANPERF_ONLY) : null;
     for (const [name, set] of scenes) {
       if (only && !only.test(name)) continue;
@@ -238,9 +244,10 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
       for (let k = 0; k < N; k++) {
         v.zoomAbout(195, 422, k < 45 ? 1.01 : 1 / 1.01);
         v.pan(k % 2 ? 0.5 : -0.5, 0);
-        const t = performance.now();
+        // (FANPERF_CPU=1: this process's CPU time, not the wall clock: steadier on a busy machine.)
+        const t = CPU ? cpuMs() : performance.now();
         v.draw();
-        times.push(performance.now() - t);
+        times.push((CPU ? cpuMs() : performance.now()) - t);
         inst = Math.max(inst, gl.mesh.n);
         rects = Math.max(rects, gl.under.n);
       }
