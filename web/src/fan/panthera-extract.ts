@@ -34,6 +34,24 @@ export interface HistSegment {
   kind: string;
 }
 
+/** A curated event in a species' past (pipeline/history `[[event]]`, ToLaD#141). */
+export interface HistEvent {
+  kind: 'bottleneck';
+  /** The window, years before present: from `fromYa` (older) up to `toYa`. */
+  fromYa: number;
+  toYa: number;
+  /** 2–5 words: the label on the fan. */
+  title: string;
+  summary: string;
+  /** Copied verbatim from the source. */
+  quote: string;
+  cite: string;
+  url: string;
+  grade: Grade;
+  /** The part of the species' range it concerns ('' = the whole species). */
+  region: string;
+}
+
 export interface HistoryRec {
   /** "counts": the curve is the species' births (EVER, procgen); "display": shown only. */
   use: string;
@@ -53,6 +71,8 @@ export interface HistoryRec {
    * '' when the history has no genomic curve.
    */
   deepJoin?: string;
+  /** Curated events (format v1.5, ToLaD#141): bottlenecks, oldest first; marked on the column, quoted on the card. */
+  events: HistEvent[];
   /** Generation length and mean lifespan (years) the segments were compiled with. */
   G: number;
   L: number;
@@ -238,6 +258,18 @@ export function extractClade(skeleton: ArrayBuffer | Uint8Array, tile: ArrayBuff
         notes: (h.notes ?? (h.modelled === 'rangeloss' ? trend?.notes : '') ?? '').trim(),
         modelled: h.modelled ?? null,
         deepJoin: String(h.deep_join ?? '').trim(),
+        events: ((h.events ?? []) as any[]).map((e) => ({
+          kind: e.kind,
+          fromYa: e.from_ya,
+          toYa: e.to_ya,
+          title: e.title,
+          summary: e.summary,
+          quote: e.quote,
+          cite: e.cite,
+          url: e.url,
+          grade: e.grade,
+          region: e.region ?? '',
+        })),
         G: h.G,
         L: h.L,
         nowYear: last ? last.year0 + last.generations * h.G : new Date().getFullYear(),

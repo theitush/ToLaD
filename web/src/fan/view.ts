@@ -10,7 +10,7 @@ import { clipPoly, FanCamera, STRAND_PX, type Camera } from './camera';
 import { laneAt, layoutFan, leftAt, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type EdgeStyle, type Fan, type FanBranch, type FanNode, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01 } from './meshgl';
-import { COLUMN_DIM, columnSpans } from './colstyle';
+import { COLUMN_DIM, columnSpans, EVENT_TINT, eventAt, eventSpans, type EventSpan } from './colstyle';
 import { bridgeInstances, type SplitStyle, type SplitWindow } from './gradual';
 import { drawTwigs, kLogAt, laneDim, LINEAGE, LIVING, TWIG_GRAY, TwigModel, type IndInfo, type TwigStats } from './twigs';
 import type { MeshBatch, RectBatch } from './meshgl';
@@ -79,6 +79,8 @@ export interface LabelSpot {
   /** The species (b) or the lineage (v) it names. */
   b?: FanBranch;
   v?: FanNode;
+  /** A curated event's label (ToLaD#141): its index in `b.sp.history.events`. */
+  ev?: number;
   text: string;
   rank: Rank;
   /** Centre x of the pill and its bottom (screen px): the text reads up from there. */
@@ -119,6 +121,26 @@ export function colSpansY(fan: Fan, b: FanBranch): [number, number, number][] {
   }
   return out;
 }
+
+/** Each branch's curated events (colstyle.ts eventSpans, ToLaD#141) in world y: `top` (younger) to `bot`; world-fixed. */
+export interface EventY extends EventSpan {
+  top: number;
+  bot: number;
+}
+const colEventCache = new WeakMap<FanBranch, EventY[]>();
+export function colEventsY(fan: Fan, b: FanBranch): EventY[] {
+  let out = colEventCache.get(b);
+  if (!out) {
+    out = eventSpans(b.sp, b.t0).map((s) => ({ ...s, top: fan.time.y(s.ago1 / 1e6), bot: fan.time.y(s.ago0 / 1e6) }));
+    colEventCache.set(b, out);
+  }
+  return out;
+}
+/** An event's tint is at least this tall and this wide on screen (px), so a short window on a thin column still reads. */
+const EVENT_MIN_PX = 3;
+const EVENT_MIN_W = 6;
+/** How far (px) above or below a window a touch still opens it. */
+const EVENT_REACH_PX = 10;
 
 const colBoxCache = new WeakMap<Fan, Map<FanBranch | FanNode, ColBox>>();
 function colBoxes(fan: Fan): Map<FanBranch | FanNode, ColBox> {
@@ -277,6 +299,19 @@ export function labelSpots(c: Screen, fan: Fan, top: number, measure: (text: str
     // Beside its branch: once the tip is off screen.
     out.push(...beside(id, text, rank, len, b, ty, Y(b.splitY), 1 - clamp01((ty - top) / 24), { b }));
   }
+  // Curated events (ToLaD#141): the title beside its window (or in the column when zoomed into it),
+  // centred on the window, while the window is on screen. After the species' names, before the lineages'.
+  for (const b of fan.branches) {
+    for (const s of colEventsY(fan, b)) {
+      const text = s.ev.title;
+      const len = measure(text) + 2 * LABEL_PAD;
+      const st = Y(s.top);
+      const sb = Y(s.bot);
+      const fit0 = clamp01((sb - top) / 12) * clamp01((bottom - st) / 12);
+      const rank: Rank = [0.5, b.width, b.index * 64 + s.k];
+      for (const p of beside(`e${b.sp.gid}.${s.k}`, text, rank, len, b, (st + sb) / 2 - len / 2, Y(b.splitY), fit0, { b })) out.push({ ...p, ev: s.k });
+    }
+  }
   // The lineages (parent columns, not the stem below the root: the clade's own label is there), while "now" is off screen.
   if (nowOn < 1) {
     for (const v of fan.nodes) {
@@ -341,6 +376,8 @@ export interface Selection {
   startMa?: number;
   /** A parent column touched (below the species' split): the lineage there, its numbers at the time touched. */
   lineage?: Lineage;
+  /** A curated event touched (its window on the column, or its label): the card explains it (ToLaD#141). */
+  event?: EventSpan;
 }
 
 /** A parent column at a time: the daughters' shared ancestors. */
@@ -402,6 +439,8 @@ export class FanView implements InputHandlers {
   twigStats = new Map<number, TwigStats>();
   /** Without the GPU layer: this frame's styled column stretches, faded once the individuals are drawn. */
   private heldRuns: { run: RibbonPt[]; hw: number; d: number }[] = [];
+  /** The event labels shown last frame (screen boxes): a tap on one opens its event. */
+  private eventLabels: { box: [number, number, number, number]; b: FanBranch; k: number }[] = [];
   private models = new Map<string, TwigModel>();
   private raf = 0;
   private anim: ((t: number) => boolean) | null = null;
@@ -688,6 +727,19 @@ export class FanView implements InputHandlers {
   }
 
   tap(x: number, y: number): void {
+    // An event's label: opens its event, the touch at the middle of its window on the column.
+    const lab = this.eventLabels.find(({ box }) => x >= box[0] - 4 && x <= box[2] + 4 && y >= box[1] - 4 && y <= box[3] + 4);
+    const ev = lab && colEventsY(this.fan, lab.b).find((s) => s.k === lab.k);
+    if (lab && ev) {
+      const ageMa = Math.sqrt(Math.max(1, ev.ago0) * Math.max(1, ev.ago1)) / 1e6;
+      const wy = this.fan.time.y(ageMa);
+      this.selected = lab.b.sp;
+      this.selInd = null;
+      this.touch = { x: leftAt(lab.b, wy) + laneAt(lab.b, wy).w / 2, ageMa };
+      this.onSelect({ sp: lab.b.sp, ageMa, startMa: lab.b.t0, event: ev });
+      this.request();
+      return;
+    }
     const b = this.hitBranch(x, y);
     this.selected = b ? b.sp : null;
     this.selInd = null;
@@ -708,7 +760,15 @@ export class FanView implements InputHandlers {
     this.touch = b && ageMa !== undefined ? { x: this.toWorld(x, y)[0], ageMa } : null;
     // Below its split: the parent column, the lineage there (unless an individual was hit).
     const lineage = b && ageMa !== undefined && !ind && wy >= b.splitY ? lineageAt(b, this.fan, ageMa) : undefined;
-    this.onSelect(b ? { sp: b.sp, ind, ageMa, startMa: b.t0, lineage } : null);
+    // Inside a curated event's window on its own column (or within a finger's reach of it): the card explains it.
+    let event: EventSpan | undefined;
+    if (b && ageMa !== undefined && !ind && !lineage) {
+      const r = EVENT_REACH_PX / this.cam.sy;
+      const a0 = this.fan.time.ageAt(Math.max(b.tipY, wy - r)) * 1e6;
+      const a1 = this.fan.time.ageAt(Math.min(this.fan.trunkBottom.y, wy + r)) * 1e6;
+      event = eventAt(colEventsY(this.fan, b), ageMa * 1e6, Math.min(a0, a1), Math.max(a0, a1)) ?? undefined;
+    }
+    this.onSelect(b ? { sp: b.sp, ind, ageMa, startMa: b.t0, lineage, event } : null);
     this.request();
   }
 
@@ -754,6 +814,7 @@ export class FanView implements InputHandlers {
     for (const b of this.fan.branches) this.drawStrand(b);
     for (const b of this.fan.branches) this.drawIndividuals(b);
     this.drawHeld();
+    this.drawEvents();
     if (this.gl) this.bridges = bridgeInstances(this, this.fan, this.split, this.splitWindow, this.gl.bridge);
     this.drawStemFade();
     // Labels: one form everywhere (see labelSpots).
@@ -993,6 +1054,63 @@ export class FanView implements InputHandlers {
   }
 
   /**
+   * The curated events on the columns (colstyle.ts, ToLaD#141): each window tinted over its own column,
+   * lanes and individuals alike, after the held fade (so an event in a held stretch still shows). At
+   * least EVENT_MIN_PX tall and EVENT_MIN_W wide, centred, so a short window on a thin column reads at
+   * home. GPU layer: the overlay batch (over the mesh); without it the same polygons on the canvas.
+   */
+  private drawEvents(): void {
+    const [r, g, bl] = EVENT_TINT.rgb;
+    for (const b of this.fan.branches) {
+      for (const s of colEventsY(this.fan, b)) {
+        let st = this.toScreen(0, s.top)[1];
+        let sb = this.toScreen(0, s.bot)[1];
+        if (sb - st < EVENT_MIN_PX) {
+          const m = (st + sb) / 2;
+          st = m - EVENT_MIN_PX / 2;
+          sb = m + EVENT_MIN_PX / 2;
+        }
+        if (sb < -4 || st > this.h + 4) continue;
+        st = Math.max(-4, st);
+        sb = Math.min(this.h + 4, sb);
+        // Slices a few px tall follow the column's curve (straight between them).
+        const n = Math.max(1, Math.min(64, Math.ceil((sb - st) / 6)));
+        let [l0, r0] = this.eventEdges(b, st);
+        for (let i = 1; i <= n; i++) {
+          const y0 = st + ((sb - st) * (i - 1)) / n;
+          const y1 = st + ((sb - st) * i) / n;
+          const [l1, r1] = this.eventEdges(b, y1);
+          if (!((r0 < -8 && r1 < -8) || (l0 > this.w + 8 && l1 > this.w + 8))) {
+            if (this.gl) this.gl.over.push(l0, y0, r0, y1, r, g, bl, EVENT_TINT.a, l1 - l0, r1 - r0, -8, this.w + 8);
+            else {
+              const ctx = this.ctx;
+              ctx.fillStyle = `rgba(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(bl * 255)},${EVENT_TINT.a})`;
+              ctx.beginPath();
+              ctx.moveTo(l0, y0);
+              ctx.lineTo(r0, y0);
+              ctx.lineTo(r1, y1);
+              ctx.lineTo(l1, y1);
+              ctx.closePath();
+              ctx.fill();
+            }
+          }
+          l0 = l1;
+          r0 = r1;
+        }
+      }
+    }
+  }
+
+  /** A species' own column at screen y (clamped to it): its left and right edges on screen, at least EVENT_MIN_W apart. */
+  private eventEdges(b: FanBranch, sy: number): [number, number] {
+    const y = Math.min(b.splitY, Math.max(b.tipY, this.toWorld(0, sy)[1]));
+    const l = this.toScreen(leftAt(b, y), y)[0];
+    const w = laneAt(b, y).w * this.cam.sx;
+    const pad = Math.max(0, (EVENT_MIN_W - w) / 2);
+    return [l - pad, l + w + pad];
+  }
+
+  /**
    * Where the card's numbers are from: on the selected column, a ring at the
    * point touched and a thin line across the column at its time, labelled
    * with that time ("70 yr ago").
@@ -1132,6 +1250,7 @@ export class FanView implements InputHandlers {
     const prev = new Map<string, boolean>();
     for (const [key, st] of this.labelState) prev.set(key, st.on);
     const on = resolveLabels(spots, prev);
+    this.eventLabels.length = 0;
     let moving = false;
     ctx.save();
     ctx.textBaseline = 'middle';
@@ -1150,6 +1269,7 @@ export class FanView implements InputHandlers {
       const alpha = st.a * s.fit;
       const [x0, y0, x1, y1] = s.box;
       if (alpha < 0.01 || x1 < 0 || x0 > this.w || y1 < 0 || y0 > this.h) continue;
+      if (s.ev !== undefined && s.b && alpha > 0.5) this.eventLabels.push({ box: [x0, y0, x1, y1], b: s.b, k: s.ev });
       ctx.globalAlpha = alpha;
       ctx.fillStyle = 'rgba(12,23,20,0.8)';
       ctx.beginPath();
@@ -1159,8 +1279,8 @@ export class FanView implements InputHandlers {
       ctx.save();
       ctx.translate(s.x, y1 - LABEL_PAD);
       ctx.rotate(-Math.PI / 2);
-      // A lineage's name in the second ink: the species' are the tree's names.
-      ctx.fillStyle = s.v ? INK2 : INK;
+      // A lineage's name in the second ink: the species' are the tree's names. An event's title in its tint.
+      ctx.fillStyle = s.ev !== undefined ? EVENT_TINT.css : s.v ? INK2 : INK;
       ctx.fillText(s.text, 0, 0.5);
       ctx.restore();
     }

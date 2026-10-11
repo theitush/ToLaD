@@ -8,7 +8,7 @@ import { formatCount } from '../data/count';
 import { SPLIT_LABEL, SPLIT_NAME, SPLIT_STYLES, type SplitStyle, type SplitWindow } from './gradual';
 import { HistorySpark } from './HistorySpark';
 import type { EdgeStyle, WidthMode } from './layout';
-import { FELIDAE, NATURAL_META, type SpeciesRec } from './panthera';
+import { FELIDAE, NATURAL_META, type HistEvent, type SpeciesRec } from './panthera';
 import { population } from './population';
 import { statusOf } from './status';
 import { FanView, fmtInt, formatYearsAgo, type IndInfo, type Lineage, type Selection } from './view';
@@ -177,7 +177,7 @@ export function FanApp() {
         ) : sel.ind ? (
           <IndCard sp={sel.sp} ind={sel.ind} onClose={() => viewRef.current?.tap(-1e6, -1e6)} />
         ) : (
-          <SpeciesCard sp={sel.sp} ageMa={sel.ageMa} startMa={sel.startMa} onClose={() => viewRef.current?.tap(-1e6, -1e6)} />
+          <SpeciesCard sp={sel.sp} ageMa={sel.ageMa} startMa={sel.startMa} event={sel.event?.k} onClose={() => viewRef.current?.tap(-1e6, -1e6)} />
         )
       ) : (
         <ul className="key" aria-label="key">
@@ -278,8 +278,42 @@ export function StatusChip({ sp }: { sp: SpeciesRec }) {
   );
 }
 
-export function SpeciesCard({ sp, onClose, open, ageMa, startMa }: { sp: SpeciesRec; onClose: () => void; open?: boolean; ageMa?: number; startMa?: number }) {
+/** Years before present, written out: "25,000". */
+const fmtYa = (ya: number) => Math.round(ya).toLocaleString('en-US');
+
+/**
+ * A curated event on the card (ToLaD#141): what the bottleneck was, in a sentence or two, the source's
+ * own words quoted, and the source linked with its grade. Shown when the touch is inside its window.
+ */
+export function EventSection({ ev, k }: { ev: HistEvent; k: number }) {
+  const kind = ev.kind === 'bottleneck' ? 'Bottleneck' : ev.kind;
+  return (
+    <section className="event" data-event={k}>
+      <p className="ev-k">
+        {kind} · {fmtYa(ev.fromYa)}–{fmtYa(ev.toYa)} years ago{ev.region ? ` · ${ev.region}` : ''}
+      </p>
+      <p className="ev-t">{ev.title}</p>
+      <p className="ev-s">{ev.summary}</p>
+      <blockquote className="ev-q">“{ev.quote}”</blockquote>
+      <p className="ev-src">
+        {ev.url ? (
+          <a href={ev.url} target="_blank" rel="noopener noreferrer">
+            {ev.cite}
+          </a>
+        ) : (
+          ev.cite
+        )}{' '}
+        <span className="dim">
+          · grade {ev.grade}: {GRADE_MEANS[ev.grade] ?? 'unknown'}
+        </span>
+      </p>
+    </section>
+  );
+}
+
+export function SpeciesCard({ sp, onClose, open, ageMa, startMa, event }: { sp: SpeciesRec; onClose: () => void; open?: boolean; ageMa?: number; startMa?: number; event?: number }) {
   const at = populationAt(sp, ageMa ?? sp.t1, startMa);
+  const ev = event !== undefined ? sp.history?.events[event] : undefined;
   const pct = (f: number) => `${Math.round(f * 100)}%`;
   const st = statusOf(sp);
   // A domestic stock: the years its own births span (its curated segments, from domestication).
@@ -296,6 +330,7 @@ export function SpeciesCard({ sp, onClose, open, ageMa, startMa }: { sp: Species
       <div className="t">
         <span>{sp.common}</span> <i>({sp.sci})</i>
       </div>
+      {ev && <EventSection ev={ev} k={event!} />}
       <div className="facts">
         <StatusChip sp={sp} />
         <p className="lead">
@@ -326,7 +361,7 @@ export function SpeciesCard({ sp, onClose, open, ageMa, startMa }: { sp: Species
           )}
         </p>
       </div>
-      {spark && <HistorySpark key={sp.gid} h={sp.history!} open={open} natural={sp.natural} naturalMeta={NATURAL_META} />}
+      {spark && <HistorySpark key={sp.gid} h={sp.history!} open={open} natural={sp.natural} naturalMeta={NATURAL_META} activeEvent={ev ? event : undefined} />}
       <details className="more" key={`more-${sp.gid}`}>
         <summary>Details</summary>
         <dl>
