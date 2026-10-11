@@ -14,7 +14,7 @@ const PREFIX = process.argv[3] || 'd';
 const ONLY = process.argv[4] ? new Set(process.argv[4].split(',')) : null;
 mkdirSync(OUT, { recursive: true });
 // [name, kind, args]: 'home' | 'far' | 'card' [species] | 'touch' [species, agoYears] | 'scroll' [zoom, agoYears] | 'bar' [species, agoYears, perBar, sy, at?]
-//   | 'split' [splitMa, time zoom × home] | 'tapnode' [splitMa, ageMa]
+//   | 'split' [splitMa, time zoom × home] | 'tapnode' [splitMa, ageMa] | 'pan' [zoom, px down from "now" at 160, px across]
 const scenes = [
   ['home', 'home'],
   ['far', 'far'],
@@ -33,6 +33,8 @@ const scenes = [
   // Sequences (#54): a slow pan down from home until "now" is above the screen, and a zoom from home into the lion.
   ...[0, 60, 120, 180, 260, 360].map((dy, k) => [`pan${k + 1}`, 'pan', [1.5, dy]]),
   ...[0, 0.2, 0.4, 0.6, 0.8, 1].map((t, k) => [`zoom${k + 1}`, 'zoomin', ['Lion', 300, t]]),
+  // A pan across with "now" off screen (#97): the labels beside their branches slide, none jumps.
+  ...[0, 40].map((dx, k) => [`across${k + 1}`, 'pan', [3, 420, dx]]),
   // The dated tree (#46): onto a split [its date Ma, time zoom × home], the mesh across one (the lion's
   // right edge just above its split from the cave lion), and a tap on a parent column [split Ma, age Ma].
   ['split-lionleopard', 'split', [2.57, 5]],
@@ -70,7 +72,7 @@ try {
   page.on('pageerror', (e) => console.log('pageerror', String(e)));
   const q = [process.env.DEBUG ? 'debug' : '', process.env.EDGE ? `edge=${process.env.EDGE}` : ''].filter(Boolean).join('&');
   await page.goto(pathToFileURL(resolve('dist-single/index.html')).href + (q ? `?${q}` : ''));
-  await page.waitForFunction(() => !!window.__fan, null, { timeout: 20000 });
+  await page.waitForFunction(() => !!window.__fan, null, { timeout: Number(process.env.LOAD_MS || 20000) });
   for (const [name, kind, args] of scenes) {
     if (ONLY && !ONLY.has(name)) continue;
     await page.evaluate(
@@ -100,10 +102,10 @@ try {
           f.camera.settle();
         } else if (kind === 'pan') {
           // Zoom z with "now" at 160 px from the top, then the view moved down dy px (into the past).
-          const [z, dy] = args;
+          const [z, dy, dx = 0] = args;
           const h = f.homeCamera();
           const sy = h.sy * z;
-          f.cam = { ...h, sx: h.sx * z, sy, ty: sy, cy: f.yNow + (f.h / 2 - (160 - dy)) / sy };
+          f.cam = { ...h, sx: h.sx * z, sy, ty: sy, cy: f.yNow + (f.h / 2 - (160 - dy)) / sy, cx: h.cx + dx / (h.sx * z) };
           f.camera.settle();
         } else if (kind === 'zoomin') {
           // From home (t = 0) to the species' individuals (t = 1, 4 per 70 px bar) about a point on its column.
