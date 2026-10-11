@@ -41,7 +41,7 @@ const scenes = [
   ['split-lionleopard', 'split', [2.57, 5]],
   ['split-cavelion', 'split', [0.5, 5]],
   ['split-eurojag', 'split', [2.0, 5]],
-  ['split-root', 'split', [4.6, 3]],
+  ['split-root', 'split', [4.58, 3]],
   ['decline', 'bar', ['Lion', 50, 1e5, 3.5, 0.5]],
   // The lion's last 200 years filling the screen; the mesh on the cave lion as it peels off the lion.
   ['last200', 'decline', ['Lion', 200]],
@@ -50,10 +50,13 @@ const scenes = [
   ['tip-cave', 'bar', ['Cave lion', 16000, 1e4, 30, 0.5]],
   ['mesh-split', 'bar', ['Lion', 499990, 100, 2e4, 1]],
   ['lineage', 'tapnode', [2.57, 1.2]],
-  // The cat family: Pantherinae vs Felinae, the crowded base (13.8–10.3 Ma), the lynxes, the domestic cat.
-  ['split-felidae', 'split', [13.8, 2]],
-  ['base-felinae', 'split', [10.65, 6]],
-  ['split-lynx', 'split', [2.68, 4]],
+  // The cat family (the data's dated tree, ToLaD#145): Pantherinae vs Felinae (11.97 Ma), the crowded Felinae base
+  // (10.4–7.5 Ma), the lynxes, the domestic cat; a tap on Panthera's stem opens its split card (date and source).
+  ['split-felidae', 'split', [11.97, 2]],
+  ['base-felinae', 'split', [10.42, 6]],
+  ['split-lynx', 'split', [2.201, 4]],
+  ['tap-panthera', 'tapnode', [4.58, 6]],
+  ['tap-pantherinae', 'tapnode', [8.162, 9]],
   ['domestic-boom', 'split', [0.0095, 3]],
   ['card-sandcat', 'card', ['Sand cat']],
   ['card-domestic', 'card', ['Domestic cat']],
@@ -226,6 +229,11 @@ try {
       }
     }
     await page.waitForTimeout(900);
+    // DETAILS=1: the card's Details opened and scrolled into view (a split's date source, ToLaD#145).
+    if (process.env.DETAILS) {
+      await page.evaluate(() => document.querySelectorAll('details').forEach((d) => { d.open = true; d.scrollIntoView({ block: 'end' }); }));
+      await page.waitForTimeout(300);
+    }
     // CLIP=x,y,w,h (CSS px): only that part of the page (with DSF=4–6, a close look).
     const clip = process.env.CLIP ? Object.fromEntries(['x', 'y', 'width', 'height'].map((k, i) => [k, Number(process.env.CLIP.split(',')[i])])) : undefined;
     await page.screenshot({ path: `${OUT}/${PREFIX}-${name}.png`, clip });
