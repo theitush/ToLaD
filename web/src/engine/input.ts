@@ -1,14 +1,26 @@
-// Pointer Events gestures: one-finger/mouse pan, two-finger pinch (zooms both
-// axes about the centroid), wheel zoom, double-tap, and fling velocity in
-// log-zoom space. No camera state lives here; it only reports deltas.
+// Pointer Events gestures: one-finger/mouse pan, two-finger pinch (zooms about
+// the centroid: both axes by the finger distance, or each axis by its own
+// spread, see `axisPinch`), wheel zoom (shift: x only, alt: y only),
+// double-tap, and fling velocity in log-zoom space. No camera state lives
+// here; it only reports deltas.
+
+/** Per-axis pinch dead zone: an axis's spread must change this many px from the pinch's start ... */
+export const PINCH_DEAD_PX = 12;
+/** ... and by at least this fraction of the furthest the other axis's spread has moved, to zoom that axis. */
+export const PINCH_AXIS_RATIO = 0.5;
+/** Spreads below this (px) count as this much, so fingers nearly in line along an axis cannot blow up its zoom. */
+export const PINCH_MIN_SPREAD = 40;
 
 export interface InputHandlers {
   gestureStart(): void;
   gestureEnd(): void;
   pan(dx: number, dy: number): void;
   zoom(px: number, py: number, fx: number, ft: number): void;
-  /** Release velocity: px/ms for pan, log-zoom/ms for zoom, about (px, py). */
-  fling(vx: number, vy: number, vz: number, px: number, py: number): void;
+  /**
+   * Release velocity: px/ms for pan, log-zoom/ms for zoom, about (px, py).
+   * With per-axis pinch, vz is the x (width) zoom and vt the y (time) zoom.
+   */
+  fling(vx: number, vy: number, vz: number, px: number, py: number, vt?: number): void;
   doubleTap(x: number, y: number): void;
   /** Optional: a single tap (also fires before the second tap of a double-tap). */
   tap?(x: number, y: number): void;
@@ -19,6 +31,7 @@ interface Sample {
   dx: number;
   dy: number;
   dz: number;
+  dt: number;
   px: number;
   py: number;
 }
@@ -32,6 +45,13 @@ export class Input {
   private lastTap = { t: -1e9, x: 0, y: 0 };
   private wheelTimer = 0;
   private wheeling = false;
+  /**
+   * The two-finger pinch in progress (per-axis mode): its finger pair, the
+   * horizontal and vertical spreads (px) when it began, the furthest each has
+   * moved since, and which axes it zooms (once on, an axis stays on until the
+   * fingers change).
+   */
+  private pinch: { a: number; b: number; x0: number; y0: number; peakX: number; peakY: number; onX: boolean; onY: boolean } | null = null;
 
   constructor(
     readonly el: HTMLElement,
@@ -88,6 +108,7 @@ export class Input {
       this.h.gestureStart();
     }
     this.pointers.set(e.pointerId, this.local(e));
+    this.pinch = null;
     this.maxPointers = Math.max(this.maxPointers, this.pointers.size);
   };
 
@@ -103,7 +124,7 @@ export class Input {
       this.pointers.set(e.pointerId, p);
       this.moved += Math.abs(dx) + Math.abs(dy);
       this.h.pan(dx, dy);
-      this.sample(e.timeStamp, dx, dy, 0, p.x, p.y);
+      this.sample(e.timeStamp, dx, dy, 0, 0, p.x, p.y);
       return;
     }
     const [a, b] = ids;
@@ -128,20 +149,61 @@ export class Input {
     this.moved += Math.abs(dx) + Math.abs(dy) + Math.abs(d1 - d0);
     this.h.pan(dx, dy);
     if (this.axisPinch) {
-      // An axis counts once the fingers are spread along it (> 40 px), so a
-      // sideways pinch does not also jitter the other axis.
-      const ax = (u0: number, u1: number) => (Math.abs(u0) > 40 && Math.abs(u1) > 40 ? Math.abs(u1) / Math.abs(u0) : 1);
-      const fx = ax(pa0.x - pb0.x, pa1.x - pb1.x);
-      const ft = ax(pa0.y - pb0.y, pa1.y - pb1.y);
+      const [fx, ft] = this.axisZoom(a, b, pa0, pb0, pa1, pb1);
       if (fx !== 1 || ft !== 1) this.h.zoom(c1x, c1y, fx, ft);
-    } else if (s !== 1) this.h.zoom(c1x, c1y, s, s);
-    this.sample(e.timeStamp, dx, dy, Math.log(s), c1x, c1y);
+      this.sample(e.timeStamp, dx, dy, Math.log(fx), Math.log(ft), c1x, c1y);
+      return;
+    }
+    if (s !== 1) this.h.zoom(c1x, c1y, s, s);
+    this.sample(e.timeStamp, dx, dy, Math.log(s), Math.log(s), c1x, c1y);
   };
+
+  /**
+   * Per-axis pinch: the fingers' horizontal spread zooms x and their vertical
+   * spread zooms y, each by its own ratio. Dead zone: an axis zooms only once
+   * its spread has moved PINCH_DEAD_PX from where the pinch began and at least
+   * PINCH_AXIS_RATIO of the furthest the other spread has moved (and nothing
+   * turns on before one spread has moved twice the dead zone), so a mostly
+   * sideways pinch zooms x alone (its fingers' vertical jitter is ignored) and
+   * a mostly upright one y alone; a diagonal one turns both on. The movement
+   * before an axis turns on is dropped, so turning on never jumps.
+   */
+  private axisZoom(
+    a: number,
+    b: number,
+    pa0: { x: number; y: number },
+    pb0: { x: number; y: number },
+    pa1: { x: number; y: number },
+    pb1: { x: number; y: number },
+  ): [number, number] {
+    const ux0 = Math.abs(pa0.x - pb0.x);
+    const uy0 = Math.abs(pa0.y - pb0.y);
+    const ux1 = Math.abs(pa1.x - pb1.x);
+    const uy1 = Math.abs(pa1.y - pb1.y);
+    let g = this.pinch;
+    if (!g || g.a !== a || g.b !== b) g = this.pinch = { a, b, x0: ux0, y0: uy0, peakX: 0, peakY: 0, onX: false, onY: false };
+    const mx = Math.abs(ux1 - g.x0);
+    const my = Math.abs(uy1 - g.y0);
+    g.peakX = Math.max(g.peakX, mx);
+    g.peakY = Math.max(g.peakY, my);
+    const wasX = g.onX;
+    const wasY = g.onY;
+    // Nothing is decided until one spread has clearly moved, so early jitter cannot pick an axis.
+    if (Math.max(g.peakX, g.peakY) >= 2 * PINCH_DEAD_PX) {
+      g.onX ||= mx > PINCH_DEAD_PX && mx >= PINCH_AXIS_RATIO * g.peakY;
+      g.onY ||= my > PINCH_DEAD_PX && my >= PINCH_AXIS_RATIO * g.peakX;
+    }
+    const m = PINCH_MIN_SPREAD;
+    const fx = wasX ? Math.max(ux1, m) / Math.max(ux0, m) : 1;
+    const ft = wasY ? Math.max(uy1, m) / Math.max(uy0, m) : 1;
+    return [fx, ft];
+  }
 
   private onUp = (e: PointerEvent): void => {
     if (!this.pointers.has(e.pointerId)) return;
     const p = this.local(e);
     this.pointers.delete(e.pointerId);
+    this.pinch = null;
     if (this.pointers.size > 0) {
       // Lifting one finger of a pinch: drop zoom samples so the fling is a pan.
       this.samples.length = 0;
@@ -167,21 +229,23 @@ export class Input {
       let dx = 0;
       let dy = 0;
       let dz = 0;
+      let dt = 0;
       for (const s of recent) {
         dx += s.dx;
         dy += s.dy;
         dz += s.dz;
+        dt += s.dt;
       }
       const last = recent[recent.length - 1];
       this.h.gestureEnd();
-      this.h.fling(dx / span, dy / span, dz / span, last.px, last.py);
+      this.h.fling(dx / span, dy / span, dz / span, last.px, last.py, dt / span);
       return;
     }
     this.h.gestureEnd();
   };
 
-  private sample(t: number, dx: number, dy: number, dz: number, px: number, py: number): void {
-    this.samples.push({ t, dx, dy, dz, px, py });
+  private sample(t: number, dx: number, dy: number, dz: number, dt: number, px: number, py: number): void {
+    this.samples.push({ t, dx, dy, dz, dt, px, py });
     if (this.samples.length > 32) this.samples.shift();
   }
 

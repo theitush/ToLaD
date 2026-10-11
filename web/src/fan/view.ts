@@ -421,7 +421,8 @@ export class FanView implements InputHandlers {
       }
     }
     this.camera = new FanCamera(layoutFan(clade, this.mode, undefined, this.edge), (b) => this.model(b));
-    this.input = new Input(canvas, this);
+    // Width and time zoom separately (#138): a sideways pinch zooms width, an upright one time, a diagonal both.
+    this.input = new Input(canvas, this, true);
     this.ro = new ResizeObserver(() => this.resize());
     this.ro.observe(canvas);
     this.resize();
@@ -578,7 +579,8 @@ export class FanView implements InputHandlers {
 
   // ---- InputHandlers --------------------------------------------------------
 
-  private vel = { x: 0, y: 0, z: 0, px: 0, py: 0 };
+  /** Fling velocity: pan (px/ms), width (z) and time (t) log-zoom (/ms), about (px, py). */
+  private vel = { x: 0, y: 0, z: 0, t: 0, px: 0, py: 0 };
 
   gestureStart(): void {
     this.anim = null;
@@ -592,20 +594,21 @@ export class FanView implements InputHandlers {
     this.zoomAbout(px, py, fx, ft);
     this.request();
   }
-  fling(vx: number, vy: number, vz: number, px: number, py: number): void {
-    this.vel = { x: vx, y: vy, z: vz, px, py };
+  fling(vx: number, vy: number, vz: number, px: number, py: number, vt = vz): void {
+    this.vel = { x: vx, y: vy, z: vz, t: vt, px, py };
     let last = performance.now();
     this.anim = (now) => {
       const dt = Math.min(50, now - last);
       last = now;
       const v = this.vel;
       this.pan(v.x * dt, v.y * dt);
-      if (v.z) this.zoomAbout(v.px, v.py, Math.exp(v.z * dt), Math.exp(v.z * dt));
+      if (v.z || v.t) this.zoomAbout(v.px, v.py, Math.exp(v.z * dt), Math.exp(v.t * dt));
       const d = Math.exp(-dt / 260);
       v.x *= d;
       v.y *= d;
       v.z *= d;
-      return Math.abs(v.x) + Math.abs(v.y) > 0.01 || Math.abs(v.z) > 1e-5;
+      v.t *= d;
+      return Math.abs(v.x) + Math.abs(v.y) > 0.01 || Math.abs(v.z) + Math.abs(v.t) > 1e-5;
     };
     this.request();
   }
