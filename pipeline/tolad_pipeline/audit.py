@@ -144,7 +144,8 @@ def leaf_row(n, census: dict, gs_model: dict, deep_reports: dict | None = None) 
         "census": (census.get(n.name) or {}).get("N"), "gs_model": (gs_model.get(n.name) or {}).get("N"),
         "file": rec.get("file"), "modelled": rec.get("modelled"), "use": rec.get("use"),
         "curve": curve,
-        "deep": ({k: deep.get(k) for k in ("ratio", "flag", "rule", "to_kind", "to_n", "deep_n", "factor", "blind")}
+        "deep": ({k: deep.get(k) for k in ("ratio", "flag", "rule", "next", "to_kind", "to_n", "deep_n", "deep_n_raw",
+                                            "factor", "blind")}
                  if deep else None),
         "deep_factors": None,
     }
@@ -288,14 +289,14 @@ def check_deep(row: dict) -> list[dict]:
         out.append(_flag("deep", abs(math.log10(v)),
                          f"PSMC's {bl['steps']} blind-spot steps average {max(v, 1 / v):.2g}x "
                          f"{'below' if v < 1 else 'above'} the youngest resolved step but are not drawn "
-                         "(no [deep.blind] source), and the join goes the other way", blind=v))
+                         "(no [deep.blind] source), and the curve is held flat across them", blind=v))
     if not d.get("flag"):
         return out
     r = d["ratio"]
     return out + [_flag("deep", abs(math.log10(r)),
-                  f"genomic level {_fmt(d['deep_n'])} is {max(r, 1 / r):.3g}x "
+                  f"genomic level {_fmt(d.get('deep_n_raw') or d['deep_n'])} is {max(r, 1 / r):.3g}x "
                   f"{'above' if r > 1 else 'below'} the next level ({d['to_kind']}, {_fmt(d['to_n'])}); "
-                  f"rule {d['rule']}" + (f" x{d['factor']:.3g}" if d["rule"] == "scaled" else ""), ratio=r)]
+                  f"genome curve scaled x{d['factor']:.3g} to meet it", ratio=r)]
 
 
 def check_status(row: dict) -> list[dict]:
