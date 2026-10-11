@@ -129,13 +129,16 @@ export function speciesRec(r: RawSpecies, clade: number): SpeciesRec {
     const segments = procgenSegments(h!, h!.component === 'domestic' ? undefined : r.ever);
     births = { segments, curve: new BirthCurve(segments, genYears), lifespan: h!.L };
   }
+  // A domestic stock's own births since domestication (the model's segments), not the dataset's
+  // total for the leaf, which also counts its wild ancestors back to the species' start.
+  const own = births && h!.component === 'domestic' ? Math.round(births.curve.total) : null;
   return {
     gid: r.gid,
     sci: r.sci,
     common: h && 'common' in h ? String((h as { common?: string }).common ?? x.common) : x.common,
-    ever: r.ever,
-    everLo: r.everLo,
-    everHi: r.everHi,
+    ever: own ?? r.ever,
+    everLo: own ?? r.everLo,
+    everHi: own ?? r.everHi,
     alive: r.alive,
     grade: r.grade,
     t0: r.t0,

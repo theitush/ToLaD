@@ -32,7 +32,12 @@ describe('Panthera data', () => {
     expect(FELIDAE.species.length).toBeGreaterThanOrEqual(9);
     for (const s of FELIDAE.species) {
       const d = decoded(s.sci);
-      expect(s.ever).toBe(d.ever);
+      // (A domestic stock counts its own births since domestication, the model's segments: the
+      // dataset's total for the leaf also holds its wild ancestors, the wildcat's.)
+      if (s.history?.component === 'domestic') {
+        expect(s.ever).toBe(Math.round(s.births!.curve.total));
+        expect(s.ever).toBeLessThan(d.ever);
+      } else expect(s.ever).toBe(d.ever);
       expect(s.alive).toBe(d.alive);
       expect(s.t0).toBe(d.t0);
       expect(s.t1).toBe(d.t1);
