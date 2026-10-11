@@ -1063,7 +1063,7 @@ function stretches(v: TwigView, m: TwigModel, yTop: number, yBot: number): Stret
  * life, one instance per generation. Each instance stays within one stretch
  * of constant column width (the gray edge steps).
  */
-export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: number, mode: 0 | 1, alpha: number, look: { lw: number; tipR: number; linkA?: number; baseA?: number }, out: MeshInst[], ancA = alpha): void {
+export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: number, mode: 0 | 1, alpha: number, look: { lw: number; tipR: number; linkA?: number; baseA?: number }, into: MeshInst[] | MeshBatch, ancA = alpha): void {
   if (!(Math.max(alpha, mode ? 0 : ancA) > 0.004) || !(yBot > yTop)) return;
   const time = m.time;
   // The texture goes on below the species' first generation, down its column through the stem
@@ -1101,14 +1101,26 @@ export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: num
   // (tauC: the continuous time level, log2 of BAND_PX over a generation's height: the cross-links' fade.)
   const tauC = (g: number) => Math.log2(BAND_PX / Math.max(1e-12, Math.abs(m.yOf((g + 1) * m.GL) - m.yOf(g * m.GL)) * v.sy));
   const bandRaw = (g: number) => Math.pow(2, Math.max(0, Math.min(24, Math.ceil(tauC(g)))));
-  const start = out.length;
+  // (Straight into a batch, each packed as it is made: no frame's worth of instances kept alive.)
+  const batch = Array.isArray(into) ? null : into;
+  const start = batch ? batch.n : (into as MeshInst[]).length;
+  const out = batch
+    ? {
+        push: (inst: MeshInst) => {
+          // (next() first: it may grow the arrays.)
+          const k = batch.next();
+          packInst(inst, batch.f, batch.u, k);
+        },
+      }
+    : (into as MeshInst[]);
   let count = 0;
   const floorMod = (a: number, t: number) => ((a % t) + t) % t;
   const NONE = -Infinity;
   for (let gA = mode ? gBot : gBot - floorMod(gBot, bandRaw(gBot)), t = 1; gA <= gTop; gA += t) {
     if (!mode) for (t = bandRaw(gA); floorMod(gA, t); ) t /= 2;
     if (++count > MAX_INST) {
-      out.length = start;
+      if (batch) batch.n = start;
+      else (into as MeshInst[]).length = start;
       return;
     }
     // (The ancestors, g < 0: generation 0's size, their own hashed seeds.)
@@ -1328,15 +1340,10 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
   const lw = Math.max(1, Math.min(4, cellPx * 0.12));
   if (v.mesh) {
     const batch = v.mesh;
-    const insts: MeshInst[] = [];
-    meshInstances(v, m, yTop, yBot, 0, dens > 0.02 ? dens : 0, { lw: 0.9, tipR: 0, linkA: LINK_ALPHA }, insts, 1);
-    meshInstances(v, m, yTop, yBot, 1, lives, { lw: lwL, tipR, linkA: LINK_ALPHA, baseA }, insts);
-    for (const inst of insts) {
-      // (next() first: it may grow the arrays.)
-      const k = batch.next();
-      packInst(inst, batch.f, batch.u, k);
-    }
-    stats.instances = insts.length;
+    const n0 = batch.n;
+    meshInstances(v, m, yTop, yBot, 0, dens > 0.02 ? dens : 0, { lw: 0.9, tipR: 0, linkA: LINK_ALPHA }, batch, 1);
+    meshInstances(v, m, yTop, yBot, 1, lives, { lw: lwL, tipR, linkA: LINK_ALPHA, baseA }, batch);
+    stats.instances = batch.n - n0;
   }
   if (cellPx < 1.5) return stats;
   const ctx = v.ctx;
