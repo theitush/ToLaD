@@ -631,15 +631,16 @@ export function shadeMesh(m0: MeshInst, px0: number, py: number, kLog: number, n
 }
 
 /**
- * Screen px across the column per unit of the frame's x, at frame x X on
- * screen row py: the frame's scale k down the instance, over the stretch of a
- * row along a column that leans by s px per px (√(1 + s²)). 1 upright.
+ * Screen px across the column per unit of the frame's x on screen row py: the
+ * frame's scale k down the instance, over the stretch of a row along a column
+ * whose middle leans by s px per px (√(1 + s²)). 1 upright. (By the column's
+ * lean, not each line's: a column widening both ways, its lattice riding the
+ * left edge, is upright.)
  */
-export function perpScale(m: MeshInst, X: number, py: number): number {
-  const sL = m.sL ?? 0;
+export function perpScale(m: MeshInst, _X: number, py: number): number {
   const sP = m.sP ?? 0;
   const k = Math.max(1e-6, 1 + sP * (py - m.y0));
-  const s = sL + (X - (m.colL ?? 0)) * sP;
+  const s = ((m.sL ?? 0) + (m.sR ?? 0)) / 2;
   return k / Math.sqrt(1 + s * s);
 }
 

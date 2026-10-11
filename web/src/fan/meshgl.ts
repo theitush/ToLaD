@@ -347,7 +347,7 @@ void main() {
     p.x = colL + (vP.x - xl) / k;
     gColR = colL + (vNar.y + vWarp.y * dy - xl) / k;
     gXG = colL + (vLife.w + vWarp.z * dy - xl) / k;
-    float sl = vWarp.x + (p.x - colL) * vWarp.w;
+    float sl = 0.5 * (vWarp.x + vWarp.y);
     if (vMisc.y < 0.5) ks = k / sqrt(1.0 + sl * sl);
     float pad = vMisc.y < 0.5 ? 1.0 + 1.5 / ks : max(vMisc.w, max(vSlot.z, 1.0) * 0.5 + 5.0) + 1.0;
     if (vWarp != vec4(0.0) && (p.x < colL - pad || p.x > gColR + pad)) discard;
