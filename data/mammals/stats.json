@@ -9234,7 +9234,10 @@
     "deep_before": 15127.076923076922,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "events": [],
+    "events": [
+     "bottleneck 30000-10000 ya: Late-glacial decline",
+     "bottleneck 3000-0 ya: Human pressure, 3,000 years"
+    ],
     "ever_after": 618459523854.5948,
     "ever_before": 13856131941.815397,
     "ever_ratio": 44.634355854262004,
@@ -9630,7 +9633,9 @@
     "deep_before": 850000.0,
     "deep_from": "natural",
     "domestic_on_leaf": false,
-    "events": [],
+    "events": [
+     "bottleneck 251-96 ya: Sealing near-extinction"
+    ],
     "ever_after": 158871323596.91733,
     "ever_before": 38470010838.83543,
     "ever_ratio": 4.129744705882353,
@@ -10598,7 +10603,9 @@
     "deep_before": 1650000.0,
     "deep_from": null,
     "domestic_on_leaf": false,
-    "events": [],
+    "events": [
+     "bottleneck 140-114 ya: Pelagic sealing crash"
+    ],
     "ever_after": 1189174280817.5332,
     "ever_before": 1189174280817.5332,
     "ever_ratio": 1.0,
@@ -10742,7 +10749,10 @@
     "deep_before": 275158.75114433933,
     "deep_from": "natural",
     "domestic_on_leaf": true,
-    "events": [],
+    "events": [
+     "bottleneck 86-76 ya: Isle Royale founders",
+     "bottleneck 61-35 ya: Scandinavian refounding"
+    ],
     "ever_after": 325658550395.4353,
     "ever_before": 324930313667.5019,
     "ever_ratio": 1.0022412089525097,
@@ -10778,7 +10788,9 @@
     "deep_before": 34836.77431372678,
     "deep_from": "natural",
     "domestic_on_leaf": false,
-    "events": [],
+    "events": [
+     "bottleneck 53-39 ya: Fourteen founders"
+    ],
     "ever_after": 16861290549.328264,
     "ever_before": 224388493567.7487,
     "ever_ratio": 0.07514329403097225,
@@ -12045,7 +12057,9 @@
     "deep_before": 236113.91666666666,
     "deep_from": "baseline",
     "domestic_on_leaf": false,
-    "events": [],
+    "events": [
+     "bottleneck 285-115 ya: Fur-trade crash"
+    ],
     "ever_after": 114792561277.5976,
     "ever_before": 120465652067.48639,
     "ever_ratio": 0.9529069847502203,
@@ -14344,7 +14358,9 @@
     "deep_before": 224500.0,
     "deep_from": "natural",
     "domestic_on_leaf": false,
-    "events": [],
+    "events": [
+     "bottleneck 216-134 ya: Hunted to a few dozen"
+    ],
     "ever_after": 66729987106.64323,
     "ever_before": 66735009658.58401,
     "ever_ratio": 0.9999247388744458,
@@ -14380,7 +14396,9 @@
     "deep_before": 9274.703579960153,
     "deep_from": "natural",
     "domestic_on_leaf": false,
-    "events": [],
+    "events": [
+     "bottleneck 45-35 ya: Eighteen survivors"
+    ],
     "ever_after": 89823155704.1923,
     "ever_before": 16202002770.964258,
     "ever_ratio": 5.543953853974468,
@@ -18033,7 +18051,9 @@
     "deep_before": 398527.4151436031,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "events": [],
+    "events": [
+     "bottleneck 146-96 ya: Scandinavian hunting low"
+    ],
     "ever_after": 87826239023.9657,
     "ever_before": 81686056093.73222,
     "ever_ratio": 1.0751680669120296,
@@ -18109,7 +18129,9 @@
     "deep_before": 26000.0,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
-    "events": [],
+    "events": [
+     "bottleneck 500000-20000 ya: Long Pleistocene decline"
+    ],
     "ever_after": 86402352746.8061,
     "ever_before": 5817581917.808218,
     "ever_ratio": 14.851935729915482,
@@ -19271,10 +19293,10 @@
   "non-species tip": 551
  },
  "output": {
-  "brotli_bytes": 782665,
+  "brotli_bytes": 785863,
   "files": 16,
-  "raw_bytes": 3195672,
-  "skeleton_brotli": 56554,
+  "raw_bytes": 3210088,
+  "skeleton_brotli": 56561,
   "skeleton_nodes": 1156,
   "skeleton_raw": 265296,
   "tiles": 15
