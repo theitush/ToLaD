@@ -190,7 +190,8 @@ describe('the species card: the population at the time touched', () => {
     expect(then).toContain('~400k alive 70 years ago');
     expect(then).toContain('58% have descendants alive today');
     expect(then).toContain('~23k alive today');
-    expect(then).toContain('Roughly 700 billion lions have ever lived (rough estimate)'); // (its genomic deep past, ToLaD#60/#66)
+    // (8 trillion, was 700 billion: since ToLaD#143 its genomic deep past is scaled x12 to meet the 1950 level.)
+    expect(then).toContain('Roughly 8 trillion lions have ever lived (rough estimate)'); // (its genomic deep past, ToLaD#60/#66)
     const now = face(renderToStaticMarkup(<SpeciesCard sp={lion} onClose={() => {}} />));
     expect(now).toContain(`${formatCount(population(lion).aliveAt(0))} alive today`);
     // At now, "alive today" once and no trivial "100% have descendants".
@@ -339,7 +340,7 @@ describe('the card shows the deep past and the natural level (ToLaD#69)', () => 
     expect(spark(byName('Eurasian lynx'), false)).toContain('data-axis="linear"');
   });
 
-  it('the genomic curve is one modelled source row, with its Ne/N ratio and the per-species join rule (ToLaD#80)', () => {
+  it('the genomic curve is one modelled source row, with its Ne/N ratio and the scale factor to the next level (ToLaD#80, #143)', () => {
     const lion = byName('Lion');
     const html = spark(lion);
     const row = text(html.match(/<li data-row="genomic">[\s\S]*?<\/li>/)![0]);
@@ -349,21 +350,21 @@ describe('the card shows the deep past and the natural level (ToLaD#69)', () => 
     expect(row).toContain('million years ago');
     expect(lion.history!.deepJoin).toBeTruthy();
     expect(html).toContain('data-deep-join=""');
-    expect(row).toContain('First cited point');
+    expect(row).toMatch(/its curve is scaled ×12 to meet the cited 1950 baseline \(~500k\), then held flat to it \(flagged/);
   });
 
-  it('says the deep-past join for a scaled curve (Bison bison) and a kept, flagged one (Addax)', () => {
+  it('says the scale factor for a curve scaled up to a cited level (Bison bison) and one scaled down to a modelled one (Addax), both flagged', () => {
     const bovids = loadClade(read, 'Bovidae').species;
     const bison = bovids.find((s) => s.sci === 'Bison bison')!;
     const b = text(spark(bison));
     // (The factor follows the data: ~981 at the flat mutation rate, ~1.2k with the per-lineage one, #74/#75.)
-    expect(b).toMatch(/Genomic curve scaled x~?[\d.,]+k? to meet the cited 1800 baseline \(~40 million\)/);
+    expect(b).toMatch(/The genome gives the shape, not the number: its curve is scaled ×~?[\d.,]+k? to meet the cited 1800 baseline \(~40 million\)/);
     expect(b).toContain('flagged');
     const addax = bovids.find((s) => s.sci === 'Addax nasomaculatus')!;
     const a = spark(addax);
     expect(a).toContain('data-axis="log"');
-    expect(text(a)).toContain('Genomic curve kept at its own level');
-    expect(text(a)).toContain('flagged: beyond 10x');
+    expect(text(a)).toMatch(/its curve is scaled ×0\.00\d+ to meet the modelled natural level in 1500 CE/);
+    expect(text(a)).toContain('flagged: beyond 10×');
     expect((a.match(/data-row="genomic"/g) ?? []).length).toBe(1);
   });
 
@@ -406,10 +407,14 @@ describe('the sparkline y axis follows the central values, not the ranges (ToLaD
   };
   const num = (html: string, re: RegExp) => [...html.matchAll(re)].map((m) => Number(m[1]));
 
-  it("a 30% fall reads as a slope: the leopard's 1998 -> 2020 estimates drop at least 8 px (3.4 when the ranges set the axis); on every Panthera a 30% fall is at least 4-5", () => {
+  it("a 30% fall reads as a slope: the leopard's 1998 -> 2020 estimates drop at least 5.5 px (3.4 when the ranges set the axis); on every Panthera a 30% fall is at least 4-5", () => {
     const leo = [...svgOf('Leopard').matchAll(/<circle cx="([\d.]+)" cy="([\d.]+)" r="3.2"/g)].map((m) => Number(m[2]));
     expect(leo.length).toBe(2); // 1998 (188k), 2020 (131k)
-    expect(leo[1] - leo[0]).toBeGreaterThan(8);
+    // (6.5, was 8: since ToLaD#143 the leopard's genomic deep past is scaled x2.2 to meet its 1998 level, so
+    // the axis reaches up to ~1.2M at 50 kya and the same fall is 6.9 px; still twice the 3.4. 5.5: since
+    // ToLaD#143's natural anchor its deep past meets its natural level, 399k in 1500, above the 1998 count,
+    // x4.7, so the axis reaches higher still and the fall is 5.7 px; still well above the 3.4.)
+    expect(leo[1] - leo[0]).toBeGreaterThan(5.5);
     for (const common of ['Lion', 'Leopard', 'Tiger', 'Snow leopard', 'Jaguar']) {
       const html = svgOf(common);
       // px per decade, from the two y ticks and their labels
@@ -419,13 +424,17 @@ describe('the sparkline y axis follows the central values, not the ranges (ToLaD
       const v = (t: string) => Number(t.replace(/k$/, 'e3').replace(/M$/, 'e6'));
       const perDecade = (ys[0] - ys[1]) / Math.log10(v(vs[1]) / v(vs[0]));
       // (The tiger's own figures span two decades, its fall from 100k to 3k, so its 30% is a little smaller; it was 2.8 px.)
-      expect(perDecade * Math.log10(1 / 0.7), common).toBeGreaterThan(common === 'Tiger' ? 4 : 5);
+      // (The lion, 3.4 px, since ToLaD#143: its deep past scaled x12 to its 1950 level reaches ~2M at 50 kya, two
+      // decades above today's 23k, as the tiger's do.)
+      expect(perDecade * Math.log10(1 / 0.7), common).toBeGreaterThan(common === 'Tiger' ? 4 : common === 'Lion' ? 3 : 5);
     }
   });
 
   it('range bars and bands that run past the plot are clipped at its edge, with a marker', () => {
     const leo = svgOf('Leopard');
-    // Both estimates' 95% ranges run off the bottom (to 61k and 43k): two bar markers; the bars end at the plot's edges.
+    // The 2020 estimate's 95% range runs off the bottom (to 43k): a bar marker; the bars end at the plot's edges.
+    // (Two: since ToLaD#143 the leopard's post-glacial low is its 1998 level, 188k, so the 1998 range, to 61k,
+    // runs off the bottom too.)
     expect((leo.match(/data-clip="bar-bottom"/g) ?? []).length).toBe(2);
     expect(leo).not.toContain('data-clip="bar-top"');
     for (const m of leo.matchAll(/y1="([\d.]+)" y2="([\d.]+)" stroke="[^"]+" stroke-width="2"/g)) {
@@ -440,7 +449,11 @@ describe('the sparkline y axis follows the central values, not the ranges (ToLaD
 
   it("a single much wider point flares the band near it, not across the whole span (the leopard's 1500)", () => {
     const leo = byName('Leopard');
-    const run = leo.history!.points.filter((p) => CURVE_KINDS.has(p.kind)).sort((a, b) => a.year - b.year);
+    // (Since ToLaD#143 the leopard's genomic curve meets its 1998 level directly, with no 1500 knot: the
+    // wide point is now set by hand, a 1500 knot as the range-loss trend's start would be, on its genomic run.)
+    const gen = leo.history!.points.filter((p) => p.kind === 'genomic').sort((a, b) => a.year - b.year);
+    const last = gen[gen.length - 1];
+    const run = [...gen, { ...last, year: 1500, lo: last.n / 20, hi: last.n * 20 }];
     const X = (y: number) => y; // a linear stand-in axis: 1 px a year
     const hi = bandEdge(run, 'hi', (y) => X(y));
     expect(hi.length).toBe(run.length + 1); // one extra vertex, before the 1500 point

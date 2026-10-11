@@ -16,7 +16,9 @@ species leaf for each class, with thresholds taken from stated rules, not tuned:
   ceiling  an IUCN CR/EW species whose today's count is modelled and above 10,000, the largest
            population criterion C or D allows any threatened listing (VU C; #88's rule). EN is not
            checked: listed under criterion A or B, an EN species can be of any size
-  deep     a genomic deep past the pipeline's own #77/#80 rule flags (beyond 10x of the next level)
+  deep     a genomic deep past the pipeline's own #77/#80 rule flags (beyond 10x of the next level), or
+           whose join runs against PSMC's dropped blind-spot steps (#143: their mean beyond 1.5x of the
+           youngest resolved step the other way; kept and drawn only where [deep.blind] cites a source)
   status   a living leaf the Red List calls EX, an extinct leaf the Red List assesses as living, an
            EW species drawn with a wild count, a fossil graft ending at the present (#105)
   name     a living leaf no extant-species list recognises (Upham, PHYLACINE, Greenspoon/IUCN, Red
@@ -142,7 +144,8 @@ def leaf_row(n, census: dict, gs_model: dict, deep_reports: dict | None = None) 
         "census": (census.get(n.name) or {}).get("N"), "gs_model": (gs_model.get(n.name) or {}).get("N"),
         "file": rec.get("file"), "modelled": rec.get("modelled"), "use": rec.get("use"),
         "curve": curve,
-        "deep": ({k: deep.get(k) for k in ("ratio", "flag", "rule", "to_kind", "to_n", "deep_n", "factor")}
+        "deep": ({k: deep.get(k) for k in ("ratio", "flag", "rule", "next", "to_kind", "to_n", "deep_n", "deep_n_raw",
+                                            "factor", "blind")}
                  if deep else None),
         "deep_factors": None,
     }
@@ -277,13 +280,23 @@ def check_ceiling(row: dict) -> list[dict]:
 
 def check_deep(row: dict) -> list[dict]:
     d = row.get("deep")
-    if not d or not d.get("flag"):
+    if not d:
         return []
+    out = []
+    bl = d.get("blind") or {}
+    if bl.get("against"):  # the join runs against PSMC's dropped blind-spot steps (ToLaD#143)
+        v = bl["vs_resolved"]
+        out.append(_flag("deep", abs(math.log10(v)),
+                         f"PSMC's {bl['steps']} blind-spot steps average {max(v, 1 / v):.2g}x "
+                         f"{'below' if v < 1 else 'above'} the youngest resolved step but are not drawn "
+                         "(no [deep.blind] source), and the curve is held flat across them", blind=v))
+    if not d.get("flag"):
+        return out
     r = d["ratio"]
-    return [_flag("deep", abs(math.log10(r)),
-                  f"genomic level {_fmt(d['deep_n'])} is {max(r, 1 / r):.3g}x "
+    return out + [_flag("deep", abs(math.log10(r)),
+                  f"genomic level {_fmt(d.get('deep_n_raw') or d['deep_n'])} is {max(r, 1 / r):.3g}x "
                   f"{'above' if r > 1 else 'below'} the next level ({d['to_kind']}, {_fmt(d['to_n'])}); "
-                  f"rule {d['rule']}" + (f" x{d['factor']:.3g}" if d["rule"] == "scaled" else ""), ratio=r)]
+                  f"genome curve scaled x{d['factor']:.3g} to meet it", ratio=r)]
 
 
 def check_status(row: dict) -> list[dict]:

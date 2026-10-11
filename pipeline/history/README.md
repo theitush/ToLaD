@@ -127,10 +127,11 @@ order of precedence:
 1. a cited `[baseline]` here (it wins, whatever the natural baseline says;
    it governs from its year on);
 2. a genomic `[deep]` curve (see "Deep past"): its points are all older than
-   the cited ones, it joins the first cited point (the baseline, if any)
-   log-linearly, and its oldest level is held back to the band start. With
-   a `[deep]` the natural baseline is not used at all (it is still reported
-   in `stats.json`): the five *Panthera* run on their PSMC curves, not on
+   the cited ones, it is scaled as a whole to meet its anchor, the higher of
+   the first cited point (the baseline, if any) and the natural level ("The
+   genome gives the shape" below), and held flat to it, and its oldest level
+   is held back to the band start. Apart from such an anchor, with a `[deep]`
+   the natural baseline is not used (it is still reported in `stats.json`): the five *Panthera* run on their PSMC curves, not on
    the natural baseline; the bulk curves of ToLaD#64 (see "Bulk genomic
    deep past") give ~100 more species one;
 3. else the natural baseline, held from the band start to the first cited
@@ -168,8 +169,10 @@ in 25-year steps.
 - **Precedence:** a history file replaces it (cited baseline, genomic or
   natural baseline before the first cited point, as below), but keeps the
   trend in the gap from 1500 to its first cited point where its deep past
-  ends at the natural level, or at a genomic curve not scaled to that point
-  (ToLaD#71; see 3. above and "Joining").
+  ends at the natural level (ToLaD#71; see 3. above). A genomic deep past
+  anchored on its first cited count gets no trend; one anchored on the
+  natural level (it is above that count) gets the trend down to it, with or
+  without both maps (ToLaD#143, "The genome gives the shape").
   Species whose two maps agree stay flat at today's count. Extant species
   with no current map (their natural level comes from density x area x
   occupancy, not from a range ratio) keep the #61 step. Extinct species run
@@ -212,7 +215,8 @@ in 25-year steps.
   sets the level at the band start (`genomic`, `baseline`, `natural` or
   `today`, in that order of precedence). With a genomic deep past,
   `deep.join` says how it met the next level, and `history.deep_join` sums
-  the rules and lists the flagged species (see "Joining" below).
+  the scale factors and lists the flagged species (see "The genome gives
+  the shape" below).
 - **Domestic** (`component = "domestic"`): the curve is the domestic stock.
   With `faostat_item`, FAOSTAT World stocks (1961 to the latest year, every 5
   years plus the latest) are added as grade B census points. Before the first
@@ -299,7 +303,62 @@ the same way by code rather than by hand.
 - **PSMC's blind spots.**
   - PSMC has little resolution in the last ~10-20 kyr, because few segments
     coalesce that recently. Steps younger than `DEEP_BLIND_YR` = 20 kyr (after
-    rescaling) are dropped.
+    rescaling) are dropped, **unless a cited source dates a decline there**
+    (ToLaD#143, below).
+  - **The blind-spot rule** (ToLaD#143). Dropping the blind steps and joining
+    straight across them drew the opposite of the evidence where the next
+    level is higher: the lion and leopard columns rose through 20-10 kya,
+    where Figueiró et al. 2017 date the big cats' strongest post-glacial
+    decline and the dropped steps themselves fall 3.5-3.8x. The rule:
+    - **Kept where a source dates a decline there.** A `[deep.blind]` table
+      (`cite`, `url`, `quote`, `window` = [from, to] years before present as
+      the source dates it, reaching into the last 20 kyr; optional `note`)
+      keeps the blind steps the window dates, older than the next point and
+      than 1500 CE, as `genomic` points graded D whose notes quote the
+      source: a step is kept when its span overlaps the window, at its
+      log-midpoint clamped into the window. So the step overlapping the
+      window's young edge is kept (it is the genome's level when the dated
+      decline ends; without it the curve would stop part-way down), dated
+      at that edge when its midpoint is younger, and the curve is scaled to
+      meet the next level there; steps wholly younger than the window stay dropped,
+      since the source dates nothing there. Lion: its 16-21, 12-15 and
+      4.6-10.5 kyr steps are kept, the last dated at 10 kya (midpoint 6.9);
+      its 3.5-4.1 kyr step is dropped. Leopard: its 12-23 and 9.4-10.9 kyr
+      steps are kept (the second's midpoint, 10.1 kya, is inside the
+      window); its 6.9-7.7 kyr step is dropped. Under the #77 rule the join
+      then rose again to the next level (lion 41k at 10 kya to 500k, an
+      hourglass at 10 kya no source dates); since the genome gives only the
+      shape ("The genome gives the shape" below), the whole curve, decline
+      included, is scaled to meet its anchor and is flat after it.
+      Lion and leopard have one
+      (Figueiró et al. 2017: "a second round of decline (most notably for
+      the lion and leopard) between 10,000 and 20,000 years ago, following
+      the last glacial maximum").
+    - **Else dropped, and a contradiction is said, not drawn.** Where no
+      source backs them, the steps stay out (one genome's weakest bins are
+      not drawn as fact; across the 109 genomic curves they swing 0.03x-44x
+      from the youngest resolved step, mostly unexplained). But when their
+      duration-weighted log-mean level (`history.blind_mean`) is beyond
+      `BLIND_AGAINST` = 1.5x from the youngest resolved step either way,
+      the flat span from that step to the next level runs against them:
+      flagged `deep.join.blind.against`, said in the card's sentence, and
+      listed by `make audit` under `deep` (49 species in the 2026-10-11
+      build, up from 17 when the join could slope with them).
+    - Why this rule: it draws what a cited source and the genome agree on,
+      and only that; a decline evidenced twice is shown, an unexplained
+      wiggle in PSMC's weakest bins is not, and where the straight join and
+      the genome disagree the reader is told. Keeping every blind step
+      (tried) added 189 grade-D points and moved the genomic level away from
+      the independent next level as often as towards it (33 closer, 35
+      further of 68), and averaging them into one level (tried) could not
+      show the leopard's fall, which sits at 7-11 kya in the build's time
+      scale.
+    - `stats.json -> history.species.<sp>.deep`: `points` (resolved),
+      `kept_blind`, `dropped_blind`, `youngest_blind_yr_ago`;
+      `deep.join.blind`: `kept`, `steps`, `vs_resolved` (youngest kept, or
+      the dropped mean, ÷ the youngest resolved step), `against`, the
+      source's `cite` / `url` / `window`; `history.deep_join.blind` lists
+      the species kept and against.
   - Population structure, and changes in connectivity, change the
     coalescence rate just as a change in size does. A PSMC peak can be a
     period of subdivision, and a "crash" can be populations merging, not a
@@ -310,66 +369,90 @@ the same way by code rather than by hand.
 
   Hence grade C at best, and D when the curve was digitised or the Ne/N ratio
   is generic. Steps older than the species band start are dropped as well.
-- **Joining** (ToLaD#77, decided by Ita 2026-10-11; built in #80, `history.deep_join`).
-  Genomic points are older than every cited point (the 20 kyr cutoff ensures
-  it), so the baseline is no longer the oldest point. The curve passes through
-  every point, so the youngest genomic point is joined to the **next level**
-  (the first non-genomic point) by the usual log-linear span, marked
-  `interpolated`, grade D (the worse of its two ends), across the blind spot.
-  What happens to the genomic level depends on what that next level is:
+- **The genome gives the shape, the anchor gives the number** (ToLaD#143,
+  decided by Ita 2026-10-11: "use the genome estimates to scale the number
+  estimates if we have them"; `history.deep_join`). It replaces the #77/#80
+  join (a cited level dated 1900 or earlier scaled the curve, a modelled or
+  later one kept the genome's own level and was joined log-linearly) and
+  #71's 1900 cutoff. Kept like that, the absolute level made the lion and
+  leopard fall through the dated 20-10 kya decline and then climb 12x and
+  4.7x back to a modelled or post-1900 level, an hourglass at 10 kya that no
+  source dates. Now:
 
-  - **Cited** (a history file's baseline or first point: any point kind, i.e.
-    `census`, `estimate`, `index-scaled`, `reconstruction`, `unverified`)
-    dated **1900 or earlier** (`DEEP_JOIN_CITED_MAX_YEAR`): the
-    genomic curve is **scaled** (its `n`, `lo`, `hi` and Ne, all by one factor)
-    so its youngest point meets the cited level. The PSMC shape is kept; the
-    cited count is better evidence of the level than the generic Ne/N = 0.1.
-    The join span is then flat. E.g. *Bison bison*: x981 to meet the 1800
-    baseline of 42 million.
-  - **Modelled** (the natural level in 1500 CE of the range-loss trend, or
-    today's modelled count): the genomic curve **keeps its own level** and
-    joins the modelled level log-linearly (the #60 rule).
-  - **Flag.** Either way, a species whose genomic / next-level ratio (before
-    any scaling) is beyond `DEEP_JOIN_FLAG` = 10x either way is flagged: the
-    build prints the list, and `stats.json -> history.deep_join` holds the
-    counts per rule and the flagged species, worst first.
+  - **Shape.** The genomic curve (PSMC, plus the `[deep.blind]` steps kept
+    inside a cited window) gives the relative change over time only.
+  - **Number.** The whole curve (`n`, `lo`, `hi` and Ne, all by one factor)
+    is scaled so its youngest point meets the **anchor**. The genome's young
+    end (>= ~10-20 kya) is pre-modern, so it must meet a pre-modern level:
+    the anchor is the **higher** of (a) the first cited count (a history
+    file's baseline or first point, any point kind, any year) and (b) the
+    modelled natural level (the level before range loss, `natural.N`; any
+    living leaf with one, with or without both maps).
+    - **(a) >= (b)** (the lion: 500,000 in 1950 against a natural 150,000;
+      the tiger): the curve meets the count, flat between (`next` cited).
+      So does a first count dated 1500 or earlier, itself pre-modern.
+    - **(b) > (a)**, a count taken after a crash or a recovery from one (the
+      wisent's 1924 census of 66, the giant panda's 1976 census, the
+      scimitar oryx's 650 in 2026, Pere David's deer's captive-bred 2,420):
+      the curve meets the natural level in 1500 CE, flat between, and the
+      range-loss trend runs from there down to the count, the ordinary
+      non-genomic path (#71; `model.rangeloss_start(leaf, any_natural=True)`)
+      (`next` natural; `below` holds the count).
+    - **No cited count** (the bulk curves' modelled records): the modelled
+      level, i.e. the natural level in 1500 CE where the range-loss trend
+      starts, the natural baseline, or today's modelled count (`next`
+      modelled). Genomic points are older than every cited point (the 20
+      kyr cutoff ensures it).
+  - **No join.** The two meet: the span from the genome's young end to the
+    anchor is flat (kind `interpolated`, grade D, as before).
+  - **Flag.** A factor beyond `DEEP_JOIN_FLAG` = 10x either way stays
+    flagged: the build prints the list, `make audit` lists it under `deep`,
+    the card's sentence says so, and `stats.json -> history.deep_join`
+    holds `by_next` (cited / natural / modelled), the factor spread
+    (`factor`: min, p10, p25, median, p75, p90, max, `beyond_flag` up /
+    down) and the flagged species, worst first.
+
+  In the 2026-10-12 build (108 genomic species: 12 anchored on a cited
+  count, 14 on the natural level above their first count, 82 on a modelled
+  level), the factor has median 1.23, p10-p90 0.13-64, and 35 are beyond 10x
+  (25 up, 10 down); within 2x: 29. Before the natural anchor (scaled to the
+  first count of any year: 26 cited, 82 modelled) it had median 1.13, p10-p90
+  0.062-53, 37 beyond 10x (23 up, 14 down): a crash set the whole deep
+  past's level (*Bison bonasus* x0.0031 to 66, *Oryx dammah* x0.0039 to
+  650, *Ailuropoda* x0.022, *Elaphurus* x0.037). Now the wisent is x326 to
+  its natural level (6,967,269, flagged; the trend then falls 1.1e5x to the
+  1924 census), the panda x0.13 (15,127), the oryx x1.4 (225,560), Pere
+  David's deer x2.3 (151,250). The leopard (natural 398,802 above its 1998
+  baseline of 188,000, x4.7, was x2.2) and the cougar (natural 1,019,752
+  above its 2023 estimate of 776,691, x27, was x21) also move to the natural
+  anchor; the lion is unchanged.
 
   Per species, `stats.json -> history.species.<sp>.deep.join` records `rule`
-  (`scaled` / `absolute`), `next` (`cited` / `modelled`), `to_kind`,
-  `to_year`, `to_n`, `deep_n_raw` (the genomic level at the cutoff as
-  converted), `deep_n` (as built), `ratio` (= `deep_n_raw` ÷ `to_n`),
-  `factor` (the scale applied, 1 when kept), `flag` and `note`: one sentence
-  for the species card, e.g. "Genomic curve scaled x981 to meet the cited 1800
-  baseline (42,000,000), keeping its shape; before scaling it was 981x below
-  that level (flagged: beyond 10x)." or "Genomic curve kept at its own level;
-  the modelled natural level in 1500 CE is 316x lower (flagged: beyond 10x);
-  the two are joined log-linearly across PSMC's last 20 kyr." The same
-  sentence ships in the tiles as `META.hist[].deep_join` (`pipeline/FORMAT.md`),
-  which `file.history(row)` returns; a scaled curve's point notes say so too.
-
-  - **Cited after 1900** (ToLaD#71; the dispatcher's call on #80, 2026-10-11):
-    a first cited point after 1900 is mostly a bottleneck or a modern count,
-    not a pre-human level (*Bison bonasus* 1924, 66 animals; *Oryx dammah*
-    2026, 650; *Ailuropoda* 1976, 2,459), and a million years of deep past
-    should not be scaled to it. The genomic curve **keeps its own level** and
-    joins the natural level in 1500 CE, and a log-linear trend (kind
-    `rangeloss`) then runs from there to the cited point, also where the
-    model itself has no range-loss trend (no current range map, as for the
-    scimitar oryx, or two maps that agree). Only a leaf with no natural level
-    at all joins the cited point itself, unscaled. The
-    card sentence says so: "First cited point (1924 census, 66) is after
-    1900, so not used as the deep past's level. Genomic curve kept at its own
-    level; ...". `deep.join.cited_late` records that point;
-    `stats.json -> history.deep_join.cited_late` counts both cases.
-    Where the natural level in 1500 is below the cited point, the trend
-    would rise (lion 150,000 in 1500 -> 500,000 in 1950), so the cited level
-    is held back to 1500 instead and the genomic curve joins that (ToLaD#93;
-    the join's ratio and flag are taken against it). The card sentence ends
-    "... that point's level, held back to 1500 CE because the modelled
-    natural level there (150,002) is below it (evidently an underestimate),
-    is 2.1x higher; ..., then that level is held flat to the cited point,
-    with no range-loss trend rising to it." In the 2026-10-11 build:
-    *Panthera leo*, *Pongo pygmaeus*, *Diceros bicornis*, *Gorilla beringei*.
+  (always `scaled`), `next` (`cited` / `natural` / `modelled`), `below`
+  (the first cited count `{year, n, kind}` when the natural level above it
+  is the anchor, else null), `to_kind`, `to_year`, `to_n` (the anchor),
+  `deep_n_raw` (the genomic level at its young end as converted), `deep_n`
+  (as built, = `to_n`), `ratio` (= `deep_n_raw` ÷ `to_n`), `factor` (= 1 /
+  `ratio`), `flag` and `note`: one sentence for the species card,
+  e.g. "The genome gives the shape, not the number: its curve is scaled ×12
+  to meet the cited 1950 baseline (500,000), then held flat to it (flagged:
+  beyond 10×)." or "... scaled ×0.5 to meet the modelled natural level in
+  1500 CE (40,000; no cited count), then held flat to it." or "... scaled
+  ×326 to meet the modelled natural level in 1500 CE (6,967,269), which is
+  above the first cited count (1924 census, 66), taken after the decline,
+  then held flat to 1500; the range-loss trend runs from there down to the
+  count (flagged: beyond 10×)." Where the blind
+  spot matters (ToLaD#143), the sentence starts with it: "PSMC's 3 steps in
+  its blind spot (the last 20 kyr, where it resolves little) are kept, grade
+  D, because Figueiró et al. 2017, ... dates a decline there: from the
+  youngest resolved step (~23 kya) to the youngest kept (~10.0 kya, the
+  young edge of the window it dates) the genomic level falls 3.5x.", or
+  "PSMC's 3 steps in its blind spot (the last 20 kyr) average 1.7x below its
+  youngest resolved step (~25 kya) but are not drawn: PSMC resolves little
+  there and no source in this file dates a change, so the curve stays flat
+  from that step instead (flagged)." The same sentence ships in the tiles as
+  `META.hist[].deep_join` (`pipeline/FORMAT.md`), which `file.history(row)`
+  returns; each scaled point's note says so too.
 
   Before the oldest genomic point, the oldest genomic level is held back to
   the band start (a `held` segment). It replaces the baseline hold, or
@@ -448,17 +531,17 @@ same `[deep]` structure in memory. Nothing is written into these TOMLs.
   1500 CE (kind `rangeloss`) and the trend to today's count (49 species);
   else straight on to today's count (39). Today's count is the model's
   alive-now, unchanged.
-- **The join at the blind spot** follows "Joining" above (#80): the youngest
-  genomic point (>= 20 kyr ago) joins the next level by one log-linear span,
-  kind `interpolated`, grade D. A history file's cited baseline or first
-  point scales the curve to meet it; a modelled record's next level (the 1500
-  natural level, or today's modelled count) is modelled, so its curve keeps
-  its own level. Every modelled record is therefore `absolute`; scaling
-  happens only in history files (bulk or hand-written `[deep]`). Before
-  #80 the ratio genomic / next level had a median of 0.86 over the 106 bulk
-  curves, but 0.001..316 at the extremes (Bison 0.001 against its 1800
-  baseline, now scaled; Addax 316 against a natural baseline scaled from
-  today's ~80 animals, kept and flagged).
+- **Meeting the anchor** follows "The genome gives the shape" above
+  (#143; bulk curves have no `[deep.blind]`, so their blind steps are
+  dropped): the whole curve is scaled so its youngest point (>= 20 kyr ago)
+  meets the next level, a history file's cited baseline or first point, else
+  a modelled record's 1500 natural level or today's modelled count, and the
+  span between them is flat. Before #143 a modelled next level kept the
+  genome's own level; the ratio genomic / next level had a median of 0.86
+  over the 106 bulk curves, but 0.001..316 at the extremes (Bison 0.001
+  against its 1800 baseline; Addax 316 against a natural baseline scaled
+  from today's ~80 animals): those are now the scale factors' extremes,
+  flagged.
 - **Reports.** `stats.json -> genomic`: the source, coverage and, per curve,
   how it was used. `history.species.<sp>.deep.bulk` marks a bulk curve.
 

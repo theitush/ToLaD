@@ -6,7 +6,7 @@ time in years, Ne, in the paper's own scaling) with each sample's mutation rate 
 generation time in Supplementary Data 1. This module reads them and emits, per species, the same
 [deep] table a history file holds (history._check_deep), so history.apply runs them through the one
 conversion of ToLaD#60 (rescale to DEEP_MU_YEAR and the leaf's G, Ne -> N by DEEP_NE_N, the blind
-spot dropped, joined to the next level by history.deep_join: scaled to a cited level, else kept).
+spot dropped, scaled by history.deep_join to meet the next level: the genome gives the shape).
 
 Precedence: a hand-written [deep] in pipeline/history/*.toml wins (the five Panthera keep Armstrong
 2025). A wild `counts` history file without one gets the bulk curve as its [deep]. A species with no

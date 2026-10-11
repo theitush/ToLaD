@@ -79,6 +79,15 @@ steps  = [
   [984880, 1553820, 57500],
 ]
 
+# PSMC's blind spot (ToLaD#143): a source dating a decline there keeps the curve's steps younger than
+# 20 kyr (rescaled), grade D, instead of joining across them (see README, "PSMC's blind spots").
+[deep.blind]
+cite   = "Figueiro et al. 2017, Sci Adv 3:e1700299, Results (PSMC, Fig. 1B)"
+url    = "https://doi.org/10.1126/sciadv.1700299"
+quote  = "a second round of decline (most notably for the lion and leopard) between 10,000 and 20,000 years ago, following the last glacial maximum"
+window = [10000, 20000]   # years before present, as the source dates it (its own PSMC scaling)
+note   = "Figueiro's leopard genome is an Amur (Far Eastern) leopard, as is the curve in this file; Pecnerova et al. 2021 (Curr Biol 31:1862) caution that Amur genomes are not necessarily representative of the whole species. This curve's own steps younger than 20 kyr (rescaled) fall from Ne 37,000 to 9,300 (published scaling). Quote checked against the full text by the #141 bottleneck research (research/bottlenecks.md)."
+
 # Bottlenecks (ToLaD#141): each window in years before present (2026), quoted from a source that was read.
 [[event]]
 kind = "bottleneck"

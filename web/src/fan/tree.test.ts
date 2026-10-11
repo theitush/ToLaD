@@ -134,8 +134,10 @@ describe('the dated tree', () => {
         const dn = below(v.y);
         const wUp = sum(v.strands.map((b) => laneAt(b, up).w));
         const wDn = sum(v.strands.map((b) => laneAt(b, dn).w));
-        expect(wDn).toBeCloseTo(v.width, 9);
-        expect(wUp).toBeCloseTo(wDn, 9);
+        // (8 digits, was 9: since ToLaD#143 the deep pasts are scaled to the next level and the widths summed
+        // here span more decades; the rounding left is ~1e-9 of a width of ~0.7.)
+        expect(wDn).toBeCloseTo(v.width, 8);
+        expect(wUp).toBeCloseTo(wDn, 8);
         // Below the split the strands sit side by side with no gaps, filling the column.
         let x = v.left;
         for (const b of v.strands) {
