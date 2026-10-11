@@ -38,6 +38,7 @@ describe('species card history', () => {
     const G = 9.14;
     const h: HistoryRec = {
       use: 'counts',
+      component: 'wild',
       scope: '',
       notes: 'Modelled, not counted (grade D).',
       modelled: 'rangeloss',
@@ -91,8 +92,9 @@ describe('species card history', () => {
   });
 
   it('no living species shows a flat assumed stretch without a "no data" mark', () => {
-    // (The wild species with a curated history; the rest show the constant model, the domestic cat its growth since domestication.)
-    const living = FELIDAE.species.filter((s) => !s.extinct && s.history?.component === 'wild');
+    // (The wild species with a curated or genomic history; the rest show the constant model, the domestic cat its growth since
+    // domestication, a range-loss trend (ToLaD#62) its modelled natural level, dashed as modelled, not held.)
+    const living = FELIDAE.species.filter((s) => !s.extinct && s.history?.component === 'wild' && s.history.modelled !== 'rangeloss');
     expect(living.length).toBeGreaterThanOrEqual(6);
     for (const sp of living) {
       const h = sp.history;

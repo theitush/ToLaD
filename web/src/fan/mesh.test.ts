@@ -73,7 +73,9 @@ const SCENES: [string, string, number, number, number][] = [
   ['overview', 'Domestic cat', 2000, 1e9, 2],
   ['mid', 'Lion', 3000, 1e4, 40],
   ['crossfade', 'Lion', 3000, 50, 40],
-  ['close (texture of lives)', 'Lion', 3000, 20, 3],
+  // (Close texture: a screen of ~1.5-6 kyr; at 3 it ran to 27 kyr, where the lion's genomic deep past (ToLaD#60) has it
+  // at 40% of its 3 kyr count and its column has left the screen at 20 per bar.)
+  ['close (texture of lives)', 'Lion', 3000, 20, 10],
   ['close (lives)', 'Lion', 3000, 10, 400],
   ['deep (texture)', 'Tiger', 6e5, 1e4, 50],
   ['deep (lives)', 'Tiger', 6e5, 10, 3000],
