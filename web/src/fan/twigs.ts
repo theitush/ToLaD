@@ -809,9 +809,11 @@ export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: num
       const lx1b = right(y1);
       // Where the column leans (a branch-out peeling off), the texture is measured across it, not
       // along the row (mesh.ts perpScale): q px of the row per px across, its pitch, widths and
-      // level of detail by that; the lanes' least widths reach q times as far along the row.
+      // level of detail by that.
       const q = Math.sqrt(1 + ((sL + sR) / 2) ** 2);
-      const padX = mode ? pad : pad + 1.5 * Math.sqrt(1 + Math.max(sL * sL, sR * sR));
+      // (Along the row only as far as the chord reaches, and 1.5 px past it: no further than
+      // the column goes, however steep.)
+      const padX = mode ? pad : pad + 1.5;
       const x0 = Math.max(-4, Math.min(lx0, lin(S.colX, y1)) - padX);
       const x1 = Math.min(v.w + 4, Math.max(lx1a, lx1b) + padX);
       if (!(x1 > x0)) continue;

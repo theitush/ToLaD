@@ -16,6 +16,7 @@ out vec2 vP;
 flat out vec4 vRect;
 flat out vec4 vColor;
 flat out vec2 vSkew;
+flat out vec2 vClip;
 void main() {
   // A trapezoid: [x0, x1] at y0, shifted by (dl, dr) at y1 (a rectangle when 0).
   // Its bounding box, grown so the anti-aliased edges have room (RECT_FS's filter, hw).
@@ -28,6 +29,7 @@ void main() {
   vRect = aRect;
   vColor = aColor;
   vSkew = aSkew.xy;
+  vClip = aSkew.zw;
   gl_Position = vec4(p.x / uView.x * 2.0 - 1.0, 1.0 - p.y / uView.y * 2.0, 0.0, 1.0);
 }`;
 
@@ -37,6 +39,7 @@ in vec2 vP;
 flat in vec4 vRect;
 flat in vec4 vColor;
 flat in vec2 vSkew;
+flat in vec2 vClip;
 out vec4 o;
 void main() {
   // The edges at this row (linear between y0 and y1), and the pixel's horizontal coverage by
@@ -46,6 +49,12 @@ void main() {
   float t = clamp((vP.y - vRect.y) / H, 0.0, 1.0);
   float xl = vRect.x + vSkew.x * t;
   float xr = vRect.z + vSkew.y * t;
+  // (Clipped to [cl, cr] along the row, if given: a lane's least width across a steep lean stops
+  // where its chord does, not a row's width past it.)
+  if (vClip.y > vClip.x) {
+    xl = max(xl, vClip.x);
+    xr = min(xr, vClip.y);
+  }
   // A lane leaning s px per px covers s px of a row per px down: filtered over that run, a thin
   // lean is a continuous faint line, not a row of dashes. (A sliver of a trapezoid, far under a
   // pixel tall, filtered over at most its own run, 3 px at least, so it does not smear.)
@@ -448,9 +457,9 @@ export class RectBatch {
   /**
    * A rectangle [x0, x1] × [y0, y1] (CSS px) in colour (r, g, b 0–1, alpha);
    * with (dl, dr), a trapezoid: its left and right edges shifted by dl and dr
-   * at y1 (straight between).
+   * at y1 (straight between); with cl < cr, clipped to [cl, cr] in x.
    */
-  push(x0: number, y0: number, x1: number, y1: number, r: number, g: number, b: number, a: number, dl = 0, dr = 0): void {
+  push(x0: number, y0: number, x1: number, y1: number, r: number, g: number, b: number, a: number, dl = 0, dr = 0, cl = 0, cr = 0): void {
     if (!(Math.max(x1, x1 + dr) > Math.min(x0, x0 + dl)) || !(y1 > y0) || a <= 0) return;
     if ((this.n + 1) * 12 > this.f.length) {
       const nf = new Float32Array(this.f.length * 2);
@@ -468,8 +477,8 @@ export class RectBatch {
     this.f[o + 7] = a;
     this.f[o + 8] = dl;
     this.f[o + 9] = dr;
-    this.f[o + 10] = 0;
-    this.f[o + 11] = 0;
+    this.f[o + 10] = cl;
+    this.f[o + 11] = cr;
     this.n++;
   }
 }

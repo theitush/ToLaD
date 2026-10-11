@@ -14,7 +14,7 @@ const PREFIX = process.argv[3] || 'd';
 const ONLY = process.argv[4] ? new Set(process.argv[4].split(',')) : null;
 mkdirSync(OUT, { recursive: true });
 // [name, kind, args]: 'home' | 'far' | 'card' [species] | 'touch' [species, agoYears] | 'scroll' [zoom, agoYears] | 'bar' [species, agoYears, perBar, sy, at?]
-//   | 'split' [splitMa, time zoom × home] | 'tapnode' [splitMa, ageMa]
+//   | 'split' [splitMa, time zoom × home] | 'tapnode' [splitMa, ageMa] | 'about' [species, agoYears, k, r]
 const scenes = [
   ['home', 'home'],
   ['far', 'far'],
@@ -57,6 +57,11 @@ const scenes = [
   // The Red List chip on a small cat (Least Concern, gray) and on the leopard (ToLaD#98).
   ['card-leopardcat', 'card', ['Leopard cat']],
   ['card-leopard', 'card', ['Leopard']],
+  // Texture at every zoom, branch-outs as lines (#100, #101): zoomed 2^k × home (time 2^(k·r)) about a
+  // column `ago` years back: the leopard cat's stem below its start, the river forks at the Felidae base.
+  ['stem-leopardcat', 'about', ['Leopard cat', 1.2e7, 9, 1]],
+  ['forks-base', 'about', ['Leopard cat', 1.2e7, 12, 0.5]],
+  ['peel-domestic', 'about', ['Domestic cat', 1e4, 3, 0.5]],
 ];
 const browser = await chromium.launch({ headless: true });
 try {
@@ -99,6 +104,15 @@ try {
           const h = f.homeCamera();
           const sy = h.sy * z;
           f.cam = { ...h, sx: h.sx * z, sy, ty: sy, cy: f.yNow + (f.h / 2 - (160 - dy)) / sy };
+          f.camera.settle();
+        } else if (kind === 'about') {
+          const [sp, ago, k, r] = args;
+          const b = fan.branches.find((b) => b.sp.common === sp);
+          const h = f.homeCamera();
+          const y = fan.time.y(ago / 1e6);
+          const L = f.model(b).lanes(y);
+          const sy = h.sy * 2 ** (k * r);
+          f.cam = { cx: L.left + L.w / 2, cy: y, sx: h.sx * 2 ** k, sy, ty: sy };
           f.camera.settle();
         } else if (kind === 'zoomin') {
           // From home (t = 0) to the species' individuals (t = 1, 4 per 70 px bar) about a point on its column.
