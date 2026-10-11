@@ -30,7 +30,7 @@ grade = "C"
 kind  = "estimate"
 cite  = "Rodriguez & Delibes 1992, Current range and status of the Iberian lynx Felis pardina Temminck, 1824 in Spain, Biological Conservation 61:189-196 (as tabulated in Guzman et al. 2004, El lince iberico (Lynx pardinus) en Espana y Portugal: censo-diagnostico de sus poblaciones, OAPN, chapter I, Table 2)"
 url   = "https://www.miteco.gob.es/es/parques-nacionales-oapn/publicaciones/edit_libro_05_01_tcm30-100272.pdf"
-note  = "Spain only (Portugal held a few dozen at most). Table 2 ('ESTIMA 1988') sums the regions to 1,060-1,223; the chapter text gives 880-1,150 individuals excluding cubs (about 350 adult females); 1,136 is the paper's headline figure as quoted by the IUCN SSC Cat Specialist Group. A survey-based estimate (interviews), not a count; the paper itself (doi:10.1016/0006-3207(92)91115-9) was not read."
+note  = "Spain only (Portugal held a few dozen at most). Table 2 ('ESTIMA 1988') sums the regions to 1,060-1,223; the chapter text gives 880-1,150 individuals excluding cubs (about 350 adult females); 1,136 is the total of Table 1 (48 nuclei over 10,669 km2 of stable presence, ~10.6 per 100 km2) and the figure the IUCN SSC Cat Specialist Group quotes. A survey-based estimate (interviews), not a count; the paper itself (doi:10.1016/0006-3207(92)91115-9) was not read."
 
 [[point]]
 year  = 1997

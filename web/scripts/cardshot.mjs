@@ -22,6 +22,11 @@ const scenes = [
   ['leopard-now', 'Leopard', 0.2],
   ['leopard-details', 'Leopard', 0.2, true],
   ['snow-leopard-details', 'Snow leopard', 0.2, true],
+  ['cougar-30k', 'Cougar', 3e4],
+  ['cougar-details', 'Cougar', 0.2, true],
+  ['iberian-lynx-details', 'Iberian lynx', 0.2, true],
+  ['eurasian-lynx-details', 'Eurasian lynx', 0.2, true],
+  ['canada-lynx-details', 'Canada lynx', 0.2, true],
 ];
 const browser = await chromium.launch({ headless: true });
 try {
@@ -29,7 +34,7 @@ try {
   const page = await ctx.newPage();
   page.on('pageerror', (e) => console.log('pageerror', String(e)));
   await page.goto(pathToFileURL(resolve('dist-single/index.html')).href);
-  await page.waitForFunction(() => !!window.__fan, null, { timeout: 20000 });
+  await page.waitForFunction(() => !!window.__fan, null, { timeout: 90000 });
   for (const [name, sp, ago, open] of scenes) {
     if (ONLY && !ONLY.has(name)) continue;
     await page.evaluate(
