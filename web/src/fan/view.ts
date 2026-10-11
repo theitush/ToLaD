@@ -4,7 +4,7 @@
 // in far enough, a branch resolves into the individuals themselves (twigs.ts).
 // Gestures come from the shared engine/input.ts.
 
-import { formatCount } from '../data/names';
+import { formatCount } from '../data/count';
 import { Input, type InputHandlers } from '../engine/input';
 import { clipPoly, FanCamera, STRAND_PX, type Camera } from './camera';
 import { laneAt, layoutFan, leftAt, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type EdgeStyle, type Fan, type FanBranch, type FanNode, type WidthMode } from './layout';
@@ -1109,7 +1109,7 @@ export class FanView implements InputHandlers {
       const per = 1 / unitPx; // individuals per px
       const n = Math.max(1, niceStep(target * per));
       const px = n / per;
-      return { px, label: `${formatCount(n)} ${n === 1 ? 'individual' : 'individuals'}` };
+      return { px, label: `${formatCount(n, { exact: true })} ${n === 1 ? 'individual' : 'individuals'}` };
     }
     if (unitPx < target * 2.5) {
       const k = Math.max(1, niceStep(target / unitPx));
@@ -1290,7 +1290,7 @@ export class FanView implements InputHandlers {
       [f.clade.sci, font('italic 400 14px', SERIF), INK2],
       // The living first; the total born only as an honest secondary line (a model figure, never bare).
       [`${formatCount(f.clade.alive)} alive now`, font('600 13px'), GREEN],
-      [`~${formatCount(f.clade.ever)} born in total (model, grade ${f.clade.grade})`, font('500 13px'), INK2],
+      [`${formatCount(f.clade.ever)} born in total (model, grade ${f.clade.grade})`, font('500 13px'), INK2],
     ];
     let wmax = 0;
     for (const [t, ft] of lines) {

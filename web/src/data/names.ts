@@ -233,32 +233,3 @@ export function formatAge(ageMa: number, stepYears = 0): string {
   if (y >= 1e3 && (!stepYears || stepYears >= 100)) return `${fmt(y / 1e3, dec(1e3))} kya`;
   return `${fmt(y, dec(1))} ya`;
 }
-
-/** A count with a short word suffix: 1.2 billion, 3.4 × 10^18. */
-export function formatCount(n: number): string {
-  if (!(n > 0)) return '0';
-  if (n < 1e4) return Math.round(n).toLocaleString('en-US');
-  const words: [number, string][] = [
-    [1e12, 'trillion'],
-    [1e9, 'billion'],
-    [1e6, 'million'],
-    [1e3, 'thousand'],
-  ];
-  if (n < 1e15) {
-    for (const [v, w] of words) if (n >= v) return `${trim(n / v)} ${w}`;
-  }
-  const e = Math.floor(Math.log10(n));
-  return `${trim(n / Math.pow(10, e))} × 10${sup(e)}`;
-}
-
-function trim(v: number): string {
-  return v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(1).replace(/\.0$/, '') : v.toFixed(2).replace(/\.?0+$/, '');
-}
-
-const SUP = '⁰¹²³⁴⁵⁶⁷⁸⁹';
-function sup(e: number): string {
-  return String(e)
-    .split('')
-    .map((d) => (d === '-' ? '⁻' : SUP[Number(d)]))
-    .join('');
-}

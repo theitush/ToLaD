@@ -484,7 +484,8 @@
   font-size: 14px;
   color: var(--ink-2);
 }
-/* Conservation status: a small chip, coloured along the Red List's own scale. */
+/* Conservation status: a small chip, coloured along the Red List's own scale;
+   Least Concern a quiet gray, so "no danger" reads at a glance (ToLaD#98). */
 .fan .card-sp .status {
   display: inline-block;
   margin: 0 0 7px;
@@ -499,7 +500,8 @@
   white-space: nowrap;
 }
 .fan .card-sp .status.iucn-lc {
-  background: #6fbf73;
+  background: #3d4642;
+  color: #c3ccc6;
 }
 .fan .card-sp .status.iucn-nt {
   background: #b9d36a;
