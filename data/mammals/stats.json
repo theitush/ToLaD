@@ -6750,7 +6750,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 3,
-    "segments": 46,
+    "segments": 66,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -6811,7 +6811,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 62,
+    "segments": 149,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -6872,7 +6872,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 0,
-    "segments": 52,
+    "segments": 124,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -6944,7 +6944,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 3,
-    "segments": 57,
+    "segments": 146,
     "trend_1500": true,
     "trend_held": null,
     "use": "counts"
@@ -7005,7 +7005,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 50,
+    "segments": 141,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -7059,7 +7059,7 @@
     "modelled": "genomic",
     "natural": null,
     "points": 0,
-    "segments": 41,
+    "segments": 126,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -7120,7 +7120,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 47,
+    "segments": 120,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -7181,7 +7181,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 0,
-    "segments": 51,
+    "segments": 68,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -7249,7 +7249,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 4,
-    "segments": 87,
+    "segments": 188,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -7343,7 +7343,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 45,
+    "segments": 138,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -7404,7 +7404,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 42,
+    "segments": 140,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -7585,7 +7585,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 45,
+    "segments": 51,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -7653,7 +7653,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 2,
-    "segments": 56,
+    "segments": 145,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -7718,7 +7718,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 4,
-    "segments": 107,
+    "segments": 201,
     "trend_1500": true,
     "trend_held": null,
     "use": "counts"
@@ -7779,7 +7779,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 37,
+    "segments": 124,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -7840,7 +7840,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 48,
+    "segments": 125,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -7894,7 +7894,7 @@
     "modelled": "genomic",
     "natural": null,
     "points": 0,
-    "segments": 46,
+    "segments": 158,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -7955,7 +7955,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 45,
+    "segments": 144,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -8016,7 +8016,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 49,
+    "segments": 145,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -8143,7 +8143,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 0,
-    "segments": 33,
+    "segments": 118,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -8237,7 +8237,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 39,
+    "segments": 73,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -8331,7 +8331,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 42,
+    "segments": 86,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -8458,7 +8458,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 40,
+    "segments": 84,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -8552,7 +8552,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 31,
+    "segments": 84,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -8613,7 +8613,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 0,
-    "segments": 33,
+    "segments": 99,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -8747,7 +8747,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 47,
+    "segments": 126,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -8812,7 +8812,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 4,
-    "segments": 47,
+    "segments": 163,
     "trend_1500": true,
     "trend_held": null,
     "use": "counts"
@@ -8873,7 +8873,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 57,
+    "segments": 140,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -8934,7 +8934,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 54,
+    "segments": 170,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -8988,7 +8988,7 @@
     "modelled": "genomic",
     "natural": null,
     "points": 0,
-    "segments": 47,
+    "segments": 130,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -9049,7 +9049,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 55,
+    "segments": 127,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -9114,7 +9114,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 2,
-    "segments": 61,
+    "segments": 108,
     "trend_1500": true,
     "trend_held": null,
     "use": "counts"
@@ -9175,7 +9175,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 46,
+    "segments": 90,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -9236,7 +9236,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 62,
+    "segments": 192,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -9308,7 +9308,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 5,
-    "segments": 53,
+    "segments": 139,
     "trend_1500": true,
     "trend_held": {
      "baseline": true,
@@ -9379,7 +9379,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 51,
+    "segments": 133,
     "trend_1500": true,
     "trend_held": null,
     "use": "counts"
@@ -9447,7 +9447,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 2,
-    "segments": 41,
+    "segments": 92,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -9574,7 +9574,7 @@
     "modelled": "genomic",
     "natural": null,
     "points": 0,
-    "segments": 41,
+    "segments": 113,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -9701,7 +9701,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 56,
+    "segments": 132,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -9762,7 +9762,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 61,
+    "segments": 203,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -9823,7 +9823,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 0,
-    "segments": 55,
+    "segments": 160,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -9884,7 +9884,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 51,
+    "segments": 126,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -10091,7 +10091,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 47,
+    "segments": 163,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -10145,7 +10145,7 @@
     "modelled": "genomic",
     "natural": null,
     "points": 0,
-    "segments": 51,
+    "segments": 150,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -10217,7 +10217,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 35,
+    "segments": 113,
     "trend_1500": true,
     "trend_held": {
      "baseline": true,
@@ -10284,7 +10284,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 36,
+    "segments": 48,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -10345,7 +10345,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 44,
+    "segments": 72,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -10406,7 +10406,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 38,
+    "segments": 122,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -10467,7 +10467,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 49,
+    "segments": 111,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -10528,7 +10528,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 53,
+    "segments": 112,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -10589,7 +10589,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 0,
-    "segments": 43,
+    "segments": 106,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -10676,7 +10676,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 53,
+    "segments": 96,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -10737,7 +10737,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 0,
-    "segments": 59,
+    "segments": 203,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -10798,7 +10798,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 0,
-    "segments": 49,
+    "segments": 109,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -10859,7 +10859,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 57,
+    "segments": 163,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -10920,7 +10920,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 0,
-    "segments": 43,
+    "segments": 130,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -10981,7 +10981,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 0,
-    "segments": 49,
+    "segments": 136,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -11042,7 +11042,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 0,
-    "segments": 47,
+    "segments": 84,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -11110,7 +11110,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 6,
-    "segments": 57,
+    "segments": 175,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -11171,7 +11171,7 @@
     "modelled": null,
     "natural": null,
     "points": 5,
-    "segments": 51,
+    "segments": 143,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -11232,7 +11232,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 0,
-    "segments": 53,
+    "segments": 152,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -11293,7 +11293,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 0,
-    "segments": 58,
+    "segments": 151,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -11460,7 +11460,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 49,
+    "segments": 95,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -11521,7 +11521,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 0,
-    "segments": 34,
+    "segments": 85,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -11582,7 +11582,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 48,
+    "segments": 92,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -11643,7 +11643,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 0,
-    "segments": 43,
+    "segments": 99,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -11704,7 +11704,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 0,
-    "segments": 41,
+    "segments": 108,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -11765,7 +11765,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 42,
+    "segments": 114,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -11826,7 +11826,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 0,
-    "segments": 52,
+    "segments": 103,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -11891,7 +11891,7 @@
      "method": "N_nat: D x natural range (PHYLACINE, rescaled to PanTHERIA areas) x fitted occupancy"
     },
     "points": 1,
-    "segments": 52,
+    "segments": 105,
     "trend_1500": true,
     "trend_held": null,
     "use": "counts"
@@ -11952,7 +11952,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 0,
-    "segments": 43,
+    "segments": 143,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -12013,7 +12013,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 0,
-    "segments": 53,
+    "segments": 145,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -12074,7 +12074,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 49,
+    "segments": 109,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -12135,7 +12135,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 41,
+    "segments": 144,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -12229,7 +12229,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 51,
+    "segments": 205,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -12290,7 +12290,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 0,
-    "segments": 49,
+    "segments": 179,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -12351,7 +12351,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 0,
-    "segments": 40,
+    "segments": 126,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -12412,7 +12412,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 39,
+    "segments": 116,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -12466,7 +12466,7 @@
     "modelled": "genomic",
     "natural": null,
     "points": 0,
-    "segments": 35,
+    "segments": 110,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -12527,7 +12527,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 0,
-    "segments": 36,
+    "segments": 132,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -12595,7 +12595,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 2,
-    "segments": 38,
+    "segments": 103,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -12667,7 +12667,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 4,
-    "segments": 51,
+    "segments": 84,
     "trend_1500": true,
     "trend_held": {
      "baseline": true,
@@ -12745,7 +12745,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 47,
+    "segments": 122,
     "trend_1500": true,
     "trend_held": null,
     "use": "counts"
@@ -12817,7 +12817,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 38,
+    "segments": 73,
     "trend_1500": true,
     "trend_held": null,
     "use": "counts"
@@ -12885,7 +12885,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 4,
-    "segments": 34,
+    "segments": 54,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -12950,7 +12950,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 3,
-    "segments": 46,
+    "segments": 65,
     "trend_1500": true,
     "trend_held": null,
     "use": "counts"
@@ -13011,7 +13011,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 50,
+    "segments": 80,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -13072,7 +13072,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 0,
-    "segments": 44,
+    "segments": 154,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -13220,7 +13220,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 2,
-    "segments": 36,
+    "segments": 96,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -13292,7 +13292,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 2,
-    "segments": 48,
+    "segments": 180,
     "trend_1500": true,
     "trend_held": {
      "baseline": true,
@@ -13352,7 +13352,7 @@
     "modelled": "genomic",
     "natural": null,
     "points": 0,
-    "segments": 42,
+    "segments": 118,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -13413,7 +13413,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 0,
-    "segments": 31,
+    "segments": 80,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -13474,7 +13474,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 48,
+    "segments": 120,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -13535,7 +13535,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 49,
+    "segments": 151,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -13596,7 +13596,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 0,
-    "segments": 43,
+    "segments": 101,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -13657,7 +13657,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 41,
+    "segments": 89,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -13831,7 +13831,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 45,
+    "segments": 127,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -13892,7 +13892,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 46,
+    "segments": 94,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -13953,7 +13953,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 31,
+    "segments": 83,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -14014,7 +14014,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 0,
-    "segments": 42,
+    "segments": 113,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -14075,7 +14075,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 0,
-    "segments": 45,
+    "segments": 128,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -14136,7 +14136,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 0,
-    "segments": 43,
+    "segments": 136,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -14197,7 +14197,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 0,
-    "segments": 56,
+    "segments": 153,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -14258,7 +14258,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 0,
-    "segments": 54,
+    "segments": 128,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -14319,7 +14319,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 47,
+    "segments": 100,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -14380,7 +14380,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 49,
+    "segments": 141,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -14445,7 +14445,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 41,
+    "segments": 92,
     "trend_1500": true,
     "trend_held": null,
     "use": "counts"
@@ -14510,7 +14510,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 3,
-    "segments": 55,
+    "segments": 123,
     "trend_1500": true,
     "trend_held": null,
     "use": "counts"
@@ -14571,7 +14571,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 1,
-    "segments": 41,
+    "segments": 83,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -14625,7 +14625,7 @@
     "modelled": "genomic",
     "natural": null,
     "points": 0,
-    "segments": 29,
+    "segments": 100,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -14693,7 +14693,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 3,
-    "segments": 60,
+    "segments": 166,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -15686,12 +15686,12 @@
   "non-species tip": 551
  },
  "output": {
-  "brotli_bytes": 679114,
+  "brotli_bytes": 733772,
   "files": 16,
-  "raw_bytes": 2729512,
-  "skeleton_brotli": 51493,
+  "raw_bytes": 2862600,
+  "skeleton_brotli": 52862,
   "skeleton_nodes": 1156,
-  "skeleton_raw": 244584,
+  "skeleton_raw": 249128,
   "tiles": 15
  },
  "overrides": {
@@ -16283,7 +16283,7 @@
     "leaf": "Gorilla gorilla",
     "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count",
     "natural": 328807.3394495413,
-    "segments": 36,
+    "segments": 48,
     "today": 320000.0
    },
    {
@@ -16295,7 +16295,7 @@
     "leaf": "Bison bison",
     "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count",
     "natural": 421146.34146341466,
-    "segments": 56,
+    "segments": 145,
     "today": 31000.0
    },
    {
@@ -16319,7 +16319,7 @@
     "leaf": "Ceratotherium simum",
     "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count",
     "natural": 20744.172307692304,
-    "segments": 47,
+    "segments": 163,
     "today": 15752.0
    },
    {
@@ -16355,7 +16355,7 @@
     "leaf": "Ursus arctos",
     "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count",
     "natural": 362297.6501305483,
-    "segments": 41,
+    "segments": 92,
     "today": 200000.0
    },
    {
@@ -16427,7 +16427,7 @@
     "leaf": "Elephas maximus",
     "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count",
     "natural": 205422.22929936307,
-    "segments": 41,
+    "segments": 92,
     "today": 50002.00000000001
    }
   ],
