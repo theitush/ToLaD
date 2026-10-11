@@ -107,6 +107,49 @@ class Schema(unittest.TestCase):
         with self.assertRaises(H.HistoryError):
             H.validate(d)
 
+    def test_event_scope(self):
+        """scope (ToLaD#149): "species" by default, "regional" needs a region; every curated event sets it."""
+        ev = {"kind": "bottleneck", "from_ya": 25000, "to_ya": 10000, "title": "A refounding",
+              "summary": "Few founders.", "quote": "q", "cite": "Z 2000", "url": "https://doi.org/10.1/x", "grade": "C"}
+        d = copy.deepcopy(GOOD)
+        d["event"] = [dict(ev), dict(ev, from_ya=900, to_ya=800, region="Gir", scope="regional", scope_why="Gir")]
+        self.assertEqual([e["scope"] for e in H.validate(d)["events"]], ["species", "regional"])
+        for mut in (dict(scope="local"), dict(scope="regional"), dict(scope_why=" ")):
+            d = copy.deepcopy(GOOD)
+            d["event"] = [dict(ev, **mut)]
+            with self.assertRaises(H.HistoryError, msg=str(mut)):
+                H.validate(d)
+        for r in H.load_all():
+            for e in r["events"]:
+                self.assertTrue(e["scope_why"], f"{r['species']}: {e['title']} has no scope_why")
+
+    def test_event_falls(self):
+        """A species-wide event's column falls >= EVENT_FALL through its window (ToLaD#149), unless listed
+        here as one the curve cannot resolve (the card says so; make audit lists them under `event`)."""
+        st = _stats()
+        if st is None:
+            self.skipTest("no build")
+        unresolved = {
+            ("Acinonyx jubatus", "Late-Pleistocene crash"),  # PSMC blind spot; bulk deep, no [deep.blind] yet
+            ("Arctocephalus gazella", "Sealing near-extinction"),  # one point (2008): Ne 150-200 is not a count
+            ("Canis rufus", "Fourteen founders"),  # the trend from 1500 already reaches the low; no earlier count
+            ("Lynx pardinus", "Ancient lynx decline"), ("Lynx pardinus", "Glacial bottleneck"),  # no [deep]
+            ("Panthera tigris", "Ancestral bottleneck"), ("Panthera tigris", "Late Pleistocene bottleneck"),
+            ("Panthera uncia", "Glacial decline"), ("Panthera uncia", "Holocene bottleneck"),
+            ("Puma concolor", "Last-glacial low"),  # its young end sits in the blind spot
+            ("Ursus maritimus", "Long Pleistocene decline"),
+        }
+        seen = set()
+        for sp, r in st["species"].items():
+            for e in r.get("events") or []:
+                if e["scope"] != "species":
+                    continue
+                key = (sp, e["what"].split(": ", 1)[1])
+                seen.add(key)
+                self.assertEqual(e["shown"], key not in unresolved, f"{key}: fall {e['fall']} ({e['why']})")
+                self.assertEqual(e["shown"], e["fall"] >= H.EVENT_FALL)
+        self.assertLessEqual(unresolved, seen)
+
     def test_seeded_bottlenecks(self):
         """The cougar's and the cheetah's bottlenecks are in their files, each quoting its source."""
         recs = {r["species"]: r for r in H.load_all()}

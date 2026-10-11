@@ -22,6 +22,8 @@ NATB_FIELDS = ["n", "lo", "hi", "km2_natural", "km2_current"]
 # RLST (v1.4, ToLaD#48): per row u32 x 3: category | source << 8 | year << 16, IUCN taxon id, assessment id
 RLST_PER_ROW = 3
 # v1.5 (ToLaD#141): META.hist[].events, a history file's curated events (bottlenecks); no new section
+# v1.6 (ToLaD#149): META.hist[].events[].scope ("species" | "regional") and .shown (the column falls through it)
+EVENT_BUILD_ONLY = {"scope_why", "fall", "end", "why"}  # in stats.json, not shipped
 MAGIC = b"TLAD"
 KIND_SKELETON, KIND_TILE = 0, 1
 TILE_BUDGET = 2500
@@ -226,7 +228,8 @@ def encode_hist(rows: list[tuple[Node, bool]], cites: dict[tuple[str, str], int]
             meta[-1]["deep_join"] = rec["deep_join"]["note"]
         if rec.get("events"):
             # curated events (v1.5, ToLaD#141): bottlenecks, marked on the fan and quoted on the card
-            meta[-1]["events"] = [dict(e) for e in rec["events"]]
+            # (v1.6, ToLaD#149: + `scope`, "species" or "regional", and `shown`, whether the column falls through it)
+            meta[-1]["events"] = [{k: v for k, v in e.items() if k not in EVENT_BUILD_ONLY} for e in rec["events"]]
     if not recs:
         return b"", 0, []
     blob = HIST_PREAMBLE.pack(len(recs), len(pts), len(segs), 0) + b"".join(heads) + b"".join(pts) + b"".join(segs)
@@ -244,7 +247,7 @@ def hist_debug(rec: dict, tile: int, row: int, gid: int) -> dict:
                    for p in rec["curve"]],
         "segments": [{"year0": s["year0"], "gens": s["gens"], "start": s["start"], "end": s["end"],
                       "grade": "ABCD"[s["grade"]], "kind": KINDS[s["kind"]]} for s in rec["segments"]],
-        "events": [dict(e) for e in rec.get("events", [])],
+        "events": [{k: v for k, v in e.items() if k not in EVENT_BUILD_ONLY} for e in rec.get("events", [])],
     }
 
 

@@ -10,6 +10,8 @@ kind    = "bottleneck"
 from_ya = 140
 to_ya   = 114
 title   = "Pelagic sealing crash"
+scope   = "regional"
+scope_why = "the Pribilof (eastern Pacific) stock; the Commander, Kuril and Robben herds are not in it"
 summary = "Hunting at sea cut the Pribilof fur seal herds until the 1911 treaty ended it; with the harvest stopped, the population grew about 8.6% a year from 1912 to 1924, the fastest rate recorded for the species. The source dates the end of the crash, not its start (pelagic sealing grew in the 1880s)."
 quote   = "Pelagic sealing led to a decrease in the northern fur seal population; however, a moratorium on northern fur seal harvesting and termination of pelagic sealing resulted in a steady increase in the northern fur seal population from 1912 to 1924. During this period, the rate of population growth was approximately 8.6% (SE = 1.47) per year"
 cite    = "Young NC, et al. (2026). Northern fur seal (Callorhinus ursinus): Eastern Pacific stock. Alaska Marine Mammal Stock Assessments 2024, NOAA-TM-AFSC-503"

@@ -103,6 +103,8 @@ kind = "bottleneck"
 from_ya = 75000
 to_ya = 30000
 title = "Glacial decline"
+scope   = "species"
+scope_why = "the species' own genome-wide history"
 summary = "Genetic (PSMC, four genomes): a slow fall from 13,000–17,000 to about 6,000–8,000 effective individuals between 75,000 and 30,000 years ago, while glaciers in the Asian mountains were at their largest; snow leopards have stayed few for 900,000 years."
 quote = "Reconstructions suggested that snow leopards had an effective population size of 13,000 to 17,000 individuals from ~300,000 to 75,000 y ago and underwent a slow decline between ~75,000 to 30,000 y ago to an effective population size of ~6,000 to 8,000 individuals. This decline is coincident with the maximum extent of glaciation in mountainous areas of Asia during the Last Glacial Maximum (~40,000 to 100,000 y ago) which was well before the global Last Glacial Maximum (~20,000 y ago) (57)."
 cite = "Solari KA, Morgan S, Poyarkov AD, et al. (2025). Exceedingly low genetic diversity in snow leopards due to persistently small population size. PNAS 122:e2502584122"
@@ -114,6 +116,8 @@ kind = "bottleneck"
 from_ya = 9000
 to_ya = 7000
 title = "Holocene bottleneck"
+scope   = "species"
+scope_why = "the species' own genome-wide history"
 summary = "Genetic (microsatellites from scat, range-wide): a bottleneck about 8,000 years ago, as the climate warmed and the treeline rose on the Tibetan Plateau. Genome-wide PSMC is too coarse to see it."
 quote = "Snow leopards exhibited low genetic diversity at microsatellites (AN = 5.8, HO = 0.433, HE = 0.568), virtually no mtDNA variation, and underwent a bottleneck in the Holocene (∼8000 years ago) coinciding with increased temperatures, precipitation, and upward treeline shift in the Tibetan Plateau."
 cite = "Janecka JE, Zhang Y, Li D, et al. (2017). Range-wide snow leopard phylogeography supports three subspecies. J Hered 108:597–607"

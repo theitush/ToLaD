@@ -91,6 +91,21 @@ labelled band.
 - **Build:** the events ride in the species' `META.hist` entry, oldest first
   (`pipeline/FORMAT.md` v1.5); they do not change any count. Report:
   `stats.json -> history.species[<sp>].events`.
+- **Scope** (ToLaD#149): `scope = "species"` (the default: the whole species;
+  tinted on its column) or `"regional"` (a subpopulation named by `region`,
+  e.g. the Gir lions: on the card and its sparkline only, since the column is
+  the whole species and cannot narrow for a few % of it), with `scope_why`,
+  one line saying why. Every event sets both.
+- **The check** (`history.event_fall`, ToLaD#149): a species-wide event must
+  sit where the drawn column (the segments) falls by at least `EVENT_FALL` =
+  1.5x, from its level at the window's old end to its lowest inside the window
+  (the pipeline's "worth telling the reader" ratio, as `BLIND_AGAINST`). Each
+  event gets `fall`, `shown` and, when not shown, `why` (blind spot, joined
+  across, before the data, data rises / too shallow, not drawn), in
+  `stats.json`; `shown` and `scope` ship in META (FORMAT v1.6). `make audit`
+  lists unshown species-wide events as class `event`, and
+  `tests/test_history.py` holds the list of the ones the curve cannot resolve
+  (the card says so; the fan still tints them).
 
 **kind** is one of:
 
