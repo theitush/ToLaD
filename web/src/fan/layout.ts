@@ -560,20 +560,28 @@ class Packer {
     return c;
   }
   shift(c: Contour, dx: number): Contour {
-    return { L: c.L.map((v) => v + dx), R: c.R.map((v) => v + dx), lw: c.lw.slice(), rw: c.rw.slice() };
+    const L = new Float64Array(CELLS);
+    const R = new Float64Array(CELLS);
+    for (let j = 0; j < CELLS; j++) {
+      L[j] = c.L[j] + dx;
+      R[j] = c.R[j] + dx;
+    }
+    return { L, R, lw: c.lw.slice(), rw: c.rw.slice() };
   }
   copy(c: Contour): Contour {
     return { L: c.L.slice(), R: c.R.slice(), lw: c.lw.slice(), rw: c.rw.slice() };
   }
-  /** Adds c into `into` (the outline of both). */
-  union(into: Contour, c: Contour): void {
+  /** Adds c, shifted by a then b, into `into` (the outline of both). (The shifts in place, no copy: shift(shift(c, a), b), to the bit.) */
+  union(into: Contour, c: Contour, a = 0, b = 0): void {
     for (let j = 0; j < CELLS; j++) {
-      if (c.L[j] < into.L[j]) {
-        into.L[j] = c.L[j];
+      const l = c.L[j] + a + b;
+      const r = c.R[j] + a + b;
+      if (l < into.L[j]) {
+        into.L[j] = l;
         into.lw[j] = c.lw[j];
       }
-      if (c.R[j] > into.R[j]) {
-        into.R[j] = c.R[j];
+      if (r > into.R[j]) {
+        into.R[j] = r;
         into.rw[j] = c.rw[j];
       }
     }
@@ -596,16 +604,16 @@ class Packer {
   gap(frac: number, wa: number, wb: number): number {
     return Math.max(frac * Math.min(wa, wb), MIN_GAP_FRAC * this.W);
   }
-  /** The least shift that puts c to the right of `acc` by the gap wherever both have columns (−∞: nowhere). */
-  right(acc: Contour, c: Contour, frac: number): number {
+  /** The least shift that puts c (shifted by a) to the right of `acc` by the gap wherever both have columns (−∞: nowhere). */
+  right(acc: Contour, c: Contour, frac: number, a = 0): number {
     let d = -Infinity;
-    for (let j = 0; j < CELLS; j++) if (acc.R[j] > -Infinity && c.L[j] < Infinity) d = Math.max(d, acc.R[j] + this.gap(frac, acc.rw[j], c.lw[j]) - c.L[j]);
+    for (let j = 0; j < CELLS; j++) if (acc.R[j] > -Infinity && c.L[j] < Infinity) d = Math.max(d, acc.R[j] + this.gap(frac, acc.rw[j], c.lw[j]) - (c.L[j] + a));
     return d;
   }
-  /** The least shift (most negative) that puts c to the left of `acc` by the gap (+∞: nowhere). */
-  left(acc: Contour, c: Contour, frac: number): number {
+  /** The least shift (most negative) that puts c (shifted by a) to the left of `acc` by the gap (+∞: nowhere). */
+  left(acc: Contour, c: Contour, frac: number, a = 0): number {
     let d = Infinity;
-    for (let j = 0; j < CELLS; j++) if (acc.L[j] < Infinity && c.R[j] > -Infinity) d = Math.min(d, acc.L[j] - this.gap(frac, acc.lw[j], c.rw[j]) - c.R[j]);
+    for (let j = 0; j < CELLS; j++) if (acc.L[j] < Infinity && c.R[j] > -Infinity) d = Math.min(d, acc.L[j] - this.gap(frac, acc.lw[j], c.rw[j]) - (c.R[j] + a));
     return d;
   }
   /** Whether a lies inside b at every height (never makes a neighbour move further). */
@@ -872,7 +880,7 @@ function placeRiver(root: FanNode, P: Packer, time: TimeScale, mode: WidthMode):
       else {
         const dx = P.right(acc, c, GAP_FRAC);
         move(k, dx);
-        P.union(acc, P.shift(c, dx));
+        P.union(acc, c, dx);
       }
     }
     // Its column: where the farthest peels left and right are equal.
@@ -1061,6 +1069,13 @@ const SIDES = new WeakMap<CladeRec, Map<Split, Map<WidthMode, Map<Split, boolean
 function chooseSides(root: FanNode, P: Packer, known?: Map<Split, boolean>): { plans: Map<FanNode, Plan>; sides: Map<Split, boolean> } {
   const better = (p: Cand, q: Cand) => (Math.abs(p.cost - q.cost) > 1e-9 ? p.cost - q.cost : p.flips - q.flips);
   // One choice at v: its daughters (table order), their candidates, mirrored or not.
+  // A species' outline on its slot (read only: the same for every plan).
+  const leaves = new Map<FanBranch, Contour>();
+  const leafOut = (b: FanBranch): Contour => {
+    let c = leaves.get(b);
+    if (!c) leaves.set(b, (c = P.shift(P.leaf(b), b.baseW / 2)));
+    return c;
+  };
   const plan = (v: FanNode, kc: (Cand | null)[], flip: boolean): Cand => {
     const idx = v.kids.map((_, i) => i);
     if (flip) idx.reverse();
@@ -1069,7 +1084,7 @@ function chooseSides(root: FanNode, P: Packer, known?: Map<Split, boolean>): { p
     const outl = idx.map((i): Contour => {
       const c = kc[i];
       const k = v.kids[i];
-      return c ? c.out : P.shift(P.leaf(k as FanBranch), (k as FanBranch).baseW / 2);
+      return c ? c.out : leafOut(k as FanBranch);
     });
     const off: number[] = [];
     let o = 0;
@@ -1084,17 +1099,15 @@ function chooseSides(root: FanNode, P: Packer, known?: Map<Split, boolean>): { p
     const out = P.shift(outl[im], off[im]);
     let prev = 0;
     for (let i = im + 1; i < order.length; i++) {
-      const c = P.shift(outl[i], off[i]);
-      dx[i] = Math.max(prev, P.right(out, c, LEAN_GAP_FRAC), 0);
+      dx[i] = Math.max(prev, P.right(out, outl[i], LEAN_GAP_FRAC, off[i]), 0);
       prev = dx[i];
-      P.union(out, P.shift(c, dx[i]));
+      P.union(out, outl[i], off[i], dx[i]);
     }
     prev = 0;
     for (let i = im - 1; i >= 0; i--) {
-      const c = P.shift(outl[i], off[i]);
-      dx[i] = Math.min(prev, P.left(out, c, LEAN_GAP_FRAC), 0);
+      dx[i] = Math.min(prev, P.left(out, outl[i], LEAN_GAP_FRAC, off[i]), 0);
       prev = dx[i];
-      P.union(out, P.shift(c, dx[i]));
+      P.union(out, outl[i], off[i], dx[i]);
     }
     // Its outline: the daughters' after their leans, their hull with its band over the leans (at most LEAN_MAX_FRAC of the
     // height to a daughter's next event), its band down to its parent's split.
