@@ -54,7 +54,7 @@ export function columnSpans(sp: SpeciesRec, startMa: number): ColumnSpan[] {
  * by a label beside it. A tint, not a fade: drawn over the held fade, so an
  * event inside a held stretch still shows. No dots or lines on the column.
  */
-export const EVENT_TINT = { rgb: [0.93, 0.62, 0.27] as [number, number, number], a: 0.34, css: '#eea045' };
+export const EVENT_TINT = { rgb: [0.93, 0.62, 0.27] as [number, number, number], a: 0.5, css: '#eea045' };
 
 /** An event's window on a species' column, years before present, clipped to the column (`ago0` older). */
 export interface EventSpan {
