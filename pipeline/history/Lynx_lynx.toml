@@ -13,20 +13,10 @@ low in the mid-20th century (extinct in most of western and central Europe by th
 the autochthonous Scandinavian, Karelian, Baltic and Carpathian populations (~1,300-2,500 each)
 recovered, and the Alpine, Jura, Dinaric, Bohemian-Bavarian, Harz and Vosges populations are 20th-
 century reintroductions of 20-160 each; the Balkan lynx (20-39 mature) is Critically Endangered
-(CMS COP14 Doc.31.4.1, Table 2). No cited global figure before 2003: the baseline below is derived
-from the sum and the PHYLACINE range ratio, the same rule the model applies to a census species.
+(CMS COP14 Doc.31.4.1, Table 2). No cited global figure before 2003: before it the build uses the modelled natural level, the
+PHYLACINE range ratio (44.5 / 27.3 million km2 = 1.63) times this sum (~113,000 in 1500, grade D),
+not times the model's own count (which gave ~708,000).
 """
-
-[baseline]
-year  = 1500
-n     = 113000
-lo    = 68880
-hi    = 113870
-grade = "D"
-kind  = "reconstruction"
-cite  = "Derived: the 2013 sum below x the PHYLACINE 1.2.1 present-natural / current range ratio (44.47 / 27.30 million km2 = 1.63; Faurby et al. 2018, Ecology 99:2626)"
-url   = "https://doi.org/10.1002/ecy.2443"
-note  = "Not a measured figure. The model's own natural level for this leaf (~708,000) is today's modelled count (~434,000) x the same ratio; with the cited count in place of the modelled one it would be ~113,000 (pipeline/history/README.md: for a census species 'the census fixes its own occupancy, and the same occupancy applies to the natural range'). Dated 1500 CE, the natural baseline's step year. lo = no range loss (today's sum); hi = the sum's high end x 1.63."
 
 [[point]]
 year  = 2013
