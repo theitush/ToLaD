@@ -98,6 +98,9 @@ try {
         // Far out (beyond the lattice's walk depth), and lanes too narrow for lines (one line their width).
         [34, 1, 1, 0.8],
         [30, 0, 1, 1, 'narrow'],
+        // A thin branch-out leaning steeply (#101): a narrow lane measured across the lean, and lines on a steep lean.
+        [30, 0, 1, 1, 'lean'],
+        [6, 1, 1, 0.6],
       ];
       bands.forEach(([lvl, gray, fold, fineA, narrow], q) => {
         const g = fold > 1 ? m.G - 1 : m.G - 400 + q * 37;
@@ -112,11 +115,14 @@ try {
           B0, lvl, latSeed: m.latticeSeed, nA: n, nB: 0, seedA: m.seedOf(g), seedB: 0, sA: fold > 1 ? Math.floor(n / 4) : n, sB: 1, fA: fold, fB: 1,
         };
         // A narrow green lane (1.3 px) beside a narrow gray one (2.6 px), each one line its own width.
-        if (narrow) Object.assign(inst, { xB0: 40.2, xG: 41.5, colL: 40.2, colR: 44.1, narG: 1, narR: 0.7, B0: 0 });
+        if (narrow === 'narrow') Object.assign(inst, { xB0: 40.2, xG: 41.5, colL: 40.2, colR: 44.1, narG: 1, narR: 0.7, B0: 0 });
+        // (A hairline, 0.3 px of the row, leaning 9 px per px down.)
+        if (narrow === 'lean') Object.assign(inst, { xB0: 20.2, xG: 20.35, colL: 20.2, colR: 20.8, narG: 1, narR: 1, B0: 0, sL: 9, sR: 9, sG: 9, sP: 0 });
         // Leaning, widening columns (the shear, mesh.ts meshFrame): the lattice mapped through a moving left
         // edge, a changing pitch, a moving right edge and green lane (a straight lean, a curve's chord).
         if (q === 1) Object.assign(inst, { sL: 0.45, sP: 0.004, colL: -bw * 1.3, colR: 90, sR: 0.15, xG: 50, sG: 0.6 });
         if (q === 3) Object.assign(inst, { sL: -0.8, sP: -0.006, colL: -bw * 1.3, colR: 110, sR: -0.3, xG: 30, sG: -0.9 });
+        if (q === bands.length - 1) Object.assign(inst, { sL: -5, sP: 0.002, colL: 150, colR: 260, sR: -5.5, xG: 200, sG: -5 });
         insts.push(inst);
         const k = gl.mesh.next();
         M.packInst(inst, gl.mesh.f, gl.mesh.u, k);

@@ -47,6 +47,12 @@ export interface HistoryRec {
    * for a modelled bulk genomic deep past (ToLaD#64).
    */
   modelled: string | null;
+  /**
+   * How the genomic deep past was joined to the next level, in one sentence (pipeline ToLaD#80):
+   * scaled to a cited count, kept at its own level against a modelled one, flagged beyond 10x.
+   * '' when the history has no genomic curve.
+   */
+  deepJoin?: string;
   /** Generation length and mean lifespan (years) the segments were compiled with. */
   G: number;
   L: number;
@@ -73,6 +79,26 @@ export interface RedListRec {
   url: string;
 }
 
+/** A species' natural (pre-human) baseline (format v1.2 NATB): always modelled, see NaturalMeta. */
+export interface NaturalRec {
+  /** Individuals alive with no human impact, and its 95% range. */
+  n: number;
+  lo: number;
+  hi: number;
+  /** PHYLACINE present-natural and current range areas, km² (current 0: extinct). */
+  km2Natural: number;
+  km2Current: number;
+}
+
+/** What every natural baseline is (skeleton META.natural): its label, grade and source. */
+export interface NaturalMeta {
+  label: string;
+  grade: Grade;
+  kind: string;
+  cite: string;
+  url: string;
+}
+
 export interface RawNode {
   gid: number;
   sci: string;
@@ -92,11 +118,14 @@ export interface RawSpecies extends RawNode {
   parentGid: number;
   history: HistoryRec | null;
   redList: RedListRec | null;
+  natural: NaturalRec | null;
 }
 
 export interface RawClade extends RawNode {
   tile: number;
   species: RawSpecies[];
+  /** What the species' natural baselines are (null: data older than v1.2). */
+  naturalMeta: NaturalMeta | null;
 }
 
 interface Tile {
@@ -115,6 +144,7 @@ interface Tile {
   dateSource(i: number): string;
   isSpecies(i: number): boolean;
   history(i: number): any;
+  natural?(i: number): NaturalRec | null;
   redList?(i: number): { category: string; source: number; year: number; taxon: number; assessment: number } | null;
   meta: any;
 }
@@ -207,6 +237,7 @@ export function extractClade(skeleton: ArrayBuffer | Uint8Array, tile: ArrayBuff
         scope: h.scope ?? '',
         notes: (h.notes ?? (h.modelled === 'rangeloss' ? trend?.notes : '') ?? '').trim(),
         modelled: h.modelled ?? null,
+        deepJoin: String(h.deep_join ?? '').trim(),
         G: h.G,
         L: h.L,
         nowYear: last ? last.year0 + last.generations * h.G : new Date().getFullYear(),
@@ -225,7 +256,10 @@ export function extractClade(skeleton: ArrayBuffer | Uint8Array, tile: ArrayBuff
         segments: segs.map((s) => ({ ...s })),
       };
     }
-    species.push({ ...node(f, i), parentGid: f.gid(f.parent[i]), history, redList: redListOf(f, i, sk.meta) });
+    const nat = f.natural ? f.natural(i) : null;
+    species.push({ ...node(f, i), parentGid: f.gid(f.parent[i]), history, redList: redListOf(f, i, sk.meta), natural: nat ? { ...nat } : null });
   }
-  return { ...node(f, root), tile: tileId, species };
+  const nm = sk.meta.natural;
+  const naturalMeta: NaturalMeta | null = nm ? { label: nm.label ?? '', grade: nm.grade ?? 'D', kind: nm.kind ?? '', cite: nm.cite ?? '', url: nm.url ?? '' } : null;
+  return { ...node(f, root), tile: tileId, species, naturalMeta };
 }

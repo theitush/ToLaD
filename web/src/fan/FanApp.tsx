@@ -8,7 +8,7 @@ import { formatCount } from '../data/count';
 import { SPLIT_LABEL, SPLIT_NAME, SPLIT_STYLES, type SplitStyle, type SplitWindow } from './gradual';
 import { HistorySpark } from './HistorySpark';
 import type { EdgeStyle, WidthMode } from './layout';
-import { FELIDAE, type SpeciesRec } from './panthera';
+import { FELIDAE, NATURAL_META, type SpeciesRec } from './panthera';
 import { population } from './population';
 import { statusOf } from './status';
 import { FanView, fmtInt, formatYearsAgo, type IndInfo, type Lineage, type Selection } from './view';
@@ -225,11 +225,20 @@ export function plainAgo(years: number): string {
   return `${plainCount(years, years < 1e6 ? 3 : 2)} years ago`;
 }
 
-/** "lions", "snow leopards", "Yucatán cave cats": the common name, plural, mid-sentence. */
+/** Names starting with a proper noun or adjective: they keep their capital mid-sentence. */
+const PROPER = /^(Yucatán|Longdan|European|Eurasian|African|American|Andean|Asian|Canada|Geoffroy|Iberian|Pallas|Sunda)\b/;
+
+/** "lion", "Eurasian lynx", "Yucatán cave cat": the common name, mid-sentence (a Latin name as it is). */
+export function midName(sp: SpeciesRec): string {
+  const c = sp.common;
+  return c === sp.sci || PROPER.test(c) ? c : c[0].toLowerCase() + c.slice(1);
+}
+
+/** "lions", "Eurasian lynxes", "Yucatán cave cats": the common name, plural, mid-sentence (ToLaD#107). */
 export function pluralName(sp: SpeciesRec): string {
-  // (Names starting with a proper noun or adjective keep their capital.)
-  const c = /^(Yucatán|Longdan|European)\b/.test(sp.common) ? sp.common : sp.common[0].toLowerCase() + sp.common.slice(1);
-  return `${c}s`;
+  if (sp.common === sp.sci) return `${sp.sci} individuals`;
+  const c = midName(sp);
+  return /(s|x|z|ch|sh)$/.test(c) ? `${c}es` : `${c}s`;
 }
 
 /** How far off a data grade can be (research/02-population-estimates.md). */
@@ -261,6 +270,7 @@ export function StatusChip({ sp }: { sp: SpeciesRec }) {
   const s = statusOf(sp);
   if (!s) return null;
   if (s.kind === 'prehistoric') return <span className="status prehistoric">{s.label}</span>;
+  if (s.kind === 'domestic') return <span className="status domestic">{s.label}</span>;
   return (
     <span className={`status iucn-${s.code.toLowerCase()}`} title={`IUCN Red List: ${s.label} (${s.status.year} assessment)`}>
       {s.label}
@@ -275,6 +285,9 @@ export function SpeciesCard({ sp, onClose, open, ageMa, startMa }: { sp: Species
   // A domestic stock: the years its own births span (its curated segments, from domestication).
   const domestic = sp.history?.component === 'domestic' && sp.births ? sp.history.segments.reduce((a, s) => a + s.generations, 0) * sp.history.G : 0;
   const lived = `from ${plainAgo(sp.t0 * 1e6)} to ${sp.extinct ? plainAgo(sp.t1 * 1e6) : 'today'}`;
+  const spark = !!sp.history && sp.history.points.length > 0;
+  // The natural (pre-human) level: on the sparkline and its sources when there is one, else here.
+  const nat = !spark && sp.natural ? sp.natural : null;
   return (
     <div className="card-sp" onPointerDown={(e) => e.stopPropagation()}>
       <button type="button" className="x" onClick={onClose} aria-label="Close">
@@ -313,7 +326,7 @@ export function SpeciesCard({ sp, onClose, open, ageMa, startMa }: { sp: Species
           )}
         </p>
       </div>
-      {sp.history && sp.history.points.length > 0 && <HistorySpark key={sp.gid} h={sp.history} open={open} />}
+      {spark && <HistorySpark key={sp.gid} h={sp.history!} open={open} natural={sp.natural} naturalMeta={NATURAL_META} />}
       <details className="more" key={`more-${sp.gid}`}>
         <summary>Details</summary>
         <dl>
@@ -339,15 +352,40 @@ export function SpeciesCard({ sp, onClose, open, ageMa, startMa }: { sp: Species
             {sp.births ? ', following the population history (the chart and its sources), its earliest level held back to the species’ start' : ', held constant over the species’ span'}.
             The share with descendants alive today comes from a randomly mixing family tree, counted back one generation at a time.
           </dd>
+          {nat && (
+            <>
+              <dt>Natural level</dt>
+              <dd data-natural="">
+                {formatCount(nat.n)} with no human impact <span className="dim">({formatCount(nat.lo)} – {formatCount(nat.hi)})</span>: modelled, grade{' '}
+                {NATURAL_META?.grade ?? 'D'}; its natural range {formatCount(nat.km2Natural)} km²
+                {nat.km2Current > 0 ? `, ${formatCount(nat.km2Current)} km² today` : ''} ·{' '}
+                {NATURAL_META?.url ? (
+                  <a href={NATURAL_META.url} target="_blank" rel="noopener noreferrer">
+                    {NATURAL_META.cite}
+                  </a>
+                ) : (
+                  NATURAL_META?.cite
+                )}
+              </dd>
+            </>
+          )}
           <dt>Status</dt>
           <dd>
-            {st?.kind === 'iucn' ? (
+            {st?.kind === 'iucn' && st.code === 'NE' ? (
+              <>IUCN Red List: Not Evaluated (NE), on no Red List assessment{st.status.cite ? ` · ${st.status.cite}` : ''}</>
+            ) : st?.kind === 'iucn' ? (
               <>
                 IUCN Red List: {st.label} ({st.code}), {st.status.year} assessment ·{' '}
-                <a href={st.status.url} target="_blank" rel="noopener noreferrer">
-                  {st.status.cite}
-                </a>
+                {st.status.url ? (
+                  <a href={st.status.url} target="_blank" rel="noopener noreferrer">
+                    {st.status.cite}
+                  </a>
+                ) : (
+                  st.status.cite
+                )}
               </>
+            ) : st?.kind === 'domestic' ? (
+              'Domesticated: the IUCN Red List does not assess domestic forms (Not Evaluated); its wild ancestor is the wildcat.'
             ) : st?.kind === 'prehistoric' ? (
               'Known from fossils; died out before the Red List’s scope (extinctions since 1500 CE), so no IUCN category.'
             ) : (
@@ -418,7 +456,7 @@ function IndCard({ sp, ind, onClose }: { sp: SpeciesRec; ind: IndInfo; onClose: 
         <span className={`dot ${ind.alive ? 'alive' : 'dead'}`} /> <span className="mono">{ind.handle}</span>
       </div>
       <div>
-        {ind.sex} {sp.common.toLowerCase()} · {ind.alive ? 'alive now' : 'dead'} · born ~{formatYearsAgo(ind.bornYearsAgo)}
+        {ind.sex} {midName(sp)} · {ind.alive ? 'alive now' : 'dead'} · born ~{formatYearsAgo(ind.bornYearsAgo)}
       </div>
       <div className="dim">
         lived {ind.lifespan.toFixed(1)} y · generation {fmtInt(ind.g + 1)} of {fmtInt(ind.G)} · {ind.children} children
