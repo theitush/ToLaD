@@ -65,13 +65,18 @@ export interface EventSpan {
   ev: HistEvent;
 }
 
-/** The species' curated events as spans of its own column (above its split at `startMa`), oldest first. */
+/**
+ * The species' curated events as spans of its own column (above its split at `startMa`), oldest first.
+ * Species-wide ones only (ToLaD#149): a regional event (a subpopulation, e.g. India's lions) cannot
+ * narrow the whole species' column, so it is neither tinted nor labelled there; the card lists it.
+ */
 export function eventSpans(sp: SpeciesRec, startMa: number): EventSpan[] {
   const evs = sp.history?.events ?? [];
   const top = sp.t1 * 1e6;
   const start = startMa * 1e6;
   const out: EventSpan[] = [];
   evs.forEach((ev, k) => {
+    if (ev.scope === 'regional') return;
     const ago0 = Math.min(start, ev.fromYa);
     const ago1 = Math.max(top, ev.toYa);
     if (ago0 > ago1) out.push({ ago0, ago1, k, ev });

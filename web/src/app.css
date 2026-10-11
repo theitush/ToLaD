@@ -325,6 +325,38 @@
 .card-sp .event .ev-src a {
   color: #9fd3b3;
 }
+/* A species-wide bottleneck our curve doesn't show (ToLaD#149): one plain sentence why. */
+.card-sp .event .ev-unshown {
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: #b7c2bb;
+}
+/* A regional bottleneck (ToLaD#149): not on the column; listed under the sparkline, outlined like its band there. */
+.card-sp .event.regional {
+  border-left-style: dashed;
+  margin: 8px 0 4px;
+}
+.card-sp .event.regional summary {
+  cursor: pointer;
+  list-style: none;
+}
+.card-sp .event.regional summary::-webkit-details-marker {
+  display: none;
+}
+.card-sp .event.regional summary .ev-k,
+.card-sp .event.regional summary .ev-t {
+  display: block;
+}
+.card-sp .event.regional summary .ev-t {
+  font-size: 14px;
+}
+.card-sp .event.regional summary .ev-t::after {
+  content: ' ▸';
+  color: #eea045;
+}
+.card-sp .event.regional[open] summary .ev-t::after {
+  content: ' ▾';
+}
 .card-sp .spark {
   display: block;
   width: 100%;

@@ -91,6 +91,21 @@ labelled band.
 - **Build:** the events ride in the species' `META.hist` entry, oldest first
   (`pipeline/FORMAT.md` v1.5); they do not change any count. Report:
   `stats.json -> history.species[<sp>].events`.
+- **Scope** (ToLaD#149): `scope = "species"` (the default: the whole species;
+  tinted on its column) or `"regional"` (a subpopulation named by `region`,
+  e.g. the Gir lions: on the card and its sparkline only, since the column is
+  the whole species and cannot narrow for a few % of it), with `scope_why`,
+  one line saying why. Every event sets both.
+- **The check** (`history.event_fall`, ToLaD#149): a species-wide event must
+  sit where the drawn column (the segments) falls by at least `EVENT_FALL` =
+  1.5x, from its level at the window's old end to its lowest inside the window
+  (the pipeline's "worth telling the reader" ratio, as `BLIND_AGAINST`). Each
+  event gets `fall`, `shown` and, when not shown, `why` (blind spot, joined
+  across, before the data, data rises / too shallow, not drawn), in
+  `stats.json`; `shown`, `scope` and `why` ship in META (FORMAT v1.7). `make audit`
+  lists unshown species-wide events as class `event`, and
+  `tests/test_history.py` holds the list of the ones the curve cannot resolve
+  (the card says so; the fan still tints them).
 
 **kind** is one of:
 
@@ -334,6 +349,13 @@ the same way by code rather than by hand.
       (Figueiró et al. 2017: "a second round of decline (most notably for
       the lion and leopard) between 10,000 and 20,000 years ago, following
       the last glacial maximum").
+      A file whose deep past is the bulk curve (no hand-written `[deep]`)
+      may hold a blind-only `[deep]`, just its `[deep.blind]` table; it
+      applies to the bulk curve the same way (ToLaD#149). The cheetah has
+      one (Dobrynin et al. 2015: "a second 11,084–12,589 years ago in
+      Africa"): its 8.6-11.6 and 11.6-15.1 kyr steps are kept, dated at the
+      window's young and old edges; their fall through the window, 1.2x, is
+      the genome's own.
     - **Else dropped, and a contradiction is said, not drawn.** Where no
       source backs them, the steps stay out (one genome's weakest bins are
       not drawn as fact; across the 109 genomic curves they swing 0.03x-44x
@@ -532,8 +554,8 @@ same `[deep]` structure in memory. Nothing is written into these TOMLs.
   else straight on to today's count (39). Today's count is the model's
   alive-now, unchanged.
 - **Meeting the anchor** follows "The genome gives the shape" above
-  (#143; bulk curves have no `[deep.blind]`, so their blind steps are
-  dropped): the whole curve is scaled so its youngest point (>= 20 kyr ago)
+  (#143; a bulk curve's blind steps are dropped unless its history
+  file has a blind-only `[deep]`, #149): the whole curve is scaled so its youngest point (>= 20 kyr ago)
   meets the next level, a history file's cited baseline or first point, else
   a modelled record's 1500 natural level or today's modelled count, and the
   span between them is flat. Before #143 a modelled next level kept the

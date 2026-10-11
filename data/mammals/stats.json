@@ -8257,29 +8257,29 @@
   "births_now_per_yr": 52688585543.22378,
   "by_era": {
    "Cretaceous 66-145 Ma": {
-    "ghost": 3.4918869351028096e+18,
+    "ghost": 3.491886935102809e+18,
     "ghost_share": 0.9999,
-    "sampled": 179520816629352.3
+    "sampled": 179520816630124.56
    },
    "Holocene-Pleistocene 0-2.58 Ma": {
-    "ghost": 9766736841274204.0,
+    "ghost": 9766595669350806.0,
     "ghost_share": 0.0717,
-    "sampled": 1.264674199611603e+17
+    "sampled": 1.2646756721683152e+17
    },
    "Jurassic and older >145 Ma": {
     "ghost": 9.139499452670106e+17,
     "ghost_share": 1.0,
-    "sampled": 16318112204480.316
+    "sampled": 16318112204488.062
    },
    "Neogene 2.58-23 Ma": {
-    "ghost": 8.276815759231948e+17,
+    "ghost": 8.276814225989724e+17,
     "ghost_share": 0.7635,
-    "sampled": 2.5636594310866384e+17
+    "sampled": 2.563660964328863e+17
    },
    "Paleogene 23-66 Ma": {
-    "ghost": 2.2470527510515108e+18,
+    "ghost": 2.2470527510497423e+18,
     "ghost_share": 0.9869,
-    "sampled": 2.992913449900812e+16
+    "sampled": 2.99291345007764e+16
    }
   },
   "f_ramp_Ma": [
@@ -8287,7 +8287,7 @@
    91.36
   ],
   "ghost_share": 0.9477,
-  "max_multiplier": 91390.21216373197,
+  "max_multiplier": 91390.21216369985,
   "multiplier_at_Ma": {
    "0.01": 1.013,
    "1": 1.022,
@@ -8299,9 +8299,9 @@
    "50": 194.752,
    "66": 3018.63
   },
-  "sampled_sum": 4.129583364976662e+17,
+  "sampled_sum": 4.1295863707932883e+17,
   "top_down_estimate": 7.903287831483567e+18,
-  "with_ghosts": 7.903296280683465e+18
+  "with_ghosts": 7.903296286767213e+18
  },
  "grid_cells": 1600,
  "history": {
@@ -8359,6 +8359,7 @@
      "Ursus maritimus": 2.2879874021326905
     },
     "kept": [
+     "Acinonyx jubatus",
      "Panthera leo",
      "Panthera pardus"
     ],
@@ -8375,7 +8376,7 @@
      "up": 25
     },
     "max": 1248.0845815759776,
-    "median": 1.230251203394819,
+    "median": 1.27453686256453,
     "min": 0.0034849229862624915,
     "n": 108,
     "p10": 0.12588222180065928,
@@ -9421,39 +9422,42 @@
      "bulk": true,
      "cite": "Bergman et al. 2023, Nat Commun 14:7679, Supplementary Data 3 (PSMC Ne trajectory)",
      "dropped_before_band": 0,
-     "dropped_blind": 6,
+     "dropped_blind": 4,
      "grade": "D",
      "join": {
       "below": null,
       "blind": {
        "against": false,
-       "ago": 10448.650468277874,
-       "cite": null,
-       "kept": false,
-       "min_ago": null,
-       "min_n": null,
-       "min_vs_resolved": null,
-       "n": 61902.09129776643,
+       "ago": 11084.0,
+       "cite": "Dobrynin et al. 2015, Genome Biol 16:277, Abstract",
+       "kept": true,
+       "min_ago": 11084.0,
+       "min_n": 57424.95840743081,
+       "min_vs_resolved": 0.6333065383307234,
+       "n": 57424.95840743081,
        "resolved_ago": 21381.04186506534,
        "resolved_n": 90674.82322035103,
-       "steps": 6,
-       "url": null,
-       "vs_resolved": 0.682682238567333,
-       "window": null
+       "steps": 2,
+       "url": "https://doi.org/10.1186/s13059-015-0837-4",
+       "vs_resolved": 0.6333065383307234,
+       "window": [
+        11084.0,
+        12589.0
+       ]
       },
-      "deep_n": 99999.99999999999,
-      "deep_n_raw": 90674.82322035103,
-      "factor": 1.1028419626138959,
+      "deep_n": 100000.0,
+      "deep_n_raw": 57424.95840743081,
+      "factor": 1.7414030897593122,
       "flag": false,
       "next": "cited",
-      "note": "The genome gives the shape, not the number: its curve is scaled \u00d71.1 to meet the cited 1900 baseline (100,000), then held flat to it.",
-      "ratio": 0.9067482322035103,
+      "note": "PSMC's 2 steps in its blind spot (the last 20 kyr, where it resolves little) are kept, grade D, because Dobrynin et al. 2015, Genome Biol 16:277, Abstract dates a decline there: from the youngest resolved step (~21 kya) to the youngest kept (~11.1 kya, the young edge of the window it dates) the genomic level falls 1.6x. The genome gives the shape, not the number: its curve is scaled \u00d71.7 to meet the cited 1900 baseline (100,000), then held flat to it.",
+      "ratio": 0.574249584074308,
       "rule": "scaled",
       "to_kind": "unverified",
       "to_n": 100000.0,
       "to_year": 1900.0
      },
-     "kept_blind": 0,
+     "kept_blind": 2,
      "method": "PSMC",
      "mu": {
       "G": 5.9958932238193015,
@@ -9464,23 +9468,31 @@
       "vs_flat": 1.2503773238513693
      },
      "ne_factor": 1.0217244599057287,
-     "oldest_n": 368913.22078516555,
+     "oldest_n": 582519.2042980503,
      "oldest_yr_ago": 1629485.7411177373,
      "points": 16,
      "time_factor": 2.042050255253065,
-     "youngest_blind_yr_ago": null,
+     "youngest_blind_yr_ago": 11084.0,
      "youngest_yr_ago": 21381.04186506534
     },
-    "deep_after": 368913.22078516555,
+    "deep_after": 582519.2042980503,
     "deep_before": 49122.941379310345,
     "deep_from": "genomic",
     "domestic_on_leaf": false,
     "events": [
-     "bottleneck 12589-11084 ya: Late-Pleistocene crash"
+     {
+      "end": 1.216,
+      "fall": 1.216,
+      "region": "Africa",
+      "scope": "species",
+      "shown": false,
+      "what": "bottleneck 12589-11084 ya: Late-Pleistocene crash",
+      "why": "data too shallow"
+     }
     ],
-    "ever_after": 423542614541.26514,
+    "ever_after": 668488049283.2251,
     "ever_before": 64825854164.0193,
-    "ever_ratio": 6.533544679097289,
+    "ever_ratio": 10.312059253270283,
     "file": "Acinonyx_jubatus.toml",
     "grades": "CD",
     "hist_row": true,
@@ -9495,7 +9507,7 @@
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
     "points": 3,
-    "segments": 62,
+    "segments": 74,
     "trend_1500": false,
     "trend_held": null,
     "use": "counts"
@@ -9759,8 +9771,24 @@
     "deep_from": "genomic",
     "domestic_on_leaf": false,
     "events": [
-     "bottleneck 30000-10000 ya: Late-glacial decline",
-     "bottleneck 3000-0 ya: Human pressure, 3,000 years"
+     {
+      "end": 1.0,
+      "fall": 1.0,
+      "region": "Sichuan (Minshan, Liangshan, Qionglai-Xiaoxiangling)",
+      "scope": "regional",
+      "shown": false,
+      "what": "bottleneck 30000-10000 ya: Late-glacial decline",
+      "why": "blind spot"
+     },
+     {
+      "end": 8.115,
+      "fall": 11.297,
+      "region": "",
+      "scope": "species",
+      "shown": true,
+      "what": "bottleneck 3000-0 ya: Human pressure, 3,000 years",
+      "why": ""
+     }
     ],
     "ever_after": 83086868409.17766,
     "ever_before": 13856131941.815397,
@@ -10233,7 +10261,15 @@
     "deep_from": "natural",
     "domestic_on_leaf": false,
     "events": [
-     "bottleneck 251-96 ya: Sealing near-extinction"
+     {
+      "end": 1.0,
+      "fall": 1.0,
+      "region": "",
+      "scope": "species",
+      "shown": false,
+      "what": "bottleneck 251-96 ya: Sealing near-extinction",
+      "why": "before the data"
+     }
     ],
     "ever_after": 158871323596.91733,
     "ever_before": 38470010838.83543,
@@ -11368,7 +11404,15 @@
     "deep_from": null,
     "domestic_on_leaf": false,
     "events": [
-     "bottleneck 140-114 ya: Pelagic sealing crash"
+     {
+      "end": 1.0,
+      "fall": 1.0,
+      "region": "Pribilof Islands (eastern Pacific stock)",
+      "scope": "regional",
+      "shown": false,
+      "what": "bottleneck 140-114 ya: Pelagic sealing crash",
+      "why": "not drawn"
+     }
     ],
     "ever_after": 1189174280817.5332,
     "ever_before": 1189174280817.5332,
@@ -11532,8 +11576,24 @@
     "deep_from": "natural",
     "domestic_on_leaf": true,
     "events": [
-     "bottleneck 86-76 ya: Isle Royale founders",
-     "bottleneck 61-35 ya: Scandinavian refounding"
+     {
+      "end": 1.004,
+      "fall": 1.004,
+      "region": "Isle Royale (Lake Superior, USA)",
+      "scope": "regional",
+      "shown": false,
+      "what": "bottleneck 86-76 ya: Isle Royale founders",
+      "why": "joined across"
+     },
+     {
+      "end": 1.01,
+      "fall": 1.01,
+      "region": "Scandinavia",
+      "scope": "regional",
+      "shown": false,
+      "what": "bottleneck 61-35 ya: Scandinavian refounding",
+      "why": "joined across"
+     }
     ],
     "ever_after": 325658550395.4353,
     "ever_before": 324930313667.5019,
@@ -11571,7 +11631,15 @@
     "deep_from": "natural",
     "domestic_on_leaf": false,
     "events": [
-     "bottleneck 53-39 ya: Fourteen founders"
+     {
+      "end": 1.12,
+      "fall": 1.12,
+      "region": "",
+      "scope": "species",
+      "shown": false,
+      "what": "bottleneck 53-39 ya: Fourteen founders",
+      "why": "joined across"
+     }
     ],
     "ever_after": 13461362177.598883,
     "ever_before": 178043367181.59747,
@@ -13014,7 +13082,15 @@
     "deep_from": "baseline",
     "domestic_on_leaf": false,
     "events": [
-     "bottleneck 285-115 ya: Fur-trade crash"
+     {
+      "end": 112.085,
+      "fall": 129.064,
+      "region": "",
+      "scope": "species",
+      "shown": true,
+      "what": "bottleneck 285-115 ya: Fur-trade crash",
+      "why": ""
+     }
     ],
     "ever_after": 114792561277.5976,
     "ever_before": 120465652067.48639,
@@ -15265,7 +15341,15 @@
     "deep_from": "natural",
     "domestic_on_leaf": false,
     "events": [
-     "bottleneck 136-61 ya: European extirpation"
+     {
+      "end": 1.074,
+      "fall": 1.074,
+      "region": "Europe",
+      "scope": "regional",
+      "shown": false,
+      "what": "bottleneck 136-61 ya: European extirpation",
+      "why": "joined across"
+     }
     ],
     "ever_after": 97854655099.15996,
     "ever_before": 612661863192.8463,
@@ -15303,10 +15387,42 @@
     "deep_from": "natural",
     "domestic_on_leaf": false,
     "events": [
-     "bottleneck 700000-100000 ya: Ancient lynx decline",
-     "bottleneck 50000-44000 ya: Glacial bottleneck",
-     "bottleneck 360-290 ya: Early-modern bottleneck",
-     "bottleneck 76-24 ya: Fewer than 100 left"
+     {
+      "end": 1.0,
+      "fall": 1.0,
+      "region": "",
+      "scope": "species",
+      "shown": false,
+      "what": "bottleneck 700000-100000 ya: Ancient lynx decline",
+      "why": "before the data"
+     },
+     {
+      "end": 1.0,
+      "fall": 1.0,
+      "region": "",
+      "scope": "species",
+      "shown": false,
+      "what": "bottleneck 50000-44000 ya: Glacial bottleneck",
+      "why": "before the data"
+     },
+     {
+      "end": 1.772,
+      "fall": 1.772,
+      "region": "",
+      "scope": "species",
+      "shown": true,
+      "what": "bottleneck 360-290 ya: Early-modern bottleneck",
+      "why": ""
+     },
+     {
+      "end": 10.717,
+      "fall": 10.802,
+      "region": "",
+      "scope": "species",
+      "shown": true,
+      "what": "bottleneck 76-24 ya: Fewer than 100 left",
+      "why": ""
+     }
     ],
     "ever_after": 112106181432.70813,
     "ever_before": 7451566000.374373,
@@ -15552,7 +15668,15 @@
     "deep_from": "natural",
     "domestic_on_leaf": false,
     "events": [
-     "bottleneck 216-134 ya: Hunted to a few dozen"
+     {
+      "end": 1718.403,
+      "fall": 2245.0,
+      "region": "",
+      "scope": "species",
+      "shown": true,
+      "what": "bottleneck 216-134 ya: Hunted to a few dozen",
+      "why": ""
+     }
     ],
     "ever_after": 66729987106.64323,
     "ever_before": 66735009658.58401,
@@ -15590,13 +15714,21 @@
     "deep_from": "natural",
     "domestic_on_leaf": false,
     "events": [
-     "bottleneck 45-35 ya: Eighteen survivors"
+     {
+      "end": 4.227,
+      "fall": 5.637,
+      "region": "",
+      "scope": "species",
+      "shown": true,
+      "what": "bottleneck 45-35 ya: Eighteen survivors",
+      "why": ""
+     }
     ],
-    "ever_after": 89823155704.1923,
+    "ever_after": 89822603176.48389,
     "ever_before": 16165894962.42898,
-    "ever_ratio": 5.556336714605009,
+    "ever_ratio": 5.556302536001863,
     "file": "Mustela_nigripes.toml",
-    "grades": "C",
+    "grades": "AC",
     "hist_row": true,
     "leaf": "Mustela nigripes",
     "modelled": null,
@@ -15608,8 +15740,8 @@
      "lo": 189.47362964877902,
      "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
     },
-    "points": 2,
-    "segments": 19,
+    "points": 4,
+    "segments": 31,
     "trend_1500": true,
     "trend_held": null,
     "use": "counts"
@@ -17352,9 +17484,33 @@
     "deep_from": "genomic",
     "domestic_on_leaf": false,
     "events": [
-     "bottleneck 20000-10000 ya: Post-glacial decline",
-     "bottleneck 4000-1000 ya: Gir founder event",
-     "bottleneck 226-116 ya: Asiatic lion near-extinction"
+     {
+      "end": 2.886,
+      "fall": 2.886,
+      "region": "",
+      "scope": "species",
+      "shown": true,
+      "what": "bottleneck 20000-10000 ya: Post-glacial decline",
+      "why": ""
+     },
+     {
+      "end": 1.0,
+      "fall": 1.0,
+      "region": "India (Gir)",
+      "scope": "regional",
+      "shown": false,
+      "what": "bottleneck 4000-1000 ya: Gir founder event",
+      "why": "blind spot"
+     },
+     {
+      "end": 1.0,
+      "fall": 1.0,
+      "region": "India (Kathiawar)",
+      "scope": "regional",
+      "shown": false,
+      "what": "bottleneck 226-116 ya: Asiatic lion near-extinction",
+      "why": "joined across"
+     }
     ],
     "ever_after": 8492246915390.799,
     "ever_before": 256264829675.55167,
@@ -17457,7 +17613,15 @@
     "deep_from": "genomic",
     "domestic_on_leaf": false,
     "events": [
-     "bottleneck 300000-30000 ya: Pleistocene decline"
+     {
+      "end": 3.899,
+      "fall": 3.899,
+      "region": "",
+      "scope": "species",
+      "shown": true,
+      "what": "bottleneck 300000-30000 ya: Pleistocene decline",
+      "why": ""
+     }
     ],
     "ever_after": 598714091225.7803,
     "ever_before": 86758987517.9911,
@@ -17563,7 +17727,15 @@
     "deep_from": "genomic",
     "domestic_on_leaf": false,
     "events": [
-     "bottleneck 20000-10000 ya: Post-glacial decline"
+     {
+      "end": 3.925,
+      "fall": 3.925,
+      "region": "Asia (Amur leopard genomes)",
+      "scope": "species",
+      "shown": true,
+      "what": "bottleneck 20000-10000 ya: Post-glacial decline",
+      "why": ""
+     }
     ],
     "ever_after": 2178827538135.1902,
     "ever_before": 280698842823.38275,
@@ -17662,9 +17834,33 @@
     "deep_from": "genomic",
     "domestic_on_leaf": false,
     "events": [
-     "bottleneck 250000-220000 ya: Ancestral bottleneck",
-     "bottleneck 120000-100000 ya: Late Pleistocene bottleneck",
-     "bottleneck 126-16 ya: 20th-century crash"
+     {
+      "end": 1.008,
+      "fall": 1.008,
+      "region": "",
+      "scope": "species",
+      "shown": false,
+      "what": "bottleneck 250000-220000 ya: Ancestral bottleneck",
+      "why": "data too shallow"
+     },
+     {
+      "end": 1.007,
+      "fall": 1.007,
+      "region": "",
+      "scope": "species",
+      "shown": false,
+      "what": "bottleneck 120000-100000 ya: Late Pleistocene bottleneck",
+      "why": "data too shallow"
+     },
+     {
+      "end": 28.788,
+      "fall": 28.788,
+      "region": "",
+      "scope": "species",
+      "shown": true,
+      "what": "bottleneck 126-16 ya: 20th-century crash",
+      "why": ""
+     }
     ],
     "ever_after": 205997072406.86377,
     "ever_before": 21818024153.757103,
@@ -17760,8 +17956,24 @@
     "deep_from": "genomic",
     "domestic_on_leaf": false,
     "events": [
-     "bottleneck 75000-30000 ya: Glacial decline",
-     "bottleneck 9000-7000 ya: Holocene bottleneck"
+     {
+      "end": 1.428,
+      "fall": 1.428,
+      "region": "",
+      "scope": "species",
+      "shown": false,
+      "what": "bottleneck 75000-30000 ya: Glacial decline",
+      "why": "data too shallow"
+     },
+     {
+      "end": 1.0,
+      "fall": 1.0,
+      "region": "",
+      "scope": "species",
+      "shown": false,
+      "what": "bottleneck 9000-7000 ya: Holocene bottleneck",
+      "why": "blind spot"
+     }
     ],
     "ever_after": 16745994929.958452,
     "ever_before": 5639930144.118823,
@@ -18434,8 +18646,24 @@
     "deep_from": "genomic",
     "domestic_on_leaf": false,
     "events": [
-     "bottleneck 25000-20000 ya: Last-glacial low",
-     "bottleneck 12000-9000 ya: North American refounding"
+     {
+      "end": 1.142,
+      "fall": 1.142,
+      "region": "North and South America",
+      "scope": "species",
+      "shown": false,
+      "what": "bottleneck 25000-20000 ya: Last-glacial low",
+      "why": "blind spot"
+     },
+     {
+      "end": 1.0,
+      "fall": 1.0,
+      "region": "North America",
+      "scope": "regional",
+      "shown": false,
+      "what": "bottleneck 12000-9000 ya: North American refounding",
+      "why": "blind spot"
+     }
     ],
     "ever_after": 9325298330670.68,
     "ever_before": 849361153306.4893,
@@ -19823,7 +20051,15 @@
     "deep_from": "genomic",
     "domestic_on_leaf": false,
     "events": [
-     "bottleneck 146-96 ya: Scandinavian hunting low"
+     {
+      "end": 1.059,
+      "fall": 1.059,
+      "region": "Scandinavia",
+      "scope": "regional",
+      "shown": false,
+      "what": "bottleneck 146-96 ya: Scandinavian hunting low",
+      "why": "joined across"
+     }
     ],
     "ever_after": 1308169358411.1438,
     "ever_before": 81686056093.73222,
@@ -19919,7 +20155,15 @@
     "deep_from": "genomic",
     "domestic_on_leaf": false,
     "events": [
-     "bottleneck 500000-20000 ya: Long Pleistocene decline"
+     {
+      "end": 1.251,
+      "fall": 1.357,
+      "region": "",
+      "scope": "species",
+      "shown": false,
+      "what": "bottleneck 500000-20000 ya: Long Pleistocene decline",
+      "why": "joined across"
+     }
     ],
     "ever_after": 48040965621.64177,
     "ever_before": 5817581917.808218,
@@ -20109,11 +20353,11 @@
  "knuckles_collapsed": 3787,
  "mammalia": {
   "alive": 93325167849.64867,
-  "ever": 7.903296280683465e+18,
-  "ghost": 7.490337944185799e+18,
+  "ever": 7.903296286767213e+18,
+  "ghost": 7.490337649687884e+18,
   "grade": "D",
-  "hi": 3.603639359195313e+22,
-  "lo": 1505508598306841.8
+  "hi": 3.6036393637750835e+22,
+  "lo": 1505508598879792.0
  },
  "mass_sources": {
   "mass:combine": 181,
@@ -21038,11 +21282,11 @@
   "non-species tip": 551
  },
  "output": {
-  "brotli_bytes": 754680,
+  "brotli_bytes": 755167,
   "dated_sidecar_raw": 960283,
   "files": 14,
-  "raw_bytes": 3091968,
-  "skeleton_brotli": 91378,
+  "raw_bytes": 3095992,
+  "skeleton_brotli": 91151,
   "skeleton_nodes": 2371,
   "skeleton_raw": 428432,
   "tiles": 13
@@ -21262,7 +21506,7 @@
   "maps_used": 5613,
   "range_maps": 5831
  },
- "pieces": 293362,
+ "pieces": 295423,
  "rangeloss": {
   "carried_by_genomic_record": 48,
   "declines": 579,
@@ -21725,7 +21969,7 @@
     "leaf": "Mustela nigripes",
     "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count",
     "natural": 51418.666666666664,
-    "segments": 19,
+    "segments": 31,
     "today": 496.0
    },
    {
@@ -22007,13 +22251,13 @@
   },
   "Hominidae": {
    "alive": 8301443764.904216,
-   "ever": 3089604877568.3613,
+   "ever": 3089604483057.138,
    "ever_range": [
-    54106912057.79398,
-    365051197461960.8
+    54106903560.83884,
+    365051177628494.3
    ],
    "extinct(gray)": false,
-   "ghost": 376231217795.599,
+   "ghost": 376230823284.3759,
    "grade": "D",
    "t0_Ma": 14.805233333333334,
    "t1_Ma": 0.0
@@ -22033,13 +22277,13 @@
   },
   "Mammalia": {
    "alive": 93325167849.64867,
-   "ever": 7.903296280683465e+18,
+   "ever": 7.903296286767213e+18,
    "ever_range": [
-    1505508598306841.8,
-    3.603639359195313e+22
+    1505508598879792.0,
+    3.6036393637750835e+22
    ],
    "extinct(gray)": 0.0,
-   "ghost": 7.490337944185799e+18,
+   "ghost": 7.490337649687884e+18,
    "grade": "D",
    "t0_Ma": 208.64140800000004,
    "t1_Ma": 0.0
@@ -22349,8 +22593,8 @@
   "by_alive": [
    {
     "alive": 50367382572.592575,
-    "ever": 1.214957253988856e+18,
-    "ghost": 1.0489687752198644e+18,
+    "ever": 1.2149571348843325e+18,
+    "ghost": 1.0489686561153409e+18,
     "ghost_share": 0.863,
     "name": "Chiroptera",
     "sampled": 1.659884787689916e+17,
@@ -22358,8 +22602,8 @@
    },
    {
     "alive": 21966955920.92067,
-    "ever": 1.7484166333282826e+18,
-    "ghost": 1.5926377230104018e+18,
+    "ever": 1.748416485154785e+18,
+    "ghost": 1.5926375748369042e+18,
     "ghost_share": 0.911,
     "name": "Rodentia",
     "sampled": 1.5577891031788083e+17,
@@ -22367,8 +22611,8 @@
    },
    {
     "alive": 5578617042.535016,
-    "ever": 6820935442619739.0,
-    "ghost": 3358904143145594.0,
+    "ever": 6820935071297438.0,
+    "ghost": 3358903771823293.0,
     "ghost_share": 0.492,
     "name": "Artiodactyla",
     "sampled": 3462031299474145.0,
@@ -22376,17 +22620,17 @@
    },
    {
     "alive": 2017527491.9104786,
-    "ever": 1.2256447097818968e+16,
-    "ghost": 1.0861013590921566e+16,
+    "ever": 1.2256746630399626e+16,
+    "ghost": 1.0861012541840286e+16,
     "ghost_share": 0.886,
     "name": "Carnivora",
-    "sampled": 1395433506897402.0,
+    "sampled": 1395734088559340.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 1282257610.2534523,
-    "ever": 1.7378774101483872e+17,
-    "ghost": 1.3400332719026774e+17,
+    "ever": 1.737877297411396e+17,
+    "ghost": 1.340033159165686e+17,
     "ghost_share": 0.771,
     "name": "Eulipotyphla",
     "sampled": 3.978441382457098e+16,
@@ -22394,8 +22638,8 @@
    },
    {
     "alive": 1114427328.725424,
-    "ever": 7.6127150953487e+16,
-    "ghost": 6.025947456387455e+16,
+    "ever": 7.61271450441236e+16,
+    "ghost": 6.0259468654511144e+16,
     "ghost_share": 0.792,
     "name": "Didelphimorphia",
     "sampled": 1.5867676389612456e+16,
@@ -22403,17 +22647,17 @@
    },
    {
     "alive": 736462366.2633649,
-    "ever": 3.969754348845176e+16,
-    "ghost": 2.8378944875692388e+16,
+    "ever": 3.969753998059071e+16,
+    "ghost": 2.8378941367831344e+16,
     "ghost_share": 0.715,
     "name": "Lagomorpha",
-    "sampled": 1.1318598612759372e+16,
+    "sampled": 1.1318598612759368e+16,
     "t0_Ma": 72.45
    },
    {
     "alive": 310814089.12791497,
-    "ever": 8163196511469820.0,
-    "ghost": 6071452929083291.0,
+    "ever": 8163195682647538.0,
+    "ghost": 6071452100261009.0,
     "ghost_share": 0.744,
     "name": "Diprotodontia",
     "sampled": 2091743582386529.0,
@@ -22421,17 +22665,17 @@
    },
    {
     "alive": 226037157.53161967,
-    "ever": 1.8422521821771252e+16,
-    "ghost": 1.1039552057913972e+16,
+    "ever": 1.8422520755446524e+16,
+    "ghost": 1.1039550991589246e+16,
     "ghost_share": 0.599,
     "name": "Macroscelidea",
-    "sampled": 7382969763857280.0,
+    "sampled": 7382969763857278.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 145006443.2142533,
-    "ever": 4118088680582588.0,
-    "ghost": 2908482458713242.0,
+    "ever": 4118088368038324.0,
+    "ghost": 2908482146168978.0,
     "ghost_share": 0.706,
     "name": "Pilosa (order in Deuterostomia)",
     "sampled": 1209606221869346.0,
@@ -22441,8 +22685,8 @@
   "by_ever": [
    {
     "alive": 21966955920.92067,
-    "ever": 1.7484166333282826e+18,
-    "ghost": 1.5926377230104018e+18,
+    "ever": 1.748416485154785e+18,
+    "ghost": 1.5926375748369042e+18,
     "ghost_share": 0.911,
     "name": "Rodentia",
     "sampled": 1.5577891031788083e+17,
@@ -22450,8 +22694,8 @@
    },
    {
     "alive": 50367382572.592575,
-    "ever": 1.214957253988856e+18,
-    "ghost": 1.0489687752198644e+18,
+    "ever": 1.2149571348843325e+18,
+    "ghost": 1.0489686561153409e+18,
     "ghost_share": 0.863,
     "name": "Chiroptera",
     "sampled": 1.659884787689916e+17,
@@ -22459,8 +22703,8 @@
    },
    {
     "alive": 1282257610.2534523,
-    "ever": 1.7378774101483872e+17,
-    "ghost": 1.3400332719026774e+17,
+    "ever": 1.737877297411396e+17,
+    "ghost": 1.340033159165686e+17,
     "ghost_share": 0.771,
     "name": "Eulipotyphla",
     "sampled": 3.978441382457098e+16,
@@ -22468,8 +22712,8 @@
    },
    {
     "alive": 1114427328.725424,
-    "ever": 7.6127150953487e+16,
-    "ghost": 6.025947456387455e+16,
+    "ever": 7.61271450441236e+16,
+    "ghost": 6.0259468654511144e+16,
     "ghost_share": 0.792,
     "name": "Didelphimorphia",
     "sampled": 1.5867676389612456e+16,
@@ -22477,35 +22721,35 @@
    },
    {
     "alive": 736462366.2633649,
-    "ever": 3.969754348845176e+16,
-    "ghost": 2.8378944875692388e+16,
+    "ever": 3.969753998059071e+16,
+    "ghost": 2.8378941367831344e+16,
     "ghost_share": 0.715,
     "name": "Lagomorpha",
-    "sampled": 1.1318598612759372e+16,
+    "sampled": 1.1318598612759368e+16,
     "t0_Ma": 72.45
    },
    {
     "alive": 226037157.53161967,
-    "ever": 1.8422521821771252e+16,
-    "ghost": 1.1039552057913972e+16,
+    "ever": 1.8422520755446524e+16,
+    "ghost": 1.1039550991589246e+16,
     "ghost_share": 0.599,
     "name": "Macroscelidea",
-    "sampled": 7382969763857280.0,
+    "sampled": 7382969763857278.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 2017527491.9104786,
-    "ever": 1.2256447097818968e+16,
-    "ghost": 1.0861013590921566e+16,
+    "ever": 1.2256746630399626e+16,
+    "ghost": 1.0861012541840286e+16,
     "ghost_share": 0.886,
     "name": "Carnivora",
-    "sampled": 1395433506897402.0,
+    "sampled": 1395734088559340.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 310814089.12791497,
-    "ever": 8163196511469820.0,
-    "ghost": 6071452929083291.0,
+    "ever": 8163195682647538.0,
+    "ghost": 6071452100261009.0,
     "ghost_share": 0.744,
     "name": "Diprotodontia",
     "sampled": 2091743582386529.0,
@@ -22513,8 +22757,8 @@
    },
    {
     "alive": 5578617042.535016,
-    "ever": 6820935442619739.0,
-    "ghost": 3358904143145594.0,
+    "ever": 6820935071297438.0,
+    "ghost": 3358903771823293.0,
     "ghost_share": 0.492,
     "name": "Artiodactyla",
     "sampled": 3462031299474145.0,
@@ -22522,8 +22766,8 @@
    },
    {
     "alive": 76858606.79902251,
-    "ever": 5399597522809649.0,
-    "ghost": 4509553104481579.0,
+    "ever": 5399597012696266.0,
+    "ghost": 4509552594368196.0,
     "ghost_share": 0.835,
     "name": "Dasyuromorphia",
     "sampled": 890044418328070.0,
@@ -22533,8 +22777,8 @@
   "by_sampled_ever": [
    {
     "alive": 50367382572.592575,
-    "ever": 1.214957253988856e+18,
-    "ghost": 1.0489687752198644e+18,
+    "ever": 1.2149571348843325e+18,
+    "ghost": 1.0489686561153409e+18,
     "ghost_share": 0.863,
     "name": "Chiroptera",
     "sampled": 1.659884787689916e+17,
@@ -22542,8 +22786,8 @@
    },
    {
     "alive": 21966955920.92067,
-    "ever": 1.7484166333282826e+18,
-    "ghost": 1.5926377230104018e+18,
+    "ever": 1.748416485154785e+18,
+    "ghost": 1.5926375748369042e+18,
     "ghost_share": 0.911,
     "name": "Rodentia",
     "sampled": 1.5577891031788083e+17,
@@ -22551,8 +22795,8 @@
    },
    {
     "alive": 1282257610.2534523,
-    "ever": 1.7378774101483872e+17,
-    "ghost": 1.3400332719026774e+17,
+    "ever": 1.737877297411396e+17,
+    "ghost": 1.340033159165686e+17,
     "ghost_share": 0.771,
     "name": "Eulipotyphla",
     "sampled": 3.978441382457098e+16,
@@ -22560,8 +22804,8 @@
    },
    {
     "alive": 1114427328.725424,
-    "ever": 7.6127150953487e+16,
-    "ghost": 6.025947456387455e+16,
+    "ever": 7.61271450441236e+16,
+    "ghost": 6.0259468654511144e+16,
     "ghost_share": 0.792,
     "name": "Didelphimorphia",
     "sampled": 1.5867676389612456e+16,
@@ -22569,26 +22813,26 @@
    },
    {
     "alive": 736462366.2633649,
-    "ever": 3.969754348845176e+16,
-    "ghost": 2.8378944875692388e+16,
+    "ever": 3.969753998059071e+16,
+    "ghost": 2.8378941367831344e+16,
     "ghost_share": 0.715,
     "name": "Lagomorpha",
-    "sampled": 1.1318598612759372e+16,
+    "sampled": 1.1318598612759368e+16,
     "t0_Ma": 72.45
    },
    {
     "alive": 226037157.53161967,
-    "ever": 1.8422521821771252e+16,
-    "ghost": 1.1039552057913972e+16,
+    "ever": 1.8422520755446524e+16,
+    "ghost": 1.1039550991589246e+16,
     "ghost_share": 0.599,
     "name": "Macroscelidea",
-    "sampled": 7382969763857280.0,
+    "sampled": 7382969763857278.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 5578617042.535016,
-    "ever": 6820935442619739.0,
-    "ghost": 3358904143145594.0,
+    "ever": 6820935071297438.0,
+    "ghost": 3358903771823293.0,
     "ghost_share": 0.492,
     "name": "Artiodactyla",
     "sampled": 3462031299474145.0,
@@ -22596,8 +22840,8 @@
    },
    {
     "alive": 310814089.12791497,
-    "ever": 8163196511469820.0,
-    "ghost": 6071452929083291.0,
+    "ever": 8163195682647538.0,
+    "ghost": 6071452100261009.0,
     "ghost_share": 0.744,
     "name": "Diprotodontia",
     "sampled": 2091743582386529.0,
@@ -22605,20 +22849,20 @@
    },
    {
     "alive": 101350585.2545455,
-    "ever": 4306734579566749.0,
-    "ghost": 2618836072761898.0,
+    "ever": 4306734254203408.0,
+    "ghost": 2618835747398556.5,
     "ghost_share": 0.608,
     "name": "Scandentia",
-    "sampled": 1687898506804851.0,
+    "sampled": 1687898506804851.5,
     "t0_Ma": 74.72
    },
    {
     "alive": 2017527491.9104786,
-    "ever": 1.2256447097818968e+16,
-    "ghost": 1.0861013590921566e+16,
+    "ever": 1.2256746630399626e+16,
+    "ghost": 1.0861012541840286e+16,
     "ghost_share": 0.886,
     "name": "Carnivora",
-    "sampled": 1395433506897402.0,
+    "sampled": 1395734088559340.0,
     "t0_Ma": 65.7
    }
   ]

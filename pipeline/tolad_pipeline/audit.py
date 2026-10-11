@@ -23,6 +23,9 @@ species leaf for each class, with thresholds taken from stated rules, not tuned:
            EW species drawn with a wild count, a fossil graft ending at the present (#105)
   name     a living leaf no extant-species list recognises (Upham, PHYLACINE, Greenspoon/IUCN, Red
            List): a stale or infraspecific name drawn as a species with its own count
+  event    a species-wide [[event]] (a bottleneck tinted on the fan's column) whose column does not fall
+           through its window by EVENT_FALL (1.5x, history.event_fall, #149), with why: the window sits in
+           PSMC's blind spot, spans a join between sources, is older than the data, or the data do not fall
   units    a genomic curve rescaled (time or Ne) by more than DEEP_FACTOR_FLAG (3x) from its source,
            beyond the 0.35-2.55x spread of the sources' own per-year mutation rates (#75)
 
@@ -49,6 +52,7 @@ CEILING = 10_000.0  # IUCN Categories and Criteria v3.1: criterion C's VU bound,
 CEILING_STATUS = ("CR", "EW")  # #88; EN is not: listed under A or B it can be any size
 C_BOUND = {"CR": 250.0, "EN": 2_500.0, "VU": 10_000.0}  # criterion C, mature individuals (context)
 DEEP_FACTOR_FLAG = 3.0  # #75: the sources' per-year rates run 0.35-2.55x of the 1e-9 the curves use
+EVENT_FALL = 1.5  # history.EVENT_FALL (ToLaD#149): a species-wide event's column falls this much through it
 IUCN_A_YEARS, IUCN_A_GENS = 10.0, 3.0  # criterion A's window: 10 years or 3 generations, the longer
 RECENT_YEAR = 2000  # a cited point this recent is a today's figure (history.ALIVE_MIN_YEAR)
 CITED = {"census", "estimate", "index-scaled", "reconstruction", "unverified"}  # history.POINT_KINDS
@@ -147,6 +151,9 @@ def leaf_row(n, census: dict, gs_model: dict, deep_reports: dict | None = None) 
                                             "factor", "blind")}
                  if deep else None),
         "deep_factors": None,
+        # curated events and whether the column falls through each (history.event_fall, ToLaD#149)
+        "events": [{k: e.get(k) for k in ("title", "from_ya", "to_ya", "scope", "region", "fall", "end", "shown",
+                                          "why")} for e in rec.get("events", [])] if rec else [],
     }
     rep = (deep_reports or {}).get(n.name)
     if rec.get("deep") and rep and rep.get("mu"):
@@ -357,7 +364,21 @@ def check_units(row: dict) -> list[dict]:
     return out
 
 
-CHECKS = (check_join, check_ceiling, check_deep, check_status, check_name, check_units)
+def check_event(row: dict) -> list[dict]:
+    """A species-wide event whose column does not fall through its window (ToLaD#149): tinted on the fan,
+    it claims a narrowing the column does not draw. Regional events are not on the column, so not checked."""
+    out = []
+    for e in row.get("events") or []:
+        if e.get("scope") != "species" or e.get("shown") or e.get("fall") is None:
+            continue
+        out.append(_flag("event", abs(math.log10(EVENT_FALL / max(e["fall"], 1e-9))),
+                         f"\"{e['title']}\" ({e['from_ya']:g}-{e['to_ya']:g} ya): the column falls "
+                         f"{e['fall']:.3g}x through it, under {EVENT_FALL:g}x ({e['why']}); the card says the "
+                         "curve does not resolve it", fall=e["fall"], why=e["why"]))
+    return out
+
+
+CHECKS = (check_join, check_ceiling, check_deep, check_status, check_name, check_units, check_event)
 
 
 def load_reviewed(path: Path = REVIEWED) -> dict[tuple[str, str], dict]:
