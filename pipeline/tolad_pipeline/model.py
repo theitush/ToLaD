@@ -657,10 +657,16 @@ def rangeloss_points(n_nat: float, n_today: float) -> list[dict]:
     return [{"year": RANGELOSS_START_YEAR, "n": n_nat}, {"year": anchors.NOW_YEAR, "n": n_today}]
 
 
-def rangeloss_start(leaf: Node) -> dict | None:
+def rangeloss_start(leaf: Node, any_natural: bool = False) -> dict | None:
     """The first knot of the range-loss trend as a curve point: the natural level in 1500 CE (kind
-    `rangeloss`, its span to today's count kind `rangeloss`, grade D). None without the trend."""
-    return _rangeloss_p0(leaf) if leaf.data.get("rangeloss") else None
+    `rangeloss`, its span to today's count kind `rangeloss`, grade D). None without the trend, unless
+    `any_natural`: then any living leaf with a natural level gets the knot (a genomic deep past whose
+    first cited point is after 1900 joins the natural level whatever its method; ToLaD#71)."""
+    D = leaf.data
+    if D.get("rangeloss") or (any_natural and D.get("natural") and not leaf.extinct
+                              and D.get("rate_wild_now", 0.0) > 0):
+        return _rangeloss_p0(leaf)
+    return None
 
 
 def _rangeloss_p0(leaf: Node) -> dict:
@@ -998,7 +1004,7 @@ def assign_leaf_counts(root: Node, raw: Path, ctx: dict, log: dict) -> None:
         if n.is_leaf and n.name and not n.extinct:
             living.setdefault(n.name, n)
     recs += genomic.attach(recs, living, genomic.load(raw), rangeloss_start, log)
-    ctx["history"] = history.apply(root, raw, log, SRC["history"], recs)
+    ctx["history"] = history.apply(root, raw, log, SRC["history"], recs, rangeloss_start)
     # range-loss trend records for the species no history file covers (a history file wins)
     for n in root.preorder():
         if n.is_leaf and n.data.get("rangeloss") and n.data.get("history") is None:

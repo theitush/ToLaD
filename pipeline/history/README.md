@@ -100,7 +100,12 @@ order of precedence:
    the natural baseline; the bulk curves of ToLaD#64 (see "Bulk genomic
    deep past") give ~100 more species one;
 3. else the natural baseline, held from the band start to the first cited
-   point (HIST segment kind `natural`, 10), then a step to the curve;
+   point (HIST segment kind `natural`, 10), then a step to the curve; where
+   the leaf has the range-loss trend (both maps, see below) and the first
+   cited point is after 1500, it is held to 1500 only, and the trend runs
+   from there to the first cited point (ToLaD#71): the history file gains
+   the trend's first knot (kind `rangeloss`, grade D) and the span to the
+   first point is kind `rangeloss`, not a step;
 4. else (no range map) today's level, as above (segment kind `model`).
 
 **Range-loss trend (ToLaD#62, layer 4 of the estimate stack).** A species
@@ -121,8 +126,11 @@ in 25-year steps.
   Australia's mammal collapse after 1788), so the trend spreads over five
   centuries a decline that was often concentrated in one or two. No
   per-region start is modelled.
-- **Precedence:** a history file replaces it entirely (cited baseline,
-  genomic or natural baseline before the first cited point, as below).
+- **Precedence:** a history file replaces it (cited baseline, genomic or
+  natural baseline before the first cited point, as below), but keeps the
+  trend in the gap from 1500 to its first cited point where its deep past
+  ends at the natural level, or at a genomic curve not scaled to that point
+  (ToLaD#71; see 3. above and "Joining").
   Species whose two maps agree stay flat at today's count. Extant species
   with no current map (their natural level comes from density x area x
   occupancy, not from a range ratio) keep the #61 step. Extinct species run
@@ -237,7 +245,8 @@ the same way by code rather than by hand.
   What happens to the genomic level depends on what that next level is:
 
   - **Cited** (a history file's baseline or first point: any point kind, i.e.
-    `census`, `estimate`, `index-scaled`, `reconstruction`, `unverified`): the
+    `census`, `estimate`, `index-scaled`, `reconstruction`, `unverified`)
+    dated **1900 or earlier** (`DEEP_JOIN_CITED_MAX_YEAR`): the
     genomic curve is **scaled** (its `n`, `lo`, `hi` and Ne, all by one factor)
     so its youngest point meets the cited level. The PSMC shape is kept; the
     cited count is better evidence of the level than the generic Ne/N = 0.1.
@@ -264,10 +273,20 @@ the same way by code rather than by hand.
   sentence ships in the tiles as `META.hist[].deep_join` (`pipeline/FORMAT.md`),
   which `file.history(row)` returns; a scaled curve's point notes say so too.
 
-  A cited first point need not be a pre-decline level: where a history file
-  has no baseline, the first point can be a bottleneck or a recent count
-  (*Bison bonasus* 1924, 66 animals; *Oryx dammah* 2026, 650). The rule still
-  scales the deep past to it, and the flag shows how far it moved.
+  - **Cited after 1900** (ToLaD#71; the dispatcher's call on #80, 2026-10-11):
+    a first cited point after 1900 is mostly a bottleneck or a modern count,
+    not a pre-human level (*Bison bonasus* 1924, 66 animals; *Oryx dammah*
+    2026, 650; *Ailuropoda* 1976, 2,459), and a million years of deep past
+    should not be scaled to it. The genomic curve **keeps its own level** and
+    joins the natural level in 1500 CE, and a log-linear trend (kind
+    `rangeloss`) then runs from there to the cited point, also where the
+    model itself has no range-loss trend (no current range map, as for the
+    scimitar oryx, or two maps that agree). Only a leaf with no natural level
+    at all joins the cited point itself, unscaled. The
+    card sentence says so: "First cited point (1924 census, 66) is after
+    1900, so not used as the deep past's level. Genomic curve kept at its own
+    level; ...". `deep.join.cited_late` records that point;
+    `stats.json -> history.deep_join.cited_late` counts both cases.
 
   Before the oldest genomic point, the oldest genomic level is held back to
   the band start (a `held` segment). It replaces the baseline hold, or

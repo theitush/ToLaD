@@ -17,15 +17,18 @@ design. In short:
               per-year mutation rate and the leaf's generation length, Ne -> N by
               Ne/N = 0.1, steps in PSMC's blind spot (< 20 kyr) dropped; the
               genomic points precede the cited ones and join them log-linearly;
-              a cited next level scales the curve to meet it, a modelled one does
-              not, a mismatch beyond 10x is flagged (deep_join, ToLaD#80)
+              a cited next level dated 1900 or earlier scales the curve to meet it,
+              a modelled one (or a later cited one) does not, a mismatch beyond 10x
+              is flagged (deep_join, ToLaD#80, #71)
     natural   with no cited baseline and no [deep], the natural (pre-human) baseline
               (model.natural_level, NATB) is held from the band start to the first
               point. Precedence before the cited points: genomic > natural > today
     rangeloss a species with no history file whose natural baseline differs from
               today's count gets a modelled two-point record instead (model.py,
               rangeloss_record): a log-linear decline from 1500 CE to now. A history
-              file always replaces it
+              file replaces it, but where its deep past ends at the natural level (or
+              at an unscaled genomic curve) the trend fills the gap from 1500 to its
+              first cited point (ToLaD#71)
 
 `apply` rewrites the leaf's pieces / alive / error before sum_tree, so the
 existing sum-up and ghost allocation keep the totals consistent up the tree.
@@ -69,6 +72,13 @@ DEEP_STEP_MAX = 64  # births pieces per curve span at most (deep spans are 1e4-1
 # The join across the blind spot (ToLaD#77/#80): a cited next level scales the genomic curve to meet it,
 # a modelled one keeps the genomic level; either way a mismatch beyond this factor is flagged.
 DEEP_JOIN_FLAG = 10.0
+# Only a cited level dated this year or earlier scales the genomic curve (dispatcher's call, ToLaD#71/#80):
+# the rule exists because a cited historical, pre-decline level (Bison 1800, Vicugna 1530, tiger 1900) is
+# better evidence than Ne/N = 0.1. A first cited point after 1900 is mostly a crash or a modern count
+# (wisent 1924: 66; scimitar oryx 2026: 650), which a million years of deep past should not be scaled to:
+# the genomic curve then keeps its level, joins the natural level in 1500 CE, and the range-loss trend
+# runs from there to that point.
+DEEP_JOIN_CITED_MAX_YEAR = 1900
 DEEP_MU_CITE = ("Armstrong et al. 2025, Genome Biol Evol 17:evaf060 (Pantherinae pedigree rates)",
                 "https://doi.org/10.1093/gbe/evaf060")
 DEEP_NE_N_CITE = ("Frankham 1995, Genet Res 66:95-107 (Ne/N ~0.1 over comprehensive estimates)",
@@ -336,17 +346,28 @@ def _x(v: float) -> str:
     return f"{v:.2g}" if v >= 1e-4 else f"{v:.1e}"
 
 
-def deep_join(deep_pts: list[dict], nxt: dict) -> tuple[list[dict], dict]:
-    """Join the genomic deep past to the next level across PSMC's blind spot (ToLaD#77, #80).
+def _cited_txt(p: dict) -> str:
+    """'1924 census, 66' / '1800 baseline, 42,000,000': a cited point for a sentence."""
+    what = "baseline" if p.get("baseline") else {"index-scaled": "index-scaled estimate",
+                                                 "unverified": "unverified figure"}.get(p["kind"], p["kind"])
+    return f"{_year_txt(p['year'])} {what}, {p['n']:,.0f}"
+
+
+def deep_join(deep_pts: list[dict], nxt: dict, skipped: dict | None = None) -> tuple[list[dict], dict]:
+    """Join the genomic deep past to the next level across PSMC's blind spot (ToLaD#77, #80, #71).
 
     `nxt` is the first non-genomic point of the curve. A cited next level (a history file's baseline or
-    first point: any POINT_KINDS) is better evidence of the level than Ne/N = 0.1, so the genomic curve
-    (n, lo, hi, Ne) is scaled to meet it, keeping its shape. A modelled next level (the natural level in
-    1500 CE, today's modelled count) keeps the genomic curve's own level, joined log-linearly. Either
-    way a mismatch (genomic / next, before any scaling) beyond DEEP_JOIN_FLAG is flagged. Returns the
-    (scaled) genomic points and the join record, whose `note` is the sentence the species card shows."""
+    first point: any POINT_KINDS) dated DEEP_JOIN_CITED_MAX_YEAR or earlier is a historical level, better
+    evidence than Ne/N = 0.1, so the genomic curve (n, lo, hi, Ne) is scaled to meet it, keeping its
+    shape. A modelled next level (the natural level in 1500 CE, today's modelled count), or a cited one
+    after the cutoff, keeps the genomic curve's own level, joined log-linearly. `skipped` is the first
+    cited point when it is after the cutoff and the natural level in 1500 (`nxt`) was put before it.
+    Either way a mismatch (genomic / next, before any scaling) beyond DEEP_JOIN_FLAG is flagged. Returns
+    the (scaled) genomic points and the join record, whose `note` is the sentence the species card shows."""
     raw = deep_pts[-1]["n"] / nxt["n"]
-    cited = nxt["kind"] in POINT_KINDS
+    cited_kind = nxt["kind"] in POINT_KINDS
+    cited = cited_kind and nxt["year"] <= DEEP_JOIN_CITED_MAX_YEAR
+    late = skipped if skipped is not None else nxt if cited_kind and not cited else None
     off = max(raw, 1 / raw)
     flag = off > DEEP_JOIN_FLAG
     f = 1 / raw if cited else 1.0
@@ -359,17 +380,25 @@ def deep_join(deep_pts: list[dict], nxt: dict) -> tuple[list[dict], dict]:
         deep_pts = [{**p, "n": p["n"] * f, "lo": p["lo"] * f, "hi": p["hi"] * f, "ne": p["ne"] * f,
                      "note": p["note"] + f"; scaled x{_x(f)} to meet {what}"} for p in deep_pts]
     else:
-        what = ("the modelled natural level in 1500 CE" if nxt["kind"] == "rangeloss" else
+        what = ("that point" if nxt is late else
+                "the modelled natural level in 1500 CE" if nxt["kind"] == "rangeloss" else
                 "the modelled natural baseline" if nxt["kind"] == "natural" else "today's modelled count")
         rel = ("about the same" if off < 1.05 else
                f"{_x(off)}x {'lower' if raw > 1 else 'higher'}")
-        note = (f"Genomic curve kept at its own level; {what} is {rel}"
+        note = ((f"First cited point ({_cited_txt(late)}) is after {DEEP_JOIN_CITED_MAX_YEAR}, so not used "
+                 "as the deep past's level. " if late is not None else "")
+                + f"Genomic curve kept at its own level; {what} is {rel}"
                 + (f" (flagged: beyond {DEEP_JOIN_FLAG:g}x)" if flag else "")
-                + "; the two are joined log-linearly across PSMC's last 20 kyr.")
-    join = {"rule": "scaled" if cited else "absolute", "next": "cited" if cited else "modelled",
+                + "; the two are joined log-linearly across PSMC's last 20 kyr"
+                + (", then the range-loss trend runs to the cited point" if skipped is not None else "")
+                + ".")
+    join = {"rule": "scaled" if cited else "absolute", "next": "cited" if cited_kind else "modelled",
             "to_kind": nxt["kind"], "to_year": nxt["year"], "to_n": nxt["n"],
             "deep_n_raw": deep_pts[-1]["n"] / f, "deep_n": deep_pts[-1]["n"],
-            "ratio": raw, "factor": f, "flag": flag, "note": note}
+            "ratio": raw, "factor": f, "flag": flag, "note": note,
+            # the first cited point, when it is after the cutoff and so not the deep past's level
+            "cited_late": ({"year": late["year"], "n": late["n"], "kind": late["kind"]}
+                           if late is not None else None)}
     return deep_pts, join
 
 
@@ -524,13 +553,21 @@ def deep_join_summary(report: dict) -> dict:
                for sp, j in sorted(joins.items(), key=lambda kv: -abs(math.log(kv[1]["ratio"])))
                if j["flag"]}
     return {
-        "note": "How each genomic deep past meets the next level across PSMC's blind spot (ToLaD#77, #80): "
-                "a cited next level (a history file's baseline or first point) scales the curve to meet it "
-                "(rule `scaled`, factor = 1 / ratio); a modelled one (the natural level in 1500 CE, today's "
-                "modelled count) keeps the genomic level (rule `absolute`). ratio = genomic level at the "
-                f"blind spot / next level, before scaling; flagged when beyond {DEEP_JOIN_FLAG:g}x either way. "
-                "Per species: history.species[<sp>].deep.join (its `note` is the card's sentence).",
+        "note": "How each genomic deep past meets the next level across PSMC's blind spot (ToLaD#77, #80, #71): "
+                "a cited next level (a history file's baseline or first point) dated "
+                f"{DEEP_JOIN_CITED_MAX_YEAR} or earlier scales the curve to meet it (rule `scaled`, factor = "
+                "1 / ratio); a modelled one (the natural level in 1500 CE, today's modelled count) keeps the "
+                f"genomic level (rule `absolute`). A first cited point after {DEEP_JOIN_CITED_MAX_YEAR} (a "
+                "crash or a modern count, not a historical level) is not the deep past's level: the curve is "
+                "kept, joins the natural level in 1500 CE where the range-loss trend applies (the trend then "
+                "runs to that point), else that point itself (`cited_late` counts them). ratio = genomic level "
+                f"at the blind spot / next level, before scaling; flagged when beyond {DEEP_JOIN_FLAG:g}x either "
+                "way. Per species: history.species[<sp>].deep.join (its `note` is the card's sentence).",
         "by_rule": {r: sum(j["rule"] == r for j in joins.values()) for r in ("scaled", "absolute")},
+        "cited_late": {"to_natural_1500": sum(bool(j.get("cited_late")) and j["to_kind"] == "rangeloss"
+                                              for j in joins.values()),
+                       "to_the_point": sum(bool(j.get("cited_late")) and j["to_kind"] in POINT_KINDS
+                                           for j in joins.values())},
         "flagged_by_rule": {r: sum(f["rule"] == r for f in flagged.values()) for r in ("scaled", "absolute")},
         "flagged": flagged,
     }
@@ -541,9 +578,16 @@ def _sd_of(p: dict) -> float:
     return math.log10(p["hi"] / p["lo"]) / (2 * 1.96)
 
 
-def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = None) -> list[dict]:
+def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = None,
+          start_point=None) -> list[dict]:
     """Rewrite curated leaves in place (before sum_tree). Returns the records
-    with their compiled curve, segments and tree location."""
+    with their compiled curve, segments and tree location.
+
+    `start_point(leaf)` gives the range-loss trend's first knot (the natural level in 1500 CE, kind
+    `rangeloss`; model.rangeloss_start) for a leaf that has the trend, else None. A wild counts file
+    whose deep past is the natural level (no baseline, no [deep]), or a genomic one whose first cited
+    point is after DEEP_JOIN_CITED_MAX_YEAR, gets that knot before its first cited point, so the gap
+    from 1500 to the first point is the trend, not a step (ToLaD#71)."""
     recs = load_all() if recs is None else recs
     leaves = {}
     for n in root.preorder():
@@ -614,11 +658,29 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
                           "grade": "ABCD"[min(3, D["grade_cap"])], "kind": "model",
                           "cite": "ToLaD model (stats.json, this leaf)", "url": "https://github.com/theitush/ToLaD",
                           "note": "the pipeline's alive-now for this leaf; no recent graded point"}]
+        wild_counts = rec["use"] == "counts" and rec["component"] == "wild"
+        n_deep = len(deep_pts)
+        # the gap before the first cited point (ToLaD#71): where the deep past ends at the natural level
+        # (no baseline, no [deep]), or at a genomic curve that is not scaled to the first cited point (it
+        # is after DEEP_JOIN_CITED_MAX_YEAR), the range-loss trend runs from the natural level in 1500 CE
+        # to that point instead of a held level and a step
+        start = start_point(leaf) if start_point is not None and wild_counts else None
+        first = pts[n_deep] if n_deep < len(pts) else None
+        if (start is None and deep_pts and start_point is not None and wild_counts and first is not None
+                and first["kind"] in POINT_KINDS and first["year"] > DEEP_JOIN_CITED_MAX_YEAR):
+            # a genomic curve not scaled to its first cited point joins the natural level in 1500 even
+            # where the model has no trend (no current range map: the scimitar oryx)
+            start = start_point(leaf, True)
+        trend = (start is not None and first is not None and first["kind"] in POINT_KINDS
+                 and first["year"] > start["year"]
+                 and (first["year"] > DEEP_JOIN_CITED_MAX_YEAR if deep_pts else nat_base is not None))
+        if trend:
+            pts = pts[:n_deep] + [start] + pts[n_deep:]
+        rec["trend_1500"] = trend
         rec["deep_join"] = None
         if deep_pts:
             # the join across the blind spot: a cited next level scales the curve, a modelled one does not
-            n_deep = len(deep_pts)
-            deep_pts, rec["deep_join"] = deep_join(deep_pts, pts[n_deep])
+            deep_pts, rec["deep_join"] = deep_join(deep_pts, pts[n_deep], first if trend else None)
             rec["deep_points"] = deep_pts
             pts = deep_pts + pts[n_deep:]
         rec["curve"] = pts
@@ -676,6 +738,7 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
                                 f"({rec['deep']['grade']}; {rec['deep']['cite']})" if deep_pts else "")
                              + (f", natural baseline {base['n']:.3g} ({base['grade']}) before the first point"
                                 if base is nat_base else "")
+                             + (", then the range-loss trend from 1500 to the first cited point" if trend else "")
                              + f"; pipeline/history/{rec['file']})"
                              + (" + bulk genomic deep past (genomic.py)" if rec.get("deep_bulk") else ""))
             D["src"].add(src_bit)
@@ -685,12 +748,17 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
         # wild: the first segment holds the baseline back to the band start; domestic and
         # humans: segments cover the curated span only (before it the model's own shape stands)
         t0_seg = leaf.t0 if rec["component"] == "wild" else year_to_ma(pts[0]["year"])
-        wild_counts = rec["use"] == "counts" and rec["component"] == "wild"
         pre = ((nat_base["n"] if nat_base else pts[-1]["n"]) if wild_counts and not rec["baseline"]
                and not deep_pts else None)
         rec["segments"] = compile_segments(pts, G, L, t0_seg, rec["baseline"] is not None and not deep_pts,
                                            pre_level=pre, pre_grade=3 if nat_base else min(3, D["grade_cap"]),
                                            pre_kind="natural" if nat_base else "model")
+        if trend and not deep_pts:
+            # the generation that straddles 1500 can fall before the trend's first knot: it holds the
+            # natural level (as in model.rangeloss_record)
+            for sg in rec["segments"]:
+                if sg["kind"] == K["held"] and sg["year0"] < start["year"]:
+                    sg["kind"] = K["natural"]
         rec["natural"] = nat_base if wild_counts else None
         deep_rep = None
         if deep_pts:
@@ -719,6 +787,7 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
             "alive_from": "history" if alive_from_hist else "model",
             "ever_before": before["ever"], "ever_after": D["ever_med"],
             "ever_ratio": D["ever_med"] / before["ever"] if before["ever"] > 0 else None,
+            "trend_1500": trend,
             "G_yr": G, "segments": len(rec["segments"]), "domestic_on_leaf": bool(D.get("domestic")),
             "deep": deep_rep,
         }

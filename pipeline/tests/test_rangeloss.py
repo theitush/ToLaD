@@ -123,7 +123,11 @@ class Build(unittest.TestCase):
         hist = {h["species"]: h for h in self.dbg["history"]}
         for sp in ("Bison bison", "Canis lupus"):
             self.assertIsNone(hist[sp].get("modelled"), sp)
-            self.assertNotIn("rangeloss", {s["kind"] for s in hist[sp]["segments"]}, sp)
+        # a cited baseline (and a genomic curve scaled to it): no trend
+        self.assertNotIn("rangeloss", {s["kind"] for s in hist["Bison bison"]["segments"]})
+        # the natural level, no baseline (ToLaD#71): the trend fills the gap from 1500 to the first point
+        self.assertEqual(hist["Canis lupus"]["points"][0]["kind"], "rangeloss")
+        self.assertIn("rangeloss", {s["kind"] for s in hist["Canis lupus"]["segments"]})
 
     def test_unchanged_range_stays_flat(self):
         # species whose natural and current maps agree have no trend and no record

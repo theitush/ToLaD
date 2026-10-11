@@ -522,8 +522,157 @@ class DeepJoin(unittest.TestCase):
             self.assertEqual(h["deep_join"], j["note"], sp)  # the card's sentence
             self.assertEqual(sp in st["deep_join"]["flagged"], j["flag"], sp)
         self.assertEqual(n, st["deep_join"]["by_rule"])
-        self.assertGreater(n["scaled"], 5)  # the history files' cited baselines, Panthera included
+        self.assertGreater(n["scaled"], 5)  # the history files' cited historical levels (Bison, tiger, ...)
         self.assertGreater(n["absolute"], 50)  # the modelled records
+
+    def test_cutoff_1900(self):
+        """ToLaD#71/#80: only a cited level dated 1900 or earlier scales the genomic curve."""
+        _, gen = self._gen()
+        for year in (1530, 1800, 1900):
+            out, j = H.deep_join(gen, self._nxt(2e5, "census", year=year))
+            self.assertEqual(j["rule"], "scaled", year)
+            self.assertIsNone(j["cited_late"])
+            self.assertAlmostEqual(out[-1]["n"], 2e5)
+        # a 1924 census of 66 (the wisent): kept, the sentence says why; flagged, as it is 1,212x off
+        late = self._nxt(66, "census", year=1924)
+        out, j = H.deep_join(gen, late)
+        self.assertEqual((j["rule"], j["next"], j["factor"], j["flag"]), ("absolute", "cited", 1.0, True))
+        self.assertEqual([p["n"] for p in out], [p["n"] for p in gen])
+        self.assertEqual(j["cited_late"], {"year": 1924, "n": 66, "kind": "census"})
+        self.assertEqual(j["note"], "First cited point (1924 census, 66) is after 1900, so not used as the deep "
+                                    "past's level. Genomic curve kept at its own level; that point is 1,212x lower "
+                                    "(flagged: beyond 10x); the two are joined log-linearly across PSMC's last "
+                                    "20 kyr.")
+        # with the natural level in 1500 put before it: joined to that, then the trend runs to the point
+        out, j = H.deep_join(gen, self._nxt(4e4, "rangeloss"), late)
+        self.assertEqual((j["rule"], j["next"], j["to_kind"], j["flag"]), ("absolute", "modelled", "rangeloss", False))
+        self.assertEqual(j["cited_late"]["year"], 1924)
+        self.assertEqual(j["note"], "First cited point (1924 census, 66) is after 1900, so not used as the deep "
+                                    "past's level. Genomic curve kept at its own level; the modelled natural level "
+                                    "in 1500 CE is 2x lower; the two are joined log-linearly across PSMC's last "
+                                    "20 kyr, then the range-loss trend runs to the cited point.")
+        s = H.deep_join_summary({"a": {"deep": {"join": j}}, "b": {"deep": {"join": H.deep_join(gen, late)[1]}}})
+        self.assertEqual(s["cited_late"], {"to_natural_1500": 1, "to_the_point": 1})
+
+    def test_built_bison_bonasus(self):
+        """The wisent's deep past is no longer scaled x0.0037 to the 1924 census of 66."""
+        st = _stats()
+        if st is None or "deep_join" not in st:
+            self.skipTest("no build output")
+        j = st["species"]["Bison bonasus"]["deep"]["join"]
+        self.assertEqual(j["rule"], "absolute")
+        self.assertEqual(j["cited_late"]["year"], 1924)
+        self.assertIn("First cited point (1924 census, 66) is after 1900, so not used as the deep past's level",
+                      j["note"])
+        for sp in ("Bison bison", "Loxodonta africana", "Vicugna vicugna", "Panthera tigris"):  # <= 1900
+            self.assertEqual(st["species"][sp]["deep"]["join"]["rule"], "scaled", sp)
+
+
+def _gap_leaf(n_nat=1e5, n_now=1e4, L=5.0, t0=1.0, rangeloss=True):
+    """A living leaf as model.py leaves it before history.apply: natural level `n_nat` (both maps),
+    today's count `n_now`, the range-loss trend (when `rangeloss`) in its pieces."""
+    from types import SimpleNamespace
+    nat = {"N": n_nat, "lo": n_nat / 10, "hi": n_nat * 10, "grade": "D", "kind": "reconstruction",
+           "scaled": rangeloss, "km2_cur": 1.0, "km2_nat": n_nat / n_now, "method": "test"}
+    D = {"L": L, "rate_wild_now": n_now / L, "natural": nat, "alive": n_now, "ever_med": 1.0, "grade_cap": 3,
+         "sd_leaf": 0.3, "pieces": [(t0, 0.0, n_now / L)], "meth": [], "src": set(), "rangeloss": rangeloss,
+         "sd_today_count": 0.2, "grade_cap_today": 2}
+    leaf = SimpleNamespace(name="Testus exemplaris", t0=t0, extinct=False, is_leaf=True, data=D)
+    return SimpleNamespace(preorder=lambda: [leaf]), leaf
+
+
+def _gap_apply(doc: dict, **kw) -> tuple[dict, dict, dict]:
+    from tolad_pipeline import model as M
+    root, leaf = _gap_leaf(**kw)
+    log = {}
+    rec = H.apply(root, Path("."), log, 0, [{**H.validate(copy.deepcopy(doc)), "file": "t.toml"}],
+                  M.rangeloss_start)[0]
+    return rec, log["history"]["species"]["Testus exemplaris"], leaf.data
+
+
+class GapTrend(unittest.TestCase):
+    """ToLaD#71: the range-loss trend fills the gap between the natural level and the first cited point."""
+
+    NOB = {k: v for k, v in GOOD.items() if k != "baseline"}  # 1950: 2e4, 2020: 1e4 (B)
+
+    def test_natural_then_trend_then_points(self):
+        rec, rep, D = _gap_apply(self.NOB)
+        c = rec["curve"]
+        self.assertEqual([(p["year"], p["kind"]) for p in c], [(1500, "rangeloss"), (1950, "estimate"),
+                                                               (2020, "census")])
+        self.assertEqual(c[0]["n"], 1e5)
+        self.assertTrue(rec["trend_1500"] and rep["trend_1500"])
+        self.assertEqual(rep["deep_from"], "natural")  # unchanged: the natural level sets the band start
+        self.assertAlmostEqual(rep["deep_after"], 1e5)
+        # births: the natural level held to 1500, then the log-linear trend to 2e4 in 1950 (no step)
+        y = 1725.0
+        want = math.exp((math.log(1e5) + math.log(2e4)) / 2) / 5.0
+        r = next(r for o, yy, r in D["pieces"] if yy <= year_to_ma(y) <= o)
+        self.assertAlmostEqual(r / want, 1.0, delta=0.01)
+        self.assertAlmostEqual(D["pieces"][0][2] * 5.0, 1e5)
+        # segments: natural, then the trend (kind rangeloss) to the first point, contiguous, no jump
+        kinds = [H.KINDS[s["kind"]] for s in rec["segments"]]
+        i = kinds.index("rangeloss")
+        self.assertEqual(set(kinds[:i]), {"natural"})
+        self.assertNotIn("held", kinds[:i])
+        for a, b in zip(rec["segments"], rec["segments"][1:]):
+            self.assertAlmostEqual(a["end"], b["start"], delta=1e-9 * a["end"])
+        self.assertIn("then the range-loss trend from 1500 to the first cited point", D["meth"][-1])
+
+    def test_no_trend_without_both_maps_or_before_1500(self):
+        # no range-loss trend on the leaf (natural level from density x area): the held level and a step
+        rec, rep, _ = _gap_apply(self.NOB, rangeloss=False)
+        self.assertEqual(rec["curve"][0]["year"], 1950)
+        self.assertFalse(rep["trend_1500"])
+        self.assertEqual(rep["deep_from"], "natural")
+        # a first point before 1500: nothing to fill
+        doc = copy.deepcopy(self.NOB)
+        doc["point"][0]["year"] = 1400
+        rec, rep, _ = _gap_apply(doc)
+        self.assertEqual(rec["curve"][0]["year"], 1400)
+        self.assertFalse(rep["trend_1500"])
+        # a cited baseline wins: no trend
+        rec, rep, _ = _gap_apply(GOOD)
+        self.assertNotIn("rangeloss", [p["kind"] for p in rec["curve"]])
+        self.assertEqual(rep["deep_from"], "baseline")
+
+    def test_genomic_scaled_to_1800_point(self):
+        doc = _with_deep()
+        del doc["baseline"]
+        doc["point"][0]["year"] = 1800
+        rec, rep, _ = _gap_apply(doc)
+        kinds = [p["kind"] for p in rec["curve"]]
+        self.assertNotIn("rangeloss", kinds)
+        j = rec["deep_join"]
+        self.assertEqual((j["rule"], j["to_year"], j["cited_late"]), ("scaled", 1800, None))
+        self.assertAlmostEqual(rec["deep_points"][-1]["n"], 2e4)
+        self.assertEqual(rep["deep_from"], "genomic")
+
+    def test_genomic_kept_and_trend_fills_to_1924_point(self):
+        doc = _with_deep()
+        del doc["baseline"]
+        doc["point"][0].update(year=1924, n=66, lo=60, hi=70, kind="census")
+        raw, _ = H.deep_points(H.validate(copy.deepcopy(doc))["deep"], 10.0, NOW_YEAR - 1e6)
+        # without the model's own trend (no current range map) the natural level in 1500 is joined too
+        rec, rep, _ = _gap_apply(doc, rangeloss=False)
+        n = len(rec["deep_points"])
+        self.assertEqual([p["kind"] for p in rec["curve"][n:]], ["rangeloss", "census", "census"])
+        self.assertTrue(rep["trend_1500"])
+        rec, rep, _ = _gap_apply(doc)
+        c = rec["curve"]
+        n = len(rec["deep_points"])
+        self.assertEqual([p["kind"] for p in c[n:]], ["rangeloss", "census", "census"])
+        self.assertEqual((c[n]["year"], c[n]["n"], c[n + 1]["year"]), (1500, 1e5, 1924))
+        j = rec["deep_join"]
+        self.assertEqual((j["rule"], j["to_kind"], j["factor"]), ("absolute", "rangeloss", 1.0))
+        self.assertEqual(j["cited_late"], {"year": 1924, "n": 66, "kind": "census"})
+        self.assertEqual([p["n"] for p in rec["deep_points"]], [p["n"] for p in raw])  # not scaled
+        self.assertIn("First cited point (1924 census, 66) is after 1900", j["note"])
+        self.assertEqual(rep["deep_from"], "genomic")
+        segk = [H.KINDS[s["kind"]] for s in rec["segments"]]
+        self.assertIn("rangeloss", segk)
+        for p in c:  # the curve passes through every point
+            self.assertAlmostEqual(H.interp(c, p["year"]) / p["n"], 1.0, places=9)
 
 
 if __name__ == "__main__":
