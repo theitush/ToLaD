@@ -2,9 +2,12 @@
 // (x) and time (y) scaled separately. It never rotates or shears: x on screen
 // depends only on world x, y only on world y.
 //
-// One pinch zooms both axes by the same factor. Width can go ~10^12 deeper
-// than time (a linear-width branch is that much thinner than it is tall), so
-// time stops at a floor and width keeps going:
+// Width and time zoom separately (#138): a sideways pinch zooms width, an
+// upright one time, a diagonal one both (engine/input.ts, with a dead zone so
+// either can be zoomed alone); the wheel zooms both, shift+wheel width only,
+// alt+wheel time only. Each axis keeps its own limits. Width can go ~10^12
+// deeper than time (a linear-width branch is that much thinner than it is
+// tall), so time stops at a floor and width keeps going:
 //   - time: MIN_YEARS (10 years) never takes more than MAX_YEARS_FRAC (10%) of
 //     the screen's height anywhere on screen, so the screen always shows at
 //     least ~100 years. On the log axis years are tallest at the top of the
