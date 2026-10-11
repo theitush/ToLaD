@@ -1,0 +1,41 @@
+species   = "Lynx canadensis"
+common    = "Canada lynx"
+component = "wild"
+use       = "counts"
+scope     = "Canada (the bulk of the range); Alaska and the contiguous United States not counted"
+notes     = """
+No global estimate exists (IUCN SSC Cat Specialist Group; the Red List assessment is Least Concern).
+Numbers swing 3-17-fold over the 8-11-year snowshoe hare cycle, so a single level is a mean over
+the cycle. Poole 2003 (from his 2001 COSEWIC report) puts ~50,000 in Canada at the cyclic low and
+over 500,000 at some peaks; the Northwest Territories alone 8,000-80,000 (GNWT species page).
+Canada still holds ~95% of the lynx's former range there (Poole 2003); the losses are at the
+southern edge, where the contiguous-US population (a few breeding populations in Maine, Minnesota,
+Montana, Washington and the reintroduced Colorado population, from 1999) is listed as Threatened
+(2000). Harvest: pelt exports from Canada and the US averaged 35,669 a year in 1980-84, 7,360 in
+1986-89 and 15,387 in 2000-06 (Poole 2003 and later CITES data, as quoted on Wikipedia). The
+model's own alive-now was ~213,000 (Greenspoon et al. 2023's per-species model), within Poole's
+range. No cited figure before 2001: the baseline is derived from it and the PHYLACINE range ratio,
+the rule the model applies to a census species.
+"""
+
+[baseline]
+year  = 1500
+n     = 218000
+lo    = 50000
+hi    = 691000
+grade = "D"
+kind  = "reconstruction"
+cite  = "Derived: the 2001 estimate below x the PHYLACINE 1.2.1 present-natural / current range ratio (14.47 / 10.47 million km2 = 1.38; Faurby et al. 2018, Ecology 99:2626)"
+url   = "https://doi.org/10.1002/ecy.2443"
+note  = "Not a measured figure. The range lost is mostly the southern edge in the contiguous US; within Canada ~95% of the former range is still occupied (Poole 2003), so the real loss may be smaller. lo = Poole's cyclic low with no range loss; hi = his peak x 1.38. Dated 1500 CE, the natural baseline's step year."
+
+[[point]]
+year  = 2001
+n     = 158000
+lo    = 50000
+hi    = 500000
+grade = "C"
+kind  = "estimate"
+cite  = "Poole 2003, A review of the Canada lynx, Lynx canadensis, in Canada, Canadian Field-Naturalist 117:360-376"
+url   = "https://www.canadianfieldnaturalist.ca/index.php/cfn/article/download/738/738/2946"
+note  = "'Considering the extent of lynx habitat in Canada (roughly 5 500 000 km2), densities during the low of 2 lynx/100 km2, and a safety factor of 50%, there may be roughly 50 000 lynx in Canada during the cyclic low and over 500 000 during some cyclic peaks.' n = the geometric mean of the two, as a level over the cycle; dated to the COSEWIC report it summarises (Poole 2001). A habitat x density extrapolation with a 10x range: grade C."

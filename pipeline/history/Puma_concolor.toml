@@ -1,0 +1,44 @@
+species   = "Puma concolor"
+common    = "Puma"
+component = "wild"
+use       = "counts"
+scope     = "global, all ages (a modelled estimate: no census or agency total exists)"
+notes     = """
+No global count exists. The IUCN assessment (Nielsen et al. 2015, errata 2016, Least Concern,
+decreasing) lists the total as unknown and gives only regional figures, all old: Canada
+3,500-5,000 and the western US 10,000 in the early 1990s (Caso et al. 2008 assessment, quoting
+Nowell & Jackson 1996); the largest subpopulation, in South America, has never been quantified. So
+the only global figure is a model, Greenspoon et al. 2023 (per-species biomass / body mass, the same
+figure the model uses for today's count), graded D below. Densities range 0.5-7 per 100 km2 (IUCN
+SSC Cat Specialist Group); 777,000 over the 26.2 million km2 PHYLACINE current range is ~3 per
+100 km2, inside that range, so the model's level is not shown to be far too high.
+
+History, regional only (not points: the curve is global): pumas were eliminated from most of the
+eastern half of the US in the two centuries after European colonisation and by 1930 were gone east
+of the Rocky Mountains in the US and Canada except Florida (Cat Specialist Group); the US Fish and
+Wildlife Service declared the eastern cougar extinct in 2018. In the western US they have generally
+recovered since bounties ended (mid-20th century) and are recolonising the Dakotas, Nebraska and
+the Midwest. Florida panther: a remnant of a few dozen by the early 1990s, augmented with eight Texas
+females in 1995, now estimated at 100-180 (Cat Specialist Group).
+
+Deep past: the bulk PSMC curve (Bergman et al. 2023; the DNA Zoo PumCon1.0 genome of Saremi et al.
+2019, Nat Commun 10:4769) ends ~25 kyr ago at ~40,000 (Ne/N = 0.1) and is joined to the modelled
+natural level in 1500 (~1.0M), 26x higher (flagged, #77). No cited global level before 1900
+exists, so the curve keeps its own level (ToLaD#94). Part of the low is real: North American
+pumas descend from a small group that recolonised from South America after the late-Pleistocene
+extinctions (~10-12 kyr ago; Culver et al. 2000, J Hered 91:186), and North and South American
+lineages split 300-100 kyr ago (Saremi et al. 2019), so one genome samples one region's ancestry;
+the rest is the generic Ne/N ratio of 0.1, which a species with long-range dispersal and strong
+structure need not follow.
+"""
+
+[[point]]
+year  = 2023
+n     = 776691
+lo    = 520000
+hi    = 1133000
+grade = "D"
+kind  = "estimate"
+cite  = "Greenspoon et al. 2023, The global biomass of wild mammals, PNAS 120:e2204892120 (per-species estimate, results/wild_land_mammal_biomass.csv: 41.9 Gg, 28.1-61.2 Gg, / adult mass 53.95 kg)"
+url   = "https://doi.org/10.1073/pnas.2204892120"
+note  = "A model, not a count: a regression of density on body mass and trophic level, times the IUCN range area, fitted on species with census data. n = the pipeline's alive-now from this source (the build applies its own occupancy fit); lo/hi = the source's biomass range over the adult mass (28.07 / 61.16 Gg over 53.95 kg). Grade D: no census or agency figure to check it against."
