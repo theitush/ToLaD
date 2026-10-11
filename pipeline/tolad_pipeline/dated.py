@@ -329,7 +329,7 @@ def build(root: Node, up_root, up_tax: dict[str, dict], ov, log: dict) -> DNode:
         if sub is None:
             continue
         A = m[id(p)]
-        g = nd.t0
+        g = max(nd.t0, sub.age)  # its band start, never below its own oldest split (a group starts at its genus record)
         fossil = nd.kind != "tree" or all(x.leaf.extinct or x.leaf.t1 > 0 for x in sub.preorder() if x.leaf is not None)
         stem = bool(p.data.get("total_group_of")) or g > A.age + EPS
         B = A
@@ -340,8 +340,10 @@ def build(root: Node, up_root, up_tax: dict[str, dict], ov, log: dict) -> DNode:
             age = max(g, A.age * 1.02 + 0.01)
             if P is not None:
                 age = min(age, P.age - EPS)
-            if age <= B.age + EPS / 2:
-                stem = False
+            if age <= B.age + EPS / 2:  # a split already there at this age (a graft of the same first appearance): join it
+                (B if B.leaf is None else P).add(sub)
+                how["on a stem, joins a graft of the same age"] += 1
+                continue
         if not stem:
             T = A if A.leaf is None else (A.parent or A)
             T.add(sub)
