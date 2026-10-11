@@ -396,8 +396,13 @@ class DeepPast(unittest.TestCase):
             s, h = st["species"][sp], hist[sp]
             d = s["deep"]
             gen = [p for p in h["points"] if p["kind"] == "genomic"]
-            self.assertEqual(len(gen), d["points"], sp)
+            # resolved steps, then the blind ones kept where [deep.blind] cites a decline there (ToLaD#143)
+            self.assertEqual(len(gen), d["points"] + d["kept_blind"], sp)
             self.assertGreaterEqual(d["youngest_yr_ago"], H.DEEP_BLIND_YR, sp)
+            self.assertEqual(d["kept_blind"] > 0, bool((d["join"]["blind"] or {}).get("kept")), sp)
+            if d["kept_blind"]:
+                self.assertLess(d["youngest_blind_yr_ago"], H.DEEP_BLIND_YR, sp)
+                self.assertTrue(all(p["grade"] == "D" for p in gen[d["points"]:]), sp)
             self.assertLessEqual(d["oldest_yr_ago"], d["band_start_yr_ago"], sp)
             self.assertTrue(all(p["grade"] in "CD" for p in gen), sp)
             # genomic points come first and are older than every cited point
@@ -418,6 +423,84 @@ class DeepPast(unittest.TestCase):
             lo = min(p["n"] for p in gen) / h["L"] * band * 0.5
             hi = max(p["n"] for p in gen) / h["L"] * band * 1.5
             self.assertTrue(lo <= s["ever_after"] <= hi, (sp, lo, s["ever_after"], hi))
+
+
+BLIND = {"cite": "F 2017, Results", "url": "https://example.org/f", "quote": "a second round of decline",
+         "window": [10000, 20000]}
+
+
+class BlindSpot(unittest.TestCase):
+    """ToLaD#143: PSMC's blind-spot steps are kept (grade D) where [deep.blind] cites a decline there;
+    else dropped, and a join running against them is flagged and said on the card."""
+
+    def _gen(self, **kw):
+        r = H.validate(_with_deep(**kw))
+        keep, drop = H.deep_points(r["deep"], 10.0)  # resolved youngest 8e4 (~33 kya); blind 4e4 (~6 kya)
+        return r, keep, drop
+
+    def test_schema(self):
+        r, _, _ = self._gen(blind=BLIND)
+        self.assertEqual(r["deep"]["blind"]["window"], [10000.0, 20000.0])
+        self.assertIsNone(self._gen()[0]["deep"]["blind"])
+        for bad in ({k: v for k, v in BLIND.items() if k != "quote"}, {**BLIND, "url": "doi:1"},
+                    {**BLIND, "window": [25000, 40000]}, {**BLIND, "window": [9, 8]}, {**BLIND, "colour": 1}):
+            with self.assertRaises(H.HistoryError):
+                H.validate(_with_deep(blind=bad))
+
+    def test_kept_where_cited(self):
+        r, keep, drop = self._gen(blind=BLIND)
+        bp = H.blind_points(drop, r["deep"]["blind"], 1500)
+        self.assertEqual(len(bp), 1)
+        p = bp[0]
+        self.assertTrue(p["blind"] and p["grade"] == "D" and p["kind"] == "genomic")
+        self.assertAlmostEqual(NOW_YEAR - p["year"], 6000, places=3)
+        self.assertIn('"a second round of decline"', p["note"])
+        self.assertEqual(H.blind_points(drop, r["deep"]["blind"], NOW_YEAR - 7000), [])  # not before the next point
+        out, j = H.deep_join(keep + bp, {"year": 1500, "n": 4e5, "lo": 2e5, "hi": 8e5, "grade": "D",
+                                         "kind": "rangeloss"}, None, drop, r["deep"]["blind"])
+        self.assertAlmostEqual(j["ratio"], 4e4 / 4e5)  # the join starts from the youngest kept step
+        self.assertTrue(j["blind"]["kept"])
+        self.assertFalse(j["blind"]["against"])
+        self.assertAlmostEqual(j["blind"]["vs_resolved"], 0.5)
+        self.assertIn("is kept, grade D, because F 2017, Results dates a decline there", j["note"])
+        self.assertIn("the genomic level falls 2x", j["note"])
+        self.assertIn("joined log-linearly from the youngest kept step", j["note"])
+
+    def test_dropped_join_against_is_flagged(self):
+        _, keep, drop = self._gen()
+
+        def nxt(n, kind="rangeloss", year=1500):
+            return {"year": year, "n": n, "lo": n / 2, "hi": n * 2, "grade": "D", "kind": kind}
+        _, j = H.deep_join(keep, nxt(4e5), None, drop)  # blind 0.5x, join rises 5x: against
+        self.assertFalse(j["blind"]["kept"])
+        self.assertTrue(j["blind"]["against"])
+        self.assertAlmostEqual(j["ratio"], 8e4 / 4e5)  # still from the youngest resolved step
+        self.assertIn("sits 2x below its youngest resolved step", j["note"])
+        self.assertIn("so the join rises instead (flagged)", j["note"])
+        self.assertIn("across PSMC's last 20 kyr", j["note"])
+        _, j = H.deep_join(keep, nxt(4e4), None, drop)  # the join falls with them: nothing to say
+        self.assertFalse(j["blind"]["against"])
+        self.assertNotIn("blind spot", j["note"])
+        _, j = H.deep_join(keep, nxt(2e5, "census", 1900), None, drop)  # scaled: the join is flat
+        self.assertTrue(j["blind"]["against"])
+        self.assertIn("so the join stays flat instead", j["note"])
+        s = H.deep_join_summary({"a": {"deep": {"join": j}}})
+        self.assertEqual(list(s["blind"]["against"]), ["a"])
+        self.assertEqual(s["blind"]["kept"], [])
+
+    def test_built_lion_and_leopard_fall_after_the_glacial_maximum(self):
+        st = _stats()
+        dbg = DATA / "debug_top.json"
+        if st is None or not dbg.exists() or "blind" not in st.get("deep_join", {}):
+            self.skipTest("no build output")
+        hist = {h["species"]: h for h in json.loads(dbg.read_text())["history"]}
+        for sp in ("Panthera leo", "Panthera pardus"):
+            self.assertIn(sp, st["deep_join"]["blind"]["kept"])
+            pts = hist[sp]["points"]
+            at = {ka: H.interp(pts, NOW_YEAR - ka * 1000) for ka in (30, 20, 15, 10, 5)}
+            self.assertLess(at[10], at[20] / 1.5, (sp, at))  # Figueiro et al. 2017: 20-10 kya
+            self.assertLessEqual(at[15], at[20], (sp, at))
+            self.assertLessEqual(at[10], at[15], (sp, at))
 
 
 class DeepJoin(unittest.TestCase):

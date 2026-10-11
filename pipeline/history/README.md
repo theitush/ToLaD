@@ -265,7 +265,46 @@ the same way by code rather than by hand.
 - **PSMC's blind spots.**
   - PSMC has little resolution in the last ~10-20 kyr, because few segments
     coalesce that recently. Steps younger than `DEEP_BLIND_YR` = 20 kyr (after
-    rescaling) are dropped.
+    rescaling) are dropped, **unless a cited source dates a decline there**
+    (ToLaD#143, below).
+  - **The blind-spot rule** (ToLaD#143). Dropping the blind steps and joining
+    straight across them drew the opposite of the evidence where the next
+    level is higher: the lion and leopard columns rose through 20-10 kya,
+    where Figueiró et al. 2017 date the big cats' strongest post-glacial
+    decline and the dropped steps themselves fall 3.5-3.8x. The rule:
+    - **Kept where a source dates a decline there.** A `[deep.blind]` table
+      (`cite`, `url`, `quote`, `window` = [from, to] years before present as
+      the source dates it, reaching into the last 20 kyr; optional `note`)
+      keeps every blind step older than the next point and than 1500 CE, as
+      `genomic` points graded D whose notes quote the source. The join then
+      starts from the youngest kept step. Lion and leopard have one
+      (Figueiró et al. 2017: "a second round of decline (most notably for
+      the lion and leopard) between 10,000 and 20,000 years ago, following
+      the last glacial maximum").
+    - **Else dropped, and a contradiction is said, not drawn.** Where no
+      source backs them, the steps stay out (one genome's weakest bins are
+      not drawn as fact; across the 109 genomic curves they swing 0.03x-44x
+      from the youngest resolved step, mostly unexplained). But when their
+      duration-weighted log-mean level (`history.blind_mean`) is beyond
+      `BLIND_AGAINST` = 1.5x from the youngest resolved step and the join
+      goes the other way (or is flat, when scaled), the join is flagged
+      `deep.join.blind.against`, the card's sentence says so, and
+      `make audit` lists it under `deep`.
+    - Why this rule: it draws what a cited source and the genome agree on,
+      and only that; a decline evidenced twice is shown, an unexplained
+      wiggle in PSMC's weakest bins is not, and where the straight join and
+      the genome disagree the reader is told. Keeping every blind step
+      (tried) added 189 grade-D points and moved the genomic level away from
+      the independent next level as often as towards it (33 closer, 35
+      further of 68), and averaging them into one level (tried) could not
+      show the leopard's fall, which sits at 7-11 kya in the build's time
+      scale.
+    - `stats.json -> history.species.<sp>.deep`: `points` (resolved),
+      `kept_blind`, `dropped_blind`, `youngest_blind_yr_ago`;
+      `deep.join.blind`: `kept`, `steps`, `vs_resolved` (youngest kept, or
+      the dropped mean, ÷ the youngest resolved step), `against`, the
+      source's `cite` / `url` / `window`; `history.deep_join.blind` lists
+      the species kept and against.
   - Population structure, and changes in connectivity, change the
     coalescence rate just as a change in size does. A PSMC peak can be a
     period of subdivision, and a "crash" can be populations merging, not a
@@ -309,7 +348,16 @@ the same way by code rather than by hand.
   baseline (42,000,000), keeping its shape; before scaling it was 981x below
   that level (flagged: beyond 10x)." or "Genomic curve kept at its own level;
   the modelled natural level in 1500 CE is 316x lower (flagged: beyond 10x);
-  the two are joined log-linearly across PSMC's last 20 kyr." The same
+  the two are joined log-linearly across PSMC's last 20 kyr." Where the
+  blind spot matters (ToLaD#143), the sentence starts with it: "PSMC's 4
+  steps in its blind spot (the last 20 kyr, where it resolves little) are
+  kept, grade D, because Figueiro et al. 2017, ... dates a decline there:
+  from the youngest resolved step (~23 kya) to the youngest kept (~3.8 kya)
+  the genomic level falls 3.5x." (the join then runs "from the youngest kept
+  step"), or "PSMC's 3 steps in its blind spot (the last 20 kyr) average
+  1.6x below its youngest resolved step (~25 kya) but are not drawn: PSMC
+  resolves little there and no source in this file dates a change, so the
+  join stays flat instead (flagged)." The same
   sentence ships in the tiles as `META.hist[].deep_join` (`pipeline/FORMAT.md`),
   which `file.history(row)` returns; a scaled curve's point notes say so too.
 
@@ -414,7 +462,8 @@ same `[deep]` structure in memory. Nothing is written into these TOMLs.
   1500 CE (kind `rangeloss`) and the trend to today's count (49 species);
   else straight on to today's count (39). Today's count is the model's
   alive-now, unchanged.
-- **The join at the blind spot** follows "Joining" above (#80): the youngest
+- **The join at the blind spot** follows "Joining" above (#80; bulk curves have
+  no `[deep.blind]`, so their blind steps are dropped, #143): the youngest
   genomic point (>= 20 kyr ago) joins the next level by one log-linear span,
   kind `interpolated`, grade D. A history file's cited baseline or first
   point scales the curve to meet it; a modelled record's next level (the 1500
