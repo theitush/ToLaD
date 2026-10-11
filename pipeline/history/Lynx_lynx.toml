@@ -1,0 +1,30 @@
+species   = "Lynx lynx"
+common    = "Eurasian lynx"
+component = "wild"
+use       = "counts"
+scope     = "global, sum of national and regional estimates (2003-2013); Central Asia, Belarus, Turkey, Iran and the Caucasus mostly not counted"
+notes     = """
+Added for ToLaD#110: the model's alive-now was ~434,000 (Greenspoon et al. 2023's per-species model,
+biomass / body mass), about 6x the published national estimates, which sum to ~69,000. The IUCN
+assessment (Breitenmoser et al. 2015, errata 2017, Least Concern, stable) gives no global total,
+only national and regional figures; it says the status in Asia is not well known and rough
+estimates exist only for a few countries, so the sum is a floor. Europe: hunted and persecuted to a
+low in the mid-20th century (extinct in most of western and central Europe by the early 1900s);
+the autochthonous Scandinavian, Karelian, Baltic and Carpathian populations (~1,300-2,500 each)
+recovered, and the Alpine, Jura, Dinaric, Bohemian-Bavarian, Harz and Vosges populations are 20th-
+century reintroductions of 20-160 each; the Balkan lynx (20-39 mature) is Critically Endangered
+(CMS COP14 Doc.31.4.1, Table 2). No cited global figure before 2003: before it the build uses the modelled natural level, the
+PHYLACINE range ratio (44.5 / 27.3 million km2 = 1.63) times this sum (~113,000 in 1500, grade D),
+not times the model's own count (which gave ~708,000).
+"""
+
+[[point]]
+year  = 2013
+n     = 69400
+lo    = 68880
+hi    = 69920
+grade = "C"
+kind  = "estimate"
+cite  = "Breitenmoser et al. 2015 (errata 2017), Lynx lynx, IUCN Red List e.T12519A121707666, national figures as quoted in UNEP/CMS/COP14/Doc.31.4.1 (2023), proposal to list the Eurasian lynx in CMS Appendix II, section 4.2 and Table 2"
+url   = "https://www.cms.int/sites/default/files/document/cms_cop14_doc.31.4.1_listing-proposal-lynx-lynx_e.pdf"
+note  = "Sum of: Europe excluding Russia and Belarus 9,000-10,000 (Breitenmoser et al. 2015); Russia 22,510 in 2013 (CentrOkhotControl, winter tracking and expert opinion; Table 2 gives 22,700); China ~27,000 (State Forestry Administration 2009); Mongolia 10,000 (2003); Georgia 160, Pakistan 80-120, Uzbekistan 130. n = midpoints summed, lo/hi = the stated ends summed; dated to the latest component (2013). Rough national estimates with countries missing, so a floor: grade C. Wikipedia's list of carnivorans by population carries the same sum (>69,510)."

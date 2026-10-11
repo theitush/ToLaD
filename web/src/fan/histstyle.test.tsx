@@ -109,10 +109,27 @@ describe('species card history', () => {
     }
   });
 
+  it('the lynxes show their cited counts, joined to the natural level in 1500 (#94, #110)', () => {
+    for (const [c, today] of [['Iberian lynx', 2401], ['Eurasian lynx', 69400], ['Canada lynx', 158000]] as const) {
+      const h = byName(c).history!;
+      const pts = h.points.slice().sort((a, b) => a.year - b.year);
+      expect(Math.abs(pts.at(-1)!.n / today - 1), c).toBeLessThan(0.01); // stored at reduced precision
+      expect(pts[0].year, c).toBe(1500);
+      expect(MODELLED_KINDS.has(h.segments[0].kind), c).toBe(true);
+    }
+  });
+
   it('no living species shows a flat assumed stretch without a "no data" mark', () => {
     // (The wild species with a curated or genomic history; the rest show the constant model, the domestic cat its growth since
-    // domestication, a range-loss trend (ToLaD#62) its modelled natural level, dashed as modelled, not held.)
-    const living = FELIDAE.species.filter((s) => !s.extinct && s.history?.component === 'wild' && s.history.modelled !== 'rangeloss');
+    // domestication, a range-loss trend (ToLaD#62) its modelled natural level, dashed as modelled, not held; so does a
+    // history file whose first cited point is joined to the natural level in 1500 by that trend, e.g. the lynxes, #94.)
+    const living = FELIDAE.species.filter(
+      (s) =>
+        !s.extinct &&
+        s.history?.component === 'wild' &&
+        s.history.modelled !== 'rangeloss' &&
+        !MODELLED_KINDS.has(s.history.segments[0]?.kind ?? ''),
+    );
     expect(living.length).toBeGreaterThanOrEqual(6);
     for (const sp of living) {
       const h = sp.history;

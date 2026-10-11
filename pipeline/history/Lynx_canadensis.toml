@@ -1,0 +1,31 @@
+species   = "Lynx canadensis"
+common    = "Canada lynx"
+component = "wild"
+use       = "counts"
+scope     = "Canada (the bulk of the range); Alaska and the contiguous United States not counted"
+notes     = """
+No global estimate exists (IUCN SSC Cat Specialist Group; the Red List assessment is Least Concern).
+Numbers swing 3-17-fold over the 8-11-year snowshoe hare cycle, so a single level is a mean over
+the cycle. Poole 2003 (from his 2001 COSEWIC report) puts ~50,000 in Canada at the cyclic low and
+over 500,000 at some peaks; the Northwest Territories alone 8,000-80,000 (GNWT species page).
+Canada still holds ~95% of the lynx's former range there (Poole 2003); the losses are at the
+southern edge, where the contiguous-US population (a few breeding populations in Maine, Minnesota,
+Montana, Washington and the reintroduced Colorado population, from 1999) is listed as Threatened
+(2000). Harvest: pelt exports from Canada and the US averaged 35,669 a year in 1980-84, 7,360 in
+1986-89 and 15,387 in 2000-06 (Poole 2003 and later CITES data, as quoted on Wikipedia). The
+model's own alive-now was ~213,000 (Greenspoon et al. 2023's per-species model), within Poole's
+range. No cited figure before 2001: before it the build uses the modelled natural level, the PHYLACINE
+range ratio (14.5 / 10.5 million km2 = 1.38, mostly the southern edge in the US) times Poole's level
+(~218,000 in 1500, grade D); within Canada the real loss may be smaller.
+"""
+
+[[point]]
+year  = 2001
+n     = 158000
+lo    = 50000
+hi    = 500000
+grade = "C"
+kind  = "estimate"
+cite  = "Poole 2003, A review of the Canada lynx, Lynx canadensis, in Canada, Canadian Field-Naturalist 117:360-376"
+url   = "https://www.canadianfieldnaturalist.ca/index.php/cfn/article/download/738/738/2946"
+note  = "'Considering the extent of lynx habitat in Canada (roughly 5 500 000 km2), densities during the low of 2 lynx/100 km2, and a safety factor of 50%, there may be roughly 50 000 lynx in Canada during the cyclic low and over 500 000 during some cyclic peaks.' n = the geometric mean of the two, as a level over the cycle; dated to the COSEWIC report it summarises (Poole 2001). A habitat x density extrapolation with a 10x range: grade C."

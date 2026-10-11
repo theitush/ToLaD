@@ -33,6 +33,11 @@ const scenes = [
   ['eurasian-lynx-sources', 'Eurasian lynx', 0.2, 'sources'],
   ['leopard-cat-details', 'Leopard cat', 0.2, true],
   ['domestic-cat-details', 'Domestic cat', 0.2, true],
+  ['cougar-30k', 'Cougar', 3e4],
+  ['cougar-details', 'Cougar', 0.2, true],
+  ['iberian-lynx-details', 'Iberian lynx', 0.2, true],
+  ['eurasian-lynx-details', 'Eurasian lynx', 0.2, true],
+  ['canada-lynx-details', 'Canada lynx', 0.2, true],
 ];
 const browser = await chromium.launch({ headless: true });
 try {

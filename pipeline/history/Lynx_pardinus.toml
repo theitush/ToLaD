@@ -1,0 +1,88 @@
+species   = "Lynx pardinus"
+common    = "Iberian lynx"
+component = "wild"
+use       = "counts"
+scope     = "global (Spain and Portugal), wild, all ages unless a point says otherwise; 1988 and 1997 are Spain only"
+notes     = """
+The best-documented cat recovery. A questionnaire survey of Spain put about 1,100 lynx in 48 nuclei
+in 1987-88 (Rodriguez & Delibes 1992); rabbit haemorrhagic disease (from the late 1980s), on top of
+myxomatosis, hunting and habitat loss, halved that by the late 1990s, and the 2000-2002 camera-trap
+and scat census found fewer than 100 in two isolated Andalusian nuclei (Donana-Aljarafe and
+Andujar-Cardena). Captive breeding (from 2005) and reintroductions (LIFE Iberlince, LIFE
+Lynxconnect: Guarrizas, Guadalmellato, Montes de Toledo, Matachel, Vale do Guadiana in Portugal)
+took the census to 2,401 in 2024. The IUCN moved it from Critically Endangered (2002-2008) to
+Endangered (2015) and Vulnerable (2024); a favourable status is put at 3,000-3,500 lynx (750
+breeding females). Mature individuals, for comparison: 62 in 2001, 648 in 2022 (IUCN 2024
+assessment, as quoted by the Cat Specialist Group and the press). Range: about 80% of the
+early-1960s range was lost by 2000 (Alda et al. 2008; Gil-Sanchez & McCain 2011, J Mammal
+92:1081). No cited count before 1988: before it the build uses the modelled natural level, the 2024 census
+times the PHYLACINE range ratio (950,000 / 37,000 km2 = 25.5), ~61,000 in 1500 (grade D). The census
+now covers reintroduction areas outside that current map, so the ratio and this level are probably
+too high; the model's own count (about 160) would have given ~4,000.
+"""
+
+[[point]]
+year  = 1988
+n     = 1136
+lo    = 1060
+hi    = 1223
+grade = "C"
+kind  = "estimate"
+cite  = "Rodriguez & Delibes 1992, Current range and status of the Iberian lynx Felis pardina Temminck, 1824 in Spain, Biological Conservation 61:189-196 (as tabulated in Guzman et al. 2004, El lince iberico (Lynx pardinus) en Espana y Portugal: censo-diagnostico de sus poblaciones, OAPN, chapter I, Table 2)"
+url   = "https://www.miteco.gob.es/es/parques-nacionales-oapn/publicaciones/edit_libro_05_01_tcm30-100272.pdf"
+note  = "Spain only (Portugal held a few dozen at most). Table 2 ('ESTIMA 1988') sums the regions to 1,060-1,223; the chapter text gives 880-1,150 individuals excluding cubs (about 350 adult females); 1,136 is the total of Table 1 (48 nuclei over 10,669 km2 of stable presence, ~10.6 per 100 km2) and the figure the IUCN SSC Cat Specialist Group quotes. A survey-based estimate (interviews), not a count; the paper itself (doi:10.1016/0006-3207(92)91115-9) was not read."
+
+[[point]]
+year  = 1997
+n     = 568
+lo    = 473
+hi    = 683
+grade = "C"
+kind  = "estimate"
+cite  = "LIFE projects 1996-1998, several authors, regional estimates as tabulated in Guzman et al. 2004, El lince iberico (Lynx pardinus) en Espana y Portugal: censo-diagnostico de sus poblaciones, OAPN, chapter I, Table 2 ('ESTIMA (1996-98)')"
+url   = "https://www.miteco.gob.es/es/parques-nacionales-oapn/publicaciones/edit_libro_05_01_tcm30-100272.pdf"
+note  = "Spain only, sum of regional estimates 473-683; n = their geometric mean, dated to the middle of 1996-98."
+
+[[point]]
+year  = 2002
+n     = 94
+lo    = 94
+hi    = 94
+grade = "B"
+kind  = "census"
+cite  = "Simon et al. 2012, Reverse of the decline of the endangered Iberian lynx, Conservation Biology 26:731-736 (the 2002 census figure, 94, as widely quoted; MITECO 2025: 'menos de 100 ejemplares contabilizados en 2002')"
+url   = "https://doi.org/10.1111/j.1523-1739.2012.01871.x"
+note  = "Two isolated nuclei in Andalusia (Donana-Aljarafe and Andujar-Cardena), camera traps and scats. The paper's text was not read here (paywalled; PubMed carries no abstract); 94 is the figure secondary sources attribute to that census, and the ministry says 'fewer than 100'. About 43 adults (25 Andujar-Cardena, 18 Donana; IUCN SSC Cat Specialist Group)."
+
+[[point]]
+year  = 2020
+n     = 1111
+lo    = 1111
+hi    = 1111
+grade = "B"
+kind  = "census"
+cite  = "MITECO 2025, press release on the 2024 Iberian lynx census: 'en 2020 la poblacion total era de 1.111 linces'"
+url   = "https://www.miteco.gob.es/es/prensa/ultimas-noticias/2025/mayo/la-poblacion-de-linces-ibericos-crecio-un-19--en-2024-respecto-a.html"
+note  = "Spain and Portugal, all ages."
+
+[[point]]
+year  = 2022
+n     = 1668
+lo    = 1668
+hi    = 1668
+grade = "B"
+kind  = "census"
+cite  = "Rodriguez 2024, Lynx pardinus, IUCN Red List e.T12520A218695618 (as summarised by the IUCN SSC Cat Specialist Group: 'the total population numbered 1,668 lynxes dispersed over five subpopulations', 648 of them mature)"
+url   = "https://doi.org/10.2305/IUCN.UK.2024-1.RLTS.T12520A218695618.en"
+note  = "Mature individuals by subpopulation: Donana 50, Sierra Morena 322, Montes de Toledo 110, Matachel 68, Vale do Guadiana (Portugal) 98. Read from https://www.catsg.org/living-species-iberianlynx; the Red List page itself was not read."
+
+[[point]]
+year  = 2024
+n     = 2401
+lo    = 2401
+hi    = 2401
+grade = "B"
+kind  = "census"
+cite  = "MITECO 2025, La poblacion de linces ibericos crecio un 19% en 2024 respecto al ano anterior (annual census, LIFE Lynxconnect and the regional governments)"
+url   = "https://www.miteco.gob.es/es/prensa/ultimas-noticias/2025/mayo/la-poblacion-de-linces-ibericos-crecio-un-19--en-2024-respecto-a.html"
+note  = "'El censo total de linces alcanza los 2.401 individuos': Spain 2,047, Portugal 354; 1,557 adults or subadults, 470 breeding or territorial females, 844 cubs born in 2024. A direct count with no stated error (B, not A)."
