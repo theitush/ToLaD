@@ -44,34 +44,34 @@ note  = "'About 64,000 individuals with the largest subpopulation in the Amazon,
 
 [deep]
 method = "PSMC"
-cite   = "Armstrong et al. 2025, Genome Biol Evol 17(4):evaf060, Fig. 4 (dark-blue curve)"
-url    = "https://doi.org/10.1093/gbe/evaf060"
-mu     = 1e-08   # the curve's mutation rate, per site per generation
-g      = 5.0       # the curve's generation time, years
+cite   = "Bergman et al. 2023, Nat Commun 14:7679, Supplementary Data 3 (PSMC Ne trajectory, sample Panthera_onca_dnaZoo)"
+url    = "https://doi.org/10.1038/s41467-023-43426-5"
+mu     = 8.41e-09   # the curve's mutation rate, per site per generation (their Supplementary Data 1, modelled)
+g      = 5.0       # the curve's generation time, years (Lorenzana et al. 2021, as their Supplementary Data 1)
 grade  = "D"
-note   = "Digitised from the published raster of Fig. 4 (PMC11997302, evaf060f4.jpg, 800x485 px): axes calibrated on the tick marks (x: 1e3-1e6 yr, log, ~60.5 px per decade; y: Ne 0-150,000, linear, ~49 px per 50,000), then every column of the panel scanned for the curve's colour; a column with one short run (<= 4 px) is on a step, neighbouring columns within 1.5 px make one step. Each step is [from, to] years ago and its Ne, in the figure's own scaling. Reading error ~1 px: ~4% in time, ~1,000 in Ne (so ~20% at Ne 5,000). PSMC run with -p 2+2+25*2+4+6 (Hilgers et al. 2025), g = 5 yr. Read: the dark-blue curve: the maximum previously used rate (1.0e-8/gen). The panel's green curve is not used: it matches the leopard panel's green curve step for step (a figure error, it seems): it is not the jaguar blue and pink curves rescaled to the jaguar rate (5.00e-9/gen), as every other panel's green curve is. The blue and pink curves agree with each other (pink = blue x 10/3.5 on both axes). The blue curve stops at ~0.45 Myr (as published), so older jaguar history is not covered."
+note   = "Read from the table (Supplementary Data 3; pinned by tolad-fetch, bergman/), not digitised: the same steps the bulk layer (ToLaD#64) would give this species, written here so the comparison stays with them. The first step (from 0, in the blind spot) and the open-ended last one are left out. PSMC -p 10*1+15*2 on the DNA Zoo jaguar (SRR11097150-54, Houston Zoo), the same genome as Armstrong et al. 2025 (their Table S17: SRR11097154). ToLaD#66 replaced Armstrong et al. 2025 Fig. 4 (dark-blue curve, 1.0e-8/gen) with it: that panel's green curve is the leopard's (a figure error), and its time axis is in generations (g = 1; see Panthera_leo.toml): read as g = 1 (times x5) the dark-blue curve lands on this one (level x0.94, log-residual x1.20, after the same rescale); read as g = 5 it does not (residual x2.48: its peak ~5x too young). Figueiro et al. 2017 Fig. 1B (Pantanal jaguar, 1.0e-8/gen, g = 5) disagrees: x0.13 the level of this curve and no peak; its ~2,000 at 1e-8 implies a heterozygosity (~1e-4) far below the jaguar's measured ~8e-4 (Solari et al. 2025 Fig. 3A), so it is not used. Cross-check charts: .claude/handoff/previews/psmc66-shots/Panthera_onca.png (local)."
 # [years ago from, to, Ne] as published (young to old); the build rescales and converts them
 steps  = [
-  [740, 1520, 3300],
-  [1520, 2490, 6400],
-  [2490, 2690, 11500],
-  [3650, 4580, 18500],
-  [4950, 5540, 27000],
-  [6210, 6710, 30800],
-  [7520, 9450, 31100],
-  [10590, 18040, 32100],
-  [18040, 26390, 28500],
-  [26390, 31930, 25900],
-  [31930, 37170, 23900],
-  [37170, 43290, 20800],
-  [43290, 52360, 18200],
-  [52360, 79580, 14100],
-  [85880, 120960, 13600],
-  [120960, 140850, 16200],
-  [140850, 151990, 19500],
-  [164010, 176980, 26200],
-  [190980, 206090, 36800],
-  [222390, 239970, 49700],
-  [258950, 351120, 61500],
-  [351120, 424720, 64100],
+  [4239, 9008, 5301],
+  [9008, 14371, 6062],
+  [14371, 20404, 12792],
+  [20404, 27190, 20001],
+  [27190, 34822, 27323],
+  [34822, 43407, 34567],
+  [43407, 53063, 40285],
+  [53063, 63924, 44649],
+  [63924, 76141, 46527],
+  [76141, 105337, 46499],
+  [105337, 142275, 41859],
+  [142275, 189007, 38005],
+  [189007, 248130, 34988],
+  [248130, 322929, 29036],
+  [322929, 417561, 22456],
+  [417561, 537285, 17951],
+  [537285, 688753, 16273],
+  [688753, 880383, 18263],
+  [880383, 1122823, 26960],
+  [1122823, 1429545, 48647],
+  [1429545, 1817595, 79759],
+  [1817595, 2308535, 89090],
 ]

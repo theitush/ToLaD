@@ -206,7 +206,11 @@ the same way by code rather than by hand.
   is still open (see "Bulk genomic deep past").
 - **Ne to census N:** `N = Ne' / 0.1`. The ratio is from Frankham 1995
   (Genet Res 66:95-107): the mean Ne/N over comprehensive estimates is
-  0.10-0.11. No felid-specific long-term ratio was found. `lo` uses Ne/N 0.3
+  0.10-0.11. No felid- or carnivore-specific long-term ratio was found
+  (searched again in ToLaD#66: Palstra & Fraser 2012, Ecol Evol 2:2357,
+  give 0.10-0.11 after the same corrections; Clarke et al. 2024, Mol Ecol
+  e17353, and Waples 2024, Evol Appl 17:e13695, give Ne, or reviews, not a
+  felid ratio). `lo` uses Ne/N 0.3
   and the fastest per-year rate (1.5e-9: tiger, 7.45e-9 per generation at
   parental age 5). `hi` uses Ne/N 0.05 and the slowest rate (0.8e-9: leopard,
   7.56e-9 at 9.4). So `lo`..`hi` is about 0.22x..2.5x of `n`, an 11x range.
@@ -274,7 +278,8 @@ same `[deep]` structure in memory. Nothing is written into these TOMLs.
   (`DEEP_MU_YEAR`, the leaf's `G`, Ne/N 0.1, the 20 kyr cutoff, steps older
   than the band start dropped).
 - **Precedence.** A hand-written `[deep]` wins: the five *Panthera* keep
-  Armstrong et al. 2025. A wild `counts` history file without a `[deep]`
+  theirs (see "Panthera sources"; the jaguar's is this table's own curve,
+  written by hand with the ToLaD#66 cross-check). A wild `counts` history file without a `[deep]`
   gets the bulk curve as its `[deep]` (18 files: Bison, Loxodonta, the great
   apes, ...); its cited baseline and points stand as before, and the genomic
   points precede them. Domestic history files (cattle, sheep, horse, ...)
@@ -298,28 +303,67 @@ same `[deep]` structure in memory. Nothing is written into these TOMLs.
 - **Reports.** `stats.json -> genomic`: the source, coverage and, per curve,
   how it was used. `history.species.<sp>.deep.bulk` marks a bulk curve.
 
-### Panthera sources (2026-10)
+### Panthera sources (2026-10, cross-checked in ToLaD#66)
 
-| species | curve used (Armstrong et al. 2025 Fig. 4) | mu / gen as published | g | time x / Ne x | G (pipeline) | span kept |
+| species | curve used | mu / gen as published | g | time x / Ne x | G (pipeline) | span kept |
 |---|---|---|---|---|---|---|
-| lion | green (species pedigree rate) | 5.42e-9 | 5 | 1.08 / 0.90 | 6.0 | 23 kyr - 1.34 Myr |
-| leopard | green | 7.56e-9 | 5 | 1.51 / 0.81 | 9.3 | 20 kyr - 1.87 Myr |
-| tiger | green | 7.45e-9 | 5 | 1.49 / 0.93 | 8.0 | 32 kyr - 0.61 Myr |
-| snow leopard | green | 3.62e-9 | 5 | 0.72 / 0.45 | 8.0 | 33 - 81 kyr |
-| jaguar | dark blue (maximum rate) | 1.0e-8 | 5 | 2.00 / 1.02 | 9.8 | 28 kyr - 0.77 Myr |
+| lion | Armstrong et al. 2025 Fig. 4, green (species pedigree rate) | 5.42e-9 | 1 | 5.42 / 0.90 | 6.0 | 23 kyr - 3.0 Myr |
+| leopard | Armstrong et al. 2025 Fig. 4, green (African, Namibia) | 7.56e-9 | 1 | 7.56 / 0.81 | 9.3 | 27 kyr - 2.8 Myr |
+| tiger | Armstrong et al. 2025 Fig. 4, green (Amur) | 7.45e-9 | 1 | 7.45 / 0.93 | 8.0 | 25 kyr - 2.0 Myr |
+| snow leopard | Solari et al. 2025 Fig. 3B, Mongolia | 3.62e-9 | 5 | 0.72 / 0.45 | 8.0 | 24 - 630 kyr |
+| jaguar | Bergman et al. 2023 Supplementary Data 3 (DNA Zoo jaguar) | 8.41e-9 | 5 | 1.68 / 0.86 | 9.8 | 29 kyr - 3.4 Myr |
 
-One paper covers all five species, each with its own pedigree mutation rate,
-so the curves share one pipeline, one PSMC setting and one plotting script.
-The paper's jaguar green curve is a copy of the leopard's, so the jaguar's
-dark-blue curve is used instead and rescaled here (`Panthera_onca.toml`).
+**Armstrong et al. 2025 Fig. 4 is plotted in generations.** Its methods set
+the generation time to five years, "provided as a g = 1 for this particular
+scaling script" (psmcr). Other genomes' PSMC curves line up with the
+figure's only when its times are multiplied by ~5: for the lion, five
+curves from four groups (best factor x4.4-5.3); for the jaguar, the same
+genome in Bergman et al. 2023 (x5.5); for the tiger, x6-9. For the leopard
+the Amur curve meets the African one before their split (0.7-3.5 Myr) at
+x1.13 when read as g = 1, and fits worse as g = 5. So these tables record
+`g = 1`: their times are generations, and Ne does not depend on g. The
+snow-leopard panel alone does not show the offset, because its curve rises
+steadily over the short span it covers, so time and level trade off.
+Before ToLaD#66 the curves were read as g = 5, which made every deep event
+five times too recent.
 
-These were not digitised:
+**Cross-check**, after the same rescale: the level of each other curve
+against the one used, from the 20 kyr cutoff to the older end, and the
+log-residual left after that level (the shape misfit). The charts are in
+`.claude/handoff/previews/psmc66-shots/` (local), and each `[deep]` note
+has the details.
 
-- Cho et al. 2013, doi:10.1038/ncomms3433 (neutral rates, g 5);
-- Figueiró et al. 2017, doi:10.1126/sciadv.1700299 (mu 1e-8, g 5, all five species);
-- de Manuel et al. 2020, doi:10.1073/pnas.1919423117 (mu 4.5e-9);
-- Armstrong et al. 2021, doi:10.1093/molbev/msab032 (tiger, mu 3.5e-9);
-- Paijmans et al. 2021, doi:10.1016/j.cub.2021.03.084 (leopard; not open in PMC);
-- Solari et al. 2025, doi:10.1073/pnas.2502584122 (snow leopard; mu 3.62e-9, g 5).
+- **Lion.** The other curves agree: Bergman 2023 x1.25 (residual x1.13),
+  Cho et al. 2013 African lion x1.17 and white lion x1.05, Figueiró et al.
+  2017 x0.84, and de Manuel et al. 2020's southern lineage x1.17. The one
+  that disagrees is de Manuel's northern (Barbary) lion (x0.67, residual
+  x2.2), a different lineage with a deep bottleneck.
+- **Leopard.** Armstrong's genome is African. The other curves, all Amur
+  leopards, agree only before the split (Bergman x1.13 over 0.7-3.5 Myr).
+  After it they run x0.30 (Bergman) and x0.23 (Figueiró). Paijmans et al.
+  2021's Fig. 3A is not open, so it was not read.
+- **Tiger.** The other curves agree within x1.5 in level: Bergman's Amur,
+  DNA Zoo and Malayan tigers x1.3-1.5, Cho's Amur and white Bengal tigers
+  x1.34 and x1.26, and Figueiró x0.69 (a rough reading). Their features
+  still sit ~1.3-2x older. The PSMC of Armstrong et al. 2021 is an EMF in
+  its supplement, so it was not read.
+- **Snow leopard.** The curve is replaced by Solari et al. 2025: it uses
+  the same rate, is wild and deep-covered, and reaches ~0.9 Myr. The old
+  curve gave three points (33-81 kyr); this one gives 17. Solari's other
+  three populations come out at x0.80-1.03, Cho x0.93, Figueiró x0.82,
+  Bergman x0.88 and Armstrong 2025 x0.83 (as published).
+- **Jaguar.** The curve is replaced by the Bergman table. Armstrong's
+  jaguar panel has two problems: its green curve is the leopard's, and its
+  time axis is in generations. Its dark-blue curve, read as g = 1, lands on
+  the Bergman table (x0.94, residual x1.20), and that table comes from the
+  same genome. Figueiró's Pantanal jaguar disagrees (x0.13, no peak). Its
+  level implies a heterozygosity far below the jaguar's measured ~8e-4
+  (Solari et al. 2025 Fig. 3A), so it is not used.
 
-Cross-checking against them is a follow-up.
+Sources: Cho et al. 2013, doi:10.1038/ncomms3433 (Fig. 4b, vector paths
+from the PDF; neutral rates per year x g 5); Figueiró et al. 2017,
+doi:10.1126/sciadv.1700299 (Fig. 1B, raster from the PDF; mu 1e-8, g 5); de
+Manuel et al. 2020, doi:10.1073/pnas.1919423117 (Fig. 3A, rendered from the
+PDF; mu 4.5e-9, g 5); Solari et al. 2025, doi:10.1073/pnas.2502584122
+(Fig. 3B, raster from the PDF); Bergman et al. 2023 (table). The scripts
+were scratch work and are not kept.

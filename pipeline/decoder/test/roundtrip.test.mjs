@@ -260,9 +260,12 @@ test('HIST: wild species without a cited baseline start at the natural baseline 
   assert.ok(n >= 5, `${n} curated species start at the natural baseline`);
   // the five Panthera (hand-written [deep]) and the bulk curves of ToLaD#64 (Bergman et al. 2023)
   assert.ok(g >= 100, `${g} species start at their genomic deep past`);
+  // ToLaD#66: the jaguar's hand-written curve is the Bergman table, the snow leopard's Solari et al. 2025
+  const src = { 'Panthera onca': 'Bergman', 'Panthera uncia': 'Solari' };
   for (const sp of ['Panthera leo', 'Panthera tigris', 'Panthera pardus', 'Panthera onca', 'Panthera uncia']) {
     const h = dump.history.find((x) => x.species === sp);
-    assert.ok(h.points.some((p) => p.kind === 'genomic' && p.cite.startsWith('Armstrong')), `${sp}: Armstrong 2025`);
+    const want = src[sp] ?? 'Armstrong';
+    assert.ok(h.points.some((p) => p.kind === 'genomic' && p.cite.startsWith(want)), `${sp}: ${want}`);
   }
 });
 
