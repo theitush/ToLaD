@@ -1119,7 +1119,11 @@ function chooseSides(root: FanNode, P: Packer, known?: Map<Split, boolean>): { p
     return { order, off, dx, a, b, out, cost, flip, flips, kids: kc };
   };
   const cands = (v: FanNode): Cand[] => {
-    const fronts = v.kids.map((k) => (isNode(k) ? cands(k) : [null]));
+    // Each daughter's best candidates: all MAX_CANDS of them when two daughters are splits (MAX_CANDS² combinations); a
+    // polytomy (the data's tree has some, ToLaD#145) keeps fewer each, so the combinations stay within that budget.
+    const nNodes = v.kids.filter(isNode).length;
+    const per = nNodes <= 2 ? MAX_CANDS : Math.max(1, Math.floor(Math.pow(MAX_CANDS * MAX_CANDS, 1 / nNodes)));
+    const fronts = v.kids.map((k) => (isNode(k) ? cands(k).slice(0, per) : [null]));
     // Every combination of the daughters' candidates, each both ways round (one daughter: no sides to choose).
     let combos: (Cand | null)[][] = [[]];
     for (const f of fronts) combos = combos.flatMap((c) => f.map((x) => [...c, x]));

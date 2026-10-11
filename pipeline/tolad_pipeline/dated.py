@@ -333,7 +333,7 @@ def build(root: Node, up_root, up_tax: dict[str, dict], ov, log: dict) -> DNode:
         fossil = nd.kind != "tree" or all(x.leaf.extinct or x.leaf.t1 > 0 for x in sub.preorder() if x.leaf is not None)
         stem = bool(p.data.get("total_group_of")) or g > A.age + EPS
         B = A
-        while B.parent is not None and B.parent.anchor is A and B.parent.age < g:
+        while B.parent is not None and B.parent.age < g:  # older than the crown's parent: further up its ancestral line
             B = B.parent
         P = B.parent
         if stem:
@@ -365,7 +365,7 @@ def build(root: Node, up_root, up_tax: dict[str, dict], ov, log: dict) -> DNode:
     for d in reversed(list(droot.preorder())):
         p = d.parent
         if (p is not None and d.leaf is None and d.src in (S_FOSSIL, S_INTERP) and d.note < 0
-                and p.age - d.age < max(1e-3 * p.age, 2 * EPS)):
+                and 0 <= p.age - d.age < max(1e-3 * p.age, 2 * EPS)):
             i = p.children.index(d)
             p.children[i:i + 1] = d.children
             for c in d.children:
@@ -393,6 +393,8 @@ def build(root: Node, up_root, up_tax: dict[str, dict], ov, log: dict) -> DNode:
         "grafts": dict(how),
         "clamped_below_parent": clamped,
         "zero_length_spliced": spliced,
+        # a fossil whose last appearance is older than the split it hangs from (a dating conflict; should be none)
+        "ended_before_split": sorted(d.leaf.name for d in leaves if d.parent is not None and d.leaf.t1 >= d.parent.age)[:20],
         "species_rows_left_out": sum(1 for n in root.preorder() if n.is_leaf and n.name and n.kind in ("tree", "graft")
                                      and n.data.get("dleaf") is None),
     }
