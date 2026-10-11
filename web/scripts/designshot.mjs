@@ -57,6 +57,11 @@ const scenes = [
   // The Red List chip on a small cat (Least Concern, gray) and on the leopard (ToLaD#98).
   ['card-leopardcat', 'card', ['Leopard cat']],
   ['card-leopard', 'card', ['Leopard']],
+  // The merged data (ToLaD#70): the lion's column from its split down past its genomic deep past, a
+  // range-loss trend (the Eurasian lynx, modelled, dashed) on its card, and the lion's card.
+  ['lion-column', 'split', [0.5, 1.5]],
+  ['card-lion', 'card', ['Lion']],
+  ['card-lynx', 'card', ['Eurasian lynx']],
 ];
 const browser = await chromium.launch({ headless: true });
 try {
