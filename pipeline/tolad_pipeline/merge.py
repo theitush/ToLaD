@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 
+from .anchors import year_to_ma
 from .load import norm_name
 from .newick import NNode
 from .tree import (BINOMIAL, D_ANCHOR, D_FOSSIL, D_INTERP, D_UPHAM, Node,
@@ -149,6 +150,62 @@ def set_extinct_flags(root: Node, phy: dict, pbdb_by_name: dict, log: dict) -> N
                 nd.data["extinct_by"] = "OTT flag"
         c["extinct" if nd.extinct else "living"] += 1
     log["extinct_flags"] = dict(c)
+
+
+def drop_unrecognised(root: Node, recognised, ott_syn: dict[int, list[str]], phy_syn: dict[str, str],
+                      log: dict) -> None:
+    """ToLaD#116: a living Open Tree tip that no extant-species list recognises (Upham, PHYLACINE, the IUCN
+    Red List, Greenspoon's census/model tables, the domestic tables) is not drawn as a species.
+
+    Such a tip is a subspecies (Felis affinis), a stale spelling (Puma yaguarondi), a synonym (Lynx
+    vulgaris) or a fossil without an extinct flag (Lynx spelaea): its individuals are already counted by
+    the species that holds them, so a count of its own counts them twice. It is dropped rather than kept
+    with no count, because a living leaf with no individuals is a species the tree says exists and nobody
+    is in it. When one of the recognised leaves knows the tip's name as a synonym (Open Tree, PHYLACINE,
+    Upham/MSW3), the name is folded into that leaf's alt names, so it is still found by name.
+    `recognised(nd)` says whether a living tip is on a list. A fossil PBDB knows comes back as a graft."""
+    tips = [nd for nd in root.preorder() if nd.is_leaf and nd.kind == "tree" and nd.name and not nd.extinct
+            and not nd.data.get("empty_higher") and nd.name != "Homo sapiens"]
+    drop = [nd for nd in tips if not recognised(nd)]
+    gone = {id(nd) for nd in drop}
+    # synonym -> the recognised leaf that carries it
+    owner: dict[str, list[Node]] = defaultdict(list)
+    for nd in root.preorder():
+        if not nd.is_leaf or nd.kind != "tree" or not nd.name or id(nd) in gone or nd.data.get("empty_higher"):
+            continue
+        for s in set(nd.alt) | set(nd.data.get("upham_names", [])) | {norm_name(x) for x in ott_syn.get(nd.ott, [])}:
+            if s != nd.name:
+                owner[s].append(nd)
+    by_name = {nd.name: nd for nd in root.preorder() if nd.is_leaf and nd.name and id(nd) not in gone}
+    for old, new in phy_syn.items():
+        if new in by_name and old != new:
+            owner[old].append(by_name[new])
+    folded, felidae = [], []
+    for nd in drop:
+        own = {norm_name(x) for x in ott_syn.get(nd.ott, [])} | set(nd.alt)
+        tgt = {id(x): x for x in owner.get(nd.name, [])}
+        tgt.update({id(by_name[x]): by_name[x] for x in own if x in by_name})
+        if len(tgt) == 1:
+            t = next(iter(tgt.values()))
+            t.alt.append(nd.name)
+            folded.append(f"{nd.name} -> {t.name}")
+        if "Felidae" in ancestor_names(nd):
+            felidae.append(nd.name)
+        par = nd.parent
+        par.children.remove(nd)
+        while par is not root and all(c.is_leaf and c.data.get("empty_higher") for c in par.children):
+            # a node left with no species under it: an empty higher taxon, kept for grafting and dropped
+            # with its empty children (drop_empty) if no fossil lands in it
+            par.data["empty_higher"] = True
+            par = par.parent
+    log["unrecognised_tips"] = {
+        "note": "living Open Tree tips no extant-species list recognises (Upham, PHYLACINE, IUCN Red List, "
+                "Greenspoon/IUCN census and model tables, domestic tables), dropped (ToLaD#116): subspecies, "
+                "stale spellings, synonyms and unflagged fossils of species the tree already counts",
+        "living_tips_checked": len(tips), "dropped": len(drop), "folded_into_a_synonym_leaf": len(folded),
+        "felidae": sorted(felidae), "folded_examples": folded[::max(1, len(folded) // 15)][:15],
+        "dropped_examples": [nd.name for nd in drop[::max(1, len(drop) // 20)]][:20],
+    }
 
 
 # ------------------------------------------------------------------ PBDB
@@ -655,6 +712,23 @@ def date_tree(root: Node, log: dict) -> None:
     log["dating"]["calibrated_raised_by_fossils"] = raised
 
 
+# Band ends of extinct leaves (ToLaD#105). The IUCN Red List covers extinctions since 1500 CE: a species it
+# (or PHYLACINE, which takes the Red List's EX) calls EX ended after 1500, and with no date of its own it ends a
+# century ago; any other extinct species ended before 1500 CE, however young its last fossil (PBDB rounds a
+# Holocene last appearance to the present). No extinct leaf reaches the present (T1 = 0).
+LAD_RECENT_EX = 0.0001  # Ma
+LAD_PLEISTOCENE = 0.0117  # Ma, end of the Pleistocene: an extinct leaf with no date at all
+EX_WINDOW_MA = year_to_ma(1500)  # 1500 CE, the start of the Red List's EX window
+
+
+def _recent_ex(nd: Node) -> bool:
+    return nd.data.get("iucn") == "EX" or bool(nd.data.get("red_list_ex"))
+
+
+def _end_floor(nd: Node) -> float:
+    return LAD_RECENT_EX if _recent_ex(nd) else EX_WINDOW_MA
+
+
 def assign_bands(root: Node, anchors_t0: dict[str, float]) -> None:
     """t0/t1 for every node. Tree children start at the parent's split; fossil
     grafts and created groups start at their first appearance."""
@@ -670,13 +744,12 @@ def assign_bands(root: Node, anchors_t0: dict[str, float]) -> None:
     for nd in root.postorder():
         if nd.is_leaf:
             if nd.kind == "graft":
-                nd.t1 = nd.lad
+                nd.t1 = min(max(nd.lad, _end_floor(nd)), nd.t0 - EPS)
             elif nd.extinct:
                 if nd.lad is None:
-                    st = nd.data.get("iucn")
-                    nd.lad = 0.0001 if st == "EX" else 0.0117
+                    nd.lad = LAD_RECENT_EX if _recent_ex(nd) else LAD_PLEISTOCENE
                     nd.data["lad_default"] = True
-                nd.t1 = min(nd.lad, nd.t0 - EPS)
+                nd.t1 = min(max(nd.lad, _end_floor(nd)), nd.t0 - EPS)
             else:
                 nd.t1 = 0.0
             if nd.name in anchors_t0:

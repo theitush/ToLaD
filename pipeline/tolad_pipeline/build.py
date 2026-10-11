@@ -15,7 +15,7 @@ from pathlib import Path
 from . import load
 from . import overrides as overrides_mod
 from .merge import (apply_placements, assign_bands, build_leaf_index, calibrate, date_tree,
-                    graft_pbdb, match_upham, rehome_stem_fossils, set_extinct_flags)
+                    drop_unrecognised, graft_pbdb, match_upham, rehome_stem_fossils, set_extinct_flags)
 from .tree import (clean_opentree, collapse_knuckles, drop_empty,
                    from_opentree)
 
@@ -67,6 +67,13 @@ def build_tree(raw: Path, work: Path, log: dict, t_start: float):
     pb_species, _pb_genera = load.load_pbdb(raw)
     pb_by_name = {load.norm_name(r["taxon_name"]): r for r in pb_species}
     set_extinct_flags(root, phy, pb_by_name, log)
+    ctx = {"phy": phy, "phy_syn": phy_syn, "ott_syn": ott_syn, "exact": exact, "syn": syn}
+    from . import redlist
+    redlist.flag_extinct(root, raw, ctx, log)
+    drop_unrecognised(root, recognised_by_a_list(root, raw, ctx), ott_syn, phy_syn, log)
+    log_step(t_start, f"unrecognised tips dropped: {log['unrecognised_tips']['dropped']}, "
+                      f"Red List EX flagged: {len(log['red_list_extinct_flags']['leaves'])}")
+    exact, syn = build_leaf_index(root, ott_syn, phy_syn)
     ov = overrides_mod.load()
     graft_pbdb(root, pb_species, exact, syn, log, ov)
     log_step(t_start, f"PBDB graft {log['pbdb_graft']}")
@@ -83,8 +90,34 @@ def build_tree(raw: Path, work: Path, log: dict, t_start: float):
     assign_bands(root, ANCHOR_T0)
     n_k = collapse_knuckles(root)
     log["knuckles_collapsed"] = n_k
-    ctx = {"phy": phy, "phy_syn": phy_syn, "ott_syn": ott_syn, "exact": exact, "syn": syn}
+    ctx.update(exact=exact, syn=syn)
     return root, ctx
+
+
+def recognised_by_a_list(root, raw: Path, ctx: dict):
+    """The extant-species lists a living Open Tree tip may be on (ToLaD#116): Upham 2019 (matched
+    already), PHYLACINE 1.2 (by name or its synonymy), the IUCN Red List 2026-1 (redlist.Matcher: name,
+    synonyms, spelling variant), and the names the count model anchors on (Greenspoon 2023 census and
+    per-species model tables, FAOSTAT and pet stocks, the domestic forms)."""
+    from . import anchors, redlist
+    from .model import match_species
+    rl, rev = redlist.load_all(raw, ctx)
+    on_rl = redlist.Matcher(root, rl, rev, ctx)
+    phy, phy_syn = ctx["phy"], ctx["phy_syn"]
+    names = set(anchors.greenspoon_census(raw)) | set(anchors.greenspoon_species_model(raw))
+    names |= set(anchors.FAO_ITEMS.values()) | set(anchors.greenspoon_pets(raw)) | set(anchors.DOMESTIC_FORMS)
+    names |= {a for v in anchors.DOMESTIC_ALIASES.values() for a in v}
+    hits, _ = match_species(sorted(names), ctx)
+    anchored = {id(nd) for nd in hits.values()}
+
+    leaf_names = {n.name for n in root.preorder() if n.is_leaf and n.name}
+
+    def recognised(nd) -> bool:
+        # a PHYLACINE synonym counts only when its accepted name is not a leaf of its own (else a duplicate)
+        acc = phy_syn.get(nd.name)
+        return bool(nd.upham or nd.name in phy or (acc in phy and acc not in leaf_names) or id(nd) in anchored
+                    or nd.name in anchors.DOMESTIC_FORMS or on_rl(nd)[0] is not None)
+    return recognised
 
 
 def main(argv: list[str] | None = None) -> int:
