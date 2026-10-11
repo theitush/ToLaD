@@ -23,7 +23,7 @@
 #
 # The dated tree (format 1.6, ToLaD#145) is Upham et al. 2019's MCC topology
 # and node ages, with every other dated species grafted on by a rule
-# (tolad_pipeline/dated.py). Its only hand values are these two sections, at
+# (tolad_pipeline/dated.py). Its only hand values are these sections, at
 # the end of the file:
 #   [[dated_clade]]   replace the dated subtree over the species in `tree` with
 #                     `tree` (`common`: English names for its species, where the
@@ -34,6 +34,10 @@
 #   [[dated_fossil]]  a fossil species branches off `sister`'s lineage at `age`
 #                     (default: its own first appearance) instead of by the
 #                     rule; `common` names it where the literature does
+#   [[dated_name]]    name the split a taxon founds (the common ancestor of the
+#                     dated species of `genera`, which must hold no other
+#                     genus's; without `genera`, the split Open Tree names
+#                     `name`) and give the taxon's English form (`common`)
 
 version = 3
 
@@ -192,3 +196,34 @@ lineage at its first appearance. Contested: Blaine et al. 2019 and Ruiz-Ramoni e
 is a short-faced bear (Arctotherium)."""
 citation = """Stinnesbeck, S.R. et al. (2020). Panthera balamoides and other Pleistocene felids from \
 the submerged caves of Yucatán. Historical Biology 32: 930-939. doi:10.1080/08912963.2018.1556649"""
+
+# Split labels (ToLaD#145): the taxon a split founds where Open Tree's synthesis does not name it,
+# and the English form the fan titles a taxon by.
+
+[[dated_name]]
+name = "Felidae"
+common = "cat"
+reason = """The fan titles a split by its taxon's well-established English form; Open Tree already \
+names this split Felidae."""
+citation = """Kitchener, A.C. et al. (2017). A revised taxonomy of the Felidae: the final report of the \
+Cat Classification Task Force of the IUCN Cat Specialist Group. Cat News Special Issue 11."""
+
+[[dated_name]]
+name = "Pantherinae"
+common = "big cat"
+genera = ["Panthera", "Neofelis"]
+reason = """Open Tree's taxonomy (OTT 3.7, from NCBI) still puts Pardofelis in Pantherinae and \
+Acinonyx in a subfamily of its own, so neither subfamily is a clade of its synthesis tree and no split \
+gets the name by rule. The revised felid taxonomy circumscribes Pantherinae as Panthera + Neofelis."""
+citation = """Kitchener, A.C. et al. (2017). A revised taxonomy of the Felidae: the final report of the \
+Cat Classification Task Force of the IUCN Cat Specialist Group. Cat News Special Issue 11."""
+
+[[dated_name]]
+name = "Felinae"
+common = "small cat"
+genera = ["Acinonyx", "Caracal", "Catopuma", "Felis", "Herpailurus", "Leopardus", "Leptailurus", "Lynx",
+          "Otocolobus", "Pardofelis", "Prionailurus", "Profelis", "Puma"]
+reason = """As for Pantherinae: Felinae is every other living cat genus, the cheetah's Acinonyx and \
+the marbled cat's Pardofelis included."""
+citation = """Kitchener, A.C. et al. (2017). A revised taxonomy of the Felidae: the final report of the \
+Cat Classification Task Force of the IUCN Cat Specialist Group. Cat News Special Issue 11."""

@@ -49,6 +49,7 @@ class DNode:
     src: int = S_UPHAM
     leaf: Node | None = None
     name: str | None = None
+    name_en: str | None = None  # the taxon's English form, from a [[dated_name]] override ("small cat")
     note: int = -1  # index into the dated overrides list (its citation)
     h: float = 0.0  # Upham's own height (Ma): the shape that unshared splits are interpolated in
     cand: dict | None = None  # {"alvarez"|"ensemble": (age, lo, hi, src)}: both ages rules, before fossil floors
@@ -519,6 +520,39 @@ def _label(d: DNode) -> str:
     return f"{sp[0]} + {sp[-1]}" if len(sp) > 1 else sp[0]
 
 
+def apply_names(droot: DNode, ov) -> int:
+    """overrides.toml `[[dated_name]]`: a taxon name (and its English form) for the split that founds it.
+
+    With `genera`, the split is the common ancestor of the dated species of those genera, and it must hold
+    no other genus's species (Open Tree's taxonomy keeps NCBI's outdated felid subfamilies, so Pantherinae
+    and Felinae are not clades of its synthesis tree); without, the entry names the split Open Tree already
+    named `name`. Returns the number of splits it newly named."""
+    leaves = [d for d in droot.preorder() if d.leaf is not None]
+    new = 0
+    for e in ov.dated_names:
+        if e.get("genera"):
+            gs = set(e["genera"])
+            mine = [d for d in leaves if d.leaf.name.split()[0] in gs]
+            if not mine:
+                raise RuntimeError(f"overrides.toml dated_name {e['name']}: no dated species of {sorted(gs)}")
+            m = _mrca(mine)
+            other = sorted({d.leaf.name for d in m.preorder() if d.leaf is not None} - {d.leaf.name for d in mine})
+            if other:
+                raise RuntimeError(f"overrides.toml dated_name {e['name']}: the common ancestor of {sorted(gs)} "
+                                   f"also holds {other}")
+            new += m.name is None
+        else:
+            hit = [d for d in droot.preorder() if d.leaf is None and d.name == e["name"]]
+            if len(hit) != 1:
+                raise RuntimeError(f"overrides.toml dated_name {e['name']}: {len(hit)} splits named so, not 1")
+            m = hit[0]
+        m.name = e["name"]
+        m.name_en = e.get("common") or None
+        ov.applied["dated_name"].append({"name": e["name"], "common": m.name_en,
+                                         "species": sum(1 for d in m.preorder() if d.leaf is not None)})
+    return new
+
+
 def build(root: Node, up_root, up_tax: dict[str, dict], ov, log: dict, ac=None, names=({}, {})) -> DNode:
     """The whole dated tree; sets n.data["dleaf"] on every species leaf in it.
 
@@ -535,7 +569,6 @@ def build(root: Node, up_root, up_tax: dict[str, dict], ov, log: dict, ac=None, 
         rep["benchmark"] = {r: benchmark(droot, fl, r) for r in RULES}
     notes: list[dict] = []
     droot, placed = apply_overrides(droot, root, ov, notes)
-    ov.check_all_used(dated=True)
 
     # the dated tree's MRCA of the matched species under every merged node (before grafting)
     m, k, dep = _mrca_map(root, droot)
@@ -550,6 +583,8 @@ def build(root: Node, up_root, up_tax: dict[str, dict], ov, log: dict, ac=None, 
             continue
         d.name = nd.name.removesuffix(" (crown)")
         named += 1
+    named += apply_names(droot, ov)
+    ov.check_all_used(dated=True)
 
     # fossil floors: no crown younger than a fossil of its genus (capped below the crown's parent split)
     if ac is not None:
@@ -703,7 +738,7 @@ def file_meta(droot: DNode | None, rows: list[tuple[Node, bool]]) -> dict | None
             keep[id(d)] = d
             kids_of[id(d)] = ks
     top = keep[id(droot)]
-    nodes, names, loose, notes, grafts = [], {}, {}, {}, []
+    nodes, names, names_en, loose, notes, grafts = [], {}, {}, {}, {}, []
     st = [(top, -1)]
     while st:
         d, par = st.pop()
@@ -716,12 +751,14 @@ def file_meta(droot: DNode | None, rows: list[tuple[Node, bool]]) -> dict | None
         nodes.append([par, _r(d.age), _r(d.lo), _r(d.hi), d.src])
         if d.name:
             names[str(i)] = d.name
+        if d.name_en:
+            names_en[str(i)] = d.name_en
         if d.loose:
             loose[str(i)] = d.loose
         if d.note >= 0:
             notes[str(i)] = d.note
         st.extend((c, i) for c in reversed(kids_of[id(d)]))
-    out.update({"nodes": nodes, "names": names, "loose": loose, "notes": notes, "grafts": sorted(grafts)})
+    out.update({"nodes": nodes, "names": names, "names_en": names_en, "loose": loose, "notes": notes, "grafts": sorted(grafts)})
     return out
 
 

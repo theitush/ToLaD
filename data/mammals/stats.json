@@ -1254,7 +1254,7 @@
    "on a stem, joins a graft of the same age": 160
   },
   "living": 5852,
-  "named_splits": 688,
+  "named_splits": 690,
   "species": 17194,
   "species_rows_left_out": 0,
   "splits": 8615,
@@ -21039,7 +21039,7 @@
  },
  "output": {
   "brotli_bytes": 754680,
-  "dated_sidecar_raw": 960006,
+  "dated_sidecar_raw": 960283,
   "files": 14,
   "raw_bytes": 3091968,
   "skeleton_brotli": 91378,
@@ -21128,6 +21128,23 @@
     "age": 0.129,
     "name": "Panthera balamoides",
     "sister": "Panthera onca"
+   }
+  ],
+  "dated_name": [
+   {
+    "common": "cat",
+    "name": "Felidae",
+    "species": 41
+   },
+   {
+    "common": "big cat",
+    "name": "Pantherinae",
+    "species": 11
+   },
+   {
+    "common": "small cat",
+    "name": "Felinae",
+    "species": 30
    }
   ],
   "exclude": [

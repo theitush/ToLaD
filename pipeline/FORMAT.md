@@ -224,7 +224,12 @@ The sidecars are JSON, one per data file, read at build time by the fan (they ar
   `source` an index into `sources`); a species is `[parent, row]`. `parent` is an index into `nodes`
   (−1 for the root). Absent when the file has no dated species.
 - `names`: `{node index: name}`, the Open Tree clade name of a split whose species are exactly that
-  clade's matched species (the outermost such name; " (crown)" dropped).
+  clade's matched species (the outermost such name; " (crown)" dropped), or the taxon an
+  `overrides.toml` `[[dated_name]]` entry names (a subfamily Open Tree's NCBI-derived taxonomy
+  circumscribes differently, e.g. Pantherinae = Panthera + Neofelis after Kitchener et al. 2017).
+- `names_en`: `{node index: English}`, the well-established English form of that split's taxon, from
+  its `[[dated_name]]` entry (`"small cat"` for Felinae); the fan titles the split "Small cat ancestors".
+  Absent where there is none (the fan uses the Latin name).
 - `loose`: `{node index: k}`, the number of daughters of that split grafted by taxonomy only.
 - `notes`: `{node index: k}`, a split from `overrides.toml`: `k` indexes the skeleton's `overrides`.
 - `grafts`: the rows of the species placed by taxonomy only (grafts, Upham's no-data extinct tips among them),
