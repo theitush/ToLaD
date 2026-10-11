@@ -18942,10 +18942,10 @@
   "non-species tip": 551
  },
  "output": {
-  "brotli_bytes": 779661,
+  "brotli_bytes": 779813,
   "files": 16,
-  "raw_bytes": 3189536,
-  "skeleton_brotli": 56630,
+  "raw_bytes": 3189608,
+  "skeleton_brotli": 56697,
   "skeleton_nodes": 1156,
   "skeleton_raw": 267104,
   "tiles": 15
