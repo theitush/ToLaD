@@ -406,10 +406,12 @@ describe('the sparkline y axis follows the central values, not the ranges (ToLaD
   };
   const num = (html: string, re: RegExp) => [...html.matchAll(re)].map((m) => Number(m[1]));
 
-  it("a 30% fall reads as a slope: the leopard's 1998 -> 2020 estimates drop at least 8 px (3.4 when the ranges set the axis); on every Panthera a 30% fall is at least 4-5", () => {
+  it("a 30% fall reads as a slope: the leopard's 1998 -> 2020 estimates drop at least 7 px (3.4 when the ranges set the axis); on every Panthera a 30% fall is at least 4-5", () => {
     const leo = [...svgOf('Leopard').matchAll(/<circle cx="([\d.]+)" cy="([\d.]+)" r="3.2"/g)].map((m) => Number(m[2]));
     expect(leo.length).toBe(2); // 1998 (188k), 2020 (131k)
-    expect(leo[1] - leo[0]).toBeGreaterThan(8);
+    // (7, was 8: since ToLaD#143 the leopard's curve falls to 85k at 10 kya, its post-glacial low, below
+    // 2020's 131k, so the axis runs a little lower and the same fall is 7.7 px; still twice the 3.4.)
+    expect(leo[1] - leo[0]).toBeGreaterThan(7);
     for (const common of ['Lion', 'Leopard', 'Tiger', 'Snow leopard', 'Jaguar']) {
       const html = svgOf(common);
       // px per decade, from the two y ticks and their labels
@@ -425,8 +427,10 @@ describe('the sparkline y axis follows the central values, not the ranges (ToLaD
 
   it('range bars and bands that run past the plot are clipped at its edge, with a marker', () => {
     const leo = svgOf('Leopard');
-    // Both estimates' 95% ranges run off the bottom (to 61k and 43k): two bar markers; the bars end at the plot's edges.
-    expect((leo.match(/data-clip="bar-bottom"/g) ?? []).length).toBe(2);
+    // The 2020 estimate's 95% range runs off the bottom (to 43k): a bar marker; the bars end at the plot's edges.
+    // (One, was two: since ToLaD#143 the axis reaches down to the post-glacial low, 85k at 10 kya, and
+    // with its headroom to ~48k, so the 1998 range, to 61k, now fits.)
+    expect((leo.match(/data-clip="bar-bottom"/g) ?? []).length).toBe(1);
     expect(leo).not.toContain('data-clip="bar-top"');
     for (const m of leo.matchAll(/y1="([\d.]+)" y2="([\d.]+)" stroke="[^"]+" stroke-width="2"/g)) {
       expect(Number(m[1])).toBeGreaterThanOrEqual(6);

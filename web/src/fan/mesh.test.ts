@@ -74,8 +74,11 @@ const SCENES: [string, string, number, number, number][] = [
   ['mid', 'Lion', 3000, 1e4, 40],
   ['crossfade', 'Lion', 3000, 50, 40],
   // (Close texture: a screen of ~1.5-6 kyr; at 3 it ran to 27 kyr, where the lion's genomic deep past (ToLaD#60) has it
-  // at 40% of its 3 kyr count and its column has left the screen at 20 per bar.)
-  ['close (texture of lives)', 'Lion', 3000, 20, 10],
+  // at 40% of its 3 kyr count and its column has left the screen at 20 per bar. Now 1.5 kyr, a screen of
+  // ~0.75-3 kyr: since ToLaD#143 the lion's curve rises 12x from 10 kya to 1500 CE, after its dated
+  // post-glacial decline, so a screen down to 6 kyr holds a column 3x narrower at its foot than at its
+  // middle, and at 20 per bar the column leaves the screen there.)
+  ['close (texture of lives)', 'Lion', 1500, 20, 10],
   ['close (lives)', 'Lion', 3000, 10, 400],
   ['deep (texture)', 'Tiger', 6e5, 1e4, 50],
   ['deep (lives)', 'Tiger', 6e5, 10, 3000],
