@@ -2,9 +2,11 @@
 // the GPU (meshgl.ts) and mirrored here on the CPU (shadeMesh) for tests.
 //
 // Width = individuals, in both lanes alike. A branch's column is one lattice of
-// slots fixed in the world, one individual wide each (TwigModel.pitch), from
-// the column's left edge: the living's green lane holds the first slots, the
-// dead's gray lane the rest (layout.ts). The structure (slot pitch, band
+// slots fixed in the world, one individual wide each (TwigModel.pitch), about
+// the column's centre (#192: a line keeps its x while N(t) changes; the edges
+// take in or drop lines): the living's green lane holds the slots on its left,
+// the dead's gray lane the rest (layout.ts); a gray line ends a little short of
+// the green lane widening over it (endCut). The structure (slot pitch, band
 // height, line weight, level of detail) depends only on world position, time
 // and zoom, never on the lane; the lane chooses the colour of the individual
 // in a slot, and where the lanes meet the colours blend.
@@ -223,6 +225,8 @@ export const MESH_F = 36;
 export const MESH_U = 12;
 /** Most members of a generation folded onto one slot (a generation up to this many times its slots). */
 export const MAX_FOLD = 8;
+/** The slot at the right of a column's centre (TwigModel.slotRange): its slots are world-fixed, counted from far out on its left (2^30: the GPU takes the block indices as int; a column of over 2^31 slots is cut at its left). */
+export const SLOT_MID = 2 ** 30;
 
 /**
  * One instance of the texture (mode 0) or the lives (mode 1): a screen
@@ -302,8 +306,9 @@ export interface MeshInst {
    * The column's curve within the instance (a chord: straight in screen y,
    * from its top row y0 down): px the left edge, the right edge (colR) and
    * the green edge (xG) move per px down, and the relative change of the
-   * pitch per px. The lattice rides the left edge and scales with the pitch:
-   * a pixel is shaded at its place in the column's frame at y0 (meshFrame).
+   * pitch per px. The lattice rides the column's centre (the middle of colL and
+   * colR, #192) and scales about it with the pitch: a pixel is shaded at its
+   * place in the column's frame at y0 (meshFrame).
    */
   sL?: number;
   sR?: number;
@@ -581,6 +586,8 @@ export function shadeMesh(m0: MeshInst, px0: number, py: number, kLog: number, n
   // Nothing to draw this far from a line (only the living glow, and they are only in the green lane).
   const reach = m.mode === 0 ? (Math.max(m.lw, 1) * 0.5 + 0.5) / ks : Math.max(m.tipR, Math.max(m.lw, 1) * 0.5 + (m.xG > m.x0 ? 5 : 0)) + 0.5;
   const bf = Math.floor((px - m.xB0) / m.bw);
+  // The texture: px the green edge moves across the (fixed) lines per px up, where it widens over the gray lane.
+  const gUp = m.mode === 0 ? greenUp(m0, py) : 0;
   let best: RGBA = [0, 0, 0, 0];
   // The lines of this block and its neighbours (each block's line is anywhere in it).
   for (let c = -1; c <= 1; c++) {
@@ -602,6 +609,7 @@ export function shadeMesh(m0: MeshInst, px0: number, py: number, kLog: number, n
     const wg = clamp01((m.xG - lineX) / pp + 0.5);
     const g = wg > 0 ? shadeLane(m, Lane.Green, iA, iB, dp, py, kLog, nowPx, pal, deadGap) : ([0, 0, 0, 0] as RGBA);
     const r = wg < 1 ? shadeLane(m, m.lane, iA, iB, dp, py, kLog, nowPx, pal, deadGap) : ([0, 0, 0, 0] as RGBA);
+    r[3] *= endCut(lineX, m.xG, gUp);
     const col = blend(g, r, wg);
     col[3] *= m.alpha * fine;
     if (col[3] > best[3]) best = col;
@@ -628,6 +636,21 @@ export function shadeMesh(m0: MeshInst, px0: number, py: number, kLog: number, n
     }
   }
   return best;
+}
+
+/** Rows (px) a gray line ends short of the green lane widening over it (#192: a lineage that ends just stops; the green one goes on above). */
+export const END_GAP_PX = 3;
+
+/** px per px up that the green edge moves right across the instance's lines (its lean against the lattice's, in the frame; ≤ 0: none). */
+export function greenUp(m: MeshInst, py: number): number {
+  const k = Math.max(1e-6, 1 + (m.sP ?? 0) * (py - m.y0));
+  return -((m.sG ?? 0) - 0.5 * ((m.sL ?? 0) + (m.sR ?? 0))) / k;
+}
+
+/** A gray line at lineX, the green edge at xG moving gUp px right per px up: its opacity, 0 within END_GAP_PX below where the edge crosses it. */
+export function endCut(lineX: number, xG: number, gUp: number): number {
+  if (!(gUp > 1e-6)) return 1;
+  return clamp01((lineX - xG) / gUp - END_GAP_PX + 0.5);
 }
 
 /**
@@ -657,26 +680,29 @@ export function narrowCover(px: number, a0: number, a1: number, min: number, ks:
 
 /**
  * A pixel in the column's frame at the instance's top row (y0): the column's
- * left edge, pitch, right and green edges move down the instance (sL, sP, sR,
- * sG), the lattice with them; x maps back by the left edge's shift and the
- * pitch's scale, the edges likewise. Null outside the column (and its pad).
+ * edges, pitch and green edge move down the instance (sL, sR, sP, sG); the
+ * lattice rides its centre (#192: a line keeps its x wherever the centre does,
+ * however the column widens or narrows: the edges take in or drop lines);
+ * x maps back by the centre's shift and the pitch's scale about it, the edges
+ * likewise. Null outside the column (and its pad).
  */
 export function meshFrame(m: MeshInst, px: number, py: number): [number, MeshInst] | null {
   const sL = m.sL ?? 0;
   const sR = m.sR ?? 0;
   const sG = m.sG ?? 0;
   const sP = m.sP ?? 0;
-  const colL = m.colL ?? 0;
   const dy = py - m.y0;
   const k = Math.max(1e-6, 1 + sP * dy);
-  const xl = colL + sL * dy;
-  const X = colL + (px - xl) / k;
-  const colR = colL + ((m.colR ?? 0) + sR * dy - xl) / k;
+  const c0 = ((m.colL ?? 0) + (m.colR ?? 0)) / 2;
+  const xc = c0 + 0.5 * (sL + sR) * dy;
+  const X = c0 + (px - xc) / k;
+  const colL = c0 + ((m.colL ?? 0) + sL * dy - xc) / k;
+  const colR = c0 + ((m.colR ?? 0) + sR * dy - xc) / k;
   const pad = m.mode === 0 ? 1 + 1.5 / perpScale(m, X, py) : Math.max(m.tipR, Math.max(m.lw, 1) * 0.5 + 5) + 1;
   // (A straight, constant column needs no clip: the instance's rectangle is it.)
   if (sL === 0 && sR === 0 && sG === 0 && sP === 0) return [X, m];
   if (X < colL - pad || X > colR + pad) return null;
-  return [X, { ...m, colR, xG: colL + (m.xG + sG * dy - xl) / k }];
+  return [X, { ...m, colL, colR, xG: c0 + (m.xG + sG * dy - xc) / k }];
 }
 
 /** Instance k of packed arrays, back (tests). */
