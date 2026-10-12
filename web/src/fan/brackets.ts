@@ -407,16 +407,33 @@ export function cladeCamera(
   };
   let cam = frame();
   const f = fan.tess.fold;
-  if (f) {
-    // Until the zoom (and the rows' anchor, the screen's centre) that frames it is the one it was measured at.
-    for (let k = 0; k < 24; k++) {
-      f.setScale(cam.sx, c.w);
-      f.setAnchor(cam.cx, cam.cy, cam.sx, c.w);
-      const next = frame();
-      const done = Math.abs(next.sx / cam.sx - 1) < 1e-5 && Math.abs(next.cx - cam.cx) * cam.sx < 0.05;
-      cam = next;
-      if (done) break;
+  if (!f) return cam;
+  // Folded, the clade's span grows with the zoom (its inner gaps open, fold.ts), so framing it at the zoom it was
+  // measured at swings between closed-and-zoomed-in and open-and-zoomed-out. The zoom that frames the span it opens
+  // to is one point: the span (px) a zoom gives grows with it, so bisect (in log zoom) on where it fills the frame.
+  const cy = cam.cy;
+  const settleAt = (sx: number): Camera => {
+    f.setScale(sx, c.w);
+    let at = cam;
+    // The rows anchored on the clade's centre (each anchoring moves the row a little: a few rounds).
+    for (let k = 0; k < 6; k++) {
+      at = frame();
+      if (!f.setAnchor(at.cx, cy, sx, c.w)) break;
     }
+    return frame();
+  };
+  let lo = Math.log(cam.sx) - 1;
+  let hi = Math.log(cam.sx) + 1;
+  for (let k = 0; k < 8 && settleAt(Math.exp(lo)).sx < Math.exp(lo); k++) lo -= 2;
+  for (let k = 0; k < 8 && settleAt(Math.exp(hi)).sx > Math.exp(hi); k++) hi += 2;
+  for (let k = 0; k < 40 && hi - lo > 1e-7; k++) {
+    const m = (lo + hi) / 2;
+    if (settleAt(Math.exp(m)).sx > Math.exp(m)) lo = m;
+    else hi = m;
   }
+  cam = settleAt(Math.exp(lo));
+  // The fold left exactly at the frame's zoom and anchor, for the camera taking it.
+  f.setScale(cam.sx, c.w);
+  f.setAnchor(cam.cx, cy, cam.sx, c.w);
   return cam;
 }
