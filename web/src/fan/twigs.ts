@@ -987,8 +987,11 @@ export class ColumnPath {
   private yHi = 0;
   constructor(private readonly m: TwigModel) {}
 
-  /** Whether the kept samples' left edges are from an older fold (reset(); read again at the next span()). */
+  /** Whether some kept samples' left edges are from an older fold (reset(); read again as span() reaches them). */
   private stale = false;
+  /** The fold's moves so far (reset()), and per kept sample the one its left edges were read at. */
+  private gen = 0;
+  private leftGen = new Int32Array(0);
   /** How many times the fold moved the columns since the kept samples were chosen (reset()), and ever. */
   private moved = 0;
   private ticks = 0;
@@ -1001,6 +1004,7 @@ export class ColumnPath {
    */
   reset(): void {
     this.ticks++;
+    this.gen++;
     if (this.n > 0 && (this.ticks + this.m.b.index) % PATH_REFOLDS !== 0) {
       this.stale = true;
       this.moved++;
@@ -1023,16 +1027,18 @@ export class ColumnPath {
     this.moved = 0;
   }
 
-  /** The kept samples' left edges at the fold as it is now (the widths and pitch stand). */
-  private releft(): void {
+  /** The kept samples i0..i1's left edges at the fold as it is now (the widths and pitch stand): those span() hands out, the rest when it reaches them. */
+  private releft(i0: number, i1: number): void {
     const v = this.vals;
-    for (let k = 0; k < this.n; k++) {
+    const G = this.leftGen;
+    for (let k = i0; k <= i1; k++) {
+      if (G[k] === this.gen) continue;
+      G[k] = this.gen;
       const y = this.ys[k];
       const e = 1e-9 * Math.max(1, Math.abs(y));
       v[8 * k] = this.m.left(y + e, v[8 * k + 1]);
       v[8 * k + 4] = this.m.left(y - e, v[8 * k + 5]);
     }
-    this.stale = false;
   }
 
   /** The kept samples over [lo, hi] (world): [i0, i1], the last at or above lo and the first at or below hi. */
@@ -1044,7 +1050,6 @@ export class ColumnPath {
     const grid = Math.floor(Math.log2(4 / Math.max(1e-12, sy)));
     const z = Math.abs(Math.log(sx / this.sxRef));
     if (!(z < Math.log(PATH_ZOOM)) || grid !== this.grid || lo < this.yLo || hi > this.yHi) this.build(sx, sy, lo, hi, grid);
-    else if (this.stale) this.releft();
     // (Bisect: the last kept at or above lo, the first at or below hi.)
     const ys = this.ys;
     let a = 0;
@@ -1062,7 +1067,9 @@ export class ColumnPath {
       if (ys[h] < hi) a = h + 1;
       else e = h;
     }
-    return [i0, Math.min(this.n - 1, a)];
+    const i1 = Math.min(this.n - 1, a);
+    if (this.stale) this.releft(i0, i1);
+    return [i0, i1];
   }
 
   private build(sx: number, sy: number, lo: number, hi: number, grid: number): void {
@@ -1135,6 +1142,7 @@ export class ColumnPath {
     this.vals = out;
     this.steps = steps;
     this.n = k;
+    this.leftGen = new Int32Array(k).fill(this.gen);
     this.sxRef = sx;
     this.grid = grid;
     this.yLo = A;

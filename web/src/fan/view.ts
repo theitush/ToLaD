@@ -16,7 +16,7 @@ import { COLUMN_DIM, columnSpans, EVENT_TINT, eventAt, eventSpans, type EventSpa
 import { drawTwigs, kLogAt, laneDim, LINEAGE, LIVING, TEX_HAIR_PX, TWIG_GRAY, TwigModel, type IndInfo, type TwigStats } from './twigs';
 import type { MeshBatch, RectBatch } from './meshgl';
 import { familyLabel, FELIDAE_TREE, type Split } from './splits';
-import { bandDepth, Brackets, cladeCamera, ROW_H } from './brackets';
+import { bandDepth, Brackets, cladeCamera, foldedFrame, ROW_H } from './brackets';
 import { axisInset, drawWorldOver, drawWorldUnder, worldFlags, type Box } from './world';
 
 export type { IndInfo } from './twigs';
@@ -110,6 +110,10 @@ export interface LabelSpot {
   fit: number;
   /** A species' pill on its tip: the px kept at its top end for its "+x" badge (ToLaD#197), part of `box`. */
   plus?: number;
+  /** A family's pill (ToLaD#212): the family it names (a `fam` spot's, or a species' pill standing for its family). */
+  fam?: FanNode;
+  /** The species whose picture it carries, when not its own `b` (a family's: its commonest living species, ToLaD#212). */
+  pic?: FanBranch | null;
 }
 
 /** Priority: species before lineages, then the wider column first, then tree order. */
@@ -303,6 +307,70 @@ export function families(fan: Fan): { v: FanNode; vi: number; text: string }[] {
   return out;
 }
 
+/** Each species' family (its innermost, families()): kept per fan. */
+const sfCache = new WeakMap<Fan, Map<FanBranch, FanNode>>();
+export function familyOf(fan: Fan, b: FanBranch): FanNode | undefined {
+  let m = sfCache.get(fan);
+  if (!m) {
+    m = new Map();
+    // The widest first, so an inner family (were there one) wins.
+    for (const { v } of [...families(fan)].sort((p, q) => q.v.strands.length - p.v.strands.length)) for (const s of v.strands) m.set(s, v);
+    sfCache.set(fan, m);
+  }
+  return m.get(b);
+}
+
+/** A family's commonest living species (ToLaD#212): the most individuals alive today (population.ts), from the data. */
+const commonCache = new WeakMap<FanNode, FanBranch | null>();
+export function commonest(v: FanNode): FanBranch | null {
+  let out = commonCache.get(v);
+  if (out === undefined) {
+    out = null;
+    let most = 0;
+    for (const b of v.strands) {
+      if (b.sp.extinct) continue;
+      const n = b.pop.aliveAt(0);
+      if (n > most) [most, out] = [n, b];
+    }
+    commonCache.set(v, out);
+  }
+  return out;
+}
+
+/**
+ * The species pills that stand for their family (ToLaD#212), counted with the cull: a family with exactly one
+ * species shown (its pill on its tip), others of it hidden in view (their tips there, none of their spots shown) and
+ * no family pill of its own shown. Keyed by that species' id: next frame its pill carries the family's name and its
+ * commonest living species' picture (labelSpots' `famOf`), and its "+x" counts the family's hidden (plusGroups).
+ */
+export function familyPills(fan: Fan, spots: readonly LabelSpot[], on: Map<string, boolean>): Map<string, FanNode> {
+  const shown = new Map<FanNode, LabelSpot[]>();
+  const hid = new Map<FanNode, number>();
+  const famShown = new Set<FanNode>();
+  const shownIds = new Set<string>();
+  for (const s of spots) if (on.get(s.key)) shownIds.add(s.id);
+  for (const s of spots) {
+    if (s.place === 'fam') {
+      if (on.get(s.key) && s.v) famShown.add(s.v);
+      continue;
+    }
+    if (!s.b || s.ev !== undefined) continue;
+    const v = familyOf(fan, s.b);
+    if (!v) continue;
+    if (on.get(s.key)) {
+      let g = shown.get(v);
+      if (!g) shown.set(v, (g = []));
+      g.push(s);
+    } else if (s.place === 'tip' && s.fit > 0 && !shownIds.has(s.id)) hid.set(v, (hid.get(v) ?? 0) + 1);
+  }
+  const out = new Map<string, FanNode>();
+  for (const [v, g] of shown) {
+    const s = g[0];
+    if (g.length === 1 && s.place === 'tip' && !s.b!.sp.extinct && (hid.get(v) ?? 0) > 0 && !famShown.has(v)) out.set(s.id, v);
+  }
+  return out;
+}
+
 /** A family's label stands on "now" over its species (its bracket under it) while its span on screen is under this many screens. */
 const FAMILY_MAX_SCREENS = 1.6;
 
@@ -319,6 +387,7 @@ export function labelSpots(
   barX0?: number,
   brk?: { named(v: FanNode): boolean },
   plus?: (id: string) => number,
+  famOf?: (id: string) => FanNode | undefined,
 ): LabelSpot[] {
   const half = LABEL_PILL / 2;
   const X = (x: number) => c.toScreen(x, 0)[0];
@@ -455,18 +524,20 @@ export function labelSpots(
     const fit = fit0 * botFit(y1);
     const xs = lo <= hi - LABEL_PILL ? [lo, (lo + hi) / 2, hi] : [Math.min(Math.max((sa + sb) / 2, LABEL_AXIS_X + half), c.w - half)];
     xs.forEach((x, k) => {
-      out.push({ key: `n${vi}:fam${k}`, id: `n${vi}`, place: 'fam', v, text, rank: [-1, wb - wa, vi], x, y1, box: [x - half, y1 - len, x + half, y1], fit, span: brk ? undefined : [sa, sb], plus: px });
+      out.push({ key: `n${vi}:fam${k}`, id: `n${vi}`, place: 'fam', v, fam: v, pic: commonest(v), text, rank: [-1, wb - wa, vi], x, y1, box: [x - half, y1 - len, x + half, y1], fit, span: brk ? undefined : [sa, sb], plus: px });
     });
   }
   for (const b of fan.branches) {
     if (!near(boxes.get(b)!)) continue;
-    const text = b.sp.common;
     const id = String(b.sp.gid);
-    const len = measure(text) + 2 * LABEL_PAD;
+    // (Standing for its family, ToLaD#212: the family's name on its tip, last frame's familyPills.)
+    const fam = famOf?.(id);
+    const famText = fam && familyLabel(fam.split);
+    const len = measure(b.sp.common) + 2 * LABEL_PAD;
     const rank: Rank = [0, b.width, b.index];
     // (On its tip, room at its top end for the "+x" of the pills it hides, ToLaD#197: as many as last frame.)
     const px = plus?.(id) ?? 0;
-    const tlen = len + px;
+    const tlen = (famText ? measure(famText) + 2 * LABEL_PAD : len) + px;
     // On its tip: centred on the column there, kept on screen (right of the time axis) while the column is.
     const tl = X(leftAt(b, b.tipY));
     const tw = laneAt(b, b.tipY).w * c.cam.sx;
@@ -486,9 +557,11 @@ export function labelSpots(
     // Above the tip, clear of the other columns (an extinct tip has its neighbours around it; above "now" there are none).
     const f = tipOn * botFit(y1);
     const tipFit = f > 0 && b.tipY > nowY ? f * clearFit(clearance(x - half, x + half, y1 - tlen, Math.min(y1, ty - 2), b)) : f;
-    out.push({ key: `${id}:tip`, id, place: 'tip', b, text, rank, x, y1, box: [x - half, y1 - tlen, x + half, y1], fit: tipFit, plus: px });
+    const tip: LabelSpot = { key: `${id}:tip`, id, place: 'tip', b, text: famText || b.sp.common, rank, x, y1, box: [x - half, y1 - tlen, x + half, y1], fit: tipFit, plus: px };
+    if (famText) Object.assign(tip, { fam, pic: commonest(fam!) });
+    out.push(tip);
     // Beside its branch: once the tip is off screen.
-    out.push(...beside(id, text, rank, len, b, ty, Y(b.splitY), 1 - clamp01((ty - top) / 24), { b }));
+    out.push(...beside(id, b.sp.common, rank, len, b, ty, Y(b.splitY), 1 - clamp01((ty - top) / 24), { b }));
   }
   // Curated events (ToLaD#141): the title beside its window (or in the column when zoomed into it),
   // centred on the window, while the window is on screen. After the species' names, before the lineages'.
@@ -557,26 +630,38 @@ export function resolveLabels(spots: LabelSpot[], prev: Map<string, boolean>): M
  * species whose pills are hidden that it stands for. A species counts as hidden when its tip spot is there (fit > 0:
  * its tip and column on screen) and none of its spots shows; each counts once, on the shown pill nearest it (the left one on a tie), so the
  * badges add up to the species hidden in view. Keyed by the shown spot's key; the pills with none are left out.
+ * Given the fan, a hidden species whose family has a pill shown counts on that one instead (ToLaD#212: the family's "+x").
  */
-export function plusGroups(spots: readonly LabelSpot[], on: Map<string, boolean>): Map<string, FanBranch[]> {
+export function plusGroups(spots: readonly LabelSpot[], on: Map<string, boolean>, fan?: Fan): Map<string, FanBranch[]> {
   const out = new Map<string, FanBranch[]>();
   const shownIds = new Set<string>();
   for (const s of spots) if (on.get(s.key)) shownIds.add(s.id);
   const isTip = (s: LabelSpot) => s.place === 'tip' && !!s.b && s.ev === undefined;
   const shown = spots.filter((s) => (isTip(s) || s.place === 'fam') && on.get(s.key)).sort((p, q) => p.x - q.x);
   if (!shown.length) return out;
+  const famPill = new Map<FanNode, LabelSpot>();
+  if (fan) for (const s of shown) if (s.fam && !famPill.has(s.fam)) famPill.set(s.fam, s);
+  // (The rest on the nearest species' pill: a family's counts its own family only, unless no other is shown.)
+  const near = famPill.size && shown.some((s) => !s.fam) ? shown.filter((s) => !s.fam) : shown;
   for (const s of spots) {
     if (!isTip(s) || !(s.fit > 0) || shownIds.has(s.id)) continue;
+    const fp = famPill.size ? famPill.get(familyOf(fan!, s.b!)!) : undefined;
+    if (fp) {
+      let g = out.get(fp.key);
+      if (!g) out.set(fp.key, (g = []));
+      g.push(s.b!);
+      continue;
+    }
     // The nearest shown pill: a binary search for the first right of it, then it or the one before.
     let lo = 0;
-    let hi = shown.length;
+    let hi = near.length;
     while (lo < hi) {
       const m = (lo + hi) >> 1;
-      if (shown[m].x < s.x) lo = m + 1;
+      if (near[m].x < s.x) lo = m + 1;
       else hi = m;
     }
-    const r = shown[Math.min(lo, shown.length - 1)];
-    const l = shown[Math.max(lo - 1, 0)];
+    const r = near[Math.min(lo, near.length - 1)];
+    const l = near[Math.max(lo - 1, 0)];
     const at = s.x - l.x <= r.x - s.x ? l : r;
     let g = out.get(at.key);
     if (!g) out.set(at.key, (g = []));
@@ -667,6 +752,10 @@ export class FanView implements InputHandlers {
   thumbHits: [number, number, number, FanBranch][] = [];
   /** The "+x" badges as last drawn (ToLaD#197): the count on each species' pill (by id), and where a tap on one lands. */
   private plusN = new Map<string, number>();
+  /** The species pills standing for their family (ToLaD#212), from the frame before (familyPills). */
+  private famPills = new Map<string, FanNode>();
+  /** The family pills drawn (ToLaD#212): a tap flies to the family, as its bracket's. */
+  famHits: { box: [number, number, number, number]; v: FanNode }[] = [];
   plusHits: { box: [number, number, number, number]; bs: FanBranch[] }[] = [];
   private models = new Map<string, TwigModel>();
   private raf = 0;
@@ -1019,13 +1108,11 @@ export class FanView implements InputHandlers {
     const sx = Math.min(Math.max(h.sx, (0.5 * this.w) / Math.max(1e-300, b.width)), Math.max(h.sx, this.camera.sxCap(b.cx, b.tipY)));
     // Within the time limit (MIN_YEARS on screen) about the tip, where it will sit.
     const s = this.camera.timeCap(b.tipY, tipPx, sy, h.sy);
-    // Folded (fold.ts): its column where the fold has it at that zoom (the fold stays there for the camera taking it).
+    // Folded (fold.ts): its column where the fold has it at that zoom, the rows anchored on it (brackets.ts
+    // foldedFrame, ToLaD#211: the fold stays there for the camera taking it, so it lands centred).
     const f = this.fan.tess.fold;
-    if (f) {
-      f.setScale(sx, this.w);
-      if (f.left(b.index, b.tipY) !== null) return { cx: leftAt(b, b.tipY) + laneAt(b, b.tipY).w / 2, cy: cyAt(s), sx, sy: s, ty: s };
-    }
-    return { cx: b.cx, cy: cyAt(s), sx, sy: s, ty: s };
+    const cx = () => (f && f.left(b.index, b.tipY) !== null ? leftAt(b, b.tipY) + laneAt(b, b.tipY).w / 2 : b.cx);
+    return foldedFrame(this.fan, this.w, () => ({ cx: cx(), cy: cyAt(s), sx, sy: s, ty: s }));
   }
 
   /** A search pick: fly to the species' column, then open its card at its tip, as a tap there would. */
@@ -1038,6 +1125,11 @@ export class FanView implements InputHandlers {
     this.touch = null;
     this.onSelect(null);
     this.flyTo(this.speciesCamera(b), ms, () => {
+      // Folded: on landing it takes the frame exactly (as a clade's flight, flyToClade).
+      if (this.fan.tess.fold) {
+        this.cam = this.speciesCamera(b);
+        this.camera.settle();
+      }
       const wy = b.tipY;
       this.selected = sp;
       this.selInd = null;
@@ -1144,6 +1236,9 @@ export class FanView implements InputHandlers {
     }
     const wxT = wx;
     cx = wxT - (x - this.w / 2) / sx;
+    // (What lands where: world x `at` at screen x `atPx`, the finger's point under the finger unless it centres.)
+    let at = wxT;
+    let atPx = x;
     if (b) {
       if (framing) {
         const [l, w] = this.spanAt(b, wy);
@@ -1155,8 +1250,27 @@ export class FanView implements InputHandlers {
       const L = m.lanes(wy);
       const slotPx = m.pitch(wy) * sx;
       if (wxT < L.left + L.gw && slotPx > 12) cx = m.nearestLiving(wxT, wy, Math.ceil(this.w / slotPx)) ?? cx;
+      if (cx !== wxT - (x - this.w / 2) / sx) [at, atPx] = [cx, this.w / 2];
     }
-    this.flyTo({ sx, sy, ty: sy, cx, cy: wy - (y - this.h / 2) / sy });
+    const to: Camera = { sx, sy, ty: sy, cx, cy: wy - (y - this.h / 2) / sy };
+    if (!b || !this.fan.tess.fold) {
+      this.flyTo(to);
+      return;
+    }
+    // Folded (fold.ts): the column moves as the zoom opens the fold and its anchor follows the camera, so what
+    // lands is held as its share across the column (or the span framed) at that height, framed where the fold
+    // has it at the landing (brackets.ts foldedFrame, ToLaD#211), and taken exactly on landing.
+    const [l0, w0] = this.spanAt(b, wy);
+    const share = (at - l0) / Math.max(1e-300, w0);
+    const frame = () => {
+      const [l, w] = this.spanAt(b, wy);
+      return { ...to, cx: l + share * w - (atPx - this.w / 2) / sx };
+    };
+    this.flyTo(foldedFrame(this.fan, this.w, frame), 650, () => {
+      this.cam = foldedFrame(this.fan, this.w, frame);
+      this.camera.settle();
+      this.request();
+    });
   }
 
   /** What a tap on strand b at world y frames: its own column above its split, the parent column below ([left, width]). */
@@ -1184,6 +1298,12 @@ export class FanView implements InputHandlers {
       this.touch = { x: leftAt(b, b.tipY) + laneAt(b, b.tipY).w / 2, ageMa };
       this.onSelect({ sp: b.sp, ageMa, startMa: b.t0 });
       this.request();
+      return;
+    }
+    // A family's pill (ToLaD#212): fly to the family, as its bracket.
+    const fp = this.famHits.find(({ box }) => x >= box[0] - 4 && x <= box[2] + 4 && y >= box[1] - 4 && y <= box[3] + 4);
+    if (fp) {
+      this.flyToClade(fp.v);
       return;
     }
     // A clade's bracket (ToLaD#193): fly to the clade.
@@ -1287,7 +1407,7 @@ export class FanView implements InputHandlers {
     this.drawGutter();
     this.drawTouch();
     const br = this.layoutBrackets();
-    const spots = labelSpots(this.camera, this.fan, this.labelTop(), (t) => this.nameWidth(t), this.barRect()?.[0], br ?? undefined, (id) => this.plusPx(this.plusN.get(id) ?? 0));
+    const spots = labelSpots(this.camera, this.fan, this.labelTop(), (t) => this.nameWidth(t), this.barRect()?.[0], br ?? undefined, (id) => this.plusPx(this.plusN.get(id) ?? 0), (id) => this.famPills.get(id));
     this.drawLabels(spots, br);
     this.drawWidthScale();
     if (this.debug) this.drawDebug();
@@ -1777,7 +1897,12 @@ export class FanView implements InputHandlers {
     const on = resolveLabels(spots, prev);
     // The "+x" badges (ToLaD#197): counted with the cull; a pill keeps room for its count from the frame before, so
     // when a count changes the next frame lays the pills out again with the room it needs.
-    const groups = plusGroups(spots, on);
+    const groups = plusGroups(spots, on, this.fan);
+    // A family with one species shown stands on its pill (ToLaD#212): as the badges, next frame, laid out again for it.
+    const famPills = familyPills(this.fan, spots, on);
+    if (famPills.size !== this.famPills.size || [...famPills].some(([id, v]) => this.famPills.get(id) !== v)) this.request();
+    this.famPills = famPills;
+    this.famHits.length = 0;
     const plusN = new Map<string, number>();
     for (const s of spots) {
       const n = groups.get(s.key)?.length ?? 0;
@@ -1824,11 +1949,15 @@ export class FanView implements InputHandlers {
       ctx.beginPath();
       ctx.roundRect(x0, y0, x1 - x0, y1 - y0, LABEL_PILL / 2);
       ctx.fill();
-      if (s.span) {
-        // A family (ToLaD#146): an outlined pill, and a bracket over the species it names, just above "now".
+      if (s.fam) {
+        // A family (ToLaD#146, #212): an outlined pill; tapped, it flies to the family.
         ctx.strokeStyle = FAMILY_INK;
         ctx.lineWidth = 1;
         ctx.stroke();
+        if (alpha > 0.5) this.famHits.push({ box: [x0, y0, x1, y1], v: s.fam });
+      }
+      if (s.span) {
+        // ...and a bracket over the species it names, just above "now".
         const a = Math.max(-2, s.span[0]);
         const b = Math.min(this.w + 2, s.span[1]);
         const y = y1 + 2.5;
@@ -1844,7 +1973,7 @@ export class FanView implements InputHandlers {
       ctx.translate(s.x, y1 - LABEL_PAD);
       ctx.rotate(-Math.PI / 2);
       // A lineage's name in the second ink: the species' are the tree's names. An event's title in its tint. A family's in its own.
-      ctx.fillStyle = s.ev !== undefined ? EVENT_TINT.css : s.span ? FAMILY_INK : s.v ? INK2 : INK;
+      ctx.fillStyle = s.ev !== undefined ? EVENT_TINT.css : s.fam ? FAMILY_INK : s.v ? INK2 : INK;
       ctx.fillText(s.text, 0, 0.5);
       // Its "+x" badge (ToLaD#197), past the name in the room the pill keeps for it: a quieter chip, tapped to open them.
       const g = groups.get(s.key);
@@ -1863,12 +1992,14 @@ export class FanView implements InputHandlers {
       }
       ctx.restore();
       // ToLaD#182: the species' Commons picture under its pill, before the name, once loaded (wiki.ts; `?thumbs=0` off).
-      const th = s.b && s.ev === undefined ? labelThumb(s.b.sp.sci, () => this.request()) : null;
+      // (A family's, ToLaD#212: its commonest living species'.)
+      const pb = s.fam ? s.pic : s.b;
+      const th = pb && s.ev === undefined ? labelThumb(pb.sp.sci, () => this.request()) : null;
       // (One picture where two would overlap, the first one shown: fewer and clearer, ToLaD#193. A fading one still draws.)
       const ty = y1 + THUMB_D / 2 + 2;
       if (th && alpha > 0.5 && !thumbs.some(([x, y]) => Math.abs(x - s.x) < THUMB_D - 4 && Math.abs(y - ty) < THUMB_D - 4)) {
         thumbs.push([s.x, ty]);
-        if (s.b) this.thumbHits.push([s.x, ty, THUMB_D / 2, s.b]);
+        if (pb) this.thumbHits.push([s.x, ty, THUMB_D / 2, pb]);
         drawThumb(ctx, th, s.x, ty, THUMB_D);
       } else if (th && alpha <= 0.5) drawThumb(ctx, th, s.x, ty, THUMB_D);
     }
