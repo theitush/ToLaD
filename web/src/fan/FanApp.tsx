@@ -345,18 +345,24 @@ function EventSource({ ev }: { ev: HistEvent }) {
  */
 export function WikiPic({ w, initial = 'loading' }: { w: WikiRec | null; initial?: 'loading' | 'ok' | 'failed' }) {
   const [state, setState] = useState(initial);
+  // A tap opens it across the card at a larger Commons thumbnail (ToLaD#182); another tap closes it.
+  const [big, setBig] = useState(false);
+  const [bigFailed, setBigFailed] = useState(false);
   const src = w?.img;
   if (!src || state === 'failed') return null;
+  const bigSrc = bigSrcOf(src);
+  const useBig = big && !bigFailed && bigSrc !== src;
   return (
-    <figure className={`pic ${state}`}>
+    <figure className={`pic ${state}${big ? ' big' : ''}`}>
       <img
-        src={src}
+        src={useBig ? bigSrc : src}
         alt=""
         loading="lazy"
         decoding="async"
         referrerPolicy="no-referrer"
+        onClick={() => setBig((b) => !b)}
         onLoad={() => setState('ok')}
-        onError={() => setState('failed')}
+        onError={() => (useBig ? setBigFailed(true) : setState('failed'))}
       />
       {state === 'ok' && w?.file && (
         <a href={w.file} target="_blank" rel="noopener">
@@ -365,6 +371,11 @@ export function WikiPic({ w, initial = 'loading' }: { w: WikiRec | null; initial
       )}
     </figure>
   );
+}
+
+/** The same Commons thumbnail at 960 px (a standard Wikimedia step); the small one if the URL isn't a sized thumb. */
+export function bigSrcOf(src: string): string {
+  return src.replace(/\/(\d+)px-([^/]+)$/, '/960px-$2');
 }
 
 export function SpeciesCard({ sp, onClose, open, ageMa, startMa, event }: { sp: SpeciesRec; onClose: () => void; open?: boolean; ageMa?: number; startMa?: number; event?: number }) {
