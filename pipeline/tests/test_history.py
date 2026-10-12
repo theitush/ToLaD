@@ -648,7 +648,7 @@ class DeepJoin(unittest.TestCase):
         r, gen = self._gen()
         pts = H.curve_points(r)
         out, j = H.deep_join(gen, pts[0])
-        self.assertIn("the cited 1800 baseline (1,000,000)", j["note"])
+        self.assertIn("meets 1,000,000 (the cited 1800 baseline)", j["note"])
         curve = out + pts
         for p in curve:
             self.assertAlmostEqual(H.interp(curve, p["year"]) / p["n"], 1.0, places=9)
@@ -667,13 +667,8 @@ class DeepJoin(unittest.TestCase):
         self.assertTrue(j["flag"])
         self.assertEqual(j["meet"], "median")
         self.assertAlmostEqual(out[-1]["n"], 66)
-        self.assertEqual(j["note"], "The genome gives the shape, not the number: its curve is scaled ×0.00047 to "
-                                    "meet the cited 1924 census (66) at its long-run level (the median of its "
-                                    "resolved steps), then held flat to it. Its young end (~33 kya), the least "
-                                    "certain part of the curve (the edge of PSMC's blind spot, and the sampled "
-                                    "genome's own regional history), sits 1.8x below that level: meeting the anchor "
-                                    "there would scale the whole curve ×0.00083 (flagged: beyond 10×), so instead "
-                                    "the curve falls to the anchor by ~33 kya and holds there.")
+        self.assertEqual(j["note"], "Flagged join: genome curve scaled ×0.00047 so its long-run level meets 66 "
+                                    "(the cited 1924 census); its young end, from ~33 kya, is held there.")
 
     def test_natural_anchor_sentence(self):
         """ToLaD#143: a first cited count below the natural level is not the anchor; the genome meets the
@@ -711,9 +706,9 @@ class DeepJoin(unittest.TestCase):
         out, j = H.deep_join(gen, self._nxt(8e4 / 316, "rangeloss"))
         self.assertTrue(j["flag"])
         self.assertAlmostEqual(out[-1]["n"], 8e4 / 316)
-        self.assertIn("scaled ×0.0018 to meet the modelled natural level in 1500 CE (253; no cited count) at its "
-                      "long-run level", j["note"])
-        self.assertIn("would scale the whole curve ×0.0032 (flagged: beyond 10×)", j["note"])
+        self.assertIn("Flagged join: genome curve scaled ×0.0018 so its long-run level meets 253 (the modelled "
+                      "natural level); its young end, from ~", j["note"])
+        self.assertAlmostEqual(j["ratio"], 316)  # the young end would have taken ×0.0032: on the record, not the card
         # flagged, with the young end at or above the median of the resolved steps: the young end meets it
         young = gen[:-1]  # 2e5, 1.2e5, 1.6e5: median 1.6e5, the young end
         out, j = H.deep_join(young, self._nxt(8e7, "estimate", year=1800))
@@ -860,7 +855,7 @@ class DeepJoin(unittest.TestCase):
         self.assertEqual((w["next"], w["to_kind"], w["to_year"]), ("natural", "rangeloss", 1500))
         self.assertEqual((w["below"]["year"], w["below"]["n"]), (1924, 66))
         self.assertGreater(w["to_n"], 1000)  # a pre-modern level, not the crash
-        self.assertIn("which is above the first cited count (1924 census, 66)", w["note"])
+        self.assertIn(f"meets {w['to_n']:,.0f} (the modelled natural level)", w["note"])  # flagged: the short sentence (ToLaD#172)
         h = next(h for h in json.loads(dbg.read_text())["history"] if h["species"] == "Bison bonasus")
         i = sum(p["kind"] == "genomic" for p in h["points"])
         self.assertEqual([(p["year"], p["kind"]) for p in h["points"][i - 1:i + 2]][1:],

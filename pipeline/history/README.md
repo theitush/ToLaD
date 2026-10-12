@@ -483,6 +483,13 @@ the same way by code rather than by hand.
       and the flag still uses it: 35 of 108 joins are flagged, while the
       factor spread in `stats.json -> history.deep_join.factor` counts the
       factors as applied (12 beyond 10x up, 10 down; median 1.23).
+    - **The card** says it in one sentence, the same shape for every such
+      join: "Flagged join: genome curve scaled ×2.2 so its long-run level
+      meets 1,019,752 (the modelled natural level); its young end, from
+      ~61 kya, is held there." (the card rounds the count to ~1.0M; a cited
+      anchor reads "66 (the cited 1924 census)"). The young-end factor
+      stays on the record (`ratio`), not on the card; "Flagged" is what
+      the card's basis list keys on.
 
   In the 2026-10-12 build (108 genomic species: 12 anchored on a cited
   count, 14 on the natural level above their first count, 82 on a modelled

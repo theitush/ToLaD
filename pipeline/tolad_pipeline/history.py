@@ -621,14 +621,14 @@ def deep_join(deep_pts: list[dict], nxt: dict, dropped: list[dict] | None = None
     hp = deep_pts[len(deep_pts) - n_held:]
     tail = ("1500; the range-loss trend runs from there down to the count" if below is not None else "it")
     if lift:
+        # one short sentence (ToLaD#172): the factor, the level met (the card rounds the count) and what it
+        # is, and where the young end is held; "Flagged" marks the join for the card's basis list
+        desc = (what[:what.rindex(" (")] if cited else
+                {"natural": "the modelled natural baseline", "model": "today's modelled count"}.get(
+                    nxt["kind"], "the modelled natural level"))
         note = blind_txt + (
-            f"The genome gives the shape, not the number: its curve is scaled ×{_x(f)} to meet {what} at its "
-            f"long-run level (the median of its resolved steps), then held flat to {tail}. Its young end "
-            f"(~{deep_pts[-1]['ago'] / 1000:.0f} kya), the least certain part of the curve (the edge of PSMC's "
-            f"blind spot, and the sampled genome's own regional history), sits {_x(med / deep_pts[-1]['n'])}x "
-            f"below that level: meeting the anchor there would scale the whole curve ×{_x(1 / raw)} (flagged: "
-            f"beyond {DEEP_JOIN_FLAG:g}×), so instead the curve falls to the anchor by "
-            f"~{hp[0]['ago'] / 1000:.0f} kya and holds there.")
+            f"Flagged join: genome curve scaled ×{_x(f)} so its long-run level meets {nxt['n']:,.0f} ({desc}); "
+            f"its young end, from ~{hp[0]['ago'] / 1000:.0f} kya, is held there.")
     else:
         note = blind_txt + (f"The genome gives the shape, not the number: its curve is scaled ×{_x(f)} to meet "
                             f"{what}, then held flat to {tail}"
