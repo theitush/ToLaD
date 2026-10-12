@@ -11,7 +11,7 @@ import { clipPoly, FanCamera, STRAND_PX, type Camera } from './camera';
 import { laneAt, layoutFan, leftAt, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type EdgeStyle, type Fan, type FanBranch, type FanNode, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01 } from './meshgl';
-import { Fold } from './fold';
+import { Fold, leanFade } from './fold';
 import { COLUMN_DIM, columnSpans, EVENT_TINT, eventAt, eventSpans, type EventSpan } from './colstyle';
 import { drawTwigs, kLogAt, laneDim, LINEAGE, LIVING, TEX_HAIR_PX, TWIG_GRAY, TwigModel, type IndInfo, type TwigStats } from './twigs';
 import type { MeshBatch, RectBatch } from './meshgl';
@@ -53,6 +53,8 @@ const LABEL_AXIS_X = 72;
 const LABEL_BOTTOM_PX = 104;
 /** How long a label takes to fade in or out when another takes or gives up its place (ms). */
 const LABEL_FADE_MS = 180;
+/** Folded: how far (px) below the order's start its stem fades out (drawStemFade, ToLaD#210). */
+const STEM_END_PX = 48;
 
 /** Rows of the clades' brackets (ToLaD#193) a framed view keeps room for above "now". */
 const BAND_ROWS = 5;
@@ -1345,11 +1347,19 @@ export class FanView implements InputHandlers {
   }
 
   /** The stem fades out over its last stretch (from STEM_FADE_MA down to the bottom of the world): nothing ends abruptly. */
+  /**
+   * Folded (the carnivores, ToLaD#210): the order's stem below its start is no slab of its founders down to the
+   * bottom of the world (its width there is the founders', its grey their lines that ended, not the order's): it
+   * fades out over STEM_END_PX below the root, and one thin line, the order's lineage, goes on down to the bottom.
+   */
   private drawStemFade(): void {
     const f = this.fan;
-    const [, ya] = this.toScreen(0, f.time.y(STEM_FADE_MA));
-    const [, yb] = this.toScreen(0, f.trunkBottom.y);
-    if (yb < 0 || ya > this.h) return;
+    const folded = !!f.tess.fold;
+    const [, yr] = this.toScreen(0, f.root.y);
+    const [, ya] = folded ? [0, yr] : this.toScreen(0, f.time.y(STEM_FADE_MA));
+    const [, yBot] = this.toScreen(0, f.trunkBottom.y);
+    const yb = folded ? Math.min(yBot, ya + STEM_END_PX) : yBot;
+    if (yBot < 0 || ya > this.h) return;
     const ctx = this.ctx;
     const g = ctx.createLinearGradient(0, ya, 0, yb);
     g.addColorStop(0, 'rgba(11,19,17,0)');
@@ -1358,6 +1368,25 @@ export class FanView implements InputHandlers {
     const t = Math.max(-8, ya);
     const b = Math.min(this.h + 8, yb + 2);
     if (b > t) ctx.fillRect(0, t, this.w, b - t);
+    if (!folded) return;
+    // (Below the fade: the ground, and the lineage's line from the root's centre down, itself fading out at the bottom.)
+    const t2 = Math.max(-8, yb + 2);
+    const b2 = Math.min(this.h + 8, yBot + 2);
+    if (b2 > t2) {
+      ctx.fillStyle = BG;
+      ctx.fillRect(0, t2, this.w, b2 - t2);
+    }
+    const cx = this.toScreen(nodeLeftAt(f.root, f.root.y) + f.root.width / 2, 0)[0];
+    if (cx < -4 || cx > this.w + 4) return;
+    const [, yf] = this.toScreen(0, f.time.y(STEM_FADE_MA));
+    const l0 = Math.max(-8, yr);
+    const l1 = Math.min(this.h + 8, yBot);
+    if (!(l1 > l0)) return;
+    const lg = ctx.createLinearGradient(0, Math.max(yr, yf), 0, yBot);
+    lg.addColorStop(0, LINEAGE);
+    lg.addColorStop(1, 'rgba(11,19,17,0)');
+    ctx.fillStyle = lg;
+    ctx.fillRect(cx - 0.75, l0, 1.5, l1 - l0);
   }
 
   /**
@@ -1467,6 +1496,9 @@ export class FanView implements InputHandlers {
         const gp = wp * p.f;
         const wm = (wq + wp) / 2;
         const gm = (gq + gp) / 2;
+        // (A stretch running near-flat across the screen, a far family's columns closing a deep fork: culled, fold.ts leanFade.)
+        const lean = this.fan.tess.fold ? leanFade(xp + wp / 2 - xq - wq / 2, y1 - y0) : 1;
+        if (!(lean > 0)) continue;
         const gc = mix01(GRAY, '#131c19', laneDim(wm - gm, lives, tex) * 0.82);
         const ec = mix01(GREEN, '#0d2318', laneDim(gm, lives, tex) * 0.9);
         // A styled stretch of the column (held flat for want of figures: colstyle.ts) fades towards the
@@ -1477,28 +1509,44 @@ export class FanView implements InputHandlers {
         const sq = Math.sqrt(1 + ((xp + wp / 2 - xq - wq / 2) / (y1 - y0)) ** 2);
         const xa = Math.min(xq, xp);
         const xr = Math.max(xq + Math.max(0.6, wq), xp + Math.max(0.6, wp)) + 0.5;
-        trap(this.gl.under, xq, xq + Math.max(0.6 * sq, wq), xp, xp + Math.max(0.6 * sq, wp), y0, y1, gc, 1, xa - 0.5, xr);
+        trap(this.gl.under, xq, xq + Math.max(0.6 * sq, wq), xp, xp + Math.max(0.6 * sq, wp), y0, y1, gc, lean, xa - 0.5, xr);
         if (dim > 0) trap(this.gl.over, xq, xq + Math.max(sq, wq), xp, xp + Math.max(sq, wp), y0, y1, BG01, dim, xa - 0.5, xr + 0.5);
         if (gq > 0 || gp > 0) {
           const g1q = xq + Math.max(sq, gq);
           const g1p = xp + Math.max(sq, gp);
           const xb = Math.max(xq + Math.max(1, gq), xp + Math.max(1, gp));
           // The living glow faintly (fading as their lane resolves into individuals).
-          const glow = (1 - lives) * (1 - dim);
+          const glow = (1 - lives) * (1 - dim) * lean;
           if (glow > 0.01) {
             trap(this.gl.under, xq - 4 * sq, g1q + 4 * sq, xp - 4 * sq, g1p + 4 * sq, y0, y1, ec, 0.06 * glow, xa - 4, xb + 4);
             trap(this.gl.under, xq - 1.5 * sq, g1q + 1.5 * sq, xp - 1.5 * sq, g1p + 1.5 * sq, y0, y1, ec, 0.14 * glow, xa - 1.5, xb + 1.5);
           }
-          trap(this.gl.under, xq, g1q, xp, g1p, y0, y1, ec, 1, xa - 0.5, xb + 0.5);
+          trap(this.gl.under, xq, g1q, xp, g1p, y0, y1, ec, lean, xa - 0.5, xb + 0.5);
         }
       }
     } else {
-      ctx.fillStyle = grayC;
-      this.ribbon(pts, (p) => hw - p.w, () => hw, 0.6);
-      if (pts.some((p) => p.f > 0)) {
-        // Green lane on the left, floored at 1 px.
-        ctx.fillStyle = greenC;
-        this.ribbon(pts, () => hw, (p) => hw - p.w * p.f, -1);
+      // (Its runs whose lean on screen is drawn, fold.ts leanFade: a near-flat stretch culled.)
+      const k = this.cam.sx;
+      const runs: RibbonPt[][] = [];
+      let run: RibbonPt[] = [pts[0]];
+      for (let i = 0; i + 1 < pts.length; i++) {
+        const p = pts[i];
+        const q = pts[i + 1];
+        if (!this.fan.tess.fold || !(p.y - q.y > 0) || leanFade(p.x + (p.w * k) / 2 - q.x - (q.w * k) / 2, p.y - q.y) > 0) run.push(q);
+        else {
+          if (run.length > 1) runs.push(run);
+          run = [q];
+        }
+      }
+      if (run.length > 1) runs.push(run);
+      for (const r of runs) {
+        ctx.fillStyle = grayC;
+        this.ribbon(r, (p) => hw - p.w, () => hw, 0.6);
+        if (r.some((p) => p.f > 0)) {
+          // Green lane on the left, floored at 1 px.
+          ctx.fillStyle = greenC;
+          this.ribbon(r, () => hw, (p) => hw - p.w * p.f, -1);
+        }
       }
       // Its styled stretches: faded over the individuals too, once they are drawn (drawHeld).
       for (const [t, bt, d] of held) {

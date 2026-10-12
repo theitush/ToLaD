@@ -1,6 +1,6 @@
 // The fold (ToLaD#146): one branch from afar, opening continuously as the width zoom grows.
 import { describe, expect, it } from 'vitest';
-import { Fold, inFamily, ROOM_BEND } from './fold';
+import { Fold, inFamily, LEAN_CUT, leanFade, ROOM_BEND, SY_HOME } from './fold';
 import { familySpan } from './view';
 import { columnsAt, g, laneAt, layoutFan, leftAt, TIME_H, type EdgeStyle, type Fan, type FanBranch, type WidthMode } from './layout';
 import { CARNIVORA, FELIDAE } from './panthera';
@@ -402,6 +402,48 @@ describe('the fold', () => {
       }
     }
   });
+
+  it(`zoomed into the weasels, a bend runs at most ${LEAN_CUT} px across per px of height where drawn (leanFade): the columns on screen keep all their bends, the far families' near-flat closings are culled (ToLaD#210)`, () => {
+    for (const mode of ['log', 'linear'] as WidthMode[]) {
+      const { fan, fold, home } = folded(mode, 'curved');
+      const g = fan.branches.filter((b) => /^Mustela /.test(b.sp.sci));
+      for (const z of mode === 'log' ? [20] : [8, 20]) {
+        const sx = home * z;
+        fold.setScale(sx, SCREEN);
+        const y0 = fan.time.y(0);
+        const cx = g.reduce((s, b) => s + centre(b, y0), 0) / g.length;
+        fold.setAnchor(cx, fan.time.y(1), sx, SCREEN);
+        fold.setAnchor(cx, fan.time.y(1), sx, SCREEN);
+        const px = (x: number) => (x - cx) * sx + SCREEN / 2;
+        const sy = SY_HOME * 1.6;
+        let worstOwn = 0;
+        let worstAt = '';
+        let culled = 0;
+        for (const b of fan.branches) {
+          const own = g.includes(b);
+          let px0 = NaN;
+          for (let y = Math.max(b.tipY, y0); y < fan.root.y; y += 2) {
+            const x = px(centre(b, y));
+            if (px0 === px0 && Math.min(x, px0) < SCREEN && Math.max(x, px0) > 0) {
+              const s = Math.abs(x - px0) / (2 * sy);
+              const f = leanFade(x - px0, 2 * sy);
+              // (Drawn: within the bound.)
+              if (f > 0) expect(s).toBeLessThan(LEAN_CUT);
+              else culled++;
+              if (own && y < b.splitY && 1 - f > worstOwn) {
+                worstOwn = 1 - f;
+                worstAt = `${b.sp.sci} ${fan.time.ageAt(y).toFixed(2)} Ma ${s.toFixed(1)}`;
+              }
+            }
+            px0 = x;
+          }
+        }
+        // (The weasels' own columns, down to their splits, are never culled; something far is, zoomed in.)
+        expect(worstOwn, `${mode} z${z} ${worstAt}`).toBe(0);
+        if (z >= 20) expect(culled, `${mode} z${z}`).toBeGreaterThan(0);
+      }
+    }
+  }, 240_000);
 
   it('dogs x15: the columns stand still over 100-500 yr (no neighbour\'s decline or boom slants them), the wolf too; the families beside stand still while the dogs open', () => {
     for (const mode of ['log', 'linear'] as WidthMode[]) {

@@ -31,6 +31,7 @@ import { attrSeed, Lane, linkWidth, MAX_FOLD, packInst, SLOT_MID, type MeshInst 
 import type { MeshBatch } from './meshgl';
 import type { SpeciesRec } from './panthera';
 import type { GenSegment } from './history';
+import { leanFade } from './fold';
 
 function keyOf(common: string): string {
   return common
@@ -1163,6 +1164,8 @@ function stretches(v: TwigView, m: TwigModel, yTop: number, yBot: number): Stret
     const a = at(ys[c], 8 * c);
     const B = at(ys[c + 1], 8 * (c + 1) + 4);
     if (!(a.L.w > 0) && !(B.L.w > 0)) continue;
+    // (A chord running near-flat across the screen, a far family's columns closing a deep fork: culled, as its lanes, fold.ts leanFade.)
+    if (m.b.tess.fold && leanFade(B.colX - a.colX + ((B.L.w - a.L.w) * v.sx) / 2, (ys[c + 1] - ys[c]) * v.sy) < 0.5) continue;
     const ym = (ys[c] + ys[c + 1]) / 2;
     const green = a.L.gw > 0 || B.L.gw > 0;
     // (A green lane that starts within the chord starts at the column's left edge.)
