@@ -132,6 +132,10 @@ const scenes = [
   ['carn-deep40', 'level', ['Carnivora', 40, 4, 3]],
   ['carn-card-dog', 'card', ['Grey wolf']],
   ['carn-search-wol', 'search', ['wol']],
+  // A pick that once landed beside the screen (ToLaD#211: the fold opening as the camera zooms): now centred, card open.
+  ['tap-monkseal', 'search', ['hawaiian', 'Hawaiian monk seal']],
+  ['tap-manedwolf', 'search', ['maned', 'Maned wolf']],
+  ['tap-polarbear', 'search', ['polar', 'Polar bear']],
   // The fold (ToLaD#146): the dogs at 1.5x, 3x and 6x home's width zoom, opening as they grow.
   ['carn-dogs-z15', 'zoomto', ['Canidae', 1.5]],
   ['carn-dogs-z3', 'zoomto', ['Canidae', 3]],
