@@ -475,35 +475,46 @@ export function cladeCamera(
     const h = ((b - a) / 2) * Math.max(1, room / (TAP_FILL * c.w));
     return band(c.frame(m - h, m + h, v.yBot, true));
   };
+  return foldedFrame(fan, c.w, frame);
+}
+
+/**
+ * The frame a flight lands on, folded (fold.ts) or not: `frame` frames what it shows as the fold stands now (a clade's
+ * span, a species' column), and folded what it shows moves with the zoom (its inner gaps open) and with the anchor
+ * (the rows stand on the screen's centre). The one camera both agree on: the zoom that frames what that zoom opens
+ * (bisected in log zoom: the span on screen grows with the zoom), the rows anchored on the frame's own centre (a few
+ * rounds: each anchoring moves the row a little). The fold is left exactly at the frame's zoom and anchor, for the
+ * camera taking it (settling there moves nothing). A frame whose zoom does not move with the fold (a species'
+ * column) takes no bisection. Used by every tap and search flight (ToLaD#193, #197, #211).
+ */
+export function foldedFrame(fan: Fan, w: number, frame: () => Camera): Camera {
   let cam = frame();
   const f = fan.tess.fold;
   if (!f) return cam;
-  // Folded, the clade's span grows with the zoom (its inner gaps open, fold.ts), so framing it at the zoom it was
-  // measured at swings between closed-and-zoomed-in and open-and-zoomed-out. The zoom that frames the span it opens
-  // to is one point: the span (px) a zoom gives grows with it, so bisect (in log zoom) on where it fills the frame.
   const cy = cam.cy;
   const settleAt = (sx: number): Camera => {
-    f.setScale(sx, c.w);
-    let at = cam;
-    // The rows anchored on the clade's centre (each anchoring moves the row a little: a few rounds).
-    for (let k = 0; k < 6; k++) {
-      at = frame();
-      if (!f.setAnchor(at.cx, cy, sx, c.w)) break;
-    }
+    f.setScale(sx, w);
+    // (A few rounds: the rows anchored on the frame's centre, which each anchoring moves a little.)
+    for (let k = 0; k < 6; k++) if (!f.setAnchor(frame().cx, cy, sx, w)) break;
     return frame();
   };
-  let lo = Math.log(cam.sx) - 1;
-  let hi = Math.log(cam.sx) + 1;
-  for (let k = 0; k < 8 && settleAt(Math.exp(lo)).sx < Math.exp(lo); k++) lo -= 2;
-  for (let k = 0; k < 8 && settleAt(Math.exp(hi)).sx > Math.exp(hi); k++) hi += 2;
-  for (let k = 0; k < 40 && hi - lo > 1e-7; k++) {
-    const m = (lo + hi) / 2;
-    if (settleAt(Math.exp(m)).sx > Math.exp(m)) lo = m;
-    else hi = m;
+  const fixed = settleAt(cam.sx);
+  if (fixed.sx === cam.sx) cam = fixed;
+  else {
+    // (The zoom that frames the span it opens to is one point: the span (px) a zoom gives grows with it.)
+    let lo = Math.log(cam.sx) - 1;
+    let hi = Math.log(cam.sx) + 1;
+    for (let k = 0; k < 8 && settleAt(Math.exp(lo)).sx < Math.exp(lo); k++) lo -= 2;
+    for (let k = 0; k < 8 && settleAt(Math.exp(hi)).sx > Math.exp(hi); k++) hi += 2;
+    for (let k = 0; k < 40 && hi - lo > 1e-7; k++) {
+      const m = (lo + hi) / 2;
+      if (settleAt(Math.exp(m)).sx > Math.exp(m)) lo = m;
+      else hi = m;
+    }
+    cam = settleAt(Math.exp(lo));
   }
-  cam = settleAt(Math.exp(lo));
   // The fold left exactly at the frame's zoom and anchor, for the camera taking it.
-  f.setScale(cam.sx, c.w);
-  f.setAnchor(cam.cx, cy, cam.sx, c.w);
+  f.setScale(cam.sx, w);
+  f.setAnchor(cam.cx, cy, cam.sx, w);
   return cam;
 }

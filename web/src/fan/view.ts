@@ -16,7 +16,7 @@ import { COLUMN_DIM, columnSpans, EVENT_TINT, eventAt, eventSpans, type EventSpa
 import { drawTwigs, kLogAt, laneDim, LINEAGE, LIVING, TEX_HAIR_PX, TWIG_GRAY, TwigModel, type IndInfo, type TwigStats } from './twigs';
 import type { MeshBatch, RectBatch } from './meshgl';
 import { familyLabel, FELIDAE_TREE, type Split } from './splits';
-import { bandDepth, Brackets, cladeCamera, ROW_H } from './brackets';
+import { bandDepth, Brackets, cladeCamera, foldedFrame, ROW_H } from './brackets';
 import { axisInset, drawWorldOver, drawWorldUnder, worldFlags, type Box } from './world';
 
 export type { IndInfo } from './twigs';
@@ -1017,13 +1017,11 @@ export class FanView implements InputHandlers {
     const sx = Math.min(Math.max(h.sx, (0.5 * this.w) / Math.max(1e-300, b.width)), Math.max(h.sx, this.camera.sxCap(b.cx, b.tipY)));
     // Within the time limit (MIN_YEARS on screen) about the tip, where it will sit.
     const s = this.camera.timeCap(b.tipY, tipPx, sy, h.sy);
-    // Folded (fold.ts): its column where the fold has it at that zoom (the fold stays there for the camera taking it).
+    // Folded (fold.ts): its column where the fold has it at that zoom, the rows anchored on it (brackets.ts
+    // foldedFrame, ToLaD#211: the fold stays there for the camera taking it, so it lands centred).
     const f = this.fan.tess.fold;
-    if (f) {
-      f.setScale(sx, this.w);
-      if (f.left(b.index, b.tipY) !== null) return { cx: leftAt(b, b.tipY) + laneAt(b, b.tipY).w / 2, cy: cyAt(s), sx, sy: s, ty: s };
-    }
-    return { cx: b.cx, cy: cyAt(s), sx, sy: s, ty: s };
+    const cx = () => (f && f.left(b.index, b.tipY) !== null ? leftAt(b, b.tipY) + laneAt(b, b.tipY).w / 2 : b.cx);
+    return foldedFrame(this.fan, this.w, () => ({ cx: cx(), cy: cyAt(s), sx, sy: s, ty: s }));
   }
 
   /** A search pick: fly to the species' column, then open its card at its tip, as a tap there would. */
@@ -1036,6 +1034,11 @@ export class FanView implements InputHandlers {
     this.touch = null;
     this.onSelect(null);
     this.flyTo(this.speciesCamera(b), ms, () => {
+      // Folded: on landing it takes the frame exactly (as a clade's flight, flyToClade).
+      if (this.fan.tess.fold) {
+        this.cam = this.speciesCamera(b);
+        this.camera.settle();
+      }
       const wy = b.tipY;
       this.selected = sp;
       this.selInd = null;
@@ -1142,6 +1145,9 @@ export class FanView implements InputHandlers {
     }
     const wxT = wx;
     cx = wxT - (x - this.w / 2) / sx;
+    // (What lands where: world x `at` at screen x `atPx`, the finger's point under the finger unless it centres.)
+    let at = wxT;
+    let atPx = x;
     if (b) {
       if (framing) {
         const [l, w] = this.spanAt(b, wy);
@@ -1153,8 +1159,27 @@ export class FanView implements InputHandlers {
       const L = m.lanes(wy);
       const slotPx = m.pitch(wy) * sx;
       if (wxT < L.left + L.gw && slotPx > 12) cx = m.nearestLiving(wxT, wy, Math.ceil(this.w / slotPx)) ?? cx;
+      if (cx !== wxT - (x - this.w / 2) / sx) [at, atPx] = [cx, this.w / 2];
     }
-    this.flyTo({ sx, sy, ty: sy, cx, cy: wy - (y - this.h / 2) / sy });
+    const to: Camera = { sx, sy, ty: sy, cx, cy: wy - (y - this.h / 2) / sy };
+    if (!b || !this.fan.tess.fold) {
+      this.flyTo(to);
+      return;
+    }
+    // Folded (fold.ts): the column moves as the zoom opens the fold and its anchor follows the camera, so what
+    // lands is held as its share across the column (or the span framed) at that height, framed where the fold
+    // has it at the landing (brackets.ts foldedFrame, ToLaD#211), and taken exactly on landing.
+    const [l0, w0] = this.spanAt(b, wy);
+    const share = (at - l0) / Math.max(1e-300, w0);
+    const frame = () => {
+      const [l, w] = this.spanAt(b, wy);
+      return { ...to, cx: l + share * w - (atPx - this.w / 2) / sx };
+    };
+    this.flyTo(foldedFrame(this.fan, this.w, frame), 650, () => {
+      this.cam = foldedFrame(this.fan, this.w, frame);
+      this.camera.settle();
+      this.request();
+    });
   }
 
   /** What a tap on strand b at world y frames: its own column above its split, the parent column below ([left, width]). */
