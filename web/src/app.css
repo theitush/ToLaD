@@ -180,6 +180,42 @@
   overflow: hidden;
   pointer-events: none;
 }
+/* ToLaD#196: the range map, across the card under the name; a tap enlarges it like the photo. */
+.card-sp .range {
+  clear: both;
+  margin: 6px 0 8px;
+  line-height: 1.1;
+}
+.card-sp .range img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 30vh;
+  object-fit: contain;
+  border-radius: 8px;
+  cursor: zoom-in;
+}
+.card-sp .range.big img {
+  max-height: 70vh;
+  cursor: zoom-out;
+}
+.card-sp .range a {
+  display: block;
+  margin-top: 3px;
+  font-size: 9px;
+  color: #7f8c85;
+  text-decoration: none;
+  text-align: right;
+}
+.card-sp .range.loading {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
 .card-sp .dim {
   color: #9faba3;
 }

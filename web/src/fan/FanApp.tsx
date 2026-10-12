@@ -375,6 +375,40 @@ export function WikiPic({ w, initial = 'loading' }: { w: WikiRec | null; initial
   );
 }
 
+/**
+ * The species' range map (ToLaD#196, Wikidata P181), hotlinked like the photo: across the card
+ * under the name, nothing until it has loaded and nothing if it fails. A tap enlarges it
+ * (the 960 px thumbnail), another shrinks it back.
+ */
+export function RangeMap({ w, initial = 'loading' }: { w: WikiRec | null; initial?: 'loading' | 'ok' | 'failed' }) {
+  const [state, setState] = useState(initial);
+  const [big, setBig] = useState(false);
+  const [bigFailed, setBigFailed] = useState(false);
+  const src = w?.range;
+  if (!src || state === 'failed') return null;
+  const bigSrc = bigSrcOf(src);
+  const useBig = big && !bigFailed && bigSrc !== src;
+  return (
+    <figure className={`range ${state}${big ? ' big' : ''}`}>
+      <img
+        src={useBig ? bigSrc : src}
+        alt=""
+        loading="lazy"
+        decoding="async"
+        referrerPolicy="no-referrer"
+        onClick={() => setBig((b) => !b)}
+        onLoad={() => setState('ok')}
+        onError={() => (useBig ? setBigFailed(true) : setState('failed'))}
+      />
+      {state === 'ok' && w?.rangeFile && (
+        <a href={w.rangeFile} target="_blank" rel="noopener">
+          Range map · Wikimedia Commons
+        </a>
+      )}
+    </figure>
+  );
+}
+
 /** The same Commons thumbnail at 960 px (a standard Wikimedia step); the small one if the URL isn't a sized thumb. */
 export function bigSrcOf(src: string): string {
   return src.replace(/\/(\d+)px-([^/]+)$/, '/960px-$2');
@@ -412,6 +446,7 @@ export function SpeciesCard({ sp, onClose, open, ageMa, startMa, event }: { sp: 
         )}{' '}
         <i>({sp.sci})</i>
       </div>
+      <RangeMap key={`range-${wiki?.range ?? ''}`} w={wiki} />
       {ev && <EventSection ev={ev} k={event!} />}
       <div className="facts">
         <StatusChip sp={sp} />
