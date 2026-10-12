@@ -25,6 +25,9 @@ species leaf for each class, with thresholds taken from stated rules, not tuned:
            EW species drawn with a wild count, a fossil graft ending at the present (#105)
   name     a living leaf no extant-species list recognises (Upham, PHYLACINE, Greenspoon/IUCN, Red
            List): a stale or infraspecific name drawn as a species with its own count
+  stale    a curated count held flat more than 10 years past its date while the file's notes name a later
+           figure (a %/yr change, a mature-only count, a count) that a [[trend]] or a `basis = "mature"` point
+           would carry to today (#174)
   event    a species-wide [[event]] (a bottleneck tinted on the fan's column) whose column does not fall
            through its window by EVENT_FALL (1.5x, history.event_fall, #149), with why: the window sits in
            PSMC's blind spot, spans a join between sources, is older than the data, or the data do not fall
@@ -45,6 +48,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import re
 import sys
 from pathlib import Path
 
@@ -407,7 +411,46 @@ def check_event(row: dict) -> list[dict]:
     return out
 
 
-CHECKS = (check_join, check_ceiling, check_deep, check_status, check_name, check_units, check_event)
+STALE_YEARS = 10  # a cited count held flat this long past its date ...
+# ... while the file's notes name a later dated figure: a %/yr change, a mature-only count, or a count
+STALE_FIGURE = re.compile(r"%|\bmature\b|\bmillion\b|\d{1,3}(?:,\d{3})+")
+STALE_YEAR = re.compile(r"\b(1[89]\d\d|20\d\d)\b")
+_NOTES: dict[str, str] = {}
+
+
+def _notes(file: str) -> str:
+    if file not in _NOTES:
+        import tomllib
+        f = ROOT / "pipeline" / "history" / file
+        _NOTES[file] = str(tomllib.loads(f.read_text()).get("notes", "")) if f.exists() else ""
+    return _NOTES[file]
+
+
+def check_stale(row: dict, notes: str | None = None) -> list[dict]:
+    """A count held flat more than STALE_YEARS past its date (ToLaD#174) where the file's notes carry a
+    later figure or trend that never reached the curve: a [[trend]] or a `basis = "mature"` point would
+    carry it (pipeline/history/README.md, "Later partial figures and trends")."""
+    from .anchors import NOW_YEAR
+    if not row.get("file") or row["extinct"] or row.get("use") != "counts" or row.get("today_src") != "history":
+        return []
+    cited = [k["year"] for k in row.get("curve", []) if k["src"] == "cited"]
+    if not cited:
+        return []
+    last = max(cited)
+    held = NOW_YEAR - last
+    if held <= STALE_YEARS:
+        return []
+    text = _notes(row["file"]) if notes is None else notes
+    later = [s.strip() for s in re.split(r"(?<=[.;])\s+", text)
+             if STALE_FIGURE.search(s) and any(int(y) > last for y in STALE_YEAR.findall(s))]
+    if not later:
+        return []
+    return [_flag("stale", math.log10(1 + held / STALE_YEARS),
+                  f"today's count is the {last:g} point held {held:g} years, but the notes name a later figure: "
+                  f"\"{later[0][:160]}\"", held_years=held)]
+
+
+CHECKS = (check_join, check_ceiling, check_deep, check_status, check_name, check_units, check_event, check_stale)
 
 
 def load_reviewed(path: Path = REVIEWED) -> dict[tuple[str, str], dict]:

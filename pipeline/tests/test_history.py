@@ -132,7 +132,6 @@ class Schema(unittest.TestCase):
         unresolved = {
             # blind-only [deep] keeps the bulk PSMC's two steps in Dobrynin's window (#149): they fall 1.2x through it
             ("Acinonyx jubatus", "Late-Pleistocene crash"),
-            ("Arctocephalus gazella", "Sealing near-extinction"),  # one point (2008): Ne 150-200 is not a count
             ("Canis rufus", "Fourteen founders"),  # the trend from 1500 already reaches the low; no earlier count
             ("Lynx pardinus", "Ancient lynx decline"), ("Lynx pardinus", "Glacial bottleneck"),  # no [deep]
             ("Panthera tigris", "Ancestral bottleneck"), ("Panthera tigris", "Late Pleistocene bottleneck"),
@@ -1046,6 +1045,53 @@ class TrendNeverRises(unittest.TestCase):
         self.assertIn("to meet the cited 1950 estimate (500,000), then held flat to it", j["note"])
         self.assertIsNone(rep["trend_held"])
         self.assertFalse(rep["trend_1500"])
+
+
+class LaterFigures(unittest.TestCase):
+    """ToLaD#174: a mature-only figure (basis + per) or a cited %/yr trend moves the curve past its last point."""
+
+    def _doc(self, **kw):
+        d = copy.deepcopy(GOOD)
+        d.update(kw)
+        return d
+
+    def test_mature_point_scaled_by_ratio(self):
+        pt = {"year": 2025, "n": 1000, "lo": 900, "hi": 1100, "grade": "C", "kind": "estimate", "basis": "mature",
+              "per": 2.0, "per_cite": "Z 2026 life table", "cite": "IUCN 2026", "url": "https://example.org/d"}
+        r = H.validate(self._doc(point=GOOD["point"] + [pt]))
+        last = r["points"][-1]
+        self.assertEqual((last["n"], last["lo"], last["hi"]), (2000.0, 1800.0, 2200.0))
+        self.assertIn("mature-only figure 1,000", last["note"])
+        self.assertIn("Z 2026 life table", last["note"])
+
+    def test_mature_point_needs_ratio_and_cite(self):
+        pt = {"year": 2025, "n": 1000, "lo": 900, "hi": 1100, "grade": "C", "kind": "estimate", "basis": "mature",
+              "per": 2.0, "cite": "IUCN 2026", "url": "https://example.org/d"}
+        with self.assertRaises(H.HistoryError):
+            H.validate(self._doc(point=GOOD["point"] + [pt]))
+        with self.assertRaises(H.HistoryError):
+            H.validate(self._doc(point=GOOD["point"] + [{**pt, "per_cite": "x", "per": 0.5}]))
+
+    def test_trend_carries_last_point(self):
+        tr = {"from_year": 2021, "to_year": 2025, "pct_per_year": -10.0, "grade": "C", "cite": "T 2025",
+              "url": "https://example.org/t"}
+        r = H.validate(self._doc(trend=[tr]))
+        last = r["points"][-1]
+        self.assertEqual(last["year"], 2025.0)
+        self.assertAlmostEqual(last["n"], 1e4 * 0.9 ** 4)  # from 2021 (after the 2020 point) to 2025
+        self.assertEqual((last["kind"], last["grade"]), ("index-scaled", "C"))
+        # a cited point at to_year wins over the trend
+        pt = {"year": 2025, "n": 5e3, "lo": 5e3, "hi": 5e3, "grade": "B", "kind": "census", "cite": "W",
+              "url": "https://example.org/w"}
+        r = H.validate(self._doc(trend=[tr], point=GOOD["point"] + [pt]))
+        self.assertEqual(r["points"][-1]["n"], 5e3)
+
+    def test_fur_seal_reaches_today(self):
+        r = [x for x in H.load_all() if x["species"] == "Arctocephalus gazella"][0]
+        pts = H.curve_points(r)
+        self.assertEqual(pts[-1]["year"], 2025.0)
+        self.assertAlmostEqual(pts[-1]["n"], 944000 * 1.9357, delta=1)
+        self.assertLess(min(p["n"] for p in pts), 100)  # the sealing low (1911) is in the curve
 
 
 if __name__ == "__main__":
