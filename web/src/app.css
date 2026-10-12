@@ -180,7 +180,7 @@
   overflow: hidden;
   pointer-events: none;
 }
-/* ToLaD#196: the range map, across the card under the name; a tap enlarges it like the photo. */
+/* ToLaD#196: the range map under the name (beside the photo, .media below); a tap enlarges it like the photo. */
 .card-sp .range {
   clear: both;
   margin: 6px 0 8px;
@@ -206,6 +206,41 @@
   color: #7f8c85;
   text-decoration: none;
   text-align: right;
+}
+/* Side by side under the name: the photo's square, the map in the rest of the row (ToLaD#196). */
+.card-sp .media {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0 10px;
+  margin: 4px 0 8px;
+}
+.card-sp .media .pic {
+  float: none;
+  margin: 0;
+}
+.card-sp .media .range {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
+}
+.card-sp .media .range img {
+  height: 120px;
+  max-height: none;
+}
+/* No photo (none, or it failed): the map alone takes the row. */
+.card-sp .media .range:only-child img {
+  height: auto;
+  max-height: 30vh;
+}
+.card-sp .media .big {
+  flex-basis: 100%;
+  order: -1;
+  margin-bottom: 8px;
+}
+.card-sp .media .range.big img {
+  height: auto;
+  max-height: 70vh;
 }
 .card-sp .range.loading {
   position: absolute;

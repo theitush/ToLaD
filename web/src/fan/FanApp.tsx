@@ -376,9 +376,10 @@ export function WikiPic({ w, initial = 'loading' }: { w: WikiRec | null; initial
 }
 
 /**
- * The species' range map (ToLaD#196, Wikidata P181), hotlinked like the photo: across the card
- * under the name, nothing until it has loaded and nothing if it fails. A tap enlarges it
- * (the 960 px thumbnail), another shrinks it back.
+ * The species' range map (ToLaD#196, Wikidata P181), hotlinked like the photo: under the name,
+ * beside the photo (across the card when there is none), nothing until it has loaded and nothing
+ * if it fails. A tap enlarges it across the card (the 960 px thumbnail), another shrinks it back.
+ * Side by side rather than stacked: stacked, the lion's card filled the whole 390×844 screen.
  */
 export function RangeMap({ w, initial = 'loading' }: { w: WikiRec | null; initial?: 'loading' | 'ok' | 'failed' }) {
   const [state, setState] = useState(initial);
@@ -435,7 +436,7 @@ export function SpeciesCard({ sp, onClose, open, ageMa, startMa, event }: { sp: 
       <button type="button" className="x" onClick={onClose} aria-label="Close">
         ×
       </button>
-      <WikiPic key={wiki?.img ?? ''} w={wiki} />
+      {!wiki?.range && <WikiPic key={wiki?.img ?? ''} w={wiki} />}
       <div className="t">
         {wiki?.wp ? (
           <a className="wp" href={wiki.wp} target="_blank" rel="noopener">
@@ -446,7 +447,13 @@ export function SpeciesCard({ sp, onClose, open, ageMa, startMa, event }: { sp: 
         )}{' '}
         <i>({sp.sci})</i>
       </div>
-      <RangeMap key={`range-${wiki?.range ?? ''}`} w={wiki} />
+      {/* With a range map, the photo and the map side by side under the name (ToLaD#196); without, as before. */}
+      {wiki?.range && (
+        <div className="media">
+          <WikiPic key={wiki?.img ?? ''} w={wiki} />
+          <RangeMap key={`range-${wiki?.range ?? ''}`} w={wiki} />
+        </div>
+      )}
       {ev && <EventSection ev={ev} k={event!} />}
       <div className="facts">
         <StatusChip sp={sp} />
