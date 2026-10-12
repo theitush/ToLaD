@@ -72,6 +72,21 @@ export const FORK_MIN = 12;
 export const FORK_SLOPE = 2;
 export const SY_HOME = 0.64;
 
+/**
+ * How sideways a drawn stretch of a column may run (ToLaD#210), px across per px of height on screen: whole up to
+ * LEAN_MAX, fading out to nothing at LEAN_CUT. The splits on screen lean at most FORK_SLOPE (a gap opens over a
+ * height by its width on screen), steeper at their ease's middle; zoomed in far, a far family's gaps close over the
+ * few px of log time a deep fork has, and its columns would run across the screen as near-flat streaks: those
+ * stretches are culled, so an off-screen family leaves steeply or not at all.
+ */
+export const LEAN_MAX = 10;
+export const LEAN_CUT = 20;
+/** A stretch's share drawn (0-1), by its lean on screen (px across per px of height). */
+export function leanFade(dxPx: number, dyPx: number): number {
+  const s = Math.abs(dxPx) / Math.max(Math.abs(dyPx), 1e-9);
+  return s <= LEAN_MAX ? 1 : s >= LEAN_CUT ? 0 : smoother((LEAN_CUT - s) / (LEAN_CUT - LEAN_MAX));
+}
+
 /** A strand's stretches (Fold.roomPlan): their ends from its split up (B[0] its split, then each bend's middle, its last height), and their rooms. */
 export interface RoomPlan {
   B: Float64Array;
