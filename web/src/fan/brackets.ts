@@ -79,6 +79,16 @@ export const TAXON_EN: Record<string, string> = {
   Mydaus: 'Stink badgers',
 };
 
+/** Shorter English for the long names, where a bracket has no room for the whole (else it is a tick). */
+export const TAXON_SHORT: Record<string, string> = {
+  Feliformia: 'Cat-like',
+  Caniformia: 'Dog-like',
+  Hemigalinae: 'Palm civets',
+  Galidiinae: 'Mongooses',
+  Bdeogale: 'Mongooses',
+  Galidictis: 'Mongooses',
+};
+
 export interface Clade {
   v: FanNode;
   latin: string;
@@ -124,14 +134,16 @@ export function bandDepth(fan: Fan): number {
   return most;
 }
 
-/** Row height (px) of the stack, the font, and the least span (px) a bracket is drawn at. */
+/** Row height (px) of the stack, the font; a row of ticks alone (no name in it on screen) takes TICK_ROW_H, an empty one none. */
 export const ROW_H = 14;
+export const TICK_ROW_H = 6;
+/** The least span (px) a bracket is drawn at. */
 export const TICK_MIN = 3;
 /** Room (px) kept clear each side of a label inside its bracket, and the gap between neighbouring brackets in a row. */
 const LABEL_PAD = 5;
 const GAP = 2;
 
-export type Form = 'full' | 'name' | 'tick';
+export type Form = 'full' | 'name' | 'short' | 'tick';
 
 export interface Placed {
   /** Index of the clade (clades()). */
@@ -148,16 +160,16 @@ export interface Placed {
 
 /**
  * Lay the stack out (pure; brackets.test.ts): `a`/`b` the clades' screen spans, `parent` each one's enclosing clade
- * (parents before daughters), `widths(i)` its labels' widths [full, name]. A clade is shown when its span is at least
+ * (parents before daughters), `widths(i)` its labels' widths [full, name, short]. A clade is shown when its span is at least
  * TICK_MIN px; its row is one above the highest row shown inside it (`rows`, when given, fixes them instead: the
  * zoom bucket's), so a bracket always stands above the brackets nested in it. Its label goes in the part of the span
- * on screen between `x0` and `x1`, centred there, the full one if it fits, else the name alone, else a tick.
+ * on screen between `x0` and `x1`, centred there, the full one if it fits, else the name alone, else a short name, else a tick.
  */
 export function layoutBrackets(
   a: ArrayLike<number>,
   b: ArrayLike<number>,
   parent: ArrayLike<number>,
-  widths: (i: number) => [number, number],
+  widths: (i: number) => [number, number, number],
   x0: number,
   x1: number,
   rows?: Int16Array,
@@ -173,9 +185,9 @@ export function layoutBrackets(
     const va = Math.max(pa, x0);
     const vb = Math.min(pb, x1);
     const room = vb - va - 2 * LABEL_PAD;
-    const [wf, wn] = widths(i);
-    const form: Form = wf <= room ? 'full' : wn <= room ? 'name' : 'tick';
-    const lw = form === 'full' ? wf : form === 'name' ? wn : 0;
+    const [wf, wn, ws] = widths(i);
+    const form: Form = wf <= room ? 'full' : wn <= room ? 'name' : ws > 0 && ws <= room ? 'short' : 'tick';
+    const lw = form === 'full' ? wf : form === 'name' ? wn : form === 'short' ? ws : 0;
     out.push({ i, a: pa, b: pb, row: row[i], form, lx: (va + vb) / 2, lw });
   }
   return out;
@@ -211,7 +223,10 @@ export class Brackets {
     readonly nameFont: string,
     readonly latinFont: string,
   ) {}
-  private widthCache = new Map<string, [number, number]>();
+  private widthCache = new Map<string, [number, number, number]>();
+  /** Per row (this frame): the height of the band under it (px above the line's base) and its own height. */
+  private rowBase = new Float32Array(1);
+  private rowH = new Float32Array(1);
   private rowKey = '';
   private rows: Int16Array | null = null;
   placed: Placed[] = [];
@@ -291,9 +306,19 @@ export class Brackets {
     this.x0 = axisX;
     this.w = c.w;
     this.placed = fit > 0 ? layoutBrackets(a, b, parent, (i) => this.widths(i, measure), axisX, c.w, this.rows) : [];
+    // Each row as tall as what it shows here: a name ROW_H, ticks alone TICK_ROW_H, nothing none.
+    let rows = 0;
+    for (const p of this.placed) rows = Math.max(rows, p.row + 1);
+    if (this.rowH.length < rows + 1) {
+      this.rowH = new Float32Array(rows + 1);
+      this.rowBase = new Float32Array(rows + 1);
+    }
+    this.rowH.fill(0);
+    for (const p of this.placed) this.rowH[p.row] = Math.max(this.rowH[p.row], p.form === 'tick' ? TICK_ROW_H : ROW_H);
+    for (let r = 1; r <= rows; r++) this.rowBase[r] = this.rowBase[r - 1] + this.rowH[r - 1];
     const sky = (this.sky = new Float32Array(Math.ceil(c.w) + 1));
     for (const p of this.placed) {
-      const h = (p.row + 1) * ROW_H;
+      const h = this.rowTop(p.row);
       for (let x = Math.max(0, Math.floor(p.a)); x <= Math.min(sky.length - 1, Math.ceil(p.b)); x++) sky[x] = Math.max(sky[x], h);
     }
     return this.placed;
@@ -311,20 +336,27 @@ export class Brackets {
     return h * this.fit;
   }
 
-  private widths(i: number, measure: (font: string, text: string) => number): [number, number] {
+  private widths(i: number, measure: (font: string, text: string) => number): [number, number, number] {
     const q = this.list[i];
     let w = this.widthCache.get(q.latin);
     if (!w) {
       const name = measure(this.nameFont, q.en ?? q.latin);
-      w = [q.en ? name + 4 + measure(this.latinFont, q.latin) : name, name];
+      const short = TAXON_SHORT[q.latin];
+      w = [q.en ? name + 4 + measure(this.latinFont, q.latin) : name, name, short ? measure(this.nameFont, short) : 0];
       this.widthCache.set(q.latin, w);
     }
     return w;
   }
 
-  /** Row r's line (screen y). */
+  /** Row r's line (screen y): a name's row has its line through the name's middle, a row of ticks at its foot. */
   rowY(r: number): number {
-    return this.nowS - 6 - r * ROW_H;
+    const h = this.rowH[r] ?? ROW_H;
+    return this.nowS - 1 - (this.rowBase[r] ?? r * ROW_H) - (h >= ROW_H ? ROW_H / 2 - 2 : 1);
+  }
+
+  /** The band's height (px above "now") to the top of row r. */
+  rowTop(r: number): number {
+    return 1 + (this.rowBase[r] ?? r * ROW_H) + (this.rowH[r] ?? ROW_H);
   }
 
   draw(ctx: CanvasRenderingContext2D, ink: string, ink2: string): void {
@@ -343,8 +375,10 @@ export class Brackets {
       const a = Math.round(Math.max(p.a, this.x0)) + 0.5;
       const b = Math.round(Math.min(p.b, this.w)) - 0.5;
       ctx.strokeStyle = p.form === 'tick' ? 'rgba(185,230,201,0.45)' : 'rgba(185,230,201,0.75)';
+      // (End ticks down to the row under it: shorter in a row of ticks.)
+      const dy = (this.rowH[p.row] ?? ROW_H) >= ROW_H ? 4 : 3;
       ctx.beginPath();
-      ctx.moveTo(a, ta ? y + 4 : y);
+      ctx.moveTo(a, ta ? y + dy : y);
       ctx.lineTo(a, y);
       if (p.form === 'tick') ctx.lineTo(b, y);
       else {
@@ -353,13 +387,14 @@ export class Brackets {
         ctx.moveTo(Math.min(b, p.lx + p.lw / 2 + 4), y);
         ctx.lineTo(b, y);
       }
-      if (tb) ctx.lineTo(b, y + 4);
+      if (tb) ctx.lineTo(b, y + dy);
       ctx.stroke();
       if (p.form === 'tick') continue;
       let x = p.lx - p.lw / 2;
-      ctx.font = q.en ? this.nameFont : this.latinFont;
-      ctx.fillStyle = q.en ? ink : ink2;
-      const name = q.en ?? q.latin;
+      const short = p.form === 'short';
+      ctx.font = q.en || short ? this.nameFont : this.latinFont;
+      ctx.fillStyle = q.en || short ? ink : ink2;
+      const name = short ? TAXON_SHORT[q.latin] : (q.en ?? q.latin);
       ctx.fillText(name, x, y);
       if (p.form === 'full' && q.en) {
         x += ctx.measureText(name).width + 4;
@@ -376,6 +411,7 @@ export class Brackets {
     let best: Placed | null = null;
     let bestD = 3;
     for (const p of this.placed) {
+      // (Its row's height, at least a name's: a row of ticks is thin to tap.)
       const ry = this.rowY(p.row);
       if (y < ry - ROW_H / 2 || y > ry + ROW_H / 2) continue;
       const d = Math.max(p.a - x, x - p.b, 0);

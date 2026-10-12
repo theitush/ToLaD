@@ -292,6 +292,17 @@ export function families(fan: Fan): { v: FanNode; vi: number; text: string }[] {
   return out;
 }
 
+/**
+ * A species' short name, for a pill with no room for the whole above the brackets (ToLaD#193): its last word, the
+ * kind of animal it is ("Least weasel": "Weasel"), as its picture under the pill shows which one.
+ */
+export function shortName(common: string): string {
+  const w = common.trim().split(/\s+/);
+  if (w.length < 2) return common;
+  const last = w[w.length - 1];
+  return last[0].toUpperCase() + last.slice(1);
+}
+
 /** A family's label stands on "now" over its species (its bracket under it) while its span on screen is under this many screens. */
 const FAMILY_MAX_SCREENS = 1.6;
 
@@ -429,10 +440,10 @@ export function labelSpots(c: Screen, fan: Fan, top: number, measure: (text: str
     const onX = clamp01((Math.min(sb, c.w) - Math.max(sa, LABEL_AXIS_X) + 12) / LABEL_PILL);
     const fit0 = nowOn * onX * clamp01((FAMILY_MAX_SCREENS * c.w - (sb - sa)) / (0.4 * c.w));
     if (!(fit0 > 0)) continue;
-    // Over the brackets (ToLaD#193), or hanging from the line where there is no room above them.
+    // Over the brackets (ToLaD#193); where there is no room above them, none (hanging from the line it crowded the columns).
     const famLift = brk ? brk.band(Math.max(sa, LABEL_AXIS_X), Math.min(sb, c.w)) : 0;
-    const y1 = famLift > 0 && nowS - 4 - famLift < top + len ? nowS + 4 + len : Math.max(nowS - 4 - famLift, top + len);
-    const fit = fit0 * botFit(y1);
+    const y1 = Math.max(nowS - 4 - famLift, top + len);
+    const fit = famLift > 0 && nowS - 4 - famLift < top + len ? 0 : fit0 * botFit(y1);
     const xs = lo <= hi - LABEL_PILL ? [lo, (lo + hi) / 2, hi] : [Math.min(Math.max((sa + sb) / 2, LABEL_AXIS_X + half), c.w - half)];
     xs.forEach((x, k) => {
       out.push({ key: `n${vi}:fam${k}`, id: `n${vi}`, place: 'fam', v, text, rank: [-1, wb - wa, vi], x, y1, box: [x - half, y1 - len, x + half, y1], fit, span: brk ? undefined : [sa, sb] });
@@ -456,16 +467,27 @@ export function labelSpots(c: Screen, fan: Fan, top: number, measure: (text: str
     const x = lo <= hi ? Math.min(Math.max(cx, lo), hi) : Math.min(Math.max(cx, hi), lo);
     const ceil = barX0 === undefined ? top : LABEL_CEIL + (top - LABEL_CEIL) * clamp01((x + half - (barX0 - 68)) / 60);
     const ty = Y(b.tipY);
-    // On "now", over the brackets there (ToLaD#193); one with no room for that under the buttons hangs from the line instead.
+    // On "now", over the brackets there (ToLaD#193); with no room for its name under the buttons, its short name
+    // (the picture under it says the rest); with no room for that either, none: a pill hanging from the line over the
+    // columns, its picture under it, crowds them (fewer, bigger pictures read better).
     let lift = brk && b.tipY <= nowY + 1e-9 ? brk.band(x - half, x + half) : 0;
-    if (lift > 0 && ty - 4 - lift < ceil + len) lift = -(len + 8);
-    const y1 = lift < 0 ? ty - lift - 4 : Math.max(ty - 4 - lift, ceil + len);
+    let tText = text;
+    let tLen = len;
+    if (lift > 0 && ty - 4 - lift < ceil + len) {
+      const short = shortName(text);
+      const sl = short === text ? Infinity : measure(short) + 2 * LABEL_PAD;
+      if (ty - 4 - lift >= ceil + sl) {
+        tText = short;
+        tLen = sl;
+      } else lift = -1;
+    }
+    const y1 = Math.max(ty - 4 - lift, ceil + tLen);
     // The tip on screen (below the top line) and its column right of the axis and left of the screen's edge.
     const tipOn = clamp01((ty - top) / 24) * clamp01((left + room - LABEL_AXIS_X + 12) / LABEL_PILL) * clamp01((c.w + 12 - left) / LABEL_PILL);
     // Above the tip, clear of the other columns (an extinct tip has its neighbours around it; above "now" there are none).
-    const f = tipOn * botFit(y1);
-    const tipFit = f > 0 && b.tipY > nowY ? f * clearFit(clearance(x - half, x + half, y1 - len, Math.min(y1, ty - 2), b)) : f;
-    out.push({ key: `${id}:tip`, id, place: 'tip', b, text, rank, x, y1, box: [x - half, y1 - len, x + half, y1], fit: tipFit, lift: Math.max(0, lift) });
+    const f = lift < 0 ? 0 : tipOn * botFit(y1);
+    const tipFit = f > 0 && b.tipY > nowY ? f * clearFit(clearance(x - half, x + half, y1 - tLen, Math.min(y1, ty - 2), b)) : f;
+    out.push({ key: `${id}:tip`, id, place: 'tip', b, text: tText, rank, x, y1, box: [x - half, y1 - tLen, x + half, y1], fit: tipFit, lift: Math.max(0, lift) });
     // Beside its branch: once the tip is off screen.
     out.push(...beside(id, text, rank, len, b, ty, Y(b.splitY), 1 - clamp01((ty - top) / 24), { b }));
   }

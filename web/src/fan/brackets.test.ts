@@ -1,7 +1,7 @@
 // The clades' brackets above "now" (ToLaD#193): nested right, never overlapping at any zoom, labelled only where the
 // label fits; a tap's flight frames the clade centred, "now" at the top and its stem's start just below.
 import { describe, expect, it } from 'vitest';
-import { bracketRows, Brackets, cladeCamera, clades, latinOf, layoutBrackets, rankOf, ROW_H, type Placed } from './brackets';
+import { bracketRows, Brackets, cladeCamera, clades, latinOf, layoutBrackets, rankOf, ROW_H, TICK_ROW_H, type Placed } from './brackets';
 import { FanCamera } from './camera';
 import { Fold } from './fold';
 import { layoutFan, type Fan, type FanBranch, type WidthMode } from './layout';
@@ -125,7 +125,15 @@ describe('the stack', () => {
             } else expect(p.lw).toBe(0);
           }
           // The band a pill stands on covers each bracket's row.
-          for (const p of placed) if (p.b > 1 && p.a < W - 1) expect(br.band(Math.max(0, p.a + 1), Math.min(W, p.b - 1))).toBeGreaterThanOrEqual((p.row + 1) * ROW_H);
+          for (const p of placed) if (p.b > 1 && p.a < W - 1) expect(br.band(Math.max(0, p.a + 1), Math.min(W, p.b - 1))).toBeGreaterThanOrEqual(br.rowTop(p.row));
+          // Rows only as tall as what they show: a name's ROW_H, ticks alone TICK_ROW_H, an empty one nothing.
+          const rows = Math.max(0, ...placed.map((p) => p.row + 1));
+          let want = 1;
+          for (let r = 0; r < rows; r++) {
+            const inRow = placed.filter((p) => p.row === r);
+            want += !inRow.length ? 0 : inRow.some((p) => p.form !== 'tick') ? ROW_H : TICK_ROW_H;
+            expect(br.rowTop(r)).toBeCloseTo(want, 5);
+          }
         }
       expect(labelled).toBeGreaterThan(5);
     });
@@ -147,10 +155,12 @@ describe('the stack', () => {
     expect(br.hit(150, br.rowY(1))?.v).toBe(br.list[0].v);
   });
 
-  it('labels follow the room: the full name, then the name alone, then a tick', () => {
-    const w = (): [number, number] => [80, 40];
-    const [full, name, tick] = layoutBrackets([100, 200, 300], [200, 260, 320], [-1, -1, -1], w, 0, W);
-    expect([full.form, name.form, tick.form]).toEqual(['full', 'name', 'tick']);
+  it('labels follow the room: the full name, then the name alone, then a short name, then a tick', () => {
+    const w = (): [number, number, number] => [80, 40, 20];
+    const [full, name, short, tick] = layoutBrackets([100, 200, 300, 340], [200, 260, 332, 360], [-1, -1, -1, -1], w, 0, W);
+    expect([full.form, name.form, short.form, tick.form]).toEqual(['full', 'name', 'short', 'tick']);
+    // (No short name: a tick.)
+    expect(layoutBrackets([300], [332], [-1], () => [80, 40, 0], 0, W)[0].form).toBe('tick');
   });
 });
 
