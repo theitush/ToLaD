@@ -150,6 +150,8 @@ const scenes = [
   ['brk-bigcats', 'tapclade', ['Pantherinae']],
   ['brk-tap-felidae', 'tapclade', ['Felidae']],
   ['brk-tap-panthera', 'tapclade', ['Panthera']],
+  // A pill's "+x" (ToLaD#197) tapped from home, the biggest: the species it stands for framed, their pills showing.
+  ['plus-tap', 'tapplus'],
 ];
 const browser = await chromium.launch({ headless: true });
 try {
@@ -272,6 +274,13 @@ try {
           const at = f.bracketAt(args[0]);
           if (at) f.tap(at[0], at[1]);
           else f.flyToClade(fan.nodes.find((n) => n.split.taxon === args[0]));
+        } else if (kind === 'tapplus') {
+          f.cam = f.homeCamera();
+          f.camera.settle();
+          f.draw();
+          f.draw();
+          const hit = [...f.plusHits].sort((p, q) => q.bs.length - p.bs.length)[0];
+          if (hit) f.tap((hit.box[0] + hit.box[2]) / 2, (hit.box[1] + hit.box[3]) / 2);
         } else if (kind === 'level') {
           // A level (ToLaD#146): the split founding taxon args[0] framed as home frames the fan; with args[1] (Ma),
           // centred on that time, time zoomed args[2] and width args[3] × the frame.
