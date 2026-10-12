@@ -4,7 +4,7 @@
 // which keeps the text, the history marks and the parent threads.
 
 import { HASH_GLSL } from '../../../packages/procgen/src/glsl.ts';
-import { LAT_DEPTH, LINK_LEVELS, LINK_P, MESH_F, MESH_U, NAR_FLOOR, TEX_FLOOR, type Palette } from './mesh';
+import { END_GAP_PX, LAT_DEPTH, LINK_LEVELS, LINK_P, MESH_F, MESH_U, NAR_FLOOR, TEX_FLOOR, type Palette } from './mesh';
 
 const RECT_VS = /* glsl */ `#version 300 es
 layout(location = 0) in vec2 corner;
@@ -128,6 +128,7 @@ out vec4 o;
 const float LN2 = 0.6931471805599453;
 const float TEX_FLOOR = ${TEX_FLOOR.toFixed(4)};
 const float NAR_FLOOR = ${NAR_FLOOR.toFixed(4)};
+const float END_GAP_PX = ${END_GAP_PX.toFixed(4)};
 const uint LAT_DEPTH = ${LAT_DEPTH}u;
 const int LINK_LEVELS = ${LINK_LEVELS};
 const uint LINK_P24 = ${Math.round(LINK_P * 16777216)}u;
@@ -340,6 +341,8 @@ void main() {
   // Screen px across the column per unit of the frame's x (mesh.ts perpScale): the texture is
   // measured across a leaning column, not along the row.
   float ks = 1.0;
+  // The texture: px the green edge moves across the lines per px up (mesh.ts greenUp).
+  float gUp = 0.0;
   {
     float dy = p.y - vRect.y;
     float k = max(1e-6, 1.0 + vWarp.w * dy);
@@ -350,7 +353,10 @@ void main() {
     gColL = c0 + (vNar.x + vWarp.x * dy - xc) / k;
     gColR = c0 + (vNar.y + vWarp.y * dy - xc) / k;
     gXG = c0 + (vLife.w + vWarp.z * dy - xc) / k;
-    if (vMisc.y < 0.5) ks = k / sqrt(1.0 + sl * sl);
+    if (vMisc.y < 0.5) {
+      ks = k / sqrt(1.0 + sl * sl);
+      gUp = -(vWarp.z - sl) / k;
+    }
     float pad = vMisc.y < 0.5 ? 1.0 + 1.5 / ks : max(vMisc.w, max(vSlot.z, 1.0) * 0.5 + 5.0) + 1.0;
     if (vWarp != vec4(0.0) && (p.x < gColL - pad || p.x > gColR + pad)) discard;
   }
@@ -399,7 +405,9 @@ void main() {
     vec4 g = wg > 0.0 ? shadeLane(0.0, iA, iB, dp, p, TEX_FLOOR, vSlot.z, false) : vec4(0.0);
     vec4 r = wg < 1.0 ? shadeLane(vMisc.z, iA, iB, dp, p, TEX_FLOOR, vSlot.z, false) : vec4(0.0);
     float ag = g.a * wg;
-    float ar = r.a * (1.0 - wg);
+    // (A gray line ends END_GAP_PX short of the green lane widening over it: mesh.ts endCut.)
+    float cut = gUp > 1e-6 ? clamp((lineX - xG) / gUp - END_GAP_PX + 0.5, 0.0, 1.0) : 1.0;
+    float ar = r.a * cut * (1.0 - wg);
     float a = ag + ar;
     if (!(a > 0.0)) continue;
     vec3 col = (g.rgb * ag + r.rgb * ar) / a;

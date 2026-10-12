@@ -584,6 +584,8 @@ export function shadeMesh(m0: MeshInst, px0: number, py: number, kLog: number, n
   // Nothing to draw this far from a line (only the living glow, and they are only in the green lane).
   const reach = m.mode === 0 ? (Math.max(m.lw, 1) * 0.5 + 0.5) / ks : Math.max(m.tipR, Math.max(m.lw, 1) * 0.5 + (m.xG > m.x0 ? 5 : 0)) + 0.5;
   const bf = Math.floor((px - m.xB0) / m.bw);
+  // The texture: px the green edge moves across the (fixed) lines per px up, where it widens over the gray lane.
+  const gUp = m.mode === 0 ? greenUp(m0, py) : 0;
   let best: RGBA = [0, 0, 0, 0];
   // The lines of this block and its neighbours (each block's line is anywhere in it).
   for (let c = -1; c <= 1; c++) {
@@ -605,6 +607,7 @@ export function shadeMesh(m0: MeshInst, px0: number, py: number, kLog: number, n
     const wg = clamp01((m.xG - lineX) / pp + 0.5);
     const g = wg > 0 ? shadeLane(m, Lane.Green, iA, iB, dp, py, kLog, nowPx, pal, deadGap) : ([0, 0, 0, 0] as RGBA);
     const r = wg < 1 ? shadeLane(m, m.lane, iA, iB, dp, py, kLog, nowPx, pal, deadGap) : ([0, 0, 0, 0] as RGBA);
+    r[3] *= endCut(lineX, m.xG, gUp);
     const col = blend(g, r, wg);
     col[3] *= m.alpha * fine;
     if (col[3] > best[3]) best = col;
@@ -631,6 +634,21 @@ export function shadeMesh(m0: MeshInst, px0: number, py: number, kLog: number, n
     }
   }
   return best;
+}
+
+/** Rows (px) a gray line ends short of the green lane widening over it (#192: a lineage that ends just stops; the green one goes on above). */
+export const END_GAP_PX = 3;
+
+/** px per px up that the green edge moves right across the instance's lines (its lean against the lattice's, in the frame; ≤ 0: none). */
+export function greenUp(m: MeshInst, py: number): number {
+  const k = Math.max(1e-6, 1 + (m.sP ?? 0) * (py - m.y0));
+  return -((m.sG ?? 0) - 0.5 * ((m.sL ?? 0) + (m.sR ?? 0))) / k;
+}
+
+/** A gray line at lineX, the green edge at xG moving gUp px right per px up: its opacity, 0 within END_GAP_PX below where the edge crosses it. */
+export function endCut(lineX: number, xG: number, gUp: number): number {
+  if (!(gUp > 1e-6)) return 1;
+  return clamp01((lineX - xG) / gUp - END_GAP_PX + 0.5);
 }
 
 /**

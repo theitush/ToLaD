@@ -1,7 +1,7 @@
 // The individuals mesh (mesh.ts): one function for both lanes, and the GPU's
 // decisions (the shader's integer hash, mirrored by lifeGPU) agree with procgen.
 import { describe, expect, it } from 'vitest';
-import { MESH_F, MESH_U, colourCode, Lane, latticeLines, latticeRep, latticeTop, lifeGPU, LINK_LEVELS, LINK_P, linkAt, linkPair, linkWeight, packInst, shadeLinks, shadeMesh, timeRank, timeRep, unpackInst, type MeshInst } from './mesh';
+import { MESH_F, MESH_U, colourCode, endCut, greenUp, Lane, latticeWalk, latticeLines, latticeRep, latticeTop, lifeGPU, LINK_LEVELS, LINK_P, linkAt, linkPair, linkWeight, packInst, shadeLinks, shadeMesh, timeRank, timeRep, unpackInst, type MeshInst } from './mesh';
 import { layoutFan } from './layout';
 import { FanCamera } from './camera';
 import { MeshBatch } from './meshgl';
@@ -413,5 +413,66 @@ describe('the cross-links: the lines interbreed, nested like the lines', () => {
     const { MESH_FS } = await import('./meshgl');
     for (const f of ['(B * 0x27d4eb2du) ^ vIdx2.x ^ ((l + 1u) * 0x165667b1u)', '(uint(a) * 0x7feb352du) ^ P ^ (uint(c + 1) * 0x846ca68bu)', 'P ^ (uint(g) * 0x9e3779b9u) ^ 0x68e31da4u'])
       expect(MESH_FS).toContain(f);
+  });
+});
+
+describe('the lines run straight (#192): they only branch and end, never slide', () => {
+  it('over a stretch with no split, every drawn line keeps its x while the population grows ×1000', () => {
+    // The domestic cat's boom, the camera on its last ~5,000 years: its column widens ~1000-fold.
+    const { c, mm, insts } = scene('Domestic cat', 300, 1e8, 2);
+    const b = mm.b;
+    // (Its centre stays put above its peel off its parent: the lattice rides the centre.)
+    const lo = c.toScreen(0, Math.max(b.tipY, c.toWorld(0, 0)[1]))[1];
+    const hi = c.toScreen(0, b.leanY)[1];
+    const xs = new Map<string, number[]>();
+    let rows = 0;
+    for (const x of insts) {
+      if (x.mode !== 0 || x.y0 < lo || x.y1 > hi) continue;
+      // The screen x of each of the instance's lines at its top and bottom rows (mesh.ts meshFrame, inverted).
+      const c0 = ((x.colL ?? 0) + (x.colR ?? 0)) / 2;
+      for (const py of [x.y0, x.y1]) {
+        const dy = py - x.y0;
+        const k = 1 + (x.sP ?? 0) * dy;
+        const xc = c0 + 0.5 * ((x.sL ?? 0) + (x.sR ?? 0)) * dy;
+        const colL = (x.colL ?? 0) + (x.sL ?? 0) * dy;
+        const colR = (x.colR ?? 0) + (x.sR ?? 0) * dy;
+        rows++;
+        for (let bb = 0; bb < 4000; bb++) {
+          const B = x.B0 + bb;
+          const { off, D } = latticeWalk(x.latSeed, x.lvl, B);
+          const X = x.xB0 + bb * x.bw + ((off + 0.5) * x.bw) / 2 ** D;
+          const px = xc + (X - c0) * k;
+          if (px > colR || px > c.w) break;
+          if (px < Math.max(colL, 0)) continue;
+          const key = `${x.lvl}:${B}`;
+          (xs.get(key) ?? xs.set(key, []).get(key)!).push(px);
+        }
+      }
+    }
+    expect(rows).toBeGreaterThan(20);
+    let lines = 0;
+    let longest = 0;
+    for (const v of xs.values()) {
+      if (v.length < 2) continue;
+      lines++;
+      longest = Math.max(longest, v.length);
+      expect(Math.max(...v) - Math.min(...v)).toBeLessThan(0.01);
+    }
+    expect(lines).toBeGreaterThan(50);
+    // (Some lines run the whole stretch; more come in at the edges as it widens.)
+    expect(longest).toBeGreaterThan(rows / 2);
+    // The model's strands alike: a slot keeps its world x at every height there.
+    const ys = [0.1, 0.4, 0.7, 0.95].map((u) => c.toWorld(0, lo + u * (hi - lo))[1]);
+    const [k0, , k1] = mm.slotRange(ys[0]);
+    for (const K of [k0, (k0 + k1) >> 1, k1 - 1]) for (const y of ys) expect(mm.slotX(K, y)).toBeCloseTo(mm.slotX(K, ys[0]), 9);
+  });
+
+  it('a gray line ends short of the green lane widening over it, never turns green', () => {
+    // The green edge moving 0.5 px right per px up: a gray line 1 px right of it ends (its last END_GAP_PX px).
+    expect(endCut(1, 0, 0.5)).toBe(0);
+    expect(endCut(10, 0, 0.5)).toBe(1);
+    expect(endCut(10, 0, 0)).toBe(1);
+    expect(endCut(1, 0, -0.5)).toBe(1);
+    expect(greenUp({ y0: 0, sL: -1, sR: 1, sG: -0.5, sP: 0 } as MeshInst, 10)).toBeCloseTo(0.5, 12);
   });
 });
