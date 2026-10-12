@@ -4,7 +4,6 @@
 // which keeps the text, the history marks and the parent threads.
 
 import { HASH_GLSL } from '../../../packages/procgen/src/glsl.ts';
-import { BridgeLayer } from './bridgegl';
 import { LAT_DEPTH, LINK_LEVELS, LINK_P, MESH_F, MESH_U, NAR_FLOOR, TEX_FLOOR, type Palette } from './mesh';
 
 const RECT_VS = /* glsl */ `#version 300 es
@@ -516,8 +515,6 @@ export class FanGL {
   readonly under = new RectBatch();
   readonly mesh = new MeshBatch();
   readonly over = new RectBatch();
-  /** Over the mesh: the cross-links between sister strands (bridge.ts, ToLaD#50). */
-  readonly bridge: BridgeLayer;
 
   constructor(readonly canvas: HTMLCanvasElement) {
     const gl = canvas.getContext('webgl2', { antialias: false, premultipliedAlpha: true, alpha: true, preserveDrawingBuffer: false });
@@ -525,7 +522,6 @@ export class FanGL {
     this.gl = gl;
     this.rectProg = compile(gl, RECT_VS, RECT_FS);
     this.meshProg = compile(gl, MESH_VS, MESH_FS);
-    this.bridge = new BridgeLayer(gl);
     for (const [prog, names] of [
       [this.rectProg, ['uView']],
       [this.meshProg, ['uView', 'uKLog', 'uNowPx', 'uPal']],
@@ -577,7 +573,6 @@ export class FanGL {
     this.under.n = 0;
     this.mesh.n = 0;
     this.over.n = 0;
-    this.bridge.n = 0;
   }
 
   private rects(b: RectBatch, w: number, h: number): void {
@@ -621,7 +616,6 @@ export class FanGL {
       gl.bufferData(gl.ARRAY_BUFFER, this.mesh.u.subarray(0, this.mesh.n * MESH_U), gl.STREAM_DRAW);
       gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, this.mesh.n);
     }
-    this.bridge.draw(w, h, kLog, pal);
     this.rects(this.over, w, h);
     gl.bindVertexArray(null);
   }

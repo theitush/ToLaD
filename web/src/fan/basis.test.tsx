@@ -1,14 +1,14 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { columnSpans, COLUMN_TINT, ROUGH_DEFAULT, ROUGH_LOOKS } from './colstyle';
 import { SpeciesCard } from './FanApp';
 import { basisRows, GENOME_NOTE } from './HistorySpark';
-import { basisSpans, joinFlagged, noDataSpans, type Basis } from './history';
+import { basisSpans, joinFlagged, type Basis } from './history';
 import { layoutFan } from './layout';
 import { FELIDAE } from './panthera';
 
-// ToLaD#164 (with #119): stretches resting on the genome, a model or a flagged join are drawn rough;
-// counted ones solid; held (no-data) ones keep #55's fade.
+// ToLaD#164 (with #119): what each stretch of a species' curve rests on (count, genome, model, a
+// flagged join, held), said in the card's text. The rough look on the fan and the sparkline was
+// dropped (#171); held (no-data) stretches keep #55's fade.
 
 const fan = layoutFan(FELIDAE, 'log');
 const byName = (common: string) => fan.branches.find((b) => b.sp.common === common)!;
@@ -17,10 +17,6 @@ const sp = (common: string) => byName(common).sp;
 const order = (common: string) => basisSpans(sp(common).history!).map((s) => s.basis);
 /** The basis at an age (years before present). */
 const basisAt = (common: string, ago: number): Basis | undefined => basisSpans(sp(common).history!).find((s) => ago <= s.ago0 && ago >= s.ago1)?.basis;
-const styleAt = (common: string, ago: number) => {
-  const b = byName(common);
-  return columnSpans(b.sp, b.t0).find((s) => ago <= s.ago0 && ago >= s.ago1)?.style ?? 'count';
-};
 
 describe('stretch classification (ToLaD#164)', () => {
   it('leopard: held, then the genome (blind steps included), the join and range-loss trend as model, counts since 1998, held after 2020', () => {
@@ -72,51 +68,6 @@ describe('stretch classification (ToLaD#164)', () => {
   });
 });
 
-describe('the column style per span (ToLaD#164)', () => {
-  it('leopard: rough from its split (younger than its genome curve) to 1998, counted (unstyled) 1998–2020, held after', () => {
-    const b = byName('Leopard');
-    expect(columnSpans(b.sp, b.t0).map((s) => s.style)).toEqual(['rough', 'held']);
-    expect(styleAt('Leopard', 1e6)).toBe('rough');
-    expect(styleAt('Leopard', 3000)).toBe('rough');
-    expect(styleAt('Leopard', 2026.77 - 2010)).toBe('count');
-    expect(styleAt('Leopard', 2)).toBe('held');
-  });
-
-  it('lion: rough to 1950, counted to now; tiger: rough to 1900; sand cat rough whole; a cat with no history held whole', () => {
-    expect(styleAt('Lion', 20_000)).toBe('rough');
-    expect(styleAt('Lion', 2026.77 - 1990)).toBe('count');
-    expect(styleAt('Lion', 1)).toBe('count');
-    expect(styleAt('Tiger', 300_000)).toBe('rough');
-    expect(styleAt('Tiger', 2026.77 - 1950)).toBe('count');
-    const sand = byName('Sand cat');
-    expect(columnSpans(sand.sp, sand.t0)).toEqual([{ ago0: sand.t0 * 1e6, ago1: 0, style: 'rough' }]);
-    const plain = fan.branches.find((x) => !x.sp.extinct && !x.sp.history)!;
-    expect(columnSpans(plain.sp, plain.t0).map((s) => s.style)).toEqual(['held']);
-  });
-
-  it('every living cat: rough spans never overlap held ones, and cover every genome, model or flagged stretch outside them', () => {
-    for (const b of fan.branches.filter((x) => !x.sp.extinct && x.sp.history && x.sp.births)) {
-      const spans = columnSpans(b.sp, b.t0);
-      for (let k = 1; k < spans.length; k++) expect(spans[k].ago0, b.sp.common).toBeLessThanOrEqual(spans[k - 1].ago1 + 1e-6);
-      const held = spans.filter((s) => s.style === 'held');
-      for (const s of basisSpans(b.sp.history!)) {
-        if (s.basis === 'count' || s.basis === 'held') continue;
-        const mid = Math.min((s.ago0 + s.ago1) / 2, b.t0 * 1e6 - 1);
-        if (held.some((h) => mid <= h.ago0 && mid >= h.ago1)) continue;
-        expect(spans.some((x) => x.style === 'rough' && mid <= x.ago0 && mid >= x.ago1), `${b.sp.common} ${s.basis} at ${mid}`).toBe(true);
-      }
-      // No-data stretches are unchanged by #164: still the noDataSpans ones.
-      expect(held.length, b.sp.common).toBe(noDataSpans(b.sp.history!).filter((s) => s.side === 'after' || b.t0 * 1e6 > b.sp.history!.nowYear - s.year).length);
-    }
-  });
-
-  it('the rough look is lighter than the held fade and keeps the stretch readable', () => {
-    expect(ROUGH_DEFAULT in ROUGH_LOOKS).toBe(true);
-    expect(COLUMN_TINT.rough.a).toBeLessThan(COLUMN_TINT.held.a);
-    expect(COLUMN_TINT.rough.a).toBeGreaterThan(0.15);
-  });
-});
-
 describe('the card (ToLaD#164)', () => {
   it('says the genome sentence where the curve has a genome stretch, and only there', () => {
     expect(GENOME_NOTE).toBe('Wiggles in the genome curve can come from a population that split into regions and rejoined, not only from changes in numbers.');
@@ -133,6 +84,9 @@ describe('the card (ToLaD#164)', () => {
     expect(lion[2]).toMatch(/– now$/);
     const html = renderToStaticMarkup(<SpeciesCard sp={sp('Leopard')} onClose={() => {}} open />);
     expect(html).toContain('data-basis-note=""');
+    expect(html).toContain(`Where these numbers come from: ${rows.join('; ')}.`);
+    expect(html.replace(/<[^>]*>/g, ' ')).not.toMatch(/solid|dashed/i); // (the text; data-style attributes aside)
+    expect(html).toContain('reconstructed guess'); // the sparkline's key as before #164
     for (const r of rows) expect(html).toContain(r);
     expect(basisRows(sp('Sand cat').history!)).toEqual([expect.stringMatching(/^model .* – now$/)]);
   });
