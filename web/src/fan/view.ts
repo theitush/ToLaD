@@ -16,6 +16,7 @@ import { COLUMN_DIM, columnSpans, EVENT_TINT, eventAt, eventSpans, type EventSpa
 import { drawTwigs, kLogAt, laneDim, LINEAGE, LIVING, TEX_HAIR_PX, TWIG_GRAY, TwigModel, type IndInfo, type TwigStats } from './twigs';
 import type { MeshBatch, RectBatch } from './meshgl';
 import { familyLabel, FELIDAE_TREE, type Split } from './splits';
+import { bandDepth, Brackets, cladeCamera, ROW_H } from './brackets';
 import { axisInset, drawWorldOver, drawWorldUnder, worldFlags, type Box } from './world';
 
 export type { IndInfo } from './twigs';
@@ -49,6 +50,9 @@ const LABEL_AXIS_X = 72;
 const LABEL_BOTTOM_PX = 104;
 /** How long a label takes to fade in or out when another takes or gives up its place (ms). */
 const LABEL_FADE_MS = 180;
+
+/** Rows of the clades' brackets (ToLaD#193) a framed view keeps room for above "now". */
+const BAND_ROWS = 5;
 
 /** Gap (px) a label keeps from the column it sits beside. */
 const LABEL_GAP = 3;
@@ -294,7 +298,7 @@ const FAMILY_MAX_SCREENS = 1.6;
  * (under the buttons); `barX0` the buttons' left edge: left of it a label on
  * "now" may reach higher, up to LABEL_CEIL.
  */
-export function labelSpots(c: Screen, fan: Fan, top: number, measure: (text: string) => number, barX0?: number): LabelSpot[] {
+export function labelSpots(c: Screen, fan: Fan, top: number, measure: (text: string) => number, barX0?: number, brk?: { named(v: FanNode): boolean }): LabelSpot[] {
   const half = LABEL_PILL / 2;
   const X = (x: number) => c.toScreen(x, 0)[0];
   const Y = (y: number) => c.toScreen(0, y)[1];
@@ -410,7 +414,9 @@ export function labelSpots(c: Screen, fan: Fan, top: number, measure: (text: str
   // span they name bracketed under the pill; at its left end, else its middle, else its right end (whichever
   // meets no other label: the left end clears the middle of a family's one big column). The same name (`n<i>`)
   // as its lineage's label beside its parent column, so once "now" is off screen the one becomes the other.
+  // (With the clades' brackets, ToLaD#193, a family is named on its bracket where that has room, else here, over the stack.)
   for (const { v, vi, text } of families(fan)) {
+    if (brk?.named(v)) continue;
     const [wa, wb] = familySpan(v);
     const sa = X(wa);
     const sb = X(wb);
@@ -421,11 +427,12 @@ export function labelSpots(c: Screen, fan: Fan, top: number, measure: (text: str
     const onX = clamp01((Math.min(sb, c.w) - Math.max(sa, LABEL_AXIS_X) + 12) / LABEL_PILL);
     const fit0 = nowOn * onX * clamp01((FAMILY_MAX_SCREENS * c.w - (sb - sa)) / (0.4 * c.w));
     if (!(fit0 > 0)) continue;
+    // (On "now", under the brackets, ToLaD#193: a long one reaches up over their lines.)
     const y1 = Math.max(nowS - 4, top + len);
     const fit = fit0 * botFit(y1);
     const xs = lo <= hi - LABEL_PILL ? [lo, (lo + hi) / 2, hi] : [Math.min(Math.max((sa + sb) / 2, LABEL_AXIS_X + half), c.w - half)];
     xs.forEach((x, k) => {
-      out.push({ key: `n${vi}:fam${k}`, id: `n${vi}`, place: 'fam', v, text, rank: [-1, wb - wa, vi], x, y1, box: [x - half, y1 - len, x + half, y1], fit, span: [sa, sb] });
+      out.push({ key: `n${vi}:fam${k}`, id: `n${vi}`, place: 'fam', v, text, rank: [-1, wb - wa, vi], x, y1, box: [x - half, y1 - len, x + half, y1], fit, span: brk ? undefined : [sa, sb] });
     });
   }
   for (const b of fan.branches) {
@@ -446,6 +453,7 @@ export function labelSpots(c: Screen, fan: Fan, top: number, measure: (text: str
     const x = lo <= hi ? Math.min(Math.max(cx, lo), hi) : Math.min(Math.max(cx, hi), lo);
     const ceil = barX0 === undefined ? top : LABEL_CEIL + (top - LABEL_CEIL) * clamp01((x + half - (barX0 - 68)) / 60);
     const ty = Y(b.tipY);
+    // On "now", under the clades' brackets (ToLaD#193: a long name reaches up over their lines, opaque over them).
     const y1 = Math.max(ty - 4, ceil + len);
     // The tip on screen (below the top line) and its column right of the axis and left of the screen's edge.
     const tipOn = clamp01((ty - top) / 24) * clamp01((left + room - LABEL_AXIS_X + 12) / LABEL_PILL) * clamp01((c.w + 12 - left) / LABEL_PILL);
@@ -596,6 +604,8 @@ export class FanView implements InputHandlers {
   private heldRuns: { run: RibbonPt[]; hw: number; d: number }[] = [];
   /** The event labels shown last frame (screen boxes): a tap on one opens its event. */
   private eventLabels: { box: [number, number, number, number]; b: FanBranch; k: number }[] = [];
+  /** The species' pictures as last drawn (ToLaD#193): [x, y, radius, its column], a tap on one opens its card. */
+  thumbHits: [number, number, number, FanBranch][] = [];
   private models = new Map<string, TwigModel>();
   private raf = 0;
   private anim: ((t: number) => boolean) | null = null;
@@ -683,7 +693,71 @@ export class FanView implements InputHandlers {
 
   /** The whole fan: "now" near the top, the stem entering from the bottom edge. */
   homeCamera(): Camera {
-    return this.camera.home();
+    return this.withBand(this.camera.home());
+  }
+
+  /**
+   * The clades' brackets above "now" (brackets.ts, ToLaD#193; `?brackets=0` off): this frame's stack, or null.
+   * The species' pills stand on it.
+   */
+  private readonly brackets = typeof location !== 'undefined' && new URLSearchParams(location.search).get('brackets') === '0' ? null : new Brackets(font('600 11px'), font('italic 400 11px', SERIF));
+  private layoutBrackets(): Brackets | null {
+    const br = this.brackets;
+    if (!br) return null;
+    const nowS = this.toScreen(0, this.yNow)[1];
+    const fit = clamp01((nowS - this.labelTop()) / 24);
+    br.layout(this.camera, this.fan, nowS, LABEL_AXIS_X, fit, (f, t) => {
+      this.ctx.save();
+      this.ctx.font = f;
+      const w = this.ctx.measureText(t).width;
+      this.ctx.restore();
+      return w;
+    }, this.labelTop());
+    return br;
+  }
+
+  /** A frame with room above "now" for BAND_ROWS rows of brackets: "now" lowered by them, the fork where it was. */
+  private withBand(cam: Camera): Camera {
+    if (!this.brackets) return cam;
+    const extra = Math.min(BAND_ROWS, bandDepth(this.fan)) * ROW_H;
+    const sn = this.h / 2 + (this.yNow - cam.cy) * cam.sy;
+    const sb = this.h - 150;
+    const sy = cam.sy * Math.max(0.5, (sb - sn - extra) / Math.max(1, sb - sn));
+    return { ...cam, sy, ty: sy, cy: this.yNow + (this.h / 2 - sn - extra) / sy };
+  }
+
+  /**
+   * Where a tap on a clade's bracket lands (brackets.ts cladeCamera, ToLaD#193): the clade centred and opened,
+   * "now" down to where its branch started. The whole fan for the root.
+   */
+  cladeCamera(v: FanNode): Camera {
+    if (!v.parent) return this.homeCamera();
+    return cladeCamera(this.camera, this.fan, v, familySpan, (cam) => this.withBand(cam));
+  }
+
+  /**
+   * A bracket's tap: fly to its clade (cladeCamera), any card closed for the flight. Folded, the frame holds for
+   * the fold as cladeCamera leaves it, while each step of a flight moves the camera with the fold (fold.ts follow):
+   * on landing it takes the frame exactly (the fold at the frame's zoom and anchor, so settling moves nothing).
+   */
+  flyToClade(v: FanNode, ms = 750): void {
+    this.selected = null;
+    this.selInd = null;
+    this.touch = null;
+    this.onSelect(null);
+    this.flyTo(this.cladeCamera(v), ms, () => {
+      if (!this.fan.tess.fold) return;
+      this.cam = this.cladeCamera(v);
+      this.camera.settle();
+      this.request();
+    });
+  }
+
+  /** The screen point of clade `latin`'s bracket as last drawn, if it is wide enough to tap (designshot), or null. */
+  bracketAt(latin: string): [number, number] | null {
+    const br = this.brackets;
+    const p = br?.placed.find((q) => br.list[q.i].latin === latin);
+    return br && p && p.b - p.a >= 6 ? [(p.a + p.b) / 2, br.rowY(p.row)] : null;
   }
 
   setMode(mode: WidthMode): void {
@@ -731,14 +805,14 @@ export class FanView implements InputHandlers {
     const v = this.fan.nodes.find((n) => n.split.taxon === name);
     if (!v) return null;
     const [x0, x1] = familySpan(v);
-    let cam = this.camera.frame(x0, x1, v.y, true);
+    let cam = this.withBand(this.camera.frame(x0, x1, v.y, true));
     // Folded (fold.ts): the clade's span at the zoom that frames it (it opens as it is framed): a few rounds.
     const f = this.fan.tess.fold;
     if (f) {
       for (let k = 0; k < 4; k++) {
         f.setScale(cam.sx, this.w);
         const [a, b] = familySpan(v);
-        cam = this.camera.frame(a, b, v.y, true);
+        cam = this.withBand(this.camera.frame(a, b, v.y, true));
       }
       f.setScale(cam.sx, this.w);
     }
@@ -1006,6 +1080,24 @@ export class FanView implements InputHandlers {
   }
 
   tap(x: number, y: number): void {
+    // A species' picture (ToLaD#193): its card, as a tap on its column at its tip.
+    const pic = this.thumbHits.find(([px, py, r]) => (x - px) ** 2 + (y - py) ** 2 <= (r + 3) ** 2);
+    if (pic) {
+      const b = pic[3];
+      this.selected = b.sp;
+      this.selInd = null;
+      const ageMa = b.sp.t1;
+      this.touch = { x: leftAt(b, b.tipY) + laneAt(b, b.tipY).w / 2, ageMa };
+      this.onSelect({ sp: b.sp, ageMa, startMa: b.t0 });
+      this.request();
+      return;
+    }
+    // A clade's bracket (ToLaD#193): fly to the clade.
+    const clade = this.brackets?.hit(x, y);
+    if (clade) {
+      this.flyToClade(clade.v);
+      return;
+    }
     // An event's label: opens its event, the touch at the middle of its window on the column.
     const lab = this.eventLabels.find(({ box }) => x >= box[0] - 4 && x <= box[2] + 4 && y >= box[1] - 4 && y <= box[3] + 4);
     const ev = lab && colEventsY(this.fan, lab.b).find((s) => s.k === lab.k);
@@ -1100,8 +1192,9 @@ export class FanView implements InputHandlers {
     // Labels: one form everywhere (see labelSpots).
     this.drawGutter();
     this.drawTouch();
-    const spots = labelSpots(this.camera, this.fan, this.labelTop(), (t) => this.nameWidth(t), this.barRect()?.[0]);
-    this.drawLabels(spots);
+    const br = this.layoutBrackets();
+    const spots = labelSpots(this.camera, this.fan, this.labelTop(), (t) => this.nameWidth(t), this.barRect()?.[0], br ?? undefined);
+    this.drawLabels(spots, br);
     this.drawWidthScale();
     if (this.debug) this.drawDebug();
     this.drawTrunkLabel();
@@ -1524,7 +1617,7 @@ export class FanView implements InputHandlers {
    * resolveLabels (a fixed priority, with hysteresis), and each fades in and
    * out over LABEL_FADE_MS rather than popping.
    */
-  private drawLabels(spots: LabelSpot[]): void {
+  private drawLabels(spots: LabelSpot[], br: Brackets | null = null): void {
     const ctx = this.ctx;
     const now = performance.now();
     const dt = Math.min(100, Math.max(0, now - this.labelT));
@@ -1538,7 +1631,10 @@ export class FanView implements InputHandlers {
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'left';
     ctx.font = font(LABEL_FONT);
-    for (const s of spots) {
+    const thumbs: [number, number][] = [];
+    this.thumbHits.length = 0;
+    const alphas = new Float32Array(spots.length);
+    spots.forEach((s, k) => {
       const want = on.get(s.key) ? 1 : 0;
       let st = this.labelState.get(s.key);
       if (!st) this.labelState.set(s.key, (st = { on: want === 1, a: want }));
@@ -1548,12 +1644,22 @@ export class FanView implements InputHandlers {
         st.a = want > st.a ? Math.min(want, st.a + step) : Math.max(want, st.a - step);
         moving = true;
       }
-      const alpha = st.a * s.fit;
+      alphas[k] = st.a * s.fit;
+    });
+    // The clades' brackets (ToLaD#193) under the pills: their labels clear of the pills shown, their lines behind them.
+    br?.draw(ctx, FAMILY_INK, INK3, spots.filter((_, k) => alphas[k] > 0.3).map((s) => s.box));
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    ctx.font = font(LABEL_FONT);
+    for (let k = 0; k < spots.length; k++) {
+      const s = spots[k];
+      const alpha = alphas[k];
       const [x0, y0, x1, y1] = s.box;
       if (alpha < 0.01 || x1 < 0 || x0 > this.w || y1 < 0 || y0 > this.h) continue;
       if (s.ev !== undefined && s.b && alpha > 0.5) this.eventLabels.push({ box: [x0, y0, x1, y1], b: s.b, k: s.ev });
       ctx.globalAlpha = alpha;
-      ctx.fillStyle = 'rgba(12,23,20,0.8)';
+      // (Opaque: a bracket's line behind it never shows through the name.)
+      ctx.fillStyle = BG;
       ctx.beginPath();
       ctx.roundRect(x0, y0, x1 - x0, y1 - y0, LABEL_PILL / 2);
       ctx.fill();
@@ -1582,7 +1688,13 @@ export class FanView implements InputHandlers {
       ctx.restore();
       // ToLaD#182: the species' Commons picture under its pill, before the name, once loaded (wiki.ts; `?thumbs=0` off).
       const th = s.b && s.ev === undefined ? labelThumb(s.b.sp.sci, () => this.request()) : null;
-      if (th) drawThumb(ctx, th, s.x, y1 + THUMB_D / 2 + 2, THUMB_D);
+      // (One picture where two would overlap, the first one shown: fewer and clearer, ToLaD#193. A fading one still draws.)
+      const ty = y1 + THUMB_D / 2 + 2;
+      if (th && alpha > 0.5 && !thumbs.some(([x, y]) => Math.abs(x - s.x) < THUMB_D - 4 && Math.abs(y - ty) < THUMB_D - 4)) {
+        thumbs.push([s.x, ty]);
+        if (s.b) this.thumbHits.push([s.x, ty, THUMB_D / 2, s.b]);
+        drawThumb(ctx, th, s.x, ty, THUMB_D);
+      } else if (th && alpha <= 0.5) drawThumb(ctx, th, s.x, ty, THUMB_D);
     }
     ctx.restore();
     if (moving) this.request();

@@ -173,6 +173,24 @@ describe('the fan: marks and tap', () => {
   });
 });
 
+describe('a picture', () => {
+  it("a tap on a species' picture opens its card, as a tap on its column", () => {
+    const v = stubView();
+    const fan = v.fan;
+    const b = fan.branches.find((q) => q.sp.common === 'Cheetah')!;
+    let sel: Selection | null = null;
+    v.onSelect = (s) => (sel = s);
+    v.thumbHits = [[200, 300, 25, b]];
+    v.tap(215, 318);
+    expect(sel!.sp.common).toBe('Cheetah');
+    expect(sel!.startMa).toBe(b.t0);
+    sel = null;
+    v.thumbHits = [[200, 300, 25, b]];
+    v.tap(240, 300);
+    expect((sel as Selection | null)?.sp.common).not.toBe('Cheetah');
+  });
+});
+
 describe('the card', () => {
   it('a touch in the window shows the section: title, summary, the quote styled as a quote, source linked, grade', () => {
     const c = sp('Cheetah');

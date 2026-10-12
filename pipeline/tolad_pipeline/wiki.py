@@ -22,6 +22,13 @@ The pictures are hotlinked, never copied (Ita, 2026-10-12): the sidecar holds UR
 from the file name's MD5 like MediaWiki does. Not Special:FilePath?width=: that answers with a
 redirect from commons.wikimedia.org first (one more round trip per picture), and the 2D canvas
 the name pills draw on needs the CORS headers upload.wikimedia.org sends on the image itself.
+
+`range` (ToLaD#196) is the species' range map, Wikidata P181 (taxon range map image), as the
+same kind of thumbnail at 500 px, with `rangeFile` its Commons file page for the credit. 500 px
+is a standard thumbnail step that reads well across the card (~350 CSS px) on a phone; the tap
+to enlarge asks for the 960 px step like the photo. Most maps are SVGs: upload.wikimedia.org
+renders those as PNG (`500px-X.svg.png`), so an SVG is taken like any other file; with several
+values, the first in sorted order.
 """
 from __future__ import annotations
 
@@ -48,29 +55,32 @@ SNAPSHOT = "wikidata/taxa.json"
 BATCH = 150
 PAUSE_S = 1.5
 THUMB_W = 330
+RANGE_W = 500
 SPECIES_Q = "Q7432"
 ITEM = re.compile(r"http://www\.wikidata\.org/entity/Q\d+")
 
-# One row per (key, item, rank, parent name, article, image). `?key` is what was asked: a taxon
-# name (P225) or an OTT id (P9157).
-QUERY = """SELECT ?key ?item ?rank ?pname ?article ?img WHERE {{
+# One row per (key, item, rank, parent name, article, image, range map). `?key` is what was asked:
+# a taxon name (P225) or an OTT id (P9157). The range map is P181 (taxon range map image, ToLaD#196).
+QUERY = """SELECT ?key ?item ?rank ?pname ?article ?img ?range WHERE {{
   VALUES ?key {{ {values} }}
   ?item wdt:{prop} ?key .
   OPTIONAL {{ ?item wdt:P105 ?rank }}
   OPTIONAL {{ ?item wdt:P171/wdt:P225 ?pname }}
   OPTIONAL {{ ?item wdt:P18 ?img }}
+  OPTIONAL {{ ?item wdt:P181 ?range }}
   OPTIONAL {{ ?article schema:about ?item ; schema:isPartOf <https://en.wikipedia.org/> }}
 }}"""
 
 # An item with no English article: the items it names, or that name it, as a taxon synonym (P1420),
 # e.g. Catopuma temminckii's item has none and Pardofelis temminckii's ("Asian golden cat") has.
-LINK_QUERY = """SELECT ?key ?item ?rank ?pname ?article ?img WHERE {{
+LINK_QUERY = """SELECT ?key ?item ?rank ?pname ?article ?img ?range WHERE {{
   VALUES ?q {{ {values} }}
   {{ ?item wdt:P1420 ?q }} UNION {{ ?q wdt:P1420 ?item }}
   BIND(STR(?q) AS ?key)
   OPTIONAL {{ ?item wdt:P105 ?rank }}
   OPTIONAL {{ ?item wdt:P171/wdt:P225 ?pname }}
   OPTIONAL {{ ?item wdt:P18 ?img }}
+  OPTIONAL {{ ?item wdt:P181 ?range }}
   OPTIONAL {{ ?article schema:about ?item ; schema:isPartOf <https://en.wikipedia.org/> }}
 }}"""
 
@@ -141,7 +151,7 @@ def _sparql(query: str) -> list[list[str]]:
                 raise
             print(f"[wiki] {type(e).__name__}, retrying in {10 * (attempt + 1)}s", file=sys.stderr)
             time.sleep(10 * (attempt + 1))
-    cols = ["key", "item", "rank", "pname", "article", "img"]
+    cols = ["key", "item", "rank", "pname", "article", "img", "range"]
     return [[b.get(c, {}).get("value", "") for c in cols] for b in res["results"]["bindings"]]
 
 
@@ -214,14 +224,18 @@ def thumb_url(file: str, width: int = THUMB_W) -> str | None:
 def _pick(rows: list[list[str]], genus: str) -> list[str] | None:
     """The best item among one key's rows (see the module docstring), merged over its duplicates."""
     items: dict[str, dict] = {}
-    for key, item, rank, pname, article, img in rows:
+    for r in rows:
+        key, item, rank, pname, article, img = r[:6]
+        rng = r[6] if len(r) > 6 else ""
         if not ITEM.fullmatch(item):
             continue  # a lexeme sense or the like, not an item
-        it = items.setdefault(item, {"species": False, "genus": False, "article": "", "img": ""})
+        it = items.setdefault(item, {"species": False, "genus": False, "article": "", "img": "", "range": ""})
         it["species"] |= rank.endswith("/" + SPECIES_Q)
         it["genus"] |= pname == genus
         it["article"] = it["article"] or article
+        # Several values: the first in sorted order, so the pick is deterministic.
         it["img"] = min(filter(None, [it["img"], img]), default="")
+        it["range"] = min(filter(None, [it["range"], rng]), default="")
     if not items:
         return None
 
@@ -230,7 +244,7 @@ def _pick(rows: list[list[str]], genus: str) -> list[str] | None:
         return (-(it["species"] and it["genus"]), -it["species"], -bool(it["article"]), -bool(it["img"]),
                 int(q.rsplit("Q", 1)[-1] or 0))
     q, it = min(items.items(), key=score)
-    return [q, it["article"], it["img"]]
+    return [q, it["article"], it["img"], it["range"]]
 
 
 def resolve(species: dict[str, int], snap: dict, raw: Path) -> dict[str, dict | None]:
@@ -260,24 +274,32 @@ def resolve(species: dict[str, int], snap: dict, raw: Path) -> dict[str, dict | 
             # No English article on the item: one its taxon-synonym links have (species first).
             alt = _pick([r for r in by_link.get(hit[0], []) if r[4]], genus)
             if alt:
-                hit = [hit[0], alt[1], hit[2] or alt[2]]
+                hit = [hit[0], alt[1], hit[2] or alt[2], hit[3] or alt[3]]
         out[name] = entry(hit)
     return out
+
+
+def _commons(value: str, width: int) -> tuple[str, str] | None:
+    """(thumbnail URL, Commons file page) of a Wikidata Commons-media value (a Special:FilePath URL)."""
+    file = urllib.parse.unquote(value.rsplit("/Special:FilePath/", 1)[-1])
+    t = thumb_url(file, width)
+    if not t:
+        return None
+    return t, "https://commons.wikimedia.org/wiki/File:" + urllib.parse.quote(file.replace(" ", "_"))
 
 
 def entry(hit: list[str] | None) -> dict | None:
     if hit is None:
         return None
-    _, article, img = hit
+    _, article, img = hit[:3]
+    rng = hit[3] if len(hit) > 3 else ""
     e: dict[str, str] = {}
     if article:
         e["wp"] = article
-    if img:
-        file = urllib.parse.unquote(img.rsplit("/Special:FilePath/", 1)[-1])
-        t = thumb_url(file)
-        if t:
-            e["img"] = t
-            e["file"] = "https://commons.wikimedia.org/wiki/File:" + urllib.parse.quote(file.replace(" ", "_"))
+    if img and (c := _commons(img, THUMB_W)):
+        e["img"], e["file"] = c
+    if rng and (c := _commons(rng, RANGE_W)):
+        e["range"], e["rangeFile"] = c
     return e or None
 
 
@@ -292,7 +314,9 @@ def rates(out: dict[str, dict | None], names: set[str]) -> str:
     n = len(names) or 1
     wp = sum(1 for k in names if (out.get(k) or {}).get("wp"))
     img = sum(1 for k in names if (out.get(k) or {}).get("img"))
-    return f"{len(names)} species: wikipedia {wp} ({100 * wp / n:.0f}%), picture {img} ({100 * img / n:.0f}%)"
+    rng = sum(1 for k in names if (out.get(k) or {}).get("range"))
+    return (f"{len(names)} species: wikipedia {wp} ({100 * wp / n:.0f}%), picture {img} ({100 * img / n:.0f}%), "
+            f"range map {rng} ({100 * rng / n:.0f}%)")
 
 
 def main(argv: list[str] | None = None) -> int:

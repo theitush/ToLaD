@@ -152,12 +152,12 @@
   "url": "https://raw.githubusercontent.com/n8upham/MamPhy_v1/740b70189c77fc168be17bd6ade204c755bcb19b/_DATA/taxonomy_mamPhy_5911species_toPublish.csv"
  },
  "wikidata/taxa.json": {
-  "bytes": 2279630,
+  "bytes": 2702687,
   "post_body": {
    "query": "see the snapshot's `query`, keys: the dated tree's species"
   },
   "retrieved": "2026-10-12",
-  "sha256": "1f306d77778457585bd4aecb790e0827ea08eb1dcb4917d70e275704439c1609",
+  "sha256": "edc48712c9749114b00c0d782e2b57db26f0e951ec987bfad3001ab4e4d6cbbc",
   "url": "https://query.wikidata.org/sparql"
  },
  "wpp/WPP2024_Demographic_Indicators_Medium.csv.gz": {

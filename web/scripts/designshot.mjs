@@ -143,6 +143,13 @@ const scenes = [
   ['world-150k', 'window', [0, 150000]],
   ['world-kpg', 'window', [30e6, 140e6]],
   ['world-20k', 'window', [0, 20000]],
+  // The clades' brackets above "now" (ToLaD#193): a level's home, and a bracket tapped from home (['tapclade', [taxon]]:
+  // the flight to the clade, now to its stem; a bracket too narrow to tap at home flown to as the tap would). LEVEL=carnivores for the order.
+  ['brk-home', 'home'],
+  ['brk-dogs', 'tapclade', ['Canidae']],
+  ['brk-bigcats', 'tapclade', ['Pantherinae']],
+  ['brk-tap-felidae', 'tapclade', ['Felidae']],
+  ['brk-tap-panthera', 'tapclade', ['Panthera']],
 ];
 const browser = await chromium.launch({ headless: true });
 try {
@@ -257,6 +264,14 @@ try {
           // A clade (taxon args[0]) centred at args[1] × home's width zoom, its level's time frame (ToLaD#146: the fold opening).
           f.cam = f.levelCamera(args[0], args[1]) ?? f.homeCamera();
           f.camera.settle();
+        } else if (kind === 'tapclade') {
+          // Home drawn, then a tap on the clade's bracket (it flies there; the shot waits WAIT_MS for it to land).
+          f.cam = f.homeCamera();
+          f.camera.settle();
+          f.draw();
+          const at = f.bracketAt(args[0]);
+          if (at) f.tap(at[0], at[1]);
+          else f.flyToClade(fan.nodes.find((n) => n.split.taxon === args[0]));
         } else if (kind === 'level') {
           // A level (ToLaD#146): the split founding taxon args[0] framed as home frames the fan; with args[1] (Ma),
           // centred on that time, time zoomed args[2] and width args[3] × the frame.
