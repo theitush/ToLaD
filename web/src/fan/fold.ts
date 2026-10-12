@@ -110,6 +110,8 @@ interface Row {
   /** The unshifted row's weighted mean slot centre (the anchor's weights) and plain mean, at this fold version. */
   mw: number;
   mg: number;
+  /** Per pair, how much of its gap its narrower daughter clade's life here holds open (carried(): the tree's alone, kept across refolds). */
+  held?: Float64Array;
 }
 
 /** What the fold's positions depend on, besides the tree: the splits' openness and the anchor's weights. */
@@ -160,8 +162,8 @@ export class Fold {
   readonly home: number;
   /** The river's rows, by height (they hold whatever the a's), each folded again when the a's change. */
   private rows = new Map<number, Row>();
-  private last: Row | null = null;
-  private lastY = NaN;
+  /** exact()'s rows by height (unfolded once, refolded per version): a frame asks a few dozen heights, interleaved. */
+  private exactRows = new Map<number, Row>();
 
   constructor(readonly fan: Fan) {
     this.strands = fan.root.strands;
@@ -494,6 +496,11 @@ export class Fold {
   /** Per strand, the anchor's weights (a hair each) summed along the drawn order, at fold version wVer. */
   private wSum = new Float64Array(0);
   private wVer = -1;
+  /** foldRow's and carried's scratch. */
+  private xBuf = new Float64Array(0);
+  private qBuf = new Float64Array(0);
+  private kBuf = new Float64Array(0);
+  private incBuf = new Float64Array(0);
 
   /**
    * Per pair at height y, its gap (world): what stands open there. A split's full gap at this zoom (a * its gap)
@@ -504,7 +511,8 @@ export class Fold {
    * only at its own lineage's splits, never at a cousin's (Ita, ToLaD#146: "the over wiggliness ... the
    * weasels"); the space inside closes at the forks as the daughters meet, and stands as dark beside the clade.
    */
-  private carried(y: number, C: Float64Array): Float64Array {
+  private carried(r: Row): Float64Array {
+    const y = r.y;
     const m = this.a.length;
     if (!this.ord) this.ord = Int32Array.from(Array.from({ length: m }, (_, p) => p).sort((p, q) => this.pairNode[p].y - this.pairNode[q].y));
     if (this.wVer !== this.ver || this.wSum.length !== m + 2) {
@@ -513,10 +521,27 @@ export class Fold {
       this.wVer = this.ver;
     }
     const P = this.wSum;
-    const K = new Float64Array(m);
-    const inc = new Float64Array(m);
+    // (Scratch, reused: a row is folded at a time.)
+    if (this.kBuf.length !== m) {
+      this.kBuf = new Float64Array(m);
+      this.incBuf = new Float64Array(m);
+    }
+    const K = this.kBuf.fill(0);
+    const inc = this.incBuf.fill(0);
     const edge = this.fan.edge;
-    const CW = this.sizeSums();
+    // (Per pair: its narrower daughter clade's life here over its size, a quarter or more holding the whole gap.)
+    let H = r.held;
+    if (!H) {
+      const C = this.lifeSums(y);
+      const CW = this.sizeSums();
+      H = r.held = new Float64Array(m);
+      for (let p = 0; p < m; p++) {
+        const lo = this.lo[p];
+        const hi = this.hi[p];
+        const mm = Math.min((C[p + 1] - C[lo]) / (CW[p + 1] - CW[lo]), (C[hi] - C[p + 1]) / (CW[hi] - CW[p + 1]));
+        H[p] = Math.min(1, mm / 0.25);
+      }
+    }
     for (let k = 0; k < m; k++) {
       const p = this.ord[k];
       const F = this.a[p] * this.pairGap[p];
@@ -527,10 +552,7 @@ export class Fold {
       const hi = this.hi[p];
       const u = y >= v.y ? 0 : this.forkTop[p] < v.y ? ease(edge, Math.min(1, (v.y - y) / (v.y - this.forkTop[p]))) : 1;
       let kept = 0;
-      if (u > 0) {
-        const mm = Math.min((C[p + 1] - C[lo]) / (CW[p + 1] - CW[lo]), (C[hi] - C[p + 1]) / (CW[hi] - CW[p + 1]));
-        kept = u * (inc[p] + F * Math.min(1, mm / 0.25));
-      }
+      if (u > 0) kept = u * (inc[p] + F * H[p]);
       K[p] = kept;
       const out = T - kept;
       if (!(out > 0)) continue;
@@ -547,9 +569,15 @@ export class Fold {
     const { w, end, n, item, y } = r;
     // Each daughter clade's width here: its items' widths (each counted at its first strand), summed along the strands.
     const S = item.length;
-    const C = this.lifeSums(y);
-    const X = new Float64Array(n);
-    const K = this.carried(y, C);
+    // (The canonical row first, folded at this version: X and the scratch below are this row's from here on.)
+    if (r.y !== this.yRef && (!this.ref || this.ref.ver !== this.ver)) this.foldRow((this.ref ??= this.riverRow(this.yRef)));
+    if (this.xBuf.length < S + 1) {
+      this.xBuf = new Float64Array(S + 1);
+      this.qBuf = new Float64Array(S + 1);
+    }
+    const X = this.xBuf;
+    X[0] = 0;
+    const K = this.carried(r);
     for (let j = 1; j < n; j++) X[j] = X[j - 1] + w[j - 1] + K[end[j - 1] - 1];
     // Where it stands: the anchor's weighted mean slot centre where it is at "now" (the canonical row, whose plain
     // mean slot centre is on the stem's centre: each strand counted once, whatever its width, so a column that
@@ -560,7 +588,7 @@ export class Fold {
     let Q: Float64Array | null = null;
     for (let i = 0; i < S; i++) {
       if (!fl[i] || !r.own[i]) continue;
-      Q ??= new Float64Array(n + 1);
+      Q ??= this.qBuf.fill(0, 0, n + 1);
       const q = item[i];
       if (fl[i] > 0) Q[q + 1] -= w[q];
       else {
@@ -587,11 +615,7 @@ export class Fold {
     let shift: number;
     if (r.y === this.yRef) shift = this.home - r.mg;
     else {
-      let ref = this.ref;
-      if (!ref || ref.ver !== this.ver) {
-        ref = this.ref = this.riverRow(this.yRef);
-        this.foldRow(ref);
-      }
+      const ref = this.ref!;
       shift = this.home - ref.mg + ref.mw - r.mw;
     }
     const xs = r.xs;
@@ -624,36 +648,54 @@ export class Fold {
     const a = r0.xs[i];
     if (t === 0) return a;
     const r1 = this.rowK(k + 1);
+    if (r0.own[i] === r1.own[i]) return a + (r1.xs[i] - a) * t;
     // (A cell its split falls in: one row has its own column's centre, the other its slot's left edge. Mixed,
     // its edge jumped sideways by half its width for one row: a horizontal line across it at every split,
-    // ToLaD#146 "least weasel 3.1M". There it is read exact.)
-    if (r0.own[i] !== r1.own[i]) return this.exact(i, y);
-    return a + (r1.xs[i] - a) * t;
+    // ToLaD#146 "least weasel 3.1M". There both are read as its left edge (as leftAt makes it of a centre),
+    // that read between them, and made a centre again above its split. Its peel is a bend tall at least (many
+    // rows), so its edge runs smoothly through its split: not a row of its own per height, ToLaD#209.)
+    const b = this.strands[i];
+    const half = (yy: number) => (lanesAt(b, yy)[0] * (1 - this.flare[i])) / 2;
+    const l0 = r0.own[i] ? a - half(k * h) : a;
+    const l1 = r1.own[i] ? r1.xs[i] - half((k + 1) * h) : r1.xs[i];
+    const l = l0 + (l1 - l0) * t;
+    return y < b.splitY ? l + half(y) : l;
   }
 
   /** Strand i's folded left edge (or own column's centre) at y, its row worked out at y itself. */
   private exact(i: number, y: number): number {
-    if (!this.last || this.lastY !== y || this.last.ver !== this.ver) {
-      this.last = this.riverRow(y);
-      this.lastY = y;
-      this.foldRow(this.last);
+    let r = this.exactRows.get(y);
+    if (!r) {
+      if (this.exactRows.size >= 2048) this.exactRows.clear();
+      this.exactRows.set(y, (r = this.riverRow(y)));
     }
-    return this.last.xs[i];
+    if (r.ver !== this.ver) this.foldRow(r);
+    return r.xs[i];
   }
 
   /** The grid's rows by their index k (y = k * gridH): rowAt's, looked up by an integer (most often a small one). */
   private kRows = new Map<number, Row>();
   private kH = 0;
   private rowK(k: number): Row {
-    if (this.kH !== this.gridH || this.kRows.size >= 8192) {
-      this.kRows.clear();
-      this.kH = this.gridH;
+    // (A frame reads the rows a strand at a time, down it: the last few by k, before the map.)
+    const c = k & 63;
+    let r = this.kLast[c];
+    if (r === undefined || this.kLastK[c] !== k || this.kH !== this.gridH) {
+      if (this.kH !== this.gridH || this.kRows.size >= 8192) {
+        this.kRows.clear();
+        this.kH = this.gridH;
+        this.kLastK.fill(NaN);
+      }
+      r = this.kRows.get(k);
+      if (!r) this.kRows.set(k, (r = this.rowAt(k * this.gridH)));
+      this.kLast[c] = r;
+      this.kLastK[c] = k;
     }
-    let r = this.kRows.get(k);
-    if (!r) this.kRows.set(k, (r = this.rowAt(k * this.gridH)));
-    else if (r.ver !== this.ver) this.foldRow(r);
+    if (r.ver !== this.ver) this.foldRow(r);
     return r;
   }
+  private kLast: (Row | undefined)[] = new Array(64);
+  private kLastK = new Float64Array(64).fill(NaN);
 
   /** Change the grid (world height between rows, a power of two: the rows a finer grid shares with a coarser are kept). */
   setGrid(h: number): void {
