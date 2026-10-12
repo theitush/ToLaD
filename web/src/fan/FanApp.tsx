@@ -8,7 +8,8 @@ import { approxMa, formatCount } from '../data/count';
 import { HistorySpark } from './HistorySpark';
 import type { EdgeStyle, WidthMode } from './layout';
 import { wikiOf, type WikiRec } from './wiki';
-import { FELIDAE, NATURAL_META, type HistEvent, type SpeciesRec } from './panthera';
+import { CARNIVORA, FELIDAE, NATURAL_META, type HistEvent, type SpeciesRec } from './panthera';
+import { CARNIVORA_TREE } from './splits';
 import { population } from './population';
 import { WorldToggle } from './WorldToggle';
 import { MagnifierIcon, SearchPanel } from './SearchPanel';
@@ -42,6 +43,19 @@ function initialEdge(): EdgeStyle {
   return 'curved';
 }
 
+/**
+ * The view (ToLaD#146): the whole order, each family one branch from afar, opening as you zoom (fold.ts).
+ * ?level=cats: the cats alone, as they were (hidden: for the tests and shots).
+ */
+type Level = 'cats' | 'carnivores';
+function initialLevel(): Level {
+  try {
+    return new URLSearchParams(window.location.search).get('level') === 'cats' ? 'cats' : 'carnivores';
+  } catch {
+    return 'carnivores';
+  }
+}
+
 export function FanApp() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const viewRef = useRef<FanView | null>(null);
@@ -49,11 +63,14 @@ export function FanApp() {
   const [edge, setEdge] = useState<EdgeStyle>(initialEdge);
   const [sel, setSel] = useState<Selection | null>(null);
   const [searching, setSearching] = useState(false);
+  const [level] = useState<Level>(initialLevel);
   const scaleRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const v = new FanView(canvasRef.current!, FELIDAE, edge);
+    const carn = level === 'carnivores';
+    const v = carn ? new FanView(canvasRef.current!, CARNIVORA, edge, CARNIVORA_TREE, true) : new FanView(canvasRef.current!, FELIDAE, edge);
+    if (mode !== 'linear') v.setMode(mode);
     v.onSelect = setSel;
     v.scaleEl = scaleRef.current;
     v.barEl = barRef.current;
@@ -72,7 +89,9 @@ export function FanApp() {
       viewRef.current = null;
       if (window.__fan === v) delete window.__fan;
     };
-  }, []);
+    // (A new view per level; the toggles' state carries over.)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [level]);
 
   return (
     <div className="app fan">
@@ -106,7 +125,7 @@ export function FanApp() {
           {edge}
         </button>
         <button type="button" onClick={() => viewRef.current?.resetView()}>
-          All cats
+          {level === 'cats' ? 'All cats' : 'All carnivores'}
         </button>
         <button
           type="button"
@@ -206,6 +225,8 @@ export function midName(sp: SpeciesRec): string {
 export function pluralName(sp: SpeciesRec): string {
   if (sp.common === sp.sci) return `${sp.sci} individuals`;
   const c = midName(sp);
+  // (The carnivores bring a -f plural, ToLaD#146: "grey wolves".)
+  if (/wolf$/.test(c)) return `${c.slice(0, -1)}ves`;
   return /(s|x|z|ch|sh)$/.test(c) ? `${c}es` : `${c}s`;
 }
 

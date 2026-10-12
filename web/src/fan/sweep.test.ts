@@ -13,7 +13,7 @@ import { laneAt, layoutFan, leftAt, STEM_BOTTOM_MA, type EdgeStyle, type Fan, ty
 import { FELIDAE } from './panthera';
 import { shadeMesh, unpackInst, type MeshInst } from './mesh';
 import { MeshBatch, rgb01 } from './meshgl';
-import { drawTwigs, kLogAt, LINEAGE, LIVING, TWIG_GRAY, TwigModel, type TwigView } from './twigs';
+import { drawTwigs, kLogAt, LINEAGE, LIVING, TEX_HAIR_PX, TWIG_GRAY, TwigModel, type TwigView } from './twigs';
 
 const PAL = [LIVING, LINEAGE, TWIG_GRAY].map(rgb01);
 const W = 390;
@@ -65,6 +65,8 @@ export function sweepFrame(f: Fan, c: FanCamera): { rows: number; holes: Hole[] 
       // (A column of under two individuals has its one line somewhere in it, not in every row's
       // piece of it on screen: the domestic cat's founders in log widths, under one alive, ~9 kya.)
       if (!(wPx > 0) || m.totalSlots(y) < 2) continue;
+      // (A hairline column, its widest under TEX_HAIR_PX[1] px on screen, is a plain lane by design (its texture fading in up to there): level of detail, ToLaD#146.)
+      if (b.width * c.cam.sx < TEX_HAIR_PX[1]) continue;
       const colL = c.toScreen(leftAt(b, y), y)[0];
       const colR = colL + Math.max(0.6, wPx);
       // (At least a px of it on screen; cut by the screen's edge, at least 10 px across the column
