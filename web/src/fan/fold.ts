@@ -140,6 +140,13 @@ export class Fold {
   lambda = 0;
   /** The anchor (setAnchor): per strand, its weight (all 1: the whole row, the plain mean). */
   readonly wt: Float64Array;
+  /**
+   * Per strand, which side its boom flares into (a domestic stock, ToLaD#146): -1 left, 1 right, away from its
+   * sister; 0 for the rest. Its own column stands at its room's inner edge (on its sister's side), and the anchor
+   * counts it as nothing wide there: its growth moves only its outer edge and what lies beyond it (the order's
+   * edge, for the dog and the cat), never its neighbours on the inner side.
+   */
+  readonly flare: Int8Array;
   /** "Now" (world y): the canonical row. */
   private readonly yRef: number;
   private ref: Row | null = null;
@@ -194,6 +201,12 @@ export class Fold {
     }
     this.home = fan.root.left + fan.root.width / 2;
     this.wt = new Float64Array(n).fill(1);
+    this.flare = new Int8Array(n);
+    for (let i = 0; i < n; i++) {
+      const b = this.strands[i];
+      if (b.sp.history?.component !== 'domestic' || b.sp.extinct || !b.path.length) continue;
+      this.flare[i] = b.path[0].node.strands[0] === b ? -1 : 1;
+    }
     this.yRef = fan.time.y(0);
   }
 
@@ -333,7 +346,7 @@ export class Fold {
     const d = new Float64Array(n);
     let dMin = Infinity;
     for (let i = 0; i < n; i++) {
-      d[i] = ((r.xs[i] + (r.own[i] ? 0 : r.sw[i] / 2) - cx) * sx) / s;
+      d[i] = ((r.xs[i] + (r.own[i] ? (this.flare[i] * r.sw[i]) / 2 : r.sw[i] / 2) - cx) * sx) / s;
       dMin = Math.min(dMin, Math.abs(d[i]));
     }
     // (Relative to the nearest strand's, so some strand always weighs 1.)
@@ -403,7 +416,7 @@ export class Fold {
       this.foldRow(r);
       for (let i = 0; i < r.xs.length; i++) {
         if (r.sw[i] <= 0) continue;
-        const l = r.xs[i] - (r.own[i] ? r.sw[i] / 2 : 0);
+        const l = r.xs[i] - (r.own[i] ? (r.sw[i] * (1 - this.flare[i])) / 2 : 0);
         lo = Math.min(lo, l);
         hi = Math.max(hi, l + r.sw[i]);
       }
@@ -541,14 +554,32 @@ export class Fold {
     // Where it stands: the anchor's weighted mean slot centre where it is at "now" (the canonical row, whose plain
     // mean slot centre is on the stem's centre: each strand counted once, whatever its width, so a column that
     // grows or shrinks moves its neighbours as little as it can).
+    // (A flaring column, its boom, counts as nothing wide at its room's inner edge: what lies on its inner side
+    // stands where it would without it. Q: the shift that takes it out, per item, summed along the row.)
+    const fl = this.flare;
+    let Q: Float64Array | null = null;
+    for (let i = 0; i < S; i++) {
+      if (!fl[i] || !r.own[i]) continue;
+      Q ??= new Float64Array(n + 1);
+      const q = item[i];
+      if (fl[i] > 0) Q[q + 1] -= w[q];
+      else {
+        Q[0] += w[q];
+        Q[q] -= w[q];
+      }
+    }
+    if (Q) for (let j = 1; j <= n; j++) Q[j] += Q[j - 1];
     let sw = 0;
     let sg = 0;
     let W = 0;
     const wt = this.wt;
     for (let i = 0; i < S; i++) {
-      const c = X[item[i]] + r.off[i] + r.sw[i] / 2;
+      let c = X[item[i]] + r.off[i] + r.sw[i] / 2;
+      // (A flaring column's centre: against its room's inner edge.)
+      if (fl[i] && r.own[i]) c -= (fl[i] * (r.sw[i] - lanesAt(this.strands[i], y)[0])) / 2;
       sg += c;
-      sw += wt[i] * c;
+      const ca = !Q ? c : fl[i] && r.own[i] ? X[item[i]] + Q[item[i]] + (fl[i] < 0 ? w[item[i]] : 0) : c + Q[item[i]];
+      sw += wt[i] * ca;
       W += wt[i];
     }
     r.mg = sg / Math.max(1, S);
@@ -564,7 +595,8 @@ export class Fold {
       shift = this.home - ref.mg + ref.mw - r.mw;
     }
     const xs = r.xs;
-    for (let i = 0; i < xs.length; i++) xs[i] = X[r.item[i]] + shift + r.off[i] + (r.own[i] ? r.sw[i] / 2 : 0);
+    // (An own column's room centre; a flaring one's room inner edge, the column held against it: leftAt.)
+    for (let i = 0; i < xs.length; i++) xs[i] = X[r.item[i]] + shift + r.off[i] + (r.own[i] ? (r.sw[i] * (1 - fl[i])) / 2 : 0);
     r.ver = this.ver;
   }
 
@@ -645,7 +677,7 @@ export class Fold {
     };
     const r0 = at(prev);
     const first = (r: Row, j: number) => (j ? r.end[j - 1] : 0);
-    const lft = (r: Row, i: number) => r.xs[i] - r.off[i] - (r.own[i] ? r.sw[i] / 2 : 0);
+    const lft = (r: Row, i: number) => r.xs[i] - r.off[i] - (r.own[i] ? (r.sw[i] * (1 - this.flare[i])) / 2 : 0);
     const X0 = Float64Array.from({ length: r0.n }, (_, j) => lft(r0, first(r0, j)));
     const r1 = at(cur);
     const X1 = Float64Array.from({ length: r1.n }, (_, j) => lft(r1, first(r1, j)));

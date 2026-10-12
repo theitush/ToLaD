@@ -43,12 +43,22 @@ function gapShare(fan: Fan, y: number): number {
   return 1 - u / (e - cs[0][0]);
 }
 const centre = (b: FanBranch, y: number) => leftAt(b, y) + laneAt(b, y).w / 2;
+/** Where a column stands: its centre, or a boom's inner edge (it flares into its own side, fold.ts). */
+const stands = (b: FanBranch, y: number) => {
+  const f = b.tess.fold!.flare[b.index];
+  return f ? leftAt(b, y) + (f < 0 ? laneAt(b, y).w : 0) : centre(b, y);
+};
 
 /** Where the fold moves columns sideways (its events): each peel, each bend of a room, each extinct line's end, each parent column's peel. */
 function events(fan: Fan, fold: Fold): [number, number][] {
   const out: [number, number][] = [];
+  const n = fan.root.strands.length;
   for (const b of fan.branches) {
-    out.push([b.leanY, b.splitY], ...fold.roomBends(b));
+    out.push([b.leanY, b.splitY]);
+    // (A boom that flares out over the order's edge (the dog, the cat: fold.ts flare) moves nothing but its own
+    // outer edge as its room bends: its room's changes are no event for the rest, which stand still through them.)
+    const f = fold.flare[b.index];
+    if (!((f < 0 && b.index === 0) || (f > 0 && b.index === n - 1))) out.push(...fold.roomBends(b));
   }
   for (const v of fan.nodes) if (v.parent) out.push([v.leanY, v.yBot]);
   out.push(...fold.forks());
@@ -115,14 +125,15 @@ describe('the fold', () => {
         for (const ys of runs) {
           for (const b of fan.branches) {
             if (!(ys[0] > b.tipY)) continue;
-            const x = ys.map((y) => (y < b.splitY ? centre(b, y) : leftAt(b, y)) * home * z);
+            const x = ys.map((y) => (y < b.splitY ? stands(b, y) : leftAt(b, y)) * home * z);
             worst = Math.max(worst, Math.max(...x) - Math.min(...x));
           }
         }
       }
       expect(worst).toBeLessThan(1e-6);
-      // (Linear: the domestic cat's and dog's booms leave few stretches where the whole order holds still; the deep-zoom test checks each column's own.)
-      expect(runs.length).toBeGreaterThanOrEqual(mode === 'linear' ? 1 : 3);
+      // (Linear: the domestic cat's and dog's booms leave few stretches where the whole order holds still; the deep-zoom test checks each column's own.
+      // Log: the dog's split from the wolf, its fork and the wolf's peel fall in what was the third still stretch: events of the tree.)
+      expect(runs.length).toBeGreaterThanOrEqual(mode === 'linear' ? 1 : 2);
     });
 
     it(`edges are continuous in time at every zoom: no jog at a split, a tip or a fork (${mode}, ${edge})`, () => {
@@ -401,7 +412,7 @@ describe('the fold', () => {
       fold.setScale(sx, SCREEN);
       const [a, b] = familySpan(v);
       fold.setAnchor((a + b) / 2, fan.time.y(1), sx, SCREEN);
-      const px = (s: FanBranch, t: number) => centre(s, fan.time.y(t)) * sx;
+      const px = (s: FanBranch, t: number) => stands(s, fan.time.y(t)) * sx;
       for (const s of v.strands) {
         if (s.tipY > fan.time.y(5e-4)) continue;
         const xs = [1e-4, 2e-4, 3e-4, 5e-4].map((t) => px(s, t));

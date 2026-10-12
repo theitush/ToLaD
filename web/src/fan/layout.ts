@@ -506,8 +506,8 @@ export class Tess {
 export function leftAt(b: FanBranch, y: number, w?: number, river = false): number {
   const f = river ? undefined : b.tess.fold;
   const l = f ? f.left(b.index, y) : null;
-  // (Folded: its own column about its room's centre, fold.ts; a slot in a parent column at its left.)
-  if (l !== null) return y < b.splitY ? l - (w ?? lanesAt(b, y)[0]) / 2 : l;
+  // (Folded: its own column about its room's centre, or a boom's against its room's inner edge, fold.ts; a slot in a parent column at its left.)
+  if (l !== null) return y < b.splitY ? l - ((w ?? lanesAt(b, y)[0]) * (1 - f!.flare[b.index])) / 2 : l;
   if (y < b.splitY) {
     const tc = b.x0 + b.baseW / 2;
     const c = tc + (b.cx - tc) * peelU(b.tess.edge, b.splitY, b.leanY, y);
