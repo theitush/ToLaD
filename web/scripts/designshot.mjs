@@ -123,7 +123,7 @@ const scenes = [
   ['wiki-noimg', 'frame', ['Panthera balamoides', null, 1, 0.4]],
   // One level up, the carnivores (ToLaD#146): home, a family framed as home frames the order ('level' [taxon]), the
   // cats as the level button frames them, a busy deep past (~40 Ma: ['level', [taxon, Ma, time zoom, width zoom]]),
-  // the wolf's card (the domestic dog is in its count), the search with "wol" typed.
+  // the wolf's card (the domestic dog its own leaf, split from it ~23 ka), the search with "wol" typed.
   ['carn-home', 'home'],
   ['carn-dogs', 'level', ['Canidae']],
   ['carn-bears', 'level', ['Ursidae']],

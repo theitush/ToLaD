@@ -13,14 +13,14 @@ import { FanCamera } from './camera';
 const fan = layoutFan(CARNIVORA, 'linear', CARNIVORA_TREE, 'curved');
 
 describe('Carnivora from the data', () => {
-  it('291 species: every living one and the dated fossils, each placed once', () => {
+  it('292 species: every living one and the dated fossils, each placed once', () => {
     const sp = speciesUnder(CARNIVORA_TREE);
-    expect(sp.length).toBe(291);
-    expect(new Set(sp).size).toBe(291);
-    expect(CARNIVORA.species.length).toBe(291);
+    expect(sp.length).toBe(292);
+    expect(new Set(sp).size).toBe(292);
+    expect(CARNIVORA.species.length).toBe(292);
     const fossils = CARNIVORA.species.filter((s) => s.extinct).map((s) => s.common);
     expect(fossils.length).toBe(7);
-    expect(fan.branches.length).toBe(291);
+    expect(fan.branches.length).toBe(292);
   });
 
   it('holds the cat family whole: the same 42 species as the cats on their own', () => {
