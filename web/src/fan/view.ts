@@ -186,41 +186,69 @@ const BOX_ROWS = 256;
 /** How long (ms) after the fold last moved the columns' edges are made exact (FanView.applyFold). */
 const FOLD_REST_MS = 120;
 
-const colBoxCache = new WeakMap<Fan, { key: string; map: Map<FanBranch | FanNode, ColBox> }>();
+/** colBoxes' boxes per fan, kept: their edges' memo entries [left, right, version, width] reused, worked out again per fold version (ToLaD#209). */
+const colBoxCache = new WeakMap<Fan, { key: string; map: Map<FanBranch | FanNode, ColBox>; gen: number; base: Float64Array }>();
 function colBoxes(fan: Fan): Map<FanBranch | FanNode, ColBox> {
   // (Folded, fold.ts: the columns move with the fold; their boxes and edges are worked out again when it changes.)
   const fold = fan.tess.fold;
   const key = fold ? `${fold.ver}:${fold.gridH}` : '';
-  const hit = colBoxCache.get(fan);
+  let hit = colBoxCache.get(fan);
   if (hit && hit.key === key) return hit.map;
-  const out = new Map<FanBranch | FanNode, ColBox>();
-  // Edges are pure functions of the height, and most heights asked for are on a grid fixed in the world: memoised.
-  const memo = (f: (y: number) => [number, number]) => {
-    const m = new Map<number, [number, number]>();
-    return (y: number) => {
-      let r = m.get(y);
-      if (!r) {
-        if (m.size > 4096) m.clear();
-        m.set(y, (r = f(y)));
-      }
-      return r;
+  if (!hit) {
+    const out = new Map<FanBranch | FanNode, ColBox>();
+    const ent = { key, map: out, gen: 0, base: new Float64Array(2 * (fan.branches.length + fan.nodes.length)) };
+    // Edges are pure functions of the height (at a fold version), and most heights asked for are on a grid fixed in
+    // the world: memoised, each entry kept from version to version and worked out again in place (no garbage a frame).
+    const memo = (f: (y: number, e: number[], fresh: boolean) => void) => {
+      const m = new Map<number, number[]>();
+      return (y: number): [number, number] => {
+        let r = m.get(y);
+        if (!r) {
+          if (m.size > 4096) m.clear();
+          m.set(y, (r = [0, 0, ent.gen, 0]));
+          f(y, r, true);
+        } else if (r[2] !== ent.gen) {
+          r[2] = ent.gen;
+          f(y, r, false);
+        }
+        return r as unknown as [number, number];
+      };
     };
-  };
-  for (const b of fan.branches) {
-    const at = memo((y) => {
-      const w = widthAt(b, y);
-      const l = leftAt(b, y, w);
-      return [l, l + w];
-    });
-    out.set(b, { x0: Math.min(b.x0, b.colLeft), x1: Math.max(b.x0, b.colLeft) + b.width, y0: b.tipY, y1: b.splitY, lean: b.leanY, own: b, at });
+    for (const b of fan.branches) {
+      const at = memo((y, e, fresh) => {
+        // (Its width stands whatever the fold: kept.)
+        if (fresh) e[3] = widthAt(b, y);
+        const w = e[3];
+        const l = leftAt(b, y, w);
+        e[0] = l;
+        e[1] = l + w;
+      });
+      out.set(b, { x0: Math.min(b.x0, b.colLeft), x1: Math.max(b.x0, b.colLeft) + b.width, y0: b.tipY, y1: b.splitY, lean: b.leanY, own: b, at });
+    }
+    for (const v of fan.nodes) {
+      const at = memo((y, e) => {
+        const l = nodeLeftAt(v, y);
+        e[0] = l;
+        e[1] = l + v.width;
+      });
+      out.set(v, { x0: Math.min(v.tile, v.left), x1: Math.max(v.tile, v.left) + v.width, y0: v.y, y1: v.parent ? v.yBot : Infinity, lean: v.leanY, own: v, at });
+    }
+    let i = 0;
+    for (const q of out.values()) {
+      ent.base[i++] = q.x0;
+      ent.base[i++] = q.x1;
+    }
+    colBoxCache.set(fan, (hit = ent));
+  } else {
+    hit.gen++;
+    let i = 0;
+    for (const q of hit.map.values()) {
+      q.x0 = hit.base[i++];
+      q.x1 = hit.base[i++];
+    }
   }
-  for (const v of fan.nodes) {
-    const at = memo((y) => {
-      const l = nodeLeftAt(v, y);
-      return [l, l + v.width];
-    });
-    out.set(v, { x0: Math.min(v.tile, v.left), x1: Math.max(v.tile, v.left) + v.width, y0: v.y, y1: v.parent ? v.yBot : Infinity, lean: v.leanY, own: v, at });
-  }
+  hit.key = key;
+  const out = hit.map;
   if (fold && fold.left(0, fan.time.y(0)) !== null) {
     // Folded: each box from its edges over its span (the fold moves columns smoothly), a hair wider, read at
     // heights on one grid for all of them, BOX_ROWS over the fan (a power of two: on the fold's own grid), so
@@ -254,7 +282,6 @@ function colBoxes(fan: Fan): Map<FanBranch | FanNode, ColBox> {
       q.x1 = x1 + pad;
     }
   }
-  colBoxCache.set(fan, { key, map: out });
   return out;
 }
 
@@ -443,9 +470,14 @@ export function labelSpots(
       seen[qi] = stamp;
       const q = cols[qi];
       if (q.own === own || q.x1 < wxa || q.x0 > wxb || q.y1 <= wya || q.y0 > wyb) continue;
-      for (const wy of heights(Math.max(wya, q.y0), Math.min(wyb, q.y1 - 1e-9), [q.lean])) {
-        const [l, r] = q.at(wy);
-        gap = Math.min(gap, Math.max(X(l) - xb, xa - X(r)));
+      // (heights()'s, without the array: the least over them.)
+      const wa = Math.max(wya, q.y0);
+      const wb = Math.min(wyb, q.y1 - 1e-9);
+      for (let j = -3, y = Math.ceil(wa / grid) * grid; j < 0 || y < wb; j < 0 ? j++ : (y += grid)) {
+        const wy = j === -3 ? wa : j === -2 ? wb : j === -1 ? q.lean : y;
+        if (j === -1 && !(wy > wa && wy < wb)) continue;
+        const e = q.at(wy);
+        gap = Math.min(gap, Math.max(X(e[0]) - xb, xa - X(e[1])));
       }
       // Hidden from here on whatever else is near.
       if (gap <= -1) return gap;
