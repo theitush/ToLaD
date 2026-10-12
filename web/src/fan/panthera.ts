@@ -15,11 +15,12 @@
 // which its segments are counted in.
 
 import raw from 'virtual:panthera-data';
+import carnivora from 'virtual:carnivora-data';
 import { BirthCurve, procgenSegments, type GenSegment } from './history';
-import { FELIDAE_TREE, sentenceCase, speciesUnder } from './splits';
+import { CARNIVORA_TREE, FELIDAE_TREE, sentenceCase, speciesUnder, type Split } from './splits';
 
 export { sentenceCase };
-import type { Grade, HistoryRec, NaturalMeta, NaturalRec, RawSpecies, RedListRec } from './panthera-extract';
+import type { Grade, HistoryRec, NaturalMeta, NaturalRec, RawClade, RawSpecies, RedListRec } from './panthera-extract';
 
 export type { Grade, HistEvent, HistoryRec, HistPoint, HistSegment, NaturalMeta, NaturalRec } from './panthera-extract';
 
@@ -122,27 +123,37 @@ function clades(species: RawSpecies[], rootGid: number): number[] {
   });
 }
 
-/** The species the dated tree places, in the tiles' order. */
-const placed = new Set(speciesUnder(FELIDAE_TREE));
 /** What every natural baseline is: label, grade, citation (skeleton META.natural). */
 export const NATURAL_META: NaturalMeta | null = raw.naturalMeta ?? null;
 
-const kept = raw.species.filter((s) => placed.has(s.sci));
-const cl = clades(kept, raw.gid);
-const species = kept.map((s, i) => speciesRec(s, cl[i]));
-const sum = (f: (s: SpeciesRec) => number) => species.reduce((a, s) => a + f(s), 0);
+/**
+ * A clade as the fan shows it: the species its dated tree places, in the tiles' order; its totals are the sums over
+ * them (the tiles' row also counts the fossil genera and synonym rows left out).
+ */
+export function cladeOf(r: RawClade, tree: Split, common: string): CladeRec {
+  const placed = new Set(speciesUnder(tree));
+  const kept = r.species.filter((s) => placed.has(s.sci));
+  const cl = clades(kept, r.gid);
+  const species = kept.map((s, i) => speciesRec(s, cl[i]));
+  const sum = (f: (s: SpeciesRec) => number) => species.reduce((a, s) => a + f(s), 0);
+  return {
+    gid: r.gid,
+    sci: r.sci,
+    common,
+    ever: sum((s) => s.ever),
+    everLo: sum((s) => s.everLo),
+    everHi: sum((s) => s.everHi),
+    alive: sum((s) => s.alive),
+    grade: r.grade,
+    t0: r.t0,
+    t1: r.t1,
+    species,
+  };
+}
 
-/** The family as the fan shows it: its totals are the sums over the species kept (the tiles' Felidae row also counts the fossil genera and synonym rows left out). */
-export const FELIDAE: CladeRec = {
-  gid: raw.gid,
-  sci: raw.sci,
-  common: 'Cats',
-  ever: sum((s) => s.ever),
-  everLo: sum((s) => s.everLo),
-  everHi: sum((s) => s.everHi),
-  alive: sum((s) => s.alive),
-  grade: raw.grade,
-  t0: raw.t0,
-  t1: raw.t1,
-  species,
-};
+/** The cat family. */
+export const FELIDAE: CladeRec = cladeOf(raw, FELIDAE_TREE, 'Cats');
+
+/** The order the cats sit in (ToLaD#146): 284 living species and the dated fossils. */
+export const CARNIVORA: CladeRec = cladeOf(carnivora, CARNIVORA_TREE, 'Carnivores');
+

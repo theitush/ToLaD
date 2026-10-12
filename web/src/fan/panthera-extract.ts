@@ -444,3 +444,15 @@ export function extractClade(
     : null;
   return { ...node(f, root), tile: tileId, species, naturalMeta, dated: tree, datedMeta };
 }
+
+/** The species under a dated split, left to right. */
+function underDated(t: DatedSplit): string[] {
+  return t.kids.flatMap((k) => (typeof k === 'string' ? [k] : underDated(k)));
+}
+
+/** A clade with only the species its dated tree places (the rows the fan draws), so a big clade's bundle stays small. */
+export function trimToFan(c: RawClade): RawClade {
+  if (!c.dated) return c;
+  const keep = new Set(underDated(c.dated));
+  return { ...c, species: c.species.filter((s) => keep.has(s.sci)) };
+}

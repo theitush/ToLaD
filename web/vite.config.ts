@@ -4,7 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
-import { loadClade } from './src/fan/panthera-extract';
+import { loadClade, trimToFan } from './src/fan/panthera-extract';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const DATA = resolve(here, '..', 'data', 'mammals');
@@ -55,6 +55,7 @@ function toladData(single: boolean): Plugin {
 }
 
 const PANTHERA = 'virtual:panthera-data';
+const CARNIVORA = 'virtual:carnivora-data';
 
 /**
  * The cat family (Felidae) subtree, decoded from ../data/mammals at build time with the v1
@@ -62,17 +63,24 @@ const PANTHERA = 'virtual:panthera-data';
  * histories are always the dataset's own.
  */
 function pantheraData(): Plugin {
+  // The order the cats sit in (ToLaD#146): only the species the fan draws (the tile's subspecies and synonym rows left out).
+  const ids: Record<string, () => unknown> = {
+    [PANTHERA]: () => loadClade((rel) => readFileSync(join(DATA, rel)), 'Felidae'),
+    [CARNIVORA]: () => trimToFan(loadClade((rel) => readFileSync(join(DATA, rel)), 'Carnivora')),
+  };
   return {
     name: 'panthera-data',
     resolveId(id) {
-      return id === PANTHERA ? '\0' + PANTHERA : null;
+      return id in ids ? '\0' + id : null;
     },
     load(id) {
-      if (id !== '\0' + PANTHERA) return null;
+      const make = id.startsWith('\0') ? ids[id.slice(1)] : undefined;
+      if (!make) return null;
       for (const f of dataFiles()) this.addWatchFile(join(DATA, f));
       if (existsSync(join(DATA, 'wiki.json'))) this.addWatchFile(join(DATA, 'wiki.json'));
-      const clade = loadClade((rel) => readFileSync(join(DATA, rel)), 'Felidae');
-      return `export default ${JSON.stringify(clade)};\nexport const wiki = ${JSON.stringify(wikiFor(clade.species.map((s) => s.sci)))};`;
+      // The pictures and links (ToLaD#182) for every species either level draws.
+      const wiki = id === '\0' + PANTHERA ? `\nexport const wiki = ${JSON.stringify(wikiFor((ids[CARNIVORA]() as { species: { sci: string }[] }).species.map((s) => s.sci)))};` : '';
+      return `export default ${JSON.stringify(make())};${wiki}`;
     },
   };
 }

@@ -108,7 +108,8 @@ class DomesticForms(unittest.TestCase):
     def test_tables_cover_every_form(self):
         for f in anchors.DOMESTIC_FORMS:
             self.assertIn(f, anchors.DOMESTICATION_YEAR)
-            self.assertIn(f, anchors.DOMESTIC_FORM_NO_STOCK)
+            if f != "Canis familiaris":  # the dog's stock is the Greenspoon pets table's (ToLaD#175)
+                self.assertIn(f, anchors.DOMESTIC_FORM_NO_STOCK)
 
 
 @unittest.skipUnless((DATA / "stats.json").exists(), "no build")

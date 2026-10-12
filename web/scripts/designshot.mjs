@@ -3,7 +3,7 @@
 // zoomed far out, and a species card open.
 //   npm run build:single && node scripts/designshot.mjs <out-dir> [prefix] [only,names]
 //   (DSF: device scale factor, default 2; CLIP=x,y,w,h; DEBUG=1: the ?debug readout; EDGE=curved|straight: the fan's edges;
-//   WIDTH=linear|log: the widths, default linear)
+//   WIDTH=linear|log: the widths, default linear; LEVEL=cats: the cats alone, a hidden flag (default: the carnivores, ToLaD#146))
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -111,6 +111,9 @@ const scenes = [
   // A flagged join met at the genome's long-run level (ToLaD#172): the puma's column from ~2 Mya to now, the
   // young end held at the anchor from ~61 kya, and its card with the one-sentence join.
   ['flag-puma', 'frame', ['Puma', 100000, 1, 0.5]],
+  // The texture inside a column (#192): the domestic cat's boom, its lines straight, only branching and ending.
+  ['tex-domcat300', 'frame', ['Domestic cat', 300, 1.6]],
+  ['tex-domcat2000', 'frame', ['Domestic cat', 2000, 1.6]],
   ['flag-puma-card', 'card', ['Puma']],
   // Wikipedia link + hotlinked Commons pictures (ToLaD#182; WAIT_MS=4000 lets them load): the lion's card,
   // home with the pills' thumbnails (WIDTH=log: eight pills), and a species with no picture (its card, its pill mid-span).
@@ -118,18 +121,54 @@ const scenes = [
   ['wiki-home', 'home'],
   ['wiki-noimg-card', 'card', ['Panthera balamoides']],
   ['wiki-noimg', 'frame', ['Panthera balamoides', null, 1, 0.4]],
+  // One level up, the carnivores (ToLaD#146): home, a family framed as home frames the order ('level' [taxon]), the
+  // cats as the level button frames them, a busy deep past (~40 Ma: ['level', [taxon, Ma, time zoom, width zoom]]),
+  // the wolf's card (the domestic dog its own leaf, split from it ~23 ka), the search with "wol" typed.
+  ['carn-home', 'home'],
+  ['carn-dogs', 'level', ['Canidae']],
+  ['carn-bears', 'level', ['Ursidae']],
+  ['carn-seals', 'level', ['Phocidae']],
+  ['carn-cats', 'level', ['Felidae']],
+  ['carn-deep40', 'level', ['Carnivora', 40, 4, 3]],
+  ['carn-card-dog', 'card', ['Grey wolf']],
+  ['carn-search-wol', 'search', ['wol']],
+  // A pick that once landed beside the screen (ToLaD#211: the fold opening as the camera zooms): now centred, card open.
+  ['tap-monkseal', 'search', ['hawaiian', 'Hawaiian monk seal']],
+  ['tap-manedwolf', 'search', ['maned', 'Maned wolf']],
+  ['tap-polarbear', 'search', ['polar', 'Polar bear']],
+  // The fold (ToLaD#146): the dogs at 1.5x, 3x and 6x home's width zoom, opening as they grow.
+  ['carn-dogs-z15', 'zoomto', ['Canidae', 1.5]],
+  ['carn-dogs-z3', 'zoomto', ['Canidae', 3]],
+  ['carn-dogs-z6', 'zoomto', ['Canidae', 6]],
+  ['carn-x3', 'zoomto', ['Carnivora', 3]],
+  ['carn-dogs-x15', 'zoomto', ['Canidae', 15]],
   // The world on the time axis (ToLaD#189): the last 150 kyr (the glacials, the LGM), ~70 Mya (K-Pg), the last 20 kyr
   // (the events). Q='periods=0&ice=0&events=0' for the layers off.
   ['world-150k', 'window', [0, 150000]],
   ['world-kpg', 'window', [30e6, 140e6]],
   ['world-20k', 'window', [0, 20000]],
+  // The clades' brackets above "now" (ToLaD#193): a level's home, and a bracket tapped from home (['tapclade', [taxon]]:
+  // the flight to the clade, now to its stem; a bracket too narrow to tap at home flown to as the tap would). LEVEL=carnivores for the order.
+  ['brk-home', 'home'],
+  ['brk-dogs', 'tapclade', ['Canidae']],
+  ['brk-bigcats', 'tapclade', ['Pantherinae']],
+  ['brk-tap-felidae', 'tapclade', ['Felidae']],
+  ['brk-tap-panthera', 'tapclade', ['Panthera']],
+  // The fold's straightness (ToLaD#146): a group of species (['group', [sci regex, share of the width it fills at
+  // agoMa, agoMa centred, time zoom × home]]): the weasels opened, the ferret badgers opened, the least weasel's
+  // split from the mountain weasel (3.1 Ma) close up.
+  ['weasels', 'group', ['^Mustela ', 0.85, 6, 1.6]],
+  ['ferretbadgers', 'group', ['^Melogale ', 0.85, 3, 2.5]],
+  ['weasel-3m', 'group', ['^Mustela (nivalis|altaica)$', 0.5, 3.1, 12]],
+  // A pill's "+x" (ToLaD#197) tapped from home, the biggest: the species it stands for framed, their pills showing.
+  ['plus-tap', 'tapplus'],
 ];
 const browser = await chromium.launch({ headless: true });
 try {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: Number(process.env.DSF || 2), isMobile: true, hasTouch: true });
   const page = await ctx.newPage();
   page.on('pageerror', (e) => console.log('pageerror', String(e)));
-  const q = [process.env.DEBUG ? 'debug' : '', process.env.EDGE ? `edge=${process.env.EDGE}` : '', process.env.Q || ''].filter(Boolean).join('&');
+  const q = [process.env.DEBUG ? 'debug' : '', process.env.EDGE ? `edge=${process.env.EDGE}` : '', process.env.LEVEL ? `level=${process.env.LEVEL}` : '', process.env.Q || ''].filter(Boolean).join('&');
   await page.goto(pathToFileURL(resolve('dist-single/index.html')).href + (q ? `?${q}` : ''));
   await page.waitForFunction(() => !!window.__fan, null, { timeout: Number(process.env.LOAD_MS || 20000) });
   for (const [name, kind, args] of scenes) {
@@ -233,6 +272,57 @@ try {
             f.cam = { cx: (lo + hi) / 2, cy: v.y - (H - 2 * v.blend) / 2, sx, sy, ty: sy };
             f.camera.settle();
           }
+        } else if (kind === 'group') {
+          const [re, fill, ma, tz] = args;
+          const r = new RegExp(re);
+          const g = fan.branches.filter((b) => r.test(b.sp.sci));
+          const h = f.homeCamera();
+          const y = fan.time.y(ma);
+          const fd = fan.tess.fold;
+          let sx = h.sx;
+          let cx = h.cx;
+          const span = () => {
+            const at = (b) => fd?.left(b.index, y) ?? f.model(b).lanes(y).left;
+            const lo = Math.min(...g.map(at));
+            const hi = Math.max(...g.map((b) => at(b) + f.model(b).lanes(y).w));
+            return [lo, hi];
+          };
+          for (let k = 0; k < 8; k++) {
+            fd?.setScale(sx, f.w);
+            let [lo, hi] = span();
+            if (fd && fd.setAnchor((lo + hi) / 2, y, sx, f.w)) [lo, hi] = span();
+            cx = (lo + hi) / 2;
+            sx = (fill * f.w) / Math.max(hi - lo, 1e-9);
+          }
+          fd?.setScale(sx, f.w);
+          if (fd && fd.setAnchor(cx, y, sx, f.w)) { const [lo, hi] = span(); cx = (lo + hi) / 2; }
+          f.cam = { cx, cy: y, sx, sy: h.sy * tz, ty: h.sy * tz };
+          f.camera.settle();
+        } else if (kind === 'zoomto') {
+          // A clade (taxon args[0]) centred at args[1] × home's width zoom, its level's time frame (ToLaD#146: the fold opening).
+          f.cam = f.levelCamera(args[0], args[1]) ?? f.homeCamera();
+          f.camera.settle();
+        } else if (kind === 'tapclade') {
+          // Home drawn, then a tap on the clade's bracket (it flies there; the shot waits WAIT_MS for it to land).
+          f.cam = f.homeCamera();
+          f.camera.settle();
+          f.draw();
+          const at = f.bracketAt(args[0]);
+          if (at) f.tap(at[0], at[1]);
+          else f.flyToClade(fan.nodes.find((n) => n.split.taxon === args[0]));
+        } else if (kind === 'tapplus') {
+          f.cam = f.homeCamera();
+          f.camera.settle();
+          f.draw();
+          f.draw();
+          const hit = [...f.plusHits].sort((p, q) => q.bs.length - p.bs.length)[0];
+          if (hit) f.tap((hit.box[0] + hit.box[2]) / 2, (hit.box[1] + hit.box[3]) / 2);
+        } else if (kind === 'level') {
+          // A level (ToLaD#146): the split founding taxon args[0] framed as home frames the fan; with args[1] (Ma),
+          // centred on that time, time zoomed args[2] and width args[3] × the frame.
+          const h = f.levelCamera(args[0]) ?? f.homeCamera();
+          f.cam = args[1] === undefined ? h : { ...h, cy: fan.time.y(args[1]), sy: h.sy * (args[2] ?? 1), ty: h.sy * (args[2] ?? 1), sx: h.sx * (args[3] ?? 1) };
+          f.camera.settle();
         } else if (kind === 'decline') {
           // The species' last `args[1]` years filling the screen, its column 60% of its width.
           const b = fan.branches.find((b) => (b.sp.common === args[0] || b.sp.sci === args[0]));

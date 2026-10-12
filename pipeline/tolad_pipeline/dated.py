@@ -427,7 +427,8 @@ def apply_overrides(root: DNode, merged: Node, ov, notes: list[dict]) -> tuple[D
     placed: set[int] = set()
     fossils = {n.name: n for n in merged.preorder() if n.is_leaf and n.name and eligible(n)}
     ents = []
-    for e in ov.dated_fossils:
+    # a domestic leaf (ToLaD#175) branches off its wild ancestor's lineage like a dated fossil
+    for e in ov.dated_fossils + ov.domestic_leaves:
         f = fossils.get(e["name"])
         why = ("no such dated species" if f is None else "already in Upham's tree" if f.data.get("dleaf")
                else f"sister {e['sister']!r} not in the dated tree" if e["sister"] not in by_name else "")

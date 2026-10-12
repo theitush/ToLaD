@@ -1,0 +1,44 @@
+species   = "Canis familiaris"
+common    = "Domestic dog"
+component = "domestic"
+use       = "counts"
+scope     = "global, owned and free-ranging domestic dogs"
+notes     = """
+The dog has no species of its own in Open Tree or Upham 2019 (both fold it into Canis lupus); the build gives it a
+leaf beside the grey wolf (overrides.toml [[domestic_leaf]], ToLaD#175), its lineage splitting from the wolf's
+~23 ka (Perri et al. 2021), so the wolf's leaf stays wild wolves only.
+
+No census of the world's dogs exists; the one global figure in the pinned sources is the rounded estimate
+Greenspoon et al. 2023 use for their biomass total (the dataset's own domestic anchor for dogs). No sourced
+global count before it was found. Before it the build keeps the model's growth since domestication (~15 ka,
+Frantz et al. 2016), shaped like human births and rescaled to meet it, as grade D model segments.
+
+Bottleneck ([[event]], ToLaD#141): the domestication founder event, from the genomes (Freedman et al. 2014),
+dated here to the window between the split from the wolves (~23 ka, Perri et al. 2021) and the start of the
+domestic stock (~15 ka). The curve in this file does not show the dip (no genome curve on this leaf, and no
+count before 2020): the mark stands on the source alone.
+"""
+
+[[event]]
+kind    = "bottleneck"
+from_ya = 23000
+to_ya   = 15000
+title   = "Domestication founders"
+scope   = "species"
+scope_why = "every dog descends from the founding population"
+summary = "The dogs' ancestors split from the grey wolves as a small population: the genomes show at least a 16-fold fall in its size, to about 2,000 breeding individuals in the population ancestral to all dogs."
+quote   = "In dogs, the domestication bottleneck involved at least a 16-fold reduction in population size"
+cite    = "Freedman AH, Gronau I, Schweizer RM, et al. (2014). Genome sequencing highlights the dynamic early history of dogs. PLoS Genet 10:e1004016"
+url     = "https://doi.org/10.1371/journal.pgen.1004016"
+grade   = "B"
+
+[[point]]
+year  = 2020
+n     = 1.0e9
+lo    = 1.0e9
+hi    = 1.0e9
+grade = "C"
+kind  = "estimate"
+cite  = "Greenspoon et al. 2023, PNAS 120:e2204892120, data release (data/domesticated_data/pets_rats_mouse.csv, Dog: population 1000000000)"
+url   = "https://doi.org/10.5281/zenodo.7594807"
+note  = "1 billion dogs, a rounded figure used for the pets' biomass (21.6 Mt at 21.62 kg); no range given. Dated 2020, the paper's reference period."

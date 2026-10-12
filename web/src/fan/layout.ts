@@ -72,6 +72,7 @@
 // holds its founders (constant): the parent population is the sum of its
 // daughters' founders.
 
+import type { Fold } from './fold';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { parentShare, population, smoother, TIME_C, type Population } from './population';
 import { FELIDAE_TREE, type Split } from './splits';
@@ -276,11 +277,15 @@ export function peelU(edge: EdgeStyle, yBot: number, leanY: number, y: number): 
 }
 
 /** A parent column's left edge at height y (in its span): from its tile in the parent to its own left (peelU). */
-export function nodeLeftAt(v: FanNode, y: number): number {
-  return v.tile + (v.left - v.tile) * peelU(v.edge, v.yBot, v.leanY, y);
+export function nodeLeftAt(v: FanNode, y: number, river = false): number {
+  const f = river ? undefined : v.strands[0]?.tess.fold;
+  const l = f ? f.left(v.strands[0].index, y) : null;
+  return l ?? v.tile + (v.left - v.tile) * peelU(v.edge, v.yBot, v.leanY, y);
 }
 
 const clampW = (v: number, w: number) => Math.min(w, Math.max(0, v));
+/** How many heights xRange reads a folded strand's edge at, at most. */
+const XR_N = 48;
 
 /**
  * Branch b's width and green lane's width at world y: [w, gw], exact. Above
@@ -320,6 +325,8 @@ function segGreen(s: PathSeg, age: number, y: number): number {
  */
 export class Tess {
   private readonly ys = new Map<FanBranch, Float64Array>();
+  /** The fold (fold.ts, ToLaD#146): how far the splits are open at the view's zoom; none: the river, fully open. */
+  fold?: Fold;
 
   constructor(
     readonly time: TimeScale,
@@ -376,6 +383,14 @@ export class Tess {
     let L = Infinity;
     let R = -Infinity;
     if (!(hi >= lo)) return [L, R];
+    // (Folded: asked twice a frame per strand, by the lanes and the individuals, each its own span: both kept for the fold's version.)
+    const f = this.fold;
+    const memo = f ? this.xMemo.get(b) : undefined;
+    if (memo) {
+      for (let o = 0; o < 12; o += 6) {
+        if (memo[o] === f!.ver && memo[o + 1] === f!.gridH && memo[o + 2] === lo && memo[o + 3] === hi) return [memo[o + 4], memo[o + 5]];
+      }
+    }
     if (lo < b.splitY) {
       const tc = b.x0 + b.baseW / 2;
       const c = (y: number) => tc + (b.cx - tc) * peelU(this.edge, b.splitY, b.leanY, y);
@@ -391,16 +406,52 @@ export class Tess {
       const z = Math.min(hi, k + 1 < p.length ? p[k + 1].y : this.bottom);
       if (!(z >= a)) continue;
       for (const y of [a, z]) {
-        const x = nodeLeftAt(p[k].node, y) + p[k].off;
+        const x = nodeLeftAt(p[k].node, y, true) + p[k].off;
         L = Math.min(L, x);
         R = Math.max(R, x + b.baseW);
       }
+    }
+    // Folded (fold.ts): its edges over the range, at the ends and the fold's rows between (as drawn).
+    if (f && R > L && f.left(b.index, lo) !== null) {
+      // (At most XR_N samples: the folded edge is smooth, eased over bends ROOM_BEND tall at least; between two
+      // samples it strays no further than the larger step beside them, a margin added on both sides.)
+      const n = f.gridH > 0 ? Math.min(XR_N, Math.ceil((hi - lo) / f.gridH)) : 16;
+      const wMax = Math.max(b.baseW, lo < b.splitY ? b.unit * g(b.pop.max, this.mode) : 0);
+      L = Infinity;
+      R = -Infinity;
+      let prev = NaN;
+      let dPrev = 0;
+      for (let k = 0; k <= n; k++) {
+        const x = f.left(b.index, n ? lo + ((hi - lo) * k) / n : lo)!;
+        L = Math.min(L, x - wMax);
+        R = Math.max(R, x + wMax);
+        if (k) {
+          // (Where the edge turns back, at the sample before, it may reach past it between: by half the larger step beside.)
+          const dx = x - prev;
+          const over = 0.5 * Math.max(Math.abs(dx), Math.abs(dPrev));
+          if (dPrev > 0 && dx < 0) R = Math.max(R, prev + wMax + over);
+          if (dPrev < 0 && dx > 0) L = Math.min(L, prev - wMax - over);
+          dPrev = dx;
+        }
+        prev = x;
+      }
+      const pad = 1e-6 * Math.max(1, Math.abs(L), Math.abs(R)) + (R - L) * 1e-3;
+      const out: [number, number] = [L - pad, R + pad];
+      // (Into the older of its two slots.)
+      let m = memo;
+      if (!m) this.xMemo.set(b, (m = new Float64Array(13).fill(NaN)));
+      const o = m[12] === 0 ? 6 : 0;
+      m[12] = o;
+      m.set([f.ver, f.gridH, lo, hi, out[0], out[1]], o);
+      return out;
     }
     // (A hair of slack for rounding.)
     const pad = 1e-6 * Math.max(1, Math.abs(L), Math.abs(R)) + (R - L) * 1e-3;
     return [L - pad, R + pad];
   }
 
+  /** xRange's last two folded answers per strand: [fold version, grid, lo, hi, L, R] twice, then the newer's offset. */
+  private readonly xMemo = new Map<FanBranch, Float64Array>();
   private readonly splits = new Map<FanBranch, Set<number>>();
   /** The heights of the splits branch b passes (a cut always falls on each). */
   private splitYs(b: FanBranch): Set<number> {
@@ -461,14 +512,18 @@ export class Tess {
 }
 
 /** Left edge of a branch at world y: its own column (about its centre, peeling off its parent) above its split, then its place in each parent column below. (w: its width there, if known: lanesAt(b, y)[0].) */
-export function leftAt(b: FanBranch, y: number, w?: number): number {
+export function leftAt(b: FanBranch, y: number, w?: number, river = false): number {
+  const f = river ? undefined : b.tess.fold;
+  const l = f ? f.left(b.index, y) : null;
+  // (Folded: its own column about its room's centre, or a boom's against its room's inner edge, fold.ts; a slot in a parent column at its left.)
+  if (l !== null) return y < b.splitY ? l - ((w ?? lanesAt(b, y)[0]) * (1 - f!.flare[b.index])) / 2 : l;
   if (y < b.splitY) {
     const tc = b.x0 + b.baseW / 2;
     const c = tc + (b.cx - tc) * peelU(b.tess.edge, b.splitY, b.leanY, y);
     return c - (w ?? lanesAt(b, y)[0]) / 2;
   }
   const s = segAt(b, y);
-  return nodeLeftAt(s.node, y) + s.off;
+  return nodeLeftAt(s.node, y, true) + s.off;
 }
 
 /**
@@ -789,8 +844,11 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = FELIDA
   if (!byTree) SIDES.set(clade, (byTree = new Map()));
   let byMode = byTree.get(tree);
   if (!byMode) byTree.set(tree, (byMode = new Map()));
+  // The order is the tree's, whatever the widths (ToLaD#146: linear vs log never reorders the species): the sides
+  // chosen on the default design's widths (linear), every other design taking them.
+  if (mode !== ORDER_MODE && !byMode.has(ORDER_MODE)) layoutFan(clade, ORDER_MODE, tree, edge);
   const P = new Packer(time, mode, W);
-  const { plans, sides } = chooseSides(root, P, byMode.get(mode));
+  const { plans, sides } = chooseSides(root, P, byMode.get(ORDER_MODE));
   byMode.set(mode, sides);
   if (edge === 'curved') placeRiver(root, P, time, mode);
   else placeLean(root, nodes, plans, time, mode);
@@ -1056,7 +1114,18 @@ interface Cand extends Plan {
  */
 const MAX_CANDS = 16;
 
+/**
+ * A tree of more species than BIG_TREE keeps only MAX_CANDS_BIG candidates per subtree (ToLaD#146): the search
+ * costs ~MAX_CANDS² plans per split, so at Carnivora's 291 species the full one took ~1.5 s (a phone: several)
+ * for a total sideways run within 0.5% of what 4 find (measured: 202.1 vs 203.3 linear, 236.4 vs 237.5 log). A
+ * family (the cats: 42) is searched in full, as before.
+ */
+const BIG_TREE = 64;
+const MAX_CANDS_BIG = 4;
+
 /** The sides chosen (mirrored or not, per split) per clade, tree and width mode: the toggle reuses them, no search. */
+/** The widths the species' left-to-right order is chosen on (every design takes it). */
+const ORDER_MODE: WidthMode = 'linear';
 const SIDES = new WeakMap<CladeRec, Map<Split, Map<WidthMode, Map<Split, boolean>>>>();
 
 /**
@@ -1074,6 +1143,8 @@ const SIDES = new WeakMap<CladeRec, Map<Split, Map<WidthMode, Map<Split, boolean
  */
 function chooseSides(root: FanNode, P: Packer, known?: Map<Split, boolean>): { plans: Map<FanNode, Plan>; sides: Map<Split, boolean> } {
   const better = (p: Cand, q: Cand) => (Math.abs(p.cost - q.cost) > 1e-9 ? p.cost - q.cost : p.flips - q.flips);
+  const count = (v: FanNode): number => v.kids.reduce((n, k) => n + (isNode(k) ? count(k) : 1), 0);
+  const big = count(root) > BIG_TREE;
   // One choice at v: its daughters (table order), their candidates, mirrored or not.
   // A species' outline on its slot (read only: the same for every plan).
   const leaves = new Map<FanBranch, Contour>();
@@ -1128,7 +1199,8 @@ function chooseSides(root: FanNode, P: Packer, known?: Map<Split, boolean>): { p
     // Each daughter's best candidates: all MAX_CANDS of them when two daughters are splits (MAX_CANDS² combinations); a
     // polytomy (the data's tree has some, ToLaD#145) keeps fewer each, so the combinations stay within that budget.
     const nNodes = v.kids.filter(isNode).length;
-    const per = nNodes <= 2 ? MAX_CANDS : Math.max(1, Math.floor(Math.pow(MAX_CANDS * MAX_CANDS, 1 / nNodes)));
+    const cap = big ? MAX_CANDS_BIG : MAX_CANDS;
+    const per = nNodes <= 2 ? cap : Math.max(1, Math.floor(Math.pow(cap * cap, 1 / nNodes)));
     const fronts = v.kids.map((k) => (isNode(k) ? cands(k).slice(0, per) : [null]));
     // Every combination of the daughters' candidates, each both ways round (one daughter: no sides to choose).
     let combos: (Cand | null)[][] = [[]];
@@ -1144,7 +1216,7 @@ function chooseSides(root: FanNode, P: Packer, known?: Map<Split, boolean>): { p
     for (const c of all) {
       if (keep.some((k) => k.cost <= c.cost + 1e-9 && k.flips <= c.flips && P.inside(k.out, c.out))) continue;
       keep.push(c);
-      if (keep.length >= MAX_CANDS) break;
+      if (keep.length >= cap) break;
     }
     return keep;
   };
