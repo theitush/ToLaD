@@ -19,10 +19,11 @@ export interface ColumnSpan {
 
 /**
  * How far each style fades its stretch of the lanes towards the background (0: as measured, 1: gone).
- * Faint, not hidden: the column keeps its width and colour, it only reads as not measured.
+ * Held is no longer faded (Ita, ToLaD#146: "what do the diff shades mean? i thought we tabled that"):
+ * every column draws in one colour; where a stretch is held, the card's text says so (#171).
  */
 export const COLUMN_DIM: Record<ColumnStyle, number> = {
-  held: 0.55,
+  held: 0,
 };
 
 /**

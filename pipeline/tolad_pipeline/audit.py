@@ -55,7 +55,11 @@ from pathlib import Path
 JOIN_FLAG = 10.0  # ToLaD#77: a ratio beyond 10x either way between two levels is flagged
 TODAY_FLAG = 10.0  # the same 10x, for today's count against an independent published figure
 CEILING = 10_000.0  # IUCN Categories and Criteria v3.1: criterion C's VU bound, the largest C/D allows
-CEILING_STATUS = ("CR", "EW")  # #88; EN is not: listed under A or B it can be any size
+# #88; EN/VU are not: listed under A or B they can be any size, and the Red List snapshot (GBIF's
+# checklist, redlist.py) carries the category but not the criteria, so a C/D listing cannot be told from
+# an A one. #183 counted what a VU/EN check without criteria would flag: 417 VU and 405 EN species
+# modelled above their C bound, nearly all of them; the suspects checked by hand were A-listed
+CEILING_STATUS = ("CR", "EW")
 C_BOUND = {"CR": 250.0, "EN": 2_500.0, "VU": 10_000.0}  # criterion C, mature individuals (context)
 DEEP_FACTOR_FLAG = 3.0  # #75: the sources' per-year rates run 0.35-2.55x of the 1e-9 the curves use
 EVENT_FALL = 1.5  # history.EVENT_FALL (ToLaD#149): a species-wide event's column falls this much through it

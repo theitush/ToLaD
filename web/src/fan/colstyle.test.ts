@@ -100,16 +100,10 @@ describe('held (no-data) stretches on the fan columns (ToLaD#55)', () => {
     expect(alive(dom, 5000) / alive(dom, 500)).toBeLessThan(0.5);
   });
 
-  it('the view draws them world-fixed: one [top, bottom, dim] per span, in world y', () => {
+  it('the view draws no fade (#146: one colour per column); the held spans stay for the card text', () => {
     const b = byName('Leopard');
-    const ys = colSpansY(fan, b);
-    const spans = columnSpans(b.sp, b.t0);
-    expect(ys).toEqual(spans.map((s) => [fan.time.y(s.ago1 / 1e6), fan.time.y(s.ago0 / 1e6), COLUMN_DIM.held]));
-    for (const [t, bt, d] of ys) {
-      expect(bt).toBeGreaterThan(t);
-      expect(d).toBeGreaterThan(0);
-      expect(d).toBeLessThan(1);
-    }
-    expect(colSpansY(fan, b)).toBe(ys); // cached: no per-frame work
+    expect(COLUMN_DIM.held).toBe(0);
+    expect(columnSpans(b.sp, b.t0).length).toBeGreaterThan(0);
+    expect(colSpansY(fan, b)).toEqual([]);
   });
 });
