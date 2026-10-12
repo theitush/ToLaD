@@ -11,7 +11,7 @@ import { clipPoly, FanCamera, STRAND_PX, type Camera } from './camera';
 import { laneAt, layoutFan, leftAt, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type EdgeStyle, type Fan, type FanBranch, type FanNode, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01 } from './meshgl';
-import { Fold, leanFade } from './fold';
+import { Fold, leanEnds, leanPieces, leanShare } from './fold';
 import { COLUMN_DIM, columnSpans, EVENT_TINT, eventAt, eventSpans, type EventSpan } from './colstyle';
 import { drawTwigs, kLogAt, laneDim, LINEAGE, LIVING, TEX_HAIR_PX, TWIG_GRAY, TwigModel, type IndInfo, type TwigStats } from './twigs';
 import type { MeshBatch, RectBatch } from './meshgl';
@@ -742,10 +742,19 @@ export class FanView implements InputHandlers {
   private labelT = 0;
   /** `?debug`: a readout of the zooms, years on screen and individuals per px. */
   readonly debug = typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug');
+  /** `?debug&hide=stem,lanes,ind,held,events,fade`: those layers not drawn (finding which layer draws what, ToLaD#210). */
+  private readonly hide = new Set(this.debug ? (new URLSearchParams(location.search).get('hide') ?? '').split(',') : []);
   /** What each branch's individuals view drew last frame (taps, tests). */
   twigStats = new Map<number, TwigStats>();
   /** Without the GPU layer: this frame's styled column stretches, faded once the individuals are drawn. */
   private heldRuns: { run: RibbonPt[]; hw: number; d: number }[] = [];
+  /** drawStem's chords on screen (their left edges, their rows). */
+  private stemXs = new Float64Array(64);
+  private stemSy = new Float64Array(64);
+  /** drawStem: each column's backdrop's share at its bottom, where it fades (folded). */
+  private stemBot = new Map<FanNode, number>();
+  /** A strand's stretches' shares drawn (leanPlan): each its own (lin), its height (h), at their ends (V); a stretch's pieces. */
+  private lean = { lin: new Float64Array(256), h: new Float64Array(256), V: new Float64Array(257), pc: [] as number[] };
   /** The event labels shown last frame (screen boxes): a tap on one opens its event. */
   private eventLabels: { box: [number, number, number, number]; b: FanBranch; k: number }[] = [];
   /** The species' pictures as last drawn (ToLaD#193): [x, y, radius, its column], a tap on one opens its card. */
@@ -1397,12 +1406,13 @@ export class FanView implements InputHandlers {
     }
     drawWorldUnder(this);
     this.drawTimeAxis(false);
-    this.drawStem();
-    for (const b of this.fan.branches) this.drawStrand(b);
-    for (const b of this.fan.branches) this.drawIndividuals(b);
-    this.drawHeld();
-    this.drawEvents();
-    this.drawStemFade();
+    const hide = this.hide;
+    if (!hide.has('stem')) this.drawStem();
+    if (!hide.has('lanes')) for (const b of this.fan.branches) this.drawStrand(b);
+    if (!hide.has('ind')) for (const b of this.fan.branches) this.drawIndividuals(b);
+    if (!hide.has('held')) this.drawHeld();
+    if (!hide.has('events')) this.drawEvents();
+    if (!hide.has('fade')) this.drawStemFade();
     // Labels: one form everywhere (see labelSpots).
     this.drawGutter();
     this.drawTouch();
@@ -1432,7 +1442,12 @@ export class FanView implements InputHandlers {
     const c = rgb01(this.gl ? mix(GRAY, '#131c19', 0.86) : GRAY);
     const [, wTop] = this.toWorld(0, -8);
     const [, wBot] = this.toWorld(0, this.h + 8);
-    for (const v of this.fan.nodes) {
+    // (Folded, daughters before their parents: a column's backdrop fades out under its daughters' where theirs do.)
+    const bot = this.stemBot;
+    bot.clear();
+    const nodes = this.fan.nodes;
+    for (let ni = nodes.length - 1; ni >= 0; ni--) {
+      const v = nodes[ni];
       const ya = Math.max(v.y, wTop);
       const yb = Math.min(v.yBot, wBot);
       if (!(yb > ya)) continue;
@@ -1447,20 +1462,63 @@ export class FanView implements InputHandlers {
         for (let i = 1; i < n; i++) ys.push(p0 + ((yb - p0) * i) / n);
       }
       ys.push(yb);
-      for (let i = 0; i + 1 < ys.length; i++) {
-        const [l0, t] = this.toScreen(nodeLeftAt(v, ys[i]), ys[i]);
-        const [l1, b] = this.toScreen(nodeLeftAt(v, ys[i + 1]), ys[i + 1]);
-        const w = v.width * this.cam.sx;
+      const n = ys.length - 1;
+      const xs = this.stemXs.length > n ? this.stemXs : (this.stemXs = new Float64Array(2 * n + 2));
+      const sy = this.stemSy.length > n ? this.stemSy : (this.stemSy = new Float64Array(2 * n + 2));
+      for (let i = 0; i <= n; i++) [xs[i], sy[i]] = this.toScreen(nodeLeftAt(v, ys[i]), ys[i]);
+      const w = v.width * this.cam.sx;
+      // (Folded: its chords running near-flat across the screen culled and the backdrop fading out either side of
+      // them, as its lanes do (drawStrand, fold.ts leanEnds): no flat dark edge where they are cut.)
+      const L = this.lean;
+      let fades = false;
+      if (this.fan.tess.fold) {
+        if (L.lin.length < n) {
+          L.lin = new Float64Array(2 * n);
+          L.h = new Float64Array(2 * n);
+          L.V = new Float64Array(2 * n + 1);
+        }
+        // (Its ends bottom first, as leanEnds takes them.)
+        let all = true;
+        for (let j = 0; j < n; j++) {
+          const i = n - 1 - j;
+          const dy = sy[i + 1] - sy[i];
+          L.lin[j] = dy > 0 ? leanShare(xs[i + 1] - xs[i], dy) : 1;
+          L.h[j] = dy > 0 ? dy : 0;
+          if (L.lin[j] < 1) all = false;
+        }
+        // (Its top at its split on screen: no more than its daughters' backdrops at their bottoms.)
+        let vTop = 1;
+        if (ya === v.y) for (const d of v.kids) if ('kids' in d) vTop = Math.min(vTop, bot.get(d) ?? 1);
+        fades = (!all || vTop < 1) && leanEnds(n, L.lin, L.h, L.V, 1, vTop);
+        if (fades && yb === v.yBot) bot.set(v, L.V[0]);
+      }
+      for (let i = 0; i < n; i++) {
+        const l0 = xs[i];
+        const t = sy[i];
+        const l1 = xs[i + 1];
+        const b = sy[i + 1];
         if (!(b > t) || Math.max(l0, l1) > this.w + 8 || Math.min(l0, l1) + w < -8) continue;
-        if (this.gl) this.gl.under.push(l0, t, l0 + w, b, c[0], c[1], c[2], 1, l1 - l0, l1 - l0);
-        else {
-          this.ctx.fillStyle = `rgb(${Math.round(c[0] * 255)},${Math.round(c[1] * 255)},${Math.round(c[2] * 255)})`;
-          this.ctx.beginPath();
-          this.ctx.moveTo(l0, t);
-          this.ctx.lineTo(l0 + w, t);
-          this.ctx.lineTo(l1 + w, b);
-          this.ctx.lineTo(l1, b);
-          this.ctx.fill();
+        const j = n - 1 - i;
+        const m = fades ? leanPieces(L.lin[j], L.V[j], L.V[j + 1], b - t, L.pc) : 1;
+        for (let k = 0; k < m; k++) {
+          // (A piece, s from its bottom (b) up to its top (t), at share a.)
+          const s0 = fades ? L.pc[3 * k] : 0;
+          const s1 = fades ? L.pc[3 * k + 1] : 1;
+          const a = fades ? L.pc[3 * k + 2] : 1;
+          const xt = l1 + (l0 - l1) * s1;
+          const xb = l1 + (l0 - l1) * s0;
+          const pt = b + (t - b) * s1;
+          const pb = b + (t - b) * s0;
+          if (this.gl) this.gl.under.push(xt, pt, xt + w, pb, c[0], c[1], c[2], a, xb - xt, xb - xt);
+          else {
+            this.ctx.fillStyle = `rgba(${Math.round(c[0] * 255)},${Math.round(c[1] * 255)},${Math.round(c[2] * 255)},${a})`;
+            this.ctx.beginPath();
+            this.ctx.moveTo(xt, pt);
+            this.ctx.lineTo(xt + w, pt);
+            this.ctx.lineTo(xb + w, pb);
+            this.ctx.lineTo(xb, pb);
+            this.ctx.fill();
+          }
         }
       }
     }
@@ -1600,6 +1658,40 @@ export class FanView implements InputHandlers {
         if (r0 > L + 8 && r1 > L + 8) r0 = r1 = L + 8;
         batch.push(l0, y0, r0, y1, c[0], c[1], c[2], a, l1 - l0, r1 - r0, cl, cr);
       };
+      const gl = this.gl;
+      // One piece of a stretch (all of it, or a slice where it fades): q's row (top) to p's, drawn at share `lean`.
+      const piece = (xq: number, wq: number, gq: number, xp: number, wp: number, gp: number, y0: number, y1: number, lean: number) => {
+        const wm = (wq + wp) / 2;
+        const gm = (gq + gp) / 2;
+        const gc = mix01(GRAY, '#131c19', laneDim(wm - gm, lives, tex) * 0.82);
+        const ec = mix01(GREEN, '#0d2318', laneDim(gm, lives, tex) * 0.9);
+        // A styled stretch of the column (held flat for want of figures: colstyle.ts) fades towards the
+        // background: the background over the whole lane, lanes and individuals alike (drawn after the mesh).
+        const dim = held.length ? dimAt(held, (y0 + y1) / 2) : 0;
+        // The least widths across the lane, not along the row: a thin branch-out leaning s px per px
+        // is √(1 + s²) px of the row per px across (else a hairline lean breaks into dashes).
+        const sq = Math.sqrt(1 + ((xp + wp / 2 - xq - wq / 2) / (y1 - y0)) ** 2);
+        const xa = Math.min(xq, xp);
+        const xr = Math.max(xq + Math.max(0.6, wq), xp + Math.max(0.6, wp)) + 0.5;
+        trap(gl.under, xq, xq + Math.max(0.6 * sq, wq), xp, xp + Math.max(0.6 * sq, wp), y0, y1, gc, lean, xa - 0.5, xr);
+        if (dim > 0) trap(gl.over, xq, xq + Math.max(sq, wq), xp, xp + Math.max(sq, wp), y0, y1, BG01, dim, xa - 0.5, xr + 0.5);
+        if (gq > 0 || gp > 0) {
+          const g1q = xq + Math.max(sq, gq);
+          const g1p = xp + Math.max(sq, gp);
+          const xb = Math.max(xq + Math.max(1, gq), xp + Math.max(1, gp));
+          // The living glow faintly (fading as their lane resolves into individuals).
+          const glow = (1 - lives) * (1 - dim) * lean;
+          if (glow > 0.01) {
+            trap(gl.under, xq - 4 * sq, g1q + 4 * sq, xp - 4 * sq, g1p + 4 * sq, y0, y1, ec, 0.06 * glow, xa - 4, xb + 4);
+            trap(gl.under, xq - 1.5 * sq, g1q + 1.5 * sq, xp - 1.5 * sq, g1p + 1.5 * sq, y0, y1, ec, 0.14 * glow, xa - 1.5, xb + 1.5);
+          }
+          trap(gl.under, xq, g1q, xp, g1p, y0, y1, ec, lean, xa - 0.5, xb + 0.5);
+        }
+      };
+      // (A stretch running near-flat across the screen, a far family's columns closing a deep fork: culled, and the
+      // column fades out over the px below it, never cut flat: fold.ts leanFade, leanEnds.)
+      const fades = this.leanPlan(pts);
+      const { lin, V, pc } = this.lean;
       for (let i = 0; i + 1 < pts.length; i++) {
         // p below q on screen: the trapezoid from q's row (top) to p's.
         const p = pts[i];
@@ -1614,52 +1706,45 @@ export class FanView implements InputHandlers {
         if (!(wq > 0) && !(wp > 0)) continue;
         const gq = wq * q.f;
         const gp = wp * p.f;
-        const wm = (wq + wp) / 2;
-        const gm = (gq + gp) / 2;
-        // (A stretch running near-flat across the screen, a far family's columns closing a deep fork: culled, fold.ts leanFade.)
-        const lean = this.fan.tess.fold ? leanFade(xp + wp / 2 - xq - wq / 2, y1 - y0) : 1;
-        if (!(lean > 0)) continue;
-        const gc = mix01(GRAY, '#131c19', laneDim(wm - gm, lives, tex) * 0.82);
-        const ec = mix01(GREEN, '#0d2318', laneDim(gm, lives, tex) * 0.9);
-        // A styled stretch of the column (held flat for want of figures: colstyle.ts) fades towards the
-        // background: the background over the whole lane, lanes and individuals alike (drawn after the mesh).
-        const dim = held.length ? dimAt(held, (y0 + y1) / 2) : 0;
-        // The least widths across the lane, not along the row: a thin branch-out leaning s px per px
-        // is √(1 + s²) px of the row per px across (else a hairline lean breaks into dashes).
-        const sq = Math.sqrt(1 + ((xp + wp / 2 - xq - wq / 2) / (y1 - y0)) ** 2);
-        const xa = Math.min(xq, xp);
-        const xr = Math.max(xq + Math.max(0.6, wq), xp + Math.max(0.6, wp)) + 0.5;
-        trap(this.gl.under, xq, xq + Math.max(0.6 * sq, wq), xp, xp + Math.max(0.6 * sq, wp), y0, y1, gc, lean, xa - 0.5, xr);
-        if (dim > 0) trap(this.gl.over, xq, xq + Math.max(sq, wq), xp, xp + Math.max(sq, wp), y0, y1, BG01, dim, xa - 0.5, xr + 0.5);
-        if (gq > 0 || gp > 0) {
-          const g1q = xq + Math.max(sq, gq);
-          const g1p = xp + Math.max(sq, gp);
-          const xb = Math.max(xq + Math.max(1, gq), xp + Math.max(1, gp));
-          // The living glow faintly (fading as their lane resolves into individuals).
-          const glow = (1 - lives) * (1 - dim) * lean;
-          if (glow > 0.01) {
-            trap(this.gl.under, xq - 4 * sq, g1q + 4 * sq, xp - 4 * sq, g1p + 4 * sq, y0, y1, ec, 0.06 * glow, xa - 4, xb + 4);
-            trap(this.gl.under, xq - 1.5 * sq, g1q + 1.5 * sq, xp - 1.5 * sq, g1p + 1.5 * sq, y0, y1, ec, 0.14 * glow, xa - 1.5, xb + 1.5);
-          }
-          trap(this.gl.under, xq, g1q, xp, g1p, y0, y1, ec, lean, xa - 0.5, xb + 0.5);
+        if (!fades) {
+          piece(xq, wq, gq, xp, wp, gp, y0, y1, 1);
+          continue;
+        }
+        // (Its pieces, t from p up to q: each slice's ends along the trapezoid's.)
+        const n = leanPieces(lin[i], V[i], V[i + 1], y1 - y0, pc);
+        for (let j = 0; j < n; j++) {
+          const t0 = pc[3 * j];
+          const t1 = pc[3 * j + 1];
+          const at = (a: number, b: number, t: number) => a + (b - a) * t;
+          const ya = at(y1, y0, t1);
+          const yb = at(y1, y0, t0);
+          if (yb < -4 || ya > this.h + 4) continue;
+          piece(at(xp, xq, t1), at(wp, wq, t1), at(gp, gq, t1), at(xp, xq, t0), at(wp, wq, t0), at(gp, gq, t0), ya, yb, pc[3 * j + 2]);
         }
       }
     } else {
-      // (Its runs whose lean on screen is drawn, fold.ts leanFade: a near-flat stretch culled.)
-      const k = this.cam.sx;
-      const runs: RibbonPt[][] = [];
+      // (Its runs drawn whole; where a near-flat stretch is culled, the column fading out over the px either side of
+      // it, a slice at a time: fold.ts leanFade, leanEnds.)
+      const fades = this.leanPlan(pts);
+      const { lin, V, pc } = this.lean;
+      const runs: [RibbonPt[], number][] = [];
       let run: RibbonPt[] = [pts[0]];
+      const at = (p: RibbonPt, q: RibbonPt, t: number): RibbonPt => ({ x: p.x + (q.x - p.x) * t, y: p.y + (q.y - p.y) * t, nx: -1, ny: 0, w: p.w + (q.w - p.w) * t, f: p.f + (q.f - p.f) * t });
       for (let i = 0; i + 1 < pts.length; i++) {
         const p = pts[i];
         const q = pts[i + 1];
-        if (!this.fan.tess.fold || !(p.y - q.y > 0) || leanFade(p.x + (p.w * k) / 2 - q.x - (q.w * k) / 2, p.y - q.y) > 0) run.push(q);
-        else {
-          if (run.length > 1) runs.push(run);
-          run = [q];
+        const n = fades ? leanPieces(lin[i], V[i], V[i + 1], p.y - q.y, pc) : 1;
+        if (!fades || (n === 1 && pc[0] === 0 && pc[1] === 1 && pc[2] >= 1)) {
+          run.push(q);
+          continue;
         }
+        if (run.length > 1) runs.push([run, 1]);
+        run = [q];
+        for (let j = 0; j < n; j++) runs.push([[at(p, q, pc[3 * j]), at(p, q, pc[3 * j + 1])], pc[3 * j + 2]]);
       }
-      if (run.length > 1) runs.push(run);
-      for (const r of runs) {
+      if (run.length > 1) runs.push([run, 1]);
+      for (const [r, a] of runs) {
+        ctx.globalAlpha = a;
         ctx.fillStyle = grayC;
         this.ribbon(r, (p) => hw - p.w, () => hw, 0.6);
         if (r.some((p) => p.f > 0)) {
@@ -1668,6 +1753,7 @@ export class FanView implements InputHandlers {
           this.ribbon(r, () => hw, (p) => hw - p.w * p.f, -1);
         }
       }
+      ctx.globalAlpha = 1;
       // Its styled stretches: faded over the individuals too, once they are drawn (drawHeld).
       for (const [t, bt, d] of held) {
         const run = pts.filter((p) => p.y >= t - 0.5 && p.y <= bt + 0.5);
@@ -1812,6 +1898,35 @@ export class FanView implements InputHandlers {
    * on screen) over the screen and a little beyond it, each exactly on the
    * edges' curves: the lanes are drawn straight between them.
    */
+  /**
+   * A strand's stretches' shares drawn on screen (ToLaD#210), into this.lean: each its own by its lean (fold.ts
+   * leanShare), and at their ends no more than 1/LEAN_FADE_PX per px away from a culled one (leanEnds). False
+   * (nothing to fade, the common case) unfolded or where every stretch is drawn whole.
+   */
+  private leanPlan(pts: RibbonPt[]): boolean {
+    if (!this.fan.tess.fold) return false;
+    const n = pts.length - 1;
+    const L = this.lean;
+    if (L.lin.length < n) {
+      L.lin = new Float64Array(2 * n);
+      L.h = new Float64Array(2 * n);
+      L.V = new Float64Array(2 * n + 1);
+    }
+    const k = this.cam.sx;
+    let all = true;
+    for (let i = 0; i < n; i++) {
+      const p = pts[i];
+      const q = pts[i + 1];
+      const dy = p.y - q.y;
+      // (A step, a point either side of a split's row, has no height: drawn as it is.)
+      const s = dy > 0 ? leanShare(p.x + ((p.w - q.w) * k) / 2 - q.x, dy) : 1;
+      L.lin[i] = s;
+      L.h[i] = dy > 0 ? dy : 0;
+      if (s < 1) all = false;
+    }
+    return !all && leanEnds(n, L.lin, L.h, L.V);
+  }
+
   lanePoints(b: FanBranch, hw: number): RibbonPt[] {
     const yb = this.fan.trunkBottom.y;
     const [, sTop] = this.toWorld(0, -20);

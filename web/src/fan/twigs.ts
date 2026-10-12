@@ -31,7 +31,7 @@ import { attrSeed, Lane, linkWidth, MAX_FOLD, packInst, SLOT_MID, type MeshInst 
 import type { MeshBatch } from './meshgl';
 import type { SpeciesRec } from './panthera';
 import type { GenSegment } from './history';
-import { leanFade } from './fold';
+import { leanEnds, leanPieces, leanShare } from './fold';
 
 function keyOf(common: string): string {
   return common
@@ -881,7 +881,12 @@ interface Stretch {
   pitchPx: [number, number];
   nT: [number, number];
   nG: number;
+  /** The share drawn (ToLaD#210): under 1 where the column fades out below (and above) a culled near-flat chord, as its lanes. */
+  a: number;
 }
+
+/** stretches' scratch: the chords' shares, heights and ends' distances (fold.ts leanEnds), a chord's pieces. */
+const LEAN = { lin: new Float64Array(256), h: new Float64Array(256), V: new Float64Array(257), pc: [] as number[] };
 
 /**
  * A column's lanes at the fan's sample heights (Tess.cuts), just below and
@@ -1232,18 +1237,44 @@ function stretches(v: TwigView, m: TwigModel, yTop: number, yBot: number): Stret
     return { L, P: vals[o + 3], colX: v.toScreen(L.left, y)[0], xG: L.gw > 0 ? v.toScreen(L.left + L.gw, y)[0] : -1e9 };
   };
   const out: Stretch[] = [];
+  // (A chord running near-flat across the screen, a far family's columns closing a deep fork: culled, and the column
+  // fading out over the px below and above it, exactly as its lanes do (view.ts leanPlan, fold.ts leanEnds/leanPieces):
+  // never cut flat, the mesh's texture no more than the lanes.)
+  // (Planned over the lanes' span, the screen and 20 px either side (view.ts lanePoints), so both fade alike at its edges.)
+  const [j0, j1] = P.span(v.sx, v.sy, Math.min(yTop, v.toWorld(0, -20)[1]), Math.max(yBot, v.toWorld(0, v.h + 20)[1]));
+  const n = j1 - j0;
+  let fades = false;
+  if (m.b.tess.fold && n > 0 && j0 <= i0 && j1 >= i1) {
+    if (LEAN.lin.length < n) {
+      LEAN.lin = new Float64Array(2 * n);
+      LEAN.h = new Float64Array(2 * n);
+      LEAN.V = new Float64Array(2 * n + 1);
+    }
+    let all = true;
+    for (let c = j0; c < j1; c++) {
+      // (Bottom first, as leanEnds takes them.)
+      const j = j1 - 1 - c;
+      const a = at(ys[c], 8 * c);
+      const B = at(ys[c + 1], 8 * (c + 1) + 4);
+      const dy = (ys[c + 1] - ys[c]) * v.sy;
+      const s = dy > 0 ? leanShare(B.colX - a.colX + ((B.L.w - a.L.w) * v.sx) / 2, dy) : 1;
+      LEAN.lin[j] = s;
+      LEAN.h[j] = dy > 0 ? dy : 0;
+      if (s < 1) all = false;
+    }
+    fades = !all && leanEnds(n, LEAN.lin, LEAN.h, LEAN.V);
+  }
+  const pc = LEAN.pc;
   for (let c = i0; c < i1; c++) {
     const a = at(ys[c], 8 * c);
     const B = at(ys[c + 1], 8 * (c + 1) + 4);
     if (!(a.L.w > 0) && !(B.L.w > 0)) continue;
-    // (A chord running near-flat across the screen, a far family's columns closing a deep fork: culled, as its lanes, fold.ts leanFade.)
-    if (m.b.tess.fold && leanFade(B.colX - a.colX + ((B.L.w - a.L.w) * v.sx) / 2, (ys[c + 1] - ys[c]) * v.sy) < 0.5) continue;
     const ym = (ys[c] + ys[c + 1]) / 2;
     const green = a.L.gw > 0 || B.L.gw > 0;
     // (A green lane that starts within the chord starts at the column's left edge.)
     const xGa = a.L.gw > 0 ? a.xG : a.colX;
     const xGb = B.L.gw > 0 ? B.xG : B.colX;
-    out.push({
+    const S: Stretch = {
       ya: ys[c],
       yb: ys[c + 1],
       colX: [a.colX, B.colX],
@@ -1252,7 +1283,31 @@ function stretches(v: TwigView, m: TwigModel, yTop: number, yBot: number): Stret
       nT: [a.L.w / a.P, B.L.w / B.P],
       // (Only whether the chord has a green lane matters to the mesh: counted only where it starts or ends in the chord.)
       nG: !green ? 0 : a.L.gw > 0 && B.L.gw > 0 ? 1 : m.greenSlots(ym),
-    });
+      a: 1,
+    };
+    if (!fades) {
+      out.push(S);
+      continue;
+    }
+    // (Its pieces, t from its bottom (yb) up to its top (ya): each a stretch of its own, its ends along the chord's.)
+    const j = j1 - 1 - c;
+    const k = leanPieces(LEAN.lin[j], LEAN.V[j], LEAN.V[j + 1], LEAN.h[j], pc);
+    if (k === 1 && pc[0] === 0 && pc[1] === 1) {
+      S.a = pc[2];
+      out.push(S);
+      continue;
+    }
+    // (Pieces come bottom first; the stretches go top down.)
+    for (let q = k - 1; q >= 0; q--) {
+      const t0 = pc[3 * q];
+      const t1 = pc[3 * q + 1];
+      // (u: 0 at the top (ya), 1 at the bottom.)
+      const ut = 1 - t1;
+      const ub = 1 - t0;
+      const lerp = (x: [number, number], u: number) => x[0] + (x[1] - x[0]) * u;
+      const two = (x: [number, number]): [number, number] => [lerp(x, ut), lerp(x, ub)];
+      out.push({ ...S, ya: S.ya + (S.yb - S.ya) * ut, yb: S.ya + (S.yb - S.ya) * ub, colX: two(S.colX), xG: green ? two(S.xG) : S.xG, pitchPx: two(S.pitchPx), nT: two(S.nT), a: pc[3 * q + 2] });
+    }
   }
   return out;
 }
@@ -1429,7 +1484,7 @@ export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: num
         T0: T0g - age,
         A: age + TIME_C,
         gBoff: gB !== NONE ? gB - gA : 0,
-        alpha: instA,
+        alpha: instA * S.a,
         mode,
         lane: Lane.Gray,
         tipR: look.tipR,
