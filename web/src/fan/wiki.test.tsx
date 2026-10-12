@@ -1,6 +1,7 @@
+import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { bigSrcOf, SpeciesCard, WikiPic } from './FanApp';
+import { bigSrcOf, RangeMap, SpeciesCard, WikiPic } from './FanApp';
 import { FELIDAE } from './panthera';
 import { labelThumb, wikiOf } from './wiki';
 
@@ -34,6 +35,84 @@ describe('wiki sidecar (ToLaD#182)', () => {
     expect(loading).not.toContain('Wikimedia Commons');
     const ok = renderToStaticMarkup(<WikiPic w={w} initial="ok" />);
     expect(ok).toContain('<a href="https://commons.wikimedia.org/wiki/File:a.jpg" target="_blank" rel="noopener">Wikimedia Commons</a>');
+  });
+});
+
+describe('range map (ToLaD#196)', () => {
+  const w = {
+    range: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/M.svg/500px-M.svg.png',
+    rangeFile: 'https://commons.wikimedia.org/wiki/File:M.svg',
+  };
+  afterEach(() => vi.restoreAllMocks());
+
+  it('the sidecar carries it for the lion, and the card shows it under the name', () => {
+    expect(wikiOf('Panthera leo')?.range).toMatch(/^https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\/thumb\/.+\/500px-/);
+    expect(wikiOf('Panthera leo')?.rangeFile).toMatch(/^https:\/\/commons\.wikimedia\.org\/wiki\/File:/);
+    const html = renderToStaticMarkup(<SpeciesCard sp={lion} onClose={() => {}} />);
+    const at = html.indexOf('class="range loading"');
+    expect(at).toBeGreaterThan(html.indexOf('class="t"'));
+    expect(html).toContain(`src="${wikiOf('Panthera leo')!.range!.replace(/&/g, '&amp;')}"`);
+  });
+
+  it('renders when set: lazy, no referrer, no alt text, credit once loaded', () => {
+    const loading = renderToStaticMarkup(<RangeMap w={w} />);
+    expect(loading).toContain('class="range loading"');
+    expect(loading).toContain(`src="${w.range}"`);
+    expect(loading).toContain('loading="lazy"');
+    expect(loading).toMatch(/referrerPolicy="no-referrer"/i);
+    expect(loading).toContain('alt=""');
+    expect(loading).not.toContain('Wikimedia Commons');
+    const ok = renderToStaticMarkup(<RangeMap w={w} initial="ok" />);
+    expect(ok).toContain('class="range ok"');
+    expect(ok).toContain(`<a href="${w.rangeFile}" target="_blank" rel="noopener">Range map · Wikimedia Commons</a>`);
+  });
+
+  it('is nothing without a range', () => {
+    expect(renderToStaticMarkup(<RangeMap w={null} />)).toBe('');
+    expect(renderToStaticMarkup(<RangeMap w={{ wp: 'https://en.wikipedia.org/wiki/X', img: 'https://upload.wikimedia.org/x/330px-a.jpg' }} />)).toBe('');
+    const none = FELIDAE.species.find((s) => wikiOf(s.sci) && !wikiOf(s.sci)?.range);
+    expect(none).toBeDefined();
+    expect(renderToStaticMarkup(<SpeciesCard sp={none!} onClose={() => {}} />)).not.toContain('class="range');
+  });
+
+  it('an image error removes it; a tap enlarges it to the 960 px thumbnail, whose error falls back', () => {
+    // A hook harness: RangeMap called as a function, its state kept here (no DOM in these tests).
+    const slots: unknown[] = [];
+    let i = 0;
+    // React 19's hook dispatcher, set for the call (there is no DOM renderer in these tests):
+    // the same path React itself takes, so the component's own onLoad/onClick/onError run.
+    const internals = (React as unknown as Record<string, { H: unknown }>).__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE;
+    const useState = (init: unknown) => {
+      const k = i++;
+      if (!(k in slots)) slots[k] = init;
+      return [slots[k], (v: unknown) => (slots[k] = typeof v === 'function' ? (v as (x: unknown) => unknown)(slots[k]) : v)];
+    };
+    type Img = React.ReactElement<{ src: string; onClick: () => void; onLoad: () => void; onError: () => void }>;
+    const render = () => {
+      i = 0;
+      const prev = internals.H;
+      internals.H = { useState };
+      try {
+        return RangeMap({ w }) as React.ReactElement<{ className: string; children: [Img, unknown] }> | null;
+      } finally {
+        internals.H = prev;
+      }
+    };
+    let el = render()!;
+    expect(el.props.className).toBe('range loading');
+    el.props.children[0].props.onLoad();
+    el = render()!;
+    expect(el.props.className).toBe('range ok');
+    el.props.children[0].props.onClick();
+    el = render()!;
+    expect(el.props.className).toBe('range ok big');
+    expect(el.props.children[0].props.src).toBe(bigSrcOf(w.range));
+    expect(el.props.children[0].props.src).toContain('/960px-M.svg.png');
+    el.props.children[0].props.onError(); // the big one failed: back to the 500 px one, still shown
+    el = render()!;
+    expect(el.props.children[0].props.src).toBe(w.range);
+    el.props.children[0].props.onError(); // the map itself failed: gone
+    expect(render()).toBeNull();
   });
 });
 
