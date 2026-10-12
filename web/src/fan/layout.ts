@@ -383,6 +383,14 @@ export class Tess {
     let L = Infinity;
     let R = -Infinity;
     if (!(hi >= lo)) return [L, R];
+    // (Folded: asked twice a frame per strand, by the lanes and the individuals, each its own span: both kept for the fold's version.)
+    const f = this.fold;
+    const memo = f ? this.xMemo.get(b) : undefined;
+    if (memo) {
+      for (let o = 0; o < 12; o += 6) {
+        if (memo[o] === f!.ver && memo[o + 1] === f!.gridH && memo[o + 2] === lo && memo[o + 3] === hi) return [memo[o + 4], memo[o + 5]];
+      }
+    }
     if (lo < b.splitY) {
       const tc = b.x0 + b.baseW / 2;
       const c = (y: number) => tc + (b.cx - tc) * peelU(this.edge, b.splitY, b.leanY, y);
@@ -404,11 +412,7 @@ export class Tess {
       }
     }
     // Folded (fold.ts): its edges over the range, at the ends and the fold's rows between (as drawn).
-    const f = this.fold;
     if (f && R > L && f.left(b.index, lo) !== null) {
-      // (Asked twice a frame per strand, the same span: kept for the fold's version.)
-      const memo = this.xMemo.get(b);
-      if (memo && memo[0] === f.ver && memo[1] === f.gridH && memo[2] === lo && memo[3] === hi) return [memo[4], memo[5]];
       // (At most XR_N samples: the folded edge is smooth, eased over bends ROOM_BEND tall at least; between two
       // samples it strays no further than the larger step beside them, a margin added on both sides.)
       const n = f.gridH > 0 ? Math.min(XR_N, Math.ceil((hi - lo) / f.gridH)) : 16;
@@ -433,7 +437,12 @@ export class Tess {
       }
       const pad = 1e-6 * Math.max(1, Math.abs(L), Math.abs(R)) + (R - L) * 1e-3;
       const out: [number, number] = [L - pad, R + pad];
-      this.xMemo.set(b, [f.ver, f.gridH, lo, hi, out[0], out[1]]);
+      // (Into the older of its two slots.)
+      let m = memo;
+      if (!m) this.xMemo.set(b, (m = new Float64Array(13).fill(NaN)));
+      const o = m[12] === 0 ? 6 : 0;
+      m[12] = o;
+      m.set([f.ver, f.gridH, lo, hi, out[0], out[1]], o);
       return out;
     }
     // (A hair of slack for rounding.)
@@ -441,8 +450,8 @@ export class Tess {
     return [L - pad, R + pad];
   }
 
-  /** xRange's last folded answer per strand: [fold version, grid, lo, hi, L, R]. */
-  private readonly xMemo = new Map<FanBranch, [number, number, number, number, number, number]>();
+  /** xRange's last two folded answers per strand: [fold version, grid, lo, hi, L, R] twice, then the newer's offset. */
+  private readonly xMemo = new Map<FanBranch, Float64Array>();
   private readonly splits = new Map<FanBranch, Set<number>>();
   /** The heights of the splits branch b passes (a cut always falls on each). */
   private splitYs(b: FanBranch): Set<number> {
