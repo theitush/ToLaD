@@ -721,7 +721,9 @@ export class FanView implements InputHandlers {
       const sx = this.homeCamera().sx * zoom;
       const f = this.fan.tess.fold;
       f?.setScale(sx, this.w);
-      const [a, b] = familySpan(v);
+      let [a, b] = familySpan(v);
+      // (Anchored on the clade, as a pinch there would: what opens or grows far from it leaves it still.)
+      if (f && f.setAnchor((a + b) / 2, fr.cy, sx, this.w)) [a, b] = familySpan(v);
       // (The fold stays at the frame's zoom: the camera taking the frame finds it there, nothing to follow.)
       return { ...fr, sx, cx: (a + b) / 2 - 22 / sx };
     }

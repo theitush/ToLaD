@@ -40,13 +40,15 @@ import { smoother } from './population';
 /** A split's full gap, as a share of the order's width: GAP_K * (its age / 2 Ma)^GAP_POW. */
 export const GAP_K = 0.006;
 export const GAP_POW = 0.7;
-/** A split inside a family opens from z0 = OPEN_Z * (20 Ma / age)^OPEN_POW to OPEN_SPAN * z0 (z: the order's width on screen over the screen's). */
-export const OPEN_Z = 0.8;
+/** A split inside a family opens from z0 = OPEN_Z * (20 Ma / age)^OPEN_POW to OPEN_SPAN * z0 (z: the order's drawn extent at home on screen over the screen's; ~0.8 at home). */
+export const OPEN_Z = 1.15;
 export const OPEN_POW = 0.6;
 export const OPEN_SPAN = 2.5;
 
 /** The least age a split between two families gaps as (the seals' families split ~10 Ma ago, inside some families' crowns). */
 export const FAMILY_MIN_MA = 15;
+/** The splits above the families gap FAMILY_GAP_X times as wide as their age gives: from afar the families stand clearly apart. */
+export const FAMILY_GAP_X = 3.5;
 
 /** A split's full gap (a share of the order's width), by its age (Ma). */
 export const gapShare = (ageMa: number) => GAP_K * Math.pow(Math.max(ageMa, 1e-3) / 2, GAP_POW);
@@ -65,6 +67,8 @@ export const ANCHOR_SIGMA = 0.1;
  */
 export const ROOM_BEND = 72;
 export const ROOM_BAND = 1.3;
+/** How many rows over a family's span its room is measured at (Fold.reserve: its gaps' widest). */
+export const FAM_ROWS = 48;
 
 /** A strand's stretches (Fold.roomPlan): their ends from its split up (B[0] its split, then each bend's middle, its last height), and their rooms. */
 export interface RoomPlan {
@@ -174,7 +178,7 @@ export class Fold {
       this.pairW[i] = Math.min(room(dp), room(dq));
       this.pairFam[i] = inFamily(v) ? 1 : 0;
       // (Two families apart at least as far as a split FAMILY_MIN_MA old: a family is never a family's sister's seam.)
-      this.pairGap[i] = gapShare(this.pairFam[i] ? v.ageMa : Math.max(v.ageMa, FAMILY_MIN_MA)) * fan.trunkWidth;
+      this.pairGap[i] = (this.pairFam[i] ? gapShare(v.ageMa) : FAMILY_GAP_X * gapShare(Math.max(v.ageMa, FAMILY_MIN_MA))) * fan.trunkWidth;
       // The two daughters' strands (each a run in the drawn order) and the split's fork (where its gap opens over).
       const run = (k: FanNode | FanBranch) => (isNode(k) ? [k.strands[0].index, k.strands[k.strands.length - 1].index + 1] : [k.index, k.index + 1]);
       this.lo[i] = run(dp)[0];
@@ -185,6 +189,7 @@ export class Fold {
     this.home = fan.root.left + fan.root.width / 2;
     this.wt = new Float64Array(n).fill(1);
     this.yRef = fan.time.y(0);
+    this.initFamilies();
   }
 
   /**
@@ -271,7 +276,9 @@ export class Fold {
         }
         // (A stretch it booms or crashes through, too short to step with it: its room within the band of its
         // narrowest, the column wider than it taking the lead: room = width while it grows, smoothly.)
-        L.push(Math.max(Math.min(hi, ROOM_BAND * lo), i0 === 0 ? b.baseW : 0));
+        // (Never narrower than the stretch before it: a column that crashes stands narrower in its room, its
+        // neighbours still; they move sideways only at a split or for a boom, ToLaD#146.)
+        L.push(Math.max(Math.min(hi, ROOM_BAND * lo), i0 === 0 ? b.baseW : L[L.length - 1]));
         if (hi > ROOM_BAND * lo) hug.push(L.length - 1);
         B.push(j === n - 1 ? top : b.splitY - j * dy);
         i0 = j;
@@ -343,7 +350,9 @@ export class Fold {
     this.screenW = screenW;
     let changed = false;
     let lam = 0;
-    const order = this.fan.trunkWidth * sx;
+    // (z: the order's drawn extent at home, its families apart and each closed, on screen over the screen's.)
+    const [e0, e1] = this.homeExtent();
+    const order = (e1 - e0) * sx;
     for (let i = 0; i < this.a.length; i++) {
       const a = this.pairFam[i] ? openness(this.pairNode[i].ageMa, order, screenW) : 1;
       if (a !== this.a[i]) changed = true;
@@ -432,29 +441,167 @@ export class Fold {
     return { y, w, end, n: m, item, off, own, ver: -1, xs: new Float64Array(n), sw, mw: 0, mg: 0 };
   }
 
+  private sizes: Float64Array | null = null;
+  /** The strands' sizes (FanBranch.width), summed along the drawn order. */
+  private sizeSums(): Float64Array {
+    if (this.sizes) return this.sizes;
+    const S = this.strands;
+    const c = new Float64Array(S.length + 1);
+    for (let i = 0; i < S.length; i++) c[i + 1] = c[i] + Math.max(S[i].width, 1e-12);
+    return (this.sizes = c);
+  }
+
+  /** Per strand, its life here summed along the drawn order (its size, FanBranch.width; an extinct one's fading over its end after its tip, as its room). */
+  private lifeSums(y: number): Float64Array {
+    const S = this.strands;
+    const edge = this.fan.edge;
+    const C = new Float64Array(S.length + 1);
+    for (let i = 0; i < S.length; i++) {
+      const b = S[i];
+      const f = y >= b.tipY ? 1 : 1 - ease(edge, Math.min(1, (b.tipY - y) / Fold.endH(b)));
+      C[i + 1] = C[i] + b.width * f;
+    }
+    return C;
+  }
+
+  /**
+   * Pair p's gap at height y, fully open (world): its split's full gap, opening over its fork, and closing only
+   * as its narrower clade ends (below a quarter of it alive), never as it declines (an endangered species'
+   * crash in the last centuries leaves its neighbours standing, ToLaD#146).
+   */
+  private pairOpen(p: number, y: number, C: Float64Array): number {
+    const CW = this.sizeSums();
+    const lo = this.lo[p];
+    const hi = this.hi[p];
+    const m = Math.min((C[p + 1] - C[lo]) / (CW[p + 1] - CW[lo]), (C[hi] - C[p + 1]) / (CW[hi] - CW[p + 1]));
+    const v = this.pairNode[p];
+    const u = this.forkTop[p] < v.y ? ease(this.fan.edge, (v.y - y) / (v.y - this.forkTop[p])) : 1;
+    return u * this.pairGap[p] * Math.min(1, m / 0.25);
+  }
+
+  /** The families (their splits), and per pair: the family its split is inside (-1: above them). */
+  private fams: FanNode[] = [];
+  private famOf = new Int32Array(0);
+  /** Per pair: the families whose run ends at it (it is their right edge) and starts after it (their left edge). */
+  private famRight: number[][] = [];
+  private famLeft: number[][] = [];
+  /** Per family and sample row (FAM_ROWS over its span): each of its pairs' gap fully open (pairOpen). */
+  private famRows: { p: number[]; open: Float64Array[] }[] = [];
+  /** Per pair: the share of its gap reserved on its family's left (the anchor's weight right of it). */
+  private shareL = new Float64Array(0);
+  /** Per family: the room its gaps open to at this zoom, reserved left and right of it (world). */
+  private famL = new Float64Array(0);
+  private famR = new Float64Array(0);
+  private resVer = -1;
+
+  private initFamilies(): void {
+    const n = this.strands.length;
+    this.famOf = new Int32Array(Math.max(0, n - 1)).fill(-1);
+    this.shareL = new Float64Array(Math.max(0, n - 1));
+    const idx = new Map<FanNode, number>();
+    for (const v of this.fan.nodes) if (/idae$/.test(v.split.taxon ?? '') && !idx.has(v)) {
+      let inner = false;
+      for (let u = v.parent; u; u = u.parent) if (/idae$/.test(u.split.taxon ?? '')) inner = true;
+      if (!inner) idx.set(v, idx.size);
+    }
+    this.fams = [...idx.keys()];
+    for (let p = 0; p + 1 < n; p++) {
+      for (let u: FanNode | null = this.pairNode[p]; u; u = u.parent) {
+        const f = idx.get(u);
+        if (f !== undefined) {
+          this.famOf[p] = f;
+          break;
+        }
+      }
+    }
+    this.famRows = this.fams.map((v, f) => {
+      const ps: number[] = [];
+      for (let p = 0; p + 1 < n; p++) if (this.famOf[p] === f) ps.push(p);
+      const open: Float64Array[] = [];
+      for (let k = 0; k <= FAM_ROWS; k++) {
+        const y = this.yRef + ((v.y - this.yRef) * k) / FAM_ROWS - 1e-9;
+        const C = this.lifeSums(y);
+        open.push(Float64Array.from(ps, (p) => this.pairOpen(p, y, C)));
+      }
+      const lo = v.strands[0].index;
+      const hi = v.strands[v.strands.length - 1].index + 1;
+      if (lo > 0) (this.famLeft[lo - 1] ??= []).push(f);
+      if (hi < n) (this.famRight[hi - 1] ??= []).push(f);
+      return { p: ps, open };
+    });
+    this.famL = new Float64Array(this.fams.length);
+    this.famR = new Float64Array(this.fams.length);
+  }
+
+  /** Each family's room at this zoom and anchor (famL/famR): its gaps split about the anchor's weight in it, at their widest. */
+  private reserve(): void {
+    if (this.resVer === this.ver) return;
+    this.resVer = this.ver;
+    const wt = this.wt;
+    for (let f = 0; f < this.fams.length; f++) {
+      const v = this.fams[f];
+      const { p: ps, open } = this.famRows[f];
+      const lo = v.strands[0].index;
+      const hi = v.strands[v.strands.length - 1].index + 1;
+      // (Weighed by the anchor, a hair of each strand's count: far from the anchor, about the family's middle.)
+      let W = 0;
+      for (let i = lo; i < hi; i++) W += wt[i] + 1e-3;
+      let right = W;
+      let q = 0;
+      for (let i = lo; i + 1 < hi; i++) {
+        right -= wt[i] + 1e-3;
+        if (ps[q] === i) this.shareL[ps[q++]] = right / W;
+      }
+      let L = 0;
+      let R = 0;
+      for (const row of open) {
+        let l = 0;
+        let r = 0;
+        for (let k = 0; k < ps.length; k++) {
+          const g = this.a[ps[k]] * row[k];
+          l += this.shareL[ps[k]] * g;
+          r += (1 - this.shareL[ps[k]]) * g;
+        }
+        L = Math.max(L, l);
+        R = Math.max(R, r);
+      }
+      this.famL[f] = L;
+      this.famR[f] = R;
+    }
+  }
+
   /** Fold a row with the current a's: each strand's move. */
   private foldRow(r: Row): void {
     const { w, end, n, item, y } = r;
     // Each daughter clade's width here: its items' widths (each counted at its first strand), summed along the strands.
     const S = item.length;
-    const C = new Float64Array(S + 1);
-    for (let i = 0; i < S; i++) C[i + 1] = C[i] + (i === 0 || item[i] !== item[i - 1] ? w[item[i]] : 0);
-    const edge = this.fan.edge;
+    const C = this.lifeSums(y);
+    this.reserve();
+    const fam = this.famOf;
+    const gl = new Float64Array(this.fams.length);
+    const gr = new Float64Array(this.fams.length);
     const X = new Float64Array(n);
+    const G = new Float64Array(n);
     for (let j = 1; j < n; j++) {
       const p = end[j - 1] - 1;
-      let gap = 0;
       const a = this.a[p];
-      if (a > 0) {
-        const m = Math.min(C[p + 1] - C[this.lo[p]], C[this.hi[p]] - C[p + 1]);
-        const v = this.pairNode[p];
-        const u = this.forkTop[p] < v.y ? ease(edge, (v.y - y) / (v.y - this.forkTop[p])) : 1;
-        // (Sized on the clades' rooms, fixed: it changes only where the narrower one ends, closing with it.)
-        // (Its full gap, closing with its narrower clade as that ends: below a quarter of its room.)
-        const P = this.pairW[p];
-        gap = a * u * this.pairGap[p] * Math.min(1, m / (0.25 * P));
+      if (a > 0) G[j] = a * this.pairOpen(p, y, C);
+      // (A family's own gaps, each counted on the side of the family it reserves its room on.)
+      const f = fam[p];
+      if (f >= 0) {
+        gl[f] += this.shareL[p] * G[j];
+        gr[f] += (1 - this.shareL[p]) * G[j];
       }
-      X[j] = X[j - 1] + w[j - 1] + gap;
+    }
+    for (let j = 1; j < n; j++) {
+      const p = end[j - 1] - 1;
+      // (Beside a family, the room its gaps will open to at this zoom, less what they have opened here: its
+      // neighbours stand still while it opens, moving only at their own split, ToLaD#146.)
+      let extra = 0;
+      for (const f of this.famRight[p] ?? []) extra += Math.max(0, this.famR[f] - gr[f]);
+      for (const f of this.famLeft[p] ?? []) extra += Math.max(0, this.famL[f] - gl[f]);
+      if (extra > 0) extra *= this.pairOpen(p, y, C) / this.pairGap[p];
+      X[j] = X[j - 1] + w[j - 1] + G[j] + extra;
     }
     // Where it stands: the anchor's weighted mean slot centre where it is at "now" (the canonical row, whose plain
     // mean slot centre is on the stem's centre: each strand counted once, whatever its width, so a column that

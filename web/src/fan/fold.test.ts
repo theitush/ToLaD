@@ -1,6 +1,7 @@
 // The fold (ToLaD#146): one branch from afar, opening continuously as the width zoom grows.
 import { describe, expect, it } from 'vitest';
 import { Fold, inFamily, ROOM_BEND } from './fold';
+import { familySpan } from './view';
 import { columnsAt, g, laneAt, layoutFan, leftAt, TIME_H, type EdgeStyle, type Fan, type FanBranch, type WidthMode } from './layout';
 import { CARNIVORA, FELIDAE } from './panthera';
 import { CARNIVORA_TREE, FELIDAE_TREE } from './splits';
@@ -27,7 +28,7 @@ const ZOOMS = [1, 1.3, 2.2, 5, 14, 50, 120];
  */
 const MIN_BEND_PX = 40;
 const FAMILY_K = 4;
-const FAMILY_MIN_PX = 3;
+const FAMILY_MIN_PX = 8;
 const MAX_GAP_SHARE = 0.05;
 /** The share of the order's width at height y that no column covers. */
 function gapShare(fan: Fan, y: number): number {
@@ -293,7 +294,8 @@ describe('the fold', () => {
           if (start === start) close();
         }
       }
-      expect(bends).toBeGreaterThan(10);
+      // (A crash no longer steps a room, a boom does: a few bends.)
+      expect(bends).toBeGreaterThan(5);
       expect(worst).toBeGreaterThanOrEqual(MIN_BEND_PX);
     });
 
@@ -339,6 +341,47 @@ describe('the fold', () => {
       // Zooming in, more and more of the species inside the families part (a gap over 1 px).
       expect(gaps(3).open).toBeGreaterThan(h.open);
       expect(gaps(15).open).toBeGreaterThan(gaps(3).open);
+    }
+  });
+
+  it('dogs x15: the columns stand still over 100-500 yr (no neighbour\'s decline or boom slants them), the wolf too; the families beside stand still while the dogs open', () => {
+    for (const mode of ['log', 'linear'] as WidthMode[]) {
+      const { fan, fold, home } = folded(mode, 'curved');
+      const v = fan.nodes.find((n) => n.split.taxon === 'Canidae')!;
+      const wolf = v.strands.find((b) => b.sp.sci === 'Canis lupus')!;
+      const sx = home * 15;
+      fold.setScale(sx, SCREEN);
+      const [a, b] = familySpan(v);
+      fold.setAnchor((a + b) / 2, fan.time.y(1), sx, SCREEN);
+      const px = (s: FanBranch, t: number) => centre(s, fan.time.y(t)) * sx;
+      for (const s of v.strands) {
+        if (s.tipY > fan.time.y(5e-4)) continue;
+        const xs = [1e-4, 2e-4, 3e-4, 5e-4].map((t) => px(s, t));
+        expect(Math.max(...xs) - Math.min(...xs), s.sp.sci).toBeLessThan(0.5);
+      }
+      const w = [1e-4, 5e-4].map((t) => px(wolf, t));
+      expect(Math.abs(w[1] - w[0])).toBeLessThan(0.5);
+      // The families beside the dogs: the dogs' opening moves them by one amount at every height from the dogs'
+      // crown up (their room, kept from their split), not with each of the dogs' splits.
+      const S = fan.root.strands;
+      const inDogs = Array.from(fold.a, (_, p) => v.strands.includes(S[p]) && v.strands.includes(S[p + 1]));
+      const at = (s: FanBranch, open: boolean) => {
+        const keep = Float64Array.from(fold.a);
+        if (!open) inDogs.forEach((d, p) => d && (fold.a[p] = 0));
+        fold.ver++;
+        const xs = [0, 1e-3, 0.1, 1, 3, 10].map((t) => px(s, t));
+        fold.a.set(keep);
+        fold.ver++;
+        return xs;
+      };
+      for (const s of [S[v.strands[0].index - 1], S[v.strands[v.strands.length - 1].index + 1]]) {
+        if (!s) continue;
+        const o = at(s, true);
+        const c = at(s, false);
+        const d = o.map((x, k) => x - c[k]);
+        expect(Math.max(...d) - Math.min(...d), s.sp.sci).toBeLessThan(2);
+        expect(Math.max(...d.map(Math.abs)), s.sp.sci).toBeGreaterThan(20);
+      }
     }
   });
 
