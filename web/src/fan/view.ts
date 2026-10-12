@@ -118,7 +118,9 @@ const colSpanCache = new WeakMap<FanBranch, [number, number, number][]>();
 export function colSpansY(fan: Fan, b: FanBranch): [number, number, number][] {
   let out = colSpanCache.get(b);
   if (!out) {
-    out = columnSpans(b.sp, b.t0).map((s) => [fan.time.y(s.ago1 / 1e6), fan.time.y(s.ago0 / 1e6), COLUMN_DIM[s.style]]);
+    out = columnSpans(b.sp, b.t0)
+      .filter((s) => COLUMN_DIM[s.style] > 0)
+      .map((s) => [fan.time.y(s.ago1 / 1e6), fan.time.y(s.ago0 / 1e6), COLUMN_DIM[s.style]]);
     colSpanCache.set(b, out);
   }
   return out;
