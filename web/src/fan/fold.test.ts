@@ -344,6 +344,50 @@ describe('the fold', () => {
     }
   });
 
+  it('weasels opened (the ferret badgers first): each column straight between its family\'s splits, moving sideways only at one (no lean over a decade)', () => {
+    for (const mode of ['log', 'linear'] as WidthMode[]) {
+      const { fan, fold, home } = folded(mode, 'curved');
+      const fam = fan.nodes.find((n) => n.split.taxon === 'Mustelidae')!;
+      const groups = [fam.strands.filter((b) => /^Melogale /.test(b.sp.sci)), fam.strands];
+      expect(groups[0].length).toBeGreaterThan(3);
+      for (const z of [8, 20]) {
+        const sx = home * z;
+        fold.setScale(sx, SCREEN);
+        // (The events inside the family: its forks. Its columns' peels and room bends move their neighbours by
+        // their rooms' change, a few px at most over a bend: under 0.3 px a step.)
+        const ev: [number, number][] = [];
+        fold.forks().forEach((f, p) => fam.strands.includes(fan.root.strands[p]) && fam.strands.includes(fan.root.strands[p + 1]) && ev.push(f));
+        const free = (y: number) => !ev.some(([a, b]) => y >= a - 1e-6 && y <= b + 1e-6);
+        for (const g of groups) {
+          const y0 = fan.time.y(0);
+          const cx = g.reduce((s, b) => s + centre(b, y0), 0) / g.length;
+          fold.setAnchor(cx, fan.time.y(1), sx, SCREEN);
+          fold.setAnchor(cx, fan.time.y(1), sx, SCREEN);
+          let worst = 0;
+          let nFree = 0;
+          let nAll = 0;
+          for (const b of g) {
+            let prev = NaN;
+            for (let y = Math.max(b.tipY, y0); y < b.splitY; y += 2) {
+              nAll++;
+              if (!free(y)) {
+                prev = NaN;
+                continue;
+              }
+              nFree++;
+              const x = centre(b, y) * sx;
+              if (prev === prev) worst = Math.max(worst, Math.abs(x - prev));
+              prev = x;
+            }
+          }
+          expect(worst, `${mode} z${z} ${g.length}`).toBeLessThan(0.3);
+          // (And the events are short: most of each column's span is straight.)
+          expect(nFree / nAll).toBeGreaterThan(0.84); // (forks a fixed bend tall: 0.77 at z20)
+        }
+      }
+    }
+  });
+
   it('dogs x15: the columns stand still over 100-500 yr (no neighbour\'s decline or boom slants them), the wolf too; the families beside stand still while the dogs open', () => {
     for (const mode of ['log', 'linear'] as WidthMode[]) {
       const { fan, fold, home } = folded(mode, 'curved');

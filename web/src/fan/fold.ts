@@ -69,6 +69,10 @@ export const ROOM_BEND = 72;
 export const ROOM_BAND = 1.3;
 /** How many rows over a family's span its room is measured at (Fold.reserve: its gaps' widest). */
 export const FAM_ROWS = 48;
+/** A gap's fork (Fold.setScale): at least FORK_MIN world tall, else its width on screen over FORK_SLOPE times SY_HOME (px per world, a phone's home time scale). */
+export const FORK_MIN = 12;
+export const FORK_SLOPE = 2;
+export const SY_HOME = 0.64;
 
 /** A strand's stretches (Fold.roomPlan): their ends from its split up (B[0] its split, then each bend's middle, its last height), and their rooms. */
 export interface RoomPlan {
@@ -130,6 +134,8 @@ export class Fold {
   private readonly lo: Int32Array;
   private readonly hi: Int32Array;
   private readonly forkTop: Float64Array;
+  /** Per pair: its fork's least top (a bend tall, or its daughters' leans); setScale shortens it for a gap narrow on screen. */
+  private readonly forkTop0: Float64Array;
   /** Per pair: how open its split is. */
   readonly a: Float64Array;
   /** How open the most open split is. */
@@ -159,6 +165,7 @@ export class Fold {
     this.lo = new Int32Array(Math.max(0, n - 1));
     this.hi = new Int32Array(Math.max(0, n - 1));
     this.forkTop = new Float64Array(Math.max(0, n - 1));
+    this.forkTop0 = new Float64Array(Math.max(0, n - 1));
     this.pairNode = [];
     this.pairGap = new Float64Array(Math.max(0, n - 1));
     this.pairFam = new Uint8Array(Math.max(0, n - 1));
@@ -184,7 +191,8 @@ export class Fold {
       this.lo[i] = run(dp)[0];
       this.hi[i] = run(dq)[1];
       // (At least a bend tall: a gap opens as a branch parts, never a ledge.)
-      this.forkTop[i] = Math.min(dp.leanY, dq.leanY, v.y - ROOM_BEND);
+      this.forkTop0[i] = Math.min(dp.leanY, dq.leanY, v.y - ROOM_BEND);
+      this.forkTop[i] = this.forkTop0[i];
     }
     this.home = fan.root.left + fan.root.width / 2;
     this.wt = new Float64Array(n).fill(1);
@@ -357,6 +365,13 @@ export class Fold {
       const a = this.pairFam[i] ? openness(this.pairNode[i].ageMa, order, screenW) : 1;
       if (a !== this.a[i]) changed = true;
       this.a[i] = a;
+      // (A gap opens over a height by its width on screen, at most FORK_SLOPE px across per px up at a phone's home
+      // time scale, between FORK_MIN and its least fork: a narrow one parts crisply at its split, not leaning
+      // its neighbours over a decade, ToLaD#146; a wide one never a ledge.)
+      const v = this.pairNode[i];
+      const h = Math.min(v.y - this.forkTop0[i], Math.max(FORK_MIN, (a * this.pairGap[i] * sx) / (FORK_SLOPE * SY_HOME)));
+      if (v.y - h !== this.forkTop[i]) changed = true;
+      this.forkTop[i] = v.y - h;
       lam = Math.max(lam, a);
     }
     if (this.a.length === 0) lam = 1;
@@ -469,13 +484,13 @@ export class Fold {
    * as its narrower clade ends (below a quarter of it alive), never as it declines (an endangered species'
    * crash in the last centuries leaves its neighbours standing, ToLaD#146).
    */
-  private pairOpen(p: number, y: number, C: Float64Array): number {
+  private pairOpen(p: number, y: number, C: Float64Array, full = false): number {
     const CW = this.sizeSums();
     const lo = this.lo[p];
     const hi = this.hi[p];
     const m = Math.min((C[p + 1] - C[lo]) / (CW[p + 1] - CW[lo]), (C[hi] - C[p + 1]) / (CW[hi] - CW[p + 1]));
     const v = this.pairNode[p];
-    const u = this.forkTop[p] < v.y ? ease(this.fan.edge, (v.y - y) / (v.y - this.forkTop[p])) : 1;
+    const u = full ? 1 : this.forkTop[p] < v.y ? ease(this.fan.edge, (v.y - y) / (v.y - this.forkTop[p])) : 1;
     return u * this.pairGap[p] * Math.min(1, m / 0.25);
   }
 
@@ -521,7 +536,8 @@ export class Fold {
       for (let k = 0; k <= FAM_ROWS; k++) {
         const y = this.yRef + ((v.y - this.yRef) * k) / FAM_ROWS - 1e-9;
         const C = this.lifeSums(y);
-        open.push(Float64Array.from(ps, (p) => this.pairOpen(p, y, C)));
+        // (Each fully open, its fork's ease aside: the room is never short of what its gaps open to.)
+        open.push(Float64Array.from(ps, (p) => this.pairOpen(p, y, C, true)));
       }
       const lo = v.strands[0].index;
       const hi = v.strands[v.strands.length - 1].index + 1;
