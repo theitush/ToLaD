@@ -861,3 +861,32 @@
   padding-top: 8px;
   border-top: 1px solid rgba(200, 230, 210, 0.1);
 }
+/* The world on the time axis (ToLaD#189): a globe in the bar opens three switches under it. */
+.fan .world-menu {
+  position: absolute;
+  top: 42px;
+  right: 0;
+  display: grid;
+  gap: 2px;
+  padding: 6px 12px 6px 8px;
+  background: rgba(12, 23, 20, 0.92);
+  border: 1px solid rgba(200, 230, 210, 0.14);
+  border-radius: 14px;
+  backdrop-filter: blur(6px);
+  font: 500 14px/1 var(--sans);
+  color: var(--ink-2);
+  z-index: 2;
+}
+.fan .world-menu label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  white-space: nowrap;
+}
+.fan .world-menu input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: #3fd286;
+}
