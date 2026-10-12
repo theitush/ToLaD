@@ -236,6 +236,30 @@ export class TwigModel {
     return leftAt(this.b, y, w);
   }
 
+  /**
+   * The left edges just below and just above y (y ± 1e-9 relative) into out[o] and out[o + 4], of a column
+   * out[o + 1] and out[o + 5] wide there (left()'s twice, as CutMemo and ColumnPath keep them). Folded on a grid
+   * and away from its split (where the fold's edge turns from a slot's left edge into its own column's centre),
+   * the fold's edge runs on through y continuously: read once, ToLaD#209.
+   */
+  leftPair(y: number, out: Float64Array, o: number): void {
+    const b = this.b;
+    const f = b.tess.fold;
+    const h = f ? f.gridH : 0;
+    if (!(h > 0) || Math.abs(y - b.splitY) <= 2 * h) {
+      const e = 1e-9 * Math.max(1, Math.abs(y));
+      out[o] = this.left(y + e, out[o + 1]);
+      out[o + 4] = this.left(y - e, out[o + 5]);
+      return;
+    }
+    const l = f!.left(b.index, y)!;
+    if (y < b.splitY) {
+      const k = (1 - f!.flare[b.index]) / 2;
+      out[o] = l - out[o + 1] * k;
+      out[o + 4] = l - out[o + 5] * k;
+    } else out[o] = out[o + 4] = l;
+  }
+
   /** The lanes at the fan's sample heights (CutMemo), kept from frame to frame. */
   readonly cutMemo = new CutMemo(this);
   /** The column's edges as drawn (ColumnPath). */
@@ -874,17 +898,32 @@ export class CutMemo {
   n = 0;
   /** Whether the kept left edges are stale (reset(): the fold moved the columns; the widths and pitch stand). */
   private stale = false;
-  constructor(private readonly m: { sample(y: number, out: Float64Array, o: number): void; left?(y: number, w: number): number }) {}
+  constructor(private readonly m: { sample(y: number, out: Float64Array, o: number): void; leftPair?(y: number, out: Float64Array, o: number): void }) {}
   /** The fold moved the columns (fold.ts): the kept left edges are read again, the rest kept. */
   reset(): void {
-    if (this.m.left) this.stale = true;
+    if (this.m.leftPair) this.stale = true;
     else this.n = 0;
   }
   update(cuts: ArrayLike<number>): Float64Array {
     const n = cuts.length;
-    const ys = new Float64Array(n);
-    const v = new Float64Array(8 * n);
     const oy = this.ys;
+    // (The same heights as last time (a refold's re-choice, the zoom about the same): their left edges read again in place.)
+    if (n === this.n) {
+      let k = 0;
+      while (k < n && oy[k] === cuts[k]) k++;
+      if (k === n) {
+        if (this.stale) for (let i = 0; i < n; i++) this.m.leftPair!(oy[i], this.v, 8 * i);
+        this.stale = false;
+        return this.v;
+      }
+    }
+    // (Into the spare buffers, swapped with the kept ones at the end: no garbage a frame.)
+    if (this.ys2.length < n) {
+      this.ys2 = new Float64Array(n + (n >> 2));
+      this.v2 = new Float64Array(8 * (n + (n >> 2)));
+    }
+    const ys = this.ys2;
+    const v = this.v2;
     const ov = this.v;
     const stale = this.stale;
     let j = 0;
@@ -895,21 +934,22 @@ export class CutMemo {
       const e = 1e-9 * Math.max(1, Math.abs(y));
       if (j < this.n && oy[j] === y) {
         for (let i = 0; i < 8; i++) v[8 * k + i] = ov[8 * j + i];
-        if (stale) {
-          v[8 * k] = this.m.left!(y + e, v[8 * k + 1]);
-          v[8 * k + 4] = this.m.left!(y - e, v[8 * k + 5]);
-        }
+        if (stale) this.m.leftPair!(y, v, 8 * k);
         continue;
       }
       this.m.sample(y + e, v, 8 * k);
       this.m.sample(y - e, v, 8 * k + 4);
     }
+    this.ys2 = this.ys;
+    this.v2 = this.v;
     this.ys = ys;
     this.v = v;
     this.n = n;
     this.stale = false;
     return v;
   }
+  private ys2 = new Float64Array(0);
+  private v2 = new Float64Array(0);
 }
 
 /** How far (screen px) a merged chord may stray from the samples it drops (Sleeve). */
@@ -986,6 +1026,14 @@ export class ColumnPath {
   private yLo = 0;
   private yHi = 0;
   constructor(private readonly m: TwigModel) {}
+  private ys2 = new Float64Array(0);
+  private vals2 = new Float64Array(0);
+  private steps2 = new Uint8Array(0);
+  /** build()'s last cuts and the span and grid they are for. */
+  private cuts: number[] = [];
+  private cutsA = NaN;
+  private cutsB = NaN;
+  private cutsGrid = NaN;
 
   /** Whether some kept samples' left edges are from an older fold (reset(); read again as span() reaches them). */
   private stale = false;
@@ -1034,10 +1082,7 @@ export class ColumnPath {
     for (let k = i0; k <= i1; k++) {
       if (G[k] === this.gen) continue;
       G[k] = this.gen;
-      const y = this.ys[k];
-      const e = 1e-9 * Math.max(1, Math.abs(y));
-      v[8 * k] = this.m.left(y + e, v[8 * k + 1]);
-      v[8 * k + 4] = this.m.left(y - e, v[8 * k + 5]);
+      this.m.leftPair(this.ys[k], v, 8 * k);
     }
   }
 
@@ -1077,12 +1122,27 @@ export class ColumnPath {
     const d = hi - lo;
     const A = Math.max(b.tipY, lo - d);
     const B = Math.min(b.tess.bottom, hi + d);
-    const cuts = b.tess.cuts(b, A, B, sy, 4);
+    // (The same span on the same grid as last time (a refold's re-choice at home): the same cuts.)
+    if (!(this.cutsA === A && this.cutsB === B && this.cutsGrid === grid)) {
+      this.cuts = b.tess.cuts(b, A, B, sy, 4);
+      this.cutsA = A;
+      this.cutsB = B;
+      this.cutsGrid = grid;
+    }
+    const cuts = this.cuts;
     const v = this.m.cutMemo.update(cuts);
     const n = cuts.length;
-    const ys = new Float64Array(n);
-    const out = new Float64Array(8 * n);
-    const steps = new Uint8Array(n);
+    // (Into the spare buffers, swapped with the kept ones at the end: no garbage a frame. The kept ones are read
+    // only until the next span().)
+    if (this.ys2.length < n) {
+      const c = n + (n >> 2);
+      this.ys2 = new Float64Array(c);
+      this.vals2 = new Float64Array(8 * c);
+      this.steps2 = new Uint8Array(c);
+    }
+    const ys = this.ys2;
+    const out = this.vals2;
+    const steps = this.steps2;
     // In world units: the tolerance at this zoom, a little under CHORD_TOL_PX (the zoom moves on).
     const tolX = CHORD_TOL_PX / PATH_ZOOM / sx;
     // The lanes step at the splits (the green lane: the strand leaves its parent's prefix there).
@@ -1138,11 +1198,15 @@ export class ColumnPath {
       sl.start(y, ends(o));
     }
     if (n > 1) keep(n - 1);
+    this.ys2 = this.ys;
+    this.vals2 = this.vals;
+    this.steps2 = this.steps;
     this.ys = ys;
     this.vals = out;
     this.steps = steps;
     this.n = k;
-    this.leftGen = new Int32Array(k).fill(this.gen);
+    if (this.leftGen.length < k) this.leftGen = new Int32Array(ys.length);
+    this.leftGen.fill(this.gen, 0, k);
     this.sxRef = sx;
     this.grid = grid;
     this.yLo = A;
