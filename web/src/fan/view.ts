@@ -1311,9 +1311,9 @@ export class FanView implements InputHandlers {
       ctx.fillStyle = s.ev !== undefined ? EVENT_TINT.css : s.v ? INK2 : INK;
       ctx.fillText(s.text, 0, 0.5);
       ctx.restore();
-      // ToLaD#182: the species' Commons picture capping its pill, once loaded (wiki.ts; `?thumbs=0` off).
+      // ToLaD#182: the species' Commons picture under its pill, before the name, once loaded (wiki.ts; `?thumbs=0` off).
       const th = s.b && s.ev === undefined ? labelThumb(s.b.sp.sci, () => this.request()) : null;
-      if (th) drawThumb(ctx, th, s.x, y0 - LABEL_PILL / 2 - 2, LABEL_PILL);
+      if (th) drawThumb(ctx, th, s.x, y1 + LABEL_PILL / 2 + 2, LABEL_PILL);
     }
     ctx.restore();
     if (moving) this.request();

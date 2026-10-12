@@ -113,10 +113,9 @@ const scenes = [
   ['flag-puma', 'frame', ['Puma', 100000, 1, 0.5]],
   ['flag-puma-card', 'card', ['Puma']],
   // Wikipedia link + hotlinked Commons pictures (ToLaD#182; WAIT_MS=4000 lets them load): the lion's card,
-  // home and a zoom with the pills' thumbnails, and a species with no picture (its card, its pill mid-span).
+  // home with the pills' thumbnails (WIDTH=log: eight pills), and a species with no picture (its card, its pill mid-span).
   ['wiki-lion-card', 'card', ['Lion']],
   ['wiki-home', 'home'],
-  ['wiki-zoom', 'pan', [3, 0]],
   ['wiki-noimg-card', 'card', ['Panthera balamoides']],
   ['wiki-noimg', 'frame', ['Panthera balamoides', null, 1, 0.4]],
 ];
