@@ -103,8 +103,9 @@ export function leanShare(dxPx: number, dyPx: number): number {
  * (and above) it.
  */
 export const LEAN_FADE_PX = 60;
-/** A fading stretch is drawn in slices about this tall (px), each at its own share. */
-const LEAN_SLICE_PX = 6;
+/** A fading stretch is drawn in slices about this tall (px), each at its own share (straight in the height, a sixth at most a slice); under LEAN_DROP, none. */
+const LEAN_SLICE_PX = 10;
+const LEAN_DROP = 0.04;
 
 /**
  * The shares at a strand's stretches' ends (ToLaD#210): n stretches bottom first, lin[i] its own share (leanShare,
@@ -128,14 +129,14 @@ export function leanEnds(n: number, lin: Float64Array, h: Float64Array, V: Float
 
 /**
  * A stretch's drawn pieces (ToLaD#210): its share lin, its ends' vb (bottom) and vt (top, leanEnds), its height hPx;
- * into out as [t0, t1, a] triples (t from its bottom 0 to its top 1, a the eased share drawn, > 0). Whole at its own
+ * into out as [t0, t1, a] triples (t from its bottom 0 to its top 1, a the share drawn, over LEAN_DROP). Whole at its own
  * share where its ends allow it, else sliced where it fades. Returns how many.
  */
 export function leanPieces(lin: number, vb: number, vt: number, hPx: number, out: number[]): number {
   let n = 0;
   const put = (t0: number, t1: number, s: number) => {
-    const a = smoother(Math.max(0, Math.min(1, s)));
-    if (a > 0 && t1 > t0) {
+    const a = Math.min(1, s);
+    if (a > LEAN_DROP && t1 > t0) {
       out[n++] = t0;
       out[n++] = t1;
       out[n++] = a;

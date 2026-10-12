@@ -1713,7 +1713,10 @@ export class FanView implements InputHandlers {
           const t0 = pc[3 * j];
           const t1 = pc[3 * j + 1];
           const at = (a: number, b: number, t: number) => a + (b - a) * t;
-          piece(at(xp, xq, t1), at(wp, wq, t1), at(gp, gq, t1), at(xp, xq, t0), at(wp, wq, t0), at(gp, gq, t0), at(y1, y0, t1), at(y1, y0, t0), pc[3 * j + 2]);
+          const ya = at(y1, y0, t1);
+          const yb = at(y1, y0, t0);
+          if (yb < -4 || ya > this.h + 4) continue;
+          piece(at(xp, xq, t1), at(wp, wq, t1), at(gp, gq, t1), at(xp, xq, t0), at(wp, wq, t0), at(gp, gq, t0), ya, yb, pc[3 * j + 2]);
         }
       }
     } else {
