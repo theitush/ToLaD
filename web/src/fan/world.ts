@@ -261,8 +261,8 @@ export interface WorldHost {
   under(x0: number, y0: number, x1: number, y1: number, rgb: [number, number, number], a?: number): void;
 }
 
-const ICE: [number, number, number] = [0.55, 0.74, 1];
-const ICE_A = 0.075;
+const ICE: [number, number, number] = [0.42, 0.66, 1];
+const ICE_A = 0.1;
 const ICE_INK = '#9cc0f0';
 const EVENT_INK = '#c3b2f5';
 const STRIP_A = 0.82;
@@ -282,7 +282,7 @@ export function drawWorldUnder(v: WorldHost): void {
   }
   const y0 = syAt(v, LGM.toKa / 1e3);
   const y1 = syAt(v, LGM.fromKa / 1e3);
-  if (y1 >= 0 && y0 <= v.h) v.under(0, Math.max(0, y0), v.w, Math.min(v.h, y1), ICE, 0.06);
+  if (y1 >= 0 && y0 <= v.h) v.under(0, Math.max(0, y0), v.w, Math.min(v.h, y1), ICE, 0.08);
 }
 
 /** The inset the axis's labels move right by (the strip's width, when it is on). */
