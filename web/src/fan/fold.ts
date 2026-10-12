@@ -51,10 +51,12 @@ interface Row {
   w: Float64Array;
   end: Int32Array;
   n: number;
-  /** Per strand: its item. */
+  /** Per strand: its item, and its offset in it (its slot in a parent column; 0 in its own). */
   item: Int32Array;
+  off: Float64Array;
   ver: number;
-  dx: Float64Array;
+  /** Per strand: its folded left edge (its slot's). */
+  xs: Float64Array;
 }
 
 export class Fold {
@@ -142,13 +144,16 @@ export class Fold {
     const w = new Float64Array(n);
     const end = new Int32Array(n);
     const item = new Int32Array(n);
+    const off = new Float64Array(n);
     const ghost = new Uint8Array(n);
     let m = 0;
     let node: FanNode | null = null;
     for (let i = 0; i < n; i++) {
       const b = S[i];
       if (y >= b.splitY) {
-        const v = segAt(b, y).node;
+        const sg = segAt(b, y);
+        const v = sg.node;
+        off[i] = sg.off;
         if (v === node) {
           item[i] = m - 1;
           end[m - 1] = i + 1;
@@ -189,7 +194,7 @@ export class Fold {
       O[j] = Math.max(lo, Math.min(O[j], hi));
       lo = O[j];
     }
-    return { O, w, end, n: m, item, ver: -1, dx: new Float64Array(n) };
+    return { O, w, end, n: m, item, off, ver: -1, xs: new Float64Array(n) };
   }
 
   /** Fold a row with the current a's: each strand's move. */
@@ -214,11 +219,8 @@ export class Fold {
       const target = this.home + this.lambda * (cRiver - this.home);
       shift = target - cf / sw;
     } else shift = O[0] - X[0];
-    const dx = r.dx;
-    for (let i = 0; i < dx.length; i++) {
-      const j = r.item[i];
-      dx[i] = X[j] + shift - O[j];
-    }
+    const xs = r.xs;
+    for (let i = 0; i < xs.length; i++) xs[i] = X[r.item[i]] + shift + r.off[i];
     r.ver = this.ver;
   }
 
@@ -233,9 +235,13 @@ export class Fold {
     return r;
   }
 
-  /** Strand i's sideways move at height y: exact (gridH 0), else read off the grid's rows, linear between them. */
-  dx(i: number, y: number): number {
-    if (this.lambda === 1 && this.allOpen()) return 0;
+  /**
+   * Strand i's folded left edge at height y (its own column's, or its slot's in a parent column): exact (gridH 0),
+   * else read off the grid's rows, linear between them (the folded edges are sums of widths: smooth, where the
+   * river's may swing far over a fork), or null when every split is open (the river's own).
+   */
+  left(i: number, y: number): number | null {
+    if (this.lambda === 1 && this.allOpen()) return null;
     const h = this.gridH;
     if (!(h > 0)) {
       if (!this.last || this.lastY !== y || this.last.ver !== this.ver) {
@@ -243,13 +249,13 @@ export class Fold {
         this.lastY = y;
         this.foldRow(this.last);
       }
-      return this.last.dx[i];
+      return this.last.xs[i];
     }
     const k = Math.floor(y / h);
     const t = y / h - k;
-    const a = this.rowAt(k * h).dx[i];
+    const a = this.rowAt(k * h).xs[i];
     if (t === 0) return a;
-    return a + (this.rowAt((k + 1) * h).dx[i] - a) * t;
+    return a + (this.rowAt((k + 1) * h).xs[i] - a) * t;
   }
 
   /** Change the grid (world height between rows, a power of two: the rows a finer grid shares with a coarser are kept). */
@@ -282,9 +288,10 @@ export class Fold {
       return r;
     };
     const r0 = at(prev);
-    const X0 = Float64Array.from({ length: r0.n }, (_, j) => r0.O[j] + r0.dx[r0.end[j] - 1]);
+    const first = (r: Row, j: number) => (j ? r.end[j - 1] : 0);
+    const X0 = Float64Array.from({ length: r0.n }, (_, j) => r0.xs[first(r0, j)] - r0.off[first(r0, j)]);
     const r1 = at(cur);
-    const X1 = Float64Array.from({ length: r1.n }, (_, j) => r1.O[j] + r1.dx[r1.end[j] - 1]);
+    const X1 = Float64Array.from({ length: r1.n }, (_, j) => r1.xs[first(r1, j)] - r1.off[first(r1, j)]);
     const n = r0.n;
     if (n === 0) return x;
     if (x <= X0[0]) return x + X1[0] - X0[0];

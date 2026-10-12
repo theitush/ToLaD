@@ -278,9 +278,9 @@ export function peelU(edge: EdgeStyle, yBot: number, leanY: number, y: number): 
 
 /** A parent column's left edge at height y (in its span): from its tile in the parent to its own left (peelU). */
 export function nodeLeftAt(v: FanNode, y: number, river = false): number {
-  const x = v.tile + (v.left - v.tile) * peelU(v.edge, v.yBot, v.leanY, y);
   const f = river ? undefined : v.strands[0]?.tess.fold;
-  return f ? x + f.dx(v.strands[0].index, y) : x;
+  const l = f ? f.left(v.strands[0].index, y) : null;
+  return l ?? v.tile + (v.left - v.tile) * peelU(v.edge, v.yBot, v.leanY, y);
 }
 
 const clampW = (v: number, w: number) => Math.min(w, Math.max(0, v));
@@ -401,19 +401,18 @@ export class Tess {
         R = Math.max(R, x + b.baseW);
       }
     }
-    // Folded (fold.ts): its moves over the range, at the ends and the fold's rows between (as drawn).
+    // Folded (fold.ts): its edges over the range, at the ends and the fold's rows between (as drawn).
     const f = this.fold;
-    if (f && R > L) {
+    if (f && R > L && f.left(b.index, lo) !== null) {
       const n = f.gridH > 0 ? Math.min(256, Math.ceil((hi - lo) / f.gridH)) : 16;
-      let d0 = Infinity;
-      let d1 = -Infinity;
+      const wMax = Math.max(b.baseW, lo < b.splitY ? b.unit * g(b.pop.max, this.mode) : 0);
+      L = Infinity;
+      R = -Infinity;
       for (let k = 0; k <= n; k++) {
-        const d = f.dx(b.index, n ? lo + ((hi - lo) * k) / n : lo);
-        d0 = Math.min(d0, d);
-        d1 = Math.max(d1, d);
+        const x = f.left(b.index, n ? lo + ((hi - lo) * k) / n : lo)!;
+        L = Math.min(L, x);
+        R = Math.max(R, x + wMax);
       }
-      L += d0;
-      R += d1;
     }
     // (A hair of slack for rounding.)
     const pad = 1e-6 * Math.max(1, Math.abs(L), Math.abs(R)) + (R - L) * 1e-3;
@@ -482,14 +481,15 @@ export class Tess {
 /** Left edge of a branch at world y: its own column (about its centre, peeling off its parent) above its split, then its place in each parent column below. (w: its width there, if known: lanesAt(b, y)[0].) */
 export function leftAt(b: FanBranch, y: number, w?: number, river = false): number {
   const f = river ? undefined : b.tess.fold;
-  const d = f ? f.dx(b.index, y) : 0;
+  const l = f ? f.left(b.index, y) : null;
+  if (l !== null) return l;
   if (y < b.splitY) {
     const tc = b.x0 + b.baseW / 2;
     const c = tc + (b.cx - tc) * peelU(b.tess.edge, b.splitY, b.leanY, y);
-    return c - (w ?? lanesAt(b, y)[0]) / 2 + d;
+    return c - (w ?? lanesAt(b, y)[0]) / 2;
   }
   const s = segAt(b, y);
-  return nodeLeftAt(s.node, y, true) + s.off + d;
+  return nodeLeftAt(s.node, y, true) + s.off;
 }
 
 /**

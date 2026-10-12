@@ -638,7 +638,18 @@ export class FanView implements InputHandlers {
     const v = this.fan.nodes.find((n) => n.split.taxon === name);
     if (!v) return null;
     const [x0, x1] = familySpan(v);
-    return this.camera.frame(x0, x1, v.y, true);
+    let cam = this.camera.frame(x0, x1, v.y, true);
+    // Folded (fold.ts): the clade's span at the zoom that frames it (it opens as it is framed): a few rounds.
+    const f = this.fan.tess.fold;
+    if (f) {
+      for (let k = 0; k < 4; k++) {
+        f.setScale(cam.sx, this.w);
+        const [a, b] = familySpan(v);
+        cam = this.camera.frame(a, b, v.y, true);
+      }
+      f.setScale(this.cam.sx, this.w);
+    }
+    return cam;
   }
 
   /** Fly to a level (levelCamera), or home if the tree has no such split. */
@@ -1009,8 +1020,9 @@ export class FanView implements InputHandlers {
       // Straight below its peel: one piece; the peel in chords.
       const peel = v.leanY;
       const ys = [ya];
-      if (peel > ya && peel < yb) ys.push(peel);
-      const p0 = Math.max(ya, peel);
+      if (peel > ya && peel < yb && !this.fan.tess.fold) ys.push(peel);
+      // (Folded, fold.ts: the column moves with its neighbours' widths at every height: chords all the way.)
+      const p0 = this.fan.tess.fold ? ya : Math.max(ya, peel);
       if (yb > p0) {
         const n = Math.min(400, Math.max(1, Math.ceil(((yb - p0) * this.cam.sy) / 4)));
         for (let i = 1; i < n; i++) ys.push(p0 + ((yb - p0) * i) / n);
