@@ -14,6 +14,7 @@ import { FanGL, rgb01 } from './meshgl';
 import { COLUMN_DIM, columnSpans, EVENT_TINT, eventAt, eventSpans, type EventSpan } from './colstyle';
 import { drawTwigs, kLogAt, laneDim, LINEAGE, LIVING, TWIG_GRAY, TwigModel, type IndInfo, type TwigStats } from './twigs';
 import type { MeshBatch, RectBatch } from './meshgl';
+import { axisInset, drawWorldOver, drawWorldUnder, worldFlags, type Box } from './world';
 
 export type { IndInfo } from './twigs';
 export type { Camera } from './camera';
@@ -443,6 +444,9 @@ export class FanView implements InputHandlers {
   private ro: ResizeObserver;
   /** The WebGL2 layer under the canvas: lanes and the individuals mesh (null: Canvas 2D only). */
   readonly gl: FanGL | null = null;
+  /** The world on the time axis (world.ts): its layers on or off, and the axis labels it keeps clear of. */
+  world = worldFlags(typeof location !== 'undefined' ? location.search : '');
+  readonly axisBoxes: Box[] = [];
   /** Frame times (ms, CPU side of draw()), for perf runs. */
   readonly frameMs: number[] = [];
 
@@ -822,7 +826,7 @@ export class FanView implements InputHandlers {
   }
 
   /** A flat rectangle under everything else (the GPU layer, or the 2D canvas without it). */
-  private under(x0: number, y0: number, x1: number, y1: number, rgb: [number, number, number], a = 1): void {
+  under(x0: number, y0: number, x1: number, y1: number, rgb: [number, number, number], a = 1): void {
     if (this.gl) {
       this.gl.under.push(x0, y0, x1, y1, rgb[0], rgb[1], rgb[2], a);
       return;
@@ -841,6 +845,7 @@ export class FanView implements InputHandlers {
       ctx.fillStyle = BG;
       ctx.fillRect(0, 0, this.w, this.h);
     }
+    drawWorldUnder(this);
     this.drawTimeAxis(false);
     this.drawStem();
     for (const b of this.fan.branches) this.drawStrand(b);
@@ -857,6 +862,7 @@ export class FanView implements InputHandlers {
     if (this.debug) this.drawDebug();
     this.drawTrunkLabel();
     this.drawTimeAxis(true);
+    drawWorldOver(this);
     if (this.gl) {
       const pal = [LIVING, LINEAGE, TWIG_GRAY].map(rgb01);
       this.gl.end(this.w, this.h, this.dpr, rgb01(BG), kLogAt(this, this.fan.time, this.cam.cy), this.toScreen(0, this.yNow)[1], pal);
@@ -1452,6 +1458,9 @@ export class FanView implements InputHandlers {
     // A gutter that fades out from the left edge, and a halo of the ground round each label:
     // the labels read over the branches and the stem.
     // (The gutter itself is drawn under the species' labels: drawGutter.)
+    ctx.translate(axisInset(this), 0);
+    this.axisBoxes.length = 0;
+    const box = (t: string, x: number, y: number) => this.axisBoxes.push([x + axisInset(this), y - 9, x + axisInset(this) + ctx.measureText(t).width, y + 9]);
     ctx.font = font('500 12px');
     ctx.lineWidth = 3.5;
     ctx.strokeStyle = 'rgba(12,23,20,0.9)';
@@ -1471,6 +1480,7 @@ export class FanView implements InputHandlers {
       if (now || p.yrs === origin) ctx.font = font('650 12.5px');
       ctx.strokeText(label, 6, p.sy - 7);
       ctx.fillText(label, 6, p.sy - 7);
+      box(label, 6, p.sy - 7);
       ctx.font = font('500 12px');
     }
     if (nowAbove) {
@@ -1478,6 +1488,7 @@ export class FanView implements InputHandlers {
       ctx.fillStyle = GREEN;
       ctx.strokeText('↑ now', 6, nowY);
       ctx.fillText('↑ now', 6, nowY);
+      box('↑ now', 6, nowY);
       ctx.font = font('500 12px');
     }
     // Honest scale note under the axis labels.
@@ -1487,6 +1498,7 @@ export class FanView implements InputHandlers {
       ctx.font = font('italic 400 12px', SERIF);
       ctx.strokeText('time, log scale', 6, oy + 9);
       ctx.fillText('time, log scale', 6, oy + 9);
+      box('time, log scale', 6, oy + 9);
     }
     ctx.restore();
   }

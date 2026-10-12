@@ -13,7 +13,7 @@ const OUT = process.argv[2] || 'perf-out/design';
 const PREFIX = process.argv[3] || 'd';
 const ONLY = process.argv[4] ? new Set(process.argv[4].split(',')) : null;
 mkdirSync(OUT, { recursive: true });
-// [name, kind, args]: 'home' | 'far' | 'card' [species] | 'touch' [species, agoYears] | 'scroll' [zoom, agoYears] | 'bar' [species, agoYears, perBar, sy, at?]
+// [name, kind, args]: 'home' | 'far' | 'window' [youngYrs, oldYrs] | 'card' [species] | 'touch' [species, agoYears] | 'scroll' [zoom, agoYears] | 'bar' [species, agoYears, perBar, sy, at?]
 //   | 'split' [splitMa, time zoom × home] | 'tapnode' [splitMa, ageMa] | 'pan' [zoom, px down from "now" at 160, px across]
 //   | 'about' [species, agoYears, k, r] | 'frame' [species, agoYears, time zoom × home, width filled?] | 'search' [query, pick?]: from home, the search opened, the query typed, and the row named `pick` tapped
 const scenes = [
@@ -118,13 +118,18 @@ const scenes = [
   ['wiki-home', 'home'],
   ['wiki-noimg-card', 'card', ['Panthera balamoides']],
   ['wiki-noimg', 'frame', ['Panthera balamoides', null, 1, 0.4]],
+  // The world on the time axis (ToLaD#189): the last 150 kyr (the glacials, the LGM), ~70 Mya (K-Pg), the last 20 kyr
+  // (the events). Q='periods=0&ice=0&events=0' for the layers off.
+  ['world-150k', 'window', [0, 150000]],
+  ['world-kpg', 'window', [30e6, 140e6]],
+  ['world-20k', 'window', [0, 20000]],
 ];
 const browser = await chromium.launch({ headless: true });
 try {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: Number(process.env.DSF || 2), isMobile: true, hasTouch: true });
   const page = await ctx.newPage();
   page.on('pageerror', (e) => console.log('pageerror', String(e)));
-  const q = [process.env.DEBUG ? 'debug' : '', process.env.EDGE ? `edge=${process.env.EDGE}` : ''].filter(Boolean).join('&');
+  const q = [process.env.DEBUG ? 'debug' : '', process.env.EDGE ? `edge=${process.env.EDGE}` : '', process.env.Q || ''].filter(Boolean).join('&');
   await page.goto(pathToFileURL(resolve('dist-single/index.html')).href + (q ? `?${q}` : ''));
   await page.waitForFunction(() => !!window.__fan, null, { timeout: Number(process.env.LOAD_MS || 20000) });
   for (const [name, kind, args] of scenes) {
@@ -155,6 +160,13 @@ try {
         } else if (kind === 'scroll') {
           const h = f.homeCamera();
           f.cam = { ...h, sx: h.sx * args[0], sy: h.sy * args[0], ty: h.sy * args[0], cy: fan.time.y(args[1] / 1e6) };
+          f.camera.settle();
+        } else if (kind === 'window') {
+          // The ages [young, old] (years ago) from 120 px under the top to 120 px above the foot.
+          const [ya, yb] = args.map((a) => fan.time.y(a / 1e6));
+          const h = f.homeCamera();
+          const sy = (f.h - 240) / Math.abs(yb - ya);
+          f.cam = { ...h, sy, ty: sy, cy: (ya + yb) / 2 };
           f.camera.settle();
         } else if (kind === 'pan') {
           // Zoom z with "now" at 160 px from the top, then the view moved down dy px (into the past).
