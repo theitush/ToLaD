@@ -2,9 +2,11 @@
 // the GPU (meshgl.ts) and mirrored here on the CPU (shadeMesh) for tests.
 //
 // Width = individuals, in both lanes alike. A branch's column is one lattice of
-// slots fixed in the world, one individual wide each (TwigModel.pitch), from
-// the column's left edge: the living's green lane holds the first slots, the
-// dead's gray lane the rest (layout.ts). The structure (slot pitch, band
+// slots fixed in the world, one individual wide each (TwigModel.pitch), about
+// the column's centre (#192: a line keeps its x while N(t) changes; the edges
+// take in or drop lines): the living's green lane holds the slots on its left,
+// the dead's gray lane the rest (layout.ts); a gray line ends a little short of
+// the green lane widening over it (endCut). The structure (slot pitch, band
 // height, line weight, level of detail) depends only on world position, time
 // and zoom, never on the lane; the lane chooses the colour of the individual
 // in a slot, and where the lanes meet the colours blend.
