@@ -410,7 +410,7 @@ export class Tess {
       R = -Infinity;
       for (let k = 0; k <= n; k++) {
         const x = f.left(b.index, n ? lo + ((hi - lo) * k) / n : lo)!;
-        L = Math.min(L, x);
+        L = Math.min(L, x - wMax);
         R = Math.max(R, x + wMax);
       }
     }
@@ -482,7 +482,8 @@ export class Tess {
 export function leftAt(b: FanBranch, y: number, w?: number, river = false): number {
   const f = river ? undefined : b.tess.fold;
   const l = f ? f.left(b.index, y) : null;
-  if (l !== null) return l;
+  // (Folded: its own column about its room's centre, fold.ts; a slot in a parent column at its left.)
+  if (l !== null) return y < b.splitY ? l - (w ?? lanesAt(b, y)[0]) / 2 : l;
   if (y < b.splitY) {
     const tc = b.x0 + b.baseW / 2;
     const c = tc + (b.cx - tc) * peelU(b.tess.edge, b.splitY, b.leanY, y);
@@ -810,8 +811,11 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = FELIDA
   if (!byTree) SIDES.set(clade, (byTree = new Map()));
   let byMode = byTree.get(tree);
   if (!byMode) byTree.set(tree, (byMode = new Map()));
+  // The order is the tree's, whatever the widths (ToLaD#146: linear vs log never reorders the species): the sides
+  // chosen on the default design's widths (linear), every other design taking them.
+  if (mode !== ORDER_MODE && !byMode.has(ORDER_MODE)) layoutFan(clade, ORDER_MODE, tree, edge);
   const P = new Packer(time, mode, W);
-  const { plans, sides } = chooseSides(root, P, byMode.get(mode));
+  const { plans, sides } = chooseSides(root, P, byMode.get(ORDER_MODE));
   byMode.set(mode, sides);
   if (edge === 'curved') placeRiver(root, P, time, mode);
   else placeLean(root, nodes, plans, time, mode);
@@ -1087,6 +1091,8 @@ const BIG_TREE = 64;
 const MAX_CANDS_BIG = 4;
 
 /** The sides chosen (mirrored or not, per split) per clade, tree and width mode: the toggle reuses them, no search. */
+/** The widths the species' left-to-right order is chosen on (every design takes it). */
+const ORDER_MODE: WidthMode = 'linear';
 const SIDES = new WeakMap<CladeRec, Map<Split, Map<WidthMode, Map<Split, boolean>>>>();
 
 /**
