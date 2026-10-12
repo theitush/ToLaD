@@ -81,16 +81,14 @@ export class FanCamera {
   }
 
   /** World x extent of the fan: its columns, with a small margin. */
-  extent(closed = false): [number, number] {
+  extent(_closed = false): [number, number] {
     const f = this.fan;
     const fo = f.tess.fold;
     if (fo) {
-      // Folded (fold.ts): the closed order is one column, no wider than the stem's width; the open fan's extent as it opens.
-      const W = f.trunkWidth * 1.04;
-      const c: [number, number] = [fo.home - W / 2, fo.home + W / 2];
-      if (closed || fo.lambda === 0) return c;
-      const m = 0.04 * (f.x1 - f.x0);
-      return [Math.min(c[0], f.x0 - m), Math.max(c[1], f.x1 + m)];
+      // Folded (fold.ts): the order as home shows it (its families apart, each closed), with a small margin.
+      const [a, b] = fo.homeExtent();
+      const m = 0.02 * (b - a);
+      return [a - m, b + m];
     }
     const m = 0.04 * (f.x1 - f.x0);
     return [f.x0 - m, f.x1 + m];

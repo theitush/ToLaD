@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { aliveAt, laneAt, layoutFan, leftAt, strandAt } from './layout';
+import { SLOT_MID } from './mesh';
 import { FELIDAE } from './panthera';
 import { speciesModel, threadEnds, TwigModel, type TwigView } from './twigs';
 
@@ -94,12 +95,20 @@ describe('width = individuals', () => {
         expect(L.w).toBeCloseTo(st.w, 12);
         expect(L.gw).toBeCloseTo(st.w * st.f, 12);
         expect(L.left).toBeCloseTo(leftAt(b, y), 12);
-        // One lattice of slots, one individual wide, across the column: green lane first.
+        // One lattice of slots, one individual wide, across the column, riding its centre (#192): green lane first.
         const P = m.pitch(y);
-        expect(m.slotX(0, y) - P / 2).toBeCloseTo(L.left, 12);
+        const [k0, kG, k1] = m.slotRange(y);
+        expect(m.slotX(SLOT_MID, y) - P / 2).toBeCloseTo(L.left + L.w / 2, 9);
+        expect(m.slotX(k0, y)).toBeGreaterThanOrEqual(L.left - 1e-9 * Math.abs(L.left));
+        expect(m.slotX(k0, y) - P).toBeLessThan(L.left);
+        expect(m.slotX(k1 - 1, y)).toBeLessThanOrEqual(L.left + L.w);
+        expect(m.slotX(k1, y)).toBeGreaterThanOrEqual(L.left + L.w - 1e-9 * Math.abs(L.left + L.w));
         expect(Math.abs(m.greenSlots(y) * P - L.gw)).toBeLessThanOrEqual(P);
+        expect(kG).toBeGreaterThanOrEqual(k0);
+        expect(kG).toBeLessThanOrEqual(k1);
         expect(m.totalSlots(y) * P).toBeCloseTo(L.w, 9);
-        for (const K of [0, 777, Math.floor(m.totalSlots(y)) - 1]) expect(m.slotAt(m.slotX(K, y), y)).toBe(K);
+        expect(Math.abs((k1 - k0) * P - L.w)).toBeLessThanOrEqual(P);
+        for (const K of [k0, k0 + 777, k1 - 1]) expect(m.slotAt(m.slotX(K, y), y)).toBe(K);
         if (f === fanLin) expect(P).toBe(b.unit); // linear: the fan's width per individual, everywhere
       }
     }
@@ -189,8 +198,9 @@ describe('determinism and links', () => {
       const t = a.twig(g, i);
       const ym = (t.yBirth + t.yDeath) / 2;
       // (A slot may hold two of a generation at once, where procgen's births outnumber the fan's N a little: either is it.)
+      // (Or one of the next generation's on the same slot, alive at ym too: their lives on a slot overlap.)
       const h = a.hit(a.slotX(t.K, ym), ym, 1e-12)!;
-      expect(h.g).toBe(g);
+      expect([g, g + 1]).toContain(h.g);
       const th = a.twig(h.g, h.i, t.K);
       expect(th.K).toBe(t.K);
       expect(th.yDeath <= ym && ym <= th.yBirth).toBe(true);

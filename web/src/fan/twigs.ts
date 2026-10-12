@@ -27,7 +27,7 @@
 import { mix } from '../../../packages/procgen/src/hash.ts';
 import { Species, type Address } from '../../../packages/procgen/src/index.ts';
 import { laneAt, leftAt, STEM_BOTTOM_MA, TIME_C, type FanBranch, type TimeScale, type WidthMode } from './layout';
-import { attrSeed, Lane, linkWidth, MAX_FOLD, packInst, type MeshInst } from './mesh';
+import { attrSeed, Lane, linkWidth, MAX_FOLD, packInst, SLOT_MID, type MeshInst } from './mesh';
 import type { MeshBatch } from './meshgl';
 import type { SpeciesRec } from './panthera';
 import type { GenSegment } from './history';
@@ -230,17 +230,33 @@ export class TwigModel {
     out[o + 3] = this.pitchOf(y, L.w);
   }
 
+  /** The left edge at y of a column w wide there (sample()'s first value; the fold's alone moves it). */
+  left(y: number, w: number): number {
+    return leftAt(this.b, y, w);
+  }
+
   /** The lanes at the fan's sample heights (CutMemo), kept from frame to frame. */
   readonly cutMemo = new CutMemo(this);
   /** The column's edges as drawn (ColumnPath). */
   readonly path: ColumnPath = new ColumnPath(this);
 
+  /** at()'s values by height: [left, w, gw, pitch, the fold version its left is for]. */
   private readonly atMemo = new Map<number, Float64Array>();
-  /** The fold moved the columns (fold.ts): sample them again. */
+  /** Bumped by refold(): a kept left edge from before it is worked out again (the widths and pitch stand). */
+  private foldVer = 0;
+  /**
+   * The fold moved the columns (fold.ts): their left edges are read again, the
+   * rest kept (the widths and the pitch do not depend on where a column stands:
+   * ToLaD#146, the fold changes on every pan and pinch).
+   */
   refold(): void {
-    this.atMemo.clear();
+    this.foldVer++;
     this.cutMemo.reset();
     this.path.reset();
+  }
+  /** The fold came to rest (fold.ts): the column's edges as drawn, exact (ColumnPath.exact). */
+  foldRest(): void {
+    this.path.exact();
   }
   /**
    * lanes() and pitch() at y: [left, w, gw, pitch], remembered (#32: the fan
@@ -248,10 +264,17 @@ export class TwigModel {
    */
   at(y: number): Float64Array {
     let r = this.atMemo.get(y);
-    if (r) return r;
+    if (r) {
+      if (r[4] !== this.foldVer) {
+        r[0] = this.left(y, r[1]);
+        r[4] = this.foldVer;
+      }
+      return r;
+    }
     if (this.atMemo.size >= 1 << 15) this.atMemo.clear();
-    r = new Float64Array(4);
+    r = new Float64Array(5);
     this.sample(y, r, 0);
+    r[4] = this.foldVer;
     this.atMemo.set(y, r);
     return r;
   }
@@ -278,13 +301,32 @@ export class TwigModel {
     return w > 0 && n > 0 ? w / Math.max(1, n) : lin;
   }
 
-  /** Green slots at height y (those alive then with living descendants today). */
-  greenSlots(y: number): number {
+  /**
+   * The column's slots at height y as world-fixed indices (#192): the lattice
+   * rides the column's centre (slot SLOT_MID's left side), not its left edge,
+   * so a slot keeps its x wherever the centre stays put (between the splits),
+   * however the population grows or shrinks: a widening column takes in new
+   * slots at its edges, a narrowing one drops them; nothing slides. [k0, kG,
+   * k1): the first slot whose centre is in the column, the first not in the
+   * green lane, and one past the last (the slots at the edges may be cut).
+   */
+  slotRange(y: number): [number, number, number] {
     const r = this.at(y);
-    return r[2] > 0 ? Math.max(1, Math.round(r[2] / r[3])) : 0;
+    const lo = SLOT_MID - r[1] / (2 * r[3]);
+    const k0 = Math.ceil(lo - 0.5);
+    // (A column narrower than a slot still holds one: the one right of its centre.)
+    const k1 = Math.max(r[1] > 0 ? k0 + 1 : k0, Math.ceil(lo + r[1] / r[3] - 0.5));
+    const kG = r[2] > 0 ? Math.min(k1, Math.max(k0 + 1, Math.ceil(lo + r[2] / r[3] - 0.5))) : k0;
+    return [k0, kG, k1];
   }
 
-  /** All the column's slots at height y (not an integer: the last one may be cut). */
+  /** Green slots at height y (those alive then with living descendants today). */
+  greenSlots(y: number): number {
+    const [k0, kG] = this.slotRange(y);
+    return kG - k0;
+  }
+
+  /** All the column's slots at height y (not an integer: the edge ones may be cut). */
   totalSlots(y: number): number {
     const r = this.at(y);
     return r[1] / r[3];
@@ -293,13 +335,13 @@ export class TwigModel {
   /** x of slot K's centre at height y. */
   slotX(K: number, y: number): number {
     const r = this.at(y);
-    return r[0] + (K + 0.5) * r[3];
+    return r[0] + r[1] / 2 + (K - SLOT_MID + 0.5) * r[3];
   }
 
   /** The slot under x at height y (may be outside the column). */
   slotAt(x: number, y: number): number {
     const r = this.at(y);
-    return Math.floor((x - r[0]) / r[3]);
+    return SLOT_MID + Math.floor((x - r[0] - r[1] / 2) / r[3]);
   }
 
   /**
@@ -332,10 +374,11 @@ export class TwigModel {
    */
   slotIndividuals(K: number, g: number, y: number): { i: number; green: boolean; deadOnly: boolean }[] {
     const n = this.size(g);
-    if (!(K >= 0) || !(n > 0) || K >= this.totalSlots(y)) return [];
+    const [k0, kG, k1] = this.slotRange(y);
+    if (!(K >= k0) || !(n > 0) || K >= k1) return [];
     const S = this.stride(g);
     const base = (K % S) % n;
-    const green = K < this.greenSlots(y);
+    const green = K < kG;
     const out: { i: number; green: boolean; deadOnly: boolean }[] = [];
     const F = this.fold(g, n);
     for (let c = 0; c < F; c++) {
@@ -351,13 +394,16 @@ export class TwigModel {
    * (a column wider than the generation's stride repeats it): K ≡ i mod S;
    * the living only in the green lane. null: not drawn at that height.
    */
-  slotOf(g: number, i: number, alive: boolean, y: number, near = 0): number | null {
+  slotOf(g: number, i: number, alive: boolean, y: number, near?: number): number | null {
     const S = this.stride(g);
     const base = i % S;
-    const lim = alive ? this.greenSlots(y) : this.totalSlots(y);
-    const j = Math.max(0, Math.round((near - base) / S));
-    for (const jj of [j, j - 1, j + 1, 0]) {
-      if (jj < 0) continue;
+    const [k0, kG, k1] = this.slotRange(y);
+    const lim = alive ? kG : k1;
+    // (Copies base + j·S; from j0, the first in the column: it when no slot is near.)
+    const j0 = Math.ceil((k0 - base) / S);
+    const j = near === undefined ? j0 : Math.max(j0, Math.round((near - base) / S));
+    for (const jj of [j, j - 1, j + 1, j0]) {
+      if (jj < j0) continue;
       const K = base + jj * S;
       if (K < lim) return K;
     }
@@ -368,7 +414,7 @@ export class TwigModel {
   isGreen(t: Twig): boolean {
     // (An extinct species' own column is all line ended; below its split it is a slice of the parent's.)
     if (this.rec.extinct && t.yBirth < this.b.splitY) return false;
-    return t.alive || t.K < this.greenSlots(t.yBirth);
+    return t.alive || t.K < this.slotRange(t.yBirth)[1];
   }
 
   twig(g: number, i: number, K?: number): Twig {
@@ -435,14 +481,14 @@ export class TwigModel {
 
   /** Does green slot k at height y hold a living strand (anyone alive now on it)? */
   livingSlot(k: number, y = this.row(this.G - 1).y): boolean {
-    if (!(k >= 0)) return false;
+    const [k0, kG] = this.slotRange(y);
+    if (!(k >= k0 && k < kG)) return false;
     // (With log widths the lattice follows the height: the slots there.)
-    const nG = this.greenSlots(y);
-    const key = this.mode === 'linear' ? k : k * 1e6 + (nG % 1e6);
+    const key = this.mode === 'linear' ? k : k * 1e6 + ((kG - k0) % 1e6);
     const c = this.slotCache.get(key);
     if (c !== undefined) return c;
     let r = false;
-    if (k < nG) {
+    {
       for (let g = this.aliveFrom; g < this.G && !r; g++) {
         for (const s of this.slotIndividuals(k, g, y)) if (this.alive(g, s.i)) r = true;
       }
@@ -456,11 +502,11 @@ export class TwigModel {
   /** World x of the living strand nearest x at height y (within `reach` slots), or null. */
   nearestLiving(x: number, y: number, reach = 64): number | null {
     if (this.aliveFrom >= this.G) return null;
-    const n = this.greenSlots(y);
+    const [k0, kG] = this.slotRange(y);
     const c = this.slotAt(x, y);
     for (let d = 0; d <= reach; d++) {
       for (const k of d ? [c - d, c + d] : [c]) {
-        if (k >= 0 && k < n && this.livingSlot(k, y)) return this.slotX(k, y);
+        if (k >= k0 && k < kG && this.livingSlot(k, y)) return this.slotX(k, y);
       }
     }
     return null;
@@ -577,7 +623,7 @@ export class TwigModel {
     const gTop = this.generationAt(wy);
     let best: { g: number; i: number } | null = null;
     let bd = Infinity;
-    const K0 = Math.max(0, this.slotAt(wx - slop, wy));
+    const K0 = Math.max(this.slotRange(wy)[0], this.slotAt(wx - slop, wy));
     const K1 = Math.min(K0 + 4000, this.slotAt(wx + slop, wy));
     for (let g = this.generationAt(wy - slopY); g >= Math.max(0, gTop - this.span); g--) {
       for (let K = K0; K <= K1; K++) {
@@ -825,10 +871,13 @@ export class CutMemo {
   private v = new Float64Array(0);
   /** The heights of the last update(), and their values. */
   n = 0;
-  constructor(private readonly m: { sample(y: number, out: Float64Array, o: number): void }) {}
-  /** Forget the kept values (the fold moved the columns, fold.ts). */
+  /** Whether the kept left edges are stale (reset(): the fold moved the columns; the widths and pitch stand). */
+  private stale = false;
+  constructor(private readonly m: { sample(y: number, out: Float64Array, o: number): void; left?(y: number, w: number): number }) {}
+  /** The fold moved the columns (fold.ts): the kept left edges are read again, the rest kept. */
   reset(): void {
-    this.n = 0;
+    if (this.m.left) this.stale = true;
+    else this.n = 0;
   }
   update(cuts: ArrayLike<number>): Float64Array {
     const n = cuts.length;
@@ -836,22 +885,28 @@ export class CutMemo {
     const v = new Float64Array(8 * n);
     const oy = this.ys;
     const ov = this.v;
+    const stale = this.stale;
     let j = 0;
     for (let k = 0; k < n; k++) {
       const y = cuts[k];
       ys[k] = y;
       while (j < this.n && oy[j] < y) j++;
+      const e = 1e-9 * Math.max(1, Math.abs(y));
       if (j < this.n && oy[j] === y) {
         for (let i = 0; i < 8; i++) v[8 * k + i] = ov[8 * j + i];
+        if (stale) {
+          v[8 * k] = this.m.left!(y + e, v[8 * k + 1]);
+          v[8 * k + 4] = this.m.left!(y - e, v[8 * k + 5]);
+        }
         continue;
       }
-      const e = 1e-9 * Math.max(1, Math.abs(y));
       this.m.sample(y + e, v, 8 * k);
       this.m.sample(y - e, v, 8 * k + 4);
     }
     this.ys = ys;
     this.v = v;
     this.n = n;
+    this.stale = false;
     return v;
   }
 }
@@ -931,11 +986,52 @@ export class ColumnPath {
   private yHi = 0;
   constructor(private readonly m: TwigModel) {}
 
-  /** Forget the kept samples (the fold moved the columns, fold.ts). */
+  /** Whether the kept samples' left edges are from an older fold (reset(); read again at the next span()). */
+  private stale = false;
+  /** How many times the fold moved the columns since the kept samples were chosen (reset()), and ever. */
+  private moved = 0;
+  private ticks = 0;
+
+  /**
+   * The fold moved the columns (fold.ts, ToLaD#146: on every pan and pinch, folded): the kept samples stay,
+   * their left edges read again (the fold moves a column smoothly, by a little a frame), and every
+   * PATH_REFOLDS-th time they are chosen afresh (the columns' phases staggered, a few a frame); exact()
+   * chooses them afresh once the fold comes to rest.
+   */
   reset(): void {
+    this.ticks++;
+    if (this.n > 0 && (this.ticks + this.m.b.index) % PATH_REFOLDS !== 0) {
+      this.stale = true;
+      this.moved++;
+      return;
+    }
+    this.forget();
+  }
+
+  /** The fold came to rest: the kept samples chosen afresh if it moved since they were (reset()). */
+  exact(): void {
+    if (this.moved > 0) this.forget();
+  }
+
+  /** Forget the kept samples: chosen afresh at the next span(). */
+  private forget(): void {
     this.n = 0;
     this.grid = NaN;
     this.sxRef = 0;
+    this.stale = false;
+    this.moved = 0;
+  }
+
+  /** The kept samples' left edges at the fold as it is now (the widths and pitch stand). */
+  private releft(): void {
+    const v = this.vals;
+    for (let k = 0; k < this.n; k++) {
+      const y = this.ys[k];
+      const e = 1e-9 * Math.max(1, Math.abs(y));
+      v[8 * k] = this.m.left(y + e, v[8 * k + 1]);
+      v[8 * k + 4] = this.m.left(y - e, v[8 * k + 5]);
+    }
+    this.stale = false;
   }
 
   /** The kept samples over [lo, hi] (world): [i0, i1], the last at or above lo and the first at or below hi. */
@@ -947,6 +1043,7 @@ export class ColumnPath {
     const grid = Math.floor(Math.log2(4 / Math.max(1e-12, sy)));
     const z = Math.abs(Math.log(sx / this.sxRef));
     if (!(z < Math.log(PATH_ZOOM)) || grid !== this.grid || lo < this.yLo || hi > this.yHi) this.build(sx, sy, lo, hi, grid);
+    else if (this.stale) this.releft();
     // (Bisect: the last kept at or above lo, the first at or below hi.)
     const ys = this.ys;
     let a = 0;
@@ -1041,11 +1138,15 @@ export class ColumnPath {
     this.grid = grid;
     this.yLo = A;
     this.yHi = B;
+    this.stale = false;
+    this.moved = 0;
   }
 }
 
 /** How far the zoom may move from the one a ColumnPath was made at (either way) before it is made again. */
 const PATH_ZOOM = 1.4;
+/** A ColumnPath chooses its samples afresh every this many moves of the fold (between, it reads their left edges again). */
+const PATH_REFOLDS = 8;
 
 /** The column's chords between yTop < yBot (ColumnPath): over the screen, the first and last reaching a little past it. */
 function stretches(v: TwigView, m: TwigModel, yTop: number, yBot: number): Stretch[] {
@@ -1228,11 +1329,16 @@ export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: num
       }
       const { L: lvl, fineA, lambda } = lvlOf;
       const bw = 2 ** lvl * P0;
+      // The lattice rides the column's centre (#192, mesh.ts meshFrame: the middle of colL and colR):
+      // slot SLOT_MID starts there, so a line keeps its x wherever the centre does.
+      const colR = lx0 + Math.max(0.6, wPx);
+      const c0 = (lx0 + colR) / 2;
+      const oX = c0 - SLOT_MID * P0;
       // (The lattice's own x, the column's frame at the top row, of the leftmost pixel over the instance.)
       const kB = 1 + sP * (y1 - y0);
-      const xMin = Math.min(x0, lx0 + (x0 - lx0 - sL * (y1 - y0)) / Math.max(1e-6, kB));
-      const B0 = Math.max(0, Math.floor((xMin - lx0) / bw) - 1);
-      if (B0 * 2 ** lvl >= Math.max(nT0, nT1)) continue;
+      const xMin = Math.min(x0, c0 + (x0 - c0 - 0.5 * (sL + sR) * (y1 - y0)) / Math.max(1e-6, kB));
+      const B0 = Math.max(0, Math.floor((xMin - oX) / bw) - 1);
+      if (B0 * 2 ** lvl >= SLOT_MID + Math.max(nT0, nT1) / 2 + 1) continue;
       // The time axis at the top of the instance, relative to generation gA's start.
       const age = time.ageAt((y0 - oy) / syv) * 1e6;
       out.push({
@@ -1240,7 +1346,7 @@ export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: num
         y0,
         x1,
         y1,
-        xB0: lx0 + B0 * bw,
+        xB0: oX + B0 * bw,
         bw,
         lw: look.lw,
         fineA,
@@ -1272,7 +1378,7 @@ export function meshInstances(v: TwigView, m: TwigModel, yTop: number, yBot: num
         fA,
         fB,
         colL: lx0,
-        colR: lx0 + Math.max(0.6, wPx),
+        colR,
         narG,
         narR,
         linkA: look.linkA ?? 0,
@@ -1399,13 +1505,13 @@ export function drawTwigs(v: TwigView, b: FanBranch, m: TwigModel, sel: { g: num
   for (let g = gLo; g <= gHi; g++) {
     const yLow = Math.min(wyBot, m.row(g).y + m.GL);
     const [x0, x1] = xr(yLow);
-    const K0 = Math.max(0, m.slotAt(x0, yLow));
-    const K1 = Math.min(m.totalSlots(yLow), m.slotAt(x1, yLow) + 1);
+    const [k0, nGs, k1] = m.slotRange(yLow);
+    const K0 = Math.max(k0, m.slotAt(x0, yLow));
+    const K1 = Math.min(k1, m.slotAt(x1, yLow) + 1);
     // (TwigModel.slotIndividuals, unrolled over the slots: members K mod S + c·S; in a gray slot only the dead.)
     const n = m.size(g);
     if (!(n > 0)) continue;
     const S = m.stride(g);
-    const nGs = m.greenSlots(yLow);
     const F = m.fold(g, n);
     for (let K = K0; K < K1; K++) {
       const base = (K % S) % n;

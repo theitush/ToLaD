@@ -3,7 +3,7 @@
 // zoomed far out, and a species card open.
 //   npm run build:single && node scripts/designshot.mjs <out-dir> [prefix] [only,names]
 //   (DSF: device scale factor, default 2; CLIP=x,y,w,h; DEBUG=1: the ?debug readout; EDGE=curved|straight: the fan's edges;
-//   WIDTH=linear|log: the widths, default linear; LEVEL=carnivores: the folded carnivores, ToLaD#146)
+//   WIDTH=linear|log: the widths, default linear; LEVEL=cats: the cats alone, a hidden flag (default: the carnivores, ToLaD#146))
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -111,6 +111,9 @@ const scenes = [
   // A flagged join met at the genome's long-run level (ToLaD#172): the puma's column from ~2 Mya to now, the
   // young end held at the anchor from ~61 kya, and its card with the one-sentence join.
   ['flag-puma', 'frame', ['Puma', 100000, 1, 0.5]],
+  // The texture inside a column (#192): the domestic cat's boom, its lines straight, only branching and ending.
+  ['tex-domcat300', 'frame', ['Domestic cat', 300, 1.6]],
+  ['tex-domcat2000', 'frame', ['Domestic cat', 2000, 1.6]],
   ['flag-puma-card', 'card', ['Puma']],
   // Wikipedia link + hotlinked Commons pictures (ToLaD#182; WAIT_MS=4000 lets them load): the lion's card,
   // home with the pills' thumbnails (WIDTH=log: eight pills), and a species with no picture (its card, its pill mid-span).
@@ -133,6 +136,8 @@ const scenes = [
   ['carn-dogs-z15', 'zoomto', ['Canidae', 1.5]],
   ['carn-dogs-z3', 'zoomto', ['Canidae', 3]],
   ['carn-dogs-z6', 'zoomto', ['Canidae', 6]],
+  ['carn-x3', 'zoomto', ['Carnivora', 3]],
+  ['carn-dogs-x15', 'zoomto', ['Canidae', 15]],
   // The world on the time axis (ToLaD#189): the last 150 kyr (the glacials, the LGM), ~70 Mya (K-Pg), the last 20 kyr
   // (the events). Q='periods=0&ice=0&events=0' for the layers off.
   ['world-150k', 'window', [0, 150000]],

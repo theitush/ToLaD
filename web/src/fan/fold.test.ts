@@ -1,6 +1,6 @@
 // The fold (ToLaD#146): one branch from afar, opening continuously as the width zoom grows.
 import { describe, expect, it } from 'vitest';
-import { Fold } from './fold';
+import { Fold, inFamily, ROOM_BEND } from './fold';
 import { columnsAt, g, laneAt, layoutFan, leftAt, TIME_H, type EdgeStyle, type Fan, type FanBranch, type WidthMode } from './layout';
 import { CARNIVORA, FELIDAE } from './panthera';
 import { CARNIVORA_TREE, FELIDAE_TREE } from './splits';
@@ -14,26 +14,48 @@ function folded(mode: WidthMode, edge: EdgeStyle): { fan: Fan; fold: Fold; home:
   const fold = new Fold(fan);
   fan.tess.fold = fold;
   // Home frames the closed order (camera.ts frame: 72 px of margins, 4% of slack).
-  const home = (SCREEN - 72) / (fan.trunkWidth * 1.04);
+  const [x0, x1] = fold.homeExtent();
+  const home = (SCREEN - 72) / ((x1 - x0) * 1.04);
   return { fan, fold, home };
 }
 const heights = (fan: Fan, n: number) => Array.from({ length: n + 1 }, (_, k) => -TIME_H + ((fan.trunkBottom.y + TIME_H) * k) / n);
 const ZOOMS = [1, 1.3, 2.2, 5, 14, 50, 120];
+/**
+ * A bend's least height on screen (px), and the share of the order's width at home that may be a hole: the
+ * widest-ever rooms left 32% at 1 kya (linear: the domestic cat's billions) and ~2% elsewhere; a stretch's room
+ * is its widest within ROOM_BAND (a 23% hole at most in a column that booms or crashes), the order's ~3% at most.
+ */
+const MIN_BEND_PX = 40;
+const FAMILY_K = 4;
+const FAMILY_MIN_PX = 3;
+const MAX_GAP_SHARE = 0.05;
+/** The share of the order's width at height y that no column covers. */
+function gapShare(fan: Fan, y: number): number {
+  const cs = columnsAt(fan, y).filter(([a, b]) => b > a).sort((p, q) => p[0] - q[0]);
+  let u = 0;
+  let e = -Infinity;
+  for (const [a, b] of cs) {
+    const s = Math.max(a, e);
+    if (b > s) u += b - s;
+    e = Math.max(e, b);
+  }
+  return 1 - u / (e - cs[0][0]);
+}
 const centre = (b: FanBranch, y: number) => leftAt(b, y) + laneAt(b, y).w / 2;
 
-/** Where the fold moves columns sideways (its events): each peel, each extinct line's end, each parent column's peel. */
-function events(fan: Fan): [number, number][] {
+/** Where the fold moves columns sideways (its events): each peel, each bend of a room, each extinct line's end, each parent column's peel. */
+function events(fan: Fan, fold: Fold): [number, number][] {
   const out: [number, number][] = [];
   for (const b of fan.branches) {
-    out.push([Math.min(b.leanY, b.splitY - Fold.endH(b)), b.splitY]);
-    if (b.tipY > -TIME_H) out.push([b.tipY - Fold.endH(b), b.tipY]);
+    out.push([b.leanY, b.splitY], ...fold.roomBends(b));
   }
   for (const v of fan.nodes) if (v.parent) out.push([v.leanY, v.yBot]);
+  out.push(...fold.forks());
   return out.sort((p, q) => p[0] - q[0]);
 }
 /** The stretches between events (each a few heights inside it), at most n of them, the longest. */
-function between(fan: Fan, n: number): number[][] {
-  const ev = events(fan);
+function between(fan: Fan, fold: Fold, n: number): number[][] {
+  const ev = events(fan, fold);
   const free: [number, number][] = [];
   let at = -TIME_H;
   for (const [a, b] of ev) {
@@ -53,10 +75,10 @@ describe('the fold', () => {
     ['linear', 'curved'],
     ['log', 'straight'],
   ] as [WidthMode, EdgeStyle][]) {
-    it(`home is one branch: every split closed, the rooms side by side, standing on the stem's centre (${mode}, ${edge})`, () => {
+    it(`home: each family one branch (its splits closed), the families apart, the rooms side by side, standing on the stem's centre (${mode}, ${edge})`, () => {
       const { fan, fold, home } = folded(mode, edge);
       fold.setScale(home, SCREEN);
-      expect(Math.max(...fold.a)).toBe(0);
+      for (let i = 0; i < fold.a.length; i++) expect(fold.a[i]).toBe(fold.pairFam[i] ? 0 : 1);
       for (const y of heights(fan, 160)) {
         const cs = columnsAt(fan, y).filter(([a, b]) => b > a).sort((p, q) => p[0] - q[0]);
         for (let i = 1; i < cs.length; i++) expect(cs[i][0]).toBeGreaterThanOrEqual(cs[i - 1][1] - 1e-9 * fan.trunkWidth);
@@ -84,7 +106,7 @@ describe('the fold', () => {
 
     it(`columns move sideways only at the tree's events: between them every column stands straight (${mode}, ${edge})`, () => {
       const { fan, fold, home } = folded(mode, edge);
-      const runs = between(fan, 40);
+      const runs = between(fan, fold, 40);
       let worst = 0;
       for (const z of [1, 3, 20]) {
         fold.setScale(home * z, SCREEN);
@@ -98,7 +120,8 @@ describe('the fold', () => {
         }
       }
       expect(worst).toBeLessThan(1e-6);
-      expect(runs.length).toBeGreaterThanOrEqual(5);
+      // (Linear: the domestic cat's and dog's booms leave few stretches where the whole order holds still; the deep-zoom test checks each column's own.)
+      expect(runs.length).toBeGreaterThanOrEqual(mode === 'linear' ? 1 : 3);
     });
 
     it(`edges are continuous in time at every zoom: no jog at a split, a tip or a fork (${mode}, ${edge})`, () => {
@@ -196,9 +219,10 @@ describe('the fold', () => {
           );
           const nodes = fan.nodes.filter((v) => v.parent && v.strands.some((q) => near.has(q)));
           const inNear = (y: number) =>
-            nodes.some((v) => y >= v.leanY && y <= v.yBot) ||
-            [...near].some((q) => (y >= Math.min(q.leanY, q.splitY - Fold.endH(q)) && y <= q.splitY) || (q.tipY > -TIME_H && y >= q.tipY - Fold.endH(q) && y <= q.tipY));
-          // Over each stretch between those events (a sister's end or split moves it, honestly: nothing else may).
+            nodes.some((v) => y >= Math.min(v.leanY, v.y - ROOM_BEND) && y <= v.yBot) ||
+            [...near].some((q) => (y >= q.leanY && y <= q.splitY) || fold.roomBends(q, false).some(([lo, hi]) => y >= lo && y <= hi));
+          // Over each stretch between those events (a sister's end or split moves it, honestly: nothing else may;
+          // not even a neighbour booming past its room, the domestic dog's billions beside the wolf).
           let lo = Infinity;
           let hi = -Infinity;
           let worst = 0;
@@ -222,6 +246,101 @@ describe('the fold', () => {
       }
     });
   }
+
+  for (const mode of ['linear', 'log'] as WidthMode[]) {
+    it(`no ledge: every change of a room is a bend at least ${MIN_BEND_PX} px tall at zooms 1, 3 and 20 (${mode})`, () => {
+      const { fan, fold, home } = folded(mode, 'curved');
+      // The phone's home time scale (camera.ts frame: 270 px of margins above and below).
+      const syHome = (844 - 270) / TIME_H;
+      fold.setScale(home, SCREEN);
+      const dy = 0.25;
+      let worst = Infinity;
+      let bends = 0;
+      for (const z of [1, 3, 20]) {
+        const sx = home * z;
+        const sy = syHome * z;
+        // Runs of change (pauses under 2 px bridged), each that moves its room by 2 px or more (a smaller jog is no ledge): their heights.
+        for (const b of fan.branches) {
+          const top = Math.max(b.tipY - Fold.endH(b), -TIME_H);
+          let start = NaN;
+          let last = NaN;
+          let lo = Infinity;
+          let hi = -Infinity;
+          const close = () => {
+            if (hi - lo >= 2 / sx) {
+              worst = Math.min(worst, (start - last) * sy);
+              bends++;
+            }
+            start = NaN;
+            lo = Infinity;
+            hi = -Infinity;
+          };
+          let prev = fold.roomAt(b, b.splitY - 1e-9);
+          for (let y = b.splitY - dy; y > top; y -= dy) {
+            const r = fold.roomAt(b, y);
+            if (Math.abs(r - prev) * sx > 1e-4) {
+              if (!(start === start)) start = y + dy;
+              if ((last - y - dy) * sy > 2) {
+                close();
+                start = y + dy;
+              }
+              last = y;
+              lo = Math.min(lo, prev, r);
+              hi = Math.max(hi, prev, r);
+            }
+            prev = r;
+          }
+          if (start === start) close();
+        }
+      }
+      expect(bends).toBeGreaterThan(10);
+      expect(worst).toBeGreaterThanOrEqual(MIN_BEND_PX);
+    });
+
+    it(`the rooms leave no holes: the gaps are under ${MAX_GAP_SHARE * 100}% of the order's width at every height (${mode})`, () => {
+      const { fan, fold } = folded(mode, 'curved');
+      // (The holes the rooms leave: every split closed, the families' gaps too.)
+      fold.setAll(0, true);
+      for (const age of [0, 1e-4, 1e-3, 0.01, 0.1, 0.5, 1, 3, 10, 30]) {
+        expect(gapShare(fan, fan.time.y(age)), `${age} Ma`).toBeLessThan(MAX_GAP_SHARE);
+      }
+    });
+  }
+
+  it(`home: the families stand apart, at least ${FAMILY_K}x further than any two species inside a family (and ${FAMILY_MIN_PX} px); zooming in, the species part`, () => {
+    for (const mode of ['log', 'linear'] as WidthMode[]) {
+      const { fan, fold, home } = folded(mode, 'curved');
+      const y = fan.time.y(0);
+      const alive = fan.root.strands.filter((b) => b.tipY <= y);
+      const gaps = (z: number) => {
+        fold.setScale(home * z, SCREEN);
+        fold.setAnchor(fold.home, y, home * z, SCREEN);
+        let fam = Infinity;
+        let inner = 0;
+        let innerN = 0;
+        let innerOpen = 0;
+        for (let i = 1; i < alive.length; i++) {
+          const p = alive[i - 1];
+          const q = alive[i];
+          const g = (leftAt(q, y) - leftAt(p, y) - laneAt(p, y).w) * home * z;
+          const v = fan.nodes.filter((n) => n.strands.includes(p) && n.strands.includes(q)).sort((m, n) => m.ageMa - n.ageMa)[0];
+          if (inFamily(v)) {
+            inner = Math.max(inner, g);
+            innerN++;
+            if (g > 1) innerOpen++;
+          } else fam = Math.min(fam, g);
+        }
+        return { fam, inner, open: innerOpen / innerN };
+      };
+      const h = gaps(1);
+      console.log(mode, JSON.stringify([1, 3, 15].map((z) => gaps(z))));
+      expect(h.fam).toBeGreaterThanOrEqual(FAMILY_MIN_PX);
+      expect(h.fam).toBeGreaterThanOrEqual(FAMILY_K * h.inner);
+      // Zooming in, more and more of the species inside the families part (a gap over 1 px).
+      expect(gaps(3).open).toBeGreaterThan(h.open);
+      expect(gaps(15).open).toBeGreaterThan(gaps(3).open);
+    }
+  });
 
   it('the species keep one left-to-right order, the tree\'s, under every width and edge, at both levels', () => {
     for (const [clade, tree] of [

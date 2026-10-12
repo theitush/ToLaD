@@ -44,15 +44,15 @@ function initialEdge(): EdgeStyle {
 }
 
 /**
- * The two views (ToLaD#146), side by side on one page: the cats as they were, and the whole order folded into
- * one branch that opens as you zoom (fold.ts). ?level=carnivores opens on the order.
+ * The view (ToLaD#146): the whole order, each family one branch from afar, opening as you zoom (fold.ts).
+ * ?level=cats: the cats alone, as they were (hidden: for the tests and shots).
  */
 type Level = 'cats' | 'carnivores';
 function initialLevel(): Level {
   try {
-    return new URLSearchParams(window.location.search).get('level') === 'carnivores' ? 'carnivores' : 'cats';
+    return new URLSearchParams(window.location.search).get('level') === 'cats' ? 'cats' : 'carnivores';
   } catch {
-    return 'cats';
+    return 'carnivores';
   }
 }
 
@@ -63,7 +63,7 @@ export function FanApp() {
   const [edge, setEdge] = useState<EdgeStyle>(initialEdge);
   const [sel, setSel] = useState<Selection | null>(null);
   const [searching, setSearching] = useState(false);
-  const [level, setLevel] = useState<Level>(initialLevel);
+  const [level] = useState<Level>(initialLevel);
   const scaleRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
 
@@ -126,17 +126,6 @@ export function FanApp() {
         </button>
         <button type="button" onClick={() => viewRef.current?.resetView()}>
           {level === 'cats' ? 'All cats' : 'All carnivores'}
-        </button>
-        <button
-          type="button"
-          aria-label={level === 'cats' ? 'Show the carnivores, folded into one branch' : 'Back to the cats'}
-          onClick={() => {
-            setSel(null);
-            setSearching(false);
-            setLevel(level === 'cats' ? 'carnivores' : 'cats');
-          }}
-        >
-          {level === 'cats' ? 'Carnivores' : 'Cats'}
         </button>
         <button
           type="button"
