@@ -139,7 +139,7 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
     const { canvas, calls } = stubs();
     // FANPERF_CLADE=carnivora: the order (ToLaD#146) instead of the cats.
     const carn = process.env.FANPERF_CLADE === 'carnivora';
-    const v = new FanView(canvas as unknown as HTMLCanvasElement, carn ? CARNIVORA : FELIDAE, 'curved', carn ? CARNIVORA_TREE : FELIDAE_TREE);
+    const v = new FanView(canvas as unknown as HTMLCanvasElement, carn ? CARNIVORA : FELIDAE, 'curved', carn ? CARNIVORA_TREE : FELIDAE_TREE, carn);
     const tNew = performance.now() - t0;
     const gl = { under: new RectBatch(), mesh: new MeshBatch(), over: new RectBatch(), begin() {}, end() {} };
     gl.begin = () => {

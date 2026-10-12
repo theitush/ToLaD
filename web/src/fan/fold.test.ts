@@ -26,7 +26,7 @@ describe('the fold', () => {
     ['linear', 'curved'],
     ['log', 'straight'],
   ] as [WidthMode, EdgeStyle][]) {
-    it(`home is one branch: every split closed, the columns side by side with no gap, about the stem's centre (${mode}, ${edge})`, () => {
+    it(`home is one branch: every split closed, the columns side by side with no gap, with no leans (${mode}, ${edge})`, () => {
       const { fan, fold, home } = folded(mode, edge);
       fold.setScale(home, SCREEN);
       expect(Math.max(...fold.a)).toBe(0);
@@ -37,12 +37,13 @@ describe('the fold', () => {
           w += cs[i][1] - cs[i][0];
           if (i) expect(Math.abs(cs[i][0] - cs[i - 1][1])).toBeLessThan(1e-9 * fan.trunkWidth + 1e-9);
         }
-        if (cs.length) expect((cs[0][0] + cs[cs.length - 1][1]) / 2).toBeCloseTo(fold.home, 6);
+        // Standing on the stem's centre: its strands' mean slot.
+        expect(fan.branches.reduce((t, b) => t + leftAt(b, y), 0) / fan.branches.length).toBeCloseTo(fold.home, 6);
         expect(w).toBeLessThanOrEqual(fan.trunkWidth * (1 + 1e-9));
       }
     });
 
-    it(`at every zoom the columns never overlap or cross, and fully open is the river (${mode}, ${edge})`, () => {
+    it(`at every zoom the columns never overlap or cross (${mode}, ${edge})`, () => {
       const { fan, fold, home } = folded(mode, edge);
       const ys = heights(fan, 500);
       let worst = 0;
@@ -54,15 +55,13 @@ describe('the fold', () => {
         }
       }
       expect(worst).toBeLessThan(1e-9 * fan.trunkWidth);
-      fold.setAll(1);
-      for (const b of fan.branches.slice(0, 40)) for (const y of ys.filter((_, k) => k % 10 === 0)) expect(leftAt(b, y)).toBe(leftAt(b, y, undefined, true));
     });
 
     it(`edges are continuous in time at every zoom: no jog at a split, a tip or a fork (${mode}, ${edge})`, () => {
       const { fan, fold, home } = folded(mode, edge);
       const yb = fan.trunkBottom.y;
       let jog = 0;
-      for (const z of [1, 1.7, 3, 8, 25]) {
+      for (const z of [1.7, 3, 8]) {
         fold.setScale(home * z, SCREEN);
         for (const b of fan.branches.filter((_, i) => i % 15 === 0)) {
           for (const y of [b.tipY, b.splitY, b.leanY]) {

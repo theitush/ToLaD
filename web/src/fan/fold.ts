@@ -1,20 +1,19 @@
 // The fold (ToLaD#146): the order reads as ONE branch from afar, and its splits open as you zoom in.
 //
-// Every species is still its own column, its width N(t) × the one scale at every height (layout.ts). The
-// river layout (placeRiver) is the fully open fan: sister columns apart by the gap rules (GAP_FRAC of the
-// narrower facing column, at least MIN_GAP_FRAC of the stem's), daughters peeling off over their split's
-// fork. The fold only closes those gaps, by how far each split is open, and moves columns sideways:
+// Every species is still its own column, its width N(t) × the one scale at every height (layout.ts), and
+// below its split its founders' slot in the parent column. The fold only says where the columns stand:
 //
 //   At a height y, the columns there in the tree's order (a species' own column above its split, a parent
-//   column below, an extinct species a zero-width mark at the centre where it ended), and between each two
-//   neighbours the river's gap g ≥ 0. The two sides of a gap meet at one split of the tree (the deepest
-//   one above both); that split is open by a ∈ [0, 1]. The folded columns stand side by side in the same
-//   order with gap a·g: so they never overlap or cross, whatever the a's, and all a = 1 is the river
-//   exactly, all a = 0 one column as wide as the sum of its species. The whole row sits with its middle
-//   on the stem's centre (all closed: one column, symmetric) or, as the splits open (λ: how open the most
-//   open split is), moved towards the river's places by its strands' mean move. Every term is continuous in y (the gaps open from 0
-//   at a split over its fork, as the river's do; an extinct column narrows to nothing before its mark
-//   stays behind), and in the zoom.
+//   column below, an extinct species a zero-width mark after its tip), side by side, and between each two
+//   neighbours a gap. The two sides of a gap meet at one split of the tree (the deepest one above both),
+//   which separates two daughter clades; the gap is today's gap rule on those clades: GAP_FRAC of the
+//   narrower one's width there (at least MIN_GAP_FRAC of the stem's, while it has that much), opening from
+//   nothing at the split over its fork (ease, as a daughter peels off in the river), times a ∈ [0, 1]: how
+//   open the split is at this zoom. So the columns never overlap or cross, whatever the a's; all a = 0 is
+//   one column as wide as the sum of its species, with no leans; every term is continuous in y (a clade's
+//   width is the sum of its columns', an extinct one narrowing to nothing, so its gaps close with it) and
+//   in the zoom. The row stands with its strands' mean slot on the stem's centre. (The river layout, placeRiver, stays
+//   the cats' own view; the fold does not use its places, so its leans at the crowded base never show.)
 //
 // How open a split is depends only on the width zoom: its narrower daughter clade's width on screen (the
 // sum of its species' rooms, its widest packed), ramped open from FOLD_LO_PX to FOLD_HI_PX (smootherstep on
@@ -27,7 +26,7 @@
 // sub-clade as it grows on screen: on a phone the order's two halves part by ~1.5x, the families by ~5x,
 // sister species once each is a few dozen px. Time zoom changes nothing.
 
-import { isNode, lanesAt, leftAt, nodeLeftAt, segAt, type Fan, type FanBranch, type FanNode } from './layout';
+import { ease, GAP_FRAC, isNode, lanesAt, MIN_GAP_FRAC, segAt, type Fan, type FanBranch, type FanNode } from './layout';
 import { smoother } from './population';
 
 /** A split's narrower daughter on screen (px): closed below FOLD_LO_PX, fully open above FOLD_HI_PX. */
@@ -46,8 +45,8 @@ export function openness(px: number, orderPx: number, screenW: number): number {
 
 /** One height's folded row: each strand's sideways move (world), stamped with the fold's version. */
 interface Row {
-  /** Per item (left to right): the river's left, width, and the first strand after it (its boundary's pair). */
-  O: Float64Array;
+  /** Its height; per item (left to right): its width, and the first strand after it (its boundary's pair). */
+  y: number;
   w: Float64Array;
   end: Int32Array;
   n: number;
@@ -65,6 +64,10 @@ export class Fold {
   /** Per neighbouring pair (i, i + 1): the narrower daughter's width (world) of the split they meet at, and that split. */
   readonly pairW: Float64Array;
   readonly pairNode: FanNode[];
+  /** Per pair: the strands of the left daughter start at lo, the right daughter's end before hi; the fork's top (world y). */
+  private readonly lo: Int32Array;
+  private readonly hi: Int32Array;
+  private readonly forkTop: Float64Array;
   /** Per pair: how open its split is. */
   readonly a: Float64Array;
   /** How open the most open split is (where the row's centre sits). */
@@ -75,7 +78,7 @@ export class Fold {
   screenW = NaN;
   /** The grid the view reads folded moves from (world height between rows), or 0: exact at every height. */
   gridH = 0;
-  private readonly ghostX: Float64Array;
+  private readonly minGap: number;
   /** The stem's centre (world x): where the closed order stands. */
   readonly home: number;
   /** The river's rows, by height (they hold whatever the a's), each folded again when the a's change. */
@@ -87,6 +90,9 @@ export class Fold {
     this.strands = fan.root.strands;
     const n = this.strands.length;
     this.pairW = new Float64Array(Math.max(0, n - 1));
+    this.lo = new Int32Array(Math.max(0, n - 1));
+    this.hi = new Int32Array(Math.max(0, n - 1));
+    this.forkTop = new Float64Array(Math.max(0, n - 1));
     this.pairNode = [];
     this.a = new Float64Array(Math.max(0, n - 1)).fill(1);
     this.lambda = 1;
@@ -102,9 +108,14 @@ export class Fold {
       const dq: FanNode | FanBranch = kq === 0 ? this.strands[i + 1] : q[kq - 1].node;
       this.pairNode.push(v);
       this.pairW[i] = Math.min(room(dp), room(dq));
+      // The two daughters' strands (each a run in the drawn order) and the split's fork (where its gap opens over).
+      const run = (k: FanNode | FanBranch) => (isNode(k) ? [k.strands[0].index, k.strands[k.strands.length - 1].index + 1] : [k.index, k.index + 1]);
+      this.lo[i] = run(dp)[0];
+      this.hi[i] = run(dq)[1];
+      this.forkTop[i] = Math.min(dp.leanY, dq.leanY);
     }
-    this.ghostX = Float64Array.from(this.strands, (b) => leftAt(b, b.tipY, 0, true));
     this.home = fan.root.left + fan.root.width / 2;
+    this.minGap = MIN_GAP_FRAC * fan.trunkWidth;
   }
 
   /** Set the width zoom (px per world unit) and screen width (px): true if any split's openness changed. */
@@ -140,12 +151,10 @@ export class Fold {
   private riverRow(y: number): Row {
     const S = this.strands;
     const n = S.length;
-    const O = new Float64Array(n);
     const w = new Float64Array(n);
     const end = new Int32Array(n);
     const item = new Int32Array(n);
     const off = new Float64Array(n);
-    const ghost = new Uint8Array(n);
     let m = 0;
     let node: FanNode | null = null;
     for (let i = 0; i < n; i++) {
@@ -160,58 +169,45 @@ export class Fold {
           continue;
         }
         node = v;
-        O[m] = nodeLeftAt(v, y, true);
         w[m] = v.width;
       } else {
         node = null;
-        if (y >= b.tipY) {
-          const W = lanesAt(b, y)[0];
-          O[m] = leftAt(b, y, W, true);
-          w[m] = W;
-        } else {
-          O[m] = this.ghostX[i];
-          w[m] = 0;
-          ghost[m] = 1;
-        }
+        w[m] = y >= b.tipY ? lanesAt(b, y)[0] : 0;
       }
       item[i] = m;
       end[m] = i + 1;
       m++;
     }
-    // A mark left by an extinct column: where it ended, kept between its live neighbours (the river may use the room).
-    let lo = -Infinity;
-    for (let j = 0; j < m; j++) {
-      if (!ghost[j]) {
-        lo = O[j] + w[j];
-        continue;
-      }
-      let hi = Infinity;
-      for (let k = j + 1; k < m; k++)
-        if (!ghost[k]) {
-          hi = O[k];
-          break;
-        }
-      O[j] = Math.max(lo, Math.min(O[j], hi));
-      lo = O[j];
-    }
-    return { O, w, end, n: m, item, off, ver: -1, xs: new Float64Array(n) };
+    return { y, w, end, n: m, item, off, ver: -1, xs: new Float64Array(n) };
   }
 
   /** Fold a row with the current a's: each strand's move. */
   private foldRow(r: Row): void {
-    const { O, w, end, n } = r;
+    const { w, end, n, item, y } = r;
+    // Each daughter clade's width here: its items' widths (each counted at its first strand), summed along the strands.
+    const S = item.length;
+    const C = new Float64Array(S + 1);
+    for (let i = 0; i < S; i++) C[i + 1] = C[i] + (i === 0 || item[i] !== item[i - 1] ? w[item[i]] : 0);
+    const edge = this.fan.edge;
     const X = new Float64Array(n);
     for (let j = 1; j < n; j++) {
-      const g = Math.max(0, O[j] - O[j - 1] - w[j - 1]);
-      X[j] = X[j - 1] + w[j - 1] + this.a[end[j - 1] - 1] * g;
+      const p = end[j - 1] - 1;
+      let gap = 0;
+      const a = this.a[p];
+      if (a > 0) {
+        const m = Math.min(C[p + 1] - C[this.lo[p]], C[this.hi[p]] - C[p + 1]);
+        const v = this.pairNode[p];
+        const u = this.forkTop[p] < v.y ? ease(edge, (v.y - y) / (v.y - this.forkTop[p])) : 1;
+        gap = a * u * Math.max(GAP_FRAC * m, Math.min(m, this.minGap));
+      }
+      X[j] = X[j - 1] + w[j - 1] + gap;
     }
-    // Where the row sits: closed, its middle on the stem's centre; opening, towards the river by the mean move of
-    // its strands (each counted once, whatever its width: a stock growing out of nobody drags nothing along).
+    // Where it stands: its strands' mean slot (each counted once, whatever its width) on the stem's centre, so
+    // a column that grows or shrinks moves its neighbours as little as it can (a stock growing out of nobody, the
+    // domestic cat's and dog's billions in linear widths, pushes aside only what is beside it).
     let mean = 0;
-    for (let i = 0; i < r.item.length; i++) mean += O[r.item[i]] - X[r.item[i]];
-    mean /= Math.max(1, r.item.length);
-    const mid = (X[0] + X[n - 1] + w[n - 1]) / 2;
-    const shift = (1 - this.lambda) * (this.home - mid) + this.lambda * mean;
+    for (let i = 0; i < S; i++) mean += X[item[i]] + r.off[i];
+    const shift = this.home - mean / Math.max(1, S);
     const xs = r.xs;
     for (let i = 0; i < xs.length; i++) xs[i] = X[r.item[i]] + shift + r.off[i];
     r.ver = this.ver;
@@ -230,11 +226,9 @@ export class Fold {
 
   /**
    * Strand i's folded left edge at height y (its own column's, or its slot's in a parent column): exact (gridH 0),
-   * else read off the grid's rows, linear between them (the folded edges are sums of widths: smooth, where the
-   * river's may swing far over a fork), or null when every split is open (the river's own).
+   * else read off the grid's rows, linear between them (the folded edges are sums of widths and gaps: smooth).
    */
   left(i: number, y: number): number | null {
-    if (this.lambda === 1 && this.allOpen()) return null;
     const h = this.gridH;
     if (!(h > 0)) {
       if (!this.last || this.lastY !== y || this.last.ver !== this.ver) {
@@ -254,16 +248,6 @@ export class Fold {
   /** Change the grid (world height between rows, a power of two: the rows a finer grid shares with a coarser are kept). */
   setGrid(h: number): void {
     this.gridH = h;
-  }
-
-  private openVer = -1;
-  private open = true;
-  private allOpen(): boolean {
-    if (this.openVer !== this.ver) {
-      this.open = this.a.every((v) => v === 1);
-      this.openVer = this.ver;
-    }
-    return this.open;
   }
 
   /**

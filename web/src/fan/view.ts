@@ -398,8 +398,9 @@ export function labelSpots(c: Screen, fan: Fan, top: number, measure: (text: str
     const tl = X(leftAt(b, b.tipY));
     const tw = laneAt(b, b.tipY).w * c.cam.sx;
     const room = b.width * c.cam.sx;
-    const left = X(b.colLeft);
     const cx = tl + tw / 2;
+    // (Folded, fold.ts: its room about where the fold has its column.)
+    const left = fan.tess.fold?.left(b.index, b.tipY) != null ? cx - room / 2 : X(b.colLeft);
     const lo = Math.max(left, LABEL_AXIS_X) + half;
     const hi = Math.min(left + room, c.w) - half;
     const x = lo <= hi ? Math.min(Math.max(cx, lo), hi) : Math.min(Math.max(cx, hi), lo);
@@ -799,6 +800,12 @@ export class FanView implements InputHandlers {
     const sx = Math.min(Math.max(h.sx, (0.5 * this.w) / Math.max(1e-300, b.width)), Math.max(h.sx, this.camera.sxCap(b.cx, b.tipY)));
     // Within the time limit (MIN_YEARS on screen) about the tip, where it will sit.
     const s = this.camera.timeCap(b.tipY, tipPx, sy, h.sy);
+    // Folded (fold.ts): its column where the fold has it at that zoom (the fold stays there for the camera taking it).
+    const f = this.fan.tess.fold;
+    if (f) {
+      f.setScale(sx, this.w);
+      if (f.left(b.index, b.tipY) !== null) return { cx: leftAt(b, b.tipY) + laneAt(b, b.tipY).w / 2, cy: cyAt(s), sx, sy: s, ty: s };
+    }
     return { cx: b.cx, cy: cyAt(s), sx, sy: s, ty: s };
   }
 
