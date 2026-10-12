@@ -33,7 +33,7 @@
 // sub-clade as it grows on screen: on a phone the order's two halves part by ~1.5x, the families by ~5x,
 // sister species once each is a few dozen px. Time zoom changes nothing.
 
-import { ease, g, GAP_FRAC, isNode, lanesAt, MIN_GAP_FRAC, peelU, segAt, type Fan, type FanBranch, type FanNode } from './layout';
+import { ease, GAP_FRAC, isNode, lanesAt, MIN_GAP_FRAC, segAt, type Fan, type FanBranch, type FanNode } from './layout';
 import { smoother } from './population';
 
 /** A split's narrower daughter on screen (px): closed below FOLD_LO_PX, fully open above FOLD_HI_PX. */
@@ -44,6 +44,23 @@ export const FOLD_GATE_LO = 0.9;
 export const FOLD_GATE_HI = 1.8;
 /** The anchor's bell (setAnchor): its sigma, as a share of the screen's width. */
 export const ANCHOR_SIGMA = 0.1;
+/**
+ * How tall (world) a room's bend is, at least (roomAt): 72 world units, ~0.7 of a decade of the log time axis,
+ * 46 px at a phone's home time scale (574 px for TIME_H) and taller at every deeper time zoom: a bend, never a
+ * ledge. ROOM_BAND: how far a column's width may fall under its room's within a stretch (the hole's bound).
+ */
+export const ROOM_BEND = 72;
+export const ROOM_BAND = 1.3;
+
+/** A strand's stretches (Fold.roomPlan): their ends from its split up (B[0] its split, then each bend's middle, its last height), and their rooms. */
+export interface RoomPlan {
+  B: Float64Array;
+  L: Float64Array;
+  /** Its peel's height: its room grows from its founders' slot over it. */
+  peel: number;
+  /** The stretches it outgrows (a boom or crash faster than a bend): the column's own width leads there. */
+  hug: number[];
+}
 
 const logRamp = (v: number, lo: number, hi: number) => (v > 0 ? smoother(Math.log(v / lo) / Math.log(hi / lo)) : 0);
 
@@ -149,25 +166,118 @@ export class Fold {
   }
 
   /**
-   * Strand b's room at height y, above its split (its own column; world): fixed between the tree's events, so
-   * the column stands straight and narrows or widens about its room's centre. Its widest ever (Fan's room),
-   * grown from its founders' slot over its peel (as its gap opens; never narrower than the column); an extinct
-   * one's closing after its tip over as long again (the line's end, as its split was its start).
+   * Strand b's room at height y, above its split (its own column; world): fixed over each of its stretches
+   * (roomPlan), so the column stands straight and narrows or widens about its room's centre; between two
+   * stretches it bends over ROOM_BEND (ease), as at its peel from its founders' slot (never narrower than the
+   * column); an extinct one's room closes after its tip over as long again (the line's end, as its split was
+   * its start).
    */
   roomAt(b: FanBranch, y: number): number {
-    const R = Math.max(b.width, b.baseW, b.unit * g(b.pop.max, b.tess.mode));
-    // (Over its peel; a straight one's with no peel over as long as an end takes: no jog at the split.)
-    const top = b.leanY < b.splitY ? b.leanY : b.splitY - Fold.endH(b);
-    const u = peelU(this.fan.edge, b.splitY, top, y);
-    let r = b.baseW + (R - b.baseW) * u;
+    const p = this.roomPlan(b);
+    const { B, L } = p;
+    const edge = this.fan.edge;
+    const yy = Math.max(y, b.tipY);
+    let k = 0;
+    while (k + 2 < B.length && yy < B[k + 1]) k++;
+    let r = L[k];
+    if (k === 0 && yy > b.splitY - p.peel) {
+      // (Its peel: from its founders' slot up to its room; a column widening faster takes the lead, smoothly: one bend.)
+      const u = (b.splitY - yy) / p.peel;
+      r = b.baseW + (L[0] - b.baseW) * ease(edge, u);
+      const w = lanesAt(b, yy)[0];
+      const e = 0.4 * L[0] * u * (1 - u);
+      r = (r + w + Math.sqrt((r - w) * (r - w) + e * e)) / 2;
+    } else if (k > 0 && yy > B[k] - ROOM_BEND / 2) r = L[k - 1] + (L[k] - L[k - 1]) * ease(edge, 0.5 + (B[k] - yy) / ROOM_BEND);
+    else if (k + 2 < B.length && yy < B[k + 1] + ROOM_BEND / 2) r = L[k] + (L[k + 1] - L[k]) * ease(edge, 0.5 + (B[k + 1] - yy) / ROOM_BEND);
     if (y >= b.tipY) return Math.max(r, lanesAt(b, y)[0]);
-    r *= 1 - ease(this.fan.edge, (b.tipY - y) / Fold.endH(b));
+    r *= 1 - ease(edge, (b.tipY - y) / Fold.endH(b));
     return r;
+  }
+
+  private readonly plans = new Map<FanBranch, RoomPlan>();
+
+  /**
+   * Strand b's stretches (ToLaD#146): from its split up, each as long as its width stays within ROOM_BAND of its
+   * narrowest there (at least ROOM_BEND long, the first a peel longer), its room its widest there, but at most
+   * ROOM_BAND times its narrowest. A column whose width holds (most) is one stretch, its room its widest: it stands
+   * straight. One that booms or crashes faster than a bend (the domestic cat) steps its room after it, a bend at
+   * a time, and where it outgrows its room the column itself takes the lead (roomAt: never narrower than the
+   * column), so it leaves no hole wider than the band.
+   */
+  roomPlan(b: FanBranch): RoomPlan {
+    let p = this.plans.get(b);
+    if (p) return p;
+    const top = Math.max(b.tipY, this.yRef);
+    const peel = Fold.peelH(b);
+    const span = b.splitY - top;
+    const H = ROOM_BEND / 2;
+    if (!(span > peel + 2 * ROOM_BEND)) {
+      // (Too short to step: one stretch, its widest.)
+      let R = b.baseW;
+      for (let k = 0; k <= 64; k++) R = Math.max(R, lanesAt(b, b.splitY - (span * k) / 64 - 1e-9)[0]);
+      p = { B: Float64Array.of(b.splitY, top), L: Float64Array.of(R), peel, hug: [] };
+    } else {
+      const dy = H / 16;
+      const n = Math.ceil(span / dy) + 1;
+      const w = new Float64Array(n);
+      for (let i = 0; i < n; i++) w[i] = lanesAt(b, Math.max(top, b.splitY - i * dy - (i === 0 ? 1e-9 : 0)))[0];
+      // (Each sample the widest of its neighbours', a hair over: the width between two samples stays under it.)
+      const M = w.map((v, i) => Math.max(v, w[i - 1] ?? 0, w[i + 1] ?? 0) * (1 + 1e-4));
+      const B = [b.splitY];
+      const L: number[] = [];
+      const hug: number[] = [];
+      const len0 = Math.ceil((peel + H) / dy);
+      const len = Math.ceil(ROOM_BEND / dy);
+      let i0 = 0;
+      while (i0 < n - 1) {
+        let j = i0;
+        let lo = M[i0];
+        let hi = M[i0];
+        const min = i0 === 0 ? len0 : len;
+        while (j + 1 < n) {
+          const l2 = Math.min(lo, M[j + 1]);
+          const h2 = Math.max(hi, M[j + 1]);
+          if (j - i0 >= min && h2 > ROOM_BAND * l2) break;
+          lo = l2;
+          hi = h2;
+          j++;
+        }
+        // (What is left too short for a stretch of its own, half a bend, joins this one.)
+        if (n - 1 - j < len / 2) {
+          for (let q = j + 1; q < n; q++) hi = Math.max(hi, M[q]);
+          j = n - 1;
+        }
+        // (A stretch it booms or crashes through, too short to step with it: its room within the band of its
+        // narrowest, the column wider than it taking the lead: room = width while it grows, smoothly.)
+        L.push(Math.max(Math.min(hi, ROOM_BAND * lo), i0 === 0 ? b.baseW : 0));
+        if (hi > ROOM_BAND * lo) hug.push(L.length - 1);
+        B.push(j === n - 1 ? top : b.splitY - j * dy);
+        i0 = j;
+      }
+      p = { B: Float64Array.from(B), L: Float64Array.from(L), peel, hug };
+    }
+    this.plans.set(b, p);
+    return p;
+  }
+
+  /** Where strand b's room changes (world [lo, hi]): its peel, each bend between its stretches, each stretch it outgrows, an extinct one's end. */
+  roomBends(b: FanBranch, hugs = true): [number, number][] {
+    const { B, peel, hug } = this.roomPlan(b);
+    const out: [number, number][] = [[b.splitY - peel, b.splitY]];
+    if (hugs) for (const k of hug) out.push([B[k + 1], B[k]]);
+    for (let k = 1; k + 1 < B.length; k++) out.push([B[k] - ROOM_BEND / 2, B[k] + ROOM_BEND / 2]);
+    if (b.tipY > this.yRef) out.push([b.tipY - Fold.endH(b), b.tipY]);
+    return out;
+  }
+
+  /** How long (world) a strand's room takes to grow from its founders' slot: its peel, at least a bend. */
+  static peelH(b: FanBranch): number {
+    return Math.max(b.splitY - b.leanY, ROOM_BEND);
   }
 
   /** How long (world) an extinct strand's room takes to close after its tip: as long as its peel took. */
   static endH(b: FanBranch): number {
-    return Math.max(b.splitY - b.leanY, 0.02 * (b.splitY - b.tipY), 1e-9);
+    return Math.max(Fold.peelH(b), 0.02 * (b.splitY - b.tipY));
   }
 
   /**
