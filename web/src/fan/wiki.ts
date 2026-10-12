@@ -1,4 +1,4 @@
-// Wikipedia link and Wikimedia Commons picture per species (ToLaD#182), from the data's
+// Wikipedia link, Wikimedia Commons picture (ToLaD#182) and range map (ToLaD#196) per species, from the data's
 // sidecar data/mammals/wiki.json (pipeline `make wiki`), filtered to the fan's species at
 // build time (vite.config.ts, `wiki` of `virtual:panthera-data`).
 //
@@ -15,6 +15,10 @@ export interface WikiRec {
   img?: string;
   /** The picture's Commons file page (its credit and licence). */
   file?: string;
+  /** The range map (Wikidata P181, ToLaD#196): a 500 px thumbnail on upload.wikimedia.org (hotlinked). */
+  range?: string;
+  /** The range map's Commons file page (its credit and licence). */
+  rangeFile?: string;
 }
 
 /** A species' Wikipedia and Commons URLs, or null when Wikidata has neither. */
