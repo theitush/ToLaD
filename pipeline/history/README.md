@@ -43,6 +43,19 @@ kind  = "estimate"
 cite  = "..."
 url   = "..."
 note  = "..."
+# optional, on a point counting part of the population (ToLaD#174):
+# basis    = "mature"  # n, lo, hi are mature individuals only
+# per      = 1.936     # all ages per mature animal; n, lo, hi are multiplied by it
+# per_cite = "where the ratio comes from (a cited ratio, or totals in the source's life table)"
+
+[[trend]]              # optional: a cited %/yr change after the last all-age point (see "Later partial figures")
+from_year    = 2009
+to_year      = 2017
+pct_per_year = -7.2    # negative = decline
+grade = "C"
+cite  = "..."
+url   = "..."
+note  = "what the rate covers (one colony? mature females?)"
 
 [deep]                 # optional, wild counts only: a genome-based Ne history (see "Deep past")
 method = "PSMC"        # PSMC | MSMC | MSMC2 | SMC++
@@ -204,7 +217,9 @@ in 25-year steps.
   in years) between points, so the curve passes through every point exactly.
   Spans between two points are marked `interpolated` and carry the worse
   grade of their two ends.
-- **Alive now:** the latest point if it is from 2000 or later and graded A-C;
+- **Alive now:** the latest point (a `basis` point scaled to all ages, or a
+  `[[trend]]` point; see "Later partial figures and trends") if it is from 2000
+  or later and graded A-C;
   otherwise the model's alive-now figure stays and is appended to the curve
   as a `model` point, so the curve and the green lane agree.
 - **Error and grade:** the leaf's log error is widened by the deep-past
@@ -238,6 +253,32 @@ in 25-year steps.
   point the existing growth since domestication (shaped like human births) is
   kept, rescaled to meet the first point.
 - **Humans:** `use = "display"`: counts stay PRB + UN WPP.
+
+## Later partial figures and trends (ToLaD#174)
+
+A count must not be held flat for years when a later figure exists. The Antarctic
+fur seal's curve ended at 3.51M in 2008 while IUCN (2026) gave 944,000 mature seals
+in 2025. The 2025 figure was in the notes only, because it counts mature animals
+only. Two ways bring such a figure into the curve; use whichever fits the data:
+
+- **A mature-only figure** goes in as a `[[point]]` with `basis = "mature"` and
+  `per`, the number of animals of all ages per mature one. Take `per` from a cited
+  ratio, or derive it from the source's own totals (e.g. Forcada et al. 2026:
+  1,983,687 all ages for 1,024,797 mature at South Georgia in 2022, ×1.936).
+  Cite it in `per_cite`. The build multiplies `n`, `lo` and `hi` by `per` and
+  starts the point's note (shown on the card) with the original figure and the
+  ratio. Graded no better than the ratio allows: usually C.
+- **A cited %/yr trend** goes in as a `[[trend]]`. The build takes the latest
+  point at or before `to_year` and carries it at `pct_per_year` from the later of
+  that point's year and `from_year` to `to_year`. That makes an `index-scaled`
+  point graded the worse of the two, with the arithmetic in its note. A cited
+  point at `to_year` wins, and the trend then adds nothing. Use a trend only when
+  the rate covers the population the points count. One colony's rate (the fur
+  seal's Bird Island, -7.2%/yr) is not the species'.
+
+The audit's `stale` check (`tolad_pipeline/audit.py`) flags a curated today that
+is held more than 10 years past its last cited point, when the file's notes name
+a later dated figure (a %, a mature count, a million, a number like 944,000).
 
 ## Deep past (`[deep]`, layer 3 of the estimate stack)
 
