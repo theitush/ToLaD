@@ -41,7 +41,7 @@ class Schema(unittest.TestCase):
     def test_all_files_validate(self):
         recs = H.load_all()
         self.assertGreaterEqual(len(recs), 40)
-        self.assertLessEqual(len(recs), 60)
+        self.assertLessEqual(len(recs), 70)
         for r in recs:
             for p in H.curve_points(r):
                 self.assertTrue(p["cite"] and p["url"].startswith("http"), r["file"])
@@ -132,6 +132,7 @@ class Schema(unittest.TestCase):
         unresolved = {
             # blind-only [deep] keeps the bulk PSMC's two steps in Dobrynin's window (#149): they fall 1.2x through it
             ("Acinonyx jubatus", "Late-Pleistocene crash"),
+            ("Canis familiaris", "Domestication founders"),  # before the domestic stock starts: nothing drawn (#175)
             ("Canis rufus", "Fourteen founders"),  # the trend from 1500 already reaches the low; no earlier count
             ("Lynx pardinus", "Ancient lynx decline"), ("Lynx pardinus", "Glacial bottleneck"),  # no [deep]
             ("Panthera tigris", "Ancestral bottleneck"), ("Panthera tigris", "Late Pleistocene bottleneck"),
