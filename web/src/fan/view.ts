@@ -742,6 +742,8 @@ export class FanView implements InputHandlers {
   private labelT = 0;
   /** `?debug`: a readout of the zooms, years on screen and individuals per px. */
   readonly debug = typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug');
+  /** `?debug&hide=stem,lanes,ind,held,events,fade`: those layers not drawn (finding which layer draws what, ToLaD#210). */
+  private readonly hide = new Set(this.debug ? (new URLSearchParams(location.search).get('hide') ?? '').split(',') : []);
   /** What each branch's individuals view drew last frame (taps, tests). */
   twigStats = new Map<number, TwigStats>();
   /** Without the GPU layer: this frame's styled column stretches, faded once the individuals are drawn. */
@@ -1404,12 +1406,13 @@ export class FanView implements InputHandlers {
     }
     drawWorldUnder(this);
     this.drawTimeAxis(false);
-    this.drawStem();
-    for (const b of this.fan.branches) this.drawStrand(b);
-    for (const b of this.fan.branches) this.drawIndividuals(b);
-    this.drawHeld();
-    this.drawEvents();
-    this.drawStemFade();
+    const hide = this.hide;
+    if (!hide.has('stem')) this.drawStem();
+    if (!hide.has('lanes')) for (const b of this.fan.branches) this.drawStrand(b);
+    if (!hide.has('ind')) for (const b of this.fan.branches) this.drawIndividuals(b);
+    if (!hide.has('held')) this.drawHeld();
+    if (!hide.has('events')) this.drawEvents();
+    if (!hide.has('fade')) this.drawStemFade();
     // Labels: one form everywhere (see labelSpots).
     this.drawGutter();
     this.drawTouch();

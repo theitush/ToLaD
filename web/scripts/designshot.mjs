@@ -4,7 +4,7 @@
 //   npm run build:single && node scripts/designshot.mjs <out-dir> [prefix] [only,names]
 //   (DSF: device scale factor, default 2; CLIP=x,y,w,h; DEBUG=1: the ?debug readout; EDGE=curved|straight: the fan's edges;
 //   WIDTH=linear|log: the widths, default linear; LEVEL=cats: the cats alone, a hidden flag (default: the carnivores, ToLaD#146))
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { chromium } from 'playwright';
@@ -368,6 +368,8 @@ try {
     }
     // CLIP=x,y,w,h (CSS px): only that part of the page (with DSF=4–6, a close look).
     const clip = process.env.CLIP ? Object.fromEntries(['x', 'y', 'width', 'height'].map((k, i) => [k, Number(process.env.CLIP.split(',')[i])])) : undefined;
+    // EVAL=file.js: that file's text evaluated in the page before the shot (a probe), its value printed.
+    if (process.env.EVAL) console.log(JSON.stringify(await page.evaluate(readFileSync(process.env.EVAL, 'utf8'))));
     await page.screenshot({ path: `${OUT}/${PREFIX}-${name}.png`, clip });
     console.log('shot', name);
   }

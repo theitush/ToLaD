@@ -100,9 +100,15 @@ export function leanShare(dxPx: number, dyPx: number): number {
  * family's columns stand straight on screen up to where they close a gap of thousands of px, too flat to draw;
  * cut there, their tops read as a wide stepped slab. Instead the share drawn along a strand rises at most
  * 1/LEAN_FADE_PX per px of height away from a culled stretch: the column fades out over LEAN_FADE_PX px below
- * (and above) it.
+ * (and above) it. Eased (leanEase, quadratic): the far families' columns all leave at their fork's row, so a
+ * short or straight fade still reads as the block's flat top in the browser (round 3's 60 px, linear: half its
+ * grey within 30 px of the cut); long and eased, they rise out of the dark, a tenth of their share 50 px below.
  */
-export const LEAN_FADE_PX = 60;
+export const LEAN_FADE_PX = 160;
+/** The share drawn at u (0-1) of the way up a fade: quadratic, so no edge where it starts. */
+export function leanEase(u: number): number {
+  return u <= 0 ? 0 : u >= 1 ? 1 : u * u;
+}
 /** A fading stretch is drawn in slices about this tall (px), each at its own share (straight in the height, a sixth at most a slice); under LEAN_DROP, none. */
 const LEAN_SLICE_PX = 10;
 const LEAN_DROP = 0.04;
@@ -110,17 +116,17 @@ const LEAN_DROP = 0.04;
 /**
  * The shares at a strand's stretches' ends (ToLaD#210): n stretches bottom first, lin[i] its own share (leanShare,
  * 1 for a stretch of no height), h[i] its height on screen (px); into V[0..n], the least of every stretch's share
- * plus its distance away over LEAN_FADE_PX (a distance transform, up then down); vBot and vTop, the shares just
+ * (in distance terms, its square root: leanEase) plus its distance away over LEAN_FADE_PX (a distance transform, up then down); vBot and vTop, the shares just
  * beyond its ends (a column's backdrop's daughters', drawStem). Returns whether any is under 1.
  */
 export function leanEnds(n: number, lin: Float64Array, h: Float64Array, V: Float64Array, vBot = 1, vTop = 1): boolean {
   let m = Math.min(1, vBot);
   V[0] = m;
-  for (let j = 1; j <= n; j++) V[j] = m = Math.min(m + h[j - 1] / LEAN_FADE_PX, lin[j - 1], 1);
+  for (let j = 1; j <= n; j++) V[j] = m = Math.min(m + h[j - 1] / LEAN_FADE_PX, Math.sqrt(lin[j - 1]), 1);
   m = Math.min(1, vTop);
   let any = false;
   for (let j = n; j >= 0; j--) {
-    if (j < n) m = Math.min(m + h[j] / LEAN_FADE_PX, lin[j], 1);
+    if (j < n) m = Math.min(m + h[j] / LEAN_FADE_PX, Math.sqrt(lin[j]), 1);
     if (m < V[j]) V[j] = m;
     if (V[j] < 1) any = true;
   }
@@ -143,20 +149,23 @@ export function leanPieces(lin: number, vb: number, vt: number, hPx: number, out
     }
   };
   if (!(lin > 0)) return 0;
-  if (Math.min(vb, vt) >= lin || !(hPx > 0)) {
+  // (vb, vt are distances away over LEAN_FADE_PX (leanEnds); the share drawn is their ease, lin at most: in
+  // distance terms, u.)
+  const u = Math.sqrt(Math.min(1, lin));
+  if (Math.min(vb, vt) >= u || !(hPx > 0)) {
     put(0, 1, lin);
     return n / 3;
   }
   const F = LEAN_FADE_PX;
-  const rb = Math.min(hPx, Math.max(0, (lin - vb) * F));
-  const rt = Math.min(hPx, Math.max(0, (lin - vt) * F));
+  const rb = Math.min(hPx, Math.max(0, (u - vb) * F));
+  const rt = Math.min(hPx, Math.max(0, (u - vt) * F));
   const slices = (d0: number, d1: number) => {
     const k = Math.max(1, Math.ceil((d1 - d0) / LEAN_SLICE_PX));
     for (let i = 0; i < k; i++) {
       const a = d0 + ((d1 - d0) * i) / k;
       const b = d0 + ((d1 - d0) * (i + 1)) / k;
       const d = (a + b) / 2;
-      put(a / hPx, b / hPx, Math.min(lin, vb + d / F, vt + (hPx - d) / F));
+      put(a / hPx, b / hPx, Math.min(lin, leanEase(Math.min(vb + d / F, vt + (hPx - d) / F))));
     }
   };
   if (rb + rt >= hPx) slices(0, hPx);
