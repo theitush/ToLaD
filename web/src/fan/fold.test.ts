@@ -497,4 +497,40 @@ describe('the fold', () => {
       for (const o of orders) expect(o).toBe(orders[0]);
     }
   });
+
+  it('xRange, folded on a grid (read off the rows, every strand at once): holds each strand at every height in the range', () => {
+    for (const mode of ['log', 'linear'] as WidthMode[]) {
+      const { fan, fold, home } = folded(mode, 'curved');
+      const yb = fan.trunkBottom.y;
+      const dogs = fan.nodes.find((n) => n.split.taxon === 'Canidae')!;
+      const [a, b] = familySpan(dogs);
+      for (const [z, sy] of [
+        [1, SY_HOME],
+        [15, SY_HOME * 40],
+      ]) {
+        const sx = home * z;
+        fold.setScale(sx, SCREEN);
+        if (z > 1) fold.setAnchor((a + b) / 2, fan.time.y(1), sx, SCREEN);
+        fold.setGrid(Math.pow(2, Math.round(Math.log2(3 / sy))));
+        // (Spans a screen tall or so, as the draw asks: the whole world at home.)
+        const scr = (y: number): [number, number] => [y - 440 / sy, y + 440 / sy];
+        const ranges: [number, number][] = [z === 1 ? [-TIME_H - 5, yb + 5] : scr(fan.time.y(1e-3)), scr(fan.time.y(1e-5)), scr(dogs.y), scr(dogs.y - 300 / sy)];
+        for (const s of fan.branches.filter((_, i) => i % 7 === 0)) {
+          for (const [y0, y1] of ranges) {
+            const [L, R] = fan.tess.xRange(s, y0, y1);
+            for (let k = 0; k <= 300; k++) {
+              const y = y0 + ((y1 - y0) * k) / 300;
+              if (y < s.tipY || y > yb) continue;
+              const w = laneAt(s, y).w;
+              if (!(w > 0)) continue;
+              const x = leftAt(s, y);
+              expect(x, `${mode} ×${z} ${s.sp.sci} at ${y}`).toBeGreaterThanOrEqual(L);
+              expect(x + w, `${mode} ×${z} ${s.sp.sci} at ${y}`).toBeLessThanOrEqual(R);
+            }
+          }
+        }
+      }
+      fold.setGrid(0);
+    }
+  }, 120_000);
 });

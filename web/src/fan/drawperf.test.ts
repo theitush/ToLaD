@@ -10,7 +10,8 @@ import { describe, it } from 'vitest';
 import { MeshBatch, RectBatch } from './meshgl';
 import { CARNIVORA, FELIDAE } from './panthera';
 import { CARNIVORA_TREE, FELIDAE_TREE } from './splits';
-import { SCALE_BAR_PX } from './twigs';
+import { laneAt, leftAt } from './layout';
+import { ColumnPath, CutMemo, SCALE_BAR_PX } from './twigs';
 import { FanView } from './view';
 
 const RUN = !!process.env.FANPERF;
@@ -175,6 +176,26 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
       return r;
     };
     const fan = v.fan;
+    // (FANPERF_COUNT=1: calls per frame of the hot helpers.)
+    const cnt: Record<string, number> = {};
+    if (process.env.FANPERF_COUNT) {
+      const wrap = (o: Record<string, unknown>, k: string, name: string) => {
+        const f = o[k] as (...a: unknown[]) => unknown;
+        o[k] = function (this: unknown, ...a: unknown[]) {
+          cnt[name] = (cnt[name] ?? 0) + 1;
+          // (FANPERF_COUNT=stacks: the fold's left() by its callers, every 64th call's.)
+          if (process.env.FANPERF_COUNT === 'stacks' && name === 'fold.left' && cnt[name] % 64 === 0) {
+            const st = (new Error().stack ?? '').split('\n').slice(2, 6).map((l) => l.trim().split(' ')[1]).join('<');
+            cnt['  ' + st] = (cnt['  ' + st] ?? 0) + 64;
+          }
+          return f.apply(this, a);
+        };
+      };
+      wrap(fan.tess as unknown as Record<string, unknown>, 'xRange', 'xRange');
+      if (fan.tess.fold) wrap(fan.tess.fold as unknown as Record<string, unknown>, 'left', 'fold.left');
+      wrap(ColumnPath.prototype as unknown as Record<string, unknown>, 'build', 'path.build');
+      wrap(CutMemo.prototype as unknown as Record<string, unknown>, 'update', 'cutMemo.update');
+    }
     const cat = fan.branches.find((b) => b.sp.common === 'Domestic cat')!;
     const unit = fan.branches[0].unit;
     const scenes: [string, () => void][] = [
@@ -220,6 +241,15 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
         },
       ]);
     }
+    // The dogs ×15 (the order only): the family's level camera, the fold opened on them.
+    if (carn)
+      scenes.push([
+        'dogs x15',
+        () => {
+          v.cam = v.levelCamera('Canidae', 15)!;
+          v.camera.settle();
+        },
+      ]);
     out(`scene                 p50    p95    max   (ms, node${CPU ? ' CPU time' : ''})`);
     const only = process.env.FANPERF_ONLY ? new RegExp(process.env.FANPERF_ONLY) : null;
     for (const [name, set] of scenes) {
@@ -237,12 +267,39 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
       }
       v.draw();
       v.draw();
+      // (FANPERF_XR=1: each strand's culling range against its exact extent over the screen, 2000 heights.)
+      if (process.env.FANPERF_XR) {
+        const [, sTop] = v.toWorld(0, -20);
+        const [, sBot] = v.toWorld(0, v.h + 20);
+        let bad = 0;
+        let vis = 0;
+        for (const b of fan.branches) {
+          const r = fan.tess.xRange(b, sTop, sBot);
+          let L = Infinity;
+          let R = -Infinity;
+          for (let k = 0; k <= 2000; k++) {
+            const y = sTop + ((sBot - sTop) * k) / 2000;
+            if (y < b.tipY) continue;
+            const w = laneAt(b, y).w;
+            if (!(w > 0)) continue;
+            const x = leftAt(b, y);
+            L = Math.min(L, x);
+            R = Math.max(R, x + w);
+          }
+          const on = (a: number, z: number) => !(v.toScreen(z, 0)[0] < -12 || v.toScreen(a, 0)[0] > v.w + 12);
+          if (on(L, R)) vis++;
+          if (on(L, R) && !on(r[0], r[1])) bad++;
+          if (L < r[0] - 1e-9 || R > r[1] + 1e-9) out(`  ${b.sp.common}: exact ${v.toScreen(L, 0)[0].toFixed(1)}..${v.toScreen(R, 0)[0].toFixed(1)} xRange ${v.toScreen(r[0], 0)[0].toFixed(1)}..${v.toScreen(r[1], 0)[0].toFixed(1)}`);
+        }
+        out(`  xr: ${vis} visible, ${bad} culled wrongly`);
+      }
       for (const k of Object.keys(acc)) delete acc[k];
       const times: number[] = [];
       let inst = 0;
       let rects = 0;
       calls.stroke = calls.fill = calls.text = calls.pieces = 0;
       lp.n = lp.pts = 0;
+      for (const k of Object.keys(cnt)) delete cnt[k];
       const N = 90;
       for (let k = 0; k < N; k++) {
         v.zoomAbout(195, 422, k < 45 ? 1.01 : 1 / 1.01);
@@ -255,6 +312,7 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
         rects = Math.max(rects, gl.under.n);
       }
       // (FANPERF_TIMES=1: every frame's time, to see where the slow ones fall.)
+      if (process.env.FANPERF_COUNT) out(`  calls/f:\n${Object.entries(cnt).sort((a, b) => b[1] - a[1]).map(([k, n]) => `    ${(n / N).toFixed(0).padStart(6)} ${k}`).join('\n')}`);
       if (process.env.FANPERF_TIMES) out(`  ${times.map((x) => x.toFixed(0)).join(' ')}`);
       const f = (x: number) => x.toFixed(1).padStart(6);
       const top = Object.entries(acc)

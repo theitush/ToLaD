@@ -690,6 +690,10 @@ export class Fold {
 
   /** The grid's rows by their index k (y = k * gridH): rowAt's, looked up by an integer (most often a small one). */
   private kRows = new Map<number, Row>();
+  /** The grid's row k's edges per strand (left(i, k * gridH) for every strand i at once: a left edge, or an own column's centre). */
+  rowXs(k: number): Float64Array {
+    return this.rowK(k).xs;
+  }
   private kH = 0;
   private rowK(k: number): Row {
     // (A frame reads the rows a strand at a time, down it: the last few by k, before the map.)

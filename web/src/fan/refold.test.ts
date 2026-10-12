@@ -20,40 +20,46 @@ describe('refold keeps the widths, reads the left edges again', () => {
   const sx = 400 / fan.trunkWidth;
   const sy = 600 / H;
 
-  it('at() and the kept path samples match a fresh model after the fold moves', () => {
-    const models = bs.map((b) => new TwigModel(b, fan.time, 'linear'));
-    for (const m of models) {
-      for (const y of ys) m.at(y);
-      m.path.span(sx, sy, now, now + H / 2);
-    }
-    // The fold moves: splits half open, the anchor on one side.
-    fold.setAll(0.5, true);
-    fold.setAnchor(fan.root.left + fan.root.width * 0.2, now + H * 0.3, sx, 390);
-    let worst = 0;
-    for (const m of models) {
-      m.refold();
-      const fresh = new TwigModel(m.b, fan.time, 'linear');
-      for (const y of ys) {
-        const a = m.at(y);
-        const f = fresh.at(y);
-        for (let i = 0; i < 4; i++) expect(a[i]).toBeCloseTo(f[i], 9);
+  // (On no grid, and on the view's: there the fold's edge is read once where it runs on through a sample (TwigModel.leftPair),
+  // a few 1e-9 off the two reads either side of it at rest.)
+  for (const grid of [0, Math.pow(2, Math.round(Math.log2(3 / sy)))]) {
+    it(`at() and the kept path samples match a fresh model after the fold moves (grid ${grid})`, () => {
+      fold.setAll(0);
+      fold.setGrid(grid);
+      const models = bs.map((b) => new TwigModel(b, fan.time, 'linear'));
+      for (const m of models) {
+        for (const y of ys) m.at(y);
+        m.path.span(sx, sy, now, now + H / 2);
       }
-      const [i0, i1] = m.path.span(sx, sy, now, now + H / 2);
-      const p = m.path;
-      for (let k = i0; k <= i1; k++) {
-        const y = p.ys[k];
-        const e = 1e-9 * Math.max(1, Math.abs(y));
-        const below = fresh.lanes(y + e).left;
-        worst = Math.max(worst, Math.abs(p.vals[8 * k] - below) * sx);
+      // The fold moves: splits half open, the anchor on one side.
+      fold.setAll(0.5, true);
+      fold.setAnchor(fan.root.left + fan.root.width * 0.2, now + H * 0.3, sx, 390);
+      let worst = 0;
+      for (const m of models) {
+        m.refold();
+        const fresh = new TwigModel(m.b, fan.time, 'linear');
+        for (const y of ys) {
+          const a = m.at(y);
+          const f = fresh.at(y);
+          for (let i = 0; i < 4; i++) expect(a[i]).toBeCloseTo(f[i], 9);
+        }
+        const [i0, i1] = m.path.span(sx, sy, now, now + H / 2);
+        const p = m.path;
+        for (let k = i0; k <= i1; k++) {
+          const y = p.ys[k];
+          const e = 1e-9 * Math.max(1, Math.abs(y));
+          const below = fresh.lanes(y + e).left;
+          worst = Math.max(worst, Math.abs(p.vals[8 * k] - below) * sx);
+        }
+        // At rest: chosen afresh, the same as a fresh model's.
+        m.foldRest();
+        const [j0, j1] = m.path.span(sx, sy, now, now + H / 2);
+        const [f0, f1] = fresh.path.span(sx, sy, now, now + H / 2);
+        expect(j1 - j0).toBe(f1 - f0);
+        for (let k = j0; k <= j1; k++) expect(m.path.vals[8 * k]).toBeCloseTo(fresh.path.vals[8 * (k - j0 + f0)], grid ? 7 : 9);
       }
-      // At rest: chosen afresh, the same as a fresh model's.
-      m.foldRest();
-      const [j0, j1] = m.path.span(sx, sy, now, now + H / 2);
-      const [f0, f1] = fresh.path.span(sx, sy, now, now + H / 2);
-      expect(j1 - j0).toBe(f1 - f0);
-      for (let k = j0; k <= j1; k++) expect(m.path.vals[8 * k]).toBeCloseTo(fresh.path.vals[8 * (k - j0 + f0)], 9);
-    }
-    // (The kept samples' left edges are exact at the fold as it is now: read again, not carried over.)
-    expect(worst).toBeLessThan(1e-6);
-  });
+      // (The kept samples' left edges are exact at the fold as it is now: read again, not carried over.)
+      expect(worst).toBeLessThan(1e-6);
+    });
+  }
 });
