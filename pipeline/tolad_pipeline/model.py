@@ -244,17 +244,24 @@ def resolve_traits(root: Node, raw: Path, ctx: dict, log: dict) -> None:
             v = first(comb_imp, names, "gen_d")
             if v:
                 D["log_gen_obs"], D["gen_src"] = math.log10(v / 365.25), "imputed"
-        marine = None
+        marine, terrestrial = None, False
         for n in names:
             if n in phy:
-                marine = phy[n]["marine"]
+                marine, terrestrial = phy[n]["marine"], phy[n]["terrestrial"]
                 break
+        in_clade = False
+        p = nd.parent
+        while p is not None and not in_clade:
+            in_clade = p.name in MARINE_CLADES or any(a in MARINE_CLADES for a in p.alt)
+            p = p.parent
         if marine is None:
-            p = nd.parent
-            while p is not None and marine is None:
-                if p.name in MARINE_CLADES or any(a in MARINE_CLADES for a in p.alt):
-                    marine = True
-                p = p.parent
+            marine = in_clade
+        elif marine and terrestrial and not in_clade:
+            # ToLaD#183: PHYLACINE codes a species marine if it uses the sea at all. One it also codes
+            # terrestrial, outside the marine clades (otters, the polar bear, the hippo, the arctic fox, the
+            # water rat), has a land range and is counted as a land species, as Greenspoon 2023 does; the
+            # marine occupancy fit (seal and whale censuses) on a land range put otters at 1-7 million
+            marine = False
         D["marine"] = bool(marine)
         for n in names:
             r = rng.get(n)
