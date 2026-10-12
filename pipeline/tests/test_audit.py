@@ -121,5 +121,16 @@ class Guards(unittest.TestCase):
         self.assertIn("Felis affinis", A.render_md(rep))
 
 
+class Stale(unittest.TestCase):
+    def test_stale_count_with_later_figure(self):
+        r = row(file="X.toml", use="counts", today_src="history", curve=[k(1990, 5e3, "cited"), k(2008, 3.5e6, "cited")])
+        notes = "Counted from the air. Since 2009 the colony has declined 7.2%/yr; IUCN gives 944,000 mature in 2025."
+        f = A.check_stale(r, notes)
+        self.assertEqual([x["class"] for x in f], ["stale"])
+        self.assertEqual(A.check_stale(r, "Counted from the air in 1990."), [])
+        recent = row(file="X.toml", use="counts", today_src="history", curve=[k(2020, 5e3, "cited")])
+        self.assertEqual(A.check_stale(recent, notes), [])
+
+
 if __name__ == "__main__":
     unittest.main()

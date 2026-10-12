@@ -66,7 +66,7 @@ POINT_KINDS = ["census", "estimate", "index-scaled", "reconstruction", "unverifi
 KINDS = POINT_KINDS + ["model", "interpolated", "held", "baseline", "genomic", "natural", "rangeloss"]
 K = {k: i for i, k in enumerate(KINDS)}
 
-TOP_KEYS = {"species", "aliases", "common", "component", "use", "scope", "faostat_item", "notes",
+TOP_KEYS = {"trend", "species", "aliases", "common", "component", "use", "scope", "faostat_item", "notes",
             "baseline", "point", "deep", "event"}
 # A curated event in a species' past (ToLaD#141): today only a population bottleneck, marked on the fan's
 # column over its window and explained on the card with the source quoted verbatim.
@@ -107,8 +107,13 @@ DEEP_MU_CITE = ("Armstrong et al. 2025, Genome Biol Evol 17:evaf060 (Pantherinae
                 "https://doi.org/10.1093/gbe/evaf060")
 DEEP_NE_N_CITE = ("Frankham 1995, Genet Res 66:95-107 (Ne/N ~0.1 over comprehensive estimates)",
                   "https://doi.org/10.1017/S0016672300034455")
-POINT_KEYS = {"year", "n", "lo", "hi", "grade", "kind", "cite", "url", "note"}
-POINT_REQUIRED = POINT_KEYS - {"note"}
+POINT_KEYS = {"year", "n", "lo", "hi", "grade", "kind", "cite", "url", "note", "basis", "per", "per_cite"}
+POINT_REQUIRED = POINT_KEYS - {"note", "basis", "per", "per_cite"}
+# a point counting only part of the population (ToLaD#174): `basis` names the part, `per` = all ages per
+# counted animal (cited or derived from a life table in the source, `per_cite`); n, lo, hi are scaled by it
+POINT_BASES = ("mature",)
+TOP_KEYS_TREND = {"from_year", "to_year", "pct_per_year", "grade", "cite", "url", "note"}
+TREND_REQUIRED = TOP_KEYS_TREND - {"note"}
 COMPONENTS = ("wild", "domestic", "total")
 USES = ("counts", "display")
 
@@ -165,9 +170,74 @@ def _check_point(p: dict, where: str) -> dict:
         raise HistoryError(f"{where}: url must be http(s)")
     if p["year"] > NOW_YEAR:
         raise HistoryError(f"{where}: year {p['year']} is in the future")
-    return {"year": float(p["year"]), "n": float(p["n"]), "lo": float(p["lo"]), "hi": float(p["hi"]),
-            "grade": p["grade"], "kind": p["kind"], "cite": p["cite"].strip(), "url": p["url"].strip(),
-            "note": str(p.get("note", "")).strip()}
+    out = {"year": float(p["year"]), "n": float(p["n"]), "lo": float(p["lo"]), "hi": float(p["hi"]),
+           "grade": p["grade"], "kind": p["kind"], "cite": p["cite"].strip(), "url": p["url"].strip(),
+           "note": str(p.get("note", "")).strip()}
+    part = {k for k in ("basis", "per", "per_cite") if k in p}
+    if part:
+        if part != {"basis", "per", "per_cite"}:
+            raise HistoryError(f"{where}: basis, per and per_cite go together")
+        if p["basis"] not in POINT_BASES:
+            raise HistoryError(f"{where}: basis {p['basis']!r} not in {POINT_BASES}")
+        if not _num(p["per"]) or not p["per"] >= 1:
+            raise HistoryError(f"{where}: per (all ages per {p['basis']} animal) must be a number >= 1")
+        if not isinstance(p["per_cite"], str) or not p["per_cite"].strip():
+            raise HistoryError(f"{where}: per_cite must say where the ratio comes from")
+        k = float(p["per"])
+        conv = (f"{p['basis']}-only figure {p['n']:,.0f} ({p['lo']:,.0f}-{p['hi']:,.0f}) x {k:.3g} all ages per "
+                f"{p['basis']} animal ({p['per_cite'].strip()})")
+        out.update(n=out["n"] * k, lo=out["lo"] * k, hi=out["hi"] * k, basis=p["basis"], per=k,
+                   basis_n=float(p["n"]), note=(conv + ". " + out["note"]).strip())
+    return out
+
+
+def _check_trend(t: dict, where: str) -> dict:
+    """A cited %/yr change after the last all-age point (ToLaD#174): see trend_points."""
+    if not isinstance(t, dict):
+        raise HistoryError(f"{where}: not a table")
+    extra = set(t) - TOP_KEYS_TREND
+    if extra:
+        raise HistoryError(f"{where}: unknown keys {sorted(extra)}")
+    miss = TREND_REQUIRED - set(t)
+    if miss:
+        raise HistoryError(f"{where}: missing {sorted(miss)}")
+    for k in ("from_year", "to_year", "pct_per_year"):
+        if not _num(t[k]):
+            raise HistoryError(f"{where}: {k} must be a number")
+    if not t["from_year"] < t["to_year"] <= NOW_YEAR:
+        raise HistoryError(f"{where}: need from_year < to_year <= {NOW_YEAR}")
+    if not -100 < t["pct_per_year"]:
+        raise HistoryError(f"{where}: pct_per_year must be above -100")
+    if t["grade"] not in GRADES:
+        raise HistoryError(f"{where}: grade {t['grade']!r} not in A-D")
+    for k in ("cite", "url"):
+        if not isinstance(t[k], str) or not t[k].strip():
+            raise HistoryError(f"{where}: {k} must be a non-empty string")
+    return {"from_year": float(t["from_year"]), "to_year": float(t["to_year"]),
+            "pct_per_year": float(t["pct_per_year"]), "grade": t["grade"], "cite": t["cite"].strip(),
+            "url": t["url"].strip(), "note": str(t.get("note", "")).strip()}
+
+
+def trend_points(points: list[dict], trends: list[dict], where: str) -> list[dict]:
+    """Each trend carries the latest point at or before its to_year on to to_year at its %/yr, from the
+    later of that point and from_year (ToLaD#174): an `index-scaled` point, graded the worse of the two."""
+    out = list(points)
+    for t in sorted(trends, key=lambda t: t["to_year"]):
+        base = [p for p in out if p["year"] <= t["to_year"]]
+        if not base:
+            raise HistoryError(f"{where}: a trend needs a point at or before its to_year {t['to_year']:g}")
+        b = base[-1]
+        if b["year"] >= t["to_year"]:
+            continue  # a cited figure at to_year already: the trend adds nothing
+        yrs = t["to_year"] - max(b["year"], t["from_year"])
+        f = (1 + t["pct_per_year"] / 100) ** yrs
+        gr = max(b["grade"], t["grade"], key=GRADES.index)
+        note = (f"{b['n']:,.0f} in {b['year']:g} ({b['cite']}) carried {yrs:g} years at {t['pct_per_year']:+g}%/yr "
+                f"({t['from_year']:g}-{t['to_year']:g}, {t['cite']}): x{f:.3g}. {t['note']}").strip()
+        out.append({"year": t["to_year"], "n": b["n"] * f, "lo": b["lo"] * f, "hi": b["hi"] * f, "grade": gr,
+                    "kind": "index-scaled", "cite": t["cite"], "url": t["url"], "note": note, "trend": True})
+        out.sort(key=lambda p: p["year"])
+    return out
 
 
 def _check_event(e: dict, where: str) -> dict:
@@ -308,6 +378,11 @@ def validate(doc: dict, name: str = "<doc>") -> dict:
     years = [p["year"] for p in points]
     if len(set(years)) != len(years):
         raise HistoryError(f"{name}: two points share a year")
+    trs = doc.get("trend", [])
+    if not isinstance(trs, list):
+        raise HistoryError(f"{name}: trend must be an array of tables ([[trend]])")
+    trends = [_check_trend(t, f"{name} trend {i + 1}") for i, t in enumerate(trs)]
+    points = trend_points(sorted(points, key=lambda p: p["year"]), trends, name) if trends else points
     # a blind-only [deep] (just [deep.blind], ToLaD#149) dates a decline in the blind spot of the bulk
     # curve (genomic.py) the file gets as its deep past; genomic.attach carries it over
     blind_only = isinstance(doc.get("deep"), dict) and set(doc["deep"]) == {"blind"}
@@ -328,7 +403,7 @@ def validate(doc: dict, name: str = "<doc>") -> dict:
         "component": doc["component"], "use": use, "scope": str(doc.get("scope", "")),
         "faostat_item": fao, "notes": str(doc.get("notes", "")).strip(),
         "baseline": base, "points": sorted(points, key=lambda p: p["year"]), "deep": deep,
-        "deep_blind": deep_blind, "events": events,
+        "deep_blind": deep_blind, "events": events, "trends": trends,
     }
 
 

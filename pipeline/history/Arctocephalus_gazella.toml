@@ -3,7 +3,7 @@ common    = "Antarctic fur seal"
 component = "wild"
 use       = "counts"
 scope     = "global, all ages (South Georgia holds ~98%)"
-notes     = "Sealed to commercial extinction by 1907; tens of animals were seen again at Bird Island, South Georgia, in the 1930s (Bonner 1968), and pup counts began in 1956. No numeric pre-sealing or low-point figure with a traceable source was found, so there is no baseline. Older totals of 4.5-6.2 million in 1999/2000 (SCAR Expert Group on Seals 2008) are judged inflated by Forcada et al. 2023 and not used. Since 2009 Bird Island has declined 7.2%/yr; IUCN (Forcada 2026, now Endangered) gives 2,187,000 mature seals in 1999 and 944,000 in 2025. Those are mature-only, so no all-age point is derived from them. Bottlenecks ([[event]], ToLaD#147): the sealing near-extinction (Paijmans et al. 2020, 1775 to the early 20th century) is not in the data: the file's one point is 2008, so the column runs on the modelled level before it. The mark stands on the source alone."
+notes     = "Sealed to commercial extinction by 1907 (last commercial catch 170 animals at South Georgia in 1908). Points: the pre-sealing level at South Georgia (Foley & Lynch 2020, females only, so a floor for all ages), Larsen's 30 animals there in 1911 (the sealing low; Hoffman et al. 2022 argue from genetics that thousands may have escaped, so it is a floor too), and 12 pups seen in 1936 (Boyd 1993, not a point: no pup-to-total ratio for a colony that small). After it: IUCN 2026 (Forcada, now Endangered), 2,187,000 mature seals in 1999 and 944,000 in 2025, taken to all ages by the ratio in Forcada et al. 2026 (South Georgia 2022: 1,983,687 all ages for 1,024,797 mature, x1.936), and the South Georgia counts of 2007-09 and 2022. Bird Island's mature females fell 7.2%/yr in 2009-2017 (Forcada et al. 2023b, as cited in Forcada et al. 2026); that is one colony, and the island-wide change, -3.93%/yr since 2007 (Forcada et al. 2026), is already in the 2008 and 2022 points, so it is not applied as a trend. Older totals of 4.5-6.2 million in 1999/2000 (SCAR Expert Group on Seals 2008) are judged inflated by Forcada et al. 2023 and not used. Bottlenecks ([[event]], ToLaD#147): the sealing near-extinction (Paijmans et al. 2020, 1775 to the early 20th century) is in the curve through the 1786 and 1911 points; the log-linear fall between them is smoother than the real crash, which was mostly over by the 1820s."
 
 [[event]]
 kind    = "bottleneck"
@@ -18,6 +18,42 @@ cite    = "Paijmans AJ, Stoffel MA, Bester MN, et al. (2020). The genetic legacy
 url     = "https://doi.org/10.1038/s41598-020-61560-8"
 grade   = "C"
 
+[baseline]
+year  = 1786
+n     = 2500000
+lo    = 1500000
+hi    = 3500000
+grade = "D"
+kind  = "reconstruction"
+cite  = "Foley CM, Lynch HJ (2020). A method to estimate pre-exploitation population size. Conservation Biology 34:256-265"
+url   = "https://doi.org/10.1111/cobi.13416"
+note  = "Pre-exploitation South Georgia, from the 1786-1908 harvest record and a stochastic age-structured model: 'the pre-exploitation abundance of Antarctic fur seals on South Georgia was 2.5 million females (95% CI 1.5-3.5 million)'. Females only and South Georgia only, so a floor for all ages; not scaled up, as no cited sex ratio was found."
+
+[[point]]
+year  = 1911
+n     = 30
+lo    = 30
+hi    = 30
+grade = "D"
+kind  = "census"
+cite  = "Larsen CA (1920), as cited in Hoffman JI et al. (2022). Demographic Reconstruction of Antarctic Fur Seals Supports the Krill Surplus Hypothesis. Genes 13:541"
+url   = "https://doi.org/10.3390/genes13030541"
+note  = "The sealing low: 'Larsen's estimate of 30 individuals at South Georgia in 1911'. South Georgia only; Hoffman et al. 2022 read their bottleneck Ne of ~534 as 'implying that thousands of animals may have escaped sealing at South Georgia', so this is a floor."
+
+[[point]]
+year     = 1999
+n        = 2187000
+lo       = 2187000
+hi       = 2187000
+basis    = "mature"
+per      = 1.9357
+per_cite = "Forcada et al. 2026, Biol Conserv 321:112005: South Georgia 2022, 1,983,687 all ages for 1,024,797 mature"
+grade    = "C"
+kind     = "estimate"
+cite     = "IUCN (2026), Forcada J: Arctocephalus gazella, IUCN Red List assessment (press release 2026-04)"
+url      = "https://iucn.org/press-release/202604/emperor-penguin-and-antarctic-fur-seal-now-endangered-due-climate-change-iucn"
+note     = "'an estimated 2,187,000 mature seals in 1999' (back-projected from 2007/09 at the 1996-2006 rate, Forcada et al. 2026); no range given. The 2022 ratio is assumed to hold in 1999."
+
 [[point]]
 year  = 2008
 n     = 3510283
@@ -28,3 +64,28 @@ kind  = "estimate"
 cite  = "Forcada et al. 2023, Global Change Biology 29:6867-6887"
 url   = "https://doi.org/10.1111/gcb.16947"
 note  = "South Georgia 2007-2009, 95% CI 3,140,548-3,919,604 (integrated population model applied to helicopter surveys); about 98% of the global population. Grade B because ~2% outside South Georgia is not included."
+
+[[point]]
+year  = 2022
+n     = 1983687
+lo    = 1606408
+hi    = 2411876
+grade = "B"
+kind  = "estimate"
+cite  = "Forcada J et al. (2026). Marked population reduction in Antarctic fur seals challenges their Least Concern category. Biological Conservation 321:112005"
+url   = "https://doi.org/10.1016/j.biocon.2026.112005"
+note  = "South Georgia 2022 (survey counts scaled by integrated population models): 'the most recent population estimate is 1,983,687 [1,606,408; 2,411,876], which is approximately 1.5 million seals fewer than in 2007/9'; mature 1,024,797. About 96% of the global population; grade B for the rest."
+
+[[point]]
+year     = 2025
+n        = 944000
+lo       = 944000
+hi       = 944000
+basis    = "mature"
+per      = 1.9357
+per_cite = "Forcada et al. 2026, Biol Conserv 321:112005: South Georgia 2022, 1,983,687 all ages for 1,024,797 mature"
+grade    = "C"
+kind     = "estimate"
+cite     = "IUCN (2026), Forcada J: Arctocephalus gazella, IUCN Red List assessment (press release 2026-04)"
+url      = "https://iucn.org/press-release/202604/emperor-penguin-and-antarctic-fur-seal-now-endangered-due-climate-change-iucn"
+note     = "'from an estimated 2,187,000 mature seals in 1999 to 944,000 in 2025' (now Endangered); global, no range given."
