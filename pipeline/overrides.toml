@@ -38,8 +38,17 @@
 #                     dated species of `genera`, which must hold no other
 #                     genus's; without `genera`, the split Open Tree names
 #                     `name`) and give the taxon's English form (`common`)
+#
+# One more section adds a leaf (ToLaD#175), at the very end:
+#   [[domestic_leaf]] a domestic form no species list carries as a species
+#                     (Open Tree and Upham make the dog a subspecies of the
+#                     wolf) gets a leaf of its own beside its wild ancestor
+#                     `sister`, its band starting at `age` (Ma); the dated
+#                     tree splits it off `sister`'s lineage at `age` (`lo`-`hi`)
+#                     and names it `common`. The ancestor's own leaf, band and
+#                     counts are untouched.
 
-version = 3
+version = 4
 
 [[exclude]]
 name = "Tikitherium copei"
@@ -227,3 +236,22 @@ reason = """As for Pantherinae: Felinae is every other living cat genus, the che
 the marbled cat's Pardofelis included."""
 citation = """Kitchener, A.C. et al. (2017). A revised taxonomy of the Felidae: the final report of the \
 Cat Classification Task Force of the IUCN Cat Specialist Group. Cat News Special Issue 11."""
+
+[[domestic_leaf]]
+name = "Canis familiaris"
+sister = "Canis lupus"
+age = 0.023
+lo = 0.0149
+hi = 0.040
+common = "Domestic dog"
+reason = """The dog lineage split from the grey wolves', and dogs were domesticated, in Siberia by \
+~23 ka (Perri et al. 2021, archaeology and genetics together). The genomes date the split from \
+14.9 ka (13.9-15.9 ka; Freedman et al. 2014, at mu = 1e-8 and 3-year generations) to 27-40 ka \
+(Skoglund et al. 2015, calibrated on the 35 ka Taimyr wolf): the interval here. 23 ka sits inside \
+it and is older than the domestic stock's start (anchors.DOMESTICATION_YEAR, ~15 ka)."""
+citation = """Perri, A.R. et al. (2021). Dog domestication and the dual dispersal of people and dogs \
+into the Americas. PNAS 118: e2010083118. doi:10.1073/pnas.2010083118; Freedman, A.H. et al. (2014). \
+Genome sequencing highlights the dynamic early history of dogs. PLoS Genet 10: e1004016. \
+doi:10.1371/journal.pgen.1004016; Skoglund, P. et al. (2015). Ancient wolf genome reveals an early \
+divergence of domestic dog ancestors and admixture into high-latitude breeds. Curr Biol 25: \
+1515-1519. doi:10.1016/j.cub.2015.04.019"""

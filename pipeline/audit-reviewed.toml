@@ -25,3 +25,9 @@ species = "Lynx pardinus"
 class = "join"
 reason = "A real collapse, not a unit or join error: the modelled 1500 level (~61,000, the 2024 census x the PHYLACINE range ratio) falls ~54x to the cited 1988 estimate (1,136), while the range fell ~89x, from the 950,000 km2 present-natural map to the 10,669 km2 of stable presence Rodriguez & Delibes 1992 mapped (Guzman et al. 2004, Table 1); the same 1988 density over the natural range would give ~100,000 (Lynx_pardinus.toml)"
 issue = 94
+
+[[reviewed]]
+species = "Canis familiaris"
+class = "name"
+reason = "The domestic dog: no species list carries it (Open Tree, Upham and the Red List make it Canis lupus familiaris), so the build adds its leaf by hand beside the grey wolf (overrides.toml [[domestic_leaf]]); its 1e9 alive is the Greenspoon 2023 pets table's dogs, moved off the wolf's leaf, which stays wild-only"
+issue = 175
