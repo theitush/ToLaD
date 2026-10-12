@@ -199,8 +199,8 @@ def greenspoon_commensal(raw: Path) -> dict[str, float]:
 
 
 # Names the domestic form may carry in the Open Tree species list
+# (not the dog: it has a leaf of its own, overrides.toml [[domestic_leaf]], ToLaD#175)
 DOMESTIC_ALIASES = {
-    "Canis familiaris": ["Canis lupus"],
     "Felis catus": ["Felis silvestris"],
     "Capra hircus": ["Capra aegagrus"],
     "Equus caballus": ["Equus ferus"],
@@ -221,6 +221,9 @@ DOMESTIC_FORMS = {
     "Bos indicus": "Bos primigenius",  # zebu <- (Indian) aurochs, extinct
     "Bos grunniens": "Bos mutus",  # domestic yak <- wild yak
     "Camelus bactrianus": "Camelus ferus",  # Bactrian camel <- wild Bactrian camel
+    # dog <- grey wolf: no species list carries it, the build adds its leaf (overrides.toml [[domestic_leaf]],
+    # ToLaD#175); its stock is the Greenspoon pets table's
+    "Canis familiaris": "Canis lupus",
 }
 
 # Why a domestic form has no stock of its own: FAOSTAT QCL (the pinned livestock source) has no item for it.
@@ -258,8 +261,8 @@ MOCK_NOTE = ("MOCK: placeholder individual for UI development. Not from a record
 
 # (species, display name, birth year, death year or None)
 MOCK_INDIVIDUALS = [
-    ("Canis lupus", "MOCK Hachiko (Akita dog)", 1923, 1935),
-    ("Canis lupus", "MOCK Laika (space dog)", 1954, 1957),
+    ("Canis familiaris", "MOCK Hachiko (Akita dog)", 1923, 1935),
+    ("Canis familiaris", "MOCK Laika (space dog)", 1954, 1957),
     ("Ovis aries", "MOCK Dolly (cloned sheep)", 1996, 2003),
     ("Ursus maritimus", "MOCK Knut (zoo polar bear)", 2006, 2011),
     ("Gorilla gorilla", "MOCK Harambe (zoo gorilla)", 1999, 2016),
