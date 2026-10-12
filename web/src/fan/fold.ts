@@ -10,9 +10,9 @@
 //   neighbours the river's gap g ≥ 0. The two sides of a gap meet at one split of the tree (the deepest
 //   one above both); that split is open by a ∈ [0, 1]. The folded columns stand side by side in the same
 //   order with gap a·g: so they never overlap or cross, whatever the a's, and all a = 1 is the river
-//   exactly, all a = 0 one column as wide as the sum of its species. The whole row sits where its
-//   width-weighted centre goes from the stem's centre (all closed: one straight column) to the river's
-//   centre there (λ: how open the most open split is). Every term is continuous in y (the gaps open from 0
+//   exactly, all a = 0 one column as wide as the sum of its species. The whole row sits with its middle
+//   on the stem's centre (all closed: one column, symmetric) or, as the splits open (λ: how open the most
+//   open split is), moved towards the river's places by its strands' mean move. Every term is continuous in y (the gaps open from 0
 //   at a split over its fork, as the river's do; an extinct column narrows to nothing before its mark
 //   stays behind), and in the zoom.
 //
@@ -201,24 +201,17 @@ export class Fold {
   private foldRow(r: Row): void {
     const { O, w, end, n } = r;
     const X = new Float64Array(n);
-    let sw = 0;
-    let cr = 0;
-    let cf = 0;
-    for (let j = 0; j < n; j++) {
-      if (j > 0) {
-        const g = Math.max(0, O[j] - O[j - 1] - w[j - 1]);
-        X[j] = X[j - 1] + w[j - 1] + this.a[end[j - 1] - 1] * g;
-      }
-      sw += w[j];
-      cr += w[j] * (O[j] + w[j] / 2);
-      cf += w[j] * (X[j] + w[j] / 2);
+    for (let j = 1; j < n; j++) {
+      const g = Math.max(0, O[j] - O[j - 1] - w[j - 1]);
+      X[j] = X[j - 1] + w[j - 1] + this.a[end[j - 1] - 1] * g;
     }
-    let shift: number;
-    if (sw > 0) {
-      const cRiver = cr / sw;
-      const target = this.home + this.lambda * (cRiver - this.home);
-      shift = target - cf / sw;
-    } else shift = O[0] - X[0];
+    // Where the row sits: closed, its middle on the stem's centre; opening, towards the river by the mean move of
+    // its strands (each counted once, whatever its width: a stock growing out of nobody drags nothing along).
+    let mean = 0;
+    for (let i = 0; i < r.item.length; i++) mean += O[r.item[i]] - X[r.item[i]];
+    mean /= Math.max(1, r.item.length);
+    const mid = (X[0] + X[n - 1] + w[n - 1]) / 2;
+    const shift = (1 - this.lambda) * (this.home - mid) + this.lambda * mean;
     const xs = r.xs;
     for (let i = 0; i < xs.length; i++) xs[i] = X[r.item[i]] + shift + r.off[i];
     r.ver = this.ver;

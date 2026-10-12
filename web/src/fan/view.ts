@@ -147,11 +147,14 @@ const EVENT_MIN_W = 3;
 /** How far (px) above or below a window a touch still opens it. */
 const EVENT_REACH_PX = 10;
 
-const colBoxCache = new WeakMap<Fan, Map<FanBranch | FanNode, ColBox>>();
+const colBoxCache = new WeakMap<Fan, { key: string; map: Map<FanBranch | FanNode, ColBox> }>();
 function colBoxes(fan: Fan): Map<FanBranch | FanNode, ColBox> {
-  let out = colBoxCache.get(fan);
-  if (out) return out;
-  out = new Map();
+  // (Folded, fold.ts: the columns move with the fold; their boxes and edges are worked out again when it changes.)
+  const fold = fan.tess.fold;
+  const key = fold ? `${fold.ver}:${fold.gridH}` : '';
+  const hit = colBoxCache.get(fan);
+  if (hit && hit.key === key) return hit.map;
+  const out = new Map<FanBranch | FanNode, ColBox>();
   // Edges are pure functions of the height, and most heights asked for are on a grid fixed in the world: memoised.
   const memo = (f: (y: number) => [number, number]) => {
     const m = new Map<number, [number, number]>();
@@ -178,13 +181,44 @@ function colBoxes(fan: Fan): Map<FanBranch | FanNode, ColBox> {
     });
     out.set(v, { x0: Math.min(v.tile, v.left), x1: Math.max(v.tile, v.left) + v.width, y0: v.y, y1: v.parent ? v.yBot : Infinity, lean: v.leanY, own: v, at });
   }
-  colBoxCache.set(fan, out);
+  if (fold && fold.left(0, fan.time.y(0)) !== null) {
+    // Folded: each box from its edges at a few heights over its span (the fold moves columns smoothly), a hair wider.
+    const yb = fan.trunkBottom.y;
+    for (const q of out.values()) {
+      const a = Math.max(q.y0, fan.time.y(0));
+      const b = Math.min(q.y1, yb);
+      let x0 = Infinity;
+      let x1 = -Infinity;
+      for (let k = 0; k <= 12; k++) {
+        const [l, r] = q.at(a + ((b - a) * k) / 12);
+        x0 = Math.min(x0, l);
+        x1 = Math.max(x1, r, l + q.own.width);
+      }
+      const pad = 0.05 * (x1 - x0);
+      q.x0 = x0 - pad;
+      q.x1 = x1 + pad;
+    }
+  }
+  colBoxCache.set(fan, { key, map: out });
   return out;
 }
 
 /** A lineage's species' rooms, side by side above its split: their world x span [x0, x1]. */
 const spanCache = new WeakMap<FanNode, [number, number]>();
 export function familySpan(v: FanNode): [number, number] {
+  const fold = v.strands[0]?.tess.fold;
+  if (fold && fold.left(0, v.strands[0].tess.time.y(0)) !== null) {
+    // Folded (fold.ts): its species' rooms where the fold has them, at "now" (an extinct one's at its tip).
+    const s: [number, number] = [Infinity, -Infinity];
+    const now = v.strands[0].tess.time.y(0);
+    for (const b of v.strands) {
+      const y = Math.max(b.tipY, now);
+      const c = leftAt(b, y) + laneAt(b, y).w / 2;
+      s[0] = Math.min(s[0], c - b.width / 2);
+      s[1] = Math.max(s[1], c + b.width / 2);
+    }
+    return s;
+  }
   let s = spanCache.get(v);
   if (!s) {
     s = [Infinity, -Infinity];
@@ -633,7 +667,19 @@ export class FanView implements InputHandlers {
    * A level inside the fan (ToLaD#146): the split founding taxon `name` ("Felidae") framed as home frames the
    * whole fan, its species across the screen and its split near the bottom. Null if the tree has no such split.
    */
-  levelCamera(name: string): Camera | null {
+  levelCamera(name: string, zoom?: number): Camera | null {
+    if (zoom !== undefined) {
+      // The level's frame in time, its clade centred at `zoom` × home's width zoom (folded: as it opens there).
+      const fr = this.levelCamera(name);
+      const v = this.fan.nodes.find((n) => n.split.taxon === name);
+      if (!fr || !v) return fr;
+      const sx = this.homeCamera().sx * zoom;
+      const f = this.fan.tess.fold;
+      f?.setScale(sx, this.w);
+      const [a, b] = familySpan(v);
+      // (The fold stays at the frame's zoom: the camera taking the frame finds it there, nothing to follow.)
+      return { ...fr, sx, cx: (a + b) / 2 - 22 / sx };
+    }
     if (this.fan.root.split.taxon === name) return this.homeCamera();
     const v = this.fan.nodes.find((n) => n.split.taxon === name);
     if (!v) return null;
@@ -647,7 +693,7 @@ export class FanView implements InputHandlers {
         const [a, b] = familySpan(v);
         cam = this.camera.frame(a, b, v.y, true);
       }
-      f.setScale(this.cam.sx, this.w);
+      f.setScale(cam.sx, this.w);
     }
     return cam;
   }

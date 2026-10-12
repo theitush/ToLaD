@@ -119,6 +119,10 @@ const scenes = [
   ['carn-deep40', 'level', ['Carnivora', 40, 4, 3]],
   ['carn-card-dog', 'card', ['Grey wolf']],
   ['carn-search-wol', 'search', ['wol']],
+  // The fold (ToLaD#146): the dogs at 1.5x, 3x and 6x home's width zoom, opening as they grow.
+  ['carn-dogs-z15', 'zoomto', ['Canidae', 1.5]],
+  ['carn-dogs-z3', 'zoomto', ['Canidae', 3]],
+  ['carn-dogs-z6', 'zoomto', ['Canidae', 6]],
 ];
 const browser = await chromium.launch({ headless: true });
 try {
@@ -222,6 +226,10 @@ try {
             f.cam = { cx: (lo + hi) / 2, cy: v.y - (H - 2 * v.blend) / 2, sx, sy, ty: sy };
             f.camera.settle();
           }
+        } else if (kind === 'zoomto') {
+          // A clade (taxon args[0]) centred at args[1] × home's width zoom, its level's time frame (ToLaD#146: the fold opening).
+          f.cam = f.levelCamera(args[0], args[1]) ?? f.homeCamera();
+          f.camera.settle();
         } else if (kind === 'level') {
           // A level (ToLaD#146): the split founding taxon args[0] framed as home frames the fan; with args[1] (Ma),
           // centred on that time, time zoomed args[2] and width args[3] × the frame.

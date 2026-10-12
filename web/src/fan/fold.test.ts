@@ -99,8 +99,8 @@ describe('the fold', () => {
       const ys = heights(fan, 12).slice(1, -1);
       let worst = 0;
       let found = 0;
-      for (const name of ['Grey wolf', 'Lion', 'Harbor seal']) {
-        const A = fan.branches.find((b) => b.sp.common === name);
+      for (const name of ['Canis lupus', 'Panthera leo', 'Phoca vitulina']) {
+        const A = fan.branches.find((b) => b.sp.sci === name);
         if (!A) continue;
         found++;
         let prev: number[] | null = null;
