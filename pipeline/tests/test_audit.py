@@ -36,6 +36,22 @@ class Guards(unittest.TestCase):
         self.assertAlmostEqual(j["ratio"], 25.5, places=1)
         self.assertFalse(j["rapid"])
 
+    def test_deep_peak_inflated_by_the_join(self):
+        # the cougar before ToLaD#172: its young end (~37k, 12x below the median) met 1.02M, x27, and the
+        # deep past peaked at 21M, 21x the anchor against the genome's own max / median of 1.7x
+        base = {"ratio": 0.037, "flag": True, "rule": "scaled", "to_kind": "rangeloss", "to_n": 1.02e6,
+                "deep_n": 1.02e6, "factor": 27.3, "res_median_raw": 4.65e5, "res_max_raw": 7.84e5, "blind": None}
+        bad = A.check_deep_peak({**base, "peak_n": 2.14e7, "peak_ago": 97000})
+        self.assertEqual(len(bad), 1)
+        self.assertAlmostEqual(bad[0]["inflation"], (2.14e7 / 1.02e6) / (7.84e5 / 4.65e5), places=6)
+        # after: the median meets the anchor, the peak is the genome's own range above it
+        self.assertEqual(A.check_deep_peak({**base, "factor": 2.19, "peak_n": 1.72e6, "peak_ago": 97000}), [])
+        # a young end kept by a cited [deep.blind] window (the lion) is the cited shape: not checked
+        self.assertEqual(A.check_deep_peak({**base, "peak_n": 2.14e7, "peak_ago": 97000, "blind": {"kept": True}}),
+                         [])
+        # an older build's row without the fields: not checked
+        self.assertEqual(A.check_deep_peak({k: v for k, v in base.items() if k != "res_median_raw"}), [])
+
     def test_cited_to_cited_is_supported(self):
         # the bison's crash, cited at both ends, is history, not an artifact
         r = row(curve=[k(1800, 3e7, "cited"), k(1890, 1000, "cited")], today_src="history")
@@ -103,6 +119,17 @@ class Guards(unittest.TestCase):
         self.assertEqual([c["name"] for c in rep["cats"]], ["Panthera leo", "Felis affinis"])
         self.assertEqual([x["name"] for x in rep["ranked"]], ["Felis affinis", "Lutra x"])
         self.assertIn("Felis affinis", A.render_md(rep))
+
+
+class Stale(unittest.TestCase):
+    def test_stale_count_with_later_figure(self):
+        r = row(file="X.toml", use="counts", today_src="history", curve=[k(1990, 5e3, "cited"), k(2008, 3.5e6, "cited")])
+        notes = "Counted from the air. Since 2009 the colony has declined 7.2%/yr; IUCN gives 944,000 mature in 2025."
+        f = A.check_stale(r, notes)
+        self.assertEqual([x["class"] for x in f], ["stale"])
+        self.assertEqual(A.check_stale(r, "Counted from the air in 1990."), [])
+        recent = row(file="X.toml", use="counts", today_src="history", curve=[k(2020, 5e3, "cited")])
+        self.assertEqual(A.check_stale(recent, notes), [])
 
 
 if __name__ == "__main__":

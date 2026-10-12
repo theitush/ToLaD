@@ -108,6 +108,16 @@ const scenes = [
   // post-glacial decline (20-10 kya, Figueiro et al. 2017), then flat to the next level (the genome scaled to meet it).
   ['blind-lion', 'about', ['Lion', 15000, 10, 0.1]],
   ['blind-leopard', 'about', ['Leopard', 15000, 10, 0.1]],
+  // A flagged join met at the genome's long-run level (ToLaD#172): the puma's column from ~2 Mya to now, the
+  // young end held at the anchor from ~61 kya, and its card with the one-sentence join.
+  ['flag-puma', 'frame', ['Puma', 100000, 1, 0.5]],
+  ['flag-puma-card', 'card', ['Puma']],
+  // Wikipedia link + hotlinked Commons pictures (ToLaD#182; WAIT_MS=4000 lets them load): the lion's card,
+  // home with the pills' thumbnails (WIDTH=log: eight pills), and a species with no picture (its card, its pill mid-span).
+  ['wiki-lion-card', 'card', ['Lion']],
+  ['wiki-home', 'home'],
+  ['wiki-noimg-card', 'card', ['Panthera balamoides']],
+  ['wiki-noimg', 'frame', ['Panthera balamoides', null, 1, 0.4]],
   // One level up, the carnivores (ToLaD#146): home, a family framed as home frames the order ('level' [taxon]), the
   // cats as the level button frames them, a busy deep past (~40 Ma: ['level', [taxon, Ma, time zoom, width zoom]]),
   // the wolf's card (the domestic dog is in its count), the search with "wol" typed.
@@ -146,14 +156,14 @@ try {
           f.cam = f.homeCamera();
           f.camera.settle();
           if (kind === 'card') {
-            const b = fan.branches.find((b) => b.sp.common === args[0]);
+            const b = fan.branches.find((b) => (b.sp.common === args[0] || b.sp.sci === args[0]));
             f.selected = b.sp;
             f.onSelect({ sp: b.sp });
           }
         } else if (kind === 'touch') {
           f.cam = f.homeCamera();
           f.camera.settle();
-          const b = fan.branches.find((b) => b.sp.common === args[0]);
+          const b = fan.branches.find((b) => (b.sp.common === args[0] || b.sp.sci === args[0]));
           const y = fan.time.y(args[1] / 1e6);
           const [px, py] = f.toScreen(b.colLeft + 0.3 * f.model(b).lanes(y).w, y);
           f.tap(px, py);
@@ -170,7 +180,7 @@ try {
           f.camera.settle();
         } else if (kind === 'about') {
           const [sp, ago, k, r] = args;
-          const b = fan.branches.find((b) => b.sp.common === sp);
+          const b = fan.branches.find((b) => (b.sp.common === sp || b.sp.sci === sp));
           const h = f.homeCamera();
           const y = fan.time.y(ago / 1e6);
           const L = f.model(b).lanes(y);
@@ -180,9 +190,9 @@ try {
         } else if (kind === 'frame') {
           // The species' column at `ago` years filling `fill` of the screen's width (ToLaD#149), time zoomed tz × home.
           const [sp, ago, tz, fill = 0.4] = args;
-          const b = fan.branches.find((b) => b.sp.common === sp);
+          const b = fan.branches.find((b) => (b.sp.common === sp || b.sp.sci === sp));
           const h = f.homeCamera();
-          const y = fan.time.y(ago / 1e6);
+          const y = fan.time.y(ago === null ? (b.sp.t0 + b.sp.t1) / 2 : ago / 1e6);
           const L = f.model(b).lanes(y);
           const sy = h.sy * tz;
           f.cam = { cx: L.left + L.w / 2, cy: y, sx: (fill * f.w) / L.w, sy, ty: sy };
@@ -190,7 +200,7 @@ try {
         } else if (kind === 'zoomin') {
           // From home (t = 0) to the species' individuals (t = 1, 4 per 70 px bar) about a point on its column.
           const [sp, ago, t] = args;
-          const b = fan.branches.find((b) => b.sp.common === sp);
+          const b = fan.branches.find((b) => (b.sp.common === sp || b.sp.sci === sp));
           const h = f.homeCamera();
           f.cam = h;
           const y = fan.time.y(ago / 1e6);
@@ -238,7 +248,7 @@ try {
           f.camera.settle();
         } else if (kind === 'decline') {
           // The species' last `args[1]` years filling the screen, its column 60% of its width.
-          const b = fan.branches.find((b) => b.sp.common === args[0]);
+          const b = fan.branches.find((b) => (b.sp.common === args[0] || b.sp.sci === args[0]));
           const y0 = fan.time.y(args[1] / 1e6);
           const y1 = fan.time.y(0);
           const sy = (0.8 * f.h) / (y0 - y1);
@@ -251,7 +261,7 @@ try {
           f.camera.settle();
         } else {
           const [sp, ago, perBar, sy, at] = args;
-          const b = fan.branches.find((b) => b.sp.common === sp);
+          const b = fan.branches.find((b) => (b.sp.common === sp || b.sp.sci === sp));
           // World width per individual (alive widths): the bar is 70 px.
           const sx = 70 / perBar / b.unit;
           f.cam = { cx: 0, cy: fan.time.y(ago / 1e6), sx, sy, ty: sy };
@@ -273,7 +283,7 @@ try {
         await page.waitForTimeout(1200);
       }
     }
-    await page.waitForTimeout(900);
+    await page.waitForTimeout(Number(process.env.WAIT_MS || 900));
     // DETAILS=1: the card's Details opened and scrolled into view (a split's date source, ToLaD#145).
     if (process.env.DETAILS) {
       await page.evaluate(() => document.querySelectorAll('details').forEach((d) => { d.open = true; d.scrollIntoView({ block: 'end' }); }));

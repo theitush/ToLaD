@@ -137,12 +137,17 @@ describe('the fan: marks and tap', () => {
       const r = Array.from(gl.over.f.subarray(i * 12, i * 12 + 12));
       if (Math.abs(r[4] - EVENT_TINT.rgb[0]) < 1e-6 && Math.abs(r[5] - EVENT_TINT.rgb[1]) < 1e-6) tints.push(r);
     }
-    expect(tints.length).toBeGreaterThan(2);
-    // Within the windows on screen, and on the cougar's column.
+    // The cougar's tints: those on its column (since ToLaD#172 narrowed its deep past, the cheetah's
+    // column and its own windows reach the screen's left edge too).
+    const x0 = v.toScreen(b.colLeft, y)[0];
+    const x1 = v.toScreen(b.colLeft + b.width, y)[0];
+    const mine = tints.filter((r) => r[0] >= x0 - 1 && r[2] <= x1 + 1);
+    expect(mine.length).toBeGreaterThan(2);
+    // Within the windows on screen.
     const ws = colEventsY(fan, b);
     const sTop = Math.min(...ws.map((w) => v.toScreen(0, w.top)[1]));
     const sBot = Math.max(...ws.map((w) => v.toScreen(0, w.bot)[1]));
-    for (const r of tints) {
+    for (const r of mine) {
       expect(r[1]).toBeGreaterThanOrEqual(sTop - 1);
       expect(r[3]).toBeLessThanOrEqual(sBot + 1);
     }

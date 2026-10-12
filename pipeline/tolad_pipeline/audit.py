@@ -18,11 +18,16 @@ species leaf for each class, with thresholds taken from stated rules, not tuned:
            checked: listed under criterion A or B, an EN species can be of any size
   deep     a genomic deep past the pipeline's own #77/#80 rule flags (beyond 10x of the next level), or
            whose join runs against PSMC's dropped blind-spot steps (#143: their mean beyond 1.5x of the
-           youngest resolved step the other way; kept and drawn only where [deep.blind] cites a source)
+           youngest resolved step the other way; kept and drawn only where [deep.blind] cites a source),
+           or whose peak sits further above its anchor than the genome's own resolved max / median (#172:
+           any inflation the join adds; not where [deep.blind] cites the decline the young end meets at)
   status   a living leaf the Red List calls EX, an extinct leaf the Red List assesses as living, an
            EW species drawn with a wild count, a fossil graft ending at the present (#105)
   name     a living leaf no extant-species list recognises (Upham, PHYLACINE, Greenspoon/IUCN, Red
            List): a stale or infraspecific name drawn as a species with its own count
+  stale    a curated count held flat more than 10 years past its date while the file's notes name a later
+           figure (a %/yr change, a mature-only count, a count) that a [[trend]] or a `basis = "mature"` point
+           would carry to today (#174)
   event    a species-wide [[event]] (a bottleneck tinted on the fan's column) whose column does not fall
            through its window by EVENT_FALL (1.5x, history.event_fall, #149), with why: the window sits in
            PSMC's blind spot, spans a join between sources, is older than the data, or the data do not fall
@@ -43,6 +48,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import re
 import sys
 from pathlib import Path
 
@@ -148,7 +154,8 @@ def leaf_row(n, census: dict, gs_model: dict, deep_reports: dict | None = None) 
         "file": rec.get("file"), "modelled": rec.get("modelled"), "use": rec.get("use"),
         "curve": curve,
         "deep": ({k: deep.get(k) for k in ("ratio", "flag", "rule", "next", "to_kind", "to_n", "deep_n", "deep_n_raw",
-                                            "factor", "blind")}
+                                            "factor", "blind", "meet", "res_median_raw", "res_max_raw",
+                                            "peak_n", "peak_ago", "held")}
                  if deep else None),
         "deep_factors": None,
         # curated events and whether the column falls through each (history.event_fall, ToLaD#149)
@@ -296,13 +303,39 @@ def check_deep(row: dict) -> list[dict]:
                          f"PSMC's {bl['steps']} blind-spot steps average {max(v, 1 / v):.2g}x "
                          f"{'below' if v < 1 else 'above'} the youngest resolved step but are not drawn "
                          "(no [deep.blind] source), and the curve is held flat across them", blind=v))
+    out += check_deep_peak(d)
     if not d.get("flag"):
         return out
     r = d["ratio"]
     return out + [_flag("deep", abs(math.log10(r)),
                   f"genomic level {_fmt(d.get('deep_n_raw') or d['deep_n'])} is {max(r, 1 / r):.3g}x "
                   f"{'above' if r > 1 else 'below'} the next level ({d['to_kind']}, {_fmt(d['to_n'])}); "
-                  f"genome curve scaled x{d['factor']:.3g} to meet it", ratio=r)]
+                  f"genome curve scaled x{d['factor']:.3g} to meet it"
+                  + (" at the median of its resolved steps, its young end held at it (#172)"
+                     if d.get("meet") == "median" else ""), ratio=r)]
+
+
+# a deep past's peak may sit above its anchor by the genome's own max / median and no more (ToLaD#172)
+DEEP_PEAK_TOL = 1.01
+
+
+def check_deep_peak(d: dict) -> list[dict]:
+    """The join's own inflation (ToLaD#172): the deep past's peak over its anchor, against the genome's
+    resolved max over median. Anchored at the median (or above it) the peak is at most that; anchored at a
+    young end below the median, it is that times median / young end. Not checked where [deep.blind] cites
+    the decline the young end shows (the lion's, Figueiro 2017): that decline is the shape, as cited."""
+    if not d.get("res_median_raw") or not d.get("peak_n") or (d.get("blind") or {}).get("kept"):
+        return []
+    own = d["res_max_raw"] / d["res_median_raw"]
+    got = d["peak_n"] / d["to_n"]
+    if got <= own * DEEP_PEAK_TOL:
+        return []
+    x = got / own
+    return [_flag("deep", math.log10(x),
+                  f"deep past peaks at {_fmt(d['peak_n'])} (~{d['peak_ago'] / 1000:.0f} kya), {got:.3g}x its anchor "
+                  f"({d['to_kind']}, {_fmt(d['to_n'])}), against the genome's own resolved max / median of "
+                  f"{own:.3g}x: the join inflates it {x:.3g}x more (its young end meets the anchor below the median)",
+                  inflation=x)]
 
 
 def check_status(row: dict) -> list[dict]:
@@ -378,7 +411,46 @@ def check_event(row: dict) -> list[dict]:
     return out
 
 
-CHECKS = (check_join, check_ceiling, check_deep, check_status, check_name, check_units, check_event)
+STALE_YEARS = 10  # a cited count held flat this long past its date ...
+# ... while the file's notes name a later dated figure: a %/yr change, a mature-only count, or a count
+STALE_FIGURE = re.compile(r"%|\bmature\b|\bmillion\b|\d{1,3}(?:,\d{3})+")
+STALE_YEAR = re.compile(r"\b(1[89]\d\d|20\d\d)\b")
+_NOTES: dict[str, str] = {}
+
+
+def _notes(file: str) -> str:
+    if file not in _NOTES:
+        import tomllib
+        f = ROOT / "pipeline" / "history" / file
+        _NOTES[file] = str(tomllib.loads(f.read_text()).get("notes", "")) if f.exists() else ""
+    return _NOTES[file]
+
+
+def check_stale(row: dict, notes: str | None = None) -> list[dict]:
+    """A count held flat more than STALE_YEARS past its date (ToLaD#174) where the file's notes carry a
+    later figure or trend that never reached the curve: a [[trend]] or a `basis = "mature"` point would
+    carry it (pipeline/history/README.md, "Later partial figures and trends")."""
+    from .anchors import NOW_YEAR
+    if not row.get("file") or row["extinct"] or row.get("use") != "counts" or row.get("today_src") != "history":
+        return []
+    cited = [k["year"] for k in row.get("curve", []) if k["src"] == "cited"]
+    if not cited:
+        return []
+    last = max(cited)
+    held = NOW_YEAR - last
+    if held <= STALE_YEARS:
+        return []
+    text = _notes(row["file"]) if notes is None else notes
+    later = [s.strip() for s in re.split(r"(?<=[.;])\s+", text)
+             if STALE_FIGURE.search(s) and any(int(y) > last for y in STALE_YEAR.findall(s))]
+    if not later:
+        return []
+    return [_flag("stale", math.log10(1 + held / STALE_YEARS),
+                  f"today's count is the {last:g} point held {held:g} years, but the notes name a later figure: "
+                  f"\"{later[0][:160]}\"", held_years=held)]
+
+
+CHECKS = (check_join, check_ceiling, check_deep, check_status, check_name, check_units, check_event, check_stale)
 
 
 def load_reviewed(path: Path = REVIEWED) -> dict[tuple[str, str], dict]:

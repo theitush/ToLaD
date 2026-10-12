@@ -77,9 +77,23 @@ function pantheraData(): Plugin {
       const make = id.startsWith('\0') ? ids[id.slice(1)] : undefined;
       if (!make) return null;
       for (const f of dataFiles()) this.addWatchFile(join(DATA, f));
-      return `export default ${JSON.stringify(make())};`;
+      if (existsSync(join(DATA, 'wiki.json'))) this.addWatchFile(join(DATA, 'wiki.json'));
+      // The pictures and links (ToLaD#182) for every species either level draws.
+      const wiki = id === '\0' + PANTHERA ? `\nexport const wiki = ${JSON.stringify(wikiFor((ids[CARNIVORA]() as { species: { sci: string }[] }).species.map((s) => s.sci)))};` : '';
+      return `export default ${JSON.stringify(make())};${wiki}`;
     },
   };
+}
+
+/**
+ * The clade's rows of the Wikipedia/Commons sidecar (data/mammals/wiki.json, ToLaD#182): only
+ * the species the fan has, so the page does not carry the whole tree's. {} when there is none.
+ */
+function wikiFor(names: string[]): Record<string, unknown> {
+  const p = join(DATA, 'wiki.json');
+  if (!existsSync(p)) return {};
+  const all = JSON.parse(readFileSync(p, 'utf8')) as Record<string, unknown>;
+  return Object.fromEntries(names.filter((n) => n in all).map((n) => [n, all[n]]));
 }
 
 /** Single-file build: inline the JS and CSS chunks into index.html. */

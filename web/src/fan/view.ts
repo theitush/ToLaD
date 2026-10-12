@@ -4,6 +4,7 @@
 // in far enough, a branch resolves into the individuals themselves (twigs.ts).
 // Gestures come from the shared engine/input.ts.
 
+import { drawThumb, labelThumb } from './wiki';
 import { formatCount } from '../data/count';
 import { Input, type InputHandlers } from '../engine/input';
 import { clipPoly, FanCamera, STRAND_PX, type Camera } from './camera';
@@ -38,6 +39,8 @@ const font = (spec: string, family = SANS) => `${spec} ${family}`;
 /** A species' label: its name, upright on a dark pill LABEL_PILL px across, LABEL_PAD px past each end of the text. */
 const LABEL_FONT = '650 15px';
 const LABEL_PILL = 22;
+/** The species picture under a name pill (ToLaD#182), its diameter. */
+const THUMB_D = 50;
 const LABEL_PAD = 8;
 /** Right edge (px) of the time axis's labels: species' labels keep right of it. */
 const LABEL_AXIS_X = 72;
@@ -1521,6 +1524,9 @@ export class FanView implements InputHandlers {
       ctx.fillStyle = s.ev !== undefined ? EVENT_TINT.css : s.span ? FAMILY_INK : s.v ? INK2 : INK;
       ctx.fillText(s.text, 0, 0.5);
       ctx.restore();
+      // ToLaD#182: the species' Commons picture under its pill, before the name, once loaded (wiki.ts; `?thumbs=0` off).
+      const th = s.b && s.ev === undefined ? labelThumb(s.b.sp.sci, () => this.request()) : null;
+      if (th) drawThumb(ctx, th, s.x, y1 + THUMB_D / 2 + 2, THUMB_D);
     }
     ctx.restore();
     if (moving) this.request();

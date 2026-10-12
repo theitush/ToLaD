@@ -43,6 +43,19 @@ kind  = "estimate"
 cite  = "..."
 url   = "..."
 note  = "..."
+# optional, on a point counting part of the population (ToLaD#174):
+# basis    = "mature"  # n, lo, hi are mature individuals only
+# per      = 1.936     # all ages per mature animal; n, lo, hi are multiplied by it
+# per_cite = "where the ratio comes from (a cited ratio, or totals in the source's life table)"
+
+[[trend]]              # optional: a cited %/yr change after the last all-age point (see "Later partial figures")
+from_year    = 2009
+to_year      = 2017
+pct_per_year = -7.2    # negative = decline
+grade = "C"
+cite  = "..."
+url   = "..."
+note  = "what the rate covers (one colony? mature females?)"
 
 [deep]                 # optional, wild counts only: a genome-based Ne history (see "Deep past")
 method = "PSMC"        # PSMC | MSMC | MSMC2 | SMC++
@@ -204,7 +217,9 @@ in 25-year steps.
   in years) between points, so the curve passes through every point exactly.
   Spans between two points are marked `interpolated` and carry the worse
   grade of their two ends.
-- **Alive now:** the latest point if it is from 2000 or later and graded A-C;
+- **Alive now:** the latest point (a `basis` point scaled to all ages, or a
+  `[[trend]]` point; see "Later partial figures and trends") if it is from 2000
+  or later and graded A-C;
   otherwise the model's alive-now figure stays and is appended to the curve
   as a `model` point, so the curve and the green lane agree.
 - **Error and grade:** the leaf's log error is widened by the deep-past
@@ -238,6 +253,32 @@ in 25-year steps.
   point the existing growth since domestication (shaped like human births) is
   kept, rescaled to meet the first point.
 - **Humans:** `use = "display"`: counts stay PRB + UN WPP.
+
+## Later partial figures and trends (ToLaD#174)
+
+A count must not be held flat for years when a later figure exists. The Antarctic
+fur seal's curve ended at 3.51M in 2008 while IUCN (2026) gave 944,000 mature seals
+in 2025. The 2025 figure was in the notes only, because it counts mature animals
+only. Two ways bring such a figure into the curve; use whichever fits the data:
+
+- **A mature-only figure** goes in as a `[[point]]` with `basis = "mature"` and
+  `per`, the number of animals of all ages per mature one. Take `per` from a cited
+  ratio, or derive it from the source's own totals (e.g. Forcada et al. 2026:
+  1,983,687 all ages for 1,024,797 mature at South Georgia in 2022, ×1.936).
+  Cite it in `per_cite`. The build multiplies `n`, `lo` and `hi` by `per` and
+  starts the point's note (shown on the card) with the original figure and the
+  ratio. Graded no better than the ratio allows: usually C.
+- **A cited %/yr trend** goes in as a `[[trend]]`. The build takes the latest
+  point at or before `to_year` and carries it at `pct_per_year` from the later of
+  that point's year and `from_year` to `to_year`. That makes an `index-scaled`
+  point graded the worse of the two, with the arithmetic in its note. A cited
+  point at `to_year` wins, and the trend then adds nothing. Use a trend only when
+  the rate covers the population the points count. One colony's rate (the fur
+  seal's Bird Island, -7.2%/yr) is not the species'.
+
+The audit's `stale` check (`tolad_pipeline/audit.py`) flags a curated today that
+is held more than 10 years past its last cited point, when the file's notes name
+a later dated figure (a %, a mature count, a million, a number like 944,000).
 
 ## Deep past (`[deep]`, layer 3 of the estimate stack)
 
@@ -433,6 +474,63 @@ the same way by code rather than by hand.
     holds `by_next` (cited / natural / modelled), the factor spread
     (`factor`: min, p10, p25, median, p75, p90, max, `beyond_flag` up /
     down) and the flagged species, worst first.
+  - **A flagged join meets the long-run level** (ToLaD#172, a
+    data-plausibility fix within #143's rule). The young end is the least
+    certain part of a PSMC curve: it sits at the edge of the blind spot,
+    and it carries the sampled genome's own regional or founder history.
+    The cougar's (one North American genome, ~37k at 21 kya) met its
+    1.02M anchor at ×27 and drew 21M cougars at 95-134 kya, ~27x today's
+    density over today's range. So where a join is flagged (beyond 10x
+    either way) and its young end sits below the **median of its resolved
+    steps** (the blind spot is already left out), that median meets the
+    anchor instead. The young steps the scaled curve then puts below the
+    anchor are **held at it**: the oldest of them becomes a point at the
+    anchor (kind `genomic`, `span_kind` `held`, so the span from it to the
+    anchor compiles to a `held` segment; its note says so) and the younger
+    ones are dropped. The curve falls to the anchor where the genome
+    falls below it and holds there, with no pinch. Above it the genome's
+    shape is untouched, so the deep past peaks at the genome's own
+    resolved max / median above the anchor and no higher. The cougar is
+    now ×2.2: from 680k at 2.5 Mya up to 1.72M at 97 kya, 1.38M at 72 kya, 1.02M from
+    61 kya, flat to 1500, then down to 777k today.
+    - **Why the median.** It is the genome's level over its whole resolved
+      span, the part PSMC resolves best, and it does not move with either
+      end. The mean of log N would do much the same. The maximum would put
+      the whole curve at or below the anchor, which reads as a rise to the
+      anchor that the genome does not show. The young end is what #172
+      replaces. Across the 33 joins it now sets, the peak is 1.4-16x the
+      anchor (the African savanna elephant's own range is 16x, its PSMC
+      curve's ancient hump), against 3-58x before.
+    - **Not changed.** A flagged join whose young end is at or above its
+      median (*Beatragus hunteri*) already peaks within the genome's own
+      range: its young end still meets the anchor. So does a young end
+      kept by a cited `[deep.blind]` window (the lion, Figueiró et al.
+      2017): that decline is the cited shape, and it keeps its 20-10 kya
+      fall (`test_event_falls`). Unflagged joins (10x or less) are
+      unchanged, though many of them meet the anchor below their median
+      too; `make audit` lists those (below).
+    - **The audit** (`check_deep_peak`, class `deep`) flags any deep past
+      whose peak over its anchor exceeds the genome's own resolved max /
+      median (by over 1%), i.e. inflation the join adds, except a young
+      end kept by `[deep.blind]`. After #172 no flagged join trips it. 63
+      unflagged ones do (the jaguar 5.3x, the sitatunga 37x).
+    - **Recorded.** `deep.join` adds `meet` (`median` or `young`),
+      `res_median_raw` and `res_max_raw` (the resolved steps' median and
+      max before scaling), `held` (`{steps, ago, year, min_n}`: the young
+      steps held at the anchor, when they were, and the lowest of them as
+      scaled; else null), `peak_n` and `peak_ago` (the deep past's peak as
+      built). `factor` is `to_n / res_median_raw` when `meet` is
+      `median`, else 1 / `ratio`. `ratio` still measures the young end,
+      and the flag still uses it: 35 of 108 joins are flagged, while the
+      factor spread in `stats.json -> history.deep_join.factor` counts the
+      factors as applied (12 beyond 10x up, 10 down; median 1.23).
+    - **The card** says it in one sentence, the same shape for every such
+      join: "Flagged join: genome curve scaled ×2.2 so its long-run level
+      meets 1,019,752 (the modelled natural level); its young end, from
+      ~61 kya, is held there." (the card rounds the count to ~1.0M; a cited
+      anchor reads "66 (the cited 1924 census)"). The young-end factor
+      stays on the record (`ratio`), not on the card; "Flagged" is what
+      the card's basis list keys on.
 
   In the 2026-10-12 build (108 genomic species: 12 anchored on a cited
   count, 14 on the natural level above their first count, 82 on a modelled

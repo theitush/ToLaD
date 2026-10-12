@@ -359,13 +359,12 @@ describe('the card shows the deep past and the natural level (ToLaD#69)', () => 
     const bison = bovids.find((s) => s.sci === 'Bison bison')!;
     const b = text(spark(bison));
     // (The factor follows the data: ~981 at the flat mutation rate, ~1.2k with the per-lineage one, #74/#75.)
-    expect(b).toMatch(/The genome gives the shape, not the number: its curve is scaled ×~?[\d.,]+k? to meet the cited 1800 baseline \(~40 million\)/);
-    expect(b).toContain('flagged');
+    // (A flagged join's one short sentence since ToLaD#172: the genome's long-run level meets the anchor.)
+    expect(b).toMatch(/Flagged join: genome curve scaled ×~?[\d.,]+k? so its long-run level meets ~40 million \(the cited 1800 baseline\); its young end, from ~\d+ kya, is held there\./);
     const addax = bovids.find((s) => s.sci === 'Addax nasomaculatus')!;
     const a = spark(addax);
     expect(a).toContain('data-axis="log"');
-    expect(text(a)).toMatch(/its curve is scaled ×0\.00\d+ to meet the modelled natural level in 1500 CE/);
-    expect(text(a)).toContain('flagged: beyond 10×');
+    expect(text(a)).toMatch(/Flagged join: genome curve scaled ×0\.00\d+ so its long-run level meets ~?[\d.,]+ \(the modelled natural level\)/);
     expect((a.match(/data-row="genomic"/g) ?? []).length).toBe(1);
   });
 

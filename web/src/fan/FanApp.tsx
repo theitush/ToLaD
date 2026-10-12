@@ -7,6 +7,7 @@ import { flushSync } from 'react-dom';
 import { approxMa, formatCount } from '../data/count';
 import { HistorySpark } from './HistorySpark';
 import type { EdgeStyle, WidthMode } from './layout';
+import { wikiOf, type WikiRec } from './wiki';
 import { CARNIVORA, FELIDAE, NATURAL_META, type HistEvent, type SpeciesRec } from './panthera';
 import { CARNIVORA_TREE } from './splits';
 import { population } from './population';
@@ -368,6 +369,47 @@ function EventSource({ ev }: { ev: HistEvent }) {
   );
 }
 
+/**
+ * The species' Commons picture (ToLaD#182), hotlinked: nothing at all until it has loaded,
+ * and nothing if it fails (no box, no alt text, no gap). Loading, it is a 1 px invisible
+ * image, so the browser still fetches it (a lazy image that is not displayed never loads).
+ * Keyed by its URL, so another species starts over.
+ */
+export function WikiPic({ w, initial = 'loading' }: { w: WikiRec | null; initial?: 'loading' | 'ok' | 'failed' }) {
+  const [state, setState] = useState(initial);
+  // A tap opens it across the card at a larger Commons thumbnail (ToLaD#182); another tap closes it.
+  const [big, setBig] = useState(false);
+  const [bigFailed, setBigFailed] = useState(false);
+  const src = w?.img;
+  if (!src || state === 'failed') return null;
+  const bigSrc = bigSrcOf(src);
+  const useBig = big && !bigFailed && bigSrc !== src;
+  return (
+    <figure className={`pic ${state}${big ? ' big' : ''}`}>
+      <img
+        src={useBig ? bigSrc : src}
+        alt=""
+        loading="lazy"
+        decoding="async"
+        referrerPolicy="no-referrer"
+        onClick={() => setBig((b) => !b)}
+        onLoad={() => setState('ok')}
+        onError={() => (useBig ? setBigFailed(true) : setState('failed'))}
+      />
+      {state === 'ok' && w?.file && (
+        <a href={w.file} target="_blank" rel="noopener">
+          Wikimedia Commons
+        </a>
+      )}
+    </figure>
+  );
+}
+
+/** The same Commons thumbnail at 960 px (a standard Wikimedia step); the small one if the URL isn't a sized thumb. */
+export function bigSrcOf(src: string): string {
+  return src.replace(/\/(\d+)px-([^/]+)$/, '/960px-$2');
+}
+
 export function SpeciesCard({ sp, onClose, open, ageMa, startMa, event }: { sp: SpeciesRec; onClose: () => void; open?: boolean; ageMa?: number; startMa?: number; event?: number }) {
   const at = populationAt(sp, ageMa ?? sp.t1, startMa);
   const ev0 = event !== undefined ? sp.history?.events[event] : undefined;
@@ -383,13 +425,22 @@ export function SpeciesCard({ sp, onClose, open, ageMa, startMa, event }: { sp: 
   const spark = !!sp.history && sp.history.points.length > 0;
   // The natural (pre-human) level: on the sparkline and its sources when there is one, else here.
   const nat = !spark && sp.natural ? sp.natural : null;
+  const wiki = wikiOf(sp.sci);
   return (
     <div className="card-sp" onPointerDown={(e) => e.stopPropagation()}>
       <button type="button" className="x" onClick={onClose} aria-label="Close">
         ×
       </button>
+      <WikiPic key={wiki?.img ?? ''} w={wiki} />
       <div className="t">
-        <span>{sp.common}</span> <i>({sp.sci})</i>
+        {wiki?.wp ? (
+          <a className="wp" href={wiki.wp} target="_blank" rel="noopener">
+            {sp.common}
+          </a>
+        ) : (
+          <span>{sp.common}</span>
+        )}{' '}
+        <i>({sp.sci})</i>
       </div>
       {ev && <EventSection ev={ev} k={event!} />}
       <div className="facts">

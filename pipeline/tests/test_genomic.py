@@ -132,8 +132,10 @@ class Build(unittest.TestCase):
             segk = [x["kind"] for x in h["segments"]]
             self.assertEqual(segk[0], "held", sp)
             self.assertIn("genomic", segk, sp)
-            # the join across PSMC's blind spot: log-linear, kind interpolated, grade D
-            join = [x for x in h["segments"] if x["kind"] == "interpolated"]
+            # the join across PSMC's blind spot: log-linear, kind interpolated, grade D; held at the anchor
+            # where a flagged join's young end is below its median (ToLaD#172)
+            held = s["deep"]["join"]["held"] is not None
+            join = [x for x in h["segments"][segk.index("genomic"):] if x["kind"] == ("held" if held else "interpolated")]
             self.assertTrue(join and all(x["grade"] == "D" for x in join), sp)
             if "rangeloss" in kinds:
                 n_rl += 1
