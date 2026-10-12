@@ -10,6 +10,7 @@ import { clipPoly, FanCamera, STRAND_PX, type Camera } from './camera';
 import { laneAt, layoutFan, leftAt, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type EdgeStyle, type Fan, type FanBranch, type FanNode, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01 } from './meshgl';
+import { Fold } from './fold';
 import { COLUMN_DIM, columnSpans, EVENT_TINT, eventAt, eventSpans, type EventSpan } from './colstyle';
 import { drawTwigs, kLogAt, laneDim, LINEAGE, LIVING, TEX_HAIR_PX, TWIG_GRAY, TwigModel, type IndInfo, type TwigStats } from './twigs';
 import type { MeshBatch, RectBatch } from './meshgl';
@@ -534,6 +535,8 @@ export class FanView implements InputHandlers {
     readonly clade: CladeRec,
     edge: EdgeStyle = 'curved',
     readonly tree: Split = FELIDAE_TREE,
+    /** The fold (fold.ts, ToLaD#146): the order one branch from afar, its splits opening as you zoom in. */
+    readonly folds = false,
   ) {
     this.edge = edge;
     const ctx = canvas.getContext('2d');
@@ -553,7 +556,7 @@ export class FanView implements InputHandlers {
         glc.remove();
       }
     }
-    this.camera = new FanCamera(layoutFan(clade, this.mode, tree, this.edge), (b) => this.model(b));
+    this.camera = new FanCamera(this.withFold(layoutFan(clade, this.mode, tree, this.edge)), (b) => this.model(b));
     // Width and time zoom separately (#138): a sideways pinch zooms width, an upright one time, a diagonal both.
     this.input = new Input(canvas, this, true);
     this.ro = new ResizeObserver(() => this.resize());
@@ -617,7 +620,7 @@ export class FanView implements InputHandlers {
   }
 
   private relayout(): void {
-    this.camera.fan = layoutFan(this.clade, this.mode, this.tree, this.edge);
+    this.camera.fan = this.withFold(layoutFan(this.clade, this.mode, this.tree, this.edge));
     this.camera.settle();
     this.request();
   }
@@ -641,6 +644,28 @@ export class FanView implements InputHandlers {
   /** Fly to a level (levelCamera), or home if the tree has no such split. */
   flyToLevel(name: string): void {
     this.flyTo(this.levelCamera(name) ?? this.homeCamera());
+  }
+
+  private withFold(fan: Fan): Fan {
+    if (this.folds) {
+      const f = new Fold(fan);
+      f.setAll(0);
+      fan.tess.fold = f;
+    }
+    return fan;
+  }
+
+  private foldKey = '';
+  /** The fold at this frame's zoom: its grid (about 3 px of screen between rows) and openness; the columns sampled anew if they moved. */
+  private applyFold(): void {
+    const f = this.fan.tess.fold;
+    if (!f) return;
+    f.setGrid(Math.pow(2, Math.round(Math.log2(3 / this.cam.sy))));
+    f.setScale(this.cam.sx, this.w);
+    const key = `${f.ver}:${f.gridH}`;
+    if (key === this.foldKey) return;
+    this.foldKey = key;
+    for (const m of this.models.values()) m.refold();
   }
 
   model(b: FanBranch): TwigModel {
@@ -934,6 +959,7 @@ export class FanView implements InputHandlers {
 
   draw(): void {
     const t0 = performance.now();
+    this.applyFold();
     const ctx = this.ctx;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     this.gl?.begin();

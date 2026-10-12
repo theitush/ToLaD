@@ -72,6 +72,7 @@
 // holds its founders (constant): the parent population is the sum of its
 // daughters' founders.
 
+import type { Fold } from './fold';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { parentShare, population, smoother, TIME_C, type Population } from './population';
 import { FELIDAE_TREE, type Split } from './splits';
@@ -276,8 +277,10 @@ export function peelU(edge: EdgeStyle, yBot: number, leanY: number, y: number): 
 }
 
 /** A parent column's left edge at height y (in its span): from its tile in the parent to its own left (peelU). */
-export function nodeLeftAt(v: FanNode, y: number): number {
-  return v.tile + (v.left - v.tile) * peelU(v.edge, v.yBot, v.leanY, y);
+export function nodeLeftAt(v: FanNode, y: number, river = false): number {
+  const x = v.tile + (v.left - v.tile) * peelU(v.edge, v.yBot, v.leanY, y);
+  const f = river ? undefined : v.strands[0]?.tess.fold;
+  return f ? x + f.dx(v.strands[0].index, y) : x;
 }
 
 const clampW = (v: number, w: number) => Math.min(w, Math.max(0, v));
@@ -320,6 +323,8 @@ function segGreen(s: PathSeg, age: number, y: number): number {
  */
 export class Tess {
   private readonly ys = new Map<FanBranch, Float64Array>();
+  /** The fold (fold.ts, ToLaD#146): how far the splits are open at the view's zoom; none: the river, fully open. */
+  fold?: Fold;
 
   constructor(
     readonly time: TimeScale,
@@ -391,10 +396,24 @@ export class Tess {
       const z = Math.min(hi, k + 1 < p.length ? p[k + 1].y : this.bottom);
       if (!(z >= a)) continue;
       for (const y of [a, z]) {
-        const x = nodeLeftAt(p[k].node, y) + p[k].off;
+        const x = nodeLeftAt(p[k].node, y, true) + p[k].off;
         L = Math.min(L, x);
         R = Math.max(R, x + b.baseW);
       }
+    }
+    // Folded (fold.ts): its moves over the range, at the ends and the fold's rows between (as drawn).
+    const f = this.fold;
+    if (f && R > L) {
+      const n = f.gridH > 0 ? Math.min(256, Math.ceil((hi - lo) / f.gridH)) : 16;
+      let d0 = Infinity;
+      let d1 = -Infinity;
+      for (let k = 0; k <= n; k++) {
+        const d = f.dx(b.index, n ? lo + ((hi - lo) * k) / n : lo);
+        d0 = Math.min(d0, d);
+        d1 = Math.max(d1, d);
+      }
+      L += d0;
+      R += d1;
     }
     // (A hair of slack for rounding.)
     const pad = 1e-6 * Math.max(1, Math.abs(L), Math.abs(R)) + (R - L) * 1e-3;
@@ -461,14 +480,16 @@ export class Tess {
 }
 
 /** Left edge of a branch at world y: its own column (about its centre, peeling off its parent) above its split, then its place in each parent column below. (w: its width there, if known: lanesAt(b, y)[0].) */
-export function leftAt(b: FanBranch, y: number, w?: number): number {
+export function leftAt(b: FanBranch, y: number, w?: number, river = false): number {
+  const f = river ? undefined : b.tess.fold;
+  const d = f ? f.dx(b.index, y) : 0;
   if (y < b.splitY) {
     const tc = b.x0 + b.baseW / 2;
     const c = tc + (b.cx - tc) * peelU(b.tess.edge, b.splitY, b.leanY, y);
-    return c - (w ?? lanesAt(b, y)[0]) / 2;
+    return c - (w ?? lanesAt(b, y)[0]) / 2 + d;
   }
   const s = segAt(b, y);
-  return nodeLeftAt(s.node, y) + s.off;
+  return nodeLeftAt(s.node, y, true) + s.off + d;
 }
 
 /**

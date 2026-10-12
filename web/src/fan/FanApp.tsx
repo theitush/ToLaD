@@ -7,7 +7,7 @@ import { flushSync } from 'react-dom';
 import { approxMa, formatCount } from '../data/count';
 import { HistorySpark } from './HistorySpark';
 import type { EdgeStyle, WidthMode } from './layout';
-import { CARNIVORA, NATURAL_META, type HistEvent, type SpeciesRec } from './panthera';
+import { CARNIVORA, FELIDAE, NATURAL_META, type HistEvent, type SpeciesRec } from './panthera';
 import { CARNIVORA_TREE } from './splits';
 import { population } from './population';
 import { MagnifierIcon, SearchPanel } from './SearchPanel';
@@ -42,13 +42,17 @@ function initialEdge(): EdgeStyle {
 }
 
 /**
- * The levels the button moves between (ToLaD#146), by taxon: the order the fan shows (its home), and the family
- * inside it the fan grew from. The button names the level it goes to.
+ * The two views (ToLaD#146), side by side on one page: the cats as they were, and the whole order folded into
+ * one branch that opens as you zoom (fold.ts). ?level=carnivores opens on the order.
  */
-const LEVELS = [
-  { taxon: CARNIVORA.sci, label: 'All carnivores' },
-  { taxon: 'Felidae', label: 'Cats' },
-];
+type Level = 'cats' | 'carnivores';
+function initialLevel(): Level {
+  try {
+    return new URLSearchParams(window.location.search).get('level') === 'carnivores' ? 'carnivores' : 'cats';
+  } catch {
+    return 'cats';
+  }
+}
 
 export function FanApp() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -57,12 +61,14 @@ export function FanApp() {
   const [edge, setEdge] = useState<EdgeStyle>(initialEdge);
   const [sel, setSel] = useState<Selection | null>(null);
   const [searching, setSearching] = useState(false);
-  const [levelAt, setLevelAt] = useState(0);
+  const [level, setLevel] = useState<Level>(initialLevel);
   const scaleRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const v = new FanView(canvasRef.current!, CARNIVORA, edge, CARNIVORA_TREE);
+    const carn = level === 'carnivores';
+    const v = carn ? new FanView(canvasRef.current!, CARNIVORA, edge, CARNIVORA_TREE, true) : new FanView(canvasRef.current!, FELIDAE, edge);
+    if (mode !== 'linear') v.setMode(mode);
     v.onSelect = setSel;
     v.scaleEl = scaleRef.current;
     v.barEl = barRef.current;
@@ -81,7 +87,9 @@ export function FanApp() {
       viewRef.current = null;
       if (window.__fan === v) delete window.__fan;
     };
-  }, []);
+    // (A new view per level; the toggles' state carries over.)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [level]);
 
   return (
     <div className="app fan">
@@ -114,17 +122,19 @@ export function FanApp() {
         >
           {edge}
         </button>
+        <button type="button" onClick={() => viewRef.current?.resetView()}>
+          {level === 'cats' ? 'All cats' : 'All carnivores'}
+        </button>
         <button
           type="button"
-          aria-label={`Show the ${LEVELS[(levelAt + 1) % LEVELS.length].label.toLowerCase()}`}
+          aria-label={level === 'cats' ? 'Show the carnivores, folded into one branch' : 'Back to the cats'}
           onClick={() => {
-            // The levels in turn (ToLaD#146): the whole order, then the cat family inside it, and back.
-            const next = (levelAt + 1) % LEVELS.length;
-            setLevelAt(next);
-            viewRef.current?.flyToLevel(LEVELS[next].taxon);
+            setSel(null);
+            setSearching(false);
+            setLevel(level === 'cats' ? 'carnivores' : 'cats');
           }}
         >
-          {LEVELS[(levelAt + 1) % LEVELS.length].label}
+          {level === 'cats' ? 'Carnivores' : 'Cats'}
         </button>
         <button
           type="button"

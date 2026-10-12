@@ -236,6 +236,12 @@ export class TwigModel {
   readonly path: ColumnPath = new ColumnPath(this);
 
   private readonly atMemo = new Map<number, Float64Array>();
+  /** The fold moved the columns (fold.ts): sample them again. */
+  refold(): void {
+    this.atMemo.clear();
+    this.cutMemo.reset();
+    this.path.reset();
+  }
   /**
    * lanes() and pitch() at y: [left, w, gw, pitch], remembered (#32: the fan
    * samples at world-fixed heights, mostly the same ones frame after frame).
@@ -820,6 +826,10 @@ export class CutMemo {
   /** The heights of the last update(), and their values. */
   n = 0;
   constructor(private readonly m: { sample(y: number, out: Float64Array, o: number): void }) {}
+  /** Forget the kept values (the fold moved the columns, fold.ts). */
+  reset(): void {
+    this.n = 0;
+  }
   update(cuts: ArrayLike<number>): Float64Array {
     const n = cuts.length;
     const ys = new Float64Array(n);
@@ -920,6 +930,13 @@ export class ColumnPath {
   private yLo = 0;
   private yHi = 0;
   constructor(private readonly m: TwigModel) {}
+
+  /** Forget the kept samples (the fold moved the columns, fold.ts). */
+  reset(): void {
+    this.n = 0;
+    this.grid = NaN;
+    this.sxRef = 0;
+  }
 
   /** The kept samples over [lo, hi] (world): [i0, i1], the last at or above lo and the first at or below hi. */
   span(sx: number, sy: number, lo: number, hi: number): [number, number] {

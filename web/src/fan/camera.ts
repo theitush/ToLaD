@@ -81,15 +81,24 @@ export class FanCamera {
   }
 
   /** World x extent of the fan: its columns, with a small margin. */
-  extent(): [number, number] {
+  extent(closed = false): [number, number] {
     const f = this.fan;
+    const fo = f.tess.fold;
+    if (fo) {
+      // Folded (fold.ts): the closed order is one column, no wider than the stem's width; the open fan's extent as it opens.
+      const W = f.trunkWidth * 1.04;
+      const c: [number, number] = [fo.home - W / 2, fo.home + W / 2];
+      if (closed || fo.lambda === 0) return c;
+      const m = 0.04 * (f.x1 - f.x0);
+      return [Math.min(c[0], f.x0 - m), Math.max(c[1], f.x1 + m)];
+    }
     const m = 0.04 * (f.x1 - f.x0);
     return [f.x0 - m, f.x1 + m];
   }
 
   /** The whole fan: "now" near the top, the stem entering from the bottom edge. */
   home(): Camera {
-    const [x0, x1] = this.extent();
+    const [x0, x1] = this.extent(true);
     return this.frame(x0, x1, 0);
   }
 
@@ -227,6 +236,12 @@ export class FanCamera {
     const [sxMin, syMin] = this.minScale();
     const prev = c.sy > 0 && Number.isFinite(c.sy) ? c.sy : c.ty;
     c.sx = Math.min(SX_MAX, Math.max(sxMin, c.sx));
+    // Folded (fold.ts): the width zoom opens or closes splits; the point under the fingers stays in its column.
+    const fo = this.fan.tess.fold;
+    if (fo) {
+      const snap = fo.snapshot();
+      if (fo.setScale(c.sx, this.w)) wx = fo.follow(wx, wy, snap);
+    }
     const want = Math.min(TY_MAX, Math.max(syMin, c.ty));
     let sy = this.timeCap(wy, py, want, prev);
     if (!this.timeOk(wy, py, sy)) {
