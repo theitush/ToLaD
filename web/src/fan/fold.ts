@@ -179,7 +179,8 @@ export class Fold {
       const run = (k: FanNode | FanBranch) => (isNode(k) ? [k.strands[0].index, k.strands[k.strands.length - 1].index + 1] : [k.index, k.index + 1]);
       this.lo[i] = run(dp)[0];
       this.hi[i] = run(dq)[1];
-      this.forkTop[i] = Math.min(dp.leanY, dq.leanY);
+      // (At least a bend tall: a gap opens as a branch parts, never a ledge.)
+      this.forkTop[i] = Math.min(dp.leanY, dq.leanY, v.y - ROOM_BEND);
     }
     this.home = fan.root.left + fan.root.width / 2;
     this.wt = new Float64Array(n).fill(1);
@@ -289,6 +290,11 @@ export class Fold {
     for (let k = 1; k + 1 < B.length; k++) out.push([B[k] - ROOM_BEND / 2, B[k] + ROOM_BEND / 2]);
     if (b.tipY > this.yRef) out.push([b.tipY - Fold.endH(b), b.tipY]);
     return out;
+  }
+
+  /** Where the gaps open (world [lo, hi]): each split's fork. */
+  forks(): [number, number][] {
+    return this.pairNode.map((v, i) => [this.forkTop[i], v.y]);
   }
 
   /** How long (world) a strand's room takes to grow from its founders' slot: its peel, at least a bend. */

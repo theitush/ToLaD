@@ -1,6 +1,6 @@
 // The fold (ToLaD#146): one branch from afar, opening continuously as the width zoom grows.
 import { describe, expect, it } from 'vitest';
-import { Fold, inFamily } from './fold';
+import { Fold, inFamily, ROOM_BEND } from './fold';
 import { columnsAt, g, laneAt, layoutFan, leftAt, TIME_H, type EdgeStyle, type Fan, type FanBranch, type WidthMode } from './layout';
 import { CARNIVORA, FELIDAE } from './panthera';
 import { CARNIVORA_TREE, FELIDAE_TREE } from './splits';
@@ -50,6 +50,7 @@ function events(fan: Fan, fold: Fold): [number, number][] {
     out.push([b.leanY, b.splitY], ...fold.roomBends(b));
   }
   for (const v of fan.nodes) if (v.parent) out.push([v.leanY, v.yBot]);
+  out.push(...fold.forks());
   return out.sort((p, q) => p[0] - q[0]);
 }
 /** The stretches between events (each a few heights inside it), at most n of them, the longest. */
@@ -119,7 +120,8 @@ describe('the fold', () => {
         }
       }
       expect(worst).toBeLessThan(1e-6);
-      expect(runs.length).toBeGreaterThanOrEqual(3);
+      // (Linear: the domestic cat's and dog's booms leave few stretches where the whole order holds still; the deep-zoom test checks each column's own.)
+      expect(runs.length).toBeGreaterThanOrEqual(mode === 'linear' ? 1 : 3);
     });
 
     it(`edges are continuous in time at every zoom: no jog at a split, a tip or a fork (${mode}, ${edge})`, () => {
@@ -217,7 +219,7 @@ describe('the fold', () => {
           );
           const nodes = fan.nodes.filter((v) => v.parent && v.strands.some((q) => near.has(q)));
           const inNear = (y: number) =>
-            nodes.some((v) => y >= v.leanY && y <= v.yBot) ||
+            nodes.some((v) => y >= Math.min(v.leanY, v.y - ROOM_BEND) && y <= v.yBot) ||
             [...near].some((q) => (y >= q.leanY && y <= q.splitY) || fold.roomBends(q, false).some(([lo, hi]) => y >= lo && y <= hi));
           // Over each stretch between those events (a sister's end or split moves it, honestly: nothing else may;
           // not even a neighbour booming past its room, the domestic dog's billions beside the wolf).
