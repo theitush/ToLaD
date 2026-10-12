@@ -7,6 +7,7 @@ import { flushSync } from 'react-dom';
 import { approxMa, formatCount } from '../data/count';
 import { HistorySpark } from './HistorySpark';
 import type { EdgeStyle, WidthMode } from './layout';
+import { wikiOf, type WikiRec } from './wiki';
 import { FELIDAE, NATURAL_META, type HistEvent, type SpeciesRec } from './panthera';
 import { population } from './population';
 import { MagnifierIcon, SearchPanel } from './SearchPanel';
@@ -336,6 +337,36 @@ function EventSource({ ev }: { ev: HistEvent }) {
   );
 }
 
+/**
+ * The species' Commons picture (ToLaD#182), hotlinked: nothing at all until it has loaded,
+ * and nothing if it fails (no box, no alt text, no gap). Loading, it is a 1 px invisible
+ * image, so the browser still fetches it (a lazy image that is not displayed never loads).
+ * Keyed by its URL, so another species starts over.
+ */
+export function WikiPic({ w, initial = 'loading' }: { w: WikiRec | null; initial?: 'loading' | 'ok' | 'failed' }) {
+  const [state, setState] = useState(initial);
+  const src = w?.img;
+  if (!src || state === 'failed') return null;
+  return (
+    <figure className={`pic ${state}`}>
+      <img
+        src={src}
+        alt=""
+        loading="lazy"
+        decoding="async"
+        referrerPolicy="no-referrer"
+        onLoad={() => setState('ok')}
+        onError={() => setState('failed')}
+      />
+      {state === 'ok' && w?.file && (
+        <a href={w.file} target="_blank" rel="noopener">
+          Wikimedia Commons
+        </a>
+      )}
+    </figure>
+  );
+}
+
 export function SpeciesCard({ sp, onClose, open, ageMa, startMa, event }: { sp: SpeciesRec; onClose: () => void; open?: boolean; ageMa?: number; startMa?: number; event?: number }) {
   const at = populationAt(sp, ageMa ?? sp.t1, startMa);
   const ev0 = event !== undefined ? sp.history?.events[event] : undefined;
@@ -351,13 +382,22 @@ export function SpeciesCard({ sp, onClose, open, ageMa, startMa, event }: { sp: 
   const spark = !!sp.history && sp.history.points.length > 0;
   // The natural (pre-human) level: on the sparkline and its sources when there is one, else here.
   const nat = !spark && sp.natural ? sp.natural : null;
+  const wiki = wikiOf(sp.sci);
   return (
     <div className="card-sp" onPointerDown={(e) => e.stopPropagation()}>
       <button type="button" className="x" onClick={onClose} aria-label="Close">
         ×
       </button>
+      <WikiPic key={wiki?.img ?? ''} w={wiki} />
       <div className="t">
-        <span>{sp.common}</span> <i>({sp.sci})</i>
+        {wiki?.wp ? (
+          <a className="wp" href={wiki.wp} target="_blank" rel="noopener">
+            {sp.common}
+          </a>
+        ) : (
+          <span>{sp.common}</span>
+        )}{' '}
+        <i>({sp.sci})</i>
       </div>
       {ev && <EventSection ev={ev} k={event!} />}
       <div className="facts">
