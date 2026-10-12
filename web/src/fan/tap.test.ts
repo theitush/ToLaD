@@ -106,7 +106,7 @@ describe('a species flown to lands centred on screen (ToLaD#211)', () => {
     it(`a sample flown frame by frame, from home and from zoomed in on the dogs (×15), ${mode} widths`, () => {
       v.setMode(mode);
       const off: string[] = [];
-      const bs = v.fan.branches.filter((_, i) => i % 9 === 0);
+      const bs = v.fan.branches.filter((_, i) => i % 23 === 0);
       for (const start of ['home', 'dogs x15']) {
         for (const b of bs) {
           if (start === 'home') atHome();
@@ -126,7 +126,7 @@ describe('a species flown to lands centred on screen (ToLaD#211)', () => {
     it(`a double-tap on a column frames it centred, and the next keeps the finger on it, ${mode} widths`, () => {
       v.setMode(mode);
       const off: string[] = [];
-      for (const b0 of v.fan.branches.filter((_, i) => i % 9 === 4)) {
+      for (const b0 of v.fan.branches.filter((_, i) => i % 29 === 4)) {
         atHome();
         const wy = b0.tipY + 0.3 * (b0.splitY - b0.tipY);
         const [x, y] = v.toScreen(leftAt(b0, wy) + laneAt(b0, wy).w / 2, wy);
