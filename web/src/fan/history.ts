@@ -265,9 +265,9 @@ function segBasis(h: HistoryRec, s: HistSegment, pts: PointKind[], flaggedJoin: 
   return 'count';
 }
 
-/** Whether the pipeline flags the history's genome join (history.deepJoin says "flagged"). */
+/** Whether the pipeline flags the history's genome join (history.deepJoin says "flagged", or since ToLaD#172 starts "Flagged join:"). */
 export function joinFlagged(h: HistoryRec): boolean {
-  return /\bflagged\b/.test(h.deepJoin ?? '');
+  return /\bflagged\b/i.test(h.deepJoin ?? '');
 }
 
 /**
