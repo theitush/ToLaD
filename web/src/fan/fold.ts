@@ -513,9 +513,23 @@ export class Fold {
     }
     const k = Math.floor(y / h);
     const t = y / h - k;
-    const a = this.rowAt(k * h).xs[i];
+    const a = this.rowK(k).xs[i];
     if (t === 0) return a;
-    return a + (this.rowAt((k + 1) * h).xs[i] - a) * t;
+    return a + (this.rowK(k + 1).xs[i] - a) * t;
+  }
+
+  /** The grid's rows by their index k (y = k * gridH): rowAt's, looked up by an integer (most often a small one). */
+  private kRows = new Map<number, Row>();
+  private kH = 0;
+  private rowK(k: number): Row {
+    if (this.kH !== this.gridH || this.kRows.size >= 8192) {
+      this.kRows.clear();
+      this.kH = this.gridH;
+    }
+    let r = this.kRows.get(k);
+    if (!r) this.kRows.set(k, (r = this.rowAt(k * this.gridH)));
+    else if (r.ver !== this.ver) this.foldRow(r);
+    return r;
   }
 
   /** Change the grid (world height between rows, a power of two: the rows a finer grid shares with a coarser are kept). */

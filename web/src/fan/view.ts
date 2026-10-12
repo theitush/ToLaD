@@ -153,6 +153,24 @@ const EVENT_MIN_W = 3;
 /** How far (px) above or below a window a touch still opens it. */
 const EVENT_REACH_PX = 10;
 
+/** A branch's width by height (laneAt's w), kept across the fold's changes (it does not depend on where the column stands). */
+const widthMemo = new WeakMap<FanBranch, Map<number, number>>();
+function widthAt(b: FanBranch, y: number): number {
+  let m = widthMemo.get(b);
+  if (!m) widthMemo.set(b, (m = new Map()));
+  let w = m.get(y);
+  if (w === undefined) {
+    if (m.size > 8192) m.clear();
+    m.set(y, (w = laneAt(b, y).w));
+  }
+  return w;
+}
+
+/** How many heights over the fan a folded column's box is read at (colBoxes). */
+const BOX_ROWS = 256;
+/** How long (ms) after the fold last moved the columns' edges are made exact (FanView.applyFold). */
+const FOLD_REST_MS = 120;
+
 const colBoxCache = new WeakMap<Fan, { key: string; map: Map<FanBranch | FanNode, ColBox> }>();
 function colBoxes(fan: Fan): Map<FanBranch | FanNode, ColBox> {
   // (Folded, fold.ts: the columns move with the fold; their boxes and edges are worked out again when it changes.)
@@ -175,8 +193,9 @@ function colBoxes(fan: Fan): Map<FanBranch | FanNode, ColBox> {
   };
   for (const b of fan.branches) {
     const at = memo((y) => {
-      const l = leftAt(b, y);
-      return [l, l + laneAt(b, y).w];
+      const w = widthAt(b, y);
+      const l = leftAt(b, y, w);
+      return [l, l + w];
     });
     out.set(b, { x0: Math.min(b.x0, b.colLeft), x1: Math.max(b.x0, b.colLeft) + b.width, y0: b.tipY, y1: b.splitY, lean: b.leanY, own: b, at });
   }
@@ -188,19 +207,34 @@ function colBoxes(fan: Fan): Map<FanBranch | FanNode, ColBox> {
     out.set(v, { x0: Math.min(v.tile, v.left), x1: Math.max(v.tile, v.left) + v.width, y0: v.y, y1: v.parent ? v.yBot : Infinity, lean: v.leanY, own: v, at });
   }
   if (fold && fold.left(0, fan.time.y(0)) !== null) {
-    // Folded: each box from its edges at a few heights over its span (the fold moves columns smoothly), a hair wider.
+    // Folded: each box from its edges over its span (the fold moves columns smoothly), a hair wider, read at
+    // heights on one grid for all of them, BOX_ROWS over the fan (a power of two: on the fold's own grid), so
+    // the fold works out a few hundred rows a change, not a dozen per column (it changes on every pan and pinch).
+    const now = fan.time.y(0);
     const yb = fan.trunkBottom.y;
+    const step = 2 ** Math.ceil(Math.log2(Math.max(1e-12, (yb - now) / BOX_ROWS)));
     for (const q of out.values()) {
-      const a = Math.max(q.y0, fan.time.y(0));
+      const a = Math.max(q.y0, now);
       const b = Math.min(q.y1, yb);
+      // (About a dozen heights: the grid's, every 2^j-th.)
+      const st = Math.max(step, 2 ** Math.ceil(Math.log2(Math.max(1e-12, (b - a) / 12))));
+      let k0 = Math.ceil(a / st);
+      let k1 = Math.floor(b / st);
+      // (A span inside one step: the grid's height nearest its middle.)
+      if (k1 < k0) k0 = k1 = Math.round((a + b) / 2 / st);
       let x0 = Infinity;
       let x1 = -Infinity;
-      for (let k = 0; k <= 12; k++) {
-        const [l, r] = q.at(a + ((b - a) * k) / 12);
+      let lp = NaN;
+      let jump = 0;
+      for (let k = k0; k <= k1; k++) {
+        const [l, r] = q.at(k * st);
+        if (k > k0) jump = Math.max(jump, Math.abs(l - lp));
+        lp = l;
         x0 = Math.min(x0, l);
         x1 = Math.max(x1, r, l + q.own.width);
       }
-      const pad = 0.05 * (x1 - x0);
+      // (Between two heights it strays at most about as far as it moves from one to the next.)
+      const pad = 0.05 * (x1 - x0) + jump;
       q.x0 = x0 - pad;
       q.x1 = x1 + pad;
     }
@@ -612,6 +646,7 @@ export class FanView implements InputHandlers {
 
   destroy(): void {
     cancelAnimationFrame(this.raf);
+    clearTimeout(this.foldRestT);
     this.input.destroy();
     this.ro.disconnect();
     this.gl?.canvas.remove();
@@ -730,10 +765,21 @@ export class FanView implements InputHandlers {
     f.setGrid(Math.pow(2, Math.round(Math.log2(3 / this.cam.sy))));
     f.setScale(this.cam.sx, this.w);
     const key = `${f.ver}:${f.gridH}`;
-    if (key === this.foldKey) return;
+    if (key === this.foldKey) {
+      // (A frame with the fold at rest after it moved: the columns' edges exact again, ColumnPath.exact.)
+      if (this.foldMoving) for (const m of this.models.values()) m.foldRest();
+      this.foldMoving = false;
+      return;
+    }
     this.foldKey = key;
+    this.foldMoving = true;
     for (const m of this.models.values()) m.refold();
+    // (One frame more once it rests, FOLD_REST_MS on: the edges exact.)
+    clearTimeout(this.foldRestT);
+    this.foldRestT = setTimeout(() => this.request(), FOLD_REST_MS);
   }
+  private foldMoving = false;
+  private foldRestT: ReturnType<typeof setTimeout> | undefined;
 
   model(b: FanBranch): TwigModel {
     const key = `${b.sp.gid}:${this.mode}`;

@@ -284,6 +284,8 @@ export function nodeLeftAt(v: FanNode, y: number, river = false): number {
 }
 
 const clampW = (v: number, w: number) => Math.min(w, Math.max(0, v));
+/** How many heights xRange reads a folded strand's edge at, at most. */
+const XR_N = 48;
 
 /**
  * Branch b's width and green lane's width at world y: [w, gw], exact. Above
@@ -404,21 +406,43 @@ export class Tess {
     // Folded (fold.ts): its edges over the range, at the ends and the fold's rows between (as drawn).
     const f = this.fold;
     if (f && R > L && f.left(b.index, lo) !== null) {
-      const n = f.gridH > 0 ? Math.min(256, Math.ceil((hi - lo) / f.gridH)) : 16;
+      // (Asked twice a frame per strand, the same span: kept for the fold's version.)
+      const memo = this.xMemo.get(b);
+      if (memo && memo[0] === f.ver && memo[1] === f.gridH && memo[2] === lo && memo[3] === hi) return [memo[4], memo[5]];
+      // (At most XR_N samples: the folded edge is smooth, eased over bends ROOM_BEND tall at least; between two
+      // samples it strays no further than the larger step beside them, a margin added on both sides.)
+      const n = f.gridH > 0 ? Math.min(XR_N, Math.ceil((hi - lo) / f.gridH)) : 16;
       const wMax = Math.max(b.baseW, lo < b.splitY ? b.unit * g(b.pop.max, this.mode) : 0);
       L = Infinity;
       R = -Infinity;
+      let prev = NaN;
+      let dPrev = 0;
       for (let k = 0; k <= n; k++) {
         const x = f.left(b.index, n ? lo + ((hi - lo) * k) / n : lo)!;
         L = Math.min(L, x - wMax);
         R = Math.max(R, x + wMax);
+        if (k) {
+          // (Where the edge turns back, at the sample before, it may reach past it between: by half the larger step beside.)
+          const dx = x - prev;
+          const over = 0.5 * Math.max(Math.abs(dx), Math.abs(dPrev));
+          if (dPrev > 0 && dx < 0) R = Math.max(R, prev + wMax + over);
+          if (dPrev < 0 && dx > 0) L = Math.min(L, prev - wMax - over);
+          dPrev = dx;
+        }
+        prev = x;
       }
+      const pad = 1e-6 * Math.max(1, Math.abs(L), Math.abs(R)) + (R - L) * 1e-3;
+      const out: [number, number] = [L - pad, R + pad];
+      this.xMemo.set(b, [f.ver, f.gridH, lo, hi, out[0], out[1]]);
+      return out;
     }
     // (A hair of slack for rounding.)
     const pad = 1e-6 * Math.max(1, Math.abs(L), Math.abs(R)) + (R - L) * 1e-3;
     return [L - pad, R + pad];
   }
 
+  /** xRange's last folded answer per strand: [fold version, grid, lo, hi, L, R]. */
+  private readonly xMemo = new Map<FanBranch, [number, number, number, number, number, number]>();
   private readonly splits = new Map<FanBranch, Set<number>>();
   /** The heights of the splits branch b passes (a cut always falls on each). */
   private splitYs(b: FanBranch): Set<number> {
