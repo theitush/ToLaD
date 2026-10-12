@@ -16,7 +16,7 @@ import { COLUMN_DIM, columnSpans, EVENT_TINT, eventAt, eventSpans, type EventSpa
 import { drawTwigs, kLogAt, laneDim, LINEAGE, LIVING, TEX_HAIR_PX, TWIG_GRAY, TwigModel, type IndInfo, type TwigStats } from './twigs';
 import type { MeshBatch, RectBatch } from './meshgl';
 import { familyLabel, FELIDAE_TREE, type Split } from './splits';
-import { bandDepth, Brackets, ROW_H } from './brackets';
+import { bandDepth, Brackets, cladeCamera, ROW_H } from './brackets';
 import { axisInset, drawWorldOver, drawWorldUnder, worldFlags, type Box } from './world';
 
 export type { IndInfo } from './twigs';
@@ -695,43 +695,37 @@ export class FanView implements InputHandlers {
   }
 
   /**
-   * Where a tap on a clade's bracket lands (ToLaD#193): the clade centred, across the screen with its columns
-   * opened as that zoom opens them, and its time from "now" at the top down to where its branch started (its stem:
-   * its split from its sister), a little of the parent below. The whole fan for the root.
+   * Where a tap on a clade's bracket lands (brackets.ts cladeCamera, ToLaD#193): the clade centred and opened,
+   * "now" down to where its branch started. The whole fan for the root.
    */
   cladeCamera(v: FanNode): Camera {
     if (!v.parent) return this.homeCamera();
-    const frame = () => {
-      const [a, b] = familySpan(v);
-      return this.withBand(this.camera.frame(a, b, v.yBot, true));
-    };
-    let cam = frame();
-    // Folded (fold.ts): its span at the zoom that frames it (it opens as it is framed), as levelCamera.
-    const f = this.fan.tess.fold;
-    if (f) {
-      for (let k = 0; k < 4; k++) {
-        f.setScale(cam.sx, this.w);
-        cam = frame();
-      }
-      f.setScale(cam.sx, this.w);
-    }
-    return cam;
+    return cladeCamera(this.camera, this.fan, v, familySpan, (cam) => this.withBand(cam));
   }
 
-  /** A bracket's tap: fly to its clade (cladeCamera), any card closed for the flight. */
+  /**
+   * A bracket's tap: fly to its clade (cladeCamera), any card closed for the flight. Folded, the frame holds for
+   * the fold as cladeCamera leaves it, while each step of a flight moves the camera with the fold (fold.ts follow):
+   * on landing it takes the frame exactly (the fold at the frame's zoom and anchor, so settling moves nothing).
+   */
   flyToClade(v: FanNode, ms = 750): void {
     this.selected = null;
     this.selInd = null;
     this.touch = null;
     this.onSelect(null);
-    this.flyTo(this.cladeCamera(v), ms);
+    this.flyTo(this.cladeCamera(v), ms, () => {
+      if (!this.fan.tess.fold) return;
+      this.cam = this.cladeCamera(v);
+      this.camera.settle();
+      this.request();
+    });
   }
 
-  /** The screen point of clade `latin`'s bracket as last drawn (designshot, tests), or null. */
+  /** The screen point of clade `latin`'s bracket as last drawn, if it is wide enough to tap (designshot), or null. */
   bracketAt(latin: string): [number, number] | null {
     const br = this.brackets;
     const p = br?.placed.find((q) => br.list[q.i].latin === latin);
-    return br && p ? [(p.a + p.b) / 2, br.rowY(p.row)] : null;
+    return br && p && p.b - p.a >= 6 ? [(p.a + p.b) / 2, br.rowY(p.row)] : null;
   }
 
   setMode(mode: WidthMode): void {

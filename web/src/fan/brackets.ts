@@ -9,6 +9,7 @@
  * over the species at "now") and a pass over the clades; the rows are kept per zoom bucket (they move only as
  * the zoom moves, never while panning), the label widths once per text.
  */
+import type { Camera } from './camera';
 import { laneAt, leftAt, type Fan, type FanNode } from './layout';
 import { FAMILY_EN, type Split } from './splits';
 
@@ -219,6 +220,9 @@ export class Brackets {
   sky = new Float32Array(0);
   nowS = 0;
   fit = 0;
+  /** The time axis's right edge and the screen's width (px): the lines run between them. */
+  private x0 = 0;
+  private w = 0;
 
   /** The clades' screen spans at "now": each species' room where its column is at "now" (an extinct one's: at its tip). */
   spans(c: BracketCam, fan: Fan): [Float64Array, Float64Array] {
@@ -239,6 +243,24 @@ export class Brackets {
         r[k] = b.colLeft + b.width;
       }
     });
+    // Neighbours' rooms (in the columns' order) that overlap (closed up, fold.ts) meet halfway: disjoint clades never overlap.
+    const order = bs.map((_, k) => k).sort((p, q) => bs[p].index - bs[q].index);
+    for (let j = 1; j < order.length; j++) {
+      const p = order[j - 1];
+      const q = order[j];
+      if (r[p] > l[q]) {
+        const m = (l[p] + r[p] + l[q] + r[q]) / 4;
+        r[p] = Math.min(r[p], m);
+        l[q] = Math.max(l[q], m);
+      }
+    }
+    // (Columns out of order at "now" would still meet: then each starts where the last ended.)
+    for (let j = 1; j < order.length; j++) {
+      const p = order[j - 1];
+      const q = order[j];
+      l[q] = Math.max(l[q], r[p]);
+      r[q] = Math.max(r[q], l[q]);
+    }
     const a = new Float64Array(list.length);
     const z = new Float64Array(list.length);
     list.forEach((q, i) => {
@@ -266,6 +288,8 @@ export class Brackets {
     }
     this.nowS = nowS;
     this.fit = fit;
+    this.x0 = axisX;
+    this.w = c.w;
     this.placed = fit > 0 ? layoutBrackets(a, b, parent, (i) => this.widths(i, measure), axisX, c.w, this.rows) : [];
     const sky = (this.sky = new Float32Array(Math.ceil(c.w) + 1));
     for (const p of this.placed) {
@@ -313,11 +337,14 @@ export class Brackets {
     for (const p of this.placed) {
       const q = this.list[p.i];
       const y = Math.round(this.rowY(p.row)) + 0.5;
-      const a = Math.round(p.a) + 0.5;
-      const b = Math.round(p.b) - 0.5;
+      // Past the time axis or the screen's edge it runs on, open-ended (no end tick there).
+      const ta = p.a >= this.x0;
+      const tb = p.b <= this.w;
+      const a = Math.round(Math.max(p.a, this.x0)) + 0.5;
+      const b = Math.round(Math.min(p.b, this.w)) - 0.5;
       ctx.strokeStyle = p.form === 'tick' ? 'rgba(185,230,201,0.45)' : 'rgba(185,230,201,0.75)';
       ctx.beginPath();
-      ctx.moveTo(a, y + 4);
+      ctx.moveTo(a, ta ? y + 4 : y);
       ctx.lineTo(a, y);
       if (p.form === 'tick') ctx.lineTo(b, y);
       else {
@@ -326,7 +353,7 @@ export class Brackets {
         ctx.moveTo(Math.min(b, p.lx + p.lw / 2 + 4), y);
         ctx.lineTo(b, y);
       }
-      ctx.lineTo(b, y + 4);
+      if (tb) ctx.lineTo(b, y + 4);
       ctx.stroke();
       if (p.form === 'tick') continue;
       let x = p.lx - p.lw / 2;
@@ -344,14 +371,52 @@ export class Brackets {
     ctx.restore();
   }
 
-  /** The clade under screen (x, y): a bracket's line or label, a few px of slop; the innermost first. */
+  /** The clade under screen (x, y): the bracket in that row nearest x (on it, or within a few px of slop). */
   hit(x: number, y: number): Clade | null {
     let best: Placed | null = null;
+    let bestD = 3;
     for (const p of this.placed) {
       const ry = this.rowY(p.row);
-      if (x < p.a - 3 || x > p.b + 3 || y < ry - ROW_H / 2 || y > ry + ROW_H / 2) continue;
-      if (!best || p.row < best.row) best = p;
+      if (y < ry - ROW_H / 2 || y > ry + ROW_H / 2) continue;
+      const d = Math.max(p.a - x, x - p.b, 0);
+      if (d <= bestD && (!best || d < bestD)) {
+        best = p;
+        bestD = d;
+      }
     }
     return best ? this.list[best.i] : null;
   }
+}
+
+/**
+ * Where a tap on a clade's bracket lands (ToLaD#193): the clade (`span` its world x at "now") across the screen and
+ * centred, its columns opened as that zoom opens them (folded: a few rounds, the fold left at the frame's zoom and
+ * anchor for the camera taking it), and its time from "now" at the top down to where its branch started (its stem: its split
+ * from its sister, `v.yBot`), a little of the parent below it. `band` makes room above "now" for the brackets.
+ */
+export function cladeCamera(
+  c: { frame(x0: number, x1: number, yFork: number, stretch?: boolean): Camera; w: number },
+  fan: Fan,
+  v: FanNode,
+  span: (v: FanNode) => [number, number],
+  band: (cam: Camera) => Camera = (cam) => cam,
+): Camera {
+  const frame = () => {
+    const [a, b] = span(v);
+    return band(c.frame(a, b, v.yBot, true));
+  };
+  let cam = frame();
+  const f = fan.tess.fold;
+  if (f) {
+    // Until the zoom (and the rows' anchor, the screen's centre) that frames it is the one it was measured at.
+    for (let k = 0; k < 24; k++) {
+      f.setScale(cam.sx, c.w);
+      f.setAnchor(cam.cx, cam.cy, cam.sx, c.w);
+      const next = frame();
+      const done = Math.abs(next.sx / cam.sx - 1) < 1e-5 && Math.abs(next.cx - cam.cx) * cam.sx < 0.05;
+      cam = next;
+      if (done) break;
+    }
+  }
+  return cam;
 }

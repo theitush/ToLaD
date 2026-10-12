@@ -138,11 +138,11 @@ const scenes = [
   ['world-150k', 'window', [0, 150000]],
   ['world-kpg', 'window', [30e6, 140e6]],
   ['world-20k', 'window', [0, 20000]],
-  // The clades' brackets above "now" (ToLaD#193): a level's home, a clade opened (['zoomto', [taxon, width zoom]]), and a
-  // bracket tapped from home (['tapclade', [taxon]]: the flight to the clade, now to its stem). LEVEL=carnivores for the order.
+  // The clades' brackets above "now" (ToLaD#193): a level's home, and a bracket tapped from home (['tapclade', [taxon]]:
+  // the flight to the clade, now to its stem; a bracket too narrow to tap at home flown to as the tap would). LEVEL=carnivores for the order.
   ['brk-home', 'home'],
-  ['brk-dogs', 'zoomto', ['Canidae', 4]],
-  ['brk-bigcats', 'zoomto', ['Pantherinae', 3]],
+  ['brk-dogs', 'tapclade', ['Canidae']],
+  ['brk-bigcats', 'tapclade', ['Pantherinae']],
   ['brk-tap-felidae', 'tapclade', ['Felidae']],
   ['brk-tap-panthera', 'tapclade', ['Panthera']],
 ];
@@ -266,7 +266,7 @@ try {
           f.draw();
           const at = f.bracketAt(args[0]);
           if (at) f.tap(at[0], at[1]);
-          else console.log('no bracket', args[0]);
+          else f.flyToClade(fan.nodes.find((n) => n.split.taxon === args[0]));
         } else if (kind === 'level') {
           // A level (ToLaD#146): the split founding taxon args[0] framed as home frames the fan; with args[1] (Ma),
           // centred on that time, time zoomed args[2] and width args[3] × the frame.
