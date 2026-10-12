@@ -214,8 +214,7 @@ export interface BracketCam {
 }
 
 /**
- * The stack for a view: its layout at this frame, the band it takes above "now" (a skyline, px per screen column)
- * for the species' pills to stand on, drawing and hits.
+ * The stack for a view: its layout at this frame (over the species' pills on "now"), drawing and hits.
  */
 export class Brackets {
   /** `nameFont` the English names' CSS font, `latinFont` the Latin's. */
@@ -224,6 +223,7 @@ export class Brackets {
     readonly latinFont: string,
   ) {}
   private widthCache = new Map<string, [number, number, number]>();
+  private probe = '';
   /** Per row (this frame): the height of the band under it (px above the line's base) and its own height. */
   private rowBase = new Float32Array(1);
   private rowH = new Float32Array(1);
@@ -231,9 +231,8 @@ export class Brackets {
   private rows: Int16Array | null = null;
   placed: Placed[] = [];
   list: Clade[] = [];
-  /** Band height (px above the "now" line) over each screen column. */
-  sky = new Float32Array(0);
-  nowS = 0;
+  /** The stack's foot (screen y): over the species' pills standing on "now" (Ita: the brackets above the names). */
+  baseS = 0;
   fit = 0;
   /** The time axis's right edge and the screen's width (px): the lines run between them. */
   private x0 = 0;
@@ -291,8 +290,12 @@ export class Brackets {
     return [a, z];
   }
 
-  /** Lay the stack out for this frame; `axisX` the time axis's right edge, `fit` (0–1) how far "now" is on screen. */
-  layout(c: BracketCam, fan: Fan, nowS: number, axisX: number, fit: number, measure: (font: string, text: string) => number): Placed[] {
+  /**
+   * Lay the stack out for this frame; `axisX` the time axis's right edge, `fit` (0–1) how far "now" is on screen,
+   * `top` the labels' top line (under the buttons). The stack stands over the species' pills: its foot PILL_ROOM px
+   * above "now", or, with less room, its top on the top line (a longer pill then reaches up over its lines).
+   */
+  layout(c: BracketCam, fan: Fan, nowS: number, axisX: number, fit: number, measure: (font: string, text: string) => number, top = 0): Placed[] {
     const [a, b] = this.spans(c, fan);
     const parent = this.list.map((q) => q.parent);
     // The rows per zoom bucket (an eighth of a doubling): a pan never moves them.
@@ -301,10 +304,15 @@ export class Brackets {
       this.rowKey = key;
       this.rows = bracketRows(a, b, parent);
     }
-    this.nowS = nowS;
     this.fit = fit;
     this.x0 = axisX;
     this.w = c.w;
+    // (The widths again once the fonts change: measured before the web font loaded, they were the fallback's.)
+    const probe = `${measure(this.nameFont, 'Carnivores')}:${measure(this.latinFont, 'Carnivora')}`;
+    if (probe !== this.probe) {
+      this.probe = probe;
+      this.widthCache.clear();
+    }
     this.placed = fit > 0 ? layoutBrackets(a, b, parent, (i) => this.widths(i, measure), axisX, c.w, this.rows) : [];
     // Each row as tall as what it shows here: a name ROW_H, ticks alone TICK_ROW_H, nothing none.
     let rows = 0;
@@ -316,24 +324,14 @@ export class Brackets {
     this.rowH.fill(0);
     for (const p of this.placed) this.rowH[p.row] = Math.max(this.rowH[p.row], p.form === 'tick' ? TICK_ROW_H : ROW_H);
     for (let r = 1; r <= rows; r++) this.rowBase[r] = this.rowBase[r - 1] + this.rowH[r - 1];
-    const sky = (this.sky = new Float32Array(Math.ceil(c.w) + 1));
-    for (const p of this.placed) {
-      const h = this.rowTop(p.row);
-      for (let x = Math.max(0, Math.floor(p.a)); x <= Math.min(sky.length - 1, Math.ceil(p.b)); x++) sky[x] = Math.max(sky[x], h);
-    }
+    const height = rows ? this.rowTop(rows - 1) : 0;
+    this.baseS = Math.min(nowS - 4, Math.max(top + height, nowS - 4 - PILL_ROOM));
     return this.placed;
   }
 
   /** Whether clade node `v`'s bracket carries its name this frame. */
   named(v: FanNode): boolean {
     return this.placed.some((p) => p.form !== 'tick' && this.list[p.i].v === v);
-  }
-
-  /** The band's height (px above "now") over screen x [x0, x1]: a pill standing there stands on it. */
-  band(x0: number, x1: number): number {
-    let h = 0;
-    for (let x = Math.max(0, Math.floor(x0)); x <= Math.min(this.sky.length - 1, Math.ceil(x1)); x++) h = Math.max(h, this.sky[x]);
-    return h * this.fit;
   }
 
   private widths(i: number, measure: (font: string, text: string) => number): [number, number, number] {
@@ -351,15 +349,20 @@ export class Brackets {
   /** Row r's line (screen y): a name's row has its line through the name's middle, a row of ticks at its foot. */
   rowY(r: number): number {
     const h = this.rowH[r] ?? ROW_H;
-    return this.nowS - 1 - (this.rowBase[r] ?? r * ROW_H) - (h >= ROW_H ? ROW_H / 2 - 2 : 1);
+    return this.baseS - 1 - (this.rowBase[r] ?? r * ROW_H) - (h >= ROW_H ? ROW_H / 2 - 2 : 1);
   }
 
-  /** The band's height (px above "now") to the top of row r. */
+  /** The stack's height (px above its foot) to the top of row r. */
   rowTop(r: number): number {
     return 1 + (this.rowBase[r] ?? r * ROW_H) + (this.rowH[r] ?? ROW_H);
   }
 
-  draw(ctx: CanvasRenderingContext2D, ink: string, ink2: string): void {
+  /**
+   * Draw the stack, under the pills (drawn after, opaque: a bracket's line runs behind a long one). `pills` the
+   * pills' boxes on screen [x0, y0, x1, y1]: a label they would cover slides along its bracket clear of them, or,
+   * with no room, leaves the bracket a plain line.
+   */
+  draw(ctx: CanvasRenderingContext2D, ink: string, ink2: string, pills: readonly (readonly number[])[] = []): void {
     if (!this.placed.length) return;
     ctx.save();
     ctx.globalAlpha = this.fit;
@@ -374,23 +377,25 @@ export class Brackets {
       const tb = p.b <= this.w;
       const a = Math.round(Math.max(p.a, this.x0)) + 0.5;
       const b = Math.round(Math.min(p.b, this.w)) - 0.5;
-      ctx.strokeStyle = p.form === 'tick' ? 'rgba(185,230,201,0.45)' : 'rgba(185,230,201,0.75)';
+      const lx = p.form === 'tick' ? NaN : clearSpot(p, Math.max(p.a, this.x0) + LABEL_PAD, Math.min(p.b, this.w) - LABEL_PAD, y, pills);
+      const form = Number.isNaN(lx) ? 'tick' : p.form;
+      ctx.strokeStyle = form === 'tick' ? 'rgba(185,230,201,0.45)' : 'rgba(185,230,201,0.75)';
       // (End ticks down to the row under it: shorter in a row of ticks.)
       const dy = (this.rowH[p.row] ?? ROW_H) >= ROW_H ? 4 : 3;
       ctx.beginPath();
       ctx.moveTo(a, ta ? y + dy : y);
       ctx.lineTo(a, y);
-      if (p.form === 'tick') ctx.lineTo(b, y);
+      if (form === 'tick') ctx.lineTo(b, y);
       else {
         // The line broken around the label.
-        ctx.lineTo(Math.max(a, p.lx - p.lw / 2 - 4), y);
-        ctx.moveTo(Math.min(b, p.lx + p.lw / 2 + 4), y);
+        ctx.lineTo(Math.max(a, lx - p.lw / 2 - 4), y);
+        ctx.moveTo(Math.min(b, lx + p.lw / 2 + 4), y);
         ctx.lineTo(b, y);
       }
       if (tb) ctx.lineTo(b, y + dy);
       ctx.stroke();
-      if (p.form === 'tick') continue;
-      let x = p.lx - p.lw / 2;
+      if (form === 'tick') continue;
+      let x = lx - p.lw / 2;
       const short = p.form === 'short';
       ctx.font = q.en || short ? this.nameFont : this.latinFont;
       ctx.fillStyle = q.en || short ? ink : ink2;
@@ -424,6 +429,31 @@ export class Brackets {
   }
 }
 
+/** Room (px) kept for the species' pills between the stack's foot and "now". */
+export const PILL_ROOM = 96;
+/** How much of the screen's width a tapped clade takes (centred in the room right of the time axis, margins both sides). */
+export const TAP_FILL = 0.72;
+
+/**
+ * Where placed bracket `p`'s label (centred at screen x, within [lo, hi]) goes on line y clear of the pills: its own
+ * place if clear, else the nearest clear one along its bracket, else NaN (no room: a plain line).
+ */
+export function clearSpot(p: Placed, lo: number, hi: number, y: number, pills: readonly (readonly number[])[]): number {
+  const half = p.lw / 2 + 4;
+  const cuts: [number, number][] = [];
+  for (const q of pills) if (q[1] < y + ROW_H / 2 && q[3] > y - ROW_H / 2 && q[2] > lo - half && q[0] < hi + half) cuts.push([q[0] - half, q[2] + half]);
+  if (!cuts.length) return p.lx;
+  // Candidates: its own place, and either side of each pill, kept within [lo + half, hi - half].
+  const cands = [p.lx, ...cuts.flat()].map((x) => Math.min(Math.max(x, lo + half - 4), hi - half + 4));
+  let best = NaN;
+  for (const x of cands) {
+    if (x - p.lw / 2 < lo - 1e-6 || x + p.lw / 2 > hi + 1e-6) continue;
+    if (cuts.some(([a, b]) => x > a + 1e-6 && x < b - 1e-6)) continue;
+    if (Number.isNaN(best) || Math.abs(x - p.lx) < Math.abs(best - p.lx)) best = x;
+  }
+  return best;
+}
+
 /**
  * Where a tap on a clade's bracket lands (ToLaD#193): the clade (`span` its world x at "now") across the screen and
  * centred, its columns opened as that zoom opens them (folded: a few rounds, the fold left at the frame's zoom and
@@ -437,9 +467,13 @@ export function cladeCamera(
   span: (v: FanNode) => [number, number],
   band: (cam: Camera) => Camera = (cam) => cam,
 ): Camera {
+  // (Framed a little wider than the clade: it takes TAP_FILL of the screen, room left either side.)
+  const room = c.w - 72;
   const frame = () => {
     const [a, b] = span(v);
-    return band(c.frame(a, b, v.yBot, true));
+    const m = (a + b) / 2;
+    const h = ((b - a) / 2) * Math.max(1, room / (TAP_FILL * c.w));
+    return band(c.frame(m - h, m + h, v.yBot, true));
   };
   let cam = frame();
   const f = fan.tess.fold;

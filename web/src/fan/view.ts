@@ -103,8 +103,6 @@ export interface LabelSpot {
   box: [number, number, number, number];
   /** 0–1: how fully this spot is there (see above). */
   fit: number;
-  /** How far (px) a pill on "now" stands lifted off it, over the clades' brackets (ToLaD#193): its picture stays at the line. */
-  lift?: number;
 }
 
 /** Priority: species before lineages, then the wider column first, then tree order. */
@@ -292,17 +290,6 @@ export function families(fan: Fan): { v: FanNode; vi: number; text: string }[] {
   return out;
 }
 
-/**
- * A species' short name, for a pill with no room for the whole above the brackets (ToLaD#193): its last word, the
- * kind of animal it is ("Least weasel": "Weasel"), as its picture under the pill shows which one.
- */
-export function shortName(common: string): string {
-  const w = common.trim().split(/\s+/);
-  if (w.length < 2) return common;
-  const last = w[w.length - 1];
-  return last[0].toUpperCase() + last.slice(1);
-}
-
 /** A family's label stands on "now" over its species (its bracket under it) while its span on screen is under this many screens. */
 const FAMILY_MAX_SCREENS = 1.6;
 
@@ -311,7 +298,7 @@ const FAMILY_MAX_SCREENS = 1.6;
  * (under the buttons); `barX0` the buttons' left edge: left of it a label on
  * "now" may reach higher, up to LABEL_CEIL.
  */
-export function labelSpots(c: Screen, fan: Fan, top: number, measure: (text: string) => number, barX0?: number, brk?: { band(x0: number, x1: number): number; named(v: FanNode): boolean }): LabelSpot[] {
+export function labelSpots(c: Screen, fan: Fan, top: number, measure: (text: string) => number, barX0?: number, brk?: { named(v: FanNode): boolean }): LabelSpot[] {
   const half = LABEL_PILL / 2;
   const X = (x: number) => c.toScreen(x, 0)[0];
   const Y = (y: number) => c.toScreen(0, y)[1];
@@ -440,10 +427,9 @@ export function labelSpots(c: Screen, fan: Fan, top: number, measure: (text: str
     const onX = clamp01((Math.min(sb, c.w) - Math.max(sa, LABEL_AXIS_X) + 12) / LABEL_PILL);
     const fit0 = nowOn * onX * clamp01((FAMILY_MAX_SCREENS * c.w - (sb - sa)) / (0.4 * c.w));
     if (!(fit0 > 0)) continue;
-    // Over the brackets (ToLaD#193); where there is no room above them, none (hanging from the line it crowded the columns).
-    const famLift = brk ? brk.band(Math.max(sa, LABEL_AXIS_X), Math.min(sb, c.w)) : 0;
-    const y1 = Math.max(nowS - 4 - famLift, top + len);
-    const fit = famLift > 0 && nowS - 4 - famLift < top + len ? 0 : fit0 * botFit(y1);
+    // (On "now", under the brackets, ToLaD#193: a long one reaches up over their lines.)
+    const y1 = Math.max(nowS - 4, top + len);
+    const fit = fit0 * botFit(y1);
     const xs = lo <= hi - LABEL_PILL ? [lo, (lo + hi) / 2, hi] : [Math.min(Math.max((sa + sb) / 2, LABEL_AXIS_X + half), c.w - half)];
     xs.forEach((x, k) => {
       out.push({ key: `n${vi}:fam${k}`, id: `n${vi}`, place: 'fam', v, text, rank: [-1, wb - wa, vi], x, y1, box: [x - half, y1 - len, x + half, y1], fit, span: brk ? undefined : [sa, sb] });
@@ -467,27 +453,14 @@ export function labelSpots(c: Screen, fan: Fan, top: number, measure: (text: str
     const x = lo <= hi ? Math.min(Math.max(cx, lo), hi) : Math.min(Math.max(cx, hi), lo);
     const ceil = barX0 === undefined ? top : LABEL_CEIL + (top - LABEL_CEIL) * clamp01((x + half - (barX0 - 68)) / 60);
     const ty = Y(b.tipY);
-    // On "now", over the brackets there (ToLaD#193); with no room for its name under the buttons, its short name
-    // (the picture under it says the rest); with no room for that either, none: a pill hanging from the line over the
-    // columns, its picture under it, crowds them (fewer, bigger pictures read better).
-    let lift = brk && b.tipY <= nowY + 1e-9 ? brk.band(x - half, x + half) : 0;
-    let tText = text;
-    let tLen = len;
-    if (lift > 0 && ty - 4 - lift < ceil + len) {
-      const short = shortName(text);
-      const sl = short === text ? Infinity : measure(short) + 2 * LABEL_PAD;
-      if (ty - 4 - lift >= ceil + sl) {
-        tText = short;
-        tLen = sl;
-      } else lift = -1;
-    }
-    const y1 = Math.max(ty - 4 - lift, ceil + tLen);
+    // On "now", under the clades' brackets (ToLaD#193: a long name reaches up over their lines, opaque over them).
+    const y1 = Math.max(ty - 4, ceil + len);
     // The tip on screen (below the top line) and its column right of the axis and left of the screen's edge.
     const tipOn = clamp01((ty - top) / 24) * clamp01((left + room - LABEL_AXIS_X + 12) / LABEL_PILL) * clamp01((c.w + 12 - left) / LABEL_PILL);
     // Above the tip, clear of the other columns (an extinct tip has its neighbours around it; above "now" there are none).
-    const f = lift < 0 ? 0 : tipOn * botFit(y1);
-    const tipFit = f > 0 && b.tipY > nowY ? f * clearFit(clearance(x - half, x + half, y1 - tLen, Math.min(y1, ty - 2), b)) : f;
-    out.push({ key: `${id}:tip`, id, place: 'tip', b, text: tText, rank, x, y1, box: [x - half, y1 - tLen, x + half, y1], fit: tipFit, lift: Math.max(0, lift) });
+    const f = tipOn * botFit(y1);
+    const tipFit = f > 0 && b.tipY > nowY ? f * clearFit(clearance(x - half, x + half, y1 - len, Math.min(y1, ty - 2), b)) : f;
+    out.push({ key: `${id}:tip`, id, place: 'tip', b, text, rank, x, y1, box: [x - half, y1 - len, x + half, y1], fit: tipFit });
     // Beside its branch: once the tip is off screen.
     out.push(...beside(id, text, rank, len, b, ty, Y(b.splitY), 1 - clamp01((ty - top) / 24), { b }));
   }
@@ -631,6 +604,8 @@ export class FanView implements InputHandlers {
   private heldRuns: { run: RibbonPt[]; hw: number; d: number }[] = [];
   /** The event labels shown last frame (screen boxes): a tap on one opens its event. */
   private eventLabels: { box: [number, number, number, number]; b: FanBranch; k: number }[] = [];
+  /** The species' pictures as last drawn (ToLaD#193): [x, y, radius, its column], a tap on one opens its card. */
+  thumbHits: [number, number, number, FanBranch][] = [];
   private models = new Map<string, TwigModel>();
   private raf = 0;
   private anim: ((t: number) => boolean) | null = null;
@@ -737,7 +712,7 @@ export class FanView implements InputHandlers {
       const w = this.ctx.measureText(t).width;
       this.ctx.restore();
       return w;
-    });
+    }, this.labelTop());
     return br;
   }
 
@@ -1103,6 +1078,18 @@ export class FanView implements InputHandlers {
   }
 
   tap(x: number, y: number): void {
+    // A species' picture (ToLaD#193): its card, as a tap on its column at its tip.
+    const pic = this.thumbHits.find(([px, py, r]) => (x - px) ** 2 + (y - py) ** 2 <= (r + 3) ** 2);
+    if (pic) {
+      const b = pic[3];
+      this.selected = b.sp;
+      this.selInd = null;
+      const ageMa = b.sp.t1;
+      this.touch = { x: leftAt(b, b.tipY) + laneAt(b, b.tipY).w / 2, ageMa };
+      this.onSelect({ sp: b.sp, ageMa, startMa: b.t0 });
+      this.request();
+      return;
+    }
     // A clade's bracket (ToLaD#193): fly to the clade.
     const clade = this.brackets?.hit(x, y);
     if (clade) {
@@ -1205,8 +1192,7 @@ export class FanView implements InputHandlers {
     this.drawTouch();
     const br = this.layoutBrackets();
     const spots = labelSpots(this.camera, this.fan, this.labelTop(), (t) => this.nameWidth(t), this.barRect()?.[0], br ?? undefined);
-    this.drawLabels(spots);
-    br?.draw(this.ctx, FAMILY_INK, INK3);
+    this.drawLabels(spots, br);
     this.drawWidthScale();
     if (this.debug) this.drawDebug();
     this.drawTrunkLabel();
@@ -1629,7 +1615,7 @@ export class FanView implements InputHandlers {
    * resolveLabels (a fixed priority, with hysteresis), and each fades in and
    * out over LABEL_FADE_MS rather than popping.
    */
-  private drawLabels(spots: LabelSpot[]): void {
+  private drawLabels(spots: LabelSpot[], br: Brackets | null = null): void {
     const ctx = this.ctx;
     const now = performance.now();
     const dt = Math.min(100, Math.max(0, now - this.labelT));
@@ -1643,7 +1629,10 @@ export class FanView implements InputHandlers {
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'left';
     ctx.font = font(LABEL_FONT);
-    for (const s of spots) {
+    const thumbs: [number, number][] = [];
+    this.thumbHits.length = 0;
+    const alphas = new Float32Array(spots.length);
+    spots.forEach((s, k) => {
       const want = on.get(s.key) ? 1 : 0;
       let st = this.labelState.get(s.key);
       if (!st) this.labelState.set(s.key, (st = { on: want === 1, a: want }));
@@ -1653,12 +1642,22 @@ export class FanView implements InputHandlers {
         st.a = want > st.a ? Math.min(want, st.a + step) : Math.max(want, st.a - step);
         moving = true;
       }
-      const alpha = st.a * s.fit;
+      alphas[k] = st.a * s.fit;
+    });
+    // The clades' brackets (ToLaD#193) under the pills: their labels clear of the pills shown, their lines behind them.
+    br?.draw(ctx, FAMILY_INK, INK3, spots.filter((_, k) => alphas[k] > 0.3).map((s) => s.box));
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    ctx.font = font(LABEL_FONT);
+    for (let k = 0; k < spots.length; k++) {
+      const s = spots[k];
+      const alpha = alphas[k];
       const [x0, y0, x1, y1] = s.box;
       if (alpha < 0.01 || x1 < 0 || x0 > this.w || y1 < 0 || y0 > this.h) continue;
       if (s.ev !== undefined && s.b && alpha > 0.5) this.eventLabels.push({ box: [x0, y0, x1, y1], b: s.b, k: s.ev });
       ctx.globalAlpha = alpha;
-      ctx.fillStyle = 'rgba(12,23,20,0.8)';
+      // (Opaque: a bracket's line behind it never shows through the name.)
+      ctx.fillStyle = BG;
       ctx.beginPath();
       ctx.roundRect(x0, y0, x1 - x0, y1 - y0, LABEL_PILL / 2);
       ctx.fill();
@@ -1687,7 +1686,13 @@ export class FanView implements InputHandlers {
       ctx.restore();
       // ToLaD#182: the species' Commons picture under its pill, before the name, once loaded (wiki.ts; `?thumbs=0` off).
       const th = s.b && s.ev === undefined ? labelThumb(s.b.sp.sci, () => this.request()) : null;
-      if (th) drawThumb(ctx, th, s.x, y1 + (s.lift ?? 0) + THUMB_D / 2 + 2, THUMB_D);
+      // (One picture where two would overlap, the first one shown: fewer and clearer, ToLaD#193. A fading one still draws.)
+      const ty = y1 + THUMB_D / 2 + 2;
+      if (th && alpha > 0.5 && !thumbs.some(([x, y]) => Math.abs(x - s.x) < THUMB_D - 4 && Math.abs(y - ty) < THUMB_D - 4)) {
+        thumbs.push([s.x, ty]);
+        if (s.b) this.thumbHits.push([s.x, ty, THUMB_D / 2, s.b]);
+        drawThumb(ctx, th, s.x, ty, THUMB_D);
+      } else if (th && alpha <= 0.5) drawThumb(ctx, th, s.x, ty, THUMB_D);
     }
     ctx.restore();
     if (moving) this.request();

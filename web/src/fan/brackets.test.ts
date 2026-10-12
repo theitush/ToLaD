@@ -1,7 +1,7 @@
 // The clades' brackets above "now" (ToLaD#193): nested right, never overlapping at any zoom, labelled only where the
 // label fits; a tap's flight frames the clade centred, "now" at the top and its stem's start just below.
 import { describe, expect, it } from 'vitest';
-import { bracketRows, Brackets, cladeCamera, clades, latinOf, layoutBrackets, rankOf, ROW_H, TICK_ROW_H, type Placed } from './brackets';
+import { bracketRows, Brackets, cladeCamera, clades, latinOf, layoutBrackets, clearSpot, PILL_ROOM, rankOf, ROW_H, TICK_ROW_H, type Placed } from './brackets';
 import { FanCamera } from './camera';
 import { Fold } from './fold';
 import { layoutFan, type Fan, type FanBranch, type WidthMode } from './layout';
@@ -124,8 +124,9 @@ describe('the stack', () => {
               expect(p.lx + p.lw / 2).toBeLessThanOrEqual(Math.min(p.b, W) - 4);
             } else expect(p.lw).toBe(0);
           }
-          // The band a pill stands on covers each bracket's row.
-          for (const p of placed) if (p.b > 1 && p.a < W - 1) expect(br.band(Math.max(0, p.a + 1), Math.min(W, p.b - 1))).toBeGreaterThanOrEqual(br.rowTop(p.row));
+          // The stack stands over the pills on "now" (their room kept under its foot), every row above its foot.
+          expect(br.baseS).toBeLessThanOrEqual(300 - 4 - PILL_ROOM + 1e-9);
+          for (const p of placed) expect(br.rowY(p.row)).toBeLessThan(br.baseS);
           // Rows only as tall as what they show: a name's ROW_H, ticks alone TICK_ROW_H, an empty one nothing.
           const rows = Math.max(0, ...placed.map((p) => p.row + 1));
           let want = 1;
@@ -143,7 +144,7 @@ describe('the stack', () => {
     const br = new Brackets('n', 'l');
     const fan = fanOf('cats', 'log', false);
     br.list = clades(fan);
-    br.nowS = 300;
+    br.baseS = 300;
     br.placed = [
       { i: 0, a: 10, b: 300, row: 1, form: 'tick', lx: 0, lw: 0 },
       { i: 1, a: 100, b: 102, row: 0, form: 'tick', lx: 0, lw: 0 },
@@ -153,6 +154,19 @@ describe('the stack', () => {
     expect(br.hit(102.4, br.rowY(0))?.v).toBe(br.list[1].v);
     expect(br.hit(150, br.rowY(0))).toBeNull();
     expect(br.hit(150, br.rowY(1))?.v).toBe(br.list[0].v);
+  });
+
+  it("a label clears the pills: in its place if clear, else the nearest clear place along its bracket, else none", () => {
+    const p: Placed = { i: 0, a: 100, b: 300, row: 0, form: 'name', lx: 200, lw: 40 };
+    expect(clearSpot(p, 105, 295, 50, [])).toBe(200);
+    // A pill across the line at 190-212: the label goes to its nearer side, clear of it.
+    const x = clearSpot(p, 105, 295, 50, [[190, 20, 212, 80]]);
+    expect(Math.abs(x - 200)).toBeLessThan(40);
+    expect(x + 20 <= 190 || x - 20 >= 212).toBe(true);
+    // A pill not across the line (below it) changes nothing.
+    expect(clearSpot(p, 105, 295, 50, [[190, 70, 212, 120]])).toBe(200);
+    // Pills all along: no room.
+    expect(clearSpot(p, 105, 295, 50, [[100, 20, 150, 80], [160, 20, 240, 80], [250, 20, 300, 80]])).toBeNaN();
   });
 
   it('labels follow the room: the full name, then the name alone, then a short name, then a tick', () => {
@@ -184,7 +198,11 @@ describe('a tap on a bracket', () => {
       const [a, b] = familySpan(v).map((x) => c.toScreen(x, 0)[0]);
       // Centred in the room right of the time axis, across most of the screen.
       expect(Math.abs((a + b) / 2 - (58 + W - 14) / 2)).toBeLessThan(12);
-      expect(b - a).toBeGreaterThan(0.75 * W);
+      // ...most of it, with room either side (Ita: "it opens a bit too wide").
+      expect(b - a).toBeGreaterThan(0.7 * W);
+      expect(b - a).toBeLessThan(0.85 * W);
+      expect(a).toBeGreaterThan(58 + 0.04 * W);
+      expect(W - b).toBeGreaterThan(0.08 * W);
       // "now" near the top (under the labels' room), the stem's start low on the screen, above the legend.
       const nowS = c.toScreen(0, fan.time.y(0))[1];
       const stemS = c.toScreen(0, v.yBot)[1];
