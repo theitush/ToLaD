@@ -174,7 +174,7 @@ describe('one mesh for both lanes: the lane only colours', () => {
 
   it('the living are all in the green lane: every living individual has a green slot that draws it', () => {
     const y = m.row(m.G - 1).y;
-    const nG = m.greenSlots(y);
+    const [k0, kG] = m.slotRange(y);
     let alive = 0;
     for (let g = m.aliveFrom; g < m.G; g++) {
       const n = m.size(g);
@@ -184,7 +184,8 @@ describe('one mesh for both lanes: the lane only colours', () => {
         alive++;
         const K = m.slotOf(g, i, true, y)!;
         expect(K).not.toBeNull();
-        expect(K).toBeLessThan(nG);
+        expect(K).toBeGreaterThanOrEqual(k0);
+        expect(K).toBeLessThan(kG);
         expect(m.slotIndividuals(K, g, y).some((s) => s.i === i && s.green)).toBe(true);
       }
     }

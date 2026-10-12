@@ -117,7 +117,8 @@ flat in vec4 vNar;    // colL, colR, narG, narR
 flat in vec4 vLink;   // linkA, lambda, tauC, tauB
 flat in vec4 vMore;   // baseA, -, -, -
 flat in vec4 vWarp;   // sL, sR, sG, sP: the column's curve down the instance (mesh.ts meshFrame)
-// The column's right edge and the green edge at this pixel's row, in the frame of the top row (main).
+// The column's edges and the green edge at this pixel's row, in the frame of the top row (main).
+float gColL;
 float gColR;
 float gXG;
 uniform float uKLog;
@@ -319,7 +320,7 @@ vec4 shadeLinks(vec2 p) {
       // The pair's two lines, left and right.
       float xa = lineAt(l, Bp, uint(dl));
       float xb = lineAt(l, Bp + 1u, uint(dl));
-      if (gColR > vNar.x && (xa < vNar.x || xb > gColR)) continue;
+      if (gColR > gColL && (xa < gColL || xb > gColR)) continue;
       float xC = dir == 0u ? xb : xa;
       float xP = dir == 0u ? xa : xb;
       float yC = p.y + (tp - tb) / dtdy;
@@ -334,7 +335,7 @@ vec4 shadeLinks(vec2 p) {
   return best;
 }
 void main() {
-  // The pixel in the column's frame at the top row: the lattice rides the left edge and scales with the pitch (mesh.ts meshFrame).
+  // The pixel in the column's frame at the top row: the lattice rides the column's centre and scales about it with the pitch (mesh.ts meshFrame).
   vec2 p = vP;
   // Screen px across the column per unit of the frame's x (mesh.ts perpScale): the texture is
   // measured across a leaning column, not along the row.
@@ -342,15 +343,16 @@ void main() {
   {
     float dy = p.y - vRect.y;
     float k = max(1e-6, 1.0 + vWarp.w * dy);
-    float colL = vNar.x;
-    float xl = colL + vWarp.x * dy;
-    p.x = colL + (vP.x - xl) / k;
-    gColR = colL + (vNar.y + vWarp.y * dy - xl) / k;
-    gXG = colL + (vLife.w + vWarp.z * dy - xl) / k;
     float sl = 0.5 * (vWarp.x + vWarp.y);
+    float c0 = 0.5 * (vNar.x + vNar.y);
+    float xc = c0 + sl * dy;
+    p.x = c0 + (vP.x - xc) / k;
+    gColL = c0 + (vNar.x + vWarp.x * dy - xc) / k;
+    gColR = c0 + (vNar.y + vWarp.y * dy - xc) / k;
+    gXG = c0 + (vLife.w + vWarp.z * dy - xc) / k;
     if (vMisc.y < 0.5) ks = k / sqrt(1.0 + sl * sl);
     float pad = vMisc.y < 0.5 ? 1.0 + 1.5 / ks : max(vMisc.w, max(vSlot.z, 1.0) * 0.5 + 5.0) + 1.0;
-    if (vWarp != vec4(0.0) && (p.x < colL - pad || p.x > gColR + pad)) discard;
+    if (vWarp != vec4(0.0) && (p.x < gColL - pad || p.x > gColR + pad)) discard;
   }
   float xG = gXG;
   uint L = vIdx.y;
@@ -386,7 +388,7 @@ void main() {
     float d = abs(p.x - lineX);
     if (d > reach) continue;
     // (Only the column's own lines: on a steep lean the pad around it reaches far along the row.)
-    if (gColR > vNar.x && (lineX < vNar.x - 1.0 || lineX > gColR + 1.0)) continue;
+    if (gColR > gColL && (lineX < gColL - 1.0 || lineX > gColR + 1.0)) continue;
     uint K = idx;
     uint iA = slotBase(K, vSeed.z, vIdx.z);
     uint iB = slotBase(K, vSeed.w, vIdx.w);
@@ -408,7 +410,7 @@ void main() {
   if (lk.a > best.a) best = lk;
   // Lanes too narrow for their lines: the lane is one line its own width, lit by a representative's lives.
   if (vMisc.y < 0.5 && (vNar.z > 0.0 || vNar.w > 0.0)) {
-    float colL = vNar.x;
+    float colL = gColL;
     bool green = xG >= colL;
     uint h = uint(int(floor(p.x - colL)));
     uint i = lowbias32((h * 0x2c1b3c6du) ^ vIdx2.x ^ 0x5bd1e995u);

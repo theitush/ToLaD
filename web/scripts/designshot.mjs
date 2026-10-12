@@ -111,6 +111,9 @@ const scenes = [
   // A flagged join met at the genome's long-run level (ToLaD#172): the puma's column from ~2 Mya to now, the
   // young end held at the anchor from ~61 kya, and its card with the one-sentence join.
   ['flag-puma', 'frame', ['Puma', 100000, 1, 0.5]],
+  // The texture inside a column (#192): the domestic cat's boom, its lines straight, only branching and ending.
+  ['tex-domcat300', 'frame', ['Domestic cat', 300, 1.6]],
+  ['tex-domcat2000', 'frame', ['Domestic cat', 2000, 1.6]],
   ['flag-puma-card', 'card', ['Puma']],
   // Wikipedia link + hotlinked Commons pictures (ToLaD#182; WAIT_MS=4000 lets them load): the lion's card,
   // home with the pills' thumbnails (WIDTH=log: eight pills), and a species with no picture (its card, its pill mid-span).

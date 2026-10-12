@@ -223,6 +223,8 @@ export const MESH_F = 36;
 export const MESH_U = 12;
 /** Most members of a generation folded onto one slot (a generation up to this many times its slots). */
 export const MAX_FOLD = 8;
+/** The slot at the right of a column's centre (TwigModel.slotRange): its slots are world-fixed, counted from far out on its left (2^30: the GPU takes the block indices as int; a column of over 2^31 slots is cut at its left). */
+export const SLOT_MID = 2 ** 30;
 
 /**
  * One instance of the texture (mode 0) or the lives (mode 1): a screen
@@ -302,8 +304,9 @@ export interface MeshInst {
    * The column's curve within the instance (a chord: straight in screen y,
    * from its top row y0 down): px the left edge, the right edge (colR) and
    * the green edge (xG) move per px down, and the relative change of the
-   * pitch per px. The lattice rides the left edge and scales with the pitch:
-   * a pixel is shaded at its place in the column's frame at y0 (meshFrame).
+   * pitch per px. The lattice rides the column's centre (the middle of colL and
+   * colR, #192) and scales about it with the pitch: a pixel is shaded at its
+   * place in the column's frame at y0 (meshFrame).
    */
   sL?: number;
   sR?: number;
@@ -657,26 +660,29 @@ export function narrowCover(px: number, a0: number, a1: number, min: number, ks:
 
 /**
  * A pixel in the column's frame at the instance's top row (y0): the column's
- * left edge, pitch, right and green edges move down the instance (sL, sP, sR,
- * sG), the lattice with them; x maps back by the left edge's shift and the
- * pitch's scale, the edges likewise. Null outside the column (and its pad).
+ * edges, pitch and green edge move down the instance (sL, sR, sP, sG); the
+ * lattice rides its centre (#192: a line keeps its x wherever the centre does,
+ * however the column widens or narrows: the edges take in or drop lines);
+ * x maps back by the centre's shift and the pitch's scale about it, the edges
+ * likewise. Null outside the column (and its pad).
  */
 export function meshFrame(m: MeshInst, px: number, py: number): [number, MeshInst] | null {
   const sL = m.sL ?? 0;
   const sR = m.sR ?? 0;
   const sG = m.sG ?? 0;
   const sP = m.sP ?? 0;
-  const colL = m.colL ?? 0;
   const dy = py - m.y0;
   const k = Math.max(1e-6, 1 + sP * dy);
-  const xl = colL + sL * dy;
-  const X = colL + (px - xl) / k;
-  const colR = colL + ((m.colR ?? 0) + sR * dy - xl) / k;
+  const c0 = ((m.colL ?? 0) + (m.colR ?? 0)) / 2;
+  const xc = c0 + 0.5 * (sL + sR) * dy;
+  const X = c0 + (px - xc) / k;
+  const colL = c0 + ((m.colL ?? 0) + sL * dy - xc) / k;
+  const colR = c0 + ((m.colR ?? 0) + sR * dy - xc) / k;
   const pad = m.mode === 0 ? 1 + 1.5 / perpScale(m, X, py) : Math.max(m.tipR, Math.max(m.lw, 1) * 0.5 + 5) + 1;
   // (A straight, constant column needs no clip: the instance's rectangle is it.)
   if (sL === 0 && sR === 0 && sG === 0 && sP === 0) return [X, m];
   if (X < colL - pad || X > colR + pad) return null;
-  return [X, { ...m, colR, xG: colL + (m.xG + sG * dy - xl) / k }];
+  return [X, { ...m, colL, colR, xG: c0 + (m.xG + sG * dy - xc) / k }];
 }
 
 /** Instance k of packed arrays, back (tests). */
