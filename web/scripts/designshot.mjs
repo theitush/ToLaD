@@ -150,6 +150,12 @@ const scenes = [
   ['brk-bigcats', 'tapclade', ['Pantherinae']],
   ['brk-tap-felidae', 'tapclade', ['Felidae']],
   ['brk-tap-panthera', 'tapclade', ['Panthera']],
+  // The fold's straightness (ToLaD#146): a group of species (['group', [sci regex, share of the width it fills at
+  // agoMa, agoMa centred, time zoom × home]]): the weasels opened, the ferret badgers opened, the least weasel's
+  // split from the mountain weasel (3.1 Ma) close up.
+  ['weasels', 'group', ['^Mustela ', 0.85, 6, 1.6]],
+  ['ferretbadgers', 'group', ['^Melogale ', 0.85, 3, 2.5]],
+  ['weasel-3m', 'group', ['^Mustela (nivalis|altaica)$', 0.5, 3.1, 12]],
 ];
 const browser = await chromium.launch({ headless: true });
 try {
@@ -260,6 +266,32 @@ try {
             f.cam = { cx: (lo + hi) / 2, cy: v.y - (H - 2 * v.blend) / 2, sx, sy, ty: sy };
             f.camera.settle();
           }
+        } else if (kind === 'group') {
+          const [re, fill, ma, tz] = args;
+          const r = new RegExp(re);
+          const g = fan.branches.filter((b) => r.test(b.sp.sci));
+          const h = f.homeCamera();
+          const y = fan.time.y(ma);
+          const fd = fan.tess.fold;
+          let sx = h.sx;
+          let cx = h.cx;
+          const span = () => {
+            const at = (b) => fd?.left(b.index, y) ?? f.model(b).lanes(y).left;
+            const lo = Math.min(...g.map(at));
+            const hi = Math.max(...g.map((b) => at(b) + f.model(b).lanes(y).w));
+            return [lo, hi];
+          };
+          for (let k = 0; k < 8; k++) {
+            fd?.setScale(sx, f.w);
+            let [lo, hi] = span();
+            if (fd && fd.setAnchor((lo + hi) / 2, y, sx, f.w)) [lo, hi] = span();
+            cx = (lo + hi) / 2;
+            sx = (fill * f.w) / Math.max(hi - lo, 1e-9);
+          }
+          fd?.setScale(sx, f.w);
+          if (fd && fd.setAnchor(cx, y, sx, f.w)) { const [lo, hi] = span(); cx = (lo + hi) / 2; }
+          f.cam = { cx, cy: y, sx, sy: h.sy * tz, ty: h.sy * tz };
+          f.camera.settle();
         } else if (kind === 'zoomto') {
           // A clade (taxon args[0]) centred at args[1] × home's width zoom, its level's time frame (ToLaD#146: the fold opening).
           f.cam = f.levelCamera(args[0], args[1]) ?? f.homeCamera();

@@ -344,7 +344,7 @@ describe('the fold', () => {
     }
   });
 
-  it('weasels opened (the ferret badgers first): each column straight between its family\'s splits, moving sideways only at one (no lean over a decade)', () => {
+  it('weasels opened (the ferret badgers first): each column straight between its own lineage\'s splits, moving sideways only at one (not at a cousin\'s, no lean over a decade)', () => {
     for (const mode of ['log', 'linear'] as WidthMode[]) {
       const { fan, fold, home } = folded(mode, 'curved');
       const fam = fan.nodes.find((n) => n.split.taxon === 'Mustelidae')!;
@@ -355,9 +355,11 @@ describe('the fold', () => {
         fold.setScale(sx, SCREEN);
         // (The events inside the family: its forks. Its columns' peels and room bends move their neighbours by
         // their rooms' change, a few px at most over a bend: under 0.3 px a step.)
-        const ev: [number, number][] = [];
-        fold.forks().forEach((f, p) => fam.strands.includes(fan.root.strands[p]) && fam.strands.includes(fan.root.strands[p + 1]) && ev.push(f));
-        const free = (y: number) => !ev.some(([a, b]) => y >= a - 1e-6 && y <= b + 1e-6);
+        // (Only its own lineage's: the splits on its path. A cousin's fork closing leaves it standing.)
+        const forks = fold.forks();
+        // (And the family's peels: a room growing from its founders' slot is a width's change, not a gap's.)
+        const peels = fam.strands.map((c) => fold.roomBends(c, false)[0]);
+        const evOf = (b: FanBranch) => [...peels, ...forks.filter((_, p) => b.path.some((s) => s.node === fold.pairNode[p]))];
         for (const g of groups) {
           const y0 = fan.time.y(0);
           const cx = g.reduce((s, b) => s + centre(b, y0), 0) / g.length;
@@ -367,6 +369,8 @@ describe('the fold', () => {
           let nFree = 0;
           let nAll = 0;
           for (const b of g) {
+            const ev = evOf(b);
+            const free = (y: number) => !ev.some(([a, c]) => y >= a - 1e-6 && y <= c + 1e-6);
             let prev = NaN;
             for (let y = Math.max(b.tipY, y0); y < b.splitY; y += 2) {
               nAll++;
@@ -382,7 +386,7 @@ describe('the fold', () => {
           }
           expect(worst, `${mode} z${z} ${g.length}`).toBeLessThan(0.3);
           // (And the events are short: most of each column's span is straight.)
-          expect(nFree / nAll).toBeGreaterThan(0.84); // (forks a fixed bend tall: 0.77 at z20)
+          expect(nFree / nAll).toBeGreaterThan(0.7); // (its forks and the family's peels: 0.77 at z20)
         }
       }
     }
