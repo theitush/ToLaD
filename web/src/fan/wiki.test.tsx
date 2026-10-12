@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { SpeciesCard, WikiPic } from './FanApp';
+import { bigSrcOf, SpeciesCard, WikiPic } from './FanApp';
 import { FELIDAE } from './panthera';
 import { labelThumb, wikiOf } from './wiki';
 
@@ -75,5 +75,14 @@ describe('label thumbnails (ToLaD#182)', () => {
     const none = FELIDAE.species.find((s) => !wikiOf(s.sci)?.img);
     if (none) expect(labelThumb(none.sci, request)).toBeNull();
     expect(FakeImage.made.length).toBe(2);
+  });
+});
+
+describe('the card picture opens larger on a tap (ToLaD#182)', () => {
+  it('asks Commons for the 960 px thumbnail of the same file, and leaves an unsized URL alone', () => {
+    expect(bigSrcOf('https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/PZ_lion_pride.jpg/330px-PZ_lion_pride.jpg')).toBe(
+      'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/PZ_lion_pride.jpg/960px-PZ_lion_pride.jpg',
+    );
+    expect(bigSrcOf('https://upload.wikimedia.org/wikipedia/commons/7/7e/PZ_lion_pride.jpg')).toBe('https://upload.wikimedia.org/wikipedia/commons/7/7e/PZ_lion_pride.jpg');
   });
 });

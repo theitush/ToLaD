@@ -149,6 +149,21 @@
   object-fit: cover;
   border-radius: 8px;
 }
+.card-sp .pic img {
+  cursor: zoom-in;
+}
+.card-sp .pic.big {
+  float: none;
+  width: 100%;
+  margin: 0 0 10px;
+}
+.card-sp .pic.big img {
+  width: 100%;
+  height: auto;
+  max-height: 70vh;
+  object-fit: contain;
+  cursor: zoom-out;
+}
 .card-sp .pic a {
   display: block;
   margin-top: 3px;

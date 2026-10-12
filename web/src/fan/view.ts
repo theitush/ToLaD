@@ -36,7 +36,7 @@ const font = (spec: string, family = SANS) => `${spec} ${family}`;
 const LABEL_FONT = '650 15px';
 const LABEL_PILL = 22;
 /** The species picture under a name pill (ToLaD#182), its diameter. */
-const THUMB_D = 38;
+const THUMB_D = 50;
 const LABEL_PAD = 8;
 /** Right edge (px) of the time axis's labels: species' labels keep right of it. */
 const LABEL_AXIS_X = 72;
