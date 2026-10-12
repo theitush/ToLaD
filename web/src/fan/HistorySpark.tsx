@@ -433,7 +433,7 @@ export function HistorySpark({
                 // A regional event (ToLaD#149): a subpopulation's, so outlined (dashed) and barely filled, not a species-wide tint.
                 <rect x={e.xa} y={TOP} width={e.xb - e.xa} height={BOT - TOP} fill={EVENT_TINT.css} fillOpacity={0.06} stroke={EVENT_TINT.css} strokeWidth="1" strokeDasharray="2 2" strokeOpacity={e.on ? 0.8 : 0.45} data-regional="" />
               ) : (
-                <rect x={e.xa} y={TOP} width={e.xb - e.xa} height={BOT - TOP} fill={EVENT_TINT.css} opacity={e.on ? 0.3 : 0.14} />
+                <rect x={e.xa} y={TOP} width={e.xb - e.xa} height={BOT - TOP} fill={EVENT_TINT.css} opacity={e.on ? 0.18 : 0.08} />
               )}
               {e.named && (
                 <text x={e.tx} y={e.ty} textAnchor={e.anchor} fontSize="9" fill={EVENT_TINT.css} opacity={e.on ? 1 : 0.6}>
