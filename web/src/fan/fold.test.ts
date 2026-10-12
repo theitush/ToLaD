@@ -1,6 +1,6 @@
 // The fold (ToLaD#146): one branch from afar, opening continuously as the width zoom grows.
 import { describe, expect, it } from 'vitest';
-import { Fold } from './fold';
+import { Fold, inFamily } from './fold';
 import { columnsAt, g, laneAt, layoutFan, leftAt, TIME_H, type EdgeStyle, type Fan, type FanBranch, type WidthMode } from './layout';
 import { CARNIVORA, FELIDAE } from './panthera';
 import { CARNIVORA_TREE, FELIDAE_TREE } from './splits';
@@ -14,7 +14,8 @@ function folded(mode: WidthMode, edge: EdgeStyle): { fan: Fan; fold: Fold; home:
   const fold = new Fold(fan);
   fan.tess.fold = fold;
   // Home frames the closed order (camera.ts frame: 72 px of margins, 4% of slack).
-  const home = (SCREEN - 72) / (fan.trunkWidth * 1.04);
+  const [x0, x1] = fold.homeExtent();
+  const home = (SCREEN - 72) / ((x1 - x0) * 1.04);
   return { fan, fold, home };
 }
 const heights = (fan: Fan, n: number) => Array.from({ length: n + 1 }, (_, k) => -TIME_H + ((fan.trunkBottom.y + TIME_H) * k) / n);
@@ -25,6 +26,8 @@ const ZOOMS = [1, 1.3, 2.2, 5, 14, 50, 120];
  * is its widest within ROOM_BAND (a 23% hole at most in a column that booms or crashes), the order's ~3% at most.
  */
 const MIN_BEND_PX = 40;
+const FAMILY_K = 4;
+const FAMILY_MIN_PX = 3;
 const MAX_GAP_SHARE = 0.05;
 /** The share of the order's width at height y that no column covers. */
 function gapShare(fan: Fan, y: number): number {
@@ -71,10 +74,10 @@ describe('the fold', () => {
     ['linear', 'curved'],
     ['log', 'straight'],
   ] as [WidthMode, EdgeStyle][]) {
-    it(`home is one branch: every split closed, the rooms side by side, standing on the stem's centre (${mode}, ${edge})`, () => {
+    it(`home: each family one branch (its splits closed), the families apart, the rooms side by side, standing on the stem's centre (${mode}, ${edge})`, () => {
       const { fan, fold, home } = folded(mode, edge);
       fold.setScale(home, SCREEN);
-      expect(Math.max(...fold.a)).toBe(0);
+      for (let i = 0; i < fold.a.length; i++) expect(fold.a[i]).toBe(fold.pairFam[i] ? 0 : 1);
       for (const y of heights(fan, 160)) {
         const cs = columnsAt(fan, y).filter(([a, b]) => b > a).sort((p, q) => p[0] - q[0]);
         for (let i = 1; i < cs.length; i++) expect(cs[i][0]).toBeGreaterThanOrEqual(cs[i - 1][1] - 1e-9 * fan.trunkWidth);
@@ -292,14 +295,50 @@ describe('the fold', () => {
       expect(worst).toBeGreaterThanOrEqual(MIN_BEND_PX);
     });
 
-    it(`home has no holes: the gaps are under ${MAX_GAP_SHARE * 100}% of the order's width at every height (${mode})`, () => {
-      const { fan, fold, home } = folded(mode, 'curved');
-      fold.setScale(home, SCREEN);
+    it(`the rooms leave no holes: the gaps are under ${MAX_GAP_SHARE * 100}% of the order's width at every height (${mode})`, () => {
+      const { fan, fold } = folded(mode, 'curved');
+      // (The holes the rooms leave: every split closed, the families' gaps too.)
+      fold.setAll(0, true);
       for (const age of [0, 1e-4, 1e-3, 0.01, 0.1, 0.5, 1, 3, 10, 30]) {
         expect(gapShare(fan, fan.time.y(age)), `${age} Ma`).toBeLessThan(MAX_GAP_SHARE);
       }
     });
   }
+
+  it(`home: the families stand apart, at least ${FAMILY_K}x further than any two species inside a family (and ${FAMILY_MIN_PX} px); zooming in, the species part`, () => {
+    for (const mode of ['log', 'linear'] as WidthMode[]) {
+      const { fan, fold, home } = folded(mode, 'curved');
+      const y = fan.time.y(0);
+      const alive = fan.root.strands.filter((b) => b.tipY <= y);
+      const gaps = (z: number) => {
+        fold.setScale(home * z, SCREEN);
+        fold.setAnchor(fold.home, y, home * z, SCREEN);
+        let fam = Infinity;
+        let inner = 0;
+        let innerN = 0;
+        let innerOpen = 0;
+        for (let i = 1; i < alive.length; i++) {
+          const p = alive[i - 1];
+          const q = alive[i];
+          const g = (leftAt(q, y) - leftAt(p, y) - laneAt(p, y).w) * home * z;
+          const v = fan.nodes.filter((n) => n.strands.includes(p) && n.strands.includes(q)).sort((m, n) => m.ageMa - n.ageMa)[0];
+          if (inFamily(v)) {
+            inner = Math.max(inner, g);
+            innerN++;
+            if (g > 1) innerOpen++;
+          } else fam = Math.min(fam, g);
+        }
+        return { fam, inner, open: innerOpen / innerN };
+      };
+      const h = gaps(1);
+      console.log(mode, JSON.stringify([1, 3, 15].map((z) => gaps(z))));
+      expect(h.fam).toBeGreaterThanOrEqual(FAMILY_MIN_PX);
+      expect(h.fam).toBeGreaterThanOrEqual(FAMILY_K * h.inner);
+      // Zooming in, more and more of the species inside the families part (a gap over 1 px).
+      expect(gaps(3).open).toBeGreaterThan(h.open);
+      expect(gaps(15).open).toBeGreaterThan(gaps(3).open);
+    }
+  });
 
   it('the species keep one left-to-right order, the tree\'s, under every width and edge, at both levels', () => {
     for (const [clade, tree] of [

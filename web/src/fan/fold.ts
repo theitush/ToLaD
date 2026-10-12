@@ -1,4 +1,5 @@
-// The fold (ToLaD#146): the order reads as ONE branch from afar, and its splits open as you zoom in.
+// The fold (ToLaD#146): from afar each family reads as one branch, apart by how related they are; inside
+// a family the splits open as you zoom in, the older first, until the species stand apart.
 //
 // Every species is still its own column, its width N(t) × the one scale at every height (layout.ts), and
 // below its split its founders' slot in the parent column. The fold only says where the columns stand:
@@ -6,11 +7,10 @@
 //   At a height y, the columns there in the tree's order (a species' own column above its split, a parent
 //   column below, an extinct species a zero-width mark after its tip), side by side, and between each two
 //   neighbours a gap. The two sides of a gap meet at one split of the tree (the deepest one above both),
-//   which separates two daughter clades; the gap is today's gap rule on those clades: GAP_FRAC of the
-//   narrower one's width there (at least MIN_GAP_FRAC of the stem's, while it has that much), opening from
+//   which separates two daughter clades; the gap is by the split's age (below), opening from
 //   nothing at the split over its fork (ease, as a daughter peels off in the river), times a ∈ [0, 1]: how
-//   open the split is at this zoom. So the columns never overlap or cross, whatever the a's; all a = 0 is
-//   one column as wide as the sum of its species, with no leans; every term is continuous in y (a clade's
+//   open the split is at this zoom. So the columns never overlap or cross, whatever the a's; a = 0 is
+//   two sister clades side by side, one column, with no leans; every term is continuous in y (a clade's
 //   width is the sum of its columns', an extinct one narrowing to nothing, so its gaps close with it) and
 //   in the zoom. (The river layout, placeRiver, stays the cats' own view; the fold does not use its places,
 //   so its leans at the crowded base never show.)
@@ -22,26 +22,40 @@
 // billions); only its own widths and splits move it. "Now" itself is the canonical row: every strand's mean
 // slot centre on the stem's centre. The camera keeps the point under the fingers when the anchor moves.
 //
-// How open a split is depends only on the width zoom: its narrower daughter clade's width on screen (the
-// sum of its species' rooms, its widest packed), ramped open from FOLD_LO_PX to FOLD_HI_PX (smootherstep on
-// the log of the width), times the order's own opening: the whole order's width over the screen's, from
-// FOLD_GATE_LO (home frames it at about 0.75 on a phone, 0.87 on a wide screen) to FOLD_GATE_HI (zoomed 2x
-// past home). Why those: below ~24 px two sister clades side by side read as one branch with a seam, and by
-// ~96 px the river's gap (GAP_FRAC of the narrower facing column) between them is a clear few px; the
-// gate keeps home one branch on any screen, so the first pinch past home is what starts the opening. A
-// split's narrower daughter is never wider than its parent's, so the wide levels open first, then each
-// sub-clade as it grows on screen: on a phone the order's two halves part by ~1.5x, the families by ~5x,
-// sister species once each is a few dozen px. Time zoom changes nothing.
+// Gaps by relatedness (Ita, ToLaD#146: "closer to each other depending on how close they are ... cats,
+// weasels, dogs would each appear as a single branch when zoomed out and be separated from each other"):
+// a split's full gap is a share of the order's width growing with its age, GAP_K * (age / 2 Ma)^GAP_POW
+// (0.6% of it for sisters 2 Ma apart, 2.9% between families ~20 Ma apart, 5.4% between the order's halves),
+// so deeper splits stand further apart at every zoom. The splits above the families (the order's halves, the
+// superfamilies) are always open: from afar each family is one branch with dark space between it and the
+// next. A split inside a family opens with the width zoom, the older first: from z0 = OPEN_Z * (20 Ma /
+// age)^OPEN_POW to OPEN_SPAN times that, z the order's width on screen over the screen's (home frames it at
+// ~0.55 on a phone, its families' gaps taking the rest). So a family's crown (12-20 Ma) parts at 1.5-2.5x
+// home, sisters 2 Ma apart by ~6x, 0.5 Ma apart by ~15x: zooming in, the species stand apart one by one.
+// A gap closes with its narrower clade (an extinct one narrowing to nothing). Time zoom changes nothing.
 
-import { ease, GAP_FRAC, isNode, lanesAt, MIN_GAP_FRAC, segAt, type Fan, type FanBranch, type FanNode } from './layout';
+import { ease, isNode, lanesAt, segAt, type Fan, type FanBranch, type FanNode } from './layout';
 import { smoother } from './population';
 
-/** A split's narrower daughter on screen (px): closed below FOLD_LO_PX, fully open above FOLD_HI_PX. */
-export const FOLD_LO_PX = 24;
-export const FOLD_HI_PX = 96;
-/** The order's width on screen over the screen's: everything closed below FOLD_GATE_LO, free above FOLD_GATE_HI. */
-export const FOLD_GATE_LO = 0.9;
-export const FOLD_GATE_HI = 1.8;
+/** A split's full gap, as a share of the order's width: GAP_K * (its age / 2 Ma)^GAP_POW. */
+export const GAP_K = 0.006;
+export const GAP_POW = 0.7;
+/** A split inside a family opens from z0 = OPEN_Z * (20 Ma / age)^OPEN_POW to OPEN_SPAN * z0 (z: the order's width on screen over the screen's). */
+export const OPEN_Z = 0.8;
+export const OPEN_POW = 0.6;
+export const OPEN_SPAN = 2.5;
+
+/** The least age a split between two families gaps as (the seals' families split ~10 Ma ago, inside some families' crowns). */
+export const FAMILY_MIN_MA = 15;
+
+/** A split's full gap (a share of the order's width), by its age (Ma). */
+export const gapShare = (ageMa: number) => GAP_K * Math.pow(Math.max(ageMa, 1e-3) / 2, GAP_POW);
+
+/** Whether split v is inside a family (the family's own split or under it): it opens with the zoom; above them, always open. */
+export function inFamily(v: FanNode | null): boolean {
+  for (let u = v; u; u = u.parent) if (/idae$/.test(u.split.taxon ?? '')) return true;
+  return false;
+}
 /** The anchor's bell (setAnchor): its sigma, as a share of the screen's width. */
 export const ANCHOR_SIGMA = 0.1;
 /**
@@ -64,9 +78,10 @@ export interface RoomPlan {
 
 const logRamp = (v: number, lo: number, hi: number) => (v > 0 ? smoother(Math.log(v / lo) / Math.log(hi / lo)) : 0);
 
-/** How open a split is with its narrower daughter `px` wide, the whole order `orderPx` wide, on a screen `screenW` wide. */
-export function openness(px: number, orderPx: number, screenW: number): number {
-  return logRamp(px, FOLD_LO_PX, FOLD_HI_PX) * logRamp(orderPx / screenW, FOLD_GATE_LO, FOLD_GATE_HI);
+/** How open a split `ageMa` old is (inside a family; above, 1) with the order `orderPx` wide on a screen `screenW` wide. */
+export function openness(ageMa: number, orderPx: number, screenW: number): number {
+  const z0 = OPEN_Z * Math.pow(20 / Math.max(ageMa, 1e-3), OPEN_POW);
+  return logRamp(orderPx / screenW, z0, z0 * OPEN_SPAN);
 }
 
 /** One height's folded row: each strand's sideways move (world), stamped with the fold's version. */
@@ -104,6 +119,9 @@ export class Fold {
   /** Per neighbouring pair (i, i + 1): the narrower daughter's width (world) of the split they meet at, and that split. */
   readonly pairW: Float64Array;
   readonly pairNode: FanNode[];
+  /** Per pair: its split's full gap (world), and whether it opens with the zoom (inside a family). */
+  readonly pairGap: Float64Array;
+  readonly pairFam: Uint8Array;
   /** Per pair: the strands of the left daughter start at lo, the right daughter's end before hi; the fork's top (world y). */
   private readonly lo: Int32Array;
   private readonly hi: Int32Array;
@@ -123,7 +141,6 @@ export class Fold {
   screenW = NaN;
   /** The grid the view reads folded moves from (world height between rows), or 0: exact at every height. */
   gridH = 0;
-  private readonly minGap: number;
   /** The stem's centre (world x): where the closed order stands. */
   readonly home: number;
   /** The river's rows, by height (they hold whatever the a's), each folded again when the a's change. */
@@ -139,6 +156,8 @@ export class Fold {
     this.hi = new Int32Array(Math.max(0, n - 1));
     this.forkTop = new Float64Array(Math.max(0, n - 1));
     this.pairNode = [];
+    this.pairGap = new Float64Array(Math.max(0, n - 1));
+    this.pairFam = new Uint8Array(Math.max(0, n - 1));
     this.a = new Float64Array(Math.max(0, n - 1)).fill(1);
     this.lambda = 1;
     const room = (k: FanNode | FanBranch) => (isNode(k) ? k.strands.reduce((s, b) => s + b.width, 0) : k.width);
@@ -153,6 +172,9 @@ export class Fold {
       const dq: FanNode | FanBranch = kq === 0 ? this.strands[i + 1] : q[kq - 1].node;
       this.pairNode.push(v);
       this.pairW[i] = Math.min(room(dp), room(dq));
+      this.pairFam[i] = inFamily(v) ? 1 : 0;
+      // (Two families apart at least as far as a split FAMILY_MIN_MA old: a family is never a family's sister's seam.)
+      this.pairGap[i] = gapShare(this.pairFam[i] ? v.ageMa : Math.max(v.ageMa, FAMILY_MIN_MA)) * fan.trunkWidth;
       // The two daughters' strands (each a run in the drawn order) and the split's fork (where its gap opens over).
       const run = (k: FanNode | FanBranch) => (isNode(k) ? [k.strands[0].index, k.strands[k.strands.length - 1].index + 1] : [k.index, k.index + 1]);
       this.lo[i] = run(dp)[0];
@@ -160,7 +182,6 @@ export class Fold {
       this.forkTop[i] = Math.min(dp.leanY, dq.leanY);
     }
     this.home = fan.root.left + fan.root.width / 2;
-    this.minGap = MIN_GAP_FRAC * fan.trunkWidth;
     this.wt = new Float64Array(n).fill(1);
     this.yRef = fan.time.y(0);
   }
@@ -318,7 +339,7 @@ export class Fold {
     let lam = 0;
     const order = this.fan.trunkWidth * sx;
     for (let i = 0; i < this.a.length; i++) {
-      const a = openness(this.pairW[i] * sx, order, screenW);
+      const a = this.pairFam[i] ? openness(this.pairNode[i].ageMa, order, screenW) : 1;
       if (a !== this.a[i]) changed = true;
       this.a[i] = a;
       lam = Math.max(lam, a);
@@ -330,13 +351,41 @@ export class Fold {
     return changed;
   }
 
-  /** Every split open (the river) or closed: for tests and the cat level. */
-  setAll(a: number): void {
-    this.a.fill(a);
+  /** Every split inside a family open (1) or closed (0), those above them open (or, `all`, as those): for tests and the cat level. */
+  setAll(a: number, all = false): void {
+    for (let i = 0; i < this.a.length; i++) this.a[i] = this.pairFam[i] || all ? a : 1;
     this.wt.fill(1);
-    this.lambda = a;
+    this.lambda = this.a.length ? Math.max(...this.a) : 1;
     this.sx = NaN;
     this.ver++;
+  }
+
+  private homeExt: [number, number] | null = null;
+  /** The order's extent (world) as home shows it: the families apart, each closed, the anchor on the whole row; its widest over its heights. */
+  homeExtent(): [number, number] {
+    if (this.homeExt) return this.homeExt;
+    const keep = this.snapshot();
+    for (let i = 0; i < this.a.length; i++) this.a[i] = this.pairFam[i] ? 0 : 1;
+    this.wt.fill(1);
+    this.ver++;
+    let lo = Infinity;
+    let hi = -Infinity;
+    const y1 = Math.max(this.yRef, this.fan.root.y);
+    for (let k = 0; k <= 32; k++) {
+      const r = this.riverRow(this.yRef + ((y1 - this.yRef) * k) / 32 - 1e-9);
+      this.foldRow(r);
+      for (let i = 0; i < r.xs.length; i++) {
+        if (r.sw[i] <= 0) continue;
+        const l = r.xs[i] - (r.own[i] ? r.sw[i] / 2 : 0);
+        lo = Math.min(lo, l);
+        hi = Math.max(hi, l + r.sw[i]);
+      }
+    }
+    this.a.set(keep.a);
+    this.wt.set(keep.wt);
+    this.lambda = keep.lambda;
+    this.ver++;
+    return (this.homeExt = [lo, hi]);
   }
 
   /** The river's columns at height y, left to right (unfolded positions). */
@@ -395,8 +444,9 @@ export class Fold {
         const v = this.pairNode[p];
         const u = this.forkTop[p] < v.y ? ease(edge, (v.y - y) / (v.y - this.forkTop[p])) : 1;
         // (Sized on the clades' rooms, fixed: it changes only where the narrower one ends, closing with it.)
+        // (Its full gap, closing with its narrower clade as that ends: below a quarter of its room.)
         const P = this.pairW[p];
-        gap = a * u * Math.min(Math.max(GAP_FRAC * P, Math.min(P, this.minGap)), m);
+        gap = a * u * this.pairGap[p] * Math.min(1, m / (0.25 * P));
       }
       X[j] = X[j - 1] + w[j - 1] + gap;
     }
