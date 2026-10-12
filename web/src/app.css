@@ -138,14 +138,14 @@
 .card-sp .pic {
   float: left;
   margin: 2px 10px 2px 0;
-  width: 76px;
+  width: 120px;
   text-align: center;
   line-height: 1.1;
 }
 .card-sp .pic img {
   display: block;
-  width: 76px;
-  height: 76px;
+  width: 120px;
+  height: 120px;
   object-fit: cover;
   border-radius: 8px;
 }
