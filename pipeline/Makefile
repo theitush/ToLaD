@@ -1,5 +1,5 @@
 # ToLaD data pipeline v0 (mammals). `make` = fetch (verify pinned checksums) + build + test.
-.PHONY: all fetch build test audit
+.PHONY: all fetch build test audit wiki
 
 all: fetch build test
 
@@ -18,3 +18,9 @@ test:
 # (data/build/audit_leaves.json) and writes research/data-audit-report.md. Flags never fail it.
 audit:
 	uv run python -I -m tolad_pipeline.audit
+
+# Wikipedia link + Wikimedia Commons picture URL per species (ToLaD#182): its own step over the built
+# data. Queries Wikidata only when data/raw/wikidata/taxa.json is missing (or `--refresh`), else
+# verifies its pinned checksum; writes data/mammals/wiki.json and nothing else.
+wiki:
+	uv run python -I -m tolad_pipeline.wiki

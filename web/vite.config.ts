@@ -70,10 +70,22 @@ function pantheraData(): Plugin {
     load(id) {
       if (id !== '\0' + PANTHERA) return null;
       for (const f of dataFiles()) this.addWatchFile(join(DATA, f));
+      if (existsSync(join(DATA, 'wiki.json'))) this.addWatchFile(join(DATA, 'wiki.json'));
       const clade = loadClade((rel) => readFileSync(join(DATA, rel)), 'Felidae');
-      return `export default ${JSON.stringify(clade)};`;
+      return `export default ${JSON.stringify(clade)};\nexport const wiki = ${JSON.stringify(wikiFor(clade.species.map((s) => s.sci)))};`;
     },
   };
+}
+
+/**
+ * The clade's rows of the Wikipedia/Commons sidecar (data/mammals/wiki.json, ToLaD#182): only
+ * the species the fan has, so the page does not carry the whole tree's. {} when there is none.
+ */
+function wikiFor(names: string[]): Record<string, unknown> {
+  const p = join(DATA, 'wiki.json');
+  if (!existsSync(p)) return {};
+  const all = JSON.parse(readFileSync(p, 'utf8')) as Record<string, unknown>;
+  return Object.fromEntries(names.filter((n) => n in all).map((n) => [n, all[n]]));
 }
 
 /** Single-file build: inline the JS and CSS chunks into index.html. */
