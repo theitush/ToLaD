@@ -11,7 +11,7 @@
 // is typed here: pointing the fan at another clade needs no hand table.
 //
 // Each split is one date where a parent population divides into its daughters (a
-// clean split: one date, a sharp Y; the gradual version is #50). Daughters are
+// clean split: one date, a sharp Y; gradual designs were tried in #50 and dropped, #171). Daughters are
 // listed left to right; a daughter is a species (scientific name) or a nested split.
 // A split may have more than two daughters (a polytomy: Upham dates them as one
 // event, or fossils join it by taxonomy only).

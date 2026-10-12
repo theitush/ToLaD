@@ -1,8 +1,8 @@
 // Pointer Events gestures: one-finger/mouse pan, two-finger pinch (zooms about
 // the centroid: both axes by the finger distance, or each axis by its own
-// spread, see `axisPinch`), wheel zoom (shift: x only, alt: y only),
-// double-tap, and fling velocity in log-zoom space. No camera state lives
-// here; it only reports deltas.
+// spread, see `axisPinch`), wheel zoom (see `onWheel`: vertical scroll zooms
+// time, horizontal scroll width, a trackpad pinch both), double-tap, and fling
+// velocity in log-zoom space. No camera state lives here; it only reports deltas.
 
 /** Per-axis pinch dead zone: an axis's spread must change this many px from the pinch's start ... */
 export const PINCH_DEAD_PX = 12;
@@ -10,6 +10,13 @@ export const PINCH_DEAD_PX = 12;
 export const PINCH_AXIS_RATIO = 0.5;
 /** Spreads below this (px) count as this much, so fingers nearly in line along an axis cannot blow up its zoom. */
 export const PINCH_MIN_SPREAD = 40;
+/** Wheel events further apart than this (ms) start a new wheel gesture (and a new axis lock). */
+export const WHEEL_GAP_MS = 140;
+/** Wheel axis lock: nothing zooms until one axis's scroll has moved this many px in the gesture. */
+export const WHEEL_DEAD_PX = 6;
+/** Zoom per px of plain scroll (log), and per px of a trackpad pinch (ctrl+wheel). */
+const WHEEL_RATE = 0.002;
+const PINCH_WHEEL_RATE = 0.01;
 
 export interface InputHandlers {
   gestureStart(): void;
@@ -46,6 +53,14 @@ export class Input {
   private wheelTimer = 0;
   private wheeling = false;
   /**
+   * The wheel gesture's axis lock: the signed scroll summed over the gesture on
+   * each axis (px), the furthest each sum has been from zero, and which axes zoom
+   * (once on, an axis stays on until the gesture ends).
+   */
+  private wheelAxes = { x: 0, y: 0, peakX: 0, peakY: 0, onX: false, onY: false };
+  /** Safari's pinch (gesturestart..gestureend) in progress: the last `scale` seen. */
+  private safariScale = 0;
+  /**
    * The two-finger pinch in progress (per-axis mode): its finger pair, the
    * horizontal and vertical spreads (px) when it began, the furthest each has
    * moved since, and which axes it zooms (once on, an axis stays on until the
@@ -69,14 +84,15 @@ export class Input {
     el.addEventListener('pointerup', this.onUp);
     el.addEventListener('pointercancel', this.onUp);
     el.addEventListener('wheel', this.onWheel, { passive: false });
-    // Safari's proprietary pinch events would otherwise zoom the page.
-    el.addEventListener('gesturestart', prevent as EventListener);
-    el.addEventListener('gesturechange', prevent as EventListener);
+    // Safari's proprietary pinch events: they zoom the view (both axes), not the page.
+    el.addEventListener('gesturestart', this.onGestureStart as EventListener);
+    el.addEventListener('gesturechange', this.onGestureChange as EventListener);
+    el.addEventListener('gestureend', this.onGestureEnd as EventListener);
     el.addEventListener('contextmenu', prevent as EventListener);
   }
 
   get active(): boolean {
-    return this.pointers.size > 0 || this.wheeling;
+    return this.pointers.size > 0 || this.wheeling || this.safariScale > 0;
   }
 
   destroy(): void {
@@ -86,8 +102,9 @@ export class Input {
     el.removeEventListener('pointerup', this.onUp);
     el.removeEventListener('pointercancel', this.onUp);
     el.removeEventListener('wheel', this.onWheel);
-    el.removeEventListener('gesturestart', prevent as EventListener);
-    el.removeEventListener('gesturechange', prevent as EventListener);
+    el.removeEventListener('gesturestart', this.onGestureStart as EventListener);
+    el.removeEventListener('gesturechange', this.onGestureChange as EventListener);
+    el.removeEventListener('gestureend', this.onGestureEnd as EventListener);
     el.removeEventListener('contextmenu', prevent as EventListener);
   }
 
@@ -249,26 +266,90 @@ export class Input {
     if (this.samples.length > 32) this.samples.shift();
   }
 
+  /**
+   * Wheel: a trackpad's two-finger scroll, a mouse wheel, or (ctrlKey) a
+   * trackpad pinch, zooming about the cursor.
+   * - Pinch (ctrl+wheel): both axes.
+   * - Scroll: deltaY zooms time (y) only, deltaX width (x) only, each by its own
+   *   delta; negative (scroll up / scroll left) zooms in. A mouse wheel has only
+   *   deltaY, so it zooms time; shift+wheel zooms width (Chrome on Windows sends
+   *   it as deltaX already; where it still arrives as deltaY, it is taken as
+   *   deltaX). Alt+wheel: time only.
+   * - Axis lock, like the per-axis pinch's dead zone: in a gesture (events less
+   *   than WHEEL_GAP_MS apart) an axis zooms only once its summed scroll has
+   *   moved WHEEL_DEAD_PX and at least PINCH_AXIS_RATIO of the furthest the
+   *   other's has, so the sideways jitter of an upright swipe does not wobble
+   *   width (and vice versa); a clearly diagonal swipe turns both on. The scroll
+   *   before an axis turns on is dropped, so turning on never jumps.
+   */
   private onWheel = (e: WheelEvent): void => {
     e.preventDefault();
     const p = this.local(e);
-    let d = e.deltaY || e.deltaX;
-    if (e.deltaMode === 1) d *= 16;
-    else if (e.deltaMode === 2) d *= this.el.clientHeight;
-    // ctrl+wheel is a trackpad pinch on desktop browsers.
-    const z = Math.exp(-d * (e.ctrlKey ? 0.01 : 0.002));
-    const fx = e.altKey ? 1 : z; // alt: time axis only
-    const ft = e.shiftKey ? 1 : z; // shift: width axis only
+    const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? this.el.clientHeight : 1;
+    let dx = e.deltaX * unit;
+    let dy = e.deltaY * unit;
     if (!this.wheeling) {
       this.wheeling = true;
+      this.wheelAxes = { x: 0, y: 0, peakX: 0, peakY: 0, onX: false, onY: false };
       this.h.gestureStart();
     }
-    this.h.zoom(p.x, p.y, fx, ft);
     clearTimeout(this.wheelTimer);
     this.wheelTimer = window.setTimeout(() => {
       this.wheeling = false;
       this.h.gestureEnd();
-    }, 140);
+    }, WHEEL_GAP_MS);
+    if (e.ctrlKey) {
+      // A trackpad pinch on desktop browsers. Safari sends gesture events instead; never both at once.
+      if (this.safariScale > 0) return;
+      const z = Math.exp(-(dy || dx) * PINCH_WHEEL_RATE);
+      this.h.zoom(p.x, p.y, z, z);
+      return;
+    }
+    if (e.altKey) {
+      dy = dy || dx;
+      dx = 0;
+    } else if (e.shiftKey && !dx) {
+      dx = dy;
+      dy = 0;
+    }
+    const g = this.wheelAxes;
+    g.x += dx;
+    g.y += dy;
+    g.peakX = Math.max(g.peakX, Math.abs(g.x));
+    g.peakY = Math.max(g.peakY, Math.abs(g.y));
+    const wasX = g.onX;
+    const wasY = g.onY;
+    g.onX ||= Math.abs(g.x) >= WHEEL_DEAD_PX && Math.abs(g.x) >= PINCH_AXIS_RATIO * g.peakY;
+    g.onY ||= Math.abs(g.y) >= WHEEL_DEAD_PX && Math.abs(g.y) >= PINCH_AXIS_RATIO * g.peakX;
+    // The event that turns an axis on counts only if nothing came before it (a mouse notch zooms at once).
+    const fx = g.onX && (wasX || Math.abs(g.x - dx) < 1e-9) ? Math.exp(-dx * WHEEL_RATE) : 1;
+    const ft = g.onY && (wasY || Math.abs(g.y - dy) < 1e-9) ? Math.exp(-dy * WHEEL_RATE) : 1;
+    if (fx !== 1 || ft !== 1) this.h.zoom(p.x, p.y, fx, ft);
+  };
+
+  private onGestureStart = (e: Event): void => {
+    e.preventDefault();
+    // iOS sends these for a touch pinch too; the pointer events already handle that.
+    if (this.pointers.size > 0 || this.safariScale > 0) return;
+    this.safariScale = 1;
+    if (!this.wheeling) this.h.gestureStart();
+  };
+
+  private onGestureChange = (e: Event): void => {
+    e.preventDefault();
+    const scale = (e as Event & { scale?: number }).scale;
+    if (this.safariScale <= 0 || this.pointers.size > 0 || !(scale! > 0)) return;
+    const z = scale! / this.safariScale;
+    this.safariScale = scale!;
+    const p = this.local(e as unknown as { clientX: number; clientY: number });
+    if (z !== 1) this.h.zoom(p.x, p.y, z, z);
+  };
+
+  private onGestureEnd = (e: Event): void => {
+    e.preventDefault();
+    if (this.safariScale <= 0) return;
+    this.safariScale = 0;
+    if (!this.wheeling) this.h.gestureEnd();
   };
 }
 

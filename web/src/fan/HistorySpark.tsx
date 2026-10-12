@@ -12,7 +12,7 @@
 
 import { useId, useState } from 'react';
 import { approxCountsIn, formatCount } from '../data/count';
-import { GRADE_COLOR, GRADE_WORD, MODELLED_KINDS, noDataSpans, styleBetween, type SpanStyle } from './history';
+import { basisSpans, GRADE_COLOR, GRADE_WORD, MODELLED_KINDS, noDataSpans, styleBetween, type Basis, type SpanStyle } from './history';
 import type { HistoryRec, HistPoint, NaturalMeta, NaturalRec } from './panthera';
 import { TIME_C } from './population';
 import { EVENT_TINT } from './colstyle';
@@ -103,6 +103,36 @@ export const DEEP_YEARS = 5000;
 /** A date in the sources list: a calendar year, or "~3 million years ago" in the deep past. */
 export function fmtWhen(year: number, nowYear: number): string {
   return year < -10000 ? `${formatCount(nowYear - year)} years ago` : fmtYear(year);
+}
+
+/** The card's sentence on genome stretches (ToLaD#164): what a wiggle in a PSMC curve can mean. */
+export const GENOME_NOTE =
+  'Wiggles in the genome curve can come from a population that split into regions and rejoined, not only from changes in numbers.';
+
+/** What each basis is called in the card's list of stretches. */
+const BASIS_WORD: Record<Exclude<Basis, 'held'>, string> = {
+  count: 'counted',
+  genome: 'genome',
+  model: 'model',
+  flagged: 'flagged join',
+};
+
+/**
+ * The card's list of which stretches are counted and which are genome, model or a flagged join
+ * (ToLaD#164), oldest first: "genome ~3 million years ago – 8059 BCE". Held stretches (no
+ * data) are said by their own note.
+ */
+export function basisRows(h: HistoryRec): string[] {
+  // A boundary is a whole generation of segments: said at the figure it meets, if one is within a generation.
+  const when = (ago: number) => {
+    if (ago < 0.5) return 'now';
+    const y = h.nowYear - ago;
+    const p = h.points.reduce<HistPoint | null>((a, q) => (Math.abs(q.year - y) <= h.G && (!a || Math.abs(q.year - y) < Math.abs(a.year - y)) ? q : a), null);
+    return fmtWhen(p ? p.year : Math.round(y), h.nowYear);
+  };
+  return basisSpans(h)
+    .filter((s): s is typeof s & { basis: Exclude<Basis, 'held'> } => s.basis !== 'held' && s.ago0 - s.ago1 >= 1)
+    .map((s) => `${BASIS_WORD[s.basis]} ${when(s.ago0)} – ${when(s.ago1)}`);
 }
 
 /** Round "years ago" ticks of a log-time axis: powers of ten from 100 years, below agoMax. */
@@ -509,6 +539,16 @@ export function HistorySpark({
       {open && before && (
         <div className="dim small" data-nodata-note="">
           No data before {fmtWhen(before.year, h.nowYear)}: held at {before.today ? "today's level" : deep ? 'the oldest figure’s level' : `the ${fmtYear(before.year)} level`}.
+        </div>
+      )}
+      {basisSpans(h).some((s) => s.basis === 'genome') && (
+        <div className="dim small" data-genome-note="">
+          {GENOME_NOTE}
+        </div>
+      )}
+      {open && (
+        <div className="dim small" data-basis-note="">
+          Where these numbers come from: {basisRows(h).join('; ')}.
         </div>
       )}
       {open && (
