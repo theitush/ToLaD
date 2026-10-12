@@ -14,7 +14,7 @@ from pathlib import Path
 
 from . import load
 from . import overrides as overrides_mod
-from .merge import (apply_placements, assign_bands, build_leaf_index, calibrate, date_tree,
+from .merge import (add_domestic_leaves, apply_placements, assign_bands, build_leaf_index, calibrate, date_tree,
                     drop_unrecognised, graft_pbdb, match_upham, rehome_stem_fossils, set_extinct_flags)
 from .tree import (clean_opentree, collapse_knuckles, drop_empty,
                    from_opentree)
@@ -73,8 +73,9 @@ def build_tree(raw: Path, work: Path, log: dict, t_start: float):
     drop_unrecognised(root, recognised_by_a_list(root, raw, ctx), ott_syn, phy_syn, log)
     log_step(t_start, f"unrecognised tips dropped: {log['unrecognised_tips']['dropped']}, "
                       f"Red List EX flagged: {len(log['red_list_extinct_flags']['leaves'])}")
-    exact, syn = build_leaf_index(root, ott_syn, phy_syn)
     ov = overrides_mod.load()
+    add_domestic_leaves(root, ov, log)
+    exact, syn = build_leaf_index(root, ott_syn, phy_syn)
     graft_pbdb(root, pb_species, exact, syn, log, ov)
     log_step(t_start, f"PBDB graft {log['pbdb_graft']}")
     n_drop = drop_empty(root)
@@ -87,7 +88,7 @@ def build_tree(raw: Path, work: Path, log: dict, t_start: float):
     ov.check_all_used()
     log["overrides"] = ov.report()
     date_tree(root, log)
-    assign_bands(root, ANCHOR_T0)
+    assign_bands(root, {**ANCHOR_T0, **{e["name"]: float(e["age"]) for e in ov.domestic_leaves}})
     n_k = collapse_knuckles(root)
     log["knuckles_collapsed"] = n_k
     ctx.update(exact=exact, syn=syn, upham=(up_root, up_tax), overrides=ov)
@@ -192,7 +193,7 @@ def counts(root) -> dict:
     }
 
 
-CHECK_SPECIES = ["Canis lupus", "Vulpes vulpes", "Loxodonta africana", "Mus musculus", "Rattus norvegicus",
+CHECK_SPECIES = ["Canis lupus", "Canis familiaris", "Vulpes vulpes", "Loxodonta africana", "Mus musculus", "Rattus norvegicus",
                  "Odocoileus virginianus", "Pan troglodytes", "Balaenoptera musculus", "Phoca vitulina",
                  "Myotis lucifugus", "Macropus giganteus", "Macropus rufus", "Sus scrofa", "Ursus arctos",
                  "Felis catus", "Gorilla gorilla", "Procyon lotor", "Tadarida brasiliensis"]

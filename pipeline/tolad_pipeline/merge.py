@@ -569,6 +569,28 @@ def _find(root: Node, name: str) -> list[Node]:
     return [h for h in hits if not any(o is not h and _is_desc(h, o) for o in hits)]
 
 
+def add_domestic_leaves(root: Node, ov, log: dict) -> None:
+    """A leaf of its own for each overrides.toml [[domestic_leaf]] (ToLaD#175): a domestic form that no
+    species list carries as a species (Open Tree and Upham fold the dog into Canis lupus as a subspecies),
+    beside its wild ancestor `sister` under the same parent. Its band starts at `age` (assign_bands takes it
+    as an anchor), so the ancestor's own leaf, band and counts are untouched; the dated tree splits it off
+    the ancestor's lineage at `age` (dated.apply_overrides)."""
+    added = []
+    for e in ov.domestic_leaves:
+        if any(n.name == e["name"] for n in root.preorder()):
+            raise RuntimeError(f"overrides.toml domestic_leaf {e['name']}: already a node of the tree")
+        sis = [n for n in _find(root, e["sister"]) if n.is_leaf]
+        if len(sis) != 1:
+            raise RuntimeError(f"overrides.toml domestic_leaf {e['name']}: sister {e['sister']!r} is "
+                               f"{len(sis)} leaves, not one")
+        leaf = Node(name=e["name"], rank="species", kind="tree", taxonomic=True)
+        leaf.data["domestic_leaf"] = True
+        sis[0].parent.add(leaf)
+        added.append(e["name"])
+        ov.applied["domestic_leaf"].append({"name": e["name"], "sister": e["sister"], "age": float(e["age"])})
+    log["domestic_leaves"] = added
+
+
 def apply_placements(root: Node, ov, log: dict) -> None:
     for p in ov.placements:
         targets = [t for t in _find(root, p["stem_of"]) if t.kind == "tree" and not t.is_leaf]
