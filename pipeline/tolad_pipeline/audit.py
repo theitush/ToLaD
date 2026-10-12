@@ -18,7 +18,9 @@ species leaf for each class, with thresholds taken from stated rules, not tuned:
            checked: listed under criterion A or B, an EN species can be of any size
   deep     a genomic deep past the pipeline's own #77/#80 rule flags (beyond 10x of the next level), or
            whose join runs against PSMC's dropped blind-spot steps (#143: their mean beyond 1.5x of the
-           youngest resolved step the other way; kept and drawn only where [deep.blind] cites a source)
+           youngest resolved step the other way; kept and drawn only where [deep.blind] cites a source),
+           or whose peak sits further above its anchor than the genome's own resolved max / median (#172:
+           any inflation the join adds; not where [deep.blind] cites the decline the young end meets at)
   status   a living leaf the Red List calls EX, an extinct leaf the Red List assesses as living, an
            EW species drawn with a wild count, a fossil graft ending at the present (#105)
   name     a living leaf no extant-species list recognises (Upham, PHYLACINE, Greenspoon/IUCN, Red
@@ -148,7 +150,8 @@ def leaf_row(n, census: dict, gs_model: dict, deep_reports: dict | None = None) 
         "file": rec.get("file"), "modelled": rec.get("modelled"), "use": rec.get("use"),
         "curve": curve,
         "deep": ({k: deep.get(k) for k in ("ratio", "flag", "rule", "next", "to_kind", "to_n", "deep_n", "deep_n_raw",
-                                            "factor", "blind")}
+                                            "factor", "blind", "meet", "res_median_raw", "res_max_raw",
+                                            "peak_n", "peak_ago", "held")}
                  if deep else None),
         "deep_factors": None,
         # curated events and whether the column falls through each (history.event_fall, ToLaD#149)
@@ -296,13 +299,39 @@ def check_deep(row: dict) -> list[dict]:
                          f"PSMC's {bl['steps']} blind-spot steps average {max(v, 1 / v):.2g}x "
                          f"{'below' if v < 1 else 'above'} the youngest resolved step but are not drawn "
                          "(no [deep.blind] source), and the curve is held flat across them", blind=v))
+    out += check_deep_peak(d)
     if not d.get("flag"):
         return out
     r = d["ratio"]
     return out + [_flag("deep", abs(math.log10(r)),
                   f"genomic level {_fmt(d.get('deep_n_raw') or d['deep_n'])} is {max(r, 1 / r):.3g}x "
                   f"{'above' if r > 1 else 'below'} the next level ({d['to_kind']}, {_fmt(d['to_n'])}); "
-                  f"genome curve scaled x{d['factor']:.3g} to meet it", ratio=r)]
+                  f"genome curve scaled x{d['factor']:.3g} to meet it"
+                  + (" at the median of its resolved steps, its young end held at it (#172)"
+                     if d.get("meet") == "median" else ""), ratio=r)]
+
+
+# a deep past's peak may sit above its anchor by the genome's own max / median and no more (ToLaD#172)
+DEEP_PEAK_TOL = 1.01
+
+
+def check_deep_peak(d: dict) -> list[dict]:
+    """The join's own inflation (ToLaD#172): the deep past's peak over its anchor, against the genome's
+    resolved max over median. Anchored at the median (or above it) the peak is at most that; anchored at a
+    young end below the median, it is that times median / young end. Not checked where [deep.blind] cites
+    the decline the young end shows (the lion's, Figueiro 2017): that decline is the shape, as cited."""
+    if not d.get("res_median_raw") or not d.get("peak_n") or (d.get("blind") or {}).get("kept"):
+        return []
+    own = d["res_max_raw"] / d["res_median_raw"]
+    got = d["peak_n"] / d["to_n"]
+    if got <= own * DEEP_PEAK_TOL:
+        return []
+    x = got / own
+    return [_flag("deep", math.log10(x),
+                  f"deep past peaks at {_fmt(d['peak_n'])} (~{d['peak_ago'] / 1000:.0f} kya), {got:.3g}x its anchor "
+                  f"({d['to_kind']}, {_fmt(d['to_n'])}), against the genome's own resolved max / median of "
+                  f"{own:.3g}x: the join inflates it {x:.3g}x more (its young end meets the anchor below the median)",
+                  inflation=x)]
 
 
 def check_status(row: dict) -> list[dict]:

@@ -21,7 +21,9 @@ design. In short:
               to meet the higher of the first cited count (any year) and the modelled
               natural level (then the range-loss trend runs down to the count), else
               the modelled level, and held flat to it; a factor beyond 10x is flagged
-              (deep_join, ToLaD#143)
+              (deep_join, ToLaD#143); a flagged join whose young end is below the
+              median of its resolved steps meets the anchor at that median, its
+              young end held at the anchor (ToLaD#172)
     natural   with no cited baseline and no [deep], the natural (pre-human) baseline
               (model.natural_level, NATB) is held from the band start to the first
               point. Precedence before the cited points: genomic > natural > today
@@ -553,8 +555,12 @@ def deep_join(deep_pts: list[dict], nxt: dict, dropped: list[dict] | None = None
     (ToLaD#143): `deep_pts` may end in blind steps kept because `blind_src` ([deep.blind]) cites a
     decline there; else `dropped` holds them, and dropped steps whose mean level is beyond BLIND_AGAINST
     from the youngest resolved step are flagged as `blind.against` (the flat span runs against them)
-    and said on the card. Returns the scaled genomic points and the join record, whose `note` is the
-    sentence the species card shows."""
+    and said on the card. A flagged join (ToLaD#172) whose young end sits below the median of the
+    resolved steps is scaled for that median to meet `nxt` instead (`meet` median), so the deep past
+    peaks no further above the anchor than the genome's own max / median; the young steps the scaled
+    curve puts below `nxt` are held at it (the oldest becomes a point at `nxt` with span_kind `held`, the
+    younger are dropped). Not where `blind_src` keeps the young end (a cited decline). Returns the scaled
+    genomic points and the join record, whose `note` is the sentence the species card shows."""
     raw = deep_pts[-1]["n"] / nxt["n"]
     cited = nxt["kind"] in POINT_KINDS
     bl = blind_summary(deep_pts, dropped, blind_src)
@@ -586,7 +592,14 @@ def deep_join(deep_pts: list[dict], nxt: dict, dropped: list[dict] | None = None
                              "curve stays flat from that step instead (flagged). ")
     off = max(raw, 1 / raw)
     flag = off > DEEP_JOIN_FLAG
-    f = 1 / raw
+    # a flagged join (ToLaD#172): the young end is the least certain part of the curve (PSMC's blind spot
+    # edge, a founder history), so where it sits below the genome's long-run level (the median of its
+    # resolved steps) that median meets the anchor instead, and the young end below it is held at the
+    # anchor. Not where [deep.blind] cites the decline the young end shows (lion, cheetah): it is kept
+    res = [p["n"] for p in deep_pts if not p.get("blind")] or [deep_pts[-1]["n"]]
+    med, rmax = float(np.median(res)), max(res)
+    lift = flag and not (bl is not None and bl["kept"]) and med > deep_pts[-1]["n"]
+    f = nxt["n"] / med if lift else 1 / raw
     if cited:
         what = (f"the cited {_year_txt(nxt['year'])} "
                 + ("baseline" if nxt.get("baseline") else {"index-scaled": "index-scaled estimate",
@@ -599,22 +612,55 @@ def deep_join(deep_pts: list[dict], nxt: dict, dropped: list[dict] | None = None
         what = ("the modelled natural level in 1500 CE" if nxt["kind"] == "rangeloss" else
                 "the modelled natural baseline" if nxt["kind"] == "natural" else "today's modelled count") + \
                f" ({nxt['n']:,.0f}; no cited count)"
-    note = blind_txt + (f"The genome gives the shape, not the number: its curve is scaled ×{_x(f)} to meet "
-                        f"{what}, then held flat to "
-                        + ("1500; the range-loss trend runs from there down to the count" if below is not None
-                           else "it")
-                        + (f" (flagged: beyond {DEEP_JOIN_FLAG:g}×)" if flag else "") + ".")
+    # the young steps the scaled curve puts below the anchor: the oldest of them is held at the anchor (the
+    # curve falls to it there, then holds), the younger ones are dropped
+    n_held = 0
+    if lift:
+        while n_held < len(deep_pts) and deep_pts[-1 - n_held]["n"] * f < nxt["n"]:
+            n_held += 1
+    hp = deep_pts[len(deep_pts) - n_held:]
+    tail = ("1500; the range-loss trend runs from there down to the count" if below is not None else "it")
+    if lift:
+        # one short sentence (ToLaD#172): the factor, the level met (the card rounds the count) and what it
+        # is, and where the young end is held; "Flagged" marks the join for the card's basis list
+        desc = (what[:what.rindex(" (")] if cited else
+                {"natural": "the modelled natural baseline", "model": "today's modelled count"}.get(
+                    nxt["kind"], "the modelled natural level"))
+        note = blind_txt + (
+            f"Flagged join: genome curve scaled ×{_x(f)} so its long-run level meets {nxt['n']:,.0f} ({desc}); "
+            f"its young end, from ~{hp[0]['ago'] / 1000:.0f} kya, is held there.")
+    else:
+        note = blind_txt + (f"The genome gives the shape, not the number: its curve is scaled ×{_x(f)} to meet "
+                            f"{what}, then held flat to {tail}"
+                            + (f" (flagged: beyond {DEEP_JOIN_FLAG:g}×)" if flag else "") + ".")
     if below is not None:  # the point notes name the anchor, not the whole sentence
         what = f"the modelled natural level in 1500 CE ({nxt['n']:,.0f}), above the first cited count"
     deep_pts = [{**p, "n": p["n"] * f, "lo": p["lo"] * f, "hi": p["hi"] * f, "ne": p["ne"] * f,
                  "note": p["note"] + f"; scaled ×{_x(f)} to meet {what}"} for p in deep_pts]
+    held = None
+    if n_held:
+        h = deep_pts[-n_held]
+        k = nxt["n"] / h["n"]
+        held = {"steps": n_held, "ago": h["ago"], "year": h["year"], "min_n": min(p["n"] for p in hp) * f}
+        deep_pts = deep_pts[:-n_held] + [{
+            **h, "n": nxt["n"], "lo": h["lo"] * k, "hi": h["hi"] * k, "ne": h["ne"] * k, "span_kind": "held",
+            "held_genomic": n_held,
+            "note": h["note"] + f"; below the anchor after scaling ({h['n']:,.0f}), so held at it from here"
+                    + (f" (with {n_held - 1} younger step{'' if n_held == 2 else 's'}, dropped)" if n_held > 1 else "")
+                    + " (ToLaD#172)"}]
     join = {"rule": "scaled", "next": "cited" if cited else "natural" if below is not None else "modelled",
             # the first cited count when the natural level is above it and so is the anchor (ToLaD#143)
             "below": ({"year": below["year"], "n": below["n"], "kind": below["kind"]}
                       if below is not None else None),
             "to_kind": nxt["kind"], "to_year": nxt["year"], "to_n": nxt["n"],
-            "deep_n_raw": deep_pts[-1]["n"] / f, "deep_n": deep_pts[-1]["n"],
+            "deep_n_raw": raw * nxt["n"], "deep_n": deep_pts[-1]["n"],
             "ratio": raw, "factor": f, "flag": flag, "note": note,
+            # what met the anchor (ToLaD#172): the young end, or on a flagged join whose young end is below
+            # it, the median of the resolved steps; their max and median (levels before scaling); the young
+            # steps held at the anchor; the deep past's peak as built
+            "meet": "median" if lift else "young", "res_median_raw": med, "res_max_raw": rmax, "held": held,
+            "peak_n": max(p["n"] for p in deep_pts),
+            "peak_ago": max(deep_pts, key=lambda p: p["n"])["ago"],
             # the kept blind steps against the youngest resolved one (ToLaD#143; levels before scaling)
             "blind": bl}
     return deep_pts, join
@@ -850,8 +896,12 @@ def deep_join_summary(report: dict) -> dict:
                 "runs down to the count (`next` natural); with no cited count, the modelled level (the "
                 "natural level in 1500 CE, the natural baseline, today's modelled count; `next` modelled). "
                 "It is held flat to it. ratio = genomic "
-                "level at its young end / anchor, before scaling; factor = 1 / ratio; flagged when beyond "
-                f"{DEEP_JOIN_FLAG:g}x either way. Per species: history.species[<sp>].deep.join (its `note` is "
+                "level at its young end / anchor, before scaling; flagged when beyond "
+                f"{DEEP_JOIN_FLAG:g}x either way; factor = 1 / ratio, except on a flagged join whose young end "
+                "is below the median of its resolved steps (ToLaD#172, `meet` median): that median meets the "
+                "anchor instead (factor = anchor / res_median_raw) and the young steps it puts below the anchor "
+                "are held at it (`held`), so the deep past peaks at most res_max_raw / res_median_raw above the "
+                "anchor; not where [deep.blind] cites the young end's decline (the lion). Per species: history.species[<sp>].deep.join (its `note` is "
                 "the card's sentence).",
         "by_next": {r: sum(j["next"] == r for j in joins.values()) for r in ("cited", "natural", "modelled")},
         "factor": {"n": len(fs), "min": fs[0] if fs else None, "p10": q(0.1), "p25": q(0.25), "median": q(0.5),

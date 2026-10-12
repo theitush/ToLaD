@@ -33,6 +33,12 @@ describe('stretch classification (ToLaD#164)', () => {
     expect(basisAt('Leopard', 2026.77 - 2010)).toBe('count');
   });
 
+  it('a join met at its long-run level says so in one sentence, and is flagged (ToLaD#172)', () => {
+    const h = { ...sp('Puma').history!, deepJoin: 'Flagged join: genome curve scaled ×2.2 so its long-run level meets 1,019,752 (the modelled natural level); its young end, from ~61 kya, is held there.' };
+    expect(joinFlagged(h)).toBe(true);
+    expect(joinFlagged({ ...h, deepJoin: 'The genome gives the shape, not the number: its curve is scaled ×0.5 to meet it, then held flat to it.' })).toBe(false);
+  });
+
   it('lion: its genome join is flagged (scaled beyond 10x), the cited counts since 1950 are counted', () => {
     expect(order('Lion')).toEqual(['held', 'genome', 'flagged', 'count']);
     expect(joinFlagged(sp('Lion').history!)).toBe(true);

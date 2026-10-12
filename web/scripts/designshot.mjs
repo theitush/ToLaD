@@ -108,6 +108,10 @@ const scenes = [
   // post-glacial decline (20-10 kya, Figueiro et al. 2017), then flat to the next level (the genome scaled to meet it).
   ['blind-lion', 'about', ['Lion', 15000, 10, 0.1]],
   ['blind-leopard', 'about', ['Leopard', 15000, 10, 0.1]],
+  // A flagged join met at the genome's long-run level (ToLaD#172): the puma's column from ~2 Mya to now, the
+  // young end held at the anchor from ~61 kya, and its card with the one-sentence join.
+  ['flag-puma', 'frame', ['Puma', 100000, 1, 0.5]],
+  ['flag-puma-card', 'card', ['Puma']],
 ];
 const browser = await chromium.launch({ headless: true });
 try {
