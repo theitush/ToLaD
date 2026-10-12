@@ -403,7 +403,7 @@ describe('the fold', () => {
     }
   });
 
-  it(`zoomed into the weasels, a bend runs at most ${LEAN_CUT} px across per px of height where drawn (leanFade): the columns on screen keep all their bends, the far families' near-flat closings are culled (ToLaD#210)`, () => {
+  it(`zoomed into the weasels, a bend runs at most ${LEAN_CUT} px across per px of height where drawn (leanFade), the weasels' own at most 3.5: the columns on screen keep all their bends, the far families' near-flat closings are culled (ToLaD#210)`, () => {
     for (const mode of ['log', 'linear'] as WidthMode[]) {
       const { fan, fold, home } = folded(mode, 'curved');
       const g = fan.branches.filter((b) => /^Mustela /.test(b.sp.sci));
@@ -418,6 +418,7 @@ describe('the fold', () => {
         const sy = SY_HOME * 1.6;
         let worstOwn = 0;
         let worstAt = '';
+        let leanOwn = 0;
         let culled = 0;
         for (const b of fan.branches) {
           const own = g.includes(b);
@@ -430,6 +431,7 @@ describe('the fold', () => {
               // (Drawn: within the bound.)
               if (f > 0) expect(s).toBeLessThan(LEAN_CUT);
               else culled++;
+              if (own && y < b.splitY) leanOwn = Math.max(leanOwn, s);
               if (own && y < b.splitY && 1 - f > worstOwn) {
                 worstOwn = 1 - f;
                 worstAt = `${b.sp.sci} ${fan.time.ageAt(y).toFixed(2)} Ma ${s.toFixed(1)}`;
@@ -440,6 +442,9 @@ describe('the fold', () => {
         }
         // (The weasels' own columns, down to their splits, are never culled; something far is, zoomed in.)
         expect(worstOwn, `${mode} z${z} ${worstAt}`).toBe(0);
+        // (Bounded at the source: every fork as tall as the gaps it closes, carried ones too, over LEAN_FORK px per px
+        // at home's time scale (fold.ts carriedForks): the weasels' own bends lean ~3 px per px here, not 8.)
+        expect(leanOwn, `${mode} z${z}`).toBeLessThan(3.5);
         if (z >= 20) expect(culled, `${mode} z${z}`).toBeGreaterThan(0);
       }
     }
@@ -463,14 +468,18 @@ describe('the fold', () => {
       const w = [1e-4, 5e-4].map((t) => px(wolf, t));
       expect(Math.abs(w[1] - w[0])).toBeLessThan(0.5);
       // The families beside the dogs: the dogs' opening moves them by one amount at every height from the dogs'
-      // crown up (their room, kept from their split), not with each of the dogs' splits.
+      // crown up (their room, kept from their split), not with each of the dogs' splits. (From the crown's fork's
+      // top: it closes the gaps the dogs' splits carry to it over a bend, ToLaD#210, ~4.6 Ma here.)
       const S = fan.root.strands;
+      const crownTop = Math.min(...fold.forks().filter((_, p) => fold.pairNode[p] === v).map(([a]) => a));
+      const ts = [0, 1e-3, 0.1, 1, 3, 10].filter((t) => fan.time.y(t) <= crownTop);
+      expect(ts.length).toBeGreaterThan(4);
       const inDogs = Array.from(fold.a, (_, p) => v.strands.includes(S[p]) && v.strands.includes(S[p + 1]));
       const at = (s: FanBranch, open: boolean) => {
         const keep = Float64Array.from(fold.a);
         if (!open) inDogs.forEach((d, p) => d && (fold.a[p] = 0));
         fold.ver++;
-        const xs = [0, 1e-3, 0.1, 1, 3, 10].map((t) => px(s, t));
+        const xs = ts.map((t) => px(s, t));
         fold.a.set(keep);
         fold.ver++;
         return xs;
