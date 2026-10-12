@@ -87,8 +87,84 @@ export const EASE_MAX = 1.875;
 export const LEAN_CUT = 8;
 /** A stretch's share drawn (0-1), by its lean on screen (px across per px of height). */
 export function leanFade(dxPx: number, dyPx: number): number {
+  return smoother(leanShare(dxPx, dyPx));
+}
+/** leanFade before its ease: 1 up to LEAN_MAX, falling straight to 0 at LEAN_CUT. */
+export function leanShare(dxPx: number, dyPx: number): number {
   const s = Math.abs(dxPx) / Math.max(Math.abs(dyPx), 1e-9);
-  return s <= LEAN_MAX ? 1 : s >= LEAN_CUT ? 0 : smoother((LEAN_CUT - s) / (LEAN_CUT - LEAN_MAX));
+  return s <= LEAN_MAX ? 1 : s >= LEAN_CUT ? 0 : (LEAN_CUT - s) / (LEAN_CUT - LEAN_MAX);
+}
+
+/**
+ * A culled stretch never leaves a column ending in a flat edge (ToLaD#210): zoomed into a small group, a far
+ * family's columns stand straight on screen up to where they close a gap of thousands of px, too flat to draw;
+ * cut there, their tops read as a wide stepped slab. Instead the share drawn along a strand rises at most
+ * 1/LEAN_FADE_PX per px of height away from a culled stretch: the column fades out over LEAN_FADE_PX px below
+ * (and above) it.
+ */
+export const LEAN_FADE_PX = 60;
+/** A fading stretch is drawn in slices about this tall (px), each at its own share. */
+const LEAN_SLICE_PX = 6;
+
+/**
+ * The shares at a strand's stretches' ends (ToLaD#210): n stretches bottom first, lin[i] its own share (leanShare,
+ * 1 for a stretch of no height), h[i] its height on screen (px); into V[0..n], the least of every stretch's share
+ * plus its distance away over LEAN_FADE_PX (a distance transform, up then down); vBot and vTop, the shares just
+ * beyond its ends (a column's backdrop's daughters', drawStem). Returns whether any is under 1.
+ */
+export function leanEnds(n: number, lin: Float64Array, h: Float64Array, V: Float64Array, vBot = 1, vTop = 1): boolean {
+  let m = Math.min(1, vBot);
+  V[0] = m;
+  for (let j = 1; j <= n; j++) V[j] = m = Math.min(m + h[j - 1] / LEAN_FADE_PX, lin[j - 1], 1);
+  m = Math.min(1, vTop);
+  let any = false;
+  for (let j = n; j >= 0; j--) {
+    if (j < n) m = Math.min(m + h[j] / LEAN_FADE_PX, lin[j], 1);
+    if (m < V[j]) V[j] = m;
+    if (V[j] < 1) any = true;
+  }
+  return any;
+}
+
+/**
+ * A stretch's drawn pieces (ToLaD#210): its share lin, its ends' vb (bottom) and vt (top, leanEnds), its height hPx;
+ * into out as [t0, t1, a] triples (t from its bottom 0 to its top 1, a the eased share drawn, > 0). Whole at its own
+ * share where its ends allow it, else sliced where it fades. Returns how many.
+ */
+export function leanPieces(lin: number, vb: number, vt: number, hPx: number, out: number[]): number {
+  let n = 0;
+  const put = (t0: number, t1: number, s: number) => {
+    const a = smoother(Math.max(0, Math.min(1, s)));
+    if (a > 0 && t1 > t0) {
+      out[n++] = t0;
+      out[n++] = t1;
+      out[n++] = a;
+    }
+  };
+  if (!(lin > 0)) return 0;
+  if (Math.min(vb, vt) >= lin || !(hPx > 0)) {
+    put(0, 1, lin);
+    return n / 3;
+  }
+  const F = LEAN_FADE_PX;
+  const rb = Math.min(hPx, Math.max(0, (lin - vb) * F));
+  const rt = Math.min(hPx, Math.max(0, (lin - vt) * F));
+  const slices = (d0: number, d1: number) => {
+    const k = Math.max(1, Math.ceil((d1 - d0) / LEAN_SLICE_PX));
+    for (let i = 0; i < k; i++) {
+      const a = d0 + ((d1 - d0) * i) / k;
+      const b = d0 + ((d1 - d0) * (i + 1)) / k;
+      const d = (a + b) / 2;
+      put(a / hPx, b / hPx, Math.min(lin, vb + d / F, vt + (hPx - d) / F));
+    }
+  };
+  if (rb + rt >= hPx) slices(0, hPx);
+  else {
+    if (rb > 0) slices(0, rb);
+    put(rb / hPx, 1 - rt / hPx, lin);
+    if (rt > 0) slices(hPx - rt, hPx);
+  }
+  return n / 3;
 }
 
 /** A strand's stretches (Fold.roomPlan): their ends from its split up (B[0] its split, then each bend's middle, its last height), and their rooms. */
