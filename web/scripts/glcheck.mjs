@@ -15,7 +15,7 @@ try {
   const page = await (await browser.newContext({ viewport: { width: 400, height: 400 } })).newPage();
   const q = [process.env.EDGE ? `edge=${process.env.EDGE}` : '', process.env.LEVEL ? `level=${process.env.LEVEL}` : ''].filter(Boolean).join('&');
   await page.goto(pathToFileURL(resolve('dist-single/index.html')).href + (q ? `?${q}` : ''));
-  await page.waitForFunction(() => !!window.__fan && !!window.__fanMesh && !!window.__fan.gl);
+  await page.waitForFunction(() => !!window.__fan && !!window.__fanMesh && !!window.__fan.gl, null, { timeout: Number(process.env.LOAD_MS || 30000) });
   const r = await page.evaluate(() => {
     const f = window.__fan;
     const M = window.__fanMesh;
