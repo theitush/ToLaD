@@ -24,7 +24,7 @@
 //   - zoom out: no further than the whole fan with a margin.
 //   - pan: some of the fan always stays on screen.
 
-import { columnsAt, type Fan, type FanBranch } from './layout';
+import { columnsAt, nearestColumn, type Fan, type FanBranch } from './layout';
 
 /** A span of this many years ... */
 export const MIN_YEARS = 10;
@@ -287,6 +287,16 @@ export class FanCamera {
     let best = x;
     let bd = Infinity;
     for (const h of ys) {
+      // (Folded: the strands in order, a search instead of every column, ToLaD#255.)
+      const q = nearestColumn(this.fan, x, h);
+      if (q !== null) {
+        if (q === x) return x;
+        if (Math.abs(q - x) < bd) {
+          bd = Math.abs(q - x);
+          best = q;
+        }
+        continue;
+      }
       for (const [a, b] of this.contentAt(h)) {
         const p = Math.min(b, Math.max(a, x));
         if (Math.abs(p - x) < bd) {

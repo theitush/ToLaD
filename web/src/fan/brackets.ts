@@ -10,7 +10,7 @@
  * the zoom moves, never while panning), the label widths once per text.
  */
 import type { Camera } from './camera';
-import { laneAt, leftAt, type Fan, type FanNode } from './layout';
+import { laneW, leftAt, type Fan, type FanNode } from './layout';
 import { FAMILY_EN, ORDER_EN, ORDER_TAXA, type Split } from './splits';
 
 export type CladeRank = 'genus' | 'subfamily' | 'family' | 'superfamily' | 'suborder' | 'order';
@@ -218,6 +218,14 @@ export interface BracketCam {
 /**
  * The stack for a view: its layout at this frame (over the species' pills on "now"), drawing and hits.
  */
+/** Fan.branches' positions in the columns' order (FanBranch.index), kept per fan. */
+const orderCache = new WeakMap<Fan, number[]>();
+function drawnOrder(fan: Fan): number[] {
+  let o = orderCache.get(fan);
+  if (!o) orderCache.set(fan, (o = fan.branches.map((_, k) => k).sort((p, q) => fan.branches[p].index - fan.branches[q].index)));
+  return o;
+}
+
 export class Brackets {
   /** `nameFont` the English names' CSS font, `latinFont` the Latin's. */
   constructor(
@@ -267,7 +275,7 @@ export class Brackets {
     bs.forEach((b, k) => {
       const y = Math.max(b.tipY, now);
       if (folded) {
-        const cx = leftAt(b, y) + laneAt(b, y).w / 2;
+        const cx = leftAt(b, y) + laneW(b, y) / 2;
         l[k] = cx - b.width / 2;
         r[k] = cx + b.width / 2;
       } else {
@@ -276,7 +284,7 @@ export class Brackets {
       }
     });
     // Neighbours' rooms (in the columns' order) that overlap (closed up, fold.ts) meet halfway: disjoint clades never overlap.
-    const order = bs.map((_, k) => k).sort((p, q) => bs[p].index - bs[q].index);
+    const order = drawnOrder(fan);
     for (let j = 1; j < order.length; j++) {
       const p = order[j - 1];
       const q = order[j];
@@ -581,8 +589,27 @@ export function cladeCamera(
     const h = ((b - a) / 2) * Math.max(1, room / (TAP_FILL * c.w));
     return band(c.frame(m - h, m + h, v.yBot, true));
   };
-  return foldedFrame(fan, c.w, frame);
+  // (The mammal level: each clade's frame kept for the screen's size, the fold put where it leaves it. A level's
+  // ladder (ToLaD#258) asks a few each time the view comes to rest, each ~100 refolds of ~6,000 strands, ToLaD#255.)
+  const f = fan.tess.fold;
+  if (!f?.ordShare.length) return foldedFrame(fan, c.w, frame);
+  const key = `${c.w}x${(c as { h?: number }).h ?? 0}`;
+  let m = frameCache.get(fan);
+  if (!m) frameCache.set(fan, (m = new Map()));
+  let byV = m.get(key);
+  if (!byV) m.set(key, (byV = new Map()));
+  const hit = byV.get(v);
+  if (hit) {
+    f.setScale(hit.sx, c.w);
+    f.setAnchor(hit.cx, hit.cy, hit.sx, c.w);
+    return { ...hit };
+  }
+  const cam = foldedFrame(fan, c.w, frame);
+  byV.set(v, { ...cam });
+  return cam;
 }
+/** cladeCamera's frames at the mammal level, per fan, screen size and clade. */
+const frameCache = new WeakMap<Fan, Map<string, Map<FanNode, Camera>>>();
 
 /**
  * The frame a flight lands on, folded (fold.ts) or not: `frame` frames what it shows as the fold stands now (a clade's
@@ -612,7 +639,9 @@ export function foldedFrame(fan: Fan, w: number, frame: () => Camera): Camera {
     let hi = Math.log(cam.sx) + 1;
     for (let k = 0; k < 8 && settleAt(Math.exp(lo)).sx < Math.exp(lo); k++) lo -= 2;
     for (let k = 0; k < 8 && settleAt(Math.exp(hi)).sx > Math.exp(hi); k++) hi += 2;
-    for (let k = 0; k < 40 && hi - lo > 1e-7; k++) {
+    // (To a hair of the zoom; at the mammal level a ten-thousandth, each round ~6,000 strands refolded, ToLaD#255.)
+    const tol = f.ordShare.length ? 1e-4 : 1e-7;
+    for (let k = 0; k < 40 && hi - lo > tol; k++) {
       const m = (lo + hi) / 2;
       if (settleAt(Math.exp(m)).sx > Math.exp(m)) lo = m;
       else hi = m;

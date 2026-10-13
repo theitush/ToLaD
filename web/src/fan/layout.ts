@@ -258,10 +258,16 @@ export function nodeQ(v: FanNode, ageMa: number): number {
 
 /** The column strand b is in at height y ≥ b.splitY: the deepest split at or above y. */
 export function segAt(b: FanBranch, y: number): PathSeg {
+  // (Its path runs down, older splits ever lower: the last seg at or above y, by halves (~50 deep at the mammal level, ToLaD#255).)
   const p = b.path;
-  let s = p[0];
-  for (let k = 1; k < p.length && p[k].y <= y; k++) s = p[k];
-  return s;
+  let lo = 0;
+  let hi = p.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (p[mid].y <= y) lo = mid;
+    else hi = mid - 1;
+  }
+  return p[lo];
 }
 
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
@@ -305,6 +311,14 @@ export function lanesAt(b: FanBranch, y: number, mode: WidthMode = b.tess.mode):
   }
   const s = segAt(b, y);
   return [b.baseW, segGreen(s, age, y)];
+}
+
+/** lanesAt(b, y)[0] alone (its width, the green not worked out): the fold's rooms and edges ask it ~6,000 times a row (ToLaD#255). */
+export function laneW(b: FanBranch, y: number, age?: number): number {
+  if (y < b.tipY) return 0;
+  if (y >= b.splitY) return b.baseW;
+  const n = b.pop.aliveAt(age ?? b.tess.time.ageAt(y));
+  return n > 0 ? b.unit * g(n, b.tess.mode) : 0;
 }
 
 /** A strand's green in a parent column at height y: from its own share at the split into the column's prefix (see FanNode.blend). */
@@ -379,7 +393,7 @@ export class Tess {
    * (Population.max); each parent column's slice: its place at both ends of
    * the stretch (nodeLeftAt is monotonic too).
    */
-  xRange(b: FanBranch, y0: number, y1: number): [number, number] {
+  xRange(b: FanBranch, y0: number, y1: number, slot = -1): [number, number] {
     const lo = Math.max(y0, b.tipY);
     const hi = Math.min(y1, this.bottom);
     let L = Infinity;
@@ -389,7 +403,7 @@ export class Tess {
     const f = this.fold;
     // (Folded on its grid: read straight off the fold's rows, every strand's at once per span, ToLaD#209.)
     if (f && f.gridH > 0) {
-      const t = this.xTable(y0, y1);
+      const t = this.xTable(y0, y1, slot);
       const i = b.index;
       if (t.L[i] > t.R[i]) return [Infinity, -Infinity];
       const wMax = Math.max(b.baseW, lo < b.splitY ? b.unit * g(b.pop.max, this.mode) : 0);
@@ -471,14 +485,20 @@ export class Tess {
    * beside it). Rows above a strand's tip or below the bottom count too (only wider). The last two tables kept for
    * the fold's version and grid, one serving any span within its own (the lanes' a frame, the individuals' within it).
    */
-  private xTable(y0: number, y1: number): { L: Float64Array; R: Float64Array } {
+  private xTable(y0: number, y1: number, slot = -1): { L: Float64Array; R: Float64Array } {
     const f = this.fold!;
     // (A table over a span holding this one does: wider only. The individuals' spans lie within the lanes'.)
-    for (const t of this.xTables) if (t.fold === f && t.ver === f.ver && t.h === f.gridH && t.y0 <= y0 && t.y1 >= y1) return t;
+    // (`slot` (2): a caller's own table (the labels' boxes, ToLaD#255), apart from the draw's two, which it never widens.)
+    const [s0, s1] = slot >= 0 ? [slot, slot] : [0, 1];
+    for (let j = s0; j <= s1; j++) {
+      const t = this.xTables[j];
+      if (t && t.fold === f && t.ver === f.ver && t.h === f.gridH && t.y0 <= y0 && t.y1 >= y1) return t;
+    }
     const S = f.strands.length;
-    const t = this.xTables[this.xNext] ?? { fold: f, ver: 0, h: 0, y0: 0, y1: 0, L: new Float64Array(S), R: new Float64Array(S), prev: new Float64Array(S), dPrev: new Float64Array(S) };
-    this.xTables[this.xNext] = t;
-    this.xNext ^= 1;
+    const at = slot >= 0 ? slot : this.xNext;
+    const t = this.xTables[at] ?? { fold: f, ver: 0, h: 0, y0: 0, y1: 0, L: new Float64Array(S), R: new Float64Array(S), prev: new Float64Array(S), dPrev: new Float64Array(S) };
+    this.xTables[at] = t;
+    if (slot < 0) this.xNext ^= 1;
     t.fold = f;
     t.ver = f.ver;
     t.h = f.gridH;
@@ -609,11 +629,11 @@ export function leftAt(b: FanBranch, y: number, w?: number, river = false): numb
   const f = river ? undefined : b.tess.fold;
   const l = f ? f.left(b.index, y) : null;
   // (Folded: its own column about its room's centre, or a boom's against its room's inner edge, fold.ts; a slot in a parent column at its left.)
-  if (l !== null) return y < b.splitY ? l - ((w ?? lanesAt(b, y)[0]) * (1 - f!.flare[b.index])) / 2 : l;
+  if (l !== null) return y < b.splitY ? l - ((w ?? laneW(b, y)) * (1 - f!.flare[b.index])) / 2 : l;
   if (y < b.splitY) {
     const tc = b.x0 + b.baseW / 2;
     const c = tc + (b.cx - tc) * peelU(b.tess.edge, b.splitY, b.leanY, y);
-    return c - (w ?? lanesAt(b, y)[0]) / 2;
+    return c - (w ?? laneW(b, y)) / 2;
   }
   const s = segAt(b, y);
   return nodeLeftAt(s.node, y, true) + s.off;
@@ -647,6 +667,115 @@ export function columnsAt(fan: Fan, y: number): [number, number][] {
     out.push([l, l + v.width]);
   }
   return out;
+}
+
+/**
+ * The point of columnsAt(fan, y) nearest x (x itself on a column), or NaN if there is none; null if it takes
+ * columnsAt's pass (no fold, or below the stem). Folded, the strands stand left to right: a binary search on their
+ * folded edges and a few columns either side, not every species (ToLaD#255: ~6,000 a height at the mammal level).
+ */
+export function nearestColumn(fan: Fan, x: number, y: number): number | null {
+  const S = fan.branches;
+  const f = S[0]?.tess.fold;
+  if (!f || !(y <= fan.root.yBot) || f.strands.length !== S.length) return null;
+  const B = f.strands;
+  const n = B.length;
+  // (The last strand whose folded edge is at or left of x.)
+  let lo = -1;
+  let hi = n - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if ((f.left(mid, y) ?? -Infinity) <= x) lo = mid;
+    else hi = mid - 1;
+  }
+  // Strand i's column at y: [a, b] (its own lanes, or the parent column it is in), and the strands after it in that column.
+  const col = (i: number): [number, number, number] | null => {
+    const b = B[i];
+    if (y < b.tipY) return null;
+    if (y < b.splitY) {
+      const l = leftAt(b, y);
+      return [l, l + laneAt(b, y).w, i + 1];
+    }
+    const v = segAt(b, y).node;
+    const l = nodeLeftAt(v, y);
+    return [l, l + v.width, v.strands[v.strands.length - 1].index + 1];
+  };
+  let best = NaN;
+  let bd = Infinity;
+  const near = (c: [number, number, number]) => {
+    const p = Math.min(c[1], Math.max(c[0], x));
+    if (Math.abs(p - x) < bd) {
+      bd = Math.abs(p - x);
+      best = p;
+    }
+  };
+  // (Two columns either side: the strands' edges are in order, so the nearest is among them.)
+  let found = 0;
+  for (let i = Math.max(0, lo); i < n && found < 3; ) {
+    const c = col(i);
+    if (!c) {
+      i++;
+      continue;
+    }
+    near(c);
+    found++;
+    i = c[2];
+  }
+  found = 0;
+  for (let i = lo - 1; i >= 0 && found < 2; i--) {
+    const c = col(i);
+    if (!c) continue;
+    near(c);
+    found++;
+    // (Past its column's first strand.)
+    if (y >= B[i].splitY) i = segAt(B[i], y).node.strands[0].index;
+  }
+  return bd === 0 ? x : best;
+}
+
+/** Each fan's strands' places in Fan.branches (their order, which a tie goes by). */
+const branchPos = new WeakMap<Fan, Int32Array>();
+/**
+ * The strand nearest x at height y (its lanes [leftAt, + laneAt's w], 0 inside; a tie to the first in Fan.branches),
+ * none past its tip; undefined if it takes a pass over every strand (no fold). Folded: a binary search on the folded
+ * edges and the strands either side (ToLaD#255).
+ */
+export function nearestStrand(fan: Fan, x: number, y: number): FanBranch | null | undefined {
+  const S = fan.branches;
+  const f = S[0]?.tess.fold;
+  if (!f || f.strands.length !== S.length) return undefined;
+  let pos = branchPos.get(fan);
+  if (!pos) {
+    pos = new Int32Array(S.length);
+    S.forEach((b, k) => (pos![b.index] = k));
+    branchPos.set(fan, pos);
+  }
+  const B = f.strands;
+  const n = B.length;
+  let lo = -1;
+  let hi = n - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if ((f.left(mid, y) ?? -Infinity) <= x) lo = mid;
+    else hi = mid - 1;
+  }
+  let best: FanBranch | null = null;
+  let bd = Infinity;
+  const try1 = (i: number): boolean => {
+    const b = B[i];
+    if (y < b.tipY) return false;
+    const left = leftAt(b, y);
+    const d = Math.max(0, left - x, x - left - laneW(b, y));
+    if (d < bd || (d === bd && best && pos![i] < pos![best.index])) {
+      bd = d;
+      best = b;
+    }
+    return true;
+  };
+  // (Three strands either side with lanes there: their edges are in order, so the nearest is among them.)
+  for (let i = Math.max(0, lo), k = 0; i < n && k < 3; i++) if (try1(i)) k++;
+  for (let i = lo - 1, k = 0; i >= 0 && k < 3; i--) if (try1(i)) k++;
+  return best;
 }
 
 /** Per species' history: the most alive in each cell of its column (leaf), the same for every width mode. */

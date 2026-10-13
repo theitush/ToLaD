@@ -9,6 +9,7 @@ import { appendFileSync, writeFileSync } from 'node:fs';
 import { Session } from 'node:inspector/promises';
 import { describe, it } from 'vitest';
 import { MeshBatch, RectBatch } from './meshgl';
+import { MESH_F } from './mesh';
 import { CARNIVORA, FELIDAE, mammaliaClade } from './panthera';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree } from './splits';
 import { laneAt, leftAt } from './layout';
@@ -23,18 +24,43 @@ const out = (s: string) => {
   if (RUN && process.env.FANPERF !== '1') appendFileSync(process.env.FANPERF!, s + '\n');
 };
 
+/** FANPERF_HASH=1: a hash of everything each frame sends (the GL batches, the 2D calls' arguments), per scene: frames identical before and after a change (ToLaD#255). */
+const HASH = !!process.env.FANPERF_HASH;
+let hsh = 0x811c9dc5;
+let chs = 0x811c9dc5;
+const f64 = new Float64Array(1);
+const u32 = new Uint32Array(f64.buffer);
+function mix(...a: unknown[]): void {
+  if (!HASH) return;
+  for (const v of a) {
+    if (typeof v === 'number') {
+      f64[0] = v;
+      hsh = Math.imul(hsh ^ u32[0], 16777619) ^ u32[1];
+      hsh = Math.imul(hsh, 16777619);
+    } else if (typeof v === 'string') for (let i = 0; i < v.length; i++) hsh = Math.imul(hsh ^ v.charCodeAt(i), 16777619);
+  }
+}
+function mixArr(f: Float32Array, n: number): void {
+  if (!HASH) return;
+  const u = new Uint32Array(f.buffer, f.byteOffset, n);
+  for (let i = 0; i < n; i++) hsh = Math.imul(hsh ^ u[i], 16777619);
+}
+
 function stubs() {
   const calls = { stroke: 0, fill: 0, text: 0, pieces: 0 };
   class P {
-    moveTo() {
+    moveTo(...a: unknown[]) {
       calls.pieces++;
+      mix('m', ...a);
     }
-    lineTo() {
+    lineTo(...a: unknown[]) {
       calls.pieces++;
+      mix('l', ...a);
     }
     arc() {}
-    bezierCurveTo() {
+    bezierCurveTo(...a: unknown[]) {
       calls.pieces++;
+      mix('c', ...a);
     }
     quadraticCurveTo() {}
     closePath() {}
@@ -63,8 +89,9 @@ function stubs() {
     globalAlpha: 1,
     setTransform: noop,
     clearRect: noop,
-    fillRect() {
+    fillRect(...a: unknown[]) {
       calls.fill++;
+      mix('R', ...a);
     },
     strokeRect: noop,
     stroke() {
@@ -75,18 +102,21 @@ function stubs() {
     },
     beginPath: noop,
     closePath: noop,
-    moveTo() {
+    moveTo(...a: unknown[]) {
       calls.pieces++;
+      mix('M', ...a);
     },
-    lineTo() {
+    lineTo(...a: unknown[]) {
       calls.pieces++;
+      mix('L', ...a);
     },
     arc: noop,
     arcTo: noop,
     rect: noop,
     roundRect: noop,
-    bezierCurveTo() {
+    bezierCurveTo(...a: unknown[]) {
       calls.pieces++;
+      mix('C', ...a);
     },
     quadraticCurveTo: noop,
     save: noop,
@@ -98,8 +128,9 @@ function stubs() {
     getTransform: () => ({ a: 1, d: 1, e: 0, f: 0 }),
     scale: noop,
     setLineDash: noop,
-    fillText() {
+    fillText(...a: unknown[]) {
       calls.text++;
+      mix('T', ...a);
     },
     strokeText: noop,
     measureText: (t: string) => ({ width: t.length * 7.5 }),
@@ -140,6 +171,9 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
     }
     let t0 = performance.now();
     const { canvas, calls } = stubs();
+    // (Hashed: a frame clock, 1/60 s a draw, so the labels' fades read the same whatever the frames took; the times then mean nothing.)
+    let clock = 0;
+    if (HASH) performance.now = () => clock;
     // FANPERF_CLADE=carnivora: the order (ToLaD#146) instead of the cats; =mammalia: every mammal (ToLaD#247).
     const mamm = process.env.FANPERF_CLADE === 'mammalia';
     const carn = process.env.FANPERF_CLADE === 'carnivora';
@@ -159,12 +193,19 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
       gl.over.n = 0;
     };
     (v as unknown as { gl: unknown }).gl = gl;
+    if (HASH) {
+      const draw = v.draw.bind(v);
+      v.draw = () => {
+        clock += 1000 / 60;
+        draw();
+      };
+    }
     const t1 = performance.now();
     v.draw();
     const tFirst = performance.now() - t1;
     out(`load: new FanView ${tNew.toFixed(0)} ms, first draw ${tFirst.toFixed(0)} ms`);
     // Per-part timings: the view's private draw steps, wrapped.
-    const parts = ['drawStrand', 'drawMerged', 'drawIndividuals', 'drawLabels', 'drawStem', 'drawStemFade', 'drawTimeAxis', 'drawTouch', 'drawGutter', 'drawEvents', 'drawHeld', 'applyFold', 'layoutBrackets'];
+    const parts = ['drawStrand', 'drawMerged', 'drawIndividuals', 'drawLabels', 'lodNow', 'drawStem', 'drawStemFade', 'drawTimeAxis', 'drawTouch', 'drawGutter', 'drawEvents', 'drawHeld', 'applyFold', 'layoutBrackets'];
     const acc: Record<string, number> = {};
     const proto = FanView.prototype as unknown as Record<string, (...a: unknown[]) => unknown>;
     for (const p of parts) {
@@ -211,6 +252,7 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
     const unit = fan.branches[0].unit;
     const scenes: [string, () => void][] = [
       ['home (linear)', () => (v.cam = v.homeCamera())],
+      ['pinch+pan (home)', () => (v.cam = v.homeCamera())],
     ];
     // The domestic cat's funnel: its column centred, `ago` years back, the width bar reading perBar, time zoom sy.
     for (const [ago, perBar, sy] of [
@@ -278,7 +320,7 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
           v.camera.settle();
         },
       ]);
-    out(`scene                 p50    p95    max   (ms, node${CPU ? ' CPU time' : ''})`);
+    out(`scene                 p50    p95    max   gest  frame  level   (ms, node${CPU ? ' CPU time' : ''}: draw(); gest the zoomAbout + pan before it, p50; frame both, p50; level: levelNow once at the gesture's end)`);
     const only = process.env.FANPERF_ONLY ? new RegExp(process.env.FANPERF_ONLY) : null;
     for (const [name, set] of scenes) {
       if (only && !only.test(name)) continue;
@@ -323,22 +365,45 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
       }
       for (const k of Object.keys(acc)) delete acc[k];
       const times: number[] = [];
+      // (The gesture itself: zoomAbout and pan, the camera's settle, the fold's anchor and follow, ToLaD#255.)
+      const gest: number[] = [];
       let inst = 0;
       let rects = 0;
       calls.stroke = calls.fill = calls.text = calls.pieces = 0;
       lp.n = lp.pts = 0;
       for (const k of Object.keys(cnt)) delete cnt[k];
       const N = 90;
+      // ('pinch+pan': a faster pinch and a wider pan, as a finger does, ToLaD#255.)
+      const fast = name.startsWith('pinch');
+      // (Under the fingers, as InputHandlers has it: the level (levelNow) waits for the gesture's end, timed apart below.)
+      const vg = v as unknown as { gestureStart(): void; gestureEnd(): void; levelNow(now?: boolean): unknown };
+      vg.gestureStart();
       for (let k = 0; k < N; k++) {
-        v.zoomAbout(195, 422, k < 45 ? 1.01 : 1 / 1.01);
-        v.pan(k % 2 ? 0.5 : -0.5, 0);
+        const t0 = CPU ? cpuMs() : performance.now();
+        v.zoomAbout(195, 422, fast ? (k < 45 ? 1.04 : 1 / 1.04) : k < 45 ? 1.01 : 1 / 1.01);
+        v.pan(fast ? (k % 30 < 15 ? 6 : -6) : k % 2 ? 0.5 : -0.5, fast ? (k % 20 < 10 ? 4 : -4) : 0);
         // (FANPERF_CPU=1: this process's CPU time, not the wall clock: steadier on a busy machine.)
         const t = CPU ? cpuMs() : performance.now();
+        gest.push(t - t0);
+        // (The camera the gesture left, hashed apart: cam.)
+        const hk = hsh;
+        hsh = chs;
+        mix(v.cam.cx, v.cam.cy, v.cam.sx, v.cam.sy);
+        chs = hsh;
+        hsh = hk;
         v.draw();
         times.push((CPU ? cpuMs() : performance.now()) - t);
+        mixArr(gl.under.f, 12 * gl.under.n);
+        mixArr(gl.mesh.f, MESH_F * gl.mesh.n);
+        mixArr(gl.over.f, 12 * gl.over.n);
         inst = Math.max(inst, gl.mesh.n);
         rects = Math.max(rects, gl.under.n);
       }
+      vg.gestureEnd();
+      // The gesture's end: the level the view is at worked out (ToLaD#258's ladder), once.
+      const tl = performance.now();
+      vg.levelNow(true);
+      const tLevel = performance.now() - tl;
       // (FANPERF_TIMES=1: every frame's time, to see where the slow ones fall.)
       if (process.env.FANPERF_COUNT) out(`  calls/f:\n${Object.entries(cnt).sort((a, b) => b[1] - a[1]).map(([k, n]) => `    ${(n / N).toFixed(0).padStart(6)} ${k}`).join('\n')}`);
       if (process.env.FANPERF_TIMES) out(`  ${times.map((x) => x.toFixed(0)).join(' ')}`);
@@ -348,8 +413,10 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
         .slice(0, 5)
         .map(([k, t]) => `${k.replace('draw', '')} ${(t / N).toFixed(1)}`)
         .join(', ');
+      if (HASH) out(`  hash ${(hsh >>> 0).toString(16).padStart(8, '0')} cam ${(chs >>> 0).toString(16).padStart(8, '0')}`);
+      hsh = chs = 0x811c9dc5;
       out(
-        `${name.padEnd(20)} ${f(q(times, 0.5))} ${f(q(times, 0.95))} ${f(Math.max(...times))}  inst ${String(inst).padStart(6)} rects ${String(rects).padStart(5)} strokes/f ${(calls.stroke / N).toFixed(0).padStart(5)} pieces/f ${(calls.pieces / N).toFixed(0).padStart(6)} strands/f ${(lp.n / N).toFixed(0).padStart(3)} pts/f ${(lp.pts / N).toFixed(0).padStart(6)} | ${top}`,
+        `${name.padEnd(20)} ${f(q(times, 0.5))} ${f(q(times, 0.95))} ${f(Math.max(...times))} ${f(q(gest, 0.5))} ${f(q(times.map((x, i) => x + gest[i]), 0.5))} ${f(tLevel)}  inst ${String(inst).padStart(6)} rects ${String(rects).padStart(5)} strokes/f ${(calls.stroke / N).toFixed(0).padStart(5)} pieces/f ${(calls.pieces / N).toFixed(0).padStart(6)} strands/f ${(lp.n / N).toFixed(0).padStart(3)} pts/f ${(lp.pts / N).toFixed(0).padStart(6)} | ${top}`,
       );
     }
     if (prof) {
