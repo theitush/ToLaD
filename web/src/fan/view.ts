@@ -728,7 +728,8 @@ export function labelSpots(
     // (On "now", under the brackets, ToLaD#193: a long one reaches up over their lines.)
     const y1 = Math.max(nowS - 4, top + len);
     const fit = fit0 * botFit(y1);
-    const xs = lo <= hi - LABEL_PILL ? [lo, (lo + hi) / 2, hi] : [Math.min(Math.max((sa + sb) / 2, LABEL_AXIS_X + half), c.w - half)];
+    // (A level's groups, ToLaD#258: the middle first, so a wide group leaves its ends to the narrow ones beside it.)
+    const xs = lo <= hi - LABEL_PILL ? (level ? [(lo + hi) / 2, lo, hi] : [lo, (lo + hi) / 2, hi]) : [Math.min(Math.max((sa + sb) / 2, LABEL_AXIS_X + half), c.w - half)];
     xs.forEach((x, k) => {
       out.push({ key: `n${vi}:fam${k}`, id: `n${vi}`, place: 'fam', v, fam: v, pic: level ? groupFace(v) : commonest(v), text, rank: [-1, wb - wa, vi], x, y1, box: [x - half, y1 - len, x + half, y1], fit, span: brk ? undefined : [sa, sb], plus: px });
     });
