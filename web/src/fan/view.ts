@@ -13,6 +13,7 @@ import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01 } from './meshgl';
 import { Lod } from './lod';
 import { Fold, type FoldState } from './fold';
+import { Steady, wantSteady } from './steady';
 import { COLUMN_DIM, columnSpans, EVENT_TINT, eventAt, eventSpans, type EventSpan } from './colstyle';
 import { drawTwigs, kLogAt, laneDim, LINEAGE, LIVING, TEX_HAIR_PX, TWIG_GRAY, TwigModel, type IndInfo, type TwigStats } from './twigs';
 import type { MeshBatch, RectBatch } from './meshgl';
@@ -1171,8 +1172,10 @@ export class FanView implements InputHandlers {
   }
 
   private withFold(fan: Fan): Fan {
-    if (this.folds) {
-      const f = new Fold(fan);
+    // (?layout=steady, ToLaD#259: rooms fixed between each branch's own splits, steady.ts; at the cats' level every split open.)
+    const steady = wantSteady();
+    if (this.folds || steady) {
+      const f = steady ? new Steady(fan, !this.folds) : new Fold(fan);
       f.setAll(0);
       fan.tess.fold = f;
     }
