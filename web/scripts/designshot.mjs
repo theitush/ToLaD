@@ -174,7 +174,7 @@ const scenes = [
   ['pill-2', 'tapagain'],
   ['pill-3', 'tapagain'],
   // ToLaD#241: a species' pill tapped from home (its branch framed, its card open); then deep in the least weasel's past,
-  // a double-tap at a time one step back: its frame, its clades', home. (`backtap`: a double-tap on the fan as it is.)
+  // a double-tap at a time one step back: its frame, its clades', home. (`backtap`: a double-tap on nothing, the fan as it is.)
   ['back-pill', 'tappill'],
   ['back-0', 'frame', ['Least weasel', 1.5e6, 20]],
   ['back-1', 'backtap'],
@@ -182,6 +182,12 @@ const scenes = [
   ['back-3', 'backtap'],
   ['back-4', 'backtap'],
   ['back-5', 'backtap'],
+  // ToLaD#245: home; a double-tap on the column farthest from the centre (into that species' frame); then a double-tap
+  // on empty space, one step back, twice. (`dblfar`: from home; `dblempty`: the fan as it is, on an empty spot.)
+  ['dbl-0', 'home'],
+  ['dbl-1', 'dblfar'],
+  ['dbl-2', 'dblempty'],
+  ['dbl-3', 'dblempty'],
   // The groups the view is inside pinned at the top (ToLaD#233): home (nothing pinned, the stack itself), deep in a
   // bear's and a weasel's past ("now" far off the top), and (LEVEL=cats) the lion's past inside Panthera.
   ['pin-home', 'home'],
@@ -215,7 +221,7 @@ try {
       ([kind, args, width]) => {
         const f = window.__fan;
         // (A tap again on a pill keeps the fan as it is: setMode lays it out anew, a new fan the last flight is not in.)
-        if (kind !== 'tapagain' && kind !== 'backtap') {
+        if (kind !== 'tapagain' && kind !== 'backtap' && kind !== 'dblempty') {
           f.setMode(width);
           f.tap(-1e6, -1e6);
         }
@@ -373,8 +379,32 @@ try {
           if (f.anim && !f.anim(performance.now() + 1e5)) f.anim = null;
           f.labelState.clear();
           f.draw();
-        } else if (kind === 'backtap') {
-          f.doubleTap(f.w / 2, f.h / 2);
+        } else if (kind === 'backtap' || kind === 'dblempty' || kind === 'dblfar') {
+          // (ToLaD#245: a double-tap on a branch goes into it, so `backtap` taps on nothing: an empty spot, or off the
+          // screen if there is none.)
+          f.labelState.clear();
+          f.draw();
+          let at = null;
+          if (kind === 'dblfar') {
+            f.cam = f.homeCamera();
+            f.camera.settle();
+            f.draw();
+            f.draw();
+            // A species' own column (above its split) as far from the centre as there is one, a column tap there.
+            let best = -1;
+            for (let y = 200; y < f.h - 200; y += 12)
+              for (let x = 14; x < f.w - 14; x += 4) {
+                const b = f.hitBranch(x, y);
+                if (!b || f.toWorld(x, y)[1] >= b.splitY || f.tapKind(x, y) !== 'card' || !f.intoAt(x, y) || f.hitBranch(x - 4, y) !== b || f.hitBranch(x + 4, y) !== b) continue;
+                const d = Math.abs(x - f.w / 2);
+                if (d > best) [best, at] = [d, [x, y, b.sp.common]];
+              }
+          } else {
+            for (let y = 130; !at && y < f.h - 160; y += 9) for (let x = 14; !at && x < f.w - 14; x += 7) if (!f.tapKind(x, y) && !f.intoAt(x, y)) at = [x, y, 'nothing'];
+          }
+          at ??= [-1e4, -1e4, 'nothing (off screen)'];
+          console.log(`double-tap at ${at[0].toFixed(0)},${at[1].toFixed(0)} on ${at[2]}`);
+          f.doubleTap(at[0], at[1]);
           if (f.anim && !f.anim(performance.now() + 1e5)) f.anim = null;
           f.labelState.clear();
           f.draw();
