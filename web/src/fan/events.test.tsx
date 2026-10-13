@@ -174,18 +174,21 @@ describe('the fan: marks and tap', () => {
 });
 
 describe('a picture', () => {
-  it("a tap on a species' picture flies to its branch and opens its card (ToLaD#230, #241); off it, the column's tap", () => {
+  it("taps on a species' picture go a level deeper each, to its branch, then open its card (ToLaD#230, #258); off it, the column's tap", () => {
     const v = stubView();
     const fan = v.fan;
     const b = fan.branches.find((q) => q.sp.common === 'Cheetah')!;
     let sel: Selection | null = null;
     let opened = 0;
     v.onSelect = (s) => ((sel = s), s && opened++);
-    v.thumbHits = [[200, 300, 25, b]];
-    v.tap(215, 318);
     const iv = v as unknown as { anim: ((t: number) => boolean) | null };
-    expect(iv.anim).not.toBeNull();
-    for (let t = performance.now() + 16; iv.anim; t += 16) if (!iv.anim(t)) iv.anim = null;
+    // (One level deeper a tap, ToLaD#258: the cat-like carnivores, the cats, …, the cheetah; there, its card.)
+    for (let k = 0; k < 10 && !opened; k++) {
+      v.thumbHits = [[200, 300, 25, b]];
+      v.tap(215, 318);
+      expect(iv.anim).not.toBeNull();
+      for (let t = performance.now() + 16; iv.anim; t += 16) if (!iv.anim(t)) iv.anim = null;
+    }
     const c = v.speciesCamera(b);
     expect(Math.abs(v.cam.cx - c.cx) * v.cam.sx).toBeLessThan(1);
     expect(Math.abs(v.cam.cy - c.cy) * v.cam.sy).toBeLessThan(1);
