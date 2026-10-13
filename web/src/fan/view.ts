@@ -1333,15 +1333,72 @@ export class FanView implements InputHandlers {
     this.request();
   }
   /**
-   * Double-tap anywhere: one step back (ToLaD#241), out along the ladder of frames over what is on screen (backLadder):
-   * deep in a species, its frame; at a species' frame, its clade's; at a clade's, the next clade out; … home. At
-   * home, nothing.
+   * A double-tap (ToLaD#241, #245). On a branch other than the one the view is in (intoAt): into it, its frame, no
+   * card. On the branch the view is in, or on empty space: one step back, out along the ladder of frames over what is
+   * on screen (backLadder): deep in a species, its frame; at a species' frame, its clade's; at a clade's, the next clade
+   * out; … home. At home on empty space, nothing.
    */
-  doubleTap(_x: number, _y: number): void {
+  doubleTap(x: number, y: number): void {
+    const into = this.intoAt(x, y);
+    if (into) {
+      this.backing = null;
+      into();
+      return;
+    }
     const step = this.backStep();
     if (!step) return;
     this.backing = step;
     step.go();
+  }
+
+  /**
+   * Where a double-tap at (x, y) goes into (ToLaD#245), or null (a step back). On a species' column above its split, or
+   * its name pill or picture: that species' frame (flyToSpecies, no card). On a column below its split (an ancestral
+   * lineage's stretch, segAt): that lineage's clade's frame (flyToClade). On a clade's bracket, its family pill (or that
+   * pill's picture) or a pinned group: that clade's frame. Not on the branch the view is in: the species whose card is
+   * open (selected), or a species or clade the view is at or inside (inFrame).
+   */
+  private intoAt(x: number, y: number): (() => void) | null {
+    let b: FanBranch | null = null;
+    let v: FanNode | null = this.brackets?.pinHit(x, y)?.v ?? null;
+    if (!v) {
+      const pill = this.pillAt(x, y);
+      const pic = pill ? null : this.picAt(x, y);
+      const brk = pill || pic ? null : this.brackets?.hit(x, y);
+      if (pill) [b, v] = [pill.b ?? null, pill.v ?? null];
+      else if (pic) [b, v] = pic[4] ? [null, pic[4]] : [pic[3], null];
+      else if (brk) v = brk.v;
+      else if ((b = this.hitBranch(x, y))) {
+        // (Below its split, the lineage it is in there: the parent column's.)
+        const wy = Math.min(this.fan.trunkBottom.y, this.toWorld(x, y)[1]);
+        if (wy >= b.splitY) [b, v] = [null, segAt(b, wy).node];
+      }
+    }
+    if (b) {
+      const sb = b;
+      if (this.selected === sb.sp || this.inFrame([sb], () => this.speciesCamera(sb))) return null;
+      return () => this.flyToSpecies(sb.sp, 700, false);
+    }
+    if (v) {
+      const sv = v;
+      if (this.inFrame(sv.strands, () => this.cladeCamera(sv))) return null;
+      return () => this.flyLevel(null, sv);
+    }
+    return null;
+  }
+
+  /**
+   * Whether the view is at or inside a frame (ToLaD#245): the lineage at the screen's centre (centreLine) one of `of`,
+   * and zoomed in at least as far as `frame`, width and time together (within BACK_SLACK, as backStep).
+   */
+  private inFrame(of: readonly FanBranch[], frame: () => Camera): boolean {
+    const mid = this.centreLine();
+    if (!mid || !of.includes(mid)) return false;
+    // (Folded, a frame computed moves the fold to it: put back after, as backStep does.)
+    const restore = this.fan.tess.fold?.keep();
+    const f = frame();
+    restore?.();
+    return Math.log(this.cam.sx / f.sx) + Math.log(this.cam.sy / f.sy) >= -Math.log(BACK_SLACK);
   }
 
   /**
@@ -1410,11 +1467,12 @@ export class FanView implements InputHandlers {
   /**
    * Whether a single tap here waits out the double-tap window (engine/input.ts, ToLaD#241), so a double-tap's first tap
    * does nothing: a tap that flies (a pill, picture, bracket, pinned group or "+x") always; one that opens a card,
-   * unless a double-tap would do nothing (at home); a tap on nothing (closing the card) never.
+   * unless a double-tap there would do nothing (on the branch the view is in, at home, ToLaD#245); a tap on nothing
+   * (closing the card) never.
    */
   tapWaits(x: number, y: number): boolean {
     const k = this.tapKind(x, y);
-    return k === 'fly' || (k === 'card' && (!!this.anim || !this.atHome()));
+    return k === 'fly' || (k === 'card' && (!!this.anim || !!this.intoAt(x, y) || !this.atHome()));
   }
 
   /** What a tap at (x, y) does: flies somewhere, opens a card, or neither (as tap() decides it). */
