@@ -75,7 +75,7 @@ describe('steady: a branch moves sideways only at its own splits', () => {
     });
   }
 
-  it('columns overlap by no more than a boom'"'"'s peel and each fits its room (carnivores, linear and log)', () => {
+  it("columns overlap by no more than a boom's peel and each fits its room (carnivores, linear and log)", () => {
     // (A column booming over its peel may brush its neighbour's slot while still near its founders': WORST_OVERLAP_PX.)
     let worst = 0;
     for (const mode of ['linear', 'log'] as WidthMode[]) {
