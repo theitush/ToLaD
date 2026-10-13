@@ -1,5 +1,5 @@
 # ToLaD data pipeline v0 (mammals). `make` = fetch (verify pinned checksums) + build + test.
-.PHONY: all fetch build test audit wiki
+.PHONY: all fetch build test audit wiki globe
 
 all: fetch build test
 
@@ -24,3 +24,9 @@ audit:
 # verifies its pinned checksum; writes data/mammals/wiki.json and nothing else.
 wiki:
 	uv run python -I -m tolad_pipeline.wiki
+
+# Every species' range cells for the card's globe (ToLaD#267): PHYLACINE 1.2.1's current and present-natural rasters,
+# run-length packed, matched to the dated tree's species. Its own step over the built data; writes
+# data/mammals/ranges.json and nothing else.
+globe:
+	uv run python -I -m tolad_pipeline.globe
