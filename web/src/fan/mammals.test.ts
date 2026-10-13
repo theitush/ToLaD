@@ -2,6 +2,10 @@
 import { describe, expect, it } from 'vitest';
 import { CARNIVORA, mammaliaClade } from './panthera';
 import { allSplits, familyLabel, mammaliaTree, ORDER_TAXA, speciesUnder, taxonKey } from './splits';
+import { loadMammalsFromFiles } from './mammals-node';
+
+// (The page fetches mammals.json; here it is built from the files the same way.)
+await loadMammalsFromFiles();
 
 describe('Mammalia from the data', () => {
   const tree = mammaliaTree();

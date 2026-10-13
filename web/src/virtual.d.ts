@@ -16,11 +16,3 @@ declare module 'virtual:carnivora-data' {
   const data: import('./fan/panthera-extract').RawClade;
   export default data;
 }
-
-declare module 'virtual:mammalia-data' {
-  /** Every mammal of data/mammals under the whole dated tree (ToLaD#247): only the species the fan draws. */
-  const data: import('./fan/panthera-extract').RawClade;
-  export default data;
-  /** The pictures and links of the species the carnivore module leaves out (data/mammals/wiki.json). */
-  export const wiki: Record<string, { wp?: string; img?: string; file?: string } | null>;
-}
