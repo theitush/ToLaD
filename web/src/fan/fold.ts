@@ -34,7 +34,7 @@
 // home, sisters 2 Ma apart by ~6x, 0.5 Ma apart by ~15x: zooming in, the species stand apart one by one.
 // A gap closes with its narrower clade (an extinct one narrowing to nothing). Time zoom changes nothing.
 
-import { ease, isNode, lanesAt, segAt, type Fan, type FanBranch, type FanNode } from './layout';
+import { ease, isNode, lanesAt, segAt, type EdgeStyle, type Fan, type FanBranch, type FanNode } from './layout';
 import { smoother } from './population';
 
 /** A split's full gap, as a share of the order's width: GAP_K * (its age / 2 Ma)^GAP_POW. */
@@ -85,6 +85,12 @@ export const LEAN_MAX = 5;
 export const LEAN_FORK = 3;
 export const EASE_MAX = 1.875;
 export const LEAN_CUT = 8;
+/**
+ * How far (px) a fork's columns run out at LEAN_MAX before the rest of its gap closes over a bend (ToLaD#232): half a
+ * phone's width, from a split near the screen's centre to past its edge. So zoomed in, every column on screen keeps
+ * its line down to its split and the branches to columns off screen run out past the edge, drawn whole.
+ */
+export const REACH_PX = 200;
 /** A stretch's share drawn (0-1), by its lean on screen (px across per px of height). */
 export function leanFade(dxPx: number, dyPx: number): number {
   return smoother(leanShare(dxPx, dyPx));
@@ -243,6 +249,9 @@ export class Fold {
   private readonly forkTop0: Float64Array;
   /** Per pair: its fork's top with the gaps it carries (carriedForks: its clade's inner gaps close over it too); at fold version forkVer. */
   private readonly forkTopC: Float64Array;
+  /** Per pair (ToLaD#232): where its fork's first phase ends (world y) and the share of its gap open there (1: one phase). */
+  private readonly forkMidC: Float64Array;
+  private readonly forkS: Float64Array;
   private forkVer = -1;
   /** Per pair: how open its split is. */
   readonly a: Float64Array;
@@ -282,6 +291,8 @@ export class Fold {
     this.forkTop = new Float64Array(Math.max(0, n - 1));
     this.forkTop0 = new Float64Array(Math.max(0, n - 1));
     this.forkTopC = new Float64Array(Math.max(0, n - 1));
+    this.forkMidC = new Float64Array(Math.max(0, n - 1));
+    this.forkS = new Float64Array(Math.max(0, n - 1)).fill(1);
     this.pairNode = [];
     this.pairGap = new Float64Array(Math.max(0, n - 1));
     this.pairFam = new Uint8Array(Math.max(0, n - 1));
@@ -655,7 +666,7 @@ export class Fold {
       const v = this.pairNode[p];
       const lo = this.lo[p];
       const hi = this.hi[p];
-      const u = y >= v.y ? 0 : this.forkTopC[p] < v.y ? ease(edge, Math.min(1, (v.y - y) / (v.y - this.forkTopC[p]))) : 1;
+      const u = y >= v.y ? 0 : this.forkTopC[p] < v.y ? this.forkU(p, v.y - y, edge) : 1;
       let kept = 0;
       if (u > 0) kept = u * (inc[p] + F * H[p]);
       K[p] = kept;
@@ -692,13 +703,58 @@ export class Fold {
       // screen, it is a far family closing at a deep split, steep and culled where drawn, leanFade.)
       const h0 = v.y - this.forkTop[p];
       const hT = k > 0 ? T * k : 0;
-      this.forkTopC[p] = v.y - Math.max(h0, Math.min(hT, ROOM_BEND, v.y - this.yRef));
+      // (ToLaD#232: a fork wider on screen than a bend lets at LEAN_FORK opens over as much height as it takes to cross
+      // REACH_PX of it at LEAN_MAX, the whole of it if narrower: every column on screen keeps its line down to its split,
+      // drawn whole. What lies further (a far family thousands of px away) closes above that, over a bend, off screen.)
+      const top = v.y - this.yRef;
+      let hA = Math.min(hT, ROOM_BEND);
+      let s = 1;
+      if (hT > ROOM_BEND && k > 0) {
+        const reach = REACH_PX / this.sx;
+        const k5 = (k * LEAN_FORK) / LEAN_MAX;
+        hA = Math.min(hT, Math.max(ROOM_BEND, Math.min(T, reach) * k5));
+        if (T > reach && hA < hT) s = reach / T;
+      }
+      let h = s < 1 ? hA + ROOM_BEND : hA;
+      // (Never above "now": squeezed into what there is, both phases alike.)
+      if (h > top) {
+        hA *= top / h;
+        h = top;
+      }
+      if (h0 >= h) {
+        h = h0;
+        hA = h;
+        s = 1;
+      }
+      this.forkTopC[p] = v.y - h;
+      this.forkMidC[p] = v.y - hA;
+      this.forkS[p] = s;
       if (!(T > 0)) continue;
       const sL = (P[this.hi[p]] - P[p + 1]) / (P[this.hi[p]] - P[this.lo[p]]);
       if (this.lo[p] > 0) inc[this.lo[p] - 1] += T * sL;
       if (this.hi[p] < m + 1) inc[this.hi[p] - 1] += T * (1 - sL);
     }
     this.forkVer = this.ver;
+  }
+
+  /**
+   * How far pair p's gap has opened (0-1) at hy (world) above its split: an ease over its fork (carriedForks), or
+   * (ToLaD#232) two: its share forkS over the height to forkMidC easing in, the rest over a bend above it, on from the
+   * lean it reached and easing out.
+   */
+  private forkU(p: number, hy: number, edge: EdgeStyle): number {
+    const h = this.pairNode[p].y - this.forkTopC[p];
+    const s = this.forkS[p];
+    if (!(s < 1)) return ease(edge, Math.min(1, hy / h));
+    const hA = this.pairNode[p].y - this.forkMidC[p];
+    // (The first half of the ease, then on at the lean it reached, steepening and easing out at the top (a cubic):
+    // leaning out all the way, no kink, never standing straight between.)
+    if (hy <= hA) return 2 * s * ease(edge, hy / hA / 2);
+    const t = Math.min(1, (hy - hA) / (h - hA));
+    if (edge !== 'curved') return s + (1 - s) * t;
+    const d = 1 - s;
+    const m = Math.min((s * EASE_MAX * (h - hA)) / hA, 3 * d);
+    return s + m * (t * t * t - 2 * t * t + t) + d * (3 * t * t - 2 * t * t * t);
   }
 
   /** Fold a row with the current a's: each strand's move. */
