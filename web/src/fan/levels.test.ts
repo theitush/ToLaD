@@ -210,3 +210,97 @@ describe('mammal home opens on the orders (ToLaD#258, #256)', () => {
     expect(groups.length).toBeLessThan(60);
   }, 120000);
 });
+
+/** The span (screen x) of species bs's columns at "now" (the living ones'; an extinct one's at its tip), as groupCentre's. */
+function nowExtent(v: FanView, all: readonly FanBranch[]): [number, number] {
+  const alive = all.filter((b) => !b.sp.extinct && b.pop.aliveAt(0) > 0);
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (const b of alive.length ? alive : all) {
+    const y = Math.max(b.tipY, v.fan.time.y(0));
+    lo = Math.min(lo, v.toScreen(leftAt(b, y), 0)[0]);
+    hi = Math.max(hi, v.toScreen(leftAt(b, y) + laneAt(b, y).w, 0)[0]);
+  }
+  return [lo, hi];
+}
+const strandsOf = (lv: Level) => (lv.b ? [lv.b] : lv.v.strands);
+
+/** At home and at each level a tap reaches on the way from home to a few species (each landed), `at`. */
+function levelsOnTheWay(v: FanView, step: number, at: (v: FanView) => void): void {
+  for (const b of v.fan.branches.filter((_, i) => i % step === 3)) {
+    home(v);
+    at(v);
+    for (let k = 0; k < 8 && !v.levelNow().b; k++) {
+      v.tap(...onColumn(v, b));
+      if (!P(v).anim) break;
+      run(v);
+      at(v);
+    }
+  }
+}
+
+describe('each group\'s picture over "now", exactly above its centre; none overlap (ToLaD#262)', () => {
+  for (const [name, mk] of FANS) {
+    it(name, () => {
+      const v = mk();
+      const bad: string[] = [];
+      levelsOnTheWay(v, v.fan.tess.fold ? 61 : 7, (v) => {
+        const lv = v.levelNow();
+        if (lv.b) return;
+        const at = nameOf(lv);
+        // Every group one level down whose centre is on screen, with a face that has a picture, has its disc.
+        for (const g of nextLevels(v.fan, lv.v)) {
+          const [lo, hi] = nowExtent(v, strandsOf(g));
+          const cx = (lo + hi) / 2;
+          if (cx < 0 || cx > v.w) continue;
+          const face = g.v ? groupFace(g.v) : g.b;
+          if (!face || !wikiOf(face.sp.sci)?.img) continue;
+          const p = v.picSpots.find((q) => (g.v ? q.lv.v === g.v : q.lv.b === g.b));
+          if (!p) bad.push(`${at}: ${nameOf(g)} has no picture`);
+          else if (Math.abs(p.x - cx) > 0.5) bad.push(`${at}: ${nameOf(g)}'s picture ${(p.x - cx).toFixed(1)} px off its centre`);
+        }
+        const ps = v.picSpots;
+        for (let i = 0; i < ps.length; i++)
+          for (let j = i + 1; j < ps.length; j++)
+            if (Math.hypot(ps[i].x - ps[j].x, ps[i].y - ps[j].y) < (ps[i].d + ps[j].d) / 2 - 1e-6) bad.push(`${at}: ${nameOf(ps[i].lv)} and ${nameOf(ps[j].lv)} overlap`);
+      });
+      expect(bad).toEqual([]);
+    });
+  }
+});
+
+describe('a "+x" stands for the names hidden near it; tapped, it frames them (ToLaD#262)', () => {
+  for (const [name, mk] of FANS) {
+    it(name, () => {
+      const v = mk();
+      let tried = 0;
+      const bad: string[] = [];
+      levelsOnTheWay(v, v.fan.tess.fold ? 61 : 7, (v) => {
+        const at = nameOf(v.levelNow());
+        // Each hidden group counts on a shown name's "+x" (when any is shown), each once.
+        if (v.famHits.length + v.nameHits.length && v.hiddenGroups.some((h) => h.on === null)) bad.push(`${at}: a hidden name on no "+x"`);
+        const n = v.plusHits.reduce((s, h) => s + h.bs.length, 0);
+        const want = v.hiddenGroups.reduce((s, h) => s + (h.on ? strandsOf(h.lv).length : 0), 0);
+        if (n !== want) bad.push(`${at}: the "+x" hold ${n} species, the hidden names ${want}`);
+        const h = v.plusHits[0];
+        if (!h || tried > 2) return;
+        tried++;
+        const cam = { ...v.cam };
+        v.tap((h.box[0] + h.box[2]) / 2, (h.box[1] + h.box[3]) / 2);
+        if (!P(v).anim) bad.push(`${at}: a "+x" tapped flew nowhere`);
+        run(v);
+        // Landed on the hidden groups' frame, their columns all on screen.
+        const to = v.groupCamera(h.bs);
+        if (Math.abs(Math.log(v.cam.sx / to.sx)) > 0.05) bad.push(`${at}: a "+x" landed off its frame`);
+        const [a, b] = nowExtent(v, h.bs);
+        if (a < -2 || b > v.w + 2) bad.push(`${at}: a "+x" landed with its groups off screen (${a.toFixed(0)}–${b.toFixed(0)})`);
+        v.cam = cam;
+        v.camera.settle();
+        P(v).applyFold();
+        settle(v);
+      });
+      expect(bad).toEqual([]);
+      expect(tried).toBeGreaterThan(0);
+    });
+  }
+});

@@ -192,6 +192,12 @@ const scenes = [
   ['tap-1', 'taps', ['Canidae', 't']],
   ['tap-2', 'taps', ['Canidae', 'tt']],
   ['tap-3', 'taps', ['Canidae', 'ttd']],
+  // ToLaD#262: names beside the branches, pictures over "now" above each group's centre: home, one and two taps down
+  // the dogs (carnivores) or Panthera (LEVEL=cats: Big cats, then the genus), and a crowded level (the weasels' family).
+  ['pics-0', 'home'],
+  ['pics-1', 'taps', [process.env.LEVEL === 'cats' ? 'Panthera' : 'Canidae', 't']],
+  ['pics-2', 'taps', [process.env.LEVEL === 'cats' ? 'Panthera' : 'Canidae', 'tt']],
+  ['pics-weasels', 'taps', ['Mustelidae', 'tt']],
   // ToLaD#246: a flight from home into the fisher's frame, and from there back home, caught every 360 ms (1.8 s each).
   ...[0, 360, 720, 1080, 1440, 1800].map((ms) => [`fly-in-${ms}`, 'flyin', ['Fisher', ms]]),
   ...[0, 360, 720, 1080, 1440, 1800].map((ms) => [`fly-out-${ms}`, 'flyout', ['Fisher', ms]]),

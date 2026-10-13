@@ -4,7 +4,8 @@
 // in far enough, a branch resolves into the individuals themselves (twigs.ts).
 // Gestures come from the shared engine/input.ts.
 
-import { drawThumb, labelThumb, wikiOf } from './wiki';
+import { drawThumb, labelThumb, thumbsOn, wikiOf } from './wiki';
+import { PIC_D, placePics, type PicSpot } from './pics';
 import { formatCount } from '../data/count';
 import { Input, type InputHandlers } from '../engine/input';
 import { clipPoly, FanCamera, type Camera } from './camera';
@@ -534,6 +535,30 @@ export function groupFace(v: FanNode): FanBranch | null {
   return out;
 }
 
+/** Strand b's middle (world x) at "now", an extinct one's at its tip. */
+export function stripMid(b: FanBranch): number {
+  const y = Math.max(b.tipY, b.tess.time.y(0));
+  return leftAt(b, y) + laneAt(b, y).w / 2;
+}
+
+/**
+ * A level's group's centre (world x, ToLaD#262): the middle of its columns at "now" (its living species'; an extinct
+ * group's at their tips). Its picture stands exactly over it.
+ */
+export function groupCentre(g: Level): number {
+  if (g.b) return stripMid(g.b);
+  const alive = g.v.strands.filter((b) => !b.sp.extinct && b.pop.aliveAt(0) > 0);
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (const b of alive.length ? alive : g.v.strands) {
+    const y = Math.max(b.tipY, b.tess.time.y(0));
+    const l = leftAt(b, y);
+    lo = Math.min(lo, l);
+    hi = Math.max(hi, l + laneAt(b, y).w);
+  }
+  return (lo + hi) / 2;
+}
+
 /**
  * The species pills that stand for their family (ToLaD#212), counted with the cull: a family with exactly one
  * species shown (its pill on its tip), others of it hidden in view (their tips there, none of their spots shown) and
@@ -713,6 +738,25 @@ export function labelSpots(
   for (const { v, vi, text } of level?.groups ?? families(fan)) {
     // (The mammal level, lod.ts: a family inside a clade drawn as one branch is not named; the clade is.)
     if ((!level && brk?.named(v)) || lod?.hidden(v)) continue;
+    if (level) {
+      // A level's group (ToLaD#262): its name beside its branch, down from "now" (its picture stands over "now",
+      // groupPics): beside the column nearest its centre, room at the name's end for the "+x" of the groups hidden.
+      if (!(nowOn > 0)) continue;
+      const cx = groupCentre({ v });
+      const [wa, wb] = familySpan(v);
+      if (!(X(wb) > 0 && X(wa) < c.w)) continue;
+      let own = v.strands[0];
+      let od = Infinity;
+      for (const b of v.strands) {
+        const d = Math.abs(stripMid(b) - cx);
+        if (d < od) [own, od] = [b, d];
+      }
+      const px = plus?.(`n${vi}`) ?? 0;
+      const rank: Rank = [-1, wb - wa, vi];
+      for (const p of beside(`n${vi}`, text, rank, measure(text) + 2 * LABEL_PAD + px, own, Math.max(nowS, Y(own.tipY)) + 4, Y(own.splitY), nowOn, { v }))
+        out.push({ ...p, fam: v, pic: groupFace(v), plus: px });
+      continue;
+    }
     const [wa, wb] = familySpan(v);
     const sa = X(wa);
     const sb = X(wb);
@@ -738,6 +782,12 @@ export function labelSpots(
     // (Given the level's groups, ToLaD#258: only a species that is a group of its own.)
     if ((lod && lod.of[b.index] >= 0) || (level && !level.species.has(b)) || !near(boxes.get(b)!)) continue;
     const id = String(b.sp.gid);
+    if (level) {
+      // (A level's species, ToLaD#262: its name beside its column, down from "now" or its tip; its picture over "now".)
+      const px = plus?.(id) ?? 0;
+      out.push(...beside(id, b.sp.common, [0, b.width, b.index], measure(b.sp.common) + 2 * LABEL_PAD + px, b, Math.max(nowS, Y(b.tipY)) + 4, Y(b.splitY), 1, { b }).map((p) => ({ ...p, plus: px })));
+      continue;
+    }
     // (Standing for its family, ToLaD#212: the family's name on its tip, last frame's familyPills.)
     const fam = famOf?.(id);
     const famText = fam && familyLabel(fam.split);
@@ -1743,6 +1793,12 @@ export class FanView implements InputHandlers {
     // One level deeper (ToLaD#258), towards what was tapped: a pinned group (ToLaD#233), a species' or group's pill
     // (ToLaD#230, #212) or picture (ToLaD#193), a clade's bracket.
     const pinned = this.brackets?.pinHit(x, y);
+    // A "+x" (ToLaD#262): the smallest frame holding the groups whose names it stands for.
+    const plus = pinned ? null : this.plusAt(x, y);
+    if (plus) {
+      this.flyToGroup(plus.bs);
+      return;
+    }
     const pill = pinned ? null : this.pillAt(x, y);
     const pic = pinned || pill ? null : this.picAt(x, y);
     const brk = pinned || pill || pic ? null : this.brackets?.hit(x, y);
@@ -1859,8 +1915,11 @@ export class FanView implements InputHandlers {
     const br = this.layoutBrackets();
     // (The labels kept under the pinned groups, ToLaD#233, as they show.)
     // (One pill per group one level down from the level the view is at, ToLaD#258: no "+x", no species standing for its family.)
-    const spots = labelSpots(this.camera, this.fan, this.labelTop() + (br ? br.pinH() * br.pinA : 0), (t) => this.nameWidth(t), this.barRect()?.[0], br ?? undefined, undefined, undefined, lod, labelGroups(this.fan, this.levelNow()));
-    this.drawLabels(spots, br);
+    // (ToLaD#262: each group's name beside its branch, room at its end for the "+x" of the names hidden near it last frame.)
+    const top = this.labelTop() + (br ? br.pinH() * br.pinA : 0);
+    const lg = labelGroups(this.fan, this.levelNow());
+    const spots = labelSpots(this.camera, this.fan, top, (t) => this.nameWidth(t), this.barRect()?.[0], br ?? undefined, (id) => this.plusRoom.get(id) ?? 0, undefined, lod, lg);
+    this.drawLabels(spots, br, { ...lg, top, lod });
     br?.drawPins(this.ctx, FAMILY_INK, INK3, BG);
     this.drawWidthScale();
     if (this.debug) this.drawDebug();
@@ -2372,6 +2431,97 @@ export class FanView implements InputHandlers {
     return (bar ? bar[3] : 44) + 8;
   }
 
+  /** The level's groups on screen (ToLaD#262), left to right: each its id (its names' spots'), level, centre (screen x). */
+  private levelGroupsOn(lg: ReturnType<typeof labelGroups> & { lod: Lod | null }): { id: string; lv: Level; x: number }[] {
+    const out: { id: string; lv: Level; x: number }[] = [];
+    for (const g of lg.groups) if (!lg.lod?.hidden(g.v)) out.push({ id: `n${g.vi}`, lv: { v: g.v }, x: this.toScreen(groupCentre({ v: g.v }), 0)[0] });
+    for (const b of lg.species) if (!lg.lod || lg.lod.of[b.index] < 0) out.push({ id: String(b.sp.gid), lv: { b }, x: this.toScreen(groupCentre({ b }), 0)[0] });
+    return out.filter((g) => g.x > -PIC_D / 2 && g.x < this.w + PIC_D / 2).sort((p, q) => p.x - q.x);
+  }
+
+  /** The level's pictures this frame (ToLaD#262): each group's on screen with a picture, as placed (pics.ts) and the group it opens. */
+  picSpots: (PicSpot & { lv: Level; face: FanBranch })[] = [];
+  /** The level's groups hidden this frame (ToLaD#262): each the shown name it counts on as "+x" (its id), or null for none shown. */
+  hiddenGroups: { lv: Level; on: string | null }[] = [];
+
+  /** The level's groups' pictures (ToLaD#262): over "now", each exactly above its group's centre, stacked up where they meet. */
+  private groupPics(lg: ReturnType<typeof labelGroups> & { lod: Lod | null }, top: number): PicSpot[] {
+    this.picSpots = [];
+    const nowS = this.toScreen(0, this.yNow)[1];
+    if (!thumbsOn || nowS < top + 12 || nowS > this.h) return [];
+    const gs: { lv: Level; face: FanBranch; x: number; y: number }[] = [];
+    for (const g of this.levelGroupsOn(lg)) {
+      const face = g.lv.v ? groupFace(g.lv.v) : g.lv.b;
+      if (!face || !wikiOf(face.sp.sci)?.img) continue;
+      gs.push({ lv: g.lv, face, x: g.x, y: g.lv.b && g.lv.b.tipY > this.yNow ? this.toScreen(0, g.lv.b.tipY)[1] : nowS });
+    }
+    const placed = placePics(gs.map((g) => g.x), gs.map((g) => g.y), nowS, top);
+    this.picSpots = placed.map((p, i) => ({ ...p, lv: gs[i].lv, face: gs[i].face }));
+    return placed;
+  }
+
+  /** Draw the level's pictures (groupPics): the stalks first, then the discs, the top row first. Each a tap to its group. */
+  private drawGroupPics(): void {
+    const ctx = this.ctx;
+    const nowS = this.toScreen(0, this.yNow)[1];
+    const alpha = clamp01((nowS - this.labelTop()) / 24);
+    if (!(alpha > 0)) return;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = INK3;
+    ctx.lineWidth = 1;
+    for (const p of this.picSpots) {
+      if (!p.stalk) continue;
+      ctx.beginPath();
+      ctx.moveTo(p.stalk[0], p.stalk[1]);
+      ctx.lineTo(p.stalk[0], p.stalk[2]);
+      ctx.stroke();
+    }
+    for (const p of [...this.picSpots].sort((a, b) => b.row - a.row)) {
+      this.thumbHits.push([p.x, p.y, p.d / 2, p.face, p.lv.v]);
+      const th = labelThumb(p.face.sp.sci, () => this.request());
+      if (th) drawThumb(ctx, th, p.x, p.y, p.d);
+      else {
+        // (Its picture still loading: the disc's place kept, an empty ring.)
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.d / 2 - 1, 0, 2 * Math.PI);
+        ctx.fillStyle = BG;
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
+  /** The "+x" room each name keeps (its id: px), from the frame before (ToLaD#262). */
+  private plusRoom = new Map<string, number>();
+
+  /**
+   * The level's names hidden (ToLaD#262): each group on screen with no name shown counts as "+x" on the shown name
+   * nearest it (by their centres); `groups` gets, per shown spot, the hidden groups' species (a tap frames them all).
+   */
+  private groupPlus(lg: ReturnType<typeof labelGroups> & { lod: Lod | null }, spots: readonly LabelSpot[], on: Map<string, boolean>, groups: Map<string, FanBranch[][]>): void {
+    const shownKey = new Map<string, string>();
+    for (const s of spots) if (on.get(s.key)) shownKey.set(s.id, s.key);
+    const gs = this.levelGroupsOn(lg).filter((g) => g.x >= LABEL_AXIS_X - 4 && g.x <= this.w + 4);
+    const shown = gs.filter((g) => shownKey.has(g.id));
+    this.hiddenGroups = [];
+    const count = new Map<string, number>();
+    for (const g of gs) {
+      if (shownKey.has(g.id)) continue;
+      let at: (typeof gs)[number] | null = null;
+      for (const q of shown) if (!at || Math.abs(q.x - g.x) < Math.abs(at.x - g.x)) at = q;
+      this.hiddenGroups.push({ lv: g.lv, on: at?.id ?? null });
+      if (!at) continue;
+      const key = shownKey.get(at.id)!;
+      let list = groups.get(key);
+      if (!list) groups.set(key, (list = []));
+      list.push(g.lv.v ? g.lv.v.strands : [g.lv.b!]);
+      count.set(at.id, (count.get(at.id) ?? 0) + 1);
+    }
+    this.plusRoom = new Map([...count].map(([id, n]) => [id, this.plusPx(n)]));
+  }
+
   /** Length (px) a pill keeps at its top end for a "+n" badge (ToLaD#197): none for 0. */
   private plusPx(n: number): number {
     if (!n) return 0;
@@ -2396,7 +2546,7 @@ export class FanView implements InputHandlers {
    * resolveLabels (a fixed priority, with hysteresis), and each fades in and
    * out over LABEL_FADE_MS rather than popping.
    */
-  private drawLabels(spots: LabelSpot[], br: Brackets | null = null): void {
+  private drawLabels(spots: LabelSpot[], br: Brackets | null = null, lg?: ReturnType<typeof labelGroups> & { top: number; lod: Lod | null }): void {
     const ctx = this.ctx;
     const now = performance.now();
     const dt = Math.min(100, Math.max(0, now - this.labelT));
@@ -2407,7 +2557,7 @@ export class FanView implements InputHandlers {
     // The "+x" badges (ToLaD#197): counted with the cull; a pill keeps room for its count from the frame before, so
     // when a count changes the next frame lays the pills out again with the room it needs.
     // (Not with one pill per group, ToLaD#258: plusGroups and familyPills, ToLaD#197 and #212, give way to labelGroups.)
-    const groups = new Map<string, FanBranch[]>();
+    const groups = new Map<string, FanBranch[][]>();
     this.famHits.length = 0;
     this.nameHits.length = 0;
     this.plusHits.length = 0;
@@ -2432,8 +2582,12 @@ export class FanView implements InputHandlers {
       }
       alphas[k] = st.a * s.fit;
     });
+    // The level's groups (ToLaD#262): each one's picture over "now", exactly above its centre; the names hidden, as "+x".
+    const pics = lg ? this.groupPics(lg, lg.top) : [];
+    if (lg) this.groupPlus(lg, spots, on, groups);
     // The clades' brackets (ToLaD#193) under the pills: their labels clear of the pills shown, their lines behind them.
-    br?.draw(ctx, FAMILY_INK, INK3, spots.filter((_, k) => alphas[k] > 0.3).map((s) => s.box));
+    br?.draw(ctx, FAMILY_INK, INK3, [...spots.filter((_, k) => alphas[k] > 0.3).map((s) => s.box), ...pics.map((p) => [p.x - p.d / 2, p.y - p.d / 2, p.x + p.d / 2, p.y + p.d / 2])]);
+    this.drawGroupPics();
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'left';
     ctx.font = font(LABEL_FONT);
@@ -2478,6 +2632,7 @@ export class FanView implements InputHandlers {
       // Its "+x" badge (ToLaD#197), past the name in the room the pill keeps for it: a quieter chip, tapped to open them.
       const g = groups.get(s.key);
       const pw = g ? this.plusPx(g.length) : 0;
+      const bs = g?.flat() ?? [];
       if (g && pw > 0 && (s.plus ?? 0) >= pw) {
         const nx = this.nameWidth(s.text) + PLUS_GAP;
         ctx.font = font(PLUS_FONT);
@@ -2488,13 +2643,14 @@ export class FanView implements InputHandlers {
         ctx.fillStyle = INK2;
         ctx.fillText(`+${g.length}`, nx, 0.5);
         ctx.font = font(LABEL_FONT);
-        if (alpha > 0.5) this.plusHits.push({ box: [x0, y0, x1, y1 - LABEL_PAD - nx + PLUS_GAP / 2], bs: s.b ? [s.b, ...g] : g });
+        if (alpha > 0.5) this.plusHits.push({ box: [x0, y0, x1, y1 - LABEL_PAD - nx + PLUS_GAP / 2], bs });
       }
       ctx.restore();
       // ToLaD#182: the species' Commons picture under its pill, before the name, once loaded (wiki.ts; `?thumbs=0` off).
       // (A family's, ToLaD#212: its commonest living species'.)
       const pb = s.fam ? s.pic : s.b;
-      const th = pb && s.ev === undefined ? labelThumb(pb.sp.sci, () => this.request()) : null;
+      // (A level's groups' pictures stand over "now" instead, groupPics, ToLaD#262.)
+      const th = pb && s.ev === undefined && !lg ? labelThumb(pb.sp.sci, () => this.request()) : null;
       // (One picture where two would overlap, the first one shown: fewer and clearer, ToLaD#193. A fading one still draws.)
       const ty = y1 + THUMB_D / 2 + 2;
       if (th && alpha > 0.5 && !thumbs.some(([x, y]) => Math.abs(x - s.x) < THUMB_D - 4 && Math.abs(y - ty) < THUMB_D - 4)) {
