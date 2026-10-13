@@ -173,6 +173,10 @@ const scenes = [
   ['pin-bear', 'frame', ['Brown bear', 4e5, 40]],
   ['pin-weasel', 'frame', ['Least weasel', 1.5e6, 20]],
   ['pin-lion', 'frame', ['Lion', 1.5e6, 8]],
+  // The bears' and the weasels' family framed (their level), scrolled into its past; (LEVEL=cats) Panthera's.
+  ['pin-ursidae', 'level', ['Ursidae', 3, 2.5]],
+  ['pin-mustelidae', 'level', ['Mustelidae', 4, 2.5]],
+  ['pin-panthera', 'level', ['Panthera', 2, 2.5]],
   // A slow pan from home into the past: the stack sticks under the buttons, then hands over to the pinned rows.
   ['pin-pan0', 'pan', [2, 0]],
   ['pin-pan1', 'pan', [2, 60]],
