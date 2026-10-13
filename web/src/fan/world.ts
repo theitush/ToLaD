@@ -1,11 +1,11 @@
 // The world on the time axis (ToLaD#189): what the Earth was like at each age, in
-// three layers Ita asked for ("Ice ages, Geological periods, Big events, makem all
-// togglable", 2026-10-12), each with its own switch (?periods=0&ice=0&events=0):
+// two layers Ita asked for ("Ice ages, Geological periods ... makem all
+// togglable", 2026-10-12), each with its own switch (?periods=0&ice=0; the big-events
+// layer was dropped in #229, an old ?events= is ignored):
 //
 // - the geological units, a thin strip at the left edge in the ICS chart's colours,
 //   at the finest rank that fits (epochs near now, periods and eras deep);
-// - the glacials, faint bluish bands across the background, under everything;
-// - a few big events, a tick and a one-line label at the left where there is room.
+// - the glacials, faint bluish bands across the background, under everything.
 //
 // Every row below is cited. Ages are years before present (or Ma where it says so).
 
@@ -125,46 +125,21 @@ export const GLACIALS: readonly Glacial[] = (() => {
 /** The Last Glacial Maximum: nearly all ice sheets at their largest from 26.5 ka to 19–20 ka (Clark et al. 2009, Science 325:710). */
 export const LGM = { fromKa: 26.5, toKa: 19 };
 
-/** The year the axis's "now" is (the Industrial Revolution's age is counted from it). */
-const NOW_YEAR = 2026;
-export interface WorldEvent {
-  label: string;
-  /** Years before present. */
-  yrs: number;
-  cite: string;
-  /** Lower draws first (wins a clash). */
-  rank: number;
-}
-export const WORLD_EVENTS: readonly WorldEvent[] = [
-  { label: 'asteroid: the dinosaurs end', yrs: 66.0e6, rank: 0, cite: 'K-Pg boundary 66.0 Ma, ICS chart v2024/12' },
-  { label: 'first Homo sapiens', yrs: 315e3, rank: 1, cite: 'Jebel Irhoud, Morocco, 315 ± 34 ka: Richter et al. 2017, Nature 546:293; Hublin et al. 2017, Nature 546:289' },
-  { label: 'farming begins', yrs: 11.5e3, rank: 2, cite: 'Fertile Crescent, management of future crops and herds by ≥11,500 cal BP: Zeder 2011, Current Anthropology 52(S4):S221' },
-  {
-    label: 'people in the Americas',
-    yrs: 22e3,
-    rank: 3,
-    cite: 'White Sands, New Mexico, footprints 23–21 ka: Bennett et al. 2021, Science 373:1528 (confirmed by Pigati et al. 2023, Science 382:73); the oldest firm date, picked over the older ~16 ka consensus',
-  },
-  { label: 'Industrial Revolution', yrs: NOW_YEAR - 1760, rank: 4, cite: 'c. 1760: Ashton 1948, The Industrial Revolution 1760–1830' },
-  { label: 'Toba super-eruption', yrs: 73.88e3, rank: 5, cite: '73.88 ± 0.32 ka: Storey, Roberts & Saidin 2012, PNAS 109:18684' },
-];
-
 // ---- the switches ----------------------------------------------------------------
 
 export interface WorldLayers {
   periods: boolean;
   ice: boolean;
-  events: boolean;
 }
 /**
- * The layers from the URL (?periods=0&ice=0&events=0). All on by default: each is quiet
+ * The layers from the URL (?periods=0&ice=0). All on by default: each is quiet
  * (a strip 8 px wide, bands at a few % alpha, at most a handful of labels), and together
  * they are the point of the axis; one tap turns any of them off.
  */
 export function worldFlags(search: string): WorldLayers {
   const q = new URLSearchParams(search);
   const on = (k: string) => q.get(k) !== '0' && q.get(k) !== 'off';
-  return { periods: on('periods'), ice: on('ice'), events: on('events') };
+  return { periods: on('periods'), ice: on('ice') };
 }
 
 // ---- layout (pure) -----------------------------------------------------------------
@@ -208,19 +183,18 @@ export type Box = [number, number, number, number];
 const hit = (a: Box, b: Box) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
 
 export interface EventLabel {
-  ev: WorldEvent | null;
   text: string;
   sy: number;
   box: Box;
 }
 /**
- * Where the events' labels go: at the left (x0), centred on their age; a label that
+ * Where the labels go: at the left (x0), centred on their age; a label that
  * would touch an axis label (`taken`: the tick labels, "now", the scale note) slides right
  * past it, and is left out if it still clashes or would run past `maxX`. In priority
  * order, each clear of those before it. Never inside [top, bottom].
  */
 export function placeEventLabels(
-  items: { ev: WorldEvent | null; text: string; sy: number }[],
+  items: { text: string; sy: number }[],
   taken: readonly Box[],
   measure: (t: string) => number,
   x0: number,
@@ -264,7 +238,6 @@ export interface WorldHost {
 const ICE: [number, number, number] = [0.42, 0.66, 1];
 const ICE_A = 0.1;
 const ICE_INK = '#9cc0f0';
-const EVENT_INK = '#c3b2f5';
 const STRIP_A = 0.82;
 /** The deepest age drawn (Ma): the bottom of the world (layout's STEM_BOTTOM_MA). */
 const BOTTOM_MA = 4000;
@@ -290,12 +263,12 @@ export function axisInset(v: { world: WorldLayers }): number {
   return v.world.periods ? STRIP_W + 3 : 0;
 }
 
-/** Over the branches, after the axis's labels: the strip and the events. */
+/** Over the branches, after the axis's labels: the strip and the glacial label. */
 export function drawWorldOver(v: WorldHost): void {
   const ctx = v.ctx;
   ctx.save();
   if (v.world.periods) drawStrip(v);
-  if (v.world.events || v.world.ice) drawEvents(v);
+  if (v.world.ice) drawEvents(v);
   ctx.restore();
 }
 
@@ -345,13 +318,12 @@ function drawStrip(v: WorldHost): void {
 function drawEvents(v: WorldHost): void {
   const ctx = v.ctx;
   const x0 = axisInset(v) + 6;
-  const items: { ev: WorldEvent | null; text: string; sy: number }[] = [];
-  if (v.world.events) for (const ev of [...WORLD_EVENTS].sort((a, b) => a.rank - b.rank)) items.push({ ev, text: ev.label, sy: syAt(v, ev.yrs / 1e6) });
+  const items: { text: string; sy: number }[] = [];
   if (v.world.ice) {
     const y0 = syAt(v, LGM.toKa / 1e3);
     const y1 = syAt(v, LGM.fromKa / 1e3);
     // Named only when the band is tall enough to be told from the label's line.
-    if (y1 - y0 > 18) items.push({ ev: null, text: 'last glacial maximum', sy: (Math.max(0, y0) + Math.min(v.h, y1)) / 2 });
+    if (y1 - y0 > 18) items.push({ text: 'last glacial maximum', sy: (Math.max(0, y0) + Math.min(v.h, y1)) / 2 });
   }
   if (!items.length) return;
   ctx.font = `600 11.5px 'Sofia Sans Condensed', 'Roboto Condensed', 'Arial Narrow', system-ui, sans-serif`;
@@ -363,9 +335,7 @@ function drawEvents(v: WorldHost): void {
   // Clear of the buttons at the top and the scale bar and key at the foot (as the axis's labels are).
   const placed = placeEventLabels(items, v.axisBoxes, (t) => ctx.measureText(t).width, x0, v.w * 0.62, 56, v.h - 74);
   for (const p of placed) {
-    const ink = p.ev ? EVENT_INK : ICE_INK;
-    ctx.fillStyle = ink;
-    if (p.ev) ctx.fillRect(0, Math.round(p.sy), x0 - 2, 1.5);
+    ctx.fillStyle = ICE_INK;
     ctx.strokeText(p.text, p.box[0], p.sy);
     ctx.fillText(p.text, p.box[0], p.sy);
   }

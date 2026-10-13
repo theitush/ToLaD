@@ -1,12 +1,11 @@
-// The world layers' switch (ToLaD#189): one small icon in the bar; a tap opens three
-// checkboxes (geological periods, ice ages, big events) under it.
+// The world layers' switch (ToLaD#189): one small icon in the bar; a tap opens two
+// checkboxes (geological periods, ice ages) under it.
 import { useState } from 'react';
 import type { WorldLayers } from './world';
 
 const ROWS: [keyof WorldLayers, string][] = [
   ['periods', 'Geological periods'],
   ['ice', 'Ice ages'],
-  ['events', 'Big events'],
 ];
 
 /** A globe: what the Earth was like. */
@@ -29,8 +28,8 @@ export function WorldToggle({ get }: { get: () => { world: WorldLayers; request(
       <button
         type="button"
         className="icon"
-        aria-label="The world: periods, ice ages, events"
-        title="The world: periods, ice ages, events"
+        aria-label="The world: periods and ice ages"
+        title="The world: periods and ice ages"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
       >
