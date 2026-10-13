@@ -7,7 +7,7 @@
 import { drawThumb, labelThumb } from './wiki';
 import { formatCount } from '../data/count';
 import { Input, type InputHandlers } from '../engine/input';
-import { clipPoly, FanCamera, STRAND_PX, type Camera } from './camera';
+import { clipPoly, FanCamera, type Camera } from './camera';
 import { laneAt, layoutFan, leftAt, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type EdgeStyle, type Fan, type FanBranch, type FanNode, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01 } from './meshgl';
@@ -49,6 +49,13 @@ const THUMB_D = 50;
 const LABEL_PAD = 8;
 /** Right edge (px) of the time axis's labels: species' labels keep right of it. */
 const LABEL_AXIS_X = 72;
+/** A frame a double-tap steps back to (ToLaD#241): what it frames (a species, a clade, home), the frame, the flight there. */
+type BackStep = { to: string; cam: Camera; go: () => void };
+/**
+ * A double-tap's step back (ToLaD#241): the view is "at" a frame of the ladder when neither axis is zoomed in more
+ * than this factor past it (15 %); zoomed in further on either, the step goes to that frame, else past it.
+ */
+const BACK_SLACK = 1.15;
 /** The scale bar and legend at the bottom (px): labels fade out over the 30 px above it. */
 const LABEL_BOTTOM_PX = 104;
 /** How long a label takes to fade in or out when another takes or gives up its place (ms). */
@@ -923,7 +930,7 @@ export class FanView implements InputHandlers {
     };
     br.layout(this.camera, this.fan, nowS, LABEL_AXIS_X, fit, measure, top);
     // The groups the view is inside, pinned under the buttons as the stack scrolls off (ToLaD#233).
-    br.pin(top, this.camera.toWorld(0, 0)[1], measure, br.fit < 1 ? (this.lineAt((LABEL_AXIS_X + this.w) / 2, this.h / 2)?.node ?? null) : null);
+    br.pin(top, this.camera.toWorld(0, 0)[1], measure, br.fit < 1 ? (this.centreLine()?.node ?? null) : null);
     return br;
   }
 
@@ -1016,14 +1023,9 @@ export class FanView implements InputHandlers {
     this.flyToClade(v, 750, () => (this.tapAt = { b, v, cam: { ...this.cam } }));
   }
 
-  /**
-   * A tap on a species' name pill or picture (ToLaD#230): fly to its branch (speciesCamera, no card). Tapped again
-   * once there, one level out: the clade it sits in, then each clade above it (tapClade).
-   */
+  /** A tap on a species' name pill or picture (ToLaD#230): fly to its branch (speciesCamera) and open its card (ToLaD#241). */
   tapSpecies(b: FanBranch): void {
-    const t = this.landedHere() ? this.tapAt : null;
-    if (t && t.b === b) this.flyLevel(b, t.v ? (this.outOf(t.v) ?? t.v) : this.cladeOf(b));
-    else this.flyToSpecies(b.sp, 700, false);
+    this.flyToSpecies(b.sp, 700);
   }
 
   /** A tap on a clade's bracket or family pill (ToLaD#193, #212): fly to it; already framed on it, to the clade above (ToLaD#230). */
@@ -1246,7 +1248,7 @@ export class FanView implements InputHandlers {
 
   /**
    * A search pick: fly to the species' column, then open its card at its tip, as a tap there would. Without `card`
-   * (a tap on its pill or picture, ToLaD#230): no card, the landing remembered for a tap again (tapSpecies).
+   * (a double-tap stepping back to it, ToLaD#241): no card, the landing remembered (tapAt).
    */
   flyToSpecies(sp: SpeciesRec, ms = 700, card = true): void {
     const b = this.fan.branches.find((x) => x.sp === sp);
@@ -1335,89 +1337,126 @@ export class FanView implements InputHandlers {
     this.request();
   }
   /**
-   * Double-tap a branch to fly in: first frame its width at that height (the
-   * width zoom jumps straight to it, however thin the branch is in linear
-   * mode), then each double-tap zooms the width 16× and time 2× towards the
-   * individuals. Off a branch: 4× on both axes.
+   * Double-tap anywhere: one step back (ToLaD#241), out along the ladder of frames over what is on screen (backLadder):
+   * deep in a species, its frame; at a species' frame, its clade's; at a clade's, the next clade out; … home. At
+   * home, nothing.
    */
-  doubleTap(x: number, y: number): void {
-    const [wx, wy] = this.toWorld(x, y);
-    const b = this.hitBranch(x, y);
-    let sx = this.cam.sx * 4;
-    let sy = this.cam.sy * 4;
-    let framing = false;
-    if (b) {
-      const [, bw] = this.spanAt(b, wy);
-      const wpx = bw * this.cam.sx;
-      const frame = (this.w * 0.6) / Math.max(1e-300, bw);
-      if (wpx < this.w * 0.45) {
-        sx = frame;
-        sy = this.cam.sy * 2;
-        framing = true;
-      } else {
-        sx = this.cam.sx * 16;
-        // Time zooms enough that a generation is about as tall as two strands are wide
-        // (deep in the past a screen holds thousands of generations).
-        const m = this.model(b);
-        const g = m.generationAt(wy);
-        const genH = Math.abs(m.yOf(g * m.GL) - m.yOf((g + 1) * m.GL));
-        // One individual's width (the same in both lanes).
-        const cell = m.pitch(wy);
-        sx = Math.min(sx, STRAND_PX / Math.max(1e-300, cell));
-        sy = Math.max(this.cam.sy * 2, Math.min(this.cam.sy * 64, (2 * cell * sx) / Math.max(1e-300, genH)));
-      }
-    }
-    // Within the camera's limits: at least 10 years on screen, the width limit where the finger is.
-    sy = this.camera.timeCap(wy, y, sy);
-    let cx = wx - (x - this.w / 2) / sx;
-    if (b) {
-      sx = Math.min(sx, Math.max(this.cam.sx, this.camera.sxCap(wx, wy)));
-    }
-    const wxT = wx;
-    cx = wxT - (x - this.w / 2) / sx;
-    // (What lands where: world x `at` at screen x `atPx`, the finger's point under the finger unless it centres.)
-    let at = wxT;
-    let atPx = x;
-    if (b) {
-      if (framing) {
-        const [l, w] = this.spanAt(b, wy);
-        cx = l + w / 2;
-      }
-      // In the green lane, land on a living strand rather than a vacant slot
-      // (only about a third of the index slots hold someone alive).
-      const m = this.model(b);
-      const L = m.lanes(wy);
-      const slotPx = m.pitch(wy) * sx;
-      if (wxT < L.left + L.gw && slotPx > 12) cx = m.nearestLiving(wxT, wy, Math.ceil(this.w / slotPx)) ?? cx;
-      if (cx !== wxT - (x - this.w / 2) / sx) [at, atPx] = [cx, this.w / 2];
-    }
-    const to: Camera = { sx, sy, ty: sy, cx, cy: wy - (y - this.h / 2) / sy };
-    if (!b || !this.fan.tess.fold) {
-      this.flyTo(to);
-      return;
-    }
-    // Folded (fold.ts): the column moves as the zoom opens the fold and its anchor follows the camera, so what
-    // lands is held as its share across the column (or the span framed) at that height, framed where the fold
-    // has it at the landing (brackets.ts foldedFrame, ToLaD#211), and taken exactly on landing.
-    const [l0, w0] = this.spanAt(b, wy);
-    const share = (at - l0) / Math.max(1e-300, w0);
-    const frame = () => {
-      const [l, w] = this.spanAt(b, wy);
-      return { ...to, cx: l + share * w - (atPx - this.w / 2) / sx };
-    };
-    this.flyTo(foldedFrame(this.fan, this.w, frame), 650, () => {
-      this.cam = foldedFrame(this.fan, this.w, frame);
-      this.camera.settle();
-      this.request();
-    });
+  doubleTap(_x: number, _y: number): void {
+    const step = this.backStep();
+    if (!step) return;
+    this.backing = step;
+    step.go();
   }
 
-  /** What a tap on strand b at world y frames: its own column above its split, the parent column below ([left, width]). */
+  /**
+   * The frames a double-tap steps back through (ToLaD#241), innermost first: the species of the lineage at the
+   * screen's centre (lineAt, as the pinned groups, ToLaD#233), then each ranked clade it sits in (cladeOf, outOf), the
+   * root's (home) last. What is on screen, not where taps went: after a pinch or a pan it starts from there.
+   */
+  private backLadder(b: FanBranch | null): BackStep[] {
+    const root = this.fan.root;
+    const steps: BackStep[] = [];
+    if (b) {
+      steps.push({ to: b.sp.common, cam: this.speciesCamera(b), go: () => this.flyToSpecies(b.sp, 700, false) });
+      for (let v: FanNode | null = this.cladeOf(b); v && v !== root; v = this.outOf(v)) {
+        const c = v;
+        steps.push({ to: c.name, cam: this.cladeCamera(c), go: () => this.flyLevel(null, c) });
+      }
+    }
+    steps.push({ to: 'home', cam: this.homeCamera(), go: () => this.flyLevel(null, root) });
+    return steps;
+  }
+
+  /**
+   * One step back from the view (ToLaD#241), or null at home. The view is inside a frame of the ladder when it is zoomed
+   * in at least that far on both axes (within BACK_SLACK, 15 %), and at it when also zoomed in no further than that.
+   * The innermost frame it is inside: zoomed in past it, the step is to it; at it, to the next frame out that the view
+   * is zoomed in past. Past the ladder's end, home unless already there. Mid-way through a step back, from where that
+   * step lands.
+   */
+  private backStep(): BackStep & { b: FanBranch | null } | null {
+    const on = this.anim && this.backing;
+    const c = on ? this.backing!.cam : this.cam;
+    const b = on ? this.backing!.b : this.centreLine();
+    // (Folded, each frame computed moves the fold to it: put back after, so the view stands as it was.)
+    const restore = this.fan.tess.fold?.keep();
+    const ladder = this.backLadder(b);
+    restore?.();
+    // The view's level: the innermost frame it is inside (zoomed in at least as far, on both axes, within the slack; a
+    // frame zoomed in further on one, as a genus's beside the clade on screen, is not one it is in).
+    const inside = (f: Camera) => c.sx * BACK_SLACK >= f.sx && c.sy * BACK_SLACK >= f.sy;
+    const closer = (f: Camera) => c.sx > f.sx * BACK_SLACK || c.sy > f.sy * BACK_SLACK;
+    const i = Math.max(0, ladder.findIndex((f) => inside(f.cam)));
+    // Closer than it: that frame. At it: the next one out it is closer than.
+    const next = closer(ladder[i].cam) && inside(ladder[i].cam) ? ladder[i] : ladder.slice(i + 1).find((f) => closer(f.cam));
+    const home = ladder[ladder.length - 1];
+    const step = next ?? (this.atHome(c) ? null : home);
+    return step && { ...step, b };
+  }
+
+  /** Whether camera c is home's (within 4 px and 2 %): where a double-tap does nothing (ToLaD#241). */
+  private atHome(c: Camera = this.cam): boolean {
+    const h = this.homeCamera();
+    return Math.abs(c.cx - h.cx) * c.sx <= 4 && Math.abs(c.cy - h.cy) * c.sy <= 4 && Math.abs(Math.log(c.sx / h.sx)) <= 0.02 && Math.abs(Math.log(c.sy / h.sy)) <= 0.02;
+  }
+
+  /** The step back under way (ToLaD#241): where it lands and the species it started from, so a double-tap mid-flight goes on from there. */
+  private backing: BackStep & { b: FanBranch | null } | null = null;
+
+  /** The lineage at the screen's centre (ToLaD#233): the pinned groups' and a double-tap's (ToLaD#241). */
+  private centreLine(): FanBranch | null {
+    return this.lineAt((LABEL_AXIS_X + this.w) / 2, this.h / 2);
+  }
+
+  /**
+   * Whether a single tap here waits out the double-tap window (engine/input.ts, ToLaD#241), so a double-tap's first tap
+   * does nothing: a tap that flies (a pill, picture, bracket, pinned group or "+x") always; one that opens a card,
+   * unless a double-tap would do nothing (at home); a tap on nothing (closing the card) never.
+   */
+  tapWaits(x: number, y: number): boolean {
+    const k = this.tapKind(x, y);
+    return k === 'fly' || (k === 'card' && (!!this.anim || !this.atHome()));
+  }
+
+  /** What a tap at (x, y) does: flies somewhere, opens a card, or neither (as tap() decides it). */
+  private tapKind(x: number, y: number): 'fly' | 'card' | null {
+    if (this.brackets?.pinHit(x, y) || this.plusAt(x, y) || this.pillAt(x, y) || this.picAt(x, y) || this.brackets?.hit(x, y)) return 'fly';
+    return this.eventLabelAt(x, y) || this.hitBranch(x, y) ? 'card' : null;
+  }
+
+  /** The "+x" badge under (x, y) (ToLaD#197). */
+  private plusAt(x: number, y: number) {
+    return this.plusHits.find(({ box }) => x >= box[0] - 8 && x <= box[2] + 8 && y >= box[1] - 4 && y <= box[3] + 4);
+  }
+
+  /** The species' or family's name pill nearest (x, y) within a finger's slack (ToLaD#230, #212), the one under it first. */
+  private pillAt(x: number, y: number): { b?: FanBranch; v?: FanNode } | null {
+    let pill: { b?: FanBranch; v?: FanNode } | null = null;
+    let pd = Infinity;
+    for (const h of [...this.nameHits, ...this.famHits]) {
+      const dx = Math.max(h.box[0] - x, x - h.box[2], 0);
+      const dy = Math.max(h.box[1] - y, y - h.box[3], 0);
+      if (dx <= 6 && dy <= 6 && dx + dy < pd) [pill, pd] = [h, dx + dy];
+    }
+    return pill;
+  }
+
+  /** The species' (or family pill's) picture under (x, y) (ToLaD#193). */
+  private picAt(x: number, y: number) {
+    return this.thumbHits.find(([px, py, r]) => (x - px) ** 2 + (y - py) ** 2 <= (r + 3) ** 2);
+  }
+
+  /** The span of strand b at world y: its own column above its split, the parent column below ([left, width]). */
   private spanAt(b: FanBranch, wy: number): [number, number] {
     const y = Math.min(this.fan.trunkBottom.y, Math.max(b.tipY, wy));
     if (y < b.splitY) return [leftAt(b, y), laneAt(b, y).w];
     const v = segAt(b, y).node;
     return [nodeLeftAt(v, y), v.width];
+  }
+
+  /** The event label under (x, y). */
+  private eventLabelAt(x: number, y: number) {
+    return this.eventLabels.find(({ box }) => x >= box[0] - 4 && x <= box[2] + 4 && y >= box[1] - 4 && y <= box[3] + 4);
   }
 
   tap(x: number, y: number): void {
@@ -1428,21 +1467,14 @@ export class FanView implements InputHandlers {
       return;
     }
     // A pill's "+x" (ToLaD#197): fly to the species it stands for, until their pills show.
-    const plus = this.plusHits.find(({ box }) => x >= box[0] - 8 && x <= box[2] + 8 && y >= box[1] - 4 && y <= box[3] + 4);
+    const plus = this.plusAt(x, y);
     if (plus) {
       this.flyToGroup(plus.bs);
       return;
     }
-    // A species' name pill (ToLaD#230): fly to its branch; tapped again there, one level out (tapSpecies). A family's
-    // pill (ToLaD#212): fly to the family, as its bracket (tapClade). The nearest within a finger's slack (the pills
-    // stand side by side): the one under the finger before a neighbour's slack.
-    let pill: { b?: FanBranch; v?: FanNode } | null = null;
-    let pd = Infinity;
-    for (const h of [...this.nameHits, ...this.famHits]) {
-      const dx = Math.max(h.box[0] - x, x - h.box[2], 0);
-      const dy = Math.max(h.box[1] - y, y - h.box[3], 0);
-      if (dx <= 6 && dy <= 6 && dx + dy < pd) [pill, pd] = [h, dx + dy];
-    }
+    // A species' name pill: fly to its branch and open its card (ToLaD#230, #241). A family's pill (ToLaD#212): fly
+    // to the family, as its bracket (tapClade).
+    const pill = this.pillAt(x, y);
     if (pill?.v) {
       this.tapClade(pill.v);
       return;
@@ -1452,7 +1484,7 @@ export class FanView implements InputHandlers {
       return;
     }
     // A species' picture (ToLaD#193): as its pill (ToLaD#230); a family pill's picture, as the family's pill.
-    const pic = this.thumbHits.find(([px, py, r]) => (x - px) ** 2 + (y - py) ** 2 <= (r + 3) ** 2);
+    const pic = this.picAt(x, y);
     if (pic) {
       if (pic[4]) this.tapClade(pic[4]);
       else this.tapSpecies(pic[3]);
@@ -1465,7 +1497,7 @@ export class FanView implements InputHandlers {
       return;
     }
     // An event's label: opens its event, the touch at the middle of its window on the column.
-    const lab = this.eventLabels.find(({ box }) => x >= box[0] - 4 && x <= box[2] + 4 && y >= box[1] - 4 && y <= box[3] + 4);
+    const lab = this.eventLabelAt(x, y);
     const ev = lab && colEventsY(this.fan, lab.b).find((s) => s.k === lab.k);
     if (lab && ev) {
       const ageMa = Math.sqrt(Math.max(1, ev.ago0) * Math.max(1, ev.ago1)) / 1e6;
