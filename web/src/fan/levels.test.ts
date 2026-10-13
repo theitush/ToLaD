@@ -1,9 +1,10 @@
 // One tap = one level deeper, a double-tap = one level out, one pill per group one level down (ToLaD#258).
 import { describe, expect, it } from 'vitest';
-import { laneAt, leftAt, type FanBranch } from './layout';
-import { CARNIVORA, FELIDAE, type CladeRec } from './panthera';
-import { CARNIVORA_TREE, FELIDAE_TREE, type Split } from './splits';
-import { FanView, groupFace, holds, labelGroups, labelSpots, levelName, nextLevels, type Level } from './view';
+import { laneAt, layoutFan, leftAt, type FanBranch } from './layout';
+import { CARNIVORA, FELIDAE, mammaliaClade, type CladeRec } from './panthera';
+import { loadMammalsFromFiles } from './mammals-node';
+import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, type Split } from './splits';
+import { FanView, groupFace, holds, isLevel, labelGroups, labelSpots, levelName, nextLevels, type Level } from './view';
 import { wikiOf } from './wiki';
 
 function stubView(clade: CladeRec = CARNIVORA, tree: Split = CARNIVORA_TREE, folds = true): FanView {
@@ -192,4 +193,20 @@ describe('a tap goes one level deeper, a double-tap one level out (ToLaD#258)', 
       }
     });
   }
+});
+
+describe('mammal home opens on the orders (ToLaD#258, #256)', () => {
+  it('the groups one level down from the root are the orders, named in English', async () => {
+    // (The page fetches mammals.json; here it is built from the files the same way.)
+    await loadMammalsFromFiles();
+    const fan = layoutFan(mammaliaClade(), 'log', mammaliaTree());
+    const groups = nextLevels(fan, fan.root);
+    const names = groups.map((g) => (g.b ? g.b.sp.common : levelName(g.v)));
+    console.log(`mammal home: ${groups.length} groups: ${names.join(', ')}`);
+    for (const o of ['Rodents', 'Bats', 'Carnivores', 'Primates', 'Shrews & moles', 'Hoofed mammals & whales']) expect(names).toContain(o);
+    // Every group is an order (or a family or species standing for one): none above an order.
+    for (const g of groups) if (g.v) expect(isLevel(fan, g.v)).toBe(true);
+    // (47 today: the armadillos and bandicoots the tree does not join under their order's split stand on their own, ToLaD#256.)
+    expect(groups.length).toBeLessThan(60);
+  }, 120000);
 });

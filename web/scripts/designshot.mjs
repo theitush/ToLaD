@@ -186,12 +186,12 @@ const scenes = [
   ['back-3', 'backtap'],
   ['back-4', 'backtap'],
   ['back-5', 'backtap'],
-  // ToLaD#245: home; a double-tap on the column farthest from the centre (into that species' frame); then a double-tap
-  // on empty space, one step back, twice. (`dblfar`: from home; `dblempty`: the fan as it is, on an empty spot.)
-  ['dbl-0', 'home'],
-  ['dbl-1', 'dblfar'],
-  ['dbl-2', 'dblempty'],
-  ['dbl-3', 'dblempty'],
+  // ToLaD#258: home; a tap on a column of the dogs (their widest), one level deeper; a second, one more; then a
+  // double-tap, one level out. (`taps` [species or group, letters]: from home, t a tap on its column, d a double-tap.)
+  ['tap-0', 'home'],
+  ['tap-1', 'taps', ['Canidae', 't']],
+  ['tap-2', 'taps', ['Canidae', 'tt']],
+  ['tap-3', 'taps', ['Canidae', 'ttd']],
   // ToLaD#246: a flight from home into the fisher's frame, and from there back home, caught every 360 ms (1.8 s each).
   ...[0, 360, 720, 1080, 1440, 1800].map((ms) => [`fly-in-${ms}`, 'flyin', ['Fisher', ms]]),
   ...[0, 360, 720, 1080, 1440, 1800].map((ms) => [`fly-out-${ms}`, 'flyout', ['Fisher', ms]]),
