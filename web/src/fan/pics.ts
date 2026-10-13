@@ -1,7 +1,8 @@
 /**
  * The level's group pictures on the "now" edge (ToLaD#262, #266): one disc per group one level down, always exactly
  * above its clade's centre (Ita: "pic must always be exactly about its clades center"), standing on "now" (an extinct
- * group's on its own tip), never moved sideways or up. When they crowd: the discs shrink (down to PIC_MIN), then
+ * group's on its own tip), never moved sideways or up. When they crowd: each disc shrinks to the room its nearest
+ * neighbour leaves (down to PIC_MIN), then
  * neighbours overlap a little (the more populous on top), then the least populous groups' pictures are dropped.
  */
 
@@ -19,9 +20,8 @@ export const PIC_D = 50;
 export const PIC_GAP = 4;
 /** The discs stand this many px above "now" (or the tip). */
 export const PIC_LIFT = 2;
-/** Diameters tried, largest first: the smallest is PIC_MIN. */
-const SIZES = [50, 44, 38, 32, 26, 22, 18];
-export const PIC_MIN = SIZES[SIZES.length - 1];
+/** The smallest disc (px): crowded past it, neighbours overlap a little, then the least populous are dropped. */
+export const PIC_MIN = 18;
 /** At the smallest size, two discs' centres at least this share of a diameter apart (they overlap by the rest). */
 export const PIC_OVERLAP = 0.7;
 
@@ -46,19 +46,20 @@ export function placePics(xs: readonly number[], ys: readonly number[], pop: rea
     for (const i of order) if (kept.every((j) => near(i, j, d) >= apart - 1e-9)) kept.push(i);
     return kept;
   };
-  // The largest size at which all stand clear; else the smallest, overlapping a little, the least populous dropped.
-  let d = PIC_MIN;
-  let kept: number[] | null = null;
-  for (const size of SIZES) {
-    const k = fits(size, size + PIC_GAP);
-    if (k.length === n) {
-      [d, kept] = [size, k];
-      break;
-    }
-  }
-  kept ??= fits(d, PIC_OVERLAP * d);
-  return kept.reverse().map((i) => {
-    const [x, y] = at(i, d);
-    return { x, y, d, i };
+  // Kept: each not nearer than a little overlap of the smallest discs to a more populous one kept (the rest dropped).
+  const kept = fits(PIC_MIN, PIC_OVERLAP * PIC_MIN);
+  // Each disc as large as its nearest kept neighbour leaves room for (two neighbours both so, they clear by PIC_GAP),
+  // PIC_D at most, PIC_MIN at least (there they overlap a little).
+  const size = kept.map((i) => {
+    let room = PIC_D;
+    for (const j of kept) if (j !== i) room = Math.min(room, near(i, j, PIC_D) - PIC_GAP);
+    return Math.max(PIC_MIN, room);
   });
+  return kept
+    .map((i, k) => {
+      const d = size[k];
+      const [x, y] = at(i, d);
+      return { x, y, d, i };
+    })
+    .reverse();
 }
