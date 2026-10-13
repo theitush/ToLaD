@@ -4,7 +4,7 @@
 // in far enough, a branch resolves into the individuals themselves (twigs.ts).
 // Gestures come from the shared engine/input.ts.
 
-import { drawThumb, labelThumb } from './wiki';
+import { drawThumb, labelThumb, wikiOf } from './wiki';
 import { formatCount } from '../data/count';
 import { Input, type InputHandlers } from '../engine/input';
 import { clipPoly, FanCamera, type Camera } from './camera';
@@ -16,8 +16,8 @@ import { Fold, type FoldState } from './fold';
 import { COLUMN_DIM, columnSpans, EVENT_TINT, eventAt, eventSpans, type EventSpan } from './colstyle';
 import { drawTwigs, kLogAt, laneDim, LINEAGE, LIVING, TEX_HAIR_PX, TWIG_GRAY, TwigModel, type IndInfo, type TwigStats } from './twigs';
 import type { MeshBatch, RectBatch } from './meshgl';
-import { familyLabel, FELIDAE_TREE, type Split } from './splits';
-import { bandDepth, Brackets, cladeCamera, foldedFrame, latinOf, rankOf, ROW_H } from './brackets';
+import { familyLabel, FELIDAE_TREE, ORDER_TAXA, taxonKey, type Split } from './splits';
+import { bandDepth, Brackets, cladeCamera, foldedFrame, latinOf, rankOf, ROW_H, TAXON_EN } from './brackets';
 import { axisInset, drawWorldOver, drawWorldUnder, worldFlags, type Box } from './world';
 
 export type { IndInfo } from './twigs';
@@ -51,12 +51,16 @@ const LABEL_PAD = 8;
 /** Right edge (px) of the time axis's labels: species' labels keep right of it. */
 const LABEL_AXIS_X = 72;
 /** A frame a double-tap steps back to (ToLaD#241): what it frames (a species, a clade, home), the frame, the flight there. */
-type BackStep = { to: string; cam: Camera; go: () => void };
+type BackStep = { to: string; cam: Camera; go: () => void; lv: Level };
 /**
  * A double-tap's step back (ToLaD#241): the view is "at" a frame of the ladder when it is zoomed within this factor
  * (15 %) of it, width and time together (the area's scale); zoomed in further, the step goes to that frame, else past it.
  */
 const BACK_SLACK = 1.15;
+/** A tap's next level (ToLaD#258) is one whose frame stands more than this many px off the view's: nearer, it is passed. */
+const LEVEL_PX = 12;
+/** The level the view is at (levelNow) is worked out at most this often (ms) while the camera moves without a gesture (a wheel). */
+const LEVEL_MS = 200;
 /** The scale bar and legend at the bottom (px): labels fade out over the 30 px above it. */
 const LABEL_BOTTOM_PX = 104;
 /** How long a label takes to fade in or out when another takes or gives up its place (ms). */
@@ -463,6 +467,106 @@ export function commonest(v: FanNode): FanBranch | null {
 }
 
 /**
+ * A level (ToLaD#258): what a tap goes one deeper into and a double-tap one out of. A named group (a clade with a rank,
+ * isLevel), or a single species.
+ */
+export type Level = { v: FanNode; b?: undefined } | { b: FanBranch; v?: undefined };
+
+/** The clades above an order (ToLaD#258): a superordinal one (Theria, Glires…) is no level, so mammal home opens on the orders. Kept per fan. */
+const aboveCache = new WeakMap<Fan, Set<FanNode>>();
+function aboveOrders(fan: Fan): Set<FanNode> {
+  let out = aboveCache.get(fan);
+  if (!out) {
+    out = new Set();
+    for (const v of fan.nodes) if (ORDER_TAXA.has(taxonKey(v.split.taxon ?? ''))) for (let p = v.parent; p; p = p.parent) out.add(p);
+    aboveCache.set(fan, out);
+  }
+  return out;
+}
+
+/** Whether clade v is a level (ToLaD#258): the root, or a ranked clade (rankOf: order, suborder, family, …, genus) not above an order. */
+export function isLevel(fan: Fan, v: FanNode): boolean {
+  return !v.parent || (!!rankOf(latinOf(v.split)) && !aboveOrders(fan).has(v));
+}
+
+/** A level's name on its pill (ToLaD#258): its English name where there is one (TAXON_EN: the orders', families' …), else its Latin. */
+export function levelName(v: FanNode): string {
+  const latin = latinOf(v.split);
+  return TAXON_EN[latin] ?? (latin || v.name);
+}
+
+/**
+ * The groups one level down from clade v (ToLaD#258), left to right: each daughter that is a level or a species, an
+ * unnamed daughter's own groups in its place. A group with all of v's species (v's one named daughter) opens to its own;
+ * a named group of a single species is that species.
+ */
+export function nextLevels(fan: Fan, v: FanNode): Level[] {
+  const out: Level[] = [];
+  const go = (u: FanNode) => {
+    for (const k of u.kids) {
+      if ('sp' in k) out.push({ b: k });
+      else if (k.strands.length === 1) out.push({ b: k.strands[0] });
+      else if (isLevel(fan, k) && k.strands.length < v.strands.length) out.push({ v: k });
+      else go(k);
+    }
+  };
+  go(v);
+  return out;
+}
+
+/** The nearest level clade v sits in, from v itself (`self`) or its parent up (ToLaD#258); null past the root. */
+export function levelUp(fan: Fan, v: FanNode | null, self = false): FanNode | null {
+  for (let p = self ? v : (v?.parent ?? null); p; p = p.parent) if (isLevel(fan, p)) return p;
+  return null;
+}
+
+/** Whether level a holds level x (itself or inside it). */
+export function holds(a: Level, x: Level): boolean {
+  if (a.b) return a.b === x.b;
+  if (x.b) return a.v.strands.includes(x.b);
+  for (let u: FanNode | null = x.v; u; u = u.parent) if (u === a.v) return true;
+  return false;
+}
+
+/**
+ * The groups named at level `at` (ToLaD#258): the groups one level down in it (nextLevels), and around it, each level
+ * it sits in's other groups (the neighbours at the screen's edges); `at` itself when a species. Each clade as labelSpots'
+ * groups ({ v, vi, text }), each species in `species`.
+ */
+const groupCache = new WeakMap<object, { groups: { v: FanNode; vi: number; text: string }[]; species: Set<FanBranch> }>();
+export function labelGroups(fan: Fan, at: Level): { groups: { v: FanNode; vi: number; text: string }[]; species: Set<FanBranch> } {
+  const key = at.v ?? at.b;
+  let out = groupCache.get(key);
+  if (out) return out;
+  const index = new Map(fan.nodes.map((v, i) => [v, i]));
+  const o = { groups: [] as { v: FanNode; vi: number; text: string }[], species: new Set<FanBranch>() };
+  const add = (g: Level) => (g.b ? o.species.add(g.b) : o.groups.push({ v: g.v, vi: index.get(g.v)!, text: levelName(g.v) }));
+  let u: FanNode | null;
+  if (at.b) {
+    add(at);
+    u = levelUp(fan, at.b.node, true);
+  } else {
+    nextLevels(fan, at.v).forEach(add);
+    u = levelUp(fan, at.v);
+  }
+  for (let inner: Level = at; u; inner = { v: u }, u = levelUp(fan, u)) for (const g of nextLevels(fan, u)) if (!holds(g, inner) && !holds(inner, g)) add(g);
+  groupCache.set(key, (out = o));
+  return out;
+}
+
+/** A group's picture (ToLaD#258): the species with the most individuals alive now that has a picture (wiki.ts), else the commonest. */
+const faceCache = new WeakMap<FanNode, FanBranch | null>();
+export function groupFace(v: FanNode): FanBranch | null {
+  let out = faceCache.get(v);
+  if (out === undefined) {
+    const alive = v.strands.filter((b) => !b.sp.extinct && b.pop.aliveAt(0) > 0).sort((p, q) => q.pop.aliveAt(0) - p.pop.aliveAt(0));
+    out = alive.find((b) => wikiOf(b.sp.sci)?.img) ?? alive[0] ?? null;
+    faceCache.set(v, out);
+  }
+  return out;
+}
+
+/**
  * The species pills that stand for their family (ToLaD#212), counted with the cull: a family with exactly one
  * species shown (its pill on its tip), others of it hidden in view (their tips there, none of their spots shown) and
  * no family pill of its own shown. Keyed by that species' id: next frame its pill carries the family's name and its
@@ -514,6 +618,7 @@ export function labelSpots(
   plus?: (id: string) => number,
   famOf?: (id: string) => FanNode | undefined,
   lod?: Lod | null,
+  level?: { groups: { v: FanNode; vi: number; text: string }[]; species: Set<FanBranch> },
 ): LabelSpot[] {
   const half = LABEL_PILL / 2;
   const X = (x: number) => c.toScreen(x, 0)[0];
@@ -636,9 +741,10 @@ export function labelSpots(
   // meets no other label: the left end clears the middle of a family's one big column). The same name (`n<i>`)
   // as its lineage's label beside its parent column, so once "now" is off screen the one becomes the other.
   // (With the clades' brackets, ToLaD#193, a family is named on its bracket where that has room, else here, over the stack.)
-  for (const { v, vi, text } of families(fan)) {
+  // (Given the level's groups, ToLaD#258: each group one level down, named whether or not its bracket is, with its picture.)
+  for (const { v, vi, text } of level?.groups ?? families(fan)) {
     // (The mammal level, lod.ts: a family inside a clade drawn as one branch is not named; the clade is.)
-    if (brk?.named(v) || lod?.hidden(v)) continue;
+    if ((!level && brk?.named(v)) || lod?.hidden(v)) continue;
     const [wa, wb] = familySpan(v);
     const sa = X(wa);
     const sb = X(wb);
@@ -654,13 +760,15 @@ export function labelSpots(
     // (On "now", under the brackets, ToLaD#193: a long one reaches up over their lines.)
     const y1 = Math.max(nowS - 4, top + len);
     const fit = fit0 * botFit(y1);
-    const xs = lo <= hi - LABEL_PILL ? [lo, (lo + hi) / 2, hi] : [Math.min(Math.max((sa + sb) / 2, LABEL_AXIS_X + half), c.w - half)];
+    // (A level's groups, ToLaD#258: the middle first, so a wide group leaves its ends to the narrow ones beside it.)
+    const xs = lo <= hi - LABEL_PILL ? (level ? [(lo + hi) / 2, lo, hi] : [lo, (lo + hi) / 2, hi]) : [Math.min(Math.max((sa + sb) / 2, LABEL_AXIS_X + half), c.w - half)];
     xs.forEach((x, k) => {
-      out.push({ key: `n${vi}:fam${k}`, id: `n${vi}`, place: 'fam', v, fam: v, pic: commonest(v), text, rank: [-1, wb - wa, vi], x, y1, box: [x - half, y1 - len, x + half, y1], fit, span: brk ? undefined : [sa, sb], plus: px });
+      out.push({ key: `n${vi}:fam${k}`, id: `n${vi}`, place: 'fam', v, fam: v, pic: level ? groupFace(v) : commonest(v), text, rank: [-1, wb - wa, vi], x, y1, box: [x - half, y1 - len, x + half, y1], fit, span: brk ? undefined : [sa, sb], plus: px });
     });
   }
   for (const b of fan.branches) {
-    if ((lod && lod.of[b.index] >= 0) || !near(boxes.get(b)!)) continue;
+    // (Given the level's groups, ToLaD#258: only a species that is a group of its own.)
+    if ((lod && lod.of[b.index] >= 0) || (level && !level.species.has(b)) || !near(boxes.get(b)!)) continue;
     const id = String(b.sp.gid);
     // (Standing for its family, ToLaD#212: the family's name on its tip, last frame's familyPills.)
     const fam = famOf?.(id);
@@ -898,10 +1006,6 @@ export class FanView implements InputHandlers {
    * nothing moved since, it goes one level out.
    */
   private tapAt: { b: FanBranch | null; v: FanNode | null; cam: Camera } | null = null;
-  /** The "+x" badges as last drawn (ToLaD#197): the count on each species' pill (by id), and where a tap on one lands. */
-  private plusN = new Map<string, number>();
-  /** The species pills standing for their family (ToLaD#212), from the frame before (familyPills). */
-  private famPills = new Map<string, FanNode>();
   /** The family pills drawn (ToLaD#212): a tap flies to the family, as its bracket's. */
   famHits: { box: [number, number, number, number]; v: FanNode }[] = [];
   plusHits: { box: [number, number, number, number]; bs: FanBranch[] }[] = [];
@@ -1074,15 +1178,13 @@ export class FanView implements InputHandlers {
 
   /** The ranked clade a species sits in (ToLaD#230): the nearest with a rank (genus, subfamily, family…), else the root. */
   cladeOf(b: FanBranch): FanNode {
-    let v = b.node;
-    while (v.parent && !rankOf(latinOf(v.split))) v = v.parent;
-    return v;
+    // (A level, ToLaD#258: not a clade above an order.)
+    return levelUp(this.fan, b.node, true) ?? this.fan.root;
   }
 
   /** One level out from clade v (ToLaD#230): the nearest ranked clade it sits in, the root last; null from the root. */
   outOf(v: FanNode): FanNode | null {
-    for (let p = v.parent; p; p = p.parent) if (!p.parent || rankOf(latinOf(p.split))) return p;
-    return null;
+    return levelUp(this.fan, v);
   }
 
   /** Whether the last pill/picture/bracket flight landed where the camera still is (ToLaD#230): nothing moved since. */
@@ -1281,6 +1383,8 @@ export class FanView implements InputHandlers {
    * it lands (not if a gesture takes over first).
    */
   flyTo(aim: Camera | (() => Camera), ms?: number, done?: () => void): void {
+    // (A level's step, backing, is set again after this by the tap or double-tap that flies it, ToLaD#258.)
+    this.backing = null;
     const fo = this.fan.tess.fold;
     const from = { ...this.cam };
     // (The frame computed moves the fold to it, ToLaD#211: its state kept, the fold put back where the view stands.)
@@ -1409,8 +1513,13 @@ export class FanView implements InputHandlers {
 
   gestureStart(): void {
     this.anim = null;
+    this.backing = null;
+    this.gesturing = true;
   }
-  gestureEnd(): void {}
+  gestureEnd(): void {
+    this.gesturing = false;
+    this.request();
+  }
   pan(dx: number, dy: number): void {
     if (dx || dy) this.tapAt = null;
     this.camera.pan(dx, dy);
@@ -1440,72 +1549,113 @@ export class FanView implements InputHandlers {
     this.request();
   }
   /**
-   * A double-tap (ToLaD#241, #245). On a branch other than the one the view is in (intoAt): into it, its frame, no
-   * card. On the branch the view is in, or on empty space: one step back, out along the ladder of frames over what is
-   * on screen (backLadder): deep in a species, its frame; at a species' frame, its clade's; at a clade's, the next clade
-   * out; … home. At home on empty space, nothing.
+   * A double-tap (ToLaD#258): one level out, anywhere, along the ladder of frames over what is on screen (backStep,
+   * ToLaD#241): deep in a species, its frame; at a species' frame, its group's; at a group's, the next one out; … home.
+   * At home, nothing.
    */
-  doubleTap(x: number, y: number): void {
-    const into = this.intoAt(x, y);
-    if (into) {
-      this.backing = null;
-      into();
-      return;
-    }
+  doubleTap(_x: number, _y: number): void {
     const step = this.backStep();
     if (!step) return;
-    this.backing = step;
     step.go();
+    this.backing = step;
   }
 
   /**
-   * Where a double-tap at (x, y) goes into (ToLaD#245), or null (a step back). On a species' column above its split, or
-   * its name pill or picture: that species' frame (flyToSpecies, no card). On a column below its split (an ancestral
-   * lineage's stretch, segAt): that lineage's clade's frame (flyToClade). On a clade's bracket, its family pill (or that
-   * pill's picture) or a pinned group: that clade's frame. Not on the branch the view is in: the species whose card is
-   * open (selected), or a species or clade the view is at or inside (inFrame).
+   * The level the view is at (ToLaD#258): the innermost frame of the ladder over the lineage at the screen's centre
+   * that the view is zoomed in at least as far as (backStep's), home's root last. Worked out again once the camera
+   * has moved and is still (no flight, fling or gesture under way), at most every LEVEL_MS; the last one meanwhile.
+   * `now`: worked out now whatever the view is doing (a tap's).
    */
-  private intoAt(x: number, y: number): (() => void) | null {
-    let b: FanBranch | null = null;
-    let v: FanNode | null = this.brackets?.pinHit(x, y)?.v ?? null;
-    if (!v) {
-      const pill = this.pillAt(x, y);
-      const pic = pill ? null : this.picAt(x, y);
-      const brk = pill || pic ? null : this.brackets?.hit(x, y);
-      if (pill) [b, v] = [pill.b ?? null, pill.v ?? null];
-      else if (pic) [b, v] = pic[4] ? [null, pic[4]] : [pic[3], null];
-      else if (brk) v = brk.v;
-      else if ((b = this.hitBranch(x, y))) {
-        // (Below its split, the lineage it is in there: the parent column's.)
-        const wy = Math.min(this.fan.trunkBottom.y, this.toWorld(x, y)[1]);
-        if (wy >= b.splitY) [b, v] = [null, segAt(b, wy).node];
+  levelNow(now = false): Level {
+    // (Where a level's flight landed, nothing moved since: that level. From the camera, a wide species' frame, as the
+    // domestic dog's, can take in its clade's.)
+    const at = this.landedHere() ? this.tapAt! : null;
+    if (at) return at.v ? { v: at.v } : { b: at.b! };
+    const k = this.lvAt;
+    const c = this.cam;
+    if (k && k.fan === this.fan && k.cam.cx === c.cx && k.cam.cy === c.cy && k.cam.sx === c.sx && k.cam.sy === c.sy) return k.lv;
+    const t = performance.now();
+    if (k && k.fan === this.fan && !now && (this.anim || this.gesturing || t - k.t < LEVEL_MS)) {
+      if (!this.anim && !this.gesturing && !this.lvTimer) this.lvTimer = setTimeout(() => ((this.lvTimer = 0), this.request()), LEVEL_MS);
+      return k.lv;
+    }
+    const b = this.centreLine();
+    const z = (f: Camera) => Math.log(c.sx / f.sx) + Math.log(c.sy / f.sy);
+    const restore = this.fan.tess.fold?.keep();
+    const ladder = this.backLadder(b);
+    restore?.();
+    // At a frame (within LEVEL_PX, as a tap passes them): the outermost there. Else from home in, while the view is
+    // inside each (a wide species' frame, as the house cat's, can take in its group's, even home's).
+    const on = [...ladder].reverse().find((f) => this.offBy(f.cam, c) <= LEVEL_PX);
+    let lv: Level = { v: this.fan.root };
+    if (on) lv = on.lv;
+    else for (let i = ladder.length - 2; i >= 0 && z(ladder[i].cam) >= -Math.log(BACK_SLACK); i--) lv = ladder[i].lv;
+    this.lvAt = { fan: this.fan, cam: { ...c }, lv, t };
+    return lv;
+  }
+  private lvAt: { fan: Fan; cam: Camera; lv: Level; t: number } | null = null;
+  private lvTimer: ReturnType<typeof setTimeout> | 0 = 0;
+  /** A pinch or drag under way (InputHandlers' gestureStart to gestureEnd): the level is worked out once it ends. */
+  private gesturing = false;
+
+  /**
+   * A tap on a branch, a group's pill, picture, bracket or pinned row (ToLaD#258): one level deeper, to the next level
+   * on the way from the level the view is at to what was tapped (`to`: a species, or a clade, an ancestral stretch's
+   * lineage among them). From the level holding both, down: the first whose frame is more than LEVEL_PX off the view's
+   * (so every tap visibly moves). Already at a species: false, for its card. A clade that holds the view's level (a
+   * pinned group, an ancestor's bracket): out to it, unless a column's stretch (`col`: false, its card).
+   */
+  private tapInto(to: Level, col: boolean): boolean {
+    const on = this.anim && this.backing;
+    const from = on ? this.backing!.lv : this.levelNow(true);
+    const cur = on ? this.backing!.cam : this.cam;
+    // What was tapped, then each level it sits in, the root last.
+    const chain: Level[] = [to];
+    for (let u = to.v ? levelUp(this.fan, to.v) : levelUp(this.fan, to.b.node, true); u; u = levelUp(this.fan, u)) chain.push({ v: u });
+    const k = Math.max(0, chain.findIndex((a) => holds(a, from)));
+    for (const lv of k ? chain.slice(0, k).reverse() : col ? [] : [to]) {
+      const cam = this.frameOf(lv);
+      if (this.offBy(cam, cur) > LEVEL_PX) {
+        this.goLevel(lv, cam);
+        return true;
       }
     }
-    if (b) {
-      const sb = b;
-      if (this.selected === sb.sp || this.inFrame([sb], () => this.speciesCamera(sb))) return null;
-      return () => this.flyToSpecies(sb.sp, false);
+    // A group whose frame is the view's (a wide species', as the house cat's in the small cats): on, towards that species.
+    if (to.v && !col && k > 0) {
+      const w = to.v.strands.reduce((p, q) => (q.width > p.width ? q : p));
+      return this.tapInto({ b: w }, false);
     }
-    if (v) {
-      const sv = v;
-      if (this.inFrame(sv.strands, () => this.cladeCamera(sv))) return null;
-      return () => this.flyLevel(null, sv);
+    // At it already: a species' pill or picture opens its card (a column, the card where it was tapped: false).
+    if (to.b && !col) {
+      this.flyToSpecies(to.b.sp);
+      return true;
     }
-    return null;
+    return !col;
   }
 
-  /**
-   * Whether the view is at or inside a frame (ToLaD#245): the lineage at the screen's centre (centreLine) one of `of`,
-   * and zoomed in at least as far as `frame`, width and time together (within BACK_SLACK, as backStep).
-   */
-  private inFrame(of: readonly FanBranch[], frame: () => Camera): boolean {
-    const mid = this.centreLine();
-    if (!mid || !of.includes(mid)) return false;
-    // (Folded, a frame computed moves the fold to it: put back after, as backStep does.)
+  /** Level lv's frame: a species' (speciesCamera) or a clade's (cladeCamera; the root's, home), the fold put back after. */
+  private frameOf(lv: Level): Camera {
     const restore = this.fan.tess.fold?.keep();
-    const f = frame();
+    const cam = lv.b ? this.speciesCamera(lv.b) : lv.v.parent ? this.cladeCamera(lv.v) : this.homeCamera();
     restore?.();
-    return Math.log(this.cam.sx / f.sx) + Math.log(this.cam.sy / f.sy) >= -Math.log(BACK_SLACK);
+    return cam;
+  }
+
+  /** How far (px) frame a's edges stand from the screen's, the view at camera c: the most of its four. */
+  private offBy(a: Camera, c: Camera): number {
+    const hw = this.w / 2;
+    const hh = this.h / 2;
+    const x = (wx: number) => (wx - c.cx) * c.sx + hw;
+    const y = (wy: number) => (wy - c.cy) * c.sy + hh;
+    return Math.max(Math.abs(x(a.cx - hw / a.sx)), Math.abs(x(a.cx + hw / a.sx) - this.w), Math.abs(y(a.cy - hh / a.sy)), Math.abs(y(a.cy + hh / a.sy) - this.h));
+  }
+
+  /** Fly to level lv's frame `cam` (a species: no card), remembered as the step under way (backing), so a tap or double-tap mid-flight goes on from there. */
+  private goLevel(lv: Level, cam: Camera): void {
+    if (lv.b) this.flyToSpecies(lv.b.sp, false);
+    else this.flyLevel(null, lv.v);
+    const b = lv.b ?? lv.v.strands[lv.v.strands.length >> 1];
+    this.backing = { to: lv.b ? lv.b.sp.common : lv.v.parent ? lv.v.name : 'home', cam, go: () => this.goLevel(lv, cam), lv, b };
   }
 
   /**
@@ -1517,13 +1667,13 @@ export class FanView implements InputHandlers {
     const root = this.fan.root;
     const steps: BackStep[] = [];
     if (b) {
-      steps.push({ to: b.sp.common, cam: this.speciesCamera(b), go: () => this.flyToSpecies(b.sp, false) });
+      steps.push({ to: b.sp.common, cam: this.speciesCamera(b), go: () => this.flyToSpecies(b.sp, false), lv: { b } });
       for (let v: FanNode | null = this.cladeOf(b); v && v !== root; v = this.outOf(v)) {
         const c = v;
-        steps.push({ to: c.name, cam: this.cladeCamera(c), go: () => this.flyLevel(null, c) });
+        steps.push({ to: c.name, cam: this.cladeCamera(c), go: () => this.flyLevel(null, c), lv: { v: c } });
       }
     }
-    steps.push({ to: 'home', cam: this.homeCamera(), go: () => this.flyLevel(null, root) });
+    steps.push({ to: 'home', cam: this.homeCamera(), go: () => this.flyLevel(null, root), lv: { v: root } });
     return steps;
   }
 
@@ -1572,14 +1722,12 @@ export class FanView implements InputHandlers {
   }
 
   /**
-   * Whether a single tap here waits out the double-tap window (engine/input.ts, ToLaD#241), so a double-tap's first tap
-   * does nothing: a tap that flies (a pill, picture, bracket, pinned group or "+x") always; one that opens a card,
-   * unless a double-tap there would do nothing (on the branch the view is in, at home, ToLaD#245); a tap on nothing
-   * (closing the card) never.
+   * Whether a single tap here waits out the double-tap window (engine/input.ts, ToLaD#241): a double-tap anywhere is
+   * one level out (ToLaD#258), so every tap that flies or opens a card waits (a double-tap's first tap does nothing);
+   * a tap on nothing (closing the card) never.
    */
   tapWaits(x: number, y: number): boolean {
-    const k = this.tapKind(x, y);
-    return k === 'fly' || (k === 'card' && (!!this.anim || !!this.intoAt(x, y) || !this.atHome()));
+    return this.tapKind(x, y) !== null;
   }
 
   /** What a tap at (x, y) does: flies somewhere, opens a card, or neither (as tap() decides it). */
@@ -1624,40 +1772,15 @@ export class FanView implements InputHandlers {
   }
 
   tap(x: number, y: number): void {
-    // A pinned group (ToLaD#233), over all under it: fly to it; tapped again there, one level out (tapClade).
+    // One level deeper (ToLaD#258), towards what was tapped: a pinned group (ToLaD#233), a species' or group's pill
+    // (ToLaD#230, #212) or picture (ToLaD#193), a clade's bracket.
     const pinned = this.brackets?.pinHit(x, y);
-    if (pinned) {
-      this.tapClade(pinned.v);
-      return;
-    }
-    // A pill's "+x" (ToLaD#197): fly to the species it stands for, until their pills show.
-    const plus = this.plusAt(x, y);
-    if (plus) {
-      this.flyToGroup(plus.bs);
-      return;
-    }
-    // A species' name pill: fly to its branch and open its card (ToLaD#230, #241). A family's pill (ToLaD#212): fly
-    // to the family, as its bracket (tapClade).
-    const pill = this.pillAt(x, y);
-    if (pill?.v) {
-      this.tapClade(pill.v);
-      return;
-    }
-    if (pill?.b) {
-      this.tapSpecies(pill.b);
-      return;
-    }
-    // A species' picture (ToLaD#193): as its pill (ToLaD#230); a family pill's picture, as the family's pill.
-    const pic = this.picAt(x, y);
-    if (pic) {
-      if (pic[4]) this.tapClade(pic[4]);
-      else this.tapSpecies(pic[3]);
-      return;
-    }
-    // A clade's bracket (ToLaD#193): fly to the clade; tapped again there, one level out (ToLaD#230).
-    const clade = this.brackets?.hit(x, y);
-    if (clade) {
-      this.tapClade(clade.v);
+    const pill = pinned ? null : this.pillAt(x, y);
+    const pic = pinned || pill ? null : this.picAt(x, y);
+    const brk = pinned || pill || pic ? null : this.brackets?.hit(x, y);
+    const to: Level | null = pinned ? { v: pinned.v } : pill?.v ? { v: pill.v } : pill?.b ? { b: pill.b } : pic ? (pic[4] ? { v: pic[4] } : { b: pic[3] }) : brk ? { v: brk.v } : null;
+    if (to) {
+      this.tapInto(to, false);
       return;
     }
     // An event's label: opens its event, the touch at the middle of its window on the column.
@@ -1674,6 +1797,11 @@ export class FanView implements InputHandlers {
       return;
     }
     const b = this.hitBranch(x, y);
+    // A column (ToLaD#258): one level deeper towards its species, or below its split towards the lineage there; at it, its card.
+    if (b) {
+      const wy = Math.min(this.fan.trunkBottom.y, this.toWorld(x, y)[1]);
+      if (this.tapInto(wy >= b.splitY ? { v: segAt(b, wy).node } : { b }, true)) return;
+    }
     this.selected = b ? b.sp : null;
     this.selInd = null;
     let ind: IndInfo | undefined;
@@ -1762,7 +1890,8 @@ export class FanView implements InputHandlers {
     this.drawTouch();
     const br = this.layoutBrackets();
     // (The labels kept under the pinned groups, ToLaD#233, as they show.)
-    const spots = labelSpots(this.camera, this.fan, this.labelTop() + (br ? br.pinH() * br.pinA : 0), (t) => this.nameWidth(t), this.barRect()?.[0], br ?? undefined, (id) => this.plusPx(this.plusN.get(id) ?? 0), (id) => this.famPills.get(id), lod);
+    // (One pill per group one level down from the level the view is at, ToLaD#258: no "+x", no species standing for its family.)
+    const spots = labelSpots(this.camera, this.fan, this.labelTop() + (br ? br.pinH() * br.pinA : 0), (t) => this.nameWidth(t), this.barRect()?.[0], br ?? undefined, undefined, undefined, lod, labelGroups(this.fan, this.levelNow()));
     this.drawLabels(spots, br);
     br?.drawPins(this.ctx, FAMILY_INK, INK3, BG);
     this.drawWidthScale();
@@ -2309,20 +2438,10 @@ export class FanView implements InputHandlers {
     const on = resolveLabels(spots, prev);
     // The "+x" badges (ToLaD#197): counted with the cull; a pill keeps room for its count from the frame before, so
     // when a count changes the next frame lays the pills out again with the room it needs.
-    const groups = plusGroups(spots, on, this.fan);
-    // A family with one species shown stands on its pill (ToLaD#212): as the badges, next frame, laid out again for it.
-    const famPills = familyPills(this.fan, spots, on);
-    if (famPills.size !== this.famPills.size || [...famPills].some(([id, v]) => this.famPills.get(id) !== v)) this.request();
-    this.famPills = famPills;
+    // (Not with one pill per group, ToLaD#258: plusGroups and familyPills, ToLaD#197 and #212, give way to labelGroups.)
+    const groups = new Map<string, FanBranch[]>();
     this.famHits.length = 0;
     this.nameHits.length = 0;
-    const plusN = new Map<string, number>();
-    for (const s of spots) {
-      const n = groups.get(s.key)?.length ?? 0;
-      if (n) plusN.set(s.id, n);
-      if (s.plus !== undefined && s.plus !== this.plusPx(n) && on.get(s.key)) this.request();
-    }
-    this.plusN = plusN;
     this.plusHits.length = 0;
     this.eventLabels.length = 0;
     let moving = false;
