@@ -188,6 +188,9 @@ const scenes = [
   ['dbl-1', 'dblfar'],
   ['dbl-2', 'dblempty'],
   ['dbl-3', 'dblempty'],
+  // ToLaD#246: a flight from home into the fisher's frame, and from there back home, caught every 360 ms (1.8 s each).
+  ...[0, 360, 720, 1080, 1440, 1800].map((ms) => [`fly-in-${ms}`, 'flyin', ['Fisher', ms]]),
+  ...[0, 360, 720, 1080, 1440, 1800].map((ms) => [`fly-out-${ms}`, 'flyout', ['Fisher', ms]]),
   // The groups the view is inside pinned at the top (ToLaD#233): home (nothing pinned, the stack itself), deep in a
   // bear's and a weasel's past ("now" far off the top), and (LEVEL=cats) the lion's past inside Panthera.
   ['pin-home', 'home'],
@@ -356,6 +359,24 @@ try {
           const at = f.bracketAt(args[0]);
           if (at) f.tap(at[0], at[1]);
           else f.flyToClade(fan.nodes.find((n) => n.split.taxon === args[0]));
+        } else if (kind === 'flyin' || kind === 'flyout') {
+          // A flight caught args[1] ms in (ToLaD#246), run a frame each 16 ms as the app runs it: `flyin` from home into
+          // species args[0]'s frame, `flyout` from that frame back home (the reset).
+          const b = fan.branches.find((x) => x.sp.common === args[0]);
+          f.cam = f.homeCamera();
+          f.camera.settle();
+          if (kind === 'flyout') {
+            f.cam = f.speciesCamera(b);
+            f.camera.settle();
+          }
+          const t0 = performance.now();
+          if (kind === 'flyin') f.flyToSpecies(b.sp, false);
+          else f.resetView();
+          // (The last, 1.8 s on: to the landing.)
+          for (let t = t0 + 16; f.anim && (t <= t0 + args[1] || (args[1] >= 1800 && t < t0 + 5000)); t += 16) if (!f.anim(t)) f.anim = null;
+          f.anim = null;
+          f.labelState.clear();
+          f.draw();
         } else if (kind === 'tapplus') {
           f.cam = f.homeCamera();
           f.camera.settle();
