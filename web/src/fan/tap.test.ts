@@ -3,7 +3,7 @@
 // 292 species, flown to from home at both widths (and a sample from zoomed in on the dogs), lands with its column's
 // centre at the screen's centre and the column on screen.
 import { describe, expect, it } from 'vitest';
-import { laneAt, leftAt, type FanBranch, type FanNode, type WidthMode } from './layout';
+import { laneAt, leftAt, segAt, type FanBranch, type FanNode, type WidthMode } from './layout';
 import { latinOf, type Brackets } from './brackets';
 import { CARNIVORA, FELIDAE, type CladeRec } from './panthera';
 import { CARNIVORA_TREE, FELIDAE_TREE, type Split } from './splits';
@@ -126,7 +126,10 @@ describe('a species flown to lands centred on screen (ToLaD#211)', () => {
   }
 });
 
-// ToLaD#230, #241: a tap on a species' name pill flies to its branch and opens its card. A double-tap then steps back
+/** A double-tap on nothing (empty space): a step back (ToLaD#245; on a branch, it would fly into that branch). */
+const NOWHERE: [number, number] = [-1e4, -1e4];
+
+// ToLaD#230, #241: a tap on a species' name pill flies to its branch and opens its card. A double-tap (on nothing) then steps back
 // one frame at a time: the clade it sits in, each clade above, home; at home it does nothing. Zoomed deep into a
 // species (after a pinch), the first step is that species' frame. Brackets and family pills fly to their clade, and
 // tapped again there one level out. Folded carnivores and the cats.
@@ -180,7 +183,8 @@ describe("a tap on a species' pill flies to it with its card; a double-tap steps
       expect(v.tapWaits((pill0.box[0] + pill0.box[2]) / 2, pill0.box[3] - 10)).toBe(true);
       const col = v.fan.branches.map((b) => v.toScreen(leftAt(b, b.tipY + 0.5 * (b.splitY - b.tipY)) + laneAt(b, b.tipY).w / 2, b.tipY + 0.5 * (b.splitY - b.tipY)));
       const onCol = col.find(([x, y]) => x > 20 && x < v.w - 20 && y > 300 && y < v.h - 160 && v.hitBranch(x, y));
-      expect(onCol && v.tapWaits(...onCol)).toBe(false);
+      // (At home a column tap waits too: a double-tap there flies into it, ToLaD#245.)
+      expect(onCol && v.tapWaits(...onCol)).toBe(true);
       for (const [start, go] of starts) {
         go();
         // Every species whose pill shows there: tap it, then again and again while its pill shows.
@@ -211,7 +215,7 @@ describe("a tap on a species' pill flies to it with its card; a double-tap steps
           settled();
           const mid = (v as unknown as { centreLine(): FanBranch | null }).centreLine();
           const [pl, , pr] = columnPx(v, b);
-          v.doubleTap(10, 400);
+          v.doubleTap(...NOWHERE);
           run(v);
           settled();
           if (!near(v.speciesCamera(b)))
@@ -226,7 +230,7 @@ describe("a tap on a species' pill flies to it with its card; a double-tap steps
           ladder.push(['home', () => v.homeCamera()]);
           let at = 0;
           for (let k = 0; at < ladder.length - 1 && k < 12; k++) {
-            v.doubleTap(10, 400);
+            v.doubleTap(...NOWHERE);
             if (card) log.push(`${start}: ${b.sp.common}: card open after a double-tap`);
             // (Nothing: home, or a frame within 4 px and 2 % of it, as the small cats' is.)
             if (!(v as unknown as Inner).anim) {
@@ -251,7 +255,7 @@ describe("a tap on a species' pill flies to it with its card; a double-tap steps
           }
           if (at === ladder.length - 1) {
             // Home: a double-tap does nothing.
-            v.doubleTap(10, 400);
+            v.doubleTap(...NOWHERE);
             if ((v as unknown as Inner).anim) log.push(`${start}: ${b.sp.common}: a double-tap at home flew`);
             homes++;
           }
@@ -319,6 +323,173 @@ describe("a tap on a species' pill flies to it with its card; a double-tap steps
       expect(log).toEqual([]);
       expect(homes).toBe(pills);
       expect(steps).toBeGreaterThanOrEqual(pills);
+      // (Every pill's chain home, folded: ~40 s alone, near the 120 s default with the whole suite running beside it.)
+    }, 300_000);
+  }
+});
+
+// ToLaD#245: a double-tap on a branch goes into it: a species' column (above its split) → its species frame, no card;
+// an ancestral stretch (below its split) → that lineage's clade frame. On the branch the view is in (the selected
+// species, or the one framed), or on empty space: one step back, as #241. At home on empty space: nothing.
+describe('a double-tap on a branch goes into it; on the one the view is in, or on nothing, one step back (ToLaD#245)', () => {
+  for (const [name, mk, startAt] of [
+    ['carnivores (folded)', () => stubView(), ['Canidae', 15]],
+    ['cats', () => stubView(FELIDAE, FELIDAE_TREE, false), ['Pantherinae', 1]],
+  ] as const) {
+    it(name, () => {
+      const v = mk();
+      type Priv = {
+        anim: unknown;
+        applyFold(): void;
+        backing: { to: string } | null;
+        backStep(): { to: string } | null;
+        tapKind(x: number, y: number): string | null;
+        intoAt(x: number, y: number): unknown;
+        pillAt(x: number, y: number): unknown;
+        picAt(x: number, y: number): unknown;
+        brackets: Brackets | null;
+        centreLine(): FanBranch | null;
+        labelState: Map<string, unknown>;
+      };
+      const iv = v as unknown as Priv;
+      let card: string | null = null;
+      v.onSelect = (s) => void (card = s ? s.sp.common : null);
+      const settled = () => {
+        iv.labelState.clear();
+        for (let k = 0; k < 3; k++) v.draw();
+      };
+      const goTo = (c: ReturnType<FanView['homeCamera']>) => {
+        v.cam = c;
+        v.camera.settle();
+        iv.applyFold();
+        settled();
+      };
+      const near = (c: { cx: number; cy: number; sx: number; sy: number }) =>
+        Math.abs(v.cam.cx - c.cx) * v.cam.sx < 2 && Math.abs(v.cam.cy - c.cy) * v.cam.sy < 2 && Math.abs(Math.log(v.cam.sx / c.sx)) < 0.01;
+      const onScreen = ([x, y]: [number, number]) => x > 12 && x < v.w - 12 && y > 120 && y < v.h - 160;
+      const bare = (p: [number, number]) => !iv.pillAt(...p) && !iv.picAt(...p) && !iv.brackets?.hit(...p) && !iv.brackets?.pinHit(...p);
+      /** A point on b's own column (above its split) at fraction f of the way down from its tip, if on screen and bare. */
+      const colPt = (b: FanBranch, f: number): [number, number] | null => {
+        const y = b.tipY + f * (b.splitY - b.tipY);
+        const p = v.toScreen(leftAt(b, y) + laneAt(b, y).w / 2, y) as [number, number];
+        return onScreen(p) && bare(p) && v.hitBranch(...p) === b ? p : null;
+      };
+      /** On-screen species columns, farthest from the screen's centre first: [b, point]. */
+      const columns = () =>
+        v.fan.branches
+          .map((b) => [b, colPt(b, 0.5) ?? colPt(b, 0.3) ?? colPt(b, 0.7)] as const)
+          .filter((q): q is readonly [FanBranch, [number, number]] => !!q[1])
+          .sort((a, b) => Math.abs(b[1][0] - v.w / 2) - Math.abs(a[1][0] - v.w / 2));
+      /** An on-screen point on nothing (no column, pill, picture or bracket), if any. */
+      const emptyPt = (): [number, number] | null => {
+        for (let y = 130; y < v.h - 160; y += 9) for (let x = 14; x < v.w - 14; x += 7) if (!iv.tapKind(x, y) && !iv.intoAt(x, y)) return [x, y];
+        return null;
+      };
+      const log: string[] = [];
+      const home = () => goTo(v.homeCamera());
+
+      // Home: a double-tap on a far species' column flies into its frame, no card (its first tap held: it waits).
+      home();
+      const [far, pFar] = columns()[0];
+      expect(v.tapWaits(...pFar)).toBe(true);
+      v.doubleTap(...pFar);
+      expect(iv.anim).toBeTruthy();
+      run(v);
+      settled();
+      if (!near(v.speciesCamera(far))) log.push(`home: double-tap on ${far.sp.common}'s column: not at its frame`);
+      if (card) log.push(`home: double-tap on ${far.sp.common}'s column: a card (${card})`);
+      // There, a double-tap on its own column (the branch the view is in): one step back, as #241, not into it again.
+      const own = colPt(far, 0.5) ?? colPt(far, 0.3);
+      if (!own) log.push(`${far.sp.common}'s frame: its column not on screen`);
+      else {
+        const want = iv.backStep()?.to;
+        v.doubleTap(...own);
+        if (!want || iv.backing?.to !== want || !iv.anim) log.push(`${far.sp.common}'s frame: double-tap on its column went to ${iv.backing?.to} (back is ${want})`);
+        run(v);
+        settled();
+        if (near(v.speciesCamera(far))) log.push(`${far.sp.common}'s frame: double-tap on its column stayed`);
+      }
+
+      // Home: a double-tap on an ancestral stretch (a column below its split) flies to that lineage's clade frame.
+      home();
+      let anc = 0;
+      for (const b of v.fan.branches) {
+        const yb = v.fan.trunkBottom.y;
+        if (b.splitY >= yb) continue;
+        const wy = b.splitY + 0.25 * (yb - b.splitY);
+        /** The lineage under b's strand at wy, if bare and on screen there (below the split of the strand hit). */
+        const under = () => {
+          const p = v.toScreen(leftAt(b, wy) + laneAt(b, wy).w / 2, wy) as [number, number];
+          const hb = onScreen(p) && bare(p) ? v.hitBranch(...p) : null;
+          const y = Math.min(yb, v.toWorld(...p)[1]);
+          const q = hb && y >= hb.splitY ? segAt(hb, y).node : null;
+          return q && q.parent && q.strands.length >= 2 ? { p, hb: hb!, q } : null;
+        };
+        if (!under()) continue;
+        // (Home again, as the tap will be: the fold at home after a flight there is not the same to the pixel.)
+        home();
+        const u = under();
+        if (!u) continue;
+        v.doubleTap(...u.p);
+        run(v);
+        settled();
+        if (!near(v.cladeCamera(u.q))) log.push(`home: double-tap on ${u.q.name}'s stretch (${u.hb.sp.common}): not at its frame`);
+        // Its strands' tips on screen.
+        const tips = u.q.strands.flatMap((s) => columnPx(v, s));
+        if (Math.min(...tips) < -2 || Math.max(...tips) > v.w + 2) log.push(`home: double-tap on ${u.q.name}'s stretch: tips ${Math.min(...tips).toFixed(0)}..${Math.max(...tips).toFixed(0)}`);
+        home();
+        if (++anc >= 6) break;
+      }
+
+      // Zoomed in: a double-tap on another species' column flies into it; on the selected species' column (its card
+      // open), one step back; on nothing, one step back.
+      const start = () => goTo(v.levelCamera(startAt[0], startAt[1])!);
+      start();
+      const mid = iv.centreLine();
+      const cols = columns().filter(([b]) => b !== mid);
+      let into = 0;
+      let sel = 0;
+      for (const [b, p] of cols.slice(0, 4)) {
+        start();
+        v.tap(...NOWHERE);
+        v.doubleTap(...p);
+        run(v);
+        settled();
+        if (!near(v.speciesCamera(b))) log.push(`${startAt[0]}: double-tap on ${b.sp.common}'s column: not at its frame`);
+        else into++;
+        start();
+        v.tap(...p);
+        if (card !== b.sp.common) log.push(`${startAt[0]}: a tap on ${b.sp.common}'s column: card ${card}`);
+        const want = iv.backStep()?.to;
+        v.doubleTap(...p);
+        if (!want || iv.backing?.to !== want) log.push(`${startAt[0]}: double-tap on selected ${b.sp.common}: to ${iv.backing?.to}, back is ${want}`);
+        else sel++;
+        if (card) log.push(`${startAt[0]}: double-tap on selected ${b.sp.common}: card still open`);
+        run(v);
+      }
+      start();
+      const e = emptyPt();
+      if (e) {
+        const want = iv.backStep()?.to;
+        v.doubleTap(...e);
+        if (!want || iv.backing?.to !== want) log.push(`${startAt[0]}: double-tap on nothing at ${e}: to ${iv.backing?.to}, back is ${want}`);
+        run(v);
+      }
+      // Home, on nothing: nothing (and a tap there does not wait).
+      home();
+      const eh = emptyPt();
+      if (eh) {
+        expect(v.tapWaits(...eh)).toBe(false);
+        v.doubleTap(...eh);
+        if (iv.anim) log.push(`home: double-tap on nothing at ${eh} flew`);
+      }
+      v.doubleTap(...NOWHERE);
+      if (iv.anim) log.push('home: double-tap on nothing flew');
+      console.log(`${name}: into ${far.sp.common}; ${anc} ancestral stretches; ${into} columns into, ${sel} selected back; empty ${e ?? 'none'} zoomed, ${eh ?? 'none'} home`);
+      expect(log).toEqual([]);
+      expect(anc).toBeGreaterThan(0);
+      expect(into).toBeGreaterThan(0);
+      expect(sel).toBeGreaterThan(0);
     });
   }
 });
