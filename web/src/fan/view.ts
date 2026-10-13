@@ -578,29 +578,56 @@ export function stripMid(b: FanBranch): number {
  * A level's group's centre (world x, ToLaD#262): the middle of its columns at "now" (its living species'; an extinct
  * group's at their tips). Its picture stands exactly over it.
  */
-const centreCache = new WeakMap<FanNode, { ver: number; x: number }>();
+const extentCache = new WeakMap<FanNode, { ver: number; s: [number, number] }>();
 export function groupCentre(g: Level): number {
   if (g.b) return stripMid(g.b);
-  // (Kept while the fold stands: the mammals' orders have thousands of species.)
-  const ver = g.v.strands[0].tess.fold?.ver ?? 0;
-  const hit = centreCache.get(g.v);
-  if (hit && hit.ver === ver) return hit.x;
-  const x = groupCentreOf(g.v);
-  centreCache.set(g.v, { ver, x });
-  return x;
-}
-function groupCentreOf(v: FanNode): number {
-  const g = { v };
-  const alive = g.v.strands.filter((b) => !b.sp.extinct && b.pop.aliveAt(0) > 0);
-  let lo = Infinity;
-  let hi = -Infinity;
-  for (const b of alive.length ? alive : g.v.strands) {
-    const y = Math.max(b.tipY, b.tess.time.y(0));
-    const l = leftAt(b, y);
-    lo = Math.min(lo, l);
-    hi = Math.max(hi, l + laneAt(b, y).w);
-  }
+  const [lo, hi] = groupExtent(g.v);
   return (lo + hi) / 2;
+}
+
+/** Clade v's columns at "now" (world x): its living species' (their tips', if none lives). Kept while the fold stands. */
+export function groupExtent(v: FanNode): [number, number] {
+  const ver = v.strands[0].tess.fold?.ver ?? 0;
+  const hit = extentCache.get(v);
+  if (hit && hit.ver === ver) return hit.s;
+  const live = livingOf(v);
+  let s: [number, number];
+  if (live.length) {
+    // (Side by side at "now" in tree order, columns never crossing: its first's left edge to its last's right.)
+    const y = v.strands[0].tess.time.y(0);
+    const last = live[live.length - 1];
+    s = [leftAt(live[0], y), leftAt(last, y) + laneAt(last, y).w];
+  } else {
+    s = [Infinity, -Infinity];
+    for (const b of v.strands) {
+      const l = leftAt(b, b.tipY);
+      s = [Math.min(s[0], l), Math.max(s[1], l + laneAt(b, b.tipY).w)];
+    }
+  }
+  extentCache.set(v, { ver, s });
+  return s;
+}
+
+/** Clade v's species alive now, in tree order (left to right). Kept per clade. */
+const livingCache = new WeakMap<FanNode, FanBranch[]>();
+export function livingOf(v: FanNode): FanBranch[] {
+  let out = livingCache.get(v);
+  if (!out) livingCache.set(v, (out = v.strands.filter((b) => !b.sp.extinct && b.pop.aliveAt(0) > 0)));
+  return out;
+}
+
+/** Clade v's column nearest world x at "now" (ToLaD#262): a living one, found by halving (they stand in order); else any. */
+function columnNear(v: FanNode, x: number): FanBranch {
+  const live = livingOf(v);
+  if (!live.length) return v.strands.reduce((p, q) => (Math.abs(stripMid(q) - x) < Math.abs(stripMid(p) - x) ? q : p));
+  let lo = 0;
+  let hi = live.length - 1;
+  while (lo < hi) {
+    const m = (lo + hi) >> 1;
+    if (stripMid(live[m]) < x) lo = m + 1;
+    else hi = m;
+  }
+  return lo > 0 && Math.abs(stripMid(live[lo - 1]) - x) < Math.abs(stripMid(live[lo]) - x) ? live[lo - 1] : live[lo];
 }
 
 /**
@@ -790,17 +817,11 @@ export function labelSpots(
       // A level's group (ToLaD#262): its name beside its branch, down from "now" (its picture stands over "now",
       // groupPics): beside the column nearest its centre, room at the name's end for the "+x" of the groups hidden.
       if (!(nowOn > 0)) continue;
-      const cx = groupCentre({ v });
-      const [wa, wb] = familySpan(v);
+      const [wa, wb] = groupExtent(v);
+      const cx = (wa + wb) / 2;
       if (!(X(wb) > 0 && X(wa) < c.w)) continue;
-      let own = v.strands[0];
-      let od = Infinity;
       // (A living column, where it has one: on "now", under its picture.)
-      const alive = v.strands.filter((b) => !b.sp.extinct && b.pop.aliveAt(0) > 0);
-      for (const b of alive.length ? alive : v.strands) {
-        const d = Math.abs(stripMid(b) - cx);
-        if (d < od) [own, od] = [b, d];
-      }
+      const own = columnNear(v, cx);
       const px = plus?.(`n${vi}`) ?? 0;
       const rank: Rank = [-1, wb - wa, vi];
       for (const p of beside(`n${vi}`, text, rank, measure(text) + 2 * LABEL_PAD + px, own, Math.max(nowS, Y(own.tipY)) + 4, Y(own.splitY), nowOn, { v }, true))
