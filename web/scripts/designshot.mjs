@@ -160,6 +160,8 @@ const scenes = [
   ['weasels', 'group', ['^Mustela ', 0.85, 6, 1.6]],
   ['ferretbadgers', 'group', ['^Melogale ', 0.85, 3, 2.5]],
   ['weasel-3m', 'group', ['^Mustela (nivalis|altaica)$', 0.5, 3.1, 12]],
+  // A cats genus zoomed in (ToLaD#232): the ocelot's kin, every column on screen joined down to its parent.
+  ['leopardus', 'group', ['^Leopardus ', 0.85, 3, 2.5]],
   // A pill's "+x" (ToLaD#197) tapped from home, the biggest: the species it stands for framed, their pills showing.
   ['plus-tap', 'tapplus'],
   // A species' name pill tapped from home (ToLaD#230): its branch framed; again: the clade it sits in; again: the one above.
