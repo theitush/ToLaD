@@ -158,10 +158,12 @@ describe('the groups the view is inside stay pinned at the top (ToLaD#233)', () 
     const both: string[] = [];
     let stack = 0;
     let pinned = 0;
-    // Two px of scroll a frame, from home until "now" is well past the top line.
-    for (let k = 0; k < 300; k++) {
+    // Two px of scroll a frame, from home until the pins have shown for a while (one draw a frame, as when dragged).
+    for (let k = 0; k < 400 && pinned < 20; k++) {
       v.cam = { ...v.cam, cy: v.cam.cy + 2 / v.cam.sy };
-      settle(v);
+      v.camera.settle();
+      (v as unknown as Inner).applyFold();
+      v.draw();
       if (br.fit > 0 && br.placed.length) stack++;
       if (br.pinA > 0 && br.pins.length) pinned++;
       if (br.fit > 0 && br.placed.length && br.pinA > 0 && br.pins.length) both.push(`frame ${k}: stack ${br.fit}, pins ${br.pinA}`);
