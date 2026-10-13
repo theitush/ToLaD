@@ -174,7 +174,7 @@ describe('the fan: marks and tap', () => {
 });
 
 describe('a picture', () => {
-  it("a tap on a species' picture flies to its branch, no card (ToLaD#230); off it, the column's tap", () => {
+  it("a tap on a species' picture flies to its branch and opens its card (ToLaD#230, #241); off it, the column's tap", () => {
     const v = stubView();
     const fan = v.fan;
     const b = fan.branches.find((q) => q.sp.common === 'Cheetah')!;
@@ -189,7 +189,8 @@ describe('a picture', () => {
     const c = v.speciesCamera(b);
     expect(Math.abs(v.cam.cx - c.cx) * v.cam.sx).toBeLessThan(1);
     expect(Math.abs(v.cam.cy - c.cy) * v.cam.sy).toBeLessThan(1);
-    expect(opened).toBe(0);
+    expect(opened).toBe(1);
+    expect((sel as Selection | null)?.sp.common).toBe('Cheetah');
     sel = null;
     v.thumbHits = [[200, 300, 25, b]];
     v.tap(240, 300);

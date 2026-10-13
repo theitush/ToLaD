@@ -123,44 +123,22 @@ describe('a species flown to lands centred on screen (ToLaD#211)', () => {
       }
       expect(off).toEqual([]);
     });
-
-    it(`a double-tap on a column frames it centred, and the next keeps the finger on it, ${mode} widths`, () => {
-      v.setMode(mode);
-      const off: string[] = [];
-      for (const b0 of v.fan.branches.filter((_, i) => i % 29 === 4)) {
-        atHome();
-        const wy = b0.tipY + 0.3 * (b0.splitY - b0.tipY);
-        const [x, y] = v.toScreen(leftAt(b0, wy) + laneAt(b0, wy).w / 2, wy);
-        const b = v.hitBranch(x, y)!;
-        v.doubleTap(x, y);
-        run(v);
-        const span = () => [leftAt(b, wy), leftAt(b, wy) + laneAt(b, wy).w].map((u) => v.toScreen(u, wy)[0]);
-        const [l, r] = span();
-        if (Math.abs((l + r) / 2 - v.w / 2) > 3 || l < 0 || r > v.w) off.push(`framed ${b.sp.common}: ${l.toFixed(0)}..${r.toFixed(0)}`);
-        // Again, off-centre on it: 16× wider, the column still under the finger.
-        const fx = l + 0.3 * (r - l);
-        v.doubleTap(fx, y);
-        run(v);
-        const [l2, r2] = span();
-        if (!(l2 <= fx && fx <= r2)) off.push(`×16 ${b.sp.common}: ${l2.toFixed(0)}..${r2.toFixed(0)}, finger at ${fx.toFixed(0)}`);
-      }
-      expect(off).toEqual([]);
-    });
   }
 });
 
-// ToLaD#230: a tap on a species' name pill flies to its branch (no card); tapped again once there, one level out (the
-// clade it sits in), and again to the clade above that; a pan in between starts over. Folded carnivores and the cats.
-describe("a tap on a species' pill flies to its branch, again one level out (ToLaD#230)", () => {
-  type Tapped = { tapAt: { b: FanBranch | null; v: { name: string } | null } | null };
+// ToLaD#230, #241: a tap on a species' name pill flies to its branch and opens its card. A double-tap then steps back
+// one frame at a time: the clade it sits in, each clade above, home; at home it does nothing. Zoomed deep into a
+// species (after a pinch), the first step is that species' frame. Brackets and family pills fly to their clade, and
+// tapped again there one level out. Folded carnivores and the cats.
+describe("a tap on a species' pill flies to it with its card; a double-tap steps back (ToLaD#230, #241)", () => {
   for (const [name, mk] of [
     ['carnivores (folded)', () => stubView()],
     ['cats', () => stubView(FELIDAE, FELIDAE_TREE, false)],
   ] as const) {
     it(name, () => {
       const v = mk();
-      let opened = 0;
-      v.onSelect = (s) => void (s && opened++);
+      let card: string | null = null;
+      v.onSelect = (s) => void (card = s ? s.sp.common : null);
       // (Drawn as settled: the labels' fades done, as they are a quarter second after a landing.)
       const settled = () => {
         (v as unknown as { labelState: Map<string, unknown> }).labelState.clear();
@@ -184,7 +162,9 @@ describe("a tap on a species' pill flies to its branch, again one level out (ToL
       const near = (c: { cx: number; cy: number; sx: number; sy: number }) =>
         Math.abs(v.cam.cx - c.cx) * v.cam.sx < 2 && Math.abs(v.cam.cy - c.cy) * v.cam.sy < 2 && Math.abs(Math.log(v.cam.sx / c.sx)) < 0.01;
       const log: string[] = [];
-      let climbed = 0;
+      const atHome = () => (v as unknown as { atHome(): boolean }).atHome();
+      let steps = 0;
+      let homes = 0;
       let pills = 0;
       const starts: [string, () => void][] = [['home', home]];
       for (const [lv, z] of name === 'cats' ? ([['Pantherinae', 1], ['Felinae', 6]] as const) : ([['Felidae', 1], ['Canidae', 15], ['Mustelidae', 4]] as const)) {
@@ -195,6 +175,12 @@ describe("a tap on a species' pill flies to its branch, again one level out (ToL
           settled();
         }]);
       }
+      home();
+      const pill0 = v.nameHits[0];
+      expect(v.tapWaits((pill0.box[0] + pill0.box[2]) / 2, pill0.box[3] - 10)).toBe(true);
+      const col = v.fan.branches.map((b) => v.toScreen(leftAt(b, b.tipY + 0.5 * (b.splitY - b.tipY)) + laneAt(b, b.tipY).w / 2, b.tipY + 0.5 * (b.splitY - b.tipY)));
+      const onCol = col.find(([x, y]) => x > 20 && x < v.w - 20 && y > 300 && y < v.h - 160 && v.hitBranch(x, y));
+      expect(onCol && v.tapWaits(...onCol)).toBe(false);
       for (const [start, go] of starts) {
         go();
         // Every species whose pill shows there: tap it, then again and again while its pill shows.
@@ -207,19 +193,68 @@ describe("a tap on a species' pill flies to its branch, again one level out (ToL
           const [l, c, r] = columnPx(v, b);
           if (Math.abs(c - v.w / 2) > 3 || l < 0 || r > v.w) log.push(`${start}: ${b.sp.common}: column ${l.toFixed(0)}..${r.toFixed(0)}`);
           if (!near(v.speciesCamera(b))) log.push(`${start}: ${b.sp.common}: not at its species frame`);
-          // Again: the clade it sits in; again: the one above.
-          let want: FanNode | null = v.cladeOf(b);
-          for (let level = 0; level < 2 && want; level++) {
-            if (!tapPill(b)) break;
-            const at = (v as unknown as Tapped).tapAt;
-            if (at?.v !== want || !near(v.cladeCamera(want))) log.push(`${start}: ${b.sp.common}: tap ${level + 2} at ${at?.v?.name}, not ${want.name}`);
-            else climbed++;
-            want = v.outOf(want);
+          if (card !== b.sp.common) log.push(`${start}: ${b.sp.common}: card ${card}, not its own`);
+          // A tap on its column there waits out the double-tap window (it would clash with a step back); its pill's too.
+          // (Unless its frame is home's, within 4 px and 2 %, as the domestic dog's: there a double-tap does nothing.)
+          const ym = b.tipY + 0.4 * (b.splitY - b.tipY);
+          if (!v.tapWaits(...v.toScreen(leftAt(b, ym) + laneAt(b, ym).w / 2, ym)) && !atHome()) log.push(`${start}: ${b.sp.common}: a column tap at its frame does not wait`);
+          // A lone tap on its column opens its card and flies nowhere.
+          v.tap(...v.toScreen(leftAt(b, ym) + laneAt(b, ym).w / 2, ym));
+          if (card !== b.sp.common || (v as unknown as Inner).anim) log.push(`${start}: ${b.sp.common}: a column tap: card ${card}${(v as unknown as Inner).anim ? ', and a flight' : ''}`);
+          // Pinched in deep (×6 both ways about the centre), the card closed: a double-tap goes back to its frame.
+          v.tap(-1e6, -1e6);
+          // (A frame at a time, as a pinch: folded, the fold opens and its anchor follows the camera as it zooms.)
+          for (let k = 0; k < 24; k++) {
+            v.zoom(v.w / 2, v.h / 2, Math.pow(6, 1 / 24), Math.pow(6, 1 / 24));
+            v.draw();
           }
-          // A pan, and the pill tapped again flies back to the species.
-          v.pan(40, 0);
           settled();
-          if (tapPill(b) && !near(v.speciesCamera(b))) log.push(`${start}: ${b.sp.common}: after a pan, not back at its species frame`);
+          const mid = (v as unknown as { centreLine(): FanBranch | null }).centreLine();
+          const [pl, , pr] = columnPx(v, b);
+          v.doubleTap(10, 400);
+          run(v);
+          settled();
+          if (!near(v.speciesCamera(b)))
+            log.push(`${start}: ${b.sp.common}: pinched in (its tip ${pl.toFixed(0)}..${pr.toFixed(0)}, centre ${mid?.sp.common}), a double-tap is not back at its frame${mid && near(v.speciesCamera(mid)) ? " (at the centre one's)" : ''}`);
+          // A double-tap at a time: out along b's ladder (its species frame, then its ranked clades, home), one frame or
+          // more out each time (frames within BACK_SLACK of the one it is at are passed), never back in, home at last.
+          const ladder: [string, () => { cx: number; cy: number; sx: number; sy: number }][] = [[b.sp.common, () => v.speciesCamera(b)]];
+          for (let q: FanNode | null = v.cladeOf(b); q && q.parent; q = v.outOf(q)) {
+            const c = q;
+            ladder.push([c.name, () => v.cladeCamera(c)]);
+          }
+          ladder.push(['home', () => v.homeCamera()]);
+          let at = 0;
+          for (let k = 0; at < ladder.length - 1 && k < 12; k++) {
+            v.doubleTap(10, 400);
+            if (card) log.push(`${start}: ${b.sp.common}: card open after a double-tap`);
+            // (Nothing: home, or a frame within 4 px and 2 % of it, as the small cats' is.)
+            if (!(v as unknown as Inner).anim) {
+              if (atHome()) at = ladder.length - 1;
+              else log.push(`${start}: ${b.sp.common}: double-tap ${k + 1} did nothing, from ${ladder[at][0]}`);
+              break;
+            }
+            const to = (v as unknown as { backing: { to: string } | null }).backing?.to;
+            run(v);
+            settled();
+            const i = ladder.findIndex(([n], j) => j > at && n === to);
+            // (The frame computed with the fold put back after, as the view does: computing one moves the fold.)
+            const keep = v.fan.tess.fold?.keep();
+            const landed = i >= 0 && near(ladder[i][1]());
+            keep?.();
+            if (!landed) {
+              log.push(`${start}: ${b.sp.common}: double-tap ${k + 1} went to ${to}${i < 0 ? ', off its ladder' : ' but landed off its frame'} (from ${ladder[at][0]})`);
+              break;
+            }
+            at = i;
+            steps++;
+          }
+          if (at === ladder.length - 1) {
+            // Home: a double-tap does nothing.
+            v.doubleTap(10, 400);
+            if ((v as unknown as Inner).anim) log.push(`${start}: ${b.sp.common}: a double-tap at home flew`);
+            homes++;
+          }
         }
       }
       // A clade's bracket: tapped, its clade; tapped again there, the clade above.
@@ -278,12 +313,12 @@ describe("a tap on a species' pill flies to its branch, again one level out (ToL
         if (!near(v.cladeCamera(up))) log.push(`family ${f.name} again: not at ${up.name}'s frame`);
         fams++;
       }
-      console.log(`${name}: ${pills} pills tapped, ${climbed} climbs, ${brs} brackets and ${fams} family pills tapped twice`);
+      console.log(`${name}: ${pills} pills tapped, ${steps} steps back (${homes} chains home), ${brs} brackets and ${fams} family pills tapped twice`);
       if (name !== 'cats') expect(fams).toBeGreaterThan(0);
       expect(brs).toBeGreaterThan(0);
       expect(log).toEqual([]);
-      expect(climbed).toBeGreaterThan(0);
-      expect(opened).toBe(0);
+      expect(homes).toBe(pills);
+      expect(steps).toBeGreaterThanOrEqual(pills);
     });
   }
 });

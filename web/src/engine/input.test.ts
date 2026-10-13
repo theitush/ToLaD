@@ -3,7 +3,7 @@
 // diagonal; a pinch (ctrl+wheel, Safari's gesture events) zooms both. Synthetic
 // wheel and gesture events through the real handler, recording what it zooms.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Input, WHEEL_GAP_MS } from './input';
+import { DOUBLE_TAP_MS, Input, WHEEL_GAP_MS } from './input';
 
 (globalThis as { window?: unknown }).window ??= globalThis;
 
@@ -208,5 +208,94 @@ describe('desktop wheel and trackpad zoom (#168)', () => {
     r.gesture('gestureend', 2);
     expect(r.z.x).toBe(0);
     expect(r.z.t).toBe(0);
+  });
+});
+
+// ToLaD#241: a double-tap steps back, so its first tap must do nothing. A single tap the handler holds (tapWaits) runs
+// once the double-tap window has passed; a double-tap or a pan after it drops it; a tap it does not hold runs at once.
+describe('a single tap held for the double-tap window (ToLaD#241)', () => {
+  function taps(waits: boolean) {
+    const on = new Map<string, Listener>();
+    const el = {
+      style: {} as Record<string, string>,
+      clientHeight: 800,
+      addEventListener: (t: string, f: Listener) => on.set(t, f),
+      removeEventListener: () => {},
+      getBoundingClientRect: () => ({ left: 0, top: 0 }),
+      setPointerCapture: () => {},
+    };
+    const log: string[] = [];
+    const noop = () => {};
+    new Input(
+      el as unknown as HTMLElement,
+      { gestureStart: noop, gestureEnd: noop, pan: noop, zoom: noop, fling: noop, doubleTap: (x) => log.push(`double ${x}`), tap: (x) => log.push(`tap ${x}`), tapWaits: () => waits },
+      true,
+    );
+    let now = 1000;
+    const ev = (x: number, y = 300) => ({ pointerId: 1, clientX: x, clientY: y, timeStamp: now, pointerType: 'touch', button: 0, preventDefault() {} });
+    const step = (ms: number) => {
+      vi.advanceTimersByTime(ms);
+      now += ms;
+    };
+    /** A tap at x, `gap` ms after the last event. */
+    const tap = (x: number, gap = 0) => {
+      step(gap);
+      on.get('pointerdown')!(ev(x));
+      step(60);
+      on.get('pointerup')!(ev(x));
+    };
+    const drag = (x: number, gap = 0) => {
+      step(gap);
+      on.get('pointerdown')!(ev(x));
+      for (let k = 1; k <= 5; k++) {
+        step(16);
+        on.get('pointermove')!(ev(x + 10 * k));
+      }
+      on.get('pointerup')!(ev(x + 50));
+    };
+    return { log, tap, drag, wait: step };
+  }
+
+  it('a lone held tap runs once the window has passed, not before', () => {
+    const r = taps(true);
+    r.tap(100);
+    expect(r.log).toEqual([]);
+    r.wait(DOUBLE_TAP_MS - 10);
+    expect(r.log).toEqual([]);
+    r.wait(20);
+    expect(r.log).toEqual(['tap 100']);
+  });
+
+  it('a double-tap drops its first tap: only the double-tap runs', () => {
+    const r = taps(true);
+    r.tap(100);
+    r.tap(105, 120);
+    r.wait(1000);
+    expect(r.log).toEqual(['double 105']);
+  });
+
+  it('a pan begun in the window drops the held tap', () => {
+    const r = taps(true);
+    r.tap(100);
+    r.drag(200, 100);
+    r.wait(1000);
+    expect(r.log).toEqual([]);
+  });
+
+  it('a second tap elsewhere runs the held one first', () => {
+    const r = taps(true);
+    r.tap(100);
+    r.tap(300, 100);
+    expect(r.log).toEqual(['tap 100']);
+    r.wait(1000);
+    expect(r.log).toEqual(['tap 100', 'tap 300']);
+  });
+
+  it('a tap not held runs at once (and still before a double-tap)', () => {
+    const r = taps(false);
+    r.tap(100);
+    expect(r.log).toEqual(['tap 100']);
+    r.tap(102, 120);
+    expect(r.log).toEqual(['tap 100', 'double 102']);
   });
 });
