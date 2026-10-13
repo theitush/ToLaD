@@ -1,8 +1,10 @@
 # ToLaD
 
-This is `theitush/ToLaD` (private), **Tree of Life and Death**: a mobile-first, zoomable tree of life where every leaf is an individual organism, alive or dead — a WebGL view in `web/` (Vite + React + TypeScript), the deterministic procedural individuals in `packages/procgen/`, the mammal data pipeline in `pipeline/` (Python under `uv`; `make` there fetches pinned sources, builds and tests), and the research notes in `research/` (start at `00-synthesis.md`). This file is thin on purpose: it grows a line at a time, when something proves worth writing down.
+This is `theitush/ToLaD` (public), **Tree of Life and Death**: a mobile-first, zoomable tree of life where every leaf is an individual organism, alive or dead — a WebGL view in `web/` (Vite + React + TypeScript), the deterministic procedural individuals in `packages/procgen/`, the mammal data pipeline in `pipeline/` (Python under `uv`; `make` there fetches pinned sources, builds and tests), and the research notes in `research/` (start at `00-synthesis.md`). This file is thin on purpose: it grows a line at a time, when something proves worth writing down.
 
 **Trunk is `main`; work lands through PRs from a task branch.** Downloaded and derived datasets (`data/raw/`, `data/build/`) are gitignored, and so is `.claude/handoff/` — local notes, not a source of truth.
+
+**The app is live at https://theitush.github.io/ToLaD/** — the `gh-pages` branch holds only `web/dist-single/index.html` (+ `.nojekyll`), pushed by hand after a merge to main (no Actions); nothing deploys by itself.
 
 ## Tasks
 
