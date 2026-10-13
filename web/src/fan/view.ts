@@ -321,17 +321,14 @@ function colBoxes(fan: Fan, view?: [number, number]): Map<FanBranch | FanNode, C
 /** colBoxes' boxes over the world heights [vy0, vy1]: each strand's reach there off the fold's rows (xRange), a parent column's from its first strand's to its last's. */
 function viewBoxes(fan: Fan, out: Map<FanBranch | FanNode, ColBox>, [vy0, vy1]: [number, number]): void {
   const t = fan.tess;
-  // (The rows over the whole view first: each column's own heights within it read off that one table.)
-  t.xRange(fan.branches[0], vy0, vy1, 2);
+  // (Each over the whole view's heights: one table of the fold's rows, its own (slot 2), for every column.)
   for (const q of out.values()) {
     if (q.y1 <= vy0 || q.y0 > vy1) continue;
     const o = q.own;
-    const a = Math.max(vy0, q.y0);
-    const b = Math.min(vy1, q.y1);
     if (isNode(o)) {
-      q.x0 = t.xRange(o.strands[0], a, b, 2)[0];
-      q.x1 = t.xRange(o.strands[o.strands.length - 1], a, b, 2)[1];
-    } else [q.x0, q.x1] = t.xRange(o, a, b, 2);
+      q.x0 = t.xRange(o.strands[0], vy0, vy1, 2)[0];
+      q.x1 = t.xRange(o.strands[o.strands.length - 1], vy0, vy1, 2)[1];
+    } else [q.x0, q.x1] = t.xRange(o, vy0, vy1, 2);
   }
 }
 

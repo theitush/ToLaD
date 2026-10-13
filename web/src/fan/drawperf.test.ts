@@ -320,7 +320,7 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
           v.camera.settle();
         },
       ]);
-    out(`scene                 p50    p95    max   gest  frame   (ms, node${CPU ? ' CPU time' : ''}: draw(); gest the zoomAbout + pan before it, p50; frame both, p50)`);
+    out(`scene                 p50    p95    max   gest  frame  level   (ms, node${CPU ? ' CPU time' : ''}: draw(); gest the zoomAbout + pan before it, p50; frame both, p50; level: levelNow once at the gesture's end)`);
     const only = process.env.FANPERF_ONLY ? new RegExp(process.env.FANPERF_ONLY) : null;
     for (const [name, set] of scenes) {
       if (only && !only.test(name)) continue;
@@ -375,6 +375,9 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
       const N = 90;
       // ('pinch+pan': a faster pinch and a wider pan, as a finger does, ToLaD#255.)
       const fast = name.startsWith('pinch');
+      // (Under the fingers, as InputHandlers has it: the level (levelNow) waits for the gesture's end, timed apart below.)
+      const vg = v as unknown as { gestureStart(): void; gestureEnd(): void; levelNow(now?: boolean): unknown };
+      vg.gestureStart();
       for (let k = 0; k < N; k++) {
         const t0 = CPU ? cpuMs() : performance.now();
         v.zoomAbout(195, 422, fast ? (k < 45 ? 1.04 : 1 / 1.04) : k < 45 ? 1.01 : 1 / 1.01);
@@ -396,6 +399,11 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
         inst = Math.max(inst, gl.mesh.n);
         rects = Math.max(rects, gl.under.n);
       }
+      vg.gestureEnd();
+      // The gesture's end: the level the view is at worked out (ToLaD#258's ladder), once.
+      const tl = performance.now();
+      vg.levelNow(true);
+      const tLevel = performance.now() - tl;
       // (FANPERF_TIMES=1: every frame's time, to see where the slow ones fall.)
       if (process.env.FANPERF_COUNT) out(`  calls/f:\n${Object.entries(cnt).sort((a, b) => b[1] - a[1]).map(([k, n]) => `    ${(n / N).toFixed(0).padStart(6)} ${k}`).join('\n')}`);
       if (process.env.FANPERF_TIMES) out(`  ${times.map((x) => x.toFixed(0)).join(' ')}`);
@@ -408,7 +416,7 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
       if (HASH) out(`  hash ${(hsh >>> 0).toString(16).padStart(8, '0')} cam ${(chs >>> 0).toString(16).padStart(8, '0')}`);
       hsh = chs = 0x811c9dc5;
       out(
-        `${name.padEnd(20)} ${f(q(times, 0.5))} ${f(q(times, 0.95))} ${f(Math.max(...times))} ${f(q(gest, 0.5))} ${f(q(times.map((x, i) => x + gest[i]), 0.5))}  inst ${String(inst).padStart(6)} rects ${String(rects).padStart(5)} strokes/f ${(calls.stroke / N).toFixed(0).padStart(5)} pieces/f ${(calls.pieces / N).toFixed(0).padStart(6)} strands/f ${(lp.n / N).toFixed(0).padStart(3)} pts/f ${(lp.pts / N).toFixed(0).padStart(6)} | ${top}`,
+        `${name.padEnd(20)} ${f(q(times, 0.5))} ${f(q(times, 0.95))} ${f(Math.max(...times))} ${f(q(gest, 0.5))} ${f(q(times.map((x, i) => x + gest[i]), 0.5))} ${f(tLevel)}  inst ${String(inst).padStart(6)} rects ${String(rects).padStart(5)} strokes/f ${(calls.stroke / N).toFixed(0).padStart(5)} pieces/f ${(calls.pieces / N).toFixed(0).padStart(6)} strands/f ${(lp.n / N).toFixed(0).padStart(3)} pts/f ${(lp.pts / N).toFixed(0).padStart(6)} | ${top}`,
       );
     }
     if (prof) {
