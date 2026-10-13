@@ -338,9 +338,10 @@ export class Brackets {
     for (let r = 1; r <= rows; r++) this.rowBase[r] = this.rowBase[r - 1] + this.rowH[r - 1];
     const height = rows ? this.rowTop(rows - 1) : 0;
     this.baseS = Math.min(nowS - 4, Math.max(top + height, nowS - 4 - PILL_ROOM));
-    // Pushed up past the top line by "now" (under the buttons), it fades out over a few px: the pinned rows take over
-    // (ToLaD#233, like a sticky header).
-    if (rows) this.fit = Math.min(fit, Math.max(0, 1 - (top + height - this.baseS) / 24));
+    // Pushed up past the top line by "now" (under the buttons) by half a row, it is swapped for the pinned rows
+    // (ToLaD#233, like a sticky header): a clean swap, never both at once (a fade showed the order twice, faintly).
+    // ("Now" itself near the top line: the same swap, half way through the old fade.)
+    this.fit = (rows && top + height - this.baseS > ROW_H / 2) || fit < 0.5 ? 0 : 1;
     return this.placed;
   }
 

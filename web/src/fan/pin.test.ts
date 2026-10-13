@@ -150,4 +150,25 @@ describe('the groups the view is inside stay pinned at the top (ToLaD#233)', () 
     settle(v);
     expect(near(v, v.cladeCamera(v.outOf(genus)!))).toBe(true);
   });
+  it('scrolled down into time the stack hands over to the pinned rows cleanly: never both at once', () => {
+    const v = stubView();
+    const br = (v as unknown as Inner).brackets!;
+    v.cam = v.homeCamera();
+    settle(v);
+    const both: string[] = [];
+    let stack = 0;
+    let pinned = 0;
+    // Two px of scroll a frame, from home until "now" is well past the top line.
+    for (let k = 0; k < 300; k++) {
+      v.cam = { ...v.cam, cy: v.cam.cy + 2 / v.cam.sy };
+      settle(v);
+      if (br.fit > 0 && br.placed.length) stack++;
+      if (br.pinA > 0 && br.pins.length) pinned++;
+      if (br.fit > 0 && br.placed.length && br.pinA > 0 && br.pins.length) both.push(`frame ${k}: stack ${br.fit}, pins ${br.pinA}`);
+      expect([0, 1]).toContain(br.fit);
+    }
+    expect(both).toEqual([]);
+    expect(stack).toBeGreaterThan(0);
+    expect(pinned).toBeGreaterThan(0);
+  });
 });

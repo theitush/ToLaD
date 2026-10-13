@@ -923,7 +923,7 @@ export class FanView implements InputHandlers {
     };
     br.layout(this.camera, this.fan, nowS, LABEL_AXIS_X, fit, measure, top);
     // The groups the view is inside, pinned under the buttons as the stack scrolls off (ToLaD#233).
-    br.pin(top, this.camera.toWorld(0, 0)[1], measure, fit < 1 ? (this.lineAt((LABEL_AXIS_X + this.w) / 2, this.h / 2)?.node ?? null) : null);
+    br.pin(top, this.camera.toWorld(0, 0)[1], measure, br.fit < 1 ? (this.lineAt((LABEL_AXIS_X + this.w) / 2, this.h / 2)?.node ?? null) : null);
     return br;
   }
 
