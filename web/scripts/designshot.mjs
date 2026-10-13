@@ -162,6 +162,11 @@ const scenes = [
   ['weasel-3m', 'group', ['^Mustela (nivalis|altaica)$', 0.5, 3.1, 12]],
   // A pill's "+x" (ToLaD#197) tapped from home, the biggest: the species it stands for framed, their pills showing.
   ['plus-tap', 'tapplus'],
+  // A species' name pill tapped from home (ToLaD#230): its branch framed; again: the clade it sits in; again: the one above.
+  // (`tappill` [species]: home, its pill tapped, or the first pill shown's; `tapagain`: the same pill tapped where it now is.)
+  ['pill-1', 'tappill'],
+  ['pill-2', 'tapagain'],
+  ['pill-3', 'tapagain'],
 ];
 const browser = await chromium.launch({ headless: true });
 try {
@@ -178,8 +183,11 @@ try {
     await page.evaluate(
       ([kind, args, width]) => {
         const f = window.__fan;
-        f.setMode(width);
-        f.tap(-1e6, -1e6);
+        // (A tap again on a pill keeps the fan as it is: setMode lays it out anew, a new fan the last flight is not in.)
+        if (kind !== 'tapagain') {
+          f.setMode(width);
+          f.tap(-1e6, -1e6);
+        }
         const fan = f.fan;
         if (kind === 'home' || kind === 'card' || kind === 'search') {
           f.cam = f.homeCamera();
@@ -317,6 +325,22 @@ try {
           f.draw();
           const hit = [...f.plusHits].sort((p, q) => q.bs.length - p.bs.length)[0];
           if (hit) f.tap((hit.box[0] + hit.box[2]) / 2, (hit.box[1] + hit.box[3]) / 2);
+        } else if (kind === 'tappill' || kind === 'tapagain') {
+          if (kind === 'tappill') {
+            f.cam = f.homeCamera();
+            f.camera.settle();
+            f.draw();
+            f.draw();
+            window.__pill = (args[0] ? f.nameHits.find((h) => h.b.sp.common === args[0]) : f.nameHits[0])?.b.sp.common;
+          }
+          // (The landing taken at once and drawn settled, labels faded in: headless frames are slow, seconds apart.)
+          f.labelState.clear();
+          f.draw();
+          const hit = f.nameHits.find((h) => h.b.sp.common === window.__pill);
+          if (hit) f.tap((hit.box[0] + hit.box[2]) / 2, hit.box[3] - 10);
+          if (f.anim && !f.anim(performance.now() + 1e5)) f.anim = null;
+          f.labelState.clear();
+          f.draw();
         } else if (kind === 'level') {
           // A level (ToLaD#146): the split founding taxon args[0] framed as home frames the fan; with args[1] (Ma),
           // centred on that time, time zoomed args[2] and width args[3] × the frame.
