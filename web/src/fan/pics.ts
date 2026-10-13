@@ -21,8 +21,8 @@ export const PIC_D = 50;
 export const PIC_GAP = 4;
 /** Row 0's discs stand this many px above "now". */
 export const PIC_LIFT = 2;
-/** Diameters tried, largest first, and the most rows while a size is still to try. */
-const SIZES = [50, 44, 38, 32, 26, 22];
+/** Diameters tried, largest first, and the rows preferred at most. */
+const SIZES = [50, 44, 38, 32, 26, 22, 18, 15];
 const MAX_ROWS = 3;
 
 /** Rows for discs of diameter d centred at xs (left to right): each the lowest whose discs it clears. */
@@ -44,14 +44,21 @@ function rowsFor(xs: readonly number[], d: number): number[] {
 export function placePics(xs: readonly number[], ys: readonly number[], nowS: number, top: number): PicSpot[] {
   if (!xs.length) return [];
   const base = nowS - PIC_LIFT;
-  let d = SIZES[0];
+  // (Up to three rows, the largest size that needs no more; else as many rows as the band above "now" holds; else the
+  // smallest size, its rows on up.)
+  const band = (d: number) => Math.max(1, Math.floor((base - top + PIC_GAP) / (d + PIC_GAP)));
+  let d = SIZES[SIZES.length - 1];
   let row: number[] = [];
-  for (const size of SIZES) {
-    d = size;
-    row = rowsFor(xs, d);
-    const fit = Math.max(1, Math.min(MAX_ROWS, Math.floor((base - top + PIC_GAP) / (d + PIC_GAP))));
-    if (Math.max(...row) < fit) break;
+  found: for (const most of [(d: number) => Math.min(MAX_ROWS, band(d)), band]) {
+    for (const size of SIZES) {
+      const r = rowsFor(xs, size);
+      if (Math.max(...r) < most(size)) {
+        [d, row] = [size, r];
+        break found;
+      }
+    }
   }
+  if (!row.length) row = rowsFor(xs, d);
   return xs.map((x, i) => {
     const y = base - d / 2 - row[i] * (d + PIC_GAP);
     const low = y + d / 2;

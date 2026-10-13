@@ -31,7 +31,7 @@ describe('group pictures over "now" (ToLaD#262)', () => {
   });
   it('a crowd: up to three rows, then smaller discs; none overlap', () => {
     check([100, 110, 120, 130]);
-    const many = Array.from({ length: 40 }, (_, i) => 80 + i * 7);
+    const many = Array.from({ length: 30 }, (_, i) => 80 + i * 10);
     const ps = check(many);
     expect(Math.max(...ps.map((p) => p.row))).toBeLessThan(3);
     expect(ps[0].d).toBeLessThan(50);

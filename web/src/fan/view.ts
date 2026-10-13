@@ -18,7 +18,7 @@ import { COLUMN_DIM, columnSpans, EVENT_TINT, eventAt, eventSpans, type EventSpa
 import { drawTwigs, kLogAt, laneDim, LINEAGE, LIVING, TEX_HAIR_PX, TWIG_GRAY, TwigModel, type IndInfo, type TwigStats } from './twigs';
 import type { MeshBatch, RectBatch } from './meshgl';
 import { familyLabel, FELIDAE_TREE, ORDER_TAXA, taxonKey, type Split } from './splits';
-import { bandDepth, Brackets, cladeCamera, foldedFrame, latinOf, rankOf, ROW_H, TAXON_EN } from './brackets';
+import { bandDepth, Brackets, cladeCamera, foldedFrame, latinOf, rankOf, ROW_H, TAP_FILL, TAXON_EN } from './brackets';
 import { axisInset, drawWorldOver, drawWorldUnder, worldFlags, type Box } from './world';
 
 export type { IndInfo } from './twigs';
@@ -60,6 +60,8 @@ type BackStep = { to: string; cam: Camera; go: () => void; lv: Level };
 const BACK_SLACK = 1.15;
 /** A tap's next level (ToLaD#258) is one whose frame stands more than this many px off the view's: nearer, it is passed. */
 const LEVEL_PX = 12;
+/** A level of one, two or three groups is framed taking this much of the screen's width (ToLaD#262; more, TAP_FILL). */
+const FEW_FILL = [0.5, 0.5, 0.5, 0.6];
 /** The level the view is at (levelNow) is worked out at most this often (ms) while the camera moves without a gesture (a wheel). */
 const LEVEL_MS = 200;
 /** The scale bar and legend at the bottom (px): labels fade out over the 30 px above it. */
@@ -123,6 +125,8 @@ export interface LabelSpot {
   y1: number;
   /** The pill [x0, y0, x1, y1]. */
   box: [number, number, number, number];
+  /** A level's name over other columns (ToLaD#262): taken only when no clear spot is. */
+  loose?: boolean;
   /** 0–1: how fully this spot is there (see above). */
   fit: number;
   /** A species' pill on its tip: the px kept at its top end for its "+x" badge (ToLaD#197), part of `box`. */
@@ -545,8 +549,19 @@ export function stripMid(b: FanBranch): number {
  * A level's group's centre (world x, ToLaD#262): the middle of its columns at "now" (its living species'; an extinct
  * group's at their tips). Its picture stands exactly over it.
  */
+const centreCache = new WeakMap<FanNode, { ver: number; x: number }>();
 export function groupCentre(g: Level): number {
   if (g.b) return stripMid(g.b);
+  // (Kept while the fold stands: the mammals' orders have thousands of species.)
+  const ver = g.v.strands[0].tess.fold?.ver ?? 0;
+  const hit = centreCache.get(g.v);
+  if (hit && hit.ver === ver) return hit.x;
+  const x = groupCentreOf(g.v);
+  centreCache.set(g.v, { ver, x });
+  return x;
+}
+function groupCentreOf(v: FanNode): number {
+  const g = { v };
   const alive = g.v.strands.filter((b) => !b.sp.extinct && b.pop.aliveAt(0) > 0);
   let lo = Infinity;
   let hi = -Infinity;
@@ -684,7 +699,7 @@ export function labelSpots(
   const clearFit = (gap: number) => clamp01((gap + 1) / 6);
 
   /** The spots beside a column on screen from y0 down (its own edge from `edge`, its bottom at screen yBot). */
-  const beside = (id: string, text: string, rank: Rank, len: number, own: FanBranch | FanNode, yTop: number, yBot: number, fit0: number, ref: { b?: FanBranch; v?: FanNode }): LabelSpot[] => {
+  const beside = (id: string, text: string, rank: Rank, len: number, own: FanBranch | FanNode, yTop: number, yBot: number, fit0: number, ref: { b?: FanBranch; v?: FanNode }, loose = false): LabelSpot[] => {
     const y0 = Math.max(top, yTop);
     const y1 = y0 + len;
     if (!(fit0 > 0) || y0 > bottom) return [];
@@ -724,6 +739,8 @@ export function labelSpots(
       // Clear of the other columns and the time axis (past the screen's right edge it is only cut off).
       const fit = f > 0 && xa < c.w && xb > 0 ? f * clearFit(Math.min(xa - LABEL_AXIS_X, clearance(xa, xb, y0, y1, own))) : 0;
       out.push({ key: `${id}:${place}`, id, place, ...ref, text, rank, x, y1, box: [xa, y0, xb, y1], fit });
+      // (A level's group's name, ToLaD#262, `loose`: failing a clear spot, over the columns beside its own, opaque; clear of the axis and the other names.)
+      if (loose) out.push({ key: `${id}:${place}~`, id, place, loose: true, ...ref, text, rank, x, y1, box: [xa, y0, xb, y1], fit: f > 0 && xa < c.w && xb > 0 ? f * clearFit(xa - LABEL_AXIS_X) : 0 });
     }
     return out;
   };
@@ -747,13 +764,15 @@ export function labelSpots(
       if (!(X(wb) > 0 && X(wa) < c.w)) continue;
       let own = v.strands[0];
       let od = Infinity;
-      for (const b of v.strands) {
+      // (A living column, where it has one: on "now", under its picture.)
+      const alive = v.strands.filter((b) => !b.sp.extinct && b.pop.aliveAt(0) > 0);
+      for (const b of alive.length ? alive : v.strands) {
         const d = Math.abs(stripMid(b) - cx);
         if (d < od) [own, od] = [b, d];
       }
       const px = plus?.(`n${vi}`) ?? 0;
       const rank: Rank = [-1, wb - wa, vi];
-      for (const p of beside(`n${vi}`, text, rank, measure(text) + 2 * LABEL_PAD + px, own, Math.max(nowS, Y(own.tipY)) + 4, Y(own.splitY), nowOn, { v }))
+      for (const p of beside(`n${vi}`, text, rank, measure(text) + 2 * LABEL_PAD + px, own, Math.max(nowS, Y(own.tipY)) + 4, Y(own.splitY), nowOn, { v }, true))
         out.push({ ...p, fam: v, pic: groupFace(v), plus: px });
       continue;
     }
@@ -785,7 +804,7 @@ export function labelSpots(
     if (level) {
       // (A level's species, ToLaD#262: its name beside its column, down from "now" or its tip; its picture over "now".)
       const px = plus?.(id) ?? 0;
-      out.push(...beside(id, b.sp.common, [0, b.width, b.index], measure(b.sp.common) + 2 * LABEL_PAD + px, b, Math.max(nowS, Y(b.tipY)) + 4, Y(b.splitY), 1, { b }).map((p) => ({ ...p, plus: px })));
+      out.push(...beside(id, b.sp.common, [0, b.width, b.index], measure(b.sp.common) + 2 * LABEL_PAD + px, b, Math.max(nowS, Y(b.tipY)) + 4, Y(b.splitY), 1, { b }, true).map((p) => ({ ...p, plus: px })));
       continue;
     }
     // (Standing for its family, ToLaD#212: the family's name on its tip, last frame's familyPills.)
@@ -867,7 +886,7 @@ export function resolveLabels(spots: LabelSpot[], prev: Map<string, boolean>): M
   const taken: number[][] = [];
   const done = new Set<string>();
   const placeOrder = { fam: 0, tip: 0, in: 1, right: 2, left: 3 };
-  const order = [...spots].sort((p, q) => p.rank[0] - q.rank[0] || q.rank[1] - p.rank[1] || p.rank[2] - q.rank[2] || placeOrder[p.place] - placeOrder[q.place]);
+  const order = [...spots].sort((p, q) => p.rank[0] - q.rank[0] || q.rank[1] - p.rank[1] || p.rank[2] - q.rank[2] || +!!p.loose - +!!q.loose || placeOrder[p.place] - placeOrder[q.place]);
   for (const s of spots) out.set(s.key, false);
   // The spots shown last frame first (each keeps its place while it fits and meets no other), then the rest.
   for (const pass of [true, false]) {
@@ -1179,7 +1198,19 @@ export class FanView implements InputHandlers {
    */
   cladeCamera(v: FanNode): Camera {
     if (!v.parent) return this.homeCamera();
-    return cladeCamera(this.camera, this.fan, v, familySpan, (cam) => this.withBand(cam));
+    // (A level of two or three groups, ToLaD#262: centred on its columns at "now" and kept to the screen's middle,
+    // FEW_FILL of it, not spread to its edges; its whole span, its past's columns too, still on screen.)
+    const few = nextLevels(this.fan, v).length;
+    const span =
+      few <= 3
+        ? (u: FanNode): [number, number] => {
+            const [a, b] = familySpan(u);
+            const m = Math.min(Math.max(groupCentre({ v: u }), a), b);
+            const h = Math.max(m - a, b - m, ((b - a) / 2) * (TAP_FILL / FEW_FILL[few]));
+            return [m - h, m + h];
+          }
+        : familySpan;
+    return cladeCamera(this.camera, this.fan, v, span, (cam) => this.withBand(cam));
   }
 
   /**
