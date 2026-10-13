@@ -4,7 +4,7 @@ This is `theitush/ToLaD` (public), **Tree of Life and Death**: a mobile-first, z
 
 **Trunk is `main`; work lands through PRs from a task branch.** Downloaded and derived datasets (`data/raw/`, `data/build/`) are gitignored, and so is `.claude/handoff/` — local notes, not a source of truth.
 
-**The app is live at https://theitush.github.io/ToLaD/** — the `gh-pages` branch holds only `web/dist-single/index.html` (+ `.nojekyll`), pushed by hand after a merge to main (no Actions); nothing deploys by itself.
+**The app is live at https://theitush.github.io/ToLaD/** — `.github/workflows/pages.yml` builds `web/` (`build:single`) and deploys it on every push to main (#239, Ita's call).
 
 ## Tasks
 
