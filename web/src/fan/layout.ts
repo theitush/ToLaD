@@ -649,9 +649,16 @@ export function columnsAt(fan: Fan, y: number): [number, number][] {
   return out;
 }
 
+/** Per species' history: the most alive in each cell of its column (leaf), the same for every width mode. */
+const MOST_ALIVE = new WeakMap<object, { originMa: number; tipY: number; splitY: number; n: Float64Array }>();
+
 /** Packing (both designs): the heights from now (−TIME_H) down to the oldest split (0), in this many cells. */
 const CELLS = 1024;
-const CELL_H = TIME_H / CELLS;
+/**
+ * A tree of more species than HUGE_TREE packs on this many (every mammal, ToLaD#247): ~12,000 outlines of 1,024
+ * cells were ~400 MB and seconds to fill. Each cell takes its widest, so coarser only packs a little looser.
+ */
+const HUGE_CELLS = 256;
 
 /**
  * A subtree's outline, cell by cell of height: its leftmost and rightmost
@@ -663,6 +670,9 @@ interface Contour {
   R: Float64Array;
   lw: Float64Array;
   rw: Float64Array;
+  /** The cells it has anything in lie in [j0, j1] (outside: empty), so the work goes by its height, not the grid's (ToLaD#247). */
+  j0: number;
+  j1: number;
 }
 
 /**
@@ -674,17 +684,51 @@ interface Contour {
  */
 class Packer {
   private readonly leaves = new Map<FanBranch, Contour>();
+  /** Its cell height. */
+  private readonly ch: number;
   constructor(
     readonly time: TimeScale,
     readonly mode: WidthMode,
     readonly W: number,
-  ) {}
+    /** Its cells (CELLS; a huge tree's fewer, HUGE_CELLS). */
+    readonly nc = CELLS,
+  ) {
+    this.ch = TIME_H / nc;
+  }
+  /** Outlines given back (free), reused: a big tree's search makes ~10⁵ of them, and new typed arrays are slow (ToLaD#247). */
+  private readonly pool: Contour[] = [];
+  private alloc(): Contour {
+    return this.pool.pop() ?? { L: new Float64Array(this.nc), R: new Float64Array(this.nc), lw: new Float64Array(this.nc), rw: new Float64Array(this.nc), j0: this.nc, j1: -1 };
+  }
+  /** Gives an outline back: nothing may read it after. */
+  free(c: Contour): void {
+    this.pool.push(c);
+  }
   private empty(): Contour {
-    return { L: new Float64Array(CELLS).fill(Infinity), R: new Float64Array(CELLS).fill(-Infinity), lw: new Float64Array(CELLS), rw: new Float64Array(CELLS) };
+    const c = this.alloc();
+    c.L.fill(Infinity);
+    c.R.fill(-Infinity);
+    c.lw.fill(0);
+    c.rw.fill(0);
+    c.j0 = this.nc;
+    c.j1 = -1;
+    return c;
   }
   /** The cells over heights [y0, y1] (y0 above), clipped to the grid. */
   private cells(y0: number, y1: number): [number, number] {
-    return [Math.max(0, Math.floor((y0 + TIME_H) / CELL_H)), Math.min(CELLS - 1, Math.floor((y1 + TIME_H) / CELL_H))];
+    return [Math.max(0, Math.floor((y0 + TIME_H) / this.ch)), Math.min(this.nc - 1, Math.floor((y1 + TIME_H) / this.ch))];
+  }
+  private ageTab: Float64Array | null = null;
+  /** The ages a whole cell is sampled at (7 per cell, as leaf samples a clipped one). */
+  private ages(): Float64Array {
+    if (this.ageTab) return this.ageTab;
+    const t = new Float64Array(this.nc * 7);
+    for (let j = 0; j < this.nc; j++) {
+      const a = -TIME_H + j * this.ch;
+      const z = -TIME_H + (j + 1) * this.ch;
+      for (let k = 0; k <= 6; k++) t[j * 7 + k] = this.time.ageAt(a + ((z - a) * k) / 6);
+    }
+    return (this.ageTab = t);
   }
   /** A species' column about its centre line at 0, from its tip down to its split: its widest in each cell. */
   leaf(b: FanBranch): Contour {
@@ -692,14 +736,29 @@ class Packer {
     if (c) return c;
     c = this.empty();
     const [j0, j1] = this.cells(b.tipY, b.splitY);
+    const ages = this.ages();
+    const memo = MOST_ALIVE.get(b.pop);
+    const most = memo && memo.originMa === this.time.originMa && memo.tipY === b.tipY && memo.splitY === b.splitY ? memo.n : null;
+    const mostNew = most ? null : new Float64Array(Math.max(0, j1 - j0 + 1));
+    if (mostNew) MOST_ALIVE.set(b.pop, { originMa: this.time.originMa, tipY: b.tipY, splitY: b.splitY, n: mostNew });
+    c.j0 = j0;
+    c.j1 = j1;
     for (let j = j0; j <= j1; j++) {
-      const a = Math.max(b.tipY, -TIME_H + j * CELL_H);
-      const z = Math.min(b.splitY, -TIME_H + (j + 1) * CELL_H);
-      let w = 0;
-      for (let k = 0; k <= 6; k++) {
-        const n = b.pop.aliveAt(this.time.ageAt(a + ((z - a) * k) / 6));
-        if (n > 0) w = Math.max(w, b.unit * g(n, this.mode));
+      const c0 = -TIME_H + j * this.ch;
+      const c1 = -TIME_H + (j + 1) * this.ch;
+      const a = Math.max(b.tipY, c0);
+      const z = Math.min(b.splitY, c1);
+      // (The widest is at the most alive: g is monotone. A whole cell's sample ages are every species', and the most
+      // alive per cell is every width mode's, ToLaD#247.)
+      let n: number;
+      if (most) n = most[j - j0];
+      else {
+        const whole = a === c0 && z === c1;
+        n = 0;
+        for (let k = 0; k <= 6; k++) n = Math.max(n, b.pop.aliveAt(whole ? ages[j * 7 + k] : this.time.ageAt(a + ((z - a) * k) / 6)));
+        mostNew![j - j0] = n;
       }
+      const w = n > 0 ? b.unit * g(n, this.mode) : 0;
       c.L[j] = -w / 2;
       c.R[j] = w / 2;
       c.lw[j] = c.rw[j] = w;
@@ -708,20 +767,35 @@ class Packer {
     return c;
   }
   shift(c: Contour, dx: number): Contour {
-    const L = new Float64Array(CELLS);
-    const R = new Float64Array(CELLS);
-    for (let j = 0; j < CELLS; j++) {
+    const o = this.alloc();
+    const { L, R } = o;
+    L.fill(Infinity);
+    R.fill(-Infinity);
+    for (let j = c.j0; j <= c.j1; j++) {
       L[j] = c.L[j] + dx;
       R[j] = c.R[j] + dx;
     }
-    return { L, R, lw: c.lw.slice(), rw: c.rw.slice() };
+    o.lw.set(c.lw);
+    o.rw.set(c.rw);
+    o.j0 = c.j0;
+    o.j1 = c.j1;
+    return o;
   }
   copy(c: Contour): Contour {
-    return { L: c.L.slice(), R: c.R.slice(), lw: c.lw.slice(), rw: c.rw.slice() };
+    const o = this.alloc();
+    o.L.set(c.L);
+    o.R.set(c.R);
+    o.lw.set(c.lw);
+    o.rw.set(c.rw);
+    o.j0 = c.j0;
+    o.j1 = c.j1;
+    return o;
   }
   /** Adds c, shifted by a then b, into `into` (the outline of both). (The shifts in place, no copy: shift(shift(c, a), b), to the bit.) */
   union(into: Contour, c: Contour, a = 0, b = 0): void {
-    for (let j = 0; j < CELLS; j++) {
+    if (c.j0 < into.j0) into.j0 = c.j0;
+    if (c.j1 > into.j1) into.j1 = c.j1;
+    for (let j = c.j0; j <= c.j1; j++) {
       const l = c.L[j] + a + b;
       const r = c.R[j] + a + b;
       if (l < into.L[j]) {
@@ -737,6 +811,10 @@ class Packer {
   /** Adds a band [x0, x1] over heights [y0, y1] (each cell's outline spans to cover it), its facing columns w wide. */
   bar(into: Contour, x0: number, x1: number, y0: number, y1: number, w = x1 - x0): void {
     const [j0, j1] = this.cells(y0, y1);
+    if (j0 <= j1) {
+      if (j0 < into.j0) into.j0 = j0;
+      if (j1 > into.j1) into.j1 = j1;
+    }
     for (let j = j0; j <= j1; j++) {
       if (x0 < into.L[j]) {
         into.L[j] = x0;
@@ -755,24 +833,24 @@ class Packer {
   /** The least shift that puts c (shifted by a) to the right of `acc` by the gap wherever both have columns (−∞: nowhere). */
   right(acc: Contour, c: Contour, frac: number, a = 0): number {
     let d = -Infinity;
-    for (let j = 0; j < CELLS; j++) if (acc.R[j] > -Infinity && c.L[j] < Infinity) d = Math.max(d, acc.R[j] + this.gap(frac, acc.rw[j], c.lw[j]) - (c.L[j] + a));
+    for (let j = Math.max(acc.j0, c.j0), j1 = Math.min(acc.j1, c.j1); j <= j1; j++) if (acc.R[j] > -Infinity && c.L[j] < Infinity) d = Math.max(d, acc.R[j] + this.gap(frac, acc.rw[j], c.lw[j]) - (c.L[j] + a));
     return d;
   }
   /** The least shift (most negative) that puts c (shifted by a) to the left of `acc` by the gap (+∞: nowhere). */
   left(acc: Contour, c: Contour, frac: number, a = 0): number {
     let d = Infinity;
-    for (let j = 0; j < CELLS; j++) if (acc.L[j] < Infinity && c.R[j] > -Infinity) d = Math.min(d, acc.L[j] - this.gap(frac, acc.lw[j], c.rw[j]) - (c.R[j] + a));
+    for (let j = Math.max(acc.j0, c.j0), j1 = Math.min(acc.j1, c.j1); j <= j1; j++) if (acc.L[j] < Infinity && c.R[j] > -Infinity) d = Math.min(d, acc.L[j] - this.gap(frac, acc.lw[j], c.rw[j]) - (c.R[j] + a));
     return d;
   }
   /** Whether a lies inside b at every height (never makes a neighbour move further). */
   inside(a: Contour, b: Contour): boolean {
-    for (let j = 0; j < CELLS; j++) if (a.L[j] < b.L[j] - 1e-12 || a.R[j] > b.R[j] + 1e-12) return false;
+    for (let j = a.j0; j <= a.j1; j++) if (a.L[j] < b.L[j] - 1e-12 || a.R[j] > b.R[j] + 1e-12) return false;
     return true;
   }
   extent(c: Contour): [number, number] {
     let a = Infinity;
     let b = -Infinity;
-    for (let j = 0; j < CELLS; j++) {
+    for (let j = c.j0; j <= c.j1; j++) {
       a = Math.min(a, c.L[j]);
       b = Math.max(b, c.R[j]);
     }
@@ -940,7 +1018,7 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = FELIDA
   // The order is the tree's, whatever the widths (ToLaD#146: linear vs log never reorders the species): the sides
   // chosen on the default design's widths (linear), every other design taking them.
   if (mode !== ORDER_MODE && !byMode.has(ORDER_MODE)) layoutFan(clade, ORDER_MODE, tree, edge);
-  const P = new Packer(time, mode, W);
+  const P = new Packer(time, mode, W, branches.length > HUGE_TREE ? HUGE_CELLS : CELLS);
   const { plans, sides } = chooseSides(root, P, byMode.get(ORDER_MODE));
   byMode.set(mode, sides);
   if (edge === 'curved') placeRiver(root, P, time, mode);
@@ -1029,11 +1107,13 @@ function placeRiver(root: FanNode, P: Packer, time: TimeScale, mode: WidthMode):
         k.colLeft = -k.width / 2;
         c = P.leaf(k);
       }
-      if (!acc) acc = P.copy(c);
+      if (!acc) acc = isNode(k) ? c : P.copy(c);
       else {
         const dx = P.right(acc, c, GAP_FRAC);
         move(k, dx);
         P.union(acc, c, dx);
+        // (A split's outline is read no more; a species' is the Packer's own.)
+        if (isNode(k)) P.free(c);
       }
     }
     // Its column: where the farthest peels left and right are equal.
@@ -1215,6 +1295,12 @@ const MAX_CANDS = 16;
  */
 const BIG_TREE = 64;
 const MAX_CANDS_BIG = 4;
+/**
+ * And one of more than HUGE_TREE (every mammal, ToLaD#247: 5,880) only MAX_CANDS_HUGE: each candidate is a whole
+ * outline, and 4 took ~20 s to open the level.
+ */
+const HUGE_TREE = 1024;
+const MAX_CANDS_HUGE = 2;
 
 /** The sides chosen (mirrored or not, per split) per clade, tree and width mode: the toggle reuses them, no search. */
 /** The widths the species' left-to-right order is chosen on (every design takes it). */
@@ -1237,7 +1323,8 @@ const SIDES = new WeakMap<CladeRec, Map<Split, Map<WidthMode, Map<Split, boolean
 function chooseSides(root: FanNode, P: Packer, known?: Map<Split, boolean>): { plans: Map<FanNode, Plan>; sides: Map<Split, boolean> } {
   const better = (p: Cand, q: Cand) => (Math.abs(p.cost - q.cost) > 1e-9 ? p.cost - q.cost : p.flips - q.flips);
   const count = (v: FanNode): number => v.kids.reduce((n, k) => n + (isNode(k) ? count(k) : 1), 0);
-  const big = count(root) > BIG_TREE;
+  const nSp = count(root);
+  const big = nSp > BIG_TREE;
   // One choice at v: its daughters (table order), their candidates, mirrored or not.
   // A species' outline on its slot (read only: the same for every plan).
   const leaves = new Map<FanBranch, Contour>();
@@ -1292,7 +1379,7 @@ function chooseSides(root: FanNode, P: Packer, known?: Map<Split, boolean>): { p
     // Each daughter's best candidates: all MAX_CANDS of them when two daughters are splits (MAX_CANDS² combinations); a
     // polytomy (the data's tree has some, ToLaD#145) keeps fewer each, so the combinations stay within that budget.
     const nNodes = v.kids.filter(isNode).length;
-    const cap = big ? MAX_CANDS_BIG : MAX_CANDS;
+    const cap = nSp > HUGE_TREE ? MAX_CANDS_HUGE : big ? MAX_CANDS_BIG : MAX_CANDS;
     const per = nNodes <= 2 ? cap : Math.max(1, Math.floor(Math.pow(cap * cap, 1 / nNodes)));
     const fronts = v.kids.map((k) => (isNode(k) ? cands(k).slice(0, per) : [null]));
     // Every combination of the daughters' candidates, each both ways round (one daughter: no sides to choose).
@@ -1311,10 +1398,19 @@ function chooseSides(root: FanNode, P: Packer, known?: Map<Split, boolean>): { p
       keep.push(c);
       if (keep.length >= cap) break;
     }
+    // (The daughters' outlines and the ones not kept are read no more: back to the pool.)
+    for (const c of all) if (!keep.includes(c)) P.free(c.out);
+    for (const k of v.kids) if (isNode(k)) for (const c of kept.get(k)!) P.free(c.out);
+    kept.set(v, keep);
     return keep;
   };
-  const fixed = (v: FanNode, sides: Map<Split, boolean>): Cand =>
-    plan(v, v.kids.map((k) => (isNode(k) ? fixed(k, sides) : null)), v.kids.length > 1 && !!sides.get(v.split));
+  const kept = new Map<FanNode, Cand[]>();
+  const fixed = (v: FanNode, sides: Map<Split, boolean>): Cand => {
+    const kc = v.kids.map((k) => (isNode(k) ? fixed(k, sides) : null));
+    const c = plan(v, kc, v.kids.length > 1 && !!sides.get(v.split));
+    for (const k of kc) if (k) P.free(k.out);
+    return c;
+  };
   const plans = new Map<FanNode, Plan>();
   const sides = new Map<Split, boolean>();
   const apply = (v: FanNode, c: Cand): void => {
@@ -1327,6 +1423,7 @@ function chooseSides(root: FanNode, P: Packer, known?: Map<Split, boolean>): { p
     sides.set(v.split, c.flip);
   };
   apply(root, known ? fixed(root, known) : cands(root)[0]);
+  for (const c of leaves.values()) P.free(c);
   return { plans, sides };
 }
 

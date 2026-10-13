@@ -197,6 +197,8 @@ function widthAt(b: FanBranch, y: number): number {
 const BOX_ROWS = 256;
 /** How long (ms) after the fold last moved the columns' edges are made exact (FanView.applyFold). */
 const FOLD_REST_MS = 120;
+/** The fold's rows at a level with orders above its families (the mammals: every row folds ~5,900 strands): about this many px apart (else 3), ToLaD#247. */
+const GRID_PX_ORDERS = 8;
 
 /** colBoxes' boxes per fan, kept: their edges' memo entries [left, right, version, width] reused, worked out again per fold version (ToLaD#209). */
 const colBoxCache = new WeakMap<Fan, { key: string; map: Map<FanBranch | FanNode, ColBox>; gen: number; base: Float64Array }>();
@@ -1182,7 +1184,8 @@ export class FanView implements InputHandlers {
   private applyFold(): void {
     const f = this.fan.tess.fold;
     if (!f) return;
-    f.setGrid(Math.pow(2, Math.round(Math.log2(3 / this.cam.sy))));
+    // (The mammal level, ~5,900 strands a row: rows further apart, GRID_PX_ORDERS, ToLaD#247.)
+    f.setGrid(Math.pow(2, Math.round(Math.log2((f.ordShare.length ? GRID_PX_ORDERS : 3) / this.cam.sy))));
     f.setScale(this.cam.sx, this.w);
     const key = `${f.ver}:${f.gridH}`;
     if (key === this.foldKey) {
@@ -1711,9 +1714,9 @@ export class FanView implements InputHandlers {
     drawWorldUnder(this);
     this.drawTimeAxis(false);
     const hide = this.hide;
-    if (!hide.has('stem')) this.drawStem();
-    // (The mammal level, lod.ts: a closed clade of hairline strands drawn as its one branch.)
+    // (The mammal level, lod.ts: a closed clade of hairline strands drawn as its one branch, its columns inside it not drawn.)
     const lod = this.lodNow();
+    if (!hide.has('stem')) this.drawStem(lod);
     if (!hide.has('lanes')) {
       for (const b of this.fan.branches) if (!lod || lod.of[b.index] < 0) this.drawStrand(b);
       if (lod) for (const v of lod.merged) this.drawMerged(v);
@@ -1749,13 +1752,14 @@ export class FanView implements InputHandlers {
    * so a column reads as one without seams passing for lanes. It follows the
    * column's curve where it peels off its parent (chords a few px tall).
    */
-  private drawStem(): void {
+  private drawStem(lod: Lod | null = null): void {
     const c = rgb01(this.gl ? mix(GRAY, '#131c19', 0.86) : GRAY);
     const [, wTop] = this.toWorld(0, -8);
     const [, wBot] = this.toWorld(0, this.h + 8);
     const nodes = this.fan.nodes;
     for (let ni = nodes.length - 1; ni >= 0; ni--) {
       const v = nodes[ni];
+      if (lod?.hidden(v)) continue;
       const ya = Math.max(v.y, wTop);
       const yb = Math.min(v.yBot, wBot);
       if (!(yb > ya)) continue;

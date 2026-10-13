@@ -163,7 +163,7 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
     const tFirst = performance.now() - t1;
     out(`load: new FanView ${tNew.toFixed(0)} ms, first draw ${tFirst.toFixed(0)} ms`);
     // Per-part timings: the view's private draw steps, wrapped.
-    const parts = ['drawStrand', 'drawIndividuals', 'drawLabels', 'drawStem', 'drawStemFade', 'drawTimeAxis', 'drawTouch', 'drawGutter'];
+    const parts = ['drawStrand', 'drawMerged', 'drawIndividuals', 'drawLabels', 'drawStem', 'drawStemFade', 'drawTimeAxis', 'drawTouch', 'drawGutter', 'drawEvents', 'drawHeld', 'applyFold', 'layoutBrackets'];
     const acc: Record<string, number> = {};
     const proto = FanView.prototype as unknown as Record<string, (...a: unknown[]) => unknown>;
     for (const p of parts) {
@@ -201,6 +201,7 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
         };
       };
       wrap(fan.tess as unknown as Record<string, unknown>, 'xRange', 'xRange');
+      wrap(fan.tess as unknown as Record<string, unknown>, 'xTable', 'xTable');
       if (fan.tess.fold) for (const k of ['left', 'foldRow', 'riverRow', 'carriedForks']) wrap(fan.tess.fold as unknown as Record<string, unknown>, k, `fold.${k}`);
       wrap(ColumnPath.prototype as unknown as Record<string, unknown>, 'build', 'path.build');
       wrap(CutMemo.prototype as unknown as Record<string, unknown>, 'update', 'cutMemo.update');
@@ -343,7 +344,7 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
       const f = (x: number) => x.toFixed(1).padStart(6);
       const top = Object.entries(acc)
         .sort((a, b) => b[1] - a[1])
-        .slice(0, 3)
+        .slice(0, 5)
         .map(([k, t]) => `${k.replace('draw', '')} ${(t / N).toFixed(1)}`)
         .join(', ');
       out(

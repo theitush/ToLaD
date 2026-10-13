@@ -577,6 +577,8 @@ export class Fold {
 
   /** The pairs youngest split first (carried: a split's gaps flow out to its clade's edges, older splits'). */
   private ord: Int32Array | null = null;
+  /** Per pair, its split's height (pairNode's y). */
+  private pairY: Float64Array | null = null;
   /** Per strand, the anchor's weights (a hair each) summed along the drawn order, at fold version forkVer (carriedForks). */
   private wSum = new Float64Array(0);
   /** Per pair, the share of its gap carried to its clade's left edge (carriedForks). */
@@ -622,22 +624,31 @@ export class Fold {
         H[p] = Math.min(1, mm / 0.25);
       }
     }
+    // (Locals and the splits' heights in a typed array: ~6,000 pairs a row at the mammal level, ToLaD#247.)
+    const ord = this.ord;
+    const A = this.a;
+    const G = this.pairGap;
+    const PY = (this.pairY ??= Float64Array.from(this.pairNode, (v) => v.y));
+    const FT = this.forkTopC;
+    const LO = this.lo;
+    const HI = this.hi;
+    const SL = this.sideL;
     for (let k = 0; k < m; k++) {
-      const p = this.ord[k];
-      const F = this.a[p] * this.pairGap[p];
+      const p = ord[k];
+      const F = A[p] * G[p];
       const T = F + inc[p];
       if (!(T > 0)) continue;
-      const v = this.pairNode[p];
-      const lo = this.lo[p];
-      const hi = this.hi[p];
-      const u = y >= v.y ? 0 : this.forkTopC[p] < v.y ? ease(edge, Math.min(1, (v.y - y) / (v.y - this.forkTopC[p]))) : 1;
+      const vy = PY[p];
+      const lo = LO[p];
+      const hi = HI[p];
+      const u = y >= vy ? 0 : FT[p] < vy ? ease(edge, Math.min(1, (vy - y) / (vy - FT[p]))) : 1;
       let kept = 0;
       if (u > 0) kept = u * (inc[p] + F * H[p]);
       K[p] = kept;
       const out = T - kept;
       if (!(out > 0)) continue;
       // (Shared about the anchor's weight in the clade: the side it is on stands still.)
-      const sL = this.sideL[p];
+      const sL = SL[p];
       if (lo > 0) inc[lo - 1] += out * sL;
       if (hi < m + 1) inc[hi - 1] += out * (1 - sL);
     }
