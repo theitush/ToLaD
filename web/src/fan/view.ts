@@ -912,15 +912,37 @@ export class FanView implements InputHandlers {
     const br = this.brackets;
     if (!br) return null;
     const nowS = this.toScreen(0, this.yNow)[1];
-    const fit = clamp01((nowS - this.labelTop()) / 24);
-    br.layout(this.camera, this.fan, nowS, LABEL_AXIS_X, fit, (f, t) => {
+    const top = this.labelTop();
+    const fit = clamp01((nowS - top) / 24);
+    const measure = (f: string, t: string) => {
       this.ctx.save();
       this.ctx.font = f;
       const w = this.ctx.measureText(t).width;
       this.ctx.restore();
       return w;
-    }, this.labelTop());
+    };
+    br.layout(this.camera, this.fan, nowS, LABEL_AXIS_X, fit, measure, top);
+    // The groups the view is inside, pinned under the buttons as the stack scrolls off (ToLaD#233).
+    br.pin(top, this.camera.toWorld(0, 0)[1], measure, br.fit < 1 ? (this.lineAt((LABEL_AXIS_X + this.w) / 2, this.h / 2)?.node ?? null) : null);
     return br;
+  }
+
+  /** The branch whose column at screen (px, py) is nearest it (ToLaD#233: the lineage the view is in), null for none there. */
+  private lineAt(px: number, py: number): FanBranch | null {
+    const [wx, wy] = this.toWorld(px, py);
+    if (wy > this.fan.trunkBottom.y) return null;
+    let best: FanBranch | null = null;
+    let bd = Infinity;
+    for (const b of this.fan.branches) {
+      if (wy < b.tipY) continue;
+      const left = leftAt(b, wy);
+      const d = Math.max(0, left - wx, wx - left - laneAt(b, wy).w);
+      if (d < bd) {
+        bd = d;
+        best = b;
+      }
+    }
+    return best;
   }
 
   /** A frame with room above "now" for BAND_ROWS rows of brackets: "now" lowered by them, the fork where it was. */
@@ -1399,6 +1421,12 @@ export class FanView implements InputHandlers {
   }
 
   tap(x: number, y: number): void {
+    // A pinned group (ToLaD#233), over all under it: fly to it; tapped again there, one level out (tapClade).
+    const pinned = this.brackets?.pinHit(x, y);
+    if (pinned) {
+      this.tapClade(pinned.v);
+      return;
+    }
     // A pill's "+x" (ToLaD#197): fly to the species it stands for, until their pills show.
     const plus = this.plusHits.find(({ box }) => x >= box[0] - 8 && x <= box[2] + 8 && y >= box[1] - 4 && y <= box[3] + 4);
     if (plus) {
@@ -1532,8 +1560,10 @@ export class FanView implements InputHandlers {
     this.drawGutter();
     this.drawTouch();
     const br = this.layoutBrackets();
-    const spots = labelSpots(this.camera, this.fan, this.labelTop(), (t) => this.nameWidth(t), this.barRect()?.[0], br ?? undefined, (id) => this.plusPx(this.plusN.get(id) ?? 0), (id) => this.famPills.get(id));
+    // (The labels kept under the pinned groups, ToLaD#233, as they show.)
+    const spots = labelSpots(this.camera, this.fan, this.labelTop() + (br ? br.pinH() * br.pinA : 0), (t) => this.nameWidth(t), this.barRect()?.[0], br ?? undefined, (id) => this.plusPx(this.plusN.get(id) ?? 0), (id) => this.famPills.get(id));
     this.drawLabels(spots, br);
+    br?.drawPins(this.ctx, FAMILY_INK, INK3, BG);
     this.drawWidthScale();
     if (this.debug) this.drawDebug();
     this.drawTrunkLabel();
