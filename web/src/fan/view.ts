@@ -587,6 +587,15 @@ export function groupFace(v: FanNode): FanBranch | null {
   return out;
 }
 
+/** A level's group's individuals alive now (ToLaD#266: whose picture stays, and on top, when they crowd). */
+const aliveCache = new WeakMap<FanNode, number>();
+export function groupAlive(g: Level): number {
+  if (g.b) return g.b.sp.extinct ? 0 : g.b.pop.aliveAt(0);
+  let n = aliveCache.get(g.v);
+  if (n === undefined) aliveCache.set(g.v, (n = g.v.strands.reduce((s, b) => s + (b.sp.extinct ? 0 : b.pop.aliveAt(0)), 0)));
+  return n;
+}
+
 /** Strand b's middle (world x) at "now", an extinct one's at its tip. */
 export function stripMid(b: FanBranch): number {
   const y = Math.max(b.tipY, b.tess.time.y(0));
@@ -2661,8 +2670,7 @@ export class FanView implements InputHandlers {
     for (const g of this.levelGroupsOn(lg)) {
       const face = g.lv.v ? groupFace(g.lv.v) : g.lv.b;
       if (!face || !wikiOf(face.sp.sci)?.img) continue;
-      const n = g.lv.v ? g.lv.v.n : g.lv.b!.pop.aliveAt(0);
-      gs.push({ lv: g.lv, face, x: g.x, y: g.lv.b && g.lv.b.tipY > this.yNow ? this.toScreen(0, g.lv.b.tipY)[1] : nowS, n });
+      gs.push({ lv: g.lv, face, x: g.x, y: g.lv.b && g.lv.b.tipY > this.yNow ? this.toScreen(0, g.lv.b.tipY)[1] : nowS, n: groupAlive(g.lv) });
     }
     const placed = placePics(gs.map((g) => g.x), gs.map((g) => g.y), gs.map((g) => g.n));
     this.picSpots = placed.map((p) => ({ ...p, lv: gs[p.i].lv, face: gs[p.i].face }));

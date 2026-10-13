@@ -4,8 +4,9 @@ import { laneAt, layoutFan, leftAt, type FanBranch } from './layout';
 import { CARNIVORA, FELIDAE, mammaliaClade, type CladeRec } from './panthera';
 import { loadMammalsFromFiles } from './mammals-node';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, type Split } from './splits';
-import { FanView, groupFace, holds, isLevel, labelGroups, labelSpots, levelName, nextLevels, type Level } from './view';
+import { FanView, groupAlive, groupFace, holds, isLevel, labelGroups, labelSpots, levelName, NAME_MODES, nextLevels, type Level } from './view';
 import { wikiOf } from './wiki';
+import { PIC_LIFT, PIC_OVERLAP } from './pics';
 
 function stubView(clade: CladeRec = CARNIVORA, tree: Split = CARNIVORA_TREE, folds = true): FanView {
   const noop = () => {};
@@ -157,21 +158,22 @@ describe('a tap goes one level deeper, a double-tap one level out (ToLaD#258)', 
           const now = v.levelNow();
           const prev = path[path.length - 1];
           if (!holds(prev, now) || (now.v && now.v === prev.v) || !holds(now, { b })) log.push(`${b.sp.common}: tap ${k + 1} went to ${nameOf(now)} from ${nameOf(prev)}`);
-          if (card) log.push(`${b.sp.common}: a card on the way`);
+          // (No card on the way; landing on the species, its card open, ToLaD#266.)
+          if (now.b ? card !== now.b.sp.common : card) log.push(`${b.sp.common}: tap ${k + 1} landed at ${nameOf(now)}, the card: ${card}`);
           path.push(now);
         }
         if (path[path.length - 1].b !== b) {
           log.push(`${b.sp.common}: ended at ${nameOf(path[path.length - 1])}`);
           continue;
         }
-        // At it: a tap opens its card, no flight.
+        // At it: a tap keeps its card, no flight.
         v.tap(...onColumn(v, b));
         if (P(v).anim || card !== b.sp.common) log.push(`${b.sp.common}: at it, a tap: card ${card}${P(v).anim ? ', and a flight' : ''}`);
-        v.tap(-1e4, -1e4);
-        // Double-taps: each one level out, back up the way it came, home at last; at home, nothing.
+        // Double-taps: each one level out, back up the way it came, home at last; at home, nothing. The first closes the card.
         for (let k = 0; k < 12; k++) {
           const prev = v.levelNow(true);
           v.doubleTap(-1e4, -1e4);
+          if (k === 0 && card) log.push(`${b.sp.common}: a double-tap out left its card open`);
           if (!P(v).anim) {
             if (!P(v).atHome()) log.push(`${b.sp.common}: double-tap ${k + 1} did nothing at ${nameOf(prev)}`);
             break;
@@ -249,16 +251,20 @@ function levelsOnTheWay(v: FanView, step: number, at: (v: FanView) => void): voi
   }
 }
 
-describe('each group\'s picture over "now", exactly above its centre; none overlap (ToLaD#262)', () => {
+describe('each group\'s picture on "now", exactly above its centre; crowded, a little overlap or dropped (ToLaD#262, #266)', () => {
   for (const [name, mk] of FANS) {
     it(name, () => {
       const v = mk();
       const bad: string[] = [];
+      let seen = 0;
       levelsOnTheWay(v, v.fan.tess.fold ? 61 : 7, (v) => {
         const lv = v.levelNow();
         if (lv.b) return;
         const at = nameOf(lv);
-        // Every group one level down whose centre is on screen, with a face that has a picture, has its disc.
+        const nowS = v.toScreen(0, v.fan.time.y(0))[1];
+        const pop = groupAlive;
+        // Every group one level down whose centre is on screen, with a face that has a picture, has its disc, on "now"
+        // (an extinct species' on its tip), never above it; else a more populous group's disc stands too near it.
         for (const g of nextLevels(v.fan, lv.v)) {
           const [lo, hi] = nowExtent(v, strandsOf(g));
           const cx = (lo + hi) / 2;
@@ -266,14 +272,23 @@ describe('each group\'s picture over "now", exactly above its centre; none overl
           const face = g.v ? groupFace(g.v) : g.b;
           if (!face || !wikiOf(face.sp.sci)?.img) continue;
           const p = v.picSpots.find((q) => (g.v ? q.lv.v === g.v : q.lv.b === g.b));
-          if (!p) bad.push(`${at}: ${nameOf(g)} has no picture`);
-          else if (Math.abs(p.x - cx) > 0.5) bad.push(`${at}: ${nameOf(g)}'s picture ${(p.x - cx).toFixed(1)} px off its centre`);
+          const edge = g.b && g.b.tipY > v.fan.time.y(0) ? v.toScreen(0, g.b.tipY)[1] : nowS;
+          if (!p) {
+            if (!v.picSpots.some((q) => pop(q.lv) >= pop(g) && Math.abs(q.x - cx) < PIC_OVERLAP * q.d + 1e-6)) bad.push(`${at}: ${nameOf(g)} has no picture, none more populous near`);
+          } else {
+            seen++;
+            if (Math.abs(p.x - cx) > 0.5) bad.push(`${at}: ${nameOf(g)}'s picture ${(p.x - cx).toFixed(1)} px off its centre`);
+            if (Math.abs(p.y + p.d / 2 - (edge - PIC_LIFT)) > 0.5) bad.push(`${at}: ${nameOf(g)}'s picture ${(edge - PIC_LIFT - p.y - p.d / 2).toFixed(1)} px off the now edge`);
+          }
         }
         const ps = v.picSpots;
         for (let i = 0; i < ps.length; i++)
           for (let j = i + 1; j < ps.length; j++)
-            if (Math.hypot(ps[i].x - ps[j].x, ps[i].y - ps[j].y) < (ps[i].d + ps[j].d) / 2 - 1e-6) bad.push(`${at}: ${nameOf(ps[i].lv)} and ${nameOf(ps[j].lv)} overlap`);
+            if (Math.hypot(ps[i].x - ps[j].x, ps[i].y - ps[j].y) < PIC_OVERLAP * Math.min(ps[i].d, ps[j].d) - 1e-6) bad.push(`${at}: ${nameOf(ps[i].lv)} and ${nameOf(ps[j].lv)} overlap more than a little`);
+        // The more populous drawn later (on top).
+        for (let i = 1; i < ps.length; i++) if (pop(ps[i].lv) < pop(ps[i - 1].lv)) bad.push(`${at}: ${nameOf(ps[i].lv)} drawn over the more populous ${nameOf(ps[i - 1].lv)}`);
       });
+      expect(seen).toBeGreaterThan(0);
       expect(bad).toEqual([]);
     });
   }
@@ -323,7 +338,8 @@ describe('a "+x" stands for the names hidden near it; tapped, it frames them (To
         if (!P(v).anim) bad.push(`${at}: a "+x" tapped flew nowhere`);
         run(v);
         // Landed on the hidden groups' frame, their columns all on screen.
-        const to = v.groupCamera(h.bs);
+        // (One species hidden: a landing on it, its frame, ToLaD#266.)
+        const to = h.bs.length === 1 ? v.speciesCamera(h.bs[0]) : v.groupCamera(h.bs);
         if (Math.abs(Math.log(v.cam.sx / to.sx)) > 0.05) bad.push(`${at}: a "+x" landed off its frame`);
         const [a, b] = nowExtent(v, h.bs);
         if (a < -2 || b > v.w + 2) bad.push(`${at}: a "+x" landed with its groups off screen (${a.toFixed(0)}–${b.toFixed(0)})`);
@@ -336,4 +352,73 @@ describe('a "+x" stands for the names hidden near it; tapped, it frames them (To
       expect(tried).toBeGreaterThan(0);
     });
   }
+});
+
+describe("the groups' names beside, mid-branch or between branches: none meet (ToLaD#266)", () => {
+  for (const [name, mk] of FANS) {
+    for (const mode of NAME_MODES) {
+      it(`${name}: ${mode}`, () => {
+        const v = mk();
+        v.names = mode;
+        const bad: string[] = [];
+        let shown = 0;
+        levelsOnTheWay(v, v.fan.tess.fold ? 61 : 7, (v) => {
+          const at = nameOf(v.levelNow());
+          const nowS = v.toScreen(0, v.fan.time.y(0))[1];
+          const hits: { box: [number, number, number, number]; lv: Level }[] = [...v.famHits.map((h) => ({ box: h.box, lv: { v: h.v } as Level })), ...v.nameHits.map((h) => ({ box: h.box, lv: { b: h.b } as Level }))];
+          shown += hits.length;
+          for (let i = 0; i < hits.length; i++)
+            for (let j = i + 1; j < hits.length; j++) {
+              const [p, q] = [hits[i].box, hits[j].box];
+              if (p[0] < q[2] && q[0] < p[2] && p[1] < q[3] && q[1] < p[3]) bad.push(`${at}: ${nameOf(hits[i].lv)} meets ${nameOf(hits[j].lv)}`);
+            }
+          if (mode === 'beside') return;
+          // Along its branch: between "now" (its tip) and where it splits off, as far as the screen shows.
+          for (const h of hits) {
+            const wTop = h.lv.b ? Math.max(h.lv.b.tipY, v.fan.time.y(0)) : v.fan.time.y(0);
+            const wBot = h.lv.b ? h.lv.b.splitY : h.lv.v.yBot;
+            const y = (h.box[1] + h.box[3]) / 2;
+            if (y < Math.max(nowS, v.toScreen(0, wTop)[1]) - 1 || y > v.toScreen(0, wBot)[1] + 1) bad.push(`${at}: ${nameOf(h.lv)}'s name off its branch's run (${y.toFixed(0)})`);
+          }
+        });
+        expect(bad).toEqual([]);
+        expect(shown).toBeGreaterThan(0);
+      });
+    }
+  }
+});
+
+describe('a tap landing on a species opens its card; a search pick too (ToLaD#266)', () => {
+  it('the cats: a search pick, then a species picture or name tapped at its level', () => {
+    const v = stubView(FELIDAE, FELIDAE_TREE, false);
+    let card: string | null = null;
+    v.onSelect = (s) => void (card = s ? s.sp.common : null);
+    home(v);
+    const sp = v.fan.branches[5];
+    v.flyToSpecies(sp.sp);
+    expect(card).toBe(null);
+    run(v);
+    expect(card).toBe(sp.sp.common);
+    // A double tap out closes it.
+    v.doubleTap(-1e4, -1e4);
+    expect(card).toBe(null);
+    run(v);
+    // Its level: a species among its groups, its picture (or name) tapped lands there, the card open.
+    expect(v.levelNow().v).toBeTruthy();
+    const one = v.picSpots.find((p) => p.lv.b) ?? null;
+    const pill = v.nameHits[0] ?? null;
+    expect(one || pill).toBeTruthy();
+    const b = one ? one.lv.b! : pill!.b;
+    if (one) v.tap(one.x, one.y);
+    else v.tap((pill!.box[0] + pill!.box[2]) / 2, (pill!.box[1] + pill!.box[3]) / 2);
+    // (Tap by tap, one level deeper each, towards it: no card until a species, then its own.)
+    for (let k = 0; k < 6 && !v.levelNow().b; k++) {
+      expect(!!P(v).anim).toBe(true);
+      run(v);
+      const at = v.levelNow();
+      expect(card).toBe(at.b ? at.b.sp.common : null);
+      if (!at.b) v.tap(...onColumn(v, b));
+    }
+    expect(v.levelNow().b).toBeTruthy();
+  });
 });
