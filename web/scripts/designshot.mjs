@@ -167,6 +167,18 @@ const scenes = [
   ['pill-1', 'tappill'],
   ['pill-2', 'tapagain'],
   ['pill-3', 'tapagain'],
+  // The groups the view is inside pinned at the top (ToLaD#233): home (nothing pinned, the stack itself), deep in a
+  // bear's and a weasel's past ("now" far off the top), and (LEVEL=cats) the lion's past inside Panthera.
+  ['pin-home', 'home'],
+  ['pin-bear', 'frame', ['Brown bear', 4e5, 40]],
+  ['pin-weasel', 'frame', ['Least weasel', 1.5e6, 20]],
+  ['pin-lion', 'frame', ['Lion', 1.5e6, 8]],
+  // A slow pan from home into the past: the stack sticks under the buttons, then hands over to the pinned rows.
+  ['pin-pan0', 'pan', [2, 0]],
+  ['pin-pan1', 'pan', [2, 60]],
+  ['pin-pan2', 'pan', [2, 100]],
+  ['pin-pan3', 'pan', [2, 130]],
+  ['pin-pan4', 'pan', [2, 220]],
 ];
 const browser = await chromium.launch({ headless: true });
 try {

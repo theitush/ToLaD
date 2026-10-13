@@ -923,8 +923,26 @@ export class FanView implements InputHandlers {
     };
     br.layout(this.camera, this.fan, nowS, LABEL_AXIS_X, fit, measure, top);
     // The groups the view is inside, pinned under the buttons as the stack scrolls off (ToLaD#233).
-    br.pin(top, this.camera.toWorld(0, 0)[1], measure);
+    br.pin(top, this.camera.toWorld(0, 0)[1], measure, fit < 1 ? (this.lineAt((LABEL_AXIS_X + this.w) / 2, this.h / 2)?.node ?? null) : null);
     return br;
+  }
+
+  /** The branch whose column at screen (px, py) is nearest it (ToLaD#233: the lineage the view is in), null for none there. */
+  private lineAt(px: number, py: number): FanBranch | null {
+    const [wx, wy] = this.toWorld(px, py);
+    if (wy > this.fan.trunkBottom.y) return null;
+    let best: FanBranch | null = null;
+    let bd = Infinity;
+    for (const b of this.fan.branches) {
+      if (wy < b.tipY) continue;
+      const left = leftAt(b, wy);
+      const d = Math.max(0, left - wx, wx - left - laneAt(b, wy).w);
+      if (d < bd) {
+        bd = d;
+        best = b;
+      }
+    }
+    return best;
   }
 
   /** A frame with room above "now" for BAND_ROWS rows of brackets: "now" lowered by them, the fork where it was. */

@@ -233,7 +233,7 @@ export class Brackets {
   list: Clade[] = [];
   /** The stack's foot (screen y): over the species' pills standing on "now" (Ita: the brackets above the names). */
   baseS = 0;
-  fit = 0;
+  fit = 1;
   /** The time axis's right edge and the screen's width (px): the lines run between them. */
   private x0 = 0;
   private w = 0;
@@ -338,25 +338,31 @@ export class Brackets {
     for (let r = 1; r <= rows; r++) this.rowBase[r] = this.rowBase[r - 1] + this.rowH[r - 1];
     const height = rows ? this.rowTop(rows - 1) : 0;
     this.baseS = Math.min(nowS - 4, Math.max(top + height, nowS - 4 - PILL_ROOM));
+    // Pushed up past the top line by "now" (under the buttons), it fades out over a few px: the pinned rows take over
+    // (ToLaD#233, like a sticky header).
+    if (rows) this.fit = Math.min(fit, Math.max(0, 1 - (top + height - this.baseS) / 24));
     return this.placed;
   }
 
   /**
    * Pin the groups the view is inside (ToLaD#233), after layout(): shown as the stack scrolls off the top (1 - fit),
-   * at `top` (the labels' top line, under the buttons). `yTop` the world y at the screen's top. The rule: the clades
-   * whose span at "now" (the brackets' own) covers the centre of the room right of the time axis, and whose branch
-   * started below the screen's top (some of their time is on screen: zoomed into a bear's past older than the bears,
-   * the bears are not pinned, the dog-like carnivores are).
+   * at `top` (the labels' top line, under the buttons). `yTop` the world y at the screen's top; `at` the lineage at
+   * the screen's centre (the branch whose column there is nearest it, its node), null for none. The rule: the clades
+   * that lineage sits in (without one, those whose span at "now", the brackets' own, covers the centre of the room
+   * right of the time axis), whose branch started below the screen's top (some of their time is on screen: zoomed
+   * into a bear's past older than the bears, the bears are not pinned, the dog-like carnivores are).
    */
-  pin(top: number, yTop: number, measure: (font: string, text: string) => number): Pin[] {
+  pin(top: number, yTop: number, measure: (font: string, text: string) => number, at: FanNode | null = null): Pin[] {
     this.pinA = 1 - this.fit;
     this.pinTop = top;
     this.pins = [];
     if (this.pinA <= 0) return this.pins;
     const cx = (this.x0 + this.w) / 2;
     const room = this.w - this.x0 - 2 * LABEL_PAD;
+    const line = new Set<FanNode>();
+    for (let u = at; u; u = u.parent) line.add(u);
     this.list.forEach((q, i) => {
-      if (!(this.sa[i] <= cx && cx < this.sb[i]) || !(q.v.yBot > yTop)) return;
+      if (!(at ? line.has(q.v) : this.sa[i] <= cx && cx < this.sb[i]) || !(q.v.yBot > yTop)) return;
       const [wf, wn, ws] = this.widths(i, measure);
       const form: Form = wf <= room ? 'full' : wn <= room ? 'name' : 'short';
       const lw = form === 'full' ? wf : form === 'name' ? wn : ws || wn;
@@ -443,7 +449,7 @@ export class Brackets {
    * with no room, leaves the bracket a plain line.
    */
   draw(ctx: CanvasRenderingContext2D, ink: string, ink2: string, pills: readonly (readonly number[])[] = []): void {
-    if (!this.placed.length) return;
+    if (!this.placed.length || this.fit <= 0) return;
     ctx.save();
     ctx.globalAlpha = this.fit;
     ctx.lineWidth = 1;
@@ -497,6 +503,8 @@ export class Brackets {
 
   /** The clade under screen (x, y): the bracket in that row nearest x (on it, or within a few px of slop). */
   hit(x: number, y: number): Clade | null {
+    // (Faded out, handed over to the pinned rows: not there to tap.)
+    if (this.fit < 0.5) return null;
     let best: Placed | null = null;
     let bestD = 3;
     for (const p of this.placed) {
