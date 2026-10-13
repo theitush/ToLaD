@@ -18,6 +18,7 @@
 
 import raw from 'virtual:panthera-data';
 import carnivora from 'virtual:carnivora-data';
+import { mammalData } from './mammals-data';
 import type { DatedSplit, RawClade } from './panthera-extract';
 
 export type Confidence = 'high' | 'medium' | 'low';
@@ -213,6 +214,12 @@ export const FELIDAE_TREE: Split = treeOf(raw);
 /** The order the cats sit in (ToLaD#146): cats, dogs, bears, seals, weasels and the rest. */
 export const CARNIVORA_TREE: Split = treeOf(carnivora);
 
+let mammTree: Split | null = null;
+/** Every mammal's dated tree (ToLaD#247), built when the level is first shown (after loadMammals, mammals-data.ts). */
+export function mammaliaTree(): Split {
+  return (mammTree ??= nameOrders(treeOf(mammalData().clade)));
+}
+
 /**
  * The plain English name of a family ("Dogs" for Canidae): the level a reader knows the order by. A rule (a split whose
  * taxon ends in -idae is a family) and this small name map; a family not in it keeps its Latin name. Subfamilies and
@@ -237,10 +244,84 @@ export const FAMILY_EN: Record<string, string> = {
   Nandiniidae: 'Palm civet',
 };
 
-/** A split's family label, or null when it founds no family (FAMILY_EN). */
+/**
+ * The mammal orders (ToLaD#247), by the taxon the data names their split (an order whose split the data does not name
+ * is not here: its families stand as branches of their own). Their plain English names label them at the mammal level.
+ */
+export const ORDER_EN: Record<string, string> = {
+  Prototheria: 'Monotremes',
+  Didelphimorphia: 'Opossums',
+  Paucituberculata: 'Shrew opossums',
+  Diprotodontia: 'Kangaroos & kin',
+  Dasyuromorphia: 'Marsupial carnivores',
+  Notoryctes: 'Marsupial moles',
+  Peramelidae: 'Bandicoots',
+  Afrosoricida: 'Tenrecs & golden moles',
+  Macroscelidea: 'Elephant shrews',
+  Hyracoidea: 'Hyraxes',
+  Sirenia: 'Sea cows',
+  Cingulata: 'Armadillos',
+  Pholidota: 'Pangolins',
+  Proboscidea: 'Elephants',
+  Pilosa: 'Sloths & anteaters',
+  Scandentia: 'Treeshrews',
+  Dermoptera: 'Colugos',
+  Primates: 'Primates',
+  Lagomorpha: 'Rabbits & hares',
+  Rodentia: 'Rodents',
+  Eulipotyphla: 'Shrews & moles',
+  Chiroptera: 'Bats',
+  Carnivora: 'Carnivores',
+  Perissodactyla: 'Horses & rhinos',
+  Artiodactyla: 'Hoofed mammals & whales',
+};
+export const ORDER_TAXA: ReadonlySet<string> = new Set(Object.keys(ORDER_EN));
+
+/**
+ * The orders whose crown the dated tree leaves unnamed (ToLaD#247), each by two of its species (Upham et al. 2019's `ord`
+ * field): their last common split is the order's, and is named for it (nameOrders), so it folds and is labelled as the
+ * others. (Peramelemorphia is not one clade in the tree, its bandicoots, Peramelidae, are; Microbiotheria and
+ * Tubulidentata are one species each.)
+ */
+export const ORDER_CROWNS: Record<string, [string, string]> = {
+  Dasyuromorphia: ['Myrmecobius fasciatus', 'Antechinus mimetes'],
+};
+
+/** Name the unnamed orders' splits (ORDER_CROWNS) in tree t: the last split over both species, if it has no taxon. */
+export function nameOrders(t: Split): Split {
+  const path = (sp: string): Split[] | null => {
+    const go = (s: Split): Split[] | null => {
+      for (const k of s.kids) {
+        if (k === sp) return [s];
+        if (typeof k !== 'string') {
+          const p = go(k);
+          if (p) return [s, ...p];
+        }
+      }
+      return null;
+    };
+    return go(t);
+  };
+  for (const [name, [a, b]] of Object.entries(ORDER_CROWNS)) {
+    const pa = path(a);
+    const pb = path(b);
+    if (!pa || !pb) continue;
+    let k = 0;
+    while (k < pa.length && pa[k] === pb[k]) k++;
+    const v = pa[k - 1];
+    if (v && v !== t && !v.taxon) v.taxon = name;
+  }
+  return t;
+}
+
+/** A taxon without Open Tree's homonym note ("Pholidota (order in Opisthokonta)" -> "Pholidota"). */
+export const taxonKey = (x: string) => x.replace(/ \(.*\)$/, '');
+
+/** A split's family (or order) label, or null when it founds neither (FAMILY_EN, ORDER_EN). */
 export function familyLabel(t: Split): string | null {
-  const x = t.taxon ?? '';
-  return /idae$/.test(x) ? (FAMILY_EN[x] ?? x) : null;
+  const x = taxonKey(t.taxon ?? '');
+  // (An order, ORDER_EN, labels like a family at the mammal level: ToLaD#247.)
+  return /idae$/.test(x) ? (FAMILY_EN[x] ?? x) : (ORDER_EN[x] ?? null);
 }
 
 /** Every split in the tree, parents before their daughters. */

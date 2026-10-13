@@ -514,7 +514,8 @@ def write_all(root: Node, out: Path, log: dict, droot=None) -> None:
                            **{f: rl[f] for f in ("category", "source", "year", "taxon", "assessment")}})
         k += 1
     log["history"]["hist_sources"] = len(cites)
-    write_dated(ddir / "skeleton.json", {"tile": -1, **dated.skeleton_meta(droot), **dated.file_meta(droot, sk_rows)})
+    write_dated(ddir / "skeleton.json", {"tile": -1, **dated.skeleton_meta(droot), **dated.file_meta(droot, sk_rows),
+                                          "all": dated.all_meta(droot, where)})
     secs, n = encode_rows(sk_rows, methods, tile_id, meta, cites)
     sk_size = write_container(out / "skeleton.tld", KIND_SKELETON, n, secs)
     files.append(out / "skeleton.tld")

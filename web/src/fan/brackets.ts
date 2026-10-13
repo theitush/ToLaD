@@ -11,7 +11,7 @@
  */
 import type { Camera } from './camera';
 import { laneAt, leftAt, type Fan, type FanNode } from './layout';
-import { FAMILY_EN, type Split } from './splits';
+import { FAMILY_EN, ORDER_EN, ORDER_TAXA, type Split } from './splits';
 
 export type CladeRank = 'genus' | 'subfamily' | 'family' | 'superfamily' | 'suborder' | 'order';
 
@@ -23,7 +23,7 @@ export function latinOf(s: Split): string {
 /** A taxon's rank by its ending (ICZN: -idae family, -inae subfamily, -oidea superfamily; -formia a suborder; one word otherwise a genus). */
 export function rankOf(latin: string): CladeRank | null {
   if (!/^[A-Z][a-z]+$/.test(latin)) return null;
-  if (latin === 'Carnivora') return 'order';
+  if (ORDER_TAXA.has(latin) && !/idae$/.test(latin)) return 'order';
   if (/idae$/.test(latin)) return 'family';
   if (/inae$/.test(latin)) return 'subfamily';
   if (/oidea$/.test(latin)) return 'superfamily';
@@ -34,6 +34,8 @@ export function rankOf(latin: string): CladeRank | null {
 /** Plain English names for the taxa above the species (the families' are splits.ts FAMILY_EN). A taxon not here keeps its Latin. */
 export const TAXON_EN: Record<string, string> = {
   ...FAMILY_EN,
+  // (The mammal orders, ToLaD#247.)
+  ...ORDER_EN,
   Carnivora: 'Carnivores',
   Feliformia: 'Cat-like carnivores',
   Caniformia: 'Dog-like carnivores',
@@ -247,6 +249,12 @@ export class Brackets {
   pins: Pin[] = [];
   pinTop = 0;
   pinA = 0;
+  /**
+   * The clades not shown (the mammal level, lod.ts: those inside a clade drawn as one branch), and a key that changes
+   * with them (the rows are laid out again).
+   */
+  hide: ((v: FanNode) => boolean) | null = null;
+  hideKey = '';
 
   /** The clades' screen spans at "now": each species' room where its column is at "now" (an extinct one's: at its tip). */
   spans(c: BracketCam, fan: Fan): [Float64Array, Float64Array] {
@@ -295,7 +303,7 @@ export class Brackets {
         hi = Math.max(hi, r[k]);
       }
       a[i] = c.toScreen(lo, 0)[0];
-      z[i] = c.toScreen(hi, 0)[0];
+      z[i] = this.hide?.(q.v) ? a[i] : c.toScreen(hi, 0)[0];
     });
     return [a, z];
   }
@@ -311,7 +319,7 @@ export class Brackets {
     this.sb = b;
     const parent = this.list.map((q) => q.parent);
     // The rows per zoom bucket (an eighth of a doubling): a pan never moves them.
-    const key = `${this.list.length}:${Math.round(Math.log2(c.cam.sx) * 8)}`;
+    const key = `${this.list.length}:${Math.round(Math.log2(c.cam.sx) * 8)}:${this.hideKey}`;
     if (key !== this.rowKey || !this.rows || this.rows.length !== a.length) {
       this.rowKey = key;
       this.rows = bracketRows(a, b, parent);
@@ -363,7 +371,7 @@ export class Brackets {
     const line = new Set<FanNode>();
     for (let u = at; u; u = u.parent) line.add(u);
     this.list.forEach((q, i) => {
-      if (!(at ? line.has(q.v) : this.sa[i] <= cx && cx < this.sb[i]) || !(q.v.yBot > yTop)) return;
+      if (!(at ? line.has(q.v) : this.sa[i] <= cx && cx < this.sb[i]) || !(q.v.yBot > yTop) || this.hide?.(q.v)) return;
       const [wf, wn, ws] = this.widths(i, measure);
       const form: Form = wf <= room ? 'full' : wn <= room ? 'name' : 'short';
       const lw = form === 'full' ? wf : form === 'name' ? wn : ws || wn;

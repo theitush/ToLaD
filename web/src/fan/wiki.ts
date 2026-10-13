@@ -7,6 +7,7 @@
 // picture and the name pills are exactly as without them.
 
 import { wiki as WIKI } from 'virtual:panthera-data';
+import { mammalData, mammalsLoaded } from './mammals-data';
 
 export interface WikiRec {
   /** The English Wikipedia article. */
@@ -23,7 +24,8 @@ export interface WikiRec {
 
 /** A species' Wikipedia and Commons URLs, or null when Wikidata has neither. */
 export function wikiOf(sci: string): WikiRec | null {
-  return (WIKI as Record<string, WikiRec | null>)[sci] ?? null;
+  // (The carnivores' rows, then every other mammal's: ToLaD#247.)
+  return (WIKI as Record<string, WikiRec | null>)[sci] ?? (mammalsLoaded() ? mammalData().wiki[sci] : null) ?? null;
 }
 
 /** `?thumbs=0` turns the name pills' thumbnails off. */

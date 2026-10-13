@@ -1,4 +1,5 @@
-// Perf runs only (FANPERF=1 npx vitest run src/fan/drawperf.test.ts): the CPU
+// Perf runs only (FANPERF=1 npx vitest run src/fan/drawperf.test.ts; skipped in the default suite; FANPERF_CLADE=mammalia
+// takes ~9 min for every scene: add --testTimeout=900000, or FANPERF_ONLY=<regex> for a few): the CPU
 // side of the fan view's draw() in node, with stub canvases (no GPU, no
 // browser): the whole view, the GPU layer replaced by its batches. Per scene, a
 // slow pinch in and out with a little pan (as scripts/fanperf.mjs does), each
@@ -8,11 +9,12 @@ import { appendFileSync, writeFileSync } from 'node:fs';
 import { Session } from 'node:inspector/promises';
 import { describe, it } from 'vitest';
 import { MeshBatch, RectBatch } from './meshgl';
-import { CARNIVORA, FELIDAE } from './panthera';
-import { CARNIVORA_TREE, FELIDAE_TREE } from './splits';
+import { CARNIVORA, FELIDAE, mammaliaClade } from './panthera';
+import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree } from './splits';
 import { laneAt, leftAt } from './layout';
 import { ColumnPath, CutMemo, SCALE_BAR_PX } from './twigs';
 import { FanView } from './view';
+import { loadMammalsFromFiles } from './mammals-node';
 
 const RUN = !!process.env.FANPERF;
 /** Where the rows go as they come (FANPERF=<file>), and the console. */
@@ -136,11 +138,19 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
       await prof.post('Profiler.enable');
       await prof.post('Profiler.start');
     }
-    const t0 = performance.now();
+    let t0 = performance.now();
     const { canvas, calls } = stubs();
-    // FANPERF_CLADE=carnivora: the order (ToLaD#146) instead of the cats.
+    // FANPERF_CLADE=carnivora: the order (ToLaD#146) instead of the cats; =mammalia: every mammal (ToLaD#247).
+    const mamm = process.env.FANPERF_CLADE === 'mammalia';
     const carn = process.env.FANPERF_CLADE === 'carnivora';
-    const v = new FanView(canvas as unknown as HTMLCanvasElement, carn ? CARNIVORA : FELIDAE, 'curved', carn ? CARNIVORA_TREE : FELIDAE_TREE, carn);
+    // (The page fetches mammals.json, mammals-data.ts; here it is built from the files, outside the timing.)
+    if (mamm) {
+      await loadMammalsFromFiles();
+      t0 = performance.now();
+    }
+    const v = mamm
+      ? new FanView(canvas as unknown as HTMLCanvasElement, mammaliaClade(), 'curved', mammaliaTree(), true)
+      : new FanView(canvas as unknown as HTMLCanvasElement, carn ? CARNIVORA : FELIDAE, 'curved', carn ? CARNIVORA_TREE : FELIDAE_TREE, carn);
     const tNew = performance.now() - t0;
     const gl = { under: new RectBatch(), mesh: new MeshBatch(), over: new RectBatch(), begin() {}, end() {} };
     gl.begin = () => {
@@ -154,7 +164,7 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
     const tFirst = performance.now() - t1;
     out(`load: new FanView ${tNew.toFixed(0)} ms, first draw ${tFirst.toFixed(0)} ms`);
     // Per-part timings: the view's private draw steps, wrapped.
-    const parts = ['drawStrand', 'drawIndividuals', 'drawLabels', 'drawStem', 'drawStemFade', 'drawTimeAxis', 'drawTouch', 'drawGutter'];
+    const parts = ['drawStrand', 'drawMerged', 'drawIndividuals', 'drawLabels', 'drawStem', 'drawStemFade', 'drawTimeAxis', 'drawTouch', 'drawGutter', 'drawEvents', 'drawHeld', 'applyFold', 'layoutBrackets'];
     const acc: Record<string, number> = {};
     const proto = FanView.prototype as unknown as Record<string, (...a: unknown[]) => unknown>;
     for (const p of parts) {
@@ -192,6 +202,7 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
         };
       };
       wrap(fan.tess as unknown as Record<string, unknown>, 'xRange', 'xRange');
+      wrap(fan.tess as unknown as Record<string, unknown>, 'xTable', 'xTable');
       if (fan.tess.fold) for (const k of ['left', 'foldRow', 'riverRow', 'carriedForks']) wrap(fan.tess.fold as unknown as Record<string, unknown>, k, `fold.${k}`);
       wrap(ColumnPath.prototype as unknown as Record<string, unknown>, 'build', 'path.build');
       wrap(CutMemo.prototype as unknown as Record<string, unknown>, 'update', 'cutMemo.update');
@@ -242,6 +253,23 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
       ]);
     }
     // The dogs ×15 (the order only): the family's level camera, the fold opened on them.
+    // Every mammal: orders at a zoom their families stand apart at (ToLaD#247).
+    if (mamm)
+      for (const [taxon, z] of [['Rodentia', 3], ['Chiroptera', 4], ['Carnivora', 15]] as const)
+        scenes.push([
+          `${taxon} x${z}`,
+          () => {
+            v.cam = v.levelCamera(taxon, z)!;
+            v.camera.settle();
+          },
+        ]);
+    if (process.env.FANPERF_DEBUG && mamm) {
+      const f = fan.tess.fold as unknown as { ordShare: number[]; pairOrd: Int32Array; pairGap: Float64Array; folds(i: number): boolean };
+      let top = 0;
+      let nTop = 0;
+      for (let i = 0; i < f.pairOrd.length; i++) if (!f.folds(i)) (top += f.pairGap[i]), nTop++;
+      out(`orders ${f.ordShare.length}: ${f.ordShare.map((x) => x.toFixed(3)).join(' ')}; always-open pairs ${nTop}, their gaps ${(top / fan.trunkWidth).toFixed(2)} x the trunk`);
+    }
     if (carn)
       scenes.push([
         'dogs x15',
@@ -317,7 +345,7 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
       const f = (x: number) => x.toFixed(1).padStart(6);
       const top = Object.entries(acc)
         .sort((a, b) => b[1] - a[1])
-        .slice(0, 3)
+        .slice(0, 5)
         .map(([k, t]) => `${k.replace('draw', '')} ${(t / N).toFixed(1)}`)
         .join(', ');
       out(

@@ -4,7 +4,8 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
-import { loadClade, trimToFan } from './src/fan/panthera-extract';
+import { MAMMALS_FILE } from './src/fan/mammals-data';
+import { loadAll, loadClade, trimToFan } from './src/fan/panthera-extract';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const DATA = resolve(here, '..', 'data', 'mammals');
@@ -79,10 +80,34 @@ function pantheraData(): Plugin {
       for (const f of dataFiles()) this.addWatchFile(join(DATA, f));
       if (existsSync(join(DATA, 'wiki.json'))) this.addWatchFile(join(DATA, 'wiki.json'));
       // The pictures and links (ToLaD#182) for every species either level draws.
-      const wiki = id === '\0' + PANTHERA ? `\nexport const wiki = ${JSON.stringify(wikiFor((ids[CARNIVORA]() as { species: { sci: string }[] }).species.map((s) => s.sci)))};` : '';
+      const sci = (k: string) => (ids[k]() as { species: { sci: string }[] }).species.map((s) => s.sci);
+      const wiki = id === '\0' + PANTHERA ? `\nexport const wiki = ${JSON.stringify(wikiFor(sci(CARNIVORA)))};` : '';
       return `export default ${JSON.stringify(make())};${wiki}`;
     },
+    // The mammal level (ToLaD#247) is a sibling file the page fetches when the level opens (fan/mammals-data.ts),
+    // not in the page: the default (carnivores) page stays small. Served at /mammals.json in dev, emitted next to
+    // index.html in both builds.
+    configureServer(server) {
+      server.middlewares.use('/' + MAMMALS_FILE, (_req, res) => {
+        res.setHeader('Content-Type', 'application/json');
+        res.end(mammalsJson());
+      });
+    },
+    generateBundle() {
+      this.emitFile({ type: 'asset', fileName: MAMMALS_FILE, source: mammalsJson() });
+    },
   };
+}
+
+/**
+ * mammals.json (fan/mammals-data.ts MammalData): every mammal under the whole dated tree, only the species the fan
+ * draws, and the pictures of those the carnivore page leaves out.
+ */
+function mammalsJson(): string {
+  const clade = trimToFan(loadAll((rel) => readFileSync(join(DATA, rel))));
+  const carn = new Set(trimToFan(loadClade((rel) => readFileSync(join(DATA, rel)), 'Carnivora')).species.map((s) => s.sci));
+  const wiki = wikiFor(clade.species.map((s) => s.sci).filter((s) => !carn.has(s)));
+  return JSON.stringify({ clade, wiki });
 }
 
 /**

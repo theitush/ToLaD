@@ -3,11 +3,10 @@
 // zoomed far out, and a species card open.
 //   npm run build:single && node scripts/designshot.mjs <out-dir> [prefix] [only,names]
 //   (DSF: device scale factor, default 2; CLIP=x,y,w,h; DEBUG=1: the ?debug readout; EDGE=curved|straight: the fan's edges;
-//   WIDTH=linear|log: the widths, default linear; LEVEL=cats: the cats alone, a hidden flag (default: the carnivores, ToLaD#146))
+//   WIDTH=linear|log: the widths, default linear; LEVEL=cats|carnivores|mammals: ?level= (default: the carnivores, ToLaD#146, #247))
 import { mkdirSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { chromium } from 'playwright';
+import { pageUrl } from './pageurl.mjs';
 
 const OUT = process.argv[2] || 'perf-out/design';
 const PREFIX = process.argv[3] || 'd';
@@ -130,6 +129,11 @@ const scenes = [
   ['carn-seals', 'level', ['Phocidae']],
   ['carn-cats', 'level', ['Felidae']],
   ['carn-deep40', 'level', ['Carnivora', 40, 4, 3]],
+  // One more level up, every mammal (ToLaD#247, LEVEL=mammals): orders framed as home frames the whole.
+  ['mamm-rodents', 'level', ['Rodentia']],
+  ['mamm-bats', 'level', ['Chiroptera']],
+  ['mamm-whales', 'level', ['Cetacea']],
+  ['mamm-primates', 'level', ['Primates']],
   ['carn-card-dog', 'card', ['Grey wolf']],
   ['carn-search-wol', 'search', ['wol']],
   // A pick that once landed beside the screen (ToLaD#211: the fold opening as the camera zooms): now centred, card open.
@@ -209,12 +213,14 @@ const scenes = [
   ['pin-pan4', 'pan', [2, 220]],
 ];
 const browser = await chromium.launch({ headless: true });
+let served = null;
 try {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: Number(process.env.DSF || 2), isMobile: true, hasTouch: true });
   const page = await ctx.newPage();
   page.on('pageerror', (e) => console.log('pageerror', String(e)));
   const q = [process.env.DEBUG ? 'debug' : '', process.env.EDGE ? `edge=${process.env.EDGE}` : '', process.env.LEVEL ? `level=${process.env.LEVEL}` : '', process.env.Q || ''].filter(Boolean).join('&');
-  await page.goto(pathToFileURL(resolve('dist-single/index.html')).href + (q ? `?${q}` : ''));
+  served = await pageUrl(q);
+  await page.goto(served.url);
   await page.waitForFunction(() => !!window.__fan, null, { timeout: Number(process.env.LOAD_MS || 20000) });
   for (const [name, kind, args] of scenes) {
     if (ONLY && !ONLY.has(name)) continue;
@@ -482,9 +488,10 @@ try {
     const clip = process.env.CLIP ? Object.fromEntries(['x', 'y', 'width', 'height'].map((k, i) => [k, Number(process.env.CLIP.split(',')[i])])) : undefined;
     // EVAL=file.js: that file's text evaluated in the page before the shot (a probe), its value printed.
     if (process.env.EVAL) console.log(JSON.stringify(await page.evaluate(readFileSync(process.env.EVAL, 'utf8'))));
-    await page.screenshot({ path: `${OUT}/${PREFIX}-${name}.png`, clip });
+    await page.screenshot({ path: `${OUT}/${PREFIX}-${name}.png`, clip, timeout: Number(process.env.LOAD_MS || 30000) });
     console.log('shot', name);
   }
 } finally {
+  served?.close();
   await browser.close();
 }
