@@ -8,7 +8,7 @@ import { drawThumb, labelThumb, wikiOf } from './wiki';
 import { formatCount } from '../data/count';
 import { Input, type InputHandlers } from '../engine/input';
 import { clipPoly, FanCamera, type Camera } from './camera';
-import { isNode, laneAt, layoutFan, leftAt, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type EdgeStyle, type Fan, type FanBranch, type FanNode, type WidthMode } from './layout';
+import { isNode, laneAt, layoutFan, leftAt, nearestStrand, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type EdgeStyle, type Fan, type FanBranch, type FanNode, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01 } from './meshgl';
 import { Lod } from './lod';
@@ -703,6 +703,9 @@ export function labelSpots(
     const wTop = c.toWorld(0, y0)[1];
     const wBot = c.toWorld(0, Math.min(y1, yBot))[1] - 1e-9;
     if (!(wBot >= wTop)) return [];
+    // (Faded out whatever its edges (its part on screen too short, or the legend): its spots, none shown, with no edges read, ToLaD#255.)
+    const f = fit0 * clamp01((yBot - y0 - 12) / 24) * botFit(y1);
+    if (!(f > 0)) return (['in', 'right', 'left'] as const).map((place) => ({ key: `${id}:${place}`, id, place, ...ref, text, rank, x: 0, y1, box: [0, y0, 0, y1], fit: 0 }));
     const ob = boxes.get(own)!;
     for (const wy of heights(wTop, wBot, [ob.lean])) {
       const [a, b] = ob.at(wy);
@@ -712,8 +715,7 @@ export function labelSpots(
       ir = Math.min(ir, X(b));
     }
     if (!(r >= l)) return [];
-    // Fades: the column's part on screen too short to stand beside, and the legend.
-    const f = fit0 * clamp01((yBot - y0 - 12) / 24) * botFit(y1);
+    // Fades: the column's part on screen too short to stand beside, and the legend (f, above).
     const out: LabelSpot[] = [];
     // Inside it, at the top line, when it is wide enough on screen (zoomed into it): centred on its part on screen.
     {
@@ -1131,6 +1133,9 @@ export class FanView implements InputHandlers {
   private lineAt(px: number, py: number): FanBranch | null {
     const [wx, wy] = this.toWorld(px, py);
     if (wy > this.fan.trunkBottom.y) return null;
+    // (Folded: a search on the strands in order, not every species a frame, ToLaD#255.)
+    const near = nearestStrand(this.fan, wx, wy);
+    if (near !== undefined) return near;
     let best: FanBranch | null = null;
     let bd = Infinity;
     for (const b of this.fan.branches) {
@@ -1318,24 +1323,35 @@ export class FanView implements InputHandlers {
   private applyFold(): void {
     const f = this.fan.tess.fold;
     if (!f) return;
-    // (The mammal level, ~5,900 strands a row: rows further apart, GRID_PX_ORDERS, ToLaD#247.)
-    f.setGrid(Math.pow(2, Math.round(Math.log2((f.ordShare.length ? GRID_PX_ORDERS : 3) / this.cam.sy))));
+    // (The mammal level, ~5,900 strands a row: rows further apart, GRID_PX_ORDERS, ToLaD#247; twice that while the
+    // fold moves (a pinch, a pan), each frame folding every row again, ToLaD#255.)
+    const coarse = f.ordShare.length > 0 && this.foldMoving;
+    f.setGrid(Math.pow(2, Math.round(Math.log2((f.ordShare.length ? GRID_PX_ORDERS * (coarse ? 2 : 1) : 3) / this.cam.sy))));
     f.setScale(this.cam.sx, this.w);
     const key = `${f.ver}:${f.gridH}`;
     if (key === this.foldKey) {
-      // (A frame with the fold at rest after it moved: the columns' edges exact again, ColumnPath.exact.)
+      // (A frame with the fold at rest after it moved: the columns' edges exact again, ColumnPath.exact; on the finer grid next frame.)
       if (this.foldMoving) for (const m of this.models.values()) m.foldRest();
       this.foldMoving = false;
+      if (coarse) this.request();
       return;
     }
     this.foldKey = key;
-    this.foldMoving = true;
+    const moved = f.ver !== this.foldVer;
+    this.foldVer = f.ver;
     for (const m of this.models.values()) m.refold();
+    if (!moved && f.ordShare.length) {
+      // (Only the grid changed (finer, at rest): the edges exact at once.)
+      for (const m of this.models.values()) m.foldRest();
+      return;
+    }
+    this.foldMoving = true;
     // (One frame more once it rests, FOLD_REST_MS on: the edges exact.)
     clearTimeout(this.foldRestT);
     this.foldRestT = setTimeout(() => this.request(), FOLD_REST_MS);
   }
   private foldMoving = false;
+  private foldVer = -1;
   private foldRestT: ReturnType<typeof setTimeout> | undefined;
 
   model(b: FanBranch): TwigModel {

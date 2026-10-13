@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { Fold, inFamily, ROOM_BEND, SY_HOME } from './fold';
 import { familySpan } from './view';
-import { columnsAt, g, laneAt, layoutFan, leftAt, nearestColumn, TIME_H, type EdgeStyle, type Fan, type FanBranch, type WidthMode } from './layout';
+import { columnsAt, g, laneAt, layoutFan, leftAt, nearestColumn, nearestStrand, TIME_H, type EdgeStyle, type Fan, type FanBranch, type WidthMode } from './layout';
 import { CARNIVORA, FELIDAE } from './panthera';
 import { CARNIVORA_TREE, FELIDAE_TREE } from './splits';
 
@@ -578,5 +578,34 @@ describe('nearestColumn (ToLaD#255)', () => {
         }
     }
     expect(n).toBeGreaterThan(5000);
+  });
+
+  it("nearestStrand finds the strand a pass over every one does", () => {
+    const { fan, fold, home } = folded('linear', 'curved');
+    const brute = (x: number, y: number) => {
+      let best: FanBranch | null = null;
+      let bd = Infinity;
+      for (const b of fan.branches) {
+        if (y < b.tipY) continue;
+        const l = leftAt(b, y);
+        const d = Math.max(0, l - x, x - l - laneAt(b, y).w);
+        if (d < bd) [bd, best] = [d, b];
+      }
+      return best;
+    };
+    const [x0, x1] = fold.homeExtent();
+    let n = 0;
+    for (const z of [1, 5, 50]) {
+      fold.setScale(home * z, SCREEN);
+      fold.setAnchor((x0 + x1) / 2, fold.fan.time.y(1), home * z, SCREEN);
+      for (const y of heights(fan, 30))
+        for (let k = 0; k <= 50; k++) {
+          const x = x0 - 0.1 * (x1 - x0) + (1.2 * (x1 - x0) * k) / 50;
+          if (y > fan.trunkBottom.y) continue;
+          n++;
+          expect(nearestStrand(fan, x, y)?.sp.gid).toBe(brute(x, y)?.sp.gid);
+        }
+    }
+    expect(n).toBeGreaterThan(3000);
   });
 });

@@ -10,7 +10,7 @@
  * the zoom moves, never while panning), the label widths once per text.
  */
 import type { Camera } from './camera';
-import { laneAt, leftAt, type Fan, type FanNode } from './layout';
+import { laneW, leftAt, type Fan, type FanNode } from './layout';
 import { FAMILY_EN, ORDER_EN, ORDER_TAXA, type Split } from './splits';
 
 export type CladeRank = 'genus' | 'subfamily' | 'family' | 'superfamily' | 'suborder' | 'order';
@@ -218,6 +218,14 @@ export interface BracketCam {
 /**
  * The stack for a view: its layout at this frame (over the species' pills on "now"), drawing and hits.
  */
+/** Fan.branches' positions in the columns' order (FanBranch.index), kept per fan. */
+const orderCache = new WeakMap<Fan, number[]>();
+function drawnOrder(fan: Fan): number[] {
+  let o = orderCache.get(fan);
+  if (!o) orderCache.set(fan, (o = fan.branches.map((_, k) => k).sort((p, q) => fan.branches[p].index - fan.branches[q].index)));
+  return o;
+}
+
 export class Brackets {
   /** `nameFont` the English names' CSS font, `latinFont` the Latin's. */
   constructor(
@@ -267,7 +275,7 @@ export class Brackets {
     bs.forEach((b, k) => {
       const y = Math.max(b.tipY, now);
       if (folded) {
-        const cx = leftAt(b, y) + laneAt(b, y).w / 2;
+        const cx = leftAt(b, y) + laneW(b, y) / 2;
         l[k] = cx - b.width / 2;
         r[k] = cx + b.width / 2;
       } else {
@@ -276,7 +284,7 @@ export class Brackets {
       }
     });
     // Neighbours' rooms (in the columns' order) that overlap (closed up, fold.ts) meet halfway: disjoint clades never overlap.
-    const order = bs.map((_, k) => k).sort((p, q) => bs[p].index - bs[q].index);
+    const order = drawnOrder(fan);
     for (let j = 1; j < order.length; j++) {
       const p = order[j - 1];
       const q = order[j];

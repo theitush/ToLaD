@@ -733,6 +733,51 @@ export function nearestColumn(fan: Fan, x: number, y: number): number | null {
   return bd === 0 ? x : best;
 }
 
+/** Each fan's strands' places in Fan.branches (their order, which a tie goes by). */
+const branchPos = new WeakMap<Fan, Int32Array>();
+/**
+ * The strand nearest x at height y (its lanes [leftAt, + laneAt's w], 0 inside; a tie to the first in Fan.branches),
+ * none past its tip; undefined if it takes a pass over every strand (no fold). Folded: a binary search on the folded
+ * edges and the strands either side (ToLaD#255).
+ */
+export function nearestStrand(fan: Fan, x: number, y: number): FanBranch | null | undefined {
+  const S = fan.branches;
+  const f = S[0]?.tess.fold;
+  if (!f || f.strands.length !== S.length) return undefined;
+  let pos = branchPos.get(fan);
+  if (!pos) {
+    pos = new Int32Array(S.length);
+    S.forEach((b, k) => (pos![b.index] = k));
+    branchPos.set(fan, pos);
+  }
+  const B = f.strands;
+  const n = B.length;
+  let lo = -1;
+  let hi = n - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if ((f.left(mid, y) ?? -Infinity) <= x) lo = mid;
+    else hi = mid - 1;
+  }
+  let best: FanBranch | null = null;
+  let bd = Infinity;
+  const try1 = (i: number): boolean => {
+    const b = B[i];
+    if (y < b.tipY) return false;
+    const left = leftAt(b, y);
+    const d = Math.max(0, left - x, x - left - laneW(b, y));
+    if (d < bd || (d === bd && best && pos![i] < pos![best.index])) {
+      bd = d;
+      best = b;
+    }
+    return true;
+  };
+  // (Three strands either side with lanes there: their edges are in order, so the nearest is among them.)
+  for (let i = Math.max(0, lo), k = 0; i < n && k < 3; i++) if (try1(i)) k++;
+  for (let i = lo - 1, k = 0; i >= 0 && k < 3; i--) if (try1(i)) k++;
+  return best;
+}
+
 /** Per species' history: the most alive in each cell of its column (leaf), the same for every width mode. */
 const MOST_ALIVE = new WeakMap<object, { originMa: number; tipY: number; splitY: number; n: Float64Array }>();
 
