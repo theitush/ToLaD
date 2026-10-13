@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { Fold, inFamily, ROOM_BEND, SY_HOME } from './fold';
 import { familySpan } from './view';
-import { columnsAt, g, laneAt, layoutFan, leftAt, TIME_H, type EdgeStyle, type Fan, type FanBranch, type WidthMode } from './layout';
+import { columnsAt, g, laneAt, layoutFan, leftAt, nearestColumn, TIME_H, type EdgeStyle, type Fan, type FanBranch, type WidthMode } from './layout';
 import { CARNIVORA, FELIDAE } from './panthera';
 import { CARNIVORA_TREE, FELIDAE_TREE } from './splits';
 
@@ -548,4 +548,35 @@ describe('the fold', () => {
       fold.setGrid(0);
     }
   }, 120_000);
+});
+
+describe('nearestColumn (ToLaD#255)', () => {
+  it("finds columnsAt's nearest point, folded, at every zoom", () => {
+    const { fan, fold, home } = folded('linear', 'curved');
+    const brute = (x: number, y: number) => {
+      let best = NaN;
+      let bd = Infinity;
+      for (const [a, b] of columnsAt(fan, y)) {
+        const p = Math.min(b, Math.max(a, x));
+        if (Math.abs(p - x) < bd) [bd, best] = [Math.abs(p - x), p];
+      }
+      return best;
+    };
+    const [x0, x1] = fold.homeExtent();
+    let n = 0;
+    for (const z of [1, 5, 50]) {
+      fold.setScale(home * z, SCREEN);
+      fold.setAnchor((x0 + x1) / 2, fold.fan.time.y(1), home * z, SCREEN);
+      for (const y of heights(fan, 40))
+        for (let k = 0; k <= 60; k++) {
+          const x = x0 - 0.1 * (x1 - x0) + (1.2 * (x1 - x0) * k) / 60;
+          const q = nearestColumn(fan, x, y);
+          if (q === null) continue;
+          n++;
+          const p = brute(x, y);
+          expect(Math.abs(q - x)).toBeCloseTo(Math.abs(p - x), 9);
+        }
+    }
+    expect(n).toBeGreaterThan(5000);
+  });
 });

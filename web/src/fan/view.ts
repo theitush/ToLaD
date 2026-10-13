@@ -8,7 +8,7 @@ import { drawThumb, labelThumb } from './wiki';
 import { formatCount } from '../data/count';
 import { Input, type InputHandlers } from '../engine/input';
 import { clipPoly, FanCamera, type Camera } from './camera';
-import { laneAt, layoutFan, leftAt, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type EdgeStyle, type Fan, type FanBranch, type FanNode, type WidthMode } from './layout';
+import { isNode, laneAt, layoutFan, leftAt, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type EdgeStyle, type Fan, type FanBranch, type FanNode, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01 } from './meshgl';
 import { Lod } from './lod';
@@ -201,16 +201,29 @@ const FOLD_REST_MS = 120;
 const GRID_PX_ORDERS = 8;
 
 /** colBoxes' boxes per fan, kept: their edges' memo entries [left, right, version, width] reused, worked out again per fold version (ToLaD#209). */
-const colBoxCache = new WeakMap<Fan, { key: string; map: Map<FanBranch | FanNode, ColBox>; gen: number; base: Float64Array }>();
-function colBoxes(fan: Fan): Map<FanBranch | FanNode, ColBox> {
+const colBoxCache = new WeakMap<Fan, { key: string; vkey: string; map: Map<FanBranch | FanNode, ColBox>; gen: number; base: Float64Array }>();
+/**
+ * The columns' boxes (world), kept per fold version. With `view` (world heights [vy0, vy1]) and the fold on its grid,
+ * at the mammal level, each box is the column's reach over those heights only, read off the fold's rows for every strand at once
+ * (Tess.xRange, ToLaD#255): a column away from the screen falls outside it, and the edges are read only near a label.
+ */
+function colBoxes(fan: Fan, view?: [number, number]): Map<FanBranch | FanNode, ColBox> {
   // (Folded, fold.ts: the columns move with the fold; their boxes and edges are worked out again when it changes.)
   const fold = fan.tess.fold;
   const key = fold ? `${fold.ver}:${fold.gridH}` : '';
+  // (At the level with orders only, ~12,000 columns: a level's labels elsewhere as they were, ToLaD#255.)
+  const rows = !!view && !!fold && fold.gridH > 0 && fold.ordShare.length > 0;
+  const vkey = rows ? `${key}:${view![0]}:${view![1]}` : key;
   let hit = colBoxCache.get(fan);
-  if (hit && hit.key === key) return hit.map;
+  if (hit && hit.vkey === vkey) return hit.map;
+  if (hit && hit.key === key && rows) {
+    hit.vkey = vkey;
+    viewBoxes(fan, hit.map, view!);
+    return hit.map;
+  }
   if (!hit) {
     const out = new Map<FanBranch | FanNode, ColBox>();
-    const ent = { key, map: out, gen: 0, base: new Float64Array(2 * (fan.branches.length + fan.nodes.length)) };
+    const ent = { key, vkey, map: out, gen: 0, base: new Float64Array(2 * (fan.branches.length + fan.nodes.length)) };
     // Edges are pure functions of the height (at a fold version), and most heights asked for are on a grid fixed in
     // the world: memoised, each entry kept from version to version and worked out again in place (no garbage a frame).
     const memo = (f: (y: number, e: number[], fresh: boolean) => void) => {
@@ -262,8 +275,10 @@ function colBoxes(fan: Fan): Map<FanBranch | FanNode, ColBox> {
     }
   }
   hit.key = key;
+  hit.vkey = vkey;
   const out = hit.map;
-  if (fold && fold.left(0, fan.time.y(0)) !== null) {
+  if (rows) viewBoxes(fan, out, view!);
+  else if (fold && fold.left(0, fan.time.y(0)) !== null) {
     // Folded: each box from its edges over its span (the fold moves columns smoothly), a hair wider, read at
     // heights on one grid for all of them, BOX_ROWS over the fan (a power of two: on the fold's own grid), so
     // the fold works out a few hundred rows a change, not a dozen per column (it changes on every pan and pinch).
@@ -297,6 +312,23 @@ function colBoxes(fan: Fan): Map<FanBranch | FanNode, ColBox> {
     }
   }
   return out;
+}
+
+/** colBoxes' boxes over the world heights [vy0, vy1]: each strand's reach there off the fold's rows (xRange), a parent column's from its first strand's to its last's. */
+function viewBoxes(fan: Fan, out: Map<FanBranch | FanNode, ColBox>, [vy0, vy1]: [number, number]): void {
+  const t = fan.tess;
+  // (The rows over the whole view first: each column's own heights within it read off that one table.)
+  t.xRange(fan.branches[0], vy0, vy1, 2);
+  for (const q of out.values()) {
+    if (q.y1 <= vy0 || q.y0 > vy1) continue;
+    const o = q.own;
+    const a = Math.max(vy0, q.y0);
+    const b = Math.min(vy1, q.y1);
+    if (isNode(o)) {
+      q.x0 = t.xRange(o.strands[0], a, b, 2)[0];
+      q.x1 = t.xRange(o.strands[o.strands.length - 1], a, b, 2)[1];
+    } else [q.x0, q.x1] = t.xRange(o, a, b, 2);
+  }
 }
 
 /** How much a flight zooms out to pan (ToLaD#246): van Wijk–Nuij's ρ (√2 theirs; less, a long trip zooms out less). */
@@ -506,10 +538,10 @@ export function labelSpots(
   // What a label beside a branch must clear: the columns near it (their widest reach within CLEAR px).
   // A gap of CLEAR px or more counts as clear (clearFit is 1 from there).
   const CLEAR = 6;
-  const boxes = colBoxes(fan);
   // Only the columns near the screen can meet a label on it (with hundreds of species, ToLaD#146, the rest are most).
   const [vx0, vy0] = c.toWorld(-60, -60);
   const [vx1, vy1] = c.toWorld(c.w + 60, c.h + 60);
+  const boxes = colBoxes(fan, [vy0, vy1]);
   const near = (q: ColBox) => !(q.x1 < vx0 || q.x0 > vx1 || q.y1 <= vy0 || q.y0 > vy1);
   const cols = [...boxes.values()].filter(near);
   // ...and those in the strip's own few px across: the columns bucketed by their world x span.

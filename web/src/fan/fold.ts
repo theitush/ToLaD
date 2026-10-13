@@ -418,7 +418,7 @@ export class Fold {
   setAnchor(cx: number, cy: number, sx: number, screenW: number): boolean {
     const n = this.strands.length;
     if (!(n > 0) || !(sx > 0) || !(screenW > 0) || !Number.isFinite(cx) || !Number.isFinite(cy)) return false;
-    const r = this.riverRow(cy);
+    const r = this.riverAt(cy);
     this.foldRow(r);
     const s = ANCHOR_SIGMA * screenW;
     const d = new Float64Array(n);
@@ -512,6 +512,14 @@ export class Fold {
     this.lambda = keep.lambda;
     this.ver++;
     return (this.homeExt = [lo, hi]);
+  }
+
+  /** The last row setAnchor or follow unfolded (a gesture asks one height a few times: ToLaD#255). */
+  private lastRiver: Row | null = null;
+  /** riverRow(y), kept: the grid's row there if it has one (any row may be refolded: each fold sets its version). */
+  private riverAt(y: number): Row {
+    const r = this.rows.get(y) ?? (this.lastRiver?.y === y ? this.lastRiver : null);
+    return r ?? (this.lastRiver = this.riverRow(y));
   }
 
   /** The river's columns at height y, left to right (unfolded positions). */
@@ -853,7 +861,7 @@ export class Fold {
       this.wt.set(s.wt);
       this.lambda = s.lambda;
       this.ver++;
-      const r = this.riverRow(y);
+      const r = this.riverAt(y);
       this.foldRow(r);
       return r;
     };
