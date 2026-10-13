@@ -11,6 +11,7 @@ import { clipPoly, FanCamera, type Camera } from './camera';
 import { laneAt, layoutFan, leftAt, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type EdgeStyle, type Fan, type FanBranch, type FanNode, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01 } from './meshgl';
+import { Lod } from './lod';
 import { Fold, type FoldState } from './fold';
 import { COLUMN_DIM, columnSpans, EVENT_TINT, eventAt, eventSpans, type EventSpan } from './colstyle';
 import { drawTwigs, kLogAt, laneDim, LINEAGE, LIVING, TEX_HAIR_PX, TWIG_GRAY, TwigModel, type IndInfo, type TwigStats } from './twigs';
@@ -478,6 +479,7 @@ export function labelSpots(
   brk?: { named(v: FanNode): boolean },
   plus?: (id: string) => number,
   famOf?: (id: string) => FanNode | undefined,
+  lod?: Lod | null,
 ): LabelSpot[] {
   const half = LABEL_PILL / 2;
   const X = (x: number) => c.toScreen(x, 0)[0];
@@ -601,7 +603,8 @@ export function labelSpots(
   // as its lineage's label beside its parent column, so once "now" is off screen the one becomes the other.
   // (With the clades' brackets, ToLaD#193, a family is named on its bracket where that has room, else here, over the stack.)
   for (const { v, vi, text } of families(fan)) {
-    if (brk?.named(v)) continue;
+    // (The mammal level, lod.ts: a family inside a clade drawn as one branch is not named; the clade is.)
+    if (brk?.named(v) || lod?.hidden(v)) continue;
     const [wa, wb] = familySpan(v);
     const sa = X(wa);
     const sb = X(wb);
@@ -623,7 +626,7 @@ export function labelSpots(
     });
   }
   for (const b of fan.branches) {
-    if (!near(boxes.get(b)!)) continue;
+    if ((lod && lod.of[b.index] >= 0) || !near(boxes.get(b)!)) continue;
     const id = String(b.sp.gid);
     // (Standing for its family, ToLaD#212: the family's name on its tip, last frame's familyPills.)
     const fam = famOf?.(id);
@@ -661,7 +664,7 @@ export function labelSpots(
   // Curated events (ToLaD#141): the title beside its window (or in the column when zoomed into it),
   // centred on the window, while the window is on screen. After the species' names, before the lineages'.
   for (const b of fan.branches) {
-    if (!near(boxes.get(b)!)) continue;
+    if ((lod && lod.of[b.index] >= 0) || !near(boxes.get(b)!)) continue;
     // (A hairline column, ToLaD#146: its events tinted on it, their titles only once it has a few px of room.)
     if (b.width * c.cam.sx < TEX_HAIR_PX[1]) continue;
     for (const s of colEventsY(fan, b)) {
@@ -678,7 +681,7 @@ export function labelSpots(
   if (nowOn < 1) {
     for (let vi = 0; vi < fan.nodes.length; vi++) {
       const v = fan.nodes[vi];
-      if (!v.parent || !near(boxes.get(v)!)) continue;
+      if (!v.parent || lod?.hidden(v) || !near(boxes.get(v)!)) continue;
       const text = familyLabel(v.split) ?? v.name;
       const id = `n${vi}`;
       const len = measure(text) + 2 * LABEL_PAD;
@@ -976,6 +979,10 @@ export class FanView implements InputHandlers {
       this.ctx.restore();
       return w;
     };
+    // (The mammal level, lod.ts: nothing inside a clade drawn as one branch is bracketed.)
+    const lod = this.lodNow();
+    br.hide = lod ? (v) => lod.hidden(v) : null;
+    br.hideKey = lod ? String(lod.gen) : '';
     br.layout(this.camera, this.fan, nowS, LABEL_AXIS_X, fit, measure, top);
     // The groups the view is inside, pinned under the buttons as the stack scrolls off (ToLaD#233).
     br.pin(top, this.camera.toWorld(0, 0)[1], measure, br.fit < 1 ? (this.centreLine()?.node ?? null) : null);
@@ -1147,19 +1154,13 @@ export class FanView implements InputHandlers {
     if (this.fan.root.split.taxon === name) return this.homeCamera();
     const v = this.fan.nodes.find((n) => n.split.taxon === name);
     if (!v) return null;
-    const [x0, x1] = familySpan(v);
-    let cam = this.withBand(this.camera.frame(x0, x1, v.y, true));
-    // Folded (fold.ts): the clade's span at the zoom that frames it (it opens as it is framed): a few rounds.
-    const f = this.fan.tess.fold;
-    if (f) {
-      for (let k = 0; k < 4; k++) {
-        f.setScale(cam.sx, this.w);
-        const [a, b] = familySpan(v);
-        cam = this.withBand(this.camera.frame(a, b, v.y, true));
-      }
-      f.setScale(cam.sx, this.w);
-    }
-    return cam;
+    // Folded (fold.ts): the clade's span at the zoom that frames it (it opens as it is framed), the rows anchored on
+    // it (foldedFrame: else the fold stands on where the view was, and a small clade far from it, the whales from home,
+    // is framed where it stood there, ToLaD#247).
+    return foldedFrame(this.fan, this.w, () => {
+      const [a, b] = familySpan(v);
+      return this.withBand(this.camera.frame(a, b, v.y, true));
+    });
   }
 
   /** Fly to a level (levelCamera), or home if the tree has no such split. */
@@ -1711,8 +1712,13 @@ export class FanView implements InputHandlers {
     this.drawTimeAxis(false);
     const hide = this.hide;
     if (!hide.has('stem')) this.drawStem();
-    if (!hide.has('lanes')) for (const b of this.fan.branches) this.drawStrand(b);
-    if (!hide.has('ind')) for (const b of this.fan.branches) this.drawIndividuals(b);
+    // (The mammal level, lod.ts: a closed clade of hairline strands drawn as its one branch.)
+    const lod = this.lodNow();
+    if (!hide.has('lanes')) {
+      for (const b of this.fan.branches) if (!lod || lod.of[b.index] < 0) this.drawStrand(b);
+      if (lod) for (const v of lod.merged) this.drawMerged(v);
+    }
+    if (!hide.has('ind')) for (const b of this.fan.branches) if (!lod || lod.of[b.index] < 0) this.drawIndividuals(b);
     if (!hide.has('held')) this.drawHeld();
     if (!hide.has('events')) this.drawEvents();
     if (!hide.has('fade')) this.drawStemFade();
@@ -1721,7 +1727,7 @@ export class FanView implements InputHandlers {
     this.drawTouch();
     const br = this.layoutBrackets();
     // (The labels kept under the pinned groups, ToLaD#233, as they show.)
-    const spots = labelSpots(this.camera, this.fan, this.labelTop() + (br ? br.pinH() * br.pinA : 0), (t) => this.nameWidth(t), this.barRect()?.[0], br ?? undefined, (id) => this.plusPx(this.plusN.get(id) ?? 0), (id) => this.famPills.get(id));
+    const spots = labelSpots(this.camera, this.fan, this.labelTop() + (br ? br.pinH() * br.pinA : 0), (t) => this.nameWidth(t), this.barRect()?.[0], br ?? undefined, (id) => this.plusPx(this.plusN.get(id) ?? 0), (id) => this.famPills.get(id), lod);
     this.drawLabels(spots, br);
     br?.drawPins(this.ctx, FAMILY_INK, INK3, BG);
     this.drawWidthScale();
@@ -1889,7 +1895,6 @@ export class FanView implements InputHandlers {
     const hw = b.width / 2;
     const pts = this.lanePoints(b, hw);
     if (pts.length < 2) return;
-    const ctx = this.ctx;
     // The column's styled spans on screen ([top, bottom, dim]), clipped to it: none for most strands.
     const held: [number, number, number][] = [];
     for (const [t, bt, d] of colSpansY(this.fan, b)) {
@@ -1899,7 +1904,63 @@ export class FanView implements InputHandlers {
     }
     // As the strands fade in (twigs.ts), the lanes dim to a backdrop under them: the same
     // lanes, the same geometry, never a switch.
-    const tw = this.twigStats.get(b.sp.gid);
+    this.drawLanes(pts, hw, held, this.twigStats.get(b.sp.gid));
+  }
+
+  private lod: Lod | null = null;
+  /** The mammal level's merged clades at this frame's zoom (lod.ts), after applyFold; null at a level with no orders. */
+  lodNow(): Lod | null {
+    const f = this.fan.tess.fold;
+    if (!f || !f.ordShare.length) return (this.lod = null);
+    if (this.lod?.fan !== this.fan) this.lod = new Lod(this.fan);
+    this.lod.update(f, this.cam.sx);
+    return this.lod;
+  }
+
+  /** A merged clade (lod.ts): one ribbon over the grid's rows on screen, its extent the fold's, its green its strands' summed. */
+  private drawMerged(v: FanNode): void {
+    const f = this.fan.tess.fold!;
+    const H = f.gridH;
+    if (!(H > 0)) return;
+    const [, sTop] = this.toWorld(0, -20);
+    const [, sBot] = this.toWorld(0, this.h + 20);
+    const top = this.lodTop(v);
+    const y0 = Math.max(top, sTop);
+    const y1 = Math.min(this.fan.trunkBottom.y, sBot);
+    if (!(y1 > y0)) return;
+    const i0 = v.strands[0].index;
+    const i1 = v.strands[v.strands.length - 1].index;
+    const k0 = Math.ceil(y0 / H);
+    const k1 = Math.floor(y1 / H);
+    const pts: RibbonPt[] = [];
+    let lo = Infinity;
+    let hi = -Infinity;
+    const push = (k: number, y: number) => {
+      const [l, r] = f.extent(i0, i1, k);
+      const w = Math.max(0, r - l);
+      const G = this.lod!.greenAt(v, k, H);
+      const [px, py] = this.toScreen(l, y);
+      lo = Math.min(lo, px);
+      hi = Math.max(hi, px + w * this.cam.sx);
+      pts.push({ x: px, y: py, nx: -1, ny: 0, w, f: w > 0 ? Math.min(1, G / w) : 0 });
+    };
+    // (Bottom up, as lanePoints: its last point at its top, read off the row under it.)
+    if (y1 > k1 * H) push(Math.min(k1 + 1, Math.ceil(y1 / H)), y1);
+    for (let k = k1; k >= k0; k--) push(k, k * H);
+    if (y0 < k0 * H) push(k0, y0);
+    if (pts.length < 2 || hi < -12 || lo > this.w + 12) return;
+    this.drawLanes(pts, 0, [], undefined);
+  }
+  private lodTops = new WeakMap<FanNode, number>();
+  private lodTop(v: FanNode): number {
+    let t = this.lodTops.get(v);
+    if (t === undefined) this.lodTops.set(v, (t = Lod.top(v)));
+    return t;
+  }
+
+  /** A column's lanes (drawStrand's, or a merged clade's, lod.ts): its points, spine offset hw, styled spans and twig fade. */
+  private drawLanes(pts: RibbonPt[], hw: number, held: [number, number, number][], tw: TwigStats | undefined): void {
+    const ctx = this.ctx;
     // Under the mesh the lanes sink to a dark tint of themselves, so the individuals carry the colour:
     // each stretch by its own lanes' widths (twigs.ts laneDim), as the mesh draws them.
     const lives = tw?.fade ?? 0;

@@ -217,7 +217,7 @@ export const CARNIVORA_TREE: Split = treeOf(carnivora);
 let mammTree: Split | null = null;
 /** Every mammal's dated tree (ToLaD#247), built when the level is first shown. */
 export function mammaliaTree(): Split {
-  return (mammTree ??= treeOf(mammalia));
+  return (mammTree ??= nameOrders(treeOf(mammalia)));
 }
 
 /**
@@ -253,6 +253,8 @@ export const ORDER_EN: Record<string, string> = {
   Didelphimorphia: 'Opossums',
   Paucituberculata: 'Shrew opossums',
   Diprotodontia: 'Kangaroos & kin',
+  Dasyuromorphia: 'Marsupial carnivores',
+  Notoryctes: 'Marsupial moles',
   Peramelidae: 'Bandicoots',
   Afrosoricida: 'Tenrecs & golden moles',
   Macroscelidea: 'Elephant shrews',
@@ -261,8 +263,7 @@ export const ORDER_EN: Record<string, string> = {
   Cingulata: 'Armadillos',
   Pholidota: 'Pangolins',
   Proboscidea: 'Elephants',
-  Folivora: 'Sloths',
-  Vermilingua: 'Anteaters',
+  Pilosa: 'Sloths & anteaters',
   Scandentia: 'Treeshrews',
   Dermoptera: 'Colugos',
   Primates: 'Primates',
@@ -275,6 +276,43 @@ export const ORDER_EN: Record<string, string> = {
   Artiodactyla: 'Hoofed mammals & whales',
 };
 export const ORDER_TAXA: ReadonlySet<string> = new Set(Object.keys(ORDER_EN));
+
+/**
+ * The orders whose crown the dated tree leaves unnamed (ToLaD#247), each by two of its species (Upham et al. 2019's `ord`
+ * field): their last common split is the order's, and is named for it (nameOrders), so it folds and is labelled as the
+ * others. (Peramelemorphia is not one clade in the tree, its bandicoots, Peramelidae, are; Microbiotheria and
+ * Tubulidentata are one species each.)
+ */
+export const ORDER_CROWNS: Record<string, [string, string]> = {
+  Dasyuromorphia: ['Myrmecobius fasciatus', 'Antechinus mimetes'],
+};
+
+/** Name the unnamed orders' splits (ORDER_CROWNS) in tree t: the last split over both species, if it has no taxon. */
+export function nameOrders(t: Split): Split {
+  const path = (sp: string): Split[] | null => {
+    const go = (s: Split): Split[] | null => {
+      for (const k of s.kids) {
+        if (k === sp) return [s];
+        if (typeof k !== 'string') {
+          const p = go(k);
+          if (p) return [s, ...p];
+        }
+      }
+      return null;
+    };
+    return go(t);
+  };
+  for (const [name, [a, b]] of Object.entries(ORDER_CROWNS)) {
+    const pa = path(a);
+    const pb = path(b);
+    if (!pa || !pb) continue;
+    let k = 0;
+    while (k < pa.length && pa[k] === pb[k]) k++;
+    const v = pa[k - 1];
+    if (v && v !== t && !v.taxon) v.taxon = name;
+  }
+  return t;
+}
 
 /** A taxon without Open Tree's homonym note ("Pholidota (order in Opisthokonta)" -> "Pholidota"). */
 export const taxonKey = (x: string) => x.replace(/ \(.*\)$/, '');

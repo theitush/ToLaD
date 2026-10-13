@@ -795,6 +795,15 @@ export class Fold {
   rowXs(k: number): Float64Array {
     return this.rowK(k).xs;
   }
+  /**
+   * The grid's row k's extent of strands i0..i1 (world [left, right]): strand i0's left edge to strand i1's right (an
+   * own column's, or its slot's in a parent column). A clade closed (no gap inside it) is that one span (lod.ts).
+   */
+  extent(i0: number, i1: number, k: number): [number, number] {
+    const r = this.rowK(k);
+    const at = (i: number) => (r.own[i] ? r.xs[i] - (r.sw[i] * (1 - this.flare[i])) / 2 : r.xs[i]);
+    return [at(i0), at(i1) + r.sw[i1]];
+  }
   private kH = 0;
   private rowK(k: number): Row {
     // (A frame reads the rows a strand at a time, down it: the last few by k, before the map.)
