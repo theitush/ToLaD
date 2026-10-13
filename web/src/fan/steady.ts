@@ -25,7 +25,7 @@
 // It is a Fold to the view (the same interface: left, rowXs, extent, setScale, follow, homeExtent...), chosen by
 // ?layout=steady (wantSteady). At the cats' level (the view's `folds` off) every split is open, at every zoom.
 
-import { ease, isNode, lanesAt, segAt, type Fan, type FanBranch, type FanNode } from './layout';
+import { ease, isNode, laneW, segAt, type Fan, type FanBranch, type FanNode } from './layout';
 import { Fold, ROOM_BEND, type FoldState } from './fold';
 
 /** A split's fork is at most this share of its shortest daughter's run (to its own split or tip). */
@@ -66,6 +66,19 @@ export class Steady extends Fold {
   private readonly bNode: Int32Array;
   private readonly pIdx: Int32Array[];
   private readonly idx = new Map<FanNode, number>();
+  /** Flat copies for the row walk (row(): ~5,900 strands a row at the mammal level): per node its split's height, its
+   * strands' run [first, last] and its daughters (a node's index, or ~ a strand's); per strand its founders' width, its
+   * split's height and its founders' slot centre's offset in its split's column. */
+  private readonly nY: Float64Array;
+  private readonly nW: Float64Array;
+  private readonly nFirst: Int32Array;
+  private readonly nLast: Int32Array;
+  private readonly kidsF: Int32Array[];
+  private readonly bw: Float64Array;
+  private readonly sY: Float64Array;
+  private readonly tcOff: Float64Array;
+  private readonly rootJ: number;
+  private readonly stack: Int32Array;
   private lay: Lay | null = null;
   private rowsH = NaN;
   private rowsVer = -1;
@@ -102,6 +115,16 @@ export class Steady extends Fold {
       }
       return Math.max(0, Math.min(Math.max(fork, ROOM_BEND), STEADY_RUN * run));
     });
+    this.nY = Float64Array.from(N, (v) => v.y);
+    this.nW = Float64Array.from(N, (v) => v.width);
+    this.nFirst = Int32Array.from(N, (v) => v.strands[0].index);
+    this.nLast = Int32Array.from(N, (v) => v.strands[v.strands.length - 1].index);
+    this.kidsF = N.map((v) => Int32Array.from(v.kids, (k) => (isNode(k) ? this.idx.get(k)! : ~k.index)));
+    this.bw = Float64Array.from(S, (b) => b.baseW);
+    this.sY = Float64Array.from(S, (b) => b.splitY);
+    this.tcOff = Float64Array.from(S, (b) => b.path[0].off + b.baseW / 2);
+    this.rootJ = this.idx.get(fan.root)!;
+    this.stack = new Int32Array(N.length + 1);
     const last = (k: FanNode | FanBranch) => (isNode(k) ? k.strands[k.strands.length - 1].index : k.index);
     this.kidPair = N.map((v) => Int32Array.from(v.kids.slice(0, -1), last));
     if (open) {
@@ -112,58 +135,62 @@ export class Steady extends Fold {
 
   /** The rooms and places at the a's `A`. */
   private compute(A: Float64Array): Lay {
-    const N = this.fan.nodes;
-    const n = N.length;
+    const n = this.nY.length;
     const G = this.pairGap;
+    const R = this.room;
+    const NW = this.nW;
     const roomW = new Float64Array(n);
     const roomL = new Float64Array(n);
     const colL = new Float64Array(n);
     const h = new Float64Array(n);
     const C = new Float64Array(this.strands.length);
-    // Rooms, daughters first (fan.nodes has parents before daughters): the daughters' side by side, with their gaps.
+    // (Daughters: a node's index, or ~ a strand's, kidsF.) Rooms, daughters first (fan.nodes has parents before
+    // daughters): the daughters' side by side, with their gaps.
     for (let j = n - 1; j >= 0; j--) {
-      const v = N[j];
+      const K = this.kidsF[j];
       const P = this.kidPair[j];
       let r = 0;
-      v.kids.forEach((k, q) => {
-        r += isNode(k) ? roomW[this.idx.get(k)!] : this.room[k.index];
+      for (let q = 0; q < K.length; q++) {
+        const k = K[q];
+        r += k >= 0 ? roomW[k] : R[~k];
         if (q > 0) r += A[P[q - 1]] * G[P[q - 1]];
-      });
+      }
       roomW[j] = r;
     }
     // Places, parents first (the root's room from 0): each daughter's room in its parent's, left to right; a species' centre its room's.
     for (let j = 0; j < n; j++) {
-      const v = N[j];
+      const K = this.kidsF[j];
       const P = this.kidPair[j];
       let x = roomL[j];
-      v.kids.forEach((k, q) => {
+      for (let q = 0; q < K.length; q++) {
+        const k = K[q];
         if (q > 0) x += A[P[q - 1]] * G[P[q - 1]];
-        if (isNode(k)) {
-          const i = this.idx.get(k)!;
-          roomL[i] = x;
-          x += roomW[i];
+        if (k >= 0) {
+          roomL[k] = x;
+          x += roomW[k];
         } else {
-          C[k.index] = x + this.room[k.index] / 2;
-          x += this.room[k.index];
+          C[~k] = x + R[~k] / 2;
+          x += R[~k];
         }
-      });
+      }
     }
     // Each parent column, daughters first: where its daughters' founders move least (their founders-weighted mean move
     // nil), inside its room.
     for (let j = n - 1; j >= 0; j--) {
-      const v = N[j];
+      const K = this.kidsF[j];
       let sw = 0;
       let s = 0;
       let o = 0;
-      for (const k of v.kids) {
-        const w = isNode(k) ? k.width : k.baseW;
-        const t = isNode(k) ? colL[this.idx.get(k)!] + w / 2 : C[k.index];
-        s += Math.max(w, 1e-12) * (t - o - w / 2);
-        sw += Math.max(w, 1e-12);
+      for (let q = 0; q < K.length; q++) {
+        const k = K[q];
+        const w = k >= 0 ? NW[k] : this.bw[~k];
+        const t = k >= 0 ? colL[k] + w / 2 : C[~k];
+        const m = Math.max(w, 1e-12);
+        s += m * (t - o - w / 2);
+        sw += m;
         o += w;
       }
-      const l = s / sw;
-      colL[j] = Math.min(roomL[j] + roomW[j] - v.width, Math.max(roomL[j], l));
+      colL[j] = Math.min(roomL[j] + roomW[j] - NW[j], Math.max(roomL[j], s / sw));
       h[j] = this.cap[j];
     }
     // The stem's centre on home: where the closed order stands.
@@ -206,10 +233,13 @@ export class Steady extends Fold {
 
   /** Strand i's own column's centre at y, above its split (peeling off its founders' slot). */
   private ownC(L: Lay, i: number, y: number): number {
-    const b = this.strands[i];
     const j = this.bNode[i];
-    const tc = L.colL[j] + b.path[0].off + b.baseW / 2;
-    return tc + (L.C[i] - tc) * this.u(b.splitY, L.h[j], y);
+    const h = L.h[j];
+    const y0 = this.sY[i];
+    // (Past its peel, as most are: its room's centre.)
+    if (h > 0 && y <= y0 - h) return L.C[i];
+    const tc = L.colL[j] + this.tcOff[i];
+    return tc + (L.C[i] - tc) * this.u(y0, h, y);
   }
 
   override left(i: number, y: number): number {
@@ -224,21 +254,28 @@ export class Steady extends Fold {
 
   /** Every strand's left (its slot's) or own column's centre at y: one walk down the tree. */
   private row(L: Lay, y: number, out: Float64Array): Float64Array {
-    const visit = (v: FanNode, j: number) => {
-      if (y >= v.y) {
+    const st = this.stack;
+    const bw = this.bw;
+    let n = 0;
+    st[n++] = this.rootJ;
+    while (n > 0) {
+      const j = st[--n];
+      if (y >= this.nY[j]) {
+        // (Below its split: its column, its strands side by side in their founders' slots.)
         let x = this.nodeLeft(L, j, y);
-        for (const b of v.strands) {
-          out[b.index] = x;
-          x += b.baseW;
+        for (let i = this.nFirst[j], e = this.nLast[j]; i <= e; i++) {
+          out[i] = x;
+          x += bw[i];
         }
-        return;
+        continue;
       }
-      for (const k of v.kids) {
-        if (isNode(k)) visit(k, this.idx.get(k)!);
-        else out[k.index] = this.ownC(L, k.index, y);
+      const K = this.kidsF[j];
+      for (let q = 0; q < K.length; q++) {
+        const k = K[q];
+        if (k >= 0) st[n++] = k;
+        else out[~k] = this.ownC(L, ~k, y);
       }
-    };
-    visit(this.fan.root, this.idx.get(this.fan.root)!);
+    }
     return out;
   }
 
@@ -246,6 +283,7 @@ export class Steady extends Fold {
     const L = this.cur();
     if (this.rowsVer !== L.ver || this.rowsH !== this.gridH || this.sRows.size >= 4096) {
       this.sRows.clear();
+      this.cRows.clear();
       this.rowsVer = L.ver;
       this.rowsH = this.gridH;
     }
@@ -259,23 +297,58 @@ export class Steady extends Fold {
    * empty space), centred on their founders' mean centre (constant between the clade's splits).
    */
   override extent(i0: number, i1: number, k: number): [number, number] {
+    const [cW, cB] = this.widthSums(k);
+    const cX = this.centreSums(k);
+    const W = cW[i1 + 1] - cW[i0];
+    const sw = cB[i1 + 1] - cB[i0];
     const xs = this.rowXs(k);
-    const y = k * this.gridH;
-    let W = 0;
-    let s = 0;
-    let sw = 0;
-    for (let i = i0; i <= i1; i++) {
-      const b = this.strands[i];
-      const own = y < b.splitY;
-      if (own && y < b.tipY) continue;
-      const w = own ? lanesAt(b, y)[0] : b.baseW;
-      W += w;
-      s += b.baseW * (own ? xs[i] : xs[i] + b.baseW / 2);
-      sw += b.baseW;
-    }
-    const c = sw > 0 ? s / sw : (xs[i0] + xs[i1]) / 2;
+    const c = sw > 0 ? (cX[i1 + 1] - cX[i0]) / sw : (xs[i0] + xs[i1]) / 2;
     return [c - W / 2, c + W / 2];
   }
+
+  /** Grid row k's widths summed along the drawn order (its columns', and its live strands' founders'): the same at every version. */
+  private widthSums(k: number): [Float64Array, Float64Array] {
+    if (this.extH !== this.gridH || this.extW.size >= 4096) {
+      this.extW.clear();
+      this.extH = this.gridH;
+    }
+    let r = this.extW.get(k);
+    if (r) return r;
+    const y = k * this.gridH;
+    const age = this.fan.time.ageAt(y);
+    const S = this.strands;
+    const cW = new Float64Array(S.length + 1);
+    const cB = new Float64Array(S.length + 1);
+    for (let i = 0; i < S.length; i++) {
+      const b = S[i];
+      const own = y < b.splitY;
+      const dead = own && y < b.tipY;
+      cW[i + 1] = cW[i] + (dead ? 0 : own ? laneW(b, y, age) : b.baseW);
+      cB[i + 1] = cB[i] + (dead ? 0 : b.baseW);
+    }
+    this.extW.set(k, (r = [cW, cB]));
+    return r;
+  }
+  private readonly extW = new Map<number, [Float64Array, Float64Array]>();
+  private extH = NaN;
+
+  /** Grid row k's live strands' founders-weighted centres summed along the drawn order (rowXs' version). */
+  private centreSums(k: number): Float64Array {
+    const xs = this.rowXs(k);
+    let r = this.cRows.get(k);
+    if (r) return r;
+    if (this.cRows.size >= 4096) this.cRows.clear();
+    const y = k * this.gridH;
+    const [, cB] = this.widthSums(k);
+    r = new Float64Array(xs.length + 1);
+    for (let i = 0; i < xs.length; i++) {
+      const w = cB[i + 1] - cB[i];
+      r[i + 1] = r[i] + (w > 0 ? w * (y < this.sY[i] ? xs[i] : xs[i] + w / 2) : 0);
+    }
+    this.cRows.set(k, r);
+    return r;
+  }
+  private readonly cRows = new Map<number, Float64Array>();
 
   /** No anchor: the places do not depend on what is on screen. */
   override setAnchor(): boolean {

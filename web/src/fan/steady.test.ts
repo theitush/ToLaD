@@ -118,6 +118,33 @@ describe('steady: a branch moves sideways only at its own splits', () => {
     }
   });
 
+  it('a merged clade is one ribbon as wide as its live columns, on its founders-weighted centre', () => {
+    const { fan, f, home } = steady('carnivores');
+    f.setScale(home * 2, SCREEN);
+    f.setGrid(8);
+    for (const v of fan.nodes.filter((u) => u.strands.length >= 3).slice(0, 12))
+      for (const k of [-110, -60, -20, 10]) {
+        const y = k * 8;
+        const i0 = v.strands[0].index;
+        const i1 = v.strands[v.strands.length - 1].index;
+        let W = 0;
+        let s = 0;
+        let sw = 0;
+        for (let i = i0; i <= i1; i++) {
+          const b = f.strands[i];
+          const own = y < b.splitY;
+          if (own && y < b.tipY) continue;
+          W += own ? lanesAt(b, y)[0] : b.baseW;
+          s += b.baseW * centre(f, i, y);
+          sw += b.baseW;
+        }
+        if (!(sw > 0)) continue;
+        const [l, r] = f.extent(i0, i1, k);
+        expect(Math.abs(r - l - W)).toBeLessThan(1e-6 * Math.max(1, W));
+        expect(Math.abs((l + r) / 2 - s / sw)).toBeLessThan(1e-6 * Math.max(1, Math.abs(l)));
+      }
+  });
+
   it('follow keeps a point in its column as a gap opens', () => {
     const { fan, f, home } = steady('carnivores');
     f.setScale(home, SCREEN);
