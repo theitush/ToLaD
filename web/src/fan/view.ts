@@ -52,8 +52,8 @@ const LABEL_AXIS_X = 72;
 /** A frame a double-tap steps back to (ToLaD#241): what it frames (a species, a clade, home), the frame, the flight there. */
 type BackStep = { to: string; cam: Camera; go: () => void };
 /**
- * A double-tap's step back (ToLaD#241): the view is "at" a frame of the ladder when neither axis is zoomed in more
- * than this factor past it (15 %); zoomed in further on either, the step goes to that frame, else past it.
+ * A double-tap's step back (ToLaD#241): the view is "at" a frame of the ladder when it is zoomed within this factor
+ * (15 %) of it, width and time together (the area's scale); zoomed in further, the step goes to that frame, else past it.
  */
 const BACK_SLACK = 1.15;
 /** The scale bar and legend at the bottom (px): labels fade out over the 30 px above it. */
@@ -1369,9 +1369,9 @@ export class FanView implements InputHandlers {
 
   /**
    * One step back from the view (ToLaD#241), or null at home. The view is inside a frame of the ladder when it is zoomed
-   * in at least that far on both axes (within BACK_SLACK, 15 %), and at it when also zoomed in no further than that.
-   * The innermost frame it is inside: zoomed in past it, the step is to it; at it, to the next frame out that the view
-   * is zoomed in past. Past the ladder's end, home unless already there. Mid-way through a step back, from where that
+   * in at least that far, width and time together (the area's scale, within BACK_SLACK, 15 %), and at it when also
+   * zoomed in no further than that. The innermost frame it is inside: zoomed in past it, the step is to it; at it, to
+   * the next frame out that the view is zoomed in past. Past the ladder's end, home unless already there. Mid-way through a step back, from where that
    * step lands.
    */
   private backStep(): BackStep & { b: FanBranch | null } | null {
@@ -1382,10 +1382,13 @@ export class FanView implements InputHandlers {
     const restore = this.fan.tess.fold?.keep();
     const ladder = this.backLadder(b);
     restore?.();
-    // The view's level: the innermost frame it is inside (zoomed in at least as far, on both axes, within the slack; a
-    // frame zoomed in further on one, as a genus's beside the clade on screen, is not one it is in).
-    const inside = (f: Camera) => c.sx * BACK_SLACK >= f.sx && c.sy * BACK_SLACK >= f.sy;
-    const closer = (f: Camera) => c.sx > f.sx * BACK_SLACK || c.sy > f.sy * BACK_SLACK;
+    // How far the view is zoomed in past frame f: width and time together (log of the area's scale), so a view deep
+    // in a species' past (time zoomed far in, its wider ancestral column framed) counts as inside that species.
+    const z = (f: Camera) => Math.log(c.sx / f.sx) + Math.log(c.sy / f.sy);
+    const slack = Math.log(BACK_SLACK);
+    // The view's level: the innermost frame it is inside (zoomed in at least as far, within the slack).
+    const inside = (f: Camera) => z(f) >= -slack;
+    const closer = (f: Camera) => z(f) > slack;
     const i = Math.max(0, ladder.findIndex((f) => inside(f.cam)));
     // Closer than it: that frame. At it: the next one out it is closer than.
     const next = closer(ladder[i].cam) && inside(ladder[i].cam) ? ladder[i] : ladder.slice(i + 1).find((f) => closer(f.cam));
