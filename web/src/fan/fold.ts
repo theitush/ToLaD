@@ -91,12 +91,30 @@ export const LEAN_CUT = 8;
  * its line down to its split and the branches to columns off screen run out past the edge, drawn whole.
  */
 export const REACH_PX = 200;
+
+/**
+ * The deep base's variant (ToLaD#232, on main behind a button so Ita can compare): 'centre' is main's fold (forks capped
+ * at a bend, far columns' near-flat closings culled: only the centre's columns reach their splits); 'reach' is round 3
+ * (two-phase forks: every column runs out REACH_PX at LEAN_MAX, the rest closing over a bend); 'all' is main's forks
+ * with no lean cull or fade at all (every stretch drawn, however flat). ?base=centre|reach|all; FanView.setBase.
+ */
+export type Base = 'centre' | 'reach' | 'all';
+export const BASES: readonly Base[] = ['centre', 'reach', 'all'];
+let base: Base = 'centre';
+export function getBase(): Base {
+  return base;
+}
+/** Set the variant; folds made after (FanView.setBase relays out) use it. */
+export function setBase(b: Base): void {
+  base = b;
+}
 /** A stretch's share drawn (0-1), by its lean on screen (px across per px of height). */
 export function leanFade(dxPx: number, dyPx: number): number {
   return smoother(leanShare(dxPx, dyPx));
 }
 /** leanFade before its ease: 1 up to LEAN_MAX, falling straight to 0 at LEAN_CUT. */
 export function leanShare(dxPx: number, dyPx: number): number {
+  if (base === 'all') return 1;
   const s = Math.abs(dxPx) / Math.max(Math.abs(dyPx), 1e-9);
   return s <= LEAN_MAX ? 1 : s >= LEAN_CUT ? 0 : (LEAN_CUT - s) / (LEAN_CUT - LEAN_MAX);
 }
@@ -693,7 +711,9 @@ export class Fold {
     if (this.forkVer === this.ver && this.wSum.length === m + 2) return;
     if (!this.ord) this.ord = Int32Array.from(Array.from({ length: m }, (_, p) => p).sort((p, q) => this.pairNode[p].y - this.pairNode[q].y));
     const P = (this.wSum = new Float64Array(m + 2));
-    for (let i = 0; i <= m; i++) P[i + 1] = P[i] + this.wt[i];
+    const reach = base === 'reach';
+    // (Main's ('centre', 'all'): a hair each, the side carried as the weight lies in the clade.)
+    for (let i = 0; i <= m; i++) P[i + 1] = P[i] + this.wt[i] + (reach ? 0 : 1e-3);
     // (Per pair, the share of what is not open carried to its clade's left edge (its left daughter moves, the right
     // stands): as the anchor's weight lies in it, and a clade with none (a hair) stands still on the anchor's side
     // (ToLaD#232): each of its forks moves a column away from the anchor, never back, so forks that overlap up a
@@ -706,7 +726,7 @@ export class Fold {
       const out = all - (P[hi] - P[lo]);
       const near = out > 0 ? (all - P[hi]) / out : 0.5;
       const e = 1e-3 * (hi - lo);
-      this.sideL[p] = (P[hi] - P[p + 1] + e * near) / (P[hi] - P[lo] + e);
+      this.sideL[p] = reach ? (P[hi] - P[p + 1] + e * near) / (P[hi] - P[lo] + e) : (P[hi] - P[p + 1]) / (P[hi] - P[lo]);
     }
     const inc = new Float64Array(m);
     const k = (this.fan.edge === 'curved' ? EASE_MAX : 1) * (this.sx / (LEAN_FORK * SY_HOME));
@@ -723,23 +743,29 @@ export class Fold {
       // drawn whole. What lies further (a far family thousands of px away) closes above that, over a bend, off screen.)
       const sL = this.sideL[p];
       const top = v.y - this.yRef;
-      let hA = Math.min(hT, ROOM_BEND);
-      let s = 1;
-      if (hT > ROOM_BEND && k > 0) {
-        const reach = REACH_PX / this.sx;
-        const k5 = (k * LEAN_FORK) / LEAN_MAX;
-        hA = Math.min(hT, Math.max(ROOM_BEND, Math.min(T, reach) * k5));
-        if (T > reach && hA < hT) s = reach / T;
+      if (!reach) {
+        // (Main's ('centre', 'all'): one ease, capped at a bend.)
+        this.forkTopC[p] = v.y - Math.max(h0, Math.min(hT, ROOM_BEND, top));
+        this.forkS[p] = 1;
+      } else {
+        let hA = Math.min(hT, ROOM_BEND);
+        let s = 1;
+        if (hT > ROOM_BEND && k > 0) {
+          const rw = REACH_PX / this.sx;
+          const k5 = (k * LEAN_FORK) / LEAN_MAX;
+          hA = Math.min(hT, Math.max(ROOM_BEND, Math.min(T, rw) * k5));
+          if (T > rw && hA < hT) s = rw / T;
+        }
+        // (The second phase a bend tall, growing from nothing as the gap outgrows REACH_PX: continuous in the zoom.)
+        let h = s < 1 ? hA + ROOM_BEND * Math.min(1, 1 / s - 1) : hA;
+        // (Squeezed into what there is, or stretched to its own gap's fork if taller, both phases alike.)
+        const h1 = Math.max(h0, Math.min(h, top));
+        hA = h > 0 ? (hA * h1) / h : h1;
+        h = h1;
+        this.forkTopC[p] = v.y - h;
+        this.forkMidC[p] = v.y - hA;
+        this.forkS[p] = s;
       }
-      // (The second phase a bend tall, growing from nothing as the gap outgrows REACH_PX: continuous in the zoom.)
-      let h = s < 1 ? hA + ROOM_BEND * Math.min(1, 1 / s - 1) : hA;
-      // (Squeezed into what there is, or stretched to its own gap's fork if taller, both phases alike.)
-      const h1 = Math.max(h0, Math.min(h, top));
-      hA = h > 0 ? (hA * h1) / h : h1;
-      h = h1;
-      this.forkTopC[p] = v.y - h;
-      this.forkMidC[p] = v.y - hA;
-      this.forkS[p] = s;
       if (!(T > 0)) continue;
       if (this.lo[p] > 0) inc[this.lo[p] - 1] += T * sL;
       if (this.hi[p] < m + 1) inc[this.hi[p] - 1] += T * (1 - sL);

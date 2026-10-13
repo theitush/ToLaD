@@ -1,6 +1,11 @@
 // The fold (ToLaD#146): one branch from afar, opening continuously as the width zoom grows.
+//
+// (ToLaD#232: these hold for the deep base's default, 'centre', main's fold. Under 'reach' (round 3, on main behind
+// the globe menu's "deep:" for Ita to judge, its geometry not fixed yet) three fail, known: "the opening is
+// continuous in the zoom…", "zoomed into the weasels, a bend runs at most 8 px…" and "dogs x15: the columns stand
+// still…" (the panda drifts ~5 px between its splits). Only the variants' sanity test below folds under them.)
 import { describe, expect, it } from 'vitest';
-import { Fold, inFamily, LEAN_CUT, leanFade, ROOM_BEND, SY_HOME } from './fold';
+import { BASES, Fold, getBase, inFamily, LEAN_CUT, leanFade, ROOM_BEND, setBase, SY_HOME } from './fold';
 import { familySpan } from './view';
 import { columnsAt, g, laneAt, layoutFan, leftAt, TIME_H, type EdgeStyle, type Fan, type FanBranch, type WidthMode } from './layout';
 import { CARNIVORA, FELIDAE } from './panthera';
@@ -449,6 +454,30 @@ describe('the fold', () => {
       }
     }
   }, 240_000);
+
+  it('the deep base\'s variants (ToLaD#232: centre, reach, all) fold every column to a finite place at every zoom, and setBase restores the default', () => {
+    const was = getBase();
+    try {
+      for (const b of BASES) {
+        setBase(b);
+        const { fan, fold, home } = folded('log', 'curved');
+        const v = fan.nodes.find((n) => n.split.taxon === 'Canidae')!;
+        const [a, c] = familySpan(v);
+        for (const z of [1, 15, 300]) {
+          const sx = home * z;
+          fold.setScale(sx, SCREEN);
+          fold.setAnchor((a + c) / 2, fan.time.y(1), sx, SCREEN);
+          for (const y of heights(fan, 24)) for (const s of fan.root.strands) {
+            const x = fold.left(s.index, y);
+            if (x !== null) expect(Number.isFinite(x), `${b} ×${z} ${s.sp.sci}`).toBe(true);
+          }
+        }
+      }
+    } finally {
+      setBase(was);
+    }
+    expect(getBase()).toBe('centre');
+  });
 
   it('dogs x15: the columns stand still over 100-500 yr (no neighbour\'s decline or boom slants them), the wolf too; the families beside stand still while the dogs open', () => {
     for (const mode of ['log', 'linear'] as WidthMode[]) {
