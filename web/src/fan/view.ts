@@ -882,8 +882,9 @@ export function labelSpots(
     const f = fit0 * botFit(y1) * clamp01((z - a - 12) / 24);
     const spot = (key: string, place: LabelSpot['place'], x: number, loose: boolean): LabelSpot => {
       const box: [number, number, number, number] = [x - half, y0, x + half, y1];
-      const onX = x - half < c.w && x + half > 0;
-      const fit = f > 0 && onX ? f * clearFit(Math.min(x - half - LABEL_AXIS_X, loose ? CLEAR : clearance(x - half, x + half, y0, y1, own))) : 0;
+      // (Whole on screen; in a gap with LABEL_GAP px either side, clear: its full ink.)
+      const onX = x - half >= 0 && x + half <= c.w + 0.5;
+      const fit = f > 0 && onX ? f * clearFit(Math.min(x - half - LABEL_AXIS_X, loose ? CLEAR : clearance(x - half, x + half, y0, y1, own) + 2)) : 0;
       return { key: `${id}:${key}`, id, place, ...ref, text, rank, x, y1, box, fit, loose: loose || undefined };
     };
     if (names === 'mid') {
