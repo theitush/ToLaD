@@ -55,14 +55,14 @@ export const FAMILY_GAP_X = 3.5;
  * A level above the orders (ToLaD#247, the mammals): each order (a split founding a taxon of splits.ts ORDER_TAXA, not the
  * fan's root) folds as the carnivores do, one branch from afar. Inside it everything is scaled to the order: its gaps a
  * share of its own width (its columns' at "now"), its families' splits opening by its own extent on screen; the splits
- * between its families open as it grows from ORDER_OPEN_LO to ORDER_OPEN_HI of the screen (the carnivores' home has the
- * order at ~0.55, its families apart). The splits above the orders are always open, their gaps scaled to TOP_SUM of the
+ * between its families open as the whole fan grows from ORDER_OPEN_LO to ORDER_OPEN_HI of the screen (home frames it at
+ * ~0.9): from home every order is one branch (the rodents and bats, most of the width in linear widths, too). The splits above the orders are always open, their gaps scaled to TOP_SUM of the
  * fan's width in all (else ~27 orders' deep gaps would be several times the fan's width).
  */
-export const ORDER_OPEN_LO = 0.08;
+export const ORDER_OPEN_LO = 1.3;
 /** Inside an order, a split the data names no family for opens as a family's does when younger than this (Ma; most families' crowns are): many families' splits are unnamed. */
 export const ORDER_FAMILY_MA = 22;
-export const ORDER_OPEN_HI = 0.3;
+export const ORDER_OPEN_HI = 3.5;
 export const TOP_SUM = 0.9;
 
 /** A split's full gap (a share of the order's width), by its age (Ma). */
@@ -259,7 +259,7 @@ export class Fold {
     if (ords.size) this.scaleOrders([...ords.keys()]);
   }
 
-  /** The level above the orders (ToLaD#247): each order's share of the width at "now", and the gaps scaled to it (ORDER_OPEN_LO). */
+  /** The level above the orders (ToLaD#247): each order's share of the width at "now", and the gaps scaled to it (ORDER_OPEN_LO's note). */
   private scaleOrders(nodes: FanNode[]): void {
     const r = this.riverRow(this.yRef);
     const wOf = (v: FanNode) => v.strands.reduce((s, b) => s + (r.own[b.index] ? r.w[r.item[b.index]] : 0), 0);
@@ -455,7 +455,7 @@ export class Fold {
         g >= 0
           ? this.famLike(i)
             ? openness(this.pairNode[i].ageMa, order * this.ordShare[g], screenW)
-            : logRamp((order * this.ordShare[g]) / screenW, ORDER_OPEN_LO, ORDER_OPEN_HI)
+            : logRamp(order / screenW, ORDER_OPEN_LO, ORDER_OPEN_HI)
           : this.pairFam[i]
             ? openness(this.pairNode[i].ageMa, order, screenW)
             : 1;
