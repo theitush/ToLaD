@@ -34,7 +34,7 @@
 // home, sisters 2 Ma apart by ~6x, 0.5 Ma apart by ~15x: zooming in, the species stand apart one by one.
 // A gap closes with its narrower clade (an extinct one narrowing to nothing). Time zoom changes nothing.
 
-import { ease, isNode, lanesAt, segAt, type Fan, type FanBranch, type FanNode } from './layout';
+import { ease, isNode, laneW, segAt, type Fan, type FanBranch, type FanNode } from './layout';
 import { smoother } from './population';
 import { ORDER_TAXA, taxonKey } from './splits';
 
@@ -294,7 +294,7 @@ export class Fold {
    * column); an extinct one's room closes after its tip over as long again (the line's end, as its split was
    * its start).
    */
-  roomAt(b: FanBranch, y: number): number {
+  roomAt(b: FanBranch, y: number, age?: number): number {
     const p = this.roomPlan(b);
     const { B, L } = p;
     const edge = this.fan.edge;
@@ -306,12 +306,12 @@ export class Fold {
       // (Its peel: from its founders' slot up to its room; a column widening faster takes the lead, smoothly: one bend.)
       const u = (b.splitY - yy) / p.peel;
       r = b.baseW + (L[0] - b.baseW) * ease(edge, u);
-      const w = lanesAt(b, yy)[0];
+      const w = laneW(b, yy);
       const e = 0.4 * L[0] * u * (1 - u);
       r = (r + w + Math.sqrt((r - w) * (r - w) + e * e)) / 2;
     } else if (k > 0 && yy > B[k] - ROOM_BEND / 2) r = L[k - 1] + (L[k] - L[k - 1]) * ease(edge, 0.5 + (B[k] - yy) / ROOM_BEND);
     else if (k + 2 < B.length && yy < B[k + 1] + ROOM_BEND / 2) r = L[k] + (L[k + 1] - L[k]) * ease(edge, 0.5 + (B[k + 1] - yy) / ROOM_BEND);
-    if (y >= b.tipY) return Math.max(r, lanesAt(b, y)[0]);
+    if (y >= b.tipY) return Math.max(r, laneW(b, y, age));
     r *= 1 - ease(edge, (b.tipY - y) / Fold.endH(b));
     return r;
   }
@@ -336,13 +336,13 @@ export class Fold {
     if (!(span > peel + 2 * ROOM_BEND)) {
       // (Too short to step: one stretch, its widest.)
       let R = b.baseW;
-      for (let k = 0; k <= 64; k++) R = Math.max(R, lanesAt(b, b.splitY - (span * k) / 64 - 1e-9)[0]);
+      for (let k = 0; k <= 64; k++) R = Math.max(R, laneW(b, b.splitY - (span * k) / 64 - 1e-9));
       p = { B: Float64Array.of(b.splitY, top), L: Float64Array.of(R), peel, hug: [] };
     } else {
       const dy = H / 16;
       const n = Math.ceil(span / dy) + 1;
       const w = new Float64Array(n);
-      for (let i = 0; i < n; i++) w[i] = lanesAt(b, Math.max(top, b.splitY - i * dy - (i === 0 ? 1e-9 : 0)))[0];
+      for (let i = 0; i < n; i++) w[i] = laneW(b, Math.max(top, b.splitY - i * dy - (i === 0 ? 1e-9 : 0)));
       // (Each sample the widest of its neighbours', a hair over: the width between two samples stays under it.)
       const M = w.map((v, i) => Math.max(v, w[i - 1] ?? 0, w[i + 1] ?? 0) * (1 + 1e-4));
       const B = [b.splitY];
@@ -418,7 +418,7 @@ export class Fold {
   setAnchor(cx: number, cy: number, sx: number, screenW: number): boolean {
     const n = this.strands.length;
     if (!(n > 0) || !(sx > 0) || !(screenW > 0) || !Number.isFinite(cx) || !Number.isFinite(cy)) return false;
-    const r = this.riverRow(cy);
+    const r = this.riverAt(cy);
     this.foldRow(r);
     const s = ANCHOR_SIGMA * screenW;
     const d = new Float64Array(n);
@@ -514,6 +514,14 @@ export class Fold {
     return (this.homeExt = [lo, hi]);
   }
 
+  /** The last row setAnchor or follow unfolded (a gesture asks one height a few times: ToLaD#255). */
+  private lastRiver: Row | null = null;
+  /** riverRow(y), kept: the grid's row there if it has one (any row may be refolded: each fold sets its version). */
+  private riverAt(y: number): Row {
+    const r = this.rows.get(y) ?? (this.lastRiver?.y === y ? this.lastRiver : null);
+    return r ?? (this.lastRiver = this.riverRow(y));
+  }
+
   /** The river's columns at height y, left to right (unfolded positions). */
   private riverRow(y: number): Row {
     const S = this.strands;
@@ -523,11 +531,22 @@ export class Fold {
     const item = new Int32Array(n);
     const off = new Float64Array(n);
     const own = new Uint8Array(n);
+    // (The row's age, once: every own column's width is read at it.)
+    const age = this.fan.time.ageAt(y);
     let m = 0;
     let node: FanNode | null = null;
+    // (The parent column a strand is in holds its next strands too, up to its last: those follow on in it, each a
+    // founders' width on, as layoutFan lays them, with no search down their paths, ToLaD#255.)
+    let last = -1;
     for (let i = 0; i < n; i++) {
       const b = S[i];
       if (y >= b.splitY) {
+        if (node && i <= last) {
+          off[i] = off[i - 1] + S[i - 1].baseW;
+          item[i] = m - 1;
+          end[m - 1] = i + 1;
+          continue;
+        }
         const sg = segAt(b, y);
         const v = sg.node;
         off[i] = sg.off;
@@ -537,10 +556,11 @@ export class Fold {
           continue;
         }
         node = v;
+        last = v.strands[v.strands.length - 1].index;
         w[m] = v.width;
       } else {
         node = null;
-        w[m] = this.roomAt(b, y);
+        w[m] = this.roomAt(b, y, age);
         own[i] = 1;
       }
       item[i] = m;
@@ -731,7 +751,7 @@ export class Fold {
     for (let i = 0; i < S; i++) {
       let c = X[item[i]] + r.off[i] + r.sw[i] / 2;
       // (A flaring column's centre: against its room's inner edge.)
-      if (fl[i] && r.own[i]) c -= (fl[i] * (r.sw[i] - lanesAt(this.strands[i], y)[0])) / 2;
+      if (fl[i] && r.own[i]) c -= (fl[i] * (r.sw[i] - laneW(this.strands[i], y))) / 2;
       sg += c;
       const ca = !Q ? c : fl[i] && r.own[i] ? X[item[i]] + Q[item[i]] + (fl[i] < 0 ? w[item[i]] : 0) : c + Q[item[i]];
       sw += wt[i] * ca;
@@ -782,7 +802,7 @@ export class Fold {
     // that read between them, and made a centre again above its split. Its peel is a bend tall at least (many
     // rows), so its edge runs smoothly through its split: not a row of its own per height, ToLaD#209.)
     const b = this.strands[i];
-    const half = (yy: number) => (lanesAt(b, yy)[0] * (1 - this.flare[i])) / 2;
+    const half = (yy: number) => (laneW(b, yy) * (1 - this.flare[i])) / 2;
     const l0 = r0.own[i] ? a - half(k * h) : a;
     const l1 = r1.own[i] ? r1.xs[i] - half((k + 1) * h) : r1.xs[i];
     const l = l0 + (l1 - l0) * t;
@@ -853,7 +873,7 @@ export class Fold {
       this.wt.set(s.wt);
       this.lambda = s.lambda;
       this.ver++;
-      const r = this.riverRow(y);
+      const r = this.riverAt(y);
       this.foldRow(r);
       return r;
     };
