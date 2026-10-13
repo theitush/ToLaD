@@ -12,9 +12,9 @@
 //     column (its founders, below its split) stands at one place in it, where its daughters' peels are least
 //     (their founders' mean move nil), so it runs straight from its own peel up to its split.
 //   - At a split the daughters peel off from their founders' slots to their own places on the S-curve (ease), all
-//     with one u (they never cross), over a fork as tall as the move on screen at FORK_SLOPE px per px, at least
-//     FORK_MIN, at most a bend (ROOM_BEND) or STEADY_RUN of the shortest daughter's run, so it ends well before the
-//     next split.
+//     with one u (they never cross), over the river's fork (FanNode leanY), at least a bend (ROOM_BEND), at most
+//     STEADY_RUN of the shortest daughter's run, so it ends well before the next split: the same height at every
+//     zoom (a peel a few px tall reads as a ledge at home).
 //
 // So at a given zoom every strand's centre is constant between its own splits (steady.test.ts asserts it to under
 // half a pixel at all three levels). The cost is honest empty space: a species below its peak (a decline, the dog
@@ -26,7 +26,7 @@
 // ?layout=steady (wantSteady). At the cats' level (the view's `folds` off) every split is open, at every zoom.
 
 import { ease, isNode, lanesAt, segAt, type Fan, type FanBranch, type FanNode } from './layout';
-import { Fold, FORK_MIN, FORK_SLOPE, ROOM_BEND, SY_HOME, type FoldState } from './fold';
+import { Fold, ROOM_BEND, type FoldState } from './fold';
 
 /** A split's fork is at most this share of its shortest daughter's run (to its own split or tip). */
 export const STEADY_RUN = 0.85;
@@ -45,7 +45,6 @@ export function wantSteady(): boolean {
 /** The rooms and places at one set of a's and width zoom (world x, the stem's centre on Fold.home). */
 interface Lay {
   ver: number;
-  sx: number;
   /** Per node (fan.nodes' order): its column's left edge (once peeled), its room's left edge and width, its split's fork height. */
   colL: Float64Array;
   roomL: Float64Array;
@@ -111,8 +110,8 @@ export class Steady extends Fold {
     }
   }
 
-  /** The rooms and places at the a's `A` and width zoom sx (NaN: every fork its cap). */
-  private compute(A: Float64Array, sx: number): Lay {
+  /** The rooms and places at the a's `A`. */
+  private compute(A: Float64Array): Lay {
     const N = this.fan.nodes;
     const n = N.length;
     const G = this.pairGap;
@@ -150,7 +149,7 @@ export class Steady extends Fold {
       });
     }
     // Each parent column, daughters first: where its daughters' founders move least (their founders-weighted mean move
-    // nil), inside its room; and its split's fork, as tall as the furthest move on screen (FORK_SLOPE), within its cap.
+    // nil), inside its room.
     for (let j = n - 1; j >= 0; j--) {
       const v = N[j];
       let sw = 0;
@@ -165,15 +164,7 @@ export class Steady extends Fold {
       }
       const l = s / sw;
       colL[j] = Math.min(roomL[j] + roomW[j] - v.width, Math.max(roomL[j], l));
-      let d = 0;
-      o = 0;
-      for (const k of v.kids) {
-        const w = isNode(k) ? k.width : k.baseW;
-        const t = isNode(k) ? colL[this.idx.get(k)!] + w / 2 : C[k.index];
-        d = Math.max(d, Math.abs(t - (colL[j] + o + w / 2)));
-        o += w;
-      }
-      h[j] = sx > 0 ? Math.min(this.cap[j], Math.max(FORK_MIN, (d * sx) / (FORK_SLOPE * SY_HOME))) : this.cap[j];
+      h[j] = this.cap[j];
     }
     // The stem's centre on home: where the closed order stands.
     const r = this.idx.get(this.fan.root)!;
@@ -183,17 +174,17 @@ export class Steady extends Fold {
       roomL[j] += sh;
     }
     for (let i = 0; i < C.length; i++) C[i] += sh;
-    return { ver: this.ver, sx, colL, roomL, roomW, h, C };
+    return { ver: this.ver, colL, roomL, roomW, h, C };
   }
 
   /** The current layout (at the fold's version and zoom). */
   private cur(): Lay {
     const L = this.lay;
-    if (L && L.ver === this.ver && (L.sx === this.sx || (Number.isNaN(L.sx) && Number.isNaN(this.sx)))) return L;
-    return (this.lay = this.compute(this.a, this.sx));
+    if (L && L.ver === this.ver) return L;
+    return (this.lay = this.compute(this.a));
   }
 
-  /** Split v's fork (world): how far above it its daughters' peels end, at this zoom. */
+  /** Split v's fork (world): how far above it its daughters' peels end. */
   forkH(v: FanNode): number {
     return this.cur().h[this.idx.get(v)!];
   }
@@ -293,21 +284,10 @@ export class Steady extends Fold {
 
   override setScale(sx: number, screenW: number): boolean {
     if (sx === this.sx && screenW === this.screenW) return false;
-    let changed: boolean;
-    if (this.open) {
-      this.sx = sx;
-      this.screenW = screenW;
-      changed = false;
-    } else changed = super.setScale(sx, screenW);
-    // (The forks' heights follow the zoom: a new version if they moved and the a's did not.)
-    const prev = this.lay;
-    const L = this.cur();
-    if (!changed && prev && prev.h.some((v, j) => v !== L.h[j])) {
-      this.ver++;
-      L.ver = this.ver;
-      changed = true;
-    }
-    return changed;
+    if (!this.open) return super.setScale(sx, screenW);
+    this.sx = sx;
+    this.screenW = screenW;
+    return false;
   }
 
   override setAll(a: number, all = false): void {
@@ -319,7 +299,7 @@ export class Steady extends Fold {
   override homeExtent(): [number, number] {
     if (this.homeExtS) return this.homeExtS;
     const A = Float64Array.from(this.a, (_, i) => (this.open || !this.folds(i) ? 1 : 0));
-    const L = this.compute(A, NaN);
+    const L = this.compute(A);
     const r = this.idx.get(this.fan.root)!;
     return (this.homeExtS = [L.roomL[r], L.roomL[r] + L.roomW[r]]);
   }
@@ -349,7 +329,7 @@ export class Steady extends Fold {
 
   /** Where world point (x, y) goes when the a's change from `prev`'s: the same place in the same column, or the same share of the same gap. */
   override follow(x: number, y: number, prev: FoldState): number {
-    const [X0, W] = this.items(this.compute(prev.a, this.sx), y);
+    const [X0, W] = this.items(this.compute(prev.a), y);
     const [X1] = this.items(this.cur(), y);
     const n = X0.length;
     if (n === 0) return x;
