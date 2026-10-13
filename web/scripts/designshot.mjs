@@ -160,6 +160,12 @@ const scenes = [
   ['weasels', 'group', ['^Mustela ', 0.85, 6, 1.6]],
   ['ferretbadgers', 'group', ['^Melogale ', 0.85, 3, 2.5]],
   ['weasel-3m', 'group', ['^Mustela (nivalis|altaica)$', 0.5, 3.1, 12]],
+  // A cats genus zoomed in (ToLaD#232): the ocelot's kin, every column on screen joined down to its parent.
+  ['leopardus', 'group', ['^Leopardus ', 0.85, 3, 2.5]],
+  // (The same frames at the width zooms the fold of #210 framed them at: the deep base's connections, ToLaD#232.)
+  ['leopardus-z', 'group', ['^Leopardus ', 0.85, 3, 2.5, 263]],
+  ['ferretbadgers-z', 'group', ['^Melogale ', 0.85, 3, 2.5, 308]],
+  ['weasels-z', 'group', ['^Mustela ', 0.85, 6, 1.6, 33.4]],
   // A pill's "+x" (ToLaD#197) tapped from home, the biggest: the species it stands for framed, their pills showing.
   ['plus-tap', 'tapplus'],
   // A species' name pill tapped from home (ToLaD#230): its branch framed; again: the clade it sits in; again: the one above.
@@ -306,7 +312,8 @@ try {
             f.camera.settle();
           }
         } else if (kind === 'group') {
-          const [re, fill, ma, tz] = args;
+          // (zx: the width zoom fixed at zx × home's, the group centred: ToLaD#232's before/after at one camera.)
+          const [re, fill, ma, tz, zx] = args;
           const r = new RegExp(re);
           const g = fan.branches.filter((b) => r.test(b.sp.sci));
           const h = f.homeCamera();
@@ -325,7 +332,7 @@ try {
             let [lo, hi] = span();
             if (fd && fd.setAnchor((lo + hi) / 2, y, sx, f.w)) [lo, hi] = span();
             cx = (lo + hi) / 2;
-            sx = (fill * f.w) / Math.max(hi - lo, 1e-9);
+            sx = zx ? h.sx * zx : (fill * f.w) / Math.max(hi - lo, 1e-9);
           }
           fd?.setScale(sx, f.w);
           if (fd && fd.setAnchor(cx, y, sx, f.w)) { const [lo, hi] = span(); cx = (lo + hi) / 2; }

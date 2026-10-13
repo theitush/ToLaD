@@ -955,6 +955,16 @@
   min-height: 34px;
   white-space: nowrap;
 }
+.fan .world-menu .base-pick {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid rgba(200, 230, 210, 0.14);
+  padding-top: 2px;
+}
+.fan .world-menu .base-pick label {
+  gap: 4px;
+}
 .fan .world-menu input {
   width: 18px;
   height: 18px;

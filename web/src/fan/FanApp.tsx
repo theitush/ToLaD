@@ -12,6 +12,7 @@ import { CARNIVORA, FELIDAE, NATURAL_META, type HistEvent, type SpeciesRec } fro
 import { CARNIVORA_TREE } from './splits';
 import { population } from './population';
 import { WorldToggle } from './WorldToggle';
+import { BASES, setBase, type Base } from './fold';
 import { MagnifierIcon, SearchPanel } from './SearchPanel';
 import { statusOf } from './status';
 import { FanView, fmtInt, formatYearsAgo, type IndInfo, type Lineage, type Selection } from './view';
@@ -43,6 +44,17 @@ function initialEdge(): EdgeStyle {
   return 'curved';
 }
 
+/** The deep base's variant at start (ToLaD#232): ?base=centre|reach|all, else main's 'centre'. */
+function initialBase(): Base {
+  try {
+    const q = new URLSearchParams(window.location.search).get('base');
+    if (BASES.includes(q as Base)) return q as Base;
+  } catch {
+    /* no URL */
+  }
+  return 'centre';
+}
+
 /**
  * The view (ToLaD#146): the whole order, each family one branch from afar, opening as you zoom (fold.ts).
  * ?level=cats: the cats alone, as they were (hidden: for the tests and shots).
@@ -68,6 +80,7 @@ export function FanApp() {
   const barRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    setBase(initialBase());
     const carn = level === 'carnivores';
     const v = carn ? new FanView(canvasRef.current!, CARNIVORA, edge, CARNIVORA_TREE, true) : new FanView(canvasRef.current!, FELIDAE, edge);
     if (mode !== 'linear') v.setMode(mode);

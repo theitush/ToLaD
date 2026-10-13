@@ -11,7 +11,7 @@ import { clipPoly, FanCamera, type Camera } from './camera';
 import { laneAt, layoutFan, leftAt, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type EdgeStyle, type Fan, type FanBranch, type FanNode, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01 } from './meshgl';
-import { Fold, leanEnds, leanPieces, leanShare } from './fold';
+import { Fold, getBase, leanEnds, leanPieces, leanShare, setBase, type Base } from './fold';
 import { COLUMN_DIM, columnSpans, EVENT_TINT, eventAt, eventSpans, type EventSpan } from './colstyle';
 import { drawTwigs, kLogAt, laneDim, LINEAGE, LIVING, TEX_HAIR_PX, TWIG_GRAY, TwigModel, type IndInfo, type TwigStats } from './twigs';
 import type { MeshBatch, RectBatch } from './meshgl';
@@ -1077,6 +1077,16 @@ export class FanView implements InputHandlers {
   setEdge(edge: EdgeStyle): void {
     if (edge === this.edge) return;
     this.edge = edge;
+    this.relayout();
+  }
+
+  /** The deep base's variant (ToLaD#232, fold.ts Base): the fold made again under it, the camera staying put. */
+  get base(): Base {
+    return getBase();
+  }
+  setBase(b: Base): void {
+    if (b === getBase()) return;
+    setBase(b);
     this.relayout();
   }
 
