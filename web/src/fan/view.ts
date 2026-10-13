@@ -16,7 +16,7 @@ import { COLUMN_DIM, columnSpans, EVENT_TINT, eventAt, eventSpans, type EventSpa
 import { drawTwigs, kLogAt, laneDim, LINEAGE, LIVING, TEX_HAIR_PX, TWIG_GRAY, TwigModel, type IndInfo, type TwigStats } from './twigs';
 import type { MeshBatch, RectBatch } from './meshgl';
 import { familyLabel, FELIDAE_TREE, type Split } from './splits';
-import { bandDepth, Brackets, cladeCamera, foldedFrame, ROW_H } from './brackets';
+import { bandDepth, Brackets, cladeCamera, foldedFrame, latinOf, rankOf, ROW_H } from './brackets';
 import { axisInset, drawWorldOver, drawWorldUnder, worldFlags, type Box } from './world';
 
 export type { IndInfo } from './twigs';
@@ -789,8 +789,19 @@ export class FanView implements InputHandlers {
   private lean = { lin: new Float64Array(256), h: new Float64Array(256), V: new Float64Array(257), pc: [] as number[] };
   /** The event labels shown last frame (screen boxes): a tap on one opens its event. */
   private eventLabels: { box: [number, number, number, number]; b: FanBranch; k: number }[] = [];
-  /** The species' pictures as last drawn (ToLaD#193): [x, y, radius, its column], a tap on one opens its card. */
-  thumbHits: [number, number, number, FanBranch][] = [];
+  /**
+   * The species' pictures as last drawn (ToLaD#193): [x, y, radius, its column, the family a family pill's picture
+   * stands for]. A tap on one flies to its species' branch (ToLaD#230; a family pill's, to the family).
+   */
+  thumbHits: [number, number, number, FanBranch, FanNode?][] = [];
+  /** The species' name pills drawn (ToLaD#230): a tap flies to the species' branch, as a bracket's to its clade. */
+  nameHits: { box: [number, number, number, number]; b: FanBranch }[] = [];
+  /**
+   * Where the last tap on a pill, a picture or a bracket flew (ToLaD#230): the species tapped (`b`, null for a clade's),
+   * the clade framed (`v`, null for the species' own frame) and the camera it landed at. Tapped again there, with
+   * nothing moved since, it goes one level out.
+   */
+  private tapAt: { b: FanBranch | null; v: FanNode | null; cam: Camera } | null = null;
   /** The "+x" badges as last drawn (ToLaD#197): the count on each species' pill (by id), and where a tap on one lands. */
   private plusN = new Map<string, number>();
   /** The species pills standing for their family (ToLaD#212), from the frame before (familyPills). */
@@ -932,17 +943,68 @@ export class FanView implements InputHandlers {
    * the fold as cladeCamera leaves it, while each step of a flight moves the camera with the fold (fold.ts follow):
    * on landing it takes the frame exactly (the fold at the frame's zoom and anchor, so settling moves nothing).
    */
-  flyToClade(v: FanNode, ms = 750): void {
+  flyToClade(v: FanNode, ms = 750, landed?: () => void): void {
     this.selected = null;
     this.selInd = null;
     this.touch = null;
     this.onSelect(null);
     this.flyTo(this.cladeCamera(v), ms, () => {
-      if (!this.fan.tess.fold) return;
-      this.cam = this.cladeCamera(v);
-      this.camera.settle();
-      this.request();
+      if (this.fan.tess.fold) {
+        this.cam = this.cladeCamera(v);
+        this.camera.settle();
+        this.request();
+      }
+      landed?.();
     });
+  }
+
+  /** The ranked clade a species sits in (ToLaD#230): the nearest with a rank (genus, subfamily, family…), else the root. */
+  cladeOf(b: FanBranch): FanNode {
+    let v = b.node;
+    while (v.parent && !rankOf(latinOf(v.split))) v = v.parent;
+    return v;
+  }
+
+  /** One level out from clade v (ToLaD#230): the nearest ranked clade it sits in, the root last; null from the root. */
+  outOf(v: FanNode): FanNode | null {
+    for (let p = v.parent; p; p = p.parent) if (!p.parent || rankOf(latinOf(p.split))) return p;
+    return null;
+  }
+
+  /** Whether the last pill/picture/bracket flight landed where the camera still is (ToLaD#230): nothing moved since. */
+  private landedHere(): boolean {
+    const t = this.tapAt;
+    if (!t || this.anim) return false;
+    const c = this.cam;
+    const d = t.cam;
+    return (
+      Math.abs(Math.log(c.sx / d.sx)) < 1e-3 &&
+      Math.abs(Math.log(c.sy / d.sy)) < 1e-3 &&
+      Math.abs(c.cx - d.cx) * c.sx < 0.5 &&
+      Math.abs(c.cy - d.cy) * c.sy < 0.5
+    );
+  }
+
+  /** Fly to clade v from a tap (ToLaD#230), remembering where it lands (`b` the species tapped, if any). */
+  private flyLevel(b: FanBranch | null, v: FanNode): void {
+    this.flyToClade(v, 750, () => (this.tapAt = { b, v, cam: { ...this.cam } }));
+  }
+
+  /**
+   * A tap on a species' name pill or picture (ToLaD#230): fly to its branch (speciesCamera, no card). Tapped again
+   * once there, one level out: the clade it sits in, then each clade above it (tapClade).
+   */
+  tapSpecies(b: FanBranch): void {
+    const t = this.landedHere() ? this.tapAt : null;
+    if (t && t.b === b) this.flyLevel(b, t.v ? (this.outOf(t.v) ?? t.v) : this.cladeOf(b));
+    else this.flyToSpecies(b.sp, 700, false);
+  }
+
+  /** A tap on a clade's bracket or family pill (ToLaD#193, #212): fly to it; already framed on it, to the clade above (ToLaD#230). */
+  tapClade(v: FanNode): void {
+    const t = this.landedHere() ? this.tapAt : null;
+    if (t && t.v === v) this.flyLevel(t.b, this.outOf(v) ?? v);
+    else this.flyLevel(null, v);
   }
 
   /**
@@ -1156,8 +1218,11 @@ export class FanView implements InputHandlers {
     return foldedFrame(this.fan, this.w, () => ({ cx: cx(), cy: cyAt(s), sx, sy: s, ty: s }));
   }
 
-  /** A search pick: fly to the species' column, then open its card at its tip, as a tap there would. */
-  flyToSpecies(sp: SpeciesRec, ms = 700): void {
+  /**
+   * A search pick: fly to the species' column, then open its card at its tip, as a tap there would. Without `card`
+   * (a tap on its pill or picture, ToLaD#230): no card, the landing remembered for a tap again (tapSpecies).
+   */
+  flyToSpecies(sp: SpeciesRec, ms = 700, card = true): void {
     const b = this.fan.branches.find((x) => x.sp === sp);
     if (!b) return;
     // The card open now closes for the flight (the column stays in view under it).
@@ -1170,6 +1235,11 @@ export class FanView implements InputHandlers {
       if (this.fan.tess.fold) {
         this.cam = this.speciesCamera(b);
         this.camera.settle();
+      }
+      if (!card) {
+        this.tapAt = { b, v: null, cam: { ...this.cam } };
+        this.request();
+        return;
       }
       const wy = b.tipY;
       this.selected = sp;
@@ -1211,10 +1281,12 @@ export class FanView implements InputHandlers {
   }
   gestureEnd(): void {}
   pan(dx: number, dy: number): void {
+    if (dx || dy) this.tapAt = null;
     this.camera.pan(dx, dy);
     this.request();
   }
   zoom(px: number, py: number, fx: number, ft: number): void {
+    if (fx !== 1 || ft !== 1) this.tapAt = null;
     this.zoomAbout(px, py, fx, ft);
     this.request();
   }
@@ -1329,28 +1401,35 @@ export class FanView implements InputHandlers {
       this.flyToGroup(plus.bs);
       return;
     }
-    // A species' picture (ToLaD#193): its card, as a tap on its column at its tip.
+    // A species' name pill (ToLaD#230): fly to its branch; tapped again there, one level out (tapSpecies). A family's
+    // pill (ToLaD#212): fly to the family, as its bracket (tapClade). The nearest within a finger's slack (the pills
+    // stand side by side): the one under the finger before a neighbour's slack.
+    let pill: { b?: FanBranch; v?: FanNode } | null = null;
+    let pd = Infinity;
+    for (const h of [...this.nameHits, ...this.famHits]) {
+      const dx = Math.max(h.box[0] - x, x - h.box[2], 0);
+      const dy = Math.max(h.box[1] - y, y - h.box[3], 0);
+      if (dx <= 6 && dy <= 6 && dx + dy < pd) [pill, pd] = [h, dx + dy];
+    }
+    if (pill?.v) {
+      this.tapClade(pill.v);
+      return;
+    }
+    if (pill?.b) {
+      this.tapSpecies(pill.b);
+      return;
+    }
+    // A species' picture (ToLaD#193): as its pill (ToLaD#230); a family pill's picture, as the family's pill.
     const pic = this.thumbHits.find(([px, py, r]) => (x - px) ** 2 + (y - py) ** 2 <= (r + 3) ** 2);
     if (pic) {
-      const b = pic[3];
-      this.selected = b.sp;
-      this.selInd = null;
-      const ageMa = b.sp.t1;
-      this.touch = { x: leftAt(b, b.tipY) + laneAt(b, b.tipY).w / 2, ageMa };
-      this.onSelect({ sp: b.sp, ageMa, startMa: b.t0 });
-      this.request();
+      if (pic[4]) this.tapClade(pic[4]);
+      else this.tapSpecies(pic[3]);
       return;
     }
-    // A family's pill (ToLaD#212): fly to the family, as its bracket.
-    const fp = this.famHits.find(({ box }) => x >= box[0] - 4 && x <= box[2] + 4 && y >= box[1] - 4 && y <= box[3] + 4);
-    if (fp) {
-      this.flyToClade(fp.v);
-      return;
-    }
-    // A clade's bracket (ToLaD#193): fly to the clade.
+    // A clade's bracket (ToLaD#193): fly to the clade; tapped again there, one level out (ToLaD#230).
     const clade = this.brackets?.hit(x, y);
     if (clade) {
-      this.flyToClade(clade.v);
+      this.tapClade(clade.v);
       return;
     }
     // An event's label: opens its event, the touch at the middle of its window on the column.
@@ -2050,6 +2129,7 @@ export class FanView implements InputHandlers {
     if (famPills.size !== this.famPills.size || [...famPills].some(([id, v]) => this.famPills.get(id) !== v)) this.request();
     this.famPills = famPills;
     this.famHits.length = 0;
+    this.nameHits.length = 0;
     const plusN = new Map<string, number>();
     for (const s of spots) {
       const n = groups.get(s.key)?.length ?? 0;
@@ -2102,7 +2182,7 @@ export class FanView implements InputHandlers {
         ctx.lineWidth = 1;
         ctx.stroke();
         if (alpha > 0.5) this.famHits.push({ box: [x0, y0, x1, y1], v: s.fam });
-      }
+      } else if (s.b && s.ev === undefined && !s.v && alpha > 0.5) this.nameHits.push({ box: [x0, y0, x1, y1], b: s.b });
       if (s.span) {
         // ...and a bracket over the species it names, just above "now".
         const a = Math.max(-2, s.span[0]);
@@ -2146,7 +2226,7 @@ export class FanView implements InputHandlers {
       const ty = y1 + THUMB_D / 2 + 2;
       if (th && alpha > 0.5 && !thumbs.some(([x, y]) => Math.abs(x - s.x) < THUMB_D - 4 && Math.abs(y - ty) < THUMB_D - 4)) {
         thumbs.push([s.x, ty]);
-        if (pb) this.thumbHits.push([s.x, ty, THUMB_D / 2, pb]);
+        if (pb) this.thumbHits.push([s.x, ty, THUMB_D / 2, pb, s.fam]);
         drawThumb(ctx, th, s.x, ty, THUMB_D);
       } else if (th && alpha <= 0.5) drawThumb(ctx, th, s.x, ty, THUMB_D);
     }
