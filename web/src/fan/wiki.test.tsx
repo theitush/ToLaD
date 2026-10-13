@@ -45,13 +45,12 @@ describe('range map (ToLaD#196)', () => {
   };
   afterEach(() => vi.restoreAllMocks());
 
-  it('the sidecar carries it for the lion, and the card shows it under the name', () => {
+  it("the sidecar carries it for the lion; under the name the card holds the globe's place (ToLaD#267)", () => {
     expect(wikiOf('Panthera leo')?.range).toMatch(/^https:\/\/upload\.wikimedia\.org\/wikipedia\/commons\/thumb\/.+\/500px-/);
     expect(wikiOf('Panthera leo')?.rangeFile).toMatch(/^https:\/\/commons\.wikimedia\.org\/wiki\/File:/);
+    // globe.json is not loaded here: the globe's disc, then the globe (or this map as its fallback: globe.test.tsx).
     const html = renderToStaticMarkup(<SpeciesCard sp={lion} onClose={() => {}} />);
-    const at = html.indexOf('class="range loading"');
-    expect(at).toBeGreaterThan(html.indexOf('class="t"'));
-    expect(html).toContain(`src="${wikiOf('Panthera leo')!.range!.replace(/&/g, '&amp;')}"`);
+    expect(html.indexOf('class="globe loading"')).toBeGreaterThan(html.indexOf('class="t"'));
   });
 
   it('renders when set: lazy, no referrer, no alt text, credit once loaded', () => {

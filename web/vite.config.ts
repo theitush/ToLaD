@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { MAMMALS_FILE } from './src/fan/mammals-data';
+import { GLOBE_FILE } from './src/fan/globe-data';
 import { loadAll, loadClade, trimToFan } from './src/fan/panthera-extract';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -92,9 +93,15 @@ function pantheraData(): Plugin {
         res.setHeader('Content-Type', 'application/json');
         res.end(mammalsJson());
       });
+      // The card's globe (ToLaD#267): every species' range cells and the land, fetched when a card first shows a map.
+      server.middlewares.use('/' + GLOBE_FILE, (_req, res) => {
+        res.setHeader('Content-Type', 'application/json');
+        res.end(globeJson());
+      });
     },
     generateBundle() {
       this.emitFile({ type: 'asset', fileName: MAMMALS_FILE, source: mammalsJson() });
+      this.emitFile({ type: 'asset', fileName: GLOBE_FILE, source: globeJson() });
     },
   };
 }
@@ -108,6 +115,19 @@ function mammalsJson(): string {
   const carn = new Set(trimToFan(loadClade((rel) => readFileSync(join(DATA, rel)), 'Carnivora')).species.map((s) => s.sci));
   const wiki = wikiFor(clade.species.map((s) => s.sci).filter((s) => !carn.has(s)));
   return JSON.stringify({ clade, wiki });
+}
+
+/**
+ * globe.json (fan/globe-data.ts GlobeData): data/mammals/ranges.json (pipeline `make globe`: PHYLACINE 1.2.1's range
+ * cells per species) and the land (src/fan/globe-land.json: Natural Earth 1:110m, public domain, via world-atlas@2.0.2
+ * land-110m.json, rings rounded to 0.1 degree; 55 kB, 19 kB gzipped). Without ranges.json, no ranges (every card
+ * falls back to the Wikimedia map).
+ */
+function globeJson(): string {
+  const p = join(DATA, 'ranges.json');
+  const r = existsSync(p) ? (JSON.parse(readFileSync(p, 'utf8')) as { grid: unknown; ranges: unknown }) : { grid: null, ranges: {} };
+  const land = JSON.parse(readFileSync(resolve(here, 'src', 'fan', 'globe-land.json'), 'utf8')) as unknown;
+  return JSON.stringify({ grid: r.grid, land, ranges: r.ranges });
 }
 
 /**
