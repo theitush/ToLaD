@@ -68,8 +68,16 @@ function home(v: FanView): void {
 const nameOf = (lv: Level) => (lv.b ? lv.b.sp.common : levelName(lv.v));
 /** A point on b's column, above its split. */
 function onColumn(v: FanView, b: FanBranch): [number, number] {
-  const y = b.tipY + 0.4 * (b.splitY - b.tipY);
-  return v.toScreen(leftAt(b, y) + laneAt(b, y).w / 2, y);
+  // (Off the names and pictures, ToLaD#262: a name may stand over a neighbour's column; a tap there is the name's.)
+  const iv = v as unknown as { pillAt(x: number, y: number): unknown; picAt(x: number, y: number): unknown };
+  let first: [number, number] | null = null;
+  for (const f of [0.4, 0.5, 0.6, 0.7, 0.3, 0.8, 0.2]) {
+    const y = b.tipY + f * (b.splitY - b.tipY);
+    const p = v.toScreen(leftAt(b, y) + laneAt(b, y).w / 2, y);
+    first ??= p;
+    if (!iv.pillAt(...p) && !iv.picAt(...p)) return p;
+  }
+  return first!;
 }
 
 /** The fans: the folded carnivores and the cats. */
@@ -108,10 +116,12 @@ describe('one pill per group one level down, titled with its name, pictured by i
       for (const h of v.famHits) expect(groups.some((g) => g.v === h.v)).toBe(true);
       for (const h of v.nameHits) expect(groups.some((g) => g.b === h.b)).toBe(true);
       expect(v.famHits.length + v.nameHits.length).toBeGreaterThan(0);
-      expect(v.plusHits).toEqual([]);
+      // (A "+x" only for groups whose names are hidden, ToLaD#262.)
+      for (const h of v.plusHits) for (const b of h.bs) expect(v.hiddenGroups.some((g) => (g.lv.v ? g.lv.v.strands.includes(b) : g.lv.b === b))).toBe(true);
       // Each clade's pill: its name, its face's picture.
       const spots = labelSpots(v.camera, v.fan, 60, (t) => t.length * 7.5, undefined, undefined, undefined, undefined, null, labelGroups(v.fan, lv));
-      const fams = spots.filter((q) => q.place === 'fam');
+      // (Beside its branch, ToLaD#262.)
+      const fams = spots.filter((q) => q.fam);
       expect(fams.length).toBeGreaterThan(0);
       for (const q of fams) {
         expect(q.text).toBe(levelName(q.fam!));
@@ -209,4 +219,121 @@ describe('mammal home opens on the orders (ToLaD#258, #256)', () => {
     // (47 today: the armadillos and bandicoots the tree does not join under their order's split stand on their own, ToLaD#256.)
     expect(groups.length).toBeLessThan(60);
   }, 120000);
+});
+
+/** The span (screen x) of species bs's columns at "now" (the living ones'; an extinct one's at its tip), as groupCentre's. */
+function nowExtent(v: FanView, all: readonly FanBranch[]): [number, number] {
+  const alive = all.filter((b) => !b.sp.extinct && b.pop.aliveAt(0) > 0);
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (const b of alive.length ? alive : all) {
+    const y = Math.max(b.tipY, v.fan.time.y(0));
+    lo = Math.min(lo, v.toScreen(leftAt(b, y), 0)[0]);
+    hi = Math.max(hi, v.toScreen(leftAt(b, y) + laneAt(b, y).w, 0)[0]);
+  }
+  return [lo, hi];
+}
+const strandsOf = (lv: Level) => (lv.b ? [lv.b] : lv.v.strands);
+
+/** At home and at each level a tap reaches on the way from home to a few species (each landed), `at`. */
+function levelsOnTheWay(v: FanView, step: number, at: (v: FanView) => void): void {
+  for (const b of v.fan.branches.filter((_, i) => i % step === 3)) {
+    home(v);
+    at(v);
+    for (let k = 0; k < 8 && !v.levelNow().b; k++) {
+      v.tap(...onColumn(v, b));
+      if (!P(v).anim) break;
+      run(v);
+      at(v);
+    }
+  }
+}
+
+describe('each group\'s picture over "now", exactly above its centre; none overlap (ToLaD#262)', () => {
+  for (const [name, mk] of FANS) {
+    it(name, () => {
+      const v = mk();
+      const bad: string[] = [];
+      levelsOnTheWay(v, v.fan.tess.fold ? 61 : 7, (v) => {
+        const lv = v.levelNow();
+        if (lv.b) return;
+        const at = nameOf(lv);
+        // Every group one level down whose centre is on screen, with a face that has a picture, has its disc.
+        for (const g of nextLevels(v.fan, lv.v)) {
+          const [lo, hi] = nowExtent(v, strandsOf(g));
+          const cx = (lo + hi) / 2;
+          if (cx < 0 || cx > v.w) continue;
+          const face = g.v ? groupFace(g.v) : g.b;
+          if (!face || !wikiOf(face.sp.sci)?.img) continue;
+          const p = v.picSpots.find((q) => (g.v ? q.lv.v === g.v : q.lv.b === g.b));
+          if (!p) bad.push(`${at}: ${nameOf(g)} has no picture`);
+          else if (Math.abs(p.x - cx) > 0.5) bad.push(`${at}: ${nameOf(g)}'s picture ${(p.x - cx).toFixed(1)} px off its centre`);
+        }
+        const ps = v.picSpots;
+        for (let i = 0; i < ps.length; i++)
+          for (let j = i + 1; j < ps.length; j++)
+            if (Math.hypot(ps[i].x - ps[j].x, ps[i].y - ps[j].y) < (ps[i].d + ps[j].d) / 2 - 1e-6) bad.push(`${at}: ${nameOf(ps[i].lv)} and ${nameOf(ps[j].lv)} overlap`);
+      });
+      expect(bad).toEqual([]);
+    });
+  }
+});
+
+describe('a level of two or three groups is framed centred, in the middle of the screen (ToLaD#262)', () => {
+  for (const [name, mk] of FANS) {
+    it(name, () => {
+      const v = mk();
+      const bad: string[] = [];
+      let seen = 0;
+      levelsOnTheWay(v, v.fan.tess.fold ? 61 : 7, (v) => {
+        const lv = v.levelNow();
+        if (lv.b || !lv.v.parent || nextLevels(v.fan, lv.v).length > 3) return;
+        seen++;
+        // Its columns at "now": their middle at the middle of the room right of the time axis, within 16 px, and
+        // not spread past the middle 70 % of the screen.
+        const [lo, hi] = nowExtent(v, lv.v.strands);
+        const mid = (58 + v.w - 14) / 2;
+        if (Math.abs((lo + hi) / 2 - mid) > 16) bad.push(`${nameOf(lv)}: centred ${((lo + hi) / 2 - mid).toFixed(0)} px off`);
+        if (hi - lo > 0.7 * v.w) bad.push(`${nameOf(lv)}: ${(hi - lo).toFixed(0)} px across`);
+      });
+      expect(bad).toEqual([]);
+      expect(seen).toBeGreaterThan(0);
+    });
+  }
+});
+
+describe('a "+x" stands for the names hidden near it; tapped, it frames them (ToLaD#262)', () => {
+  for (const [name, mk] of FANS) {
+    it(name, () => {
+      const v = mk();
+      let tried = 0;
+      const bad: string[] = [];
+      levelsOnTheWay(v, v.fan.tess.fold ? 61 : 7, (v) => {
+        const at = nameOf(v.levelNow());
+        // Each hidden group counts on a shown name's "+x" (when any is shown), each once.
+        if (v.famHits.length + v.nameHits.length && v.hiddenGroups.some((h) => h.on === null)) bad.push(`${at}: a hidden name on no "+x"`);
+        const n = v.plusHits.reduce((s, h) => s + h.bs.length, 0);
+        const want = v.hiddenGroups.reduce((s, h) => s + (h.on ? strandsOf(h.lv).length : 0), 0);
+        if (n !== want) bad.push(`${at}: the "+x" hold ${n} species, the hidden names ${want}`);
+        const h = v.plusHits[0];
+        if (!h || tried > 2) return;
+        tried++;
+        const cam = { ...v.cam };
+        v.tap((h.box[0] + h.box[2]) / 2, (h.box[1] + h.box[3]) / 2);
+        if (!P(v).anim) bad.push(`${at}: a "+x" tapped flew nowhere`);
+        run(v);
+        // Landed on the hidden groups' frame, their columns all on screen.
+        const to = v.groupCamera(h.bs);
+        if (Math.abs(Math.log(v.cam.sx / to.sx)) > 0.05) bad.push(`${at}: a "+x" landed off its frame`);
+        const [a, b] = nowExtent(v, h.bs);
+        if (a < -2 || b > v.w + 2) bad.push(`${at}: a "+x" landed with its groups off screen (${a.toFixed(0)}–${b.toFixed(0)})`);
+        v.cam = cam;
+        v.camera.settle();
+        P(v).applyFold();
+        settle(v);
+      });
+      expect(bad).toEqual([]);
+      expect(tried).toBeGreaterThan(0);
+    });
+  }
 });
