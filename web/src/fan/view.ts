@@ -702,7 +702,7 @@ export function labelSpots(
     if (!(wBot >= wTop)) return [];
     // (Faded out whatever its edges (its part on screen too short, or the legend): its spots, none shown, with no edges read, ToLaD#255.)
     const f = fit0 * clamp01((yBot - y0 - 12) / 24) * botFit(y1);
-    if (!(f > 0)) return (['in', 'right', 'left'] as const).map((place) => ({ key: `${id}:${place}`, id, place, ...ref, text, rank, x: 0, y1, box: [0, y0, 0, y1], fit: 0 }));
+    if (!(f > 0)) return (['in', 'right', 'left'] as const).map((place) => ({ key: `${id}:${place}`, id, place, ...ref, text, rank, x: 0, y1, box: [-half, y0, half, y1], fit: 0 }));
     const ob = boxes.get(own)!;
     for (const wy of heights(wTop, wBot, [ob.lean])) {
       const [a, b] = ob.at(wy);
