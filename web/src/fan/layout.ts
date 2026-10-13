@@ -258,10 +258,16 @@ export function nodeQ(v: FanNode, ageMa: number): number {
 
 /** The column strand b is in at height y ≥ b.splitY: the deepest split at or above y. */
 export function segAt(b: FanBranch, y: number): PathSeg {
+  // (Its path runs down, older splits ever lower: the last seg at or above y, by halves (~50 deep at the mammal level, ToLaD#255).)
   const p = b.path;
-  let s = p[0];
-  for (let k = 1; k < p.length && p[k].y <= y; k++) s = p[k];
-  return s;
+  let lo = 0;
+  let hi = p.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (p[mid].y <= y) lo = mid;
+    else hi = mid - 1;
+  }
+  return p[lo];
 }
 
 const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
@@ -305,6 +311,14 @@ export function lanesAt(b: FanBranch, y: number, mode: WidthMode = b.tess.mode):
   }
   const s = segAt(b, y);
   return [b.baseW, segGreen(s, age, y)];
+}
+
+/** lanesAt(b, y)[0] alone (its width, the green not worked out): the fold's rooms and edges ask it ~6,000 times a row (ToLaD#255). */
+export function laneW(b: FanBranch, y: number, age?: number): number {
+  if (y < b.tipY) return 0;
+  if (y >= b.splitY) return b.baseW;
+  const n = b.pop.aliveAt(age ?? b.tess.time.ageAt(y));
+  return n > 0 ? b.unit * g(n, b.tess.mode) : 0;
 }
 
 /** A strand's green in a parent column at height y: from its own share at the split into the column's prefix (see FanNode.blend). */
@@ -615,11 +629,11 @@ export function leftAt(b: FanBranch, y: number, w?: number, river = false): numb
   const f = river ? undefined : b.tess.fold;
   const l = f ? f.left(b.index, y) : null;
   // (Folded: its own column about its room's centre, or a boom's against its room's inner edge, fold.ts; a slot in a parent column at its left.)
-  if (l !== null) return y < b.splitY ? l - ((w ?? lanesAt(b, y)[0]) * (1 - f!.flare[b.index])) / 2 : l;
+  if (l !== null) return y < b.splitY ? l - ((w ?? laneW(b, y)) * (1 - f!.flare[b.index])) / 2 : l;
   if (y < b.splitY) {
     const tc = b.x0 + b.baseW / 2;
     const c = tc + (b.cx - tc) * peelU(b.tess.edge, b.splitY, b.leanY, y);
-    return c - (w ?? lanesAt(b, y)[0]) / 2;
+    return c - (w ?? laneW(b, y)) / 2;
   }
   const s = segAt(b, y);
   return nodeLeftAt(s.node, y, true) + s.off;

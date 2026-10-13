@@ -205,7 +205,7 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
     const tFirst = performance.now() - t1;
     out(`load: new FanView ${tNew.toFixed(0)} ms, first draw ${tFirst.toFixed(0)} ms`);
     // Per-part timings: the view's private draw steps, wrapped.
-    const parts = ['drawStrand', 'drawMerged', 'drawIndividuals', 'drawLabels', 'drawStem', 'drawStemFade', 'drawTimeAxis', 'drawTouch', 'drawGutter', 'drawEvents', 'drawHeld', 'applyFold', 'layoutBrackets'];
+    const parts = ['drawStrand', 'drawMerged', 'drawIndividuals', 'drawLabels', 'lodNow', 'drawStem', 'drawStemFade', 'drawTimeAxis', 'drawTouch', 'drawGutter', 'drawEvents', 'drawHeld', 'applyFold', 'layoutBrackets'];
     const acc: Record<string, number> = {};
     const proto = FanView.prototype as unknown as Record<string, (...a: unknown[]) => unknown>;
     for (const p of parts) {
