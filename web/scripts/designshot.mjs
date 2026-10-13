@@ -173,6 +173,15 @@ const scenes = [
   ['pill-1', 'tappill'],
   ['pill-2', 'tapagain'],
   ['pill-3', 'tapagain'],
+  // ToLaD#241: a species' pill tapped from home (its branch framed, its card open); then deep in the least weasel's past,
+  // a double-tap at a time one step back: its frame, its clades', home. (`backtap`: a double-tap on the fan as it is.)
+  ['back-pill', 'tappill'],
+  ['back-0', 'frame', ['Least weasel', 1.5e6, 20]],
+  ['back-1', 'backtap'],
+  ['back-2', 'backtap'],
+  ['back-3', 'backtap'],
+  ['back-4', 'backtap'],
+  ['back-5', 'backtap'],
   // The groups the view is inside pinned at the top (ToLaD#233): home (nothing pinned, the stack itself), deep in a
   // bear's and a weasel's past ("now" far off the top), and (LEVEL=cats) the lion's past inside Panthera.
   ['pin-home', 'home'],
@@ -206,7 +215,7 @@ try {
       ([kind, args, width]) => {
         const f = window.__fan;
         // (A tap again on a pill keeps the fan as it is: setMode lays it out anew, a new fan the last flight is not in.)
-        if (kind !== 'tapagain') {
+        if (kind !== 'tapagain' && kind !== 'backtap') {
           f.setMode(width);
           f.tap(-1e6, -1e6);
         }
@@ -361,6 +370,11 @@ try {
           f.draw();
           const hit = f.nameHits.find((h) => h.b.sp.common === window.__pill);
           if (hit) f.tap((hit.box[0] + hit.box[2]) / 2, hit.box[3] - 10);
+          if (f.anim && !f.anim(performance.now() + 1e5)) f.anim = null;
+          f.labelState.clear();
+          f.draw();
+        } else if (kind === 'backtap') {
+          f.doubleTap(f.w / 2, f.h / 2);
           if (f.anim && !f.anim(performance.now() + 1e5)) f.anim = null;
           f.labelState.clear();
           f.draw();

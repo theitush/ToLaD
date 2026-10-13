@@ -14,6 +14,8 @@ export const PINCH_MIN_SPREAD = 40;
 export const WHEEL_GAP_MS = 140;
 /** Wheel axis lock: nothing zooms until one axis's scroll has moved this many px in the gesture. */
 export const WHEEL_DEAD_PX = 6;
+/** A second tap within this (ms) of the first's release, and near it, is a double-tap. */
+export const DOUBLE_TAP_MS = 320;
 /** Zoom per px of plain scroll (log), and per px of a trackpad pinch (ctrl+wheel). */
 const WHEEL_RATE = 0.002;
 const PINCH_WHEEL_RATE = 0.01;
@@ -29,8 +31,13 @@ export interface InputHandlers {
    */
   fling(vx: number, vy: number, vz: number, px: number, py: number, vt?: number): void;
   doubleTap(x: number, y: number): void;
-  /** Optional: a single tap (also fires before the second tap of a double-tap). */
+  /** Optional: a single tap (fires before the second tap of a double-tap, unless `tapWaits` holds it). */
   tap?(x: number, y: number): void;
+  /**
+   * Optional: whether a single tap here waits out the double-tap window (DOUBLE_TAP_MS) before `tap` runs, so a
+   * double-tap's first tap does nothing (ToLaD#241). A double-tap drops it; a pan or pinch that follows drops it too.
+   */
+  tapWaits?(x: number, y: number): boolean;
 }
 
 interface Sample {
@@ -50,6 +57,8 @@ export class Input {
   private moved = 0;
   private maxPointers = 0;
   private lastTap = { t: -1e9, x: 0, y: 0 };
+  /** A single tap held for the double-tap window (tapWaits): where, and its timer. */
+  private held: { x: number; y: number; timer: number } | null = null;
   private wheelTimer = 0;
   private wheeling = false;
   /**
@@ -96,6 +105,7 @@ export class Input {
   }
 
   destroy(): void {
+    this.drop();
     const el = this.el;
     el.removeEventListener('pointerdown', this.onDown);
     el.removeEventListener('pointermove', this.onMove);
@@ -216,6 +226,28 @@ export class Input {
     return [fx, ft];
   }
 
+  /**
+   * Hold a single tap for the double-tap window; it runs when the window passes with no finger down. A finger down
+   * then leaves it to that touch's end: another tap runs it first, a pan or pinch drops it.
+   */
+  private hold(x: number, y: number): void {
+    this.held = { x, y, timer: window.setTimeout(() => this.pointers.size === 0 && this.release(), DOUBLE_TAP_MS) };
+  }
+
+  /** The held tap, if any, runs now. */
+  private release(): void {
+    const t = this.held;
+    if (!t) return;
+    this.drop();
+    this.h.tap?.(t.x, t.y);
+  }
+
+  /** The held tap, if any, is dropped (a double-tap, or a pan or pinch after it). */
+  private drop(): void {
+    if (this.held) clearTimeout(this.held.timer);
+    this.held = null;
+  }
+
   private onUp = (e: PointerEvent): void => {
     if (!this.pointers.has(e.pointerId)) return;
     const p = this.local(e);
@@ -229,15 +261,19 @@ export class Input {
     const isTap = this.maxPointers === 1 && this.moved < 12 && e.timeStamp - this.downAt < 300;
     if (isTap) {
       const lt = this.lastTap;
-      if (e.timeStamp - lt.t < 320 && Math.hypot(p.x - lt.x, p.y - lt.y) < 40) {
+      if (e.timeStamp - lt.t < DOUBLE_TAP_MS && Math.hypot(p.x - lt.x, p.y - lt.y) < 40) {
         this.lastTap.t = -1e9;
+        this.drop();
         this.h.gestureEnd();
         this.h.doubleTap(p.x, p.y);
         return;
       }
+      // A tap held before this one that was not its double's first: it goes now, then this one.
+      this.release();
       this.lastTap = { t: e.timeStamp, x: p.x, y: p.y };
-      this.h.tap?.(p.x, p.y);
-    }
+      if (this.h.tapWaits?.(p.x, p.y)) this.hold(p.x, p.y);
+      else this.h.tap?.(p.x, p.y);
+    } else this.drop();
     // Fling from the last ~80 ms of movement, if the pointer was still moving.
     const now = e.timeStamp;
     const recent = this.samples.filter((s) => now - s.t < 80);

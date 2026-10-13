@@ -971,6 +971,20 @@ export class Fold {
     return x + X1[n - 1] - X0[n - 1];
   }
 
+  /**
+   * The fold as it stands (its zoom, openness and anchor), put back by the function returned: for frames computed for
+   * another view (brackets.ts foldedFrame moves the fold to each frame's), as a double-tap's ladder (ToLaD#241).
+   */
+  keep(): () => void {
+    const [sx, w] = [this.sx, this.screenW];
+    const wt = Float64Array.from(this.wt);
+    return () => {
+      if (sx > 0 && w > 0) this.setScale(sx, w);
+      this.wt.set(wt);
+      this.ver++;
+    };
+  }
+
   snapshot(): FoldState {
     return { a: Float64Array.from(this.a), lambda: this.lambda, wt: Float64Array.from(this.wt) };
   }
