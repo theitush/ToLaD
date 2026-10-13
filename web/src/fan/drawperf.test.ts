@@ -1,4 +1,5 @@
-// Perf runs only (FANPERF=1 npx vitest run src/fan/drawperf.test.ts): the CPU
+// Perf runs only (FANPERF=1 npx vitest run src/fan/drawperf.test.ts; skipped in the default suite; FANPERF_CLADE=mammalia
+// takes ~9 min for every scene: add --testTimeout=900000, or FANPERF_ONLY=<regex> for a few): the CPU
 // side of the fan view's draw() in node, with stub canvases (no GPU, no
 // browser): the whole view, the GPU layer replaced by its batches. Per scene, a
 // slow pinch in and out with a little pan (as scripts/fanperf.mjs does), each
