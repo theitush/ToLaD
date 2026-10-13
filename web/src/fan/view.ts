@@ -11,7 +11,7 @@ import { clipPoly, FanCamera, type Camera } from './camera';
 import { laneAt, layoutFan, leftAt, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type EdgeStyle, type Fan, type FanBranch, type FanNode, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01 } from './meshgl';
-import { Fold } from './fold';
+import { Fold, type FoldState } from './fold';
 import { COLUMN_DIM, columnSpans, EVENT_TINT, eventAt, eventSpans, type EventSpan } from './colstyle';
 import { drawTwigs, kLogAt, laneDim, LINEAGE, LIVING, TEX_HAIR_PX, TWIG_GRAY, TwigModel, type IndInfo, type TwigStats } from './twigs';
 import type { MeshBatch, RectBatch } from './meshgl';
@@ -294,6 +294,58 @@ function colBoxes(fan: Fan): Map<FanBranch | FanNode, ColBox> {
     }
   }
   return out;
+}
+
+/** How much a flight zooms out to pan (ToLaD#246): van Wijk–Nuij's ρ (√2 theirs; less, a long trip zooms out less). */
+export const FLY_RHO = 1.2;
+/** A flight's time (ms, ToLaD#246): this much ... */
+const FLY_MS0 = 650;
+/** ... and this much per unit of path (flightPath S: a screen panned, or e^ρ zoomed), ... */
+const FLY_MS_PER = 220;
+/** ... within these. */
+const FLY_MS_MIN = 900;
+const FLY_MS_MAX = 1800;
+
+/** A flight's duration (ms) for a path S long (flightPath, ToLaD#246): longer the farther it goes, 0.9–1.8 s. */
+export function flightMs(S: number): number {
+  return Math.min(FLY_MS_MAX, Math.max(FLY_MS_MIN, FLY_MS0 + FLY_MS_PER * (Number.isFinite(S) ? S : 0)));
+}
+
+/** ln cosh x, without overflow. */
+function lnCosh(x: number): number {
+  const a = Math.abs(x);
+  return a + Math.log1p(Math.exp(-2 * a)) - Math.LN2;
+}
+
+/**
+ * One axis of a flight (ToLaD#246): van Wijk & Nuij's smooth zoom-and-pan from a view `w0` wide (world) to one `w1`
+ * wide, `d` away (world). S: its length (log-zoom ÷ ρ plus pan in screens, as the eye sees it). at(e), e from 0 to 1
+ * along it at even speed: the view's width there and the share of the pan done (0 to 1). A long trip zooms out to
+ * see both ends, pans, zooms in; a short one zooms and pans together.
+ */
+export function flightPath(w0: number, w1: number, d: number): { S: number; at(e: number): [number, number] } {
+  const rho = FLY_RHO;
+  const r2 = rho * rho;
+  if (!(w0 > 0) || !(w1 > 0) || !Number.isFinite(w0) || !Number.isFinite(w1)) return { S: 0, at: (e) => [w1, e] };
+  if (!(d > 1e-6 * Math.max(w0, w1))) {
+    // (No pan to speak of: log-zoom, any pan kept to a fixed point on screen.)
+    const S = Math.abs(Math.log(w1 / w0)) / rho;
+    return { S, at: (e) => { const w = w0 * Math.pow(w1 / w0, e); return [w, w0 === w1 ? e : (w0 - w) / (w0 - w1)]; } };
+  }
+  const b0 = (w1 * w1 - w0 * w0 + r2 * r2 * d * d) / (2 * w0 * r2 * d);
+  const b1 = (w1 * w1 - w0 * w0 - r2 * r2 * d * d) / (2 * w1 * r2 * d);
+  const r0 = -Math.asinh(b0);
+  const r1 = -Math.asinh(b1);
+  const S = (r1 - r0) / rho;
+  return {
+    S,
+    at: (e) => {
+      const s = e * S;
+      const w = w0 * Math.exp(lnCosh(r0) - lnCosh(rho * s + r0));
+      const u = (w0 / r2) * Math.exp(Math.log(Math.abs(Math.sinh(rho * s)) || 1e-300) - lnCosh(rho * s + r0));
+      return [w, Math.min(1, Math.max(0, u / d))];
+    },
+  };
 }
 
 /** A lineage's species' rooms, side by side above its split: their world x span [x0, x1]. */
@@ -968,23 +1020,15 @@ export class FanView implements InputHandlers {
   }
 
   /**
-   * A bracket's tap: fly to its clade (cladeCamera), any card closed for the flight. Folded, the frame holds for
-   * the fold as cladeCamera leaves it, while each step of a flight moves the camera with the fold (fold.ts follow):
-   * on landing it takes the frame exactly (the fold at the frame's zoom and anchor, so settling moves nothing).
+   * A bracket's tap: fly to its clade (cladeCamera), any card closed for the flight. Folded, the flight tracks the
+   * frame as the fold moves and lands on it computed there (flyTo, ToLaD#246).
    */
-  flyToClade(v: FanNode, ms = 750, landed?: () => void): void {
+  flyToClade(v: FanNode, landed?: () => void): void {
     this.selected = null;
     this.selInd = null;
     this.touch = null;
     this.onSelect(null);
-    this.flyTo(this.cladeCamera(v), ms, () => {
-      if (this.fan.tess.fold) {
-        this.cam = this.cladeCamera(v);
-        this.camera.settle();
-        this.request();
-      }
-      landed?.();
-    });
+    this.flyTo(() => this.cladeCamera(v), undefined, landed);
   }
 
   /** The ranked clade a species sits in (ToLaD#230): the nearest with a rank (genus, subfamily, family…), else the root. */
@@ -1016,12 +1060,12 @@ export class FanView implements InputHandlers {
 
   /** Fly to clade v from a tap (ToLaD#230), remembering where it lands (`b` the species tapped, if any). */
   private flyLevel(b: FanBranch | null, v: FanNode): void {
-    this.flyToClade(v, 750, () => (this.tapAt = { b, v, cam: { ...this.cam } }));
+    this.flyToClade(v, () => (this.tapAt = { b, v, cam: { ...this.cam } }));
   }
 
   /** A tap on a species' name pill or picture (ToLaD#230): fly to its branch (speciesCamera) and open its card (ToLaD#241). */
   tapSpecies(b: FanBranch): void {
-    this.flyToSpecies(b.sp, 700);
+    this.flyToSpecies(b.sp);
   }
 
   /** A tap on a clade's bracket or family pill (ToLaD#193, #212): fly to it; already framed on it, to the clade above (ToLaD#230). */
@@ -1044,17 +1088,12 @@ export class FanView implements InputHandlers {
     return cladeCamera(this.camera, this.fan, { ...v, yBot: v.y }, () => spanOf(bs), (cam) => this.withBand(cam));
   }
 
-  flyToGroup(bs: readonly FanBranch[], ms = 750): void {
+  flyToGroup(bs: readonly FanBranch[]): void {
     this.selected = null;
     this.selInd = null;
     this.touch = null;
     this.onSelect(null);
-    this.flyTo(this.groupCamera(bs), ms, () => {
-      if (!this.fan.tess.fold) return;
-      this.cam = this.groupCamera(bs);
-      this.camera.settle();
-      this.request();
-    });
+    this.flyTo(() => this.groupCamera(bs));
   }
 
   /** The screen point of clade `latin`'s bracket as last drawn, if it is wide enough to tap (designshot), or null. */
@@ -1083,7 +1122,7 @@ export class FanView implements InputHandlers {
   }
 
   resetView(): void {
-    this.flyTo(this.homeCamera());
+    this.flyTo(() => this.homeCamera());
   }
 
   /**
@@ -1125,7 +1164,7 @@ export class FanView implements InputHandlers {
 
   /** Fly to a level (levelCamera), or home if the tree has no such split. */
   flyToLevel(name: string): void {
-    this.flyTo(this.levelCamera(name) ?? this.homeCamera());
+    this.flyTo(() => this.levelCamera(name) ?? this.homeCamera());
   }
 
   private withFold(fan: Fan): Fan {
@@ -1197,25 +1236,62 @@ export class FanView implements InputHandlers {
     this.camera.zoomAbout(px, py, fx, fy);
   }
 
-  /** Animate the camera to `to` over `ms`; `done` runs when it lands (not if a gesture takes over first). */
-  flyTo(to: Camera, ms = 650, done?: () => void): void {
+  /**
+   * Fly the camera to the frame `aim` computes (ToLaD#246): slow and smooth, in and out, so the eye can follow. Each axis
+   * (width, time) takes a van Wijk–Nuij path (flightPath: a long trip zooms out a little, pans, zooms in), on one sine
+   * ease, over a time by how far it goes (flightMs, 0.9–1.8 s, or `ms`). Folded, the frame's world moves as the fold
+   * opens, closes and re-anchors: the start and the frame are tracked through it (fold.ts follow) and the camera aims
+   * between them each step, landing on the frame computed again there (so nothing snaps at the end). `done` runs when
+   * it lands (not if a gesture takes over first).
+   */
+  flyTo(aim: Camera | (() => Camera), ms?: number, done?: () => void): void {
+    const fo = this.fan.tess.fold;
     const from = { ...this.cam };
+    // (The frame computed moves the fold to it, ToLaD#211: its state kept, the fold put back where the view stands.)
+    const restore = fo?.keep();
+    const frame = typeof aim === 'function' ? aim : () => aim;
+    const to = frame();
+    const toSnap = fo?.snapshot();
+    restore?.();
+    const fromSnap = fo?.snapshot();
+    // A frame that leaves the fold as it is (home): computed again each step where the fold then stands, the flight
+    // aiming at it as it moves. One that moves it (foldedFrame's, a level's): its point followed there (fold.ts follow).
+    const same = (p: FoldState, q: FoldState) => p.lambda === q.lambda && p.a.every((x, i) => x === q.a[i]) && p.wt.every((x, i) => x === q.wt[i]);
+    const live = !!fo && !!toSnap && !!fromSnap && same(toSnap, fromSnap);
+    // (The frame's x where the fold stands now, for the path's length.)
+    const tx0 = fo && toSnap && !live ? fo.follow(to.cx, to.cy, toSnap) : to.cx;
+    const px = flightPath(this.w / from.sx, this.w / to.sx, Math.abs(tx0 - from.cx));
+    const py = flightPath(this.h / from.sy, this.h / to.ty, Math.abs(to.cy - from.cy));
+    const dur = ms ?? flightMs(Math.max(px.S, py.S));
     const t0 = performance.now();
-    // Interpolate log-zoom, and each centre coordinate so it moves at constant screen speed.
-    const axis = (s0: number, s1: number, c0: number, c1: number, e: number): [number, number] => {
-      const s = Math.exp(Math.log(s0) + (Math.log(s1) - Math.log(s0)) * e);
-      const k = s0 === s1 ? e : (1 / s0 - 1 / s) / (1 / s0 - 1 / s1);
-      return [s, c0 + (c1 - c0) * k];
-    };
+    let x0 = from.cx;
+    let x1 = tx0;
+    let at = to;
     this.anim = (now) => {
-      const u = Math.min(1, (now - t0) / ms);
-      const e = u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
-      const [sx, cx] = axis(from.sx, to.sx, from.cx, to.cx, e);
-      const [ty, cy] = axis(from.sy, to.ty, from.cy, to.cy, e);
-      this.cam = { sx, sy: ty, ty, cx, cy };
+      const u = Math.min(1, Math.max(0, (now - t0) / dur));
+      const e = (1 - Math.cos(Math.PI * u)) / 2;
+      if (u >= 1) {
+        // Landing: the frame computed where the fold now stands (as the flight has tracked it all the way).
+        this.cam = { ...(fo ? frame() : to) };
+        this.camera.settle();
+        done?.();
+        return false;
+      }
+      const [wx, kx] = px.at(e);
+      const [wy, ky] = py.at(e);
+      // (A live frame's zoom and height as it now stands, eased in.)
+      const sx = (this.w / wx) * Math.pow(at.sx / to.sx, e);
+      const sy = (this.h / wy) * Math.pow(at.ty / to.ty, e);
+      this.cam = { sx, sy, ty: sy, cx: x0 + (x1 - x0) * kx, cy: from.cy + (at.cy - from.cy) * ky };
       this.camera.settle();
-      if (u >= 1) done?.();
-      return u < 1;
+      if (fo && fromSnap && toSnap) {
+        // The start and the frame where the fold now has them; the camera between, as far along as the path is.
+        x0 = fo.follow(from.cx, from.cy, fromSnap);
+        if (live) at = frame();
+        x1 = live ? at.cx : fo.follow(to.cx, to.cy, toSnap);
+        this.cam.cx = x0 + (x1 - x0) * kx;
+      }
+      return true;
     };
     this.request();
   }
@@ -1246,7 +1322,7 @@ export class FanView implements InputHandlers {
    * A search pick: fly to the species' column, then open its card at its tip, as a tap there would. Without `card`
    * (a double-tap stepping back to it, ToLaD#241): no card, the landing remembered (tapAt).
    */
-  flyToSpecies(sp: SpeciesRec, ms = 700, card = true): void {
+  flyToSpecies(sp: SpeciesRec, card = true): void {
     const b = this.fan.branches.find((x) => x.sp === sp);
     if (!b) return;
     // The card open now closes for the flight (the column stays in view under it).
@@ -1254,12 +1330,7 @@ export class FanView implements InputHandlers {
     this.selInd = null;
     this.touch = null;
     this.onSelect(null);
-    this.flyTo(this.speciesCamera(b), ms, () => {
-      // Folded: on landing it takes the frame exactly (as a clade's flight, flyToClade).
-      if (this.fan.tess.fold) {
-        this.cam = this.speciesCamera(b);
-        this.camera.settle();
-      }
+    this.flyTo(() => this.speciesCamera(b), undefined, () => {
       if (!card) {
         this.tapAt = { b, v: null, cam: { ...this.cam } };
         this.request();
@@ -1377,7 +1448,7 @@ export class FanView implements InputHandlers {
     if (b) {
       const sb = b;
       if (this.selected === sb.sp || this.inFrame([sb], () => this.speciesCamera(sb))) return null;
-      return () => this.flyToSpecies(sb.sp, 700, false);
+      return () => this.flyToSpecies(sb.sp, false);
     }
     if (v) {
       const sv = v;
@@ -1410,7 +1481,7 @@ export class FanView implements InputHandlers {
     const root = this.fan.root;
     const steps: BackStep[] = [];
     if (b) {
-      steps.push({ to: b.sp.common, cam: this.speciesCamera(b), go: () => this.flyToSpecies(b.sp, 700, false) });
+      steps.push({ to: b.sp.common, cam: this.speciesCamera(b), go: () => this.flyToSpecies(b.sp, false) });
       for (let v: FanNode | null = this.cladeOf(b); v && v !== root; v = this.outOf(v)) {
         const c = v;
         steps.push({ to: c.name, cam: this.cladeCamera(c), go: () => this.flyLevel(null, c) });
