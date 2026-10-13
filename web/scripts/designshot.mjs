@@ -422,17 +422,47 @@ try {
             for (let y = 200; y < f.h - 200; y += 12)
               for (let x = 14; x < f.w - 14; x += 4) {
                 const b = f.hitBranch(x, y);
-                if (!b || f.toWorld(x, y)[1] >= b.splitY || f.tapKind(x, y) !== 'card' || !f.intoAt(x, y) || f.hitBranch(x - 4, y) !== b || f.hitBranch(x + 4, y) !== b) continue;
+                if (!b || f.toWorld(x, y)[1] >= b.splitY || f.tapKind(x, y) !== 'card' || f.hitBranch(x - 4, y) !== b || f.hitBranch(x + 4, y) !== b) continue;
                 const d = Math.abs(x - f.w / 2);
                 if (d > best) [best, at] = [d, [x, y, b.sp.common]];
               }
           } else {
-            for (let y = 130; !at && y < f.h - 160; y += 9) for (let x = 14; !at && x < f.w - 14; x += 7) if (!f.tapKind(x, y) && !f.intoAt(x, y)) at = [x, y, 'nothing'];
+            for (let y = 130; !at && y < f.h - 160; y += 9) for (let x = 14; !at && x < f.w - 14; x += 7) if (!f.tapKind(x, y)) at = [x, y, 'nothing'];
           }
           at ??= [-1e4, -1e4, 'nothing (off screen)'];
           console.log(`double-tap at ${at[0].toFixed(0)},${at[1].toFixed(0)} on ${at[2]}`);
           f.doubleTap(at[0], at[1]);
           if (f.anim && !f.anim(performance.now() + 1e5)) f.anim = null;
+          f.labelState.clear();
+          f.draw();
+        } else if (kind === 'taps') {
+          // ToLaD#258: from home, a tap ('t') on the column of args[0] (a species, or a group by its name: its widest
+          // species), or a double-tap ('d') on nothing, for each letter of args[1]; each flight landed.
+          f.cam = f.homeCamera();
+          f.camera.settle();
+          f.draw();
+          const named = (v) => v.split && ((v.split.taxon ?? '').replace(/\s*\(.*\)\s*$/, '') === args[0] || v.name === args[0]);
+          const g = fan.nodes.find(named);
+          const b = fan.branches.find((q) => q.sp.common === args[0] || q.sp.sci === args[0]) ?? (g ? [...g.strands].sort((p, q) => q.width - p.width)[0] : null);
+          for (const c of args[1] ?? 't') {
+            if (c === 't' && b) {
+              // A point on its column between its tip and its split, off the pills and pictures.
+              const ty = f.toScreen(0, b.tipY)[1];
+              const sy = f.toScreen(0, b.splitY)[1];
+              let p = null;
+              for (let y = Math.max(140, ty + 10); !p && y < Math.min(f.h - 160, sy - 4); y += 6)
+                for (let x = 4; !p && x < f.w - 4; x += 2) if (f.hitBranch(x, y) === b && !f.pillAt(x, y) && !f.picAt(x, y)) p = [x, y];
+              console.log(`t: ${b.sp.common} at ${p}`);
+              if (p) f.tap(p[0], p[1]);
+            } else f.doubleTap(-1e4, -1e4);
+            for (let t = performance.now() + 16; f.anim; t += 16) {
+              if (!f.anim(t)) f.anim = null;
+              f.applyFold();
+            }
+            f.labelState.clear();
+            f.draw();
+            console.log(`${c}: at ${(() => { const l = f.levelNow(); return l.b ? l.b.sp.common : l.v.name; })()}`);
+          }
           f.labelState.clear();
           f.draw();
         } else if (kind === 'level') {
