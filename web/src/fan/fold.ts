@@ -614,8 +614,10 @@ export class Fold {
 
   /** The pairs youngest split first (carried: a split's gaps flow out to its clade's edges, older splits'). */
   private ord: Int32Array | null = null;
-  /** Per strand, the anchor's weights (a hair each) summed along the drawn order, at fold version forkVer (carriedForks). */
+  /** Per strand, the anchor's weights summed along the drawn order, at fold version forkVer (carriedForks). */
   private wSum = new Float64Array(0);
+  /** Per pair, the share of its gap carried to its clade's left edge (carriedForks). */
+  private sideL = new Float64Array(0);
   /** foldRow's and carried's scratch. */
   private xBuf = new Float64Array(0);
   private qBuf = new Float64Array(0);
@@ -636,7 +638,6 @@ export class Fold {
     const m = this.a.length;
     if (!this.ord) this.ord = Int32Array.from(Array.from({ length: m }, (_, p) => p).sort((p, q) => this.pairNode[p].y - this.pairNode[q].y));
     this.carriedForks();
-    const P = this.wSum;
     // (Scratch, reused: a row is folded at a time.)
     if (this.kBuf.length !== m) {
       this.kBuf = new Float64Array(m);
@@ -673,7 +674,7 @@ export class Fold {
       const out = T - kept;
       if (!(out > 0)) continue;
       // (Shared about the anchor's weight in the clade: the side it is on stands still.)
-      const sL = (P[hi] - P[p + 1]) / (P[hi] - P[lo]);
+      const sL = this.sideL[p];
       if (lo > 0) inc[lo - 1] += out * sL;
       if (hi < m + 1) inc[hi - 1] += out * (1 - sL);
     }
@@ -692,7 +693,21 @@ export class Fold {
     if (this.forkVer === this.ver && this.wSum.length === m + 2) return;
     if (!this.ord) this.ord = Int32Array.from(Array.from({ length: m }, (_, p) => p).sort((p, q) => this.pairNode[p].y - this.pairNode[q].y));
     const P = (this.wSum = new Float64Array(m + 2));
-    for (let i = 0; i <= m; i++) P[i + 1] = P[i] + this.wt[i] + 1e-3;
+    for (let i = 0; i <= m; i++) P[i + 1] = P[i] + this.wt[i];
+    // (Per pair, the share of what is not open carried to its clade's left edge (its left daughter moves, the right
+    // stands): as the anchor's weight lies in it, and a clade with none (a hair) stands still on the anchor's side
+    // (ToLaD#232): each of its forks moves a column away from the anchor, never back, so forks that overlap up a
+    // column add up to one lean, never a wiggle.)
+    if (this.sideL.length !== m) this.sideL = new Float64Array(m);
+    const all = P[m + 1];
+    for (let p = 0; p < m; p++) {
+      const lo = this.lo[p];
+      const hi = this.hi[p];
+      const out = all - (P[hi] - P[lo]);
+      const near = out > 0 ? (all - P[hi]) / out : 0.5;
+      const e = 1e-3 * (hi - lo);
+      this.sideL[p] = (P[hi] - P[p + 1] + e * near) / (P[hi] - P[lo] + e);
+    }
     const inc = new Float64Array(m);
     const k = (this.fan.edge === 'curved' ? EASE_MAX : 1) * (this.sx / (LEAN_FORK * SY_HOME));
     for (let j = 0; j < m; j++) {
@@ -706,6 +721,7 @@ export class Fold {
       // (ToLaD#232: a fork wider on screen than a bend lets at LEAN_FORK opens over as much height as it takes to cross
       // REACH_PX of it at LEAN_MAX, the whole of it if narrower: every column on screen keeps its line down to its split,
       // drawn whole. What lies further (a far family thousands of px away) closes above that, over a bend, off screen.)
+      const sL = this.sideL[p];
       const top = v.y - this.yRef;
       let hA = Math.min(hT, ROOM_BEND);
       let s = 1;
@@ -715,22 +731,16 @@ export class Fold {
         hA = Math.min(hT, Math.max(ROOM_BEND, Math.min(T, reach) * k5));
         if (T > reach && hA < hT) s = reach / T;
       }
-      let h = s < 1 ? hA + ROOM_BEND : hA;
-      // (Never above "now": squeezed into what there is, both phases alike.)
-      if (h > top) {
-        hA *= top / h;
-        h = top;
-      }
-      if (h0 >= h) {
-        h = h0;
-        hA = h;
-        s = 1;
-      }
+      // (The second phase a bend tall, growing from nothing as the gap outgrows REACH_PX: continuous in the zoom.)
+      let h = s < 1 ? hA + ROOM_BEND * Math.min(1, 1 / s - 1) : hA;
+      // (Squeezed into what there is, or stretched to its own gap's fork if taller, both phases alike.)
+      const h1 = Math.max(h0, Math.min(h, top));
+      hA = h > 0 ? (hA * h1) / h : h1;
+      h = h1;
       this.forkTopC[p] = v.y - h;
       this.forkMidC[p] = v.y - hA;
       this.forkS[p] = s;
       if (!(T > 0)) continue;
-      const sL = (P[this.hi[p]] - P[p + 1]) / (P[this.hi[p]] - P[this.lo[p]]);
       if (this.lo[p] > 0) inc[this.lo[p] - 1] += T * sL;
       if (this.hi[p] < m + 1) inc[this.hi[p] - 1] += T * (1 - sL);
     }
