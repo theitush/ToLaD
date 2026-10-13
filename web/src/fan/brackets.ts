@@ -237,6 +237,16 @@ export class Brackets {
   /** The time axis's right edge and the screen's width (px): the lines run between them. */
   private x0 = 0;
   private w = 0;
+  /** This frame's clades' screen spans (spans()). */
+  private sa: ArrayLike<number> = new Float64Array(0);
+  private sb: ArrayLike<number> = new Float64Array(0);
+  /**
+   * The groups the view is inside (ToLaD#233), pinned at the top of the screen while the stack itself is off it:
+   * the order on top, the innermost last (nearest the content). Their spans, labels and how much they show (pinA).
+   */
+  pins: Pin[] = [];
+  pinTop = 0;
+  pinA = 0;
 
   /** The clades' screen spans at "now": each species' room where its column is at "now" (an extinct one's: at its tip). */
   spans(c: BracketCam, fan: Fan): [Float64Array, Float64Array] {
@@ -297,6 +307,8 @@ export class Brackets {
    */
   layout(c: BracketCam, fan: Fan, nowS: number, axisX: number, fit: number, measure: (font: string, text: string) => number, top = 0): Placed[] {
     const [a, b] = this.spans(c, fan);
+    this.sa = a;
+    this.sb = b;
     const parent = this.list.map((q) => q.parent);
     // The rows per zoom bucket (an eighth of a doubling): a pan never moves them.
     const key = `${this.list.length}:${Math.round(Math.log2(c.cam.sx) * 8)}`;
@@ -327,6 +339,74 @@ export class Brackets {
     const height = rows ? this.rowTop(rows - 1) : 0;
     this.baseS = Math.min(nowS - 4, Math.max(top + height, nowS - 4 - PILL_ROOM));
     return this.placed;
+  }
+
+  /**
+   * Pin the groups the view is inside (ToLaD#233), after layout(): shown as the stack scrolls off the top (1 - fit),
+   * at `top` (the labels' top line, under the buttons). `yTop` the world y at the screen's top. The rule: the clades
+   * whose span at "now" (the brackets' own) covers the centre of the room right of the time axis, and whose branch
+   * started below the screen's top (some of their time is on screen: zoomed into a bear's past older than the bears,
+   * the bears are not pinned, the dog-like carnivores are).
+   */
+  pin(top: number, yTop: number, measure: (font: string, text: string) => number): Pin[] {
+    this.pinA = 1 - this.fit;
+    this.pinTop = top;
+    this.pins = [];
+    if (this.pinA <= 0) return this.pins;
+    const cx = (this.x0 + this.w) / 2;
+    const room = this.w - this.x0 - 2 * LABEL_PAD;
+    this.list.forEach((q, i) => {
+      if (!(this.sa[i] <= cx && cx < this.sb[i]) || !(q.v.yBot > yTop)) return;
+      const [wf, wn, ws] = this.widths(i, measure);
+      const form: Form = wf <= room ? 'full' : wn <= room ? 'name' : 'short';
+      const lw = form === 'full' ? wf : form === 'name' ? wn : ws || wn;
+      // Its label centred on the part of it on screen, kept on screen (a narrow one's label reaches past its ends).
+      const va = Math.max(this.sa[i], this.x0);
+      const vb = Math.min(this.sb[i], this.w);
+      const lx = Math.min(Math.max((va + vb) / 2, this.x0 + LABEL_PAD + lw / 2), this.w - LABEL_PAD - lw / 2);
+      this.pins.push({ i, a: this.sa[i] + GAP / 2, b: this.sb[i] - GAP / 2, row: 0, form, lx, lw });
+    });
+    this.pins.forEach((p, k) => (p.row = k));
+    return this.pins;
+  }
+
+  /** The pinned rows' height (px below pinTop, the band's own backdrop included), 0 without any. */
+  pinH(): number {
+    return this.pins.length ? this.pins.length * ROW_H + PIN_PAD : 0;
+  }
+
+  /** Pinned row k's line (screen y): the order's on top. */
+  pinY(k: number): number {
+    return this.pinTop + k * ROW_H + ROW_H / 2;
+  }
+
+  /** Draw the pinned groups (ToLaD#233) over everything under them, on a backdrop of the ground. */
+  drawPins(ctx: CanvasRenderingContext2D, ink: string, ink2: string, bg: string): void {
+    if (!this.pins.length || this.pinA <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = this.pinA;
+    const y0 = this.pinTop - PIN_PAD / 2;
+    const y1 = this.pinTop + this.pinH() - PIN_PAD / 2;
+    ctx.fillStyle = bg;
+    ctx.globalAlpha = this.pinA * 0.9;
+    ctx.fillRect(this.x0, y0, this.w - this.x0, y1 - y0);
+    ctx.globalAlpha = this.pinA;
+    ctx.lineWidth = 1;
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    for (const p of this.pins) this.drawOne(ctx, p, Math.round(this.pinY(p.row)) + 0.5, p.lx, p.form, 4, ink, ink2);
+    ctx.restore();
+  }
+
+  /** The pinned group under screen (x, y), while the pins show (ToLaD#233): its row, along its line (a few px of slop). */
+  pinHit(x: number, y: number): Clade | null {
+    if (this.pinA < 0.5 || x < this.x0) return null;
+    for (const p of this.pins) {
+      const ry = this.pinY(p.row);
+      if (y < ry - ROW_H / 2 || y >= ry + ROW_H / 2) continue;
+      if (x >= Math.min(p.a, p.lx - p.lw / 2) - 3 && x <= Math.max(p.b, p.lx + p.lw / 2) + 3) return this.list[p.i];
+    }
+    return null;
   }
 
   /** Whether clade node `v`'s bracket carries its name this frame. */
@@ -370,45 +450,49 @@ export class Brackets {
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'left';
     for (const p of this.placed) {
-      const q = this.list[p.i];
       const y = Math.round(this.rowY(p.row)) + 0.5;
-      // Past the time axis or the screen's edge it runs on, open-ended (no end tick there).
-      const ta = p.a >= this.x0;
-      const tb = p.b <= this.w;
-      const a = Math.round(Math.max(p.a, this.x0)) + 0.5;
-      const b = Math.round(Math.min(p.b, this.w)) - 0.5;
       const lx = p.form === 'tick' ? NaN : clearSpot(p, Math.max(p.a, this.x0) + LABEL_PAD, Math.min(p.b, this.w) - LABEL_PAD, y, pills);
       const form = Number.isNaN(lx) ? 'tick' : p.form;
-      ctx.strokeStyle = form === 'tick' ? 'rgba(185,230,201,0.45)' : 'rgba(185,230,201,0.75)';
       // (End ticks down to the row under it: shorter in a row of ticks.)
-      const dy = (this.rowH[p.row] ?? ROW_H) >= ROW_H ? 4 : 3;
-      ctx.beginPath();
-      ctx.moveTo(a, ta ? y + dy : y);
-      ctx.lineTo(a, y);
-      if (form === 'tick') ctx.lineTo(b, y);
-      else {
-        // The line broken around the label.
-        ctx.lineTo(Math.max(a, lx - p.lw / 2 - 4), y);
-        ctx.moveTo(Math.min(b, lx + p.lw / 2 + 4), y);
-        ctx.lineTo(b, y);
-      }
-      if (tb) ctx.lineTo(b, y + dy);
-      ctx.stroke();
-      if (form === 'tick') continue;
-      let x = lx - p.lw / 2;
-      const short = p.form === 'short';
-      ctx.font = q.en || short ? this.nameFont : this.latinFont;
-      ctx.fillStyle = q.en || short ? ink : ink2;
-      const name = short ? TAXON_SHORT[q.latin] : (q.en ?? q.latin);
-      ctx.fillText(name, x, y);
-      if (p.form === 'full' && q.en) {
-        x += ctx.measureText(name).width + 4;
-        ctx.font = this.latinFont;
-        ctx.fillStyle = ink2;
-        ctx.fillText(q.latin, x, y);
-      }
+      this.drawOne(ctx, p, y, lx, form, (this.rowH[p.row] ?? ROW_H) >= ROW_H ? 4 : 3, ink, ink2);
     }
     ctx.restore();
+  }
+
+  /** One bracket on line y: its label (`form`, centred at lx) breaking its line, its end ticks `dy` down. */
+  private drawOne(ctx: CanvasRenderingContext2D, p: Placed, y: number, lx: number, form: Form, dy: number, ink: string, ink2: string): void {
+    const q = this.list[p.i];
+    // Past the time axis or the screen's edge it runs on, open-ended (no end tick there).
+    const ta = p.a >= this.x0;
+    const tb = p.b <= this.w;
+    const a = Math.round(Math.max(p.a, this.x0)) + 0.5;
+    const b = Math.round(Math.min(p.b, this.w)) - 0.5;
+    ctx.strokeStyle = form === 'tick' ? 'rgba(185,230,201,0.45)' : 'rgba(185,230,201,0.75)';
+    ctx.beginPath();
+    ctx.moveTo(a, ta ? y + dy : y);
+    ctx.lineTo(a, y);
+    if (form === 'tick') ctx.lineTo(b, y);
+    else {
+      // The line broken around the label.
+      ctx.lineTo(Math.max(a, lx - p.lw / 2 - 4), y);
+      ctx.moveTo(Math.min(b, lx + p.lw / 2 + 4), y);
+      ctx.lineTo(b, y);
+    }
+    if (tb) ctx.lineTo(b, y + dy);
+    ctx.stroke();
+    if (form === 'tick') return;
+    let x = lx - p.lw / 2;
+    const short = form === 'short' && !!TAXON_SHORT[q.latin];
+    ctx.font = q.en || short ? this.nameFont : this.latinFont;
+    ctx.fillStyle = q.en || short ? ink : ink2;
+    const name = short ? TAXON_SHORT[q.latin] : (q.en ?? q.latin);
+    ctx.fillText(name, x, y);
+    if (form === 'full' && q.en) {
+      x += ctx.measureText(name).width + 4;
+      ctx.font = this.latinFont;
+      ctx.fillStyle = ink2;
+      ctx.fillText(q.latin, x, y);
+    }
   }
 
   /** The clade under screen (x, y): the bracket in that row nearest x (on it, or within a few px of slop). */
@@ -428,6 +512,11 @@ export class Brackets {
     return best ? this.list[best.i] : null;
   }
 }
+
+/** A pinned group (ToLaD#233): a bracket placed in the pinned rows (row 0 the order's, at the top). */
+export type Pin = Placed;
+/** Backdrop (px) the pinned rows take beyond their own height. */
+export const PIN_PAD = 6;
 
 /** Room (px) kept for the species' pills between the stack's foot and "now". */
 export const PILL_ROOM = 96;
