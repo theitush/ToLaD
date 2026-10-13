@@ -55,6 +55,10 @@ const LABEL_BOTTOM_PX = 104;
 const LABEL_FADE_MS = 180;
 /** Folded: how far (px) below the order's start its stem fades out (drawStemFade, ToLaD#210). */
 const STEM_END_PX = 48;
+/** A lane's living glow at full strength from this green width (px) up, thinner ones in proportion: a family of thin columns side by side glows as one (ToLaD#231). */
+const GLOW_W = 6;
+/** The glow fades out across a lean: gone where the lane runs √(1 + s²) - 1 = GLOW_LEAN off straight down (s ≈ 0.75 px per px). */
+const GLOW_LEAN = 0.25;
 
 /** Rows of the clades' brackets (ToLaD#193) a framed view keeps room for above "now". */
 const BAND_ROWS = 5;
@@ -774,7 +778,7 @@ export class FanView implements InputHandlers {
   private labelT = 0;
   /** `?debug`: a readout of the zooms, years on screen and individuals per px. */
   readonly debug = typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug');
-  /** `?debug&hide=stem,lanes,ind,held,events,fade`: those layers not drawn (finding which layer draws what, ToLaD#210). */
+  /** `?debug&hide=stem,lanes,glow,ind,held,events,fade`: those layers not drawn (finding which layer draws what, ToLaD#210, #231). */
   private readonly hide = new Set(this.debug ? (new URLSearchParams(location.search).get('hide') ?? '').split(',') : []);
   /** What each branch's individuals view drew last frame (taps, tests). */
   twigStats = new Map<number, TwigStats>();
@@ -1802,11 +1806,16 @@ export class FanView implements InputHandlers {
           const g1q = xq + Math.max(sq, gq);
           const g1p = xp + Math.max(sq, gp);
           const xb = Math.max(xq + Math.max(1, gq), xp + Math.max(1, gp));
-          // The living glow faintly (fading as their lane resolves into individuals).
-          const glow = (1 - lives) * (1 - dim) * lean;
-          if (glow > 0.01) {
-            trap(gl.under, xq - 4 * sq, g1q + 4 * sq, xp - 4 * sq, g1p + 4 * sq, y0, y1, ec, 0.06 * glow, xa - 4, xb + 4);
-            trap(gl.under, xq - 1.5 * sq, g1q + 1.5 * sq, xp - 1.5 * sq, g1p + 1.5 * sq, y0, y1, ec, 0.14 * glow, xa - 1.5, xb + 1.5);
+          // The living glow faintly (fading as their lane resolves into individuals). Zoomed out a family is
+          // dozens of thin columns side by side, each its own strand: each glows by its own width (full from
+          // GLOW_W px), so the family glows about as one strand as wide as all of them, not as a stack of
+          // dozens of halos (a wide soft smear, ToLaD#231). And only where the lane runs near-straight
+          // down: a halo is a row-flat slab per sample, so across a lean (a branch leaving its parent) it
+          // breaks into steps; it fades out by the lean (GLOW_LEAN), and there the branch is its crisp lane.
+          const glow = (1 - lives) * (1 - dim) * lean * Math.min(1, gm / GLOW_W) * Math.max(0, 1 - (sq - 1) / GLOW_LEAN);
+          if (glow > 0.01 && !this.hide.has('glow')) {
+            trap(gl.under, xq - 4 * sq, g1q + 4 * sq, xp - 4 * sq, g1p + 4 * sq, y0, y1, ec, 0.06 * glow, xa - 4 * sq, xb + 4 * sq);
+            trap(gl.under, xq - 1.5 * sq, g1q + 1.5 * sq, xp - 1.5 * sq, g1p + 1.5 * sq, y0, y1, ec, 0.14 * glow, xa - 1.5 * sq, xb + 1.5 * sq);
           }
           trap(gl.under, xq, g1q, xp, g1p, y0, y1, ec, lean, xa - 0.5, xb + 0.5);
         }
