@@ -1,11 +1,10 @@
-// ToLaD#210: zoomed into a small group, the deep past's far columns fade softly, never end in a cut block.
+// ToLaD#210, #232: zoomed into a small group, the deep past's far columns are drawn whole down to their splits, never end in a cut block.
 import { describe, expect, it } from 'vitest';
 import { MeshBatch, RectBatch } from './meshgl';
 import { CARNIVORA } from './panthera';
 import { CARNIVORA_TREE } from './splits';
 import type { WidthMode } from './layout';
 import { FanView } from './view';
-import { LEAN_CUT, LEAN_FADE_PX } from './fold';
 
 function stubView(): FanView {
   const g = globalThis as Record<string, unknown>;
@@ -141,11 +140,11 @@ function flatEdge(v: FanView): { px: number; at: string } {
     if (Math.abs(y - yNow) < 4 || y > yBot - 4) continue;
     let run = 0;
     for (let x = 0; x < W; x++) {
-      // (A lane leaning s px per px moves s px a row: only a change no pixel within LEAN_CUT px in the row above
+      // (A lane leaning s px per px moves s px a row: only a change no pixel within LEAN_ROW px in the row above
       // explains is an edge across.)
       let lo = 1;
       let hi = 0;
-      for (let d = Math.max(0, x - LEAN_CUT); d <= Math.min(W - 1, x + LEAN_CUT); d++) {
+      for (let d = Math.max(0, x - LEAN_ROW); d <= Math.min(W - 1, x + LEAN_ROW); d++) {
         lo = Math.min(lo, cover[(y - 1) * W + d]);
         hi = Math.max(hi, cover[(y - 1) * W + d]);
       }
@@ -160,14 +159,18 @@ function flatEdge(v: FanView): { px: number; at: string } {
   return { px, at };
 }
 
-/**
- * How wide a flat edge may be (px): a column's own end, a few px (the deep columns at these zooms are 1-6 px wide),
- * never a block of them side by side, as the far families' columns cut at their culled closings were (100-300 px).
- */
-const FLAT_MAX_PX = 8;
+/** How far (px) a lane may move along a row from the row above and still read as one lane, not an edge across. */
+const LEAN_ROW = 8;
 
-describe('deep zoom: no cut blocks (ToLaD#210)', () => {
-  it(`zoomed into the weasels and the ferret badgers, no lane ends in a flat edge wider than ${FLAT_MAX_PX} px: the far families' columns fade out below their culled closings; the group's own columns are drawn whole`, () => {
+/**
+ * How wide a flat edge may be (px): never a block of columns side by side, as the far families' columns cut at their
+ * culled closings were (100-300 px, ToLaD#210). Uncut (ToLaD#232), a far family's columns closing near-flat at a deep
+ * fork turn more than LEAN_ROW px a row where they leave or meet a straight run: 5-28 px here (linear 21, 28; log 5, 11).
+ */
+const FLAT_MAX_PX = 32;
+
+describe('deep zoom: no cut blocks (ToLaD#210, #232)', () => {
+  it(`zoomed into the weasels and the ferret badgers, no lane ends in a flat edge wider than ${FLAT_MAX_PX} px: nothing is culled: the far families' columns run on whole to their splits`, () => {
     for (const mode of ['linear', 'log'] as WidthMode[]) {
       const v = stubView();
       v.setMode(mode);
@@ -177,32 +180,6 @@ describe('deep zoom: no cut blocks (ToLaD#210)', () => {
         const e = flatEdge(v);
         if (process.env.DEEPEDGE_LOG) console.log(mode, name, e.px, e.at);
         expect(e.px, `${mode} ${name}: ${e.at}`).toBeLessThanOrEqual(FLAT_MAX_PX);
-        // (The group's own columns on screen, from their tips down to their splits, are drawn whole away from their own
-        // bends steeper than LEAN_MAX (a ferret badger's at this zoom): no far column's fade reaches them.)
-        const L = (v as unknown as { lean: { V: Float64Array; lin: Float64Array } }).lean;
-        const plan = (v as unknown as { leanPlan(p: unknown): boolean }).leanPlan.bind(v);
-        let n = 0;
-        for (const b of v.fan.branches.filter((b) => re.test(b.sp.sci))) {
-          const hw = b.width / 2;
-          const pts = v.lanePoints(b, hw);
-          const ySplit = v.toScreen(0, b.splitY)[1];
-          const fades = plan(pts);
-          const steep = fades
-            ? pts
-                .slice(0, -1)
-                .filter((_, j) => L.lin[j] < 1)
-                .map((p) => p.y)
-            : [];
-          for (let i = 0; i + 1 < pts.length; i++) {
-            const [p, q] = [pts[i], pts[i + 1]];
-            const x = q.x - hw * v.cam.sx;
-            if (!(p.y > q.y) || p.y > ySplit || q.y < 0 || p.y > v.h || x > v.w || x + q.w * v.cam.sx < 0) continue;
-            if (steep.some((y) => y > q.y - LEAN_FADE_PX - 4 && y < p.y + LEAN_FADE_PX + 4)) continue;
-            n++;
-            if (fades) expect(Math.min(L.V[i], L.lin[i], L.V[i + 1]), `${mode} ${name} ${b.sp.sci}`).toBe(1);
-          }
-        }
-        expect(n, `${mode} ${name}`).toBeGreaterThan(5);
       }
     }
   }, 600_000);

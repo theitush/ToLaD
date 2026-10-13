@@ -1,11 +1,6 @@
 // The fold (ToLaD#146): one branch from afar, opening continuously as the width zoom grows.
-//
-// (ToLaD#232: these hold for the deep base's default, 'centre', main's fold. Under 'reach' (round 3, on main behind
-// the globe menu's "deep:" for Ita to judge, its geometry not fixed yet) three fail, known: "the opening is
-// continuous in the zoom…", "zoomed into the weasels, a bend runs at most 8 px…" and "dogs x15: the columns stand
-// still…" (the panda drifts ~5 px between its splits). Only the variants' sanity test below folds under them.)
 import { describe, expect, it } from 'vitest';
-import { BASES, Fold, getBase, inFamily, LEAN_CUT, leanFade, ROOM_BEND, setBase, SY_HOME } from './fold';
+import { Fold, inFamily, ROOM_BEND, SY_HOME } from './fold';
 import { familySpan } from './view';
 import { columnsAt, g, laneAt, layoutFan, leftAt, TIME_H, type EdgeStyle, type Fan, type FanBranch, type WidthMode } from './layout';
 import { CARNIVORA, FELIDAE } from './panthera';
@@ -408,7 +403,7 @@ describe('the fold', () => {
     }
   });
 
-  it(`zoomed into the weasels, a bend runs at most ${LEAN_CUT} px across per px of height where drawn (leanFade), the weasels' own at most 3.5: the columns on screen keep all their bends, the far families' near-flat closings are culled (ToLaD#210)`, () => {
+  it(`zoomed into the weasels, the weasels' own bends lean at most 3.5 px across per px of height; nothing is culled: the far families' closings run out near-flat, drawn whole, so every column on screen reaches its split (ToLaD#210, #232)`, () => {
     for (const mode of ['log', 'linear'] as WidthMode[]) {
       const { fan, fold, home } = folded(mode, 'curved');
       const g = fan.branches.filter((b) => /^Mustela /.test(b.sp.sci));
@@ -421,62 +416,44 @@ describe('the fold', () => {
         fold.setAnchor(cx, fan.time.y(1), sx, SCREEN);
         const px = (x: number) => (x - cx) * sx + SCREEN / 2;
         const sy = SY_HOME * 1.6;
-        let worstOwn = 0;
-        let worstAt = '';
         let leanOwn = 0;
-        let culled = 0;
+        let flat = 0;
         for (const b of fan.branches) {
           const own = g.includes(b);
           let px0 = NaN;
           for (let y = Math.max(b.tipY, y0); y < fan.root.y; y += 2) {
             const x = px(centre(b, y));
+            expect(Number.isFinite(x), `${mode} z${z} ${b.sp.sci}`).toBe(true);
             if (px0 === px0 && Math.min(x, px0) < SCREEN && Math.max(x, px0) > 0) {
               const s = Math.abs(x - px0) / (2 * sy);
-              const f = leanFade(x - px0, 2 * sy);
-              // (Drawn: within the bound.)
-              if (f > 0) expect(s).toBeLessThan(LEAN_CUT);
-              else culled++;
               if (own && y < b.splitY) leanOwn = Math.max(leanOwn, s);
-              if (own && y < b.splitY && 1 - f > worstOwn) {
-                worstOwn = 1 - f;
-                worstAt = `${b.sp.sci} ${fan.time.ageAt(y).toFixed(2)} Ma ${s.toFixed(1)}`;
-              }
+              if (!own && s > 8) flat++;
             }
             px0 = x;
           }
         }
-        // (The weasels' own columns, down to their splits, are never culled; something far is, zoomed in.)
-        expect(worstOwn, `${mode} z${z} ${worstAt}`).toBe(0);
         // (Bounded at the source: every fork as tall as the gaps it closes, carried ones too, over LEAN_FORK px per px
-        // at home's time scale (fold.ts carriedForks): the weasels' own bends lean ~3 px per px here, not 8.)
+        // at home's time scale (fold.ts carriedForks): the weasels' own bends lean ~3 px per px here.)
         expect(leanOwn, `${mode} z${z}`).toBeLessThan(3.5);
-        if (z >= 20) expect(culled, `${mode} z${z}`).toBeGreaterThan(0);
+        // (The far families leave near-flat, a deep fork capped at a bend: these were culled (#210), now drawn (#232).)
+        if (z >= 20) expect(flat, `${mode} z${z}`).toBeGreaterThan(0);
       }
     }
   }, 240_000);
 
-  it('the deep base\'s variants (ToLaD#232: centre, reach, all) fold every column to a finite place at every zoom, and setBase restores the default', () => {
-    const was = getBase();
-    try {
-      for (const b of BASES) {
-        setBase(b);
-        const { fan, fold, home } = folded('log', 'curved');
-        const v = fan.nodes.find((n) => n.split.taxon === 'Canidae')!;
-        const [a, c] = familySpan(v);
-        for (const z of [1, 15, 300]) {
-          const sx = home * z;
-          fold.setScale(sx, SCREEN);
-          fold.setAnchor((a + c) / 2, fan.time.y(1), sx, SCREEN);
-          for (const y of heights(fan, 24)) for (const s of fan.root.strands) {
-            const x = fold.left(s.index, y);
-            if (x !== null) expect(Number.isFinite(x), `${b} ×${z} ${s.sp.sci}`).toBe(true);
-          }
-        }
+  it('every column folds to a finite place at every zoom, the dogs anchored (ToLaD#232)', () => {
+    const { fan, fold, home } = folded('log', 'curved');
+    const v = fan.nodes.find((n) => n.split.taxon === 'Canidae')!;
+    const [a, c] = familySpan(v);
+    for (const z of [1, 15, 300]) {
+      const sx = home * z;
+      fold.setScale(sx, SCREEN);
+      fold.setAnchor((a + c) / 2, fan.time.y(1), sx, SCREEN);
+      for (const y of heights(fan, 24)) for (const s of fan.root.strands) {
+        const x = fold.left(s.index, y);
+        if (x !== null) expect(Number.isFinite(x), `×${z} ${s.sp.sci}`).toBe(true);
       }
-    } finally {
-      setBase(was);
     }
-    expect(getBase()).toBe('centre');
   });
 
   it('dogs x15: the columns stand still over 100-500 yr (no neighbour\'s decline or boom slants them), the wolf too; the families beside stand still while the dogs open', () => {

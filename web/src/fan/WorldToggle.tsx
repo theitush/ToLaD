@@ -2,7 +2,6 @@
 // checkboxes (geological periods, ice ages) under it.
 import { useState } from 'react';
 import type { WorldLayers } from './world';
-import { BASES, type Base } from './fold';
 
 const ROWS: [keyof WorldLayers, string][] = [
   ['periods', 'Geological periods'],
@@ -20,7 +19,7 @@ function GlobeIcon() {
   );
 }
 
-export function WorldToggle({ get }: { get: () => { world: WorldLayers; request(): void; base: Base; setBase(b: Base): void } | null }) {
+export function WorldToggle({ get }: { get: () => { world: WorldLayers; request(): void } | null }) {
   const [open, setOpen] = useState(false);
   const [, bump] = useState(0);
   const v = get();
@@ -52,24 +51,6 @@ export function WorldToggle({ get }: { get: () => { world: WorldLayers; request(
               {label}
             </label>
           ))}
-          {/* The deep base's variants (ToLaD#232): main's, round 3's reach, no cull; ?base= too. */}
-          <div className="base-pick" role="radiogroup" aria-label="Deep base">
-            <span>deep:</span>
-            {BASES.map((b) => (
-              <label key={b}>
-                <input
-                  type="radio"
-                  name="deep-base"
-                  checked={v.base === b}
-                  onChange={() => {
-                    v.setBase(b);
-                    bump((n) => n + 1);
-                  }}
-                />
-                {b}
-              </label>
-            ))}
-          </div>
         </div>
       )}
     </>
