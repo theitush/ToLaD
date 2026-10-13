@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { FELIDAE, type SpeciesRec } from './panthera';
 import { fold, matchRank, searchSpecies } from './search';
 import { SearchPanel } from './SearchPanel';
+import { laneAt, leftAt } from './layout';
 import { FanView, type Selection } from './view';
 
 const names = (q: string, all: { common: string; sci: string }[] = FELIDAE.species) => searchSpecies(all, q).map((s) => s.common);
@@ -148,7 +149,8 @@ describe('a pick flies there and opens the card', () => {
       const b = fan.branches.find((x) => x.sp === sp)!;
       pick(sp);
       // The column's centre line at its tip, mid-screen across and in the top half (above the card).
-      const [x, y] = v.toScreen(b.cx, b.tipY);
+      // (Where the view has it: the river's centre, or a folded or steady layout's, ToLaD#259.)
+      const [x, y] = v.toScreen(leftAt(b, b.tipY) + laneAt(b, b.tipY).w / 2, b.tipY);
       expect(x).toBeGreaterThan(0.3 * v.w);
       expect(x).toBeLessThan(0.7 * v.w);
       expect(y).toBeGreaterThan(120);

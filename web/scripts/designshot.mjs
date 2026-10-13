@@ -151,6 +151,8 @@ const scenes = [
   ['world-150k', 'window', [0, 150000]],
   ['world-kpg', 'window', [30e6, 140e6]],
   ['world-20k', 'window', [0, 20000]],
+  // The domestic dog's boom out of the wolf, 100 yr to 50 kya at home's width (ToLaD#259: fold vs Q=layout=steady).
+  ['dog-window', 'window', [100, 50000]],
   // The clades' brackets above "now" (ToLaD#193): a level's home, and a bracket tapped from home (['tapclade', [taxon]]:
   // the flight to the clade, now to its stem; a bracket too narrow to tap at home flown to as the tap would). LEVEL=carnivores for the order.
   ['brk-home', 'home'],

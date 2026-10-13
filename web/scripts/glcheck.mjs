@@ -3,7 +3,7 @@
 // was born by a given time; the CPU mirror (mesh.ts lifeGPU / colourCode)
 // decides the same from the same hashed inputs. Every pixel must agree.
 //   npm run build:single && node scripts/glcheck.mjs
-//   (EDGE=curved|straight: the fan's edges, ?edge=; default the app's. LEVEL=cats|carnivores|mammals: ?level=, ToLaD#247)
+//   (EDGE=curved|straight: the fan's edges, ?edge=; default the app's. LEVEL=cats|carnivores|mammals: ?level=, ToLaD#247; LAYOUT=steady: ?layout=, ToLaD#259)
 import { chromium } from 'playwright';
 import { pageUrl } from './pageurl.mjs';
 
@@ -13,7 +13,7 @@ let served = null;
 let bad = 0;
 try {
   const page = await (await browser.newContext({ viewport: { width: 400, height: 400 } })).newPage();
-  const q = [process.env.EDGE ? `edge=${process.env.EDGE}` : '', process.env.LEVEL ? `level=${process.env.LEVEL}` : ''].filter(Boolean).join('&');
+  const q = [process.env.EDGE ? `edge=${process.env.EDGE}` : '', process.env.LEVEL ? `level=${process.env.LEVEL}` : '', process.env.LAYOUT ? `layout=${process.env.LAYOUT}` : ''].filter(Boolean).join('&');
   served = await pageUrl(q);
   await page.goto(served.url);
   await page.waitForFunction(() => !!window.__fan && !!window.__fanMesh && !!window.__fan.gl, null, { timeout: Number(process.env.LOAD_MS || 30000) });

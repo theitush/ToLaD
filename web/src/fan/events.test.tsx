@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { EVENT_TINT, eventAt, eventSpans } from './colstyle';
 import { SpeciesCard, unshownSentence } from './FanApp';
 import { HistorySpark } from './HistorySpark';
-import { layoutFan } from './layout';
+import { laneAt, layoutFan, leftAt } from './layout';
 import { RectBatch, MeshBatch } from './meshgl';
 import { FELIDAE } from './panthera';
 import { colEventsY, colSpansY, FanView, type Selection } from './view';
@@ -117,12 +117,14 @@ describe('the fan: marks and tap', () => {
   const v = stubView();
   const fan = v.fan;
   const b = fan.branches.find((x) => x.sp.common === 'Puma')!;
+  // (Its centre line where the view has it: the river's, or a folded or steady layout's, ToLaD#259.)
+  const cxAt = (yy: number) => leftAt(b, yy) + laneAt(b, yy).w / 2;
   // Zoomed onto the cougar's column about 16 kyr ago, both windows on screen.
   const home = v.homeCamera();
   const y = fan.time.y(0.016);
   const sx = home.sx * 2 ** 8;
   const sy = home.sy * 2 ** 4;
-  v.cam = { cx: b.colLeft + b.width / 2, cy: y, sx, sy, ty: sy };
+  v.cam = { cx: cxAt(y), cy: y, sx, sy, ty: sy };
   v.camera.settle();
 
   it('draws each window as a tint over the column, after (over) the held fade', () => {
@@ -139,8 +141,8 @@ describe('the fan: marks and tap', () => {
     }
     // The cougar's tints: those on its column (since ToLaD#172 narrowed its deep past, the cheetah's
     // column and its own windows reach the screen's left edge too).
-    const x0 = v.toScreen(b.colLeft, y)[0];
-    const x1 = v.toScreen(b.colLeft + b.width, y)[0];
+    const x0 = v.toScreen(cxAt(y) - b.width / 2, y)[0];
+    const x1 = v.toScreen(cxAt(y) + b.width / 2, y)[0];
     const mine = tints.filter((r) => r[0] >= x0 - 1 && r[2] <= x1 + 1);
     expect(mine.length).toBeGreaterThan(2);
     // Within the windows on screen.
@@ -165,7 +167,7 @@ describe('the fan: marks and tap', () => {
       [15500, undefined],
     ] as const) {
       const wy = fan.time.y(ago / 1e6);
-      const [px, py] = v.toScreen(b.colLeft + b.width / 2, wy);
+      const [px, py] = v.toScreen(cxAt(wy), wy);
       v.tap(px, py);
       expect(sel!.sp.common).toBe('Puma');
       expect(sel!.event?.ev.title).toBe(title);

@@ -2,6 +2,7 @@
 // checkboxes (geological periods, ice ages) under it.
 import { useState } from 'react';
 import type { WorldLayers } from './world';
+import { wantSteady } from './steady';
 
 const ROWS: [keyof WorldLayers, string][] = [
   ['periods', 'Geological periods'],
@@ -51,6 +52,20 @@ export function WorldToggle({ get }: { get: () => { world: WorldLayers; request(
               {label}
             </label>
           ))}
+          {/* The steady layout (ToLaD#259, steady.ts): a branch moves sideways only at its own splits; the page opens again with ?layout=steady on or off. */}
+          <label>
+            <input
+              type="checkbox"
+              checked={wantSteady()}
+              onChange={(e) => {
+                const u = new URL(window.location.href);
+                if (e.target.checked) u.searchParams.set('layout', 'steady');
+                else u.searchParams.delete('layout');
+                window.location.assign(u.toString());
+              }}
+            />
+            Steady layout
+          </label>
         </div>
       )}
     </>
