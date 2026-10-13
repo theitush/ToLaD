@@ -4,17 +4,18 @@
 // decides the same from the same hashed inputs. Every pixel must agree.
 //   npm run build:single && node scripts/glcheck.mjs
 //   (EDGE=curved|straight: the fan's edges, ?edge=; default the app's. LEVEL=cats|carnivores|mammals: ?level=, ToLaD#247)
-import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { chromium } from 'playwright';
+import { pageUrl } from './pageurl.mjs';
 
 // Default headless (its software GL renders WebGL2): no GPU flags.
 const browser = await chromium.launch({ headless: true });
+let served = null;
 let bad = 0;
 try {
   const page = await (await browser.newContext({ viewport: { width: 400, height: 400 } })).newPage();
   const q = [process.env.EDGE ? `edge=${process.env.EDGE}` : '', process.env.LEVEL ? `level=${process.env.LEVEL}` : ''].filter(Boolean).join('&');
-  await page.goto(pathToFileURL(resolve('dist-single/index.html')).href + (q ? `?${q}` : ''));
+  served = await pageUrl(q);
+  await page.goto(served.url);
   await page.waitForFunction(() => !!window.__fan && !!window.__fanMesh && !!window.__fan.gl, null, { timeout: Number(process.env.LOAD_MS || 30000) });
   const r = await page.evaluate(() => {
     const f = window.__fan;
@@ -211,6 +212,7 @@ try {
   console.log(`  (none / alive / lineage / ended: ${r.counts.join(' / ')})`);
   for (const mm of r.mismatches) console.log('  mismatch', JSON.stringify(mm));
 } finally {
+  served?.close();
   await browser.close();
 }
 process.exit(bad ? 1 : 0);

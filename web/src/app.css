@@ -565,6 +565,22 @@
   flex-wrap: wrap;
   justify-content: flex-end;
 }
+/* Home and the level stepper (ToLaD#247): one pill in two halves, so the level costs the bar no new row. */
+.fan .bar .pair {
+  display: flex;
+}
+.fan .bar .pair > button:first-child {
+  border-radius: 999px 0 0 999px;
+  border-right: none;
+  padding-right: 8px;
+}
+.fan .bar .pair > button.step {
+  border-radius: 0 999px 999px 0;
+  border-left: 1px solid rgba(200, 230, 210, 0.22);
+  width: 30px;
+  padding: 0 4px 0 2px;
+  font-size: 15px;
+}
 /* The search (ToLaD#157): a magnifier in the bar; open, a field over the bar and the matches under it. */
 .fan .bar button.icon {
   width: 34px;

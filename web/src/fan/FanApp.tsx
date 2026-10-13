@@ -165,28 +165,33 @@ export function FanApp() {
         >
           {edge}
         </button>
-        <button
-          type="button"
-          aria-label={`level: ${LEVEL_NAME[level]}; tap for ${LEVEL_NAME[LEVELS[(LEVELS.indexOf(level) + 1) % LEVELS.length]]}`}
-          onClick={() => {
-            const next = LEVELS[(LEVELS.indexOf(level) + 1) % LEVELS.length];
-            setSel(null);
-            if (next === 'mammals') setMamm(mammStart());
-            setLevel(next);
-            try {
-              const u = new URL(window.location.href);
-              u.searchParams.set('level', next);
-              window.history.replaceState(null, '', u);
-            } catch {
-              /* not in the address */
-            }
-          }}
-        >
-          {LEVEL_NAME[level]} ⇅
-        </button>
-        <button type="button" onClick={() => viewRef.current?.resetView()}>
-          {level === 'cats' ? 'All cats' : level === 'mammals' ? 'All mammals' : 'All carnivores'}
-        </button>
+        {/* Home for this level, and the level stepper joined to it (ToLaD#247): one pill, so the bar stays one row. */}
+        <span className="pair">
+          <button type="button" onClick={() => viewRef.current?.resetView()}>
+            {level === 'cats' ? 'All cats' : level === 'mammals' ? 'All mammals' : 'All carnivores'}
+          </button>
+          <button
+            type="button"
+            className="step"
+            title={`Change level (now ${LEVEL_NAME[level]})`}
+            aria-label={`level: ${LEVEL_NAME[level]}; tap for ${LEVEL_NAME[LEVELS[(LEVELS.indexOf(level) + 1) % LEVELS.length]]}`}
+            onClick={() => {
+              const next = LEVELS[(LEVELS.indexOf(level) + 1) % LEVELS.length];
+              setSel(null);
+              if (next === 'mammals') setMamm(mammStart());
+              setLevel(next);
+              try {
+                const u = new URL(window.location.href);
+                u.searchParams.set('level', next);
+                window.history.replaceState(null, '', u);
+              } catch {
+                /* not in the address */
+              }
+            }}
+          >
+            ⇅
+          </button>
+        </span>
         <button
           type="button"
           className="icon"
