@@ -3,7 +3,7 @@
 // zoomed far out, and a species card open.
 //   npm run build:single && node scripts/designshot.mjs <out-dir> [prefix] [only,names]
 //   (DSF: device scale factor, default 2; CLIP=x,y,w,h; DEBUG=1: the ?debug readout; EDGE=curved|straight: the fan's edges;
-//   WIDTH=linear|log: the widths, default linear; LEVEL=cats: the cats alone, a hidden flag (default: the carnivores, ToLaD#146))
+//   WIDTH=linear|log: the widths, default linear; LEVEL=cats|carnivores|mammals: ?level= (default: the carnivores, ToLaD#146, #247))
 import { mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -130,6 +130,11 @@ const scenes = [
   ['carn-seals', 'level', ['Phocidae']],
   ['carn-cats', 'level', ['Felidae']],
   ['carn-deep40', 'level', ['Carnivora', 40, 4, 3]],
+  // One more level up, every mammal (ToLaD#247, LEVEL=mammals): orders framed as home frames the whole.
+  ['mamm-rodents', 'level', ['Rodentia']],
+  ['mamm-bats', 'level', ['Chiroptera']],
+  ['mamm-whales', 'level', ['Cetacea']],
+  ['mamm-primates', 'level', ['Primates']],
   ['carn-card-dog', 'card', ['Grey wolf']],
   ['carn-search-wol', 'search', ['wol']],
   // A pick that once landed beside the screen (ToLaD#211: the fold opening as the camera zooms): now centred, card open.
