@@ -8,8 +8,8 @@ import { approxMa, formatCount } from '../data/count';
 import { HistorySpark } from './HistorySpark';
 import type { EdgeStyle, WidthMode } from './layout';
 import { wikiOf, type WikiRec } from './wiki';
-import { CARNIVORA, FELIDAE, NATURAL_META, type HistEvent, type SpeciesRec } from './panthera';
-import { CARNIVORA_TREE } from './splits';
+import { CARNIVORA, FELIDAE, mammaliaClade, NATURAL_META, type HistEvent, type SpeciesRec } from './panthera';
+import { CARNIVORA_TREE, mammaliaTree } from './splits';
 import { population } from './population';
 import { WorldToggle } from './WorldToggle';
 import { MagnifierIcon, SearchPanel } from './SearchPanel';
@@ -45,12 +45,15 @@ function initialEdge(): EdgeStyle {
 
 /**
  * The view (ToLaD#146): the whole order, each family one branch from afar, opening as you zoom (fold.ts).
- * ?level=cats: the cats alone, as they were (hidden: for the tests and shots).
+ * The level button (ToLaD#247) steps cats -> carnivores -> mammals (every living mammal) -> cats; ?level= opens one.
  */
-type Level = 'cats' | 'carnivores';
+type Level = 'cats' | 'carnivores' | 'mammals';
+const LEVELS: Level[] = ['cats', 'carnivores', 'mammals'];
+const LEVEL_NAME: Record<Level, string> = { cats: 'Cats', carnivores: 'Carnivores', mammals: 'Mammals' };
 function initialLevel(): Level {
   try {
-    return new URLSearchParams(window.location.search).get('level') === 'cats' ? 'cats' : 'carnivores';
+    const q = new URLSearchParams(window.location.search).get('level');
+    return LEVELS.includes(q as Level) ? (q as Level) : 'carnivores';
   } catch {
     return 'carnivores';
   }
@@ -63,13 +66,18 @@ export function FanApp() {
   const [edge, setEdge] = useState<EdgeStyle>(initialEdge);
   const [sel, setSel] = useState<Selection | null>(null);
   const [searching, setSearching] = useState(false);
-  const [level] = useState<Level>(initialLevel);
+  const [level, setLevel] = useState<Level>(initialLevel);
   const scaleRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const carn = level === 'carnivores';
-    const v = carn ? new FanView(canvasRef.current!, CARNIVORA, edge, CARNIVORA_TREE, true) : new FanView(canvasRef.current!, FELIDAE, edge);
+    const c = canvasRef.current!;
+    const v =
+      level === 'mammals'
+        ? new FanView(c, mammaliaClade(), edge, mammaliaTree(), true)
+        : level === 'carnivores'
+          ? new FanView(c, CARNIVORA, edge, CARNIVORA_TREE, true)
+          : new FanView(c, FELIDAE, edge);
     if (mode !== 'linear') v.setMode(mode);
     v.onSelect = setSel;
     v.scaleEl = scaleRef.current;
@@ -124,8 +132,26 @@ export function FanApp() {
         >
           {edge}
         </button>
+        <button
+          type="button"
+          aria-label={`level: ${LEVEL_NAME[level]}; tap for ${LEVEL_NAME[LEVELS[(LEVELS.indexOf(level) + 1) % LEVELS.length]]}`}
+          onClick={() => {
+            const next = LEVELS[(LEVELS.indexOf(level) + 1) % LEVELS.length];
+            setSel(null);
+            setLevel(next);
+            try {
+              const u = new URL(window.location.href);
+              u.searchParams.set('level', next);
+              window.history.replaceState(null, '', u);
+            } catch {
+              /* not in the address */
+            }
+          }}
+        >
+          {LEVEL_NAME[level]} ⇅
+        </button>
         <button type="button" onClick={() => viewRef.current?.resetView()}>
-          {level === 'cats' ? 'All cats' : 'All carnivores'}
+          {level === 'cats' ? 'All cats' : level === 'mammals' ? 'All mammals' : 'All carnivores'}
         </button>
         <button
           type="button"

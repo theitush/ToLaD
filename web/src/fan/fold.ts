@@ -36,6 +36,7 @@
 
 import { ease, isNode, lanesAt, segAt, type Fan, type FanBranch, type FanNode } from './layout';
 import { smoother } from './population';
+import { ORDER_TAXA, taxonKey } from './splits';
 
 /** A split's full gap, as a share of the order's width: GAP_K * (its age / 2 Ma)^GAP_POW. */
 export const GAP_K = 0.006;
@@ -50,12 +51,26 @@ export const FAMILY_MIN_MA = 15;
 /** The splits above the families gap FAMILY_GAP_X times as wide as their age gives: from afar the families stand clearly apart. */
 export const FAMILY_GAP_X = 3.5;
 
+/**
+ * A level above the orders (ToLaD#247, the mammals): each order (a split founding a taxon of splits.ts ORDER_TAXA, not the
+ * fan's root) folds as the carnivores do, one branch from afar. Inside it everything is scaled to the order: its gaps a
+ * share of its own width (its columns' at "now"), its families' splits opening by its own extent on screen; the splits
+ * between its families open as it grows from ORDER_OPEN_LO to ORDER_OPEN_HI of the screen (the carnivores' home has the
+ * order at ~0.55, its families apart). The splits above the orders are always open, their gaps scaled to TOP_SUM of the
+ * fan's width in all (else ~27 orders' deep gaps would be several times the fan's width).
+ */
+export const ORDER_OPEN_LO = 0.08;
+/** Inside an order, a split the data names no family for opens as a family's does when younger than this (Ma; most families' crowns are): many families' splits are unnamed. */
+export const ORDER_FAMILY_MA = 22;
+export const ORDER_OPEN_HI = 0.3;
+export const TOP_SUM = 0.9;
+
 /** A split's full gap (a share of the order's width), by its age (Ma). */
 export const gapShare = (ageMa: number) => GAP_K * Math.pow(Math.max(ageMa, 1e-3) / 2, GAP_POW);
 
 /** Whether split v is inside a family (the family's own split or under it): it opens with the zoom; above them, always open. */
 export function inFamily(v: FanNode | null): boolean {
-  for (let u = v; u; u = u.parent) if (/idae$/.test(u.split.taxon ?? '')) return true;
+  for (let u = v; u; u = u.parent) if (/idae$/.test(taxonKey(u.split.taxon ?? ''))) return true;
   return false;
 }
 /** The anchor's bell (setAnchor): its sigma, as a share of the screen's width. */
@@ -141,6 +156,10 @@ export class Fold {
   /** Per pair: its split's full gap (world), and whether it opens with the zoom (inside a family). */
   readonly pairGap: Float64Array;
   readonly pairFam: Uint8Array;
+  /** Per pair: the order its split is inside (ToLaD#247: an index into ordShare), or -1 (not inside one, or no orders: a single order's fan). */
+  readonly pairOrd: Int32Array;
+  /** Per order: its share of the fan's width at "now". */
+  readonly ordShare: number[] = [];
   /** Per pair: the strands of the left daughter start at lo, the right daughter's end before hi; the fork's top (world y). */
   private readonly lo: Int32Array;
   private readonly hi: Int32Array;
@@ -191,6 +210,17 @@ export class Fold {
     this.pairNode = [];
     this.pairGap = new Float64Array(Math.max(0, n - 1));
     this.pairFam = new Uint8Array(Math.max(0, n - 1));
+    this.pairOrd = new Int32Array(Math.max(0, n - 1)).fill(-1);
+    // (The orders below the root: none at the carnivore or cat level, whose root is the order itself.)
+    const ords = new Map<FanNode, number>();
+    const ordOf = (v: FanNode): number => {
+      for (let u: FanNode | null = v; u && u.parent; u = u.parent)
+        if (ORDER_TAXA.has(taxonKey(u.split.taxon ?? ''))) {
+          if (!ords.has(u)) ords.set(u, ords.size);
+          return ords.get(u)!;
+        }
+      return -1;
+    };
     this.a = new Float64Array(Math.max(0, n - 1)).fill(1);
     this.lambda = 1;
     const room = (k: FanNode | FanBranch) => (isNode(k) ? k.strands.reduce((s, b) => s + b.width, 0) : k.width);
@@ -206,6 +236,7 @@ export class Fold {
       this.pairNode.push(v);
       this.pairW[i] = Math.min(room(dp), room(dq));
       this.pairFam[i] = inFamily(v) ? 1 : 0;
+      this.pairOrd[i] = ordOf(v);
       // (Two families apart at least as far as a split FAMILY_MIN_MA old: a family is never a family's sister's seam.)
       this.pairGap[i] = (this.pairFam[i] ? gapShare(v.ageMa) : FAMILY_GAP_X * gapShare(Math.max(v.ageMa, FAMILY_MIN_MA))) * fan.trunkWidth;
       // The two daughters' strands (each a run in the drawn order) and the split's fork (where its gap opens over).
@@ -225,6 +256,35 @@ export class Fold {
       this.flare[i] = b.path[0].node.strands[0] === b ? -1 : 1;
     }
     this.yRef = fan.time.y(0);
+    if (ords.size) this.scaleOrders([...ords.keys()]);
+  }
+
+  /** The level above the orders (ToLaD#247): each order's share of the width at "now", and the gaps scaled to it (ORDER_OPEN_LO). */
+  private scaleOrders(nodes: FanNode[]): void {
+    const r = this.riverRow(this.yRef);
+    const wOf = (v: FanNode) => v.strands.reduce((s, b) => s + (r.own[b.index] ? r.w[r.item[b.index]] : 0), 0);
+    const all = this.strands.reduce((s, b) => s + (r.own[b.index] ? r.w[r.item[b.index]] : 0), 0) || 1;
+    for (const v of nodes) this.ordShare.push(wOf(v) / all);
+    const W = this.fan.trunkWidth;
+    let top = 0;
+    for (let i = 0; i < this.pairGap.length; i++) {
+      const g = this.pairOrd[i];
+      const v = this.pairNode[i];
+      if (g >= 0) this.pairGap[i] = (this.famLike(i) ? gapShare(v.ageMa) : FAMILY_GAP_X * gapShare(Math.max(v.ageMa, FAMILY_MIN_MA))) * W * this.ordShare[g];
+      else top += this.pairGap[i];
+    }
+    const k = top > 0 ? Math.min(1, (TOP_SUM * W) / top) : 1;
+    for (let i = 0; i < this.pairGap.length; i++) if (this.pairOrd[i] < 0) this.pairGap[i] *= k;
+  }
+
+  /** Whether pair i's split is a family's own or under one: named, or inside an order and younger than ORDER_FAMILY_MA. */
+  private famLike(i: number): boolean {
+    return this.pairFam[i] === 1 || (this.pairOrd[i] >= 0 && this.pairNode[i].ageMa < ORDER_FAMILY_MA);
+  }
+
+  /** Whether pair i's split opens with the zoom (inside a family or an order); else always open. */
+  folds(i: number): boolean {
+    return this.pairFam[i] === 1 || this.pairOrd[i] >= 0;
   }
 
   /**
@@ -390,7 +450,15 @@ export class Fold {
     const [e0, e1] = this.homeExtent();
     const order = (e1 - e0) * sx;
     for (let i = 0; i < this.a.length; i++) {
-      const a = this.pairFam[i] ? openness(this.pairNode[i].ageMa, order, screenW) : 1;
+      const g = this.pairOrd[i];
+      const a =
+        g >= 0
+          ? this.famLike(i)
+            ? openness(this.pairNode[i].ageMa, order * this.ordShare[g], screenW)
+            : logRamp((order * this.ordShare[g]) / screenW, ORDER_OPEN_LO, ORDER_OPEN_HI)
+          : this.pairFam[i]
+            ? openness(this.pairNode[i].ageMa, order, screenW)
+            : 1;
       if (a !== this.a[i]) changed = true;
       this.a[i] = a;
       // (A gap opens over a height by its width on screen, at most FORK_SLOPE px across per px up at a phone's home
@@ -411,7 +479,7 @@ export class Fold {
 
   /** Every split inside a family open (1) or closed (0), those above them open (or, `all`, as those): for tests and the cat level. */
   setAll(a: number, all = false): void {
-    for (let i = 0; i < this.a.length; i++) this.a[i] = this.pairFam[i] || all ? a : 1;
+    for (let i = 0; i < this.a.length; i++) this.a[i] = this.folds(i) || all ? a : 1;
     this.wt.fill(1);
     this.lambda = this.a.length ? Math.max(...this.a) : 1;
     this.sx = NaN;
@@ -423,7 +491,7 @@ export class Fold {
   homeExtent(): [number, number] {
     if (this.homeExt) return this.homeExt;
     const keep = this.snapshot();
-    for (let i = 0; i < this.a.length; i++) this.a[i] = this.pairFam[i] ? 0 : 1;
+    for (let i = 0; i < this.a.length; i++) this.a[i] = this.folds(i) ? 0 : 1;
     this.wt.fill(1);
     this.ver++;
     let lo = Infinity;

@@ -4,7 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
-import { loadClade, trimToFan } from './src/fan/panthera-extract';
+import { loadAll, loadClade, trimToFan } from './src/fan/panthera-extract';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const DATA = resolve(here, '..', 'data', 'mammals');
@@ -56,6 +56,7 @@ function toladData(single: boolean): Plugin {
 
 const PANTHERA = 'virtual:panthera-data';
 const CARNIVORA = 'virtual:carnivora-data';
+const MAMMALIA = 'virtual:mammalia-data';
 
 /**
  * The cat family (Felidae) subtree, decoded from ../data/mammals at build time with the v1
@@ -67,6 +68,8 @@ function pantheraData(): Plugin {
   const ids: Record<string, () => unknown> = {
     [PANTHERA]: () => loadClade((rel) => readFileSync(join(DATA, rel)), 'Felidae'),
     [CARNIVORA]: () => trimToFan(loadClade((rel) => readFileSync(join(DATA, rel)), 'Carnivora')),
+    // Every mammal (ToLaD#247): the skeleton and all the tiles, under the whole dated tree.
+    [MAMMALIA]: () => trimToFan(loadAll((rel) => readFileSync(join(DATA, rel)))),
   };
   return {
     name: 'panthera-data',
@@ -79,7 +82,15 @@ function pantheraData(): Plugin {
       for (const f of dataFiles()) this.addWatchFile(join(DATA, f));
       if (existsSync(join(DATA, 'wiki.json'))) this.addWatchFile(join(DATA, 'wiki.json'));
       // The pictures and links (ToLaD#182) for every species either level draws.
-      const wiki = id === '\0' + PANTHERA ? `\nexport const wiki = ${JSON.stringify(wikiFor((ids[CARNIVORA]() as { species: { sci: string }[] }).species.map((s) => s.sci)))};` : '';
+      const sci = (k: string) => (ids[k]() as { species: { sci: string }[] }).species.map((s) => s.sci);
+      if (id === '\0' + MAMMALIA) {
+        // (~20x the carnivores: a JSON string parses faster than an object literal; its pictures are the
+        // species the carnivore module's leave out.)
+        const carn = new Set(sci(CARNIVORA));
+        const wiki = wikiFor(sci(MAMMALIA).filter((s) => !carn.has(s)));
+        return `export default JSON.parse(${JSON.stringify(JSON.stringify(make()))});\nexport const wiki = JSON.parse(${JSON.stringify(JSON.stringify(wiki))});`;
+      }
+      const wiki = id === '\0' + PANTHERA ? `\nexport const wiki = ${JSON.stringify(wikiFor(sci(CARNIVORA)))};` : '';
       return `export default ${JSON.stringify(make())};${wiki}`;
     },
   };

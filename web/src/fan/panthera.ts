@@ -16,8 +16,9 @@
 
 import raw from 'virtual:panthera-data';
 import carnivora from 'virtual:carnivora-data';
+import mammalia from 'virtual:mammalia-data';
 import { BirthCurve, procgenSegments, type GenSegment } from './history';
-import { CARNIVORA_TREE, FELIDAE_TREE, sentenceCase, speciesUnder, type Split } from './splits';
+import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, sentenceCase, speciesUnder, type Split } from './splits';
 
 export { sentenceCase };
 import type { Grade, HistoryRec, NaturalMeta, NaturalRec, RawClade, RawSpecies, RedListRec } from './panthera-extract';
@@ -157,3 +158,9 @@ export const FELIDAE: CladeRec = cladeOf(raw, FELIDAE_TREE, 'Cats');
 /** The order the cats sit in (ToLaD#146): 284 living species and the dated fossils. */
 export const CARNIVORA: CladeRec = cladeOf(carnivora, CARNIVORA_TREE, 'Carnivores');
 
+
+let mamm: CladeRec | null = null;
+/** Every mammal (ToLaD#247): ~5,850 living species and the dated fossils, built when the level is first shown. */
+export function mammaliaClade(): CladeRec {
+  return (mamm ??= cladeOf(mammalia, mammaliaTree(), 'Mammals'));
+}

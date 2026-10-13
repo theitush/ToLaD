@@ -210,6 +210,8 @@ export interface DatedFile {
   gen_how?: string[];
   common_source?: string;
   overrides?: { name: string; cite: string; reason: string }[];
+  /** The dated tree over every file's species (ToLaD#247): a species is [parent, tile, row]. */
+  all?: { nodes?: number[][]; names?: Record<string, string>; names_en?: Record<string, string>; loose?: Record<string, number>; notes?: Record<string, number> };
 }
 
 /**
@@ -233,14 +235,16 @@ export function onFan(grafts: ReadonlySet<number>, row: number, extinct: boolean
  * A file's dated tree induced on `rows` (species row index -> scientific name): a split left
  * with fewer than two branches collapses; null if no row is in it.
  */
-export function datedTree(file: DatedFile, sk: DatedFile, rows: Map<number, string>): DatedSplit | null {
+export function datedTree(file: DatedFile, sk: DatedFile, rows: Map<number | string, string>): DatedSplit | null {
   const nodes = file.nodes ?? [];
   const kids: number[][] = nodes.map(() => []);
   nodes.forEach((n, i) => n[0] >= 0 && kids[n[0]].push(i));
   const src = sk.sources ?? [];
   const build = (i: number): string | DatedSplit | null => {
     const n = nodes[i];
+    // (A species: [parent, row], or [parent, tile, row] in the skeleton's whole tree `all`, keyed "tile:row".)
     if (n.length === 2) return rows.get(n[1]) ?? null;
+    if (n.length === 3) return rows.get(`${n[1]}:${n[2]}`) ?? null;
     const ks = kids[i].map(build).filter((k): k is string | DatedSplit => k !== null);
     if (ks.length === 0) return null;
     if (ks.length === 1) return ks[0];
@@ -360,6 +364,8 @@ export function extractClade(
   tileId: number,
   name: string,
   dated?: { sk: DatedFile; file: DatedFile },
+  /** Filled with the file's on-fan species rows (row -> scientific name), for a tree over several files (loadAll). */
+  rowsOut?: Map<number, string>,
 ): RawClade {
   const sk = decodeFile(skeleton) as unknown as Tile;
   const f = decodeFile(tile) as unknown as Tile;
@@ -436,6 +442,7 @@ export function extractClade(
     });
     if (onFan(grafts, i, f.extinct(i))) rows.set(i, f.name(i));
   }
+  if (rowsOut) for (const [i, n] of rows) rowsOut.set(i, n);
   const nm = sk.meta.natural;
   const naturalMeta: NaturalMeta | null = nm ? { label: nm.label ?? '', grade: nm.grade ?? 'D', kind: nm.kind ?? '', cite: nm.cite ?? '', url: nm.url ?? '' } : null;
   const tree = dated ? datedTree(dated.file, dated.sk, rows) : null;
@@ -443,6 +450,42 @@ export function extractClade(
     ? { upham: dated.sk.upham ?? '', alvarez: dated.sk.alvarez ?? '', genHow: dated.sk.gen_how ?? [], commonSource: dated.sk.common_source ?? '' }
     : null;
   return { ...node(f, root), tile: tileId, species, naturalMeta, dated: tree, datedMeta };
+}
+
+/**
+ * Every mammal (ToLaD#247): the species of the skeleton and of every tile, under the skeleton's whole dated tree
+ * (dated/skeleton.json `all`: the per-file trees cannot be joined without it). The clade row is the skeleton's root.
+ */
+export function loadAll(read: (rel: string) => Uint8Array): RawClade {
+  const skBytes = read('skeleton.tld');
+  const skTile = decodeFile(skBytes) as unknown as Tile;
+  const json = (rel: string): DatedFile | null => {
+    try {
+      return JSON.parse(new TextDecoder().decode(read(rel))) as DatedFile;
+    } catch {
+      return null;
+    }
+  };
+  const skJ = json('dated/skeleton.json');
+  if (!skJ?.all?.nodes) throw new Error('data/mammals has no whole dated tree (skeleton.json `all`, ToLaD#247): rebuild it with `make -C pipeline build`');
+  const files: { id: number; bytes: Uint8Array }[] = [
+    { id: -1, bytes: skBytes },
+    ...(skTile.meta.tiles as { id: number; file: string }[]).map((t) => ({ id: t.id, bytes: read(t.file) })),
+  ];
+  const rows = new Map<number | string, string>();
+  const species: RawSpecies[] = [];
+  let top: RawClade | null = null;
+  for (const { id, bytes } of files) {
+    const file = id < 0 ? skJ : json(`dated/${id}.json`);
+    const f = decodeFile(bytes) as unknown as Tile;
+    const r = new Map<number, string>();
+    const c = extractClade(skBytes, bytes, id, f.name(0), file ? { sk: skJ, file } : undefined, r);
+    for (const [i, n] of r) rows.set(`${id}:${i}`, n);
+    species.push(...c.species);
+    if (id < 0) top = c;
+  }
+  const tree = datedTree({ ...skJ.all, tile: -1, common: {}, gen: {} }, skJ, rows);
+  return { ...top!, species, dated: tree };
 }
 
 /** The species under a dated split, left to right. */

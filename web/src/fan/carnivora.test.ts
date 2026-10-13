@@ -31,8 +31,9 @@ describe('Carnivora from the data', () => {
   it('names its families by the rule (-idae) and the name map', () => {
     const names = families(fan).map((f) => f.text);
     for (const n of ['Cats', 'Dogs', 'Bears', 'Seals', 'Sea lions', 'Weasels', 'Raccoons', 'Skunks', 'Hyenas', 'Mongooses', 'Civets']) expect(names).toContain(n);
-    // Only families: no subfamily or genus gets a family label.
-    for (const s of allSplits(CARNIVORA_TREE)) if (familyLabel(s)) expect(s.taxon).toMatch(/idae$/);
+    // Only families (and the order itself, labelled at the mammal level, ToLaD#247): no subfamily or genus gets a family label.
+    for (const s of allSplits(CARNIVORA_TREE)) if (familyLabel(s)) expect(s.taxon).toMatch(/idae$|^Carnivora$/);
+    expect(names).not.toContain('Carnivores');
   });
 
   it('a family span holds its species and no other', () => {

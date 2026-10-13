@@ -18,6 +18,7 @@
 
 import raw from 'virtual:panthera-data';
 import carnivora from 'virtual:carnivora-data';
+import mammalia from 'virtual:mammalia-data';
 import type { DatedSplit, RawClade } from './panthera-extract';
 
 export type Confidence = 'high' | 'medium' | 'low';
@@ -213,6 +214,12 @@ export const FELIDAE_TREE: Split = treeOf(raw);
 /** The order the cats sit in (ToLaD#146): cats, dogs, bears, seals, weasels and the rest. */
 export const CARNIVORA_TREE: Split = treeOf(carnivora);
 
+let mammTree: Split | null = null;
+/** Every mammal's dated tree (ToLaD#247), built when the level is first shown. */
+export function mammaliaTree(): Split {
+  return (mammTree ??= treeOf(mammalia));
+}
+
 /**
  * The plain English name of a family ("Dogs" for Canidae): the level a reader knows the order by. A rule (a split whose
  * taxon ends in -idae is a family) and this small name map; a family not in it keeps its Latin name. Subfamilies and
@@ -237,10 +244,46 @@ export const FAMILY_EN: Record<string, string> = {
   Nandiniidae: 'Palm civet',
 };
 
-/** A split's family label, or null when it founds no family (FAMILY_EN). */
+/**
+ * The mammal orders (ToLaD#247), by the taxon the data names their split (an order whose split the data does not name
+ * is not here: its families stand as branches of their own). Their plain English names label them at the mammal level.
+ */
+export const ORDER_EN: Record<string, string> = {
+  Prototheria: 'Monotremes',
+  Didelphimorphia: 'Opossums',
+  Paucituberculata: 'Shrew opossums',
+  Diprotodontia: 'Kangaroos & kin',
+  Peramelidae: 'Bandicoots',
+  Afrosoricida: 'Tenrecs & golden moles',
+  Macroscelidea: 'Elephant shrews',
+  Hyracoidea: 'Hyraxes',
+  Sirenia: 'Sea cows',
+  Cingulata: 'Armadillos',
+  Pholidota: 'Pangolins',
+  Proboscidea: 'Elephants',
+  Folivora: 'Sloths',
+  Vermilingua: 'Anteaters',
+  Scandentia: 'Treeshrews',
+  Dermoptera: 'Colugos',
+  Primates: 'Primates',
+  Lagomorpha: 'Rabbits & hares',
+  Rodentia: 'Rodents',
+  Eulipotyphla: 'Shrews & moles',
+  Chiroptera: 'Bats',
+  Carnivora: 'Carnivores',
+  Perissodactyla: 'Horses & rhinos',
+  Artiodactyla: 'Hoofed mammals & whales',
+};
+export const ORDER_TAXA: ReadonlySet<string> = new Set(Object.keys(ORDER_EN));
+
+/** A taxon without Open Tree's homonym note ("Pholidota (order in Opisthokonta)" -> "Pholidota"). */
+export const taxonKey = (x: string) => x.replace(/ \(.*\)$/, '');
+
+/** A split's family (or order) label, or null when it founds neither (FAMILY_EN, ORDER_EN). */
 export function familyLabel(t: Split): string | null {
-  const x = t.taxon ?? '';
-  return /idae$/.test(x) ? (FAMILY_EN[x] ?? x) : null;
+  const x = taxonKey(t.taxon ?? '');
+  // (An order, ORDER_EN, labels like a family at the mammal level: ToLaD#247.)
+  return /idae$/.test(x) ? (FAMILY_EN[x] ?? x) : (ORDER_EN[x] ?? null);
 }
 
 /** Every split in the tree, parents before their daughters. */

@@ -431,7 +431,7 @@ try {
     const clip = process.env.CLIP ? Object.fromEntries(['x', 'y', 'width', 'height'].map((k, i) => [k, Number(process.env.CLIP.split(',')[i])])) : undefined;
     // EVAL=file.js: that file's text evaluated in the page before the shot (a probe), its value printed.
     if (process.env.EVAL) console.log(JSON.stringify(await page.evaluate(readFileSync(process.env.EVAL, 'utf8'))));
-    await page.screenshot({ path: `${OUT}/${PREFIX}-${name}.png`, clip });
+    await page.screenshot({ path: `${OUT}/${PREFIX}-${name}.png`, clip, timeout: Number(process.env.LOAD_MS || 30000) });
     console.log('shot', name);
   }
 } finally {

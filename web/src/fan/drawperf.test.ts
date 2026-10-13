@@ -8,8 +8,8 @@ import { appendFileSync, writeFileSync } from 'node:fs';
 import { Session } from 'node:inspector/promises';
 import { describe, it } from 'vitest';
 import { MeshBatch, RectBatch } from './meshgl';
-import { CARNIVORA, FELIDAE } from './panthera';
-import { CARNIVORA_TREE, FELIDAE_TREE } from './splits';
+import { CARNIVORA, FELIDAE, mammaliaClade } from './panthera';
+import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree } from './splits';
 import { laneAt, leftAt } from './layout';
 import { ColumnPath, CutMemo, SCALE_BAR_PX } from './twigs';
 import { FanView } from './view';
@@ -138,9 +138,12 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
     }
     const t0 = performance.now();
     const { canvas, calls } = stubs();
-    // FANPERF_CLADE=carnivora: the order (ToLaD#146) instead of the cats.
+    // FANPERF_CLADE=carnivora: the order (ToLaD#146) instead of the cats; =mammalia: every mammal (ToLaD#247).
+    const mamm = process.env.FANPERF_CLADE === 'mammalia';
     const carn = process.env.FANPERF_CLADE === 'carnivora';
-    const v = new FanView(canvas as unknown as HTMLCanvasElement, carn ? CARNIVORA : FELIDAE, 'curved', carn ? CARNIVORA_TREE : FELIDAE_TREE, carn);
+    const v = mamm
+      ? new FanView(canvas as unknown as HTMLCanvasElement, mammaliaClade(), 'curved', mammaliaTree(), true)
+      : new FanView(canvas as unknown as HTMLCanvasElement, carn ? CARNIVORA : FELIDAE, 'curved', carn ? CARNIVORA_TREE : FELIDAE_TREE, carn);
     const tNew = performance.now() - t0;
     const gl = { under: new RectBatch(), mesh: new MeshBatch(), over: new RectBatch(), begin() {}, end() {} };
     gl.begin = () => {
@@ -242,6 +245,23 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
       ]);
     }
     // The dogs ×15 (the order only): the family's level camera, the fold opened on them.
+    // Every mammal: orders at a zoom their families stand apart at (ToLaD#247).
+    if (mamm)
+      for (const [taxon, z] of [['Rodentia', 3], ['Chiroptera', 4], ['Carnivora', 15]] as const)
+        scenes.push([
+          `${taxon} x${z}`,
+          () => {
+            v.cam = v.levelCamera(taxon, z)!;
+            v.camera.settle();
+          },
+        ]);
+    if (process.env.FANPERF_DEBUG && mamm) {
+      const f = fan.tess.fold as unknown as { ordShare: number[]; pairOrd: Int32Array; pairGap: Float64Array; folds(i: number): boolean };
+      let top = 0;
+      let nTop = 0;
+      for (let i = 0; i < f.pairOrd.length; i++) if (!f.folds(i)) (top += f.pairGap[i]), nTop++;
+      out(`orders ${f.ordShare.length}: ${f.ordShare.map((x) => x.toFixed(3)).join(' ')}; always-open pairs ${nTop}, their gaps ${(top / fan.trunkWidth).toFixed(2)} x the trunk`);
+    }
     if (carn)
       scenes.push([
         'dogs x15',
