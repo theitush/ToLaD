@@ -13,6 +13,7 @@ import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree } from './splits';
 import { laneAt, leftAt } from './layout';
 import { ColumnPath, CutMemo, SCALE_BAR_PX } from './twigs';
 import { FanView } from './view';
+import { loadMammalsFromFiles } from './mammals-node';
 
 const RUN = !!process.env.FANPERF;
 /** Where the rows go as they come (FANPERF=<file>), and the console. */
@@ -136,11 +137,16 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
       await prof.post('Profiler.enable');
       await prof.post('Profiler.start');
     }
-    const t0 = performance.now();
+    let t0 = performance.now();
     const { canvas, calls } = stubs();
     // FANPERF_CLADE=carnivora: the order (ToLaD#146) instead of the cats; =mammalia: every mammal (ToLaD#247).
     const mamm = process.env.FANPERF_CLADE === 'mammalia';
     const carn = process.env.FANPERF_CLADE === 'carnivora';
+    // (The page fetches mammals.json, mammals-data.ts; here it is built from the files, outside the timing.)
+    if (mamm) {
+      await loadMammalsFromFiles();
+      t0 = performance.now();
+    }
     const v = mamm
       ? new FanView(canvas as unknown as HTMLCanvasElement, mammaliaClade(), 'curved', mammaliaTree(), true)
       : new FanView(canvas as unknown as HTMLCanvasElement, carn ? CARNIVORA : FELIDAE, 'curved', carn ? CARNIVORA_TREE : FELIDAE_TREE, carn);

@@ -10,6 +10,7 @@ import type { EdgeStyle, WidthMode } from './layout';
 import { wikiOf, type WikiRec } from './wiki';
 import { CARNIVORA, FELIDAE, mammaliaClade, NATURAL_META, type HistEvent, type SpeciesRec } from './panthera';
 import { CARNIVORA_TREE, mammaliaTree } from './splits';
+import { loadMammals, mammalsLoaded } from './mammals-data';
 import { population } from './population';
 import { WorldToggle } from './WorldToggle';
 import { MagnifierIcon, SearchPanel } from './SearchPanel';
@@ -50,6 +51,14 @@ function initialEdge(): EdgeStyle {
 type Level = 'cats' | 'carnivores' | 'mammals';
 const LEVELS: Level[] = ['cats', 'carnivores', 'mammals'];
 const LEVEL_NAME: Record<Level, string> = { cats: 'Cats', carnivores: 'Carnivores', mammals: 'Mammals' };
+/**
+ * The mammal level's data is a file of its own (mammals-data.ts, ToLaD#247), fetched when the level first opens:
+ * 'fetch' while it comes, 'build' for one painted frame (the note shows before the layout's long synchronous build),
+ * then 'ready'; any other string is the error.
+ */
+type MammState = 'fetch' | 'build' | 'ready' | string;
+const mammStart = (): MammState => (mammalsLoaded() ? 'build' : 'fetch');
+
 function initialLevel(): Level {
   try {
     const q = new URLSearchParams(window.location.search).get('level');
@@ -67,10 +76,29 @@ export function FanApp() {
   const [sel, setSel] = useState<Selection | null>(null);
   const [searching, setSearching] = useState(false);
   const [level, setLevel] = useState<Level>(initialLevel);
+  const [mamm, setMamm] = useState<MammState>(mammStart);
+  // The view can be built: any level but the mammals, or the mammals once their data is in.
+  const viewReady = level !== 'mammals' || mamm === 'ready';
   const scaleRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (level !== 'mammals' || mamm === 'ready') return;
+    let live = true;
+    if (mamm === 'fetch')
+      loadMammals().then(
+        () => live && setMamm('build'),
+        (e: unknown) => live && setMamm(`could not load the mammals (${e instanceof Error ? e.message : String(e)})`),
+      );
+    // (Two frames: the note paints before the view's build holds the page.)
+    else if (mamm === 'build') requestAnimationFrame(() => setTimeout(() => live && setMamm('ready'), 30));
+    return () => {
+      live = false;
+    };
+  }, [level, mamm]);
+
+  useEffect(() => {
+    if (!viewReady) return;
     const c = canvasRef.current!;
     const v =
       level === 'mammals'
@@ -99,11 +127,16 @@ export function FanApp() {
     };
     // (A new view per level; the toggles' state carries over.)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [level]);
+  }, [level, viewReady]);
 
   return (
     <div className="app fan">
       <canvas ref={canvasRef} className="stage" />
+      {!viewReady && (
+        <div className="loading" role="status">
+          {mamm === 'fetch' ? 'loading mammals…' : mamm === 'build' ? 'building the mammal tree…' : mamm}
+        </div>
+      )}
       <div className="bar" ref={barRef}>
         <button
           type="button"
@@ -138,6 +171,7 @@ export function FanApp() {
           onClick={() => {
             const next = LEVELS[(LEVELS.indexOf(level) + 1) % LEVELS.length];
             setSel(null);
+            if (next === 'mammals') setMamm(mammStart());
             setLevel(next);
             try {
               const u = new URL(window.location.href);
