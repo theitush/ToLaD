@@ -723,6 +723,24 @@ def file_meta(droot: DNode | None, rows: list[tuple[Node, bool]]) -> dict | None
     marked = {id(nd.data["dleaf"]) for nd, stub in rows if not stub and nd.data.get("dleaf") is not None}
     if not marked:
         return out
+    out.update(_induce(droot, marked, lambda leaf: [row_of[id(leaf)]]))
+    return out
+
+
+def all_meta(droot: DNode | None, where: dict[int, tuple[int, int]]) -> dict:
+    """The dated tree induced on every species row of every file (ToLaD#247: the whole-mammal fan): as
+    file_meta's `nodes`, but a species is `[parent, tile, row]` (tile -1: the skeleton) and `grafts` lists
+    `[tile, row]` pairs. `where` maps id(species node) to its (tile, row)."""
+    if droot is None:
+        return {}
+    marked = {id(d) for d in droot.preorder() if d.leaf is not None and id(d.leaf) in where}
+    if not marked:
+        return {}
+    return _induce(droot, marked, lambda leaf: list(where[id(leaf)]))
+
+
+def _induce(droot: DNode, marked: set[int], ref) -> dict:
+    """The dated tree induced on the marked leaves; `ref(leaf node)` is a species' entry after its parent."""
     # induce: postorder keep nodes with >= 2 marked branches
     keep: dict[int, DNode | None] = {}
     kids_of: dict[int, list[DNode]] = {}
@@ -745,9 +763,10 @@ def file_meta(droot: DNode | None, rows: list[tuple[Node, bool]]) -> dict | None
         d, par = st.pop()
         i = len(nodes)
         if d.leaf is not None:
-            nodes.append([par, row_of[id(d.leaf)]])
+            r = ref(d.leaf)
+            nodes.append([par, *r])
             if d.graft:
-                grafts.append(row_of[id(d.leaf)])
+                grafts.append(r if len(r) > 1 else r[0])
             continue
         nodes.append([par, _r(d.age), _r(d.lo), _r(d.hi), d.src])
         if d.name:
@@ -759,8 +778,7 @@ def file_meta(droot: DNode | None, rows: list[tuple[Node, bool]]) -> dict | None
         if d.note >= 0:
             notes[str(i)] = d.note
         st.extend((c, i) for c in reversed(kids_of[id(d)]))
-    out.update({"nodes": nodes, "names": names, "names_en": names_en, "loose": loose, "notes": notes, "grafts": sorted(grafts)})
-    return out
+    return {"nodes": nodes, "names": names, "names_en": names_en, "loose": loose, "notes": notes, "grafts": sorted(grafts)}
 
 
 def skeleton_meta(droot: DNode | None) -> dict:

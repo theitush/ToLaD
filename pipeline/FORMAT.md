@@ -241,7 +241,10 @@ The sidecars are JSON, one per data file, read at build time by the fan (they ar
   `gen_how`: `COMBINE reported`, `COMBINE imputed` (Soria et al. 2021, Pacifici et al. 2013's values),
   or `allometric` (the model's mass fit, for fossils and species COMBINE lacks).
 
-`skeleton.json` adds the shared tables: `sources` (`upham`, `upham-imputed`: a split that joins a tip
+`skeleton.json` adds the shared tables and `all` (ToLaD#247): the dated tree induced on every file's species
+rows, keyed as `nodes`/`names`/`names_en`/`loose`/`notes`/`grafts` above, except that a species is
+`[parent, tile, row]` (tile −1: the skeleton) and `grafts` lists `[tile, row]` pairs (the whole-mammal fan reads
+it; the per-file trees cannot be joined without it). Then `sources` (`upham`, `upham-imputed`: a split that joins a tip
 Upham placed with no genetic data, `fossil`: a graft's first appearance or a fossil subtree's
 fossil-range age, `interpolated`: an Open Tree node's interpolated age, `override`, and since #145's ages
 rule: `ensemble`: a clade of both Upham and Álvarez-Carretero 2022 dated by the geometric mean of their ages
