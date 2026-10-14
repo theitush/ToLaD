@@ -323,7 +323,7 @@ export class Steady extends Fold {
       cW[i + 1] = cW[i] + (dead ? 0 : own ? laneW(b, y, age) : b.baseW);
       cB[i + 1] = cB[i] + (dead ? 0 : b.baseW);
     }
-    this.extW.set(k, (r = [cW, cB]));
+    this.extW.set(y, (r = [cW, cB]));
     return r;
   }
   private readonly extW = new Map<number, [Float64Array, Float64Array]>();
