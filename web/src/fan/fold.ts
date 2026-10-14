@@ -169,10 +169,15 @@ export abstract class Fold {
 
   /** The level above the orders (ToLaD#247): each order's share of the width at "now", and the gaps scaled to it (ORDER_OPEN_LO's note). */
   private scaleOrders(nodes: FanNode[]): void {
-    const r = this.nowRow();
-    const wOf = (v: FanNode) => v.strands.reduce((s, b) => s + (r.own[b.index] ? r.w[r.item[b.index]] : 0), 0);
-    const all = this.strands.reduce((s, b) => s + (r.own[b.index] ? r.w[r.item[b.index]] : 0), 0) || 1;
-    for (const v of nodes) this.ordShare.push(wOf(v) / all);
+    // (Worked out at build time for the mammal level, the layout's seed: the same numbers, ToLaD#255.)
+    const seed = this.fan.ordShare;
+    if (seed && seed.length === nodes.length) this.ordShare.push(...seed);
+    else {
+      const r = this.nowRow();
+      const wOf = (v: FanNode) => v.strands.reduce((s, b) => s + (r.own[b.index] ? r.w[r.item[b.index]] : 0), 0);
+      const all = this.strands.reduce((s, b) => s + (r.own[b.index] ? r.w[r.item[b.index]] : 0), 0) || 1;
+      for (const v of nodes) this.ordShare.push(wOf(v) / all);
+    }
     const W = this.fan.trunkWidth;
     let top = 0;
     for (let i = 0; i < this.pairGap.length; i++) {
