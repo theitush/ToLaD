@@ -216,6 +216,9 @@ const scenes = [
   ['frame-2', 'taps', [process.env.LEVEL === 'cats' ? 'Panthera' : process.env.LEVEL === 'mammals' ? 'Primates' : 'Canidae', 'tt']],
   ['frame-3', 'taps', [process.env.LEVEL === 'cats' ? 'Panthera' : process.env.LEVEL === 'mammals' ? 'Primates' : 'Canidae', 'ttt']],
   ['frame-plus', 'tapplus'],
+  // ToLaD#278: MDD splits beside their parent species: (LEVEL=cats) the small cats and the wildcats, a tap or two down.
+  ['mdd-smallcats', 'taps', ['Leopardus', 't']],
+  ['mdd-wildcats', 'taps', ['Felis', 'tt']],
   // ToLaD#246: a flight from home into the fisher's frame, and from there back home, caught every 360 ms (1.8 s each).
   ...[0, 360, 720, 1080, 1440, 1800].map((ms) => [`fly-in-${ms}`, 'flyin', ['Fisher', ms]]),
   ...[0, 360, 720, 1080, 1440, 1800].map((ms) => [`fly-out-${ms}`, 'flyout', ['Fisher', ms]]),
