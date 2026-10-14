@@ -6,6 +6,8 @@ This is `theitush/ToLaD` (public), **Tree of Life and Death**: a mobile-first, z
 
 **The app is live at https://theitush.github.io/ToLaD/** — `.github/workflows/pages.yml` builds `web/` (`build:single`) and deploys it on every push to main (#239, Ita's call).
 
+**We build a scalable tree, we don't tinker** (Ita, #330): big zoomable trees are a solved field — layout, label placement, level of detail and rendering have established algorithms, so use them. The baseline must be solid and awesome out of the box at every level; a special case, magic pixel constant or per-clade nudge is not a fix. Tuning is for highlights only (hominins, cats), at the end.
+
 ## Tasks
 
 *Generated from `coo/templates/CLAUDE-tasks.md` and overwritten whenever it changes — put this repo's own rules above this heading.*
