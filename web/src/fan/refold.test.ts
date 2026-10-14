@@ -2,7 +2,7 @@
 // they sampled and read only the left edges again (TwigModel.refold, ColumnPath.reset). What they hand out
 // must be what a fresh model works out at the fold as it is now.
 import { describe, expect, it } from 'vitest';
-import { Fold } from './fold';
+import { Steady } from './steady';
 import { layoutFan } from './layout';
 import { CARNIVORA } from './panthera';
 import { CARNIVORA_TREE } from './splits';
@@ -10,7 +10,7 @@ import { TwigModel } from './twigs';
 
 describe('refold keeps the widths, reads the left edges again', () => {
   const fan = layoutFan(CARNIVORA, 'linear', CARNIVORA_TREE, 'curved');
-  const fold = new Fold(fan);
+  const fold = new Steady(fan);
   fan.tess.fold = fold;
   fold.setAll(0);
   const now = fan.time.y(0);
@@ -31,9 +31,8 @@ describe('refold keeps the widths, reads the left edges again', () => {
         for (const y of ys) m.at(y);
         m.path.span(sx, sy, now, now + H / 2);
       }
-      // The fold moves: splits half open, the anchor on one side.
+      // The layout moves: splits half open.
       fold.setAll(0.5, true);
-      fold.setAnchor(fan.root.left + fan.root.width * 0.2, now + H * 0.3, sx, 390);
       let worst = 0;
       for (const m of models) {
         m.refold();

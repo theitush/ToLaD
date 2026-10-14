@@ -244,7 +244,7 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
       };
       wrap(fan.tess as unknown as Record<string, unknown>, 'xRange', 'xRange');
       wrap(fan.tess as unknown as Record<string, unknown>, 'xTable', 'xTable');
-      if (fan.tess.fold) for (const k of ['left', 'foldRow', 'riverRow', 'carriedForks', 'rowXs', 'row']) wrap(fan.tess.fold as unknown as Record<string, unknown>, k, `fold.${k}`);
+      if (fan.tess.fold) for (const k of ['left', 'rowXs', 'row']) wrap(fan.tess.fold as unknown as Record<string, unknown>, k, `fold.${k}`);
       wrap(ColumnPath.prototype as unknown as Record<string, unknown>, 'build', 'path.build');
       wrap(CutMemo.prototype as unknown as Record<string, unknown>, 'update', 'cutMemo.update');
     }

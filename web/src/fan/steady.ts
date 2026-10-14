@@ -20,10 +20,10 @@
 // half a pixel at all three levels). The cost is honest empty space: a species below its peak (a decline, the dog
 // before its boom) stands narrower in its room. A gap's opening (the zoom) moves things only at the split it
 // belongs to; the camera keeps the point under the fingers (follow). Positions do not depend on what is on screen,
-// so there is no anchor (setAnchor never moves anything), and a row is one walk down the tree: no refolding.
+// so there is no anchor (the fold had one), and a row is one walk down the tree: no refolding.
 //
-// It is a Fold to the view (the same interface: left, rowXs, extent, setScale, follow, homeExtent...), chosen by
-// the default (wantSteady; ?layout=fold for the fold, ToLaD#273). At the cats' level (the view's `folds` off) every split is open, at every zoom.
+// It is the view's layout (fan.tess.fold; its base, fold.ts, holds the splits' gaps and their openness by zoom), the
+// only one since ToLaD#300 retired the fold's own packing. At the cats' level (the view's `folds` off) every split is open, at every zoom.
 
 import { ease, isNode, laneW, segAt, type Fan, type FanBranch, type FanNode } from './layout';
 import { Fold, ROOM_BEND, type FoldState } from './fold';
@@ -40,17 +40,6 @@ export const LIFE_GAP = 0.5;
 
 /** Rooms by life: a strand's widest over a window is laneW at this many steps (and its ends). */
 const LIFE_SAMPLES = 48;
-
-/** Whether the steady layout is in use: the default (ToLaD#273); ?layout=fold, or TOLAD_LAYOUT=fold in node (tests, perf runs), brings the fold back. */
-export function wantSteady(): boolean {
-  try {
-    if (typeof location !== 'undefined' && new URLSearchParams(location.search).get('layout') === 'fold') return false;
-  } catch {
-    /* no URL */
-  }
-  const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
-  return env?.TOLAD_LAYOUT !== 'fold';
-}
 
 /**
  * Whether a level whose living members dwarf its fossils is framed on the fossils (ToLaD#289): ?fit=fossils, or
@@ -157,8 +146,6 @@ export class Steady extends Fold {
     readonly life = wantLifeRooms(),
   ) {
     super(fan);
-    // (A boom stands centred in its room like any column: its centre is constant, ToLaD#259.)
-    this.flare.fill(0);
     const N = fan.nodes;
     N.forEach((v, j) => this.idx.set(v, j));
     this.par = Int32Array.from(N, (v) => (v.parent ? this.idx.get(v.parent)! : -1));
@@ -208,10 +195,7 @@ export class Steady extends Fold {
       this.tipN[j] = t;
     }
     this.yNow = yRef;
-    if (open) {
-      this.a.fill(1);
-      this.lambda = 1;
-    }
+    if (open) this.a.fill(1);
   }
 
   /** The rooms and places at the a's `A`. */
@@ -779,11 +763,6 @@ export class Steady extends Fold {
     return r;
   }
   private readonly cRows = new Map<number, Float64Array>();
-
-  /** No anchor: the places do not depend on what is on screen. */
-  override setAnchor(): boolean {
-    return false;
-  }
 
   override setScale(sx: number, screenW: number): boolean {
     if (sx === this.sx && screenW === this.screenW) return false;

@@ -13,8 +13,8 @@ import { isNode, laneAt, layoutFan, leftAt, nearestStrand, nodeLeftAt, nodeQ, se
 import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01 } from './meshgl';
 import { Lod } from './lod';
-import { Fold, type FoldState } from './fold';
-import { Steady, wantFitFossils, wantSteady } from './steady';
+import type { FoldState } from './fold';
+import { Steady, wantFitFossils } from './steady';
 import { COLUMN_DIM, columnSpans, EVENT_TINT, eventAt, eventSpans, type EventSpan } from './colstyle';
 import { drawTwigs, kLogAt, laneDim, LINEAGE, LIVING, TEX_HAIR_PX, TWIG_GRAY, TwigModel, type IndInfo, type TwigStats } from './twigs';
 import type { MeshBatch, RectBatch } from './meshgl';
@@ -1724,18 +1724,14 @@ export class FanView implements InputHandlers {
       const sx = this.homeCamera().sx * zoom;
       const f = this.fan.tess.fold;
       f?.setScale(sx, this.w);
-      let [a, b] = levelSpan(v);
-      // (Anchored on the clade, as a pinch there would: what opens or grows far from it leaves it still.)
-      if (f && f.setAnchor((a + b) / 2, fr.cy, sx, this.w)) [a, b] = levelSpan(v);
+      const [a, b] = levelSpan(v);
       // (The fold stays at the frame's zoom: the camera taking the frame finds it there, nothing to follow.)
       return { ...fr, sx, cx: (a + b) / 2 - 22 / sx };
     }
     if (this.fan.root.split.taxon === name) return this.homeCamera();
     const v = this.fan.nodes.find((n) => n.split.taxon === name);
     if (!v) return null;
-    // Folded (fold.ts): the clade's span at the zoom that frames it (it opens as it is framed), the rows anchored on
-    // it (foldedFrame: else the fold stands on where the view was, and a small clade far from it, the whales from home,
-    // is framed where it stood there, ToLaD#247).
+    // The clade's span at the zoom that frames it (it opens as it is framed: foldedFrame, ToLaD#247).
     return foldedFrame(this.fan, this.w, () => {
       // (?fit=fossils, ToLaD#289: as a tap's frame, cladeCamera, a level whose living columns dwarf its fossils framed on them.)
       const [a, b] = levelSpan(v);
@@ -1749,13 +1745,10 @@ export class FanView implements InputHandlers {
   }
 
   private withFold(fan: Fan): Fan {
-    // (steady by default, ?layout=fold for the fold, ToLaD#259/#273: rooms fixed between each branch's own splits, steady.ts; at the cats' level every split open.)
-    const steady = wantSteady();
-    if (this.folds || steady) {
-      const f = steady ? new Steady(fan, !this.folds) : new Fold(fan);
-      f.setAll(0);
-      fan.tess.fold = f;
-    }
+    // (The steady layout, ToLaD#259: rooms fixed between each branch's own splits, steady.ts; at the cats' level every split open.)
+    const f = new Steady(fan, !this.folds);
+    f.setAll(0);
+    fan.tess.fold = f;
     return fan;
   }
 
@@ -1834,8 +1827,8 @@ export class FanView implements InputHandlers {
   /**
    * Fly the camera to the frame `aim` computes (ToLaD#246): slow and smooth, in and out, so the eye can follow. Each axis
    * (width, time) takes a van Wijk–Nuij path (flightPath: a long trip zooms out a little, pans, zooms in), on one sine
-   * ease, over a time by how far it goes (flightMs, 0.9–1.8 s, or `ms`). Folded, the frame's world moves as the fold
-   * opens, closes and re-anchors: the start and the frame are tracked through it (fold.ts follow) and the camera aims
+   * ease, over a time by how far it goes (flightMs, 0.9–1.8 s, or `ms`). Laid out, the frame's world moves as the
+   * splits open and close: the start and the frame are tracked through it (fold.ts follow) and the camera aims
    * between them each step, landing on the frame computed again there (so nothing snaps at the end). `done` runs when
    * it lands (not if a gesture takes over first). Returns the frame aimed at (computed now).
    */
@@ -1853,7 +1846,7 @@ export class FanView implements InputHandlers {
     const fromSnap = fo?.snapshot();
     // A frame that leaves the fold as it is (home): computed again each step where the fold then stands, the flight
     // aiming at it as it moves. One that moves it (foldedFrame's, a level's): its point followed there (fold.ts follow).
-    const same = (p: FoldState, q: FoldState) => p.lambda === q.lambda && p.a.every((x, i) => x === q.a[i]) && p.wt.every((x, i) => x === q.wt[i]);
+    const same = (p: FoldState, q: FoldState) => p.a.every((x, i) => x === q.a[i]);
     const live = !!fo && !!toSnap && !!fromSnap && same(toSnap, fromSnap);
     // (The frame's x where the fold stands now, for the path's length.)
     const tx0 = fo && toSnap && !live ? fo.follow(to.cx, to.cy, toSnap) : to.cx;
@@ -1926,8 +1919,8 @@ export class FanView implements InputHandlers {
     const sx = Math.min(Math.max(h.sx, (0.5 * this.w) / Math.max(1e-300, b.width)), Math.max(h.sx, this.camera.sxCap(b.cx, b.tipY)));
     // Within the time limit (MIN_YEARS on screen) about the tip, where it will sit.
     const s = this.camera.timeCap(b.tipY, tipPx, sy, h.sy);
-    // Folded (fold.ts): its column where the fold has it at that zoom, the rows anchored on it (brackets.ts
-    // foldedFrame, ToLaD#211: the fold stays there for the camera taking it, so it lands centred).
+    // Laid out (steady.ts): its column where the layout has it at that zoom (brackets.ts foldedFrame, ToLaD#211: the
+    // layout stays there for the camera taking it, so it lands centred).
     const f = this.fan.tess.fold;
     const cx = () => (f && f.left(b.index, b.tipY) !== null ? leftAt(b, b.tipY) + laneAt(b, b.tipY).w / 2 : b.cx);
     return foldedFrame(this.fan, this.w, () => ({ cx: cx(), cy: cyAt(s), sx, sy: s, ty: s }));
