@@ -994,7 +994,7 @@
     "of": 15
    }
   },
-  "clamped_below_parent": 99,
+  "clamped_below_parent": 103,
   "ended_before_split": [],
   "fossil_floors": [
    {
@@ -1264,22 +1264,26 @@
   ],
   "grafts": {
    "MDD species: beside the species it was split from (loose)": 685,
-   "MDD species: joins its genus crown (loose)": 449,
-   "joins a split (loose)": 2042,
+   "MDD species: joins its genus crown (loose)": 464,
+   "joins a split (loose)": 2036,
    "on a stem (fossil)": 1175,
-   "on a stem (living, interpolated)": 76,
-   "on a stem, joins a graft of the same age": 160
+   "on a stem (living, interpolated)": 71,
+   "on a stem, joins a graft of the same age": 156
   },
   "living": 7015,
+  "mdd_crowns_by_rank": {
+   "family": 14,
+   "genus": 450
+  },
   "named_splits": 689,
   "species": 18366,
   "species_rows_left_out": 0,
-  "splits": 9144,
+  "splits": 9143,
   "splits_by_source": {
    "ensemble": 2264,
-   "fossil": 2713,
+   "fossil": 2715,
    "fossil-floor": 33,
-   "interpolated": 753,
+   "interpolated": 750,
    "override": 33,
    "upham": 1,
    "upham-imputed": 1387,
@@ -1289,7 +1293,7 @@
    "extinct, placed without data (grafted instead)": 44,
    "unmatched tip": 217
   },
-  "zero_length_spliced": 797
+  "zero_length_spliced": 793
  },
  "dating": {
   "calibrated_raised_by_fossils": 402,
@@ -31106,7 +31110,283 @@
    }
   },
   "source": "Mammal Diversity Database 2026. Mammal Diversity Database (Version 2.5) [Data set]. Zenodo. doi:10.5281/zenodo.21654811; CC BY 4.0",
-  "species": 6904
+  "species": 6904,
+  "structure": {
+   "checked": {
+    "family": 162,
+    "order": 27
+   },
+   "named_off": {
+    "family Anomaluridae": {
+     "e.g.": [
+      "Zenkerella insignis"
+     ],
+     "others": 1
+    },
+    "family Bathyergidae": {
+     "e.g.": [
+      "Heterocephalus glaber",
+      "Heterocephalus phillipsi"
+     ],
+     "others": 2
+    },
+    "family Bovidae": {
+     "e.g.": [
+      "Moschus anhuiensis",
+      "Moschus berezovskii",
+      "Moschus chrysogaster",
+      "Moschus cupreus",
+      "Moschus fuscus",
+      "Moschus leucogaster",
+      "Moschus moschiferus"
+     ],
+     "others": 7
+    },
+    "family Tenrecidae": {
+     "e.g.": [
+      "Micropotamogale lamottei",
+      "Micropotamogale ruwenzorii",
+      "Potamogale velox"
+     ],
+     "others": 3
+    }
+   },
+   "not_one_clade": {
+    "family Anomaluridae": {
+     "e.g.": [
+      "Zenkerella insignis"
+     ],
+     "others": 1,
+     "species": 6,
+     "split_holds": 7
+    },
+    "family Balaenidae": {
+     "e.g.": [
+      "Lissodelphis borealis",
+      "Lissodelphis peronii",
+      "Mesoplodon ginkgodens",
+      "Mesoplodon peruvianus"
+     ],
+     "others": 4,
+     "species": 4,
+     "split_holds": 8
+    },
+    "family Balaenopteridae": {
+     "e.g.": [
+      "Balaena mysticetus",
+      "Caperea marginata",
+      "Eubalaena australis",
+      "Eubalaena glacialis",
+      "Eubalaena japonica",
+      "Lissodelphis borealis",
+      "Lissodelphis peronii",
+      "Mesoplodon ginkgodens"
+     ],
+     "others": 10,
+     "species": 11,
+     "split_holds": 21
+    },
+    "family Bovidae": {
+     "e.g.": [
+      "Moschus anhuiensis",
+      "Moschus berezovskii",
+      "Moschus chrysogaster",
+      "Moschus cupreus",
+      "Moschus fuscus",
+      "Moschus leucogaster",
+      "Moschus moschiferus"
+     ],
+     "others": 7,
+     "species": 152,
+     "split_holds": 165
+    },
+    "family Cheirogaleidae": {
+     "e.g.": [
+      "Lepilemur aeeclis",
+      "Lepilemur ahmansonorum",
+      "Lepilemur ankaranensis",
+      "Lepilemur betsileo",
+      "Lepilemur dorsalis",
+      "Lepilemur edwardsi",
+      "Lepilemur fleuretae",
+      "Lepilemur grewcocki"
+     ],
+     "others": 25,
+     "species": 36,
+     "split_holds": 71
+    },
+    "family Dasypodidae": {
+     "e.g.": [
+      "Cabassous centralis",
+      "Cabassous chacoensis",
+      "Cabassous squamicaudis",
+      "Cabassous tatouay",
+      "Cabassous unicinctus",
+      "Calyptophractus retusus",
+      "Chaetophractus vellerosus",
+      "Chaetophractus villosus"
+     ],
+     "others": 14,
+     "species": 11,
+     "split_holds": 26
+    },
+    "family Delphinidae": {
+     "e.g.": [
+      "Balaena mysticetus",
+      "Balaenoptera acutorostrata",
+      "Balaenoptera bonaerensis",
+      "Balaenoptera borealis",
+      "Balaenoptera brydei",
+      "Balaenoptera edeni",
+      "Balaenoptera musculus",
+      "Balaenoptera omurai"
+     ],
+     "others": 58,
+     "species": 41,
+     "split_holds": 100
+    },
+    "family Dipodidae": {
+     "e.g.": [
+      "Breviforamen shannanense",
+      "Eozapus setchuanus",
+      "Eozapus vicinus",
+      "Eozapus wanglangensis",
+      "Napaeozapus abietorum",
+      "Napaeozapus insignis",
+      "Sicista armenica",
+      "Sicista betulina"
+     ],
+     "others": 37,
+     "species": 41,
+     "split_holds": 82
+    },
+    "family Heteromyidae": {
+     "e.g.": [
+      "Cratogeomys castanops",
+      "Cratogeomys fulvescens",
+      "Cratogeomys fumosus",
+      "Cratogeomys goldmani",
+      "Cratogeomys merriami",
+      "Cratogeomys perotensis",
+      "Cratogeomys planiceps",
+      "Geomys arenarius"
+     ],
+     "others": 49,
+     "species": 73,
+     "split_holds": 128
+    },
+    "family Hipposideridae": {
+     "e.g.": [
+      "Cloeotis percivali",
+      "Paratriaenops auritus",
+      "Paratriaenops furculus",
+      "Paratriaenops pauliani",
+      "Rhinonicteris aurantia",
+      "Triaenops afer",
+      "Triaenops menamena",
+      "Triaenops parvus"
+     ],
+     "others": 9,
+     "species": 94,
+     "split_holds": 107
+    },
+    "family Iniidae": {
+     "e.g.": [
+      "Lipotes vexillifer",
+      "Pontoporia blainvillei"
+     ],
+     "others": 2,
+     "species": 4,
+     "split_holds": 6
+    },
+    "family Lorisidae": {
+     "e.g.": [
+      "Euoticus elegantulus",
+      "Euoticus pallidus",
+      "Galago alleni",
+      "Galago gabonensis",
+      "Galago gallarum",
+      "Galago granti",
+      "Galago matschiei",
+      "Galago moholi"
+     ],
+     "others": 19,
+     "species": 17,
+     "split_holds": 38
+    },
+    "family Megadermatidae": {
+     "e.g.": [
+      "Acerodon celebensis",
+      "Acerodon humilis",
+      "Acerodon jubatus",
+      "Acerodon leucotis",
+      "Acerodon mackloti",
+      "Aeorestes cinereus",
+      "Aeorestes egregius",
+      "Aethalops aequalis"
+     ],
+     "others": 1498,
+     "species": 7,
+     "split_holds": 1548
+    },
+    "family Mormoopidae": {
+     "e.g.": [
+      "Ametrida centurio",
+      "Anoura aequatoris",
+      "Anoura cadenai",
+      "Anoura caudifer",
+      "Anoura cultrata",
+      "Anoura fistulata",
+      "Anoura geoffroyi",
+      "Anoura javieri"
+     ],
+     "others": 231,
+     "species": 18,
+     "split_holds": 253
+    },
+    "family Muridae": {
+     "e.g.": [
+      "Abrawayaomys ruschii",
+      "Abrothrix andinus",
+      "Abrothrix dolichonyx",
+      "Abrothrix hershkovitzi",
+      "Abrothrix hirta",
+      "Abrothrix illuteus",
+      "Abrothrix jelskii",
+      "Abrothrix lanosus"
+     ],
+     "others": 968,
+     "species": 865,
+     "split_holds": 1891
+    },
+    "family Vespertilionidae": {
+     "e.g.": [
+      "Cistugo lesueuri",
+      "Cistugo seabrae",
+      "Eudiscoderma thongareeae"
+     ],
+     "others": 3,
+     "species": 555,
+     "split_holds": 580
+    },
+    "family Ziphiidae": {
+     "e.g.": [
+      "Balaena mysticetus",
+      "Balaenoptera acutorostrata",
+      "Balaenoptera bonaerensis",
+      "Balaenoptera borealis",
+      "Balaenoptera brydei",
+      "Balaenoptera edeni",
+      "Balaenoptera musculus",
+      "Balaenoptera omurai"
+     ],
+     "others": 78,
+     "species": 24,
+     "split_holds": 103
+    }
+   },
+   "note": "Is every MDD order and family one clade of the dated tree (ToLaD#278)? Its living species (MDD's own,"
+  }
  },
  "mock_individuals": 7,
  "natural_baseline": {
@@ -32039,7 +32319,7 @@
  },
  "output": {
   "brotli_bytes": 789528,
-  "dated_sidecar_raw": 1732567,
+  "dated_sidecar_raw": 1732621,
   "files": 15,
   "raw_bytes": 3320704,
   "skeleton_brotli": 64671,
