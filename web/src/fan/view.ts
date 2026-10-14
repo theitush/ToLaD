@@ -605,11 +605,11 @@ export const FIT_DWARF = 3;
 
 /**
  * Where a level's fossils lived (?fit=fossils, ToLaD#289): the world x its columns took (each at its own width
- * there) from the level's start up to its youngest fossil's end, or null when it has no fossil or its span at "now"
+ * there) from the level's start up to its youngest fossil group's end (fossilEnd), or null when it has no fossil or its span at "now"
  * (familySpan) is under FIT_DWARF times that: the living columns' widening since is left to run off the screen.
  */
-export function fossilSpan(v: FanNode): [number, number] | null {
-  const yEnd = fossilEnd(v);
+export function fossilSpan(fan: Fan, v: FanNode): [number, number] | null {
+  const yEnd = fossilEnd(fan, v);
   if (yEnd === null) return null;
   const s: [number, number] = [Infinity, -Infinity];
   for (const b of v.strands) {
@@ -629,25 +629,34 @@ export function fossilSpan(v: FanNode): [number, number] | null {
   return z - a > FIT_DWARF * (s[1] - s[0]) ? s : null;
 }
 
-/** World y of a level's youngest fossil's end (its extinct strand nearest "now"), or null when it has none. */
-function fossilEnd(v: FanNode): number | null {
+/**
+ * World y of a level's youngest fossil group's end (ToLaD#298): of its groups one level down (nextLevels) with no
+ * member alive now, the one whose last member died nearest "now"; null when every group has one alive. (At the
+ * Hominins the Homo group, the humans in it, is no fossil: its fossils' ~40 kya would leave the australopiths and
+ * Paranthropus, the level's own fossils, at the screen's foot.)
+ */
+function fossilEnd(fan: Fan, v: FanNode): number | null {
+  const gone = (b: FanBranch) => b.sp.extinct || !(b.pop.aliveAt(0) > 0);
   let y = Infinity;
-  for (const b of v.strands) if (b.sp.extinct || !(b.pop.aliveAt(0) > 0)) y = Math.min(y, b.tipY);
+  for (const g of nextLevels(fan, v)) {
+    const bs = g.b ? [g.b] : g.v.strands;
+    if (bs.every(gone)) for (const b of bs) y = Math.min(y, b.tipY);
+  }
   return y < Infinity ? y : null;
 }
 
 /**
  * The world y a level's frame puts where "now" would stand (ToLaD#298): under ?fit=fossils, a level framed on its
- * fossils (fossilSpan) has its youngest fossil's end there, "now" (and the living columns' last ~40 kyr, which log
- * time gives most of the screen) above the screen; otherwise null ("now" there).
+ * fossils (fossilSpan) has its youngest fossil group's end there, "now" (and the living columns' last ~40 kyr, which
+ * log time gives most of the screen) above the screen; otherwise null ("now" there).
  */
-export function fossilTop(v: FanNode): number | null {
-  return wantFitFossils() && fossilSpan(v) ? fossilEnd(v) : null;
+export function fossilTop(fan: Fan, v: FanNode): number | null {
+  return wantFitFossils() && fossilSpan(fan, v) ? fossilEnd(fan, v) : null;
 }
 
 /** The world x a level is framed on: its span at "now" (familySpan), or under ?fit=fossils where its dwarfed fossils lived (fossilSpan, ToLaD#289). */
-export function levelSpan(v: FanNode): [number, number] {
-  return (wantFitFossils() && fossilSpan(v)) || familySpan(v);
+export function levelSpan(fan: Fan, v: FanNode): [number, number] {
+  return (wantFitFossils() && fossilSpan(fan, v)) || familySpan(v);
 }
 
 /** Species' rooms side by side: their world x span [x0, x1] (folded, fold.ts: where the fold has them, at "now", an extinct one's at its tip). */
@@ -1004,6 +1013,11 @@ export function labelSpots(
   const nowS = Y(nowY);
   /** "now" on screen (below the top line): 1, fading over 24 px as it goes above. */
   const nowOn = clamp01((nowS - top) / 24);
+  // (?fit=fossils, ToLaD#298: a level framed on its fossils has "now" above the screen; a living group's picture stands
+  // under the top line then (groupPics), its name under that, and the level's names show.)
+  const fossils = !!level && wantFitFossils();
+  const standS = fossils ? Math.max(nowS, top + NOW_ROOM) : nowS;
+  const levelOn = fossils ? 1 : nowOn;
 
   // Heights (world) to measure a column's edge at between wa < wb: both ends, its own ends and peel's end
   // (`at`) and a grid fixed in the world, at most 8 px apart. Points only enter at the ends, where the edge
@@ -1319,7 +1333,7 @@ export function labelSpots(
     if (level) {
       // A level's group (ToLaD#262): its name beside its branch, down from "now" (its picture stands over "now",
       // groupPics): beside the column nearest its centre, room at the name's end for the "+x" of the groups hidden.
-      if (!(nowOn > 0)) continue;
+      if (!(levelOn > 0)) continue;
       const [wa, wb] = groupExtent(v);
       const cx = (wa + wb) / 2;
       if (!(X(wb) > 0 && X(wa) < c.w)) continue;
@@ -1332,7 +1346,7 @@ export function labelSpots(
         for (const p of along(`n${vi}`, text, rank, measure(text) + 2 * LABEL_PAD + px, v, nowY, v.yBot, nowOn, { v })) out.push({ ...p, fam: v, pic: groupFace(v), plus: px });
         continue;
       }
-      for (const p of beside(`n${vi}`, text, rank, measure(text) + 2 * LABEL_PAD + px, own, Math.max(nowS, Y(own.tipY)) + 4, Y(own.splitY), nowOn, { v }, true))
+      for (const p of beside(`n${vi}`, text, rank, measure(text) + 2 * LABEL_PAD + px, own, Math.max(standS, Y(own.tipY)) + 4, Y(own.splitY), levelOn, { v }, true))
         out.push({ ...p, fam: v, pic: groupFace(v), plus: px });
       continue;
     }
@@ -1368,7 +1382,7 @@ export function labelSpots(
         out.push(...along(id, b.sp.common, [0, b.width, b.index], measure(b.sp.common) + 2 * LABEL_PAD + px, b, Math.max(nowY, b.tipY), b.splitY, 1, { b }).map((p) => ({ ...p, plus: px })));
         continue;
       }
-      out.push(...beside(id, b.sp.common, [0, b.width, b.index], measure(b.sp.common) + 2 * LABEL_PAD + px, b, Math.max(nowS, Y(b.tipY)) + 4, Y(b.splitY), 1, { b }, true).map((p) => ({ ...p, plus: px })));
+      out.push(...beside(id, b.sp.common, [0, b.width, b.index], measure(b.sp.common) + 2 * LABEL_PAD + px, b, Math.max(standS, Y(b.tipY)) + 4, Y(b.splitY), 1, { b }, true).map((p) => ({ ...p, plus: px })));
       continue;
     }
     // (Standing for its family, ToLaD#212: the family's name on its tip, last frame's familyPills.)
@@ -1843,8 +1857,8 @@ export class FanView implements InputHandlers {
           }
         : familySpan;
     // (?fit=fossils, ToLaD#289: a level whose living columns dwarf its fossils framed on where the fossils lived.)
-    const fit = wantFitFossils() ? (u: FanNode) => fossilSpan(u) ?? span(u) : span;
-    return cladeCamera(this.camera, this.fan, v, fit, (cam) => this.withBand(cam, v, fossilTop(v) ?? this.yNow));
+    const fit = wantFitFossils() ? (u: FanNode) => fossilSpan(this.fan, u) ?? span(u) : span;
+    return cladeCamera(this.camera, this.fan, v, fit, (cam) => this.withBand(cam, v, fossilTop(this.fan, v) ?? this.yNow));
   }
 
   /**
@@ -1971,7 +1985,7 @@ export class FanView implements InputHandlers {
       const sx = this.homeCamera().sx * zoom;
       const f = this.fan.tess.fold;
       f?.setScale(sx, this.w);
-      const [a, b] = levelSpan(v);
+      const [a, b] = levelSpan(this.fan, v);
       // (The fold stays at the frame's zoom: the camera taking the frame finds it there, nothing to follow.)
       return { ...fr, sx, cx: (a + b) / 2 - 22 / sx };
     }
@@ -1981,8 +1995,8 @@ export class FanView implements InputHandlers {
     // The clade's span at the zoom that frames it (it opens as it is framed: foldedFrame, ToLaD#247).
     return foldedFrame(this.fan, this.w, () => {
       // (?fit=fossils, ToLaD#289: as a tap's frame, cladeCamera, a level whose living columns dwarf its fossils framed on them.)
-      const [a, b] = levelSpan(v);
-      return this.withBand(this.camera.frame(a, b, v.y, true), v, fossilTop(v) ?? this.yNow);
+      const [a, b] = levelSpan(this.fan, v);
+      return this.withBand(this.camera.frame(a, b, v.y, true), v, fossilTop(this.fan, v) ?? this.yNow);
     });
   }
 
@@ -3228,7 +3242,10 @@ export class FanView implements InputHandlers {
     for (const g of this.levelGroupsOn(lg)) {
       const face = g.lv.v ? groupFace(g.lv.v) : g.lv.b;
       if (!face || !wikiOf(face.sp.sci)?.img) continue;
-      const y = g.lv.b && g.lv.b.tipY > this.yNow ? this.toScreen(0, g.lv.b.tipY)[1] : nowS;
+      // (Fossils framed, ToLaD#298: a genus all gone on its youngest tip; a living group's, "now" above the screen,
+      // under the top line, over its name.)
+      const tip = g.lv.b ? g.lv.b.tipY : fossils && g.lv.v.strands.every((b) => b.tipY > this.yNow) ? Math.min(...g.lv.v.strands.map((b) => b.tipY)) : this.yNow;
+      const y = tip > this.yNow ? this.toScreen(0, tip)[1] : fossils ? Math.max(nowS, top + NOW_ROOM) : nowS;
       if (y < top + 12 || y > this.h) continue;
       gs.push({ lv: g.lv, face, x: g.x, y, n: groupAlive(g.lv) });
     }

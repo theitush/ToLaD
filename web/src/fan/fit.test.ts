@@ -113,7 +113,7 @@ describe('?fit=fossils: the hominins readable (ToLaD#289)', () => {
     const bad: string[] = [];
     const lines: string[] = [];
     for (const u of [by('Hominini'), by('Homo')]) {
-      expect(fossilSpan(u)).not.toBeNull();
+      expect(fossilSpan(v.fan, u)).not.toBeNull();
       for (const r of measure(v, u)) {
         lines.push(`${levelName(u)} ${r.sci}: ${r.px.toFixed(1)} px${r.on ? '' : ' (off screen)'}${r.named ? '' : ' (name hidden)'}`);
         if (r.sci === 'Homo sapiens') continue;
