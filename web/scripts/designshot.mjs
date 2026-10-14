@@ -137,6 +137,12 @@ const scenes = [
   // The great apes and the hominins (ToLaD#275): Hominidae framed, the human lineage, a Neanderthal's card.
   ['mamm-hominidae', 'level', ['Hominidae']],
   ['mamm-homininae', 'level', ['Homininae']],
+  // ToLaD#289: the Hominins and Homo levels (?fit=fossils: framed on the fossils), and tapped down to them from home along the humans.
+  ['mamm-hominini', 'level', ['Hominini']],
+  ['mamm-homo', 'level', ['Homo']],
+  ['hom-taps-6', 'taps', ['Homo sapiens', 'tttttt']],
+  ['hom-taps-7', 'taps', ['Homo sapiens', 'ttttttt']],
+  ['hom-taps-5', 'taps', ['Homo sapiens', 'ttttt']],
   ['mamm-neanderthal', 'search', ['neander', 'Neanderthal']],
   ['carn-card-dog', 'card', ['Grey wolf']],
   ['carn-search-wol', 'search', ['wol']],
@@ -241,6 +247,7 @@ let served = null;
 try {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: Number(process.env.DSF || 2), isMobile: true, hasTouch: true });
   const page = await ctx.newPage();
+  if (process.env.LOGS) page.on('console', (m) => console.log('  [page]', m.text()));
   page.on('pageerror', (e) => console.log('pageerror', String(e)));
   const q = [process.env.DEBUG ? 'debug' : '', process.env.EDGE ? `edge=${process.env.EDGE}` : '', process.env.LEVEL ? `level=${process.env.LEVEL}` : '', process.env.Q || ''].filter(Boolean).join('&');
   served = await pageUrl(q);

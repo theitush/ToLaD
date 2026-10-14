@@ -509,6 +509,11 @@ export function fossilSpan(v: FanNode): [number, number] | null {
   return z - a > FIT_DWARF * (s[1] - s[0]) ? s : null;
 }
 
+/** The world x a level is framed on: its span at "now" (familySpan), or under ?fit=fossils where its dwarfed fossils lived (fossilSpan, ToLaD#289). */
+export function levelSpan(v: FanNode): [number, number] {
+  return (wantFitFossils() && fossilSpan(v)) || familySpan(v);
+}
+
 /** Species' rooms side by side: their world x span [x0, x1] (folded, fold.ts: where the fold has them, at "now", an extinct one's at its tip). */
 export function spanOf(bs: readonly FanBranch[]): [number, number] {
   const s: [number, number] = [Infinity, -Infinity];
@@ -1686,9 +1691,9 @@ export class FanView implements InputHandlers {
       const sx = this.homeCamera().sx * zoom;
       const f = this.fan.tess.fold;
       f?.setScale(sx, this.w);
-      let [a, b] = familySpan(v);
+      let [a, b] = levelSpan(v);
       // (Anchored on the clade, as a pinch there would: what opens or grows far from it leaves it still.)
-      if (f && f.setAnchor((a + b) / 2, fr.cy, sx, this.w)) [a, b] = familySpan(v);
+      if (f && f.setAnchor((a + b) / 2, fr.cy, sx, this.w)) [a, b] = levelSpan(v);
       // (The fold stays at the frame's zoom: the camera taking the frame finds it there, nothing to follow.)
       return { ...fr, sx, cx: (a + b) / 2 - 22 / sx };
     }
@@ -1699,7 +1704,8 @@ export class FanView implements InputHandlers {
     // it (foldedFrame: else the fold stands on where the view was, and a small clade far from it, the whales from home,
     // is framed where it stood there, ToLaD#247).
     return foldedFrame(this.fan, this.w, () => {
-      const [a, b] = familySpan(v);
+      // (?fit=fossils, ToLaD#289: as a tap's frame, cladeCamera, a level whose living columns dwarf its fossils framed on them.)
+      const [a, b] = levelSpan(v);
       return this.withBand(this.camera.frame(a, b, v.y, true), v);
     });
   }
