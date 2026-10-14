@@ -261,7 +261,7 @@ describe('a level framed by name (levelCamera, the design shots\' "level"): noth
     const bad: string[] = [];
     const walk = (v: FanView, us: FanNode[]) => {
       for (const u of us) {
-        v.cam = v.levelCamera(u.split.taxon)!;
+        v.cam = v.levelCamera(u.split.taxon!)!;
         v.camera.settle();
         (v as unknown as { tapAt: unknown }).tapAt = null;
         settle(v);
