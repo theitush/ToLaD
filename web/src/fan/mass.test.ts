@@ -59,11 +59,29 @@ describe('mass widths', () => {
     for (const s of top) console.log(`${s.sci.padEnd(28)} ${s.common.padEnd(24)} ${(tonnes(s) / 1e6).toFixed(2).padStart(8)} Mt  ${s.alive.toExponential(2)} × ${s.massKg!.toFixed(1)} kg (${s.massHow})`);
     const names = top.map((s) => s.sci);
     for (const s of ['Bos taurus', 'Homo sapiens']) expect(names, s).toContain(s);
-    // (Today's mammals weigh ~1.1 Gt: livestock ~630 Mt, humans ~390 Mt, wild land ~20 Mt and marine ~40 Mt; Greenspoon 2023,
-    // Bar-On 2018. The data gives ~2.4 Gt: the cattle weigh PHYLACINE's Bos taurus, the aurochs' 900 kg, about twice a
-    // cow's; the bounds hold that until the domestic stocks get their own mass.)
-    expect(total / 1e6).toBeGreaterThan(500);
-    expect(total / 1e6).toBeLessThan(3000);
+    // The domestic stocks weigh their herd's mean live mass (ToLaD#328: Greenspoon 2023's livestock and pets), not
+    // their wild ancestor's adult mass: a cow ~280 kg with the calves, not the aurochs' 900.
+    const cattle = cl.species.find((s) => s.sci === 'Bos taurus')!;
+    expect(cattle.massHow).toBe('domestic stock');
+    expect(cattle.massKg).toBeGreaterThan(200);
+    expect(cattle.massKg).toBeLessThan(400);
+    // Against the literature (research/domestic-mass.md): Greenspoon 2023 ~1.1 Gt wet (livestock and pets ~630 Mt,
+    // humans ~390 Mt at 50 kg, wild ~60 Mt); Bar-On 2018 in carbon, at 0.15 g C per g wet: livestock ~0.1 Gt C (~670 Mt),
+    // humans ~0.06 (~400 Mt), wild ~0.007 (~50 Mt). Each part within ~30%, the humans' over by their adult 60 kg.
+    const part = (f: (s: (typeof cl.species)[number]) => boolean) => cl.species.filter(f).reduce((a, s) => a + tonnes(s), 0) / 1e6;
+    const domestic = part((s) => s.massHow === 'domestic stock');
+    const humans = part((s) => s.sci === 'Homo sapiens');
+    const wild = total / 1e6 - domestic - humans;
+    console.log(`domestic ${domestic.toFixed(0)} Mt, humans ${humans.toFixed(0)} Mt, wild ${wild.toFixed(0)} Mt; ` +
+      `in carbon (×0.15) ${(total * 0.15 / 1e9).toFixed(3)} Gt C`);
+    expect(domestic).toBeGreaterThan(630 * 0.7);
+    expect(domestic).toBeLessThan(670 * 1.3);
+    expect(humans).toBeGreaterThan(390 * 0.9);
+    expect(humans).toBeLessThan(400 * 1.3);
+    expect(wild).toBeGreaterThan(20);
+    expect(wild).toBeLessThan(150);
+    expect(total / 1e6).toBeGreaterThan(1100 * 0.8);
+    expect(total / 1e6).toBeLessThan(1100 * 1.3);
   });
 
   it('lays out the whole mammal tree by mass', () => {
