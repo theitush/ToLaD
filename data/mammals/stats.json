@@ -21513,6 +21513,14 @@
   "hi": 5.736411360932109e+23,
   "lo": 113937933484023.2
  },
+ "mass_imputed": {
+  "clade mean": 4636,
+  "family mean": 3585,
+  "genus mean": 1353,
+  "order mean": 2792,
+  "subfamily mean": 23,
+  "superfamily mean": 6
+ },
  "mass_sources": {
   "mass:combine": 250,
   "mass:pantheria": 24,
@@ -32319,7 +32327,7 @@
  },
  "output": {
   "brotli_bytes": 789528,
-  "dated_sidecar_raw": 1732621,
+  "dated_sidecar_raw": 2057156,
   "files": 15,
   "raw_bytes": 3320704,
   "skeleton_brotli": 64671,

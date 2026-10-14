@@ -80,6 +80,17 @@ import { FELIDAE_TREE, type Split } from './splits';
 export { TIME_C };
 
 export type WidthMode = 'log' | 'linear';
+/**
+ * What a column's width counts (ToLaD#276, the viewer's toggle): the individuals alive, or their total adult body mass
+ * (individuals × the species' adult mass, the pipeline's mass column: PHYLACINE 1.2 first, a species with none takes
+ * its nearest clade's geometric mean; panthera.ts SpeciesRec.massKg). Mass widths are in kg (the scale bar says tonnes).
+ */
+export type Measure = 'individuals' | 'mass';
+
+/** What one individual of `sp` weighs in the widths: 1, or its adult mass in kg (`fallback` where the data has none). */
+export function weightOf(sp: SpeciesRec, measure: Measure, fallback = 1): number {
+  return measure === 'mass' ? (sp.massKg ?? fallback) : 1;
+}
 /** The edges' design: smooth S-curved forks (a river), or straight lines whose daughters lean out. */
 export type EdgeStyle = 'curved' | 'straight';
 
@@ -229,6 +240,8 @@ export interface Fan {
   ordShare?: number[];
   clade: CladeRec;
   mode: WidthMode;
+  /** What the widths count (ToLaD#276): individuals, or their mass in kg. */
+  measure: Measure;
   edge: EdgeStyle;
   trunkWidth: number;
   trunkBottom: Pt;
@@ -1055,8 +1068,11 @@ function emergeRun(k: Kid, time: TimeScale, mode: WidthMode, edge: EdgeStyle, re
   return lo;
 }
 
-export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = FELIDAE_TREE, edge: EdgeStyle = 'curved'): Fan {
+export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = FELIDAE_TREE, edge: EdgeStyle = 'curved', measure: Measure = 'individuals'): Fan {
   const W = TRUNK_WIDTH;
+  // (A species with no mass in the data, none since ToLaD#276's build: the clade's median.)
+  const known = measure === 'mass' ? clade.species.map((s) => s.massKg ?? NaN).filter((m) => m > 0).sort((a, b) => a - b) : [];
+  const massFallback = known.length ? known[known.length >> 1] : 1;
   const time = new TimeScale(tree.ageMa);
   const yBottom = time.y(STEM_BOTTOM_MA);
   const tess = new Tess(time, mode, yBottom, edge);
@@ -1072,7 +1088,7 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = FELIDA
       share: 0,
       width: 0,
       unit: 0,
-      pop: population(sp, v.ageMa),
+      pop: population(sp, v.ageMa, weightOf(sp, measure, massFallback)),
       t0: v.ageMa,
       splitY: v.y,
       baseW: 0,
@@ -1157,19 +1173,22 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = FELIDA
   if (!byMode) byTree.set(tree, (byMode = new Map()));
   // The order is the tree's, whatever the widths (ToLaD#146: linear vs log never reorders the species): the sides
   // chosen on the default design's widths (linear), every other design taking them.
-  if (mode !== ORDER_MODE && !byMode.has(ORDER_MODE)) layoutFan(clade, ORDER_MODE, tree, edge);
-  // (The default design's sides and places, worked out at build time for the mammal level, ToLaD#255: taken as they are.)
-  const seed = mode === ORDER_MODE && edge === 'curved' ? clade.seed : undefined;
+  // (The mass widths too, ToLaD#276: the toggle never reorders the species either.)
+  const key = measure === 'mass' ? `${mode}:mass` : mode;
+  if (key !== ORDER_MODE && !byMode.has(ORDER_MODE)) layoutFan(clade, ORDER_MODE, tree, edge);
+  // (The default design's sides and places, worked out at build time for the mammal level, ToLaD#255: taken as they are.
+  // Only for its own widths: the mass widths place their columns, and share the orders' width, afresh.)
+  const seed = key === ORDER_MODE && edge === 'curved' ? clade.seed : undefined;
   const seeded = !!seed && seedFits(seed, nodes, branches);
-  if (seeded) byMode.set(mode, applySeed(seed, nodes, branches));
+  if (seeded) byMode.set(key, applySeed(seed, nodes, branches));
   else {
     const P = new Packer(time, mode, W, branches.length > HUGE_TREE ? HUGE_CELLS : CELLS);
     const { plans, sides } = chooseSides(root, P, byMode.get(ORDER_MODE));
-    byMode.set(mode, sides);
+    byMode.set(key, sides);
     if (edge === 'curved') placeRiver(root, P, time, mode);
     else placeLean(root, nodes, plans, time, mode);
   }
-  if (SEED_OUT && mode === ORDER_MODE && edge === 'curved') SEED_OUT.seed = takeSeed(nodes, branches, byMode.get(mode)!);
+  if (SEED_OUT && key === ORDER_MODE && edge === 'curved') SEED_OUT.seed = takeSeed(nodes, branches, byMode.get(key)!);
   // Each strand's place in its ancestors' columns (offsets in the column's order), each column's tile in its parent, each leaf's slot.
   for (const [v, s] of underAll(nodes)) v.strands = s;
   for (const v of nodes) {
@@ -1213,6 +1232,7 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = FELIDA
   return {
     clade,
     mode,
+    measure,
     edge,
     trunkWidth: W,
     trunkBottom: { x: root.left + root.width / 2, y: yBottom },
@@ -1522,7 +1542,7 @@ const MAX_CANDS_HUGE = 2;
 /** The sides chosen (mirrored or not, per split) per clade, tree and width mode: the toggle reuses them, no search. */
 /** The widths the species' left-to-right order is chosen on (every design takes it). */
 const ORDER_MODE: WidthMode = 'linear';
-const SIDES = new WeakMap<CladeRec, Map<Split, Map<WidthMode, Map<Split, boolean>>>>();
+const SIDES = new WeakMap<CladeRec, Map<Split, Map<string, Map<Split, boolean>>>>();
 
 /**
  * The species' left-to-right order, the same in both designs (the toggle only
