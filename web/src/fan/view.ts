@@ -598,9 +598,8 @@ export const FIT_DWARF = 3;
  * (familySpan) is under FIT_DWARF times that: the living columns' widening since is left to run off the screen.
  */
 export function fossilSpan(v: FanNode): [number, number] | null {
-  const ext = v.strands.filter((b) => b.sp.extinct || !(b.pop.aliveAt(0) > 0));
-  if (!ext.length) return null;
-  const yEnd = Math.min(...ext.map((b) => b.tipY));
+  const yEnd = fossilEnd(v);
+  if (yEnd === null) return null;
   const s: [number, number] = [Infinity, -Infinity];
   for (const b of v.strands) {
     const hi = Math.min(b.splitY, v.yBot);
@@ -617,6 +616,22 @@ export function fossilSpan(v: FanNode): [number, number] | null {
   if (!(s[1] > s[0])) return null;
   const [a, z] = familySpan(v);
   return z - a > FIT_DWARF * (s[1] - s[0]) ? s : null;
+}
+
+/** World y of a level's youngest fossil's end (its extinct strand nearest "now"), or null when it has none. */
+function fossilEnd(v: FanNode): number | null {
+  let y = Infinity;
+  for (const b of v.strands) if (b.sp.extinct || !(b.pop.aliveAt(0) > 0)) y = Math.min(y, b.tipY);
+  return y < Infinity ? y : null;
+}
+
+/**
+ * The world y a level's frame puts where "now" would stand (ToLaD#298): under ?fit=fossils, a level framed on its
+ * fossils (fossilSpan) has its youngest fossil's end there, "now" (and the living columns' last ~40 kyr, which log
+ * time gives most of the screen) above the screen; otherwise null ("now" there).
+ */
+export function fossilTop(v: FanNode): number | null {
+  return wantFitFossils() && fossilSpan(v) ? fossilEnd(v) : null;
 }
 
 /** The world x a level is framed on: its span at "now" (familySpan), or under ?fit=fossils where its dwarfed fossils lived (fossilSpan, ToLaD#289). */
@@ -1731,14 +1746,15 @@ export class FanView implements InputHandlers {
    * A level's frame spans the clade's life (ToLaD#288): "now" under the brackets' stack this frame lays out with
    * room for the level's pictures under it (nowUnder, ToLaD#274); its start (the fork
    * camera.frame puts FRAME_BOTTOM px up from the screen's foot) down at FORK_PX from the foot, over the scale bar.
-   * Only the time is moved: the width (and with it the stack) stays as framed.
+   * Only the time is moved: the width (and with it the stack) stays as framed. `top`: the world y put where "now"
+   * would stand, "now" itself by default (?fit=fossils, ToLaD#298: a level framed on its fossils, its youngest fossil's end, fossilTop).
    */
-  private withBand(cam: Camera, lv: FanNode | null = null): Camera {
+  private withBand(cam: Camera, lv: FanNode | null = null, top = this.yNow): Camera {
     const sn = this.h / 2 + (this.yNow - cam.cy) * cam.sy;
     const yFork = cam.cy + (this.h - FRAME_BOTTOM - this.h / 2) / cam.sy;
     const nowS = this.brackets ? Math.max(this.nowUnder(cam, lv), this.labelTop() + NOW_ROOM) : sn;
-    const sy = Math.max(1e-300, this.h - FORK_PX - nowS) / Math.max(1e-300, yFork - this.yNow);
-    return { ...cam, sy, ty: sy, cy: this.yNow + (this.h / 2 - nowS) / sy };
+    const sy = Math.max(1e-300, this.h - FORK_PX - nowS) / Math.max(1e-300, yFork - top);
+    return { ...cam, sy, ty: sy, cy: top + (this.h / 2 - nowS) / sy };
   }
 
   /**
@@ -1809,7 +1825,7 @@ export class FanView implements InputHandlers {
         : familySpan;
     // (?fit=fossils, ToLaD#289: a level whose living columns dwarf its fossils framed on where the fossils lived.)
     const fit = wantFitFossils() ? (u: FanNode) => fossilSpan(u) ?? span(u) : span;
-    return cladeCamera(this.camera, this.fan, v, fit, (cam) => this.withBand(cam, v));
+    return cladeCamera(this.camera, this.fan, v, fit, (cam) => this.withBand(cam, v, fossilTop(v) ?? this.yNow));
   }
 
   /**
@@ -1947,7 +1963,7 @@ export class FanView implements InputHandlers {
     return foldedFrame(this.fan, this.w, () => {
       // (?fit=fossils, ToLaD#289: as a tap's frame, cladeCamera, a level whose living columns dwarf its fossils framed on them.)
       const [a, b] = levelSpan(v);
-      return this.withBand(this.camera.frame(a, b, v.y, true), v);
+      return this.withBand(this.camera.frame(a, b, v.y, true), v, fossilTop(v) ?? this.yNow);
     });
   }
 
@@ -3148,12 +3164,16 @@ export class FanView implements InputHandlers {
     }
     this.picSpots = [];
     const nowS = this.toScreen(0, this.yNow)[1];
-    if (!thumbsOn || nowS < top + 12 || nowS > this.h) return [];
+    // (?fit=fossils, ToLaD#298: the fossils' frame has "now" above the screen, an extinct species' picture still on its tip.)
+    const fossils = wantFitFossils();
+    if (!thumbsOn || nowS > this.h || (!fossils && nowS < top + 12)) return [];
     const gs: { lv: Level; face: FanBranch; x: number; y: number; n: number }[] = [];
     for (const g of this.levelGroupsOn(lg)) {
       const face = g.lv.v ? groupFace(g.lv.v) : g.lv.b;
       if (!face || !wikiOf(face.sp.sci)?.img) continue;
-      gs.push({ lv: g.lv, face, x: g.x, y: g.lv.b && g.lv.b.tipY > this.yNow ? this.toScreen(0, g.lv.b.tipY)[1] : nowS, n: groupAlive(g.lv) });
+      const y = g.lv.b && g.lv.b.tipY > this.yNow ? this.toScreen(0, g.lv.b.tipY)[1] : nowS;
+      if (y < top + 12 || y > this.h) continue;
+      gs.push({ lv: g.lv, face, x: g.x, y, n: groupAlive(g.lv) });
     }
     const placed = placePics(gs.map((g) => g.x), gs.map((g) => g.y), gs.map((g) => g.n));
     this.picSpots = placed.map((p) => ({ ...p, lv: gs[p.i].lv, face: gs[p.i].face }));
@@ -3164,7 +3184,8 @@ export class FanView implements InputHandlers {
   private drawGroupPics(): void {
     const ctx = this.ctx;
     const nowS = this.toScreen(0, this.yNow)[1];
-    const alpha = clamp01((nowS - this.labelTop()) / 24);
+    // (?fit=fossils: each faded by where it stands, "now" off the screen's top or not, ToLaD#298.)
+    const alpha = wantFitFossils() ? 1 : clamp01((nowS - this.labelTop()) / 24);
     if (!(alpha > 0)) return;
     ctx.save();
     ctx.globalAlpha = alpha;
