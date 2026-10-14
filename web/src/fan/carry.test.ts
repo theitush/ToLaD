@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { CARNIVORA, FELIDAE, type CladeRec } from './panthera';
 import { CARNIVORA_TREE, FELIDAE_TREE, type Split } from './splits';
-import { FanView, labelGroups, labelSpots, type LabelSpot } from './view';
+import { carryLabels, FanView, labelGroups, labelSpots, type LabelSpot } from './view';
 
 function stubView(clade: CladeRec = CARNIVORA, tree: Split = CARNIVORA_TREE, folds = true): FanView {
   const noop = () => {};
@@ -104,4 +104,15 @@ describe('labels carried with the camera while it moves, laid out again at rest 
       expect(p.labLast!.spots.map(key)).toEqual(fresh(v).map(key));
     });
   }
+});
+
+describe('a label carried off the side of the screen lets go of its place (ToLaD#255)', () => {
+  it('fit 0 once wholly off, kept while any of it is on', () => {
+    const spot = (x: number): LabelSpot => ({ key: `s${x}:right`, id: `s${x}`, place: 'right', text: 'x', rank: [1, 1, 0], x, y1: 300, box: [x - 10, 280, x + 10, 300], fit: 1 }) as LabelSpot;
+    const spots = [spot(360), spot(340), spot(30)];
+    carryLabels(spots, [1, 45, 1, 0], 100, 390);
+    expect(spots.map((s) => s.fit)).toEqual([0, 1, 1]);
+    carryLabels(spots, [1, -90, 1, 0], 100, 390);
+    expect(spots.map((s) => [s.box[0], s.fit])).toEqual([[305, 0], [285, 1], [-25, 0]]);
+  });
 });
