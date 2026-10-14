@@ -144,8 +144,7 @@ describe('the "+x" badges (ToLaD#197)', () => {
           let v: FanNode | null = own.node;
           while (v?.parent && !bs.every((b) => v!.strands.includes(b))) v = v.parent;
           // (The app's frame, groupCamera's span: their columns at "now" and a name's room past them, ToLaD#274 and #293;
-          // not their widest columns (spanOf), which at MDD's carnivores ×8 framed the American black bear's six so
-          // wide that three of their names had no room.)
+          // not their widest columns (spanOf), which the app stopped framing in #274.)
           c.cam = cladeCamera(c, fan, { ...v!, yBot: v!.y }, () => groupSpan(bs, c.yNow));
           c.settle();
           const after = check(c);
