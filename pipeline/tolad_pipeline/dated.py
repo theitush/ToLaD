@@ -19,7 +19,8 @@ builds one by rule, for every clade at once:
    appearance); a younger one joins that node's split (its place inside is not known: `loose`).
    A fossil-only subtree keeps the merged tree's shape and dates inside. A living species only MDD
    gives us (#278) joins the dated crown of its MDD genus-mates instead (`loose`; with one mate, a
-   split halfway down that mate's branch).
+   split halfway down that mate's branch); one its MDD notes say was split from a species of ours
+   splits that species' own branch, at half its terminal branch and at most SPLIT_CAP (1 Ma).
 
 Every split carries its date source, so the web can tell an Upham date from an
 interpolated one. tiles.py writes the tree induced on each file's species rows into its
@@ -41,6 +42,7 @@ S_UPHAM, S_IMPUTED, S_FOSSIL, S_INTERP, S_OVERRIDE, S_ALVAREZ, S_ENSEMBLE, S_UPI
 AGES = "ensemble"
 GEN_HOW = ["COMBINE reported", "COMBINE imputed", "allometric"]
 EPS = 1e-4  # Ma
+SPLIT_CAP = 1.0  # Ma: the oldest an MDD split beside its parent species is placed (dated.build, ToLaD#278)
 
 
 @dataclass(eq=False)
@@ -645,9 +647,30 @@ def build(root: Node, up_root, up_tax: dict[str, dict], ov, log: dict, ac=None, 
             gsplit[g] = x
         return gsplit[g]
 
+    # an MDD species its taxonomyNotes say was split from one of ours (mdd.sisters sets "mdd_parent") splits that
+    # species' own branch instead: sister to it, at half its terminal branch and never older than SPLIT_CAP Ma (a
+    # rule, not a date: MDD cites none, and these are splits of one species' populations described as species since
+    # 2017; a parent's daughters share the one split). A daughter of a graft waits until that graft is placed.
+    dl = {d.leaf.name: d for d in droot.preorder() if d.leaf is not None and not d.leaf.extinct}
+    psplit: dict[int, DNode] = {}
+
+    def beside(nd: Node) -> DNode | None:
+        D = dl.get(nd.data.get("mdd_parent") or "")
+        if D is None or D.parent is None or D.leaf is nd:
+            return None
+        if id(D) not in psplit:
+            P = D.parent
+            x = DNode(age=min(P.age / 2, SPLIT_CAP), lo=0.0, hi=P.age, src=S_INTERP, anchor=D)
+            P.children[P.children.index(D)] = x
+            x.parent = P
+            x.add(D)
+            psplit[id(D)] = x
+        return psplit[id(D)]
+
     # grafts
     how = Counter()
     clamped = 0
+    waiting: list[tuple[Node, DNode]] = []
     for nd in list(root.preorder()):
         p = nd.parent
         if p is None or k[id(nd)] > 0 or k[id(p)] == 0:
@@ -655,10 +678,22 @@ def build(root: Node, up_root, up_tax: dict[str, dict], ov, log: dict, ac=None, 
         sub = _sub(nd, placed)
         if sub is None:
             continue
+        if nd.is_leaf and nd.data.get("mdd_parent") and nd.data["mdd_parent"] not in dl:
+            waiting.append((nd, sub))
+            continue
+        G = beside(nd) if nd.is_leaf and not nd.extinct and nd.t1 <= 0 else None
+        if G is not None:
+            G.add(sub)
+            G.loose += 1
+            dl[nd.name] = sub
+            how["MDD species: beside the species it was split from (loose)"] += 1
+            continue
         G = mdd_crown(nd)
         if G is not None:
             G.add(sub)
             G.loose += 1
+            if nd.is_leaf and nd.name:
+                dl.setdefault(nd.name, sub)
             how["MDD species: joins its genus crown (loose)"] += 1
             continue
         A = m[id(p)]
@@ -694,6 +729,29 @@ def build(root: Node, up_root, up_tax: dict[str, dict], ov, log: dict, ac=None, 
         x.add(B)
         x.add(sub)
         how["on a stem (fossil)" if fossil else "on a stem (living, interpolated)"] += 1
+    while waiting:  # daughters of grafts, once their parent is in; the rest join their genus crown
+        still = [(nd, sub) for nd, sub in waiting if nd.data["mdd_parent"] not in dl]
+        if len(still) == len(waiting):
+            for nd, sub in still:
+                G = mdd_crown(nd)
+                if G is not None:
+                    G.add(sub)
+                    G.loose += 1
+                    how["MDD species: joins its genus crown (loose)"] += 1
+            break
+        for nd, sub in waiting:
+            if nd.data["mdd_parent"] in dl:
+                G = beside(nd)
+                if G is None:
+                    G = mdd_crown(nd)
+                    how["MDD species: joins its genus crown (loose)"] += 1
+                else:
+                    how["MDD species: beside the species it was split from (loose)"] += 1
+                if G is not None:
+                    G.add(sub)
+                    G.loose += 1
+                    dl[nd.name] = sub
+        waiting = still
     # a graft's merged subtree resolves polytomies with zero-length branches (merge.EPS): splice those into their
     # parent, so a split dated by fossils or interpolation that is no later than its parent becomes one event
     spliced = 0

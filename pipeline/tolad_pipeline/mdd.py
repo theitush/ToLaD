@@ -69,7 +69,7 @@ def load(raw: Path) -> list[dict]:
             out.append({"name": name, "id": int(r["id"]), "genus": genus, "family": _na(r["family"]),
                         "order": _na(r["order"]), "common": _na(r["mainCommonName"]) or None,
                         "extinct": r["extinct"] == "1", "domestic": r["domestic"] == "1", "iucn": iucn or None,
-                        "year": _na(r["authoritySpeciesYear"]), "syn": syn})
+                        "year": _na(r["authoritySpeciesYear"]), "syn": syn, "notes": _na(r.get("taxonomyNotes"))})
     return out
 
 
@@ -145,6 +145,64 @@ def match(root: Node, rows: list[dict], syn_index: dict[str, list[Node]]) -> tup
             hit[r["name"]], how[r["name"]] = found
             claimed.add(id(found[0]))
     return hit, how
+
+
+# The species an MDD species was split from, as its taxonomyNotes say it ("split from L. tigrinus", "split frmo
+# C. calvus", "Split from H. brasiliensis", "spit from N. elegans", "recently described based on populations
+# previously attributed to A. laniger", "split from chinensis; moved from Eothenomys"). The first such phrase wins;
+# "split from X and Y" names X. A "recently described" species names none. The parent's own notes may say it the
+# other way round ("previously included C. ucayalii, C. novaesi, ..."): parent_index reads those.
+_PARENT = re.compile(
+    r"\b(?:[Ss]pl?it\s+(?:from|frmo|form)|previously\s+(?:attributed|attribtued)\s+to"
+    r"|included\s+(?:under|in|within)|(?:a\s+)?subspecies\s+of|synonym\s+of|distinct\s+from|wild\s+form\s+of)\s+"
+    r"(?:([A-Z][a-z]*)\.?\s+)?([a-z][a-z-]+)")
+_INCLUDED = re.compile(r"\bpreviously\s+included\s+(?!(?:in|under|within|as)\b)([^;]+)")
+_BINOM = re.compile(r"\b([A-Z][a-z]*)\.?\s+([a-z][a-z-]{2,})")
+_NOT_EPITHET = {"the", "a", "an", "its", "it", "populations", "species", "both", "all", "and", "now"}
+
+
+_FAM_CACHE: dict[int, dict[str, list[str]]] = {}
+
+
+def _family_genera(rows: list[dict]) -> dict[str, list[str]]:
+    if id(rows) not in _FAM_CACHE:
+        fam: dict[str, set[str]] = defaultdict(set)
+        for x in rows:
+            fam[x["family"]].add(x["genus"])
+        _FAM_CACHE.clear()
+        _FAM_CACHE[id(rows)] = {f: sorted(g) for f, g in fam.items()}
+    return _FAM_CACHE[id(rows)]
+
+
+def _names(g: str | None, ep: str, r: dict, rows: list[dict]) -> list[str]:
+    """A note's name, its genus maybe abbreviated or left out, as candidate binomials (the row's own genus first)."""
+    if ep in _NOT_EPITHET:
+        return []
+    if g and len(g) > 1:  # a full genus name
+        return [f"{g} {ep}"]
+    gens = [r["genus"]] + [x for x in _family_genera(rows).get(r["family"], []) if x != r["genus"]]
+    if g:  # an abbreviation: its own genus when the letter fits, else a family genus starting so
+        gens = [x for x in gens if x.startswith(g)]
+    return [f"{x} {ep}" for x in gens]
+
+
+def parent_names(r: dict, rows: list[dict]) -> list[str]:
+    """Candidate binomials (most likely first) for the species `r` was split from, by its own taxonomyNotes."""
+    m = _PARENT.search(r.get("notes") or "")
+    return _names(m.group(1), m.group(2), r, rows) if m else []
+
+
+def parent_index(rows: list[dict]) -> dict[str, str]:
+    """name -> the MDD species whose notes say it "previously included" that name (its parent, the other way round)."""
+    out: dict[str, str] = {}
+    for r in rows:
+        if r["extinct"]:
+            continue
+        for m in _INCLUDED.finditer(r.get("notes") or ""):
+            for g, ep in _BINOM.findall(m.group(1)):
+                for c in _names(g, ep, r, rows)[:1]:
+                    out.setdefault(c, r["name"])
+    return out
 
 
 def _tight(m: Node, mates: list[Node]) -> bool:
@@ -257,6 +315,7 @@ def graft(root: Node, rows: list[dict], syn_index: dict[str, list[Node]], log: d
         all_names.add(r["name"])
         placed[where] += 1
         new.append(leaf)
+    sis = sisters(root, rows, hit, new)
     matched_ids = {id(nd) for nd in hit.values()}
     ours = sorted(n.name for n in _living_leaves(root) if id(n) not in matched_ids and not n.data.get("mdd")
                   and n.name != "Homo sapiens")
@@ -270,10 +329,97 @@ def graft(root: Node, rows: list[dict], syn_index: dict[str, list[Node]], log: d
         "grafted": len(new), "grafted_on": dict(placed),
         "skipped": {k: {"n": len(v), "names": sorted(v)} for k, v in skipped.items()},
         "grafted_names": sorted(n.name for n in new),
+        "beside_parent": sis,
         "ours_not_in_mdd": {"note": "our living leaves no living MDD species matches by name or synonym "
                                     "(reported only, ToLaD#278)", "n": len(ours), "names": ours},
     }
     return new
+
+
+def sisters(root: Node, rows: list[dict], hit: dict[str, Node], new: list[Node]) -> dict:
+    """An MDD species split from one of ours sits beside it, not at its genus crown (ToLaD#278): its taxonomyNotes
+    name the parent (parent_names), resolved to our living leaf by name, MDD synonym or epithet gender. Sets
+    leaf.data["mdd_parent"] (the dated tree splits the parent's own branch by it, dated.build) on every graft and
+    every Open Tree tip only MDD knows; a graft also moves, in the merged tree, into a new split above its parent's
+    leaf (shared by the parent's other daughters; a daughter of a graft joins its parent's split). Returns the report."""
+    by_row = {r["name"]: r for r in rows if not r["extinct"]}
+    leaves = {n.name: n for n in _living_leaves(root)}
+    owner: dict[str, set[str]] = defaultdict(set)
+    for r in by_row.values():
+        for s in r["syn"]:
+            owner[s].add(r["name"])
+    gstem: dict[tuple[str, str], list[Node]] = defaultdict(list)
+    for n in leaves.values():
+        g, _, ep = n.name.partition(" ")
+        gstem[(g, _gender_stem(ep))].append(n)
+
+    def node_of(name: str) -> Node | None:
+        if name in hit:
+            return hit[name]
+        if name in leaves:
+            return leaves[name]
+        o = owner.get(name, set())
+        if len(o) == 1:
+            acc = next(iter(o))
+            return hit.get(acc) or leaves.get(acc)
+        g, _, ep = name.partition(" ")
+        s = gstem.get((g, _gender_stem(ep)), [])
+        return s[0] if len(s) == 1 else None
+
+    subjects = [(n, by_row.get(n.name)) for n in new]
+    subjects += [(nd, by_row[nm]) for nm, nd in hit.items() if nd.data.get("mdd_rescued")]
+    rev = parent_index(rows)
+    found: dict[int, Node] = {}
+    straggle: Counter = Counter()
+    for n, r in subjects:
+        if r is None:
+            continue
+        P = None
+        for c in parent_names(r, rows) + ([rev[r["name"]]] if r["name"] in rev else []):
+            P = node_of(c)
+            if P is not None and P is not n:
+                break
+        if P is not None and P is not n:
+            found[id(n)] = P
+            n.data["mdd_parent"] = P.name
+        else:
+            why = "no parent named" if not parent_names(r, rows) and r["name"] not in rev else "parent named, not in our tree"
+            straggle[f"{why}: " + " ".join((r.get("notes") or "NA").split(";")[0].split()[:3])] += 1
+
+    def base(n: Node) -> Node:  # the root of a chain of daughters: the leaf they all descend from
+        seen = set()
+        while id(n) in found and id(n) not in seen:
+            seen.add(id(n))
+            n = found[id(n)]
+        return n
+
+    moved = 0
+    gr = {id(n) for n in new}
+    wraps: dict[int, Node] = {}
+    for n in new:
+        if id(n) not in found:
+            continue
+        b = base(n)
+        if b is n or id(b) in gr:  # a chain that starts at a graft stays at the genus here (dated.build still splits it)
+            continue
+        w = wraps.get(id(b))
+        if w is None:
+            w = Node(name=None, rank="no rank", kind="tree", taxonomic=True)
+            w.data["created_from"] = "MDD split"
+            par = b.parent
+            par.children[par.children.index(b)] = w
+            w.parent = par
+            w.add(b)
+            wraps[id(b)] = w
+        n.parent.children.remove(n)
+        w.add(n)
+        moved += 1
+    return {"note": "an MDD species its taxonomyNotes say was split from one of ours sits beside that species "
+                    "(mdd.sisters); the rest stay at their genus's crown",
+            "grafts_beside_parent": sum(1 for k in found if k in gr), "grafts_at_genus": len(new) - sum(1 for k in found if k in gr),
+            "open_tree_tips_beside_parent": sum(1 for k in found if k not in gr), "merged_tree_moves": moved,
+            "parents": {n.name: found[id(n)].name for n, _ in subjects if id(n) in found},
+            "stragglers_by_note": dict(straggle.most_common())}
 
 
 def _is_under(nd: Node, anc: Node) -> bool:

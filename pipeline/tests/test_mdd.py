@@ -29,10 +29,10 @@ def tree(spec):
     return nodes["Mammalia"], nodes
 
 
-def row(name, genus=None, family="Cheirogaleidae", order="Primates", syn=(), extinct=False, domestic=False):
+def row(name, genus=None, family="Cheirogaleidae", order="Primates", syn=(), extinct=False, domestic=False, notes=""):
     return {"name": name, "id": 1, "genus": genus or name.split()[0], "family": family, "order": order,
             "common": f"{name} (en)", "extinct": extinct, "domestic": domestic, "iucn": "LC", "year": "2020",
-            "syn": set(syn)}
+            "syn": set(syn), "notes": notes}
 
 
 class Match(unittest.TestCase):
@@ -90,6 +90,33 @@ class Match(unittest.TestCase):
         self.assertEqual(log["mdd"]["grafted"], 3)
         self.assertIn("Phaner pallescens", self.n["Phaner furcifer"].alt)
 
+    def test_split_sits_beside_its_parent(self):
+        # "split from L. tigrinus": a new split above our L. tigrinus, not the Leopardus crown; "split frmo" too;
+        # the parent's own "previously included" names a daughter; "recently described" stays at the crown
+        fam = "Felidae"
+        root, n = tree({"Mammalia": ["Leopardus"],
+                        "Leopardus": ["Leopardus tigrinus", "Leopardus colocolo", "Leopardus wiedii", "Leopardus pardalis"]})
+        rows = [row("Leopardus tigrinus", family=fam, notes="previously included L. pardinoides and L. guttulus"),
+                row("Leopardus colocola", family=fam, syn=["Leopardus colocolo"]), row("Leopardus wiedii", family=fam),
+                row("Leopardus pardalis", family=fam),
+                row("Leopardus guttulus", family=fam, notes="split from L. tigrinus"),
+                row("Leopardus pardinoides", family=fam, notes="NA"),
+                row("Leopardus braccatus", family=fam, notes="split frmo L. colocola; moved"),
+                row("Leopardus garleppi", family=fam, notes="split from L. braccatus and L. pajeros"),
+                row("Leopardus novus", family=fam, notes="recently described")]
+        self.assertEqual(mdd.parent_names(rows[4], rows)[0], "Leopardus tigrinus")
+        log = {}
+        new = {x.name: x for x in mdd.graft(root, rows, {}, log)}
+        w = new["Leopardus guttulus"].parent
+        self.assertEqual(w.data["created_from"], "MDD split")
+        self.assertEqual({c.name for c in w.children}, {"Leopardus tigrinus", "Leopardus guttulus", "Leopardus pardinoides"})
+        self.assertEqual(new["Leopardus braccatus"].data["mdd_parent"], "Leopardus colocolo")  # our leaf MDD matched
+        self.assertEqual(new["Leopardus garleppi"].data["mdd_parent"], "Leopardus braccatus")  # a graft's daughter
+        self.assertIs(new["Leopardus novus"].parent, n["Leopardus"])
+        self.assertNotIn("mdd_parent", new["Leopardus novus"].data)
+        b = log["mdd"]["beside_parent"]
+        self.assertEqual((b["grafts_beside_parent"], b["grafts_at_genus"]), (4, 1))
+
     def test_extinct_and_domestic_are_not_grafted(self):
         rows = self.rows + [row("Microcebus extinctus", extinct=True), row("Microcebus domesticus", domestic=True)]
         names = {n.name for n in mdd.graft(self.root, rows, {}, {})}
@@ -139,7 +166,13 @@ class Built(unittest.TestCase):
         # an MDD species joins its genus-mates' dated crown, never the stem by its merged band start
         # (Canis lycaon hung at 14 Ma, Mus species at 40 Ma)
         g = json.loads((DATA / "stats.json").read_text())["dated_tree"]["grafts"]
-        self.assertGreater(g.get("MDD species: joins its genus crown (loose)", 0), 1000)
+        beside = g.get("MDD species: beside the species it was split from (loose)", 0)
+        self.assertGreater(g.get("MDD species: joins its genus crown (loose)", 0) + beside, 1000)
+        # one its notes say was split from a species of ours sits beside it, not at the genus crown
+        self.assertGreater(beside, 500)
+        b = json.loads((DATA / "stats.json").read_text())["mdd"]["beside_parent"]
+        self.assertEqual(b["parents"]["Leopardus pardinoides"], "Leopardus tigrinus")
+        self.assertEqual(b["parents"]["Mustela haidarum"], "Mustela erminea")
 
 
 if __name__ == "__main__":
