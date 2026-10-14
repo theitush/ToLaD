@@ -428,6 +428,28 @@ export function flightMs(S: number): number {
   return Math.min(FLY_MS_MAX, Math.max(FLY_MS_MIN, FLY_MS0 + FLY_MS_PER * (Number.isFinite(S) ? S : 0)));
 }
 
+/** The shortest share of a flight its ease speeds up over (and slows down over, at the end): see flightEase. */
+const FLY_RAMP_MIN = 0.15;
+
+/**
+ * A flight's ease (ToLaD#246, #293): u (time, 0 to 1) to e (share of its path). Up to the time cap it is the sine ease
+ * (slow in, fastest midway, slow out). A flight the cap cuts short (flightMs) cruises instead: it speeds up over the
+ * first share r of its time on the sine's quarter, keeps that speed, and slows over the last r, so its fastest frame is
+ * no faster than it must be (a cross-order flight at species depth zooms out ~10^4 and back in, ToLaD#293). r = ½ is
+ * the sine ease itself.
+ */
+export function flightEase(S: number, ms: number): (u: number) => number {
+  const want = FLY_MS0 + FLY_MS_PER * (Number.isFinite(S) ? S : 0);
+  // (The speed at the sine's peak, π/2, as much slower as the cap made the flight shorter; the ramps from it.)
+  const c = 1 - 2 / Math.PI;
+  const V = Math.max(1 / (1 - 2 * FLY_RAMP_MIN * c), (Math.PI / 2) * Math.min(1, ms / want));
+  const r = Math.min(0.5, (1 - 1 / V) / (2 * c));
+  if (r >= 0.5) return (u) => (1 - Math.cos(Math.PI * u)) / 2;
+  const ramp = (u: number) => V * ((2 * r) / Math.PI) * (1 - Math.cos((Math.PI * u) / (2 * r)));
+  const mid = V * ((2 * r) / Math.PI);
+  return (u) => (u <= r ? ramp(u) : u >= 1 - r ? 1 - ramp(1 - u) : mid + V * (u - r));
+}
+
 /** ln cosh x, without overflow. */
 function lnCosh(x: number): number {
   const a = Math.abs(x);
@@ -1824,16 +1846,31 @@ export class FanView implements InputHandlers {
     const live = !!fo && !!toSnap && !!fromSnap && same(toSnap, fromSnap);
     // (The frame's x where the fold stands now, for the path's length.)
     const tx0 = fo && toSnap && !live ? fo.follow(to.cx, to.cy, toSnap) : to.cx;
-    const px = flightPath(this.w / from.sx, this.w / to.sx, Math.abs(tx0 - from.cx));
+    // (The pan as it stands at the flight's widest (ToLaD#293): the gaps the zoom opened between the two ends close as it
+    // zooms out, so a trip measured where it starts zoomed out far past both ends, and the far end raced in as they closed.)
+    let dx = Math.abs(tx0 - from.cx);
+    if (fo && toSnap && fromSnap) {
+      const back = fo.keep();
+      for (let i = 0; i < 2; i++) {
+        const p = flightPath(this.w / from.sx, this.w / to.sx, dx);
+        const wTop = Math.max(...Array.from({ length: 33 }, (_, k) => p.at(k / 32)[0]));
+        if (!(wTop > 1.01 * Math.max(this.w / from.sx, this.w / to.sx))) break;
+        fo.setScale(this.w / wTop, this.w);
+        dx = Math.min(dx, Math.abs(fo.follow(tx0, to.cy, fromSnap) - fo.follow(from.cx, from.cy, fromSnap)));
+      }
+      back();
+    }
+    const px = flightPath(this.w / from.sx, this.w / to.sx, dx);
     const py = flightPath(this.h / from.sy, this.h / to.ty, Math.abs(to.cy - from.cy));
     const dur = ms ?? flightMs(Math.max(px.S, py.S));
+    const ease = flightEase(Math.max(px.S, py.S), ms == null ? dur : Infinity);
     const t0 = performance.now();
     let x0 = from.cx;
     let x1 = tx0;
     let at = to;
     this.anim = (now) => {
       const u = Math.min(1, Math.max(0, (now - t0) / dur));
-      const e = (1 - Math.cos(Math.PI * u)) / 2;
+      const e = ease(u);
       if (u >= 1) {
         // Landing: the frame computed where the fold now stands (as the flight has tracked it all the way).
         this.cam = { ...(fo ? frame() : to) };
