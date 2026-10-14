@@ -1,6 +1,6 @@
 // ?fit=fossils (ToLaD#289, #298): at the Hominins and Homo levels the frame is where and when the fossils lived (from
 // the level's start to its youngest fossil group's end, "now" above the screen), so every hominin with a picture gets
-// a column a few px wide (its name: todo, ToLaD#297); off (the default), the frame fits today's humans.
+// a column a few px wide and its name (ToLaD#297); off (the default), the frame fits today's humans.
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { mammaliaClade, type CladeRec } from './panthera';
 import { loadMammalsFromFiles } from './mammals-node';
@@ -96,9 +96,13 @@ describe('?fit=fossils: the hominins readable (ToLaD#289)', () => {
   // fossils' frame is ~13x narrower than hom289b's and a pictured hominin's column is 3-5 px (Neanderthals ~50 px).
   // Narrower are the regional populations, their cited census 10,000 or fewer (the data, not the layout; ToLaD#302,
   // overrides.toml [[fossil_count]]): H. antecessor, H. naledi, H. georgicus ~1.5 px, H. floresiensis (an island) less.
-  // Not every name shows yet: the pills crowd (labels' layout), so names are left todo.
   const SMALL = new Set(['Homo antecessor', 'Homo naledi', 'Homo georgicus', 'Homo floresiensis']);
-  it.todo('at Hominins and Homo every hominin with a picture gets its name');
+  it('at Hominins and Homo every hominin with a picture gets its name (ToLaD#297)', () => {
+    const by = (latin: string) => v.fan.nodes.find((u) => latinOf(u.split) === latin)!;
+    const bad: string[] = [];
+    for (const u of [by('Hominini'), by('Homo')]) for (const r of measure(v, u)) if (!r.named) bad.push(`${levelName(u)} ${r.sci}`);
+    expect(bad).toEqual([]);
+  }, 400000);
   it('at Hominins and Homo every hominin with a picture gets a column >= 3 px (but the four smallest populations)', () => {
     const by = (latin: string) => v.fan.nodes.find((u) => latinOf(u.split) === latin)!;
     const bad: string[] = [];
@@ -131,3 +135,59 @@ describe('?fit=fossils: the hominins readable (ToLaD#289)', () => {
     expect(bad).toEqual([]);
   }, 400000);
 });
+
+/** The names shown at rest (resolved afresh), each its text. */
+function shownNames(v: FanView): string[] {
+  const V = v as unknown as { labLast: { spots: { key: string; text: string }[] }; labelState: Map<string, { on: boolean }> };
+  return V.labLast.spots.filter((s) => V.labelState.get(s.key)?.on).map((s) => s.text);
+}
+
+for (const fit of ['fossils', 'off'])
+  describe(`the hominins' groups and level, fit ${fit} (ToLaD#312, #311)`, () => {
+    let v: FanView;
+    beforeAll(async () => {
+      vi.stubEnv('TOLAD_FIT', fit);
+      await loadMammalsFromFiles();
+      v = stubView(mammaliaClade(), mammaliaTree(), true);
+    }, 400000);
+    afterAll(() => vi.unstubAllEnvs());
+    const by = (latin: string) => v.fan.nodes.find((u) => latinOf(u.split) === latin)!;
+
+    // A level's pills name distinct real groups: no name twice, no "X ancestors"/"X lineage" made up for an unnamed split
+    // inside it, framed and with "now" pushed off the screen's top (where the columns' lineage names show).
+    it('at Hominins and Homo, framed or panned into the past, each name once and none generated', () => {
+      const bad: string[] = [];
+      for (const latin of ['Hominini', 'Homo'])
+        for (const down of [0, 0.4]) {
+          v.cam = v.cladeCamera(by(latin));
+          v.camera.settle();
+          v.cam = { ...v.cam, cy: v.cam.cy + (down * v.h) / v.cam.sy };
+          v.camera.settle();
+          settle(v);
+          const names = shownNames(v);
+          for (const n of names) if (/ (ancestors|lineage)$/.test(n) || names.indexOf(n) !== names.lastIndexOf(n)) bad.push(`${latin} +${down}: ${n}`);
+        }
+      expect([...new Set(bad)]).toEqual([]);
+    }, 400000);
+
+    // A pan of a third of the screen off a level's frame leaves the view at that level (not the Catarrhini's, nor a
+    // gibbon's or a fossil genus' line under the centre).
+    it('a pan sideways at Hominins and Homo keeps the level', () => {
+      const V = v as unknown as { tapAt: unknown; lvAt: unknown };
+      const bad: string[] = [];
+      for (const latin of ['Hominini', 'Homo'])
+        for (const dx of [-130, 130]) {
+          v.cam = v.cladeCamera(by(latin));
+          v.camera.settle();
+          V.tapAt = null;
+          V.lvAt = null;
+          v.levelNow(true);
+          v.cam = { ...v.cam, cx: v.cam.cx + dx / v.cam.sx };
+          v.camera.settle();
+          const lv = v.levelNow(true);
+          const at = lv.v ? latinOf(lv.v.split) : lv.b.sp.sci;
+          if (at !== latin) bad.push(`${latin} ${dx}px: ${at}`);
+        }
+      expect(bad).toEqual([]);
+    }, 400000);
+  });

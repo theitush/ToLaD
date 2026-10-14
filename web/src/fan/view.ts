@@ -1516,10 +1516,10 @@ export function labelSpots(
       const sp = beside(id, text, rank, len, b, y0, Y(b.splitY), 1, { b }, true).map((p) => ({ ...p, plus: px }));
       // (ToLaD#297: or further down its column, a name's length at a time, where a neighbour's name stands at its tip.)
       if (more) for (let k = 1; k <= 2; k++) for (const p of beside(id, text, rank, len, b, y0 + k * (len + LABEL_GAP), Y(b.splitY), 1, { b }, true)) sp.push({ ...p, key: `${p.key}+${k}`, plus: px });
-      // (A fossil's, ToLaD#297: failing room beside its column, over its picture on its tip, as the clear spots go.
+      // (Under the fossils' frame, a fossil's, ToLaD#297: failing room beside its column, over its picture on its tip.
       // An old one near the screen's foot has no room below its tip; over it, the air the younger ones left.)
       const ty = Y(b.tipY);
-      if (b.tipY > nowY && ty > top && ty < c.h) {
+      if (fossils && b.tipY > nowY && ty > top && ty < c.h) {
         const x = X(stripMid(b));
         const y1 = ty - PIC_LIFT - PIC_D - LABEL_GAP;
         const ya = y1 - len;
@@ -2601,7 +2601,7 @@ export class FanView implements InputHandlers {
         // while the view is within a screen of the one it sits in: far from every frame, the outer ones stand further
         // off the deeper they go.)
         const off = this.offBy(ladder[i].cam, c);
-        if (off > offLv + LEVEL_PX && (ladder[i].lv.b || offLv < this.w)) break;
+        if (ladder[i].lv.b && off > offLv + LEVEL_PX) break;
         lv = ladder[i].lv;
         offLv = off;
       }
