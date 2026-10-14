@@ -70,6 +70,9 @@ function initialLevel(): Level {
   }
 }
 
+// (A level opens on its first frame; its labels follow in the next slice, ToLaD#255.)
+FanView.labelsAfterFirst = true;
+
 export function FanApp() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const viewRef = useRef<FanView | null>(null);

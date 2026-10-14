@@ -1813,6 +1813,7 @@ export class FanView implements InputHandlers {
   destroy(): void {
     cancelAnimationFrame(this.raf);
     clearTimeout(this.foldRestT);
+    if (this.labWait) clearTimeout(this.labWait);
     this.input.destroy();
     this.ro.disconnect();
     this.gl?.canvas.remove();
@@ -2758,12 +2759,17 @@ export class FanView implements InputHandlers {
     this.drawGutter();
     this.drawTouch();
     const tl = performance.now();
-    const { br, top, lg, spots, carried } = this.labelsNow(lod);
-    this.drawLabels(spots, br, { ...lg, top, lod }, carried);
-    br?.drawPins(this.ctx, FAMILY_INK, INK3, BG);
-    this.labelAllMs.push(performance.now() - tl);
-    if (this.labelAllMs.length > 600) this.labelAllMs.shift();
-    if (this.labelMs.length > 600) this.labelMs.shift();
+    // (The page's first frame without the labels, ToLaD#255: they follow in the next slice, the level shown first.)
+    if (FanView.labelsAfterFirst && !this.labWait && !this.labLast) {
+      this.labWait = setTimeout(() => this.request(), 0);
+    } else {
+      const { br, top, lg, spots, carried } = this.labelsNow(lod);
+      this.drawLabels(spots, br, { ...lg, top, lod }, carried);
+      br?.drawPins(this.ctx, FAMILY_INK, INK3, BG);
+      this.labelAllMs.push(performance.now() - tl);
+      if (this.labelAllMs.length > 600) this.labelAllMs.shift();
+      if (this.labelMs.length > 600) this.labelMs.shift();
+    }
     this.drawWidthScale();
     if (this.debug) this.drawDebug();
     this.drawTrunkLabel();
@@ -2837,6 +2843,10 @@ export class FanView implements InputHandlers {
     if (this.labelLayMs.length > 600) this.labelLayMs.shift();
     return { br, top, lg, spots, carried: null };
   }
+  /** The page (FanApp) draws a view's first frame without its labels, which follow in the next slice (ToLaD#255); tests draw them at once. */
+  static labelsAfterFirst = false;
+  /** The first frame's labels pending (labelsAfterFirst): its timer. */
+  private labWait: ReturnType<typeof setTimeout> | 0 = 0;
   /** At rest: the labels shown chosen afresh, not kept from the frame before (drawLabels, ToLaD#255). */
   private labClean = false;
   /** The "+x" room the labels laid out at rest settled on, and where (labelsNow). */
