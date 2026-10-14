@@ -49,7 +49,7 @@
 #                     and names it `common`. The ancestor's own leaf, band and
 #                     counts are untouched.
 
-version = 5
+version = 6
 
 [[exclude]]
 name = "Tikitherium copei"
@@ -135,7 +135,7 @@ citation = """Wood, B. & Boyle, E.K. (2016). American Journal of Physical Anthro
 doi:10.1002/ajpa.22902"""
 
 [[date]]
-name = "Ardipithecus ramidus"
+name = "Australopithecus ramidus"
 fad = 4.5
 lad = 4.3
 reason = "Aramis and Gona, Ethiopia, ~4.5-4.3 Ma. PBDB: 4.5 Ma first, 4.0 Ma last (wide windows)."
@@ -634,3 +634,357 @@ Genome sequencing highlights the dynamic early history of dogs. PLoS Genet 10: e
 doi:10.1371/journal.pgen.1004016; Skoglund, P. et al. (2015). Ancient wolf genome reveals an early \
 divergence of domestic dog ancestors and admixture into high-latitude breeds. Curr Biol 25: \
 1515-1519. doi:10.1016/j.cub.2015.04.019"""
+
+# --- Denisovans (ToLaD#280) ------------------------------------------------------------
+# No fossil database carries them as a species: PBDB has no record and Open Tree no leaf. The Harbin
+# cranium (Homo longi, Ji et al. 2021) is Denisovan by its proteome and its mitochondrial DNA (Fu et al.
+# 2025), so the leaf takes that name and is titled "Denisovan".
+
+[[fossil_leaf]]
+name = "Homo longi"
+order = "Primates"
+family = "Hominidae"
+fad = 0.2
+lad = 0.05
+reason = """Denisovans: Denisova Cave, Siberia, from ~200 ka (Denisova 25) to 76-52 ka (Denisova 3), dated by \
+optical and radiocarbon ages and Bayesian modelling (Douka et al. 2019); also Baishiya (Xiahe, Tibet, \
+>=160 ka) and Harbin (>=146 ka), both Denisovan by their proteins. Their DNA in Papuans hints at later \
+survival, which no fossil dates."""
+citation = """Douka, K. et al. (2019). Age estimates for hominin fossils and the onset of the Upper \
+Palaeolithic at Denisova Cave. Nature 565: 640-644. doi:10.1038/s41586-018-0870-z; Fu, Q. et al. (2025). \
+The proteome of the late Middle Pleistocene Harbin individual. Science, doi:10.1126/science.adu9677; \
+Fu, Q. et al. (2025). Denisovan mitochondrial DNA from dental calculus of the >146,000-year-old Harbin \
+cranium. Cell, doi:10.1016/j.cell.2025.05.040"""
+
+[[dated_fossil]]
+name = "Homo longi"
+sister = "Homo neanderthalensis"
+age = 0.43
+lo = 0.381
+hi = 0.473
+common = "Denisovan"
+reason = """Denisovans are the Neanderthals' sister lineage: their genomes put the population split at \
+381-473 ka (Prüfer et al. 2014)."""
+citation = """Prüfer, K. et al. (2014). The complete genome sequence of a Neanderthal from the Altai \
+Mountains. Nature 505: 43-49. doi:10.1038/nature12886"""
+
+# --- Hominin census sizes (ToLaD#302, #280) -------------------------------------------------
+# The allometric model (density x range x occupancy, research/02 §3) gives fossil species a level from
+# their body mass and their clade's mean range, which for the hominins is no estimate at all. These are
+# cited census sizes, individuals alive at a time, held over each species' band; `lo`-`hi` is the range
+# the sources span. `kind` says how each was obtained (overrides.FOSSIL_COUNT_KINDS):
+#   census       a published census-size estimate
+#   ne-ratio     a genetic effective size (Ne) x a census/Ne ratio of 3-10 (Sjödin et al. 2012's ~10 for
+#                early H. sapiens, the ratio the app's human deep past uses, web/src/fan/population.ts)
+#   density-area a forager density (0.04-0.4 per km2, the span of recorded hunter-gatherers; Marlowe 2005)
+#                x an area
+#   analog       no figure exists for the species: the census of living great apes of its size in Africa
+#                (bonobos 15,000-20,000, one regional species; chimpanzees 173,000-300,000, pan-African)
+# `generation` (years) replaces the allometric one (~9 yr for a 40 kg primate): 25 years, the chimpanzee's
+# (Langergraber, K.E. et al. 2012, PNAS 109: 15716-15721, doi:10.1073/pnas.1211740109); modern humans' is
+# 26.9 (Wang, R.J. et al. 2023, Science Advances 9: eabm7047). Births per year = n / (generation / 2), as
+# for every species (model.py), so "ever lived" = n x span / 12.5 years.
+# research/hominin-populations.md tabulates them with the model's numbers they replace.
+
+[[fossil_count]]
+name = "Homo neanderthalensis"
+kind = "census"
+generation = 25.0
+n = 2.0e4
+lo = 5.0e3
+hi = 7.0e4
+reason = """Nine demographic scenarios (densities, ranges and Ne-to-census conversions) give the whole \
+Neanderthal metapopulation, Europe and western Asia, 5,000-70,000 individuals; 20,000 is their geometric \
+middle. Genomes give a small Ne (1,000-5,000 by PSMC, Prüfer et al. 2014)."""
+citation = """Bocquet-Appel, J.-P. & Degioanni, A. (2013). Neanderthal demographic estimates. Current \
+Anthropology 54 (S8): S202-S213. doi:10.1086/673725"""
+
+[[fossil_count]]
+name = "Homo longi"
+kind = "ne-ratio"
+generation = 25.0
+n = 2.5e4
+lo = 3.0e3
+hi = 1.5e5
+reason = """Denisovan Ne: a few thousand by PSMC on the Denisova 3 genome, whose heterozygosity is a fifth of \
+Africans' (Meyer et al. 2012), up to ~15,000 by Rogers et al. (2017). Census = Ne x 3-10: 2,500 x 10 = 25,000, \
+range 1,000 x 3 to 15,000 x 10. Their range (Siberia to Tibet, China and likely Southeast Asia) was wide."""
+citation = """Meyer, M. et al. (2012). A high-coverage genome sequence from an archaic Denisovan individual. \
+Science 338: 222-226. doi:10.1126/science.1224344; Rogers, A.R., Bohlender, R.J. & Huff, C.D. (2017). Early \
+history of Neanderthals and Denisovans. PNAS 114: 9859-9863. doi:10.1073/pnas.1706426114; Sjödin, P. et al. \
+(2012). Mol Biol Evol 29: 1851-1860. doi:10.1093/molbev/mss061"""
+
+[[fossil_count]]
+name = "Homo erectus"
+kind = "ne-ratio"
+generation = 25.0
+n = 2.0e5
+lo = 5.0e4
+hi = 5.0e5
+reason = """The human ancestral lineage's Ne over 1-2 Ma, i.e. African H. erectus/ergaster, is ~18,500 \
+(14,500-26,000) from mobile elements (Huff et al. 2010): x 10 = 185,000. Deevey's classic census is 125,000 \
+people at 1 Ma. Asian H. erectus (China, Java) adds to it; a genomic bottleneck of Ne ~1,300 at 930-813 ka \
+(Hu et al. 2023) would cut the African part briefly. 200,000 (50,000-500,000) over its band."""
+citation = """Huff, C.D. et al. (2010). Mobile elements reveal small population size in the ancient \
+ancestors of Homo sapiens. PNAS 107: 2147-2152. doi:10.1073/pnas.0909000107; Deevey, E.S. (1960). The human \
+population. Scientific American 203 (3): 194-204; Hu, W. et al. (2023). Genomic inference of a severe human \
+bottleneck during the Early to Middle Pleistocene transition. Science 381: 979-984. \
+doi:10.1126/science.abq7487"""
+
+[[fossil_count]]
+name = "Homo georgicus"
+kind = "density-area"
+generation = 25.0
+n = 1.0e4
+lo = 2.0e3
+hi = 5.0e4
+reason = """Dmanisi's hominins, early H. erectus in the Caucasus (1.85-1.77 Ma): forager densities 0.04-0.4 per \
+km2 over the southern Caucasus and Anatolian uplands (~1e5 km2, a regional population); 0.1/km2 = 10,000."""
+citation = """Marlowe, F.W. (2005). Hunter-gatherers and human evolution. Evolutionary Anthropology 14: \
+54-67. doi:10.1002/evan.20046"""
+
+[[fossil_count]]
+name = "Homo antecessor"
+kind = "density-area"
+generation = 25.0
+n = 1.0e4
+lo = 2.0e3
+hi = 5.0e4
+reason = """Known from Atapuerca, Spain (~0.85 Ma): Europe's Early Pleistocene people were few and sporadic. \
+Forager densities 0.04-0.4 per km2 over ~1e5 km2 of occupied northern Iberia; 0.1/km2 = 10,000."""
+citation = """Marlowe, F.W. (2005). Hunter-gatherers and human evolution. Evolutionary Anthropology 14: \
+54-67. doi:10.1002/evan.20046"""
+
+[[fossil_count]]
+name = "Homo floresiensis"
+kind = "density-area"
+generation = 25.0
+n = 1.4e3
+lo = 5.0e2
+hi = 5.0e3
+reason = """An island population: Flores is 13,540 km2; forager densities 0.04-0.4 per km2 give 540-5,400, \
+0.1/km2 = 1,400. The fossils are ~15 individuals."""
+citation = """Marlowe, F.W. (2005). Hunter-gatherers and human evolution. Evolutionary Anthropology 14: \
+54-67. doi:10.1002/evan.20046; Brown, P. et al. (2004). A new small-bodied hominin from the Late Pleistocene \
+of Flores, Indonesia. Nature 431: 1055-1061. doi:10.1038/nature02999"""
+
+[[fossil_count]]
+name = "Homo naledi"
+kind = "density-area"
+generation = 25.0
+n = 1.0e4
+lo = 2.0e3
+hi = 5.0e4
+reason = """Known only from the Rising Star cave system, South Africa (335-236 ka), a regional species: forager \
+densities 0.04-0.4 per km2 over ~1e5 km2 of the highveld; 0.1/km2 = 10,000."""
+citation = """Marlowe, F.W. (2005). Hunter-gatherers and human evolution. Evolutionary Anthropology 14: \
+54-67. doi:10.1002/evan.20046; Dirks, P.H.G.M. et al. (2017). The age of Homo naledi. eLife 6: e24231. \
+doi:10.7554/eLife.24231"""
+
+[[fossil_count]]
+name = "Homo habilis"
+kind = "analog"
+generation = 25.0
+n = 5.0e4
+lo = 1.5e4
+hi = 3.0e5
+reason = """No census or genetic estimate exists for any pre-erectus hominin. A ~30-50 kg African hominid \
+species is taken at the census of the living great apes like it: bonobos 15,000-20,000 (one regional \
+species) to chimpanzees 173,000-300,000 (four subspecies across Africa); 50,000 (15,000-300,000)."""
+citation = """Fruth, B. et al. (2016). Pan paniscus. IUCN Red List: e.T15932A102331567; Humle, T. et al. \
+(2016). Pan troglodytes. IUCN Red List: e.T15933A129038584"""
+
+[[fossil_count]]
+name = "Homo rudolfensis"
+kind = "analog"
+generation = 25.0
+n = 5.0e4
+lo = 1.5e4
+hi = 3.0e5
+reason = """No census or genetic estimate exists for any pre-erectus hominin. A ~30-50 kg African hominid \
+species is taken at the census of the living great apes like it: bonobos 15,000-20,000 (one regional \
+species) to chimpanzees 173,000-300,000 (four subspecies across Africa); 50,000 (15,000-300,000)."""
+citation = """Fruth, B. et al. (2016). Pan paniscus. IUCN Red List: e.T15932A102331567; Humle, T. et al. \
+(2016). Pan troglodytes. IUCN Red List: e.T15933A129038584"""
+
+[[fossil_count]]
+name = "Kenyanthropus platyops"
+kind = "analog"
+generation = 25.0
+n = 5.0e4
+lo = 1.5e4
+hi = 3.0e5
+reason = """No census or genetic estimate exists for any pre-erectus hominin. A ~30-50 kg African hominid \
+species is taken at the census of the living great apes like it: bonobos 15,000-20,000 (one regional \
+species) to chimpanzees 173,000-300,000 (four subspecies across Africa); 50,000 (15,000-300,000)."""
+citation = """Fruth, B. et al. (2016). Pan paniscus. IUCN Red List: e.T15932A102331567; Humle, T. et al. \
+(2016). Pan troglodytes. IUCN Red List: e.T15933A129038584"""
+
+[[fossil_count]]
+name = "Australopithecus sediba"
+kind = "analog"
+generation = 25.0
+n = 5.0e4
+lo = 1.5e4
+hi = 3.0e5
+reason = """No census or genetic estimate exists for any pre-erectus hominin. A ~30-50 kg African hominid \
+species is taken at the census of the living great apes like it: bonobos 15,000-20,000 (one regional \
+species) to chimpanzees 173,000-300,000 (four subspecies across Africa); 50,000 (15,000-300,000)."""
+citation = """Fruth, B. et al. (2016). Pan paniscus. IUCN Red List: e.T15932A102331567; Humle, T. et al. \
+(2016). Pan troglodytes. IUCN Red List: e.T15933A129038584"""
+
+[[fossil_count]]
+name = "Australopithecus garhi"
+kind = "analog"
+generation = 25.0
+n = 5.0e4
+lo = 1.5e4
+hi = 3.0e5
+reason = """No census or genetic estimate exists for any pre-erectus hominin. A ~30-50 kg African hominid \
+species is taken at the census of the living great apes like it: bonobos 15,000-20,000 (one regional \
+species) to chimpanzees 173,000-300,000 (four subspecies across Africa); 50,000 (15,000-300,000)."""
+citation = """Fruth, B. et al. (2016). Pan paniscus. IUCN Red List: e.T15932A102331567; Humle, T. et al. \
+(2016). Pan troglodytes. IUCN Red List: e.T15933A129038584"""
+
+[[fossil_count]]
+name = "Australopithecus africanus"
+kind = "analog"
+generation = 25.0
+n = 5.0e4
+lo = 1.5e4
+hi = 3.0e5
+reason = """No census or genetic estimate exists for any pre-erectus hominin. A ~30-50 kg African hominid \
+species is taken at the census of the living great apes like it: bonobos 15,000-20,000 (one regional \
+species) to chimpanzees 173,000-300,000 (four subspecies across Africa); 50,000 (15,000-300,000)."""
+citation = """Fruth, B. et al. (2016). Pan paniscus. IUCN Red List: e.T15932A102331567; Humle, T. et al. \
+(2016). Pan troglodytes. IUCN Red List: e.T15933A129038584"""
+
+[[fossil_count]]
+name = "Australopithecus deyiremeda"
+kind = "analog"
+generation = 25.0
+n = 5.0e4
+lo = 1.5e4
+hi = 3.0e5
+reason = """No census or genetic estimate exists for any pre-erectus hominin. A ~30-50 kg African hominid \
+species is taken at the census of the living great apes like it: bonobos 15,000-20,000 (one regional \
+species) to chimpanzees 173,000-300,000 (four subspecies across Africa); 50,000 (15,000-300,000)."""
+citation = """Fruth, B. et al. (2016). Pan paniscus. IUCN Red List: e.T15932A102331567; Humle, T. et al. \
+(2016). Pan troglodytes. IUCN Red List: e.T15933A129038584"""
+
+[[fossil_count]]
+name = "Australopithecus afarensis"
+kind = "analog"
+generation = 25.0
+n = 5.0e4
+lo = 1.5e4
+hi = 3.0e5
+reason = """No census or genetic estimate exists for any pre-erectus hominin. A ~30-50 kg African hominid \
+species is taken at the census of the living great apes like it: bonobos 15,000-20,000 (one regional \
+species) to chimpanzees 173,000-300,000 (four subspecies across Africa); 50,000 (15,000-300,000)."""
+citation = """Fruth, B. et al. (2016). Pan paniscus. IUCN Red List: e.T15932A102331567; Humle, T. et al. \
+(2016). Pan troglodytes. IUCN Red List: e.T15933A129038584"""
+
+[[fossil_count]]
+name = "Australopithecus anamensis"
+kind = "analog"
+generation = 25.0
+n = 5.0e4
+lo = 1.5e4
+hi = 3.0e5
+reason = """No census or genetic estimate exists for any pre-erectus hominin. A ~30-50 kg African hominid \
+species is taken at the census of the living great apes like it: bonobos 15,000-20,000 (one regional \
+species) to chimpanzees 173,000-300,000 (four subspecies across Africa); 50,000 (15,000-300,000)."""
+citation = """Fruth, B. et al. (2016). Pan paniscus. IUCN Red List: e.T15932A102331567; Humle, T. et al. \
+(2016). Pan troglodytes. IUCN Red List: e.T15933A129038584"""
+
+[[fossil_count]]
+name = "Paranthropus robustus"
+kind = "analog"
+generation = 25.0
+n = 5.0e4
+lo = 1.5e4
+hi = 3.0e5
+reason = """No census or genetic estimate exists for any pre-erectus hominin. A ~30-50 kg African hominid \
+species is taken at the census of the living great apes like it: bonobos 15,000-20,000 (one regional \
+species) to chimpanzees 173,000-300,000 (four subspecies across Africa); 50,000 (15,000-300,000)."""
+citation = """Fruth, B. et al. (2016). Pan paniscus. IUCN Red List: e.T15932A102331567; Humle, T. et al. \
+(2016). Pan troglodytes. IUCN Red List: e.T15933A129038584"""
+
+[[fossil_count]]
+name = "Paranthropus boisei"
+kind = "analog"
+generation = 25.0
+n = 5.0e4
+lo = 1.5e4
+hi = 3.0e5
+reason = """No census or genetic estimate exists for any pre-erectus hominin. A ~30-50 kg African hominid \
+species is taken at the census of the living great apes like it: bonobos 15,000-20,000 (one regional \
+species) to chimpanzees 173,000-300,000 (four subspecies across Africa); 50,000 (15,000-300,000)."""
+citation = """Fruth, B. et al. (2016). Pan paniscus. IUCN Red List: e.T15932A102331567; Humle, T. et al. \
+(2016). Pan troglodytes. IUCN Red List: e.T15933A129038584"""
+
+[[fossil_count]]
+name = "Paranthropus aethiopicus"
+kind = "analog"
+generation = 25.0
+n = 5.0e4
+lo = 1.5e4
+hi = 3.0e5
+reason = """No census or genetic estimate exists for any pre-erectus hominin. A ~30-50 kg African hominid \
+species is taken at the census of the living great apes like it: bonobos 15,000-20,000 (one regional \
+species) to chimpanzees 173,000-300,000 (four subspecies across Africa); 50,000 (15,000-300,000)."""
+citation = """Fruth, B. et al. (2016). Pan paniscus. IUCN Red List: e.T15932A102331567; Humle, T. et al. \
+(2016). Pan troglodytes. IUCN Red List: e.T15933A129038584"""
+
+[[fossil_count]]
+name = "Australopithecus ramidus"
+kind = "analog"
+generation = 25.0
+n = 5.0e4
+lo = 1.5e4
+hi = 3.0e5
+reason = """No census or genetic estimate exists for any pre-erectus hominin. A ~30-50 kg African hominid \
+species is taken at the census of the living great apes like it: bonobos 15,000-20,000 (one regional \
+species) to chimpanzees 173,000-300,000 (four subspecies across Africa); 50,000 (15,000-300,000)."""
+citation = """Fruth, B. et al. (2016). Pan paniscus. IUCN Red List: e.T15932A102331567; Humle, T. et al. \
+(2016). Pan troglodytes. IUCN Red List: e.T15933A129038584"""
+
+[[fossil_count]]
+name = "Ardipithecus kadabba"
+kind = "analog"
+generation = 25.0
+n = 5.0e4
+lo = 1.5e4
+hi = 3.0e5
+reason = """No census or genetic estimate exists for any pre-erectus hominin. A ~30-50 kg African hominid \
+species is taken at the census of the living great apes like it: bonobos 15,000-20,000 (one regional \
+species) to chimpanzees 173,000-300,000 (four subspecies across Africa); 50,000 (15,000-300,000)."""
+citation = """Fruth, B. et al. (2016). Pan paniscus. IUCN Red List: e.T15932A102331567; Humle, T. et al. \
+(2016). Pan troglodytes. IUCN Red List: e.T15933A129038584"""
+
+[[fossil_count]]
+name = "Orrorin tugenensis"
+kind = "analog"
+generation = 25.0
+n = 5.0e4
+lo = 1.5e4
+hi = 3.0e5
+reason = """No census or genetic estimate exists for any pre-erectus hominin. A ~30-50 kg African hominid \
+species is taken at the census of the living great apes like it: bonobos 15,000-20,000 (one regional \
+species) to chimpanzees 173,000-300,000 (four subspecies across Africa); 50,000 (15,000-300,000)."""
+citation = """Fruth, B. et al. (2016). Pan paniscus. IUCN Red List: e.T15932A102331567; Humle, T. et al. \
+(2016). Pan troglodytes. IUCN Red List: e.T15933A129038584"""
+
+[[fossil_count]]
+name = "Sahelanthropus tchadensis"
+kind = "analog"
+generation = 25.0
+n = 5.0e4
+lo = 1.5e4
+hi = 3.0e5
+reason = """No census or genetic estimate exists for any pre-erectus hominin. A ~30-50 kg African hominid \
+species is taken at the census of the living great apes like it: bonobos 15,000-20,000 (one regional \
+species) to chimpanzees 173,000-300,000 (four subspecies across Africa); 50,000 (15,000-300,000)."""
+citation = """Fruth, B. et al. (2016). Pan paniscus. IUCN Red List: e.T15932A102331567; Humle, T. et al. \
+(2016). Pan troglodytes. IUCN Red List: e.T15933A129038584"""

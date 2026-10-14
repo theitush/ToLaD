@@ -55,7 +55,7 @@ SOURCES = [
     ("mock", "MOCK placeholder (not a real record)"),
     ("greenspoon-data", "Greenspoon et al. 2023 data release (Zenodo 10.5281/zenodo.7594807): per-species "
                         "population reports (IUCN Red List), dog and cat numbers; CC BY 4.0"),
-    ("overrides", "ToLaD manual overrides (pipeline/overrides.toml): fossil dates and placements, with citations"),
+    ("overrides", "ToLaD manual overrides (pipeline/overrides.toml): fossil dates, placements and hominin census sizes, with citations"),
     ("history", history.HISTORY_SRC_LABEL),
 ]
 SRC = {k: i for i, (k, _) in enumerate(SOURCES)}
@@ -119,6 +119,9 @@ SD_NAT_RANGE = 0.2  # dex, a present-natural range that differs from the current
 NATURAL_METHOD_SCALED = "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
 METHOD_A_PHYLACINE = "A:PHYLACINE current (rescaled to PanTHERIA areas)"
 NATURAL_METHOD_FIT = "N_nat: D x natural range (PHYLACINE, rescaled to PanTHERIA areas) x fitted occupancy"
+# how a [[fossil_count]] was obtained (overrides.FOSSIL_COUNT_KINDS), as the leaf's method line says it
+FOSSIL_COUNT_LABEL = {"census": "census estimate", "ne-ratio": "effective size x census/Ne ratio",
+                      "density-area": "density x area", "analog": "census of living analogs"}
 GRID_N = 1600
 GRID_MIN_MA = 1e-6
 PROFILE_K = 16
@@ -877,6 +880,9 @@ def assign_leaf_counts(root: Node, raw: Path, ctx: dict, log: dict) -> None:
     }
 
     found = Counter()
+    ov = ctx.get("overrides")
+    fossil_counts = ov.fossil_counts if ov is not None else {}
+    fc_log: list[dict] = []
     for n in root.preorder():
         if not n.is_leaf:
             continue
@@ -956,6 +962,30 @@ def assign_leaf_counts(root: Node, raw: Path, ctx: dict, log: dict) -> None:
                 found["natural: extant, differs from today"] += 1
             else:
                 found["natural: extant, same as today"] += 1
+        fc = fossil_counts.get(n.name) if n.extinct else None
+        if fc is not None:
+            # a cited census size (overrides.toml [[fossil_count]], hominins, ToLaD#302) replaces the
+            # allometric model's level over the whole band
+            model_N = nat["N"] if nat is not None else N
+            model_L = D["L"]
+            if fc.get("generation"):
+                D["gen_yr"] = float(fc["generation"])
+                D["gen_how"] = "cited (overrides.toml)"
+                D["L"] = D["gen_yr"] / 2
+            D.pop("natural", None)
+            r_nat = fc["n"] / D["L"]
+            D["sd_leaf"] = math.log10(fc["hi"] / fc["lo"]) / (2 * 1.96)
+            D["meth"] = ([m for m in D["meth"] if not m.startswith(("D:", "A:", "k:", "N:", "N_nat:"))]
+                         + [f"N:cited {FOSSIL_COUNT_LABEL[fc['kind']]} {fc['n']:.2g} ({fc['lo']:.2g}-{fc['hi']:.2g}) "
+                            "alive at a time, held over the band (overrides.toml [[fossil_count]])"])
+            D["src"].add(SRC["overrides"])
+            D["fossil_count"] = fc
+            cap = 3
+            fc_log.append({"name": n.name, "kind": fc["kind"], "model_alive": model_N, "alive": fc["n"],
+                           "lo": fc["lo"], "hi": fc["hi"], "L": D["L"], "t0": n.t0, "t1": n.t1,
+                           "model_L": model_L, "model_ever": (n.t0 - n.t1) * 1e6 * model_N / model_L,
+                           "ever": (n.t0 - n.t1) * 1e6 * r_nat})
+            found["cited fossil count"] += 1
         step = year_to_ma(NATURAL_STEP_YEAR)
         if n.extinct:
             pieces = [(n.t0, n.t1, r_nat)]
@@ -1050,6 +1080,15 @@ def assign_leaf_counts(root: Node, raw: Path, ctx: dict, log: dict) -> None:
         "alive": sum(n.data["alive"] for n in unverified),
         "examples": [n.name for n in unverified[::max(1, len(unverified) // 12)]][:12],
     }
+    unused_fc = sorted(set(fossil_counts) - {r["name"] for r in fc_log})
+    if unused_fc:
+        raise RuntimeError(f"overrides.toml fossil_count entries matched no extinct leaf: {unused_fc}")
+    log["fossil_counts"] = {
+        "note": "cited census sizes for fossil species (overrides.toml [[fossil_count]], ToLaD#302): alive at a "
+                "time over the band, replacing the allometric model (model_alive, model_ever)",
+        "leaves": fc_log}
+    if ov is not None:
+        ov.applied["fossil_count"].extend(r["name"] for r in fc_log)
     log["domestic_anchors"] = {d["species"]: {"leaf": leaf, "stock": d["stock"], "alive_grade": d["grade"],
                                               "source": d["label"]} for leaf, d in dom_by_leaf.items()}
     if missing_dom:

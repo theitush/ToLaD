@@ -68,6 +68,9 @@ HAND = {
     "Homo naledi": ("https://en.wikipedia.org/wiki/Homo_naledi", "Homo naledi skeletal specimens.jpg"),
     "Kenyanthropus platyops": ("https://en.wikipedia.org/wiki/Kenyanthropus_platyops",
                                "Kenyanthropus platyops, skull (model).JPG"),
+    # Denisovans (ToLaD#280): a leaf the build adds (overrides.toml [[fossil_leaf]]); the Denisovan article's lead
+    # picture, the Harbin cranium (CC BY 4.0, Fu et al. 2025)
+    "Homo longi": ("https://en.wikipedia.org/wiki/Denisovan", "Homo longi holotype.jpg"),
 }
 ITEM = re.compile(r"http://www\.wikidata\.org/entity/Q\d+")
 
