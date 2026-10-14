@@ -208,6 +208,60 @@ interface Knot {
   m: number;
 }
 
+/** Slopes and corner windows of a history's knots (newest first): CORNER_HALF of the axis below each corner, and under half the way to its neighbours (`end`, years ago, the species' start, beyond the oldest). */
+function fillet(K: Knot[], end: number): void {
+  for (let k = 0; k + 1 < K.length; k++) K[k].m = (K[k + 1].ln - K[k].ln) / (K[k + 1].ago - K[k].ago);
+  for (let k = 1; k < K.length; k++) {
+    const prev = K[k].ago - K[k - 1].ago;
+    const next = k + 1 < K.length ? K[k + 1].ago - K[k].ago : end - K[k].ago;
+    K[k].H = Math.max(0, Math.min((K[k].ago + TIME_C) * (1 - Math.pow(10, -CORNER_HALF)), 0.45 * prev, 0.45 * next));
+  }
+}
+
+/**
+ * A species' census before its history's points (years before present, individuals alive), cited: what its
+ * width follows back to its start (held at the oldest). ToLaD#289: humans were not 8 billion 300,000 years ago.
+ */
+export const DEEP_PAST: Record<string, { ya: number; n: number; lo: number; hi: number; cite: string; url: string; note: string }[]> = {
+  'Homo sapiens': [
+    {
+      ya: 21_000,
+      n: 2.5e6,
+      lo: 2.12e6,
+      hi: 2.95e6,
+      cite: 'Gautney & Holliday 2015, J. Archaeol. Sci. 58:103-112',
+      url: 'https://doi.org/10.1016/j.jas.2015.03.008',
+      note: 'Last Glacial Maximum, Africa and Eurasia: 2.12-2.95 million from carnivore-based densities (3.0-8.3 million from hunter-gatherer densities).',
+    },
+    {
+      ya: 130_000,
+      n: 2e5,
+      lo: 1e5,
+      hi: 3e5,
+      cite: 'Sjödin, Sjöstrand, Jakobsson & Blum 2012, Mol. Biol. Evol. 29:1851-1860',
+      url: 'https://doi.org/10.1093/molbev/mss061',
+      note: 'Penultimate glacial: effective size 10,000-30,000, census of early Homo sapiens roughly 100,000-300,000; held back to the species\' start.',
+    },
+  ],
+};
+
+/** Whether a species' width follows its display-only history: a history of the whole species (component "total", humans) that does not drive the counts. */
+export function shapes(sp: SpeciesRec): boolean {
+  const h = sp.history;
+  return !!h && !sp.births && !sp.extinct && h.use === 'display' && h.component === 'total' && h.points.length > 0;
+}
+
+/** The points a shaping history's width runs through, newest first (years ago, alive): today's count, its points, its deep past. */
+export function shapePoints(sp: SpeciesRec): { ago: number; n: number }[] {
+  const h = sp.history!;
+  const out: { ago: number; n: number }[] = [];
+  const pts = h.points.map((p) => ({ ago: Math.max(0, h.nowYear - p.year), n: p.n })).sort((a, b) => a.ago - b.ago);
+  if (sp.alive > 0 && !(pts[0].ago <= 0)) out.push({ ago: 0, n: sp.alive });
+  for (const p of pts) if (!out.length || p.ago > out[out.length - 1].ago) out.push(p);
+  for (const d of DEEP_PAST[sp.sci] ?? []) if (d.ya > out[out.length - 1].ago) out.push({ ago: d.ya, n: d.n });
+  return out;
+}
+
 export class Population {
   /** Individuals alive at the species' start (its split): its share of the parent column below it. */
   readonly founders: number;
@@ -254,14 +308,14 @@ export class Population {
         pts[k] = { ago: pts[k - 1].ago + Math.min(0.5 * GL, 0.25 * (next - pts[k - 1].ago)), size: pts[k].size };
       }
       for (const p of pts) this.knots.push({ ago: p.ago, ln: Math.log(Math.max(1e-9, p.size * this.lg)), H: 0, m: 0 });
-      const K = this.knots;
-      for (let k = 0; k + 1 < K.length; k++) K[k].m = (K[k + 1].ln - K[k].ln) / (K[k + 1].ago - K[k].ago);
-      // Each corner's window: CORNER_HALF of the axis below it, and under half the way to its neighbours (the species' start beyond the oldest).
-      for (let k = 1; k < K.length; k++) {
-        const prev = K[k].ago - K[k - 1].ago;
-        const next = k + 1 < K.length ? K[k + 1].ago - K[k].ago : end - K[k].ago;
-        K[k].H = Math.max(0, Math.min((K[k].ago + TIME_C) * (1 - Math.pow(10, -CORNER_HALF)), 0.45 * prev, 0.45 * next));
-      }
+      fillet(this.knots, end);
+    } else if (shapes(sp)) {
+      // The whole species' history, shown only (humans: the counts stay PRB's), shapes the width: its points
+      // and, before them, the cited deep past (DEEP_PAST); today's count at now. Births stay the constant model's.
+      this.lg = sp.alive > 0 ? (sp.alive * years) / sp.ever / GL : 0.5;
+      this.nConst = 0;
+      for (const p of shapePoints(sp)) this.knots.push({ ago: p.ago, ln: Math.log(Math.max(1e-9, p.n)), H: 0, m: 0 });
+      fillet(this.knots, end);
     } else {
       // procgen's constant-size model (twigs.ts speciesModel): N per generation over ~years/GL generations.
       this.lg = sp.alive > 0 ? (sp.alive * years) / sp.ever / GL : 0.5;
@@ -297,6 +351,8 @@ export class Population {
         const segs = c.segments;
         for (let j = segs.length - 1; j > 0; j--) varGens += segs[j].generations;
       }
+      // (A shaping history's size changes back to its oldest point.)
+      else if (this.knots.length) varGens = Math.ceil(this.knots[this.knots.length - 1].ago / GL);
       const own = Math.max(1, (startMa - sp.t1) * 1e6);
       // Sampled (bounded: per generation only where the share moves, ToLaD#70), back to the species' start.
       const g = shareBackSampled((k) => this.aliveAt(ago(k) / 1e6), varGens, Math.ceil(own / GL), GL);
