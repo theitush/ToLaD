@@ -130,6 +130,11 @@ export class Steady extends Fold {
   private readonly tcOff: Float64Array;
   private readonly rootJ: number;
   private readonly stack: Int32Array;
+  /** row()'s straight passes: per node its parent's split height (Infinity the root's), per strand its split node's;
+   * mono: every split at or under its parent's (else the walk). */
+  private readonly nYp: Float64Array;
+  private readonly bY: Float64Array;
+  private readonly mono: boolean;
   private lay: Lay | null = null;
   private rowsVer = -1;
   private readonly sRows = new Map<number, Float64Array>();
@@ -185,6 +190,9 @@ export class Steady extends Fold {
     this.tcOff = Float64Array.from(S, (b) => b.path[0].off + b.baseW / 2);
     this.rootJ = this.idx.get(fan.root)!;
     this.stack = new Int32Array(N.length + 1);
+    this.nYp = Float64Array.from(N, (_, j) => (this.par[j] < 0 ? Infinity : this.nY[this.par[j]]));
+    this.bY = Float64Array.from(S, (_, i) => this.nY[this.bNode[i]]);
+    this.mono = this.nY.every((y, j) => y <= this.nYp[j]);
     const last = (k: FanNode | FanBranch) => (isNode(k) ? k.strands[k.strands.length - 1].index : k.index);
     this.kidPair = N.map((v) => Int32Array.from(v.kids.slice(0, -1), last));
     // (Rooms by life: each node's last tip, the youngest of its strands', and now.)
@@ -506,8 +514,73 @@ export class Steady extends Fold {
     return this.nodeLeft(L, this.pIdx[i][a - 1], y) + this.pOff[i][a - 1];
   }
 
-  /** Every strand's left (its slot's) or own column's centre at y: one walk down the tree (nodeLeft and ownC inlined). */
+  /**
+   * Every strand's left (its slot's) or own column's centre at y, in two straight passes (no walk, ToLaD#255): a
+   * strand above its split node's height has its own column there; else it is in the one node column spanning y
+   * (from its split up to its parent's), its strands side by side from its left edge. The same sums the walk makes
+   * (walk(), kept for a tree whose splits are not each under its parent's).
+   */
   private row(L: Lay, y: number, out: Float64Array): Float64Array {
+    if (!this.mono) return this.walk(L, y, out);
+    this.prep(L);
+    const { colL, h, C } = L;
+    const tile = L.tile!;
+    const dl = L.dl!;
+    const tc = L.tc!;
+    const dc = L.dc!;
+    const edge = this.fan.edge;
+    const nY = this.nY;
+    const nYp = this.nYp;
+    const bY = this.bY;
+    const bNode = this.bNode;
+    const sY = this.sY;
+    const S = bY.length;
+    for (let i = 0; i < S; i++) {
+      if (!(y < bY[i])) continue;
+      const hj = h[bNode[i]];
+      const y0 = sY[i];
+      if (hj > 0 && y <= y0 - hj) out[i] = C[i];
+      else {
+        let u: number;
+        if (!(hj > 0)) u = y < y0 ? 1 : 0;
+        else {
+          const t = (y0 - y) / hj;
+          u = t <= 0 ? 0 : t >= 1 ? 1 : ease(edge, t);
+        }
+        out[i] = tc[i] + dc[i] * u;
+      }
+    }
+    const par = this.par;
+    const bw = this.bw;
+    const nFirst = this.nFirst;
+    const nLast = this.nLast;
+    const N = nY.length;
+    for (let j = 0; j < N; j++) {
+      if (!(y >= nY[j] && y < nYp[j])) continue;
+      const p = par[j];
+      let x: number;
+      if (p < 0) x = colL[j];
+      else {
+        const y0 = nY[p];
+        const hp = h[p];
+        let u: number;
+        if (!(hp > 0)) u = y < y0 ? 1 : 0;
+        else {
+          const t = (y0 - y) / hp;
+          u = t <= 0 ? 0 : t >= 1 ? 1 : ease(edge, t);
+        }
+        x = tile[j] + dl[j] * u;
+      }
+      for (let i = nFirst[j], e = nLast[j]; i <= e; i++) {
+        out[i] = x;
+        x += bw[i];
+      }
+    }
+    return out;
+  }
+
+  /** row() as one walk down the tree (nodeLeft and ownC inlined). */
+  private walk(L: Lay, y: number, out: Float64Array): Float64Array {
     this.prep(L);
     const st = this.stack;
     const bw = this.bw;
