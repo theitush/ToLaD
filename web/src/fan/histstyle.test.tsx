@@ -14,6 +14,10 @@ import { approxCountsIn, formatCount } from '../data/count';
 
 const byName = (common: string) => FELIDAE.species.find((s) => s.common === common)!;
 
+// The living cats only the Mammal Diversity Database gives (ToLaD#278: split or described since Upham 2019): COMBINE has no
+// generation length for them (allometric), PHYLACINE no range, and the Red List has assessed only Felis lybica (the rest NE).
+const MDD_CATS = ['Felis lybica', 'Prionailurus javanensis', 'Leopardus braccatus', 'Leopardus pajeros', 'Leopardus fasciatus', 'Leopardus garleppi', 'Leopardus pardinoides'];
+
 describe('species card history', () => {
   it('lists every point with its year, numbers, grade, kind, citation link and note; the genomic curve as one row', () => {
     // 'Puma': the Red List's English name for Puma concolor (the data's names since ToLaD#145; the hand table said Cougar).
@@ -243,6 +247,8 @@ describe('the species card: the population at the time touched', () => {
         expect(html).toContain('class="status domestic"');
         expect(sp.redList?.source).toBe('not-listed');
         expect(html).not.toContain('href=""');
+      } else if (MDD_CATS.includes(sp.sci) && sp.redList?.source === 'not-listed') {
+        expect(chip![1]).toBe('Not Evaluated');
       } else {
         if (want[sp.common]) expect(chip![1]).toBe(want[sp.common]);
         // the data's status (ToLaD#48), or the curated one where that is the newer assessment

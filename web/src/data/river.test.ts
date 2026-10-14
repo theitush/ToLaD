@@ -92,7 +92,11 @@ describe('births-rate width (area = individuals ever lived)', () => {
   });
 
   it('the root band drawn by the layout has area = EVER; children never exceed theirs', () => {
+    // The whole tree, every tile loaded: which nodes the skeleton holds is where the pipeline's greedy tile cut
+    // happens to fall, and the MDD tree (#278) moved it so the skeleton is 2,368 fossils and 14 living nodes
+    // (main's: 1,539 and 832), so a skeleton-only median measured the cut, not the layout (0.60 vs 0.76).
     const src = new TileTreeSource(skel);
+    for (const t of skel.meta.tiles) src.add(load(t.id));
     const L = new Layout(src);
     const root = L.root;
     L.ensureShape(root);
@@ -127,7 +131,10 @@ describe('births-rate width (area = individuals ever lived)', () => {
     walk(root, root.cxs * rmax, span);
     ratios = ratios.sort((a, b) => a - b);
     // Coarse profiles of siblings can add up to more than the parent at some times; then they are squeezed to fit.
-    expect(ratios[Math.floor(ratios.length / 2)]).toBeGreaterThan(0.7);
+    // Over the whole tree the median is 0.696 on the tree before MDD and 0.699 with it (#278: unchanged); the floor
+    // of 0.7 was set on the skeleton alone, whose living clades sat higher (0.80), so the whole tree's floor is 0.65.
+    expect(ratios.length).toBeGreaterThan(20000);
+    expect(ratios[Math.floor(ratios.length / 2)]).toBeGreaterThan(0.65);
   });
 });
 

@@ -55,6 +55,13 @@
   "sha256": "b076b5c6b401196401eda8703ea12f7353ca86e38a03096eaaee0202dfac7a6c",
   "url": "https://zenodo.org/api/records/7594807/files/mammal_biomass-master.zip/content"
  },
+ "mdd/MDD_v2.5_6904species.csv": {
+  "bytes": 9303589,
+  "post_body": null,
+  "retrieved": "2026-10-14",
+  "sha256": "0d07a7e9409712fa86c1e3afadcf4c67bf4f9e16d5693a878e11ec1bf6860493",
+  "url": "https://zenodo.org/api/records/21654811/files/MDD_v2.5_6904species.csv/content"
+ },
  "opentree/about.json": {
   "bytes": 611,
   "post_body": {},

@@ -13,14 +13,15 @@ import { FanCamera } from './camera';
 const fan = layoutFan(CARNIVORA, 'linear', CARNIVORA_TREE, 'curved');
 
 describe('Carnivora from the data', () => {
-  it('292 species: every living one and the dated fossils, each placed once', () => {
+  it('325 species: every living one and the dated fossils, each placed once', () => {
+    // 292 before the Mammal Diversity Database added the living species described or split since (ToLaD#278)
     const sp = speciesUnder(CARNIVORA_TREE);
-    expect(sp.length).toBe(292);
-    expect(new Set(sp).size).toBe(292);
-    expect(CARNIVORA.species.length).toBe(292);
+    expect(sp.length).toBe(325);
+    expect(new Set(sp).size).toBe(325);
+    expect(CARNIVORA.species.length).toBe(325);
     const fossils = CARNIVORA.species.filter((s) => s.extinct).map((s) => s.common);
     expect(fossils.length).toBe(7);
-    expect(fan.branches.length).toBe(292);
+    expect(fan.branches.length).toBe(325);
   });
 
   it('holds the cat family whole: the same 42 species as the cats on their own', () => {

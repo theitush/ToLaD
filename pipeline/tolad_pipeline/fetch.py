@@ -147,6 +147,14 @@ SOURCES: dict[str, list[tuple[str, str, dict | None]]] = {
          "https://static-content.springer.com/esm/art%3A10.1038%2Fs41586-023-05752-y/MediaObjects/"
          "41586_2023_5752_MOESM5_ESM.xlsx", None),
     ],
+    # Mammal Diversity Database v2.5 (MDD, ASM; Zenodo doi:10.5281/zenodo.21654811, 2026-07-28,
+    # CC BY 4.0): the current list of 6,904 mammal species (living and recently extinct) with
+    # authority, English name, genus/family/order, extinct and domestic flags and IUCN status.
+    # Source of the living species our 2017-era backbone lacks (ToLaD#278, mdd.py). Read as CSV.
+    "mdd": [
+        ("mdd/MDD_v2.5_6904species.csv",
+         "https://zenodo.org/api/records/21654811/files/MDD_v2.5_6904species.csv/content", None),
+    ],
     "prb": [
         ("prb/how-many-people-have-ever-lived-on-earth.html",
          "https://www.prb.org/articles/how-many-people-have-ever-lived-on-earth/", None),

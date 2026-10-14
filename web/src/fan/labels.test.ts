@@ -63,7 +63,11 @@ function sweep(c: FanCamera, cams: Camera[], bound: number) {
         const d = Math.max(Math.abs(s.x - p.x), Math.abs(s.y1 - p.y1));
         worst = Math.max(worst, d);
         // Beside a branch a label follows its edge, which can lean (a peel) or widen fast (a boom on the log time axis): faster than the camera.
-        expect(d, `${s.key} moved`).toBeLessThanOrEqual(s.place === 'tip' ? bound : 6 * bound);
+        // (8.5x, 6x before MDD (ToLaD#293): its Felis ancestors, the Chinese mountain cat now its own kid beside the Sand
+        // cat's and the Black-footed cat's lineages, leans 8.17 px per px of height at its steepest (home's aspect),
+        // between the Jungle cat lineage's column and its kids'; its label beside it follows that edge, 16.3 px in a
+        // 2 px step at x2.2, no faster than the edge.)
+        expect(d, `${s.key} moved`).toBeLessThanOrEqual(s.place === 'tip' ? bound : 8.5 * bound);
       }
     }
     const on = resolveLabels(spots, shown);

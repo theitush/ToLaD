@@ -44,6 +44,10 @@ function recorder() {
   return { ctx: ctx as unknown as CanvasRenderingContext2D, fills };
 }
 
+// The living cats only the Mammal Diversity Database gives (ToLaD#278: split or described since Upham 2019): COMBINE has no
+// generation length for them (allometric), PHYLACINE no range, and the Red List has assessed only Felis lybica (the rest NE).
+const MDD_CATS = ['Felis lybica', 'Prionailurus javanensis', 'Leopardus braccatus', 'Leopardus pajeros', 'Leopardus fasciatus', 'Leopardus garleppi', 'Leopardus pardinoides'];
+
 describe('range globe data (ToLaD#267)', () => {
   it('decodes the run-length cells', () => {
     expect(unpackRuns([])).toEqual([]);
@@ -119,7 +123,8 @@ describe('range globe in the card (ToLaD#267)', () => {
   });
 
   it('nearly every cat has a globe', () => {
-    const n = FELIDAE.species.filter((s) => speciesRange(s.sci)).length;
-    expect(n).toBeGreaterThan(FELIDAE.species.length * 0.9);
+    const cats = FELIDAE.species.filter((s) => !MDD_CATS.includes(s.sci));
+    const n = cats.filter((s) => speciesRange(s.sci)).length;
+    expect(n).toBeGreaterThan(cats.length * 0.9);
   });
 });

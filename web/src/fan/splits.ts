@@ -229,6 +229,7 @@ export const FAMILY_EN: Record<string, string> = {
   Felidae: 'Cats',
   Canidae: 'Dogs',
   Ursidae: 'Bears',
+  Peramelidae: 'Bandicoots',
   Phocidae: 'Seals',
   Otariidae: 'Sea lions',
   Odobenidae: 'Walrus',
@@ -272,7 +273,7 @@ export const ORDER_EN: Record<string, string> = {
   Diprotodontia: 'Kangaroos & kin',
   Dasyuromorphia: 'Marsupial carnivores',
   Notoryctes: 'Marsupial moles',
-  Peramelidae: 'Bandicoots',
+  Peramelemorphia: 'Bandicoots & bilbies',
   Afrosoricida: 'Tenrecs & golden moles',
   Macroscelidea: 'Elephant shrews',
   Hyracoidea: 'Hyraxes',
@@ -297,11 +298,14 @@ export const ORDER_TAXA: ReadonlySet<string> = new Set(Object.keys(ORDER_EN));
 /**
  * The orders whose crown the dated tree leaves unnamed (ToLaD#247), each by two of its species (Upham et al. 2019's `ord`
  * field): their last common split is the order's, and is named for it (nameOrders), so it folds and is labelled as the
- * others. (Peramelemorphia is not one clade in the tree, its bandicoots, Peramelidae, are; Microbiotheria and
- * Tubulidentata are one species each.)
+ * others. (Peramelemorphia's living species are one clade, with its Miocene fossils, but the data names only a part of
+ * its bandicoots, Peramelidae: unnamed, Echymipera and Microperoryctes stood beside the orders at home, ToLaD#278. The
+ * pig-footed bandicoot Chaeropus, extinct, sits among the dasyuromorphs. Microbiotheria and Tubulidentata are one
+ * species each.)
  */
 export const ORDER_CROWNS: Record<string, [string, string]> = {
   Dasyuromorphia: ['Myrmecobius fasciatus', 'Antechinus mimetes'],
+  Peramelemorphia: ['Perameles nasuta', 'Macrotis lagotis'],
 };
 
 /**

@@ -66,6 +66,11 @@ const THUMB_D = 50;
 const LABEL_PAD = 8;
 /** Right edge (px) of the time axis's labels: species' labels keep right of it. */
 const LABEL_AXIS_X = 72;
+/** A "+x" tap's frame (groupCamera): the species' span at "now" widened this share each side, a name's room (~27 px) past the outer ones. */
+const GROUP_NAME_PAD = 0.1;
+/** A "+x" tap's frame: neighbouring names at least this far apart (px; a pill and a gap), and a column running off its edge this much on screen. */
+const GROUP_NAME_GAP = 28;
+const GROUP_DOM_PX = 40;
 /** A level's flight under way (ToLaD#258, #271): the level it lands on and its frame, so a tap or double-tap mid-flight goes on from there. */
 type Step = { lv: Level; cam: Camera };
 /**
@@ -553,6 +558,28 @@ export function flightMs(S: number): number {
   return Math.min(FLY_MS_MAX, Math.max(FLY_MS_MIN, FLY_MS0 + FLY_MS_PER * (Number.isFinite(S) ? S : 0)));
 }
 
+/** The shortest share of a flight its ease speeds up over (and slows down over, at the end): see flightEase. */
+const FLY_RAMP_MIN = 0.15;
+
+/**
+ * A flight's ease (ToLaD#246, #293): u (time, 0 to 1) to e (share of its path). Up to the time cap it is the sine ease
+ * (slow in, fastest midway, slow out). A flight the cap cuts short (flightMs) cruises instead: it speeds up over the
+ * first share r of its time on the sine's quarter, keeps that speed, and slows over the last r, so its fastest frame is
+ * no faster than it must be (a cross-order flight at species depth zooms out ~10^4 and back in, ToLaD#293). r = ½ is
+ * the sine ease itself.
+ */
+export function flightEase(S: number, ms: number): (u: number) => number {
+  const want = FLY_MS0 + FLY_MS_PER * (Number.isFinite(S) ? S : 0);
+  // (The speed at the sine's peak, π/2, as much slower as the cap made the flight shorter; the ramps from it.)
+  const c = 1 - 2 / Math.PI;
+  const V = Math.max(1 / (1 - 2 * FLY_RAMP_MIN * c), (Math.PI / 2) * Math.min(1, ms / want));
+  const r = Math.min(0.5, (1 - 1 / V) / (2 * c));
+  if (r >= 0.5) return (u) => (1 - Math.cos(Math.PI * u)) / 2;
+  const ramp = (u: number) => V * ((2 * r) / Math.PI) * (1 - Math.cos((Math.PI * u) / (2 * r)));
+  const mid = V * ((2 * r) / Math.PI);
+  return (u) => (u <= r ? ramp(u) : u >= 1 - r ? 1 - ramp(1 - u) : mid + V * (u - r));
+}
+
 /** ln cosh x, without overflow. */
 function lnCosh(x: number): number {
   const a = Math.abs(x);
@@ -681,6 +708,58 @@ export function spanOf(bs: readonly FanBranch[]): [number, number] {
     s[1] = Math.max(s[1], b.colLeft + b.width);
   }
   return s;
+}
+
+/**
+ * What a "+x" tap frames across the screen (groupCamera, ToLaD#274): the species' columns at "now" (`yNow`; an extinct
+ * one's at its tip), where their names and pictures stand, not their rooms, wider where they were wider in the past.
+ * Widened GROUP_NAME_PAD each side, a name's room beyond the outer ones (ToLaD#293: the leftmost's name beside it
+ * right of the time axis, not squeezed against its neighbour's; MDD's mongooses: the Crab-eating mongoose at the
+ * frame's edge).
+ *
+ * Closer in where that frame leaves neighbouring names (on their columns' centres) nearer than GROUP_NAME_GAP px, as
+ * far as their names still fit on a screen `w` px wide (ToLaD#293: MDD's young splits, the Polar bear 25 px from the
+ * Brown bear). A column wider than the rest together at an end (the domestic dog's, the domestic cat's) runs off that
+ * edge, GROUP_DOM_PX of it kept on screen with its name, so the wild species beside it open out rather than stand as
+ * slivers at its side.
+ */
+export function groupSpan(bs: readonly FanBranch[], yNow: number, w = 0): [number, number] {
+  const cols = bs.map((b) => {
+    const y = Math.max(b.tipY, yNow);
+    const l = leftAt(b, y);
+    const r = l + laneAt(b, y).w;
+    return { l, r, c: (l + r) / 2 };
+  });
+  const s: [number, number] = [Math.min(...cols.map((q) => q.l)), Math.max(...cols.map((q) => q.r))];
+  const pad = GROUP_NAME_PAD * (s[1] - s[0]);
+  const out: [number, number] = [s[0] - pad, s[1] + pad];
+  if (!w || cols.length < 2) return out;
+  // (Its zoom, px per world unit: cladeCamera lays the span across `fill` px, centred `mid` px from the left, camera.frame.)
+  const fill = Math.min(w - 72, TAP_FILL * w);
+  const mid = w / 2 + (58 - 14) / 2;
+  const p0 = fill / (out[1] - out[0]);
+  // (Where the outer columns can stand: a name's room (a pill and a gap) right of the time axis and in from the
+  // screen's edge, for a level's names beside their columns, not on them: MDD's Crab-eating mongoose.)
+  const L = LABEL_AXIS_X + GROUP_NAME_GAP;
+  const R = w - GROUP_NAME_GAP;
+  cols.sort((a, b) => a.c - b.c);
+  const widest = cols.reduce((a, q) => (q.r - q.l > a.r - a.l ? q : a));
+  const dom = widest.r - widest.l > (s[1] - s[0]) / 2 ? (widest === cols[0] ? -1 : widest === cols[cols.length - 1] ? 1 : 0) : 0;
+  const core = dom < 0 ? cols.slice(1) : dom > 0 ? cols.slice(0, -1) : cols;
+  let gap = Infinity;
+  for (let i = 1; i < core.length; i++) gap = Math.min(gap, core[i].c - core[i - 1].c);
+  // (What has to fit between L and R: the names' centres, and a dominant column's edge GROUP_DOM_PX in from its side.)
+  const x0 = dom < 0 ? widest.r : core[0].c;
+  const x1 = dom > 0 ? widest.l : core[core.length - 1].c;
+  const room = R - L - (dom ? GROUP_DOM_PX : 0);
+  const need = GROUP_NAME_GAP / gap;
+  const p = Math.min(need, x1 > x0 ? room / (x1 - x0) : Infinity);
+  if (!(p > p0 * 1.001) || !Number.isFinite(p)) return out;
+  // (Laid in L..R, centred on what is left over, a dominant column showing at least GROUP_DOM_PX of itself.)
+  const lead = L + (dom < 0 ? GROUP_DOM_PX : 0) + (room - (x1 - x0) * p) / 2;
+  const m = x0 + (mid - lead) / p;
+  const half = fill / p / 2;
+  return [m - half, m + half];
 }
 
 /** The fan's families (splits founding a taxon ending in -idae, splits.ts familyLabel; not the root: the clade's own label names it), with their labels. */
@@ -1187,12 +1266,26 @@ export function labelSpots(
       // (heights()'s, without the array: the least over them.)
       const wa = Math.max(wya, q.y0);
       const wb = Math.min(wyb, q.y1 - 1e-9);
+      // (Which side of the strip it is on at each height, wa then the grid up to wb: an edge that lies nearly flat
+      // (a peel across the screen, MDD's Chinese mountain cat at the Felis polytomy, ToLaD#293) can cross the strip
+      // between two heights, on neither, and is then through it.)
+      let side = 0;
+      let sideB = 0;
       for (let j = -3, y = Math.ceil(wa / grid) * grid; j < 0 || y < wb; j < 0 ? j++ : (y += grid)) {
         const wy = j === -3 ? wa : j === -2 ? wb : j === -1 ? q.lean : y;
         if (j === -1 && !(wy > wa && wy < wb)) continue;
         const e = q.at(wy);
-        gap = Math.min(gap, Math.max(X(e[0]) - xb, xa - X(e[1])));
+        const ea = X(e[0]);
+        const eb = X(e[1]);
+        gap = Math.min(gap, Math.max(ea - xb, xa - eb));
+        const sd = eb < xa ? -1 : ea > xb ? 1 : 0;
+        if (j === -2) sideB = sd;
+        else if (j !== -1) {
+          if (side * sd < 0) gap = Math.min(gap, -(xb - xa) / 2);
+          side = sd;
+        }
       }
+      if (side * sideB < 0) gap = Math.min(gap, -(xb - xa) / 2);
       // Hidden from here on whatever else is near.
       if (gap <= -1) return gap;
     }
@@ -1955,16 +2048,7 @@ export class FanView implements InputHandlers {
     // (Down to the split where they meet, not the clade's stem: for a group across the level, the root, not the world's bottom.)
     // (Across the screen: their columns at "now" (an extinct one's at its tip), where their names and pictures stand,
     // not their rooms, wider where they were wider in the past: the most room each name and picture can have, ToLaD#274.)
-    const now = (): [number, number] => {
-      const s: [number, number] = [Infinity, -Infinity];
-      for (const b of bs) {
-        const y = Math.max(b.tipY, this.yNow);
-        s[0] = Math.min(s[0], leftAt(b, y));
-        s[1] = Math.max(s[1], leftAt(b, y) + laneAt(b, y).w);
-      }
-      return s;
-    };
-    return cladeCamera(this.camera, this.fan, { ...v, yBot: v.y }, now, (cam) => this.withBand(cam, v));
+    return cladeCamera(this.camera, this.fan, { ...v, yBot: v.y }, () => groupSpan(bs, this.yNow, this.w), (cam) => this.withBand(cam, v));
   }
 
   flyToGroup(bs: readonly FanBranch[]): void {
@@ -2149,16 +2233,31 @@ export class FanView implements InputHandlers {
     const live = !!fo && !!toSnap && !!fromSnap && same(toSnap, fromSnap);
     // (The frame's x where the fold stands now, for the path's length.)
     const tx0 = fo && toSnap && !live ? fo.follow(to.cx, to.cy, toSnap) : to.cx;
-    const px = flightPath(this.w / from.sx, this.w / to.sx, Math.abs(tx0 - from.cx));
+    // (The pan as it stands at the flight's widest (ToLaD#293): the gaps the zoom opened between the two ends close as it
+    // zooms out, so a trip measured where it starts zoomed out far past both ends, and the far end raced in as they closed.)
+    let dx = Math.abs(tx0 - from.cx);
+    if (fo && toSnap && fromSnap) {
+      const back = fo.keep();
+      for (let i = 0; i < 2; i++) {
+        const p = flightPath(this.w / from.sx, this.w / to.sx, dx);
+        const wTop = Math.max(...Array.from({ length: 33 }, (_, k) => p.at(k / 32)[0]));
+        if (!(wTop > 1.01 * Math.max(this.w / from.sx, this.w / to.sx))) break;
+        fo.setScale(this.w / wTop, this.w);
+        dx = Math.min(dx, Math.abs(fo.follow(tx0, to.cy, fromSnap) - fo.follow(from.cx, from.cy, fromSnap)));
+      }
+      back();
+    }
+    const px = flightPath(this.w / from.sx, this.w / to.sx, dx);
     const py = flightPath(this.h / from.sy, this.h / to.ty, Math.abs(to.cy - from.cy));
     const dur = ms ?? flightMs(Math.max(px.S, py.S));
+    const ease = flightEase(Math.max(px.S, py.S), ms == null ? dur : Infinity);
     const t0 = performance.now();
     let x0 = from.cx;
     let x1 = tx0;
     let at = to;
     this.anim = (now) => {
       const u = Math.min(1, Math.max(0, (now - t0) / dur));
-      const e = (1 - Math.cos(Math.PI * u)) / 2;
+      const e = ease(u);
       if (u >= 1) {
         // Landing: the frame computed where the fold now stands (as the flight has tracked it all the way).
         this.cam = { ...(fo ? frame() : to) };
