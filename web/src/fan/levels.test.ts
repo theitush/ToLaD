@@ -1,5 +1,6 @@
 // One tap = one level deeper, a double-tap = one level out, one pill per group one level down (ToLaD#258).
 import { describe, expect, it } from 'vitest';
+import { wantCutLabels } from './cut';
 import { laneAt, layoutFan, leftAt, type FanBranch, type FanNode } from './layout';
 import { CARNIVORA, FELIDAE, mammaliaClade, type CladeRec } from './panthera';
 import { loadMammalsFromFiles } from './mammals-node';
@@ -136,7 +137,7 @@ describe("a group's picture is its most-populous living species with a picture (
   }
 });
 
-describe('one pill per group one level down, titled with its name, pictured by its face (ToLaD#258)', () => {
+describe.skipIf(wantCutLabels())('one pill per group one level down, titled with its name, pictured by its face (ToLaD#258)', () => {
   for (const [name, mk] of FANS) {
     it(name, () => {
       const v = mk();
@@ -165,7 +166,7 @@ describe('one pill per group one level down, titled with its name, pictured by i
   }
 });
 
-describe('a tap goes one level deeper, a double-tap one level out (ToLaD#258)', () => {
+describe.skipIf(wantCutLabels())('a tap goes one level deeper, a double-tap one level out (ToLaD#258)', () => {
   for (const [name, mk] of FANS) {
     it(`${name}: a column, tapped again and again from home, then double-tapped home`, () => {
       const v = mk();
@@ -284,7 +285,7 @@ function levelsOnTheWay(v: FanView, step: number, at: (v: FanView) => void): voi
   }
 }
 
-describe('each group\'s picture on "now", exactly above its centre; crowded, a little overlap or dropped (ToLaD#262, #266)', () => {
+describe.skipIf(wantCutLabels())('each group\'s picture on "now", exactly above its centre; crowded, a little overlap or dropped (ToLaD#262, #266)', () => {
   for (const [name, mk] of FANS) {
     it(name, () => {
       const v = mk();
@@ -350,7 +351,7 @@ describe('a level of two or three groups is framed centred, in the middle of the
   }
 });
 
-describe('a "+x" stands for the names hidden near it; tapped, it frames them (ToLaD#262)', () => {
+describe.skipIf(wantCutLabels())('a "+x" stands for the names hidden near it; tapped, it frames them (ToLaD#262)', () => {
   for (const [name, mk] of FANS) {
     it(name, () => {
       const v = mk();
