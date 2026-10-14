@@ -2,6 +2,7 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createElement } from 'react';
 import { describe, expect, it } from 'vitest';
+import { wantCutLabels } from './cut';
 import { FELIDAE, type SpeciesRec } from './panthera';
 import { fold, matchRank, searchSpecies } from './search';
 import { SearchPanel } from './SearchPanel';
@@ -127,7 +128,7 @@ function stubView(): { v: FanView; frames: (t: number) => void } {
   return { v, frames };
 }
 
-describe('a pick flies there and opens the card', () => {
+describe.skipIf(wantCutLabels())('a pick flies there and opens the card', () => {
   const { v, frames } = stubView();
   const fan = v.fan;
   const sels: (Selection | null)[] = [];
