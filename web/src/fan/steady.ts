@@ -31,7 +31,11 @@ import { Fold, ROOM_BEND, type FoldState } from './fold';
 /** A split's fork is at most this share of its shortest daughter's run (to its own split or tip). */
 export const STEADY_RUN = 0.85;
 
-/** Rooms by life: the gap between two daughters where one is a fossil is at most this share of their extents together while both lived. */
+/**
+ * Rooms by life: the gap between two daughters where one is a fossil is at most this share of the narrower one's extent
+ * while both lived (ToLaD#289: of the two together, a fossil beside its sister's parent column, the founders of all its
+ * species, stood ~13 px off at Hominins with a 0.3 px column; of the narrower, ~4 px columns there).
+ */
 export const LIFE_GAP = 0.5;
 
 /** Rooms by life: a strand's widest over a window is laneW at this many steps (and its ends). */
@@ -355,8 +359,8 @@ export class Steady extends Fold {
           else {
             ext(K[p], t0, ea);
             ext(K[q], t0, eb);
-            // (The gap too: a share of the order's width, the humans' 8e9 at the primates', would dwarf the fossils; at most LIFE_GAP of what the two were then.)
-            const gl = Math.min(g, LIFE_GAP * (ea[1] - ea[0] + eb[1] - eb[0]));
+            // (The gap too: a share of the order's width, the humans' 8e9 at the primates', would dwarf the fossils; at most LIFE_GAP of the narrower of the two then.)
+            const gl = Math.min(g, LIFE_GAP * Math.min(ea[1] - ea[0], eb[1] - eb[0]));
             x = Math.max(x, o[p] + ea[1] + gl - eb[0]);
           }
           // (Those before a sister living to now are clear of q already: they are clear of her column, which q clears.)
