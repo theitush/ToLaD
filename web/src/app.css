@@ -971,6 +971,14 @@
   min-height: 34px;
   white-space: nowrap;
 }
+.fan .world-menu select {
+  font: inherit;
+  color: var(--ink);
+  background: rgba(12, 23, 20, 0.9);
+  border: 1px solid rgba(200, 230, 210, 0.22);
+  border-radius: 8px;
+  padding: 5px 6px;
+}
 .fan .world-menu input {
   width: 18px;
   height: 18px;

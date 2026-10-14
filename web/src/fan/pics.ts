@@ -1,68 +1,65 @@
 /**
- * The level's group pictures on the "now" edge (ToLaD#262): one disc per group one level down, always exactly above
- * its clade's centre (Ita: "pic must always be exactly about its clades center"), never slid sideways. Discs that
- * would overlap side by side are resolved only upwards: each takes the lowest row where it meets none placed before it
- * (a second row, then a third), with a thin upright stalk down to "now"; the discs are smaller only when three rows
- * are not room, and past the smallest size the rows go on up.
+ * The level's group pictures on the "now" edge (ToLaD#262, #266): one disc per group one level down, always exactly
+ * above its clade's centre (Ita: "pic must always be exactly about its clades center"), standing on "now" (an extinct
+ * group's on its own tip), never moved sideways or up. When they crowd: each disc shrinks to the room its nearest
+ * neighbour leaves (down to PIC_MIN), then
+ * neighbours overlap a little (the more populous on top), then the least populous groups' pictures are dropped.
  */
 
-/** A disc's place: centre (x, y), diameter d, row (0 on "now"), and its stalk [x, y0, y1] (null on row 0 over "now"). */
+/** A disc's place: centre (x, y), diameter d, and `i`, its group's index in placePics' input. */
 export interface PicSpot {
   x: number;
   y: number;
   d: number;
-  row: number;
-  stalk: [number, number, number] | null;
+  i: number;
 }
 
 /** Largest disc diameter (px): the species' pictures' (THUMB_D). */
 export const PIC_D = 50;
-/** Least gap (px) between two discs, side by side or row over row. */
+/** Least gap (px) between two discs side by side, while they need not overlap. */
 export const PIC_GAP = 4;
-/** Row 0's discs stand this many px above "now". */
+/** The discs stand this many px above "now" (or the tip). */
 export const PIC_LIFT = 2;
-/** Diameters tried, largest first, and the rows preferred at most. */
-const SIZES = [50, 44, 38, 32, 26, 22, 18, 15];
-const MAX_ROWS = 3;
-
-/** Rows for discs of diameter d centred at xs (left to right): each the lowest whose discs it clears. */
-function rowsFor(xs: readonly number[], d: number): number[] {
-  const right: number[] = [];
-  return xs.map((x) => {
-    let r = right.findIndex((e) => x - e >= d + PIC_GAP - 1e-9);
-    if (r < 0) r = right.length;
-    right[r] = x;
-    return r;
-  });
-}
+/** The smallest disc (px): crowded past it, neighbours overlap a little, then the least populous are dropped. */
+export const PIC_MIN = 18;
+/** At the smallest size, two discs' centres at least this share of a diameter apart (they overlap by the rest). */
+export const PIC_OVERLAP = 0.7;
 
 /**
- * The discs over the clades' centres `xs` (screen x, left to right), each its stalk down to `ys` ("now", or an
- * extinct species' tip below it): row 0 bottoms PIC_LIFT above nowS, the rows over it no higher than `top` while a
- * smaller size is left to try.
+ * The discs over the clades' centres `xs` (screen x), each bottoming PIC_LIFT above `ys` ("now", or an extinct group's
+ * tip below it), `pop` the groups' individuals alive (who stays, and on top, when they crowd). Returned least populous
+ * first: drawn in that order, the more populous lie on top.
  */
-export function placePics(xs: readonly number[], ys: readonly number[], nowS: number, top: number): PicSpot[] {
-  if (!xs.length) return [];
-  const base = nowS - PIC_LIFT;
-  // (Up to three rows, the largest size that needs no more; else as many rows as the band above "now" holds; else the
-  // smallest size, its rows on up.)
-  const band = (d: number) => Math.max(1, Math.floor((base - top + PIC_GAP) / (d + PIC_GAP)));
-  let d = SIZES[SIZES.length - 1];
-  let row: number[] = [];
-  found: for (const most of [(d: number) => Math.min(MAX_ROWS, band(d)), band]) {
-    for (const size of SIZES) {
-      const r = rowsFor(xs, size);
-      if (Math.max(...r) < most(size)) {
-        [d, row] = [size, r];
-        break found;
-      }
-    }
-  }
-  if (!row.length) row = rowsFor(xs, d);
-  return xs.map((x, i) => {
-    const y = base - d / 2 - row[i] * (d + PIC_GAP);
-    const low = y + d / 2;
-    const stalk: [number, number, number] | null = row[i] > 0 || ys[i] > nowS + 0.5 ? [x, low, ys[i]] : null;
-    return { x, y, d, row: row[i], stalk };
+export function placePics(xs: readonly number[], ys: readonly number[], pop: readonly number[]): PicSpot[] {
+  const n = xs.length;
+  if (!n) return [];
+  // The most populous first: each kept where it stands clear (enough) of those kept before it.
+  const order = [...xs.keys()].sort((a, b) => pop[b] - pop[a] || xs[a] - xs[b]);
+  const at = (i: number, d: number) => [xs[i], ys[i] - PIC_LIFT - d / 2];
+  const near = (i: number, j: number, d: number) => {
+    const [x0, y0] = at(i, d);
+    const [x1, y1] = at(j, d);
+    return Math.hypot(x0 - x1, y0 - y1);
+  };
+  const fits = (d: number, apart: number): number[] => {
+    const kept: number[] = [];
+    for (const i of order) if (kept.every((j) => near(i, j, d) >= apart - 1e-9)) kept.push(i);
+    return kept;
+  };
+  // Kept: each not nearer than a little overlap of the smallest discs to a more populous one kept (the rest dropped).
+  const kept = fits(PIC_MIN, PIC_OVERLAP * PIC_MIN);
+  // Each disc as large as its nearest kept neighbour leaves room for (two neighbours both so, they clear by PIC_GAP),
+  // PIC_D at most, PIC_MIN at least (there they overlap a little).
+  const size = kept.map((i) => {
+    let room = PIC_D;
+    for (const j of kept) if (j !== i) room = Math.min(room, near(i, j, PIC_D) - PIC_GAP);
+    return Math.max(PIC_MIN, room);
   });
+  return kept
+    .map((i, k) => {
+      const d = size[k];
+      const [x, y] = at(i, d);
+      return { x, y, d, i };
+    })
+    .reverse();
 }

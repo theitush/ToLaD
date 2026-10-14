@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { WorldLayers } from './world';
 import { wantSteady } from './steady';
+import type { NameMode } from './view';
 
 const ROWS: [keyof WorldLayers, string][] = [
   ['periods', 'Geological periods'],
@@ -20,7 +21,7 @@ function GlobeIcon() {
   );
 }
 
-export function WorldToggle({ get }: { get: () => { world: WorldLayers; request(): void } | null }) {
+export function WorldToggle({ get }: { get: () => { world: WorldLayers; names: NameMode; request(): void } | null }) {
   const [open, setOpen] = useState(false);
   const [, bump] = useState(0);
   const v = get();
@@ -65,6 +66,31 @@ export function WorldToggle({ get }: { get: () => { world: WorldLayers; request(
               }}
             />
             Steady layout
+          </label>
+          {/* Where the groups' names stand (ToLaD#266): switched in place, the URL's ?names= kept in step. */}
+          <label>
+            Names
+            <select
+              aria-label="Where the group names stand"
+              value={v.names}
+              onChange={(e) => {
+                v.names = e.target.value as NameMode;
+                try {
+                  const u = new URL(window.location.href);
+                  if (v.names === 'beside') u.searchParams.delete('names');
+                  else u.searchParams.set('names', v.names);
+                  window.history.replaceState(null, '', u.toString());
+                } catch {
+                  /* no URL */
+                }
+                v.request();
+                bump((n) => n + 1);
+              }}
+            >
+              <option value="beside">beside the branch</option>
+              <option value="mid">mid-branch</option>
+              <option value="gap">between branches</option>
+            </select>
           </label>
         </div>
       )}

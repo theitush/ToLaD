@@ -200,6 +200,8 @@ const scenes = [
   ['pics-1', 'taps', [process.env.LEVEL === 'cats' ? 'Panthera' : 'Canidae', 't']],
   ['pics-2', 'taps', [process.env.LEVEL === 'cats' ? 'Panthera' : 'Canidae', 'tt']],
   ['pics-weasels', 'taps', ['Mustelidae', 'tt']],
+  // ToLaD#266: tapped on down to a species (the dogs': Dog-like, Dogs, the species), its card open as the flight lands.
+  ['land-card', 'taps', [process.env.LEVEL === 'cats' ? 'Panthera' : 'Canidae', 'ttt']],
   // ToLaD#246: a flight from home into the fisher's frame, and from there back home, caught every 360 ms (1.8 s each).
   ...[0, 360, 720, 1080, 1440, 1800].map((ms) => [`fly-in-${ms}`, 'flyin', ['Fisher', ms]]),
   ...[0, 360, 720, 1080, 1440, 1800].map((ms) => [`fly-out-${ms}`, 'flyout', ['Fisher', ms]]),

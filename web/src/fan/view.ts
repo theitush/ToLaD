@@ -81,6 +81,24 @@ const BAND_ROWS = 5;
 
 /** Gap (px) a label keeps from the column it sits beside. */
 const LABEL_GAP = 3;
+
+/**
+ * Where a level's group names stand (ToLaD#266, Ita: "lets try", a toggle): `beside` its branch just below "now"
+ * (ToLaD#262), `mid` along its branch halfway between "now" and where it splits off, or `gap` between its branch and
+ * its neighbour's at that same height. Each of the last two clamped to the part on screen.
+ */
+export type NameMode = 'beside' | 'mid' | 'gap';
+export const NAME_MODES: readonly NameMode[] = ['beside', 'mid', 'gap'];
+/** The names' place asked for: ?names=mid|gap (else beside). */
+export function wantNames(): NameMode {
+  try {
+    const q = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('names') : null;
+    if (q === 'mid' || q === 'gap') return q;
+  } catch {
+    /* no URL */
+  }
+  return 'beside';
+}
 /** Highest a label standing on "now" may reach where the buttons are not above it (px from the top). */
 const LABEL_CEIL = 6;
 
@@ -569,6 +587,15 @@ export function groupFace(v: FanNode): FanBranch | null {
   return out;
 }
 
+/** A level's group's individuals alive now (ToLaD#266: whose picture stays, and on top, when they crowd). */
+const aliveCache = new WeakMap<FanNode, number>();
+export function groupAlive(g: Level): number {
+  if (g.b) return g.b.sp.extinct ? 0 : g.b.pop.aliveAt(0);
+  let n = aliveCache.get(g.v);
+  if (n === undefined) aliveCache.set(g.v, (n = g.v.strands.reduce((s, b) => s + (b.sp.extinct ? 0 : b.pop.aliveAt(0)), 0)));
+  return n;
+}
+
 /** Strand b's middle (world x) at "now", an extinct one's at its tip. */
 export function stripMid(b: FanBranch): number {
   const y = Math.max(b.tipY, b.tess.time.y(0));
@@ -684,6 +711,7 @@ export function labelSpots(
   famOf?: (id: string) => FanNode | undefined,
   lod?: Lod | null,
   level?: { groups: { v: FanNode; vi: number; text: string }[]; species: Set<FanBranch> },
+  names: NameMode = 'beside',
 ): LabelSpot[] {
   const half = LABEL_PILL / 2;
   const X = (x: number) => c.toScreen(x, 0)[0];
@@ -804,6 +832,79 @@ export function labelSpots(
     return out;
   };
 
+  /** Screen x of clade (or strand) u's left (or right) edge among its columns at world y wy, null where none spans it. */
+  const edgeAt = (u: FanNode | FanBranch, wy: number, right: boolean): number | null => {
+    const q = boxes.get(u);
+    if (q && wy >= q.y0 && wy <= q.y1) return X(q.at(wy)[right ? 1 : 0]);
+    if (isNode(u) && wy < u.y)
+      for (let k = 0; k < u.kids.length; k++) {
+        const e = edgeAt(u.kids[right ? u.kids.length - 1 - k : k], wy, right);
+        if (e !== null) return e;
+      }
+    return null;
+  };
+  /** The nearest column edge (screen x) past x at world y wy, rightwards (a left edge) or leftwards (a right edge); null for none near. */
+  const nextEdge = (x: number, wy: number, right: boolean): number | null => {
+    let best: number | null = null;
+    const k0 = Math.max(0, Math.min(NB - 1, Math.floor((c.toWorld(x, 0)[0] - vx0) / bw)));
+    stamp++;
+    for (let k = k0; k >= 0 && k < NB; k += right ? 1 : -1) {
+      // (Past the best found so far: done.)
+      const kx = X(vx0 + (right ? k : k + 1) * bw);
+      if (best !== null && (right ? kx > best : kx < best)) break;
+      for (const qi of buckets[k]) {
+        if (seen[qi] === stamp) continue;
+        seen[qi] = stamp;
+        const q = cols[qi];
+        if (!(wy >= q.y0 && wy <= q.y1)) continue;
+        const e = q.at(wy);
+        const ex = X(e[right ? 0 : 1]);
+        if (right ? ex > x + 0.5 && (best === null || ex < best) : ex < x - 0.5 && (best === null || ex > best)) best = ex;
+      }
+    }
+    return best;
+  };
+  /**
+   * A level's group's name along its branch (ToLaD#266, `mid`) or between it and its neighbour (`gap`): centred
+   * halfway between "now" (or its tip, wTop) and where it splits off (wBot), over the part of that on screen.
+   */
+  const along = (id: string, text: string, rank: Rank, len: number, own: FanNode | FanBranch, wTop: number, wBot: number, fit0: number, ref: { b?: FanBranch; v?: FanNode }): LabelSpot[] => {
+    const a = Math.max(top, Y(wTop));
+    const z = Math.min(bottom, Y(wBot));
+    if (!(fit0 > 0) || !(z > a)) return [];
+    const y0 = Math.max(top, (a + z) / 2 - len / 2);
+    const y1 = y0 + len;
+    const wy = c.toWorld(0, (y0 + y1) / 2)[1];
+    const L = edgeAt(own, wy, false);
+    const R = edgeAt(own, wy, true);
+    if (L === null || R === null || R < 0 || L > c.w) return [];
+    // (Its part on screen too short to hold a name: faded out; the legend at the bottom too.)
+    const f = fit0 * botFit(y1) * clamp01((z - a - 12) / 24);
+    const spot = (key: string, place: LabelSpot['place'], x: number, loose: boolean): LabelSpot => {
+      const box: [number, number, number, number] = [x - half, y0, x + half, y1];
+      // (Whole on screen; in a gap with LABEL_GAP px either side, clear: its full ink.)
+      const onX = x - half >= 0 && x + half <= c.w + 0.5;
+      const fit = f > 0 && onX ? f * clearFit(Math.min(x - half - LABEL_AXIS_X, loose ? CLEAR : clearance(x - half, x + half, y0, y1, own) + 2)) : 0;
+      return { key: `${id}:${key}`, id, place, ...ref, text, rank, x, y1, box, fit, loose: loose || undefined };
+    };
+    if (names === 'mid') {
+      // On its branch, opaque (over its own columns), its middle on screen right of the axis.
+      const lo = Math.max(L, LABEL_AXIS_X + half + 4);
+      const hi = Math.min(R, c.w) - half;
+      const x = lo <= hi ? (lo + hi) / 2 : Math.min(Math.max((L + R) / 2, LABEL_AXIS_X + half + 4), c.w - half);
+      return [spot('mid', 'in', x, true)];
+    }
+    // In the gap to its right, else to its left (with no neighbour there, just beside the branch); clear of the
+    // columns, else over them.
+    const nr = nextEdge(R, wy, true);
+    const nl = nextEdge(L, wy, false);
+    const xr = nr !== null && nr - R >= LABEL_PILL + 2 * LABEL_GAP ? (R + nr) / 2 : R + LABEL_GAP + half;
+    const xl = nl !== null && L - nl >= LABEL_PILL + 2 * LABEL_GAP ? (L + nl) / 2 : L - LABEL_GAP - half;
+    const xr2 = nr !== null ? (R + nr) / 2 : xr;
+    const xl2 = nl !== null ? (L + nl) / 2 : xl;
+    return [spot('gapR', 'right', xr, false), spot('gapL', 'left', xl, false), spot('gapR~', 'right', xr2, true), spot('gapL~', 'left', xl2, true)];
+  };
+
   const out: LabelSpot[] = [];
   // The families (ToLaD#146), first of all: standing on "now" over their species while "now" is on screen, the
   // span they name bracketed under the pill; at its left end, else its middle, else its right end (whichever
@@ -825,6 +926,11 @@ export function labelSpots(
       const own = columnNear(v, cx);
       const px = plus?.(`n${vi}`) ?? 0;
       const rank: Rank = [-1, wb - wa, vi];
+      // (Or along its branch, or between it and its neighbour, ToLaD#266: halfway down to where it splits off.)
+      if (names !== 'beside') {
+        for (const p of along(`n${vi}`, text, rank, measure(text) + 2 * LABEL_PAD + px, v, nowY, v.yBot, nowOn, { v })) out.push({ ...p, fam: v, pic: groupFace(v), plus: px });
+        continue;
+      }
       for (const p of beside(`n${vi}`, text, rank, measure(text) + 2 * LABEL_PAD + px, own, Math.max(nowS, Y(own.tipY)) + 4, Y(own.splitY), nowOn, { v }, true))
         out.push({ ...p, fam: v, pic: groupFace(v), plus: px });
       continue;
@@ -857,6 +963,10 @@ export function labelSpots(
     if (level) {
       // (A level's species, ToLaD#262: its name beside its column, down from "now" or its tip; its picture over "now".)
       const px = plus?.(id) ?? 0;
+      if (names !== 'beside') {
+        out.push(...along(id, b.sp.common, [0, b.width, b.index], measure(b.sp.common) + 2 * LABEL_PAD + px, b, Math.max(nowY, b.tipY), b.splitY, 1, { b }).map((p) => ({ ...p, plus: px })));
+        continue;
+      }
       out.push(...beside(id, b.sp.common, [0, b.width, b.index], measure(b.sp.common) + 2 * LABEL_PAD + px, b, Math.max(nowS, Y(b.tipY)) + 4, Y(b.splitY), 1, { b }, true).map((p) => ({ ...p, plus: px })));
       continue;
     }
@@ -1107,6 +1217,8 @@ export class FanView implements InputHandlers {
   readonly gl: FanGL | null = null;
   /** The world on the time axis (world.ts): its layers on or off, and the axis labels it keeps clear of. */
   world = worldFlags(typeof location !== 'undefined' ? location.search : '');
+  /** Where a level's group names stand (ToLaD#266): ?names=, switched in the globe menu. */
+  names: NameMode = wantNames();
   readonly axisBoxes: Box[] = [];
   /** Frame times (ms, CPU side of draw()), for perf runs. */
   readonly frameMs: number[] = [];
@@ -1337,6 +1449,8 @@ export class FanView implements InputHandlers {
   }
 
   flyToGroup(bs: readonly FanBranch[]): void {
+    // (One species: a landing on it, its card open, ToLaD#266.)
+    if (bs.length === 1) return this.flyToSpecies(bs[0].sp);
     this.selected = null;
     this.selInd = null;
     this.touch = null;
@@ -1577,8 +1691,8 @@ export class FanView implements InputHandlers {
   }
 
   /**
-   * A search pick: fly to the species' column, then open its card at its tip, as a tap there would. Without `card`
-   * (a double-tap stepping back to it, ToLaD#241): no card, the landing remembered (tapAt).
+   * A search pick or a tap landing on a species (ToLaD#266): fly to the species' column, then open its card at its tip,
+   * as a tap there would. Without `card` (a double-tap stepping back to it, ToLaD#241): no card. The landing remembered (tapAt).
    */
   flyToSpecies(sp: SpeciesRec, card = true): void {
     const b = this.fan.branches.find((x) => x.sp === sp);
@@ -1589,8 +1703,8 @@ export class FanView implements InputHandlers {
     this.touch = null;
     this.onSelect(null);
     this.flyTo(() => this.speciesCamera(b), undefined, () => {
+      this.tapAt = { b, v: null, cam: { ...this.cam } };
       if (!card) {
-        this.tapAt = { b, v: null, cam: { ...this.cam } };
         this.request();
         return;
       }
@@ -1770,7 +1884,8 @@ export class FanView implements InputHandlers {
 
   /** Fly to level lv's frame `cam` (a species: no card), remembered as the step under way (backing), so a tap or double-tap mid-flight goes on from there. */
   private goLevel(lv: Level, cam: Camera): void {
-    if (lv.b) this.flyToSpecies(lv.b.sp, false);
+    // (Landing on a species: its card opens, ToLaD#266.)
+    if (lv.b) this.flyToSpecies(lv.b.sp);
     else this.flyLevel(null, lv.v);
     const b = lv.b ?? lv.v.strands[lv.v.strands.length >> 1];
     this.backing = { to: lv.b ? lv.b.sp.common : lv.v.parent ? lv.v.name : 'home', cam, go: () => this.goLevel(lv, cam), lv, b };
@@ -2018,7 +2133,7 @@ export class FanView implements InputHandlers {
     // (ToLaD#262: each group's name beside its branch, room at its end for the "+x" of the names hidden near it last frame.)
     const top = this.labelTop() + (br ? br.pinH() * br.pinA : 0);
     const lg = labelGroups(this.fan, this.levelNow());
-    const spots = labelSpots(this.camera, this.fan, top, (t) => this.nameWidth(t), this.barRect()?.[0], br ?? undefined, (id) => this.plusRoom.get(id) ?? 0, undefined, lod, lg);
+    const spots = labelSpots(this.camera, this.fan, top, (t) => this.nameWidth(t), this.barRect()?.[0], br ?? undefined, (id) => this.plusRoom.get(id) ?? 0, undefined, lod, lg, this.names);
     this.drawLabels(spots, br, { ...lg, top, lod });
     br?.drawPins(this.ctx, FAMILY_INK, INK3, BG);
     this.drawWidthScale();
@@ -2544,23 +2659,26 @@ export class FanView implements InputHandlers {
   /** The level's groups hidden this frame (ToLaD#262): each the shown name it counts on as "+x" (its id), or null for none shown. */
   hiddenGroups: { lv: Level; on: string | null }[] = [];
 
-  /** The level's groups' pictures (ToLaD#262): over "now", each exactly above its group's centre, stacked up where they meet. */
+  /**
+   * The level's groups' pictures (ToLaD#262, #266): on "now" (an extinct species' on its tip), each exactly above its
+   * group's centre; crowded, smaller, then overlapping a little, then the least populous dropped (pics.ts).
+   */
   private groupPics(lg: ReturnType<typeof labelGroups> & { lod: Lod | null }, top: number): PicSpot[] {
     this.picSpots = [];
     const nowS = this.toScreen(0, this.yNow)[1];
     if (!thumbsOn || nowS < top + 12 || nowS > this.h) return [];
-    const gs: { lv: Level; face: FanBranch; x: number; y: number }[] = [];
+    const gs: { lv: Level; face: FanBranch; x: number; y: number; n: number }[] = [];
     for (const g of this.levelGroupsOn(lg)) {
       const face = g.lv.v ? groupFace(g.lv.v) : g.lv.b;
       if (!face || !wikiOf(face.sp.sci)?.img) continue;
-      gs.push({ lv: g.lv, face, x: g.x, y: g.lv.b && g.lv.b.tipY > this.yNow ? this.toScreen(0, g.lv.b.tipY)[1] : nowS });
+      gs.push({ lv: g.lv, face, x: g.x, y: g.lv.b && g.lv.b.tipY > this.yNow ? this.toScreen(0, g.lv.b.tipY)[1] : nowS, n: groupAlive(g.lv) });
     }
-    const placed = placePics(gs.map((g) => g.x), gs.map((g) => g.y), nowS, top);
-    this.picSpots = placed.map((p, i) => ({ ...p, lv: gs[i].lv, face: gs[i].face }));
+    const placed = placePics(gs.map((g) => g.x), gs.map((g) => g.y), gs.map((g) => g.n));
+    this.picSpots = placed.map((p) => ({ ...p, lv: gs[p.i].lv, face: gs[p.i].face }));
     return placed;
   }
 
-  /** Draw the level's pictures (groupPics): the stalks first, then the discs, the top row first. Each a tap to its group. */
+  /** Draw the level's pictures (groupPics), the least populous first (the more populous on top). Each a tap to its group. */
   private drawGroupPics(): void {
     const ctx = this.ctx;
     const nowS = this.toScreen(0, this.yNow)[1];
@@ -2570,15 +2688,9 @@ export class FanView implements InputHandlers {
     ctx.globalAlpha = alpha;
     ctx.strokeStyle = INK3;
     ctx.lineWidth = 1;
+    // (Hits: the one on top found first.)
+    for (const p of [...this.picSpots].reverse()) this.thumbHits.push([p.x, p.y, p.d / 2, p.face, p.lv.v]);
     for (const p of this.picSpots) {
-      if (!p.stalk) continue;
-      ctx.beginPath();
-      ctx.moveTo(p.stalk[0], p.stalk[1]);
-      ctx.lineTo(p.stalk[0], p.stalk[2]);
-      ctx.stroke();
-    }
-    for (const p of [...this.picSpots].sort((a, b) => b.row - a.row)) {
-      this.thumbHits.push([p.x, p.y, p.d / 2, p.face, p.lv.v]);
       const th = labelThumb(p.face.sp.sci, () => this.request());
       if (th) drawThumb(ctx, th, p.x, p.y, p.d);
       else {
