@@ -127,15 +127,19 @@ export type Carry = [number, number, number, number];
 /**
  * Carry label spots laid out at one camera to the next (ToLaD#255), in place: x with the camera; y with it too where a
  * spot stands on something in the world ("now", its tip, its column's top on screen), kept at the top line `top`
- * where it was held there (its column's top above it), and never above it.
+ * where it was held there (its column's top above it), and never above it. A spot carried wholly off the screen's
+ * side (width `w`) no longer fits (fit 0).
  */
-export function carryLabels(spots: LabelSpot[], k: Carry, top: number): void {
+export function carryLabels(spots: LabelSpot[], k: Carry, top: number, w = Infinity): void {
   for (const s of spots) {
     const b = s.box;
     const dx = k[0] * s.x + k[1] - s.x;
     s.x += dx;
     b[0] += dx;
     b[2] += dx;
+    // (Carried off the screen's side, it no longer fits, as a layout there would say: its hold on the place is let go, so
+    // at rest a name that left and came back waits for room like it does when laid out every frame.)
+    if (b[0] >= w || b[2] <= 0) s.fit = 0;
     if (s.span) {
       s.span[0] = k[0] * s.span[0] + k[1];
       s.span[1] = k[0] * s.span[1] + k[1];
@@ -1229,8 +1233,7 @@ export class FanView implements InputHandlers {
   barEl: HTMLElement | null = null;
   private scaleKey = '';
   /** Each species' label: shown or not, and its fade (0–1); when it was last drawn (ms). */
-  /** Each label's state: shown (`on`), its fade (`a`), and whether shown at the last layout (`lo`: carried frames, ToLaD#255, leave it). */
-  private labelState = new Map<string, { on: boolean; a: number; lo?: boolean }>();
+  private labelState = new Map<string, { on: boolean; a: number }>();
   private labelT = 0;
   /** `?debug`: a readout of the zooms, years on screen and individuals per px. */
   readonly debug = typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug');
@@ -2247,7 +2250,7 @@ export class FanView implements InputHandlers {
       L.frames++;
       const br = this.brackets && L.br ? L.br : null;
       br?.carry(k[0], k[1], this.toScreen(0, this.yNow)[1]);
-      carryLabels(L.spots, k, L.top);
+      carryLabels(L.spots, k, L.top, this.w);
       this.labelMs.push(performance.now() - t0);
       return { br, top: L.top, lg, spots: L.spots, carried: k };
     }
@@ -2910,8 +2913,7 @@ export class FanView implements InputHandlers {
     const dt = Math.min(100, Math.max(0, now - this.labelT));
     this.labelT = now;
     const prev = new Map<string, boolean>();
-    // (Which were shown at the last layout: what the carried frames between showed does not tip the choice at rest, ToLaD#255.)
-    for (const [key, st] of this.labelState) if (st.lo !== undefined) prev.set(key, st.lo);
+    for (const [key, st] of this.labelState) prev.set(key, st.on);
     const on = resolveLabels(spots, prev);
     // The "+x" badges (ToLaD#197): counted with the cull; a pill keeps room for its count from the frame before, so
     // when a count changes the next frame lays the pills out again with the room it needs.
@@ -2934,7 +2936,6 @@ export class FanView implements InputHandlers {
       let st = this.labelState.get(s.key);
       if (!st) this.labelState.set(s.key, (st = { on: want === 1, a: want }));
       st.on = want === 1;
-      if (!carried) st.lo = st.on;
       if (st.a !== want) {
         const step = dt / LABEL_FADE_MS;
         st.a = want > st.a ? Math.min(want, st.a + step) : Math.max(want, st.a - step);
