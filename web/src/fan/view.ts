@@ -558,6 +558,24 @@ export function spanOf(bs: readonly FanBranch[]): [number, number] {
   return s;
 }
 
+/**
+ * What a "+x" tap frames across the screen (groupCamera, ToLaD#274): the species' columns at "now" (`yNow`; an extinct
+ * one's at its tip), where their names and pictures stand, not their rooms, wider where they were wider in the past.
+ * Widened GROUP_NAME_PAD each side, a name's room beyond the outer ones (ToLaD#293: the leftmost's name beside it
+ * right of the time axis, not squeezed against its neighbour's; MDD's mongooses: the Crab-eating mongoose at the
+ * frame's edge).
+ */
+export function groupSpan(bs: readonly FanBranch[], yNow: number): [number, number] {
+  const s: [number, number] = [Infinity, -Infinity];
+  for (const b of bs) {
+    const y = Math.max(b.tipY, yNow);
+    s[0] = Math.min(s[0], leftAt(b, y));
+    s[1] = Math.max(s[1], leftAt(b, y) + laneAt(b, y).w);
+  }
+  const pad = GROUP_NAME_PAD * (s[1] - s[0]);
+  return [s[0] - pad, s[1] + pad];
+}
+
 /** The fan's families (splits founding a taxon ending in -idae, splits.ts familyLabel; not the root: the clade's own label names it), with their labels. */
 const famCache = new WeakMap<Fan, { v: FanNode; vi: number; text: string }[]>();
 export function families(fan: Fan): { v: FanNode; vi: number; text: string }[] {
@@ -1651,19 +1669,7 @@ export class FanView implements InputHandlers {
     // (Down to the split where they meet, not the clade's stem: for a group across the level, the root, not the world's bottom.)
     // (Across the screen: their columns at "now" (an extinct one's at its tip), where their names and pictures stand,
     // not their rooms, wider where they were wider in the past: the most room each name and picture can have, ToLaD#274.)
-    const now = (): [number, number] => {
-      const s: [number, number] = [Infinity, -Infinity];
-      for (const b of bs) {
-        const y = Math.max(b.tipY, this.yNow);
-        s[0] = Math.min(s[0], leftAt(b, y));
-        s[1] = Math.max(s[1], leftAt(b, y) + laneAt(b, y).w);
-      }
-      // (A name's room beyond the outer ones, ToLaD#293: the leftmost's name beside it right of the time axis, not
-      // squeezed against its neighbour's (MDD's mongooses: the Crab-eating mongoose at the frame's edge).)
-      const pad = GROUP_NAME_PAD * (s[1] - s[0]);
-      return [s[0] - pad, s[1] + pad];
-    };
-    return cladeCamera(this.camera, this.fan, { ...v, yBot: v.y }, now, (cam) => this.withBand(cam, v));
+    return cladeCamera(this.camera, this.fan, { ...v, yBot: v.y }, () => groupSpan(bs, this.yNow), (cam) => this.withBand(cam, v));
   }
 
   flyToGroup(bs: readonly FanBranch[]): void {
