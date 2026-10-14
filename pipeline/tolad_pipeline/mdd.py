@@ -7,7 +7,7 @@ species described or split since are missing. MDD is the current list. This modu
    so drop_unrecognised (ToLaD#116) keeps it;
 2. **matches** each living MDD species to our living leaves: its own name first, then its synonyms (MDD's
    nominal names in its genus, its original combination, its MSW3 and CMW names and the name the Red List
-   assessed it under, then our OTT/PHYLACINE synonym index), each leaf claimed once and never by another MDD
+   assessed it under, then our OTT/PHYLACINE synonym index, then its epithet in another gender), each leaf claimed once and never by another MDD
    species' accepted name (a split's daughter does not claim the parent's leaf);
 3. **grafts** each living, wild MDD species with no leaf onto its genus: the common ancestor of our leaves its
    MDD genus-mates matched (a split inside the genus, dated by interpolation like any living graft); with one
@@ -90,6 +90,17 @@ def _living_leaves(root: Node) -> list[Node]:
             and not n.data.get("empty_higher")]
 
 
+_GENDER_ENDINGS = ("us", "um", "a", "is", "e")
+
+
+def _gender_stem(ep: str) -> str:
+    """A Latin adjectival epithet without its gender ending (malayanus, malayana, malayanum -> malayan)."""
+    for e in _GENDER_ENDINGS:
+        if ep.endswith(e) and len(ep) - len(e) >= 4:
+            return ep[: -len(e)]
+    return ep
+
+
 def match(root: Node, rows: list[dict], syn_index: dict[str, list[Node]]) -> tuple[dict[str, Node], dict]:
     """MDD living species -> our living leaf; and how each was found."""
     leaves = _living_leaves(root)
@@ -99,6 +110,11 @@ def match(root: Node, rows: list[dict], syn_index: dict[str, list[Node]]) -> tup
     hit: dict[str, Node] = {}
     how: dict[str, str] = {}
     living = [r for r in rows if not r["extinct"]]
+    by_gender: dict[tuple[str, str], list[Node]] = defaultdict(list)
+    for n in leaves:
+        g, _, ep = n.name.partition(" ")
+        if ep and " " not in ep:
+            by_gender[(g, _gender_stem(ep))].append(n)
     for r in living:
         nd = by_name.get(r["name"])
         if nd is not None:
@@ -120,6 +136,11 @@ def match(root: Node, rows: list[dict], syn_index: dict[str, list[Node]]) -> tup
                 if len(s) == 1:
                     found = (next(iter(s.values())), "our synonym index")
                     break
+        if found is None:  # the same genus and epithet in another gender (Euroscaptor malayanus = our malayana)
+            g, ep = r["name"].split(" ", 1)
+            s = [x for x in by_gender.get((g, _gender_stem(ep)), []) if id(x) not in claimed and x.name not in accepted]
+            if len(s) == 1:
+                found = (s[0], "epithet gender")
         if found is not None:
             hit[r["name"]], how[r["name"]] = found
             claimed.add(id(found[0]))

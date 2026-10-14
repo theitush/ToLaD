@@ -57,6 +57,16 @@ class Match(unittest.TestCase):
         self.assertIs(hit["Phaner pallescens"], self.n["Phaner furcifer"])
         self.assertEqual(how["Phaner pallescens"], "MDD synonym")
 
+    def test_epithet_in_another_gender_is_the_same_species(self):
+        # MDD's Euroscaptor malayanus is our E. malayana: matched, not grafted beside it as a second mole
+        root, n = tree({"Mammalia": ["Euroscaptor"], "Euroscaptor": ["Euroscaptor malayana", "Euroscaptor klossi"]})
+        rows = [row("Euroscaptor malayanus", family="Talpidae"), row("Euroscaptor klossi", family="Talpidae"),
+                row("Euroscaptor kuznetsovi", family="Talpidae")]
+        hit, how = mdd.match(root, rows, {})
+        self.assertIs(hit["Euroscaptor malayanus"], n["Euroscaptor malayana"])
+        self.assertEqual(how["Euroscaptor malayanus"], "epithet gender")
+        self.assertNotIn("Euroscaptor kuznetsovi", hit)  # another species, not an ending away from klossi
+
     def test_grafts_on_the_genus(self):
         log = {}
         new = {n.name: n for n in mdd.graft(self.root, self.rows, {}, log)}
