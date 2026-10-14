@@ -89,8 +89,7 @@ class Match(unittest.TestCase):
     def test_recogniser(self):
         known = mdd.recogniser(self.rows)
         self.assertTrue(known("Microcebus berthae", set()))
-        self.assertTrue(known("Phaner furcifer", set()))  # a synonym of one species no tip has by name
-        self.assertFalse(known("Phaner furcifer", {"Phaner pallescens"}))
+        self.assertFalse(known("Phaner furcifer", set()))  # a synonym is not a species (#116)
         self.assertFalse(known("Felis affinis", set()))
 
 

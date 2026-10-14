@@ -3,8 +3,8 @@
 Our species list is Upham 2019 (taxonomy ~2017) plus the Open Tree tips some species list recognises, so the
 species described or split since are missing. MDD is the current list. This module
 
-1. **recognises** an Open Tree tip MDD accepts as a living species (or knows by a synonym of a species no tip
-   has by name), so drop_unrecognised (ToLaD#116) keeps it;
+1. **recognises** an Open Tree tip MDD accepts by name as a living species (a synonym alone does not count),
+   so drop_unrecognised (ToLaD#116) keeps it;
 2. **matches** each living MDD species to our living leaves: its own name first, then its synonyms (MDD's
    nominal names in its genus, its original combination, its MSW3 and CMW names and the name the Red List
    assessed it under, then our OTT/PHYLACINE synonym index), each leaf claimed once and never by another MDD
@@ -74,21 +74,14 @@ def load(raw: Path) -> list[dict]:
 
 
 def recogniser(rows: list[dict]):
-    """name -> True when MDD accepts it as a living species, or it is a synonym of exactly one living MDD
-    species whose own name is not taken by another tip (`leaf_names`, checked at call time)."""
+    """name -> True when MDD accepts it as a living species. A synonym does not count: one MDD species
+    has many (Felis lybica: F. ornata, F. servalina, ...), and keeping such tips is #116 again; the
+    species itself is matched or grafted under its MDD name instead. (`leaf_names` is unused, kept for
+    the call's shape.)"""
     living = {r["name"] for r in rows if not r["extinct"]}
-    by_syn: dict[str, set[str]] = defaultdict(set)
-    for r in rows:
-        if not r["extinct"]:
-            for s in r["syn"]:
-                if s not in living:
-                    by_syn[s].add(r["name"])
 
     def known(name: str, leaf_names: set[str]) -> bool:
-        if name in living:
-            return True
-        acc = by_syn.get(name, set())
-        return len(acc) == 1 and next(iter(acc)) not in leaf_names
+        return name in living
     return known
 
 
@@ -152,6 +145,7 @@ def graft(root: Node, rows: list[dict], syn_index: dict[str, list[Node]], log: d
             nd.data["mdd_genus"] = r["genus"]
             nd.data["mdd_family"] = r["family"]
             nd.data["mdd_order"] = r["order"]
+            nd.data["mdd_iucn"] = r["iucn"]
             if nd.name != r["name"] and r["name"] not in nd.alt:
                 nd.alt.append(r["name"])
             if nd.data.get("mdd_rescued") and r["common"]:
@@ -235,6 +229,7 @@ def graft(root: Node, rows: list[dict], syn_index: dict[str, list[Node]], log: d
         leaf.data["mdd"] = {"id": r["id"], "year": r["year"], "iucn": r["iucn"], "genus": r["genus"],
                             "family": r["family"], "order": r["order"]}
         leaf.data["mdd_genus"], leaf.data["mdd_family"], leaf.data["mdd_order"] = r["genus"], r["family"], r["order"]
+        leaf.data["mdd_iucn"] = r["iucn"]
         if r["common"]:
             leaf.data["common_mdd"] = r["common"]
         node.add(leaf)

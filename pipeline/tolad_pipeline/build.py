@@ -103,7 +103,7 @@ def build_tree(raw: Path, work: Path, log: dict, t_start: float):
 def recognised_by_a_list(root, raw: Path, ctx: dict):
     """The extant-species lists a living Open Tree tip may be on (ToLaD#116): Upham 2019 (matched
     already), PHYLACINE 1.2 (by name or its synonymy), the IUCN Red List 2026-1 (redlist.Matcher: name,
-    synonyms, spelling variant), MDD v2.5 (a living species, or a synonym of one no tip has by name;
+    synonyms, spelling variant), MDD v2.5 (a living species by its accepted name;
     ToLaD#278), and the names the count model anchors on (Greenspoon 2023 census and
     per-species model tables, FAOSTAT and pet stocks, the domestic forms)."""
     from . import anchors, redlist

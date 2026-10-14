@@ -151,8 +151,8 @@ def leaf_row(n, census: dict, gs_model: dict, deep_reports: dict | None = None) 
     nat = D.get("natural")
     rl = D.get("red_list") or {}
     row = {
-        "name": n.name, "family": _ancestor(n, "family") or D.get("upham_family"),
-        "order": _ancestor(n, "order") or D.get("upham_order"), "kind": n.kind,
+        "name": n.name, "family": _ancestor(n, "family") or D.get("upham_family") or D.get("mdd_family"),
+        "order": _ancestor(n, "order") or D.get("upham_order") or D.get("mdd_order"), "kind": n.kind,
         "extinct": bool(n.extinct), "extinct_by": D.get("extinct_by"), "t1_ma": n.t1,
         "alive": float(D.get("alive", 0.0)), "today_src": _today_src(n),
         "domestic": bool(D.get("domestic")), "G": 2 * D["L"] if D.get("L") else None,

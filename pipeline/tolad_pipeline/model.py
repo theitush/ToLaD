@@ -109,6 +109,8 @@ RANGELOSS_SHOWCASE = ["Bison bison", "Elephas maximus", "Ursus arctos", "Canis l
 # modelled count (density x a range nobody has seen it in) is capped at CR criterion D's threshold.
 NEAR_EXTINCT_STATUS = ("CR", "EW")
 NEAR_EXTINCT_CAP = 50.0  # IUCN Categories and Criteria v3.1, CR criterion D: < 50 mature individuals
+# a guessed (genus-median, ToLaD#278) count of a CR/EW species is held to CR criterion C's bound: < 250 mature
+CR_GUESS_CAP = 250.0
 SD_NEAR_EXTINCT = 1.0  # dex: anything from a last few to the cap, or none
 NEAR_EXTINCT_METHOD = ("N:capped at 50 (no current range in PHYLACINE/IUCN and IUCN {status}: possibly "
                        "extinct; IUCN 2012 Categories and Criteria v3.1, CR criterion D < 50 mature)")
@@ -848,6 +850,9 @@ def mdd_fallback(root: Node, census: dict[int, float], gs: dict[int, float]) -> 
             if v:
                 sd = max(0.5, float(np.std(v))) if len(v) > 1 else 1.0
                 out[id(n)] = {"N": 10 ** float(np.median(v)), "sd": sd, "level": lvl, "taxon": t, "of": len(v)}
+                if n.data.get("mdd_iucn") in NEAR_EXTINCT_STATUS and out[id(n)]["N"] > CR_GUESS_CAP:
+                    # a CR/EW species: its listing says more than its congeners do (Rice's whale, the popa langur)
+                    out[id(n)].update(N=CR_GUESS_CAP, sd=SD_NEAR_EXTINCT, capped=n.data["mdd_iucn"])
                 break
     return out
 
@@ -967,7 +972,9 @@ def assign_leaf_counts(root: Node, raw: Path, ctx: dict, log: dict) -> None:
             D["sys_sd"] = SD_SYSTEMATIC
             D["meth"] = [m for m in D["meth"] if not m.startswith(("D:", "A:"))]
             D["meth"].append(f"N:median of the {f['of']} other species of its {f['level']} {f['taxon']} (no census, "
-                             f"range or published estimate of its own; a guess, grade D)")
+                             f"range or published estimate of its own; a guess, grade D)"
+                             + (f", held to {CR_GUESS_CAP:.0f} (IUCN CR criterion C bound; MDD lists it "
+                                f"{f['capped']})" if f.get("capped") else ""))
             D["genus_median"] = f
             cap = 3
             found[f"MDD graft: {f['level']} median"] += 1
