@@ -230,7 +230,7 @@ export interface LabelSpot {
 }
 
 /** A frame's labels from the cut (?labels=cut, ToLaD#333): the names' spots, each one's "+x" species, the pictures. */
-interface CutLabels {
+export interface CutLabels {
   spots: LabelSpot[];
   groups: Map<string, FanBranch[][]>;
   pics: (PicSpot & { lv: Level; face: FanBranch })[];
@@ -2996,7 +2996,7 @@ export class FanView implements InputHandlers {
     if (T) {
       const br = this.layoutBrackets();
       const top = this.labelTop() + (br ? br.pinH() * br.pinA : 0);
-      const cut = this.cutLabels(T, top);
+      const cut = (this.cutLast = this.cutLabels(T, top));
       this.labLast = null;
       this.labelMs.push(performance.now() - t0);
       this.labelLayMs.push(performance.now() - t0);
@@ -3070,6 +3070,8 @@ export class FanView implements InputHandlers {
     this.terr = { fan: this.fan, fold: f, w: this.w, t };
     return t;
   }
+  /** The last labels from the cut (?labels=cut; tests read it). */
+  cutLast: CutLabels | null = null;
   /** Names, pictures and "+x" on/off from the cut (wantCutLabels; tests set it). */
   static labelsCut = wantCutLabels();
 
@@ -3091,24 +3093,30 @@ export class FanView implements InputHandlers {
     const spots: LabelSpot[] = [];
     const groups = new Map<string, FanBranch[][]>();
     const bottom = this.h - LABEL_BOTTOM_PX + 30;
-    /** An item's screen x centre kept on screen inside its territory, and its youngest tip (screen y). */
-    const place = (it: CutItem): [number, number] => {
-      const l = X(it.x0);
-      const r = X(it.x1);
-      const lo = Math.max(l, LABEL_AXIS_X) + half;
-      const hi = Math.min(r, this.w) - half;
+    /**
+     * An item's centre (screen x) for a box `d` wide: inside its territory always (it fits there), on screen as well
+     * where the territory's part on screen holds it; and its youngest tip (screen y).
+     */
+    const place = (it: CutItem, d: number): [number, number] => {
+      const l = X(it.x0) + d / 2;
+      const r = X(it.x1) - d / 2;
+      const lo = Math.max(l, LABEL_AXIS_X + d / 2);
+      const hi = Math.min(r, this.w - d / 2);
       const cx = (l + r) / 2;
-      return [lo <= hi ? Math.min(Math.max(cx, lo), hi) : Math.min(Math.max(cx, hi), lo), Y(T.youngest(it))];
+      const x = lo <= hi ? Math.min(Math.max(cx, lo), hi) : Math.min(Math.max(cx, hi), lo);
+      return [Math.min(Math.max(x, l), r), Y(T.youngest(it))];
     };
+    // (Items only touching the screen's ends, none of them on it, culled.)
+    const shown = (it: CutItem) => it.fits && X(it.x1) > LABEL_AXIS_X && X(it.x0) < this.w;
     for (const it of T.t.cut(sx, LABEL_PILL, vx0, vx1)) {
-      if (!it.fits) continue;
+      if (!shown(it)) continue;
       const v = it.kind === 'leaf' ? null : T.t.nodes[it.j];
       const b = it.kind === 'leaf' ? T.t.strands[it.j] : null;
       const key = `c${it.kind}${it.j}:${it.q0}`;
       const { text, hid } = T.label(it, key);
       const px = this.plusPx(hid.length);
       const tlen = (text ? this.nameWidth(text) + 2 * LABEL_PAD : LABEL_PAD) + px;
-      const [x, ty] = place(it);
+      const [x, ty] = place(it, LABEL_PILL);
       // (Hanging from its youngest tip into its own columns, kept under the top line: nothing else is in its territory there.)
       const y0 = Math.max(ty + 4, top);
       const y1 = y0 + tlen;
@@ -3124,11 +3132,11 @@ export class FanView implements InputHandlers {
     const pics: CutLabels['pics'] = [];
     if (thumbsOn) {
       for (const it of T.t.cut(sx, PIC_D, vx0, vx1)) {
-        if (!it.fits || it.kind === 'run') continue;
+        if (!shown(it) || it.kind === 'run') continue;
         const lv: Level = it.kind === 'leaf' ? { b: T.t.strands[it.j] } : { v: T.t.nodes[it.j] };
         const face = lv.b ?? groupFace(lv.v!);
         if (!face || !wikiOf(face.sp.sci)?.img) continue;
-        const [x, ty] = place(it);
+        const [x, ty] = place(it, PIC_D);
         const y = ty - PIC_LIFT - PIC_D / 2;
         if (y - PIC_D / 2 < top || y > this.h) continue;
         pics.push({ x, y, d: PIC_D, i: pics.length, lv, face });
