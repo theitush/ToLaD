@@ -175,6 +175,47 @@ describe('a "+x" tap: every group it stood for named and pictured (ToLaD#274)', 
   }
 });
 
+describe('a chip with a "+x" is one tap target (ToLaD#287): its name lands where its badge does, every group named', () => {
+  it('carnivores (folded)', () => {
+    const v = stubView();
+    const bad: string[] = [];
+    let taps = 0;
+    const levels: Level[] = [{ v: v.fan.root }, ...v.fan.nodes.filter((u) => u.parent && isLevel(v.fan, u) && u.strands.length > 1 && levelUp(v.fan, u) === v.fan.root).map((u) => ({ v: u }))];
+    for (const lv of levels) {
+      land(v, lv);
+      // (Each badge's chip: the name pill it ends.)
+      const chipOf = (q: readonly number[]) => [...v.famHits, ...v.nameHits].find((c) => c.box[0] <= q[0] + 1 && c.box[2] >= q[2] - 1 && c.box[1] <= q[1] + 1 && c.box[3] >= q[3] - 1);
+      const hits = v.plusHits.map((h) => ({ chip: [...(chipOf(h.badge)?.box ?? h.box)], badge: [...h.badge], bs: [...h.bs] }));
+      const stoodBy = hits.map((h) => v.hiddenGroups.filter((g) => strandsOf(g.lv).every((b) => h.bs.includes(b))).length);
+      hits.forEach((h, k) => {
+        const at = nameOf(lv);
+        const landing = (x: number, y: number): Camera | null => {
+          land(v, lv);
+          v.tap(x, y);
+          if (!P(v).anim) return null;
+          run(v);
+          return { ...v.cam };
+        };
+        // The badge, then the name (the pill's foot end: an upright name reads up from it).
+        const byBadge = landing((h.badge[0] + h.badge[2]) / 2, (h.badge[1] + h.badge[3]) / 2);
+        if (!(h.chip[3] - h.badge[3] > 12)) bad.push(`${at}: +${stoodBy[k]}: no name pill under its badge`);
+        const byName = landing((h.chip[0] + h.chip[2]) / 2, h.chip[3] - 6);
+        if (!byBadge || !byName) {
+          bad.push(`${at}: +${stoodBy[k]}: ${byBadge ? '' : 'badge '}${byName ? '' : 'name '}flew nowhere`);
+          return;
+        }
+        taps++;
+        if (Math.abs(Math.log(byName.sx / byBadge.sx)) > 1e-6 || Math.abs(byName.cx - byBadge.cx) * byName.sx > 0.5 || Math.abs(byName.cy - byBadge.cy) * byName.sy > 0.5) bad.push(`${at}: +${stoodBy[k]}: the name landed off the badge's frame`);
+        // Landed by the name: the groups it stood for named (the living ones; up to five, as a "+x" tap's, ToLaD#274).
+        const still = v.hiddenGroups.filter((g) => living(g.lv) && strandsOf(g.lv).some((b) => h.bs.includes(b)));
+        if (stoodBy[k] <= 5 && still.length) bad.push(`${at}: +${stoodBy[k]} by the name, still hidden: ${still.map((g) => nameOf(g.lv)).join(', ')}`);
+      });
+    }
+    expect(taps).toBeGreaterThan(0);
+    expect(bad).toEqual([]);
+  }, 400000);
+});
+
 describe('the hominins are one group (ToLaD#289)', () => {
   it('Great apes → Hominins → Homo → a species, each a level; the stack at most three rows and a "…"', async () => {
     await loadMammalsFromFiles();
