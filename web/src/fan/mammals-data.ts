@@ -6,6 +6,7 @@
 // mammaliaClade) are built from it only when the level is shown. Tests and scripts in node load it from the data files
 // (mammals-node.ts), the same build the page fetches.
 
+import type { LayoutSeed } from './layout';
 import type { RawClade } from './panthera-extract';
 
 /** What mammals.json holds. */
@@ -14,6 +15,8 @@ export interface MammalData {
   clade: RawClade;
   /** The pictures and links of the species the carnivore page leaves out (data/mammals/wiki.json, ToLaD#182). */
   wiki: Record<string, { wp?: string; img?: string; file?: string; range?: string; rangeFile?: string } | null>;
+  /** The level's default layout, worked out at build time (layout.ts LayoutSeed, ToLaD#255); absent, the page works it out. */
+  seed?: LayoutSeed;
 }
 
 /** The sibling file's name (vite.config.ts emits it; pages.yml stages it next to index.html). */

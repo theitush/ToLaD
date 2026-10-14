@@ -1147,11 +1147,17 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = FELIDA
   // The order is the tree's, whatever the widths (ToLaD#146: linear vs log never reorders the species): the sides
   // chosen on the default design's widths (linear), every other design taking them.
   if (mode !== ORDER_MODE && !byMode.has(ORDER_MODE)) layoutFan(clade, ORDER_MODE, tree, edge);
-  const P = new Packer(time, mode, W, branches.length > HUGE_TREE ? HUGE_CELLS : CELLS);
-  const { plans, sides } = chooseSides(root, P, byMode.get(ORDER_MODE));
-  byMode.set(mode, sides);
-  if (edge === 'curved') placeRiver(root, P, time, mode);
-  else placeLean(root, nodes, plans, time, mode);
+  // (The default design's sides and places, worked out at build time for the mammal level, ToLaD#255: taken as they are.)
+  const seed = mode === ORDER_MODE && edge === 'curved' ? clade.seed : undefined;
+  if (seed && seedFits(seed, nodes, branches)) byMode.set(mode, applySeed(seed, nodes, branches));
+  else {
+    const P = new Packer(time, mode, W, branches.length > HUGE_TREE ? HUGE_CELLS : CELLS);
+    const { plans, sides } = chooseSides(root, P, byMode.get(ORDER_MODE));
+    byMode.set(mode, sides);
+    if (edge === 'curved') placeRiver(root, P, time, mode);
+    else placeLean(root, nodes, plans, time, mode);
+  }
+  if (SEED_OUT && mode === ORDER_MODE && edge === 'curved') SEED_OUT.seed = takeSeed(nodes, branches, byMode.get(mode)!);
   // Each strand's place in its ancestors' columns (offsets in the column's order), each column's tile in its parent, each leaf's slot.
   for (const v of nodes) v.strands = under(v);
   for (const v of nodes) {
@@ -1207,6 +1213,73 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = FELIDA
     x0,
     x1,
   };
+}
+
+/**
+ * What the default design (linear, curved) decided, for a big clade worked out at build time (ToLaD#255: the mammal
+ * level's ~2 s of choosing sides and packing columns, ~8 s on a phone): which splits are mirrored, and where every
+ * column sits. In the order layoutFan builds them (nodes, then branches, before their sort): the same tree and the same
+ * code give the same numbers, read back exactly (JSON keeps a double's every bit).
+ */
+export interface LayoutSeed {
+  /** The nodes (build order) whose daughters are mirrored. */
+  flips: number[];
+  /** Per node: left, cx, blend, leanY. */
+  node: number[];
+  /** Per branch (build order): cx, colLeft, leanY. */
+  leaf: number[];
+}
+
+/** Set (seedOut) to collect the seed of the next default-design layout (the build, vite.config.ts). */
+let SEED_OUT: { seed?: LayoutSeed } | null = null;
+
+/** The seed of this clade's default design (linear, curved) on this tree: layoutFan run once, its decisions kept. */
+export function layoutSeed(clade: CladeRec, tree: Split): LayoutSeed {
+  SEED_OUT = {};
+  try {
+    layoutFan({ ...clade, seed: undefined }, ORDER_MODE, tree, 'curved');
+    return SEED_OUT.seed!;
+  } finally {
+    SEED_OUT = null;
+  }
+}
+
+function seedFits(s: LayoutSeed, nodes: FanNode[], branches: FanBranch[]): boolean {
+  return s.node.length === nodes.length * 4 && s.leaf.length === branches.length * 3 && s.flips.every((i) => i < nodes.length && nodes[i].kids.length > 1);
+}
+
+function takeSeed(nodes: FanNode[], branches: FanBranch[], sides: Map<Split, boolean>): LayoutSeed {
+  const flips: number[] = [];
+  const node: number[] = [];
+  nodes.forEach((v, i) => {
+    if (sides.get(v.split)) flips.push(i);
+    node.push(v.left, v.cx, v.blend, v.leanY);
+  });
+  const leaf: number[] = [];
+  for (const b of branches) leaf.push(b.cx, b.colLeft, b.leanY);
+  return { flips, node, leaf };
+}
+
+/** The seed's sides and places on a fresh layout (chooseSides' daughters' order, placeRiver's places); the sides chosen. */
+function applySeed(s: LayoutSeed, nodes: FanNode[], branches: FanBranch[]): Map<Split, boolean> {
+  const sides = new Map<Split, boolean>();
+  for (const v of nodes) sides.set(v.split, false);
+  for (const i of s.flips) {
+    nodes[i].kids.reverse();
+    sides.set(nodes[i].split, true);
+  }
+  nodes.forEach((v, i) => {
+    v.left = s.node[4 * i];
+    v.cx = s.node[4 * i + 1];
+    v.blend = s.node[4 * i + 2];
+    v.leanY = s.node[4 * i + 3];
+  });
+  branches.forEach((b, i) => {
+    b.cx = s.leaf[3 * i];
+    b.colLeft = s.leaf[3 * i + 1];
+    b.leanY = s.leaf[3 * i + 2];
+  });
+  return sides;
 }
 
 /**
