@@ -372,12 +372,49 @@ export class Brackets {
     for (const p of this.placed) this.rowH[p.row] = Math.max(this.rowH[p.row], p.form === 'tick' ? TICK_ROW_H : ROW_H);
     for (let r = 1; r <= rows; r++) this.rowBase[r] = this.rowBase[r - 1] + this.rowH[r - 1];
     const height = rows ? this.rowTop(rows - 1) : 0;
+    this.stack = [top, height, rows, fit];
     this.baseS = Math.min(nowS - 4, Math.max(top + height, nowS - 4 - PILL_ROOM));
     // Pushed up past the top line by "now" (under the buttons) by half a row, it is swapped for the pinned rows
     // (ToLaD#233, like a sticky header): a clean swap, never both at once (a fade showed the order twice, faintly).
     // ("Now" itself near the top line: the same swap, half way through the old fade.)
     this.fit = (rows && top + height - this.baseS > ROW_H / 2) || fit < 0.5 ? 0 : 1;
     return this.placed;
+  }
+
+  /** The last layout's top line, stack height, rows and fit asked for (carry()). */
+  private stack: [number, number, number, number] = [0, 0, 0, 0];
+
+  /**
+   * Carry the last layout (and pins) with the camera (ToLaD#255): between layouts, while the view moves, its x moved
+   * by x → ax·x + bx (the camera's change since the frame before), its foot and fit again from "now" at `nowS`, the
+   * rows, forms and pinned groups kept. layout() and pin() again once the view settles.
+   */
+  carry(ax: number, bx: number, nowS: number): void {
+    for (const p of this.placed) {
+      p.a = ax * p.a + bx;
+      p.b = ax * p.b + bx;
+      p.lx = ax * p.lx + bx;
+    }
+    for (const p of this.pins) {
+      p.a = ax * p.a + bx;
+      p.b = ax * p.b + bx;
+      const va = Math.max(p.a - GAP / 2, this.x0);
+      const vb = Math.min(p.b + GAP / 2, this.w);
+      p.lx = Math.min(Math.max((va + vb) / 2, this.x0 + LABEL_PAD + p.lw / 2), this.w - LABEL_PAD - p.lw / 2);
+    }
+    const sa = this.sa as Float64Array;
+    const sb = this.sb as Float64Array;
+    for (let i = 0; i < sa.length; i++) {
+      sa[i] = ax * sa[i] + bx;
+      sb[i] = ax * sb[i] + bx;
+    }
+    const [top, height, rows, fit0] = this.stack;
+    if (!(fit0 > 0)) return;
+    const fit = Math.min(1, Math.max(0, (nowS - top) / 24));
+    this.baseS = Math.min(nowS - 4, Math.max(top + height, nowS - 4 - PILL_ROOM));
+    this.fit = (rows && top + height - this.baseS > ROW_H / 2) || fit < 0.5 ? 0 : 1;
+    // (The pinned rows swap in as the stack goes: those pinned at the last layout, none if the stack showed then.)
+    this.pinA = this.pins.length ? 1 - this.fit : 0;
   }
 
   /**
