@@ -607,13 +607,12 @@ export const FIT_DWARF = 3;
 
 /**
  * Where a level's fossils lived (?fit=fossils, ToLaD#289): the world x its columns took (each at its own width
- * there) from the level's start up to its youngest fossil's end, or null when it has no fossil or its span at "now"
+ * there) from the level's start up to its youngest fossil group's end (fossilEnd), or null when it has no fossil or its span at "now"
  * (familySpan) is under FIT_DWARF times that: the living columns' widening since is left to run off the screen.
  */
-export function fossilSpan(v: FanNode): [number, number] | null {
-  const ext = v.strands.filter((b) => b.sp.extinct || !(b.pop.aliveAt(0) > 0));
-  if (!ext.length) return null;
-  const yEnd = Math.min(...ext.map((b) => b.tipY));
+export function fossilSpan(fan: Fan, v: FanNode): [number, number] | null {
+  const yEnd = fossilEnd(fan, v);
+  if (yEnd === null) return null;
   const s: [number, number] = [Infinity, -Infinity];
   for (const b of v.strands) {
     const hi = Math.min(b.splitY, v.yBot);
@@ -632,9 +631,34 @@ export function fossilSpan(v: FanNode): [number, number] | null {
   return z - a > FIT_DWARF * (s[1] - s[0]) ? s : null;
 }
 
+/**
+ * World y of a level's youngest fossil group's end (ToLaD#298): of its groups one level down (nextLevels) with no
+ * member alive now, the one whose last member died nearest "now"; null when every group has one alive. (At the
+ * Hominins the Homo group, the humans in it, is no fossil: its fossils' ~40 kya would leave the australopiths and
+ * Paranthropus, the level's own fossils, at the screen's foot.)
+ */
+function fossilEnd(fan: Fan, v: FanNode): number | null {
+  const gone = (b: FanBranch) => b.sp.extinct || !(b.pop.aliveAt(0) > 0);
+  let y = Infinity;
+  for (const g of nextLevels(fan, v)) {
+    const bs = g.b ? [g.b] : g.v.strands;
+    if (bs.every(gone)) for (const b of bs) y = Math.min(y, b.tipY);
+  }
+  return y < Infinity ? y : null;
+}
+
+/**
+ * The world y a level's frame puts where "now" would stand (ToLaD#298): under ?fit=fossils, a level framed on its
+ * fossils (fossilSpan) has its youngest fossil group's end there, "now" (and the living columns' last ~40 kyr, which
+ * log time gives most of the screen) above the screen; otherwise null ("now" there).
+ */
+export function fossilTop(fan: Fan, v: FanNode): number | null {
+  return wantFitFossils() && fossilSpan(fan, v) ? fossilEnd(fan, v) : null;
+}
+
 /** The world x a level is framed on: its span at "now" (familySpan), or under ?fit=fossils where its dwarfed fossils lived (fossilSpan, ToLaD#289). */
-export function levelSpan(v: FanNode): [number, number] {
-  return (wantFitFossils() && fossilSpan(v)) || familySpan(v);
+export function levelSpan(fan: Fan, v: FanNode): [number, number] {
+  return (wantFitFossils() && fossilSpan(fan, v)) || familySpan(v);
 }
 
 /** Species' rooms side by side: their world x span [x0, x1] (folded, fold.ts: where the fold has them, at "now", an extinct one's at its tip). */
@@ -991,6 +1015,11 @@ export function labelSpots(
   const nowS = Y(nowY);
   /** "now" on screen (below the top line): 1, fading over 24 px as it goes above. */
   const nowOn = clamp01((nowS - top) / 24);
+  // (?fit=fossils, ToLaD#298: a level framed on its fossils has "now" above the screen; a living group's picture stands
+  // under the top line then (groupPics), its name under that, and the level's names show.)
+  const fossils = !!level && wantFitFossils();
+  const standS = fossils ? Math.max(nowS, top + NOW_ROOM) : nowS;
+  const levelOn = fossils ? 1 : nowOn;
 
   // Heights (world) to measure a column's edge at between wa < wb: both ends, its own ends and peel's end
   // (`at`) and a grid fixed in the world, at most 8 px apart. Points only enter at the ends, where the edge
@@ -1306,7 +1335,7 @@ export function labelSpots(
     if (level) {
       // A level's group (ToLaD#262): its name beside its branch, down from "now" (its picture stands over "now",
       // groupPics): beside the column nearest its centre, room at the name's end for the "+x" of the groups hidden.
-      if (!(nowOn > 0)) continue;
+      if (!(levelOn > 0)) continue;
       const [wa, wb] = groupExtent(v);
       const cx = (wa + wb) / 2;
       if (!(X(wb) > 0 && X(wa) < c.w)) continue;
@@ -1319,7 +1348,7 @@ export function labelSpots(
         for (const p of along(`n${vi}`, text, rank, measure(text) + 2 * LABEL_PAD + px, v, nowY, v.yBot, nowOn, { v })) out.push({ ...p, fam: v, pic: groupFace(v), plus: px });
         continue;
       }
-      for (const p of beside(`n${vi}`, text, rank, measure(text) + 2 * LABEL_PAD + px, own, Math.max(nowS, Y(own.tipY)) + 4, Y(own.splitY), nowOn, { v }, true))
+      for (const p of beside(`n${vi}`, text, rank, measure(text) + 2 * LABEL_PAD + px, own, Math.max(standS, Y(own.tipY)) + 4, Y(own.splitY), levelOn, { v }, true))
         out.push({ ...p, fam: v, pic: groupFace(v), plus: px });
       continue;
     }
@@ -1355,7 +1384,7 @@ export function labelSpots(
         out.push(...along(id, b.sp.common, [0, b.width, b.index], measure(b.sp.common) + 2 * LABEL_PAD + px, b, Math.max(nowY, b.tipY), b.splitY, 1, { b }).map((p) => ({ ...p, plus: px })));
         continue;
       }
-      out.push(...beside(id, b.sp.common, [0, b.width, b.index], measure(b.sp.common) + 2 * LABEL_PAD + px, b, Math.max(nowS, Y(b.tipY)) + 4, Y(b.splitY), 1, { b }, true).map((p) => ({ ...p, plus: px })));
+      out.push(...beside(id, b.sp.common, [0, b.width, b.index], measure(b.sp.common) + 2 * LABEL_PAD + px, b, Math.max(standS, Y(b.tipY)) + 4, Y(b.splitY), 1, { b }, true).map((p) => ({ ...p, plus: px })));
       continue;
     }
     // (Standing for its family, ToLaD#212: the family's name on its tip, last frame's familyPills.)
@@ -1752,14 +1781,15 @@ export class FanView implements InputHandlers {
    * A level's frame spans the clade's life (ToLaD#288): "now" under the brackets' stack this frame lays out with
    * room for the level's pictures under it (nowUnder, ToLaD#274); its start (the fork
    * camera.frame puts FRAME_BOTTOM px up from the screen's foot) down at FORK_PX from the foot, over the scale bar.
-   * Only the time is moved: the width (and with it the stack) stays as framed.
+   * Only the time is moved: the width (and with it the stack) stays as framed. `top`: the world y put where "now"
+   * would stand, "now" itself by default (?fit=fossils, ToLaD#298: a level framed on its fossils, its youngest fossil's end, fossilTop).
    */
-  private withBand(cam: Camera, lv: FanNode | null = null): Camera {
+  private withBand(cam: Camera, lv: FanNode | null = null, top = this.yNow): Camera {
     const sn = this.h / 2 + (this.yNow - cam.cy) * cam.sy;
     const yFork = cam.cy + (this.h - FRAME_BOTTOM - this.h / 2) / cam.sy;
     const nowS = this.brackets ? Math.max(this.nowUnder(cam, lv), this.labelTop() + NOW_ROOM) : sn;
-    const sy = Math.max(1e-300, this.h - FORK_PX - nowS) / Math.max(1e-300, yFork - this.yNow);
-    return { ...cam, sy, ty: sy, cy: this.yNow + (this.h / 2 - nowS) / sy };
+    const sy = Math.max(1e-300, this.h - FORK_PX - nowS) / Math.max(1e-300, yFork - top);
+    return { ...cam, sy, ty: sy, cy: top + (this.h / 2 - nowS) / sy };
   }
 
   /**
@@ -1829,8 +1859,8 @@ export class FanView implements InputHandlers {
           }
         : familySpan;
     // (?fit=fossils, ToLaD#289: a level whose living columns dwarf its fossils framed on where the fossils lived.)
-    const fit = wantFitFossils() ? (u: FanNode) => fossilSpan(u) ?? span(u) : span;
-    return cladeCamera(this.camera, this.fan, v, fit, (cam) => this.withBand(cam, v));
+    const fit = wantFitFossils() ? (u: FanNode) => fossilSpan(this.fan, u) ?? span(u) : span;
+    return cladeCamera(this.camera, this.fan, v, fit, (cam) => this.withBand(cam, v, fossilTop(this.fan, v) ?? this.yNow));
   }
 
   /**
@@ -1961,7 +1991,7 @@ export class FanView implements InputHandlers {
       const sx = this.homeCamera().sx * zoom;
       const f = this.fan.tess.fold;
       f?.setScale(sx, this.w);
-      const [a, b] = levelSpan(v);
+      const [a, b] = levelSpan(this.fan, v);
       // (The fold stays at the frame's zoom: the camera taking the frame finds it there, nothing to follow.)
       return { ...fr, sx, cx: (a + b) / 2 - 22 / sx };
     }
@@ -1971,8 +2001,8 @@ export class FanView implements InputHandlers {
     // The clade's span at the zoom that frames it (it opens as it is framed: foldedFrame, ToLaD#247).
     return foldedFrame(this.fan, this.w, () => {
       // (?fit=fossils, ToLaD#289: as a tap's frame, cladeCamera, a level whose living columns dwarf its fossils framed on them.)
-      const [a, b] = levelSpan(v);
-      return this.withBand(this.camera.frame(a, b, v.y, true), v);
+      const [a, b] = levelSpan(this.fan, v);
+      return this.withBand(this.camera.frame(a, b, v.y, true), v, fossilTop(this.fan, v) ?? this.yNow);
     });
   }
 
@@ -3242,12 +3272,19 @@ export class FanView implements InputHandlers {
     }
     this.picSpots = [];
     const nowS = this.toScreen(0, this.yNow)[1];
-    if (!thumbsOn || nowS < top + 12 || nowS > this.h) return [];
+    // (?fit=fossils, ToLaD#298: the fossils' frame has "now" above the screen, an extinct species' picture still on its tip.)
+    const fossils = wantFitFossils();
+    if (!thumbsOn || nowS > this.h || (!fossils && nowS < top + 12)) return [];
     const gs: { lv: Level; face: FanBranch; x: number; y: number; n: number }[] = [];
     for (const g of this.levelGroupsOn(lg)) {
       const face = g.lv.v ? groupFace(g.lv.v) : g.lv.b;
       if (!face || !wikiOf(face.sp.sci)?.img) continue;
-      gs.push({ lv: g.lv, face, x: g.x, y: g.lv.b && g.lv.b.tipY > this.yNow ? this.toScreen(0, g.lv.b.tipY)[1] : nowS, n: groupAlive(g.lv) });
+      // (Fossils framed, ToLaD#298: a genus all gone on its youngest tip; a living group's, "now" above the screen,
+      // under the top line, over its name.)
+      const tip = g.lv.b ? g.lv.b.tipY : fossils && g.lv.v.strands.every((b) => b.tipY > this.yNow) ? Math.min(...g.lv.v.strands.map((b) => b.tipY)) : this.yNow;
+      const y = tip > this.yNow ? this.toScreen(0, tip)[1] : fossils ? Math.max(nowS, top + NOW_ROOM) : nowS;
+      if (y < top + 12 || y > this.h) continue;
+      gs.push({ lv: g.lv, face, x: g.x, y, n: groupAlive(g.lv) });
     }
     const placed = placePics(gs.map((g) => g.x), gs.map((g) => g.y), gs.map((g) => g.n));
     this.picSpots = placed.map((p) => ({ ...p, lv: gs[p.i].lv, face: gs[p.i].face }));
@@ -3258,7 +3295,8 @@ export class FanView implements InputHandlers {
   private drawGroupPics(): void {
     const ctx = this.ctx;
     const nowS = this.toScreen(0, this.yNow)[1];
-    const alpha = clamp01((nowS - this.labelTop()) / 24);
+    // (?fit=fossils: each faded by where it stands, "now" off the screen's top or not, ToLaD#298.)
+    const alpha = wantFitFossils() ? 1 : clamp01((nowS - this.labelTop()) / 24);
     if (!(alpha > 0)) return;
     ctx.save();
     ctx.globalAlpha = alpha;
@@ -3474,9 +3512,12 @@ export class FanView implements InputHandlers {
   /**
    * The width scale, like a map's: a bar and how many individuals alive at
    * the time its width holds at the current zoom (a round 1, 2 or 5 × 10^k).
-   * In log widths a width is 1 + log10(individuals), so the bar is the width
-   * that multiplies the individuals by 10 (or by 10^k, or by a factor,
-   * whichever fits).
+   * In log widths a width is 1 + log10(individuals) (layout.ts g), so the bar is
+   * a column's width, the individuals a column that wide holds: a power of ten,
+   * the one whose column comes nearest the bar's length, from 1 to 10 billion (ToLaD#299: a
+   * bar of ten to the hundredth was a sum of decades no column has). Zoomed in so far
+   * that one individual's column is more than 2.5 bars, the bar is what a column
+   * that much wider holds more: a factor near 1.
    */
   widthScale(): { px: number; label: string } {
     const unitPx = this.fan.branches[0].unit * this.cam.sx; // px per individual (linear) or per decade (log)
@@ -3487,12 +3528,15 @@ export class FanView implements InputHandlers {
       const px = n / per;
       return { px, label: `${formatCount(n, { exact: true })} ${n === 1 ? 'individual' : 'individuals'}` };
     }
-    if (unitPx < target * 2.5) {
-      const k = Math.max(1, niceStep(target / unitPx));
-      return { px: k * unitPx, label: `×${k === 1 ? '10' : `10${sup(k)}`} individuals · log widths` };
+    if (unitPx <= target * 2.5) {
+      // (Width 1 + k for 10^k: the k nearest the bar's length in ratio, within 0..10.)
+      let k = 0;
+      for (let j = 1; j <= 10; j++) if (Math.abs(Math.log((1 + j) * unitPx / target)) < Math.abs(Math.log((1 + k) * unitPx / target))) k = j;
+      const n = 10 ** k;
+      return { px: (1 + k) * unitPx, label: `${formatCount(n, { exact: true })} ${n === 1 ? 'individual' : 'individuals'} · log widths` };
     }
     const fct = Math.pow(10, target / unitPx);
-    return { px: target, label: `×${fct < 1.1 ? fct.toFixed(4) : fct.toFixed(2)} individuals · log widths` };
+    return { px: target, label: `×${fct < 1.1 ? fct.toFixed(4) : fct.toFixed(2)} individuals a bar wider · log widths` };
   }
 
   private drawWidthScale(): void {
@@ -3709,14 +3753,6 @@ export class FanView implements InputHandlers {
     ctx.restore();
   }
 
-}
-
-
-function sup(k: number): string {
-  return String(k)
-    .split('')
-    .map((d) => '⁰¹²³⁴⁵⁶⁷⁸⁹'[Number(d)] ?? d)
-    .join('');
 }
 
 /** A round step (1, 2 or 5 × 10^k) near `x`. */
