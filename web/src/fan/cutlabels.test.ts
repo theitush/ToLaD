@@ -5,7 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { loadMammalsFromFiles } from './mammals-node';
 import { CARNIVORA, FELIDAE, mammaliaClade, type CladeRec } from './panthera';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, type Split } from './splits';
-import { FanView, type CutLabels } from './view';
+import { FanView, groupCentre, type CutLabels } from './view';
 
 function stubView(clade: CladeRec = CARNIVORA, tree: Split = CARNIVORA_TREE, folds = true): FanView {
   const noop = () => {};
@@ -101,12 +101,20 @@ describe('labels from the cut (?labels=cut, ToLaD#333)', () => {
       const v = await mk();
       const home = v.homeCamera();
       const cams = [home, ...[2, 5, 13, 40].flatMap((z) => [0.3, 0.6].map((f) => ({ ...home, sx: home.sx * z, cx: home.cx + (f - 0.5) * (v.w / home.sx) })))];
+      // (The hoofed mammals and the horses framed, at the mammals: their pictures over their columns, Ita 2026-10-14.)
+      for (const t of ['Artiodactyla', 'Perissodactyla', 'Camelidae', 'Equidae']) if (v.fan.nodes.some((u) => u.split.taxon === t)) cams.push(v.levelCamera(t)!);
       const seen: string[][] = [];
       for (const c of cams) {
         v.cam = { ...c };
         const cut = shot(v);
         if (c === home) expect(cut.spots.length).toBeGreaterThan(0);
         check(cut, v.w);
+        // Each picture stands over the column of the species it shows at "now", its territory only bounding it: within
+        // half its width of it (the territory holds that column and the picture), where the screen leaves it room.
+        for (const p of cut.pics) {
+          const c = v.toScreen(groupCentre({ b: p.face }), 0)[0];
+          if (c >= 72 + p.d / 2 && c <= v.w - p.d / 2) expect([p.face.sp.common, Math.abs(p.x - c) <= p.d / 2 + 1e-6]).toEqual([p.face.sp.common, true]);
+        }
         seen.push(sig(cut));
       }
       // The same camera, reached the other way round (from deep in to home), gives the same labels.

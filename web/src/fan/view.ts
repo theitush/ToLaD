@@ -266,6 +266,23 @@ class CutTerritories {
   youngOf(k: number): number {
     return k >= 0 ? this.young[k] : Math.max(this.t.strands[~k].tipY, this.now);
   }
+  /** A cut item's columns at "now" (world x, their middle; groupCentre): where its name and picture stand, its territory bounding them. */
+  columns(it: CutItem): number {
+    if (it.kind === 'leaf') return groupCentre({ b: this.t.strands[it.j] });
+    if (it.kind === 'node') return groupCentre({ v: this.t.nodes[it.j] });
+    return this.columnsOf(Array.from(this.t.kids[it.j].subarray(it.q0, it.q1 + 1)));
+  }
+  /** Daughters ks' (a node's index, ~ a strand's) columns at "now", their middle (world x). */
+  columnsOf(ks: readonly number[]): number {
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (const k of ks) {
+      const [a, b] = k >= 0 ? groupExtent(this.t.nodes[k]) : [groupCentre({ b: this.t.strands[~k] }), groupCentre({ b: this.t.strands[~k] })];
+      lo = Math.min(lo, a);
+      hi = Math.max(hi, b);
+    }
+    return (lo + hi) / 2;
+  }
   /** A cut item's youngest tip (world y). */
   youngest(it: CutItem): number {
     if (it.kind === 'leaf') return this.youngOf(~it.j);
@@ -3181,19 +3198,21 @@ export class FanView implements InputHandlers {
     const groups = new Map<string, FanBranch[][]>();
     const bottom = this.h - LABEL_BOTTOM_PX + 30;
     /**
-     * An item's centre (screen x) for a box `d` wide: inside its territory always (it fits there), on screen as well
-     * where the territory's part on screen holds it; and its youngest tip (screen y).
+     * An item's centre (screen x) for a box `d` wide: over its own columns at "now" (`at`, world x: groupCentre), the
+     * territory only bounding it: inside its territory always (it fits there), on screen as well where the
+     * territory's part on screen holds it. (Rooms are the widest ever: a territory's middle can be far from the
+     * columns alive now.) And its youngest tip (screen y).
      */
-    const placeX = (x0: number, x1: number, d: number): number => {
+    const placeX = (x0: number, x1: number, d: number, at: number): number => {
       const l = X(x0) + d / 2;
       const r = X(x1) - d / 2;
       const lo = Math.max(l, LABEL_AXIS_X + d / 2);
       const hi = Math.min(r, this.w - d / 2);
-      const cx = (l + r) / 2;
+      const cx = X(at);
       const x = lo <= hi ? Math.min(Math.max(cx, lo), hi) : Math.min(Math.max(cx, hi), lo);
       return Math.min(Math.max(x, l), r);
     };
-    const place = (it: CutItem, d: number): [number, number] => [placeX(it.x0, it.x1, d), Y(T.youngest(it))];
+    const place = (it: CutItem, d: number): [number, number] => [placeX(it.x0, it.x1, d, T.columns(it)), Y(T.youngest(it))];
     // (A label shows whole or not at all: its territory's part on screen holds it. Runs, only touching the screen's ends, culled.)
     const room = (x0: number, x1: number) => Math.min(X(x1), this.w) - Math.max(X(x0), LABEL_AXIS_X);
     const onScreen = (it: CutItem) => X(it.x1) > LABEL_AXIS_X && X(it.x0) < this.w;
@@ -3222,7 +3241,7 @@ export class FanView implements InputHandlers {
     const s2: [number, number] = [0, 0];
     /** The borrowed pills' screen x extents, and the runs' "+x" pills to place clear of them once all are known. */
     const taken: [number, number][] = [];
-    const plus: { key: string; hid: FanBranch[][]; x0: number; x1: number; ty: number; j: number }[] = [];
+    const plus: { key: string; hid: FanBranch[][]; x0: number; x1: number; ty: number; j: number; at: number }[] = [];
     for (const it of T.t.cut(sx, LABEL_PILL, vx0, vx1)) {
       if (it.kind !== 'run') {
         if (!shown(it, LABEL_PILL)) continue;
@@ -3243,7 +3262,8 @@ export class FanView implements InputHandlers {
           const x1 = T.t.span(K[q - 1], s2)[1];
           let ty = Infinity;
           for (let r = q0; r < q; r++) ty = Math.min(ty, T.youngOf(K[r]));
-          plus.push({ key: `crun${it.j}:${q0}-${q - 1}`, hid: T.species(Array.from(K.subarray(q0, q))), x0, x1, ty, j: it.j });
+          const ks = Array.from(K.subarray(q0, q));
+          plus.push({ key: `crun${it.j}:${q0}-${q - 1}`, hid: T.species(ks), x0, x1, ty, j: it.j, at: T.columnsOf(ks) });
         }
         q0 = q + 1;
         if (q > it.q1) break;
@@ -3257,7 +3277,7 @@ export class FanView implements InputHandlers {
     }
     for (const p of plus) {
       if (sx * (p.x1 - p.x0) < LABEL_PILL || room(p.x0, p.x1) < LABEL_PILL) continue;
-      const x = placeX(p.x0, p.x1, LABEL_PILL);
+      const x = placeX(p.x0, p.x1, LABEL_PILL, p.at);
       // (A "+x" in its own run's territory, clear of the pills borrowing room from it.)
       if (taken.some(([a, b]) => x + half > a && x - half < b)) continue;
       pill(p.key, '', p.hid, x, Y(p.ty), p.x1 - p.x0, p.j, null);
@@ -3270,7 +3290,9 @@ export class FanView implements InputHandlers {
         const lv: Level = it.kind === 'leaf' ? { b: T.t.strands[it.j] } : { v: T.t.nodes[it.j] };
         const face = lv.b ?? groupFace(lv.v!);
         if (!face || !wikiOf(face.sp.sci)?.img) continue;
-        const [x, ty] = place(it, PIC_D);
+        // (On the column of the species it shows, at its tip: a group's picture is its face species', ToLaD#333.)
+        const x = placeX(it.x0, it.x1, PIC_D, groupCentre({ b: face }));
+        const ty = Y(Math.max(face.tipY, this.yNow));
         const y = ty - PIC_LIFT - PIC_D / 2;
         if (y - PIC_D / 2 < top || y > this.h) continue;
         pics.push({ x, y, d: PIC_D, i: pics.length, lv, face });
