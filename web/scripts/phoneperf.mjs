@@ -4,7 +4,7 @@
 //
 //   npm run build:single && flock /tmp/tolad-browser.lock node scripts/phoneperf.mjs
 //
-// Env: Q=extra query (default layout=steady), THROTTLE=4, ONLY=scene,scene, PROFILE=scene (a CDP CPU profile of that
+// Env: Q=extra query, THROTTLE=4, ONLY=scene,scene, PROFILE=scene (a CDP CPU profile of that
 // scene's gestures, written to PROFILE_OUT, default phoneperf.cpuprofile), REPS=1 (gestures repeated).
 // Per scene: load ms (navigation to the first frame drawn), then over the gestures the rAF deltas' p50/p95/max,
 // dropped frames (each delta over 16.7 ms counts the vsyncs it missed) and the draw()'s own p50/p95 (frameMs).
@@ -15,7 +15,7 @@ import { chromium } from 'playwright';
 import { pageUrl } from './pageurl.mjs';
 
 const THROTTLE = Number(process.env.THROTTLE || 4);
-const Q = process.env.Q ?? 'layout=steady';
+const Q = process.env.Q ?? '';
 const ONLY = process.env.ONLY ? new Set(process.env.ONLY.split(',')) : null;
 const PROFILE = process.env.PROFILE || '';
 const REPS = Number(process.env.REPS || 1);

@@ -20,10 +20,10 @@
 // half a pixel at all three levels). The cost is honest empty space: a species below its peak (a decline, the dog
 // before its boom) stands narrower in its room. A gap's opening (the zoom) moves things only at the split it
 // belongs to; the camera keeps the point under the fingers (follow). Positions do not depend on what is on screen,
-// so there is no anchor (setAnchor never moves anything), and a row is one walk down the tree: no refolding.
+// so there is no anchor (the fold had one), and a row is one walk down the tree: no refolding.
 //
-// It is a Fold to the view (the same interface: left, rowXs, extent, setScale, follow, homeExtent...), chosen by
-// the default (wantSteady; ?layout=fold for the fold, ToLaD#273). At the cats' level (the view's `folds` off) every split is open, at every zoom.
+// It is the view's layout (fan.tess.fold; its base, fold.ts, holds the splits' gaps and their openness by zoom), the
+// only one since ToLaD#300 retired the fold's own packing. At the cats' level (the view's `folds` off) every split is open, at every zoom.
 
 import { ease, isNode, laneW, segAt, type Fan, type FanBranch, type FanNode } from './layout';
 import { Fold, ROOM_BEND, type FoldState } from './fold';
@@ -40,17 +40,6 @@ export const LIFE_GAP = 0.5;
 
 /** Rooms by life: a strand's widest over a window is laneW at this many steps (and its ends). */
 const LIFE_SAMPLES = 48;
-
-/** Whether the steady layout is in use: the default (ToLaD#273); ?layout=fold, or TOLAD_LAYOUT=fold in node (tests, perf runs), brings the fold back. */
-export function wantSteady(): boolean {
-  try {
-    if (typeof location !== 'undefined' && new URLSearchParams(location.search).get('layout') === 'fold') return false;
-  } catch {
-    /* no URL */
-  }
-  const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
-  return env?.TOLAD_LAYOUT !== 'fold';
-}
 
 /**
  * Whether a level whose living members dwarf its fossils is framed on the fossils (ToLaD#289): ?fit=fossils, or
@@ -97,6 +86,12 @@ interface Lay {
   h: Float64Array;
   /** Per strand (drawn order): its own column's centre (its room's). */
   C: Float64Array;
+  /** The row walk's per-version constants (prep()): per node its tile in its parent (colL[p] + off) and its peel's
+   * move (colL - tile); per strand its founders' slot centre (colL + tcOff) and its peel's move (C - that). */
+  tile?: Float64Array;
+  dl?: Float64Array;
+  tc?: Float64Array;
+  dc?: Float64Array;
 }
 
 export class Steady extends Fold {
@@ -110,6 +105,10 @@ export class Steady extends Fold {
   private readonly room: Float64Array;
   private readonly bNode: Int32Array;
   private readonly pIdx: Int32Array[];
+  /** Per strand its path's splits' heights and its offsets in their columns (b.path's, flat: left() bisects them). */
+  private readonly pY: Float64Array[];
+  private readonly pOff: Float64Array[];
+  private readonly pLin: Uint8Array;
   private readonly idx = new Map<FanNode, number>();
   /** Flat copies for the row walk (row(): ~5,900 strands a row at the mammal level): per node its split's height, its
    * strands' run [first, last] and its daughters (a node's index, or ~ a strand's); per strand its founders' width, its
@@ -124,6 +123,11 @@ export class Steady extends Fold {
   private readonly tcOff: Float64Array;
   private readonly rootJ: number;
   private readonly stack: Int32Array;
+  /** row()'s straight passes: per node its parent's split height (Infinity the root's), per strand its split node's;
+   * mono: every split at or under its parent's (else the walk). */
+  private readonly nYp: Float64Array;
+  private readonly bY: Float64Array;
+  private readonly mono: boolean;
   private lay: Lay | null = null;
   private rowsVer = -1;
   private readonly sRows = new Map<number, Float64Array>();
@@ -142,8 +146,6 @@ export class Steady extends Fold {
     readonly life = wantLifeRooms(),
   ) {
     super(fan);
-    // (A boom stands centred in its room like any column: its centre is constant, ToLaD#259.)
-    this.flare.fill(0);
     const N = fan.nodes;
     N.forEach((v, j) => this.idx.set(v, j));
     this.par = Int32Array.from(N, (v) => (v.parent ? this.idx.get(v.parent)! : -1));
@@ -156,6 +158,9 @@ export class Steady extends Fold {
     this.room = Float64Array.from(S, (b) => Math.max(b.width, b.baseW));
     this.bNode = Int32Array.from(S, (b) => this.idx.get(b.node)!);
     this.pIdx = S.map((b) => Int32Array.from(b.path, (p) => this.idx.get(p.node)!));
+    this.pY = S.map((b) => Float64Array.from(b.path, (p) => p.y));
+    this.pOff = S.map((b) => Float64Array.from(b.path, (p) => p.off));
+    this.pLin = Uint8Array.from(this.pY, (py) => (py.some((y, k) => k > 0 && !(y >= py[k - 1])) ? 1 : 0));
     const yRef = fan.time.y(0);
     this.cap = Float64Array.from(N, (v) => {
       let run = Infinity;
@@ -176,6 +181,9 @@ export class Steady extends Fold {
     this.tcOff = Float64Array.from(S, (b) => b.path[0].off + b.baseW / 2);
     this.rootJ = this.idx.get(fan.root)!;
     this.stack = new Int32Array(N.length + 1);
+    this.nYp = Float64Array.from(N, (_, j) => (this.par[j] < 0 ? Infinity : this.nY[this.par[j]]));
+    this.bY = Float64Array.from(S, (_, i) => this.nY[this.bNode[i]]);
+    this.mono = this.nY.every((y, j) => y <= this.nYp[j]);
     const last = (k: FanNode | FanBranch) => (isNode(k) ? k.strands[k.strands.length - 1].index : k.index);
     this.kidPair = N.map((v) => Int32Array.from(v.kids.slice(0, -1), last));
     // (Rooms by life: each node's last tip, the youngest of its strands', and now.)
@@ -187,10 +195,7 @@ export class Steady extends Fold {
       this.tipN[j] = t;
     }
     this.yNow = yRef;
-    if (open) {
-      this.a.fill(1);
-      this.lambda = 1;
-    }
+    if (open) this.a.fill(1);
   }
 
   /** The rooms and places at the a's `A`. */
@@ -434,12 +439,39 @@ export class Steady extends Fold {
     return t <= 0 ? 0 : t >= 1 ? 1 : ease(this.fan.edge, t);
   }
 
+  /** The row walk's per-version constants into L (once per layout): the same sums nodeLeft and ownC make, made once. */
+  private prep(L: Lay): void {
+    if (L.tile) return;
+    const n = this.nY.length;
+    const tile = new Float64Array(n);
+    const dl = new Float64Array(n);
+    for (let j = 0; j < n; j++) {
+      const p = this.par[j];
+      if (p < 0) continue;
+      const t = L.colL[p] + this.off[j];
+      tile[j] = t;
+      dl[j] = L.colL[j] - t;
+    }
+    const S = this.bNode.length;
+    const tc = new Float64Array(S);
+    const dc = new Float64Array(S);
+    for (let i = 0; i < S; i++) {
+      const t = L.colL[this.bNode[i]] + this.tcOff[i];
+      tc[i] = t;
+      dc[i] = L.C[i] - t;
+    }
+    L.dl = dl;
+    L.tc = tc;
+    L.dc = dc;
+    L.tile = tile;
+  }
+
   /** Node j's column's left edge at y (in its span: from its parent's split up to its own). */
   private nodeLeft(L: Lay, j: number, y: number): number {
     const p = this.par[j];
     if (p < 0) return L.colL[j];
-    const tile = L.colL[p] + this.off[j];
-    return tile + (L.colL[j] - tile) * this.u(this.fan.nodes[p].y, L.h[p], y);
+    this.prep(L);
+    return L.tile![j] + L.dl![j] * this.u(this.nY[p], L.h[p], y);
   }
 
   /** Strand i's own column's centre at y, above its split (peeling off its founders' slot). */
@@ -449,58 +481,206 @@ export class Steady extends Fold {
     const y0 = this.sY[i];
     // (Past its peel, as most are: its room's centre.)
     if (h > 0 && y <= y0 - h) return L.C[i];
-    const tc = L.colL[j] + this.tcOff[i];
-    return tc + (L.C[i] - tc) * this.u(y0, h, y);
+    this.prep(L);
+    return L.tc![i] + L.dc![i] * this.u(y0, h, y);
   }
 
   override left(i: number, y: number): number {
     const L = this.cur();
-    const b = this.strands[i];
-    if (y < b.splitY) return this.ownC(L, i, y);
-    const p = b.path;
-    let k = 0;
-    while (k + 1 < p.length && p[k + 1].y <= y) k++;
-    return this.nodeLeft(L, this.pIdx[i][k], y) + p[k].off;
+    if (y < this.sY[i]) return this.ownC(L, i, y);
+    // (The last of its path's splits at or above y: bisected, ToLaD#255.)
+    const py = this.pY[i];
+    let a = 1;
+    let z = py.length;
+    // (A path not ascending (none known): walked as before.)
+    if (this.pLin[i]) while (a < z && py[a] <= y) a++;
+    else while (a < z) {
+      const m = (a + z) >> 1;
+      if (py[m] <= y) a = m + 1;
+      else z = m;
+    }
+    return this.nodeLeft(L, this.pIdx[i][a - 1], y) + this.pOff[i][a - 1];
   }
 
-  /** Every strand's left (its slot's) or own column's centre at y: one walk down the tree. */
+  /**
+   * Every strand's left (its slot's) or own column's centre at y, in two straight passes (no walk, ToLaD#255): a
+   * strand above its split node's height has its own column there; else it is in the one node column spanning y
+   * (from its split up to its parent's), its strands side by side from its left edge. The same sums the walk makes
+   * (walk(), kept for a tree whose splits are not each under its parent's).
+   */
   private row(L: Lay, y: number, out: Float64Array): Float64Array {
-    const st = this.stack;
-    const bw = this.bw;
-    let n = 0;
-    st[n++] = this.rootJ;
-    while (n > 0) {
-      const j = st[--n];
-      if (y >= this.nY[j]) {
-        // (Below its split: its column, its strands side by side in their founders' slots.)
-        let x = this.nodeLeft(L, j, y);
-        for (let i = this.nFirst[j], e = this.nLast[j]; i <= e; i++) {
-          out[i] = x;
-          x += bw[i];
+    if (!this.mono) return this.walk(L, y, out);
+    this.prep(L);
+    const { colL, h, C } = L;
+    const tile = L.tile!;
+    const dl = L.dl!;
+    const tc = L.tc!;
+    const dc = L.dc!;
+    const edge = this.fan.edge;
+    const nY = this.nY;
+    const nYp = this.nYp;
+    const bY = this.bY;
+    const bNode = this.bNode;
+    const sY = this.sY;
+    const S = bY.length;
+    for (let i = 0; i < S; i++) {
+      if (!(y < bY[i])) continue;
+      const hj = h[bNode[i]];
+      const y0 = sY[i];
+      if (hj > 0 && y <= y0 - hj) out[i] = C[i];
+      else {
+        let u: number;
+        if (!(hj > 0)) u = y < y0 ? 1 : 0;
+        else {
+          const t = (y0 - y) / hj;
+          u = t <= 0 ? 0 : t >= 1 ? 1 : ease(edge, t);
         }
-        continue;
+        out[i] = tc[i] + dc[i] * u;
       }
-      const K = this.kidsF[j];
-      for (let q = 0; q < K.length; q++) {
-        const k = K[q];
-        if (k >= 0) st[n++] = k;
-        else out[~k] = this.ownC(L, ~k, y);
+    }
+    const par = this.par;
+    const bw = this.bw;
+    const nFirst = this.nFirst;
+    const nLast = this.nLast;
+    const N = nY.length;
+    for (let j = 0; j < N; j++) {
+      if (!(y >= nY[j] && y < nYp[j])) continue;
+      const p = par[j];
+      let x: number;
+      if (p < 0) x = colL[j];
+      else {
+        const y0 = nY[p];
+        const hp = h[p];
+        let u: number;
+        if (!(hp > 0)) u = y < y0 ? 1 : 0;
+        else {
+          const t = (y0 - y) / hp;
+          u = t <= 0 ? 0 : t >= 1 ? 1 : ease(edge, t);
+        }
+        x = tile[j] + dl[j] * u;
+      }
+      for (let i = nFirst[j], e = nLast[j]; i <= e; i++) {
+        out[i] = x;
+        x += bw[i];
       }
     }
     return out;
   }
 
+  /** row() as one walk down the tree (nodeLeft and ownC inlined). */
+  private walk(L: Lay, y: number, out: Float64Array): Float64Array {
+    this.prep(L);
+    const st = this.stack;
+    const bw = this.bw;
+    const nY = this.nY;
+    const par = this.par;
+    const nFirst = this.nFirst;
+    const nLast = this.nLast;
+    const kidsF = this.kidsF;
+    const bNode = this.bNode;
+    const sY = this.sY;
+    const { colL, h, C } = L;
+    const tile = L.tile!;
+    const dl = L.dl!;
+    const tc = L.tc!;
+    const dc = L.dc!;
+    const edge = this.fan.edge;
+    let n = 0;
+    st[n++] = this.rootJ;
+    while (n > 0) {
+      const j = st[--n];
+      if (y >= nY[j]) {
+        // (Below its split: its column, its strands side by side in their founders' slots.)
+        const p = par[j];
+        let x: number;
+        if (p < 0) x = colL[j];
+        else {
+          const y0 = nY[p];
+          const hp = h[p];
+          let u: number;
+          if (!(hp > 0)) u = y < y0 ? 1 : 0;
+          else {
+            const t = (y0 - y) / hp;
+            u = t <= 0 ? 0 : t >= 1 ? 1 : ease(edge, t);
+          }
+          x = tile[j] + dl[j] * u;
+        }
+        for (let i = nFirst[j], e = nLast[j]; i <= e; i++) {
+          out[i] = x;
+          x += bw[i];
+        }
+        continue;
+      }
+      const K = kidsF[j];
+      for (let q = 0; q < K.length; q++) {
+        const k = K[q];
+        if (k >= 0) st[n++] = k;
+        else {
+          const i = ~k;
+          const hj = h[bNode[i]];
+          const y0 = sY[i];
+          if (hj > 0 && y <= y0 - hj) out[i] = C[i];
+          else {
+            let u: number;
+            if (!(hj > 0)) u = y < y0 ? 1 : 0;
+            else {
+              const t = (y0 - y) / hj;
+              u = t <= 0 ? 0 : t >= 1 ? 1 : ease(edge, t);
+            }
+            out[i] = tc[i] + dc[i] * u;
+          }
+        }
+      }
+    }
+    return out;
+  }
+
+  /** The rows' arrays let go at a version change (sRows', cRows'), used again: no garbage a pinch frame (ToLaD#255). */
+  private readonly pool: Float64Array[] = [];
+  private readonly cPool: Float64Array[] = [];
+  private release(m: Map<number, Float64Array>, pool: Float64Array[]): void {
+    for (const r of m.values()) if (pool.length < 256) pool.push(r);
+    m.clear();
+  }
+  /** Bumped whenever the rows are let go (a version, the cap): the front caches' entries from before stale. */
+  private rowsGen = 0;
+  /**
+   * A front cache before the rows' maps (by world y, a float key): per slot (k & 63) its k, grid, rows generation and
+   * row, rowXs' and centreSums' (and widthSums', by its own generation), ToLaD#255: a frame asks the same few rows
+   * thousands of times (xTable, every merged clade's extent).
+   */
+  private readonly fK = new Float64Array(64).fill(NaN);
+  private readonly fH = new Float64Array(64);
+  private readonly fG = new Int32Array(64).fill(-1);
+  private readonly fR: (Float64Array | undefined)[] = new Array(64);
+  private readonly cK = new Float64Array(64).fill(NaN);
+  private readonly cH = new Float64Array(64);
+  private readonly cG = new Int32Array(64).fill(-1);
+  private readonly cR: (Float64Array | undefined)[] = new Array(64);
+  private readonly wK = new Float64Array(64).fill(NaN);
+  private readonly wH = new Float64Array(64);
+  private readonly wG = new Int32Array(64).fill(-1);
+  private readonly wR: ([Float64Array, Float64Array] | undefined)[] = new Array(64);
+  private extGen = 0;
+
   override rowXs(k: number): Float64Array {
     const L = this.cur();
+    if (this.rowsVer !== L.ver || this.sRows.size >= this.rowCap()) {
+      this.release(this.sRows, this.pool);
+      this.release(this.cRows, this.cPool);
+      this.rowsVer = L.ver;
+      this.rowsGen++;
+    }
+    const c = k & 63;
+    if (this.fK[c] === k && this.fH[c] === this.gridH && this.fG[c] === this.rowsGen) return this.fR[c]!;
     // (By world y, not by k: the grid's rows a power of two apart, a coarser grid's rows are a finer one's, ToLaD#255.)
     const y = k * this.gridH;
-    if (this.rowsVer !== L.ver || this.sRows.size >= this.rowCap()) {
-      this.sRows.clear();
-      this.cRows.clear();
-      this.rowsVer = L.ver;
-    }
     let r = this.sRows.get(y);
-    if (!r) this.sRows.set(y, (r = this.row(L, y, new Float64Array(this.strands.length))));
+    if (!r) this.sRows.set(y, (r = this.row(L, y, this.pool.pop() ?? new Float64Array(this.strands.length))));
+    this.fK[c] = k;
+    this.fH[c] = this.gridH;
+    this.fG[c] = this.rowsGen;
+    this.fR[c] = r;
     return r;
   }
 
@@ -520,22 +700,32 @@ export class Steady extends Fold {
 
   /** Grid row k's widths summed along the drawn order (its columns', and its live strands' founders'): the same at every version. */
   private widthSums(k: number): [Float64Array, Float64Array] {
+    const c = k & 63;
+    if (this.wK[c] === k && this.wH[c] === this.gridH && this.wG[c] === this.extGen) return this.wR[c]!;
     const y = k * this.gridH;
-    if (this.extW.size >= this.rowCap()) this.extW.clear();
-    let r = this.extW.get(y);
-    if (r) return r;
-    const age = this.fan.time.ageAt(y);
-    const S = this.strands;
-    const cW = new Float64Array(S.length + 1);
-    const cB = new Float64Array(S.length + 1);
-    for (let i = 0; i < S.length; i++) {
-      const b = S[i];
-      const own = y < b.splitY;
-      const dead = own && y < b.tipY;
-      cW[i + 1] = cW[i] + (dead ? 0 : own ? laneW(b, y, age) : b.baseW);
-      cB[i + 1] = cB[i] + (dead ? 0 : b.baseW);
+    if (this.extW.size >= this.rowCap()) {
+      this.extW.clear();
+      this.extGen++;
     }
-    this.extW.set(y, (r = [cW, cB]));
+    let r = this.extW.get(y);
+    if (!r) {
+      const age = this.fan.time.ageAt(y);
+      const S = this.strands;
+      const cW = new Float64Array(S.length + 1);
+      const cB = new Float64Array(S.length + 1);
+      for (let i = 0; i < S.length; i++) {
+        const b = S[i];
+        const own = y < b.splitY;
+        const dead = own && y < b.tipY;
+        cW[i + 1] = cW[i] + (dead ? 0 : own ? laneW(b, y, age) : b.baseW);
+        cB[i + 1] = cB[i] + (dead ? 0 : b.baseW);
+      }
+      this.extW.set(y, (r = [cW, cB]));
+    }
+    this.wK[c] = k;
+    this.wH[c] = this.gridH;
+    this.wG[c] = this.extGen;
+    this.wR[c] = r;
     return r;
   }
   private readonly extW = new Map<number, [Float64Array, Float64Array]>();
@@ -547,25 +737,32 @@ export class Steady extends Fold {
   /** Grid row k's live strands' founders-weighted centres summed along the drawn order (rowXs' version). */
   private centreSums(k: number): Float64Array {
     const xs = this.rowXs(k);
+    const c = k & 63;
+    if (this.cK[c] === k && this.cH[c] === this.gridH && this.cG[c] === this.rowsGen) return this.cR[c]!;
     const y = k * this.gridH;
     let r = this.cRows.get(y);
-    if (r) return r;
-    if (this.cRows.size >= this.rowCap()) this.cRows.clear();
-    const [, cB] = this.widthSums(k);
-    r = new Float64Array(xs.length + 1);
-    for (let i = 0; i < xs.length; i++) {
-      const w = cB[i + 1] - cB[i];
-      r[i + 1] = r[i] + (w > 0 ? w * (y < this.sY[i] ? xs[i] : xs[i] + w / 2) : 0);
+    if (!r) {
+      if (this.cRows.size >= this.rowCap()) {
+        // (Its arrays pooled: the front caches' entries from before stale.)
+        this.release(this.cRows, this.cPool);
+        this.rowsGen++;
+      }
+      const [, cB] = this.widthSums(k);
+      r = this.cPool.pop() ?? new Float64Array(xs.length + 1);
+      r[0] = 0;
+      for (let i = 0; i < xs.length; i++) {
+        const w = cB[i + 1] - cB[i];
+        r[i + 1] = r[i] + (w > 0 ? w * (y < this.sY[i] ? xs[i] : xs[i] + w / 2) : 0);
+      }
+      this.cRows.set(y, r);
     }
-    this.cRows.set(y, r);
+    this.cK[c] = k;
+    this.cH[c] = this.gridH;
+    this.cG[c] = this.rowsGen;
+    this.cR[c] = r;
     return r;
   }
   private readonly cRows = new Map<number, Float64Array>();
-
-  /** No anchor: the places do not depend on what is on screen. */
-  override setAnchor(): boolean {
-    return false;
-  }
 
   override setScale(sx: number, screenW: number): boolean {
     if (sx === this.sx && screenW === this.screenW) return false;

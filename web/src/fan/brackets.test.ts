@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { bracketRows, Brackets, cladeCamera, clades, latinOf, layoutBrackets, clearSpot, PILL_ROOM, rankOf, ROW_H, TICK_ROW_H, type Placed } from './brackets';
 import { FanCamera } from './camera';
-import { Fold } from './fold';
+import { Steady } from './steady';
 import { layoutFan, type Fan, type FanBranch, type WidthMode } from './layout';
 import { CARNIVORA, FELIDAE } from './panthera';
 import { CARNIVORA_TREE, FELIDAE_TREE } from './splits';
@@ -21,7 +21,7 @@ function fanOf(level: 'cats' | 'carnivores', mode: WidthMode, fold: boolean): Fa
   if (!fan) {
     fan = level === 'cats' ? layoutFan(FELIDAE, mode, FELIDAE_TREE) : layoutFan(CARNIVORA, mode, CARNIVORA_TREE);
     if (fold) {
-      const f = new Fold(fan);
+      const f = new Steady(fan);
       f.setAll(0);
       fan.tess.fold = f;
     }
