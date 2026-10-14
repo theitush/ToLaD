@@ -36,8 +36,9 @@ describe('the columns', () => {
   });
 
   // Held on the fold; on steady a strand pokes 0.02 world out at the carnivores' home (linear, Spilogale putorius):
-  // ToLaD#304. An expected failure until that is fixed, when the `.fails` comes off.
-  it.fails('xRange, on a grid (read off the rows, every strand at once): holds each strand at every height in the range (ToLaD#304)', () => {
+  // ToLaD#304. An expected failure until that is fixed, when the `.fails` comes off. (On MDD's tree, ToLaD#293, it holds:
+  // the spotted skunks' layout changed with their MDD splits; #304's cause is not shown fixed, only not hit here.)
+  it('xRange, on a grid (read off the rows, every strand at once): holds each strand at every height in the range (ToLaD#304)', () => {
     for (const mode of ['log', 'linear'] as WidthMode[]) {
       const { fan, fold, home } = folded(mode, 'curved');
       const yb = fan.trunkBottom.y;
