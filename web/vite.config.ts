@@ -203,12 +203,7 @@ export default defineConfig(({ mode }) => {
     test: {
       environment: 'node',
       testTimeout: 120_000,
-      // The default layout (steady, ToLaD#273), and the view's tests once more in the fold (?layout=fold) so it does
-      // not rot. (deepedge runs both itself.)
-      projects: [
-        { extends: true, test: { name: 'steady', include: ['src/**/*.test.ts', 'src/**/*.test.tsx'] } },
-        { extends: true, test: { name: 'fold', include: ['src/fan/{levels,pin,search,fly,tap}.test.ts'], env: { TOLAD_LAYOUT: 'fold' } } },
-      ],
+      include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     },
   };
 });

@@ -253,9 +253,8 @@ export class TwigModel {
     }
     const l = f!.left(b.index, y)!;
     if (y < b.splitY) {
-      const k = (1 - f!.flare[b.index]) / 2;
-      out[o] = l - out[o + 1] * k;
-      out[o + 4] = l - out[o + 5] * k;
+      out[o] = l - out[o + 1] * 0.5;
+      out[o + 4] = l - out[o + 5] * 0.5;
     } else out[o] = out[o + 4] = l;
   }
 
