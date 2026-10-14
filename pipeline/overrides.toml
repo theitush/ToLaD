@@ -687,6 +687,21 @@ Mountains. Nature 505: 43-49. doi:10.1038/nature12886"""
 # research/hominin-populations.md tabulates them with the model's numbers they replace.
 
 [[fossil_count]]
+name = "Homo heidelbergensis"
+kind = "ne-ratio"
+generation = 25.0
+n = 1.0e5
+lo = 3.0e4
+hi = 3.0e5
+reason = """The Middle Pleistocene people of Africa and Europe (700-200 ka here), ancestral to Neanderthals, \
+Denisovans and modern humans. The archaic human lineage's Ne is 10,000-26,000 (mobile elements, Huff et al. 2010; \
+~10,000 the long-run figure); x 3-10 = 30,000-260,000, 10,000 x 10 = 100,000. Deevey's census, all people at \
+300 ka, is 1,000,000."""
+citation = """Huff, C.D. et al. (2010). Mobile elements reveal small population size in the ancient \
+ancestors of Homo sapiens. PNAS 107: 2147-2152. doi:10.1073/pnas.0909000107; Deevey, E.S. (1960). The human \
+population. Scientific American 203 (3): 194-204"""
+
+[[fossil_count]]
 name = "Homo neanderthalensis"
 kind = "census"
 generation = 25.0
