@@ -449,7 +449,8 @@ describe('a double tap goes up to the parent level, not back (ToLaD#271)', () =>
         settle(v);
       });
       expect(bad).toEqual([]);
-      expect(n).toBeGreaterThan(3);
+      // (Steady widths, ToLaD#259: the cats' taps from home pass fewer levels.)
+      expect(n).toBeGreaterThan(1);
     });
 
     it(`${name}: after a search pick, the species' own level, not home; double taps on reach home and stop`, () => {
@@ -490,7 +491,8 @@ describe('a double tap goes up to the parent level, not back (ToLaD#271)', () =>
       const bad: string[] = [];
       let tried = 0;
       levelsOnTheWay(v, v.fan.tess.fold ? 61 : 7, (v) => {
-        const h = v.plusHits.find((q) => q.bs.length > 1);
+        // (One of several species where there is one; else one species', a landing on it, ToLaD#266.)
+        const h = v.plusHits.find((q) => q.bs.length > 1) ?? v.plusHits[0];
         if (!h || tried > 3) return;
         tried++;
         const at = nameOf(v.levelNow());
@@ -509,7 +511,9 @@ describe('a double tap goes up to the parent level, not back (ToLaD#271)', () =>
         const chain = [levelUp(v.fan, meet, true)!, ...upChain(v, { v: levelUp(v.fan, meet, true)! })];
         const i = chain.findIndex((u) => zIn(u) >= -Math.log(1.15));
         const want =
-          i >= 0 && zIn(chain[i]) > Math.log(1.15) && P(v).offBy(P(v).frameOf({ v: chain[i] }), v.cam) > LEVEL_PX
+          h.bs.length === 1
+            ? wantUp(v, { b: h.bs[0] })
+            : i >= 0 && zIn(chain[i]) > Math.log(1.15) && P(v).offBy(P(v).frameOf({ v: chain[i] }), v.cam) > LEVEL_PX
             ? chain[i]
             : (chain.slice(i + 1).find((u) => P(v).offBy(P(v).frameOf({ v: u }), v.cam) > LEVEL_PX) ?? null);
         v.doubleTap(-1e4, -1e4);
