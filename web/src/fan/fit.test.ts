@@ -2,6 +2,7 @@
 // the level's start to its youngest fossil group's end, "now" above the screen), so every hominin with a picture gets
 // a column a few px wide and its name (ToLaD#297); off (the default), the frame fits today's humans.
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { wantCutLabels } from './cut';
 import { mammaliaClade, type CladeRec } from './panthera';
 import { loadMammalsFromFiles } from './mammals-node';
 import { mammaliaTree, type Split } from './splits';
@@ -155,7 +156,8 @@ for (const fit of ['fossils', 'off'])
 
     // A level's pills name distinct real groups: no name twice, no "X ancestors"/"X lineage" made up for an unnamed split
     // inside it, framed and with "now" pushed off the screen's top (where the columns' lineage names show).
-    it('at Hominins and Homo, framed or panned into the past, each name once and none generated', () => {
+    // (Today's labels' own check: under ?labels=cut, fit off, the cut's own tests, cutlabels.test.ts.)
+    it.skipIf(wantCutLabels() && fit === 'off')('at Hominins and Homo, framed or panned into the past, each name once and none generated', () => {
       const bad: string[] = [];
       for (const latin of ['Hominini', 'Homo'])
         for (const down of [0, 0.4]) {

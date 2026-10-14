@@ -18,6 +18,23 @@
 import { isNode, type Fan, type FanBranch, type FanNode } from './layout';
 import type { Steady } from './steady';
 
+/**
+ * Whether names, pictures, "+x" and brackets come from the cut (ToLaD#333, plan step 2): ?labels=cut, or
+ * TOLAD_LABELS=cut in node. Off by default (today's labels) until Ita picks.
+ */
+export function wantCutLabels(): boolean {
+  try {
+    if (typeof location !== 'undefined') {
+      const q = new URLSearchParams(location.search).get('labels');
+      if (q) return q === 'cut';
+    }
+  } catch {
+    /* no URL */
+  }
+  const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
+  return env?.TOLAD_LABELS === 'cut';
+}
+
 /** Fit zooms are resolved to 1/LADDER of a doubling (rounded up): a resolution, not a look. */
 export const LADDER = 32;
 

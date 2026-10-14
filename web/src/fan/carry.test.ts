@@ -1,6 +1,7 @@
 // ToLaD#255: the labels and the brackets laid out at rest, and while the view moves at most every 150 ms; between,
 // carried with the camera. Carried, they stay on what they name; at rest, exactly what a layout gives.
 import { describe, expect, it } from 'vitest';
+import { wantCutLabels } from './cut';
 import { loadMammalsFromFiles } from './mammals-node';
 import { CARNIVORA, FELIDAE, mammaliaClade, type CladeRec } from './panthera';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, type Split } from './splits';
@@ -66,7 +67,7 @@ const FANS: [string, () => FanView][] = [
   ['cats', () => stubView(FELIDAE as CladeRec, FELIDAE_TREE as Split, false)],
 ];
 
-describe('labels carried with the camera while it moves, laid out again at rest (ToLaD#255)', () => {
+describe.skipIf(wantCutLabels())('labels carried with the camera while it moves, laid out again at rest (ToLaD#255)', () => {
   for (const [name, mk] of FANS) {
     it(name, () => {
       const v = mk();
@@ -121,7 +122,7 @@ describe('a label carried off the side of the screen lets go of its place (ToLaD
 // ToLaD#255: while the view moves the labels are carried (across lod.gen too, at the mammal level), and which show keeps
 // to the frame before (hysteresis). At rest none of that counts: the same camera, however reached, gives the same labels
 // (spots, the names shown, their "+x" room) as a still view opened there.
-describe('at rest, the same labels whatever the way there (ToLaD#255)', () => {
+describe.skipIf(wantCutLabels())('at rest, the same labels whatever the way there (ToLaD#255)', () => {
   type Shot = { spots: string[]; on: string[] };
   const shot = (v: FanView): Shot => {
     const st = (v as unknown as { labelState: Map<string, { on: boolean }> }).labelState;
