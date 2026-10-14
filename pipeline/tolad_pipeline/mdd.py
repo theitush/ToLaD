@@ -411,9 +411,16 @@ def sisters(root: Node, rows: list[dict], hit: dict[str, Node], new: list[Node])
             w.parent = par
             w.add(b)
             wraps[id(b)] = w
-        n.parent.children.remove(n)
+        old = n.parent
+        old.children.remove(n)
         w.add(n)
         moved += 1
+        while not old.children and old.data.get("created_from") == "MDD" and old.parent is not None:
+            # a genus node made for it alone, now empty (else a leaf named Olisthomys): gone
+            up = old.parent
+            up.children.remove(old)
+            old.parent = None
+            old = up
     return {"note": "an MDD species its taxonomyNotes say was split from one of ours sits beside that species "
                     "(mdd.sisters); the rest stay at their genus's crown",
             "grafts_beside_parent": sum(1 for k in found if k in gr), "grafts_at_genus": len(new) - sum(1 for k in found if k in gr),
