@@ -59,7 +59,9 @@ describe('mass widths', () => {
     for (const s of top) console.log(`${s.sci.padEnd(28)} ${s.common.padEnd(24)} ${(tonnes(s) / 1e6).toFixed(2).padStart(8)} Mt  ${s.alive.toExponential(2)} × ${s.massKg!.toFixed(1)} kg (${s.massHow})`);
     const names = top.map((s) => s.sci);
     for (const s of ['Bos taurus', 'Homo sapiens']) expect(names, s).toContain(s);
-    // (Today's mammals weigh ~1.1 Gt: livestock ~630 Mt, humans ~390 Mt, wild land ~20 Mt and marine ~40 Mt; Greenspoon 2023, Bar-On 2018.)
+    // (Today's mammals weigh ~1.1 Gt: livestock ~630 Mt, humans ~390 Mt, wild land ~20 Mt and marine ~40 Mt; Greenspoon 2023,
+    // Bar-On 2018. The data gives ~2.4 Gt: the cattle weigh PHYLACINE's Bos taurus, the aurochs' 900 kg, about twice a
+    // cow's; the bounds hold that until the domestic stocks get their own mass.)
     expect(total / 1e6).toBeGreaterThan(500);
     expect(total / 1e6).toBeLessThan(3000);
   });
