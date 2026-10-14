@@ -16,7 +16,7 @@ import { Lod } from './lod';
 import type { FoldState } from './fold';
 import { Steady, wantFitFossils } from './steady';
 import { COLUMN_DIM, columnSpans, EVENT_TINT, eventAt, eventSpans, type EventSpan } from './colstyle';
-import { drawTwigs, kLogAt, laneDim, LINEAGE, LIVING, TEX_HAIR_PX, TWIG_GRAY, TwigModel, type IndInfo, type TwigStats } from './twigs';
+import { drawTwigs, kLogAt, laneDim, LINEAGE, LIVING, pathFrame, TEX_HAIR_PX, TWIG_GRAY, TwigModel, type IndInfo, type TwigStats } from './twigs';
 import type { MeshBatch, RectBatch } from './meshgl';
 import { FAMILY_EN, familyLabel, FELIDAE_TREE, ORDER_EN, ORDER_TAXA, taxonKey, type Split } from './splits';
 import { Brackets, cladeCamera, foldedFrame, latinOf, rankOf, TAP_FILL, TAXON_EN, type StackAt } from './brackets';
@@ -2729,6 +2729,8 @@ export class FanView implements InputHandlers {
 
   draw(): void {
     const t0 = performance.now();
+    // (The columns' paths made again a few a frame while the view moves, all at once at rest: ToLaD#313.)
+    pathFrame.start(this.gesturing || !!this.anim);
     this.applyFold();
     const ctx = this.ctx;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
