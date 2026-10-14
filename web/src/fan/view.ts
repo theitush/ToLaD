@@ -80,6 +80,8 @@ type Step = { lv: Level; cam: Camera };
  * up from it, never back to its own frame: ToLaD#301.)
  */
 const BACK_SLACK = 1.15;
+/** The level the view was at is kept while the view is within half a screen of its frame and zoomed at most this far from it (ToLaD#311). */
+const LEVEL_KEEP = 1.6;
 /** A touch that has moved this many px is a pan, not a tap (engine/input.ts's tap): a level's flight under it stops (ToLaD#301). */
 const TOUCH_SLOP = 12;
 /** A tap's next level (ToLaD#258) is one whose frame stands more than this many px off the view's: nearer, it is passed. */
@@ -158,9 +160,11 @@ export function carryLabels(spots: LabelSpot[], k: Carry, top: number, w = Infin
       s.span[0] = k[0] * s.span[0] + k[1];
       s.span[1] = k[0] * s.span[1] + k[1];
     }
-    const held = s.place !== 'tip' && s.place !== 'fam' && b[1] <= top + 0.5;
+    // (Standing on something at its foot: "now", its tip, a fossil's picture on its tip, `over`.)
+    const foot = s.place === 'tip' || s.place === 'fam' || s.place === 'over';
+    const held = !foot && b[1] <= top + 0.5;
     if (held) continue;
-    const at = s.place === 'tip' || s.place === 'fam' ? s.y1 : b[1];
+    const at = foot ? s.y1 : b[1];
     const dy = Math.max(k[2] * at + k[3] - at, top - b[1]);
     s.y1 += dy;
     b[1] += dy;
@@ -198,7 +202,7 @@ export interface LabelSpot {
   key: string;
   /** The name's id: a species' gid, or `n<index>` for a lineage. Place: see labelSpots. */
   id: string;
-  place: 'tip' | 'in' | 'right' | 'left' | 'fam';
+  place: 'tip' | 'in' | 'right' | 'left' | 'fam' | 'over';
   /** A family's label (`fam`, ToLaD#146): the screen x span of its species, bracketed under the pill. */
   span?: [number, number];
   /** The species (b) or the lineage (v) it names. */
@@ -999,13 +1003,21 @@ export function holds(a: Level, x: Level): boolean {
  * it sits in's other groups (the neighbours at the screen's edges); `at` itself when a species. Each clade as labelSpots'
  * groups ({ v, vi, text }), each species in `species`.
  */
-const groupCache = new WeakMap<object, { groups: { v: FanNode; vi: number; text: string }[]; species: Set<FanBranch> }>();
-export function labelGroups(fan: Fan, at: Level): { groups: { v: FanNode; vi: number; text: string }[]; species: Set<FanBranch> } {
+export interface LabelGroups {
+  groups: { v: FanNode; vi: number; text: string }[];
+  species: Set<FanBranch>;
+  /** The level's clade (ToLaD#312: its own unnamed columns carry no lineage name; a species' level, the one it sits in). */
+  at?: FanNode | null;
+  /** The species that are groups of the level itself, not its neighbours' (ToLaD#297: named first). */
+  own?: Set<FanBranch>;
+}
+const groupCache = new WeakMap<object, LabelGroups>();
+export function labelGroups(fan: Fan, at: Level): LabelGroups {
   const key = at.v ?? at.b;
   let out = groupCache.get(key);
   if (out) return out;
   const index = new Map(fan.nodes.map((v, i) => [v, i]));
-  const o = { groups: [] as { v: FanNode; vi: number; text: string }[], species: new Set<FanBranch>() };
+  const o: LabelGroups = { groups: [], species: new Set<FanBranch>(), at: at.v ?? levelUp(fan, at.b.node, true) };
   const add = (g: Level) => (g.b ? o.species.add(g.b) : o.groups.push({ v: g.v, vi: index.get(g.v)!, text: levelName(g.v) }));
   let u: FanNode | null;
   if (at.b) {
@@ -1015,6 +1027,7 @@ export function labelGroups(fan: Fan, at: Level): { groups: { v: FanNode; vi: nu
     nextLevels(fan, at.v).forEach(add);
     u = levelUp(fan, at.v);
   }
+  o.own = new Set(o.species);
   for (let inner: Level = at; u; inner = { v: u }, u = levelUp(fan, u)) for (const g of nextLevels(fan, u)) if (!holds(g, inner) && !holds(inner, g)) add(g);
   groupCache.set(key, (out = o));
   return out;
@@ -1137,6 +1150,19 @@ export function familyPills(fan: Fan, spots: readonly LabelSpot[], on: Map<strin
   return out;
 }
 
+/**
+ * A level's species' name (ToLaD#297): a fossil known only by its Latin binomial with its genus abbreviated, as the
+ * paleontologists write it ("A. afarensis", "H. erectus"), so the hominins' pills fit beside their narrow columns.
+ */
+export function levelText(b: FanBranch): string {
+  // (Its name a binomial with its Latin's epithet: the tree's Latin may file it in another genus, "Ardipithecus ramidus"
+  // under Australopithecus.)
+  const t = b.sp.common;
+  const m = b.sp.extinct ? /^([A-Z])[a-z]+ ([a-z-]+)$/.exec(t) : null;
+  // (Ardipithecus as "Ar.", the australopiths' "A." being taken.)
+  return m && b.sp.sci.endsWith(` ${m[2]}`) ? `${t.startsWith('Ardipithecus ') ? 'Ar' : m[1]}. ${m[2]}` : t;
+}
+
 /** A family's label stands on "now" over its species (its bracket under it) while its span on screen is under this many screens. */
 const FAMILY_MAX_SCREENS = 1.6;
 
@@ -1171,7 +1197,7 @@ export function labelSpots(
   plus?: (id: string) => number,
   famOf?: (id: string) => FanNode | undefined,
   lod?: Lod | null,
-  level?: { groups: { v: FanNode; vi: number; text: string }[]; species: Set<FanBranch> },
+  level?: LabelGroups,
   names: NameMode = 'beside',
 ): LabelSpot[] {
   const half = LABEL_PILL / 2;
@@ -1562,11 +1588,51 @@ export function labelSpots(
     if (level) {
       // (A level's species, ToLaD#262: its name beside its column, down from "now" or its tip; its picture over "now".)
       const px = plus?.(id) ?? 0;
+      const text = levelText(b);
+      const len = measure(text) + 2 * LABEL_PAD + px;
       if (names !== 'beside') {
-        out.push(...along(id, b.sp.common, [0, b.width, b.index], measure(b.sp.common) + 2 * LABEL_PAD + px, b, Math.max(nowY, b.tipY), b.splitY, 1, { b }).map((p) => ({ ...p, plus: px })));
+        out.push(...along(id, text, [0, b.width, b.index], len, b, Math.max(nowY, b.tipY), b.splitY, 1, { b }).map((p) => ({ ...p, plus: px })));
         continue;
       }
-      out.push(...beside(id, b.sp.common, [0, b.width, b.index], measure(b.sp.common) + 2 * LABEL_PAD + px, b, Math.max(standS, Y(b.tipY)) + 4, Y(b.splitY), 1, { b }, true).map((p) => ({ ...p, plus: px })));
+      const y0 = Math.max(standS, Y(b.tipY)) + 4;
+      // (A neighbouring level's species after the level's own, ToLaD#297.)
+      const mine = !level.own || level.own.has(b);
+      const rank: Rank = [mine ? 0 : 0.25, b.width, b.index];
+      // (The fossils' frame, its own species: more places to try, ToLaD#297; a neighbour's name stays by its column.)
+      const more = fossils && mine;
+      const sp = beside(id, text, rank, len, b, y0, Y(b.splitY), 1, { b }, true).map((p) => ({ ...p, plus: px }));
+      // (ToLaD#297: or further down its column, a name's length at a time, where a neighbour's name stands at its tip.)
+      if (more) for (let k = 1; k <= 2; k++) for (const p of beside(id, text, rank, len, b, y0 + k * (len + LABEL_GAP), Y(b.splitY), 1, { b }, true)) sp.push({ ...p, key: `${p.key}+${k}`, plus: px });
+      // (Under the fossils' frame, a fossil's, ToLaD#297: failing room beside its column, over its picture on its tip.
+      // An old one near the screen's foot has no room below its tip; over it, the air the younger ones left.)
+      const ty = Y(b.tipY);
+      if (fossils && b.tipY > nowY && ty > top && ty < c.h) {
+        const x = X(stripMid(b));
+        const y1 = ty - PIC_LIFT - PIC_D - LABEL_GAP;
+        const ya = y1 - len;
+        const xa = x - half;
+        const xb = x + half;
+        // (Faded in over 24 px under the top line and 12 px in from the screen's sides, not cut: a pinch's frames keep it, ToLaD#311.)
+        const onFit = (xa: number, ya: number, xb: number, y1: number) => botFit(y1) * clamp01((ya - top) / 24) * clamp01(xa / 12) * clamp01((c.w - xb) / 12);
+        const f0 = onFit(xa, ya, xb, y1);
+        const fit = f0 > 0 ? f0 * clearFit(Math.min(xa - LABEL_AXIS_X, clearance(xa, xb, ya, y1, b))) : 0;
+        const o = { id, place: 'over' as const, b, text, rank, x, y1, plus: px };
+        sp.push({ ...o, key: `${id}:over`, box: [xa, ya, xb, y1], fit });
+        // (Failing a clear one, over the columns there, opaque: clear of the axis and the other names. Under fossils'
+        // frame, crowded, beside its picture, or further up, a name's length at a time.)
+        const loose = (key: string, x: number, y1: number) => {
+          const [xa, ya, xb] = [x - half, y1 - len, x + half];
+          sp.push({ ...o, key: `${id}:${key}`, x, y1, box: [xa, ya, xb, y1], loose: true, fit: onFit(xa, ya, xb, y1) * clearFit(xa - LABEL_AXIS_X) });
+        };
+        loose('over~', x, y1);
+        if (more) {
+          const side = PIC_D / 2 + LABEL_GAP + half;
+          loose('over~r', x + side, ty - 2);
+          loose('over~l', x - side, ty - 2);
+          for (let k = 1; k <= 2; k++) loose(`over~${k}`, x, y1 - k * (len + LABEL_GAP));
+        }
+      }
+      out.push(...sp);
       continue;
     }
     // (Standing for its family, ToLaD#212: the family's name on its tip, last frame's familyPills.)
@@ -1619,10 +1685,31 @@ export function labelSpots(
     }
   }
   // The lineages (parent columns, not the stem below the root: the clade's own label is there), while "now" is off screen.
+  // (At a level, ToLaD#312: a column inside one of its groups is named as the group, one pill for all of them, a tap
+  // flying to it; the level's own unnamed columns between its groups carry no name of their own ("Human ancestors" on
+  // each split of the humans' line, "Homo floresiensis lineage" on the erectus' column): its groups name them.)
+  const groupIn = new Map<FanNode, { v: FanNode; vi: number; text: string }>();
+  for (const g of level?.groups ?? []) groupIn.set(g.v, g);
   if (nowOn < 1) {
     for (let vi = 0; vi < fan.nodes.length; vi++) {
       const v = fan.nodes[vi];
       if (!v.parent || lod?.hidden(v) || !near(boxes.get(v)!)) continue;
+      let g: { v: FanNode; vi: number; text: string } | undefined;
+      let inLevel = false;
+      if (level)
+        for (let u: FanNode | null = v; u && !g; u = u.parent) {
+          g = groupIn.get(u);
+          if (u === level.at) inLevel = true;
+          if (inLevel) break;
+        }
+      if (g) {
+        const id = `n${g.vi}`;
+        const px = plus?.(id) ?? 0;
+        const rank: Rank = [1, v.width, vi];
+        for (const p of beside(id, g.text, rank, measure(g.text) + 2 * LABEL_PAD + px, v, Y(v.y), Y(v.yBot), 1 - nowOn, { v: g.v })) out.push({ ...p, key: `${p.key}.${vi}`, fam: g.v, pic: groupFace(g.v), plus: px });
+        continue;
+      }
+      if (inLevel && !v.split.taxon) continue;
       const text = familyLabel(v.split) ?? v.name;
       const id = `n${vi}`;
       const len = measure(text) + 2 * LABEL_PAD;
@@ -1650,7 +1737,7 @@ export function resolveLabels(spots: LabelSpot[], prev: Map<string, boolean> | (
   // (The order kept per layout: carried frames, ToLaD#255, resolve the same spots again.)
   let order = orderCache.get(spots);
   if (!order || order.length !== spots.length) {
-    const placeOrder = { fam: 0, tip: 0, in: 1, right: 2, left: 3 };
+    const placeOrder = { fam: 0, tip: 0, in: 1, right: 2, left: 3, over: 4 };
     order = [...spots].sort((p, q) => p.rank[0] - q.rank[0] || q.rank[1] - p.rank[1] || p.rank[2] - q.rank[2] || +!!p.loose - +!!q.loose || placeOrder[p.place] - placeOrder[q.place]);
     orderCache.set(spots, order);
   }
@@ -2577,16 +2664,38 @@ export class FanView implements InputHandlers {
     // At a frame (within LEVEL_PX, as a tap passes them): the outermost there. Else from home in, while the view is
     // inside each (a wide species' frame, as the house cat's, can take in its group's, even home's).
     const on = [...ladder].reverse().find((f) => this.offBy(f.cam, c) <= LEVEL_PX);
+    // (The level the view was at, while it is still near its frame: a pan of a third of the screen at the Hominins put
+    // the centre on a gibbon's line, or the human's, and the level flipped to theirs, the names and pictures with it, ToLaD#311.)
+    const was = k && k.fan === this.fan ? k.lv : null;
+    const near = (lv: Level) => {
+      const f = this.frameOf(lv);
+      return this.offBy(f, c) <= this.w / 2 && Math.abs(z(f)) <= Math.log(LEVEL_KEEP);
+    };
     let lv: Level = { v: this.fan.root };
     if (on) lv = on.lv;
-    else
-      for (let i = ladder.length - 2; i >= 0 && z(ladder[i].cam) >= -Math.log(BACK_SLACK); i--) {
-        // (A species whose frame stands further off the view than its level's is not where the view is, however far
-        // in: the human, its column filling the Hominins' and Homo's frames, else read as the level there, and a pan
-        // onto a fossil's line flipped it to that line's levels, the pills and pictures with it, ToLaD#302.)
-        if (i === 0 && ladder.length > 1 && ladder[0].lv.b && this.offBy(ladder[0].cam, c) > this.offBy(ladder[1].cam, c) + LEVEL_PX) break;
+    else if (was && near(was)) lv = was;
+    else {
+      let offLv = this.offBy(ladder[ladder.length - 1].cam, c);
+      for (let i = ladder.length - 2; i >= 0; i--) {
+        const zi = z(ladder[i].cam);
+        if (zi < -Math.log(BACK_SLACK)) {
+          // (A frame tighter than the next one in, ?fit=fossils: the great apes framed on "now", the hominins' wider on
+          // their fossils. Passed over, not where the walk ends: else a pan off the Hominins' frame read the view as at
+          // the Catarrhini, the pictures and names gone, ToLaD#311.)
+          if (i > 0 && z(ladder[i - 1].cam) >= zi) continue;
+          break;
+        }
+        // (A level whose frame stands further off the view than the one it sits in is not where the view is, however
+        // far in: a species', the human, its column filling the Hominins' and Homo's frames, else read as the level
+        // there, ToLaD#302; a fossil genus' a pan away from the Hominins' frame, Paranthropus', ToLaD#311. A clade's only
+        // while the view is within a screen of the one it sits in: far from every frame, the outer ones stand further
+        // off the deeper they go.)
+        const off = this.offBy(ladder[i].cam, c);
+        if (ladder[i].lv.b && off > offLv + LEVEL_PX) break;
         lv = ladder[i].lv;
+        offLv = off;
       }
+    }
     this.lvAt = { fan: this.fan, cam: { ...c }, lv, t };
     return lv;
   }
@@ -2933,6 +3042,9 @@ export class FanView implements InputHandlers {
       for (let i = 0; i < 3 && lg.groups.length + lg.species.size > 0; i++) {
         const next = this.groupPlus({ ...lg, lod }, spots, resolveLabels(spots, new Map()), new Map());
         if (next.size === room.size && [...next].every(([id, px]) => room.get(id) === px)) break;
+        // (After the first, the room only grows: a pill whose room for its "+x" crowds it out, its count then gone, the
+        // room with it, shown again, laid out at rest frame after frame: it flickered, ToLaD#311.)
+        if (i > 0) for (const [id, px] of room) next.set(id, Math.max(px, next.get(id) ?? 0));
         room = next;
         spots = lay(room);
       }
