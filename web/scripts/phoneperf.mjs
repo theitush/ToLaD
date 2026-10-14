@@ -129,9 +129,8 @@ try {
       window.__pp.deltas = [];
       window.__pp.cb = [];
       window.__pp.rec = true;
-      window.__fan.frameMs.length = 0;
-      window.__fan.labelAllMs.length = 0;
-      window.__fan.labelLayMs.length = 0;
+      // (An older build may lack the label timings: then they read empty.)
+      for (const k of ['frameMs', 'labelAllMs', 'labelLayMs']) if (window.__fan[k]) window.__fan[k].length = 0;
     });
     const t0 = Date.now();
     for (let r = 0; r < REPS; r++) {
@@ -160,7 +159,7 @@ try {
     const secs = (Date.now() - t0) / 1000;
     const rec = await page.evaluate(() => {
       window.__pp.rec = false;
-      return { deltas: window.__pp.deltas, cb: window.__pp.cb, draw: [...window.__fan.frameMs], lab: [...window.__fan.labelAllMs], lay: [...(window.__fan.labelLayMs ?? [])] };
+      return { deltas: window.__pp.deltas, cb: window.__pp.cb, draw: [...window.__fan.frameMs], lab: [...(window.__fan.labelAllMs ?? [])], lay: [...(window.__fan.labelLayMs ?? [])] };
     });
     if (PROFILE === name) {
       const { profile } = await cdp.send('Profiler.stop');
