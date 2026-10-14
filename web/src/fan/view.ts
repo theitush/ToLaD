@@ -2594,6 +2594,8 @@ export class FanView implements InputHandlers {
     const spots = labelSpots(this.camera, this.fan, top, (t) => this.nameWidth(t), this.barRect()?.[0], br ?? undefined, (id) => this.plusRoom.get(id) ?? 0, undefined, lod, lg, this.names);
     this.labLast = { fan: this.fan, lg, lod, lodGen: lod?.gen ?? -1, w: this.w, h: this.h, names: this.names, topLine, t: t0, frames: 0, cam: { ...c }, br, top, spots };
     this.labelMs.push(performance.now() - t0);
+    this.labelLayMs.push(performance.now() - t0);
+    if (this.labelLayMs.length > 600) this.labelLayMs.shift();
     return { br, top, lg, spots, carried: null };
   }
   private labSettle = false;
@@ -2618,6 +2620,8 @@ export class FanView implements InputHandlers {
   readonly labelMs: number[] = [];
   /** ...and with drawLabels' (the fades, the pictures, the "+x", the pills drawn) and the pinned rows'. */
   readonly labelAllMs: number[] = [];
+  /** Each label layout's time (labelsNow when it laid out, not carried: ToLaD#255's ≤50 ms on the phone proxy). */
+  readonly labelLayMs: number[] = [];
 
   /**
    * The parent columns below each split (the stem below the oldest): their
