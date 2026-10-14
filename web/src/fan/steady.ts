@@ -26,7 +26,7 @@
 // ?layout=steady (wantSteady). At the cats' level (the view's `folds` off) every split is open, at every zoom.
 
 import { ease, isNode, laneW, segAt, type Fan, type FanBranch, type FanNode } from './layout';
-import { Fold, ROOM_BEND, type FoldState } from './fold';
+import { EASE_MAX, Fold, LEAN_FORK, ROOM_BEND, SY_HOME, type FoldState } from './fold';
 
 /** A split's fork is at most this share of its shortest daughter's run (to its own split or tip). */
 export const STEADY_RUN = 0.85;
@@ -49,7 +49,9 @@ interface Lay {
   colL: Float64Array;
   roomL: Float64Array;
   roomW: Float64Array;
-  h: Float64Array;
+  /** The window (world) a column at height y averages its places over (window()): sampled from yRef every hdy. */
+  H: Float64Array;
+  hdy: number;
   /** Per strand (drawn order): its own column's centre (its room's). */
   C: Float64Array;
 }
@@ -59,6 +61,12 @@ export class Steady extends Fold {
   private readonly par: Int32Array;
   private readonly off: Float64Array;
   private readonly cap: Float64Array;
+  /** "Now" and the oldest split (world y): the windows' span, sampled hG times. */
+  private readonly yNow: number;
+  private readonly yTop: number;
+  private readonly hG = 1024;
+  /** The width zoom the forks are as tall as (setScale's, in quarter octaves: the layout changes only at those steps). */
+  private sxQ = NaN;
   /** Per node, per daughter after the first: the pair whose gap stands before it (its left sister's last strand). */
   private readonly kidPair: Int32Array[];
   /** Per strand: its room (its widest), its split's node index, and its path's node indices (b.path's order). */
@@ -106,15 +114,10 @@ export class Steady extends Fold {
     this.bNode = Int32Array.from(S, (b) => this.idx.get(b.node)!);
     this.pIdx = S.map((b) => Int32Array.from(b.path, (p) => this.idx.get(p.node)!));
     const yRef = fan.time.y(0);
-    this.cap = Float64Array.from(N, (v) => {
-      let run = Infinity;
-      let fork = 0;
-      for (const k of v.kids) {
-        run = Math.min(run, v.y - (isNode(k) ? k.y : Math.max(k.tipY, yRef)));
-        fork = Math.max(fork, v.y - k.leanY);
-      }
-      return Math.max(0, Math.min(Math.max(fork, ROOM_BEND), STEADY_RUN * run));
-    });
+    // (Its least: the river's fork, at least a bend; its most: STEADY_RUN of the time to "now", ToLaD#268.)
+    this.cap = Float64Array.from(N, (v) => Math.max(ROOM_BEND, ...v.kids.map((k) => v.y - k.leanY)));
+    this.yNow = yRef;
+    this.yTop = Math.max(yRef + 1, ...N.map((v) => v.y));
     this.nY = Float64Array.from(N, (v) => v.y);
     this.nW = Float64Array.from(N, (v) => v.width);
     this.nFirst = Int32Array.from(N, (v) => v.strands[0].index);
@@ -142,7 +145,6 @@ export class Steady extends Fold {
     const roomW = new Float64Array(n);
     const roomL = new Float64Array(n);
     const colL = new Float64Array(n);
-    const h = new Float64Array(n);
     const C = new Float64Array(this.strands.length);
     // (Daughters: a node's index, or ~ a strand's, kidsF.) Rooms, daughters first (fan.nodes has parents before
     // daughters): the daughters' side by side, with their gaps.
@@ -191,8 +193,33 @@ export class Steady extends Fold {
         o += w;
       }
       colL[j] = Math.min(roomL[j] + roomW[j] - NW[j], Math.max(roomL[j], s / sw));
-      h[j] = this.cap[j];
     }
+    // The peels (ToLaD#268). A strand's centre at y is its places' mean over the window [y, y + H(y)] below it,
+    // eased (its own column's and its founders' slots', each constant between its own splits): past a split by H it
+    // stands still again. One window for every strand at a height: each is a mean of the same ordered rows, so the
+    // columns never cross or overlap. H is the tallest fork a split there asks: at least the river's, a bend, and as
+    // tall as its daughters' moves on screen over LEAN_FORK px per px at a phone's home time scale (as the fold's
+    // forks, carriedForks), however soon they split again (a deep base, where log time leaves a few px of run, is no
+    // ledge across the screen zoomed in), at most STEADY_RUN of the time to "now"; changing at most half as fast as y.
+    const kS = Number.isFinite(this.sxQ) ? (EASE_MAX * this.sxQ) / (LEAN_FORK * SY_HOME) : 0;
+    const yRef = this.yNow;
+    const NG = this.hG;
+    const hdy = (this.yTop - yRef) / (NG - 1);
+    const H = new Float64Array(NG);
+    for (let j = 0; j < n; j++) {
+      const K = this.kidsF[j];
+      let d = 0;
+      for (let q = 0; q < K.length; q++) {
+        const k = K[q];
+        d = Math.max(d, Math.abs(k >= 0 ? colL[k] - colL[j] - this.off[k] : C[~k] - colL[j] - this.tcOff[~k]));
+      }
+      const hj = Math.max(this.cap[j], d * kS);
+      const g1 = Math.min(NG - 1, Math.floor((this.nY[j] - yRef) / hdy));
+      for (let g = Math.max(0, Math.ceil((this.nY[j] - hj - yRef) / hdy)); g <= g1; g++) H[g] = Math.max(H[g], hj);
+    }
+    for (let g = 1; g < NG; g++) H[g] = Math.max(H[g], H[g - 1] - hdy / 2);
+    for (let g = NG - 2; g >= 0; g--) H[g] = Math.max(H[g], H[g + 1] - hdy / 2);
+    for (let g = 0; g < NG; g++) H[g] = Math.min(H[g], STEADY_RUN * g * hdy);
     // The stem's centre on home: where the closed order stands.
     const r = this.idx.get(this.fan.root)!;
     const sh = this.home - (colL[r] + this.fan.root.width / 2);
@@ -201,7 +228,7 @@ export class Steady extends Fold {
       roomL[j] += sh;
     }
     for (let i = 0; i < C.length; i++) C[i] += sh;
-    return { ver: this.ver, colL, roomL, roomW, h, C };
+    return { ver: this.ver, colL, roomL, roomW, H, hdy, C };
   }
 
   /** The current layout (at the fold's version and zoom). */
@@ -211,35 +238,49 @@ export class Steady extends Fold {
     return (this.lay = this.compute(this.a));
   }
 
-  /** Split v's fork (world): how far above it its daughters' peels end. */
+  /** The window at y (world): how far below y the places a column's centre is the mean of reach. */
+  private window(L: Lay, y: number): number {
+    const t = Math.max(0, (y - this.yNow) / L.hdy);
+    const g = Math.floor(t);
+    const H = L.H;
+    if (g >= H.length - 1) return H[H.length - 1];
+    return H[g] + (H[g + 1] - H[g]) * (t - g);
+  }
+
+  /** Split v's fork (world): how far above it its daughters still move (y + window(y) reaches it). */
   forkH(v: FanNode): number {
-    return this.cur().h[this.idx.get(v)!];
+    const L = this.cur();
+    let lo = v.y - L.H.reduce((m, h) => Math.max(m, h), 0) - 1;
+    let hi = v.y;
+    for (let k = 0; k < 60; k++) {
+      const m = (lo + hi) / 2;
+      if (m + this.window(L, m) < v.y) lo = m;
+      else hi = m;
+    }
+    return v.y - lo;
   }
 
-  /** How far a peel has gone at y: 0 at its split (y0), 1 a fork h up. */
-  private u(y0: number, h: number, y: number): number {
-    if (!(h > 0)) return y < y0 ? 1 : 0;
-    const t = (y0 - y) / h;
-    return t <= 0 ? 0 : t >= 1 ? 1 : ease(this.fan.edge, t);
-  }
-
-  /** Node j's column's left edge at y (in its span: from its parent's split up to its own). */
-  private nodeLeft(L: Lay, j: number, y: number): number {
-    const p = this.par[j];
-    if (p < 0) return L.colL[j];
-    const tile = L.colL[p] + this.off[j];
-    return tile + (L.colL[j] - tile) * this.u(this.fan.nodes[p].y, L.h[p], y);
+  /** Node j's column's left edge at y (at or above its parent's split): its place less each of its founders' moves inside the window, by what of the window lies before it. */
+  private nodeLeft(L: Lay, j: number, y: number, Hy = this.window(L, y)): number {
+    let x = L.colL[j];
+    const top = y + Hy;
+    for (let a = j, p = this.par[a]; p >= 0; a = p, p = this.par[a]) {
+      const ys = this.nY[p];
+      if (ys >= top) break;
+      x -= (L.colL[a] - L.colL[p] - this.off[a]) * (1 - ease(this.fan.edge, (ys - y) / Hy));
+    }
+    return x;
   }
 
   /** Strand i's own column's centre at y, above its split (peeling off its founders' slot). */
   private ownC(L: Lay, i: number, y: number): number {
-    const j = this.bNode[i];
-    const h = L.h[j];
+    const Hy = this.window(L, y);
     const y0 = this.sY[i];
-    // (Past its peel, as most are: its room's centre.)
-    if (h > 0 && y <= y0 - h) return L.C[i];
+    // (Past its peel and its founders' column's, as most are: its room's centre.)
+    if (y0 >= y + Hy) return L.C[i];
+    const j = this.bNode[i];
     const tc = L.colL[j] + this.tcOff[i];
-    return tc + (L.C[i] - tc) * this.u(y0, h, y);
+    return L.C[i] - (L.C[i] - tc) * (1 - ease(this.fan.edge, (y0 - y) / Hy)) - (L.colL[j] - this.nodeLeft(L, j, y, Hy));
   }
 
   override left(i: number, y: number): number {
@@ -357,10 +398,14 @@ export class Steady extends Fold {
 
   override setScale(sx: number, screenW: number): boolean {
     if (sx === this.sx && screenW === this.screenW) return false;
-    if (!this.open) return super.setScale(sx, screenW);
+    const q = Math.pow(2, Math.round(4 * Math.log2(sx)) / 4);
+    const tall = q !== this.sxQ;
+    this.sxQ = q;
+    if (tall) this.ver++;
+    if (!this.open) return super.setScale(sx, screenW) || tall;
     this.sx = sx;
     this.screenW = screenW;
-    return false;
+    return tall;
   }
 
   override setAll(a: number, all = false): void {
