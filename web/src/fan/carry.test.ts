@@ -1,8 +1,9 @@
 // ToLaD#255: the labels and the brackets laid out at rest, and while the view moves at most every 150 ms; between,
 // carried with the camera. Carried, they stay on what they name; at rest, exactly what a layout gives.
 import { describe, expect, it } from 'vitest';
-import { CARNIVORA, FELIDAE, type CladeRec } from './panthera';
-import { CARNIVORA_TREE, FELIDAE_TREE, type Split } from './splits';
+import { loadMammalsFromFiles } from './mammals-node';
+import { CARNIVORA, FELIDAE, mammaliaClade, type CladeRec } from './panthera';
+import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, type Split } from './splits';
 import { carryLabels, FanView, labelGroups, labelSpots, type LabelSpot } from './view';
 
 function stubView(clade: CladeRec = CARNIVORA, tree: Split = CARNIVORA_TREE, folds = true): FanView {
@@ -115,4 +116,70 @@ describe('a label carried off the side of the screen lets go of its place (ToLaD
     carryLabels(spots, [1, -90, 1, 0], 100, 390);
     expect(spots.map((s) => [s.box[0], s.fit])).toEqual([[305, 0], [285, 1], [-25, 0]]);
   });
+});
+
+// ToLaD#255: while the view moves the labels are carried (across lod.gen too, at the mammal level), and which show keeps
+// to the frame before (hysteresis). At rest none of that counts: the same camera, however reached, gives the same labels
+// (spots, the names shown, their "+x" room) as a still view opened there.
+describe('at rest, the same labels whatever the way there (ToLaD#255)', () => {
+  type Shot = { spots: string[]; on: string[] };
+  const shot = (v: FanView): Shot => {
+    const st = (v as unknown as { labelState: Map<string, { on: boolean }> }).labelState;
+    const spots = P(v).labLast!.spots;
+    return { spots: spots.map(key), on: spots.filter((s) => st.get(s.key)?.on).map((s) => s.key) };
+  };
+  /** A gesture of `steps` (zoom factor, pan dx, dy) drawn frame by frame from `from`, ending on `to`, then at rest. */
+  const via = (v: FanView, from: FanView['cam'], steps: [number, number, number][], to: FanView['cam']): Shot => {
+    v.cam = { ...from };
+    v.draw();
+    v.draw();
+    P(v).gestureStart();
+    for (const [z, dx, dy] of steps) {
+      v.zoomAbout(195, 422, z);
+      v.pan(dx, dy);
+      v.draw();
+    }
+    v.cam = { ...to };
+    v.draw();
+    P(v).gestureEnd();
+    v.draw();
+    v.draw();
+    return shot(v);
+  };
+  const ramp = (n: number, z: number, dx: number, dy: number) => Array.from({ length: n }, () => [z, dx, dy] as [number, number, number]);
+  const mammals = async () => {
+    await loadMammalsFromFiles();
+    return stubView(mammaliaClade(), mammaliaTree(), true);
+  };
+  const cases: [string, () => Promise<FanView>, (v: FanView) => FanView['cam']][] = [
+    ['carnivores (folded)', async () => stubView(), (v) => v.homeCamera()],
+    ['mammals, home', mammals, (v) => v.homeCamera()],
+    ['mammals, Rodentia x3', mammals, (v) => v.levelCamera('Rodentia', 3)!],
+  ];
+  for (const [name, mk, at] of cases)
+    it(name, { timeout: 300_000 }, async () => {
+      const v = await mk();
+      const to0 = at(v);
+      // The camera to reach: the level's own (home), or a little off it, zoomed and panned.
+      v.cam = { ...to0 };
+      if (!name.includes('home')) {
+        v.zoomAbout(195, 422, 1.3);
+        v.pan(-30, 12);
+      }
+      const to = { ...v.cam };
+      // A: a slow pinch in and out, a little pan (drawperf's); B: in then out, panning left; C: a still view opened there.
+      const slow = Array.from({ length: 90 }, (_, k) => [k < 45 ? 1.01 : 1 / 1.01, k % 2 ? 0.5 : -0.5, 0] as [number, number, number]);
+      const a = via(v, to0, slow, to);
+      const b = via(v, to0, [...ramp(15, 1.06, -8, -4), ...ramp(6, 1 / 1.04, 3, 2)], to);
+      const c = await mk();
+      c.cam = { ...to };
+      c.draw();
+      c.draw();
+      const s = shot(c);
+      expect(s.on.length).toBeGreaterThan(0);
+      expect(a.spots).toEqual(s.spots);
+      expect(b.spots).toEqual(s.spots);
+      expect(a.on).toEqual(s.on);
+      expect(b.on).toEqual(s.on);
+    });
 });

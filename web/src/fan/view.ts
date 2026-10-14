@@ -2563,7 +2563,9 @@ export class FanView implements InputHandlers {
     const L = this.labLast;
     const c = this.cam;
     const moving = this.gesturing || !!this.anim;
-    const same = L && L.fan === this.fan && L.lg === lg && L.lod === lod && L.lodGen === (lod?.gen ?? -1) && L.w === this.w && L.h === this.h && L.names === this.names && L.topLine === this.labelTop();
+    // (Carried across a change in the clades drawn as one, lod.gen, ToLaD#255: at the mammal level a pinch changes them on
+    // almost every frame. Carried names may then differ from a layout's; at rest they never do, below.)
+    const same = L && L.fan === this.fan && L.lg === lg && L.lod === lod && L.w === this.w && L.h === this.h && L.names === this.names && L.topLine === this.labelTop();
     if (L && same && moving && labelCarry && (t0 - L.t < LABEL_MS || L.frames < LABEL_FRAMES)) {
       const ax = c.sx / L.cam.sx;
       const ay = c.sy / L.cam.sy;
@@ -2576,22 +2578,43 @@ export class FanView implements InputHandlers {
       this.labelMs.push(performance.now() - t0);
       return { br, top: L.top, lg, spots: L.spots, carried: k };
     }
-    // (Laid out at rest after carried frames: the "+x" room counted on them may change once more, drawLabels.)
-    this.labSettle = !moving && !!L && L.frames > 0;
     const br = this.layoutBrackets();
     // (The labels kept under the pinned groups, ToLaD#233, as they show.)
     // (One pill per group one level down from the level the view is at, ToLaD#258: no "+x", no species standing for its family.)
     // (ToLaD#262: each group's name beside its branch, room at its end for the "+x" of the names hidden near it last frame.)
     const topLine = this.labelTop();
     const top = topLine + (br ? br.pinH() * br.pinA : 0);
-    const spots = labelSpots(this.camera, this.fan, top, (t) => this.nameWidth(t), this.barRect()?.[0], br ?? undefined, (id) => this.plusRoom.get(id) ?? 0, undefined, lod, lg, this.names);
+    const lay = (room: Map<string, number>) => labelSpots(this.camera, this.fan, top, (t) => this.nameWidth(t), this.barRect()?.[0], br ?? undefined, (id) => room.get(id) ?? 0, undefined, lod, lg, this.names);
+    let spots: LabelSpot[];
+    this.labClean = !moving;
+    if (moving) spots = lay(this.plusRoom);
+    else {
+      // At rest (ToLaD#255): what a still view at this camera gives, whatever the way here. The names shown chosen afresh
+      // (no hysteresis, drawLabels), and the "+x" room from none: laid out, its room counted, again until the room
+      // holds (once more as a rule). The room it settled on kept for the frames after at this same camera.
+      const key = `${c.cx}|${c.cy}|${c.sx}|${c.sy}|${this.w}|${this.h}|${top}|${this.names}|${lod?.gen ?? -1}|${this.nameWFont}`;
+      const R = this.restRoom;
+      let room = R && R.fan === this.fan && R.lg === lg && R.key === key ? R.room : new Map<string, number>();
+      spots = lay(room);
+      for (let i = 0; i < 3 && lg.groups.length + lg.species.size > 0; i++) {
+        const next = this.groupPlus({ ...lg, lod }, spots, resolveLabels(spots, new Map()), new Map());
+        if (next.size === room.size && [...next].every(([id, px]) => room.get(id) === px)) break;
+        room = next;
+        spots = lay(room);
+      }
+      this.plusRoom = room;
+      this.restRoom = { fan: this.fan, lg, key, room };
+    }
     this.labLast = { fan: this.fan, lg, lod, lodGen: lod?.gen ?? -1, w: this.w, h: this.h, names: this.names, topLine, t: t0, frames: 0, cam: { ...c }, br, top, spots };
     this.labelMs.push(performance.now() - t0);
     this.labelLayMs.push(performance.now() - t0);
     if (this.labelLayMs.length > 600) this.labelLayMs.shift();
     return { br, top, lg, spots, carried: null };
   }
-  private labSettle = false;
+  /** At rest: the labels shown chosen afresh, not kept from the frame before (drawLabels, ToLaD#255). */
+  private labClean = false;
+  /** The "+x" room the labels laid out at rest settled on, and where (labelsNow). */
+  private restRoom: { fan: Fan; lg: ReturnType<typeof labelGroups>; key: string; room: Map<string, number> } | null = null;
   /** The last labels laid out (labelsNow), carried with the camera since. */
   private labLast: {
     fan: Fan;
@@ -3187,7 +3210,7 @@ export class FanView implements InputHandlers {
    * The level's names hidden (ToLaD#262): each group on screen with no name shown counts as "+x" on the shown name
    * nearest it (by their centres); `groups` gets, per shown spot, the hidden groups' species (a tap frames them all).
    */
-  private groupPlus(lg: ReturnType<typeof labelGroups> & { lod: Lod | null }, spots: readonly LabelSpot[], on: Map<string, boolean>, groups: Map<string, FanBranch[][]>): void {
+  private groupPlus(lg: ReturnType<typeof labelGroups> & { lod: Lod | null }, spots: readonly LabelSpot[], on: Map<string, boolean>, groups: Map<string, FanBranch[][]>): Map<string, number> {
     const shownKey = new Map<string, string>();
     for (const s of spots) if (on.get(s.key)) shownKey.set(s.id, s.key);
     const gs = this.levelGroupsOn(lg).filter((g) => g.x >= LABEL_AXIS_X - 4 && g.x <= this.w + 4);
@@ -3206,7 +3229,7 @@ export class FanView implements InputHandlers {
       list.push(g.lv.v ? g.lv.v.strands : [g.lv.b!]);
       count.set(at.id, (count.get(at.id) ?? 0) + 1);
     }
-    this.plusRoom = new Map([...count].map(([id, n]) => [id, this.plusPx(n)]));
+    return new Map([...count].map(([id, n]) => [id, this.plusPx(n)]));
   }
 
   /** Length (px) a pill keeps at its top end for a "+n" badge (ToLaD#197): none for 0. */
@@ -3253,8 +3276,9 @@ export class FanView implements InputHandlers {
     const now = performance.now();
     const dt = Math.min(100, Math.max(0, now - this.labelT));
     this.labelT = now;
+    // (At rest, chosen afresh: what a still view gives, whatever the way here, ToLaD#255.)
     const prev = new Map<string, boolean>();
-    for (const [key, st] of this.labelState) prev.set(key, st.on);
+    if (!this.labClean) for (const [key, st] of this.labelState) prev.set(key, st.on);
     const on = resolveLabels(spots, prev);
     // The "+x" badges (ToLaD#197): counted with the cull; a pill keeps room for its count from the frame before, so
     // when a count changes the next frame lays the pills out again with the room it needs.
@@ -3287,12 +3311,10 @@ export class FanView implements InputHandlers {
     // The level's groups (ToLaD#262): each one's picture over "now", exactly above its centre; the names hidden, as "+x".
     const pics = lg ? this.groupPics(lg, lg.top, carried) : [];
     if (lg) {
-      const room = this.plusRoom;
-      this.groupPlus(lg, spots, on, groups);
-      // (The first layout at rest after carried frames, ToLaD#255: one more frame if the "+x" room it was laid out with changed.)
-      if (this.labSettle && (room.size !== this.plusRoom.size || [...room].some(([id, px]) => this.plusRoom.get(id) !== px))) this.request();
+      // (At rest the room was settled already, labelsNow.)
+      const room = this.groupPlus(lg, spots, on, groups);
+      if (!this.labClean) this.plusRoom = room;
     }
-    this.labSettle = false;
     // The clades' brackets (ToLaD#193) under the pills: their labels clear of the pills shown, their lines behind them.
     br?.draw(ctx, FAMILY_INK, INK3, [...spots.filter((_, k) => alphas[k] > 0.3).map((s) => s.box), ...pics.map((p) => [p.x - p.d / 2, p.y - p.d / 2, p.x + p.d / 2, p.y + p.d / 2])]);
     this.drawGroupPics();
