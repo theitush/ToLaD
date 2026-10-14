@@ -98,6 +98,6 @@ describe('labels from the cut (?labels=cut, ToLaD#333)', () => {
         expect(sig(shot(v))).toEqual(seen[i]);
       }
       const ms = [...(v as unknown as { labelLayMs: number[] }).labelLayMs].sort((p, q) => p - q);
-      process.stderr.write(`${name}: labels (brackets' layout included) ${ms[ms.length >> 1].toFixed(3)} ms a frame (median of ${ms.length}), ${seen[0].length} at home\n`);
+      (globalThis as unknown as { process: { stderr: { write(s: string): void } } }).process.stderr.write(`${name}: labels (brackets' layout included) ${ms[ms.length >> 1].toFixed(3)} ms a frame (median of ${ms.length}), ${seen[0].length} at home\n`);
     });
 });

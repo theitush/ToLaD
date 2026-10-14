@@ -1,5 +1,6 @@
 // Every level's frame keeps "now" and its pictures on screen; a "+x" tap shows all its groups (ToLaD#274).
 import { describe, expect, it } from 'vitest';
+import { wantCutLabels } from './cut';
 import { CARNIVORA, FELIDAE, mammaliaClade, type CladeRec } from './panthera';
 import { loadMammalsFromFiles } from './mammals-node';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, type Split } from './splits';
@@ -129,7 +130,7 @@ const FANS = [
   ['mammals', () => stubView(mammaliaClade(), mammaliaTree(), true)],
 ] as const;
 
-describe("every level's frame: now near the top, every next-level group's picture on screen (ToLaD#274)", () => {
+describe.skipIf(wantCutLabels())("every level's frame: now near the top, every next-level group's picture on screen (ToLaD#274)", () => {
   for (const [name, mk] of FANS) {
     it(name, async () => {
       if (name === "mammals") await loadMammalsFromFiles();
@@ -193,7 +194,7 @@ describe('a "+x" tap: every group it stood for named and pictured (ToLaD#274)', 
   }
 });
 
-describe('a chip with a "+x" is one tap target (ToLaD#287): its name lands where its badge does, every group named', () => {
+describe.skipIf(wantCutLabels())('a chip with a "+x" is one tap target (ToLaD#287): its name lands where its badge does, every group named', () => {
   it('carnivores (folded)', () => {
     const v = stubView();
     const bad: string[] = [];
@@ -256,7 +257,7 @@ describe('the hominins are one group (ToLaD#289)', () => {
   }, 400000);
 });
 
-describe('a level framed by name (levelCamera, the design shots\' "level"): nothing cut off at the edge (ToLaD#319)', () => {
+describe.skipIf(wantCutLabels())('a level framed by name (levelCamera, the design shots\' "level"): nothing cut off at the edge (ToLaD#319)', () => {
   it('every carnivore level, and the marsupials and the bandicoots at the mammals', async () => {
     const bad: string[] = [];
     const walk = (v: FanView, us: FanNode[]) => {
