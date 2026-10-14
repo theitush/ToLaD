@@ -4,9 +4,9 @@
 import * as MeshMirror from './mesh';
 import { useEffect, useRef, useState, type PointerEvent as RPointerEvent, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
-import { approxMa, formatCount } from '../data/count';
+import { approxMa, formatCount, formatMass } from '../data/count';
 import { HistorySpark } from './HistorySpark';
-import type { EdgeStyle, WidthMode } from './layout';
+import type { EdgeStyle, Measure, WidthMode } from './layout';
 import { wikiOf, type WikiRec } from './wiki';
 import { RangeGlobe } from './Globe';
 import { CARNIVORA, FELIDAE, mammaliaClade, NATURAL_META, type HistEvent, type SpeciesRec } from './panthera';
@@ -18,7 +18,7 @@ import { WorldToggle } from './WorldToggle';
 import { MagnifierIcon, SearchPanel } from './SearchPanel';
 import { statusOf } from './status';
 import { cardTapper, onControl } from './cardtap';
-import { FanView, fmtInt, formatYearsAgo, type IndInfo, type Lineage, type Selection } from './view';
+import { FanView, fmtInt, formatYearsAgo, initialMeasure, type IndInfo, type Lineage, type Selection } from './view';
 
 declare global {
   interface Window {
@@ -80,6 +80,8 @@ export function FanApp() {
   // A double tap on the card (ToLaD#301): what one on the tree does, one level up, the card closed.
   const cardUp = (x: number, y: number) => viewRef.current?.doubleTap(x, y);
   const [mode, setMode] = useState<WidthMode>('linear');
+  // What the widths count (ToLaD#276): individuals, or their mass (`?width=mass`).
+  const [measure, setMeasure] = useState<Measure>(initialMeasure);
   const [edge, setEdge] = useState<EdgeStyle>(initialEdge);
   const [sel, setSel] = useState<Selection | null>(null);
   const [searching, setSearching] = useState(false);
@@ -117,6 +119,7 @@ export function FanApp() {
           : new FanView(c, FELIDAE, edge);
     stamp('view');
     if (mode !== 'linear') v.setMode(mode);
+    v.setMeasure(measure);
     v.onSelect = setSel;
     v.scaleEl = scaleRef.current;
     v.barEl = barRef.current;
@@ -215,7 +218,7 @@ export function FanApp() {
         >
           <MagnifierIcon />
         </button>
-        <WorldToggle get={() => viewRef.current} />
+        <WorldToggle get={() => viewRef.current} onMeasure={setMeasure} />
       </div>
       {searching && (
         <SearchPanel
@@ -239,7 +242,7 @@ export function FanApp() {
         ) : sel.ind ? (
           <IndCard sp={sel.sp} ind={sel.ind} onClose={() => viewRef.current?.tap(-1e6, -1e6)} onUp={cardUp} />
         ) : (
-          <SpeciesCard sp={sel.sp} ageMa={sel.ageMa} startMa={sel.startMa} event={sel.event?.k} onClose={() => viewRef.current?.tap(-1e6, -1e6)} onUp={cardUp} />
+          <SpeciesCard sp={sel.sp} mass={measure === 'mass'} ageMa={sel.ageMa} startMa={sel.startMa} event={sel.event?.k} onClose={() => viewRef.current?.tap(-1e6, -1e6)} onUp={cardUp} />
         )
       ) : (
         <ul className="key" aria-label="key">
@@ -540,7 +543,15 @@ function CardShell({ onUp, children }: { onUp?: (x: number, y: number) => void; 
   );
 }
 
-export function SpeciesCard({ sp, onClose, onUp, open, ageMa, startMa, event }: { sp: SpeciesRec; onClose: () => void; onUp?: (x: number, y: number) => void; open?: boolean; ageMa?: number; startMa?: number; event?: number }) {
+/** Where a species' adult mass comes from, as the card's mass line ends (ToLaD#276; dated.MASS_HOW). */
+function massNote(how: string | undefined): string {
+  if (!how) return '';
+  if (how.endsWith(' mean')) return how === 'Mammalia mean' ? ' (the mammals\' mean: no mass known)' : ` (its ${how.replace(' mean', '')}'s mean: its own not known)`;
+  const src: Record<string, string> = { phylacine: 'PHYLACINE 1.2', combine: 'COMBINE', pantheria: 'PanTHERIA', 'combine-imputed': 'COMBINE, imputed' };
+  return ` (adult, ${src[how] ?? how})`;
+}
+
+export function SpeciesCard({ sp, onClose, onUp, open, ageMa, startMa, event, mass }: { sp: SpeciesRec; onClose: () => void; onUp?: (x: number, y: number) => void; open?: boolean; ageMa?: number; startMa?: number; event?: number; mass?: boolean }) {
   const at = populationAt(sp, ageMa ?? sp.t1, startMa);
   const ev0 = event !== undefined ? sp.history?.events[event] : undefined;
   const ev = ev0?.scope === 'regional' ? undefined : ev0;
@@ -585,6 +596,11 @@ export function SpeciesCard({ sp, onClose, onUp, open, ageMa, startMa, event }: 
             <b>{formatCount(at.alive)}</b> alive {at.when}
           </span>
         </p>
+        {mass && sp.massKg ? (
+          <p className="sub" data-mass>
+            Weighing {formatMass(at.alive * sp.massKg)}, at {formatMass(sp.massKg)} each{massNote(sp.massHow)}
+          </p>
+        ) : null}
         {!sp.extinct && !at.now && <p className="sub">{pct(at.green)} have descendants alive today</p>}
         {sp.extinct && !at.end && <p className="sub">Died out {plainAgo(sp.t1 * 1e6)}</p>}
         {!sp.extinct && !at.now && (
@@ -700,7 +716,15 @@ export function LineageCard({ lin, onClose, onUp }: { lin: Lineage; onClose: () 
         <p className="lead">
           <span className="lane lineage" />
           <span>
-            <b>{formatCount(lin.alive)}</b> alive {plainAgo(lin.ageMa * 1e6)} <span className="dim">(model)</span>
+            {lin.measure === 'mass' ? (
+              <>
+                <b>{formatMass(lin.alive)}</b> of them alive {plainAgo(lin.ageMa * 1e6)} <span className="dim">(model)</span>
+              </>
+            ) : (
+              <>
+                <b>{formatCount(lin.alive)}</b> alive {plainAgo(lin.ageMa * 1e6)} <span className="dim">(model)</span>
+              </>
+            )}
           </span>
         </p>
         <p className="sub">{Math.round(lin.green * 100)}% have descendants alive today</p>

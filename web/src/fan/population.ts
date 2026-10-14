@@ -300,10 +300,14 @@ export class Population {
   /**
    * @param startMa the species' start (Ma): its split in the dated tree, where
    * its own column begins (by default its first appearance).
+   * @param weight what one individual weighs in the widths (ToLaD#276): 1 counts individuals, the adult body mass
+   * (kg) weighs them. founders, max and aliveAt are scaled by it; the genealogy (the green share) stays the
+   * individuals' own (it is the one of weight 1, shared).
    */
   constructor(
     readonly sp: SpeciesRec,
     readonly startMa = sp.t0,
+    readonly weight = 1,
   ) {
     const GL = sp.genYears;
     this.GL = GL;
@@ -351,9 +355,14 @@ export class Population {
       for (const p of this.knots) if (p.ago >= lo && p.ago <= end) mx = Math.max(mx, Math.exp(p.ln));
       mx = Math.max(mx, Math.exp(this.lnHistory(end)), Math.exp(this.lnHistory(lo)));
     }
-    this.max = mx;
+    this.max = mx * weight;
     this.founders = this.aliveAt(startMa);
-    if (sp.extinct || !(sp.alive > 0)) {
+    if (weight !== 1) {
+      const base = population(sp, startMa);
+      this.hk = base.hk;
+      this.h = base.h;
+      this.qBase = base.qBase;
+    } else if (sp.extinct || !(sp.alive > 0)) {
       this.hk = new Float64Array([0]);
       this.h = new Float64Array([0]);
       this.qBase = Q_STAR;
@@ -369,7 +378,7 @@ export class Population {
       else if (this.knots.length) varGens = Math.ceil(this.knots[this.knots.length - 1].ago / GL);
       const own = Math.max(1, (startMa - sp.t1) * 1e6);
       // Sampled (bounded: per generation only where the share moves, ToLaD#70), back to the species' start.
-      const g = shareBackSampled((k) => this.aliveAt(ago(k) / 1e6), varGens, Math.ceil(own / GL), GL);
+      const g = shareBackSampled((k) => this.count(ago(k) / 1e6), varGens, Math.ceil(own / GL), GL);
       this.hk = g.k;
       this.h = g.h;
       this.qBase = this.h[this.h.length - 1];
@@ -412,6 +421,11 @@ export class Population {
   }
 
   aliveAt(ageMa: number): number {
+    return this.count(ageMa) * this.weight;
+  }
+
+  /** The individuals alive at `ageMa` (aliveAt with weight 1). */
+  private count(ageMa: number): number {
     const sp = this.sp;
     if (ageMa < sp.t1) return 0;
     const a = Math.min(ageMa, sp.t0, this.startMa);
@@ -509,9 +523,9 @@ export class Population {
 
 const cache = new Map<string, Population>();
 /** The population model of a species starting at `startMa` (by default its first appearance; cached by gid and start). */
-export function population(sp: SpeciesRec, startMa = sp.t0): Population {
-  const key = `${sp.gid}:${startMa}`;
+export function population(sp: SpeciesRec, startMa = sp.t0, weight = 1): Population {
+  const key = weight === 1 ? `${sp.gid}:${startMa}` : `${sp.gid}:${startMa}:${weight}`;
   let p = cache.get(key);
-  if (!p || p.sp !== sp) cache.set(key, (p = new Population(sp, startMa)));
+  if (!p || p.sp !== sp) cache.set(key, (p = new Population(sp, startMa, weight)));
   return p;
 }

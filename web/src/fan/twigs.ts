@@ -312,14 +312,15 @@ export class TwigModel {
    * column's width over the individuals alive there.
    */
   pitch(y: number): number {
-    return this.mode === 'linear' ? this.b.unit : this.at(y)[3];
+    // (By mass, ToLaD#276: one individual is its adult mass wide, pop.weight units.)
+    return this.mode === 'linear' ? this.b.unit * this.b.pop.weight : this.at(y)[3];
   }
 
   /** pitch(y), the column's width there w. */
   private pitchOf(y: number, w: number): number {
-    const lin = this.b.unit;
+    const lin = this.b.unit * this.b.pop.weight;
     if (this.mode === 'linear') return lin;
-    const n = this.b.pop.stepAt(Math.min(this.b.t0, this.time.ageAt(y))).n;
+    const n = this.b.pop.stepAt(Math.min(this.b.t0, this.time.ageAt(y))).n / this.b.pop.weight;
     // (Never wider than the column: one slot at least, where the steps count under one alive.)
     return w > 0 && n > 0 ? w / Math.max(1, n) : lin;
   }
@@ -379,7 +380,7 @@ export class TwigModel {
     let v = this.strides.get(g);
     if (v === undefined) {
       if (this.strides.size > 50000) this.strides.clear();
-      this.strides.set(g, (v = Math.max(1, Math.round(this.b.pop.aliveAt(Math.min(this.b.t0, this.ageOf((g + 0.5) * this.GL)))))));
+      this.strides.set(g, (v = Math.max(1, Math.round(this.b.pop.aliveAt(Math.min(this.b.t0, this.ageOf((g + 0.5) * this.GL))) / this.b.pop.weight))));
     }
     return v;
   }
