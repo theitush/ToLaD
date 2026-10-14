@@ -12,6 +12,7 @@ import { clipPoly, FanCamera, type Camera } from './camera';
 import { g, isNode, laneAt, layoutFan, leftAt, nearestStrand, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type EdgeStyle, type Fan, type FanBranch, type FanNode, type Measure, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01 } from './meshgl';
+import { ColsData, ColsGL } from './colsgl';
 import { Lod } from './lod';
 import type { FoldState } from './fold';
 import { Steady, wantFitFossils } from './steady';
@@ -145,6 +146,9 @@ export function wantNames(): NameMode {
 const LABEL_MS = 150;
 const LABEL_FRAMES = 3;
 /** `?carry=0`: laid out every frame, as before ToLaD#255 (to compare). */
+/** The columns from static GPU buffers (colsgl.ts, ToLaD#340): ?gl=cols. Off by default (the CPU's trapezoids each frame). */
+const glCols = typeof location !== 'undefined' && new URLSearchParams(location.search).get('gl') === 'cols';
+
 const labelCarry = typeof location === 'undefined' || new URLSearchParams(location.search).get('carry') !== '0';
 /** The camera's change between two frames on screen: x → k[0]·x + k[1], y → k[2]·y + k[3]. */
 export type Carry = [number, number, number, number];
@@ -2888,9 +2892,15 @@ export class FanView implements InputHandlers {
     const hide = this.hide;
     // (The mammal level, lod.ts: a closed clade of hairline strands drawn as its one branch, its columns inside it not drawn.)
     const lod = this.lodNow();
-    if (!hide.has('stem')) this.drawStem(lod);
+    // (?gl=cols: the stem and the lanes from the static GPU buffers, drawn under what the CPU still draws, ToLaD#340.)
+    const cols = this.colsNow(lod);
+    if (this.gl) {
+      this.gl.cols = cols && !hide.has('lanes') ? (w, h) => cols.draw(w, h, this.cam, COLS_PAL, !hide.has('glow')) : null;
+      this.gl.colsAt = this.gl.under.n;
+    }
+    if (!hide.has('stem') && !cols) this.drawStem(lod);
     if (!hide.has('lanes')) {
-      for (const b of this.fan.branches) if (!lod || lod.of[b.index] < 0) this.drawStrand(b);
+      for (const b of this.fan.branches) if ((!lod || lod.of[b.index] < 0) && (!cols || this.colsCpu(b))) this.drawStrand(b);
       if (lod) for (const v of lod.merged) this.drawMerged(v);
     }
     // (Mass widths have no individuals' lattice: the texture is the individuals' own.)
@@ -3027,6 +3037,35 @@ export class FanView implements InputHandlers {
    * so a column reads as one without seams passing for lanes. It follows the
    * column's curve where it peels off its parent (chords a few px tall).
    */
+  private colsGL: ColsGL | null = null;
+  /** Per strand: styled spans (colstyle.ts), drawn on the CPU (its fan's). */
+  private colsStyled: { fan: Fan; s: Uint8Array } | null = null;
+  /** Columns drawn from the static GPU buffers this frame (?gl=cols, colsgl.ts), null: on the CPU. */
+  private colsNow(lod: Lod | null): ColsGL | null {
+    const st = this.fan.tess.fold;
+    if (!glCols || !this.gl || !(st instanceof Steady)) return null;
+    if (this.colsGL?.data.fan !== this.fan || this.colsGL.data.st !== st) {
+      const data = new ColsData(this.fan, st);
+      this.colsGL = new ColsGL(this.gl.gl, data);
+      this.colsStyled = { fan: this.fan, s: Uint8Array.from(this.fan.branches, (b) => (colSpansY(this.fan, b).length ? 1 : 0)) };
+      console.info(`fan: ?gl=cols: ${data.n} pieces built in ${data.buildMs.toFixed(0)} ms`);
+    }
+    const c = this.colsGL;
+    const H = c.hidden;
+    const nodes = this.fan.nodes;
+    for (let j = 0; j < nodes.length; j++) {
+      H[2 * j] = lod?.hidden(nodes[j]) ? 1 : 0;
+      H[2 * j + 1] = 0;
+    }
+    for (const b of this.fan.branches) H[2 * (nodes.length + b.index) + 1] = (lod && lod.of[b.index] >= 0) || this.colsCpu(b) ? 1 : 0;
+    c.sync(this.cam.cx, this.cam.sx, this.w);
+    return c.usable(this.cam.sx, this.cam.sy) ? c : null;
+  }
+  /** A strand the CPU still draws under ?gl=cols: one with its individuals' fade or a styled span. */
+  private colsCpu(b: FanBranch): boolean {
+    return this.twigStats.has(b.sp.gid) || this.colsStyled!.s[b.index] === 1;
+  }
+
   /** drawStem's heights, pooled. */
   private stemYs: number[] = [];
   private drawStem(lod: Lod | null = null): void {
@@ -4115,6 +4154,8 @@ const GRAY01 = rgb01(GRAY);
 const GRAY_DARK01 = rgb01('#131c19');
 const GREEN01 = rgb01(GREEN);
 const GREEN_DARK01 = rgb01('#0d2318');
+/** The GPU columns' colours (colsgl.ts): drawStem's and drawLanes'. */
+const COLS_PAL = { stem: rgb01(mix(GRAY, '#131c19', 0.86)), gray: GRAY01, grayDark: GRAY_DARK01, green: GREEN01, greenDark: GREEN_DARK01 };
 /** drawLanes' piece colours: written per piece, read at once by trap(). */
 const GC_MIX: [number, number, number] = [0, 0, 0];
 const EC_MIX: [number, number, number] = [0, 0, 0];

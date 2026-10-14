@@ -485,6 +485,39 @@ export class Steady extends Fold {
     return L.tc![i] + L.dc![i] * this.u(y0, h, y);
   }
 
+  /**
+   * The GPU columns (colsgl.ts, ToLaD#340): every edge is T[k] + D[k] * u, k a column (a node's, index j < nodes; a
+   * strand's own, nodes + i) and u its peel's ease at y, which depends on y alone (the forks' heights are fixed:
+   * cap). nodeU and ownU give u; segs the T and D of the layout as it stands (its zoom's openness), relative to x0.
+   */
+  nodeIndex(v: FanNode): number {
+    return this.idx.get(v)!;
+  }
+  nodeU(j: number, y: number): number {
+    const p = this.par[j];
+    return p < 0 ? 0 : this.u(this.nY[p], this.cap[p], y);
+  }
+  ownFork(i: number): number {
+    return this.cap[this.bNode[i]];
+  }
+  ownU(i: number, y: number): number {
+    return this.u(this.sY[i], this.cap[this.bNode[i]], y);
+  }
+  segs(x0: number, out: Float32Array): void {
+    const L = this.cur();
+    this.prep(L);
+    const n = this.nY.length;
+    for (let j = 0; j < n; j++) {
+      const root = this.par[j] < 0;
+      out[4 * j] = (root ? L.colL[j] : L.tile![j]) - x0;
+      out[4 * j + 1] = root ? 0 : L.dl![j];
+    }
+    for (let i = 0; i < this.bNode.length; i++) {
+      out[4 * (n + i)] = L.tc![i] - x0;
+      out[4 * (n + i) + 1] = L.dc![i];
+    }
+  }
+
   override left(i: number, y: number): number {
     const L = this.cur();
     if (y < this.sY[i]) return this.ownC(L, i, y);

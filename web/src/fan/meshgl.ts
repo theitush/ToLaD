@@ -33,7 +33,7 @@ void main() {
   gl_Position = vec4(p.x / uView.x * 2.0 - 1.0, 1.0 - p.y / uView.y * 2.0, 0.0, 1.0);
 }`;
 
-const RECT_FS = /* glsl */ `#version 300 es
+export const RECT_FS = /* glsl */ `#version 300 es
 precision highp float;
 in vec2 vP;
 flat in vec4 vRect;
@@ -443,7 +443,7 @@ void main() {
   o = vec4(best.rgb * best.a, best.a);
 }`;
 
-function compile(gl: WebGL2RenderingContext, vs: string, fs: string): WebGLProgram {
+export function compile(gl: WebGL2RenderingContext, vs: string, fs: string): WebGLProgram {
   const p = gl.createProgram()!;
   for (const [type, src] of [
     [gl.VERTEX_SHADER, vs],
@@ -585,15 +585,22 @@ export class FanGL {
     this.over.n = 0;
   }
 
-  private rects(b: RectBatch, w: number, h: number): void {
-    if (!b.n) return;
+  /**
+   * The static GPU columns (colsgl.ts, ToLaD#340, ?gl=cols): drawn after the under batch's first `colsAt` rects (the
+   * world beneath), before the rest (the lanes still drawn on the CPU, over them). Set per frame; null: none.
+   */
+  cols: ((w: number, h: number) => void) | null = null;
+  colsAt = 0;
+
+  private rects(b: RectBatch, w: number, h: number, from = 0, to = b.n): void {
+    if (!(to > from)) return;
     const gl = this.gl;
     gl.useProgram(this.rectProg);
     gl.uniform2f(this.u['r.uView'], w, h);
     gl.bindVertexArray(this.rectVao);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.rectBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, b.f.subarray(0, b.n * 12), gl.STREAM_DRAW);
-    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, b.n);
+    gl.bufferData(gl.ARRAY_BUFFER, b.f.subarray(from * 12, to * 12), gl.STREAM_DRAW);
+    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, to - from);
   }
 
   /** Draw the frame: background, lanes, mesh, overlay lines. w, h in CSS px. */
@@ -612,7 +619,13 @@ export class FanGL {
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-    this.rects(this.under, w, h);
+    if (this.cols) {
+      const at = Math.min(this.colsAt, this.under.n);
+      this.rects(this.under, w, h, 0, at);
+      this.cols(w, h);
+      gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+      this.rects(this.under, w, h, at, this.under.n);
+    } else this.rects(this.under, w, h);
     if (this.mesh.n) {
       gl.useProgram(this.meshProg);
       gl.uniform2f(this.u['m.uView'], w, h);

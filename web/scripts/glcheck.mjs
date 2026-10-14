@@ -211,6 +211,64 @@ try {
   console.log(`checked ${r.checked} individuals on the GPU: ${bad} disagree with the CPU mirror`);
   console.log(`  (none / alive / lineage / ended: ${r.counts.join(' / ')})`);
   for (const mm of r.mismatches) console.log('  mismatch', JSON.stringify(mm));
+  // The columns from static GPU buffers (?gl=cols, colsgl.ts, ToLaD#340) against the default (the CPU's trapezoids
+  // each frame): the GPU layer's pixels at a few cameras, both pages at a phone's size. A pixel disagrees when a
+  // channel is off by more than 24 of 255 (an edge's coverage, a seam); off by more than 96 counted apart (a column
+  // missing or misplaced). COLS=0 skips it.
+  if (process.env.COLS !== '0') {
+    const shots = {};
+    for (const mode of ['', 'gl=cols']) {
+      const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+      const pg = await ctx.newPage();
+      const s2 = await pageUrl([q, mode].filter(Boolean).join('&'));
+      try {
+        await pg.goto(s2.url);
+        await pg.waitForFunction(() => !!window.__fan && !!window.__fan.gl, null, { timeout: Number(process.env.LOAD_MS || 60000) });
+        await pg.waitForTimeout(1500);
+        shots[mode] = await pg.evaluate(() => {
+          const f = window.__fan;
+          const home = { ...f.cam };
+          const out = {};
+          // (Width zooms about the screen's centre; one time zoom.)
+          for (const [name, kx, ky] of [['home', 1, 1], ['x3', 3, 1], ['x12', 12, 1], ['x40', 40, 1], ['t4', 1, 4]]) {
+            f.cam = { ...home, sx: home.sx * kx, sy: home.sy * ky };
+            f.draw();
+            f.draw();
+            const g = f.gl.gl;
+            const W = g.drawingBufferWidth;
+            const H = g.drawingBufferHeight;
+            const px = new Uint8Array(W * H * 4);
+            g.readPixels(0, 0, W, H, g.RGBA, g.UNSIGNED_BYTE, px);
+            out[name] = { W, H, px: Array.from(px) };
+          }
+          f.cam = home;
+          f.request();
+          return out;
+        });
+      } finally {
+        s2.close();
+        await ctx.close();
+      }
+    }
+    let colsBad = 0;
+    for (const name of Object.keys(shots[''])) {
+      const a = shots[''][name];
+      const b = shots['gl=cols'][name];
+      let off = 0;
+      let far = 0;
+      let lit = 0;
+      for (let i = 0; i < a.px.length; i += 4) {
+        let d = 0;
+        for (let c = 0; c < 4; c++) d = Math.max(d, Math.abs(a.px[i + c] - b.px[i + c]));
+        if (a.px[i + 3] > 0 || b.px[i + 3] > 0) lit++;
+        if (d > 24) off++;
+        if (d > 96) far++;
+      }
+      colsBad += far;
+      console.log(`cols ${name}: ${off} of ${lit} lit pixels disagree (>24/255), ${far} far off (>96/255)`);
+    }
+    console.log(`cols: ${colsBad} pixels far off in all (?gl=cols vs the CPU's columns)`);
+  }
 } finally {
   served?.close();
   await browser.close();
