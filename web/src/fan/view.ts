@@ -79,6 +79,8 @@ type Step = { lv: Level; cam: Camera };
  * up from it, never back to its own frame: ToLaD#301.)
  */
 const BACK_SLACK = 1.15;
+/** The level the view was at is kept while the view is within half a screen of its frame and zoomed at most this far from it (ToLaD#311). */
+const LEVEL_KEEP = 1.6;
 /** A touch that has moved this many px is a pan, not a tap (engine/input.ts's tap): a level's flight under it stops (ToLaD#301). */
 const TOUCH_SLOP = 12;
 /** A tap's next level (ToLaD#258) is one whose frame stands more than this many px off the view's: nearer, it is passed. */
@@ -1523,14 +1525,17 @@ export function labelSpots(
         const ya = y1 - len;
         const xa = x - half;
         const xb = x + half;
-        const fit = ya >= top && xa >= 0 && xb <= c.w ? botFit(y1) * clearFit(Math.min(xa - LABEL_AXIS_X, clearance(xa, xb, ya, y1, b))) : 0;
+        // (Faded in over 24 px under the top line and 12 px in from the screen's sides, not cut: a pinch's frames keep it, ToLaD#311.)
+        const onFit = (xa: number, ya: number, xb: number, y1: number) => botFit(y1) * clamp01((ya - top) / 24) * clamp01(xa / 12) * clamp01((c.w - xb) / 12);
+        const f0 = onFit(xa, ya, xb, y1);
+        const fit = f0 > 0 ? f0 * clearFit(Math.min(xa - LABEL_AXIS_X, clearance(xa, xb, ya, y1, b))) : 0;
         const o = { id, place: 'over' as const, b, text, rank, x, y1, plus: px };
         sp.push({ ...o, key: `${id}:over`, box: [xa, ya, xb, y1], fit });
         // (Failing a clear one, over the columns there, opaque: clear of the axis and the other names. Under fossils'
         // frame, crowded, beside its picture, or further up, a name's length at a time.)
         const loose = (key: string, x: number, y1: number) => {
           const [xa, ya, xb] = [x - half, y1 - len, x + half];
-          sp.push({ ...o, key: `${id}:${key}`, x, y1, box: [xa, ya, xb, y1], loose: true, fit: ya >= top && xa >= 0 && xb <= c.w ? botFit(y1) * clearFit(xa - LABEL_AXIS_X) : 0 });
+          sp.push({ ...o, key: `${id}:${key}`, x, y1, box: [xa, ya, xb, y1], loose: true, fit: onFit(xa, ya, xb, y1) * clearFit(xa - LABEL_AXIS_X) });
         };
         loose('over~', x, y1);
         if (more) {
@@ -2569,16 +2574,38 @@ export class FanView implements InputHandlers {
     // At a frame (within LEVEL_PX, as a tap passes them): the outermost there. Else from home in, while the view is
     // inside each (a wide species' frame, as the house cat's, can take in its group's, even home's).
     const on = [...ladder].reverse().find((f) => this.offBy(f.cam, c) <= LEVEL_PX);
+    // (The level the view was at, while it is still near its frame: a pan of a third of the screen at the Hominins put
+    // the centre on a gibbon's line, or the human's, and the level flipped to theirs, the names and pictures with it, ToLaD#311.)
+    const was = k && k.fan === this.fan ? k.lv : null;
+    const near = (lv: Level) => {
+      const f = this.frameOf(lv);
+      return this.offBy(f, c) <= this.w / 2 && Math.abs(z(f)) <= Math.log(LEVEL_KEEP);
+    };
     let lv: Level = { v: this.fan.root };
     if (on) lv = on.lv;
-    else
-      for (let i = ladder.length - 2; i >= 0 && z(ladder[i].cam) >= -Math.log(BACK_SLACK); i--) {
-        // (A species whose frame stands further off the view than its level's is not where the view is, however far
-        // in: the human, its column filling the Hominins' and Homo's frames, else read as the level there, and a pan
-        // onto a fossil's line flipped it to that line's levels, the pills and pictures with it, ToLaD#302.)
-        if (i === 0 && ladder.length > 1 && ladder[0].lv.b && this.offBy(ladder[0].cam, c) > this.offBy(ladder[1].cam, c) + LEVEL_PX) break;
+    else if (was && near(was)) lv = was;
+    else {
+      let offLv = this.offBy(ladder[ladder.length - 1].cam, c);
+      for (let i = ladder.length - 2; i >= 0; i--) {
+        const zi = z(ladder[i].cam);
+        if (zi < -Math.log(BACK_SLACK)) {
+          // (A frame tighter than the next one in, ?fit=fossils: the great apes framed on "now", the hominins' wider on
+          // their fossils. Passed over, not where the walk ends: else a pan off the Hominins' frame read the view as at
+          // the Catarrhini, the pictures and names gone, ToLaD#311.)
+          if (i > 0 && z(ladder[i - 1].cam) >= zi) continue;
+          break;
+        }
+        // (A level whose frame stands further off the view than the one it sits in is not where the view is, however
+        // far in: a species', the human, its column filling the Hominins' and Homo's frames, else read as the level
+        // there, ToLaD#302; a fossil genus' a pan away from the Hominins' frame, Paranthropus', ToLaD#311. A clade's only
+        // while the view is within a screen of the one it sits in: far from every frame, the outer ones stand further
+        // off the deeper they go.)
+        const off = this.offBy(ladder[i].cam, c);
+        if (off > offLv + LEVEL_PX && (ladder[i].lv.b || offLv < this.w)) break;
         lv = ladder[i].lv;
+        offLv = off;
       }
+    }
     this.lvAt = { fan: this.fan, cam: { ...c }, lv, t };
     return lv;
   }
@@ -2907,6 +2934,9 @@ export class FanView implements InputHandlers {
       for (let i = 0; i < 3 && lg.groups.length + lg.species.size > 0; i++) {
         const next = this.groupPlus({ ...lg, lod }, spots, resolveLabels(spots, new Map()), new Map());
         if (next.size === room.size && [...next].every(([id, px]) => room.get(id) === px)) break;
+        // (After the first, the room only grows: a pill whose room for its "+x" crowds it out, its count then gone, the
+        // room with it, shown again, laid out at rest frame after frame: it flickered, ToLaD#311.)
+        if (i > 0) for (const [id, px] of room) next.set(id, Math.max(px, next.get(id) ?? 0));
         room = next;
         spots = lay(room);
       }
