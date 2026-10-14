@@ -90,6 +90,8 @@ const LABEL_FADE_MS = 180;
 const STEM_END_PX = 48;
 /** A lane's living glow at full strength from this green width (px) up, thinner ones in proportion: a family of thin columns side by side glows as one (ToLaD#231). */
 const GLOW_W = 6;
+/** A column with no styled spans on screen (drawStrand): shared, never written. */
+const NO_HELD: [number, number, number][] = [];
 /** The glow fades out across a lean: gone where the lane runs √(1 + s²) - 1 = GLOW_LEAN off straight down (s ≈ 0.75 px per px). */
 const GLOW_LEAN = 0.25;
 
@@ -1576,13 +1578,41 @@ export function lineageAt(b: FanBranch, fan: Fan, ageMa: number): Lineage {
   return { node: v, name: v.name, ageMa, alive: v.n, green: nodeQ(v, ageMa), of: v.strands.map((s) => s.sp.common) };
 }
 
-interface RibbonPt {
-  x: number;
-  y: number;
-  nx: number;
-  ny: number;
-  w: number;
-  f: number;
+/**
+ * A column's lane points on screen, bottom up (lanePoints, drawMerged): x the spine's left edge (px), y (px), w the
+ * lanes' width (world), f the green's share of it. Flat and pooled, written afresh by each column: no objects a
+ * point (a frame at the mammal level samples ~1M, ToLaD#255). Read only until the next column is written.
+ */
+class LanePts {
+  x = new Float64Array(256);
+  y = new Float64Array(256);
+  w = new Float64Array(256);
+  f = new Float64Array(256);
+  n = 0;
+  push(x: number, y: number, w: number, f: number): void {
+    if (this.n === this.x.length) {
+      const grow = (a: Float64Array) => {
+        const b = new Float64Array(2 * a.length);
+        b.set(a);
+        return b;
+      };
+      this.x = grow(this.x);
+      this.y = grow(this.y);
+      this.w = grow(this.w);
+      this.f = grow(this.f);
+    }
+    const i = this.n++;
+    this.x[i] = x;
+    this.y[i] = y;
+    this.w[i] = w;
+    this.f[i] = f;
+  }
+  /** Points i0..i1 (inclusive) copied out (the 2D path's held runs, kept past the next column). */
+  slice(i0: number, i1: number): LanePts {
+    const r = new LanePts();
+    for (let i = i0; i <= i1; i++) r.push(this.x[i], this.y[i], this.w[i], this.f[i]);
+    return r;
+  }
 }
 
 export class FanView implements InputHandlers {
@@ -1612,7 +1642,9 @@ export class FanView implements InputHandlers {
   /** What each branch's individuals view drew last frame (taps, tests). */
   twigStats = new Map<number, TwigStats>();
   /** Without the GPU layer: this frame's styled column stretches, faded once the individuals are drawn. */
-  private heldRuns: { run: RibbonPt[]; hw: number; d: number }[] = [];
+  private heldRuns: { run: LanePts; hw: number; d: number }[] = [];
+  /** The lane points (lanePoints, drawMerged), pooled. */
+  private lanePts = new LanePts();
   /** drawStem's chords on screen (their left edges, their rows). */
   private stemXs = new Float64Array(64);
   private stemSy = new Float64Array(64);
@@ -2738,11 +2770,15 @@ export class FanView implements InputHandlers {
    * so a column reads as one without seams passing for lanes. It follows the
    * column's curve where it peels off its parent (chords a few px tall).
    */
+  /** drawStem's heights, pooled. */
+  private stemYs: number[] = [];
   private drawStem(lod: Lod | null = null): void {
     const c = rgb01(this.gl ? mix(GRAY, '#131c19', 0.86) : GRAY);
-    const [, wTop] = this.toWorld(0, -8);
-    const [, wBot] = this.toWorld(0, this.h + 8);
+    const cam = this.camera;
+    const wTop = cam.worldY(-8);
+    const wBot = cam.worldY(this.h + 8);
     const nodes = this.fan.nodes;
+    const ys = this.stemYs;
     for (let ni = nodes.length - 1; ni >= 0; ni--) {
       const v = nodes[ni];
       if (lod?.hidden(v)) continue;
@@ -2751,7 +2787,8 @@ export class FanView implements InputHandlers {
       if (!(yb > ya)) continue;
       // Straight below its peel: one piece; the peel in chords.
       const peel = v.leanY;
-      const ys = [ya];
+      ys.length = 0;
+      ys.push(ya);
       if (peel > ya && peel < yb && !this.fan.tess.fold) ys.push(peel);
       // (Folded, fold.ts: the column moves with its neighbours' widths at every height: chords all the way.)
       const p0 = this.fan.tess.fold ? ya : Math.max(ya, peel);
@@ -2763,7 +2800,10 @@ export class FanView implements InputHandlers {
       const n = ys.length - 1;
       const xs = this.stemXs.length > n ? this.stemXs : (this.stemXs = new Float64Array(2 * n + 2));
       const sy = this.stemSy.length > n ? this.stemSy : (this.stemSy = new Float64Array(2 * n + 2));
-      for (let i = 0; i <= n; i++) [xs[i], sy[i]] = this.toScreen(nodeLeftAt(v, ys[i]), ys[i]);
+      for (let i = 0; i <= n; i++) {
+        xs[i] = cam.screenX(nodeLeftAt(v, ys[i]));
+        sy[i] = cam.screenY(ys[i]);
+      }
       const w = v.width * this.cam.sx;
       for (let i = 0; i < n; i++) {
         const l0 = xs[i];
@@ -2834,22 +2874,22 @@ export class FanView implements InputHandlers {
    * towards the right). The polygon is clipped to the screen in float64 before
    * it reaches the canvas, which mishandles coordinates far off screen.
    */
-  private ribbon(pts: RibbonPt[], a: (p: RibbonPt) => number, bOff: (p: RibbonPt) => number, minPx = 0): void {
+  private ribbon(pts: LanePts, a: (i: number) => number, bOff: (i: number) => number, minPx = 0): void {
     const k = this.cam.sx;
     const xs: number[] = [];
     const ys: number[] = [];
-    for (const p of pts) {
-      const off = a(p) * k;
-      xs.push(p.x + p.nx * off);
-      ys.push(p.y + p.ny * off);
+    // (The lanes run down the screen: their normal is (-1, 0).)
+    for (let i = 0; i < pts.n; i++) {
+      const off = a(i) * k;
+      xs.push(pts.x[i] - off);
+      ys.push(pts.y[i]);
     }
-    for (let i = pts.length - 1; i >= 0; i--) {
-      const p = pts[i];
-      const ao = a(p) * k;
-      const bo = bOff(p) * k;
+    for (let i = pts.n - 1; i >= 0; i--) {
+      const ao = a(i) * k;
+      const bo = bOff(i) * k;
       const off = minPx >= 0 ? Math.max(bo, ao + minPx) : Math.min(bo, ao + minPx);
-      xs.push(p.x + p.nx * off);
-      ys.push(p.y + p.ny * off);
+      xs.push(pts.x[i] - off);
+      ys.push(pts.y[i]);
     }
     const [cx, cy] = clipPoly(xs, ys, -8, -8, this.w + 8, this.h + 8);
     if (cx.length < 3) return;
@@ -2874,23 +2914,24 @@ export class FanView implements InputHandlers {
    */
   private drawStrand(b: FanBranch): void {
     const yb = this.fan.trunkBottom.y;
-    const [, ayTip] = this.toScreen(0, b.tipY);
-    const [, byBot] = this.toScreen(0, yb);
+    const cam = this.camera;
+    const ayTip = cam.screenY(b.tipY);
+    const byBot = cam.screenY(yb);
     if (byBot < 0 || ayTip > this.h) return;
     // Wholly left or right of the screen (zoomed in, most strands are): nothing to sample.
-    const [, sTop] = this.toWorld(0, -20);
-    const [, sBot] = this.toWorld(0, this.h + 20);
+    const sTop = cam.worldY(-20);
+    const sBot = cam.worldY(this.h + 20);
     const xr = this.fan.tess.xRange(b, sTop, sBot);
-    if (this.toScreen(xr[1], 0)[0] < -12 || this.toScreen(xr[0], 0)[0] > this.w + 12) return;
+    if (cam.screenX(xr[1]) < -12 || cam.screenX(xr[0]) > this.w + 12) return;
     const hw = b.width / 2;
     const pts = this.lanePoints(b, hw);
-    if (pts.length < 2) return;
+    if (pts.n < 2) return;
     // The column's styled spans on screen ([top, bottom, dim]), clipped to it: none for most strands.
-    const held: [number, number, number][] = [];
+    let held = NO_HELD;
     for (const [t, bt, d] of colSpansY(this.fan, b)) {
-      const st = this.toScreen(0, t)[1];
-      const sb = this.toScreen(0, bt)[1];
-      if (sb > -20 && st < this.h + 20) held.push([st, sb, d]);
+      const st = cam.screenY(t);
+      const sb = cam.screenY(bt);
+      if (sb > -20 && st < this.h + 20) (held === NO_HELD ? (held = []) : held).push([st, sb, d]);
     }
     // As the strands fade in (twigs.ts), the lanes dim to a backdrop under them: the same
     // lanes, the same geometry, never a switch.
@@ -2922,25 +2963,29 @@ export class FanView implements InputHandlers {
     const i1 = v.strands[v.strands.length - 1].index;
     const k0 = Math.ceil(y0 / H);
     const k1 = Math.floor(y1 / H);
-    const pts: RibbonPt[] = [];
+    const pts = this.lanePts;
+    pts.n = 0;
+    const ext = this.mergedExt;
     let lo = Infinity;
     let hi = -Infinity;
+    const cam = this.camera;
     const push = (k: number, y: number) => {
-      const [l, r] = f.extent(i0, i1, k);
+      const [l, r] = f.extent(i0, i1, k, ext);
       const w = Math.max(0, r - l);
       const G = this.lod!.greenAt(v, k, H);
-      const [px, py] = this.toScreen(l, y);
+      const px = cam.screenX(l);
       lo = Math.min(lo, px);
       hi = Math.max(hi, px + w * this.cam.sx);
-      pts.push({ x: px, y: py, nx: -1, ny: 0, w, f: w > 0 ? Math.min(1, G / w) : 0 });
+      pts.push(px, cam.screenY(y), w, w > 0 ? Math.min(1, G / w) : 0);
     };
     // (Bottom up, as lanePoints: its last point at its top, read off the row under it.)
     if (y1 > k1 * H) push(Math.min(k1 + 1, Math.ceil(y1 / H)), y1);
     for (let k = k1; k >= k0; k--) push(k, k * H);
     if (y0 < k0 * H) push(k0, y0);
-    if (pts.length < 2 || hi < -12 || lo > this.w + 12) return;
-    this.drawLanes(pts, 0, [], undefined);
+    if (pts.n < 2 || hi < -12 || lo > this.w + 12) return;
+    this.drawLanes(pts, 0, NO_HELD, undefined);
   }
+  private mergedExt: [number, number] = [0, 0];
   private lodTops = new WeakMap<FanNode, number>();
   private lodTop(v: FanNode): number {
     let t = this.lodTops.get(v);
@@ -2949,7 +2994,7 @@ export class FanView implements InputHandlers {
   }
 
   /** A column's lanes (drawStrand's, or a merged clade's, lod.ts): its points, spine offset hw, styled spans and twig fade. */
-  private drawLanes(pts: RibbonPt[], hw: number, held: [number, number, number][], tw: TwigStats | undefined): void {
+  private drawLanes(pts: LanePts, hw: number, held: [number, number, number][], tw: TwigStats | undefined): void {
     const ctx = this.ctx;
     // Under the mesh the lanes sink to a dark tint of themselves, so the individuals carry the colour:
     // each stretch by its own lanes' widths (twigs.ts laneDim), as the mesh draws them.
@@ -2979,8 +3024,8 @@ export class FanView implements InputHandlers {
       const piece = (xq: number, wq: number, gq: number, xp: number, wp: number, gp: number, y0: number, y1: number) => {
         const wm = (wq + wp) / 2;
         const gm = (gq + gp) / 2;
-        const gc = mix01(GRAY, '#131c19', laneDim(wm - gm, lives, tex) * 0.82);
-        const ec = mix01(GREEN, '#0d2318', laneDim(gm, lives, tex) * 0.9);
+        const gc = mixInto(GC_MIX, GRAY01, GRAY_DARK01, laneDim(wm - gm, lives, tex) * 0.82);
+        const ec = mixInto(EC_MIX, GREEN01, GREEN_DARK01, laneDim(gm, lives, tex) * 0.9);
         // A styled stretch of the column (held flat for want of figures: colstyle.ts) fades towards the
         // background: the background over the whole lane, lanes and individuals alike (drawn after the mesh).
         const dim = held.length ? dimAt(held, (y0 + y1) / 2) : 0;
@@ -3009,35 +3054,43 @@ export class FanView implements InputHandlers {
           trap(gl.under, xq, g1q, xp, g1p, y0, y1, ec, 1, xa - 0.5, xb + 0.5);
         }
       };
-      for (let i = 0; i + 1 < pts.length; i++) {
-        // p below q on screen: the trapezoid from q's row (top) to p's.
-        const p = pts[i];
-        const q = pts[i + 1];
-        const y0 = q.y;
-        const y1 = p.y;
+      const { x: X, y: Y, w: W, f: F } = pts;
+      const hk = hw * k;
+      for (let i = 0; i + 1 < pts.n; i++) {
+        // p (i) below q (i + 1) on screen: the trapezoid from q's row (top) to p's.
+        const y0 = Y[i + 1];
+        const y1 = Y[i];
         if (!(y1 > y0) || y1 < -4 || y0 > this.h + 4) continue;
-        const xq = q.x - hw * k;
-        const xp = p.x - hw * k;
-        const wq = q.w * k;
-        const wp = p.w * k;
+        const xq = X[i + 1] - hk;
+        const xp = X[i] - hk;
+        const wq = W[i + 1] * k;
+        const wp = W[i] * k;
         if (!(wq > 0) && !(wp > 0)) continue;
-        const gq = wq * q.f;
-        const gp = wp * p.f;
+        // Wholly off screen, every trapezoid piece() would send dropped by trap() (zoomed out most are, ToLaD#255):
+        // its widest reach is the glow's, 4 px a unit of lean past the lane's floored width.
+        const gq = wq * F[i + 1];
+        const gp = wp * F[i];
+        const sq = Math.sqrt(1 + ((xp + wp / 2 - xq - wq / 2) / (y1 - y0)) ** 2);
+        if ((xq + Math.max(wq, gq, sq) + 4 * sq < -8 && xp + Math.max(wp, gp, sq) + 4 * sq < -8) || (xq - 4 * sq > L + 8 && xp - 4 * sq > L + 8)) continue;
         piece(xq, wq, gq, xp, wp, gp, y0, y1);
       }
     } else {
       // (Its run drawn whole.)
       ctx.fillStyle = grayC;
-      this.ribbon(pts, (p) => hw - p.w, () => hw, 0.6);
-      if (pts.some((p) => p.f > 0)) {
+      this.ribbon(pts, (i) => hw - pts.w[i], () => hw, 0.6);
+      if (pts.f.subarray(0, pts.n).some((f) => f > 0)) {
         // Green lane on the left, floored at 1 px.
         ctx.fillStyle = greenC;
-        this.ribbon(pts, () => hw, (p) => hw - p.w * p.f, -1);
+        this.ribbon(pts, () => hw, (i) => hw - pts.w[i] * pts.f[i], -1);
       }
       // Its styled stretches: faded over the individuals too, once they are drawn (drawHeld).
       for (const [t, bt, d] of held) {
-        const run = pts.filter((p) => p.y >= t - 0.5 && p.y <= bt + 0.5);
-        if (run.length > 1) this.heldRuns.push({ run, hw, d });
+        // (The points are bottom up: y falls along them.)
+        let i1 = 0;
+        while (i1 < pts.n && !(pts.y[i1] <= bt + 0.5)) i1++;
+        let i0 = i1;
+        while (i0 < pts.n && pts.y[i0] >= t - 0.5) i0++;
+        if (i0 - i1 > 1) this.heldRuns.push({ run: pts.slice(i1, i0 - 1), hw, d });
       }
     }
   }
@@ -3049,7 +3102,7 @@ export class FanView implements InputHandlers {
   private drawHeld(): void {
     for (const { run, hw, d } of this.heldRuns) {
       this.ctx.fillStyle = `rgba(12,23,20,${d})`;
-      this.ribbon(run, (p) => hw - p.w, () => hw, 0.6);
+      this.ribbon(run, (i) => hw - run.w[i], () => hw, 0.6);
     }
     this.heldRuns.length = 0;
   }
@@ -3178,10 +3231,11 @@ export class FanView implements InputHandlers {
    * on screen) over the screen and a little beyond it, each exactly on the
    * edges' curves: the lanes are drawn straight between them.
    */
-  lanePoints(b: FanBranch, hw: number): RibbonPt[] {
+  lanePoints(b: FanBranch, hw: number): LanePts {
     const yb = this.fan.trunkBottom.y;
-    const [, sTop] = this.toWorld(0, -20);
-    const [, sBot] = this.toWorld(0, this.h + 20);
+    const cam = this.camera;
+    const sTop = cam.worldY(-20);
+    const sBot = cam.worldY(this.h + 20);
     // The column's kept samples (twigs.ts ColumnPath: those where its chords run straight on screen dropped).
     const P = this.model(b).path;
     const [i0, i1] = P.span(this.cam.sx, this.cam.sy, sTop, Math.min(yb, sBot));
@@ -3189,17 +3243,14 @@ export class FanView implements InputHandlers {
     const vals = P.vals;
     // Spine at left + hw: the ribbon spans offsets [hw - w, hw] to its left (nx = -1).
     // (Where the lanes step, as at a split, where the strand leaves its parent's prefix: a point either side.)
-    const pts: RibbonPt[] = [];
-    const push = (y: number, o: number) => {
-      const w = vals[o + 1];
-      const [px, py] = this.toScreen(vals[o] + hw, y);
-      pts.push({ x: px, y: py, nx: -1, ny: 0, w, f: w > 0 ? vals[o + 2] / w : 0 });
-    };
+    const pts = this.lanePts;
+    pts.n = 0;
     for (let i = i1; i >= i0; i--) {
-      const y = ys[i];
-      const o = 8 * i;
-      push(y, o);
-      if (P.steps[i]) push(y, o + 4);
+      const py = cam.screenY(ys[i]);
+      for (let o = 8 * i, e = P.steps[i] ? o + 4 : o; o <= e; o += 4) {
+        const w = vals[o + 1];
+        pts.push(cam.screenX(vals[o] + hw), py, w, w > 0 ? vals[o + 2] / w : 0);
+      }
     }
     return pts;
   }
@@ -3795,16 +3846,18 @@ function dimAt(spans: [number, number, number][], y: number): number {
   return 0;
 }
 
-const rgbParsed = new Map<string, [number, number, number]>();
-/** mix() straight to 0–1 channels, as rgb01(mix(a, b, t)) gives them (no strings: it runs per chord, per frame). */
-function mix01(a: string, b: string, t: number): [number, number, number] {
-  let A = rgbParsed.get(a);
-  if (!A) rgbParsed.set(a, (A = rgb01(a)));
-  let B = rgbParsed.get(b);
-  if (!B) rgbParsed.set(b, (B = rgb01(b)));
-  const c = (k: number) => Math.round((A[k] * (1 - t) + B[k] * t) * 255) / 255;
-  return [c(0), c(1), c(2)];
+/** mix() straight to 0–1 channels, as rgb01(mix(a, b, t)) gives them, of parsed colours, into out (no strings, no tuple: it runs per chord, per frame); out returned. */
+function mixInto(out: [number, number, number], A: readonly number[], B: readonly number[], t: number): [number, number, number] {
+  for (let k = 0; k < 3; k++) out[k] = Math.round((A[k] * (1 - t) + B[k] * t) * 255) / 255;
+  return out;
 }
+const GRAY01 = rgb01(GRAY);
+const GRAY_DARK01 = rgb01('#131c19');
+const GREEN01 = rgb01(GREEN);
+const GREEN_DARK01 = rgb01('#0d2318');
+/** drawLanes' piece colours: written per piece, read at once by trap(). */
+const GC_MIX: [number, number, number] = [0, 0, 0];
+const EC_MIX: [number, number, number] = [0, 0, 0];
 
 export function fmtInt(n: number): string {
   return Math.round(n).toLocaleString('en-US');
