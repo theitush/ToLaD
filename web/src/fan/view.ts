@@ -79,6 +79,8 @@ const GLOW_LEAN = 0.25;
 
 /** Rows of the clades' brackets (ToLaD#193) a framed view keeps room for above "now". */
 const BAND_ROWS = 5;
+/** Room (px) a frame keeps between the brackets' stack and "now" for the level's pictures standing on it (ToLaD#274). */
+const NOW_ROOM = PIC_D + 8;
 
 /** Gap (px) a label keeps from the column it sits beside. */
 const LABEL_GAP = 3;
@@ -1351,15 +1353,67 @@ export class FanView implements InputHandlers {
     return best;
   }
 
-  /** A frame with room above "now" for BAND_ROWS rows of brackets: "now" lowered by them, the fork where it was. */
+  /**
+   * A frame with room above "now" for the brackets: "now" lowered by BAND_ROWS rows of them, or further, under the whole
+   * stack this frame lays out with room for the level's pictures under it (ToLaD#274: a deep level's stack, as the
+   * primates' among the mammals, no longer covers "now" and its pictures); the fork where it was.
+   */
   private withBand(cam: Camera): Camera {
     if (!this.brackets) return cam;
-    const extra = Math.min(BAND_ROWS, bandDepth(this.fan)) * ROW_H;
     const sn = this.h / 2 + (this.yNow - cam.cy) * cam.sy;
+    const want = Math.max(sn + Math.min(BAND_ROWS, bandDepth(this.fan)) * ROW_H, this.nowUnder(cam));
+    const extra = want - sn;
     const sb = this.h - 150;
     const sy = cam.sy * Math.max(0.5, (sb - sn - extra) / Math.max(1, sb - sn));
     return { ...cam, sy, ty: sy, cy: this.yNow + (this.h / 2 - sn - extra) / sy };
   }
+
+  /**
+   * The highest screen y "now" may stand at in camera `cam` (ToLaD#274): under the labels' top line, the brackets'
+   * whole stack as that frame lays it out (its rows at that zoom, the fold as it stands), and NOW_ROOM for the
+   * level's pictures standing on "now".
+   */
+  private nowUnder(cam: Camera): number {
+    const br = this.probeBr;
+    if (!br) return 0;
+    // (Kept per zoom (a sixteenth of a doubling) and centre (8 px): a folded frame's bisection asks ~40 times, ToLaD#255.)
+    const key = `${this.w}x${this.h}:${Math.round(Math.log2(cam.sx) * 16)}:${Math.round((cam.cx * cam.sx) / 8)}`;
+    if (this.nowUnderFan !== this.fan || this.nowUnderAt.size > 2000) [this.nowUnderFan, this.nowUnderAt] = [this.fan, new Map()];
+    const hit = this.nowUnderAt.get(key);
+    if (hit !== undefined) return hit;
+    const f = this.fan.tess.fold;
+    let hide: ((v: FanNode) => boolean) | null = null;
+    if (f?.ordShare.length) {
+      if (this.probeLod?.fan !== this.fan) this.probeLod = new Lod(this.fan);
+      const lod = this.probeLod;
+      lod.update(f, cam.sx);
+      hide = (v) => lod.hidden(v);
+    }
+    br.hide = hide;
+    br.hideKey = hide ? `p${cam.sx}` : '';
+    const hw = this.w / 2;
+    const hh = this.h / 2;
+    const c = { w: this.w, cam, toScreen: (x: number, y: number): [number, number] => [(x - cam.cx) * cam.sx + hw, (y - cam.cy) * cam.sy + hh] };
+    const top = this.labelTop();
+    const measure = (font: string, t: string) => {
+      this.ctx.save();
+      this.ctx.font = font;
+      const w = this.ctx.measureText(t).width;
+      this.ctx.restore();
+      return w;
+    };
+    const placed = br.layout(c, this.fan, this.h, LABEL_AXIS_X, 1, measure, top);
+    let rows = 0;
+    for (const p of placed) rows = Math.max(rows, p.row + 1);
+    const y = top + (rows ? br.rowTop(rows - 1) : 0) + NOW_ROOM;
+    this.nowUnderAt.set(key, y);
+    return y;
+  }
+  private nowUnderFan: Fan | null = null;
+  private nowUnderAt = new Map<string, number>();
+  /** A stack and a level of detail of their own for nowUnder's frames (the drawn ones keep theirs). */
+  private readonly probeBr = this.brackets ? new Brackets(font('600 11px'), font('italic 400 11px', SERIF)) : null;
+  private probeLod: Lod | null = null;
 
   /**
    * Where a tap on a clade's bracket lands (brackets.ts cladeCamera, ToLaD#193): the clade centred and opened,
@@ -1440,7 +1494,18 @@ export class FanView implements InputHandlers {
     while (v?.parent && !bs.every((b) => v!.strands.includes(b))) v = v.parent;
     if (!v) return this.homeCamera();
     // (Down to the split where they meet, not the clade's stem: for a group across the level, the root, not the world's bottom.)
-    return cladeCamera(this.camera, this.fan, { ...v, yBot: v.y }, () => spanOf(bs), (cam) => this.withBand(cam));
+    // (Across the screen: their columns at "now" (an extinct one's at its tip), where their names and pictures stand,
+    // not their rooms, wider where they were wider in the past: the most room each name and picture can have, ToLaD#274.)
+    const now = (): [number, number] => {
+      const s: [number, number] = [Infinity, -Infinity];
+      for (const b of bs) {
+        const y = Math.max(b.tipY, this.yNow);
+        s[0] = Math.min(s[0], leftAt(b, y));
+        s[1] = Math.max(s[1], leftAt(b, y) + laneAt(b, y).w);
+      }
+      return s;
+    };
+    return cladeCamera(this.camera, this.fan, { ...v, yBot: v.y }, now, (cam) => this.withBand(cam));
   }
 
   flyToGroup(bs: readonly FanBranch[]): void {
@@ -1672,7 +1737,8 @@ export class FanView implements InputHandlers {
    */
   speciesCamera(b: FanBranch): Camera {
     const h = this.homeCamera();
-    const tipPx = Math.max(this.labelTop() + 150, 0.2 * this.h);
+    // (Its tip under the stack its frame lays out, room for its picture between, ToLaD#274: a provisional frame's.)
+    const tipPx = Math.max(this.labelTop() + 150, 0.2 * this.h, this.nowUnder({ ...h, cx: b.cx, sx: Math.max(h.sx, (0.5 * this.w) / Math.max(1e-300, b.width)) }));
     const band = Math.max(80, 0.52 * this.h - tipPx);
     const sy = Math.max(h.sy, band / Math.max(1e-300, b.splitY - b.tipY));
     const cyAt = (s: number) => b.tipY + (this.h / 2 - tipPx) / s;
