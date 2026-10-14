@@ -774,6 +774,27 @@ export class Steady extends Fold {
     return false;
   }
 
+  override opennessAt(sx: number, screenW: number, out: Float64Array = new Float64Array(this.a.length)): Float64Array {
+    return this.open ? out.fill(1) : super.opennessAt(sx, screenW, out);
+  }
+
+  override openOne(i: number, sx: number, screenW: number): number {
+    return this.open ? 1 : super.openOne(i, sx, screenW);
+  }
+
+  override openRamp(i: number, screenW: number): [number, number] | null {
+    return this.open ? null : super.openRamp(i, screenW);
+  }
+
+  /**
+   * The rooms as they stand (cut.ts's territories, ToLaD#333): per node (fan.nodes' order) its room's left edge and
+   * width, per strand (drawn order) its own column's centre (its room's), world x. Read only.
+   */
+  rooms(): { roomL: Float64Array; roomW: Float64Array; C: Float64Array } {
+    const L = this.cur();
+    return { roomL: L.roomL, roomW: L.roomW, C: L.C };
+  }
+
   override setAll(a: number, all = false): void {
     super.setAll(a, all);
     if (this.open) this.a.fill(1);
