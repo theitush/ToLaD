@@ -894,6 +894,8 @@ export class CutMemo {
   private v = new Float64Array(0);
   /** The heights of the last update(), and their values. */
   n = 0;
+  /** How many of the last update()'s heights were new (worked out, not kept): a ColumnPath build's cost, pathFrame. */
+  fresh = 0;
   /** Whether the kept left edges are stale (reset(): the fold moved the columns; the widths and pitch stand). */
   private stale = false;
   constructor(private readonly m: { sample(y: number, out: Float64Array, o: number): void; leftPair?(y: number, out: Float64Array, o: number): void }) {}
@@ -906,6 +908,7 @@ export class CutMemo {
     const n = cuts.length;
     const oy = this.ys;
     // (The same heights as last time (a refold's re-choice, the zoom about the same): their left edges read again in place.)
+    this.fresh = 0;
     if (n === this.n) {
       let k = 0;
       while (k < n && oy[k] === cuts[k]) k++;
@@ -937,6 +940,7 @@ export class CutMemo {
       }
       this.m.sample(y + e, v, 8 * k);
       this.m.sample(y - e, v, 8 * k + 4);
+      this.fresh++;
     }
     this.ys2 = this.ys;
     this.v2 = this.v;
@@ -1041,6 +1045,8 @@ export class ColumnPath {
   /** How many times the fold moved the columns since the kept samples were chosen (reset()), and ever. */
   private moved = 0;
   private ticks = 0;
+  /** The kept samples are due to be chosen afresh (reset()'s turn, exact()): at the next span() the frame's budget allows (pathFrame). */
+  private redo = false;
 
   /**
    * The fold moved the columns (fold.ts, ToLaD#146: on every pan and pinch, folded): the kept samples stay,
@@ -1051,26 +1057,17 @@ export class ColumnPath {
   reset(): void {
     this.ticks++;
     this.gen++;
-    if (this.n > 0 && (this.ticks + this.m.b.index) % PATH_REFOLDS !== 0) {
-      this.stale = true;
-      this.moved++;
-      return;
-    }
-    this.forget();
+    if (this.n === 0) return;
+    this.stale = true;
+    this.moved++;
+    // (Every PATH_REFOLDS-th: chosen afresh, when the frame's budget allows (span(), pathFrame); drawn till then as they
+    // are, their left edges read again: ToLaD#313, at the mammal level ~3,000 strands a frame were forgotten in turn.)
+    if ((this.ticks + this.m.b.index) % PATH_REFOLDS === 0) this.redo = true;
   }
 
-  /** The fold came to rest: the kept samples chosen afresh if it moved since they were (reset()). */
+  /** The fold came to rest: the kept samples chosen afresh if it moved since they were (reset()), as the frame's budget allows. */
   exact(): void {
-    if (this.moved > 0) this.forget();
-  }
-
-  /** Forget the kept samples: chosen afresh at the next span(). */
-  private forget(): void {
-    this.n = 0;
-    this.grid = NaN;
-    this.sxRef = 0;
-    this.stale = false;
-    this.moved = 0;
+    if (this.moved > 0) this.redo = true;
   }
 
   /** The kept samples i0..i1's left edges at the fold as it is now (the widths and pitch stand): those span() hands out, the rest when it reaches them. */
@@ -1092,7 +1089,16 @@ export class ColumnPath {
     if (!(hi > lo)) return [0, -1];
     const grid = Math.floor(Math.log2(4 / Math.max(1e-12, sy)));
     const z = Math.abs(Math.log(sx / this.sxRef));
-    if (!(z < Math.log(PATH_ZOOM)) || grid !== this.grid || lo < this.yLo || hi > this.yHi) this.build(sx, sy, lo, hi, grid);
+    // Made again: at once where it must be (none kept, the span past the kept one's, the zoom past PATH_ZOOM twice
+    // over or the grid two steps off); else (the zoom past PATH_ZOOM, the grid a step off, due afresh) as the frame's
+    // budget allows (pathFrame, ToLaD#313: a pinch across PATH_ZOOM or a grid step made every path again on one frame,
+    // seconds at the mammal level), meanwhile drawn as it is: its chords within CHORD_TOL_PX * PATH_ZOOM, its samples
+    // at most twice as far apart.
+    const must = this.n === 0 || lo < this.yLo || hi > this.yHi || !(z < 2 * Math.log(PATH_ZOOM)) || !(Math.abs(grid - this.grid) <= 1);
+    if (must || ((this.redo || !(z < Math.log(PATH_ZOOM)) || grid !== this.grid) && pathFrame.spend())) {
+      this.build(sx, sy, lo, hi, grid);
+      pathFrame.left -= this.cuts.length + PATH_FRESH * this.m.cutMemo.fresh;
+    }
     // (Bisect: the last kept at or above lo, the first at or below hi.)
     const ys = this.ys;
     let a = 0;
@@ -1211,8 +1217,35 @@ export class ColumnPath {
     this.yHi = B;
     this.stale = false;
     this.moved = 0;
+    this.redo = false;
   }
 }
+
+/**
+ * The ColumnPaths' builds a frame (ToLaD#313), in work: each its cuts, and PATH_FRESH more for each height
+ * worked out anew (CutMemo.fresh). While the view moves (a gesture, a flight) a frame spends up to PATH_BUDGET
+ * on the builds that can wait (ColumnPath.span), the rest the next frames in turn; at rest, all at once.
+ */
+export const pathFrame = {
+  left: Infinity,
+  /** Builds put off this frame. */
+  owed: 0,
+  /** A new frame: moving, the budget; at rest, none. */
+  start(moving: boolean): void {
+    this.left = moving ? PATH_BUDGET : Infinity;
+    this.owed = 0;
+  },
+  /** Whether a build that can wait goes this frame. */
+  spend(): boolean {
+    if (this.left > 0) return true;
+    this.owed++;
+    return false;
+  },
+};
+/** ~30 ms of builds on this machine's node (~0.25 µs a unit), ~120 on a mid phone. */
+const PATH_BUDGET = 120_000;
+/** A height worked out anew (TwigModel.sample twice) costs about this many cuts. */
+const PATH_FRESH = 4;
 
 /** How far the zoom may move from the one a ColumnPath was made at (either way) before it is made again. */
 const PATH_ZOOM = 1.4;
