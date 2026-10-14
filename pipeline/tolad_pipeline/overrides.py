@@ -26,9 +26,14 @@ class Overrides:
     dated_names: list[dict] = field(default_factory=list)
     # domestic forms no species list carries as a species (ToLaD#175): a leaf of their own
     domestic_leaves: list[dict] = field(default_factory=list)
+    # extinct species no fossil database carries (Denisovans, ToLaD#280): a leaf of their own
+    fossil_leaves: list[dict] = field(default_factory=list)
+    # cited census sizes for fossil species (hominins, ToLaD#302): they replace the allometric model's count
+    fossil_counts: dict[str, dict] = field(default_factory=dict)
     applied: dict[str, list] = field(default_factory=lambda: {"exclude": [], "date": [], "placement": [],
                                                               "dated_clade": [], "dated_fossil": [],
-                                                              "dated_name": [], "domestic_leaf": []})
+                                                              "dated_name": [], "domestic_leaf": [],
+                                                              "fossil_leaf": [], "fossil_count": []})
 
     def check_all_used(self, dated: bool = False) -> None:
         """Every entry matched something; `dated` checks the dated tree's sections (applied later)."""
@@ -49,7 +54,9 @@ class Overrides:
                   + [f"placement {p['name']}" for p in self.placements
                      if p["name"] not in {a["name"] for a in self.applied["placement"]}]
                   + [f"domestic_leaf {e['name']}" for e in self.domestic_leaves
-                     if e["name"] not in {a["name"] for a in self.applied["domestic_leaf"]}])
+                     if e["name"] not in {a["name"] for a in self.applied["domestic_leaf"]}]
+                  + [f"fossil_leaf {e['name']}" for e in self.fossil_leaves
+                     if e["name"] not in {a["name"] for a in self.applied["fossil_leaf"]}])
         if unused:
             raise RuntimeError(f"overrides.toml entries matched nothing: {unused}")
 
@@ -59,7 +66,8 @@ class Overrides:
 
 def load(path: Path = PATH) -> Overrides:
     d = tomllib.loads(path.read_text(encoding="utf-8"))
-    for sec in ("exclude", "date", "placement", "dated_clade", "dated_fossil", "dated_name", "domestic_leaf"):
+    for sec in ("exclude", "date", "placement", "dated_clade", "dated_fossil", "dated_name", "domestic_leaf",
+                "fossil_leaf", "fossil_count"):
         for e in d.get(sec, []):
             if not e.get("reason") or not e.get("citation"):
                 raise RuntimeError(f"overrides.toml [{sec}] {e.get('name')}: reason and citation are required")
@@ -72,4 +80,25 @@ def load(path: Path = PATH) -> Overrides:
         dated_fossils=list(d.get("dated_fossil", [])),
         dated_names=list(d.get("dated_name", [])),
         domestic_leaves=list(d.get("domestic_leaf", [])),
+        fossil_leaves=list(d.get("fossil_leaf", [])),
+        fossil_counts={e["name"]: check_count(e) for e in d.get("fossil_count", [])},
     )
+
+
+# census: a published census-size estimate; ne-ratio: a genetic effective size (Ne) times a census/Ne
+# ratio; density-area: a population density times an area, both cited; analog: no figure exists for the
+# species, so the census of living species like it (the great apes, for the early hominins)
+FOSSIL_COUNT_KINDS = ("census", "ne-ratio", "density-area", "analog")
+
+
+def check_count(e: dict) -> dict:
+    """A [[fossil_count]]: census individuals alive at a time over the species' band, `n` within `lo`..`hi`."""
+    try:
+        n, lo, hi = float(e["n"]), float(e["lo"]), float(e["hi"])
+    except (KeyError, TypeError, ValueError) as err:
+        raise RuntimeError(f"overrides.toml [fossil_count] {e.get('name')}: n, lo and hi are required numbers") from err
+    if not 0 < lo <= n <= hi:
+        raise RuntimeError(f"overrides.toml [fossil_count] {e['name']}: need 0 < lo <= n <= hi")
+    if e.get("kind") not in FOSSIL_COUNT_KINDS:
+        raise RuntimeError(f"overrides.toml [fossil_count] {e['name']}: kind must be one of {FOSSIL_COUNT_KINDS}")
+    return {**e, "n": n, "lo": lo, "hi": hi}
