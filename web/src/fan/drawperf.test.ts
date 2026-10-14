@@ -243,7 +243,7 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
     v.lanePoints = (b, hw) => {
       const r = lanePoints(b, hw);
       lp.n++;
-      lp.pts += r.length;
+      lp.pts += r.n;
       return r;
     };
     const fan = v.fan;

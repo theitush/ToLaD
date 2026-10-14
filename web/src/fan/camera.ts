@@ -75,6 +75,21 @@ export class FanCamera {
     return [(x - c.cx) * c.sx + this.w / 2, (y - c.cy) * c.sy + this.h / 2];
   }
 
+  /** toScreen's x alone (no tuple: the draw path's hot loops, ToLaD#255). */
+  screenX(x: number): number {
+    return (x - this.cam.cx) * this.cam.sx + this.w / 2;
+  }
+
+  /** toScreen's y alone. */
+  screenY(y: number): number {
+    return (y - this.cam.cy) * this.cam.sy + this.h / 2;
+  }
+
+  /** toWorld's y alone. */
+  worldY(py: number): number {
+    return this.cam.cy + (py - this.h / 2) / this.cam.sy;
+  }
+
   toWorld(px: number, py: number): [number, number] {
     const c = this.cam;
     return [c.cx + (px - this.w / 2) / c.sx, c.cy + (py - this.h / 2) / c.sy];
