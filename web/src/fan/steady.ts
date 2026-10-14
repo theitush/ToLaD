@@ -688,14 +688,16 @@ export class Steady extends Fold {
    * Strands i0..i1 at grid row k as one ribbon (a merged clade, lod.ts): as wide as their columns there (no room's
    * empty space), centred on their founders' mean centre (constant between the clade's splits).
    */
-  override extent(i0: number, i1: number, k: number): [number, number] {
+  override extent(i0: number, i1: number, k: number, out: [number, number] = [0, 0]): [number, number] {
     const [cW, cB] = this.widthSums(k);
     const cX = this.centreSums(k);
     const W = cW[i1 + 1] - cW[i0];
     const sw = cB[i1 + 1] - cB[i0];
     const xs = this.rowXs(k);
     const c = sw > 0 ? (cX[i1 + 1] - cX[i0]) / sw : (xs[i0] + xs[i1]) / 2;
-    return [c - W / 2, c + W / 2];
+    out[0] = c - W / 2;
+    out[1] = c + W / 2;
+    return out;
   }
 
   /** Grid row k's widths summed along the drawn order (its columns', and its live strands' founders'): the same at every version. */
