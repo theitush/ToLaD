@@ -8,7 +8,7 @@ import { layoutFan, type Fan, type FanBranch, type FanNode, type WidthMode } fro
 import { CARNIVORA, FELIDAE } from './panthera';
 import { CARNIVORA_TREE, FELIDAE_TREE } from './splits';
 import { TwigModel } from './twigs';
-import { boxGap, labelSpots, plusGroups, resolveLabels, spanOf, type LabelSpot } from './view';
+import { boxGap, groupSpan, labelSpots, plusGroups, resolveLabels, type LabelSpot } from './view';
 
 const TOP = 52;
 const BAR_X0 = 150;
@@ -143,7 +143,9 @@ describe('the "+x" badges (ToLaD#197)', () => {
           const bs = [...new Set([own, ...g])];
           let v: FanNode | null = own.node;
           while (v?.parent && !bs.every((b) => v!.strands.includes(b))) v = v.parent;
-          c.cam = cladeCamera(c, fan, { ...v!, yBot: v!.y }, () => spanOf(bs));
+          // (The app's frame, groupCamera's span: their columns at "now" and a name's room past them, ToLaD#274 and #293;
+          // not their widest columns (spanOf), which the app stopped framing in #274.)
+          c.cam = cladeCamera(c, fan, { ...v!, yBot: v!.y }, () => groupSpan(bs, c.yNow, c.w));
           c.settle();
           const after = check(c);
           const shown = new Set(after.spots.filter((s) => after.on.get(s.key)).map((s) => s.id));

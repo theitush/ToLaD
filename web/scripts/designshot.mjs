@@ -228,6 +228,20 @@ const scenes = [
   ['frame-2', 'taps', [process.env.LEVEL === 'cats' ? 'Panthera' : process.env.LEVEL === 'mammals' ? 'Primates' : 'Canidae', 'tt']],
   ['frame-3', 'taps', [process.env.LEVEL === 'cats' ? 'Panthera' : process.env.LEVEL === 'mammals' ? 'Primates' : 'Canidae', 'ttt']],
   ['frame-plus', 'tapplus'],
+  // ToLaD#278: MDD splits beside their parent species: (LEVEL=cats) the small cats and the wildcats, a tap or two down.
+  ['mdd-smallcats', 'taps', ['Leopardus', 't']],
+  ['mdd-wildcats', 'taps', ['Felis', 'tt']],
+  // ToLaD#293: MDD's young splits, each level's biggest "+x" tapped and landed; the Fisher to the Kaokoveld slender mongoose.
+  // ToLaD#278 (mdd278h): mammals home, the rodents, the marsupials and the bandicoots' order as levels (LEVEL=mammals).
+  ['mdd-home', 'home'],
+  ['mdd-rodents', 'level', ['Rodentia']],
+  ['mdd-marsupials', 'level', ['Metatheria']],
+  ['mdd-bandicoots', 'level', ['Peramelemorphia']],
+  ['mdd-plus-wildcats', 'levelplus', ['Felis']],
+  ['mdd-plus-mongooses', 'levelplus', ['Herpestidae']],
+  ['mdd-plus-weasels', 'levelplus', ['Mustela']],
+  ['mdd-plus-bears', 'levelplus', ['Ursidae']],
+  ...[0, 300, 600, 900, 1200, 1800].map((ms) => [`mdd-fly-${ms}`, 'flyfrom', ['Fisher', 'Kaokoveld slender mongoose', ms]]),
   // ToLaD#246: a flight from home into the fisher's frame, and from there back home, caught every 360 ms (1.8 s each).
   ...[0, 360, 720, 1080, 1440, 1800].map((ms) => [`fly-in-${ms}`, 'flyin', ['Fisher', ms]]),
   ...[0, 360, 720, 1080, 1440, 1800].map((ms) => [`fly-out-${ms}`, 'flyout', ['Fisher', ms]]),
@@ -416,6 +430,36 @@ try {
           // (The last, 1.8 s on: to the landing.)
           for (let t = t0 + 16; f.anim && (t <= t0 + args[1] || (args[1] >= 1800 && t < t0 + 5000)); t += 16) if (!f.anim(t)) f.anim = null;
           f.anim = null;
+          f.labelState.clear();
+          f.draw();
+        } else if (kind === 'flyfrom') {
+          // ToLaD#293: from species args[0]'s frame, a flight to species args[1]'s, caught args[2] ms in (as flyin).
+          const a = fan.branches.find((x) => x.sp.common === args[0]);
+          const b = fan.branches.find((x) => x.sp.common === args[1]);
+          f.cam = f.speciesCamera(a);
+          f.camera.settle();
+          const t0 = performance.now();
+          f.flyToSpecies(b.sp, false);
+          for (let t = t0 + 16; f.anim && (t <= t0 + args[2] || (args[2] >= 1800 && t < t0 + 5000)); t += 16) if (!f.anim(t)) f.anim = null;
+          f.anim = null;
+          f.labelState.clear();
+          f.draw();
+        } else if (kind === 'levelplus') {
+          // ToLaD#293: taxon args[0]'s level (as 'level'), then a tap on its "+x" standing for the most species, landed.
+          f.cam = f.levelCamera(args[0]) ?? f.homeCamera();
+          f.camera.settle();
+          f.labelState.clear();
+          f.draw();
+          f.draw();
+          // (A badge is a hit only once its label has faded in past half: cleared, the labels fade in over real time.)
+          for (const end = performance.now() + 3000; !f.plusHits.length && performance.now() < end; ) f.draw();
+          const hit = [...f.plusHits].sort((p, q) => q.bs.length - p.bs.length)[0];
+          console.log(`levelplus ${args[0]}: ${f.plusHits.length} badges, tapping +${hit ? hit.bs.length : 0}`);
+          if (hit) f.tap((hit.box[0] + hit.box[2]) / 2, (hit.box[1] + hit.box[3]) / 2);
+          for (let t = performance.now() + 16; f.anim; t += 16) {
+            if (!f.anim(t)) f.anim = null;
+            f.applyFold();
+          }
           f.labelState.clear();
           f.draw();
         } else if (kind === 'tapplus') {

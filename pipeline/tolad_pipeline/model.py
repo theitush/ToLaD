@@ -57,6 +57,8 @@ SOURCES = [
                         "population reports (IUCN Red List), dog and cat numbers; CC BY 4.0"),
     ("overrides", "ToLaD manual overrides (pipeline/overrides.toml): fossil dates, placements and hominin census sizes, with citations"),
     ("history", history.HISTORY_SRC_LABEL),
+    ("mdd", "Mammal Diversity Database v2.5 (2026, doi:10.5281/zenodo.21654811): living species our backbone "
+            "lacks, placed on their genus by taxonomy, with their English names; CC BY 4.0"),
 ]
 SRC = {k: i for i, (k, _) in enumerate(SOURCES)}
 
@@ -107,6 +109,8 @@ RANGELOSS_SHOWCASE = ["Bison bison", "Elephas maximus", "Ursus arctos", "Canis l
 # modelled count (density x a range nobody has seen it in) is capped at CR criterion D's threshold.
 NEAR_EXTINCT_STATUS = ("CR", "EW")
 NEAR_EXTINCT_CAP = 50.0  # IUCN Categories and Criteria v3.1, CR criterion D: < 50 mature individuals
+# a guessed (genus-median, ToLaD#278) count of a CR/EW species is held to CR criterion C's bound: < 250 mature
+CR_GUESS_CAP = 250.0
 SD_NEAR_EXTINCT = 1.0  # dex: anything from a last few to the cap, or none
 NEAR_EXTINCT_METHOD = ("N:capped at 50 (no current range in PHYLACINE/IUCN and IUCN {status}: possibly "
                        "extinct; IUCN 2012 Categories and Criteria v3.1, CR criterion D < 50 mature)")
@@ -344,7 +348,7 @@ def model_leaves(root: Node, raw: Path, log: dict) -> None:
         sd2 = 0.0
         sdNA2 = 0.0  # density + range part (replaced by a census where one exists)
         meth = []
-        src = {SRC["opentree"] if n.kind == "tree" else SRC["pbdb"]}
+        src = {SRC["mdd"] if D.get("mdd") else SRC["opentree"] if n.kind == "tree" else SRC["pbdb"]}
         if n.kind == "graft" or n.pbdb:
             src.add(SRC["pbdb"])
         if D.get("placement_override"):
@@ -819,6 +823,43 @@ def natural_report(root: Node) -> dict:
     }
 
 
+def mdd_fallback(root: Node, census: dict[int, float], gs: dict[int, float]) -> dict[int, dict]:
+    """The MDD-grafted species (ToLaD#278) the count model has no inputs for (no census, no Greenspoon
+    estimate, no range of their own: their mass and range would be clade means, a clade-mean copy, #116):
+    the median today's count of the other species of their MDD genus (else family, else order), with that
+    taxon's spread (min 0.5 dex, 1 dex from a single species) as the error. id(leaf) -> the estimate."""
+    leaves = [n for n in root.preorder() if n.is_leaf and n.kind == "tree" and not n.extinct
+              and n.name != "Homo sapiens" and "log_k" in n.data]
+
+    def own_range(n: Node) -> bool:
+        return "log_range_obs" in n.data or n.data.get("phy_range", {}).get("km2_cur", 0) > 0
+    need = [n for n in leaves if (n.data.get("mdd") or n.data.get("mdd_rescued")) and id(n) not in census
+            and id(n) not in gs and not own_range(n)]
+    skip = {id(n) for n in need}
+    vals: dict[tuple[str, str], list[float]] = {}
+    for n in leaves:
+        if id(n) in skip:
+            continue
+        N = census.get(id(n)) or gs.get(id(n)) or n.data["N_raw"] * 10 ** n.data["log_k"]
+        for lvl in ("genus", "family", "order"):
+            t = n.data.get(f"mdd_{lvl}")
+            if t:
+                vals.setdefault((lvl, t), []).append(math.log10(N))
+    out = {}
+    for n in need:
+        for lvl in ("genus", "family", "order"):
+            t = n.data.get(f"mdd_{lvl}")
+            v = vals.get((lvl, t))
+            if v:
+                sd = max(0.5, float(np.std(v))) if len(v) > 1 else 1.0
+                out[id(n)] = {"N": 10 ** float(np.median(v)), "sd": sd, "level": lvl, "taxon": t, "of": len(v)}
+                if n.data.get("mdd_iucn") in NEAR_EXTINCT_STATUS and out[id(n)]["N"] > CR_GUESS_CAP:
+                    # a CR/EW species: its listing says more than its congeners do (Rice's whale, the popa langur)
+                    out[id(n)].update(N=CR_GUESS_CAP, sd=SD_NEAR_EXTINCT, capped=n.data["mdd_iucn"])
+                break
+    return out
+
+
 def human_rate_at(pieces, age_ma: float) -> float:
     for old, young, r in pieces:
         if young <= age_ma <= old:
@@ -878,6 +919,15 @@ def assign_leaf_counts(root: Node, raw: Path, ctx: dict, log: dict) -> None:
         "species_model_estimates": len(gs_model), "species_model_used": len(gs),
         "species_model_unmatched": len(gs_miss),
     }
+    fallback = mdd_fallback(root, census, gs)
+    if "mdd" in log:
+        log["mdd"]["genus_median_estimates"] = {
+            "note": "MDD-grafted species with no census, Greenspoon estimate or range map of their own: today's "
+                    "count is the median of the other species of their MDD genus (else family, else order), "
+                    "grade D, spread = that taxon's (min 0.5 dex). A guess, listed so it can be checked (ToLaD#278)",
+            "n": len(fallback),
+            "species": {n.name: {k: (round(v, 3) if isinstance(v, float) else v) for k, v in fallback[id(n)].items()}
+                        for n in root.preorder() if id(n) in fallback}}
 
     found = Counter()
     ov = ctx.get("overrides")
@@ -919,6 +969,21 @@ def assign_leaf_counts(root: Node, raw: Path, ctx: dict, log: dict) -> None:
             D["meth"].append("N:Greenspoon 2023 per-species model (no census report)")
             D["src"].add(SRC["greenspoon-data"])
             found["greenspoon model"] += 1
+        elif id(n) in fallback:
+            # an MDD-grafted species with no count, range or Greenspoon estimate of its own (ToLaD#278):
+            # its genus's per-species median, grade D, listed in stats.json -> mdd.genus_median_estimates
+            f = fallback[id(n)]
+            N = f["N"]
+            D["sd_leaf"] = math.sqrt(max(D["sd_leaf"] ** 2 - D["sd_NA"] ** 2, 0.0) + f["sd"] ** 2)
+            D["sys_sd"] = SD_SYSTEMATIC
+            D["meth"] = [m for m in D["meth"] if not m.startswith(("D:", "A:"))]
+            D["meth"].append(f"N:median of the {f['of']} other species of its {f['level']} {f['taxon']} (no census, "
+                             f"range or published estimate of its own; a guess, grade D)"
+                             + (f", held to {CR_GUESS_CAP:.0f} (IUCN CR criterion C bound; MDD lists it "
+                                f"{f['capped']})" if f.get("capped") else ""))
+            D["genus_median"] = f
+            cap = 3
+            found[f"MDD graft: {f['level']} median"] += 1
         else:
             N = D["N_raw"] * 10 ** D["log_k"]
             D["sys_sd"] = SD_SYSTEMATIC
@@ -938,6 +1003,7 @@ def assign_leaf_counts(root: Node, raw: Path, ctx: dict, log: dict) -> None:
         D["grade_cap_today"] = cap
         # natural (pre-human) baseline: the level before NATURAL_STEP_YEAR (extinct: the whole band)
         sd_today = (SD_CENSUS if id(n) in census else SD_GS_MODEL if id(n) in gs
+                    else fallback[id(n)]["sd"] if id(n) in fallback
                     else SD_NEAR_EXTINCT if D.get("near_extinct_cap")
                     else math.hypot(D["sd_NA"], D.get("k_sd", 0.0)))
         D["sd_today_count"] = sd_today
@@ -1071,7 +1137,8 @@ def assign_leaf_counts(root: Node, raw: Path, ctx: dict, log: dict) -> None:
     # layer 2, genetic diversity: a cross-check written to stats.json only (ToLaD#63)
     log["diversity_crosscheck"] = diversity.report(root, raw, ctx)
     unverified = [n for n in root.preorder() if n.is_leaf and n.kind == "tree" and not n.extinct
-                  and not n.upham and "iucn" not in n.data and id(n) not in ref and n.name != "Homo sapiens"]
+                  and not n.upham and "iucn" not in n.data and id(n) not in ref and n.name != "Homo sapiens"
+                  and not n.data.get("mdd") and not n.data.get("mdd_rescued")]  # stats.json -> mdd
     log["unverified_extant_tips"] = {
         "note": "living Open Tree tips that only the IUCN Red List 2026-1 (or a domestic table) recognises, not "
                 "Upham, PHYLACINE or Greenspoon/IUCN: mostly recent splits. Their counts come from the occupancy "
