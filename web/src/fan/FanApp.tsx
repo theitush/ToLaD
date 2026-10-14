@@ -159,20 +159,6 @@ export function FanApp() {
         >
           {mode === 'log' ? 'log widths' : 'linear widths'}
         </button>
-        {/* Widths by individuals or by their mass (ToLaD#276): the same tree, its columns weighed. */}
-        <button
-          type="button"
-          aria-label={`widths count ${measure}; tap for ${measure === 'mass' ? 'individuals' : 'mass'}`}
-          title="Widths: individuals or their mass"
-          aria-pressed={measure === 'mass'}
-          onClick={() => {
-            const next = measure === 'mass' ? 'individuals' : 'mass';
-            setMeasure(next);
-            viewRef.current?.setMeasure(next);
-          }}
-        >
-          {measure === 'mass' ? 'mass' : 'count'}
-        </button>
         <button
           type="button"
           aria-label="branch shape"
@@ -229,7 +215,7 @@ export function FanApp() {
         >
           <MagnifierIcon />
         </button>
-        <WorldToggle get={() => viewRef.current} />
+        <WorldToggle get={() => viewRef.current} onMeasure={setMeasure} />
       </div>
       {searching && (
         <SearchPanel
