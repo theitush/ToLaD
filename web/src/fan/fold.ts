@@ -395,7 +395,8 @@ export abstract class Fold {
   abstract rowXs(k: number): Float64Array;
 
   /** The grid's row k's extent of strands i0..i1 (world [left, right]): strand i0's left edge to strand i1's right. */
-  abstract extent(i0: number, i1: number, k: number): [number, number];
+  /** (Into out when given: no tuple a row, the draw's merged clades, ToLaD#255.) */
+  abstract extent(i0: number, i1: number, k: number, out?: [number, number]): [number, number];
 
   /** Where world point (x, y) goes when the a's change from `prev` to the current ones (the camera keeps it under the fingers). */
   abstract follow(x: number, y: number, prev: FoldState): number;
