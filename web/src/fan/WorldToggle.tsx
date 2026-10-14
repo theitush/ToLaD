@@ -53,19 +53,19 @@ export function WorldToggle({ get }: { get: () => { world: WorldLayers; names: N
               {label}
             </label>
           ))}
-          {/* The steady layout (ToLaD#259, steady.ts): a branch moves sideways only at its own splits; the page opens again with ?layout=steady on or off. */}
+          {/* The old layout, the fold (ToLaD#273): the steady layout (#259, steady.ts) is the default; the page opens again with ?layout=fold on or off. */}
           <label>
             <input
               type="checkbox"
-              checked={wantSteady()}
+              checked={!wantSteady()}
               onChange={(e) => {
                 const u = new URL(window.location.href);
-                if (e.target.checked) u.searchParams.set('layout', 'steady');
+                if (e.target.checked) u.searchParams.set('layout', 'fold');
                 else u.searchParams.delete('layout');
                 window.location.assign(u.toString());
               }}
             />
-            Steady layout
+            Old layout
           </label>
           {/* Where the groups' names stand (ToLaD#266): switched in place, the URL's ?names= kept in step. */}
           <label>

@@ -3,7 +3,7 @@
 // was born by a given time; the CPU mirror (mesh.ts lifeGPU / colourCode)
 // decides the same from the same hashed inputs. Every pixel must agree.
 //   npm run build:single && node scripts/glcheck.mjs
-//   (EDGE=curved|straight: the fan's edges, ?edge=; default the app's. LEVEL=cats|carnivores|mammals: ?level=, ToLaD#247; LAYOUT=steady: ?layout=, ToLaD#259)
+//   (EDGE=curved|straight: the fan's edges, ?edge=; default the app's. LEVEL=cats|carnivores|mammals: ?level=, ToLaD#247; LAYOUT=fold: ?layout=, the old layout, ToLaD#259, #273)
 import { chromium } from 'playwright';
 import { pageUrl } from './pageurl.mjs';
 

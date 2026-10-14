@@ -85,6 +85,9 @@ function run(v: FanView): void {
   settle(v);
 }
 function settle(v: FanView): void {
+  // (A first draw lays the "+x" rooms out for this frame: run() flies without drawing, so they are the take-off's.
+  // Without it a name moved by its new room restarts its fade and is checked half there, ToLaD#273.)
+  v.draw();
   P(v).labelState.clear();
   for (let k = 0; k < 3; k++) v.draw();
 }
