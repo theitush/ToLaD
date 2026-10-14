@@ -14,7 +14,7 @@ import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01 } from './meshgl';
 import { Lod } from './lod';
 import { Fold, type FoldState } from './fold';
-import { Steady, wantSteady } from './steady';
+import { Steady, wantFitFossils, wantSteady } from './steady';
 import { COLUMN_DIM, columnSpans, EVENT_TINT, eventAt, eventSpans, type EventSpan } from './colstyle';
 import { drawTwigs, kLogAt, laneDim, LINEAGE, LIVING, TEX_HAIR_PX, TWIG_GRAY, TwigModel, type IndInfo, type TwigStats } from './twigs';
 import type { MeshBatch, RectBatch } from './meshgl';
@@ -478,6 +478,36 @@ const isFolded = (bs: readonly FanBranch[]): boolean => {
   const fold = bs[0]?.tess.fold;
   return !!fold && fold.left(0, bs[0].tess.time.y(0)) !== null;
 };
+
+/** A level's fossils are dwarfed when its span at "now" is more than this many times what they and their kin stood in. */
+export const FIT_DWARF = 3;
+
+/**
+ * Where a level's fossils lived (?fit=fossils, ToLaD#289): the world x its columns took (each at its own width
+ * there) from the level's start up to its youngest fossil's end, or null when it has no fossil or its span at "now"
+ * (familySpan) is under FIT_DWARF times that: the living columns' widening since is left to run off the screen.
+ */
+export function fossilSpan(v: FanNode): [number, number] | null {
+  const ext = v.strands.filter((b) => b.sp.extinct || !(b.pop.aliveAt(0) > 0));
+  if (!ext.length) return null;
+  const yEnd = Math.min(...ext.map((b) => b.tipY));
+  const s: [number, number] = [Infinity, -Infinity];
+  for (const b of v.strands) {
+    const hi = Math.min(b.splitY, v.yBot);
+    const lo = Math.max(b.tipY, yEnd);
+    if (!(hi > lo)) continue;
+    for (let k = 0; k <= 32; k++) {
+      const y = lo + ((hi - lo) * k) / 32 - (k === 32 ? 1e-9 : 0);
+      const w = laneAt(b, y).w;
+      const l = leftAt(b, y, w);
+      s[0] = Math.min(s[0], l);
+      s[1] = Math.max(s[1], l + w);
+    }
+  }
+  if (!(s[1] > s[0])) return null;
+  const [a, z] = familySpan(v);
+  return z - a > FIT_DWARF * (s[1] - s[0]) ? s : null;
+}
 
 /** Species' rooms side by side: their world x span [x0, x1] (folded, fold.ts: where the fold has them, at "now", an extinct one's at its tip). */
 export function spanOf(bs: readonly FanBranch[]): [number, number] {
@@ -1527,7 +1557,9 @@ export class FanView implements InputHandlers {
             return [m - h, m + h];
           }
         : familySpan;
-    return cladeCamera(this.camera, this.fan, v, span, (cam) => this.withBand(cam, v));
+    // (?fit=fossils, ToLaD#289: a level whose living columns dwarf its fossils framed on where the fossils lived.)
+    const fit = wantFitFossils() ? (u: FanNode) => fossilSpan(u) ?? span(u) : span;
+    return cladeCamera(this.camera, this.fan, v, fit, (cam) => this.withBand(cam, v));
   }
 
   /**
