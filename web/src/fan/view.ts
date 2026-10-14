@@ -2309,7 +2309,14 @@ export class FanView implements InputHandlers {
     const on = [...ladder].reverse().find((f) => this.offBy(f.cam, c) <= LEVEL_PX);
     let lv: Level = { v: this.fan.root };
     if (on) lv = on.lv;
-    else for (let i = ladder.length - 2; i >= 0 && z(ladder[i].cam) >= -Math.log(BACK_SLACK); i--) lv = ladder[i].lv;
+    else
+      for (let i = ladder.length - 2; i >= 0 && z(ladder[i].cam) >= -Math.log(BACK_SLACK); i--) {
+        // (A species whose frame stands further off the view than its level's is not where the view is, however far
+        // in: the human, its column filling the Hominins' and Homo's frames, else read as the level there, and a pan
+        // onto a fossil's line flipped it to that line's levels, the pills and pictures with it, ToLaD#302.)
+        if (i === 0 && ladder.length > 1 && ladder[0].lv.b && this.offBy(ladder[0].cam, c) > this.offBy(ladder[1].cam, c) + LEVEL_PX) break;
+        lv = ladder[i].lv;
+      }
     this.lvAt = { fan: this.fan, cam: { ...c }, lv, t };
     return lv;
   }

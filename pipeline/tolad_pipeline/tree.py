@@ -187,7 +187,10 @@ def collapse_knuckles(root: Node) -> int:
         if nd.name:
             c.alt.append(nd.name)
         c.alt.extend(nd.alt)
-        c.t0 = max(c.t0, nd.t0)
+        if not (c.is_leaf and c.extinct and c.data.get("date_override")):
+            # (a literature first appearance, overrides.toml [[date]], keeps its start: Sahelanthropus's own
+            # genus would give it 11 Ma, ToLaD#302)
+            c.t0 = max(c.t0, nd.t0)
         if c.ott is None:
             c.ott = nd.ott
         n += 1

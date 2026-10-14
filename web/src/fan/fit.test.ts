@@ -93,12 +93,12 @@ describe('?fit=fossils: the hominins readable (ToLaD#289)', () => {
 
   // Measured (hom289c): with the gaps beside a fossil at most half the narrower one's extent (steady.ts LIFE_GAP), the
   // fossils' frame is ~13x narrower than hom289b's and a pictured hominin's column is 3-5 px (Neanderthals ~50 px).
-  // Three are narrower, their widest population a fifth or less of the others' (the data, not the layout):
-  // Australopithecus anamensis and A. afarensis ~0.9 px, Homo floresiensis ~0.1 px (an island population).
+  // Narrower are the regional populations, their cited census 10,000 or fewer (the data, not the layout; ToLaD#302,
+  // overrides.toml [[fossil_count]]): H. antecessor, H. naledi, H. georgicus ~1.5 px, H. floresiensis (an island) less.
   // Not every name shows yet: the pills crowd (labels' layout), so names are left todo.
-  const SMALL = new Set(['Australopithecus anamensis', 'Australopithecus afarensis', 'Homo floresiensis']);
+  const SMALL = new Set(['Homo antecessor', 'Homo naledi', 'Homo georgicus', 'Homo floresiensis']);
   it.todo('at Hominins and Homo every hominin with a picture gets its name');
-  it('at Hominins and Homo every hominin with a picture gets a column >= 3 px (but the three smallest populations)', () => {
+  it('at Hominins and Homo every hominin with a picture gets a column >= 3 px (but the four smallest populations)', () => {
     const by = (latin: string) => v.fan.nodes.find((u) => latinOf(u.split) === latin)!;
     const bad: string[] = [];
     for (const u of [by('Hominini'), by('Homo')])
