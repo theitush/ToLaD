@@ -5,7 +5,8 @@
 //   (LEVEL=mammals|cats: ?level=; Q=fit=fossils: more query)
 // A route's steps: t:<group or species> a tap on its column (off the pills); p:<group> a tap on its pill or picture;
 // x a tap on a "+x" of several species; s:<query>|<pick> a search pick; m a tap on the stack's "…"; pan:dx,dy a drag;
-// (a name's spaces as _) pinch:f a two-finger spread by f (width); d a double tap (at DY); ~ the next tap's flight not waited
+// (a name's spaces as _) pinch:f a two-finger spread by f (width); d a double tap (at DY); c a double tap on the card,
+// off its controls (ToLaD#301), which must close it; ~ the next tap's flight not waited
 // for (a double tap mid-flight).
 import { chromium } from 'playwright';
 import { pageUrl } from './pageurl.mjs';
@@ -25,6 +26,8 @@ const ROUTES = MAMMALS
       more: 't:Homo_sapiens t:Homo_sapiens t:Homo_sapiens m m m',
       mid: 't:Primates ~t:Primates d d',
       midup: 't:Primates t:Primates t:Primates d ~d d',
+      card: 't:Homo_sapiens t:Homo_sapiens t:Homo_sapiens t:Homo_sapiens t:Homo_sapiens t:Homo_sapiens c c c',
+      cards: 's:chimp|Chimpanzee c c c',
     }
   : {
       dogs: 't:Canidae t:Canidae t:Canidae t:Canidae d d d d d',
@@ -40,6 +43,9 @@ const ROUTES = MAMMALS
       midup: 't:Canidae t:Canidae t:Canidae d ~d d',
       card: 't:Ursidae t:Ursidae t:Ursidae t:Ursidae t:Ursidae d d',
       plus3: 't:Mustelidae x d d d',
+      cardc: 't:Ursidae t:Ursidae t:Ursidae t:Ursidae t:Ursidae c c',
+      cardcat: 't:Felidae t:Felidae t:Felidae t:Felidae t:Felidae c c',
+      cards: 's:polar|Polar_bear c c',
     };
 // The double tap's height (px): over the species' card, which takes the screen's foot (DY=470: on it, where it is tall).
 const DY = Number(process.env.DY || 300);
@@ -120,7 +126,36 @@ try {
       if (mid) st = st.slice(1);
       const before = await page.evaluate(() => window.__up.now());
       const taps0 = await page.evaluate(() => window.__taps);
-      if (st === 'd') {
+      if (st === 'd' || st === 'c') {
+        // c: the double tap on the species' card (ToLaD#301), off its controls, where it is tall.
+        let at0 = { x: 195, y: DY };
+        if (st === 'c') {
+          await page.waitForTimeout(800);
+          const p = await page.evaluate(() => {
+            const card = document.querySelector('.card-sp');
+            if (!card) return null;
+            // (Its count line's text, else any of its blank off the controls.)
+            const ever = card.querySelector('.ever, .dim');
+            if (ever) {
+              const e = ever.getBoundingClientRect();
+              return { x: e.left + Math.min(40, e.width / 2), y: (e.top + e.bottom) / 2 };
+            }
+            const r = card.getBoundingClientRect();
+            const ctl = 'a, button, summary, input, select, textarea, label, img, canvas, [role="button"]';
+            for (let y = r.bottom - 8; y > r.top + 8; y -= 6)
+              for (let x = r.left + 12; x < r.right - 12; x += 8) {
+                const el = document.elementFromPoint(x, y);
+                if (el && card.contains(el) && !el.closest(ctl)) return { x, y };
+              }
+            return null;
+          });
+          if (!p) {
+            rows.push([route, trail.join(' '), before, '-', '-', '-', 'no card open', 'skip']);
+            trail.push('c?');
+            continue;
+          }
+          at0 = p;
+        }
         // Mid-flight (the last step's flight not waited for): from where it lands.
         const info = await page.evaluate((mid) => {
           const f = window.__fan;
@@ -134,11 +169,11 @@ try {
         }, noWait);
         // (Sent at once, so a busy page's frames do not stretch the gap past the double tap's window; FAST=0: two taps 90 ms apart.)
         if (process.env.FAST === '0') {
-          await tap(195, DY);
+          await tap(at0.x, at0.y);
           await page.waitForTimeout(90);
-          await tap(195, DY);
+          await tap(at0.x, at0.y);
         } else {
-          const at = [{ x: 195, y: DY, id: 7 }];
+          const at = [{ x: at0.x, y: at0.y, id: 7 }];
           await Promise.all([
             cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: at }),
             cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }),
@@ -156,9 +191,9 @@ try {
         }
         await land();
         const after = await page.evaluate(() => ({ at: window.__up.now(), stack: window.__up.stack(), n: window.__dbl, t: window.__taps, card: !!window.__fan.selected, log: `${window.__tlog ?? ''} ${window.__dlog ?? ''}` }));
-        const ok = (after.at === info.want || (info.want.startsWith('(none') && after.at === info.from)) && after.n === info.n + 1;
+        const ok = (after.at === info.want || (info.want.startsWith('(none') && after.at === info.from)) && after.n === info.n + 1 && !(st === 'c' && after.card);
         rows.push([route, trail.join(' ') + (noWait ? ' (mid-flight)' : ''), info.from, after.at, info.want, after.stack, (after.n === info.n + 1 ? '' : 'NOT A DOUBLE TAP') + (after.t > info.t ? ` (+${after.t - info.t} single tap)` : '') + (process.env.VERBOSE ? ` [${after.log}]` : ''), ok ? 'ok' : 'WRONG']);
-        trail.push('d');
+        trail.push(st === 'c' ? `c@${at0.x | 0},${at0.y | 0}${after.card ? ' CARD STILL OPEN' : ''}` : 'd');
         noWait = false;
         continue;
       }

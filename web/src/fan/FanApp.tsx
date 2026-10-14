@@ -2,7 +2,7 @@
 // still available at ?river (and the synthetic spike tree at ?synthetic).
 
 import * as MeshMirror from './mesh';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type PointerEvent as RPointerEvent, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import { approxMa, formatCount } from '../data/count';
 import { HistorySpark } from './HistorySpark';
@@ -16,6 +16,7 @@ import { population } from './population';
 import { WorldToggle } from './WorldToggle';
 import { MagnifierIcon, SearchPanel } from './SearchPanel';
 import { statusOf } from './status';
+import { cardTapper, onControl } from './cardtap';
 import { FanView, fmtInt, formatYearsAgo, type IndInfo, type Lineage, type Selection } from './view';
 
 declare global {
@@ -72,6 +73,8 @@ function initialLevel(): Level {
 export function FanApp() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const viewRef = useRef<FanView | null>(null);
+  // A double tap on the card (ToLaD#301): what one on the tree does, one level up, the card closed.
+  const cardUp = (x: number, y: number) => viewRef.current?.doubleTap(x, y);
   const [mode, setMode] = useState<WidthMode>('linear');
   const [edge, setEdge] = useState<EdgeStyle>(initialEdge);
   const [sel, setSel] = useState<Selection | null>(null);
@@ -226,11 +229,11 @@ export function FanApp() {
         </div>
       {sel ? (
         sel.lineage ? (
-          <LineageCard lin={sel.lineage} onClose={() => viewRef.current?.tap(-1e6, -1e6)} />
+          <LineageCard lin={sel.lineage} onClose={() => viewRef.current?.tap(-1e6, -1e6)} onUp={cardUp} />
         ) : sel.ind ? (
-          <IndCard sp={sel.sp} ind={sel.ind} onClose={() => viewRef.current?.tap(-1e6, -1e6)} />
+          <IndCard sp={sel.sp} ind={sel.ind} onClose={() => viewRef.current?.tap(-1e6, -1e6)} onUp={cardUp} />
         ) : (
-          <SpeciesCard sp={sel.sp} ageMa={sel.ageMa} startMa={sel.startMa} event={sel.event?.k} onClose={() => viewRef.current?.tap(-1e6, -1e6)} />
+          <SpeciesCard sp={sel.sp} ageMa={sel.ageMa} startMa={sel.startMa} event={sel.event?.k} onClose={() => viewRef.current?.tap(-1e6, -1e6)} onUp={cardUp} />
         )
       ) : (
         <ul className="key" aria-label="key">
@@ -502,7 +505,36 @@ export function bigSrcOf(src: string): string {
   return src.replace(/\/(\d+)px-([^/]+)$/, '/960px-$2');
 }
 
-export function SpeciesCard({ sp, onClose, open, ageMa, startMa, event }: { sp: SpeciesRec; onClose: () => void; open?: boolean; ageMa?: number; startMa?: number; event?: number }) {
+/**
+ * A card's box (the species', the split's, the individual's): its touches kept from the tree under it, and a double tap
+ * on it, off its controls (links, buttons, Details, the pictures, the globe), one level up as on the tree (ToLaD#301).
+ */
+function CardShell({ onUp, children }: { onUp?: (x: number, y: number) => void; children: ReactNode }) {
+  const up = useRef(onUp);
+  up.current = onUp;
+  const tapper = useRef<ReturnType<typeof cardTapper> | null>(null);
+  tapper.current ??= cardTapper((x, y) => {
+    // (A mouse's double click selects a word: not here.)
+    window.getSelection?.()?.removeAllRanges();
+    up.current?.(x, y);
+  });
+  const pt = (e: RPointerEvent) => ({ id: e.pointerId, x: e.clientX, y: e.clientY, t: e.timeStamp, ctl: onControl(e.target) });
+  return (
+    <div
+      className="card-sp"
+      onPointerDown={(e) => {
+        e.stopPropagation();
+        tapper.current!.down(pt(e));
+      }}
+      onPointerUp={(e) => tapper.current!.up(pt(e))}
+      onPointerCancel={() => tapper.current!.cancel()}
+    >
+      {children}
+    </div>
+  );
+}
+
+export function SpeciesCard({ sp, onClose, onUp, open, ageMa, startMa, event }: { sp: SpeciesRec; onClose: () => void; onUp?: (x: number, y: number) => void; open?: boolean; ageMa?: number; startMa?: number; event?: number }) {
   const at = populationAt(sp, ageMa ?? sp.t1, startMa);
   const ev0 = event !== undefined ? sp.history?.events[event] : undefined;
   const ev = ev0?.scope === 'regional' ? undefined : ev0;
@@ -519,7 +551,7 @@ export function SpeciesCard({ sp, onClose, open, ageMa, startMa, event }: { sp: 
   const nat = !spark && sp.natural ? sp.natural : null;
   const wiki = wikiOf(sp.sci);
   return (
-    <div className="card-sp" onPointerDown={(e) => e.stopPropagation()}>
+    <CardShell onUp={onUp}>
       <button type="button" className="x" onClick={onClose} aria-label="Close">
         ×
       </button>
@@ -640,18 +672,18 @@ export function SpeciesCard({ sp, onClose, open, ageMa, startMa, event }: { sp: 
           </dd>
         </dl>
       </details>
-    </div>
+    </CardShell>
   );
 }
 
 /** A parent column touched: the daughters' shared ancestors at that time, and their split. */
-export function LineageCard({ lin, onClose }: { lin: Lineage; onClose: () => void }) {
+export function LineageCard({ lin, onClose, onUp }: { lin: Lineage; onClose: () => void; onUp?: (x: number, y: number) => void }) {
   const s = lin.node.split;
   const of = lin.of.length > 1 ? `${lin.of.slice(0, -1).join(', ')} and ${lin.of[lin.of.length - 1]}` : lin.of[0];
   const [lo, hi] = [approxMa(s.lo), approxMa(s.hi)];
   const range = s.lo === s.hi ? 'no range found' : lo === hi ? `range ~${lo} million` : `range ${lo}–${hi} million`;
   return (
-    <div className="card-sp" onPointerDown={(e) => e.stopPropagation()}>
+    <CardShell onUp={onUp}>
       <button type="button" className="x" onClick={onClose} aria-label="Close">
         ×
       </button>
@@ -689,13 +721,13 @@ export function LineageCard({ lin, onClose }: { lin: Lineage; onClose: () => voi
           </dd>
         </dl>
       </details>
-    </div>
+    </CardShell>
   );
 }
 
-function IndCard({ sp, ind, onClose }: { sp: SpeciesRec; ind: IndInfo; onClose: () => void }) {
+function IndCard({ sp, ind, onClose, onUp }: { sp: SpeciesRec; ind: IndInfo; onClose: () => void; onUp?: (x: number, y: number) => void }) {
   return (
-    <div className="card-sp" onPointerDown={(e) => e.stopPropagation()}>
+    <CardShell onUp={onUp}>
       <button type="button" className="x" onClick={onClose} aria-label="Close">
         ×
       </button>
@@ -719,6 +751,6 @@ function IndCard({ sp, ind, onClose }: { sp: SpeciesRec; ind: IndInfo; onClose: 
               </span>
             ))}
       </div>
-    </div>
+    </CardShell>
   );
 }
