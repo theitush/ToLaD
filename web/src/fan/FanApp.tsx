@@ -8,6 +8,7 @@ import { approxMa, formatCount } from '../data/count';
 import { HistorySpark } from './HistorySpark';
 import type { EdgeStyle, WidthMode } from './layout';
 import { wikiOf, type WikiRec } from './wiki';
+import { RangeGlobe } from './Globe';
 import { CARNIVORA, FELIDAE, mammaliaClade, NATURAL_META, type HistEvent, type SpeciesRec } from './panthera';
 import { CARNIVORA_TREE, mammaliaTree } from './splits';
 import { loadMammals, mammalsLoaded } from './mammals-data';
@@ -522,7 +523,6 @@ export function SpeciesCard({ sp, onClose, open, ageMa, startMa, event }: { sp: 
       <button type="button" className="x" onClick={onClose} aria-label="Close">
         ×
       </button>
-      {!wiki?.range && <WikiPic key={wiki?.img ?? ''} w={wiki} />}
       <div className="t">
         {wiki?.wp ? (
           <a className="wp" href={wiki.wp} target="_blank" rel="noopener">
@@ -533,13 +533,11 @@ export function SpeciesCard({ sp, onClose, open, ageMa, startMa, event }: { sp: 
         )}{' '}
         <i>({sp.sci})</i>
       </div>
-      {/* With a range map, the photo and the map side by side under the name (ToLaD#196); without, as before. */}
-      {wiki?.range && (
-        <div className="media">
-          <WikiPic key={wiki?.img ?? ''} w={wiki} />
-          <RangeMap key={`range-${wiki?.range ?? ''}`} w={wiki} />
-        </div>
-      )}
+      {/* The photo and the range side by side under the name (ToLaD#196): the globe (ToLaD#267), else the Wikimedia map. */}
+      <div className="media">
+        <WikiPic key={wiki?.img ?? ''} w={wiki} />
+        <RangeGlobe key={sp.sci} sci={sp.sci} fallback={wiki?.range ? <RangeMap key={`range-${wiki.range}`} w={wiki} /> : null} />
+      </div>
       {ev && <EventSection ev={ev} k={event!} />}
       <div className="facts">
         <StatusChip sp={sp} />

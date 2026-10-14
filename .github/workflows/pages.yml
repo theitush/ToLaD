@@ -31,9 +31,10 @@ jobs:
         working-directory: web
       - run: npm run build:single
         working-directory: web
-      # (The mammal level's data, mammals.json, is fetched by the page when that level opens: ToLaD#247.)
+      # (The mammal level's data, mammals.json, is fetched by the page when that level opens: ToLaD#247;
+      # globe.json and globe-draw.js, the card's range globe, when a card first shows one: ToLaD#267.)
       - name: Stage the page
-        run: mkdir _site && cp web/dist-single/index.html web/dist-single/mammals.json _site/ && touch _site/.nojekyll
+        run: mkdir _site && cp web/dist-single/index.html web/dist-single/mammals.json web/dist-single/globe.json web/dist-single/globe-draw.js _site/ && touch _site/.nojekyll
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
