@@ -52,11 +52,12 @@ const THUMB_D = 50;
 const LABEL_PAD = 8;
 /** Right edge (px) of the time axis's labels: species' labels keep right of it. */
 const LABEL_AXIS_X = 72;
-/** A frame a double-tap steps back to (ToLaD#241): what it frames (a species, a clade, home), the frame, the flight there. */
-type BackStep = { to: string; cam: Camera; go: () => void; lv: Level };
+/** A level's flight under way (ToLaD#258, #271): the level it lands on and its frame, so a tap or double-tap mid-flight goes on from there. */
+type Step = { lv: Level; cam: Camera };
 /**
- * A double-tap's step back (ToLaD#241): the view is "at" a frame of the ladder when it is zoomed within this factor
- * (15 %) of it, width and time together (the area's scale); zoomed in further, the step goes to that frame, else past it.
+ * The view is "inside" a level's frame when it is zoomed in at least this far less than it (15 %), width and time
+ * together (the area's scale): levelNow's. Zoomed in further than this past the level's own frame (a pinch, a "+x"), a
+ * double-tap goes to that frame first (ToLaD#271).
  */
 const BACK_SLACK = 1.15;
 /** A tap's next level (ToLaD#258) is one whose frame stands more than this many px off the view's: nearer, it is passed. */
@@ -1393,12 +1394,6 @@ export class FanView implements InputHandlers {
     this.flyTo(() => this.cladeCamera(v), undefined, landed);
   }
 
-  /** The ranked clade a species sits in (ToLaD#230): the nearest with a rank (genus, subfamily, family…), else the root. */
-  cladeOf(b: FanBranch): FanNode {
-    // (A level, ToLaD#258: not a clade above an order.)
-    return levelUp(this.fan, b.node, true) ?? this.fan.root;
-  }
-
   /** One level out from clade v (ToLaD#230): the nearest ranked clade it sits in, the root last; null from the root. */
   outOf(v: FanNode): FanNode | null {
     return levelUp(this.fan, v);
@@ -1612,10 +1607,10 @@ export class FanView implements InputHandlers {
    * ease, over a time by how far it goes (flightMs, 0.9–1.8 s, or `ms`). Folded, the frame's world moves as the fold
    * opens, closes and re-anchors: the start and the frame are tracked through it (fold.ts follow) and the camera aims
    * between them each step, landing on the frame computed again there (so nothing snaps at the end). `done` runs when
-   * it lands (not if a gesture takes over first).
+   * it lands (not if a gesture takes over first). Returns the frame aimed at (computed now).
    */
-  flyTo(aim: Camera | (() => Camera), ms?: number, done?: () => void): void {
-    // (A level's step, backing, is set again after this by the tap or double-tap that flies it, ToLaD#258.)
+  flyTo(aim: Camera | (() => Camera), ms?: number, done?: () => void): Camera {
+    // (A level's flight, backing, is set again after this by what flies it: a tap, a double-tap, a search pick, ToLaD#258.)
     this.backing = null;
     const fo = this.fan.tess.fold;
     const from = { ...this.cam };
@@ -1666,6 +1661,7 @@ export class FanView implements InputHandlers {
       return true;
     };
     this.request();
+    return to;
   }
 
   /**
@@ -1702,7 +1698,7 @@ export class FanView implements InputHandlers {
     this.selInd = null;
     this.touch = null;
     this.onSelect(null);
-    this.flyTo(() => this.speciesCamera(b), undefined, () => {
+    const to = this.flyTo(() => this.speciesCamera(b), undefined, () => {
       this.tapAt = { b, v: null, cam: { ...this.cam } };
       if (!card) {
         this.request();
@@ -1715,6 +1711,8 @@ export class FanView implements InputHandlers {
       this.onSelect({ sp, ageMa: sp.t1, startMa: b.t0 });
       this.request();
     });
+    // (A level's flight: a double-tap mid-way goes up from the species, ToLaD#271.)
+    this.backing = { lv: { b }, cam: to };
   }
 
   /** Branch (column part) under a screen point, with a finger-sized slop. */
@@ -1781,20 +1779,37 @@ export class FanView implements InputHandlers {
     this.request();
   }
   /**
-   * A double-tap (ToLaD#258): one level out, anywhere, along the ladder of frames over what is on screen (backStep,
-   * ToLaD#241): deep in a species, its frame; at a species' frame, its group's; at a group's, the next one out; … home.
-   * At home, nothing.
+   * A double-tap (ToLaD#258, #271): one level up, anywhere: from the level the view is at (levelNow; a level's flight
+   * under way, from where it lands) to the level it sits in (levelUp), the tree a tap goes down, so the two mirror each
+   * other. Not back the way it came: after a search pick, a "+x" or a pinch, the parent of where the view is. A level
+   * whose frame is within LEVEL_PX of the view is passed (every double-tap visibly moves). At home, nothing. The card
+   * closes for the flight.
    */
   doubleTap(_x: number, _y: number): void {
-    const step = this.backStep();
-    if (!step) return;
-    step.go();
-    this.backing = step;
+    const on = this.anim && this.backing;
+    const from = on ? this.backing!.lv : this.levelNow(true);
+    const step = this.upFrom(from, on ? this.backing!.cam : this.cam);
+    if (step) this.goLevel(step.lv, step.cam, false);
+  }
+
+  /**
+   * Where a double-tap from level `from` goes, the view at camera c (ToLaD#271): zoomed in well past from's own frame
+   * (BACK_SLACK: a pinch, a "+x" into part of it), that frame; else the first level `from` sits in (levelUp, home's
+   * root last) whose frame is more than LEVEL_PX off the view. Null when there is none (home).
+   */
+  private upFrom(from: Level, c: Camera): Step | null {
+    const own = this.frameOf(from);
+    if (Math.log(c.sx / own.sx) + Math.log(c.sy / own.sy) > Math.log(BACK_SLACK) && this.offBy(own, c) > LEVEL_PX) return { lv: from, cam: own };
+    for (let u = from.b ? levelUp(this.fan, from.b.node, true) : levelUp(this.fan, from.v); u; u = levelUp(this.fan, u)) {
+      const cam = this.frameOf({ v: u });
+      if (this.offBy(cam, c) > LEVEL_PX) return { lv: { v: u }, cam };
+    }
+    return null;
   }
 
   /**
    * The level the view is at (ToLaD#258): the innermost frame of the ladder over the lineage at the screen's centre
-   * that the view is zoomed in at least as far as (backStep's), home's root last. Worked out again once the camera
+   * (its species, then each level it sits in, levelUp's, home's root last) that the view is zoomed in at least as far as. Worked out again once the camera
    * has moved and is still (no flight, fling or gesture under way), at most every LEVEL_MS; the last one meanwhile.
    * `now`: worked out now whatever the view is doing (a tap's).
    */
@@ -1813,9 +1828,11 @@ export class FanView implements InputHandlers {
     }
     const b = this.centreLine();
     const z = (f: Camera) => Math.log(c.sx / f.sx) + Math.log(c.sy / f.sy);
-    const restore = this.fan.tess.fold?.keep();
-    const ladder = this.backLadder(b);
-    restore?.();
+    const ladder: Step[] = [];
+    const push = (lv: Level) => ladder.push({ lv, cam: this.frameOf(lv) });
+    if (b) push({ b });
+    for (let u = b ? levelUp(this.fan, b.node, true) : null; u; u = levelUp(this.fan, u)) push({ v: u });
+    if (ladder[ladder.length - 1]?.lv.v !== this.fan.root) push({ v: this.fan.root });
     // At a frame (within LEVEL_PX, as a tap passes them): the outermost there. Else from home in, while the view is
     // inside each (a wide species' frame, as the house cat's, can take in its group's, even home's).
     const on = [...ladder].reverse().find((f) => this.offBy(f.cam, c) <= LEVEL_PX);
@@ -1882,74 +1899,20 @@ export class FanView implements InputHandlers {
     return Math.max(Math.abs(x(a.cx - hw / a.sx)), Math.abs(x(a.cx + hw / a.sx) - this.w), Math.abs(y(a.cy - hh / a.sy)), Math.abs(y(a.cy + hh / a.sy) - this.h));
   }
 
-  /** Fly to level lv's frame `cam` (a species: no card), remembered as the step under way (backing), so a tap or double-tap mid-flight goes on from there. */
-  private goLevel(lv: Level, cam: Camera): void {
-    // (Landing on a species: its card opens, ToLaD#266.)
-    if (lv.b) this.flyToSpecies(lv.b.sp);
+  /**
+   * Fly to level lv's frame `cam`, remembered as the step under way (backing), so a tap or double-tap mid-flight goes on
+   * from there. Landing on a species, its card opens (ToLaD#266), unless `card` is false (a double-tap's).
+   */
+  private goLevel(lv: Level, cam: Camera, card = true): void {
+    if (lv.b) this.flyToSpecies(lv.b.sp, card);
     else this.flyLevel(null, lv.v);
-    const b = lv.b ?? lv.v.strands[lv.v.strands.length >> 1];
-    this.backing = { to: lv.b ? lv.b.sp.common : lv.v.parent ? lv.v.name : 'home', cam, go: () => this.goLevel(lv, cam), lv, b };
+    this.backing = { lv, cam };
   }
 
-  /**
-   * The frames a double-tap steps back through (ToLaD#241), innermost first: the species of the lineage at the
-   * screen's centre (lineAt, as the pinned groups, ToLaD#233), then each ranked clade it sits in (cladeOf, outOf), the
-   * root's (home) last. What is on screen, not where taps went: after a pinch or a pan it starts from there.
-   */
-  private backLadder(b: FanBranch | null): BackStep[] {
-    const root = this.fan.root;
-    const steps: BackStep[] = [];
-    if (b) {
-      steps.push({ to: b.sp.common, cam: this.speciesCamera(b), go: () => this.flyToSpecies(b.sp, false), lv: { b } });
-      for (let v: FanNode | null = this.cladeOf(b); v && v !== root; v = this.outOf(v)) {
-        const c = v;
-        steps.push({ to: c.name, cam: this.cladeCamera(c), go: () => this.flyLevel(null, c), lv: { v: c } });
-      }
-    }
-    steps.push({ to: 'home', cam: this.homeCamera(), go: () => this.flyLevel(null, root), lv: { v: root } });
-    return steps;
-  }
+  /** The level's flight under way (ToLaD#258): where it lands, so a tap or double-tap mid-flight goes on from there (a search pick's too). */
+  private backing: Step | null = null;
 
-  /**
-   * One step back from the view (ToLaD#241), or null at home. The view is inside a frame of the ladder when it is zoomed
-   * in at least that far, width and time together (the area's scale, within BACK_SLACK, 15 %), and at it when also
-   * zoomed in no further than that. The innermost frame it is inside: zoomed in past it, the step is to it; at it, to
-   * the next frame out that the view is zoomed in past. Past the ladder's end, home unless already there. Mid-way through a step back, from where that
-   * step lands.
-   */
-  private backStep(): BackStep & { b: FanBranch | null } | null {
-    const on = this.anim && this.backing;
-    const c = on ? this.backing!.cam : this.cam;
-    const b = on ? this.backing!.b : this.centreLine();
-    // (Folded, each frame computed moves the fold to it: put back after, so the view stands as it was.)
-    const restore = this.fan.tess.fold?.keep();
-    const ladder = this.backLadder(b);
-    restore?.();
-    // How far the view is zoomed in past frame f: width and time together (log of the area's scale), so a view deep
-    // in a species' past (time zoomed far in, its wider ancestral column framed) counts as inside that species.
-    const z = (f: Camera) => Math.log(c.sx / f.sx) + Math.log(c.sy / f.sy);
-    const slack = Math.log(BACK_SLACK);
-    // The view's level: the innermost frame it is inside (zoomed in at least as far, within the slack).
-    const inside = (f: Camera) => z(f) >= -slack;
-    const closer = (f: Camera) => z(f) > slack;
-    const i = Math.max(0, ladder.findIndex((f) => inside(f.cam)));
-    // Closer than it: that frame. At it: the next one out it is closer than.
-    const next = closer(ladder[i].cam) && inside(ladder[i].cam) ? ladder[i] : ladder.slice(i + 1).find((f) => closer(f.cam));
-    const home = ladder[ladder.length - 1];
-    const step = next ?? (this.atHome(c) ? null : home);
-    return step && { ...step, b };
-  }
-
-  /** Whether camera c is home's (within 4 px and 2 %): where a double-tap does nothing (ToLaD#241). */
-  private atHome(c: Camera = this.cam): boolean {
-    const h = this.homeCamera();
-    return Math.abs(c.cx - h.cx) * c.sx <= 4 && Math.abs(c.cy - h.cy) * c.sy <= 4 && Math.abs(Math.log(c.sx / h.sx)) <= 0.02 && Math.abs(Math.log(c.sy / h.sy)) <= 0.02;
-  }
-
-  /** The step back under way (ToLaD#241): where it lands and the species it started from, so a double-tap mid-flight goes on from there. */
-  private backing: BackStep & { b: FanBranch | null } | null = null;
-
-  /** The lineage at the screen's centre (ToLaD#233): the pinned groups' and a double-tap's (ToLaD#241). */
+  /** The lineage at the screen's centre (ToLaD#233): the pinned groups' and levelNow's. */
   private centreLine(): FanBranch | null {
     return this.lineAt((LABEL_AXIS_X + this.w) / 2, this.h / 2);
   }

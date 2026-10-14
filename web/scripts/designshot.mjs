@@ -14,7 +14,7 @@ const ONLY = process.argv[4] ? new Set(process.argv[4].split(',')) : null;
 mkdirSync(OUT, { recursive: true });
 // [name, kind, args]: 'home' | 'far' | 'window' [youngYrs, oldYrs] | 'card' [species] | 'touch' [species, agoYears] | 'scroll' [zoom, agoYears] | 'bar' [species, agoYears, perBar, sy, at?]
 //   | 'split' [splitMa, time zoom × home] | 'tapnode' [splitMa, ageMa] | 'pan' [zoom, px down from "now" at 160, px across]
-//   | 'about' [species, agoYears, k, r] | 'frame' [species, agoYears, time zoom × home, width filled?] | 'search' [query, pick?]: from home, the search opened, the query typed, and the row named `pick` tapped
+//   | 'about' [species, agoYears, k, r] | 'frame' [species, agoYears, time zoom × home, width filled?] | 'search' [query, pick?, double taps?]: from home, the search opened, the query typed, the row named `pick` tapped, then that many double taps
 const scenes = [
   ['home', 'home'],
   ['far', 'far'],
@@ -140,6 +140,9 @@ const scenes = [
   ['tap-monkseal', 'search', ['hawaiian', 'Hawaiian monk seal']],
   ['tap-manedwolf', 'search', ['maned', 'Maned wolf']],
   ['tap-polarbear', 'search', ['polar', 'Polar bear']],
+  // A double tap after a pick goes up to its parent level, then that one's (ToLaD#271): not back home.
+  ['up-polar1', 'search', ['polar', 'Polar bear', 1]],
+  ['up-polar2', 'search', ['polar', 'Polar bear', 2]],
   // The fold (ToLaD#146): the dogs at 1.5x, 3x and 6x home's width zoom, opening as they grow.
   ['carn-dogs-z15', 'zoomto', ['Canidae', 1.5]],
   ['carn-dogs-z3', 'zoomto', ['Canidae', 3]],
@@ -516,6 +519,12 @@ try {
         await page.click(`.search-list li:has(.nm:text-is("${args[1]}"))`);
         // The flight (~0.7 s), then the card.
         await page.waitForTimeout(1200);
+        // args[2]: that many double taps after it, each flight landed (ToLaD#271).
+        for (let k = 0; k < (args[2] ?? 0); k++) {
+          await page.waitForTimeout(800);
+          await page.evaluate(() => window.__fan.doubleTap(-1e4, -1e4));
+          await page.waitForTimeout(2400);
+        }
       }
     }
     await page.waitForTimeout(Number(process.env.WAIT_MS || 900));
