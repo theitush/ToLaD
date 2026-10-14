@@ -7,7 +7,7 @@ import { laneAt, leftAt, type FanBranch, type FanNode } from './layout';
 import { latinOf, rankOf, type Brackets } from './brackets';
 import { CARNIVORA, FELIDAE, type CladeRec } from './panthera';
 import { CARNIVORA_TREE, FELIDAE_TREE, type Split } from './splits';
-import { FanView } from './view';
+import { familiar, FanView, isLevel } from './view';
 
 function stubView(clade: CladeRec = CARNIVORA, tree: Split = CARNIVORA_TREE, folds = true): FanView {
   const noop = () => {};
@@ -109,7 +109,8 @@ describe('the groups the view is inside stay pinned at the top (ToLaD#233)', () 
           continue;
         }
         intoPast(v, b);
-        const want = ranked(b).reverse().map((u) => latinOf(u.split));
+        // (The familiar levels only, the innermost three, ToLaD#288.)
+        const want = ranked(b).reverse().filter((u) => isLevel(v.fan, u) && familiar(u)).slice(-3).map((u) => latinOf(u.split));
         const got = br.pins.map((p) => br.list[p.i].latin);
         console.log(`${name}: ${b.sp.common} → ${got.join(' › ')}`);
         if (got.join() !== want.join()) log.push(`${b.sp.common}: pinned ${got.join(' › ')}, not ${want.join(' › ')}`);
