@@ -43,8 +43,12 @@ export interface Split {
 
 /** The species under a dated split, left to right. */
 function datedSpecies(t: DatedSplit): string[] {
-  return t.kids.flatMap((k) => (typeof k === 'string' ? [k] : datedSpecies(k)));
+  // (Kept per split: splitFrom asks at every split for its own and its daughters', ToLaD#255. Read only.)
+  let s = DATED_SPECIES.get(t);
+  if (!s) DATED_SPECIES.set(t, (s = t.kids.flatMap((k) => (typeof k === 'string' ? [k] : datedSpecies(k)))));
+  return s;
 }
+const DATED_SPECIES = new WeakMap<DatedSplit, string[]>();
 
 /**
  * The Red List's Title Case English name in the fan's sentence case: words after the first lowercased, except a
