@@ -283,10 +283,6 @@ class CutTerritories {
     }
     return (lo + hi) / 2;
   }
-  /** Where daughter k (a node's index, ~ a strand's) splits off its parent (world y): a clade's stem's foot, a species' split. */
-  splitOff(k: number): number {
-    return k >= 0 ? this.t.nodes[k].yBot : this.t.strands[~k].splitY;
-  }
   /** A cut item's youngest tip (world y). */
   youngest(it: CutItem): number {
     if (it.kind === 'leaf') return this.youngOf(~it.j);
@@ -3221,16 +3217,11 @@ export class FanView implements InputHandlers {
     const room = (x0: number, x1: number) => Math.min(X(x1), this.w) - Math.max(X(x0), LABEL_AXIS_X);
     const onScreen = (it: CutItem) => X(it.x1) > LABEL_AXIS_X && X(it.x0) < this.w;
     const shown = (it: CutItem, d: number) => it.fits && room(it.x0, it.x1) >= d;
-    /**
-     * A name pill in its own columns, in the middle of its branch (Ita's pick, ToLaD#342: as ?names=mid), halfway
-     * between its youngest tip `ty` and where it splits off `by` (screen y) over the part on screen; never above its
-     * tip (4 px under it, as a tip's pill stands) nor the top line. Nothing else is in its territory below its tip.
-     */
-    const pill = (key: string, text: string, hid: FanBranch[][], x: number, ty: number, by: number, wide: number, j: number, k: number | null): LabelSpot | null => {
+    /** A name pill hanging from `ty` (screen) into its own columns, kept under the top line: nothing else is in its territory there. */
+    const pill = (key: string, text: string, hid: FanBranch[][], x: number, ty: number, wide: number, j: number, k: number | null): LabelSpot | null => {
       const px = this.plusPx(hid.length);
       const tlen = (text ? this.nameWidth(text) + 2 * LABEL_PAD : LABEL_PAD) + px;
-      const a = Math.max(ty + 4, top);
-      const y0 = Math.max(a, (a + Math.min(by, bottom - 30)) / 2 - tlen / 2);
+      const y0 = Math.max(ty + 4, top);
       const y1 = y0 + tlen;
       const fit = clamp01((bottom - y1) / 30);
       if (!(fit > 0)) return null;
@@ -3257,7 +3248,7 @@ export class FanView implements InputHandlers {
         const [x, ty] = place(it, LABEL_PILL);
         const k = it.kind === 'leaf' ? ~it.j : it.j;
         const { text, hid } = T.label(it, '');
-        pill(`c${it.kind}${it.j}:${it.q0}`, text, hid, x, ty, Y(T.splitOff(k)), it.x1 - it.x0, it.j, k);
+        pill(`c${it.kind}${it.j}:${it.q0}`, text, hid, x, ty, it.x1 - it.x0, it.j, k);
         continue;
       }
       if (!onScreen(it)) continue;
@@ -3281,7 +3272,7 @@ export class FanView implements InputHandlers {
         // (Whole on screen, or not at all: it stands where its own columns are.)
         if (x - half < LABEL_AXIS_X || x + half > this.w) continue;
         const { text, hid } = T.named(K[q]);
-        if (pill(`cb${K[q]}`, text, hid, x, Y(T.youngOf(K[q])), Y(T.splitOff(K[q])), b - a, it.j, K[q])) taken.push([x - half, x + half]);
+        if (pill(`cb${K[q]}`, text, hid, x, Y(T.youngOf(K[q])), b - a, it.j, K[q])) taken.push([x - half, x + half]);
       }
     }
     for (const p of plus) {
@@ -3289,8 +3280,7 @@ export class FanView implements InputHandlers {
       const x = placeX(p.x0, p.x1, LABEL_PILL, p.at);
       // (A "+x" in its own run's territory, clear of the pills borrowing room from it.)
       if (taken.some(([a, b]) => x + half > a && x - half < b)) continue;
-      // (A run's daughters split off where their parent splits.)
-      pill(p.key, '', p.hid, x, Y(p.ty), Y(T.t.nodes[p.j].y), p.x1 - p.x0, p.j, null);
+      pill(p.key, '', p.hid, x, Y(p.ty), p.x1 - p.x0, p.j, null);
     }
     // The pictures: the coarser cut, each standing on its item's youngest tip (the names hang below it).
     const pics: CutLabels['pics'] = [];
