@@ -1,6 +1,6 @@
 // A species flown to lands on screen (ToLaD#211): in the folded carnivores the fold opens and its anchor moves as the
 // camera zooms, so a frame computed before the flight once landed with the species beside the screen. Every one of the
-// 292 species, flown to from home at both widths (and a sample from zoomed in on the dogs), lands with its column's
+// 325 species (ToLaD#278), flown to from home at both widths (and a sample from zoomed in on the dogs), lands with its column's
 // centre at the screen's centre and the column on screen.
 import { describe, expect, it } from 'vitest';
 import { laneAt, leftAt, type FanBranch, type WidthMode } from './layout';

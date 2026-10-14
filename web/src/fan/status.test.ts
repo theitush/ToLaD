@@ -13,11 +13,19 @@ const rec = (category: string, year: number, source = 'iucn-2026-1'): RedListRec
   category, year, source, sourceLabel: source, cite: `x ${year}`, url: source === 'not-listed' ? '' : 'https://www.iucnredlist.org/species/1/2',
 });
 
+// The living cats only the Mammal Diversity Database gives (ToLaD#278: split or described since Upham 2019): COMBINE has no
+// generation length for them (allometric), PHYLACINE no range, and the Red List has assessed only Felis lybica (the rest NE).
+const MDD_CATS = ['Felis lybica', 'Prionailurus javanensis', 'Leopardus braccatus', 'Leopardus pajeros', 'Leopardus fasciatus', 'Leopardus garleppi', 'Leopardus pardinoides'];
+
 describe('Red List status from the data (ToLaD#48)', () => {
   it('every living wild cat reads its status from the data, with the assessment page', () => {
     // (The domestic cat is not listed: Not Evaluated, no page; see the extract test below.)
     for (const s of FELIDAE.species.filter((x) => !x.extinct && x.sci !== 'Felis catus')) {
       expect(s.redList, s.sci).toBeTruthy();
+      if (MDD_CATS.includes(s.sci) && s.redList!.source === 'not-listed') {
+        expect(s.redList!.category).toBe('NE');
+        continue;
+      }
       expect(s.redList!.source).toBe('iucn-2026-1');
       expect(s.redList!.url).toMatch(/^https:\/\/www\.iucnredlist\.org\/species\/\d+\/\d+$/);
       expect(s.redList!.cite).toMatch(/^IUCN Red List 2026-1, e\.T\d+A\d+$/);

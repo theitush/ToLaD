@@ -25,6 +25,10 @@ function clade(name: string) {
   return { raw, tree, rec };
 }
 
+// The living cats only the Mammal Diversity Database gives (ToLaD#278: split or described since Upham 2019): COMBINE has no
+// generation length for them (allometric), PHYLACINE no range, and the Red List has assessed only Felis lybica (the rest NE).
+const MDD_CATS = ['Felis lybica', 'Prionailurus javanensis', 'Leopardus braccatus', 'Leopardus pajeros', 'Leopardus fasciatus', 'Leopardus garleppi', 'Leopardus pardinoides'];
+
 describe('the dated tree from the data', () => {
   it('Felidae: every split is dated and ordered, every species placed once, sources carried', () => {
     const sp = speciesUnder(FELIDAE_TREE);
@@ -51,7 +55,7 @@ describe('the dated tree from the data', () => {
     // common names and generation lengths come from the data
     expect(FELIDAE.species.find((s) => s.sci === 'Panthera leo')!.common).toBe('Lion');
     expect(FELIDAE.species.find((s) => s.sci === 'Panthera spelaea')!.common).toBe('Cave lion');
-    for (const s of living) expect(s.genSource).toMatch(/COMBINE|curated history/);
+    for (const s of living) expect(s.genSource, s.sci).toMatch(MDD_CATS.includes(s.sci) ? /allometric/ : /COMBINE|curated history/);
   });
 
   it('Felidae: the override table holds Panthera (Figueiró 2017) and the domestic cat', () => {
