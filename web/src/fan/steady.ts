@@ -23,7 +23,7 @@
 // so there is no anchor (setAnchor never moves anything), and a row is one walk down the tree: no refolding.
 //
 // It is a Fold to the view (the same interface: left, rowXs, extent, setScale, follow, homeExtent...), chosen by
-// ?layout=steady (wantSteady). At the cats' level (the view's `folds` off) every split is open, at every zoom.
+// the default (wantSteady; ?layout=fold for the fold, ToLaD#273). At the cats' level (the view's `folds` off) every split is open, at every zoom.
 
 import { ease, isNode, laneW, segAt, type Fan, type FanBranch, type FanNode } from './layout';
 import { Fold, ROOM_BEND, type FoldState } from './fold';
@@ -31,15 +31,15 @@ import { Fold, ROOM_BEND, type FoldState } from './fold';
 /** A split's fork is at most this share of its shortest daughter's run (to its own split or tip). */
 export const STEADY_RUN = 0.85;
 
-/** Whether the steady layout is asked for: ?layout=steady, or TOLAD_LAYOUT=steady in node (tests, perf runs). */
+/** Whether the steady layout is in use: the default (ToLaD#273); ?layout=fold, or TOLAD_LAYOUT=fold in node (tests, perf runs), brings the fold back. */
 export function wantSteady(): boolean {
   try {
-    if (typeof location !== 'undefined' && new URLSearchParams(location.search).get('layout') === 'steady') return true;
+    if (typeof location !== 'undefined' && new URLSearchParams(location.search).get('layout') === 'fold') return false;
   } catch {
     /* no URL */
   }
   const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
-  return env?.TOLAD_LAYOUT === 'steady';
+  return env?.TOLAD_LAYOUT !== 'fold';
 }
 
 /** The rooms and places at one set of a's and width zoom (world x, the stem's centre on Fold.home). */
