@@ -20,12 +20,20 @@ try {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
   const page = await ctx.newPage();
   page.on('pageerror', (e) => console.log('pageerror', String(e)));
+  if (process.env.SPOTS) page.on('console', (m) => console.log('  [page]', m.text()));
   await page.goto(url);
   await page.waitForFunction(() => !!window.__fan && window.__fan.fan.branches.length > 1000, null, { timeout: 60000 });
   const cdp = await ctx.newCDPSession(page);
+  // (SPOTS=<id>: each step, that name's spots, their fit and which is on: why it flickers, ToLaD#311.)
+  const spotsOf = process.env.SPOTS || '';
   const state = () =>
-    page.evaluate(() => {
+    page.evaluate((spotsOf) => {
       const f = window.__fan;
+      if (spotsOf) {
+        const L = f.labLast;
+        const ss = (L?.spots ?? []).filter((s) => s.id === spotsOf);
+        console.log(`${L && L.frames ? 'carried' : 'laid'} ` + ss.filter((s) => s.fit > 0 || f.labelState.get(s.key)?.on).map((s) => `${f.labelState.get(s.key)?.on ? '*' : ''}${s.key.slice(s.id.length + 1)} ${s.fit.toFixed(2)} [${s.box.map((x) => x.toFixed(0))}]`).join(' | '));
+      }
       const l = f.levelNow();
       const on = [...f.labelState].filter(([, s]) => s.on).map(([k]) => k);
       return {
@@ -39,16 +47,20 @@ try {
         mark: (() => {
           const b = window.__mark;
           if (!b) return null;
-          let best = null;
-          for (const p of f.lanePoints(b, 0)) if (!best || Math.abs(p.y - 450) < Math.abs(best.y - 450)) best = p;
-          return best ? best.x + (best.w * f.cam.sx) / 2 : null;
+          // (lanePoints: flat arrays since ToLaD#255.)
+          const P = f.lanePoints(b, 0);
+          let best = -1;
+          for (let i = 0; i < P.n; i++) if (best < 0 || Math.abs(P.y[i] - 450) < Math.abs(P.y[best] - 450)) best = i;
+          return best >= 0 ? P.x[best] + (P.w[best] * f.cam.sx) / 2 : null;
         })(),
       };
-    });
+    }, spotsOf);
   const start = () =>
     page.evaluate((t) => {
       const f = window.__fan;
-      f.cam = f.levelCamera(t) ?? f.homeCamera();
+      // (The level's frame as a tap on it lands, cladeCamera: ToLaD#311.)
+      const v = f.fan.nodes.find((n) => n.split.taxon === t);
+      f.cam = v ? f.cladeCamera(v) : f.homeCamera();
       f.camera.settle();
       f.labelState.clear();
       f.request();
@@ -83,6 +95,15 @@ try {
       for (let i = 1; i < seq.length; i++) if (seq[i] !== seq[i - 1]) changes++;
       if (changes >= 2) flick.add(`${k}×${changes}`);
     }
+    // (A name on, off, on again: what the eye sees flicker. A name moving between its spots is not counted there.)
+    const ids = new Set(log.flatMap((s) => s.on.map((k) => k.split(':')[0])));
+    const nameFlick = [];
+    for (const id of ids) {
+      const seq = log.map((s) => s.on.some((k) => k.split(':')[0] === id));
+      let changes = 0;
+      for (let i = 1; i < seq.length; i++) if (seq[i] !== seq[i - 1]) changes++;
+      if (changes >= 2) nameFlick.push(`${id}×${changes}`);
+    }
     const lvs = [...new Set(log.map((s) => s.lv))];
     const runs = (a) => a.filter((x, i) => i === 0 || x !== a[i - 1]).join(',');
     const pics = runs(log.map((s) => s.pics));
@@ -103,7 +124,7 @@ try {
     const mz = log[log.length - 1].mark;
     const mrel = mz !== null && log[n].mark !== null ? `${(mz - log[n].mark).toFixed(0)}px` : 'lost';
     console.log(`${name}: column seen moves ≤${mjump.toFixed(0)}px a step, ${mrel} after release`);
-    console.log(`${name}: level ${lvs.join(' → ')} | flicker ${[...flick].join(' ') || 'none'} | pics ${pics} | pills ${pills} | max step ${jump.toFixed(0)}px | after release ${settle} | on at rest ${log[log.length - 1].on.length}`);
+    console.log(`${name}: level ${lvs.join(' → ')} | names flicker ${nameFlick.join(' ') || 'none'} | spots flicker ${[...flick].join(' ') || 'none'} | pics ${pics} | pills ${pills} | max step ${jump.toFixed(0)}px | after release ${settle} | on at rest ${log[log.length - 1].on.length}`);
     if (process.env.SHOTS) await page.screenshot({ path: `${out}/${taxon}-${name}.png` });
   };
   await start();
