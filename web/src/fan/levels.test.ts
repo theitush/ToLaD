@@ -489,7 +489,7 @@ describe('a double tap goes up to the parent level, not back (ToLaD#271)', () =>
       expect(bad).toEqual([]);
     });
 
-    it(`${name}: after a "+x", the level its groups sit in`, () => {
+    it(`${name}: after a "+x", the level above the one shown, never back`, () => {
       const v = mk();
       const bad: string[] = [];
       let tried = 0;
@@ -502,27 +502,14 @@ describe('a double tap goes up to the parent level, not back (ToLaD#271)', () =>
         const cam = { ...v.cam };
         v.tap((h.box[0] + h.box[2]) / 2, (h.box[1] + h.box[3]) / 2);
         run(v);
-        // Where the groups meet; of the levels holding them, the nearest whose frame takes in the view (zoomed out at
-        // least as far, within 15 %: a level of a few groups, framed narrower, does not): that one when the view is
-        // zoomed well past it, else the first above it that visibly moves. Never zoomed in, never back to `at`'s for that.
-        let meet: FanNode = h.bs[0].node;
-        while (meet.parent && !h.bs.every((b) => meet.strands.includes(b))) meet = meet.parent;
-        const zIn = (u: FanNode) => {
-          const f = P(v).frameOf({ v: u });
-          return Math.log(v.cam.sx / f.sx) + Math.log(v.cam.sy / f.sy);
-        };
-        const chain = [levelUp(v.fan, meet, true)!, ...upChain(v, { v: levelUp(v.fan, meet, true)! })];
-        const i = chain.findIndex((u) => zIn(u) >= -Math.log(1.15));
-        const want =
-          h.bs.length === 1
-            ? wantUp(v, { b: h.bs[0] })
-            : i >= 0 && zIn(chain[i]) > Math.log(1.15) && P(v).offBy(P(v).frameOf({ v: chain[i] }), v.cam) > LEVEL_PX
-            ? chain[i]
-            : (chain.slice(i + 1).find((u) => P(v).offBy(P(v).frameOf({ v: u }), v.cam) > LEVEL_PX) ?? null);
+        // (ToLaD#301: up from the level the view is at, never back to its own frame, the one the "+x" was tapped at.)
+        const from = v.levelNow(true);
+        const want = wantUp(v, from);
         v.doubleTap(-1e4, -1e4);
         run(v);
         const now = v.levelNow();
-        if (!want || now.v !== want || !atFrame(v, now)) bad.push(`${at}: a "+x" of ${h.bs.length} then a double tap went to ${nameOf(now)}, not ${want ? levelName(want) : 'nowhere'}`);
+        if (want ? now.v !== want || !atFrame(v, now) : P(v).anim) bad.push(`${at}: a "+x" of ${h.bs.length} then a double tap went to ${nameOf(now)}, not ${want ? levelName(want) : 'nowhere'}`);
+        if (want && atFrame(v, from)) bad.push(`${at}: a "+x" of ${h.bs.length} then a double tap went back to ${nameOf(from)}`);
         v.cam = cam;
         v.camera.settle();
         P(v).applyFold();
@@ -532,6 +519,144 @@ describe('a double tap goes up to the parent level, not back (ToLaD#271)', () =>
       expect(tried).toBeGreaterThan(0);
     });
   }
+});
+
+/** Run the flight under way n frames of 16 ms (not to its landing). */
+function fly(v: FanView, n: number): void {
+  const iv = P(v);
+  for (let t = performance.now() + 16, k = 0; iv.anim && k < n; t += 16, k++) {
+    if (!iv.anim(t)) iv.anim = null;
+    iv.applyFold();
+  }
+}
+/** The brackets' stack's innermost row as the view now draws it (stackAt of levelNow, ToLaD#288). */
+const stackTop = (v: FanView) => (v as unknown as { brackets: { atKey: { up: FanNode[] } | null } | null }).brackets?.atKey?.up[0] ?? null;
+const backing = (v: FanView) => (v as unknown as { backing: { lv: Level; cam: Camera } | null }).backing;
+
+describe('a double tap goes up one level on every route, never back (ToLaD#301)', () => {
+  /**
+   * A double tap from where the view is (`how`: landed; mid-flight, its touch coming down while a tap's flight is under
+   * way; or its first tap already run as a single tap, the double-tap window's timer first): it lands on the parent
+   * level (wantUp of the level the view was at, or that the flight lands on) and the stack shows it. The view put back.
+   */
+  const check = (v: FanView, label: string, bad: string[], how: 'landed' | 'mid' | 'ran', tapTo?: [number, number]) => {
+    const cam = { ...v.cam };
+    const tapAt = P(v).tapAt;
+    let from = v.levelNow(true);
+    let want = wantUp(v, from);
+    if (how !== 'landed') {
+      if (!tapTo) return;
+      v.tap(...tapTo);
+      if (!P(v).anim) return;
+      if (how === 'mid') {
+        // (Its flight a few frames along, then the double tap's touch: down, a little jitter, up.)
+        const to = backing(v)!;
+        from = to.lv;
+        const at = v.cam;
+        v.cam = to.cam;
+        want = wantUp(v, from);
+        v.cam = at;
+        fly(v, 5);
+        v.gestureStart();
+        v.pan(2, -1);
+        v.gestureEnd();
+      } else fly(v, 2);
+    }
+    v.doubleTap(-1e4, -1e4, how === 'ran');
+    run(v);
+    const now = v.levelNow(true);
+    if (want ? now.v !== want || !atFrame(v, now) : !atFrame(v, from))
+      bad.push(`${label} (${how}): from ${nameOf(from)} went to ${nameOf(now)}, not ${want ? levelName(want) : 'nowhere'}`);
+    if (want && stackTop(v) !== want) bad.push(`${label} (${how}): the stack shows ${stackTop(v) ? levelName(stackTop(v)!) : 'nothing'}, not ${levelName(want)}`);
+    v.cam = cam;
+    v.camera.settle();
+    P(v).applyFold();
+    P(v).tapAt = tapAt;
+    settle(v);
+  };
+  /** Down each target's column tap by tap from home, every route checked at each level; then a search pick of it, double taps up to home. */
+  const walk = (v: FanView, targets: FanBranch[], bad: string[], down = true) => {
+    for (const b of targets) {
+      const name = b.sp.common || b.sp.sci;
+      home(v);
+      for (let k = 0; down && k < 10; k++) {
+        const lv = v.levelNow(true);
+        for (const how of ['landed', 'mid', 'ran'] as const) check(v, `${name} at ${nameOf(lv)}`, bad, how, onColumn(v, b));
+        if (lv.b) break;
+        v.tap(...onColumn(v, b));
+        if (!P(v).anim) break;
+        run(v);
+      }
+      home(v);
+      v.flyToSpecies(b.sp);
+      run(v);
+      for (let k = 0; k < 12; k++) {
+        const from = v.levelNow(true);
+        const want = wantUp(v, from);
+        v.doubleTap(-1e4, -1e4);
+        if (!want) break;
+        run(v);
+        const now = v.levelNow(true);
+        if (now.v !== want) bad.push(`${name} (search): from ${nameOf(from)} went to ${nameOf(now)}, not ${levelName(want)}`);
+        if (stackTop(v) !== want) bad.push(`${name} (search): the stack shows ${stackTop(v) ? levelName(stackTop(v)!) : 'nothing'}, not ${levelName(want)}`);
+      }
+      if (!atHome(v)) bad.push(`${name} (search): double taps stopped away from home`);
+    }
+  };
+  for (const [name, mk] of FANS) {
+    it(`${name}: tapped down, from each level landed, mid-flight and with the first tap run; a search pick`, () => {
+      const v = mk();
+      const bad: string[] = [];
+      const bs = v.fan.branches;
+      walk(v, [bs[4], bs[Math.floor(bs.length / 2)], bs[bs.length - 3]], bad);
+      expect(bad).toEqual([]);
+    });
+  }
+
+  it('carnivores: after a pinch into a level, up from it, not back to its frame', () => {
+    const v = stubView();
+    const bad: string[] = [];
+    let n = 0;
+    levelsOnTheWay(v, Math.ceil(v.fan.branches.length / 3), (v) => {
+      const lv = v.levelNow(true);
+      if (lv.b) return;
+      const cam = { ...v.cam };
+      v.gestureStart();
+      v.zoom(v.w / 2, v.h / 2, 1.8, 1.4);
+      v.gestureEnd();
+      settle(v);
+      n++;
+      check(v, `${nameOf(lv)} pinched`, bad, 'landed');
+      v.cam = cam;
+      v.camera.settle();
+      P(v).applyFold();
+      settle(v);
+    });
+    expect(bad).toEqual([]);
+    expect(n).toBeGreaterThan(3);
+  });
+
+  it("at home, a double tap whose first tap ran puts that tap's flight back: home", () => {
+    const v = stubView(FELIDAE, FELIDAE_TREE, false);
+    home(v);
+    v.tap(...onColumn(v, v.fan.branches[7]));
+    expect(!!P(v).anim).toBe(true);
+    fly(v, 3);
+    v.doubleTap(-1e4, -1e4, true);
+    run(v);
+    expect(atHome(v)).toBe(true);
+  });
+
+  it('mammals: down to the humans (Hominini, Homo), the chimpanzee and the polar bear, and a search pick of each', async () => {
+    await loadMammalsFromFiles();
+    const v = stubView(mammaliaClade(), mammaliaTree(), false);
+    const bad: string[] = [];
+    const targets = ['Homo sapiens', 'Pan troglodytes', 'Ursus maritimus'].map((s) => v.fan.branches.find((b) => b.sp.sci === s)!).filter(Boolean);
+    expect(targets.length).toBe(3);
+    walk(v, targets.slice(0, 1), bad);
+    walk(v, targets.slice(1), bad, false);
+    expect(bad).toEqual([]);
+  }, 300000);
 });
 
 describe('a tap landing on a species opens its card; a search pick too (ToLaD#266)', () => {

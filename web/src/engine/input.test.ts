@@ -228,7 +228,7 @@ describe('a single tap held for the double-tap window (ToLaD#241)', () => {
     const noop = () => {};
     new Input(
       el as unknown as HTMLElement,
-      { gestureStart: noop, gestureEnd: noop, pan: noop, zoom: noop, fling: noop, doubleTap: (x) => log.push(`double ${x}`), tap: (x) => log.push(`tap ${x}`), tapWaits: () => waits },
+      { gestureStart: noop, gestureEnd: noop, pan: noop, zoom: noop, fling: noop, doubleTap: (x, _y, ran) => log.push(`double ${x}${ran ? ' (its first tap ran)' : ''}`), tap: (x) => log.push(`tap ${x}`), tapWaits: () => waits },
       true,
     );
     let now = 1000;
@@ -253,7 +253,9 @@ describe('a single tap held for the double-tap window (ToLaD#241)', () => {
       }
       on.get('pointerup')!(ev(x + 50));
     };
-    return { log, tap, drag, wait: step };
+    // (The window's timer runs, the clock the events carry not moved: a busy frame holding the next tap's events back.)
+    const lag = (ms: number) => vi.advanceTimersByTime(ms);
+    return { log, tap, drag, wait: step, lag };
   }
 
   it('a lone held tap runs once the window has passed, not before', () => {
@@ -272,6 +274,15 @@ describe('a single tap held for the double-tap window (ToLaD#241)', () => {
     r.tap(105, 120);
     r.wait(1000);
     expect(r.log).toEqual(['double 105']);
+  });
+
+  it('a double-tap whose first tap the timer ran before its events came in says so (ToLaD#301)', () => {
+    const r = taps(true);
+    r.tap(100);
+    r.lag(DOUBLE_TAP_MS + 40);
+    expect(r.log).toEqual(['tap 100']);
+    r.tap(104, 120);
+    expect(r.log).toEqual(['tap 100', 'double 104 (its first tap ran)']);
   });
 
   it('a pan begun in the window drops the held tap', () => {
