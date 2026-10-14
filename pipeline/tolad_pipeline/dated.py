@@ -41,6 +41,10 @@ S_UPHAM, S_IMPUTED, S_FOSSIL, S_INTERP, S_OVERRIDE, S_ALVAREZ, S_ENSEMBLE, S_UPI
 # ages on the clades both trees share) or "ensemble" (candidate B: their geometric mean). The build scores both.
 AGES = "ensemble"
 GEN_HOW = ["COMBINE reported", "COMBINE imputed", "allometric", "cited (overrides.toml)"]
+# Where a species' adult body mass comes from (model.py: PHYLACINE 1.2 first, then COMBINE, PanTHERIA, COMBINE's
+# imputed value; a species none of them has takes the geometric mean of its nearest clade with data). ToLaD#276.
+MASS_HOW = ["phylacine", "combine", "pantheria", "combine-imputed", "genus mean", "subfamily mean", "family mean",
+            "superfamily mean", "order mean", "clade mean", "Mammalia mean"]
 EPS = 1e-4  # Ma
 SPLIT_CAP = 1.0  # Ma: the oldest an MDD split beside its parent species is placed (dated.build, ToLaD#278)
 
@@ -898,6 +902,15 @@ def gen_entry(nd: Node) -> list | None:
     return [_r(g), GEN_HOW.index(nd.data.get("gen_how", "allometric"))]
 
 
+def mass_entry(nd: Node) -> list | None:
+    """[adult body mass (g), MASS_HOW index]: the model's own mass column (ToLaD#276)."""
+    lm = nd.data.get("log_mass")
+    src = nd.data.get("mass_src")
+    if lm is None or src not in MASS_HOW:
+        return None
+    return [_r(10 ** lm), MASS_HOW.index(src)]
+
+
 def common_name(nd: Node) -> str | None:
     # (Then a curated history's own: the Red List does not assess humans, so "Human" comes from its history, #275;
     # then MDD's, for a species only MDD knows, ToLaD#278.)
@@ -908,7 +921,7 @@ def common_name(nd: Node) -> str | None:
 def file_meta(droot: DNode | None, rows: list[tuple[Node, bool]]) -> dict | None:
     """The dated tree induced on this file's species rows, plus their common names and generation lengths."""
     row_of = {id(nd): i for i, (nd, stub) in enumerate(rows) if not stub}
-    common, gen = {}, {}
+    common, gen, mass = {}, {}, {}
     for nd, stub in rows:
         if stub or not nd.is_leaf or not nd.name:
             continue
@@ -919,7 +932,10 @@ def file_meta(droot: DNode | None, rows: list[tuple[Node, bool]]) -> dict | None
         g = gen_entry(nd)
         if g:
             gen[str(i)] = g
-    out: dict = {"common": common, "gen": gen}
+        m = mass_entry(nd)
+        if m:
+            mass[str(i)] = m
+    out: dict = {"common": common, "gen": gen, "mass": mass}
     if droot is None:
         return out
     marked = {id(nd.data["dleaf"]) for nd, stub in rows if not stub and nd.data.get("dleaf") is not None}
@@ -992,6 +1008,7 @@ def skeleton_meta(droot: DNode | None) -> dict:
         "alvarez": AC_CITE,
         "ages": AGES,
         "gen_how": GEN_HOW,
+        "mass_how": MASS_HOW,
         "common_source": "IUCN Red List 2026-1 (GBIF checklist doi:10.15468/0qnb58), preferred English name",
         "overrides": getattr(droot, "data_notes", []) if droot is not None else [],
     }

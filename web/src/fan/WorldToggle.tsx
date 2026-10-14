@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { WorldLayers } from './world';
 import { wantFitFossils } from './steady';
 import type { NameMode } from './view';
+import type { Measure } from './layout';
 
 const ROWS: [keyof WorldLayers, string][] = [
   ['periods', 'Geological periods'],
@@ -21,7 +22,14 @@ function GlobeIcon() {
   );
 }
 
-export function WorldToggle({ get }: { get: () => { world: WorldLayers; names: NameMode; request(): void } | null }) {
+export function WorldToggle({
+  get,
+  onMeasure,
+}: {
+  get: () => { world: WorldLayers; names: NameMode; measure: Measure; setMeasure(m: Measure): void; request(): void } | null;
+  /** The widths' measure changed (the card says tonnes, ToLaD#276). */
+  onMeasure?: (m: Measure) => void;
+}) {
   const [open, setOpen] = useState(false);
   const [, bump] = useState(0);
   const v = get();
@@ -66,6 +74,23 @@ export function WorldToggle({ get }: { get: () => { world: WorldLayers; names: N
               }}
             />
             Fit fossils
+          </label>
+          {/* What the widths count (ToLaD#276): the individuals alive, or their mass (individuals × adult mass); ?width=mass kept in step. */}
+          <label>
+            Widths
+            <select
+              aria-label="What the widths count"
+              value={v.measure}
+              onChange={(e) => {
+                const m = e.target.value as Measure;
+                v.setMeasure(m);
+                onMeasure?.(m);
+                bump((n) => n + 1);
+              }}
+            >
+              <option value="individuals">individuals</option>
+              <option value="mass">mass (tonnes)</option>
+            </select>
           </label>
           {/* Where the groups' names stand (ToLaD#266): switched in place, the URL's ?names= kept in step. */}
           <label>

@@ -6,10 +6,10 @@
 
 import { drawThumb, labelThumb, thumbsOn, wikiOf } from './wiki';
 import { PIC_D, PIC_LIFT, placePics, type PicSpot } from './pics';
-import { formatCount } from '../data/count';
+import { formatCount, formatMass } from '../data/count';
 import { DOUBLE_TAP_MS, Input, type InputHandlers } from '../engine/input';
 import { clipPoly, FanCamera, type Camera } from './camera';
-import { g, isNode, laneAt, layoutFan, leftAt, nearestStrand, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type EdgeStyle, type Fan, type FanBranch, type FanNode, type WidthMode } from './layout';
+import { g, isNode, laneAt, layoutFan, leftAt, nearestStrand, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type EdgeStyle, type Fan, type FanBranch, type FanNode, type Measure, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01 } from './meshgl';
 import { Lod } from './lod';
@@ -39,6 +39,16 @@ export const textureOn = (() => {
   }
   return (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.TOLAD_TEXTURE === '1';
 })();
+
+/** What the widths count when the page opens (ToLaD#276): `?width=mass` (TOLAD_WIDTH=mass in node) weighs the individuals by their adult mass. */
+export function initialMeasure(): Measure {
+  try {
+    if (typeof location !== 'undefined' && new URLSearchParams(location.search).get('width') === 'mass') return 'mass';
+  } catch {
+    /* no URL */
+  }
+  return (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.TOLAD_WIDTH === 'mass' ? 'mass' : 'individuals';
+}
 
 /** Alive now: the one luminous colour. */
 export const GREEN = '#3fd286';
@@ -1832,9 +1842,11 @@ export interface Lineage {
   node: FanNode;
   name: string;
   ageMa: number;
-  /** Individuals alive then (model) and the share with living descendants today. */
+  /** Individuals alive then (model; by mass, ToLaD#276: their mass, kg) and the share with living descendants today. */
   alive: number;
   green: number;
+  /** What `alive` counts (the fan's widths). */
+  measure: Measure;
   /** The species it is the ancestor of, left to right (common names). */
   of: string[];
 }
@@ -1842,7 +1854,7 @@ export interface Lineage {
 /** The lineage in the column strand b is in at age `ageMa` (at or below its split). */
 export function lineageAt(b: FanBranch, fan: Fan, ageMa: number): Lineage {
   const v = segAt(b, fan.time.y(ageMa)).node;
-  return { node: v, name: v.name, ageMa, alive: v.n, green: nodeQ(v, ageMa), of: v.strands.map((s) => s.sp.common) };
+  return { node: v, name: v.name, ageMa, alive: v.n, green: nodeQ(v, ageMa), measure: fan.measure, of: v.strands.map((s) => s.sp.common) };
 }
 
 /**
@@ -1887,6 +1899,8 @@ export class FanView implements InputHandlers {
   readonly input: Input;
   readonly camera: FanCamera;
   mode: WidthMode = 'linear';
+  /** What the widths count (ToLaD#276): individuals, or their mass. */
+  measure: Measure = initialMeasure();
   edge: EdgeStyle = 'curved';
   dpr = 1;
   selected: SpeciesRec | null = null;
@@ -1974,7 +1988,7 @@ export class FanView implements InputHandlers {
         glc.remove();
       }
     }
-    this.camera = new FanCamera(this.withFold(layoutFan(clade, this.mode, tree, this.edge)), (b) => this.model(b));
+    this.camera = new FanCamera(this.withFold(layoutFan(clade, this.mode, tree, this.edge, this.measure)), (b) => this.model(b));
     // Width and time zoom separately (#138): a sideways pinch zooms width, an upright one time, a diagonal both.
     this.input = new Input(canvas, this, true);
     this.ro = new ResizeObserver(() => this.resize());
@@ -2252,6 +2266,21 @@ export class FanView implements InputHandlers {
     this.relayout();
   }
 
+  /** What the widths count (the toggle, ToLaD#276): the same tree and order, the camera stays put; `?width=mass` kept in step. */
+  setMeasure(measure: Measure): void {
+    if (measure === this.measure) return;
+    this.measure = measure;
+    this.relayout();
+    try {
+      const u = new URL(window.location.href);
+      if (measure === 'mass') u.searchParams.set('width', 'mass');
+      else u.searchParams.delete('width');
+      window.history.replaceState(null, '', u.toString());
+    } catch {
+      /* no URL */
+    }
+  }
+
   /** The edges' design (the toggle): curved or straight. Same data, the camera stays put. */
   setEdge(edge: EdgeStyle): void {
     if (edge === this.edge) return;
@@ -2260,7 +2289,7 @@ export class FanView implements InputHandlers {
   }
 
   private relayout(): void {
-    this.camera.fan = this.withFold(layoutFan(this.clade, this.mode, this.tree, this.edge));
+    this.camera.fan = this.withFold(layoutFan(this.clade, this.mode, this.tree, this.edge, this.measure));
     this.camera.settle();
     this.request();
   }
@@ -2949,7 +2978,8 @@ export class FanView implements InputHandlers {
       for (const b of this.fan.branches) if (!lod || lod.of[b.index] < 0) this.drawStrand(b);
       if (lod) for (const v of lod.merged) this.drawMerged(v);
     }
-    if (textureOn && !hide.has('ind')) for (const b of this.fan.branches) if (!lod || lod.of[b.index] < 0) this.drawIndividuals(b);
+    // (Mass widths have no individuals' lattice: the texture is the individuals' own.)
+    if (textureOn && this.measure !== 'mass' && !hide.has('ind')) for (const b of this.fan.branches) if (!lod || lod.of[b.index] < 0) this.drawIndividuals(b);
     if (!hide.has('held')) this.drawHeld();
     if (!hide.has('events')) this.drawEvents();
     if (!hide.has('fade')) this.drawStemFade();
@@ -3986,23 +4016,26 @@ export class FanView implements InputHandlers {
    * that much wider holds more: a factor near 1.
    */
   widthScale(): { px: number; label: string } {
-    const unitPx = this.fan.branches[0].unit * this.cam.sx; // px per individual (linear) or per decade (log)
+    const unitPx = this.fan.branches[0].unit * this.cam.sx; // px per individual (linear) or per decade (log); per kg by mass
     const target = 70;
+    const mass = this.measure === 'mass';
+    // (By mass, ToLaD#276: kg, said in tonnes from one tonne up.)
+    const say = (n: number) => (mass ? formatMass(n, { exact: true }) : `${formatCount(n, { exact: true })} ${n === 1 ? 'individual' : 'individuals'}`);
     if (this.mode === 'linear') {
-      const per = 1 / unitPx; // individuals per px
-      const n = Math.max(1, niceStep(target * per));
+      const per = 1 / unitPx; // individuals (kg) per px
+      const n = Math.max(mass ? 0.001 : 1, niceStep(target * per));
       const px = n / per;
-      return { px, label: `${formatCount(n, { exact: true })} ${n === 1 ? 'individual' : 'individuals'}` };
+      return { px, label: say(n) };
     }
     if (unitPx <= target * 2.5) {
       // (Width 1 + k for 10^k: the k nearest the bar's length in ratio, within 0..10.)
       let k = 0;
       for (let j = 1; j <= 10; j++) if (Math.abs(Math.log((1 + j) * unitPx / target)) < Math.abs(Math.log((1 + k) * unitPx / target))) k = j;
       const n = 10 ** k;
-      return { px: (1 + k) * unitPx, label: `${formatCount(n, { exact: true })} ${n === 1 ? 'individual' : 'individuals'} · log widths` };
+      return { px: (1 + k) * unitPx, label: `${say(n)} · log widths` };
     }
     const fct = Math.pow(10, target / unitPx);
-    return { px: target, label: `×${fct < 1.1 ? fct.toFixed(4) : fct.toFixed(2)} individuals a bar wider · log widths` };
+    return { px: target, label: `×${fct < 1.1 ? fct.toFixed(4) : fct.toFixed(2)} ${mass ? 'the mass' : 'individuals'} a bar wider · log widths` };
   }
 
   private drawWidthScale(): void {
@@ -4028,7 +4061,7 @@ export class FanView implements InputHandlers {
     const lines = [
       `width ×${(c.sx / h.sx).toPrecision(4)}  time ×${(c.sy / h.sy).toPrecision(4)} (asked ×${(c.ty / h.sy).toPrecision(3)})`,
       `screen ${formatYearsAgo(yrs).replace(' ago', '')} · top ${formatYearsAgo(Math.max(0, this.camera.years(yTop)))}`,
-      `${this.mode === 'linear' ? `${perPx.toPrecision(3)} individuals/px` : `${perPx.toPrecision(3)} log units/px`}`,
+      `${this.mode === 'linear' ? `${perPx.toPrecision(3)} ${this.measure === 'mass' ? 'kg' : 'individuals'}/px` : `${perPx.toPrecision(3)} log units/px`}`,
     ];
     const ctx = this.ctx;
     ctx.save();
