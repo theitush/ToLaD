@@ -1,5 +1,4 @@
-// The main view: the dated Panthera tree, OneZoom-style. The time river is
-// still available at ?river (and the synthetic spike tree at ?synthetic).
+// The main view: the dated tree, OneZoom-style.
 
 import * as MeshMirror from './mesh';
 import { useEffect, useRef, useState, type PointerEvent as RPointerEvent, type ReactNode } from 'react';

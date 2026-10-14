@@ -50,7 +50,6 @@ type Priv = {
   nameWidth(t: string): number;
   barRect(): number[] | null;
   plusRoom: Map<string, number>;
-  names: 'beside';
   brackets: { named(v: unknown): boolean } | null;
 };
 const P = (v: FanView) => v as unknown as Priv;
@@ -58,7 +57,7 @@ const P = (v: FanView) => v as unknown as Priv;
 function fresh(v: FanView): LabelSpot[] {
   const p = P(v);
   const L = p.labLast!;
-  return labelSpots(v.camera, v.fan, L.top, (t) => p.nameWidth(t), p.barRect()?.[0], p.brackets ?? undefined, (id) => p.plusRoom.get(id) ?? 0, undefined, null, labelGroups(v.fan, v.levelNow()), p.names);
+  return labelSpots(v.camera, v.fan, L.top, (t) => p.nameWidth(t), p.barRect()?.[0], p.brackets ?? undefined, (id) => p.plusRoom.get(id) ?? 0, undefined, null, labelGroups(v.fan, v.levelNow()));
 }
 const key = (s: LabelSpot) => `${s.key} ${s.x.toFixed(3)} ${s.y1.toFixed(3)} ${s.box.map((q) => q.toFixed(3)).join(',')} ${s.fit.toFixed(3)}`;
 

@@ -43,7 +43,7 @@ const LIFE_SAMPLES = 48;
 
 /**
  * Whether a level whose living members dwarf its fossils is framed on the fossils (ToLaD#289): ?fit=fossils, or
- * TOLAD_FIT=fossils in node; the globe menu's "Fit fossils". It turns on the rooms by life (wantLifeRooms) too. Off by default.
+ * TOLAD_FIT=fossils in node; the globe menu's "Fit fossils". It turns on the rooms by life (wantLifeRooms, computeLife). Off by default.
  */
 export function wantFitFossils(): boolean {
   try {
@@ -59,21 +59,11 @@ export function wantFitFossils(): boolean {
 }
 
 /**
- * Whether a fossil's room is only what it stood beside while it lived (ToLaD#289): ?rooms=life, or TOLAD_ROOMS=life
- * in node. Off by default: every room is its widest ever, so a hominin fossil stands beside the humans' 8e9-wide room.
+ * Whether a fossil's room is only what it stood beside while it lived (ToLaD#289): under ?fit=fossils, which needs it
+ * (its hominins' columns and names, fit.test.ts, were measured with these rooms). Else every room is its widest ever.
  */
 export function wantLifeRooms(): boolean {
-  if (wantFitFossils()) return true;
-  try {
-    if (typeof location !== 'undefined') {
-      const q = new URLSearchParams(location.search).get('rooms');
-      if (q) return q === 'life';
-    }
-  } catch {
-    /* no URL */
-  }
-  const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
-  return env?.TOLAD_ROOMS === 'life';
+  return wantFitFossils();
 }
 
 /** The rooms and places at one set of a's and width zoom (world x, the stem's centre on Fold.home). */

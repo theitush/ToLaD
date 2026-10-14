@@ -5,7 +5,7 @@ import { laneAt, layoutFan, leftAt, type FanBranch, type FanNode } from './layou
 import { CARNIVORA, FELIDAE, mammaliaClade, type CladeRec } from './panthera';
 import { loadMammalsFromFiles } from './mammals-node';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, type Split } from './splits';
-import { FanView, groupAlive, groupFace, holds, isLevel, labelGroups, labelSpots, levelName, levelUp, NAME_MODES, nextLevels, type Level } from './view';
+import { FanView, groupAlive, groupFace, holds, isLevel, labelGroups, labelSpots, levelName, levelUp, nextLevels, type Level } from './view';
 import type { Camera } from './camera';
 import { wikiOf } from './wiki';
 import { PIC_LIFT, PIC_OVERLAP } from './pics';
@@ -388,12 +388,11 @@ describe.skipIf(wantCutLabels())('a "+x" stands for the names hidden near it; ta
   }
 });
 
-describe("the groups' names beside, mid-branch or between branches: none meet (ToLaD#266)", () => {
+describe("the groups' names mid-branch: none meet (ToLaD#266, #342)", () => {
   for (const [name, mk] of FANS) {
-    for (const mode of NAME_MODES) {
-      it(`${name}: ${mode}`, () => {
+    {
+      it(name, () => {
         const v = mk();
-        v.names = mode;
         const bad: string[] = [];
         let shown = 0;
         levelsOnTheWay(v, v.fan.tess.fold ? 61 : 7, (v) => {
@@ -406,7 +405,6 @@ describe("the groups' names beside, mid-branch or between branches: none meet (T
               const [p, q] = [hits[i].box, hits[j].box];
               if (p[0] < q[2] && q[0] < p[2] && p[1] < q[3] && q[1] < p[3]) bad.push(`${at}: ${nameOf(hits[i].lv)} meets ${nameOf(hits[j].lv)}`);
             }
-          if (mode === 'beside') return;
           // Along its branch: between "now" (its tip) and where it splits off, as far as the screen shows.
           for (const h of hits) {
             const wTop = h.lv.b ? Math.max(h.lv.b.tipY, v.fan.time.y(0)) : v.fan.time.y(0);

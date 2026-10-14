@@ -126,23 +126,6 @@ const LABEL_GAP = 3;
 /** A name's room beside a column (px): its gap, the pill, and the fade's margin from the screen's edge (ToLaD#319). */
 const PILL_ROOM_PX = LABEL_GAP + LABEL_PILL + 6;
 
-/**
- * Where a level's group names stand (ToLaD#266, Ita: "lets try", a toggle): `beside` its branch just below "now"
- * (ToLaD#262), `mid` along its branch halfway between "now" and where it splits off, or `gap` between its branch and
- * its neighbour's at that same height. Each of the last two clamped to the part on screen.
- */
-export type NameMode = 'beside' | 'mid' | 'gap';
-export const NAME_MODES: readonly NameMode[] = ['beside', 'mid', 'gap'];
-/** The names' place asked for: ?names=mid|gap (else beside). */
-export function wantNames(): NameMode {
-  try {
-    const q = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('names') : null;
-    if (q === 'mid' || q === 'gap') return q;
-  } catch {
-    /* no URL */
-  }
-  return 'beside';
-}
 /** While the view moves, the labels and brackets are laid out again at most this often (ms) and every this many frames (ToLaD#255); carried with the camera between. */
 const LABEL_MS = 150;
 const LABEL_FRAMES = 3;
@@ -1209,7 +1192,6 @@ export function labelSpots(
   famOf?: (id: string) => FanNode | undefined,
   lod?: Lod | null,
   level?: LabelGroups,
-  names: NameMode = 'beside',
 ): LabelSpot[] {
   const half = LABEL_PILL / 2;
   const X = (x: number) => c.toScreen(x, 0)[0];
@@ -1523,22 +1505,11 @@ export function labelSpots(
       const fit = f > 0 && onX ? f * clearFit(Math.min(x - half - LABEL_AXIS_X, loose ? CLEAR : clearance(x - half, x + half, y0, y1, own) + 2)) : 0;
       return { key: `${id}:${key}`, id, place, ...ref, text, rank, x, y1, box, fit, loose: loose || undefined };
     };
-    if (names === 'mid') {
-      // On its branch, opaque (over its own columns), its middle on screen right of the axis.
-      const lo = Math.max(L, LABEL_AXIS_X + half + 4);
-      const hi = Math.min(R, c.w) - half;
-      const x = lo <= hi ? (lo + hi) / 2 : Math.min(Math.max((L + R) / 2, LABEL_AXIS_X + half + 4), c.w - half);
-      return [spot('mid', 'in', x, true)];
-    }
-    // In the gap to its right, else to its left (with no neighbour there, just beside the branch); clear of the
-    // columns, else over them.
-    const nr = nextEdge(R, wy, true);
-    const nl = nextEdge(L, wy, false);
-    const xr = nr !== null && nr - R >= LABEL_PILL + 2 * LABEL_GAP ? (R + nr) / 2 : R + LABEL_GAP + half;
-    const xl = nl !== null && L - nl >= LABEL_PILL + 2 * LABEL_GAP ? (L + nl) / 2 : L - LABEL_GAP - half;
-    const xr2 = nr !== null ? (R + nr) / 2 : xr;
-    const xl2 = nl !== null ? (L + nl) / 2 : xl;
-    return [spot('gapR', 'right', xr, false), spot('gapL', 'left', xl, false), spot('gapR~', 'right', xr2, true), spot('gapL~', 'left', xl2, true)];
+    // On its branch, opaque (over its own columns), its middle on screen right of the axis.
+    const lo = Math.max(L, LABEL_AXIS_X + half + 4);
+    const hi = Math.min(R, c.w) - half;
+    const x = lo <= hi ? (lo + hi) / 2 : Math.min(Math.max((L + R) / 2, LABEL_AXIS_X + half + 4), c.w - half);
+    return [spot('mid', 'in', x, true)];
   };
 
   const out: LabelSpot[] = [];
@@ -1558,17 +1529,10 @@ export function labelSpots(
       const [wa, wb] = groupExtent(v);
       const cx = (wa + wb) / 2;
       if (!(X(wb) > 0 && X(wa) < c.w)) continue;
-      // (A living column, where it has one: on "now", under its picture.)
-      const own = columnNear(v, cx);
       const px = plus?.(`n${vi}`) ?? 0;
       const rank: Rank = [-1, wb - wa, vi];
-      // (Or along its branch, or between it and its neighbour, ToLaD#266: halfway down to where it splits off.)
-      if (names !== 'beside') {
-        for (const p of along(`n${vi}`, text, rank, measure(text) + 2 * LABEL_PAD + px, v, nowY, v.yBot, nowOn, { v })) out.push({ ...p, fam: v, pic: groupFace(v), plus: px });
-        continue;
-      }
-      for (const p of beside(`n${vi}`, text, rank, measure(text) + 2 * LABEL_PAD + px, own, Math.max(standS, Y(own.tipY)) + 4, Y(own.splitY), levelOn, { v }, true))
-        out.push({ ...p, fam: v, pic: groupFace(v), plus: px });
+      // Along its branch, halfway down from "now" to where it splits off (ToLaD#266, #342).
+      for (const p of along(`n${vi}`, text, rank, measure(text) + 2 * LABEL_PAD + px, v, nowY, v.yBot, nowOn, { v })) out.push({ ...p, fam: v, pic: groupFace(v), plus: px });
       continue;
     }
     const [wa, wb] = familySpan(v);
@@ -1601,49 +1565,7 @@ export function labelSpots(
       const px = plus?.(id) ?? 0;
       const text = levelText(b);
       const len = measure(text) + 2 * LABEL_PAD + px;
-      if (names !== 'beside') {
-        out.push(...along(id, text, [0, b.width, b.index], len, b, Math.max(nowY, b.tipY), b.splitY, 1, { b }).map((p) => ({ ...p, plus: px })));
-        continue;
-      }
-      const y0 = Math.max(standS, Y(b.tipY)) + 4;
-      // (A neighbouring level's species after the level's own, ToLaD#297.)
-      const mine = !level.own || level.own.has(b);
-      const rank: Rank = [mine ? 0 : 0.25, b.width, b.index];
-      // (The fossils' frame, its own species: more places to try, ToLaD#297; a neighbour's name stays by its column.)
-      const more = fossils && mine;
-      const sp = beside(id, text, rank, len, b, y0, Y(b.splitY), 1, { b }, true).map((p) => ({ ...p, plus: px }));
-      // (ToLaD#297: or further down its column, a name's length at a time, where a neighbour's name stands at its tip.)
-      if (more) for (let k = 1; k <= 2; k++) for (const p of beside(id, text, rank, len, b, y0 + k * (len + LABEL_GAP), Y(b.splitY), 1, { b }, true)) sp.push({ ...p, key: `${p.key}+${k}`, plus: px });
-      // (Under the fossils' frame, a fossil's, ToLaD#297: failing room beside its column, over its picture on its tip.
-      // An old one near the screen's foot has no room below its tip; over it, the air the younger ones left.)
-      const ty = Y(b.tipY);
-      if (fossils && b.tipY > nowY && ty > top && ty < c.h) {
-        const x = X(stripMid(b));
-        const y1 = ty - PIC_LIFT - PIC_D - LABEL_GAP;
-        const ya = y1 - len;
-        const xa = x - half;
-        const xb = x + half;
-        // (Faded in over 24 px under the top line and 12 px in from the screen's sides, not cut: a pinch's frames keep it, ToLaD#311.)
-        const onFit = (xa: number, ya: number, xb: number, y1: number) => botFit(y1) * clamp01((ya - top) / 24) * clamp01(xa / 12) * clamp01((c.w - xb) / 12);
-        const f0 = onFit(xa, ya, xb, y1);
-        const fit = f0 > 0 ? f0 * clearFit(Math.min(xa - LABEL_AXIS_X, clearance(xa, xb, ya, y1, b))) : 0;
-        const o = { id, place: 'over' as const, b, text, rank, x, y1, plus: px };
-        sp.push({ ...o, key: `${id}:over`, box: [xa, ya, xb, y1], fit });
-        // (Failing a clear one, over the columns there, opaque: clear of the axis and the other names. Under fossils'
-        // frame, crowded, beside its picture, or further up, a name's length at a time.)
-        const loose = (key: string, x: number, y1: number) => {
-          const [xa, ya, xb] = [x - half, y1 - len, x + half];
-          sp.push({ ...o, key: `${id}:${key}`, x, y1, box: [xa, ya, xb, y1], loose: true, fit: onFit(xa, ya, xb, y1) * clearFit(xa - LABEL_AXIS_X) });
-        };
-        loose('over~', x, y1);
-        if (more) {
-          const side = PIC_D / 2 + LABEL_GAP + half;
-          loose('over~r', x + side, ty - 2);
-          loose('over~l', x - side, ty - 2);
-          for (let k = 1; k <= 2; k++) loose(`over~${k}`, x, y1 - k * (len + LABEL_GAP));
-        }
-      }
-      out.push(...sp);
+      out.push(...along(id, text, [0, b.width, b.index], len, b, Math.max(nowY, b.tipY), b.splitY, 1, { b }).map((p) => ({ ...p, plus: px })));
       continue;
     }
     // (Standing for its family, ToLaD#212: the family's name on its tip, last frame's familyPills.)
@@ -1957,8 +1879,6 @@ export class FanView implements InputHandlers {
   readonly gl: FanGL | null = null;
   /** The world on the time axis (world.ts): its layers on or off, and the axis labels it keeps clear of. */
   world = worldFlags(typeof location !== 'undefined' ? location.search : '');
-  /** Where a level's group names stand (ToLaD#266): ?names=, switched in the globe menu. */
-  names: NameMode = wantNames();
   readonly axisBoxes: Box[] = [];
   /** Frame times (ms, CPU side of draw()), for perf runs. */
   readonly frameMs: number[] = [];
@@ -3045,7 +2965,7 @@ export class FanView implements InputHandlers {
     const moving = this.gesturing || !!this.anim;
     // (Carried across a change in the clades drawn as one, lod.gen, ToLaD#255: at the mammal level a pinch changes them on
     // almost every frame. Carried names may then differ from a layout's; at rest they never do, below.)
-    const same = L && L.fan === this.fan && L.lg === lg && L.lod === lod && L.w === this.w && L.h === this.h && L.names === this.names && L.topLine === this.labelTop();
+    const same = L && L.fan === this.fan && L.lg === lg && L.lod === lod && L.w === this.w && L.h === this.h && L.topLine === this.labelTop();
     if (L && same && moving && labelCarry && (t0 - L.t < LABEL_MS || L.frames < LABEL_FRAMES)) {
       const ax = c.sx / L.cam.sx;
       const ay = c.sy / L.cam.sy;
@@ -3064,7 +2984,7 @@ export class FanView implements InputHandlers {
     // (ToLaD#262: each group's name beside its branch, room at its end for the "+x" of the names hidden near it last frame.)
     const topLine = this.labelTop();
     const top = topLine + (br ? br.pinH() * br.pinA : 0);
-    const lay = (room: Map<string, number>) => labelSpots(this.camera, this.fan, top, (t) => this.nameWidth(t), this.barRect()?.[0], br ?? undefined, (id) => room.get(id) ?? 0, undefined, lod, lg, this.names);
+    const lay = (room: Map<string, number>) => labelSpots(this.camera, this.fan, top, (t) => this.nameWidth(t), this.barRect()?.[0], br ?? undefined, (id) => room.get(id) ?? 0, undefined, lod, lg);
     let spots: LabelSpot[];
     this.labClean = !moving;
     if (moving) spots = lay(this.plusRoom);
@@ -3072,7 +2992,7 @@ export class FanView implements InputHandlers {
       // At rest (ToLaD#255): what a still view at this camera gives, whatever the way here. The names shown chosen afresh
       // (no hysteresis, drawLabels), and the "+x" room from none: laid out, its room counted, again until the room
       // holds (once more as a rule). The room it settled on kept for the frames after at this same camera.
-      const key = `${c.cx}|${c.cy}|${c.sx}|${c.sy}|${this.w}|${this.h}|${top}|${this.names}|${lod?.gen ?? -1}|${this.nameWFont}`;
+      const key = `${c.cx}|${c.cy}|${c.sx}|${c.sy}|${this.w}|${this.h}|${top}|${lod?.gen ?? -1}|${this.nameWFont}`;
       const R = this.restRoom;
       let room = R && R.fan === this.fan && R.lg === lg && R.key === key ? R.room : new Map<string, number>();
       spots = lay(room);
@@ -3088,7 +3008,7 @@ export class FanView implements InputHandlers {
       this.plusRoom = room;
       this.restRoom = { fan: this.fan, lg, key, room };
     }
-    this.labLast = { fan: this.fan, lg, lod, lodGen: lod?.gen ?? -1, w: this.w, h: this.h, names: this.names, topLine, t: t0, frames: 0, cam: { ...c }, br, top, spots };
+    this.labLast = { fan: this.fan, lg, lod, lodGen: lod?.gen ?? -1, w: this.w, h: this.h, topLine, t: t0, frames: 0, cam: { ...c }, br, top, spots };
     this.labelMs.push(performance.now() - t0);
     this.labelLayMs.push(performance.now() - t0);
     if (this.labelLayMs.length > 600) this.labelLayMs.shift();
@@ -3098,7 +3018,7 @@ export class FanView implements InputHandlers {
   private terr: { fan: Fan; fold: unknown; w: number; t: CutTerritories } | null = null;
   private territories(): CutTerritories | null {
     const f = this.fan.tess.fold;
-    // (Off under the rooms by life, ?rooms=life / ?fit=fossils: Steady's computeLife places the columns otherwise than
+    // (Off under the rooms by life, ?fit=fossils: Steady's computeLife places the columns otherwise than
     // the territories' widest rooms, so the cut's boxes would not be where the columns are. Today's labels there.)
     if (!FanView.labelsCut || !(f instanceof Steady) || f.life) return null;
     const P = this.terr;
@@ -3199,7 +3119,6 @@ export class FanView implements InputHandlers {
     lodGen: number;
     w: number;
     h: number;
-    names: NameMode;
     topLine: number;
     t: number;
     frames: number;
