@@ -1225,7 +1225,8 @@ export class FanView implements InputHandlers {
   private tapAt: { b: FanBranch | null; v: FanNode | null; cam: Camera } | null = null;
   /** The family pills drawn (ToLaD#212): a tap flies to the family, as its bracket's. */
   famHits: { box: [number, number, number, number]; v: FanNode }[] = [];
-  plusHits: { box: [number, number, number, number]; bs: FanBranch[] }[] = [];
+  /** The chips with a "+x" drawn (ToLaD#197, #262): `box` the whole chip (a tap on its name or its badge alike, ToLaD#287), `badge` the badge's end. */
+  plusHits: { box: [number, number, number, number]; badge: [number, number, number, number]; bs: FanBranch[] }[] = [];
   private models = new Map<string, TwigModel>();
   private raf = 0;
   private anim: ((t: number) => boolean) | null = null;
@@ -2898,7 +2899,8 @@ export class FanView implements InputHandlers {
         ctx.fillStyle = INK2;
         ctx.fillText(`+${g.length}`, nx, 0.5);
         ctx.font = font(LABEL_FONT);
-        if (alpha > 0.5) this.plusHits.push({ box: [x0, y0, x1, y1 - LABEL_PAD - nx + PLUS_GAP / 2], bs });
+        // (The whole chip, its name too, is the badge's one tap target, ToLaD#287: "its all the same chip".)
+        if (alpha > 0.5) this.plusHits.push({ box: [x0, y0, x1, y1], badge: [x0, y0, x1, y1 - LABEL_PAD - nx + PLUS_GAP / 2], bs });
       }
       ctx.restore();
       // ToLaD#182: the species' Commons picture under its pill, before the name, once loaded (wiki.ts; `?thumbs=0` off).
