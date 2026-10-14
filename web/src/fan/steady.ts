@@ -31,6 +31,12 @@ import { Fold, ROOM_BEND, type FoldState } from './fold';
 /** A split's fork is at most this share of its shortest daughter's run (to its own split or tip). */
 export const STEADY_RUN = 0.85;
 
+/** Rooms by life: the gap between two daughters where one is a fossil is at most this share of their extents together while both lived. */
+export const LIFE_GAP = 0.5;
+
+/** Rooms by life: a strand's widest over a window is laneW at this many steps (and its ends). */
+const LIFE_SAMPLES = 48;
+
 /** Whether the steady layout is in use: the default (ToLaD#273); ?layout=fold, or TOLAD_LAYOUT=fold in node (tests, perf runs), brings the fold back. */
 export function wantSteady(): boolean {
   try {
@@ -40,6 +46,41 @@ export function wantSteady(): boolean {
   }
   const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
   return env?.TOLAD_LAYOUT !== 'fold';
+}
+
+/**
+ * Whether a level whose living members dwarf its fossils is framed on the fossils (ToLaD#289): ?fit=fossils, or
+ * TOLAD_FIT=fossils in node; the globe menu's "Fit fossils". It turns on the rooms by life (wantLifeRooms) too. Off by default.
+ */
+export function wantFitFossils(): boolean {
+  try {
+    if (typeof location !== 'undefined') {
+      const q = new URLSearchParams(location.search).get('fit');
+      if (q) return q === 'fossils';
+    }
+  } catch {
+    /* no URL */
+  }
+  const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
+  return env?.TOLAD_FIT === 'fossils';
+}
+
+/**
+ * Whether a fossil's room is only what it stood beside while it lived (ToLaD#289): ?rooms=life, or TOLAD_ROOMS=life
+ * in node. Off by default: every room is its widest ever, so a hominin fossil stands beside the humans' 8e9-wide room.
+ */
+export function wantLifeRooms(): boolean {
+  if (wantFitFossils()) return true;
+  try {
+    if (typeof location !== 'undefined') {
+      const q = new URLSearchParams(location.search).get('rooms');
+      if (q) return q === 'life';
+    }
+  } catch {
+    /* no URL */
+  }
+  const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
+  return env?.TOLAD_ROOMS === 'life';
 }
 
 /** The rooms and places at one set of a's and width zoom (world x, the stem's centre on Fold.home). */
@@ -84,11 +125,18 @@ export class Steady extends Fold {
   private rowsVer = -1;
   private readonly sRows = new Map<number, Float64Array>();
   private homeExtS: [number, number] | null = null;
+  /** Rooms by life: per strand its tip, per node its last tip (the youngest), now's height; a strand's widest in a window (laneW sampled), by `${i} ${t0}`. */
+  private readonly tipS: Float64Array;
+  private readonly tipN: Float64Array;
+  private readonly yNow: number;
+  private readonly winW = new Map<string, number>();
 
   /** open: every split open at every zoom (the cats' level), else the fold's openness by zoom. */
   constructor(
     fan: Fan,
     readonly open = false,
+    /** Rooms by life (wantLifeRooms, ToLaD#289): an extinct daughter and its sister stand apart by their extents while both lived. */
+    readonly life = wantLifeRooms(),
   ) {
     super(fan);
     // (A boom stands centred in its room like any column: its centre is constant, ToLaD#259.)
@@ -127,6 +175,15 @@ export class Steady extends Fold {
     this.stack = new Int32Array(N.length + 1);
     const last = (k: FanNode | FanBranch) => (isNode(k) ? k.strands[k.strands.length - 1].index : k.index);
     this.kidPair = N.map((v) => Int32Array.from(v.kids.slice(0, -1), last));
+    // (Rooms by life: each node's last tip, the youngest of its strands', and now.)
+    this.tipS = Float64Array.from(S, (b) => b.tipY);
+    this.tipN = new Float64Array(N.length);
+    for (let j = N.length - 1; j >= 0; j--) {
+      let t = Infinity;
+      for (const k of this.kidsF[j]) t = Math.min(t, k >= 0 ? this.tipN[k] : this.tipS[~k]);
+      this.tipN[j] = t;
+    }
+    this.yNow = yRef;
     if (open) {
       this.a.fill(1);
       this.lambda = 1;
@@ -135,6 +192,7 @@ export class Steady extends Fold {
 
   /** The rooms and places at the a's `A`. */
   private compute(A: Float64Array): Lay {
+    if (this.life) return this.computeLife(A);
     const n = this.nY.length;
     const G = this.pairGap;
     const R = this.room;
@@ -195,6 +253,156 @@ export class Steady extends Fold {
     }
     // The stem's centre on home: where the closed order stands.
     const r = this.idx.get(this.fan.root)!;
+    const sh = this.home - (colL[r] + this.fan.root.width / 2);
+    for (let j = 0; j < n; j++) {
+      colL[j] += sh;
+      roomL[j] += sh;
+    }
+    for (let i = 0; i < C.length; i++) C[i] += sh;
+    return { ver: this.ver, colL, roomL, roomW, h, C };
+  }
+
+  /** Strand i's widest from its split up to window bottom t0 (world y; its tip if later): laneW sampled, its founders' at the split. */
+  private widestSince(i: number, t0: number): number {
+    const b = this.strands[i];
+    const lo = Math.max(t0, b.tipY);
+    const key = `${i} ${lo}`;
+    let w = this.winW.get(key);
+    if (w !== undefined) return w;
+    w = b.baseW;
+    const hi = b.splitY;
+    if (hi > lo) {
+      const age = this.fan.time;
+      for (let k = 0; k <= LIFE_SAMPLES; k++) {
+        const y = lo + ((hi - lo) * k) / LIFE_SAMPLES;
+        w = Math.max(w, laneW(b, y, age.ageAt(y)));
+      }
+    }
+    this.winW.set(key, w);
+    return w;
+  }
+
+  /**
+   * Rooms by life (ToLaD#289): as compute, but a daughter's place in its parent's room is the least that keeps it clear
+   * of every sister before it (with the gaps between) only where both lived: from the split up to the later of their
+   * last tips. Two that live on to now stand apart by their whole rooms, as in compute; a fossil beside the humans by
+   * what the humans were while it lived. Places are still constant between splits (each daughter's offset is one
+   * number); a room is the span of its daughters' at their widest, so offsets may start left of 0 (then shifted).
+   */
+  private computeLife(A: Float64Array): Lay {
+    const n = this.nY.length;
+    const G = this.pairGap;
+    const R = this.room;
+    const NW = this.nW;
+    const now = this.yNow + 1e-9;
+    const roomW = new Float64Array(n);
+    const roomL = new Float64Array(n);
+    const colL = new Float64Array(n);
+    const h = new Float64Array(n);
+    const C = new Float64Array(this.strands.length);
+    /** Per node, its daughters' offsets in its room (kidsF's order); a node's column's left in its room. */
+    const offs: Float64Array[] = new Array(n);
+    const colR = new Float64Array(n);
+    // A daughter's extent [lo, hi] in its own room from its parent's split up to window bottom t0: a strand its column
+    // about its room's centre at its widest there; a node its column below its split, and the daughters alive by t0.
+    const ext = (k: number, t0: number, out: [number, number]): [number, number] => {
+      if (k < 0) {
+        const c = R[~k] / 2;
+        const w = this.widestSince(~k, t0) / 2;
+        out[0] = c - w;
+        out[1] = c + w;
+        return out;
+      }
+      let lo = colR[k];
+      let hi = colR[k] + NW[k];
+      if (this.nY[k] > t0) {
+        const K = this.kidsF[k];
+        const o = offs[k];
+        for (let q = 0; q < K.length; q++) {
+          const d = K[q];
+          // (Nothing to add if its whole room is inside; one dead before t0 stood there while it lived: widestSince starts at its tip.)
+          if (o[q] >= lo && o[q] + (d >= 0 ? roomW[d] : R[~d]) <= hi) continue;
+          ext(d, t0, out);
+          lo = Math.min(lo, o[q] + out[0]);
+          hi = Math.max(hi, o[q] + out[1]);
+        }
+      }
+      out[0] = lo;
+      out[1] = hi;
+      return out;
+    };
+    const ea: [number, number] = [0, 0];
+    const eb: [number, number] = [0, 0];
+    // Rooms, daughters first.
+    for (let j = n - 1; j >= 0; j--) {
+      const K = this.kidsF[j];
+      const P = this.kidPair[j];
+      const m = K.length;
+      const o = new Float64Array(m);
+      const full = new Float64Array(m);
+      const tip = new Float64Array(m);
+      for (let q = 0; q < m; q++) {
+        const k = K[q];
+        full[q] = k >= 0 ? roomW[k] : R[~k];
+        tip[q] = k >= 0 ? this.tipN[k] : this.tipS[~k];
+      }
+      for (let q = 1; q < m; q++) {
+        let x = -Infinity;
+        let g = 0;
+        for (let p = q - 1; p >= 0; p--) {
+          g = Math.max(g, A[P[p]] * G[P[p]]);
+          const t0 = Math.max(tip[p], tip[q]);
+          if (t0 <= now) x = Math.max(x, o[p] + full[p] + g);
+          else {
+            ext(K[p], t0, ea);
+            ext(K[q], t0, eb);
+            // (The gap too: a share of the order's width, the humans' 8e9 at the primates', would dwarf the fossils; at most LIFE_GAP of what the two were then.)
+            const gl = Math.min(g, LIFE_GAP * (ea[1] - ea[0] + eb[1] - eb[0]));
+            x = Math.max(x, o[p] + ea[1] + gl - eb[0]);
+          }
+          // (Those before a sister living to now are clear of q already: they are clear of her column, which q clears.)
+          if (tip[p] <= now) break;
+        }
+        o[q] = x;
+      }
+      let lo = Infinity;
+      let hi = -Infinity;
+      for (let q = 0; q < m; q++) {
+        lo = Math.min(lo, o[q]);
+        hi = Math.max(hi, o[q] + full[q]);
+      }
+      if (!(m > 0)) lo = hi = 0;
+      for (let q = 0; q < m; q++) o[q] -= lo;
+      offs[j] = o;
+      roomW[j] = Math.max(hi - lo, NW[j]);
+      // Its column: where its daughters' founders move least (compute's rule), inside its room.
+      let sw = 0;
+      let s = 0;
+      let c = 0;
+      for (let q = 0; q < m; q++) {
+        const k = K[q];
+        const w = k >= 0 ? NW[k] : this.bw[~k];
+        const t = o[q] + (k >= 0 ? colR[k] + w / 2 : R[~k] / 2);
+        const mw = Math.max(w, 1e-12);
+        s += mw * (t - c - w / 2);
+        sw += mw;
+        c += w;
+      }
+      colR[j] = Math.min(roomW[j] - NW[j], Math.max(0, s / sw));
+      h[j] = this.cap[j];
+    }
+    // Places, parents first (the root's room from 0).
+    for (let j = 0; j < n; j++) {
+      const K = this.kidsF[j];
+      const o = offs[j];
+      colL[j] = roomL[j] + colR[j];
+      for (let q = 0; q < K.length; q++) {
+        const k = K[q];
+        if (k >= 0) roomL[k] = roomL[j] + o[q];
+        else C[~k] = roomL[j] + o[q] + R[~k] / 2;
+      }
+    }
+    const r = this.rootJ;
     const sh = this.home - (colL[r] + this.fan.root.width / 2);
     for (let j = 0; j < n; j++) {
       colL[j] += sh;
