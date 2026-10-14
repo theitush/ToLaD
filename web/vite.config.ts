@@ -151,8 +151,10 @@ function inlineAll(): Plugin {
       if (!html || html.type !== 'asset') return;
       let src = String(html.source);
       for (const [name, b] of Object.entries(bundle)) {
-        if (b.type === 'chunk' && name.endsWith('.js')) {
-          const code = b.code.replace(/<\/script/gi, '<\\/script');
+        // Only the entry is inlined; a lazily imported chunk (the card's globe, ToLaD#267) stays a sibling file.
+        if (b.type === 'chunk' && name.endsWith('.js') && b.isEntry) {
+          // (Vite fills a dynamic import's preload list after this hook; with modulePreload off it is none: void 0.)
+          const code = b.code.replace(/<\/script/gi, '<\\/script').replace(/__VITE_PRELOAD__/g, 'void 0');
           const re = new RegExp(`<script[^>]*src="[^"]*${escapeRe(name)}"[^>]*></script>`);
           src = src.replace(re, () => `<script type="module">${code}</script>`);
           src = src.replace(new RegExp(`<link[^>]*href="[^"]*${escapeRe(name)}"[^>]*>`), '');
@@ -178,7 +180,15 @@ export default defineConfig(({ mode }) => {
     base: './',
     plugins: [react(), toladData(single), pantheraData(), ...(single ? [inlineAll()] : [])],
     build: single
-      ? { outDir: 'dist-single', assetsInlineLimit: 1e9, cssCodeSplit: false, modulePreload: false }
+      ? {
+          outDir: 'dist-single',
+          assetsInlineLimit: 1e9,
+          cssCodeSplit: false,
+          modulePreload: false,
+          // The lazy globe chunk by a fixed name next to index.html (pages.yml stages it: globe-draw.js). The entry is
+          // inlined into index.html, so it too is named at the top level: its import of the chunk is then ./, not ../.
+          rollupOptions: { output: { chunkFileNames: '[name].js', entryFileNames: '[name].js' } },
+        }
       : {},
     server: {
       // `npm run dev -- --host` exposes the dev server on the LAN.

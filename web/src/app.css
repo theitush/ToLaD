@@ -273,7 +273,7 @@
   height: 160px;
 }
 .card-sp .globe.big canvas {
-  width: min(100%, 60vh);
+  width: min(100%, 50vh);
   height: auto;
   aspect-ratio: 1;
 }

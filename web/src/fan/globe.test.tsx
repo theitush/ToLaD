@@ -4,7 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { RangeMap, SpeciesCard } from './FanApp';
-import { drawGlobe, GLOBE_COLORS, RangeGlobe } from './Globe';
+import { loadGlobeCode, RangeGlobe } from './Globe';
+import { drawGlobe, GLOBE_COLORS } from './globe-draw';
 import { globeData, loadGlobe, speciesRange, unpackRuns, type GlobeData } from './globe-data';
 import { FELIDAE } from './panthera';
 
@@ -12,13 +13,14 @@ const here = dirname(fileURLToPath(import.meta.url));
 const DATA = resolve(here, '..', '..', '..', 'data', 'mammals');
 
 // What vite.config.ts globeJson() serves as globe.json.
-beforeAll(() =>
-  loadGlobe(async () => {
+beforeAll(async () => {
+  await loadGlobe(async () => {
     const r = JSON.parse(readFileSync(join(DATA, 'ranges.json'), 'utf8'));
     const land = JSON.parse(readFileSync(join(here, 'globe-land.json'), 'utf8'));
     return { grid: r.grid, land, ranges: r.ranges } as GlobeData;
-  }),
-);
+  });
+  await loadGlobeCode(); // what a card does first: the drawing chunk, the data (already in, here)
+});
 
 /** A 2D context that records what is filled: per fill, its colour and how many rings were drawn into it. */
 function recorder() {

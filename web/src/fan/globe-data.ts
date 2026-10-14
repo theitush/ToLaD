@@ -113,7 +113,8 @@ export function speciesRange(sci: string, d: GlobeData | null = data): SpeciesRa
     y = 0,
     z = 0;
   const rad = Math.PI / 180;
-  for (const i of new Set([...cur, ...nat])) {
+  const all = new Set([...cur, ...nat]);
+  for (const i of all) {
     const row = Math.floor(i / d.grid.cols);
     const lon = (d.grid.lon0 + (i % d.grid.cols) + 0.5) * rad;
     const lat = ((d.grid.lat[row] + d.grid.lat[row + 1]) / 2) * rad;
@@ -122,7 +123,10 @@ export function speciesRange(sci: string, d: GlobeData | null = data): SpeciesRa
     z += Math.sin(lat);
   }
   const h = Math.hypot(x, y);
-  const centre: [number, number] = h + Math.abs(z) < 1e-9 ? [0, 0] : [Math.atan2(y, x) / rad, Math.atan2(z, h) / rad];
+  // A range spread round the world (the whales: its cells' mean vector short) is faced from nearer the equator.
+  const n = all.size;
+  const spread = n ? Math.min(1, Math.hypot(x, y, z) / (0.4 * n)) : 1;
+  const centre: [number, number] = h + Math.abs(z) < 1e-9 ? [0, 0] : [Math.atan2(y, x) / rad, (Math.atan2(z, h) / rad) * spread];
   return { cur: cur.length, lost: lost.length, curShape: shape(cur, d.grid), lostShape: shape(lost, d.grid), centre };
 }
 
