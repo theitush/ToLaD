@@ -77,3 +77,17 @@ export function approxCountsIn(text: string): string {
     return all[at - 1] === '~' ? f.replace(/^~/, '') : f;
   });
 }
+
+/**
+ * A mass in kg as the mass widths say it (ToLaD#276): tonnes from one tonne up ("~3.2 million tonnes", "50 tonnes",
+ * "1 tonne"), kg below ("200 kg"), grams under a kg ("5 g"). `style` as formatCount's, applied to the number shown.
+ */
+export function formatMass(kg: number, style: CountStyle = {}): string {
+  if (!(kg > 0)) return '0 kg';
+  if (kg >= 1000) {
+    const t = formatCount(kg / 1000, style);
+    return `${t} ${t === '1' ? 'tonne' : 'tonnes'}`;
+  }
+  if (kg >= 1) return `${formatCount(kg, style)} kg`;
+  return `${formatCount(kg * 1000, style)} g`;
+}

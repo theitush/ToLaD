@@ -178,6 +178,8 @@ export interface RawSpecies extends RawNode {
   common?: string | null;
   /** Generation length (years) the model uses, and where it came from (DatedMeta.genHow). */
   gen?: { years: number; how: string } | null;
+  /** Adult body mass (g) the model uses, and where it came from (dated/skeleton.json mass_how; ToLaD#276). */
+  mass?: { g: number; how: string } | null;
 }
 
 export interface RawClade extends RawNode {
@@ -203,11 +205,14 @@ export interface DatedFile {
   grafts?: number[];
   common: Record<string, string>;
   gen: Record<string, [number, number]>;
+  /** Adult body mass (g) and its source (an index into mass_how); absent in data before ToLaD#276. */
+  mass?: Record<string, [number, number]>;
   // skeleton.json only
   sources?: string[];
   upham?: string;
   alvarez?: string;
   gen_how?: string[];
+  mass_how?: string[];
   common_source?: string;
   overrides?: { name: string; cite: string; reason: string }[];
   /** The dated tree over every file's species (ToLaD#247): a species is [parent, tile, row]. */
@@ -431,6 +436,7 @@ export function extractClade(
     }
     const nat = f.natural ? f.natural(i) : null;
     const g = dated?.file.gen[i];
+    const m = dated?.file.mass?.[i];
     species.push({
       ...node(f, i),
       parentGid: f.gid(f.parent[i]),
@@ -439,6 +445,7 @@ export function extractClade(
       natural: nat ? { ...nat } : null,
       common: dated?.file.common[i] ?? null,
       gen: g ? { years: g[0], how: dated!.sk.gen_how?.[g[1]] ?? '' } : null,
+      mass: m ? { g: m[0], how: dated!.sk.mass_how?.[m[1]] ?? '' } : null,
     });
     if (onFan(grafts, i, f.extinct(i))) rows.set(i, f.name(i));
   }

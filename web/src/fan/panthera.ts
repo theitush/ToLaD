@@ -58,6 +58,9 @@ export interface SpeciesRec {
   redList?: RedListRec | null;
   /** The natural (pre-human) baseline from the data (format v1.2), always modelled; null if none. */
   natural?: NaturalRec | null;
+  /** Adult body mass (kg) and where it came from (the pipeline's mass column, ToLaD#276); null in data before it. */
+  massKg?: number | null;
+  massHow?: string;
 }
 
 export interface CladeRec {
@@ -109,6 +112,8 @@ export function speciesRec(r: RawSpecies, clade: number): SpeciesRec {
     births,
     redList: r.redList ?? null,
     natural: r.natural ?? null,
+    massKg: r.mass ? r.mass.g / 1000 : null,
+    massHow: r.mass?.how ?? '',
   };
 }
 

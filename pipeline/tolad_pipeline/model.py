@@ -314,10 +314,14 @@ def model_leaves(root: Node, raw: Path, log: dict) -> None:
     # nearest-clade imputation of mass and range
     acc_m = clade_means(root, "log_mass")
     gm_m = np.mean([n.data["log_mass"] for n in leaves if "log_mass" in n.data])
+    imputed: Counter = Counter()
     for n in leaves:
         if "log_mass" not in n.data:
             n.data["log_mass"], lvl = impute_from_clade(n, acc_m, gm_m)
             n.data["mass_src"] = f"{lvl} mean"
+            imputed[n.data["mass_src"]] += 1
+    # (ToLaD#276: the widths by mass use this column; the species with no mass of their own, by the level they took.)
+    log["mass_imputed"] = dict(sorted(imputed.items()))
     # PHYLACINE range cells (96.5 km Behrmann grid) -> PanTHERIA's range-area scale. Rasterising
     # inflates small ranges (a 100 km2 range fills a 9,300 km2 cell), so an area taken from the
     # maps alone is mapped onto the scale the occupancy fit was calibrated on.
