@@ -174,6 +174,39 @@ class Built(unittest.TestCase):
         self.assertEqual(b["parents"]["Leopardus pardinoides"], "Leopardus tigrinus")
         self.assertEqual(b["parents"]["Mustela haidarum"], "Mustela erminea")
 
+    # MDD families the dated tree does not hold as one clade (dated.mdd_structure), each for a reason of Upham's tree
+    # or MDD's own taxonomy, not of how the MDD species are placed. Every one but Dipodidae is so on main before MDD
+    # (the same audit run there by name, ToLaD#278); no order is.
+    KNOWN_NOT_ONE_CLADE = {
+        "Anomaluridae": "Upham puts Zenkerella (MDD: Zenkerellidae) inside the scaly-tailed squirrels",
+        "Balaenidae": "Upham's baleen and toothed whales interleave (also Balaenopteridae, Delphinidae, Iniidae, Ziphiidae)",
+        "Balaenopteridae": "as Balaenidae", "Delphinidae": "as Balaenidae", "Iniidae": "as Balaenidae",
+        "Ziphiidae": "as Balaenidae",
+        "Bovidae": "Upham puts the musk deer (Moschidae) inside the bovids",
+        "Cheirogaleidae": "Upham puts the sportive lemurs (Lepilemuridae) inside the dwarf lemurs",
+        "Dasypodidae": "MDD's Dasypodidae is the long-nosed armadillos; Upham's Chlamyphoridae sits among them",
+        "Dipodidae": "Upham's Salpingotulus michaelis (MDD: Salpingotus) hangs at the jerboas' superfamily crown, "
+                     "so MDD's family takes in Zapodidae and Sminthidae (main: not an MDD name, not counted)",
+        "Heteromyidae": "Upham puts the pocket gophers (Geomyidae) inside the pocket mice",
+        "Hipposideridae": "Upham puts the trident bats (Rhinonycteridae) inside the leaf-nosed bats",
+        "Lorisidae": "Upham puts the galagos (Galagidae) inside the lorises",
+        "Megadermatidae": "Upham's false vampire bats are not one clade (they span most bats)",
+        "Mormoopidae": "Upham puts the leaf-nosed bats (Phyllostomidae) among the mormoopids",
+        "Muridae": "Upham's murids and cricetids interleave at Muroidea's crown",
+        "Vespertilionidae": "Upham puts Cistugo (Cistugidae) and the megadermatid Eudiscoderma among the vesper bats",
+    }
+
+    def test_mdd_orders_and_families_are_clades(self):
+        st = json.loads((DATA / "stats.json").read_text())["mdd"]["structure"]
+        self.assertGreater(st["checked"]["family"], 150)
+        self.assertEqual(st["checked"]["order"], 27)
+        off = {k.split(" ", 1)[1] for k in st["not_one_clade"]}
+        self.assertFalse([k for k in st["not_one_clade"] if k.startswith("order ")])
+        self.assertEqual(off - set(self.KNOWN_NOT_ONE_CLADE), set(), "a new MDD family not one clade")
+        # a split named for an MDD family holds another's species only where Upham's tree already has it so
+        self.assertEqual(set(st["named_off"]),
+                         {"family Anomaluridae", "family Bathyergidae", "family Bovidae", "family Tenrecidae"})
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -163,6 +163,9 @@ def main(argv: list[str] | None = None) -> int:
     droot = dated.build(root, *ctx["upham"], ctx["overrides"], log, ac=dated.load_alvarez(a.raw),
                         names=(ctx["exact"], ctx["syn"]))
     log_step(t_start, f"dated tree: {log['dated_tree']['species']} species, {log['dated_tree']['splits']} splits")
+    if "mdd" in log:  # is every MDD order and family one clade of it (ToLaD#278)? tests/test_mdd.py names the exceptions
+        log["mdd"]["structure"] = dated.mdd_structure(droot)
+        log_step(t_start, f"MDD groups not one clade: {sorted(log['mdd']['structure']['not_one_clade'])}")
     for rule, b in log["dated_tree"].get("benchmark", {}).items():
         log_step(t_start, f"dates benchmark, {rule}: {b['inside']}/{b['of']} inside, x{b['median_factor_off']} off")
     log["counts"] = counts(root)

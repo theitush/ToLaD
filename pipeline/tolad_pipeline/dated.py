@@ -29,7 +29,7 @@ META (FORMAT.md, "Dated tree").
 
 from __future__ import annotations
 
-from collections import Counter
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 
 from .tree import D_INTERP, D_UPHAM, Node
@@ -620,32 +620,80 @@ def build(root: Node, up_root, up_tax: dict[str, dict], ov, log: dict, ac=None, 
     # interpolation over Open Tree's taxonomy (Canis lycaon at 14 Ma, Mus species at 40 Ma), not evidence that it
     # is older than its genus, so it never hangs from the stem by it. With one genus-mate: a new split halfway
     # down that mate's own branch, shared by its other MDD congeners.
+    # A merged subtree of MDD species alone (a genus node made for grafts of a genus new to us, or Open Tree's genus
+    # node over a kept tip whose genus-mates Upham has elsewhere: Salpingotus thomasi) is placed the same way, and
+    # with no genus crown, at its MDD family's crown (else its order's): never by its merged parent, whose dated
+    # MRCA can be far above the family (Muroidea for the new murid and cricetid genera, ToLaD#278).
+    # A group's crown is the split over its matched species; when that split is loose (a mate Upham places far off,
+    # Salpingotulus michaelis at the jerboas' superfamily crown: more than 3 x mates + 2 living species under it), the
+    # smallest split holding most of them.
     dep = _depths(droot)
-    gcrown: dict[str, DNode] = {}
+    mates: dict[tuple[str, str], list[DNode]] = defaultdict(list)
+    n_living: dict[int, int] = defaultdict(int)
     for d in list(droot.preorder()):
         L = d.leaf
-        if L is None or L.extinct or L.t1 > 0 or L.data.get("mdd") or L.data.get("mdd_rescued"):
+        if L is None or L.extinct or L.t1 > 0:
             continue
-        g = L.data.get("mdd_genus")
-        if g:
-            gcrown[g] = d if g not in gcrown else _lca(gcrown[g], d, dep)
-    gsplit: dict[str, DNode] = {}
+        p = d
+        while p is not None:
+            n_living[id(p)] += 1
+            p = p.parent
+        if L.data.get("mdd") or L.data.get("mdd_rescued"):
+            continue
+        for rank in ("genus", "family", "order"):
+            g = L.data.get(f"mdd_{rank}")
+            if g:
+                mates[(rank, g)].append(d)
+    crown: dict[tuple[str, str], DNode] = {}
+    for key, ds in mates.items():
+        A = ds[0]
+        for d in ds[1:]:
+            A = _lca(A, d, dep)
+        if n_living[id(A)] > 3 * len(ds) + 2:
+            under: Counter = Counter()
+            at: dict[int, DNode] = {}
+            for d in ds:
+                p = d
+                while p is not None:
+                    under[id(p)] += 1
+                    at[id(p)] = p
+                    p = p.parent
+            A = min((at[i] for i, c in under.items() if 2 * c > len(ds)), key=lambda x: n_living[id(x)])
+        crown[key] = A
+    gsplit: dict[tuple[str, str], DNode] = {}
+    crown_by: Counter = Counter()  # MDD subtrees placed at a crown, by the rank of the crown
+
+    def mdd_only(nd: Node) -> list[Node] | None:
+        """nd's leaves, when every one is a living MDD species (a graft or a kept tip only MDD knows)."""
+        out = [x for x in nd.preorder() if x.is_leaf]
+        if all(not x.extinct and x.t1 <= 0 and (x.data.get("mdd") or x.data.get("mdd_rescued")) for x in out):
+            return out
+        return None
 
     def mdd_crown(nd: Node) -> DNode | None:
-        if not nd.is_leaf or nd.extinct or nd.t1 > 0 or not (nd.data.get("mdd") or nd.data.get("mdd_rescued")):
+        sp = mdd_only(nd)
+        if not sp:
             return None
-        g = nd.data.get("mdd_genus")
-        G = gcrown.get(g) if g else None
-        if G is None or G.leaf is None:
-            return G
-        if g not in gsplit:  # one genus-mate: a split on its branch
-            P = G.parent
-            x = DNode(age=P.age / 2, lo=0.0, hi=P.age, src=S_INTERP, anchor=G)
-            P.children[P.children.index(G)] = x
-            x.parent = P
-            x.add(G)
-            gsplit[g] = x
-        return gsplit[g]
+        for rank in ("genus", "family", "order"):
+            gs = {x.data.get(f"mdd_{rank}") for x in sp}
+            G = crown.get((rank, next(iter(gs)))) if len(gs) == 1 else None
+            if G is None:
+                continue
+            crown_by[rank] += 1
+            if G.leaf is None:
+                return G
+            key = (rank, next(iter(gs)))
+            if key not in gsplit:  # one mate: a split on its branch
+                P = G.parent
+                x = DNode(age=P.age / 2, lo=0.0, hi=P.age, src=S_INTERP, anchor=G)
+                P.children[P.children.index(G)] = x
+                x.parent = P
+                x.add(G)
+                gsplit[key] = x
+                if crown.get(("genus", G.leaf.data.get("mdd_genus"))) is G:  # its genus-mates join the same split
+                    gsplit[("genus", G.leaf.data["mdd_genus"])] = x
+            return gsplit[key]
+        return None
 
     # an MDD species its taxonomyNotes say was split from one of ours (mdd.sisters sets "mdd_parent") splits that
     # species' own branch instead: sister to it, at half its terminal branch and never older than SPLIT_CAP Ma (a
@@ -786,6 +834,7 @@ def build(root: Node, up_root, up_tax: dict[str, dict], ov, log: dict, ac=None, 
         "grafts": dict(how),
         "clamped_below_parent": clamped,
         "zero_length_spliced": spliced,
+        "mdd_crowns_by_rank": dict(crown_by),
         # a fossil whose last appearance is older than the split it hangs from (a dating conflict; should be none)
         "ended_before_split": sorted(d.leaf.name for d in leaves if d.parent is not None and d.leaf.t1 >= d.parent.age)[:20],
         "species_rows_left_out": sum(1 for n in root.preorder() if n.is_leaf and n.name and n.kind in ("tree", "graft")
@@ -793,6 +842,46 @@ def build(root: Node, up_root, up_tax: dict[str, dict], ov, log: dict, ac=None, 
     }
     droot.data_notes = notes  # type: ignore[attr-defined]
     return droot
+
+
+def mdd_structure(droot: DNode) -> dict:
+    """Is every MDD order and family one clade of the dated tree (ToLaD#278)? Its living species (MDD's own,
+    matched or grafted: leaf.data mdd_order / mdd_family) and the split over them all (their last common
+    ancestor): the family is one clade when that split holds no living species MDD puts in another. Also every
+    split named for an MDD order or family that holds another's species. A group MDD's species of which Upham's
+    tree already splits (a known disagreement) is listed too: the test names each with its reason."""
+    dep = _depths(droot)
+    living = [d for d in droot.preorder() if d.leaf is not None and not d.leaf.extinct and d.leaf.t1 <= 0]
+    below: dict[int, list[DNode]] = {}  # living leaves under each split, by walking up (cheap: depth ~ 60)
+    for d in living:
+        p = d
+        while p is not None:
+            below.setdefault(id(p), []).append(d)
+            p = p.parent
+    out: dict = {"note": mdd_structure.__doc__.split("\n")[0], "checked": {}, "not_one_clade": {}, "named_off": {}}
+    for rank in ("order", "family"):
+        grp: dict[str, list[DNode]] = defaultdict(list)
+        for d in living:
+            g = d.leaf.data.get(f"mdd_{rank}")
+            if g:
+                grp[g].append(d)
+        out["checked"][rank] = len(grp)
+        for g, ds in sorted(grp.items()):
+            A = ds[0]
+            for d in ds[1:]:
+                A = _lca(A, d, dep)
+            others = sorted(d.leaf.name for d in below[id(A)]
+                            if d.leaf.data.get(f"mdd_{rank}") not in (None, g))
+            if others:
+                out["not_one_clade"][f"{rank} {g}"] = {"species": len(ds), "split_holds": len(below[id(A)]),
+                                                       "others": len(others), "e.g.": others[:8]}
+        for d in droot.preorder():
+            if d.leaf is None and d.name and d.name in grp:
+                others = sorted(x.leaf.name for x in below.get(id(d), [])
+                                if x.leaf.data.get(f"mdd_{rank}") not in (None, d.name))
+                if others:
+                    out["named_off"][f"{rank} {d.name}"] = {"others": len(others), "e.g.": others[:8]}
+    return out
 
 
 # ------------------------------------------------------------------ per file
