@@ -9,7 +9,7 @@ import { PIC_D, placePics, type PicSpot } from './pics';
 import { formatCount } from '../data/count';
 import { DOUBLE_TAP_MS, Input, type InputHandlers } from '../engine/input';
 import { clipPoly, FanCamera, type Camera } from './camera';
-import { isNode, laneAt, layoutFan, leftAt, nearestStrand, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type EdgeStyle, type Fan, type FanBranch, type FanNode, type WidthMode } from './layout';
+import { g, isNode, laneAt, layoutFan, leftAt, nearestStrand, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type EdgeStyle, type Fan, type FanBranch, type FanNode, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01 } from './meshgl';
 import { Lod } from './lod';
@@ -404,6 +404,34 @@ function colBoxes(fan: Fan, view?: [number, number]): Map<FanBranch | FanNode, C
 /** colBoxes' boxes over the world heights [vy0, vy1]: each strand's reach there off the fold's rows (xRange), a parent column's from its first strand's to its last's. */
 function viewBoxes(fan: Fan, out: Map<FanBranch | FanNode, ColBox>, [vy0, vy1]: [number, number]): void {
   const t = fan.tess;
+  // (Off the bands' rows, read once for the labels' clearance too: Tess.xRange's box (its table, slot 2), worked out alike.)
+  const bd = bandBoxes(fan, vy0, vy1);
+  if (bd) {
+    const { GL, GR, w } = bd;
+    const bot = t.bottom;
+    const box = (b: FanBranch, right: boolean): number => {
+      const lo = Math.max(vy0, b.tipY);
+      const i = b.index;
+      if (!(Math.min(vy1, bot) >= lo) || GL[i] > GR[i]) return right ? -Infinity : Infinity;
+      const wMax = lo < b.splitY ? w[i] : b.baseW;
+      const l = GL[i] - wMax;
+      const r = GR[i] + wMax;
+      const pad = 1e-6 * Math.max(1, Math.abs(l), Math.abs(r)) + (r - l) * 1e-3;
+      return right ? r + pad : l - pad;
+    };
+    for (const q of out.values()) {
+      if (q.y1 <= vy0 || q.y0 > vy1) continue;
+      const o = q.own;
+      if (isNode(o)) {
+        q.x0 = box(o.strands[0], false);
+        q.x1 = box(o.strands[o.strands.length - 1], true);
+      } else {
+        q.x0 = box(o, false);
+        q.x1 = box(o, true);
+      }
+    }
+    return;
+  }
   // (Each over the whole view's heights: one table of the fold's rows, its own (slot 2), for every column.)
   for (const q of out.values()) {
     if (q.y1 <= vy0 || q.y0 > vy1) continue;
@@ -413,6 +441,88 @@ function viewBoxes(fan: Fan, out: Map<FanBranch | FanNode, ColBox>, [vy0, vy1]: 
       q.x1 = t.xRange(o.strands[o.strands.length - 1], vy0, vy1, 2)[1];
     } else [q.x0, q.x1] = t.xRange(o, vy0, vy1, 2);
   }
+}
+
+/** How many of the fold's rows bandBoxes reads at most (Tess.xTable's XR_ROWS: every one over a screen's height). */
+const XR_ROWS = 512;
+/** How many rows of the fold's grid a band of bandBoxes' spans (ToLaD#255). */
+const BAND_ROWS = 8;
+/** bandBoxes' tables per fan, kept and refilled in place (no garbage a layout). */
+const bandCache = new WeakMap<Fan, Bands>();
+interface Bands {
+  ver: number;
+  h: number;
+  vy0: number;
+  vy1: number;
+  /** The rows kA..kB, in bands of BAND_ROWS (band j: rows kA + j·BAND_ROWS to kA + (j + 1)·BAND_ROWS, both ends). */
+  kA: number;
+  kB: number;
+  nb: number;
+  /** Per band and strand (j·S + i): the least and most of its edge at the band's rows (Fold.rowXs: a left edge or an own column's centre). */
+  L: Float64Array;
+  R: Float64Array;
+  /** Per strand: the widest its column gets (an own column's centre ± this holds it; a slot's left + this). */
+  w: Float64Array;
+  /** Per strand: the least and most over every band (all the rows kA..kB: Tess.xTable's over the same heights). */
+  GL: Float64Array;
+  GR: Float64Array;
+}
+/**
+ * The strands' reach per band of the fold's rows over the world heights [vy0, vy1] (ToLaD#255): labelSpots' clearance
+ * skips a column whose reach over the bands its strip spans stays clear of it, as viewBoxes' box over the whole
+ * view does (the edge is linear between two rows: within their least and most). Null off the fold's grid.
+ */
+function bandBoxes(fan: Fan, vy0: number, vy1: number): Bands | null {
+  const f = fan.tess.fold;
+  if (!f || !(f.gridH > 0)) return null;
+  let t = bandCache.get(fan);
+  if (t && t.ver === f.ver && t.h === f.gridH && t.vy0 === vy0 && t.vy1 === vy1) return t;
+  const S = f.strands.length;
+  const h = f.gridH;
+  let tip = Infinity;
+  for (const b of f.strands) if (b.tipY < tip) tip = b.tipY;
+  const a = Math.max(vy0, tip);
+  const z = Math.min(vy1, fan.tess.bottom);
+  if (!(z >= a)) return null;
+  const kA = Math.floor(a / h);
+  const kB = Math.max(kA, Math.ceil(z / h));
+  // (Every row read, as Tess.xTable reads them over a screen's height; more: none, the boxes as they were.)
+  if (kB - kA > XR_ROWS) return null;
+  const nb = Math.max(1, Math.ceil((kB - kA) / BAND_ROWS));
+  if (!t || t.L.length < nb * S) {
+    t = { ver: 0, h: 0, vy0: 0, vy1: 0, kA: 0, kB: 0, nb: 0, L: new Float64Array(Math.max(nb, 32) * S), R: new Float64Array(Math.max(nb, 32) * S), w: new Float64Array(S), GL: new Float64Array(S), GR: new Float64Array(S) };
+    for (const b of f.strands) t.w[b.index] = Math.max(b.baseW, b.unit * g(b.pop.max, fan.tess.mode));
+    bandCache.set(fan, t);
+  }
+  Object.assign(t, { ver: f.ver, h, vy0, vy1, kA, kB, nb });
+  const { L, R, GL, GR } = t;
+  for (let j = 0; j < nb; j++) {
+    const o = j * S;
+    const k0 = kA + j * BAND_ROWS;
+    const k1 = Math.min(kB, k0 + BAND_ROWS);
+    for (let k = k0; k <= k1; k++) {
+      const xs = f.rowXs(k);
+      if (k === k0) {
+        L.set(xs.subarray(0, S), o);
+        R.set(xs.subarray(0, S), o);
+        continue;
+      }
+      for (let i = 0; i < S; i++) {
+        const x = xs[i];
+        if (x < L[o + i]) L[o + i] = x;
+        if (x > R[o + i]) R[o + i] = x;
+      }
+    }
+    if (j === 0) {
+      GL.set(L.subarray(0, S));
+      GR.set(R.subarray(0, S));
+    } else
+      for (let i = 0; i < S; i++) {
+        if (L[o + i] < GL[i]) GL[i] = L[o + i];
+        if (R[o + i] > GR[i]) GR[i] = R[o + i];
+      }
+  }
+  return t;
 }
 
 /** How much a flight zooms out to pan (ToLaD#246): van Wijk–Nuij's ρ (√2 theirs; less, a long trip zooms out less). */
@@ -832,6 +942,22 @@ const FAMILY_MAX_SCREENS = 1.6;
  * (under the buttons); `barX0` the buttons' left edge: left of it a label on
  * "now" may reach higher, up to LABEL_CEIL.
  */
+/** labelSpots' working arrays (the columns near the screen, their buckets), kept from layout to layout. */
+const SCRATCH = {
+  cols: [] as ColBox[],
+  cx: new Float64Array(0),
+  ck: new Int32Array(0),
+  cs: new Int32Array(0),
+  cw: new Float64Array(0),
+  wide: new Int32Array(0),
+  cand: new Float64Array(0),
+  nbStart: new Int32Array(65),
+  nbucket: new Int32Array(1024),
+  bStart: new Int32Array(65),
+  bFill: new Int32Array(64),
+  bucket: new Int32Array(1024),
+  seen: new Int32Array(1024),
+};
 export function labelSpots(
   c: Screen,
   fan: Fan,
@@ -872,33 +998,150 @@ export function labelSpots(
   const [vx0, vy0] = c.toWorld(-60, -60);
   const [vx1, vy1] = c.toWorld(c.w + 60, c.h + 60);
   const boxes = colBoxes(fan, [vy0, vy1]);
+  const fold0 = fan.tess.fold;
   const near = (q: ColBox) => !(q.x1 < vx0 || q.x0 > vx1 || q.y1 <= vy0 || q.y0 > vy1);
-  const cols = [...boxes.values()].filter(near);
-  // ...and those in the strip's own few px across: the columns bucketed by their world x span.
+  // (Into arrays kept from layout to layout: no garbage a layout, ToLaD#255.)
+  const cols = SCRATCH.cols;
+  cols.length = 0;
+  for (const q of boxes.values()) if (near(q)) cols.push(q);
+  // ...and those in the strip's own few px across: the columns bucketed by their world x span (cols' order in each).
   const NB = 64;
   const bw = Math.max(1e-12, (vx1 - vx0) / NB);
-  const buckets: number[][] = Array.from({ length: NB }, () => []);
-  cols.forEach((q, i) => {
-    const k0 = Math.max(0, Math.floor((q.x0 - vx0) / bw));
-    const k1 = Math.min(NB - 1, Math.floor((q.x1 - vx0) / bw));
-    for (let k = k0; k <= k1; k++) buckets[k].push(i);
-  });
-  const seen = new Int32Array(cols.length);
+  const nc = cols.length;
+  // (Each column's box and first and last bucket, in flat arrays: clearance scans them, ToLaD#255.)
+  if (SCRATCH.cx.length < 4 * nc) {
+    SCRATCH.cx = new Float64Array(8 * nc);
+    SCRATCH.ck = new Int32Array(4 * nc);
+    SCRATCH.cs = new Int32Array(2 * nc);
+    SCRATCH.cw = new Float64Array(2 * nc);
+    SCRATCH.wide = new Int32Array(2 * nc);
+    SCRATCH.cand = new Float64Array(2 * nc);
+  }
+  const { cx, ck, cs, cw, wide } = SCRATCH;
+  // (A column across more than WIDE_NB buckets (leaning across the view) is scanned for every strip; the rest are
+  // found in the strip's buckets, nb*.)
+  const WIDE_NB = 8;
+  let nw = 0;
+  const nbStart = SCRATCH.nbStart;
+  nbStart.fill(0);
+  for (let i = 0; i < nc; i++) {
+    const q = cols[i];
+    cx[4 * i] = q.x0;
+    cx[4 * i + 1] = q.x1;
+    cx[4 * i + 2] = q.y0;
+    cx[4 * i + 3] = q.y1;
+    const a = Math.max(0, Math.floor((q.x0 - vx0) / bw));
+    const z = Math.min(NB - 1, Math.floor((q.x1 - vx0) / bw));
+    ck[2 * i] = a;
+    ck[2 * i + 1] = z;
+    const o = q.own;
+    const node = isNode(o);
+    cs[i] = node ? o.strands[0].index : o.index;
+    cw[i] = node ? o.width : 0;
+    if (z - a >= WIDE_NB) wide[nw++] = i;
+    else for (let k = a; k <= z; k++) nbStart[k + 1]++;
+  }
+  for (let k = 0; k < NB; k++) nbStart[k + 1] += nbStart[k];
+  if (SCRATCH.nbucket.length < nbStart[NB]) SCRATCH.nbucket = new Int32Array(2 * nbStart[NB]);
+  const nbucket = SCRATCH.nbucket;
+  {
+    const fill = SCRATCH.bFill;
+    fill.set(nbStart.subarray(0, NB));
+    for (let i = 0; i < nc; i++) if (ck[2 * i + 1] - ck[2 * i] < WIDE_NB) for (let k = ck[2 * i]; k <= ck[2 * i + 1]; k++) nbucket[fill[k]++] = i;
+  }
+  // (Bucket k's columns: bucket[bStart[k] .. bStart[k + 1]), in cols' order; built when first asked for, by nextEdge.)
+  const bStart = SCRATCH.bStart;
+  let bucket = SCRATCH.bucket;
+  let bucketed = false;
+  const buckets = () => {
+    bucketed = true;
+    bStart.fill(0);
+    for (let i = 0; i < nc; i++) for (let k = ck[2 * i]; k <= ck[2 * i + 1]; k++) bStart[k + 1]++;
+    for (let k = 0; k < NB; k++) bStart[k + 1] += bStart[k];
+    if (SCRATCH.bucket.length < bStart[NB]) SCRATCH.bucket = new Int32Array(2 * bStart[NB]);
+    bucket = SCRATCH.bucket;
+    const bFill = SCRATCH.bFill;
+    bFill.set(bStart.subarray(0, NB));
+    for (let i = 0; i < nc; i++) for (let k = ck[2 * i]; k <= ck[2 * i + 1]; k++) bucket[bFill[k]++] = i;
+  };
+  if (SCRATCH.seen.length < nc) SCRATCH.seen = new Int32Array(2 * nc);
+  const seen = SCRATCH.seen;
+  seen.fill(0, 0, nc);
+  // (At the mammal level, on the fold's grid: the columns' reach per band of its rows, for clearance.)
+  const bands = fold0 && fold0.gridH > 0 && fold0.ordShare.length > 0 ? bandBoxes(fan, vy0, vy1) : null;
   let stamp = 0;
-  /** Least gap (px, up to CLEAR) between the strip [xa, xb] × [ya, yb] and any column but `own`'s (negative: they overlap). */
+  /** Column q's reach (world [lo, hi]) over bands j0..j1 (bandBoxes'), into `reach`. */
+  const reach = new Float64Array(2);
+  const bandReach = (ci: number, j0: number, j1: number) => {
+    const i0 = cs[ci];
+    const S = bands!.w.length;
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (let j = j0; j <= j1; j++) {
+      if (bands!.L[j * S + i0] < lo) lo = bands!.L[j * S + i0];
+      if (bands!.R[j * S + i0] > hi) hi = bands!.R[j * S + i0];
+    }
+    const pad = 1e-6 * Math.max(1, Math.abs(lo), Math.abs(hi)) + bands!.w[i0];
+    reach[0] = lo - pad;
+    reach[1] = hi + pad + cw[ci];
+  };
+  /**
+   * Least gap (px, up to CLEAR) between the strip [xa, xb] × [ya, yb] and any column but `own`'s (negative: they overlap).
+   * The columns in the order the buckets give them (the first bucket of the strip's each is in, then cols' order),
+   * the first that makes it -1 or less ending it (ToLaD#255: found by a scan of the flat boxes, not the buckets).
+   */
   const clearance = (xa: number, xb: number, ya: number, yb: number, own: FanBranch | FanNode) => {
     let gap = CLEAR;
     if (!(yb > ya)) return gap;
     const [wxa, wya] = c.toWorld(xa - CLEAR, ya);
     const [wxb, wyb] = c.toWorld(xb + CLEAR, yb);
-    stamp++;
+    // (The bands of the fold's rows from the one at or above wya to the one at or below wyb: -1 for none.)
+    let bj0 = -1;
+    let bj1 = -1;
+    if (bands) {
+      const qa = Math.floor(wya / bands.h);
+      const qb = Math.ceil(wyb / bands.h);
+      if (qa >= bands.kA && qb <= bands.kB) {
+        bj0 = Math.floor((qa - bands.kA) / BAND_ROWS);
+        bj1 = Math.min(bands.nb - 1, Math.max(bj0, Math.ceil((qb - bands.kA) / BAND_ROWS) - 1));
+      }
+    }
     const k0 = Math.max(0, Math.min(NB - 1, Math.floor((wxa - vx0) / bw)));
     const k1 = Math.max(0, Math.min(NB - 1, Math.floor((wxb - vx0) / bw)));
-    for (let k = k0; k <= k1; k++) for (const qi of buckets[k]) {
-      if (seen[qi] === stamp) continue;
-      seen[qi] = stamp;
-      const q = cols[qi];
-      if (q.own === own || q.x1 < wxa || q.x0 > wxb || q.y1 <= wya || q.y0 > wyb) continue;
+    // The columns that can come near it (in a bucket of its, their box and their reach over its bands meeting it),
+    // each keyed by the first of its buckets it is in, then its place in cols (as a walk through the buckets meets them).
+    const cand = SCRATCH.cand;
+    let n = 0;
+    stamp++;
+    const test = (i: number) => {
+      if (cx[4 * i + 1] < wxa || cx[4 * i] > wxb || cx[4 * i + 3] <= wya || cx[4 * i + 2] > wyb) return;
+      const first = Math.max(ck[2 * i], k0);
+      if (first > Math.min(ck[2 * i + 1], k1)) return;
+      if (cols[i].own === own) return;
+      if (bj0 >= 0) {
+        bandReach(i, bj0, bj1);
+        if (reach[1] < wxa || reach[0] > wxb) return;
+      }
+      cand[n++] = first * 1048576 + i;
+    };
+    for (let k = k0; k <= k1; k++)
+      for (let m = nbStart[k], mEnd = nbStart[k + 1]; m < mEnd; m++) {
+        const i = nbucket[m];
+        if (seen[i] === stamp) continue;
+        seen[i] = stamp;
+        test(i);
+      }
+    for (let m = 0; m < nw; m++) test(wide[m]);
+    const cs1 = cand.subarray(0, n).sort();
+    for (let m = 0; m < n; m++) {
+      const ci = cs1[m] % 1048576;
+      const q = cols[ci];
+      // (Nowhere nearer than the gap found so far: none of its edges can make it less.)
+      if (Math.max(X(q.x0) - xb, xa - X(q.x1)) >= gap) continue;
+      if (bj0 >= 0) {
+        bandReach(ci, bj0, bj1);
+        if (Math.max(X(reach[0]) - xb, xa - X(reach[1])) >= gap) continue;
+      }
       // (heights()'s, without the array: the least over them.)
       const wa = Math.max(wya, q.y0);
       const wb = Math.min(wyb, q.y1 - 1e-9);
@@ -977,6 +1220,7 @@ export function labelSpots(
   };
   /** The nearest column edge (screen x) past x at world y wy, rightwards (a left edge) or leftwards (a right edge); null for none near. */
   const nextEdge = (x: number, wy: number, right: boolean): number | null => {
+    if (!bucketed) buckets();
     let best: number | null = null;
     const k0 = Math.max(0, Math.min(NB - 1, Math.floor((c.toWorld(x, 0)[0] - vx0) / bw)));
     stamp++;
@@ -984,7 +1228,8 @@ export function labelSpots(
       // (Past the best found so far: done.)
       const kx = X(vx0 + (right ? k : k + 1) * bw);
       if (best !== null && (right ? kx > best : kx < best)) break;
-      for (const qi of buckets[k]) {
+      for (let n = bStart[k], nEnd = bStart[k + 1]; n < nEnd; n++) {
+        const qi = bucket[n];
         if (seen[qi] === stamp) continue;
         seen[qi] = stamp;
         const q = cols[qi];
@@ -2379,6 +2624,8 @@ export class FanView implements InputHandlers {
     const spots = labelSpots(this.camera, this.fan, top, (t) => this.nameWidth(t), this.barRect()?.[0], br ?? undefined, (id) => this.plusRoom.get(id) ?? 0, undefined, lod, lg, this.names);
     this.labLast = { fan: this.fan, lg, lod, lodGen: lod?.gen ?? -1, w: this.w, h: this.h, names: this.names, topLine, t: t0, frames: 0, cam: { ...c }, br, top, spots };
     this.labelMs.push(performance.now() - t0);
+    this.labelLayMs.push(performance.now() - t0);
+    if (this.labelLayMs.length > 600) this.labelLayMs.shift();
     return { br, top, lg, spots, carried: null };
   }
   private labSettle = false;
@@ -2403,6 +2650,8 @@ export class FanView implements InputHandlers {
   readonly labelMs: number[] = [];
   /** ...and with drawLabels' (the fades, the pictures, the "+x", the pills drawn) and the pinned rows'. */
   readonly labelAllMs: number[] = [];
+  /** Each label layout's time (labelsNow when it laid out, not carried: ToLaD#255's ≤50 ms on the phone proxy). */
+  readonly labelLayMs: number[] = [];
 
   /**
    * The parent columns below each split (the stem below the oldest): their
@@ -3009,12 +3258,27 @@ export class FanView implements InputHandlers {
 
   /** Length (px) of a species' name in the label font (not cached: the web font may arrive after the first frame). */
   private nameWidth(text: string): number {
-    this.ctx.save();
-    this.ctx.font = font(LABEL_FONT);
-    const w = this.ctx.measureText(text).width;
-    this.ctx.restore();
+    // (Kept per font, and while the faces load or not (the canvas measures in system type until then): a layout
+    // measures every name it places, ToLaD#255.)
+    const f = font(LABEL_FONT);
+    const fk = typeof document !== 'undefined' && document.fonts ? `${f}|${document.fonts.status}` : f;
+    if (fk !== this.nameWFont) {
+      this.nameW.clear();
+      this.nameWFont = fk;
+    }
+    let w = this.nameW.get(text);
+    if (w === undefined) {
+      this.ctx.save();
+      this.ctx.font = f;
+      w = this.ctx.measureText(text).width;
+      this.ctx.restore();
+      if (this.nameW.size > 20000) this.nameW.clear();
+      this.nameW.set(text, w);
+    }
     return w;
   }
+  private nameW = new Map<string, number>();
+  private nameWFont = '';
 
   /**
    * The species' labels (see labelSpots for where): which show is decided by
