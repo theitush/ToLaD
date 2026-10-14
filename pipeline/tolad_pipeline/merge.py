@@ -319,6 +319,11 @@ def graft_pbdb(root: Node, species: list[dict], exact, syn, log: dict, ov) -> No
             return group("family", family, on)
         return on
 
+    # PBDB's own living species: an extinct PBDB species that Open Tree files as a synonym of one of these is a
+    # different species to PBDB (OTT 3.7 sinks Homo floresiensis into Homo sapiens, the aurochs into cattle, the
+    # Miocene dolphin Pomatodelphis into the spinner dolphin; ToLaD#275), so it is not merged
+    # into the living leaf (its range would replace the living species' first appearance) but grafted on its own.
+    pbdb_living = {norm_name(r["taxon_name"]) for r in species if r.get("is_extant") == "extant"}
     for r in species:
         name = norm_name(r["taxon_name"])
         if name in ov.exclude:
@@ -346,6 +351,11 @@ def graft_pbdb(root: Node, species: list[dict], exact, syn, log: dict, ov) -> No
             m = "exact"
         else:
             for nd in syn.get(name, []):
+                # (the same epithet in another genus is one species recombined, e.g. Anoa quarlesi: still merged)
+                if (r.get("is_extant") == "extinct" and nd.name in pbdb_living
+                        and nd.name.split()[-1] != name.split()[-1]):
+                    how["extinct synonym of a PBDB living species (grafted on its own)"] += 1
+                    continue
                 if context_ok(nd, fam, order):
                     hit, m = nd, "synonym"
                     break
@@ -362,7 +372,8 @@ def graft_pbdb(root: Node, species: list[dict], exact, syn, log: dict, ov) -> No
         if r.get("is_extant") != "extinct":
             how["living, not in OT (skipped)" if r.get("is_extant") == "extant" else "status unknown (skipped)"] += 1
             continue
-        if not rng or not r.get("n_occs"):
+        # (A [[date]] override's literature range stands in for occurrences PBDB has not entered, e.g. Homo naledi.)
+        if not rng or not (r.get("n_occs") or name in ov.dates):
             how["no occurrences/range (skipped)"] += 1
             continue
         # 2. graft under genus / family / order
@@ -404,6 +415,14 @@ def graft_pbdb(root: Node, species: list[dict], exact, syn, log: dict, ov) -> No
         leaf.data["pbdb_family"] = fam
         leaf.data["pbdb_order"] = order
         g.add(leaf)
+    # A [[date]] for a species PBDB lacks (Orrorin tugenensis, ToLaD#275): its Open Tree leaf takes the range.
+    done = {a["name"] for a in ov.applied["date"]}
+    for name, e in ov.dates.items():
+        hits = [] if name in done else [n for n in _find(root, name) if n.is_leaf]
+        if len(hits) == 1 and "fad" in e and "lad" in e:
+            hits[0].fad, hits[0].lad = float(e["fad"]), float(e["lad"])
+            hits[0].data["date_override"] = True
+            ov.applied["date"].append({"name": name, "pbdb_fad_lad": None, "fad_lad": [hits[0].fad, hits[0].lad]})
     log["pbdb_graft"] = dict(how)
     log["pbdb_groups_created"] = Counter(k[0] for k in created)
     # name-match summary: how deep into the Open Tree did each fossil land?

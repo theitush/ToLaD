@@ -31,7 +31,8 @@
 #                     `tree`: Newick with each split's age and 95% interval in
 #                     Ma, `(a,b)age[lo,hi]`; the species must be exactly the
 #                     dated tree's under their common ancestor
-#   [[dated_fossil]]  a fossil species branches off `sister`'s lineage at `age`
+#   [[dated_fossil]]  a fossil species branches off `sister`'s lineage (a species,
+#                     or a list of species: their common ancestor's) at `age`
 #                     (default: its own first appearance) instead of by the
 #                     rule; `common` names it where the literature does
 #   [[dated_name]]    name the split a taxon founds (the common ancestor of the
@@ -48,7 +49,7 @@
 #                     and names it `common`. The ancestor's own leaf, band and
 #                     counts are untouched.
 
-version = 4
+version = 5
 
 [[exclude]]
 name = "Tikitherium copei"
@@ -102,6 +103,200 @@ mammoth (M. lamarmorai) is late Middle to Late Pleistocene; its youngest specime
 roughly 57-29 ka."""
 citation = """Palombo, M.R., Zedda, M. & Zoboli, D. (2024). The Sardinian mammoth's \
 evolutionary history: lights and shadows. Quaternary 7(1): 10. doi:10.3390/quat7010010"""
+
+# --- Hominins (ToLaD#275) -----------------------------------------------------------
+# PBDB's hominin ranges are interval midpoints of very wide windows (Homo erectus from the
+# Zanclean, 4.1 Ma; Orrorin to the Late Pleistocene; Australopithecus africanus from the
+# Tortonian). These are the commonly cited first and last appearances, rounded; the review
+# tabulates them all, the primary dates are cited where one site sets the bound.
+
+[[date]]
+name = "Sahelanthropus tchadensis"
+fad = 7.2
+lad = 6.8
+reason = "Toros-Menalla, Chad: cosmogenic 10Be/9Be age 7.2-6.8 Ma. PBDB: 7.25-5.33 Ma (one window)."
+citation = """Lebatard, A.-E. et al. (2008). Cosmogenic nuclide dating of Sahelanthropus tchadensis and \
+Australopithecus bahrelghazali. PNAS 105: 3226-3231. doi:10.1073/pnas.0708015105"""
+
+[[date]]
+name = "Orrorin tugenensis"
+fad = 6.1
+lad = 5.7
+reason = "Lukeino Formation, Kenya, ~6.1-5.7 Ma. PBDB's last appearance (Late Pleistocene) is spurious."
+citation = """Wood, B. & Boyle, E.K. (2016). Hominin taxic diversity: fact or fantasy? American Journal \
+of Physical Anthropology 159 (S61): 37-78. doi:10.1002/ajpa.22902"""
+
+[[date]]
+name = "Ardipithecus kadabba"
+fad = 5.8
+lad = 5.2
+reason = "Middle Awash, Ethiopia, ~5.8-5.2 Ma. PBDB: 11.6-3.6 Ma (one window)."
+citation = """Wood, B. & Boyle, E.K. (2016). American Journal of Physical Anthropology 159 (S61): 37-78. \
+doi:10.1002/ajpa.22902"""
+
+[[date]]
+name = "Ardipithecus ramidus"
+fad = 4.5
+lad = 4.3
+reason = "Aramis and Gona, Ethiopia, ~4.5-4.3 Ma. PBDB: 4.5 Ma first, 4.0 Ma last (wide windows)."
+citation = """White, T.D. et al. (2009). Ardipithecus ramidus and the paleobiology of early hominids. \
+Science 326: 64-86. doi:10.1126/science.1175802"""
+
+[[date]]
+name = "Australopithecus anamensis"
+fad = 4.2
+lad = 3.8
+reason = "Kanapoi and Allia Bay, Kenya, to Woranso-Mille (MRD, 3.8 Ma). PBDB: 4.5-4.0 Ma (wide windows)."
+citation = """Haile-Selassie, Y. et al. (2019). A 3.8-million-year-old hominin cranium from Woranso-Mille, \
+Ethiopia. Nature 573: 214-219. doi:10.1038/s41586-019-1513-8"""
+
+[[date]]
+name = "Australopithecus afarensis"
+fad = 3.85
+lad = 2.95
+reason = "Laetoli to Hadar, ~3.85-2.95 Ma. PBDB: 6.3 Ma first (a Messinian window)."
+citation = """Kimbel, W.H. & Delezene, L.K. (2009). 'Lucy' redux: a review of research on Australopithecus \
+afarensis. Yearbook of Physical Anthropology 52: 2-48. doi:10.1002/ajpa.21183"""
+
+[[date]]
+name = "Kenyanthropus platyops"
+fad = 3.5
+lad = 3.2
+reason = "Lomekwi, West Turkana, ~3.5-3.2 Ma. PBDB has the species but no occurrences entered."
+citation = """Leakey, M.G. et al. (2001). New hominin genus from eastern Africa shows diverse middle \
+Pliocene lineages. Nature 410: 433-440. doi:10.1038/35068500"""
+
+[[date]]
+name = "Australopithecus deyiremeda"
+fad = 3.5
+lad = 3.3
+reason = "Burtele and Waytaleyta, Woranso-Mille, 3.5-3.3 Ma. PBDB: 5.33-2.58 Ma (one window)."
+citation = """Haile-Selassie, Y. et al. (2015). New species from Ethiopia further expands Middle Pliocene \
+hominin diversity. Nature 521: 483-488. doi:10.1038/nature14448"""
+
+[[date]]
+name = "Australopithecus africanus"
+fad = 3.0
+lad = 2.1
+reason = "Taung, Sterkfontein Member 4 and Makapansgat, ~3.0-2.1 Ma. PBDB: 7.6 Ma first (a Tortonian window)."
+citation = """Wood, B. & Boyle, E.K. (2016). American Journal of Physical Anthropology 159 (S61): 37-78. \
+doi:10.1002/ajpa.22902"""
+
+[[date]]
+name = "Paranthropus aethiopicus"
+fad = 2.7
+lad = 2.3
+reason = "Omo Shungura and West Turkana (the Black Skull, 2.5 Ma), ~2.7-2.3 Ma. PBDB has no occurrences."
+citation = """Wood, B. & Boyle, E.K. (2016). American Journal of Physical Anthropology 159 (S61): 37-78. \
+doi:10.1002/ajpa.22902"""
+
+[[date]]
+name = "Australopithecus garhi"
+fad = 2.6
+lad = 2.4
+reason = "Bouri, Middle Awash, 2.5 Ma. PBDB: 5.33-2.58 Ma (one window)."
+citation = """Asfaw, B. et al. (1999). Australopithecus garhi: a new species of early hominid from \
+Ethiopia. Science 284: 629-635. doi:10.1126/science.284.5414.629"""
+
+[[date]]
+name = "Homo habilis"
+fad = 2.4
+lad = 1.44
+reason = "Olduvai and Koobi Fora, ~2.4 to 1.44 Ma (KNM-ER 42703). PBDB: 2.2-1.3 Ma (interval midpoints)."
+citation = """Spoor, F. et al. (2007). Implications of new early Homo fossils from Ileret, east of Lake \
+Turkana, Kenya. Nature 448: 688-691. doi:10.1038/nature05986"""
+
+[[date]]
+name = "Paranthropus boisei"
+fad = 2.3
+lad = 1.4
+reason = "Omo to Olduvai and Konso, ~2.3-1.4 Ma. PBDB: 4.0-0.9 Ma (wide windows)."
+citation = """Wood, B. & Constantino, P. (2007). Paranthropus boisei: fifty years of evidence and \
+analysis. Yearbook of Physical Anthropology 50: 106-132. doi:10.1002/ajpa.20732"""
+
+[[date]]
+name = "Homo rudolfensis"
+fad = 2.1
+lad = 1.8
+reason = "Koobi Fora (KNM-ER 1470, ~2.0 Ma) and Uraha, ~2.1-1.8 Ma. PBDB: 5.33 Ma-11.7 ka (one window)."
+citation = """Wood, B. & Boyle, E.K. (2016). American Journal of Physical Anthropology 159 (S61): 37-78. \
+doi:10.1002/ajpa.22902"""
+
+[[date]]
+name = "Homo erectus"
+fad = 2.0
+lad = 0.108
+reason = """Drimolen (DNH 134, ~2.04 Ma) to Ngandong, Java (117-108 ka). PBDB: 3.6 Ma first (a Zanclean \
+window); the Ngandong date sets the last appearance."""
+citation = """Rizal, Y. et al. (2020). Last appearance of Homo erectus at Ngandong, Java, 117,000-108,000 \
+years ago. Nature 577: 381-385. doi:10.1038/s41586-019-1863-2"""
+
+[[date]]
+name = "Paranthropus robustus"
+fad = 2.0
+lad = 1.0
+reason = "Drimolen (DNH 155, ~2.0 Ma) to Swartkrans Member 3 (~1.0 Ma). PBDB: 2.2 Ma first, 1.3 Ma last."
+citation = """Herries, A.I.R. et al. (2020). Contemporaneity of Australopithecus, Paranthropus, and early \
+Homo erectus in South Africa. Science 368: eaaw7293. doi:10.1126/science.aaw7293"""
+
+[[date]]
+name = "Australopithecus sediba"
+fad = 1.98
+lad = 1.97
+reason = "Malapa, South Africa, 1.977 Ma (U-Pb). PBDB: 2.58-0.77 Ma (one window)."
+citation = """Pickering, R. et al. (2011). Australopithecus sediba at 1.977 Ma and implications for the \
+origins of the genus Homo. Science 333: 1421-1423. doi:10.1126/science.1203697"""
+
+[[date]]
+name = "Homo georgicus"
+fad = 1.85
+lad = 1.77
+reason = "Dmanisi, Georgia, 1.85-1.77 Ma (often counted in H. erectus). PBDB: 2.58-0.77 Ma (one window)."
+citation = """Ferring, R. et al. (2011). Earliest human occupations at Dmanisi (Georgian Caucasus) dated \
+to 1.85-1.78 Ma. PNAS 108: 10432-10436. doi:10.1073/pnas.1106638108"""
+
+[[date]]
+name = "Homo antecessor"
+fad = 0.95
+lad = 0.77
+reason = "Gran Dolina TD6, Atapuerca, ~0.95-0.77 Ma. PBDB: 2.58 Ma-11.7 ka (one window)."
+citation = """Duval, M. et al. (2018). The first direct ESR dating of a hominin tooth from Atapuerca Gran \
+Dolina TD-6 (Spain) supports the antiquity of Homo antecessor. Quaternary Geochronology 47: 120-137. \
+doi:10.1016/j.quageo.2018.05.001"""
+
+[[date]]
+name = "Homo heidelbergensis"
+fad = 0.7
+lad = 0.2
+reason = "Mauer (~0.6 Ma) and its Middle Pleistocene kin, ~0.7-0.2 Ma. PBDB: 0.77-0.13 Ma (one window)."
+citation = """Wood, B. & Boyle, E.K. (2016). American Journal of Physical Anthropology 159 (S61): 37-78. \
+doi:10.1002/ajpa.22902"""
+
+[[date]]
+name = "Homo neanderthalensis"
+fad = 0.43
+lad = 0.04
+reason = """Sima de los Huesos (~430 ka, the earliest on the Neanderthal lineage) to their disappearance \
+41-39 ka (Higham et al. 2014, Nature 512: 306). PBDB: 0.45 Ma first, 70 ka last (interval midpoints)."""
+citation = """Arsuaga, J.L. et al. (2014). Neandertal roots: cranial and chronological evidence from Sima \
+de los Huesos. Science 344: 1358-1363. doi:10.1126/science.1253958"""
+
+[[date]]
+name = "Homo naledi"
+fad = 0.335
+lad = 0.236
+reason = "Rising Star, Dinaledi Chamber, 335-236 ka. PBDB has the species but no occurrences entered."
+citation = """Dirks, P.H.G.M. et al. (2017). The age of Homo naledi and associated sediments in the Rising \
+Star Cave, South Africa. eLife 6: e24231. doi:10.7554/eLife.24231"""
+
+[[date]]
+name = "Homo floresiensis"
+fad = 0.19
+lad = 0.05
+reason = """Liang Bua, Flores: skeletal remains 100-60 ka, its stone tools 190-50 ka. PBDB: 0.13-0.01 Ma \
+(one window)."""
+citation = """Sutikna, T. et al. (2016). Revised stratigraphy and chronology for Homo floresiensis at Liang \
+Bua in Indonesia. Nature 532: 366-369. doi:10.1038/nature17179"""
 
 # --- Cretaceous metatherians filed under Didelphimorphia ------------------------
 # OTT 3.7.3 lists Stagodontidae and Pediomyidae (incertae sedis) under
@@ -205,6 +400,190 @@ lineage at its first appearance. Contested: Blaine et al. 2019 and Ruiz-Ramoni e
 is a short-faced bear (Arctotherium)."""
 citation = """Stinnesbeck, S.R. et al. (2020). Panthera balamoides and other Pleistocene felids from \
 the submerged caves of Yucatán. Historical Biology 32: 930-939. doi:10.1080/08912963.2018.1556649"""
+
+# --- Hominins (ToLaD#275) -------------------------------------------------------------
+# The fan draws no fossil placed by taxonomy only, so the human lineage's extinct relatives (all
+# PBDB grafts) were not drawn. Their relationships are argued over, so this is grade-honest: each
+# branches off the human lineage (below Homo's crown, `sister` = sapiens + the Sima de los Huesos
+# genome Upham calls H. heidelbergensis) at its first appearance ([[date]] above), except where a
+# lineage is widely agreed (Paranthropus; Dmanisi and Flores with
+# H. erectus; Neanderthals from the modern human lineage, dated by their genomes). Sahelanthropus
+# (7.2 Ma) is older than this tree's Homo-Pan split (6.15 Ma), so it sits on the stem of both.
+
+[[dated_fossil]]
+name = "Sahelanthropus tchadensis"
+sister = ["Homo sapiens", "Pan troglodytes"]
+reason = """Possibly the earliest hominin, possibly a stem hominine; this tree's Homo-Pan split (6.15 Ma) \
+is younger than its 7.2 Ma first appearance, so it branches off the stem of both."""
+citation = """Brunet, M. et al. (2002). A new hominid from the Upper Miocene of Chad, Central Africa. \
+Nature 418: 145-151. doi:10.1038/nature00879"""
+
+[[dated_fossil]]
+name = "Orrorin tugenensis"
+sister = ["Homo sapiens", "Homo heidelbergensis"]
+reason = "An early hominin (bipedal femora); it branches off the human lineage at its first appearance."
+citation = """Wood, B. & Boyle, E.K. (2016). Hominin taxic diversity: fact or fantasy? American Journal \
+of Physical Anthropology 159 (S61): 37-78. doi:10.1002/ajpa.22902"""
+
+[[dated_fossil]]
+name = "Ardipithecus kadabba"
+sister = ["Homo sapiens", "Homo heidelbergensis"]
+reason = "An early hominin; it branches off the human lineage at its first appearance."
+citation = """Wood, B. & Boyle, E.K. (2016). American Journal of Physical Anthropology 159 (S61): 37-78. \
+doi:10.1002/ajpa.22902"""
+
+[[dated_fossil]]
+name = "Australopithecus ramidus"
+sister = ["Homo sapiens", "Homo heidelbergensis"]
+common = "Ardipithecus ramidus"
+reason = """Open Tree keeps its original genus (Australopithecus ramidus, White et al. 1994); White et al. \
+1995 moved it to Ardipithecus, the name it is known by, given here as its label. It branches off the \
+human lineage at its first appearance."""
+citation = """White, T.D. et al. (2009). Ardipithecus ramidus and the paleobiology of early hominids. \
+Science 326: 64-86. doi:10.1126/science.1175802"""
+
+[[dated_fossil]]
+name = "Australopithecus anamensis"
+sister = ["Homo sapiens", "Homo heidelbergensis"]
+reason = "The earliest australopith; it branches off the human lineage at its first appearance."
+citation = """Wood, B. & Boyle, E.K. (2016). American Journal of Physical Anthropology 159 (S61): 37-78. \
+doi:10.1002/ajpa.22902"""
+
+[[dated_fossil]]
+name = "Australopithecus afarensis"
+sister = ["Homo sapiens", "Homo heidelbergensis"]
+reason = """Lucy's species, often taken as the ancestor of later hominins (from A. anamensis by anagenesis); \
+it branches off the human lineage at its first appearance."""
+citation = """Kimbel, W.H. & Delezene, L.K. (2009). Yearbook of Physical Anthropology 52: 2-48. \
+doi:10.1002/ajpa.21183"""
+
+[[dated_fossil]]
+name = "Kenyanthropus platyops"
+sister = ["Homo sapiens", "Homo heidelbergensis"]
+reason = "A contemporary of A. afarensis, of debated affinity; it branches off the human lineage at its first appearance."
+citation = """Leakey, M.G. et al. (2001). Nature 410: 433-440. doi:10.1038/35068500"""
+
+[[dated_fossil]]
+name = "Australopithecus deyiremeda"
+sister = ["Homo sapiens", "Homo heidelbergensis"]
+age = 3.45
+lo = 3.3
+hi = 3.5
+reason = """A contemporary of A. afarensis; it branches off the human lineage within its range (3.5-3.3 Ma), \
+at 3.45 Ma so that it does not tie with K. platyops's 3.5 Ma."""
+citation = """Haile-Selassie, Y. et al. (2015). Nature 521: 483-488. doi:10.1038/nature14448"""
+
+[[dated_fossil]]
+name = "Australopithecus africanus"
+sister = ["Homo sapiens", "Homo heidelbergensis"]
+reason = "The Taung child's species; it branches off the human lineage at its first appearance."
+citation = """Wood, B. & Boyle, E.K. (2016). American Journal of Physical Anthropology 159 (S61): 37-78. \
+doi:10.1002/ajpa.22902"""
+
+[[dated_fossil]]
+name = "Paranthropus aethiopicus"
+sister = ["Homo sapiens", "Homo heidelbergensis"]
+reason = "The earliest robust australopith (the Black Skull); the Paranthropus lineage leaves the human lineage here."
+citation = """Wood, B. & Boyle, E.K. (2016). American Journal of Physical Anthropology 159 (S61): 37-78. \
+doi:10.1002/ajpa.22902"""
+
+[[dated_fossil]]
+name = "Australopithecus garhi"
+sister = ["Homo sapiens", "Homo heidelbergensis"]
+reason = "Found with early stone-tool cut marks at Bouri; it branches off the human lineage at its first appearance."
+citation = """Asfaw, B. et al. (1999). Science 284: 629-635. doi:10.1126/science.284.5414.629"""
+
+[[dated_fossil]]
+name = "Homo habilis"
+sister = ["Homo sapiens", "Homo heidelbergensis"]
+reason = "Early Homo; it branches off the human lineage at its first appearance."
+citation = """Spoor, F. et al. (2007). Nature 448: 688-691. doi:10.1038/nature05986"""
+
+[[dated_fossil]]
+name = "Paranthropus boisei"
+sister = "Paranthropus aethiopicus"
+age = 2.35
+lo = 2.3
+hi = 2.4
+reason = """East Africa's later robust australopith, widely taken as P. aethiopicus's descendant; their records \
+meet at ~2.3 Ma, so it branches off just before P. aethiopicus's last (2.35 Ma)."""
+citation = """Wood, B. & Constantino, P. (2007). Yearbook of Physical Anthropology 50: 106-132. \
+doi:10.1002/ajpa.20732"""
+
+[[dated_fossil]]
+name = "Homo rudolfensis"
+sister = ["Homo sapiens", "Homo heidelbergensis"]
+reason = "Early Homo beside H. habilis; it branches off the human lineage at its first appearance."
+citation = """Wood, B. & Boyle, E.K. (2016). American Journal of Physical Anthropology 159 (S61): 37-78. \
+doi:10.1002/ajpa.22902"""
+
+[[dated_fossil]]
+name = "Homo erectus"
+sister = ["Homo sapiens", "Homo heidelbergensis"]
+reason = "The first long-legged, Africa-leaving Homo; it branches off the human lineage at its first appearance."
+citation = """Rizal, Y. et al. (2020). Nature 577: 381-385. doi:10.1038/s41586-019-1863-2"""
+
+[[dated_fossil]]
+name = "Paranthropus robustus"
+sister = "Paranthropus boisei"
+reason = """South Africa's robust australopith; it branches off the Paranthropus lineage (P. boisei's by then: \
+P. aethiopicus was gone by 2.3 Ma) at its first appearance."""
+citation = """Herries, A.I.R. et al. (2020). Science 368: eaaw7293. doi:10.1126/science.aaw7293"""
+
+[[dated_fossil]]
+name = "Australopithecus sediba"
+sister = ["Homo sapiens", "Homo heidelbergensis"]
+reason = """Described as a Homo-like descendant of A. africanus, but A. africanus's last record (~2.1 Ma) is older \
+than its 1.98 Ma: it branches off the human lineage at its first appearance."""
+citation = """Berger, L.R. et al. (2010). Australopithecus sediba: a new species of Homo-like australopith \
+from South Africa. Science 328: 195-204. doi:10.1126/science.1184944"""
+
+[[dated_fossil]]
+name = "Homo georgicus"
+sister = "Homo erectus"
+reason = "The Dmanisi hominins, usually counted as early H. erectus; it branches off that lineage at its first appearance."
+citation = """Lordkipanidze, D. et al. (2013). A complete skull from Dmanisi, Georgia, and the evolutionary \
+biology of early Homo. Science 342: 326-331. doi:10.1126/science.1238484"""
+
+[[dated_fossil]]
+name = "Homo antecessor"
+sister = "Homo sapiens"
+reason = """Its enamel proteome puts it as a close sister of the lineage of Neanderthals, Denisovans and modern \
+humans; it branches off the human lineage at its first appearance."""
+citation = """Welker, F. et al. (2020). The dental proteome of Homo antecessor. Nature 580: 235-238. \
+doi:10.1038/s41586-020-2153-8"""
+
+[[dated_fossil]]
+name = "Homo floresiensis"
+sister = "Homo erectus"
+age = 0.7
+lo = 0.7
+hi = 1.0
+reason = """The Flores 'hobbit'. Its likely ancestors are the Mata Menge hominins (~0.7 Ma), usually derived from \
+H. erectus (a more primitive source is argued too); it branches off H. erectus there."""
+citation = """van den Bergh, G.D. et al. (2016). Homo floresiensis-like fossils from the early Middle \
+Pleistocene of Flores. Nature 534: 245-248. doi:10.1038/nature17999"""
+
+[[dated_fossil]]
+name = "Homo neanderthalensis"
+sister = "Homo sapiens"
+age = 0.6
+lo = 0.55
+hi = 0.765
+common = "Neanderthal"
+reason = """Their high-coverage genome puts the split of Neanderthal and modern human populations at \
+550-765 ka (Prüfer et al. 2014); their band starts at Sima de los Huesos, ~430 ka."""
+citation = """Prüfer, K. et al. (2014). The complete genome sequence of a Neanderthal from the Altai \
+Mountains. Nature 505: 43-49. doi:10.1038/nature12886"""
+
+[[dated_fossil]]
+name = "Homo naledi"
+sister = "Homo sapiens"
+age = 0.9
+reason = """Small-brained but late (335-236 ka); its place in Homo is unresolved. It branches off the human \
+lineage at 0.9 Ma, a placeholder inside Homo's crown, not a dated split."""
+citation = """Berger, L.R. et al. (2017). Homo naledi and Pleistocene hominin evolution in subequatorial \
+Africa. eLife 6: e24234. doi:10.7554/eLife.24234"""
 
 # Split labels (ToLaD#145): the taxon a split founds where Open Tree's synthesis does not name it,
 # and the English form the fan titles a taxon by.
