@@ -167,7 +167,9 @@ describe('the fan: marks and tap', () => {
       [15500, undefined],
     ] as const) {
       const wy = fan.time.y(ago / 1e6);
-      const [px, py] = v.toScreen(cxAt(wy), wy);
+      // (On the column, a quarter of its width right of its centre line: beside its name, written along that line, a
+      // pill whose tap flies. Since ToLaD#288's taller home the regional window at 10,500 years lies under the name.)
+      const [px, py] = v.toScreen(cxAt(wy) + laneAt(b, wy).w / 4, wy);
       v.tap(px, py);
       expect(sel!.sp.common).toBe('Puma');
       expect(sel!.event?.ev.title).toBe(title);

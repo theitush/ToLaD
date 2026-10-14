@@ -304,7 +304,18 @@ export const ORDER_CROWNS: Record<string, [string, string]> = {
   Dasyuromorphia: ['Myrmecobius fasciatus', 'Antechinus mimetes'],
 };
 
-/** Name the unnamed orders' splits (ORDER_CROWNS) in tree t: the last split over both species, if it has no taxon. */
+/**
+ * Named clades the dated tree leaves unnamed, each a level (ToLaD#289): the split over both species, named if it has
+ * no taxon. The hominins (Hominini: humans and every relative since the split from the chimpanzees' line, Orrorin
+ * the oldest the tree puts on our side, Sahelanthropus being a stem hominine) and humans' genus Homo (from H. habilis;
+ * A. sediba, placed after it on our line, falls inside, as the placements have it).
+ */
+export const NAMED_CLADES: Record<string, [string, string]> = {
+  Hominini: ['Homo sapiens', 'Orrorin tugenensis'],
+  Homo: ['Homo sapiens', 'Homo habilis'],
+};
+
+/** Name the unnamed orders' splits (ORDER_CROWNS) and NAMED_CLADES' in tree t: the last split over both species, if it has no taxon. */
 export function nameOrders(t: Split): Split {
   const path = (sp: string): Split[] | null => {
     const go = (s: Split): Split[] | null => {
@@ -319,7 +330,7 @@ export function nameOrders(t: Split): Split {
     };
     return go(t);
   };
-  for (const [name, [a, b]] of Object.entries(ORDER_CROWNS)) {
+  for (const [name, [a, b]] of [...Object.entries(ORDER_CROWNS), ...Object.entries(NAMED_CLADES)]) {
     const pa = path(a);
     const pb = path(b);
     if (!pa || !pb) continue;
