@@ -1519,7 +1519,7 @@ export class FanView implements InputHandlers {
   }
 
   private withFold(fan: Fan): Fan {
-    // (?layout=steady, ToLaD#259: rooms fixed between each branch's own splits, steady.ts; at the cats' level every split open.)
+    // (steady by default, ?layout=fold for the fold, ToLaD#259/#273: rooms fixed between each branch's own splits, steady.ts; at the cats' level every split open.)
     const steady = wantSteady();
     if (this.folds || steady) {
       const f = steady ? new Steady(fan, !this.folds) : new Fold(fan);

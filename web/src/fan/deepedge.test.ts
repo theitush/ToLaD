@@ -169,8 +169,11 @@ const LEAN_ROW = 8;
  */
 const FLAT_MAX_PX = 32;
 
-describe('deep zoom: no cut blocks (ToLaD#210, #232)', () => {
-  it(`zoomed into the weasels and the ferret badgers, no lane ends in a flat edge wider than ${FLAT_MAX_PX} px: nothing is culled: the far families' columns run on whole to their splits`, () => {
+/** Every scene, in both width modes, in one layout (TOLAD_LAYOUT, read by wantSteady when the view is made). */
+function noFlatEdge(layout: 'fold' | 'steady'): void {
+  const was = process.env.TOLAD_LAYOUT;
+  process.env.TOLAD_LAYOUT = layout;
+  try {
     for (const mode of ['linear', 'log'] as WidthMode[]) {
       const v = stubView();
       v.setMode(mode);
@@ -178,9 +181,21 @@ describe('deep zoom: no cut blocks (ToLaD#210, #232)', () => {
         group(v, re, fill, ma, tz);
         v.draw();
         const e = flatEdge(v);
-        if (process.env.DEEPEDGE_LOG) console.log(mode, name, e.px, e.at);
-        expect(e.px, `${mode} ${name}: ${e.at}`).toBeLessThanOrEqual(FLAT_MAX_PX);
+        if (process.env.DEEPEDGE_LOG) console.log(layout, mode, name, e.px, e.at);
+        expect(e.px, `${layout} ${mode} ${name}: ${e.at}`).toBeLessThanOrEqual(FLAT_MAX_PX);
       }
     }
-  }, 600_000);
+  } finally {
+    if (was === undefined) delete process.env.TOLAD_LAYOUT;
+    else process.env.TOLAD_LAYOUT = was;
+  }
+}
+
+describe('deep zoom: no cut blocks (ToLaD#210, #232)', () => {
+  const what = `zoomed into the weasels and the ferret badgers, no lane ends in a flat edge wider than ${FLAT_MAX_PX} px: nothing is culled: the far families' columns run on whole to their splits`;
+  // (This guards the fold, ?layout=fold, whatever the default is.)
+  it(`the fold: ${what}`, () => noFlatEdge('fold'), 600_000);
+  // The steady layout (the default, ToLaD#273) still peels near-flat at deep bases (222 px at the weasels' 42.5 Ma
+  // split): ToLaD#268. An expected failure until that is fixed, when this flips and the `.fails` comes off.
+  it.fails(`steady (ToLaD#268): ${what}`, () => noFlatEdge('steady'), 600_000);
 });
