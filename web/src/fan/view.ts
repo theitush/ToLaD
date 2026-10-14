@@ -403,7 +403,9 @@ function colBoxes(fan: Fan, view?: [number, number]): Map<FanBranch | FanNode, C
 function viewBoxes(fan: Fan, out: Map<FanBranch | FanNode, ColBox>, [vy0, vy1]: [number, number]): void {
   const t = fan.tess;
   // (Off the bands' rows, read once for the labels' clearance too: Tess.xRange's box (its table, slot 2), worked out alike.)
+  const tb = performance.now();
   const bd = bandBoxes(fan, vy0, vy1);
+  LC.tBand += performance.now() - tb;
   if (bd) {
     const { GL, GR, w } = bd;
     const bot = t.bottom;
@@ -936,8 +938,22 @@ const FAMILY_MAX_SCREENS = 1.6;
  * "now" may reach higher, up to LABEL_CEIL.
  */
 /** labelSpots' working arrays (the columns near the screen, their buckets), kept from layout to layout. */
-const SCRATCH = { cols: [] as ColBox[], bStart: new Int32Array(65), bFill: new Int32Array(64), bucket: new Int32Array(1024), seen: new Int32Array(1024) };
-export const LC: Record<string, number> = { layouts: 0, beside: 0, besideLive: 0, besideAt: 0, clear: 0, clearCol: 0, clearAt: 0, cols: 0, boxes: 0 };
+const SCRATCH = {
+  cols: [] as ColBox[],
+  cx: new Float64Array(0),
+  ck: new Int32Array(0),
+  cs: new Int32Array(0),
+  cw: new Float64Array(0),
+  wide: new Int32Array(0),
+  cand: new Float64Array(0),
+  nbStart: new Int32Array(65),
+  nbucket: new Int32Array(1024),
+  bStart: new Int32Array(65),
+  bFill: new Int32Array(64),
+  bucket: new Int32Array(1024),
+  seen: new Int32Array(1024),
+};
+export const LC: Record<string, number> = { layouts: 0, beside: 0, besideLive: 0, besideAt: 0, clear: 0, clearCol: 0, clearAt: 0, cols: 0, boxes: 0, tBoxes: 0, tBucket: 0, tGroups: 0, tSpecies: 0, tEvents: 0, tLineages: 0, tSpots: 0, tBand: 0 };
 export function labelSpots(
   c: Screen,
   fan: Fan,
@@ -977,53 +993,110 @@ export function labelSpots(
   // Only the columns near the screen can meet a label on it (with hundreds of species, ToLaD#146, the rest are most).
   const [vx0, vy0] = c.toWorld(-60, -60);
   const [vx1, vy1] = c.toWorld(c.w + 60, c.h + 60);
+  let tp = performance.now();
   const boxes = colBoxes(fan, [vy0, vy1]);
   const fold0 = fan.tess.fold;
   const near = (q: ColBox) => !(q.x1 < vx0 || q.x0 > vx1 || q.y1 <= vy0 || q.y0 > vy1);
   // (Into arrays kept from layout to layout: no garbage a layout, ToLaD#255.)
+  LC.tBoxes += performance.now() - tp; tp = performance.now();
   const cols = SCRATCH.cols;
   cols.length = 0;
   for (const q of boxes.values()) if (near(q)) cols.push(q);
   LC.layouts++;
   LC.cols += cols.length;
   LC.boxes += boxes.size;
-  // ...and those in the strip's own few px across: the columns bucketed by their world x span.
+  // ...and those in the strip's own few px across: the columns bucketed by their world x span (cols' order in each).
   const NB = 64;
   const bw = Math.max(1e-12, (vx1 - vx0) / NB);
-  // (Bucket k's columns: bucket[bStart[k] .. bStart[k + 1]), in cols' order.)
+  const nc = cols.length;
+  // (Each column's box and first and last bucket, in flat arrays: clearance scans them, ToLaD#255.)
+  if (SCRATCH.cx.length < 4 * nc) {
+    SCRATCH.cx = new Float64Array(8 * nc);
+    SCRATCH.ck = new Int32Array(4 * nc);
+    SCRATCH.cs = new Int32Array(2 * nc);
+    SCRATCH.cw = new Float64Array(2 * nc);
+    SCRATCH.wide = new Int32Array(2 * nc);
+    SCRATCH.cand = new Float64Array(2 * nc);
+  }
+  const { cx, ck, cs, cw, wide } = SCRATCH;
+  // (A column across more than WIDE_NB buckets (leaning across the view) is scanned for every strip; the rest are
+  // found in the strip's buckets, nb*.)
+  const WIDE_NB = 8;
+  let nw = 0;
+  const nbStart = SCRATCH.nbStart;
+  nbStart.fill(0);
+  for (let i = 0; i < nc; i++) {
+    const q = cols[i];
+    cx[4 * i] = q.x0;
+    cx[4 * i + 1] = q.x1;
+    cx[4 * i + 2] = q.y0;
+    cx[4 * i + 3] = q.y1;
+    const a = Math.max(0, Math.floor((q.x0 - vx0) / bw));
+    const z = Math.min(NB - 1, Math.floor((q.x1 - vx0) / bw));
+    ck[2 * i] = a;
+    ck[2 * i + 1] = z;
+    const o = q.own;
+    const node = isNode(o);
+    cs[i] = node ? o.strands[0].index : o.index;
+    cw[i] = node ? o.width : 0;
+    if (z - a >= WIDE_NB) wide[nw++] = i;
+    else for (let k = a; k <= z; k++) nbStart[k + 1]++;
+  }
+  for (let k = 0; k < NB; k++) nbStart[k + 1] += nbStart[k];
+  if (SCRATCH.nbucket.length < nbStart[NB]) SCRATCH.nbucket = new Int32Array(2 * nbStart[NB]);
+  const nbucket = SCRATCH.nbucket;
+  {
+    const fill = SCRATCH.bFill;
+    fill.set(nbStart.subarray(0, NB));
+    for (let i = 0; i < nc; i++) if (ck[2 * i + 1] - ck[2 * i] < WIDE_NB) for (let k = ck[2 * i]; k <= ck[2 * i + 1]; k++) nbucket[fill[k]++] = i;
+  }
+  // (Bucket k's columns: bucket[bStart[k] .. bStart[k + 1]), in cols' order; built when first asked for, by nextEdge.)
   const bStart = SCRATCH.bStart;
-  bStart.fill(0);
-  for (let i = 0; i < cols.length; i++) {
-    const q = cols[i];
-    const k0 = Math.max(0, Math.floor((q.x0 - vx0) / bw));
-    const k1 = Math.min(NB - 1, Math.floor((q.x1 - vx0) / bw));
-    for (let k = k0; k <= k1; k++) bStart[k + 1]++;
-  }
-  for (let k = 0; k < NB; k++) bStart[k + 1] += bStart[k];
-  if (SCRATCH.bucket.length < bStart[NB]) SCRATCH.bucket = new Int32Array(2 * bStart[NB]);
-  const bucket = SCRATCH.bucket;
-  const bFill = SCRATCH.bFill;
-  bFill.set(bStart.subarray(0, NB));
-  for (let i = 0; i < cols.length; i++) {
-    const q = cols[i];
-    const k0 = Math.max(0, Math.floor((q.x0 - vx0) / bw));
-    const k1 = Math.min(NB - 1, Math.floor((q.x1 - vx0) / bw));
-    for (let k = k0; k <= k1; k++) bucket[bFill[k]++] = i;
-  }
-  if (SCRATCH.seen.length < cols.length) SCRATCH.seen = new Int32Array(2 * cols.length);
+  let bucket = SCRATCH.bucket;
+  let bucketed = false;
+  const buckets = () => {
+    bucketed = true;
+    bStart.fill(0);
+    for (let i = 0; i < nc; i++) for (let k = ck[2 * i]; k <= ck[2 * i + 1]; k++) bStart[k + 1]++;
+    for (let k = 0; k < NB; k++) bStart[k + 1] += bStart[k];
+    if (SCRATCH.bucket.length < bStart[NB]) SCRATCH.bucket = new Int32Array(2 * bStart[NB]);
+    bucket = SCRATCH.bucket;
+    const bFill = SCRATCH.bFill;
+    bFill.set(bStart.subarray(0, NB));
+    for (let i = 0; i < nc; i++) for (let k = ck[2 * i]; k <= ck[2 * i + 1]; k++) bucket[bFill[k]++] = i;
+  };
+  if (SCRATCH.seen.length < nc) SCRATCH.seen = new Int32Array(2 * nc);
   const seen = SCRATCH.seen;
-  seen.fill(0, 0, cols.length);
+  seen.fill(0, 0, nc);
   // (At the mammal level, on the fold's grid: the columns' reach per band of its rows, for clearance.)
   const bands = fold0 && fold0.gridH > 0 && fold0.ordShare.length > 0 ? bandBoxes(fan, vy0, vy1) : null;
   let stamp = 0;
-  /** Least gap (px, up to CLEAR) between the strip [xa, xb] × [ya, yb] and any column but `own`'s (negative: they overlap). */
+  /** Column q's reach (world [lo, hi]) over bands j0..j1 (bandBoxes'), into `reach`. */
+  const reach = new Float64Array(2);
+  const bandReach = (ci: number, j0: number, j1: number) => {
+    const i0 = cs[ci];
+    const S = bands!.w.length;
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (let j = j0; j <= j1; j++) {
+      if (bands!.L[j * S + i0] < lo) lo = bands!.L[j * S + i0];
+      if (bands!.R[j * S + i0] > hi) hi = bands!.R[j * S + i0];
+    }
+    const pad = 1e-6 * Math.max(1, Math.abs(lo), Math.abs(hi)) + bands!.w[i0];
+    reach[0] = lo - pad;
+    reach[1] = hi + pad + cw[ci];
+  };
+  /**
+   * Least gap (px, up to CLEAR) between the strip [xa, xb] × [ya, yb] and any column but `own`'s (negative: they overlap).
+   * The columns in the order the buckets give them (the first bucket of the strip's each is in, then cols' order),
+   * the first that makes it -1 or less ending it (ToLaD#255: found by a scan of the flat boxes, not the buckets).
+   */
   const clearance = (xa: number, xb: number, ya: number, yb: number, own: FanBranch | FanNode) => {
     LC.clear++;
     let gap = CLEAR;
     if (!(yb > ya)) return gap;
     const [wxa, wya] = c.toWorld(xa - CLEAR, ya);
     const [wxb, wyb] = c.toWorld(xb + CLEAR, yb);
-    stamp++;
     // (The bands of the fold's rows from the one at or above wya to the one at or below wyb: -1 for none.)
     let bj0 = -1;
     let bj1 = -1;
@@ -1037,29 +1110,39 @@ export function labelSpots(
     }
     const k0 = Math.max(0, Math.min(NB - 1, Math.floor((wxa - vx0) / bw)));
     const k1 = Math.max(0, Math.min(NB - 1, Math.floor((wxb - vx0) / bw)));
-    for (let k = k0; k <= k1; k++) for (let n = bStart[k], nEnd = bStart[k + 1]; n < nEnd; n++) {
-      const qi = bucket[n];
-      if (seen[qi] === stamp) continue;
-      seen[qi] = stamp;
-      const q = cols[qi];
-      if (q.own === own || q.x1 < wxa || q.x0 > wxb || q.y1 <= wya || q.y0 > wyb) continue;
-      // (Nowhere nearer than the gap found so far: none of its edges can make it less, ToLaD#255.)
-      if (Math.max(X(q.x0) - xb, xa - X(q.x1)) >= gap) continue;
-      // (Its reach over the bands of the fold's rows the strip spans: clear of it, likewise.)
+    // The columns that can come near it (in a bucket of its, their box and their reach over its bands meeting it),
+    // each keyed by the first of its buckets it is in, then its place in cols (as a walk through the buckets meets them).
+    const cand = SCRATCH.cand;
+    let n = 0;
+    stamp++;
+    const test = (i: number) => {
+      if (cx[4 * i + 1] < wxa || cx[4 * i] > wxb || cx[4 * i + 3] <= wya || cx[4 * i + 2] > wyb) return;
+      const first = Math.max(ck[2 * i], k0);
+      if (first > Math.min(ck[2 * i + 1], k1)) return;
+      if (cols[i].own === own) return;
       if (bj0 >= 0) {
-        const o = q.own;
-        const i0 = isNode(o) ? o.strands[0].index : o.index;
-        const S = bands!.w.length;
-        let lo = Infinity;
-        let hi = -Infinity;
-        for (let j = bj0; j <= bj1; j++) {
-          if (bands!.L[j * S + i0] < lo) lo = bands!.L[j * S + i0];
-          if (bands!.R[j * S + i0] > hi) hi = bands!.R[j * S + i0];
-        }
-        const pad = 1e-6 * Math.max(1, Math.abs(lo), Math.abs(hi)) + bands!.w[i0];
-        lo -= pad;
-        hi += pad + (isNode(o) ? o.width : 0);
-        if (hi < wxa || lo > wxb || Math.max(X(lo) - xb, xa - X(hi)) >= gap) continue;
+        bandReach(i, bj0, bj1);
+        if (reach[1] < wxa || reach[0] > wxb) return;
+      }
+      cand[n++] = first * 1048576 + i;
+    };
+    for (let k = k0; k <= k1; k++)
+      for (let m = nbStart[k], mEnd = nbStart[k + 1]; m < mEnd; m++) {
+        const i = nbucket[m];
+        if (seen[i] === stamp) continue;
+        seen[i] = stamp;
+        test(i);
+      }
+    for (let m = 0; m < nw; m++) test(wide[m]);
+    const cs1 = cand.subarray(0, n).sort();
+    for (let m = 0; m < n; m++) {
+      const ci = cs1[m] % 1048576;
+      const q = cols[ci];
+      // (Nowhere nearer than the gap found so far: none of its edges can make it less.)
+      if (Math.max(X(q.x0) - xb, xa - X(q.x1)) >= gap) continue;
+      if (bj0 >= 0) {
+        bandReach(ci, bj0, bj1);
+        if (Math.max(X(reach[0]) - xb, xa - X(reach[1])) >= gap) continue;
       }
       LC.clearCol++;
       // (heights()'s, without the array: the least over them.)
@@ -1144,6 +1227,7 @@ export function labelSpots(
   };
   /** The nearest column edge (screen x) past x at world y wy, rightwards (a left edge) or leftwards (a right edge); null for none near. */
   const nextEdge = (x: number, wy: number, right: boolean): number | null => {
+    if (!bucketed) buckets();
     let best: number | null = null;
     const k0 = Math.max(0, Math.min(NB - 1, Math.floor((c.toWorld(x, 0)[0] - vx0) / bw)));
     stamp++;
@@ -1212,6 +1296,7 @@ export function labelSpots(
   // as its lineage's label beside its parent column, so once "now" is off screen the one becomes the other.
   // (With the clades' brackets, ToLaD#193, a family is named on its bracket where that has room, else here, over the stack.)
   // (Given the level's groups, ToLaD#258: each group one level down, named whether or not its bracket is, with its picture.)
+  LC.tBucket += performance.now() - tp; tp = performance.now();
   for (const { v, vi, text } of level?.groups ?? families(fan)) {
     // (The mammal level, lod.ts: a family inside a clade drawn as one branch is not named; the clade is.)
     if ((!level && brk?.named(v)) || lod?.hidden(v)) continue;
@@ -1256,6 +1341,7 @@ export function labelSpots(
       out.push({ key: `n${vi}:fam${k}`, id: `n${vi}`, place: 'fam', v, fam: v, pic: level ? groupFace(v) : commonest(v), text, rank: [-1, wb - wa, vi], x, y1, box: [x - half, y1 - len, x + half, y1], fit, span: brk ? undefined : [sa, sb], plus: px });
     });
   }
+  LC.tGroups += performance.now() - tp; tp = performance.now();
   for (const b of fan.branches) {
     // (Given the level's groups, ToLaD#258: only a species that is a group of its own.)
     if ((lod && lod.of[b.index] >= 0) || (level && !level.species.has(b)) || !near(boxes.get(b)!)) continue;
@@ -1303,6 +1389,7 @@ export function labelSpots(
     // Beside its branch: once the tip is off screen.
     out.push(...beside(id, b.sp.common, rank, len, b, ty, Y(b.splitY), 1 - clamp01((ty - top) / 24), { b }));
   }
+  LC.tSpecies += performance.now() - tp; tp = performance.now();
   // Curated events (ToLaD#141): the title beside its window (or in the column when zoomed into it),
   // centred on the window, while the window is on screen. After the species' names, before the lineages'.
   for (const b of fan.branches) {
@@ -1320,6 +1407,7 @@ export function labelSpots(
     }
   }
   // The lineages (parent columns, not the stem below the root: the clade's own label is there), while "now" is off screen.
+  LC.tEvents += performance.now() - tp; tp = performance.now();
   if (nowOn < 1) {
     for (let vi = 0; vi < fan.nodes.length; vi++) {
       const v = fan.nodes[vi];
@@ -1331,6 +1419,7 @@ export function labelSpots(
       out.push(...beside(id, text, rank, len, v, Y(v.y), Y(v.yBot), 1 - nowOn, { v }));
     }
   }
+  LC.tLineages += performance.now() - tp;
   return out;
 }
 
@@ -2515,7 +2604,9 @@ export class FanView implements InputHandlers {
     // (ToLaD#262: each group's name beside its branch, room at its end for the "+x" of the names hidden near it last frame.)
     const topLine = this.labelTop();
     const top = topLine + (br ? br.pinH() * br.pinA : 0);
+    let tq = performance.now();
     const spots = labelSpots(this.camera, this.fan, top, (t) => this.nameWidth(t), this.barRect()?.[0], br ?? undefined, (id) => this.plusRoom.get(id) ?? 0, undefined, lod, lg, this.names);
+    LC.tSpots += performance.now() - tq;
     this.labLast = { fan: this.fan, lg, lod, lodGen: lod?.gen ?? -1, w: this.w, h: this.h, names: this.names, topLine, t: t0, frames: 0, cam: { ...c }, br, top, spots };
     this.labelMs.push(performance.now() - t0);
     return { br, top, lg, spots, carried: null };
@@ -3148,12 +3239,27 @@ export class FanView implements InputHandlers {
 
   /** Length (px) of a species' name in the label font (not cached: the web font may arrive after the first frame). */
   private nameWidth(text: string): number {
-    this.ctx.save();
-    this.ctx.font = font(LABEL_FONT);
-    const w = this.ctx.measureText(text).width;
-    this.ctx.restore();
+    // (Kept per font, and while the faces load or not (the canvas measures in system type until then): a layout
+    // measures every name it places, ToLaD#255.)
+    const f = font(LABEL_FONT);
+    const fk = typeof document !== 'undefined' && document.fonts ? `${f}|${document.fonts.status}` : f;
+    if (fk !== this.nameWFont) {
+      this.nameW.clear();
+      this.nameWFont = fk;
+    }
+    let w = this.nameW.get(text);
+    if (w === undefined) {
+      this.ctx.save();
+      this.ctx.font = f;
+      w = this.ctx.measureText(text).width;
+      this.ctx.restore();
+      if (this.nameW.size > 20000) this.nameW.clear();
+      this.nameW.set(text, w);
+    }
     return w;
   }
+  private nameW = new Map<string, number>();
+  private nameWFont = '';
 
   /**
    * The species' labels (see labelSpots for where): which show is decided by
