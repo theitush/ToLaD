@@ -80,7 +80,6 @@ export class Steady extends Fold {
   private readonly rootJ: number;
   private readonly stack: Int32Array;
   private lay: Lay | null = null;
-  private rowsH = NaN;
   private rowsVer = -1;
   private readonly sRows = new Map<number, Float64Array>();
   private homeExtS: [number, number] | null = null;
@@ -281,14 +280,15 @@ export class Steady extends Fold {
 
   override rowXs(k: number): Float64Array {
     const L = this.cur();
-    if (this.rowsVer !== L.ver || this.rowsH !== this.gridH || this.sRows.size >= 4096) {
+    // (By world y, not by k: the grid's rows a power of two apart, a coarser grid's rows are a finer one's, ToLaD#255.)
+    const y = k * this.gridH;
+    if (this.rowsVer !== L.ver || this.sRows.size >= this.rowCap()) {
       this.sRows.clear();
       this.cRows.clear();
       this.rowsVer = L.ver;
-      this.rowsH = this.gridH;
     }
-    let r = this.sRows.get(k);
-    if (!r) this.sRows.set(k, (r = this.row(L, k * this.gridH, new Float64Array(this.strands.length))));
+    let r = this.sRows.get(y);
+    if (!r) this.sRows.set(y, (r = this.row(L, y, new Float64Array(this.strands.length))));
     return r;
   }
 
@@ -308,13 +308,10 @@ export class Steady extends Fold {
 
   /** Grid row k's widths summed along the drawn order (its columns', and its live strands' founders'): the same at every version. */
   private widthSums(k: number): [Float64Array, Float64Array] {
-    if (this.extH !== this.gridH || this.extW.size >= 4096) {
-      this.extW.clear();
-      this.extH = this.gridH;
-    }
-    let r = this.extW.get(k);
-    if (r) return r;
     const y = k * this.gridH;
+    if (this.extW.size >= this.rowCap()) this.extW.clear();
+    let r = this.extW.get(y);
+    if (r) return r;
     const age = this.fan.time.ageAt(y);
     const S = this.strands;
     const cW = new Float64Array(S.length + 1);
@@ -330,22 +327,25 @@ export class Steady extends Fold {
     return r;
   }
   private readonly extW = new Map<number, [Float64Array, Float64Array]>();
-  private extH = NaN;
+  /** How many rows a cache keeps (a row is a float per strand: some 50 MB at most each, the mammals' ~1,000 rows). */
+  private rowCap(): number {
+    return 4096;
+  }
 
   /** Grid row k's live strands' founders-weighted centres summed along the drawn order (rowXs' version). */
   private centreSums(k: number): Float64Array {
     const xs = this.rowXs(k);
-    let r = this.cRows.get(k);
-    if (r) return r;
-    if (this.cRows.size >= 4096) this.cRows.clear();
     const y = k * this.gridH;
+    let r = this.cRows.get(y);
+    if (r) return r;
+    if (this.cRows.size >= this.rowCap()) this.cRows.clear();
     const [, cB] = this.widthSums(k);
     r = new Float64Array(xs.length + 1);
     for (let i = 0; i < xs.length; i++) {
       const w = cB[i + 1] - cB[i];
       r[i + 1] = r[i] + (w > 0 ? w * (y < this.sY[i] ? xs[i] : xs[i] + w / 2) : 0);
     }
-    this.cRows.set(k, r);
+    this.cRows.set(y, r);
     return r;
   }
   private readonly cRows = new Map<number, Float64Array>();
