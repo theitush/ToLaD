@@ -1262,21 +1262,22 @@
    }
   ],
   "grafts": {
-   "joins a split (loose)": 2661,
-   "on a stem (fossil)": 1174,
-   "on a stem (living, interpolated)": 302,
-   "on a stem, joins a graft of the same age": 452
+   "MDD species: joins its genus crown (loose)": 1134,
+   "joins a split (loose)": 2046,
+   "on a stem (fossil)": 1175,
+   "on a stem (living, interpolated)": 74,
+   "on a stem, joins a graft of the same age": 160
   },
   "living": 7015,
   "named_splits": 689,
   "species": 18365,
   "species_rows_left_out": 1,
-  "splits": 8780,
+  "splits": 8707,
   "splits_by_source": {
    "ensemble": 2264,
-   "fossil": 2707,
+   "fossil": 2713,
    "fossil-floor": 33,
-   "interpolated": 396,
+   "interpolated": 317,
    "override": 32,
    "upham": 1,
    "upham-imputed": 1387,
@@ -1286,7 +1287,7 @@
    "extinct, placed without data (grafted instead)": 44,
    "unmatched tip": 217
   },
-  "zero_length_spliced": 883
+  "zero_length_spliced": 797
  },
  "dating": {
   "calibrated_raised_by_fossils": 402,
@@ -30968,7 +30969,7 @@
  },
  "output": {
   "brotli_bytes": 781017,
-  "dated_sidecar_raw": 1704797,
+  "dated_sidecar_raw": 1703164,
   "files": 15,
   "raw_bytes": 3279848,
   "skeleton_brotli": 62993,

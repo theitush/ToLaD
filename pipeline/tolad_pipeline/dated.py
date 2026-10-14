@@ -17,7 +17,9 @@ builds one by rule, for every clade at once:
    under its Open Tree parent. A graft older than that node (or one the merged tree put on a
    clade's stem, `total_group_of`) branches off its stem at its band start (a fossil: its first
    appearance); a younger one joins that node's split (its place inside is not known: `loose`).
-   A fossil-only subtree keeps the merged tree's shape and dates inside.
+   A fossil-only subtree keeps the merged tree's shape and dates inside. A living species only MDD
+   gives us (#278) joins the dated crown of its MDD genus-mates instead (`loose`; with one mate, a
+   split halfway down that mate's branch).
 
 Every split carries its date source, so the web can tell an Upham date from an
 interpolated one. tiles.py writes the tree induced on each file's species rows into its
@@ -611,6 +613,38 @@ def build(root: Node, up_root, up_tax: dict[str, dict], ov, log: dict, ac=None, 
             A.age, A.lo, A.hi, A.src = new, max(A.lo, new), max(A.hi, new), S_FLOOR
         rep["fossil_floors"] = floors
 
+    # an MDD species (grafted, or an Open Tree tip only MDD knows; ToLaD#278) is placed by its MDD genus alone:
+    # it joins the dated crown of its genus-mates, whatever its Open Tree parent. Its merged band start is
+    # interpolation over Open Tree's taxonomy (Canis lycaon at 14 Ma, Mus species at 40 Ma), not evidence that it
+    # is older than its genus, so it never hangs from the stem by it. With one genus-mate: a new split halfway
+    # down that mate's own branch, shared by its other MDD congeners.
+    dep = _depths(droot)
+    gcrown: dict[str, DNode] = {}
+    for d in list(droot.preorder()):
+        L = d.leaf
+        if L is None or L.extinct or L.t1 > 0 or L.data.get("mdd") or L.data.get("mdd_rescued"):
+            continue
+        g = L.data.get("mdd_genus")
+        if g:
+            gcrown[g] = d if g not in gcrown else _lca(gcrown[g], d, dep)
+    gsplit: dict[str, DNode] = {}
+
+    def mdd_crown(nd: Node) -> DNode | None:
+        if not nd.is_leaf or nd.extinct or nd.t1 > 0 or not (nd.data.get("mdd") or nd.data.get("mdd_rescued")):
+            return None
+        g = nd.data.get("mdd_genus")
+        G = gcrown.get(g) if g else None
+        if G is None or G.leaf is None:
+            return G
+        if g not in gsplit:  # one genus-mate: a split on its branch
+            P = G.parent
+            x = DNode(age=P.age / 2, lo=0.0, hi=P.age, src=S_INTERP, anchor=G)
+            P.children[P.children.index(G)] = x
+            x.parent = P
+            x.add(G)
+            gsplit[g] = x
+        return gsplit[g]
+
     # grafts
     how = Counter()
     clamped = 0
@@ -620,6 +654,12 @@ def build(root: Node, up_root, up_tax: dict[str, dict], ov, log: dict, ac=None, 
             continue
         sub = _sub(nd, placed)
         if sub is None:
+            continue
+        G = mdd_crown(nd)
+        if G is not None:
+            G.add(sub)
+            G.loose += 1
+            how["MDD species: joins its genus crown (loose)"] += 1
             continue
         A = m[id(p)]
         g = max(nd.t0, sub.age)  # its band start, never below its own oldest split (a group starts at its genus record)

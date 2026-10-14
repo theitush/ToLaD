@@ -86,6 +86,14 @@ class Match(unittest.TestCase):
         self.assertNotIn("Microcebus extinctus", names)
         self.assertNotIn("Microcebus domesticus", names)
 
+    def test_kept_tip_carries_its_mdd_status(self):
+        # an Open Tree tip only MDD knows (kept by #116's rescue) carries MDD's IUCN category, so the count
+        # model's CR/EW cap applies to it as to a graft
+        self.n["Microcebus rufus"].data["mdd_rescued"] = True
+        rows = [dict(r, iucn="CR") if r["name"] == "Microcebus rufus" else r for r in self.rows]
+        mdd.graft(self.root, rows, {}, {})
+        self.assertEqual(self.n["Microcebus rufus"].data["mdd_iucn"], "CR")
+
     def test_recogniser(self):
         known = mdd.recogniser(self.rows)
         self.assertTrue(known("Microcebus berthae", set()))
@@ -103,6 +111,25 @@ class Built(unittest.TestCase):
         for sp, e in s["genus_median_estimates"]["species"].items():
             self.assertIn(e["level"], ("genus", "family", "order"))
             self.assertGreaterEqual(e["of"], 1)
+
+    def test_cr_guesses_held(self):
+        # a CR/EW species (by MDD's IUCN category) counted by its genus median, grafted or a kept Open Tree tip
+        # (Lepilemur grewcocki), is held to 250
+        rows = mdd.load(DATA.parents[1] / "data" / "raw")
+        if not rows:
+            self.skipTest("no MDD raw file")
+        cr = {r["name"] for r in rows if r["iucn"] in ("CR", "EW")}
+        est = json.loads((DATA / "stats.json").read_text())["mdd"]["genus_median_estimates"]["species"]
+        held = [sp for sp in est if sp in cr]
+        self.assertIn("Lepilemur grewcocki", held)
+        for sp in held:
+            self.assertLessEqual(est[sp]["N"], 250, sp)
+
+    def test_mdd_species_inside_their_genus(self):
+        # an MDD species joins its genus-mates' dated crown, never the stem by its merged band start
+        # (Canis lycaon hung at 14 Ma, Mus species at 40 Ma)
+        g = json.loads((DATA / "stats.json").read_text())["dated_tree"]["grafts"]
+        self.assertGreater(g.get("MDD species: joins its genus crown (loose)", 0), 1000)
 
 
 if __name__ == "__main__":
