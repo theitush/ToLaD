@@ -406,7 +406,7 @@ the submerged caves of Yucatán. Historical Biology 32: 930-939. doi:10.1080/089
 # PBDB grafts) were not drawn. Their relationships are argued over, so this is grade-honest: each
 # branches off the human lineage (below Homo's crown, `sister` = sapiens + the Sima de los Huesos
 # genome Upham calls H. heidelbergensis) at its first appearance ([[date]] above), except where a
-# lineage is widely agreed (Paranthropus; A. sediba with A. africanus; Dmanisi and Flores with
+# lineage is widely agreed (Paranthropus; Dmanisi and Flores with
 # H. erectus; Neanderthals from the modern human lineage, dated by their genomes). Sahelanthropus
 # (7.2 Ma) is older than this tree's Homo-Pan split (6.15 Ma), so it sits on the stem of both.
 
@@ -502,7 +502,11 @@ citation = """Spoor, F. et al. (2007). Nature 448: 688-691. doi:10.1038/nature05
 [[dated_fossil]]
 name = "Paranthropus boisei"
 sister = "Paranthropus aethiopicus"
-reason = "East Africa's later robust australopith, widely taken as P. aethiopicus's descendant."
+age = 2.35
+lo = 2.3
+hi = 2.4
+reason = """East Africa's later robust australopith, widely taken as P. aethiopicus's descendant; their records \
+meet at ~2.3 Ma, so it branches off just before P. aethiopicus's last (2.35 Ma)."""
 citation = """Wood, B. & Constantino, P. (2007). Yearbook of Physical Anthropology 50: 106-132. \
 doi:10.1002/ajpa.20732"""
 
@@ -521,14 +525,16 @@ citation = """Rizal, Y. et al. (2020). Nature 577: 381-385. doi:10.1038/s41586-0
 
 [[dated_fossil]]
 name = "Paranthropus robustus"
-sister = "Paranthropus aethiopicus"
-reason = "South Africa's robust australopith; it branches off the Paranthropus lineage at its first appearance."
+sister = "Paranthropus boisei"
+reason = """South Africa's robust australopith; it branches off the Paranthropus lineage (P. boisei's by then: \
+P. aethiopicus was gone by 2.3 Ma) at its first appearance."""
 citation = """Herries, A.I.R. et al. (2020). Science 368: eaaw7293. doi:10.1126/science.aaw7293"""
 
 [[dated_fossil]]
 name = "Australopithecus sediba"
-sister = "Australopithecus africanus"
-reason = "Described as a descendant of A. africanus; it branches off that lineage at its first appearance."
+sister = ["Homo sapiens", "Homo heidelbergensis"]
+reason = """Described as a Homo-like descendant of A. africanus, but A. africanus's last record (~2.1 Ma) is older \
+than its 1.98 Ma: it branches off the human lineage at its first appearance."""
 citation = """Berger, L.R. et al. (2010). Australopithecus sediba: a new species of Homo-like australopith \
 from South Africa. Science 328: 195-204. doi:10.1126/science.1184944"""
 

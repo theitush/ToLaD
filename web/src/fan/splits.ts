@@ -242,6 +242,23 @@ export const FAMILY_EN: Record<string, string> = {
   Eupleridae: 'Malagasy carnivores',
   Prionodontidae: 'Linsangs',
   Nandiniidae: 'Palm civet',
+  // (Primates, ToLaD#275.)
+  Galagidae: 'Galagos',
+  Lorisidae: 'Lorises',
+  Lemuridae: 'True lemurs',
+  Indriidae: 'Indris & sifakas',
+  Cheirogaleidae: 'Mouse & dwarf lemurs',
+  Lepilemuridae: 'Sportive lemurs',
+  Daubentoniidae: 'Aye-aye',
+  Tarsiidae: 'Tarsiers',
+  Pitheciidae: 'Titis, sakis & uakaris',
+  Cebidae: 'Capuchins & squirrel monkeys',
+  Aotidae: 'Night monkeys',
+  Callitrichidae: 'Marmosets & tamarins',
+  Atelidae: 'Spider & howler monkeys',
+  Cercopithecidae: 'Old World monkeys',
+  Hylobatidae: 'Gibbons',
+  Hominidae: 'Great apes',
 };
 
 /**

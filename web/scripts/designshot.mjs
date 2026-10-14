@@ -134,6 +134,10 @@ const scenes = [
   ['mamm-bats', 'level', ['Chiroptera']],
   ['mamm-whales', 'level', ['Cetacea']],
   ['mamm-primates', 'level', ['Primates']],
+  // The great apes and the hominins (ToLaD#275): Hominidae framed, the human lineage, a Neanderthal's card.
+  ['mamm-hominidae', 'level', ['Hominidae']],
+  ['mamm-homininae', 'level', ['Homininae']],
+  ['mamm-neanderthal', 'search', ['neander', 'Neanderthal']],
   ['carn-card-dog', 'card', ['Grey wolf']],
   ['carn-search-wol', 'search', ['wol']],
   // A pick that once landed beside the screen (ToLaD#211: the fold opening as the camera zooms): now centred, card open.

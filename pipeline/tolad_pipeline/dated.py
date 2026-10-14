@@ -443,6 +443,11 @@ def apply_overrides(root: DNode, merged: Node, ov, notes: list[dict]) -> tuple[D
         ents.append((age, e, f))
     for age, e, f in sorted(ents, key=lambda x: -x[0]):
         s = _mrca([by_name[x] for x in sis(e)])
+        # (A fossil sister must still be alive at the split: P. aethiopicus ended at 2.3 Ma, before P. robustus's 2.0.)
+        end = getattr(s.leaf, "lad", None) if s.leaf is not None else None
+        if end is not None and end >= age:
+            raise RuntimeError(f"overrides.toml dated_fossil {e['name']}: sister {e['sister']!r} ended at {end} Ma, "
+                               f"before the split at {age}")
         if s.parent is not None and age >= s.parent.age:
             raise RuntimeError(f"overrides.toml dated_fossil {e['name']}: age {age} is not below "
                                f"{e['sister']}'s split at {s.parent.age}")

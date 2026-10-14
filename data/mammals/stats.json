@@ -989,10 +989,7 @@
    }
   },
   "clamped_below_parent": 103,
-  "ended_before_split": [
-   "Australopithecus africanus",
-   "Paranthropus aethiopicus"
-  ],
+  "ended_before_split": [],
   "fossil_floors": [
    {
     "capped": false,
@@ -22173,7 +22170,7 @@
  },
  "output": {
   "brotli_bytes": 746353,
-  "dated_sidecar_raw": 1586399,
+  "dated_sidecar_raw": 1586636,
   "files": 14,
   "raw_bytes": 3072312,
   "skeleton_brotli": 90124,
@@ -22586,7 +22583,7 @@
     ]
    },
    {
-    "age": 2.3,
+    "age": 2.35,
     "name": "Paranthropus boisei",
     "sister": "Paranthropus aethiopicus"
    },
@@ -22614,12 +22611,15 @@
    {
     "age": 2.0,
     "name": "Paranthropus robustus",
-    "sister": "Paranthropus aethiopicus"
+    "sister": "Paranthropus boisei"
    },
    {
     "age": 1.98,
     "name": "Australopithecus sediba",
-    "sister": "Australopithecus africanus"
+    "sister": [
+     "Homo sapiens",
+     "Homo heidelbergensis"
+    ]
    },
    {
     "age": 1.85,
