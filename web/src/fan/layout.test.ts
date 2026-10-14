@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { columnsAt, g, GAP_FRAC, isNode, laneAt, layoutFan, LEAN_MAX_FRAC, leftAt, MIN_GAP_FRAC, nodeLeftAt, segAt, strandAt, TIME_H, type EdgeStyle, type WidthMode } from './layout';
-import { FELIDAE } from './panthera';
+import { columnsAt, g, GAP_FRAC, isNode, laneAt, layoutFan, layoutSeed, LEAN_MAX_FRAC, leftAt, MIN_GAP_FRAC, nodeLeftAt, segAt, strandAt, TIME_H, type EdgeStyle, type WidthMode } from './layout';
+import { CARNIVORA, FELIDAE } from './panthera';
+import { CARNIVORA_TREE } from './splits';
 
 describe('fan strands: width = alive at the time', () => {
   for (const mode of ['log', 'linear'] as WidthMode[]) {
@@ -245,5 +246,24 @@ describe('Tess: culling and thinning (the draw path, #32)', () => {
       }
     }
     expect(thinned).toBeGreaterThan(0);
+  });
+});
+
+describe('the build-time layout seed (ToLaD#255)', () => {
+  it('a seeded layout is the worked-out one, number for number, and other designs still take its sides', () => {
+    const seed = JSON.parse(JSON.stringify(layoutSeed(CARNIVORA, CARNIVORA_TREE)));
+    expect(seed.flips.length).toBeGreaterThan(0);
+    const plain = { ...CARNIVORA };
+    const seeded = { ...CARNIVORA, seed };
+    const pick = (f: ReturnType<typeof layoutFan>) => ({
+      nodes: f.nodes.map((v) => [v.name, v.left, v.cx, v.blend, v.leanY, v.tile, v.width, v.kids.map((k) => (isNode(k) ? k.name : k.sp.sci)).join()]),
+      branches: f.branches.map((b) => [b.sp.sci, b.index, b.cx, b.colLeft, b.x0, b.leanY, b.width, b.path.map((p) => [p.y, p.left, p.off, p.w, p.gAbove])]),
+      ext: [f.x0, f.x1, f.stem, f.trunkBottom],
+    });
+    for (const mode of ['linear', 'log'] as WidthMode[])
+      for (const edge of ['curved', 'straight'] as EdgeStyle[]) expect(pick(layoutFan(seeded, mode, CARNIVORA_TREE, edge))).toEqual(pick(layoutFan(plain, mode, CARNIVORA_TREE, edge)));
+    // A seed that does not fit the tree is not taken.
+    const bad = { ...CARNIVORA, seed: { ...seed, leaf: seed.leaf.slice(3) } };
+    expect(pick(layoutFan(bad, 'linear', CARNIVORA_TREE, 'curved'))).toEqual(pick(layoutFan(plain, 'linear', CARNIVORA_TREE, 'curved')));
   });
 });
