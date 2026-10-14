@@ -273,15 +273,33 @@ export class FanCamera {
     return columnsAt(this.fan, y);
   }
 
+  /** Every strand's tip and split height, ascending (nearestContent's events), for the fan they are from. */
+  private evAll(): Float64Array {
+    if (this.evFan !== this.fan) {
+      this.evFan = this.fan;
+      const a = new Float64Array(2 * this.fan.branches.length);
+      this.fan.branches.forEach((b, i) => {
+        a[2 * i] = b.tipY;
+        a[2 * i + 1] = b.splitY;
+      });
+      // (A NaN never in a span: left out, the rest bisectable.)
+      this.evSorted = a.filter((v) => v === v).sort();
+    }
+    return this.evSorted;
+  }
+  private evFan: Fan | null = null;
+  private evSorted = new Float64Array(0);
+
   /** Nearest x holding content at height y, or anywhere in heights [y, y1] (x itself if it does). */
   nearestContent(x: number, y: number, y1 = y): number {
     const ys = [y, y1];
     for (let k = 1; k < 8; k++) ys.push(y + ((y1 - y) * k) / 8);
     // The tips and splits in [y, y1] (where content starts or ends), at most 24 of them evenly picked: with
     // hundreds of species (ToLaD#146) each height costs a pass over every column.
-    const ev: number[] = [];
-    for (const b of this.fan.branches) for (const v of [b.tipY, b.splitY]) if (v > y && v < y1) ev.push(v);
-    ev.sort((a, b) => a - b);
+    // (Off every tip and split sorted once per fan (evAll), bisected: ~12,000 at the mammal level, ToLaD#255.)
+    const all = this.evAll();
+    const lo = bisectAbove(all, y);
+    const ev = all.subarray(lo, Math.max(lo, bisectBelow(all, y1)));
     const step = Math.max(1, ev.length / 24);
     for (let k = 0; k < ev.length; k += step) ys.push(ev[Math.floor(k)]);
     let best = x;
@@ -396,4 +414,28 @@ export function clipPoly(xs: number[], ys: number[], x0: number, y0: number, x1:
     py = oy;
   }
   return [px, py];
+}
+
+/** The first index in ascending a whose value is above y. */
+function bisectAbove(a: Float64Array, y: number): number {
+  let lo = 0;
+  let hi = a.length;
+  while (lo < hi) {
+    const m = (lo + hi) >> 1;
+    if (a[m] > y) hi = m;
+    else lo = m + 1;
+  }
+  return lo;
+}
+
+/** The first index in ascending a whose value is at or above y (those before it below y). */
+function bisectBelow(a: Float64Array, y: number): number {
+  let lo = 0;
+  let hi = a.length;
+  while (lo < hi) {
+    const m = (lo + hi) >> 1;
+    if (a[m] >= y) hi = m;
+    else lo = m + 1;
+  }
+  return lo;
 }
