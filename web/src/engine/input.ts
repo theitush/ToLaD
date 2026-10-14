@@ -30,7 +30,11 @@ export interface InputHandlers {
    * With per-axis pinch, vz is the x (width) zoom and vt the y (time) zoom.
    */
   fling(vx: number, vy: number, vz: number, px: number, py: number, vt?: number): void;
-  doubleTap(x: number, y: number): void;
+  /**
+   * A double-tap. `firstRan`: its first tap was held (tapWaits) but ran as a single tap before the second came in (the
+   * window's timer fired first: a busy frame held the second tap's events back, ToLaD#301), so what it did is undone.
+   */
+  doubleTap(x: number, y: number, firstRan?: boolean): void;
   /** Optional: a single tap (fires before the second tap of a double-tap, unless `tapWaits` holds it). */
   tap?(x: number, y: number): void;
   /**
@@ -56,7 +60,7 @@ export class Input {
   private downAt = 0;
   private moved = 0;
   private maxPointers = 0;
-  private lastTap = { t: -1e9, x: 0, y: 0 };
+  private lastTap = { t: -1e9, x: 0, y: 0, ran: false };
   /** A single tap held for the double-tap window (tapWaits): where, and its timer. */
   private held: { x: number; y: number; timer: number } | null = null;
   private wheelTimer = 0;
@@ -231,7 +235,15 @@ export class Input {
    * then leaves it to that touch's end: another tap runs it first, a pan or pinch drops it.
    */
   private hold(x: number, y: number): void {
-    this.held = { x, y, timer: window.setTimeout(() => this.pointers.size === 0 && this.release(), DOUBLE_TAP_MS) };
+    this.held = {
+      x,
+      y,
+      timer: window.setTimeout(() => {
+        if (this.pointers.size > 0) return;
+        this.lastTap.ran = true;
+        this.release();
+      }, DOUBLE_TAP_MS),
+    };
   }
 
   /** The held tap, if any, runs now. */
@@ -262,15 +274,16 @@ export class Input {
     if (isTap) {
       const lt = this.lastTap;
       if (e.timeStamp - lt.t < DOUBLE_TAP_MS && Math.hypot(p.x - lt.x, p.y - lt.y) < 40) {
+        const ran = lt.ran;
         this.lastTap.t = -1e9;
         this.drop();
         this.h.gestureEnd();
-        this.h.doubleTap(p.x, p.y);
+        this.h.doubleTap(p.x, p.y, ran);
         return;
       }
       // A tap held before this one that was not its double's first: it goes now, then this one.
       this.release();
-      this.lastTap = { t: e.timeStamp, x: p.x, y: p.y };
+      this.lastTap = { t: e.timeStamp, x: p.x, y: p.y, ran: false };
       if (this.h.tapWaits?.(p.x, p.y)) this.hold(p.x, p.y);
       else this.h.tap?.(p.x, p.y);
     } else this.drop();

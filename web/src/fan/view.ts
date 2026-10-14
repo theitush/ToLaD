@@ -7,7 +7,7 @@
 import { drawThumb, labelThumb, thumbsOn, wikiOf } from './wiki';
 import { PIC_D, placePics, type PicSpot } from './pics';
 import { formatCount } from '../data/count';
-import { Input, type InputHandlers } from '../engine/input';
+import { DOUBLE_TAP_MS, Input, type InputHandlers } from '../engine/input';
 import { clipPoly, FanCamera, type Camera } from './camera';
 import { g, isNode, laneAt, layoutFan, leftAt, nearestStrand, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type EdgeStyle, type Fan, type FanBranch, type FanNode, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
@@ -70,10 +70,12 @@ const LABEL_AXIS_X = 72;
 type Step = { lv: Level; cam: Camera };
 /**
  * The view is "inside" a level's frame when it is zoomed in at least this far less than it (15 %), width and time
- * together (the area's scale): levelNow's. Zoomed in further than this past the level's own frame (a pinch, a "+x"), a
- * double-tap goes to that frame first (ToLaD#271).
+ * together (the area's scale): levelNow's. (Zoomed in past it, a pinch or a "+x" into part of it, a double-tap still goes
+ * up from it, never back to its own frame: ToLaD#301.)
  */
 const BACK_SLACK = 1.15;
+/** A touch that has moved this many px is a pan, not a tap (engine/input.ts's tap): a level's flight under it stops (ToLaD#301). */
+const TOUCH_SLOP = 12;
 /** A tap's next level (ToLaD#258) is one whose frame stands more than this many px off the view's: nearer, it is passed. */
 const LEVEL_PX = 12;
 /** A level of one, two or three groups is framed taking this much of the screen's width (ToLaD#262; more, TAP_FILL). */
@@ -1910,7 +1912,11 @@ export class FanView implements InputHandlers {
     this.selInd = null;
     this.touch = null;
     this.onSelect(null);
-    this.flyTo(() => this.groupCamera(bs));
+    const to = this.flyTo(() => this.groupCamera(bs));
+    // (A level's flight (ToLaD#301): the level its groups sit in, so a tap or double-tap mid-way goes on from there.)
+    let v: FanNode | null = bs[0].node;
+    while (v?.parent && !bs.every((b) => v!.strands.includes(b))) v = v.parent;
+    this.backing = { lv: { v: levelUp(this.fan, v, true) ?? this.fan.root }, cam: to };
   }
 
   /** The screen point of clade `latin`'s bracket as last drawn, if it is wide enough to tap (designshot), or null. */
@@ -2198,21 +2204,38 @@ export class FanView implements InputHandlers {
   private vel = { x: 0, y: 0, z: 0, t: 0, px: 0, py: 0 };
 
   gestureStart(): void {
+    // (A level's flight goes on under a touch until it pans or pinches (ToLaD#301): a tap or double-tap mid-flight goes
+    // on from where it lands, not from where the touch stopped it. A fling or any other flight stops.)
+    if (!this.backing) this.anim = null;
+    this.panned = 0;
+    this.gesturing = true;
+  }
+  /** How far (px) the touch under way has panned (ToLaD#301): a level's flight stops once it is a pan (TOUCH_SLOP). */
+  private panned = 0;
+  /** A level's flight stops under a pan or pinch: the view is the user's. */
+  private stopFlight(): void {
     this.anim = null;
     this.backing = null;
-    this.gesturing = true;
   }
   gestureEnd(): void {
     this.gesturing = false;
     this.request();
   }
   pan(dx: number, dy: number): void {
+    if (this.gesturing && this.anim && this.backing) {
+      // (A tap's jitter leaves the flight be; a pan takes the view.)
+      if ((this.panned += Math.abs(dx) + Math.abs(dy)) < TOUCH_SLOP) return;
+      this.stopFlight();
+    }
     if (dx || dy) this.tapAt = null;
     this.camera.pan(dx, dy);
     this.request();
   }
   zoom(px: number, py: number, fx: number, ft: number): void {
-    if (fx !== 1 || ft !== 1) this.tapAt = null;
+    if (fx !== 1 || ft !== 1) {
+      this.tapAt = null;
+      if (this.backing) this.stopFlight();
+    }
     this.zoomAbout(px, py, fx, ft);
     this.request();
   }
@@ -2239,28 +2262,39 @@ export class FanView implements InputHandlers {
    * under way, from where it lands) to the level it sits in (levelUp), the tree a tap goes down, so the two mirror each
    * other. Not back the way it came: after a search pick, a "+x" or a pinch, the parent of where the view is. A level
    * whose frame is within LEVEL_PX of the view is passed (every double-tap visibly moves). At home, nothing. The card
-   * closes for the flight.
+   * closes for the flight. `firstRan` (ToLaD#301): its first tap already ran as a single tap (a level deeper, a "+x"),
+   * so from the level the view was at before that tap, never from where that tap went: up, not back.
    */
-  doubleTap(_x: number, _y: number): void {
-    const on = this.anim && this.backing;
-    const from = on ? this.backing!.lv : this.levelNow(true);
-    const step = this.upFrom(from, on ? this.backing!.cam : this.cam);
+  doubleTap(_x: number, _y: number, firstRan = false): void {
+    const pre = firstRan && this.preTap && performance.now() - this.preTap.t < 4 * DOUBLE_TAP_MS ? this.preTap : null;
+    const on = !pre && this.anim && this.backing;
+    const from = pre ? pre.lv : on ? this.backing!.lv : this.levelNow(true);
+    const step = this.upFrom(from, pre ? pre.cam : on ? this.backing!.cam : this.cam);
     if (step) this.goLevel(step.lv, step.cam, false);
+    // (Home: nothing, so the first tap's flight is put back.)
+    else if (pre && (this.anim || this.offBy(pre.cam, this.cam) > 0.5)) this.goLevel(pre.lv, pre.cam, false);
   }
+  /** Where the last single tap found the view (ToLaD#301): its level (a flight's under way, where it lands) and frame, and when. */
+  private preTap: (Step & { t: number }) | null = null;
 
   /**
-   * Where a double-tap from level `from` goes, the view at camera c (ToLaD#271): zoomed in well past from's own frame
-   * (BACK_SLACK: a pinch, a "+x" into part of it), that frame; else the first level `from` sits in (levelUp, home's
-   * root last) whose frame is more than LEVEL_PX off the view. Null when there is none (home).
+   * Where a double-tap from level `from` goes, the view at camera c (ToLaD#271, #301): the first level `from` sits in
+   * (levelUp, home's root last) whose frame is more than LEVEL_PX off the view. Never `from`'s own frame, even zoomed
+   * in past it (a pinch, a "+x" into part of it): that is back where the view was, not up. Null when there is none (home).
    */
   private upFrom(from: Level, c: Camera): Step | null {
-    const own = this.frameOf(from);
-    if (Math.log(c.sx / own.sx) + Math.log(c.sy / own.sy) > Math.log(BACK_SLACK) && this.offBy(own, c) > LEVEL_PX) return { lv: from, cam: own };
-    for (let u = from.b ? levelUp(this.fan, from.b.node, true) : levelUp(this.fan, from.v); u; u = levelUp(this.fan, u)) {
+    for (const u of this.levelsAbove(from)) {
       const cam = this.frameOf({ v: u });
       if (this.offBy(cam, c) > LEVEL_PX) return { lv: { v: u }, cam };
     }
     return null;
+  }
+
+  /** The levels level `from` sits in (levelUp's tree, ToLaD#258), nearest first, home's root last. */
+  levelsAbove(from: Level): FanNode[] {
+    const out: FanNode[] = [];
+    for (let u = from.b ? levelUp(this.fan, from.b.node, true) : levelUp(this.fan, from.v); u; u = levelUp(this.fan, u)) out.push(u);
+    return out;
   }
 
   /**
@@ -2431,6 +2465,9 @@ export class FanView implements InputHandlers {
   }
 
   tap(x: number, y: number): void {
+    // (Where this tap finds the view: a double-tap whose first tap this was goes up from here, ToLaD#301.)
+    const on = this.anim && this.backing;
+    this.preTap = { ...(on ? this.backing! : { lv: this.levelNow(true), cam: { ...this.cam } }), t: performance.now() };
     // One level deeper (ToLaD#258), towards what was tapped: a pinned group (ToLaD#233), a species' or group's pill
     // (ToLaD#230, #212) or picture (ToLaD#193), a clade's bracket. The stack's "…": one level up (ToLaD#288).
     if (this.brackets?.moreHit(x, y)) {
