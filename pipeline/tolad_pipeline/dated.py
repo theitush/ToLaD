@@ -43,8 +43,11 @@ AGES = "ensemble"
 GEN_HOW = ["COMBINE reported", "COMBINE imputed", "allometric", "cited (overrides.toml)"]
 # Where a species' adult body mass comes from (model.py: PHYLACINE 1.2 first, then COMBINE, PanTHERIA, COMBINE's
 # imputed value; a species none of them has takes the geometric mean of its nearest clade with data). ToLaD#276.
+# A leaf carrying a domestic stock (ToLaD#328) weighs the mean of who is alive on it now: the stock at its herd's mean
+# live mass (anchors.greenspoon_domestic_mass: Greenspoon 2023, IPCC 2006 Tier 1 weights; dogs and cats from its pets
+# table), any wild population left at the adult mass above; "domestic stock" (appended: the indices above stay).
 MASS_HOW = ["phylacine", "combine", "pantheria", "combine-imputed", "genus mean", "subfamily mean", "family mean",
-            "superfamily mean", "order mean", "clade mean", "Mammalia mean"]
+            "superfamily mean", "order mean", "clade mean", "Mammalia mean", "domestic stock"]
 EPS = 1e-4  # Ma
 SPLIT_CAP = 1.0  # Ma: the oldest an MDD split beside its parent species is placed (dated.build, ToLaD#278)
 
@@ -908,6 +911,12 @@ def mass_entry(nd: Node) -> list | None:
     src = nd.data.get("mass_src")
     if lm is None or src not in MASS_HOW:
         return None
+    dom = nd.data.get("domestic")
+    alive = nd.data.get("alive") or 0.0
+    if dom and alive > 0:
+        stock = min(alive, nd.data.get("domestic_now", dom["stock"]))
+        g = (stock * dom["mass_kg"] * 1000 + (alive - stock) * 10 ** lm) / alive
+        return [_r(g), MASS_HOW.index("domestic stock")]
     return [_r(10 ** lm), MASS_HOW.index(src)]
 
 
