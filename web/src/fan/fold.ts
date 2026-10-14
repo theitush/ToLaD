@@ -350,25 +350,51 @@ export abstract class Fold {
     return Math.max(Fold.peelH(b), 0.02 * (b.splitY - b.tipY));
   }
 
+  /**
+   * Every split's openness at width zoom `sx` (px per world unit) on a screen `screenW` wide, into `out` (pure: the
+   * layout is not moved; setScale applies it, cut.ts's territories read it at zooms not on screen). Never falls as sx grows.
+   */
+  opennessAt(sx: number, screenW: number, out: Float64Array = new Float64Array(this.a.length)): Float64Array {
+    for (let i = 0; i < this.a.length; i++) out[i] = this.openOne(i, sx, screenW);
+    return out;
+  }
+
+  /** Pair i's split's openness at width zoom sx on a screen screenW wide (opennessAt's, one split). */
+  openOne(i: number, sx: number, screenW: number): number {
+    // (z: the order's drawn extent at home, its families apart and each closed, on screen over the screen's.)
+    const [e0, e1] = this.homeExtent();
+    const order = (e1 - e0) * sx;
+    const g = this.pairOrd[i];
+    return g >= 0
+      ? this.famLike(i)
+        ? openness(this.pairNode[i].ageMa, order * this.ordShare[g], screenW)
+        : logRamp(order / screenW, ORDER_OPEN_LO, ORDER_OPEN_HI)
+      : this.pairFam[i]
+        ? openness(this.pairNode[i].ageMa, order, screenW)
+        : 1;
+  }
+
+  /** The width zooms between which pair i's split opens (closed at or below the first, open at or above the second), or null: always open. */
+  openRamp(i: number, screenW: number): [number, number] | null {
+    const [e0, e1] = this.homeExtent();
+    const E = e1 - e0;
+    const g = this.pairOrd[i];
+    const z0 = OPEN_Z * Math.pow(20 / Math.max(this.pairNode[i].ageMa, 1e-3), OPEN_POW);
+    const r = (lo: number, hi: number, k: number): [number, number] => [(lo * screenW) / (E * k), (hi * screenW) / (E * k)];
+    if (g >= 0) return this.famLike(i) ? r(z0, z0 * OPEN_SPAN, this.ordShare[g]) : r(ORDER_OPEN_LO, ORDER_OPEN_HI, 1);
+    return this.pairFam[i] ? r(z0, z0 * OPEN_SPAN, 1) : null;
+  }
+  private aNext: Float64Array | null = null;
+
   /** Set the width zoom (px per world unit) and screen width (px): true if any split's openness changed. */
   setScale(sx: number, screenW: number): boolean {
     if (sx === this.sx && screenW === this.screenW) return false;
     this.sx = sx;
     this.screenW = screenW;
     let changed = false;
-    // (z: the order's drawn extent at home, its families apart and each closed, on screen over the screen's.)
-    const [e0, e1] = this.homeExtent();
-    const order = (e1 - e0) * sx;
+    const A = this.opennessAt(sx, screenW, (this.aNext ??= new Float64Array(this.a.length)));
     for (let i = 0; i < this.a.length; i++) {
-      const g = this.pairOrd[i];
-      const a =
-        g >= 0
-          ? this.famLike(i)
-            ? openness(this.pairNode[i].ageMa, order * this.ordShare[g], screenW)
-            : logRamp(order / screenW, ORDER_OPEN_LO, ORDER_OPEN_HI)
-          : this.pairFam[i]
-            ? openness(this.pairNode[i].ageMa, order, screenW)
-            : 1;
+      const a = A[i];
       if (a !== this.a[i]) changed = true;
       this.a[i] = a;
       // (A gap opens over a height by its width on screen, at most FORK_SLOPE px across per px up at a phone's home

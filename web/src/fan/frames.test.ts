@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { CARNIVORA, FELIDAE, mammaliaClade, type CladeRec } from './panthera';
 import { loadMammalsFromFiles } from './mammals-node';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, type Split } from './splits';
-import { levelUp, FanView, groupCentre, groupFace, isLevel, levelName, nextLevels, type Level } from './view';
+import { levelUp, FanView, groupCentre, groupExtent, groupFace, isLevel, levelName, nextLevels, type Level } from './view';
 import type { Camera } from './camera';
 import type { FanNode } from './layout';
 import { latinOf } from './brackets';
@@ -81,6 +81,7 @@ function frameFaults(v: FanView, lv: Level): string[] {
   const rows = new Set((br?.placed ?? []).map((p) => (p as { row: number }).row));
   const more = (br as unknown as { moreRow: number } | null)?.moreRow ?? -1;
   if (rows.size > 3 || [...rows].some((r) => r > 2) || more > 3) bad.push(`${at}: ${rows.size} bracket rows, "…" at ${more}`);
+  bad.push(...cutFaults(v, lv));
   if (lv.b) return bad;
   let n = 0;
   let shown = 0;
@@ -96,6 +97,23 @@ function frameFaults(v: FanView, lv: Level): string[] {
     if (p && (p.x - p.d / 2 < -1 || p.x + p.d / 2 > v.w + 1 || p.y - p.d / 2 < foot - 1)) bad.push(`${at}: ${nameOf(g)}'s picture off screen (${p.x.toFixed(0)}, ${p.y.toFixed(0)})`);
   }
   if (shown < n) log.push(`${at}: ${shown}/${n} pictures, now at ${nowS.toFixed(0)}, sx ${v.cam.sx.toExponential(2)}`);
+  return bad;
+}
+/**
+ * What is cut off at the screen's edge at level lv (ToLaD#319): a next-level group's columns at "now" (a species', its
+ * centre) off the screen, or any name pill shown running past either edge.
+ */
+function cutFaults(v: FanView, lv: Level): string[] {
+  const bad: string[] = [];
+  const at = nameOf(lv);
+  if (!lv.b)
+    for (const g of nextLevels(v.fan, lv.v)) {
+      const [lo, hi] = g.b ? [groupCentre(g), groupCentre(g)] : groupExtent(g.v);
+      const [a, z] = [v.toScreen(lo, 0)[0], v.toScreen(hi, 0)[0]];
+      if (a < -0.5 || z > v.w + 0.5) bad.push(`${at}: ${nameOf(g)}'s columns at ${a.toFixed(0)}..${z.toFixed(0)} px`);
+    }
+  for (const h of v.famHits) if (h.box[0] < -0.5 || h.box[2] > v.w + 0.5) bad.push(`${at}: the pill ${levelName(h.v)} at ${h.box[0].toFixed(0)}..${h.box[2].toFixed(0)} px`);
+  for (const h of v.nameHits) if (h.box[0] < -0.5 || h.box[2] > v.w + 0.5) bad.push(`${at}: the pill ${h.b.sp.common} at ${h.box[0].toFixed(0)}..${h.box[2].toFixed(0)} px`);
   return bad;
 }
 const log: string[] = [];
@@ -117,7 +135,7 @@ describe("every level's frame: now near the top, every next-level group's pictur
       if (name === "mammals") await loadMammalsFromFiles();
       const v = mk();
       const bad: string[] = [];
-      for (const u of v.fan.nodes) if (isLevel(v.fan, u) && u.strands.length > 1 && (name !== 'mammals' || levelUp(v.fan, u) === v.fan.root || levelName(u) === 'Primates' || (levelUp(v.fan, u) && levelName(levelUp(v.fan, u)!) === 'Primates') || inGreatApes(v, u))) {
+      for (const u of v.fan.nodes) if (isLevel(v.fan, u) && u.strands.length > 1 && (name !== 'mammals' || levelUp(v.fan, u) === v.fan.root || ['Primates', 'Bandicoots & bilbies'].includes(levelName(u)) || (levelUp(v.fan, u) && ['Primates', 'Metatheria'].includes(levelName(levelUp(v.fan, u)!))) || inGreatApes(v, u))) {
         land(v, { v: u });
         bad.push(...frameFaults(v, { v: u }));
       }
@@ -234,6 +252,60 @@ describe('the hominins are one group (ToLaD#289)', () => {
       land(v, lv);
       bad.push(...frameFaults(v, lv));
     }
+    expect(bad).toEqual([]);
+  }, 400000);
+});
+
+describe('a level framed by name (levelCamera, the design shots\' "level"): nothing cut off at the edge (ToLaD#319)', () => {
+  it('every carnivore level, and the marsupials and the bandicoots at the mammals', async () => {
+    const bad: string[] = [];
+    const walk = (v: FanView, us: FanNode[]) => {
+      for (const u of us) {
+        v.cam = v.levelCamera(u.split.taxon!)!;
+        v.camera.settle();
+        (v as unknown as { tapAt: unknown }).tapAt = null;
+        settle(v);
+        bad.push(...cutFaults(v, { v: u }));
+      }
+    };
+    const c = stubView();
+    walk(c, c.fan.nodes.filter((u) => u.parent && u.split.taxon && isLevel(c.fan, u) && u.strands.length > 1));
+    await loadMammalsFromFiles();
+    const m = stubView(mammaliaClade(), mammaliaTree(), true);
+    const us = ['Metatheria', 'Peramelemorphia'].map((t) => m.fan.nodes.find((u) => u.split.taxon === t)!);
+    expect(us.map((u) => u && levelName(u))).toEqual(['Metatheria', 'Bandicoots & bilbies']);
+    walk(m, us);
+    expect(bad).toEqual([]);
+  }, 400000);
+});
+
+describe('a one-species "+x" lands on the species it stands for (ToLaD#318)', () => {
+  it('carnivores (folded): every level, every "+x" standing for one species: it on screen, its name shown, its card open', () => {
+    const v = stubView();
+    const bad: string[] = [];
+    let taps = 0;
+    let selected: string | null = null;
+    v.onSelect = (s) => (selected = s ? s.sp.common : null);
+    for (const u of v.fan.nodes.filter((u) => isLevel(v.fan, u) && u.strands.length > 1)) {
+      const lv = { v: u };
+      land(v, lv);
+      for (const h of v.plusHits.map((p) => ({ box: [...p.box], bs: [...p.bs] }))) {
+        if (h.bs.length !== 1) continue;
+        const b = h.bs[0];
+        land(v, lv);
+        v.tap((h.box[0] + h.box[2]) / 2, (h.box[1] + h.box[3]) / 2);
+        if (!P(v).anim) {
+          bad.push(`${nameOf(lv)}: +1 (${b.sp.common}) flew nowhere`);
+          continue;
+        }
+        taps++;
+        run(v);
+        const x = v.toScreen(groupCentre({ b }), 0)[0];
+        const pill = v.nameHits.find((n) => n.b === b);
+        if (!(x >= 0 && x <= v.w) || !pill || selected !== b.sp.common) bad.push(`${nameOf(lv)}: +1 (${b.sp.common}) landed at x ${x.toFixed(0)}, ${pill ? 'named' : 'no name'}, card ${selected}`);
+      }
+    }
+    expect(taps).toBeGreaterThan(10);
     expect(bad).toEqual([]);
   }, 400000);
 });
