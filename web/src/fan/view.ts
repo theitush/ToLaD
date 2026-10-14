@@ -25,6 +25,20 @@ import { axisInset, drawWorldOver, drawWorldUnder, worldFlags, type Box } from '
 export type { IndInfo } from './twigs';
 export type { Camera } from './camera';
 
+/**
+ * The texture inside the columns (the individuals' lines and lives, twigs.ts drawTwigs; ToLaD#100, #101, #192): off
+ * for now (ToLaD#273, "the texture just breaks"), the columns flat bands of their green and grey lanes. `?texture=1`
+ * (TOLAD_TEXTURE=1 in node) brings it back; off, nothing of it runs.
+ */
+export const textureOn = (() => {
+  try {
+    if (typeof location !== 'undefined') return new URLSearchParams(location.search).get('texture') === '1';
+  } catch {
+    /* no URL */
+  }
+  return (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.TOLAD_TEXTURE === '1';
+})();
+
 /** Alive now: the one luminous colour. */
 export const GREEN = '#3fd286';
 /** Line ended: a cool slate, darker than both greens (told apart by lightness too, not hue alone). */
@@ -2083,7 +2097,7 @@ export class FanView implements InputHandlers {
       for (const b of this.fan.branches) if (!lod || lod.of[b.index] < 0) this.drawStrand(b);
       if (lod) for (const v of lod.merged) this.drawMerged(v);
     }
-    if (!hide.has('ind')) for (const b of this.fan.branches) if (!lod || lod.of[b.index] < 0) this.drawIndividuals(b);
+    if (textureOn && !hide.has('ind')) for (const b of this.fan.branches) if (!lod || lod.of[b.index] < 0) this.drawIndividuals(b);
     if (!hide.has('held')) this.drawHeld();
     if (!hide.has('events')) this.drawEvents();
     if (!hide.has('fade')) this.drawStemFade();
