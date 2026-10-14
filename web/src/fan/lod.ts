@@ -30,9 +30,8 @@ export class Lod {
   private readonly flag: Uint8Array;
   private readonly room: Float64Array;
   private readonly gap: Float64Array;
-  /** Per merged-able node: its green (world, summed over its strands) per grid row, at grid height greenH. */
+  /** Per merged-able node: its green (world, summed over its strands) per grid row, by the row's world y. */
   private green = new Map<FanNode, Map<number, number>>();
-  private greenH = NaN;
 
   constructor(readonly fan: Fan) {
     fan.nodes.forEach((v, i) => this.idx.set(v, i));
@@ -107,18 +106,16 @@ export class Lod {
 
   /** Clade v's green (world: the sum of its strands' green widths) at grid row k of height h. */
   greenAt(v: FanNode, k: number, h: number): number {
-    if (h !== this.greenH) {
-      this.green.clear();
-      this.greenH = h;
-    }
+    // (By world y, not by (k, h): a coarser grid's rows are a finer one's (powers of two), kept across the switch, ToLaD#255.)
+    const y = k * h;
     let m = this.green.get(v);
     if (!m) this.green.set(v, (m = new Map()));
-    let G = m.get(k);
+    let G = m.get(y);
     if (G === undefined) {
+      if (m.size >= 8192) m.clear();
       G = 0;
-      const y = k * h;
       for (const b of v.strands) if (y >= b.tipY) G += lanesAt(b, y)[1];
-      m.set(k, G);
+      m.set(y, G);
     }
     return G;
   }
