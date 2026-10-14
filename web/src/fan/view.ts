@@ -66,6 +66,8 @@ const THUMB_D = 50;
 const LABEL_PAD = 8;
 /** Right edge (px) of the time axis's labels: species' labels keep right of it. */
 const LABEL_AXIS_X = 72;
+/** A "+x" tap's frame (groupCamera): the species' span at "now" widened this share each side, a name's room (~27 px) past the outer ones. */
+const GROUP_NAME_PAD = 0.1;
 /** A level's flight under way (ToLaD#258, #271): the level it lands on and its frame, so a tap or double-tap mid-flight goes on from there. */
 type Step = { lv: Level; cam: Camera };
 /**
@@ -1656,7 +1658,10 @@ export class FanView implements InputHandlers {
         s[0] = Math.min(s[0], leftAt(b, y));
         s[1] = Math.max(s[1], leftAt(b, y) + laneAt(b, y).w);
       }
-      return s;
+      // (A name's room beyond the outer ones, ToLaD#293: the leftmost's name beside it right of the time axis, not
+      // squeezed against its neighbour's (MDD's mongooses: the Crab-eating mongoose at the frame's edge).)
+      const pad = GROUP_NAME_PAD * (s[1] - s[0]);
+      return [s[0] - pad, s[1] + pad];
     };
     return cladeCamera(this.camera, this.fan, { ...v, yBot: v.y }, now, (cam) => this.withBand(cam, v));
   }
