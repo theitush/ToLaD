@@ -2,7 +2,7 @@
 import { createReadStream, existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { defineConfig, type Plugin } from 'vite';
+import { createServer, defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { MAMMALS_FILE } from './src/fan/mammals-data';
 import { GLOBE_FILE } from './src/fan/globe-data';
@@ -99,8 +99,8 @@ function pantheraData(): Plugin {
         res.end(globeJson());
       });
     },
-    generateBundle() {
-      this.emitFile({ type: 'asset', fileName: MAMMALS_FILE, source: mammalsJson() });
+    async generateBundle() {
+      this.emitFile({ type: 'asset', fileName: MAMMALS_FILE, source: await mammalsJson(true) });
       this.emitFile({ type: 'asset', fileName: GLOBE_FILE, source: globeJson() });
     },
   };
@@ -110,11 +110,35 @@ function pantheraData(): Plugin {
  * mammals.json (fan/mammals-data.ts MammalData): every mammal under the whole dated tree, only the species the fan
  * draws, and the pictures of those the carnivore page leaves out.
  */
-function mammalsJson(): string {
+function mammalsJson(): string;
+function mammalsJson(seeded: true): Promise<string>;
+function mammalsJson(seeded = false): string | Promise<string> {
   const clade = trimToFan(loadAll((rel) => readFileSync(join(DATA, rel))));
   const carn = new Set(trimToFan(loadClade((rel) => readFileSync(join(DATA, rel)), 'Carnivora')).species.map((s) => s.sci));
   const wiki = wikiFor(clade.species.map((s) => s.sci).filter((s) => !carn.has(s)));
-  return JSON.stringify({ clade, wiki });
+  if (!seeded) return JSON.stringify({ clade, wiki });
+  // The build's: with the level's default layout worked out here (fan/mammals-seed.ts, ToLaD#255), on the clade as the
+  // page reads it (through JSON). Dev serves it without: the page works it out.
+  return mammalsSeed(JSON.parse(JSON.stringify(clade))).then((seed) => JSON.stringify({ clade, wiki, seed }));
+}
+
+/** fan/mammals-seed.ts run in node through a vite server of its own (the virtual data modules resolved). */
+async function mammalsSeed(clade: unknown): Promise<unknown> {
+  const server = await createServer({
+    configFile: false,
+    root: here,
+    logLevel: 'error',
+    plugins: [pantheraData()],
+    appType: 'custom',
+    server: { middlewareMode: true, hmr: false, ws: false },
+    optimizeDeps: { noDiscovery: true, include: [] },
+  });
+  try {
+    const m = (await server.ssrLoadModule('/src/fan/mammals-seed.ts')) as { mammalsSeed(c: unknown): Promise<unknown> };
+    return await m.mammalsSeed(clade);
+  } finally {
+    await server.close();
+  }
 }
 
 /**

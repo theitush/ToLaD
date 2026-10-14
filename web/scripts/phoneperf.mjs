@@ -4,7 +4,7 @@
 //
 //   npm run build:single && flock /tmp/tolad-browser.lock node scripts/phoneperf.mjs
 //
-// Env: Q=extra query, THROTTLE=4, ONLY=scene,scene, PROFILE=scene (a CDP CPU profile of that
+// Env: Q=extra query, THROTTLE=4, LOADONLY=1 (load times only), ONLY=scene,scene, PROFILE=scene (a CDP CPU profile of that
 // scene's gestures, written to PROFILE_OUT, default phoneperf.cpuprofile), REPS=1 (gestures repeated).
 // Per scene: load ms (navigation to the first frame drawn), then over the gestures the rAF deltas' p50/p95/max,
 // dropped frames (each delta over 16.7 ms counts the vsyncs it missed) and the draw()'s own p50/p95 (frameMs).
@@ -66,9 +66,25 @@ try {
     const cdp = await ctx.newCDPSession(page);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: THROTTLE });
     const url = served.url.replace(/\/\?$|\/$/, '/') + `?level=${level}${Q ? '&' + Q : ''}`;
+    // (LOADONLY=1: the load times only, no gestures, ToLaD#255; with PROFILE=scene, the load's CPU profile.)
+    const LOADONLY = !!process.env.LOADONLY;
+    if (LOADONLY && PROFILE === name) {
+      await cdp.send('Profiler.enable');
+      await cdp.send('Profiler.setSamplingInterval', { interval: 500 });
+      await cdp.send('Profiler.start');
+    }
     await page.goto(url);
     await page.waitForFunction(() => window.__pp.first > 0, null, { timeout: 120000 });
     const load = await page.evaluate(() => window.__pp.first);
+    if (LOADONLY) {
+      if (PROFILE === name) {
+        const { profile } = await cdp.send('Profiler.stop');
+        writeFileSync(process.env.PROFILE_OUT || 'phoneperf.cpuprofile', JSON.stringify(profile));
+      }
+      console.log(`${name.padEnd(11)} load ${Math.round(load)} ms`);
+      await ctx.close();
+      continue;
+    }
     // The view framed (unthrottled for the setup, it is not what is timed), settled.
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
     const ok = await page.evaluate((s) => {
