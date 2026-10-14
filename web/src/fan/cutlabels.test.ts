@@ -76,6 +76,23 @@ const FANS: [string, () => Promise<FanView>][] = [
   ['cats', async () => stubView(FELIDAE as CladeRec, FELIDAE_TREE as Split, false)],
   ['carnivores', async () => stubView()],
   ['mammals', mammals],
+  // (Widths by mass, ToLaD#338: the same rooms, measured otherwise.)
+  [
+    'carnivores, widths by mass',
+    async () => {
+      const v = stubView();
+      v.setMeasure('mass');
+      return v;
+    },
+  ],
+  [
+    'mammals, widths by mass',
+    async () => {
+      const v = await mammals();
+      v.setMeasure('mass');
+      return v;
+    },
+  ],
 ];
 
 describe('labels from the cut (?labels=cut, ToLaD#333)', () => {
