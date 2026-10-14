@@ -225,6 +225,8 @@ export interface FanNode {
 }
 
 export interface Fan {
+  /** The seed's order shares when the layout is the seed's (fold.ts scaleOrders takes them; ToLaD#255). */
+  ordShare?: number[];
   clade: CladeRec;
   mode: WidthMode;
   edge: EdgeStyle;
@@ -1013,7 +1015,15 @@ export function strandAt(b: FanBranch, ageMa: number, mode: WidthMode): { w: num
 const MAX_Q_GENS = 5000;
 
 type Kid = FanNode | FanBranch;
-const under = (v: FanNode): FanBranch[] => v.kids.flatMap((k) => (isNode(k) ? under(k) : [k]));
+/** Each node's strands, left to right (every node's, in one pass from the leaves up: nodes in build order, parents first). */
+const underAll = (nodes: FanNode[]): Map<FanNode, FanBranch[]> => {
+  const m = new Map<FanNode, FanBranch[]>();
+  for (let i = nodes.length - 1; i >= 0; i--) {
+    const v = nodes[i];
+    m.set(v, v.kids.flatMap((k) => (isNode(k) ? m.get(k)! : [k])));
+  }
+  return m;
+};
 
 /**
  * A daughter that grows out of nobody at its split (a domestic stock,
@@ -1107,12 +1117,13 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = FELIDA
     b.baseW = unit * g(b.pop.founders, mode);
   });
   // Parent columns, daughters first: the sum of the strands' founders; green by the genealogy.
+  const below = underAll(nodes);
   const sizes = (v: FanNode): void => {
     for (const k of v.kids) if (isNode(k)) sizes(k);
     let n = 0;
     let gl = 0;
     let w = 0;
-    for (const b of under(v)) {
+    for (const b of below.get(v)!) {
       n += b.pop.founders;
       gl += b.pop.founders * b.sp.genYears;
       w += b.baseW;
@@ -1149,7 +1160,8 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = FELIDA
   if (mode !== ORDER_MODE && !byMode.has(ORDER_MODE)) layoutFan(clade, ORDER_MODE, tree, edge);
   // (The default design's sides and places, worked out at build time for the mammal level, ToLaD#255: taken as they are.)
   const seed = mode === ORDER_MODE && edge === 'curved' ? clade.seed : undefined;
-  if (seed && seedFits(seed, nodes, branches)) byMode.set(mode, applySeed(seed, nodes, branches));
+  const seeded = !!seed && seedFits(seed, nodes, branches);
+  if (seeded) byMode.set(mode, applySeed(seed, nodes, branches));
   else {
     const P = new Packer(time, mode, W, branches.length > HUGE_TREE ? HUGE_CELLS : CELLS);
     const { plans, sides } = chooseSides(root, P, byMode.get(ORDER_MODE));
@@ -1159,7 +1171,7 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = FELIDA
   }
   if (SEED_OUT && mode === ORDER_MODE && edge === 'curved') SEED_OUT.seed = takeSeed(nodes, branches, byMode.get(mode)!);
   // Each strand's place in its ancestors' columns (offsets in the column's order), each column's tile in its parent, each leaf's slot.
-  for (const v of nodes) v.strands = under(v);
+  for (const [v, s] of underAll(nodes)) v.strands = s;
   for (const v of nodes) {
     let off = 0;
     for (const k of v.kids) {
@@ -1212,6 +1224,7 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = FELIDA
     stem: [root.left, root.left + root.width],
     x0,
     x1,
+    ordShare: seeded ? seed.ord : undefined,
   };
 }
 
@@ -1228,6 +1241,8 @@ export interface LayoutSeed {
   node: number[];
   /** Per branch (build order): cx, colLeft, leanY. */
   leaf: number[];
+  /** The orders' shares of the width at "now" (fold.ts Fold.ordShare), worked out on this layout (mammalsSeed). */
+  ord?: number[];
 }
 
 /** Set (seedOut) to collect the seed of the next default-design layout (the build, vite.config.ts). */
