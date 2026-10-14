@@ -795,6 +795,7 @@ const FAMILY_MAX_SCREENS = 1.6;
  * (under the buttons); `barX0` the buttons' left edge: left of it a label on
  * "now" may reach higher, up to LABEL_CEIL.
  */
+export const LC: Record<string, number> = { layouts: 0, beside: 0, besideLive: 0, besideAt: 0, clear: 0, clearCol: 0, clearAt: 0, cols: 0, boxes: 0 };
 export function labelSpots(
   c: Screen,
   fan: Fan,
@@ -837,6 +838,9 @@ export function labelSpots(
   const boxes = colBoxes(fan, [vy0, vy1]);
   const near = (q: ColBox) => !(q.x1 < vx0 || q.x0 > vx1 || q.y1 <= vy0 || q.y0 > vy1);
   const cols = [...boxes.values()].filter(near);
+  LC.layouts++;
+  LC.cols += cols.length;
+  LC.boxes += boxes.size;
   // ...and those in the strip's own few px across: the columns bucketed by their world x span.
   const NB = 64;
   const bw = Math.max(1e-12, (vx1 - vx0) / NB);
@@ -850,6 +854,7 @@ export function labelSpots(
   let stamp = 0;
   /** Least gap (px, up to CLEAR) between the strip [xa, xb] × [ya, yb] and any column but `own`'s (negative: they overlap). */
   const clearance = (xa: number, xb: number, ya: number, yb: number, own: FanBranch | FanNode) => {
+    LC.clear++;
     let gap = CLEAR;
     if (!(yb > ya)) return gap;
     const [wxa, wya] = c.toWorld(xa - CLEAR, ya);
@@ -862,12 +867,14 @@ export function labelSpots(
       seen[qi] = stamp;
       const q = cols[qi];
       if (q.own === own || q.x1 < wxa || q.x0 > wxb || q.y1 <= wya || q.y0 > wyb) continue;
+      LC.clearCol++;
       // (heights()'s, without the array: the least over them.)
       const wa = Math.max(wya, q.y0);
       const wb = Math.min(wyb, q.y1 - 1e-9);
       for (let j = -3, y = Math.ceil(wa / grid) * grid; j < 0 || y < wb; j < 0 ? j++ : (y += grid)) {
         const wy = j === -3 ? wa : j === -2 ? wb : j === -1 ? q.lean : y;
         if (j === -1 && !(wy > wa && wy < wb)) continue;
+        LC.clearAt++;
         const e = q.at(wy);
         gap = Math.min(gap, Math.max(X(e[0]) - xb, xa - X(e[1])));
       }
@@ -880,6 +887,7 @@ export function labelSpots(
 
   /** The spots beside a column on screen from y0 down (its own edge from `edge`, its bottom at screen yBot). */
   const beside = (id: string, text: string, rank: Rank, len: number, own: FanBranch | FanNode, yTop: number, yBot: number, fit0: number, ref: { b?: FanBranch; v?: FanNode }, loose = false): LabelSpot[] => {
+    LC.beside++;
     const y0 = Math.max(top, yTop);
     const y1 = y0 + len;
     if (!(fit0 > 0) || y0 > bottom) return [];
@@ -895,7 +903,9 @@ export function labelSpots(
     const f = fit0 * clamp01((yBot - y0 - 12) / 24) * botFit(y1);
     if (!(f > 0)) return (['in', 'right', 'left'] as const).map((place) => ({ key: `${id}:${place}`, id, place, ...ref, text, rank, x: 0, y1, box: [-half, y0, half, y1], fit: 0 }));
     const ob = boxes.get(own)!;
+    LC.besideLive++;
     for (const wy of heights(wTop, wBot, [ob.lean])) {
+      LC.besideAt++;
       const [a, b] = ob.at(wy);
       l = Math.min(l, X(a));
       r = Math.max(r, X(b));

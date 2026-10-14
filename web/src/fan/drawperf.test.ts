@@ -14,7 +14,7 @@ import { CARNIVORA, FELIDAE, mammaliaClade } from './panthera';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree } from './splits';
 import { laneAt, leftAt } from './layout';
 import { ColumnPath, CutMemo, SCALE_BAR_PX } from './twigs';
-import { FanView } from './view';
+import { FanView, LC } from './view';
 import { loadMammalsFromFiles } from './mammals-node';
 
 const RUN = !!process.env.FANPERF;
@@ -217,6 +217,24 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
         return r;
       };
     }
+    // The labels (ToLaD#255): each layout's time (labelsNow when it laid out, not carried), and the label work a frame
+    // (labelsNow + drawLabels + the pins, labelAllMs). FANPERF_LAYOUT=1: laid out every frame (no carry), for the layout's spread.
+    const labLay: number[] = [];
+    const vl = v as unknown as { labelsNow(l: unknown): { carried: unknown }; labLast: unknown; labelAllMs: number[] };
+    const labelsNow = vl.labelsNow.bind(v);
+    vl.labelsNow = (l: unknown) => {
+      if (process.env.FANPERF_LAYOUT) vl.labLast = null;
+      const t = CPU ? cpuMs() : performance.now();
+      const L0 = vl.labLast as Record<string, unknown> | null;
+      const g0 = (v as unknown as { gesturing: boolean }).gesturing;
+      const r = labelsNow(l);
+      if (process.env.FANPERF_LABDBG && r.carried === null && L0) {
+        const L1 = vl.labLast as Record<string, unknown>;
+        out(`  relayout: moving ${g0} ${['fan', 'lg', 'lod', 'lodGen', 'w', 'h', 'names', 'topLine'].filter((k) => L0[k] !== L1[k]).join(',')} frames ${L0.frames}`);
+      }
+      if (r.carried === null) labLay.push((CPU ? cpuMs() : performance.now()) - t);
+      return r;
+    };
     // How many strands get sampled per frame, and at how many points.
     const lp = { n: 0, pts: 0 };
     const lanePoints = v.lanePoints.bind(v);
@@ -371,6 +389,8 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
       let rects = 0;
       calls.stroke = calls.fill = calls.text = calls.pieces = 0;
       lp.n = lp.pts = 0;
+      labLay.length = 0;
+      vl.labelAllMs.length = 0;
       for (const k of Object.keys(cnt)) delete cnt[k];
       const N = 90;
       // ('pinch+pan': a faster pinch and a wider pan, as a finger does, ToLaD#255.)
@@ -404,6 +424,26 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
       const tl = performance.now();
       vg.levelNow(true);
       const tLevel = performance.now() - tl;
+      const labAll = vl.labelAllMs.slice();
+      const nLay = labLay.length;
+      // At rest after it (ToLaD#255): the labels laid out there, hashed (key, place, x, y1, box, fit of every spot): the same before and after a change.
+      v.draw();
+      v.draw();
+      const sp = (vl.labLast as { spots: { key: string; x: number; y1: number; box: number[]; fit: number }[] } | null)?.spots ?? [];
+      const hk = hsh;
+      hsh = 0x811c9dc5;
+      for (const s of sp) {
+        for (let i = 0; i < s.key.length; i++) hsh = Math.imul(hsh ^ s.key.charCodeAt(i), 16777619);
+        for (const x of [s.x, s.y1, ...s.box, s.fit]) {
+          f64[0] = x;
+          hsh = Math.imul(Math.imul(hsh ^ u32[0], 16777619) ^ u32[1], 16777619);
+        }
+      }
+      if (process.env.FANPERF_LABDBG) out(`  LC per layout: ${Object.entries(LC).map(([k, n]) => `${k} ${(n / Math.max(1, LC.layouts)).toFixed(0)}`).join(' ')}`);
+      for (const k of Object.keys(LC)) LC[k] = 0;
+      const restHash = `${sp.length} spots ${(hsh >>> 0).toString(16).padStart(8, '0')}`;
+      hsh = hk;
+      out(`  labels: layout p50 ${q(labLay, 0.5)?.toFixed(1)} p95 ${q(labLay, 0.95)?.toFixed(1)} max ${Math.max(...labLay).toFixed(1)} (${nLay} of ${N} frames); label work/frame p50 ${q(labAll, 0.5).toFixed(1)} p95 ${q(labAll, 0.95).toFixed(1)} mean ${(labAll.reduce((a, b) => a + b, 0) / labAll.length).toFixed(1)}; at rest ${restHash}`);
       // (FANPERF_TIMES=1: every frame's time, to see where the slow ones fall.)
       if (process.env.FANPERF_COUNT) out(`  calls/f:\n${Object.entries(cnt).sort((a, b) => b[1] - a[1]).map(([k, n]) => `    ${(n / N).toFixed(0).padStart(6)} ${k}`).join('\n')}`);
       if (process.env.FANPERF_TIMES) out(`  ${times.map((x) => x.toFixed(0)).join(' ')}`);
