@@ -31,6 +31,9 @@ import { Fold, ROOM_BEND, type FoldState } from './fold';
 /** A split's fork is at most this share of its shortest daughter's run (to its own split or tip). */
 export const STEADY_RUN = 0.85;
 
+/** Rooms by life: the gap between two daughters where one is a fossil is at most this share of their extents together while both lived. */
+export const LIFE_GAP = 0.5;
+
 /** Rooms by life: a strand's widest over a window is laneW at this many steps (and its ends). */
 const LIFE_SAMPLES = 48;
 
@@ -46,10 +49,28 @@ export function wantSteady(): boolean {
 }
 
 /**
+ * Whether a level whose living members dwarf its fossils is framed on the fossils (ToLaD#289): ?fit=fossils, or
+ * TOLAD_FIT=fossils in node; the globe menu's "Fit fossils". It turns on the rooms by life (wantLifeRooms) too. Off by default.
+ */
+export function wantFitFossils(): boolean {
+  try {
+    if (typeof location !== 'undefined') {
+      const q = new URLSearchParams(location.search).get('fit');
+      if (q) return q === 'fossils';
+    }
+  } catch {
+    /* no URL */
+  }
+  const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
+  return env?.TOLAD_FIT === 'fossils';
+}
+
+/**
  * Whether a fossil's room is only what it stood beside while it lived (ToLaD#289): ?rooms=life, or TOLAD_ROOMS=life
  * in node. Off by default: every room is its widest ever, so a hominin fossil stands beside the humans' 8e9-wide room.
  */
 export function wantLifeRooms(): boolean {
+  if (wantFitFossils()) return true;
   try {
     if (typeof location !== 'undefined') {
       const q = new URLSearchParams(location.search).get('rooms');
@@ -335,7 +356,9 @@ export class Steady extends Fold {
           else {
             ext(K[p], t0, ea);
             ext(K[q], t0, eb);
-            x = Math.max(x, o[p] + ea[1] + g - eb[0]);
+            // (The gap too: a share of the order's width, the humans' 8e9 at the primates', would dwarf the fossils; at most LIFE_GAP of what the two were then.)
+            const gl = Math.min(g, LIFE_GAP * (ea[1] - ea[0] + eb[1] - eb[0]));
+            x = Math.max(x, o[p] + ea[1] + gl - eb[0]);
           }
           // (Those before a sister living to now are clear of q already: they are clear of her column, which q clears.)
           if (tip[p] <= now) break;
