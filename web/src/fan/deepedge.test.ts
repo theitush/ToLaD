@@ -71,7 +71,7 @@ function stubView(): FanView {
   return v;
 }
 
-/** designshot.mjs's 'group' scene: the species matching `re` filling `fill` of the width at `ma` Mya, time zoom tz × home. */
+/** designshot.mjs's 'group' scene: the species matching `re` filling `fill` of the width at `ma` Mya, time zoom tz × HOME_SY (home before ToLaD#288). */
 function group(v: FanView, re: RegExp, fill: number, ma: number, tz: number): void {
   const fan = v.fan;
   const g = fan.branches.filter((b) => re.test(b.sp.sci));
@@ -98,9 +98,18 @@ function group(v: FanView, re: RegExp, fill: number, ma: number, tz: number): vo
     const [lo, hi] = span();
     cx = (lo + hi) / 2;
   }
-  v.cam = { cx, cy: y, sx, sy: h.sy * tz, ty: h.sy * tz };
+  const sy = HOME_SY * tz;
+  v.cam = { cx, cy: y, sx, sy, ty: sy };
   v.camera.settle();
 }
+
+/**
+ * The time scale (px per world unit) the scenes' tz multiplies: home's at 390×844 among the mammals when the edges
+ * below were measured, before ToLaD#288 reframed home to span the fan's life (19% taller in time). Held as a number:
+ * a flat edge is a pixel's matter (ToLaD#290), so the scenes stay where they were measured. (At 2.5 × today's home the
+ * ferret badgers' deep fork, closing near-flat at 22-25 px a row at 26.4 Ma, reads 39 px; at 0.2% off this, 43.)
+ */
+const HOME_SY = 0.56;
 
 const SCENES: [string, RegExp, number, number, number][] = [
   ['weasels', /^Mustela /, 0.85, 6, 1.6],
