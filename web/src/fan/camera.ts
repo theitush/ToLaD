@@ -234,14 +234,11 @@ export class FanCamera {
     const [sxMin, syMin] = this.minScale();
     const prev = c.sy > 0 && Number.isFinite(c.sy) ? c.sy : c.ty;
     c.sx = Math.min(SX_MAX, Math.max(sxMin, c.sx));
-    // Folded (fold.ts): the width zoom opens or closes splits, and the rows stand anchored on the screen's
-    // centre (where it lands: the time zoom's change ignored); the point under the fingers stays in its column.
+    // Laid out (steady.ts): the width zoom opens or closes splits; the point under the fingers stays in its column.
     const fo = this.fan.tess.fold;
     if (fo) {
       const snap = fo.snapshot();
-      const ch = fo.setScale(c.sx, this.w);
-      const an = fo.setAnchor(wx - (px - this.w / 2) / c.sx, wy - (py - this.h / 2) / prev, c.sx, this.w);
-      if (ch || an) wx = fo.follow(wx, wy, snap);
+      if (fo.setScale(c.sx, this.w)) wx = fo.follow(wx, wy, snap);
     }
     const want = Math.min(TY_MAX, Math.max(syMin, c.ty));
     let sy = this.timeCap(wy, py, want, prev);

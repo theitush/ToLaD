@@ -164,7 +164,7 @@ const scenes = [
   ['world-150k', 'window', [0, 150000]],
   ['world-kpg', 'window', [30e6, 140e6]],
   ['world-20k', 'window', [0, 20000]],
-  // The domestic dog's boom out of the wolf, 100 yr to 50 kya at home's width (ToLaD#259: fold vs Q=layout=steady).
+  // The domestic dog's boom out of the wolf, 100 yr to 50 kya at home's width (ToLaD#259).
   ['dog-window', 'window', [100, 50000]],
   // The clades' brackets above "now" (ToLaD#193): a level's home, and a bracket tapped from home (['tapclade', [taxon]]:
   // the flight to the clade, now to its stem; a bracket too narrow to tap at home flown to as the tap would). LEVEL=carnivores for the order.
@@ -375,13 +375,11 @@ try {
           };
           for (let k = 0; k < 8; k++) {
             fd?.setScale(sx, f.w);
-            let [lo, hi] = span();
-            if (fd && fd.setAnchor((lo + hi) / 2, y, sx, f.w)) [lo, hi] = span();
+            const [lo, hi] = span();
             cx = (lo + hi) / 2;
             sx = zx ? h.sx * zx : (fill * f.w) / Math.max(hi - lo, 1e-9);
           }
           fd?.setScale(sx, f.w);
-          if (fd && fd.setAnchor(cx, y, sx, f.w)) { const [lo, hi] = span(); cx = (lo + hi) / 2; }
           f.cam = { cx, cy: y, sx, sy: h.sy * tz, ty: h.sy * tz };
           f.camera.settle();
         } else if (kind === 'zoomto') {
