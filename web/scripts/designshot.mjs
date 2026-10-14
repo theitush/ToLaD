@@ -232,6 +232,11 @@ const scenes = [
   ['mdd-smallcats', 'taps', ['Leopardus', 't']],
   ['mdd-wildcats', 'taps', ['Felis', 'tt']],
   // ToLaD#293: MDD's young splits, each level's biggest "+x" tapped and landed; the Fisher to the Kaokoveld slender mongoose.
+  // ToLaD#278 (mdd278h): mammals home, the rodents, the marsupials and the bandicoots' order as levels (LEVEL=mammals).
+  ['mdd-home', 'home'],
+  ['mdd-rodents', 'level', ['Rodentia']],
+  ['mdd-marsupials', 'level', ['Metatheria']],
+  ['mdd-bandicoots', 'level', ['Peramelemorphia']],
   ['mdd-plus-wildcats', 'levelplus', ['Felis']],
   ['mdd-plus-mongooses', 'levelplus', ['Herpestidae']],
   ['mdd-plus-weasels', 'levelplus', ['Mustela']],
@@ -446,6 +451,8 @@ try {
           f.labelState.clear();
           f.draw();
           f.draw();
+          // (A badge is a hit only once its label has faded in past half: cleared, the labels fade in over real time.)
+          for (const end = performance.now() + 3000; !f.plusHits.length && performance.now() < end; ) f.draw();
           const hit = [...f.plusHits].sort((p, q) => q.bs.length - p.bs.length)[0];
           console.log(`levelplus ${args[0]}: ${f.plusHits.length} badges, tapping +${hit ? hit.bs.length : 0}`);
           if (hit) f.tap((hit.box[0] + hit.box[2]) / 2, (hit.box[1] + hit.box[3]) / 2);
