@@ -1,10 +1,11 @@
 // One tap = one level deeper, a double-tap = one level out, one pill per group one level down (ToLaD#258).
 import { describe, expect, it } from 'vitest';
-import { laneAt, layoutFan, leftAt, type FanBranch } from './layout';
+import { laneAt, layoutFan, leftAt, type FanBranch, type FanNode } from './layout';
 import { CARNIVORA, FELIDAE, mammaliaClade, type CladeRec } from './panthera';
 import { loadMammalsFromFiles } from './mammals-node';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, type Split } from './splits';
-import { FanView, groupAlive, groupFace, holds, isLevel, labelGroups, labelSpots, levelName, NAME_MODES, nextLevels, type Level } from './view';
+import { FanView, groupAlive, groupFace, holds, isLevel, labelGroups, labelSpots, levelName, levelUp, NAME_MODES, nextLevels, type Level } from './view';
+import type { Camera } from './camera';
 import { wikiOf } from './wiki';
 import { PIC_LIFT, PIC_OVERLAP } from './pics';
 
@@ -44,8 +45,35 @@ function stubView(clade: CladeRec = CARNIVORA, tree: Split = CARNIVORA_TREE, fol
   return new FanView(canvas as unknown as HTMLCanvasElement, clade, 'curved', tree, folds);
 }
 
-type Priv = { anim: ((t: number) => boolean) | null; applyFold(): void; labelState: Map<string, unknown>; atHome(): boolean };
+type Priv = {
+  anim: ((t: number) => boolean) | null;
+  applyFold(): void;
+  labelState: Map<string, unknown>;
+  frameOf(lv: Level): Camera;
+  offBy(a: Camera, c: Camera): number;
+  tapAt: unknown;
+};
 const P = (v: FanView) => v as unknown as Priv;
+/** Whether the view is at home's frame (within 4 px and 2 %). */
+function atHome(v: FanView): boolean {
+  const c = v.cam;
+  const h = v.homeCamera();
+  return Math.abs(c.cx - h.cx) * c.sx <= 4 && Math.abs(c.cy - h.cy) * c.sy <= 4 && Math.abs(Math.log(c.sx / h.sx)) <= 0.02 && Math.abs(Math.log(c.sy / h.sy)) <= 0.02;
+}
+/** view.ts's LEVEL_PX: a level whose frame is nearer the view than this is passed. */
+const LEVEL_PX = 12;
+/** The levels a level sits in (levelUp's tree, ToLaD#258), nearest first, home's root last. */
+function upChain(v: FanView, from: Level): FanNode[] {
+  const out: FanNode[] = [];
+  for (let u = from.b ? levelUp(v.fan, from.b.node, true) : levelUp(v.fan, from.v); u; u = levelUp(v.fan, u)) out.push(u);
+  return out;
+}
+/** Where a double-tap from `from` should go, the view where it is (ToLaD#271): the first level up whose frame visibly moves. */
+function wantUp(v: FanView, from: Level): FanNode | null {
+  return upChain(v, from).find((u) => P(v).offBy(P(v).frameOf({ v: u }), v.cam) > LEVEL_PX) ?? null;
+}
+/** Whether the view stands at level lv's frame (within 2 px). */
+const atFrame = (v: FanView, lv: Level) => P(v).offBy(P(v).frameOf(lv), v.cam) <= 2;
 
 /** Run the flight under way to its landing, a frame each 16 ms (the fold at each frame's zoom), then draw settled. */
 function run(v: FanView): void {
@@ -169,19 +197,21 @@ describe('a tap goes one level deeper, a double-tap one level out (ToLaD#258)', 
         // At it: a tap keeps its card, no flight.
         v.tap(...onColumn(v, b));
         if (P(v).anim || card !== b.sp.common) log.push(`${b.sp.common}: at it, a tap: card ${card}${P(v).anim ? ', and a flight' : ''}`);
-        // Double-taps: each one level out, back up the way it came, home at last; at home, nothing. The first closes the card.
+        // Double-taps: each one level up (levelUp's, ToLaD#271), home at last; at home, nothing. The first closes the card.
         for (let k = 0; k < 12; k++) {
           const prev = v.levelNow(true);
+          const want = wantUp(v, prev);
           v.doubleTap(-1e4, -1e4);
           if (k === 0 && card) log.push(`${b.sp.common}: a double-tap out left its card open`);
           if (!P(v).anim) {
-            if (!P(v).atHome()) log.push(`${b.sp.common}: double-tap ${k + 1} did nothing at ${nameOf(prev)}`);
+            if (!atHome(v) || want) log.push(`${b.sp.common}: double-tap ${k + 1} did nothing at ${nameOf(prev)}`);
             break;
           }
           run(v);
           const now = v.levelNow();
-          if (!holds(now, prev) || (now.v && now.v === prev.v) || (now.b && now.b === prev.b)) log.push(`${b.sp.common}: double-tap ${k + 1} went to ${nameOf(now)} from ${nameOf(prev)}`);
+          if (!want || now.v !== want || !atFrame(v, now)) log.push(`${b.sp.common}: double-tap ${k + 1} went to ${nameOf(now)} from ${nameOf(prev)}, not ${want ? levelName(want) : 'nowhere'}`);
         }
+        if (!atHome(v)) log.push(`${b.sp.common}: double-taps ended away from home`);
       }
       expect(log).toEqual([]);
     });
@@ -201,7 +231,7 @@ describe('a tap goes one level deeper, a double-tap one level out (ToLaD#258)', 
         expect(holds({ v: g }, v.levelNow())).toBe(true);
         v.doubleTap(-1e4, -1e4);
         run(v);
-        expect(P(v).atHome()).toBe(true);
+        expect(atHome(v)).toBe(true);
       }
     });
   }
@@ -385,6 +415,115 @@ describe("the groups' names beside, mid-branch or between branches: none meet (T
         expect(shown).toBeGreaterThan(0);
       });
     }
+  }
+});
+
+describe('a double tap goes up to the parent level, not back (ToLaD#271)', () => {
+  for (const [name, mk] of FANS) {
+    it(`${name}: from every level tapped down to from home, exactly the level it sits in (or the next that visibly moves)`, () => {
+      const v = mk();
+      let card: string | null = null;
+      v.onSelect = (s) => void (card = s ? s.sp.common : null);
+      const bad: string[] = [];
+      let n = 0;
+      levelsOnTheWay(v, v.fan.tess.fold ? 61 : 7, (v) => {
+        const from = v.levelNow(true);
+        const want = wantUp(v, from);
+        const cam = { ...v.cam };
+        const tapAt = P(v).tapAt;
+        v.doubleTap(-1e4, -1e4);
+        if (card) bad.push(`${nameOf(from)}: the card left open`);
+        if (!want) {
+          if (P(v).anim || from.v !== v.fan.root) bad.push(`${nameOf(from)}: ${P(v).anim ? 'flew from home' : 'nowhere to go'}`);
+          return;
+        }
+        run(v);
+        n++;
+        const now = v.levelNow();
+        if (now.v !== want || !atFrame(v, now)) bad.push(`${nameOf(from)}: went to ${nameOf(now)}, not ${levelName(want)}`);
+        // (Back where it was, to tap on down.)
+        v.cam = cam;
+        v.camera.settle();
+        P(v).applyFold();
+        P(v).tapAt = tapAt;
+        settle(v);
+      });
+      expect(bad).toEqual([]);
+      expect(n).toBeGreaterThan(3);
+    });
+
+    it(`${name}: after a search pick, the species' own level, not home; double taps on reach home and stop`, () => {
+      const v = mk();
+      let card: string | null = null;
+      v.onSelect = (s) => void (card = s ? s.sp.common : null);
+      const bad: string[] = [];
+      for (const b of v.fan.branches.filter((_, i) => i % (v.fan.tess.fold ? 97 : 11) === 5)) {
+        home(v);
+        v.flyToSpecies(b.sp);
+        run(v);
+        const want = wantUp(v, { b });
+        v.doubleTap(-1e4, -1e4);
+        if (card) bad.push(`${b.sp.common}: the card left open`);
+        run(v);
+        const now = v.levelNow();
+        if (!want || now.v !== want || !atFrame(v, now)) bad.push(`${b.sp.common}: went to ${nameOf(now)}, not ${want ? levelName(want) : 'nowhere'}`);
+        // (Its own level: the nearest one it sits in, unless that one's frame is the species' own.)
+        const first = upChain(v, { b })[0];
+        if (want !== first && P(v).offBy(P(v).frameOf({ v: first }), P(v).frameOf({ b })) > LEVEL_PX) bad.push(`${b.sp.common}: skipped ${levelName(first)}`);
+        // On up: each a level higher, home at last, then nothing.
+        let k = 0;
+        for (; k < 12; k++) {
+          const prev = v.levelNow(true);
+          const up = wantUp(v, prev);
+          v.doubleTap(-1e4, -1e4);
+          if (!P(v).anim) break;
+          run(v);
+          if (v.levelNow().v !== up) bad.push(`${b.sp.common}: from ${nameOf(prev)} went to ${nameOf(v.levelNow())}`);
+        }
+        if (!atHome(v) || k === 12) bad.push(`${b.sp.common}: double taps stopped away from home`);
+      }
+      expect(bad).toEqual([]);
+    });
+
+    it(`${name}: after a "+x", the level its groups sit in`, () => {
+      const v = mk();
+      const bad: string[] = [];
+      let tried = 0;
+      levelsOnTheWay(v, v.fan.tess.fold ? 61 : 7, (v) => {
+        const h = v.plusHits.find((q) => q.bs.length > 1);
+        if (!h || tried > 3) return;
+        tried++;
+        const at = nameOf(v.levelNow());
+        const cam = { ...v.cam };
+        v.tap((h.box[0] + h.box[2]) / 2, (h.box[1] + h.box[3]) / 2);
+        run(v);
+        // Where the groups meet; of the levels holding them, the nearest whose frame takes in the view (zoomed out at
+        // least as far, within 15 %: a level of a few groups, framed narrower, does not): that one when the view is
+        // zoomed well past it, else the first above it that visibly moves. Never zoomed in, never back to `at`'s for that.
+        let meet: FanNode = h.bs[0].node;
+        while (meet.parent && !h.bs.every((b) => meet.strands.includes(b))) meet = meet.parent;
+        const zIn = (u: FanNode) => {
+          const f = P(v).frameOf({ v: u });
+          return Math.log(v.cam.sx / f.sx) + Math.log(v.cam.sy / f.sy);
+        };
+        const chain = [levelUp(v.fan, meet, true)!, ...upChain(v, { v: levelUp(v.fan, meet, true)! })];
+        const i = chain.findIndex((u) => zIn(u) >= -Math.log(1.15));
+        const want =
+          i >= 0 && zIn(chain[i]) > Math.log(1.15) && P(v).offBy(P(v).frameOf({ v: chain[i] }), v.cam) > LEVEL_PX
+            ? chain[i]
+            : (chain.slice(i + 1).find((u) => P(v).offBy(P(v).frameOf({ v: u }), v.cam) > LEVEL_PX) ?? null);
+        v.doubleTap(-1e4, -1e4);
+        run(v);
+        const now = v.levelNow();
+        if (!want || now.v !== want || !atFrame(v, now)) bad.push(`${at}: a "+x" of ${h.bs.length} then a double tap went to ${nameOf(now)}, not ${want ? levelName(want) : 'nowhere'}`);
+        v.cam = cam;
+        v.camera.settle();
+        P(v).applyFold();
+        settle(v);
+      });
+      expect(bad).toEqual([]);
+      expect(tried).toBeGreaterThan(0);
+    });
   }
 });
 
