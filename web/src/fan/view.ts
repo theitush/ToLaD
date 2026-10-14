@@ -3512,9 +3512,12 @@ export class FanView implements InputHandlers {
   /**
    * The width scale, like a map's: a bar and how many individuals alive at
    * the time its width holds at the current zoom (a round 1, 2 or 5 × 10^k).
-   * In log widths a width is 1 + log10(individuals), so the bar is the width
-   * that multiplies the individuals by 10 (or by 10^k, or by a factor,
-   * whichever fits).
+   * In log widths a width is 1 + log10(individuals) (layout.ts g), so the bar is
+   * a column's width, the individuals a column that wide holds: a power of ten,
+   * the one whose column comes nearest the bar's length, from 1 to 10 billion (ToLaD#299: a
+   * bar of ten to the hundredth was a sum of decades no column has). Zoomed in so far
+   * that one individual's column is more than 2.5 bars, the bar is what a column
+   * that much wider holds more: a factor near 1.
    */
   widthScale(): { px: number; label: string } {
     const unitPx = this.fan.branches[0].unit * this.cam.sx; // px per individual (linear) or per decade (log)
@@ -3525,12 +3528,15 @@ export class FanView implements InputHandlers {
       const px = n / per;
       return { px, label: `${formatCount(n, { exact: true })} ${n === 1 ? 'individual' : 'individuals'}` };
     }
-    if (unitPx < target * 2.5) {
-      const k = Math.max(1, niceStep(target / unitPx));
-      return { px: k * unitPx, label: `×${k === 1 ? '10' : `10${sup(k)}`} individuals · log widths` };
+    if (unitPx <= target * 2.5) {
+      // (Width 1 + k for 10^k: the k nearest the bar's length in ratio, within 0..10.)
+      let k = 0;
+      for (let j = 1; j <= 10; j++) if (Math.abs(Math.log((1 + j) * unitPx / target)) < Math.abs(Math.log((1 + k) * unitPx / target))) k = j;
+      const n = 10 ** k;
+      return { px: (1 + k) * unitPx, label: `${formatCount(n, { exact: true })} ${n === 1 ? 'individual' : 'individuals'} · log widths` };
     }
     const fct = Math.pow(10, target / unitPx);
-    return { px: target, label: `×${fct < 1.1 ? fct.toFixed(4) : fct.toFixed(2)} individuals · log widths` };
+    return { px: target, label: `×${fct < 1.1 ? fct.toFixed(4) : fct.toFixed(2)} individuals a bar wider · log widths` };
   }
 
   private drawWidthScale(): void {
@@ -3747,14 +3753,6 @@ export class FanView implements InputHandlers {
     ctx.restore();
   }
 
-}
-
-
-function sup(k: number): string {
-  return String(k)
-    .split('')
-    .map((d) => '⁰¹²³⁴⁵⁶⁷⁸⁹'[Number(d)] ?? d)
-    .join('');
 }
 
 /** A round step (1, 2 or 5 × 10^k) near `x`. */
