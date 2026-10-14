@@ -6,6 +6,7 @@
 // mammaliaClade) are built from it only when the level is shown. Tests and scripts in node load it from the data files
 // (mammals-node.ts), the same build the page fetches.
 
+import { stamp } from '../stamp';
 import type { LayoutSeed } from './layout';
 import type { RawClade } from './panthera-extract';
 
@@ -39,7 +40,10 @@ export function mammalsLoaded(): boolean {
 async function fetchMammals(): Promise<MammalData> {
   const r = await fetch(new URL(MAMMALS_FILE, document.baseURI));
   if (!r.ok) throw new Error(`${MAMMALS_FILE}: HTTP ${r.status}`);
-  return (await r.json()) as MammalData;
+  stamp('fetch');
+  const d = (await r.json()) as MammalData;
+  stamp('json');
+  return d;
 }
 
 /** Load the mammal data once (later calls share the first); `get` replaces the fetch (node: mammals-node.ts). */

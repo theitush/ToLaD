@@ -2,7 +2,6 @@
 
 import type { ProcessedFile } from './river';
 import DataWorker from './worker?worker&inline';
-import { inlineData } from 'virtual:tolad-data';
 
 interface Reply {
   id: number;
@@ -24,6 +23,8 @@ export class DataClient {
   private next = 1;
   private waiting = new Map<number, { resolve: (p: ProcessedFile) => void; reject: (e: Error) => void; tile: number }>();
   readonly stats: LoadStat[] = [];
+  /** The worker told where the files are (the single-file build's inlined copy is a sibling script, imported first). */
+  private ready: Promise<void>;
 
   constructor(base: string) {
     this.worker = new DataWorker();
@@ -37,15 +38,21 @@ export class DataClient {
         w.resolve(r.file);
       } else w.reject(new Error(r.error ?? 'worker error'));
     };
-    this.worker.postMessage({ type: 'init', base: inlineData ? null : base, inline: inlineData });
+    // (Its own chunk, not in the page: the fan never reads it, and the page would parse its ~4 MB at every open, ToLaD#255.)
+    this.ready = import('virtual:tolad-data').then(({ inlineData }) => {
+      this.worker.postMessage({ type: 'init', base: inlineData ? null : base, inline: inlineData });
+    });
   }
 
   load(tile: number): Promise<ProcessedFile> {
     const id = this.next++;
-    return new Promise((resolve, reject) => {
-      this.waiting.set(id, { resolve, reject, tile });
-      this.worker.postMessage({ type: 'load', id, tile });
-    });
+    return this.ready.then(
+      () =>
+        new Promise((resolve, reject) => {
+          this.waiting.set(id, { resolve, reject, tile });
+          this.worker.postMessage({ type: 'load', id, tile });
+        }),
+    );
   }
 
   destroy(): void {

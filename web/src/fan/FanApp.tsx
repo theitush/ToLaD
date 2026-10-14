@@ -12,6 +12,7 @@ import { RangeGlobe } from './Globe';
 import { CARNIVORA, FELIDAE, mammaliaClade, NATURAL_META, type HistEvent, type SpeciesRec } from './panthera';
 import { CARNIVORA_TREE, mammaliaTree } from './splits';
 import { loadMammals, mammalsLoaded } from './mammals-data';
+import { stamp } from '../stamp';
 import { population } from './population';
 import { WorldToggle } from './WorldToggle';
 import { MagnifierIcon, SearchPanel } from './SearchPanel';
@@ -107,12 +108,14 @@ export function FanApp() {
   useEffect(() => {
     if (!viewReady) return;
     const c = canvasRef.current!;
+    stamp('build');
     const v =
       level === 'mammals'
         ? new FanView(c, mammaliaClade(), edge, mammaliaTree(), true)
         : level === 'carnivores'
           ? new FanView(c, CARNIVORA, edge, CARNIVORA_TREE, true)
           : new FanView(c, FELIDAE, edge);
+    stamp('view');
     if (mode !== 'linear') v.setMode(mode);
     v.onSelect = setSel;
     v.scaleEl = scaleRef.current;

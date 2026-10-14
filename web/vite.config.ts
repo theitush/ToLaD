@@ -211,7 +211,13 @@ export default defineConfig(({ mode }) => {
           modulePreload: false,
           // The lazy globe chunk by a fixed name next to index.html (pages.yml stages it: globe-draw.js). The entry is
           // inlined into index.html, so it too is named at the top level: its import of the chunk is then ./, not ../.
-          rollupOptions: { output: { chunkFileNames: '[name].js', entryFileNames: '[name].js' } },
+          // The time river's inlined data files (?river only) are such a chunk too, river-data.js (ToLaD#255).
+          rollupOptions: {
+            output: {
+              chunkFileNames: (c) => (c.facadeModuleId === '\0' + VIRTUAL ? 'river-data.js' : '[name].js'),
+              entryFileNames: '[name].js',
+            },
+          },
         }
       : {},
     server: {
