@@ -546,6 +546,8 @@ function CardShell({ onUp, children }: { onUp?: (x: number, y: number) => void; 
 /** Where a species' adult mass comes from, as the card's mass line ends (ToLaD#276; dated.MASS_HOW). */
 function massNote(how: string | undefined): string {
   if (!how) return '';
+  // (A domestic stock weighs its herd's mean live mass, young in it: Greenspoon 2023's livestock and pets, ToLaD#328.)
+  if (how === 'domestic stock') return " (the herd's mean, young ones in it; Greenspoon 2023)";
   if (how.endsWith(' mean')) return how === 'Mammalia mean' ? ' (the mammals\' mean: no mass known)' : ` (its ${how.replace(' mean', '')}'s mean: its own not known)`;
   const src: Record<string, string> = { phylacine: 'PHYLACINE 1.2', combine: 'COMBINE', pantheria: 'PanTHERIA', 'combine-imputed': 'COMBINE, imputed' };
   return ` (adult, ${src[how] ?? how})`;

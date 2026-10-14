@@ -163,6 +163,69 @@ def greenspoon_pets(raw: Path) -> dict[str, float]:
     return out
 
 
+# The domestic stocks' mean live mass (ToLaD#328): Greenspoon 2023's livestock biomass, FAOSTAT 2018 head counts by
+# region times the IPCC 2006 Tier 1 typical live weights (Vol. 4 ch. 10, Tables 10A.1-10A.9, data/domesticated_data/
+# livestock_mass.csv), divided by the heads; the pets table's own body mass for dogs and cats. A herd's mean, calves and
+# lambs in it, not the wild ancestor's adult mass. Greenspoon's FAO item -> the binomial the stock lands on (FAO_ITEMS).
+GREENSPOON_LIVESTOCK = {
+    "Cattle": "Bos taurus", "Buffaloes": "Bubalus bubalis", "Swine": "Sus scrofa", "Sheep": "Ovis aries",
+    "Goats": "Capra hircus", "Horses": "Equus caballus", "Asses": "Equus asinus", "Camels": "Camelus dromedarius",
+}
+_GS_MIDDLE_EAST = {"Bahrain", "Cyprus", "Oman", "Pakistan", "Palestine", "Saudi Arabia", "Qatar",
+                   "Iran (Islamic Republic of)", "Iraq", "Israel", "Jordan", "Kuwait", "Lebanon", "Syrian Arab Republic",
+                   "Turkey", "United Arab Emirates", "Yemen"}
+_GS_INDIAN = {"Bangladesh", "Bhutan", "India"}
+_GS_ASIA = {"Afghanistan", "Armenia", "Azerbaijan", "Brunei Darussalam", "Cambodia", "China, Hong Kong SAR",
+            "China, Taiwan Province of", "China, mainland", "Democratic People's Republic of Korea", "Georgia", "Japan",
+            "Kazakhstan", "Kyrgyzstan", "Indonesia", "Lao People's Democratic Republic", "Malaysia", "Mongolia",
+            "Myanmar", "Nepal", "Philippines", "Republic of Korea", "Singapore", "Sri Lanka", "Tajikistan", "Thailand",
+            "Timor-Leste", "Turkmenistan", "Uzbekistan", "Viet Nam"}
+
+
+def _gs_region(area: str) -> str:
+    """Greenspoon's notebook (human_and_domesticated_biomass.ipynb, set_region): an FAO area -> its mass table's region."""
+    if area in _GS_ASIA:
+        return "Asia"
+    if area in _GS_MIDDLE_EAST:
+        return "Middle East"
+    if area in _GS_INDIAN:
+        return "Indian Subcontinent"
+    if area in ("Caribbean", "Central America", "South America"):
+        return "Latin America"
+    if area in ("Northern Europe", "Southern Europe", "Western Europe"):
+        return "Western Europe"
+    if area in ("Eastern Europe", "Africa", "Oceania"):
+        return area
+    return "North America"
+
+
+def greenspoon_domestic_mass(raw: Path) -> dict[str, dict]:
+    """binomial -> {kg: the stock's mean live mass, heads, biomass_Mt}: Greenspoon 2023's domestic biomass method
+    (human_and_domesticated_biomass.ipynb), reproduced from its data release, per stock."""
+    mass = {r["Item"]: r for r in _gs_rows(raw, "data/domesticated_data/livestock_mass.csv")}
+    heads: dict[str, float] = {}
+    kg_heads: dict[str, float] = {}
+    for member in ("data/domesticated_data/fao_livestock_data.csv",
+                   "data/domesticated_data/fao_livestock_data_cattle_pigs.csv"):
+        for r in _gs_rows(raw, member):
+            item = r["Item"]
+            group = item.split(",")[0]  # "Cattle, dairy" -> "Cattle", "Swine, market" -> "Swine"
+            if group not in GREENSPOON_LIVESTOCK or not r["Value"]:
+                continue
+            n = float(r["Value"]) * (1000 if r["Unit"] == "1000 Head" else 1)
+            heads[group] = heads.get(group, 0.0) + n
+            kg_heads[group] = kg_heads.get(group, 0.0) + n * float(mass[item][_gs_region(r["Area"])])
+    out = {GREENSPOON_LIVESTOCK[g]: {"kg": kg_heads[g] / heads[g], "heads": heads[g], "biomass_Mt": kg_heads[g] / 1e9,
+                                     "item": g} for g in heads}
+    for r in _gs_rows(raw, "data/domesticated_data/pets_rats_mouse.csv"):
+        if r["Item"] in ("Dog", "Cat"):
+            out[r["binomial"].strip()] = {"kg": float(r["body_mass"]), "heads": float(r["population"]),
+                                          "biomass_Mt": float(r["biomass_Mt"]), "item": r["Item"]}
+    if set(out) != set(GREENSPOON_LIVESTOCK.values()) | {"Canis familiaris", "Felis catus"}:
+        raise RuntimeError(f"Greenspoon domestic mass tables changed: {sorted(out)}")
+    return out
+
+
 def greenspoon_order_targets(raw: Path) -> dict[str, dict]:
     """Wild land mammal biomass and individuals by order (Greenspoon 2023,
     results/results_grouped_by_order.csv): nine named orders plus 'Other'.
