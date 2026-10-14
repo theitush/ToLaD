@@ -111,6 +111,8 @@ const NOW_ROOM = PIC_D + 8;
 
 /** Gap (px) a label keeps from the column it sits beside. */
 const LABEL_GAP = 3;
+/** A name's room beside a column (px): its gap, the pill, and the fade's margin from the screen's edge (ToLaD#319). */
+const PILL_ROOM_PX = LABEL_GAP + LABEL_PILL + 6;
 
 /**
  * Where a level's group names stand (ToLaD#266, Ita: "lets try", a toggle): `beside` its branch just below "now"
@@ -1359,11 +1361,11 @@ export function labelSpots(
       const x = place === 'right' ? r + LABEL_GAP + half : l - LABEL_GAP - half;
       const xa = x - half;
       const xb = x + half;
-      // Clear of the other columns and the time axis (past the screen's right edge it is only cut off).
-      const fit = f > 0 && xa < c.w && xb > 0 ? f * clearFit(Math.min(xa - LABEL_AXIS_X, clearance(xa, xb, y0, y1, own))) : 0;
+      // Clear of the other columns, the time axis and the screen's edge (ToLaD#319: never a name cut off at the edge; past it, it fades).
+      const fit = f > 0 && xa < c.w && xb > 0 ? f * clearFit(Math.min(xa - LABEL_AXIS_X, c.w - xb, clearance(xa, xb, y0, y1, own))) : 0;
       out.push({ key: `${id}:${place}`, id, place, ...ref, text, rank, x, y1, box: [xa, y0, xb, y1], fit });
       // (A level's group's name, ToLaD#262, `loose`: failing a clear spot, over the columns beside its own, opaque; clear of the axis and the other names.)
-      if (loose) out.push({ key: `${id}:${place}~`, id, place, loose: true, ...ref, text, rank, x, y1, box: [xa, y0, xb, y1], fit: f > 0 && xa < c.w && xb > 0 ? f * clearFit(xa - LABEL_AXIS_X) : 0 });
+      if (loose) out.push({ key: `${id}:${place}~`, id, place, loose: true, ...ref, text, rank, x, y1, box: [xa, y0, xb, y1], fit: f > 0 && xa < c.w && xb > 0 ? f * clearFit(Math.min(xa - LABEL_AXIS_X, c.w - xb)) : 0 });
     }
     return out;
   };
@@ -2206,7 +2208,9 @@ export class FanView implements InputHandlers {
     return foldedFrame(this.fan, this.w, () => {
       // (?fit=fossils, ToLaD#289: as a tap's frame, cladeCamera, a level whose living columns dwarf its fossils framed on them.)
       const [a, b] = levelSpan(this.fan, v);
-      return this.withBand(this.camera.frame(a, b, v.y, true), v, fossilTop(this.fan, v) ?? this.yNow);
+      // (Room each side for an outer group's name beside its column, ToLaD#319: none cut off at the screen's edge.)
+      const pad = (PILL_ROOM_PX * (b - a)) / Math.max(1, this.w - 72 - 2 * PILL_ROOM_PX);
+      return this.withBand(this.camera.frame(a - pad, b + pad, v.y, true), v, fossilTop(this.fan, v) ?? this.yNow);
     });
   }
 
