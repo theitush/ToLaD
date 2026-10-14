@@ -130,6 +130,8 @@ try {
       window.__pp.cb = [];
       window.__pp.rec = true;
       window.__fan.frameMs.length = 0;
+      window.__fan.labelAllMs.length = 0;
+      window.__fan.labelLayMs.length = 0;
     });
     const t0 = Date.now();
     for (let r = 0; r < REPS; r++) {
@@ -158,7 +160,7 @@ try {
     const secs = (Date.now() - t0) / 1000;
     const rec = await page.evaluate(() => {
       window.__pp.rec = false;
-      return { deltas: window.__pp.deltas, cb: window.__pp.cb, draw: [...window.__fan.frameMs] };
+      return { deltas: window.__pp.deltas, cb: window.__pp.cb, draw: [...window.__fan.frameMs], lab: [...window.__fan.labelAllMs], lay: [...(window.__fan.labelLayMs ?? [])] };
     });
     if (PROFILE === name) {
       const { profile } = await cdp.send('Profiler.stop');
@@ -187,12 +189,18 @@ try {
       draws: rec.draw.length,
       d50: q(rec.draw, 0.5),
       d95: q(rec.draw, 0.95),
+      // (The labels, ToLaD#255: their work a frame (laid out or carried), and each layout's.)
+      lab50: q(rec.lab, 0.5),
+      labMean: rec.lab.length ? rec.lab.reduce((a, b) => a + b, 0) / rec.lab.length : NaN,
+      lays: rec.lay.length,
+      lay50: q(rec.lay, 0.5),
+      lay95: q(rec.lay, 0.95),
       secs,
     };
     rows.push(row);
     const f = (v) => v.toFixed(1).padStart(7);
     console.log(
-      `${name.padEnd(11)} load ${String(row.load).padStart(6)} ms | frames ${String(row.frames).padStart(4)} p50 ${f(row.p50)} p95 ${f(row.p95)} max ${f(row.max)} dropped ${String(dropped).padStart(4)} | main n ${String(row.cbs).padStart(4)} p50 ${f(row.c50)} p95 ${f(row.c95)} >16 ${String(row.over16).padStart(3)} | draw n ${String(row.draws).padStart(4)} p50 ${f(row.d50)} p95 ${f(row.d95)} | ${secs.toFixed(1)} s`,
+      `${name.padEnd(11)} load ${String(row.load).padStart(6)} ms | frames ${String(row.frames).padStart(4)} p50 ${f(row.p50)} p95 ${f(row.p95)} max ${f(row.max)} dropped ${String(dropped).padStart(4)} | main n ${String(row.cbs).padStart(4)} p50 ${f(row.c50)} p95 ${f(row.c95)} >16 ${String(row.over16).padStart(3)} | draw n ${String(row.draws).padStart(4)} p50 ${f(row.d50)} p95 ${f(row.d95)} | labels/f p50 ${f(row.lab50)} mean ${f(row.labMean)} | layouts ${String(row.lays).padStart(3)} p50 ${f(row.lay50)} p95 ${f(row.lay95)} | ${secs.toFixed(1)} s`,
     );
     await ctx.close();
   }
