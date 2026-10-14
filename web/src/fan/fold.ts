@@ -163,6 +163,9 @@ export class Fold {
   /** Per pair: the strands of the left daughter start at lo, the right daughter's end before hi; the fork's top (world y). */
   private readonly lo: Int32Array;
   private readonly hi: Int32Array;
+  /** Per pair, the edges what is not open is carried to: its split's first strand and one past its last. */
+  private readonly cLo: Int32Array;
+  private readonly cHi: Int32Array;
   private readonly forkTop: Float64Array;
   /** Per pair: its fork's least top (a bend tall, or its daughters' leans); setScale shortens it for a gap narrow on screen. */
   private readonly forkTop0: Float64Array;
@@ -204,6 +207,8 @@ export class Fold {
     this.pairW = new Float64Array(Math.max(0, n - 1));
     this.lo = new Int32Array(Math.max(0, n - 1));
     this.hi = new Int32Array(Math.max(0, n - 1));
+    this.cLo = new Int32Array(Math.max(0, n - 1));
+    this.cHi = new Int32Array(Math.max(0, n - 1));
     this.forkTop = new Float64Array(Math.max(0, n - 1));
     this.forkTop0 = new Float64Array(Math.max(0, n - 1));
     this.forkTopC = new Float64Array(Math.max(0, n - 1));
@@ -243,6 +248,10 @@ export class Fold {
       const run = (k: FanNode | FanBranch) => (isNode(k) ? [k.strands[0].index, k.strands[k.strands.length - 1].index + 1] : [k.index, k.index + 1]);
       this.lo[i] = run(dp)[0];
       this.hi[i] = run(dq)[1];
+      // (What is not open is carried to its split's edges: its two daughters', or at a polytomy (MDD's species at
+      // their genus crown, #278) every daughter's, never into a sister pair at the same split, which would close it twice.)
+      this.cLo[i] = v.strands[0].index;
+      this.cHi[i] = v.strands[v.strands.length - 1].index + 1;
       // (At least a bend tall: a gap opens as a branch parts, never a ledge.)
       this.forkTop0[i] = Math.min(dp.leanY, dq.leanY, v.y - ROOM_BEND);
       this.forkTop[i] = this.forkTop0[i];
@@ -621,7 +630,7 @@ export class Fold {
   private carried(r: Row): Float64Array {
     const y = r.y;
     const m = this.a.length;
-    if (!this.ord) this.ord = Int32Array.from(Array.from({ length: m }, (_, p) => p).sort((p, q) => this.pairNode[p].y - this.pairNode[q].y));
+    this.ord ??= this.pairOrder();
     this.carriedForks();
     // (Scratch, reused: a row is folded at a time.)
     if (this.kBuf.length !== m) {
@@ -650,8 +659,8 @@ export class Fold {
     const G = this.pairGap;
     const PY = (this.pairY ??= Float64Array.from(this.pairNode, (v) => v.y));
     const FT = this.forkTopC;
-    const LO = this.lo;
-    const HI = this.hi;
+    const LO = this.cLo;
+    const HI = this.cHi;
     const SL = this.sideL;
     for (let k = 0; k < m; k++) {
       const p = ord[k];
@@ -685,13 +694,13 @@ export class Fold {
   private carriedForks(): void {
     const m = this.a.length;
     if (this.forkVer === this.ver && this.wSum.length === m + 2) return;
-    if (!this.ord) this.ord = Int32Array.from(Array.from({ length: m }, (_, p) => p).sort((p, q) => this.pairNode[p].y - this.pairNode[q].y));
+    this.ord ??= this.pairOrder();
     const P = (this.wSum = new Float64Array(m + 2));
     for (let i = 0; i <= m; i++) P[i + 1] = P[i] + this.wt[i] + 1e-3;
     // (Per pair, the share of what is not open carried to its clade's left edge (its left daughter moves, the right
     // stands): as the anchor's weight lies in it.)
     if (this.sideL.length !== m) this.sideL = new Float64Array(m);
-    for (let p = 0; p < m; p++) this.sideL[p] = (P[this.hi[p]] - P[p + 1]) / (P[this.hi[p]] - P[this.lo[p]]);
+    for (let p = 0; p < m; p++) this.sideL[p] = (P[this.cHi[p]] - P[p + 1]) / (P[this.cHi[p]] - P[this.cLo[p]]);
     const inc = new Float64Array(m);
     const k = (this.fan.edge === 'curved' ? EASE_MAX : 1) * (this.sx / (LEAN_FORK * SY_HOME));
     for (let j = 0; j < m; j++) {
@@ -705,10 +714,17 @@ export class Fold {
       this.forkTopC[p] = v.y - Math.max(h0, Math.min(hT, ROOM_BEND, v.y - this.yRef));
       const sL = this.sideL[p];
       if (!(T > 0)) continue;
-      if (this.lo[p] > 0) inc[this.lo[p] - 1] += T * sL;
-      if (this.hi[p] < m + 1) inc[this.hi[p] - 1] += T * (1 - sL);
+      if (this.cLo[p] > 0) inc[this.cLo[p] - 1] += T * sL;
+      if (this.cHi[p] < m + 1) inc[this.cHi[p] - 1] += T * (1 - sL);
     }
     this.forkVer = this.ver;
+  }
+
+  /** The pairs youngest split first (ties: the narrower first, so a carried gap always goes outward). */
+  private pairOrder(): Int32Array {
+    const m = this.a.length;
+    const w = (p: number) => this.cHi[p] - this.cLo[p];
+    return Int32Array.from(Array.from({ length: m }, (_, p) => p).sort((p, q) => this.pairNode[p].y - this.pairNode[q].y || w(p) - w(q)));
   }
 
   /** Fold a row with the current a's: each strand's move. */
