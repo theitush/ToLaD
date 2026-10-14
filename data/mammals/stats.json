@@ -7543,6 +7543,18 @@
  "domestic_leaves": [
   "Canis familiaris"
  ],
+ "domestic_mass_kg": {
+  "Bos taurus": 277.07,
+  "Bubalus bubalis": 333.21,
+  "Camelus dromedarius": 217.0,
+  "Canis familiaris": 21.62,
+  "Capra hircus": 30.19,
+  "Equus asinus": 130.0,
+  "Equus caballus": 276.58,
+  "Felis catus": 3.75,
+  "Ovis aries": 31.94,
+  "Sus scrofa": 38.51
+ },
  "extinct_flags": {
   "extinct": 240,
   "living": 2189,
@@ -32327,7 +32339,7 @@
  },
  "output": {
   "brotli_bytes": 789528,
-  "dated_sidecar_raw": 2057156,
+  "dated_sidecar_raw": 2057182,
   "files": 15,
   "raw_bytes": 3320704,
   "skeleton_brotli": 64671,

@@ -879,6 +879,8 @@ def assign_leaf_counts(root: Node, raw: Path, ctx: dict, log: dict) -> None:
     leaf_names = {n.name for n in root.preorder() if n.is_leaf}
     fao_raw, _ = anchors.faostat_stocks(raw)
     pets = anchors.greenspoon_pets(raw)
+    # (each stock's mean live mass, ToLaD#328: the widths by mass weigh the herd, not its wild ancestor)
+    dom_mass = anchors.greenspoon_domestic_mass(raw)
     domestic: dict[str, dict] = {}
     missing_dom = []
     for sp, (val, year) in fao_raw.items():
@@ -887,6 +889,9 @@ def assign_leaf_counts(root: Node, raw: Path, ctx: dict, log: dict) -> None:
         domestic[sp] = {"stock": val, "src": "greenspoon-data", "grade": "C",
                         "label": f"{val:.2g} ({'dogs' if sp.startswith('Canis') else 'cats'}; "
                                  f"Greenspoon 2023 data, pets table)"}
+    for sp, d in domestic.items():
+        d["mass_kg"] = dom_mass[sp]["kg"]
+    log["domestic_mass_kg"] = {sp: round(v["kg"], 2) for sp, v in sorted(dom_mass.items())}
     dom_by_leaf: dict[str, dict] = {}
     for sp, d in domestic.items():
         for cand in [sp] + anchors.DOMESTIC_ALIASES.get(sp, []):
