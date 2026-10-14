@@ -265,6 +265,40 @@ try {
         if (d > 96) far++;
       }
       colsBad += far;
+      // (COLS_DIFF=<dir>: the CPU's, the GPU's and where they differ, side by side, a PNG per camera.)
+      if (process.env.COLS_DIFF) {
+        const { mkdirSync, writeFileSync } = await import('node:fs');
+        mkdirSync(process.env.COLS_DIFF, { recursive: true });
+        const pg = await (await browser.newContext()).newPage();
+        const url = await pg.evaluate(({ a, b }) => {
+          const { W, H } = a;
+          const c = document.createElement('canvas');
+          c.width = 3 * W;
+          c.height = H;
+          const x = c.getContext('2d');
+          const img = x.createImageData(3 * W, H);
+          const put = (k, y, X, r, g, bl) => {
+            const o = ((H - 1 - y) * 3 * W + k * W + X) * 4;
+            img.data[o] = r;
+            img.data[o + 1] = g;
+            img.data[o + 2] = bl;
+            img.data[o + 3] = 255;
+          };
+          for (let y = 0; y < H; y++)
+            for (let X = 0; X < W; X++) {
+              const i = (y * W + X) * 4;
+              put(0, y, X, a.px[i], a.px[i + 1], a.px[i + 2]);
+              put(1, y, X, b.px[i], b.px[i + 1], b.px[i + 2]);
+              let d = 0;
+              for (let ch = 0; ch < 4; ch++) d = Math.max(d, Math.abs(a.px[i + ch] - b.px[i + ch]));
+              put(2, y, X, d > 96 ? 255 : d > 24 ? 255 : 30, d > 96 ? 0 : d > 24 ? 200 : 30, 30);
+            }
+          x.putImageData(img, 0, 0);
+          return c.toDataURL('image/png');
+        }, { a, b });
+        writeFileSync(`${process.env.COLS_DIFF}/${process.env.LEVEL || 'default'}-${name}.png`, Buffer.from(url.split(',')[1], 'base64'));
+        await pg.close();
+      }
       console.log(`cols ${name}: ${off} of ${lit} lit pixels disagree (>24/255), ${far} far off (>96/255)`);
     }
     console.log(`cols: ${colsBad} pixels far off in all (?gl=cols vs the CPU's columns)`);
