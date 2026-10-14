@@ -403,9 +403,7 @@ function colBoxes(fan: Fan, view?: [number, number]): Map<FanBranch | FanNode, C
 function viewBoxes(fan: Fan, out: Map<FanBranch | FanNode, ColBox>, [vy0, vy1]: [number, number]): void {
   const t = fan.tess;
   // (Off the bands' rows, read once for the labels' clearance too: Tess.xRange's box (its table, slot 2), worked out alike.)
-  const tb = performance.now();
   const bd = bandBoxes(fan, vy0, vy1);
-  LC.tBand += performance.now() - tb;
   if (bd) {
     const { GL, GR, w } = bd;
     const bot = t.bottom;
@@ -953,7 +951,6 @@ const SCRATCH = {
   bucket: new Int32Array(1024),
   seen: new Int32Array(1024),
 };
-export const LC: Record<string, number> = { layouts: 0, beside: 0, besideLive: 0, besideAt: 0, clear: 0, clearCol: 0, clearAt: 0, cols: 0, boxes: 0, tBoxes: 0, tBucket: 0, tGroups: 0, tSpecies: 0, tEvents: 0, tLineages: 0, tSpots: 0, tBand: 0 };
 export function labelSpots(
   c: Screen,
   fan: Fan,
@@ -993,18 +990,13 @@ export function labelSpots(
   // Only the columns near the screen can meet a label on it (with hundreds of species, ToLaD#146, the rest are most).
   const [vx0, vy0] = c.toWorld(-60, -60);
   const [vx1, vy1] = c.toWorld(c.w + 60, c.h + 60);
-  let tp = performance.now();
   const boxes = colBoxes(fan, [vy0, vy1]);
   const fold0 = fan.tess.fold;
   const near = (q: ColBox) => !(q.x1 < vx0 || q.x0 > vx1 || q.y1 <= vy0 || q.y0 > vy1);
   // (Into arrays kept from layout to layout: no garbage a layout, ToLaD#255.)
-  LC.tBoxes += performance.now() - tp; tp = performance.now();
   const cols = SCRATCH.cols;
   cols.length = 0;
   for (const q of boxes.values()) if (near(q)) cols.push(q);
-  LC.layouts++;
-  LC.cols += cols.length;
-  LC.boxes += boxes.size;
   // ...and those in the strip's own few px across: the columns bucketed by their world x span (cols' order in each).
   const NB = 64;
   const bw = Math.max(1e-12, (vx1 - vx0) / NB);
@@ -1092,7 +1084,6 @@ export function labelSpots(
    * the first that makes it -1 or less ending it (ToLaD#255: found by a scan of the flat boxes, not the buckets).
    */
   const clearance = (xa: number, xb: number, ya: number, yb: number, own: FanBranch | FanNode) => {
-    LC.clear++;
     let gap = CLEAR;
     if (!(yb > ya)) return gap;
     const [wxa, wya] = c.toWorld(xa - CLEAR, ya);
@@ -1144,14 +1135,12 @@ export function labelSpots(
         bandReach(ci, bj0, bj1);
         if (Math.max(X(reach[0]) - xb, xa - X(reach[1])) >= gap) continue;
       }
-      LC.clearCol++;
       // (heights()'s, without the array: the least over them.)
       const wa = Math.max(wya, q.y0);
       const wb = Math.min(wyb, q.y1 - 1e-9);
       for (let j = -3, y = Math.ceil(wa / grid) * grid; j < 0 || y < wb; j < 0 ? j++ : (y += grid)) {
         const wy = j === -3 ? wa : j === -2 ? wb : j === -1 ? q.lean : y;
         if (j === -1 && !(wy > wa && wy < wb)) continue;
-        LC.clearAt++;
         const e = q.at(wy);
         gap = Math.min(gap, Math.max(X(e[0]) - xb, xa - X(e[1])));
       }
@@ -1164,7 +1153,6 @@ export function labelSpots(
 
   /** The spots beside a column on screen from y0 down (its own edge from `edge`, its bottom at screen yBot). */
   const beside = (id: string, text: string, rank: Rank, len: number, own: FanBranch | FanNode, yTop: number, yBot: number, fit0: number, ref: { b?: FanBranch; v?: FanNode }, loose = false): LabelSpot[] => {
-    LC.beside++;
     const y0 = Math.max(top, yTop);
     const y1 = y0 + len;
     if (!(fit0 > 0) || y0 > bottom) return [];
@@ -1180,9 +1168,7 @@ export function labelSpots(
     const f = fit0 * clamp01((yBot - y0 - 12) / 24) * botFit(y1);
     if (!(f > 0)) return (['in', 'right', 'left'] as const).map((place) => ({ key: `${id}:${place}`, id, place, ...ref, text, rank, x: 0, y1, box: [-half, y0, half, y1], fit: 0 }));
     const ob = boxes.get(own)!;
-    LC.besideLive++;
     for (const wy of heights(wTop, wBot, [ob.lean])) {
-      LC.besideAt++;
       const [a, b] = ob.at(wy);
       l = Math.min(l, X(a));
       r = Math.max(r, X(b));
@@ -1296,7 +1282,6 @@ export function labelSpots(
   // as its lineage's label beside its parent column, so once "now" is off screen the one becomes the other.
   // (With the clades' brackets, ToLaD#193, a family is named on its bracket where that has room, else here, over the stack.)
   // (Given the level's groups, ToLaD#258: each group one level down, named whether or not its bracket is, with its picture.)
-  LC.tBucket += performance.now() - tp; tp = performance.now();
   for (const { v, vi, text } of level?.groups ?? families(fan)) {
     // (The mammal level, lod.ts: a family inside a clade drawn as one branch is not named; the clade is.)
     if ((!level && brk?.named(v)) || lod?.hidden(v)) continue;
@@ -1341,7 +1326,6 @@ export function labelSpots(
       out.push({ key: `n${vi}:fam${k}`, id: `n${vi}`, place: 'fam', v, fam: v, pic: level ? groupFace(v) : commonest(v), text, rank: [-1, wb - wa, vi], x, y1, box: [x - half, y1 - len, x + half, y1], fit, span: brk ? undefined : [sa, sb], plus: px });
     });
   }
-  LC.tGroups += performance.now() - tp; tp = performance.now();
   for (const b of fan.branches) {
     // (Given the level's groups, ToLaD#258: only a species that is a group of its own.)
     if ((lod && lod.of[b.index] >= 0) || (level && !level.species.has(b)) || !near(boxes.get(b)!)) continue;
@@ -1389,7 +1373,6 @@ export function labelSpots(
     // Beside its branch: once the tip is off screen.
     out.push(...beside(id, b.sp.common, rank, len, b, ty, Y(b.splitY), 1 - clamp01((ty - top) / 24), { b }));
   }
-  LC.tSpecies += performance.now() - tp; tp = performance.now();
   // Curated events (ToLaD#141): the title beside its window (or in the column when zoomed into it),
   // centred on the window, while the window is on screen. After the species' names, before the lineages'.
   for (const b of fan.branches) {
@@ -1407,7 +1390,6 @@ export function labelSpots(
     }
   }
   // The lineages (parent columns, not the stem below the root: the clade's own label is there), while "now" is off screen.
-  LC.tEvents += performance.now() - tp; tp = performance.now();
   if (nowOn < 1) {
     for (let vi = 0; vi < fan.nodes.length; vi++) {
       const v = fan.nodes[vi];
@@ -1419,7 +1401,6 @@ export function labelSpots(
       out.push(...beside(id, text, rank, len, v, Y(v.y), Y(v.yBot), 1 - nowOn, { v }));
     }
   }
-  LC.tLineages += performance.now() - tp;
   return out;
 }
 
@@ -2604,9 +2585,7 @@ export class FanView implements InputHandlers {
     // (ToLaD#262: each group's name beside its branch, room at its end for the "+x" of the names hidden near it last frame.)
     const topLine = this.labelTop();
     const top = topLine + (br ? br.pinH() * br.pinA : 0);
-    let tq = performance.now();
     const spots = labelSpots(this.camera, this.fan, top, (t) => this.nameWidth(t), this.barRect()?.[0], br ?? undefined, (id) => this.plusRoom.get(id) ?? 0, undefined, lod, lg, this.names);
-    LC.tSpots += performance.now() - tq;
     this.labLast = { fan: this.fan, lg, lod, lodGen: lod?.gen ?? -1, w: this.w, h: this.h, names: this.names, topLine, t: t0, frames: 0, cam: { ...c }, br, top, spots };
     this.labelMs.push(performance.now() - t0);
     return { br, top, lg, spots, carried: null };

@@ -431,7 +431,9 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
       // At rest after it (ToLaD#255): the labels laid out there, hashed (key, place, x, y1, box, fit of every spot): the same before and after a change.
       v.draw();
       v.draw();
+      if (process.env.FANPERF_REST) for (let k = 0; k < +process.env.FANPERF_REST; k++) v.draw();
       const sp = (vl.labLast as { spots: { key: string; x: number; y1: number; box: number[]; fit: number }[] } | null)?.spots ?? [];
+      if (process.env.FANPERF_SPOTS) appendFileSync(process.env.FANPERF_SPOTS, sp.map((s) => `${name} ${s.key} ${s.x.toFixed(2)} ${s.y1.toFixed(2)} ${s.fit.toFixed(3)}`).join("\n") + "\n");
       const hk = hsh;
       hsh = 0x811c9dc5;
       for (const s of sp) {
@@ -441,7 +443,7 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
           hsh = Math.imul(Math.imul(hsh ^ u32[0], 16777619) ^ u32[1], 16777619);
         }
       }
-      if (process.env.FANPERF_LABDBG) out(`  LC per layout: ${Object.entries(LC).map(([k, n]) => `${k} ${(n / Math.max(1, LC.layouts)).toFixed(0)}`).join(' ')}`);
+      if (process.env.FANPERF_LABDBG) out(`  LC per layout: ${Object.entries(LC).map(([k, n]) => `${k} ${(n / Math.max(1, LC.layouts)).toFixed(k[0] === "t" ? 1 : 0)}`).join(' ')}`);
       for (const k of Object.keys(LC)) LC[k] = 0;
       const restHash = `${sp.length} spots ${(hsh >>> 0).toString(16).padStart(8, '0')}`;
       hsh = hk;
