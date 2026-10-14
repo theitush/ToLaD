@@ -5,7 +5,7 @@
 // Gestures come from the shared engine/input.ts.
 
 import { drawThumb, labelThumb, thumbsOn, wikiOf } from './wiki';
-import { PIC_D, placePics, type PicSpot } from './pics';
+import { PIC_D, PIC_LIFT, placePics, type PicSpot } from './pics';
 import { formatCount } from '../data/count';
 import { DOUBLE_TAP_MS, Input, type InputHandlers } from '../engine/input';
 import { clipPoly, FanCamera, type Camera } from './camera';
@@ -15,6 +15,7 @@ import { FanGL, rgb01 } from './meshgl';
 import { Lod } from './lod';
 import type { FoldState } from './fold';
 import { Steady, wantFitFossils } from './steady';
+import { Territories, wantCutLabels, type CutItem } from './cut';
 import { COLUMN_DIM, columnSpans, EVENT_TINT, eventAt, eventSpans, type EventSpan } from './colstyle';
 import { drawTwigs, kLogAt, laneDim, LINEAGE, LIVING, pathFrame, TEX_HAIR_PX, TWIG_GRAY, TwigModel, type IndInfo, type TwigStats } from './twigs';
 import type { MeshBatch, RectBatch } from './meshgl';
@@ -222,6 +223,90 @@ export interface LabelSpot {
   fam?: FanNode;
   /** The species whose picture it carries, when not its own `b` (a family's: its commonest living species, ToLaD#212). */
   pic?: FanBranch | null;
+}
+
+/** A frame's labels from the cut (?labels=cut, ToLaD#333): the names' spots, each one's "+x" species, the pictures. */
+interface CutLabels {
+  spots: LabelSpot[];
+  groups: Map<string, FanBranch[][]>;
+  pics: (PicSpot & { lv: Level; face: FanBranch })[];
+}
+
+/** The territories (cut.ts) with what the labels read off a cut item: its youngest tip, the species its "+x" counts. */
+class CutTerritories {
+  readonly t: Territories;
+  /** Per node: its youngest tip (world y, "now" at most). */
+  private readonly young: Float64Array;
+  private readonly now: number;
+  private readonly hid = new Map<string, { text: string; hid: FanBranch[][] }>();
+  constructor(fan: Fan, fold: Steady, w: number) {
+    this.t = new Territories(fan, fold, w);
+    this.now = fan.time.y(0);
+    this.young = Float64Array.from(fan.nodes, (v) => {
+      let y = Infinity;
+      for (const b of v.strands) y = Math.min(y, Math.max(b.tipY, this.now));
+      return y;
+    });
+  }
+  private youngOf(k: number): number {
+    return k >= 0 ? this.young[k] : Math.max(this.t.strands[~k].tipY, this.now);
+  }
+  /** A cut item's youngest tip (world y). */
+  youngest(it: CutItem): number {
+    if (it.kind === 'leaf') return this.youngOf(~it.j);
+    if (it.kind === 'node') return this.young[it.j];
+    const K = this.t.kids[it.j];
+    let y = Infinity;
+    for (let q = it.q0; q <= it.q1; q++) y = Math.min(y, this.youngOf(K[q]));
+    return y;
+  }
+  /**
+   * A cut item's name and the species its "+x" counts, those it stands for that the name does not name (kept per item).
+   * A species: its name. A clade: its name; one with none, its largest named clade's (OneZoom's signposts), else its
+   * face species'. A run: none, only its "+x".
+   */
+  label(it: CutItem, key: string): { text: string; hid: FanBranch[][] } {
+    let out = this.hid.get(key);
+    if (!out) {
+      const v = this.t.nodes[it.j];
+      if (it.kind === 'leaf') out = { text: this.t.strands[it.j].sp.common, hid: [] };
+      else if (it.kind === 'run') {
+        const K = this.t.kids[it.j];
+        const ks = Array.from(K.subarray(it.q0, it.q1 + 1), (k) => (k >= 0 ? this.t.nodes[k] : this.t.strands[~k]));
+        out = { text: '', hid: ks.flatMap((k) => ('sp' in k ? [[k]] : k.strands.map((b) => [b]))) };
+      } else {
+        const sign = this.signpost(v);
+        const face = sign ? null : groupFace(v);
+        // ("+x": its species with no name of their own, research/scalable-tree.md §3: all of them, its face species aside.)
+        const text = sign ? levelName(sign) : (face?.sp.common ?? v.name);
+        out = { text, hid: v.strands.filter((b) => b !== face).map((b) => [b]) };
+      }
+      this.hid.set(key, out);
+    }
+    return out;
+  }
+  private readonly signs = new Map<FanNode, FanNode | null>();
+  /** Clade v if named, else its largest (most species) topmost named clade, or null for none. */
+  signpost(v: FanNode): FanNode | null {
+    let out = this.signs.get(v);
+    if (out === undefined) {
+      out = null;
+      if (latinOf(v.split)) out = v;
+      else
+        for (const k of v.kids) {
+          if ('sp' in k) continue;
+          const c = this.signpost(k);
+          if (c && (!out || c.strands.length > out.strands.length)) out = c;
+        }
+      this.signs.set(v, out);
+    }
+    return out;
+  }
+  /** Clade v's territory (world x) at the layout as it stands. */
+  spanOf(v: FanNode): [number, number] | null {
+    const j = this.t.index.get(v);
+    return j === undefined ? null : this.t.span(j);
+  }
 }
 
 /** Priority: species before lineages, then the wider column first, then tree order. */
@@ -2767,8 +2852,8 @@ export class FanView implements InputHandlers {
     if (FanView.labelsAfterFirst && !this.labWait && !this.labLast) {
       this.labWait = setTimeout(() => this.request(), 0);
     } else {
-      const { br, top, lg, spots, carried } = this.labelsNow(lod);
-      this.drawLabels(spots, br, { ...lg, top, lod }, carried);
+      const { br, top, lg, spots, carried, cut } = this.labelsNow(lod);
+      this.drawLabels(spots, br, cut ? undefined : { ...lg, top, lod }, carried, cut);
       br?.drawPins(this.ctx, FAMILY_INK, INK3, BG);
       this.labelAllMs.push(performance.now() - tl);
       if (this.labelAllMs.length > 600) this.labelAllMs.shift();
@@ -2793,9 +2878,22 @@ export class FanView implements InputHandlers {
    * the last layout carried with the camera (carryLabels): names, pictures and lines move rigidly with the pan and
    * zoom, and fade as they meet or leave (drawLabels, each frame). `carried` the camera's change carried, null when laid out.
    */
-  private labelsNow(lod: Lod | null): { br: Brackets | null; top: number; lg: ReturnType<typeof labelGroups>; spots: LabelSpot[]; carried: Carry | null } {
+  private labelsNow(lod: Lod | null): { br: Brackets | null; top: number; lg: ReturnType<typeof labelGroups>; spots: LabelSpot[]; carried: Carry | null; cut?: CutLabels } {
     const t0 = performance.now();
     const lg = labelGroups(this.fan, this.levelNow());
+    // (?labels=cut, ToLaD#333: from the cut, every frame; no carry, no rest pass, no hysteresis.)
+    const T = this.territories();
+    if (this.brackets) this.brackets.spanOf = T ? (v) => T.spanOf(v) : null;
+    if (T) {
+      const br = this.layoutBrackets();
+      const top = this.labelTop() + (br ? br.pinH() * br.pinA : 0);
+      const cut = this.cutLabels(T, top);
+      this.labLast = null;
+      this.labelMs.push(performance.now() - t0);
+      this.labelLayMs.push(performance.now() - t0);
+      if (this.labelLayMs.length > 600) this.labelLayMs.shift();
+      return { br, top, lg, spots: cut.spots, carried: null, cut };
+    }
     const L = this.labLast;
     const c = this.cam;
     const moving = this.gesturing || !!this.anim;
@@ -2847,6 +2945,87 @@ export class FanView implements InputHandlers {
     if (this.labelLayMs.length > 600) this.labelLayMs.shift();
     return { br, top, lg, spots, carried: null };
   }
+  /** ?labels=cut (ToLaD#333): this fan's territories at this screen width, or null when off. */
+  private terr: { fan: Fan; fold: unknown; w: number; t: CutTerritories } | null = null;
+  private territories(): CutTerritories | null {
+    const f = this.fan.tess.fold;
+    // (Off under the rooms by life, ?rooms=life / ?fit=fossils: Steady's computeLife places the columns otherwise than
+    // the territories' widest rooms, so the cut's boxes would not be where the columns are. Today's labels there.)
+    if (!FanView.labelsCut || !(f instanceof Steady) || f.life) return null;
+    const P = this.terr;
+    if (P && P.fan === this.fan && P.fold === f && P.w === this.w) return P.t;
+    const t = new CutTerritories(this.fan, f, this.w);
+    this.terr = { fan: this.fan, fold: f, w: this.w, t };
+    return t;
+  }
+  /** Names, pictures and "+x" on/off from the cut (wantCutLabels; tests set it). */
+  static labelsCut = wantCutLabels();
+
+  /**
+   * This frame's labels from the cut (ToLaD#333, research/scalable-tree.md §3). Names: the cut for a pill's thickness
+   * (LABEL_PILL), one upright pill per item centred in its territory, hanging from its youngest tip into its own
+   * columns (as a tip's pill stands 4 px over it); a species' its name, a clade's its name (or its face species') and
+   * "+x" its species not named, a run of daughters that do not fit only its "+x". Pictures: the cut for a picture's
+   * width (PIC_D), one disc per item standing on its youngest tip (PIC_LIFT over it), its face species'. Territories
+   * are disjoint and nested, names hang below an item's youngest tip and pictures stand above it, so nothing meets.
+   */
+  private cutLabels(T: CutTerritories, top: number): CutLabels {
+    const half = LABEL_PILL / 2;
+    const X = (x: number) => this.toScreen(x, 0)[0];
+    const Y = (y: number) => this.toScreen(0, y)[1];
+    const [vx0] = this.toWorld(LABEL_AXIS_X, 0);
+    const [vx1] = this.toWorld(this.w, 0);
+    const sx = this.cam.sx;
+    const spots: LabelSpot[] = [];
+    const groups = new Map<string, FanBranch[][]>();
+    const bottom = this.h - LABEL_BOTTOM_PX + 30;
+    /** An item's screen x centre kept on screen inside its territory, and its youngest tip (screen y). */
+    const place = (it: CutItem): [number, number] => {
+      const l = X(it.x0);
+      const r = X(it.x1);
+      const lo = Math.max(l, LABEL_AXIS_X) + half;
+      const hi = Math.min(r, this.w) - half;
+      const cx = (l + r) / 2;
+      return [lo <= hi ? Math.min(Math.max(cx, lo), hi) : Math.min(Math.max(cx, hi), lo), Y(T.youngest(it))];
+    };
+    for (const it of T.t.cut(sx, LABEL_PILL, vx0, vx1)) {
+      if (!it.fits) continue;
+      const v = it.kind === 'leaf' ? null : T.t.nodes[it.j];
+      const b = it.kind === 'leaf' ? T.t.strands[it.j] : null;
+      const key = `c${it.kind}${it.j}:${it.q0}`;
+      const { text, hid } = T.label(it, key);
+      const px = this.plusPx(hid.length);
+      const tlen = (text ? this.nameWidth(text) + 2 * LABEL_PAD : LABEL_PAD) + px;
+      const [x, ty] = place(it);
+      // (Hanging from its youngest tip into its own columns, kept under the top line: nothing else is in its territory there.)
+      const y0 = Math.max(ty + 4, top);
+      const y1 = y0 + tlen;
+      const fit = clamp01((bottom - y1) / 30);
+      if (!(fit > 0)) continue;
+      if (hid.length) groups.set(key, hid);
+      const s: LabelSpot = { key, id: key, place: 'tip', text, rank: [0, it.x1 - it.x0, it.j], x, y1, box: [x - half, y0, x + half, y1], fit, plus: px };
+      if (b) s.b = b;
+      else if (it.kind === 'node') Object.assign(s, { v, fam: v, pic: groupFace(v!) });
+      spots.push(s);
+    }
+    // The pictures: the coarser cut, each standing on its item's youngest tip (the names hang below it).
+    const pics: CutLabels['pics'] = [];
+    if (thumbsOn) {
+      for (const it of T.t.cut(sx, PIC_D, vx0, vx1)) {
+        if (!it.fits || it.kind === 'run') continue;
+        const lv: Level = it.kind === 'leaf' ? { b: T.t.strands[it.j] } : { v: T.t.nodes[it.j] };
+        const face = lv.b ?? groupFace(lv.v!);
+        if (!face || !wikiOf(face.sp.sci)?.img) continue;
+        const [x, ty] = place(it);
+        const y = ty - PIC_LIFT - PIC_D / 2;
+        if (y - PIC_D / 2 < top || y > this.h) continue;
+        pics.push({ x, y, d: PIC_D, i: pics.length, lv, face });
+      }
+    }
+    this.picSpots = pics;
+    return { spots, groups, pics };
+  }
+
   /** The page (FanApp) draws a view's first frame without its labels, which follow in the next slice (ToLaD#255); tests draw them at once. */
   static labelsAfterFirst = false;
   /** The first frame's labels pending (labelsAfterFirst): its timer. */
@@ -3553,18 +3732,19 @@ export class FanView implements InputHandlers {
    * resolveLabels (a fixed priority, with hysteresis), and each fades in and
    * out over LABEL_FADE_MS rather than popping.
    */
-  private drawLabels(spots: LabelSpot[], br: Brackets | null = null, lg?: ReturnType<typeof labelGroups> & { top: number; lod: Lod | null }, carried: Carry | null = null): void {
+  private drawLabels(spots: LabelSpot[], br: Brackets | null = null, lg?: ReturnType<typeof labelGroups> & { top: number; lod: Lod | null }, carried: Carry | null = null, cut?: CutLabels): void {
     const ctx = this.ctx;
     const now = performance.now();
     const dt = Math.min(100, Math.max(0, now - this.labelT));
     this.labelT = now;
     // (At rest, chosen afresh: what a still view gives, whatever the way here, ToLaD#255.)
     const st0 = this.labelState;
-    const on = resolveLabels(spots, this.labClean ? () => false : (key) => !!st0.get(key)?.on);
+    // (?labels=cut, ToLaD#333: every item of the cut shown, its "+x" its species not named.)
+    const on = cut ? new Map(spots.map((s) => [s.key, true])) : resolveLabels(spots, this.labClean ? () => false : (key) => !!st0.get(key)?.on);
     // The "+x" badges (ToLaD#197): counted with the cull; a pill keeps room for its count from the frame before, so
     // when a count changes the next frame lays the pills out again with the room it needs.
     // (Not with one pill per group, ToLaD#258: plusGroups and familyPills, ToLaD#197 and #212, give way to labelGroups.)
-    const groups = new Map<string, FanBranch[][]>();
+    const groups = cut?.groups ?? new Map<string, FanBranch[][]>();
     this.famHits.length = 0;
     this.nameHits.length = 0;
     this.plusHits.length = 0;
@@ -3590,7 +3770,7 @@ export class FanView implements InputHandlers {
       alphas[k] = st.a * s.fit;
     });
     // The level's groups (ToLaD#262): each one's picture over "now", exactly above its centre; the names hidden, as "+x".
-    const pics = lg ? this.groupPics(lg, lg.top, carried) : [];
+    const pics = cut ? cut.pics : lg ? this.groupPics(lg, lg.top, carried) : [];
     if (lg) {
       // (At rest the room was settled already, labelsNow.)
       const room = this.groupPlus(lg, spots, on, groups, !!carried);
@@ -3662,7 +3842,7 @@ export class FanView implements InputHandlers {
       // (A family's, ToLaD#212: its commonest living species'.)
       const pb = s.fam ? s.pic : s.b;
       // (A level's groups' pictures stand over "now" instead, groupPics, ToLaD#262.)
-      const th = pb && s.ev === undefined && !lg ? labelThumb(pb.sp.sci, () => this.request()) : null;
+      const th = pb && s.ev === undefined && !lg && !cut ? labelThumb(pb.sp.sci, () => this.request()) : null;
       // (One picture where two would overlap, the first one shown: fewer and clearer, ToLaD#193. A fading one still draws.)
       const ty = y1 + THUMB_D / 2 + 2;
       if (th && alpha > 0.5 && !thumbs.some(([x, y]) => Math.abs(x - s.x) < THUMB_D - 4 && Math.abs(y - ty) < THUMB_D - 4)) {
