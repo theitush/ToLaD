@@ -57,6 +57,18 @@ PAUSE_S = 1.5
 THUMB_W = 330
 RANGE_W = 500
 SPECIES_Q = "Q7432"
+
+# By hand (ToLaD#275): (English article, Commons file) for a species whose Wikidata picture is no photo, or that
+# the pinned snapshot predates. Homo sapiens's P18 is Human.svg, a dark silhouette; its stand-in is the photo the
+# Human article long led with (an Akha couple, northern Thailand; CC BY-SA 2.0 de, Weltenbummler84). The three
+# hominins joined the dated tree after the snapshot; their files are their Wikidata items' P18 (2026-10-14).
+HAND = {
+    "Homo sapiens": ("https://en.wikipedia.org/wiki/Human", "Akha cropped hires.JPG"),
+    "Homo floresiensis": ("https://en.wikipedia.org/wiki/Homo_floresiensis", "Homo Florensiensis-MGL 95216-P5030051-white.jpg"),
+    "Homo naledi": ("https://en.wikipedia.org/wiki/Homo_naledi", "Homo naledi skeletal specimens.jpg"),
+    "Kenyanthropus platyops": ("https://en.wikipedia.org/wiki/Kenyanthropus_platyops",
+                               "Kenyanthropus platyops, skull (model).JPG"),
+}
 ITEM = re.compile(r"http://www\.wikidata\.org/entity/Q\d+")
 
 # One row per (key, item, rank, parent name, article, image, range map). `?key` is what was asked:
@@ -347,6 +359,11 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         snap = json.loads(snap_path.read_text(encoding="utf-8"))
     out = resolve(species, snap, a.raw)
+    for name, (article, photo) in HAND.items():
+        if name in out:
+            e = dict(out[name] or {}, wp=article)
+            e["img"], e["file"] = _commons("/Special:FilePath/" + photo, THUMB_W)
+            out[name] = e
     write_sidecar(out, a.mammals / "wiki.json")
     print(f"[wiki] all {rates(out, set(out))}", file=sys.stderr)
     return 0

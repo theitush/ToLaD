@@ -430,16 +430,26 @@ def apply_overrides(root: DNode, merged: Node, ov, notes: list[dict]) -> tuple[D
     fossils = {n.name: n for n in merged.preorder() if n.is_leaf and n.name and eligible(n)}
     ents = []
     # a domestic leaf (ToLaD#175) branches off its wild ancestor's lineage like a dated fossil
+    # `sister` is a species, or a list of species: the lineage of their common ancestor (a clade; ToLaD#275's
+    # hominins branch off the human lineage below Homo's crown, and Sahelanthropus off Homo + Pan's)
+    sis = lambda e: [e["sister"]] if isinstance(e["sister"], str) else list(e["sister"])  # noqa: E731
     for e in ov.dated_fossils + ov.domestic_leaves:
         f = fossils.get(e["name"])
+        # (A sister may be another, older dated fossil: placed first, it is in the tree by then.)
+        miss = [s for s in sis(e) if s not in by_name and s not in {x["name"] for x in ov.dated_fossils}]
         why = ("no such dated species" if f is None else "already in Upham's tree" if f.data.get("dleaf")
-               else f"sister {e['sister']!r} not in the dated tree" if e["sister"] not in by_name else "")
+               else f"sister {miss[0]!r} not in the dated tree" if miss else "")
         if why:
             raise RuntimeError(f"overrides.toml dated_fossil {e['name']}: {why}")
         age = float(e.get("age", f.fad if f.fad is not None else f.t0))
         ents.append((age, e, f))
     for age, e, f in sorted(ents, key=lambda x: -x[0]):
-        s = by_name[e["sister"]]
+        s = _mrca([by_name[x] for x in sis(e)])
+        # (A fossil sister must still be alive at the split: P. aethiopicus ended at 2.3 Ma, before P. robustus's 2.0.)
+        end = getattr(s.leaf, "lad", None) if s.leaf is not None else None
+        if end is not None and end >= age:
+            raise RuntimeError(f"overrides.toml dated_fossil {e['name']}: sister {e['sister']!r} ended at {end} Ma, "
+                               f"before the split at {age}")
         if s.parent is not None and age >= s.parent.age:
             raise RuntimeError(f"overrides.toml dated_fossil {e['name']}: age {age} is not below "
                                f"{e['sister']}'s split at {s.parent.age}")
@@ -702,8 +712,10 @@ def gen_entry(nd: Node) -> list | None:
 
 
 def common_name(nd: Node) -> str | None:
+    # (Then a curated history's own: the Red List does not assess humans, so "Human" comes from its history, #275;
+    # then MDD's, for a species only MDD knows, ToLaD#278.)
     return (nd.data.get("common_override") or (nd.data.get("red_list") or {}).get("common")
-            or nd.data.get("common_mdd"))  # an MDD-grafted species' MDD English name (ToLaD#278)
+            or (nd.data.get("history") or {}).get("common") or nd.data.get("common_mdd") or None)
 
 
 def file_meta(droot: DNode | None, rows: list[tuple[Node, bool]]) -> dict | None:
