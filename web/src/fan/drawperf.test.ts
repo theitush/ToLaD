@@ -14,7 +14,9 @@ import { CARNIVORA, FELIDAE, mammaliaClade } from './panthera';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree } from './splits';
 import { laneAt, leftAt } from './layout';
 import { ColumnPath, CutMemo, SCALE_BAR_PX } from './twigs';
-import { FanView, LC } from './view';
+import * as VIEW from './view';
+import { FanView } from './view';
+const LC: Record<string, number> = (VIEW as unknown as { LC?: Record<string, number> }).LC ?? { layouts: 0 };
 import { loadMammalsFromFiles } from './mammals-node';
 
 const RUN = !!process.env.FANPERF;

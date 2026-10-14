@@ -258,6 +258,9 @@ function drawnOrder(fan: Fan): number[] {
   return o;
 }
 
+/** Each strand's width at "now" (an extinct one's at its tip), per fan (Brackets.spans). */
+const nowWidths = new WeakMap<Fan, { now: number; w: Float64Array }>();
+
 export class Brackets {
   /** `nameFont` the English names' CSS font, `latinFont` the Latin's. */
   constructor(
@@ -309,10 +312,14 @@ export class Brackets {
     const r = new Float64Array(bs.length);
     const now = fan.time.y(0);
     const folded = !!fan.tess.fold && fan.tess.fold.left(0, now) !== null;
+    // (Each strand's width where it is read, at "now" or its tip: fixed, kept per fan, ToLaD#255.)
+    let ws = nowWidths.get(fan);
+    if (!ws || ws.now !== now) nowWidths.set(fan, (ws = { now, w: Float64Array.from(bs, (b) => laneW(b, Math.max(b.tipY, now))) }));
+    const W = ws.w;
     bs.forEach((b, k) => {
       const y = Math.max(b.tipY, now);
       if (folded) {
-        const cx = leftAt(b, y) + laneW(b, y) / 2;
+        const cx = leftAt(b, y, W[k]) + W[k] / 2;
         l[k] = cx - b.width / 2;
         r[k] = cx + b.width / 2;
       } else {
