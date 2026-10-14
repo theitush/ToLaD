@@ -34,6 +34,15 @@ try {
         on,
         pics: f.thumbHits.length,
         pills: f.famHits.map((h) => h.v.name ?? '?'),
+        // (What the eye sees move, ToLaD#302: the screen x of the column picked at the gesture's start, at screen
+        // y 450, its middle; the camera's cx moves with the layout too, as the rooms open, which nobody sees.)
+        mark: (() => {
+          const b = window.__mark;
+          if (!b) return null;
+          let best = null;
+          for (const p of f.lanePoints(b, 0)) if (!best || Math.abs(p.y - 450) < Math.abs(best.y - 450)) best = p;
+          return best ? best.x + (best.w * f.cam.sx) / 2 : null;
+        })(),
       };
     });
   const start = () =>
@@ -47,6 +56,12 @@ try {
   // One gesture: fingers from a to b (one or two), in n steps; the state after each step and at rest.
   const gesture = async (name, from, to, n = 20) => {
     const pts = (u) => from.map((p, i) => ({ x: p[0] + (to[i][0] - p[0]) * u, y: p[1] + (to[i][1] - p[1]) * u, id: i }));
+    await page.evaluate(() => {
+      const f = window.__fan;
+      // (The widest column under the gesture's middle row, near the screen's centre.)
+      window.__mark = null;
+      for (let d = 0; d < 195 && !window.__mark; d += 3) window.__mark = f.hitBranch(195 + d, 450) ?? f.hitBranch(195 - d, 450);
+    });
     const log = [await state()];
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: pts(0) });
     for (let k = 1; k <= n; k++) {
@@ -82,6 +97,12 @@ try {
       const a = log[i - 1].cam, b = log[i].cam;
       jump = Math.max(jump, Math.abs((b.cx - a.cx) * b.sx), Math.abs((b.cy - a.cy) * b.sy));
     }
+    // the marked column's screen x: its largest step under the fingers, and its move after they left
+    let mjump = 0;
+    for (let i = 1; i <= n; i++) if (log[i].mark !== null && log[i - 1].mark !== null) mjump = Math.max(mjump, Math.abs(log[i].mark - log[i - 1].mark));
+    const mz = log[log.length - 1].mark;
+    const mrel = mz !== null && log[n].mark !== null ? `${(mz - log[n].mark).toFixed(0)}px` : 'lost';
+    console.log(`${name}: column seen moves ≤${mjump.toFixed(0)}px a step, ${mrel} after release`);
     console.log(`${name}: level ${lvs.join(' → ')} | flicker ${[...flick].join(' ') || 'none'} | pics ${pics} | pills ${pills} | max step ${jump.toFixed(0)}px | after release ${settle} | on at rest ${log[log.length - 1].on.length}`);
     if (process.env.SHOTS) await page.screenshot({ path: `${out}/${taxon}-${name}.png` });
   };

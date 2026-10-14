@@ -1,10 +1,11 @@
-// ?fit=fossils (ToLaD#289): at the Hominins and Homo levels the frame is where the fossils lived, so every hominin
-// with a picture gets a column a few px wide (its name: todo); off (the default), the frame fits today's humans.
+// ?fit=fossils (ToLaD#289, #298): at the Hominins and Homo levels the frame is where and when the fossils lived (from
+// the level's start to its youngest fossil group's end, "now" above the screen), so every hominin with a picture gets
+// a column a few px wide (its name: todo, ToLaD#297); off (the default), the frame fits today's humans.
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { mammaliaClade, type CladeRec } from './panthera';
 import { loadMammalsFromFiles } from './mammals-node';
 import { mammaliaTree, type Split } from './splits';
-import { FanView, fossilSpan, levelName } from './view';
+import { FanView, fossilSpan, levelName, nextLevels } from './view';
 import type { FanNode } from './layout';
 import { laneAt, leftAt } from './layout';
 import { latinOf } from './brackets';
@@ -113,10 +114,13 @@ describe('?fit=fossils: the hominins readable (ToLaD#289)', () => {
     const bad: string[] = [];
     const lines: string[] = [];
     for (const u of [by('Hominini'), by('Homo')]) {
-      expect(fossilSpan(u)).not.toBeNull();
+      expect(fossilSpan(v.fan, u)).not.toBeNull();
+      // (A level's frame is its fossil groups' era, ToLaD#298: a group with a member alive now (Homo at the Hominins)
+      // is no fossil, framed at its own level; its species, younger than the australopiths, may stand above the screen.)
+      const living = new Set(nextLevels(v.fan, u).flatMap((g) => (g.v && g.v.strands.some((b) => !b.sp.extinct && b.pop.aliveAt(0) > 0) ? g.v.strands.map((b) => b.sp.sci) : [])));
       for (const r of measure(v, u)) {
         lines.push(`${levelName(u)} ${r.sci}: ${r.px.toFixed(1)} px${r.on ? '' : ' (off screen)'}${r.named ? '' : ' (name hidden)'}`);
-        if (r.sci === 'Homo sapiens') continue;
+        if (r.sci === 'Homo sapiens' || living.has(r.sci)) continue;
         if (!r.on) bad.push(lines[lines.length - 1]);
         if (r.sci === 'Homo neanderthalensis' && !(r.px >= 3)) bad.push(lines[lines.length - 1]);
       }

@@ -140,6 +140,12 @@ const scenes = [
   // ToLaD#289: the Hominins and Homo levels (?fit=fossils: framed on the fossils), and tapped down to them from home along the humans.
   ['mamm-hominini', 'level', ['Hominini']],
   ['mamm-homo', 'level', ['Homo']],
+  // ToLaD#302: flown to as a tap on its bracket lands there (cladeCamera, the level the view is at then that one): the
+  // great apes, the hominins, Homo, and the cats (the bar they are judged against).
+  ['fly-hominidae', 'fly', ['Hominidae']],
+  ['fly-hominini', 'fly', ['Hominini']],
+  ['fly-homo', 'fly', ['Homo']],
+  ['fly-felidae', 'fly', ['Felidae']],
   ['hom-taps-6', 'taps', ['Homo sapiens', 'tttttt']],
   ['hom-taps-7', 'taps', ['Homo sapiens', 'ttttttt']],
   ['hom-taps-5', 'taps', ['Homo sapiens', 'ttttt']],
@@ -499,6 +505,19 @@ try {
           console.log(`double-tap at ${at[0].toFixed(0)},${at[1].toFixed(0)} on ${at[2]}`);
           f.doubleTap(at[0], at[1]);
           if (f.anim && !f.anim(performance.now() + 1e5)) f.anim = null;
+          f.labelState.clear();
+          f.draw();
+        } else if (kind === 'fly') {
+          // A level's tap flight from home (ToLaD#302): the clade founded by taxon args[0], landed.
+          f.cam = f.homeCamera();
+          f.camera.settle();
+          f.draw();
+          const v = fan.nodes.find((n) => (n.split.taxon ?? '').replace(/\s*\(.*\)\s*$/, '') === args[0]);
+          f.flyLevel(null, v);
+          for (let t = performance.now() + 16; f.anim; t += 16) {
+            if (!f.anim(t)) f.anim = null;
+            f.applyFold();
+          }
           f.labelState.clear();
           f.draw();
         } else if (kind === 'taps') {
