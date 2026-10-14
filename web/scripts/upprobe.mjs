@@ -87,8 +87,10 @@ try {
     f.doubleTap = (x, y, ran) => (window.__dbl++, (window.__dlog = `ran=${!!ran} anim=${!!f.anim} backing=${f.backing ? window.__up.nm(f.backing.lv) : '-'} now=${window.__up.nm(f.levelNow(true))}`), dt(x, y, ran));
     f.tap = ((tp) => (x, y) => ((window.__tlog = `tap ${x | 0},${y | 0} kind=${f.tapKind(x, y)}`), tp(x, y)))(f.tap.bind(f));
   });
-  const land = async () => {
+  // (A held tap runs once the double-tap window's timer fires, late on a busy page: `taps`, the count it waits to pass.)
+  const land = async (taps = -1) => {
     await page.waitForTimeout(420);
+    if (taps >= 0) await page.waitForFunction((n) => window.__taps > n, taps, { timeout: 5000 }).catch(() => {});
     await page.waitForFunction(() => !window.__fan.anim, null, { timeout: 20000 });
     await page.waitForTimeout(250);
   };
@@ -117,6 +119,7 @@ try {
       const mid = st.startsWith('~');
       if (mid) st = st.slice(1);
       const before = await page.evaluate(() => window.__up.now());
+      const taps0 = await page.evaluate(() => window.__taps);
       if (st === 'd') {
         // Mid-flight (the last step's flight not waited for): from where it lands.
         const info = await page.evaluate((mid) => {
@@ -235,7 +238,7 @@ try {
         await page.waitForTimeout(560);
         noWait = true;
       } else {
-        await land();
+        await land(st.startsWith('t:') || st.startsWith('p:') || st === 'x' || st === 'm' ? taps0 : -1);
         if (st.startsWith('s:')) await page.waitForTimeout(600);
       }
       const now = await page.evaluate(() => window.__up.now());
