@@ -240,8 +240,8 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
     // How many strands get sampled per frame, and at how many points.
     const lp = { n: 0, pts: 0 };
     const lanePoints = v.lanePoints.bind(v);
-    v.lanePoints = (b, hw) => {
-      const r = lanePoints(b, hw);
+    v.lanePoints = (...a) => {
+      const r = lanePoints(...a);
       lp.n++;
       lp.pts += r.n;
       return r;
@@ -384,6 +384,7 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
         out(`  xr: ${vis} visible, ${bad} culled wrongly`);
       }
       for (const k of Object.keys(acc)) delete acc[k];
+      if (process.env.FANPERF_CP) { (globalThis as any).__CP = { n: 0 }; (globalThis as any).__OUT = out; }
       const times: number[] = [];
       // (The gesture itself: zoomAbout and pan, the camera's settle, the fold's anchor and follow, ToLaD#255.)
       const gest: number[] = [];

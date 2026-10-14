@@ -85,6 +85,11 @@ export class FanCamera {
     return (y - this.cam.cy) * this.cam.sy + this.h / 2;
   }
 
+  /** toWorld's x alone. */
+  worldX(px: number): number {
+    return this.cam.cx + (px - this.w / 2) / this.cam.sx;
+  }
+
   /** toWorld's y alone. */
   worldY(py: number): number {
     return this.cam.cy + (py - this.h / 2) / this.cam.sy;

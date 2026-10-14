@@ -292,6 +292,26 @@ export function nodeLeftAt(v: FanNode, y: number, river = false): number {
 const clampW = (v: number, w: number) => Math.min(w, Math.max(0, v));
 /** How many of the fold's rows xRange reads, folded on a grid, at most (every one over a screen's height). */
 const XR_ROWS = 512;
+/** The draw's xTable in this many slices of its span too (xBand). */
+const XR_BANDS = 16;
+/** Tess.xTable: per strand its edge's least and most over a span of the fold's rows, and per slice of it (BL, BR: nb slices of rpb rows from row kA). */
+interface XTable {
+  fold: Fold;
+  ver: number;
+  h: number;
+  y0: number;
+  y1: number;
+  L: Float64Array;
+  R: Float64Array;
+  prev: Float64Array;
+  dPrev: Float64Array;
+  nb: number;
+  kA: number;
+  kB: number;
+  rpb: number;
+  BL: Float64Array;
+  BR: Float64Array;
+}
 /** How many heights xRange reads a folded strand's edge at, at most (exact folds). */
 const XR_N = 48;
 
@@ -485,7 +505,49 @@ export class Tess {
    * beside it). Rows above a strand's tip or below the bottom count too (only wider). The last two tables kept for
    * the fold's version and grid, one serving any span within its own (the lanes' a frame, the individuals' within it).
    */
-  private xTable(y0: number, y1: number, slot = -1): { L: Float64Array; R: Float64Array } {
+  /**
+   * The world heights over [y0, y1] where strand b's lanes may be within world x [x0, x1] (folded on its grid, ToLaD#255):
+   * [lo, hi] spanning the XR_BANDS-th slices of the draw's xTable over [y0, y1] its edges (padded as xRange pads them)
+   * reach into it in, empty (lo > hi) in none; [y0, y1] itself where the table holds no slices (unfolded, or strided).
+   * Zoomed out, a strand is often on screen only where its parents' columns gather it in (the lion overview at the
+   * mammals: ~7 of its ~400 pieces): its lanes sampled only there.
+   */
+  xBand(b: FanBranch, y0: number, y1: number, x0: number, x1: number, out: [number, number]): [number, number] {
+    out[0] = y0;
+    out[1] = y1;
+    const f = this.fold;
+    if (!f || !(f.gridH > 0)) return out;
+    const t = this.xTable(y0, y1);
+    if (!t.nb) return out;
+    const S = f.strands.length;
+    const i = b.index;
+    const lo = Math.max(y0, b.tipY);
+    const wMax = Math.max(b.baseW, lo < b.splitY ? b.unit * g(b.pop.max, this.mode) : 0);
+    let a = -1;
+    let z = -1;
+    for (let j = 0; j < t.nb; j++) {
+      const l = t.BL[j * S + i] - wMax;
+      const r = t.BR[j * S + i] + wMax;
+      const pad = 1e-6 * Math.max(1, Math.abs(l), Math.abs(r)) + (r - l) * 1e-3;
+      if (l - pad > x1 || r + pad < x0) continue;
+      if (a < 0) a = j;
+      z = j;
+    }
+    if (a < 0) {
+      out[0] = Infinity;
+      out[1] = -Infinity;
+      return out;
+    }
+    // (A slice more either side: between its rows the edge is linear only roughly, ToLaD#304.)
+    a = Math.max(0, a - 1);
+    z = Math.min(t.nb - 1, z + 1);
+    const h = t.h;
+    out[0] = Math.max(y0, (t.kA + a * t.rpb) * h);
+    out[1] = Math.min(y1, (t.kA + Math.min(t.kB - t.kA, (z + 1) * t.rpb)) * h);
+    return out;
+  }
+
+  private xTable(y0: number, y1: number, slot = -1): XTable {
     const f = this.fold!;
     // (A table over a span holding this one does: wider only. The individuals' spans lie within the lanes'.)
     // (`slot` (2): a caller's own table (the labels' boxes, ToLaD#255), apart from the draw's two, which it never widens.)
@@ -496,7 +558,7 @@ export class Tess {
     }
     const S = f.strands.length;
     const at = slot >= 0 ? slot : this.xNext;
-    const t = this.xTables[at] ?? { fold: f, ver: 0, h: 0, y0: 0, y1: 0, L: new Float64Array(S), R: new Float64Array(S), prev: new Float64Array(S), dPrev: new Float64Array(S) };
+    const t: XTable = this.xTables[at] ?? { fold: f, ver: 0, h: 0, y0: 0, y1: 0, L: new Float64Array(S), R: new Float64Array(S), prev: new Float64Array(S), dPrev: new Float64Array(S), nb: 0, kA: 0, kB: 0, rpb: 0, BL: new Float64Array(0), BR: new Float64Array(0) };
     this.xTables[at] = t;
     if (slot < 0) this.xNext ^= 1;
     t.fold = f;
@@ -516,6 +578,17 @@ export class Tess {
     // (Every row over a screen's height or so (the grid is about 3 px: the draw's spans), exact at the rows and the edge
     // linear between them; strided beyond.)
     const st = Math.max(1, Math.ceil((kB - kA) / XR_ROWS));
+    // (The draw's tables, every row: per slice of XR_BANDS too, each from the row at its top to the one at its bottom (xBand).)
+    const rpb = Math.ceil((kB - kA) / XR_BANDS);
+    t.nb = slot < 0 && st === 1 && rpb > 0 ? Math.ceil((kB - kA) / rpb) : 0;
+    t.kA = kA;
+    t.kB = kB;
+    t.rpb = rpb;
+    if (t.nb && t.BL.length < t.nb * S) {
+      t.BL = new Float64Array(XR_BANDS * S);
+      t.BR = new Float64Array(XR_BANDS * S);
+    }
+    const { BL, BR } = t;
     let first = true;
     for (let k = kA; ; k = Math.min(kB, k + st)) {
       const xs = f.rowXs(k);
@@ -525,7 +598,26 @@ export class Tess {
           L[i] = R[i] = prev[i] = x;
           dPrev[i] = 0;
         }
+        if (t.nb) {
+          BL.set(L.subarray(0, S), 0);
+          BR.set(L.subarray(0, S), 0);
+        }
         first = false;
+      } else if (t.nb) {
+        // (Every row, in slices: the edge is linear between two, within them. A row between two slices is in both.)
+        const r = k - kA;
+        const o = S * Math.ceil(r / rpb - 1);
+        for (let i = 0; i < S; i++) {
+          const x = xs[i];
+          if (x < L[i]) L[i] = x;
+          else if (x > R[i]) R[i] = x;
+          if (x < BL[o + i]) BL[o + i] = x;
+          else if (x > BR[o + i]) BR[o + i] = x;
+        }
+        if (r % rpb === 0 && k < kB) {
+          BL.set(xs.subarray(0, S), o + S);
+          BR.set(xs.subarray(0, S), o + S);
+        }
       } else if (st === 1) {
         // (Every row: the edge is linear between two, within them.)
         for (let i = 0; i < S; i++) {
@@ -555,7 +647,7 @@ export class Tess {
     }
     return t;
   }
-  private readonly xTables: { fold: Fold; ver: number; h: number; y0: number; y1: number; L: Float64Array; R: Float64Array; prev: Float64Array; dPrev: Float64Array }[] = [];
+  private readonly xTables: XTable[] = [];
   private xNext = 0;
   /** The highest tip of any strand (the folded rows over xTable start no higher). */
   private get tipMin(): number {

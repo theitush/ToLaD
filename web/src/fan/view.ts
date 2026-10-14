@@ -90,6 +90,8 @@ const LABEL_FADE_MS = 180;
 const STEM_END_PX = 48;
 /** A lane's living glow at full strength from this green width (px) up, thinner ones in proportion: a family of thin columns side by side glows as one (ToLaD#231). */
 const GLOW_W = 6;
+/** A strand on screen over less than this share of its height has its lanes sampled only there (drawStrand). */
+const BAND_SHARE = 0.5;
 /** A column with no styled spans on screen (drawStrand): shared, never written. */
 const NO_HELD: [number, number, number][] = [];
 /** The glow fades out across a lean: gone where the lane runs √(1 + s²) - 1 = GLOW_LEAN off straight down (s ≈ 0.75 px per px). */
@@ -2923,8 +2925,14 @@ export class FanView implements InputHandlers {
     const sBot = cam.worldY(this.h + 20);
     const xr = this.fan.tess.xRange(b, sTop, sBot);
     if (cam.screenX(xr[1]) < -12 || cam.screenX(xr[0]) > this.w + 12) return;
+    // Zoomed out, a strand is often on screen only over a little of the screen's height (where its parents' columns
+    // gather it in): its lanes sampled only there (Tess.xBand, ToLaD#255). (Not with the individuals, whose
+    // stretches read the same ColumnPath over the whole screen.)
+    const band = this.fan.tess.xBand(b, sTop, sBot, cam.worldX(-12), cam.worldX(this.w + 12), this.band);
+    const narrow = !textureOn && band[1] >= band[0] && band[1] - band[0] < BAND_SHARE * (sBot - sTop);
+    { const D = (globalThis as any).__CP; if (D && D.n++ % 97 === 0 && D.n < 2000) { const t = this.fan.tess as any; const T = t.xTable(sTop, sBot); const S = t.fold.strands.length; (globalThis as any).__OUT(`  ${b.sp.common} narrow ${narrow} band ${cam.screenY(band[0]).toFixed(0)}..${cam.screenY(band[1]).toFixed(0)} rpb ${T.rpb} nb ${T.nb}: ` + Array.from({ length: T.nb }, (_, j) => `${cam.screenX(T.BL[j * S + b.index]).toFixed(0)}..${cam.screenX(T.BR[j * S + b.index]).toFixed(0)}`).join(' ')); const P = this.lanePoints(b, b.width / 2); const xs: string[] = []; for (let i = 0; i < P.n; i += Math.ceil(P.n / 12)) xs.push(`${P.x[i].toFixed(0)}@${P.y[i].toFixed(0)}`); (globalThis as any).__OUT('    pts ' + xs.join(' ')); } }
     const hw = b.width / 2;
-    const pts = this.lanePoints(b, hw);
+    const pts = narrow ? this.lanePoints(b, hw, band[0], band[1]) : this.lanePoints(b, hw);
     if (pts.n < 2) return;
     // The column's styled spans on screen ([top, bottom, dim]), clipped to it: none for most strands.
     let held = NO_HELD;
@@ -2986,6 +2994,8 @@ export class FanView implements InputHandlers {
     this.drawLanes(pts, 0, NO_HELD, undefined);
   }
   private mergedExt: [number, number] = [0, 0];
+  /** drawStrand's on-screen heights (Tess.xBand), pooled. */
+  private band: [number, number] = [0, 0];
   private lodTops = new WeakMap<FanNode, number>();
   private lodTop(v: FanNode): number {
     let t = this.lodTops.get(v);
@@ -3231,11 +3241,9 @@ export class FanView implements InputHandlers {
    * on screen) over the screen and a little beyond it, each exactly on the
    * edges' curves: the lanes are drawn straight between them.
    */
-  lanePoints(b: FanBranch, hw: number): LanePts {
+  lanePoints(b: FanBranch, hw: number, sTop = this.camera.worldY(-20), sBot = this.camera.worldY(this.h + 20)): LanePts {
     const yb = this.fan.trunkBottom.y;
     const cam = this.camera;
-    const sTop = cam.worldY(-20);
-    const sBot = cam.worldY(this.h + 20);
     // The column's kept samples (twigs.ts ColumnPath: those where its chords run straight on screen dropped).
     const P = this.model(b).path;
     const [i0, i1] = P.span(this.cam.sx, this.cam.sy, sTop, Math.min(yb, sBot));
