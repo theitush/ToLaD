@@ -16,7 +16,7 @@
   "greenspoon model": 4355,
   "natural: extant, differs from today": 709,
   "natural: extant, same as today": 4668,
-  "natural: extinct, whole band": 236,
+  "natural: extinct, whole band": 237,
   "near-extinct cap": 15
  },
  "calibration_check": {
@@ -40,7 +40,7 @@
   },
   "Canis lupus": {
    "domestic_alive": 0.0,
-   "ever": 117635107654.18564,
+   "ever": 216754693745.6199,
    "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count, held before 1500, then log-linear to today's count (range loss, modelled); H:curated history (1 points, natural baseline 2.77e+05 (D) before the first point, then the range-loss trend from 1500 to the first cited point; pipeline/history/Canis_lupus.toml)",
    "occupancy_model_only": 29581.2106722291,
    "published": 223607.0,
@@ -834,14 +834,14 @@
   "note": "ToLaD#68. no_current_range: living leaves with a PHYLACINE map but an empty current range (PHYLACINE's current range is IUCN's without 'possibly extinct' areas). IUCN CR/EW ones are capped at 50 (CR criterion D, IUCN Categories and Criteria v3.1) unless a history file gives a cited count; the rest (DD/LC/unassessed: unmapped, mostly taxonomic) are flagged only. Their natural baseline takes the density route. cr_modelled_above_10k: IUCN CR/EW species whose today's count is still modelled and above 10000 (the ceiling of IUCN criterion C): candidates for a census anchor, not changed. today = the shipped alive count."
  },
  "counts": {
-  "internal": 6351,
-  "nodes": 23547,
-  "taxonomic_nodes": 13502,
-  "tips": 17196,
+  "internal": 6352,
+  "nodes": 23556,
+  "taxonomic_nodes": 13511,
+  "tips": 17204,
   "tips_extant": 5854,
-  "tips_extinct": 11342,
+  "tips_extinct": 11350,
   "tips_extinct_in_opentree": 327,
-  "tips_fossil_grafted": 11015
+  "tips_fossil_grafted": 11023
  },
  "dated_tree": {
   "ages": {
@@ -989,7 +989,10 @@
    }
   },
   "clamped_below_parent": 103,
-  "ended_before_split": [],
+  "ended_before_split": [
+   "Australopithecus africanus",
+   "Paranthropus aethiopicus"
+  ],
   "fossil_floors": [
    {
     "capped": false,
@@ -1257,22 +1260,22 @@
    }
   ],
   "grafts": {
-   "joins a split (loose)": 2039,
-   "on a stem (fossil)": 1179,
+   "joins a split (loose)": 2037,
+   "on a stem (fossil)": 1175,
    "on a stem (living, interpolated)": 70,
-   "on a stem, joins a graft of the same age": 160
+   "on a stem, joins a graft of the same age": 156
   },
   "living": 5853,
-  "named_splits": 690,
-  "species": 17195,
+  "named_splits": 689,
+  "species": 17203,
   "species_rows_left_out": 0,
-  "splits": 8616,
+  "splits": 8632,
   "splits_by_source": {
    "ensemble": 2264,
-   "fossil": 2718,
+   "fossil": 2715,
    "fossil-floor": 33,
-   "interpolated": 243,
-   "override": 10,
+   "interpolated": 240,
+   "override": 32,
    "upham": 1,
    "upham-imputed": 1387,
    "upham-interp": 1960
@@ -1281,10 +1284,10 @@
    "extinct, placed without data (grafted instead)": 44,
    "unmatched tip": 217
   },
-  "zero_length_spliced": 795
+  "zero_length_spliced": 793
  },
  "dating": {
-  "calibrated_raised_by_fossils": 400,
+  "calibrated_raised_by_fossils": 401,
   "uncalibrated_internal": 8308,
   "upham_calibrated_nodes": 1655
  },
@@ -8285,29 +8288,29 @@
   "births_now_per_yr": 52685790230.85576,
   "by_era": {
    "Cretaceous 66-145 Ma": {
-    "ghost": 3.4917024704574766e+18,
+    "ghost": 3.491702493276767e+18,
     "ghost_share": 0.9999,
-    "sampled": 178719213996796.2
+    "sampled": 178696394705677.2
    },
    "Holocene-Pleistocene 0-2.58 Ma": {
-    "ghost": 1.0994692468882042e+16,
+    "ghost": 1.0994422393478986e+16,
     "ghost_share": 0.0807,
-    "sampled": 1.2522394191252202e+17
+    "sampled": 1.2522421198792506e+17
    },
    "Jurassic and older >145 Ma": {
-    "ghost": 9.139014581567306e+17,
+    "ghost": 9.139014602098881e+17,
     "ghost_share": 1.0,
-    "sampled": 16316139438549.863
+    "sampled": 16314086281111.98
    },
    "Neogene 2.58-23 Ma": {
-    "ghost": 8.293887842436567e+17,
+    "ghost": 8.29388308301426e+17,
     "ghost_share": 0.7651,
-    "sampled": 2.546012223041179e+17
+    "sampled": 2.5460169824634854e+17
    },
    "Paleogene 23-66 Ma": {
-    "ghost": 2.246960603035883e+18,
+    "ghost": 2.2469601777299602e+18,
     "ghost_share": 0.9869,
-    "sampled": 2.990048072121496e+16
+    "sampled": 2.990090602713794e+16
    }
   },
   "f_ramp_Ma": [
@@ -8315,21 +8318,21 @@
    91.36
   ],
   "ghost_share": 0.9481,
-  "max_multiplier": 91393.54952197536,
+  "max_multiplier": 91402.07136434535,
   "multiplier_at_Ma": {
    "0.01": 1.013,
    "1": 1.03,
-   "100": 67505.866,
-   "150": 43929.504,
+   "100": 67519.487,
+   "150": 43934.732,
    "20": 11.94,
-   "200": 24830.89,
+   "200": 24833.93,
    "5": 2.049,
-   "50": 194.833,
-   "66": 3031.488
+   "50": 194.843,
+   "66": 3032.067
   },
-  "sampled_sum": 4.099206802912902e+17,
+  "sampled_sum": 4.099218267423983e+17,
   "top_down_estimate": 7.902868534628364e+18,
-  "with_ghosts": 7.90286868865392e+18
+  "with_ghosts": 7.902868688653919e+18
  },
  "grid_cells": 1600,
  "history": {
@@ -11834,9 +11837,9 @@
       "why": "joined across"
      }
     ],
-    "ever_after": 117635107654.18561,
-    "ever_before": 116906870926.25218,
-    "ever_ratio": 1.0062292038283431,
+    "ever_after": 216754693745.61987,
+    "ever_before": 215412796646.907,
+    "ever_ratio": 1.0062294214624232,
     "file": "Canis_lupus.toml",
     "grades": "C",
     "hist_row": true,
@@ -21240,16 +21243,16 @@
  "knuckles_collapsed": 3787,
  "mammalia": {
   "alive": 93310803589.12282,
-  "ever": 7.902868688653919e+18,
-  "ghost": 7.492948008362629e+18,
+  "ever": 7.902868688653918e+18,
+  "ghost": 7.49294686191152e+18,
   "grade": "D",
-  "hi": 2.825656468124067e+22,
-  "lo": 1921018651212384.8
+  "hi": 2.825656313754822e+22,
+  "lo": 1921018755992463.5
  },
  "mass_sources": {
   "mass:combine": 181,
   "mass:pantheria": 22,
-  "mass:phylacine": 5630
+  "mass:phylacine": 5631
  },
  "mock_individuals": 7,
  "natural_baseline": {
@@ -21280,8 +21283,8 @@
    "natural": 74356292291.42128,
    "today": 74803669399.537
   },
-  "extinct": 236,
-  "extinct_total_natural": 659418258.8115165,
+  "extinct": 237,
+  "extinct_total_natural": 659419165.7576755,
   "highest_ratio": [
    {
     "area_ratio": null,
@@ -21424,7 +21427,7 @@
     "today": 50.0
    }
   ],
-  "leaves": 5613,
+  "leaves": 5614,
   "lowest_ratio": [
    {
     "area_ratio": null,
@@ -21569,7 +21572,7 @@
   ],
   "methods": {
    "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count": 5350,
-   "N_nat: D x natural range (PHYLACINE, rescaled to PanTHERIA areas) x fitted occupancy": 263
+   "N_nat: D x natural range (PHYLACINE, rescaled to PanTHERIA areas) x fitted occupancy": 264
   },
   "note": "Layer 1 of the estimate stack (ToLaD#61): N_nat = density x PHYLACINE present-natural range x occupancy, grade D, kind reconstruction. Extant species: today's count x natural/current range cells (the same occupancy and area scale as today's count). No current range: density x natural area (rescaled to PanTHERIA areas) x fitted occupancy. Held before 1500 where it differs from today's count; extinct species: the whole band.",
   "showcase": [
@@ -22169,13 +22172,13 @@
   "non-species tip": 551
  },
  "output": {
-  "brotli_bytes": 745140,
-  "dated_sidecar_raw": 1578645,
+  "brotli_bytes": 746353,
+  "dated_sidecar_raw": 1586399,
   "files": 14,
-  "raw_bytes": 3070728,
-  "skeleton_brotli": 90217,
-  "skeleton_nodes": 2371,
-  "skeleton_raw": 425816,
+  "raw_bytes": 3072312,
+  "skeleton_brotli": 90124,
+  "skeleton_nodes": 2372,
+  "skeleton_raw": 426720,
   "tiles": 13
  },
  "overrides": {
@@ -22223,6 +22226,247 @@
      4.913,
      0.387
     ]
+   },
+   {
+    "fad_lad": [
+     2.0,
+     1.0
+    ],
+    "name": "Paranthropus robustus",
+    "pbdb_fad_lad": [
+     2.187,
+     1.296
+    ]
+   },
+   {
+    "fad_lad": [
+     2.3,
+     1.4
+    ],
+    "name": "Paranthropus boisei",
+    "pbdb_fad_lad": [
+     3.957,
+     0.906
+    ]
+   },
+   {
+    "fad_lad": [
+     2.7,
+     2.3
+    ],
+    "name": "Paranthropus aethiopicus",
+    "pbdb_fad_lad": null
+   },
+   {
+    "fad_lad": [
+     7.2,
+     6.8
+    ],
+    "name": "Sahelanthropus tchadensis",
+    "pbdb_fad_lad": [
+     7.246,
+     5.333
+    ]
+   },
+   {
+    "fad_lad": [
+     0.7,
+     0.2
+    ],
+    "name": "Homo heidelbergensis",
+    "pbdb_fad_lad": [
+     0.774,
+     0.129
+    ]
+   },
+   {
+    "fad_lad": [
+     0.19,
+     0.05
+    ],
+    "name": "Homo floresiensis",
+    "pbdb_fad_lad": [
+     0.129,
+     0.012
+    ]
+   },
+   {
+    "fad_lad": [
+     0.335,
+     0.236
+    ],
+    "name": "Homo naledi",
+    "pbdb_fad_lad": null
+   },
+   {
+    "fad_lad": [
+     0.95,
+     0.77
+    ],
+    "name": "Homo antecessor",
+    "pbdb_fad_lad": [
+     2.296,
+     0.296
+    ]
+   },
+   {
+    "fad_lad": [
+     0.43,
+     0.04
+    ],
+    "name": "Homo neanderthalensis",
+    "pbdb_fad_lad": [
+     0.452,
+     0.07
+    ]
+   },
+   {
+    "fad_lad": [
+     2.1,
+     1.8
+    ],
+    "name": "Homo rudolfensis",
+    "pbdb_fad_lad": [
+     3.672,
+     1.672
+    ]
+   },
+   {
+    "fad_lad": [
+     3.5,
+     3.2
+    ],
+    "name": "Kenyanthropus platyops",
+    "pbdb_fad_lad": null
+   },
+   {
+    "fad_lad": [
+     1.85,
+     1.77
+    ],
+    "name": "Homo georgicus",
+    "pbdb_fad_lad": [
+     2.58,
+     0.774
+    ]
+   },
+   {
+    "fad_lad": [
+     2.4,
+     1.44
+    ],
+    "name": "Homo habilis",
+    "pbdb_fad_lad": [
+     2.19,
+     1.287
+    ]
+   },
+   {
+    "fad_lad": [
+     2.0,
+     0.108
+    ],
+    "name": "Homo erectus",
+    "pbdb_fad_lad": [
+     3.567,
+     0.07
+    ]
+   },
+   {
+    "fad_lad": [
+     4.5,
+     4.3
+    ],
+    "name": "Ardipithecus ramidus",
+    "pbdb_fad_lad": [
+     4.466,
+     3.957
+    ]
+   },
+   {
+    "fad_lad": [
+     5.8,
+     5.2
+    ],
+    "name": "Ardipithecus kadabba",
+    "pbdb_fad_lad": [
+     8.615,
+     6.615
+    ]
+   },
+   {
+    "fad_lad": [
+     1.98,
+     1.97
+    ],
+    "name": "Australopithecus sediba",
+    "pbdb_fad_lad": [
+     2.58,
+     0.774
+    ]
+   },
+   {
+    "fad_lad": [
+     3.5,
+     3.3
+    ],
+    "name": "Australopithecus deyiremeda",
+    "pbdb_fad_lad": [
+     4.957,
+     2.957
+    ]
+   },
+   {
+    "fad_lad": [
+     2.6,
+     2.4
+    ],
+    "name": "Australopithecus garhi",
+    "pbdb_fad_lad": [
+     4.957,
+     2.957
+    ]
+   },
+   {
+    "fad_lad": [
+     3.0,
+     2.1
+    ],
+    "name": "Australopithecus africanus",
+    "pbdb_fad_lad": [
+     7.615,
+     2.187
+    ]
+   },
+   {
+    "fad_lad": [
+     4.2,
+     3.8
+    ],
+    "name": "Australopithecus anamensis",
+    "pbdb_fad_lad": [
+     4.466,
+     3.957
+    ]
+   },
+   {
+    "fad_lad": [
+     3.85,
+     2.95
+    ],
+    "name": "Australopithecus afarensis",
+    "pbdb_fad_lad": [
+     6.29,
+     3.09
+    ]
+   },
+   {
+    "fad_lad": [
+     6.1,
+     5.7
+    ],
+    "name": "Orrorin tugenensis",
+    "pbdb_fad_lad": null
    }
   ],
   "dated_clade": [
@@ -22241,14 +22485,166 @@
   ],
   "dated_fossil": [
    {
+    "age": 7.2,
+    "name": "Sahelanthropus tchadensis",
+    "sister": [
+     "Homo sapiens",
+     "Pan troglodytes"
+    ]
+   },
+   {
+    "age": 6.1,
+    "name": "Orrorin tugenensis",
+    "sister": [
+     "Homo sapiens",
+     "Homo heidelbergensis"
+    ]
+   },
+   {
+    "age": 5.8,
+    "name": "Ardipithecus kadabba",
+    "sister": [
+     "Homo sapiens",
+     "Homo heidelbergensis"
+    ]
+   },
+   {
+    "age": 4.5,
+    "name": "Australopithecus ramidus",
+    "sister": [
+     "Homo sapiens",
+     "Homo heidelbergensis"
+    ]
+   },
+   {
+    "age": 4.2,
+    "name": "Australopithecus anamensis",
+    "sister": [
+     "Homo sapiens",
+     "Homo heidelbergensis"
+    ]
+   },
+   {
+    "age": 3.85,
+    "name": "Australopithecus afarensis",
+    "sister": [
+     "Homo sapiens",
+     "Homo heidelbergensis"
+    ]
+   },
+   {
+    "age": 3.5,
+    "name": "Kenyanthropus platyops",
+    "sister": [
+     "Homo sapiens",
+     "Homo heidelbergensis"
+    ]
+   },
+   {
+    "age": 3.45,
+    "name": "Australopithecus deyiremeda",
+    "sister": [
+     "Homo sapiens",
+     "Homo heidelbergensis"
+    ]
+   },
+   {
+    "age": 3.0,
+    "name": "Australopithecus africanus",
+    "sister": [
+     "Homo sapiens",
+     "Homo heidelbergensis"
+    ]
+   },
+   {
+    "age": 2.7,
+    "name": "Paranthropus aethiopicus",
+    "sister": [
+     "Homo sapiens",
+     "Homo heidelbergensis"
+    ]
+   },
+   {
+    "age": 2.6,
+    "name": "Australopithecus garhi",
+    "sister": [
+     "Homo sapiens",
+     "Homo heidelbergensis"
+    ]
+   },
+   {
     "age": 2.58,
     "name": "Panthera zdanskyi",
     "sister": "Panthera tigris"
    },
    {
+    "age": 2.4,
+    "name": "Homo habilis",
+    "sister": [
+     "Homo sapiens",
+     "Homo heidelbergensis"
+    ]
+   },
+   {
+    "age": 2.3,
+    "name": "Paranthropus boisei",
+    "sister": "Paranthropus aethiopicus"
+   },
+   {
+    "age": 2.1,
+    "name": "Homo rudolfensis",
+    "sister": [
+     "Homo sapiens",
+     "Homo heidelbergensis"
+    ]
+   },
+   {
     "age": 2.0,
     "name": "Panthera gombaszoegensis",
     "sister": "Panthera onca"
+   },
+   {
+    "age": 2.0,
+    "name": "Homo erectus",
+    "sister": [
+     "Homo sapiens",
+     "Homo heidelbergensis"
+    ]
+   },
+   {
+    "age": 2.0,
+    "name": "Paranthropus robustus",
+    "sister": "Paranthropus aethiopicus"
+   },
+   {
+    "age": 1.98,
+    "name": "Australopithecus sediba",
+    "sister": "Australopithecus africanus"
+   },
+   {
+    "age": 1.85,
+    "name": "Homo georgicus",
+    "sister": "Homo erectus"
+   },
+   {
+    "age": 0.95,
+    "name": "Homo antecessor",
+    "sister": "Homo sapiens"
+   },
+   {
+    "age": 0.9,
+    "name": "Homo naledi",
+    "sister": "Homo sapiens"
+   },
+   {
+    "age": 0.7,
+    "name": "Homo floresiensis",
+    "sister": "Homo erectus"
+   },
+   {
+    "age": 0.6,
+    "name": "Homo neanderthalensis",
+    "sister": "Homo sapiens"
    },
    {
     "age": 0.5,
@@ -22320,17 +22716,18 @@
     "to": "stem of Metatheria"
    }
   ],
-  "version": 4
+  "version": 5
  },
  "pbdb_graft": {
   "excluded (overrides.toml)": 1,
+  "extinct synonym of a PBDB living species (grafted on its own)": 10,
   "grafted: MRCA of OT genus members": 137,
-  "grafted: OT genus": 784,
-  "grafted: PBDB genus (created)": 10094,
+  "grafted: OT genus": 788,
+  "grafted: PBDB genus (created)": 10098,
   "living, not in OT (skipped)": 377,
   "matched OT leaf (exact)": 2098,
-  "matched OT leaf (synonym)": 316,
-  "no occurrences/range (skipped)": 2467,
+  "matched OT leaf (synonym)": 306,
+  "no occurrences/range (skipped)": 2469,
   "not a plain binomial": 240,
   "status unknown (skipped)": 88
  },
@@ -22340,15 +22737,15 @@
   "order": 32
  },
  "pbdb_match": {
-  "grafted under OT family-level node": 4344,
-  "grafted under OT genus": 1038,
-  "grafted under OT order or higher": 3015,
+  "grafted under OT family-level node": 4346,
+  "grafted under OT genus": 1042,
+  "grafted under OT order or higher": 3017,
   "grafted unplaced (Mammalia root / incertae sedis)": 2618,
-  "matched_existing_OT_species": 2414,
-  "rate_family_or_better": 0.5805,
-  "rate_matched_species": 0.1798,
-  "rate_species_or_genus": 0.2571,
-  "species_used": 13429
+  "matched_existing_OT_species": 2404,
+  "rate_family_or_better": 0.5803,
+  "rate_matched_species": 0.179,
+  "rate_species_or_genus": 0.2566,
+  "species_used": 13427
  },
  "phylacine_ranges": {
   "current_vs_pantheria_dex": {
@@ -22400,12 +22797,12 @@
    "Herpestes edwardsii",
    "Lama guanicoe"
   ],
-  "leaves_with_map": 5630,
+  "leaves_with_map": 5631,
   "maps_on_more_than_one_leaf": 17,
-  "maps_used": 5613,
+  "maps_used": 5614,
   "range_maps": 5831
  },
- "pieces": 254105,
+ "pieces": 254118,
  "rangeloss": {
   "carried_by_genomic_record": 48,
   "declines": 579,
@@ -23150,13 +23547,13 @@
   },
   "Hominidae": {
    "alive": 8301443764.904216,
-   "ever": 3012691187463.2637,
+   "ever": 2943128853779.3877,
    "ever_range": [
-    47134837186.94531,
-    320300946045647.9
+    49195720667.68791,
+    302150836794440.3
    ],
    "extinct(gray)": false,
-   "ghost": 380170273250.1653,
+   "ghost": 380169958792.80963,
    "grade": "D",
    "t0_Ma": 14.805233333333334,
    "t1_Ma": 0.0
@@ -23176,13 +23573,13 @@
   },
   "Mammalia": {
    "alive": 93310803589.12282,
-   "ever": 7.902868688653919e+18,
+   "ever": 7.902868688653918e+18,
    "ever_range": [
-    1921018651212384.8,
-    2.825656468124067e+22
+    1921018755992463.5,
+    2.825656313754822e+22
    ],
    "extinct(gray)": 0.0,
-   "ghost": 7.492948008362629e+18,
+   "ghost": 7.49294686191152e+18,
    "grade": "D",
    "t0_Ma": 208.64140800000004,
    "t1_Ma": 0.0
@@ -23216,7 +23613,7 @@
  },
  "stem_rehoming": {
   "by_crown": {
-   "(unnamed clade)": 180,
+   "(unnamed clade)": 181,
    "Ammospermophilus": 2,
    "Ancodonta": 7,
    "Anomaluridae": 2,
@@ -23485,15 +23882,15 @@
    }
   ],
   "rule": "fossil-only subtrees older than the Upham 95% HPD upper bound of an enclosing crown node are moved to that crown's stem (inside a total-group node)",
-  "subtrees_moved": 765,
+  "subtrees_moved": 766,
   "total_groups": 115
  },
  "top_orders": {
   "by_alive": [
    {
     "alive": 50367382572.592575,
-    "ever": 1.2161730013436206e+18,
-    "ghost": 1.050184522574629e+18,
+    "ever": 1.2161724891186173e+18,
+    "ghost": 1.0501840103496257e+18,
     "ghost_share": 0.864,
     "name": "Chiroptera",
     "sampled": 1.659884787689916e+17,
@@ -23501,8 +23898,8 @@
    },
    {
     "alive": 21967195521.35113,
-    "ever": 1.7499402125725522e+18,
-    "ghost": 1.594184420178053e+18,
+    "ever": 1.7499396240180849e+18,
+    "ghost": 1.5941838316235858e+18,
     "ghost_share": 0.911,
     "name": "Rodentia",
     "sampled": 1.5575579239449907e+17,
@@ -23510,53 +23907,53 @@
    },
    {
     "alive": 5578573056.072559,
-    "ever": 4193790744561713.0,
-    "ghost": 3362349575211124.5,
+    "ever": 4193794813573928.0,
+    "ghost": 3362348002690297.5,
     "ghost_share": 0.802,
     "name": "Artiodactyla",
-    "sampled": 831441169350588.5,
+    "sampled": 831446810883630.5,
     "t0_Ma": 61.87
    },
    {
     "alive": 2002977595.2226315,
-    "ever": 1.2009666947247854e+16,
-    "ghost": 1.067774662804757e+16,
+    "ever": 1.201148147467592e+16,
+    "ghost": 1.0677742524113154e+16,
     "ghost_share": 0.889,
     "name": "Carnivora",
-    "sampled": 1331920319200284.0,
+    "sampled": 1333738950562766.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 1282257610.2534523,
-    "ever": 1.739028648937188e+17,
-    "ghost": 1.3411845106914779e+17,
+    "ever": 1.7390282024756586e+17,
+    "ghost": 1.3411840642299488e+17,
     "ghost_share": 0.771,
     "name": "Eulipotyphla",
-    "sampled": 3.978441382457099e+16,
+    "sampled": 3.978441382457098e+16,
     "t0_Ma": 75.11
    },
    {
     "alive": 1114427328.725424,
-    "ever": 7.618748315587808e+16,
-    "ghost": 6.0319806766265624e+16,
+    "ever": 7.618745953844254e+16,
+    "ghost": 6.03197831488301e+16,
     "ghost_share": 0.792,
     "name": "Didelphimorphia",
-    "sampled": 1.5867676389612456e+16,
+    "sampled": 1.5867676389612448e+16,
     "t0_Ma": 74.42
    },
    {
     "alive": 736462366.2633649,
-    "ever": 3.973334525277619e+16,
-    "ghost": 2.841474664001682e+16,
+    "ever": 3.973332940337762e+16,
+    "ghost": 2.8414730790618252e+16,
     "ghost_share": 0.715,
     "name": "Lagomorpha",
-    "sampled": 1.1318598612759372e+16,
+    "sampled": 1.1318598612759364e+16,
     "t0_Ma": 72.45
    },
    {
     "alive": 310814089.12791497,
-    "ever": 8030776845721196.0,
-    "ghost": 6079910474316183.0,
+    "ever": 8030772819547791.0,
+    "ghost": 6079906448142778.0,
     "ghost_share": 0.757,
     "name": "Diprotodontia",
     "sampled": 1950866371405013.0,
@@ -23564,17 +23961,17 @@
    },
    {
     "alive": 226037157.53161967,
-    "ever": 1.8433408810246468e+16,
-    "ghost": 1.1050439046389188e+16,
+    "ever": 1.8433404563077916e+16,
+    "ghost": 1.1050434799220638e+16,
     "ghost_share": 0.599,
     "name": "Macroscelidea",
-    "sampled": 7382969763857280.0,
+    "sampled": 7382969763857278.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 145006443.2142533,
-    "ever": 4121279188161837.5,
-    "ghost": 2911672966292491.5,
+    "ever": 4121277892708369.5,
+    "ghost": 2911671670839023.5,
     "ghost_share": 0.706,
     "name": "Pilosa (order in Deuterostomia)",
     "sampled": 1209606221869346.0,
@@ -23584,8 +23981,8 @@
   "by_ever": [
    {
     "alive": 21967195521.35113,
-    "ever": 1.7499402125725522e+18,
-    "ghost": 1.594184420178053e+18,
+    "ever": 1.7499396240180849e+18,
+    "ghost": 1.5941838316235858e+18,
     "ghost_share": 0.911,
     "name": "Rodentia",
     "sampled": 1.5575579239449907e+17,
@@ -23593,8 +23990,8 @@
    },
    {
     "alive": 50367382572.592575,
-    "ever": 1.2161730013436206e+18,
-    "ghost": 1.050184522574629e+18,
+    "ever": 1.2161724891186173e+18,
+    "ghost": 1.0501840103496257e+18,
     "ghost_share": 0.864,
     "name": "Chiroptera",
     "sampled": 1.659884787689916e+17,
@@ -23602,53 +23999,53 @@
    },
    {
     "alive": 1282257610.2534523,
-    "ever": 1.739028648937188e+17,
-    "ghost": 1.3411845106914779e+17,
+    "ever": 1.7390282024756586e+17,
+    "ghost": 1.3411840642299488e+17,
     "ghost_share": 0.771,
     "name": "Eulipotyphla",
-    "sampled": 3.978441382457099e+16,
+    "sampled": 3.978441382457098e+16,
     "t0_Ma": 75.11
    },
    {
     "alive": 1114427328.725424,
-    "ever": 7.618748315587808e+16,
-    "ghost": 6.0319806766265624e+16,
+    "ever": 7.618745953844254e+16,
+    "ghost": 6.03197831488301e+16,
     "ghost_share": 0.792,
     "name": "Didelphimorphia",
-    "sampled": 1.5867676389612456e+16,
+    "sampled": 1.5867676389612448e+16,
     "t0_Ma": 74.42
    },
    {
     "alive": 736462366.2633649,
-    "ever": 3.973334525277619e+16,
-    "ghost": 2.841474664001682e+16,
+    "ever": 3.973332940337762e+16,
+    "ghost": 2.8414730790618252e+16,
     "ghost_share": 0.715,
     "name": "Lagomorpha",
-    "sampled": 1.1318598612759372e+16,
+    "sampled": 1.1318598612759364e+16,
     "t0_Ma": 72.45
    },
    {
     "alive": 226037157.53161967,
-    "ever": 1.8433408810246468e+16,
-    "ghost": 1.1050439046389188e+16,
+    "ever": 1.8433404563077916e+16,
+    "ghost": 1.1050434799220638e+16,
     "ghost_share": 0.599,
     "name": "Macroscelidea",
-    "sampled": 7382969763857280.0,
+    "sampled": 7382969763857278.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 2002977595.2226315,
-    "ever": 1.2009666947247854e+16,
-    "ghost": 1.067774662804757e+16,
+    "ever": 1.201148147467592e+16,
+    "ghost": 1.0677742524113154e+16,
     "ghost_share": 0.889,
     "name": "Carnivora",
-    "sampled": 1331920319200284.0,
+    "sampled": 1333738950562766.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 310814089.12791497,
-    "ever": 8030776845721196.0,
-    "ghost": 6079910474316183.0,
+    "ever": 8030772819547791.0,
+    "ghost": 6079906448142778.0,
     "ghost_share": 0.757,
     "name": "Diprotodontia",
     "sampled": 1950866371405013.0,
@@ -23656,17 +24053,17 @@
    },
    {
     "alive": 76858606.79902251,
-    "ever": 5404804480027010.0,
-    "ghost": 4514760061698940.0,
+    "ever": 5404824818602460.0,
+    "ghost": 4514757872046975.0,
     "ghost_share": 0.835,
     "name": "Dasyuromorphia",
-    "sampled": 890044418328070.0,
+    "sampled": 890066946555485.0,
     "t0_Ma": 58.64
    },
    {
     "alive": 101350585.2545455,
-    "ever": 4310055250355789.0,
-    "ghost": 2622156743550937.5,
+    "ever": 4310053769014279.0,
+    "ghost": 2622155262209427.5,
     "ghost_share": 0.608,
     "name": "Scandentia",
     "sampled": 1687898506804851.5,
@@ -23676,8 +24073,8 @@
   "by_sampled_ever": [
    {
     "alive": 50367382572.592575,
-    "ever": 1.2161730013436206e+18,
-    "ghost": 1.050184522574629e+18,
+    "ever": 1.2161724891186173e+18,
+    "ghost": 1.0501840103496257e+18,
     "ghost_share": 0.864,
     "name": "Chiroptera",
     "sampled": 1.659884787689916e+17,
@@ -23685,8 +24082,8 @@
    },
    {
     "alive": 21967195521.35113,
-    "ever": 1.7499402125725522e+18,
-    "ghost": 1.594184420178053e+18,
+    "ever": 1.7499396240180849e+18,
+    "ghost": 1.5941838316235858e+18,
     "ghost_share": 0.911,
     "name": "Rodentia",
     "sampled": 1.5575579239449907e+17,
@@ -23694,44 +24091,44 @@
    },
    {
     "alive": 1282257610.2534523,
-    "ever": 1.739028648937188e+17,
-    "ghost": 1.3411845106914779e+17,
+    "ever": 1.7390282024756586e+17,
+    "ghost": 1.3411840642299488e+17,
     "ghost_share": 0.771,
     "name": "Eulipotyphla",
-    "sampled": 3.978441382457099e+16,
+    "sampled": 3.978441382457098e+16,
     "t0_Ma": 75.11
    },
    {
     "alive": 1114427328.725424,
-    "ever": 7.618748315587808e+16,
-    "ghost": 6.0319806766265624e+16,
+    "ever": 7.618745953844254e+16,
+    "ghost": 6.03197831488301e+16,
     "ghost_share": 0.792,
     "name": "Didelphimorphia",
-    "sampled": 1.5867676389612456e+16,
+    "sampled": 1.5867676389612448e+16,
     "t0_Ma": 74.42
    },
    {
     "alive": 736462366.2633649,
-    "ever": 3.973334525277619e+16,
-    "ghost": 2.841474664001682e+16,
+    "ever": 3.973332940337762e+16,
+    "ghost": 2.8414730790618252e+16,
     "ghost_share": 0.715,
     "name": "Lagomorpha",
-    "sampled": 1.1318598612759372e+16,
+    "sampled": 1.1318598612759364e+16,
     "t0_Ma": 72.45
    },
    {
     "alive": 226037157.53161967,
-    "ever": 1.8433408810246468e+16,
-    "ghost": 1.1050439046389188e+16,
+    "ever": 1.8433404563077916e+16,
+    "ghost": 1.1050434799220638e+16,
     "ghost_share": 0.599,
     "name": "Macroscelidea",
-    "sampled": 7382969763857280.0,
+    "sampled": 7382969763857278.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 310814089.12791497,
-    "ever": 8030776845721196.0,
-    "ghost": 6079910474316183.0,
+    "ever": 8030772819547791.0,
+    "ghost": 6079906448142778.0,
     "ghost_share": 0.757,
     "name": "Diprotodontia",
     "sampled": 1950866371405013.0,
@@ -23739,8 +24136,8 @@
    },
    {
     "alive": 101350585.2545455,
-    "ever": 4310055250355789.0,
-    "ghost": 2622156743550937.5,
+    "ever": 4310053769014279.0,
+    "ghost": 2622155262209427.5,
     "ghost_share": 0.608,
     "name": "Scandentia",
     "sampled": 1687898506804851.5,
@@ -23748,17 +24145,17 @@
    },
    {
     "alive": 2002977595.2226315,
-    "ever": 1.2009666947247854e+16,
-    "ghost": 1.067774662804757e+16,
+    "ever": 1.201148147467592e+16,
+    "ghost": 1.0677742524113154e+16,
     "ghost_share": 0.889,
     "name": "Carnivora",
-    "sampled": 1331920319200284.0,
+    "sampled": 1333738950562766.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 145006443.2142533,
-    "ever": 4121279188161837.5,
-    "ghost": 2911672966292491.5,
+    "ever": 4121277892708369.5,
+    "ghost": 2911671670839023.5,
     "ghost_share": 0.706,
     "name": "Pilosa (order in Deuterostomia)",
     "sampled": 1209606221869346.0,
