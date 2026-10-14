@@ -51,6 +51,7 @@ export const TAXON_EN: Record<string, string> = {
   Cercopithecinae: 'Cheek-pouch monkeys',
   Callitrichinae: 'Marmosets & tamarins',
   Homininae: 'African great apes',
+  Hominini: 'Hominins',
   Homo: 'Humans',
   Pan: 'Chimpanzees',
   Gorilla: 'Gorillas',
@@ -227,6 +228,18 @@ export function bracketRows(a: ArrayLike<number>, b: ArrayLike<number>, parent: 
   return row;
 }
 
+/**
+ * What the stack shows at a level (ToLaD#288): its groups' brackets (the clades one level down, one row), then the
+ * level itself and the familiar (English-named) levels up from it, innermost first, at most STACK_ROWS rows in all;
+ * anything above them is one leading "…" (a tap: one level up). Without it, every clade (the whole nesting).
+ */
+export interface StackAt {
+  groups: readonly FanNode[];
+  up: readonly FanNode[];
+}
+/** Rows the stack shows at a level (ToLaD#288), its "…" over them. */
+export const STACK_ROWS = 3;
+
 /** The view's side of it: what the stack needs from the camera. */
 export interface BracketCam {
   toScreen(x: number, y: number): [number, number];
@@ -282,6 +295,11 @@ export class Brackets {
    */
   hide: ((v: FanNode) => boolean) | null = null;
   hideKey = '';
+  /** The "…" row over the stack (ToLaD#288): its row, or -1 for none; the pinned rows' likewise (pinMore). */
+  moreRow = -1;
+  pinMore = false;
+  private atKey: StackAt | null = null;
+  private atRows = new Int16Array(0);
 
   /** The clades' screen spans at "now": each species' room where its column is at "now" (an extinct one's: at its tip). */
   spans(c: BracketCam, fan: Fan): [Float64Array, Float64Array] {
@@ -340,7 +358,7 @@ export class Brackets {
    * `top` the labels' top line (under the buttons). The stack stands over the species' pills: its foot PILL_ROOM px
    * above "now", or, with less room, its top on the top line (a longer pill then reaches up over its lines).
    */
-  layout(c: BracketCam, fan: Fan, nowS: number, axisX: number, fit: number, measure: (font: string, text: string) => number, top = 0): Placed[] {
+  layout(c: BracketCam, fan: Fan, nowS: number, axisX: number, fit: number, measure: (font: string, text: string) => number, top = 0, at: StackAt | null = null): Placed[] {
     const [a, b] = this.spans(c, fan);
     this.sa = a;
     this.sb = b;
@@ -351,6 +369,32 @@ export class Brackets {
       this.rowKey = key;
       this.rows = bracketRows(a, b, parent);
     }
+    this.moreRow = -1;
+    let rowsNow = this.rows;
+    if (at) {
+      // (At a level, ToLaD#288: its groups' row if any is wide enough to show, then the level and the levels up.)
+      const ix = new Map(this.list.map((q, i) => [q.v, i]));
+      if (at !== this.atKey || this.atRows.length !== a.length) {
+        this.atKey = at;
+        this.atRows = new Int16Array(a.length);
+      }
+      const r = this.atRows.fill(-1);
+      let row = 0;
+      for (const v of at.groups) {
+        const i = ix.get(v);
+        if (i !== undefined && b[i] - a[i] >= TICK_MIN && b[i] > axisX && a[i] < c.w) [r[i], row] = [0, 1];
+      }
+      for (const v of at.up) {
+        const i = ix.get(v);
+        if (i === undefined || this.hide?.(v)) continue;
+        if (row >= STACK_ROWS) {
+          this.moreRow = row;
+          break;
+        }
+        r[i] = row++;
+      }
+      rowsNow = r;
+    }
     this.fit = fit;
     this.x0 = axisX;
     this.w = c.w;
@@ -360,16 +404,22 @@ export class Brackets {
       this.probe = probe;
       this.widthCache.clear();
     }
-    this.placed = fit > 0 ? layoutBrackets(a, b, parent, (i) => this.widths(i, measure), axisX, c.w, this.rows) : [];
+    this.placed = fit > 0 ? layoutBrackets(a, b, parent, (i) => this.widths(i, measure), axisX, c.w, rowsNow) : [];
     // Each row as tall as what it shows here: a name ROW_H, ticks alone TICK_ROW_H, nothing none.
     let rows = 0;
     for (const p of this.placed) rows = Math.max(rows, p.row + 1);
+    if (!this.placed.length || fit <= 0) this.moreRow = -1;
+    if (this.moreRow >= 0) {
+      this.moreRow = Math.min(this.moreRow, rows);
+      rows = this.moreRow + 1;
+    }
     if (this.rowH.length < rows + 1) {
       this.rowH = new Float32Array(rows + 1);
       this.rowBase = new Float32Array(rows + 1);
     }
     this.rowH.fill(0);
     for (const p of this.placed) this.rowH[p.row] = Math.max(this.rowH[p.row], p.form === 'tick' ? TICK_ROW_H : ROW_H);
+    if (this.moreRow >= 0) this.rowH[this.moreRow] = ROW_H;
     for (let r = 1; r <= rows; r++) this.rowBase[r] = this.rowBase[r - 1] + this.rowH[r - 1];
     const height = rows ? this.rowTop(rows - 1) : 0;
     this.stack = [top, height, rows, fit];
@@ -425,10 +475,11 @@ export class Brackets {
    * right of the time axis), whose branch started below the screen's top (some of their time is on screen: zoomed
    * into a bear's past older than the bears, the bears are not pinned, the dog-like carnivores are).
    */
-  pin(top: number, yTop: number, measure: (font: string, text: string) => number, at: FanNode | null = null): Pin[] {
+  pin(top: number, yTop: number, measure: (font: string, text: string) => number, at: FanNode | null = null, keep: ((v: FanNode) => boolean) | null = null): Pin[] {
     this.pinA = 1 - this.fit;
     this.pinTop = top;
     this.pins = [];
+    this.pinMore = false;
     if (this.pinA <= 0) return this.pins;
     const cx = (this.x0 + this.w) / 2;
     const room = this.w - this.x0 - 2 * LABEL_PAD;
@@ -436,6 +487,8 @@ export class Brackets {
     for (let u = at; u; u = u.parent) line.add(u);
     this.list.forEach((q, i) => {
       if (!(at ? line.has(q.v) : this.sa[i] <= cx && cx < this.sb[i]) || !(q.v.yBot > yTop) || this.hide?.(q.v)) return;
+      // (Only the familiar ones, ToLaD#288: no row for a Latin-only clade between them.)
+      if (keep && !keep(q.v)) return;
       const [wf, wn, ws] = this.widths(i, measure);
       const form: Form = wf <= room ? 'full' : wn <= room ? 'name' : 'short';
       const lw = form === 'full' ? wf : form === 'name' ? wn : ws || wn;
@@ -445,13 +498,19 @@ export class Brackets {
       const lx = Math.min(Math.max((va + vb) / 2, this.x0 + LABEL_PAD + lw / 2), this.w - LABEL_PAD - lw / 2);
       this.pins.push({ i, a: this.sa[i] + GAP / 2, b: this.sb[i] - GAP / 2, row: 0, form, lx, lw });
     });
-    this.pins.forEach((p, k) => (p.row = k));
+    // (At most STACK_ROWS, the innermost; a "…" row over them for the rest, ToLaD#288.)
+    if (keep && this.pins.length > STACK_ROWS) {
+      this.pins = this.pins.slice(-STACK_ROWS);
+      this.pinMore = true;
+    }
+    const k0 = this.pinMore ? 1 : 0;
+    this.pins.forEach((p, k) => (p.row = k + k0));
     return this.pins;
   }
 
   /** The pinned rows' height (px below pinTop, the band's own backdrop included), 0 without any. */
   pinH(): number {
-    return this.pins.length ? this.pins.length * ROW_H + PIN_PAD : 0;
+    return this.pins.length ? (this.pins.length + (this.pinMore ? 1 : 0)) * ROW_H + PIN_PAD : 0;
   }
 
   /** Pinned row k's line (screen y): the order's on top. */
@@ -474,6 +533,7 @@ export class Brackets {
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'left';
     for (const p of this.pins) this.drawOne(ctx, p, Math.round(this.pinY(p.row)) + 0.5, p.lx, p.form, 4, ink, ink2);
+    if (this.pinMore) this.drawMore(ctx, this.pinY(0), ink2);
     ctx.restore();
   }
 
@@ -486,6 +546,20 @@ export class Brackets {
       if (x >= Math.min(p.a, p.lx - p.lw / 2) - 3 && x <= Math.max(p.b, p.lx + p.lw / 2) + 3) return this.list[p.i];
     }
     return null;
+  }
+
+  /** The "…" (ToLaD#288), on line y at the room's left. */
+  private drawMore(ctx: CanvasRenderingContext2D, y: number, ink2: string): void {
+    ctx.font = this.nameFont;
+    ctx.fillStyle = ink2;
+    ctx.fillText('…', this.x0 + LABEL_PAD, Math.round(y) + 0.5);
+  }
+
+  /** Whether screen (x, y) is on the "…" row, the stack's or the pinned rows' (ToLaD#288): a tap there goes one level up. */
+  moreHit(x: number, y: number): boolean {
+    if (x < this.x0 || x > this.x0 + 60) return false;
+    if (this.pinMore && this.pinA >= 0.5) return Math.abs(y - this.pinY(0)) <= ROW_H / 2;
+    return this.moreRow >= 0 && this.fit >= 0.5 && Math.abs(y - this.rowY(this.moreRow)) <= ROW_H / 2;
   }
 
   /** Whether clade node `v`'s bracket carries its name this frame. */
@@ -535,6 +609,7 @@ export class Brackets {
       // (End ticks down to the row under it: shorter in a row of ticks.)
       this.drawOne(ctx, p, y, lx, form, (this.rowH[p.row] ?? ROW_H) >= ROW_H ? 4 : 3, ink, ink2);
     }
+    if (this.moreRow >= 0) this.drawMore(ctx, this.rowY(this.moreRow), ink2);
     ctx.restore();
   }
 

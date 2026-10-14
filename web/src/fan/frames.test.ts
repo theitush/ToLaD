@@ -5,6 +5,8 @@ import { loadMammalsFromFiles } from './mammals-node';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, type Split } from './splits';
 import { levelUp, FanView, groupCentre, groupFace, isLevel, levelName, nextLevels, type Level } from './view';
 import type { Camera } from './camera';
+import type { FanNode } from './layout';
+import { latinOf } from './brackets';
 import { wikiOf } from './wiki';
 
 function stubView(clade: CladeRec = CARNIVORA, tree: Split = CARNIVORA_TREE, folds = true): FanView {
@@ -72,6 +74,13 @@ function frameFaults(v: FanView, lv: Level): string[] {
   const br = (v as unknown as { brackets: { fit: number; baseS: number; placed: unknown[] } | null }).brackets;
   if (br && br.placed.length && br.fit < 1) bad.push(`${at}: the stack pinned over "now" (now at ${nowS.toFixed(0)})`);
   const foot = br && br.placed.length ? br.baseS : top;
+  // The level's whole life on screen (ToLaD#288): its start (its fork; a species', its split) at the foot, over the scale bar.
+  const fork = v.toScreen(0, lv.b ? lv.b.splitY : lv.v.parent ? lv.v.yBot : v.fan.trunkBottom.y)[1];
+  if (lv.v?.parent && Math.abs(fork - (v.h - 104)) > 2) bad.push(`${at}: its start at ${fork.toFixed(0)} px, not at the foot (${v.h - 104})`);
+  // At most three rows of brackets, a "…" over them (ToLaD#288).
+  const rows = new Set((br?.placed ?? []).map((p) => (p as { row: number }).row));
+  const more = (br as unknown as { moreRow: number } | null)?.moreRow ?? -1;
+  if (rows.size > 3 || [...rows].some((r) => r > 2) || more > 3) bad.push(`${at}: ${rows.size} bracket rows, "…" at ${more}`);
   if (lv.b) return bad;
   let n = 0;
   let shown = 0;
@@ -90,6 +99,11 @@ function frameFaults(v: FanView, lv: Level): string[] {
   return bad;
 }
 const log: string[] = [];
+/** Whether clade u is the great apes or a level inside them (ToLaD#289: Great apes → Hominins → Homo). */
+function inGreatApes(v: FanView, u: FanNode): boolean {
+  for (let p: FanNode | null = u; p; p = levelUp(v.fan, p)) if (levelName(p) === 'Great apes') return true;
+  return false;
+}
 
 const FANS = [
   ['carnivores (folded)', () => stubView()],
@@ -103,7 +117,7 @@ describe("every level's frame: now near the top, every next-level group's pictur
       if (name === "mammals") await loadMammalsFromFiles();
       const v = mk();
       const bad: string[] = [];
-      for (const u of v.fan.nodes) if (isLevel(v.fan, u) && u.strands.length > 1 && (name !== 'mammals' || levelUp(v.fan, u) === v.fan.root || levelName(u) === 'Primates' || (levelUp(v.fan, u) && levelName(levelUp(v.fan, u)!) === 'Primates'))) {
+      for (const u of v.fan.nodes) if (isLevel(v.fan, u) && u.strands.length > 1 && (name !== 'mammals' || levelUp(v.fan, u) === v.fan.root || levelName(u) === 'Primates' || (levelUp(v.fan, u) && levelName(levelUp(v.fan, u)!) === 'Primates') || inGreatApes(v, u))) {
         land(v, { v: u });
         bad.push(...frameFaults(v, { v: u }));
       }
@@ -198,6 +212,28 @@ describe('a chip with a "+x" is one tap target (ToLaD#287): its name lands where
       });
     }
     expect(taps).toBeGreaterThan(0);
+    expect(bad).toEqual([]);
+  }, 400000);
+});
+
+describe('the hominins are one group (ToLaD#289)', () => {
+  it('Great apes → Hominins → Homo → a species, each a level; the stack at most three rows and a "…"', async () => {
+    await loadMammalsFromFiles();
+    const v = stubView(mammaliaClade(), mammaliaTree(), true);
+    const by = (latin: string) => v.fan.nodes.find((u) => latinOf(u.split) === latin)!;
+    const [apes, hominins, homo] = [by('Hominidae'), by('Hominini'), by('Homo')];
+    expect(hominins && homo).toBeTruthy();
+    expect([isLevel(v.fan, hominins), isLevel(v.fan, homo)]).toEqual([true, true]);
+    expect(levelUp(v.fan, homo)).toBe(hominins);
+    expect(levelName(hominins)).toBe('Hominins');
+    expect(nextLevels(v.fan, apes).some((g) => g.v === hominins)).toBe(true);
+    expect(nextLevels(v.fan, hominins).some((g) => g.v === homo)).toBe(true);
+    expect(homo.strands.some((b) => b.sp.sci === 'Homo sapiens') && !hominins.strands.some((b) => b.sp.sci.startsWith('Pan '))).toBe(true);
+    const bad: string[] = [];
+    for (const lv of [{ v: apes }, { v: hominins }, { v: homo }]) {
+      land(v, lv);
+      bad.push(...frameFaults(v, lv));
+    }
     expect(bad).toEqual([]);
   }, 400000);
 });

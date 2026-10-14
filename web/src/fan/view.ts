@@ -18,8 +18,8 @@ import { Steady, wantSteady } from './steady';
 import { COLUMN_DIM, columnSpans, EVENT_TINT, eventAt, eventSpans, type EventSpan } from './colstyle';
 import { drawTwigs, kLogAt, laneDim, LINEAGE, LIVING, TEX_HAIR_PX, TWIG_GRAY, TwigModel, type IndInfo, type TwigStats } from './twigs';
 import type { MeshBatch, RectBatch } from './meshgl';
-import { familyLabel, FELIDAE_TREE, ORDER_TAXA, taxonKey, type Split } from './splits';
-import { bandDepth, Brackets, cladeCamera, foldedFrame, latinOf, rankOf, ROW_H, TAP_FILL, TAXON_EN } from './brackets';
+import { FAMILY_EN, familyLabel, FELIDAE_TREE, ORDER_EN, ORDER_TAXA, taxonKey, type Split } from './splits';
+import { Brackets, cladeCamera, foldedFrame, latinOf, rankOf, TAP_FILL, TAXON_EN, type StackAt } from './brackets';
 import { axisInset, drawWorldOver, drawWorldUnder, worldFlags, type Box } from './world';
 
 export type { IndInfo } from './twigs';
@@ -91,8 +91,10 @@ const GLOW_W = 6;
 /** The glow fades out across a lean: gone where the lane runs √(1 + s²) - 1 = GLOW_LEAN off straight down (s ≈ 0.75 px per px). */
 const GLOW_LEAN = 0.25;
 
-/** Rows of the clades' brackets (ToLaD#193) a framed view keeps room for above "now". */
-const BAND_ROWS = 5;
+/** camera.frame's fork: this many px up from the screen's foot. */
+const FRAME_BOTTOM = 150;
+/** A level's start (its fork, a species' split) stands this many px up from the screen's foot, just over the scale bar (ToLaD#288). */
+const FORK_PX = LABEL_BOTTOM_PX;
 /** Room (px) a frame keeps between the brackets' stack and "now" for the level's pictures standing on it (ToLaD#274). */
 const NOW_ROOM = PIC_D + 8;
 
@@ -594,6 +596,44 @@ export function nextLevels(fan: Fan, v: FanNode): Level[] {
 export function levelUp(fan: Fan, v: FanNode | null, self = false): FanNode | null {
   for (let p = self ? v : (v?.parent ?? null); p; p = p.parent) if (isLevel(fan, p)) return p;
   return null;
+}
+
+/** Whether clade v has a familiar name (ToLaD#288): an English one (TAXON_EN, ORDER_EN, FAMILY_EN), or is the root. */
+export function familiar(v: FanNode): boolean {
+  const latin = latinOf(v.split);
+  return !v.parent || !!(TAXON_EN[latin] ?? ORDER_EN[latin] ?? FAMILY_EN[latin]);
+}
+
+/**
+ * What the brackets' stack shows at level clade v (ToLaD#288): its groups one level down (nextLevels' clades), then v
+ * and every familiar level up from it (levelUp; a Latin-only one, as Theria, gets no row), innermost first. Kept per fan.
+ */
+const stackCache = new WeakMap<Fan, Map<FanNode, StackAt>>();
+export function stackAt(fan: Fan, v: FanNode): StackAt {
+  let m = stackCache.get(fan);
+  if (!m) stackCache.set(fan, (m = new Map()));
+  let out = m.get(v);
+  if (!out) {
+    const groups = nextLevels(fan, v).flatMap((g) => (g.v ? [g.v] : []));
+    const up = [v];
+    for (let u = levelUp(fan, v); u; u = levelUp(fan, u)) if (familiar(u)) up.push(u);
+    m.set(v, (out = { groups, up }));
+  }
+  return out;
+}
+
+/** A clade's number for cache keys (FanNode carries none). */
+const nodeIds = new WeakMap<FanNode, number>();
+let nodeN = 0;
+function nodeId(v: FanNode): number {
+  let k = nodeIds.get(v);
+  if (k === undefined) nodeIds.set(v, (k = nodeN++));
+  return k;
+}
+
+/** A level's clade (ToLaD#288): itself, a species' the level it sits in, the root's last. */
+export function levelClade(fan: Fan, lv: Level): FanNode {
+  return lv.v ?? levelUp(fan, lv.b.node, true) ?? fan.root;
 }
 
 /** Whether level a holds level x (itself or inside it). */
@@ -1354,7 +1394,7 @@ export class FanView implements InputHandlers {
 
   /** The whole fan: "now" near the top, the stem entering from the bottom edge. */
   homeCamera(): Camera {
-    return this.withBand(this.camera.home());
+    return this.withBand(this.camera.home(), this.fan.root);
   }
 
   /**
@@ -1379,9 +1419,10 @@ export class FanView implements InputHandlers {
     const lod = this.lodNow();
     br.hide = lod ? (v) => lod.hidden(v) : null;
     br.hideKey = lod ? String(lod.gen) : '';
-    br.layout(this.camera, this.fan, nowS, LABEL_AXIS_X, fit, measure, top);
-    // The groups the view is inside, pinned under the buttons as the stack scrolls off (ToLaD#233).
-    br.pin(top, this.camera.toWorld(0, 0)[1], measure, br.fit < 1 ? (this.centreLine()?.node ?? null) : null);
+    // (The stack at the level the view is at, ToLaD#288: its groups, it and the familiar levels up, "…" over three rows.)
+    br.layout(this.camera, this.fan, nowS, LABEL_AXIS_X, fit, measure, top, stackAt(this.fan, levelClade(this.fan, this.levelNow())));
+    // The groups the view is inside, pinned under the buttons as the stack scrolls off (ToLaD#233): the familiar levels.
+    br.pin(top, this.camera.toWorld(0, 0)[1], measure, br.fit < 1 ? (this.centreLine()?.node ?? null) : null, (v) => isLevel(this.fan, v) && familiar(v));
     return br;
   }
 
@@ -1407,18 +1448,17 @@ export class FanView implements InputHandlers {
   }
 
   /**
-   * A frame with room above "now" for the brackets: "now" lowered by BAND_ROWS rows of them, or further, under the whole
-   * stack this frame lays out with room for the level's pictures under it (ToLaD#274: a deep level's stack, as the
-   * primates' among the mammals, no longer covers "now" and its pictures); the fork where it was.
+   * A level's frame spans the clade's life (ToLaD#288): "now" under the brackets' stack this frame lays out with
+   * room for the level's pictures under it (nowUnder, ToLaD#274); its start (the fork
+   * camera.frame puts FRAME_BOTTOM px up from the screen's foot) down at FORK_PX from the foot, over the scale bar.
+   * Only the time is moved: the width (and with it the stack) stays as framed.
    */
-  private withBand(cam: Camera): Camera {
-    if (!this.brackets) return cam;
+  private withBand(cam: Camera, lv: FanNode | null = null): Camera {
     const sn = this.h / 2 + (this.yNow - cam.cy) * cam.sy;
-    const want = Math.max(sn + Math.min(BAND_ROWS, bandDepth(this.fan)) * ROW_H, this.nowUnder(cam));
-    const extra = want - sn;
-    const sb = this.h - 150;
-    const sy = cam.sy * Math.max(0.5, (sb - sn - extra) / Math.max(1, sb - sn));
-    return { ...cam, sy, ty: sy, cy: this.yNow + (this.h / 2 - sn - extra) / sy };
+    const yFork = cam.cy + (this.h - FRAME_BOTTOM - this.h / 2) / cam.sy;
+    const nowS = this.brackets ? Math.max(this.nowUnder(cam, lv), this.labelTop() + NOW_ROOM) : sn;
+    const sy = Math.max(1e-300, this.h - FORK_PX - nowS) / Math.max(1e-300, yFork - this.yNow);
+    return { ...cam, sy, ty: sy, cy: this.yNow + (this.h / 2 - nowS) / sy };
   }
 
   /**
@@ -1426,11 +1466,12 @@ export class FanView implements InputHandlers {
    * whole stack as that frame lays it out (its rows at that zoom, the fold as it stands), and NOW_ROOM for the
    * level's pictures standing on "now".
    */
-  private nowUnder(cam: Camera): number {
+  private nowUnder(cam: Camera, lv: FanNode | null = null): number {
     const br = this.probeBr;
     if (!br) return 0;
-    // (Kept per zoom (a sixteenth of a doubling) and centre (8 px): a folded frame's bisection asks ~40 times, ToLaD#255.)
-    const key = `${this.w}x${this.h}:${Math.round(Math.log2(cam.sx) * 16)}:${Math.round((cam.cx * cam.sx) / 8)}`;
+    const at = lv ?? this.fan.root;
+    // (Kept per zoom (a sixteenth of a doubling), centre (8 px) and level: a folded frame's bisection asks ~40 times, ToLaD#255.)
+    const key = `${this.w}x${this.h}:${Math.round(Math.log2(cam.sx) * 16)}:${Math.round((cam.cx * cam.sx) / 8)}:${nodeId(at)}`;
     if (this.nowUnderFan !== this.fan || this.nowUnderAt.size > 2000) [this.nowUnderFan, this.nowUnderAt] = [this.fan, new Map()];
     const hit = this.nowUnderAt.get(key);
     if (hit !== undefined) return hit;
@@ -1455,8 +1496,8 @@ export class FanView implements InputHandlers {
       this.ctx.restore();
       return w;
     };
-    const placed = br.layout(c, this.fan, this.h, LABEL_AXIS_X, 1, measure, top);
-    let rows = 0;
+    const placed = br.layout(c, this.fan, this.h, LABEL_AXIS_X, 1, measure, top, stackAt(this.fan, at));
+    let rows = br.moreRow + 1;
     for (const p of placed) rows = Math.max(rows, p.row + 1);
     const y = top + (rows ? br.rowTop(rows - 1) : 0) + NOW_ROOM;
     this.nowUnderAt.set(key, y);
@@ -1486,7 +1527,7 @@ export class FanView implements InputHandlers {
             return [m - h, m + h];
           }
         : familySpan;
-    return cladeCamera(this.camera, this.fan, v, span, (cam) => this.withBand(cam));
+    return cladeCamera(this.camera, this.fan, v, span, (cam) => this.withBand(cam, v));
   }
 
   /**
@@ -1558,7 +1599,7 @@ export class FanView implements InputHandlers {
       }
       return s;
     };
-    return cladeCamera(this.camera, this.fan, { ...v, yBot: v.y }, now, (cam) => this.withBand(cam));
+    return cladeCamera(this.camera, this.fan, { ...v, yBot: v.y }, now, (cam) => this.withBand(cam, v));
   }
 
   flyToGroup(bs: readonly FanBranch[]): void {
@@ -1627,7 +1668,7 @@ export class FanView implements InputHandlers {
     // is framed where it stood there, ToLaD#247).
     return foldedFrame(this.fan, this.w, () => {
       const [a, b] = familySpan(v);
-      return this.withBand(this.camera.frame(a, b, v.y, true));
+      return this.withBand(this.camera.frame(a, b, v.y, true), v);
     });
   }
 
@@ -1790,9 +1831,10 @@ export class FanView implements InputHandlers {
    */
   speciesCamera(b: FanBranch): Camera {
     const h = this.homeCamera();
-    // (Its tip under the stack its frame lays out, room for its picture between, ToLaD#274: a provisional frame's.)
-    const tipPx = Math.max(this.labelTop() + 150, 0.2 * this.h, this.nowUnder({ ...h, cx: b.cx, sx: Math.max(h.sx, (0.5 * this.w) / Math.max(1e-300, b.width)) }));
-    const band = Math.max(80, 0.52 * this.h - tipPx);
+    // (Its tip under the stack its frame lays out at its level, room for its picture between, ToLaD#274, #288: a
+    // provisional frame's; its own split down at FORK_PX from the foot: its whole life on screen.)
+    const tipPx = Math.max(this.labelTop() + NOW_ROOM, this.nowUnder({ ...h, cx: b.cx, sx: Math.max(h.sx, (0.5 * this.w) / Math.max(1e-300, b.width)) }, levelUp(this.fan, b.node, true)));
+    const band = Math.max(80, this.h - FORK_PX - tipPx);
     const sy = Math.max(h.sy, band / Math.max(1e-300, b.splitY - b.tipY));
     const cyAt = (s: number) => b.tipY + (this.h / 2 - tipPx) / s;
     const sx = Math.min(Math.max(h.sx, (0.5 * this.w) / Math.max(1e-300, b.width)), Math.max(h.sx, this.camera.sxCap(b.cx, b.tipY)));
@@ -2047,7 +2089,7 @@ export class FanView implements InputHandlers {
 
   /** What a tap at (x, y) does: flies somewhere, opens a card, or neither (as tap() decides it). */
   private tapKind(x: number, y: number): 'fly' | 'card' | null {
-    if (this.brackets?.pinHit(x, y) || this.plusAt(x, y) || this.pillAt(x, y) || this.picAt(x, y) || this.brackets?.hit(x, y)) return 'fly';
+    if (this.brackets?.moreHit(x, y) || this.brackets?.pinHit(x, y) || this.plusAt(x, y) || this.pillAt(x, y) || this.picAt(x, y) || this.brackets?.hit(x, y)) return 'fly';
     return this.eventLabelAt(x, y) || this.hitBranch(x, y) ? 'card' : null;
   }
 
@@ -2088,7 +2130,11 @@ export class FanView implements InputHandlers {
 
   tap(x: number, y: number): void {
     // One level deeper (ToLaD#258), towards what was tapped: a pinned group (ToLaD#233), a species' or group's pill
-    // (ToLaD#230, #212) or picture (ToLaD#193), a clade's bracket.
+    // (ToLaD#230, #212) or picture (ToLaD#193), a clade's bracket. The stack's "…": one level up (ToLaD#288).
+    if (this.brackets?.moreHit(x, y)) {
+      this.doubleTap(x, y);
+      return;
+    }
     const pinned = this.brackets?.pinHit(x, y);
     // A "+x" (ToLaD#262): the smallest frame holding the groups whose names it stands for.
     const plus = pinned ? null : this.plusAt(x, y);
