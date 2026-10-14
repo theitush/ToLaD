@@ -118,6 +118,44 @@ export function wantNames(): NameMode {
   }
   return 'beside';
 }
+/** While the view moves, the labels and brackets are laid out again at most this often (ms) and every this many frames (ToLaD#255); carried with the camera between. */
+const LABEL_MS = 150;
+const LABEL_FRAMES = 3;
+/** `?carry=0`: laid out every frame, as before ToLaD#255 (to compare). */
+const labelCarry = typeof location === 'undefined' || new URLSearchParams(location.search).get('carry') !== '0';
+/** The camera's change between two frames on screen: x → k[0]·x + k[1], y → k[2]·y + k[3]. */
+export type Carry = [number, number, number, number];
+
+/**
+ * Carry label spots laid out at one camera to the next (ToLaD#255), in place: x with the camera; y with it too where a
+ * spot stands on something in the world ("now", its tip, its column's top on screen), kept at the top line `top`
+ * where it was held there (its column's top above it), and never above it. A spot carried wholly off the screen's
+ * side (width `w`) no longer fits (fit 0).
+ */
+export function carryLabels(spots: LabelSpot[], k: Carry, top: number, w = Infinity): void {
+  for (const s of spots) {
+    const b = s.box;
+    const dx = k[0] * s.x + k[1] - s.x;
+    s.x += dx;
+    b[0] += dx;
+    b[2] += dx;
+    // (Carried off the screen's side, it no longer fits, as a layout there would say: its hold on the place is let go, so
+    // at rest a name that left and came back waits for room like it does when laid out every frame.)
+    if (b[0] >= w || b[2] <= 0) s.fit = 0;
+    if (s.span) {
+      s.span[0] = k[0] * s.span[0] + k[1];
+      s.span[1] = k[0] * s.span[1] + k[1];
+    }
+    const held = s.place !== 'tip' && s.place !== 'fam' && b[1] <= top + 0.5;
+    if (held) continue;
+    const at = s.place === 'tip' || s.place === 'fam' ? s.y1 : b[1];
+    const dy = Math.max(k[2] * at + k[3] - at, top - b[1]);
+    s.y1 += dy;
+    b[1] += dy;
+    b[3] += dy;
+  }
+}
+
 /** Highest a label standing on "now" may reach where the buttons are not above it (px from the top). */
 const LABEL_CEIL = 6;
 
@@ -1265,7 +1303,8 @@ export class FanView implements InputHandlers {
   private tapAt: { b: FanBranch | null; v: FanNode | null; cam: Camera } | null = null;
   /** The family pills drawn (ToLaD#212): a tap flies to the family, as its bracket's. */
   famHits: { box: [number, number, number, number]; v: FanNode }[] = [];
-  plusHits: { box: [number, number, number, number]; bs: FanBranch[] }[] = [];
+  /** The chips with a "+x" drawn (ToLaD#197, #262): `box` the whole chip (a tap on its name or its badge alike, ToLaD#287), `badge` the badge's end. */
+  plusHits: { box: [number, number, number, number]; badge: [number, number, number, number]; bs: FanBranch[] }[] = [];
   private models = new Map<string, TwigModel>();
   private raf = 0;
   private anim: ((t: number) => boolean) | null = null;
@@ -2216,15 +2255,13 @@ export class FanView implements InputHandlers {
     // Labels: one form everywhere (see labelSpots).
     this.drawGutter();
     this.drawTouch();
-    const br = this.layoutBrackets();
-    // (The labels kept under the pinned groups, ToLaD#233, as they show.)
-    // (One pill per group one level down from the level the view is at, ToLaD#258: no "+x", no species standing for its family.)
-    // (ToLaD#262: each group's name beside its branch, room at its end for the "+x" of the names hidden near it last frame.)
-    const top = this.labelTop() + (br ? br.pinH() * br.pinA : 0);
-    const lg = labelGroups(this.fan, this.levelNow());
-    const spots = labelSpots(this.camera, this.fan, top, (t) => this.nameWidth(t), this.barRect()?.[0], br ?? undefined, (id) => this.plusRoom.get(id) ?? 0, undefined, lod, lg, this.names);
-    this.drawLabels(spots, br, { ...lg, top, lod });
+    const tl = performance.now();
+    const { br, top, lg, spots, carried } = this.labelsNow(lod);
+    this.drawLabels(spots, br, { ...lg, top, lod }, carried);
     br?.drawPins(this.ctx, FAMILY_INK, INK3, BG);
+    this.labelAllMs.push(performance.now() - tl);
+    if (this.labelAllMs.length > 600) this.labelAllMs.shift();
+    if (this.labelMs.length > 600) this.labelMs.shift();
     this.drawWidthScale();
     if (this.debug) this.drawDebug();
     this.drawTrunkLabel();
@@ -2237,6 +2274,67 @@ export class FanView implements InputHandlers {
     this.frameMs.push(performance.now() - t0);
     if (this.frameMs.length > 600) this.frameMs.shift();
   }
+
+  /**
+   * The labels' spots and the brackets' stack this frame (ToLaD#255): laid out (layoutBrackets, labelSpots) at rest,
+   * and while the view moves (a gesture, a flight, a fling) at most every LABEL_MS and LABEL_FRAMES frames; between,
+   * the last layout carried with the camera (carryLabels): names, pictures and lines move rigidly with the pan and
+   * zoom, and fade as they meet or leave (drawLabels, each frame). `carried` the camera's change carried, null when laid out.
+   */
+  private labelsNow(lod: Lod | null): { br: Brackets | null; top: number; lg: ReturnType<typeof labelGroups>; spots: LabelSpot[]; carried: Carry | null } {
+    const t0 = performance.now();
+    const lg = labelGroups(this.fan, this.levelNow());
+    const L = this.labLast;
+    const c = this.cam;
+    const moving = this.gesturing || !!this.anim;
+    const same = L && L.fan === this.fan && L.lg === lg && L.lod === lod && L.lodGen === (lod?.gen ?? -1) && L.w === this.w && L.h === this.h && L.names === this.names && L.topLine === this.labelTop();
+    if (L && same && moving && labelCarry && (t0 - L.t < LABEL_MS || L.frames < LABEL_FRAMES)) {
+      const ax = c.sx / L.cam.sx;
+      const ay = c.sy / L.cam.sy;
+      const k: Carry = [ax, this.w / 2 - (ax * this.w) / 2 + (L.cam.cx - c.cx) * c.sx, ay, this.h / 2 - (ay * this.h) / 2 + (L.cam.cy - c.cy) * c.sy];
+      L.cam = { ...c };
+      L.frames++;
+      const br = this.brackets && L.br ? L.br : null;
+      br?.carry(k[0], k[1], this.toScreen(0, this.yNow)[1]);
+      carryLabels(L.spots, k, L.top, this.w);
+      this.labelMs.push(performance.now() - t0);
+      return { br, top: L.top, lg, spots: L.spots, carried: k };
+    }
+    // (Laid out at rest after carried frames: the "+x" room counted on them may change once more, drawLabels.)
+    this.labSettle = !moving && !!L && L.frames > 0;
+    const br = this.layoutBrackets();
+    // (The labels kept under the pinned groups, ToLaD#233, as they show.)
+    // (One pill per group one level down from the level the view is at, ToLaD#258: no "+x", no species standing for its family.)
+    // (ToLaD#262: each group's name beside its branch, room at its end for the "+x" of the names hidden near it last frame.)
+    const topLine = this.labelTop();
+    const top = topLine + (br ? br.pinH() * br.pinA : 0);
+    const spots = labelSpots(this.camera, this.fan, top, (t) => this.nameWidth(t), this.barRect()?.[0], br ?? undefined, (id) => this.plusRoom.get(id) ?? 0, undefined, lod, lg, this.names);
+    this.labLast = { fan: this.fan, lg, lod, lodGen: lod?.gen ?? -1, w: this.w, h: this.h, names: this.names, topLine, t: t0, frames: 0, cam: { ...c }, br, top, spots };
+    this.labelMs.push(performance.now() - t0);
+    return { br, top, lg, spots, carried: null };
+  }
+  private labSettle = false;
+  /** The last labels laid out (labelsNow), carried with the camera since. */
+  private labLast: {
+    fan: Fan;
+    lg: ReturnType<typeof labelGroups>;
+    lod: Lod | null;
+    lodGen: number;
+    w: number;
+    h: number;
+    names: NameMode;
+    topLine: number;
+    t: number;
+    frames: number;
+    cam: Camera;
+    br: Brackets | null;
+    top: number;
+    spots: LabelSpot[];
+  } | null = null;
+  /** The labels' and brackets' work per frame (ms, labelsNow; the pictures' and fades' in drawLabels not counted). */
+  readonly labelMs: number[] = [];
+  /** ...and with drawLabels' (the fades, the pictures, the "+x", the pills drawn) and the pinned rows'. */
+  readonly labelAllMs: number[] = [];
 
   /**
    * The parent columns below each split (the stem below the oldest): their
@@ -2752,7 +2850,15 @@ export class FanView implements InputHandlers {
    * The level's groups' pictures (ToLaD#262, #266): on "now" (an extinct species' on its tip), each exactly above its
    * group's centre; crowded, smaller, then overlapping a little, then the least populous dropped (pics.ts).
    */
-  private groupPics(lg: ReturnType<typeof labelGroups> & { lod: Lod | null }, top: number): PicSpot[] {
+  private groupPics(lg: ReturnType<typeof labelGroups> & { lod: Lod | null }, top: number, carried: Carry | null = null): PicSpot[] {
+    // (Carried with the camera between layouts, ToLaD#255: each standing on "now", or its tip, where it was placed.)
+    if (carried) {
+      for (const p of this.picSpots) {
+        p.x = carried[0] * p.x + carried[1];
+        p.y = carried[2] * p.y + carried[3];
+      }
+      return this.picSpots;
+    }
     this.picSpots = [];
     const nowS = this.toScreen(0, this.yNow)[1];
     if (!thumbsOn || nowS < top + 12 || nowS > this.h) return [];
@@ -2847,7 +2953,7 @@ export class FanView implements InputHandlers {
    * resolveLabels (a fixed priority, with hysteresis), and each fades in and
    * out over LABEL_FADE_MS rather than popping.
    */
-  private drawLabels(spots: LabelSpot[], br: Brackets | null = null, lg?: ReturnType<typeof labelGroups> & { top: number; lod: Lod | null }): void {
+  private drawLabels(spots: LabelSpot[], br: Brackets | null = null, lg?: ReturnType<typeof labelGroups> & { top: number; lod: Lod | null }, carried: Carry | null = null): void {
     const ctx = this.ctx;
     const now = performance.now();
     const dt = Math.min(100, Math.max(0, now - this.labelT));
@@ -2884,8 +2990,14 @@ export class FanView implements InputHandlers {
       alphas[k] = st.a * s.fit;
     });
     // The level's groups (ToLaD#262): each one's picture over "now", exactly above its centre; the names hidden, as "+x".
-    const pics = lg ? this.groupPics(lg, lg.top) : [];
-    if (lg) this.groupPlus(lg, spots, on, groups);
+    const pics = lg ? this.groupPics(lg, lg.top, carried) : [];
+    if (lg) {
+      const room = this.plusRoom;
+      this.groupPlus(lg, spots, on, groups);
+      // (The first layout at rest after carried frames, ToLaD#255: one more frame if the "+x" room it was laid out with changed.)
+      if (this.labSettle && (room.size !== this.plusRoom.size || [...room].some(([id, px]) => this.plusRoom.get(id) !== px))) this.request();
+    }
+    this.labSettle = false;
     // The clades' brackets (ToLaD#193) under the pills: their labels clear of the pills shown, their lines behind them.
     br?.draw(ctx, FAMILY_INK, INK3, [...spots.filter((_, k) => alphas[k] > 0.3).map((s) => s.box), ...pics.map((p) => [p.x - p.d / 2, p.y - p.d / 2, p.x + p.d / 2, p.y + p.d / 2])]);
     this.drawGroupPics();
@@ -2944,7 +3056,8 @@ export class FanView implements InputHandlers {
         ctx.fillStyle = INK2;
         ctx.fillText(`+${g.length}`, nx, 0.5);
         ctx.font = font(LABEL_FONT);
-        if (alpha > 0.5) this.plusHits.push({ box: [x0, y0, x1, y1 - LABEL_PAD - nx + PLUS_GAP / 2], bs });
+        // (The whole chip, its name too, is the badge's one tap target, ToLaD#287: "its all the same chip".)
+        if (alpha > 0.5) this.plusHits.push({ box: [x0, y0, x1, y1], badge: [x0, y0, x1, y1 - LABEL_PAD - nx + PLUS_GAP / 2], bs });
       }
       ctx.restore();
       // ToLaD#182: the species' Commons picture under its pill, before the name, once loaded (wiki.ts; `?thumbs=0` off).
