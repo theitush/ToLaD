@@ -1222,12 +1222,26 @@ export function labelSpots(
       // (heights()'s, without the array: the least over them.)
       const wa = Math.max(wya, q.y0);
       const wb = Math.min(wyb, q.y1 - 1e-9);
+      // (Which side of the strip it is on at each height, wa then the grid up to wb: an edge that lies nearly flat
+      // (a peel across the screen, MDD's Chinese mountain cat at the Felis polytomy, ToLaD#293) can cross the strip
+      // between two heights, on neither, and is then through it.)
+      let side = 0;
+      let sideB = 0;
       for (let j = -3, y = Math.ceil(wa / grid) * grid; j < 0 || y < wb; j < 0 ? j++ : (y += grid)) {
         const wy = j === -3 ? wa : j === -2 ? wb : j === -1 ? q.lean : y;
         if (j === -1 && !(wy > wa && wy < wb)) continue;
         const e = q.at(wy);
-        gap = Math.min(gap, Math.max(X(e[0]) - xb, xa - X(e[1])));
+        const ea = X(e[0]);
+        const eb = X(e[1]);
+        gap = Math.min(gap, Math.max(ea - xb, xa - eb));
+        const sd = eb < xa ? -1 : ea > xb ? 1 : 0;
+        if (j === -2) sideB = sd;
+        else if (j !== -1) {
+          if (side * sd < 0) gap = Math.min(gap, -(xb - xa) / 2);
+          side = sd;
+        }
       }
+      if (side * sideB < 0) gap = Math.min(gap, -(xb - xa) / 2);
       // Hidden from here on whatever else is near.
       if (gap <= -1) return gap;
     }
