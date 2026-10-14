@@ -23,7 +23,7 @@ species leaf for each class, with thresholds taken from stated rules, not tuned:
            any inflation the join adds; not where [deep.blind] cites the decline the young end meets at)
   status   a living leaf the Red List calls EX, an extinct leaf the Red List assesses as living, an
            EW species drawn with a wild count, a fossil graft ending at the present (#105)
-  name     a living leaf no extant-species list recognises (Upham, PHYLACINE, Greenspoon/IUCN, Red
+  name     a living leaf no extant-species list recognises (Upham, PHYLACINE, MDD, Greenspoon/IUCN, Red
            List): a stale or infraspecific name drawn as a species with its own count
   stale    a curated count held flat more than 10 years past its date while the file's notes name a later
            figure (a %/yr change, a mature-only count, a count) that a [[trend]] or a `basis = "mature"` point
@@ -104,7 +104,13 @@ def _today_src(n) -> str:
         return "greenspoon model"
     if n.name == "Homo sapiens":
         return "anchor"
+    if D.get("genus_median"):
+        return "genus median"  # an MDD-grafted species with no inputs of its own (ToLaD#278)
     return "model"
+
+
+# today's counts the pipeline models (not counted): the join, today and ceiling checks look at these
+MODELLED = ("model", "greenspoon model", "genus median")
 
 
 def _knot(p: dict) -> dict:
@@ -150,7 +156,7 @@ def leaf_row(n, census: dict, gs_model: dict, deep_reports: dict | None = None) 
         "extinct": bool(n.extinct), "extinct_by": D.get("extinct_by"), "t1_ma": n.t1,
         "alive": float(D.get("alive", 0.0)), "today_src": _today_src(n),
         "domestic": bool(D.get("domestic")), "G": 2 * D["L"] if D.get("L") else None,
-        "phylacine": D.get("iucn"), "upham": bool(n.upham), "dated": D.get("dleaf") is not None,
+        "phylacine": D.get("iucn"), "upham": bool(n.upham), "mdd": bool(D.get("mdd") or D.get("mdd_genus")), "dated": D.get("dleaf") is not None,
         "graft": D.get("dleaf") is not None and D["dleaf"].graft,
         "red_list": rl.get("category"), "red_list_year": rl.get("year"),
         "natural": {k: nat[k] for k in ("N", "lo", "hi")} if nat else None,
@@ -270,7 +276,7 @@ def anchors_for(row: dict) -> list[tuple[str, float]]:
 def check_today(row: dict) -> tuple[list[dict], bool]:
     """Flags, and whether today's count rests on no published figure at all (unanchored)."""
     src = row["today_src"]
-    if row["extinct"] or row["alive"] <= 0 or row["domestic"] or src not in ("model", "greenspoon model"):
+    if row["extinct"] or row["alive"] <= 0 or row["domestic"] or src not in MODELLED:
         return [], False  # a cited count (census, history file) or the CR cap is not a modelled level
     out = []
     for label, v in anchors_for(row):
@@ -279,14 +285,14 @@ def check_today(row: dict) -> tuple[list[dict], bool]:
             out.append(_flag("today", abs(math.log10(r)),
                              f"today {_fmt(row['alive'])} ({src}) is {max(r, 1 / r):.3g}x "
                              f"{'above' if r > 1 else 'below'} {label} {_fmt(v)}", ratio=r, anchor=label))
-    unanchored = src in ("model", "greenspoon model") and not row.get("census") and not any(
+    unanchored = src in MODELLED and not row.get("census") and not any(
         k["src"] == "cited" and k["year"] >= RECENT_YEAR for k in row["curve"])
     return out, unanchored
 
 
 def check_ceiling(row: dict) -> list[dict]:
     cat = row.get("red_list") or row.get("phylacine")
-    if (cat in CEILING_STATUS and not row["extinct"] and row["today_src"] in ("model", "greenspoon model")
+    if (cat in CEILING_STATUS and not row["extinct"] and row["today_src"] in MODELLED
             and row["alive"] > CEILING):
         return [_flag("ceiling", math.log10(row["alive"] / CEILING),
                       f"IUCN {cat} but modelled at {_fmt(row['alive'])} ({row['today_src']}), above "
@@ -364,9 +370,9 @@ def check_status(row: dict) -> list[dict]:
 
 def check_name(row: dict) -> list[dict]:
     if (row["kind"] == "tree" and not row["extinct"] and row["t1_ma"] == 0 and not row["upham"]
-            and not row.get("phylacine") and not row.get("census") and not row.get("gs_model")
+            and not row.get("mdd") and not row.get("phylacine") and not row.get("census") and not row.get("gs_model")
             and row.get("red_list") in (None, "NE") and row["name"] != "Homo sapiens"):
-        return [_flag("name", SEV_NAME, f"no extant-species list knows this name (Upham, PHYLACINE, "
+        return [_flag("name", SEV_NAME, f"no extant-species list knows this name (Upham, PHYLACINE, MDD, "
                                         f"Greenspoon/IUCN, Red List: {row.get('red_list') or 'none'}); drawn "
                                         f"as a living species with {_fmt(row['alive'])} alive")]
     return []

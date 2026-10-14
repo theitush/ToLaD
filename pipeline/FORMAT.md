@@ -86,7 +86,7 @@ Bin 0 is the youngest (ends at `t1`) and bin 15 the oldest (starts at `t0`). Eac
 |---|---|
 | 0–1 | grade: 0 = A, 1 = B, 2 = C, 3 = D (02 grades) |
 | 2 | extinct: `T1 > 0`, no living descendant (draw gray) |
-| 3 | `topology_confidence = taxonomic`: a PBDB graft or a group created from PBDB taxonomy |
+| 3 | `topology_confidence = taxonomic`: a PBDB graft or a group created from PBDB taxonomy, or a living MDD species grafted on its genus and the split or genus node made for it (ToLaD#278) |
 | 4–5 | date source: 0 = Upham-calibrated, 1 = interpolated, 2 = fossil range or fossil-constrained, 3 = anchored |
 | 6 | species tip (in the full tree) |
 | 7 | stub: children are in tile `STUB[...]` |
@@ -208,7 +208,7 @@ concordant and interpolated elsewhere. The dated tree is a proper dated phylogen
 built by rule (`pipeline/tolad_pipeline/dated.py`): Upham et al. 2019's node-dated MCC tree (topology,
 node heights, 95% HPDs) over the species matched to its tips; then the hand values in
 `overrides.toml` (`[[dated_clade]]`, `[[dated_fossil]]`); then every other species row the data
-defines grafted on (a fossil with a first or last appearance, a living species a Red List knows or a
+defines grafted on (a fossil with a first or last appearance, a living species a Red List or MDD knows or a
 curated history covers; a name no species list knows is left out). A graft hangs from the Upham node
 that is the common ancestor of the matched species under its Open Tree parent: older than that node (or
 on a total group's stem), it branches off the node's stem at its band start; younger, it joins that

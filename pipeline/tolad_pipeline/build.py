@@ -12,7 +12,7 @@ import time
 from collections import Counter
 from pathlib import Path
 
-from . import load
+from . import load, mdd
 from . import overrides as overrides_mod
 from .merge import (add_domestic_leaves, apply_placements, assign_bands, build_leaf_index, calibrate, date_tree,
                     drop_unrecognised, graft_pbdb, match_upham, rehome_stem_fossils, set_extinct_flags)
@@ -67,7 +67,7 @@ def build_tree(raw: Path, work: Path, log: dict, t_start: float):
     pb_species, _pb_genera = load.load_pbdb(raw)
     pb_by_name = {load.norm_name(r["taxon_name"]): r for r in pb_species}
     set_extinct_flags(root, phy, pb_by_name, log)
-    ctx = {"phy": phy, "phy_syn": phy_syn, "ott_syn": ott_syn, "exact": exact, "syn": syn}
+    ctx = {"phy": phy, "phy_syn": phy_syn, "ott_syn": ott_syn, "exact": exact, "syn": syn, "mdd": mdd.load(raw)}
     from . import redlist
     redlist.flag_extinct(root, raw, ctx, log)
     drop_unrecognised(root, recognised_by_a_list(root, raw, ctx), ott_syn, phy_syn, log)
@@ -78,6 +78,11 @@ def build_tree(raw: Path, work: Path, log: dict, t_start: float):
     exact, syn = build_leaf_index(root, ott_syn, phy_syn)
     graft_pbdb(root, pb_species, exact, syn, log, ov)
     log_step(t_start, f"PBDB graft {log['pbdb_graft']}")
+    # the living species our backbone lacks, from the Mammal Diversity Database (ToLaD#278)
+    mdd.graft(root, ctx["mdd"], syn, log)
+    exact, syn = build_leaf_index(root, ott_syn, phy_syn)
+    log_step(t_start, f"MDD: {log['mdd'].get('living_matched')} living species matched, "
+                      f"{log['mdd'].get('grafted', 0)} grafted on their genus")
     n_drop = drop_empty(root)
     log["opentree"]["empty_higher_dropped"] = n_drop
 
@@ -98,7 +103,8 @@ def build_tree(raw: Path, work: Path, log: dict, t_start: float):
 def recognised_by_a_list(root, raw: Path, ctx: dict):
     """The extant-species lists a living Open Tree tip may be on (ToLaD#116): Upham 2019 (matched
     already), PHYLACINE 1.2 (by name or its synonymy), the IUCN Red List 2026-1 (redlist.Matcher: name,
-    synonyms, spelling variant), and the names the count model anchors on (Greenspoon 2023 census and
+    synonyms, spelling variant), MDD v2.5 (a living species, or a synonym of one no tip has by name;
+    ToLaD#278), and the names the count model anchors on (Greenspoon 2023 census and
     per-species model tables, FAOSTAT and pet stocks, the domestic forms)."""
     from . import anchors, redlist
     from .model import match_species
@@ -112,12 +118,18 @@ def recognised_by_a_list(root, raw: Path, ctx: dict):
     anchored = {id(nd) for nd in hits.values()}
 
     leaf_names = {n.name for n in root.preorder() if n.is_leaf and n.name}
+    on_mdd = mdd.recogniser(ctx["mdd"])
 
     def recognised(nd) -> bool:
         # a PHYLACINE synonym counts only when its accepted name is not a leaf of its own (else a duplicate)
         acc = phy_syn.get(nd.name)
-        return bool(nd.upham or nd.name in phy or (acc in phy and acc not in leaf_names) or id(nd) in anchored
-                    or nd.name in anchors.DOMESTIC_FORMS or on_rl(nd)[0] is not None)
+        if (nd.upham or nd.name in phy or (acc in phy and acc not in leaf_names) or id(nd) in anchored
+                or nd.name in anchors.DOMESTIC_FORMS or on_rl(nd)[0] is not None):
+            return True
+        if on_mdd(nd.name, leaf_names):
+            nd.data["mdd_rescued"] = True  # only MDD knows it: a species described or split since (ToLaD#278)
+            return True
+        return False
     return recognised
 
 

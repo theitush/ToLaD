@@ -81,7 +81,9 @@ def eligible(nd: Node) -> bool:
     if nd.extinct or nd.t1 > 0:
         return nd.fad is not None or nd.lad is not None  # a first or last appearance (PBDB, PHYLACINE EP)
     rl = nd.data.get("red_list")
-    return bool(nd.data.get("history")) or (rl is not None and rl.get("source", 2) != 2)  # 2: not-listed
+    return (bool(nd.data.get("history"))
+            or bool(nd.data.get("mdd") or nd.data.get("mdd_rescued"))  # a species only MDD knows (#278)
+            or (rl is not None and rl.get("source", 2) != 2))  # 2: not-listed
 
 
 # ------------------------------------------------------------------ 1. Upham
@@ -700,7 +702,8 @@ def gen_entry(nd: Node) -> list | None:
 
 
 def common_name(nd: Node) -> str | None:
-    return nd.data.get("common_override") or (nd.data.get("red_list") or {}).get("common")
+    return (nd.data.get("common_override") or (nd.data.get("red_list") or {}).get("common")
+            or nd.data.get("common_mdd"))  # an MDD-grafted species' MDD English name (ToLaD#278)
 
 
 def file_meta(droot: DNode | None, rows: list[tuple[Node, bool]]) -> dict | None:
