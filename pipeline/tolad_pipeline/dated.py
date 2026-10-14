@@ -37,7 +37,7 @@ S_UPHAM, S_IMPUTED, S_FOSSIL, S_INTERP, S_OVERRIDE, S_ALVAREZ, S_ENSEMBLE, S_UPI
 # The ages rule the build applies (research/dated-tree-sources.md §5): "alvarez" (candidate A: Álvarez-Carretero
 # ages on the clades both trees share) or "ensemble" (candidate B: their geometric mean). The build scores both.
 AGES = "ensemble"
-GEN_HOW = ["COMBINE reported", "COMBINE imputed", "allometric"]
+GEN_HOW = ["COMBINE reported", "COMBINE imputed", "allometric", "cited (overrides.toml)"]
 EPS = 1e-4  # Ma
 
 

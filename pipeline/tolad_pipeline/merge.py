@@ -324,7 +324,22 @@ def graft_pbdb(root: Node, species: list[dict], exact, syn, log: dict, ov) -> No
     # Miocene dolphin Pomatodelphis into the spinner dolphin; ToLaD#275), so it is not merged
     # into the living leaf (its range would replace the living species' first appearance) but grafted on its own.
     pbdb_living = {norm_name(r["taxon_name"]) for r in species if r.get("is_extant") == "extant"}
-    for r in species:
+    # an extinct species PBDB does not carry (overrides.toml [[fossil_leaf]], Denisovans, ToLaD#280): grafted
+    # like a PBDB record with its literature range, under its genus
+    known = {norm_name(r["taxon_name"]) for r in species}
+    extra = []
+    for e in ov.fossil_leaves:
+        if e["name"] in known:
+            raise RuntimeError(f"overrides.toml fossil_leaf {e['name']}: PBDB carries it; use [[date]]")
+        fad, lad = float(e["fad"]), float(e["lad"])
+        if not fad > lad:
+            raise RuntimeError(f"overrides.toml fossil_leaf {e['name']}: fad must be older than lad")
+        extra.append({"taxon_name": e["name"], "taxon_no": None, "is_extant": "extinct", "n_occs": None,
+                      "firstapp_max_ma": fad, "firstapp_min_ma": fad, "lastapp_max_ma": lad, "lastapp_min_ma": lad,
+                      "order": e["order"], "family": e["family"], "genus": e["name"].split()[0],
+                      "fossil_leaf": True})
+        ov.applied["fossil_leaf"].append({"name": e["name"], "fad_lad": [fad, lad]})
+    for r in list(species) + extra:
         name = norm_name(r["taxon_name"])
         if name in ov.exclude:
             how["excluded (overrides.toml)"] += 1
@@ -373,7 +388,7 @@ def graft_pbdb(root: Node, species: list[dict], exact, syn, log: dict, ov) -> No
             how["living, not in OT (skipped)" if r.get("is_extant") == "extant" else "status unknown (skipped)"] += 1
             continue
         # (A [[date]] override's literature range stands in for occurrences PBDB has not entered, e.g. Homo naledi.)
-        if not rng or not (r.get("n_occs") or name in ov.dates):
+        if not rng or not (r.get("n_occs") or name in ov.dates or r.get("fossil_leaf")):
             how["no occurrences/range (skipped)"] += 1
             continue
         # 2. graft under genus / family / order
@@ -406,7 +421,7 @@ def graft_pbdb(root: Node, species: list[dict], exact, syn, log: dict, ov) -> No
                 g = group("genus", genus, fnode)
                 how["grafted: PBDB genus (created)"] += 1
         leaf = Node(name=name, rank="species", kind="graft", taxonomic=True, extinct=True,
-                    pbdb=int(r["taxon_no"]))
+                    pbdb=int(r["taxon_no"]) if r.get("taxon_no") else None)
         leaf.fad, leaf.lad = rng
         leaf.date_src = D_FOSSIL
         leaf.data["n_occs"] = r.get("n_occs")
@@ -787,6 +802,11 @@ def assign_bands(root: Node, anchors_t0: dict[str, float]) -> None:
             if nd.kind == "graft":
                 nd.t1 = min(max(nd.lad, _end_floor(nd)), nd.t0 - EPS)
             elif nd.extinct:
+                if nd.data.get("date_override") and nd.fad is not None and nd.fad < nd.t0:
+                    # a literature first appearance (overrides.toml [[date]]) on an Open Tree leaf: its band starts
+                    # there, not at its parent's split (H. erectus's at Homo's 3.8 Ma; Sahelanthropus's at 11 Ma),
+                    # so its count is not spread over millions of years it is not known from (ToLaD#302)
+                    nd.t0 = nd.fad
                 if nd.lad is None:
                     nd.lad = LAD_RECENT_EX if _recent_ex(nd) else LAD_PLEISTOCENE
                     nd.data["lad_default"] = True
