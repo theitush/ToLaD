@@ -2,7 +2,7 @@
 // checkboxes (geological periods, ice ages) under it.
 import { useState } from 'react';
 import type { WorldLayers } from './world';
-import { wantFitFossils, wantSteady } from './steady';
+import { wantFitFossils } from './steady';
 import type { NameMode } from './view';
 
 const ROWS: [keyof WorldLayers, string][] = [
@@ -53,20 +53,6 @@ export function WorldToggle({ get }: { get: () => { world: WorldLayers; names: N
               {label}
             </label>
           ))}
-          {/* The old layout, the fold (ToLaD#273): the steady layout (#259, steady.ts) is the default; the page opens again with ?layout=fold on or off. */}
-          <label>
-            <input
-              type="checkbox"
-              checked={!wantSteady()}
-              onChange={(e) => {
-                const u = new URL(window.location.href);
-                if (e.target.checked) u.searchParams.set('layout', 'fold');
-                else u.searchParams.delete('layout');
-                window.location.assign(u.toString());
-              }}
-            />
-            Old layout
-          </label>
           {/* A level whose living members dwarf its fossils (the hominins beside the humans, ToLaD#289) framed on the fossils, the rooms by life; the page opens again with ?fit=fossils on or off. */}
           <label>
             <input

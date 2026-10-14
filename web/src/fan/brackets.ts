@@ -701,8 +701,7 @@ export function clearSpot(p: Placed, lo: number, hi: number, y: number, pills: r
 
 /**
  * Where a tap on a clade's bracket lands (ToLaD#193): the clade (`span` its world x at "now") across the screen and
- * centred, its columns opened as that zoom opens them (folded: a few rounds, the fold left at the frame's zoom and
- * anchor for the camera taking it), and its time from "now" at the top down to where its branch started (its stem: its split
+ * centred, its columns opened as that zoom opens them (the layout left at the frame's zoom for the camera taking it), and its time from "now" at the top down to where its branch started (its stem: its split
  * from its sister, `v.yBot`), a little of the parent below it. `band` makes room above "now" for the brackets.
  */
 export function cladeCamera(
@@ -732,7 +731,6 @@ export function cladeCamera(
   const hit = byV.get(v);
   if (hit) {
     f.setScale(hit.sx, c.w);
-    f.setAnchor(hit.cx, hit.cy, hit.sx, c.w);
     return { ...hit };
   }
   const cam = foldedFrame(fan, c.w, frame);
@@ -743,23 +741,19 @@ export function cladeCamera(
 const frameCache = new WeakMap<Fan, Map<string, Map<FanNode, Camera>>>();
 
 /**
- * The frame a flight lands on, folded (fold.ts) or not: `frame` frames what it shows as the fold stands now (a clade's
- * span, a species' column), and folded what it shows moves with the zoom (its inner gaps open) and with the anchor
- * (the rows stand on the screen's centre). The one camera both agree on: the zoom that frames what that zoom opens
- * (bisected in log zoom: the span on screen grows with the zoom), the rows anchored on the frame's own centre (a few
- * rounds: each anchoring moves the row a little). The fold is left exactly at the frame's zoom and anchor, for the
- * camera taking it (settling there moves nothing). A frame whose zoom does not move with the fold (a species'
- * column) takes no bisection. Used by every tap and search flight (ToLaD#193, #197, #211).
+ * The frame a flight lands on, laid out (steady.ts) or not: `frame` frames what it shows as the layout stands now (a
+ * clade's span, a species' column), and what it shows moves with the zoom (its inner gaps open). The one camera both
+ * agree on: the zoom that frames what that zoom opens (bisected in log zoom: the span on screen grows with the zoom).
+ * The layout is left exactly at the frame's zoom, for the camera taking it (settling there moves nothing). A frame
+ * whose zoom does not move with the layout (a species' column) takes no bisection. Used by every tap and search
+ * flight (ToLaD#193, #197, #211).
  */
 export function foldedFrame(fan: Fan, w: number, frame: () => Camera): Camera {
   let cam = frame();
   const f = fan.tess.fold;
   if (!f) return cam;
-  const cy = cam.cy;
   const settleAt = (sx: number): Camera => {
     f.setScale(sx, w);
-    // (A few rounds: the rows anchored on the frame's centre, which each anchoring moves a little.)
-    for (let k = 0; k < 6; k++) if (!f.setAnchor(frame().cx, cy, sx, w)) break;
     return frame();
   };
   const fixed = settleAt(cam.sx);
@@ -779,8 +773,7 @@ export function foldedFrame(fan: Fan, w: number, frame: () => Camera): Camera {
     }
     cam = settleAt(Math.exp(lo));
   }
-  // The fold left exactly at the frame's zoom and anchor, for the camera taking it.
+  // The layout left exactly at the frame's zoom, for the camera taking it.
   f.setScale(cam.sx, w);
-  f.setAnchor(cam.cx, cy, cam.sx, w);
   return cam;
 }

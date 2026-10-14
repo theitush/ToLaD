@@ -3,7 +3,7 @@
 // (familyPills), the pill laid out for it the next frame, as the "+x" badges are (plus.test.ts).
 import { describe, expect, it } from 'vitest';
 import { FanCamera, type Camera } from './camera';
-import { Fold } from './fold';
+import { Steady } from './steady';
 import { layoutFan, type Fan, type FanBranch, type FanNode, type WidthMode } from './layout';
 import { CARNIVORA, FELIDAE } from './panthera';
 import { CARNIVORA_TREE, familyLabel, FELIDAE_TREE } from './splits';
@@ -18,7 +18,7 @@ const plusPx = (n: number) => (n ? 6 * `+${n}`.length + 6 : 0);
 function fanOf(level: 'cats' | 'carnivores', mode: WidthMode): Fan {
   const fan = level === 'cats' ? layoutFan(FELIDAE, mode, FELIDAE_TREE) : layoutFan(CARNIVORA, mode, CARNIVORA_TREE);
   if (level === 'carnivores') {
-    const f = new Fold(fan);
+    const f = new Steady(fan);
     f.setAll(0);
     fan.tess.fold = f;
   }
