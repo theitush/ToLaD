@@ -68,6 +68,9 @@ const LABEL_PAD = 8;
 const LABEL_AXIS_X = 72;
 /** A "+x" tap's frame (groupCamera): the species' span at "now" widened this share each side, a name's room (~27 px) past the outer ones. */
 const GROUP_NAME_PAD = 0.1;
+/** A "+x" tap's frame: neighbouring names at least this far apart (px; a pill and a gap), and a column running off its edge this much on screen. */
+const GROUP_NAME_GAP = 28;
+const GROUP_DOM_PX = 40;
 /** A level's flight under way (ToLaD#258, #271): the level it lands on and its frame, so a tap or double-tap mid-flight goes on from there. */
 type Step = { lv: Level; cam: Camera };
 /**
@@ -674,16 +677,50 @@ export function spanOf(bs: readonly FanBranch[]): [number, number] {
  * Widened GROUP_NAME_PAD each side, a name's room beyond the outer ones (ToLaD#293: the leftmost's name beside it
  * right of the time axis, not squeezed against its neighbour's; MDD's mongooses: the Crab-eating mongoose at the
  * frame's edge).
+ *
+ * Closer in where that frame leaves neighbouring names (on their columns' centres) nearer than GROUP_NAME_GAP px, as
+ * far as their names still fit on a screen `w` px wide (ToLaD#293: MDD's young splits, the Polar bear 25 px from the
+ * Brown bear). A column wider than the rest together at an end (the domestic dog's, the domestic cat's) runs off that
+ * edge, GROUP_DOM_PX of it kept on screen with its name, so the wild species beside it open out rather than stand as
+ * slivers at its side.
  */
-export function groupSpan(bs: readonly FanBranch[], yNow: number): [number, number] {
-  const s: [number, number] = [Infinity, -Infinity];
-  for (const b of bs) {
+export function groupSpan(bs: readonly FanBranch[], yNow: number, w = 0): [number, number] {
+  const cols = bs.map((b) => {
     const y = Math.max(b.tipY, yNow);
-    s[0] = Math.min(s[0], leftAt(b, y));
-    s[1] = Math.max(s[1], leftAt(b, y) + laneAt(b, y).w);
-  }
+    const l = leftAt(b, y);
+    const r = l + laneAt(b, y).w;
+    return { l, r, c: (l + r) / 2 };
+  });
+  const s: [number, number] = [Math.min(...cols.map((q) => q.l)), Math.max(...cols.map((q) => q.r))];
   const pad = GROUP_NAME_PAD * (s[1] - s[0]);
-  return [s[0] - pad, s[1] + pad];
+  const out: [number, number] = [s[0] - pad, s[1] + pad];
+  if (!w || cols.length < 2) return out;
+  // (Its zoom, px per world unit: cladeCamera lays the span across `fill` px, centred `mid` px from the left, camera.frame.)
+  const fill = Math.min(w - 72, TAP_FILL * w);
+  const mid = w / 2 + (58 - 14) / 2;
+  const p0 = fill / (out[1] - out[0]);
+  // (Where the outer columns can stand: a name's room (a pill and a gap) right of the time axis and in from the
+  // screen's edge, for a level's names beside their columns, not on them: MDD's Crab-eating mongoose.)
+  const L = LABEL_AXIS_X + GROUP_NAME_GAP;
+  const R = w - GROUP_NAME_GAP;
+  cols.sort((a, b) => a.c - b.c);
+  const widest = cols.reduce((a, q) => (q.r - q.l > a.r - a.l ? q : a));
+  const dom = widest.r - widest.l > (s[1] - s[0]) / 2 ? (widest === cols[0] ? -1 : widest === cols[cols.length - 1] ? 1 : 0) : 0;
+  const core = dom < 0 ? cols.slice(1) : dom > 0 ? cols.slice(0, -1) : cols;
+  let gap = Infinity;
+  for (let i = 1; i < core.length; i++) gap = Math.min(gap, core[i].c - core[i - 1].c);
+  // (What has to fit between L and R: the names' centres, and a dominant column's edge GROUP_DOM_PX in from its side.)
+  const x0 = dom < 0 ? widest.r : core[0].c;
+  const x1 = dom > 0 ? widest.l : core[core.length - 1].c;
+  const room = R - L - (dom ? GROUP_DOM_PX : 0);
+  const need = GROUP_NAME_GAP / gap;
+  const p = Math.min(need, x1 > x0 ? room / (x1 - x0) : Infinity);
+  if (!(p > p0 * 1.001) || !Number.isFinite(p)) return out;
+  // (Laid in L..R, centred on what is left over, a dominant column showing at least GROUP_DOM_PX of itself.)
+  const lead = L + (dom < 0 ? GROUP_DOM_PX : 0) + (room - (x1 - x0) * p) / 2;
+  const m = x0 + (mid - lead) / p;
+  const half = fill / p / 2;
+  return [m - half, m + half];
 }
 
 /** The fan's families (splits founding a taxon ending in -idae, splits.ts familyLabel; not the root: the clade's own label names it), with their labels. */
@@ -1914,7 +1951,7 @@ export class FanView implements InputHandlers {
     // (Down to the split where they meet, not the clade's stem: for a group across the level, the root, not the world's bottom.)
     // (Across the screen: their columns at "now" (an extinct one's at its tip), where their names and pictures stand,
     // not their rooms, wider where they were wider in the past: the most room each name and picture can have, ToLaD#274.)
-    return cladeCamera(this.camera, this.fan, { ...v, yBot: v.y }, () => groupSpan(bs, this.yNow), (cam) => this.withBand(cam, v));
+    return cladeCamera(this.camera, this.fan, { ...v, yBot: v.y }, () => groupSpan(bs, this.yNow, this.w), (cam) => this.withBand(cam, v));
   }
 
   flyToGroup(bs: readonly FanBranch[]): void {

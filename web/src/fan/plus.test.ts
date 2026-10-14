@@ -145,7 +145,7 @@ describe('the "+x" badges (ToLaD#197)', () => {
           while (v?.parent && !bs.every((b) => v!.strands.includes(b))) v = v.parent;
           // (The app's frame, groupCamera's span: their columns at "now" and a name's room past them, ToLaD#274 and #293;
           // not their widest columns (spanOf), which the app stopped framing in #274.)
-          c.cam = cladeCamera(c, fan, { ...v!, yBot: v!.y }, () => groupSpan(bs, c.yNow));
+          c.cam = cladeCamera(c, fan, { ...v!, yBot: v!.y }, () => groupSpan(bs, c.yNow, c.w));
           c.settle();
           const after = check(c);
           const shown = new Set(after.spots.filter((s) => after.on.get(s.key)).map((s) => s.id));
