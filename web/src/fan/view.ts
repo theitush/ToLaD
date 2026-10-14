@@ -1229,7 +1229,8 @@ export class FanView implements InputHandlers {
   barEl: HTMLElement | null = null;
   private scaleKey = '';
   /** Each species' label: shown or not, and its fade (0–1); when it was last drawn (ms). */
-  private labelState = new Map<string, { on: boolean; a: number }>();
+  /** Each label's state: shown (`on`), its fade (`a`), and whether shown at the last layout (`lo`: carried frames, ToLaD#255, leave it). */
+  private labelState = new Map<string, { on: boolean; a: number; lo?: boolean }>();
   private labelT = 0;
   /** `?debug`: a readout of the zooms, years on screen and individuals per px. */
   readonly debug = typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug');
@@ -2909,7 +2910,8 @@ export class FanView implements InputHandlers {
     const dt = Math.min(100, Math.max(0, now - this.labelT));
     this.labelT = now;
     const prev = new Map<string, boolean>();
-    for (const [key, st] of this.labelState) prev.set(key, st.on);
+    // (Which were shown at the last layout: what the carried frames between showed does not tip the choice at rest, ToLaD#255.)
+    for (const [key, st] of this.labelState) if (st.lo !== undefined) prev.set(key, st.lo);
     const on = resolveLabels(spots, prev);
     // The "+x" badges (ToLaD#197): counted with the cull; a pill keeps room for its count from the frame before, so
     // when a count changes the next frame lays the pills out again with the room it needs.
@@ -2932,6 +2934,7 @@ export class FanView implements InputHandlers {
       let st = this.labelState.get(s.key);
       if (!st) this.labelState.set(s.key, (st = { on: want === 1, a: want }));
       st.on = want === 1;
+      if (!carried) st.lo = st.on;
       if (st.a !== want) {
         const step = dt / LABEL_FADE_MS;
         st.a = want > st.a ? Math.min(want, st.a + step) : Math.max(want, st.a - step);
