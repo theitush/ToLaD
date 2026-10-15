@@ -377,8 +377,9 @@ export class Population {
       // (A shaping history's size changes back to its oldest point.)
       else if (this.knots.length) varGens = Math.ceil(this.knots[this.knots.length - 1].ago / GL);
       const own = Math.max(1, (startMa - sp.t1) * 1e6);
-      // Sampled (bounded: per generation only where the share moves, ToLaD#70), back to the species' start.
-      const g = shareBackSampled((k) => this.count(ago(k) / 1e6), varGens, Math.ceil(own / GL), GL);
+      // Sampled (bounded: per generation only where the share moves, ToLaD#70), back to the species' start; or the
+      // build's, worked out ahead from the same data (genealogiesAhead, ToLaD#255).
+      const g = AHEAD.get(`${sp.gid}:${startMa}`) ?? shareBackSampled((k) => this.count(ago(k) / 1e6), varGens, Math.ceil(own / GL), GL);
       this.hk = g.k;
       this.h = g.h;
       this.qBase = this.h[this.h.length - 1];
@@ -446,6 +447,11 @@ export class Population {
   stepAt(ageMa: number): { n: number; q: number } {
     if (ageMa < this.sp.t1) return { n: 0, q: 0 };
     return { n: this.aliveAt(ageMa), q: this.greenAt(ageMa) };
+  }
+
+  /** The genealogy walked for this species and start (null: none, extinct or weighed, the weight-1 one's). */
+  genealogy(): Genealogy | null {
+    return this.weight === 1 && !this.sp.extinct && this.sp.alive > 0 ? { k: this.hk, h: this.h } : null;
   }
 
   /** The genealogy's samples (how many steps of the green share the fan keeps for this species). */
@@ -519,6 +525,29 @@ export class Population {
     const hi = Math.min(this.sp.t0, this.startMa) * 1e6;
     return out.filter((a) => a >= lo && a <= hi).sort((p, q) => p - q);
   }
+}
+
+/** A genealogy's samples (shareBackSampled): generations back and the share with living descendants there. */
+export interface Genealogy {
+  k: Float64Array;
+  h: Float64Array;
+}
+/** Genealogies worked out ahead, by `gid:startMa` (the mammal level's, at build time: mammals-data.ts, ToLaD#255). */
+const AHEAD = new Map<string, Genealogy>();
+
+/** Take these genealogies as worked out (the build's, from the same data): a Population of that species and start reads them instead of walking it. */
+export function genealogiesAhead(g: Map<string, Genealogy>): void {
+  for (const [key, v] of g) AHEAD.set(key, v);
+}
+
+/** The genealogies of these populations (weight 1, living), by `gid:startMa`: what genealogiesAhead takes. */
+export function genealogiesOf(pops: Iterable<Population>): Map<string, Genealogy> {
+  const out = new Map<string, Genealogy>();
+  for (const p of pops) {
+    const g = p.genealogy();
+    if (g) out.set(`${p.sp.gid}:${p.startMa}`, g);
+  }
+  return out;
 }
 
 const cache = new Map<string, Population>();
