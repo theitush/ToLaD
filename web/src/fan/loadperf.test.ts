@@ -4,7 +4,7 @@
 import { writeFileSync } from 'node:fs';
 import { Session } from 'node:inspector/promises';
 import { describe, expect, it } from 'vitest';
-import { MeshBatch, RectBatch } from './meshgl';
+import { RectBatch } from './meshgl';
 import { Steady } from './steady';
 import { layoutFan, layoutSeed, type Fan } from './layout';
 import { mammalData } from './mammals-data';
@@ -82,7 +82,7 @@ describe.skipIf(!RUN)('mammal level open (perf)', () => {
     lap('mammaliaClade');
     const v = new FanView(canvas as unknown as HTMLCanvasElement, mammaliaClade(), 'curved', mammaliaTree(), true);
     lap('new FanView');
-    const gl = { under: new RectBatch(), mesh: new MeshBatch(), over: new RectBatch(), begin() {}, end() {} };
+    const gl = { under: new RectBatch(), over: new RectBatch(), begin() {}, end() {} };
     (v as unknown as { gl: unknown }).gl = gl;
     v.draw();
     lap('draw 1');

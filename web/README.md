@@ -24,37 +24,10 @@ width = individuals, green = alive, gray = dead, height = time.
   one width from base to tip (log mode: W·g(alive)/g(ever)), only the gray peels off. The
   stem is drawn as its children's strands side by side, so each green lane runs unbroken
   from now to the root (1 px floor).
-- **Individuals** (`twigs.ts`): zooming in, the same two lanes resolve into strands; there
-  is no switch to another picture. Procgen (`packages/procgen`; `speciesModel` builds a
-  constant-size model from ever, alive, span and generation length) gives the individuals.
-  - Green lane: one deep-green strand per index slot holding someone alive now, from now
-    all the way down: green lines all the way back.
-  - Gray lane: one strand slot per procgen index (procgen keeps children near their
-    parents in index space, so a slot is roughly a family line). Each dead individual's
-    life is drawn on its slot: pale green if it has a living descendant, gray if its line
-    ended. Dead tips stop 3 px short of "now".
-  - Threads: each child's mother thread (the line the strands and the lineage search
-    follow) and a thinner father thread (the interbreeding mesh) curve up from the parent's
-    strand into the child's base. Threads end exactly on procgen's `parents()`.
-  - Continuity: the green lane turns into a texture of its strands once the width scale
-    bar reads ~100 individuals (`TEXTURE_IND`: from 150 down to 50, while strands are still
-    well under a pixel apart): ~1 px columns that keep their fraction of the lane, each as
-    bright as the share of its index slots holding someone alive now, with the lane dimmed
-    under it. As strands get 2–10 px apart they fade in (the texture fades out) while the
-    lane dims under them. Then individuals, threads, and `lion#…` handles appear. Every line
-    drawn is a real strand or individual (no flow lines or grooves). The gray lane has a
-    texture of its own dead (`grayTexture`) from ~100 individuals per scale bar, or as
-    soon as its slots are pixels apart, until there are few enough lives on screen to draw
-    each (6000, fading over the last half): cells of a slot (every s-th index, s a power
-    of two, ≥2 px apart) by a band of t generations (t a power of two, ~6 px tall), each
-    as bright as the real lives on it cover the band (their own lifespans) and pale green
-    if they have living descendants. Finer slots fade in over the octave. Threads to the
-    parents fade in from 4 px strands (and as they get few enough), not at a switch.
-    Gray strands follow the stepped lane: straight within a step, resuming at their new x
-    after a step line. Only visible generations, index ranges and texture cells are
-    computed.
-  - "Has a living descendant" is exact (children, then down the mother line) within a
-    lookup budget; past it, a critical-branching estimate decides, deterministically.
+- **Individuals** (`twigs.ts`): a column's width at every height is the individuals alive
+  there (procgen, `packages/procgen`; `speciesModel`). The texture of individuals drawn
+  inside the columns (lines, lives, threads to the parents) was deleted (ToLaD#342): the
+  columns are their green and gray lanes.
 - **Layout** (`layout.ts`): a rectangular tree, fixed in world units; nothing depends on
   the camera but the step grid. Below the fork the stem is its children's slices side by
   side (no gaps). Just above it each child jogs sideways over `JOG` (1 world unit; a
@@ -98,8 +71,7 @@ width = individuals, green = alive, gray = dead, height = time.
   canvas.
 - **No flashing**: the old view-referenced packing (`Pack.setRef`) re-anchored the camera
   every frame and changed the shapes under it; it is gone, and the camera keeps the point
-  under the fingers fixed in world units. Step grids morph, texture lattices and links
-  fade, so no level of detail switches back and forth (`camera.test.ts` scripts smooth
+  under the fingers fixed in world units. Step grids morph, so no level of detail switches back and forth (`camera.test.ts` scripts smooth
   pinches and pans and checks for jumps and flip-flops).
 - `node scripts/fanshot.mjs [out] [prefix]` screenshots `dist-single` at 390×844
   (`STEPS_FILE` = JSON list of `[name, js]` steps run against `window.__fan`;

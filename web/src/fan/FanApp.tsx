@@ -1,6 +1,5 @@
 // The main view: the dated tree, OneZoom-style.
 
-import * as MeshMirror from './mesh';
 import { useEffect, useRef, useState, type PointerEvent as RPointerEvent, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import { approxMa, formatCount, formatMass } from '../data/count';
@@ -17,13 +16,11 @@ import { WorldToggle } from './WorldToggle';
 import { MagnifierIcon, SearchPanel } from './SearchPanel';
 import { statusOf } from './status';
 import { cardTapper, onControl } from './cardtap';
-import { FanView, fmtInt, formatYearsAgo, initialMeasure, type IndInfo, type Lineage, type Selection } from './view';
+import { FanView, initialMeasure, type Lineage, type Selection } from './view';
 
 declare global {
   interface Window {
     __fan?: FanView;
-    /** The mesh's CPU mirror, for scripts/glcheck.mjs (GPU and CPU decisions compared). */
-    __fanMesh?: typeof MeshMirror;
   }
 }
 
@@ -124,7 +121,6 @@ export function FanApp() {
     v.barEl = barRef.current;
     viewRef.current = v;
     window.__fan = v;
-    window.__fanMesh = MeshMirror;
     v.request();
     // The canvas text waits for the faces (drawn in system type until then).
     if (typeof document !== 'undefined' && document.fonts) {
@@ -238,8 +234,6 @@ export function FanApp() {
       {sel ? (
         sel.lineage ? (
           <LineageCard lin={sel.lineage} onClose={() => viewRef.current?.tap(-1e6, -1e6)} onUp={cardUp} />
-        ) : sel.ind ? (
-          <IndCard sp={sel.sp} ind={sel.ind} onClose={() => viewRef.current?.tap(-1e6, -1e6)} onUp={cardUp} />
         ) : (
           <SpeciesCard sp={sel.sp} mass={measure === 'mass'} ageMa={sel.ageMa} startMa={sel.startMa} event={sel.event?.k} onClose={() => viewRef.current?.tap(-1e6, -1e6)} onUp={cardUp} />
         )
@@ -756,32 +750,3 @@ export function LineageCard({ lin, onClose, onUp }: { lin: Lineage; onClose: () 
   );
 }
 
-function IndCard({ sp, ind, onClose, onUp }: { sp: SpeciesRec; ind: IndInfo; onClose: () => void; onUp?: (x: number, y: number) => void }) {
-  return (
-    <CardShell onUp={onUp}>
-      <button type="button" className="x" onClick={onClose} aria-label="Close">
-        ×
-      </button>
-      <div className="t">
-        <span className={`dot ${ind.alive ? 'alive' : 'dead'}`} /> <span className="mono">{ind.handle}</span>
-      </div>
-      <div>
-        {ind.sex} {midName(sp)} · {ind.alive ? 'alive now' : 'dead'} · born ~{formatYearsAgo(ind.bornYearsAgo)}
-      </div>
-      <div className="dim">
-        lived {ind.lifespan.toFixed(1)} y · generation {fmtInt(ind.g + 1)} of {fmtInt(ind.G)} · {ind.children} children
-      </div>
-      <div className="dim">
-        parents:{' '}
-        {ind.parents.length === 0
-          ? 'none (founding generation)'
-          : ind.parents.map((p, k) => (
-              <span key={k} className="mono">
-                {k ? ' + ' : ''}
-                {p.handle}
-              </span>
-            ))}
-      </div>
-    </CardShell>
-  );
-}

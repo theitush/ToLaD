@@ -8,12 +8,14 @@
 import { appendFileSync, writeFileSync } from 'node:fs';
 import { Session } from 'node:inspector/promises';
 import { describe, it } from 'vitest';
-import { MeshBatch, RectBatch } from './meshgl';
-import { MESH_F } from './mesh';
+import { RectBatch } from './meshgl';
 import { CARNIVORA, FELIDAE, mammaliaClade } from './panthera';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree } from './splits';
 import { laneAt, leftAt } from './layout';
-import { ColumnPath, CutMemo, SCALE_BAR_PX } from './twigs';
+import { ColumnPath, CutMemo } from './twigs';
+
+/** The width scale bar's target length (px, view.ts drawWidthScale). */
+const SCALE_BAR_PX = 70;
 import * as VIEW from './view';
 import { FanView } from './view';
 const LC: Record<string, number> = (VIEW as unknown as { LC?: Record<string, number> }).LC ?? { layouts: 0 };
@@ -188,10 +190,9 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
       ? new FanView(canvas as unknown as HTMLCanvasElement, mammaliaClade(), 'curved', mammaliaTree(), true)
       : new FanView(canvas as unknown as HTMLCanvasElement, carn ? CARNIVORA : FELIDAE, 'curved', carn ? CARNIVORA_TREE : FELIDAE_TREE, carn);
     const tNew = performance.now() - t0;
-    const gl = { under: new RectBatch(), mesh: new MeshBatch(), over: new RectBatch(), begin() {}, end() {} };
+    const gl = { under: new RectBatch(), over: new RectBatch(), begin() {}, end() {} };
     gl.begin = () => {
       gl.under.n = 0;
-      gl.mesh.n = 0;
       gl.over.n = 0;
     };
     (v as unknown as { gl: unknown }).gl = gl;
@@ -298,7 +299,7 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
     for (const [name, ago, perBar, sy] of [
       ['lion overview', 2e5, 1e9, 0.7],
       ['lion mid', 5e4, 1e7, 3],
-      ['lion texture', 2000, 60, 5],
+      ['lion close', 2000, 60, 5],
       ['lion lives', 300, 20, 30],
       ['lion near now', 25, 0.4, 300],
     ] as const) {
@@ -387,7 +388,6 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
       const times: number[] = [];
       // (The gesture itself: zoomAbout and pan, the camera's settle, the fold's anchor and follow, ToLaD#255.)
       const gest: number[] = [];
-      let inst = 0;
       let rects = 0;
       calls.stroke = calls.fill = calls.text = calls.pieces = 0;
       lp.n = lp.pts = 0;
@@ -416,9 +416,7 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
         v.draw();
         times.push((CPU ? cpuMs() : performance.now()) - t);
         mixArr(gl.under.f, 12 * gl.under.n);
-        mixArr(gl.mesh.f, MESH_F * gl.mesh.n);
         mixArr(gl.over.f, 12 * gl.over.n);
-        inst = Math.max(inst, gl.mesh.n);
         rects = Math.max(rects, gl.under.n);
       }
       vg.gestureEnd();
@@ -460,7 +458,7 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
       if (HASH) out(`  hash ${(hsh >>> 0).toString(16).padStart(8, '0')} cam ${(chs >>> 0).toString(16).padStart(8, '0')}`);
       hsh = chs = 0x811c9dc5;
       out(
-        `${name.padEnd(20)} ${f(q(times, 0.5))} ${f(q(times, 0.95))} ${f(Math.max(...times))} ${f(q(gest, 0.5))} ${f(q(times.map((x, i) => x + gest[i]), 0.5))} ${f(tLevel)}  inst ${String(inst).padStart(6)} rects ${String(rects).padStart(5)} strokes/f ${(calls.stroke / N).toFixed(0).padStart(5)} pieces/f ${(calls.pieces / N).toFixed(0).padStart(6)} strands/f ${(lp.n / N).toFixed(0).padStart(3)} pts/f ${(lp.pts / N).toFixed(0).padStart(6)} | ${top}`,
+        `${name.padEnd(20)} ${f(q(times, 0.5))} ${f(q(times, 0.95))} ${f(Math.max(...times))} ${f(q(gest, 0.5))} ${f(q(times.map((x, i) => x + gest[i]), 0.5))} ${f(tLevel)}  rects ${String(rects).padStart(5)} strokes/f ${(calls.stroke / N).toFixed(0).padStart(5)} pieces/f ${(calls.pieces / N).toFixed(0).padStart(6)} strands/f ${(lp.n / N).toFixed(0).padStart(3)} pts/f ${(lp.pts / N).toFixed(0).padStart(6)} | ${top}`,
       );
     }
     if (prof) {
