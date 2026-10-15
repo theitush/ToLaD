@@ -4,7 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer, defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
-import { MAMMALS_FILE } from './src/fan/mammals-data';
+import { MAMMALS_FILE, packMammals } from './src/fan/mammals-data';
 import { GLOBE_FILE } from './src/fan/globe-data';
 import { loadAll, loadClade, trimToFan } from './src/fan/panthera-extract';
 
@@ -76,10 +76,13 @@ function mammalsJson(seeded = false): string | Promise<string> {
   const clade = trimToFan(loadAll((rel) => readFileSync(join(DATA, rel))));
   const carn = new Set(trimToFan(loadClade((rel) => readFileSync(join(DATA, rel)), 'Carnivora')).species.map((s) => s.sci));
   const wiki = wikiFor(clade.species.map((s) => s.sci).filter((s) => !carn.has(s)));
-  if (!seeded) return JSON.stringify({ clade, wiki });
+  if (!seeded) return JSON.stringify(packMammals(JSON.parse(JSON.stringify({ clade, wiki }))));
   // The build's: with the level's default layout worked out here (fan/mammals-seed.ts, ToLaD#255), on the clade as the
   // page reads it (through JSON). Dev serves it without: the page works it out.
-  return mammalsSeed(JSON.parse(JSON.stringify(clade))).then((seed) => JSON.stringify({ clade, wiki, seed }));
+  // (The dated tree goes in built, splits.ts mammaliaTree: the clade's raw one is left out.)
+  return mammalsSeed(JSON.parse(JSON.stringify(clade))).then((ahead) =>
+    JSON.stringify(packMammals(JSON.parse(JSON.stringify({ clade: { ...clade, dated: undefined, datedMeta: undefined }, wiki, ...(ahead as object) })))),
+  );
 }
 
 /** fan/mammals-seed.ts run in node through a vite server of its own (the virtual data modules resolved). */
