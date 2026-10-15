@@ -158,16 +158,30 @@ const JUMP_AXIS = 0.01;
 export function shareBackSampled(n: (k: number) => number, varGens: number, maxGens: number, genYears = 1): { k: Float64Array; h: Float64Array } {
   const ks: number[] = [0];
   const hs: number[] = [1];
+  // (n and the settled share at each generation worked out once: the walk asks the same k up to ~6 times, and both
+  // are pure, so the samples are the same number for number; the mammal level opens ~5,900 of these, ToLaD#255.)
+  const nMemo = new Map<number, number>();
+  const nk = (k: number) => {
+    let v = nMemo.get(k);
+    if (v === undefined) nMemo.set(k, (v = n(k)));
+    return v;
+  };
   const r = (k: number) => {
-    const a = n(k - 1);
-    const b = n(k);
+    const a = nk(k - 1);
+    const b = nk(k);
     return a > 0 && b > 0 ? a / b : 0;
+  };
+  const sMemo = new Map<number, number>();
+  const settledAt = (k: number) => {
+    let v = sMemo.get(k);
+    if (v === undefined) sMemo.set(k, (v = settledShare(r(k))));
+    return v;
   };
   let h = 1;
   let k = 0;
   let J = 2;
   while (k < maxGens && ks.length < MAX_SHARE_SAMPLES) {
-    const settled = k > 0 && Math.abs(h - settledShare(r(k))) < 1e-10;
+    const settled = k > 0 && Math.abs(h - settledAt(k)) < 1e-10;
     if (settled && k > varGens + 2 && r(k) === 1) {
       // Constant from here to the start: the share holds.
       break;
@@ -177,9 +191,9 @@ export function shareBackSampled(n: (k: number) => number, varGens: number, maxG
       // (At most JUMP_AXIS of the time axis at a time, so a turn of the size, a fillet, is never jumped over.)
       const far = Math.floor(((k * genYears + TIME_C) * (Math.pow(10, JUMP_AXIS) - 1)) / genYears);
       for (let j = Math.min(J, far, maxGens - k); j >= 2; j >>= 1) {
-        const qEnd = settledShare(r(k + j));
+        const qEnd = settledAt(k + j);
         if (Math.abs(qEnd - h) > JUMP_TOL) continue;
-        const qMid = settledShare(r(k + (j >> 1)));
+        const qMid = settledAt(k + (j >> 1));
         if (Math.abs(qMid - (h + qEnd) / 2) > JUMP_LIN) continue;
         k += j;
         h = qEnd;
@@ -190,7 +204,7 @@ export function shareBackSampled(n: (k: number) => number, varGens: number, maxG
     }
     if (!jumped) {
       // One generation exactly (the share still moves, or the size turns too fast to jump).
-      h = parentShare(h, n(k), n(k + 1));
+      h = parentShare(h, nk(k), nk(k + 1));
       k += 1;
       J = 2;
     }

@@ -7,6 +7,7 @@
 import { drawThumb, labelThumb, thumbsOn, wikiOf } from './wiki';
 import { PIC_D, PIC_LIFT, placePics, type PicSpot } from './pics';
 import { formatCount, formatMass } from '../data/count';
+import { stamp } from '../stamp';
 import { DOUBLE_TAP_MS, Input, type InputHandlers } from '../engine/input';
 import { clipPoly, FanCamera, type Camera } from './camera';
 import { g, isNode, laneAt, layoutFan, leftAt, nearestStrand, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type EdgeStyle, type Fan, type FanBranch, type FanNode, type Measure, type WidthMode } from './layout';
@@ -1970,6 +1971,7 @@ export class FanView implements InputHandlers {
     /** The fold (fold.ts, ToLaD#146): the order one branch from afar, its splits opening as you zoom in. */
     readonly folds = false,
   ) {
+    stamp('clade');
     this.edge = edge;
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('No 2D canvas context');
@@ -1988,7 +1990,11 @@ export class FanView implements InputHandlers {
         glc.remove();
       }
     }
-    this.camera = new FanCamera(this.withFold(layoutFan(clade, this.mode, tree, this.edge, this.measure)), (b) => this.model(b));
+    stamp('gl');
+    const laid = layoutFan(clade, this.mode, tree, this.edge, this.measure);
+    stamp('layout');
+    this.camera = new FanCamera(this.withFold(laid), (b) => this.model(b));
+    stamp('fold');
     // Width and time zoom separately (#138): a sideways pinch zooms width, an upright one time, a diagonal both.
     this.input = new Input(canvas, this, true);
     this.ro = new ResizeObserver(() => this.resize());
@@ -3009,6 +3015,7 @@ export class FanView implements InputHandlers {
     }
     this.frameMs.push(performance.now() - t0);
     if (this.frameMs.length > 600) this.frameMs.shift();
+    if (this.frameMs.length <= 2) stamp(this.frameMs.length === 1 ? 'first' : 'second');
   }
 
   /**

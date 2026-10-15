@@ -81,7 +81,16 @@ try {
         const { profile } = await cdp.send('Profiler.stop');
         writeFileSync(process.env.PROFILE_OUT || 'phoneperf.cpuprofile', JSON.stringify(profile));
       }
-      console.log(`${name.padEnd(11)} load ${Math.round(load)} ms`);
+      // The page's own load stamps (src/stamp.ts, tl:<step>) and the HTML's arrival, ms from navigation (ToLaD#255);
+      // the second frame (the labels') waited for.
+      await page.waitForFunction(() => performance.getEntriesByName('tl:second').length > 0, null, { timeout: 60000 }).catch(() => {});
+      const marks = await page.evaluate(() => {
+        const n = performance.getEntriesByType('navigation')[0];
+        const out = n ? [['html', n.responseEnd], ['parsed', n.domInteractive]] : [];
+        for (const m of performance.getEntriesByType('mark')) if (m.name.startsWith('tl:')) out.push([m.name.slice(3), m.startTime]);
+        return out;
+      });
+      console.log(`${name.padEnd(11)} load ${Math.round(load)} ms  ${marks.map(([k, t]) => `${k} ${Math.round(t)}`).join(' · ')}`);
       await ctx.close();
       continue;
     }
