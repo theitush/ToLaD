@@ -12,6 +12,7 @@ import { RangeGlobe } from './Globe';
 import { CARNIVORA, FELIDAE, mammaliaClade, NATURAL_META, type HistEvent, type SpeciesRec } from './panthera';
 import { CARNIVORA_TREE, mammaliaTree } from './splits';
 import { loadMammals, mammalsLoaded } from './mammals-data';
+import { synthLevelData, synthMarksNow, synthQuery } from './synthetic-level';
 import { stamp } from '../stamp';
 import { population } from './population';
 import { WorldToggle } from './WorldToggle';
@@ -25,6 +26,8 @@ declare global {
     __fan?: FanView;
     /** The mesh's CPU mirror, for scripts/glcheck.mjs (GPU and CPU decisions compared). */
     __fanMesh?: typeof MeshMirror;
+    /** The synthetic level's depths (ToLaD#343, synthetic.ts synthMarks), for scripts/scale.mjs. */
+    __synth?: { order: string; family: string; species: string } | null;
   }
 }
 
@@ -51,9 +54,10 @@ function initialEdge(): EdgeStyle {
  * The view (ToLaD#146): the whole order, each family one branch from afar, opening as you zoom (fold.ts).
  * The level button (ToLaD#247) steps cats -> carnivores -> mammals (every living mammal) -> cats; ?level= opens one.
  */
-type Level = 'cats' | 'carnivores' | 'mammals';
+// ('synthetic', ToLaD#343: the scale yardstick's tree, `?level=synthetic&n=70000`, on the mammals' path; not on the stepper.)
+type Level = 'cats' | 'carnivores' | 'mammals' | 'synthetic';
 const LEVELS: Level[] = ['cats', 'carnivores', 'mammals'];
-const LEVEL_NAME: Record<Level, string> = { cats: 'Cats', carnivores: 'Carnivores', mammals: 'Mammals' };
+const LEVEL_NAME: Record<Level, string> = { cats: 'Cats', carnivores: 'Carnivores', mammals: 'Mammals', synthetic: 'Synthetic' };
 /**
  * The mammal level's data is a file of its own (mammals-data.ts, ToLaD#247), fetched when the level first opens:
  * 'fetch' while it comes, 'build' for one painted frame (the note shows before the layout's long synchronous build),
@@ -65,7 +69,7 @@ const mammStart = (): MammState => (mammalsLoaded() ? 'build' : 'fetch');
 function initialLevel(): Level {
   try {
     const q = new URLSearchParams(window.location.search).get('level');
-    return LEVELS.includes(q as Level) ? (q as Level) : 'carnivores';
+    return LEVELS.includes(q as Level) || q === 'synthetic' ? (q as Level) : 'carnivores';
   } catch {
     return 'carnivores';
   }
@@ -88,15 +92,16 @@ export function FanApp() {
   const [level, setLevel] = useState<Level>(initialLevel);
   const [mamm, setMamm] = useState<MammState>(mammStart);
   // The view can be built: any level but the mammals, or the mammals once their data is in.
-  const viewReady = level !== 'mammals' || mamm === 'ready';
+  const onMammals = level === 'mammals' || level === 'synthetic';
+  const viewReady = !onMammals || mamm === 'ready';
   const scaleRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (level !== 'mammals' || mamm === 'ready') return;
+    if (!onMammals || mamm === 'ready') return;
     let live = true;
     if (mamm === 'fetch')
-      loadMammals().then(
+      loadMammals(level === 'synthetic' ? () => synthLevelData(synthQuery(window.location.search)).then((d) => ((window.__synth = synthMarksNow), d)) : undefined).then(
         () => live && setMamm('build'),
         (e: unknown) => live && setMamm(`could not load the mammals (${e instanceof Error ? e.message : String(e)})`),
       );
@@ -112,7 +117,7 @@ export function FanApp() {
     const c = canvasRef.current!;
     stamp('build');
     const v =
-      level === 'mammals'
+      onMammals
         ? new FanView(c, mammaliaClade(), edge, mammaliaTree(), true)
         : level === 'carnivores'
           ? new FanView(c, CARNIVORA, edge, CARNIVORA_TREE, true)
@@ -181,7 +186,7 @@ export function FanApp() {
         {/* Home for this level, and the level stepper joined to it (ToLaD#247): one pill, so the bar stays one row. */}
         <span className="pair">
           <button type="button" onClick={() => viewRef.current?.resetView()}>
-            {level === 'cats' ? 'All cats' : level === 'mammals' ? 'All mammals' : 'All carnivores'}
+            {level === 'cats' ? 'All cats' : level === 'mammals' ? 'All mammals' : level === 'synthetic' ? `Synthetic ${synthQuery(window.location.search).n}` : 'All carnivores'}
           </button>
           <button
             type="button"

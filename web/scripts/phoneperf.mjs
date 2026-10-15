@@ -4,7 +4,8 @@
 //
 //   npm run build:single && flock /tmp/tolad-browser.lock node scripts/phoneperf.mjs
 //
-// Env: Q=extra query, THROTTLE=4, LOADONLY=1 (load times only), ONLY=scene,scene, PROFILE=scene (a CDP CPU profile of that
+// Env: SYNTH_N=70000: the synthetic level's scenes instead (ToLaD#343: home, its largest order, that order's largest
+// family; scripts/scale.mjs), LOAD_TIMEOUT=ms (default 120000). Q=extra query, THROTTLE=4, LOADONLY=1 (load times only), ONLY=scene,scene, PROFILE=scene (a CDP CPU profile of that
 // scene's gestures, written to PROFILE_OUT, default phoneperf.cpuprofile), REPS=1 (gestures repeated).
 // Per scene: load ms (navigation to the first frame drawn), then over the gestures the rAF deltas' p50/p95/max,
 // dropped frames (each delta over 16.7 ms counts the vsyncs it missed) and the draw()'s own p50/p95 (frameMs).
@@ -23,7 +24,12 @@ const W = 390;
 const H = 844;
 
 // [name, level, setup]: setup runs in the page once loaded (f = window.__fan), the view framed where the gestures start.
-const SCENES = [
+const SYNTH_N = Number(process.env.SYNTH_N || 0);
+const SCENES = SYNTH_N ? [
+  [`s${SYNTH_N}-home`, `synthetic&n=${SYNTH_N}`, { home: true }],
+  [`s${SYNTH_N}-order`, `synthetic&n=${SYNTH_N}`, { synth: 'order' }],
+  [`s${SYNTH_N}-family`, `synthetic&n=${SYNTH_N}`, { synth: 'family' }],
+] : [
   ['carnivores', 'carnivores', { home: true }],
   ['cats', 'cats', { home: true }],
   ['mammals', 'mammals', { home: true }],
@@ -45,7 +51,7 @@ try {
     // Every rAF's delta from the start; the first frame the fan draws.
     await page.addInitScript(() => {
       const w = window;
-      w.__pp = { deltas: [], cb: [], rec: false, first: 0 };
+      w.__pp = { deltas: [], cb: [], rec: false, first: 0, heap: 0, phase: '', by: {} };
       let last = 0;
       // The page's own rAF callbacks timed (the fan's frame: its flight step and draw, on the main thread).
       const raf = w.requestAnimationFrame.bind(w);
@@ -57,6 +63,9 @@ try {
         });
       const tick = (t) => {
         if (w.__pp.rec && last) w.__pp.deltas.push(t - last);
+        if (w.__pp.rec && last && w.__pp.phase) (w.__pp.by[w.__pp.phase] ??= []).push(t - last);
+        // (The JS heap's peak, MB: Chromium's performance.memory, sampled every frame.)
+        if (performance.memory) w.__pp.heap = Math.max(w.__pp.heap, performance.memory.usedJSHeapSize / 2 ** 20);
         last = t;
         if (!w.__pp.first && w.__fan && w.__fan.frameMs.length) w.__pp.first = performance.now();
         requestAnimationFrame(tick);
@@ -74,7 +83,13 @@ try {
       await cdp.send('Profiler.start');
     }
     await page.goto(url);
-    await page.waitForFunction(() => window.__pp.first > 0, null, { timeout: 120000 });
+    const ok0 = await page.waitForFunction(() => window.__pp.first > 0, null, { timeout: Number(process.env.LOAD_TIMEOUT || 120000) }).then(() => true, () => false);
+    if (!ok0) {
+      console.log(`${name.padEnd(11)} never opened within ${process.env.LOAD_TIMEOUT || 120000} ms`);
+      rows.push({ name, load: null });
+      await ctx.close();
+      continue;
+    }
     const load = await page.evaluate(() => window.__pp.first);
     if (LOADONLY) {
       if (PROFILE === name) {
@@ -90,7 +105,9 @@ try {
         for (const m of performance.getEntriesByType('mark')) if (m.name.startsWith('tl:')) out.push([m.name.slice(3), m.startTime]);
         return out;
       });
-      console.log(`${name.padEnd(11)} load ${Math.round(load)} ms  ${marks.map(([k, t]) => `${k} ${Math.round(t)}`).join(' · ')}`);
+      const heap = await page.evaluate(() => Math.round(window.__pp.heap));
+      rows.push({ name, load: Math.round(load), heap, marks: Object.fromEntries(marks.map(([k, t]) => [k, Math.round(t)])) });
+      console.log(`${name.padEnd(11)} load ${Math.round(load)} ms  heap ${heap} MB  ${marks.map(([k, t]) => `${k} ${Math.round(t)}`).join(' · ')}`);
       await ctx.close();
       continue;
     }
@@ -102,6 +119,10 @@ try {
       if (s.home) f.cam = f.homeCamera();
       else if (s.level) {
         const c = f.levelCamera(s.level);
+        if (!c) return false;
+        f.cam = c;
+      } else if (s.synth) {
+        const c = window.__synth && f.levelCamera(window.__synth[s.synth]);
         if (!c) return false;
         f.cam = c;
       } else if (s.species) {
@@ -158,16 +179,21 @@ try {
       for (const k of ['frameMs', 'labelAllMs', 'labelLayMs']) if (window.__fan[k]) window.__fan[k].length = 0;
     });
     const t0 = Date.now();
+    const phase = (k) => page.evaluate((x) => (window.__pp.phase = x), k);
     for (let r = 0; r < REPS; r++) {
+      await phase('pinch');
       await pinch(W / 2, H * 0.55, 90, 300); // in
       await idle();
+      await phase('pan');
       await pan(W * 0.3, H * 0.5, W * 0.7, H * 0.4); // pan
       await idle();
       await pan(W * 0.7, H * 0.55, W * 0.2, H * 0.45, 5, 8); // fling
       await idle();
+      await phase('pinch');
       await pinch(W / 2, H * 0.5, 300, 90); // out
       await idle();
       // A tap flight: into the widest species on screen, and back (the reset).
+      await phase('flight');
       await page.evaluate(() => {
         const f = window.__fan;
         const on = f.fan.branches.filter((b) => {
@@ -184,7 +210,7 @@ try {
     const secs = (Date.now() - t0) / 1000;
     const rec = await page.evaluate(() => {
       window.__pp.rec = false;
-      return { deltas: window.__pp.deltas, cb: window.__pp.cb, draw: [...window.__fan.frameMs], lab: [...(window.__fan.labelAllMs ?? [])], lay: [...(window.__fan.labelLayMs ?? [])] };
+      return { by: window.__pp.by, heap: Math.round(window.__pp.heap), deltas: window.__pp.deltas, cb: window.__pp.cb, draw: [...window.__fan.frameMs], lab: [...(window.__fan.labelAllMs ?? [])], lay: [...(window.__fan.labelLayMs ?? [])] };
     });
     if (PROFILE === name) {
       const { profile } = await cdp.send('Profiler.stop');
@@ -201,6 +227,9 @@ try {
     const row = {
       name,
       load: Math.round(load),
+      heap: rec.heap,
+      // (Per gesture, ToLaD#343: the rAF deltas' p50/p95 while pinching, panning, flying.)
+      by: Object.fromEntries(Object.entries(rec.by).map(([k, a]) => [k, { p50: q(a, 0.5), p95: q(a, 0.95), n: a.length }])),
       frames: d.length,
       p50: q(d, 0.5),
       p95: q(d, 0.95),
