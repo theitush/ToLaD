@@ -8,8 +8,9 @@
 // Env: NS=7000,70000 (sizes; 1M only by hand, NS=1000000, and it needs tens of GB: research/scale-yardstick.md), MODES=default,cut (cut: ?labels=cut&frame=cut; noorders: ?orders=0), NODE=0 / PHONE=0 (skip one side),
 // PHONE_NS=7000,70000 (the phone's sizes; default NS), LOAD_TIMEOUT=ms (phone: a size that has not opened by then is
 // recorded as never opening), OUT=<dir> (default scale-out/): node-<n>-<labels>.json, phone-<n>[-load].json, scale.json.
-// Run times on this machine (idle): node 7k ~0.5 min, 70k ~3 min, 1M see research/scale-yardstick.md; the phone
-// proxy 4 page loads per size.
+// Run times on this machine, per mode: node 7k ~1 min (~1 GB); 70k ~1 min load only (SCALE_GESTURES=0) but 40-60 min
+// with the gestures, its frames ~0.5 s each, and ~6 GB; the phone proxy 7k ~1 min a load, a few with the gestures.
+// 1M does not fit (research/scale-yardstick.md).
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
