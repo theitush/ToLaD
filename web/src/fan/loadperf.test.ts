@@ -74,13 +74,13 @@ describe.skipIf(!RUN)('mammal level open (perf)', () => {
     if (process.env.LOADPERF_SEED) {
       const clade = cladeOf(mammalData().clade, mammaliaTree(), 'Mammals');
       const seed = layoutSeed(clade, mammaliaTree());
-      seed.ord = new Steady(layoutFan({ ...clade, seed }, 'linear', mammaliaTree(), 'curved')).ordShare;
+      seed.ord = new Steady(layoutFan({ ...clade, seed }, 'linear', mammaliaTree())).ordShare;
       mammalData().seed = JSON.parse(JSON.stringify(seed));
       lap('(seed, build)');
     }
     mammaliaClade();
     lap('mammaliaClade');
-    const v = new FanView(canvas as unknown as HTMLCanvasElement, mammaliaClade(), 'curved', mammaliaTree(), true);
+    const v = new FanView(canvas as unknown as HTMLCanvasElement, mammaliaClade(), mammaliaTree(), true);
     lap('new FanView');
     const gl = { under: new RectBatch(), over: new RectBatch(), begin() {}, end() {} };
     (v as unknown as { gl: unknown }).gl = gl;
@@ -105,8 +105,8 @@ describe.skipIf(!RUN)('mammal level open (perf)', () => {
     // (Seeded: the layout is the worked-out one, number for number, ToLaD#255.)
     if (process.env.LOADPERF_SEED) {
       const nums = (f: Fan) => JSON.stringify([f.nodes.map((n) => [n.left, n.cx, n.blend, n.leanY, n.tile]), f.branches.map((b) => [b.cx, b.colLeft, b.x0, b.leanY, b.index, b.path.map((p) => [p.left, p.gAbove])])]);
-      expect(JSON.stringify(v.fan.tess.fold!.ordShare)).toBe(JSON.stringify(new Steady(layoutFan({ ...mammaliaClade(), seed: undefined }, 'linear', mammaliaTree(), 'curved')).ordShare));
-      expect(nums(v.fan)).toBe(nums(layoutFan({ ...mammaliaClade(), seed: undefined }, 'linear', mammaliaTree(), 'curved')));
+      expect(JSON.stringify(v.fan.tess.fold!.ordShare)).toBe(JSON.stringify(new Steady(layoutFan({ ...mammaliaClade(), seed: undefined }, 'linear', mammaliaTree())).ordShare));
+      expect(nums(v.fan)).toBe(nums(layoutFan({ ...mammaliaClade(), seed: undefined }, 'linear', mammaliaTree())));
     }
     if (prof) {
       const { profile } = await prof.post('Profiler.stop');

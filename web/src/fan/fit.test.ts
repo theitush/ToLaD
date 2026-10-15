@@ -51,7 +51,7 @@ function stubView(clade: CladeRec, tree: Split, folds = true): FanView {
     addEventListener: noop,
     removeEventListener: noop,
   };
-  return new FanView(canvas as unknown as HTMLCanvasElement, clade, 'curved', tree, folds);
+  return new FanView(canvas as unknown as HTMLCanvasElement, clade, tree, folds);
 }
 
 const settle = (v: FanView) => {

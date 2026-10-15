@@ -43,7 +43,7 @@ function stubView(clade: CladeRec = CARNIVORA, tree: Split = CARNIVORA_TREE, fol
     addEventListener: noop,
     removeEventListener: noop,
   };
-  return new FanView(canvas as unknown as HTMLCanvasElement, clade, 'curved', tree, folds);
+  return new FanView(canvas as unknown as HTMLCanvasElement, clade, tree, folds);
 }
 
 type Priv = {

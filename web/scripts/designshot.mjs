@@ -2,7 +2,7 @@
 // home, the mesh at a range of individuals per scale bar, deep in the lives,
 // zoomed far out, and a species card open.
 //   npm run build:single && node scripts/designshot.mjs <out-dir> [prefix] [only,names]
-//   (DSF: device scale factor, default 2; CLIP=x,y,w,h; DEBUG=1: the ?debug readout; EDGE=curved|straight: the fan's edges;
+//   (DSF: device scale factor, default 2; CLIP=x,y,w,h; DEBUG=1: the ?debug readout;
 //   WIDTH=linear|log: the widths, default linear; LEVEL=cats|carnivores|mammals: ?level= (default: the carnivores, ToLaD#146, #247))
 import { mkdirSync, readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
@@ -269,7 +269,7 @@ try {
   const page = await ctx.newPage();
   if (process.env.LOGS) page.on('console', (m) => console.log('  [page]', m.text()));
   page.on('pageerror', (e) => console.log('pageerror', String(e)));
-  const q = [process.env.DEBUG ? 'debug' : '', process.env.EDGE ? `edge=${process.env.EDGE}` : '', process.env.LEVEL ? `level=${process.env.LEVEL}` : '', process.env.Q || ''].filter(Boolean).join('&');
+  const q = [process.env.DEBUG ? 'debug' : '', process.env.LEVEL ? `level=${process.env.LEVEL}` : '', process.env.Q || ''].filter(Boolean).join('&');
   served = await pageUrl(q);
   await page.goto(served.url);
   await page.waitForFunction(() => !!window.__fan, null, { timeout: Number(process.env.LOAD_MS || 20000) });

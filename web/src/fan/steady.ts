@@ -426,7 +426,7 @@ export class Steady extends Fold {
   private u(y0: number, h: number, y: number): number {
     if (!(h > 0)) return y < y0 ? 1 : 0;
     const t = (y0 - y) / h;
-    return t <= 0 ? 0 : t >= 1 ? 1 : ease(this.fan.edge, t);
+    return t <= 0 ? 0 : t >= 1 ? 1 : ease(t);
   }
 
   /** The row walk's per-version constants into L (once per layout): the same sums nodeLeft and ownC make, made once. */
@@ -506,7 +506,6 @@ export class Steady extends Fold {
     const dl = L.dl!;
     const tc = L.tc!;
     const dc = L.dc!;
-    const edge = this.fan.edge;
     const nY = this.nY;
     const nYp = this.nYp;
     const bY = this.bY;
@@ -523,7 +522,7 @@ export class Steady extends Fold {
         if (!(hj > 0)) u = y < y0 ? 1 : 0;
         else {
           const t = (y0 - y) / hj;
-          u = t <= 0 ? 0 : t >= 1 ? 1 : ease(edge, t);
+          u = t <= 0 ? 0 : t >= 1 ? 1 : ease(t);
         }
         out[i] = tc[i] + dc[i] * u;
       }
@@ -545,7 +544,7 @@ export class Steady extends Fold {
         if (!(hp > 0)) u = y < y0 ? 1 : 0;
         else {
           const t = (y0 - y) / hp;
-          u = t <= 0 ? 0 : t >= 1 ? 1 : ease(edge, t);
+          u = t <= 0 ? 0 : t >= 1 ? 1 : ease(t);
         }
         x = tile[j] + dl[j] * u;
       }
@@ -574,7 +573,6 @@ export class Steady extends Fold {
     const dl = L.dl!;
     const tc = L.tc!;
     const dc = L.dc!;
-    const edge = this.fan.edge;
     let n = 0;
     st[n++] = this.rootJ;
     while (n > 0) {
@@ -591,7 +589,7 @@ export class Steady extends Fold {
           if (!(hp > 0)) u = y < y0 ? 1 : 0;
           else {
             const t = (y0 - y) / hp;
-            u = t <= 0 ? 0 : t >= 1 ? 1 : ease(edge, t);
+            u = t <= 0 ? 0 : t >= 1 ? 1 : ease(t);
           }
           x = tile[j] + dl[j] * u;
         }
@@ -615,7 +613,7 @@ export class Steady extends Fold {
             if (!(hj > 0)) u = y < y0 ? 1 : 0;
             else {
               const t = (y0 - y) / hj;
-              u = t <= 0 ? 0 : t >= 1 ? 1 : ease(edge, t);
+              u = t <= 0 ? 0 : t >= 1 ? 1 : ease(t);
             }
             out[i] = tc[i] + dc[i] * u;
           }

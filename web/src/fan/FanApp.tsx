@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type PointerEvent as RPointerEvent, type R
 import { flushSync } from 'react-dom';
 import { approxMa, formatCount, formatMass } from '../data/count';
 import { HistorySpark } from './HistorySpark';
-import type { EdgeStyle, Measure, WidthMode } from './layout';
+import type { Measure, WidthMode } from './layout';
 import { wikiOf, type WikiRec } from './wiki';
 import { RangeGlobe } from './Globe';
 import { CARNIVORA, FELIDAE, mammaliaClade, NATURAL_META, type HistEvent, type SpeciesRec } from './panthera';
@@ -22,25 +22,6 @@ declare global {
   interface Window {
     __fan?: FanView;
   }
-}
-
-/** The edges' design this viewer chose last (remembered on this device); ?edge=curved|straight overrides it. */
-const EDGE_KEY = 'tolad.fan.edge';
-function initialEdge(): EdgeStyle {
-  const isEdge = (v: unknown): v is EdgeStyle => v === 'curved' || v === 'straight';
-  try {
-    const q = new URLSearchParams(window.location.search).get('edge');
-    if (isEdge(q)) return q;
-  } catch {
-    /* no URL */
-  }
-  try {
-    const v = window.localStorage.getItem(EDGE_KEY);
-    if (isEdge(v)) return v;
-  } catch {
-    /* no storage */
-  }
-  return 'curved';
 }
 
 /**
@@ -78,7 +59,6 @@ export function FanApp() {
   const [mode, setMode] = useState<WidthMode>('linear');
   // What the widths count (ToLaD#276): individuals, or their mass (`?width=mass`).
   const [measure, setMeasure] = useState<Measure>(initialMeasure);
-  const [edge, setEdge] = useState<EdgeStyle>(initialEdge);
   const [sel, setSel] = useState<Selection | null>(null);
   const [searching, setSearching] = useState(false);
   const [level, setLevel] = useState<Level>(initialLevel);
@@ -109,10 +89,10 @@ export function FanApp() {
     stamp('build');
     const v =
       level === 'mammals'
-        ? new FanView(c, mammaliaClade(), edge, mammaliaTree(), true)
+        ? new FanView(c, mammaliaClade(), mammaliaTree(), true)
         : level === 'carnivores'
-          ? new FanView(c, CARNIVORA, edge, CARNIVORA_TREE, true)
-          : new FanView(c, FELIDAE, edge);
+          ? new FanView(c, CARNIVORA, CARNIVORA_TREE, true)
+          : new FanView(c, FELIDAE);
     stamp('view');
     if (mode !== 'linear') v.setMode(mode);
     v.setMeasure(measure);
@@ -156,22 +136,6 @@ export function FanApp() {
           }}
         >
           {mode === 'log' ? 'log widths' : 'linear widths'}
-        </button>
-        <button
-          type="button"
-          aria-label="branch shape"
-          onClick={() => {
-            const next = edge === 'curved' ? 'straight' : 'curved';
-            setEdge(next);
-            viewRef.current?.setEdge(next);
-            try {
-              window.localStorage.setItem(EDGE_KEY, next);
-            } catch {
-              /* not remembered */
-            }
-          }}
-        >
-          {edge}
         </button>
         {/* Home for this level, and the level stepper joined to it (ToLaD#247): one pill, so the bar stays one row. */}
         <span className="pair">

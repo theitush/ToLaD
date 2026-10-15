@@ -42,7 +42,7 @@ function stubView(clade: CladeRec = CARNIVORA, tree: Split = CARNIVORA_TREE, fol
     addEventListener: noop,
     removeEventListener: noop,
   };
-  return new FanView(canvas as unknown as HTMLCanvasElement, clade, 'curved', tree, folds);
+  return new FanView(canvas as unknown as HTMLCanvasElement, clade, tree, folds);
 }
 
 type Inner = { anim: ((t: number) => boolean) | null; applyFold(): void; brackets: Brackets | null; tapAt: { v: FanNode | null } | null };

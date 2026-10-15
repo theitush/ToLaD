@@ -54,7 +54,7 @@ function stubView(): FanView {
     addEventListener: noop,
     removeEventListener: noop,
   };
-  const v = new FanView(canvas as unknown as HTMLCanvasElement, CARNIVORA, 'curved', CARNIVORA_TREE, true);
+  const v = new FanView(canvas as unknown as HTMLCanvasElement, CARNIVORA, CARNIVORA_TREE, true);
   const gl = {
     under: new RectBatch(),
     over: new RectBatch(),

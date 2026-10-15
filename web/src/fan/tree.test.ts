@@ -3,14 +3,14 @@
 // genealogy recurrence on the summed population, geometry fixed in the world.
 import { describe, expect, it } from 'vitest';
 import { FanCamera } from './camera';
-import { columnsAt, isNode, laneAt, layoutFan, leftAt, nodeQ, type Fan, type FanBranch, type EdgeStyle, type FanNode, type WidthMode } from './layout';
+import { columnsAt, isNode, laneAt, layoutFan, leftAt, nodeQ, type Fan, type FanBranch, type FanNode, type WidthMode } from './layout';
 import { FELIDAE } from './panthera';
 import { parentShare, Q_STAR } from './population';
-import { allSplits, FELIDAE_TREE, speciesUnder, type Split } from './splits';
+import { allSplits, FELIDAE_TREE, speciesUnder } from './splits';
 import { TwigModel } from './twigs';
 
-function camera(mode: WidthMode, edge: EdgeStyle): FanCamera {
-  const fan = layoutFan(FELIDAE, mode, undefined, edge);
+function camera(mode: WidthMode): FanCamera {
+  const fan = layoutFan(FELIDAE, mode);
   const models = new Map<FanBranch, TwigModel>();
   const model = (b: FanBranch) => {
     let m = models.get(b);
@@ -26,7 +26,6 @@ function camera(mode: WidthMode, edge: EdgeStyle): FanCamera {
 }
 
 const MODES: WidthMode[] = ['log', 'linear'];
-const EDGES: EdgeStyle[] = ['curved', 'straight'];
 /** A hair above / below a height (relative, so it survives the log axis; small, since a genomic deep past still slopes at a split: the sums agree in the limit). */
 const above = (y: number) => y - 1e-9 * Math.max(1, Math.abs(y));
 const below = (y: number) => y + 1e-9 * Math.max(1, Math.abs(y));
@@ -34,9 +33,9 @@ const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 const byName = (f: Fan, name: string) => f.branches.find((b) => b.sp.common === name)!;
 
 describe('the dated tree', () => {
-  for (const edge of EDGES) {
-    it(`every species is placed once, under its own splits, sides chosen for the shortest leans (${edge})`, () => {
-      const f = layoutFan(FELIDAE, 'linear', undefined, edge);
+  {
+    it('every species is placed once, under its own splits, sides chosen for the shortest leans', () => {
+      const f = layoutFan(FELIDAE, 'linear');
       const drawn = [...f.branches].sort((p, q) => p.index - q.index);
       expect(drawn.map((b) => b.sp.sci).sort()).toEqual(speciesUnder(FELIDAE_TREE).sort());
       expect(drawn).toEqual(f.root.strands);
@@ -53,47 +52,10 @@ describe('the dated tree', () => {
     });
   }
 
+
   for (const mode of MODES) {
-    it(`the toggle keeps every species in its left-to-right place: one order for both designs (${mode})`, () => {
-      const [c, s] = EDGES.map((e) => layoutFan(FELIDAE, mode, undefined, e));
-      // Left to right as drawn, by the columns' centres once they have peeled off.
-      // (The species' order: the strands' in the stem. A column may tuck in under a wider neighbour's later spread, so not by centre.)
-    const ltr = (f: Fan) => f.root.strands.map((b) => b.sp.sci);
-      expect(ltr(s)).toEqual(ltr(c));
-      expect(ltr(c)).toEqual(c.root.strands.map((b) => b.sp.sci));
-      expect(s.branches.map((b) => b.index)).toEqual(c.branches.map((b) => b.index));
-      // And every parent column holds its daughters in the same order.
-      const kids = (f: Fan) => f.nodes.map((v) => v.kids.map((k) => (isNode(k) ? k.split.name + k.ageMa : k.sp.sci)));
-      expect(kids(s)).toEqual(kids(c));
-    });
-  }
-
-  it('one order for both designs on any tree: a random 40-species one, toggled either way round', () => {
-    // Panthera's records, cloned, on a random binary tree (Felidae's size).
-    const species = Array.from({ length: 40 }, (_, i) => ({ ...FELIDAE.species[i % FELIDAE.species.length], sci: `S${i}`, common: `S${i}` }));
-    let seed = 7;
-    const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
-    const build = (names: string[], age: number): Split | string => {
-      if (names.length === 1) return names[0];
-      const cut = 1 + Math.floor(rnd() * (names.length - 1));
-      const a = age * (0.5 + 0.4 * rnd());
-      return { name: `n${names.length}`, ageMa: age, lo: age, hi: age, kids: [build(names.slice(0, cut), a), build(names.slice(cut), a * 0.98)] } as Split;
-    };
-    const tree = build(species.map((s) => s.sci), 4.6) as Split;
-    // (The species' order: the strands' in the stem. A column may tuck in under a wider neighbour's later spread, so not by centre.)
-    const ltr = (f: Fan) => f.root.strands.map((b) => b.sp.sci);
-    // Curved first, then straight (sides reused); and straight first on a fresh clade (sides searched).
-    const c1 = layoutFan({ ...FELIDAE, species }, 'log', tree, 'curved');
-    const s1 = layoutFan(c1.clade, 'log', tree, 'straight');
-    const s2 = layoutFan({ ...FELIDAE, species }, 'log', tree, 'straight');
-    expect(ltr(s1)).toEqual(ltr(c1));
-    expect(ltr(s2)).toEqual(ltr(c1));
-    expect(s2.branches.map((b) => b.cx)).toEqual(s1.branches.map((b) => b.cx));
-  });
-
-  for (const edge of EDGES) for (const mode of MODES) {
-    it(`each split is at its table date (${mode}, ${edge})`, () => {
-      const f = layoutFan(FELIDAE, mode, undefined, edge);
+    it(`each split is at its table date (${mode})`, () => {
+      const f = layoutFan(FELIDAE, mode);
       // The oldest split is the fork, y = 0; the stem below it.
       expect(f.root.ageMa).toBe(FELIDAE_TREE.ageMa);
       expect(f.root.y).toBeCloseTo(0, 12);
@@ -110,7 +72,7 @@ describe('the dated tree', () => {
           // Its column grows out of its slice of the parent (no jog), and has peeled off to its own centre a fork span above.
           expect(leftAt(k, below(k.splitY))).toBeCloseTo(k.path[0].left, 12);
           // (A straight lean leaves at its slope: a hair above, a hair aside.)
-          expect(leftAt(k, above(k.splitY))).toBeCloseTo(k.path[0].left, edge === 'curved' ? 5 : 3);
+          expect(leftAt(k, above(k.splitY))).toBeCloseTo(k.path[0].left, 5);
           const yF = k.leanY;
           if (yF > k.tipY) expect(leftAt(k, yF) + laneAt(k, yF).w / 2).toBeCloseTo(k.cx, 9);
           expect(k.path[0].node).toBe(v);
@@ -127,8 +89,8 @@ describe('the dated tree', () => {
       expect(start('Yucatán cave cat')).toBe(0.129);
     });
 
-    it(`widths add up at every split: the parent just below = the daughters just above (${mode}, ${edge})`, () => {
-      const f = layoutFan(FELIDAE, mode, undefined, edge);
+    it(`widths add up at every split: the parent just below = the daughters just above (${mode})`, () => {
+      const f = layoutFan(FELIDAE, mode);
       for (const v of f.nodes) {
         const up = above(v.y);
         const dn = below(v.y);
@@ -150,7 +112,7 @@ describe('the dated tree', () => {
         // Curved: where its daughters' peels are the shortest, the farthest left as far as the farthest right
         // (straight: the larger daughter runs straight on).
         // Off that place only where two splits come close in time, and then every peel under the edges' limit (12, layout.test).
-        if (edge === 'curved') {
+        {
           const moves = v.kids.map((k) => (isNode(k) ? k.left - k.tile : k.cx - (k.x0 + k.baseW / 2)));
           const fork = v.y - v.kids[0].leanY;
           if (Math.abs(Math.max(...moves) + Math.min(...moves)) > 1e-9) for (const m of moves) expect(Math.abs(m) * 1.875).toBeLessThanOrEqual(12 * fork);
@@ -163,8 +125,8 @@ describe('the dated tree', () => {
       expect(columnsAt(f, 1)).toEqual([f.stem]);
     });
 
-    it(`an extinct branch is 0% green above its split, its own column all line-ended (${mode}, ${edge})`, () => {
-      const f = layoutFan(FELIDAE, mode, undefined, edge);
+    it(`an extinct branch is 0% green above its split, its own column all line-ended (${mode})`, () => {
+      const f = layoutFan(FELIDAE, mode);
       const extinct = f.branches.filter((b) => b.sp.extinct);
       // (The overrides' four Panthera fossils: the fossils the data grafts by taxonomy are not drawn, FAN_PLACEMENT, ToLaD#145.)
       expect(extinct.map((b) => b.sp.common).sort()).toEqual(['Cave lion', 'European jaguar', 'Longdan tiger', 'Yucatán cave cat']);
@@ -178,8 +140,8 @@ describe('the dated tree', () => {
       }
     });
 
-    it(`a parent column is green by the genealogy recurrence on the summed population, turning from its daughters' own shares (${mode}, ${edge})`, () => {
-      const f = layoutFan(FELIDAE, mode, undefined, edge);
+    it(`a parent column is green by the genealogy recurrence on the summed population, turning from its daughters' own shares (${mode})`, () => {
+      const f = layoutFan(FELIDAE, mode);
       // The share with living descendants just above a split, weighted by size: what feeds the parent.
       const shareAbove = (k: FanNode | FanBranch, ageMa: number): [number, number] =>
         isNode(k) ? [nodeQ(k, ageMa), k.n] : [k.sp.extinct ? 0 : k.pop.greenAt(ageMa - 1e-9), k.pop.founders];
@@ -221,7 +183,7 @@ describe('the dated tree', () => {
       expect(nodeQ(v, v.ageMa)).toBeCloseTo((lion.pop.greenAt(v.ageMa - 1e-9) * lion.pop.founders) / (lion.pop.founders + cave.pop.founders), 12);
     });
 
-    it(`geometry is identical for two cameras at two zooms (${mode}, ${edge})`, () => {
+    it(`geometry is identical for two cameras at two zooms (${mode})`, () => {
       const sample = (f: Fan) =>
         f.branches.flatMap((b) =>
           [0, 1e-4, 0.01, 0.1, 0.3, 0.5, 1, 2, 2.3, 2.575, 3, 3.55, 4, 4.6, 5, 100].map((a) => {
@@ -230,9 +192,9 @@ describe('the dated tree', () => {
             return [leftAt(b, y), L.w, L.gw];
           }),
         );
-      const a = camera(mode, edge);
+      const a = camera(mode);
       const ref = sample(a.fan);
-      const b = camera(mode, edge);
+      const b = camera(mode);
       // (About the lion's column 100 kyr ago: zooming never goes into nothing.)
       const lion = byName(b.fan, 'Lion');
       const [px, py] = b.toScreen(lion.cx, b.fan.time.y(0.1));

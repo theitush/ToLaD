@@ -187,8 +187,8 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
       t0 = performance.now();
     }
     const v = mamm
-      ? new FanView(canvas as unknown as HTMLCanvasElement, mammaliaClade(), 'curved', mammaliaTree(), true)
-      : new FanView(canvas as unknown as HTMLCanvasElement, carn ? CARNIVORA : FELIDAE, 'curved', carn ? CARNIVORA_TREE : FELIDAE_TREE, carn);
+      ? new FanView(canvas as unknown as HTMLCanvasElement, mammaliaClade(), mammaliaTree(), true)
+      : new FanView(canvas as unknown as HTMLCanvasElement, carn ? CARNIVORA : FELIDAE, carn ? CARNIVORA_TREE : FELIDAE_TREE, carn);
     const tNew = performance.now() - t0;
     const gl = { under: new RectBatch(), over: new RectBatch(), begin() {}, end() {} };
     gl.begin = () => {
