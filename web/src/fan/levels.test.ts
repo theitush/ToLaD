@@ -388,7 +388,7 @@ describe.skipIf(wantCutLabels())('a "+x" stands for the names hidden near it; ta
   }
 });
 
-describe("the groups' names mid-branch: none meet (ToLaD#266, #342)", () => {
+describe("the groups' names beside their branch: none meet, each within its branch's run (ToLaD#262, #266, #342)", () => {
   for (const [name, mk] of FANS) {
     {
       it(name, () => {
@@ -405,7 +405,7 @@ describe("the groups' names mid-branch: none meet (ToLaD#266, #342)", () => {
               const [p, q] = [hits[i].box, hits[j].box];
               if (p[0] < q[2] && q[0] < p[2] && p[1] < q[3] && q[1] < p[3]) bad.push(`${at}: ${nameOf(hits[i].lv)} meets ${nameOf(hits[j].lv)}`);
             }
-          // Along its branch: between "now" (its tip) and where it splits off, as far as the screen shows.
+          // Within its branch's run: between "now" (its tip) and where it splits off, as far as the screen shows.
           for (const h of hits) {
             const wTop = h.lv.b ? Math.max(h.lv.b.tipY, v.fan.time.y(0)) : v.fan.time.y(0);
             const wBot = h.lv.b ? h.lv.b.splitY : h.lv.v.yBot;
