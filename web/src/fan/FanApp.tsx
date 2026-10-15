@@ -1,12 +1,10 @@
-// The main view: the dated Panthera tree, OneZoom-style. The time river is
-// still available at ?river (and the synthetic spike tree at ?synthetic).
+// The main view: the dated tree, OneZoom-style.
 
-import * as MeshMirror from './mesh';
 import { useEffect, useRef, useState, type PointerEvent as RPointerEvent, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import { approxMa, formatCount, formatMass } from '../data/count';
 import { HistorySpark } from './HistorySpark';
-import type { EdgeStyle, Measure, WidthMode } from './layout';
+import type { Measure, WidthMode } from './layout';
 import { wikiOf, type WikiRec } from './wiki';
 import { RangeGlobe } from './Globe';
 import { CARNIVORA, FELIDAE, mammaliaClade, NATURAL_META, type HistEvent, type SpeciesRec } from './panthera';
@@ -18,33 +16,12 @@ import { WorldToggle } from './WorldToggle';
 import { MagnifierIcon, SearchPanel } from './SearchPanel';
 import { statusOf } from './status';
 import { cardTapper, onControl } from './cardtap';
-import { FanView, fmtInt, formatYearsAgo, initialMeasure, type IndInfo, type Lineage, type Selection } from './view';
+import { FanView, initialMeasure, type Lineage, type Selection } from './view';
 
 declare global {
   interface Window {
     __fan?: FanView;
-    /** The mesh's CPU mirror, for scripts/glcheck.mjs (GPU and CPU decisions compared). */
-    __fanMesh?: typeof MeshMirror;
   }
-}
-
-/** The edges' design this viewer chose last (remembered on this device); ?edge=curved|straight overrides it. */
-const EDGE_KEY = 'tolad.fan.edge';
-function initialEdge(): EdgeStyle {
-  const isEdge = (v: unknown): v is EdgeStyle => v === 'curved' || v === 'straight';
-  try {
-    const q = new URLSearchParams(window.location.search).get('edge');
-    if (isEdge(q)) return q;
-  } catch {
-    /* no URL */
-  }
-  try {
-    const v = window.localStorage.getItem(EDGE_KEY);
-    if (isEdge(v)) return v;
-  } catch {
-    /* no storage */
-  }
-  return 'curved';
 }
 
 /**
@@ -82,7 +59,6 @@ export function FanApp() {
   const [mode, setMode] = useState<WidthMode>('linear');
   // What the widths count (ToLaD#276): individuals, or their mass (`?width=mass`).
   const [measure, setMeasure] = useState<Measure>(initialMeasure);
-  const [edge, setEdge] = useState<EdgeStyle>(initialEdge);
   const [sel, setSel] = useState<Selection | null>(null);
   const [searching, setSearching] = useState(false);
   const [level, setLevel] = useState<Level>(initialLevel);
@@ -113,10 +89,10 @@ export function FanApp() {
     stamp('build');
     const v =
       level === 'mammals'
-        ? new FanView(c, mammaliaClade(), edge, mammaliaTree(), true)
+        ? new FanView(c, mammaliaClade(), mammaliaTree(), true)
         : level === 'carnivores'
-          ? new FanView(c, CARNIVORA, edge, CARNIVORA_TREE, true)
-          : new FanView(c, FELIDAE, edge);
+          ? new FanView(c, CARNIVORA, CARNIVORA_TREE, true)
+          : new FanView(c, FELIDAE);
     stamp('view');
     if (mode !== 'linear') v.setMode(mode);
     v.setMeasure(measure);
@@ -125,7 +101,6 @@ export function FanApp() {
     v.barEl = barRef.current;
     viewRef.current = v;
     window.__fan = v;
-    window.__fanMesh = MeshMirror;
     v.request();
     // The canvas text waits for the faces (drawn in system type until then).
     if (typeof document !== 'undefined' && document.fonts) {
@@ -161,22 +136,6 @@ export function FanApp() {
           }}
         >
           {mode === 'log' ? 'log widths' : 'linear widths'}
-        </button>
-        <button
-          type="button"
-          aria-label="branch shape"
-          onClick={() => {
-            const next = edge === 'curved' ? 'straight' : 'curved';
-            setEdge(next);
-            viewRef.current?.setEdge(next);
-            try {
-              window.localStorage.setItem(EDGE_KEY, next);
-            } catch {
-              /* not remembered */
-            }
-          }}
-        >
-          {edge}
         </button>
         {/* Home for this level, and the level stepper joined to it (ToLaD#247): one pill, so the bar stays one row. */}
         <span className="pair">
@@ -239,8 +198,6 @@ export function FanApp() {
       {sel ? (
         sel.lineage ? (
           <LineageCard lin={sel.lineage} onClose={() => viewRef.current?.tap(-1e6, -1e6)} onUp={cardUp} />
-        ) : sel.ind ? (
-          <IndCard sp={sel.sp} ind={sel.ind} onClose={() => viewRef.current?.tap(-1e6, -1e6)} onUp={cardUp} />
         ) : (
           <SpeciesCard sp={sel.sp} mass={measure === 'mass'} ageMa={sel.ageMa} startMa={sel.startMa} event={sel.event?.k} onClose={() => viewRef.current?.tap(-1e6, -1e6)} onUp={cardUp} />
         )
@@ -757,32 +714,3 @@ export function LineageCard({ lin, onClose, onUp }: { lin: Lineage; onClose: () 
   );
 }
 
-function IndCard({ sp, ind, onClose, onUp }: { sp: SpeciesRec; ind: IndInfo; onClose: () => void; onUp?: (x: number, y: number) => void }) {
-  return (
-    <CardShell onUp={onUp}>
-      <button type="button" className="x" onClick={onClose} aria-label="Close">
-        ×
-      </button>
-      <div className="t">
-        <span className={`dot ${ind.alive ? 'alive' : 'dead'}`} /> <span className="mono">{ind.handle}</span>
-      </div>
-      <div>
-        {ind.sex} {midName(sp)} · {ind.alive ? 'alive now' : 'dead'} · born ~{formatYearsAgo(ind.bornYearsAgo)}
-      </div>
-      <div className="dim">
-        lived {ind.lifespan.toFixed(1)} y · generation {fmtInt(ind.g + 1)} of {fmtInt(ind.G)} · {ind.children} children
-      </div>
-      <div className="dim">
-        parents:{' '}
-        {ind.parents.length === 0
-          ? 'none (founding generation)'
-          : ind.parents.map((p, k) => (
-              <span key={k} className="mono">
-                {k ? ' + ' : ''}
-                {p.handle}
-              </span>
-            ))}
-      </div>
-    </CardShell>
-  );
-}

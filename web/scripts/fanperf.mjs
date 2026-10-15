@@ -22,7 +22,7 @@ try {
   const scenes = [
     ['overview', 'Lion', 2e5, 1e9, 0.7],
     ['mid', 'Lion', 5e4, 1e7, 3],
-    ['texture', 'Lion', 2000, 60, 5],
+    ['close', 'Lion', 2000, 60, 5],
     ['lives', 'Lion', 300, 20, 30],
     ['near now', 'Lion', 25, 0.4, 300],
     ['deep', 'Tiger', 1.5e6, 100, 50],

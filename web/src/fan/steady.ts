@@ -43,7 +43,7 @@ const LIFE_SAMPLES = 48;
 
 /**
  * Whether a level whose living members dwarf its fossils is framed on the fossils (ToLaD#289): ?fit=fossils, or
- * TOLAD_FIT=fossils in node; the globe menu's "Fit fossils". It turns on the rooms by life (wantLifeRooms) too. Off by default.
+ * TOLAD_FIT=fossils in node; the globe menu's "Fit fossils". It turns on the rooms by life (wantLifeRooms, computeLife). Off by default.
  */
 export function wantFitFossils(): boolean {
   try {
@@ -59,21 +59,11 @@ export function wantFitFossils(): boolean {
 }
 
 /**
- * Whether a fossil's room is only what it stood beside while it lived (ToLaD#289): ?rooms=life, or TOLAD_ROOMS=life
- * in node. Off by default: every room is its widest ever, so a hominin fossil stands beside the humans' 8e9-wide room.
+ * Whether a fossil's room is only what it stood beside while it lived (ToLaD#289): under ?fit=fossils, which needs it
+ * (its hominins' columns and names, fit.test.ts, were measured with these rooms). Else every room is its widest ever.
  */
 export function wantLifeRooms(): boolean {
-  if (wantFitFossils()) return true;
-  try {
-    if (typeof location !== 'undefined') {
-      const q = new URLSearchParams(location.search).get('rooms');
-      if (q) return q === 'life';
-    }
-  } catch {
-    /* no URL */
-  }
-  const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
-  return env?.TOLAD_ROOMS === 'life';
+  return wantFitFossils();
 }
 
 /** The rooms and places at one set of a's and width zoom (world x, the stem's centre on Fold.home). */
@@ -436,7 +426,7 @@ export class Steady extends Fold {
   private u(y0: number, h: number, y: number): number {
     if (!(h > 0)) return y < y0 ? 1 : 0;
     const t = (y0 - y) / h;
-    return t <= 0 ? 0 : t >= 1 ? 1 : ease(this.fan.edge, t);
+    return t <= 0 ? 0 : t >= 1 ? 1 : ease(t);
   }
 
   /** The row walk's per-version constants into L (once per layout): the same sums nodeLeft and ownC make, made once. */
@@ -516,7 +506,6 @@ export class Steady extends Fold {
     const dl = L.dl!;
     const tc = L.tc!;
     const dc = L.dc!;
-    const edge = this.fan.edge;
     const nY = this.nY;
     const nYp = this.nYp;
     const bY = this.bY;
@@ -533,7 +522,7 @@ export class Steady extends Fold {
         if (!(hj > 0)) u = y < y0 ? 1 : 0;
         else {
           const t = (y0 - y) / hj;
-          u = t <= 0 ? 0 : t >= 1 ? 1 : ease(edge, t);
+          u = t <= 0 ? 0 : t >= 1 ? 1 : ease(t);
         }
         out[i] = tc[i] + dc[i] * u;
       }
@@ -555,7 +544,7 @@ export class Steady extends Fold {
         if (!(hp > 0)) u = y < y0 ? 1 : 0;
         else {
           const t = (y0 - y) / hp;
-          u = t <= 0 ? 0 : t >= 1 ? 1 : ease(edge, t);
+          u = t <= 0 ? 0 : t >= 1 ? 1 : ease(t);
         }
         x = tile[j] + dl[j] * u;
       }
@@ -584,7 +573,6 @@ export class Steady extends Fold {
     const dl = L.dl!;
     const tc = L.tc!;
     const dc = L.dc!;
-    const edge = this.fan.edge;
     let n = 0;
     st[n++] = this.rootJ;
     while (n > 0) {
@@ -601,7 +589,7 @@ export class Steady extends Fold {
           if (!(hp > 0)) u = y < y0 ? 1 : 0;
           else {
             const t = (y0 - y) / hp;
-            u = t <= 0 ? 0 : t >= 1 ? 1 : ease(edge, t);
+            u = t <= 0 ? 0 : t >= 1 ? 1 : ease(t);
           }
           x = tile[j] + dl[j] * u;
         }
@@ -625,7 +613,7 @@ export class Steady extends Fold {
             if (!(hj > 0)) u = y < y0 ? 1 : 0;
             else {
               const t = (y0 - y) / hj;
-              u = t <= 0 ? 0 : t >= 1 ? 1 : ease(edge, t);
+              u = t <= 0 ? 0 : t >= 1 ? 1 : ease(t);
             }
             out[i] = tc[i] + dc[i] * u;
           }

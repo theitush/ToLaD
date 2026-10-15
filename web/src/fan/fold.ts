@@ -253,7 +253,6 @@ export abstract class Fold {
   roomAt(b: FanBranch, y: number, age?: number): number {
     const p = this.roomPlan(b);
     const { B, L } = p;
-    const edge = this.fan.edge;
     const yy = Math.max(y, b.tipY);
     let k = 0;
     while (k + 2 < B.length && yy < B[k + 1]) k++;
@@ -261,14 +260,14 @@ export abstract class Fold {
     if (k === 0 && yy > b.splitY - p.peel) {
       // (Its peel: from its founders' slot up to its room; a column widening faster takes the lead, smoothly: one bend.)
       const u = (b.splitY - yy) / p.peel;
-      r = b.baseW + (L[0] - b.baseW) * ease(edge, u);
+      r = b.baseW + (L[0] - b.baseW) * ease(u);
       const w = laneW(b, yy);
       const e = 0.4 * L[0] * u * (1 - u);
       r = (r + w + Math.sqrt((r - w) * (r - w) + e * e)) / 2;
-    } else if (k > 0 && yy > B[k] - ROOM_BEND / 2) r = L[k - 1] + (L[k] - L[k - 1]) * ease(edge, 0.5 + (B[k] - yy) / ROOM_BEND);
-    else if (k + 2 < B.length && yy < B[k + 1] + ROOM_BEND / 2) r = L[k] + (L[k + 1] - L[k]) * ease(edge, 0.5 + (B[k + 1] - yy) / ROOM_BEND);
+    } else if (k > 0 && yy > B[k] - ROOM_BEND / 2) r = L[k - 1] + (L[k] - L[k - 1]) * ease(0.5 + (B[k] - yy) / ROOM_BEND);
+    else if (k + 2 < B.length && yy < B[k + 1] + ROOM_BEND / 2) r = L[k] + (L[k + 1] - L[k]) * ease(0.5 + (B[k + 1] - yy) / ROOM_BEND);
     if (y >= b.tipY) return Math.max(r, laneW(b, y, age));
-    r *= 1 - ease(edge, (b.tipY - y) / Fold.endH(b));
+    r *= 1 - ease((b.tipY - y) / Fold.endH(b));
     return r;
   }
 

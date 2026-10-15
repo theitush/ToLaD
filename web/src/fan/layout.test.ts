@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { columnsAt, g, GAP_FRAC, isNode, laneAt, layoutFan, layoutSeed, LEAN_MAX_FRAC, leftAt, MIN_GAP_FRAC, nodeLeftAt, segAt, strandAt, TIME_H, type EdgeStyle, type WidthMode } from './layout';
+import { columnsAt, g, GAP_FRAC, isNode, laneAt, layoutFan, layoutSeed, leftAt, MIN_GAP_FRAC, nodeLeftAt, segAt, strandAt, TIME_H, type WidthMode } from './layout';
 import { CARNIVORA, FELIDAE } from './panthera';
 import { CARNIVORA_TREE } from './splits';
 
@@ -46,9 +46,9 @@ describe('the fan, both designs: fixed, continuous, honest', () => {
     return () => (s = (s * 1103515245 + 12345) % 2147483648) / 2147483648;
   };
 
-  for (const edge of ['curved', 'straight'] as EdgeStyle[]) for (const mode of ['log', 'linear'] as WidthMode[]) {
-    it(`width = N(t) × one fixed scale, exactly, at every height; green = its share (${mode}, ${edge})`, () => {
-      const fan = layoutFan(FELIDAE, mode, undefined, edge);
+  for (const mode of ['log', 'linear'] as WidthMode[]) {
+    it(`width = N(t) × one fixed scale, exactly, at every height; green = its share (${mode})`, () => {
+      const fan = layoutFan(FELIDAE, mode);
       const rnd = seeded(5);
       // One width per individual (linear) or per decade of individuals (log), the same for every branch:
       // the number the scale bar shows (view.ts widthScale).
@@ -69,11 +69,8 @@ describe('the fan, both designs: fixed, continuous, honest', () => {
       }
     });
 
-    // Straight + log was `it.fails` for the too-steep leans at the crowded Felidae splits (#102); it passes since
-    // ToLaD#143's natural anchor rebuilt the leopard's and cougar's deep pasts (both wider before 1500), so the
-    // data no longer trips it. #102 itself (the design's lean rule) is not fixed by this.
-    it(`every edge is a continuous function of time: edges and the lanes' boundary, no jog at a split, no step at a population change (${mode}, ${edge})`, () => {
-      const fan = layoutFan(FELIDAE, mode, undefined, edge);
+    it(`every edge is a continuous function of time: edges and the lanes' boundary, no jog at a split, no step at a population change (${mode})`, () => {
+      const fan = layoutFan(FELIDAE, mode);
       const yb = fan.trunkBottom.y;
       const edges = (b: (typeof fan.branches)[0], y: number) => {
         const l = leftAt(b, y);
@@ -109,13 +106,13 @@ describe('the fan, both designs: fixed, continuous, honest', () => {
       }
     });
 
-    it(`columns are symmetric about fixed centres, sister species packed as close as the gap allows at some height, and never overlap (${mode}, ${edge})`, () => {
-      const fan = layoutFan(FELIDAE, mode, undefined, edge);
+    it(`columns are symmetric about fixed centres, sister species packed as close as the gap allows at some height, and never overlap (${mode})`, () => {
+      const fan = layoutFan(FELIDAE, mode);
       const W = fan.trunkWidth;
       const bs = [...fan.branches].sort((p, q) => p.index - q.index);
       // Curved: two sister species as close as the gap lets them be at their closest height (their columns at their own
       // places: GAP_FRAC of the narrower there, at least MIN_GAP_FRAC of the stem's; a hair more for the packing's cells).
-      if (edge === 'curved') for (const v of fan.nodes) for (let i = 1; i < v.kids.length; i++) {
+      for (const v of fan.nodes) for (let i = 1; i < v.kids.length; i++) {
         const p = v.kids[i - 1];
         const q = v.kids[i];
         if (isNode(p) || isNode(q)) continue;
@@ -164,33 +161,6 @@ describe('the fan, both designs: fixed, continuous, honest', () => {
   }
 });
 
-describe('straight: lines that lean', () => {
-  for (const mode of ['log', 'linear'] as WidthMode[]) {
-    it(`the larger daughter runs straight on; each other leans out to clear its sibling's subtree, ending before either daughter's next event (${mode})`, () => {
-      const fan = layoutFan(FELIDAE, mode, undefined, 'straight');
-      const bandW = (k: (typeof fan.nodes)[0]['kids'][0]) => (isNode(k) ? k.width : k.baseW);
-      for (const v of fan.nodes) {
-        const room = Math.min(...v.kids.map((k) => v.y - (isNode(k) ? k.y : k.tipY)));
-        const main = v.kids.reduce((m, k) => (bandW(k) > bandW(m) ? k : m), v.kids[0]);
-        for (const k of v.kids) {
-          const leans = isNode(k) ? Math.abs(k.left - k.tile) > 1e-9 : Math.abs(k.cx - (k.x0 + k.baseW / 2)) > 1e-12;
-          expect(leans).toBe(k !== main);
-          if (k === main) expect(k.leanY).toBe(v.y);
-          else {
-            expect(k.leanY).toBeLessThan(v.y);
-            expect(v.y - k.leanY).toBeLessThanOrEqual(LEAN_MAX_FRAC * room * (1 + 1e-12));
-          }
-        }
-      }
-      // Nothing ever overlaps.
-      for (let k = 0; k <= 3000; k++) {
-        const y = -TIME_H + ((fan.trunkBottom.y + TIME_H) * k) / 3000;
-        const cs = columnsAt(fan, y).sort((p, q) => p[0] - q[0]);
-        for (let i = 1; i < cs.length; i++) expect(cs[i][0]).toBeGreaterThanOrEqual(cs[i - 1][1] - 1e-9);
-      }
-    });
-  }
-});
 
 describe('Tess: culling and thinning (the draw path, #32)', () => {
   for (const mode of ['log', 'linear'] as WidthMode[]) {
@@ -261,9 +231,9 @@ describe('the build-time layout seed (ToLaD#255)', () => {
       ext: [f.x0, f.x1, f.stem, f.trunkBottom],
     });
     for (const mode of ['linear', 'log'] as WidthMode[])
-      for (const edge of ['curved', 'straight'] as EdgeStyle[]) expect(pick(layoutFan(seeded, mode, CARNIVORA_TREE, edge))).toEqual(pick(layoutFan(plain, mode, CARNIVORA_TREE, edge)));
+      expect(pick(layoutFan(seeded, mode, CARNIVORA_TREE))).toEqual(pick(layoutFan(plain, mode, CARNIVORA_TREE)));
     // A seed that does not fit the tree is not taken.
     const bad = { ...CARNIVORA, seed: { ...seed, leaf: seed.leaf.slice(3) } };
-    expect(pick(layoutFan(bad, 'linear', CARNIVORA_TREE, 'curved'))).toEqual(pick(layoutFan(plain, 'linear', CARNIVORA_TREE, 'curved')));
+    expect(pick(layoutFan(bad, 'linear', CARNIVORA_TREE))).toEqual(pick(layoutFan(plain, 'linear', CARNIVORA_TREE)));
   });
 });

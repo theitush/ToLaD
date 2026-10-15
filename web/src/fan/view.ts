@@ -10,7 +10,7 @@ import { formatCount, formatMass } from '../data/count';
 import { stamp } from '../stamp';
 import { DOUBLE_TAP_MS, Input, type InputHandlers } from '../engine/input';
 import { clipPoly, FanCamera, type Camera } from './camera';
-import { g, isNode, laneAt, layoutFan, leftAt, nearestStrand, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type EdgeStyle, type Fan, type FanBranch, type FanNode, type Measure, type WidthMode } from './layout';
+import { g, isNode, laneAt, layoutFan, leftAt, nearestStrand, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type Fan, type FanBranch, type FanNode, type Measure, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01 } from './meshgl';
 import { Lod } from './lod';
@@ -18,28 +18,13 @@ import type { FoldState } from './fold';
 import { Steady, wantFitFossils } from './steady';
 import { Territories, wantCutFrame, wantCutLabels, type CutItem } from './cut';
 import { COLUMN_DIM, columnSpans, EVENT_TINT, eventAt, eventSpans, type EventSpan } from './colstyle';
-import { drawTwigs, kLogAt, laneDim, LINEAGE, LIVING, pathFrame, TEX_HAIR_PX, TWIG_GRAY, TwigModel, type IndInfo, type TwigStats } from './twigs';
-import type { MeshBatch, RectBatch } from './meshgl';
+import { laneDim, LINEAGE, pathFrame, TwigModel } from './twigs';
+import type { RectBatch } from './meshgl';
 import { FAMILY_EN, familyLabel, FELIDAE_TREE, ORDER_EN, ORDER_TAXA, taxonKey, type Split } from './splits';
 import { Brackets, cladeCamera, foldedFrame, latinOf, rankOf, TAP_FILL, TAXON_EN, type StackAt } from './brackets';
 import { axisInset, drawWorldOver, drawWorldUnder, worldFlags, type Box } from './world';
 
-export type { IndInfo } from './twigs';
 export type { Camera } from './camera';
-
-/**
- * The texture inside the columns (the individuals' lines and lives, twigs.ts drawTwigs; ToLaD#100, #101, #192): off
- * for now (ToLaD#273, "the texture just breaks"), the columns flat bands of their green and grey lanes. `?texture=1`
- * (TOLAD_TEXTURE=1 in node) brings it back; off, nothing of it runs.
- */
-export const textureOn = (() => {
-  try {
-    if (typeof location !== 'undefined') return new URLSearchParams(location.search).get('texture') === '1';
-  } catch {
-    /* no URL */
-  }
-  return (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.TOLAD_TEXTURE === '1';
-})();
 
 /** What the widths count when the page opens (ToLaD#276): `?width=mass` (TOLAD_WIDTH=mass in node) weighs the individuals by their adult mass. */
 export function initialMeasure(): Measure {
@@ -123,26 +108,11 @@ const NOW_ROOM = PIC_D + 8;
 
 /** Gap (px) a label keeps from the column it sits beside. */
 const LABEL_GAP = 3;
+/** A column narrower than this (px) is a hairline (ToLaD#146): its events tinted on it, their titles only past it. */
+const HAIR_PX = 4;
 /** A name's room beside a column (px): its gap, the pill, and the fade's margin from the screen's edge (ToLaD#319). */
 const PILL_ROOM_PX = LABEL_GAP + LABEL_PILL + 6;
 
-/**
- * Where a level's group names stand (ToLaD#266, Ita: "lets try", a toggle): `beside` its branch just below "now"
- * (ToLaD#262), `mid` along its branch halfway between "now" and where it splits off, or `gap` between its branch and
- * its neighbour's at that same height. Each of the last two clamped to the part on screen.
- */
-export type NameMode = 'beside' | 'mid' | 'gap';
-export const NAME_MODES: readonly NameMode[] = ['beside', 'mid', 'gap'];
-/** The names' place asked for: ?names=mid|gap (else beside). */
-export function wantNames(): NameMode {
-  try {
-    const q = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('names') : null;
-    if (q === 'mid' || q === 'gap') return q;
-  } catch {
-    /* no URL */
-  }
-  return 'beside';
-}
 /** While the view moves, the labels and brackets are laid out again at most this often (ms) and every this many frames (ToLaD#255); carried with the camera between. */
 const LABEL_MS = 150;
 const LABEL_FRAMES = 3;
@@ -1232,10 +1202,8 @@ const SCRATCH = {
   wide: new Int32Array(0),
   cand: new Float64Array(0),
   nbStart: new Int32Array(65),
-  nbucket: new Int32Array(1024),
-  bStart: new Int32Array(65),
   bFill: new Int32Array(64),
-  bucket: new Int32Array(1024),
+  nbucket: new Int32Array(1024),
   seen: new Int32Array(1024),
 };
 export function labelSpots(
@@ -1249,7 +1217,6 @@ export function labelSpots(
   famOf?: (id: string) => FanNode | undefined,
   lod?: Lod | null,
   level?: LabelGroups,
-  names: NameMode = 'beside',
 ): LabelSpot[] {
   const half = LABEL_PILL / 2;
   const X = (x: number) => c.toScreen(x, 0)[0];
@@ -1334,21 +1301,6 @@ export function labelSpots(
     fill.set(nbStart.subarray(0, NB));
     for (let i = 0; i < nc; i++) if (ck[2 * i + 1] - ck[2 * i] < WIDE_NB) for (let k = ck[2 * i]; k <= ck[2 * i + 1]; k++) nbucket[fill[k]++] = i;
   }
-  // (Bucket k's columns: bucket[bStart[k] .. bStart[k + 1]), in cols' order; built when first asked for, by nextEdge.)
-  const bStart = SCRATCH.bStart;
-  let bucket = SCRATCH.bucket;
-  let bucketed = false;
-  const buckets = () => {
-    bucketed = true;
-    bStart.fill(0);
-    for (let i = 0; i < nc; i++) for (let k = ck[2 * i]; k <= ck[2 * i + 1]; k++) bStart[k + 1]++;
-    for (let k = 0; k < NB; k++) bStart[k + 1] += bStart[k];
-    if (SCRATCH.bucket.length < bStart[NB]) SCRATCH.bucket = new Int32Array(2 * bStart[NB]);
-    bucket = SCRATCH.bucket;
-    const bFill = SCRATCH.bFill;
-    bFill.set(bStart.subarray(0, NB));
-    for (let i = 0; i < nc; i++) for (let k = ck[2 * i]; k <= ck[2 * i + 1]; k++) bucket[bFill[k]++] = i;
-  };
   if (SCRATCH.seen.length < nc) SCRATCH.seen = new Int32Array(2 * nc);
   const seen = SCRATCH.seen;
   seen.fill(0, 0, nc);
@@ -1517,70 +1469,6 @@ export function labelSpots(
       }
     return null;
   };
-  /** The nearest column edge (screen x) past x at world y wy, rightwards (a left edge) or leftwards (a right edge); null for none near. */
-  const nextEdge = (x: number, wy: number, right: boolean): number | null => {
-    if (!bucketed) buckets();
-    let best: number | null = null;
-    const k0 = Math.max(0, Math.min(NB - 1, Math.floor((c.toWorld(x, 0)[0] - vx0) / bw)));
-    stamp++;
-    for (let k = k0; k >= 0 && k < NB; k += right ? 1 : -1) {
-      // (Past the best found so far: done.)
-      const kx = X(vx0 + (right ? k : k + 1) * bw);
-      if (best !== null && (right ? kx > best : kx < best)) break;
-      for (let n = bStart[k], nEnd = bStart[k + 1]; n < nEnd; n++) {
-        const qi = bucket[n];
-        if (seen[qi] === stamp) continue;
-        seen[qi] = stamp;
-        const q = cols[qi];
-        if (!(wy >= q.y0 && wy <= q.y1)) continue;
-        const e = q.at(wy);
-        const ex = X(e[right ? 0 : 1]);
-        if (right ? ex > x + 0.5 && (best === null || ex < best) : ex < x - 0.5 && (best === null || ex > best)) best = ex;
-      }
-    }
-    return best;
-  };
-  /**
-   * A level's group's name along its branch (ToLaD#266, `mid`) or between it and its neighbour (`gap`): centred
-   * halfway between "now" (or its tip, wTop) and where it splits off (wBot), over the part of that on screen.
-   */
-  const along = (id: string, text: string, rank: Rank, len: number, own: FanNode | FanBranch, wTop: number, wBot: number, fit0: number, ref: { b?: FanBranch; v?: FanNode }): LabelSpot[] => {
-    const a = Math.max(top, Y(wTop));
-    const z = Math.min(bottom, Y(wBot));
-    if (!(fit0 > 0) || !(z > a)) return [];
-    const y0 = Math.max(top, (a + z) / 2 - len / 2);
-    const y1 = y0 + len;
-    const wy = c.toWorld(0, (y0 + y1) / 2)[1];
-    const L = edgeAt(own, wy, false);
-    const R = edgeAt(own, wy, true);
-    if (L === null || R === null || R < 0 || L > c.w) return [];
-    // (Its part on screen too short to hold a name: faded out; the legend at the bottom too.)
-    const f = fit0 * botFit(y1) * clamp01((z - a - 12) / 24);
-    const spot = (key: string, place: LabelSpot['place'], x: number, loose: boolean): LabelSpot => {
-      const box: [number, number, number, number] = [x - half, y0, x + half, y1];
-      // (Whole on screen; in a gap with LABEL_GAP px either side, clear: its full ink.)
-      const onX = x - half >= 0 && x + half <= c.w + 0.5;
-      const fit = f > 0 && onX ? f * clearFit(Math.min(x - half - LABEL_AXIS_X, loose ? CLEAR : clearance(x - half, x + half, y0, y1, own) + 2)) : 0;
-      return { key: `${id}:${key}`, id, place, ...ref, text, rank, x, y1, box, fit, loose: loose || undefined };
-    };
-    if (names === 'mid') {
-      // On its branch, opaque (over its own columns), its middle on screen right of the axis.
-      const lo = Math.max(L, LABEL_AXIS_X + half + 4);
-      const hi = Math.min(R, c.w) - half;
-      const x = lo <= hi ? (lo + hi) / 2 : Math.min(Math.max((L + R) / 2, LABEL_AXIS_X + half + 4), c.w - half);
-      return [spot('mid', 'in', x, true)];
-    }
-    // In the gap to its right, else to its left (with no neighbour there, just beside the branch); clear of the
-    // columns, else over them.
-    const nr = nextEdge(R, wy, true);
-    const nl = nextEdge(L, wy, false);
-    const xr = nr !== null && nr - R >= LABEL_PILL + 2 * LABEL_GAP ? (R + nr) / 2 : R + LABEL_GAP + half;
-    const xl = nl !== null && L - nl >= LABEL_PILL + 2 * LABEL_GAP ? (L + nl) / 2 : L - LABEL_GAP - half;
-    const xr2 = nr !== null ? (R + nr) / 2 : xr;
-    const xl2 = nl !== null ? (L + nl) / 2 : xl;
-    return [spot('gapR', 'right', xr, false), spot('gapL', 'left', xl, false), spot('gapR~', 'right', xr2, true), spot('gapL~', 'left', xl2, true)];
-  };
-
   const out: LabelSpot[] = [];
   // The families (ToLaD#146), first of all: standing on "now" over their species while "now" is on screen, the
   // span they name bracketed under the pill; at its left end, else its middle, else its right end (whichever
@@ -1602,11 +1490,6 @@ export function labelSpots(
       const own = columnNear(v, cx);
       const px = plus?.(`n${vi}`) ?? 0;
       const rank: Rank = [-1, wb - wa, vi];
-      // (Or along its branch, or between it and its neighbour, ToLaD#266: halfway down to where it splits off.)
-      if (names !== 'beside') {
-        for (const p of along(`n${vi}`, text, rank, measure(text) + 2 * LABEL_PAD + px, v, nowY, v.yBot, nowOn, { v })) out.push({ ...p, fam: v, pic: groupFace(v), plus: px });
-        continue;
-      }
       for (const p of beside(`n${vi}`, text, rank, measure(text) + 2 * LABEL_PAD + px, own, Math.max(standS, Y(own.tipY)) + 4, Y(own.splitY), levelOn, { v }, true))
         out.push({ ...p, fam: v, pic: groupFace(v), plus: px });
       continue;
@@ -1641,10 +1524,6 @@ export function labelSpots(
       const px = plus?.(id) ?? 0;
       const text = levelText(b);
       const len = measure(text) + 2 * LABEL_PAD + px;
-      if (names !== 'beside') {
-        out.push(...along(id, text, [0, b.width, b.index], len, b, Math.max(nowY, b.tipY), b.splitY, 1, { b }).map((p) => ({ ...p, plus: px })));
-        continue;
-      }
       const y0 = Math.max(standS, Y(b.tipY)) + 4;
       // (A neighbouring level's species after the level's own, ToLaD#297.)
       const mine = !level.own || level.own.has(b);
@@ -1724,7 +1603,7 @@ export function labelSpots(
   for (const b of fan.branches) {
     if ((lod && lod.of[b.index] >= 0) || !near(boxes.get(b)!)) continue;
     // (A hairline column, ToLaD#146: its events tinted on it, their titles only once it has a few px of room.)
-    if (b.width * c.cam.sx < TEX_HAIR_PX[1]) continue;
+    if (b.width * c.cam.sx < HAIR_PX) continue;
     for (const s of colEventsY(fan, b)) {
       const text = s.ev.title;
       const len = measure(text) + 2 * LABEL_PAD;
@@ -1867,7 +1746,6 @@ function clamp01(v: number): number {
 
 export interface Selection {
   sp: SpeciesRec;
-  ind?: IndInfo;
   /** The time touched (Ma), within the species' column: the card shows the population then. */
   ageMa?: number;
   /** The species' start (Ma): its split, where its own column begins (the card's numbers are the column's). */
@@ -1942,10 +1820,8 @@ export class FanView implements InputHandlers {
   mode: WidthMode = 'linear';
   /** What the widths count (ToLaD#276): individuals, or their mass. */
   measure: Measure = initialMeasure();
-  edge: EdgeStyle = 'curved';
   dpr = 1;
   selected: SpeciesRec | null = null;
-  selInd: { g: number; i: number } | null = null;
   /** The point touched on the selected column (world x, age in Ma): marked on the graph, the card's numbers are for it. */
   touch: { x: number; ageMa: number } | null = null;
   onSelect: (sel: Selection | null) => void = () => {};
@@ -1959,10 +1835,8 @@ export class FanView implements InputHandlers {
   private labelT = 0;
   /** `?debug`: a readout of the zooms, years on screen and individuals per px. */
   readonly debug = typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug');
-  /** `?debug&hide=stem,lanes,glow,ind,held,events,fade`: those layers not drawn (finding which layer draws what, ToLaD#210, #231). */
+  /** `?debug&hide=stem,lanes,glow,held,events,fade`: those layers not drawn (finding which layer draws what, ToLaD#210, #231). */
   private readonly hide = new Set(this.debug ? (new URLSearchParams(location.search).get('hide') ?? '').split(',') : []);
-  /** What each branch's individuals view drew last frame (taps, tests). */
-  twigStats = new Map<number, TwigStats>();
   /** Without the GPU layer: this frame's styled column stretches, faded once the individuals are drawn. */
   private heldRuns: { run: LanePts; hw: number; d: number }[] = [];
   /** The lane points (lanePoints, drawMerged), pooled. */
@@ -1997,8 +1871,6 @@ export class FanView implements InputHandlers {
   readonly gl: FanGL | null = null;
   /** The world on the time axis (world.ts): its layers on or off, and the axis labels it keeps clear of. */
   world = worldFlags(typeof location !== 'undefined' ? location.search : '');
-  /** Where a level's group names stand (ToLaD#266): ?names=, switched in the globe menu. */
-  names: NameMode = wantNames();
   readonly axisBoxes: Box[] = [];
   /** Frame times (ms, CPU side of draw()), for perf runs. */
   readonly frameMs: number[] = [];
@@ -2006,13 +1878,11 @@ export class FanView implements InputHandlers {
   constructor(
     readonly canvas: HTMLCanvasElement,
     readonly clade: CladeRec,
-    edge: EdgeStyle = 'curved',
     readonly tree: Split = FELIDAE_TREE,
     /** The fold (fold.ts, ToLaD#146): the order one branch from afar, its splits opening as you zoom in. */
     readonly folds = false,
   ) {
     stamp('clade');
-    this.edge = edge;
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('No 2D canvas context');
     this.ctx = ctx;
@@ -2031,7 +1901,7 @@ export class FanView implements InputHandlers {
       }
     }
     stamp('gl');
-    const laid = layoutFan(clade, this.mode, tree, this.edge, this.measure);
+    const laid = layoutFan(clade, this.mode, tree, this.measure);
     stamp('layout');
     this.camera = new FanCamera(this.withFold(laid), (b) => this.model(b));
     stamp('fold');
@@ -2250,7 +2120,6 @@ export class FanView implements InputHandlers {
    */
   flyToClade(v: FanNode, landed?: () => void): void {
     this.selected = null;
-    this.selInd = null;
     this.touch = null;
     this.onSelect(null);
     this.flyTo(() => this.cladeCamera(v), undefined, landed);
@@ -2320,7 +2189,6 @@ export class FanView implements InputHandlers {
     // (One species: a landing on it, its card open, ToLaD#266.)
     if (bs.length === 1) return this.flyToSpecies(bs[0].sp);
     this.selected = null;
-    this.selInd = null;
     this.touch = null;
     this.onSelect(null);
     const to = this.flyTo(() => this.groupCamera(bs));
@@ -2357,15 +2225,8 @@ export class FanView implements InputHandlers {
     }
   }
 
-  /** The edges' design (the toggle): curved or straight. Same data, the camera stays put. */
-  setEdge(edge: EdgeStyle): void {
-    if (edge === this.edge) return;
-    this.edge = edge;
-    this.relayout();
-  }
-
   private relayout(): void {
-    this.camera.fan = this.withFold(layoutFan(this.clade, this.mode, this.tree, this.edge, this.measure));
+    this.camera.fan = this.withFold(layoutFan(this.clade, this.mode, this.tree, this.measure));
     this.camera.settle();
     this.request();
   }
@@ -2602,7 +2463,6 @@ export class FanView implements InputHandlers {
     if (!b) return;
     // The card open now closes for the flight (the column stays in view under it).
     this.selected = null;
-    this.selInd = null;
     this.touch = null;
     this.onSelect(null);
     const to = this.flyTo(() => this.speciesCamera(b), undefined, () => {
@@ -2613,8 +2473,7 @@ export class FanView implements InputHandlers {
       }
       const wy = b.tipY;
       this.selected = sp;
-      this.selInd = null;
-      this.touch = { x: leftAt(b, wy) + laneAt(b, wy).w / 2, ageMa: sp.t1 };
+        this.touch = { x: leftAt(b, wy) + laneAt(b, wy).w / 2, ageMa: sp.t1 };
       this.onSelect({ sp, ageMa: sp.t1, startMa: b.t0 });
       this.request();
     });
@@ -2963,8 +2822,7 @@ export class FanView implements InputHandlers {
       const ageMa = Math.sqrt(Math.max(1, ev.ago0) * Math.max(1, ev.ago1)) / 1e6;
       const wy = this.fan.time.y(ageMa);
       this.selected = lab.b.sp;
-      this.selInd = null;
-      this.touch = { x: leftAt(lab.b, wy) + laneAt(lab.b, wy).w / 2, ageMa };
+        this.touch = { x: leftAt(lab.b, wy) + laneAt(lab.b, wy).w / 2, ageMa };
       this.onSelect({ sp: lab.b.sp, ageMa, startMa: lab.b.t0, event: ev });
       this.request();
       return;
@@ -2976,33 +2834,21 @@ export class FanView implements InputHandlers {
       if (this.tapInto(wy >= b.splitY ? { v: segAt(b, wy).node } : { b }, true)) return;
     }
     this.selected = b ? b.sp : null;
-    this.selInd = null;
-    let ind: IndInfo | undefined;
-    const st = b && this.twigStats.get(b.sp.gid);
-    if (b && st && st.mode !== 'texture') {
-      const [wx, wy] = this.toWorld(x, y);
-      const m = this.model(b);
-      const a = m.hit(wx, wy, 14 / this.cam.sx, 14 / this.cam.sy);
-      if (a) {
-        this.selInd = a;
-        ind = m.info(a.g, a.i);
-      }
-    }
     // The time touched, kept within the strand (from its tip down to the bottom of the world).
     const wy = Math.min(this.fan.trunkBottom.y, this.toWorld(x, y)[1]);
     const ageMa = b ? Math.max(b.sp.t1, this.fan.time.ageAt(wy)) : undefined;
     this.touch = b && ageMa !== undefined ? { x: this.toWorld(x, y)[0], ageMa } : null;
     // Below its split: the parent column, the lineage there (unless an individual was hit).
-    const lineage = b && ageMa !== undefined && !ind && wy >= b.splitY ? lineageAt(b, this.fan, ageMa) : undefined;
+    const lineage = b && ageMa !== undefined && wy >= b.splitY ? lineageAt(b, this.fan, ageMa) : undefined;
     // Inside a curated event's window on its own column (or within a finger's reach of it): the card explains it.
     let event: EventSpan | undefined;
-    if (b && ageMa !== undefined && !ind && !lineage) {
+    if (b && ageMa !== undefined && !lineage) {
       const r = EVENT_REACH_PX / this.cam.sy;
       const a0 = this.fan.time.ageAt(Math.max(b.tipY, wy - r)) * 1e6;
       const a1 = this.fan.time.ageAt(Math.min(this.fan.trunkBottom.y, wy + r)) * 1e6;
       event = eventAt(colEventsY(this.fan, b), ageMa * 1e6, Math.min(a0, a1), Math.max(a0, a1)) ?? undefined;
     }
-    this.onSelect(b ? { sp: b.sp, ind, ageMa, startMa: b.t0, lineage, event } : null);
+    this.onSelect(b ? { sp: b.sp, ageMa, startMa: b.t0, lineage, event } : null);
     this.request();
   }
 
@@ -3016,11 +2862,6 @@ export class FanView implements InputHandlers {
       this.draw();
       if (this.anim) this.request();
     });
-  }
-
-  /** Where drawTwigs sends the mesh (the GPU layer). */
-  get mesh(): MeshBatch | undefined {
-    return this.gl?.mesh;
   }
 
   /** A flat rectangle under everything else (the GPU layer, or the 2D canvas without it). */
@@ -3056,8 +2897,6 @@ export class FanView implements InputHandlers {
       for (const b of this.fan.branches) if (!lod || lod.of[b.index] < 0) this.drawStrand(b);
       if (lod) for (const v of lod.merged) this.drawMerged(v);
     }
-    // (Mass widths have no individuals' lattice: the texture is the individuals' own.)
-    if (textureOn && this.measure !== 'mass' && !hide.has('ind')) for (const b of this.fan.branches) if (!lod || lod.of[b.index] < 0) this.drawIndividuals(b);
     if (!hide.has('held')) this.drawHeld();
     if (!hide.has('events')) this.drawEvents();
     if (!hide.has('fade')) this.drawStemFade();
@@ -3082,8 +2921,7 @@ export class FanView implements InputHandlers {
     this.drawTimeAxis(true);
     drawWorldOver(this);
     if (this.gl) {
-      const pal = [LIVING, LINEAGE, TWIG_GRAY].map(rgb01);
-      this.gl.end(this.w, this.h, this.dpr, rgb01(BG), kLogAt(this, this.fan.time, this.cam.cy), this.toScreen(0, this.yNow)[1], pal);
+      this.gl.end(this.w, this.h, this.dpr);
     }
     this.frameMs.push(performance.now() - t0);
     if (this.frameMs.length > 600) this.frameMs.shift();
@@ -3117,7 +2955,7 @@ export class FanView implements InputHandlers {
     const moving = this.gesturing || !!this.anim;
     // (Carried across a change in the clades drawn as one, lod.gen, ToLaD#255: at the mammal level a pinch changes them on
     // almost every frame. Carried names may then differ from a layout's; at rest they never do, below.)
-    const same = L && L.fan === this.fan && L.lg === lg && L.lod === lod && L.w === this.w && L.h === this.h && L.names === this.names && L.topLine === this.labelTop();
+    const same = L && L.fan === this.fan && L.lg === lg && L.lod === lod && L.w === this.w && L.h === this.h && L.topLine === this.labelTop();
     if (L && same && moving && labelCarry && (t0 - L.t < LABEL_MS || L.frames < LABEL_FRAMES)) {
       const ax = c.sx / L.cam.sx;
       const ay = c.sy / L.cam.sy;
@@ -3136,7 +2974,7 @@ export class FanView implements InputHandlers {
     // (ToLaD#262: each group's name beside its branch, room at its end for the "+x" of the names hidden near it last frame.)
     const topLine = this.labelTop();
     const top = topLine + (br ? br.pinH() * br.pinA : 0);
-    const lay = (room: Map<string, number>) => labelSpots(this.camera, this.fan, top, (t) => this.nameWidth(t), this.barRect()?.[0], br ?? undefined, (id) => room.get(id) ?? 0, undefined, lod, lg, this.names);
+    const lay = (room: Map<string, number>) => labelSpots(this.camera, this.fan, top, (t) => this.nameWidth(t), this.barRect()?.[0], br ?? undefined, (id) => room.get(id) ?? 0, undefined, lod, lg);
     let spots: LabelSpot[];
     this.labClean = !moving;
     if (moving) spots = lay(this.plusRoom);
@@ -3144,7 +2982,7 @@ export class FanView implements InputHandlers {
       // At rest (ToLaD#255): what a still view at this camera gives, whatever the way here. The names shown chosen afresh
       // (no hysteresis, drawLabels), and the "+x" room from none: laid out, its room counted, again until the room
       // holds (once more as a rule). The room it settled on kept for the frames after at this same camera.
-      const key = `${c.cx}|${c.cy}|${c.sx}|${c.sy}|${this.w}|${this.h}|${top}|${this.names}|${lod?.gen ?? -1}|${this.nameWFont}`;
+      const key = `${c.cx}|${c.cy}|${c.sx}|${c.sy}|${this.w}|${this.h}|${top}|${lod?.gen ?? -1}|${this.nameWFont}`;
       const R = this.restRoom;
       let room = R && R.fan === this.fan && R.lg === lg && R.key === key ? R.room : new Map<string, number>();
       spots = lay(room);
@@ -3160,7 +2998,7 @@ export class FanView implements InputHandlers {
       this.plusRoom = room;
       this.restRoom = { fan: this.fan, lg, key, room };
     }
-    this.labLast = { fan: this.fan, lg, lod, lodGen: lod?.gen ?? -1, w: this.w, h: this.h, names: this.names, topLine, t: t0, frames: 0, cam: { ...c }, br, top, spots };
+    this.labLast = { fan: this.fan, lg, lod, lodGen: lod?.gen ?? -1, w: this.w, h: this.h, topLine, t: t0, frames: 0, cam: { ...c }, br, top, spots };
     this.labelMs.push(performance.now() - t0);
     this.labelLayMs.push(performance.now() - t0);
     if (this.labelLayMs.length > 600) this.labelLayMs.shift();
@@ -3170,7 +3008,7 @@ export class FanView implements InputHandlers {
   private terr: { fan: Fan; fold: unknown; w: number; t: CutTerritories } | null = null;
   private territories(): CutTerritories | null {
     const f = this.fan.tess.fold;
-    // (Off under the rooms by life, ?rooms=life / ?fit=fossils: Steady's computeLife places the columns otherwise than
+    // (Off under the rooms by life, ?fit=fossils: Steady's computeLife places the columns otherwise than
     // the territories' widest rooms, so the cut's boxes would not be where the columns are. Today's labels there.)
     if (!(FanView.labelsCut || FanView.frameCut) || !(f instanceof Steady) || f.life) return null;
     const P = this.terr;
@@ -3325,7 +3163,6 @@ export class FanView implements InputHandlers {
     lodGen: number;
     w: number;
     h: number;
-    names: NameMode;
     topLine: number;
     t: number;
     frames: number;
@@ -3512,7 +3349,7 @@ export class FanView implements InputHandlers {
     }
     // As the strands fade in (twigs.ts), the lanes dim to a backdrop under them: the same
     // lanes, the same geometry, never a switch.
-    this.drawLanes(pts, hw, held, this.twigStats.get(b.sp.gid));
+    this.drawLanes(pts, hw, held);
   }
 
   private lod: Lod | null = null;
@@ -3560,7 +3397,7 @@ export class FanView implements InputHandlers {
     for (let k = k1; k >= k0; k--) push(k, k * H);
     if (y0 < k0 * H) push(k0, y0);
     if (pts.n < 2 || hi < -12 || lo > this.w + 12) return;
-    this.drawLanes(pts, 0, NO_HELD, undefined);
+    this.drawLanes(pts, 0, NO_HELD);
   }
   private mergedExt: [number, number] = [0, 0];
   private lodTops = new WeakMap<FanNode, number>();
@@ -3571,15 +3408,9 @@ export class FanView implements InputHandlers {
   }
 
   /** A column's lanes (drawStrand's, or a merged clade's, lod.ts): its points, spine offset hw, styled spans and twig fade. */
-  private drawLanes(pts: LanePts, hw: number, held: [number, number, number][], tw: TwigStats | undefined): void {
+  private drawLanes(pts: LanePts, hw: number, held: [number, number, number][]): void {
     const ctx = this.ctx;
-    // Under the mesh the lanes sink to a dark tint of themselves, so the individuals carry the colour:
-    // each stretch by its own lanes' widths (twigs.ts laneDim), as the mesh draws them.
-    const lives = tw?.fade ?? 0;
-    const greenFade = tw?.fadeGreen ?? 0;
-    const tex = tw?.tex ?? 1;
-    const greenC = mix(GREEN, '#0d2318', greenFade * 0.9);
-    const grayC = mix(GRAY, '#131c19', Math.max(lives, tw?.texGray ?? 0) * 0.82);
+    // On the GPU layer each stretch sinks to a dark tint of itself by its own lanes' widths (twigs.ts laneDim).
     if (this.gl) {
       // Between neighbouring samples each lane is a trapezoid (the curve's chord, a few px at most):
       // the whole lane gray (at least 0.6 px), the green lane over its left edge (at least 1 px).
@@ -3601,8 +3432,8 @@ export class FanView implements InputHandlers {
       const piece = (xq: number, wq: number, gq: number, xp: number, wp: number, gp: number, y0: number, y1: number) => {
         const wm = (wq + wp) / 2;
         const gm = (gq + gp) / 2;
-        const gc = mixInto(GC_MIX, GRAY01, GRAY_DARK01, laneDim(wm - gm, lives, tex) * 0.82);
-        const ec = mixInto(EC_MIX, GREEN01, GREEN_DARK01, laneDim(gm, lives, tex) * 0.9);
+        const gc = mixInto(GC_MIX, GRAY01, GRAY_DARK01, laneDim(wm - gm) * 0.82);
+        const ec = mixInto(EC_MIX, GREEN01, GREEN_DARK01, laneDim(gm) * 0.9);
         // A styled stretch of the column (held flat for want of figures: colstyle.ts) fades towards the
         // background: the background over the whole lane, lanes and individuals alike (drawn after the mesh).
         const dim = held.length ? dimAt(held, (y0 + y1) / 2) : 0;
@@ -3623,7 +3454,7 @@ export class FanView implements InputHandlers {
           // dozens of halos (a wide soft smear, ToLaD#231). And only where the lane runs near-straight
           // down: a halo is a row-flat slab per sample, so across a lean (a branch leaving its parent) it
           // breaks into steps; it fades out by the lean (GLOW_LEAN), and there the branch is its crisp lane.
-          const glow = (1 - lives) * (1 - dim) * Math.min(1, gm / GLOW_W) * Math.max(0, 1 - (sq - 1) / GLOW_LEAN);
+          const glow = (1 - dim) * Math.min(1, gm / GLOW_W) * Math.max(0, 1 - (sq - 1) / GLOW_LEAN);
           if (glow > 0.01 && !this.hide.has('glow')) {
             trap(gl.under, xq - 4 * sq, g1q + 4 * sq, xp - 4 * sq, g1p + 4 * sq, y0, y1, ec, 0.06 * glow, xa - 4 * sq, xb + 4 * sq);
             trap(gl.under, xq - 1.5 * sq, g1q + 1.5 * sq, xp - 1.5 * sq, g1p + 1.5 * sq, y0, y1, ec, 0.14 * glow, xa - 1.5 * sq, xb + 1.5 * sq);
@@ -3653,11 +3484,11 @@ export class FanView implements InputHandlers {
       }
     } else {
       // (Its run drawn whole.)
-      ctx.fillStyle = grayC;
+      ctx.fillStyle = GRAY;
       this.ribbon(pts, (i) => hw - pts.w[i], () => hw, 0.6);
       if (pts.f.subarray(0, pts.n).some((f) => f > 0)) {
         // Green lane on the left, floored at 1 px.
-        ctx.fillStyle = greenC;
+        ctx.fillStyle = GREEN;
         this.ribbon(pts, () => hw, (i) => hw - pts.w[i] * pts.f[i], -1);
       }
       // Its styled stretches: faded over the individuals too, once they are drawn (drawHeld).
@@ -3749,7 +3580,7 @@ export class FanView implements InputHandlers {
   private drawTouch(): void {
     const b = this.fan.branches.find((x) => x.sp === this.selected);
     const t = this.touch;
-    if (!b || !t || this.selInd) return;
+    if (!b || !t) return;
     const wy = this.fan.time.y(t.ageMa);
     const [, y] = this.toScreen(0, wy);
     if (y < -10 || y > this.h + 10) return;
@@ -3830,16 +3661,6 @@ export class FanView implements InputHandlers {
       }
     }
     return pts;
-  }
-
-  private drawIndividuals(b: FanBranch): void {
-    const st = drawTwigs(this, b, this.model(b), this.selected === b.sp ? this.selInd : null);
-    const prev = this.twigStats.get(b.sp.gid);
-    // The lanes under the strands depend on the fade: redraw once when it changes,
-    // and keep drawing while lineage answers are still being worked out.
-    if ((prev?.fade ?? 0) !== (st?.fade ?? 0) || (prev?.fadeGreen ?? 0) !== (st?.fadeGreen ?? 0) || (prev?.texGray ?? 0) !== (st?.texGray ?? 0) || st?.pending) this.request();
-    if (st) this.twigStats.set(b.sp.gid, st);
-    else this.twigStats.delete(b.sp.gid);
   }
 
   /** The buttons' box in canvas px [x0, y0, x1, y1], if any. */

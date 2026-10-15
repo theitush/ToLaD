@@ -3,16 +3,16 @@
 import { describe, expect, it } from 'vitest';
 import { SY_HOME } from './fold';
 import { Steady } from './steady';
-import { columnsAt, laneAt, layoutFan, leftAt, nearestColumn, nearestStrand, TIME_H, type EdgeStyle, type Fan, type FanBranch, type WidthMode } from './layout';
+import { columnsAt, laneAt, layoutFan, leftAt, nearestColumn, nearestStrand, TIME_H, type Fan, type FanBranch, type WidthMode } from './layout';
 import { CARNIVORA, FELIDAE } from './panthera';
 import { CARNIVORA_TREE, FELIDAE_TREE } from './splits';
 
 const SCREEN = 390;
 const fans = new Map<string, Fan>();
-function folded(mode: WidthMode, edge: EdgeStyle): { fan: Fan; fold: Steady; home: number } {
-  const key = `${mode}:${edge}`;
+function folded(mode: WidthMode): { fan: Fan; fold: Steady; home: number } {
+  const key = mode;
   let fan = fans.get(key);
-  if (!fan) fans.set(key, (fan = layoutFan(CARNIVORA, mode, CARNIVORA_TREE, edge)));
+  if (!fan) fans.set(key, (fan = layoutFan(CARNIVORA, mode, CARNIVORA_TREE)));
   const fold = new Steady(fan);
   fan.tess.fold = fold;
   // Home frames the closed order (camera.ts frame: 72 px of margins, 4% of slack).
@@ -23,14 +23,12 @@ function folded(mode: WidthMode, edge: EdgeStyle): { fan: Fan; fold: Steady; hom
 const heights = (fan: Fan, n: number) => Array.from({ length: n + 1 }, (_, k) => -TIME_H + ((fan.trunkBottom.y + TIME_H) * k) / n);
 
 describe('the columns', () => {
-  it('the species keep one left-to-right order, the tree\'s, under every width and edge, at both levels', () => {
+  it('the species keep one left-to-right order, the tree\'s, under every width, at both levels', () => {
     for (const [clade, tree] of [
       [FELIDAE, FELIDAE_TREE],
       [CARNIVORA, CARNIVORA_TREE],
     ] as const) {
-      const orders = (['linear', 'log'] as WidthMode[]).flatMap((mode) =>
-        (['curved', 'straight'] as EdgeStyle[]).map((edge) => layoutFan(clade, mode, tree, edge).root.strands.map((b) => b.sp.sci).join(',')),
-      );
+      const orders = (['linear', 'log'] as WidthMode[]).map((mode) => layoutFan(clade, mode, tree).root.strands.map((b) => b.sp.sci).join(','));
       for (const o of orders) expect(o).toBe(orders[0]);
     }
   });
@@ -40,7 +38,7 @@ describe('the columns', () => {
   // the spotted skunks' layout changed with their MDD splits; #304's cause is not shown fixed, only not hit here.)
   it('xRange, on a grid (read off the rows, every strand at once): holds each strand at every height in the range (ToLaD#304)', () => {
     for (const mode of ['log', 'linear'] as WidthMode[]) {
-      const { fan, fold, home } = folded(mode, 'curved');
+      const { fan, fold, home } = folded(mode);
       const yb = fan.trunkBottom.y;
       const dogs = fan.nodes.find((n) => n.split.taxon === 'Canidae')!;
       for (const [z, sy] of [
@@ -75,7 +73,7 @@ describe('the columns', () => {
 
 describe('nearestColumn (ToLaD#255)', () => {
   it("finds columnsAt's nearest point, folded, at every zoom", () => {
-    const { fan, fold, home } = folded('linear', 'curved');
+    const { fan, fold, home } = folded('linear');
     const brute = (x: number, y: number) => {
       let best = NaN;
       let bd = Infinity;
@@ -103,7 +101,7 @@ describe('nearestColumn (ToLaD#255)', () => {
   });
 
   it("nearestStrand finds the strand a pass over every one does", () => {
-    const { fan, fold, home } = folded('linear', 'curved');
+    const { fan, fold, home } = folded('linear');
     const brute = (x: number, y: number) => {
       let best: FanBranch | null = null;
       let bd = Infinity;

@@ -59,7 +59,7 @@ describe('the mammal level worked out ahead', () => {
   });
 
   it('every strand genealogy, packed and read back, is the walked one sample for sample', () => {
-    const fan = layoutFan(mammaliaClade(), 'linear', mammaliaTree(), 'curved');
+    const fan = layoutFan(mammaliaClade(), 'linear', mammaliaTree());
     const live = genealogiesOf(fan.branches.map((b) => population(b.sp, b.t0)));
     expect(live.size).toBeGreaterThan(5000);
     const back = unpackGenealogies(JSON.parse(JSON.stringify(packGenealogies(live))));

@@ -17,7 +17,7 @@ export async function mammalsSeed(clade: RawClade): Promise<MammalAhead> {
   const tree = packTree(mammaliaTree());
   const seed = layoutSeed(mammaliaClade(), mammaliaTree());
   // (The orders' shares, fold.ts scaleOrders: worked out on the layout without them.)
-  const fan = layoutFan({ ...mammaliaClade(), seed }, 'linear', mammaliaTree(), 'curved');
+  const fan = layoutFan({ ...mammaliaClade(), seed }, 'linear', mammaliaTree());
   seed.ord = new Steady(fan).ordShare;
   // Every strand's genealogy (the walk back, population.ts shareBackSampled): the bulk of the level's layout.
   const gen = packGenealogies(genealogiesOf(fan.branches.map((b) => population(b.sp, b.t0))));
