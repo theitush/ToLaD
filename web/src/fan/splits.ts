@@ -19,6 +19,7 @@
 import raw from 'virtual:panthera-data';
 import carnivora from 'virtual:carnivora-data';
 import { mammalData } from './mammals-data';
+import { unpackTree } from './packed';
 import type { DatedSplit, RawClade } from './panthera-extract';
 
 export type Confidence = 'high' | 'medium' | 'low';
@@ -219,9 +220,13 @@ export const FELIDAE_TREE: Split = treeOf(raw);
 export const CARNIVORA_TREE: Split = treeOf(carnivora);
 
 let mammTree: Split | null = null;
-/** Every mammal's dated tree (ToLaD#247), built when the level is first shown (after loadMammals, mammals-data.ts). */
+/**
+ * Every mammal's dated tree (ToLaD#247), when the level is first shown (after loadMammals, mammals-data.ts): the one
+ * the build worked out (mammals-seed.ts, ToLaD#255), or built here from the data's dated tree.
+ */
 export function mammaliaTree(): Split {
-  return (mammTree ??= nameOrders(treeOf(mammalData().clade)));
+  const d = mammalData();
+  return (mammTree ??= d.tree ? unpackTree(d.tree) : nameOrders(treeOf(d.clade)));
 }
 
 /**
