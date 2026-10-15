@@ -14,6 +14,13 @@
 // opened; a node none of whose daughters fit is one item (it stands for its species); a node with some daughters that
 // fit opens those and gathers each run of neighbouring daughters that do not into one item (its "+x"). Every species is
 // under exactly one item, items' territories are disjoint, and the cut depends only on the width zoom and the screen.
+//
+// That is widest rooms (Steady's `life` off, tests). Under rooms by life (the view's), sister rooms stay apart only
+// while both lived, so a territory is per row instead (Steady.cell): at each row the lineages there split x at the
+// middles between their drawn edges (a 1D Voronoi of the row), and an item's territory is its strands' share over the
+// rows its label takes (RowsOf: its pill from mid-branch, its picture over its youngest tip, a lineage keeping its place
+// that high over its tip). Items are runs of strands that do not overlap, so their territories are disjoint at every
+// row they share: labels inside their own never meet, by construction. They depend on the camera's height too.
 
 import { isNode, type Fan, type FanBranch, type FanNode } from './layout';
 import type { Steady } from './steady';
@@ -34,7 +41,10 @@ export interface CutItem {
   /** A run's daughters (indices into the node's kids). */
   q0: number;
   q1: number;
-  /** Its territory (world x) at the layout as it stands. */
+  /** Its strands (drawn order, first and last). */
+  f: number;
+  l: number;
+  /** Its territory (world x) at the layout as it stands: over its label's rows (RowsOf) under rooms by life. */
   x0: number;
   x1: number;
   /** How many species it stands for. */
@@ -42,6 +52,15 @@ export interface CutItem {
   /** Whether its box fits its territory at this zoom (a run, or the root before anything fits, may not). */
   fits: boolean;
 }
+
+/** A cut item's place in the tree (CutItem's kind, j, q0, q1). */
+export type Ref = Pick<CutItem, 'kind' | 'j' | 'q0' | 'q1'>;
+
+/**
+ * The rows (world y, top and bottom) item r's label takes, which its territory is taken over (rooms by life): the
+ * view's pill or picture, as it stands.
+ */
+export type RowsOf = (r: Ref) => [number, number];
 
 export class Territories {
   readonly nodes: readonly FanNode[];
@@ -166,9 +185,12 @@ export class Territories {
     return out;
   }
 
-  /** Node j's (or, ~j, strand ~j's) territory (world x) at the layout as it stands (the fold's zoom). */
+  /**
+   * Node j's (or, ~j, strand ~j's) room (world x) at the layout as it stands (the fold's zoom), with half the open gap
+   * on each side: under widest rooms its territory; under rooms by life the hull its columns stand in at every time
+   * (culling, framing), a label's territory being per row (over()).
+   */
   span(j: number, out: [number, number] = [0, 0]): [number, number] {
-    if (this.fold.territory(j, out)) return out;
     const { roomL, roomW, C } = this.fold.rooms();
     const A = this.fold.a;
     if (j >= 0) {
@@ -184,56 +206,109 @@ export class Territories {
     return out;
   }
 
+  /** Item r's strands, first and last (drawn order). */
+  range(r: Ref, out: [number, number] = [0, 0]): [number, number] {
+    if (r.kind === 'leaf') out[0] = out[1] = r.j;
+    else if (r.kind === 'node') [out[0], out[1]] = [this.first[r.j], this.last[r.j]];
+    else {
+      const K = this.kids[r.j];
+      const a = K[r.q0];
+      const b = K[r.q1];
+      out[0] = a >= 0 ? this.first[a] : ~a;
+      out[1] = b >= 0 ? this.last[b] : ~b;
+    }
+    return out;
+  }
+
+  /** Daughter k (a node's index, ~ a strand's) as an item. */
+  static ref(k: number): Ref {
+    return k >= 0 ? { kind: 'node', j: k, q0: 0, q1: 0 } : { kind: 'leaf', j: ~k, q0: 0, q1: 0 };
+  }
+
+  /**
+   * Item r's territory (world x) over its label's rows `rows(r)`: its strands' share of each row (Steady.cell, rooms
+   * by life: the lineages there split it at the middles between them), `ghost` (world) the height a lineage keeps its
+   * place above its tip (its picture's). Items with no strands in common have disjoint territories at every row.
+   */
+  over(r: Ref, rows: RowsOf, ghost: number, out: [number, number] = [0, 0]): [number, number] {
+    const [ya, yb] = rows(r);
+    const [f, l] = this.range(r, out);
+    return this.fold.cell(f, l, ya, yb, ghost, out);
+  }
+
   /**
    * The cut at width zoom `sx` for a box `px` wide (the fold set to sx: its rooms are the positions), only what
-   * meets world x [vx0, vx1] (the screen): O(what is on screen). Items left to right.
+   * meets world x [vx0, vx1] (the screen): O(what is on screen). Items left to right. Rooms by life: an item fits
+   * when its territory over its label's rows (`rows`, over(); without, its youngest tip's row) holds the box, all
+   * as laid out; widest rooms: from its fit zoom on.
    */
-  cut(sx: number, px: number, vx0 = -Infinity, vx1 = Infinity): CutItem[] {
+  cut(sx: number, px: number, vx0 = -Infinity, vx1 = Infinity, rows?: RowsOf, ghost = 0): CutItem[] {
     const out: CutItem[] = [];
     const s: [number, number] = [0, 0];
-    const span = (k: number, o: [number, number]) => this.span(k, o);
-    const w: [number, number] = [0, 0];
-    // (Rooms by life: the territory as laid out is the test, Steady.territory. Widest rooms: the fit zoom.)
-    const z = this.fold.life ? null : this.fitZoom(px);
-    const ok = (k: number) => (z ? sx >= (k >= 0 ? z.node[k] : z.strand[~k]) : (span(k, w), sx * (w[1] - w[0]) >= px * (1 - 1e-9)));
-    const on = (k: number) => (span(k, s), s[1] >= vx0 && s[0] <= vx1);
-    const item = (kind: CutItem['kind'], j: number, q0: number, q1: number, x0: number, x1: number, count: number, fits: boolean) =>
-      out.push({ kind, j, q0, q1, x0, x1, count, fits });
+    const fl: [number, number] = [0, 0];
+    const life = this.fold.life;
+    const R: RowsOf = rows ?? ((r) => (this.range(r, fl), [this.youngest(fl[0], fl[1]), this.youngest(fl[0], fl[1])]));
+    const z = life ? null : this.fitZoom(px);
+    // (Each daughter's territory, as the walk meets it, by its key.)
+    const got = new Map<number, [number, number]>();
+    const terr = (k: number): [number, number] => {
+      let t = got.get(k);
+      if (!t) got.set(k, (t = life ? this.over(Territories.ref(k), R, ghost) : this.span(k)));
+      return t;
+    };
+    const fit = (x0: number, x1: number) => sx * (x1 - x0) >= px * (1 - 1e-9);
+    const ok = (k: number) => (z ? sx >= (k >= 0 ? z.node[k] : z.strand[~k]) : fit(...terr(k)));
+    const meets = (x0: number, x1: number) => x1 >= vx0 && x0 <= vx1;
+    // (Culled by room, nested: an item shows when its room and its territory both meet the window.)
+    const on = (k: number) => (this.span(k, s), meets(s[0], s[1]));
+    const item = (r: Ref, x: [number, number], count: number, fits: boolean) => {
+      this.range(r, fl);
+      out.push({ kind: r.kind, j: r.j, q0: r.q0, q1: r.q1, f: fl[0], l: fl[1], x0: x[0], x1: x[1], count, fits });
+    };
     const root = this.index.get(this.fan.root)!;
     const walk = (j: number): void => {
       const K = this.kids[j];
       let any = false;
       for (const k of K) if (ok(k)) any = true;
       if (!any) {
-        span(j, s);
-        item('node', j, 0, K.length - 1, s[0], s[1], this.count[j], ok(j));
+        const t = terr(j);
+        if (meets(t[0], t[1])) item({ kind: 'node', j, q0: 0, q1: K.length - 1 }, t, this.count[j], ok(j));
         return;
       }
       for (let q = 0; q < K.length; q++) {
         const k = K[q];
         if (ok(k)) {
-          if (!on(k)) continue;
-          if (k >= 0) walk(k);
-          else item('leaf', ~k, 0, 0, s[0], s[1], 1, true);
+          if (k >= 0) {
+            if (on(k)) walk(k);
+          } else if (on(k) && meets(...terr(k))) item({ kind: 'leaf', j: ~k, q0: 0, q1: 0 }, terr(k), 1, true);
           continue;
         }
         // (A run of daughters that do not fit: one item, its territory theirs together.)
         let q1 = q;
         while (q1 + 1 < K.length && !ok(K[q1 + 1])) q1++;
-        const [x0, x1] = this.hull(j, q, q1, s);
+        const r: Ref = { kind: 'run', j, q0: q, q1 };
+        const t: [number, number] = life ? this.over(r, R, ghost) : this.hull(j, q, q1);
         let n = 0;
-        for (let r = q; r <= q1; r++) n += K[r] >= 0 ? this.count[K[r]] : 1;
-        if (x1 >= vx0 && x0 <= vx1) item('run', j, q, q1, x0, x1, n, sx * (x1 - x0) >= px);
+        for (let p = q; p <= q1; p++) n += K[p] >= 0 ? this.count[K[p]] : 1;
+        const [h0, h1] = this.hull(j, q, q1, s);
+        if (meets(h0, h1) && meets(t[0], t[1])) item(r, t, n, fit(t[0], t[1]));
         q = q1;
       }
     };
     if (!on(root)) return out;
-    if (!ok(root)) item('node', root, 0, this.kids[root].length - 1, s[0], s[1], this.count[root], false);
+    if (!ok(root)) item({ kind: 'node', j: root, q0: 0, q1: this.kids[root].length - 1 }, terr(root), this.count[root], false);
     else walk(root);
     return out;
   }
 
-  /** Node j's daughters q0..q1 together: their territories' hull (world x; rooms by life leave them gaps, not overlaps). */
+  /** Strands f..l's youngest tip (world y, "now" at most; cut()'s rows without the view's). */
+  private youngest(f: number, l: number): number {
+    let y = Infinity;
+    for (let i = f; i <= l; i++) y = Math.min(y, this.strands[i].tipY);
+    return Math.max(y, this.fan.time.y(0));
+  }
+
+  /** Node j's daughters q0..q1 together: their rooms' hull (world x, span()). */
   hull(j: number, q0: number, q1: number, out: [number, number] = [0, 0]): [number, number] {
     const K = this.kids[j];
     let a = Infinity;
@@ -262,16 +337,28 @@ export class Territories {
    * their own territory and spilling into neighbours' that show nothing. Been et al. 2010's 1D active ranges along the
    * row: each stretch of runs side by side (between items that fit, their territories untouched) takes the most
    * species it can under disjoint boxes (weighted interval scheduling, optimal), `named` daughters before unnamed at
-   * equal counts. From the layout as it stands (the rooms by life included), so the same whatever the way there.
+   * equal counts. From the layout as it stands, so the same whatever the way there. Under rooms by life (`rows`), a
+   * daughter's box over its label's rows: centred on its own share of them, inside its stretch's. Each chosen, its
+   * centre (world x).
    */
-  borrowed(sx: number, px: number, items: readonly CutItem[], named: (k: number) => boolean = () => true): Set<number> {
-    const out = new Set<number>();
+  borrowed(
+    sx: number,
+    px: number,
+    items: readonly CutItem[],
+    named: (k: number) => boolean = () => true,
+    rows?: RowsOf,
+    ghost = 0,
+  ): Map<number, number> {
+    const out = new Map<number, number>();
     const half = px / 2 / sx;
     const s: [number, number] = [0, 0];
+    const st: [number, number] = [0, 0];
+    const life = this.fold.life && rows;
     for (let i = 0; i < items.length; i++) {
       if (items[i].kind !== 'run') continue;
+      // (A stretch: runs side by side, each strand's next; its room the hull, or under rooms by life, per row.)
       let e = i;
-      while (e + 1 < items.length && items[e + 1].kind === 'run') e++;
+      while (e + 1 < items.length && items[e + 1].kind === 'run' && items[e + 1].f === items[e].l + 1) e++;
       let x0 = Infinity;
       let x1 = -Infinity;
       for (let r = i; r <= e; r++) {
@@ -283,13 +370,24 @@ export class Territories {
         const K = this.kids[items[r].j];
         for (let q = items[r].q0; q <= items[r].q1; q++) {
           const d = K[q];
-          this.span(d, s);
+          if (life) {
+            // (Over its own label's rows: centred on its share of them, inside the stretch's.)
+            const R = Territories.ref(d);
+            const [ya, yb] = rows(R);
+            this.over(R, rows, ghost, s);
+            if (!(s[1] > s[0])) continue;
+            this.fold.cell(items[i].f, items[e].l, ya, yb, ghost, st);
+          } else {
+            this.span(d, s);
+            [st[0], st[1]] = [x0, x1];
+          }
           const c = (s[0] + s[1]) / 2;
-          if (c - half >= x0 && c + half <= x1) cs.push({ k: d, c, w: d >= 0 ? this.count[d] : 1, nm: named(d) ? 1 : 0, kept: 0 });
+          if (c - half >= st[0] && c + half <= st[1]) cs.push({ k: d, c, w: d >= 0 ? this.count[d] : 1, nm: named(d) ? 1 : 0, kept: 0 });
         }
       }
       cs.sort((a, b) => a.c - b.c);
-      for (const d of schedule(cs, 2 * half)) out.add(d);
+      const at = new Map(cs.map((c) => [c.k, c.c]));
+      for (const d of schedule(cs, 2 * half)) out.set(d, at.get(d)!);
       i = e;
     }
     return out;
