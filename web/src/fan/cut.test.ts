@@ -181,3 +181,41 @@ describe('cut: one cut through the tree (ToLaD#333)', () => {
     }
   });
 });
+
+describe('cut: borrowed room, Been et al. 1D active ranges (ToLaD#333, plan step 2b)', () => {
+  for (const level of levels)
+    it(`${level}: daughters that borrow room hold disjoint boxes inside their stretch of runs; more labels`, () => {
+      const { f, t, home } = S.get(level)!;
+      const px = BOXES[0];
+      const k0 = Territories.rung(home / 2);
+      let more = 0;
+      for (let k = k0; k < k0 + 6 * LADDER; k += 3) {
+        const sx = Math.pow(2, k / LADDER);
+        f.setScale(sx, SCREEN);
+        const items = t.cut(sx, px);
+        // Stretches: runs side by side; each lent daughter's box inside its own stretch, none meeting another.
+        const boxes: [number, number][] = [];
+        for (let i = 0; i < items.length; i++) {
+          if (items[i].kind !== 'run') continue;
+          let e = i;
+          while (e + 1 < items.length && items[e + 1].kind === 'run') e++;
+          const [x0, x1] = [items[i].x0, items[e].x1];
+          for (let r = i; r <= e; r++)
+            for (let q = items[r].q0; q <= items[r].q1; q++) {
+              const d = t.kids[items[r].j][q];
+              if (!t.lent(px, d, k)) continue;
+              const [a, b] = t.span(d);
+              const h = px / 2 / sx;
+              const c = (a + b) / 2;
+              expect(c - h).toBeGreaterThanOrEqual(x0 - REL * Math.abs(x0) - 1e-9);
+              expect(c + h).toBeLessThanOrEqual(x1 + REL * Math.abs(x1) + 1e-9);
+              boxes.push([c - h, c + h]);
+            }
+          i = e;
+        }
+        for (let i = 1; i < boxes.length; i++) expect(boxes[i][0]).toBeGreaterThanOrEqual(boxes[i - 1][1] - REL * Math.abs(boxes[i][0]) - 1e-9);
+        more += boxes.length;
+      }
+      if (level !== 'cats') expect(more).toBeGreaterThan(0);
+    });
+});

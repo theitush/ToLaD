@@ -133,6 +133,9 @@ const scenes = [
   ['mamm-rodents', 'level', ['Rodentia']],
   ['mamm-bats', 'level', ['Chiroptera']],
   ['mamm-whales', 'level', ['Cetacea']],
+  // (The hoofed mammals and whales, the horses: the camel's and the horse's pictures on their columns, ToLaD#333.)
+  ['mamm-hoofed', 'level', ['Artiodactyla']],
+  ['mamm-horses', 'level', ['Perissodactyla']],
   ['mamm-primates', 'level', ['Primates']],
   // The great apes and the hominins (ToLaD#275): Hominidae framed, the human lineage, a Neanderthal's card.
   ['mamm-hominidae', 'level', ['Hominidae']],
