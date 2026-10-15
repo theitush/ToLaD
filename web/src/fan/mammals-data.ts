@@ -8,9 +8,8 @@
 
 import { stamp } from '../stamp';
 import type { LayoutSeed } from './layout';
-import { packColumns, unpackColumns, unpackGenealogies, type Columns, type PackedGenealogies, type PackedTree } from './packed';
+import { packColumns, unpackColumns, type Columns, type PackedGenealogies, type PackedTree } from './packed';
 import type { RawClade } from './panthera-extract';
-import { genealogiesAhead } from './population';
 
 /** What mammals.json holds. */
 export interface MammalData {
@@ -86,10 +85,7 @@ async function fetchMammals(): Promise<MammalData> {
 export function loadMammals(get: () => Promise<MammalData> = fetchMammals): Promise<MammalData> {
   if (data) return Promise.resolve(data);
   pending ??= get().then(
-    (d) => {
-      if (d.gen) genealogiesAhead(unpackGenealogies(d.gen));
-      return (data = d);
-    },
+    (d) => (data = d),
     (e) => {
       pending = null;
       throw e;

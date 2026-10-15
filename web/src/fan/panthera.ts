@@ -17,6 +17,8 @@
 import raw from 'virtual:panthera-data';
 import carnivora from 'virtual:carnivora-data';
 import { mammalData } from './mammals-data';
+import { unpackGenealogies } from './packed';
+import { genealogiesAhead } from './population';
 import type { LayoutSeed } from './layout';
 import { BirthCurve, procgenSegments, type GenSegment } from './history';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, sentenceCase, speciesUnder, type Split } from './splits';
@@ -170,5 +172,10 @@ export const CARNIVORA: CladeRec = cladeOf(carnivora, CARNIVORA_TREE, 'Carnivore
 let mamm: CladeRec | null = null;
 /** Every mammal (ToLaD#247): ~5,850 living species and the dated fossils, built when the level is first shown (after loadMammals, mammals-data.ts). */
 export function mammaliaClade(): CladeRec {
-  return (mamm ??= { ...cladeOf(mammalData().clade, mammaliaTree(), 'Mammals'), seed: mammalData().seed });
+  if (mamm) return mamm;
+  const d = mammalData();
+  mamm = { ...cladeOf(d.clade, mammaliaTree(), 'Mammals'), seed: d.seed };
+  // Its genealogies, worked out at build time (mammals-seed.ts, ToLaD#255), for these species.
+  if (d.gen) genealogiesAhead(unpackGenealogies(d.gen), mamm.species);
+  return mamm;
 }

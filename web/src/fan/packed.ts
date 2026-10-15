@@ -53,10 +53,36 @@ export function uintsFromBase64(s: string): number[] {
   return out;
 }
 
-/** Genealogies as mammals.json carries them: per entry its gid and start, the generations as varint steps, the shares as float64s. */
+/**
+ * float64s as base64 in byte planes (every value's first byte, then every second...): the planes of sign and exponent
+ * repeat, so the file's gzip takes them down where interleaved bytes would not; bit for bit.
+ */
+export function f64PlanesToBase64(a: ArrayLike<number>): string {
+  const b = new Uint8Array(Float64Array.from(a).buffer);
+  const n = a.length;
+  const out = new Uint8Array(b.length);
+  for (let i = 0; i < n; i++) for (let p = 0; p < 8; p++) out[p * n + i] = b[i * 8 + p];
+  return toBase64(out);
+}
+export function f64PlanesFromBase64(s: string): Float64Array {
+  const b = fromBase64(s);
+  const n = b.length / 8;
+  const out = new Uint8Array(b.length);
+  for (let p = 0; p < 8; p++) for (let i = 0; i < n; i++) out[i * 8 + p] = b[p * n + i];
+  return new Float64Array(out.buffer);
+}
+
+/**
+ * Genealogies as mammals.json carries them: per entry its gid and start, and either an earlier entry whose genealogy
+ * it is (most are the same walk as another: same size, generation and start) or its own: the generations as varint
+ * steps, the shares as float64s in byte planes.
+ */
 export interface PackedGenealogies {
   gid: string;
   start: string;
+  /** Per entry: 0, its own genealogy follows; d > 0, entry e − d's. */
+  same: string;
+  /** Per own genealogy: its samples. */
   n: string;
   k: string;
   h: string;
@@ -65,35 +91,57 @@ export interface PackedGenealogies {
 export function packGenealogies(g: Map<string, Genealogy>): PackedGenealogies {
   const gid: number[] = [];
   const start: number[] = [];
+  const same: number[] = [];
   const n: number[] = [];
   const dk: number[] = [];
   const h: number[] = [];
+  const first = new Map<string, number>();
+  let e = 0;
   for (const [key, v] of g) {
     const at = key.indexOf(':');
     gid.push(Number(key.slice(0, at)));
     start.push(Number(key.slice(at + 1)));
-    if (`${gid[gid.length - 1]}:${start[start.length - 1]}` !== key) throw new Error(`genealogy key does not round-trip: ${key}`);
-    n.push(v.k.length);
-    for (let i = 0; i < v.k.length; i++) dk.push(v.k[i] - (i ? v.k[i - 1] : 0));
-    for (let i = 0; i < v.h.length; i++) h.push(v.h[i]);
+    if (`${gid[e]}:${start[e]}` !== key) throw new Error(`genealogy key does not round-trip: ${key}`);
+    // (The same walk: its samples bit for bit, generations and shares.)
+    const id = `${f64ToBase64(v.k)}|${f64ToBase64(v.h)}`;
+    const was = first.get(id);
+    if (was !== undefined) same.push(e - was);
+    else {
+      first.set(id, e);
+      same.push(0);
+      n.push(v.k.length);
+      for (let i = 0; i < v.k.length; i++) dk.push(v.k[i] - (i ? v.k[i - 1] : 0));
+      for (let i = 0; i < v.h.length; i++) h.push(v.h[i]);
+    }
+    e++;
   }
-  return { gid: uintsToBase64(gid), start: f64ToBase64(start), n: uintsToBase64(n), k: uintsToBase64(dk), h: f64ToBase64(h) };
+  return { gid: uintsToBase64(gid), start: f64ToBase64(start), same: uintsToBase64(same), n: uintsToBase64(n), k: uintsToBase64(dk), h: f64PlanesToBase64(h) };
 }
 
 export function unpackGenealogies(p: PackedGenealogies): Map<string, Genealogy> {
   const gid = uintsFromBase64(p.gid);
   const start = f64FromBase64(p.start);
+  const same = uintsFromBase64(p.same);
   const n = uintsFromBase64(p.n);
   const dk = uintsFromBase64(p.k);
-  const h = f64FromBase64(p.h);
+  const h = f64PlanesFromBase64(p.h);
   const out = new Map<string, Genealogy>();
+  const all: Genealogy[] = [];
   let at = 0;
+  let own = 0;
   for (let e = 0; e < gid.length; e++) {
-    const k = new Float64Array(n[e]);
-    let acc = 0;
-    for (let i = 0; i < n[e]; i++) k[i] = acc += dk[at + i];
-    out.set(`${gid[e]}:${start[e]}`, { k, h: h.subarray(at, at + n[e]) });
-    at += n[e];
+    let g: Genealogy;
+    if (same[e]) g = all[e - same[e]];
+    else {
+      const c = n[own++];
+      const k = new Float64Array(c);
+      let acc = 0;
+      for (let i = 0; i < c; i++) k[i] = acc += dk[at + i];
+      g = { k, h: h.subarray(at, at + c) };
+      at += c;
+    }
+    all.push(g);
+    out.set(`${gid[e]}:${start[e]}`, g);
   }
   return out;
 }

@@ -3,7 +3,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { layoutFan } from './layout';
 import { loadMammalsFromFiles } from './mammals-node';
-import { f64FromBase64, f64ToBase64, packColumns, packGenealogies, packTree, uintsFromBase64, uintsToBase64, unpackColumns, unpackGenealogies, unpackTree } from './packed';
+import { f64FromBase64, f64PlanesFromBase64, f64PlanesToBase64, f64ToBase64, packColumns, packGenealogies, packTree, uintsFromBase64, uintsToBase64, unpackColumns, unpackGenealogies, unpackTree } from './packed';
 import { mammaliaClade } from './panthera';
 import { genealogiesOf, population } from './population';
 import { mammalData, packMammals, unpackMammals } from './mammals-data';
@@ -14,6 +14,8 @@ describe('packed numbers', () => {
     const f = [0, -0, 1, Math.PI, 1e-300, 4345102241715.732, Number.MAX_VALUE, -1.5e-7];
     expect(Object.is(f64FromBase64(f64ToBase64(f))[1], -0)).toBe(true);
     expect([...f64FromBase64(f64ToBase64(f))]).toEqual(f);
+    expect([...f64PlanesFromBase64(f64PlanesToBase64(f))]).toEqual(f);
+    expect(Object.is(f64PlanesFromBase64(f64PlanesToBase64(f))[1], -0)).toBe(true);
     const u = [0, 1, 127, 128, 16383, 16384, 2 ** 31, 2 ** 40 + 3, Number.MAX_SAFE_INTEGER];
     expect(uintsFromBase64(uintsToBase64(u))).toEqual(u);
     expect(() => uintsToBase64([1.5])).toThrow();

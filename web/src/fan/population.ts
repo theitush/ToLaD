@@ -379,7 +379,7 @@ export class Population {
       const own = Math.max(1, (startMa - sp.t1) * 1e6);
       // Sampled (bounded: per generation only where the share moves, ToLaD#70), back to the species' start; or the
       // build's, worked out ahead from the same data (genealogiesAhead, ToLaD#255).
-      const g = AHEAD.get(`${sp.gid}:${startMa}`) ?? shareBackSampled((k) => this.count(ago(k) / 1e6), varGens, Math.ceil(own / GL), GL);
+      const g = (AHEAD_FOR.has(sp) ? AHEAD.get(`${sp.gid}:${startMa}`) : undefined) ?? shareBackSampled((k) => this.count(ago(k) / 1e6), varGens, Math.ceil(own / GL), GL);
       this.hk = g.k;
       this.h = g.h;
       this.qBase = this.h[this.h.length - 1];
@@ -532,12 +532,18 @@ export interface Genealogy {
   k: Float64Array;
   h: Float64Array;
 }
-/** Genealogies worked out ahead, by `gid:startMa` (the mammal level's, at build time: mammals-data.ts, ToLaD#255). */
+/** Genealogies worked out ahead, by `gid:startMa` (the mammal level's, at build time: panthera.ts mammaliaClade, ToLaD#255). */
 const AHEAD = new Map<string, Genealogy>();
+/** The species they were worked out for (another level's record of the same gid walks its own). */
+const AHEAD_FOR = new WeakSet<SpeciesRec>();
 
-/** Take these genealogies as worked out (the build's, from the same data): a Population of that species and start reads them instead of walking it. */
-export function genealogiesAhead(g: Map<string, Genealogy>): void {
+/**
+ * Take these genealogies as worked out (the build's, from the same data) for these species: a Population of one of
+ * them, at a start worked out, reads its genealogy instead of walking it.
+ */
+export function genealogiesAhead(g: Map<string, Genealogy>, species: Iterable<SpeciesRec>): void {
   for (const [key, v] of g) AHEAD.set(key, v);
+  for (const sp of species) AHEAD_FOR.add(sp);
 }
 
 /** The genealogies of these populations (weight 1, living), by `gid:startMa`: what genealogiesAhead takes. */
