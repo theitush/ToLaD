@@ -215,6 +215,8 @@ export interface CutLabels {
   spots: LabelSpot[];
   groups: Map<string, FanBranch[][]>;
   pics: (PicSpot & { lv: Level; face: FanBranch })[];
+  /** The names' cut (tests read it). */
+  items: CutItem[];
 }
 
 /** The territories (cut.ts) with what the labels read off a cut item: its youngest tip, the species its "+x" counts. */
@@ -3193,7 +3195,7 @@ export class FanView implements InputHandlers {
     const shownPics = pics.filter((p) => !meets(p));
     shownPics.forEach((p, i) => (p.i = i));
     this.picSpots = shownPics;
-    return { spots, groups, pics: shownPics };
+    return { spots, groups, pics: shownPics, items };
   }
 
   /** The page (FanApp) draws a view's first frame without its labels, which follow in the next slice (ToLaD#255); tests draw them at once. */
