@@ -5,7 +5,7 @@
 //
 //   npm run build:single && flock /tmp/tolad-browser.lock node scripts/scale.mjs
 //
-// Env: NS=7000,70000,1000000 (sizes), LABELS=default,cut (?labels=cut too), NODE=0 / PHONE=0 (skip one side),
+// Env: NS=7000,70000,1000000 (sizes), MODES=default,cut (cut: ?labels=cut&frame=cut; noorders: ?orders=0), NODE=0 / PHONE=0 (skip one side),
 // PHONE_NS=7000,70000 (the phone's sizes; default NS), LOAD_TIMEOUT=ms (phone: a size that has not opened by then is
 // recorded as never opening), OUT=<dir> (default scale-out/): node-<n>-<labels>.json, phone-<n>[-load].json, scale.json.
 // Run times on this machine (idle): node 7k ~0.5 min, 70k ~3 min, 1M see research/scale-yardstick.md; the phone
@@ -19,7 +19,10 @@ const OUT = resolve(process.env.OUT || join(WEB, 'scale-out'));
 mkdirSync(OUT, { recursive: true });
 const NS = (process.env.NS || '7000,70000,1000000').split(',').map(Number);
 const PHONE_NS = process.env.PHONE_NS ? process.env.PHONE_NS.split(',').map(Number) : NS;
-const LABELS = (process.env.LABELS || 'default,cut').split(',');
+// (Modes: default; cut = ?labels=cut&frame=cut; noorders = ?orders=0, the tree's orders not registered, synthetic-level.ts.)
+const LABELS = (process.env.MODES || process.env.LABELS || 'default,cut').split(',');
+const NODE_ENV = { default: {}, cut: { TOLAD_LABELS: 'cut', TOLAD_FRAME: 'cut' }, noorders: { SCALE_ORDERS: '0' } };
+const PAGE_Q = { default: {}, cut: { Q: 'labels=cut&frame=cut' }, noorders: { Q: 'orders=0' } };
 const read = (f) => (existsSync(f) ? JSON.parse(readFileSync(f, 'utf8')) : null);
 const run = (cmd, args, env, ms) => {
   const t = Date.now();
@@ -37,14 +40,14 @@ if (process.env.NODE !== '0')
     for (const lab of LABELS) {
       const f = join(OUT, `node-${n}-${lab}.json`);
       console.log(`node: n=${n} labels=${lab}`);
-      const env = { SCALEPERF: f, SCALE_N: String(n), ...(lab === 'cut' ? { TOLAD_LABELS: 'cut' } : {}), NODE_OPTIONS: '--max-old-space-size=12000' };
+      const env = { SCALEPERF: f, SCALE_N: String(n), ...NODE_ENV[lab], NODE_OPTIONS: '--max-old-space-size=12000' };
       res.runSecs[`node-${n}-${lab}`] = run('npx', ['vitest', 'run', 'src/fan/scaleperf.test.ts'], env, 3600e3);
       res.node[`${n}-${lab}`] = read(f);
     }
 if (process.env.PHONE !== '0')
   for (const n of PHONE_NS)
     for (const lab of LABELS) {
-      const q = lab === 'cut' ? { Q: 'labels=cut' } : {};
+      const q = PAGE_Q[lab];
       for (const loadOnly of [true, false]) {
         const f = join(OUT, `phone-${n}-${lab}${loadOnly ? '-load' : ''}.json`);
         console.log(`phone: n=${n} labels=${lab}${loadOnly ? ' (load)' : ''}`);

@@ -294,6 +294,17 @@ function history(r: () => number, t0: number, G: number, nat: number, alive: num
   };
 }
 
+/** The orders' names (the splits the first band founds: their names end in -ia, which no other name does). */
+export function synthOrders(d: MammalData): string[] {
+  const out: string[] = [];
+  const walk = (t: DatedSplit) => {
+    if (t.name.endsWith('ia')) return void out.push(t.name);
+    for (const k of t.kids) if (typeof k !== 'string') walk(k);
+  };
+  walk(d.clade.dated!);
+  return out;
+}
+
 /** Where the benchmark frames its two depths: the largest order, the largest family in it, a species in that. */
 export function synthMarks(d: MammalData): { order: string; family: string; species: string } {
   let best: [number, string, DatedSplit | null] = [0, '', null];

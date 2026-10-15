@@ -6,9 +6,10 @@
 //
 // A synthetic tree of SCALE_N living species (synthetic.ts) opened as the page opens it (synthetic-level.ts: the
 // build's part, then the file parsed, the tree, the clade, the view, the first frames), then frame times of a pinch,
-// a pan and a flight at home and two depths (the largest order, its largest family). TOLAD_LABELS=cut: ?labels=cut.
-// SCALE_SEED=0 / SCALE_JSON=0: no layout seed / no file (synthetic-level.ts). SCALE_GESTURES=0: the load only.
+// a pan and a flight at home and two depths (the largest order, its largest family). TOLAD_LABELS=cut TOLAD_FRAME=cut: ?labels=cut&frame=cut.
+// SCALE_PROF=<file>: a CPU profile of the run after the build's part (.cpuprofile). SCALE_SEED=0 / SCALE_JSON=0 / SCALE_ORDERS=0: no layout seed / no file / its orders not registered (synthetic-level.ts). SCALE_GESTURES=0: the load only.
 import { appendFileSync, writeFileSync } from 'node:fs';
+import { Session } from 'node:inspector/promises';
 import { describe, it } from 'vitest';
 import { MeshBatch, RectBatch } from './meshgl';
 import { loadMammals } from './mammals-data';
@@ -67,16 +68,22 @@ const stats = (a: number[]) => ({ n: a.length, p50: +q(a, 0.5).toFixed(2), p95: 
 describe.skipIf(!OUT)('scale yardstick (perf)', () => {
   it('opens and moves', async () => {
     const n = Number(process.env.SCALE_N || 7000);
-    const res: Record<string, unknown> = { n, labels: process.env.TOLAD_LABELS || 'default', node: proc.version };
+    const res: Record<string, unknown> = { orders: process.env.SCALE_ORDERS !== '0', n, labels: process.env.TOLAD_LABELS || 'default', node: proc.version };
     const load: Record<string, number> = {};
     let rss = 0;
     const mem = () => (rss = Math.max(rss, proc.memoryUsage().rss));
     const canvas = stubCanvas();
     // The build's part and the file read (synthetic-level.ts laps: synth-gen, synth-seed, synth-file, fetch, json).
     log(`n=${n} start`);
-    await loadMammals(() => synthLevelData({ n, seed: process.env.SCALE_SEED !== '0', json: process.env.SCALE_JSON !== '0' }, load));
+    await loadMammals(() => synthLevelData({ n, seed: process.env.SCALE_SEED !== '0', json: process.env.SCALE_JSON !== '0', orders: process.env.SCALE_ORDERS !== '0' }, load));
     log(`data ${JSON.stringify(load)}`);
     mem();
+    const prof = process.env.SCALE_PROF ? new Session() : null;
+    if (prof) {
+      prof.connect();
+      await prof.post('Profiler.enable');
+      await prof.post('Profiler.start');
+    }
     let t0 = performance.now();
     const lap = (k: string) => {
       const t = performance.now();
@@ -162,6 +169,7 @@ describe.skipIf(!OUT)('scale yardstick (perf)', () => {
       }
       res.frames = frames;
     }
+    if (prof) writeFileSync(process.env.SCALE_PROF!, JSON.stringify((await prof.post('Profiler.stop')).profile));
     res.rssMB = Math.round(rss / 2 ** 20);
     writeFileSync(OUT!, JSON.stringify(res, null, 1));
   }, 3600000);

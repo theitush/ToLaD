@@ -3,27 +3,31 @@
 // tree of that size costs. What the build does for the mammals (vite.config.ts: the layout seed, the JSON file) is
 // done here first and stamped apart (`tl:synth-gen`, `tl:synth-seed`, `tl:synth-file`); from `tl:fetch` on, the steps
 // are the mammals': the file parsed (`tl:json`), the tree, the clade, the view, the first frame.
+// Its orders (synthetic.ts: the splits founded under 66 Ma) are registered as the mammal orders are listed (splits.ts
+// ORDER_TAXA): the fold's level above the orders and the merged clades' detail (lod.ts) key on that list, so without it
+// a tree has neither and every species is drawn every frame (`&orders=0` measures that: any tree not in the list today).
 // `&seed=0`: no layout seed (the page works the layout out); `&json=0`: the data handed over as objects, no file (a
 // file past V8's string limit, ~512 MB, cannot be parsed: the 1M tree's).
 import { stamp } from '../stamp';
 import { layoutFan, layoutSeed } from './layout';
 import type { MammalData } from './mammals-data';
 import { cladeOf } from './panthera';
-import { nameOrders, treeOf } from './splits';
+import { nameOrders, ORDER_TAXA, treeOf } from './splits';
 import { Steady } from './steady';
-import { synthData, synthMarks } from './synthetic';
+import { synthData, synthMarks, synthOrders } from './synthetic';
 
 export interface SynthQuery {
   n: number;
   seed: boolean;
   json: boolean;
+  orders: boolean;
 }
 
 /** The query's synthetic-level options (n defaults to 70,000). */
 export function synthQuery(search: string): SynthQuery {
   const q = new URLSearchParams(search);
   const n = Number(q.get('n'));
-  return { n: Number.isFinite(n) && n >= 2 ? Math.floor(n) : 70000, seed: q.get('seed') !== '0', json: q.get('json') !== '0' };
+  return { n: Number.isFinite(n) && n >= 2 ? Math.floor(n) : 70000, seed: q.get('seed') !== '0', json: q.get('json') !== '0', orders: q.get('orders') !== '0' };
 }
 
 /** Where the benchmark frames its depths, the last tree made (window.__synth in the page). */
@@ -40,6 +44,7 @@ export async function synthLevelData(o: SynthQuery, ms?: Record<string, number>)
   };
   const d = synthData({ n: o.n });
   synthMarksNow = synthMarks(d);
+  if (o.orders) for (const name of synthOrders(d)) (ORDER_TAXA as Set<string>).add(name);
   lap('synth-gen');
   if (o.seed) {
     // (As mammals-seed.ts: on a tree and clade of its own, not the level's memoized ones.)
