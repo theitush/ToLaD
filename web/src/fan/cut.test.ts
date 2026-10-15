@@ -34,23 +34,36 @@ const REL = 1e-6;
 
 describe('cut: territories (ToLaD#333)', () => {
   for (const level of levels) {
-    it(`${level}: disjoint and nested at every zoom; the daughters tile their parent`, () => {
-      const { f, t, home } = S.get(level)!;
+    it(`${level}: in space and time, two territories that share a time are disjoint (rooms by life, Steady.territory)`, () => {
+      const { fan, f, t, home } = S.get(level)!;
+      // (An item's labels stand from its youngest tip up to its parent's split: its window in time.)
+      const tipN = Float64Array.from(t.nodes, (v) => Math.min(...v.strands.map((b) => Math.max(b.tipY, fan.time.y(0)))));
+      const win = (k: number, j: number): [number, number] => [k >= 0 ? tipN[k] : Math.max(t.strands[~k].tipY, fan.time.y(0)), t.nodes[j].y];
       for (const z of ZOOMS) {
         f.setScale(home * z, SCREEN);
+        // The cut's items for a pill at this zoom, as the labels see them: every pair sharing a time stands apart.
+        const cs = t.cut(home * z, 22).filter((c) => c.kind !== 'run');
+        const box = cs.map((c) => {
+          const k = c.kind === 'leaf' ? ~c.j : c.j;
+          const up = k >= 0 ? t.nodes[k].parent : t.strands[~k].node;
+          return { x: t.span(k), y: up ? win(k, t.index.get(up)!) : [-Infinity, Infinity] };
+        });
+        for (let a = 0; a < box.length; a++)
+          for (let b = a + 1; b < box.length; b++) {
+            const [p, q] = [box[a], box[b]];
+            if (!(p.y[0] < q.y[1] && q.y[0] < p.y[1])) continue;
+            const tol = REL * Math.max(Math.abs(p.x[1]), Math.abs(q.x[0])) + 1e-9;
+            expect(p.x[1] <= q.x[0] + tol || q.x[1] <= p.x[0] + tol).toBe(true);
+          }
+        // Sisters: always sharing their parent's split, side by side left to right.
         t.nodes.forEach((_, j) => {
-          const [a, b] = t.span(j);
-          const tol = REL * (b - a) + 1e-9;
-          const K = t.kids[j];
-          let prev = a;
-          for (const k of K) {
+          let prev = -Infinity;
+          for (const k of t.kids[j]) {
             const [c, d] = t.span(k);
-            // (Each daughter starts where the one before ended: disjoint, and nothing between them left out.)
-            expect(Math.abs(c - prev)).toBeLessThan(tol);
+            expect(c).toBeGreaterThanOrEqual(prev - REL * Math.abs(c) - 1e-9);
             expect(d).toBeGreaterThanOrEqual(c);
             prev = d;
           }
-          expect(Math.abs(prev - b)).toBeLessThan(tol);
         });
       }
     });

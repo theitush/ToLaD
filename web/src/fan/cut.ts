@@ -168,6 +168,7 @@ export class Territories {
 
   /** Node j's (or, ~j, strand ~j's) territory (world x) at the layout as it stands (the fold's zoom). */
   span(j: number, out: [number, number] = [0, 0]): [number, number] {
+    if (this.fold.territory(j, out)) return out;
     const { roomL, roomW, C } = this.fold.rooms();
     const A = this.fold.a;
     if (j >= 0) {
@@ -188,14 +189,13 @@ export class Territories {
    * meets world x [vx0, vx1] (the screen): O(what is on screen). Items left to right.
    */
   cut(sx: number, px: number, vx0 = -Infinity, vx1 = Infinity): CutItem[] {
-    const z = this.fitZoom(px);
     const out: CutItem[] = [];
     const s: [number, number] = [0, 0];
     const span = (k: number, o: [number, number]) => this.span(k, o);
     const w: [number, number] = [0, 0];
-    // (Its fit zoom, from the widest rooms, is a bound: under the rooms by life a fossil's room is narrower, so its
-    // territory as laid out is the test.)
-    const ok = (k: number) => sx >= (k >= 0 ? z.node[k] : z.strand[~k]) && (!this.fold.life || (span(k, w), sx * (w[1] - w[0]) >= px));
+    // (Rooms by life: the territory as laid out is the test, Steady.territory. Widest rooms: the fit zoom.)
+    const z = this.fold.life ? null : this.fitZoom(px);
+    const ok = (k: number) => (z ? sx >= (k >= 0 ? z.node[k] : z.strand[~k]) : (span(k, w), sx * (w[1] - w[0]) >= px * (1 - 1e-9)));
     const on = (k: number) => (span(k, s), s[1] >= vx0 && s[0] <= vx1);
     const item = (kind: CutItem['kind'], j: number, q0: number, q1: number, x0: number, x1: number, count: number, fits: boolean) =>
       out.push({ kind, j, q0, q1, x0, x1, count, fits });
@@ -220,8 +220,7 @@ export class Territories {
         // (A run of daughters that do not fit: one item, its territory theirs together.)
         let q1 = q;
         while (q1 + 1 < K.length && !ok(K[q1 + 1])) q1++;
-        const x0 = span(K[q], s)[0];
-        const x1 = span(K[q1], s)[1];
+        const [x0, x1] = this.hull(j, q, q1, s);
         let n = 0;
         for (let r = q; r <= q1; r++) n += K[r] >= 0 ? this.count[K[r]] : 1;
         if (x1 >= vx0 && x0 <= vx1) item('run', j, q, q1, x0, x1, n, sx * (x1 - x0) >= px);
@@ -231,6 +230,21 @@ export class Territories {
     if (!on(root)) return out;
     if (!ok(root)) item('node', root, 0, this.kids[root].length - 1, s[0], s[1], this.count[root], false);
     else walk(root);
+    return out;
+  }
+
+  /** Node j's daughters q0..q1 together: their territories' hull (world x; rooms by life leave them gaps, not overlaps). */
+  hull(j: number, q0: number, q1: number, out: [number, number] = [0, 0]): [number, number] {
+    const K = this.kids[j];
+    let a = Infinity;
+    let b = -Infinity;
+    for (let q = q0; q <= q1; q++) {
+      this.span(K[q], out);
+      a = Math.min(a, out[0]);
+      b = Math.max(b, out[1]);
+    }
+    out[0] = a;
+    out[1] = b;
     return out;
   }
 

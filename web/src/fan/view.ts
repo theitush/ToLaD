@@ -3121,8 +3121,7 @@ export class FanView implements InputHandlers {
       for (let q = it.q0; q <= it.q1 + 1; q++) {
         if (q <= it.q1 && !lent(K[q])) continue;
         if (q > q0) {
-          const x0 = T.t.span(K[q0], s2)[0];
-          const x1 = T.t.span(K[q - 1], s2)[1];
+          const [x0, x1] = T.t.hull(it.j, q0, q - 1, s2);
           let ty = Infinity;
           for (let r = q0; r < q; r++) ty = Math.min(ty, T.youngOf(K[r]));
           const ks = Array.from(K.subarray(q0, q));

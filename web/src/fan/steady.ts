@@ -57,6 +57,20 @@ interface Lay {
   dl?: Float64Array;
   tc?: Float64Array;
   dc?: Float64Array;
+  /** Rooms by life: per node, the boundaries between its daughters (Bounds; computeLife). */
+  bounds?: Bounds[];
+}
+
+/**
+ * Rooms by life, per node: the boundary (world x) between two of its daughters, daughter `l` (kidsF's index) left of
+ * it and `r` right, the middle of the gap between their extents while both lived (computeLife's window: from the
+ * split down to `t`, the later of their last tips, where its construction keeps them apart).
+ */
+interface Bounds {
+  l: Int32Array;
+  r: Int32Array;
+  x: Float64Array;
+  t: Float64Array;
 }
 
 export class Steady extends Fold {
@@ -160,8 +174,23 @@ export class Steady extends Fold {
       this.tipN[j] = t;
     }
     this.yNow = yRef;
+    // (Territories: each item's parent and its place among the parent's daughters.)
+    this.upN = new Int32Array(N.length).fill(-1);
+    this.upS = new Int32Array(S.length).fill(-1);
+    this.qN = new Int32Array(N.length);
+    this.qS = new Int32Array(S.length);
+    this.kidsF.forEach((K, j) =>
+      K.forEach((k, q) => {
+        if (k >= 0) [this.upN[k], this.qN[k]] = [j, q];
+        else [this.upS[~k], this.qS[~k]] = [j, q];
+      }),
+    );
     if (open) this.a.fill(1);
   }
+  private readonly upN: Int32Array;
+  private readonly upS: Int32Array;
+  private readonly qN: Int32Array;
+  private readonly qS: Int32Array;
 
   /** The rooms and places at the a's `A`. */
   private compute(A: Float64Array): Lay {
@@ -306,11 +335,19 @@ export class Steady extends Fold {
     };
     const ea: [number, number] = [0, 0];
     const eb: [number, number] = [0, 0];
+    const bounds: Bounds[] = new Array(n);
+    // (A pair's boundary, by its extents' ends in the room: p's right end, q's left end from its offset, and the window.)
+    const bl: number[] = [];
+    const br: number[] = [];
+    const bp: number[] = [];
+    const bq: number[] = [];
+    const bt: number[] = [];
     // Rooms, daughters first.
     for (let j = n - 1; j >= 0; j--) {
       const K = this.kidsF[j];
       const P = this.kidPair[j];
       const m = K.length;
+      bl.length = br.length = bp.length = bq.length = bt.length = 0;
       const o = new Float64Array(m);
       const full = new Float64Array(m);
       const tip = new Float64Array(m);
@@ -322,21 +359,27 @@ export class Steady extends Fold {
       for (let q = 1; q < m; q++) {
         let x = -Infinity;
         let g = 0;
+        const e0 = bl.length;
         for (let p = q - 1; p >= 0; p--) {
           g = Math.max(g, A[P[p]] * G[P[p]]);
           const t0 = Math.max(tip[p], tip[q]);
-          if (t0 <= now) x = Math.max(x, o[p] + full[p] + g);
-          else {
+          if (t0 <= now) {
+            x = Math.max(x, o[p] + full[p] + g);
+            bl.push(o[p] + full[p]), br.push(0);
+          } else {
             ext(K[p], t0, ea);
             ext(K[q], t0, eb);
             // (The gap too: a share of the order's width, the humans' 8e9 at the primates', would dwarf the fossils; at most LIFE_GAP of the narrower of the two then.)
             const gl = Math.min(g, LIFE_GAP * Math.min(ea[1] - ea[0], eb[1] - eb[0]));
             x = Math.max(x, o[p] + ea[1] + gl - eb[0]);
+            bl.push(o[p] + ea[1]), br.push(eb[0]);
           }
+          bp.push(p), bq.push(q), bt.push(t0);
           // (Those before a sister living to now are clear of q already: they are clear of her column, which q clears.)
           if (tip[p] <= now) break;
         }
         o[q] = x;
+        for (let e = e0; e < bl.length; e++) bl[e] = (bl[e] + x + br[e]) / 2;
       }
       let lo = Infinity;
       let hi = -Infinity;
@@ -347,6 +390,7 @@ export class Steady extends Fold {
       if (!(m > 0)) lo = hi = 0;
       for (let q = 0; q < m; q++) o[q] -= lo;
       offs[j] = o;
+      bounds[j] = { l: Int32Array.from(bp), r: Int32Array.from(bq), x: Float64Array.from(bl, (x) => x - lo), t: Float64Array.from(bt) };
       roomW[j] = Math.max(hi - lo, NW[j]);
       // Its column: where its daughters' founders move least (compute's rule), inside its room.
       let sw = 0;
@@ -369,6 +413,8 @@ export class Steady extends Fold {
       const K = this.kidsF[j];
       const o = offs[j];
       colL[j] = roomL[j] + colR[j];
+      const bx = bounds[j].x;
+      for (let e = 0; e < bx.length; e++) bx[e] += roomL[j];
       for (let q = 0; q < K.length; q++) {
         const k = K[q];
         if (k >= 0) roomL[k] = roomL[j] + o[q];
@@ -382,7 +428,8 @@ export class Steady extends Fold {
       roomL[j] += sh;
     }
     for (let i = 0; i < C.length; i++) C[i] += sh;
-    return { ver: this.ver, colL, roomL, roomW, h, C };
+    for (const b of bounds) for (let e = 0; e < b.x.length; e++) b.x[e] += sh;
+    return { ver: this.ver, colL, roomL, roomW, h, C, bounds };
   }
 
   /** The current layout (at the fold's version and zoom). */
@@ -756,6 +803,39 @@ export class Steady extends Fold {
   rooms(): { roomL: Float64Array; roomW: Float64Array; C: Float64Array } {
     const L = this.cur();
     return { roomL: L.roomL, roomW: L.roomW, C: L.C };
+  }
+
+  /**
+   * Rooms by life: item k's territory (a node's index, ~ a strand's; world x, `out`) for a label anywhere from its
+   * youngest tip up to its parent's split: between the boundaries (Bounds) with its sisters, and with its ancestors'
+   * sisters whose window reaches that high (one that died before it, all of it younger, meets none of its labels), in
+   * its root's room. A label inside its own territory meets no other in its own: two that share a time are kept apart
+   * by their pair's boundary (computeLife keeps their extents apart there), so territories need no collision test.
+   * Null without rooms by life (cut.ts's widest rooms).
+   */
+  territory(k: number, out: [number, number] = [0, 0]): [number, number] | null {
+    const L = this.cur();
+    const B = L.bounds;
+    if (!B) return null;
+    let j = k >= 0 ? this.upN[k] : this.upS[~k];
+    let q = k >= 0 ? this.qN[k] : this.qS[~k];
+    const top = j >= 0 ? this.nY[j] : Infinity;
+    let lo = -Infinity;
+    let hi = Infinity;
+    while (j >= 0) {
+      const b = B[j];
+      for (let e = 0; e < b.x.length; e++) {
+        if (b.t[e] > top) continue;
+        if (b.r[e] === q) lo = Math.max(lo, b.x[e]);
+        else if (b.l[e] === q) hi = Math.min(hi, b.x[e]);
+      }
+      q = this.qN[j];
+      j = this.upN[j];
+    }
+    const r = this.rootJ;
+    out[0] = Math.max(lo, L.roomL[r]);
+    out[1] = Math.min(hi, L.roomL[r] + L.roomW[r]);
+    return out;
   }
 
   override setAll(a: number, all = false): void {
