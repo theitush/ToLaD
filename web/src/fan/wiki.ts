@@ -28,9 +28,6 @@ export function wikiOf(sci: string): WikiRec | null {
   return (WIKI as Record<string, WikiRec | null>)[sci] ?? (mammalsLoaded() ? mammalData().wiki[sci] : null) ?? null;
 }
 
-/** `?thumbs=0` turns the name pills' thumbnails off. */
-export const thumbsOn = typeof location === 'undefined' || new URLSearchParams(location.search).get('thumbs') !== '0';
-
 // One image per URL for the page's life: loading, loaded, or failed (null).
 const cache = new Map<string, HTMLImageElement | null>();
 let redraw: (() => void) | null = null;
@@ -43,7 +40,7 @@ let redraw: (() => void) | null = null;
  * header fails and is simply not drawn.
  */
 export function labelThumb(sci: string, request: () => void): HTMLImageElement | null {
-  const url = thumbsOn ? wikiOf(sci)?.img : undefined;
+  const url = wikiOf(sci)?.img;
   if (!url || typeof Image === 'undefined') return null;
   redraw = request;
   const have = cache.get(url);

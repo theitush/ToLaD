@@ -18,38 +18,9 @@
 import { isNode, type Fan, type FanBranch, type FanNode } from './layout';
 import type { Steady } from './steady';
 
-/**
- * Whether names, pictures, "+x" and brackets come from the cut (ToLaD#333, plan step 2): ?labels=cut, or
- * TOLAD_LABELS=cut in node. Off by default (today's labels) until Ita picks.
- */
+/** Old tests' switch until they are ported or deleted (ToLaD#342): the cut is the only label system. */
 export function wantCutLabels(): boolean {
-  try {
-    if (typeof location !== 'undefined') {
-      const q = new URLSearchParams(location.search).get('labels');
-      if (q) return q === 'cut';
-    }
-  } catch {
-    /* no URL */
-  }
-  const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
-  return env?.TOLAD_LABELS === 'cut';
-}
-
-/**
- * Whether taps and levels are framed by their territories (ToLaD#333, plan step 3): ?frame=cut, or TOLAD_FRAME=cut in
- * node. Off by default (today's frames) until Ita picks.
- */
-export function wantCutFrame(): boolean {
-  try {
-    if (typeof location !== 'undefined') {
-      const q = new URLSearchParams(location.search).get('frame');
-      if (q) return q === 'cut';
-    }
-  } catch {
-    /* no URL */
-  }
-  const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
-  return env?.TOLAD_FRAME === 'cut';
+  return true;
 }
 
 /** Fit zooms are resolved to 1/LADDER of a doubling (rounded up): a resolution, not a look. */
@@ -217,15 +188,14 @@ export class Territories {
    * meets world x [vx0, vx1] (the screen): O(what is on screen). Items left to right.
    */
   cut(sx: number, px: number, vx0 = -Infinity, vx1 = Infinity): CutItem[] {
-    return this.walk(sx, px, (k, s) => this.span(k, s), vx0, vx1);
-  }
-
-  /** The cut at `sx` for a box `px` wide, territories by `span` (world x), only what meets [vx0, vx1]. */
-  private walk(sx: number, px: number, span: (k: number, s: [number, number]) => [number, number], vx0 = -Infinity, vx1 = Infinity, whole?: Float64Array): CutItem[] {
     const z = this.fitZoom(px);
     const out: CutItem[] = [];
     const s: [number, number] = [0, 0];
-    const ok = (k: number) => sx >= (k >= 0 ? z.node[k] : z.strand[~k]);
+    const span = (k: number, o: [number, number]) => this.span(k, o);
+    const w: [number, number] = [0, 0];
+    // (Its fit zoom, from the widest rooms, is a bound: under the rooms by life a fossil's room is narrower, so its
+    // territory as laid out is the test.)
+    const ok = (k: number) => sx >= (k >= 0 ? z.node[k] : z.strand[~k]) && (!this.fold.life || (span(k, w), sx * (w[1] - w[0]) >= px));
     const on = (k: number) => (span(k, s), s[1] >= vx0 && s[0] <= vx1);
     const item = (kind: CutItem['kind'], j: number, q0: number, q1: number, x0: number, x1: number, count: number, fits: boolean) =>
       out.push({ kind, j, q0, q1, x0, x1, count, fits });
@@ -243,11 +213,8 @@ export class Territories {
         const k = K[q];
         if (ok(k)) {
           if (!on(k)) continue;
-          if (k >= 0) {
-            // (Everything under it fits, `whole`: it stands for it all, its runs none.)
-            if (whole && sx >= whole[k]) item('node', k, 0, this.kids[k].length - 1, s[0], s[1], this.count[k], true);
-            else walk(k);
-          } else item('leaf', ~k, 0, 0, s[0], s[1], 1, true);
+          if (k >= 0) walk(k);
+          else item('leaf', ~k, 0, 0, s[0], s[1], 1, true);
           continue;
         }
         // (A run of daughters that do not fit: one item, its territory theirs together.)
@@ -276,123 +243,42 @@ export class Territories {
   }
 
   /**
-   * Borrowed room (research/scalable-tree.md §3, plan step 2b): whether daughter `d` (a node's index, ~ a strand's), in
-   * one of the cut's runs (it does not fit its own territory), shows a box `px` wide all the same on ladder rung `k`,
-   * centred on its own territory and spilling into neighbours' that show nothing. Been et al. 2010's 1D active ranges:
-   * along the row, each stretch of runs between items that fit (their territories untouched) takes the most species
-   * it can under disjoint boxes (weighted interval scheduling, optimal), `named` daughters before unnamed at equal
-   * counts. Worked out rung by rung up the ladder from the first, as far as asked and once (per box and screen width);
-   * a daughter shown on a rung is kept on the next while it still lies in its stretch (boxes only move apart as the
-   * zoom grows), so each shows over one range of zooms, the same whatever the way there.
+   * Borrowed room (research/scalable-tree.md §3, plan step 2b): of the cut `items` at width zoom `sx` for a box `px`
+   * wide, the daughters in its runs (each too narrow for its own territory) that show a box all the same, centred on
+   * their own territory and spilling into neighbours' that show nothing. Been et al. 2010's 1D active ranges along the
+   * row: each stretch of runs side by side (between items that fit, their territories untouched) takes the most
+   * species it can under disjoint boxes (weighted interval scheduling, optimal), `named` daughters before unnamed at
+   * equal counts. From the layout as it stands (the rooms by life included), so the same whatever the way there.
    */
-  lent(px: number, d: number, k: number, named: (k: number) => boolean = () => true): boolean {
-    let L = this.lends.get(px);
-    if (!L) this.lends.set(px, (L = this.lender(px, named)));
-    L.upTo(k);
-    const r = L.ranges.get(d);
-    if (r) for (let i = 0; i < r.length; i += 2) if (k >= r[i] && k < r[i + 1]) return true;
-    return false;
-  }
-  private readonly lends = new Map<number, { ranges: Map<number, number[]>; upTo(k: number): void }>();
-  private lender(px: number, named: (k: number) => boolean): { ranges: Map<number, number[]>; upTo(k: number): void } {
-    const ranges = new Map<number, number[]>();
-    const z = this.fitZoom(px);
-    let lo = Infinity;
-    let hi = -Infinity;
-    for (const a of [z.node, z.strand])
-      for (const v of a)
-        if (v < Infinity) {
-          lo = Math.min(lo, v);
-          hi = Math.max(hi, v);
-        }
-    if (!(lo < Infinity)) return { ranges, upTo: () => {} };
-    const nS = this.R.length;
-    const A = new Float64Array(this.G.length).fill(1);
-    const PG = new Float64Array(this.G.length + 1);
-    const ramps = Array.from(A, (_, p) => this.fold.openRamp(p, this.screenW));
-    // (Territories on the rung, as `span` has them with the fold set there, up to a shift.)
-    const span = (k: number, s: [number, number]): [number, number] => {
-      const f = k >= 0 ? this.first[k] : ~k;
-      const l = k >= 0 ? this.last[k] : ~k;
-      s[0] = this.PR[f] + PG[f] - (f > 0 ? (A[f - 1] * this.G[f - 1]) / 2 : 0);
-      s[1] = this.PR[l + 1] + PG[l] + (l < nS - 1 ? (A[l] * this.G[l]) / 2 : 0);
-      return s;
-    };
-    // (Per node: the zoom past which everything under it fits, its strands' last: the walk need not go in.)
-    const whole = new Float64Array(this.nodes.length).fill(NaN);
-    const wholeOf = (j: number): number => {
-      if (Number.isNaN(whole[j])) {
-        let m = -Infinity;
-        for (const k of this.kids[j]) m = Math.max(m, k >= 0 ? wholeOf(k) : z.strand[~k]);
-        whole[j] = m;
-      }
-      return whole[j];
-    };
-    for (let j = 0; j < this.nodes.length; j++) wholeOf(j);
-    // (The splits opening, by where their ramps start: below it a split is closed, above its end open.)
-    const ramped = Int32Array.from(ramps.keys()).filter((p) => !!ramps[p]);
-    for (const p of ramped) A[p] = 0;
-    ramped.sort((p, q) => ramps[p]![0] - ramps[q]![0]);
-    let opening: number[] = [];
-    let o = 0;
-    let kept = new Set<number>();
+  borrowed(sx: number, px: number, items: readonly CutItem[], named: (k: number) => boolean = () => true): Set<number> {
+    const out = new Set<number>();
+    const half = px / 2 / sx;
     const s: [number, number] = [0, 0];
-    // (From the first rung anything fits to the last strand's: past it every daughter fits, no runs.)
-    let k = Territories.rung(lo);
-    const k1 = Territories.rung(hi);
-    const step = () => {
-      const sx = Math.pow(2, k / LADDER);
-      while (o < ramped.length && ramps[ramped[o]]![0] < sx) opening.push(ramped[o++]);
-      opening = opening.filter((p) => {
-        const r = ramps[p]!;
-        A[p] = sx >= r[1] ? 1 : this.fold.openOne(p, sx, this.screenW);
-        return sx < r[1];
-      });
-      this.gapSums(A, PG);
-      const half = px / 2 / sx;
-      const items = this.walk(sx, px, span, -Infinity, Infinity, whole);
-      const now = new Set<number>();
-      for (let i = 0; i < items.length; i++) {
-        if (items[i].kind !== 'run') continue;
-        // A stretch: runs side by side, its room theirs together.
-        let e = i;
-        while (e + 1 < items.length && items[e + 1].kind === 'run') e++;
-        const x0 = items[i].x0;
-        const x1 = items[e].x1;
-        const cs: Cand[] = [];
-        for (let r = i; r <= e; r++) {
-          const K = this.kids[items[r].j];
-          for (let q = items[r].q0; q <= items[r].q1; q++) {
-            const d = K[q];
-            span(d, s);
-            const c = (s[0] + s[1]) / 2;
-            if (c - half >= x0 && c + half <= x1) cs.push({ k: d, c, w: d >= 0 ? this.count[d] : 1, nm: named(d) ? 1 : 0, kept: kept.has(d) ? 1 : 0 });
-          }
-        }
-        for (const d of schedule(cs, 2 * half)) now.add(d);
-        i = e;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].kind !== 'run') continue;
+      let e = i;
+      while (e + 1 < items.length && items[e + 1].kind === 'run') e++;
+      let x0 = Infinity;
+      let x1 = -Infinity;
+      for (let r = i; r <= e; r++) {
+        x0 = Math.min(x0, items[r].x0);
+        x1 = Math.max(x1, items[r].x1);
       }
-      // (Each range [from, to): open, its end Infinity, until the daughter stops showing.)
-      for (const d of now)
-        if (!kept.has(d)) {
-          let r = ranges.get(d);
-          if (!r) ranges.set(d, (r = []));
-          r.push(k, Infinity);
+      const cs: Cand[] = [];
+      for (let r = i; r <= e; r++) {
+        const K = this.kids[items[r].j];
+        for (let q = items[r].q0; q <= items[r].q1; q++) {
+          const d = K[q];
+          this.span(d, s);
+          const c = (s[0] + s[1]) / 2;
+          if (c - half >= x0 && c + half <= x1) cs.push({ k: d, c, w: d >= 0 ? this.count[d] : 1, nm: named(d) ? 1 : 0, kept: 0 });
         }
-      for (const d of kept)
-        if (!now.has(d)) {
-          const r = ranges.get(d)!;
-          r[r.length - 1] = k;
-        }
-      kept = now;
-      k++;
-    };
-    return {
-      ranges,
-      upTo: (to: number) => {
-        while (k <= Math.min(to, k1)) step();
-      },
-    };
+      }
+      cs.sort((a, b) => a.c - b.c);
+      for (const d of schedule(cs, 2 * half)) out.add(d);
+      i = e;
+    }
+    return out;
   }
 }
 

@@ -41,31 +41,6 @@ export const LIFE_GAP = 0.5;
 /** Rooms by life: a strand's widest over a window is laneW at this many steps (and its ends). */
 const LIFE_SAMPLES = 48;
 
-/**
- * Whether a level whose living members dwarf its fossils is framed on the fossils (ToLaD#289): ?fit=fossils, or
- * TOLAD_FIT=fossils in node; the globe menu's "Fit fossils". It turns on the rooms by life (wantLifeRooms, computeLife). Off by default.
- */
-export function wantFitFossils(): boolean {
-  try {
-    if (typeof location !== 'undefined') {
-      const q = new URLSearchParams(location.search).get('fit');
-      if (q) return q === 'fossils';
-    }
-  } catch {
-    /* no URL */
-  }
-  const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
-  return env?.TOLAD_FIT === 'fossils';
-}
-
-/**
- * Whether a fossil's room is only what it stood beside while it lived (ToLaD#289): under ?fit=fossils, which needs it
- * (its hominins' columns and names, fit.test.ts, were measured with these rooms). Else every room is its widest ever.
- */
-export function wantLifeRooms(): boolean {
-  return wantFitFossils();
-}
-
 /** The rooms and places at one set of a's and width zoom (world x, the stem's centre on Fold.home). */
 interface Lay {
   ver: number;
@@ -132,8 +107,8 @@ export class Steady extends Fold {
   constructor(
     fan: Fan,
     readonly open = false,
-    /** Rooms by life (wantLifeRooms, ToLaD#289): an extinct daughter and its sister stand apart by their extents while both lived. */
-    readonly life = wantLifeRooms(),
+    /** Rooms by life (ToLaD#289, #342: the only rooms; widest-ever rooms for tests): an extinct daughter and its sister stand apart by their extents while both lived. */
+    readonly life = true,
   ) {
     super(fan);
     const N = fan.nodes;

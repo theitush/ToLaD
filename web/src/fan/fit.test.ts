@@ -1,8 +1,7 @@
-// ?fit=fossils (ToLaD#289, #298): at the Hominins and Homo levels the frame is where and when the fossils lived (from
-// the level's start to its youngest fossil group's end, "now" above the screen), so every hominin with a picture gets
-// a column a few px wide and its name (ToLaD#297); off (the default), the frame fits today's humans.
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { wantCutLabels } from './cut';
+// Fit fossils (ToLaD#289, #298; the only framing since #342): at the Hominins and Homo levels the frame is where and
+// when the fossils lived (from the level's start to its youngest fossil group's end, "now" above the screen), so every
+// hominin with a picture gets a column a few px wide and its name (ToLaD#297).
+import { beforeAll, describe, expect, it } from 'vitest';
 import { mammaliaClade, type CladeRec } from './panthera';
 import { loadMammalsFromFiles } from './mammals-node';
 import { mammaliaTree, type Split } from './splits';
@@ -64,7 +63,7 @@ function measure(v: FanView, u: FanNode) {
   v.cam = v.cladeCamera(u);
   v.camera.settle();
   settle(v);
-  const hidden = new Set(v.hiddenGroups.flatMap((g) => (g.lv.b ? [g.lv.b] : g.lv.v.strands)));
+  const own = new Set(v.cutLast!.spots.flatMap((s) => (s.b ? [s.b] : [])));
   const out: { sci: string; px: number; on: boolean; named: boolean }[] = [];
   for (const b of u.strands) {
     if (!WIKI[b.sp.sci]?.img) continue;
@@ -79,19 +78,17 @@ function measure(v: FanView, u: FanNode) {
       const [l, sy] = v.toScreen(leftAt(b, y), y);
       on = l + w > 0 && l < v.w && sy > 0 && sy < v.h;
     }
-    out.push({ sci: b.sp.sci, px, on, named: !hidden.has(b) });
+    out.push({ sci: b.sp.sci, px, on, named: own.has(b) });
   }
   return out;
 }
 
-describe('?fit=fossils: the hominins readable (ToLaD#289)', () => {
+describe('Fit fossils: the hominins readable (ToLaD#289)', () => {
   let v: FanView;
   beforeAll(async () => {
-    vi.stubEnv('TOLAD_FIT', 'fossils');
     await loadMammalsFromFiles();
     v = stubView(mammaliaClade(), mammaliaTree(), true);
   }, 400000);
-  afterAll(() => vi.unstubAllEnvs());
 
   // Measured (hom289c): with the gaps beside a fossil at most half the narrower one's extent (steady.ts LIFE_GAP), the
   // fossils' frame is ~13x narrower than hom289b's and a pictured hominin's column is 3-5 px (Neanderthals ~50 px).
@@ -139,25 +136,21 @@ describe('?fit=fossils: the hominins readable (ToLaD#289)', () => {
 
 /** The names shown at rest (resolved afresh), each its text. */
 function shownNames(v: FanView): string[] {
-  const V = v as unknown as { labLast: { spots: { key: string; text: string }[] }; labelState: Map<string, { on: boolean }> };
-  return V.labLast.spots.filter((s) => V.labelState.get(s.key)?.on).map((s) => s.text);
+  return v.cutLast!.spots.map((s) => s.text).filter((t) => t);
 }
 
-for (const fit of ['fossils', 'off'])
-  describe(`the hominins' groups and level, fit ${fit} (ToLaD#312, #311)`, () => {
+{
+  describe(`the hominins' groups and level (ToLaD#312, #311)`, () => {
     let v: FanView;
     beforeAll(async () => {
-      vi.stubEnv('TOLAD_FIT', fit);
       await loadMammalsFromFiles();
       v = stubView(mammaliaClade(), mammaliaTree(), true);
     }, 400000);
-    afterAll(() => vi.unstubAllEnvs());
     const by = (latin: string) => v.fan.nodes.find((u) => latinOf(u.split) === latin)!;
 
     // A level's pills name distinct real groups: no name twice, no "X ancestors"/"X lineage" made up for an unnamed split
     // inside it, framed and with "now" pushed off the screen's top (where the columns' lineage names show).
-    // (Today's labels' own check: under ?labels=cut, fit off, the cut's own tests, cutlabels.test.ts.)
-    it.skipIf(wantCutLabels() && fit === 'off')('at Hominins and Homo, framed or panned into the past, each name once and none generated', () => {
+    it('at Hominins and Homo, framed or panned into the past, each name once and none generated', () => {
       const bad: string[] = [];
       for (const latin of ['Hominini', 'Homo'])
         for (const down of [0, 0.4]) {
@@ -193,3 +186,4 @@ for (const fit of ['fossils', 'off'])
       expect(bad).toEqual([]);
     }, 400000);
   });
+}

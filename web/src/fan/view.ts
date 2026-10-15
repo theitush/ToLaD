@@ -4,7 +4,7 @@
 // in far enough, a branch resolves into the individuals themselves (twigs.ts).
 // Gestures come from the shared engine/input.ts.
 
-import { drawThumb, labelThumb, thumbsOn, wikiOf } from './wiki';
+import { drawThumb, labelThumb, wikiOf } from './wiki';
 import { PIC_D, PIC_LIFT, placePics, type PicSpot } from './pics';
 import { formatCount, formatMass } from '../data/count';
 import { stamp } from '../stamp';
@@ -15,8 +15,8 @@ import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01 } from './meshgl';
 import { Lod } from './lod';
 import type { FoldState } from './fold';
-import { Steady, wantFitFossils } from './steady';
-import { Territories, wantCutFrame, wantCutLabels, type CutItem } from './cut';
+import { Steady } from './steady';
+import { Territories, type CutItem } from './cut';
 import { COLUMN_DIM, columnSpans, EVENT_TINT, eventAt, eventSpans, type EventSpan } from './colstyle';
 import { laneDim, LINEAGE, pathFrame, TwigModel } from './twigs';
 import type { RectBatch } from './meshgl';
@@ -210,7 +210,7 @@ export interface LabelSpot {
   pic?: FanBranch | null;
 }
 
-/** A frame's labels from the cut (?labels=cut, ToLaD#333): the names' spots, each one's "+x" species, the pictures. */
+/** A frame's labels from the cut (ToLaD#333): the names' spots, each one's "+x" species, the pictures. */
 export interface CutLabels {
   spots: LabelSpot[];
   groups: Map<string, FanBranch[][]>;
@@ -254,6 +254,10 @@ class CutTerritories {
     }
     return (lo + hi) / 2;
   }
+  /** Where daughter k (a node's index, ~ a strand's) splits off its parent (world y): a clade's stem's foot, a species' split. */
+  splitOff(k: number): number {
+    return k >= 0 ? this.t.nodes[k].yBot : this.t.strands[~k].splitY;
+  }
   /** A cut item's youngest tip (world y). */
   youngest(it: CutItem): number {
     if (it.kind === 'leaf') return this.youngOf(~it.j);
@@ -291,13 +295,13 @@ class CutTerritories {
   named(k: number): { text: string; hid: FanBranch[][] } {
     let out = this.names.get(k);
     if (!out) {
-      if (k < 0) out = { text: this.t.strands[~k].sp.common, hid: [] };
+      if (k < 0) out = { text: levelText(this.t.strands[~k]), hid: [] };
       else {
         const v = this.t.nodes[k];
         const sign = latinOf(v.split) ? v : this.signpost(v, true);
         const face = sign ? null : groupFace(v);
         const latin = sign || face ? null : this.signpost(v, false);
-        const text = sign ? levelName(sign) : face ? face.sp.common : latin ? levelName(latin) : v.name;
+        const text = sign ? levelName(sign) : face ? levelText(face) : latin ? levelName(latin) : v.name;
         out = { text, hid: v.strands.filter((b) => b !== face).map((b) => [b]) };
       }
       this.names.set(k, out);
@@ -747,7 +751,7 @@ const isFolded = (bs: readonly FanBranch[]): boolean => {
 export const FIT_DWARF = 3;
 
 /**
- * Where a level's fossils lived (?fit=fossils, ToLaD#289): the world x its columns took (each at its own width
+ * Where a level's fossils lived (Fit fossils, ToLaD#289): the world x its columns took (each at its own width
  * there) from the level's start up to its youngest fossil group's end (fossilEnd), or null when it has no fossil or its span at "now"
  * (familySpan) is under FIT_DWARF times that: the living columns' widening since is left to run off the screen.
  */
@@ -789,17 +793,17 @@ function fossilEnd(fan: Fan, v: FanNode): number | null {
 }
 
 /**
- * The world y a level's frame puts where "now" would stand (ToLaD#298): under ?fit=fossils, a level framed on its
+ * The world y a level's frame puts where "now" would stand (ToLaD#298): a level framed on its
  * fossils (fossilSpan) has its youngest fossil group's end there, "now" (and the living columns' last ~40 kyr, which
  * log time gives most of the screen) above the screen; otherwise null ("now" there).
  */
 export function fossilTop(fan: Fan, v: FanNode): number | null {
-  return wantFitFossils() && fossilSpan(fan, v) ? fossilEnd(fan, v) : null;
+  return fossilSpan(fan, v) ? fossilEnd(fan, v) : null;
 }
 
-/** The world x a level is framed on: its span at "now" (familySpan), or under ?fit=fossils where its dwarfed fossils lived (fossilSpan, ToLaD#289). */
+/** The world x a level is framed on: its span at "now" (familySpan), or where its dwarfed fossils lived (fossilSpan, ToLaD#289). */
 export function levelSpan(fan: Fan, v: FanNode): [number, number] {
-  return (wantFitFossils() && fossilSpan(fan, v)) || familySpan(v);
+  return fossilSpan(fan, v) || familySpan(v);
 }
 
 /** Species' rooms side by side: their world x span [x0, x1] (folded, fold.ts: where the fold has them, at "now", an extinct one's at its tip). */
@@ -1227,9 +1231,9 @@ export function labelSpots(
   const nowS = Y(nowY);
   /** "now" on screen (below the top line): 1, fading over 24 px as it goes above. */
   const nowOn = clamp01((nowS - top) / 24);
-  // (?fit=fossils, ToLaD#298: a level framed on its fossils has "now" above the screen; a living group's picture stands
+  // (Fit fossils, ToLaD#298: a level framed on its fossils has "now" above the screen; a living group's picture stands
   // under the top line then (groupPics), its name under that, and the level's names show.)
-  const fossils = !!level && wantFitFossils();
+  const fossils = !!level;
   const standS = fossils ? Math.max(nowS, top + NOW_ROOM) : nowS;
   const levelOn = fossils ? 1 : nowOn;
 
@@ -1835,8 +1839,6 @@ export class FanView implements InputHandlers {
   private labelT = 0;
   /** `?debug`: a readout of the zooms, years on screen and individuals per px. */
   readonly debug = typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug');
-  /** `?debug&hide=stem,lanes,glow,held,events,fade`: those layers not drawn (finding which layer draws what, ToLaD#210, #231). */
-  private readonly hide = new Set(this.debug ? (new URLSearchParams(location.search).get('hide') ?? '').split(',') : []);
   /** Without the GPU layer: this frame's styled column stretches, faded once the individuals are drawn. */
   private heldRuns: { run: LanePts; hw: number; d: number }[] = [];
   /** The lane points (lanePoints, drawMerged), pooled. */
@@ -1958,10 +1960,10 @@ export class FanView implements InputHandlers {
   }
 
   /**
-   * The clades' brackets above "now" (brackets.ts, ToLaD#193; `?brackets=0` off): this frame's stack, or null.
+   * The clades' brackets above "now" (brackets.ts, ToLaD#193): this frame's stack, or null.
    * The species' pills stand on it.
    */
-  private readonly brackets = typeof location !== 'undefined' && new URLSearchParams(location.search).get('brackets') === '0' ? null : new Brackets(font('600 11px'), font('italic 400 11px', SERIF));
+  private readonly brackets: Brackets | null = new Brackets(font('600 11px'), font('italic 400 11px', SERIF));
   private layoutBrackets(): Brackets | null {
     const br = this.brackets;
     if (!br) return null;
@@ -2012,7 +2014,7 @@ export class FanView implements InputHandlers {
    * room for the level's pictures under it (nowUnder, ToLaD#274); its start (the fork
    * camera.frame puts FRAME_BOTTOM px up from the screen's foot) down at FORK_PX from the foot, over the scale bar.
    * Only the time is moved: the width (and with it the stack) stays as framed. `top`: the world y put where "now"
-   * would stand, "now" itself by default (?fit=fossils, ToLaD#298: a level framed on its fossils, its youngest fossil's end, fossilTop).
+   * would stand, "now" itself by default (Fit fossils, ToLaD#298: a level framed on its fossils, its youngest fossil's end, fossilTop).
    */
   private withBand(cam: Camera, lv: FanNode | null = null, top = this.yNow): Camera {
     const sn = this.h / 2 + (this.yNow - cam.cy) * cam.sy;
@@ -2075,27 +2077,42 @@ export class FanView implements InputHandlers {
    * "now" down to where its branch started. The whole fan for the root.
    */
   /**
-   * ?frame=cut (ToLaD#333, research/scalable-tree.md §4): strands lo..hi's territory across the labels' width of the
-   * screen (from LABEL_AXIS_X to its edge) at the zoom where it fills it (foldedFrame's bisection), "now" down to
-   * `yFork` in time. Every label of what it frames stands centred in a territory inside it, so none is cut off at the
-   * edge, with no padding. Null when off, or under the rooms by life.
+   * A frame by territories (ToLaD#333, research/scalable-tree.md §4): daughters ks' (a node's index, ~ a strand's)
+   * territory together across the labels' width of the screen (from LABEL_AXIS_X to its edge) at the zoom where it
+   * fills it (foldedFrame's bisection), "now" (or `top`) down to `yFork` in time. The rooms are by life, so a fossil
+   * stands beside its sisters only while they lived: the territory is what the columns hold, not their widest-ever
+   * sum. A level whose living columns dwarf its fossils (fossilSpan, ToLaD#289) is framed on where the fossils lived.
+   * Every label of what it frames stands centred in a territory inside it, so none is cut off at the edge.
    */
-  private cutFrame(lo: number, hi: number, v: FanNode, yFork: number, top = this.yNow): Camera | null {
-    const T = FanView.frameCut ? this.territories() : null;
-    if (!T) return null;
+  private cutFrame(ks: readonly number[], v: FanNode, yFork: number, top = this.yNow): Camera | null {
+    const T = this.territories();
+    if (!T || !ks.length) return null;
     const s: [number, number] = [0, 0];
+    const fossils = ks.length === 1 && this.fan.nodes[ks[0]] === v ? fossilSpan(this.fan, v) : null;
     return foldedFrame(this.fan, this.w, () => {
-      const a = T.t.span(~lo, s)[0];
-      const b = T.t.span(~hi, s)[1];
+      let a = Infinity;
+      let b = -Infinity;
+      if (fossils) [a, b] = fossilSpan(this.fan, v)!;
+      else
+        for (const k of ks) {
+          T.t.span(k, s);
+          a = Math.min(a, s[0]);
+          b = Math.max(b, s[1]);
+        }
       const cam = this.camera.frame(a, b, yFork, true);
       const sx = (this.w - LABEL_AXIS_X) / (b - a);
       return this.withBand({ ...cam, sx, cx: a + (this.w / 2 - LABEL_AXIS_X) / sx }, v, top);
     });
   }
+  /** Clade v's index among the territories (fan.nodes'). */
+  private nodeK(v: FanNode): number[] {
+    const j = this.fan.nodes.indexOf(v);
+    return j < 0 ? [] : [j];
+  }
 
   cladeCamera(v: FanNode): Camera {
     if (!v.parent) return this.homeCamera();
-    const cut = this.cutFrame(v.strands[0].index, v.strands[v.strands.length - 1].index, v, v.yBot, fossilTop(this.fan, v) ?? this.yNow);
+    const cut = this.cutFrame(this.nodeK(v), v, v.yBot, fossilTop(this.fan, v) ?? this.yNow);
     if (cut) return cut;
     // (A level of two or three groups, ToLaD#262: centred on its columns at "now" and kept to the screen's middle,
     // FEW_FILL of it, not spread to its edges; its whole span, its past's columns too, still on screen.)
@@ -2109,8 +2126,8 @@ export class FanView implements InputHandlers {
             return [m - h, m + h];
           }
         : familySpan;
-    // (?fit=fossils, ToLaD#289: a level whose living columns dwarf its fossils framed on where the fossils lived.)
-    const fit = wantFitFossils() ? (u: FanNode) => fossilSpan(this.fan, u) ?? span(u) : span;
+    // (Fit fossils, ToLaD#289: a level whose living columns dwarf its fossils framed on where the fossils lived.)
+    const fit = (u: FanNode) => fossilSpan(this.fan, u) ?? span(u);
     return cladeCamera(this.camera, this.fan, v, fit, (cam) => this.withBand(cam, v, fossilTop(this.fan, v) ?? this.yNow));
   }
 
@@ -2170,13 +2187,11 @@ export class FanView implements InputHandlers {
     let v: FanNode | null = bs[0].node;
     while (v?.parent && !bs.every((b) => v!.strands.includes(b))) v = v.parent;
     if (!v) return this.homeCamera();
-    // (?frame=cut: the daughters of the clade where they meet that hold any of them, their territory.)
+    // (The daughters of the clade where they meet that hold any of them, their territory.)
     if (FanView.frameCut) {
       const B = new Set(bs);
       const ks = v.kids.filter((k) => ('sp' in k ? B.has(k) : k.strands.some((b) => B.has(b))));
-      const lo = Math.min(...ks.map((k) => ('sp' in k ? k.index : k.strands[0].index)));
-      const hi = Math.max(...ks.map((k) => ('sp' in k ? k.index : k.strands[k.strands.length - 1].index)));
-      const cut = ks.length ? this.cutFrame(lo, hi, v, v.y) : null;
+      const cut = this.cutFrame(ks.flatMap((k) => ('sp' in k ? [~k.index] : this.nodeK(k))), v, v.y);
       if (cut) return cut;
     }
     // (Down to the split where they meet, not the clade's stem: for a group across the level, the root, not the world's bottom.)
@@ -2255,11 +2270,11 @@ export class FanView implements InputHandlers {
     if (this.fan.root.split.taxon === name) return this.homeCamera();
     const v = this.fan.nodes.find((n) => n.split.taxon === name);
     if (!v) return null;
-    const cut = this.cutFrame(v.strands[0].index, v.strands[v.strands.length - 1].index, v, v.y, fossilTop(this.fan, v) ?? this.yNow);
+    const cut = this.cutFrame(this.nodeK(v), v, v.y, fossilTop(this.fan, v) ?? this.yNow);
     if (cut) return cut;
     // The clade's span at the zoom that frames it (it opens as it is framed: foldedFrame, ToLaD#247).
     return foldedFrame(this.fan, this.w, () => {
-      // (?fit=fossils, ToLaD#289: as a tap's frame, cladeCamera, a level whose living columns dwarf its fossils framed on them.)
+      // (Fit fossils, ToLaD#289: as a tap's frame, cladeCamera, a level whose living columns dwarf its fossils framed on them.)
       const [a, b] = levelSpan(this.fan, v);
       // (Room each side for an outer group's name beside its column, ToLaD#319: none cut off at the screen's edge.)
       const pad = (PILL_ROOM_PX * (b - a)) / Math.max(1, this.w - 72 - 2 * PILL_ROOM_PX);
@@ -2645,7 +2660,7 @@ export class FanView implements InputHandlers {
       for (let i = ladder.length - 2; i >= 0; i--) {
         const zi = z(ladder[i].cam);
         if (zi < -Math.log(BACK_SLACK)) {
-          // (A frame tighter than the next one in, ?fit=fossils: the great apes framed on "now", the hominins' wider on
+          // (A frame tighter than the next one in, Fit fossils: the great apes framed on "now", the hominins' wider on
           // their fossils. Passed over, not where the walk ends: else a pan off the Hominins' frame read the view as at
           // the Catarrhini, the pictures and names gone, ToLaD#311.)
           if (i > 0 && z(ladder[i - 1].cam) >= zi) continue;
@@ -2889,17 +2904,16 @@ export class FanView implements InputHandlers {
     }
     drawWorldUnder(this);
     this.drawTimeAxis(false);
-    const hide = this.hide;
     // (The mammal level, lod.ts: a closed clade of hairline strands drawn as its one branch, its columns inside it not drawn.)
     const lod = this.lodNow();
-    if (!hide.has('stem')) this.drawStem(lod);
-    if (!hide.has('lanes')) {
+    this.drawStem(lod);
+    {
       for (const b of this.fan.branches) if (!lod || lod.of[b.index] < 0) this.drawStrand(b);
       if (lod) for (const v of lod.merged) this.drawMerged(v);
     }
-    if (!hide.has('held')) this.drawHeld();
-    if (!hide.has('events')) this.drawEvents();
-    if (!hide.has('fade')) this.drawStemFade();
+    this.drawHeld();
+    this.drawEvents();
+    this.drawStemFade();
     // Labels: one form everywhere (see labelSpots).
     this.drawGutter();
     this.drawTouch();
@@ -2937,7 +2951,7 @@ export class FanView implements InputHandlers {
   private labelsNow(lod: Lod | null): { br: Brackets | null; top: number; lg: ReturnType<typeof labelGroups>; spots: LabelSpot[]; carried: Carry | null; cut?: CutLabels } {
     const t0 = performance.now();
     const lg = labelGroups(this.fan, this.levelNow());
-    // (?labels=cut, ToLaD#333: from the cut, every frame; no carry, no rest pass, no hysteresis.)
+    // (ToLaD#333: from the cut, every frame; no carry, no rest pass, no hysteresis.)
     const T = FanView.labelsCut ? this.territories() : null;
     if (this.brackets) this.brackets.spanOf = T ? (v) => T.spanOf(v) : null;
     if (T) {
@@ -3004,25 +3018,23 @@ export class FanView implements InputHandlers {
     if (this.labelLayMs.length > 600) this.labelLayMs.shift();
     return { br, top, lg, spots, carried: null };
   }
-  /** ?labels=cut (ToLaD#333): this fan's territories at this screen width, or null when off. */
+  /** This fan's territories at this screen width (ToLaD#333), or null with no steady fold. */
   private terr: { fan: Fan; fold: unknown; w: number; t: CutTerritories } | null = null;
   private territories(): CutTerritories | null {
     const f = this.fan.tess.fold;
-    // (Off under the rooms by life, ?fit=fossils: Steady's computeLife places the columns otherwise than
-    // the territories' widest rooms, so the cut's boxes would not be where the columns are. Today's labels there.)
-    if (!(FanView.labelsCut || FanView.frameCut) || !(f instanceof Steady) || f.life) return null;
+    if (!(FanView.labelsCut || FanView.frameCut) || !(f instanceof Steady)) return null;
     const P = this.terr;
     if (P && P.fan === this.fan && P.fold === f && P.w === this.w) return P.t;
     const t = new CutTerritories(this.fan, f, this.w);
     this.terr = { fan: this.fan, fold: f, w: this.w, t };
     return t;
   }
-  /** The last labels from the cut (?labels=cut; tests read it). */
+  /** The last labels from the cut (tests read it). */
   cutLast: CutLabels | null = null;
   /** Names, pictures and "+x" on/off from the cut (wantCutLabels; tests set it). */
-  static labelsCut = wantCutLabels();
+  static labelsCut = true;
   /** Taps and levels framed by their territories (wantCutFrame; tests set it). */
-  static frameCut = wantCutFrame();
+  static frameCut = true;
 
   /**
    * This frame's labels from the cut (ToLaD#333, research/scalable-tree.md §3). Names: the cut for a pill's thickness
@@ -3062,11 +3074,16 @@ export class FanView implements InputHandlers {
     const room = (x0: number, x1: number) => Math.min(X(x1), this.w) - Math.max(X(x0), LABEL_AXIS_X);
     const onScreen = (it: CutItem) => X(it.x1) > LABEL_AXIS_X && X(it.x0) < this.w;
     const shown = (it: CutItem, d: number) => it.fits && room(it.x0, it.x1) >= d;
-    /** A name pill hanging from `ty` (screen) into its own columns, kept under the top line: nothing else is in its territory there. */
-    const pill = (key: string, text: string, hid: FanBranch[][], x: number, ty: number, wide: number, j: number, k: number | null): LabelSpot | null => {
+    /**
+     * A name pill in its own columns, in the middle of its branch (Ita's pick, ToLaD#342: as ?names=mid), halfway
+     * between its youngest tip `ty` and where it splits off `by` (screen y) over the part on screen; never above its
+     * tip (4 px under it, as a tip's pill stands) nor the top line. Nothing else is in its territory below its tip.
+     */
+    const pill = (key: string, text: string, hid: FanBranch[][], x: number, ty: number, by: number, wide: number, j: number, k: number | null): LabelSpot | null => {
       const px = this.plusPx(hid.length);
       const tlen = (text ? this.nameWidth(text) + 2 * LABEL_PAD : LABEL_PAD) + px;
-      const y0 = Math.max(ty + 4, top);
+      const a = Math.max(ty + 4, top);
+      const y0 = Math.max(a, (a + Math.min(by, bottom - 30)) / 2 - tlen / 2);
       const y1 = y0 + tlen;
       const fit = clamp01((bottom - y1) / 30);
       if (!(fit > 0)) return null;
@@ -3081,19 +3098,20 @@ export class FanView implements InputHandlers {
       return s;
     };
     // (Plan step 2b: daughters in runs that borrow their neighbours' unused room, Territories.borrowed, by this rung.)
-    const rung = Territories.rung(sx);
-    const lent = (k: number) => T.t.lent(LABEL_PILL, k, rung, (d) => T.hasName(d));
     const s2: [number, number] = [0, 0];
     /** The borrowed pills' screen x extents, and the runs' "+x" pills to place clear of them once all are known. */
     const taken: [number, number][] = [];
     const plus: { key: string; hid: FanBranch[][]; x0: number; x1: number; ty: number; j: number; at: number }[] = [];
-    for (const it of T.t.cut(sx, LABEL_PILL, vx0, vx1)) {
+    const items = T.t.cut(sx, LABEL_PILL, vx0, vx1);
+    const borrowed = T.t.borrowed(sx, LABEL_PILL, items, (d) => T.hasName(d));
+    const lent = (k: number) => borrowed.has(k);
+    for (const it of items) {
       if (it.kind !== 'run') {
         if (!shown(it, LABEL_PILL)) continue;
         const [x, ty] = place(it, LABEL_PILL);
         const k = it.kind === 'leaf' ? ~it.j : it.j;
         const { text, hid } = T.label(it, '');
-        pill(`c${it.kind}${it.j}:${it.q0}`, text, hid, x, ty, it.x1 - it.x0, it.j, k);
+        pill(`c${it.kind}${it.j}:${it.q0}`, text, hid, x, ty, Y(T.splitOff(k)), it.x1 - it.x0, it.j, k);
         continue;
       }
       if (!onScreen(it)) continue;
@@ -3117,7 +3135,7 @@ export class FanView implements InputHandlers {
         // (Whole on screen, or not at all: it stands where its own columns are.)
         if (x - half < LABEL_AXIS_X || x + half > this.w) continue;
         const { text, hid } = T.named(K[q]);
-        if (pill(`cb${K[q]}`, text, hid, x, Y(T.youngOf(K[q])), b - a, it.j, K[q])) taken.push([x - half, x + half]);
+        if (pill(`cb${K[q]}`, text, hid, x, Y(T.youngOf(K[q])), Y(T.splitOff(K[q])), b - a, it.j, K[q])) taken.push([x - half, x + half]);
       }
     }
     for (const p of plus) {
@@ -3125,11 +3143,12 @@ export class FanView implements InputHandlers {
       const x = placeX(p.x0, p.x1, LABEL_PILL, p.at);
       // (A "+x" in its own run's territory, clear of the pills borrowing room from it.)
       if (taken.some(([a, b]) => x + half > a && x - half < b)) continue;
-      pill(p.key, '', p.hid, x, Y(p.ty), p.x1 - p.x0, p.j, null);
+      // (A run's daughters split off where their parent splits.)
+      pill(p.key, '', p.hid, x, Y(p.ty), Y(T.t.nodes[p.j].y), p.x1 - p.x0, p.j, null);
     }
     // The pictures: the coarser cut, each standing on its item's youngest tip (the names hang below it).
     const pics: CutLabels['pics'] = [];
-    if (thumbsOn) {
+    {
       for (const it of T.t.cut(sx, PIC_D, vx0, vx1)) {
         if (!shown(it, PIC_D) || it.kind === 'run') continue;
         const lv: Level = it.kind === 'leaf' ? { b: T.t.strands[it.j] } : { v: T.t.nodes[it.j] };
@@ -3143,8 +3162,23 @@ export class FanView implements InputHandlers {
         pics.push({ x, y, d: PIC_D, i: pics.length, lv, face });
       }
     }
-    this.picSpots = pics;
-    return { spots, groups, pics };
+    // Where rooms by life let two territories share x (a fossil beside a sister that outlived it, steady.ts
+    // computeLife: apart only while both lived), boxes may meet: placed greedily, the widest territory first (names,
+    // then pictures), one that meets one placed left out (the collision pass of map labelling). Elsewhere a no-op.
+    const placed: number[][] = [];
+    const clear = (b: number[]) => {
+      if (placed.some((p) => b[0] < p[2] && p[0] < b[2] && b[1] < p[3] && p[1] < b[3])) return false;
+      placed.push(b);
+      return true;
+    };
+    const kept = [...spots].sort((a, b) => b.rank[1] - a.rank[1]).filter((s) => clear(s.box));
+    const keep = new Set(kept);
+    const named = spots.filter((s) => keep.has(s));
+    for (const s of spots) if (!keep.has(s)) groups.delete(s.key);
+    const shownPics = pics.filter((p) => clear([p.x - p.d / 2, p.y - p.d / 2, p.x + p.d / 2, p.y + p.d / 2]));
+    shownPics.forEach((p, i) => (p.i = i));
+    this.picSpots = shownPics;
+    return { spots: named, groups, pics: shownPics };
   }
 
   /** The page (FanApp) draws a view's first frame without its labels, which follow in the next slice (ToLaD#255); tests draw them at once. */
@@ -3455,7 +3489,7 @@ export class FanView implements InputHandlers {
           // down: a halo is a row-flat slab per sample, so across a lean (a branch leaving its parent) it
           // breaks into steps; it fades out by the lean (GLOW_LEAN), and there the branch is its crisp lane.
           const glow = (1 - dim) * Math.min(1, gm / GLOW_W) * Math.max(0, 1 - (sq - 1) / GLOW_LEAN);
-          if (glow > 0.01 && !this.hide.has('glow')) {
+          if (glow > 0.01) {
             trap(gl.under, xq - 4 * sq, g1q + 4 * sq, xp - 4 * sq, g1p + 4 * sq, y0, y1, ec, 0.06 * glow, xa - 4 * sq, xb + 4 * sq);
             trap(gl.under, xq - 1.5 * sq, g1q + 1.5 * sq, xp - 1.5 * sq, g1p + 1.5 * sq, y0, y1, ec, 0.14 * glow, xa - 1.5 * sq, xb + 1.5 * sq);
           }
@@ -3721,9 +3755,9 @@ export class FanView implements InputHandlers {
     }
     this.picSpots = [];
     const nowS = this.toScreen(0, this.yNow)[1];
-    // (?fit=fossils, ToLaD#298: the fossils' frame has "now" above the screen, an extinct species' picture still on its tip.)
-    const fossils = wantFitFossils();
-    if (!thumbsOn || nowS > this.h || (!fossils && nowS < top + 12)) return [];
+    // (Fit fossils, ToLaD#298: the fossils' frame has "now" above the screen, an extinct species' picture still on its tip.)
+    const fossils = true;
+    if (nowS > this.h || (!fossils && nowS < top + 12)) return [];
     const gs: { lv: Level; face: FanBranch; x: number; y: number; n: number }[] = [];
     for (const g of this.levelGroupsOn(lg)) {
       const face = g.lv.v ? groupFace(g.lv.v) : g.lv.b;
@@ -3743,10 +3777,7 @@ export class FanView implements InputHandlers {
   /** Draw the level's pictures (groupPics), the least populous first (the more populous on top). Each a tap to its group. */
   private drawGroupPics(): void {
     const ctx = this.ctx;
-    const nowS = this.toScreen(0, this.yNow)[1];
-    // (?fit=fossils: each faded by where it stands, "now" off the screen's top or not, ToLaD#298.)
-    const alpha = wantFitFossils() ? 1 : clamp01((nowS - this.labelTop()) / 24);
-    if (!(alpha > 0)) return;
+    const alpha = 1;
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.strokeStyle = INK3;
@@ -3843,7 +3874,7 @@ export class FanView implements InputHandlers {
     this.labelT = now;
     // (At rest, chosen afresh: what a still view gives, whatever the way here, ToLaD#255.)
     const st0 = this.labelState;
-    // (?labels=cut, ToLaD#333: every item of the cut shown, its "+x" its species not named.)
+    // (ToLaD#333: every item of the cut shown, its "+x" its species not named.)
     const on = cut ? new Map(spots.map((s) => [s.key, true])) : resolveLabels(spots, this.labClean ? () => false : (key) => !!st0.get(key)?.on);
     // The "+x" badges (ToLaD#197): counted with the cull; a pill keeps room for its count from the frame before, so
     // when a count changes the next frame lays the pills out again with the room it needs.

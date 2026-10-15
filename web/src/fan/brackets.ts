@@ -297,7 +297,7 @@ export class Brackets {
    * with them (the rows are laid out again).
    */
   hide: ((v: FanNode) => boolean) | null = null;
-  /** A clade's span (world x) in place of its species' rooms at "now" (?labels=cut: its territory, cut.ts), or null. */
+  /** A clade's span (world x) in place of its species' rooms at "now" (its territory, cut.ts), or null. */
   spanOf: ((v: FanNode) => readonly [number, number] | null) | null = null;
   hideKey = '';
   /** The "…" row over the stack (ToLaD#288): its row, or -1 for none; the pinned rows' likewise (pinMore). */
@@ -356,7 +356,7 @@ export class Brackets {
         lo = Math.min(lo, l[k]);
         hi = Math.max(hi, r[k]);
       }
-      // (?labels=cut, ToLaD#333: each clade's territory, cut.ts, the same boxes its names and pictures stand in.)
+      // (ToLaD#333: each clade's territory, cut.ts, the same boxes its names and pictures stand in.)
       const t = this.spanOf?.(q.v);
       if (t) [lo, hi] = t;
       a[i] = c.toScreen(lo, 0)[0];
