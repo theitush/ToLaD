@@ -71,7 +71,11 @@ describe.skipIf(!OUT)('scale yardstick (perf)', () => {
     const res: Record<string, unknown> = { orders: process.env.SCALE_ORDERS !== '0', n, labels: process.env.TOLAD_LABELS || 'default', node: proc.version };
     const load: Record<string, number> = {};
     let rss = 0;
-    const mem = () => (rss = Math.max(rss, proc.memoryUsage().rss));
+    const mem = () => {
+      const r = proc.memoryUsage().rss;
+      rss = Math.max(rss, r);
+      return r;
+    };
     const canvas = stubCanvas();
     // The build's part and the file read (synthetic-level.ts laps: synth-gen, synth-seed, synth-file, fetch, json).
     log(`n=${n} start`);
@@ -107,6 +111,8 @@ describe.skipIf(!OUT)('scale yardstick (perf)', () => {
     res.load = Object.fromEntries(Object.entries(load).map(([k, x]) => [k, Math.round(k === 'bytes' ? x : x)]));
     res.species = mammaliaClade().species.length;
     res.marks = synthMarksNow;
+    res.rssMB = Math.round(rss / 2 ** 20);
+    writeFileSync(OUT!, JSON.stringify(res, null, 1));
     if (process.env.SCALE_GESTURES !== '0') {
       const at = v as unknown as {
         cam: unknown;
@@ -148,7 +154,7 @@ describe.skipIf(!OUT)('scale yardstick (perf)', () => {
         for (let k = 0; k < 30; k++) pan.push(timed(() => v.pan(k < 15 ? 8 : -8, k % 10 < 5 ? 3 : -3)));
         at.gestureEnd();
         at.levelNow(true);
-        log(`${depth} pinch+pan done`);
+        log(`${depth} pinch ${JSON.stringify(stats(pinch))} pan ${JSON.stringify(stats(pan))} rss ${Math.round(mem() / 2 ** 20)} MB`);
         const fly: number[] = [];
         const on = v.fan.branches.filter((b) => {
           const [x] = at.toScreen(b.cx, b.tipY);
@@ -166,6 +172,11 @@ describe.skipIf(!OUT)('scale yardstick (perf)', () => {
         }
         mem();
         frames[depth] = { pinch: stats(pinch), pan: stats(pan), flight: stats(fly) };
+        // (Written as it goes: a run stopped part way keeps what it measured.)
+        res.frames = frames;
+        res.rssMB = Math.round(rss / 2 ** 20);
+        writeFileSync(OUT!, JSON.stringify(res, null, 1));
+        log(`${depth} ${JSON.stringify(frames[depth])} rss ${res.rssMB} MB`);
       }
       res.frames = frames;
     }
