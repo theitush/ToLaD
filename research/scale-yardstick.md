@@ -55,7 +55,7 @@ All of this runs on demand only, by hand, for speed work. None of it is in the s
 |---|---|---|
 | node, 7k | ~1 min | ~1 GB |
 | node, 70k, load only | ~1 min | — |
-| node, 70k, with gestures | ~40–60 min | 6.1 GB |
+| node, 70k, with gestures | over 2 h (the flight in the family depth had not ended after 2 h: its frames take seconds each) | 6.1 GB |
 | phone proxy, 7k | ~1 min a load, ~2 min with gestures | — |
 
 At 70k the gestures run slowly because each frame takes most of a second, and a flight in and back is about 300 frames. The 1M tree is not run: it does not fit, as explained below.
