@@ -2,15 +2,13 @@
 // like the screen). Nothing here depends on the camera: panning or zooming
 // never changes a shape or a width.
 //
-// Two designs share everything but the edges' geometry (EdgeStyle, the
-// viewer's toggle): 'curved', a smooth river (#46 variant C, described just
-// below), and 'straight', lines that lean (#46 variant D, Ita's sketch; see
-// placeLean). Shared: the population (population.ts: N(t), the green share, the
-// extinct taper), the parent columns and their green (FanNode.q), the lanes'
-// blend below a split (segGreen), the tessellation (Tess) and the mesh's
-// shear (mesh.ts). Per design: where the columns sit (placeRiver, placeLean)
+// The edges are a smooth river (#46 variant C, described just below; the
+// straight design, lines that lean, was deleted in ToLaD#342). The population
+// (population.ts: N(t), the green share, the extinct taper), the parent
+// columns and their green (FanNode.q), the lanes' blend below a split
+// (segGreen) and the tessellation (Tess); where the columns sit (placeRiver)
 // and how a column moves from its slot in the parent to its own place above a
-// split (ease: a smootherstep S-curve, or a straight line).
+// split (ease: a smootherstep S-curve).
 //
 // The tree is splits.ts's: each split is one date where a parent population
 // divides into its daughters.
@@ -91,8 +89,6 @@ export type Measure = 'individuals' | 'mass';
 export function weightOf(sp: SpeciesRec, measure: Measure, fallback = 1): number {
   return measure === 'mass' ? (sp.massKg ?? fallback) : 1;
 }
-/** The edges' design: smooth S-curved forks (a river), or straight lines whose daughters lean out. */
-export type EdgeStyle = 'curved' | 'straight';
 
 export const TRUNK_WIDTH = 110;
 /** The bottom of the world: the stem (the clade's ancestors) runs down to here (Ma, ~first life). */
@@ -109,11 +105,9 @@ export const MIN_GAP_FRAC = 0.001;
 export const FORK_FRAC = 0.85;
 /** ... at most this (world units of height: ~0.4 decades of time). */
 export const FORK_MAX = 60;
-/** Straight: gap between a leaning daughter's subtree and its neighbour's at a height, this share of the narrower facing column there ... */
+/** Gap between a daughter's subtree and its neighbour's at a height, this share of the narrower facing column there (chooseSides' leans) ... */
 export const LEAN_GAP_FRAC = 0.45;
-/** ... its slope, world heights per world unit sideways (steeper than 45° on screen at the home view) ... */
-export const LEAN_RISE = 2;
-/** ... taking at most this share of the height to the next event of either daughter. */
+/** ... the leans taking at most this share of the height to the next event of either daughter. */
 export const LEAN_MAX_FRAC = 0.5;
 /* Time axis offset TIME_C (years, population.ts): height is log10(years before present + C). With
  * C = 10 years the axis resolves the last decades and centuries; it is close
@@ -219,9 +213,8 @@ export interface FanNode {
   cx: number;
   /** Its left edge where it starts: its tile in the parent column at the parent's split (the root: left). */
   tile: number;
-  /** Where its peel from the tile to its own place ends (world y, above yBot; yBot if it does not move), and the edges' design. */
+  /** Where its peel from the tile to its own place ends (world y, above yBot; yBot if it does not move). */
   leanY: number;
-  edge: EdgeStyle;
   /** Height below the split over which its strands' green turns from the daughters' own shares into its prefix. */
   blend: number;
   /**
@@ -242,7 +235,6 @@ export interface Fan {
   mode: WidthMode;
   /** What the widths count (ToLaD#276): individuals, or their mass in kg. */
   measure: Measure;
-  edge: EdgeStyle;
   trunkWidth: number;
   trunkBottom: Pt;
   /** One per species, in the dataset's order (clade.species). */
@@ -285,23 +277,21 @@ export function segAt(b: FanBranch, y: number): PathSeg {
   return p[lo];
 }
 
-const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
-
-/** The one per-design curve: a column's move from its slot (u = 0) to its own place (u = 1). Curved: smootherstep (C2, flat at both ends); straight: a line. */
-export function ease(edge: EdgeStyle, u: number): number {
-  return edge === 'curved' ? smoother(u) : clamp01(u);
+/** The curve of a column's move from its slot (u = 0) to its own place (u = 1): smootherstep (C2, flat at both ends). */
+export function ease(u: number): number {
+  return smoother(u);
 }
 
 /** How far a column has moved at height y: 0 at its bottom (yBot), 1 from its peel's end (leanY) up. */
-export function peelU(edge: EdgeStyle, yBot: number, leanY: number, y: number): number {
-  return leanY < yBot ? ease(edge, (yBot - y) / (yBot - leanY)) : 1;
+export function peelU(yBot: number, leanY: number, y: number): number {
+  return leanY < yBot ? ease((yBot - y) / (yBot - leanY)) : 1;
 }
 
 /** A parent column's left edge at height y (in its span): from its tile in the parent to its own left (peelU). */
 export function nodeLeftAt(v: FanNode, y: number, river = false): number {
   const f = river ? undefined : v.strands[0]?.tess.fold;
   const l = f ? f.left(v.strands[0].index, y) : null;
-  return l ?? v.tile + (v.left - v.tile) * peelU(v.edge, v.yBot, v.leanY, y);
+  return l ?? v.tile + (v.left - v.tile) * peelU(v.yBot, v.leanY, y);
 }
 
 const clampW = (v: number, w: number) => Math.min(w, Math.max(0, v));
@@ -363,7 +353,6 @@ export class Tess {
     readonly time: TimeScale,
     readonly mode: WidthMode,
     readonly bottom = Infinity,
-    readonly edge: EdgeStyle = 'curved',
   ) {}
 
   /** World heights of branch b's features, ascending, from its tip down to the bottom of the world. */
@@ -374,7 +363,7 @@ export class Tess {
     const add = (y: number) => {
       if (y >= b.tipY && y <= this.bottom) out.push(y);
     };
-    // A peel: its ends (a straight one's kinks) and samples along it (a curved one's S).
+    // A peel: its ends and samples along its S.
     const peel = (yBot: number, leanY: number) => {
       if (leanY < yBot) for (let i = 0; i <= 48; i++) add(yBot - ((yBot - leanY) * i) / 48);
     };
@@ -435,7 +424,7 @@ export class Tess {
     }
     if (lo < b.splitY) {
       const tc = b.x0 + b.baseW / 2;
-      const c = (y: number) => tc + (b.cx - tc) * peelU(this.edge, b.splitY, b.leanY, y);
+      const c = (y: number) => tc + (b.cx - tc) * peelU(b.splitY, b.leanY, y);
       const ca = c(lo);
       const cb = c(Math.min(hi, b.splitY));
       const hw = (b.unit * g(b.pop.max, this.mode)) / 2;
@@ -647,7 +636,7 @@ export function leftAt(b: FanBranch, y: number, w?: number, river = false): numb
   if (l !== null) return y < b.splitY ? l - (w ?? laneW(b, y)) / 2 : l;
   if (y < b.splitY) {
     const tc = b.x0 + b.baseW / 2;
-    const c = tc + (b.cx - tc) * peelU(b.tess.edge, b.splitY, b.leanY, y);
+    const c = tc + (b.cx - tc) * peelU(b.splitY, b.leanY, y);
     return c - (w ?? laneW(b, y)) / 2;
   }
   const s = segAt(b, y);
@@ -1049,14 +1038,14 @@ const underAll = (nodes: FanNode[]): Map<FanNode, FanBranch[]> => {
  * into its sibling's column. (The log widths jump to one unit at the first
  * individual: the ramp in N alone is not enough.)
  */
-function emergeRun(k: Kid, time: TimeScale, mode: WidthMode, edge: EdgeStyle, reach: number): number {
+function emergeRun(k: Kid, time: TimeScale, mode: WidthMode, reach: number): number {
   const e = isNode(k) ? null : k.pop.emergeAges();
   if (isNode(k) || !e || !(k.width > 0)) return Infinity;
   if (!(reach > 0)) return 0;
   const E = Math.abs(time.y(e[1]) - time.y(e[0]));
   const xs = Array.from({ length: 96 }, (_, i) => (E * (i + 1)) / 96);
   const share = xs.map((x) => (k.unit * g(k.pop.aliveAt(time.ageAt(k.splitY - x)), mode)) / reach);
-  const ok = (F: number) => xs.every((x, i) => ease(edge, x / F) >= share[i]);
+  const ok = (F: number) => xs.every((x, i) => ease(x / F) >= share[i]);
   if (ok(E)) return E;
   let lo = 0;
   let hi = E;
@@ -1068,14 +1057,14 @@ function emergeRun(k: Kid, time: TimeScale, mode: WidthMode, edge: EdgeStyle, re
   return lo;
 }
 
-export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = FELIDAE_TREE, edge: EdgeStyle = 'curved', measure: Measure = 'individuals'): Fan {
+export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = FELIDAE_TREE, measure: Measure = 'individuals'): Fan {
   const W = TRUNK_WIDTH;
   // (A species with no mass in the data, none since ToLaD#276's build: the clade's median.)
   const known = measure === 'mass' ? clade.species.map((s) => s.massKg ?? NaN).filter((m) => m > 0).sort((a, b) => a - b) : [];
   const massFallback = known.length ? known[known.length >> 1] : 1;
   const time = new TimeScale(tree.ageMa);
   const yBottom = time.y(STEM_BOTTOM_MA);
-  const tess = new Tess(time, mode, yBottom, edge);
+  const tess = new Tess(time, mode, yBottom);
   const bySci = new Map(clade.species.map((s) => [s.sci, s]));
   const placed = new Set<string>();
   const branches: FanBranch[] = [];
@@ -1106,7 +1095,7 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = FELIDA
   };
   const build = (s: Split, parent: FanNode | null): FanNode => {
     const yBot = parent ? parent.y : yBottom;
-    const v: FanNode = { split: s, name: s.name, ageMa: s.ageMa, y: time.y(s.ageMa), yBot, parent, kids: [], strands: [], n: 0, genYears: 0, width: 0, left: 0, cx: 0, tile: 0, leanY: yBot, edge, blend: 0, q: new Float64Array([0]) };
+    const v: FanNode = { split: s, name: s.name, ageMa: s.ageMa, y: time.y(s.ageMa), yBot, parent, kids: [], strands: [], n: 0, genYears: 0, width: 0, left: 0, cx: 0, tile: 0, leanY: yBot, blend: 0, q: new Float64Array([0]) };
     nodes.push(v);
     for (const k of s.kids) {
       if (typeof k === 'string') {
@@ -1175,20 +1164,19 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = FELIDA
   // chosen on the default design's widths (linear), every other design taking them.
   // (The mass widths too, ToLaD#276: the toggle never reorders the species either.)
   const key = measure === 'mass' ? `${mode}:mass` : mode;
-  if (key !== ORDER_MODE && !byMode.has(ORDER_MODE)) layoutFan(clade, ORDER_MODE, tree, edge);
+  if (key !== ORDER_MODE && !byMode.has(ORDER_MODE)) layoutFan(clade, ORDER_MODE, tree);
   // (The default design's sides and places, worked out at build time for the mammal level, ToLaD#255: taken as they are.
   // Only for its own widths: the mass widths place their columns, and share the orders' width, afresh.)
-  const seed = key === ORDER_MODE && edge === 'curved' ? clade.seed : undefined;
+  const seed = key === ORDER_MODE ? clade.seed : undefined;
   const seeded = !!seed && seedFits(seed, nodes, branches);
   if (seeded) byMode.set(key, applySeed(seed, nodes, branches));
   else {
     const P = new Packer(time, mode, W, branches.length > HUGE_TREE ? HUGE_CELLS : CELLS);
-    const { plans, sides } = chooseSides(root, P, byMode.get(ORDER_MODE));
+    const { sides } = chooseSides(root, P, byMode.get(ORDER_MODE));
     byMode.set(key, sides);
-    if (edge === 'curved') placeRiver(root, P, time, mode);
-    else placeLean(root, nodes, plans, time, mode);
+    placeRiver(root, P, time, mode);
   }
-  if (SEED_OUT && key === ORDER_MODE && edge === 'curved') SEED_OUT.seed = takeSeed(nodes, branches, byMode.get(key)!);
+  if (SEED_OUT && key === ORDER_MODE) SEED_OUT.seed = takeSeed(nodes, branches, byMode.get(key)!);
   // Each strand's place in its ancestors' columns (offsets in the column's order), each column's tile in its parent, each leaf's slot.
   for (const [v, s] of underAll(nodes)) v.strands = s;
   for (const v of nodes) {
@@ -1233,7 +1221,6 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = FELIDA
     clade,
     mode,
     measure,
-    edge,
     trunkWidth: W,
     trunkBottom: { x: root.left + root.width / 2, y: yBottom },
     branches,
@@ -1268,11 +1255,11 @@ export interface LayoutSeed {
 /** Set (seedOut) to collect the seed of the next default-design layout (the build, vite.config.ts). */
 let SEED_OUT: { seed?: LayoutSeed } | null = null;
 
-/** The seed of this clade's default design (linear, curved) on this tree: layoutFan run once, its decisions kept. */
+/** The seed of this clade's default design (linear widths) on this tree: layoutFan run once, its decisions kept. */
 export function layoutSeed(clade: CladeRec, tree: Split): LayoutSeed {
   SEED_OUT = {};
   try {
-    layoutFan({ ...clade, seed: undefined }, ORDER_MODE, tree, 'curved');
+    layoutFan({ ...clade, seed: undefined }, ORDER_MODE, tree);
     return SEED_OUT.seed!;
   } finally {
     SEED_OUT = null;
@@ -1374,7 +1361,7 @@ function placeRiver(root: FanNode, P: Packer, time: TimeScale, mode: WidthMode):
       // Its reach: twice the least room it moves into from either neighbour (centres ending further apart than they start).
       let r = Infinity;
       for (const n of [v.kids[i - 1], v.kids[i + 1]]) if (n) r = Math.min(r, 2 * (Math.abs(n.cx - k.cx) - (bandW(n) + bandW(k)) / 2));
-      return emergeRun(k, time, mode, 'curved', r);
+      return emergeRun(k, time, mode, r);
     });
     const fork = Math.max(0, Math.min(FORK_MAX, FORK_FRAC * run, ...emerge));
     for (const k of v.kids) k.leanY = v.y - fork;
@@ -1498,7 +1485,7 @@ function move(k: Kid, dx: number): void {
   }
 }
 
-/** One choice of sides for a subtree (each daughter's slot and straight-design lean, its extent, the leans' total run). */
+/** One choice of sides for a subtree (each daughter's slot and lean, its extent, the leans' total run). */
 interface Plan {
   order: Kid[];
   off: number[];
@@ -1545,9 +1532,9 @@ const ORDER_MODE: WidthMode = 'linear';
 const SIDES = new WeakMap<CladeRec, Map<Split, Map<string, Map<Split, boolean>>>>();
 
 /**
- * The species' left-to-right order, the same in both designs (the toggle only
- * reshapes the edges): each split's daughters on the sides that make the
- * straight design's leans (placeLean) the least total sideways run; equal runs
+ * The species' left-to-right order: each split's daughters on the sides that
+ * make their leans (each leaning out from its slot to clear its sibling's
+ * subtree) the least total sideways run; equal runs
  * keep the table's order (the fewer mirrored splits). It depends only on the
  * tree and the widths. Exact for any tree: per subtree, every choice of sides
  * not beaten on all of its extent's left, its right, its run and its mirrored
@@ -1662,52 +1649,4 @@ function chooseSides(root: FanNode, P: Packer, known?: Map<Split, boolean>): { p
   apply(root, known ? fixed(root, known) : cands(root)[0]);
   for (const c of leaves.values()) P.free(c);
   return { plans, sides };
-}
-
-/**
- * Straight (lines that lean, Ita's sketch):
- *
- *     |  |  |        read upwards: the right line is the parent, running
- *     \ _|  |        straight on through the split; the daughter peels off
- *         \ |        its side and leans out "for a bit" to its own column,
- *          \|        then runs straight up.
- *
- * At a split the larger daughter continues straight (the most ink stays put);
- * each other one leaves from its own part of the parent's band, on the side it
- * leans towards, along a straight diagonal (LEAN_RISE heights per unit
- * sideways, at most LEAN_MAX_FRAC of the height to either daughter's next
- * event, so leans end before anything else starts and never meet), just far
- * enough to clear its sibling's subtree by a gap at every height (Packer, LEAN_GAP_FRAC). Which side
- * each daughter is on is the shared order's (chooseSides: the leans' least
- * total sideways run). A species' column is centred on its slot's centre plus
- * its lean. The lanes blend below a split as far down as its daughters lean
- * out above it (at most half its band).
- */
-function placeLean(root: FanNode, nodes: FanNode[], plans: Map<FanNode, Plan>, time: TimeScale, mode: WidthMode): void {
-  const rp = plans.get(root)!;
-  // Place it: the whole centred on 0, then each daughter from its slot in its parent's band.
-  const nextEvent = (k: Kid) => (isNode(k) ? k.y : k.tipY);
-  const place = (v: FanNode): void => {
-    const p = plans.get(v)!;
-    v.cx = v.left + v.width / 2;
-    const room = Math.min(...p.order.map((k) => v.y - nextEvent(k)));
-    // (A stock growing out of nobody: its reach is its own lean, or its sibling's away from it if it runs straight on.)
-    const far = Math.max(...p.dx.map(Math.abs));
-    const emerge = Math.min(...p.order.map((k, i) => emergeRun(k, time, mode, 'straight', 2 * (p.dx[i] ? Math.abs(p.dx[i]) : far))));
-    p.order.forEach((k, i) => {
-      const x0 = v.left + p.off[i];
-      const d = p.dx[i];
-      k.leanY = d ? v.y - Math.min(Math.abs(d) * LEAN_RISE, LEAN_MAX_FRAC * room, emerge) : v.y;
-      if (isNode(k)) {
-        k.left = x0 + d;
-        place(k);
-      } else {
-        k.cx = x0 + k.baseW / 2 + d;
-        k.colLeft = k.cx - k.width / 2;
-      }
-    });
-  };
-  root.left = -(rp.a + rp.b) / 2;
-  place(root);
-  for (const v of nodes) v.blend = Math.min(Math.max(0, ...v.kids.map((k) => v.y - k.leanY)), 0.5 * (v.yBot - v.y));
 }

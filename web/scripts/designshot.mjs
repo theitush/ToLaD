@@ -2,7 +2,7 @@
 // home, the mesh at a range of individuals per scale bar, deep in the lives,
 // zoomed far out, and a species card open.
 //   npm run build:single && node scripts/designshot.mjs <out-dir> [prefix] [only,names]
-//   (DSF: device scale factor, default 2; CLIP=x,y,w,h; DEBUG=1: the ?debug readout; EDGE=curved|straight: the fan's edges;
+//   (DSF: device scale factor, default 2; CLIP=x,y,w,h; DEBUG=1: the ?debug readout;
 //   WIDTH=linear|log: the widths, default linear; LEVEL=cats|carnivores|mammals: ?level= (default: the carnivores, ToLaD#146, #247))
 import { mkdirSync, readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
@@ -67,7 +67,7 @@ const scenes = [
   ['lion-column', 'split', [0.5, 1.5]],
   ['card-lion', 'card', ['Lion']],
   ['card-lynx', 'card', ['Eurasian lynx']],
-  // Texture at every zoom, branch-outs as lines (#100, #101): zoomed 2^k × home (time 2^(k·r)) about a
+  // Branch-outs (#100, #101): zoomed 2^k × home (time 2^(k·r)) about a
   // column `ago` years back: the leopard cat's stem below its start, the river forks at the Felidae base.
   ['stem-leopardcat', 'about', ['Mainland leopard cat', 1.2e7, 9, 1]],
   ['forks-base', 'about', ['Mainland leopard cat', 1.2e7, 12, 0.5]],
@@ -110,9 +110,6 @@ const scenes = [
   // A flagged join met at the genome's long-run level (ToLaD#172): the puma's column from ~2 Mya to now, the
   // young end held at the anchor from ~61 kya, and its card with the one-sentence join.
   ['flag-puma', 'frame', ['Puma', 100000, 1, 0.5]],
-  // The texture inside a column (#192): the domestic cat's boom, its lines straight, only branching and ending.
-  ['tex-domcat300', 'frame', ['Domestic cat', 300, 1.6]],
-  ['tex-domcat2000', 'frame', ['Domestic cat', 2000, 1.6]],
   ['flag-puma-card', 'card', ['Puma']],
   // Wikipedia link + hotlinked Commons pictures (ToLaD#182; WAIT_MS=4000 lets them load): the lion's card,
   // home with the pills' thumbnails (WIDTH=log: eight pills), and a species with no picture (its card, its pill mid-span).
@@ -272,7 +269,7 @@ try {
   const page = await ctx.newPage();
   if (process.env.LOGS) page.on('console', (m) => console.log('  [page]', m.text()));
   page.on('pageerror', (e) => console.log('pageerror', String(e)));
-  const q = [process.env.DEBUG ? 'debug' : '', process.env.EDGE ? `edge=${process.env.EDGE}` : '', process.env.LEVEL ? `level=${process.env.LEVEL}` : '', process.env.Q || ''].filter(Boolean).join('&');
+  const q = [process.env.DEBUG ? 'debug' : '', process.env.LEVEL ? `level=${process.env.LEVEL}` : '', process.env.Q || ''].filter(Boolean).join('&');
   served = await pageUrl(q);
   await page.goto(served.url);
   await page.waitForFunction(() => !!window.__fan, null, { timeout: Number(process.env.LOAD_MS || 20000) });

@@ -21,7 +21,7 @@ describe('mass widths', () => {
 
   it('weighs each column by its mass and keeps the order', () => {
     const ind = layoutFan(CARNIVORA, 'linear', CARNIVORA_TREE);
-    const mass = layoutFan(CARNIVORA, 'linear', CARNIVORA_TREE, 'curved', 'mass');
+    const mass = layoutFan(CARNIVORA, 'linear', CARNIVORA_TREE, 'mass');
     expect(mass.measure).toBe('mass');
     // The same species, left to right.
     const order = (f: typeof ind) => [...f.branches].sort((a, b) => a.cx - b.cx).map((b) => b.sp.sci);
@@ -85,7 +85,7 @@ describe('mass widths', () => {
   });
 
   it('lays out the whole mammal tree by mass', () => {
-    const f = layoutFan(mammaliaClade(), 'linear', mammaliaTree(), 'curved', 'mass');
+    const f = layoutFan(mammaliaClade(), 'linear', mammaliaTree(), 'mass');
     let widest = 0;
     for (const b of f.branches) widest = Math.max(widest, b.share);
     // The widest column is a share of the trunk, not all of it.

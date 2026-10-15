@@ -1,5 +1,5 @@
 /// <reference types="vitest/config" />
-import { createReadStream, existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer, defineConfig, type Plugin } from 'vite';
@@ -10,50 +10,10 @@ import { loadAll, loadClade, trimToFan } from './src/fan/panthera-extract';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const DATA = resolve(here, '..', 'data', 'mammals');
-const VIRTUAL = 'virtual:tolad-data';
 
+/** The dataset's files (the cat and carnivore extracts read them; their change rebuilds them in dev). */
 function dataFiles(): string[] {
   return ['skeleton.tld', ...readdirSync(join(DATA, 't')).filter((f) => f.endsWith('.tld')).map((f) => `t/${f}`)];
-}
-
-function base64(u: Uint8Array): string {
-  let s = '';
-  for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000));
-  return btoa(s);
-}
-
-/**
- * Serves ../data/mammals at /data/mammals in dev and copies it into the build
- * (no committed duplicate). In single-file mode the files are inlined as base64
- * through `virtual:tolad-data` instead.
- */
-function toladData(single: boolean): Plugin {
-  return {
-    name: 'tolad-data',
-    resolveId(id) {
-      return id === VIRTUAL ? '\0' + VIRTUAL : null;
-    },
-    load(id) {
-      if (id !== '\0' + VIRTUAL) return null;
-      if (!single) return 'export const inlineData = null;';
-      const obj: Record<string, string> = {};
-      for (const f of dataFiles()) obj[f] = base64(readFileSync(join(DATA, f)));
-      return `export const inlineData = ${JSON.stringify(obj)};`;
-    },
-    configureServer(server) {
-      server.middlewares.use('/data/mammals', (req, res, next) => {
-        const rel = decodeURIComponent(((req as { url?: string }).url ?? "/").split("?")[0]);
-        const p = join(DATA, rel);
-        if (!p.startsWith(DATA) || !existsSync(p) || statSync(p).isDirectory()) return next();
-        res.setHeader('Content-Type', 'application/octet-stream');
-        createReadStream(p).pipe(res);
-      });
-    },
-    generateBundle() {
-      if (single) return;
-      for (const f of dataFiles()) this.emitFile({ type: 'asset', fileName: `data/mammals/${f}`, source: readFileSync(join(DATA, f)) });
-    },
-  };
 }
 
 const PANTHERA = 'virtual:panthera-data';
@@ -202,7 +162,7 @@ export default defineConfig(({ mode }) => {
   const single = mode === 'single';
   return {
     base: './',
-    plugins: [react(), toladData(single), pantheraData(), ...(single ? [inlineAll()] : [])],
+    plugins: [react(), pantheraData(), ...(single ? [inlineAll()] : [])],
     build: single
       ? {
           outDir: 'dist-single',

@@ -13,6 +13,6 @@ export async function mammalsSeed(clade: RawClade): Promise<LayoutSeed> {
   await loadMammals(async () => ({ clade, wiki: {} }));
   const seed = layoutSeed(mammaliaClade(), mammaliaTree());
   // (The orders' shares, fold.ts scaleOrders: worked out on the layout without them.)
-  seed.ord = new Steady(layoutFan({ ...mammaliaClade(), seed }, 'linear', mammaliaTree(), 'curved')).ordShare;
+  seed.ord = new Steady(layoutFan({ ...mammaliaClade(), seed }, 'linear', mammaliaTree())).ordShare;
   return seed;
 }

@@ -24,37 +24,10 @@ width = individuals, green = alive, gray = dead, height = time.
   one width from base to tip (log mode: W·g(alive)/g(ever)), only the gray peels off. The
   stem is drawn as its children's strands side by side, so each green lane runs unbroken
   from now to the root (1 px floor).
-- **Individuals** (`twigs.ts`): zooming in, the same two lanes resolve into strands; there
-  is no switch to another picture. Procgen (`packages/procgen`; `speciesModel` builds a
-  constant-size model from ever, alive, span and generation length) gives the individuals.
-  - Green lane: one deep-green strand per index slot holding someone alive now, from now
-    all the way down: green lines all the way back.
-  - Gray lane: one strand slot per procgen index (procgen keeps children near their
-    parents in index space, so a slot is roughly a family line). Each dead individual's
-    life is drawn on its slot: pale green if it has a living descendant, gray if its line
-    ended. Dead tips stop 3 px short of "now".
-  - Threads: each child's mother thread (the line the strands and the lineage search
-    follow) and a thinner father thread (the interbreeding mesh) curve up from the parent's
-    strand into the child's base. Threads end exactly on procgen's `parents()`.
-  - Continuity: the green lane turns into a texture of its strands once the width scale
-    bar reads ~100 individuals (`TEXTURE_IND`: from 150 down to 50, while strands are still
-    well under a pixel apart): ~1 px columns that keep their fraction of the lane, each as
-    bright as the share of its index slots holding someone alive now, with the lane dimmed
-    under it. As strands get 2–10 px apart they fade in (the texture fades out) while the
-    lane dims under them. Then individuals, threads, and `lion#…` handles appear. Every line
-    drawn is a real strand or individual (no flow lines or grooves). The gray lane has a
-    texture of its own dead (`grayTexture`) from ~100 individuals per scale bar, or as
-    soon as its slots are pixels apart, until there are few enough lives on screen to draw
-    each (6000, fading over the last half): cells of a slot (every s-th index, s a power
-    of two, ≥2 px apart) by a band of t generations (t a power of two, ~6 px tall), each
-    as bright as the real lives on it cover the band (their own lifespans) and pale green
-    if they have living descendants. Finer slots fade in over the octave. Threads to the
-    parents fade in from 4 px strands (and as they get few enough), not at a switch.
-    Gray strands follow the stepped lane: straight within a step, resuming at their new x
-    after a step line. Only visible generations, index ranges and texture cells are
-    computed.
-  - "Has a living descendant" is exact (children, then down the mother line) within a
-    lookup budget; past it, a critical-branching estimate decides, deterministically.
+- **Individuals** (`twigs.ts`): a column's width at every height is the individuals alive
+  there (procgen, `packages/procgen`; `speciesModel`). The texture of individuals drawn
+  inside the columns (lines, lives, threads to the parents) was deleted (ToLaD#342): the
+  columns are their green and gray lanes.
 - **Layout** (`layout.ts`): a rectangular tree, fixed in world units; nothing depends on
   the camera but the step grid. Below the fork the stem is its children's slices side by
   side (no gaps). Just above it each child jogs sideways over `JOG` (1 world unit; a
@@ -98,8 +71,7 @@ width = individuals, green = alive, gray = dead, height = time.
   canvas.
 - **No flashing**: the old view-referenced packing (`Pack.setRef`) re-anchored the camera
   every frame and changed the shapes under it; it is gone, and the camera keeps the point
-  under the fingers fixed in world units. Step grids morph, texture lattices and links
-  fade, so no level of detail switches back and forth (`camera.test.ts` scripts smooth
+  under the fingers fixed in world units. Step grids morph, so no level of detail switches back and forth (`camera.test.ts` scripts smooth
   pinches and pans and checks for jumps and flip-flops).
 - `node scripts/fanshot.mjs [out] [prefix]` screenshots `dist-single` at 390×844
   (`STEPS_FILE` = JSON list of `[name, js]` steps run against `window.__fan`;
@@ -110,77 +82,6 @@ someone alive now, so deep in it the living strands are sparser than one per slo
 two greens (deep = alive, pale = dead with living descendants) appear only inside the
 mesh; in the fan's lanes the pale-green share is under a pixel in linear mode. Parent
 threads can be long, because procgen parents sit several slots away.
-
-The time river is still there at `?river`.
-
-## Time river (`?river`)
-
-The river shows the real mammal dataset (`../data/mammals`, format v1) as a births-rate
-time river; `?synthetic` brings back the spike's infinite synthetic tree.
-
-- `src/data/`: `river.ts` decodes a `.tld` file and lays it out (pure, runs in the data
-  worker `worker.ts` and in tests); `tile-source.ts` is the `TreeSource` that loads the
-  skeleton, then tiles when a stub is on screen; `names.ts` has display names (a small
-  hand-made common-name table: v1 data has scientific names only).
-- `npm run build:single` writes `dist-single/index.html`: JS, CSS and all data (base64)
-  in one file that works from `file://` with no network (`node scripts/check-single.mjs`).
-- `node scripts/shot.mjs` screenshots the opening view and named clades;
-  `npm run perf` runs the real-data perf phases (`PERF_SYNTH=1` for the spike's dives).
-
-The rest of this file describes the spike.
-
-This spike tests the two hardest problems before any real data exists:
-
-- **Deep-zoom numerics.** It zooms more than 1000 levels into an infinitely deep synthetic tree with no jitter, cracks or teleporting.
-- **Mobile performance.** It uses a WebGL2 instanced-band renderer.
-
-See `../research/00-synthesis.md` (plan step 0) and `../research/03-rendering.md` §3 and §8.
-
-```bash
-npm install
-npm run dev -- --host     # dev server on the LAN, port 5173
-npm test                  # Vitest: tree, camera/frame math, 1000+ level continuity test
-npm run build             # type-check + production build into dist/
-npm run perf              # headless Chromium mobile-emulation perf run (needs a build first)
-```
-
-Add `?debug` to the URL, or press the **debug** button, to open the overlay. It shows:
-
-- the anchor node id and depth;
-- the x/t zoom exponents;
-- frame time (avg/p95) and the CPU part of it;
-- instance, draw-call and chunk counts.
-
-Debug mode also outlines every drawn chunk in orange.
-
-## Controls
-
-| | Touch | Desktop |
-|---|---|---|
-| Pan | one finger drag | mouse drag |
-| Zoom (both axes) | pinch | wheel / trackpad pinch |
-| Zoom width only / time only | – | shift+wheel / alt+wheel |
-| Fit a clade | double-tap a band (again: its parent) | double-click |
-| Back to LUCA | **LUCA** button | same |
-| Linear ↔ log widths | **linear/log widths** button (animated) | same |
-
-Pan and zoom carry momentum. Zoom momentum decays in log-zoom space.
-
-## Layout of the code
-
-Everything under `src/engine/` is plain TypeScript. React (`src/App.tsx`) only mounts the canvas and the buttons. Camera and per-frame state never go through React.
-
-| File | What it does |
-|---|---|
-| `tree.ts` | `TreeSource` interface (`root`, `children`, `info`) and `SyntheticTree`. The synthetic tree is infinitely deep and deterministic. Structure (2–4 children, integer weights, integer start/end times, extinct or surviving) is decided by `Math.imul` hashing only. Task `river` swaps real tiles in behind this interface. |
-| `layout.ts` | Nested sibling shares `g(n)/Σg`: linear g = n, log g = 1 + log10 n. The shares are precomputed per node and mixed by `mix` for the animated toggle. The green lane fraction follows the active mode. Also does chunk membership and memory pruning. |
-| `frame.ts` | Float64 frame math. A frame maps a node's local `[0,1]²` to the screen with **separate width (kx) and time (kt) scales**. |
-| `camera.ts` | Re-anchoring camera: an anchor node plus a float64 frame. It descends into the child under the screen centre once that child is ≥ 64 px on both axes, and ascends when the anchor drops under 32 px or the centre leaves it. Every number it handles stays roughly screen-sized at any depth. |
-| `scene.ts` | Decides what to draw each frame. **Chunks** span ≤ 4 levels and ≤ 1:1000 scale per axis. Their geometry is stored once as float32 in the chunk root's frame, and per frame only one float64-composed transform per chunk is computed. Nodes too big for float32 (ancestors around the anchor) go through a float64 **near path** that clips them to the viewport in screen space. A child chunk only opens once its root covers ≥ 32×32 px. Until then, a flat proxy band in the parent chunk stands in for it. This cut per-frame scene cost about 7× during fast dives. |
-| `renderer.ts` | Raw WebGL2. One instanced draw per chunk. Each node is drawn as tapered trapezoids: thread → band, plus a taper-out for extinct clades. Side edges get analytic AA in the fragment shader, and the green/gray lane split is AA'd too. Any clade with something alive gets a 1 px green floor. |
-| `input.ts` | Pointer Events (`touch-action: none`), pinch about the centroid, wheel, double-tap, and fling velocity. |
-| `engine.ts` | Glue. Renders on demand, caps DPR at 2, and drops resolution to 0.75× during gestures if frames are slow. LOD adapts OneZoom-style. Also runs the animations: log/linear, fit-clade flights interpolated in log-scale per axis, and inertia. Exposes test hooks on `window.__tolad`. |
-| `dive.ts` | Scripted zoom into a pseudo-random descendant chain. Used by the continuity test and the perf run. |
 
 ## Open it on a phone (WSL2)
 
@@ -240,31 +141,3 @@ It prints a `https://….trycloudflare.com` URL; open it on the phone. `ngrok ht
 
 Tunnels add latency to page loads, not to rendering, so frame times measured on the phone are still valid. They also give you HTTPS, which some phone browser features require.
 
-### What to measure on the device
-
-1. Open `/?debug`.
-2. Pinch and pan at the root, then dive deep. Double-tap repeatedly to fly down a lineage, or keep pinching.
-3. Repeat at depth 1000+. The anchor depth is shown in the overlay.
-4. Note the `frame avg / p95` line.
-
-Target: 60 fps (≈16.7 ms) at depth 10^3+ on a mid-range Android and on an iPhone. If the phone has remote debugging enabled (Chrome `chrome://inspect` / Safari Web Inspector), you can reach depth 1000 instantly from the console:
-
-```js
-__tolad.diveInstant(1000)
-__tolad.diveAnimated(50)
-```
-
-## Performance run (headless)
-
-`npm run perf` starts `vite preview` and opens the app in headless Chromium (Playwright) with these settings:
-
-- a 390×844 viewport;
-- DPR 3 (the backing store is capped at DPR 2, so 780×1688);
-- touch enabled;
-- **4× CPU throttling** via CDP.
-
-It then replays real touch pinches and pans through CDP `Input.dispatchTouchEvent` (they arrive as Pointer Events), at the root and at ~1000 levels. It also runs animated dives (0 → 60 and ~1000 → ~1060 levels) and a log/linear toggle. Every frame is recorded.
-
-Output goes to `perf-out/`: `perf.json` plus screenshots.
-
-**Caveat:** headless Chromium has no GPU, so WebGL runs on SwiftShader (software rasterisation on the CPU), throttled 4× on top. The frame *interval* numbers are therefore dominated by software fill of ~1.3 MP and are **not representative of a phone**. The *cpu* column (JS + GL command submission per frame) is the more meaningful number. Real devices are the real test.

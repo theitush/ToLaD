@@ -41,7 +41,7 @@ function stubView(folds: boolean): FanView {
     addEventListener: noop,
     removeEventListener: noop,
   };
-  return new FanView(canvas as unknown as HTMLCanvasElement, CARNIVORA, 'curved', CARNIVORA_TREE, folds);
+  return new FanView(canvas as unknown as HTMLCanvasElement, CARNIVORA, CARNIVORA_TREE, folds);
 }
 
 type Inner = { anim: ((t: number) => boolean) | null; applyFold(): void };

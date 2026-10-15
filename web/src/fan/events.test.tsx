@@ -6,7 +6,7 @@ import { EVENT_TINT, eventAt, eventSpans } from './colstyle';
 import { SpeciesCard, unshownSentence } from './FanApp';
 import { HistorySpark } from './HistorySpark';
 import { laneAt, layoutFan, leftAt } from './layout';
-import { RectBatch, MeshBatch } from './meshgl';
+import { RectBatch } from './meshgl';
 import { FELIDAE } from './panthera';
 import { colEventsY, colSpansY, FanView, type Selection } from './view';
 
@@ -128,9 +128,9 @@ describe('the fan: marks and tap', () => {
   v.camera.settle();
 
   it('draws each window as a tint over the column, after (over) the held fade', () => {
-    const gl = { under: new RectBatch(), mesh: new MeshBatch(), over: new RectBatch(), begin() {}, end() {} };
+    const gl = { under: new RectBatch(), over: new RectBatch(), begin() {}, end() {} };
     gl.begin = () => {
-      gl.under.n = gl.mesh.n = gl.over.n = 0;
+      gl.under.n = gl.over.n = 0;
     };
     (v as unknown as { gl: unknown }).gl = gl;
     v.draw();

@@ -74,18 +74,6 @@
   box-shadow: 0 0 12px rgba(63, 210, 134, 0.18);
 }
 
-.legend {
-  position: absolute;
-  left: 10px;
-  bottom: max(10px, env(safe-area-inset-bottom));
-  background: rgba(14, 24, 20, 0.72);
-  border: 1px solid rgba(190, 220, 200, 0.1);
-  border-radius: 10px;
-  padding: 5px 9px;
-  pointer-events: none;
-  backdrop-filter: blur(6px);
-}
-
 .dot {
   display: inline-block;
   width: 9px;
@@ -311,41 +299,6 @@
   padding: 4px 8px;
 }
 
-.overlay {
-  position: absolute;
-  top: max(54px, calc(env(safe-area-inset-top) + 44px));
-  left: 10px;
-  margin: 0;
-  padding: 6px 8px;
-  max-width: calc(100% - 36px);
-  overflow: hidden;
-  font: 11px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace;
-  background: rgba(0, 0, 0, 0.62);
-  border-radius: 6px;
-  pointer-events: none;
-  white-space: pre;
-}
-
-.error {
-  position: absolute;
-  inset: 40% 16px auto;
-  padding: 12px;
-  background: #5a1d1d;
-  border-radius: 8px;
-}
-
-.dot.ghost {
-  background: repeating-linear-gradient(135deg, #8f88a8 0 2px, #5b5670 2px 4px);
-  border-radius: 2px;
-}
-
-.legend {
-  left: 60px;
-  right: 10px;
-  max-width: max-content;
-  font-size: 12px;
-}
-
 .loading {
   position: absolute;
   inset: 45% 16px auto;
@@ -353,53 +306,7 @@
   color: #9fb3a8;
 }
 
-.nowebgl {
-  position: fixed;
-  inset: 0;
-  overflow: auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  background: #0b0f0d;
-  color: #dfe7e2;
-  font: 15px/1.5 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  -webkit-user-select: text;
-  user-select: text;
-}
-
-.nowebgl .card {
-  max-width: 480px;
-  padding: 20px 22px;
-  background: #141c18;
-  border: 1px solid rgba(160, 190, 170, 0.25);
-  border-radius: 12px;
-}
-
-.nowebgl h1 {
-  font-size: 20px;
-  margin: 0 0 10px;
-}
-
-.nowebgl a {
-  color: #5fd38a;
-}
-
-.nowebgl li {
-  margin: 6px 0;
-}
-
-.nowebgl button {
-  font: inherit;
-  color: inherit;
-  background: #1f2b25;
-  border: 1px solid rgba(160, 190, 170, 0.35);
-  border-radius: 8px;
-  padding: 7px 14px;
-  margin-top: 6px;
-}
-
-/* Fan: the width scale sits above the legend or the card, at every zoom. */
+/* Fan: the width scale sits above the card, at every zoom. */
 .foot {
   position: absolute;
   left: 10px;
@@ -414,7 +321,6 @@
 .foot > * {
   pointer-events: auto;
 }
-.foot .legend,
 .foot .card-sp {
   position: relative;
   left: auto;
@@ -443,7 +349,6 @@
   border-top: none;
   box-sizing: border-box;
 }
-.foot .legend,
 .foot .wscale {
   margin-left: 50px;
 }
@@ -574,15 +479,7 @@
   vertical-align: 1px;
 }
 
-.legend .dim {
-  color: #8a978f;
-}
-.legend .dot {
-  margin-left: 2px;
-}
-
-.wscale .wlab,
-.legend .li {
+.wscale .wlab {
   white-space: nowrap;
 }
 
@@ -753,7 +650,6 @@
   gap: 7px;
   background: linear-gradient(to top, rgba(12, 23, 20, 0.94) 0%, rgba(12, 23, 20, 0.78) 55%, rgba(12, 23, 20, 0) 100%);
 }
-.fan .foot .legend,
 .fan .foot .wscale {
   margin-left: 0;
 }

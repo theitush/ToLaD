@@ -10,7 +10,7 @@ import { CARNIVORA_TREE, familyLabel, allSplits, speciesUnder } from './splits';
 import { boxGap, families, familySpan, labelSpots, resolveLabels } from './view';
 import { FanCamera } from './camera';
 
-const fan = layoutFan(CARNIVORA, 'linear', CARNIVORA_TREE, 'curved');
+const fan = layoutFan(CARNIVORA, 'linear', CARNIVORA_TREE);
 
 describe('Carnivora from the data', () => {
   it('325 species: every living one and the dated fossils, each placed once', () => {

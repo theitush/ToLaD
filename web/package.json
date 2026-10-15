@@ -8,8 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "build:single": "tsc --noEmit && vite build --mode single",
     "preview": "vite preview",
-    "test": "vitest run",
-    "perf": "node scripts/perf.mjs"
+    "test": "vitest run"
   },
   "dependencies": {
     "@fontsource-variable/newsreader": "^5.3.0",
