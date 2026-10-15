@@ -10,7 +10,7 @@ import { formatCount, formatMass } from '../data/count';
 import { stamp } from '../stamp';
 import { DOUBLE_TAP_MS, Input, type InputHandlers } from '../engine/input';
 import { clipPoly, FanCamera, type Camera } from './camera';
-import { g, isNode, laneAt, layoutFan, leftAt, nearestStrand, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type EdgeStyle, type Fan, type FanBranch, type FanNode, type Measure, type WidthMode } from './layout';
+import { g, isNode, laneAt, layoutFan, leftAt, nearestStrand, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type Fan, type FanBranch, type FanNode, type Measure, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01 } from './meshgl';
 import { Lod } from './lod';
@@ -1123,6 +1123,20 @@ export function livingOf(v: FanNode): FanBranch[] {
   return out;
 }
 
+/** Clade v's column nearest world x at "now" (ToLaD#262): a living one, found by halving (they stand in order); else any. */
+function columnNear(v: FanNode, x: number): FanBranch {
+  const live = livingOf(v);
+  if (!live.length) return v.strands.reduce((p, q) => (Math.abs(stripMid(q) - x) < Math.abs(stripMid(p) - x) ? q : p));
+  let lo = 0;
+  let hi = live.length - 1;
+  while (lo < hi) {
+    const m = (lo + hi) >> 1;
+    if (stripMid(live[m]) < x) lo = m + 1;
+    else hi = m;
+  }
+  return lo > 0 && Math.abs(stripMid(live[lo - 1]) - x) < Math.abs(stripMid(live[lo]) - x) ? live[lo - 1] : live[lo];
+}
+
 /**
  * The species pills that stand for their family (ToLaD#212), counted with the cull: a family with exactly one
  * species shown (its pill on its tip), others of it hidden in view (their tips there, none of their spots shown) and
@@ -1216,6 +1230,7 @@ export function labelSpots(
   // (?fit=fossils, ToLaD#298: a level framed on its fossils has "now" above the screen; a living group's picture stands
   // under the top line then (groupPics), its name under that, and the level's names show.)
   const fossils = !!level && wantFitFossils();
+  const standS = fossils ? Math.max(nowS, top + NOW_ROOM) : nowS;
   const levelOn = fossils ? 1 : nowOn;
 
   // Heights (world) to measure a column's edge at between wa < wb: both ends, its own ends and peel's end
@@ -1454,36 +1469,6 @@ export function labelSpots(
       }
     return null;
   };
-  /**
-   * A level's group's name along its branch (ToLaD#266, #342): centred
-   * halfway between "now" (or its tip, wTop) and where it splits off (wBot), over the part of that on screen.
-   */
-  const along = (id: string, text: string, rank: Rank, len: number, own: FanNode | FanBranch, wTop: number, wBot: number, fit0: number, ref: { b?: FanBranch; v?: FanNode }): LabelSpot[] => {
-    const a = Math.max(top, Y(wTop));
-    const z = Math.min(bottom, Y(wBot));
-    if (!(fit0 > 0) || !(z > a)) return [];
-    const y0 = Math.max(top, (a + z) / 2 - len / 2);
-    const y1 = y0 + len;
-    const wy = c.toWorld(0, (y0 + y1) / 2)[1];
-    const L = edgeAt(own, wy, false);
-    const R = edgeAt(own, wy, true);
-    if (L === null || R === null || R < 0 || L > c.w) return [];
-    // (Its part on screen too short to hold a name: faded out; the legend at the bottom too.)
-    const f = fit0 * botFit(y1) * clamp01((z - a - 12) / 24);
-    const spot = (key: string, place: LabelSpot['place'], x: number, loose: boolean): LabelSpot => {
-      const box: [number, number, number, number] = [x - half, y0, x + half, y1];
-      // (Whole on screen; in a gap with LABEL_GAP px either side, clear: its full ink.)
-      const onX = x - half >= 0 && x + half <= c.w + 0.5;
-      const fit = f > 0 && onX ? f * clearFit(Math.min(x - half - LABEL_AXIS_X, loose ? CLEAR : clearance(x - half, x + half, y0, y1, own) + 2)) : 0;
-      return { key: `${id}:${key}`, id, place, ...ref, text, rank, x, y1, box, fit, loose: loose || undefined };
-    };
-    // On its branch, opaque (over its own columns), its middle on screen right of the axis.
-    const lo = Math.max(L, LABEL_AXIS_X + half + 4);
-    const hi = Math.min(R, c.w) - half;
-    const x = lo <= hi ? (lo + hi) / 2 : Math.min(Math.max((L + R) / 2, LABEL_AXIS_X + half + 4), c.w - half);
-    return [spot('mid', 'in', x, true)];
-  };
-
   const out: LabelSpot[] = [];
   // The families (ToLaD#146), first of all: standing on "now" over their species while "now" is on screen, the
   // span they name bracketed under the pill; at its left end, else its middle, else its right end (whichever
@@ -1495,15 +1480,18 @@ export function labelSpots(
     // (The mammal level, lod.ts: a family inside a clade drawn as one branch is not named; the clade is.)
     if ((!level && brk?.named(v)) || lod?.hidden(v)) continue;
     if (level) {
-      // A level's group (ToLaD#262): its name on its branch (its picture stands over "now", groupPics), room at the
-      // name's end for the "+x" of the groups hidden.
+      // A level's group (ToLaD#262): its name beside its branch, down from "now" (its picture stands over "now",
+      // groupPics): beside the column nearest its centre, room at the name's end for the "+x" of the groups hidden.
       if (!(levelOn > 0)) continue;
       const [wa, wb] = groupExtent(v);
+      const cx = (wa + wb) / 2;
       if (!(X(wb) > 0 && X(wa) < c.w)) continue;
+      // (A living column, where it has one: on "now", under its picture.)
+      const own = columnNear(v, cx);
       const px = plus?.(`n${vi}`) ?? 0;
       const rank: Rank = [-1, wb - wa, vi];
-      // Along its branch, halfway down from "now" to where it splits off (ToLaD#266, #342).
-      for (const p of along(`n${vi}`, text, rank, measure(text) + 2 * LABEL_PAD + px, v, nowY, v.yBot, nowOn, { v })) out.push({ ...p, fam: v, pic: groupFace(v), plus: px });
+      for (const p of beside(`n${vi}`, text, rank, measure(text) + 2 * LABEL_PAD + px, own, Math.max(standS, Y(own.tipY)) + 4, Y(own.splitY), levelOn, { v }, true))
+        out.push({ ...p, fam: v, pic: groupFace(v), plus: px });
       continue;
     }
     const [wa, wb] = familySpan(v);
@@ -1536,7 +1524,45 @@ export function labelSpots(
       const px = plus?.(id) ?? 0;
       const text = levelText(b);
       const len = measure(text) + 2 * LABEL_PAD + px;
-      out.push(...along(id, text, [0, b.width, b.index], len, b, Math.max(nowY, b.tipY), b.splitY, 1, { b }).map((p) => ({ ...p, plus: px })));
+      const y0 = Math.max(standS, Y(b.tipY)) + 4;
+      // (A neighbouring level's species after the level's own, ToLaD#297.)
+      const mine = !level.own || level.own.has(b);
+      const rank: Rank = [mine ? 0 : 0.25, b.width, b.index];
+      // (The fossils' frame, its own species: more places to try, ToLaD#297; a neighbour's name stays by its column.)
+      const more = fossils && mine;
+      const sp = beside(id, text, rank, len, b, y0, Y(b.splitY), 1, { b }, true).map((p) => ({ ...p, plus: px }));
+      // (ToLaD#297: or further down its column, a name's length at a time, where a neighbour's name stands at its tip.)
+      if (more) for (let k = 1; k <= 2; k++) for (const p of beside(id, text, rank, len, b, y0 + k * (len + LABEL_GAP), Y(b.splitY), 1, { b }, true)) sp.push({ ...p, key: `${p.key}+${k}`, plus: px });
+      // (Under the fossils' frame, a fossil's, ToLaD#297: failing room beside its column, over its picture on its tip.
+      // An old one near the screen's foot has no room below its tip; over it, the air the younger ones left.)
+      const ty = Y(b.tipY);
+      if (fossils && b.tipY > nowY && ty > top && ty < c.h) {
+        const x = X(stripMid(b));
+        const y1 = ty - PIC_LIFT - PIC_D - LABEL_GAP;
+        const ya = y1 - len;
+        const xa = x - half;
+        const xb = x + half;
+        // (Faded in over 24 px under the top line and 12 px in from the screen's sides, not cut: a pinch's frames keep it, ToLaD#311.)
+        const onFit = (xa: number, ya: number, xb: number, y1: number) => botFit(y1) * clamp01((ya - top) / 24) * clamp01(xa / 12) * clamp01((c.w - xb) / 12);
+        const f0 = onFit(xa, ya, xb, y1);
+        const fit = f0 > 0 ? f0 * clearFit(Math.min(xa - LABEL_AXIS_X, clearance(xa, xb, ya, y1, b))) : 0;
+        const o = { id, place: 'over' as const, b, text, rank, x, y1, plus: px };
+        sp.push({ ...o, key: `${id}:over`, box: [xa, ya, xb, y1], fit });
+        // (Failing a clear one, over the columns there, opaque: clear of the axis and the other names. Under fossils'
+        // frame, crowded, beside its picture, or further up, a name's length at a time.)
+        const loose = (key: string, x: number, y1: number) => {
+          const [xa, ya, xb] = [x - half, y1 - len, x + half];
+          sp.push({ ...o, key: `${id}:${key}`, x, y1, box: [xa, ya, xb, y1], loose: true, fit: onFit(xa, ya, xb, y1) * clearFit(xa - LABEL_AXIS_X) });
+        };
+        loose('over~', x, y1);
+        if (more) {
+          const side = PIC_D / 2 + LABEL_GAP + half;
+          loose('over~r', x + side, ty - 2);
+          loose('over~l', x - side, ty - 2);
+          for (let k = 1; k <= 2; k++) loose(`over~${k}`, x, y1 - k * (len + LABEL_GAP));
+        }
+      }
+      out.push(...sp);
       continue;
     }
     // (Standing for its family, ToLaD#212: the family's name on its tip, last frame's familyPills.)
@@ -1794,7 +1820,6 @@ export class FanView implements InputHandlers {
   mode: WidthMode = 'linear';
   /** What the widths count (ToLaD#276): individuals, or their mass. */
   measure: Measure = initialMeasure();
-  edge: EdgeStyle = 'curved';
   dpr = 1;
   selected: SpeciesRec | null = null;
   /** The point touched on the selected column (world x, age in Ma): marked on the graph, the card's numbers are for it. */
@@ -1853,13 +1878,11 @@ export class FanView implements InputHandlers {
   constructor(
     readonly canvas: HTMLCanvasElement,
     readonly clade: CladeRec,
-    edge: EdgeStyle = 'curved',
     readonly tree: Split = FELIDAE_TREE,
     /** The fold (fold.ts, ToLaD#146): the order one branch from afar, its splits opening as you zoom in. */
     readonly folds = false,
   ) {
     stamp('clade');
-    this.edge = edge;
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('No 2D canvas context');
     this.ctx = ctx;
@@ -1878,7 +1901,7 @@ export class FanView implements InputHandlers {
       }
     }
     stamp('gl');
-    const laid = layoutFan(clade, this.mode, tree, this.edge, this.measure);
+    const laid = layoutFan(clade, this.mode, tree, this.measure);
     stamp('layout');
     this.camera = new FanCamera(this.withFold(laid), (b) => this.model(b));
     stamp('fold');
@@ -2202,15 +2225,8 @@ export class FanView implements InputHandlers {
     }
   }
 
-  /** The edges' design (the toggle): curved or straight. Same data, the camera stays put. */
-  setEdge(edge: EdgeStyle): void {
-    if (edge === this.edge) return;
-    this.edge = edge;
-    this.relayout();
-  }
-
   private relayout(): void {
-    this.camera.fan = this.withFold(layoutFan(this.clade, this.mode, this.tree, this.edge, this.measure));
+    this.camera.fan = this.withFold(layoutFan(this.clade, this.mode, this.tree, this.measure));
     this.camera.settle();
     this.request();
   }
