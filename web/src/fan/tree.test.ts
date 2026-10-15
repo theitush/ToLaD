@@ -71,7 +71,7 @@ describe('the dated tree', () => {
           expect(k.splitY).toBe(v.y);
           // Its column grows out of its slice of the parent (no jog), and has peeled off to its own centre a fork span above.
           expect(leftAt(k, below(k.splitY))).toBeCloseTo(k.path[0].left, 12);
-          // (A straight lean leaves at its slope: a hair above, a hair aside.)
+          // (The S leaves flat: a hair above, a hair aside.)
           expect(leftAt(k, above(k.splitY))).toBeCloseTo(k.path[0].left, 5);
           const yF = k.leanY;
           if (yF > k.tipY) expect(leftAt(k, yF) + laneAt(k, yF).w / 2).toBeCloseTo(k.cx, 9);
@@ -109,8 +109,7 @@ describe('the dated tree', () => {
         expect(x).toBeCloseTo(v.left + v.width, 9);
         // And in counts: the parent is the sum of the daughters' founders.
         expect(v.n).toBeCloseTo(sum(v.strands.map((b) => b.pop.founders)), 6);
-        // Curved: where its daughters' peels are the shortest, the farthest left as far as the farthest right
-        // (straight: the larger daughter runs straight on).
+        // Where its daughters' peels are the shortest, the farthest left as far as the farthest right.
         // Off that place only where two splits come close in time, and then every peel under the edges' limit (12, layout.test).
         {
           const moves = v.kids.map((k) => (isNode(k) ? k.left - k.tile : k.cx - (k.x0 + k.baseW / 2)));

@@ -363,7 +363,7 @@ export class Tess {
     const add = (y: number) => {
       if (y >= b.tipY && y <= this.bottom) out.push(y);
     };
-    // A peel: its ends (a straight one's kinks) and samples along it (a curved one's S).
+    // A peel: its ends and samples along its S.
     const peel = (yBot: number, leanY: number) => {
       if (leanY < yBot) for (let i = 0; i <= 48; i++) add(yBot - ((yBot - leanY) * i) / 48);
     };
