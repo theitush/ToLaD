@@ -16,7 +16,7 @@ import { FanGL, rgb01 } from './meshgl';
 import { Lod } from './lod';
 import type { FoldState } from './fold';
 import { Steady, wantFitFossils } from './steady';
-import { Territories, wantCutLabels, type CutItem } from './cut';
+import { Territories, wantCutFrame, wantCutLabels, type CutItem } from './cut';
 import { COLUMN_DIM, columnSpans, EVENT_TINT, eventAt, eventSpans, type EventSpan } from './colstyle';
 import { laneDim, LINEAGE, pathFrame, TwigModel } from './twigs';
 import type { RectBatch } from './meshgl';
@@ -233,8 +233,26 @@ class CutTerritories {
       return y;
     });
   }
-  private youngOf(k: number): number {
+  /** Daughter k's (a node's index, ~ a strand's) youngest tip (world y). */
+  youngOf(k: number): number {
     return k >= 0 ? this.young[k] : Math.max(this.t.strands[~k].tipY, this.now);
+  }
+  /** A cut item's columns at "now" (world x, their middle; groupCentre): where its name and picture stand, its territory bounding them. */
+  columns(it: CutItem): number {
+    if (it.kind === 'leaf') return groupCentre({ b: this.t.strands[it.j] });
+    if (it.kind === 'node') return groupCentre({ v: this.t.nodes[it.j] });
+    return this.columnsOf(Array.from(this.t.kids[it.j].subarray(it.q0, it.q1 + 1)));
+  }
+  /** Daughters ks' (a node's index, ~ a strand's) columns at "now", their middle (world x). */
+  columnsOf(ks: readonly number[]): number {
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (const k of ks) {
+      const [a, b] = k >= 0 ? groupExtent(this.t.nodes[k]) : [groupCentre({ b: this.t.strands[~k] }), groupCentre({ b: this.t.strands[~k] })];
+      lo = Math.min(lo, a);
+      hi = Math.max(hi, b);
+    }
+    return (lo + hi) / 2;
   }
   /** A cut item's youngest tip (world y). */
   youngest(it: CutItem): number {
@@ -247,43 +265,65 @@ class CutTerritories {
   }
   /**
    * A cut item's name and the species its "+x" counts, those it stands for that the name does not name (kept per item).
-   * A species: its name. A clade: its name; one with none, its largest named clade's (OneZoom's signposts), else its
-   * face species'. A run: none, only its "+x".
+   * A species or a clade: its own (named). A run of daughters: none, only its "+x".
    */
   label(it: CutItem, key: string): { text: string; hid: FanBranch[][] } {
+    if (it.kind !== 'run') return this.named(it.kind === 'leaf' ? ~it.j : it.j);
     let out = this.hid.get(key);
     if (!out) {
-      const v = this.t.nodes[it.j];
-      if (it.kind === 'leaf') out = { text: this.t.strands[it.j].sp.common, hid: [] };
-      else if (it.kind === 'run') {
-        const K = this.t.kids[it.j];
-        const ks = Array.from(K.subarray(it.q0, it.q1 + 1), (k) => (k >= 0 ? this.t.nodes[k] : this.t.strands[~k]));
-        out = { text: '', hid: ks.flatMap((k) => ('sp' in k ? [[k]] : k.strands.map((b) => [b]))) };
-      } else {
-        const sign = this.signpost(v);
-        const face = sign ? null : groupFace(v);
-        // ("+x": its species with no name of their own, research/scalable-tree.md §3: all of them, its face species aside.)
-        const text = sign ? levelName(sign) : (face?.sp.common ?? v.name);
-        out = { text, hid: v.strands.filter((b) => b !== face).map((b) => [b]) };
-      }
+      const K = this.t.kids[it.j];
+      out = { text: '', hid: this.species(Array.from(K.subarray(it.q0, it.q1 + 1))) };
       this.hid.set(key, out);
     }
     return out;
   }
-  private readonly signs = new Map<FanNode, FanNode | null>();
-  /** Clade v if named, else its largest (most species) topmost named clade, or null for none. */
-  signpost(v: FanNode): FanNode | null {
-    let out = this.signs.get(v);
+  /** The species under daughters ks (a node's index, ~ a strand's), one per "+x" group. */
+  species(ks: readonly number[]): FanBranch[][] {
+    return ks.flatMap((k) => (k >= 0 ? this.t.nodes[k].strands.map((b) => [b]) : [[this.t.strands[~k]]]));
+  }
+  private readonly names = new Map<number, { text: string; hid: FanBranch[][] }>();
+  /**
+   * Daughter k's name (a node's index, ~ a strand's) and the species its "+x" counts. A species: its name. A clade:
+   * its own name; one with none (OneZoom's signposts), its largest clade with an English name, else its face
+   * species' name, else its largest clade's Latin name. "+x": its species with no name of their own (research/
+   * scalable-tree.md §3), all of them, the face species aside when it names the clade.
+   */
+  named(k: number): { text: string; hid: FanBranch[][] } {
+    let out = this.names.get(k);
+    if (!out) {
+      if (k < 0) out = { text: this.t.strands[~k].sp.common, hid: [] };
+      else {
+        const v = this.t.nodes[k];
+        const sign = latinOf(v.split) ? v : this.signpost(v, true);
+        const face = sign ? null : groupFace(v);
+        const latin = sign || face ? null : this.signpost(v, false);
+        const text = sign ? levelName(sign) : face ? face.sp.common : latin ? levelName(latin) : v.name;
+        out = { text, hid: v.strands.filter((b) => b !== face).map((b) => [b]) };
+      }
+      this.names.set(k, out);
+    }
+    return out;
+  }
+  /** Whether daughter k has a name of its own (a species, a named clade): borrowing room, it goes first at equal counts. */
+  hasName(k: number): boolean {
+    return k < 0 || !!latinOf(this.t.nodes[k].split);
+  }
+  private readonly signs = [new Map<FanNode, FanNode | null>(), new Map<FanNode, FanNode | null>()];
+  /** Clade v if named (`en`: in English, TAXON_EN), else its largest (most species) topmost such clade, or null for none. */
+  signpost(v: FanNode, en: boolean): FanNode | null {
+    const S = this.signs[en ? 1 : 0];
+    let out = S.get(v);
     if (out === undefined) {
       out = null;
-      if (latinOf(v.split)) out = v;
+      const latin = latinOf(v.split);
+      if (en ? Object.prototype.hasOwnProperty.call(TAXON_EN, latin) : latin) out = v;
       else
         for (const k of v.kids) {
           if ('sp' in k) continue;
-          const c = this.signpost(k);
+          const c = this.signpost(k, en);
           if (c && (!out || c.strands.length > out.strands.length)) out = c;
         }
-      this.signs.set(v, out);
+      S.set(v, out);
     }
     return out;
   }
@@ -2011,8 +2051,29 @@ export class FanView implements InputHandlers {
    * Where a tap on a clade's bracket lands (brackets.ts cladeCamera, ToLaD#193): the clade centred and opened,
    * "now" down to where its branch started. The whole fan for the root.
    */
+  /**
+   * ?frame=cut (ToLaD#333, research/scalable-tree.md §4): strands lo..hi's territory across the labels' width of the
+   * screen (from LABEL_AXIS_X to its edge) at the zoom where it fills it (foldedFrame's bisection), "now" down to
+   * `yFork` in time. Every label of what it frames stands centred in a territory inside it, so none is cut off at the
+   * edge, with no padding. Null when off, or under the rooms by life.
+   */
+  private cutFrame(lo: number, hi: number, v: FanNode, yFork: number, top = this.yNow): Camera | null {
+    const T = FanView.frameCut ? this.territories() : null;
+    if (!T) return null;
+    const s: [number, number] = [0, 0];
+    return foldedFrame(this.fan, this.w, () => {
+      const a = T.t.span(~lo, s)[0];
+      const b = T.t.span(~hi, s)[1];
+      const cam = this.camera.frame(a, b, yFork, true);
+      const sx = (this.w - LABEL_AXIS_X) / (b - a);
+      return this.withBand({ ...cam, sx, cx: a + (this.w / 2 - LABEL_AXIS_X) / sx }, v, top);
+    });
+  }
+
   cladeCamera(v: FanNode): Camera {
     if (!v.parent) return this.homeCamera();
+    const cut = this.cutFrame(v.strands[0].index, v.strands[v.strands.length - 1].index, v, v.yBot, fossilTop(this.fan, v) ?? this.yNow);
+    if (cut) return cut;
     // (A level of two or three groups, ToLaD#262: centred on its columns at "now" and kept to the screen's middle,
     // FEW_FILL of it, not spread to its edges; its whole span, its past's columns too, still on screen.)
     const few = nextLevels(this.fan, v).length;
@@ -2086,6 +2147,15 @@ export class FanView implements InputHandlers {
     let v: FanNode | null = bs[0].node;
     while (v?.parent && !bs.every((b) => v!.strands.includes(b))) v = v.parent;
     if (!v) return this.homeCamera();
+    // (?frame=cut: the daughters of the clade where they meet that hold any of them, their territory.)
+    if (FanView.frameCut) {
+      const B = new Set(bs);
+      const ks = v.kids.filter((k) => ('sp' in k ? B.has(k) : k.strands.some((b) => B.has(b))));
+      const lo = Math.min(...ks.map((k) => ('sp' in k ? k.index : k.strands[0].index)));
+      const hi = Math.max(...ks.map((k) => ('sp' in k ? k.index : k.strands[k.strands.length - 1].index)));
+      const cut = ks.length ? this.cutFrame(lo, hi, v, v.y) : null;
+      if (cut) return cut;
+    }
     // (Down to the split where they meet, not the clade's stem: for a group across the level, the root, not the world's bottom.)
     // (Across the screen: their columns at "now" (an extinct one's at its tip), where their names and pictures stand,
     // not their rooms, wider where they were wider in the past: the most room each name and picture can have, ToLaD#274.)
@@ -2169,6 +2239,8 @@ export class FanView implements InputHandlers {
     if (this.fan.root.split.taxon === name) return this.homeCamera();
     const v = this.fan.nodes.find((n) => n.split.taxon === name);
     if (!v) return null;
+    const cut = this.cutFrame(v.strands[0].index, v.strands[v.strands.length - 1].index, v, v.y, fossilTop(this.fan, v) ?? this.yNow);
+    if (cut) return cut;
     // The clade's span at the zoom that frames it (it opens as it is framed: foldedFrame, ToLaD#247).
     return foldedFrame(this.fan, this.w, () => {
       // (?fit=fossils, ToLaD#289: as a tap's frame, cladeCamera, a level whose living columns dwarf its fossils framed on them.)
@@ -2850,7 +2922,7 @@ export class FanView implements InputHandlers {
     const t0 = performance.now();
     const lg = labelGroups(this.fan, this.levelNow());
     // (?labels=cut, ToLaD#333: from the cut, every frame; no carry, no rest pass, no hysteresis.)
-    const T = this.territories();
+    const T = FanView.labelsCut ? this.territories() : null;
     if (this.brackets) this.brackets.spanOf = T ? (v) => T.spanOf(v) : null;
     if (T) {
       const br = this.layoutBrackets();
@@ -2922,7 +2994,7 @@ export class FanView implements InputHandlers {
     const f = this.fan.tess.fold;
     // (Off under the rooms by life, ?fit=fossils: Steady's computeLife places the columns otherwise than
     // the territories' widest rooms, so the cut's boxes would not be where the columns are. Today's labels there.)
-    if (!FanView.labelsCut || !(f instanceof Steady) || f.life) return null;
+    if (!(FanView.labelsCut || FanView.frameCut) || !(f instanceof Steady) || f.life) return null;
     const P = this.terr;
     if (P && P.fan === this.fan && P.fold === f && P.w === this.w) return P.t;
     const t = new CutTerritories(this.fan, f, this.w);
@@ -2933,6 +3005,8 @@ export class FanView implements InputHandlers {
   cutLast: CutLabels | null = null;
   /** Names, pictures and "+x" on/off from the cut (wantCutLabels; tests set it). */
   static labelsCut = wantCutLabels();
+  /** Taps and levels framed by their territories (wantCutFrame; tests set it). */
+  static frameCut = wantCutFrame();
 
   /**
    * This frame's labels from the cut (ToLaD#333, research/scalable-tree.md §3). Names: the cut for a pill's thickness
@@ -2953,49 +3027,101 @@ export class FanView implements InputHandlers {
     const groups = new Map<string, FanBranch[][]>();
     const bottom = this.h - LABEL_BOTTOM_PX + 30;
     /**
-     * An item's centre (screen x) for a box `d` wide: inside its territory always (it fits there), on screen as well
-     * where the territory's part on screen holds it; and its youngest tip (screen y).
+     * An item's centre (screen x) for a box `d` wide: over its own columns at "now" (`at`, world x: groupCentre), the
+     * territory only bounding it: inside its territory always (it fits there), on screen as well where the
+     * territory's part on screen holds it. (Rooms are the widest ever: a territory's middle can be far from the
+     * columns alive now.) And its youngest tip (screen y).
      */
-    const place = (it: CutItem, d: number): [number, number] => {
-      const l = X(it.x0) + d / 2;
-      const r = X(it.x1) - d / 2;
+    const placeX = (x0: number, x1: number, d: number, at: number): number => {
+      const l = X(x0) + d / 2;
+      const r = X(x1) - d / 2;
       const lo = Math.max(l, LABEL_AXIS_X + d / 2);
       const hi = Math.min(r, this.w - d / 2);
-      const cx = (l + r) / 2;
+      const cx = X(at);
       const x = lo <= hi ? Math.min(Math.max(cx, lo), hi) : Math.min(Math.max(cx, hi), lo);
-      return [Math.min(Math.max(x, l), r), Y(T.youngest(it))];
+      return Math.min(Math.max(x, l), r);
     };
-    // (Items only touching the screen's ends, none of them on it, culled.)
-    const shown = (it: CutItem) => it.fits && X(it.x1) > LABEL_AXIS_X && X(it.x0) < this.w;
-    for (const it of T.t.cut(sx, LABEL_PILL, vx0, vx1)) {
-      if (!shown(it)) continue;
-      const v = it.kind === 'leaf' ? null : T.t.nodes[it.j];
-      const b = it.kind === 'leaf' ? T.t.strands[it.j] : null;
-      const key = `c${it.kind}${it.j}:${it.q0}`;
-      const { text, hid } = T.label(it, key);
+    const place = (it: CutItem, d: number): [number, number] => [placeX(it.x0, it.x1, d, T.columns(it)), Y(T.youngest(it))];
+    // (A label shows whole or not at all: its territory's part on screen holds it. Runs, only touching the screen's ends, culled.)
+    const room = (x0: number, x1: number) => Math.min(X(x1), this.w) - Math.max(X(x0), LABEL_AXIS_X);
+    const onScreen = (it: CutItem) => X(it.x1) > LABEL_AXIS_X && X(it.x0) < this.w;
+    const shown = (it: CutItem, d: number) => it.fits && room(it.x0, it.x1) >= d;
+    /** A name pill hanging from `ty` (screen) into its own columns, kept under the top line: nothing else is in its territory there. */
+    const pill = (key: string, text: string, hid: FanBranch[][], x: number, ty: number, wide: number, j: number, k: number | null): LabelSpot | null => {
       const px = this.plusPx(hid.length);
       const tlen = (text ? this.nameWidth(text) + 2 * LABEL_PAD : LABEL_PAD) + px;
-      const [x, ty] = place(it, LABEL_PILL);
-      // (Hanging from its youngest tip into its own columns, kept under the top line: nothing else is in its territory there.)
       const y0 = Math.max(ty + 4, top);
       const y1 = y0 + tlen;
       const fit = clamp01((bottom - y1) / 30);
-      if (!(fit > 0)) continue;
+      if (!(fit > 0)) return null;
       if (hid.length) groups.set(key, hid);
-      const s: LabelSpot = { key, id: key, place: 'tip', text, rank: [0, it.x1 - it.x0, it.j], x, y1, box: [x - half, y0, x + half, y1], fit, plus: px };
-      if (b) s.b = b;
-      else if (it.kind === 'node') Object.assign(s, { v, fam: v, pic: groupFace(v!) });
+      const s: LabelSpot = { key, id: key, place: 'tip', text, rank: [0, wide, j], x, y1, box: [x - half, y0, x + half, y1], fit, plus: px };
+      if (k !== null && k < 0) s.b = T.t.strands[~k];
+      else if (k !== null) {
+        const v = T.t.nodes[k];
+        Object.assign(s, { v, fam: v, pic: groupFace(v) });
+      }
       spots.push(s);
+      return s;
+    };
+    // (Plan step 2b: daughters in runs that borrow their neighbours' unused room, Territories.borrowed, by this rung.)
+    const rung = Territories.rung(sx);
+    const lent = (k: number) => T.t.lent(LABEL_PILL, k, rung, (d) => T.hasName(d));
+    const s2: [number, number] = [0, 0];
+    /** The borrowed pills' screen x extents, and the runs' "+x" pills to place clear of them once all are known. */
+    const taken: [number, number][] = [];
+    const plus: { key: string; hid: FanBranch[][]; x0: number; x1: number; ty: number; j: number; at: number }[] = [];
+    for (const it of T.t.cut(sx, LABEL_PILL, vx0, vx1)) {
+      if (it.kind !== 'run') {
+        if (!shown(it, LABEL_PILL)) continue;
+        const [x, ty] = place(it, LABEL_PILL);
+        const k = it.kind === 'leaf' ? ~it.j : it.j;
+        const { text, hid } = T.label(it, '');
+        pill(`c${it.kind}${it.j}:${it.q0}`, text, hid, x, ty, it.x1 - it.x0, it.j, k);
+        continue;
+      }
+      if (!onScreen(it)) continue;
+      const K = T.t.kids[it.j];
+      // Its daughters that borrow room, each centred on its own territory; the rest, each run of them, only a "+x".
+      let q0 = it.q0;
+      for (let q = it.q0; q <= it.q1 + 1; q++) {
+        if (q <= it.q1 && !lent(K[q])) continue;
+        if (q > q0) {
+          const x0 = T.t.span(K[q0], s2)[0];
+          const x1 = T.t.span(K[q - 1], s2)[1];
+          let ty = Infinity;
+          for (let r = q0; r < q; r++) ty = Math.min(ty, T.youngOf(K[r]));
+          const ks = Array.from(K.subarray(q0, q));
+          plus.push({ key: `crun${it.j}:${q0}-${q - 1}`, hid: T.species(ks), x0, x1, ty, j: it.j, at: T.columnsOf(ks) });
+        }
+        q0 = q + 1;
+        if (q > it.q1) break;
+        const [a, b] = T.t.span(K[q], s2);
+        const x = (X(a) + X(b)) / 2;
+        // (Whole on screen, or not at all: it stands where its own columns are.)
+        if (x - half < LABEL_AXIS_X || x + half > this.w) continue;
+        const { text, hid } = T.named(K[q]);
+        if (pill(`cb${K[q]}`, text, hid, x, Y(T.youngOf(K[q])), b - a, it.j, K[q])) taken.push([x - half, x + half]);
+      }
+    }
+    for (const p of plus) {
+      if (sx * (p.x1 - p.x0) < LABEL_PILL || room(p.x0, p.x1) < LABEL_PILL) continue;
+      const x = placeX(p.x0, p.x1, LABEL_PILL, p.at);
+      // (A "+x" in its own run's territory, clear of the pills borrowing room from it.)
+      if (taken.some(([a, b]) => x + half > a && x - half < b)) continue;
+      pill(p.key, '', p.hid, x, Y(p.ty), p.x1 - p.x0, p.j, null);
     }
     // The pictures: the coarser cut, each standing on its item's youngest tip (the names hang below it).
     const pics: CutLabels['pics'] = [];
     if (thumbsOn) {
       for (const it of T.t.cut(sx, PIC_D, vx0, vx1)) {
-        if (!shown(it) || it.kind === 'run') continue;
+        if (!shown(it, PIC_D) || it.kind === 'run') continue;
         const lv: Level = it.kind === 'leaf' ? { b: T.t.strands[it.j] } : { v: T.t.nodes[it.j] };
         const face = lv.b ?? groupFace(lv.v!);
         if (!face || !wikiOf(face.sp.sci)?.img) continue;
-        const [x, ty] = place(it, PIC_D);
+        // (On the column of the species it shows, at its tip: a group's picture is its face species', ToLaD#333.)
+        const x = placeX(it.x0, it.x1, PIC_D, groupCentre({ b: face }));
+        const ty = Y(Math.max(face.tipY, this.yNow));
         const y = ty - PIC_LIFT - PIC_D / 2;
         if (y - PIC_D / 2 < top || y > this.h) continue;
         pics.push({ x, y, d: PIC_D, i: pics.length, lv, face });
