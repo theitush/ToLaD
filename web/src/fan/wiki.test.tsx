@@ -149,10 +149,15 @@ describe('the tree pictures: placeholder at once, fetched ahead (ToLaD#351)', ()
   const ctxRec = () => {
     const drawn: number[] = [];
     let fills = 0;
+    const saved: number[] = [];
     const ctx = {
       globalAlpha: 1,
-      save() {},
-      restore() {},
+      save() {
+        saved.push(ctx.globalAlpha);
+      },
+      restore() {
+        ctx.globalAlpha = saved.pop()!;
+      },
       beginPath() {},
       arc() {},
       clip() {},

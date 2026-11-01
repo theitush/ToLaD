@@ -195,9 +195,6 @@ export function prefetchPics(scis: readonly (string | null | undefined)[]): void
   picLoader()?.ahead(urls);
 }
 
-/** `?ph=initial` puts the species' initial on its placeholder disc (ToLaD#351, a variant to compare); plain otherwise. */
-const phInitial = typeof location !== 'undefined' && new URLSearchParams(location.search).get('ph') === 'initial';
-
 /**
  * A species' picture as a disc of diameter `d` centred at (cx, cy) (ToLaD#351): its placeholder at once, at its final
  * size and place (a quiet disc in its ring), and the picture fading in over it once loaded (PIC_FADE_MS; `request` is
@@ -224,13 +221,7 @@ export function drawPic(ctx: CanvasRenderingContext2D, sci: string, cx: number, 
     ctx.strokeStyle = 'rgba(125,142,132,0.55)';
     ctx.lineWidth = 1;
     ctx.stroke();
-    if (phInitial && d >= 24) {
-      ctx.fillStyle = 'rgba(125,142,132,0.75)';
-      ctx.font = `600 ${Math.round(d * 0.42)}px system-ui, sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(sci[0], cx, cy + 1);
-    }
+    // (Plain: an initial was tried, ToLaD#351, but a group's face is one species, so its letter, the bats' "E", misleads.)
   }
   if (got) {
     const { img, fade } = got;
