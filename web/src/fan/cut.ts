@@ -150,7 +150,7 @@ export class Territories {
       from[q] = Math.max(k0, Math.floor(Math.log2(px / this.width(ones, PG1, f(q), l(q))) * LADDER));
       until[q] = Math.min(k1, Math.ceil(Math.log2(px / this.width(A, PG, f(q), l(q))) * LADDER));
     }
-    const ramps = Array.from(A, (_, p) => this.fold.openRamp(p, this.screenW));
+    const up = this.climber();
     const order = Int32Array.from(from.keys()).sort((p, q) => from[p] - from[q]);
     let active: number[] = [];
     let o = 0;
@@ -161,15 +161,11 @@ export class Territories {
         continue;
       }
       const sx = Math.pow(2, k / LADDER);
-      // (Only the splits opening at this zoom are worked out: below its ramp a split is closed, above it open.)
-      for (let p = 0; p < A.length; p++) {
-        const r = ramps[p];
-        A[p] = !r || sx >= r[1] ? 1 : sx <= r[0] ? 0 : this.fold.openOne(p, sx, this.screenW);
-      }
-      this.gapSums(A, PG);
+      up.to(sx);
+      this.gapSums(up.A, PG);
       const keep: number[] = [];
       for (const q of active) {
-        if (k >= until[q] || sx * this.width(A, PG, f(q), l(q)) >= px) {
+        if (k >= until[q] || sx * this.width(up.A, PG, f(q), l(q)) >= px) {
           if (q < nN) node[q] = sx;
           else strand[q - nN] = sx;
         } else keep.push(q);
@@ -178,6 +174,35 @@ export class Territories {
     }
     this.fits.set(px, (out = { node, strand }));
     return out;
+  }
+
+  /**
+   * The splits' openness as the width zoom climbs (fitZoom's and activeRanges' sweeps up the ladder): `to(sx)` sets A
+   * at sx, asked in increasing order; only the splits opening at that zoom are worked out (below its ramp a split is
+   * closed, above it open), each over its ramp once.
+   */
+  private climber(): { A: Float64Array; to: (sx: number) => void } {
+    const A = new Float64Array(this.G.length);
+    const ramps = Array.from(A, (_, p) => this.fold.openRamp(p, this.screenW));
+    const order = Int32Array.from(A.keys())
+      .filter((p) => !!ramps[p])
+      .sort((p, q) => ramps[p]![0] - ramps[q]![0]);
+    for (let p = 0; p < A.length; p++) if (!ramps[p]) A[p] = 1;
+    let o = 0;
+    let live: number[] = [];
+    const to = (sx: number) => {
+      while (o < order.length && ramps[order[o]]![0] < sx) live.push(order[o++]);
+      const keep: number[] = [];
+      for (const p of live) {
+        if (sx >= ramps[p]![1]) A[p] = 1;
+        else {
+          A[p] = this.fold.openOne(p, sx, this.screenW);
+          keep.push(p);
+        }
+      }
+      live = keep;
+    };
+    return { A, to };
   }
 
   /**
@@ -334,14 +359,194 @@ export class Territories {
   }
 
   /**
-   * Borrowed room (research/scalable-tree.md §3, plan step 2b): of the cut `items` at width zoom `sx` for a box `px`
-   * wide, the daughters in its runs (each too narrow for its own territory) that show a box all the same, centred on
-   * their own territory and spilling into neighbours' that show nothing. Been et al. 2010's 1D active ranges along the
-   * row: each stretch of runs side by side (between items that fit, their territories untouched) takes the most
-   * species it can under disjoint boxes (weighted interval scheduling, optimal), `named` daughters before unnamed at
-   * equal counts. From the layout as it stands, so the same whatever the way there. Under rooms by life (`rows`), a
-   * daughter's box over its label's rows: centred on its own share of them, inside its stretch's. Each chosen, its
-   * centre (world x).
+   * Borrowed room's active ranges (research/scalable-tree.md §3, plan step 2b; Been, Daiches & Yap 2006, Been,
+   * Nöllenburg, Poon & Wolff 2010): for a box `px` wide, the daughters in runs (each too narrow for its own territory)
+   * that show a box all the same, centred on their own territory and spilling into neighbours' that show nothing, each
+   * with ONE range of rungs [a, b) in which it does. Computed once per box width (and screen width: this Territories),
+   * by the zoom-only model fitZoom works in (widest rooms, the openness at each rung), so a label shows iff the zoom is
+   * in its range: the same whatever the way there, and within a pinch one way it appears once and goes once.
+   *
+   * A daughter d of node j is in a run from j's opening (its first daughter fits) until d fits itself, when it is an
+   * item of its own; while in a run its strands are borrowable room. In 1D, with boxes of one screen width, two boxes
+   * that are clear of each other at a zoom stay clear at every greater one (their centres only move apart on screen), so
+   * the active-range problem is solved by a sweep up the ladder, in a priority order fixed in advance (most species,
+   * then named, then left to right): at each rung a waiting daughter starts when its box lies inside borrowable room
+   * and clear of the boxes already showing; a showing one stays until it fits on its own, or until its room shrinks
+   * under its box (a neighbour starts to fit and takes its territory back). Never started again: one range each.
+   * Keyed by daughter (a node's index, ~ a strand's). O(rungs × splits + boxes' widths in strands).
+   */
+  activeRanges(px: number, named: (k: number) => boolean = () => true): Map<number, [number, number]> {
+    let out = this.lent.get(px);
+    if (out) return out;
+    out = new Map();
+    this.lent.set(px, out);
+    const z = this.fitZoom(px);
+    const nS = this.R.length;
+    const rk = (sx: number) => (sx < Infinity ? Territories.rung(sx) : Infinity);
+    // (Each daughter in a run at some rung: its node's opening to its own fit.)
+    const D: number[] = [];
+    const A0: number[] = [];
+    const B: number[] = [];
+    const F: number[] = [];
+    const L: number[] = [];
+    const W: number[] = [];
+    const N: number[] = [];
+    for (let j = 0; j < this.nodes.length; j++) {
+      const K = this.kids[j];
+      const fk = Array.from(K, (k) => rk(k >= 0 ? z.node[k] : z.strand[~k]));
+      let open = Infinity;
+      for (const r of fk) open = Math.min(open, r);
+      if (open === Infinity) continue;
+      K.forEach((k, q) => {
+        if (fk[q] <= open) return;
+        D.push(k);
+        A0.push(open);
+        B.push(fk[q]);
+        F.push(k >= 0 ? this.first[k] : ~k);
+        L.push(k >= 0 ? this.last[k] : ~k);
+        W.push(k >= 0 ? this.count[k] : 1);
+        N.push(named(k) ? 1 : 0);
+      });
+    }
+    const n = D.length;
+    if (!n) return out;
+    const prio = Int32Array.from(D.keys()).sort((p, q) => W[q] - W[p] || N[q] - N[p] || F[p] - F[q]);
+    const rank = new Int32Array(n);
+    prio.forEach((p, r) => (rank[p] = r));
+    /** The waiting daughters, in priority order. */
+    let wl: number[] = [];
+    const byA = Int32Array.from(D.keys()).sort((p, q) => A0[p] - A0[q]);
+    const byB = Int32Array.from(D.keys()).sort((p, q) => B[p] - B[q]);
+    // (Per strand: whether a daughter in a run holds it at this rung, borrowable room; at most one does.)
+    const cover = new Uint8Array(nS);
+    // (And the strands not held, as a Fenwick tree: whether a box's strands are all held, in O(log n).)
+    const free = new Int32Array(nS + 1);
+    for (let i = 1; i <= nS; i++) {
+      free[i] += 1;
+      const u = i + (i & -i);
+      if (u <= nS) free[u] += free[i];
+    }
+    const hold = (i: number, v: 0 | 1) => {
+      if (cover[i] === v) return;
+      cover[i] = v;
+      for (let u = i + 1; u <= nS; u += u & -u) free[u] += v ? -1 : 1;
+    };
+    const freeTo = (i: number) => {
+      let t = 0;
+      for (let u = i + 1; u > 0; u -= u & -u) t += free[u];
+      return t;
+    };
+    /** Per daughter: 1 showing; waiting: in a run, not yet started; done: never again. */
+    const showing = new Uint8Array(n);
+    const waiting = new Uint8Array(n);
+    const start = new Int32Array(n);
+    /** The showing daughters, by first strand (never two over one strand: a daughter and hers are in runs at different rungs). */
+    const act: number[] = [];
+    const G = this.G;
+    const up = this.climber();
+    const Aw = up.A;
+    const PG = new Float64Array(G.length + 1);
+    const TL = (i: number) => this.PR[i] + PG[i] - (i > 0 ? (Aw[i - 1] * G[i - 1]) / 2 : 0);
+    const TR = (i: number) => this.PR[i + 1] + PG[i] + (i < nS - 1 ? (Aw[i] * G[i]) / 2 : 0);
+    const centre = (p: number) => (TL(F[p]) + TR(L[p])) / 2;
+    let h = 0;
+    // (Its box inside borrowable room: every strand whose territory it reaches in a run, and inside the fan.)
+    const inside = (p: number) => {
+      const c = centre(p);
+      const eps = 1e-9 * (Math.abs(c) + h);
+      if (c - h < TL(0) - eps || c + h > TR(nS - 1) + eps) return false;
+      // (The strands it reaches: from the first whose territory ends past its left edge to the last starting before its right.)
+      let a = 0;
+      let b = F[p];
+      while (a < b) {
+        const m = (a + b) >> 1;
+        if (TR(m) > c - h + eps) b = m;
+        else a = m + 1;
+      }
+      const i0 = a;
+      a = L[p];
+      b = nS - 1;
+      while (a < b) {
+        const m = (a + b + 1) >> 1;
+        if (TL(m) < c + h - eps) a = m;
+        else b = m - 1;
+      }
+      return freeTo(a) - (i0 > 0 ? freeTo(i0 - 1) : 0) === 0;
+    };
+    const at = (p: number) => {
+      let a = 0;
+      let b = act.length;
+      while (a < b) {
+        const m = (a + b) >> 1;
+        if (F[act[m]] < F[p]) a = m + 1;
+        else b = m;
+      }
+      return a;
+    };
+    const end = (p: number, k: number) => {
+      if (showing[p]) {
+        act.splice(at(p), 1);
+        out.set(D[p], [start[p], k]);
+      }
+      showing[p] = 0;
+      waiting[p] = 0;
+    };
+    let minR = Infinity;
+    for (let i = 0; i < nS; i++) if (this.R[i] > 0) minR = Math.min(minR, this.R[i]);
+    // (Past where the narrowest room alone fits, every daughter is an item of its own.)
+    const k1 = Math.ceil(Math.log2(px / minR) * LADDER) + 1;
+    let kA = 0;
+    let kB = 0;
+    let live = 0;
+    for (let k = A0[byA[0]]; k <= k1 && (kA < n || live > 0); k++) {
+      if (!live && kA < n && A0[byA[kA]] > k) k = A0[byA[kA]];
+      const sx = Math.pow(2, k / LADDER);
+      h = px / 2 / sx;
+      up.to(sx);
+      this.gapSums(Aw, PG);
+      // (Those that fit on their own leave their runs, then those whose node opens join one.)
+      for (; kB < n && B[byB[kB]] <= k; kB++) {
+        const p = byB[kB];
+        if (A0[p] > k) continue;
+        for (let i = F[p]; i <= L[p]; i++) hold(i, 0);
+        end(p, B[p]);
+        live--;
+      }
+      for (; kA < n && A0[byA[kA]] <= k; kA++) {
+        const p = byA[kA];
+        if (B[p] <= k) continue;
+        for (let i = F[p]; i <= L[p]; i++) hold(i, 1);
+        waiting[p] = 1;
+        wl.push(p);
+        live++;
+      }
+      wl = wl.filter((p) => waiting[p]).sort((p, q) => rank[p] - rank[q]);
+      // (A showing box whose room shrank under it goes, for good.)
+      for (let s = act.length - 1; s >= 0; s--) if (!inside(act[s])) end(act[s], k);
+      for (const p of wl) {
+        if (!waiting[p] || !inside(p)) continue;
+        const s = at(p);
+        const c = centre(p);
+        if (s > 0 && c - centre(act[s - 1]) < 2 * h * (1 - 1e-9)) continue;
+        if (s < act.length && centre(act[s]) - c < 2 * h * (1 - 1e-9)) continue;
+        act.splice(s, 0, p);
+        showing[p] = 1;
+        start[p] = k;
+        waiting[p] = 0;
+      }
+    }
+    for (const p of act) out.set(D[p], [start[p], B[p]]);
+    return out;
+  }
+  private readonly lent = new Map<number, Map<number, [number, number]>>();
+
+  /**
+   * Borrowed room at width zoom `sx` (plan step 2b): of the cut `items` for a box `px` wide, the daughters in its runs
+   * whose active range (activeRanges) holds this rung, each centred on its own territory. Under rooms by life (`rows`),
+   * a daughter's box over its label's rows: centred on its own share of them. Shown only inside its stretch's room (runs
+   * side by side, between items that fit) and clear of those before it in the ranges' priority order, as laid out now:
+   * the ranges come from the zoom-only model, and this keeps the boxes disjoint by construction under rooms by life
+   * too. Each shown, its centre (world x).
    */
   borrowed(
     sx: number,
@@ -352,10 +557,14 @@ export class Territories {
     ghost = 0,
   ): Map<number, number> {
     const out = new Map<number, number>();
+    const ranges = this.activeRanges(px, named);
+    const k = Territories.rung(sx);
     const half = px / 2 / sx;
     const s: [number, number] = [0, 0];
     const st: [number, number] = [0, 0];
     const life = this.fold.life && rows;
+    const cs: { k: number; c: number; w: number; nm: number; f: number }[] = [];
+    const taken: [number, number][] = [];
     for (let i = 0; i < items.length; i++) {
       if (items[i].kind !== 'run') continue;
       // (A stretch: runs side by side, each strand's next; its room the hull, or under rooms by life, per row.)
@@ -367,11 +576,13 @@ export class Territories {
         x0 = Math.min(x0, items[r].x0);
         x1 = Math.max(x1, items[r].x1);
       }
-      const cs: Cand[] = [];
+      cs.length = 0;
       for (let r = i; r <= e; r++) {
         const K = this.kids[items[r].j];
         for (let q = items[r].q0; q <= items[r].q1; q++) {
           const d = K[q];
+          const g = ranges.get(d);
+          if (!g || k < g[0] || k >= g[1]) continue;
           if (life) {
             // (Over its own label's rows: centred on its share of them, inside the stretch's.)
             const R = Territories.ref(d);
@@ -384,65 +595,18 @@ export class Territories {
             [st[0], st[1]] = [x0, x1];
           }
           const c = (s[0] + s[1]) / 2;
-          if (c - half >= st[0] && c + half <= st[1]) cs.push({ k: d, c, w: d >= 0 ? this.count[d] : 1, nm: named(d) ? 1 : 0, kept: 0 });
+          if (c - half >= st[0] && c + half <= st[1]) cs.push({ k: d, c, w: d >= 0 ? this.count[d] : 1, nm: named(d) ? 1 : 0, f: d >= 0 ? this.first[d] : ~d });
         }
       }
-      cs.sort((a, b) => a.c - b.c);
-      const at = new Map(cs.map((c) => [c.k, c.c]));
-      for (const d of schedule(cs, 2 * half)) out.set(d, at.get(d)!);
+      cs.sort((a, b) => b.w - a.w || b.nm - a.nm || a.f - b.f);
+      taken.length = 0;
+      for (const x of cs) {
+        if (taken.some(([a, b]) => x.c + half > a && x.c - half < b)) continue;
+        taken.push([x.c - half, x.c + half]);
+        out.set(x.k, x.c);
+      }
       i = e;
     }
     return out;
   }
-}
-
-/** A daughter that may borrow room: its key, centre (world x), species, named (1/0), shown on the rung before (1/0). */
-interface Cand {
-  k: number;
-  c: number;
-  w: number;
-  nm: number;
-  kept: number;
-}
-
-/**
- * Weighted interval scheduling on the line: of boxes `d` wide centred at `c` (in order of c), the disjoint set with
- * the most kept, then the most species, then the most named. O(n log n). The keys chosen, left to right.
- */
-function schedule(cs: Cand[], d: number): number[] {
-  const n = cs.length;
-  if (!n) return [];
-  // (Per prefix: the best [kept, species, named], compared in that order.)
-  const V = new Float64Array(3 * (n + 1));
-  const take = new Uint8Array(n + 1);
-  const prev = new Int32Array(n + 1);
-  for (let i = 1; i <= n; i++) {
-    const x = cs[i - 1];
-    // (The last box clear of this one, by binary search.)
-    let a = 0;
-    let b = i - 1;
-    while (a < b) {
-      const m = (a + b + 1) >> 1;
-      if (cs[m - 1].c + d <= x.c) a = m;
-      else b = m - 1;
-    }
-    prev[i] = a;
-    const t0 = V[3 * a] + x.kept;
-    const t1 = V[3 * a + 1] + x.w;
-    const t2 = V[3 * a + 2] + x.nm;
-    const j = 3 * (i - 1);
-    if (t0 !== V[j] ? t0 > V[j] : t1 !== V[j + 1] ? t1 > V[j + 1] : t2 > V[j + 2]) {
-      V[3 * i] = t0;
-      V[3 * i + 1] = t1;
-      V[3 * i + 2] = t2;
-      take[i] = 1;
-    } else V.copyWithin(3 * i, j, j + 3);
-  }
-  const out: number[] = [];
-  for (let i = n; i > 0; )
-    if (take[i]) {
-      out.push(cs[i - 1].k);
-      i = prev[i];
-    } else i--;
-  return out.reverse();
 }
