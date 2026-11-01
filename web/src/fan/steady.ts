@@ -787,9 +787,11 @@ export class Steady extends Fold {
    * in their own shares never meet, whatever the times they stand at.
    *
    * The rows are fixed in the world (TERR_H apart), never the draw's grid (finer at rest than while moving, and by the
-   * time zoom): a row's share is a function of the layout alone (rowCell). At ya and at yb the share is the linear blend
-   * of the rows on either side, so a territory moves continuously as its label's rows do (a row passing an end is the
-   * blend's value there as it enters or leaves). Each row is a scan from f and l to the nearest lineages.
+   * time zoom): a row's share is a function of the layout alone (rowCell). Between two rows the shares are the linear
+   * blend of theirs, both split among the lower row's lineages (those born in between counted at both), so at every y
+   * disjoint runs keep disjoint shares, and the territory, this blend's intersection over ya..yb (its ends and the rows
+   * inside), moves continuously as its label's rows do; it steps only where a lineage is born, at a row fixed in the
+   * world. Each row is a scan from f and l to the nearest lineages.
    */
   cell(f: number, l: number, ya: number, yb: number, ghost: number, out: [number, number] = [0, 0]): [number, number] {
     const H = TERR_H;
@@ -801,26 +803,27 @@ export class Steady extends Fold {
     let any = false;
     const c = this.cellC;
     const d = this.cellD;
-    // (At y between rows k and k + 1, the blend of the two; where f..l have no lineage on one, the other alone.)
+    // (At y between rows k and k + 1, the blend of the two, both split among row k + 1's lineages.)
     const at = (y: number) => {
       const k = Math.floor(y / H);
-      const okA = this.rowCell(f, l, k, ghost, c);
-      const okB = this.rowCell(f, l, k + 1, ghost, d);
-      if (!okA && !okB) return;
-      const t = okA && okB ? y / H - k : 0;
-      const [a0, a1] = okA ? c : d;
-      const [b0, b1] = okB ? d : c;
+      if (!this.rowCell(f, l, k, ghost, c, true) || !this.rowCell(f, l, k + 1, ghost, d)) return;
+      const t = y / H - k;
       any = true;
-      lo = Math.max(lo, a0 + t * (b0 - a0));
-      hi = Math.min(hi, a1 + t * (b1 - a1));
+      lo = Math.max(lo, c[0] + t * (d[0] - c[0]));
+      hi = Math.min(hi, c[1] + t * (d[1] - c[1]));
     };
-    at(ya);
-    at(yb);
-    for (let k = Math.floor(ya / H) + 1; k * H < yb && lo < hi; k++) {
-      if (!this.rowCell(f, l, k, ghost, c)) continue;
+    const row = (k: number, below: boolean) => {
+      if (!this.rowCell(f, l, k, ghost, c, below)) return;
       any = true;
       lo = Math.max(lo, c[0]);
       hi = Math.min(hi, c[1]);
+    };
+    at(ya);
+    at(yb);
+    // (A row inside: the blend's ends on both sides of it, the stretch above's and the one below's.)
+    for (let k = Math.floor(ya / H) + 1; k * H < yb && lo < hi; k++) {
+      row(k, false);
+      row(k, true);
     }
     if (!any) {
       lo = Infinity;
@@ -833,30 +836,75 @@ export class Steady extends Fold {
   private readonly cellC: [number, number] = [0, 0];
   private readonly cellD: [number, number] = [0, 0];
 
-  /** Strands f..l's share of territory row k (world y k * TERR_H) into `out`; false where they have no lineage there. */
-  private rowCell(f: number, l: number, k: number, ghost: number, out: [number, number]): boolean {
+  /**
+   * Strands f..l's share of territory row k (world y k * TERR_H) into `out`; false where they have no lineage there.
+   * Cached per version and ghost (the cost cache, ToLaD#333): a function of the layout alone; a frame asks the same rows
+   * of the same runs again and again (the cut's daughters, borrowed's stretches, the pictures' chains), and a pan or a
+   * frame at rest asks the last frame's.
+   */
+  private rowCell(f: number, l: number, k: number, ghost: number, out: [number, number], below = false): boolean {
     const L = this.cur();
     this.fresh(L);
+    const N = this.strands.length;
+    const key = (((k + 0x100000) * 2 + (below ? 1 : 0)) * N + f) * N + l;
+    const M = this.cellMemo;
+    if (this.memoVer !== L.ver || this.memoGhost !== ghost || M.size >= 1 << 18) {
+      M.clear();
+      this.memoN = 0;
+      this.memoVer = L.ver;
+      this.memoGhost = ghost;
+    }
+    const hit = M.get(key);
+    if (hit !== undefined) {
+      out[0] = this.memoV[hit];
+      out[1] = this.memoV[hit + 1];
+      return out[0] === out[0];
+    }
+    const ok = this.rowCellNow(L, f, l, k, ghost, out, below);
+    if (this.memoV.length < this.memoN + 2) {
+      const v = new Float64Array(Math.max(1024, 2 * this.memoV.length));
+      v.set(this.memoV);
+      this.memoV = v;
+    }
+    this.memoV[this.memoN] = ok ? out[0] : NaN;
+    this.memoV[this.memoN + 1] = out[1];
+    M.set(key, this.memoN);
+    this.memoN += 2;
+    return ok;
+  }
+  private readonly cellMemo = new Map<number, number>();
+  private memoV = new Float64Array(0);
+  private memoN = 0;
+  private memoVer = -1;
+  private memoGhost = NaN;
+
+  private rowCellNow(L: Lay, f: number, l: number, k: number, ghost: number, out: [number, number], below: boolean): boolean {
     const y = k * TERR_H;
     const xs = this.rowAt(L, y);
     const age = this.fan.time.ageAt(y);
+    // (`below`: the lineages of row k + 1, those born between the two rows where they are there, so both ends of the
+    // stretch split x among the same lineages and the blend between them keeps every pair in order.)
+    const y2 = (k + 1) * TERR_H;
+    const xs2 = below ? this.rowAt(L, y2) : xs;
+    const age2 = below ? this.fan.time.ageAt(y2) : age;
+    const has = (i: number) => this.site(i, y, age, xs, ghost) || (below && this.site(i, y2, age2, xs2, ghost));
     const e = this.edge;
     const N = this.strands.length;
     let a = f;
-    while (a <= l && !this.site(a, y, age, xs, ghost)) a++;
+    while (a <= l && !has(a)) a++;
     if (a > l) return false;
     const La = e[0];
     let b = l;
-    while (!this.site(b, y, age, xs, ghost)) b--;
+    while (!has(b)) b--;
     const Rb = e[1];
     const r = this.rootJ;
     out[0] = L.roomL[r];
     out[1] = L.roomL[r] + L.roomW[r];
     let p = f - 1;
-    while (p >= 0 && !this.site(p, y, age, xs, ghost)) p--;
+    while (p >= 0 && !has(p)) p--;
     if (p >= 0) out[0] = (e[1] + La) / 2;
     let n = l + 1;
-    while (n < N && !this.site(n, y, age, xs, ghost)) n++;
+    while (n < N && !has(n)) n++;
     if (n < N) out[1] = (Rb + e[0]) / 2;
     return true;
   }

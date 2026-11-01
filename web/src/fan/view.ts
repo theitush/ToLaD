@@ -168,21 +168,23 @@ class CutTerritories {
       return y;
     });
   }
-  private faceKids: Float64Array | null = null;
-  /** Node j's daughter (a node's index, ~ a strand's) holding its face species (groupFace; NaN, none): the pictures' cut's `holds`. */
+  private faceKids: Map<number, number> = new Map();
+  /** Node j's daughter (a node's index, ~ a strand's) holding its face species (groupFace; NaN, none): the pictures' cut's `holds`. Per node as asked (groupFace is not cheap: ~0.4 s for every mammal node at once). */
   readonly faceKid = (j: number): number => {
-    if (!this.faceKids) {
-      const { nodes, kids, strands } = this.t;
-      const at = new Map(strands.map((b, i) => [b, i]));
-      this.faceKids = Float64Array.from(nodes, (v, n) => {
-        const face = groupFace(v);
-        const i = face ? at.get(face) : undefined;
-        if (i === undefined) return NaN;
-        for (const k of kids[n]) if (k >= 0 ? nodes[k].strands.includes(face!) : ~k === i) return k;
-        return NaN;
-      });
-    }
-    return this.faceKids[j];
+    let out = this.faceKids.get(j);
+    if (out !== undefined) return out;
+    out = NaN;
+    const { nodes, kids, first, last } = this.t;
+    const face = groupFace(nodes[j]);
+    const i = face ? face.index : -1;
+    if (i >= 0)
+      for (const k of kids[j])
+        if (k >= 0 ? first[k] <= i && i <= last[k] : ~k === i) {
+          out = k;
+          break;
+        }
+    this.faceKids.set(j, out);
+    return out;
   };
   /** Daughter k's (a node's index, ~ a strand's) youngest tip (world y). */
   youngOf(k: number): number {
