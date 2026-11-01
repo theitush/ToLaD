@@ -5,12 +5,12 @@
 // Gestures come from the shared engine/input.ts.
 
 import { drawThumb, labelThumb, wikiOf } from './wiki';
-import { PIC_D, PIC_LIFT, placePics, type PicSpot } from './pics';
+import { PIC_D, PIC_LIFT, type PicSpot } from './pics';
 import { formatCount, formatMass } from '../data/count';
 import { stamp } from '../stamp';
 import { DOUBLE_TAP_MS, Input, type InputHandlers } from '../engine/input';
 import { clipPoly, FanCamera, type Camera } from './camera';
-import { g, isNode, laneAt, layoutFan, leftAt, nearestStrand, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type Fan, type FanBranch, type FanNode, type Measure, type WidthMode } from './layout';
+import { laneAt, layoutFan, leftAt, nearestStrand, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type Fan, type FanBranch, type FanNode, type Measure, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01 } from './meshgl';
 import { Lod } from './lod';
@@ -58,8 +58,6 @@ const LABEL_PILL = 22;
 /** The "+x" badge at a pill's top end (ToLaD#197): its type, smaller and quieter than the name; the gap from the name before it. */
 const PLUS_FONT = '600 11px';
 const PLUS_GAP = 6;
-/** The species picture under a name pill (ToLaD#182), its diameter. */
-const THUMB_D = 50;
 const LABEL_PAD = 8;
 /** Right edge (px) of the time axis's labels: species' labels keep right of it. */
 const LABEL_AXIS_X = 72;
@@ -88,8 +86,6 @@ const FEW_FILL = [0.5, 0.5, 0.5, 0.6];
 const LEVEL_MS = 200;
 /** The scale bar and legend at the bottom (px): labels fade out over the 30 px above it. */
 const LABEL_BOTTOM_PX = 104;
-/** How long a label takes to fade in or out when another takes or gives up its place (ms). */
-const LABEL_FADE_MS = 180;
 /** Folded: how far (px) below the order's start its stem fades out (drawStemFade, ToLaD#210). */
 const STEM_END_PX = 48;
 /** A lane's living glow at full strength from this green width (px) up, thinner ones in proportion: a family of thin columns side by side glows as one (ToLaD#231). */
@@ -108,80 +104,17 @@ const NOW_ROOM = PIC_D + 8;
 
 /** Gap (px) a label keeps from the column it sits beside. */
 const LABEL_GAP = 3;
-/** A column narrower than this (px) is a hairline (ToLaD#146): its events tinted on it, their titles only past it. */
-const HAIR_PX = 4;
 /** A name's room beside a column (px): its gap, the pill, and the fade's margin from the screen's edge (ToLaD#319). */
 const PILL_ROOM_PX = LABEL_GAP + LABEL_PILL + 6;
 
-/** While the view moves, the labels and brackets are laid out again at most this often (ms) and every this many frames (ToLaD#255); carried with the camera between. */
-const LABEL_MS = 150;
-const LABEL_FRAMES = 3;
-/** `?carry=0`: laid out every frame, as before ToLaD#255 (to compare). */
-const labelCarry = typeof location === 'undefined' || new URLSearchParams(location.search).get('carry') !== '0';
-/** The camera's change between two frames on screen: x → k[0]·x + k[1], y → k[2]·y + k[3]. */
-export type Carry = [number, number, number, number];
-
 /**
- * Carry label spots laid out at one camera to the next (ToLaD#255), in place: x with the camera; y with it too where a
- * spot stands on something in the world ("now", its tip, its column's top on screen), kept at the top line `top`
- * where it was held there (its column's top above it), and never above it. A spot carried wholly off the screen's
- * side (width `w`) no longer fits (fit 0).
- */
-export function carryLabels(spots: LabelSpot[], k: Carry, top: number, w = Infinity): void {
-  for (const s of spots) {
-    const b = s.box;
-    const dx = k[0] * s.x + k[1] - s.x;
-    s.x += dx;
-    b[0] += dx;
-    b[2] += dx;
-    // (Carried off the screen's side, it no longer fits, as a layout there would say: its hold on the place is let go, so
-    // at rest a name that left and came back waits for room like it does when laid out every frame.)
-    if (b[0] >= w || b[2] <= 0) s.fit = 0;
-    if (s.span) {
-      s.span[0] = k[0] * s.span[0] + k[1];
-      s.span[1] = k[0] * s.span[1] + k[1];
-    }
-    // (Standing on something at its foot: "now", its tip, a fossil's picture on its tip, `over`.)
-    const foot = s.place === 'tip' || s.place === 'fam' || s.place === 'over';
-    const held = !foot && b[1] <= top + 0.5;
-    if (held) continue;
-    const at = foot ? s.y1 : b[1];
-    const dy = Math.max(k[2] * at + k[3] - at, top - b[1]);
-    s.y1 += dy;
-    b[1] += dy;
-    b[3] += dy;
-  }
-}
-
-/** Highest a label standing on "now" may reach where the buttons are not above it (px from the top). */
-const LABEL_CEIL = 6;
-
-/**
- * Where a label goes (#97). One pill everywhere (#54): the name upright on a
- * dark pill, the same text and size at every zoom. Two places for it:
- *
- *  - On its tip (`tip`): standing on the "now" line at the top of its column
- *    for a living species (an extinct one: on its own tip), centred on the
- *    column and sliding along it to stay on screen. The space above "now" is
- *    empty, so a pill reaches up from the line as far as the buttons allow.
- *  - Beside its branch (`right`, `left`): when the tip is off screen (above
- *    the top line), next to the top of its column's part on screen, a gap
- *    clear of it, where no other column is in the way. A parent column (a
- *    lineage: "Small cat ancestors") is labelled this way too, but only while
- *    "now" is off screen: at home the species name the tree.
- *  - In its column (`in`), at the top line, where the column is wider on
- *    screen than the pill (zoomed into it): nothing is beside it then.
- *
- * Every spot is a continuous function of the camera; its `fit` (0–1) fades
- * it in and out over a few px of motion (the tip leaving the top, no room
- * beside the column, the time axis on the left, the legend at the bottom),
- * so a label moves from its tip to beside its branch by a cross-fade, never a
- * jump. resolveLabels picks one spot per name and never lets two meet.
+ * A name pill (ToLaD#333, view.ts cutLabels): the name upright on a dark pill, the same text and size at every zoom,
+ * in the middle of its item's branch inside the item's territory, its "+x" at its top end.
  */
 export interface LabelSpot {
   /** The spot's key: the name's id and the place (`tip`, `in`, `right`, `left`). */
   key: string;
-  /** The name's id: a species' gid, or `n<index>` for a lineage. Place: see labelSpots. */
+  /** The name's id (cutLabels' key). */
   id: string;
   place: 'tip' | 'in' | 'right' | 'left' | 'fam' | 'over';
   /** A family's label (`fam`, ToLaD#146): the screen x span of its species, bracketed under the pill. */
@@ -343,22 +276,6 @@ class CutTerritories {
 /** Priority: species before lineages, then the wider column first, then tree order. */
 type Rank = [number, number, number];
 
-type Screen = Pick<FanCamera, 'toScreen' | 'toWorld' | 'w' | 'h'> & { cam: { sx: number; sy: number } };
-
-/** A column's world span: x (its widest reach, peel included) and y. */
-interface ColBox {
-  x0: number;
-  x1: number;
-  y0: number;
-  y1: number;
-  /** Where its peel ends (world y). */
-  lean: number;
-  own: FanBranch | FanNode;
-  /** Its edges [left, right] at world y (in its span). */
-  at: (y: number) => [number, number];
-}
-
-/** The fan's columns as ColBoxes: the leaf columns above their splits, the parent columns over their spans (the stem below the root). Kept per fan. */
 /** Each branch's styled column spans (colstyle.ts) in world y: [top, bottom, dim]; world-fixed, so built once per layout. */
 const colSpanCache = new WeakMap<FanBranch, [number, number, number][]>();
 export function colSpansY(fan: Fan, b: FanBranch): [number, number, number][] {
@@ -392,274 +309,10 @@ const EVENT_MIN_W = 3;
 /** How far (px) above or below a window a touch still opens it. */
 const EVENT_REACH_PX = 10;
 
-/** A branch's width by height (laneAt's w), kept across the fold's changes (it does not depend on where the column stands). */
-const widthMemo = new WeakMap<FanBranch, Map<number, number>>();
-function widthAt(b: FanBranch, y: number): number {
-  let m = widthMemo.get(b);
-  if (!m) widthMemo.set(b, (m = new Map()));
-  let w = m.get(y);
-  if (w === undefined) {
-    if (m.size > 8192) m.clear();
-    m.set(y, (w = laneAt(b, y).w));
-  }
-  return w;
-}
-
-/** How many heights over the fan a folded column's box is read at (colBoxes). */
-const BOX_ROWS = 256;
 /** How long (ms) after the fold last moved the columns' edges are made exact (FanView.applyFold). */
 const FOLD_REST_MS = 120;
 /** The fold's rows at a level with orders above its families (the mammals: every row folds ~5,900 strands): about this many px apart (else 3), ToLaD#247. */
 const GRID_PX_ORDERS = 8;
-
-/** colBoxes' boxes per fan, kept: their edges' memo entries [left, right, version, width] reused, worked out again per fold version (ToLaD#209). */
-const colBoxCache = new WeakMap<Fan, { key: string; vkey: string; map: Map<FanBranch | FanNode, ColBox>; gen: number; base: Float64Array }>();
-/**
- * The columns' boxes (world), kept per fold version. With `view` (world heights [vy0, vy1]) and the fold on its grid,
- * at the mammal level, each box is the column's reach over those heights only, read off the fold's rows for every strand at once
- * (Tess.xRange, ToLaD#255): a column away from the screen falls outside it, and the edges are read only near a label.
- */
-function colBoxes(fan: Fan, view?: [number, number]): Map<FanBranch | FanNode, ColBox> {
-  // (Folded, fold.ts: the columns move with the fold; their boxes and edges are worked out again when it changes.)
-  const fold = fan.tess.fold;
-  const key = fold ? `${fold.ver}:${fold.gridH}` : '';
-  // (At the level with orders only, ~12,000 columns: a level's labels elsewhere as they were, ToLaD#255.)
-  const rows = !!view && !!fold && fold.gridH > 0 && fold.ordShare.length > 0;
-  const vkey = rows ? `${key}:${view![0]}:${view![1]}` : key;
-  let hit = colBoxCache.get(fan);
-  if (hit && hit.vkey === vkey) return hit.map;
-  if (hit && hit.key === key && rows) {
-    hit.vkey = vkey;
-    viewBoxes(fan, hit.map, view!);
-    return hit.map;
-  }
-  if (!hit) {
-    const out = new Map<FanBranch | FanNode, ColBox>();
-    const ent = { key, vkey, map: out, gen: 0, base: new Float64Array(2 * (fan.branches.length + fan.nodes.length)) };
-    // Edges are pure functions of the height (at a fold version), and most heights asked for are on a grid fixed in
-    // the world: memoised, each entry kept from version to version and worked out again in place (no garbage a frame).
-    const memo = (f: (y: number, e: number[], fresh: boolean) => void) => {
-      const m = new Map<number, number[]>();
-      return (y: number): [number, number] => {
-        let r = m.get(y);
-        if (!r) {
-          if (m.size > 4096) m.clear();
-          m.set(y, (r = [0, 0, ent.gen, 0]));
-          f(y, r, true);
-        } else if (r[2] !== ent.gen) {
-          r[2] = ent.gen;
-          f(y, r, false);
-        }
-        return r as unknown as [number, number];
-      };
-    };
-    for (const b of fan.branches) {
-      const at = memo((y, e, fresh) => {
-        // (Its width stands whatever the fold: kept.)
-        if (fresh) e[3] = widthAt(b, y);
-        const w = e[3];
-        const l = leftAt(b, y, w);
-        e[0] = l;
-        e[1] = l + w;
-      });
-      out.set(b, { x0: Math.min(b.x0, b.colLeft), x1: Math.max(b.x0, b.colLeft) + b.width, y0: b.tipY, y1: b.splitY, lean: b.leanY, own: b, at });
-    }
-    for (const v of fan.nodes) {
-      const at = memo((y, e) => {
-        const l = nodeLeftAt(v, y);
-        e[0] = l;
-        e[1] = l + v.width;
-      });
-      out.set(v, { x0: Math.min(v.tile, v.left), x1: Math.max(v.tile, v.left) + v.width, y0: v.y, y1: v.parent ? v.yBot : Infinity, lean: v.leanY, own: v, at });
-    }
-    let i = 0;
-    for (const q of out.values()) {
-      ent.base[i++] = q.x0;
-      ent.base[i++] = q.x1;
-    }
-    colBoxCache.set(fan, (hit = ent));
-  } else {
-    hit.gen++;
-    let i = 0;
-    for (const q of hit.map.values()) {
-      q.x0 = hit.base[i++];
-      q.x1 = hit.base[i++];
-    }
-  }
-  hit.key = key;
-  hit.vkey = vkey;
-  const out = hit.map;
-  if (rows) viewBoxes(fan, out, view!);
-  else if (fold && fold.left(0, fan.time.y(0)) !== null) {
-    // Folded: each box from its edges over its span (the fold moves columns smoothly), a hair wider, read at
-    // heights on one grid for all of them, BOX_ROWS over the fan (a power of two: on the fold's own grid), so
-    // the fold works out a few hundred rows a change, not a dozen per column (it changes on every pan and pinch).
-    const now = fan.time.y(0);
-    const yb = fan.trunkBottom.y;
-    const step = 2 ** Math.ceil(Math.log2(Math.max(1e-12, (yb - now) / BOX_ROWS)));
-    for (const q of out.values()) {
-      const a = Math.max(q.y0, now);
-      const b = Math.min(q.y1, yb);
-      // (About a dozen heights: the grid's, every 2^j-th.)
-      const st = Math.max(step, 2 ** Math.ceil(Math.log2(Math.max(1e-12, (b - a) / 12))));
-      let k0 = Math.ceil(a / st);
-      let k1 = Math.floor(b / st);
-      // (A span inside one step: the grid's height nearest its middle.)
-      if (k1 < k0) k0 = k1 = Math.round((a + b) / 2 / st);
-      let x0 = Infinity;
-      let x1 = -Infinity;
-      let lp = NaN;
-      let jump = 0;
-      for (let k = k0; k <= k1; k++) {
-        const [l, r] = q.at(k * st);
-        if (k > k0) jump = Math.max(jump, Math.abs(l - lp));
-        lp = l;
-        x0 = Math.min(x0, l);
-        x1 = Math.max(x1, r, l + q.own.width);
-      }
-      // (Between two heights it strays at most about as far as it moves from one to the next.)
-      const pad = 0.05 * (x1 - x0) + jump;
-      q.x0 = x0 - pad;
-      q.x1 = x1 + pad;
-    }
-  }
-  return out;
-}
-
-const viewList = new WeakMap<Map<FanBranch | FanNode, ColBox>, { qs: ColBox[]; lo: FanBranch[]; hi: FanBranch[] }>();
-/** colBoxes' boxes over the world heights [vy0, vy1]: each strand's reach there off the fold's rows (xRange), a parent column's from its first strand's to its last's. */
-function viewBoxes(fan: Fan, out: Map<FanBranch | FanNode, ColBox>, [vy0, vy1]: [number, number]): void {
-  const t = fan.tess;
-  // (Off the bands' rows, read once for the labels' clearance too: Tess.xRange's box (its table, slot 2), worked out alike.)
-  const bd = bandBoxes(fan, vy0, vy1);
-  if (bd) {
-    const { GL, GR, w } = bd;
-    const bot = t.bottom;
-    const box = (b: FanBranch, right: boolean): number => {
-      const lo = Math.max(vy0, b.tipY);
-      const i = b.index;
-      if (!(Math.min(vy1, bot) >= lo) || GL[i] > GR[i]) return right ? -Infinity : Infinity;
-      const wMax = lo < b.splitY ? w[i] : b.baseW;
-      const l = GL[i] - wMax;
-      const r = GR[i] + wMax;
-      const pad = 1e-6 * Math.max(1, Math.abs(l), Math.abs(r)) + (r - l) * 1e-3;
-      return right ? r + pad : l - pad;
-    };
-    // (The boxes as flat lists, kept per map: ~11,700 at the mammal level, walked every layout, ToLaD#255.)
-    let fl = viewList.get(out);
-    if (!fl) {
-      const qs: ColBox[] = [];
-      const lo: FanBranch[] = [];
-      const hi: FanBranch[] = [];
-      for (const q of out.values()) {
-        const o = q.own;
-        qs.push(q);
-        lo.push(isNode(o) ? o.strands[0] : o);
-        hi.push(isNode(o) ? o.strands[o.strands.length - 1] : o);
-      }
-      viewList.set(out, (fl = { qs, lo, hi }));
-    }
-    const { qs, lo, hi } = fl;
-    for (let k = 0; k < qs.length; k++) {
-      const q = qs[k];
-      if (q.y1 <= vy0 || q.y0 > vy1) continue;
-      q.x0 = box(lo[k], false);
-      q.x1 = box(hi[k], true);
-    }
-    return;
-  }
-  // (Each over the whole view's heights: one table of the fold's rows, its own (slot 2), for every column.)
-  for (const q of out.values()) {
-    if (q.y1 <= vy0 || q.y0 > vy1) continue;
-    const o = q.own;
-    if (isNode(o)) {
-      q.x0 = t.xRange(o.strands[0], vy0, vy1, 2)[0];
-      q.x1 = t.xRange(o.strands[o.strands.length - 1], vy0, vy1, 2)[1];
-    } else [q.x0, q.x1] = t.xRange(o, vy0, vy1, 2);
-  }
-}
-
-/** How many of the fold's rows bandBoxes reads at most (Tess.xTable's XR_ROWS: every one over a screen's height). */
-const XR_ROWS = 512;
-/** How many rows of the fold's grid a band of bandBoxes' spans (ToLaD#255). */
-const BAND_ROWS = 8;
-/** bandBoxes' tables per fan, kept and refilled in place (no garbage a layout). */
-const bandCache = new WeakMap<Fan, Bands>();
-interface Bands {
-  ver: number;
-  h: number;
-  vy0: number;
-  vy1: number;
-  /** The rows kA..kB, in bands of BAND_ROWS (band j: rows kA + j·BAND_ROWS to kA + (j + 1)·BAND_ROWS, both ends). */
-  kA: number;
-  kB: number;
-  nb: number;
-  /** Per band and strand (j·S + i): the least and most of its edge at the band's rows (Fold.rowXs: a left edge or an own column's centre). */
-  L: Float64Array;
-  R: Float64Array;
-  /** Per strand: the widest its column gets (an own column's centre ± this holds it; a slot's left + this). */
-  w: Float64Array;
-  /** Per strand: the least and most over every band (all the rows kA..kB: Tess.xTable's over the same heights). */
-  GL: Float64Array;
-  GR: Float64Array;
-}
-/**
- * The strands' reach per band of the fold's rows over the world heights [vy0, vy1] (ToLaD#255): labelSpots' clearance
- * skips a column whose reach over the bands its strip spans stays clear of it, as viewBoxes' box over the whole
- * view does (the edge is linear between two rows: within their least and most). Null off the fold's grid.
- */
-function bandBoxes(fan: Fan, vy0: number, vy1: number): Bands | null {
-  const f = fan.tess.fold;
-  if (!f || !(f.gridH > 0)) return null;
-  let t = bandCache.get(fan);
-  if (t && t.ver === f.ver && t.h === f.gridH && t.vy0 === vy0 && t.vy1 === vy1) return t;
-  const S = f.strands.length;
-  const h = f.gridH;
-  let tip = Infinity;
-  for (const b of f.strands) if (b.tipY < tip) tip = b.tipY;
-  const a = Math.max(vy0, tip);
-  const z = Math.min(vy1, fan.tess.bottom);
-  if (!(z >= a)) return null;
-  const kA = Math.floor(a / h);
-  const kB = Math.max(kA, Math.ceil(z / h));
-  // (Every row read, as Tess.xTable reads them over a screen's height; more: none, the boxes as they were.)
-  if (kB - kA > XR_ROWS) return null;
-  const nb = Math.max(1, Math.ceil((kB - kA) / BAND_ROWS));
-  if (!t || t.L.length < nb * S) {
-    t = { ver: 0, h: 0, vy0: 0, vy1: 0, kA: 0, kB: 0, nb: 0, L: new Float64Array(Math.max(nb, 32) * S), R: new Float64Array(Math.max(nb, 32) * S), w: new Float64Array(S), GL: new Float64Array(S), GR: new Float64Array(S) };
-    for (const b of f.strands) t.w[b.index] = Math.max(b.baseW, b.unit * g(b.pop.max, fan.tess.mode));
-    bandCache.set(fan, t);
-  }
-  Object.assign(t, { ver: f.ver, h, vy0, vy1, kA, kB, nb });
-  const { L, R, GL, GR } = t;
-  for (let j = 0; j < nb; j++) {
-    const o = j * S;
-    const k0 = kA + j * BAND_ROWS;
-    const k1 = Math.min(kB, k0 + BAND_ROWS);
-    for (let k = k0; k <= k1; k++) {
-      const xs = f.rowXs(k);
-      if (k === k0) {
-        L.set(xs.subarray(0, S), o);
-        R.set(xs.subarray(0, S), o);
-        continue;
-      }
-      for (let i = 0; i < S; i++) {
-        const x = xs[i];
-        if (x < L[o + i]) L[o + i] = x;
-        if (x > R[o + i]) R[o + i] = x;
-      }
-    }
-    if (j === 0) {
-      GL.set(L.subarray(0, S));
-      GR.set(R.subarray(0, S));
-    } else
-      for (let i = 0; i < S; i++) {
-        if (L[o + i] < GL[i]) GL[i] = L[o + i];
-        if (R[o + i] > GR[i]) GR[i] = R[o + i];
-      }
-  }
-  return t;
-}
 
 /** How much a flight zooms out to pan (ToLaD#246): van Wijk–Nuij's ρ (√2 theirs; less, a long trip zooms out less). */
 export const FLY_RHO = 1.2;
@@ -1027,7 +680,7 @@ export function holds(a: Level, x: Level): boolean {
 
 /**
  * The groups named at level `at` (ToLaD#258): the groups one level down in it (nextLevels), and around it, each level
- * it sits in's other groups (the neighbours at the screen's edges); `at` itself when a species. Each clade as labelSpots'
+ * it sits in's other groups (the neighbours at the screen's edges); `at` itself when a species. Each clade as
  * groups ({ v, vi, text }), each species in `species`.
  */
 export interface LabelGroups {
@@ -1129,54 +782,6 @@ export function livingOf(v: FanNode): FanBranch[] {
   return out;
 }
 
-/** Clade v's column nearest world x at "now" (ToLaD#262): a living one, found by halving (they stand in order); else any. */
-function columnNear(v: FanNode, x: number): FanBranch {
-  const live = livingOf(v);
-  if (!live.length) return v.strands.reduce((p, q) => (Math.abs(stripMid(q) - x) < Math.abs(stripMid(p) - x) ? q : p));
-  let lo = 0;
-  let hi = live.length - 1;
-  while (lo < hi) {
-    const m = (lo + hi) >> 1;
-    if (stripMid(live[m]) < x) lo = m + 1;
-    else hi = m;
-  }
-  return lo > 0 && Math.abs(stripMid(live[lo - 1]) - x) < Math.abs(stripMid(live[lo]) - x) ? live[lo - 1] : live[lo];
-}
-
-/**
- * The species pills that stand for their family (ToLaD#212), counted with the cull: a family with exactly one
- * species shown (its pill on its tip), others of it hidden in view (their tips there, none of their spots shown) and
- * no family pill of its own shown. Keyed by that species' id: next frame its pill carries the family's name and its
- * commonest living species' picture (labelSpots' `famOf`), and its "+x" counts the family's hidden (plusGroups).
- */
-export function familyPills(fan: Fan, spots: readonly LabelSpot[], on: Map<string, boolean>): Map<string, FanNode> {
-  const shown = new Map<FanNode, LabelSpot[]>();
-  const hid = new Map<FanNode, number>();
-  const famShown = new Set<FanNode>();
-  const shownIds = new Set<string>();
-  for (const s of spots) if (on.get(s.key)) shownIds.add(s.id);
-  for (const s of spots) {
-    if (s.place === 'fam') {
-      if (on.get(s.key) && s.v) famShown.add(s.v);
-      continue;
-    }
-    if (!s.b || s.ev !== undefined) continue;
-    const v = familyOf(fan, s.b);
-    if (!v) continue;
-    if (on.get(s.key)) {
-      let g = shown.get(v);
-      if (!g) shown.set(v, (g = []));
-      g.push(s);
-    } else if (s.place === 'tip' && s.fit > 0 && !shownIds.has(s.id)) hid.set(v, (hid.get(v) ?? 0) + 1);
-  }
-  const out = new Map<string, FanNode>();
-  for (const [v, g] of shown) {
-    const s = g[0];
-    if (g.length === 1 && s.place === 'tip' && !s.b!.sp.extinct && (hid.get(v) ?? 0) > 0 && !famShown.has(v)) out.set(s.id, v);
-  }
-  return out;
-}
-
 /**
  * A level's species' name (ToLaD#297): a fossil known only by its Latin binomial with its genus abbreviated, as the
  * paleontologists write it ("A. afarensis", "H. erectus"), so the hominins' pills fit beside their narrow columns.
@@ -1188,561 +793,6 @@ export function levelText(b: FanBranch): string {
   const m = b.sp.extinct ? /^([A-Z])[a-z]+ ([a-z-]+)$/.exec(t) : null;
   // (Ardipithecus as "Ar.", the australopiths' "A." being taken.)
   return m && b.sp.sci.endsWith(` ${m[2]}`) ? `${t.startsWith('Ardipithecus ') ? 'Ar' : m[1]}. ${m[2]}` : t;
-}
-
-/** A family's label stands on "now" over its species (its bracket under it) while its span on screen is under this many screens. */
-const FAMILY_MAX_SCREENS = 1.6;
-
-/**
- * The species' and lineages' label spots. `top` is the labels' top line
- * (under the buttons); `barX0` the buttons' left edge: left of it a label on
- * "now" may reach higher, up to LABEL_CEIL.
- */
-/** labelSpots' working arrays (the columns near the screen, their buckets), kept from layout to layout. */
-const SCRATCH = {
-  cols: [] as ColBox[],
-  cx: new Float64Array(0),
-  ck: new Int32Array(0),
-  cs: new Int32Array(0),
-  cw: new Float64Array(0),
-  wide: new Int32Array(0),
-  cand: new Float64Array(0),
-  nbStart: new Int32Array(65),
-  bFill: new Int32Array(64),
-  nbucket: new Int32Array(1024),
-  seen: new Int32Array(1024),
-};
-export function labelSpots(
-  c: Screen,
-  fan: Fan,
-  top: number,
-  measure: (text: string) => number,
-  barX0?: number,
-  brk?: { named(v: FanNode): boolean },
-  plus?: (id: string) => number,
-  famOf?: (id: string) => FanNode | undefined,
-  lod?: Lod | null,
-  level?: LabelGroups,
-): LabelSpot[] {
-  const half = LABEL_PILL / 2;
-  const X = (x: number) => c.toScreen(x, 0)[0];
-  const Y = (y: number) => c.toScreen(0, y)[1];
-  const bottom = c.h - LABEL_BOTTOM_PX + 30;
-  const botFit = (y1: number) => clamp01((bottom - y1) / 30);
-  const nowY = fan.time.y(0);
-  const nowS = Y(nowY);
-  /** "now" on screen (below the top line): 1, fading over 24 px as it goes above. */
-  const nowOn = clamp01((nowS - top) / 24);
-  // (Fit fossils, ToLaD#298: a level framed on its fossils has "now" above the screen; a living group's picture stands
-  // under the top line then (groupPics), its name under that, and the level's names show.)
-  const fossils = !!level;
-  const standS = fossils ? Math.max(nowS, top + NOW_ROOM) : nowS;
-  const levelOn = fossils ? 1 : nowOn;
-
-  // Heights (world) to measure a column's edge at between wa < wb: both ends, its own ends and peel's end
-  // (`at`) and a grid fixed in the world, at most 8 px apart. Points only enter at the ends, where the edge
-  // is measured exactly, so what is measured changes continuously as the camera moves.
-  const grid = 2 ** -Math.ceil(Math.log2(Math.max(1e-12, c.cam.sy) / 8));
-  const heights = (wa: number, wb: number, at: number[]): number[] => {
-    const ys = [wa, wb];
-    for (const y of at) if (y > wa && y < wb) ys.push(y);
-    for (let y = Math.ceil(wa / grid) * grid; y < wb; y += grid) ys.push(y);
-    return ys;
-  };
-  // What a label beside a branch must clear: the columns near it (their widest reach within CLEAR px).
-  // A gap of CLEAR px or more counts as clear (clearFit is 1 from there).
-  const CLEAR = 6;
-  // Only the columns near the screen can meet a label on it (with hundreds of species, ToLaD#146, the rest are most).
-  const [vx0, vy0] = c.toWorld(-60, -60);
-  const [vx1, vy1] = c.toWorld(c.w + 60, c.h + 60);
-  const boxes = colBoxes(fan, [vy0, vy1]);
-  const fold0 = fan.tess.fold;
-  const near = (q: ColBox) => !(q.x1 < vx0 || q.x0 > vx1 || q.y1 <= vy0 || q.y0 > vy1);
-  // (Into arrays kept from layout to layout: no garbage a layout, ToLaD#255.)
-  const cols = SCRATCH.cols;
-  cols.length = 0;
-  for (const q of boxes.values()) if (near(q)) cols.push(q);
-  // ...and those in the strip's own few px across: the columns bucketed by their world x span (cols' order in each).
-  const NB = 64;
-  const bw = Math.max(1e-12, (vx1 - vx0) / NB);
-  const nc = cols.length;
-  // (Each column's box and first and last bucket, in flat arrays: clearance scans them, ToLaD#255.)
-  if (SCRATCH.cx.length < 4 * nc) {
-    SCRATCH.cx = new Float64Array(8 * nc);
-    SCRATCH.ck = new Int32Array(4 * nc);
-    SCRATCH.cs = new Int32Array(2 * nc);
-    SCRATCH.cw = new Float64Array(2 * nc);
-    SCRATCH.wide = new Int32Array(2 * nc);
-    SCRATCH.cand = new Float64Array(2 * nc);
-  }
-  const { cx, ck, cs, cw, wide } = SCRATCH;
-  // (A column across more than WIDE_NB buckets (leaning across the view) is scanned for every strip; the rest are
-  // found in the strip's buckets, nb*.)
-  const WIDE_NB = 8;
-  let nw = 0;
-  const nbStart = SCRATCH.nbStart;
-  nbStart.fill(0);
-  for (let i = 0; i < nc; i++) {
-    const q = cols[i];
-    cx[4 * i] = q.x0;
-    cx[4 * i + 1] = q.x1;
-    cx[4 * i + 2] = q.y0;
-    cx[4 * i + 3] = q.y1;
-    const a = Math.max(0, Math.floor((q.x0 - vx0) / bw));
-    const z = Math.min(NB - 1, Math.floor((q.x1 - vx0) / bw));
-    ck[2 * i] = a;
-    ck[2 * i + 1] = z;
-    const o = q.own;
-    const node = isNode(o);
-    cs[i] = node ? o.strands[0].index : o.index;
-    cw[i] = node ? o.width : 0;
-    if (z - a >= WIDE_NB) wide[nw++] = i;
-    else for (let k = a; k <= z; k++) nbStart[k + 1]++;
-  }
-  for (let k = 0; k < NB; k++) nbStart[k + 1] += nbStart[k];
-  if (SCRATCH.nbucket.length < nbStart[NB]) SCRATCH.nbucket = new Int32Array(2 * nbStart[NB]);
-  const nbucket = SCRATCH.nbucket;
-  {
-    const fill = SCRATCH.bFill;
-    fill.set(nbStart.subarray(0, NB));
-    for (let i = 0; i < nc; i++) if (ck[2 * i + 1] - ck[2 * i] < WIDE_NB) for (let k = ck[2 * i]; k <= ck[2 * i + 1]; k++) nbucket[fill[k]++] = i;
-  }
-  if (SCRATCH.seen.length < nc) SCRATCH.seen = new Int32Array(2 * nc);
-  const seen = SCRATCH.seen;
-  seen.fill(0, 0, nc);
-  // (At the mammal level, on the fold's grid: the columns' reach per band of its rows, for clearance.)
-  const bands = fold0 && fold0.gridH > 0 && fold0.ordShare.length > 0 ? bandBoxes(fan, vy0, vy1) : null;
-  let stamp = 0;
-  /** Column q's reach (world [lo, hi]) over bands j0..j1 (bandBoxes'), into `reach`. */
-  const reach = new Float64Array(2);
-  const bandReach = (ci: number, j0: number, j1: number) => {
-    const i0 = cs[ci];
-    const S = bands!.w.length;
-    let lo = Infinity;
-    let hi = -Infinity;
-    for (let j = j0; j <= j1; j++) {
-      if (bands!.L[j * S + i0] < lo) lo = bands!.L[j * S + i0];
-      if (bands!.R[j * S + i0] > hi) hi = bands!.R[j * S + i0];
-    }
-    const pad = 1e-6 * Math.max(1, Math.abs(lo), Math.abs(hi)) + bands!.w[i0];
-    reach[0] = lo - pad;
-    reach[1] = hi + pad + cw[ci];
-  };
-  /**
-   * Least gap (px, up to CLEAR) between the strip [xa, xb] × [ya, yb] and any column but `own`'s (negative: they overlap).
-   * The columns in the order the buckets give them (the first bucket of the strip's each is in, then cols' order),
-   * the first that makes it -1 or less ending it (ToLaD#255: found by a scan of the flat boxes, not the buckets).
-   */
-  const clearance = (xa: number, xb: number, ya: number, yb: number, own: FanBranch | FanNode) => {
-    let gap = CLEAR;
-    if (!(yb > ya)) return gap;
-    const [wxa, wya] = c.toWorld(xa - CLEAR, ya);
-    const [wxb, wyb] = c.toWorld(xb + CLEAR, yb);
-    // (The bands of the fold's rows from the one at or above wya to the one at or below wyb: -1 for none.)
-    let bj0 = -1;
-    let bj1 = -1;
-    if (bands) {
-      const qa = Math.floor(wya / bands.h);
-      const qb = Math.ceil(wyb / bands.h);
-      if (qa >= bands.kA && qb <= bands.kB) {
-        bj0 = Math.floor((qa - bands.kA) / BAND_ROWS);
-        bj1 = Math.min(bands.nb - 1, Math.max(bj0, Math.ceil((qb - bands.kA) / BAND_ROWS) - 1));
-      }
-    }
-    const k0 = Math.max(0, Math.min(NB - 1, Math.floor((wxa - vx0) / bw)));
-    const k1 = Math.max(0, Math.min(NB - 1, Math.floor((wxb - vx0) / bw)));
-    // The columns that can come near it (in a bucket of its, their box and their reach over its bands meeting it),
-    // each keyed by the first of its buckets it is in, then its place in cols (as a walk through the buckets meets them).
-    const cand = SCRATCH.cand;
-    let n = 0;
-    stamp++;
-    const test = (i: number) => {
-      if (cx[4 * i + 1] < wxa || cx[4 * i] > wxb || cx[4 * i + 3] <= wya || cx[4 * i + 2] > wyb) return;
-      const first = Math.max(ck[2 * i], k0);
-      if (first > Math.min(ck[2 * i + 1], k1)) return;
-      if (cols[i].own === own) return;
-      if (bj0 >= 0) {
-        bandReach(i, bj0, bj1);
-        if (reach[1] < wxa || reach[0] > wxb) return;
-      }
-      cand[n++] = first * 1048576 + i;
-    };
-    for (let k = k0; k <= k1; k++)
-      for (let m = nbStart[k], mEnd = nbStart[k + 1]; m < mEnd; m++) {
-        const i = nbucket[m];
-        if (seen[i] === stamp) continue;
-        seen[i] = stamp;
-        test(i);
-      }
-    for (let m = 0; m < nw; m++) test(wide[m]);
-    const cs1 = cand.subarray(0, n).sort();
-    for (let m = 0; m < n; m++) {
-      const ci = cs1[m] % 1048576;
-      const q = cols[ci];
-      // (Nowhere nearer than the gap found so far: none of its edges can make it less.)
-      if (Math.max(X(q.x0) - xb, xa - X(q.x1)) >= gap) continue;
-      if (bj0 >= 0) {
-        bandReach(ci, bj0, bj1);
-        if (Math.max(X(reach[0]) - xb, xa - X(reach[1])) >= gap) continue;
-      }
-      // (heights()'s, without the array: the least over them.)
-      const wa = Math.max(wya, q.y0);
-      const wb = Math.min(wyb, q.y1 - 1e-9);
-      // (Which side of the strip it is on at each height, wa then the grid up to wb: an edge that lies nearly flat
-      // (a peel across the screen, MDD's Chinese mountain cat at the Felis polytomy, ToLaD#293) can cross the strip
-      // between two heights, on neither, and is then through it.)
-      let side = 0;
-      let sideB = 0;
-      for (let j = -3, y = Math.ceil(wa / grid) * grid; j < 0 || y < wb; j < 0 ? j++ : (y += grid)) {
-        const wy = j === -3 ? wa : j === -2 ? wb : j === -1 ? q.lean : y;
-        if (j === -1 && !(wy > wa && wy < wb)) continue;
-        const e = q.at(wy);
-        const ea = X(e[0]);
-        const eb = X(e[1]);
-        gap = Math.min(gap, Math.max(ea - xb, xa - eb));
-        const sd = eb < xa ? -1 : ea > xb ? 1 : 0;
-        if (j === -2) sideB = sd;
-        else if (j !== -1) {
-          if (side * sd < 0) gap = Math.min(gap, -(xb - xa) / 2);
-          side = sd;
-        }
-      }
-      if (side * sideB < 0) gap = Math.min(gap, -(xb - xa) / 2);
-      // Hidden from here on whatever else is near.
-      if (gap <= -1) return gap;
-    }
-    return gap;
-  };
-  const clearFit = (gap: number) => clamp01((gap + 1) / 6);
-
-  /** The spots beside a column on screen from y0 down (its own edge from `edge`, its bottom at screen yBot). */
-  const beside = (id: string, text: string, rank: Rank, len: number, own: FanBranch | FanNode, yTop: number, yBot: number, fit0: number, ref: { b?: FanBranch; v?: FanNode }, loose = false): LabelSpot[] => {
-    const y0 = Math.max(top, yTop);
-    const y1 = y0 + len;
-    if (!(fit0 > 0) || y0 > bottom) return [];
-    // Its widest (l, r) and narrowest (il, ir) along the pill.
-    let l = Infinity;
-    let r = -Infinity;
-    let il = -Infinity;
-    let ir = Infinity;
-    const wTop = c.toWorld(0, y0)[1];
-    const wBot = c.toWorld(0, Math.min(y1, yBot))[1] - 1e-9;
-    if (!(wBot >= wTop)) return [];
-    // (Faded out whatever its edges (its part on screen too short, or the legend): its spots, none shown, with no edges read, ToLaD#255.)
-    const f = fit0 * clamp01((yBot - y0 - 12) / 24) * botFit(y1);
-    if (!(f > 0)) return (['in', 'right', 'left'] as const).map((place) => ({ key: `${id}:${place}`, id, place, ...ref, text, rank, x: 0, y1, box: [-half, y0, half, y1], fit: 0 }));
-    const ob = boxes.get(own)!;
-    for (const wy of heights(wTop, wBot, [ob.lean])) {
-      const [a, b] = ob.at(wy);
-      l = Math.min(l, X(a));
-      r = Math.max(r, X(b));
-      il = Math.max(il, X(a));
-      ir = Math.min(ir, X(b));
-    }
-    if (!(r >= l)) return [];
-    // Fades: the column's part on screen too short to stand beside, and the legend (f, above).
-    const out: LabelSpot[] = [];
-    // Inside it, at the top line, when it is wide enough on screen (zoomed into it): centred on its part on screen.
-    {
-      const a = Math.max(il, LABEL_AXIS_X) + half + 4;
-      const b = Math.min(ir, c.w) - half - 4;
-      const mid = (il + ir) / 2;
-      const x = a <= b ? Math.min(Math.max(mid, a), b) : Math.min(Math.max(mid, b), a);
-      const fit = f * clamp01((b - a) / 8) * clamp01((yBot - y1) / 12);
-      out.push({ key: `${id}:in`, id, place: 'in', ...ref, text, rank, x, y1, box: [x - half, y0, x + half, y1], fit });
-    }
-    for (const place of ['right', 'left'] as const) {
-      const x = place === 'right' ? r + LABEL_GAP + half : l - LABEL_GAP - half;
-      const xa = x - half;
-      const xb = x + half;
-      // Clear of the other columns, the time axis and the screen's edge (ToLaD#319: never a name cut off at the edge; past it, it fades).
-      const fit = f > 0 && xa < c.w && xb > 0 ? f * clearFit(Math.min(xa - LABEL_AXIS_X, c.w - xb, clearance(xa, xb, y0, y1, own))) : 0;
-      out.push({ key: `${id}:${place}`, id, place, ...ref, text, rank, x, y1, box: [xa, y0, xb, y1], fit });
-      // (A level's group's name, ToLaD#262, `loose`: failing a clear spot, over the columns beside its own, opaque; clear of the axis and the other names.)
-      if (loose) out.push({ key: `${id}:${place}~`, id, place, loose: true, ...ref, text, rank, x, y1, box: [xa, y0, xb, y1], fit: f > 0 && xa < c.w && xb > 0 ? f * clearFit(Math.min(xa - LABEL_AXIS_X, c.w - xb)) : 0 });
-    }
-    return out;
-  };
-
-  /** Screen x of clade (or strand) u's left (or right) edge among its columns at world y wy, null where none spans it. */
-  const edgeAt = (u: FanNode | FanBranch, wy: number, right: boolean): number | null => {
-    const q = boxes.get(u);
-    if (q && wy >= q.y0 && wy <= q.y1) return X(q.at(wy)[right ? 1 : 0]);
-    if (isNode(u) && wy < u.y)
-      for (let k = 0; k < u.kids.length; k++) {
-        const e = edgeAt(u.kids[right ? u.kids.length - 1 - k : k], wy, right);
-        if (e !== null) return e;
-      }
-    return null;
-  };
-  const out: LabelSpot[] = [];
-  // The families (ToLaD#146), first of all: standing on "now" over their species while "now" is on screen, the
-  // span they name bracketed under the pill; at its left end, else its middle, else its right end (whichever
-  // meets no other label: the left end clears the middle of a family's one big column). The same name (`n<i>`)
-  // as its lineage's label beside its parent column, so once "now" is off screen the one becomes the other.
-  // (With the clades' brackets, ToLaD#193, a family is named on its bracket where that has room, else here, over the stack.)
-  // (Given the level's groups, ToLaD#258: each group one level down, named whether or not its bracket is, with its picture.)
-  for (const { v, vi, text } of level?.groups ?? families(fan)) {
-    // (The mammal level, lod.ts: a family inside a clade drawn as one branch is not named; the clade is.)
-    if ((!level && brk?.named(v)) || lod?.hidden(v)) continue;
-    if (level) {
-      // A level's group (ToLaD#262): its name beside its branch, down from "now" (its picture stands over "now",
-      // groupPics): beside the column nearest its centre, room at the name's end for the "+x" of the groups hidden.
-      if (!(levelOn > 0)) continue;
-      const [wa, wb] = groupExtent(v);
-      const cx = (wa + wb) / 2;
-      if (!(X(wb) > 0 && X(wa) < c.w)) continue;
-      // (A living column, where it has one: on "now", under its picture.)
-      const own = columnNear(v, cx);
-      const px = plus?.(`n${vi}`) ?? 0;
-      const rank: Rank = [-1, wb - wa, vi];
-      for (const p of beside(`n${vi}`, text, rank, measure(text) + 2 * LABEL_PAD + px, own, Math.max(standS, Y(own.tipY)) + 4, Y(own.splitY), levelOn, { v }, true))
-        out.push({ ...p, fam: v, pic: groupFace(v), plus: px });
-      continue;
-    }
-    const [wa, wb] = familySpan(v);
-    const sa = X(wa);
-    const sb = X(wb);
-    // (With room at its top end for the "+x" of the pills it hides, ToLaD#197.)
-    const px = plus?.(`n${vi}`) ?? 0;
-    const len = measure(text) + 2 * LABEL_PAD + px;
-    const lo = Math.max(sa, LABEL_AXIS_X) + half;
-    const hi = Math.min(sb, c.w) - half;
-    // Its span on screen right of the axis (fading over a pill's width), and not so wide that the screen is inside it.
-    const onX = clamp01((Math.min(sb, c.w) - Math.max(sa, LABEL_AXIS_X) + 12) / LABEL_PILL);
-    const fit0 = nowOn * onX * clamp01((FAMILY_MAX_SCREENS * c.w - (sb - sa)) / (0.4 * c.w));
-    if (!(fit0 > 0)) continue;
-    // (On "now", under the brackets, ToLaD#193: a long one reaches up over their lines.)
-    const y1 = Math.max(nowS - 4, top + len);
-    const fit = fit0 * botFit(y1);
-    // (A level's groups, ToLaD#258: the middle first, so a wide group leaves its ends to the narrow ones beside it.)
-    const xs = lo <= hi - LABEL_PILL ? (level ? [(lo + hi) / 2, lo, hi] : [lo, (lo + hi) / 2, hi]) : [Math.min(Math.max((sa + sb) / 2, LABEL_AXIS_X + half), c.w - half)];
-    xs.forEach((x, k) => {
-      out.push({ key: `n${vi}:fam${k}`, id: `n${vi}`, place: 'fam', v, fam: v, pic: level ? groupFace(v) : commonest(v), text, rank: [-1, wb - wa, vi], x, y1, box: [x - half, y1 - len, x + half, y1], fit, span: brk ? undefined : [sa, sb], plus: px });
-    });
-  }
-  for (const b of fan.branches) {
-    // (Given the level's groups, ToLaD#258: only a species that is a group of its own.)
-    if ((lod && lod.of[b.index] >= 0) || (level && !level.species.has(b)) || !near(boxes.get(b)!)) continue;
-    const id = String(b.sp.gid);
-    if (level) {
-      // (A level's species, ToLaD#262: its name beside its column, down from "now" or its tip; its picture over "now".)
-      const px = plus?.(id) ?? 0;
-      const text = levelText(b);
-      const len = measure(text) + 2 * LABEL_PAD + px;
-      const y0 = Math.max(standS, Y(b.tipY)) + 4;
-      // (A neighbouring level's species after the level's own, ToLaD#297.)
-      const mine = !level.own || level.own.has(b);
-      const rank: Rank = [mine ? 0 : 0.25, b.width, b.index];
-      // (The fossils' frame, its own species: more places to try, ToLaD#297; a neighbour's name stays by its column.)
-      const more = fossils && mine;
-      const sp = beside(id, text, rank, len, b, y0, Y(b.splitY), 1, { b }, true).map((p) => ({ ...p, plus: px }));
-      // (ToLaD#297: or further down its column, a name's length at a time, where a neighbour's name stands at its tip.)
-      if (more) for (let k = 1; k <= 2; k++) for (const p of beside(id, text, rank, len, b, y0 + k * (len + LABEL_GAP), Y(b.splitY), 1, { b }, true)) sp.push({ ...p, key: `${p.key}+${k}`, plus: px });
-      // (Under the fossils' frame, a fossil's, ToLaD#297: failing room beside its column, over its picture on its tip.
-      // An old one near the screen's foot has no room below its tip; over it, the air the younger ones left.)
-      const ty = Y(b.tipY);
-      if (fossils && b.tipY > nowY && ty > top && ty < c.h) {
-        const x = X(stripMid(b));
-        const y1 = ty - PIC_LIFT - PIC_D - LABEL_GAP;
-        const ya = y1 - len;
-        const xa = x - half;
-        const xb = x + half;
-        // (Faded in over 24 px under the top line and 12 px in from the screen's sides, not cut: a pinch's frames keep it, ToLaD#311.)
-        const onFit = (xa: number, ya: number, xb: number, y1: number) => botFit(y1) * clamp01((ya - top) / 24) * clamp01(xa / 12) * clamp01((c.w - xb) / 12);
-        const f0 = onFit(xa, ya, xb, y1);
-        const fit = f0 > 0 ? f0 * clearFit(Math.min(xa - LABEL_AXIS_X, clearance(xa, xb, ya, y1, b))) : 0;
-        const o = { id, place: 'over' as const, b, text, rank, x, y1, plus: px };
-        sp.push({ ...o, key: `${id}:over`, box: [xa, ya, xb, y1], fit });
-        // (Failing a clear one, over the columns there, opaque: clear of the axis and the other names. Under fossils'
-        // frame, crowded, beside its picture, or further up, a name's length at a time.)
-        const loose = (key: string, x: number, y1: number) => {
-          const [xa, ya, xb] = [x - half, y1 - len, x + half];
-          sp.push({ ...o, key: `${id}:${key}`, x, y1, box: [xa, ya, xb, y1], loose: true, fit: onFit(xa, ya, xb, y1) * clearFit(xa - LABEL_AXIS_X) });
-        };
-        loose('over~', x, y1);
-        if (more) {
-          const side = PIC_D / 2 + LABEL_GAP + half;
-          loose('over~r', x + side, ty - 2);
-          loose('over~l', x - side, ty - 2);
-          for (let k = 1; k <= 2; k++) loose(`over~${k}`, x, y1 - k * (len + LABEL_GAP));
-        }
-      }
-      out.push(...sp);
-      continue;
-    }
-    // (Standing for its family, ToLaD#212: the family's name on its tip, last frame's familyPills.)
-    const fam = famOf?.(id);
-    const famText = fam && familyLabel(fam.split);
-    const len = measure(b.sp.common) + 2 * LABEL_PAD;
-    const rank: Rank = [0, b.width, b.index];
-    // (On its tip, room at its top end for the "+x" of the pills it hides, ToLaD#197: as many as last frame.)
-    const px = plus?.(id) ?? 0;
-    const tlen = (famText ? measure(famText) + 2 * LABEL_PAD : len) + px;
-    // On its tip: centred on the column there, kept on screen (right of the time axis) while the column is.
-    const tl = X(leftAt(b, b.tipY));
-    const tw = laneAt(b, b.tipY).w * c.cam.sx;
-    const room = b.width * c.cam.sx;
-    const cx = tl + tw / 2;
-    // (Folded, fold.ts: its room about where the fold has its column.)
-    const left = fan.tess.fold?.left(b.index, b.tipY) != null ? cx - room / 2 : X(b.colLeft);
-    const lo = Math.max(left, LABEL_AXIS_X) + half;
-    const hi = Math.min(left + room, c.w) - half;
-    const x = lo <= hi ? Math.min(Math.max(cx, lo), hi) : Math.min(Math.max(cx, hi), lo);
-    const ceil = barX0 === undefined ? top : LABEL_CEIL + (top - LABEL_CEIL) * clamp01((x + half - (barX0 - 68)) / 60);
-    const ty = Y(b.tipY);
-    // On "now", under the clades' brackets (ToLaD#193: a long name reaches up over their lines, opaque over them).
-    const y1 = Math.max(ty - 4, ceil + tlen);
-    // The tip on screen (below the top line) and its column right of the axis and left of the screen's edge.
-    const tipOn = clamp01((ty - top) / 24) * clamp01((left + room - LABEL_AXIS_X + 12) / LABEL_PILL) * clamp01((c.w + 12 - left) / LABEL_PILL);
-    // Above the tip, clear of the other columns (an extinct tip has its neighbours around it; above "now" there are none).
-    const f = tipOn * botFit(y1);
-    const tipFit = f > 0 && b.tipY > nowY ? f * clearFit(clearance(x - half, x + half, y1 - tlen, Math.min(y1, ty - 2), b)) : f;
-    const tip: LabelSpot = { key: `${id}:tip`, id, place: 'tip', b, text: famText || b.sp.common, rank, x, y1, box: [x - half, y1 - tlen, x + half, y1], fit: tipFit, plus: px };
-    if (famText) Object.assign(tip, { fam, pic: commonest(fam!) });
-    out.push(tip);
-    // Beside its branch: once the tip is off screen.
-    out.push(...beside(id, b.sp.common, rank, len, b, ty, Y(b.splitY), 1 - clamp01((ty - top) / 24), { b }));
-  }
-  // Curated events (ToLaD#141): the title beside its window (or in the column when zoomed into it),
-  // centred on the window, while the window is on screen. After the species' names, before the lineages'.
-  for (const b of fan.branches) {
-    if ((lod && lod.of[b.index] >= 0) || !near(boxes.get(b)!)) continue;
-    // (A hairline column, ToLaD#146: its events tinted on it, their titles only once it has a few px of room.)
-    if (b.width * c.cam.sx < HAIR_PX) continue;
-    for (const s of colEventsY(fan, b)) {
-      const text = s.ev.title;
-      const len = measure(text) + 2 * LABEL_PAD;
-      const st = Y(s.top);
-      const sb = Y(s.bot);
-      const fit0 = clamp01((sb - top) / 12) * clamp01((bottom - st) / 12);
-      const rank: Rank = [0.5, b.width, b.index * 64 + s.k];
-      for (const p of beside(`e${b.sp.gid}.${s.k}`, text, rank, len, b, (st + sb) / 2 - len / 2, Y(b.splitY), fit0, { b })) out.push({ ...p, ev: s.k });
-    }
-  }
-  // The lineages (parent columns, not the stem below the root: the clade's own label is there), while "now" is off screen.
-  // (At a level, ToLaD#312: a column inside one of its groups is named as the group, one pill for all of them, a tap
-  // flying to it; the level's own unnamed columns between its groups carry no name of their own ("Human ancestors" on
-  // each split of the humans' line, "Homo floresiensis lineage" on the erectus' column): its groups name them.)
-  const groupIn = new Map<FanNode, { v: FanNode; vi: number; text: string }>();
-  for (const g of level?.groups ?? []) groupIn.set(g.v, g);
-  if (nowOn < 1) {
-    for (let vi = 0; vi < fan.nodes.length; vi++) {
-      const v = fan.nodes[vi];
-      if (!v.parent || lod?.hidden(v) || !near(boxes.get(v)!)) continue;
-      let g: { v: FanNode; vi: number; text: string } | undefined;
-      let inLevel = false;
-      if (level)
-        for (let u: FanNode | null = v; u && !g; u = u.parent) {
-          g = groupIn.get(u);
-          if (u === level.at) inLevel = true;
-          if (inLevel) break;
-        }
-      if (g) {
-        const id = `n${g.vi}`;
-        const px = plus?.(id) ?? 0;
-        const rank: Rank = [1, v.width, vi];
-        for (const p of beside(id, g.text, rank, measure(g.text) + 2 * LABEL_PAD + px, v, Y(v.y), Y(v.yBot), 1 - nowOn, { v: g.v })) out.push({ ...p, key: `${p.key}.${vi}`, fam: g.v, pic: groupFace(g.v), plus: px });
-        continue;
-      }
-      if (inLevel && !v.split.taxon) continue;
-      const text = familyLabel(v.split) ?? v.name;
-      const id = `n${vi}`;
-      const len = measure(text) + 2 * LABEL_PAD;
-      const rank: Rank = [1, v.width, vi];
-      out.push(...beside(id, text, rank, len, v, Y(v.y), Y(v.yBot), 1 - nowOn, { v }));
-    }
-  }
-  return out;
-}
-
-/**
- * Which spots show: at most one per name, never two meeting. A fixed priority
- * (species first, the wider column first, then tree order) so the order never
- * changes with the camera; a name takes the first of its spots (on its tip,
- * in its column, right, left)
- * that meets none shown before it. Hysteresis: the spots shown last frame go
- * first, each keeping its place while it fits and meets no other; a hidden
- * one waits for a clear gap and a fit over 0.6, so a newcomer never pushes a
- * shown label off.
- */
-export function resolveLabels(spots: LabelSpot[], prev: Map<string, boolean> | ((key: string) => boolean)): Map<string, boolean> {
-  const out = new Map<string, boolean>();
-  const taken: number[][] = [];
-  const done = new Set<string>();
-  // (The order kept per layout: carried frames, ToLaD#255, resolve the same spots again.)
-  let order = orderCache.get(spots);
-  if (!order || order.length !== spots.length) {
-    const placeOrder = { fam: 0, tip: 0, in: 1, right: 2, left: 3, over: 4 };
-    order = [...spots].sort((p, q) => p.rank[0] - q.rank[0] || q.rank[1] - p.rank[1] || p.rank[2] - q.rank[2] || +!!p.loose - +!!q.loose || placeOrder[p.place] - placeOrder[q.place]);
-    orderCache.set(spots, order);
-  }
-  const was = typeof prev === 'function' ? prev : (key: string) => !!prev.get(key);
-  for (const s of spots) out.set(s.key, false);
-  // The spots shown last frame first (each keeps its place while it fits and meets no other), then the rest.
-  for (const pass of [true, false]) {
-    for (const s of order) {
-      if (done.has(s.id) || was(s.key) !== pass) continue;
-      if (!(s.fit > (pass ? 0 : 0.6))) continue;
-      if (taken.some((q) => boxGap(s.box, q) < (pass ? -1 : 5))) continue;
-      out.set(s.key, true);
-      done.add(s.id);
-      taken.push(s.box);
-    }
-  }
-  return out;
-}
-
-const orderCache = new WeakMap<LabelSpot[], LabelSpot[]>();
-
-/**
- * The "+x" badges (ToLaD#197): for each pill shown on "now" (a species' on its tip, a family's over its species), the
- * species whose pills are hidden that it stands for. A species counts as hidden when its tip spot is there (fit > 0:
- * its tip and column on screen) and none of its spots shows; each counts once, on the shown pill nearest it (the left one on a tie), so the
- * badges add up to the species hidden in view. Keyed by the shown spot's key; the pills with none are left out.
- * Given the fan, a hidden species whose family has a pill shown counts on that one instead (ToLaD#212: the family's "+x").
- */
-export function plusGroups(spots: readonly LabelSpot[], on: Map<string, boolean>, fan?: Fan): Map<string, FanBranch[]> {
-  const out = new Map<string, FanBranch[]>();
-  const shownIds = new Set<string>();
-  for (const s of spots) if (on.get(s.key)) shownIds.add(s.id);
-  const isTip = (s: LabelSpot) => s.place === 'tip' && !!s.b && s.ev === undefined;
-  const shown = spots.filter((s) => (isTip(s) || s.place === 'fam') && on.get(s.key)).sort((p, q) => p.x - q.x);
-  if (!shown.length) return out;
-  const famPill = new Map<FanNode, LabelSpot>();
-  if (fan) for (const s of shown) if (s.fam && !famPill.has(s.fam)) famPill.set(s.fam, s);
-  // (The rest on the nearest species' pill: a family's counts its own family only, unless no other is shown.)
-  const near = famPill.size && shown.some((s) => !s.fam) ? shown.filter((s) => !s.fam) : shown;
-  for (const s of spots) {
-    if (!isTip(s) || !(s.fit > 0) || shownIds.has(s.id)) continue;
-    const fp = famPill.size ? famPill.get(familyOf(fan!, s.b!)!) : undefined;
-    if (fp) {
-      let g = out.get(fp.key);
-      if (!g) out.set(fp.key, (g = []));
-      g.push(s.b!);
-      continue;
-    }
-    // The nearest shown pill: a binary search for the first right of it, then it or the one before.
-    let lo = 0;
-    let hi = near.length;
-    while (lo < hi) {
-      const m = (lo + hi) >> 1;
-      if (near[m].x < s.x) lo = m + 1;
-      else hi = m;
-    }
-    const r = near[Math.min(lo, near.length - 1)];
-    const l = near[Math.max(lo - 1, 0)];
-    const at = s.x - l.x <= r.x - s.x ? l : r;
-    let g = out.get(at.key);
-    if (!g) out.set(at.key, (g = []));
-    g.push(s.b!);
-  }
-  return out;
-}
-
-/** Gap (px) between two boxes [x0, y0, x1, y1]: negative when they overlap. */
-export function boxGap(a: number[], b: number[]): number {
-  return Math.max(b[0] - a[2], a[0] - b[2], b[1] - a[3], a[1] - b[3]);
 }
 
 function clamp01(v: number): number {
@@ -1836,9 +886,6 @@ export class FanView implements InputHandlers {
   /** The buttons (a DOM element over the canvas): labels never go under them. */
   barEl: HTMLElement | null = null;
   private scaleKey = '';
-  /** Each species' label: shown or not, and its fade (0–1); when it was last drawn (ms). */
-  private labelState = new Map<string, { on: boolean; a: number }>();
-  private labelT = 0;
   /** `?debug`: a readout of the zooms, years on screen and individuals per px. */
   readonly debug = typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug');
   /** Without the GPU layer: this frame's styled column stretches, faded once the individuals are drawn. */
@@ -1921,7 +968,6 @@ export class FanView implements InputHandlers {
   destroy(): void {
     cancelAnimationFrame(this.raf);
     clearTimeout(this.foldRestT);
-    if (this.labWait) clearTimeout(this.labWait);
     this.input.destroy();
     this.ro.disconnect();
     this.gl?.canvas.remove();
@@ -2088,7 +1134,7 @@ export class FanView implements InputHandlers {
    */
   private cutFrame(ks: readonly number[], v: FanNode, yFork: number, top = this.yNow): Camera | null {
     const T = this.territories();
-    if (!T || !ks.length) return null;
+    if (!ks.length) return null;
     const s: [number, number] = [0, 0];
     const fossils = ks.length === 1 && this.fan.nodes[ks[0]] === v ? fossilSpan(this.fan, v) : null;
     return foldedFrame(this.fan, this.w, () => {
@@ -2190,12 +1236,10 @@ export class FanView implements InputHandlers {
     while (v?.parent && !bs.every((b) => v!.strands.includes(b))) v = v.parent;
     if (!v) return this.homeCamera();
     // (The daughters of the clade where they meet that hold any of them, their territory.)
-    if (FanView.frameCut) {
-      const B = new Set(bs);
-      const ks = v.kids.filter((k) => ('sp' in k ? B.has(k) : k.strands.some((b) => B.has(b))));
-      const cut = this.cutFrame(ks.flatMap((k) => ('sp' in k ? [~k.index] : this.nodeK(k))), v, v.y);
-      if (cut) return cut;
-    }
+    const B = new Set(bs);
+    const ks = v.kids.filter((k) => ('sp' in k ? B.has(k) : k.strands.some((b) => B.has(b))));
+    const cut = this.cutFrame(ks.flatMap((k) => ('sp' in k ? [~k.index] : this.nodeK(k))), v, v.y);
+    if (cut) return cut;
     // (Down to the split where they meet, not the clade's stem: for a group across the level, the root, not the world's bottom.)
     // (Across the screen: their columns at "now" (an extinct one's at its tip), where their names and pictures stand,
     // not their rooms, wider where they were wider in the past: the most room each name and picture can have, ToLaD#274.)
@@ -2916,21 +1960,15 @@ export class FanView implements InputHandlers {
     this.drawHeld();
     this.drawEvents();
     this.drawStemFade();
-    // Labels: one form everywhere (see labelSpots).
     this.drawGutter();
     this.drawTouch();
     const tl = performance.now();
-    // (The page's first frame without the labels, ToLaD#255: they follow in the next slice, the level shown first.)
-    if (FanView.labelsAfterFirst && !this.labWait && !this.labLast) {
-      this.labWait = setTimeout(() => this.request(), 0);
-    } else {
-      const { br, top, lg, spots, carried, cut } = this.labelsNow(lod);
-      this.drawLabels(spots, br, cut ? undefined : { ...lg, top, lod }, carried, cut);
-      br?.drawPins(this.ctx, FAMILY_INK, INK3, BG);
-      this.labelAllMs.push(performance.now() - tl);
-      if (this.labelAllMs.length > 600) this.labelAllMs.shift();
-      if (this.labelMs.length > 600) this.labelMs.shift();
-    }
+    // (The labels on the same frame as the tree, the first one too: the cut decides them each frame, ToLaD#333.)
+    const { br, cut } = this.labelsNow();
+    this.drawLabels(cut, br);
+    br?.drawPins(this.ctx, FAMILY_INK, INK3, BG);
+    this.labelAllMs.push(performance.now() - tl);
+    if (this.labelAllMs.length > 600) this.labelAllMs.shift();
     this.drawWidthScale();
     if (this.debug) this.drawDebug();
     this.drawTrunkLabel();
@@ -2945,86 +1983,24 @@ export class FanView implements InputHandlers {
   }
 
   /**
-   * The labels' spots and the brackets' stack this frame (ToLaD#255): laid out (layoutBrackets, labelSpots) at rest,
-   * and while the view moves (a gesture, a flight, a fling) at most every LABEL_MS and LABEL_FRAMES frames; between,
-   * the last layout carried with the camera (carryLabels): names, pictures and lines move rigidly with the pan and
-   * zoom, and fade as they meet or leave (drawLabels, each frame). `carried` the camera's change carried, null when laid out.
+   * The labels' spots and the brackets' stack this frame (ToLaD#333): from the cut, every frame. No carry, no pass at
+   * rest, no hysteresis: what shows and where is a function of the camera alone.
    */
-  private labelsNow(lod: Lod | null): { br: Brackets | null; top: number; lg: ReturnType<typeof labelGroups>; spots: LabelSpot[]; carried: Carry | null; cut?: CutLabels } {
+  private labelsNow(): { br: Brackets | null; top: number; cut: CutLabels } {
     const t0 = performance.now();
-    const lg = labelGroups(this.fan, this.levelNow());
-    // (ToLaD#333: from the cut, every frame; no carry, no rest pass, no hysteresis.)
-    const T = FanView.labelsCut ? this.territories() : null;
-    if (this.brackets) this.brackets.spanOf = T ? (v) => T.spanOf(v) : null;
-    if (T) {
-      const br = this.layoutBrackets();
-      const top = this.labelTop() + (br ? br.pinH() * br.pinA : 0);
-      const cut = (this.cutLast = this.cutLabels(T, top));
-      this.labLast = null;
-      this.labelMs.push(performance.now() - t0);
-      this.labelLayMs.push(performance.now() - t0);
-      if (this.labelLayMs.length > 600) this.labelLayMs.shift();
-      return { br, top, lg, spots: cut.spots, carried: null, cut };
-    }
-    const L = this.labLast;
-    const c = this.cam;
-    const moving = this.gesturing || !!this.anim;
-    // (Carried across a change in the clades drawn as one, lod.gen, ToLaD#255: at the mammal level a pinch changes them on
-    // almost every frame. Carried names may then differ from a layout's; at rest they never do, below.)
-    const same = L && L.fan === this.fan && L.lg === lg && L.lod === lod && L.w === this.w && L.h === this.h && L.topLine === this.labelTop();
-    if (L && same && moving && labelCarry && (t0 - L.t < LABEL_MS || L.frames < LABEL_FRAMES)) {
-      const ax = c.sx / L.cam.sx;
-      const ay = c.sy / L.cam.sy;
-      const k: Carry = [ax, this.w / 2 - (ax * this.w) / 2 + (L.cam.cx - c.cx) * c.sx, ay, this.h / 2 - (ay * this.h) / 2 + (L.cam.cy - c.cy) * c.sy];
-      L.cam = { ...c };
-      L.frames++;
-      const br = this.brackets && L.br ? L.br : null;
-      br?.carry(k[0], k[1], this.toScreen(0, this.yNow)[1]);
-      carryLabels(L.spots, k, L.top, this.w);
-      this.labelMs.push(performance.now() - t0);
-      return { br, top: L.top, lg, spots: L.spots, carried: k };
-    }
+    const T = this.territories();
+    if (this.brackets) this.brackets.spanOf = (v) => T.spanOf(v);
     const br = this.layoutBrackets();
-    // (The labels kept under the pinned groups, ToLaD#233, as they show.)
-    // (One pill per group one level down from the level the view is at, ToLaD#258: no "+x", no species standing for its family.)
-    // (ToLaD#262: each group's name beside its branch, room at its end for the "+x" of the names hidden near it last frame.)
-    const topLine = this.labelTop();
-    const top = topLine + (br ? br.pinH() * br.pinA : 0);
-    const lay = (room: Map<string, number>) => labelSpots(this.camera, this.fan, top, (t) => this.nameWidth(t), this.barRect()?.[0], br ?? undefined, (id) => room.get(id) ?? 0, undefined, lod, lg);
-    let spots: LabelSpot[];
-    this.labClean = !moving;
-    if (moving) spots = lay(this.plusRoom);
-    else {
-      // At rest (ToLaD#255): what a still view at this camera gives, whatever the way here. The names shown chosen afresh
-      // (no hysteresis, drawLabels), and the "+x" room from none: laid out, its room counted, again until the room
-      // holds (once more as a rule). The room it settled on kept for the frames after at this same camera.
-      const key = `${c.cx}|${c.cy}|${c.sx}|${c.sy}|${this.w}|${this.h}|${top}|${lod?.gen ?? -1}|${this.nameWFont}`;
-      const R = this.restRoom;
-      let room = R && R.fan === this.fan && R.lg === lg && R.key === key ? R.room : new Map<string, number>();
-      spots = lay(room);
-      for (let i = 0; i < 3 && lg.groups.length + lg.species.size > 0; i++) {
-        const next = this.groupPlus({ ...lg, lod }, spots, resolveLabels(spots, new Map()), new Map());
-        if (next.size === room.size && [...next].every(([id, px]) => room.get(id) === px)) break;
-        // (After the first, the room only grows: a pill whose room for its "+x" crowds it out, its count then gone, the
-        // room with it, shown again, laid out at rest frame after frame: it flickered, ToLaD#311.)
-        if (i > 0) for (const [id, px] of room) next.set(id, Math.max(px, next.get(id) ?? 0));
-        room = next;
-        spots = lay(room);
-      }
-      this.plusRoom = room;
-      this.restRoom = { fan: this.fan, lg, key, room };
-    }
-    this.labLast = { fan: this.fan, lg, lod, lodGen: lod?.gen ?? -1, w: this.w, h: this.h, topLine, t: t0, frames: 0, cam: { ...c }, br, top, spots };
+    const top = this.labelTop() + (br ? br.pinH() * br.pinA : 0);
+    const cut = (this.cutLast = this.cutLabels(T, top));
     this.labelMs.push(performance.now() - t0);
-    this.labelLayMs.push(performance.now() - t0);
-    if (this.labelLayMs.length > 600) this.labelLayMs.shift();
-    return { br, top, lg, spots, carried: null };
+    if (this.labelMs.length > 600) this.labelMs.shift();
+    return { br, top, cut };
   }
-  /** This fan's territories at this screen width (ToLaD#333), or null with no steady fold. */
+  /** This fan's territories at this screen width (ToLaD#333; the fold is always the steady one, withFold). */
   private terr: { fan: Fan; fold: unknown; w: number; t: CutTerritories } | null = null;
-  private territories(): CutTerritories | null {
-    const f = this.fan.tess.fold;
-    if (!(FanView.labelsCut || FanView.frameCut) || !(f instanceof Steady)) return null;
+  private territories(): CutTerritories {
+    const f = this.fan.tess.fold as Steady;
     const P = this.terr;
     if (P && P.fan === this.fan && P.fold === f && P.w === this.w) return P.t;
     const t = new CutTerritories(this.fan, f, this.w);
@@ -3033,10 +2009,6 @@ export class FanView implements InputHandlers {
   }
   /** The last labels from the cut (tests read it). */
   cutLast: CutLabels | null = null;
-  /** Names, pictures and "+x" on/off from the cut (wantCutLabels; tests set it). */
-  static labelsCut = true;
-  /** Taps and levels framed by their territories (wantCutFrame; tests set it). */
-  static frameCut = true;
 
   /**
    * This frame's labels from the cut (ToLaD#333, research/scalable-tree.md §3). Names: the cut for a pill's thickness
@@ -3198,36 +2170,10 @@ export class FanView implements InputHandlers {
     return { spots, groups, pics: shownPics, items };
   }
 
-  /** The page (FanApp) draws a view's first frame without its labels, which follow in the next slice (ToLaD#255); tests draw them at once. */
-  static labelsAfterFirst = false;
-  /** The first frame's labels pending (labelsAfterFirst): its timer. */
-  private labWait: ReturnType<typeof setTimeout> | 0 = 0;
-  /** At rest: the labels shown chosen afresh, not kept from the frame before (drawLabels, ToLaD#255). */
-  private labClean = false;
-  /** The "+x" room the labels laid out at rest settled on, and where (labelsNow). */
-  private restRoom: { fan: Fan; lg: ReturnType<typeof labelGroups>; key: string; room: Map<string, number> } | null = null;
-  /** The last labels laid out (labelsNow), carried with the camera since. */
-  private labLast: {
-    fan: Fan;
-    lg: ReturnType<typeof labelGroups>;
-    lod: Lod | null;
-    lodGen: number;
-    w: number;
-    h: number;
-    topLine: number;
-    t: number;
-    frames: number;
-    cam: Camera;
-    br: Brackets | null;
-    top: number;
-    spots: LabelSpot[];
-  } | null = null;
   /** The labels' and brackets' work per frame (ms, labelsNow; the pictures' and fades' in drawLabels not counted). */
   readonly labelMs: number[] = [];
   /** ...and with drawLabels' (the fades, the pictures, the "+x", the pills drawn) and the pinned rows'. */
   readonly labelAllMs: number[] = [];
-  /** Each label layout's time (labelsNow when it laid out, not carried: ToLaD#255's ≤50 ms on the phone proxy). */
-  readonly labelLayMs: number[] = [];
 
   /**
    * The parent columns below each split (the stem below the oldest): their
@@ -3729,69 +2675,10 @@ export class FanView implements InputHandlers {
     return (bar ? bar[3] : 44) + 8;
   }
 
-  /** The level's groups on screen (ToLaD#262), left to right: each its id (its names' spots'), level, centre (screen x). */
-  private levelGroupsOn(lg: ReturnType<typeof labelGroups> & { lod: Lod | null }, carried = false): { id: string; lv: Level; x: number }[] {
-    // (The groups and their centres (world x) found once per layout; carried frames, ToLaD#255, only move them on screen.)
-    let G = this.groupsLaid;
-    const ver = this.fan.tess.fold?.ver ?? 0;
-    const gen = lg.lod?.gen ?? -1;
-    if (!G || G.lg !== lg.groups || (!carried && (G.ver !== ver || G.gen !== gen))) {
-      const all: { id: string; lv: Level; wx: number }[] = [];
-      for (const g of lg.groups) if (!lg.lod?.hidden(g.v)) all.push({ id: `n${g.vi}`, lv: { v: g.v }, wx: groupCentre({ v: g.v }) });
-      for (const b of lg.species) if (!lg.lod || lg.lod.of[b.index] < 0) all.push({ id: String(b.sp.gid), lv: { b }, wx: groupCentre({ b }) });
-      // (Left to right in the world is left to right on screen.)
-      all.sort((p, q) => p.wx - q.wx);
-      G = this.groupsLaid = { lg: lg.groups, ver, gen, all };
-    }
-    const out: { id: string; lv: Level; x: number }[] = [];
-    for (const g of G.all) {
-      const x = this.toScreen(g.wx, 0)[0];
-      if (x > -PIC_D / 2 && x < this.w + PIC_D / 2) out.push({ id: g.id, lv: g.lv, x });
-    }
-    return out;
-  }
-  private groupsLaid: { lg: unknown; ver: number; gen: number; all: { id: string; lv: Level; wx: number }[] } | null = null;
-
-  /** The level's pictures this frame (ToLaD#262): each group's on screen with a picture, as placed (pics.ts) and the group it opens. */
+  /** This frame's pictures (cutLabels), each with the level or species it opens. */
   picSpots: (PicSpot & { lv: Level; face: FanBranch })[] = [];
-  /** The level's groups hidden this frame (ToLaD#262): each the shown name it counts on as "+x" (its id), or null for none shown. */
-  hiddenGroups: { lv: Level; on: string | null }[] = [];
 
-  /**
-   * The level's groups' pictures (ToLaD#262, #266): on "now" (an extinct species' on its tip), each exactly above its
-   * group's centre; crowded, smaller, then overlapping a little, then the least populous dropped (pics.ts).
-   */
-  private groupPics(lg: ReturnType<typeof labelGroups> & { lod: Lod | null }, top: number, carried: Carry | null = null): PicSpot[] {
-    // (Carried with the camera between layouts, ToLaD#255: each standing on "now", or its tip, where it was placed.)
-    if (carried) {
-      for (const p of this.picSpots) {
-        p.x = carried[0] * p.x + carried[1];
-        p.y = carried[2] * p.y + carried[3];
-      }
-      return this.picSpots;
-    }
-    this.picSpots = [];
-    const nowS = this.toScreen(0, this.yNow)[1];
-    // (Fit fossils, ToLaD#298: the fossils' frame has "now" above the screen, an extinct species' picture still on its tip.)
-    const fossils = true;
-    if (nowS > this.h || (!fossils && nowS < top + 12)) return [];
-    const gs: { lv: Level; face: FanBranch; x: number; y: number; n: number }[] = [];
-    for (const g of this.levelGroupsOn(lg)) {
-      const face = g.lv.v ? groupFace(g.lv.v) : g.lv.b;
-      if (!face || !wikiOf(face.sp.sci)?.img) continue;
-      // (Fossils framed, ToLaD#298: a genus all gone on its youngest tip; a living group's, "now" above the screen,
-      // under the top line, over its name.)
-      const tip = g.lv.b ? g.lv.b.tipY : fossils && g.lv.v.strands.every((b) => b.tipY > this.yNow) ? Math.min(...g.lv.v.strands.map((b) => b.tipY)) : this.yNow;
-      const y = tip > this.yNow ? this.toScreen(0, tip)[1] : fossils ? Math.max(nowS, top + NOW_ROOM) : nowS;
-      if (y < top + 12 || y > this.h) continue;
-      gs.push({ lv: g.lv, face, x: g.x, y, n: groupAlive(g.lv) });
-    }
-    const placed = placePics(gs.map((g) => g.x), gs.map((g) => g.y), gs.map((g) => g.n));
-    this.picSpots = placed.map((p) => ({ ...p, lv: gs[p.i].lv, face: gs[p.i].face }));
-    return placed;
-  }
-
-  /** Draw the level's pictures (groupPics), the least populous first (the more populous on top). Each a tap to its group. */
+  /** Draw this frame's pictures (cutLabels). Each a tap to its group. */
   private drawGroupPics(): void {
     const ctx = this.ctx;
     const alpha = 1;
@@ -3814,35 +2701,6 @@ export class FanView implements InputHandlers {
       }
     }
     ctx.restore();
-  }
-
-  /** The "+x" room each name keeps (its id: px), from the frame before (ToLaD#262). */
-  private plusRoom = new Map<string, number>();
-
-  /**
-   * The level's names hidden (ToLaD#262): each group on screen with no name shown counts as "+x" on the shown name
-   * nearest it (by their centres); `groups` gets, per shown spot, the hidden groups' species (a tap frames them all).
-   */
-  private groupPlus(lg: ReturnType<typeof labelGroups> & { lod: Lod | null }, spots: readonly LabelSpot[], on: Map<string, boolean>, groups: Map<string, FanBranch[][]>, carried = false): Map<string, number> {
-    const shownKey = new Map<string, string>();
-    for (const s of spots) if (on.get(s.key)) shownKey.set(s.id, s.key);
-    const gs = this.levelGroupsOn(lg, carried).filter((g) => g.x >= LABEL_AXIS_X - 4 && g.x <= this.w + 4);
-    const shown = gs.filter((g) => shownKey.has(g.id));
-    this.hiddenGroups = [];
-    const count = new Map<string, number>();
-    for (const g of gs) {
-      if (shownKey.has(g.id)) continue;
-      let at: (typeof gs)[number] | null = null;
-      for (const q of shown) if (!at || Math.abs(q.x - g.x) < Math.abs(at.x - g.x)) at = q;
-      this.hiddenGroups.push({ lv: g.lv, on: at?.id ?? null });
-      if (!at) continue;
-      const key = shownKey.get(at.id)!;
-      let list = groups.get(key);
-      if (!list) groups.set(key, (list = []));
-      list.push(g.lv.v ? g.lv.v.strands : [g.lv.b!]);
-      count.set(at.id, (count.get(at.id) ?? 0) + 1);
-    }
-    return new Map([...count].map(([id, n]) => [id, this.plusPx(n)]));
   }
 
   /** Length (px) a pill keeps at its top end for a "+n" badge (ToLaD#197): none for 0. */
@@ -3880,63 +2738,26 @@ export class FanView implements InputHandlers {
   private nameWFont = '';
 
   /**
-   * The species' labels (see labelSpots for where): which show is decided by
-   * resolveLabels (a fixed priority, with hysteresis), and each fades in and
-   * out over LABEL_FADE_MS rather than popping.
+   * This frame's labels (cutLabels): the brackets, the pictures, the name and "+x" pills. Each drawn whole where the
+   * cut puts it, no fade (a fit fades it only at the legend at the bottom: `fit`).
    */
-  private drawLabels(spots: LabelSpot[], br: Brackets | null = null, lg?: ReturnType<typeof labelGroups> & { top: number; lod: Lod | null }, carried: Carry | null = null, cut?: CutLabels): void {
+  private drawLabels(cut: CutLabels, br: Brackets | null): void {
     const ctx = this.ctx;
-    const now = performance.now();
-    const dt = Math.min(100, Math.max(0, now - this.labelT));
-    this.labelT = now;
-    // (At rest, chosen afresh: what a still view gives, whatever the way here, ToLaD#255.)
-    const st0 = this.labelState;
-    // (ToLaD#333: every item of the cut shown, its "+x" its species not named.)
-    const on = cut ? new Map(spots.map((s) => [s.key, true])) : resolveLabels(spots, this.labClean ? () => false : (key) => !!st0.get(key)?.on);
-    // The "+x" badges (ToLaD#197): counted with the cull; a pill keeps room for its count from the frame before, so
-    // when a count changes the next frame lays the pills out again with the room it needs.
-    // (Not with one pill per group, ToLaD#258: plusGroups and familyPills, ToLaD#197 and #212, give way to labelGroups.)
-    const groups = cut?.groups ?? new Map<string, FanBranch[][]>();
+    const { spots, groups, pics } = cut;
     this.famHits.length = 0;
     this.nameHits.length = 0;
     this.plusHits.length = 0;
     this.eventLabels.length = 0;
-    let moving = false;
-    ctx.save();
-    ctx.textBaseline = 'middle';
-    ctx.textAlign = 'left';
-    ctx.font = font(LABEL_FONT);
-    const thumbs: [number, number][] = [];
     this.thumbHits.length = 0;
-    const alphas = new Float32Array(spots.length);
-    spots.forEach((s, k) => {
-      const want = on.get(s.key) ? 1 : 0;
-      let st = this.labelState.get(s.key);
-      if (!st) this.labelState.set(s.key, (st = { on: want === 1, a: want }));
-      st.on = want === 1;
-      if (st.a !== want) {
-        const step = dt / LABEL_FADE_MS;
-        st.a = want > st.a ? Math.min(want, st.a + step) : Math.max(want, st.a - step);
-        moving = true;
-      }
-      alphas[k] = st.a * s.fit;
-    });
-    // The level's groups (ToLaD#262): each one's picture over "now", exactly above its centre; the names hidden, as "+x".
-    const pics = cut ? cut.pics : lg ? this.groupPics(lg, lg.top, carried) : [];
-    if (lg) {
-      // (At rest the room was settled already, labelsNow.)
-      const room = this.groupPlus(lg, spots, on, groups, !!carried);
-      if (!this.labClean) this.plusRoom = room;
-    }
-    // The clades' brackets (ToLaD#193) under the pills: their labels clear of the pills shown, their lines behind them.
-    br?.draw(ctx, FAMILY_INK, INK3, [...spots.filter((_, k) => alphas[k] > 0.3).map((s) => s.box), ...pics.map((p) => [p.x - p.d / 2, p.y - p.d / 2, p.x + p.d / 2, p.y + p.d / 2])]);
+    // The clades' brackets (ToLaD#193) under the pills: their labels clear of the pills and pictures, their lines behind them.
+    br?.draw(ctx, FAMILY_INK, INK3, [...spots.filter((s) => s.fit > 0.3).map((s) => s.box), ...pics.map((p) => [p.x - p.d / 2, p.y - p.d / 2, p.x + p.d / 2, p.y + p.d / 2])]);
     this.drawGroupPics();
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'left';
     ctx.font = font(LABEL_FONT);
     for (let k = 0; k < spots.length; k++) {
       const s = spots[k];
-      const alpha = alphas[k];
+      const alpha = s.fit;
       const [x0, y0, x1, y1] = s.box;
       if (alpha < 0.01 || x1 < 0 || x0 > this.w || y1 < 0 || y0 > this.h) continue;
       if (s.ev !== undefined && s.b && alpha > 0.5) this.eventLabels.push({ box: [x0, y0, x1, y1], b: s.b, k: s.ev });
@@ -3990,21 +2811,8 @@ export class FanView implements InputHandlers {
         if (alpha > 0.5) this.plusHits.push({ box: [x0, y0, x1, y1], badge: [x0, y0, x1, y1 - LABEL_PAD - nx + PLUS_GAP / 2], bs });
       }
       ctx.restore();
-      // ToLaD#182: the species' Commons picture under its pill, before the name, once loaded (wiki.ts; `?thumbs=0` off).
-      // (A family's, ToLaD#212: its commonest living species'.)
-      const pb = s.fam ? s.pic : s.b;
-      // (A level's groups' pictures stand over "now" instead, groupPics, ToLaD#262.)
-      const th = pb && s.ev === undefined && !lg && !cut ? labelThumb(pb.sp.sci, () => this.request()) : null;
-      // (One picture where two would overlap, the first one shown: fewer and clearer, ToLaD#193. A fading one still draws.)
-      const ty = y1 + THUMB_D / 2 + 2;
-      if (th && alpha > 0.5 && !thumbs.some(([x, y]) => Math.abs(x - s.x) < THUMB_D - 4 && Math.abs(y - ty) < THUMB_D - 4)) {
-        thumbs.push([s.x, ty]);
-        if (pb) this.thumbHits.push([s.x, ty, THUMB_D / 2, pb, s.fam]);
-        drawThumb(ctx, th, s.x, ty, THUMB_D);
-      } else if (th && alpha <= 0.5) drawThumb(ctx, th, s.x, ty, THUMB_D);
     }
     ctx.restore();
-    if (moving) this.request();
   }
 
   /**

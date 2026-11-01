@@ -1,7 +1,7 @@
 // ?frame=cut (ToLaD#333, research/scalable-tree.md §4, plan step 3): a level, a bracket's tap and a "+x" tap frame their
 // territory across the labels' width of the screen, so every label shown there stands whole on screen, with no padding;
 // a "+x" lands with the species it counted on screen. With ?labels=cut (the cut's labels).
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { loadMammalsFromFiles } from './mammals-node';
 import { CARNIVORA, mammaliaClade, type CladeRec } from './panthera';
 import { CARNIVORA_TREE, mammaliaTree, type Split } from './splits';
@@ -45,19 +45,10 @@ function stubView(clade: CladeRec = CARNIVORA, tree: Split = CARNIVORA_TREE, fol
   return new FanView(canvas as unknown as HTMLCanvasElement, clade, tree, folds);
 }
 
-const was = [FanView.labelsCut, FanView.frameCut];
-beforeAll(() => {
-  FanView.labelsCut = true;
-  FanView.frameCut = true;
-});
-afterAll(() => {
-  [FanView.labelsCut, FanView.frameCut] = was;
-});
 
-type Priv = { anim: ((t: number) => boolean) | null; applyFold(): void; labelState: Map<string, unknown> };
+type Priv = { anim: ((t: number) => boolean) | null; applyFold(): void };
 const P = (v: FanView) => v as unknown as Priv;
 function settle(v: FanView): void {
-  P(v).labelState.clear();
   for (let k = 0; k < 3; k++) v.draw();
 }
 function run(v: FanView): void {

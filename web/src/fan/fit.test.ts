@@ -54,7 +54,6 @@ function stubView(clade: CladeRec, tree: Split, folds = true): FanView {
 }
 
 const settle = (v: FanView) => {
-  (v as unknown as { labelState: Map<string, unknown> }).labelState.clear();
   for (let k = 0; k < 3; k++) v.draw();
 };
 

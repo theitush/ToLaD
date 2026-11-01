@@ -25,11 +25,6 @@
 import { isNode, type Fan, type FanBranch, type FanNode } from './layout';
 import type { Steady } from './steady';
 
-/** Old tests' switch until they are ported or deleted (ToLaD#342): the cut is the only label system. */
-export function wantCutLabels(): boolean {
-  return true;
-}
-
 /** Fit zooms are resolved to 1/LADDER of a doubling (rounded up): a resolution, not a look. */
 export const LADDER = 32;
 

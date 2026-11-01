@@ -1,14 +1,12 @@
 // One tap = one level deeper, a double-tap = one level out, one pill per group one level down (ToLaD#258).
 import { describe, expect, it } from 'vitest';
-import { wantCutLabels } from './cut';
 import { laneAt, layoutFan, leftAt, type FanBranch, type FanNode } from './layout';
 import { CARNIVORA, FELIDAE, mammaliaClade, type CladeRec } from './panthera';
 import { loadMammalsFromFiles } from './mammals-node';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, type Split } from './splits';
-import { FanView, groupAlive, groupFace, holds, isLevel, labelGroups, labelSpots, levelName, levelUp, nextLevels, type Level } from './view';
+import { FanView, groupFace, holds, isLevel, levelName, levelUp, nextLevels, type Level } from './view';
 import type { Camera } from './camera';
 import { wikiOf } from './wiki';
-import { PIC_LIFT, PIC_OVERLAP } from './pics';
 
 function stubView(clade: CladeRec = CARNIVORA, tree: Split = CARNIVORA_TREE, folds = true): FanView {
   const noop = () => {};
@@ -49,7 +47,6 @@ function stubView(clade: CladeRec = CARNIVORA, tree: Split = CARNIVORA_TREE, fol
 type Priv = {
   anim: ((t: number) => boolean) | null;
   applyFold(): void;
-  labelState: Map<string, unknown>;
   frameOf(lv: Level): Camera;
   offBy(a: Camera, c: Camera): number;
   tapAt: unknown;
@@ -89,7 +86,6 @@ function settle(v: FanView): void {
   // (A first draw lays the "+x" rooms out for this frame: run() flies without drawing, so they are the take-off's.
   // Without it a name moved by its new room restarts its fade and is checked half there, ToLaD#273.)
   v.draw();
-  P(v).labelState.clear();
   for (let k = 0; k < 3; k++) v.draw();
 }
 function home(v: FanView): void {
@@ -137,36 +133,7 @@ describe("a group's picture is its most-populous living species with a picture (
   }
 });
 
-describe.skipIf(wantCutLabels())('one pill per group one level down, titled with its name, pictured by its face (ToLaD#258)', () => {
-  for (const [name, mk] of FANS) {
-    it(name, () => {
-      const v = mk();
-      home(v);
-      const lv = v.levelNow();
-      expect(lv.v).toBe(v.fan.root);
-      const groups = nextLevels(v.fan, v.fan.root);
-      // Every pill shown at home is one of home's groups: a clade's pill for a clade, a species' for a species.
-      for (const h of v.famHits) expect(groups.some((g) => g.v === h.v)).toBe(true);
-      for (const h of v.nameHits) expect(groups.some((g) => g.b === h.b)).toBe(true);
-      expect(v.famHits.length + v.nameHits.length).toBeGreaterThan(0);
-      // (A "+x" only for groups whose names are hidden, ToLaD#262.)
-      for (const h of v.plusHits) for (const b of h.bs) expect(v.hiddenGroups.some((g) => (g.lv.v ? g.lv.v.strands.includes(b) : g.lv.b === b))).toBe(true);
-      // Each clade's pill: its name, its face's picture.
-      const spots = labelSpots(v.camera, v.fan, 60, (t) => t.length * 7.5, undefined, undefined, undefined, undefined, null, labelGroups(v.fan, lv));
-      // (Beside its branch, ToLaD#262.)
-      const fams = spots.filter((q) => q.fam);
-      expect(fams.length).toBeGreaterThan(0);
-      for (const q of fams) {
-        expect(q.text).toBe(levelName(q.fam!));
-        expect(q.pic).toBe(groupFace(q.fam!));
-      }
-      // No species pill but a group's own.
-      for (const q of spots) if (q.b && q.place === 'tip') expect(labelGroups(v.fan, lv).species.has(q.b)).toBe(true);
-    });
-  }
-});
-
-describe.skipIf(wantCutLabels())('a tap goes one level deeper, a double-tap one level out (ToLaD#258)', () => {
+describe('a tap goes one level deeper, a double-tap one level out (ToLaD#258)', () => {
   for (const [name, mk] of FANS) {
     it(`${name}: a column, tapped again and again from home, then double-tapped home`, () => {
       const v = mk();
@@ -269,7 +236,6 @@ function nowExtent(v: FanView, all: readonly FanBranch[]): [number, number] {
   }
   return [lo, hi];
 }
-const strandsOf = (lv: Level) => (lv.b ? [lv.b] : lv.v.strands);
 
 /** At home and at each level a tap reaches on the way from home to a few species (each landed), `at`. */
 function levelsOnTheWay(v: FanView, step: number, at: (v: FanView) => void): void {
@@ -284,49 +250,6 @@ function levelsOnTheWay(v: FanView, step: number, at: (v: FanView) => void): voi
     }
   }
 }
-
-describe.skipIf(wantCutLabels())('each group\'s picture on "now", exactly above its centre; crowded, a little overlap or dropped (ToLaD#262, #266)', () => {
-  for (const [name, mk] of FANS) {
-    it(name, () => {
-      const v = mk();
-      const bad: string[] = [];
-      let seen = 0;
-      levelsOnTheWay(v, v.fan.tess.fold ? 61 : 7, (v) => {
-        const lv = v.levelNow();
-        if (lv.b) return;
-        const at = nameOf(lv);
-        const nowS = v.toScreen(0, v.fan.time.y(0))[1];
-        const pop = groupAlive;
-        // Every group one level down whose centre is on screen, with a face that has a picture, has its disc, on "now"
-        // (an extinct species' on its tip), never above it; else a more populous group's disc stands too near it.
-        for (const g of nextLevels(v.fan, lv.v)) {
-          const [lo, hi] = nowExtent(v, strandsOf(g));
-          const cx = (lo + hi) / 2;
-          if (cx < 0 || cx > v.w) continue;
-          const face = g.v ? groupFace(g.v) : g.b;
-          if (!face || !wikiOf(face.sp.sci)?.img) continue;
-          const p = v.picSpots.find((q) => (g.v ? q.lv.v === g.v : q.lv.b === g.b));
-          const edge = g.b && g.b.tipY > v.fan.time.y(0) ? v.toScreen(0, g.b.tipY)[1] : nowS;
-          if (!p) {
-            if (!v.picSpots.some((q) => pop(q.lv) >= pop(g) && Math.abs(q.x - cx) < PIC_OVERLAP * q.d + 1e-6)) bad.push(`${at}: ${nameOf(g)} has no picture, none more populous near`);
-          } else {
-            seen++;
-            if (Math.abs(p.x - cx) > 0.5) bad.push(`${at}: ${nameOf(g)}'s picture ${(p.x - cx).toFixed(1)} px off its centre`);
-            if (Math.abs(p.y + p.d / 2 - (edge - PIC_LIFT)) > 0.5) bad.push(`${at}: ${nameOf(g)}'s picture ${(edge - PIC_LIFT - p.y - p.d / 2).toFixed(1)} px off the now edge`);
-          }
-        }
-        const ps = v.picSpots;
-        for (let i = 0; i < ps.length; i++)
-          for (let j = i + 1; j < ps.length; j++)
-            if (Math.hypot(ps[i].x - ps[j].x, ps[i].y - ps[j].y) < PIC_OVERLAP * Math.min(ps[i].d, ps[j].d) - 1e-6) bad.push(`${at}: ${nameOf(ps[i].lv)} and ${nameOf(ps[j].lv)} overlap more than a little`);
-        // The more populous drawn later (on top).
-        for (let i = 1; i < ps.length; i++) if (pop(ps[i].lv) < pop(ps[i - 1].lv)) bad.push(`${at}: ${nameOf(ps[i].lv)} drawn over the more populous ${nameOf(ps[i - 1].lv)}`);
-      });
-      expect(seen).toBeGreaterThan(0);
-      expect(bad).toEqual([]);
-    });
-  }
-});
 
 describe('a level of two or three groups is framed centred, in the middle of the screen (ToLaD#262)', () => {
   for (const [name, mk] of FANS) {
@@ -347,43 +270,6 @@ describe('a level of two or three groups is framed centred, in the middle of the
       });
       expect(bad).toEqual([]);
       expect(seen).toBeGreaterThan(0);
-    });
-  }
-});
-
-describe.skipIf(wantCutLabels())('a "+x" stands for the names hidden near it; tapped, it frames them (ToLaD#262)', () => {
-  for (const [name, mk] of FANS) {
-    it(name, () => {
-      const v = mk();
-      let tried = 0;
-      const bad: string[] = [];
-      levelsOnTheWay(v, v.fan.tess.fold ? 61 : 7, (v) => {
-        const at = nameOf(v.levelNow());
-        // Each hidden group counts on a shown name's "+x" (when any is shown), each once.
-        if (v.famHits.length + v.nameHits.length && v.hiddenGroups.some((h) => h.on === null)) bad.push(`${at}: a hidden name on no "+x"`);
-        const n = v.plusHits.reduce((s, h) => s + h.bs.length, 0);
-        const want = v.hiddenGroups.reduce((s, h) => s + (h.on ? strandsOf(h.lv).length : 0), 0);
-        if (n !== want) bad.push(`${at}: the "+x" hold ${n} species, the hidden names ${want}`);
-        const h = v.plusHits[0];
-        if (!h || tried > 2) return;
-        tried++;
-        const cam = { ...v.cam };
-        v.tap((h.box[0] + h.box[2]) / 2, (h.box[1] + h.box[3]) / 2);
-        if (!P(v).anim) bad.push(`${at}: a "+x" tapped flew nowhere`);
-        run(v);
-        // Landed on the hidden groups' frame, their columns all on screen.
-        // (One species hidden: a landing on it, its frame, ToLaD#266.)
-        const to = h.bs.length === 1 ? v.speciesCamera(h.bs[0]) : v.groupCamera(h.bs);
-        if (Math.abs(Math.log(v.cam.sx / to.sx)) > 0.05) bad.push(`${at}: a "+x" landed off its frame`);
-        const [a, b] = nowExtent(v, h.bs);
-        if (a < -2 || b > v.w + 2) bad.push(`${at}: a "+x" landed with its groups off screen (${a.toFixed(0)}–${b.toFixed(0)})`);
-        v.cam = cam;
-        v.camera.settle();
-        P(v).applyFold();
-        settle(v);
-      });
-      expect(bad).toEqual([]);
-      expect(tried).toBeGreaterThan(0);
     });
   }
 });
