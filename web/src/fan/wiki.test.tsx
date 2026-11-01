@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { bigSrcOf, RangeMap, SpeciesCard, WikiPic } from './FanApp';
 import { FELIDAE } from './panthera';
-import { labelThumb, wikiOf } from './wiki';
+import { drawPic, PIC_CAP, PIC_FADE_MS, PicLoader, picSrcOf, wikiOf } from './wiki';
 
 const lion = FELIDAE.species.find((s) => s.sci === 'Panthera leo')!;
 
@@ -115,44 +115,135 @@ describe('range map (ToLaD#196)', () => {
   });
 });
 
-describe('label thumbnails (ToLaD#182)', () => {
+describe('the tree pictures: placeholder at once, fetched ahead (ToLaD#351)', () => {
+  // An image whose load the test settles: decode() resolves or rejects when told.
   class FakeImage {
     static made: FakeImage[] = [];
     src = '';
     crossOrigin = '';
     referrerPolicy = '';
     decoding = '';
-    complete = false;
     naturalWidth = 0;
     naturalHeight = 0;
-    onload: (() => void) | null = null;
-    onerror: (() => void) | null = null;
+    settle: (ok: boolean) => void = () => {};
+    decode(): Promise<void> {
+      return new Promise((res, rej) => {
+        this.settle = (ok) => {
+          if (ok) Object.assign(this, { naturalWidth: 250, naturalHeight: 167 });
+          (ok ? res : rej)();
+        };
+      });
+    }
     constructor() {
       FakeImage.made.push(this);
     }
   }
-  afterEach(() => vi.unstubAllGlobals());
+  const tick = () => new Promise((r) => setTimeout(r, 0));
+  let t = 0;
+  const fresh = () => {
+    FakeImage.made = [];
+    t = 0;
+    return new PicLoader(() => new FakeImage() as unknown as HTMLImageElement, () => t);
+  };
+  // A canvas that only records whether a picture was drawn, and at what alpha.
+  const ctxRec = () => {
+    const drawn: number[] = [];
+    let fills = 0;
+    const ctx = {
+      globalAlpha: 1,
+      save() {},
+      restore() {},
+      beginPath() {},
+      arc() {},
+      clip() {},
+      stroke() {},
+      fill() {
+        fills++;
+      },
+      fillText() {},
+      drawImage() {
+        drawn.push(ctx.globalAlpha);
+      },
+    };
+    return { ctx: ctx as unknown as CanvasRenderingContext2D, drawn, fills: () => fills };
+  };
+  const sp = FELIDAE.species.filter((s) => wikiOf(s.sci)?.img).map((s) => s.sci);
+  const url = (s: string) => wikiOf(s)!.img!;
 
-  it('is nothing until loaded, nothing on error, and asks for one redraw on load', () => {
-    vi.stubGlobal('Image', FakeImage);
+  it('asks Commons for the 250 px thumbnail (its standard width sharp for a 50 px disc at 3×), any page prefix kept', () => {
+    expect(picSrcOf('https://upload.wikimedia.org/wikipedia/commons/thumb/b/b9/A_b.png/330px-A_b.png')).toBe('https://upload.wikimedia.org/wikipedia/commons/thumb/b/b9/A_b.png/250px-A_b.png');
+    expect(picSrcOf('https://upload.wikimedia.org/wikipedia/commons/thumb/9/9a/D.tif/lossy-page1-330px-D.tif.jpg')).toBe('https://upload.wikimedia.org/wikipedia/commons/thumb/9/9a/D.tif/lossy-page1-250px-D.tif.jpg');
+    expect(picSrcOf('https://upload.wikimedia.org/wikipedia/commons/thumb/b/b9/A.png/120px-A.png')).toBe('https://upload.wikimedia.org/wikipedia/commons/thumb/b/b9/A.png/120px-A.png');
+    expect(picSrcOf('https://upload.wikimedia.org/wikipedia/commons/b/b9/A.png')).toBe('https://upload.wikimedia.org/wikipedia/commons/b/b9/A.png');
+  });
+
+  it('draws the placeholder disc before the load, then fades the picture in over PIC_FADE_MS, then asks no more redraws', async () => {
+    const L = fresh();
     const request = vi.fn();
-    const sp = FELIDAE.species.filter((s) => wikiOf(s.sci)?.img);
-    const [a, b] = [sp[0].sci, sp[1].sci];
-    expect(labelThumb(a, request)).toBeNull();
-    expect(labelThumb(b, request)).toBeNull();
-    const [ia, ib] = FakeImage.made;
-    expect(ia.crossOrigin).toBe('anonymous');
-    expect(ia.src).toBe(wikiOf(a)!.img);
-    Object.assign(ia, { complete: true, naturalWidth: 330, naturalHeight: 220 });
-    ia.onload!();
-    expect(request).toHaveBeenCalledTimes(1);
-    expect(labelThumb(a, request)).toBe(ia);
-    ib.onerror!();
-    expect(labelThumb(b, request)).toBeNull();
-    expect(FakeImage.made.length).toBe(2); // cached: no second load
-    const none = FELIDAE.species.find((s) => !wikiOf(s.sci)?.img);
-    if (none) expect(labelThumb(none.sci, request)).toBeNull();
-    expect(FakeImage.made.length).toBe(2);
+    const r = ctxRec();
+    drawPic(r.ctx, sp[0], 50, 50, 50, request, L);
+    expect(r.drawn).toEqual([]); // placeholder only
+    expect(r.fills()).toBe(2); // its ring's dark disc and its quiet fill
+    const [img] = FakeImage.made;
+    expect(img.src).toBe(picSrcOf(url(sp[0])));
+    expect(img.crossOrigin).toBe('anonymous');
+    t = 1000;
+    img.settle(true);
+    await tick();
+    expect(request).toHaveBeenCalledTimes(1); // one redraw on load
+    t = 1000 + PIC_FADE_MS / 2;
+    drawPic(r.ctx, sp[0], 50, 50, 50, request, L);
+    expect(r.drawn).toEqual([0.5]); // half faded in, over the placeholder
+    expect(request).toHaveBeenCalledTimes(2); // the fade's next frame
+    t = 1000 + PIC_FADE_MS;
+    const n = r.fills();
+    drawPic(r.ctx, sp[0], 50, 50, 50, request, L);
+    expect(r.drawn).toEqual([0.5, 1]);
+    expect(r.fills() - n).toBe(1); // the placeholder's fill no longer under it
+    expect(request).toHaveBeenCalledTimes(2); // faded in: no further redraws
+    expect(FakeImage.made.length).toBe(1); // loaded once
+  });
+
+  it('keeps at most PIC_CAP loading, the pictures on screen before those fetched ahead', async () => {
+    const L = fresh();
+    const ahead = sp.slice(0, 10).map(url);
+    L.ahead(ahead);
+    expect(L.inFlight).toBe(PIC_CAP);
+    expect(FakeImage.made.map((i) => i.src)).toEqual(ahead.slice(0, PIC_CAP).map(picSrcOf));
+    // One on screen jumps the queue: the next free slot is its.
+    L.want(url(sp[12]));
+    expect(L.inFlight).toBe(PIC_CAP);
+    FakeImage.made[0].settle(true);
+    await tick();
+    expect(L.inFlight).toBe(PIC_CAP);
+    expect(FakeImage.made[PIC_CAP].src).toBe(picSrcOf(url(sp[12])));
+    // A new list ahead replaces the queued rest of the old one.
+    L.ahead([url(sp[13])]);
+    for (const i of FakeImage.made.slice(1)) i.settle(true);
+    await tick();
+    expect(FakeImage.made.slice(PIC_CAP + 1).map((i) => i.src)).toEqual([picSrcOf(url(sp[13]))]);
+    FakeImage.made[PIC_CAP + 1].settle(true);
+    await tick();
+    expect(L.inFlight).toBe(0);
+  });
+
+  it('falls back to the stored URL, and a picture that fails stays a placeholder', async () => {
+    const L = fresh();
+    const request = vi.fn();
+    const r = ctxRec();
+    drawPic(r.ctx, sp[0], 50, 50, 50, request, L);
+    FakeImage.made[0].settle(false); // the 250 px one refused
+    await tick();
+    expect(FakeImage.made[1].src).toBe(url(sp[0])); // the stored one tried
+    FakeImage.made[1].settle(false);
+    await tick();
+    expect(L.failed(url(sp[0]))).toBe(true);
+    expect(L.inFlight).toBe(0);
+    drawPic(r.ctx, sp[0], 50, 50, 50, request, L);
+    expect(r.drawn).toEqual([]);
+    expect(r.fills()).toBe(4); // still the placeholder, every frame
+    expect(FakeImage.made.length).toBe(2); // not asked again
+    expect(request).not.toHaveBeenCalled();
   });
 });
 

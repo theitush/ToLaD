@@ -4,7 +4,7 @@
 // in far enough, a branch resolves into the individuals themselves (twigs.ts).
 // Gestures come from the shared engine/input.ts.
 
-import { drawThumb, labelThumb, thumbsOn, wikiOf } from './wiki';
+import { drawPic, hasPic, prefetchPics, thumbsOn, wikiOf } from './wiki';
 import { PIC_D, PIC_LIFT, placePics, type PicSpot } from './pics';
 import { formatCount, formatMass } from '../data/count';
 import { stamp } from '../stamp';
@@ -1063,6 +1063,14 @@ export function groupFace(v: FanNode): FanBranch | null {
     out = alive.find((b) => wikiOf(b.sp.sci)?.img) ?? alive[0] ?? null;
     faceCache.set(v, out);
   }
+  return out;
+}
+
+/** The species whose pictures a tap on group v would show (its next level's faces, ToLaD#351: fetched ahead). */
+const nextFaceCache = new WeakMap<FanNode, string[]>();
+function nextFaces(fan: Fan, v: FanNode): string[] {
+  let out = nextFaceCache.get(v);
+  if (!out) nextFaceCache.set(v, (out = nextLevels(fan, v).flatMap((g) => (g.b ?? groupFace(g.v))?.sp.sci ?? [])));
   return out;
 }
 
@@ -3753,18 +3761,9 @@ export class FanView implements InputHandlers {
     ctx.lineWidth = 1;
     // (Hits: the one on top found first.)
     for (const p of [...this.picSpots].reverse()) this.thumbHits.push([p.x, p.y, p.d / 2, p.face, p.lv.v]);
-    for (const p of this.picSpots) {
-      const th = labelThumb(p.face.sp.sci, () => this.request());
-      if (th) drawThumb(ctx, th, p.x, p.y, p.d);
-      else {
-        // (Its picture still loading: the disc's place kept, an empty ring.)
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.d / 2 - 1, 0, 2 * Math.PI);
-        ctx.fillStyle = BG;
-        ctx.fill();
-        ctx.stroke();
-      }
-    }
+    // (Its placeholder at once, the picture fading in when loaded; what a tap would show next fetched ahead, ToLaD#351.)
+    for (const p of this.picSpots) drawPic(ctx, p.face.sp.sci, p.x, p.y, p.d, () => this.request());
+    prefetchPics(this.picSpots.flatMap((p) => (p.lv.v ? nextFaces(this.fan, p.lv.v) : [])));
     ctx.restore();
   }
 
@@ -3942,18 +3941,18 @@ export class FanView implements InputHandlers {
         if (alpha > 0.5) this.plusHits.push({ box: [x0, y0, x1, y1], badge: [x0, y0, x1, y1 - LABEL_PAD - nx + PLUS_GAP / 2], bs });
       }
       ctx.restore();
-      // ToLaD#182: the species' Commons picture under its pill, before the name, once loaded (wiki.ts; `?thumbs=0` off).
-      // (A family's, ToLaD#212: its commonest living species'.)
+      // ToLaD#182: the species' Commons picture under its pill, before the name (wiki.ts; `?thumbs=0` off): its
+      // placeholder at once, the picture fading in when loaded (ToLaD#351). (A family's, ToLaD#212: its commonest living species'.)
       const pb = s.fam ? s.pic : s.b;
       // (A level's groups' pictures stand over "now" instead, groupPics, ToLaD#262.)
-      const th = pb && s.ev === undefined && !lg && !cut ? labelThumb(pb.sp.sci, () => this.request()) : null;
+      const th = pb && s.ev === undefined && !lg && !cut && hasPic(pb.sp.sci) ? pb.sp.sci : null;
       // (One picture where two would overlap, the first one shown: fewer and clearer, ToLaD#193. A fading one still draws.)
       const ty = y1 + THUMB_D / 2 + 2;
       if (th && alpha > 0.5 && !thumbs.some(([x, y]) => Math.abs(x - s.x) < THUMB_D - 4 && Math.abs(y - ty) < THUMB_D - 4)) {
         thumbs.push([s.x, ty]);
         if (pb) this.thumbHits.push([s.x, ty, THUMB_D / 2, pb, s.fam]);
-        drawThumb(ctx, th, s.x, ty, THUMB_D);
-      } else if (th && alpha <= 0.5) drawThumb(ctx, th, s.x, ty, THUMB_D);
+        drawPic(ctx, th, s.x, ty, THUMB_D, () => this.request());
+      } else if (th && alpha <= 0.5) drawPic(ctx, th, s.x, ty, THUMB_D, () => this.request());
     }
     ctx.restore();
     if (moving) this.request();
