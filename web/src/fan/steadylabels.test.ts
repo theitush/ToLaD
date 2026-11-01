@@ -9,7 +9,7 @@ import { loadMammalsFromFiles } from './mammals-node';
 import { CARNIVORA, FELIDAE, mammaliaClade, type CladeRec } from './panthera';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, type Split } from './splits';
 import { PIC_D } from './pics';
-import { FanView, type CutLabels } from './view';
+import { FanView, groupCentre, type CutLabels } from './view';
 
 function stubView(clade: CladeRec = CARNIVORA, tree: Split = CARNIVORA_TREE, folds = true): FanView {
   const noop = () => {};
@@ -47,14 +47,19 @@ function stubView(clade: CladeRec = CARNIVORA, tree: Split = CARNIVORA_TREE, fol
   return new FanView(canvas as unknown as HTMLCanvasElement, clade, tree, folds);
 }
 
-type Spot = { x: number; y: number; w: number; h: number };
+/** A label's place and size (screen), and the screen x of the columns it stands on (its anchor: groupCentre; NaN, a "+x"). */
+type Spot = { x: number; y: number; w: number; h: number; c: number };
 type Shot = Map<string, Spot>;
 /** A frame's labels: each name pill (by its item and text) and each picture (by what it opens), where and how big. */
-function shot(c: CutLabels): Shot {
+function shot(v: FanView, c: CutLabels): Shot {
   const m: Shot = new Map();
-  for (const s of c.spots) m.set(`name ${s.key} ${s.text}`, { x: s.x, y: s.box[3], w: s.box[2] - s.box[0], h: s.box[3] - s.box[1] });
+  const at = (x: number) => v.toScreen(x, 0)[0];
+  for (const s of c.spots) {
+    const g = s.v ? { v: s.v } : s.b ? { b: s.b } : null;
+    m.set(`name ${s.key} ${s.text}`, { x: s.x, y: s.box[3], w: s.box[2] - s.box[0], h: s.box[3] - s.box[1], c: g ? at(groupCentre(g)) : NaN });
+  }
   // (A picture is its face species', whichever item of the cut it stands for.)
-  for (const p of c.pics) m.set(`pic ${p.face.sp.sci}`, { x: p.x, y: p.y, w: p.d, h: p.d });
+  for (const p of c.pics) m.set(`pic ${p.face.sp.sci}`, { x: p.x, y: p.y, w: p.d, h: p.d, c: at(groupCentre({ b: p.face })) });
   return m;
 }
 type Step = (v: FanView) => void;
@@ -62,14 +67,14 @@ type Step = (v: FanView) => void;
 /** Play `steps`, one a frame, drawing each; the shots, and per step the most a world point on screen moved (px). */
 function play(v: FanView, steps: Step[]): { shots: Shot[]; moved: number[] } {
   v.draw();
-  const shots = [shot(v.cutLast!)];
+  const shots = [shot(v, v.cutLast!)];
   const moved: number[] = [];
   const grid = [0, 0.25, 0.5, 0.75, 1].flatMap((a) => [0, 0.25, 0.5, 0.75, 1].map((b) => [a * v.w, b * v.h]));
   for (const step of steps) {
     const was = grid.map(([x, y]) => v.toWorld(x, y));
     step(v);
     v.draw();
-    shots.push(shot(v.cutLast!));
+    shots.push(shot(v, v.cutLast!));
     moved.push(Math.max(...was.map(([x, y], i) => Math.hypot(v.toScreen(x, y)[0] - grid[i][0], v.toScreen(x, y)[1] - grid[i][1]))));
   }
   return { shots, moved };
@@ -77,12 +82,22 @@ function play(v: FanView, steps: Step[]): { shots: Shot[]; moved: number[] } {
 
 /**
  * Sizes that changed, jumps, and labels shown, hidden, then shown again. A jump: farther than the world on screen moved
- * plus a third (the steady fold's rooms move a little with the zoom too, the columns with them) and 2 px.
+ * plus a third and 2 px, the world being the camera's points and the columns the labels stand on (the steady fold's
+ * gaps open and close with the width zoom, the columns with them: a pinch at the mammals moves bats' columns twice as
+ * far as any point under the camera, and their names, on them, with them).
  */
 function judge(shots: Shot[], moved: number[], monotonic: boolean): string[] {
   const bad: string[] = [];
   const size = new Map<string, Spot>();
   const gone = new Set<string>();
+  moved = moved.map((m, f) => {
+    let c = m;
+    for (const [k, s] of shots[f + 1]) {
+      const p = shots[f].get(k);
+      if (p && Number.isFinite(s.c - p.c)) c = Math.max(c, Math.abs(s.c - p.c));
+    }
+    return c;
+  });
   for (let f = 0; f < shots.length; f++) {
     for (const [k, s] of shots[f]) {
       if (k.startsWith('pic ') && s.w !== PIC_D) bad.push(`frame ${f}: ${k} is ${s.w} px, not ${PIC_D}`);

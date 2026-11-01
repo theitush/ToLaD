@@ -2025,6 +2025,8 @@ export class FanView implements InputHandlers {
   }
   /** The last labels from the cut (tests read it). */
   cutLast: CutLabels | null = null;
+  /** cutLabels' pictures' chains (picX), pooled. */
+  private readonly picChain: number[] = [];
 
   /**
    * This frame's labels from the cut (ToLaD#333, research/scalable-tree.md §3). Names: the cut for a pill's thickness
@@ -2188,13 +2190,36 @@ export class FanView implements InputHandlers {
     }
     // The pictures: the coarser cut, each standing on its item's youngest tip (the names hang below it).
     const pics: CutLabels['pics'] = [];
+    const hp = PIC_D / 2 / sx;
+    /**
+     * A picture's place (world x): over its face species' column, clamped into each territory down the chain of items
+     * it passes to as the zoom grows (T.faceKid: the item, its daughter holding the face, hers, ... the face species),
+     * the deepest first, over the picture's rows; one too narrow to hold it puts it at its middle. The daughter's
+     * territory is inside her mother's over the same rows, and the cut hands the picture on only once she fits it, so
+     * at the handoff the place is the same on both sides: it moves continuously with the zoom (ToLaD#333 cut333j).
+     */
+    const picX = (it: CutItem, at: number): number => {
+      const ch = this.picChain;
+      ch.length = 0;
+      let k = it.kind === 'leaf' ? ~it.j : it.j;
+      ch.push(k);
+      while (k >= 0 && !Number.isNaN(T.faceKid(k))) ch.push((k = T.faceKid(k)));
+      const rows = picRows(it);
+      let x = at;
+      for (let i = ch.length - 1; i >= 0; i--) {
+        const [a, b] = i === 0 ? [it.x0, it.x1] : T.t.over(Territories.ref(ch[i]), () => rows, ghost, s2);
+        if (!(b > a)) continue;
+        x = b - a >= 2 * hp ? Math.min(Math.max(x, a + hp), b - hp) : (a + b) / 2;
+      }
+      return x;
+    };
     for (const it of T.t.cut(sx, PIC_D, vx0, vx1, picRows, ghost, T.faceKid)) {
       if (!shown(it, PIC_D) || it.kind === 'run') continue;
       const lv: Level = it.kind === 'leaf' ? { b: T.t.strands[it.j] } : { v: T.t.nodes[it.j] };
       const face = lv.b ?? groupFace(lv.v!);
       if (!face || !wikiOf(face.sp.sci)?.img) continue;
       // (On the column of the species it shows, over its youngest tip: a group's picture is its face species', ToLaD#333.)
-      const x = placeX(it.x0, it.x1, PIC_D, groupCentre({ b: face }));
+      const x = placeX(it.x0, it.x1, PIC_D, picX(it, groupCentre({ b: face })));
       const y = Y(T.youngest(it)) - PIC_LIFT - PIC_D / 2;
       if (y - PIC_D / 2 < top || y > this.h) continue;
       // (Where the cuts nest, by item, not by what touches on screen: a picture gives way to a shown name of an item

@@ -38,6 +38,13 @@ export const STEADY_RUN = 0.85;
  */
 export const LIFE_GAP = 0.5;
 
+/**
+ * Territory rows (Steady.cell, ToLaD#333): the world height between them, fixed in the world, a power of two. At a
+ * phone's home time scale (SY_HOME) ~20 px, the draw's coarsest grid there (the mammals' while moving), so at every
+ * deeper time zoom they are rows the draw samples too (one cache, by world y). A resolution, not a look.
+ */
+export const TERR_H = 32;
+
 /** Rooms by life: a strand's widest over a window is laneW at this many steps (and its ends). */
 const LIFE_SAMPLES = 48;
 
@@ -626,20 +633,30 @@ export class Steady extends Fold {
   private readonly wR: ([Float64Array, Float64Array] | undefined)[] = new Array(64);
   private extGen = 0;
 
-  override rowXs(k: number): Float64Array {
-    const L = this.cur();
+  /** The rows' maps let go at a version change or at their cap. */
+  private fresh(L: Lay): void {
     if (this.rowsVer !== L.ver || this.sRows.size >= this.rowCap()) {
       this.release(this.sRows, this.pool);
       this.release(this.cRows, this.cPool);
       this.rowsVer = L.ver;
       this.rowsGen++;
     }
+  }
+
+  /** Every strand's left (or own column's centre) at world y, cached by y (the draw's grid rows and the territories' alike). */
+  private rowAt(L: Lay, y: number): Float64Array {
+    let r = this.sRows.get(y);
+    if (!r) this.sRows.set(y, (r = this.row(L, y, this.pool.pop() ?? new Float64Array(this.strands.length))));
+    return r;
+  }
+
+  override rowXs(k: number): Float64Array {
+    const L = this.cur();
+    this.fresh(L);
     const c = k & 63;
     if (this.fK[c] === k && this.fH[c] === this.gridH && this.fG[c] === this.rowsGen) return this.fR[c]!;
     // (By world y, not by k: the grid's rows a power of two apart, a coarser grid's rows are a finer one's, ToLaD#255.)
-    const y = k * this.gridH;
-    let r = this.sRows.get(y);
-    if (!r) this.sRows.set(y, (r = this.row(L, y, this.pool.pop() ?? new Float64Array(this.strands.length))));
+    const r = this.rowAt(L, k * this.gridH);
     this.fK[c] = k;
     this.fH[c] = this.gridH;
     this.fG[c] = this.rowsGen;
@@ -760,52 +777,88 @@ export class Steady extends Fold {
 
   /**
    * Per-row territories (ToLaD#333): strands f..l's (drawn order, a node's run or a run of its daughters) share of the
-   * grid rows from world y `ya` to `yb` (world x, `out`; empty, out[0] >= out[1], where they have no lineage on a row).
+   * rows from world y `ya` to `yb` (world x, `out`; empty, out[0] >= out[1], where they have no lineage).
    *
    * At a row the lineages there split x between them, each boundary the middle of the gap between neighbours' drawn
    * edges: a 1D Voronoi of the row, over the drawn order (the columns stand in it left to right). A strand's lineage is
    * its slot in a parent column, its own column while it lives (laneW wide), and for `ghost` (world height) above its
    * tip the point its column ended at, where its picture stands. Strands f..l take their lineages' cells together; over
    * rows, the intersection. Two runs of strands that do not overlap have disjoint shares at every row, so labels placed
-   * in their own shares never meet, whatever the times they stand at. Each row is a scan from f and l to the nearest
-   * lineages (O(1) where the strands live), on the draw's rows (rowXs, cached).
+   * in their own shares never meet, whatever the times they stand at.
+   *
+   * The rows are fixed in the world (TERR_H apart), never the draw's grid (finer at rest than while moving, and by the
+   * time zoom): a row's share is a function of the layout alone (rowCell). At ya and at yb the share is the linear blend
+   * of the rows on either side, so a territory moves continuously as its label's rows do (a row passing an end is the
+   * blend's value there as it enters or leaves). Each row is a scan from f and l to the nearest lineages.
    */
   cell(f: number, l: number, ya: number, yb: number, ghost: number, out: [number, number] = [0, 0]): [number, number] {
-    const h = this.gridH;
-    let k0 = Math.ceil(ya / h);
-    let k1 = Math.floor(yb / h);
-    if (k0 > k1) k0 = k1 = Math.round((ya + yb) / 2 / h);
-    const N = this.strands.length;
+    const H = TERR_H;
+    if (yb < ya) [ya, yb] = [yb, ya];
     const L = this.cur();
     const r = this.rootJ;
     let lo = L.roomL[r];
     let hi = L.roomL[r] + L.roomW[r];
-    const e = this.edge;
-    for (let k = k0; k <= k1 && lo < hi; k++) {
-      const y = k * h;
-      const xs = this.rowXs(k);
-      const age = this.fan.time.ageAt(y);
-      let a = f;
-      while (a <= l && !this.site(a, y, age, xs, ghost)) a++;
-      if (a > l) {
-        lo = Infinity;
-        hi = -Infinity;
-        break;
-      }
-      const La = e[0];
-      let b = l;
-      while (!this.site(b, y, age, xs, ghost)) b--;
-      const Rb = e[1];
-      let p = f - 1;
-      while (p >= 0 && !this.site(p, y, age, xs, ghost)) p--;
-      if (p >= 0) lo = Math.max(lo, (e[1] + La) / 2);
-      let n = l + 1;
-      while (n < N && !this.site(n, y, age, xs, ghost)) n++;
-      if (n < N) hi = Math.min(hi, (Rb + e[0]) / 2);
+    let any = false;
+    const c = this.cellC;
+    const d = this.cellD;
+    // (At y between rows k and k + 1, the blend of the two; where f..l have no lineage on one, the other alone.)
+    const at = (y: number) => {
+      const k = Math.floor(y / H);
+      const okA = this.rowCell(f, l, k, ghost, c);
+      const okB = this.rowCell(f, l, k + 1, ghost, d);
+      if (!okA && !okB) return;
+      const t = okA && okB ? y / H - k : 0;
+      const [a0, a1] = okA ? c : d;
+      const [b0, b1] = okB ? d : c;
+      any = true;
+      lo = Math.max(lo, a0 + t * (b0 - a0));
+      hi = Math.min(hi, a1 + t * (b1 - a1));
+    };
+    at(ya);
+    at(yb);
+    for (let k = Math.floor(ya / H) + 1; k * H < yb && lo < hi; k++) {
+      if (!this.rowCell(f, l, k, ghost, c)) continue;
+      any = true;
+      lo = Math.max(lo, c[0]);
+      hi = Math.min(hi, c[1]);
+    }
+    if (!any) {
+      lo = Infinity;
+      hi = -Infinity;
     }
     out[0] = lo;
     out[1] = hi;
     return out;
+  }
+  private readonly cellC: [number, number] = [0, 0];
+  private readonly cellD: [number, number] = [0, 0];
+
+  /** Strands f..l's share of territory row k (world y k * TERR_H) into `out`; false where they have no lineage there. */
+  private rowCell(f: number, l: number, k: number, ghost: number, out: [number, number]): boolean {
+    const L = this.cur();
+    this.fresh(L);
+    const y = k * TERR_H;
+    const xs = this.rowAt(L, y);
+    const age = this.fan.time.ageAt(y);
+    const e = this.edge;
+    const N = this.strands.length;
+    let a = f;
+    while (a <= l && !this.site(a, y, age, xs, ghost)) a++;
+    if (a > l) return false;
+    const La = e[0];
+    let b = l;
+    while (!this.site(b, y, age, xs, ghost)) b--;
+    const Rb = e[1];
+    const r = this.rootJ;
+    out[0] = L.roomL[r];
+    out[1] = L.roomL[r] + L.roomW[r];
+    let p = f - 1;
+    while (p >= 0 && !this.site(p, y, age, xs, ghost)) p--;
+    if (p >= 0) out[0] = (e[1] + La) / 2;
+    let n = l + 1;
+    while (n < N && !this.site(n, y, age, xs, ghost)) n++;
+    if (n < N) out[1] = (Rb + e[0]) / 2;
+    return true;
   }
   /** site()'s edges. */
   private readonly edge: [number, number] = [0, 0];
