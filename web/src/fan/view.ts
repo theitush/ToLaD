@@ -168,6 +168,22 @@ class CutTerritories {
       return y;
     });
   }
+  private faceKids: Float64Array | null = null;
+  /** Node j's daughter (a node's index, ~ a strand's) holding its face species (groupFace; NaN, none): the pictures' cut's `holds`. */
+  readonly faceKid = (j: number): number => {
+    if (!this.faceKids) {
+      const { nodes, kids, strands } = this.t;
+      const at = new Map(strands.map((b, i) => [b, i]));
+      this.faceKids = Float64Array.from(nodes, (v, n) => {
+        const face = groupFace(v);
+        const i = face ? at.get(face) : undefined;
+        if (i === undefined) return NaN;
+        for (const k of kids[n]) if (k >= 0 ? nodes[k].strands.includes(face!) : ~k === i) return k;
+        return NaN;
+      });
+    }
+    return this.faceKids[j];
+  };
   /** Daughter k's (a node's index, ~ a strand's) youngest tip (world y). */
   youngOf(k: number): number {
     return k >= 0 ? this.young[k] : Math.max(this.t.strands[~k].tipY, this.now);
@@ -2089,11 +2105,15 @@ export class FanView implements InputHandlers {
       const ty = Y(T.youngest(r));
       return [Wy(ty - PIC_LIFT - PIC_D), Wy(ty - PIC_LIFT)];
     };
-    /** A name pill at x (screen) over rows `y` (pillAt), item k's (a node's index, ~ a strand's; null for a "+x"). */
-    const pill = (key: string, text: string, hid: FanBranch[][], x: number, y: [number, number], wide: number, j: number, k: number | null): LabelSpot | null => {
+    /** The shown names' items (their strands, first and last) and rows (screen y), for the pictures' rule below. */
+    const held: { f: number; l: number; y0: number; y1: number }[] = [];
+    /** A name pill at x (screen) over rows `y` (pillAt), item r's: k its node's index, ~ its strand's (null for a "+x"). */
+    const pill = (key: string, text: string, hid: FanBranch[][], x: number, y: [number, number], wide: number, j: number, k: number | null, r: Ref): LabelSpot | null => {
       const [y0, y1] = y;
       const fit = clamp01((bottom - y1) / 30);
       if (!(fit > 0)) return null;
+      const [f, l] = T.t.range(r);
+      held.push({ f, l, y0, y1 });
       if (hid.length) groups.set(key, hid);
       const s: LabelSpot = { key, id: key, place: 'tip', text, rank: [0, wide, j], x, y1, box: [x - half, y0, x + half, y1], fit, plus: this.plusPx(hid.length) };
       if (k !== null && k < 0) s.b = T.t.strands[~k];
@@ -2106,8 +2126,8 @@ export class FanView implements InputHandlers {
     };
     // (Plan step 2b: daughters in runs that borrow their neighbours' unused room, Territories.borrowed, by this rung.)
     const s2: [number, number] = [0, 0];
-    /** The borrowed pills' screen x extents, and the runs' "+x" pills to place clear of them once all are known. */
-    const taken: [number, number][] = [];
+    /** The borrowed pills' world x extents, and the runs' "+x" pills to place clear of them once all are known. */
+    const takenW: [number, number][] = [];
     const plus: { r: Ref; x0: number; x1: number; at: number }[] = [];
     const items = T.t.cut(sx, LABEL_PILL, vx0, vx1, pillRows, ghost);
     const borrowed = T.t.borrowed(sx, LABEL_PILL, items, (d) => T.hasName(d), pillRows, ghost);
@@ -2116,7 +2136,7 @@ export class FanView implements InputHandlers {
         if (!shown(it, LABEL_PILL)) continue;
         const k = it.kind === 'leaf' ? ~it.j : it.j;
         const { text, hid, y } = nameOf(it);
-        pill(`c${it.kind}${it.j}:${it.q0}`, text, hid, placeX(it.x0, it.x1, LABEL_PILL, T.columns(it)), y, it.x1 - it.x0, it.j, k);
+        pill(`c${it.kind}${it.j}:${it.q0}`, text, hid, placeX(it.x0, it.x1, LABEL_PILL, T.columns(it)), y, it.x1 - it.x0, it.j, k, it);
         continue;
       }
       if (!onScreen(it)) continue;
@@ -2132,25 +2152,43 @@ export class FanView implements InputHandlers {
         }
         q0 = q + 1;
         if (q > it.q1) break;
-        const x = X(borrowed.get(K[q])!);
+        const c = borrowed.get(K[q])!;
+        takenW.push([c - half / sx, c + half / sx]);
+        const x = X(c);
         // (Whole on screen, or not at all: it stands where its own columns are.)
         if (x - half < LABEL_AXIS_X || x + half > this.w) continue;
         const { text, hid, y } = nameOf(Territories.ref(K[q]));
         const [a, b] = T.t.over(Territories.ref(K[q]), pillRows, ghost, s2);
-        if (pill(`cb${K[q]}`, text, hid, x, y, b - a, it.j, K[q])) taken.push([x - half, x + half]);
+        pill(`cb${K[q]}`, text, hid, x, y, b - a, it.j, K[q], Territories.ref(K[q]));
       }
     }
+    // (A "+x" in its own run's territory less the boxes its neighbours borrow (shown or not), in world x: its place, and
+    // whether it has one, a function of the zoom alone, never of what it meets on screen this frame. Of the stretches
+    // left that hold it, the nearest its columns; on screen it slides only inside that one, as a name in its territory.)
+    takenW.sort((a, b) => a[0] - b[0]);
+    const hw = half / sx;
     for (const p of plus) {
-      if (sx * (p.x1 - p.x0) < LABEL_PILL || room(p.x0, p.x1) < LABEL_PILL) continue;
-      const x = placeX(p.x0, p.x1, LABEL_PILL, p.at);
-      // (A "+x" in its own run's territory, clear of the pills borrowing room from it.)
-      if (taken.some(([a, b]) => x + half > a && x - half < b)) continue;
+      let best: [number, number] | null = null;
+      let bd = Infinity;
+      let a = p.x0;
+      for (let i = 0; i <= takenW.length && a < p.x1; i++) {
+        const [c0, c1] = i < takenW.length ? takenW[i] : [Infinity, Infinity];
+        if (c1 <= a) continue;
+        const b = Math.min(c0, p.x1);
+        if (b - a >= 2 * hw * (1 - 1e-9)) {
+          const d = Math.max(a + hw - p.at, p.at - (b - hw), 0);
+          if (d < bd) [best, bd] = [[a, b], d];
+        }
+        a = Math.max(a, c1);
+      }
+      if (!best || room(best[0], best[1]) < LABEL_PILL) continue;
+      const x = placeX(best[0], best[1], LABEL_PILL, p.at);
       const { hid, y } = nameOf(p.r);
-      pill(`crun${p.r.j}:${p.r.q0}-${p.r.q1}`, '', hid, x, y, p.x1 - p.x0, p.r.j, null);
+      pill(`crun${p.r.j}:${p.r.q0}-${p.r.q1}`, '', hid, x, y, p.x1 - p.x0, p.r.j, null, p.r);
     }
     // The pictures: the coarser cut, each standing on its item's youngest tip (the names hang below it).
     const pics: CutLabels['pics'] = [];
-    for (const it of T.t.cut(sx, PIC_D, vx0, vx1, picRows, ghost)) {
+    for (const it of T.t.cut(sx, PIC_D, vx0, vx1, picRows, ghost, T.faceKid)) {
       if (!shown(it, PIC_D) || it.kind === 'run') continue;
       const lv: Level = it.kind === 'leaf' ? { b: T.t.strands[it.j] } : { v: T.t.nodes[it.j] };
       const face = lv.b ?? groupFace(lv.v!);
@@ -2159,12 +2197,16 @@ export class FanView implements InputHandlers {
       const x = placeX(it.x0, it.x1, PIC_D, groupCentre({ b: face }));
       const y = Y(T.youngest(it)) - PIC_LIFT - PIC_D / 2;
       if (y - PIC_D / 2 < top || y > this.h) continue;
+      // (Where the cuts nest, by item, not by what touches on screen: a picture gives way to a shown name of an item
+      // strictly holding its own, over the rows the picture takes. Every other pair cannot meet: items apart have
+      // territories apart at every row; the same item's, or a finer one's, name hangs below the tip the picture stands
+      // over, the youngest of the item's.)
+      const y0 = y - PIC_D / 2;
+      const y1 = y + PIC_D / 2;
+      if (held.some((n) => n.f <= it.f && it.l <= n.l && n.l - n.f > it.l - it.f && n.y0 < y1 && y0 < n.y1)) continue;
       pics.push({ x, y, d: PIC_D, i: pics.length, lv, face });
     }
-    // (Where the cuts nest, a picture over a clade's tip in the rows of the name of a clade holding it gives way.)
-    const meets = (p: PicSpot) =>
-      spots.some((s) => p.x - p.d / 2 < s.box[2] && s.box[0] < p.x + p.d / 2 && p.y - p.d / 2 < s.box[3] && s.box[1] < p.y + p.d / 2);
-    const shownPics = pics.filter((p) => !meets(p));
+    const shownPics = pics;
     shownPics.forEach((p, i) => (p.i = i));
     this.picSpots = shownPics;
     return { spots, groups, pics: shownPics, items };

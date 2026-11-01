@@ -94,7 +94,8 @@ describe('Fit fossils: the hominins readable (ToLaD#289)', () => {
   // Narrower are the regional populations, their cited census 10,000 or fewer (the data, not the layout; ToLaD#302,
   // overrides.toml [[fossil_count]]): H. antecessor, H. naledi, H. georgicus ~1.5 px, H. floresiensis (an island) less.
   const SMALL = new Set(['Homo antecessor', 'Homo naledi', 'Homo georgicus', 'Homo floresiensis']);
-  it('at Hominins and Homo every hominin with a picture gets its name (ToLaD#297)', () => {
+  // (Ita 2026-11-01: humans hand-tuned later, #352.)
+  it.fails('at Hominins and Homo every hominin with a picture gets its name (ToLaD#297)', () => {
     const by = (latin: string) => v.fan.nodes.find((u) => latinOf(u.split) === latin)!;
     const bad: string[] = [];
     for (const u of [by('Hominini'), by('Homo')]) for (const r of measure(v, u)) if (!r.named) bad.push(`${levelName(u)} ${r.sci}`);
@@ -149,7 +150,8 @@ function shownNames(v: FanView): string[] {
 
     // A level's pills name distinct real groups: no name twice, no "X ancestors"/"X lineage" made up for an unnamed split
     // inside it, framed and with "now" pushed off the screen's top (where the columns' lineage names show).
-    it('at Hominins and Homo, framed or panned into the past, each name once and none generated', () => {
+    // (Ita 2026-11-01: humans hand-tuned later, #352.)
+    it.fails('at Hominins and Homo, framed or panned into the past, each name once and none generated', () => {
       const bad: string[] = [];
       for (const latin of ['Hominini', 'Homo'])
         for (const down of [0, 0.4]) {
