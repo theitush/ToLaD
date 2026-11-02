@@ -11,7 +11,8 @@ between batches):
   2. a miss: its Open Tree Taxonomy id (P9157), then its OTT synonyms as taxon names (P225);
   3. a miss: the name as an alias or label of a taxon item (skos:altLabel / rdfs:label, "mul" and "en"), living species
      only. Wikidata keeps the domestic dog as Canis lupus familiaris, with "Canis familiaris" only an alias of it;
-  4. an item with no picture (P18): the lead image of its English article (the MediaWiki pageimages API).
+  4. an item with no picture (P18): the `image` parameter of its English article's taxobox / speciesbox (the wikitext
+     through the MediaWiki API). Not the article's lead image (pageimages): that is often the range map.
 The first cause of misses was none of these: the snapshot was older than the dated tree (MDD's living species
 were grafted on two days after it), so 1,266 living species were never asked about. `--extend` asks for the
 names a snapshot has not asked (`asked`) and runs steps 3 and 4 over it, keeping its rows.
@@ -128,7 +129,7 @@ ITEM_QUERY = """SELECT ?key ?item ?rank ?pname ?article ?img ?range WHERE {{
 }}"""
 
 PAGEIMAGES = "https://en.wikipedia.org/w/api.php"
-PAGEIMG_BATCH = 50
+PAGEIMG_BATCH = 20
 
 # ---- species rows of the built data ---------------------------------------------------------
 
@@ -262,24 +263,70 @@ def _api(params: dict) -> dict:
     raise AssertionError
 
 
+INFOBOX = re.compile(r"\{\{\s*(?:automatic\s+taxobox|speciesbox|taxobox|subspeciesbox)\b", re.I)
+IMAGE_PARAM = re.compile(r"^\s*\|\s*image\s*=", re.I | re.M)
+FILE_EXT = re.compile(r"^(?:(?:file|image)\s*:)?\s*([^\n]+?\.(?:jpe?g|png|gif|webp|tiff?|svg))$", re.I)
+
+
+def _value(text: str, start: int) -> str:
+    """The parameter value from `start` to the next `|` outside nested {{ }} / [[ ]] (or the box's closing }})."""
+    depth = 0
+    for i in range(start, len(text)):
+        two = text[i: i + 2]
+        if two in ("{{", "[["):
+            depth += 1
+        elif two in ("}}", "]]"):
+            if depth == 0:
+                return text[start:i]
+            depth -= 1
+        elif text[i] == "|" and depth == 0:
+            return text[start:i]
+    return text[start:]
+
+
+def infobox_image(wikitext: str) -> str | None:
+    """The file named by the `image` parameter of an article's taxobox / speciesbox, else None.
+
+    Only that parameter: the box's own photo field. Its `range_map`, `image2`, `status_system` ... are other
+    fields, and the article's lead image (pageimages) is often the range map, a skull plate or a chromosome figure.
+    The value is a file name, `[[File:..]]`, or a template of pictures ({{multiple image |image1 = ..}}, the dog):
+    the first file name in it.
+    """
+    m = INFOBOX.search(wikitext)
+    if not m:
+        return None
+    im = IMAGE_PARAM.search(wikitext, m.end())  # the first `image =` after the box opens is the box's
+    if not im:
+        return None
+    value = re.sub(r"<!--.*?-->", "", _value(wikitext, im.end()), flags=re.S)
+    for seg in re.split(r"[|=\[\]{}\n]+", value):
+        if mm := FILE_EXT.match(seg.strip()):
+            return mm.group(1).strip().replace("_", " ")
+    return None
+
+
 def page_images(articles: list[str]) -> dict[str, str]:
-    """English article URL -> Commons file name of its lead image (pageimages; redirects followed)."""
+    """English article URL -> Commons file name of its taxobox `image` (redirects followed)."""
     titles = {urllib.parse.unquote(a.rsplit("/wiki/", 1)[-1]).replace("_", " "): a for a in articles}
     keys = sorted(titles)
     out: dict[str, str] = {}
     for i in range(0, len(keys), PAGEIMG_BATCH):
         chunk = keys[i: i + PAGEIMG_BATCH]
-        res = _api({"action": "query", "prop": "pageimages", "piprop": "name", "redirects": "1",
+        res = _api({"action": "query", "prop": "revisions", "rvprop": "content", "rvslots": "main", "redirects": "1",
                     "titles": "|".join(chunk)}).get("query", {})
         moved = {x["from"]: x["to"] for x in res.get("normalized", []) + res.get("redirects", [])}
-        got = {p["title"]: p["pageimage"] for p in res.get("pages", []) if p.get("pageimage")}
+        got = {}
+        for p in res.get("pages", []):
+            revs = p.get("revisions") or []
+            if revs and (f := infobox_image(revs[0].get("slots", {}).get("main", {}).get("content", ""))):
+                got[p["title"]] = f
         for t in chunk:
             t2 = t
             for _ in range(2):  # normalized, then redirected
                 t2 = moved.get(t2, t2)
             if t2 in got:
                 out[titles[t]] = got[t2]
-        print(f"[wiki] pageimages {i + len(chunk)}/{len(keys)}: {len(out)} images", file=sys.stderr)
+        print(f"[wiki] infobox images {i + len(chunk)}/{len(keys)}: {len(out)} images", file=sys.stderr)
         time.sleep(PAUSE_S)
     return out
 
@@ -303,7 +350,11 @@ def extend_snapshot(species: dict[str, int], snap: dict, raw: Path, living: set[
     # paleontological one that Wikidata rarely has a picture for.
     miss = sorted(n for n, e in resolve(species, dict(snap, alias=[], pageimg={}), raw).items()
                   if e is None and (living is None or n in living))
-    snap = dict(snap, alias_query=ALIAS_QUERY, item_query=ITEM_QUERY, alias=sorted(query_all("alias", miss)) if miss else [])
+    if "alias_query" in snap and not [n for n in miss if n not in snap.get("alias_asked", [])]:
+        pass  # the alias step has been run for every one of these names
+    else:
+        snap = dict(snap, alias_query=ALIAS_QUERY, item_query=ITEM_QUERY, alias_asked=miss,
+                    alias=sorted(query_all("alias", miss)) if miss else [])
     return dict(snap, pageimg=page_images(pic_less(resolve(species, dict(snap, pageimg={}), raw))))
 
 
