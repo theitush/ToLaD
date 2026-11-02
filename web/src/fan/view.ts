@@ -2059,12 +2059,12 @@ export class FanView implements InputHandlers {
    * This frame's labels (ToLaD#358, research/scalable-tree.md §3): one cut through the tree at the label's width (a
    * picture's, PIC_D, its widest part), one label per item: its picture standing on the item's youngest tip (PIC_LIFT
    * over it; held under the top line when the tip is above it) and its name pill in the middle of the branch below,
-   * over the same x, both inside the item's territory over the rows they take (Territories.over: the row's lineages
-   * split x between them, a lineage keeping its place a
-   * picture's height over its tip), so labels of different items never meet, by construction. The label names the
-   * most populous clade or species the item stands for (CutTerritories.nameOf), its picture that one's most populous
-   * living species (a placeholder disc where it has no photo), its "+x" the item's other species. Shown whole,
-   * picture and name together, or not at all. `whole`: over the whole tree, nothing culled for the screen (tests).
+   * over the same x (faceX), both inside the item's territory over the rows they take (Territories.over: the row's
+   * lineages split x between them, a lineage keeping its place a picture's height over its tip), so labels of
+   * different items never meet, by construction. The label names the most populous clade or species the item stands
+   * for (CutTerritories.nameOf), its picture that one's most populous living species (a placeholder disc where it has
+   * no photo), its "+x" the item's other species. Shown whole, picture and name together, or not at all. `whole`: over
+   * the whole tree, nothing culled for the screen (tests).
    */
   private cutLabels(T: CutTerritories, top: number, whole = false): CutLabels {
     const half = LABEL_PILL / 2;
@@ -2170,10 +2170,14 @@ export class FanView implements InputHandlers {
       const key = `c${it.f}:${it.l}`;
       if (name.hid.length) groups.set(key, name.hid);
       const s: LabelSpot = { key, id: key, place: 'tip', text: name.text, rank: [0, it.x1 - it.x0, it.head], x, y1: pill[1], box: [x - half, pill[0], x + half, pill[1]], fit, plus: this.plusPx(name.hid.length), pic: name.face };
-      if (name.lv.b) s.b = name.lv.b;
-      else Object.assign(s, { v: name.lv.v, fam: name.lv.v });
+      // (A tap on it, name or picture, goes where the item stands, its head climbed: the clade or species of the tree
+      // it is, as before ToLaD#358; framing and taps from the items' names are #359's.)
+      const k = T.whole(it.head, it.f, it.l);
+      const lv: Level = k < 0 ? { b: T.t.strands[~k] } : { v: T.t.nodes[k] };
+      if (lv.b) s.b = lv.b;
+      else Object.assign(s, { v: lv.v, fam: lv.v });
       spots.push(s);
-      pics.push({ x, y: (disc[0] + disc[1]) / 2, d: PIC_D, i: pics.length, lv: name.lv, face: name.face });
+      pics.push({ x, y: (disc[0] + disc[1]) / 2, d: PIC_D, i: pics.length, lv, face: name.face });
       shown.push(it);
     }
     if (!whole) this.picSpots = pics;
