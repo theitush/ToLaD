@@ -2049,8 +2049,9 @@ export class FanView implements InputHandlers {
   /**
    * This frame's labels (ToLaD#358, research/scalable-tree.md §3): one cut through the tree at the label's width (a
    * picture's, PIC_D, its widest part), one label per item: its picture standing on the item's youngest tip (PIC_LIFT
-   * over it) and its name pill in the middle of the branch below, over the same x, both inside the item's territory
-   * over the rows they take (Territories.over: the row's lineages split x between them, a lineage keeping its place a
+   * over it; held under the top line when the tip is above it) and its name pill in the middle of the branch below,
+   * over the same x, both inside the item's territory over the rows they take (Territories.over: the row's lineages
+   * split x between them, a lineage keeping its place a
    * picture's height over its tip), so labels of different items never meet, by construction. The label names the
    * most populous clade or species the item stands for (CutTerritories.nameOf), its picture that one's most populous
    * living species (a placeholder disc where it has no photo), its "+x" the item's other species. Shown whole,
@@ -2090,10 +2091,10 @@ export class FanView implements InputHandlers {
     /**
      * A name pill's rows (screen y, top and bottom), in the middle of its branch (Ita's pick, ToLaD#342: as
      * ?names=mid): halfway between its youngest tip `ty` and where it splits off `by` over the part on screen, never
-     * above its tip (4 px under it, as a tip's pill stands) nor the top line. `tlen` long.
+     * above its tip (4 px under it, as a tip's pill stands) nor `floor` (4 px under its picture). `tlen` long.
      */
-    const pillAt = (ty: number, by: number, tlen: number): [number, number] => {
-      const a = Math.max(ty + 4, top);
+    const pillAt = (ty: number, by: number, tlen: number, floor: number): [number, number] => {
+      const a = Math.max(ty + 4, floor);
       const y0 = Math.max(a, (a + Math.min(by, bottom - 30)) / 2 - tlen / 2);
       return [y0, y0 + tlen];
     };
@@ -2106,7 +2107,10 @@ export class FanView implements InputHandlers {
         const name = T.nameOf(r);
         const ty = Y(T.youngOf(r.head));
         const tlen = this.nameWidth(name.text) + 2 * LABEL_PAD + this.plusPx(name.hid.length);
-        m = { name, disc: [ty - PIC_LIFT - PIC_D, ty - PIC_LIFT], pill: pillAt(ty, Y(T.splitOff(r.head)), tlen) };
+        // (Its picture over its tip, or with the tip above the top line, held under it, its name below: a label stays
+        // whole on screen while its branch is, scrolled into the past too.)
+        const d0 = Math.max(ty - PIC_LIFT - PIC_D, top);
+        m = { name, disc: [d0, d0 + PIC_D], pill: pillAt(ty, Y(T.splitOff(r.head)), tlen, d0 + PIC_D + 4) };
         memo.set(key, m);
       }
       return m;
@@ -2120,7 +2124,7 @@ export class FanView implements InputHandlers {
       if (!it.fits) continue;
       const { name, disc, pill } = at(it);
       // (Whole on screen or not at all: its territory's part on screen holds it, its picture under the top line.)
-      if (!whole && (Math.min(X(it.x1), right) - Math.max(X(it.x0), left) < PIC_D || disc[0] < top || disc[0] > this.h)) continue;
+      if (!whole && (Math.min(X(it.x1), right) - Math.max(X(it.x0), left) < PIC_D || disc[1] > this.h)) continue;
       const fit = clamp01((bottom - pill[1]) / 30);
       if (!(fit > 0)) continue;
       const x = placeX(it.x0, it.x1, PIC_D, groupCentre({ b: name.face }));
