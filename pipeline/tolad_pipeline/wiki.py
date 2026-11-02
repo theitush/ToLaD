@@ -8,7 +8,13 @@ touched.
 Resolution, per species (the Wikidata Query Service, batched SPARQL, polite User-Agent, a pause
 between batches):
   1. its name as a taxon name (P225);
-  2. a miss: its Open Tree Taxonomy id (P9157), then its OTT synonyms as taxon names (P225).
+  2. a miss: its Open Tree Taxonomy id (P9157), then its OTT synonyms as taxon names (P225);
+  3. a miss: the name as an alias or label of a taxon item (skos:altLabel / rdfs:label, "mul" and "en"), living species
+     only. Wikidata keeps the domestic dog as Canis lupus familiaris, with "Canis familiaris" only an alias of it;
+  4. an item with no picture (P18): the lead image of its English article (the MediaWiki pageimages API).
+The first cause of misses was none of these: the snapshot was older than the dated tree (MDD's living species
+were grafted on two days after it), so 1,266 living species were never asked about. `--extend` asks for the
+names a snapshot has not asked (`asked`) and runs steps 3 and 4 over it, keeping its rows.
 Several items with one name (homonyms, duplicates): the one ranked species whose parent taxon is
 the name's genus, then the one with an English article, then a picture, then the lowest Q number.
 
@@ -53,6 +59,7 @@ ENDPOINT = "https://query.wikidata.org/sparql"
 UA = "ToLaD-pipeline/0.1 (+https://github.com/theitush/ToLaD; species links, ToLaD#182)"
 SNAPSHOT = "wikidata/taxa.json"
 BATCH = 150
+ALIAS_BATCH = 100
 PAUSE_S = 1.5
 THUMB_W = 330
 RANGE_W = 500
@@ -99,6 +106,30 @@ LINK_QUERY = """SELECT ?key ?item ?rank ?pname ?article ?img ?range WHERE {{
   OPTIONAL {{ ?article schema:about ?item ; schema:isPartOf <https://en.wikipedia.org/> }}
 }}"""
 
+# A miss's name as an alias or label of a taxon item (a "mul" alias is Wikidata's scientific-name alias), or as a
+# ?key is the name. (A p:P225 branch for deprecated names made the join time out, as did property paths.)
+ALIAS_QUERY = """SELECT ?key ?item WHERE {{
+  VALUES ?l {{ {labels} }}
+  {{ ?item skos:altLabel ?l }} UNION {{ ?item rdfs:label ?l }}
+  BIND(STR(?l) AS ?key)
+  ?item wdt:P225 ?taxon .
+}}"""
+
+# The same columns as QUERY for the items ALIAS_QUERY found (kept apart: joined to the alias lookup, the optional
+# parts make the query service time out).
+ITEM_QUERY = """SELECT ?key ?item ?rank ?pname ?article ?img ?range WHERE {{
+  VALUES ?item {{ {values} }}
+  BIND(STR(?item) AS ?key)
+  OPTIONAL {{ ?item wdt:P105 ?rank }}
+  OPTIONAL {{ ?item wdt:P171/wdt:P225 ?pname }}
+  OPTIONAL {{ ?item wdt:P18 ?img }}
+  OPTIONAL {{ ?item wdt:P181 ?range }}
+  OPTIONAL {{ ?article schema:about ?item ; schema:isPartOf <https://en.wikipedia.org/> }}
+}}"""
+
+PAGEIMAGES = "https://en.wikipedia.org/w/api.php"
+PAGEIMG_BATCH = 50
+
 # ---- species rows of the built data ---------------------------------------------------------
 
 def _sections(b: bytes) -> dict[bytes, tuple[int, int, int]]:
@@ -138,6 +169,21 @@ def species_rows(mammals: Path) -> dict[str, int]:
     return out
 
 
+def living_species(mammals: Path) -> set[str]:
+    """The species rows that reach the present (T1 = 0)."""
+    out: set[str] = set()
+    for f in sorted((mammals / "dated").glob("*.json")):
+        d = json.loads(f.read_text(encoding="utf-8"))
+        t = d["tile"]
+        path = mammals / "skeleton.tld" if t == -1 else mammals / "t" / f"{t}.tld"
+        b = path.read_bytes()
+        n = struct.unpack_from("<I", b, 8)[0]
+        t1 = struct.unpack_from(f"<{n}H", b, _sections(b)[b"T1__"][0])
+        rows = tld_rows(path)
+        out |= {rows[nd[1]][0].split("|")[0] for nd in d.get("nodes", []) if len(nd) == 2 and t1[nd[1]] == 0}
+    return out
+
+
 # ---- Wikidata ------------------------------------------------------------------------------
 
 def _literal(s: str) -> str:
@@ -172,9 +218,26 @@ def _sparql(query: str) -> list[list[str]]:
 
 def query_all(prop: str, keys: list[str]) -> list[list[str]]:
     rows: list[list[str]] = []
-    for i in range(0, len(keys), BATCH):
-        chunk = keys[i: i + BATCH]
-        if prop == "P1420":
+    step = ALIAS_BATCH if prop == "alias" else BATCH  # the alias query is heavier: 150 names time out at 60 s
+    for i in range(0, len(keys), step):
+        chunk = keys[i: i + step]
+        if prop == "alias":
+            q = ALIAS_QUERY.format(
+                                   labels=" ".join(f"{_literal(k)}@{lang}" for k in chunk for lang in ("mul", "en")))
+            found = {(r[0], r[1]) for r in _sparql(q) if ITEM.fullmatch(r[1])}
+            time.sleep(PAUSE_S)
+            if found:
+                detail: dict[str, list[list[str]]] = {}
+                items = sorted({it for _, it in found})
+                for j in range(0, len(items), BATCH):
+                    ids = " ".join("wd:" + it.rsplit("/", 1)[-1] for it in items[j: j + BATCH])
+                    for r in _sparql(ITEM_QUERY.format(values=ids)):
+                        detail.setdefault(r[0], []).append(r)
+                    time.sleep(PAUSE_S)
+                rows += [[k] + r[1:] for k, it in sorted(found) for r in detail.get(it, [])]
+            print(f"[wiki] alias {i + len(chunk)}/{len(keys)}: {len(rows)} rows", file=sys.stderr)
+            continue
+        elif prop == "P1420":
             q = LINK_QUERY.format(values=" ".join("wd:" + k.rsplit("/", 1)[-1] for k in chunk))
         else:
             q = QUERY.format(values=" ".join(_literal(k) for k in chunk), prop=prop)
@@ -182,6 +245,71 @@ def query_all(prop: str, keys: list[str]) -> list[list[str]]:
         print(f"[wiki] {prop} {i + len(chunk)}/{len(keys)}: {len(rows)} rows", file=sys.stderr)
         time.sleep(PAUSE_S)
     return rows
+
+
+def _api(params: dict) -> dict:
+    url = PAGEIMAGES + "?" + urllib.parse.urlencode({**params, "format": "json", "formatversion": "2"})
+    req = urllib.request.Request(url, headers={"User-Agent": UA})
+    for attempt in range(6):
+        try:
+            with urllib.request.urlopen(req, timeout=60) as r:
+                return json.load(r)
+        except (urllib.error.URLError, http.client.IncompleteRead, TimeoutError, json.JSONDecodeError) as e:
+            if attempt == 5:
+                raise
+            print(f"[wiki] {type(e).__name__}, retrying in {10 * (attempt + 1)}s", file=sys.stderr)
+            time.sleep(10 * (attempt + 1))
+    raise AssertionError
+
+
+def page_images(articles: list[str]) -> dict[str, str]:
+    """English article URL -> Commons file name of its lead image (pageimages; redirects followed)."""
+    titles = {urllib.parse.unquote(a.rsplit("/wiki/", 1)[-1]).replace("_", " "): a for a in articles}
+    keys = sorted(titles)
+    out: dict[str, str] = {}
+    for i in range(0, len(keys), PAGEIMG_BATCH):
+        chunk = keys[i: i + PAGEIMG_BATCH]
+        res = _api({"action": "query", "prop": "pageimages", "piprop": "name", "redirects": "1",
+                    "titles": "|".join(chunk)}).get("query", {})
+        moved = {x["from"]: x["to"] for x in res.get("normalized", []) + res.get("redirects", [])}
+        got = {p["title"]: p["pageimage"] for p in res.get("pages", []) if p.get("pageimage")}
+        for t in chunk:
+            t2 = t
+            for _ in range(2):  # normalized, then redirected
+                t2 = moved.get(t2, t2)
+            if t2 in got:
+                out[titles[t]] = got[t2]
+        print(f"[wiki] pageimages {i + len(chunk)}/{len(keys)}: {len(out)} images", file=sys.stderr)
+        time.sleep(PAUSE_S)
+    return out
+
+
+def extend_snapshot(species: dict[str, int], snap: dict, raw: Path, living: set[str] | None = None) -> dict:
+    """Bring a pinned snapshot up to the species rows and to steps 3 and 4 of the docstring.
+
+    The dated tree grows after a snapshot is taken (MDD's living species were grafted on two days after the first
+    one: 1,266 of the 7,015 living species were never asked about, 973 of them with no OTT id). `asked` is every
+    name step 1 has been run for; a snapshot without it is taken to have asked only for the names that resolved,
+    so every miss is asked again once.
+    """
+    base = resolve(species, dict(snap, alias=[], pageimg={}), raw)
+    asked = set(snap.get("asked", [])) or {n for n, e in base.items() if e}
+    fresh = sorted(n for n in species if n not in asked)
+    snap = dict(snap, names=sorted(map(list, {tuple(r) for r in snap["names"]} | {tuple(r) for r in query_all("P225", fresh)})),
+                asked=sorted(species))
+    # Saved here, so that a failure in the heavier steps below costs only them (the next --extend skips this one).
+    (raw / SNAPSHOT).write_text(json.dumps(snap, ensure_ascii=False, indent=0, sort_keys=True) + "\n", encoding="utf-8")
+    # The alias step only for living species: it is one lookup per name (~10 s per 100), and a fossil's name is a
+    # paleontological one that Wikidata rarely has a picture for.
+    miss = sorted(n for n, e in resolve(species, dict(snap, alias=[], pageimg={}), raw).items()
+                  if e is None and (living is None or n in living))
+    snap = dict(snap, alias_query=ALIAS_QUERY, item_query=ITEM_QUERY, alias=sorted(query_all("alias", miss)) if miss else [])
+    return dict(snap, pageimg=page_images(pic_less(resolve(species, dict(snap, pageimg={}), raw))))
+
+
+def pic_less(out: dict[str, dict | None]) -> list[str]:
+    """The English articles of the entries with no picture."""
+    return sorted({e["wp"] for e in out.values() if e and e.get("wp") and not e.get("img")})
 
 
 def fetch_snapshot(species: dict[str, int], raw: Path) -> dict:
@@ -198,16 +326,18 @@ def fetch_snapshot(species: dict[str, int], raw: Path) -> dict:
     with_article = {r[1] for r in by_name + by_ott + by_syn if r[4]}
     bare = sorted({r[1] for r in by_name + by_ott + by_syn if ITEM.fullmatch(r[1])} - with_article)
     by_link = query_all("P1420", bare) if bare else []
-    return {
+    snap = {
         "endpoint": ENDPOINT,
         "query": QUERY,
         "retrieved": _dt.date.today().isoformat(),
+        "asked": sorted(species),
         "names": sorted(by_name),
         "ott": sorted(by_ott),
         "synonyms": sorted(by_syn),
         "link_query": LINK_QUERY,
         "linked": sorted(by_link),
     }
+    return extend_snapshot(species, snap, raw)
 
 
 def synonyms(ids: set[int], raw: Path) -> dict[int, list[str]]:
@@ -270,6 +400,7 @@ def resolve(species: dict[str, int], snap: dict, raw: Path) -> dict[str, dict | 
         return g
     by_name, by_ott, by_syn = group(snap["names"]), group(snap["ott"]), group(snap["synonyms"])
     by_link = group(snap.get("linked", []))
+    by_alias, pageimg = group(snap.get("alias", [])), snap.get("pageimg", {})
     syn: dict[int, list[str]] = {}
     out: dict[str, dict | None] = {}
     for name in sorted(species):
@@ -285,11 +416,15 @@ def resolve(species: dict[str, int], snap: dict, raw: Path) -> dict[str, dict | 
                 hit = _pick(by_syn.get(s, []), s.split()[0])
                 if hit:
                     break
+        if hit is None:
+            hit = _pick(by_alias.get(name, []), genus)
         if hit is not None and not hit[1]:
             # No English article on the item: one its taxon-synonym links have (species first).
             alt = _pick([r for r in by_link.get(hit[0], []) if r[4]], genus)
             if alt:
                 hit = [hit[0], alt[1], hit[2] or alt[2], hit[3] or alt[3]]
+        if hit is not None and not hit[2] and hit[1] in pageimg:
+            hit = [hit[0], hit[1], "/Special:FilePath/" + urllib.parse.quote(pageimg[hit[1]]), hit[3]]
         out[name] = entry(hit)
     return out
 
@@ -340,14 +475,19 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--raw", type=Path, default=root / "data" / "raw")
     ap.add_argument("--mammals", type=Path, default=root / "data" / "mammals")
     ap.add_argument("--lock", type=Path, default=root / "pipeline" / "sources.lock.json")
+    ap.add_argument("--extend", action="store_true",
+                    help="keep the snapshot's rows and run only the steps it lacks (alias, page images), re-pinning it")
     ap.add_argument("--refresh", action="store_true", help="query Wikidata again and re-pin the snapshot")
     a = ap.parse_args(argv)
 
     species = species_rows(a.mammals)
     snap_path = a.raw / SNAPSHOT
     lock = json.loads(a.lock.read_text())
-    if a.refresh or not snap_path.exists():
-        snap = fetch_snapshot(species, a.raw)
+    extend = a.extend and snap_path.exists()
+    if extend or a.refresh or not snap_path.exists():
+        snap = (extend_snapshot(species, json.loads(snap_path.read_text(encoding="utf-8")), a.raw,
+                                         living_species(a.mammals)) if extend
+                else fetch_snapshot(species, a.raw))
         snap_path.parent.mkdir(parents=True, exist_ok=True)
         snap_path.write_text(json.dumps(snap, ensure_ascii=False, indent=0, sort_keys=True) + "\n", encoding="utf-8")
         lock[SNAPSHOT] = {"url": ENDPOINT, "post_body": {"query": "see the snapshot's `query`, keys: the dated tree's species"},

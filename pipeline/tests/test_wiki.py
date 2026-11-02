@@ -75,6 +75,31 @@ class Pick(unittest.TestCase):
         self.assertIsNone(wiki.entry(["Q1", "", ""]))
 
 
+class Fallbacks(unittest.TestCase):
+    Q = "http://www.wikidata.org/entity/"
+    SP = Q + "Q7432"
+    NOWHERE = Path("/nonexistent")
+
+    def snap(self, **kw):
+        return {"names": [], "ott": [], "synonyms": [], "linked": [], **kw}
+
+    def test_alias_finds_the_domestic_form(self):
+        # Wikidata keeps the dog as Canis lupus familiaris; "Canis familiaris" is only an alias of its item.
+        alias = [["Canis familiaris", self.Q + "Q144", self.SP, "Canis", "https://en.wikipedia.org/wiki/Dog", "", ""]]
+        out = wiki.resolve({"Canis familiaris": 0}, self.snap(alias=alias), self.NOWHERE)
+        self.assertEqual(out["Canis familiaris"], {"wp": "https://en.wikipedia.org/wiki/Dog"})
+
+    def test_article_lead_image_fills_a_missing_picture(self):
+        art = "https://en.wikipedia.org/wiki/Dog"
+        names = [["Canis x", self.Q + "Q1", self.SP, "Canis", art, "", ""]]
+        out = wiki.resolve({"Canis x": 0}, self.snap(names=names, pageimg={art: "A dog.jpg"}), self.NOWHERE)
+        self.assertEqual(out["Canis x"]["img"], wiki.thumb_url("A dog.jpg"))
+        # a Wikidata picture wins over the article's
+        names[0][5] = "http://commons.wikimedia.org/wiki/Special:FilePath/W.jpg"
+        out = wiki.resolve({"Canis x": 0}, self.snap(names=names, pageimg={art: "A dog.jpg"}), self.NOWHERE)
+        self.assertEqual(out["Canis x"]["img"], wiki.thumb_url("W.jpg"))
+
+
 @unittest.skipUnless((MAMMALS / "wiki.json").exists(), "no data/mammals/wiki.json (run make wiki)")
 class Sidecar(unittest.TestCase):
     def test_every_species_row_has_an_entry(self):
