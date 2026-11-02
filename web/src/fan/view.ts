@@ -2278,8 +2278,9 @@ export class FanView implements InputHandlers {
      * a run's, the run then its daughter holding its face, `kid`), the deepest first, over the picture's rows; one too
      * narrow to hold it puts it at its middle. The daughter's territory is inside her mother's (and her run's) over the
      * same rows, so where the picture is handed on its place stays inside both (ToLaD#333 cut333j). The cut opens a
-     * node once any daughter fits (pics333b: a node held whole until its face daughter fitted kept the bats, wide,
-     * under the hoofed mammals' cow); the face then stays with the run holding its daughter while that run holds it.
+     * node when that shows more pictures (Territories.cut's `most`; pics333b: a node held whole until its face
+     * daughter fitted kept the bats, hundreds of px wide, under the hoofed mammals' cow); the face then stays with the
+     * run holding its daughter while that run holds it.
      */
     const picX = (it: CutItem, at: number, kid: number): number => {
       const ch = this.picChain;
@@ -2298,7 +2299,7 @@ export class FanView implements InputHandlers {
       }
       return x;
     };
-    for (const it of T.t.cut(sx, PIC_D, vx0, vx1, picRows, ghost)) {
+    for (const it of T.t.cut(sx, PIC_D, vx0, vx1, picRows, ghost, true)) {
       if (!shown(it, PIC_D)) continue;
       const { face, kid } = T.faceOf(it);
       if (!face || !wikiOf(face.sp.sci)?.img) continue;

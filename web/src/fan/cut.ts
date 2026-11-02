@@ -260,9 +260,12 @@ export class Territories {
    * The cut at width zoom `sx` for a box `px` wide (the fold set to sx: its rooms are the positions), only what
    * meets world x [vx0, vx1] (the screen): O(what is on screen). Items left to right. Rooms by life: an item fits
    * when its territory over its label's rows (`rows`, over(); without, its youngest tip's row) holds the box, all
-   * as laid out; widest rooms: from its fit zoom on.
+   * as laid out; widest rooms: from its fit zoom on. `most` (the pictures' cut, ToLaD#333 pics333b): a node is opened
+   * only when that shows more fitting items than it standing whole (a run of daughters counted too), the most a
+   * node's territory can show, by a DP over its subtree on screen (Been et al.'s 1D optimum); on a tie it stands whole
+   * (its face is its commonest species, the degree of interest's pick).
    */
-  cut(sx: number, px: number, vx0 = -Infinity, vx1 = Infinity, rows?: RowsOf, ghost = 0): CutItem[] {
+  cut(sx: number, px: number, vx0 = -Infinity, vx1 = Infinity, rows?: RowsOf, ghost = 0, most = false): CutItem[] {
     const out: CutItem[] = [];
     const s: [number, number] = [0, 0];
     const fl: [number, number] = [0, 0];
@@ -286,10 +289,42 @@ export class Territories {
       out.push({ kind: r.kind, j: r.j, q0: r.q0, q1: r.q1, f: fl[0], l: fl[1], x0: x[0], x1: x[1], count, fits });
     };
     const root = this.index.get(this.fan.root)!;
+    // (`most`: per node on screen, the most fitting items its territory shows, and whether opening it shows more.)
+    const best = new Map<number, number>();
+    const opened = new Set<number>();
+    const val = (k: number): number => {
+      if (k < 0) return ok(k) ? 1 : 0;
+      let v = best.get(k);
+      if (v !== undefined) return v;
+      const K = this.kids[k];
+      const whole = ok(k) ? 1 : 0;
+      let open = -1;
+      for (let q = 0; q < K.length; q++) {
+        if (!ok(K[q])) continue;
+        // (Opened: each daughter that fits its most, each run of those that do not one item if it fits.)
+        open = 0;
+        for (let p = 0; p < K.length; p++) {
+          if (ok(K[p])) {
+            if (on(K[p])) open += val(K[p]);
+            continue;
+          }
+          let p1 = p;
+          while (p1 + 1 < K.length && !ok(K[p1 + 1])) p1++;
+          const r: Ref = { kind: 'run', j: k, q0: p, q1: p1 };
+          if (fit(...(life ? this.over(r, R, ghost, s) : this.hull(k, p, p1, s)))) open++;
+          p = p1;
+        }
+        break;
+      }
+      if (open > whole) opened.add(k);
+      best.set(k, (v = Math.max(whole, open)));
+      return v;
+    };
     const walk = (j: number): void => {
       const K = this.kids[j];
       let any = false;
       for (const k of K) if (ok(k)) any = true;
+      if (any && most) any = (val(j), opened.has(j));
       if (!any) {
         const t = terr(j);
         if (meets(t[0], t[1])) item({ kind: 'node', j, q0: 0, q1: K.length - 1 }, t, this.count[j], ok(j));
