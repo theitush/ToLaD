@@ -11,7 +11,8 @@ const prefix = process.argv[3] || 't';
 const steps = (process.argv[4] || '').split(',').filter(Boolean).map((s) => s.replace(/_/g, ' '));
 mkdirSync(out, { recursive: true });
 process.env.LEVEL = 'mammals';
-const { url, close } = await pageUrl('level=mammals');
+// (PAGE=<url>: that page instead of dist-single, e.g. the live site for a before shot.)
+const { url, close } = process.env.PAGE ? { url: process.env.PAGE, close() {} } : await pageUrl('level=mammals');
 const browser = await chromium.launch({ headless: true });
 try {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
@@ -22,7 +23,7 @@ try {
   await page.waitForTimeout(1500);
   await page.evaluate(() => {
     // A pill's or picture's group by the name its pill shows (a signpost's, ToLaD#333), else its own.
-    window.__nm = (v) => window.__fan.cutLast?.spots.find((s) => s.fam === v)?.text || window.__levelName(v);
+    window.__nm = (v) => window.__fan.cutLast?.spots.find((s) => s.fam === v)?.text || (window.__levelName ? window.__levelName(v) : v.split?.taxon || v.name);
   });
   const state = () =>
     page.evaluate(() => {
@@ -30,7 +31,7 @@ try {
       const nm = window.__nm;
       const lv = f.levelNow(true);
       const lvName = lv.b ? lv.b.sp.common : nm(lv.v);
-      const pills = f.famHits.map((h) => `${nm(h.v)} [${window.__levelName(h.v)}]@${h.box.map((x) => x | 0).join(',')}`);
+      const pills = f.famHits.map((h) => `${nm(h.v)}@${h.box.map((x) => x | 0).join(',')}`);
       const pics = f.thumbHits.map((t) => `${t[4] ? `${nm(t[4])} [${t[4].split?.taxon ?? ""} n=${t[4].strands.length}, face ${t[3].sp.common}]` : t[3].sp.common}@${t[0] | 0},${t[1] | 0}`);
       const names = f.nameHits.map((h) => h.b.sp.common);
       const plus = f.plusHits.map((h) => `+${h.bs.length}`);
