@@ -260,10 +260,9 @@ export class Territories {
    * The cut at width zoom `sx` for a box `px` wide (the fold set to sx: its rooms are the positions), only what
    * meets world x [vx0, vx1] (the screen): O(what is on screen). Items left to right. Rooms by life: an item fits
    * when its territory over its label's rows (`rows`, over(); without, its youngest tip's row) holds the box, all
-   * as laid out; widest rooms: from its fit zoom on. `holds`: per node, the daughter (a node's index, ~ a strand's;
-   * NaN, none) it splits only once that one fits (the pictures' cut: the daughter holding its face species).
+   * as laid out; widest rooms: from its fit zoom on.
    */
-  cut(sx: number, px: number, vx0 = -Infinity, vx1 = Infinity, rows?: RowsOf, ghost = 0, holds?: (j: number) => number): CutItem[] {
+  cut(sx: number, px: number, vx0 = -Infinity, vx1 = Infinity, rows?: RowsOf, ghost = 0): CutItem[] {
     const out: CutItem[] = [];
     const s: [number, number] = [0, 0];
     const fl: [number, number] = [0, 0];
@@ -291,12 +290,6 @@ export class Territories {
       const K = this.kids[j];
       let any = false;
       for (const k of K) if (ok(k)) any = true;
-      // (With `holds`, a node splits only once the daughter it names fits: the picture of its face species then passes
-      // straight from the node to that daughter and back, never a zoom with neither, Been et al.'s ranges kept whole.)
-      if (any && holds) {
-        const h = holds(j);
-        if (!Number.isNaN(h)) any = ok(h);
-      }
       if (!any) {
         const t = terr(j);
         if (meets(t[0], t[1])) item({ kind: 'node', j, q0: 0, q1: K.length - 1 }, t, this.count[j], ok(j));
