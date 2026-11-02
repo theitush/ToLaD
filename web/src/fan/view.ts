@@ -209,6 +209,24 @@ class CutTerritories {
     }
     return { face: best, kid };
   }
+  /**
+   * The pictures' cut's openings for a picture `px` wide (Territories.openings, ToLaD#333 pics333c): per node, the rung
+   * it opens from, by the zoom alone. Faces in groupFace's order: the living with a picture, then by individuals now.
+   */
+  picOpens(px: number): Float64Array {
+    const S = this.t.strands;
+    if (!this.faceRank) {
+      const pic = Uint8Array.from(S, (b) => (wikiOf(b.sp.sci)?.img ? 1 : 0));
+      const alive = (i: number) => !S[i].sp.extinct && S[i].pop.aliveAt(0) > 0;
+      const live = Array.from(S.keys()).filter(alive);
+      live.sort((p, q) => pic[q] - pic[p] || S[q].pop.aliveAt(0) - S[p].pop.aliveAt(0) || p - q);
+      const rank = new Int32Array(S.length).fill(-1);
+      live.forEach((i, r) => (rank[i] = r));
+      this.faceRank = { rank, pic };
+    }
+    return this.t.openings(px, this.faceRank.rank, this.faceRank.pic);
+  }
+  private faceRank: { rank: Int32Array; pic: Uint8Array } | null = null;
   /** Daughter k's (a node's index, ~ a strand's) youngest tip (world y). */
   youngOf(k: number): number {
     return k >= 0 ? this.young[k] : Math.max(this.t.strands[~k].tipY, this.now);
@@ -2278,7 +2296,7 @@ export class FanView implements InputHandlers {
      * a run's, the run then its daughter holding its face, `kid`), the deepest first, over the picture's rows; one too
      * narrow to hold it puts it at its middle. The daughter's territory is inside her mother's (and her run's) over the
      * same rows, so where the picture is handed on its place stays inside both (ToLaD#333 cut333j). The cut opens a
-     * node when that shows more pictures (Territories.cut's `most`; pics333b: a node held whole until its face
+     * node when that shows more pictures, by the zoom alone (Territories.openings, pics333c; pics333b: a node held whole until its face
      * daughter fitted kept the bats, hundreds of px wide, under the hoofed mammals' cow); the face then stays with the
      * run holding its daughter while that run holds it.
      */
@@ -2299,7 +2317,7 @@ export class FanView implements InputHandlers {
       }
       return x;
     };
-    for (const it of T.t.cut(sx, PIC_D, vx0, vx1, picRows, ghost, true)) {
+    for (const it of T.t.cut(sx, PIC_D, vx0, vx1, picRows, ghost, T.picOpens(PIC_D))) {
       if (!shown(it, PIC_D)) continue;
       const { face, kid } = T.faceOf(it);
       if (!face || !wikiOf(face.sp.sci)?.img) continue;

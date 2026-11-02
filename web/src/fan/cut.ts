@@ -260,12 +260,11 @@ export class Territories {
    * The cut at width zoom `sx` for a box `px` wide (the fold set to sx: its rooms are the positions), only what
    * meets world x [vx0, vx1] (the screen): O(what is on screen). Items left to right. Rooms by life: an item fits
    * when its territory over its label's rows (`rows`, over(); without, its youngest tip's row) holds the box, all
-   * as laid out; widest rooms: from its fit zoom on. `most` (the pictures' cut, ToLaD#333 pics333b): a node is opened
-   * only when that shows more fitting items than it standing whole (a run of daughters counted too), the most a
-   * node's territory can show, by a DP over its subtree on screen (Been et al.'s 1D optimum); on a tie it stands whole
-   * (its face is its commonest species, the degree of interest's pick).
+   * as laid out; widest rooms: from its fit zoom on. `opens` (the pictures' cut, ToLaD#333 pics333c): per node, the
+   * rung from which it is opened (openings(): decided in the zoom-only model, so by the zoom alone, never the pan);
+   * below it a node stands whole even where some daughters fit.
    */
-  cut(sx: number, px: number, vx0 = -Infinity, vx1 = Infinity, rows?: RowsOf, ghost = 0, most = false): CutItem[] {
+  cut(sx: number, px: number, vx0 = -Infinity, vx1 = Infinity, rows?: RowsOf, ghost = 0, opens?: Float64Array): CutItem[] {
     const out: CutItem[] = [];
     const s: [number, number] = [0, 0];
     const fl: [number, number] = [0, 0];
@@ -289,42 +288,12 @@ export class Territories {
       out.push({ kind: r.kind, j: r.j, q0: r.q0, q1: r.q1, f: fl[0], l: fl[1], x0: x[0], x1: x[1], count, fits });
     };
     const root = this.index.get(this.fan.root)!;
-    // (`most`: per node on screen, the most fitting items its territory shows, and whether opening it shows more.)
-    const best = new Map<number, number>();
-    const opened = new Set<number>();
-    const val = (k: number): number => {
-      if (k < 0) return ok(k) ? 1 : 0;
-      let v = best.get(k);
-      if (v !== undefined) return v;
-      const K = this.kids[k];
-      const whole = ok(k) ? 1 : 0;
-      let open = -1;
-      for (let q = 0; q < K.length; q++) {
-        if (!ok(K[q])) continue;
-        // (Opened: each daughter that fits its most, each run of those that do not one item if it fits.)
-        open = 0;
-        for (let p = 0; p < K.length; p++) {
-          if (ok(K[p])) {
-            if (on(K[p])) open += val(K[p]);
-            continue;
-          }
-          let p1 = p;
-          while (p1 + 1 < K.length && !ok(K[p1 + 1])) p1++;
-          const r: Ref = { kind: 'run', j: k, q0: p, q1: p1 };
-          if (fit(...(life ? this.over(r, R, ghost, s) : this.hull(k, p, p1, s)))) open++;
-          p = p1;
-        }
-        break;
-      }
-      if (open > whole) opened.add(k);
-      best.set(k, (v = Math.max(whole, open)));
-      return v;
-    };
+    const rung = opens ? Territories.rung(sx) : 0;
     const walk = (j: number): void => {
       const K = this.kids[j];
       let any = false;
       for (const k of K) if (ok(k)) any = true;
-      if (any && most) any = (val(j), opened.has(j));
+      if (any && opens) any = rung >= opens[j];
       if (!any) {
         const t = terr(j);
         if (meets(t[0], t[1])) item({ kind: 'node', j, q0: 0, q1: K.length - 1 }, t, this.count[j], ok(j));
@@ -567,6 +536,129 @@ export class Territories {
     return out;
   }
   private readonly lent = new Map<number, Map<number, [number, number]>>();
+
+  /**
+   * The pictures' cut's openings (ToLaD#333 pics333c; research/scalable-tree.md §3, Been et al.'s 1D active ranges):
+   * per node, the ladder rung from which the pictures' cut opens it (Infinity: never), for a picture `px` wide. Decided
+   * once per picture width and screen width (this Territories), in the zoom-only model fitZoom works in (widest rooms,
+   * the openness at each rung), over the whole tree with nothing culled: so which nodes are open depends on the zoom
+   * alone, never on the pan, and a node once opened stays open (each item's picture has one range of zooms).
+   *
+   * At each rung, bottom up, a node's best is the most pictures its territory can show, standing whole (one, if it
+   * fits and its face has a picture) or opened (each daughter's best where she fits, each run of those that do not one
+   * picture where the run fits and its face has one). It opens when opened shows more; on a tie, when the opened
+   * pictures stand over more width in total, a picture standing over the branch it is centred on (picX): down its
+   * face's chain (the item, its daughter holding the face, hers, ...), the first too narrow to hold it (a run's: its
+   * daughter holding its face), else the species itself. A picture goes where the visible branch is widest: at the
+   * mammals' home a bat's picture over the bats, not the cow's over a hoofed column too narrow for it.
+   *
+   * Faces by `rank` (per strand: lower is better; < 0, no face: groupFace's order, the living with a picture first, then
+   * the most individuals now), `pic` (per strand: whether it has a picture). O(rungs × (nodes + strands)).
+   */
+  openings(px: number, rank: Int32Array, pic: Uint8Array): Float64Array {
+    let out = this.opened.get(px);
+    if (out) return out;
+    const nN = this.nodes.length;
+    const nS = this.R.length;
+    out = new Float64Array(nN).fill(Infinity);
+    this.opened.set(px, out);
+    const z = this.fitZoom(px);
+    const rk = (sx: number) => (sx < Infinity ? Territories.rung(sx) : Infinity);
+    const fitN = Float64Array.from(z.node, rk);
+    const fitS = Float64Array.from(z.strand, rk);
+    // (Nodes daughters first; each one's face strand (-1, none) and the daughter holding it.)
+    const order: number[] = [];
+    const stack = [this.index.get(this.fan.root)!];
+    while (stack.length) {
+      const j = stack.pop()!;
+      order.push(j);
+      for (const k of this.kids[j]) if (k >= 0) stack.push(k);
+    }
+    order.reverse();
+    const face = new Int32Array(nN).fill(-1);
+    const faceKid = new Int32Array(nN).fill(-1);
+    const better = (a: number, b: number) => a >= 0 && (b < 0 || rank[a] < rank[b]);
+    const faceOfKid = (k: number) => (k >= 0 ? face[k] : rank[~k] >= 0 ? ~k : -1);
+    for (const j of order) {
+      const K = this.kids[j];
+      for (let q = 0; q < K.length; q++) {
+        const f = faceOfKid(K[q]);
+        if (better(f, face[j])) [face[j], faceKid[j]] = [f, q];
+      }
+    }
+    let minR = Infinity;
+    for (let i = 0; i < nS; i++) if (this.R[i] > 0) minR = Math.min(minR, this.R[i]);
+    const ones = new Float64Array(this.G.length).fill(1);
+    const all = this.width(ones, this.gapSums(ones), 0, nS - 1);
+    if (!(all > 0) || !(minR < Infinity)) return out;
+    // (From where the whole tree could first hold a picture to where the narrowest room alone does: past it, all fit.)
+    const k0 = Math.floor(Math.log2(px / all) * LADDER);
+    const k1 = Math.ceil(Math.log2(px / minR) * LADDER) + 1;
+    const up = this.climber();
+    const PG = new Float64Array(this.G.length + 1);
+    const C = new Int32Array(nN);
+    const S = new Float64Array(nN);
+    const H = new Float64Array(nN);
+    const F = (k: number) => (k >= 0 ? this.first[k] : ~k);
+    const L = (k: number) => (k >= 0 ? this.last[k] : ~k);
+    // (A node with every daughter fitting, each node among them so too, is settled: opened, its species each a picture
+    // of their own from here on, the most there is; standing whole, it holds one species with a picture at most, which
+    // opening would only move. Its count stands; its width is its pictured species', PP's prefix sums.)
+    const done = new Uint8Array(nN);
+    const PP = new Float64Array(nS + 1);
+    for (let k = k0; k <= k1; k++) {
+      const sx = Math.pow(2, k / LADDER);
+      up.to(sx);
+      this.gapSums(up.A, PG);
+      const W = (k0: number, k1: number) => this.width(up.A, PG, F(k0), L(k1));
+      for (let i = 0; i < nS; i++) PP[i + 1] = PP[i] + (pic[i] && rank[i] >= 0 ? this.width(up.A, PG, i, i) : 0);
+      const fits = (d: number) => k >= (d >= 0 ? fitN[d] : fitS[~d]);
+      const sOf = (d: number) => (done[d] ? PP[this.last[d] + 1] - PP[this.first[d]] : S[d]);
+      const hOf = (d: number) => (done[d] ? W(~face[d], ~face[d]) : H[d]);
+      for (const j of order) {
+        // (A node too narrow for a picture shows none, nor do its daughters, narrower still.)
+        if (done[j] || k < fitN[j]) continue;
+        const K = this.kids[j];
+        const fj = face[j];
+        const wc = fj >= 0 && pic[fj] ? 1 : 0;
+        // (The branch its picture stands over: down its face's chain, the first too narrow to hold it, else the species.)
+        const fd = faceKid[j] >= 0 ? K[faceKid[j]] : 0;
+        if (fj >= 0) H[j] = fd >= 0 && fits(fd) ? hOf(fd) : W(fd, fd);
+        const ws = wc ? H[j] : 0;
+        let oc = 0;
+        let os = 0;
+        let any = false;
+        let all = true;
+        for (let q = 0; q < K.length; q++) {
+          const d = K[q];
+          if (fits(d)) {
+            any = true;
+            if (d >= 0) (oc += C[d]), (os += sOf(d)), (all &&= !!done[d]);
+            else if (pic[~d] && rank[~d] >= 0) (oc++, (os += W(d, d)));
+            continue;
+          }
+          all = false;
+          // (A run of daughters that do not fit: one picture where it fits, its face's, over the daughter holding it.)
+          let q1 = q;
+          let fq = -1;
+          let fr = -1;
+          for (; ; q1++) {
+            const f = faceOfKid(K[q1]);
+            if (better(f, fr)) (fr = f), (fq = q1);
+            if (q1 + 1 >= K.length || fits(K[q1 + 1])) break;
+          }
+          if (fr >= 0 && pic[fr] && sx * W(K[q], K[q1]) >= px * (1 - 1e-9)) (oc++, (os += W(K[fq], K[fq])));
+          q = q1;
+        }
+        if (any && (out[j] < k || oc > wc || (oc === wc && os > ws))) {
+          if (out[j] > k) out[j] = k;
+          (C[j] = oc), (S[j] = os), (done[j] = all ? 1 : 0);
+        } else (C[j] = wc), (S[j] = ws), (done[j] = all ? 1 : 0);
+      }
+    }
+    return out;
+  }
+  private readonly opened = new Map<number, Float64Array>();
 
   /**
    * Borrowed room at width zoom `sx` (plan step 2b): of the cut `items` for a box `px` wide, the daughters in its runs
