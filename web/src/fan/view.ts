@@ -203,6 +203,20 @@ class CutTerritories {
     }
     return out!;
   }
+  /**
+   * The widest clade daughter k (a node's index, ~ a strand's) is in whose species are all in strands f..l: k climbed
+   * while its parent's are. An item's head climbed is the branch its label stands on: the same whether the clade is one
+   * item or a daughter of it with her sisters riding on her.
+   */
+  whole(k: number, f: number, l: number): number {
+    const { nodes, strands, first, last, index } = this.t;
+    for (let u = k >= 0 ? nodes[k].parent : strands[~k].node; u; u = u.parent) {
+      const j = index.get(u)!;
+      if (first[j] < f || last[j] > l) break;
+      k = j;
+    }
+    return k;
+  }
   private readonly names = new Map<string, ItemName>();
   /**
    * Item r's label (ToLaD#358): the most populous (individuals alive now) named clade or species among those it
@@ -213,19 +227,11 @@ class CutTerritories {
     const key = `${r.f}:${r.l}`;
     let out = this.names.get(key);
     if (out) return out;
-    const { nodes, strands, first, last } = this.t;
+    const { nodes, strands } = this.t;
     // (Its whole clades: each part climbed while its parent's species are all the item's.)
     let pick = NaN;
     for (const p of r.parts ?? [r.head]) {
-      let k = p;
-      let u = k >= 0 ? nodes[k].parent : strands[~k].node;
-      while (u) {
-        const j = this.t.index.get(u)!;
-        if (first[j] < r.f || last[j] > r.l) break;
-        k = j;
-        u = u.parent;
-      }
-      const c = this.bestNamed(k);
+      const c = this.bestNamed(this.whole(p, r.f, r.l));
       if (Number.isNaN(pick) || this.aliveOf(c) > this.aliveOf(pick)) pick = c;
     }
     const lv: Level = pick < 0 ? { b: strands[~pick] } : { v: nodes[pick] };
@@ -2023,6 +2029,7 @@ export class FanView implements InputHandlers {
     const br = this.layoutBrackets();
     const top = this.labelTop() + (br ? br.pinH() * br.pinA : 0);
     const cut = (this.cutLast = this.cutLabels(T, top));
+    this.topLast = top;
     this.labelMs.push(performance.now() - t0);
     if (this.labelMs.length > 600) this.labelMs.shift();
     return { br, top, cut };
@@ -2039,6 +2046,8 @@ export class FanView implements InputHandlers {
   }
   /** The last labels from the cut (tests read it). */
   cutLast: CutLabels | null = null;
+  /** ...and the labels' top line it held them under (screen y: under the buttons and the pinned rows; tests read it). */
+  topLast = 0;
   /** The labels over the whole tree at this camera, nothing culled for the screen (ToLaD#358's invariants, tests). */
   wholeLabels(): CutLabels {
     const f = this.fan.tess.fold;
@@ -2075,16 +2084,14 @@ export class FanView implements InputHandlers {
     // (A lineage keeps its place over its tip as high as a picture stands: the pictures' rows are in the partition too.)
     const ghost = (PIC_LIFT + PIC_D) / this.cam.sy;
     /**
-     * An item's centre (screen x) for a box `d` wide: over `at` (world x: its picture's species' column at "now"), the
-     * territory only bounding it: inside its territory always (it fits there), on screen as well where the
-     * territory's part on screen holds it.
+     * An item's centre (screen x) for a box `d` wide: at `cx` (screen x), the territory [x0, x1] (world) only bounding
+     * it: inside its territory always (it fits there), on screen as well where the territory's part on screen holds it.
      */
-    const placeX = (x0: number, x1: number, d: number, at: number): number => {
+    const placeX = (x0: number, x1: number, d: number, cx: number): number => {
       const l = X(x0) + d / 2;
       const r = X(x1) - d / 2;
       const lo = Math.max(l, left + d / 2);
       const hi = Math.min(r, right - d / 2);
-      const cx = X(at);
       const x = lo <= hi ? Math.min(Math.max(cx, lo), hi) : Math.min(Math.max(cx, hi), lo);
       return Math.min(Math.max(x, l), r);
     };
@@ -2098,19 +2105,24 @@ export class FanView implements InputHandlers {
       const y0 = Math.max(a, (a + Math.min(by, bottom - 30)) / 2 - tlen / 2);
       return [y0, y0 + tlen];
     };
-    /** Item r's label: its name, and its picture's and pill's rows (screen y), from its head's youngest tip and branch. */
+    /**
+     * Item r's label: its name, and its picture's and pill's rows (screen y), from the youngest tip and the branch of
+     * its head climbed (CutTerritories.whole: a clade's own, whether it is one item or her daughter with her sisters
+     * riding on her).
+     */
     const memo = new Map<string, { name: ItemName; disc: [number, number]; pill: [number, number] }>();
     const at = (r: Ref & { parts?: readonly number[] }) => {
-      const key = `${r.head}:${r.f}:${r.l}`;
+      const k = T.whole(r.head, r.f, r.l);
+      const key = `${k}:${r.f}:${r.l}`;
       let m = memo.get(key);
       if (!m) {
         const name = T.nameOf(r);
-        const ty = Y(T.youngOf(r.head));
+        const ty = Y(T.youngOf(k));
         const tlen = this.nameWidth(name.text) + 2 * LABEL_PAD + this.plusPx(name.hid.length);
         // (Its picture over its tip, or with the tip above the top line, held under it, its name below: a label stays
         // whole on screen while its branch is, scrolled into the past too.)
         const d0 = Math.max(ty - PIC_LIFT - PIC_D, top);
-        m = { name, disc: [d0, d0 + PIC_D], pill: pillAt(ty, Y(T.splitOff(r.head)), tlen, d0 + PIC_D + 4) };
+        m = { name, disc: [d0, d0 + PIC_D], pill: pillAt(ty, Y(T.splitOff(k)), tlen, d0 + PIC_D + 4) };
         memo.set(key, m);
       }
       return m;
@@ -2118,6 +2130,33 @@ export class FanView implements InputHandlers {
     const rows: RowsOf = (r) => {
       const { disc, pill } = at(r);
       return [Wy(disc[0]), Wy(disc[1]), Wy(pill[0]), Wy(pill[1])];
+    };
+    /**
+     * Item it's label's place (screen x) before its territory and the screen bound it: its picture's species' column at
+     * "now", walked up from that species through the item's clades it is in to the first whose territory holds the
+     * label (each over its own label's rows, as the cut tries it), clamped into that; each narrower one on the way
+     * gives its middle. A clade starts to fit, and is cut off as an item of its own, when its territory is just the
+     * label's width: the place is its middle on both sides of the cut, so a label moves with the zoom continuously
+     * through a split (ToLaD#333's handoff, #358; exactly where territories nest, under widest rooms).
+     */
+    const cell: [number, number] = [0, 0];
+    const faceX = (it: CutItem, face: FanBranch): number => {
+      const { index, first, last } = T.t;
+      let cx = X(groupCentre({ b: face }));
+      let r = T.t.refOf(~face.index);
+      for (let u: FanNode | null = face.node; ; ) {
+        T.t.over(r, rows, ghost, cell);
+        if (cell[1] >= cell[0]) {
+          const l = X(cell[0]) + PIC_D / 2;
+          const h = X(cell[1]) - PIC_D / 2;
+          if (l <= h) return Math.min(Math.max(cx, l), h);
+          cx = (l + h) / 2;
+        }
+        const j = u ? index.get(u) : undefined;
+        if (!u || j === undefined || first[j] < it.f || last[j] > it.l) return cx;
+        r = T.t.refOf(j);
+        u = u.parent;
+      }
     };
     for (const it of T.t.cut(sx, PIC_D, vx0, vx1, rows, ghost)) {
       // (Only the root, before anything fits, does not hold its label.)
@@ -2127,7 +2166,7 @@ export class FanView implements InputHandlers {
       if (!whole && (Math.min(X(it.x1), right) - Math.max(X(it.x0), left) < PIC_D || disc[1] > this.h)) continue;
       const fit = clamp01((bottom - pill[1]) / 30);
       if (!(fit > 0)) continue;
-      const x = placeX(it.x0, it.x1, PIC_D, groupCentre({ b: name.face }));
+      const x = placeX(it.x0, it.x1, PIC_D, faceX(it, name.face));
       const key = `c${it.f}:${it.l}`;
       if (name.hid.length) groups.set(key, name.hid);
       const s: LabelSpot = { key, id: key, place: 'tip', text: name.text, rank: [0, it.x1 - it.x0, it.head], x, y1: pill[1], box: [x - half, pill[0], x + half, pill[1]], fit, plus: this.plusPx(name.hid.length), pic: name.face };

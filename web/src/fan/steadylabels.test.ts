@@ -48,18 +48,25 @@ function stubView(clade: CladeRec = CARNIVORA, tree: Split = CARNIVORA_TREE, fol
 }
 
 /** A label's place and size (screen), and the screen x of the columns it stands on (its anchor: groupCentre; NaN, a "+x"). */
-type Spot = { x: number; y: number; w: number; h: number; c: number };
+type Spot = { x: number; y: number; w: number; h: number; c: number; it: string; t: [number, number] };
 type Shot = Map<string, Spot>;
-/** A frame's labels: each name pill (by its item and text) and each picture (by what it opens), where and how big. */
+/**
+ * A frame's labels: each name pill (by its item and text) and each picture (by what it opens), where and how big, and
+ * its item and its territory's ends (screen x: the label is held inside it).
+ */
 function shot(v: FanView, c: CutLabels): Shot {
   const m: Shot = new Map();
   const at = (x: number) => v.toScreen(x, 0)[0];
-  for (const s of c.spots) {
+  c.spots.forEach((s, i) => {
     const g = s.v ? { v: s.v } : s.b ? { b: s.b } : null;
-    m.set(`name ${s.key} ${s.text}`, { x: s.x, y: s.box[3], w: s.box[2] - s.box[0], h: s.box[3] - s.box[1], c: g ? at(groupCentre(g)) : NaN });
-  }
+    const it = c.items[i];
+    m.set(`name ${s.key} ${s.text}`, { x: s.x, y: s.box[3], w: s.box[2] - s.box[0], h: s.box[3] - s.box[1], c: g ? at(groupCentre(g)) : NaN, it: s.key, t: [at(it.x0), at(it.x1)] });
+  });
   // (A picture is its face species', whichever item of the cut it stands for.)
-  for (const p of c.pics) m.set(`pic ${p.face.sp.sci}`, { x: p.x, y: p.y, w: p.d, h: p.d, c: at(groupCentre({ b: p.face })) });
+  c.pics.forEach((p, i) => {
+    const it = c.items[i];
+    m.set(`pic ${p.face.sp.sci}`, { x: p.x, y: p.y, w: p.d, h: p.d, c: at(groupCentre({ b: p.face })), it: c.spots[i].key, t: [at(it.x0), at(it.x1)] });
+  });
   return m;
 }
 type Step = (v: FanView) => void;
@@ -68,6 +75,7 @@ type Step = (v: FanView) => void;
 function play(v: FanView, steps: Step[]): { shots: Shot[]; moved: number[] } {
   v.draw();
   const shots = [shot(v, v.cutLast!)];
+  let top = v.topLast;
   const moved: number[] = [];
   const grid = [0, 0.25, 0.5, 0.75, 1].flatMap((a) => [0, 0.25, 0.5, 0.75, 1].map((b) => [a * v.w, b * v.h]));
   for (const step of steps) {
@@ -75,7 +83,10 @@ function play(v: FanView, steps: Step[]): { shots: Shot[]; moved: number[] } {
     step(v);
     v.draw();
     shots.push(shot(v, v.cutLast!));
-    moved.push(Math.max(...was.map(([x, y], i) => Math.hypot(v.toScreen(x, y)[0] - grid[i][0], v.toScreen(x, y)[1] - grid[i][1]))));
+    // (A label held under the top line moves with it: the pinned rows come and go as the brackets' stack scrolls off.)
+    const held = Math.abs(v.topLast - top);
+    top = v.topLast;
+    moved.push(Math.max(held, ...was.map(([x, y], i) => Math.hypot(v.toScreen(x, y)[0] - grid[i][0], v.toScreen(x, y)[1] - grid[i][1]))));
   }
   return { shots, moved };
 }
@@ -84,7 +95,8 @@ function play(v: FanView, steps: Step[]): { shots: Shot[]; moved: number[] } {
  * Sizes that changed, jumps, and labels shown, hidden, then shown again. A jump: farther than the world on screen moved
  * plus a third and 2 px, the world being the camera's points and the columns the labels stand on (the steady fold's
  * gaps open and close with the width zoom, the columns with them: a pinch at the mammals moves bats' columns twice as
- * far as any point under the camera, and their names, on them, with them).
+ * far as any point under the camera, and their names, on them, with them), the territory a label is held in while its
+ * item stays the same, and the labels' top line.
  */
 function judge(shots: Shot[], moved: number[], monotonic: boolean): string[] {
   const bad: string[] = [];
@@ -95,6 +107,9 @@ function judge(shots: Shot[], moved: number[], monotonic: boolean): string[] {
     for (const [k, s] of shots[f + 1]) {
       const p = shots[f].get(k);
       if (p && Number.isFinite(s.c - p.c)) c = Math.max(c, Math.abs(s.c - p.c));
+      // (Its item's territory, the same item: its lineages' share of x over the label's rows, ToLaD#358. The rows are
+      // on screen, the pill in the middle of its branch's part there, so a pan up or down slides their share too.)
+      if (p && p.it === s.it) for (const e of [0, 1]) if (Number.isFinite(s.t[e] - p.t[e])) c = Math.max(c, Math.abs(s.t[e] - p.t[e]));
     }
     return c;
   });
@@ -104,7 +119,10 @@ function judge(shots: Shot[], moved: number[], monotonic: boolean): string[] {
       const s0 = size.get(k);
       if (!s0) size.set(k, s);
       else if (Math.abs(s0.w - s.w) > 1e-6 || Math.abs(s0.h - s.h) > 1e-6) bad.push(`frame ${f}: ${k} resized ${s0.w.toFixed(1)}x${s0.h.toFixed(1)} -> ${s.w.toFixed(1)}x${s.h.toFixed(1)}`);
-      if (monotonic && gone.has(k) && !shots[f - 1].has(k)) bad.push(`frame ${f}: ${k} shown again after it went`);
+      // (A picture is its name's, ToLaD#358: a run's label names its most populous clade, so a species' picture may go
+      // to a richer sister's run and come back as its own clade splits off, Bos taurus at the mammals: Laurasiatheria,
+      // then a run named Pteropodidae, then Hoofed mammals. Each species' label only narrows: onelabel.test.)
+      if (monotonic && !k.startsWith('pic ') && gone.has(k) && !shots[f - 1].has(k)) bad.push(`frame ${f}: ${k} shown again after it went`);
       const p = f > 0 ? shots[f - 1].get(k) : undefined;
       if (p) {
         const d = Math.hypot(s.x - p.x, s.y - p.y);
