@@ -1149,12 +1149,19 @@ export class FanView implements InputHandlers {
    * stands beside its sisters only while they lived: the territory is what the columns hold, not their widest-ever
    * sum. A level whose living columns dwarf its fossils (fossilSpan, ToLaD#289) is framed on where the fossils lived.
    * Every label of what it frames stands centred in a territory inside it, so none is cut off at the edge.
+   *
+   * Its zoom is the least at which each of its groups (a level's next levels, nextLevels; a "+x"'s daughters ks) has
+   * room for its picture (PIC_D, the widest label) in its territory: the groups' fit zoom (Been et al.'s active
+   * ranges), never past where the territory fills the labels' width. A level of a few wide groups fits before it
+   * fills, and is framed centred in the labels' width, not spread to the screen's edges (Ita, ToLaD#262).
    */
   private cutFrame(ks: readonly number[], v: FanNode, yFork: number, top = this.yNow): Camera | null {
     const T = this.territories();
     if (!ks.length) return null;
     const s: [number, number] = [0, 0];
-    const fossils = ks.length === 1 && this.fan.nodes[ks[0]] === v ? fossilSpan(this.fan, v) : null;
+    const level = ks.length === 1 && this.fan.nodes[ks[0]] === v;
+    const fossils = level ? fossilSpan(this.fan, v) : null;
+    const groups = level ? nextLevels(this.fan, v).map((g) => (g.b ? ~g.b.index : (T.t.index.get(g.v) ?? NaN))) : ks;
     return foldedFrame(this.fan, this.w, () => {
       let a = Infinity;
       let b = -Infinity;
@@ -1166,8 +1173,30 @@ export class FanView implements InputHandlers {
           b = Math.max(b, s[1]);
         }
       const cam = this.camera.frame(a, b, yFork, true);
-      const sx = (this.w - LABEL_AXIS_X) / (b - a);
-      return this.withBand({ ...cam, sx, cx: a + (this.w / 2 - LABEL_AXIS_X) / sx }, v, top);
+      let sx = (this.w - LABEL_AXIS_X) / (b - a);
+      if (!fossils && groups.length > 1) {
+        // (The zoom at which the narrowest group's territory, as the layout stands, holds a picture.)
+        let fit = 0;
+        for (const g of groups) {
+          if (g !== g) continue;
+          T.t.span(g, s);
+          fit = Math.max(fit, PIC_D / Math.max(1e-300, s[1] - s[0]));
+        }
+        sx = Math.min(sx, fit);
+      }
+      // (Centred on its living columns at "now", where its pictures stand, as far as its territory stays whole in the labels' width.)
+      let m = (a + b) / 2;
+      if (sx < (this.w - LABEL_AXIS_X) / (b - a)) {
+        let lo = Infinity;
+        let hi = -Infinity;
+        for (const k of ks) {
+          const [p, q] = k >= 0 ? groupExtent(this.fan.nodes[k]) : [stripMid(T.t.strands[~k]), stripMid(T.t.strands[~k])];
+          [lo, hi] = [Math.min(lo, p), Math.max(hi, q)];
+        }
+        if (hi > lo) m = (lo + hi) / 2;
+      }
+      const cx = Math.min(a + (this.w / 2 - LABEL_AXIS_X) / sx, Math.max(b - this.w / 2 / sx, m - LABEL_AXIS_X / 2 / sx));
+      return this.withBand({ ...cam, sx, cx }, v, top);
     });
   }
   /** Clade v's index among the territories (fan.nodes'). */
@@ -1834,9 +1863,9 @@ export class FanView implements InputHandlers {
     return this.eventLabelAt(x, y) || this.hitBranch(x, y) ? 'card' : null;
   }
 
-  /** The "+x" badge under (x, y) (ToLaD#197). */
+  /** The "+x" badge under (x, y) (ToLaD#197): its own part of the pill (the name before it is the group's, a level deeper). */
   private plusAt(x: number, y: number) {
-    return this.plusHits.find(({ box }) => x >= box[0] - 8 && x <= box[2] + 8 && y >= box[1] - 4 && y <= box[3] + 4);
+    return this.plusHits.find(({ badge: q }) => x >= q[0] - 8 && x <= q[2] + 8 && y >= q[1] - 4 && y <= q[3] + 4);
   }
 
   /** The species' or family's name pill nearest (x, y) within a finger's slack (ToLaD#230, #212), the one under it first. */

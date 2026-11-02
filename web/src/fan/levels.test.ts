@@ -187,7 +187,7 @@ describe('a tap goes one level deeper, a double-tap one level out (ToLaD#258)', 
       expect(log).toEqual([]);
     });
 
-    it(`${name}: each group's pill at home flies to that group; a double-tap, home`, () => {
+    it(`${name}: each group's pill at home flies one level deeper towards that group; a double-tap, home`, () => {
       const v = mk();
       home(v);
       const pills = v.famHits.map((h) => h.v);
@@ -198,8 +198,10 @@ describe('a tap goes one level deeper, a double-tap one level out (ToLaD#258)', 
         v.tap((h.box[0] + h.box[2]) / 2, (h.box[1] + h.box[3]) / 2);
         expect(!!P(v).anim).toBe(true);
         run(v);
-        // (That group, or where its frame is the view's, on into it, ToLaD#258.)
-        expect(holds({ v: g }, v.levelNow())).toBe(true);
+        // (That group, or where its frame is the view's, on into it; a deeper group's name, as the cut shows them at
+        // home (the bears' in the carnivores, ToLaD#333): the next level on its way, one tap one level, ToLaD#258.)
+        const now = v.levelNow();
+        expect(holds({ v: g }, now) || (!!now.v && now.v !== v.fan.root && holds(now, { v: g }))).toBe(true);
         v.doubleTap(-1e4, -1e4);
         run(v);
         expect(atHome(v)).toBe(true);
@@ -264,7 +266,8 @@ describe('a level of two or three groups is framed centred, in the middle of the
         // Its columns at "now": their middle at the middle of the room right of the time axis, within 16 px, and
         // not spread past the middle 70 % of the screen.
         const [lo, hi] = nowExtent(v, lv.v.strands);
-        const mid = (58 + v.w - 14) / 2;
+        // (The room levels are framed in, ToLaD#333: the labels' width, LABEL_AXIS_X to the screen's edge, as cutframe.test.)
+        const mid = (72 + v.w) / 2;
         if (Math.abs((lo + hi) / 2 - mid) > 16) bad.push(`${nameOf(lv)}: centred ${((lo + hi) / 2 - mid).toFixed(0)} px off`);
         if (hi - lo > 0.7 * v.w) bad.push(`${nameOf(lv)}: ${(hi - lo).toFixed(0)} px across`);
       });

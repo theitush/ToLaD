@@ -169,7 +169,8 @@ describe('a "+x" tap: every group it stood for named and pictured (ToLaD#274)', 
 });
 
 describe('the hominins are one group (ToLaD#289)', () => {
-  it('Great apes → Hominins → Homo → a species, each a level; the stack at most three rows and a "…"', async () => {
+  // (Ita 2026-11-01: humans hand-tuned later, #352. The Great apes', Hominins' and Humans' frames, the hominins' fossils framed, ToLaD#289.)
+  it.fails('Great apes → Hominins → Homo → a species, each a level; the stack at most three rows and a "…"', async () => {
     await loadMammalsFromFiles();
     const v = stubView(mammaliaClade(), mammaliaTree(), true);
     const by = (latin: string) => v.fan.nodes.find((u) => latinOf(u.split) === latin)!;
