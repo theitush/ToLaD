@@ -1,11 +1,12 @@
 // ?frame=cut (ToLaD#333, research/scalable-tree.md §4, plan step 3): a level, a bracket's tap and a "+x" tap frame their
-// territory across the labels' width of the screen, so every label shown there stands whole on screen, with no padding;
+// territory whole in the labels' width of the screen (across it, or at the zoom its groups first hold their pictures), so every label shown there stands whole on screen, with no padding;
 // a "+x" lands with the species it counted on screen. With ?labels=cut (the cut's labels).
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { loadMammalsFromFiles } from './mammals-node';
 import { CARNIVORA, mammaliaClade, type CladeRec } from './panthera';
 import { CARNIVORA_TREE, mammaliaTree, type Split } from './splits';
-import { FanView, isLevel, levelName } from './view';
+import { FanView, fossilSpan, isLevel, levelName, nextLevels } from './view';
+import { PIC_D } from './pics';
 import type { FanNode } from './layout';
 
 
@@ -45,19 +46,10 @@ function stubView(clade: CladeRec = CARNIVORA, tree: Split = CARNIVORA_TREE, fol
   return new FanView(canvas as unknown as HTMLCanvasElement, clade, tree, folds);
 }
 
-const was = [FanView.labelsCut, FanView.frameCut];
-beforeAll(() => {
-  FanView.labelsCut = true;
-  FanView.frameCut = true;
-});
-afterAll(() => {
-  [FanView.labelsCut, FanView.frameCut] = was;
-});
 
-type Priv = { anim: ((t: number) => boolean) | null; applyFold(): void; labelState: Map<string, unknown> };
+type Priv = { anim: ((t: number) => boolean) | null; applyFold(): void };
 const P = (v: FanView) => v as unknown as Priv;
 function settle(v: FanView): void {
-  P(v).labelState.clear();
   for (let k = 0; k < 3; k++) v.draw();
 }
 function run(v: FanView): void {
@@ -97,9 +89,17 @@ describe('?frame=cut: a level framed by its territory, every label whole (ToLaD#
           v.camera.settle();
           settle(v);
           const at = `${levelName(u)} (${how})`;
-          // (Its territory across the labels' width, LABEL_AXIS_X to the edge.)
-          const [a, b] = onScreen(v, u.strands[0].index, u.strands[u.strands.length - 1].index);
-          if (Math.abs(a - 72) > 0.5 || Math.abs(b - v.w) > 0.5) bad.push(`${at}: framed at ${a.toFixed(1)}–${b.toFixed(1)}`);
+          // (Its territory (the hull its columns stand in, rooms by life; a level framed on its fossils, where they lived,
+          // ToLaD#289) whole in the labels' width, LABEL_AXIS_X to the edge: across it, or at the zoom its narrowest group's
+          // territory first holds a picture (PIC_D), ToLaD#262.)
+          const T = (v as unknown as { territories(): { t: { span(j: number): [number, number]; index: Map<FanNode, number> } } }).territories().t;
+          const fs = fossilSpan(v.fan, u);
+          const [a, b] = (fs ?? T.span(T.index.get(u)!)).map((x) => v.toScreen(x, 0)[0]);
+          const groups = nextLevels(v.fan, u).map((g) => (g.b ? T.span(~g.b.index) : T.span(T.index.get(g.v)!)));
+          const fit = Math.min(...groups.map(([p, q]) => (q - p) * v.cam.sx));
+          const whole = a >= 72 - 0.5 && b <= v.w + 0.5;
+          if (!whole || !(Math.abs(a - 72) <= 0.5 && Math.abs(b - v.w) <= 0.5) && !(!fs && Math.abs(fit - PIC_D) <= 0.5))
+            bad.push(`${at}: framed at ${a.toFixed(1)}–${b.toFixed(1)}, its narrowest group ${fit.toFixed(1)} px`);
           if (!v.cutLast!.spots.length) bad.push(`${at}: no labels`);
           bad.push(...cutOff(v, at));
           n++;

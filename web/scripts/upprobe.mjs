@@ -2,7 +2,7 @@
 // double tap's level before, where it landed, the parent level it should land on (the first level up from the level
 // shown whose frame visibly moves) and the brackets' stack's innermost row after. One line per double tap, a table.
 //   npm run build:single && node scripts/upprobe.mjs [route names,...]
-//   (LEVEL=mammals|cats: ?level=; Q=fit=fossils: more query)
+//   (LEVEL=mammals|cats: ?level=; Q: more query)
 // A route's steps: t:<group or species> a tap on its column (off the pills); p:<group> a tap on its pill or picture;
 // x a tap on a "+x" of several species; s:<query>|<pick> a search pick; m a tap on the stack's "…"; pan:dx,dy a drag;
 // (a name's spaces as _) pinch:f a two-finger spread by f (width); d a double tap (at DY); c a double tap on the card,

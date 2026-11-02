@@ -38,33 +38,15 @@ export const STEADY_RUN = 0.85;
  */
 export const LIFE_GAP = 0.5;
 
+/**
+ * Territory rows (Steady.cell, ToLaD#333): the world height between them, fixed in the world, a power of two. At a
+ * phone's home time scale (SY_HOME) ~20 px, the draw's coarsest grid there (the mammals' while moving), so at every
+ * deeper time zoom they are rows the draw samples too (one cache, by world y). A resolution, not a look.
+ */
+export const TERR_H = 32;
+
 /** Rooms by life: a strand's widest over a window is laneW at this many steps (and its ends). */
 const LIFE_SAMPLES = 48;
-
-/**
- * Whether a level whose living members dwarf its fossils is framed on the fossils (ToLaD#289): ?fit=fossils, or
- * TOLAD_FIT=fossils in node; the globe menu's "Fit fossils". It turns on the rooms by life (wantLifeRooms, computeLife). Off by default.
- */
-export function wantFitFossils(): boolean {
-  try {
-    if (typeof location !== 'undefined') {
-      const q = new URLSearchParams(location.search).get('fit');
-      if (q) return q === 'fossils';
-    }
-  } catch {
-    /* no URL */
-  }
-  const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
-  return env?.TOLAD_FIT === 'fossils';
-}
-
-/**
- * Whether a fossil's room is only what it stood beside while it lived (ToLaD#289): under ?fit=fossils, which needs it
- * (its hominins' columns and names, fit.test.ts, were measured with these rooms). Else every room is its widest ever.
- */
-export function wantLifeRooms(): boolean {
-  return wantFitFossils();
-}
 
 /** The rooms and places at one set of a's and width zoom (world x, the stem's centre on Fold.home). */
 interface Lay {
@@ -132,8 +114,8 @@ export class Steady extends Fold {
   constructor(
     fan: Fan,
     readonly open = false,
-    /** Rooms by life (wantLifeRooms, ToLaD#289): an extinct daughter and its sister stand apart by their extents while both lived. */
-    readonly life = wantLifeRooms(),
+    /** Rooms by life (ToLaD#289, #342: the only rooms; widest-ever rooms for tests): an extinct daughter and its sister stand apart by their extents while both lived. */
+    readonly life = true,
   ) {
     super(fan);
     const N = fan.nodes;
@@ -651,20 +633,30 @@ export class Steady extends Fold {
   private readonly wR: ([Float64Array, Float64Array] | undefined)[] = new Array(64);
   private extGen = 0;
 
-  override rowXs(k: number): Float64Array {
-    const L = this.cur();
+  /** The rows' maps let go at a version change or at their cap. */
+  private fresh(L: Lay): void {
     if (this.rowsVer !== L.ver || this.sRows.size >= this.rowCap()) {
       this.release(this.sRows, this.pool);
       this.release(this.cRows, this.cPool);
       this.rowsVer = L.ver;
       this.rowsGen++;
     }
+  }
+
+  /** Every strand's left (or own column's centre) at world y, cached by y (the draw's grid rows and the territories' alike). */
+  private rowAt(L: Lay, y: number): Float64Array {
+    let r = this.sRows.get(y);
+    if (!r) this.sRows.set(y, (r = this.row(L, y, this.pool.pop() ?? new Float64Array(this.strands.length))));
+    return r;
+  }
+
+  override rowXs(k: number): Float64Array {
+    const L = this.cur();
+    this.fresh(L);
     const c = k & 63;
     if (this.fK[c] === k && this.fH[c] === this.gridH && this.fG[c] === this.rowsGen) return this.fR[c]!;
     // (By world y, not by k: the grid's rows a power of two apart, a coarser grid's rows are a finer one's, ToLaD#255.)
-    const y = k * this.gridH;
-    let r = this.sRows.get(y);
-    if (!r) this.sRows.set(y, (r = this.row(L, y, this.pool.pop() ?? new Float64Array(this.strands.length))));
+    const r = this.rowAt(L, k * this.gridH);
     this.fK[c] = k;
     this.fH[c] = this.gridH;
     this.fG[c] = this.rowsGen;
@@ -781,6 +773,161 @@ export class Steady extends Fold {
   rooms(): { roomL: Float64Array; roomW: Float64Array; C: Float64Array } {
     const L = this.cur();
     return { roomL: L.roomL, roomW: L.roomW, C: L.C };
+  }
+
+  /**
+   * Per-row territories (ToLaD#333): strands f..l's (drawn order, a node's run or a run of its daughters) share of the
+   * rows from world y `ya` to `yb` (world x, `out`; empty, out[0] >= out[1], where they have no lineage).
+   *
+   * At a row the lineages there split x between them, each boundary the middle of the gap between neighbours' drawn
+   * edges: a 1D Voronoi of the row, over the drawn order (the columns stand in it left to right). A strand's lineage is
+   * its slot in a parent column, its own column while it lives (laneW wide), and for `ghost` (world height) above its
+   * tip the point its column ended at, where its picture stands. Strands f..l take their lineages' cells together; over
+   * rows, the intersection. Two runs of strands that do not overlap have disjoint shares at every row, so labels placed
+   * in their own shares never meet, whatever the times they stand at.
+   *
+   * The rows are fixed in the world (TERR_H apart), never the draw's grid (finer at rest than while moving, and by the
+   * time zoom): a row's share is a function of the layout alone (rowCell). Between two rows the shares are the linear
+   * blend of theirs, both split among the lower row's lineages (those born in between counted at both), so at every y
+   * disjoint runs keep disjoint shares, and the territory, this blend's intersection over ya..yb (its ends and the rows
+   * inside), moves continuously as its label's rows do; it steps only where a lineage is born, at a row fixed in the
+   * world. Each row is a scan from f and l to the nearest lineages.
+   */
+  cell(f: number, l: number, ya: number, yb: number, ghost: number, out: [number, number] = [0, 0]): [number, number] {
+    const H = TERR_H;
+    if (yb < ya) [ya, yb] = [yb, ya];
+    const L = this.cur();
+    const r = this.rootJ;
+    let lo = L.roomL[r];
+    let hi = L.roomL[r] + L.roomW[r];
+    let any = false;
+    const c = this.cellC;
+    const d = this.cellD;
+    // (At y between rows k and k + 1, the blend of the two, both split among row k + 1's lineages.)
+    const at = (y: number) => {
+      const k = Math.floor(y / H);
+      if (!this.rowCell(f, l, k, ghost, c, true) || !this.rowCell(f, l, k + 1, ghost, d)) return;
+      const t = y / H - k;
+      any = true;
+      lo = Math.max(lo, c[0] + t * (d[0] - c[0]));
+      hi = Math.min(hi, c[1] + t * (d[1] - c[1]));
+    };
+    const row = (k: number, below: boolean) => {
+      if (!this.rowCell(f, l, k, ghost, c, below)) return;
+      any = true;
+      lo = Math.max(lo, c[0]);
+      hi = Math.min(hi, c[1]);
+    };
+    at(ya);
+    at(yb);
+    // (A row inside: the blend's ends on both sides of it, the stretch above's and the one below's.)
+    for (let k = Math.floor(ya / H) + 1; k * H < yb && lo < hi; k++) {
+      row(k, false);
+      row(k, true);
+    }
+    if (!any) {
+      lo = Infinity;
+      hi = -Infinity;
+    }
+    out[0] = lo;
+    out[1] = hi;
+    return out;
+  }
+  private readonly cellC: [number, number] = [0, 0];
+  private readonly cellD: [number, number] = [0, 0];
+
+  /**
+   * Strands f..l's share of territory row k (world y k * TERR_H) into `out`; false where they have no lineage there.
+   * Cached per version and ghost (the cost cache, ToLaD#333): a function of the layout alone; a frame asks the same rows
+   * of the same runs again and again (the cut's daughters, borrowed's stretches, the pictures' chains), and a pan or a
+   * frame at rest asks the last frame's.
+   */
+  private rowCell(f: number, l: number, k: number, ghost: number, out: [number, number], below = false): boolean {
+    const L = this.cur();
+    this.fresh(L);
+    const N = this.strands.length;
+    const key = (((k + 0x100000) * 2 + (below ? 1 : 0)) * N + f) * N + l;
+    const M = this.cellMemo;
+    if (this.memoVer !== L.ver || this.memoGhost !== ghost || M.size >= 1 << 18) {
+      M.clear();
+      this.memoN = 0;
+      this.memoVer = L.ver;
+      this.memoGhost = ghost;
+    }
+    const hit = M.get(key);
+    if (hit !== undefined) {
+      out[0] = this.memoV[hit];
+      out[1] = this.memoV[hit + 1];
+      return out[0] === out[0];
+    }
+    const ok = this.rowCellNow(L, f, l, k, ghost, out, below);
+    if (this.memoV.length < this.memoN + 2) {
+      const v = new Float64Array(Math.max(1024, 2 * this.memoV.length));
+      v.set(this.memoV);
+      this.memoV = v;
+    }
+    this.memoV[this.memoN] = ok ? out[0] : NaN;
+    this.memoV[this.memoN + 1] = out[1];
+    M.set(key, this.memoN);
+    this.memoN += 2;
+    return ok;
+  }
+  private readonly cellMemo = new Map<number, number>();
+  private memoV = new Float64Array(0);
+  private memoN = 0;
+  private memoVer = -1;
+  private memoGhost = NaN;
+
+  private rowCellNow(L: Lay, f: number, l: number, k: number, ghost: number, out: [number, number], below: boolean): boolean {
+    const y = k * TERR_H;
+    const xs = this.rowAt(L, y);
+    const age = this.fan.time.ageAt(y);
+    // (`below`: the lineages of row k + 1, those born between the two rows where they are there, so both ends of the
+    // stretch split x among the same lineages and the blend between them keeps every pair in order.)
+    const y2 = (k + 1) * TERR_H;
+    const xs2 = below ? this.rowAt(L, y2) : xs;
+    const age2 = below ? this.fan.time.ageAt(y2) : age;
+    const has = (i: number) => this.site(i, y, age, xs, ghost) || (below && this.site(i, y2, age2, xs2, ghost));
+    const e = this.edge;
+    const N = this.strands.length;
+    let a = f;
+    while (a <= l && !has(a)) a++;
+    if (a > l) return false;
+    const La = e[0];
+    let b = l;
+    while (!has(b)) b--;
+    const Rb = e[1];
+    const r = this.rootJ;
+    out[0] = L.roomL[r];
+    out[1] = L.roomL[r] + L.roomW[r];
+    let p = f - 1;
+    while (p >= 0 && !has(p)) p--;
+    if (p >= 0) out[0] = (e[1] + La) / 2;
+    let n = l + 1;
+    while (n < N && !has(n)) n++;
+    if (n < N) out[1] = (Rb + e[0]) / 2;
+    return true;
+  }
+  /** site()'s edges. */
+  private readonly edge: [number, number] = [0, 0];
+  /** Whether strand i has a lineage at row y (age `age`, the row's xs), its drawn edges into `edge` (cell()). */
+  private site(i: number, y: number, age: number, xs: Float64Array, ghost: number): boolean {
+    const e = this.edge;
+    if (y >= this.sY[i]) {
+      e[0] = xs[i];
+      e[1] = xs[i] + this.bw[i];
+      return true;
+    }
+    const t = this.tipS[i];
+    if (y >= t) {
+      const w = laneW(this.strands[i], y, age) / 2;
+      e[0] = xs[i] - w;
+      e[1] = xs[i] + w;
+      return true;
+    }
+    if (y < t - ghost) return false;
+    e[0] = e[1] = xs[i];
+    return true;
   }
 
   override setAll(a: number, all = false): void {

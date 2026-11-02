@@ -137,7 +137,7 @@ const scenes = [
   // The great apes and the hominins (ToLaD#275): Hominidae framed, the human lineage, a Neanderthal's card.
   ['mamm-hominidae', 'level', ['Hominidae']],
   ['mamm-homininae', 'level', ['Homininae']],
-  // ToLaD#289: the Hominins and Homo levels (?fit=fossils: framed on the fossils), and tapped down to them from home along the humans.
+  // ToLaD#289: the Hominins and Homo levels (framed on the fossils), and tapped down to them from home along the humans.
   ['mamm-hominini', 'level', ['Hominini']],
   ['mamm-homo', 'level', ['Homo']],
   // ToLaD#302: flown to as a tap on its bracket lands there (cladeCamera, the level the view is at then that one): the

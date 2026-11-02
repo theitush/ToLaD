@@ -91,15 +91,12 @@ describe.skipIf(!RUN)('mammal level open (perf)', () => {
     v.draw();
     lap('draw 3');
     // The labels laid out at rest at a few frames (labelsNow's layout, the frame's own): the home again, Rodentia, the bats.
-    const at = v as unknown as { cam: unknown; homeCamera(): unknown; levelCamera(n: string): unknown; labelLayMs: number[]; restRoom: unknown; labLast: unknown };
+    const at = v as unknown as { cam: unknown; homeCamera(): unknown; levelCamera(n: string): unknown; labelMs: number[] };
     for (const [s, cam] of [['home', () => at.homeCamera()], ['Rodentia', () => at.levelCamera('Rodentia')], ['Chiroptera', () => at.levelCamera('Chiroptera')]] as const) {
       at.cam = cam();
       v.draw();
       lap(`${s} frame`);
-      at.restRoom = null;
-      at.labLast = null;
-      v.draw();
-      t.push([`  labels ${s}`, at.labelLayMs[at.labelLayMs.length - 1]]);
+      t.push([`  labels ${s}`, at.labelMs[at.labelMs.length - 1]]);
       t0 = performance.now();
     }
     // (Seeded: the layout is the worked-out one, number for number, ToLaD#255.)

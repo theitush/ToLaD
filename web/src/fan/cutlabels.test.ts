@@ -1,7 +1,7 @@
 // ?labels=cut (ToLaD#333, research/scalable-tree.md §3): names, pictures and "+x" from one cut through the territories.
 // No two names meet, no two pictures, no name and picture (names hang below a tip, pictures stand on it); each stays
 // inside its own territory; and what shows depends only on the camera, not the way there.
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { loadMammalsFromFiles } from './mammals-node';
 import { CARNIVORA, FELIDAE, mammaliaClade, type CladeRec } from './panthera';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, type Split } from './splits';
@@ -43,13 +43,6 @@ function stubView(clade: CladeRec = CARNIVORA, tree: Split = CARNIVORA_TREE, fol
   return new FanView(canvas as unknown as HTMLCanvasElement, clade, tree, folds);
 }
 
-const was = FanView.labelsCut;
-beforeAll(() => {
-  FanView.labelsCut = true;
-});
-afterAll(() => {
-  FanView.labelsCut = was;
-});
 
 const shot = (v: FanView): CutLabels => {
   v.draw();
@@ -122,7 +115,7 @@ describe('labels from the cut (?labels=cut, ToLaD#333)', () => {
         v.cam = { ...cams[i] };
         expect(sig(shot(v))).toEqual(seen[i]);
       }
-      const ms = [...(v as unknown as { labelLayMs: number[] }).labelLayMs].sort((p, q) => p - q);
+      const ms = [...(v as unknown as { labelMs: number[] }).labelMs].sort((p, q) => p - q);
       (globalThis as unknown as { process: { stderr: { write(s: string): void } } }).process.stderr.write(`${name}: labels (brackets' layout included) ${ms[ms.length >> 1].toFixed(3)} ms a frame (median of ${ms.length}), ${seen[0].length} at home\n`);
     });
 });

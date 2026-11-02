@@ -1,7 +1,7 @@
 // Whether a pill's hit box goes stale (ToLaD#301): real touches at 390×844 (default headless, no GPU flags) on each
 // group's pill or picture where the last drawn frame put it, the view still; what the tap flew to, and whether what
 // is under that point changed between the touch and the held tap running (the double-tap window, 320 ms).
-//   npm run build:single && LEVEL=mammals Q=fit=fossils [PRE=Primates,...] node scripts/hitprobe.mjs [groups,...]
+//   npm run build:single && LEVEL=mammals [PRE=Primates,...] node scripts/hitprobe.mjs [groups,...]
 // (PRE: from home, a tap on each of these groups' pills or pictures first, so the groups probed are the level's there.)
 import { chromium } from 'playwright';
 import { pageUrl } from './pageurl.mjs';

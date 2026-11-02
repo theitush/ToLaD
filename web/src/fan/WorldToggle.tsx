@@ -2,7 +2,6 @@
 // checkboxes (geological periods, ice ages) under it.
 import { useState } from 'react';
 import type { WorldLayers } from './world';
-import { wantFitFossils } from './steady';
 import type { Measure } from './layout';
 
 const ROWS: [keyof WorldLayers, string][] = [
@@ -60,20 +59,6 @@ export function WorldToggle({
               {label}
             </label>
           ))}
-          {/* A level whose living members dwarf its fossils (the hominins beside the humans, ToLaD#289) framed on the fossils, the rooms by life; the page opens again with ?fit=fossils on or off. */}
-          <label>
-            <input
-              type="checkbox"
-              checked={wantFitFossils()}
-              onChange={(e) => {
-                const u = new URL(window.location.href);
-                if (e.target.checked) u.searchParams.set('fit', 'fossils');
-                else u.searchParams.delete('fit');
-                window.location.assign(u.toString());
-              }}
-            />
-            Fit fossils
-          </label>
           {/* What the widths count (ToLaD#276): the individuals alive, or their mass (individuals × adult mass); ?width=mass kept in step. */}
           <label>
             Widths

@@ -7,7 +7,7 @@ import { layoutFan } from './layout';
 import { CARNIVORA, FELIDAE } from './panthera';
 import { searchSpecies } from './search';
 import { CARNIVORA_TREE, familyLabel, allSplits, speciesUnder } from './splits';
-import { boxGap, families, familySpan, labelSpots, resolveLabels } from './view';
+import { families, familySpan } from './view';
 import { FanCamera } from './camera';
 
 const fan = layoutFan(CARNIVORA, 'linear', CARNIVORA_TREE);
@@ -64,26 +64,6 @@ describe('Carnivora at home and at the cats', () => {
   });
   cam.w = 390;
   cam.h = 844;
-  const measure = (t: string) => t.length * 7.5;
-  const TOP = 60;
-
-  it('at home: family labels on "now" with their brackets, the families first; no two labels meet', () => {
-    cam.cam = cam.home();
-    cam.settle();
-    const spots = labelSpots(cam, fan, TOP, measure);
-    const on = resolveLabels(spots, new Map());
-    const shown = spots.filter((s) => on.get(s.key));
-    const fams = shown.filter((s) => s.place === 'fam');
-    expect(fams.length).toBeGreaterThanOrEqual(4);
-    expect(fams.map((s) => s.text)).toContain('Cats');
-    for (const s of fams) {
-      expect(s.span![1]).toBeGreaterThan(s.span![0]);
-      expect(s.box[0]).toBeGreaterThanOrEqual(0);
-      expect(s.box[2]).toBeLessThanOrEqual(390);
-    }
-    expect(new Set(shown.map((s) => s.id)).size).toBe(shown.length);
-    for (let i = 0; i < shown.length; i++) for (let j = i + 1; j < shown.length; j++) expect(boxGap(shown[i].box, shown[j].box)).toBeGreaterThanOrEqual(-1);
-  });
 
   it('the cats framed (the level button): every cat column on screen, the family wider than half of it', () => {
     const v = fan.nodes.find((n) => n.split.taxon === 'Felidae')!;

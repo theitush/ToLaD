@@ -220,22 +220,14 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
         return r;
       };
     }
-    // The labels (ToLaD#255): each layout's time (labelsNow when it laid out, not carried), and the label work a frame
-    // (labelsNow + drawLabels + the pins, labelAllMs). FANPERF_LAYOUT=1: laid out every frame (no carry), for the layout's spread.
+    // The labels (ToLaD#333): their layout each frame (labelsNow), and the label work a frame (labelsNow + drawLabels + the pins, labelAllMs).
     const labLay: number[] = [];
-    const vl = v as unknown as { labelsNow(l: unknown): { carried: unknown }; labLast: unknown; labelAllMs: number[] };
+    const vl = v as unknown as { labelsNow(): unknown; labelAllMs: number[] };
     const labelsNow = vl.labelsNow.bind(v);
-    vl.labelsNow = (l: unknown) => {
-      if (process.env.FANPERF_LAYOUT) vl.labLast = null;
+    vl.labelsNow = () => {
       const t = CPU ? cpuMs() : performance.now();
-      const L0 = vl.labLast as Record<string, unknown> | null;
-      const g0 = (v as unknown as { gesturing: boolean }).gesturing;
-      const r = labelsNow(l);
-      if (process.env.FANPERF_LABDBG && r.carried === null && L0) {
-        const L1 = vl.labLast as Record<string, unknown>;
-        out(`  relayout: moving ${g0} ${['fan', 'lg', 'lod', 'lodGen', 'w', 'h', 'names', 'topLine'].filter((k) => L0[k] !== L1[k]).join(',')} frames ${L0.frames}`);
-      }
-      if (r.carried === null) labLay.push((CPU ? cpuMs() : performance.now()) - t);
+      const r = labelsNow();
+      labLay.push((CPU ? cpuMs() : performance.now()) - t);
       return r;
     };
     // How many strands get sampled per frame, and at how many points.
@@ -430,7 +422,7 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
       v.draw();
       v.draw();
       if (process.env.FANPERF_REST) for (let k = 0; k < +process.env.FANPERF_REST; k++) v.draw();
-      const sp = (vl.labLast as { spots: { key: string; x: number; y1: number; box: number[]; fit: number }[] } | null)?.spots ?? [];
+      const sp = v.cutLast?.spots ?? [];
       if (process.env.FANPERF_SPOTS) appendFileSync(process.env.FANPERF_SPOTS, sp.map((s) => `${name} ${s.key} ${s.x.toFixed(2)} ${s.y1.toFixed(2)} ${s.fit.toFixed(3)}`).join("\n") + "\n");
       const hk = hsh;
       hsh = 0x811c9dc5;
