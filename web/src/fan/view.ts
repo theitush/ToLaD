@@ -1158,7 +1158,7 @@ export class FanView implements InputHandlers {
    * sum. A level whose living columns dwarf its fossils (fossilSpan, ToLaD#289) is framed on where the fossils lived.
    * Every label of what it frames stands centred in a territory inside it, so none is cut off at the edge.
    *
-   * Its zoom is the least at which each of its groups (a level's next levels, nextLevels; a "+x"'s daughters ks) has
+   * Its zoom is the least at which each of its groups (a level's next levels, nextLevels; a "+x"'s species, in its daughters ks) has
    * room for its picture (PIC_D, the widest label) in its territory: the groups' fit zoom (Been et al.'s active
    * ranges), never past where the territory fills the labels' width. A level of a few wide groups fits before it
    * fills, and is framed centred in the labels' width, not spread to the screen's edges (Ita, ToLaD#262).
@@ -1169,7 +1169,10 @@ export class FanView implements InputHandlers {
     const s: [number, number] = [0, 0];
     const level = ks.length === 1 && this.fan.nodes[ks[0]] === v;
     const fossils = level ? fossilSpan(this.fan, v) : null;
-    const groups = level ? nextLevels(this.fan, v).map((g) => (g.b ? ~g.b.index : (T.t.index.get(g.v) ?? NaN))) : ks;
+    // (What its labels are to stand for: a level's groups; a "+x"'s species, each named and pictured, ToLaD#274.)
+    const groups = level
+      ? nextLevels(this.fan, v).map((g) => (g.b ? ~g.b.index : (T.t.index.get(g.v) ?? NaN)))
+      : ks.flatMap((k) => (k < 0 ? [k] : this.fan.nodes[k].strands.map((b) => ~b.index)));
     return foldedFrame(this.fan, this.w, () => {
       let a = Infinity;
       let b = -Infinity;

@@ -142,7 +142,8 @@ describe('a "+x" tap: every group it stood for named and pictured (ToLaD#274)', 
       const levels: Level[] = [{ v: v.fan.root }, ...v.fan.nodes.filter((u) => u.parent && isLevel(v.fan, u) && u.strands.length > 1 && levelUp(v.fan, u) && levelUp(v.fan, levelUp(v.fan, u)) === v.fan.root).map((u) => ({ v: u }))];
       for (const lv of levels) {
         land(v, lv);
-        const hits = v.plusHits.map((h) => ({ box: h.box, bs: [...h.bs] }));
+        // (Its "+x" badge tapped: the name before it is the group's, a level deeper, ToLaD#258.)
+        const hits = v.plusHits.map((h) => ({ box: h.badge, bs: [...h.bs] }));
         for (const h of hits) {
           land(v, lv);
           const at = nameOf(v.levelNow(true));
@@ -201,7 +202,7 @@ describe('a one-species "+x" lands on the species it stands for (ToLaD#318)', ()
     for (const u of v.fan.nodes.filter((u) => isLevel(v.fan, u) && u.strands.length > 1)) {
       const lv = { v: u };
       land(v, lv);
-      for (const h of v.plusHits.map((p) => ({ box: [...p.box], bs: [...p.bs] }))) {
+      for (const h of v.plusHits.map((p) => ({ box: [...p.badge], bs: [...p.bs] }))) {
         if (h.bs.length !== 1) continue;
         const b = h.bs[0];
         land(v, lv);
