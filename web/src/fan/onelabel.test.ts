@@ -64,7 +64,9 @@ function check(v: FanView, c: CutLabels, at: string, bad: string[]): Int32Array 
     if (!s.text || !p || !p.face || p.d !== PIC_D || Math.abs(p.x - s.x) > 1e-6) bad.push(`${at}: label ${s.key} "${s.text}" without its picture`);
     // 1. Its name's species (when it names one) and its "+x" species: its item's, each once.
     const it = c.items[i];
-    const sp = [...(s.b ? [s.b] : []), ...(c.groups.get(s.key) ?? []).flat()];
+    // (Its name names a species when its picture's is not in its "+x"; s.b is where a tap goes, the item's own.)
+    const hid = (c.groups.get(s.key) ?? []).flat();
+    const sp = [...(hid.includes(p.face) ? [] : [p.face]), ...hid];
     if (sp.length !== it.l - it.f + 1) bad.push(`${at}: "${s.text}" counts ${sp.length} of its ${it.l - it.f + 1} species`);
     for (const b of sp) {
       const k = by.get(b as never)!;
