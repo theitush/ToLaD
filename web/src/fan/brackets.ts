@@ -627,7 +627,8 @@ export class Brackets {
     const q = this.list[i];
     let w = this.widthCache.get(q.latin);
     if (!w) {
-      const name = measure(this.nameFont, q.en ?? q.latin);
+      // (A clade with no English name is drawn in the Latin's font: measured in it, else its line ran through its end.)
+      const name = measure(q.en ? this.nameFont : this.latinFont, q.en ?? q.latin);
       const short = TAXON_SHORT[q.latin];
       w = [q.en ? name + 4 + measure(this.latinFont, q.latin) : name, name, short ? measure(this.nameFont, short) : 0];
       this.widthCache.set(q.latin, w);
