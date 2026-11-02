@@ -6,7 +6,6 @@ import { loadMammalsFromFiles } from './mammals-node';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, type Split } from './splits';
 import { FanView, groupFace, holds, isLevel, levelName, levelUp, nextLevels, type Level } from './view';
 import type { Camera } from './camera';
-import { wikiOf } from './wiki';
 
 function stubView(clade: CladeRec = CARNIVORA, tree: Split = CARNIVORA_TREE, folds = true): FanView {
   const noop = () => {};
@@ -115,7 +114,7 @@ const FANS = [
   ['cats', () => stubView(FELIDAE, FELIDAE_TREE, false)],
 ] as const;
 
-describe("a group's picture is its most-populous living species with a picture (ToLaD#258)", () => {
+describe("a group's picture is its most-populous living species, photo or not (ToLaD#258; #358: no photo, the placeholder disc)", () => {
   for (const [name, mk] of FANS) {
     it(name, () => {
       const v = mk();
@@ -123,10 +122,8 @@ describe("a group's picture is its most-populous living species with a picture (
       for (const u of v.fan.nodes) {
         const face = groupFace(u);
         const alive = u.strands.filter((b) => !b.sp.extinct && b.pop.aliveAt(0) > 0);
-        const pics = alive.filter((b) => wikiOf(b.sp.sci)?.img);
-        const want = pics.length ? pics : alive;
-        const most = Math.max(...want.map((b) => b.pop.aliveAt(0)));
-        if (!alive.length ? face !== null : !face || !want.includes(face) || face.pop.aliveAt(0) < most) bad.push(`${u.name}: ${face?.sp.common}`);
+        const most = Math.max(...alive.map((b) => b.pop.aliveAt(0)));
+        if (!alive.length ? face !== null : !face || !alive.includes(face) || face.pop.aliveAt(0) < most) bad.push(`${u.name}: ${face?.sp.common}`);
       }
       expect(bad).toEqual([]);
     });

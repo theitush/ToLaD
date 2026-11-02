@@ -839,7 +839,7 @@ export class Steady extends Fold {
   /**
    * Strands f..l's share of territory row k (world y k * TERR_H) into `out`; false where they have no lineage there.
    * Cached per version and ghost (the cost cache, ToLaD#333): a function of the layout alone; a frame asks the same rows
-   * of the same runs again and again (the cut's daughters, borrowed's stretches, the pictures' chains), and a pan or a
+   * of the same runs again and again (the cut's daughters, its items' labels), and a pan or a
    * frame at rest asks the last frame's.
    */
   private rowCell(f: number, l: number, k: number, ghost: number, out: [number, number], below = false): boolean {
