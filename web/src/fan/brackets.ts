@@ -260,6 +260,8 @@ function drawnOrder(fan: Fan): number[] {
 
 /** Each strand's width at "now" (an extinct one's at its tip), per fan (Brackets.spans). */
 const nowWidths = new WeakMap<Fan, { now: number; w: Float64Array }>();
+/** Per clade list (clades()): each clade's index by its node, and its parent's index. */
+const cladeIndex = new WeakMap<Clade[], { at: Map<FanNode, number>; parent: Int32Array }>();
 
 export class Brackets {
   /** `nameFont` the English names' CSS font, `latinFont` the Latin's. */
@@ -282,9 +284,31 @@ export class Brackets {
   /** The time axis's right edge and the screen's width (px): the lines run between them. */
   private x0 = 0;
   private w = 0;
-  /** This frame's clades' screen spans (spans()). */
-  private sa: ArrayLike<number> = new Float64Array(0);
-  private sb: ArrayLike<number> = new Float64Array(0);
+  /** This frame's clades' screen spans, each worked out when first asked (span(); sGen[i] the frame it was). */
+  private sa = new Float64Array(0);
+  private sb = new Float64Array(0);
+  private sGen = new Uint32Array(0);
+  private spanGen = 0;
+  private spanCam: BracketCam | null = null;
+  private spanFan: Fan | null = null;
+  /** Clade i's screen span this frame (sa[i], sb[i]): its territory (spanOf), else its species' rooms at "now" (spans()). */
+  private span(i: number): void {
+    if (this.sGen[i] === this.spanGen) return;
+    this.sGen[i] = this.spanGen;
+    const q = this.list[i];
+    const t = this.spanOf?.(q.v);
+    if (!t) {
+      // (No territory for it: every clade's rooms, as without territories.)
+      const [a, b] = this.spans(this.spanCam!, this.spanFan!);
+      this.sa.set(a);
+      this.sb.set(b);
+      this.sGen.fill(this.spanGen);
+      return;
+    }
+    const c = this.spanCam!;
+    this.sa[i] = c.toScreen(t[0], 0)[0];
+    this.sb[i] = this.hide?.(q.v) ? this.sa[i] : c.toScreen(t[1], 0)[0];
+  }
   /**
    * The groups the view is inside (ToLaD#233), pinned at the top of the screen while the stack itself is off it:
    * the order on top, the innermost last (nearest the content). Their spans, labels and how much they show (pinA).
@@ -371,38 +395,56 @@ export class Brackets {
    * above "now", or, with less room, its top on the top line (a longer pill then reaches up over its lines).
    */
   layout(c: BracketCam, fan: Fan, nowS: number, axisX: number, fit: number, measure: (font: string, text: string) => number, top = 0, at: StackAt | null = null): Placed[] {
-    const [a, b] = this.spans(c, fan);
-    this.sa = a;
-    this.sb = b;
-    const parent = this.list.map((q) => q.parent);
-    // The rows per zoom bucket (an eighth of a doubling): a pan never moves them.
-    const key = `${this.list.length}:${Math.round(Math.log2(c.cam.sx) * 8)}:${this.hideKey}`;
-    if (key !== this.rowKey || !this.rows || this.rows.length !== a.length) {
-      this.rowKey = key;
-      this.rows = bracketRows(a, b, parent);
-    }
+    const list = (this.list = clades(fan));
+    const n = list.length;
+    let ix = cladeIndex.get(list);
+    if (!ix) cladeIndex.set(list, (ix = { at: new Map(list.map((q, i) => [q.v, i])), parent: Int32Array.from(list, (q) => q.parent) }));
+    const parent = ix.parent;
+    // (The stack is icicle rows over the clades' territories, ToLaD#333, research/scalable-tree.md §3: at a level only
+    // its groups' and the levels' up rows show, so only theirs are worked out, as asked (span()); the whole nesting's,
+    // or every clade's rooms without territories, all at once.)
+    this.spanCam = c;
+    this.spanFan = fan;
+    this.spanGen++;
+    if (this.sGen.length !== n) [this.sa, this.sb, this.sGen] = [new Float64Array(n), new Float64Array(n), new Uint32Array(n)];
+    if (!this.spanOf) {
+      const [a, b] = this.spans(c, fan);
+      this.sa.set(a);
+      this.sb.set(b);
+      this.sGen.fill(this.spanGen);
+    } else if (!at) for (let i = 0; i < n; i++) this.span(i);
+    const a = this.sa;
+    const b = this.sb;
     this.moreRow = -1;
-    let rowsNow = this.rows;
-    if (at) {
+    let rowsNow: Int16Array;
+    if (!at) {
+      // The rows per zoom bucket (an eighth of a doubling): a pan never moves them.
+      const key = `${n}:${Math.round(Math.log2(c.cam.sx) * 8)}:${this.hideKey}`;
+      if (key !== this.rowKey || !this.rows || this.rows.length !== n) {
+        this.rowKey = key;
+        this.rows = bracketRows(a, b, parent);
+      }
+      rowsNow = this.rows;
+    } else {
       // (At a level, ToLaD#288: its groups' row if any is wide enough to show, then the level and the levels up.)
-      const ix = new Map(this.list.map((q, i) => [q.v, i]));
-      if (at !== this.atKey || this.atRows.length !== a.length) {
+      if (at !== this.atKey || this.atRows.length !== n) {
         this.atKey = at;
-        this.atRows = new Int16Array(a.length);
+        this.atRows = new Int16Array(n);
       }
       const r = this.atRows.fill(-1);
       let row = 0;
       for (const v of at.groups) {
-        const i = ix.get(v);
-        if (i !== undefined && b[i] - a[i] >= TICK_MIN && b[i] > axisX && a[i] < c.w) [r[i], row] = [0, 1];
+        const i = ix.at.get(v);
+        if (i !== undefined && (this.span(i), b[i] - a[i] >= TICK_MIN && b[i] > axisX && a[i] < c.w)) [r[i], row] = [0, 1];
       }
       for (const v of at.up) {
-        const i = ix.get(v);
+        const i = ix.at.get(v);
         if (i === undefined || this.hide?.(v)) continue;
         if (row >= STACK_ROWS) {
           this.moreRow = row;
           break;
         }
+        this.span(i);
         r[i] = row++;
       }
       rowsNow = r;
@@ -498,7 +540,9 @@ export class Brackets {
     const line = new Set<FanNode>();
     for (let u = at; u; u = u.parent) line.add(u);
     this.list.forEach((q, i) => {
-      if (!(at ? line.has(q.v) : this.sa[i] <= cx && cx < this.sb[i]) || !(q.v.yBot > yTop) || this.hide?.(q.v)) return;
+      if (at ? !line.has(q.v) : (this.span(i), !(this.sa[i] <= cx && cx < this.sb[i]))) return;
+      if (!(q.v.yBot > yTop) || this.hide?.(q.v)) return;
+      this.span(i);
       // (Only the familiar ones, ToLaD#288: no row for a Latin-only clade between them.)
       if (keep && !keep(q.v)) return;
       const [wf, wn, ws] = this.widths(i, measure);
