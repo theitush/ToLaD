@@ -4,7 +4,7 @@
 // in far enough, a branch resolves into the individuals themselves (twigs.ts).
 // Gestures come from the shared engine/input.ts.
 
-import { drawThumb, labelThumb, wikiOf } from './wiki';
+import { drawPic, prefetchPics, wikiOf } from './wiki';
 import { PIC_D, PIC_LIFT, type PicSpot } from './pics';
 import { formatCount, formatMass } from '../data/count';
 import { stamp } from '../stamp';
@@ -740,6 +740,14 @@ export function groupFace(v: FanNode): FanBranch | null {
     out = alive.find((b) => wikiOf(b.sp.sci)?.img) ?? alive[0] ?? null;
     faceCache.set(v, out);
   }
+  return out;
+}
+
+/** The species whose pictures a tap on group v would show (its next level's faces, ToLaD#351: fetched ahead). */
+const nextFaceCache = new WeakMap<FanNode, string[]>();
+function nextFaces(fan: Fan, v: FanNode): string[] {
+  let out = nextFaceCache.get(v);
+  if (!out) nextFaceCache.set(v, (out = nextLevels(fan, v).flatMap((g) => (g.b ?? groupFace(g.v))?.sp.sci ?? [])));
   return out;
 }
 
@@ -2789,18 +2797,9 @@ export class FanView implements InputHandlers {
     ctx.lineWidth = 1;
     // (Hits: the one on top found first.)
     for (const p of [...this.picSpots].reverse()) this.thumbHits.push([p.x, p.y, p.d / 2, p.face, p.lv.v]);
-    for (const p of this.picSpots) {
-      const th = labelThumb(p.face.sp.sci, () => this.request());
-      if (th) drawThumb(ctx, th, p.x, p.y, p.d);
-      else {
-        // (Its picture still loading: the disc's place kept, an empty ring.)
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.d / 2 - 1, 0, 2 * Math.PI);
-        ctx.fillStyle = BG;
-        ctx.fill();
-        ctx.stroke();
-      }
-    }
+    // (Its placeholder at once, the picture fading in when loaded; what a tap would show next fetched ahead, ToLaD#351.)
+    for (const p of this.picSpots) drawPic(ctx, p.face.sp.sci, p.x, p.y, p.d, () => this.request());
+    prefetchPics(this.picSpots.flatMap((p) => (p.lv.v ? nextFaces(this.fan, p.lv.v) : [])));
     ctx.restore();
   }
 
