@@ -3,8 +3,9 @@ import { describe, expect, it } from 'vitest';
 import { CARNIVORA, FELIDAE, mammaliaClade, type CladeRec } from './panthera';
 import { loadMammalsFromFiles } from './mammals-node';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, type Split } from './splits';
-import { levelUp, FanView, groupCentre, groupExtent, groupFace, isLevel, levelName, nextLevels, type Level } from './view';
+import { levelUp, FanView, groupCentre, groupExtent, groupFace, holds, isLevel, levelName, nextLevels, type Level } from './view';
 import type { Camera } from './camera';
+import type { FanNode } from './layout';
 import { latinOf } from './brackets';
 import { wikiOf } from './wiki';
 
@@ -221,4 +222,62 @@ describe('a one-species "+x" lands on the species it stands for (ToLaD#318)', ()
     expect(taps).toBeGreaterThan(10);
     expect(bad).toEqual([]);
   }, 400000);
+});
+
+describe('a tap on a group lands on it (ToLaD#352)', () => {
+  // At every level in the primates (and the level they sit in), every name pill and picture tapped: the flight goes in
+  // (never out to a wider frame: "Primates" is a signpost's pill, its frame tighter than the Primates' own), it lands on
+  // a level holding what was tapped, deeper than where it started or the tapped species itself, its columns on screen,
+  // with labels shown. (The great apes' frame was a fossil's: a lone stem fossil among its groups framed the screen on its
+  // sliver of a column, ~4 million times the zoom, nothing on it.)
+  // (Skipped in the suite: ~10 min, each tap's frames worked out in the fold; unverified, ToLaD#352's result. Run it with it.only.)
+  it.skip("mammals: the apes' levels and the lemurs', every pill and picture", async () => {
+    await loadMammalsFromFiles();
+    const v = stubView(mammaliaClade(), mammaliaTree(), true);
+    const by = (latin: string) => v.fan.nodes.find((u) => latinOf(u.split) === latin)!;
+    const prim = by('Primates');
+    // (The way down to the apes and their sisters, and the lemurs for comparison: every level in the primates, each
+    // tap a fold's frames, took over half an hour.)
+    const levels: FanNode[] = ['Primates', 'Haplorrhini', 'Simiiformes', 'Catarrhini', 'Hominidae', 'Pan', 'Gorilla', 'Pongo', 'Hylobatidae', 'Strepsirrhini', 'Lemuriformes'].map(by);
+    const bad: string[] = [];
+    let taps = 0;
+    for (const u of [levelUp(v.fan, prim)!, ...levels]) {
+      (globalThis as unknown as { process: { stderr: { write(s: string): void } } }).process.stderr.write(`at ${levelName(u)} ${performance.now() | 0}\n`);
+      const lv = { v: u };
+      land(v, lv);
+      const targets: { at: [number, number]; to: Level; name: string }[] = [
+        ...v.famHits.map((h) => ({ at: [(h.box[0] + h.box[2]) / 2, (h.box[1] + h.box[3]) / 2] as [number, number], to: { v: h.v }, name: levelName(h.v) })),
+        ...v.nameHits.map((h) => ({ at: [(h.box[0] + h.box[2]) / 2, (h.box[1] + h.box[3]) / 2] as [number, number], to: { b: h.b }, name: h.b.sp.common })),
+        ...v.picSpots.map((p) => ({ at: [p.x, p.y] as [number, number], to: p.lv, name: `${nameOf(p.lv)}'s picture` })),
+      ];
+      for (const g of targets) {
+        land(v, lv);
+        const sx = v.cam.sx;
+        v.tap(...g.at);
+        if (!P(v).anim) continue;
+        taps++;
+        // (Landed where the flight goes, its frame (backing), without flying it frame by frame: ~250 levels' worth.)
+        const step = (v as unknown as { backing: { lv: Level; cam: Camera } | null }).backing;
+        P(v).anim = null;
+        if (step) {
+          // (Its frame taken afresh: frameOf puts the fold back, cladeCamera leaves it at the frame's zoom, as a landing does.)
+          v.cam = step.lv.b ? v.speciesCamera(step.lv.b) : step.lv.v.parent ? v.cladeCamera(step.lv.v) : v.homeCamera();
+          v.camera.settle();
+          (v as unknown as { tapAt: unknown }).tapAt = { b: step.lv.b ?? null, v: step.lv.v ?? null, cam: { ...v.cam } };
+        } else run(v);
+        settle(v);
+        const to = v.levelNow(true);
+        const at = `${nameOf(lv)}: ${g.name} -> ${nameOf(to)}`;
+        if (v.cam.sx < sx / 1.15) bad.push(`${at}: out, ${sx.toFixed(1)} -> ${v.cam.sx.toFixed(1)}`);
+        if (!holds(to, g.to) && !(to.b && g.to.v && g.to.v.strands.includes(to.b))) bad.push(`${at}: not holding it`);
+        if (to.v && to.v === u) bad.push(`${at}: no deeper`);
+        const [a, z] = g.to.b ? [groupCentre(g.to), groupCentre(g.to)] : groupExtent(g.to.v);
+        if (v.toScreen(z, 0)[0] < 0 || v.toScreen(a, 0)[0] > v.w) bad.push(`${at}: off screen`);
+        if (!v.cutLast?.spots.length && !v.picSpots.length) bad.push(`${at}: no labels`);
+      }
+    }
+    (globalThis as unknown as { process: { stderr: { write(s: string): void } } }).process.stderr.write(`primates: ${levels.length} levels, ${taps} taps\n${bad.join('\n')}\n`);
+    expect(taps).toBeGreaterThan(30);
+    expect(bad).toEqual([]);
+  }, 900000);
 });

@@ -16,11 +16,13 @@ import { WorldToggle } from './WorldToggle';
 import { MagnifierIcon, SearchPanel } from './SearchPanel';
 import { statusOf } from './status';
 import { cardTapper, onControl } from './cardtap';
-import { FanView, initialMeasure, type Lineage, type Selection } from './view';
+import { FanView, initialMeasure, levelName, type Lineage, type Selection } from './view';
 
 declare global {
   interface Window {
     __fan?: FanView;
+    /** The name a group's pill shows, for the browser probes (scripts/tapshot.mjs). */
+    __levelName?: typeof levelName;
   }
 }
 
@@ -98,6 +100,7 @@ export function FanApp() {
     v.barEl = barRef.current;
     viewRef.current = v;
     window.__fan = v;
+    window.__levelName = levelName;
     v.request();
     // The canvas text waits for the faces (drawn in system type until then).
     if (typeof document !== 'undefined' && document.fonts) {

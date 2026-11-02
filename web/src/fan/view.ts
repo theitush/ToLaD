@@ -454,15 +454,26 @@ export function fossilSpan(fan: Fan, v: FanNode): [number, number] | null {
  * member alive now, the one whose last member died nearest "now"; null when every group has one alive. (At the
  * Hominins the Homo group, the humans in it, is no fossil: its fossils' ~40 kya would leave the australopiths and
  * Paranthropus, the level's own fossils, at the screen's foot.)
+ *
+ * Null too when its fossil groups are fewer than its living ones (ToLaD#352): a group's label stands at its tip, a
+ * living group's at "now", a fossil's in the past, and a level is framed where most of its groups' labels stand. A
+ * frame on the fossils' era puts "now" above the screen, and with it every living group's name and picture: at the
+ * Great apes one stem fossil (Sahelanthropus) framed the screen on its own sliver of a column, the chimpanzees,
+ * gorillas, orangutans and hominins all off it.
  */
 function fossilEnd(fan: Fan, v: FanNode): number | null {
   const gone = (b: FanBranch) => b.sp.extinct || !(b.pop.aliveAt(0) > 0);
   let y = Infinity;
+  let fossil = 0;
+  let living = 0;
   for (const g of nextLevels(fan, v)) {
     const bs = g.b ? [g.b] : g.v.strands;
-    if (bs.every(gone)) for (const b of bs) y = Math.min(y, b.tipY);
+    if (bs.every(gone)) {
+      fossil++;
+      for (const b of bs) y = Math.min(y, b.tipY);
+    } else living++;
   }
-  return y < Infinity ? y : null;
+  return y < Infinity && fossil >= living ? y : null;
 }
 
 /**
@@ -1806,6 +1817,11 @@ export class FanView implements InputHandlers {
     const k = Math.max(0, chain.findIndex((a) => holds(a, from)));
     for (const lv of k ? chain.slice(0, k).reverse() : col ? [] : [to]) {
       const cam = this.frameOf(lv);
+      // (Deeper is never further out (ToLaD#352): a level framed wider than the view is passed over on the way in. A
+      // signpost's pill (an unnamed clade named for its largest named one, as "Primates" for the primates, treeshrews and
+      // colugos) frames that clade at its narrowest group's fit zoom, tighter than the Primates' own frame of two wide
+      // groups: a tap on the humans' picture there flew out to the Primates, the bats and rodents beside them.)
+      if (k && Math.log(cam.sx / cur.sx) + Math.log(cam.sy / cur.sy) < -Math.log(BACK_SLACK)) continue;
       if (this.offBy(cam, cur) > LEVEL_PX) {
         this.goLevel(lv, cam);
         return true;
