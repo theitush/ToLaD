@@ -112,6 +112,11 @@ export interface LabelSpot {
   place: 'tip' | 'in' | 'right' | 'left' | 'fam' | 'over';
   /** A family's label (`fam`, ToLaD#146): the screen x span of its species, bracketed under the pill. */
   span?: [number, number];
+  /**
+   * A "+x" label's branches (ToLaD#368): the screen x of its item's first and last branch at the label's foot (just
+   * under its name pill, screen y), which a hairline spans there, a tick down onto each end branch.
+   */
+  over?: [number, number, number];
   /** A cut item's label (ToLaD#359): the item's strands, first and last, which a tap on it goes into (tapItem). */
   run?: Run;
   /** The species (b) or the lineage (v) it names. */
@@ -1206,6 +1211,13 @@ export class FanView implements InputHandlers {
     return br && p && p.b - p.a >= 6 ? [(p.a + p.b) / 2, br.rowY(p.row)] : null;
   }
 
+  /** Whether a "+x" label stands at the middle of its branches with a hairline over them (ToLaD#368), or at its named species' place (#358). A switch while Ita compares: the middle jumps where an item splits, the species' place does not. */
+  midLabels = true;
+  setMidLabels(on: boolean): void {
+    this.midLabels = on;
+    this.request();
+  }
+
   setMode(mode: WidthMode): void {
     this.mode = mode;
     this.relayout();
@@ -2224,6 +2236,23 @@ export class FanView implements InputHandlers {
         u = u.parent;
       }
     };
+    /**
+     * Item it's branches at its label's foot (ToLaD#368): the middles (world x) of its first and last strand that
+     * reach row `wy` (world y), or null. The strands stand side by side in drawn order, never crossing, each
+     * inside its share of the row, so they are inside the item's share there and no two items' spans meet.
+     */
+    const now = this.fan.time.y(0);
+    const reach = (it: CutItem, wy: number): [number, number] | null => {
+      const S = T.t.strands;
+      const on = (i: number) => Math.max(S[i].tipY, now) <= wy + 1e-9;
+      let a = it.f;
+      while (a <= it.l && !on(a)) a++;
+      if (a > it.l) return null;
+      let b = it.l;
+      while (!on(b)) b--;
+      const mid = (s: FanBranch) => leftAt(s, wy) + laneAt(s, wy).w / 2;
+      return [mid(S[a]), mid(S[b])];
+    };
     const cut = T.t.cut(sx, PIC_D, vx0, vx1, rows, ghost);
     for (const it of cut) {
       // (Only the root, before anything fits, does not hold its label.)
@@ -2233,7 +2262,11 @@ export class FanView implements InputHandlers {
       if (!whole && (Math.min(X(it.x1), right) - Math.max(X(it.x0), left) < PIC_D * (1 - 1e-9) || disc[1] > this.h)) continue;
       const fit = clamp01((bottom - pill[1]) / 30);
       if (!(fit > 0)) continue;
-      const x = placeX(it.x0, it.x1, PIC_D, faceX(it, name.face));
+      // (A "+x" at the middle of its branches at its foot, ToLaD#368, clamped into its territory as any; a species' at
+      // its face's place. Its foot: just under its name pill, the tip row being "now"'s line.)
+      const foot = pill[1] + LABEL_UNDER;
+      const span = this.midLabels && name.hid.length ? reach(it, Wy(foot)) : null;
+      const x = placeX(it.x0, it.x1, PIC_D, span ? X((span[0] + span[1]) / 2) : faceX(it, name.face));
       const key = `c${it.f}:${it.l}`;
       if (name.hid.length) groups.set(key, name.hid);
       const s: LabelSpot = { key, id: key, run: [it.f, it.l], place: 'tip', text: name.text, rank: [0, it.x1 - it.x0, it.head], x, y1: pill[1], box: [x - half, pill[0], x + half, pill[1]], fit, plus: this.plusPx(name.hid.length), pic: name.face };
@@ -2243,6 +2276,7 @@ export class FanView implements InputHandlers {
       const lv: Level = k < 0 ? { b: T.t.strands[~k] } : { v: T.t.nodes[k] };
       if (lv.b) s.b = lv.b;
       else Object.assign(s, { v: lv.v, fam: lv.v });
+      if (span && span[1] > span[0]) s.over = [X(span[0]), X(span[1]), foot];
       spots.push(s);
       pics.push({ x, y: (disc[0] + disc[1]) / 2, d: PIC_D, i: pics.length, lv, face: name.face, run: [it.f, it.l] });
       shown.push(it);
@@ -2823,6 +2857,26 @@ export class FanView implements InputHandlers {
     this.thumbHits.length = 0;
     // The clades' brackets (ToLaD#193) under the pills: their labels clear of the pills and pictures, their lines behind them.
     br?.draw(ctx, FAMILY_INK, INK3, [...spots.filter((s) => s.fit > 0.3).map((s) => s.box), ...pics.map((p) => [p.x - p.d / 2, p.y - p.d / 2, p.x + p.d / 2, p.y + p.d / 2])]);
+    // A "+x" label's branches (ToLaD#368): a hairline at its foot from its first branch to its last, under its name
+    // pill, a tick down onto each end branch, as the brackets draw theirs (open-ended past the screen's edge).
+    ctx.save();
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(185,230,201,0.6)';
+    ctx.beginPath();
+    for (const s of spots) {
+      if (!s.over || s.fit < 0.01) continue;
+      const [sa, sb, sy] = s.over;
+      if (sb < 0 || sa > this.w) continue;
+      const y = Math.round(sy) + 0.5;
+      const a = Math.round(Math.max(sa, -1)) + 0.5;
+      const b = Math.round(Math.min(sb, this.w + 1)) - 0.5;
+      ctx.moveTo(a, sa >= 0 ? y + 4 : y);
+      ctx.lineTo(a, y);
+      ctx.lineTo(b, y);
+      if (sb <= this.w) ctx.lineTo(b, y + 4);
+    }
+    ctx.stroke();
+    ctx.restore();
     this.drawGroupPics();
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'left';
