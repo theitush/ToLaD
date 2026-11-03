@@ -1,14 +1,13 @@
 // The clades' brackets above "now" (ToLaD#193): nested right, never overlapping at any zoom, labelled only where the
 // label fits; a tap's flight frames the clade centred, "now" at the top and its stem's start just below.
 import { describe, expect, it } from 'vitest';
-import { bracketRows, Brackets, cladeCamera, clades, latinOf, layoutBrackets, clearSpot, PILL_ROOM, rankOf, ROW_H, TICK_ROW_H, type Placed } from './brackets';
+import { bracketRows, Brackets, clades, latinOf, layoutBrackets, clearSpot, PILL_ROOM, rankOf, ROW_H, TICK_ROW_H, type Placed } from './brackets';
 import { FanCamera } from './camera';
 import { Steady } from './steady';
 import { layoutFan, type Fan, type FanBranch, type WidthMode } from './layout';
 import { CARNIVORA, FELIDAE } from './panthera';
 import { CARNIVORA_TREE, FELIDAE_TREE } from './splits';
 import { TwigModel } from './twigs';
-import { familySpan } from './view';
 
 const W = 390;
 const AXIS = 72;
@@ -176,40 +175,4 @@ describe('the stack', () => {
     // (No short name: a tick.)
     expect(layoutBrackets([300], [332], [-1], () => [80, 40, 0], 0, W)[0].form).toBe('tick');
   });
-});
-
-describe('a tap on a bracket', () => {
-  for (const [level, latin, fold, mode] of [
-    ['carnivores', 'Felidae', true, 'log'],
-    ['carnivores', 'Canidae', true, 'log'],
-    ['carnivores', 'Canidae', true, 'linear'],
-    ['carnivores', 'Pantherinae', true, 'linear'],
-    ['cats', 'Panthera', false, 'log'],
-    ['cats', 'Pantherinae', false, 'linear'],
-  ] as const) {
-    it(`${latin} (${level}, ${mode}): centred, across most of the screen, "now" at the top and its stem's start just below`, () => {
-      const fan = fanOf(level, mode, fold);
-      const c = cameraOf(fan);
-      const v = fan.nodes.find((n) => latinOf(n.split) === latin)!;
-      c.cam = cladeCamera(c, fan, v, familySpan);
-      const want = c.cam.sx;
-      c.settle();
-      expect(c.cam.sx / want, 'capped').toBeCloseTo(1, 3);
-      const [a, b] = familySpan(v).map((x) => c.toScreen(x, 0)[0]);
-      // Centred in the room right of the time axis, across most of the screen.
-      expect(Math.abs((a + b) / 2 - (58 + W - 14) / 2)).toBeLessThan(12);
-      // ...most of it, with room either side (Ita: "it opens a bit too wide").
-      expect(b - a).toBeGreaterThan(0.7 * W);
-      expect(b - a).toBeLessThan(0.85 * W);
-      expect(a).toBeGreaterThan(58 + 0.04 * W);
-      expect(W - b).toBeGreaterThan(0.08 * W);
-      // "now" near the top (under the labels' room), the stem's start low on the screen, above the legend.
-      const nowS = c.toScreen(0, fan.time.y(0))[1];
-      const stemS = c.toScreen(0, v.yBot)[1];
-      expect(nowS).toBeGreaterThan(60);
-      expect(nowS).toBeLessThan(0.2 * c.h);
-      expect(stemS).toBeGreaterThan(0.75 * c.h);
-      expect(stemS).toBeLessThan(c.h - 104);
-    });
-  }
 });

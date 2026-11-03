@@ -21,7 +21,7 @@ import { COLUMN_DIM, columnSpans, EVENT_TINT, eventAt, eventSpans, type EventSpa
 import { laneDim, LINEAGE, pathFrame, TwigModel } from './twigs';
 import type { RectBatch } from './meshgl';
 import { FAMILY_EN, familyLabel, FELIDAE_TREE, ORDER_EN, ORDER_TAXA, taxonKey, type Split } from './splits';
-import { Brackets, cladeCamera, foldedFrame, latinOf, rankOf, TAP_FILL, TAXON_EN, type StackAt } from './brackets';
+import { Brackets, foldedFrame, latinOf, rankOf, TAXON_EN, type StackAt } from './brackets';
 import { axisInset, drawWorldOver, drawWorldUnder, worldFlags, type Box } from './world';
 
 export type { Camera } from './camera';
@@ -61,11 +61,6 @@ const PLUS_GAP = 6;
 const LABEL_PAD = 8;
 /** Right edge (px) of the time axis's labels: species' labels keep right of it. */
 const LABEL_AXIS_X = 72;
-/** A "+x" tap's frame (groupCamera): the species' span at "now" widened this share each side, a name's room (~27 px) past the outer ones. */
-const GROUP_NAME_PAD = 0.1;
-/** A "+x" tap's frame: neighbouring names at least this far apart (px; a pill and a gap), and a column running off its edge this much on screen. */
-const GROUP_NAME_GAP = 28;
-const GROUP_DOM_PX = 40;
 /** A level's flight under way (ToLaD#258, #271): the level it lands on and its frame, so a tap or double-tap mid-flight goes on from there. */
 type Step = { lv: Level; cam: Camera };
 /**
@@ -80,8 +75,6 @@ const LEVEL_KEEP = 1.6;
 const TOUCH_SLOP = 12;
 /** A tap's next level (ToLaD#258) is one whose frame stands more than this many px off the view's: nearer, it is passed. */
 const LEVEL_PX = 12;
-/** A level of one, two or three groups is framed taking this much of the screen's width (ToLaD#262; more, TAP_FILL). */
-const FEW_FILL = [0.5, 0.5, 0.5, 0.6];
 /** The level the view is at (levelNow) is worked out at most this often (ms) while the camera moves without a gesture (a wheel). */
 const LEVEL_MS = 200;
 /** The scale bar and legend at the bottom (px): labels fade out over the 30 px above it. */
@@ -102,12 +95,8 @@ const FORK_PX = LABEL_BOTTOM_PX;
 /** Room (px) a frame keeps between the brackets' stack and "now" for the level's pictures standing on it (ToLaD#274). */
 const NOW_ROOM = PIC_D + 8;
 
-/** Gap (px) a label keeps from the column it sits beside. */
-const LABEL_GAP = 3;
 /** Gap (px) between a label's picture and its name pill right under it (ToLaD#358: one unit at the tip). */
 const LABEL_UNDER = 4;
-/** A name's room beside a column (px): its gap, the pill, and the fade's margin from the screen's edge (ToLaD#319). */
-const PILL_ROOM_PX = LABEL_GAP + LABEL_PILL + 6;
 
 /**
  * A name pill (ToLaD#333, view.ts cutLabels): the name upright on a dark pill, the same text and size at every zoom,
@@ -121,6 +110,8 @@ export interface LabelSpot {
   place: 'tip' | 'in' | 'right' | 'left' | 'fam' | 'over';
   /** A family's label (`fam`, ToLaD#146): the screen x span of its species, bracketed under the pill. */
   span?: [number, number];
+  /** A cut item's label (ToLaD#359): the item's strands, first and last, which a tap on it goes into (tapItem). */
+  run?: Run;
   /** The species (b) or the lineage (v) it names. */
   b?: FanBranch;
   v?: FanNode;
@@ -149,7 +140,7 @@ export interface LabelSpot {
 export interface CutLabels {
   spots: LabelSpot[];
   groups: Map<string, FanBranch[][]>;
-  pics: (PicSpot & { lv: Level; face: FanBranch })[];
+  pics: (PicSpot & { lv: Level; face: FanBranch; run?: Run })[];
   /** The cut (tests read it), and per shown item its pill and picture (`spots[i]`, `pics[i]`: one label, ToLaD#358). */
   items: CutItem[];
 }
@@ -466,58 +457,6 @@ export function spanOf(bs: readonly FanBranch[]): [number, number] {
   return s;
 }
 
-/**
- * What a "+x" tap frames across the screen (groupCamera, ToLaD#274): the species' columns at "now" (`yNow`; an extinct
- * one's at its tip), where their names and pictures stand, not their rooms, wider where they were wider in the past.
- * Widened GROUP_NAME_PAD each side, a name's room beyond the outer ones (ToLaD#293: the leftmost's name beside it
- * right of the time axis, not squeezed against its neighbour's; MDD's mongooses: the Crab-eating mongoose at the
- * frame's edge).
- *
- * Closer in where that frame leaves neighbouring names (on their columns' centres) nearer than GROUP_NAME_GAP px, as
- * far as their names still fit on a screen `w` px wide (ToLaD#293: MDD's young splits, the Polar bear 25 px from the
- * Brown bear). A column wider than the rest together at an end (the domestic dog's, the domestic cat's) runs off that
- * edge, GROUP_DOM_PX of it kept on screen with its name, so the wild species beside it open out rather than stand as
- * slivers at its side.
- */
-export function groupSpan(bs: readonly FanBranch[], yNow: number, w = 0): [number, number] {
-  const cols = bs.map((b) => {
-    const y = Math.max(b.tipY, yNow);
-    const l = leftAt(b, y);
-    const r = l + laneAt(b, y).w;
-    return { l, r, c: (l + r) / 2 };
-  });
-  const s: [number, number] = [Math.min(...cols.map((q) => q.l)), Math.max(...cols.map((q) => q.r))];
-  const pad = GROUP_NAME_PAD * (s[1] - s[0]);
-  const out: [number, number] = [s[0] - pad, s[1] + pad];
-  if (!w || cols.length < 2) return out;
-  // (Its zoom, px per world unit: cladeCamera lays the span across `fill` px, centred `mid` px from the left, camera.frame.)
-  const fill = Math.min(w - 72, TAP_FILL * w);
-  const mid = w / 2 + (58 - 14) / 2;
-  const p0 = fill / (out[1] - out[0]);
-  // (Where the outer columns can stand: a name's room (a pill and a gap) right of the time axis and in from the
-  // screen's edge, for a level's names beside their columns, not on them: MDD's Crab-eating mongoose.)
-  const L = LABEL_AXIS_X + GROUP_NAME_GAP;
-  const R = w - GROUP_NAME_GAP;
-  cols.sort((a, b) => a.c - b.c);
-  const widest = cols.reduce((a, q) => (q.r - q.l > a.r - a.l ? q : a));
-  const dom = widest.r - widest.l > (s[1] - s[0]) / 2 ? (widest === cols[0] ? -1 : widest === cols[cols.length - 1] ? 1 : 0) : 0;
-  const core = dom < 0 ? cols.slice(1) : dom > 0 ? cols.slice(0, -1) : cols;
-  let gap = Infinity;
-  for (let i = 1; i < core.length; i++) gap = Math.min(gap, core[i].c - core[i - 1].c);
-  // (What has to fit between L and R: the names' centres, and a dominant column's edge GROUP_DOM_PX in from its side.)
-  const x0 = dom < 0 ? widest.r : core[0].c;
-  const x1 = dom > 0 ? widest.l : core[core.length - 1].c;
-  const room = R - L - (dom ? GROUP_DOM_PX : 0);
-  const need = GROUP_NAME_GAP / gap;
-  const p = Math.min(need, x1 > x0 ? room / (x1 - x0) : Infinity);
-  if (!(p > p0 * 1.001) || !Number.isFinite(p)) return out;
-  // (Laid in L..R, centred on what is left over, a dominant column showing at least GROUP_DOM_PX of itself.)
-  const lead = L + (dom < 0 ? GROUP_DOM_PX : 0) + (room - (x1 - x0) * p) / 2;
-  const m = x0 + (mid - lead) / p;
-  const half = fill / p / 2;
-  return [m - half, m + half];
-}
-
 /** The fan's families (splits founding a taxon ending in -idae, splits.ts familyLabel; not the root: the clade's own label names it), with their labels. */
 const famCache = new WeakMap<Fan, { v: FanNode; vi: number; text: string }[]>();
 export function families(fan: Fan): { v: FanNode; vi: number; text: string }[] {
@@ -568,6 +507,8 @@ export function commonest(v: FanNode): FanBranch | null {
  * isLevel), or a single species.
  */
 export type Level = { v: FanNode; b?: undefined } | { b: FanBranch; v?: undefined };
+/** A cut item's strands (drawn order): first and last. */
+export type Run = [number, number];
 
 /** The clades above an order (ToLaD#258): a superordinal one (Theria, Glires…) is no level, so mammal home opens on the orders. Kept per fan. */
 const aboveCache = new WeakMap<Fan, Set<FanNode>>();
@@ -894,19 +835,20 @@ export class FanView implements InputHandlers {
    * The species' pictures as last drawn (ToLaD#193): [x, y, radius, its column, the family a family pill's picture
    * stands for]. A tap on one flies to its species' branch (ToLaD#230; a family pill's, to the family).
    */
-  thumbHits: [number, number, number, FanBranch, FanNode?][] = [];
+  thumbHits: [number, number, number, FanBranch, FanNode?, Run?][] = [];
   /** The species' name pills drawn (ToLaD#230): a tap flies to the species' branch, as a bracket's to its clade. */
-  nameHits: { box: [number, number, number, number]; b: FanBranch }[] = [];
+  nameHits: { box: [number, number, number, number]; b: FanBranch; run?: Run }[] = [];
   /**
    * Where the last tap on a pill, a picture or a bracket flew (ToLaD#230): the species tapped (`b`, null for a clade's),
    * the clade framed (`v`, null for the species' own frame) and the camera it landed at. Tapped again there, with
    * nothing moved since, it goes one level out.
    */
-  private tapAt: { b: FanBranch | null; v: FanNode | null; cam: Camera } | null = null;
+  /** ...`part`: a cut item's, part of clade v (tapItem, ToLaD#359): a double tap goes out to v's own frame. */
+  private tapAt: { b: FanBranch | null; v: FanNode | null; cam: Camera; part?: boolean } | null = null;
   /** The family pills drawn (ToLaD#212): a tap flies to the family, as its bracket's. */
-  famHits: { box: [number, number, number, number]; v: FanNode }[] = [];
+  famHits: { box: [number, number, number, number]; v: FanNode; run?: Run }[] = [];
   /** The chips with a "+x" drawn (ToLaD#197, #262): `box` the whole chip (a tap on its name or its badge alike, ToLaD#287), `badge` the badge's end. */
-  plusHits: { box: [number, number, number, number]; badge: [number, number, number, number]; bs: FanBranch[] }[] = [];
+  plusHits: { box: [number, number, number, number]; badge: [number, number, number, number]; bs: FanBranch[]; run?: Run }[] = [];
   private models = new Map<string, TwigModel>();
   private raf = 0;
   private anim: ((t: number) => boolean) | null = null;
@@ -997,7 +939,8 @@ export class FanView implements InputHandlers {
 
   /** The whole fan: "now" near the top, the stem entering from the bottom edge. */
   homeCamera(): Camera {
-    return this.withBand(this.camera.home(), this.fan.root);
+    const n = this.fan.root.strands.length;
+    return this.fan.tess.fold ? this.runFrame(0, n - 1, 0, this.fan.root) : this.withBand(this.camera.home(), this.fan.root);
   }
 
   /**
@@ -1114,94 +1057,48 @@ export class FanView implements InputHandlers {
   private probeLod: Lod | null = null;
 
   /**
-   * Where a tap on a clade's bracket lands (brackets.ts cladeCamera, ToLaD#193): the clade centred and opened,
-   * "now" down to where its branch started. The whole fan for the root.
+   * The one frame (ToLaD#359, research/scalable-tree.md §4): strands f..l's territory (Territories.hull: their rooms,
+   * half the open gap past each end) across the labels' width of the screen, from LABEL_AXIS_X to its edge, at the
+   * zoom where it fills it (foldedFrame's bisection: the territory widens as the zoom opens its gaps), "now" (or `top`)
+   * down to `yFork` in time. Its labels are the cut at that zoom; each stands inside a territory inside this one, so
+   * none is cut off by the time axis or the screen's edge, with no padding. Home, a level, a bracket's tap, a label's.
+   * Kept per screen size (a bisection at the mammals is ~40 refolds of ~6,000 strands, ToLaD#255), the fold put where
+   * it leaves it.
    */
-  /**
-   * A frame by territories (ToLaD#333, research/scalable-tree.md §4): daughters ks' (a node's index, ~ a strand's)
-   * territory together across the labels' width of the screen (from LABEL_AXIS_X to its edge) at the zoom where it
-   * fills it (foldedFrame's bisection), "now" (or `top`) down to `yFork` in time. The rooms are by life, so a fossil
-   * stands beside its sisters only while they lived: the territory is what the columns hold, not their widest-ever
-   * sum. A level whose living columns dwarf its fossils (fossilSpan, ToLaD#289) is framed on where the fossils lived.
-   * Every label of what it frames stands centred in a territory inside it, so none is cut off at the edge.
-   *
-   * Its zoom is the least at which each of its groups (a level's next levels, nextLevels; a "+x"'s species, in its daughters ks) has
-   * room for its picture (PIC_D, the widest label) in its territory: the groups' fit zoom (Been et al.'s active
-   * ranges), never past where the territory fills the labels' width. A level of a few wide groups fits before it
-   * fills, and is framed centred in the labels' width, not spread to the screen's edges (Ita, ToLaD#262).
-   */
-  private cutFrame(ks: readonly number[], v: FanNode, yFork: number, top = this.yNow): Camera | null {
-    const T = this.territories();
-    if (!ks.length) return null;
+  private runFrame(f: number, l: number, yFork: number, v: FanNode, top = this.yNow): Camera {
+    const fold = this.fan.tess.fold;
+    const key = `${this.w}x${this.h}:${f}:${l}:${yFork}:${top}`;
+    if (this.framesFan !== this.fan) [this.framesFan, this.frames] = [this.fan, new Map()];
+    const hit = this.frames.get(key);
+    if (hit) {
+      fold?.setScale(hit.sx, this.w);
+      return { ...hit };
+    }
+    const T = this.territories().t;
     const s: [number, number] = [0, 0];
-    const level = ks.length === 1 && this.fan.nodes[ks[0]] === v;
-    const fossils = level ? fossilSpan(this.fan, v) : null;
-    // (What its labels are to stand for: a level's groups; a "+x"'s species, each named and pictured, ToLaD#274.)
-    const groups = level
-      ? nextLevels(this.fan, v).map((g) => (g.b ? ~g.b.index : (T.t.index.get(g.v) ?? NaN)))
-      : ks.flatMap((k) => (k < 0 ? [k] : this.fan.nodes[k].strands.map((b) => ~b.index)));
-    return foldedFrame(this.fan, this.w, () => {
-      let a = Infinity;
-      let b = -Infinity;
-      if (fossils) [a, b] = fossilSpan(this.fan, v)!;
-      else
-        for (const k of ks) {
-          T.t.span(k, s);
-          a = Math.min(a, s[0]);
-          b = Math.max(b, s[1]);
-        }
-      const cam = this.camera.frame(a, b, yFork, true);
-      let sx = (this.w - LABEL_AXIS_X) / (b - a);
-      if (!fossils && groups.length > 1) {
-        // (The zoom at which the narrowest group's territory, as the layout stands, holds a picture.)
-        let fit = 0;
-        for (const g of groups) {
-          if (g !== g) continue;
-          T.t.span(g, s);
-          fit = Math.max(fit, PIC_D / Math.max(1e-300, s[1] - s[0]));
-        }
-        sx = Math.min(sx, fit);
-      }
-      // (Centred on its living columns at "now", where its pictures stand, as far as its territory stays whole in the labels' width.)
-      let m = (a + b) / 2;
-      if (sx < (this.w - LABEL_AXIS_X) / (b - a)) {
-        let lo = Infinity;
-        let hi = -Infinity;
-        for (const k of ks) {
-          const [p, q] = k >= 0 ? groupExtent(this.fan.nodes[k]) : [stripMid(T.t.strands[~k]), stripMid(T.t.strands[~k])];
-          [lo, hi] = [Math.min(lo, p), Math.max(hi, q)];
-        }
-        if (hi > lo) m = (lo + hi) / 2;
-      }
-      const cx = Math.min(a + (this.w / 2 - LABEL_AXIS_X) / sx, Math.max(b - this.w / 2 / sx, m - LABEL_AXIS_X / 2 / sx));
-      return this.withBand({ ...cam, sx, cx }, v, top);
+    const cam = foldedFrame(this.fan, this.w, () => {
+      const [a, b] = T.hull(f, l, s);
+      const sx = (this.w - LABEL_AXIS_X) / Math.max(1e-300, b - a);
+      return this.withBand({ ...this.camera.frame(a, b, yFork, true), sx, cx: a + (this.w / 2 - LABEL_AXIS_X) / sx }, v, top);
     });
+    this.frames.set(key, { ...cam });
+    return cam;
   }
-  /** Clade v's index among the territories (fan.nodes'). */
-  private nodeK(v: FanNode): number[] {
-    const j = this.fan.nodes.indexOf(v);
-    return j < 0 ? [] : [j];
+  private framesFan: Fan | null = null;
+  private frames = new Map<string, Camera>();
+
+  /** Strands f..l's clade where they meet: the least clade holding them all. */
+  private meetOf(f: number, l: number): FanNode {
+    const T = this.territories().t;
+    let u: FanNode = T.strands[f].node;
+    while (u.parent && (u.strands[0].index > f || u.strands[u.strands.length - 1].index < l)) u = u.parent;
+    return u;
   }
 
+  /** A clade's frame (runFrame: its territory, from its split to "now"; a level framed on its fossils, from their end). */
   cladeCamera(v: FanNode): Camera {
     if (!v.parent) return this.homeCamera();
-    const cut = this.cutFrame(this.nodeK(v), v, v.yBot, fossilTop(this.fan, v) ?? this.yNow);
-    if (cut) return cut;
-    // (A level of two or three groups, ToLaD#262: centred on its columns at "now" and kept to the screen's middle,
-    // FEW_FILL of it, not spread to its edges; its whole span, its past's columns too, still on screen.)
-    const few = nextLevels(this.fan, v).length;
-    const span =
-      few <= 3
-        ? (u: FanNode): [number, number] => {
-            const [a, b] = familySpan(u);
-            const m = Math.min(Math.max(groupCentre({ v: u }), a), b);
-            const h = Math.max(m - a, b - m, ((b - a) / 2) * (TAP_FILL / FEW_FILL[few]));
-            return [m - h, m + h];
-          }
-        : familySpan;
-    // (Fit fossils, ToLaD#289: a level whose living columns dwarf its fossils framed on where the fossils lived.)
-    const fit = (u: FanNode) => fossilSpan(this.fan, u) ?? span(u);
-    return cladeCamera(this.camera, this.fan, v, fit, (cam) => this.withBand(cam, v, fossilTop(this.fan, v) ?? this.yNow));
+    return this.runFrame(v.strands[0].index, v.strands[v.strands.length - 1].index, v.y, v, fossilTop(this.fan, v) ?? this.yNow);
   }
 
   /**
@@ -1251,24 +1148,12 @@ export class FanView implements InputHandlers {
     else this.flyLevel(null, v);
   }
 
-  /**
-   * Where a tap on a pill's "+x" lands (ToLaD#197): as a clade's bracket's tap (cladeCamera), the species it stands
-   * for (`bs`, the pill's own first) framed across the screen, from "now" down to the split where they meet. Many of them
-   * (more than the screen has room for) open to fewer, each with its own "+x": tap again to go on.
-   */
+  /** Where a "+x" tap lands (ToLaD#197, #359): the frame of the species it stands for, from where they meet (runFrame). */
   groupCamera(bs: readonly FanBranch[]): Camera {
-    let v: FanNode | null = bs[0].node;
-    while (v?.parent && !bs.every((b) => v!.strands.includes(b))) v = v.parent;
-    if (!v) return this.homeCamera();
-    // (The daughters of the clade where they meet that hold any of them, their territory.)
-    const B = new Set(bs);
-    const ks = v.kids.filter((k) => ('sp' in k ? B.has(k) : k.strands.some((b) => B.has(b))));
-    const cut = this.cutFrame(ks.flatMap((k) => ('sp' in k ? [~k.index] : this.nodeK(k))), v, v.y);
-    if (cut) return cut;
-    // (Down to the split where they meet, not the clade's stem: for a group across the level, the root, not the world's bottom.)
-    // (Across the screen: their columns at "now" (an extinct one's at its tip), where their names and pictures stand,
-    // not their rooms, wider where they were wider in the past: the most room each name and picture can have, ToLaD#274.)
-    return cladeCamera(this.camera, this.fan, { ...v, yBot: v.y }, () => groupSpan(bs, this.yNow, this.w), (cam) => this.withBand(cam, v));
+    const f = Math.min(...bs.map((b) => b.index));
+    const l = Math.max(...bs.map((b) => b.index));
+    const v = this.meetOf(f, l);
+    return this.runFrame(f, l, v.y, v);
   }
 
   flyToGroup(bs: readonly FanBranch[]): void {
@@ -1334,23 +1219,12 @@ export class FanView implements InputHandlers {
       const sx = this.homeCamera().sx * zoom;
       const f = this.fan.tess.fold;
       f?.setScale(sx, this.w);
-      const [a, b] = levelSpan(this.fan, v);
+      const [a, b] = this.territories().t.span(this.fan.nodes.indexOf(v));
       // (The fold stays at the frame's zoom: the camera taking the frame finds it there, nothing to follow.)
       return { ...fr, sx, cx: (a + b) / 2 - 22 / sx };
     }
-    if (this.fan.root.split.taxon === name) return this.homeCamera();
     const v = this.fan.nodes.find((n) => n.split.taxon === name);
-    if (!v) return null;
-    const cut = this.cutFrame(this.nodeK(v), v, v.y, fossilTop(this.fan, v) ?? this.yNow);
-    if (cut) return cut;
-    // The clade's span at the zoom that frames it (it opens as it is framed: foldedFrame, ToLaD#247).
-    return foldedFrame(this.fan, this.w, () => {
-      // (Fit fossils, ToLaD#289: as a tap's frame, cladeCamera, a level whose living columns dwarf its fossils framed on them.)
-      const [a, b] = levelSpan(this.fan, v);
-      // (Room each side for an outer group's name beside its column, ToLaD#319: none cut off at the screen's edge.)
-      const pad = (PILL_ROOM_PX * (b - a)) / Math.max(1, this.w - 72 - 2 * PILL_ROOM_PX);
-      return this.withBand(this.camera.frame(a - pad, b + pad, v.y, true), v, fossilTop(this.fan, v) ?? this.yNow);
-    });
+    return v ? this.cladeCamera(v) : null;
   }
 
   /** Fly to a level (levelCamera), or home if the tree has no such split. */
@@ -1663,7 +1537,10 @@ export class FanView implements InputHandlers {
     const pre = firstRan && this.preTap && performance.now() - this.preTap.t < 4 * DOUBLE_TAP_MS ? this.preTap : null;
     const on = !pre && this.anim && this.backing;
     const from = pre ? pre.lv : on ? this.backing!.lv : this.levelNow(true);
-    const step = this.upFrom(from, pre ? pre.cam : on ? this.backing!.cam : this.cam);
+    // (Landed on part of a clade, a cut item's frame (ToLaD#359): out to the clade's own frame first.)
+    const part = !pre && !on && this.landedHere() && this.tapAt!.part && this.tapAt!.v;
+    const own = part ? { lv: { v: part }, cam: this.frameOf({ v: part }) } : null;
+    const step = own && this.offBy(own.cam, this.cam) > LEVEL_PX ? own : this.upFrom(from, pre ? pre.cam : on ? this.backing!.cam : this.cam);
     if (step) this.goLevel(step.lv, step.cam, false);
     // (Home: nothing, so the first tap's flight is put back.)
     else if (pre && (this.anim || this.offBy(pre.cam, this.cam) > 0.5)) this.goLevel(pre.lv, pre.cam, false);
@@ -1822,6 +1699,61 @@ export class FanView implements InputHandlers {
    * Fly to level lv's frame `cam`, remembered as the step under way (backing), so a tap or double-tap mid-flight goes on
    * from there. Landing on a species, its card opens (ToLaD#266), unless `card` is false (a double-tap's).
    */
+  /**
+   * A tap on a cut item's label, strands f..l (ToLaD#359): into exactly the item it stands for, its frame (runFrame:
+   * its territory filling the screen, from where its strands meet to "now"), where the cut one step finer shows its
+   * labels; one species, its landing and card. An item that does not split at its own frame (one label there, as
+   * "Cats +49" at the cats' home, the house cat's column taking the width) is entered through its widest daughter, the
+   * one its sisters ride on, until a frame splits it: every tap goes one step finer.
+   */
+  tapItem(f: number, l: number): void {
+    const T = this.territories().t;
+    const cur = this.anim && this.backing ? this.backing.cam : this.cam;
+    const s: [number, number] = [0, 0];
+    for (;;) {
+      if (f === l) {
+        const b = T.strands[f];
+        this.goLevel({ b }, this.frameOf({ b }));
+        return;
+      }
+      const v = this.meetOf(f, l);
+      const whole = v.strands[0].index === f && v.strands[v.strands.length - 1].index === l;
+      const top = (whole && fossilTop(this.fan, v)) || this.yNow;
+      const restore = this.fan.tess.fold?.keep();
+      const cam = this.runFrame(f, l, v.y, v, top);
+      const n = this.offBy(cam, cur) > LEVEL_PX ? this.labelsIn(cam, f, l) : 0;
+      restore?.();
+      if (n > 1) {
+        this.selected = null;
+        this.touch = null;
+        this.onSelect(null);
+        this.flyTo(() => this.runFrame(f, l, v.y, v, top), undefined, () => (this.tapAt = { b: null, v, cam: { ...this.cam }, part: !whole }));
+        this.backing = { lv: { v }, cam };
+        return;
+      }
+      // (Its widest daughter inside it, by territory.)
+      let best = NaN;
+      let bw = -Infinity;
+      for (const k of T.kids[T.index.get(v)!]) {
+        const r = T.refOf(k);
+        if (r.f < f || r.l > l) continue;
+        T.span(k, s);
+        if (s[1] - s[0] > bw) [best, bw] = [k, s[1] - s[0]];
+      }
+      if (Number.isNaN(best)) return;
+      ({ f, l } = T.refOf(best));
+    }
+  }
+
+  /** How many labels camera `cam` shows for strands f..l (the cut there, on screen; the fold at cam's zoom). */
+  private labelsIn(cam: Camera, f: number, l: number): number {
+    const [keep, pics] = [this.cam, this.picSpots];
+    this.cam = cam;
+    const c = this.cutLabels(this.territories(), this.labelTop());
+    [this.cam, this.picSpots] = [keep, pics];
+    return c.items.filter((it) => it.f >= f && it.l <= l).length;
+  }
+
   private goLevel(lv: Level, cam: Camera, card = true): void {
     if (lv.b) this.flyToSpecies(lv.b.sp, card);
     else this.flyLevel(null, lv.v);
@@ -1857,8 +1789,8 @@ export class FanView implements InputHandlers {
   }
 
   /** The species' or family's name pill nearest (x, y) within a finger's slack (ToLaD#230, #212), the one under it first. */
-  private pillAt(x: number, y: number): { b?: FanBranch; v?: FanNode } | null {
-    let pill: { b?: FanBranch; v?: FanNode } | null = null;
+  private pillAt(x: number, y: number): { b?: FanBranch; v?: FanNode; run?: Run } | null {
+    let pill: { b?: FanBranch; v?: FanNode; run?: Run } | null = null;
     let pd = Infinity;
     for (const h of [...this.nameHits, ...this.famHits]) {
       const dx = Math.max(h.box[0] - x, x - h.box[2], 0);
@@ -1900,11 +1832,18 @@ export class FanView implements InputHandlers {
     // A "+x" (ToLaD#262): the smallest frame holding the groups whose names it stands for.
     const plus = pinned ? null : this.plusAt(x, y);
     if (plus) {
-      this.flyToGroup(plus.bs);
+      if (plus.run) this.tapItem(...plus.run);
+      else this.flyToGroup(plus.bs);
       return;
     }
     const pill = pinned ? null : this.pillAt(x, y);
     const pic = pinned || pill ? null : this.picAt(x, y);
+    // A cut item's label (ToLaD#359): into the item it stands for.
+    const run = pill?.run ?? pic?.[5];
+    if (run) {
+      this.tapItem(...run);
+      return;
+    }
     const brk = pinned || pill || pic ? null : this.brackets?.hit(x, y);
     const to: Level | null = pinned ? { v: pinned.v } : pill?.v ? { v: pill.v } : pill?.b ? { b: pill.b } : pic ? (pic[4] ? { v: pic[4] } : { b: pic[3] }) : brk ? { v: brk.v } : null;
     if (to) {
@@ -2161,15 +2100,15 @@ export class FanView implements InputHandlers {
       const x = placeX(it.x0, it.x1, PIC_D, faceX(it, name.face));
       const key = `c${it.f}:${it.l}`;
       if (name.hid.length) groups.set(key, name.hid);
-      const s: LabelSpot = { key, id: key, place: 'tip', text: name.text, rank: [0, it.x1 - it.x0, it.head], x, y1: pill[1], box: [x - half, pill[0], x + half, pill[1]], fit, plus: this.plusPx(name.hid.length), pic: name.face };
-      // (A tap on it, name or picture, goes where the item stands, its head climbed: the clade or species of the tree
-      // it is, as before ToLaD#358; framing and taps from the items' names are #359's.)
+      const s: LabelSpot = { key, id: key, run: [it.f, it.l], place: 'tip', text: name.text, rank: [0, it.x1 - it.x0, it.head], x, y1: pill[1], box: [x - half, pill[0], x + half, pill[1]], fit, plus: this.plusPx(name.hid.length), pic: name.face };
+      // (What it opens, its head climbed: the clade or species of the tree it is; a tap on it, name, picture or "+x",
+      // goes into the item itself, tapItem, ToLaD#359.)
       const k = T.whole(it.head, it.f, it.l);
       const lv: Level = k < 0 ? { b: T.t.strands[~k] } : { v: T.t.nodes[k] };
       if (lv.b) s.b = lv.b;
       else Object.assign(s, { v: lv.v, fam: lv.v });
       spots.push(s);
-      pics.push({ x, y: (disc[0] + disc[1]) / 2, d: PIC_D, i: pics.length, lv, face: name.face });
+      pics.push({ x, y: (disc[0] + disc[1]) / 2, d: PIC_D, i: pics.length, lv, face: name.face, run: [it.f, it.l] });
       shown.push(it);
     }
     if (!whole) this.picSpots = pics;
@@ -2682,7 +2621,7 @@ export class FanView implements InputHandlers {
   }
 
   /** This frame's pictures (cutLabels), each with the level or species it opens. */
-  picSpots: (PicSpot & { lv: Level; face: FanBranch })[] = [];
+  picSpots: (PicSpot & { lv: Level; face: FanBranch; run?: Run })[] = [];
 
   /** Draw this frame's pictures (cutLabels). Each a tap to its group. */
   private drawGroupPics(): void {
@@ -2693,7 +2632,7 @@ export class FanView implements InputHandlers {
     ctx.strokeStyle = INK3;
     ctx.lineWidth = 1;
     // (Hits: the one on top found first.)
-    for (const p of [...this.picSpots].reverse()) this.thumbHits.push([p.x, p.y, p.d / 2, p.face, p.lv.v]);
+    for (const p of [...this.picSpots].reverse()) this.thumbHits.push([p.x, p.y, p.d / 2, p.face, p.lv.v, p.run]);
     // (Its placeholder at once, the picture fading in when loaded; what a tap would show next fetched ahead, ToLaD#351.)
     for (const p of this.picSpots) drawPic(ctx, p.face.sp.sci, p.x, p.y, p.d, () => this.request());
     prefetchPics(this.picSpots.flatMap((p) => (p.lv.v ? nextFaces(this.fan, p.lv.v) : [])));
@@ -2769,8 +2708,8 @@ export class FanView implements InputHandlers {
         ctx.strokeStyle = FAMILY_INK;
         ctx.lineWidth = 1;
         ctx.stroke();
-        if (alpha > 0.5) this.famHits.push({ box: [x0, y0, x1, y1], v: s.fam });
-      } else if (s.b && s.ev === undefined && !s.v && alpha > 0.5) this.nameHits.push({ box: [x0, y0, x1, y1], b: s.b });
+        if (alpha > 0.5) this.famHits.push({ box: [x0, y0, x1, y1], v: s.fam, run: s.run });
+      } else if (s.b && s.ev === undefined && !s.v && alpha > 0.5) this.nameHits.push({ box: [x0, y0, x1, y1], b: s.b, run: s.run });
       if (s.span) {
         // ...and a bracket over the species it names, just above "now".
         const a = Math.max(-2, s.span[0]);
@@ -2805,7 +2744,7 @@ export class FanView implements InputHandlers {
         ctx.fillText(`+${g.length}`, nx, 0.5);
         ctx.font = font(LABEL_FONT);
         // (The whole chip, its name too, is the badge's one tap target, ToLaD#287: "its all the same chip".)
-        if (alpha > 0.5) this.plusHits.push({ box: [x0, y0, x1, y1], badge: [x0, y0, x1, y1 - LABEL_PAD - nx + PLUS_GAP / 2], bs });
+        if (alpha > 0.5) this.plusHits.push({ box: [x0, y0, x1, y1], badge: [x0, y0, x1, y1 - LABEL_PAD - nx + PLUS_GAP / 2], bs, run: s.run });
       }
       ctx.restore();
     }
