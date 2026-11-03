@@ -1829,19 +1829,25 @@ export class FanView implements InputHandlers {
   }
 
   /**
-   * The cut items strands f..l make at zoom `z` (the whole cut, not only the screen's; the fold left at z, on the rows'
-   * grid it lands on, foldTo: the territories over rows are the landing's), left to right.
+   * The labels camera `cam` would show (cutLabels; `whole`: the whole cut, not only the screen's), measured as its
+   * landing draws them: the fold at its zoom and on its rows' grid (foldTo; the territories over rows are the
+   * grid's), the fold's grid and the view put back after, its zoom left at cam's.
    */
-  private piecesAt(f: number, l: number, v: FanNode, z: number): CutItem[] {
+  private labelsAt(cam: Camera, whole = false): CutLabels {
     const [keep, pics] = [this.cam, this.picSpots];
     const fold = this.fan.tess.fold;
     const grid = fold?.gridH;
-    this.cam = this.labelsFrame(f, l, v, z, 0);
+    this.cam = cam;
     if (fold) this.foldTo(fold);
-    const c = this.cutLabels(this.territories(), this.labelTop(), true);
+    const c = this.cutLabels(this.territories(), this.labelTop(), whole);
     if (fold && grid !== undefined) fold.setGrid(grid);
     [this.cam, this.picSpots] = [keep, pics];
-    return c.all.filter((it) => it.l >= f && it.f <= l);
+    return c;
+  }
+
+  /** The cut items strands f..l make at zoom `z` (the whole cut, not only the screen's; the fold left at z), left to right. */
+  private piecesAt(f: number, l: number, v: FanNode, z: number): CutItem[] {
+    return this.labelsAt(this.labelsFrame(f, l, v, z, 0), true).all.filter((it) => it.l >= f && it.f <= l);
   }
 
   /** Strands f..l at width zoom `z`, world x `mid` at the middle of the labels' width (LABEL_AXIS_X to the edge), from where they meet in clade v to "now". */
@@ -1853,11 +1859,7 @@ export class FanView implements InputHandlers {
 
   /** How many labels camera `cam` shows for strands f..l (the cut there, on screen; the fold at cam's zoom). */
   private labelsIn(cam: Camera, f: number, l: number): number {
-    const [keep, pics] = [this.cam, this.picSpots];
-    this.cam = cam;
-    const c = this.cutLabels(this.territories(), this.labelTop());
-    [this.cam, this.picSpots] = [keep, pics];
-    return c.items.filter((it) => it.f >= f && it.l <= l).length;
+    return this.labelsAt(cam).items.filter((it) => it.f >= f && it.l <= l).length;
   }
 
   private goLevel(lv: Level, cam: Camera, card = true): void {
