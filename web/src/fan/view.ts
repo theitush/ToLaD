@@ -143,6 +143,8 @@ export interface CutLabels {
   pics: (PicSpot & { lv: Level; face: FanBranch; run?: Run })[];
   /** The cut (tests read it), and per shown item its pill and picture (`spots[i]`, `pics[i]`: one label, ToLaD#358). */
   items: CutItem[];
+  /** The whole cut meeting the screen, its labels shown or not (tapItem measures an edge's room on it). */
+  all: CutItem[];
 }
 
 /** What an item's label says (ToLaD#358): the clade or species it names, its text, its picture's species, its "+x". */
@@ -1057,32 +1059,57 @@ export class FanView implements InputHandlers {
   private probeLod: Lod | null = null;
 
   /**
-   * The one frame (ToLaD#359, research/scalable-tree.md §4): strands f..l's territory (Territories.hull: their rooms,
-   * half the open gap past each end) across the labels' width of the screen, from LABEL_AXIS_X to its edge, at the
-   * zoom where it fills it (foldedFrame's bisection: the territory widens as the zoom opens its gaps), "now" (or `top`)
-   * down to `yFork` in time. Its labels are the cut at that zoom; each stands inside a territory inside this one, so
-   * none is cut off by the time axis or the screen's edge, with no padding. Home, a level, a bracket's tap, a label's.
+   * The one frame (ToLaD#359, research/scalable-tree.md §4): strands f..l's territory (runSpan: the rooms of the whole
+   * clades they make up, half the open gap past each end) across the labels' width of the screen, from LABEL_AXIS_X to
+   * its edge, at the zoom where it fills it (foldedFrame's bisection: the territory widens as the zoom opens its gaps),
+   * "now" (or `top`) down to `yFork` in time. Its labels are the cut at that zoom; each stands inside a territory inside
+   * this one, so none is cut off by the time axis or the screen's edge, with no padding. Home, a level, a bracket's tap,
+   * a label's. `edge` (px; < 0 on the left): room kept on that side for the neighbour its strands ride on (tapItem). `fossils`: a level whose living columns dwarf its fossils framed on where they lived (ToLaD#289).
    * Kept per screen size (a bisection at the mammals is ~40 refolds of ~6,000 strands, ToLaD#255), the fold put where
    * it leaves it.
    */
-  private runFrame(f: number, l: number, yFork: number, v: FanNode, top = this.yNow): Camera {
+  private runFrame(f: number, l: number, yFork: number, v: FanNode, top = this.yNow, edge = 0, fossils = false): Camera {
     const fold = this.fan.tess.fold;
-    const key = `${this.w}x${this.h}:${f}:${l}:${yFork}:${top}`;
+    const key = `${this.w}x${this.h}:${f}:${l}:${yFork}:${top}:${edge}:${fossils}`;
     if (this.framesFan !== this.fan) [this.framesFan, this.frames] = [this.fan, new Map()];
     const hit = this.frames.get(key);
     if (hit) {
       fold?.setScale(hit.sx, this.w);
       return { ...hit };
     }
-    const T = this.territories().t;
     const s: [number, number] = [0, 0];
     const cam = foldedFrame(this.fan, this.w, () => {
-      const [a, b] = T.hull(f, l, s);
-      const sx = (this.w - LABEL_AXIS_X) / Math.max(1e-300, b - a);
-      return this.withBand({ ...this.camera.frame(a, b, yFork, true), sx, cx: a + (this.w / 2 - LABEL_AXIS_X) / sx }, v, top);
+      const [a, b] = (fossils && fossilSpan(this.fan, v)) || this.runSpan(f, l, s);
+      const x0 = LABEL_AXIS_X + Math.max(0, -edge);
+      const sx = (this.w - LABEL_AXIS_X - Math.abs(edge)) / Math.max(1e-300, b - a);
+      return this.withBand({ ...this.camera.frame(a, b, yFork, true), sx, cx: a + (this.w / 2 - x0) / sx }, v, top);
     });
     this.frames.set(key, { ...cam });
     return cam;
+  }
+  /**
+   * Strands f..l's territory (world x, at the layout as it stands): the union of the territories (Territories.span) of
+   * the whole clades and species they make up, so a clade's is its own (rooms by life: the hull its columns stand in at
+   * every time, not only its first and last strand's).
+   */
+  private runSpan(f: number, l: number, out: [number, number]): [number, number] {
+    const T = this.territories().t;
+    const s: [number, number] = [0, 0];
+    out[0] = Infinity;
+    out[1] = -Infinity;
+    const go = (k: number) => {
+      const r = T.refOf(k);
+      if (r.l < f || r.f > l) return;
+      if (r.f < f || r.l > l) {
+        for (const q of T.kids[k]) go(q);
+        return;
+      }
+      T.span(k, s);
+      out[0] = Math.min(out[0], s[0]);
+      out[1] = Math.max(out[1], s[1]);
+    };
+    go(T.index.get(this.fan.root)!);
+    return out;
   }
   private framesFan: Fan | null = null;
   private frames = new Map<string, Camera>();
@@ -1098,7 +1125,8 @@ export class FanView implements InputHandlers {
   /** A clade's frame (runFrame: its territory, from its split to "now"; a level framed on its fossils, from their end). */
   cladeCamera(v: FanNode): Camera {
     if (!v.parent) return this.homeCamera();
-    return this.runFrame(v.strands[0].index, v.strands[v.strands.length - 1].index, v.y, v, fossilTop(this.fan, v) ?? this.yNow);
+    const top = fossilTop(this.fan, v);
+    return this.runFrame(v.strands[0].index, v.strands[v.strands.length - 1].index, v.y, v, top ?? this.yNow, 0, top !== null);
   }
 
   /**
@@ -1702,47 +1730,133 @@ export class FanView implements InputHandlers {
   /**
    * A tap on a cut item's label, strands f..l (ToLaD#359): into exactly the item it stands for, its frame (runFrame:
    * its territory filling the screen, from where its strands meet to "now"), where the cut one step finer shows its
-   * labels; one species, its landing and card. An item that does not split at its own frame (one label there, as
-   * "Cats +49" at the cats' home, the house cat's column taking the width) is entered through its widest daughter, the
-   * one its sisters ride on, until a frame splits it: every tap goes one step finer.
+   * labels; one species, its landing and card.
+   *
+   * An item that does not split at its own frame (one label there: as "Cats +50" at the cats' home, the house cat's
+   * column taking the width; or the one the view already frames) goes to its next split, the zoom where the cut first
+   * makes it two or more items (its active range's end, Been et al.): its widest piece there runs off the screen's
+   * edge, its label's room of it kept, and the pieces on the side with more species fill the rest, as far in as the
+   * widest is still one label (so a tap on her goes on to the rest of her, not only her edge). Every tap goes one
+   * step finer, and every species is reached by taps on names.
    */
   tapItem(f: number, l: number): void {
     const T = this.territories().t;
     const cur = this.anim && this.backing ? this.backing.cam : this.cam;
-    const s: [number, number] = [0, 0];
-    for (;;) {
-      if (f === l) {
-        const b = T.strands[f];
-        this.goLevel({ b }, this.frameOf({ b }));
-        return;
-      }
-      const v = this.meetOf(f, l);
-      const whole = v.strands[0].index === f && v.strands[v.strands.length - 1].index === l;
-      const top = (whole && fossilTop(this.fan, v)) || this.yNow;
-      const restore = this.fan.tess.fold?.keep();
-      const cam = this.runFrame(f, l, v.y, v, top);
-      const n = this.offBy(cam, cur) > LEVEL_PX ? this.labelsIn(cam, f, l) : 0;
-      restore?.();
-      if (n > 1) {
-        this.selected = null;
-        this.touch = null;
-        this.onSelect(null);
-        this.flyTo(() => this.runFrame(f, l, v.y, v, top), undefined, () => (this.tapAt = { b: null, v, cam: { ...this.cam }, part: !whole }));
-        this.backing = { lv: { v }, cam };
-        return;
-      }
-      // (Its widest daughter inside it, by territory.)
-      let best = NaN;
-      let bw = -Infinity;
-      for (const k of T.kids[T.index.get(v)!]) {
-        const r = T.refOf(k);
-        if (r.f < f || r.l > l) continue;
-        T.span(k, s);
-        if (s[1] - s[0] > bw) [best, bw] = [k, s[1] - s[0]];
-      }
-      if (Number.isNaN(best)) return;
-      ({ f, l } = T.refOf(best));
+    const go = (cam: Camera, again: () => Camera, v: FanNode, part: boolean) => {
+      this.selected = null;
+      this.touch = null;
+      this.onSelect(null);
+      this.flyTo(again, undefined, () => (this.tapAt = { b: null, v, cam: { ...this.cam }, part }));
+      this.backing = { lv: { v }, cam };
+    };
+    if (f === l) {
+      const b = T.strands[f];
+      this.goLevel({ b }, this.frameOf({ b }));
+      return;
     }
+    const v = this.meetOf(f, l);
+    const whole = v.strands[0].index === f && v.strands[v.strands.length - 1].index === l;
+    const top = (whole && fossilTop(this.fan, v)) || this.yNow;
+    const keep = this.fan.tess.fold?.keep();
+    const cam = this.runFrame(f, l, v.y, v, top);
+    if (this.offBy(cam, cur) > LEVEL_PX && this.labelsIn(cam, f, l) > 1) {
+      keep?.();
+      go(cam, () => this.runFrame(f, l, v.y, v, top), v, !whole);
+      return;
+    }
+    // (Its next split: the least zoom past its frame's where the cut makes it more than one item.)
+    const pieces = (z: number) => this.piecesAt(f, l, v, z);
+    let [a, b] = [Math.log(cam.sx), Math.log(cam.sx) + 1];
+    for (let k = 0; k < 60 && pieces(Math.exp(b)).length < 2; k++) [a, b] = [b, b + 1];
+    for (let k = 0; k < 40 && b - a > 1e-4; k++) {
+      const m = (a + b) / 2;
+      if (pieces(Math.exp(m)).length < 2) a = m;
+      else b = m;
+    }
+    const P = pieces(Math.exp(b));
+    if (P.length < 2) {
+      keep?.();
+      return;
+    }
+    // (Its widest piece there, and the side with more species.)
+    let q = 0;
+    P.forEach((it, i) => {
+      if (it.x1 - it.x0 > P[q].x1 - P[q].x0) q = i;
+    });
+    const nOf = (ps: CutItem[]) => ps.reduce((c, it) => c + it.l - it.f + 1, 0);
+    const [lo, hi] = [P.slice(0, q), P.slice(q + 1)];
+    const side = lo.length && nOf(lo) >= nOf(hi) ? lo : hi;
+    const dir = side === lo ? 1 : -1;
+    const [sf, sl] = [side[0].f, side[side.length - 1].l];
+    const [rf, rl] = [P[q].f, P[q].l];
+    const near = dir > 0 ? rf : rl;
+    // (Where the side fills the screen, the widest's label's room kept: as her item's label is placed, over its rows
+    // (rooms by life), measured at the frame and made up; no further in than where she is still one label.)
+    const zs = Math.exp(b);
+    const holds = (c: Camera) => {
+      const got = this.itemOn(c, near);
+      return { room: got.room, one: !!got.it && got.it.f <= rf && got.it.l >= rl };
+    };
+    let edge = dir * PIC_D;
+    let ecam = this.runFrame(sf, sl, v.y, v, this.yNow, edge);
+    let h = holds(ecam);
+    for (let k = 0; k < 4 && h.room < PIC_D * (1 - 1e-9); k++) {
+      edge += dir * (PIC_D - Math.max(0, h.room));
+      ecam = this.runFrame(sf, sl, v.y, v, this.yNow, edge);
+      h = holds(ecam);
+    }
+    const e = edge;
+    let again = () => this.runFrame(sf, sl, v.y, v, this.yNow, e);
+    if (ecam.sx > zs && !h.one) {
+      [a, b] = [Math.log(zs), Math.log(ecam.sx)];
+      for (let k = 0; k < 40 && b - a > 1e-4; k++) {
+        const m = (a + b) / 2;
+        if (holds(this.sideFrame(sf, sl, v, Math.exp(m), dir)).one) a = m;
+        else b = m;
+      }
+      const z = Math.exp(a);
+      ecam = this.sideFrame(sf, sl, v, z, dir);
+      h = holds(ecam);
+      again = () => this.sideFrame(sf, sl, v, z, dir);
+    }
+    // (Where that does not hold her label (her territory over its rows narrower than the side's span leaves her), the
+    // split itself: the side's pieces at the screen's edge, as the cut has them, the widest across the rest.)
+    if (!(ecam.sx > zs) || !h.one || h.room < PIC_D * (1 - 1e-9) || this.labelsIn(ecam, f, l) < 2) {
+      const x = dir > 0 ? side[0].x0 : side[side.length - 1].x1;
+      ecam = this.sideFrame(sf, sl, v, zs, dir, x);
+      again = () => this.sideFrame(sf, sl, v, zs, dir, x);
+    }
+    keep?.();
+    go(ecam, again, v, true);
+  }
+
+  /** The cut items strands f..l make at zoom `z` (the whole cut, not only the screen's; the fold left at z), left to right. */
+  private piecesAt(f: number, l: number, v: FanNode, z: number): CutItem[] {
+    const [keep, pics] = [this.cam, this.picSpots];
+    this.cam = this.sideFrame(f, l, v, z, 1);
+    const c = this.cutLabels(this.territories(), this.labelTop(), true);
+    [this.cam, this.picSpots] = [keep, pics];
+    return c.all.filter((it) => it.l >= f && it.f <= l);
+  }
+
+  /** Strands sf..sl framed at zoom `z` from the screen's labels' edge on the side away from `dir` (1: from the axis; that end at world x `at` if given), from where they meet in clade v to "now". */
+  private sideFrame(sf: number, sl: number, v: FanNode, z: number, dir: number, at?: number): Camera {
+    this.fan.tess.fold?.setScale(z, this.w);
+    let [a, b] = this.runSpan(sf, sl, [0, 0]);
+    if (at !== undefined) [a, b] = dir > 0 ? [at, b] : [a, at];
+    const cx = dir > 0 ? a + (this.w / 2 - LABEL_AXIS_X) / z : b - this.w / 2 / z;
+    return this.withBand({ ...this.camera.frame(a, b, v.y, true), sx: z, cx }, v, this.yNow);
+  }
+
+  /** The cut item holding strand i at camera `cam` (the fold at cam's zoom), and its room (px) on screen, where its label stands. */
+  private itemOn(cam: Camera, i: number): { it: CutItem | undefined; room: number } {
+    const [keep, pics] = [this.cam, this.picSpots];
+    this.cam = cam;
+    const c = this.cutLabels(this.territories(), this.labelTop());
+    const it = c.all.find((q) => q.f <= i && i <= q.l);
+    const room = it ? Math.min(this.toScreen(it.x1, 0)[0], this.w) - Math.max(this.toScreen(it.x0, 0)[0], LABEL_AXIS_X) : 0;
+    [this.cam, this.picSpots] = [keep, pics];
+    return { it, room };
   }
 
   /** How many labels camera `cam` shows for strands f..l (the cut there, on screen; the fold at cam's zoom). */
@@ -2089,12 +2203,13 @@ export class FanView implements InputHandlers {
         u = u.parent;
       }
     };
-    for (const it of T.t.cut(sx, PIC_D, vx0, vx1, rows, ghost)) {
+    const cut = T.t.cut(sx, PIC_D, vx0, vx1, rows, ghost);
+    for (const it of cut) {
       // (Only the root, before anything fits, does not hold its label.)
       if (!it.fits) continue;
       const { name, disc, pill } = at(it);
       // (Whole on screen or not at all: its territory's part on screen holds it, its picture under the top line.)
-      if (!whole && (Math.min(X(it.x1), right) - Math.max(X(it.x0), left) < PIC_D || disc[1] > this.h)) continue;
+      if (!whole && (Math.min(X(it.x1), right) - Math.max(X(it.x0), left) < PIC_D * (1 - 1e-9) || disc[1] > this.h)) continue;
       const fit = clamp01((bottom - pill[1]) / 30);
       if (!(fit > 0)) continue;
       const x = placeX(it.x0, it.x1, PIC_D, faceX(it, name.face));
@@ -2112,7 +2227,7 @@ export class FanView implements InputHandlers {
       shown.push(it);
     }
     if (!whole) this.picSpots = pics;
-    return { spots, groups, pics, items: shown };
+    return { spots, groups, pics, items: shown, all: cut };
   }
 
   /** The labels' and brackets' work per frame (ms, labelsNow; the pictures' and fades' in drawLabels not counted). */
