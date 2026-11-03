@@ -57,11 +57,11 @@ function check(v: FanView, c: CutLabels, at: string, bad: string[]): Int32Array 
   const by = new Map(strands.map((b, i) => [b, i]));
   const label = new Int32Array(2 * n).fill(-1);
   const seen = new Uint8Array(n);
-  // 3. One picture per name, over the same x, a name's text and a picture's species each.
+  // 3. One picture per name, its name pill under it (within its footprint: beside a thin branch, ToLaD#368), a name's text and a picture's species each.
   if (c.spots.length !== c.pics.length || c.spots.length !== c.items.length) bad.push(`${at}: ${c.spots.length} names, ${c.pics.length} pictures, ${c.items.length} items`);
   c.spots.forEach((s, i) => {
     const p = c.pics[i];
-    if (!s.text || !p || !p.face || p.d !== PIC_D || Math.abs(p.x - s.x) > 1e-6) bad.push(`${at}: label ${s.key} "${s.text}" without its picture`);
+    if (!s.text || !p || !p.face || p.d !== PIC_D || Math.abs(p.x - s.x) > (PIC_D - (s.box[2] - s.box[0])) / 2 + 1e-6) bad.push(`${at}: label ${s.key} "${s.text}" without its picture`);
     // 1. Its name's species (when it names one) and its "+x" species: its item's, each once.
     const it = c.items[i];
     // (Its name names a species when its picture's is not in its "+x"; s.b is where a tap goes, the item's own.)

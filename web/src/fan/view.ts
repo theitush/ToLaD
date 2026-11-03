@@ -101,6 +101,11 @@ const NOW_ROOM = PIC_D + 8;
 const LABEL_UNDER = 4;
 /** ...a "+x" label's (ToLaD#368, Ita: "between the pic and the text"): room for the hairline over its branches there. */
 const LABEL_LINE_GAP = 14;
+/**
+ * A name pill hides a branch column it covers more than this share of (ToLaD#368, Ita: "if it covers the branch or i
+ * dunno 80% of it it should be on its side"): a column narrower than LABEL_PILL / PILL_HIDES is thin, the pill slides off it.
+ */
+const PILL_HIDES = 0.8;
 
 /**
  * A name pill (ToLaD#333, view.ts cutLabels): the name upright on a dark pill, the same text and size at every zoom,
@@ -2255,6 +2260,80 @@ export class FanView implements InputHandlers {
       const mid = (s: FanBranch) => leftAt(s, wy) + laneAt(s, wy).w / 2;
       return [mid(S[a]), mid(S[b])];
     };
+    /**
+     * A name pill's offset (px, right of its picture's centre `x`, screen) for its rows `pill` (screen y): beside the
+     * thin branch columns it would hide at its top (ToLaD#368, Ita: "it mostly matter at the top of the branches like
+     * the closest to now as thats the thin part that is covered.. so it doesnt have to move all the way just it needs
+     * to make sure the top is showing"), within [0, side], so the pill stays under its picture, inside the picture's
+     * footprint and so inside the territory placeX proved. The drawn columns at the pill's top row, where its cap is
+     * full width (its strands' lanes side by side, touching lanes one column: a parent column below its split is one).
+     * A column of width w <= thin, its middle d from x, is hidden by a pill at offset o when the pill covers more than
+     * PILL_HIDES of it: for o within c = half - (PILL_HIDES - 1/2)·w of d. Each pushes the pill right just past it,
+     * o = d + c (the least that shows it), as far as side; one further right than the pill can clear lets it back as
+     * it goes, as fast as it moves (o = 2·side - c - d), to nothing once it is clear of the pill at rest. The offset is
+     * the most any column pushes: one side, so it never flips; continuous in the camera (a max of continuous pushes),
+     * moving no faster than the branches do; a function of the camera alone, as the labels are (no carry).
+     */
+    const side = (PIC_D - LABEL_PILL) / 2;
+    const thin = LABEL_PILL / PILL_HIDES;
+    const S = T.t.strands;
+    const lane = (i: number, wy: number): [number, number] | null => {
+      const s = S[i];
+      if (s.tipY > wy) return null;
+      const w = laneAt(s, wy).w * sx;
+      if (!(w > 0)) return null;
+      const a = X(leftAt(s, wy));
+      return [a, a + w];
+    };
+    const pillOff = (x: number, pill: [number, number]): number => {
+      const wy = Wy(pill[0] + half);
+      const A0 = x - PIC_D / 2;
+      const A1 = x + PIC_D / 2;
+      // (The first strand at or past the window's left, its own column's centre or its slot's left: drawn order is x order.)
+      let i0 = 0;
+      let i1 = S.length;
+      while (i0 < i1) {
+        const m = (i0 + i1) >> 1;
+        if (X(leftAt(S[m], wy, 0)) < A0 - thin) i0 = m + 1;
+        else i1 = m;
+      }
+      let o = 0;
+      let col: [number, number] | null = null;
+      const close = () => {
+        if (!col) return;
+        const [a, b] = col;
+        const w = b - a;
+        if (w <= thin) {
+          const c = half - (PILL_HIDES - 0.5) * w;
+          const d = (a + b) / 2 - x;
+          o = Math.max(o, Math.min(d + c, 2 * side - c - d, side));
+        }
+        col = null;
+      };
+      // (A column running in from the left: back over its lanes, as far as it could still be thin.)
+      let first = lane(i0, wy);
+      for (let j = i0 - 1; first && j >= 0; j--) {
+        const p = lane(j, wy);
+        if (!p || p[1] < first[0] - 1) break;
+        first = [p[0], first[1]];
+        if (first[1] - first[0] > thin) break;
+      }
+      for (let i = i0; i < S.length; i++) {
+        const q = i === i0 ? first : lane(i, wy);
+        if (!q) continue;
+        // (Touching, a seam under a pixel: one column.)
+        if (col && q[0] <= col[1] + 1) col[1] = Math.max(col[1], q[1]);
+        else {
+          close();
+          if (q[0] > A1) break;
+          col = [q[0], q[1]];
+        }
+        // (Past the footprint, or wide already: nothing more it could push.)
+        if (col[0] > A1 || (col[1] > A1 && col[1] - col[0] > thin)) break;
+      }
+      close();
+      return o;
+    };
     const cut = T.t.cut(sx, PIC_D, vx0, vx1, rows, ghost);
     for (const it of cut) {
       // (Only the root, before anything fits, does not hold its label.)
@@ -2271,7 +2350,9 @@ export class FanView implements InputHandlers {
       const x = placeX(it.x0, it.x1, PIC_D, span ? X((span[0] + span[1]) / 2) : faceX(it, name.face));
       const key = `c${it.f}:${it.l}`;
       if (name.hid.length) groups.set(key, name.hid);
-      const s: LabelSpot = { key, id: key, run: [it.f, it.l], place: 'tip', text: name.text, rank: [0, it.x1 - it.x0, it.head], x, y1: pill[1], box: [x - half, pill[0], x + half, pill[1]], fit, plus: this.plusPx(name.hid.length), pic: name.face };
+      // (Its name pill under its picture, beside the thin branches it would hide, ToLaD#368.)
+      const px = x + pillOff(x, pill);
+      const s: LabelSpot = { key, id: key, run: [it.f, it.l], place: 'tip', text: name.text, rank: [0, it.x1 - it.x0, it.head], x: px, y1: pill[1], box: [px - half, pill[0], px + half, pill[1]], fit, plus: this.plusPx(name.hid.length), pic: name.face };
       // (What it opens, its head climbed: the clade or species of the tree it is; a tap on it, name, picture or "+x",
       // goes into the item itself, tapItem, ToLaD#359.)
       const k = T.whole(it.head, it.f, it.l);
