@@ -107,13 +107,14 @@ function tapEach(v: FanView, at: string, bad: string[], depth: number, sample = 
     const [a, b] = T.hull(f, l).map((x) => v.toScreen(x, 0)[0]);
     if (a >= AXIS - 1 && b <= v.w + 1) frameCheck(v, f, l, here, bad);
     if (bad.length >= 20) return n;
-    // A double tap, right after the tap: out to a frame holding the item, whole.
+    // A double tap, right after the tap: out one step, back to the frame the tap was made at (never deeper: the item's
+    // own clade's frame is inside it, ToLaD#359).
     v.doubleTap(0, 0);
     run(v);
     const out = v.cam;
     if (!(out.sx < inside.sx * 0.999)) bad.push(`${here}: a double tap did not go out`);
-    const [a2, b2] = T.hull(f, l).map((x) => v.toScreen(x, 0)[0]);
-    if (a2 < AXIS - 1 || b2 > v.w + 1) bad.push(`${here}: the double tap's frame does not hold it (${a2.toFixed(0)}–${b2.toFixed(0)} px)`);
+    const off = Math.max(Math.abs(Math.log(out.sx / from.sx)), Math.abs(Math.log(out.sy / from.sy))) + Math.abs(out.cx - from.cx) * from.sx / v.w + Math.abs(out.cy - from.cy) * from.sy / v.h;
+    if (off > 1e-2) bad.push(`${here}: the double tap went to x ${(1 / out.sx).toExponential(2)} at ${out.cx.toFixed(1)}, not back to the frame tapped at`);
     if (depth > 1) {
       v.cam = { ...inside };
       n += tapEach(v, here, bad, depth - 1, sample);

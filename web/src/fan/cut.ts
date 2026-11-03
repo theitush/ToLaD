@@ -275,15 +275,30 @@ export class Territories {
     const R: RowsOf = rows ?? ((r) => [this.youngest(r.f, r.l), this.youngest(r.f, r.l)]);
     const z = life ? null : this.fitZoom(px);
     const fit = (x0: number, x1: number) => sx * (x1 - x0) >= px * (1 - 1e-9);
-    // (Whether each daughter fits, as the walk meets it, by its key.)
+    // (Whether each daughter fits, as the walk meets it, by its key; under rooms by life, her territory over her rows.)
     const got = new Map<number, boolean>();
+    const terr = new Map<number, [number, number]>();
     const ok = (k: number): boolean => {
       let o = got.get(k);
-      if (o === undefined) got.set(k, (o = z ? sx >= (k >= 0 ? z.node[k] : z.strand[~k]) : fit(...this.over(this.refOf(k), R, ghost, s))));
+      if (o === undefined) {
+        if (z) o = sx >= (k >= 0 ? z.node[k] : z.strand[~k]);
+        else {
+          const t = this.over(this.refOf(k), R, ghost, [0, 0]);
+          terr.set(k, t);
+          o = fit(t[0], t[1]);
+        }
+        got.set(k, o);
+      }
       return o;
     };
     const meets = (x0: number, x1: number) => x1 >= vx0 && x0 <= vx1;
-    const on = (k: number) => (this.span(k, s), meets(s[0], s[1]));
+    // (On screen: her room, or her territory over her rows, which reaches past her room where her neighbours there
+    // have ended, ToLaD#359: a label stands wherever its territory's part on screen holds it.)
+    const on = (k: number) => {
+      if ((this.span(k, s), meets(s[0], s[1]))) return true;
+      const t = terr.get(k);
+      return !!t && meets(t[0], t[1]);
+    };
     const opens = (k: number) => k >= 0 && this.kids[k].some(ok);
     const ride = (it: CutItem | null, k: number) => {
       if (!it) return;
@@ -345,8 +360,7 @@ export class Territories {
       const t = life ? this.over(it, R, ghost, s) : this.hull(it.f, it.l, s);
       [it.x0, it.x1] = t;
       it.fits = fit(t[0], t[1]);
-      const h = this.hull(it.f, it.l, s);
-      if (meets(h[0], h[1]) && meets(it.x0, it.x1)) out.push(it);
+      if (meets(it.x0, it.x1)) out.push(it);
     }
     return out;
   }
