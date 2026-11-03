@@ -56,6 +56,7 @@ export function FanApp() {
   // A double tap on the card (ToLaD#301): what one on the tree does, one level up, the card closed.
   const cardUp = (x: number, y: number) => viewRef.current?.doubleTap(x, y);
   const [mode, setMode] = useState<WidthMode>('linear');
+  const [mid, setMid] = useState(true);
   // What the widths count (ToLaD#276): individuals, or their mass (`?width=mass`).
   const [measure, setMeasure] = useState<Measure>(initialMeasure);
   const [sel, setSel] = useState<Selection | null>(null);
@@ -94,6 +95,7 @@ export function FanApp() {
           : new FanView(c, FELIDAE);
     stamp('view');
     if (mode !== 'linear') v.setMode(mode);
+    if (!mid) v.setMidLabels(false);
     v.setMeasure(measure);
     v.onSelect = setSel;
     v.scaleEl = scaleRef.current;
@@ -136,6 +138,17 @@ export function FanApp() {
           }}
         >
           {mode === 'log' ? 'log widths' : 'linear widths'}
+        </button>
+        {/* ToLaD#368: a "+x" label at the middle of its branches with a line over them, or at its named species. */}
+        <button
+          type="button"
+          aria-pressed={mid}
+          onClick={() => {
+            setMid(!mid);
+            viewRef.current?.setMidLabels(!mid);
+          }}
+        >
+          mid labels
         </button>
         {/* Home for this level, and the level stepper joined to it (ToLaD#247): one pill, so the bar stays one row. */}
         <span className="pair">

@@ -1211,6 +1211,13 @@ export class FanView implements InputHandlers {
     return br && p && p.b - p.a >= 6 ? [(p.a + p.b) / 2, br.rowY(p.row)] : null;
   }
 
+  /** Whether a "+x" label stands at the middle of its branches with a hairline over them (ToLaD#368), or at its named species' place (#358). A switch while Ita compares: the middle jumps where an item splits, the species' place does not. */
+  midLabels = true;
+  setMidLabels(on: boolean): void {
+    this.midLabels = on;
+    this.request();
+  }
+
   setMode(mode: WidthMode): void {
     this.mode = mode;
     this.relayout();
@@ -2231,7 +2238,7 @@ export class FanView implements InputHandlers {
       // (A "+x" at the middle of its branches at its foot, ToLaD#368, clamped into its territory as any; a species' at
       // its face's place. Its foot: just under its name pill, the tip row being "now"'s line.)
       const foot = pill[1] + LABEL_UNDER;
-      const span = name.hid.length ? reach(it, Wy(foot)) : null;
+      const span = this.midLabels && name.hid.length ? reach(it, Wy(foot)) : null;
       const x = placeX(it.x0, it.x1, PIC_D, span ? X((span[0] + span[1]) / 2) : faceX(it, name.face));
       const key = `c${it.f}:${it.l}`;
       if (name.hid.length) groups.set(key, name.hid);
