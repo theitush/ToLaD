@@ -6,6 +6,7 @@ import { CARNIVORA, FELIDAE, mammaliaClade } from './panthera';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree } from './splits';
 import { loadMammalsFromFiles } from './mammals-node';
 import { LADDER, Territories, type CutItem, type RowsOf } from './cut';
+import { PIC_D as PIC, PIC_LIFT } from './pics';
 
 await loadMammalsFromFiles();
 
@@ -46,15 +47,15 @@ function setup(level: Level): Setup {
   const now = fan.time.y(0);
   const py = (fan.root.yBot - now) / TALL;
   f.setGrid(Math.pow(2, Math.round(Math.log2(3 * py))));
-  // A name pill PILL_LEN long in the middle of its branch, from 4 px under its youngest tip (view.ts pillAt).
+  // A label, one unit at its youngest tip (view.ts cutLabels): its picture PIC_LIFT over the tip, its name pill PILL_LEN
+  // long right under it.
   const rows: RowsOf = (r) => {
     let ty = Infinity;
     for (let i = r.f; i <= r.l; i++) ty = Math.min(ty, t.strands[i].tipY);
     ty = Math.max(ty, now);
-    const by = r.head >= 0 ? t.nodes[r.head].yBot : t.strands[~r.head].splitY;
-    const a = ty + 4 * py;
-    const y0 = Math.max(a, (a + by) / 2 - (PILL_LEN * py) / 2);
-    return [y0, y0 + PILL_LEN * py];
+    const d1 = ty - PIC_LIFT * py;
+    const p0 = d1 + 4 * py;
+    return [d1 - PIC * py, d1, p0, p0 + PILL_LEN * py];
   };
   return { fan, f, t, wf, wt: new Territories(fan, wf, SCREEN), home: (SCREEN - 72) / ((x1 - x0) * 1.04), py, rows };
 }
@@ -183,6 +184,7 @@ describe('cut: one cut through the tree (ToLaD#333)', () => {
             next = c.l + 1;
             if (c.fits) expect((c.x1 - c.x0) * sx).toBeGreaterThanOrEqual(px * (1 - REL));
             // (Only the root, before anything fits, can be an item that does not hold its box: a run rides with a fitting neighbour.)
+            if (cs.length > 1 && !c.fits) console.log('PROBE', level, px, z, c.head, c.parts.join(','), c.f, c.l, (c.x1 - c.x0) * sx);
             if (cs.length > 1) expect(c.fits).toBe(true);
           }
           expect(seen.every((k) => k === 1)).toBe(true);

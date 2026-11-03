@@ -104,12 +104,14 @@ const NOW_ROOM = PIC_D + 8;
 
 /** Gap (px) a label keeps from the column it sits beside. */
 const LABEL_GAP = 3;
+/** Gap (px) between a label's picture and its name pill right under it (ToLaD#358: one unit at the tip). */
+const LABEL_UNDER = 4;
 /** A name's room beside a column (px): its gap, the pill, and the fade's margin from the screen's edge (ToLaD#319). */
 const PILL_ROOM_PX = LABEL_GAP + LABEL_PILL + 6;
 
 /**
  * A name pill (ToLaD#333, view.ts cutLabels): the name upright on a dark pill, the same text and size at every zoom,
- * in the middle of its item's branch inside the item's territory, its "+x" at its top end.
+ * right under its item's picture inside the item's territory (ToLaD#358), its "+x" at its top end.
  */
 export interface LabelSpot {
   /** The spot's key: the name's id and the place (`tip`, `in`, `right`, `left`). */
@@ -180,10 +182,6 @@ class CutTerritories {
   /** Daughter k's (a node's index, ~ a strand's) youngest tip (world y). */
   youngOf(k: number): number {
     return k >= 0 ? this.young[k] : Math.max(this.t.strands[~k].tipY, this.now);
-  }
-  /** Where daughter k (a node's index, ~ a strand's) splits off its parent (world y): a clade's stem's foot, a species' split. */
-  splitOff(k: number): number {
-    return k >= 0 ? this.t.nodes[k].yBot : this.t.strands[~k].splitY;
   }
   /** Daughter k's individuals alive now. */
   aliveOf(k: number): number {
@@ -1789,8 +1787,9 @@ export class FanView implements InputHandlers {
         return true;
       }
     }
-    // A group whose frame is the view's (a wide species', as the house cat's in the small cats): on, towards that species.
-    if (to.v && !col && k > 0) {
+    // A group whose frame is the view's (a wide species', as the house cat's in the small cats; the level the view is
+    // at, a label standing for all of it, as "Cats +49" at the cats' home, ToLaD#358): on, towards its widest species.
+    if (to.v && !col) {
       const w = to.v.strands.reduce((p, q) => (q.width > p.width ? q : p));
       return this.tapInto({ b: w }, false);
     }
@@ -2058,10 +2057,10 @@ export class FanView implements InputHandlers {
   /**
    * This frame's labels (ToLaD#358, research/scalable-tree.md §3): one cut through the tree at the label's width (a
    * picture's, PIC_D, its widest part), one label per item: its picture standing on the item's youngest tip (PIC_LIFT
-   * over it; held under the top line when the tip is above it) and its name pill in the middle of the branch below,
-   * over the same x (faceX), both inside the item's territory over the rows they take (Territories.over: the row's
-   * lineages split x between them, a lineage keeping its place a picture's height over its tip), so labels of
-   * different items never meet, by construction. The label names the most populous clade or species the item stands
+   * over it; held under the top line when the tip is above it) and its name pill right under it, one unit at a fixed
+   * offset from the tip, over one x (faceX), inside the item's territory over the rows they take (Territories.over:
+   * the row's lineages split x between them, a lineage keeping its place a picture's height over its tip), so labels
+   * of different items never meet, by construction. The label names the most populous clade or species the item stands
    * for (CutTerritories.nameOf), its picture that one's most populous living species (a placeholder disc where it has
    * no photo), its "+x" the item's other species. Shown whole, picture and name together, or not at all. `whole`: over
    * the whole tree, nothing culled for the screen (tests).
@@ -2096,19 +2095,11 @@ export class FanView implements InputHandlers {
       return Math.min(Math.max(x, l), r);
     };
     /**
-     * A name pill's rows (screen y, top and bottom), in the middle of its branch (Ita's pick, ToLaD#342: as
-     * ?names=mid): halfway between its youngest tip `ty` and where it splits off `by` over the part on screen, never
-     * above its tip (4 px under it, as a tip's pill stands) nor `floor` (4 px under its picture). `tlen` long.
-     */
-    const pillAt = (ty: number, by: number, tlen: number, floor: number): [number, number] => {
-      const a = Math.max(ty + 4, floor);
-      const y0 = Math.max(a, (a + Math.min(by, bottom - 30)) / 2 - tlen / 2);
-      return [y0, y0 + tlen];
-    };
-    /**
-     * Item r's label: its name, and its picture's and pill's rows (screen y), from the youngest tip and the branch of
-     * its head climbed (CutTerritories.whole: a clade's own, whether it is one item or her daughter with her sisters
-     * riding on her).
+     * Item r's label, one unit at the youngest tip of its head climbed (CutTerritories.whole: a clade's own, whether it
+     * is one item or her daughter with her sisters riding on her): its name, its picture's rows (screen y) PIC_LIFT over
+     * the tip, and its name pill's right under the picture (Ita, ToLaD#358: "A"), the text sideways as ever. Its rows are
+     * a fixed offset from the tip: the time zoom and pan move the unit rigidly, nothing in it depends on the branch's
+     * part on screen.
      */
     const memo = new Map<string, { name: ItemName; disc: [number, number]; pill: [number, number] }>();
     const at = (r: Ref & { parts?: readonly number[] }) => {
@@ -2119,10 +2110,11 @@ export class FanView implements InputHandlers {
         const name = T.nameOf(r);
         const ty = Y(T.youngOf(k));
         const tlen = this.nameWidth(name.text) + 2 * LABEL_PAD + this.plusPx(name.hid.length);
-        // (Its picture over its tip, or with the tip above the top line, held under it, its name below: a label stays
-        // whole on screen while its branch is, scrolled into the past too.)
+        // (Its picture over its tip, or with the tip above the top line, held under it, its name right below: a label
+        // stays whole on screen while its branch is, scrolled into the past too.)
         const d0 = Math.max(ty - PIC_LIFT - PIC_D, top);
-        m = { name, disc: [d0, d0 + PIC_D], pill: pillAt(ty, Y(T.splitOff(k)), tlen, d0 + PIC_D + 4) };
+        const p0 = d0 + PIC_D + LABEL_UNDER;
+        m = { name, disc: [d0, d0 + PIC_D], pill: [p0, p0 + tlen] };
         memo.set(key, m);
       }
       return m;

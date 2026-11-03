@@ -192,7 +192,10 @@ describe('a tap goes one level deeper, a double-tap one level out (ToLaD#258)', 
       for (const g of pills) {
         home(v);
         const h = v.famHits.find((q) => q.v === g)!;
-        v.tap((h.box[0] + h.box[2]) / 2, (h.box[1] + h.box[3]) / 2);
+        // (On its name: a "+x" badge at its top end is a tap of its own, ToLaD#262.)
+        const badge = (v as unknown as { plusHits: { badge: number[] }[] }).plusHits.find((q) => q.badge[0] === h.box[0] && q.badge[1] === h.box[1]);
+        const y0 = badge ? badge.badge[3] + 6 : h.box[1];
+        v.tap((h.box[0] + h.box[2]) / 2, (y0 + h.box[3]) / 2);
         expect(!!P(v).anim).toBe(true);
         run(v);
         // (That group, or where its frame is the view's, on into it; a deeper group's name, as the cut shows them at

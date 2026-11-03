@@ -110,6 +110,10 @@ describe('one cut, one label (ToLaD#358): invariants over the whole tree at the 
       let rungs = 0;
       let most = 0;
       let still = 0;
+      // (A species' picture is its label's name's: it may go to a richer sister's run and come back as its own clade
+      // splits off, the naming rule's honest result, steadylabels' one exemption: how many species, printed.)
+      const pic = new Map<string, number>();
+      const again = new Set<string>();
       const t0 = performance.now();
       const err = (globalThis as unknown as { process: { stderr: { write(s: string): void } } }).process.stderr;
       // (From home in, `every` rungs (1/LADDER of a doubling) at a time, to where every species has a label of its own,
@@ -132,11 +136,17 @@ describe('one cut, one label (ToLaD#358): invariants over the whole tree at the 
               break;
             }
         prev = label;
+        const now = new Set(c.pics.map((p) => p.face.sp.sci));
+        for (const [k, st] of pic) if (st === 1 && !now.has(k)) pic.set(k, 2);
+        for (const k of now) {
+          if (pic.get(k) === 2) again.add(k);
+          pic.set(k, 1);
+        }
         if (bad.length >= 20 || c.items.every((it) => it.f === it.l)) break;
       }
       const ms = (performance.now() - t0) / rungs;
       const multi = c.items.filter((it) => it.l > it.f).length;
-      err.write(`onelabel ${name}: ${rungs} rungs to ${(v.cam.sx / home.sx).toPrecision(4)}x, up to ${most} labels (${multi} still for more than one species), ${ms.toFixed(1)} ms a whole-tree cut\n`);
+      err.write(`onelabel ${name}: ${rungs} rungs to ${(v.cam.sx / home.sx).toPrecision(4)}x, up to ${most} labels (${multi} still for more than one species), ${ms.toFixed(1)} ms a whole-tree cut; ${again.size} of ${pic.size} species' pictures shown again after they went${again.size ? ` (${[...again].slice(0, 6).join(', ')}${again.size > 6 ? ', ...' : ''})` : ''}\n`);
       expect(bad).toEqual([]);
     });
 

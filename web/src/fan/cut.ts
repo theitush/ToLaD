@@ -20,7 +20,7 @@
 // That is widest rooms (Steady's `life` off, tests). Under rooms by life (the view's), sister rooms stay apart only
 // while both lived, so a territory is per row instead (Steady.cell): at each row the lineages there split x at the
 // middles between their drawn edges (a 1D Voronoi of the row), and an item's territory is its strands' share over the
-// rows its label takes (RowsOf: its pill from mid-branch, its picture over its youngest tip, a lineage keeping its place
+// rows its label takes (RowsOf: its picture over its youngest tip, its pill right under it, a lineage keeping its place
 // that high over its tip). Items are runs of strands that do not overlap, so their territories are disjoint at every
 // row they share: labels inside their own never meet, by construction. They depend on the camera's height too.
 

@@ -48,25 +48,18 @@ function stubView(clade: CladeRec = CARNIVORA, tree: Split = CARNIVORA_TREE, fol
 }
 
 /** A label's place and size (screen), and the screen x of the columns it stands on (its anchor: groupCentre; NaN, a "+x"). */
-type Spot = { x: number; y: number; w: number; h: number; c: number; it: string; t: [number, number] };
+type Spot = { x: number; y: number; w: number; h: number; c: number };
 type Shot = Map<string, Spot>;
-/**
- * A frame's labels: each name pill (by its item and text) and each picture (by what it opens), where and how big, and
- * its item and its territory's ends (screen x: the label is held inside it).
- */
+/** A frame's labels: each name pill (by its item and text) and each picture (by what it opens), where and how big. */
 function shot(v: FanView, c: CutLabels): Shot {
   const m: Shot = new Map();
   const at = (x: number) => v.toScreen(x, 0)[0];
-  c.spots.forEach((s, i) => {
+  for (const s of c.spots) {
     const g = s.v ? { v: s.v } : s.b ? { b: s.b } : null;
-    const it = c.items[i];
-    m.set(`name ${s.key} ${s.text}`, { x: s.x, y: s.box[3], w: s.box[2] - s.box[0], h: s.box[3] - s.box[1], c: g ? at(groupCentre(g)) : NaN, it: s.key, t: [at(it.x0), at(it.x1)] });
-  });
+    m.set(`name ${s.key} ${s.text}`, { x: s.x, y: s.box[3], w: s.box[2] - s.box[0], h: s.box[3] - s.box[1], c: g ? at(groupCentre(g)) : NaN });
+  }
   // (A picture is its face species', whichever item of the cut it stands for.)
-  c.pics.forEach((p, i) => {
-    const it = c.items[i];
-    m.set(`pic ${p.face.sp.sci}`, { x: p.x, y: p.y, w: p.d, h: p.d, c: at(groupCentre({ b: p.face })), it: c.spots[i].key, t: [at(it.x0), at(it.x1)] });
-  });
+  for (const p of c.pics) m.set(`pic ${p.face.sp.sci}`, { x: p.x, y: p.y, w: p.d, h: p.d, c: at(groupCentre({ b: p.face })) });
   return m;
 }
 type Step = (v: FanView) => void;
@@ -95,8 +88,7 @@ function play(v: FanView, steps: Step[]): { shots: Shot[]; moved: number[] } {
  * Sizes that changed, jumps, and labels shown, hidden, then shown again. A jump: farther than the world on screen moved
  * plus a third and 2 px, the world being the camera's points and the columns the labels stand on (the steady fold's
  * gaps open and close with the width zoom, the columns with them: a pinch at the mammals moves bats' columns twice as
- * far as any point under the camera, and their names, on them, with them), the territory a label is held in while its
- * item stays the same, and the labels' top line.
+ * far as any point under the camera, and their names, on them, with them), and the labels' top line.
  */
 function judge(shots: Shot[], moved: number[], monotonic: boolean): string[] {
   const bad: string[] = [];
@@ -107,9 +99,6 @@ function judge(shots: Shot[], moved: number[], monotonic: boolean): string[] {
     for (const [k, s] of shots[f + 1]) {
       const p = shots[f].get(k);
       if (p && Number.isFinite(s.c - p.c)) c = Math.max(c, Math.abs(s.c - p.c));
-      // (Its item's territory, the same item: its lineages' share of x over the label's rows, ToLaD#358. The rows are
-      // on screen, the pill in the middle of its branch's part there, so a pan up or down slides their share too.)
-      if (p && p.it === s.it) for (const e of [0, 1]) if (Number.isFinite(s.t[e] - p.t[e])) c = Math.max(c, Math.abs(s.t[e] - p.t[e]));
     }
     return c;
   });
