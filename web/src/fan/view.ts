@@ -99,6 +99,8 @@ const NOW_ROOM = PIC_D + 8;
 
 /** Gap (px) between a label's picture and its name pill right under it (ToLaD#358: one unit at the tip). */
 const LABEL_UNDER = 4;
+/** ...a "+x" label's (ToLaD#368, Ita: "between the pic and the text"): room for the hairline over its branches there. */
+const LABEL_LINE_GAP = 14;
 
 /**
  * A name pill (ToLaD#333, view.ts cutLabels): the name upright on a dark pill, the same text and size at every zoom,
@@ -113,8 +115,8 @@ export interface LabelSpot {
   /** A family's label (`fam`, ToLaD#146): the screen x span of its species, bracketed under the pill. */
   span?: [number, number];
   /**
-   * A "+x" label's branches (ToLaD#368): the screen x of its item's first and last branch at the label's foot (just
-   * under its name pill, screen y), which a hairline spans there, a tick down onto each end branch.
+   * A "+x" label's branches (ToLaD#368): the screen x of its item's first and last branch at the label's foot (between
+   * its picture and its name pill, screen y), which a hairline spans there, a tick down onto each end branch.
    */
   over?: [number, number, number];
   /** A cut item's label (ToLaD#359): the item's strands, first and last, which a tap on it goes into (tapItem). */
@@ -2199,7 +2201,7 @@ export class FanView implements InputHandlers {
         // (Its picture over its tip, or with the tip above the top line, held under it, its name right below: a label
         // stays whole on screen while its branch is, scrolled into the past too.)
         const d0 = Math.max(ty - PIC_LIFT - PIC_D, top);
-        const p0 = d0 + PIC_D + LABEL_UNDER;
+        const p0 = d0 + PIC_D + (this.midLabels && name.hid.length ? LABEL_LINE_GAP : LABEL_UNDER);
         m = { name, disc: [d0, d0 + PIC_D], pill: [p0, p0 + tlen] };
         memo.set(key, m);
       }
@@ -2263,8 +2265,8 @@ export class FanView implements InputHandlers {
       const fit = clamp01((bottom - pill[1]) / 30);
       if (!(fit > 0)) continue;
       // (A "+x" at the middle of its branches at its foot, ToLaD#368, clamped into its territory as any; a species' at
-      // its face's place. Its foot: just under its name pill, the tip row being "now"'s line.)
-      const foot = pill[1] + LABEL_UNDER;
+      // its face's place. Its foot: between its picture and its name, Ita.)
+      const foot = disc[1] + LABEL_LINE_GAP / 2;
       const span = this.midLabels && name.hid.length ? reach(it, Wy(foot)) : null;
       const x = placeX(it.x0, it.x1, PIC_D, span ? X((span[0] + span[1]) / 2) : faceX(it, name.face));
       const key = `c${it.f}:${it.l}`;
@@ -2857,7 +2859,7 @@ export class FanView implements InputHandlers {
     this.thumbHits.length = 0;
     // The clades' brackets (ToLaD#193) under the pills: their labels clear of the pills and pictures, their lines behind them.
     br?.draw(ctx, FAMILY_INK, INK3, [...spots.filter((s) => s.fit > 0.3).map((s) => s.box), ...pics.map((p) => [p.x - p.d / 2, p.y - p.d / 2, p.x + p.d / 2, p.y + p.d / 2])]);
-    // A "+x" label's branches (ToLaD#368): a hairline at its foot from its first branch to its last, under its name
+    // A "+x" label's branches (ToLaD#368): a hairline at its foot from its first branch to its last, between its picture and its name
     // pill, a tick down onto each end branch, as the brackets draw theirs (open-ended past the screen's edge).
     ctx.save();
     ctx.lineWidth = 1;
