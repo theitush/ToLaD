@@ -6,6 +6,7 @@ import { CARNIVORA, FELIDAE, mammaliaClade } from './panthera';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree } from './splits';
 import { loadMammalsFromFiles } from './mammals-node';
 import { LADDER, Territories, type CutItem, type RowsOf } from './cut';
+import { PIC_D as PIC, PIC_LIFT } from './pics';
 
 await loadMammalsFromFiles();
 
@@ -46,17 +47,15 @@ function setup(level: Level): Setup {
   const now = fan.time.y(0);
   const py = (fan.root.yBot - now) / TALL;
   f.setGrid(Math.pow(2, Math.round(Math.log2(3 * py))));
-  // A name pill PILL_LEN long in the middle of its branch, from 4 px under its youngest tip (view.ts pillAt).
-  const fl: [number, number] = [0, 0];
+  // A label, one unit at its youngest tip (view.ts cutLabels): its picture PIC_LIFT over the tip, its name pill PILL_LEN
+  // long right under it.
   const rows: RowsOf = (r) => {
-    t.range(r, fl);
     let ty = Infinity;
-    for (let i = fl[0]; i <= fl[1]; i++) ty = Math.min(ty, t.strands[i].tipY);
+    for (let i = r.f; i <= r.l; i++) ty = Math.min(ty, t.strands[i].tipY);
     ty = Math.max(ty, now);
-    const by = r.kind === 'run' ? t.nodes[r.j].y : r.kind === 'leaf' ? t.strands[r.j].splitY : t.nodes[r.j].yBot;
-    const a = ty + 4 * py;
-    const y0 = Math.max(a, (a + by) / 2 - (PILL_LEN * py) / 2);
-    return [y0, y0 + PILL_LEN * py];
+    const d1 = ty - PIC_LIFT * py;
+    const p0 = d1 + 4 * py;
+    return [d1 - PIC * py, d1, p0, p0 + PILL_LEN * py];
   };
   return { fan, f, t, wf, wt: new Territories(fan, wf, SCREEN), home: (SCREEN - 72) / ((x1 - x0) * 1.04), py, rows };
 }
@@ -83,7 +82,7 @@ function sweep(s: Setup, cs: readonly CutItem[], rows: RowsOf = s.rows): number 
     for (let k = k0; k <= k1; k++) {
       const e = end.get(k) ?? -Infinity;
       const tol = REL * Math.max(Math.abs(e), Math.abs(c.x0)) + 1e-9;
-      if (!(c.x0 >= e - tol)) expect.fail(`row ${k}: ${c.kind}${c.j} starts at ${c.x0}, before ${e}`);
+      if (!(c.x0 >= e - tol)) expect.fail(`row ${k}: item ${c.head} starts at ${c.x0}, before ${e}`);
       end.set(k, c.x1);
       n++;
     }
@@ -153,17 +152,15 @@ describe('cut: territories (ToLaD#333)', () => {
   }
 });
 
-/** An item's species (strand indices). */
+/** An item's species (strand indices): its parts', in the drawn order. */
 function speciesOf(t: Territories, c: CutItem): number[] {
   const out: number[] = [];
-  if (c.kind === 'leaf') return [c.j];
-  const K = [...t.kids[c.j]].slice(c.q0, c.q1 + 1);
-  for (const k of K)
+  for (const k of c.parts)
     if (k >= 0) for (let i = t.first[k]; i <= t.last[k]; i++) out.push(i);
     else out.push(~k);
-  return out;
+  return out.sort((a, b) => a - b);
 }
-const key = (cs: CutItem[]) => cs.map((c) => `${c.kind}${c.j}:${c.q0}-${c.q1}:${c.fits ? 1 : 0}:${c.x0.toPrecision(12)}`).join(' ');
+const key = (cs: CutItem[]) => cs.map((c) => `${c.head}:${c.f}-${c.l}:${c.fits ? 1 : 0}:${c.x0.toPrecision(12)}`).join(' ');
 
 
 describe('cut: one cut through the tree (ToLaD#333)', () => {
@@ -183,13 +180,30 @@ describe('cut: one cut through the tree (ToLaD#333)', () => {
             for (const i of sp) seen[i]++;
             expect(c.count).toBe(sp.length);
             expect([c.f, c.l]).toEqual([next, next + sp.length - 1]);
+            expect(sp).toEqual(Array.from(sp, (_, i) => next + i));
             next = c.l + 1;
             if (c.fits) expect((c.x1 - c.x0) * sx).toBeGreaterThanOrEqual(px * (1 - REL));
-            // (Only a run, or the root before anything fits, can be an item that does not hold its box.)
-            if (c.kind !== 'run' && cs.length > 1) expect(c.fits).toBe(true);
+            // (Only the root, before anything fits, can be an item that does not hold its box: a run rides with a fitting neighbour.)
+            if (cs.length > 1) expect(c.fits).toBe(true);
           }
           expect(seen.every((k) => k === 1)).toBe(true);
         }
+    });
+
+    it(`${level}: zooming in, an item only splits (each species' item narrows), rooms by life and widest rooms`, () => {
+      const s = S.get(level)!;
+      for (const [f, t] of [[s.f, s.t], [s.wf, s.wt]] as const) {
+        let prev: Int32Array | null = null;
+        for (let k = -LADDER; k <= 10 * LADDER; k += 4) {
+          const sx = s.home * Math.pow(2, k / LADDER);
+          f.setScale(sx, SCREEN);
+          const at = new Int32Array(2 * t.strands.length);
+          for (const c of t.cut(sx, BOXES[1], -Infinity, Infinity, s.rows))
+            for (let i = c.f; i <= c.l; i++) [at[2 * i], at[2 * i + 1]] = [c.f, c.l];
+          if (prev) for (let i = 0; i < at.length; i += 2) if (at[i] < prev[i] || at[i + 1] > prev[i + 1]) expect.fail(`${sx}: species ${i / 2} from ${prev[i]}-${prev[i + 1]} to ${at[i]}-${at[i + 1]}`);
+          prev = at;
+        }
+      }
     });
 
     it(`${level}: what shows depends only on the camera, not on the way there; a window gives what meets it`, () => {
@@ -210,7 +224,7 @@ describe('cut: one cut through the tree (ToLaD#333)', () => {
         const half = SCREEN / sx / 2;
         const meets = (a: number, b: number) => b >= mid - half && a <= mid + half;
         // (An item meets the window when its room (culling) and its territory both do.)
-        const room = (c: CutItem) => (c.kind === 'run' ? t.hull(c.j, c.q0, c.q1, r) : t.span(c.kind === 'leaf' ? ~c.j : c.j, r));
+        const room = (c: CutItem) => t.hull(c.f, c.l, r);
         const win = t.cut(sx, 22, mid - half, mid + half, s.rows);
         expect(key(win)).toBe(key(all.filter((c) => meets(...room(c)) && meets(c.x0, c.x1))));
       }
@@ -234,46 +248,4 @@ describe('cut: one cut through the tree (ToLaD#333)', () => {
       expect(ms).toBeLessThan(5);
     }
   });
-});
-
-describe('cut: borrowed room, Been et al. 1D active ranges (ToLaD#333, plan step 2b)', () => {
-  for (const level of levels)
-    it(`${level}: daughters that borrow room hold disjoint boxes inside their stretch of runs, over their rows; more labels`, () => {
-      const s = S.get(level)!;
-      const { f, t, home } = s;
-      const px = BOXES[0];
-      const k0 = Territories.rung(home / 2);
-      const st: [number, number] = [0, 0];
-      let more = 0;
-      for (let k = k0; k < k0 + 6 * LADDER; k += 3) {
-        const sx = Math.pow(2, k / LADDER);
-        f.setScale(sx, SCREEN);
-        const items = t.cut(sx, px, -Infinity, Infinity, s.rows);
-        const lent = t.borrowed(sx, px, items, undefined, s.rows);
-        // Stretches: runs side by side; each lent daughter's box inside its own stretch's share of its rows, none meeting another.
-        const boxes: [number, number][] = [];
-        for (let i = 0; i < items.length; i++) {
-          if (items[i].kind !== 'run') continue;
-          let e = i;
-          while (e + 1 < items.length && items[e + 1].kind === 'run' && items[e + 1].f === items[e].l + 1) e++;
-          for (let r = i; r <= e; r++)
-            for (let q = items[r].q0; q <= items[r].q1; q++) {
-              const d = t.kids[items[r].j][q];
-              const c = lent.get(d);
-              if (c === undefined) continue;
-              const [ya, yb] = s.rows(Territories.ref(d));
-              const [x0, x1] = f.cell(items[i].f, items[e].l, ya, yb, 0, st);
-              const h = px / 2 / sx;
-              expect(c - h).toBeGreaterThanOrEqual(x0 - REL * Math.abs(x0) - 1e-9);
-              expect(c + h).toBeLessThanOrEqual(x1 + REL * Math.abs(x1) + 1e-9);
-              boxes.push([c - h, c + h]);
-            }
-          i = e;
-        }
-        boxes.sort((a, b) => a[0] - b[0]);
-        for (let i = 1; i < boxes.length; i++) expect(boxes[i][0]).toBeGreaterThanOrEqual(boxes[i - 1][1] - REL * Math.abs(boxes[i][0]) - 1e-9);
-        more += boxes.length;
-      }
-      if (level !== 'cats') expect(more).toBeGreaterThan(0);
-    });
 });

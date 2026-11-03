@@ -6,7 +6,6 @@ import { loadMammalsFromFiles } from './mammals-node';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, type Split } from './splits';
 import { FanView, groupFace, holds, isLevel, levelName, levelUp, nextLevels, type Level } from './view';
 import type { Camera } from './camera';
-import { wikiOf } from './wiki';
 
 function stubView(clade: CladeRec = CARNIVORA, tree: Split = CARNIVORA_TREE, folds = true): FanView {
   const noop = () => {};
@@ -115,7 +114,7 @@ const FANS = [
   ['cats', () => stubView(FELIDAE, FELIDAE_TREE, false)],
 ] as const;
 
-describe("a group's picture is its most-populous living species with a picture (ToLaD#258)", () => {
+describe("a group's picture is its most-populous living species, photo or not (ToLaD#258; #358: no photo, the placeholder disc)", () => {
   for (const [name, mk] of FANS) {
     it(name, () => {
       const v = mk();
@@ -123,10 +122,8 @@ describe("a group's picture is its most-populous living species with a picture (
       for (const u of v.fan.nodes) {
         const face = groupFace(u);
         const alive = u.strands.filter((b) => !b.sp.extinct && b.pop.aliveAt(0) > 0);
-        const pics = alive.filter((b) => wikiOf(b.sp.sci)?.img);
-        const want = pics.length ? pics : alive;
-        const most = Math.max(...want.map((b) => b.pop.aliveAt(0)));
-        if (!alive.length ? face !== null : !face || !want.includes(face) || face.pop.aliveAt(0) < most) bad.push(`${u.name}: ${face?.sp.common}`);
+        const most = Math.max(...alive.map((b) => b.pop.aliveAt(0)));
+        if (!alive.length ? face !== null : !face || !alive.includes(face) || face.pop.aliveAt(0) < most) bad.push(`${u.name}: ${face?.sp.common}`);
       }
       expect(bad).toEqual([]);
     });
@@ -195,7 +192,10 @@ describe('a tap goes one level deeper, a double-tap one level out (ToLaD#258)', 
       for (const g of pills) {
         home(v);
         const h = v.famHits.find((q) => q.v === g)!;
-        v.tap((h.box[0] + h.box[2]) / 2, (h.box[1] + h.box[3]) / 2);
+        // (On its name: a "+x" badge at its top end is a tap of its own, ToLaD#262.)
+        const badge = (v as unknown as { plusHits: { badge: number[] }[] }).plusHits.find((q) => q.badge[0] === h.box[0] && q.badge[1] === h.box[1]);
+        const y0 = badge ? badge.badge[3] + 6 : h.box[1];
+        v.tap((h.box[0] + h.box[2]) / 2, (y0 + h.box[3]) / 2);
         expect(!!P(v).anim).toBe(true);
         run(v);
         // (That group, or where its frame is the view's, on into it; a deeper group's name, as the cut shows them at
