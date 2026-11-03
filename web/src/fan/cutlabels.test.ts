@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { loadMammalsFromFiles } from './mammals-node';
 import { CARNIVORA, FELIDAE, mammaliaClade, type CladeRec } from './panthera';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, type Split } from './splits';
+import { laneAt, leftAt } from './layout';
 import { FanView, groupCentre, type CutLabels } from './view';
 
 function stubView(clade: CladeRec = CARNIVORA, tree: Split = CARNIVORA_TREE, folds = true): FanView {
@@ -61,6 +62,37 @@ function check(c: CutLabels, w: number): void {
   for (const s of S) expect([s.key, s.x, s.box[2] > 0 && s.box[0] < w]).toEqual([s.key, s.x, true]);
 }
 
+/**
+ * The thin branch columns a name pill hides at its top (ToLaD#368: Ita, "if it covers the branch or i dunno 80% of it
+ * it should be on its side"; "it mostly matter at the top of the branches"), brute force: at the pill's top row (where
+ * its cap is full width) the drawn columns (every lane there, touching lanes one column), no wider than the pill / 0.8,
+ * it covers more than 80 % of, that it could have cleared (their middle no further right of its picture's centre `px`
+ * than a pill pushed right as far as it goes clears: (PIC_D - 22) / 2 - (11 - 0.3·w)).
+ */
+function hidden(v: FanView, box: readonly number[], px: number, d: number): string[] {
+  const out: string[] = [];
+  const wy = v.toWorld(0, box[1] + 11)[1];
+  const L = v.fan.branches
+    .filter((b) => b.tipY <= wy && laneAt(b, wy).w > 0)
+    .map((b) => {
+      const a = v.toScreen(leftAt(b, wy), 0)[0];
+      return { a, b: a + laneAt(b, wy).w * v.cam.sx };
+    })
+    .sort((p, q) => p.a - q.a);
+  const cols: { a: number; b: number }[] = [];
+  for (const l of L) {
+    const t = cols[cols.length - 1];
+    if (t && l.a <= t.b + 1) t.b = Math.max(t.b, l.b);
+    else cols.push({ ...l });
+  }
+  for (const k of cols) {
+    const w = k.b - k.a;
+    const clear = (k.a + k.b) / 2 - px <= (d - 22) / 2 - (11 - 0.3 * w);
+    if (w <= 22 / 0.8 && clear && Math.min(k.b, box[2]) - Math.max(k.a, box[0]) > 0.8 * w + 1e-6) out.push(`${w.toFixed(1)} px at ${k.a.toFixed(1)}`);
+  }
+  return out;
+}
+
 const mammals = async () => {
   await loadMammalsFromFiles();
   return stubView(mammaliaClade(), mammaliaTree(), true);
@@ -111,6 +143,16 @@ describe('labels from the cut (?labels=cut, ToLaD#333)', () => {
           const c = o ? (o[0] + o[1]) / 2 : v.toScreen(groupCentre({ b: p.face }), 0)[0];
           if (c >= 72 + p.d / 2 && c <= v.w - p.d / 2) expect([p.face.sp.common, Math.abs(p.x - c) <= p.d / 2 + 1e-6]).toEqual([p.face.sp.common, true]);
         }
+        // Each name pill under its picture, right of its centre within its footprint, beside the thin branches it
+        // could clear there (ToLaD#368).
+        if (!name.startsWith('mammals'))
+          for (let i = 0; i < cut.spots.length; i++) {
+            const s = cut.spots[i];
+            const p = cut.pics[i];
+            expect(s.x - p.x).toBeGreaterThanOrEqual(-1e-6);
+            expect(s.x - p.x).toBeLessThanOrEqual((p.d - 22) / 2 + 1e-6);
+            expect([s.text, hidden(v, s.box, p.x, p.d)]).toEqual([s.text, []]);
+          }
         seen.push(sig(cut));
       }
       // The same camera, reached the other way round (from deep in to home), gives the same labels.
