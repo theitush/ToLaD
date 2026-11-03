@@ -48,10 +48,17 @@ function setup(level: Level): Setup {
   const py = (fan.root.yBot - now) / TALL;
   f.setGrid(Math.pow(2, Math.round(Math.log2(3 * py))));
   // A label, one unit at its youngest tip (view.ts cutLabels): its picture PIC_LIFT over the tip, its name pill PILL_LEN
-  // long right under it.
+  // long right under it. The tip is its head climbed's (view.ts CutTerritories.whole: the widest clade the head is in
+  // whose species are all the item's), not its riders': a sister riding on it lends it no row (ToLaD#358, #359).
   const rows: RowsOf = (r) => {
+    let [a, z] = r.head >= 0 ? [t.first[r.head], t.last[r.head]] : [~r.head, ~r.head];
+    for (let u = r.head >= 0 ? t.nodes[r.head].parent : t.strands[~r.head].node; u; u = u.parent) {
+      const j = t.index.get(u)!;
+      if (t.first[j] < r.f || t.last[j] > r.l) break;
+      [a, z] = [t.first[j], t.last[j]];
+    }
     let ty = Infinity;
-    for (let i = r.f; i <= r.l; i++) ty = Math.min(ty, t.strands[i].tipY);
+    for (let i = a; i <= z; i++) ty = Math.min(ty, t.strands[i].tipY);
     ty = Math.max(ty, now);
     const d1 = ty - PIC_LIFT * py;
     const p0 = d1 + 4 * py;
