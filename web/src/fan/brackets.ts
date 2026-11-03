@@ -773,17 +773,33 @@ export function foldedFrame(fan: Fan, w: number, frame: () => Camera): Camera {
   const fixed = settleAt(cam.sx);
   if (fixed.sx === cam.sx) cam = fixed;
   else {
-    // (The zoom that frames the span it opens to is one point: the span (px) a zoom gives grows with it.)
+    // (The zoom that frames the span it opens to is one point: the span (px) a zoom gives grows with it, so
+    // g(z) = log(the zoom framing the span at z) - z falls through 0 there, once.)
+    const g = (z: number) => Math.log(settleAt(Math.exp(z)).sx) - z;
     let lo = Math.log(cam.sx) - 1;
     let hi = Math.log(cam.sx) + 1;
-    for (let k = 0; k < 8 && settleAt(Math.exp(lo)).sx < Math.exp(lo); k++) lo -= 2;
-    for (let k = 0; k < 8 && settleAt(Math.exp(hi)).sx > Math.exp(hi); k++) hi += 2;
-    // (To a hair of the zoom; at the mammal level a ten-thousandth, each round ~6,000 strands refolded, ToLaD#255.)
+    let [glo, ghi] = [g(lo), g(hi)];
+    for (let k = 0; k < 8 && glo < 0; k++) glo = g((lo -= 2));
+    for (let k = 0; k < 8 && ghi > 0; k++) ghi = g((hi += 2));
+    // (To a hair of the zoom; at the mammal level a ten-thousandth, each round ~6,000 strands refolded, ToLaD#255: by
+    // false position, Illinois's (the end kept twice running weighed half), a handful of rounds, not a bisection's
+    // fifteen; each step at least half the tolerance inside the bracket, so it closes on both sides.)
     const tol = f.ordShare.length ? 1e-4 : 1e-7;
+    let side = 0;
     for (let k = 0; k < 40 && hi - lo > tol; k++) {
-      const m = (lo + hi) / 2;
-      if (settleAt(Math.exp(m)).sx > Math.exp(m)) lo = m;
-      else hi = m;
+      let m = glo > 0 && ghi <= 0 ? (lo * ghi - hi * glo) / (ghi - glo) : (lo + hi) / 2;
+      if (!(m > lo + tol / 2)) m = lo + tol / 2;
+      if (!(m < hi - tol / 2)) m = hi - tol / 2;
+      const gm = g(m);
+      if (gm > 0) {
+        [lo, glo] = [m, gm];
+        if (side > 0) ghi /= 2;
+        side = 1;
+      } else {
+        [hi, ghi] = [m, gm];
+        if (side < 0) glo /= 2;
+        side = -1;
+      }
     }
     cam = settleAt(Math.exp(lo));
   }
