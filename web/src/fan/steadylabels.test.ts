@@ -44,7 +44,11 @@ function stubView(clade: CladeRec = CARNIVORA, tree: Split = CARNIVORA_TREE, fol
     addEventListener: noop,
     removeEventListener: noop,
   };
-  return new FanView(canvas as unknown as HTMLCanvasElement, clade, tree, folds);
+  const v = new FanView(canvas as unknown as HTMLCanvasElement, clade, tree, folds);
+  // (The steady place is the named species' (#358); the middle of an item's branches (ToLaD#368, the default while Ita
+  // compares) jumps where the item splits, its branches being the cut's: that switch is off here.)
+  v.midLabels = false;
+  return v;
 }
 
 /** A label's place and size (screen), and the screen x of the columns it stands on (its anchor: groupCentre; NaN, a "+x"). */
