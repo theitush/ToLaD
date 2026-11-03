@@ -4,7 +4,7 @@
 // in far enough, a branch resolves into the individuals themselves (twigs.ts).
 // Gestures come from the shared engine/input.ts.
 
-import { drawPies, prefetchPics } from './wiki';
+import { drawPic, prefetchPics } from './wiki';
 import { PIC_D, PIC_LIFT, type PicSpot } from './pics';
 import { formatCount, formatMass } from '../data/count';
 import { stamp } from '../stamp';
@@ -142,7 +142,7 @@ export interface LabelSpot {
 export interface CutLabels {
   spots: LabelSpot[];
   groups: Map<string, FanBranch[][]>;
-  pics: (PicSpot & { lv: Level; face: FanBranch; pie?: FanBranch[]; run?: Run })[];
+  pics: (PicSpot & { lv: Level; face: FanBranch; run?: Run })[];
   /** The cut (tests read it), and per shown item its pill and picture (`spots[i]`, `pics[i]`: one label, ToLaD#358). */
   items: CutItem[];
   /** The whole cut meeting the screen, its labels shown or not (tapItem's next split counts its pieces on it). */
@@ -155,8 +155,6 @@ export interface ItemName {
   text: string;
   face: FanBranch;
   hid: FanBranch[][];
-  /** The label's picture slices (ToLaD#364): when it stands for more than one species, its 2-3 most populous living ones, its own face first. */
-  pie: FanBranch[];
 }
 
 /** The territories (cut.ts) with what the labels read off a cut item: its youngest tip, its name, the species its "+x" counts. */
@@ -233,17 +231,7 @@ class CutTerritories {
     const face = lv.b ?? groupFace(lv.v) ?? lv.v.strands[0];
     const hid: FanBranch[][] = [];
     for (let i = r.f; i <= r.l; i++) if (strands[i] !== lv.b) hid.push([strands[i]]);
-    const pie = [face];
-    if (hid.length) {
-      const more: FanBranch[] = [];
-      for (let i = r.f; i <= r.l; i++) {
-        const b = strands[i];
-        if (b !== face && !b.sp.extinct && b.pop.aliveAt(0) > 0) more.push(b);
-      }
-      more.sort((p, q) => q.pop.aliveAt(0) - p.pop.aliveAt(0));
-      pie.push(...more.slice(0, 2));
-    }
-    out = { lv, text: lv.b ? levelText(lv.b) : levelName(lv.v), face, hid, pie };
+    out = { lv, text: lv.b ? levelText(lv.b) : levelName(lv.v), face, hid };
     this.names.set(key, out);
     return out;
   }
@@ -2229,7 +2217,7 @@ export class FanView implements InputHandlers {
       if (lv.b) s.b = lv.b;
       else Object.assign(s, { v: lv.v, fam: lv.v });
       spots.push(s);
-      pics.push({ x, y: (disc[0] + disc[1]) / 2, d: PIC_D, i: pics.length, lv, face: name.face, pie: name.pie, run: [it.f, it.l] });
+      pics.push({ x, y: (disc[0] + disc[1]) / 2, d: PIC_D, i: pics.length, lv, face: name.face, run: [it.f, it.l] });
       shown.push(it);
     }
     if (!whole) this.picSpots = pics;
@@ -2742,13 +2730,7 @@ export class FanView implements InputHandlers {
   }
 
   /** This frame's pictures (cutLabels), each with the level or species it opens. */
-  picSpots: (PicSpot & { lv: Level; face: FanBranch; pie?: FanBranch[]; run?: Run })[] = [];
-  /** Whether a "+x" label's picture is split into its species' slices (ToLaD#364). */
-  splitPics = true;
-  setSplitPics(on: boolean): void {
-    this.splitPics = on;
-    this.request();
-  }
+  picSpots: (PicSpot & { lv: Level; face: FanBranch; run?: Run })[] = [];
 
   /** Draw this frame's pictures (cutLabels). Each a tap to its group. */
   private drawGroupPics(): void {
@@ -2761,9 +2743,8 @@ export class FanView implements InputHandlers {
     // (Hits: the one on top found first.)
     for (const p of [...this.picSpots].reverse()) this.thumbHits.push([p.x, p.y, p.d / 2, p.face, p.lv.v, p.run]);
     // (Its placeholder at once, the picture fading in when loaded; what a tap would show next fetched ahead, ToLaD#351.)
-    const slices = (p: (typeof this.picSpots)[number]) => (this.splitPics && p.pie && p.pie.length > 1 ? p.pie : [p.face]);
-    for (const p of this.picSpots) drawPies(ctx, slices(p).map((b) => b.sp.sci), p.x, p.y, p.d, () => this.request());
-    prefetchPics([...this.picSpots.flatMap((p) => slices(p).slice(1).map((b) => b.sp.sci)), ...this.picSpots.flatMap((p) => (p.lv.v ? nextFaces(this.fan, p.lv.v) : []))]);
+    for (const p of this.picSpots) drawPic(ctx, p.face.sp.sci, p.x, p.y, p.d, () => this.request());
+    prefetchPics(this.picSpots.flatMap((p) => (p.lv.v ? nextFaces(this.fan, p.lv.v) : [])));
     ctx.restore();
   }
 
