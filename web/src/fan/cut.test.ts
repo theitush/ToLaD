@@ -184,7 +184,6 @@ describe('cut: one cut through the tree (ToLaD#333)', () => {
             next = c.l + 1;
             if (c.fits) expect((c.x1 - c.x0) * sx).toBeGreaterThanOrEqual(px * (1 - REL));
             // (Only the root, before anything fits, can be an item that does not hold its box: a run rides with a fitting neighbour.)
-            if (cs.length > 1 && !c.fits) console.log('PROBE', level, px, z, c.head, c.parts.join(','), c.f, c.l, (c.x1 - c.x0) * sx);
             if (cs.length > 1) expect(c.fits).toBe(true);
           }
           expect(seen.every((k) => k === 1)).toBe(true);
