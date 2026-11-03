@@ -102,10 +102,13 @@ describe('labels from the cut (?labels=cut, ToLaD#333)', () => {
         const cut = shot(v);
         if (c === home) expect(cut.spots.length).toBeGreaterThan(0);
         check(cut, v.w);
-        // Each picture stands over the column of the species it shows at "now", its territory only bounding it: within
-        // half its width of it (the territory holds that column and the picture), where the screen leaves it room.
-        for (const p of cut.pics) {
-          const c = v.toScreen(groupCentre({ b: p.face }), 0)[0];
+        // Each picture stands over the column of the species it shows at "now", a "+x"'s over the middle of its
+        // branches at its foot (ToLaD#368), its territory only bounding it: within half its width of it (the territory
+        // holds that column and the picture), where the screen leaves it room.
+        for (let i = 0; i < cut.pics.length; i++) {
+          const p = cut.pics[i];
+          const o = cut.spots[i].over;
+          const c = o ? (o[0] + o[1]) / 2 : v.toScreen(groupCentre({ b: p.face }), 0)[0];
           if (c >= 72 + p.d / 2 && c <= v.w - p.d / 2) expect([p.face.sp.common, Math.abs(p.x - c) <= p.d / 2 + 1e-6]).toEqual([p.face.sp.common, true]);
         }
         seen.push(sig(cut));
