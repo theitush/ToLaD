@@ -75,6 +75,8 @@ export class Territories {
   /** Prefix sums of the rooms (PR[i]: strands before i). */
   private readonly PR: Float64Array;
   private readonly fits = new Map<number, { node: Float64Array; strand: Float64Array }>();
+  /** The last cut's daughters' territories (world x, over their rows) as its walk tried them (rooms by life). */
+  terr = new Map<number, [number, number]>();
 
   constructor(
     readonly fan: Fan,
@@ -277,7 +279,7 @@ export class Territories {
     const fit = (x0: number, x1: number) => sx * (x1 - x0) >= px * (1 - 1e-9);
     // (Whether each daughter fits, as the walk meets it, by its key; under rooms by life, her territory over her rows.)
     const got = new Map<number, boolean>();
-    const terr = new Map<number, [number, number]>();
+    const terr = (this.terr = new Map<number, [number, number]>());
     const ok = (k: number): boolean => {
       let o = got.get(k);
       if (o === undefined) {

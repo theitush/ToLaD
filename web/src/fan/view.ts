@@ -1794,17 +1794,37 @@ export class FanView implements InputHandlers {
       go(cam, () => this.runFrame(f, l, v.y, v, top), v);
       return;
     }
-    // (Its next split: the least zoom past its frame's where the cut makes it more than one item.)
-    const pieces = (z: number) => this.piecesAt(f, l, v, z);
-    let [a, b] = [Math.log(cam.sx), Math.log(cam.sx) + 1];
-    for (let k = 0; k < 60 && pieces(Math.exp(b)).length < 2; k++) [a, b] = [b, b + 1];
-    for (let k = 0; k < 40 && b - a > 1e-4; k++) {
-      const m = (a + b) / 2;
-      if (pieces(Math.exp(m)).length < 2) a = m;
-      else b = m;
+    // (Its next split (its active range's end): the least rung of the cut's ladder (LADDER) past its frame's zoom where
+    // the cut makes it two or more items, each rung tried a cut of the item alone (piecesAt: its own nodes and a path
+    // down to them, never the tree). The cut only splits items as the zoom grows, so it is a search on a bracket, a
+    // rung known whole (a) and one known split (b). Each rung found whole says where it surely splits: a territory on
+    // screen only widens with the zoom (a daughter whose territory is w world wide holds the label by zoom PIC_D / w),
+    // and the item splits once a sister riding with it fits or two of its head's daughters do. That rung tried, then the
+    // one under it: two cuts where the guess is tight; a gallop up and a bisection back where it is not.)
+    const kMax = Math.floor(Math.log2(cam.sx) * LADDER) + 64 * LADDER;
+    let [a, b, dk, g, tight] = [kMax - 64 * LADDER, kMax + 1, 1, Infinity, false];
+    const splits = (k: number): boolean => {
+      const P = this.piecesAt(f, l, v, Math.pow(2, k / LADDER));
+      if (P.length !== 1) return P.length > 1;
+      const it = P[0];
+      const at = (q: number) => {
+        const t = T.terr.get(q);
+        return t && t[1] > t[0] ? PIC_D / (t[1] - t[0]) : Infinity;
+      };
+      const kids = it.head >= 0 ? Array.from(T.kids[it.head], at).sort((p, q) => p - q) : [];
+      g = Math.ceil(Math.log2(Math.min(kids[1] ?? Infinity, ...it.parts.filter((q) => q !== it.head).map(at))) * LADDER);
+      return false;
+    };
+    while (b - a > 1) {
+      let m: number;
+      if (tight) m = b - 1;
+      else if (g > a && g < b) m = g;
+      else if (b > kMax) [m, dk] = [Math.min(kMax, a + dk), dk * 2];
+      else m = (a + b) >> 1;
+      if (splits(m)) [b, tight] = [m, m === g && !tight];
+      else [a, tight] = [m, false];
     }
-    const P = pieces(Math.exp(b));
-    if (P.length < 2) {
+    if (b > kMax) {
       // (No zoom splits it (a fossil too short-lived for a label of its own beside its sister): the species that never
       // gets one, its least populous (its name is its most populous's), landed on.)
       keep?.();
@@ -1817,10 +1837,10 @@ export class FanView implements InputHandlers {
     // (Its pieces there framed: a piece's label shows where its territory's part on screen holds it (cutLabels), so
     // the screen's span L..L + W shows piece [x0, x1] when x0 + d - W <= L <= x1 - d. The most pieces (then species)
     // some L shows, at the middle of the L's that show them all: where the void between their territories is wider
-    // than the screen, as much of the item a step finer as one screen holds. At the split rounded up to the cut's
-    // resolution (LADDER): at the split itself a piece just holds its label, and the landing's cut can lose it.)
-    const zs = Math.exp(b) * Math.pow(2, 1 / LADDER);
-    const Q = pieces(zs);
+    // than the screen, as much of the item a step finer as one screen holds. One rung past the split: at the split
+    // itself a piece just holds its label, and the landing's cut can lose it.)
+    const zs = Math.pow(2, (b + 1) / LADDER);
+    const Q = this.piecesAt(f, l, v, zs);
     const W = (this.w - LABEL_AXIS_X) / zs;
     const d = PIC_D / zs;
     let [lo, hi, best, most] = [0, 0, 0, 0];
@@ -1841,17 +1861,18 @@ export class FanView implements InputHandlers {
   }
 
   /**
-   * The labels camera `cam` would show (cutLabels; `whole`: the whole cut, not only the screen's), measured as its
+   * The labels camera `cam` would show (cutLabels; `whole`: the whole cut, not only the screen's, or with `win` only
+   * what meets world x win[0]..win[1]), measured as its
    * landing draws them: the fold at its zoom and on its rows' grid (foldTo; the territories over rows are the
    * grid's), the fold's grid and the view put back after, its zoom left at cam's.
    */
-  private labelsAt(cam: Camera, whole = false): CutLabels {
+  private labelsAt(cam: Camera, whole = false, win?: [number, number]): CutLabels {
     const [keep, pics] = [this.cam, this.picSpots];
     const fold = this.fan.tess.fold;
     const grid = fold?.gridH;
     this.cam = cam;
     if (fold) this.foldTo(fold);
-    const c = this.cutLabels(this.territories(), this.labelTop(), whole);
+    const c = this.cutLabels(this.territories(), this.labelTop(), whole, win);
     if (fold && grid !== undefined) fold.setGrid(grid);
     [this.cam, this.picSpots] = [keep, pics];
     return c;
@@ -1859,14 +1880,20 @@ export class FanView implements InputHandlers {
 
   /** The cut items strands f..l make at zoom `z` (the whole cut, not only the screen's; the fold left at z), left to right. */
   private piecesAt(f: number, l: number, v: FanNode, z: number): CutItem[] {
-    return this.labelsAt(this.labelsFrame(f, l, v, z, 0), true).all.filter((it) => it.l >= f && it.f <= l);
+    const cam = this.labelsFrame(f, l, v, z, 0);
+    // (The cut over the item's own territory only (its pieces' are inside it): what the whole cut makes of it, at the
+    // cost of its own nodes and a path down to them, Territories.cut.)
+    return this.labelsAt(cam, true, this.runSpan(f, l, [0, 0])).all.filter((it) => it.l >= f && it.f <= l);
   }
 
   /** Strands f..l at width zoom `z`, world x `mid` at the middle of the labels' width (LABEL_AXIS_X to the edge), from where they meet in clade v to "now". */
   private labelsFrame(f: number, l: number, v: FanNode, z: number, mid: number): Camera {
     this.fan.tess.fold?.setScale(z, this.w);
     const [a, b] = this.runSpan(f, l, [0, 0]);
-    return this.withBand({ ...this.camera.frame(a, b, v.y, true), sx: z, cx: mid - LABEL_AXIS_X / 2 / z }, v, this.yNow);
+    // (Its band in time as at the middle of its territory, wherever `mid` puts it: the labels' rows, and so their
+    // territories and the cut, are the same at every mid, so its pieces measured at one are its landing's at another.)
+    const cam = this.withBand({ ...this.camera.frame(a, b, v.y, true), sx: z, cx: (a + b) / 2 - LABEL_AXIS_X / 2 / z }, v, this.yNow);
+    return { ...cam, cx: mid - LABEL_AXIS_X / 2 / z };
   }
 
   /** How many labels camera `cam` shows for strands f..l (the cut there, on screen; the fold at cam's zoom). */
@@ -2124,15 +2151,15 @@ export class FanView implements InputHandlers {
    * no photo), its "+x" the item's other species. Shown whole, picture and name together, or not at all. `whole`: over
    * the whole tree, nothing culled for the screen (tests).
    */
-  private cutLabels(T: CutTerritories, top: number, whole = false): CutLabels {
+  private cutLabels(T: CutTerritories, top: number, whole = false, win?: [number, number]): CutLabels {
     const half = LABEL_PILL / 2;
     const X = (x: number) => this.toScreen(x, 0)[0];
     const Y = (y: number) => this.toScreen(0, y)[1];
     const Wy = (y: number) => this.toWorld(0, y)[1];
     const left = whole ? -Infinity : LABEL_AXIS_X;
     const right = whole ? Infinity : this.w;
-    const vx0 = whole ? -Infinity : this.toWorld(left, 0)[0];
-    const vx1 = whole ? Infinity : this.toWorld(right, 0)[0];
+    const vx0 = win ? win[0] : whole ? -Infinity : this.toWorld(left, 0)[0];
+    const vx1 = win ? win[1] : whole ? Infinity : this.toWorld(right, 0)[0];
     const sx = this.cam.sx;
     const spots: LabelSpot[] = [];
     const pics: CutLabels['pics'] = [];
