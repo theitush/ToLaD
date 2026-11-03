@@ -253,7 +253,7 @@ function levelsOnTheWay(v: FanView, step: number, at: (v: FanView) => void): voi
   }
 }
 
-describe('a level of two or three groups is framed centred, in the middle of the screen (ToLaD#262)', () => {
+describe('a level of two or three groups is framed in the labels\' width (ToLaD#262, #359)', () => {
   for (const [name, mk] of FANS) {
     it(name, () => {
       const v = mk();
@@ -263,13 +263,12 @@ describe('a level of two or three groups is framed centred, in the middle of the
         const lv = v.levelNow();
         if (lv.b || !lv.v.parent || nextLevels(v.fan, lv.v).length > 3) return;
         seen++;
-        // Its columns at "now": their middle at the middle of the room right of the time axis, within 16 px, and
-        // not spread past the middle 70 % of the screen.
+        // Its columns at "now" inside the room levels are framed in (ToLaD#333: the labels' width, LABEL_AXIS_X to the
+        // screen's edge, as cutframe.test). (Since ToLaD#359's one frame a level's
+        // frame is its territory filling that room, not its columns at "now" centred in the middle 70 % (FEW_FILL's, deleted): a
+        // territory, rooms by life at every time, need not be centred on the living columns (the cats 16 px, big cats 20).)
         const [lo, hi] = nowExtent(v, lv.v.strands);
-        // (The room levels are framed in, ToLaD#333: the labels' width, LABEL_AXIS_X to the screen's edge, as cutframe.test.)
-        const mid = (72 + v.w) / 2;
-        if (Math.abs((lo + hi) / 2 - mid) > 16) bad.push(`${nameOf(lv)}: centred ${((lo + hi) / 2 - mid).toFixed(0)} px off`);
-        if (hi - lo > 0.7 * v.w) bad.push(`${nameOf(lv)}: ${(hi - lo).toFixed(0)} px across`);
+        if (lo < 72 - 0.5 || hi > v.w + 0.5) bad.push(`${nameOf(lv)}: its columns at ${lo.toFixed(0)}..${hi.toFixed(0)} px`);
       });
       expect(bad).toEqual([]);
       expect(seen).toBeGreaterThan(0);
@@ -377,7 +376,11 @@ describe('a double tap goes up to the parent level, not back (ToLaD#271)', () =>
       expect(bad).toEqual([]);
     });
 
-    it(`${name}: after a "+x", the level above the one shown, never back`, () => {
+    // (Since ToLaD#359 a "+x" is a tap into the cut item it counts, often part of a clade (its next split): a double
+    // tap goes out one step, to the frame that tap was made at, never deeper (as the item's own clade, or the level
+    // over it, both inside the level the tap came from); ToLaD#301's "the level above the one shown" was that frame
+    // while a "+x" flew to a level.)
+    it(`${name}: after a "+x", back out to the frame it was tapped at`, () => {
       const v = mk();
       const bad: string[] = [];
       let tried = 0;
@@ -390,14 +393,13 @@ describe('a double tap goes up to the parent level, not back (ToLaD#271)', () =>
         const cam = { ...v.cam };
         v.tap((h.box[0] + h.box[2]) / 2, (h.box[1] + h.box[3]) / 2);
         run(v);
-        // (ToLaD#301: up from the level the view is at, never back to its own frame, the one the "+x" was tapped at.)
         const from = v.levelNow(true);
-        const want = wantUp(v, from);
+        // (One species: its landing and card, a level's: up from it, ToLaD#301.)
+        const want = from.b ? wantUp(v, from) : null;
         v.doubleTap(-1e4, -1e4);
         run(v);
         const now = v.levelNow();
-        if (want ? now.v !== want || !atFrame(v, now) : P(v).anim) bad.push(`${at}: a "+x" of ${h.bs.length} then a double tap went to ${nameOf(now)}, not ${want ? levelName(want) : 'nowhere'}`);
-        if (want && atFrame(v, from)) bad.push(`${at}: a "+x" of ${h.bs.length} then a double tap went back to ${nameOf(from)}`);
+        if (want ? now.v !== want || !atFrame(v, now) : P(v).offBy(cam, v.cam) > 2) bad.push(`${at}: a "+x" of ${h.bs.length} then a double tap went to ${nameOf(now)}, not ${want ? levelName(want) : at}`);
         v.cam = cam;
         v.camera.settle();
         P(v).applyFold();
