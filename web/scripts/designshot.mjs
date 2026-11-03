@@ -18,6 +18,11 @@ mkdirSync(OUT, { recursive: true });
 const scenes = [
   ['home', 'home'],
   ['far', 'far'],
+  ['item-dogs', 'tapitem', ['Dogs']],
+  ['item-weasels', 'tapitem', ['Weasels']],
+  ['item-laurasiatheria', 'tapitem', ['Laurasiatheria']],
+  ['item-cats', 'tapitem', ['Cats']],
+  ['item-cats-wild', 'tapitem', ['Cats', 'Wildcats']],
   ['bar-5e4', 'bar', ['Lion', 3000, 5e4, 40]],
   ['bar-1e3', 'bar', ['Lion', 3000, 1e3, 40]],
   ['bar-100', 'bar', ['Lion', 3000, 100, 40]],
@@ -526,6 +531,23 @@ try {
             f.applyFold();
           }
           f.labelState.clear();
+          f.draw();
+        } else if (kind === 'tapitem') {
+          // ToLaD#359: from home, a tap on the label (picture) of each cut item named in args, each flight landed.
+          f.cam = f.homeCamera();
+          f.camera.settle();
+          f.draw();
+          for (const name of args) {
+            const i = f.cutLast.spots.findIndex((q) => q.text === name);
+            const p = f.cutLast.pics[i];
+            console.log(`tapitem ${name}: ${p ? `at ${p.x.toFixed(0)},${p.y.toFixed(0)}` : `none (${f.cutLast.spots.map((q) => q.text).join(', ')})`}`);
+            if (p) f.tap(p.x, p.y);
+            for (let t = performance.now() + 16; f.anim; t += 16) {
+              if (!f.anim(t)) f.anim = null;
+              f.applyFold();
+            }
+            f.draw();
+          }
           f.draw();
         } else if (kind === 'taps') {
           // ToLaD#258: from home, a tap ('t') on the column of args[0] (a species, or a group by its name: its widest

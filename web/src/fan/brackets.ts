@@ -733,8 +733,6 @@ export const PIN_PAD = 6;
 
 /** Room (px) kept for the species' pills between the stack's foot and "now". */
 export const PILL_ROOM = 96;
-/** How much of the screen's width a tapped clade takes (centred in the room right of the time axis, margins both sides). */
-export const TAP_FILL = 0.72;
 
 /**
  * Where placed bracket `p`'s label (centred at screen x, within [lo, hi]) goes on line y clear of the pills: its own
@@ -755,47 +753,6 @@ export function clearSpot(p: Placed, lo: number, hi: number, y: number, pills: r
   }
   return best;
 }
-
-/**
- * Where a tap on a clade's bracket lands (ToLaD#193): the clade (`span` its world x at "now") across the screen and
- * centred, its columns opened as that zoom opens them (the layout left at the frame's zoom for the camera taking it), and its time from "now" at the top down to where its branch started (its stem: its split
- * from its sister, `v.yBot`), a little of the parent below it. `band` makes room above "now" for the brackets.
- */
-export function cladeCamera(
-  c: { frame(x0: number, x1: number, yFork: number, stretch?: boolean): Camera; w: number },
-  fan: Fan,
-  v: FanNode,
-  span: (v: FanNode) => [number, number],
-  band: (cam: Camera) => Camera = (cam) => cam,
-): Camera {
-  // (Framed a little wider than the clade: it takes TAP_FILL of the screen, room left either side.)
-  const room = c.w - 72;
-  const frame = () => {
-    const [a, b] = span(v);
-    const m = (a + b) / 2;
-    const h = ((b - a) / 2) * Math.max(1, room / (TAP_FILL * c.w));
-    return band(c.frame(m - h, m + h, v.yBot, true));
-  };
-  // (The mammal level: each clade's frame kept for the screen's size, the fold put where it leaves it. A level's
-  // ladder (ToLaD#258) asks a few each time the view comes to rest, each ~100 refolds of ~6,000 strands, ToLaD#255.)
-  const f = fan.tess.fold;
-  if (!f?.ordShare.length) return foldedFrame(fan, c.w, frame);
-  const key = `${c.w}x${(c as { h?: number }).h ?? 0}`;
-  let m = frameCache.get(fan);
-  if (!m) frameCache.set(fan, (m = new Map()));
-  let byV = m.get(key);
-  if (!byV) m.set(key, (byV = new Map()));
-  const hit = byV.get(v);
-  if (hit) {
-    f.setScale(hit.sx, c.w);
-    return { ...hit };
-  }
-  const cam = foldedFrame(fan, c.w, frame);
-  byV.set(v, { ...cam });
-  return cam;
-}
-/** cladeCamera's frames at the mammal level, per fan, screen size and clade. */
-const frameCache = new WeakMap<Fan, Map<string, Map<FanNode, Camera>>>();
 
 /**
  * The frame a flight lands on, laid out (steady.ts) or not: `frame` frames what it shows as the layout stands now (a

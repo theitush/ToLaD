@@ -134,7 +134,7 @@ describe('?frame=cut: a "+x" tap flies to its group, its species across the scre
         settle(v);
       };
       land();
-      for (const h of v.plusHits.map((p) => ({ badge: [...p.badge], bs: [...p.bs] }))) {
+      for (const h of v.plusHits.map((p) => ({ badge: [...p.badge], bs: [...p.bs], run: p.run }))) {
         if (h.bs.length < 2) continue;
         land();
         v.tap((h.badge[0] + h.badge[2]) / 2, (h.badge[1] + h.badge[3]) / 2);
@@ -144,9 +144,13 @@ describe('?frame=cut: a "+x" tap flies to its group, its species across the scre
         }
         run(v);
         taps++;
+        // (Into its item (ToLaD#359, tapItem): its species across the screen, or, where that frame does not split it, its
+        // next split, two or more of its labels on screen.)
         const ix = h.bs.map((b) => b.index);
-        const [a, b] = onScreen(v, Math.min(...ix), Math.max(...ix));
-        if (a < 72 - 0.5 || b > v.w + 0.5) bad.push(`${at}: +${h.bs.length} landed with its species at ${a.toFixed(1)}–${b.toFixed(1)}`);
+        const [lo, hi] = h.run ?? [Math.min(...ix), Math.max(...ix)];
+        const [a, b] = onScreen(v, lo, hi);
+        const split = v.cutLast!.items.filter((it) => it.f >= lo && it.l <= hi).length;
+        if ((a < 72 - 0.5 || b > v.w + 0.5) && split < 2) bad.push(`${at}: +${h.bs.length} landed with its species at ${a.toFixed(1)}–${b.toFixed(1)}, ${split} of its labels`);
         bad.push(...cutOff(v, `${at} → +${h.bs.length}`));
       }
     }
