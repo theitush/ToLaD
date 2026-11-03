@@ -133,7 +133,10 @@ function run(v: FanView): void {
   settle(v);
 }
 
-describe('a "+x" tap: every group it stood for named and pictured (ToLaD#274)', () => {
+// (Since ToLaD#358 every label but a lone species' has a "+x" (its species but the one named), so a tap shows its species
+// split among labels that each count theirs again: what a "+x" tap owes is a step finer (ToLaD#359, tapItem), the item
+// it stands for as two or more labels on screen, every species of it still under one of them.)
+describe('a "+x" tap: the item it stands for a step finer, its species under two or more labels (ToLaD#274, #359)', () => {
   for (const [name, mk] of FANS.slice(0, 2)) {
     it(name, () => {
       const v = mk();
@@ -144,7 +147,7 @@ describe('a "+x" tap: every group it stood for named and pictured (ToLaD#274)', 
       for (const lv of levels) {
         land(v, lv);
         // (Its "+x" badge tapped: the name before it is the group's, a level deeper, ToLaD#258.)
-        const hits = v.plusHits.map((h) => ({ box: h.badge, bs: [...h.bs] }));
+        const hits = v.plusHits.map((h) => ({ box: h.badge, bs: [...h.bs], run: h.run }));
         for (const h of hits) {
           land(v, lv);
           const at = nameOf(v.levelNow(true));
@@ -156,12 +159,9 @@ describe('a "+x" tap: every group it stood for named and pictured (ToLaD#274)', 
           }
           taps++;
           run(v);
-          // (A living group's: an extinct one's name below its tip deep in the past may still hide, left over in ToLaD#274's result.)
-          // (Still hidden: a living species it stood for that a "+x" still counts, ToLaD#333.)
-          const still = h.bs.filter((b) => !b.sp.extinct && v.plusHits.some((q) => q.bs.includes(b)));
-          // (More than the screen has names for side by side, as the dogs' 18 species (no named groups inside the dogs):
-          // fewer hidden, each with its own "+x" again, #197. Left over in ToLaD#274's result.)
-          if (stood.length <= 5 ? still.length : still.length >= stood.length) bad.push(`${at}: +${stood.length} landed at ${nameOf(v.levelNow())}, still hidden: ${still.map((b) => b.sp.common).join(', ')}`);
+          const [f, l] = h.run ?? [Math.min(...stood.map((b) => b.index)), Math.max(...stood.map((b) => b.index))];
+          const its = v.cutLast!.items.filter((it) => it.l >= f && it.f <= l);
+          if (its.length < 2 || its.some((it) => it.f < f || it.l > l)) bad.push(`${at}: +${stood.length} landed at ${nameOf(v.levelNow())}, its item ${f}-${l} under ${its.map((it) => `${it.f}-${it.l}`).join(', ') || 'no label'}`);
         }
       }
       (globalThis as unknown as { process: { stderr: { write(s: string): void } } }).process.stderr.write(`${name}: ${taps} +x taps\n${bad.join('\n')}\n`);
@@ -193,8 +193,11 @@ describe('the hominins are one group (ToLaD#289)', () => {
   }, 400000);
 });
 
-describe('a one-species "+x" lands on the species it stands for (ToLaD#318)', () => {
-  it('carnivores (folded): every level, every "+x" standing for one species: it on screen, its name shown, its card open', () => {
+// (A "+1" stands for an item of two species (ToLaD#358): its tap goes into the item (ToLaD#359), both named; the card
+// opens on a tap on one species' own label. An item no zoom splits (a fossil too short-lived for a label of its own
+// beside its sister) lands on that species, its card open.)
+describe('a one-species "+x" lands with the species it stands for named (ToLaD#318, #359)', () => {
+  it('carnivores (folded): every level, every "+x" standing for one species: it on screen, its name shown or its card open', () => {
     const v = stubView();
     const bad: string[] = [];
     let taps = 0;
@@ -216,7 +219,7 @@ describe('a one-species "+x" lands on the species it stands for (ToLaD#318)', ()
         run(v);
         const x = v.toScreen(groupCentre({ b }), 0)[0];
         const pill = v.nameHits.find((n) => n.b === b);
-        if (!(x >= 0 && x <= v.w) || !pill || selected !== b.sp.common) bad.push(`${nameOf(lv)}: +1 (${b.sp.common}) landed at x ${x.toFixed(0)}, ${pill ? 'named' : 'no name'}, card ${selected}`);
+        if (!(x >= 0 && x <= v.w) || (!pill && selected !== b.sp.common)) bad.push(`${nameOf(lv)}: +1 (${b.sp.common}) landed at x ${x.toFixed(0)}, ${pill ? 'named' : 'no name'}, card ${selected}`);
       }
     }
     expect(taps).toBeGreaterThan(10);

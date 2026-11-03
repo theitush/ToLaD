@@ -1775,7 +1775,13 @@ export class FanView implements InputHandlers {
     }
     const P = pieces(Math.exp(b));
     if (P.length < 2) {
+      // (No zoom splits it (a fossil too short-lived for a label of its own beside its sister): the species that never
+      // gets one, its least populous (its name is its most populous's), landed on.)
       keep?.();
+      let nb = f;
+      for (let i = f; i <= l; i++) if (groupAlive({ b: T.strands[i] }) < groupAlive({ b: T.strands[nb] })) nb = i;
+      const sp = T.strands[nb];
+      this.goLevel({ b: sp }, this.frameOf({ b: sp }));
       return;
     }
     // (Its widest piece there, and the side with more species.)

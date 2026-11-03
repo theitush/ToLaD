@@ -21,6 +21,8 @@ const scenes = [
   ['item-dogs', 'tapitem', ['Dogs']],
   ['item-weasels', 'tapitem', ['Weasels']],
   ['item-laurasiatheria', 'tapitem', ['Laurasiatheria']],
+  ['item-cats', 'tapitem', ['Cats']],
+  ['item-cats-wild', 'tapitem', ['Cats', 'Wildcats']],
   ['bar-5e4', 'bar', ['Lion', 3000, 5e4, 40]],
   ['bar-1e3', 'bar', ['Lion', 3000, 1e3, 40]],
   ['bar-100', 'bar', ['Lion', 3000, 100, 40]],
