@@ -201,38 +201,72 @@ export function prefetchPics(scis: readonly (string | null | undefined)[]): void
  * asked for the fade's frames, then never again). A picture that fails stays a placeholder. `L` for tests.
  */
 export function drawPic(ctx: CanvasRenderingContext2D, sci: string, cx: number, cy: number, d: number, request: () => void, L = picLoader()): void {
-  const url = thumbsOn ? wikiOf(sci)?.img : undefined;
-  if (url && L) {
-    L.onChange = request;
-    L.want(url);
-  }
-  const got = url && L ? L.ready(url) : null;
+  drawPies(ctx, [sci], cx, cy, d, request, L);
+}
+
+/**
+ * A disc split into equal slices (ToLaD#364), one species' picture each, cropped to its wedge, a thin dark seam between;
+ * the first slice starts at the top, going clockwise. A slice without a picture is a placeholder wedge. One species is
+ * drawPic's whole disc. Same size and place as drawPic, whatever the number of slices.
+ */
+export function drawPies(ctx: CanvasRenderingContext2D, scis: readonly string[], cx: number, cy: number, d: number, request: () => void, L = picLoader()): void {
+  const n = scis.length;
   ctx.save();
   ctx.beginPath();
   ctx.arc(cx, cy, d / 2, 0, Math.PI * 2);
   ctx.fillStyle = 'rgba(12,23,20,0.8)';
   ctx.fill();
-  ctx.beginPath();
-  ctx.arc(cx, cy, d / 2 - 1.5, 0, Math.PI * 2);
-  if (!got || got.fade < 1) {
-    // The placeholder: a quiet fill and ring in the app's palette (INK3, #7d8e84).
-    ctx.fillStyle = 'rgba(125,142,132,0.16)';
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(125,142,132,0.55)';
-    ctx.lineWidth = 1;
+  const r = d / 2 - 1.5;
+  scis.forEach((sci, i) => {
+    const url = thumbsOn ? wikiOf(sci)?.img : undefined;
+    if (url && L) {
+      L.onChange = request;
+      L.want(url);
+    }
+    const got = url && L ? L.ready(url) : null;
+    ctx.save();
+    ctx.beginPath();
+    if (n > 1) {
+      const a0 = -Math.PI / 2 + (i * 2 * Math.PI) / n;
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, r, a0, a0 + (2 * Math.PI) / n);
+      ctx.closePath();
+    } else ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    if (!got || got.fade < 1) {
+      // The placeholder: a quiet fill and ring in the app's palette (INK3, #7d8e84).
+      ctx.fillStyle = 'rgba(125,142,132,0.16)';
+      ctx.fill();
+      if (n === 1) {
+        ctx.strokeStyle = 'rgba(125,142,132,0.55)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+      // (Plain: an initial was tried, ToLaD#351, but a group's face is one species, so its letter, the bats' "E", misleads.)
+    }
+    if (got) {
+      const { img, fade } = got;
+      const s = Math.min(img.naturalWidth, img.naturalHeight);
+      const sx = (img.naturalWidth - s) / 2;
+      // Portraits keep their top (heads), landscapes their centre.
+      const sy = img.naturalHeight > img.naturalWidth ? (img.naturalHeight - s) * 0.25 : (img.naturalHeight - s) / 2;
+      ctx.clip();
+      ctx.globalAlpha *= fade;
+      ctx.drawImage(img, sx, sy, s, s, cx - r, cy - r, 2 * r, 2 * r);
+      if (fade < 1) request();
+    }
+    ctx.restore();
+  });
+  if (n > 1) {
+    // The seams: a thin dark line from the middle to the rim at each wedge's start.
+    ctx.strokeStyle = 'rgba(12,23,20,0.95)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+      const a = -Math.PI / 2 + (i * 2 * Math.PI) / n;
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + r * Math.cos(a), cy + r * Math.sin(a));
+    }
     ctx.stroke();
-    // (Plain: an initial was tried, ToLaD#351, but a group's face is one species, so its letter, the bats' "E", misleads.)
-  }
-  if (got) {
-    const { img, fade } = got;
-    const s = Math.min(img.naturalWidth, img.naturalHeight);
-    const sx = (img.naturalWidth - s) / 2;
-    // Portraits keep their top (heads), landscapes their centre.
-    const sy = img.naturalHeight > img.naturalWidth ? (img.naturalHeight - s) * 0.25 : (img.naturalHeight - s) / 2;
-    ctx.clip();
-    ctx.globalAlpha *= fade;
-    ctx.drawImage(img, sx, sy, s, s, cx - d / 2 + 1.5, cy - d / 2 + 1.5, d - 3, d - 3);
-    if (fade < 1) request();
   }
   ctx.restore();
 }
