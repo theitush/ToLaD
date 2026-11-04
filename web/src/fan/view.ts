@@ -2358,7 +2358,7 @@ export class FanView implements InputHandlers {
       if (lod?.hidden(v)) continue;
       const ya = Math.max(v.y, wTop);
       // (Its peel no whole ribbon, ToLaD#377: the backdrop stops where its column does.)
-      const cutH = corners && v.parent && steady!.ribbon(v, this.cam.sx, this.cam.sy) < 1 ? steady!.forkH(v.parent) : 0;
+      const cutH = corners ? steady!.footCut(ni, this.cam.sx, this.cam.sy) : 0;
       const yb = Math.min(v.yBot - cutH, wBot);
       if (!(yb > ya)) continue;
       // Straight below its peel: one piece; the peel in chords.
@@ -2504,7 +2504,7 @@ export class FanView implements InputHandlers {
     if (pts.n < 2) return;
     const fo = this.fan.tess.fold;
     if (fo instanceof Steady && forkMode() === 'flat') {
-      fo.strandForks(b.index, this.cam.sx, this.cam.sy, this.forkCuts);
+      fo.strandForks(b.index, this.cam.sx, this.cam.sy, sTop, sBot, this.forkCuts);
       if (this.forkCuts.length) pts = this.cutForks(pts, (y) => leftAt(b, y) + hw);
     }
     // The column's styled spans on screen ([top, bottom, dim]), clipped to it: none for most strands.
@@ -2565,7 +2565,7 @@ export class FanView implements InputHandlers {
     if (y0 < k0 * H) push(k0, y0);
     if (pts.n < 2 || hi < -12 || lo > this.w + 12) return;
     if (f instanceof Steady && forkMode() === 'flat') {
-      f.nodeForks(v, this.cam.sx, this.cam.sy, this.forkCuts);
+      f.nodeForks(v, this.cam.sx, this.cam.sy, sTop, sBot, this.forkCuts);
       if (this.forkCuts.length) return this.drawLanes(this.cutForks(pts, (y) => f.left(i0, y)!), 0, NO_HELD);
     }
     this.drawLanes(pts, 0, NO_HELD);
@@ -2635,12 +2635,12 @@ export class FanView implements InputHandlers {
         this.ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
       }
     };
-    for (const v of this.fan.nodes) {
-      if (lod && (lod.hidden(v) || lod.isMerged(v))) continue;
+    const nodes = this.fan.nodes;
+    f.splitsOn(cam.worldY(-4), cam.worldY(this.h + 4), this.toWorld(-8, 0)[0], this.toWorld(this.w + 8, 0)[0], (j, top) => {
+      const v = nodes[j];
+      if (lod && (lod.hidden(v) || lod.isMerged(v))) return;
       const y0 = cam.screenY(v.y);
-      const top = v.y - f.forkH(v);
       const yt = cam.screenY(top);
-      if (y0 < -4 || yt > this.h + 4) continue;
       const pc = cam.screenX(f.corner(v, sx, sy, out));
       // (Gray first: where the lines overlap, the living's shows.)
       for (const live of [false, true]) {
@@ -2655,7 +2655,7 @@ export class FanView implements InputHandlers {
           rect(dc - 0.5, yt, dc + 0.5, y0, c);
         }
       }
-    }
+    });
   }
   private mergedExt: [number, number] = [0, 0];
   private lodTops = new WeakMap<FanNode, number>();

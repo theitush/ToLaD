@@ -437,44 +437,56 @@ export class Steady extends Fold {
     return this.cur().h[this.idx.get(v)!];
   }
 
-  /** Node v's peel's ribbon's share at this zoom (ribbonShare), 1 for the root, which has none. */
-  ribbon(v: FanNode, sx: number, sy: number): number {
-    const j = this.idx.get(v)!;
+  /** Node j's (fan.nodes' order) foot's height cut off at this zoom: its parent's fork if its peel is no whole ribbon (ribbonShare), else 0. */
+  footCut(j: number, sx: number, sy: number): number {
     const p = this.par[j];
-    if (p < 0) return 1;
+    if (p < 0) return 0;
     const L = this.cur();
     this.prep(L);
-    return ribbonShare(L.dl![j], L.h[p], sx, sy);
+    return ribbonShare(L.dl![j], L.h[p], sx, sy) < 1 ? L.h[p] : 0;
+  }
+
+  /** Each split whose fork and room meet the screen (world heights and x): ~13,000 nodes at the mammal level, most off it. */
+  splitsOn(yTop: number, yBot: number, x0: number, x1: number, visit: (j: number, top: number) => void): void {
+    const { h, roomL, roomW } = this.cur();
+    const nY = this.nY;
+    for (let j = 0; j < nY.length; j++) {
+      if (nY[j] < yTop || nY[j] - h[j] > yBot || roomL[j] > x1 || roomL[j] + roomW[j] < x0) continue;
+      visit(j, nY[j] - h[j]);
+    }
   }
 
   /**
    * The peels on the way up to node j that are not whole ribbons at this zoom, youngest first: out gets [top, bottom
    * (its split), ribbonShare] a peel (world y). A row of them for each column the draw cuts (view.ts cutForks).
    */
-  private forksUp(L: Lay, j: number, sx: number, sy: number, out: number[]): void {
+  private forksUp(L: Lay, j: number, sx: number, sy: number, yTop: number, yBot: number, out: number[]): void {
     for (let p = this.par[j]; p >= 0; j = p, p = this.par[j]) {
+      // (Only those on screen: up the tree the splits only get older, so past its bottom none is left.)
+      if (this.nY[p] - L.h[p] > yBot) break;
+      if (this.nY[p] < yTop) continue;
       const t = ribbonShare(L.dl![j], L.h[p], sx, sy);
       if (t < 1) out.push(this.nY[p] - L.h[p], this.nY[p], t);
     }
   }
 
   /** forksUp for strand i: its own peel, then its columns'. */
-  strandForks(i: number, sx: number, sy: number, out: number[]): void {
+  strandForks(i: number, sx: number, sy: number, yTop: number, yBot: number, out: number[]): void {
     const L = this.cur();
     this.prep(L);
     out.length = 0;
     const j = this.bNode[i];
     const t = ribbonShare(L.dc![i], L.h[j], sx, sy);
-    if (t < 1) out.push(this.sY[i] - L.h[j], this.sY[i], t);
-    this.forksUp(L, j, sx, sy, out);
+    if (t < 1 && this.sY[i] >= yTop && this.sY[i] - L.h[j] <= yBot) out.push(this.sY[i] - L.h[j], this.sY[i], t);
+    this.forksUp(L, j, sx, sy, yTop, yBot, out);
   }
 
   /** forksUp for node v's own peel and its ancestors' (a merged clade, one ribbon above its split). */
-  nodeForks(v: FanNode, sx: number, sy: number, out: number[]): void {
+  nodeForks(v: FanNode, sx: number, sy: number, yTop: number, yBot: number, out: number[]): void {
     const L = this.cur();
     this.prep(L);
     out.length = 0;
-    this.forksUp(L, this.idx.get(v)!, sx, sy, out);
+    this.forksUp(L, this.idx.get(v)!, sx, sy, yTop, yBot, out);
   }
 
   /** Node v's split, for its corners: its column's centre, and out gets per daughter (v.kids' order) [its column's centre, its ribbon's share]. */
