@@ -10,7 +10,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { CARNIVORA, FELIDAE, type CladeRec } from './panthera';
 import { CARNIVORA_TREE, FELIDAE_TREE, type Split } from './splits';
-import { FanView, type CutLabels } from './view';
+import { discSci, FanView, groupFace, groupPics, type CutLabels } from './view';
+import { hasPic } from './wiki';
 
 function stubView(clade: CladeRec, tree: Split): FanView {
   const noop = () => {};
@@ -62,6 +63,14 @@ function check(v: FanView, c: CutLabels, at: string, bad: string[]): void {
   for (const s of c.names) {
     for (const [n, b] of boxes) if (meets(s.box, b)) bad.push(`${at}: name ${s.text} meets ${n}`);
     boxes.push([`name ${s.text}`, s.box]);
+    // Its picture (ToLaD#400): a pill across, at the foot of its box, its pill above it, not over it.
+    const d = s.disc;
+    if (!d) bad.push(`${at}: name ${s.text} has no picture`);
+    else {
+      if (d.d !== s.box[2] - s.box[0]) bad.push(`${at}: ${s.text}'s disc is ${d.d} across`);
+      if (Math.abs(d.y + d.d / 2 - s.box[3]) > 1e-6) bad.push(`${at}: ${s.text}'s disc is not at its box's foot`);
+      if (s.y1 > d.y - d.d / 2 - 1e-6 || s.y1 <= s.box[1]) bad.push(`${at}: ${s.text}'s pill (foot ${s.y1}) is not above its disc`);
+    }
   }
   // Every species once: a picture's named species and "+x", each name's named species and "+x".
   const seen = new Map<number, string>();
@@ -175,6 +184,52 @@ describe.each(LEVELS)('names alone at %s (ToLaD#396)', (_name, clade, tree) => {
       expect(tapped).toBeGreaterThan(0);
       expect(stayed).toBeGreaterThan(0);
     }
+  });
+});
+
+describe.each(LEVELS)('every label has a picture at %s (ToLaD#400)', (_name, clade, tree) => {
+  it("a disc's tap is its pill's: into its own run", () => {
+    const v = stubView(clade, tree);
+    const home = v.homeCamera();
+    const P = v as unknown as { tapHere(x: number, y: number): void };
+    const bad: string[] = [];
+    for (let i = 0; i <= 80; i += 4) {
+      v.cam = { ...home, sx: home.sx * Math.pow(2, i / 8), sy: home.sy, ty: home.sy };
+      applyFold(v);
+      v.draw();
+      for (const s of v.cutLast!.names) {
+        if (s.fit <= 0.5) continue;
+        const spy = vi.spyOn(v, 'tapItem').mockImplementation(() => {});
+        P.tapHere(s.x, s.disc!.y);
+        if (spy.mock.calls.length !== 1 || spy.mock.calls[0][0] !== s.run![0] || spy.mock.calls[0][1] !== s.run![1]) bad.push(`tap on ${s.text}'s disc went to ${JSON.stringify(spy.mock.calls)}`);
+        spy.mockRestore();
+      }
+    }
+    expect(bad.slice(0, 12)).toEqual([]);
+  });
+
+  it("a disc draws its face's photo; a group with none, a relative's; a species or a group of nobody with a photo, its own stub", () => {
+    const v = stubView(clade, tree);
+    const bad: string[] = [];
+    let relatives = 0;
+    for (const u of v.fan.nodes) {
+      const face = groupFace(u);
+      if (!face) continue;
+      const scis = u.strands.map((b) => b.sp.sci);
+      const drawn = discSci({ v: u }, face);
+      if (hasPic(face.sp.sci)) {
+        if (drawn !== face.sp.sci) bad.push(`${u.name}: its face has a photo but it draws ${drawn}`);
+      } else if (scis.some(hasPic)) {
+        relatives++;
+        if (!hasPic(drawn) || !scis.includes(drawn)) bad.push(`${u.name}: draws ${drawn}, no relative with a photo`);
+        if (drawn !== groupPics(u)[0]) bad.push(`${u.name}: draws ${drawn}, not its first`);
+      } else if (drawn !== face.sp.sci) bad.push(`${u.name}: nobody has a photo but it draws ${drawn}`);
+      // The relatives' list is the group's once: a frame walks nothing.
+      if (groupPics(u) !== groupPics(u)) bad.push(`${u.name}: its list is not cached`);
+    }
+    for (const b of v.fan.branches) if (discSci({ b }, b) !== b.sp.sci) bad.push(`${b.sp.sci}: a species draws another's`);
+    expect(bad.slice(0, 12)).toEqual([]);
+    if (clade === CARNIVORA) expect(relatives).toBeGreaterThan(0);
   });
 });
 
