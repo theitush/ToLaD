@@ -2050,6 +2050,12 @@ export class FanView implements InputHandlers {
       return;
     }
     const brk = pinned || pill || pic ? null : this.brackets?.hit(x, y);
+    // A name at its fork (ToLaD#390): that clade's own frame, its fork over the scale bar, not a level on the way to it;
+    // framed already, it stays. (A flight that moves nothing is no step, tap().)
+    if (brk && forkNames()) {
+      this.goLevel({ v: brk.v }, this.frameOf({ v: brk.v }));
+      return;
+    }
     const to: Level | null = pinned ? { v: pinned.v } : pill?.v ? { v: pill.v } : pill?.b ? { b: pill.b } : pic ? (pic[4] ? { v: pic[4] } : { b: pic[3] }) : brk ? { v: brk.v } : null;
     if (to) {
       this.tapInto(to, false);

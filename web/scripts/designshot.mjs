@@ -252,6 +252,11 @@ const scenes = [
   ...[0, 360, 720, 1080, 1440, 1800].map((ms) => [`fly-out-${ms}`, 'flyout', ['Fisher', ms]]),
   // The groups the view is inside pinned at the top (ToLaD#233): home (nothing pinned, the stack itself), deep in a
   // bear's and a weasel's past ("now" far off the top), and (LEVEL=cats) the lion's past inside Panthera.
+  ['ftap-home', 'home'],
+  ['ftap-feliformia', 'tapfork', ['Feliformia']],
+  ['ftap-carnivora', 'tapfork', ['Carnivora']],
+  ['ftap-chiroptera', 'tapfork', ['Chiroptera']],
+  ['ftap-primates', 'tapfork', ['Primates']],
   ['pin-home', 'home'],
   ['pin-bear', 'frame', ['Brown bear', 4e5, 40]],
   ['pin-weasel', 'frame', ['Least weasel', 1.5e6, 20]],
@@ -548,6 +553,21 @@ try {
             }
             f.draw();
           }
+          f.draw();
+        } else if (kind === 'tapfork') {
+          // ToLaD#390: from home, a tap on the fork name of the clade named in args (its Latin), the flight landed.
+          f.cam = f.homeCamera();
+          f.camera.settle();
+          f.draw();
+          const br = f.brackets;
+          const n = Array.from({ length: br.forkN }, (_, k) => br.forks[k]).find((q) => br.list[q.i].latin === args[0]);
+          console.log(`tapfork ${args[0]}: ${n ? `at ${n.x.toFixed(0)},${n.y.toFixed(0)}` : 'none'}`);
+          if (n) f.tap(n.x, n.y);
+          for (let t = performance.now() + 16; f.anim; t += 16) {
+            if (!f.anim(t)) f.anim = null;
+            f.applyFold();
+          }
+          f.draw();
           f.draw();
         } else if (kind === 'taps') {
           // ToLaD#258: from home, a tap ('t') on the column of args[0] (a species, or a group by its name: its widest

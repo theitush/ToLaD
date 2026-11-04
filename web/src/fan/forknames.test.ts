@@ -3,11 +3,12 @@
 // its fork and moves rigidly with it; a tap on one is the tap on its bracket's name was; the pinned rows still come.
 import { describe, expect, it } from 'vitest';
 import { FORK_H, forkNames, setForkNames, type Brackets } from './brackets';
-import { CARNIVORA } from './panthera';
-import { CARNIVORA_TREE } from './splits';
-import { FanView, type CutLabels } from './view';
+import { nodeLeftAt, type FanNode } from './layout';
+import { CARNIVORA, FELIDAE, type CladeRec } from './panthera';
+import { CARNIVORA_TREE, FELIDAE_TREE, type Split } from './splits';
+import { FanView, type CutLabels, type Level } from './view';
 
-function stubView(): FanView {
+function stubView(clade: CladeRec = CARNIVORA, tree: Split = CARNIVORA_TREE): FanView {
   const noop = () => {};
   const g = globalThis as Record<string, unknown>;
   g.Path2D = class {
@@ -40,10 +41,19 @@ function stubView(): FanView {
     addEventListener: noop,
     removeEventListener: noop,
   };
-  return new FanView(canvas as unknown as HTMLCanvasElement, CARNIVORA, CARNIVORA_TREE, true);
+  return new FanView(canvas as unknown as HTMLCanvasElement, clade, tree, true);
 }
 
-type Inner = { brackets: Brackets; applyFold(): void; cutLast: CutLabels | null };
+type Inner = {
+  brackets: Brackets;
+  applyFold(): void;
+  cutLast: CutLabels | null;
+  anim: ((t: number) => boolean) | null;
+  steps: unknown[];
+  tapAt: unknown;
+  frameOf(lv: Level): { cx: number; cy: number; sx: number; sy: number; ty: number };
+  offBy(a: unknown, c: unknown): number;
+};
 const inner = (v: FanView) => v as unknown as Inner;
 const frame = (v: FanView) => {
   v.camera.settle();
@@ -150,5 +160,74 @@ describe('names at their forks (ToLaD#373)', () => {
     for (let k = 0; k < br.forkN; k++) expect(pinned.has(br.forks[k].i)).toBe(false);
     // (The pictures' tops clear the pinned rows: the band's row came down as far as their most.)
     for (const s of inner(v).cutLast!.spots) if (s.fit > 0.3) expect(s.box[1]).toBeGreaterThanOrEqual(br.pinTop + br.pinH() - 1);
+  });
+
+  // (ToLaD#390: the flights flown a frame each 16 ms, as the page; the names as drawn there.)
+  const land = (v: FanView) => {
+    const iv = inner(v);
+    for (let t = performance.now() + 16; iv.anim; t += 16) {
+      if (!iv.anim(t)) iv.anim = null;
+      iv.applyFold();
+    }
+    frame(v);
+    v.draw();
+  };
+  const atHome = (v: FanView) => {
+    const iv = inner(v);
+    iv.steps = [];
+    iv.tapAt = null;
+    v.cam = v.homeCamera();
+    frame(v);
+    v.draw();
+  };
+  const names = (v: FanView) => {
+    const br = inner(v).brackets;
+    return Array.from({ length: br.forkN }, (_, k) => br.forks[k]).map((f) => ({ x: f.x, y: f.y, v: br.list[f.i].v, latin: br.list[f.i].latin }));
+  };
+  const intoWeasels = (v: FanView) => {
+    atHome(v);
+    const cut = inner(v).cutLast!;
+    const p = cut.pics[cut.spots.findIndex((s) => s.text === 'Weasels')];
+    v.tap(p.x, p.y);
+    land(v);
+  };
+  const scenes: [string, () => FanView, (v: FanView) => void][] = [
+    ['carnivores home', () => stubView(), atHome],
+    ['cats home', () => stubView(FELIDAE, FELIDAE_TREE), atHome],
+    ['the weasels', () => stubView(), intoWeasels],
+  ];
+  it.each(scenes)('%s: a tap on each name lands on that clade, its fork on screen and its name there; a double tap comes back', (where, make, at) => {
+    const v = make();
+    const iv = inner(v);
+    const offFrame = (n: FanNode) => iv.offBy(iv.frameOf({ v: n }), v.cam);
+    at(v);
+    const all = names(v);
+    expect(all.length, where).toBeGreaterThanOrEqual(3);
+    for (const { latin, v: n } of all) {
+      at(v);
+      const start = { ...v.cam };
+      const q = names(v).find((f) => f.v === n)!;
+      v.tap(q.x, q.y);
+      land(v);
+      const what = `${where}: ${latin}`;
+      expect(offFrame(n), `${what}: its own frame`).toBeLessThanOrEqual(2);
+      expect(v.levelNow(true).v, `${what}: the level`).toBe(n);
+      const [fx, fy] = v.toScreen(nodeLeftAt(n, n.y) + n.width / 2, n.y);
+      expect(fy, `${what}: the fork over the scale bar`).toBeLessThan(iv.brackets.forkFoot);
+      expect(fy, `${what}: the fork on screen`).toBeGreaterThan(0);
+      expect(fx, `${what}: the fork on screen`).toBeGreaterThanOrEqual(0);
+      expect(fx, `${what}: the fork on screen`).toBeLessThanOrEqual(v.w);
+      expect(names(v).some((f) => f.v === n) || iv.brackets.pins.some((p) => iv.brackets.list[p.i].v === n), `${what}: its name there`).toBe(true);
+      // (A second tap: framed already, it stays, and is no step of its own.)
+      const again = names(v).find((f) => f.v === n);
+      if (again) {
+        v.tap(again.x, again.y);
+        land(v);
+        expect(offFrame(n), `${what}: a second tap stays`).toBeLessThanOrEqual(2);
+      }
+      v.doubleTap(0, 0);
+      land(v);
+      expect(iv.offBy(start, v.cam), `${what}: a double tap back`).toBeLessThanOrEqual(2);
+    }
   });
 });
