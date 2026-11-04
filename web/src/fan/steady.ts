@@ -716,9 +716,8 @@ export class Steady extends Fold {
     return out;
   }
 
-  /** The rows' arrays let go at a version change (sRows', cRows'), used again: no garbage a pinch frame (ToLaD#255). */
+  /** The rows' arrays let go at a version change (sRows'), used again: no garbage a pinch frame (ToLaD#255). */
   private readonly pool: Float64Array[] = [];
-  private readonly cPool: Float64Array[] = [];
   private release(m: Map<number, Float64Array>, pool: Float64Array[]): void {
     for (const r of m.values()) if (pool.length < 256) pool.push(r);
     m.clear();
@@ -727,17 +726,13 @@ export class Steady extends Fold {
   private rowsGen = 0;
   /**
    * A front cache before the rows' maps (by world y, a float key): per slot (k & 63) its k, grid, rows generation and
-   * row, rowXs' and centreSums' (and widthSums', by its own generation), ToLaD#255: a frame asks the same few rows
+   * row, rowXs' (and widthSums', by its own generation), ToLaD#255: a frame asks the same few rows
    * thousands of times (xTable, every merged clade's extent).
    */
   private readonly fK = new Float64Array(64).fill(NaN);
   private readonly fH = new Float64Array(64);
   private readonly fG = new Int32Array(64).fill(-1);
   private readonly fR: (Float64Array | undefined)[] = new Array(64);
-  private readonly cK = new Float64Array(64).fill(NaN);
-  private readonly cH = new Float64Array(64);
-  private readonly cG = new Int32Array(64).fill(-1);
-  private readonly cR: (Float64Array | undefined)[] = new Array(64);
   private readonly wK = new Float64Array(64).fill(NaN);
   private readonly wH = new Float64Array(64);
   private readonly wG = new Int32Array(64).fill(-1);
@@ -748,7 +743,6 @@ export class Steady extends Fold {
   private fresh(L: Lay): void {
     if (this.rowsVer !== L.ver || this.sRows.size >= this.rowCap()) {
       this.release(this.sRows, this.pool);
-      this.release(this.cRows, this.cPool);
       this.rowsVer = L.ver;
       this.rowsGen++;
     }
@@ -780,14 +774,25 @@ export class Steady extends Fold {
    * empty space), centred on their founders' mean centre (constant between the clade's splits).
    */
   override extent(i0: number, i1: number, k: number, out: [number, number] = [0, 0]): [number, number] {
-    const [cW, cB] = this.widthSums(k);
-    const cX = this.centreSums(k);
-    const W = cW[i1 + 1] - cW[i0];
-    const sw = cB[i1 + 1] - cB[i0];
+    // (The hull of its strands where they stand, gaps and all (ToLaD#389): their widths summed about their middle leave
+    // strands outside it now the gaps stay open, and a wide own column need not stand between its neighbours.)
+    const [cW] = this.widthSums(k);
     const xs = this.rowXs(k);
-    const c = sw > 0 ? (cX[i1 + 1] - cX[i0]) / sw : (xs[i0] + xs[i1]) / 2;
-    out[0] = c - W / 2;
-    out[1] = c + W / 2;
+    const y = k * this.gridH;
+    const sY = this.sY;
+    let L = Infinity;
+    let R = -Infinity;
+    for (let i = i0; i <= i1; i++) {
+      const w = cW[i + 1] - cW[i];
+      if (!(w > 0)) continue;
+      // (rowXs: a left edge, or an own column's centre.)
+      const l = y < sY[i] ? xs[i] - w / 2 : xs[i];
+      if (l < L) L = l;
+      if (l + w > R) R = l + w;
+    }
+    if (L > R) L = R = (xs[i0] + xs[i1]) / 2;
+    out[0] = L;
+    out[1] = R;
     return out;
   }
 
@@ -827,35 +832,6 @@ export class Steady extends Fold {
     return 4096;
   }
 
-  /** Grid row k's live strands' founders-weighted centres summed along the drawn order (rowXs' version). */
-  private centreSums(k: number): Float64Array {
-    const xs = this.rowXs(k);
-    const c = k & 63;
-    if (this.cK[c] === k && this.cH[c] === this.gridH && this.cG[c] === this.rowsGen) return this.cR[c]!;
-    const y = k * this.gridH;
-    let r = this.cRows.get(y);
-    if (!r) {
-      if (this.cRows.size >= this.rowCap()) {
-        // (Its arrays pooled: the front caches' entries from before stale.)
-        this.release(this.cRows, this.cPool);
-        this.rowsGen++;
-      }
-      const [, cB] = this.widthSums(k);
-      r = this.cPool.pop() ?? new Float64Array(xs.length + 1);
-      r[0] = 0;
-      for (let i = 0; i < xs.length; i++) {
-        const w = cB[i + 1] - cB[i];
-        r[i + 1] = r[i] + (w > 0 ? w * (y < this.sY[i] ? xs[i] : xs[i] + w / 2) : 0);
-      }
-      this.cRows.set(y, r);
-    }
-    this.cK[c] = k;
-    this.cH[c] = this.gridH;
-    this.cG[c] = this.rowsGen;
-    this.cR[c] = r;
-    return r;
-  }
-  private readonly cRows = new Map<number, Float64Array>();
 
   override setScale(sx: number, screenW: number): boolean {
     if (sx === this.sx && screenW === this.screenW) return false;
