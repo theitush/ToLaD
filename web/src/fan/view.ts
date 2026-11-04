@@ -2174,6 +2174,8 @@ export class FanView implements InputHandlers {
     const row = this.heldRow();
     const cut = (this.cutLast = this.cutLabels(T, row));
     this.rowLast = row;
+    // (The names at their forks clear of the labels and the axis's labels as last drawn; its origin note reaches past the gutter.)
+    if (br && forkNames()) br.placeForks([...cut.spots.filter((s) => s.fit > 0.3).map((s) => s.box), ...cut.pics.map((p) => [p.x - p.d / 2, p.y - p.d / 2, p.x + p.d / 2, p.y + p.d / 2]), ...this.axisBoxes]);
     this.labelMs.push(performance.now() - t0);
     if (this.labelMs.length > 600) this.labelMs.shift();
     return { br, cut };
@@ -3033,8 +3035,7 @@ export class FanView implements InputHandlers {
     this.eventLabels.length = 0;
     this.thumbHits.length = 0;
     // The clades' brackets (ToLaD#193) behind the pills: their labels clear of the pills and pictures, their lines behind them.
-    // (The fork names clear of the axis's labels too, as last drawn: its origin note reaches past the gutter.)
-    br?.draw(ctx, FAMILY_INK, INK3, [...spots.filter((s) => s.fit > 0.3).map((s) => s.box), ...pics.map((p) => [p.x - p.d / 2, p.y - p.d / 2, p.x + p.d / 2, p.y + p.d / 2]), ...(forkNames() ? this.axisBoxes : [])], BG);
+    br?.draw(ctx, FAMILY_INK, INK3, [...spots.filter((s) => s.fit > 0.3).map((s) => s.box), ...pics.map((p) => [p.x - p.d / 2, p.y - p.d / 2, p.x + p.d / 2, p.y + p.d / 2]), ], BG);
     // A "+x" label's branches (ToLaD#368, #373): a hairline at its foot from its first branch to its last, in the gap under its picture,
     // a tick down onto each end branch, as the brackets draw theirs (open-ended past the screen's edge).
     ctx.save();
