@@ -4,8 +4,9 @@
 import { describe, expect, it } from 'vitest';
 import { FORK_H, forkNames, setForkNames, type Brackets } from './brackets';
 import { nodeLeftAt, type FanNode } from './layout';
-import { CARNIVORA, FELIDAE, type CladeRec } from './panthera';
-import { CARNIVORA_TREE, FELIDAE_TREE, type Split } from './splits';
+import { loadMammalsFromFiles } from './mammals-node';
+import { CARNIVORA, FELIDAE, mammaliaClade, type CladeRec } from './panthera';
+import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, type Split } from './splits';
 import { FanView, type CutLabels, type Level } from './view';
 
 function stubView(clade: CladeRec = CARNIVORA, tree: Split = CARNIVORA_TREE): FanView {
@@ -52,6 +53,7 @@ type Inner = {
   steps: unknown[];
   tapAt: unknown;
   frameOf(lv: Level): { cx: number; cy: number; sx: number; sy: number; ty: number };
+  tapInto(lv: Level, column: boolean): boolean;
   offBy(a: unknown, c: unknown): number;
 };
 const inner = (v: FanView) => v as unknown as Inner;
@@ -204,13 +206,24 @@ describe('names at their forks (ToLaD#373)', () => {
     const all = names(v);
     expect(all.length, where).toBeGreaterThanOrEqual(3);
     for (const { latin, v: n } of all) {
+      // (Where its picture's tap goes, from here; a name already framed stays, its picture's tap going a step finer.)
+      at(v);
+      const framed = iv.offBy(iv.frameOf({ v: n }), v.cam) <= 12;
+      v.tapItem(n.strands[0].index, n.strands[n.strands.length - 1].index);
+      land(v);
+      // (Unless that frame loses its fork, as Felinae's: then its own frame.)
+      const px = v.toScreen(nodeLeftAt(n, n.y) + n.width / 2, n.y)[0];
+      const picture = px >= 72 && px <= v.w ? { ...v.cam } : null;
       at(v);
       const start = { ...v.cam };
       const q = names(v).find((f) => f.v === n)!;
       v.tap(q.x, q.y);
       land(v);
+      const landed = { ...v.cam };
       const what = `${where}: ${latin}`;
-      expect(offFrame(n), `${what}: its own frame`).toBeLessThanOrEqual(2);
+      if (framed) expect(offFrame(n), `${what}: framed already, it stays`).toBeLessThanOrEqual(12);
+      else if (picture) expect(iv.offBy(picture, v.cam), `${what}: where its picture's tap goes`).toBeLessThanOrEqual(2);
+      else expect(offFrame(n), `${what}: its own frame`).toBeLessThanOrEqual(2);
       expect(v.levelNow(true).v, `${what}: the level`).toBe(n);
       const [fx, fy] = v.toScreen(nodeLeftAt(n, n.y) + n.width / 2, n.y);
       expect(fy, `${what}: the fork over the scale bar`).toBeLessThan(iv.brackets.forkFoot);
@@ -223,11 +236,72 @@ describe('names at their forks (ToLaD#373)', () => {
       if (again) {
         v.tap(again.x, again.y);
         land(v);
-        expect(offFrame(n), `${what}: a second tap stays`).toBeLessThanOrEqual(2);
+        expect(iv.offBy(landed, v.cam), `${what}: a second tap stays`).toBeLessThanOrEqual(2);
       }
       v.doubleTap(0, 0);
       land(v);
       expect(iv.offBy(start, v.cam), `${what}: a double tap back`).toBeLessThanOrEqual(2);
+    }
+  });
+
+  // (Ita: "why does pressing on solenodon put them at the left side? of th escreen and nothing ont he right?" Its own
+  // frame, its territory, has its two branches at 74..78 px; its name is there, tapped as the page does.)
+  it('mammals: a tap on the Solenodon fork lands as its picture does, both named, not in the left third with the right empty', { timeout: 300_000 }, async () => {
+    await loadMammalsFromFiles();
+    const v = stubView(mammaliaClade(), mammaliaTree());
+    const iv = inner(v);
+    v.cam = v.homeCamera();
+    frame(v);
+    const sol = iv.brackets.list.find((c) => c.latin === 'Solenodon')!.v;
+    v.cam = iv.frameOf({ v: sol });
+    frame(v);
+    v.draw();
+    const start = { ...v.cam };
+    const q = names(v).find((f) => f.v === sol)!;
+    v.tap(q.x, q.y);
+    land(v);
+    const landed = { ...v.cam };
+    const now = v.fan.time.y(0);
+    const box = sol.strands.map((b) => {
+      const m = v.model(b).lanes(now);
+      return [v.toScreen(m.left, 0)[0], v.toScreen(m.left + m.w, 0)[0]];
+    });
+    const [a, b] = [Math.min(...box.map((s) => s[0])), Math.max(...box.map((s) => s[1]))];
+    expect(a, 'not in the left third').toBeGreaterThan(72 + (v.w - 72) / 3);
+    expect(b, 'on screen').toBeLessThanOrEqual(v.w);
+    const cut = iv.cutLast!;
+    expect(cut.pics.filter((p) => p.run && p.run[0] >= sol.strands[0].index && p.run[1] <= sol.strands[1].index).length, 'both named').toBe(2);
+    const [, fy] = v.toScreen(0, sol.y);
+    expect(fy, 'the fork over the scale bar').toBeLessThan(iv.brackets.forkFoot);
+    expect(fy, 'the fork on screen').toBeGreaterThan(0);
+    const again = names(v).find((f) => f.v === sol)!;
+    v.tap(again.x, again.y);
+    land(v);
+    expect(iv.offBy(landed, v.cam), 'a second tap stays').toBeLessThanOrEqual(2);
+    v.doubleTap(0, 0);
+    land(v);
+    expect(iv.offBy(start, v.cam), 'a double tap back').toBeLessThanOrEqual(2);
+  });
+
+  it('switched off, a bracket on such a clade still goes as it did', () => {
+    const v = stubView(FELIDAE, FELIDAE_TREE);
+    const iv = inner(v);
+    setForkNames(false);
+    try {
+      atHome(v);
+      const felinae = iv.brackets.list.find((c) => c.latin === 'Felinae')!.v;
+      iv.tapInto({ v: felinae }, false);
+      land(v);
+      const into = { ...v.cam };
+      atHome(v);
+      const hit = iv.brackets.hit;
+      iv.brackets.hit = () => iv.brackets.list.find((c) => c.v === felinae)!;
+      v.tap(-1e6, -1e6);
+      iv.brackets.hit = hit;
+      land(v);
+      expect(iv.offBy(into, v.cam)).toBeLessThanOrEqual(2);
+    } finally {
+      setForkNames(true);
     }
   });
 });

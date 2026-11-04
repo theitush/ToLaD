@@ -258,6 +258,9 @@ const scenes = [
   ['ftap-carnivora', 'tapfork', ['Carnivora']],
   ['ftap-chiroptera', 'tapfork', ['Chiroptera']],
   ['ftap-primates', 'tapfork', ['Primates']],
+  ['ftap-felidae', 'tapfork', ['Felidae']],
+  ['ftap-felinae', 'tapfork', ['Felinae']],
+  ['ftap-solenodon', 'tapfork', ['Solenodon']],
   ['pin-home', 'home'],
   ['pin-bear', 'frame', ['Brown bear', 4e5, 40]],
   ['pin-weasel', 'frame', ['Least weasel', 1.5e6, 20]],
@@ -561,7 +564,15 @@ try {
           f.camera.settle();
           f.draw();
           const br = f.brackets;
-          const n = Array.from({ length: br.forkN }, (_, k) => br.forks[k]).find((q) => br.list[q.i].latin === args[0]);
+          const placed = () => Array.from({ length: br.forkN }, (_, k) => br.forks[k]).find((q) => br.list[q.i].latin === args[0]);
+          // (Its name not placed at home: from its own frame, where it is.)
+          if (!placed()) {
+            f.cam = f.frameOf({ v: br.list.find((c) => c.latin === args[0]).v });
+            f.camera.settle();
+            f.draw();
+            f.draw();
+          }
+          const n = placed();
           console.log(`tapfork ${args[0]}: ${n ? `at ${n.x.toFixed(0)},${n.y.toFixed(0)}` : 'none'}`);
           if (n) f.tap(n.x, n.y);
           for (let t = performance.now() + 16; f.anim; t += 16) {
