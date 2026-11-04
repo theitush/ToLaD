@@ -10,8 +10,16 @@
  * the zoom moves, never while panning), the label widths once per text.
  */
 import type { Camera } from './camera';
-import { laneW, leftAt, type Fan, type FanNode } from './layout';
+import { laneW, leftAt, nodeLeftAt, type Fan, type FanNode } from './layout';
 import { FAMILY_EN, ORDER_EN, ORDER_TAXA, type Split } from './splits';
+
+// (FORKNAMES=off in the environment: the test files' run with the switch off.)
+let forkNow = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.FORKNAMES !== 'off';
+/** The switch (ToLaD#373, `?forknames=off`, the button in FanApp): the stack's clades named at their forks, or the stack. What the views built from now on use. */
+export function setForkNames(on: boolean): void {
+  forkNow = on;
+}
+export const forkNames = (): boolean => forkNow;
 
 export type CladeRank = 'genus' | 'subfamily' | 'family' | 'superfamily' | 'suborder' | 'order';
 
@@ -240,6 +248,25 @@ export interface StackAt {
 /** Rows the stack shows at a level (ToLaD#288), its "…" over them. */
 export const STACK_ROWS = 3;
 
+/** A clade's name at its fork (ToLaD#373): the pill's centre and size on screen, what it says. */
+export interface ForkName {
+  i: number;
+  form: Form;
+  x: number;
+  y: number;
+  /** The pill's width (its text lw, its padding each side). */
+  pw: number;
+  lw: number;
+}
+/** A fork name's pill: its height, the padding each side of its text, the gap kept to what stands near it (px). */
+export const FORK_H = 16;
+const FORK_PAD = 5;
+const FORK_GAP = 2;
+/** Rows a name whose fork is below the screen's foot may climb, clear of what stands there. */
+const FORK_HOLD_ROWS = 2;
+/** Rows a name may slide up into its crotch, clear of what stands there. */
+const FORK_SLIDE_ROWS = 3;
+
 /** The view's side of it: what the stack needs from the camera. */
 export interface BracketCam {
   toScreen(x: number, y: number): [number, number];
@@ -271,6 +298,7 @@ export class Brackets {
   ) {}
   private widthCache = new Map<string, [number, number, number]>();
   private probe = '';
+  private measure: ((font: string, text: string) => number) | null = null;
   /** Per row (this frame): the height of the band under it (px above the line's base) and its own height. */
   private rowBase = new Float32Array(1);
   private rowH = new Float32Array(1);
@@ -278,6 +306,12 @@ export class Brackets {
   private rows: Int16Array | null = null;
   placed: Placed[] = [];
   list: Clade[] = [];
+  /** This frame's names at their forks (placeForks; forks[0..forkN), kept from frame to frame, no allocation). */
+  forks: ForkName[] = [];
+  forkN = 0;
+  /** The screen's foot the fork names stay over (the scale bar's top, screen y; the view's). */
+  forkFoot = Infinity;
+  private forkBox = new Float64Array(0);
   /** The stack's foot (screen y): over the species' pills standing on "now" (Ita: the brackets above the names). */
   baseS = 0;
   fit = 1;
@@ -452,6 +486,7 @@ export class Brackets {
       rowsNow = r;
     }
     this.fit = fit;
+    this.measure = measure;
     this.x0 = axisX;
     this.w = c.w;
     // (The widths again once the fonts change: measured before the web font loaded, they were the fallback's.)
@@ -460,11 +495,13 @@ export class Brackets {
       this.probe = probe;
       this.widthCache.clear();
     }
-    this.placed = fit > 0 ? layoutBrackets(a, b, parent, (i) => this.widths(i, measure), axisX, c.w, rowsNow) : [];
+    if (forkNow) fit = fit >= 0.5 ? 1 : 0;
+    this.placed = fit > 0 || forkNow ? layoutBrackets(a, b, parent, (i) => this.widths(i, measure), axisX, c.w, rowsNow) : [];
     // Each row as tall as what it shows here: a name ROW_H, ticks alone TICK_ROW_H, nothing none.
     let rows = 0;
     for (const p of this.placed) rows = Math.max(rows, p.row + 1);
-    if (!this.placed.length || fit <= 0) this.moreRow = -1;
+    // (Named at their forks: no rows to overflow.)
+    if (!this.placed.length || fit <= 0 || forkNow) this.moreRow = -1;
     if (this.moreRow >= 0) {
       this.moreRow = Math.min(this.moreRow, rows);
       rows = this.moreRow + 1;
@@ -483,7 +520,7 @@ export class Brackets {
     // Pushed up past the top line by "now" (under the buttons) by half a row, it is swapped for the pinned rows
     // (ToLaD#233, like a sticky header): a clean swap, never both at once (a fade showed the order twice, faintly).
     // ("Now" itself near the top line: the same swap, half way through the old fade.)
-    this.fit = (rows && top + height - this.baseS > ROW_H / 2) || fit < 0.5 ? 0 : 1;
+    this.fit = (rows && top + height - this.baseS > ROW_H / 2 && !forkNow) || fit < 0.5 ? 0 : 1;
     return this.placed;
   }
 
@@ -622,6 +659,10 @@ export class Brackets {
 
   /** Whether clade node `v`'s bracket carries its name this frame. */
   named(v: FanNode): boolean {
+    if (forkNow) {
+      for (let k = 0; k < this.forkN; k++) if (this.list[this.forks[k].i].v === v) return true;
+      return false;
+    }
     return this.placed.some((p) => p.form !== 'tick' && this.list[p.i].v === v);
   }
 
@@ -654,7 +695,12 @@ export class Brackets {
    * pills' boxes on screen [x0, y0, x1, y1]: a label they would cover slides along its bracket clear of them, or,
    * with no room, leaves the bracket a plain line.
    */
-  draw(ctx: CanvasRenderingContext2D, ink: string, ink2: string, pills: readonly (readonly number[])[] = []): void {
+  draw(ctx: CanvasRenderingContext2D, ink: string, ink2: string, pills: readonly (readonly number[])[] = [], bg = '#000'): void {
+    if (forkNow) {
+      this.placeForks(pills);
+      this.drawForks(ctx, ink, ink2, bg);
+      return;
+    }
     if (!this.placed.length || this.fit <= 0) return;
     ctx.save();
     ctx.globalAlpha = this.fit;
@@ -669,6 +715,135 @@ export class Brackets {
       this.drawOne(ctx, p, y, lx, form, (this.rowH[p.row] ?? ROW_H) >= ROW_H ? 4 : 3, ink, ink2);
     }
     if (this.moreRow >= 0) this.drawMore(ctx, this.rowY(this.moreRow), ink2);
+    ctx.restore();
+  }
+
+  /**
+   * Name each clade the stack would at its fork (ToLaD#373), after layout(): greedy point-feature placement, the wider
+   * clade first, its pill centred over the fork in its crotch (node v: the fork moves it, rigidly, how its peels are
+   * drawn does not). A pill that meets what is placed or `pills` (the labels' boxes) slides up the crotch, the least
+   * that clears it, so it moves continuously with what it clears; with no room there down its stem from under the fork, then the same in its shorter forms; else it is
+   * dropped. A fork past the screen's foot: held at the foot over the middle of the clade's span on screen, after the
+   * forks on screen. Off the top, on its stem under the top line. What the pinned rows say is not said again.
+   * A function of the camera alone: no state, so no flicker.
+   */
+  placeForks(pills: readonly (readonly number[])[]): void {
+    const c = this.spanCam;
+    this.forkN = 0;
+    if (!c || !this.placed.length) return;
+    const list = this.list;
+    // (By size, the same order each frame: the set changes only with the level.)
+    const by = this.placed.sort((p, q) => list[q.i].strands.length - list[p.i].strands.length || p.i - q.i);
+    if (this.forkBox.length < by.length * 4) this.forkBox = new Float64Array(by.length * 4);
+    const y0 = c.toScreen(0, 0)[1];
+    const sy = c.toScreen(0, 1)[1] - y0;
+    const top = this.pinTop + (this.pinA > 0 ? this.pinH() : 0);
+    const foot = this.forkFoot;
+    const sw = c.cam.sx;
+    const held: Placed[] = [];
+    for (const p of by) {
+      const q = list[p.i];
+      if (this.pinA > 0 && this.pins.some((u) => u.i === p.i)) continue;
+      if (!(sy > 0)) continue;
+      const fork = y0 + q.v.y * sy;
+      if (fork + FORK_H >= foot) {
+        held.push(p);
+        continue;
+      }
+      const end = Math.min(foot, y0 + q.v.yBot * sy);
+      if (end < top + FORK_H) continue;
+      const half = FORK_H / 2;
+      // (Over the fork its own x; on its stem under the fork, the stem's: never how the peels above it are drawn.)
+      const xAt = (s: number) => {
+        const x = c.toScreen(nodeLeftAt(q.v, (Math.max(s, fork) - y0) / sy) + q.v.width / 2, 0)[0];
+        return x + (q.v.width * sw) / 2 < this.x0 || x - (q.v.width * sw) / 2 > this.w ? NaN : x;
+      };
+      const upTo = Math.max(top + half, fork - half - 1 - FORK_SLIDE_ROWS * (FORK_H + FORK_GAP));
+      const under = Math.max(fork + half + 1, top + half);
+      this.forkLadder(p, fork - half - 1, upTo, -1, under, end - half, 1, pills, xAt);
+    }
+    for (const p of held) {
+      // (Its middle on screen, as its bracket's name was.)
+      const m = (Math.max(p.a, this.x0) + Math.min(p.b, this.w)) / 2;
+      const y = foot - FORK_H / 2;
+      const e = y - FORK_HOLD_ROWS * (FORK_H + FORK_GAP);
+      this.forkLadder(p, y, e, -1, y, e, -1, pills, () => m);
+    }
+  }
+
+  /**
+   * Place clade p's name in its largest form with room: from y along `dir` (1 down, -1 up) as far as `end`, else from
+   * y2 along dir2 as far as end2; then its shorter forms the same way; else not at all.
+   */
+  private forkLadder(p: Placed, y: number, end: number, dir: 1 | -1, y2: number, end2: number, dir2: 1 | -1, pills: readonly (readonly number[])[], xAt: (y: number) => number): void {
+    const q = this.list[p.i];
+    const [wf, wn, ws] = this.widths(p.i, this.measure!);
+    const at = (form: Form, w: number) => this.forkAt(p, form, w, y, end, dir, pills, xAt) || this.forkAt(p, form, w, y2, end2, dir2, pills, xAt);
+    // (The Latin too only where its span has the room for it, as its bracket's; a tick has no fork name, a name has.)
+    const room = Math.min(p.b, this.w) - Math.max(p.a, this.x0) - 2 * LABEL_PAD;
+    if (q.en && wf <= room && at('full', wf)) return;
+    if (at('name', wn)) return;
+    if (ws > 0) at('short', ws);
+  }
+
+  /** The least slide from y that clears everything placed and `pills`; placed there if there is one. */
+  private forkAt(p: Placed, form: Form, lw: number, y: number, end: number, dir: 1 | -1, pills: readonly (readonly number[])[], xAt: (y: number) => number): boolean {
+    const pw = lw + 2 * FORK_PAD;
+    const half = FORK_H / 2;
+    const box = this.forkBox;
+    // (Each round clears one more thing it met, further along.)
+    for (let round = 0; round < 16 && (dir > 0 ? y <= end : y >= end); round++) {
+      let x = xAt(y);
+      if (Number.isNaN(x)) return false;
+      x = Math.min(Math.max(x, this.x0 + pw / 2 + 1), this.w - pw / 2 - 1);
+      const a = x - pw / 2 - FORK_GAP;
+      const b = x + pw / 2 + FORK_GAP;
+      const t = y - half - FORK_GAP;
+      const u = y + half + FORK_GAP;
+      let next = NaN;
+      const meet = (x0: number, y0: number, x1: number, y1: number) => {
+        if (x1 <= a || x0 >= b || y1 <= t || y0 >= u) return;
+        const to = dir > 0 ? y1 + half + FORK_GAP : y0 - half - FORK_GAP;
+        if (Number.isNaN(next) || (dir > 0 ? to > next : to < next)) next = to;
+      };
+      for (const r of pills) meet(r[0], r[1], r[2], r[3]);
+      for (let k = 0; k < this.forkN; k++) meet(box[4 * k], box[4 * k + 1], box[4 * k + 2], box[4 * k + 3]);
+      if (Number.isNaN(next)) {
+        const k = this.forkN++;
+        const f = this.forks[k] ?? (this.forks[k] = { i: 0, form: 'name', x: 0, y: 0, pw: 0, lw: 0 });
+        f.i = p.i;
+        f.form = form;
+        f.x = x;
+        f.y = y;
+        f.pw = pw;
+        f.lw = lw;
+        box[4 * k] = x - pw / 2;
+        box[4 * k + 1] = y - half;
+        box[4 * k + 2] = x + pw / 2;
+        box[4 * k + 3] = y + half;
+        return true;
+      }
+      y = next;
+    }
+    return false;
+  }
+
+  /** Draw the names at their forks: each on an opaque pill, as the other labels. */
+  private drawForks(ctx: CanvasRenderingContext2D, ink: string, ink2: string, bg: string): void {
+    if (!this.forkN) return;
+    ctx.save();
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    for (let k = 0; k < this.forkN; k++) {
+      const f = this.forks[k];
+      const x0 = Math.round(f.x - f.pw / 2);
+      const y0 = Math.round(f.y - FORK_H / 2);
+      ctx.fillStyle = bg;
+      ctx.beginPath();
+      ctx.roundRect(x0, y0, f.pw, FORK_H, FORK_H / 2);
+      ctx.fill();
+      this.drawLabel(ctx, this.list[f.i], f.form, x0 + FORK_PAD, y0 + FORK_H / 2 + 0.5, ink, ink2);
+    }
     ctx.restore();
   }
 
@@ -694,7 +869,11 @@ export class Brackets {
     if (tb) ctx.lineTo(b, y + dy);
     ctx.stroke();
     if (form === 'tick') return;
-    let x = lx - p.lw / 2;
+    this.drawLabel(ctx, q, form, lx - p.lw / 2, y, ink, ink2);
+  }
+
+  /** A clade's label in its form, from x on line y: its name, the Latin past it in the full form. */
+  private drawLabel(ctx: CanvasRenderingContext2D, q: Clade, form: Form, x: number, y: number, ink: string, ink2: string): void {
     const short = form === 'short' && !!TAXON_SHORT[q.latin];
     ctx.font = q.en || short ? this.nameFont : this.latinFont;
     ctx.fillStyle = q.en || short ? ink : ink2;
@@ -710,6 +889,14 @@ export class Brackets {
 
   /** The clade under screen (x, y): the bracket in that row nearest x (on it, or within a few px of slop). */
   hit(x: number, y: number): Clade | null {
+    if (forkNow) {
+      // (A finger's few px past its pill: nothing else stands that near, placeForks.)
+      for (let k = 0; k < this.forkN; k++) {
+        const f = this.forks[k];
+        if (Math.abs(x - f.x) <= f.pw / 2 + 3 && Math.abs(y - f.y) <= FORK_H / 2 + 3) return this.list[f.i];
+      }
+      return null;
+    }
     // (Faded out, handed over to the pinned rows: not there to tap.)
     if (this.fit < 0.5) return null;
     let best: Placed | null = null;
