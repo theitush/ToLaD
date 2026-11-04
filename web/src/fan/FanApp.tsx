@@ -14,6 +14,7 @@ import { stamp } from '../stamp';
 import { population } from './population';
 import { WorldToggle } from './WorldToggle';
 import { GAP_MODES, gapMode, setGapMode, type GapMode } from './fold';
+import { FORK_MODES, forkMode, setForkMode, type ForkMode } from './steady';
 import { MagnifierIcon, SearchPanel } from './SearchPanel';
 import { statusOf } from './status';
 import { cardTapper, onControl } from './cardtap';
@@ -51,6 +52,17 @@ function initialLevel(): Level {
   }
 }
 
+/** How a fork is drawn (ToLaD#377, `?forks=`): a look only, no new view. */
+function initialForks(): ForkMode {
+  try {
+    const q = new URLSearchParams(window.location.search).get('forks');
+    if (FORK_MODES.includes(q as ForkMode)) setForkMode(q as ForkMode);
+  } catch {
+    /* no address */
+  }
+  return forkMode();
+}
+
 /** How the neighbouring branches are spaced (ToLaD#378, `?gaps=`): set before the first view is built. */
 function initialGaps(): GapMode {
   try {
@@ -70,6 +82,8 @@ export function FanApp() {
   const [mode, setMode] = useState<WidthMode>('linear');
   const [mid, setMid] = useState(true);
   const [gaps, setGaps] = useState<GapMode>(initialGaps);
+  // (ToLaD#377: only from the address so far; a button for it when the bar has room.)
+  useState<ForkMode>(initialForks);
   // What the widths count (ToLaD#276): individuals, or their mass (`?width=mass`).
   const [measure, setMeasure] = useState<Measure>(initialMeasure);
   const [sel, setSel] = useState<Selection | null>(null);
