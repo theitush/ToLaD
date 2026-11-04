@@ -676,6 +676,49 @@ describe('a double tap is the reverse of a single tap (ToLaD#376)', () => {
       expect(atHome(v)).toBe(true);
     });
 
+    it(`${name}: the stack's "…" is a tap: tap, tap, "…" lands one named level up, a double tap comes back to where "…" started, then to the taps' own frames`, () => {
+      const v = mk();
+      let card: string | null = null;
+      v.onSelect = (s) => void (card = s ? s.sp.common : null);
+      /** A point on the "…" this frame, if there is one. */
+      const moreAt = (): [number, number] | null => {
+        const br = (v as unknown as { brackets: { x0: number; moreHit(x: number, y: number): boolean } | null }).brackets;
+        if (!br) return null;
+        const x = br.x0 + 8;
+        for (let y = 0; y < v.h; y++) if (br.moreHit(x, y)) return [x, y];
+        return null;
+      };
+      let checked = 0;
+      for (const b of v.fan.branches) {
+        home(v);
+        const frames: Frame[] = [];
+        // Tapped down its column, each tap a step, to the first frame with a "…" at least two taps in.
+        for (let k = 0; k < 12 && !(frames.length >= 2 && moreAt()); k++) {
+          const before = frameNow(v);
+          v.tap(...onColumn(v, b));
+          if (!P(v).anim) break;
+          frames.push(before);
+          run(v);
+        }
+        const more = frames.length >= 2 ? moreAt() : null;
+        if (!more) continue;
+        checked++;
+        const start = frameNow(v);
+        const want = wantUp(v, start.lv);
+        expect(want, `${b.sp.common}: a level over ${nameOf(start.lv)}`).toBeTruthy();
+        v.tap(...more);
+        expect(card, `${b.sp.common}: "…" left the card open`).toBe(null);
+        run(v);
+        expect(nameOf(v.levelNow(true)), `${b.sp.common}: "…" from ${nameOf(start.lv)}`).toBe(levelName(want!));
+        expect(atFrame(v, { v: want! }), `${b.sp.common}: at ${levelName(want!)}'s frame`).toBe(true);
+        const bad: string[] = [];
+        up(v, [...frames, start], bad);
+        expect(bad, b.sp.common).toEqual([]);
+        expect(atHome(v), `${b.sp.common}: home at last`).toBe(true);
+      }
+      expect(checked, 'a stack with a "…" on some route').toBeGreaterThan(0);
+    });
+
     it(`${name}: a pinch or a search pick forgets the steps: one level up from there`, () => {
       const v = mk();
       home(v);
