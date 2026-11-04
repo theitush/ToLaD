@@ -8,7 +8,7 @@
 //     peel to its tip, narrowing and widening about one centre. A population change fills or empties its own
 //     room only; nothing beside it moves.
 //   - A clade's room is its daughters' rooms side by side with the gaps between them (the fold's gaps by
-//     relatedness, GAP_K/OPEN_Z: a * pairGap, opening with the width zoom), the same at every height. Its parent
+//     switch: a * pairGap, fixed, or by relatedness and opening with the width zoom), the same at every height. Its parent
 //     column (its founders, below its split) stands at one place in it, where its daughters' peels are least
 //     (their founders' mean move nil), so it runs straight from its own peel up to its split.
 //   - At a split the daughters peel off from their founders' slots to their own places on the S-curve (ease), all
@@ -26,7 +26,7 @@
 // only one since ToLaD#300 retired the fold's own packing. At the cats' level (the view's `folds` off) every split is open, at every zoom.
 
 import { ease, isNode, laneW, segAt, type Fan, type FanBranch, type FanNode } from './layout';
-import { Fold, ROOM_BEND, type FoldState } from './fold';
+import { Fold, ROOM_BEND, gapMode, type FoldState, type GapMode } from './fold';
 
 /** A split's fork is at most this share of its shortest daughter's run (to its own split or tip). */
 export const STEADY_RUN = 0.85;
@@ -110,14 +110,19 @@ export class Steady extends Fold {
   private readonly yNow: number;
   private readonly winW = new Map<string, number>();
 
-  /** open: every split open at every zoom (the cats' level), else the fold's openness by zoom. */
+  /** Every split open at every zoom, so nothing here depends on the width zoom: the cats' level, or fixed gaps (ToLaD#378). */
+  readonly open: boolean;
+
+  /** open: as the field, else (with `age` gaps) the fold's openness by zoom. gaps: the switch (fold.ts). */
   constructor(
     fan: Fan,
-    readonly open = false,
+    open = false,
     /** Rooms by life (ToLaD#289, #342: the only rooms; widest-ever rooms for tests): an extinct daughter and its sister stand apart by their extents while both lived. */
     readonly life = true,
+    gaps: GapMode = gapMode(),
   ) {
-    super(fan);
+    super(fan, gaps);
+    this.open = open || gaps !== 'age';
     const N = fan.nodes;
     N.forEach((v, j) => this.idx.set(v, j));
     this.par = Int32Array.from(N, (v) => (v.parent ? this.idx.get(v.parent)! : -1));
@@ -167,7 +172,7 @@ export class Steady extends Fold {
       this.tipN[j] = t;
     }
     this.yNow = yRef;
-    if (open) this.a.fill(1);
+    if (this.open) this.a.fill(1);
   }
 
   /** The rooms and places at the a's `A`. */

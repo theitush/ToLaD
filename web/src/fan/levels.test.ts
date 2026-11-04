@@ -323,17 +323,27 @@ describe('with no tap to reverse, a double tap goes up to the parent level, not 
       const bad: string[] = [];
       let n = 0;
       levelsOnTheWay(v, v.fan.tess.fold ? 61 : 7, (v) => {
-        const from = v.levelNow(true);
-        const want = wantUp(v, from);
         const cam = { ...v.cam };
         const tapAt = P(v).tapAt;
         const steps = P(v).steps;
-        P(v).steps = [];
+        // (A real pinch, in a hair: what forgets the steps.)
+        v.gestureStart();
+        v.zoom(v.w / 2, v.h / 2, 1.001, 1.001);
+        v.gestureEnd();
+        settle(v);
+        if (P(v).steps.length) bad.push(`${nameOf(v.levelNow(true))}: a pinch left the steps`);
+        const from = v.levelNow(true);
+        const want = wantUp(v, from);
         v.doubleTap(-1e4, -1e4);
         if (card) bad.push(`${nameOf(from)}: the card left open`);
         if (!want) {
           if (P(v).anim || from.v !== v.fan.root) bad.push(`${nameOf(from)}: ${P(v).anim ? 'flew from home' : 'nowhere to go'}`);
+          v.cam = cam;
+          v.camera.settle();
+          P(v).applyFold();
+          P(v).tapAt = tapAt;
           P(v).steps = steps;
+          settle(v);
           return;
         }
         run(v);
@@ -438,7 +448,7 @@ describe('a double tap reverses the last tap on every route, and with none goes 
     const cam = { ...v.cam };
     const tapAt = P(v).tapAt;
     const steps = [...P(v).steps];
-    let back: Camera | null = steps[steps.length - 1]?.cam ?? null;
+    let back: { cam: Camera; lv: Level } | null = steps[steps.length - 1] ?? null;
     let from = v.levelNow(true);
     let want = wantUp(v, from);
     if (how !== 'landed') {
@@ -449,7 +459,7 @@ describe('a double tap reverses the last tap on every route, and with none goes 
         return;
       }
       if (how === 'mid') {
-        if (P(v).steps.length > steps.length) back = cam;
+        if (P(v).steps.length > steps.length) back = { cam, lv: from };
         // (Its flight a few frames along, then the double tap's touch: down, a little jitter, up.)
         const to = backing(v)!;
         from = to.lv;
@@ -466,8 +476,8 @@ describe('a double tap reverses the last tap on every route, and with none goes 
     v.doubleTap(-1e4, -1e4, how === 'ran');
     run(v);
     const now = v.levelNow(true);
-    if (back ? P(v).offBy(back, v.cam) >= 1 : want ? now.v !== want || !atFrame(v, now) : !atFrame(v, from))
-      bad.push(`${label} (${how}): from ${nameOf(from)} went to ${nameOf(now)}, not ${back ? 'the frame before the tap' : want ? levelName(want) : 'nowhere'}`);
+    if (back ? P(v).offBy(back.cam, v.cam) >= 1 || nameOf(now) !== nameOf(back.lv) : want ? now.v !== want || !atFrame(v, now) : !atFrame(v, from))
+      bad.push(`${label} (${how}): from ${nameOf(from)} went to ${nameOf(now)}, not ${back ? `${nameOf(back.lv)}, the frame before the tap` : want ? levelName(want) : 'nowhere'}`);
     if (!back && want && stackTop(v) !== want) bad.push(`${label} (${how}): the stack shows ${stackTop(v) ? levelName(stackTop(v)!) : 'nothing'}, not ${levelName(want)}`);
     v.cam = cam;
     v.camera.settle();
@@ -674,6 +684,52 @@ describe('a double tap is the reverse of a single tap (ToLaD#376)', () => {
       run(v);
       expect(P(v).offBy(frames[0].cam, v.cam)).toBeLessThan(1);
       expect(atHome(v)).toBe(true);
+    });
+
+    // (The cats' stack is never deep enough for a "…".)
+    it.runIf(name === 'carnivores')(`${name}: the stack's "…" is a tap: tap, tap, "…" lands one named level up, a double tap comes back to where "…" started, then to the taps' own frames`, () => {
+      const v = mk();
+      let card: string | null = null;
+      v.onSelect = (s) => void (card = s ? s.sp.common : null);
+      /** A point on the "…" this frame, if there is one. */
+      const moreAt = (): [number, number] | null => {
+        const br = (v as unknown as { brackets: { x0: number; moreHit(x: number, y: number): boolean } | null }).brackets;
+        if (!br) return null;
+        const x = br.x0 + 8;
+        for (let y = 0; y < v.h; y++) if (br.moreHit(x, y)) return [x, y];
+        return null;
+      };
+      let checked = 0;
+      for (const b of v.fan.branches) {
+        // (A few routes are enough: each a walk down and back.)
+        if (checked >= 3) break;
+        home(v);
+        const frames: Frame[] = [];
+        // Tapped down its column, each tap a step, to the first frame with a "…" at least two taps in.
+        for (let k = 0; k < 12 && !(frames.length >= 2 && moreAt()); k++) {
+          const before = frameNow(v);
+          v.tap(...onColumn(v, b));
+          if (!P(v).anim) break;
+          frames.push(before);
+          run(v);
+        }
+        const more = frames.length >= 2 ? moreAt() : null;
+        if (!more) continue;
+        checked++;
+        const start = frameNow(v);
+        const want = wantUp(v, start.lv);
+        expect(want, `${b.sp.common}: a level over ${nameOf(start.lv)}`).toBeTruthy();
+        v.tap(...more);
+        expect(card, `${b.sp.common}: "…" left the card open`).toBe(null);
+        run(v);
+        expect(nameOf(v.levelNow(true)), `${b.sp.common}: "…" from ${nameOf(start.lv)}`).toBe(levelName(want!));
+        expect(atFrame(v, { v: want! }), `${b.sp.common}: at ${levelName(want!)}'s frame`).toBe(true);
+        const bad: string[] = [];
+        up(v, [...frames, start], bad);
+        expect(bad, b.sp.common).toEqual([]);
+        expect(atHome(v), `${b.sp.common}: home at last`).toBe(true);
+      }
+      expect(checked, 'a stack with a "…" on some route').toBeGreaterThan(0);
     });
 
     it(`${name}: a pinch or a search pick forgets the steps: one level up from there`, () => {

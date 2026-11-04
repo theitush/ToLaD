@@ -13,6 +13,7 @@ import { loadMammals, mammalsLoaded } from './mammals-data';
 import { stamp } from '../stamp';
 import { population } from './population';
 import { WorldToggle } from './WorldToggle';
+import { GAP_MODES, gapMode, setGapMode, type GapMode } from './fold';
 import { MagnifierIcon, SearchPanel } from './SearchPanel';
 import { statusOf } from './status';
 import { cardTapper, onControl } from './cardtap';
@@ -50,6 +51,17 @@ function initialLevel(): Level {
   }
 }
 
+/** How the neighbouring branches are spaced (ToLaD#378, `?gaps=`): set before the first view is built. */
+function initialGaps(): GapMode {
+  try {
+    const q = new URLSearchParams(window.location.search).get('gaps');
+    if (GAP_MODES.includes(q as GapMode)) setGapMode(q as GapMode);
+  } catch {
+    /* no address */
+  }
+  return gapMode();
+}
+
 export function FanApp() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const viewRef = useRef<FanView | null>(null);
@@ -57,6 +69,7 @@ export function FanApp() {
   const cardUp = (x: number, y: number) => viewRef.current?.doubleTap(x, y);
   const [mode, setMode] = useState<WidthMode>('linear');
   const [mid, setMid] = useState(true);
+  const [gaps, setGaps] = useState<GapMode>(initialGaps);
   // What the widths count (ToLaD#276): individuals, or their mass (`?width=mass`).
   const [measure, setMeasure] = useState<Measure>(initialMeasure);
   const [sel, setSel] = useState<Selection | null>(null);
@@ -115,9 +128,9 @@ export function FanApp() {
       viewRef.current = null;
       if (window.__fan === v) delete window.__fan;
     };
-    // (A new view per level; the toggles' state carries over.)
+    // (A new view per level and per gaps' switch; the toggles' state carries over.)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [level, viewReady]);
+  }, [level, viewReady, gaps]);
 
   return (
     <div className="app fan">
@@ -149,6 +162,26 @@ export function FanApp() {
           }}
         >
           mid labels
+        </button>
+        {/* ToLaD#378: the gaps between neighbouring branches, the same (even), larger between groups, or by age (the old look). */}
+        <button
+          type="button"
+          title="Gaps between branches: even, groups or age"
+          onClick={() => {
+            const next = GAP_MODES[(GAP_MODES.indexOf(gaps) + 1) % GAP_MODES.length];
+            setGapMode(next);
+            setSel(null);
+            setGaps(next);
+            try {
+              const u = new URL(window.location.href);
+              u.searchParams.set('gaps', next);
+              window.history.replaceState(null, '', u);
+            } catch {
+              /* not in the address */
+            }
+          }}
+        >
+          {`gaps: ${gaps}`}
         </button>
         {/* Home for this level, and the level stepper joined to it (ToLaD#247): one pill, so the bar stays one row. */}
         <span className="pair">
