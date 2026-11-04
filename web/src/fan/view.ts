@@ -21,7 +21,7 @@ import { COLUMN_DIM, columnSpans, EVENT_TINT, eventAt, eventSpans, type EventSpa
 import { laneDim, LINEAGE, pathFrame, TwigModel } from './twigs';
 import type { RectBatch } from './meshgl';
 import { FAMILY_EN, familyLabel, FELIDAE_TREE, ORDER_EN, ORDER_TAXA, taxonKey, type Split } from './splits';
-import { Brackets, foldedFrame, latinOf, rankOf, STACK_MOST, TAXON_EN, type StackAt } from './brackets';
+import { Brackets, foldedFrame, forkNames, latinOf, rankOf, STACK_MOST, TAXON_EN, type StackAt } from './brackets';
 import { axisInset, drawWorldOver, drawWorldUnder, worldFlags, type Box } from './world';
 
 export type { Camera } from './camera';
@@ -96,6 +96,8 @@ const GLOW_LEAN = 0.25;
 const FRAME_BOTTOM = 150;
 /** A level's start (its fork, a species' split) stands this many px up from the screen's foot, just over the scale bar (ToLaD#288). */
 const FORK_PX = LABEL_BOTTOM_PX;
+/** The scale bar's top from the screen's foot where it has no element to measure (px; tests). */
+const SCALE_PX = 60;
 /** Gap (px) between a label's name pill and its picture right under it (ToLaD#358: one unit at the tip; #373: the name on top). */
 const LABEL_UNDER = 4;
 /**
@@ -967,7 +969,8 @@ export class FanView implements InputHandlers {
     if (!br) return null;
     const nowS = this.toScreen(0, this.yNow)[1];
     const top = this.labelTop();
-    const fit = clamp01((nowS - top) / 24);
+    // (Named at their forks, ToLaD#373: the pinned rows come once the labels' row has made way for them, heldRow.)
+    const fit = forkNames() ? (this.labelBand().now - nowS < STACK_MOST ? 1 : 0) : clamp01((nowS - top) / 24);
     const measure = (f: string, t: string) => {
       this.ctx.save();
       this.ctx.font = f;
@@ -980,6 +983,8 @@ export class FanView implements InputHandlers {
     br.hide = lod ? (v) => lod.hidden(v) : null;
     br.hideKey = lod ? String(lod.gen) : '';
     br.pillRoom = this.labelBand().room;
+    // (The fork names' foot: the scale bar's top.)
+    br.forkFoot = this.scaleTop();
     // (The stack at the level the view is at, ToLaD#288: its groups, it and the familiar levels up, "…" over three rows.)
     br.layout(this.camera, this.fan, nowS, LABEL_AXIS_X, fit, measure, top, stackAt(this.fan, levelClade(this.fan, this.levelNow())));
     // The groups the view is inside, pinned under the buttons as the stack scrolls off (ToLaD#233): the familiar levels.
@@ -1016,12 +1021,28 @@ export class FanView implements InputHandlers {
    * under that row; `room` the stack's foot to "now" (Brackets.pillRoom).
    */
   private labelBand(): { top: number; cap: number; row: number; now: number; room: number } {
-    const top = this.labelTop() + (this.brackets ? STACK_MOST : 0);
+    // (Named at their forks, ToLaD#373: no stack to keep rows for, the tree has them; heldRow makes way for the pinned rows.)
+    const top = this.labelTop() + (this.brackets && !forkNames() ? STACK_MOST : 0);
     const under = LABEL_UNDER + PIC_D + PIC_LIFT;
     const cap = Math.max(PIC_D, Math.min(LABEL_CAP, this.h * LABELS_SHARE - top - under));
     const row = top + cap + LABEL_UNDER;
     const now = row + PIC_D + PIC_LIFT;
     return { top, cap, row, now, room: now - 4 - top };
+  }
+
+  /**
+   * The row the labels are held on this frame (labelBand's). With the names at their forks the band reserves no rows
+   * for the pinned ones, so as "now" scrolls up past where it stands the row comes down as far as those rows' most, and they come in over it.
+   */
+  private heldRow(): number {
+    const { row, now } = this.labelBand();
+    return forkNames() ? row + Math.min(STACK_MOST, Math.max(0, now - this.toScreen(0, this.yNow)[1])) : row;
+  }
+
+  /** The scale bar's top (screen y), the foot of what stands on the tree. */
+  private scaleTop(): number {
+    const r = this.scaleEl?.getBoundingClientRect?.();
+    return r && r.height > 0 ? r.top - this.canvas.getBoundingClientRect().top : this.h - SCALE_PX;
   }
 
   /**
@@ -1192,6 +1213,10 @@ export class FanView implements InputHandlers {
   /** The screen point of clade `latin`'s bracket as last drawn, if it is wide enough to tap (designshot), or null. */
   bracketAt(latin: string): [number, number] | null {
     const br = this.brackets;
+    if (br && forkNames()) {
+      for (let k = 0; k < br.forkN; k++) if (br.list[br.forks[k].i].latin === latin) return [br.forks[k].x, br.forks[k].y];
+      return null;
+    }
     const p = br?.placed.find((q) => br.list[q.i].latin === latin);
     return br && p && p.b - p.a >= 6 ? [(p.a + p.b) / 2, br.rowY(p.row)] : null;
   }
@@ -2145,7 +2170,7 @@ export class FanView implements InputHandlers {
     const T = this.territories();
     if (this.brackets) this.brackets.spanOf = (v) => T.spanOf(v);
     const br = this.layoutBrackets();
-    const row = this.labelBand().row;
+    const row = this.heldRow();
     const cut = (this.cutLast = this.cutLabels(T, row));
     this.rowLast = row;
     this.labelMs.push(performance.now() - t0);
@@ -2907,7 +2932,8 @@ export class FanView implements InputHandlers {
     this.eventLabels.length = 0;
     this.thumbHits.length = 0;
     // The clades' brackets (ToLaD#193) behind the pills: their labels clear of the pills and pictures, their lines behind them.
-    br?.draw(ctx, FAMILY_INK, INK3, [...spots.filter((s) => s.fit > 0.3).map((s) => s.box), ...pics.map((p) => [p.x - p.d / 2, p.y - p.d / 2, p.x + p.d / 2, p.y + p.d / 2])]);
+    // (The fork names clear of the axis's labels too, as last drawn: its origin note reaches past the gutter.)
+    br?.draw(ctx, FAMILY_INK, INK3, [...spots.filter((s) => s.fit > 0.3).map((s) => s.box), ...pics.map((p) => [p.x - p.d / 2, p.y - p.d / 2, p.x + p.d / 2, p.y + p.d / 2]), ...(forkNames() ? this.axisBoxes : [])], BG);
     // A "+x" label's branches (ToLaD#368, #373): a hairline at its foot from its first branch to its last, in the gap under its picture,
     // a tick down onto each end branch, as the brackets draw theirs (open-ended past the screen's edge).
     ctx.save();
