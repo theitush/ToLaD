@@ -150,8 +150,8 @@ function shownNames(v: FanView): string[] {
 
     // A level's pills name distinct real groups: no name twice, no "X ancestors"/"X lineage" made up for an unnamed split
     // inside it, framed and with "now" pushed off the screen's top (where the columns' lineage names show).
-    // (Ita 2026-11-01: humans hand-tuned later, #352.)
-    it.fails('at Hominins and Homo, framed or panned into the past, each name once and none generated', () => {
+    // (Holds since the labels are the cut's (ToLaD#358): one per item, the items' runs disjoint, each named from a real taxon.)
+    it('at Hominins and Homo, framed or panned into the past, each name once and none generated', () => {
       const bad: string[] = [];
       for (const latin of ['Hominini', 'Homo'])
         for (const down of [0, 0.4]) {

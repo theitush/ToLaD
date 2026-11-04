@@ -236,13 +236,26 @@ export class Territories {
     return k >= 0 ? { head: k, f: this.first[k], l: this.last[k] } : { head: k, f: ~k, l: ~k };
   }
 
+  /** Daughter k's youngest strand (the lineage there at every row any of hers is), what her share stands on where a row's sites cross (Steady.cell). */
+  private readonly anchors = new Map<number, number>();
+  private anchorOf(k: number): number {
+    if (k < 0) return ~k;
+    let a = this.anchors.get(k);
+    if (a === undefined) {
+      a = this.first[k];
+      for (let i = a; i <= this.last[k]; i++) if (this.strands[i].tipY < this.strands[a].tipY) a = i;
+      this.anchors.set(k, a);
+    }
+    return a;
+  }
+
   /** Item r's territory (world x) over its label's rows `rows(r)`, `ghost` (world) the height a lineage keeps its place above its tip (Steady.cell). */
   over(r: Ref, rows: RowsOf, ghost: number, out: [number, number] = [0, 0]): [number, number] {
     const R = rows(r);
     let a = -Infinity;
     let b = Infinity;
     for (let i = 0; i + 1 < R.length; i += 2) {
-      this.fold.cell(r.f, r.l, R[i], R[i + 1], ghost, out);
+      this.fold.cell(r.f, r.l, R[i], R[i + 1], ghost, out, this.anchorOf(r.head));
       a = Math.max(a, out[0]);
       b = Math.min(b, out[1]);
     }

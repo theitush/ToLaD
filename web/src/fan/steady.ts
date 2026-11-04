@@ -44,6 +44,12 @@ export const LIFE_GAP = 0.5;
  * deeper time zoom they are rows the draw samples too (one cache, by world y). A resolution, not a look.
  */
 export const TERR_H = 32;
+/** The [first, last] pair of `W` (sorted, apart) holding i, as its first's offset, or -1. */
+function rangeAt(W: Int32Array, i: number): number {
+  for (let w = 0; w < W.length; w += 2) if (i >= W[w] && i <= W[w + 1]) return w;
+  return -1;
+}
+const inRanges = (W: Int32Array, i: number) => rangeAt(W, i) >= 0;
 
 /** Rooms by life: a strand's widest over a window is laneW at this many steps (and its ends). */
 const LIFE_SAMPLES = 48;
@@ -193,6 +199,10 @@ export class Steady extends Fold {
     this.kidPair = N.map((v) => Int32Array.from(v.kids.slice(0, -1), last));
     // (Rooms by life: each node's last tip, the youngest of its strands', and now.)
     this.tipS = Float64Array.from(S, (b) => b.tipY);
+    this.crossL = new Float64Array(S.length);
+    this.crossR = new Float64Array(S.length);
+    this.crossF = new Int32Array(S.length);
+    this.crossE = new Int32Array(S.length);
     this.tipN = new Float64Array(N.length);
     for (let j = N.length - 1; j >= 0; j--) {
       let t = Infinity;
@@ -866,7 +876,8 @@ export class Steady extends Fold {
 
   /**
    * Per-row territories (ToLaD#333): strands f..l's (drawn order, a node's run or a run of its daughters) share of the
-   * rows from world y `ya` to `yb` (world x, `out`; empty, out[0] >= out[1], where they have no lineage).
+   * rows from world y `ya` to `yb` (world x, `out`; empty, out[0] >= out[1], where they have no lineage). `anchor`: the
+   * one of them their share is taken around in a row whose sites cross (crossedCell).
    *
    * At a row the lineages there split x between them, each boundary the middle of the gap between neighbours' drawn
    * edges: a 1D Voronoi of the row, over the drawn order (the columns stand in it left to right). A strand's lineage is
@@ -882,7 +893,7 @@ export class Steady extends Fold {
    * inside), moves continuously as its label's rows do; it steps only where a lineage is born, at a row fixed in the
    * world. Each row is a scan from f and l to the nearest lineages.
    */
-  cell(f: number, l: number, ya: number, yb: number, ghost: number, out: [number, number] = [0, 0]): [number, number] {
+  cell(f: number, l: number, ya: number, yb: number, ghost: number, out: [number, number] = [0, 0], anchor = l): [number, number] {
     const H = TERR_H;
     if (yb < ya) [ya, yb] = [yb, ya];
     const L = this.cur();
@@ -895,14 +906,14 @@ export class Steady extends Fold {
     // (At y between rows k and k + 1, the blend of the two, both split among row k + 1's lineages.)
     const at = (y: number) => {
       const k = Math.floor(y / H);
-      if (!this.rowCell(f, l, k, ghost, c, true) || !this.rowCell(f, l, k + 1, ghost, d)) return;
+      if (!this.rowCell(f, l, k, ghost, c, true, anchor) || !this.rowCell(f, l, k + 1, ghost, d, false, anchor)) return;
       const t = y / H - k;
       any = true;
       lo = Math.max(lo, c[0] + t * (d[0] - c[0]));
       hi = Math.min(hi, c[1] + t * (d[1] - c[1]));
     };
     const row = (k: number, below: boolean) => {
-      if (!this.rowCell(f, l, k, ghost, c, below)) return;
+      if (!this.rowCell(f, l, k, ghost, c, below, anchor)) return;
       any = true;
       lo = Math.max(lo, c[0]);
       hi = Math.min(hi, c[1]);
@@ -931,7 +942,7 @@ export class Steady extends Fold {
    * of the same runs again and again (the cut's daughters, its items' labels), and a pan or a
    * frame at rest asks the last frame's.
    */
-  private rowCell(f: number, l: number, k: number, ghost: number, out: [number, number], below = false): boolean {
+  private rowCell(f: number, l: number, k: number, ghost: number, out: [number, number], below: boolean, anchor: number): boolean {
     const L = this.cur();
     this.fresh(L);
     const N = this.strands.length;
@@ -939,6 +950,8 @@ export class Steady extends Fold {
     const M = this.cellMemo;
     if (this.memoVer !== L.ver || this.memoGhost !== ghost || M.size >= 1 << 18) {
       M.clear();
+      this.crossMemo.clear();
+      this.crossedRuns.clear();
       this.memoN = 0;
       this.memoVer = L.ver;
       this.memoGhost = ghost;
@@ -947,7 +960,9 @@ export class Steady extends Fold {
     if (hit !== undefined) {
       out[0] = this.memoV[hit];
       out[1] = this.memoV[hit + 1];
-      return out[0] === out[0];
+      const there = out[0] === out[0];
+      if (there && this.crossedRuns.has(key)) this.crossedCell(L, f, l, k, ghost, below, anchor, out);
+      return there;
     }
     const ok = this.rowCellNow(L, f, l, k, ghost, out, below);
     if (this.memoV.length < this.memoN + 2) {
@@ -959,6 +974,10 @@ export class Steady extends Fold {
     this.memoV[this.memoN + 1] = out[1];
     M.set(key, this.memoN);
     this.memoN += 2;
+    if (ok && this.crossedNow) {
+      this.crossedRuns.add(key);
+      this.crossedCell(L, f, l, k, ghost, below, anchor, out);
+    }
     return ok;
   }
   private readonly cellMemo = new Map<number, number>();
@@ -995,8 +1014,114 @@ export class Steady extends Fold {
     let n = l + 1;
     while (n < N && !has(n)) n++;
     if (n < N) out[1] = (Rb + e[0]) / 2;
+    const W = this.crossings(k, below, has);
+    this.crossedNow = W.length > 0 && (inRanges(W, a) || inRanges(W, b) || (p >= 0 && inRanges(W, p)) || (n < N && inRanges(W, n)));
     return true;
   }
+  /**
+   * Row k's stretches of strands (drawn order, [first, last] pairs, usually none) whose sites are out of that order: an
+   * ended lineage's point stands at its room's centre, and a later neighbour's room, by life, may lie past it. Merged the
+   * way a monotone stack merges: outside them the row is in order, and they do not overlap each other in x.
+   */
+  private crossings(k: number, below: boolean, has: (i: number) => boolean): Int32Array {
+    const key = (k + 0x100000) * 2 + (below ? 1 : 0);
+    let W = this.crossMemo.get(key);
+    if (W) return W;
+    const N = this.strands.length;
+    const e = this.edge;
+    const { crossL: mn, crossR: mx, crossF: first, crossE: end } = this;
+    let top = 0;
+    for (let i = 0; i < N; i++) {
+      if (!has(i)) continue;
+      let [lo, hi, s] = [e[0], e[1], i];
+      while (top > 0 && mx[top - 1] > lo + 1e-9) {
+        top--;
+        lo = Math.min(lo, mn[top]);
+        hi = Math.max(hi, mx[top]);
+        s = first[top];
+      }
+      mn[top] = lo;
+      mx[top] = hi;
+      first[top] = s;
+      end[top] = i;
+      top++;
+    }
+    const out: number[] = [];
+    for (let t = 0; t < top; t++) if (end[t] > first[t]) out.push(first[t], end[t]);
+    W = Int32Array.from(out);
+    this.crossMemo.set(key, W);
+    return W;
+  }
+  /**
+   * Strands f..l's share of a row where crossings() touch them: the block, among the row's sites taken by x, that holds
+   * `anchor` (one of them) and only them, split from the next site on each side as ever. Two runs' blocks hold different
+   * sites, so their shares stay disjoint; a run holds what its anchor's own share does.
+   */
+  private crossedCell(L: Lay, f: number, l: number, k: number, ghost: number, below: boolean, anchor: number, out: [number, number]): void {
+    const y = k * TERR_H;
+    const xs = this.rowAt(L, y);
+    const age = this.fan.time.ageAt(y);
+    const y2 = (k + 1) * TERR_H;
+    const xs2 = below ? this.rowAt(L, y2) : xs;
+    const age2 = below ? this.fan.time.ageAt(y2) : age;
+    const has = (i: number) => this.site(i, y, age, xs, ghost) || (below && this.site(i, y2, age2, xs2, ghost));
+    const W = this.crossings(k, below, has);
+    const N = this.strands.length;
+    const e = this.edge;
+    const from = (i: number) => {
+      const w = rangeAt(W, i);
+      return w < 0 ? i : W[w];
+    };
+    const to = (i: number) => {
+      const w = rangeAt(W, i);
+      return w < 0 ? i : W[w + 1];
+    };
+    let c0 = from(f);
+    let p = c0 - 1;
+    while (p >= 0 && !has(p)) p--;
+    if (p >= 0) c0 = from(p);
+    let c1 = to(l);
+    let n = c1 + 1;
+    while (n < N && !has(n)) n++;
+    if (n < N) c1 = to(n);
+    const sites: { i: number; lo: number; hi: number }[] = [];
+    for (let i = c0; i <= c1; i++) if (has(i)) sites.push({ i, lo: e[0], hi: e[1] });
+    sites.sort((u, v) => u.lo + u.hi - v.lo - v.hi || u.i - v.i);
+    // (Its anchor has no lineage here where its label's rows are a wider clade's: then its youngest that has.)
+    let young = -1;
+    for (const s of sites) if (s.i >= f && s.i <= l && (young < 0 || this.tipS[s.i] < this.tipS[young])) young = s.i;
+    let at = sites.findIndex((s) => s.i === anchor);
+    if (at < 0) at = sites.findIndex((s) => s.i === young);
+    const r = this.rootJ;
+    out[0] = L.roomL[r];
+    out[1] = L.roomL[r] + L.roomW[r];
+    const mine = (i: number) => i >= f && i <= l;
+    let [lo, hi] = [sites[at].lo, sites[at].hi];
+    for (let q = at - 1; q >= 0; q--) {
+      const s = sites[q];
+      if (!mine(s.i)) {
+        out[0] = (s.hi + lo) / 2;
+        break;
+      }
+      lo = Math.min(lo, s.lo);
+    }
+    for (let q = at + 1; q < sites.length; q++) {
+      const s = sites[q];
+      if (!mine(s.i)) {
+        out[1] = (hi + s.lo) / 2;
+        break;
+      }
+      hi = Math.max(hi, s.hi);
+    }
+  }
+  private readonly crossMemo = new Map<number, Int32Array>();
+  /** The memo's runs a crossing touches (rowCell): their shares depend on the anchor, so they are not kept in it. */
+  private readonly crossedRuns = new Set<number>();
+  private crossedNow = false;
+  private readonly crossL: Float64Array;
+  private readonly crossR: Float64Array;
+  private readonly crossF: Int32Array;
+  private readonly crossE: Int32Array;
   /** site()'s edges. */
   private readonly edge: [number, number] = [0, 0];
   /** Whether strand i has a lineage at row y (age `age`, the row's xs), its drawn edges into `edge` (cell()). */
