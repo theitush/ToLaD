@@ -10,5 +10,5 @@ export interface PicSpot {
 
 /** A picture's diameter (px), the same at every zoom. */
 export const PIC_D = 50;
-/** The discs stand this many px above their tip. */
-export const PIC_LIFT = 2;
+/** The discs stand this many px above their tip: the gap a "+x" label's hairline runs in, above "now" (ToLaD#368, #373). */
+export const PIC_LIFT = 14;

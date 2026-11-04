@@ -68,11 +68,13 @@ function frameFaults(v: FanView, lv: Level): string[] {
   const nowS = v.toScreen(0, v.fan.time.y(0))[1];
   const top = P(v).labelTop();
   const at = nameOf(lv);
-  if (!(nowS >= top + 12 && nowS <= 0.45 * v.h)) bad.push(`${at}: "now" at ${nowS.toFixed(0)} px (top ${top})`);
+  if (!(nowS >= top + 12 && nowS <= 0.55 * v.h)) bad.push(`${at}: "now" at ${nowS.toFixed(0)} px (top ${top})`);
   // The brackets' stack whole above "now" (not swapped for the pinned rows over it), its foot over the pictures.
   const br = (v as unknown as { brackets: { fit: number; baseS: number; placed: unknown[] } | null }).brackets;
   if (br && br.placed.length && br.fit < 1) bad.push(`${at}: the stack pinned over "now" (now at ${nowS.toFixed(0)})`);
   const foot = br && br.placed.length ? br.baseS : top;
+  // Its labels under the stack (ToLaD#373: the frame keeps the room its own labels take), the living's all over "now".
+  for (const s of v.cutLast?.spots ?? []) if (s.box[1] < foot - 1) bad.push(`${at}: "${s.text}" reaches ${(foot - s.box[1]).toFixed(0)} px over the stack's foot`);
   // The level's whole life on screen (ToLaD#288): its start (its fork; a species', its split) at the foot, over the scale bar.
   const fork = v.toScreen(0, lv.b ? lv.b.splitY : lv.v.parent ? lv.v.yBot : v.fan.trunkBottom.y)[1];
   if (lv.v?.parent && Math.abs(fork - (v.h - 104)) > 2) bad.push(`${at}: its start at ${fork.toFixed(0)} px, not at the foot (${v.h - 104})`);
