@@ -1,8 +1,8 @@
 // Territories, fit zooms and the cut (ToLaD#333, research/scalable-tree.md steps 1–2): one set of boxes for names,
 // pictures, "+x" and framing.
 //
-// A node's territory is its steady room (steady.ts) plus half the gap on each side (fold.ts: a split's gap, its openness
-// by the width zoom). Rooms are disjoint and nested, and the gaps between neighbours are split down the middle, so
+// A node's territory is its steady room (steady.ts) plus half the gap on each side (fold.ts: a split's gap, with `age`
+// gaps its openness by the width zoom). Rooms are disjoint and nested, and the gaps between neighbours are split down the middle, so
 // territories are disjoint and nested too, and on screen they only grow as the width zoom grows (the openness never
 // falls). Time zoom and panning never change them.
 //
