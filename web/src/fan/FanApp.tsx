@@ -13,6 +13,7 @@ import { loadMammals, mammalsLoaded } from './mammals-data';
 import { stamp } from '../stamp';
 import { population } from './population';
 import { WorldToggle } from './WorldToggle';
+import { forkNames, setForkNames } from './brackets';
 import { GAP_MODES, gapMode, setGapMode, type GapMode } from './fold';
 import { FORK_MODES, forkMode, setForkMode, type ForkMode } from './steady';
 import { MagnifierIcon, SearchPanel } from './SearchPanel';
@@ -74,6 +75,16 @@ function initialGaps(): GapMode {
   return gapMode();
 }
 
+/** The upper clades' names at their forks (ToLaD#373, `?forknames=off`: the stack over "now"): set before the first view is built. */
+function initialForkNames(): boolean {
+  try {
+    if (new URLSearchParams(window.location.search).get('forknames') === 'off') setForkNames(false);
+  } catch {
+    /* no address */
+  }
+  return forkNames();
+}
+
 export function FanApp() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const viewRef = useRef<FanView | null>(null);
@@ -81,6 +92,7 @@ export function FanApp() {
   const cardUp = (x: number, y: number) => viewRef.current?.doubleTap(x, y);
   const [mode, setMode] = useState<WidthMode>('linear');
   const [mid, setMid] = useState(true);
+  const [forks, setForks] = useState(initialForkNames);
   const [gaps, setGaps] = useState<GapMode>(initialGaps);
   // (ToLaD#377: only from the address so far; a button for it when the bar has room.)
   useState<ForkMode>(initialForks);
@@ -144,7 +156,7 @@ export function FanApp() {
     };
     // (A new view per level and per gaps' switch; the toggles' state carries over.)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [level, viewReady, gaps]);
+  }, [level, viewReady, gaps, forks]);
 
   return (
     <div className="app fan">
@@ -176,6 +188,26 @@ export function FanApp() {
           }}
         >
           mid labels
+        </button>
+        {/* ToLaD#373: the upper clades named at their forks, or in the stack over "now". */}
+        <button
+          type="button"
+          aria-pressed={forks}
+          onClick={() => {
+            setForkNames(!forks);
+            setSel(null);
+            setForks(!forks);
+            try {
+              const u = new URL(window.location.href);
+              if (forks) u.searchParams.set('forknames', 'off');
+              else u.searchParams.delete('forknames');
+              window.history.replaceState(null, '', u);
+            } catch {
+              /* not in the address */
+            }
+          }}
+        >
+          fork names
         </button>
         {/* ToLaD#378: the gaps between neighbouring branches, the same (even), larger between groups, or by age (the old look). */}
         <button
