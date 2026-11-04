@@ -48,6 +48,34 @@ export const TERR_H = 32;
 /** Rooms by life: a strand's widest over a window is laneW at this many steps (and its ends). */
 const LIFE_SAMPLES = 48;
 
+/**
+ * How a fork is drawn (ToLaD#377, `?forks=`; a look only: positions, frames and taps stay the peels' own). `flat`: the
+ * corners of a rectangular tree where a peel has too little height for its move. `peel`: every daughter a ribbon on its S (the way back).
+ */
+export type ForkMode = 'flat' | 'peel';
+export const FORK_MODES: ForkMode[] = ['flat', 'peel'];
+let forkModeNow: ForkMode = 'flat';
+export const forkMode = (): ForkMode => forkModeNow;
+export const setForkMode = (m: ForkMode): void => {
+  forkModeNow = m;
+};
+
+/**
+ * The peel's mean slope on screen (px across per px up) at which a ribbon stops reading as a ribbon: at or under
+ * RIBBON_SLOPE it is one, whole; from there it narrows, and at LINE_SLOPE it has gone, a rectangular tree's corner in its place.
+ */
+export const RIBBON_SLOPE = 2;
+export const LINE_SLOPE = 4;
+
+/** A peel's ribbon's share of its width at this zoom: 1 a whole ribbon, 0 a corner. */
+export function ribbonShare(move: number, h: number, sx: number, sy: number): number {
+  const m = Math.abs(move) * sx;
+  if (!(m > 0)) return 1;
+  if (!(h > 0)) return 0;
+  const s = m / (h * sy);
+  return s <= RIBBON_SLOPE ? 1 : s >= LINE_SLOPE ? 0 : (LINE_SLOPE - s) / (LINE_SLOPE - RIBBON_SLOPE);
+}
+
 /** The rooms and places at one set of a's and width zoom (world x, the stem's centre on Fold.home). */
 interface Lay {
   ver: number;
@@ -407,6 +435,62 @@ export class Steady extends Fold {
   /** Split v's fork (world): how far above it its daughters' peels end. */
   forkH(v: FanNode): number {
     return this.cur().h[this.idx.get(v)!];
+  }
+
+  /** Node v's peel's ribbon's share at this zoom (ribbonShare), 1 for the root, which has none. */
+  ribbon(v: FanNode, sx: number, sy: number): number {
+    const j = this.idx.get(v)!;
+    const p = this.par[j];
+    if (p < 0) return 1;
+    const L = this.cur();
+    this.prep(L);
+    return ribbonShare(L.dl![j], L.h[p], sx, sy);
+  }
+
+  /**
+   * The peels on the way up to node j that are not whole ribbons at this zoom, youngest first: out gets [top, bottom
+   * (its split), ribbonShare] a peel (world y). A row of them for each column the draw cuts (view.ts cutForks).
+   */
+  private forksUp(L: Lay, j: number, sx: number, sy: number, out: number[]): void {
+    for (let p = this.par[j]; p >= 0; j = p, p = this.par[j]) {
+      const t = ribbonShare(L.dl![j], L.h[p], sx, sy);
+      if (t < 1) out.push(this.nY[p] - L.h[p], this.nY[p], t);
+    }
+  }
+
+  /** forksUp for strand i: its own peel, then its columns'. */
+  strandForks(i: number, sx: number, sy: number, out: number[]): void {
+    const L = this.cur();
+    this.prep(L);
+    out.length = 0;
+    const j = this.bNode[i];
+    const t = ribbonShare(L.dc![i], L.h[j], sx, sy);
+    if (t < 1) out.push(this.sY[i] - L.h[j], this.sY[i], t);
+    this.forksUp(L, j, sx, sy, out);
+  }
+
+  /** forksUp for node v's own peel and its ancestors' (a merged clade, one ribbon above its split). */
+  nodeForks(v: FanNode, sx: number, sy: number, out: number[]): void {
+    const L = this.cur();
+    this.prep(L);
+    out.length = 0;
+    this.forksUp(L, this.idx.get(v)!, sx, sy, out);
+  }
+
+  /** Node v's split, for its corners: its column's centre, and out gets per daughter (v.kids' order) [its column's centre, its ribbon's share]. */
+  corner(v: FanNode, sx: number, sy: number, out: number[]): number {
+    const L = this.cur();
+    this.prep(L);
+    const j = this.idx.get(v)!;
+    const K = this.kidsF[j];
+    const h = L.h[j];
+    out.length = 0;
+    for (let q = 0; q < K.length; q++) {
+      const k = K[q];
+      if (k >= 0) out.push(L.colL[k] + this.nW[k] / 2, ribbonShare(L.dl![k], h, sx, sy));
+      else out.push(L.C[~k], ribbonShare(L.dc![~k], h, sx, sy));
+    }
+    return L.colL[j] + this.nW[j] / 2;
   }
 
   /** How far a peel has gone at y: 0 at its split (y0), 1 a fork h up. */
