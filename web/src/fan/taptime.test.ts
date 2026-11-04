@@ -109,12 +109,13 @@ describe('a tap lands at once (ToLaD#359): its own work before the flight', () =
     v.cam = v.cladeCamera(node('Diprotodontia'));
     tap('kangaroos & kin > wombats', of('Vombatidae'));
     v.cam = v.homeCamera();
-    tap('home > marsupials', of('Metatheria'));
+    // (The marsupials ride with a neighbour's label at home with `groups`, ToLaD#378: the label holding them.)
+    const meta = node('Metatheria').strands;
+    tap('home > marsupials', (s) => !!s.run && s.run[0] <= meta[0].index && s.run[1] >= meta[meta.length - 1].index);
     // Down to the spectral tarsier from the primates, every tap on the label holding it (its "+1" among them).
     v.cam = v.cladeCamera(node('Primates'));
     for (let k = 0; k < 8 && !(v as unknown as { backing: { lv: { b?: unknown } } | null }).backing?.lv.b; k++)
       if (!tap(`primates, tap ${k + 1} to the spectral tarsier`, (s) => !!s.run && s.run[0] <= tarsier && s.run[1] >= tarsier)) break;
-    if (bad.length) console.error("BAD", JSON.stringify(bad).slice(0, 1500));
     expect(bad).toEqual([]);
   });
 });

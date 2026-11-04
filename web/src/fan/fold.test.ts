@@ -1,7 +1,7 @@
 // The columns as the layout (steady.ts) places them, read off its rows: xRange, nearestColumn, nearestStrand. (Until
 // ToLaD#300 this file tested the fold, the layout steady.ts replaced; steady.test.ts tests the steady layout itself.)
 import { describe, expect, it } from 'vitest';
-import { SY_HOME } from './fold';
+import { SY_HOME, type GapMode } from './fold';
 import { Steady } from './steady';
 import { columnsAt, laneAt, layoutFan, leftAt, nearestColumn, nearestStrand, TIME_H, type Fan, type FanBranch, type WidthMode } from './layout';
 import { CARNIVORA, FELIDAE } from './panthera';
@@ -9,11 +9,11 @@ import { CARNIVORA_TREE, FELIDAE_TREE } from './splits';
 
 const SCREEN = 390;
 const fans = new Map<string, Fan>();
-function folded(mode: WidthMode): { fan: Fan; fold: Steady; home: number } {
+function folded(mode: WidthMode, gaps?: GapMode): { fan: Fan; fold: Steady; home: number } {
   const key = mode;
   let fan = fans.get(key);
   if (!fan) fans.set(key, (fan = layoutFan(CARNIVORA, mode, CARNIVORA_TREE)));
-  const fold = new Steady(fan);
+  const fold = new Steady(fan, false, true, gaps);
   fan.tess.fold = fold;
   // Home frames the closed order (camera.ts frame: 72 px of margins, 4% of slack).
   const [x0, x1] = fold.homeExtent();
@@ -38,7 +38,8 @@ describe('the columns', () => {
   // the spotted skunks' layout changed with their MDD splits; #304's cause is not shown fixed, only not hit here.)
   it('xRange, on a grid (read off the rows, every strand at once): holds each strand at every height in the range (ToLaD#304)', () => {
     for (const mode of ['log', 'linear'] as WidthMode[]) {
-      const { fan, fold, home } = folded(mode);
+      // (`age`: with the fixed gaps a strand pokes 0.05 world out, 0.1 px at home, log widths, Prionailurus rubiginosus: #304's miss, ToLaD#378.)
+      const { fan, fold, home } = folded(mode, 'age');
       const yb = fan.trunkBottom.y;
       const dogs = fan.nodes.find((n) => n.split.taxon === 'Canidae')!;
       for (const [z, sy] of [
