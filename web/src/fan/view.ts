@@ -1872,11 +1872,15 @@ export class FanView implements InputHandlers {
   /** Whether camera `cam` shows strands f..l split, two labels or more, every strand under one (the cut there, on screen; the fold at cam's zoom). */
   private labelsCover(cam: Camera, f: number, l: number): boolean {
     let [n, species] = [0, 0];
-    for (const it of this.labelsAt(cam).items)
-      if (it.f >= f && it.l <= l) {
+    const c = this.labelsAt(cam);
+    c.items.forEach((it, i) => {
+      // (Whole on screen, right of the axis: a label sliding off the edge is no label of this frame.)
+      const x = c.pics[i].x;
+      if (it.f >= f && it.l <= l && x - PIC_D / 2 >= LABEL_AXIS_X - 1e-6 && x + PIC_D / 2 <= this.w + 1e-6) {
         n++;
         species += it.l - it.f + 1;
       }
+    });
     return n > 1 && species === l - f + 1;
   }
 

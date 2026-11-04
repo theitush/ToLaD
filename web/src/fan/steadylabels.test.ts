@@ -91,6 +91,8 @@ function play(v: FanView, steps: Step[]): { shots: Shot[]; moved: number[] } {
  * gaps open and close with the width zoom, the columns with them: a pinch at the mammals moves bats' columns twice as
  * far as any point under the camera, and their names, on them, with them), and the labels' top line.
  */
+const HOLD_LEFT = 72 + PIC_D / 2;
+const HOLD_RIGHT = 390 - PIC_D / 2;
 function judge(shots: Shot[], moved: number[], monotonic: boolean): string[] {
   const bad: string[] = [];
   const size = new Map<string, Spot>();
@@ -116,7 +118,10 @@ function judge(shots: Shot[], moved: number[], monotonic: boolean): string[] {
       const p = f > 0 ? shots[f - 1].get(k) : undefined;
       if (p) {
         const d = Math.hypot(s.x - p.x, s.y - p.y);
-        if (d > 1.35 * moved[f - 1] + 2) bad.push(`frame ${f}: ${k} jumped ${d.toFixed(1)} px (the world ${moved[f - 1].toFixed(1)})`);
+        // (At the screen's edge, where an item's territory held its label on screen, ToLaD#373: as it splits or merges its
+        // label goes to where the new item's territory has it, a picture or so past the hold; it used to vanish.)
+        const atEdge = Math.min(p.x, s.x) <= HOLD_LEFT + 1e-6 || Math.max(p.x, s.x) >= HOLD_RIGHT - 1e-6;
+        if (!atEdge && d > 1.35 * moved[f - 1] + 2) bad.push(`frame ${f}: ${k} jumped ${d.toFixed(1)} px, x ${p.x.toFixed(0)} to ${s.x.toFixed(0)} (the world ${moved[f - 1].toFixed(1)})`);
       }
     }
     // (Only where no label is held under the top line: a held label's rows come down off the room over "now", where a
@@ -183,6 +188,33 @@ describe('steady labels while the view moves (ToLaD#333)', () => {
       const one = play(v, pan(40, -8, 0));
       expect(judge(one.shots, one.moved, true)).toEqual([]);
     });
+    // (A pan at one zoom, ToLaD#373, Ita: "when sliding pics disappear suddenyl when they read the edge.. they should
+    // not disappear.. leave them be": every label moves no further than the view, and comes and goes only wholly off screen.)
+    if (name !== 'cats')
+      it(`${name}: a pan across: labels slide off the edge, none vanishes on screen`, { timeout: 300_000 }, async () => {
+        const v = await mk();
+        v.midLabels = true;
+        const h = v.homeCamera();
+        const [z, dx] = name === 'mammals' ? [3, 12] : [3, 6];
+        const sx = h.sx * z;
+        const across = (v.w * z) / dx;
+        const bad: string[] = [];
+        let was: Map<string, number> | null = null;
+        for (let k = 0; k <= across; k++) {
+          v.cam = { ...h, sx, cx: h.cx - (v.w * (z - 1)) / 2 / sx + (k * dx) / sx };
+          v.draw();
+          const now = new Map(v.cutLast!.pics.map((p) => [p.face.sp.sci, p.x]));
+          for (const [q, x] of now) {
+            const p = was?.get(q);
+            if (p === undefined) {
+              if (was && x + PIC_D / 2 > dx + 1e-6 && x - PIC_D / 2 < v.w - dx - 1e-6) bad.push(`step ${k}: ${q} appeared at ${x.toFixed(1)}`);
+            } else if (Math.abs(x - p) > dx + 1e-6) bad.push(`step ${k}: ${q} moved ${p.toFixed(1)} to ${x.toFixed(1)}, the view ${dx}`);
+          }
+          for (const [q, p] of was ?? []) if (!now.has(q) && p + PIC_D / 2 > dx + 1e-6 && p - PIC_D / 2 < v.w - dx - 1e-6) bad.push(`step ${k}: ${q} vanished from ${p.toFixed(1)}`);
+          was = now;
+        }
+        expect(bad).toEqual([]);
+      });
     it(`${name}: a flight to ${to}: sizes kept, no jumps`, { timeout: 300_000 }, async () => {
       const v = await mk();
       v.cam = v.homeCamera();

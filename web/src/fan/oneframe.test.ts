@@ -62,14 +62,16 @@ function run(v: FanView): void {
 const AXIS = 72;
 
 /**
- * At the view's frame for strands f..l: every label shown whole on screen (right of the axis), and every species of
- * f..l under a shown label that stands for none outside f..l (its next-level labels, all of them).
+ * At the view's frame for strands f..l: every label of them shown whole on screen (right of the axis; a neighbour's
+ * may be sliding off the edge, ToLaD#373), and every species of f..l under a shown label that stands for none outside
+ * f..l (its next-level labels, all of them).
  */
 function frameCheck(v: FanView, f: number, l: number, at: string, bad: string[]): void {
   settle(v);
   const c = v.cutLast!;
-  for (const s of c.spots) if (s.box[0] < AXIS - 1e-6 || s.box[2] > v.w + 1e-6 || s.box[3] > v.h) bad.push(`${at}: "${s.text}" cut off at x ${s.box[0].toFixed(1)}–${s.box[2].toFixed(1)}`);
-  for (const p of c.pics) if (p.x - p.d / 2 < AXIS - 1e-6 || p.x + p.d / 2 > v.w + 1e-6 || p.y - p.d / 2 < 0) bad.push(`${at}: ${p.face.sp.common}'s picture cut off at ${p.x.toFixed(1)}, ${p.y.toFixed(1)}`);
+  const mine = (run?: readonly number[]) => !!run && run[0] >= f && run[1] <= l;
+  for (const s of c.spots) if (mine(s.run) && (s.box[0] < AXIS - 1e-6 || s.box[2] > v.w + 1e-6 || s.box[3] > v.h)) bad.push(`${at}: "${s.text}" cut off at x ${s.box[0].toFixed(1)}–${s.box[2].toFixed(1)}`);
+  for (const p of c.pics) if (mine(p.run) && (p.x - p.d / 2 < AXIS - 1e-6 || p.x + p.d / 2 > v.w + 1e-6 || p.y - p.d / 2 < 0)) bad.push(`${at}: ${p.face.sp.common}'s picture cut off at ${p.x.toFixed(1)}, ${p.y.toFixed(1)}`);
   const got = new Int32Array(l - f + 1);
   for (const it of c.items) {
     if (it.l < f || it.f > l) continue;

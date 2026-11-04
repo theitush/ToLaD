@@ -200,10 +200,8 @@ describe('a tap goes one level deeper, a double-tap one level out (ToLaD#258)', 
         run(v);
         // (That group, or where its frame is the view's, on into it; a deeper group's name, as the cut shows them at
         // home (the bears' in the carnivores, ToLaD#333): the next level on its way, one tap one level, ToLaD#258.)
-        // (An item with sisters riding on it that meet only at the root, as "Lynxes +29" in the cats: the root's level, framed in.)
         const now = v.levelNow();
-        const into = now.v === v.fan.root ? v.cam.sx > v.homeCamera().sx * 1.01 : !!now.v;
-        expect(holds({ v: g }, now) || (into && holds(now, { v: g }))).toBe(true);
+        expect(holds({ v: g }, now) || (!!now.v && now.v !== v.fan.root && holds(now, { v: g }))).toBe(true);
         v.doubleTap(-1e4, -1e4);
         run(v);
         expect(atHome(v)).toBe(true);
