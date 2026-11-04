@@ -76,7 +76,7 @@ function initialGaps(): GapMode {
 }
 
 /** The upper clades' names at their forks (ToLaD#373, `?forknames=off`: the stack over "now"): set before the first view is built. */
-function initialForks(): boolean {
+function initialForkNames(): boolean {
   try {
     if (new URLSearchParams(window.location.search).get('forknames') === 'off') setForkNames(false);
   } catch {
@@ -92,7 +92,7 @@ export function FanApp() {
   const cardUp = (x: number, y: number) => viewRef.current?.doubleTap(x, y);
   const [mode, setMode] = useState<WidthMode>('linear');
   const [mid, setMid] = useState(true);
-  const [forks, setForks] = useState(initialForks);
+  const [forks, setForks] = useState(initialForkNames);
   const [gaps, setGaps] = useState<GapMode>(initialGaps);
   // (ToLaD#377: only from the address so far; a button for it when the bar has room.)
   useState<ForkMode>(initialForks);
