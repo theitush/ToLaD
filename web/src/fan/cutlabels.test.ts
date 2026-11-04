@@ -5,7 +5,6 @@ import { describe, expect, it } from 'vitest';
 import { loadMammalsFromFiles } from './mammals-node';
 import { CARNIVORA, FELIDAE, mammaliaClade, type CladeRec } from './panthera';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, type Split } from './splits';
-import { laneAt, leftAt } from './layout';
 import { FanView, groupCentre, type CutLabels } from './view';
 
 function stubView(clade: CladeRec = CARNIVORA, tree: Split = CARNIVORA_TREE, folds = true): FanView {
@@ -56,42 +55,12 @@ function check(c: CutLabels, w: number): void {
   for (let k = 1; k < S.length; k++) expect(S[k].box[0]).toBeGreaterThanOrEqual(S[k - 1].box[2] - 1e-6);
   const P = [...c.pics].sort((p, q) => p.x - q.x);
   for (let k = 1; k < P.length; k++) expect(P[k].x - P[k].d / 2).toBeGreaterThanOrEqual(P[k - 1].x + P[k - 1].d / 2 - 1e-6);
-  // (No name over another's picture; over its own only held under the top line, ToLaD#373: asserted with "now" in room below.)
+  // (No name over a picture, ToLaD#373.)
   for (const p of P)
     for (const s of S)
-      if (c.pics[c.spots.indexOf(s)] !== p && s.box[2] > p.x - p.d / 2 && s.box[0] < p.x + p.d / 2) expect(s.box[3]).toBeLessThanOrEqual(p.y - p.d / 2 + 1e-6);
-  for (const s of S) expect([s.key, s.x, s.box[2] > 0 && s.box[0] < w]).toEqual([s.key, s.x, true]);
-}
-
-/**
- * The thin branch columns a name pill hides at its top (ToLaD#368: Ita, "if it covers the branch or i dunno 80% of it
- * it should be on its side"; "it mostly matter at the top of the branches"), brute force: at the pill's top row (where
- * its cap is full width) the drawn columns (every lane there, touching lanes one column), no wider than the pill / 0.8,
- * it covers more than 80 % of, that it could have cleared (their middle no further right of its picture's centre `px`
- * than a pill pushed right as far as it goes clears: (PIC_D - 22) / 2 - (11 - 0.3·w)).
- */
-function hidden(v: FanView, box: readonly number[], px: number, d: number): string[] {
-  const out: string[] = [];
-  const wy = v.toWorld(0, box[1] + 11)[1];
-  const L = v.fan.branches
-    .filter((b) => b.tipY <= wy && laneAt(b, wy).w > 0)
-    .map((b) => {
-      const a = v.toScreen(leftAt(b, wy), 0)[0];
-      return { a, b: a + laneAt(b, wy).w * v.cam.sx };
-    })
-    .sort((p, q) => p.a - q.a);
-  const cols: { a: number; b: number }[] = [];
-  for (const l of L) {
-    const t = cols[cols.length - 1];
-    if (t && l.a <= t.b + 1) t.b = Math.max(t.b, l.b);
-    else cols.push({ ...l });
-  }
-  for (const k of cols) {
-    const w = k.b - k.a;
-    const clear = (k.a + k.b) / 2 - px <= (d - 22) / 2 - (11 - 0.3 * w);
-    if (w <= 22 / 0.8 && clear && Math.min(k.b, box[2]) - Math.max(k.a, box[0]) > 0.8 * w + 1e-6) out.push(`${w.toFixed(1)} px at ${k.a.toFixed(1)}`);
-  }
-  return out;
+      if (s.box[2] > p.x - p.d / 2 && s.box[0] < p.x + p.d / 2) expect(s.box[3]).toBeLessThanOrEqual(p.y - p.d / 2 + 1e-6);
+  // (Each on screen, its picture at least: it stays until wholly off the edge.)
+  for (const q of c.pics) expect([q.x, q.x + q.d / 2 >= 0 && q.x - q.d / 2 <= w]).toEqual([q.x, true]);
 }
 
 const mammals = async () => {
@@ -148,27 +117,25 @@ describe('labels from the cut (?labels=cut, ToLaD#333)', () => {
         // cover the branches"): its name over its picture over its "+x" line, all above it, and every picture in one row.
         const nowY = v.toScreen(0, v.fan.time.y(0))[1];
         const T = (v as unknown as { territories(): { whole(k: number, f: number, l: number): number; youngOf(k: number): number } }).territories();
-        if (nowY >= (v as unknown as { topLast: number }).topLast + 120)
+        const row = (v as unknown as { rowLast: number }).rowLast;
           for (let i = 0; i < cut.spots.length; i++) {
             const it = cut.items[i];
             if (T.youngOf(T.whole(it.head, it.f, it.l)) > v.fan.time.y(0)) continue;
             const s = cut.spots[i];
             const p = cut.pics[i];
-            if (s.box[1] <= (v as unknown as { topLast: number }).topLast + 1e-6) continue;
-            expect([s.text, p.y + p.d / 2 + 14]).toEqual([s.text, expect.closeTo(nowY, 6)]);
-            expect([s.text, s.box[3] <= p.y - p.d / 2]).toEqual([s.text, true]);
-            if (s.over) expect([s.text, s.over[2] < nowY && s.over[2] > p.y + p.d / 2]).toEqual([s.text, true]);
+            if (p.y - p.d / 2 > row + 1e-6) {
+              expect([s.text, p.y + p.d / 2 + 14]).toEqual([s.text, expect.closeTo(nowY, 6)]);
+              if (s.over) expect([s.text, s.over[2] < nowY && s.over[2] > p.y + p.d / 2]).toEqual([s.text, true]);
+            }
           }
-        // Each name pill over its picture, right of its centre within its footprint, beside the thin branches it
-        // could clear there (ToLaD#368).
-        if (!name.startsWith('mammals'))
-          for (let i = 0; i < cut.spots.length; i++) {
-            const s = cut.spots[i];
-            const p = cut.pics[i];
-            expect(s.x - p.x).toBeGreaterThanOrEqual(-1e-6);
-            expect(s.x - p.x).toBeLessThanOrEqual((p.d - 22) / 2 + 1e-6);
-            expect([s.text, hidden(v, s.box, p.x, p.d)]).toEqual([s.text, []]);
-          }
+        // One rigid unit (ToLaD#373, Ita: "the name should be attached to the pic and always above it"): each pill
+        // centred on its picture, its foot just over it, never under the band's row less the longest pill.
+        for (let i = 0; i < cut.spots.length; i++) {
+          const s = cut.spots[i];
+          const p = cut.pics[i];
+          expect([s.text, s.x, s.box[3]]).toEqual([s.text, expect.closeTo(p.x, 6), expect.closeTo(p.y - p.d / 2 - 4, 6)]);
+          expect([s.text, p.y - p.d / 2 >= row - 1e-6]).toEqual([s.text, true]);
+        }
         seen.push(sig(cut));
       }
       // The same camera, reached the other way round (from deep in to home), gives the same labels.

@@ -324,7 +324,7 @@ export class Brackets {
   /** A clade's span (world x) in place of its species' rooms at "now" (its territory, cut.ts), or null. */
   spanOf: ((v: FanNode) => readonly [number, number] | null) | null = null;
   hideKey = '';
-  /** Room (px) kept for the labels between the stack's foot and "now" (the view's: the tallest label its fan could have, ToLaD#373). */
+  /** Room (px) kept for the labels between the stack's foot and "now" (the view's: its label band's, ToLaD#373). */
   pillRoom: number = PILL_ROOM;
   /** The "…" row over the stack (ToLaD#288): its row, or -1 for none; the pinned rows' likewise (pinMore). */
   moreRow = -1;
@@ -732,6 +732,9 @@ export class Brackets {
 export type Pin = Placed;
 /** Backdrop (px) the pinned rows take beyond their own height. */
 export const PIN_PAD = 6;
+
+/** What stands over the labels at its most (px): the stack or the pinned rows at STACK_ROWS rows and the "…" (view.ts labelBand). */
+export const STACK_MOST = (STACK_ROWS + 1) * ROW_H + PIN_PAD;
 
 /** Room (px) kept for the labels between the stack's foot and "now", by default (Brackets.pillRoom: the view's own). */
 export const PILL_ROOM = 96;

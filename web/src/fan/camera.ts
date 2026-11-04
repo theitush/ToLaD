@@ -34,8 +34,8 @@ export const MAX_YEARS_FRAC = 0.1;
 export const STRAND_PX = 90;
 /** Zoom out to this fraction of the home view at most. */
 export const MIN_ZOOM = 0.75;
-/** The most of the height between the brackets' stack and a level's start that its labels' room over "now" takes (ToLaD#373; view.ts withBand). */
-export const LABELS_SHARE = 0.5;
+/** "Now" stands no lower than this share of the height down: the labels' band over it shrinks to keep it there on a short screen (ToLaD#373; view.ts labelBand). */
+export const LABELS_SHARE = 0.45;
 const SX_MAX = 1e14;
 const TY_MAX = 1e9;
 
@@ -137,8 +137,8 @@ export class FanCamera {
   }
 
   /**
-   * Zoom-out bounds (px per world unit) for width and time. In time, home's less what a frame's labels may take of the
-   * tree's height: a level near home's span with longer names than home's stands that much shorter (ToLaD#373).
+   * Zoom-out bounds (px per world unit) for width and time. In time, home's less what the labels' band may take of the
+   * height: the view's frames stand that much shorter than this home (ToLaD#373).
    */
   minScale(): [number, number] {
     const h = this.home();
@@ -347,13 +347,12 @@ export class FanCamera {
 
   /**
    * Keep the fan on screen: content within 40% of the screen's width of the
-   * centre (at some height on screen), "now" no lower than 40% down, the
+   * centre (at some height on screen), "now" no lower than LABELS_SHARE down, the
    * stem's end no higher than 60%.
    */
   clampPan(): void {
     const c = this.cam;
-    // ("Now" no lower than the middle of the screen: a frame's room for its labels can take it about that far, ToLaD#373.)
-    const yTop = this.yNow;
+    const yTop = this.yNow + ((0.5 - LABELS_SHARE) * this.h) / c.sy;
     const yBot = this.fan.trunkBottom.y - (0.1 * this.h) / c.sy;
     c.cy = yTop > yBot ? (yTop + yBot) / 2 : Math.min(yBot, Math.max(yTop, c.cy));
     const p = this.nearestContent(c.cx, Math.max(this.yNow, c.cy - this.h / 2 / c.sy), c.cy + this.h / 2 / c.sy);
