@@ -2053,9 +2053,27 @@ export class FanView implements InputHandlers {
     }
     const brk = pinned || pill || pic ? null : this.brackets?.hit(x, y);
     // A name at its fork (ToLaD#390): that clade's own frame, its fork over the scale bar, not a level on the way to it;
-    // framed already, it stays. (A flight that moves nothing is no step, tap().)
+    // framed already, it stays. (A flight that moves nothing is no step, tap().) A clade its own frame does not show
+    // split (as the solenodons, their branches a sliver of their territory) goes where a tap on its picture goes, its
+    // next split (tapItem), and stays there too, the same frame computed again; unless its fork is not on that frame,
+    // which the name is for: then its own.
     if (brk && forkNames()) {
-      this.goLevel({ v: brk.v }, this.frameOf({ v: brk.v }));
+      const v = brk.v;
+      const [f, l] = [v.strands[0].index, v.strands[v.strands.length - 1].index];
+      const fold = this.fan.tess.fold;
+      const keep = fold?.keep();
+      const cam = v.parent ? this.cladeCamera(v) : this.homeCamera();
+      const shown = this.labelsCover(cam, f, l);
+      keep?.();
+      if (!shown) {
+        this.tapItem(f, l);
+        const at = this.backing!.cam;
+        fold?.setScale(at.sx, this.w);
+        const x = (nodeLeftAt(v, v.y) + v.width / 2 - at.cx) * at.sx + this.w / 2;
+        keep?.();
+        if (x >= LABEL_AXIS_X && x <= this.w) return;
+      }
+      this.goLevel({ v }, cam);
       return;
     }
     const to: Level | null = pinned ? { v: pinned.v } : pill?.v ? { v: pill.v } : pill?.b ? { b: pill.b } : pic ? (pic[4] ? { v: pic[4] } : { b: pic[3] }) : brk ? { v: brk.v } : null;
