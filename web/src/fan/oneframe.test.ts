@@ -86,14 +86,15 @@ function frameCheck(v: FanView, f: number, l: number, at: string, bad: string[])
 function tapEach(v: FanView, at: string, bad: string[], depth: number, sample = Infinity): number {
   settle(v);
   const from = { ...v.cam };
-  const items = v.cutLast!.items.filter((it) => it.l > it.f).map((it) => [it.f, it.l] as [number, number]);
+  const items = v.cutLast!.spots.filter((s) => s.run && s.run[1] > s.run[0]).map((s) => [...s.run!, s.box] as const);
   const step = Math.max(1, Math.ceil(items.length / sample));
   let n = 0;
   for (let i = 0; i < items.length; i += step) {
-    const [f, l] = items[i];
+    const [f, l, box] = items[i];
     v.cam = { ...from };
     settle(v);
-    v.tapItem(f, l);
+    // (A real tap, on its label: a tap's step is what a double tap goes back by, ToLaD#376.)
+    v.tap((box[0] + box[2]) / 2, (box[1] + box[3]) / 2);
     run(v);
     const here = `${at} > ${f}-${l}`;
     n++;
