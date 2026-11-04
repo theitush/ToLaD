@@ -117,7 +117,7 @@ const FANS = [
   ['cats', () => stubView(FELIDAE, FELIDAE_TREE, false)],
 ] as const;
 
-describe("a group's picture is its most-populous living species, photo or not (ToLaD#258; #358: no photo, the placeholder disc)", () => {
+describe("a group's picture is its most-populous living species, photo or not (ToLaD#258, #358; no photo: a relative's on its disc, or the stub, #400)", () => {
   for (const [name, mk] of FANS) {
     it(name, () => {
       const v = mk();

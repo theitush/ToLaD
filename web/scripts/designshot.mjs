@@ -276,6 +276,13 @@ const scenes = [
   ['pin-pan2', 'pan', [2, 100]],
   ['pin-pan3', 'pan', [2, 130]],
   ['pin-pan4', 'pan', [2, 220]],
+  // ToLaD#400 (LEVEL=mammals): a small picture on every name alone, a relative's photo, the stub for none.
+  ['pstub-apes', 'level', ['Catarrhini']],
+  ['pstub-gibbons', 'level', ['Hylobatidae']],
+  ['pstub-dasymys', 'level', ['Dasymys']],
+  ['pstub-murinae', 'level', ['Murinae']],
+  ['pstub-chodsigoa', 'level', ['Chodsigoa']],
+  ['pstub-cheirogaleus', 'level', ['Cheirogaleus']],
 ];
 const browser = await chromium.launch({ headless: true });
 let served = null;

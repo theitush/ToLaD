@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { bigSrcOf, RangeMap, SpeciesCard, WikiPic } from './FanApp';
 import { FELIDAE } from './panthera';
-import { drawPic, PIC_CAP, PIC_FADE_MS, PicLoader, picSrcOf, wikiOf } from './wiki';
+import { drawPic, livePic, PIC_CAP, PIC_FADE_MS, PicLoader, picSrcOf, wikiOf } from './wiki';
 
 const lion = FELIDAE.species.find((s) => s.sci === 'Panthera leo')!;
 
@@ -149,6 +149,7 @@ describe('the tree pictures: placeholder at once, fetched ahead (ToLaD#351)', ()
   const ctxRec = () => {
     const drawn: number[] = [];
     let fills = 0;
+    let dashes = 0;
     const saved: number[] = [];
     const ctx = {
       globalAlpha: 1,
@@ -162,6 +163,13 @@ describe('the tree pictures: placeholder at once, fetched ahead (ToLaD#351)', ()
       arc() {},
       clip() {},
       stroke() {},
+      moveTo() {},
+      lineTo() {},
+      closePath() {},
+      roundRect() {},
+      setLineDash(d: number[]) {
+        if (d.length) dashes++;
+      },
       fill() {
         fills++;
       },
@@ -170,7 +178,7 @@ describe('the tree pictures: placeholder at once, fetched ahead (ToLaD#351)', ()
         drawn.push(ctx.globalAlpha);
       },
     };
-    return { ctx: ctx as unknown as CanvasRenderingContext2D, drawn, fills: () => fills };
+    return { ctx: ctx as unknown as CanvasRenderingContext2D, drawn, fills: () => fills, stubs: () => dashes };
   };
   const sp = FELIDAE.species.filter((s) => wikiOf(s.sci)?.img).map((s) => s.sci);
   const url = (s: string) => wikiOf(s)!.img!;
@@ -189,6 +197,7 @@ describe('the tree pictures: placeholder at once, fetched ahead (ToLaD#351)', ()
     drawPic(r.ctx, sp[0], 50, 50, 50, request, L);
     expect(r.drawn).toEqual([]); // placeholder only
     expect(r.fills()).toBe(2); // its ring's dark disc and its quiet fill
+    expect(r.stubs()).toBe(0); // loading is not "no photo"
     const [img] = FakeImage.made;
     expect(img.src).toBe(picSrcOf(url(sp[0])));
     expect(img.crossOrigin).toBe('anonymous');
@@ -244,11 +253,28 @@ describe('the tree pictures: placeholder at once, fetched ahead (ToLaD#351)', ()
     await tick();
     expect(L.failed(url(sp[0]))).toBe(true);
     expect(L.inFlight).toBe(0);
+    expect(request).toHaveBeenCalledTimes(1); // one redraw, for the stub
+    expect(r.stubs()).toBe(0);
+    expect(livePic(sp[0], L)).toBe(false); // a group's disc moves on to a relative
+    expect(livePic(sp[1], L)).toBe(true);
     drawPic(r.ctx, sp[0], 50, 50, 50, request, L);
     expect(r.drawn).toEqual([]);
-    expect(r.fills()).toBe(4); // still the placeholder, every frame
+    expect(r.stubs()).toBe(1); // failed for good: the stub, every frame
     expect(FakeImage.made.length).toBe(2); // not asked again
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it('draws the stub at once for a species with no photo, at both sizes, and loads nothing (ToLaD#400)', () => {
+    const L = fresh();
+    const request = vi.fn();
+    const r = ctxRec();
+    drawPic(r.ctx, 'Not a species', 50, 50, 50, request, L);
+    drawPic(r.ctx, 'Not a species', 50, 50, 22, request, L);
+    expect(r.stubs()).toBe(2);
+    expect(r.drawn).toEqual([]);
+    expect(FakeImage.made.length).toBe(0);
     expect(request).not.toHaveBeenCalled();
+    expect(livePic('Not a species', L)).toBe(false);
   });
 });
 
