@@ -4,7 +4,7 @@
 // in far enough, a branch resolves into the individuals themselves (twigs.ts).
 // Gestures come from the shared engine/input.ts.
 
-import { drawPic, prefetchPics } from './wiki';
+import { drawPic, hasPic, livePic, PIC_TRIES, prefetchPics } from './wiki';
 import { PIC_D, PIC_LIFT, type PicSpot } from './pics';
 import { formatCount, formatMass } from '../data/count';
 import { stamp } from '../stamp';
@@ -150,6 +150,11 @@ export interface LabelSpot {
   fam?: FanNode;
   /** The species whose picture it carries, when not its own `b` (a family's: its commonest living species, ToLaD#212). */
   pic?: FanBranch | null;
+  /**
+   * A name alone's small picture (ToLaD#400): a disc `d` across centred at (x, y), under its pill. Then `y1` is the
+   * pill's foot and `box` holds the pill and the disc together: what the placing, the taps and the brackets go by.
+   */
+  disc?: { y: number; d: number; lv: Level };
 }
 
 /** A frame's labels from the cut (ToLaD#333, #358): one per item, its name pill and its picture, and its "+x" species. */
@@ -651,7 +656,7 @@ export function labelGroups(fan: Fan, at: Level): LabelGroups {
   return out;
 }
 
-/** A group's picture (ToLaD#258, #358): its species with the most individuals alive now, photo or not (no photo: the placeholder disc). */
+/** A group's picture (ToLaD#258, #358): its species with the most individuals alive now, photo or not (what its disc draws: groupPics). */
 const faceCache = new WeakMap<FanNode, FanBranch | null>();
 export function groupFace(v: FanNode): FanBranch | null {
   let out = faceCache.get(v);
@@ -663,11 +668,37 @@ export function groupFace(v: FanNode): FanBranch | null {
   return out;
 }
 
+/**
+ * The relatives a group's disc may show when its face has no photo (ToLaD#400): its members with a photo, the most
+ * individuals alive now first, a fossil only where nobody living has one. The first PIC_TRIES, worked out once.
+ */
+const picsCache = new WeakMap<FanNode, string[]>();
+export function groupPics(v: FanNode): string[] {
+  let out = picsCache.get(v);
+  if (!out) {
+    const alive = (b: FanBranch) => (b.sp.extinct ? 0 : b.pop.aliveAt(0));
+    out = v.strands.filter((b) => hasPic(b.sp.sci)).sort((p, q) => alive(q) - alive(p)).slice(0, PIC_TRIES).map((b) => b.sp.sci);
+    picsCache.set(v, out);
+  }
+  return out;
+}
+/**
+ * The species a label's disc draws (ToLaD#400): its face, unless the label stands for a group and its face has no photo
+ * (or that photo failed): then the first relative whose photo has not failed. Back to its face, for its stub, when none
+ * is left. Draw only: a label's name, place and tap stay its face's.
+ */
+export function discSci(lv: Level, face: FanBranch): string {
+  const own = face.sp.sci;
+  if (!lv.v || livePic(own)) return own;
+  for (const s of groupPics(lv.v)) if (livePic(s)) return s;
+  return own;
+}
+
 /** The species whose pictures a tap on group v would show (its next level's faces, ToLaD#351: fetched ahead). */
 const nextFaceCache = new WeakMap<FanNode, string[]>();
 function nextFaces(fan: Fan, v: FanNode): string[] {
   let out = nextFaceCache.get(v);
-  if (!out) nextFaceCache.set(v, (out = nextLevels(fan, v).flatMap((g) => (g.b ?? groupFace(g.v))?.sp.sci ?? [])));
+  if (!out) nextFaceCache.set(v, (out = nextLevels(fan, v).flatMap((g) => (g.b ? g.b.sp.sci : (groupPics(g.v)[0] ?? [])))));
   return out;
 }
 
@@ -2394,7 +2425,8 @@ export class FanView implements InputHandlers {
      * pictures with their pills and the names already placed (the slider model: a name of several branches slides
      * inside its territory to the nearest free stretch, a name of one stays on its branch); what has no free place is
      * not drawn. Its species leave its item's "+x" and go on its own. It comes in as its free stretch opens: a function
-     * of the camera alone, so a pinch fades it instead of popping it.
+     * of the camera alone, so a pinch fades it instead of popping it. Its picture (ToLaD#400): a disc a pill across, at
+     * the foot, the pill the same gap over it as over a big picture.
      */
     const boxes: (readonly number[])[] = [...spots.map((s) => s.box), ...pics.map((p) => [p.x - p.d / 2, p.y - p.d / 2, p.x + p.d / 2, p.y + p.d / 2])];
     const pieces: { it: CutItem; o: CutItem; alive: number }[] = [];
@@ -2426,7 +2458,8 @@ export class FanView implements InputHandlers {
       if (x + half < 0 || x - half > this.w) continue;
       const plus = this.plusPx(name.hid.length);
       const text = this.pillText(name.text, cap - 2 * LABEL_PAD - plus);
-      const y0 = y1 - this.nameWidth(text) - 2 * LABEL_PAD - plus;
+      const pillFoot = y1 - LABEL_PILL - LABEL_UNDER;
+      const y0 = pillFoot - this.nameWidth(text) - 2 * LABEL_PAD - plus;
       // (Where its centre is free of what stands across its rows, in its territory: the free stretch nearest its place.)
       const lo = one ? X(it.x0) + half : Math.max(X(it.x0) + half, left + half);
       const hi = one ? X(it.x1) - half : Math.min(X(it.x1) - half, right - half);
@@ -2449,10 +2482,12 @@ export class FanView implements InputHandlers {
       boxes.push(box);
       const key = `n${it.f}:${it.l}`;
       if (name.hid.length) groups.set(key, name.hid);
-      const s: LabelSpot = { key, id: key, run: [it.f, it.l], place: 'tip', text, rank: [1, it.x1 - it.x0, it.head], x, y1, box, fit: fit * clamp01(clear / LABEL_UNDER), plus, pic: name.face };
+      const s: LabelSpot = { key, id: key, run: [it.f, it.l], place: 'tip', text, rank: [1, it.x1 - it.x0, it.head], x, y1: pillFoot, box, fit: fit * clamp01(clear / LABEL_UNDER), plus, pic: name.face };
       const k = T.whole(it.head, it.f, it.l);
-      if (k < 0) s.b = T.t.strands[~k];
-      else Object.assign(s, { v: T.t.nodes[k], fam: T.t.nodes[k] });
+      const lv: Level = k < 0 ? { b: T.t.strands[~k] } : { v: T.t.nodes[k] };
+      if (lv.b) s.b = lv.b;
+      else Object.assign(s, { v: lv.v, fam: lv.v });
+      s.disc = { y: y1 - half, d: LABEL_PILL, lv };
       if (span && span[1] > span[0]) s.over = [X(span[0]), X(span[1]), foot];
       names.push(s);
       const r = named.get(o);
@@ -3091,7 +3126,7 @@ export class FanView implements InputHandlers {
     // (Hits: the one on top found first.)
     for (const p of [...this.picSpots].reverse()) this.thumbHits.push([p.x, p.y, p.d / 2, p.face, p.lv.v, p.run]);
     // (Its placeholder at once, the picture fading in when loaded; what a tap would show next fetched ahead, ToLaD#351.)
-    for (const p of this.picSpots) drawPic(ctx, p.face.sp.sci, p.x, p.y, p.d, () => this.request());
+    for (const p of this.picSpots) drawPic(ctx, discSci(p.lv, p.face), p.x, p.y, p.d, () => this.request());
     prefetchPics(this.picSpots.flatMap((p) => (p.lv.v ? nextFaces(this.fan, p.lv.v) : [])));
     ctx.restore();
   }
@@ -3180,10 +3215,13 @@ export class FanView implements InputHandlers {
     for (let k = 0; k < spots.length; k++) {
       const s = spots[k];
       const alpha = s.fit;
-      const [x0, y0, x1, y1] = s.box;
-      if (alpha < 0.01 || x1 < 0 || x0 > this.w || y1 < 0 || y0 > this.h) continue;
+      const [x0, y0, x1, foot] = s.box;
+      if (alpha < 0.01 || x1 < 0 || x0 > this.w || foot < 0 || y0 > this.h) continue;
+      // (A name alone's pill ends over its disc; its box, and so its tap, is the two.)
+      const y1 = s.disc ? s.y1 : foot;
       if (s.ev !== undefined && s.b && alpha > 0.5) this.eventLabels.push({ box: [x0, y0, x1, y1], b: s.b, k: s.ev });
       ctx.globalAlpha = alpha;
+      if (s.disc) drawPic(ctx, discSci(s.disc.lv, s.pic!), s.x, s.disc.y, s.disc.d, () => this.request());
       // (Opaque: a bracket's line behind it never shows through the name.)
       ctx.fillStyle = BG;
       ctx.beginPath();
@@ -3194,8 +3232,8 @@ export class FanView implements InputHandlers {
         ctx.strokeStyle = FAMILY_INK;
         ctx.lineWidth = 1;
         ctx.stroke();
-        if (alpha > 0.5) this.famHits.push({ box: [x0, y0, x1, y1], v: s.fam, run: s.run });
-      } else if (s.b && s.ev === undefined && !s.v && alpha > 0.5) this.nameHits.push({ box: [x0, y0, x1, y1], b: s.b, run: s.run });
+        if (alpha > 0.5) this.famHits.push({ box: [x0, y0, x1, foot], v: s.fam, run: s.run });
+      } else if (s.b && s.ev === undefined && !s.v && alpha > 0.5) this.nameHits.push({ box: [x0, y0, x1, foot], b: s.b, run: s.run });
       if (s.span) {
         // ...and a bracket over the species it names, just above "now".
         const a = Math.max(-2, s.span[0]);

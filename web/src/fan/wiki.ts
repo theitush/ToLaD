@@ -4,7 +4,7 @@
 //
 // The pictures are hotlinked, never copied (Ita, 2026-10-12). Where they cannot load (no
 // network, the Claude artifact's CSP, a dead file), the card has no picture and the tree's
-// discs stay placeholders (drawPic, ToLaD#351).
+// discs show the stub for no photo (drawPic, ToLaD#351, #400).
 
 import { wiki as WIKI } from 'virtual:panthera-data';
 import { mammalData, mammalsLoaded } from './mammals-data';
@@ -50,6 +50,11 @@ export function picSrcOf(src: string): string {
 
 /** How long a loaded picture fades in over its placeholder (ms); after it, no further redraws. */
 export const PIC_FADE_MS = 150;
+/** The stub's dashes round its ring; its ink (the palette's INK3), the slash's (INK2) and what cuts them (the disc's dark). */
+const STUB_DASHES = 10;
+const STUB_INK = '#7d8e84';
+const STUB_SLASH = '#a9b8ae';
+const STUB_CUT = '#0c1714';
 /** Most pictures loading at once. */
 export const PIC_CAP = 6;
 
@@ -69,7 +74,7 @@ interface Pic {
  * The pictures' loader (ToLaD#351): one image per stored URL for the page's life; at most `cap` loading at once, the
  * ones on screen (`want`) before the ones fetched ahead (`ahead`, the last list given replacing the one before);
  * decoded off the main thread (`img.decode()`) before they count as loaded; a URL that fails falls back to the next,
- * the last failing for good (its disc stays a placeholder). `onChange` is called when one is ready.
+ * the last failing for good (its disc turns to the stub). `onChange` is called when one is ready or has failed for good.
  */
 export class PicLoader {
   private readonly pics = new Map<string, Pic>();
@@ -128,7 +133,7 @@ export class PicLoader {
     return p?.state === 'ready' && p.img ? { img: p.img, fade: Math.min(1, Math.max(0, (this.clock() - p.at) / PIC_FADE_MS)) } : null;
   }
 
-  /** Whether the picture failed for good (its disc stays a placeholder). */
+  /** Whether the picture failed for good (its disc shows the stub). */
   failed(url: string): boolean {
     return this.pics.get(url)?.state === 'failed';
   }
@@ -164,7 +169,7 @@ export class PicLoader {
       if (ok) Object.assign(p, { state: 'ready', img, at: this.clock() });
       else p.state = 'failed';
       this.pump();
-      if (ok) this.onChange?.();
+      this.onChange?.();
     };
     img.src = p.srcs[k];
     // (Decoded off the main thread before it counts as loaded, so its first draw does not stall a frame.)
@@ -195,10 +200,66 @@ export function prefetchPics(scis: readonly (string | null | undefined)[]): void
   picLoader()?.ahead(urls);
 }
 
+/** How many of a group's photos its disc tries before its stub (ToLaD#400): a dead file has a relative behind it, a dead network does not walk the whole group. */
+export const PIC_TRIES = 3;
+
+/** Whether the species has a photo to show that has not failed for good. */
+export function livePic(sci: string, L = picLoader()): boolean {
+  return hasPic(sci) && !L?.failed(wikiOf(sci)!.img!);
+}
+
+/**
+ * The stub for no photo (ToLaD#400): a dashed ring and a camera struck through, all in proportion to `d`, so that it
+ * reads as a statement at 22 px and at 50 px, where the loading disc is a plain fill in a whole ring. Paths only.
+ */
+function drawStub(ctx: CanvasRenderingContext2D, cx: number, cy: number, d: number): void {
+  const r = d / 2 - 1.5;
+  const line = Math.max(1, d * 0.03);
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  // (A whole number of dashes, so that the ring closes on one.)
+  const dash = (Math.PI * r) / STUB_DASHES;
+  ctx.setLineDash([dash, dash]);
+  ctx.strokeStyle = STUB_INK;
+  ctx.lineWidth = line;
+  ctx.stroke();
+  ctx.setLineDash([]);
+  // The camera: a body with its viewfinder's hump, the lens cut out.
+  const [w, h, hump] = [d * 0.5, d * 0.33, d * 0.065];
+  const [x0, y0] = [cx - w / 2, cy - h / 2 + hump / 2];
+  ctx.beginPath();
+  ctx.roundRect(x0, y0, w, h, d * 0.05);
+  ctx.moveTo(cx - w * 0.22, y0 + h * 0.1);
+  ctx.lineTo(cx - w * 0.13, y0 - hump);
+  ctx.lineTo(cx + w * 0.13, y0 - hump);
+  ctx.lineTo(cx + w * 0.22, y0 + h * 0.1);
+  ctx.closePath();
+  ctx.fillStyle = STUB_INK;
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(cx, y0 + h / 2, h * 0.27, 0, Math.PI * 2);
+  ctx.fillStyle = STUB_CUT;
+  ctx.fill();
+  // The slash: the disc's dark around a line in the name's ink, across the camera and short of the ring.
+  const s = r * 0.62;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(cx - s, cy + s);
+  ctx.lineTo(cx + s, cy - s);
+  ctx.strokeStyle = STUB_CUT;
+  ctx.lineWidth = line * 2.6;
+  ctx.stroke();
+  ctx.strokeStyle = STUB_SLASH;
+  ctx.lineWidth = line * 1.2;
+  ctx.stroke();
+}
+
 /**
  * A species' picture as a disc of diameter `d` centred at (cx, cy) (ToLaD#351): its placeholder at once, at its final
  * size and place (a quiet disc in its ring), and the picture fading in over it once loaded (PIC_FADE_MS; `request` is
- * asked for the fade's frames, then never again). A picture that fails stays a placeholder. `L` for tests.
+ * asked for the fade's frames, then never again). With no photo, or one that failed for good, the stub (ToLaD#400):
+ * never while one may yet come, and the wiki's rows are in by then (the carnivores' are in the page, the rest arrive
+ * with the data any other species is drawn from). Thumbnails off, the placeholder alone. `L` for tests.
  */
 export function drawPic(ctx: CanvasRenderingContext2D, sci: string, cx: number, cy: number, d: number, request: () => void, L = picLoader()): void {
   const url = thumbsOn ? wikiOf(sci)?.img : undefined;
@@ -207,11 +268,17 @@ export function drawPic(ctx: CanvasRenderingContext2D, sci: string, cx: number, 
     L.want(url);
   }
   const got = url && L ? L.ready(url) : null;
+  const none = thumbsOn && (!url || !!L?.failed(url));
   ctx.save();
   ctx.beginPath();
   ctx.arc(cx, cy, d / 2, 0, Math.PI * 2);
   ctx.fillStyle = 'rgba(12,23,20,0.8)';
   ctx.fill();
+  if (none) {
+    drawStub(ctx, cx, cy, d);
+    ctx.restore();
+    return;
+  }
   ctx.beginPath();
   ctx.arc(cx, cy, d / 2 - 1.5, 0, Math.PI * 2);
   if (!got || got.fade < 1) {
