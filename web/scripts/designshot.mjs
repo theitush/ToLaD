@@ -253,6 +253,7 @@ const scenes = [
   // The groups the view is inside pinned at the top (ToLaD#233): home (nothing pinned, the stack itself), deep in a
   // bear's and a weasel's past ("now" far off the top), and (LEVEL=cats) the lion's past inside Panthera.
   ['ftap-home', 'home'],
+  ...[4, 16, 32, 64, 128].map((z) => [`blocks-x${z}`, 'zoomto', ['Primates', z]]),
   ['ftap-feliformia', 'tapfork', ['Feliformia']],
   ['ftap-carnivora', 'tapfork', ['Carnivora']],
   ['ftap-chiroptera', 'tapfork', ['Chiroptera']],
