@@ -57,7 +57,7 @@ type Shot = Map<string, Spot> & { held?: boolean };
 /** A frame's labels: each name pill (by its item and text) and each picture (by what it opens), where and how big. */
 function shot(v: FanView, c: CutLabels): Shot {
   const m: Shot = new Map();
-  m.held = c.spots.some((s) => s.box[1] <= v.topLast + 1e-6);
+  m.held = c.pics.some((p) => p.y - p.d / 2 <= v.rowLast + 1e-6);
   const at = (x: number) => v.toScreen(x, 0)[0];
   for (const s of c.spots) {
     const g = s.v ? { v: s.v } : s.b ? { b: s.b } : null;
@@ -73,7 +73,6 @@ type Step = (v: FanView) => void;
 function play(v: FanView, steps: Step[]): { shots: Shot[]; moved: number[] } {
   v.draw();
   const shots = [shot(v, v.cutLast!)];
-  let top = v.topLast;
   const moved: number[] = [];
   const grid = [0, 0.25, 0.5, 0.75, 1].flatMap((a) => [0, 0.25, 0.5, 0.75, 1].map((b) => [a * v.w, b * v.h]));
   for (const step of steps) {
@@ -81,10 +80,7 @@ function play(v: FanView, steps: Step[]): { shots: Shot[]; moved: number[] } {
     step(v);
     v.draw();
     shots.push(shot(v, v.cutLast!));
-    // (A label held under the top line moves with it: the pinned rows come and go as the brackets' stack scrolls off.)
-    const held = Math.abs(v.topLast - top);
-    top = v.topLast;
-    moved.push(Math.max(held, ...was.map(([x, y], i) => Math.hypot(v.toScreen(x, y)[0] - grid[i][0], v.toScreen(x, y)[1] - grid[i][1]))));
+    moved.push(Math.max(...was.map(([x, y], i) => Math.hypot(v.toScreen(x, y)[0] - grid[i][0], v.toScreen(x, y)[1] - grid[i][1]))));
   }
   return { shots, moved };
 }

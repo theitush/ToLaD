@@ -106,10 +106,9 @@ export function FanApp() {
     v.request();
     // The canvas text waits for the faces (drawn in system type until then).
     if (typeof document !== 'undefined' && document.fonts) {
-      const home = { ...v.cam };
       Promise.all([document.fonts.load("600 16px 'Sofia Sans Condensed'"), document.fonts.load("italic 400 14px 'Newsreader'")])
         .catch(() => undefined)
-        .then(() => v.facesLoaded(home));
+        .then(() => v.request());
     }
     return () => {
       v.destroy();
