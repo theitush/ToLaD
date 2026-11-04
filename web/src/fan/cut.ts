@@ -17,6 +17,11 @@
 // apart. Every species is under exactly one item, every item holds its label, items' territories are disjoint, an item
 // only splits as the zoom grows, and the cut depends only on the width zoom and the screen.
 //
+// A clade with living species fits at "now" and one with none at its own youngest tip, usually lower, where the room is
+// wide. So nothing living rides on a daughter with none (ToLaD#395): she would carry it far from its branches. Living
+// species only ever ride on living ones: a daughter with none stands only if no living sister would ride on her, and a
+// node with living species opens only when a daughter with living species fits.
+//
 // That is widest rooms (Steady's `life` off, tests). Under rooms by life (the view's), sister rooms stay apart only
 // while both lived, so a territory is per row instead (Steady.cell): at each row the lineages there split x at the
 // middles between their drawn edges (a 1D Voronoi of the row), and an item's territory is its strands' share over the
@@ -74,6 +79,8 @@ export class Territories {
   readonly index = new Map<FanNode, number>();
   /** Prefix sums of the rooms (PR[i]: strands before i). */
   private readonly PR: Float64Array;
+  /** Prefix sums of the living strands (PL[i]: those before i, a tip at "now"). */
+  private readonly PL: Int32Array;
   private readonly fits = new Map<number, { node: Float64Array; strand: Float64Array }>();
   /** The last cut's daughters' territories (world x, over their rows) as its walk tried them (rooms by life). */
   terr = new Map<number, [number, number]>();
@@ -94,6 +101,15 @@ export class Territories {
     this.kids = this.nodes.map((v) => Int32Array.from(v.kids, (k) => (isNode(k) ? this.index.get(k)! : ~k.index)));
     this.PR = new Float64Array(this.R.length + 1);
     for (let i = 0; i < this.R.length; i++) this.PR[i + 1] = this.PR[i] + this.R[i];
+    const now = fan.time.y(0);
+    this.PL = new Int32Array(this.R.length + 1);
+    for (let i = 0; i < this.R.length; i++) this.PL[i + 1] = this.PL[i] + (this.strands[i].tipY <= now ? 1 : 0);
+  }
+
+  /** Whether daughter k (a node's index, ~ a strand's) has a living species. */
+  living(k: number): boolean {
+    const [f, l] = k >= 0 ? [this.first[k], this.last[k]] : [~k, ~k];
+    return this.PL[l + 1] > this.PL[f];
   }
 
   /** The gaps' prefix sums at openness A (PG[p]: the open gaps of pairs before p). */
@@ -281,7 +297,8 @@ export class Territories {
    * none of whose daughters fit is one item; one with some opens: each fitting daughter is walked, each run of
    * sisters that do not fit rides with its neighbour's edge item (CutItem). So every item holds its label, every
    * species is under exactly one, and as the zoom grows an item only splits: a fitting daughter fits on, and a run
-   * gives up a sister only as she fits, the sisters on each side of her riding with her or as before.
+   * gives up a sister only as she fits, the sisters on each side of her riding with her or as before. A daughter with no
+   * living species that fits but would carry living ones rides herself (stands(), ToLaD#395).
    */
   cut(sx: number, px: number, vx0 = -Infinity, vx1 = Infinity, rows?: RowsOf, ghost = 0): CutItem[] {
     const pushed: CutItem[] = [];
@@ -314,7 +331,29 @@ export class Territories {
       const t = terr.get(k);
       return !!t && meets(t[0], t[1]);
     };
-    const opens = (k: number) => k >= 0 && this.kids[k].some(ok);
+    /**
+     * Which of node k's daughters stand as items: those that fit, less those with no living species that a living one
+     * would ride on (its sisters' runs, or `inL`, `inR`: what rides on k's own left and right edge items, from above).
+     * Such a one rides too, so her neighbour takes her run and hers. Null: none stands, k is one item.
+     */
+    const stands = (k: number, inL: boolean, inR: boolean): Uint8Array | null => {
+      if (k < 0) return null;
+      const K = this.kids[k];
+      const st = Uint8Array.from(K, (d) => (ok(d) ? 1 : 0));
+      let live = inR;
+      for (let q = K.length - 1; q >= 0; q--) {
+        if (!st[q]) live ||= this.living(K[q]);
+        else if (live && !this.living(K[q])) st[q] = 0;
+        else live = false;
+      }
+      live = inL;
+      for (let q = 0; q < K.length; q++) {
+        if (!st[q]) live ||= this.living(K[q]);
+        else if (live && !this.living(K[q])) st[q] = 0;
+        else break;
+      }
+      return st.includes(1) ? st : null;
+    };
     const ride = (it: CutItem | null, k: number) => {
       if (!it) return;
       const r = this.refOf(k);
@@ -325,10 +364,12 @@ export class Territories {
     };
     /**
      * Daughter k walked: its leftmost and rightmost items. Off screen only what its sisters ride on is worked out,
-     * `need` (1 its leftmost, 2 its rightmost), one path down each (null: not worked out).
+     * `need` (1 its leftmost, 2 its rightmost), one path down each (null: not worked out). `inL`, `inR`: whether a
+     * living species will ride on its leftmost, its rightmost item.
      */
-    const walk = (k: number, need: number): [CutItem | null, CutItem | null] => {
-      if (!opens(k)) {
+    const walk = (k: number, need: number, inL: boolean, inR: boolean): [CutItem | null, CutItem | null] => {
+      const st = stands(k, inL, inR);
+      if (!st) {
         const r = this.refOf(k);
         const it: CutItem = { head: k, parts: [k], f: r.f, l: r.l, x0: 0, x1: 0, count: r.l - r.f + 1, fits: true };
         pushed.push(it);
@@ -339,7 +380,7 @@ export class Territories {
       let q1 = -1;
       let qn = -1;
       for (let q = 0; q < K.length; q++)
-        if (ok(K[q])) {
+        if (st[q]) {
           if (q1 < 0) q1 = q;
           qn = q;
         }
@@ -347,7 +388,7 @@ export class Territories {
       let Rt: CutItem | null = null;
       const before: number[] = [];
       for (let q = 0; q < K.length; q++) {
-        if (!ok(K[q])) {
+        if (!st[q]) {
           if (q < q1) before.push(K[q]);
           else ride(Rt, K[q]);
           continue;
@@ -356,9 +397,13 @@ export class Territories {
         const n = full
           ? on(K[q])
             ? 3
-            : (q === q1 && before.length ? 1 : 0) | (q + 1 < K.length && !ok(K[q + 1]) ? 2 : 0)
+            : (q === q1 && before.length ? 1 : 0) | (q + 1 < K.length && !st[q + 1] ? 2 : 0)
           : (q === q1 && need & 1 ? 1 : 0) | (q === qn && need & 2 ? 2 : 0);
-        const [a, b] = n ? walk(K[q], n) : [null, null];
+        // (What rides on her edges: her run after her, and from k's own edges where she is its first or last.)
+        let liveR = q === qn && inR;
+        for (let o = q + 1; o < K.length && !st[o] && !liveR; o++) liveR = this.living(K[o]);
+        const liveL = q === q1 && (inL || before.some((o) => this.living(o)));
+        const [a, b] = n ? walk(K[q], n, liveL, liveR) : [null, null];
         if (q === q1) {
           for (const o of before) ride(a, o);
           L = a;
@@ -369,7 +414,7 @@ export class Territories {
     };
     const root = this.index.get(this.fan.root)!;
     if (!on(root)) return [];
-    walk(root, 3);
+    walk(root, 3, false, false);
     const out: CutItem[] = [];
     for (const it of pushed) {
       const t = life ? this.over(it, R, ghost, s) : this.hull(it.f, it.l, s);
