@@ -300,7 +300,7 @@ export class Territories {
    * gives up a sister only as she fits, the sisters on each side of her riding with her or as before. A daughter with no
    * living species that fits but would carry living ones rides herself (stands(), ToLaD#395).
    */
-  cut(sx: number, px: number, vx0 = -Infinity, vx1 = Infinity, rows?: RowsOf, ghost = 0): CutItem[] {
+  cut(sx: number, px: number, vx0 = -Infinity, vx1 = Infinity, rows?: RowsOf, ghost = 0, known?: Map<number, [number, number]>): CutItem[] {
     const pushed: CutItem[] = [];
     const s: [number, number] = [0, 0];
     const life = this.fold.life;
@@ -309,14 +309,15 @@ export class Territories {
     const fit = (x0: number, x1: number) => sx * (x1 - x0) >= px * (1 - 1e-9);
     // (Whether each daughter fits, as the walk meets it, by its key; under rooms by life, her territory over her rows.)
     const got = new Map<number, boolean>();
-    const terr = (this.terr = new Map<number, [number, number]>());
+    // (`known`: the territories of an earlier cut of this frame on the same rows, not worked out again, ToLaD#396.)
+    const terr = (this.terr = known ?? new Map<number, [number, number]>());
     const ok = (k: number): boolean => {
       let o = got.get(k);
       if (o === undefined) {
         if (z) o = sx >= (k >= 0 ? z.node[k] : z.strand[~k]);
         else {
-          const t = this.over(this.refOf(k), R, ghost, [0, 0]);
-          terr.set(k, t);
+          let t = terr.get(k);
+          if (!t) terr.set(k, (t = this.over(this.refOf(k), R, ghost, [0, 0])));
           o = fit(t[0], t[1]);
         }
         got.set(k, o);
