@@ -152,7 +152,8 @@ export interface LabelSpot {
 export interface CutLabels {
   spots: LabelSpot[];
   groups: Map<string, FanBranch[][]>;
-  pics: (PicSpot & { lv: Level; face: FanBranch; run?: Run })[];
+  /** (`held`: a label of several branches, held on screen; else of one branch, staying with it, placeX.) */
+  pics: (PicSpot & { lv: Level; face: FanBranch; run?: Run; held: boolean })[];
   /** The cut (tests read it), and per shown item its pill and picture (`spots[i]`, `pics[i]`: one label, ToLaD#358). */
   items: CutItem[];
   /** The whole cut meeting the screen, its labels shown or not (tapItem's next split counts its pieces on it). */
@@ -1825,26 +1826,48 @@ export class FanView implements InputHandlers {
       this.goLevel({ b: sp }, this.frameOf({ b: sp }));
       return;
     }
-    // (Its pieces there framed: a piece's label shows where its territory's part on screen holds it (cutLabels), so
-    // the screen's span L..L + W shows piece [x0, x1] when x0 + d - W <= L <= x1 - d. The most pieces (then species)
-    // some L shows, at the middle of the L's that show them all: where the void between their territories is wider
-    // than the screen, as much of the item a step finer as one screen holds. One rung past the split: at the split
-    // itself a piece just holds its label, and the landing's cut can lose it.)
+    // (Its pieces there framed: a label of several branches shows where its territory's part on screen holds it, a label
+    // of one branch only at its own place, on its branch (cutLabels, ToLaD#373). So the screen's span L..L + W shows a
+    // piece for L in [x0 + d - W, x1 - d], its territory, or, one branch at world x p, in [p + d / 2 - W, p - d / 2]. The
+    // most pieces (then species) some L shows, at the middle of the L's that show them all: where the void between them
+    // is wider than the screen, as much of the item a step finer as one screen holds. One rung past the split: at the
+    // split itself a piece just holds its label, and the landing's cut can lose it. The L its pieces' territories alone
+    // give stands, moved only as far as those labels need.)
     const zs = Math.pow(2, (b + 1) / LADDER);
-    const Q = this.piecesAt(f, l, v, zs);
     const W = (this.w - LABEL_AXIS_X) / zs;
     const d = PIC_D / zs;
-    let [lo, hi, best, most] = [0, 0, 0, 0];
-    for (const at of Q) {
-      const L1 = at.x1 - d;
-      const S = Q.filter((q) => q.x1 - d >= L1 && q.x0 + d - W <= L1);
-      const n = S.reduce((c, q) => c + q.l - q.f + 1, 0);
-      if (S.length > best || (S.length === best && n > most)) {
-        [best, most] = [S.length, n];
-        [lo, hi] = [Math.max(...S.map((q) => q.x0 + d - W)), Math.min(...S.map((q) => q.x1 - d))];
+    const at = this.labelsFrame(f, l, v, zs, 0);
+    const c = this.labelsAt(at, true, this.runSpan(f, l, [0, 0]));
+    const Q = c.items.filter((q) => q.l >= f && q.f <= l);
+    const most = (lo: (q: CutItem) => number, hi: (q: CutItem) => number): [number, number] => {
+      let [from, to, best, n] = [0, 0, 0, 0];
+      for (const p of Q) {
+        const L1 = hi(p);
+        const S = Q.filter((q) => hi(q) >= L1 && lo(q) <= L1);
+        const m = S.reduce((s, q) => s + q.l - q.f + 1, 0);
+        if (S.length > best || (S.length === best && m > n)) {
+          [best, n] = [S.length, m];
+          [from, to] = [Math.max(...S.map(lo)), Math.min(...S.map(hi))];
+        }
       }
-    }
-    const mid = (lo + hi) / 2 + W / 2;
+      return [from, to];
+    };
+    const own = (q: CutItem): number | null => {
+      const pic = c.pics[c.items.indexOf(q)];
+      return pic.held ? null : at.cx + (pic.x - this.w / 2) / zs;
+    };
+    const [t0, t1] = most((q) => q.x0 + d - W, (q) => q.x1 - d);
+    const [p0, p1] = most(
+      (q) => {
+        const x = own(q);
+        return x === null ? q.x0 + d - W : x + d / 2 - W;
+      },
+      (q) => {
+        const x = own(q);
+        return x === null ? q.x1 - d : x - d / 2;
+      },
+    );
+    const mid = Math.min(Math.max((t0 + t1) / 2, p0), p1) + W / 2;
     const again = () => this.labelsFrame(f, l, v, zs, mid);
     const ecam = again();
     keep?.();
@@ -2300,7 +2323,7 @@ export class FanView implements InputHandlers {
       else Object.assign(s, { v: lv.v, fam: lv.v });
       if (span && span[1] > span[0]) s.over = [X(span[0]), X(span[1]), foot];
       spots.push(s);
-      pics.push({ x, y: d0 + PIC_D / 2, d: PIC_D, i: pics.length, lv, face: name.face, run: [it.f, it.l] });
+      pics.push({ x, y: d0 + PIC_D / 2, d: PIC_D, i: pics.length, lv, face: name.face, run: [it.f, it.l], held: !one });
       shown.push(it);
     }
     if (!whole) this.picSpots = pics;
