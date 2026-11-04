@@ -352,8 +352,8 @@ export class FanCamera {
    */
   clampPan(): void {
     const c = this.cam;
-    // ("Now" no lower than a tenth under the middle: a frame's room for its labels can take it to about the middle, ToLaD#373.)
-    const yTop = this.yNow - (0.1 * this.h) / c.sy;
+    // ("Now" no lower than the middle of the screen: a frame's room for its labels can take it about that far, ToLaD#373.)
+    const yTop = this.yNow;
     const yBot = this.fan.trunkBottom.y - (0.1 * this.h) / c.sy;
     c.cy = yTop > yBot ? (yTop + yBot) / 2 : Math.min(yBot, Math.max(yTop, c.cy));
     const p = this.nearestContent(c.cx, Math.max(this.yNow, c.cy - this.h / 2 / c.sy), c.cy + this.h / 2 / c.sy);

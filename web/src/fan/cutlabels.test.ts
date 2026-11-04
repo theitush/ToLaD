@@ -56,9 +56,10 @@ function check(c: CutLabels, w: number): void {
   for (let k = 1; k < S.length; k++) expect(S[k].box[0]).toBeGreaterThanOrEqual(S[k - 1].box[2] - 1e-6);
   const P = [...c.pics].sort((p, q) => p.x - q.x);
   for (let k = 1; k < P.length; k++) expect(P[k].x - P[k].d / 2).toBeGreaterThanOrEqual(P[k - 1].x + P[k - 1].d / 2 - 1e-6);
+  // (No name over another's picture; over its own only held under the top line, ToLaD#373: asserted with "now" in room below.)
   for (const p of P)
     for (const s of S)
-      if (s.box[2] > p.x - p.d / 2 && s.box[0] < p.x + p.d / 2) expect(s.box[3]).toBeLessThanOrEqual(p.y - p.d / 2 + 1e-6);
+      if (c.pics[c.spots.indexOf(s)] !== p && s.box[2] > p.x - p.d / 2 && s.box[0] < p.x + p.d / 2) expect(s.box[3]).toBeLessThanOrEqual(p.y - p.d / 2 + 1e-6);
   for (const s of S) expect([s.key, s.x, s.box[2] > 0 && s.box[0] < w]).toEqual([s.key, s.x, true]);
 }
 
