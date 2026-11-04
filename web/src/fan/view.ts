@@ -2157,14 +2157,19 @@ export class FanView implements InputHandlers {
     const ghost = (PIC_LIFT + PIC_D + LABEL_UNDER + cap) / this.cam.sy;
     /**
      * An item's centre (screen x) for a box `d` wide: at `cx` (screen x), the territory [x0, x1] (world) only bounding
-     * it: inside its territory always (it fits there), on screen as well where the territory's part on screen holds it.
+     * it, a function of the world alone, so a pan moves it 1:1 and it leaves with its branch (ToLaD#373, Ita: "the label
+     * shouldnt move when its showing just one branch"). `held` (a label of several branches, none of which is its
+     * place): on screen as well, where the territory's part on screen holds it.
      */
-    const placeX = (x0: number, x1: number, d: number, cx: number): number => {
+    const placeX = (x0: number, x1: number, d: number, cx: number, held: boolean): number => {
       const l = X(x0) + d / 2;
       const r = X(x1) - d / 2;
-      const lo = Math.max(l, left + d / 2);
-      const hi = Math.min(r, right - d / 2);
-      const x = lo <= hi ? Math.min(Math.max(cx, lo), hi) : Math.min(Math.max(cx, hi), lo);
+      let x = cx;
+      if (held) {
+        const lo = Math.max(l, left + d / 2);
+        const hi = Math.min(r, right - d / 2);
+        x = lo <= hi ? Math.min(Math.max(cx, lo), hi) : Math.min(Math.max(cx, hi), lo);
+      }
       return Math.min(Math.max(x, l), r);
     };
     /**
@@ -2248,8 +2253,10 @@ export class FanView implements InputHandlers {
       // its face's place. Its foot: in the gap under its picture, ToLaD#373.)
       const foot = d0 + PIC_D + PIC_LIFT / 2;
       const span = this.midLabels && name.hid.length ? reach(it, Wy(foot)) : null;
-      const x = placeX(it.x0, it.x1, PIC_D, span ? X((span[0] + span[1]) / 2) : faceX(it, name.face));
-      // (Wholly off the screen's edge, and only then: until there it slides off with its territory.)
+      // (One branch, a species or an item with one strand at its foot: it stays with that branch; several: held on screen.)
+      const one = !name.hid.length || (!!span && span[1] <= span[0]);
+      const x = placeX(it.x0, it.x1, PIC_D, span ? X((span[0] + span[1]) / 2) : faceX(it, name.face), !one);
+      // (Wholly off the screen's edge, and only then: until there it slides off with its branch or its territory.)
       if (!whole && (x + PIC_D / 2 < 0 || x - PIC_D / 2 > this.w)) continue;
       const key = `c${it.f}:${it.l}`;
       if (name.hid.length) groups.set(key, name.hid);

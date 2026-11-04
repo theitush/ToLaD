@@ -215,6 +215,44 @@ describe('steady labels while the view moves (ToLaD#333)', () => {
         }
         expect(bad).toEqual([]);
       });
+    // (A label of one branch, ToLaD#373, Ita: "it should just stay with its branch": exactly the pan, wherever it is on
+    // screen, past the axis too. The first zoom, doubling, with a one-branch label around the dog.)
+    if (name !== 'cats')
+      it(`${name}: a pan at one zoom: a one-branch label moves exactly with it`, { timeout: 300_000 }, async () => {
+        const v = await mk();
+        v.midLabels = true;
+        const h = v.homeCamera();
+        const dog = v.fan.branches.find((b) => b.sp.common === 'Domestic dog')!;
+        const frame = (sx: number, dx: number) => {
+          // (The fold first: the columns' places are the zoom's.)
+          v.cam = { ...h, sx };
+          v.draw();
+          v.cam = { ...h, sx, cx: groupCentre({ b: dog }) - v.w / 2 / sx + dx / sx };
+          v.draw();
+          return new Map(v.cutLast!.spots.filter((s) => !s.over).map((s) => [s.key, s.x]));
+        };
+        let sx = h.sx;
+        while (!frame(sx, 0).size && sx < h.sx * 2 ** 30) sx *= 2;
+        expect(frame(sx, 0).size).toBeGreaterThan(0);
+        const bad: string[] = [];
+        let moved = 0;
+        for (const dir of [1, -1]) {
+          const dx = 7 * dir;
+          let was = frame(sx, 0);
+          for (let k = 1; k <= 60; k++) {
+            const now = frame(sx, k * dx);
+            for (const [q, x] of now) {
+              const p = was.get(q);
+              if (p === undefined) continue;
+              moved++;
+              if (Math.abs(x - (p - dx)) > 0.5) bad.push(`step ${k}: ${q} moved ${p.toFixed(1)} to ${x.toFixed(1)}, the pan ${-dx}`);
+            }
+            was = now;
+          }
+        }
+        expect(moved).toBeGreaterThan(0);
+        expect(bad).toEqual([]);
+      });
     it(`${name}: a flight to ${to}: sizes kept, no jumps`, { timeout: 300_000 }, async () => {
       const v = await mk();
       v.cam = v.homeCamera();
