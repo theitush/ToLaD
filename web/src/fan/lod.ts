@@ -1,9 +1,9 @@
 // The mammal level's detail by zoom (ToLaD#247): a clade the fold has closed (fold.ts: no gap inside it wider than
 // CLOSED_PX on screen) whose species are under MERGE_PX each on screen, on average, is drawn as the one branch it reads
 // as: one ribbon from its left edge to its right, its green the share of its species' (lod.ts mergedPts), not ~5,900
-// hairline strands side by side, each floored to a pixel (a striped block, and most of a frame's time). Zoomed in, a
-// clade parts (its gaps open) or its species widen, and it falls apart into its daughters, each merged while it still
-// qualifies, down to the species. The levels with no orders above them (the cats, the carnivores) have none of this:
+// hairline strands side by side, each floored to a pixel (a striped block, and most of a frame's time). Zoomed in, its
+// ribbon grows past BRANCH_PX, a clade parts (its gaps open) or its species widen, and it falls apart into its daughters,
+// each merged while it still qualifies, down to the species: zooming shows the branches inside a branch (ToLaD#389). The levels with no orders above them (the cats, the carnivores) have none of this:
 // their strands are drawn one by one, as before.
 //
 // The clade's brackets and labels go with it: what is inside a merged clade is not named on its own (the stack reads
@@ -14,6 +14,8 @@ import type { Fold } from './fold';
 
 /** A closed clade is drawn as one branch while its species are under this many px wide each on screen, on average. */
 export const MERGE_PX = 1;
+/** A clade is drawn as one branch only while its ribbon is under this many px wide on screen. */
+export const BRANCH_PX = 24;
 /** A clade is closed while no gap inside it is this wide on screen (px). */
 export const CLOSED_PX = 0.5;
 
@@ -39,6 +41,8 @@ export class Lod {
   private readonly flag: Uint8Array;
   private readonly room: Float64Array;
   private readonly gap: Float64Array;
+  /** Per node: the gaps inside it, summed (with room, its ribbon's width). */
+  private readonly gaps: Float64Array;
   /** Per merged-able node: its green share per grid row, by the row's world y. */
   private green = new Map<FanNode, GreenRows>();
   private gLast: GreenRows | undefined;
@@ -48,6 +52,7 @@ export class Lod {
     this.of = new Int32Array(fan.root.strands.length).fill(-1);
     this.flag = new Uint8Array(fan.nodes.length);
     this.gap = new Float64Array(fan.nodes.length);
+    this.gaps = new Float64Array(fan.nodes.length);
     this.room = new Float64Array(fan.nodes.length);
     fan.nodes.forEach((v, i) => (this.room[i] = v.strands.reduce((s, b) => s + b.width, 0)));
     this.par = Int32Array.from(fan.nodes, (v) => (v.parent ? this.idx.get(v.parent)! : -1));
@@ -82,15 +87,21 @@ export class Lod {
     }
     const pi = this.pairIdx;
     const g = this.gap.fill(0);
+    const gs = this.gaps.fill(0);
     for (let i = 0; i < pi.length; i++) {
       const k = pi[i];
-      g[k] = Math.max(g[k], fold.a[i] * fold.pairGap[i]);
+      const w = fold.a[i] * fold.pairGap[i];
+      g[k] = Math.max(g[k], w);
+      gs[k] += w;
     }
-    // (Parents before their daughters in fan.nodes: the widest gap inside each clade, bottom up.)
+    // (Parents before their daughters in fan.nodes: the widest gap inside each clade and their sum, bottom up.)
     const par = this.par;
     for (let i = N.length - 1; i > 0; i--) {
       const k = par[i];
-      if (k >= 0) g[k] = Math.max(g[k], g[i]);
+      if (k >= 0) {
+        g[k] = Math.max(g[k], g[i]);
+        gs[k] += gs[i];
+      }
     }
     const merged: FanNode[] = [];
     const flag = this.flag2.fill(0);
@@ -101,7 +112,7 @@ export class Lod {
     while (n > 0) {
       const i = st[--n];
       const kids = this.kidN[i];
-      if (par[i] >= 0 && this.nStr[i] >= 2 && g[i] * sx < CLOSED_PX && (this.room[i] * sx) / this.nStr[i] < MERGE_PX) {
+      if (par[i] >= 0 && this.nStr[i] >= 2 && g[i] * sx < CLOSED_PX && (this.room[i] * sx) / this.nStr[i] < MERGE_PX && (this.room[i] + gs[i]) * sx < BRANCH_PX) {
         flag[i] = 1;
         merged.push(N[i]);
         // (Every node inside it: its daughters' runs in fan.nodes are not contiguous, so walked.)

@@ -85,10 +85,8 @@ const LEVEL_MS = 200;
 const LABEL_BOTTOM_PX = 104;
 /** Folded: how far (px) below the order's start its stem fades out (drawStemFade, ToLaD#210). */
 const STEM_END_PX = 48;
-/** A merged ribbon's stripes (drawStripes): px apart, px wide, and how dark. */
-const STRIPE_PX = 4;
-const STRIPE_W = 1;
-const STRIPE_A = 0.55;
+/** A merged ribbon stands this far (px) inside its hull on each side, a quarter of its width at most: dark shows between neighbours, whose real gaps are sub-pixel (ToLaD#389). */
+const RIBBON_INSET_PX = 1;
 /** A lane's living glow at full strength from this green width (px) up, thinner ones in proportion: a family of thin columns side by side glows as one (ToLaD#231). */
 const GLOW_W = 6;
 /** A column with no styled spans on screen (drawStrand): shared, never written. */
@@ -2566,7 +2564,7 @@ export class FanView implements InputHandlers {
     return this.lod;
   }
 
-  /** A merged clade (lod.ts): one ribbon over the grid's rows on screen, its extent the fold's, its green its strands' share of their widths; striped, so it reads as many branches (ToLaD#389). */
+  /** A merged clade (lod.ts): one ribbon over the grid's rows on screen, its extent the fold's, its green its strands' share of their widths (ToLaD#389). */
   private drawMerged(v: FanNode): void {
     const f = this.fan.tess.fold!;
     const H = f.gridH;
@@ -2593,7 +2591,8 @@ export class FanView implements InputHandlers {
       const px = cam.screenX(l);
       lo = Math.min(lo, px);
       hi = Math.max(hi, px + w * this.cam.sx);
-      pts.push(px, cam.screenY(y), w, this.lod!.greenShareAt(v, k, H));
+      const inset = Math.min(RIBBON_INSET_PX, (w * this.cam.sx) / 4);
+      pts.push(px + inset, cam.screenY(y), w - (2 * inset) / this.cam.sx, this.lod!.greenShareAt(v, k, H));
     };
     // (Bottom up, as lanePoints: its last point at its top, read off the row under it.)
     if (y1 > k1 * H) push(Math.min(k1 + 1, Math.ceil(y1 / H)), y1);
@@ -2603,47 +2602,9 @@ export class FanView implements InputHandlers {
     let out = pts;
     if (f instanceof Steady && forkMode() === 'flat') {
       f.nodeForks(v, this.cam.sx, this.cam.sy, sTop, sBot, this.forkCuts);
-      if (this.forkCuts.length) out = this.cutForks(pts, (y) => f.left(i0, y)!);
+      if (this.forkCuts.length) out = this.cutForks(pts, (y) => f.left(i0, y)! + RIBBON_INSET_PX / this.cam.sx);
     }
     this.drawLanes(out, 0, NO_HELD);
-    // (Fixed to its left edge at its top, the same wherever the rows on screen start: they pan with it.)
-    if (v.strands.length > 1) this.drawStripes(out, cam.screenX(f.extent(i0, i1, Math.ceil(top / H), ext)[0]));
-  }
-
-  /** Thin upright dark stripes down a ribbon's points, STRIPE_PX apart from x0 (px), inside it on each row: a fake of the strands it stands for. */
-  private drawStripes(pts: LanePts, x0: number): void {
-    const { x: X, y: Y, w: W } = pts;
-    const k = this.cam.sx;
-    let a = 0;
-    let b = -1;
-    let yb = 0;
-    let yt = 0;
-    const flush = () => {
-      for (let j = a; j <= b; j++) {
-        const x = x0 + j * STRIPE_PX;
-        if (this.gl) this.gl.under.push(x, yt, x + STRIPE_W, yb, BG01[0], BG01[1], BG01[2], STRIPE_A, 0, 0, -8, this.w + 8);
-        else {
-          this.ctx.fillStyle = `rgba(${BG01.map((c) => Math.round(c * 255)).join(',')},${STRIPE_A})`;
-          this.ctx.fillRect(x, yt, STRIPE_W, yb - yt);
-        }
-      }
-    };
-    // (A run of rows with the same stripes is one quad each.)
-    for (let i = 0; i + 1 < pts.n; i++) {
-      if (!(Y[i] > Y[i + 1])) continue;
-      const l = Math.max(X[i], X[i + 1], -8);
-      const r = Math.min(X[i] + W[i] * k, X[i + 1] + W[i + 1] * k, this.w + 8);
-      const ja = Math.ceil((l - x0) / STRIPE_PX);
-      const jb = Math.floor((r - STRIPE_W - x0) / STRIPE_PX);
-      if (ja !== a || jb !== b) {
-        flush();
-        a = ja;
-        b = jb;
-        yb = Y[i];
-      }
-      yt = Y[i + 1];
-    }
-    flush();
   }
 
   /** The peels the column being drawn runs through that are no whole ribbons (Steady.strandForks), and the column's points cut at them. */
