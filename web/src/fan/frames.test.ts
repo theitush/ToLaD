@@ -68,7 +68,7 @@ function frameFaults(v: FanView, lv: Level): string[] {
   const nowS = v.toScreen(0, v.fan.time.y(0))[1];
   const top = P(v).labelTop();
   const at = nameOf(lv);
-  if (!(nowS >= top + 12 && nowS <= 0.5 * v.h)) bad.push(`${at}: "now" at ${nowS.toFixed(0)} px (top ${top})`);
+  if (!(nowS >= top + 12 && nowS <= 0.45 * v.h)) bad.push(`${at}: "now" at ${nowS.toFixed(0)} px (top ${top})`);
   // The brackets' stack whole above "now" (not swapped for the pinned rows over it), its foot over the pictures.
   const br = (v as unknown as { brackets: { fit: number; baseS: number; placed: unknown[] } | null }).brackets;
   if (br && br.placed.length && br.fit < 1) bad.push(`${at}: the stack pinned over "now" (now at ${nowS.toFixed(0)})`);

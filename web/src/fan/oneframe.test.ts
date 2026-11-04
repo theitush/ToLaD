@@ -62,14 +62,16 @@ function run(v: FanView): void {
 const AXIS = 72;
 
 /**
- * At the view's frame for strands f..l: every label shown whole on screen (right of the axis), and every species of
- * f..l under a shown label that stands for none outside f..l (its next-level labels, all of them).
+ * At the view's frame for strands f..l: every label of them shown whole on screen (right of the axis; a neighbour's
+ * may be sliding off the edge, ToLaD#373), and every species of f..l under a shown label that stands for none outside
+ * f..l (its next-level labels, all of them).
  */
 function frameCheck(v: FanView, f: number, l: number, at: string, bad: string[]): void {
   settle(v);
   const c = v.cutLast!;
-  for (const s of c.spots) if (s.box[0] < AXIS - 1e-6 || s.box[2] > v.w + 1e-6 || s.box[3] > v.h) bad.push(`${at}: "${s.text}" cut off at x ${s.box[0].toFixed(1)}–${s.box[2].toFixed(1)}`);
-  for (const p of c.pics) if (p.x - p.d / 2 < AXIS - 1e-6 || p.x + p.d / 2 > v.w + 1e-6 || p.y - p.d / 2 < 0) bad.push(`${at}: ${p.face.sp.common}'s picture cut off at ${p.x.toFixed(1)}, ${p.y.toFixed(1)}`);
+  const mine = (run?: readonly number[]) => !!run && run[0] >= f && run[1] <= l;
+  for (const s of c.spots) if (mine(s.run) && (s.box[0] < AXIS - 1e-6 || s.box[2] > v.w + 1e-6 || s.box[3] > v.h)) bad.push(`${at}: "${s.text}" cut off at x ${s.box[0].toFixed(1)}–${s.box[2].toFixed(1)}`);
+  for (const p of c.pics) if (mine(p.run) && (p.x - p.d / 2 < AXIS - 1e-6 || p.x + p.d / 2 > v.w + 1e-6 || p.y - p.d / 2 < 0)) bad.push(`${at}: ${p.face.sp.common}'s picture cut off at ${p.x.toFixed(1)}, ${p.y.toFixed(1)}`);
   const got = new Int32Array(l - f + 1);
   for (const it of c.items) {
     if (it.l < f || it.f > l) continue;
@@ -84,14 +86,15 @@ function frameCheck(v: FanView, f: number, l: number, at: string, bad: string[])
 function tapEach(v: FanView, at: string, bad: string[], depth: number, sample = Infinity): number {
   settle(v);
   const from = { ...v.cam };
-  const items = v.cutLast!.items.filter((it) => it.l > it.f).map((it) => [it.f, it.l] as [number, number]);
+  const items = v.cutLast!.spots.filter((s) => s.run && s.run[1] > s.run[0]).map((s) => [...s.run!, s.box] as const);
   const step = Math.max(1, Math.ceil(items.length / sample));
   let n = 0;
   for (let i = 0; i < items.length; i += step) {
-    const [f, l] = items[i];
+    const [f, l, box] = items[i];
     v.cam = { ...from };
     settle(v);
-    v.tapItem(f, l);
+    // (A real tap, on its label: a tap's step is what a double tap goes back by, ToLaD#376.)
+    v.tap((box[0] + box[2]) / 2, (box[1] + box[3]) / 2);
     run(v);
     const here = `${at} > ${f}-${l}`;
     n++;
