@@ -94,8 +94,7 @@ export function FanApp() {
   const [mid, setMid] = useState(true);
   const [forks, setForks] = useState(initialForkNames);
   const [gaps, setGaps] = useState<GapMode>(initialGaps);
-  // (ToLaD#377: only from the address so far; a button for it when the bar has room.)
-  useState<ForkMode>(initialForks);
+  const [forkLook, setForkLook] = useState<ForkMode>(initialForks);
   // What the widths count (ToLaD#276): individuals, or their mass (`?width=mass`).
   const [measure, setMeasure] = useState<Measure>(initialMeasure);
   const [sel, setSel] = useState<Selection | null>(null);
@@ -228,6 +227,26 @@ export function FanApp() {
           }}
         >
           {`gaps: ${gaps}`}
+        </button>
+        {/* ToLaD#377: how a fork with too little height is drawn: a rectangular tree's corner (flat), or a ribbon (peel, the old look). */}
+        <button
+          type="button"
+          title="Forks: flat corners or peeling ribbons"
+          onClick={() => {
+            const next = FORK_MODES[(FORK_MODES.indexOf(forkLook) + 1) % FORK_MODES.length];
+            setForkMode(next);
+            setForkLook(next);
+            viewRef.current?.request();
+            try {
+              const u = new URL(window.location.href);
+              u.searchParams.set('forks', next);
+              window.history.replaceState(null, '', u);
+            } catch {
+              /* not in the address */
+            }
+          }}
+        >
+          {`forks: ${forkLook}`}
         </button>
         {/* Home for this level, and the level stepper joined to it (ToLaD#247): one pill, so the bar stays one row. */}
         <span className="pair">
