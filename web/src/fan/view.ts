@@ -10,12 +10,12 @@ import { formatCount, formatMass } from '../data/count';
 import { stamp } from '../stamp';
 import { DOUBLE_TAP_MS, Input, type InputHandlers } from '../engine/input';
 import { clipPoly, FanCamera, LABELS_SHARE, type Camera } from './camera';
-import { laneAt, layoutFan, leftAt, nearestStrand, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type Fan, type FanBranch, type FanNode, type Measure, type WidthMode } from './layout';
+import { isNode, laneAt, layoutFan, leftAt, nearestStrand, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type Fan, type FanBranch, type FanNode, type Measure, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01 } from './meshgl';
 import { Lod } from './lod';
 import type { Fold, FoldState } from './fold';
-import { Steady } from './steady';
+import { forkMode, Steady } from './steady';
 import { LADDER, Territories, type CutItem, type Ref, type RowsOf } from './cut';
 import { COLUMN_DIM, columnSpans, EVENT_TINT, eventAt, eventSpans, type EventSpan } from './colstyle';
 import { laneDim, LINEAGE, pathFrame, TwigModel } from './twigs';
@@ -2110,6 +2110,7 @@ export class FanView implements InputHandlers {
     {
       for (const b of this.fan.branches) if (!lod || lod.of[b.index] < 0) this.drawStrand(b);
       if (lod) for (const v of lod.merged) this.drawMerged(v);
+      this.drawCorners(lod);
     }
     this.drawHeld();
     this.drawEvents();
@@ -2350,11 +2351,15 @@ export class FanView implements InputHandlers {
     const wBot = cam.worldY(this.h + 8);
     const nodes = this.fan.nodes;
     const ys = this.stemYs;
+    const steady = this.fan.tess.fold instanceof Steady ? this.fan.tess.fold : null;
+    const corners = !!steady && forkMode() === 'flat';
     for (let ni = nodes.length - 1; ni >= 0; ni--) {
       const v = nodes[ni];
       if (lod?.hidden(v)) continue;
       const ya = Math.max(v.y, wTop);
-      const yb = Math.min(v.yBot, wBot);
+      // (Its peel no whole ribbon, ToLaD#377: the backdrop stops where its column does.)
+      const cutH = corners && v.parent && steady!.ribbon(v, this.cam.sx, this.cam.sy) < 1 ? steady!.forkH(v.parent) : 0;
+      const yb = Math.min(v.yBot - cutH, wBot);
       if (!(yb > ya)) continue;
       // Straight below its peel: one piece; the peel in chords.
       const peel = v.leanY;
@@ -2495,8 +2500,13 @@ export class FanView implements InputHandlers {
     const xr = this.fan.tess.xRange(b, sTop, sBot);
     if (cam.screenX(xr[1]) < -12 || cam.screenX(xr[0]) > this.w + 12) return;
     const hw = b.width / 2;
-    const pts = this.lanePoints(b, hw);
+    let pts = this.lanePoints(b, hw);
     if (pts.n < 2) return;
+    const fo = this.fan.tess.fold;
+    if (fo instanceof Steady && forkMode() === 'flat') {
+      fo.strandForks(b.index, this.cam.sx, this.cam.sy, this.forkCuts);
+      if (this.forkCuts.length) pts = this.cutForks(pts, (y) => leftAt(b, y) + hw);
+    }
     // The column's styled spans on screen ([top, bottom, dim]), clipped to it: none for most strands.
     let held = NO_HELD;
     for (const [t, bt, d] of colSpansY(this.fan, b)) {
@@ -2554,7 +2564,98 @@ export class FanView implements InputHandlers {
     for (let k = k1; k >= k0; k--) push(k, k * H);
     if (y0 < k0 * H) push(k0, y0);
     if (pts.n < 2 || hi < -12 || lo > this.w + 12) return;
+    if (f instanceof Steady && forkMode() === 'flat') {
+      f.nodeForks(v, this.cam.sx, this.cam.sy, this.forkCuts);
+      if (this.forkCuts.length) return this.drawLanes(this.cutForks(pts, (y) => f.left(i0, y)!), 0, NO_HELD);
+    }
     this.drawLanes(pts, 0, NO_HELD);
+  }
+
+  /** The peels the column being drawn runs through that are no whole ribbons (Steady.strandForks), and the column's points cut at them. */
+  private forkCuts: number[] = [];
+  private cutPts = new LanePts();
+  /**
+   * Column points (bottom up) with its ribbon narrowed through each of forkCuts' peels (ToLaD#377): its width stands
+   * for animals up to the peel's foot and from its top on, flat-ended; inside it is its ribbon's share about its middle,
+   * nil at a corner, whose line drawCorners draws. x: the column's left at a height (world). Its positions are not touched.
+   */
+  private cutForks(pts: LanePts, x: (y: number) => number): LanePts {
+    const out = this.cutPts;
+    out.n = 0;
+    const B = this.forkCuts;
+    const k = this.cam.sx;
+    const cam = this.camera;
+    const { x: X, y: Y, w: W, f: F } = pts;
+    let q = B.length - 3;
+    let inside = false;
+    for (let i = 0; i < pts.n; i++) {
+      const y = Y[i];
+      while (q >= 0) {
+        const yw = inside ? B[q] : B[q + 1];
+        const ys = cam.screenY(yw);
+        if (y > ys) break;
+        const t = B[q + 2];
+        const below = Math.max(0, i - 1);
+        const u = Y[below] > y ? Math.max(0, Math.min(1, (Y[below] - ys) / (Y[below] - y))) : 1;
+        const w = W[below] + (W[i] - W[below]) * u;
+        const g = F[below] + (F[i] - F[below]) * u;
+        const xs = cam.screenX(x(yw));
+        if (inside) out.push(xs + (w * (1 - t) * k) / 2, ys, w * t, g);
+        out.push(xs, ys, w, g);
+        if (!inside) out.push(xs + (w * (1 - t) * k) / 2, ys, w * t, g);
+        else q -= 3;
+        inside = !inside;
+      }
+      if (inside) {
+        const t = B[q + 2];
+        out.push(X[i] + (W[i] * (1 - t) * k) / 2, y, W[i] * t, F[i]);
+      } else out.push(X[i], y, W[i], F[i]);
+    }
+    return out;
+  }
+
+  /** drawCorners' daughters, pooled. */
+  private cornerOut: number[] = [];
+  /**
+   * Where a peel has too little height for its move, a rectangular tree's corner (ToLaD#377): at the split a flat line
+   * from the parent's column to the daughter's, and up from it a line to where the daughter's column starts. Nested
+   * rooms, so no two cross. A line's width says nothing (a column's does); green if the daughter holds any living descendants.
+   */
+  private drawCorners(lod: Lod | null): void {
+    const f = this.fan.tess.fold;
+    if (!(f instanceof Steady) || forkMode() !== 'flat') return;
+    const { sx, sy } = this.cam;
+    const cam = this.camera;
+    const out = this.cornerOut;
+    const rect = (x0: number, y0: number, x1: number, y1: number, c: readonly number[]) => {
+      if (x1 < -8 || x0 > this.w + 8) return;
+      if (this.gl) this.gl.under.push(Math.max(-8, x0), y0, Math.min(this.w + 8, x1), y1, c[0], c[1], c[2], 1, 0, 0);
+      else {
+        this.ctx.fillStyle = `rgb(${Math.round(c[0] * 255)},${Math.round(c[1] * 255)},${Math.round(c[2] * 255)})`;
+        this.ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+      }
+    };
+    for (const v of this.fan.nodes) {
+      if (lod && (lod.hidden(v) || lod.isMerged(v))) continue;
+      const y0 = cam.screenY(v.y);
+      const top = v.y - f.forkH(v);
+      const yt = cam.screenY(top);
+      if (y0 < -4 || yt > this.h + 4) continue;
+      const pc = cam.screenX(f.corner(v, sx, sy, out));
+      // (Gray first: where the lines overlap, the living's shows.)
+      for (const live of [false, true]) {
+        const c = live ? mixInto(EC_MIX, GREEN01, GREEN_DARK01, laneDim(1) * 0.9) : mixInto(GC_MIX, GRAY01, GRAY_DARK01, laneDim(1) * 0.82);
+        for (let q = 0; q < v.kids.length; q++) {
+          if (out[2 * q + 1] > 0) continue;
+          const kid = v.kids[q];
+          const has = isNode(kid) ? nodeQ(kid, v.ageMa) > 0 : laneAt(kid, Math.max(kid.tipY, top)).gw > 0;
+          if (has !== live) continue;
+          const dc = cam.screenX(out[2 * q]);
+          rect(Math.min(pc, dc) - 0.5, y0 - 0.5, Math.max(pc, dc) + 0.5, y0 + 0.5, c);
+          rect(dc - 0.5, yt, dc + 0.5, y0, c);
+        }
+      }
+    }
   }
   private mergedExt: [number, number] = [0, 0];
   private lodTops = new WeakMap<FanNode, number>();
