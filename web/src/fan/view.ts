@@ -1578,10 +1578,14 @@ export class FanView implements InputHandlers {
       this.steps = steps;
       return;
     }
-    const step = this.upFrom(pre ? pre.lv : on ? this.backing!.lv : this.levelNow(true), cam);
-    if (step) this.goLevel(step.lv, step.cam, false);
     // (Home: nothing, so the first tap's flight is put back.)
-    else if (pre && (this.anim || this.offBy(pre.cam, this.cam) > 0.5)) this.goLevel(pre.lv, pre.cam, false);
+    if (!this.goUp(pre ? pre.lv : on ? this.backing!.lv : this.levelNow(true), cam) && pre && (this.anim || this.offBy(pre.cam, this.cam) > 0.5)) this.goLevel(pre.lv, pre.cam, false);
+  }
+  /** Fly one named level up from level `from`, the view at camera c (upFrom), the card closing for the flight: a double tap's with no steps, the stack's "…"'s. At home nothing, and false. */
+  private goUp(from: Level, c: Camera): boolean {
+    const step = this.upFrom(from, c);
+    if (step) this.goLevel(step.lv, step.cam, false);
+    return !!step;
   }
   /** Fly back to where a tap started (doubleTap), landing as the view was there (its tapAt, so the next tap or double tap goes on from there as it would have). */
   private goBack(back: TapStep): void {
@@ -1990,13 +1994,10 @@ export class FanView implements InputHandlers {
     // from here (ToLaD#301); where the tap moves the view, its step (ToLaD#376).
     const start: TapStep = this.anim && this.backing ? { at: null, ...this.backing } : { at: this.landedHere() ? this.tapAt : null, lv: this.levelNow(true), cam: { ...this.cam } };
     const pre = (this.preTap = { lv: start.lv, cam: start.cam, t: performance.now(), step: null as TapStep | null });
-    // The stack's "…": one level up (ToLaD#288), a double tap in a tap's place, no step of its own.
-    if (this.brackets?.moreHit(x, y)) {
-      this.doubleTap(x, y);
-      return;
-    }
     const steps = this.steps;
-    this.tapHere(x, y);
+    // The stack's "…": one level up (ToLaD#288), whatever the steps; a tap like any, its step what a double tap comes back by.
+    if (this.brackets?.moreHit(x, y)) this.goUp(start.lv, start.cam);
+    else this.tapHere(x, y);
     // (A flight, flyTo emptying the steps; one that stays within LEVEL_PX, a card opening where the view is, moved nothing.)
     if (this.steps === steps) return;
     this.steps = steps;
