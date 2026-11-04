@@ -60,12 +60,16 @@ function run(v: FanView): void {
   }
   settle(v);
 }
-/** The labels (names, "+x", pictures) not whole on screen. */
-function cutOff(v: FanView, at: string): string[] {
+/**
+ * The labels (names, "+x", pictures) of strands lo..hi, what the frame is of, not whole on screen. A neighbour's may be
+ * past the edge: a label of one branch stays with its branch (ToLaD#373).
+ */
+function cutOff(v: FanView, at: string, lo: number, hi: number): string[] {
   const c = v.cutLast!;
   const bad: string[] = [];
-  for (const s of c.spots) if (s.box[0] < -1e-6 || s.box[2] > v.w + 1e-6 || s.box[3] > v.h) bad.push(`${at}: "${s.text}" at x ${s.box[0].toFixed(1)}–${s.box[2].toFixed(1)}`);
-  for (const p of c.pics) if (p.x - p.d / 2 < -1e-6 || p.x + p.d / 2 > v.w + 1e-6) bad.push(`${at}: ${p.face.sp.common}'s picture at x ${p.x.toFixed(1)}`);
+  const mine = (run?: readonly number[]) => !!run && run[1] >= lo && run[0] <= hi;
+  for (const s of c.spots) if (mine(s.run) && (s.box[0] < -1e-6 || s.box[2] > v.w + 1e-6 || s.box[3] > v.h)) bad.push(`${at}: "${s.text}" at x ${s.box[0].toFixed(1)}–${s.box[2].toFixed(1)}`);
+  for (const p of c.pics) if (mine(p.run) && (p.x - p.d / 2 < -1e-6 || p.x + p.d / 2 > v.w + 1e-6)) bad.push(`${at}: ${p.face.sp.common}'s picture at x ${p.x.toFixed(1)}`);
   return bad;
 }
 /** Clade u's territory on screen, its strands lo..hi's. */
@@ -101,7 +105,8 @@ describe('?frame=cut: a level framed by its territory, every label whole (ToLaD#
           if (!whole || !(Math.abs(a - 72) <= 0.5 && Math.abs(b - v.w) <= 0.5) && !(!fs && Math.abs(fit - PIC_D) <= 0.5))
             bad.push(`${at}: framed at ${a.toFixed(1)}–${b.toFixed(1)}, its narrowest group ${fit.toFixed(1)} px`);
           if (!v.cutLast!.spots.length) bad.push(`${at}: no labels`);
-          bad.push(...cutOff(v, at));
+          const [lo, hi] = [u.strands[0].index, u.strands[u.strands.length - 1].index];
+          bad.push(...cutOff(v, at, lo, hi));
           n++;
         }
     };
@@ -151,7 +156,7 @@ describe('?frame=cut: a "+x" tap flies to its group, its species across the scre
         const [a, b] = onScreen(v, lo, hi);
         const split = v.cutLast!.items.filter((it) => it.f >= lo && it.l <= hi).length;
         if ((a < 72 - 0.5 || b > v.w + 0.5) && split < 2) bad.push(`${at}: +${h.bs.length} landed with its species at ${a.toFixed(1)}–${b.toFixed(1)}, ${split} of its labels`);
-        bad.push(...cutOff(v, `${at} → +${h.bs.length}`));
+        bad.push(...cutOff(v, `${at} → +${h.bs.length}`, lo, hi));
       }
     }
     expect(taps).toBeGreaterThan(5);
