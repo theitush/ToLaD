@@ -149,6 +149,7 @@ describe('one frame (ToLaD#359): a label\'s tap frames its item, every next-leve
       frameCheck(v, 0, v.fan.root.strands.length - 1, `${name} home`, bad);
       const n = tapEach(v, `${name} home`, bad, depth, sample);
       (globalThis as unknown as { process: { stderr: { write(s: string): void } } }).process.stderr.write(`oneframe ${name}: ${n} taps checked\n`);
+      if (bad.length) console.error("BAD", JSON.stringify(bad).slice(0, 1500));
       expect(bad).toEqual([]);
       expect(n).toBeGreaterThan(0);
     });

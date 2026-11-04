@@ -114,6 +114,7 @@ describe('a tap lands at once (ToLaD#359): its own work before the flight', () =
     v.cam = v.cladeCamera(node('Primates'));
     for (let k = 0; k < 8 && !(v as unknown as { backing: { lv: { b?: unknown } } | null }).backing?.lv.b; k++)
       if (!tap(`primates, tap ${k + 1} to the spectral tarsier`, (s) => !!s.run && s.run[0] <= tarsier && s.run[1] >= tarsier)) break;
+    if (bad.length) console.error("BAD", JSON.stringify(bad).slice(0, 1500));
     expect(bad).toEqual([]);
   });
 });
