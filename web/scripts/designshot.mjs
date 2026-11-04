@@ -139,6 +139,7 @@ const scenes = [
   ['mamm-hoofed', 'level', ['Artiodactyla']],
   ['mamm-horses', 'level', ['Perissodactyla']],
   ['mamm-primates', 'level', ['Primates']],
+  ['mamm-shrews', 'level', ['Eulipotyphla']],
   // The great apes and the hominins (ToLaD#275): Hominidae framed, the human lineage, a Neanderthal's card.
   ['mamm-hominidae', 'level', ['Hominidae']],
   ['mamm-homininae', 'level', ['Homininae']],

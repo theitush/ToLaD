@@ -162,6 +162,8 @@ export interface CutLabels {
   items: CutItem[];
   /** The whole cut meeting the screen, its labels shown or not (tapItem's next split counts its pieces on it). */
   all: CutItem[];
+  /** The second tier (ToLaD#396): names alone, on pieces of the items with room for a pill but not a picture. The screen's frame only. */
+  names: LabelSpot[];
 }
 
 /** What an item's label says (ToLaD#358): the clade or species it names, its text, its picture's species, its "+x". */
@@ -2183,7 +2185,7 @@ export class FanView implements InputHandlers {
     const cut = (this.cutLast = this.cutLabels(T, row));
     this.rowLast = row;
     // (The names at their forks clear of the labels and the axis's labels as last drawn; its origin note reaches past the gutter.)
-    if (br && forkNames()) br.placeForks([...cut.spots.filter((s) => s.fit > 0.3).map((s) => s.box), ...cut.pics.map((p) => [p.x - p.d / 2, p.y - p.d / 2, p.x + p.d / 2, p.y + p.d / 2]), ...this.axisBoxes]);
+    if (br && forkNames()) br.placeForks([...[...cut.spots, ...cut.names].filter((s) => s.fit > 0.3).map((s) => s.box), ...cut.pics.map((p) => [p.x - p.d / 2, p.y - p.d / 2, p.x + p.d / 2, p.y + p.d / 2]), ...this.axisBoxes]);
     this.labelMs.push(performance.now() - t0);
     if (this.labelMs.length > 600) this.labelMs.shift();
     return { br, cut };
@@ -2363,7 +2365,92 @@ export class FanView implements InputHandlers {
       shown.push(it);
     }
     if (!whole) this.picSpots = pics;
-    return { spots, groups, pics, items: shown, all: cut };
+    // (The second tier on the frame drawn only: taps and frames ask of the pictures' labels alone.)
+    const names: LabelSpot[] = [];
+    if (whole || win) return { spots, groups, pics, items: shown, all: cut, names };
+    /**
+     * The names alone (ToLaD#396): the cut again at a pill's width, on the same rows, so its pieces are inside the
+     * items and inside their own territories. Each piece but the one carrying its item's picture is a candidate: its
+     * pill stands at its picture's place in the unit (its foot where a picture's bottom would be, the same gap under
+     * it), over the middle of its branches. Greedy placement, most individuals alive first, against the
+     * pictures with their pills and the names already placed (the slider model: a name of several branches slides
+     * inside its territory to the nearest free stretch, a name of one stays on its branch); what has no free place is
+     * not drawn. Its species leave its item's "+x" and go on its own. It comes in as its free stretch opens: a function
+     * of the camera alone, so a pinch fades it instead of popping it.
+     */
+    const boxes: (readonly number[])[] = [...spots.map((s) => s.box), ...pics.map((p) => [p.x - p.d / 2, p.y - p.d / 2, p.x + p.d / 2, p.y + p.d / 2])];
+    const pieces: { it: CutItem; o: CutItem; alive: number }[] = [];
+    let q = 0;
+    for (const it of T.t.cut(sx, LABEL_PILL, vx0, vx1, rows, ghost, T.t.terr)) {
+      while (q < cut.length && cut[q].l < it.f) q++;
+      const o = cut[q];
+      // (A piece not inside one item, which a fossil riding differently can make, stays with the pictures' "+x".)
+      if (!o || !it.fits || o.f > it.f || o.l < it.l) continue;
+      const fi = T.nameOf(o).face.index;
+      if (fi >= it.f && fi <= it.l) continue;
+      let alive = 0;
+      for (const p of it.parts) alive += T.aliveOf(p);
+      pieces.push({ it, o, alive });
+    }
+    pieces.sort((a, b) => b.alive - a.alive || a.it.f - b.it.f);
+    const named = new Map<CutItem, [number, number][]>();
+    for (const { it, o } of pieces) {
+      const d0 = discTop(it);
+      if (d0 > this.h) continue;
+      const y1 = d0 + PIC_D;
+      const fit = clamp01((bottom - (y1 + PIC_LIFT)) / 30);
+      if (!(fit > 0)) continue;
+      const name = T.nameOf(it);
+      const foot = y1 + PIC_LIFT / 2;
+      const span = this.midLabels && name.hid.length ? reach(it, Wy(foot)) : null;
+      const one = !name.hid.length || (!!span && span[1] <= span[0]);
+      let x = placeX(it.x0, it.x1, LABEL_PILL, span ? X((span[0] + span[1]) / 2) : X(groupCentre({ b: name.face })), !one);
+      if (x + half < 0 || x - half > this.w) continue;
+      const plus = this.plusPx(name.hid.length);
+      const text = this.pillText(name.text, cap - 2 * LABEL_PAD - plus);
+      const y0 = y1 - this.nameWidth(text) - 2 * LABEL_PAD - plus;
+      // (Where its centre is free of what stands across its rows, in its territory: the free stretch nearest its place.)
+      const lo = one ? X(it.x0) + half : Math.max(X(it.x0) + half, left + half);
+      const hi = one ? X(it.x1) - half : Math.min(X(it.x1) - half, right - half);
+      const blocks = boxes.filter((b) => b[1] < y1 && b[3] > y0).map((b) => [b[0] - half, b[2] + half]).sort((p, r) => p[0] - r[0]);
+      let [g0, g1, gd] = [0, -1, Infinity];
+      let from = lo;
+      for (let i = 0; i <= blocks.length; i++) {
+        const to = i < blocks.length ? Math.min(blocks[i][0], hi) : hi;
+        if (to >= from) {
+          const d = Math.max(from - x, x - to, 0);
+          if (d < gd) [g0, g1, gd] = [from, to, d];
+        }
+        if (i < blocks.length) from = Math.max(from, blocks[i][1]);
+      }
+      // (One branch: only at its own place, so a pan keeps it on its branch. Several: slid along the free stretch.)
+      if (gd === Infinity || (one && gd > 0)) continue;
+      if (!one) x = Math.min(Math.max(x, g0), g1);
+      const clear = one ? 2 * Math.min(x - g0, g1 - x) : g1 - g0;
+      const box: LabelSpot['box'] = [x - half, y0, x + half, y1];
+      boxes.push(box);
+      const key = `n${it.f}:${it.l}`;
+      if (name.hid.length) groups.set(key, name.hid);
+      const s: LabelSpot = { key, id: key, run: [it.f, it.l], place: 'tip', text, rank: [1, it.x1 - it.x0, it.head], x, y1, box, fit: fit * clamp01(clear / LABEL_UNDER), plus, pic: name.face };
+      const k = T.whole(it.head, it.f, it.l);
+      if (k < 0) s.b = T.t.strands[~k];
+      else Object.assign(s, { v: T.t.nodes[k], fam: T.t.nodes[k] });
+      if (span && span[1] > span[0]) s.over = [X(span[0]), X(span[1]), foot];
+      names.push(s);
+      const r = named.get(o);
+      if (r) r.push([it.f, it.l]);
+      else named.set(o, [[it.f, it.l]]);
+    }
+    // (Every species counted once: what a name now names leaves its item's "+x". The pill keeps its size, its chip's count smaller.)
+    for (const [o, runs] of named) {
+      const key = `c${o.f}:${o.l}`;
+      const hid = groups.get(key);
+      if (!hid) continue;
+      const left = hid.filter(([b]) => !runs.some(([f, l]) => b.index >= f && b.index <= l));
+      if (left.length) groups.set(key, left);
+      else groups.delete(key);
+    }
+    return { spots, groups, pics, items: shown, all: cut, names };
   }
 
   /** The labels' and brackets' work per frame (ms, labelsNow; the pictures' and fades' in drawLabels not counted). */
@@ -3037,7 +3124,9 @@ export class FanView implements InputHandlers {
    */
   private drawLabels(cut: CutLabels, br: Brackets | null): void {
     const ctx = this.ctx;
-    const { spots, groups, pics } = cut;
+    const { groups, pics } = cut;
+    // (The pictures' pills, then the names alone: spots[i], pics[i] stay one label; the names are drawn the same.)
+    const spots = cut.names.length ? [...cut.spots, ...cut.names] : cut.spots;
     this.famHits.length = 0;
     this.nameHits.length = 0;
     this.plusHits.length = 0;
@@ -3050,7 +3139,6 @@ export class FanView implements InputHandlers {
     ctx.save();
     ctx.lineWidth = 1;
     ctx.strokeStyle = 'rgba(185,230,201,0.6)';
-    ctx.beginPath();
     for (const s of spots) {
       if (!s.over || s.fit < 0.01) continue;
       const [sa, sb, sy] = s.over;
@@ -3058,12 +3146,14 @@ export class FanView implements InputHandlers {
       const y = Math.round(sy) + 0.5;
       const a = Math.round(Math.max(sa, -1)) + 0.5;
       const b = Math.round(Math.min(sb, this.w + 1)) - 0.5;
+      ctx.beginPath();
+      ctx.globalAlpha = s.fit;
       ctx.moveTo(a, sa >= 0 ? y + PIC_LIFT / 2 : y);
       ctx.lineTo(a, y);
       ctx.lineTo(b, y);
       if (sb <= this.w) ctx.lineTo(b, y + PIC_LIFT / 2);
+      ctx.stroke();
     }
-    ctx.stroke();
     ctx.restore();
     this.drawGroupPics();
     ctx.textBaseline = 'middle';
