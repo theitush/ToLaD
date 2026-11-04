@@ -82,11 +82,18 @@ function frameCheck(v: FanView, f: number, l: number, at: string, bad: string[])
   if (miss.length) bad.push(`${at}: ${miss.length} of its ${l - f + 1} species under no label on screen, e.g. strand ${f + miss[0]}`);
 }
 
+const counted = { labelled: 0, bare: 0 };
 /** Tap into each item shown at the view (all, or `sample` of them, spread), check its frame, and a double tap back out; `depth` taps deep. */
 function tapEach(v: FanView, at: string, bad: string[], depth: number, sample = Infinity): number {
   settle(v);
   const from = { ...v.cam };
-  const items = v.cutLast!.spots.filter((s) => s.run && s.run[1] > s.run[0]).map((s) => [...s.run!, s.box] as const);
+  const onScreen = (b: readonly number[]) => (b[0] + b[2]) / 2 >= 0 && (b[0] + b[2]) / 2 <= v.w && (b[1] + b[3]) / 2 >= 0 && (b[1] + b[3]) / 2 <= v.h;
+  const labelled = v.cutLast!.spots.filter((s) => s.run && s.run[1] > s.run[0] && onScreen(s.box)).map((s) => [...s.run!, s.box] as [number, number, readonly number[] | null]);
+  // (An item with no label on screen, as one whose label left with its branch, ToLaD#373, has no tap of its own: flown to as a label's tap flies, its frame checked, no step to go back by.)
+  const bare = v.cutLast!.items.filter((it) => it.l > it.f && !labelled.some(([f, l]) => f === it.f && l === it.l)).map((it) => [it.f, it.l, null] as [number, number, readonly number[] | null]);
+  counted.labelled += labelled.length;
+  counted.bare += bare.length;
+  const items = [...labelled, ...bare];
   const step = Math.max(1, Math.ceil(items.length / sample));
   let n = 0;
   for (let i = 0; i < items.length; i += step) {
@@ -94,7 +101,8 @@ function tapEach(v: FanView, at: string, bad: string[], depth: number, sample = 
     v.cam = { ...from };
     settle(v);
     // (A real tap, on its label: a tap's step is what a double tap goes back by, ToLaD#376.)
-    v.tap((box[0] + box[2]) / 2, (box[1] + box[3]) / 2);
+    if (box) v.tap((box[0] + box[2]) / 2, (box[1] + box[3]) / 2);
+    else v.tapItem(f, l);
     run(v);
     const here = `${at} > ${f}-${l}`;
     n++;
@@ -112,12 +120,14 @@ function tapEach(v: FanView, at: string, bad: string[], depth: number, sample = 
     if (bad.length >= 20) return n;
     // A double tap, right after the tap: out one step, back to the frame the tap was made at (never deeper: the item's
     // own clade's frame is inside it, ToLaD#359).
-    v.doubleTap(0, 0);
-    run(v);
-    const out = v.cam;
-    if (!(out.sx < inside.sx * 0.999)) bad.push(`${here}: a double tap did not go out`);
-    const off = Math.max(Math.abs(Math.log(out.sx / from.sx)), Math.abs(Math.log(out.sy / from.sy))) + Math.abs(out.cx - from.cx) * from.sx / v.w + Math.abs(out.cy - from.cy) * from.sy / v.h;
-    if (off > 1e-2) bad.push(`${here}: the double tap went to x ${(1 / out.sx).toExponential(2)} at ${out.cx.toFixed(1)}, not back to the frame tapped at`);
+    if (box) {
+      v.doubleTap(0, 0);
+      run(v);
+      const out = v.cam;
+      if (!(out.sx < inside.sx * 0.999)) bad.push(`${here}: a double tap did not go out`);
+      const off = Math.max(Math.abs(Math.log(out.sx / from.sx)), Math.abs(Math.log(out.sy / from.sy))) + Math.abs(out.cx - from.cx) * from.sx / v.w + Math.abs(out.cy - from.cy) * from.sy / v.h;
+      if (off > 1e-2) bad.push(`${here}: the double tap went to x ${(1 / out.sx).toExponential(2)} at ${out.cx.toFixed(1)}, not back to the frame tapped at`);
+    }
     if (depth > 1) {
       v.cam = { ...inside };
       n += tapEach(v, here, bad, depth - 1, sample);
@@ -148,7 +158,8 @@ describe('one frame (ToLaD#359): a label\'s tap frames its item, every next-leve
       v.cam = v.homeCamera();
       frameCheck(v, 0, v.fan.root.strands.length - 1, `${name} home`, bad);
       const n = tapEach(v, `${name} home`, bad, depth, sample);
-      (globalThis as unknown as { process: { stderr: { write(s: string): void } } }).process.stderr.write(`oneframe ${name}: ${n} taps checked\n`);
+      (globalThis as unknown as { process: { stderr: { write(s: string): void } } }).process.stderr.write(`oneframe ${name}: ${n} taps checked, ${counted.labelled} by a label's real tap, ${counted.bare} items with no label on screen flown to\n`);
+      counted.labelled = counted.bare = 0;
       expect(bad).toEqual([]);
       expect(n).toBeGreaterThan(0);
     });
