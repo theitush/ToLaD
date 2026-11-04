@@ -1,6 +1,6 @@
 // The mammal level's detail by zoom (ToLaD#247): a clade the fold has closed (fold.ts: no gap inside it wider than
 // CLOSED_PX on screen) whose species are under MERGE_PX each on screen, on average, is drawn as the one branch it reads
-// as: one ribbon from its left edge to its right, its green the sum of its species' (lod.ts mergedPts), not ~5,900
+// as: one ribbon from its left edge to its right, its green the share of its species' (lod.ts mergedPts), not ~5,900
 // hairline strands side by side, each floored to a pixel (a striped block, and most of a frame's time). Zoomed in, a
 // clade parts (its gaps open) or its species widen, and it falls apart into its daughters, each merged while it still
 // qualifies, down to the species. The levels with no orders above them (the cats, the carnivores) have none of this:
@@ -17,7 +17,7 @@ export const MERGE_PX = 1;
 /** A clade is closed while no gap inside it is this wide on screen (px). */
 export const CLOSED_PX = 0.5;
 
-/** A clade's greens by row (Lod.greenAt): by world y, and a front cache by k (its grid h). */
+/** A clade's green shares by row (Lod.greenShareAt): by world y, and a front cache by k (its grid h). */
 interface GreenRows {
   v: FanNode;
   m: Map<number, number>;
@@ -39,7 +39,7 @@ export class Lod {
   private readonly flag: Uint8Array;
   private readonly room: Float64Array;
   private readonly gap: Float64Array;
-  /** Per merged-able node: its green (world, summed over its strands) per grid row, by the row's world y. */
+  /** Per merged-able node: its green share per grid row, by the row's world y. */
   private green = new Map<FanNode, GreenRows>();
   private gLast: GreenRows | undefined;
 
@@ -140,8 +140,8 @@ export class Lod {
   private readonly stack: Int32Array;
   private readonly stack2: Int32Array;
 
-  /** Clade v's green (world: the sum of its strands' green widths) at grid row k of height h. */
-  greenAt(v: FanNode, k: number, h: number): number {
+  /** Clade v's green share at grid row k of height h: its strands' green widths over their widths, so the gaps in its ribbon are not painted as ended lines (ToLaD#389). */
+  greenShareAt(v: FanNode, k: number, h: number): number {
     // (By world y, not by (k, h): a coarser grid's rows are a finer one's (powers of two), kept across the switch, ToLaD#255.)
     const y = k * h;
     // (The last clade's, and per clade a front cache by k before its map (a float key): drawMerged asks a clade's rows in a run, ToLaD#255.)
@@ -157,8 +157,15 @@ export class Lod {
     let G = m.get(y);
     if (G === undefined) {
       if (m.size >= 8192) m.clear();
-      G = 0;
-      for (const b of v.strands) if (y >= b.tipY) G += lanesAt(b, y)[1];
+      let g = 0;
+      let w = 0;
+      for (const b of v.strands) {
+        if (y < b.tipY) continue;
+        const l = lanesAt(b, y);
+        w += l[0];
+        g += l[1];
+      }
+      G = w > 0 ? Math.min(1, g / w) : 0;
       m.set(y, G);
     }
     e.K[c] = k;
