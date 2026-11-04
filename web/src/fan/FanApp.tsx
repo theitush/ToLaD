@@ -94,7 +94,7 @@ export function FanApp() {
   const [mid, setMid] = useState(true);
   const [forks, setForks] = useState(initialForkNames);
   const [gaps, setGaps] = useState<GapMode>(initialGaps);
-  const [forks, setForks] = useState<ForkMode>(initialForks);
+  const [forkLook, setForkLook] = useState<ForkMode>(initialForks);
   // What the widths count (ToLaD#276): individuals, or their mass (`?width=mass`).
   const [measure, setMeasure] = useState<Measure>(initialMeasure);
   const [sel, setSel] = useState<Selection | null>(null);
@@ -233,9 +233,9 @@ export function FanApp() {
           type="button"
           title="Forks: flat corners or peeling ribbons"
           onClick={() => {
-            const next = FORK_MODES[(FORK_MODES.indexOf(forks) + 1) % FORK_MODES.length];
+            const next = FORK_MODES[(FORK_MODES.indexOf(forkLook) + 1) % FORK_MODES.length];
             setForkMode(next);
-            setForks(next);
+            setForkLook(next);
             viewRef.current?.request();
             try {
               const u = new URL(window.location.href);
@@ -246,7 +246,7 @@ export function FanApp() {
             }
           }}
         >
-          {`forks: ${forks}`}
+          {`forks: ${forkLook}`}
         </button>
         {/* Home for this level, and the level stepper joined to it (ToLaD#247): one pill, so the bar stays one row. */}
         <span className="pair">
