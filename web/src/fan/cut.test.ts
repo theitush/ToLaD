@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { Steady } from './steady';
 import { layoutFan, type Fan } from './layout';
 import { CARNIVORA, FELIDAE, mammaliaClade } from './panthera';
-import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree } from './splits';
+import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, type Split } from './splits';
 import { loadMammalsFromFiles } from './mammals-node';
 import { LADDER, Territories, type CutItem, type RowsOf } from './cut';
 import { PIC_D as PIC, PIC_LIFT } from './pics';
@@ -31,9 +31,9 @@ interface Setup {
   /** How high (world) a lineage keeps its place over its tip: the label's height, its rows above "now" (ToLaD#373). */
   ghost: number;
 }
-function setup(level: Level): Setup {
+function setup(level: Level, given?: Fan): Setup {
   const fan =
-    level === 'cats'
+    given ? given : level === 'cats'
       ? layoutFan(FELIDAE, 'linear', FELIDAE_TREE)
       : level === 'carnivores'
         ? layoutFan(CARNIVORA, 'linear', CARNIVORA_TREE)
@@ -256,5 +256,64 @@ describe('cut: one cut through the tree (ToLaD#333)', () => {
       console.log(`cut333: mammals ${z}x home: ${all.length} items in all, ${n / 50} on screen, ${ms.toFixed(3)} ms a cut (rows cached)`);
       expect(ms).toBeLessThan(5);
     }
+  });
+});
+
+// A group with living species stands at "now", on its own living branches (ToLaD#395): nothing living rides on a daughter
+// with none, who fits low down where the room is wide. The mammals' run bites without the rule ("Gibbons +26": a clade's
+// rightmost daughter a fossil, her living aunts too narrow for a label of their own).
+describe('cut: living species stand at now (ToLaD#395)', () => {
+  /** Its head climbed (view.ts CutTerritories.whole), the branch its label stands on. */
+  const climbed = (t: Territories, c: CutItem): number => {
+    let k = c.head;
+    for (let u = k >= 0 ? t.nodes[k].parent : t.strands[~k].node; u; u = u.parent) {
+      const j = t.index.get(u)!;
+      if (t.first[j] < c.f || t.last[j] > c.l) break;
+      k = j;
+    }
+    return k;
+  };
+  /** Over the cut at sx: each species under one item, and no item with a living species standing on a branch with none. Its items. */
+  const check = (s: Setup, sx: number): CutItem[] => {
+    const now = s.fan.time.y(0);
+    s.f.setScale(sx, SCREEN);
+    const cs = s.t.cut(sx, PIC, -Infinity, Infinity, s.rows, s.ghost);
+    let at = 0;
+    for (const c of cs) {
+      expect(c.f).toBe(at);
+      at = c.l + 1;
+      const living = s.t.strands.slice(c.f, c.l + 1).some((b) => b.tipY <= now);
+      if (living) expect([c.f, c.l, s.t.living(climbed(s.t, c))]).toEqual([c.f, c.l, true]);
+    }
+    expect(at).toBe(s.t.strands.length);
+    return cs;
+  };
+  const dead = (s: Setup, c: CutItem) => s.t.strands.slice(c.f, c.l + 1).every((b) => b.tipY > s.fan.time.y(0));
+
+  for (const level of levels)
+    it(`${level}: every item with a living species stands on a living branch, at every zoom`, () => {
+      const s = S.get(level)!;
+      for (let z = 0.5; z < 3000; z *= 1.3) check(s, s.home * z);
+    });
+
+  it('a fossil with living aunts rides until they fit; alone, she stands on her own tip', () => {
+    const sp = (sci: string) => FELIDAE.species.find((x) => x.sci === sci)!;
+    // (The fossil that ended longest ago: where she ended there is the most room.)
+    const old = S.get('cats')!.t.strands.reduce((a, b) => (b.tipY > a.tipY ? b : a));
+    const fossil = sp(old.sp.sci);
+    const aunts = FELIDAE.species.filter((x) => !x.extinct && x.sci !== 'Panthera leo');
+    const split = (name: string, ageMa: number, kids: Split['kids']): Split => ({ ...FELIDAE_TREE, name, ageMa, kids });
+    const tree = split('all', 12, [split('pair', 8, [sp('Panthera leo').sci, fossil.sci]), ...aunts.map((a) => a.sci)]);
+    const s = setup('carnivores', layoutFan({ ...FELIDAE, species: [sp('Panthera leo'), fossil, ...aunts] }, 'linear', tree));
+    const i = s.t.strands.findIndex((b) => b.sp.sci === fossil.sci);
+    let rode = 0;
+    let alone = 0;
+    for (let z = 0.2; z < 1e6; z *= 1.2) {
+      const c = check(s, s.home * z).find((x) => x.f <= i && i <= x.l)!;
+      if (c.head === ~i && dead(s, c)) alone++;
+      else if (c.f < i || c.l > i) rode++;
+    }
+    expect(rode).toBeGreaterThan(0);
+    expect(alone).toBeGreaterThan(0);
   });
 });
