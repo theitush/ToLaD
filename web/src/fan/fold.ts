@@ -16,9 +16,10 @@
 //
 // That is the `age` switch's look, the way back. By default a gap no longer shows relatedness (Ita, ToLaD#378: a
 // fork's height already does, and a standard tree spaces its neighbouring leaves evenly): `even`, every neighbouring
-// pair the same small gap, at every level of the tree, or `groups`, the splits above the families one larger gap so
-// groups stand apart from afar. Both are fixed in the world, always open, so the layout does not depend on the width
-// zoom at all, and sized by one share per fan (GAP_SUM, GROUP_SUM) of its width at "now".
+// pair the same small gap, at every level of the tree, or `groups` (the default: `even` reads as one solid block from
+// afar), the splits above the named groups (the families, or the orders where the fan has them) one larger gap, so
+// the groups stand apart from afar. Both are fixed in the world, always open, so the layout does not depend on the
+// width zoom at all, and sized by one share per fan (GAP_SUM, GROUP_SUM) of its width at "now".
 
 import { ease, laneW, segAt, type Fan, type FanBranch, type FanNode } from './layout';
 import { smoother } from './population';
@@ -27,7 +28,7 @@ import { ORDER_TAXA, taxonKey } from './splits';
 /** How a neighbouring pair's gap is sized (ToLaD#378; `?gaps=`, the button in FanApp). */
 export type GapMode = 'even' | 'groups' | 'age';
 export const GAP_MODES: readonly GapMode[] = ['even', 'groups', 'age'];
-let gapModeNow: GapMode = 'even';
+let gapModeNow: GapMode = 'groups';
 /** The switch: what the layouts built from now on use. */
 export function setGapMode(m: GapMode): void {
   gapModeNow = m;
@@ -199,7 +200,8 @@ export abstract class Fold {
    * living strands stand apart by the widest gap between them (the rooms of steady.ts), so those are the ones counted.
    */
   private fixGaps(): void {
-    const big = (i: number) => this.gaps === 'groups' && !this.famLike(i);
+    // (The groups are named, no age: above the families, or above the orders where the fan has them.)
+    const big = (i: number) => this.gaps === 'groups' && this.pairFam[i] === 0 && this.pairOrd[i] < 0;
     const S = this.strands;
     let rooms = 0;
     let nBig = 0;
