@@ -1,7 +1,7 @@
 // The clades' brackets above "now" (ToLaD#193): nested right, never overlapping at any zoom, labelled only where the
 // label fits; a tap's flight frames the clade centred, "now" at the top and its stem's start just below.
-import { describe, expect, it } from 'vitest';
-import { bracketRows, Brackets, clades, latinOf, layoutBrackets, clearSpot, PILL_ROOM, rankOf, ROW_H, TICK_ROW_H, type Placed } from './brackets';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { bracketRows, Brackets, clades, latinOf, layoutBrackets, clearSpot, PILL_ROOM, rankOf, ROW_H, setForkNames, TICK_ROW_H, type Placed } from './brackets';
 import { FanCamera } from './camera';
 import { Steady } from './steady';
 import { layoutFan, type Fan, type FanBranch, type WidthMode } from './layout';
@@ -94,6 +94,9 @@ function stackAt(fan: Fan, z: number, pan: number): { placed: Placed[]; br: Brac
 }
 
 describe('the stack', () => {
+  // (The stack itself: the switch off, ToLaD#373; the names at their forks are forknames.test.ts'.)
+  beforeAll(() => setForkNames(false));
+  afterAll(() => setForkNames(process.env.FORKNAMES !== 'off'));
   const ZOOMS = [1, 1.4, 2, 3, 5, 8, 14, 30, 80];
   const PANS = [-0.6, 0, 0.45];
   for (const [level, mode, fold] of [['cats', 'linear', false], ['cats', 'log', false], ['carnivores', 'linear', true], ['carnivores', 'log', true]] as const) {

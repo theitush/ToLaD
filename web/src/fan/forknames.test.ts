@@ -93,7 +93,7 @@ describe('names at their forks (ToLaD#373)', () => {
     let flips = 0;
     let last = new Map<string, number>();
     for (let k = 0; k < 120; k++) {
-      v.cam = { ...v.cam, sx: v.cam.sx * 1.01, tx: v.cam.sx * 1.01, cx: v.cam.cx + 0.3 / v.cam.sx };
+      v.cam = { ...v.cam, sx: v.cam.sx * 1.01, cx: v.cam.cx + 0.3 / v.cam.sx };
       frame(v);
       clear(v, `step ${k}`);
       const now = new Map<string, number>();
@@ -112,8 +112,11 @@ describe('names at their forks (ToLaD#373)', () => {
     const br = inner(v).brackets;
     const k = br.forks.findIndex((f, j) => j < br.forkN && br.list[f.i].v.parent === null);
     expect(k).toBeGreaterThanOrEqual(0);
+    // (Twice: the axis's labels it stays clear of are last frame's.)
+    frame(v);
     const y0 = br.forks[k].y;
     v.cam = { ...v.cam, cy: v.cam.cy + 6 / v.cam.sy };
+    frame(v);
     frame(v);
     expect(Math.abs(br.forks[k].y - (y0 - 6))).toBeLessThan(0.01);
   });
