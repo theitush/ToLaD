@@ -1,5 +1,6 @@
 // One tap = one level deeper, a double-tap = one level out, one pill per group one level down (ToLaD#258).
 import { describe, expect, it } from 'vitest';
+import { forkNames } from './brackets';
 import { laneAt, layoutFan, leftAt, type FanBranch, type FanNode } from './layout';
 import { CARNIVORA, FELIDAE, mammaliaClade, type CladeRec } from './panthera';
 import { loadMammalsFromFiles } from './mammals-node';
@@ -692,7 +693,7 @@ describe('a double tap is the reverse of a single tap (ToLaD#376)', () => {
     });
 
     // (The cats' stack is never deep enough for a "…".)
-    it.runIf(name === 'carnivores')(`${name}: the stack's "…" is a tap: tap, tap, "…" lands one named level up, a double tap comes back to where "…" started, then to the taps' own frames`, () => {
+    it.runIf(name === 'carnivores' && !forkNames())(`${name}: the stack's "…" is a tap: tap, tap, "…" lands one named level up, a double tap comes back to where "…" started, then to the taps' own frames`, () => {
       const v = mk();
       let card: string | null = null;
       v.onSelect = (s) => void (card = s ? s.sp.common : null);

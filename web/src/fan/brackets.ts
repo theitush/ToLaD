@@ -697,7 +697,7 @@ export class Brackets {
    */
   draw(ctx: CanvasRenderingContext2D, ink: string, ink2: string, pills: readonly (readonly number[])[] = [], bg = '#000'): void {
     if (forkNow) {
-      this.placeForks(pills);
+      // (Placed with the labels, placeForks: their boxes are its obstacles.)
       this.drawForks(ctx, ink, ink2, bg);
       return;
     }
