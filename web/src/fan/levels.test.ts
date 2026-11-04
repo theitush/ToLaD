@@ -200,8 +200,10 @@ describe('a tap goes one level deeper, a double-tap one level out (ToLaD#258)', 
         run(v);
         // (That group, or where its frame is the view's, on into it; a deeper group's name, as the cut shows them at
         // home (the bears' in the carnivores, ToLaD#333): the next level on its way, one tap one level, ToLaD#258.)
+        // (An item with sisters riding on it that meet only at the root, as "Lynxes +29" in the cats: the root's level, framed in.)
         const now = v.levelNow();
-        expect(holds({ v: g }, now) || (!!now.v && now.v !== v.fan.root && holds(now, { v: g }))).toBe(true);
+        const into = now.v === v.fan.root ? v.cam.sx > v.homeCamera().sx * 1.01 : !!now.v;
+        expect(holds({ v: g }, now) || (into && holds(now, { v: g }))).toBe(true);
         v.doubleTap(-1e4, -1e4);
         run(v);
         expect(atHome(v)).toBe(true);
@@ -293,12 +295,12 @@ describe("the groups' names beside their branch: none meet, each within its bran
               const [p, q] = [hits[i].box, hits[j].box];
               if (p[0] < q[2] && q[0] < p[2] && p[1] < q[3] && q[1] < p[3]) bad.push(`${at}: ${nameOf(hits[i].lv)} meets ${nameOf(hits[j].lv)}`);
             }
-          // Within its branch's run: between "now" (its tip) and where it splits off, as far as the screen shows.
+          // Over its branch's run: above where it splits off, as far as the screen shows, standing on its tip (ToLaD#373).
           for (const h of hits) {
             const wTop = h.lv.b ? Math.max(h.lv.b.tipY, v.fan.time.y(0)) : v.fan.time.y(0);
             const wBot = h.lv.b ? h.lv.b.splitY : h.lv.v.yBot;
             const y = (h.box[1] + h.box[3]) / 2;
-            if (y < Math.max(nowS, v.toScreen(0, wTop)[1]) - 1 || y > v.toScreen(0, wBot)[1] + 1) bad.push(`${at}: ${nameOf(h.lv)}'s name off its branch's run (${y.toFixed(0)})`);
+            if (h.box[3] > Math.max(nowS, v.toScreen(0, wTop)[1]) + 1 || y > v.toScreen(0, wBot)[1] + 1) bad.push(`${at}: ${nameOf(h.lv)}'s name off its branch's run (${y.toFixed(0)})`);
           }
         });
         expect(bad).toEqual([]);

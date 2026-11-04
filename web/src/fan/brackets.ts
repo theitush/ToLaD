@@ -324,6 +324,8 @@ export class Brackets {
   /** A clade's span (world x) in place of its species' rooms at "now" (its territory, cut.ts), or null. */
   spanOf: ((v: FanNode) => readonly [number, number] | null) | null = null;
   hideKey = '';
+  /** Room (px) kept for the labels between the stack's foot and "now" (the view's: the tallest label its fan could have, ToLaD#373). */
+  pillRoom: number = PILL_ROOM;
   /** The "…" row over the stack (ToLaD#288): its row, or -1 for none; the pinned rows' likewise (pinMore). */
   moreRow = -1;
   pinMore = false;
@@ -391,7 +393,7 @@ export class Brackets {
 
   /**
    * Lay the stack out for this frame; `axisX` the time axis's right edge, `fit` (0–1) how far "now" is on screen,
-   * `top` the labels' top line (under the buttons). The stack stands over the species' pills: its foot PILL_ROOM px
+   * `top` the labels' top line (under the buttons). The stack stands over the labels: its foot pillRoom px
    * above "now", or, with less room, its top on the top line (a longer pill then reaches up over its lines).
    */
   layout(c: BracketCam, fan: Fan, nowS: number, axisX: number, fit: number, measure: (font: string, text: string) => number, top = 0, at: StackAt | null = null): Placed[] {
@@ -477,7 +479,7 @@ export class Brackets {
     for (let r = 1; r <= rows; r++) this.rowBase[r] = this.rowBase[r - 1] + this.rowH[r - 1];
     const height = rows ? this.rowTop(rows - 1) : 0;
     this.stack = [top, height, rows, fit];
-    this.baseS = Math.min(nowS - 4, Math.max(top + height, nowS - 4 - PILL_ROOM));
+    this.baseS = Math.min(nowS - 4, Math.max(top + height, nowS - 4 - this.pillRoom));
     // Pushed up past the top line by "now" (under the buttons) by half a row, it is swapped for the pinned rows
     // (ToLaD#233, like a sticky header): a clean swap, never both at once (a fade showed the order twice, faintly).
     // ("Now" itself near the top line: the same swap, half way through the old fade.)
@@ -515,7 +517,7 @@ export class Brackets {
     const [top, height, rows, fit0] = this.stack;
     if (!(fit0 > 0)) return;
     const fit = Math.min(1, Math.max(0, (nowS - top) / 24));
-    this.baseS = Math.min(nowS - 4, Math.max(top + height, nowS - 4 - PILL_ROOM));
+    this.baseS = Math.min(nowS - 4, Math.max(top + height, nowS - 4 - this.pillRoom));
     this.fit = (rows && top + height - this.baseS > ROW_H / 2) || fit < 0.5 ? 0 : 1;
     // (The pinned rows swap in as the stack goes: those pinned at the last layout, none if the stack showed then.)
     this.pinA = this.pins.length ? 1 - this.fit : 0;
@@ -731,7 +733,7 @@ export type Pin = Placed;
 /** Backdrop (px) the pinned rows take beyond their own height. */
 export const PIN_PAD = 6;
 
-/** Room (px) kept for the species' pills between the stack's foot and "now". */
+/** Room (px) kept for the labels between the stack's foot and "now", by default (Brackets.pillRoom: the view's own). */
 export const PILL_ROOM = 96;
 
 /**

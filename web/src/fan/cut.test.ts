@@ -28,6 +28,8 @@ interface Setup {
   /** World y per screen px. */
   py: number;
   rows: RowsOf;
+  /** How high (world) a lineage keeps its place over its tip: the label's height, its rows above "now" (ToLaD#373). */
+  ghost: number;
 }
 function setup(level: Level): Setup {
   const fan =
@@ -48,7 +50,7 @@ function setup(level: Level): Setup {
   const py = (fan.root.yBot - now) / TALL;
   f.setGrid(Math.pow(2, Math.round(Math.log2(3 * py))));
   // A label, one unit at its youngest tip (view.ts cutLabels): its picture PIC_LIFT over the tip, its name pill PILL_LEN
-  // long right under it. The tip is its head climbed's (view.ts CutTerritories.whole: the widest clade the head is in
+  // long right over it (ToLaD#373). The tip is its head climbed's (view.ts CutTerritories.whole: the widest clade the head is in
   // whose species are all the item's), not its riders': a sister riding on it lends it no row (ToLaD#358, #359).
   const rows: RowsOf = (r) => {
     let [a, z] = r.head >= 0 ? [t.first[r.head], t.last[r.head]] : [~r.head, ~r.head];
@@ -61,10 +63,10 @@ function setup(level: Level): Setup {
     for (let i = a; i <= z; i++) ty = Math.min(ty, t.strands[i].tipY);
     ty = Math.max(ty, now);
     const d1 = ty - PIC_LIFT * py;
-    const p0 = d1 + 4 * py;
-    return [d1 - PIC * py, d1, p0, p0 + PILL_LEN * py];
+    const p1 = d1 - PIC * py - 4 * py;
+    return [p1 - PILL_LEN * py, p1, d1 - PIC * py, d1];
   };
-  return { fan, f, t, wf, wt: new Territories(fan, wf, SCREEN), home: (SCREEN - 72) / ((x1 - x0) * 1.04), py, rows };
+  return { fan, f, t, wf, wt: new Territories(fan, wf, SCREEN), home: (SCREEN - 72) / ((x1 - x0) * 1.04), py, rows, ghost: (PIC_LIFT + PIC + 4 + PILL_LEN) * py };
 }
 const ZOOMS = [0.5, 1, 2.2, 5, 14, 50, 400];
 const levels: Level[] = ['cats', 'carnivores', 'mammals'];
@@ -105,7 +107,7 @@ describe('cut: territories (ToLaD#333)', () => {
       for (const px of BOXES)
         for (const z of ZOOMS) {
           f.setScale(home * z, SCREEN);
-          const cs = t.cut(home * z, px, -Infinity, Infinity, s.rows);
+          const cs = t.cut(home * z, px, -Infinity, Infinity, s.rows, s.ghost);
           expect(sweep(s, cs)).toBeGreaterThan(0);
         }
     });
@@ -179,7 +181,7 @@ describe('cut: one cut through the tree (ToLaD#333)', () => {
         for (const z of ZOOMS) {
           const sx = home * z;
           f.setScale(sx, SCREEN);
-          const cs = t.cut(sx, px, -Infinity, Infinity, s.rows);
+          const cs = t.cut(sx, px, -Infinity, Infinity, s.rows, s.ghost);
           const seen = new Uint8Array(t.strands.length);
           let next = 0;
           for (const c of cs) {
@@ -205,7 +207,7 @@ describe('cut: one cut through the tree (ToLaD#333)', () => {
           const sx = s.home * Math.pow(2, k / LADDER);
           f.setScale(sx, SCREEN);
           const at = new Int32Array(2 * t.strands.length);
-          for (const c of t.cut(sx, BOXES[1], -Infinity, Infinity, s.rows))
+          for (const c of t.cut(sx, BOXES[1], -Infinity, Infinity, s.rows, s.ghost))
             for (let i = c.f; i <= c.l; i++) [at[2 * i], at[2 * i + 1]] = [c.f, c.l];
           if (prev) for (let i = 0; i < at.length; i += 2) if (at[i] < prev[i] || at[i + 1] > prev[i + 1]) expect.fail(`${sx}: species ${i / 2} from ${prev[i]}-${prev[i + 1]} to ${at[i]}-${at[i + 1]}`);
           prev = at;
@@ -219,20 +221,20 @@ describe('cut: one cut through the tree (ToLaD#333)', () => {
       for (const z of [1, 5, 50]) {
         const sx = home * z;
         f.setScale(sx, SCREEN);
-        const direct = key(t.cut(sx, 22, -Infinity, Infinity, s.rows));
+        const direct = key(t.cut(sx, 22, -Infinity, Infinity, s.rows, s.ghost));
         for (const via of [[0.5, 400], [14, 2.2], [1000]]) {
           for (const w of via) f.setScale(home * w, SCREEN);
           f.setScale(sx, SCREEN);
-          expect(key(t.cut(sx, 22, -Infinity, Infinity, s.rows))).toBe(direct);
+          expect(key(t.cut(sx, 22, -Infinity, Infinity, s.rows, s.ghost))).toBe(direct);
         }
-        const all = t.cut(sx, 22, -Infinity, Infinity, s.rows);
+        const all = t.cut(sx, 22, -Infinity, Infinity, s.rows, s.ghost);
         const r: [number, number] = [0, 0];
         const mid = (all[0].x0 + all[all.length - 1].x1) / 2;
         const half = SCREEN / sx / 2;
         const meets = (a: number, b: number) => b >= mid - half && a <= mid + half;
         // (An item meets the window when its room (culling) and its territory both do.)
         const room = (c: CutItem) => t.hull(c.f, c.l, r);
-        const win = t.cut(sx, 22, mid - half, mid + half, s.rows);
+        const win = t.cut(sx, 22, mid - half, mid + half, s.rows, s.ghost);
         expect(key(win)).toBe(key(all.filter((c) => meets(...room(c)) && meets(c.x0, c.x1))));
       }
     });
@@ -244,12 +246,12 @@ describe('cut: one cut through the tree (ToLaD#333)', () => {
     for (const z of [1, 50]) {
       const sx = home * z;
       f.setScale(sx, SCREEN);
-      const all = t.cut(sx, 22, -Infinity, Infinity, s.rows);
+      const all = t.cut(sx, 22, -Infinity, Infinity, s.rows, s.ghost);
       const mid = (all[0].x0 + all[all.length - 1].x1) / 2;
-      t.cut(sx, 22, mid - SCREEN / sx / 2, mid + SCREEN / sx / 2, s.rows);
+      t.cut(sx, 22, mid - SCREEN / sx / 2, mid + SCREEN / sx / 2, s.rows, s.ghost);
       const t1 = performance.now();
       let n = 0;
-      for (let k = 0; k < 50; k++) n += t.cut(sx, 22, mid - SCREEN / sx / 2, mid + SCREEN / sx / 2, s.rows).length;
+      for (let k = 0; k < 50; k++) n += t.cut(sx, 22, mid - SCREEN / sx / 2, mid + SCREEN / sx / 2, s.rows, s.ghost).length;
       const ms = (performance.now() - t1) / 50;
       console.log(`cut333: mammals ${z}x home: ${all.length} items in all, ${n / 50} on screen, ${ms.toFixed(3)} ms a cut (rows cached)`);
       expect(ms).toBeLessThan(5);

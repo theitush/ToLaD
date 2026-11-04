@@ -9,7 +9,7 @@ import { PIC_D, PIC_LIFT, type PicSpot } from './pics';
 import { formatCount, formatMass } from '../data/count';
 import { stamp } from '../stamp';
 import { DOUBLE_TAP_MS, Input, type InputHandlers } from '../engine/input';
-import { clipPoly, FanCamera, type Camera } from './camera';
+import { clipPoly, FanCamera, LABELS_SHARE, type Camera } from './camera';
 import { laneAt, layoutFan, leftAt, nearestStrand, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type Fan, type FanBranch, type FanNode, type Measure, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01 } from './meshgl';
@@ -94,13 +94,13 @@ const GLOW_LEAN = 0.25;
 const FRAME_BOTTOM = 150;
 /** A level's start (its fork, a species' split) stands this many px up from the screen's foot, just over the scale bar (ToLaD#288). */
 const FORK_PX = LABEL_BOTTOM_PX;
-/** Room (px) a frame keeps between the brackets' stack and "now" for the level's pictures standing on it (ToLaD#274). */
-const NOW_ROOM = PIC_D + 8;
+/** Clearance (px) a frame keeps between the brackets' stack and the tallest of its labels standing on "now" (ToLaD#274, #373: labelRoom). */
+const NOW_CLEAR = 6;
 
-/** Gap (px) between a label's picture and its name pill right under it (ToLaD#358: one unit at the tip). */
+/** Gap (px) between a label's name pill and its picture right under it (ToLaD#358: one unit at the tip; #373: the name on top). */
 const LABEL_UNDER = 4;
-/** ...a "+x" label's (ToLaD#368, Ita: "between the pic and the text"): room for the hairline over its branches there. */
-const LABEL_LINE_GAP = 14;
+/** A label's height (px) from its tip up (ToLaD#373): the gap the "+x" hairline runs in, its picture, the gap, a name pill `len` long. */
+const labelUp = (len: number): number => PIC_LIFT + PIC_D + LABEL_UNDER + len;
 /**
  * A name pill hides a branch column it covers more than this share of (ToLaD#368, Ita: "if it covers the branch or i
  * dunno 80% of it it should be on its side"): a column narrower than LABEL_PILL / PILL_HIDES is thin, the pill slides off it.
@@ -109,7 +109,7 @@ const PILL_HIDES = 0.8;
 
 /**
  * A name pill (ToLaD#333, view.ts cutLabels): the name upright on a dark pill, the same text and size at every zoom,
- * right under its item's picture inside the item's territory (ToLaD#358), its "+x" at its top end.
+ * right over its item's picture inside the item's territory (ToLaD#358, #373), its "+x" at its top end.
  */
 export interface LabelSpot {
   /** The spot's key: the name's id and the place (`tip`, `in`, `right`, `left`). */
@@ -120,8 +120,9 @@ export interface LabelSpot {
   /** A family's label (`fam`, ToLaD#146): the screen x span of its species, bracketed under the pill. */
   span?: [number, number];
   /**
-   * A "+x" label's branches (ToLaD#368): the screen x of its item's first and last branch at the label's foot (between
-   * its picture and its name pill, screen y), which a hairline spans there, a tick down onto each end branch.
+   * A "+x" label's branches (ToLaD#368, #373): the screen x of its item's first and last branch at the label's foot (the
+   * gap under its picture, screen y; with its tip at "now", just above the now line), which a hairline spans there, a
+   * tick down onto each end branch.
    */
   over?: [number, number, number];
   /** A cut item's label (ToLaD#359): the item's strands, first and last, which a tap on it goes into (tapItem). */
@@ -981,6 +982,7 @@ export class FanView implements InputHandlers {
     const lod = this.lodNow();
     br.hide = lod ? (v) => lod.hidden(v) : null;
     br.hideKey = lod ? String(lod.gen) : '';
+    br.pillRoom = this.roomMax();
     // (The stack at the level the view is at, ToLaD#288: its groups, it and the familiar levels up, "…" over three rows.)
     br.layout(this.camera, this.fan, nowS, LABEL_AXIS_X, fit, measure, top, stackAt(this.fan, levelClade(this.fan, this.levelNow())));
     // The groups the view is inside, pinned under the buttons as the stack scrolls off (ToLaD#233): the familiar levels.
@@ -1015,19 +1017,23 @@ export class FanView implements InputHandlers {
    * camera.frame puts FRAME_BOTTOM px up from the screen's foot) down at FORK_PX from the foot, over the scale bar.
    * Only the time is moved: the width (and with it the stack) stays as framed. `top`: the world y put where "now"
    * would stand, "now" itself by default (Fit fossils, ToLaD#298: a level framed on its fossils, its youngest fossil's end, fossilTop).
+   * `room`: the px kept between the stack and "now" for the labels standing on it, the most any label of the fan could
+   * need (roomMax) until the frame is known and its own can be measured (labelRoom; the width does not depend on it).
    */
-  private withBand(cam: Camera, lv: FanNode | null = null, top = this.yNow): Camera {
+  private withBand(cam: Camera, lv: FanNode | null = null, top = this.yNow, room = this.roomMax()): Camera {
     const sn = this.h / 2 + (this.yNow - cam.cy) * cam.sy;
     const yFork = cam.cy + (this.h - FRAME_BOTTOM - this.h / 2) / cam.sy;
-    const nowS = this.brackets ? Math.max(this.nowUnder(cam, lv), this.labelTop() + NOW_ROOM) : sn;
+    // (On a short screen a long name is held under the top line, over the stack, rather than squeezing the tree: LABELS_SHARE.)
+    const foot = this.brackets ? this.nowUnder(cam, lv) : 0;
+    const nowS = this.brackets ? foot + Math.min(room, (this.h - FORK_PX - foot) * LABELS_SHARE) : sn;
     const sy = Math.max(1e-300, this.h - FORK_PX - nowS) / Math.max(1e-300, yFork - top);
     return { ...cam, sy, ty: sy, cy: top + (this.h / 2 - nowS) / sy };
   }
 
   /**
-   * The highest screen y "now" may stand at in camera `cam` (ToLaD#274): under the labels' top line, the brackets'
-   * whole stack as that frame lays it out (its rows at that zoom, the fold as it stands), and NOW_ROOM for the
-   * level's pictures standing on "now".
+   * The foot of what stands over the labels in camera `cam` (screen y, ToLaD#274): the labels' top line and under it
+   * the brackets' whole stack as that frame lays it out (its rows at that zoom, the fold as it stands). "Now" stands
+   * the labels' room below it (withBand).
    */
   private nowUnder(cam: Camera, lv: FanNode | null = null): number {
     const br = this.probeBr;
@@ -1062,7 +1068,7 @@ export class FanView implements InputHandlers {
     const placed = br.layout(c, this.fan, this.h, LABEL_AXIS_X, 1, measure, top, stackAt(this.fan, at));
     let rows = br.moreRow + 1;
     for (const p of placed) rows = Math.max(rows, p.row + 1);
-    const y = top + (rows ? br.rowTop(rows - 1) : 0) + NOW_ROOM;
+    const y = top + (rows ? br.rowTop(rows - 1) : 0);
     this.nowUnderAt.set(key, y);
     return y;
   }
@@ -1071,6 +1077,66 @@ export class FanView implements InputHandlers {
   /** A stack and a level of detail of their own for nowUnder's frames (the drawn ones keep theirs). */
   private readonly probeBr = this.brackets ? new Brackets(font('600 11px'), font('italic 400 11px', SERIF)) : null;
   private probeLod: Lod | null = null;
+
+  /**
+   * The longest name a label of this fan shows (px, ToLaD#373) and with it the longest pill: the names of its species
+   * and named clades at their 99th percentile, the 1 % past it (a data line of 78 characters) cut short (pillText), and
+   * the fan's largest "+x". Measured once per fan and font (the names' widths are kept, nameWidth). What a lineage's
+   * place above its tip must reach (cutLabels' ghost) and what no frame needs more than.
+   */
+  private pillBound(): { name: number; pill: number } {
+    const fk = this.nameFontKey();
+    const P = this.pillAt_;
+    if (P && P.fan === this.fan && P.font === fk) return P;
+    const W = this.fan.branches.map((b) => this.nameWidth(levelText(b)));
+    for (const v of this.fan.nodes) if (latinOf(v.split)) W.push(this.nameWidth(levelName(v)));
+    W.sort((a, b) => a - b);
+    const name = W[Math.ceil(0.99 * (W.length - 1))];
+    const pill = name + 2 * LABEL_PAD + this.plusPx(this.fan.branches.length);
+    this.pillAt_ = { fan: this.fan, font: fk, name, pill };
+    return this.pillAt_;
+  }
+  private pillAt_: { fan: Fan; font: string; name: number; pill: number } | null = null;
+  /** The longest pill a label of this fan shows (px). */
+  private pillMax(): number {
+    return this.pillBound().pill;
+  }
+  /** Name `text` as its pill shows it: whole, or past this fan's longest (pillBound) cut short with an ellipsis. */
+  private pillText(text: string): string {
+    const max = this.pillBound().name;
+    if (this.nameWidth(text) <= max) return text;
+    let [lo, hi] = [0, text.length];
+    while (hi - lo > 1) {
+      const m = (lo + hi) >> 1;
+      if (this.nameWidth(`${text.slice(0, m).trimEnd()}…`) <= max) lo = m;
+      else hi = m;
+    }
+    return `${text.slice(0, lo).trimEnd()}…`;
+  }
+  /** The most room (px) a frame's labels could need over "now": the longest pill's label and the clearance. */
+  private roomMax(): number {
+    return labelUp(this.pillMax()) + NOW_CLEAR;
+  }
+  /**
+   * The room (px) camera `cam`'s labels take over the row `top` (world y; "now", or a fossil level's youngest end):
+   * measured on the frame's own cut (labelsAt, one cut; a function of the width, the time only moving the rows a little),
+   * the tallest of the labels standing at or under that row, and the clearance. At least a picture's, a frame without a
+   * label keeping its place. Labels standing on younger tips, higher up, take no room here: they are held under the top line.
+   */
+  private labelRoom(cam: Camera, top: number): number {
+    const y = (top - cam.cy) * cam.sy + this.h / 2;
+    const c = this.labelsAt(cam);
+    this.roomCut = { sx: cam.sx, cx: cam.cx, items: c.items };
+    let up = labelUp(0);
+    c.spots.forEach((s, i) => {
+      const p = c.pics[i];
+      if (p.y + p.d / 2 + PIC_LIFT >= y - 1) up = Math.max(up, y - s.box[1]);
+    });
+    return up + NOW_CLEAR;
+  }
+
+  /** labelRoom's last cut: the frame's, the same whatever room it then keeps (its pictures' rows are its tips', cutLabels), so a tap's labelsCover need not cut again. */
+  private roomCut: { sx: number; cx: number; items: CutItem[] } | null = null;
 
   /**
    * The one frame (ToLaD#359, research/scalable-tree.md §4): strands f..l's territory (runSpan: the rooms of the whole
@@ -1084,7 +1150,8 @@ export class FanView implements InputHandlers {
    */
   private runFrame(f: number, l: number, yFork: number, v: FanNode, top = this.yNow, fossils = false): Camera {
     const fold = this.fan.tess.fold;
-    const key = `${this.w}x${this.h}:${f}:${l}:${yFork}:${top}:${fossils}`;
+    // (Its room is measured in the labels' type, ToLaD#373: a frame kept per font too.)
+    const key = `${this.w}x${this.h}:${f}:${l}:${yFork}:${top}:${fossils}:${this.nameFontKey()}`;
     if (this.framesFan !== this.fan) [this.framesFan, this.frames] = [this.fan, new Map()];
     const hit = this.frames.get(key);
     if (hit) {
@@ -1092,12 +1159,15 @@ export class FanView implements InputHandlers {
       return { ...hit };
     }
     const s: [number, number] = [0, 0];
-    const cam = foldedFrame(this.fan, this.w, () => {
+    const frame = (room?: number) => {
       const [a, b] = (fossils && fossilSpan(this.fan, v)) || this.runSpan(f, l, s);
       const x0 = LABEL_AXIS_X;
       const sx = (this.w - LABEL_AXIS_X) / Math.max(1e-300, b - a);
-      return this.withBand({ ...this.camera.frame(a, b, yFork, true), sx, cx: a + (this.w / 2 - x0) / sx }, v, top);
-    });
+      return this.withBand({ ...this.camera.frame(a, b, yFork, true), sx, cx: a + (this.w / 2 - x0) / sx }, v, top, room);
+    };
+    const wide = foldedFrame(this.fan, this.w, () => frame());
+    // (Its width found, the room its own labels take, ToLaD#373: only the time moves.)
+    const cam = this.brackets ? { ...frame(this.labelRoom(wide, top)), sx: wide.sx, cx: wide.cx } : wide;
     this.frames.set(key, { ...cam });
     return cam;
   }
@@ -1451,20 +1521,25 @@ export class FanView implements InputHandlers {
    */
   speciesCamera(b: FanBranch): Camera {
     const h = this.homeCamera();
-    // (Its tip under the stack its frame lays out at its level, room for its picture between, ToLaD#274, #288: a
+    // (Its tip under the stack its frame lays out at its level, room for its labels between, ToLaD#274, #288, #373: a
     // provisional frame's; its own split down at FORK_PX from the foot: its whole life on screen.)
-    const tipPx = Math.max(this.labelTop() + NOW_ROOM, this.nowUnder({ ...h, cx: b.cx, sx: Math.max(h.sx, (0.5 * this.w) / Math.max(1e-300, b.width)) }, levelUp(this.fan, b.node, true)));
-    const band = Math.max(80, this.h - FORK_PX - tipPx);
-    const sy = Math.max(h.sy, band / Math.max(1e-300, b.splitY - b.tipY));
-    const cyAt = (s: number) => b.tipY + (this.h / 2 - tipPx) / s;
+    const foot = this.nowUnder({ ...h, cx: b.cx, sx: Math.max(h.sx, (0.5 * this.w) / Math.max(1e-300, b.width)) }, levelUp(this.fan, b.node, true));
+    const inTime = (room: number) => {
+      const tipPx = foot + Math.min(room, (this.h - FORK_PX - foot) * LABELS_SHARE);
+      const band = Math.max(80, this.h - FORK_PX - tipPx);
+      const sy = Math.max(h.sy, band / Math.max(1e-300, b.splitY - b.tipY));
+      // Within the time limit (MIN_YEARS on screen) about the tip, where it will sit.
+      const s = this.camera.timeCap(b.tipY, tipPx, sy, h.sy);
+      return { cy: b.tipY + (this.h / 2 - tipPx) / s, sy: s, ty: s };
+    };
     const sx = Math.min(Math.max(h.sx, (0.5 * this.w) / Math.max(1e-300, b.width)), Math.max(h.sx, this.camera.sxCap(b.cx, b.tipY)));
-    // Within the time limit (MIN_YEARS on screen) about the tip, where it will sit.
-    const s = this.camera.timeCap(b.tipY, tipPx, sy, h.sy);
     // Laid out (steady.ts): its column where the layout has it at that zoom (brackets.ts foldedFrame, ToLaD#211: the
     // layout stays there for the camera taking it, so it lands centred).
     const f = this.fan.tess.fold;
     const cx = () => (f && f.left(b.index, b.tipY) !== null ? leftAt(b, b.tipY) + laneAt(b, b.tipY).w / 2 : b.cx);
-    return foldedFrame(this.fan, this.w, () => ({ cx: cx(), cy: cyAt(s), sx, sy: s, ty: s }));
+    const cam = foldedFrame(this.fan, this.w, () => ({ cx: cx(), sx, ...inTime(this.roomMax()) }));
+    // (Its width found, the room its own labels take: only the time moves.)
+    return this.brackets ? { ...cam, ...inTime(this.labelRoom(cam, b.tipY)) } : cam;
   }
 
   /**
@@ -1796,7 +1871,7 @@ export class FanView implements InputHandlers {
     const top = (whole && fossilTop(this.fan, v)) || this.yNow;
     const keep = this.fan.tess.fold?.keep();
     const cam = this.runFrame(f, l, v.y, v, top);
-    if (this.offBy(cam, cur) > LEVEL_PX && this.labelsIn(cam, f, l) > 1) {
+    if (this.offBy(cam, cur) > LEVEL_PX && this.labelsCover(cam, f, l)) {
       keep?.();
       go(cam, () => this.runFrame(f, l, v.y, v, top), v);
       return;
@@ -1861,7 +1936,9 @@ export class FanView implements InputHandlers {
       }
     }
     const mid = (lo + hi) / 2 + W / 2;
-    const again = () => this.labelsFrame(f, l, v, zs, mid);
+    // (The room its landing's own labels take, ToLaD#373: the rungs above kept the most any could.)
+    const room = this.labelRoom(this.labelsFrame(f, l, v, zs, mid), this.yNow);
+    const again = () => this.labelsFrame(f, l, v, zs, mid, room);
     const ecam = again();
     keep?.();
     go(ecam, again, v);
@@ -1894,18 +1971,26 @@ export class FanView implements InputHandlers {
   }
 
   /** Strands f..l at width zoom `z`, world x `mid` at the middle of the labels' width (LABEL_AXIS_X to the edge), from where they meet in clade v to "now". */
-  private labelsFrame(f: number, l: number, v: FanNode, z: number, mid: number): Camera {
+  private labelsFrame(f: number, l: number, v: FanNode, z: number, mid: number, room?: number): Camera {
     this.fan.tess.fold?.setScale(z, this.w);
     const [a, b] = this.runSpan(f, l, [0, 0]);
     // (Its band in time as at the middle of its territory, wherever `mid` puts it: the labels' rows, and so their
     // territories and the cut, are the same at every mid, so its pieces measured at one are its landing's at another.)
-    const cam = this.withBand({ ...this.camera.frame(a, b, v.y, true), sx: z, cx: (a + b) / 2 - LABEL_AXIS_X / 2 / z }, v, this.yNow);
+    const cam = this.withBand({ ...this.camera.frame(a, b, v.y, true), sx: z, cx: (a + b) / 2 - LABEL_AXIS_X / 2 / z }, v, this.yNow, room);
     return { ...cam, cx: mid - LABEL_AXIS_X / 2 / z };
   }
 
-  /** How many labels camera `cam` shows for strands f..l (the cut there, on screen; the fold at cam's zoom). */
-  private labelsIn(cam: Camera, f: number, l: number): number {
-    return this.labelsAt(cam).items.filter((it) => it.f >= f && it.l <= l).length;
+  /** Whether camera `cam` shows strands f..l split, two labels or more, every strand under one (the cut there, on screen; the fold at cam's zoom). */
+  private labelsCover(cam: Camera, f: number, l: number): boolean {
+    let [n, species] = [0, 0];
+    const C = this.roomCut;
+    this.roomCut = null;
+    for (const it of C && C.sx === cam.sx && C.cx === cam.cx ? C.items : this.labelsAt(cam).items)
+      if (it.f >= f && it.l <= l) {
+        n++;
+        species += it.l - it.f + 1;
+      }
+    return n > 1 && species === l - f + 1;
   }
 
   private goLevel(lv: Level, cam: Camera, card = true): void {
@@ -2149,11 +2234,13 @@ export class FanView implements InputHandlers {
 
   /**
    * This frame's labels (ToLaD#358, research/scalable-tree.md §3): one cut through the tree at the label's width (a
-   * picture's, PIC_D, its widest part), one label per item: its picture standing on the item's youngest tip (PIC_LIFT
-   * over it; held under the top line when the tip is above it) and its name pill right under it, one unit at a fixed
-   * offset from the tip, over one x (faceX), inside the item's territory over the rows they take (Territories.over:
-   * the row's lineages split x between them, a lineage keeping its place a picture's height over its tip), so labels
-   * of different items never meet, by construction. The label names the most populous clade or species the item stands
+   * picture's, PIC_D, its widest part), one label per item: top to bottom its name pill (ToLaD#373, Ita: "so that they
+   * dont cover the branches"), its picture, the gap its "+x" hairline runs in, the item's youngest tip, at a fixed
+   * offset from the tip; the picture held under the top line when it would go above it, the name likewise, by itself,
+   * coming over the picture (so a picture's row is its tip's alone, whatever name it carries), over one x (faceX), inside
+   * the item's territory over the rows they take (Territories.over: the row's lineages split x between them, a lineage
+   * keeping its place as high over its tip as any label could reach), so labels of different items never meet, by
+   * construction. With "now" on screen nothing of a label on a living item lies over the branches. The label names the most populous clade or species the item stands
    * for (CutTerritories.nameOf), its picture that one's most populous living species (a placeholder disc where it has
    * no photo), its "+x" the item's other species. Shown whole, picture and name together, or not at all. `whole`: over
    * the whole tree, nothing culled for the screen (tests).
@@ -2173,8 +2260,11 @@ export class FanView implements InputHandlers {
     const shown: CutItem[] = [];
     const groups = new Map<string, FanBranch[][]>();
     const bottom = whole ? Infinity : this.h - LABEL_BOTTOM_PX + 30;
-    // (A lineage keeps its place over its tip as high as a picture stands: the pictures' rows are in the partition too.)
-    const ghost = (PIC_LIFT + PIC_D) / this.cam.sy;
+    // (A lineage keeps its place over its tip as high as any label reaches, the fan's longest pill's at the time zoom's
+    // floor: the rows of a label's picture and pill are all in the partition. Fixed in the world, not by this frame's
+    // time zoom: a row's lineages are a function of the layout alone, none coming or going at once as the zoom moves;
+    // a label's rows above "now" have no column to bound it, so this is all that does.)
+    const ghost = labelUp(this.pillMax()) / this.camera.minScale()[1];
     /**
      * An item's centre (screen x) for a box `d` wide: at `cx` (screen x), the territory [x0, x1] (world) only bounding
      * it: inside its territory always (it fits there), on screen as well where the territory's part on screen holds it.
@@ -2190,11 +2280,11 @@ export class FanView implements InputHandlers {
     /**
      * Item r's label, one unit at the youngest tip of its head climbed (CutTerritories.whole: a clade's own, whether it
      * is one item or her daughter with her sisters riding on her): its name, its picture's rows (screen y) PIC_LIFT over
-     * the tip, and its name pill's right under the picture (Ita, ToLaD#358: "A"), the text sideways as ever. Its rows are
-     * a fixed offset from the tip: the time zoom and pan move the unit rigidly, nothing in it depends on the branch's
-     * part on screen.
+     * the tip, and its name pill's right over the picture (ToLaD#358, #373), the text sideways as ever, its foot on the
+     * picture. Its rows are a fixed offset from the tip until the top line holds them: the time zoom and pan move the unit rigidly, nothing in it
+     * depends on the branch's part on screen. Pictures of a row's tips stand in one row, whatever their names' lengths.
      */
-    const memo = new Map<string, { name: ItemName; disc: [number, number]; pill: [number, number] }>();
+    const memo = new Map<string, { name: ItemName; text: string; disc: [number, number]; pill: [number, number] }>();
     const at = (r: Ref & { parts?: readonly number[] }) => {
       const k = T.whole(r.head, r.f, r.l);
       const key = `${k}:${r.f}:${r.l}`;
@@ -2202,19 +2292,22 @@ export class FanView implements InputHandlers {
       if (!m) {
         const name = T.nameOf(r);
         const ty = Y(T.youngOf(k));
-        const tlen = this.nameWidth(name.text) + 2 * LABEL_PAD + this.plusPx(name.hid.length);
-        // (Its picture over its tip, or with the tip above the top line, held under it, its name right below: a label
-        // stays whole on screen while its branch is, scrolled into the past too.)
+        const text = this.pillText(name.text);
+        const tlen = this.nameWidth(text) + 2 * LABEL_PAD + this.plusPx(name.hid.length);
+        // (Its picture over its tip, held under the top line when the tip is less than that under it, its name over it,
+        // held under the line by itself and coming over the picture when there is no room above: a picture's row is
+        // a function of its tip alone, the same whatever name it carries, ToLaD#373. So with room for a picture over
+        // "now" no row of a daughter the cut tries depends on how long her name is, unless the pill alone reaches "now".)
         const d0 = Math.max(ty - PIC_LIFT - PIC_D, top);
-        const p0 = d0 + PIC_D + (this.midLabels && name.hid.length ? LABEL_LINE_GAP : LABEL_UNDER);
-        m = { name, disc: [d0, d0 + PIC_D], pill: [p0, p0 + tlen] };
+        const p0 = Math.max(d0 - LABEL_UNDER - tlen, top);
+        m = { name, text, disc: [d0, d0 + PIC_D], pill: [p0, p0 + tlen] };
         memo.set(key, m);
       }
       return m;
     };
     const rows: RowsOf = (r) => {
       const { disc, pill } = at(r);
-      return [Wy(disc[0]), Wy(disc[1]), Wy(pill[0]), Wy(pill[1])];
+      return [Wy(pill[0]), Wy(pill[1]), Wy(disc[0]), Wy(disc[1])];
     };
     /**
      * Item it's label's place (screen x) before its territory and the screen bound it: its picture's species' column at
@@ -2245,12 +2338,18 @@ export class FanView implements InputHandlers {
     };
     /**
      * Item it's branches at its label's foot (ToLaD#368): the middles (world x) of its first and last strand that
-     * reach row `wy` (world y), or null. The strands stand side by side in drawn order, never crossing, each
-     * inside its share of the row, so they are inside the item's share there and no two items' spans meet.
+     * reach row `wy` (world y), or null. Above the first row any of them is at ("now", or the item's youngest tip, the
+     * foot just over the now line, ToLaD#373) the strands of that row: the tips the ticks come down on, and it moves
+     * on continuously as the row comes down past it. The strands stand side by side in drawn order, never crossing,
+     * each inside its share of the row, so they are inside the item's share there and no two items' spans meet.
      */
     const now = this.fan.time.y(0);
-    const reach = (it: CutItem, wy: number): [number, number] | null => {
+    const reach = (it: CutItem, foot: number): [number, number] | null => {
       const S = T.t.strands;
+      // (The first row any strand is at: "now" as soon as a living one is met.)
+      let first = Infinity;
+      for (let i = it.f; i <= it.l && first > now; i++) first = Math.min(first, Math.max(S[i].tipY, now));
+      const wy = Math.max(foot, first);
       const on = (i: number) => Math.max(S[i].tipY, now) <= wy + 1e-9;
       let a = it.f;
       while (a <= it.l && !on(a)) a++;
@@ -2264,7 +2363,7 @@ export class FanView implements InputHandlers {
      * A name pill's offset (px, right of its picture's centre `x`, screen) for its rows `pill` (screen y): beside the
      * thin branch columns it would hide at its top (ToLaD#368, Ita: "it mostly matter at the top of the branches like
      * the closest to now as thats the thin part that is covered.. so it doesnt have to move all the way just it needs
-     * to make sure the top is showing"), within [0, side], so the pill stays under its picture, inside the picture's
+     * to make sure the top is showing"), within [0, side], so the pill stays over its picture, inside the picture's
      * footprint and so inside the territory placeX proved. The drawn columns at the pill's top row, where its cap is
      * full width (its strands' lanes side by side, touching lanes one column: a parent column below its split is one).
      * A column of width w <= thin, its middle d from x, is hidden by a pill at offset o when the pill covers more than
@@ -2272,7 +2371,9 @@ export class FanView implements InputHandlers {
      * o = d + c (the least that shows it), as far as side; one further right than the pill can clear lets it back as
      * it goes, as fast as it moves (o = 2·side - c - d), to nothing once it is clear of the pill at rest. The offset is
      * the most any column pushes: one side, so it never flips; continuous in the camera (a max of continuous pushes),
-     * moving no faster than the branches do; a function of the camera alone, as the labels are (no carry).
+     * moving no faster than the branches do; a function of the camera alone, as the labels are (no carry). A pill above
+     * "now" is over no branch (ToLaD#373): this is for a label held under the top line, or an extinct item's among the
+     * living.
      */
     const side = (PIC_D - LABEL_PILL) / 2;
     const thin = LABEL_PILL / PILL_HIDES;
@@ -2287,6 +2388,7 @@ export class FanView implements InputHandlers {
     };
     const pillOff = (x: number, pill: [number, number]): number => {
       const wy = Wy(pill[0] + half);
+      if (wy < now) return 0;
       const A0 = x - PIC_D / 2;
       const A1 = x + PIC_D / 2;
       // (The first strand at or past the window's left, its own column's centre or its slot's left: drawn order is x order.)
@@ -2338,21 +2440,22 @@ export class FanView implements InputHandlers {
     for (const it of cut) {
       // (Only the root, before anything fits, does not hold its label.)
       if (!it.fits) continue;
-      const { name, disc, pill } = at(it);
+      const { name, text, disc, pill } = at(it);
       // (Whole on screen or not at all: its territory's part on screen holds it, its picture under the top line.)
       if (!whole && (Math.min(X(it.x1), right) - Math.max(X(it.x0), left) < PIC_D * (1 - 1e-9) || disc[1] > this.h)) continue;
-      const fit = clamp01((bottom - pill[1]) / 30);
+      const fit = clamp01((bottom - Math.max(disc[1] + PIC_LIFT, pill[1])) / 30);
       if (!(fit > 0)) continue;
       // (A "+x" at the middle of its branches at its foot, ToLaD#368, clamped into its territory as any; a species' at
-      // its face's place. Its foot: between its picture and its name, Ita.)
-      const foot = disc[1] + LABEL_LINE_GAP / 2;
+      // its face's place. Its foot: in the gap under its picture, ToLaD#373.)
+      const foot = disc[1] + PIC_LIFT / 2;
       const span = this.midLabels && name.hid.length ? reach(it, Wy(foot)) : null;
       const x = placeX(it.x0, it.x1, PIC_D, span ? X((span[0] + span[1]) / 2) : faceX(it, name.face));
       const key = `c${it.f}:${it.l}`;
       if (name.hid.length) groups.set(key, name.hid);
-      // (Its name pill under its picture, beside the thin branches it would hide, ToLaD#368.)
-      const px = x + pillOff(x, pill);
-      const s: LabelSpot = { key, id: key, run: [it.f, it.l], place: 'tip', text: name.text, rank: [0, it.x1 - it.x0, it.head], x: px, y1: pill[1], box: [px - half, pill[0], px + half, pill[1]], fit, plus: this.plusPx(name.hid.length), pic: name.face };
+      // (Its name pill over its picture, beside the thin branches it would hide, ToLaD#368.)
+      // (Come over its own picture, no room above it: to the picture's side as it comes, the picture's face showing, ToLaD#373.)
+      const px = x + Math.max(pillOff(x, pill), side * clamp01((pill[1] + LABEL_UNDER - disc[0]) / PIC_D));
+      const s: LabelSpot = { key, id: key, run: [it.f, it.l], place: 'tip', text, rank: [0, it.x1 - it.x0, it.head], x: px, y1: pill[1], box: [px - half, pill[0], px + half, pill[1]], fit, plus: this.plusPx(name.hid.length), pic: name.face };
       // (What it opens, its head climbed: the clade or species of the tree it is; a tap on it, name, picture or "+x",
       // goes into the item itself, tapItem, ToLaD#359.)
       const k = T.whole(it.head, it.f, it.l);
@@ -2902,12 +3005,28 @@ export class FanView implements InputHandlers {
     return Math.ceil(w) + PLUS_GAP;
   }
 
+  /**
+   * The web faces arrived (FanApp): the names' lengths, and with them a frame's room for its labels (ToLaD#373), are
+   * those of the faces from now on. A view still at `home`, the first frame it took, measured in system type, takes it again.
+   */
+  facesLoaded(home: Camera): void {
+    const c = this.cam;
+    if (c.sx === home.sx && c.sy === home.sy && c.cx === home.cx && c.cy === home.cy) this.cam = this.homeCamera();
+    this.request();
+  }
+
+  /** The label font, and while the faces load or not (nameWidth, pillBound). */
+  private nameFontKey(): string {
+    const f = font(LABEL_FONT);
+    return typeof document !== 'undefined' && document.fonts ? `${f}|${document.fonts.status}` : f;
+  }
+
   /** Length (px) of a species' name in the label font (not cached: the web font may arrive after the first frame). */
   private nameWidth(text: string): number {
     // (Kept per font, and while the faces load or not (the canvas measures in system type until then): a layout
     // measures every name it places, ToLaD#255.)
     const f = font(LABEL_FONT);
-    const fk = typeof document !== 'undefined' && document.fonts ? `${f}|${document.fonts.status}` : f;
+    const fk = this.nameFontKey();
     if (fk !== this.nameWFont) {
       this.nameW.clear();
       this.nameWFont = fk;
@@ -2938,10 +3057,10 @@ export class FanView implements InputHandlers {
     this.plusHits.length = 0;
     this.eventLabels.length = 0;
     this.thumbHits.length = 0;
-    // The clades' brackets (ToLaD#193) under the pills: their labels clear of the pills and pictures, their lines behind them.
+    // The clades' brackets (ToLaD#193) behind the pills: their labels clear of the pills and pictures, their lines behind them.
     br?.draw(ctx, FAMILY_INK, INK3, [...spots.filter((s) => s.fit > 0.3).map((s) => s.box), ...pics.map((p) => [p.x - p.d / 2, p.y - p.d / 2, p.x + p.d / 2, p.y + p.d / 2])]);
-    // A "+x" label's branches (ToLaD#368): a hairline at its foot from its first branch to its last, between its picture and its name
-    // pill, a tick down onto each end branch, as the brackets draw theirs (open-ended past the screen's edge).
+    // A "+x" label's branches (ToLaD#368, #373): a hairline at its foot from its first branch to its last, in the gap under its picture,
+    // a tick down onto each end branch, as the brackets draw theirs (open-ended past the screen's edge).
     ctx.save();
     ctx.lineWidth = 1;
     ctx.strokeStyle = 'rgba(185,230,201,0.6)';
@@ -2953,10 +3072,10 @@ export class FanView implements InputHandlers {
       const y = Math.round(sy) + 0.5;
       const a = Math.round(Math.max(sa, -1)) + 0.5;
       const b = Math.round(Math.min(sb, this.w + 1)) - 0.5;
-      ctx.moveTo(a, sa >= 0 ? y + 4 : y);
+      ctx.moveTo(a, sa >= 0 ? y + PIC_LIFT / 2 : y);
       ctx.lineTo(a, y);
       ctx.lineTo(b, y);
-      if (sb <= this.w) ctx.lineTo(b, y + 4);
+      if (sb <= this.w) ctx.lineTo(b, y + PIC_LIFT / 2);
     }
     ctx.stroke();
     ctx.restore();

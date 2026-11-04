@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clipPoly, FanCamera, MAX_YEARS_FRAC, MIN_YEARS, MIN_ZOOM, STRAND_PX } from './camera';
+import { clipPoly, FanCamera, LABELS_SHARE, MAX_YEARS_FRAC, MIN_YEARS, MIN_ZOOM, STRAND_PX } from './camera';
 import { laneAt, layoutFan, leftAt, strandAt, type FanBranch, type WidthMode } from './layout';
 import { FELIDAE } from './panthera';
 import { TwigModel } from './twigs';
@@ -86,7 +86,7 @@ describe('fan camera', () => {
   for (const mode of ['linear', 'log'] as WidthMode[]) {
     it(`keeps at least ${MIN_YEARS} years on screen, the fan in reach, and finite numbers (${mode})`, () => {
       const c = camera(mode);
-      const [sxMin, syMin] = [c.home().sx * MIN_ZOOM, c.home().sy * MIN_ZOOM];
+      const [sxMin, syMin] = [c.home().sx * MIN_ZOOM, c.home().sy * MIN_ZOOM * (1 - LABELS_SHARE)];
       const [x0, x1] = c.extent();
       for (const seed of [1, 2, 3]) {
         c.cam = c.home();
@@ -116,7 +116,7 @@ describe('fan camera', () => {
     for (let k = 0; k < 50; k++) c.zoomAbout(100, 700, 0.5);
     const h = c.home();
     expect(c.cam.sx).toBeCloseTo(h.sx * MIN_ZOOM, 9);
-    expect(c.cam.sy).toBeCloseTo(h.sy * MIN_ZOOM, 9);
+    expect(c.cam.sy).toBeCloseTo(h.sy * MIN_ZOOM * (1 - LABELS_SHARE), 9);
     const [x0, x1] = c.extent();
     expect(c.toScreen(x0, 0)[0]).toBeGreaterThan(0);
     expect(c.toScreen(x1, 0)[0]).toBeLessThan(c.w);

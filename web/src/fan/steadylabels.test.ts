@@ -53,10 +53,11 @@ function stubView(clade: CladeRec = CARNIVORA, tree: Split = CARNIVORA_TREE, fol
 
 /** A label's place and size (screen), and the screen x of the columns it stands on (its anchor: groupCentre; NaN, a "+x"). */
 type Spot = { x: number; y: number; w: number; h: number; c: number };
-type Shot = Map<string, Spot>;
+type Shot = Map<string, Spot> & { held?: boolean };
 /** A frame's labels: each name pill (by its item and text) and each picture (by what it opens), where and how big. */
 function shot(v: FanView, c: CutLabels): Shot {
   const m: Shot = new Map();
+  m.held = c.spots.some((s) => s.box[1] <= v.topLast + 1e-6);
   const at = (x: number) => v.toScreen(x, 0)[0];
   for (const s of c.spots) {
     const g = s.v ? { v: s.v } : s.b ? { b: s.b } : null;
@@ -122,7 +123,10 @@ function judge(shots: Shot[], moved: number[], monotonic: boolean): string[] {
         if (d > 1.35 * moved[f - 1] + 2) bad.push(`frame ${f}: ${k} jumped ${d.toFixed(1)} px (the world ${moved[f - 1].toFixed(1)})`);
       }
     }
-    if (f > 0) for (const k of shots[f - 1].keys()) if (!shots[f].has(k)) gone.add(k);
+    // (Only where no label is held under the top line: a held label's rows come down off the room over "now", where a
+    // wide column has half its width, onto the branches, where it has all of it, so a thin sister's label stops fitting
+    // beside it, at a zoom it does not fit at any more than where it comes back, zoomed further in, ToLaD#373.)
+    if (f > 0 && !shots[f].held && !shots[f - 1].held) for (const k of shots[f - 1].keys()) if (!shots[f].has(k)) gone.add(k);
   }
   return bad;
 }

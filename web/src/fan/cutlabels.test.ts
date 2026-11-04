@@ -1,5 +1,5 @@
 // ?labels=cut (ToLaD#333, research/scalable-tree.md §3): names, pictures and "+x" from one cut through the territories.
-// No two names meet, no two pictures, no name and picture (names hang below a tip, pictures stand on it); each stays
+// No two names meet, no two pictures, no name and picture (a name stands on its picture, the picture over its tip); each stays
 // inside its own territory; and what shows depends only on the camera, not the way there.
 import { describe, expect, it } from 'vitest';
 import { loadMammalsFromFiles } from './mammals-node';
@@ -56,9 +56,10 @@ function check(c: CutLabels, w: number): void {
   for (let k = 1; k < S.length; k++) expect(S[k].box[0]).toBeGreaterThanOrEqual(S[k - 1].box[2] - 1e-6);
   const P = [...c.pics].sort((p, q) => p.x - q.x);
   for (let k = 1; k < P.length; k++) expect(P[k].x - P[k].d / 2).toBeGreaterThanOrEqual(P[k - 1].x + P[k - 1].d / 2 - 1e-6);
+  // (No name over another's picture; over its own only held under the top line, ToLaD#373: asserted with "now" in room below.)
   for (const p of P)
     for (const s of S)
-      if (s.box[2] > p.x - p.d / 2 && s.box[0] < p.x + p.d / 2) expect(s.box[1]).toBeGreaterThanOrEqual(p.y + p.d / 2 - 1e-6);
+      if (c.pics[c.spots.indexOf(s)] !== p && s.box[2] > p.x - p.d / 2 && s.box[0] < p.x + p.d / 2) expect(s.box[3]).toBeLessThanOrEqual(p.y - p.d / 2 + 1e-6);
   for (const s of S) expect([s.key, s.x, s.box[2] > 0 && s.box[0] < w]).toEqual([s.key, s.x, true]);
 }
 
@@ -143,7 +144,22 @@ describe('labels from the cut (?labels=cut, ToLaD#333)', () => {
           const c = o ? (o[0] + o[1]) / 2 : v.toScreen(groupCentre({ b: p.face }), 0)[0];
           if (c >= 72 + p.d / 2 && c <= v.w - p.d / 2) expect([p.face.sp.common, Math.abs(p.x - c) <= p.d / 2 + 1e-6]).toEqual([p.face.sp.common, true]);
         }
-        // Each name pill under its picture, right of its centre within its footprint, beside the thin branches it
+        // With "now" on screen, no label of a living item reaches below the now line (ToLaD#373, Ita: "so that they dont
+        // cover the branches"): its name over its picture over its "+x" line, all above it, and every picture in one row.
+        const nowY = v.toScreen(0, v.fan.time.y(0))[1];
+        const T = (v as unknown as { territories(): { whole(k: number, f: number, l: number): number; youngOf(k: number): number } }).territories();
+        if (nowY >= (v as unknown as { topLast: number }).topLast + 120)
+          for (let i = 0; i < cut.spots.length; i++) {
+            const it = cut.items[i];
+            if (T.youngOf(T.whole(it.head, it.f, it.l)) > v.fan.time.y(0)) continue;
+            const s = cut.spots[i];
+            const p = cut.pics[i];
+            if (s.box[1] <= (v as unknown as { topLast: number }).topLast + 1e-6) continue;
+            expect([s.text, p.y + p.d / 2 + 14]).toEqual([s.text, expect.closeTo(nowY, 6)]);
+            expect([s.text, s.box[3] <= p.y - p.d / 2]).toEqual([s.text, true]);
+            if (s.over) expect([s.text, s.over[2] < nowY && s.over[2] > p.y + p.d / 2]).toEqual([s.text, true]);
+          }
+        // Each name pill over its picture, right of its centre within its footprint, beside the thin branches it
         // could clear there (ToLaD#368).
         if (!name.startsWith('mammals'))
           for (let i = 0; i < cut.spots.length; i++) {
