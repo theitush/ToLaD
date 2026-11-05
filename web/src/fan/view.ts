@@ -15,7 +15,7 @@ import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01 } from './meshgl';
 import { Lod } from './lod';
 import type { Fold, FoldState } from './fold';
-import { forkMode, Steady } from './steady';
+import { forkMode, LABEL_PILL, Steady } from './steady';
 import { LADDER, Territories, type CutItem, type Ref, type RowsOf } from './cut';
 import { COLUMN_DIM, columnSpans, EVENT_TINT, eventAt, eventSpans, type EventSpan } from './colstyle';
 import { laneDim, LINEAGE, pathFrame, TwigModel } from './twigs';
@@ -54,7 +54,6 @@ export const SERIF = "'Newsreader', 'Iowan Old Style', Georgia, serif";
 const font = (spec: string, family = SANS) => `${spec} ${family}`;
 /** A species' label: its name, upright on a dark pill LABEL_PILL px across, LABEL_PAD px past each end of the text. */
 const LABEL_FONT = '650 15px';
-const LABEL_PILL = 22;
 /** The "+x" badge at a pill's top end (ToLaD#197): its type, smaller and quieter than the name; the gap from the name before it. */
 const PLUS_FONT = '600 11px';
 const PLUS_GAP = 6;

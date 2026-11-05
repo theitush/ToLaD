@@ -73,7 +73,13 @@ export const setForkMode = (m: ForkMode): void => {
  */
 export const RIBBON_SLOPE = 2;
 export const LINE_SLOPE = 4;
-/** A stem's width on screen over its height on screen (ToLaD#402): at or under STEM_WHOLE it is a column, whole; at STEM_LINE it has gone, a line in its place. */
+/** A species' label's pill, px across (ToLaD#396): the shortest thing on screen that holds a name. */
+export const LABEL_PILL = 22;
+/**
+ * A stem's width on screen over its height on screen (ToLaD#402): at or under STEM_WHOLE it is a column, whole; at
+ * STEM_LINE it has gone, a line in its place. What counts is what the eye reads as a plate, a sliver; so a width counts
+ * only up to LABEL_PILL: a stem as tall as a name's pill stands however wide it runs, and only one under half of that can go.
+ */
 export const STEM_WHOLE = 1;
 export const STEM_LINE = 2;
 
@@ -93,7 +99,7 @@ export function ribbonShare(move: number, h: number, sx: number, sy: number): nu
 
 /** A stem's share of its width at this zoom (width and height world): 1 a whole column, 0 a line. */
 export function stemShare(w: number, h: number, sx: number, sy: number): number {
-  return share(w, h, sx, sy, STEM_WHOLE, STEM_LINE);
+  return share(Math.min(w, LABEL_PILL / sx), h, sx, sy, STEM_WHOLE, STEM_LINE);
 }
 
 /** The rooms and places at one set of a's and width zoom (world x, the stem's centre on Fold.home). */

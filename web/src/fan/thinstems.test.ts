@@ -1,17 +1,17 @@
 // A stem wider than it is tall draws as a line (ToLaD#402, `forks: thin`): measured at the draw itself at the frame Ita
 // saw it at, the marsupials among the mammals, and through a pinch; `flat` and `peel` keep their cuts; a look only.
 import { afterAll, describe, expect, it } from 'vitest';
-import type { FanNode } from './layout';
+import { leftAt, type FanBranch, type FanNode } from './layout';
 import { loadMammalsFromFiles } from './mammals-node';
 import { RectBatch } from './meshgl';
-import { mammaliaClade } from './panthera';
-import { mammaliaTree } from './splits';
-import { FORK_MODES, forkMode, setForkMode, stemShare, Steady } from './steady';
+import { CARNIVORA, mammaliaClade, type CladeRec } from './panthera';
+import { CARNIVORA_TREE, mammaliaTree, type Split } from './splits';
+import { FORK_MODES, forkMode, LABEL_PILL, setForkMode, stemShare, Steady, type ForkMode } from './steady';
 import { FanView } from './view';
 
 await loadMammalsFromFiles();
 
-function stubView(): { v: FanView; under: RectBatch } {
+function stubView(clade: CladeRec = mammaliaClade(), tree: Split = mammaliaTree()): { v: FanView; under: RectBatch; over: RectBatch } {
   const noop = () => {};
   const g = globalThis as Record<string, unknown>;
   g.Path2D = class {
@@ -44,7 +44,7 @@ function stubView(): { v: FanView; under: RectBatch } {
     addEventListener: noop,
     removeEventListener: noop,
   };
-  const v = new FanView(canvas as unknown as HTMLCanvasElement, mammaliaClade(), mammaliaTree(), true);
+  const v = new FanView(canvas as unknown as HTMLCanvasElement, clade, tree, true);
   const gl = { under: new RectBatch(), over: new RectBatch(), begin() {}, end() {} };
   gl.begin = () => {
     gl.under.n = 0;
@@ -52,7 +52,7 @@ function stubView(): { v: FanView; under: RectBatch } {
   };
   (v as unknown as { gl: unknown }).gl = gl;
   Object.assign(v, { labelsNow: () => ({ br: null, cut: null }), drawLabels: noop, drawTimeAxis: noop, drawEvents: noop, drawTrunkLabel: noop, drawWidthScale: noop, drawGutter: noop, drawTouch: noop });
-  return { v, under: gl.under };
+  return { v, under: gl.under, over: gl.over };
 }
 
 type Cam = { screenX(x: number): number; screenY(y: number): number; worldY(y: number): number; settle(): void };
@@ -180,5 +180,135 @@ describe('thin stems: at the marsupial frame', () => {
         expect(onSplit, 'a cut in `flat` ends on a split').toBe(true);
       }
     }
+  });
+});
+
+describe('thin stems: a column a user sees as a branch never goes', () => {
+  const { v, under, over } = stubView(CARNIVORA, CARNIVORA_TREE);
+  v.setMode('linear');
+  const fan = () => v.fan;
+  const sp = (common: string) => fan().branches.find((b) => b.sp.common === common)!;
+  type Camera = typeof v.cam;
+  const tapFrame = (b: FanBranch): Camera => (v as unknown as { frameOf(l: { b: FanBranch }): Camera }).frameOf({ b });
+  /** designshot's 'bar' scenes: a species' column `ago` years back, `perBar` individuals to the 70 px scale bar. */
+  const bar = (common: string, ago: number, perBar: number, sy: number): Camera => {
+    const b = sp(common);
+    const cy = fan().time.y(ago / 1e6);
+    const c = { cx: 0, cy, sx: 70 / perBar / b.unit, sy, ty: sy };
+    v.cam = { ...c };
+    camOf(v).settle();
+    const L = v.model(b).lanes(cy);
+    return { ...c, cx: L.left + L.gw };
+  };
+  const sent = (cam: Camera, mode: ForkMode) => {
+    setForkMode(mode);
+    v.cam = { ...cam };
+    camOf(v).settle();
+    v.draw();
+    return [under, over].map((r) => Array.from(r.f.subarray(0, r.n * 12)));
+  };
+  /** What is solid on screen, on a 4 px grid: a filled cell where a rectangle or trapezoid sent to the GPU, at half alpha or more, covers it. */
+  const solid = (cam: Camera, mode: ForkMode) => {
+    sent(cam, mode);
+    const cols = Math.floor(W / 4);
+    const rows = Math.floor(H / 4);
+    const g = new Uint8Array(cols * rows);
+    const F = under.f;
+    for (let k = 0; k < under.n; k++) {
+      const o = k * 12;
+      if (F[o + 7] < 0.5) continue;
+      const [y0, y1] = [F[o + 1], F[o + 3]];
+      for (let r = Math.max(0, Math.ceil(y0 / 4)); r <= Math.min(rows - 1, Math.floor(y1 / 4)); r++) {
+        const t = (r * 4 - y0) / (y1 - y0);
+        let [l, R] = [F[o] + t * F[o + 8], F[o + 2] + t * F[o + 9]];
+        if (F[o + 10] < F[o + 11]) [l, R] = [Math.max(l, F[o + 10]), Math.min(R, F[o + 11])];
+        for (let c = Math.max(0, Math.ceil(l / 4)); c <= Math.min(cols - 1, Math.floor(R / 4)); c++) g[r * cols + c] = 1;
+      }
+    }
+    return g;
+  };
+  /** The share of the screen `flat` fills and `thin` leaves empty. */
+  const lost = (cam: Camera) => {
+    const a = solid(cam, 'flat');
+    const b = solid(cam, 'thin');
+    let n = 0;
+    for (let i = 0; i < a.length; i++) if (a[i] && !b[i]) n++;
+    return n / a.length;
+  };
+
+  const deep: [string, number, number, number][] = [
+    ['deep', 300, 4, 3000],
+    ['bar-100', 3000, 100, 40],
+    ['bar-1e3', 3000, 1e3, 40],
+    ['nearnow', 25, 2e3, 900],
+  ];
+  for (const [name, ago, perBar, sy] of deep) {
+    it(`deep on the Lion (${name}): \`thin\` sends the GPU what \`flat\` does`, () => {
+      const cam = bar('Lion', ago, perBar, sy);
+      expect(sent(cam, 'thin')).toEqual(sent(cam, 'flat'));
+      expect(solid(cam, 'thin').reduce((n, c) => n + c, 0)).toBeGreaterThan(0.9 * Math.floor(W / 4) * Math.floor(H / 4));
+    });
+  }
+
+  // (Each of these went blank, all or most of the screen, while the rule still let a width count up to the screen's.)
+  const between: [string, number, number, number][] = [
+    ['Lion', 1e6, 1e5, 40],
+    ['Lion', 2e6, 1e4, 40],
+    ['Lion', 3e6, 1e6, 40],
+    ['Grey wolf', 2e6, 1e4, 40],
+    ['Grey wolf', 8e6, 1e4, 100],
+    ['Grey wolf', 8e6, 1e3, 300],
+    ['Northern raccoon', 2e7, 1e5, 100],
+  ];
+  for (const [common, ago, perBar, sy] of between) {
+    it(`in between: ${common} ${ago / 1e6} Ma, ${perBar} to the bar, sy ${sy}: the screen stays lit`, () => {
+      expect(lost(bar(common, ago, perBar, sy))).toBeLessThan(0.25);
+    });
+  }
+
+  it("every species' own column stands at its tap's frame, and with width zoomed further: the screen it fills in `flat` stays lit", () => {
+    let frames = 0;
+    for (const b of fan().branches) {
+      for (const wx of [1, 3, 10]) {
+        const f = tapFrame(b);
+        const cam = { ...f, sx: f.sx * wx };
+        expect(lost(cam), `${b.sp.common} ×${wx}`).toBeLessThan(0.25);
+        frames++;
+      }
+    }
+    expect(frames).toBeGreaterThan(100);
+  }, 120000);
+
+  it("at the Lion's tap's frame its column is as `flat` draws it, across its width at its mid-height, at every width zoom", () => {
+    const b = sp('Lion');
+    for (const wx of [1, 3, 10]) {
+      const f = tapFrame(b);
+      const cf = { ...f, sx: f.sx * wx };
+      const flat = solid(cf, 'flat');
+      const g = solid(cf, 'thin');
+      const cam = camOf(v);
+      const y = (b.tipY + (b.splitY - (v.fan.tess.fold as Steady).forkH(b.node))) / 2;
+      const c0 = cam.screenX(leftAt(b, y));
+      const c1 = c0 + b.width * v.cam.sx;
+      const row = Math.round(cam.screenY(y) / 4) * Math.floor(W / 4);
+      const [first, last] = [Math.ceil(Math.max(c0, 0) / 4), Math.floor((Math.min(c1, W) - 1) / 4)];
+      let lit = 0;
+      for (let c = first; c <= last; c++) {
+        lit += g[row + c];
+        expect(g[row + c], `×${wx}, ${c * 4} px`).toBe(flat[row + c]);
+      }
+      expect(lit, `×${wx}`).toBeGreaterThan(3);
+    }
+  });
+
+  it('the cap: a stem as tall as a pill stands however wide, one at half of it is a line once wider than that, and a narrow one goes by its own width', () => {
+    const [sx, sy] = [1, 1];
+    expect(stemShare(1e6, LABEL_PILL, sx, sy)).toBe(1);
+    expect(stemShare(1e6, LABEL_PILL / 2, sx, sy)).toBe(0);
+    expect(stemShare(1e6, (3 * LABEL_PILL) / 4, sx, sy)).toBeCloseTo(2 / 3, 9);
+    expect(stemShare(6, 3, sx, sy)).toBe(0);
+    expect(stemShare(6, 6, sx, sy)).toBe(1);
+    // A function of the camera alone, in height and width together: scale both and nothing moves under the cap.
+    expect(stemShare(6, 4, 2, 2)).toBe(stemShare(6, 4, 1, 1));
   });
 });
