@@ -6,7 +6,7 @@ import { loadMammalsFromFiles } from './mammals-node';
 import { RectBatch } from './meshgl';
 import { mammaliaClade } from './panthera';
 import { mammaliaTree } from './splits';
-import { forkMode, setForkMode, stemShare, Steady } from './steady';
+import { FORK_MODES, forkMode, setForkMode, stemShare, Steady } from './steady';
 import { FanView } from './view';
 
 await loadMammalsFromFiles();
@@ -111,6 +111,7 @@ describe('thin stems: at the marsupial frame', () => {
 
   it('`thin` is the default, and the button goes through all three', () => {
     expect(mark).toBe('thin');
+    expect(FORK_MODES).toEqual(['thin', 'flat', 'peel']);
   });
 
   for (const wx of [1, 2.5]) {
@@ -125,7 +126,6 @@ describe('thin stems: at the marsupial frame', () => {
         // Nothing across it at its middle reaches its width (its solid backdrop included): threads and lines.
         const across = rowsAt(py, s.x + 1, s.x + s.w - 1).filter(([, , a]) => a === 1);
         for (const [l, r] of across) {
-          // (A column of its own a neighbour's, passing at this height, is no part of it: it sits inside the room.)
           expect(r - l, `${s.n.split.taxon ?? s.n.name}: ${s.w.toFixed(1)} px wide, ${(s.bot - s.top).toFixed(1)} tall`).toBeLessThan(s.w);
         }
       }
