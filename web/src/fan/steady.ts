@@ -55,12 +55,13 @@ const inRanges = (W: Int32Array, i: number) => rangeAt(W, i) >= 0;
 const LIFE_SAMPLES = 48;
 
 /**
- * How a fork is drawn (ToLaD#377, `?forks=`; a look only: positions, frames and taps stay the peels' own). `flat`: the
- * corners of a rectangular tree where a peel has too little height for its move. `peel`: every daughter a ribbon on its S (the way back).
+ * How a fork is drawn (ToLaD#377, `?forks=`; a look only: positions, frames and taps stay the peels' own). `thin` (ToLaD#402):
+ * `flat`, and a stem wider than it is tall a line too. `flat`: the corners of a rectangular tree where a peel has too
+ * little height for its move. `peel`: every daughter a ribbon on its S (the way back).
  */
-export type ForkMode = 'flat' | 'peel';
-export const FORK_MODES: ForkMode[] = ['flat', 'peel'];
-let forkModeNow: ForkMode = 'flat';
+export type ForkMode = 'thin' | 'flat' | 'peel';
+export const FORK_MODES: ForkMode[] = ['thin', 'flat', 'peel'];
+let forkModeNow: ForkMode = 'thin';
 export const forkMode = (): ForkMode => forkModeNow;
 export const setForkMode = (m: ForkMode): void => {
   forkModeNow = m;
@@ -72,14 +73,33 @@ export const setForkMode = (m: ForkMode): void => {
  */
 export const RIBBON_SLOPE = 2;
 export const LINE_SLOPE = 4;
+/** A species' label's pill, px across (ToLaD#396): the shortest thing on screen that holds a name. */
+export const LABEL_PILL = 22;
+/**
+ * A stem's width on screen over its height on screen (ToLaD#402): at or under STEM_WHOLE it is a column, whole; at
+ * STEM_LINE it has gone, a line in its place. What counts is what the eye reads as a plate, a sliver; so a width counts
+ * only up to LABEL_PILL: a stem as tall as a name's pill stands however wide it runs, and only one under half of that can go.
+ */
+export const STEM_WHOLE = 1;
+export const STEM_LINE = 2;
 
-/** A peel's ribbon's share of its width at this zoom: 1 a whole ribbon, 0 a corner. */
-export function ribbonShare(move: number, h: number, sx: number, sy: number): number {
-  const m = Math.abs(move) * sx;
+/** A stretch's share of its width at this zoom, by how far it runs across per px up (across and h world): 1 whole, 0 a line. */
+function share(across: number, h: number, sx: number, sy: number, whole: number, line: number): number {
+  const m = Math.abs(across) * sx;
   if (!(m > 0)) return 1;
   if (!(h > 0)) return 0;
   const s = m / (h * sy);
-  return s <= RIBBON_SLOPE ? 1 : s >= LINE_SLOPE ? 0 : (LINE_SLOPE - s) / (LINE_SLOPE - RIBBON_SLOPE);
+  return s <= whole ? 1 : s >= line ? 0 : (line - s) / (line - whole);
+}
+
+/** A peel's ribbon's share of its width at this zoom: 1 a whole ribbon, 0 a corner. */
+export function ribbonShare(move: number, h: number, sx: number, sy: number): number {
+  return share(move, h, sx, sy, RIBBON_SLOPE, LINE_SLOPE);
+}
+
+/** A stem's share of its width at this zoom (width and height world): 1 a whole column, 0 a line. */
+export function stemShare(w: number, h: number, sx: number, sy: number): number {
+  return share(Math.min(w, LABEL_PILL / sx), h, sx, sy, STEM_WHOLE, STEM_LINE);
 }
 
 /** The rooms and places at one set of a's and width zoom (world x, the stem's centre on Fold.home). */
@@ -121,6 +141,11 @@ export class Steady extends Fold {
    * split's height and its founders' slot centre's offset in its split's column. */
   private readonly nY: Float64Array;
   private readonly nW: Float64Array;
+  /** Per node: where its stem's stretch starts going down: its split, or a clade's youngest tip while it is drawn as one branch (setMerged); which ones are. */
+  private readonly stemTop: Float64Array;
+  private readonly stemTopSet: number[] = [];
+  /** The bottom of the world, where the root's stem ends. */
+  private readonly yFloor: number;
   private readonly nFirst: Int32Array;
   private readonly nLast: Int32Array;
   private readonly kidsF: Int32Array[];
@@ -184,6 +209,8 @@ export class Steady extends Fold {
     });
     this.nY = Float64Array.from(N, (v) => v.y);
     this.nW = Float64Array.from(N, (v) => v.width);
+    this.stemTop = this.nY.slice();
+    this.yFloor = fan.trunkBottom.y;
     this.nFirst = Int32Array.from(N, (v) => v.strands[0].index);
     this.nLast = Int32Array.from(N, (v) => v.strands[v.strands.length - 1].index);
     this.kidsF = N.map((v) => Int32Array.from(v.kids, (k) => (isNode(k) ? this.idx.get(k)! : ~k.index)));
@@ -447,13 +474,62 @@ export class Steady extends Fold {
     return this.cur().h[this.idx.get(v)!];
   }
 
-  /** Node j's (fan.nodes' order) foot's height cut off at this zoom: its parent's fork if its peel is no whole ribbon (ribbonShare), else 0. */
+  /**
+   * Node j's stem's share at this zoom (ToLaD#402): its stretch from its split (a clade drawn as one branch: from its
+   * youngest tip, setMerged) to its parent's fork; the root's, to the bottom of the world. 1 but in `thin`.
+   */
+  private nodeStem(L: Lay, j: number, sx: number, sy: number): number {
+    if (forkModeNow !== 'thin') return 1;
+    return stemShare(this.nW[j], this.stemFoot(L, j) - this.stemTop[j], sx, sy);
+  }
+
+  /** Where node j's stem ends going down (world). */
+  private stemFoot(L: Lay, j: number): number {
+    const p = this.par[j];
+    return p < 0 ? this.yFloor : this.nY[p] - L.h[p];
+  }
+
+  /** Strand i's first stretch's share: from its tip to its fork, as a node's stem. */
+  private strandStem(L: Lay, i: number, sx: number, sy: number): number {
+    if (forkModeNow !== 'thin') return 1;
+    return stemShare(this.strands[i].width, this.sY[i] - L.h[this.bNode[i]] - Math.max(this.tipS[i], this.yNow), sx, sy);
+  }
+
+  /** Node j's peel's share: no ribbon runs off or into a stem that is not whole; the corner it leaves is what a line can join. */
+  private nodePeel(L: Lay, j: number, sx: number, sy: number): number {
+    const p = this.par[j];
+    return Math.min(ribbonShare(L.dl![j], L.h[p], sx, sy), this.nodeStem(L, j, sx, sy), this.nodeStem(L, p, sx, sy));
+  }
+
+  /** Strand i's peel's share, as nodePeel. */
+  private strandPeel(L: Lay, i: number, sx: number, sy: number): number {
+    const j = this.bNode[i];
+    return Math.min(ribbonShare(L.dc![i], L.h[j], sx, sy), this.strandStem(L, i, sx, sy), this.nodeStem(L, j, sx, sy));
+  }
+
+  /** The clades drawn as one branch this frame (lod.ts): each one's stem runs up to its youngest tip, its split being inside the branch. */
+  setMerged(merged: readonly FanNode[], top: (v: FanNode) => number): void {
+    for (const j of this.stemTopSet) this.stemTop[j] = this.nY[j];
+    this.stemTopSet.length = 0;
+    for (const v of merged) {
+      const j = this.idx.get(v)!;
+      this.stemTop[j] = Math.max(top(v), this.yNow);
+      this.stemTopSet.push(j);
+    }
+  }
+
+  /** Node j's (fan.nodes' order) foot's height cut off at this zoom: its parent's fork if its peel is no whole ribbon, else 0. */
   footCut(j: number, sx: number, sy: number): number {
     const p = this.par[j];
     if (p < 0) return 0;
     const L = this.cur();
     this.prep(L);
-    return ribbonShare(L.dl![j], L.h[p], sx, sy) < 1 ? L.h[p] : 0;
+    return this.nodePeel(L, j, sx, sy) < 1 ? L.h[p] : 0;
+  }
+
+  /** Node j's stem's share at this zoom (the backdrop goes with it). */
+  stemAt(j: number, sx: number, sy: number): number {
+    return this.nodeStem(this.cur(), j, sx, sy);
   }
 
   /** Each split whose fork and room meet the screen (world heights and x): ~13,000 nodes at the mammal level, most off it. */
@@ -467,31 +543,41 @@ export class Steady extends Fold {
   }
 
   /**
-   * The peels on the way up to node j that are not whole ribbons at this zoom, youngest first: out gets [top, bottom
-   * (its split), ribbonShare] a peel (world y). A row of them for each column the draw cuts (view.ts cutForks).
+   * The stretches on the way up from node j that are not whole at this zoom, youngest first: its stem (ToLaD#402), then
+   * its peel, and so on up. out gets [top, bottom, share] a stretch (world y). A row of them for each column the draw cuts (view.ts cutForks).
    */
   private forksUp(L: Lay, j: number, sx: number, sy: number, yTop: number, yBot: number, out: number[]): void {
     for (let p = this.par[j]; p >= 0; j = p, p = this.par[j]) {
+      const fork = this.nY[p] - L.h[p];
+      const st = this.nodeStem(L, j, sx, sy);
+      if (st < 1 && this.stemTop[j] <= yBot && fork >= yTop) out.push(this.stemTop[j], fork, st);
       // (Only those on screen: up the tree the splits only get older, so past its bottom none is left.)
-      if (this.nY[p] - L.h[p] > yBot) break;
+      if (fork > yBot) return;
       if (this.nY[p] < yTop) continue;
-      const t = ribbonShare(L.dl![j], L.h[p], sx, sy);
-      if (t < 1) out.push(this.nY[p] - L.h[p], this.nY[p], t);
+      const t = this.nodePeel(L, j, sx, sy);
+      if (t < 1) out.push(fork, this.nY[p], t);
     }
+    // (j: the root. Its stem, on to the bottom of the world.)
+    const st = this.nodeStem(L, j, sx, sy);
+    if (st < 1 && this.stemTop[j] <= yBot && this.yFloor >= yTop) out.push(this.stemTop[j], this.yFloor, st);
   }
 
-  /** forksUp for strand i: its own peel, then its columns'. */
+  /** forksUp for strand i: its first stretch and its peel, then its columns'. */
   strandForks(i: number, sx: number, sy: number, yTop: number, yBot: number, out: number[]): void {
     const L = this.cur();
     this.prep(L);
     out.length = 0;
     const j = this.bNode[i];
-    const t = ribbonShare(L.dc![i], L.h[j], sx, sy);
-    if (t < 1 && this.sY[i] >= yTop && this.sY[i] - L.h[j] <= yBot) out.push(this.sY[i] - L.h[j], this.sY[i], t);
+    const fork = this.sY[i] - L.h[j];
+    const st = this.strandStem(L, i, sx, sy);
+    const tip = Math.max(this.tipS[i], this.yNow);
+    if (st < 1 && tip <= yBot && fork >= yTop) out.push(tip, fork, st);
+    const t = this.strandPeel(L, i, sx, sy);
+    if (t < 1 && this.sY[i] >= yTop && fork <= yBot) out.push(fork, this.sY[i], t);
     this.forksUp(L, j, sx, sy, yTop, yBot, out);
   }
 
-  /** forksUp for node v's own peel and its ancestors' (a merged clade, one ribbon above its split). */
+  /** forksUp for node v's own stem and peel and its ancestors' (a merged clade, one ribbon above its split). */
   nodeForks(v: FanNode, sx: number, sy: number, yTop: number, yBot: number, out: number[]): void {
     const L = this.cur();
     this.prep(L);
@@ -499,18 +585,26 @@ export class Steady extends Fold {
     this.forksUp(L, this.idx.get(v)!, sx, sy, yTop, yBot, out);
   }
 
-  /** Node v's split, for its corners: its column's centre, and out gets per daughter (v.kids' order) [its column's centre, its ribbon's share]. */
-  corner(v: FanNode, sx: number, sy: number, out: number[]): number {
+  /**
+   * Node v's split, for its corners: its column's centre, and out gets per daughter (v.kids' order) [its column's centre,
+   * its ribbon's share]. stems, if given, gets per daughter [its stem's share, its stem's top (world)] (`thin`, ToLaD#402).
+   */
+  corner(v: FanNode, sx: number, sy: number, out: number[], stems?: number[]): number {
     const L = this.cur();
     this.prep(L);
     const j = this.idx.get(v)!;
     const K = this.kidsF[j];
-    const h = L.h[j];
     out.length = 0;
+    if (stems) stems.length = 0;
     for (let q = 0; q < K.length; q++) {
       const k = K[q];
-      if (k >= 0) out.push(L.colL[k] + this.nW[k] / 2, ribbonShare(L.dl![k], h, sx, sy));
-      else out.push(L.C[~k], ribbonShare(L.dc![~k], h, sx, sy));
+      if (k >= 0) {
+        out.push(L.colL[k] + this.nW[k] / 2, this.nodePeel(L, k, sx, sy));
+        stems?.push(this.nodeStem(L, k, sx, sy), this.stemTop[k]);
+      } else {
+        out.push(L.C[~k], this.strandPeel(L, ~k, sx, sy));
+        stems?.push(this.strandStem(L, ~k, sx, sy), Math.max(this.tipS[~k], this.yNow));
+      }
     }
     return L.colL[j] + this.nW[j] / 2;
   }

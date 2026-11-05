@@ -228,10 +228,10 @@ export function FanApp() {
         >
           {`gaps: ${gaps}`}
         </button>
-        {/* ToLaD#377: how a fork with too little height is drawn: a rectangular tree's corner (flat), or a ribbon (peel, the old look). */}
+        {/* ToLaD#377, #402: how a fork with too little height is drawn: a rectangular tree's corner (flat), that and a stem wider than tall a line (thin), or a ribbon (peel, the old look). */}
         <button
           type="button"
-          title="Forks: flat corners or peeling ribbons"
+          title="Forks: thin lines for wide stems, flat corners, or peeling ribbons"
           onClick={() => {
             const next = FORK_MODES[(FORK_MODES.indexOf(forkLook) + 1) % FORK_MODES.length];
             setForkMode(next);
