@@ -2190,6 +2190,8 @@ export class FanView implements InputHandlers {
     this.drawTimeAxis(false);
     // (The mammal level, lod.ts: a closed clade of hairline strands drawn as its one branch, its columns inside it not drawn.)
     const lod = this.lodNow();
+    const sf = this.fan.tess.fold;
+    if (sf instanceof Steady) sf.setMerged(lod ? lod.merged : [], Lod.top);
     this.drawStem(lod);
     {
       for (const b of this.fan.branches) if (!lod || lod.of[b.index] < 0) this.drawStrand(b);
@@ -2526,7 +2528,7 @@ export class FanView implements InputHandlers {
     const nodes = this.fan.nodes;
     const ys = this.stemYs;
     const steady = this.fan.tess.fold instanceof Steady ? this.fan.tess.fold : null;
-    const corners = !!steady && forkMode() === 'flat';
+    const corners = !!steady && forkMode() !== 'peel';
     for (let ni = nodes.length - 1; ni >= 0; ni--) {
       const v = nodes[ni];
       if (lod?.hidden(v)) continue;
@@ -2535,6 +2537,9 @@ export class FanView implements InputHandlers {
       const cutH = corners ? steady!.footCut(ni, this.cam.sx, this.cam.sy) : 0;
       const yb = Math.min(v.yBot - cutH, wBot);
       if (!(yb > ya)) continue;
+      // (A stem going to a line, ToLaD#402: its backdrop goes with it.)
+      const alpha = corners ? steady!.stemAt(ni, this.cam.sx, this.cam.sy) : 1;
+      if (!(alpha > 0)) continue;
       // Straight below its peel: one piece; the peel in chords.
       const peel = v.leanY;
       ys.length = 0;
@@ -2561,9 +2566,9 @@ export class FanView implements InputHandlers {
         const l1 = xs[i + 1];
         const b = sy[i + 1];
         if (!(b > t) || Math.max(l0, l1) > this.w + 8 || Math.min(l0, l1) + w < -8) continue;
-        if (this.gl) this.gl.under.push(l0, t, l0 + w, b, c[0], c[1], c[2], 1, l1 - l0, l1 - l0);
+        if (this.gl) this.gl.under.push(l0, t, l0 + w, b, c[0], c[1], c[2], alpha, l1 - l0, l1 - l0);
         else {
-          this.ctx.fillStyle = `rgb(${Math.round(c[0] * 255)},${Math.round(c[1] * 255)},${Math.round(c[2] * 255)})`;
+          this.ctx.fillStyle = `rgba(${Math.round(c[0] * 255)},${Math.round(c[1] * 255)},${Math.round(c[2] * 255)},${alpha})`;
           this.ctx.beginPath();
           this.ctx.moveTo(l0, t);
           this.ctx.lineTo(l0 + w, t);
@@ -2677,7 +2682,7 @@ export class FanView implements InputHandlers {
     let pts = this.lanePoints(b, hw);
     if (pts.n < 2) return;
     const fo = this.fan.tess.fold;
-    if (fo instanceof Steady && forkMode() === 'flat') {
+    if (fo instanceof Steady && forkMode() !== 'peel') {
       fo.strandForks(b.index, this.cam.sx, this.cam.sy, sTop, sBot, this.forkCuts);
       if (this.forkCuts.length) pts = this.cutForks(pts, (y) => leftAt(b, y) + hw);
     }
@@ -2739,7 +2744,7 @@ export class FanView implements InputHandlers {
     if (y0 < k0 * H) push(k0, y0);
     if (pts.n < 2 || hi < -12 || lo > this.w + 12) return;
     let out = pts;
-    if (f instanceof Steady && forkMode() === 'flat') {
+    if (f instanceof Steady && forkMode() !== 'peel') {
       f.nodeForks(v, this.cam.sx, this.cam.sy, sTop, sBot, this.forkCuts);
       if (this.forkCuts.length) out = this.cutForks(pts, (y) => f.left(i0, y)! + RIBBON_INSET_PX / this.cam.sx);
     }
@@ -2791,6 +2796,7 @@ export class FanView implements InputHandlers {
 
   /** drawCorners' daughters, pooled. */
   private cornerOut: number[] = [];
+  private cornerStems: number[] = [];
   /**
    * Where a peel has too little height for its move, a rectangular tree's corner (ToLaD#377): at the split a flat line
    * from the parent's column to the daughter's, and up from it a line to where the daughter's column starts. Nested
@@ -2798,10 +2804,11 @@ export class FanView implements InputHandlers {
    */
   private drawCorners(lod: Lod | null): void {
     const f = this.fan.tess.fold;
-    if (!(f instanceof Steady) || forkMode() !== 'flat') return;
+    if (!(f instanceof Steady) || forkMode() === 'peel') return;
     const { sx, sy } = this.cam;
     const cam = this.camera;
     const out = this.cornerOut;
+    const stems = this.cornerStems;
     const rect = (x0: number, y0: number, x1: number, y1: number, c: readonly number[]) => {
       if (x1 < -8 || x0 > this.w + 8) return;
       if (this.gl) this.gl.under.push(Math.max(-8, x0), y0, Math.min(this.w + 8, x1), y1, c[0], c[1], c[2], 1, 0, 0);
@@ -2816,7 +2823,7 @@ export class FanView implements InputHandlers {
       if (lod && (lod.hidden(v) || lod.isMerged(v))) return;
       const y0 = cam.screenY(v.y);
       const yt = cam.screenY(top);
-      const pc = cam.screenX(f.corner(v, sx, sy, out));
+      const pc = cam.screenX(f.corner(v, sx, sy, out, stems));
       // (Gray first: where the lines overlap, the living's shows.)
       for (const live of [false, true]) {
         const c = live ? mixInto(EC_MIX, GREEN01, GREEN_DARK01, laneDim(1) * 0.9) : mixInto(GC_MIX, GRAY01, GRAY_DARK01, laneDim(1) * 0.82);
@@ -2827,7 +2834,8 @@ export class FanView implements InputHandlers {
           if (has !== live) continue;
           const dc = cam.screenX(out[2 * q]);
           rect(Math.min(pc, dc) - 0.5, y0 - 0.5, Math.max(pc, dc) + 0.5, y0 + 0.5, c);
-          rect(dc - 0.5, yt, dc + 0.5, y0, c);
+          // (Its stem a line too, ToLaD#402: on up from the fork to its own split, whose corners start from there.)
+          rect(dc - 0.5, stems[2 * q] > 0 ? yt : cam.screenY(stems[2 * q + 1]), dc + 0.5, y0, c);
         }
       }
     });
