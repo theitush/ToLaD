@@ -70,7 +70,7 @@ function edges(v: FanView): [number, number] {
   return [l, r];
 }
 
-/** Drag sideways a whole number of screens' worth a move at a time until the view stops; the px it moved. */
+/** Drag sideways, move after move, until the view stops; the px it moved. */
 function drag(v: FanView, dx: number): number {
   v.gestureStart();
   let moved = 0;
@@ -117,9 +117,10 @@ function crosses(v: FanView, cam: Camera): void {
     drag(v, dir * 25);
     const [l, r] = edges(v);
     const m = (0.4 * v.w) / v.cam.sx;
-    // The stop is at the outer edge, and 40% of a screen past it. Within the sampled heights' reach of the true one.
-    const off = dir > 0 ? v.cam.cx - (l - m) : r + m - v.cam.cx;
-    expect(Math.abs(off) * v.cam.sx).toBeLessThan(1 + v.w);
+    // The stop is 40% of a screen past the outer edge: never short of it. (A tip the sampled heights here pass over can stand further out.)
+    const short = (dir > 0 ? v.cam.cx - (l - m) : r + m - v.cam.cx) * v.cam.sx;
+    expect(short).toBeLessThan(1);
+    expect(short).toBeGreaterThan(-v.w);
     // Past it, nothing moves.
     const held = v.cam.cx;
     v.pan(dir * 500, 0);
