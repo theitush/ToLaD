@@ -144,8 +144,14 @@ describe('a sideways swipe crosses any gap (ToLaD#403)', () => {
     const v = stubView(mammaliaClade(), mammaliaTree());
     const b = v.fan.branches.find((s) => s.sp.common === 'Giant armadillo')!;
     const cam = P(v).frameOf({ b });
-    at(v, cam);
-    expect(drag(v, 25)).toBeGreaterThan(100 * v.w);
+    // A finger's moves, each way: every px of them taken (the old rule stopped them ~254 px out).
+    for (const dir of [1, -1]) {
+      at(v, cam);
+      v.gestureStart();
+      for (let k = 0; k < 80; k++) v.pan(dir * 25, 0);
+      v.gestureEnd();
+      expect(Math.abs(v.cam.cx - cam.cx) * v.cam.sx).toBeCloseTo(2000, 3);
+    }
     crosses(v, cam);
     // ... as do the groups of the top level.
     for (const g of nextLevels(v.fan, v.fan.root).filter((_, i) => i % 7 === 2)) crosses(v, P(v).frameOf(g));
