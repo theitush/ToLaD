@@ -70,7 +70,7 @@ function edges(v: FanView): [number, number] {
   return [l, r];
 }
 
-/** Drag sideways a whole number of screens' worth a move at a time until the view stops; the px it moved. */
+/** Drag sideways, move after move, until the view stops; the px it moved. */
 function drag(v: FanView, dx: number): number {
   v.gestureStart();
   let moved = 0;
@@ -117,9 +117,10 @@ function crosses(v: FanView, cam: Camera): void {
     drag(v, dir * 25);
     const [l, r] = edges(v);
     const m = (0.4 * v.w) / v.cam.sx;
-    // The stop is at the outer edge, and 40% of a screen past it. Within the sampled heights' reach of the true one.
-    const off = dir > 0 ? v.cam.cx - (l - m) : r + m - v.cam.cx;
-    expect(Math.abs(off) * v.cam.sx).toBeLessThan(1 + v.w);
+    // The stop is 40% of a screen past the outer edge: never short of it. (A tip the sampled heights here pass over can stand further out.)
+    const short = (dir > 0 ? v.cam.cx - (l - m) : r + m - v.cam.cx) * v.cam.sx;
+    expect(short).toBeLessThan(1);
+    expect(short).toBeGreaterThan(-v.w);
     // Past it, nothing moves.
     const held = v.cam.cx;
     v.pan(dir * 500, 0);
@@ -143,8 +144,14 @@ describe('a sideways swipe crosses any gap (ToLaD#403)', () => {
     const v = stubView(mammaliaClade(), mammaliaTree());
     const b = v.fan.branches.find((s) => s.sp.common === 'Giant armadillo')!;
     const cam = P(v).frameOf({ b });
-    at(v, cam);
-    expect(drag(v, 25)).toBeGreaterThan(100 * v.w);
+    // A finger's moves, each way: every px of them taken (the old rule stopped them ~254 px out).
+    for (const dir of [1, -1]) {
+      at(v, cam);
+      v.gestureStart();
+      for (let k = 0; k < 80; k++) v.pan(dir * 25, 0);
+      v.gestureEnd();
+      expect(Math.abs(v.cam.cx - cam.cx) * v.cam.sx).toBeCloseTo(2000, 3);
+    }
     crosses(v, cam);
     // ... as do the groups of the top level.
     for (const g of nextLevels(v.fan, v.fan.root).filter((_, i) => i % 7 === 2)) crosses(v, P(v).frameOf(g));
