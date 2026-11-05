@@ -99,9 +99,11 @@ describe('fan camera', () => {
           expect(yrs).toBeGreaterThanOrEqual((MIN_YEARS / MAX_YEARS_FRAC) * 0.999);
           expect(k.sx).toBeGreaterThanOrEqual(sxMin * 0.999);
           expect(k.sy).toBeGreaterThanOrEqual(syMin * 0.999);
-          // Content stays near the centre, and "now" / the stem's end stay in reach.
+          // The fan's outer edges hold the centre (a gap in it can be crossed, ToLaD#403), and "now" / the stem's end stay in reach.
           const near = c.nearestContent(k.cx, Math.max(c.yNow, k.cy - c.h / 2 / k.sy), k.cy + c.h / 2 / k.sy);
-          expect(Math.abs(c.toScreen(near, 0)[0] - c.w / 2)).toBeLessThanOrEqual(0.4 * c.w + 1e-3);
+          const [xl, xr] = [x0 - (x1 - x0), x1 + (x1 - x0)].map((x) => c.nearestContent(x, Math.max(c.yNow, k.cy - c.h / 2 / k.sy), k.cy + c.h / 2 / k.sy));
+          expect(c.toScreen(xl, 0)[0] - c.w / 2).toBeLessThanOrEqual(0.4 * c.w + 1e-3);
+          expect(c.w / 2 - c.toScreen(xr, 0)[0]).toBeLessThanOrEqual(0.4 * c.w + 1e-3);
           expect(near).toBeGreaterThanOrEqual(x0 - 1e-9);
           expect(near).toBeLessThanOrEqual(x1 + 1e-9);
           expect(c.toScreen(0, c.yNow)[1]).toBeLessThanOrEqual(0.4 * c.h + 1e-6);
