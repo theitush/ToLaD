@@ -4,6 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import { loadMammalsFromFiles } from './mammals-node';
 import { CARNIVORA, FELIDAE, mammaliaClade, type CladeRec } from './panthera';
+import { PIC_D, PIC_ROOM } from './pics';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, type Split } from './splits';
 import { FanView, groupCentre, type CutLabels } from './view';
 
@@ -54,13 +55,13 @@ function check(c: CutLabels, w: number): void {
   const S = [...c.spots].sort((p, q) => p.x - q.x);
   for (let k = 1; k < S.length; k++) expect(S[k].box[0]).toBeGreaterThanOrEqual(S[k - 1].box[2] - 1e-6);
   const P = [...c.pics].sort((p, q) => p.x - q.x);
-  for (let k = 1; k < P.length; k++) expect(P[k].x - P[k].d / 2).toBeGreaterThanOrEqual(P[k - 1].x + P[k - 1].d / 2 - 1e-6);
+  for (let k = 1; k < P.length; k++) expect(P[k].x - PIC_D / 2).toBeGreaterThanOrEqual(P[k - 1].x + PIC_D / 2 - 1e-6);
   // (No name over a picture, ToLaD#373.)
   for (const p of P)
     for (const s of S)
-      if (s.box[2] > p.x - p.d / 2 && s.box[0] < p.x + p.d / 2) expect(s.box[3]).toBeLessThanOrEqual(p.y - p.d / 2 + 1e-6);
+      if (s.box[2] > p.x - PIC_D / 2 && s.box[0] < p.x + PIC_D / 2) expect(s.box[3]).toBeLessThanOrEqual(p.y - PIC_D / 2 + 1e-6);
   // (Each on screen, its picture at least: it stays until wholly off the edge.)
-  for (const q of c.pics) expect([q.x, q.x + q.d / 2 >= 0 && q.x - q.d / 2 <= w]).toEqual([q.x, true]);
+  for (const q of c.pics) expect([q.x, q.x + PIC_ROOM / 2 >= 0 && q.x - PIC_ROOM / 2 <= w]).toEqual([q.x, true]);
 }
 
 const mammals = async () => {
@@ -111,7 +112,7 @@ describe('labels from the cut (?labels=cut, ToLaD#333)', () => {
           const p = cut.pics[i];
           const o = cut.spots[i].over;
           const c = o ? (o[0] + o[1]) / 2 : v.toScreen(groupCentre({ b: p.face }), 0)[0];
-          if (c >= 72 + p.d / 2 && c <= v.w - p.d / 2) expect([p.face.sp.common, Math.abs(p.x - c) <= p.d / 2 + 1e-6]).toEqual([p.face.sp.common, true]);
+          if (c >= 72 + PIC_ROOM / 2 && c <= v.w - PIC_ROOM / 2) expect([p.face.sp.common, Math.abs(p.x - c) <= PIC_ROOM / 2 + 1e-6]).toEqual([p.face.sp.common, true]);
         }
         // With "now" on screen, no label of a living item reaches below the now line (ToLaD#373, Ita: "so that they dont
         // cover the branches"): its name over its picture over its "+x" line, all above it, and every picture in one row.
@@ -123,9 +124,9 @@ describe('labels from the cut (?labels=cut, ToLaD#333)', () => {
             if (T.youngOf(T.whole(it.head, it.f, it.l)) > v.fan.time.y(0)) continue;
             const s = cut.spots[i];
             const p = cut.pics[i];
-            if (p.y - p.d / 2 > row + 1e-6) {
-              expect([s.text, p.y + p.d / 2 + 14]).toEqual([s.text, expect.closeTo(nowY, 6)]);
-              if (s.over) expect([s.text, s.over[2] < nowY && s.over[2] > p.y + p.d / 2]).toEqual([s.text, true]);
+            if (p.y + PIC_D / 2 - PIC_ROOM > row + 1e-6) {
+              expect([s.text, p.y + PIC_D / 2 + 14]).toEqual([s.text, expect.closeTo(nowY, 6)]);
+              if (s.over) expect([s.text, s.over[2] < nowY && s.over[2] > p.y + PIC_D / 2]).toEqual([s.text, true]);
             }
           }
         // One rigid unit (ToLaD#373, Ita: "the name should be attached to the pic and always above it"): each pill
@@ -133,8 +134,8 @@ describe('labels from the cut (?labels=cut, ToLaD#333)', () => {
         for (let i = 0; i < cut.spots.length; i++) {
           const s = cut.spots[i];
           const p = cut.pics[i];
-          expect([s.text, s.x, s.box[3]]).toEqual([s.text, expect.closeTo(p.x, 6), expect.closeTo(p.y - p.d / 2 - 4, 6)]);
-          expect([s.text, p.y - p.d / 2 >= row - 1e-6]).toEqual([s.text, true]);
+          expect([s.text, s.x, s.box[3]]).toEqual([s.text, expect.closeTo(p.x, 6), expect.closeTo(p.y - PIC_D / 2 - 4, 6)]);
+          expect([s.text, p.y + PIC_D / 2 - PIC_ROOM >= row - 1e-6]).toEqual([s.text, true]);
         }
         seen.push(sig(cut));
       }

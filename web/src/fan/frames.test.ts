@@ -1,6 +1,7 @@
 // Every level's frame keeps "now" and its pictures on screen; a "+x" tap shows all its groups (ToLaD#274).
 import { describe, expect, it } from 'vitest';
 import { CARNIVORA, FELIDAE, mammaliaClade, type CladeRec } from './panthera';
+import { PIC_D } from './pics';
 import { loadMammalsFromFiles } from './mammals-node';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, type Split } from './splits';
 import { levelUp, FanView, groupCentre, groupExtent, groupFace, holds, isLevel, levelName, nextLevels, type Level } from './view';
@@ -95,7 +96,7 @@ function frameFaults(v: FanView, lv: Level): string[] {
     const p = v.picSpots.find((q) => q.lv.b === g.b && q.lv.v === g.v);
     if (!p && (x < 0 || x > v.w)) bad.push(`${at}: ${nameOf(g)} centre off screen at ${x.toFixed(0)} px`);
     if (p) shown++;
-    if (p && (p.x - p.d / 2 < -1 || p.x + p.d / 2 > v.w + 1 || p.y - p.d / 2 < foot - 1)) bad.push(`${at}: ${nameOf(g)}'s picture off screen (${p.x.toFixed(0)}, ${p.y.toFixed(0)})`);
+    if (p && (p.x - PIC_D / 2 < -1 || p.x + PIC_D / 2 > v.w + 1 || p.y - PIC_D / 2 < foot - 1)) bad.push(`${at}: ${nameOf(g)}'s picture off screen (${p.x.toFixed(0)}, ${p.y.toFixed(0)})`);
   }
   if (shown < n) log.push(`${at}: ${shown}/${n} pictures, now at ${nowS.toFixed(0)}, sx ${v.cam.sx.toExponential(2)}`);
   return bad;
