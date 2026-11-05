@@ -61,7 +61,7 @@ function check(v: FanView, c: CutLabels, at: string, bad: string[]): Int32Array 
   if (c.spots.length !== c.pics.length || c.spots.length !== c.items.length) bad.push(`${at}: ${c.spots.length} names, ${c.pics.length} pictures, ${c.items.length} items`);
   c.spots.forEach((s, i) => {
     const p = c.pics[i];
-    if (!s.text || !p || !p.face || p.d !== PIC_D || Math.abs(p.x - s.x) > (PIC_D - (s.box[2] - s.box[0])) / 2 + 1e-6) bad.push(`${at}: label ${s.key} "${s.text}" without its picture`);
+    if (!s.text || !p || !p.face || Math.abs(p.x - s.x) > (PIC_D - (s.box[2] - s.box[0])) / 2 + 1e-6) bad.push(`${at}: label ${s.key} "${s.text}" without its picture`);
     // 1. Its name's species (when it names one) and its "+x" species: its item's, each once.
     const it = c.items[i];
     // (Its name names a species when its picture's is not in its "+x"; s.b is where a tap goes, the item's own.)
@@ -80,7 +80,7 @@ function check(v: FanView, c: CutLabels, at: string, bad: string[]): Int32Array 
   // 2. No two boxes meet: the pills and the discs, swept left to right.
   const boxes: [number, number, number, number, string][] = [
     ...c.spots.map((s) => [...s.box, `"${s.text}"`] as [number, number, number, number, string]),
-    ...c.pics.map((p) => [p.x - p.d / 2, p.y - p.d / 2, p.x + p.d / 2, p.y + p.d / 2, `picture of ${p.face.sp.common}`] as [number, number, number, number, string]),
+    ...c.pics.map((p) => [p.x - PIC_D / 2, p.y - PIC_D / 2, p.x + PIC_D / 2, p.y + PIC_D / 2, `picture of ${p.face.sp.common}`] as [number, number, number, number, string]),
   ].sort((a, b) => a[0] - b[0]);
   const eps = 1e-6;
   for (let i = 0; i < boxes.length && bad.length < 20; i++)

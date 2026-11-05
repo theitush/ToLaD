@@ -9,6 +9,7 @@
 //   7. zooming in steadily, no name goes on and off and on again.
 import { describe, expect, it, vi } from 'vitest';
 import { CARNIVORA, FELIDAE, type CladeRec } from './panthera';
+import { PIC_D, picBox } from './pics';
 import { CARNIVORA_TREE, FELIDAE_TREE, type Split } from './splits';
 import { discSci, FanView, groupFace, groupPics, type CutLabels } from './view';
 import { hasPic } from './wiki';
@@ -58,18 +59,18 @@ const meets = (a: Box, b: Box) => a[0] < b[2] - 1e-6 && b[0] < a[2] - 1e-6 && a[
 function check(v: FanView, c: CutLabels, at: string, bad: string[]): void {
   const boxes: [string, Box][] = [
     ...c.spots.map((s): [string, Box] => [`pill ${s.text}`, s.box]),
-    ...c.pics.map((p): [string, Box] => [`picture ${p.face.sp.sci}`, [p.x - p.d / 2, p.y - p.d / 2, p.x + p.d / 2, p.y + p.d / 2]]),
+    ...c.pics.map((p): [string, Box] => [`picture ${p.face.sp.sci}`, picBox(p)]),
   ];
   for (const s of c.names) {
     for (const [n, b] of boxes) if (meets(s.box, b)) bad.push(`${at}: name ${s.text} meets ${n}`);
     boxes.push([`name ${s.text}`, s.box]);
-    // Its picture (ToLaD#400): a pill across, at the foot of its box, its pill above it, not over it.
+    // Its picture (ToLaD#400): as wide as its box, at its foot, its pill above it, not over it.
     const d = s.disc;
     if (!d) bad.push(`${at}: name ${s.text} has no picture`);
     else {
-      if (d.d !== s.box[2] - s.box[0]) bad.push(`${at}: ${s.text}'s disc is ${d.d} across`);
-      if (Math.abs(d.y + d.d / 2 - s.box[3]) > 1e-6) bad.push(`${at}: ${s.text}'s disc is not at its box's foot`);
-      if (s.y1 > d.y - d.d / 2 - 1e-6 || s.y1 <= s.box[1]) bad.push(`${at}: ${s.text}'s pill (foot ${s.y1}) is not above its disc`);
+      if (PIC_D !== s.box[2] - s.box[0]) bad.push(`${at}: ${s.text}'s box is ${s.box[2] - s.box[0]} across`);
+      if (Math.abs(d.y + PIC_D / 2 - s.box[3]) > 1e-6) bad.push(`${at}: ${s.text}'s disc is not at its box's foot`);
+      if (s.y1 > d.y - PIC_D / 2 - 1e-6 || s.y1 <= s.box[1]) bad.push(`${at}: ${s.text}'s pill (foot ${s.y1}) is not above its disc`);
     }
   }
   // Every species once: a picture's named species and "+x", each name's named species and "+x".

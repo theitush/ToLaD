@@ -6,7 +6,7 @@ import { loadMammalsFromFiles } from './mammals-node';
 import { CARNIVORA, mammaliaClade, type CladeRec } from './panthera';
 import { CARNIVORA_TREE, mammaliaTree, type Split } from './splits';
 import { FanView, fossilSpan, isLevel, levelName, nextLevels } from './view';
-import { PIC_D } from './pics';
+import { PIC_D, PIC_ROOM } from './pics';
 import type { FanNode } from './layout';
 
 
@@ -69,7 +69,7 @@ function cutOff(v: FanView, at: string, lo: number, hi: number): string[] {
   const bad: string[] = [];
   const mine = (run?: readonly number[]) => !!run && run[1] >= lo && run[0] <= hi;
   for (const s of c.spots) if (mine(s.run) && (s.box[0] < -1e-6 || s.box[2] > v.w + 1e-6 || s.box[3] > v.h)) bad.push(`${at}: "${s.text}" at x ${s.box[0].toFixed(1)}–${s.box[2].toFixed(1)}`);
-  for (const p of c.pics) if (mine(p.run) && (p.x - p.d / 2 < -1e-6 || p.x + p.d / 2 > v.w + 1e-6)) bad.push(`${at}: ${p.face.sp.common}'s picture at x ${p.x.toFixed(1)}`);
+  for (const p of c.pics) if (mine(p.run) && (p.x - PIC_D / 2 < -1e-6 || p.x + PIC_D / 2 > v.w + 1e-6)) bad.push(`${at}: ${p.face.sp.common}'s picture at x ${p.x.toFixed(1)}`);
   return bad;
 }
 /** Clade u's territory on screen, its strands lo..hi's. */
@@ -95,14 +95,14 @@ describe('?frame=cut: a level framed by its territory, every label whole (ToLaD#
           const at = `${levelName(u)} (${how})`;
           // (Its territory (the hull its columns stand in, rooms by life; a level framed on its fossils, where they lived,
           // ToLaD#289) whole in the labels' width, LABEL_AXIS_X to the edge: across it, or at the zoom its narrowest group's
-          // territory first holds a picture (PIC_D), ToLaD#262.)
+          // territory first holds a label (PIC_ROOM), ToLaD#262.)
           const T = (v as unknown as { territories(): { t: { span(j: number): [number, number]; index: Map<FanNode, number> } } }).territories().t;
           const fs = fossilSpan(v.fan, u);
           const [a, b] = (fs ?? T.span(T.index.get(u)!)).map((x) => v.toScreen(x, 0)[0]);
           const groups = nextLevels(v.fan, u).map((g) => (g.b ? T.span(~g.b.index) : T.span(T.index.get(g.v)!)));
           const fit = Math.min(...groups.map(([p, q]) => (q - p) * v.cam.sx));
           const whole = a >= 72 - 0.5 && b <= v.w + 0.5;
-          if (!whole || !(Math.abs(a - 72) <= 0.5 && Math.abs(b - v.w) <= 0.5) && !(!fs && Math.abs(fit - PIC_D) <= 0.5))
+          if (!whole || !(Math.abs(a - 72) <= 0.5 && Math.abs(b - v.w) <= 0.5) && !(!fs && Math.abs(fit - PIC_ROOM) <= 0.5))
             bad.push(`${at}: framed at ${a.toFixed(1)}–${b.toFixed(1)}, its narrowest group ${fit.toFixed(1)} px`);
           if (!v.cutLast!.spots.length) bad.push(`${at}: no labels`);
           const [lo, hi] = [u.strands[0].index, u.strands[u.strands.length - 1].index];

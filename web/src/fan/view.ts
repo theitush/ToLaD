@@ -5,7 +5,7 @@
 // Gestures come from the shared engine/input.ts.
 
 import { drawPic, hasPic, livePic, PIC_TRIES, prefetchPics } from './wiki';
-import { PIC_D, PIC_LIFT, type PicSpot } from './pics';
+import { PIC_D, PIC_LIFT, PIC_ROOM, picBox, type PicSpot } from './pics';
 import { formatCount, formatMass } from '../data/count';
 import { stamp } from '../stamp';
 import { DOUBLE_TAP_MS, Input, type InputHandlers } from '../engine/input';
@@ -151,10 +151,10 @@ export interface LabelSpot {
   /** The species whose picture it carries, when not its own `b` (a family's: its commonest living species, ToLaD#212). */
   pic?: FanBranch | null;
   /**
-   * A name alone's small picture (ToLaD#400): a disc `d` across centred at (x, y), under its pill. Then `y1` is the
-   * pill's foot and `box` holds the pill and the disc together: what the placing, the taps and the brackets go by.
+   * A name alone's picture (ToLaD#400): its disc, PIC_D across like any, centred at (x, y), under its pill. Then `y1` is
+   * the pill's foot and `box` holds the pill and the disc together, the disc's width: what the placing, the taps and the brackets go by.
    */
-  disc?: { y: number; d: number; lv: Level };
+  disc?: { y: number; lv: Level };
 }
 
 /** A frame's labels from the cut (ToLaD#333, #358): one per item, its name pill and its picture, and its "+x" species. */
@@ -1051,17 +1051,17 @@ export class FanView implements InputHandlers {
   /**
    * The labels' band (screen y, ToLaD#373), a constant per screen: `top` under the buttons and the brackets' stack or
    * the pinned rows at their most, whatever a frame has of them; `cap` the longest name pill it holds, less on a short
-   * screen, where "now" stays within LABELS_SHARE of the height (never under a picture's width); `row` the top of the
-   * pictures' row, the pills' feet just over it; `now` where every frame stands "now", a picture's height and lift
+   * screen, where "now" stays within LABELS_SHARE of the height (never under a picture's room); `row` the top of the
+   * pictures' rooms; `now` where every frame stands "now", a picture's room and lift
    * under that row; `room` the stack's foot to "now" (Brackets.pillRoom).
    */
   private labelBand(): { top: number; cap: number; row: number; now: number; room: number } {
     // (Named at their forks, ToLaD#373: no stack to keep rows for, the tree has them; heldRow makes way for the pinned rows.)
     const top = this.labelTop() + (this.brackets && !forkNames() ? STACK_MOST : 0);
-    const under = LABEL_UNDER + PIC_D + PIC_LIFT;
-    const cap = Math.max(PIC_D, Math.min(LABEL_CAP, this.h * LABELS_SHARE - top - under));
+    const under = LABEL_UNDER + PIC_ROOM + PIC_LIFT;
+    const cap = Math.max(PIC_ROOM, Math.min(LABEL_CAP, this.h * LABELS_SHARE - top - under));
     const row = top + cap + LABEL_UNDER;
-    const now = row + PIC_D + PIC_LIFT;
+    const now = row + PIC_ROOM + PIC_LIFT;
     return { top, cap, row, now, room: now - 4 - top };
   }
 
@@ -1850,7 +1850,7 @@ export class FanView implements InputHandlers {
     // the cut makes it two or more items, each rung tried a cut of the item alone (piecesAt: its own nodes and a path
     // down to them, never the tree). The cut only splits items as the zoom grows, so it is a search on a bracket, a
     // rung known whole (a) and one known split (b). Each rung found whole says where it surely splits: a territory on
-    // screen only widens with the zoom (a daughter whose territory is w world wide holds the label by zoom PIC_D / w),
+    // screen only widens with the zoom (a daughter whose territory is w world wide holds the label by zoom PIC_ROOM / w),
     // and the item splits once a sister riding with it fits or two of its head's daughters do. That rung tried, then the
     // one under it: two cuts where the guess is tight; a gallop up and a bisection back where it is not.)
     const kMax = Math.floor(Math.log2(cam.sx) * LADDER) + 64 * LADDER;
@@ -1861,7 +1861,7 @@ export class FanView implements InputHandlers {
       const it = P[0];
       const at = (q: number) => {
         const t = T.terr.get(q);
-        return t && t[1] > t[0] ? PIC_D / (t[1] - t[0]) : Infinity;
+        return t && t[1] > t[0] ? PIC_ROOM / (t[1] - t[0]) : Infinity;
       };
       const kids = it.head >= 0 ? Array.from(T.kids[it.head], at).sort((p, q) => p - q) : [];
       g = Math.ceil(Math.log2(Math.min(kids[1] ?? Infinity, ...it.parts.filter((q) => q !== it.head).map(at))) * LADDER);
@@ -1895,7 +1895,7 @@ export class FanView implements InputHandlers {
     // give stands, moved only as far as those labels need.)
     const zs = Math.pow(2, (b + 1) / LADDER);
     const W = (this.w - LABEL_AXIS_X) / zs;
-    const d = PIC_D / zs;
+    const d = PIC_ROOM / zs;
     const at = this.labelsFrame(f, l, v, zs, 0);
     const c = this.labelsAt(at, true, this.runSpan(f, l, [0, 0]));
     const Q = c.items.filter((q) => q.l >= f && q.f <= l);
@@ -1977,7 +1977,7 @@ export class FanView implements InputHandlers {
     c.items.forEach((it, i) => {
       // (Whole on screen, right of the axis: a label sliding off the edge is no label of this frame.)
       const x = c.pics[i].x;
-      if (it.f >= f && it.l <= l && x - PIC_D / 2 >= LABEL_AXIS_X - 1e-6 && x + PIC_D / 2 <= this.w + 1e-6) {
+      if (it.f >= f && it.l <= l && x - PIC_ROOM / 2 >= LABEL_AXIS_X - 1e-6 && x + PIC_ROOM / 2 <= this.w + 1e-6) {
         n++;
         species += it.l - it.f + 1;
       }
@@ -2234,7 +2234,7 @@ export class FanView implements InputHandlers {
     const cut = (this.cutLast = this.cutLabels(T, row));
     this.rowLast = row;
     // (The names at their forks clear of the labels and the axis's labels as last drawn; its origin note reaches past the gutter.)
-    if (br && forkNames()) br.placeForks([...[...cut.spots, ...cut.names].filter((s) => s.fit > 0.3).map((s) => s.box), ...cut.pics.map((p) => [p.x - p.d / 2, p.y - p.d / 2, p.x + p.d / 2, p.y + p.d / 2]), ...this.axisBoxes]);
+    if (br && forkNames()) br.placeForks([...[...cut.spots, ...cut.names].filter((s) => s.fit > 0.3).map((s) => s.box), ...cut.pics.map(picBox), ...this.axisBoxes]);
     this.labelMs.push(performance.now() - t0);
     if (this.labelMs.length > 600) this.labelMs.shift();
     return { br, cut };
@@ -2261,10 +2261,10 @@ export class FanView implements InputHandlers {
   }
 
   /**
-   * This frame's labels (ToLaD#358, research/scalable-tree.md §3): one cut through the tree at the label's width (a
-   * picture's, PIC_D, its widest part), one label per item: top to bottom its name pill (ToLaD#373, Ita: "so that they
-   * dont cover the branches"), its picture, the gap its "+x" hairline runs in, the item's youngest tip: one rigid unit,
-   * the pill always right on the picture, the picture on its tip or held on the band's row (`row`, labelBand) above it,
+   * This frame's labels (ToLaD#358, research/scalable-tree.md §3): one cut through the tree at the room a label reserves
+   * (PIC_ROOM, what frames and taps go by), one label per item: top to bottom its name pill (ToLaD#373, Ita: "so that they
+   * dont cover the branches"), its picture (PIC_D across, at the room's foot), the gap its "+x" hairline runs in, the
+   * item's youngest tip: one rigid unit, the pill always right on the picture, the room on its tip or held on the band's row (`row`, labelBand) above it,
    * over one x (faceX), inside the item's territory over the rows the unit may take (Territories.over: the row's lineages
    * split x between them, a lineage keeping its place the band's height over its tip), whatever name it carries, so
    * labels of different items never meet, by construction. With "now" on screen nothing of a label on a living item lies
@@ -2291,7 +2291,7 @@ export class FanView implements InputHandlers {
     const bottom = whole ? Infinity : this.h - LABEL_BOTTOM_PX + 30;
     // (A lineage keeps its place over its tip as high as a label reaches: a label's rows above "now" have no column to bound it.)
     const { cap } = this.labelBand();
-    const ghost = (PIC_LIFT + PIC_D + LABEL_UNDER + cap) / this.cam.sy;
+    const ghost = (PIC_LIFT + PIC_ROOM + LABEL_UNDER + cap) / this.cam.sy;
     /**
      * An item's centre (screen x) for a box `d` wide: at `cx` (screen x), the territory [x0, x1] (world) only bounding
      * it, a function of the world alone, so a pan moves it 1:1 and it leaves with its branch (ToLaD#373, Ita: "the label
@@ -2310,22 +2310,22 @@ export class FanView implements InputHandlers {
       return Math.min(Math.max(x, l), r);
     };
     /**
-     * Item r's picture's top (screen y): its unit stands on the youngest tip of its head climbed (CutTerritories.whole:
+     * Item r's room's top (screen y; its picture at the room's foot): its unit stands on the youngest tip of its head climbed (CutTerritories.whole:
      * a clade's own, whether it is one item or her daughter with her sisters riding on her), PIC_LIFT over it, held on
      * the band's row when the tip is less than that under it. A fixed offset from the tip: the time zoom and pan move
      * the unit rigidly, and nothing in it depends on the branch's part on screen or on the name it carries.
      */
     const tops = new Map<number, number>();
-    const discTop = (r: Ref): number => {
+    const roomTop = (r: Ref): number => {
       const k = T.whole(r.head, r.f, r.l);
       let d0 = tops.get(k);
-      if (d0 === undefined) tops.set(k, (d0 = Math.max(Y(T.youngOf(k)) - PIC_LIFT - PIC_D, row)));
+      if (d0 === undefined) tops.set(k, (d0 = Math.max(Y(T.youngOf(k)) - PIC_LIFT - PIC_ROOM, row)));
       return d0;
     };
-    // (A label's rows: the band a pill may take over its picture, and the picture's, for every name alike.)
+    // (A label's rows: the band a pill may take over its room, and the room's, for every name alike.)
     const rows: RowsOf = (r) => {
-      const d0 = discTop(r);
-      return [Wy(d0 - LABEL_UNDER - cap), Wy(d0 - LABEL_UNDER), Wy(d0), Wy(d0 + PIC_D)];
+      const d0 = roomTop(r);
+      return [Wy(d0 - LABEL_UNDER - cap), Wy(d0 - LABEL_UNDER), Wy(d0), Wy(d0 + PIC_ROOM)];
     };
     /**
      * Item it's label's place (screen x) before its territory and the screen bound it: its picture's species' column at
@@ -2343,8 +2343,8 @@ export class FanView implements InputHandlers {
       for (let u: FanNode | null = face.node; ; ) {
         T.t.over(r, rows, ghost, cell);
         if (cell[1] >= cell[0]) {
-          const l = X(cell[0]) + PIC_D / 2;
-          const h = X(cell[1]) - PIC_D / 2;
+          const l = X(cell[0]) + PIC_ROOM / 2;
+          const h = X(cell[1]) - PIC_ROOM / 2;
           if (l <= h) return Math.min(Math.max(cx, l), h);
           cx = (l + h) / 2;
         }
@@ -2377,30 +2377,30 @@ export class FanView implements InputHandlers {
       const mid = (s: FanBranch) => leftAt(s, wy) + laneAt(s, wy).w / 2;
       return [mid(S[a]), mid(S[b])];
     };
-    const cut = T.t.cut(sx, PIC_D, vx0, vx1, rows, ghost);
+    const cut = T.t.cut(sx, PIC_ROOM, vx0, vx1, rows, ghost);
     for (const it of cut) {
       // (Only the root, before anything fits, does not hold its label.)
       if (!it.fits) continue;
-      const d0 = discTop(it);
+      const d0 = roomTop(it);
       if (d0 > this.h && !whole) continue;
-      const fit = clamp01((bottom - (d0 + PIC_D + PIC_LIFT)) / 30);
+      const fit = clamp01((bottom - (d0 + PIC_ROOM + PIC_LIFT)) / 30);
       if (!(fit > 0)) continue;
       const name = T.nameOf(it);
       // (A "+x" at the middle of its branches at its foot, ToLaD#368, clamped into its territory as any; a species' at
       // its face's place. Its foot: in the gap under its picture, ToLaD#373.)
-      const foot = d0 + PIC_D + PIC_LIFT / 2;
+      const foot = d0 + PIC_ROOM + PIC_LIFT / 2;
       const span = this.midLabels && name.hid.length ? reach(it, Wy(foot)) : null;
       // (One branch, a species or an item with one strand at its foot: it stays with that branch; several: held on screen.)
       const one = !name.hid.length || (!!span && span[1] <= span[0]);
-      const x = placeX(it.x0, it.x1, PIC_D, span ? X((span[0] + span[1]) / 2) : faceX(it, name.face), !one);
+      const x = placeX(it.x0, it.x1, PIC_ROOM, span ? X((span[0] + span[1]) / 2) : faceX(it, name.face), !one);
       // (Wholly off the screen's edge, and only then: until there it slides off with its branch or its territory.)
-      if (!whole && (x + PIC_D / 2 < 0 || x - PIC_D / 2 > this.w)) continue;
+      if (!whole && (x + PIC_ROOM / 2 < 0 || x - PIC_ROOM / 2 > this.w)) continue;
       const key = `c${it.f}:${it.l}`;
       if (name.hid.length) groups.set(key, name.hid);
       // (Its pill right on its picture, the "+x" chip whole, the name cut to what is left of the cap.)
       const plus = this.plusPx(name.hid.length);
       const text = this.pillText(name.text, cap - 2 * LABEL_PAD - plus);
-      const y1 = d0 - LABEL_UNDER;
+      const y1 = d0 + PIC_ROOM - PIC_D - LABEL_UNDER;
       const s: LabelSpot = { key, id: key, run: [it.f, it.l], place: 'tip', text, rank: [0, it.x1 - it.x0, it.head], x, y1, box: [x - half, y1 - this.nameWidth(text) - 2 * LABEL_PAD - plus, x + half, y1], fit, plus, pic: name.face };
       // (What it opens, its head climbed: the clade or species of the tree it is; a tap on it, name, picture or "+x",
       // goes into the item itself, tapItem, ToLaD#359.)
@@ -2410,7 +2410,7 @@ export class FanView implements InputHandlers {
       else Object.assign(s, { v: lv.v, fam: lv.v });
       if (span && span[1] > span[0]) s.over = [X(span[0]), X(span[1]), foot];
       spots.push(s);
-      pics.push({ x, y: d0 + PIC_D / 2, d: PIC_D, i: pics.length, lv, face: name.face, run: [it.f, it.l], held: !one });
+      pics.push({ x, y: d0 + PIC_ROOM - PIC_D / 2, i: pics.length, lv, face: name.face, run: [it.f, it.l], held: !one });
       shown.push(it);
     }
     if (!whole) this.picSpots = pics;
@@ -2418,20 +2418,19 @@ export class FanView implements InputHandlers {
     const names: LabelSpot[] = [];
     if (whole || win) return { spots, groups, pics, items: shown, all: cut, names };
     /**
-     * The names alone (ToLaD#396): the cut again at a pill's width, on the same rows, so its pieces are inside the
+     * The names alone (ToLaD#396): the cut again at a disc's width, on the same rows, so its pieces are inside the
      * items and inside their own territories. Each piece but the one carrying its item's picture is a candidate: its
-     * pill stands at its picture's place in the unit (its foot where a picture's bottom would be, the same gap under
-     * it), over the middle of its branches. Greedy placement, most individuals alive first, against the
+     * disc stands where any stands in the unit, its pill the same gap over it, over the middle of its branches. Greedy placement, most individuals alive first, against the
      * pictures with their pills and the names already placed (the slider model: a name of several branches slides
      * inside its territory to the nearest free stretch, a name of one stays on its branch); what has no free place is
      * not drawn. Its species leave its item's "+x" and go on its own. It comes in as its free stretch opens: a function
-     * of the camera alone, so a pinch fades it instead of popping it. Its picture (ToLaD#400): a disc a pill across, at
-     * the foot, the pill the same gap over it as over a big picture.
+     * of the camera alone, so a pinch fades it instead of popping it.
      */
-    const boxes: (readonly number[])[] = [...spots.map((s) => s.box), ...pics.map((p) => [p.x - p.d / 2, p.y - p.d / 2, p.x + p.d / 2, p.y + p.d / 2])];
+    const boxes: (readonly number[])[] = [...spots.map((s) => s.box), ...pics.map(picBox)];
+    const r0 = PIC_D / 2;
     const pieces: { it: CutItem; o: CutItem; alive: number }[] = [];
     let q = 0;
-    for (const it of T.t.cut(sx, LABEL_PILL, vx0, vx1, rows, ghost, T.t.terr)) {
+    for (const it of T.t.cut(sx, PIC_D, vx0, vx1, rows, ghost, T.t.terr)) {
       while (q < cut.length && cut[q].l < it.f) q++;
       const o = cut[q];
       // (A piece not inside one item, which a fossil riding differently can make, stays with the pictures' "+x".)
@@ -2445,25 +2444,25 @@ export class FanView implements InputHandlers {
     pieces.sort((a, b) => b.alive - a.alive || a.it.f - b.it.f);
     const named = new Map<CutItem, [number, number][]>();
     for (const { it, o } of pieces) {
-      const d0 = discTop(it);
+      const d0 = roomTop(it);
       if (d0 > this.h) continue;
-      const y1 = d0 + PIC_D;
+      const y1 = d0 + PIC_ROOM;
       const fit = clamp01((bottom - (y1 + PIC_LIFT)) / 30);
       if (!(fit > 0)) continue;
       const name = T.nameOf(it);
       const foot = y1 + PIC_LIFT / 2;
       const span = this.midLabels && name.hid.length ? reach(it, Wy(foot)) : null;
       const one = !name.hid.length || (!!span && span[1] <= span[0]);
-      let x = placeX(it.x0, it.x1, LABEL_PILL, span ? X((span[0] + span[1]) / 2) : X(groupCentre({ b: name.face })), !one);
-      if (x + half < 0 || x - half > this.w) continue;
+      let x = placeX(it.x0, it.x1, PIC_D, span ? X((span[0] + span[1]) / 2) : X(groupCentre({ b: name.face })), !one);
+      if (x + r0 < 0 || x - r0 > this.w) continue;
       const plus = this.plusPx(name.hid.length);
       const text = this.pillText(name.text, cap - 2 * LABEL_PAD - plus);
-      const pillFoot = y1 - LABEL_PILL - LABEL_UNDER;
+      const pillFoot = y1 - PIC_D - LABEL_UNDER;
       const y0 = pillFoot - this.nameWidth(text) - 2 * LABEL_PAD - plus;
       // (Where its centre is free of what stands across its rows, in its territory: the free stretch nearest its place.)
-      const lo = one ? X(it.x0) + half : Math.max(X(it.x0) + half, left + half);
-      const hi = one ? X(it.x1) - half : Math.min(X(it.x1) - half, right - half);
-      const blocks = boxes.filter((b) => b[1] < y1 && b[3] > y0).map((b) => [b[0] - half, b[2] + half]).sort((p, r) => p[0] - r[0]);
+      const lo = one ? X(it.x0) + r0 : Math.max(X(it.x0) + r0, left + r0);
+      const hi = one ? X(it.x1) - r0 : Math.min(X(it.x1) - r0, right - r0);
+      const blocks = boxes.filter((b) => b[1] < y1 && b[3] > y0).map((b) => [b[0] - r0, b[2] + r0]).sort((p, r) => p[0] - r[0]);
       let [g0, g1, gd] = [0, -1, Infinity];
       let from = lo;
       for (let i = 0; i <= blocks.length; i++) {
@@ -2478,7 +2477,7 @@ export class FanView implements InputHandlers {
       if (gd === Infinity || (one && gd > 0)) continue;
       if (!one) x = Math.min(Math.max(x, g0), g1);
       const clear = one ? 2 * Math.min(x - g0, g1 - x) : g1 - g0;
-      const box: LabelSpot['box'] = [x - half, y0, x + half, y1];
+      const box: LabelSpot['box'] = [x - r0, y0, x + r0, y1];
       boxes.push(box);
       const key = `n${it.f}:${it.l}`;
       if (name.hid.length) groups.set(key, name.hid);
@@ -2487,7 +2486,7 @@ export class FanView implements InputHandlers {
       const lv: Level = k < 0 ? { b: T.t.strands[~k] } : { v: T.t.nodes[k] };
       if (lv.b) s.b = lv.b;
       else Object.assign(s, { v: lv.v, fam: lv.v });
-      s.disc = { y: y1 - half, d: LABEL_PILL, lv };
+      s.disc = { y: y1 - r0, lv };
       if (span && span[1] > span[0]) s.over = [X(span[0]), X(span[1]), foot];
       names.push(s);
       const r = named.get(o);
@@ -3124,9 +3123,9 @@ export class FanView implements InputHandlers {
     ctx.strokeStyle = INK3;
     ctx.lineWidth = 1;
     // (Hits: the one on top found first.)
-    for (const p of [...this.picSpots].reverse()) this.thumbHits.push([p.x, p.y, p.d / 2, p.face, p.lv.v, p.run]);
+    for (const p of [...this.picSpots].reverse()) this.thumbHits.push([p.x, p.y, PIC_D / 2, p.face, p.lv.v, p.run]);
     // (Its placeholder at once, the picture fading in when loaded; what a tap would show next fetched ahead, ToLaD#351.)
-    for (const p of this.picSpots) drawPic(ctx, discSci(p.lv, p.face), p.x, p.y, p.d, () => this.request());
+    for (const p of this.picSpots) drawPic(ctx, discSci(p.lv, p.face), p.x, p.y, PIC_D, () => this.request());
     prefetchPics(this.picSpots.flatMap((p) => (p.lv.v ? nextFaces(this.fan, p.lv.v) : [])));
     ctx.restore();
   }
@@ -3186,7 +3185,7 @@ export class FanView implements InputHandlers {
     this.eventLabels.length = 0;
     this.thumbHits.length = 0;
     // The clades' brackets (ToLaD#193) behind the pills: their labels clear of the pills and pictures, their lines behind them.
-    br?.draw(ctx, FAMILY_INK, INK3, [...spots.filter((s) => s.fit > 0.3).map((s) => s.box), ...pics.map((p) => [p.x - p.d / 2, p.y - p.d / 2, p.x + p.d / 2, p.y + p.d / 2]), ], BG);
+    br?.draw(ctx, FAMILY_INK, INK3, [...spots.filter((s) => s.fit > 0.3).map((s) => s.box), ...pics.map(picBox)], BG);
     // A "+x" label's branches (ToLaD#368, #373): a hairline at its foot from its first branch to its last, in the gap under its picture,
     // a tick down onto each end branch, as the brackets draw theirs (open-ended past the screen's edge).
     ctx.save();
@@ -3217,15 +3216,16 @@ export class FanView implements InputHandlers {
       const alpha = s.fit;
       const [x0, y0, x1, foot] = s.box;
       if (alpha < 0.01 || x1 < 0 || x0 > this.w || foot < 0 || y0 > this.h) continue;
-      // (A name alone's pill ends over its disc; its box, and so its tap, is the two.)
+      // (A name alone's pill, LABEL_PILL across, ends over its disc; its box, and so its tap, is the two, the disc's width.)
       const y1 = s.disc ? s.y1 : foot;
+      const [px0, px1] = s.disc ? [s.x - LABEL_PILL / 2, s.x + LABEL_PILL / 2] : [x0, x1];
       if (s.ev !== undefined && s.b && alpha > 0.5) this.eventLabels.push({ box: [x0, y0, x1, y1], b: s.b, k: s.ev });
       ctx.globalAlpha = alpha;
-      if (s.disc) drawPic(ctx, discSci(s.disc.lv, s.pic!), s.x, s.disc.y, s.disc.d, () => this.request());
+      if (s.disc) drawPic(ctx, discSci(s.disc.lv, s.pic!), s.x, s.disc.y, PIC_D, () => this.request());
       // (Opaque: a bracket's line behind it never shows through the name.)
       ctx.fillStyle = BG;
       ctx.beginPath();
-      ctx.roundRect(x0, y0, x1 - x0, y1 - y0, LABEL_PILL / 2);
+      ctx.roundRect(px0, y0, px1 - px0, y1 - y0, LABEL_PILL / 2);
       ctx.fill();
       if (s.fam) {
         // A family (ToLaD#146, #212): an outlined pill; tapped, it flies to the family.

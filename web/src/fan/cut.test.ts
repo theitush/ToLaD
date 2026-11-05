@@ -6,12 +6,12 @@ import { CARNIVORA, FELIDAE, mammaliaClade } from './panthera';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, type Split } from './splits';
 import { loadMammalsFromFiles } from './mammals-node';
 import { LADDER, Territories, type CutItem, type RowsOf } from './cut';
-import { PIC_D as PIC, PIC_LIFT } from './pics';
+import { PIC_LIFT, PIC_ROOM as PIC } from './pics';
 
 await loadMammalsFromFiles();
 
 const SCREEN = 390;
-/** A name pill's thickness and a picture's diameter (view.ts LABEL_PILL, pics.ts PIC_D). */
+/** A name pill's thickness and a picture's room (view.ts LABEL_PILL, pics.ts PIC_ROOM). */
 const BOXES = [22, 50];
 /** A name pill's length (px), and the tree's height on screen (px): the labels' rows as the view takes them. */
 const PILL_LEN = 80;

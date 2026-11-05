@@ -1,6 +1,6 @@
 // Steady labels (ToLaD#333, Ita 2026-11-01: "the pics and tags like move and change size and stuff when i move around
 // the tree.. they shouldt"). Over a recorded gesture (a pinch, a pan, a flight) at the cats, the carnivores and the
-// mammals: every picture is PIC_D across and every name pill keeps its size, frame after frame; where a label stays
+// mammals: every name pill keeps its size, frame after frame; where a label stays
 // shown it moves no farther than the world on screen does (a continuous function of the camera, no jumps); and within
 // a pinch or a pan one way no label shows, hides, then shows again (each appears or goes at its own fit zoom, Been et
 // al.'s active range). Every frame is laid out (no carry, no rest pass): the first frame has its labels.
@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { loadMammalsFromFiles } from './mammals-node';
 import { CARNIVORA, FELIDAE, mammaliaClade, type CladeRec } from './panthera';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, type Split } from './splits';
-import { PIC_D } from './pics';
+import { PIC_D, PIC_ROOM } from './pics';
 import { FanView, groupCentre, type CutLabels } from './view';
 
 function stubView(clade: CladeRec = CARNIVORA, tree: Split = CARNIVORA_TREE, folds = true): FanView {
@@ -57,14 +57,14 @@ type Shot = Map<string, Spot> & { held?: boolean };
 /** A frame's labels: each name pill (by its item and text) and each picture (by what it opens), where and how big. */
 function shot(v: FanView, c: CutLabels): Shot {
   const m: Shot = new Map();
-  m.held = c.pics.some((p) => p.y - p.d / 2 <= v.rowLast + 1e-6);
+  m.held = c.pics.some((p) => p.y + PIC_D / 2 - PIC_ROOM <= v.rowLast + 1e-6);
   const at = (x: number) => v.toScreen(x, 0)[0];
   for (const s of c.spots) {
     const g = s.v ? { v: s.v } : s.b ? { b: s.b } : null;
     m.set(`name ${s.key} ${s.text}`, { x: s.x, y: s.box[3], w: s.box[2] - s.box[0], h: s.box[3] - s.box[1], c: g ? at(groupCentre(g)) : NaN });
   }
   // (A picture is its face species', whichever item of the cut it stands for.)
-  for (const p of c.pics) m.set(`pic ${p.face.sp.sci}`, { x: p.x, y: p.y, w: p.d, h: p.d, c: at(groupCentre({ b: p.face })) });
+  for (const p of c.pics) m.set(`pic ${p.face.sp.sci}`, { x: p.x, y: p.y, w: PIC_D, h: PIC_D, c: at(groupCentre({ b: p.face })) });
   return m;
 }
 type Step = (v: FanView) => void;
@@ -91,8 +91,8 @@ function play(v: FanView, steps: Step[]): { shots: Shot[]; moved: number[] } {
  * gaps open and close with the width zoom, the columns with them: a pinch at the mammals moves bats' columns twice as
  * far as any point under the camera, and their names, on them, with them), and the labels' top line.
  */
-const HOLD_LEFT = 72 + PIC_D / 2;
-const HOLD_RIGHT = 390 - PIC_D / 2;
+const HOLD_LEFT = 72 + PIC_ROOM / 2;
+const HOLD_RIGHT = 390 - PIC_ROOM / 2;
 function judge(shots: Shot[], moved: number[], monotonic: boolean): string[] {
   const bad: string[] = [];
   const size = new Map<string, Spot>();
@@ -107,7 +107,6 @@ function judge(shots: Shot[], moved: number[], monotonic: boolean): string[] {
   });
   for (let f = 0; f < shots.length; f++) {
     for (const [k, s] of shots[f]) {
-      if (k.startsWith('pic ') && s.w !== PIC_D) bad.push(`frame ${f}: ${k} is ${s.w} px, not ${PIC_D}`);
       const s0 = size.get(k);
       if (!s0) size.set(k, s);
       else if (Math.abs(s0.w - s.w) > 1e-6 || Math.abs(s0.h - s.h) > 1e-6) bad.push(`frame ${f}: ${k} resized ${s0.w.toFixed(1)}x${s0.h.toFixed(1)} -> ${s.w.toFixed(1)}x${s.h.toFixed(1)}`);
@@ -207,10 +206,10 @@ describe('steady labels while the view moves (ToLaD#333)', () => {
           for (const [q, x] of now) {
             const p = was?.get(q);
             if (p === undefined) {
-              if (was && x + PIC_D / 2 > dx + 1e-6 && x - PIC_D / 2 < v.w - dx - 1e-6) bad.push(`step ${k}: ${q} appeared at ${x.toFixed(1)}`);
+              if (was && x + PIC_ROOM / 2 > dx + 1e-6 && x - PIC_ROOM / 2 < v.w - dx - 1e-6) bad.push(`step ${k}: ${q} appeared at ${x.toFixed(1)}`);
             } else if (Math.abs(x - p) > dx + 1e-6) bad.push(`step ${k}: ${q} moved ${p.toFixed(1)} to ${x.toFixed(1)}, the view ${dx}`);
           }
-          for (const [q, p] of was ?? []) if (!now.has(q) && p + PIC_D / 2 > dx + 1e-6 && p - PIC_D / 2 < v.w - dx - 1e-6) bad.push(`step ${k}: ${q} vanished from ${p.toFixed(1)}`);
+          for (const [q, p] of was ?? []) if (!now.has(q) && p + PIC_ROOM / 2 > dx + 1e-6 && p - PIC_ROOM / 2 < v.w - dx - 1e-6) bad.push(`step ${k}: ${q} vanished from ${p.toFixed(1)}`);
           was = now;
         }
         expect(bad).toEqual([]);

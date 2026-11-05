@@ -6,6 +6,7 @@ import { FORK_H, forkNames, setForkNames, type Brackets } from './brackets';
 import { nodeLeftAt, type FanNode } from './layout';
 import { loadMammalsFromFiles } from './mammals-node';
 import { CARNIVORA, FELIDAE, mammaliaClade, type CladeRec } from './panthera';
+import { picBox } from './pics';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, type Split } from './splits';
 import { FanView, type CutLabels, type Level } from './view';
 
@@ -68,7 +69,7 @@ const meets = (a: readonly number[], b: readonly number[]) => a[0] < b[2] && a[2
 function clear(v: FanView, where: string): number {
   const br = inner(v).brackets;
   const cut = inner(v).cutLast!;
-  const obstacles = [...cut.spots.filter((s) => s.fit > 0.3).map((s) => s.box as readonly number[]), ...cut.pics.map((p) => [p.x - p.d / 2, p.y - p.d / 2, p.x + p.d / 2, p.y + p.d / 2])];
+  const obstacles = [...cut.spots.filter((s) => s.fit > 0.3).map((s) => s.box as readonly number[]), ...cut.pics.map(picBox)];
   const boxes: number[][] = [];
   for (let k = 0; k < br.forkN; k++) {
     const f = br.forks[k];
