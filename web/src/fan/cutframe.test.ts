@@ -6,8 +6,13 @@ import { loadMammalsFromFiles } from './mammals-node';
 import { CARNIVORA, mammaliaClade, type CladeRec } from './panthera';
 import { CARNIVORA_TREE, mammaliaTree, type Split } from './splits';
 import { FanView, fossilSpan, isLevel, levelName, nextLevels } from './view';
-import { PIC_D, PIC_ROOM } from './pics';
+import { setLabelMode, PIC_D, PIC_ROOM } from './pics';
 import type { FanNode } from './layout';
+import { setGapMode } from './fold';
+
+// (Written for the cut's labels and the groups' gaps, modes still in the modules: the app's defaults since ToLaD#439 are `groups` and `clades`.)
+setLabelMode('cut');
+setGapMode('groups');
 
 
 function stubView(clade: CladeRec = CARNIVORA, tree: Split = CARNIVORA_TREE, folds = true): FanView {
