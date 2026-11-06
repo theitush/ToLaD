@@ -39,14 +39,22 @@ export function fits(slots: readonly Slot[], d: number): boolean {
  * tried once. Each try sweeps only as far as it pushes a neighbour: a linked list of the leftmost places.
  */
 export function coverOf<G>(root: G, win: (g: G) => [number, number], parts: (g: G) => readonly G[], heavier: (p: G, q: G) => number, d: number): G[] {
+  return coverFrom([root], win, parts, heavier, d);
+}
+
+/**
+ * The same from a cover already standing, left to right (`from`, fitting at these windows): each of it tried once more, and
+ * `opened` told of each that splits. Windows only grow with the zoom and what fitted still fits, so a cover carried up the zooms only ever
+ * splits (coverLadder).
+ */
+export function coverFrom<G>(from: readonly G[], win: (g: G) => [number, number], parts: (g: G) => readonly G[], heavier: (p: G, q: G) => number, d: number, opened?: (g: G) => void): G[] {
   type N = { g: G; lo: number; hi: number; x: number; prev: N | null; next: N | null };
   const make = (g: G): N => {
     const [lo, hi] = win(g);
     return { g, lo, hi, x: lo, prev: null, next: null };
   };
-  const head = make(root);
   // (A binary heap, heaviest on top.)
-  const heap: N[] = [head];
+  const heap: N[] = [];
   const push = (n: N) => {
     let i = heap.push(n) - 1;
     while (i > 0) {
@@ -71,7 +79,20 @@ export function coverOf<G>(root: G, win: (g: G) => [number, number], parts: (g: 
     }
     return top;
   };
-  let first = head;
+  let first: N | null = null;
+  {
+    let at: N | null = null;
+    for (const g of from) {
+      const n = make(g);
+      if (at) {
+        n.prev = at;
+        at.next = n;
+        n.x = Math.max(n.lo, at.x + d);
+      } else first = n;
+      at = n;
+      push(n);
+    }
+  }
   while (heap.length) {
     const n = pop();
     const ps = parts(n.g);
@@ -92,6 +113,7 @@ export function coverOf<G>(root: G, win: (g: G) => [number, number], parts: (g: 
     }
     if (!ok) continue;
     for (const [e, ex] of pushed) e.x = ex;
+    opened?.(n.g);
     row.forEach((q, i) => {
       q.prev = i ? row[i - 1] : n.prev;
       q.next = i < row.length - 1 ? row[i + 1] : n.next;
@@ -102,8 +124,39 @@ export function coverOf<G>(root: G, win: (g: G) => [number, number], parts: (g: 
     if (n.next) n.next.prev = row[row.length - 1];
   }
   const out: G[] = [];
-  for (let e: N | null = first; e; e = e.next) out.push(e.g);
+  for (let e = first; e; e = e.next) out.push(e.g);
   return out;
+}
+
+/** Zoom steps to a doubling of a cover's ladder: how finely its splits are told apart, nothing on screen measured by it. */
+const LADDER_STEPS = 16;
+
+/**
+ * A cover per zoom that only ever splits as the zoom grows (ToLaD#440; active ranges, Been, Daiches & Yap 2006: each label has one range of
+ * zooms it stands for): from the zoom two labels first fit across the tree, up a ladder of zooms, the cover at each the one
+ * below carried on (coverFrom), each group remembering the step it split at. Any zoom's cover is then the tree cut at its step. Climbed as far as asked, once.
+ */
+export function coverLadder<G>(root: G, wide: number, win: (g: G, sx: number) => [number, number], parts: (g: G) => readonly G[], heavier: (p: G, q: G) => number, d: number): (sx: number) => { list: G[]; at: number } {
+  const zero = d / wide;
+  const opened = new Map<G, number>();
+  let top = -1;
+  let now: G[] = [root];
+  return (sx) => {
+    const k = Math.floor(Math.log2(sx / zero) * LADDER_STEPS);
+    if (k < 0) return { list: [root], at: zero };
+    for (; top < k; ) {
+      const step = ++top;
+      const s = zero * 2 ** (step / LADDER_STEPS);
+      now = coverFrom(now, (g) => win(g, s), parts, heavier, d, (g) => opened.set(g, step));
+    }
+    const list: G[] = [];
+    const cut = (g: G) => {
+      if ((opened.get(g) ?? Infinity) <= k) parts(g).forEach(cut);
+      else list.push(g);
+    };
+    cut(root);
+    return { list, at: zero * 2 ** (k / LADDER_STEPS) };
+  };
 }
 
 /**

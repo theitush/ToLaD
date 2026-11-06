@@ -9,7 +9,7 @@ import { latinOf } from './brackets';
 import { loadMammalsFromFiles } from './mammals-node';
 import { mammaliaClade } from './panthera';
 import { GROUP_D, PIC_D, PIC_LIFT, setLabelMode } from './pics';
-import { coverOf, fits, keepOnScreen, placeSlots, type Slot } from './slide';
+import { coverLadder, coverOf, fits, keepOnScreen, placeSlots, type Slot } from './slide';
 import { mammaliaTree } from './splits';
 import { setGapMode, type GapMode } from './fold';
 import type { FanBranch, FanNode } from './layout';
@@ -96,7 +96,7 @@ function coverCheck(v: FanView, c: CutLabels, at: string, bad: string[]): void {
 /** The list at this sx: the strands each in exactly one group, in order; no split left that would have fitted. */
 function listCheck(v: FanView, at: string, bad: string[]): void {
   const list = v.coverLast!.list;
-  const sx = v.coverLast!.sx;
+  const sx = v.coverLast!.at;
   for (let i = 1; i < list.length; i++) if (list[i].f !== list[i - 1].l + 1) bad.push(`${at}: ${nameOfLv(list[i - 1].lv)} and ${nameOfLv(list[i].lv)} leave a gap or overlap`);
   if (list[0].f !== 0 || list[list.length - 1].l !== v.fan.branches.length - 1) bad.push(`${at}: the list does not span the tree`);
   const win = (g: { a: number; b: number }): Slot => ({ lo: g.a * sx, hi: g.b * sx, at: 0 });
@@ -176,6 +176,19 @@ describe('placing on branches (slide.ts)', () => {
     const wide = g(100, 300, 8, [g(100, 150, 4), g(200, 300, 4)]);
     const list = coverOf(g(0, 300, 20, [tight, wide]), (q) => q.w, (q) => q.kids, (p, q) => p.n - q.n, 40);
     expect(list).toEqual([tight, wide.kids[0], wide.kids[1]]);
+  });
+  it('a ladder of covers only ever splits, whatever falls in the way', () => {
+    type G = { w: [number, number]; kids: G[]; n: number };
+    const g = (lo: number, hi: number, n: number, kids: G[] = []): G => ({ w: [lo, hi], kids, n });
+    const tree = g(0, 8, 20, [g(0, 1, 5, [g(0, 0.5, 1), g(0.5, 1, 4)]), g(1, 2, 9, [g(1, 1.1, 2), g(1.1, 2, 7)]), g(2, 8, 6, [g(2, 5, 3), g(5, 8, 3)])]);
+    const at = coverLadder(tree, 8, (q, s) => [q.w[0] * s, q.w[1] * s], (q) => q.kids, (p, q) => p.n - q.n, 40);
+    let last: G[] = [tree];
+    for (let sx = 1; sx < 2000; sx *= 1.07) {
+      const { list } = at(sx);
+      for (const q of last) expect(list.includes(q) || q.kids.some((c) => list.includes(c) || c.kids.some((e) => list.includes(e)))).toBe(true);
+      last = list;
+    }
+    expect(last.length).toBe(6);
   });
   it('a group going off an edge gives way, nobody else', () => {
     const k = keepOnScreen([[-100, 5], [20, 30], [100, 200], [370, 500]], 18, 372, 40);

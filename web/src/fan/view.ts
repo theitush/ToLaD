@@ -6,7 +6,7 @@
 
 import { drawPic, hasPic, livePic, PIC_TRIES, prefetchPics } from './wiki';
 import { GROUP_D, LABEL_AXIS_X, labelMode, PIC_D, PIC_LIFT, PIC_ROOM, picBox, type PicSpot } from './pics';
-import { coverOf, keepOnScreen, placeSlots } from './slide';
+import { coverLadder, keepOnScreen, placeSlots } from './slide';
 import { formatCount, formatMass } from '../data/count';
 import { stamp } from '../stamp';
 import { DOUBLE_TAP_MS, Input, type InputHandlers } from '../engine/input';
@@ -639,14 +639,16 @@ export function levelName(v: FanNode): string {
 /**
  * A group label's name (ToLaD#417): its English name, or where it has none (the suborders and subfamilies few have one
  * for) what it is told by: its largest part with one, down the largest parts, that one's first name and "& kin" ("Vesper bats & kin"). No English
- * name down there: its Latin. One rule at every level; its fork keeps the Latin, levelName.
+ * name down there: its Latin. One rule at every level; its fork keeps the Latin, levelName. A fork with no name of its own (a label's group since
+ * ToLaD#440, labelParts) goes by the same rule, and with no part to tell it, by the one on its picture ("Leopard & kin").
  */
 const kinCache = new WeakMap<FanNode, string>();
 export function groupName(fan: Fan, v: FanNode): string {
   let out = kinCache.get(v);
   if (out === undefined) {
-    out = levelName(v);
-    if (out === latinOf(v.split) && !familiar(v)) {
+    const latin = latinOf(v.split);
+    out = latin ? levelName(v) : '';
+    if (out === latin && !familiar(v)) {
       for (let u: FanNode | undefined = v; u; ) {
         let big: FanNode | undefined;
         for (const g of nextLevels(fan, u)) if (g.v && (!big || g.v.strands.length > big.strands.length)) big = g.v;
@@ -657,6 +659,7 @@ export function groupName(fan: Fan, v: FanNode): string {
         u = big;
       }
     }
+    if (!out) out = `${levelText(groupFace(v) ?? v.strands[0])} & kin`;
     kinCache.set(v, out);
   }
   return out;
@@ -682,9 +685,9 @@ export function nextLevels(fan: Fan, v: FanNode): Level[] {
 }
 
 /**
- * The parts of clade v for a group label (ToLaD#440), left to right: as nextLevels, but over the tree's named groups at
- * every height, the ones above the orders too (Theria, Afrotheria…), which frames and taps don't step through (isLevel).
- * An unnamed fork isn't a group: its parts stand in its place.
+ * The parts of clade v for a group label (ToLaD#440), left to right: its daughters, every fork a group, named or not (groupName), so a
+ * group opens one fork at a time and a tight pair stays together under their own small fork rather than holding the whole of v up.
+ * Frames and taps step through fewer of them (isLevel). A daughter with all of v's species opens to its own.
  */
 export function labelParts(v: FanNode): Level[] {
   const out: Level[] = [];
@@ -692,7 +695,7 @@ export function labelParts(v: FanNode): Level[] {
     for (const k of u.kids) {
       if ('sp' in k) out.push({ b: k });
       else if (k.strands.length === 1) out.push({ b: k.strands[0] });
-      else if (rankOf(latinOf(k.split)) && k.strands.length < v.strands.length) out.push({ v: k });
+      else if (k.strands.length < v.strands.length) out.push({ v: k });
       else go(k);
     }
   };
@@ -2493,38 +2496,48 @@ export class FanView implements InputHandlers {
 
   /**
    * The groups the tree is cut into at width zoom sx (ToLaD#440, Ita: "zooming changes the levels but moving around the
-   * graphs shouldnt"): a cover of the whole tree from the root, down the named groups at every height (labelParts), each
-   * group's window its whole branch at its youngest row, world x times sx (slide.ts coverOf): a function of sx alone,
-   * not of where the view stands, nor how high. Kept for the last sx, so a pan costs nothing.
+   * graphs shouldnt"): a cover of the whole tree from the root, one fork at a time (labelParts), each
+   * group's window its whole branch at its youngest row, world x times sx (slide.ts coverLadder): a function of sx alone,
+   * not of where the view stands, nor how high, and a zoom in only ever splits. Kept for the last sx, so a pan costs nothing.
    */
   coverAt(T: CutTerritories, sx: number): CoverGroup[] {
     const had = this.coverLast;
     if (had && had.T === T && had.sx === sx) return had.list;
-    const { index, first, last } = T.t;
-    const span: [number, number] = [0, 0];
-    const of = (lv: Level): CoverGroup => {
-      const k = lv.b ? ~lv.b.index : index.get(lv.v)!;
-      const wy = T.branchOf(k, span);
-      return { lv, k, f: k < 0 ? ~k : first[k], l: k < 0 ? ~k : last[k], wy, a: span[0], b: span[1] };
-    };
-    const list = coverOf(
-      of({ v: this.fan.root }),
-      (g) => [g.a * sx, g.b * sx],
-      (g) => {
-        if (!g.lv.v) return [];
-        let gs = this.partsCache.get(g.lv.v);
-        if (!gs) this.partsCache.set(g.lv.v, (gs = labelParts(g.lv.v).map(of).sort((p, q) => p.f - q.f)));
-        return gs;
-      },
-      (p, q) => T.aliveOf(p.k) - T.aliveOf(q.k) || p.l - p.f - (q.l - q.f) || q.f - p.f,
-      GROUP_D,
-    );
-    this.coverLast = { T, sx, list };
+    let L = this.ladder;
+    if (!L || L.T !== T) {
+      const { index, first, last } = T.t;
+      const span: [number, number] = [0, 0];
+      const of = (lv: Level): CoverGroup => {
+        const k = lv.b ? ~lv.b.index : index.get(lv.v)!;
+        const wy = T.branchOf(k, span);
+        return { lv, k, f: k < 0 ? ~k : first[k], l: k < 0 ? ~k : last[k], wy, a: span[0], b: span[1] };
+      };
+      const parts = new Map<FanNode, CoverGroup[]>();
+      const root = of({ v: this.fan.root });
+      L = this.ladder = {
+        T,
+        at: coverLadder(
+          root,
+          root.b - root.a,
+          (g, s) => [g.a * s, g.b * s],
+          (g) => {
+            if (!g.lv.v) return [];
+            let gs = parts.get(g.lv.v);
+            if (!gs) parts.set(g.lv.v, (gs = labelParts(g.lv.v).map(of).sort((p, q) => p.f - q.f)));
+            return gs;
+          },
+          (p, q) => T.aliveOf(p.k) - T.aliveOf(q.k) || p.l - p.f - (q.l - q.f) || q.f - p.f,
+          GROUP_D,
+        ),
+      };
+    }
+    const { list, at } = L.at(sx);
+    this.coverLast = { T, sx, at, list };
     return list;
   }
-  /** The last cut (tests read it). */
-  coverLast: { T: CutTerritories; sx: number; list: CoverGroup[] } | null = null;
-  private readonly partsCache = new Map<FanNode, CoverGroup[]>();
+  /** The last cut (tests read it): at its zoom sx, the cut of the ladder's step `at`. */
+  coverLast: { T: CutTerritories; sx: number; at: number; list: CoverGroup[] } | null = null;
+  private ladder: { T: CutTerritories; at: (sx: number) => { list: CoverGroup[]; at: number } } | null = null;
 
   /**
    * This frame's labels under `?labels=groups` (ToLaD#417, #440): which groups comes from the zoom alone (coverAt); a pan
