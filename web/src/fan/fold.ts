@@ -19,15 +19,16 @@
 // pair the same small gap, at every level of the tree, or `groups` (the default: `even` reads as one solid block from
 // afar), the splits above the named groups (the families, or the orders where the fan has them) one larger gap, so
 // the groups stand apart from afar. Both are fixed in the world, always open, so the layout does not depend on the
-// width zoom at all, and sized by one share per fan (GAP_SUM, GROUP_SUM) of its width at "now".
+// width zoom at all, and sized by one share per fan (GAP_SUM, GROUP_SUM) of its width at "now". `clades` (ToLaD#408) sizes
+// every split's gap by the clade it parts, so the tree's nesting shows at every level: see Fold.cladeGaps.
 
 import { ease, laneW, segAt, type Fan, type FanBranch, type FanNode } from './layout';
 import { smoother } from './population';
 import { ORDER_TAXA, taxonKey } from './splits';
 
 /** How a neighbouring pair's gap is sized (ToLaD#378; `?gaps=`, the button in FanApp). */
-export type GapMode = 'even' | 'groups' | 'age';
-export const GAP_MODES: readonly GapMode[] = ['even', 'groups', 'age'];
+export type GapMode = 'even' | 'groups' | 'clades' | 'age';
+export const GAP_MODES: readonly GapMode[] = ['even', 'groups', 'clades', 'age'];
 let gapModeNow: GapMode = 'groups';
 /** The switch: what the layouts built from now on use. */
 export function setGapMode(m: GapMode): void {
@@ -39,6 +40,10 @@ export const gapMode = (): GapMode => gapModeNow;
 export const GAP_SUM = 0.15;
 /** groups: all the larger gaps between the groups (the splits above the families) together, as that share. */
 export const GROUP_SUM = 0.2;
+/** clades: all the gaps together, as that share. */
+export const CLADE_SUM = 0.35;
+/** clades: a split's gap grows as this power of its clade's strands (over 1, the deep splits take most of the budget; the shallow stay closed until zoomed into). */
+export const CLADE_POW = 1.5;
 
 /** A split's full gap, as a share of the order's width: GAP_K * (its age / 2 Ma)^GAP_POW. */
 export const GAP_K = 0.006;
@@ -190,7 +195,8 @@ export abstract class Fold {
     this.home = fan.root.left + fan.root.width / 2;
     this.yRef = fan.time.y(0);
     if (ords.size) this.shareOrders([...ords.keys()]);
-    if (gaps !== 'age') this.fixGaps();
+    if (gaps === 'clades') this.cladeGaps();
+    else if (gaps !== 'age') this.fixGaps();
     else if (ords.size) this.scaleOrders();
   }
 
@@ -225,6 +231,32 @@ export abstract class Fold {
     const small = nSmall ? (GAP_SUM * width) / nSmall : 0;
     const large = nBig ? (sb * width) / nBig : 0;
     for (let i = 0; i < this.pairGap.length; i++) this.pairGap[i] = big(i) ? large : small;
+  }
+
+  /**
+   * The gaps of `clades` (ToLaD#408): a split's gap is k * n^CLADE_POW, n its clade's strands, the padding of a nested
+   * layout grown with the box it pads. One rule for every split at every level: no age, no zoom, no names. A clade holds
+   * more strands than any clade inside it, so a split always stands wider than the splits inside its daughters. k: all of
+   * them together CLADE_SUM of the fan's width at "now", counted as fixGaps' are.
+   */
+  private cladeGaps(): void {
+    const S = this.strands;
+    const raw = (i: number) => Math.pow(this.pairNode[i].strands.length, CLADE_POW);
+    let rooms = 0;
+    let sum = 0;
+    let prev = -1;
+    let widest = 0;
+    for (let i = 0; i < S.length; i++) {
+      if (S[i].tipY <= this.yRef + 1e-9) {
+        rooms += Math.max(S[i].width, S[i].baseW);
+        if (prev >= 0) sum += widest;
+        prev = i;
+        widest = 0;
+      }
+      if (i + 1 < S.length) widest = Math.max(widest, raw(i));
+    }
+    const k = sum > 0 ? (CLADE_SUM / (1 - CLADE_SUM)) * (rooms / sum) : 0;
+    for (let i = 0; i < this.pairGap.length; i++) this.pairGap[i] = k * raw(i);
   }
 
   /** The level above the orders (ToLaD#247): each order's share of the width at "now" (ORDER_OPEN_LO's note). */

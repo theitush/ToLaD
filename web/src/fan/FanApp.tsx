@@ -208,10 +208,10 @@ export function FanApp() {
         >
           fork names
         </button>
-        {/* ToLaD#378: the gaps between neighbouring branches, the same (even), larger between groups, or by age (the old look). */}
+        {/* ToLaD#378, #408: the gaps between neighbouring branches, the same (even), larger between groups, by the clade each parts (clades), or by age (the old look). */}
         <button
           type="button"
-          title="Gaps between branches: even, groups or age"
+          title="Gaps between branches: even, groups, clades or age"
           onClick={() => {
             const next = GAP_MODES[(GAP_MODES.indexOf(gaps) + 1) % GAP_MODES.length];
             setGapMode(next);
