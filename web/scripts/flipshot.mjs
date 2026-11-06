@@ -60,7 +60,7 @@ console.log(
       v.chainV = null;
       v.chainFrame();
       const t = el.textContent;
-      if (n++ && t === long) continue;
+      n++;
       if (t.startsWith('…')) cut++;
       if (t.length > long.length) long = t;
       if (el.scrollWidth > el.clientWidth) over.push(t);
