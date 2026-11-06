@@ -7,7 +7,7 @@ export interface Named {
   common: string;
   sci: string;
   /** A domestic stock's leaf: its wild form's name finds it too (the wild boar finds the pig, ToLaD#435). */
-  history?: { wildCommon: string | null } | null;
+  history?: { wildCommon?: string | null } | null;
 }
 
 /** A name folded for matching: accents stripped, lower case, runs of space and punctuation as one space. */

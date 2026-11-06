@@ -67,9 +67,9 @@ export interface HistoryRec {
    */
   component: string;
   /** Today's two parts of a "wild+domestic" leaf; null otherwise. */
-  parts: { wild: number; domestic: number } | null;
+  parts?: { wild: number; domestic: number } | null;
   /** The Red List's name of the wild form, where a domestic stock names the leaf (the pig's "Wild boar"); else null. */
-  wildCommon: string | null;
+  wildCommon?: string | null;
   scope: string;
   notes: string;
   /**

@@ -228,9 +228,12 @@ def encode_hist(rows: list[tuple[Node, bool]], cites: dict[tuple[str, str], int]
         if rec.get("parts"):
             # wild + domestic on one leaf (ToLaD#435): the card says which part is which
             meta[-1]["parts"] = {"wild": rec["parts"]["wild"]["n"], "domestic": rec["parts"]["domestic"]["n"]}
-        if rec.get("wild_common"):
-            # the Red List's name of the wild form, where a domestic stock names the leaf (ToLaD#435)
-            meta[-1]["wild_common"] = rec["wild_common"]
+        # the Red List's name of the wild form, where a domestic stock names the leaf (ToLaD#435): the card says it, a search
+        # finds it
+        leaf_data = rows[row][0].data
+        wild_name = (leaf_data.get("red_list") or {}).get("common")
+        if leaf_data.get("stock_common") and wild_name and wild_name.lower() != leaf_data["stock_common"].lower():
+            meta[-1]["wild_common"] = wild_name
         if rec.get("deep_join"):
             # how the genomic deep past meets the next level, for the species card (ToLaD#80)
             meta[-1]["deep_join"] = rec["deep_join"]["note"]

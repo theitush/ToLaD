@@ -34278,11 +34278,11 @@
   "non-species tip": 551
  },
  "output": {
-  "brotli_bytes": 791610,
+  "brotli_bytes": 791914,
   "dated_sidecar_raw": 2065827,
   "files": 15,
-  "raw_bytes": 3336376,
-  "skeleton_brotli": 64688,
+  "raw_bytes": 3336456,
+  "skeleton_brotli": 64734,
   "skeleton_nodes": 2383,
   "skeleton_raw": 457464,
   "tiles": 14

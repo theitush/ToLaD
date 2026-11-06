@@ -430,6 +430,9 @@ export function pluralName(sp: SpeciesRec): string {
   const c = midName(sp);
   // (The carnivores bring a -f plural, ToLaD#146: "grey wolves".)
   if (/wolf$/.test(c)) return `${c.slice(0, -1)}ves`;
+  // (The domestic stocks bring these, ToLaD#435: "sheep", "dromedaries".)
+  if (/(sheep|cattle|deer)$/.test(c)) return c;
+  if (/[^aeiou]y$/.test(c)) return `${c.slice(0, -1)}ies`;
   return /(s|x|z|ch|sh)$/.test(c) ? `${c}es` : `${c}s`;
 }
 

@@ -1429,10 +1429,6 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
         D = leaf.data
         if D.get("domestic_now", 0.0) > D.get("rate_wild_now", 0.0) * D["L"]:
             D["stock_common"] = rec["common"]
-            # the wild form's own name stays on the record: the card names it, a search finds it
-            wild_name = (D.get("red_list") or {}).get("common")
-            if wild_name and wild_name.lower() != rec["common"].lower():
-                D["history"]["wild_common"] = wild_name
     if missing:
         raise HistoryError(f"history species not found among living tree leaves: {missing}")
     log["history"] = {
