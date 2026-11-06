@@ -7,7 +7,7 @@ import { loadMammalsFromFiles } from './mammals-node';
 import { RectBatch } from './meshgl';
 import { CARNIVORA, FELIDAE, mammaliaClade, type CladeRec } from './panthera';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, type Split } from './splits';
-import { grayOn, setGrayOn } from './steady';
+import { forkMode, grayOn, setForkMode, setGrayOn, type ForkMode } from './steady';
 import { allGray, cladeAllGray, FanView, GRAY, grayFoot, type CutLabels } from './view';
 
 const fills: string[] = [];
@@ -62,7 +62,8 @@ const inner = (v: FanView) => v as unknown as Inner;
 type Spied = {
   drawStrand(b: FanBranch): void;
   drawMerged(v: FanNode): void;
-  drawLanes(pts: { n: number; y: Float64Array }, hw: number, held: unknown, gray: boolean): void;
+  drawCorners(lod: unknown): void;
+  drawLanes(pts: { n: number; y: Float64Array; w: Float64Array; f: Float64Array }, hw: number, held: unknown, gray: boolean): void;
 };
 const frame = (v: FanView) => {
   v.camera.settle();
@@ -238,6 +239,119 @@ describe('gray off (ToLaD#410)', () => {
         }
       }, 300000);
     }
+  }
+
+  // ToLaD#444: anyone alive then is still shown. With it off a column is painted all the way from its tip to the bottom of the screen
+  // (or of the tree), the only breaks those a fork's line stands in for; and every line a fork draws with it on is drawn, green if anyone in it lives.
+  for (const forks of ['peel', 'thin'] as ForkMode[]) {
+    it(`gaps clades, forks ${forks}: no column has a gap or floats, every fork is drawn`, () => {
+      const was = gapMode();
+      const wasForks = forkMode();
+      setGapMode('clades');
+      setForkMode(forks);
+      try {
+        const v = stubView(mammaliaClade(), mammaliaTree());
+        const gl = { under: new RectBatch(), over: new RectBatch(), begin() {}, end() {} };
+        gl.begin = () => {
+          gl.under.n = 0;
+          gl.over.n = 0;
+        };
+        inner(v).gl = gl;
+        const self = v as unknown as Spied;
+        const proto = FanView.prototype as unknown as Spied;
+        let now: FanBranch | FanNode | null = null;
+        let painted = new Map<FanBranch | FanNode, [number, number][]>();
+        let lines: [number, number] = [0, 0];
+        self.drawStrand = (b) => {
+          now = b;
+          proto.drawStrand.call(v, b);
+        };
+        self.drawMerged = (n) => {
+          now = n;
+          proto.drawMerged.call(v, n);
+        };
+        self.drawCorners = (lod) => {
+          const n0 = gl.under.n;
+          proto.drawCorners.call(v, lod);
+          lines = [n0, gl.under.n];
+        };
+        self.drawLanes = (pts, _hw, _held, gray) => {
+          const { y: Y, w: W, f: F, n } = pts;
+          let at = painted.get(now!);
+          if (!at) painted.set(now!, (at = []));
+          for (let i = 0; i + 1 < n; i++) if (Y[i] > Y[i + 1] && (W[i] > 0 || W[i + 1] > 0) && (gray || W[i] * F[i] > 0 || W[i + 1] * F[i + 1] > 0)) at.push([Y[i + 1], Y[i]]);
+        };
+        const rects = () => {
+          const out: { box: string; y0: number; y1: number; green: boolean; edge: boolean }[] = [];
+          for (let i = lines[0]; i < lines[1]; i++) {
+            const [x0, y0, x1, y1, r, g, bl] = Array.from(gl.under.f.subarray(12 * i, 12 * i + 7));
+            out.push({ box: [x0, y0, x1, y1].map((a) => a.toFixed(2)).join(), y0, y1, green: g > 1.2 * bl && g > r, edge: x0 <= -8 || x1 >= 398 });
+          }
+          return out;
+        };
+        const by = (t: string) => v.fan.nodes.find((n) => n.split.taxon === t)!;
+        const cams = [v.homeCamera(), ...['Didelphimorphia', 'Carnivora', 'Hominini'].flatMap((t) => {
+          const c = v.cladeCamera(by(t));
+          // (Its frame, and pinched in on its fork in time, as Ita's opossums.)
+          return [c, { ...c, sy: c.sy * 3, ty: c.sy * 3, cy: by(t).y - 150 / (c.sy * 3) }];
+        })];
+        const bad: string[] = [];
+        let met = 0;
+        for (const cam of cams) {
+          v.cam = { ...cam } as typeof v.cam;
+          setGrayOn(true);
+          frame(v);
+          const on = rects();
+          setGrayOn(false);
+          painted = new Map();
+          frame(v);
+          const off = rects();
+          expect(off.map((r) => r.box).sort()).toEqual(on.map((r) => r.box).sort());
+          // A line stands in where a column has no width at a fork, only under `thin`.
+          const green = off.filter((r) => r.green).sort((p, q) => p.y0 - q.y0);
+          const bridged = (y0: number, y1: number) => {
+            if (forks !== 'thin') return false;
+            let y = y0;
+            // (A flat line running off the screen's edge: the upright from it is off screen, not sent.)
+            for (const r of green) if ((r.y0 <= y + 1 || r.edge) && r.y1 > y) y = r.y1;
+            return y >= y1 - 1;
+          };
+          const bottom = Math.min(844, v.camera.screenY(v.fan.trunkBottom.y));
+          // (Where its lane is on screen at all: a line off screen is not sent.)
+          const seen = (of: FanBranch | FanNode, y0: number, y1: number) => {
+            if (isNode(of)) return true;
+            for (let k = 0; k <= 8; k++) {
+              const x = v.camera.screenX(leftAt(of, v.camera.worldY(y0 + ((y1 - y0) * k) / 8)));
+              if (x >= -8 && x <= 398) return true;
+            }
+            return false;
+          };
+          for (const [of, at] of painted) {
+            // (No founders, a domestic species' (ToLaD#435): no width below its split, with the gray on or off; its column stands on its wild form's.)
+            if (!isNode(of) && !(of.baseW > 0)) continue;
+            // (Under thin an extinct column may be all gray line, whose breaks are not this test's: its living ones are.)
+            if (forks === 'thin' && (isNode(of) ? cladeAllGray(of) : allGray(of))) continue;
+            const name = isNode(of) ? of.split.taxon : of.sp.sci;
+            at.sort((p, q) => p[0] - q[0]);
+            let y = at.length ? at[0][0] : Infinity;
+            if (!isNode(of) && y > Math.max(-20, v.camera.screenY(of.tipY)) + 1) bad.push(`${name}: its tip not drawn, starts at ${y}`);
+            for (const [t, b] of at) {
+              if (t > y + 0.01 && !bridged(y, t) && seen(of, y, t)) bad.push(`${name}: a gap ${y}..${t}`);
+              y = Math.max(y, b);
+              met++;
+            }
+            // (Under thin, a line whose fork is below the screen is not sent, gray on or off: nothing to judge past the last line.)
+            if (at.length && y < bottom - 1 && !bridged(y, bottom) && (forks !== 'thin' || green.some((r) => r.y1 > y))) bad.push(`${name}: floats, stops at ${y} of ${bottom}`);
+          }
+        }
+        expect(met).toBeGreaterThan(0);
+        expect(bad.slice(0, 12)).toEqual([]);
+      } finally {
+        setGrayOn(true);
+        setGapMode(was);
+        setForkMode(wasForks);
+      }
+    }, 300000);
   }
 
   it('a living column with gray keeps no gray fill with it off, on the 2D path', () => {
