@@ -22,7 +22,7 @@ import { COLUMN_DIM, columnSpans, EVENT_TINT, eventAt, eventSpans, type EventSpa
 import { laneDim, LINEAGE, pathFrame, TwigModel } from './twigs';
 import type { RectBatch } from './meshgl';
 import { FAMILY_EN, familyLabel, ORDER_EN, ORDER_TAXA, taxonKey, type Split } from './splits';
-import { Brackets, foldedFrame, forkNames, latinOf, rankOf, STACK_MOST, TAXON_EN, type StackAt } from './brackets';
+import { Brackets, foldedFrame, forkLeaders, forkNames, latinOf, rankOf, STACK_MOST, TAXON_EN, type ForkLines, type StackAt } from './brackets';
 import { axisInset, drawWorldOver, drawWorldUnder, worldFlags, type Box } from './world';
 
 export type { Camera } from './camera';
@@ -2465,7 +2465,7 @@ export class FanView implements InputHandlers {
     const cut = (this.cutLast = labelMode() === 'groups' ? this.groupLabels(T, row) : this.cutLabels(T, row));
     this.rowLast = row;
     // (The names at their forks clear of the labels and the axis's labels as last drawn; its origin note reaches past the gutter.)
-    if (br && forkNames()) br.placeForks([...[...cut.spots, ...cut.names].filter((s) => s.fit > 0.3).map((s) => s.box), ...cut.pics.map(picBox), ...this.axisBoxes]);
+    if (br && forkNames()) br.placeForks([...[...cut.spots, ...cut.names].filter((s) => s.fit > 0.3).map((s) => s.box), ...cut.pics.map(picBox), ...this.axisBoxes], forkLeaders() ? this.forkLinesNow() : null);
     this.labelMs.push(performance.now() - t0);
     if (this.labelMs.length > 600) this.labelMs.shift();
     return { br, cut };
@@ -3156,6 +3156,41 @@ export class FanView implements InputHandlers {
         }
       }
     });
+  }
+  private forkLines: ForkLines = { n: 0, xy: [], at: new Map() };
+  /** The horizontals drawCorners draws this frame, for the leaders (ToLaD#434); none under `peel`, which draws none. */
+  private forkLinesNow(): ForkLines {
+    const L = this.forkLines;
+    L.n = 0;
+    L.at.clear();
+    const f = this.fan.tess.fold;
+    if (!(f instanceof Steady) || forkMode() === 'peel') return L;
+    const lod = this.lodNow();
+    const { sx, sy } = this.cam;
+    const cam = this.camera;
+    const out = this.cornerOut;
+    const stems = this.cornerStems;
+    const nodes = this.fan.nodes;
+    f.splitsOn(cam.worldY(-4), cam.worldY(this.h + 4), this.toWorld(-8, 0)[0], this.toWorld(this.w + 8, 0)[0], (j) => {
+      const v = nodes[j];
+      if (lod && (lod.hidden(v) || lod.isMerged(v))) return;
+      const c = cam.screenX(f.corner(v, sx, sy, out, stems));
+      let a = c;
+      let b = c;
+      for (let q = 0; q < v.kids.length; q++) {
+        if (out[2 * q + 1] > 0) continue;
+        const dc = cam.screenX(out[2 * q]);
+        a = Math.min(a, dc);
+        b = Math.max(b, dc);
+      }
+      const k = L.n++;
+      L.xy[4 * k] = a;
+      L.xy[4 * k + 1] = b;
+      L.xy[4 * k + 2] = cam.screenY(v.y);
+      L.xy[4 * k + 3] = c;
+      L.at.set(v, k);
+    });
+    return L;
   }
   private mergedExt: [number, number] = [0, 0];
   private lodTops = new WeakMap<FanNode, number>();

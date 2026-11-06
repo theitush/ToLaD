@@ -13,7 +13,7 @@ import { loadMammals, mammalsLoaded } from './mammals-data';
 import { stamp } from '../stamp';
 import { population } from './population';
 import { WorldToggle } from './WorldToggle';
-import { forkNames, setForkNames } from './brackets';
+import { forkLeaders, forkNames, setForkLeaders, setForkNames } from './brackets';
 import { labelMode, setLabelMode, type LabelMode } from './pics';
 import { GAP_MODES, gapMode, setGapMode, type GapMode } from './fold';
 import { FORK_MODES, forkMode, grayOn, setForkMode, setGrayOn, type ForkMode } from './steady';
@@ -89,14 +89,23 @@ function initialLabels(): LabelMode {
   return labelMode();
 }
 
-/** The upper clades' names at their forks (ToLaD#373, `?forknames=off`: the stack over "now"): set before the first view is built. */
-function initialForkNames(): boolean {
+/** The upper clades' names (ToLaD#373, #434): at their forks, on leaders off them (`?forknames=leaders`), or the stack over "now" (`?forknames=off`). */
+type ForkNaming = 'at fork' | 'leaders' | 'off';
+const FORK_NAMINGS: ForkNaming[] = ['at fork', 'leaders', 'off'];
+const forkNaming = (m: ForkNaming) => {
+  setForkNames(m !== 'off');
+  setForkLeaders(m === 'leaders');
+};
+/** Set before the first view is built. */
+function initialForkNames(): ForkNaming {
   try {
-    if (new URLSearchParams(window.location.search).get('forknames') === 'off') setForkNames(false);
+    const q = new URLSearchParams(window.location.search).get('forknames');
+    if (q === 'off') forkNaming('off');
+    if (q === 'leaders') forkNaming('leaders');
   } catch {
     /* no address */
   }
-  return forkNames();
+  return !forkNames() ? 'off' : forkLeaders() ? 'leaders' : 'at fork';
 }
 
 export function FanApp() {
@@ -218,26 +227,27 @@ export function FanApp() {
         >
           mid labels
         </button>
-        {/* ToLaD#373: the upper clades named at their forks, or in the stack over "now". */}
+        {/* ToLaD#373, #434: the upper clades named at their forks, on leaders off them, or in the stack over "now". */}
         <button
           type="button"
-          aria-pressed={forks}
+          title="Upper clades' names: at their forks, on leaders off them, or off (the stack over now)"
           onClick={() => {
+            const next = FORK_NAMINGS[(FORK_NAMINGS.indexOf(forks) + 1) % FORK_NAMINGS.length];
             placeRef.current = viewRef.current?.place() ?? null;
-            setForkNames(!forks);
+            forkNaming(next);
             setSel(null);
-            setForks(!forks);
+            setForks(next);
             try {
               const u = new URL(window.location.href);
-              if (forks) u.searchParams.set('forknames', 'off');
-              else u.searchParams.delete('forknames');
+              if (next === 'at fork') u.searchParams.delete('forknames');
+              else u.searchParams.set('forknames', next);
               window.history.replaceState(null, '', u);
             } catch {
               /* not in the address */
             }
           }}
         >
-          fork names
+          {`fork names: ${forks}`}
         </button>
         {/* ToLaD#378, #408: the gaps between neighbouring branches, the same (even), larger between groups, by the clade each parts (clades), or by age (the old look). */}
         <button
