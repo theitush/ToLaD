@@ -5,7 +5,8 @@
 // Gestures come from the shared engine/input.ts.
 
 import { drawPic, hasPic, livePic, PIC_TRIES, prefetchPics } from './wiki';
-import { AXIS_ROOM, chainFit, CHAIN_ROOM, flipOn, FORK_PX as FLIP_FORK_PX, LABELS_MA, NOW_PX, turnCanvas, upright } from './flip';
+import { AXIS_ROOM, chainFit, CHAIN_ROOM, flipOn, FORK_PX as FLIP_FORK_PX, gapNamesOn, LABELS_MA, NOW_PX, turnCanvas, upright } from './flip';
+import { GapNames, type WrittenName } from './gapnames';
 import { GROUP_D, LABEL_AXIS_X, labelMode, PIC_D, PIC_LIFT, PIC_ROOM, picBox, type PicSpot } from './pics';
 import { coverLadder, keepOnScreen, placeSlots } from './slide';
 import { formatCount, formatMass } from '../data/count';
@@ -2584,10 +2585,30 @@ export class FanView implements InputHandlers {
     const cut = (this.cutLast = labelMode() === 'groups' ? this.groupLabels(T, row) : this.cutLabels(T, row));
     this.rowLast = row;
     // (The names at their forks clear of the labels and the axis's labels as last drawn; its origin note reaches past the gutter.)
-    if (br && forkNames()) br.placeForks([...[...cut.spots, ...cut.names].filter((s) => s.fit > 0.3).map((s) => s.box), ...cut.pics.map(picBox), ...this.axisBoxes], forkLeaders() ? this.forkLinesNow() : null);
+    const onGaps = this.flip && gapNamesOn();
+    if (onGaps || (br && forkNames())) {
+      const covers = [...[...cut.spots, ...cut.names].filter((s) => s.fit > 0.3).map((s) => s.box), ...cut.pics.map(picBox), ...this.axisBoxes];
+      if (onGaps) this.gapNames().place(this.cam, this.w, this.h, covers, this.gapLast);
+      else br!.placeForks(covers, forkLeaders() ? this.forkLinesNow() : null);
+    }
     this.labelMs.push(performance.now() - t0);
     if (this.labelMs.length > 600) this.labelMs.shift();
     return { br, cut };
+  }
+  /** This frame's names on the gaps and in the branches (ToLaD#455). */
+  readonly gapLast: WrittenName[] = [];
+  private gapN: { fan: Fan; fold: unknown; g: GapNames } | null = null;
+  private gapNames(): GapNames {
+    const f = this.fan.tess.fold as Steady;
+    const P = this.gapN;
+    if (P && P.fan === this.fan && P.fold === f) return P.g;
+    const measure = (spec: string, text: string) => {
+      this.ctx.font = font(spec);
+      return this.ctx.measureText(text).width;
+    };
+    const g = new GapNames(this.fan, f, (v) => groupName(this.fan, v), (b) => levelText(b) || b.sp.sci, measure);
+    this.gapN = { fan: this.fan, fold: f, g };
+    return g;
   }
   /** This fan's territories at this screen width (ToLaD#333; the fold is always the steady one, withFold). */
   private terr: { fan: Fan; fold: unknown; w: number; t: CutTerritories } | null = null;
@@ -3680,6 +3701,11 @@ export class FanView implements InputHandlers {
     this.plusHits.length = 0;
     this.eventLabels.length = 0;
     this.thumbHits.length = 0;
+    // The names on the gaps and in the branches (ToLaD#455), under the pills and pictures; a clade's taps as its fork name did.
+    if (this.flip && gapNamesOn()) {
+      this.gapNames().draw(ctx, this.gapLast, this.h, font, FAMILY_INK, INK, BG);
+      for (const m of this.gapLast) if (m.v && m.alpha > 0.5) this.famHits.push({ box: m.box, v: m.v });
+    }
     // The clades' brackets (ToLaD#193) behind the pills: their labels clear of the pills and pictures, their lines behind them.
     br?.draw(ctx, FAMILY_INK, INK3, [...spots.filter((s) => s.fit > 0.3).map((s) => s.box), ...pics.map(picBox)], BG);
     // A "+x" label's branches (ToLaD#368, #373): a hairline at its foot from its first branch to its last, in the gap under its picture,
