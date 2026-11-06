@@ -11,7 +11,8 @@ export function setFlip(on: boolean): void {
 }
 
 const namesAsked = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('names') : null;
-let stacksNow = namesAsked === 'stacks';
+// (On the page the stacks stay until Ita picks, `?names=gaps` the new labels, ToLaD#458; tests start without them.)
+let stacksNow = typeof location !== 'undefined' && namesAsked !== 'gaps';
 let forkQuietNow = true;
 /** The stacks of titles on the gaps and the small species' names (ToLaD#455), kept to compare by `?names=stacks` (ToLaD#458): only ever on the tree on its side, the fork names off. */
 export const gapNamesOn = (): boolean => flipNow && stacksNow && forkQuietNow;
