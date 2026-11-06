@@ -15,7 +15,7 @@ import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01 } from './meshgl';
 import { Lod } from './lod';
 import type { Fold, FoldState } from './fold';
-import { forkMode, LABEL_PILL, Steady } from './steady';
+import { forkMode, grayOn, LABEL_PILL, Steady } from './steady';
 import { LADDER, Territories, type CutItem, type Ref, type RowsOf } from './cut';
 import { COLUMN_DIM, columnSpans, EVENT_TINT, eventAt, eventSpans, type EventSpan } from './colstyle';
 import { laneDim, LINEAGE, pathFrame, TwigModel } from './twigs';
@@ -183,8 +183,12 @@ class CutTerritories {
   private readonly young: Float64Array;
   private readonly alive: Float64Array;
   private readonly now: number;
+  /** Strands before i that have living descendants. */
+  private readonly liveBefore: Int32Array;
   constructor(fan: Fan, fold: Steady, w: number) {
     this.t = new Territories(fan, fold, w);
+    this.liveBefore = new Int32Array(this.t.strands.length + 1);
+    this.t.strands.forEach((b, i) => (this.liveBefore[i + 1] = this.liveBefore[i] + (allGray(b) ? 0 : 1)));
     this.now = fan.time.y(0);
     this.young = Float64Array.from(fan.nodes, (v) => {
       let y = Infinity;
@@ -196,6 +200,10 @@ class CutTerritories {
   /** Daughter k's (a node's index, ~ a strand's) youngest tip (world y). */
   youngOf(k: number): number {
     return k >= 0 ? this.young[k] : Math.max(this.t.strands[~k].tipY, this.now);
+  }
+  /** Any of strands f..l has living descendants. */
+  lives(f: number, l: number): boolean {
+    return this.liveBefore[l + 1] > this.liveBefore[f];
   }
   /** Daughter k's individuals alive now. */
   aliveOf(k: number): number {
@@ -234,9 +242,10 @@ class CutTerritories {
    * Item r's label (ToLaD#358): the most populous (individuals alive now) named clade or species among those it
    * stands for, by its English name where there is one, else its Latin; its picture that one's most populous living
    * species (a fossil's own); "+x" every species of the item with no label of its own (all but the named species).
+   * `noGray` (ToLaD#410, the labels drawn with the gray off): the "+x" leaves out the species with no living descendants.
    */
-  nameOf(r: Ref & { parts?: readonly number[] }): ItemName {
-    const key = `${r.f}:${r.l}`;
+  nameOf(r: Ref & { parts?: readonly number[] }, noGray = false): ItemName {
+    const key = `${r.f}:${r.l}:${noGray}`;
     let out = this.names.get(key);
     if (out) return out;
     const { nodes, strands } = this.t;
@@ -249,7 +258,7 @@ class CutTerritories {
     const lv: Level = pick < 0 ? { b: strands[~pick] } : { v: nodes[pick] };
     const face = lv.b ?? groupFace(lv.v) ?? lv.v.strands[0];
     const hid: FanBranch[][] = [];
-    for (let i = r.f; i <= r.l; i++) if (strands[i] !== lv.b) hid.push([strands[i]]);
+    for (let i = r.f; i <= r.l; i++) if (strands[i] !== lv.b && !(noGray && allGray(strands[i]))) hid.push([strands[i]]);
     out = { lv, text: lv.b ? levelText(lv.b) : levelName(lv.v), face, hid };
     this.names.set(key, out);
     return out;
@@ -748,6 +757,11 @@ export function groupExtent(v: FanNode): [number, number] {
   return s;
 }
 
+/** Strand b has no living descendants, no green anywhere on its column: what `?gray=off` drops (ToLaD#410). (By extinct, not by who is alive now: the domestic species' counts today are 0, their columns green.) */
+export const allGray = (b: FanBranch): boolean => b.sp.extinct;
+/** Nor anyone in clade v. */
+export const cladeAllGray = (v: FanNode): boolean => v.strands.every(allGray);
+
 /** Clade v's species alive now, in tree order (left to right). Kept per clade. */
 const livingCache = new WeakMap<FanNode, FanBranch[]>();
 export function livingOf(v: FanNode): FanBranch[] {
@@ -1012,8 +1026,10 @@ export class FanView implements InputHandlers {
     };
     // (The mammal level, lod.ts: nothing inside a clade drawn as one branch is bracketed.)
     const lod = this.lodNow();
-    br.hide = lod ? (v) => lod.hidden(v) : null;
-    br.hideKey = lod ? String(lod.gen) : '';
+    // (Gray off, ToLaD#410: nor a clade with no living descendants: no name at its fork, no pinned row.)
+    const gray = grayOn();
+    br.hide = gray ? (lod ? (v) => lod.hidden(v) : null) : (v) => cladeAllGray(v) || !!lod?.hidden(v);
+    br.hideKey = (lod ? String(lod.gen) : '') + (gray ? '' : ':nogray');
     br.pillRoom = this.labelBand().room;
     // (The fork names' foot: the scale bar's top.)
     br.forkFoot = this.scaleTop();
@@ -1541,8 +1557,9 @@ export class FanView implements InputHandlers {
     let best: FanBranch | null = null;
     let bd = Infinity;
     const yb = this.fan.trunkBottom.y;
+    const gray = grayOn();
     for (const b of this.fan.branches) {
-      if (wy > yb + slopY || wy < b.tipY - slopY) continue;
+      if (wy > yb + slopY || wy < b.tipY - slopY || (!gray && allGray(b))) continue;
       const yc = Math.min(yb, Math.max(b.tipY, wy));
       const left = leftAt(b, yc);
       const d = Math.max(0, left - wx, wx - left - laneAt(b, yc).w);
@@ -2191,7 +2208,7 @@ export class FanView implements InputHandlers {
     const lod = this.lodNow();
     const sf = this.fan.tess.fold;
     if (sf instanceof Steady) sf.setMerged(lod ? lod.merged : [], Lod.top);
-    this.drawStem(lod);
+    if (grayOn()) this.drawStem(lod);
     {
       for (const b of this.fan.branches) if (!lod || lod.of[b.index] < 0) this.drawStrand(b);
       if (lod) for (const v of lod.merged) this.drawMerged(v);
@@ -2285,6 +2302,8 @@ export class FanView implements InputHandlers {
     const vx0 = win ? win[0] : whole ? -Infinity : this.toWorld(0, 0)[0];
     const vx1 = win ? win[1] : whole ? Infinity : this.toWorld(right, 0)[0];
     const sx = this.cam.sx;
+    // (Gray off, ToLaD#410: the labels drawn, not those a frame is worked out from: every frame stands as with it on.)
+    const noGray = !grayOn() && !whole && !win;
     const spots: LabelSpot[] = [];
     const pics: CutLabels['pics'] = [];
     const shown: CutItem[] = [];
@@ -2366,10 +2385,11 @@ export class FanView implements InputHandlers {
     const reach = (it: CutItem, foot: number): [number, number] | null => {
       const S = T.t.strands;
       // (The first row any strand is at: "now" as soon as a living one is met.)
+      const counts = (i: number) => !noGray || !allGray(S[i]);
       let first = Infinity;
-      for (let i = it.f; i <= it.l && first > now; i++) first = Math.min(first, Math.max(S[i].tipY, now));
+      for (let i = it.f; i <= it.l && first > now; i++) if (counts(i)) first = Math.min(first, Math.max(S[i].tipY, now));
       const wy = Math.max(foot, first);
-      const on = (i: number) => Math.max(S[i].tipY, now) <= wy + 1e-9;
+      const on = (i: number) => counts(i) && Math.max(S[i].tipY, now) <= wy + 1e-9;
       let a = it.f;
       while (a <= it.l && !on(a)) a++;
       if (a > it.l) return null;
@@ -2381,12 +2401,12 @@ export class FanView implements InputHandlers {
     const cut = T.t.cut(sx, PIC_ROOM, vx0, vx1, rows, ghost);
     for (const it of cut) {
       // (Only the root, before anything fits, does not hold its label.)
-      if (!it.fits) continue;
+      if (!it.fits || (noGray && !T.lives(it.f, it.l))) continue;
       const d0 = roomTop(it);
       if (d0 > this.h && !whole) continue;
       const fit = clamp01((bottom - (d0 + PIC_ROOM + PIC_LIFT)) / 30);
       if (!(fit > 0)) continue;
-      const name = T.nameOf(it);
+      const name = T.nameOf(it, noGray);
       // (A "+x" at the middle of its branches at its foot, ToLaD#368, clamped into its territory as any; a species' at
       // its face's place. Its foot: in the gap under its picture, ToLaD#373.)
       const foot = d0 + PIC_ROOM + PIC_LIFT / 2;
@@ -2436,7 +2456,8 @@ export class FanView implements InputHandlers {
       const o = cut[q];
       // (A piece not inside one item, which a fossil riding differently can make, stays with the pictures' "+x".)
       if (!o || !it.fits || o.f > it.f || o.l < it.l) continue;
-      const fi = T.nameOf(o).face.index;
+      if (noGray && !T.lives(it.f, it.l)) continue;
+      const fi = T.nameOf(o, noGray).face.index;
       if (fi >= it.f && fi <= it.l) continue;
       let alive = 0;
       for (const p of it.parts) alive += T.aliveOf(p);
@@ -2450,7 +2471,7 @@ export class FanView implements InputHandlers {
       const y1 = d0 + PIC_ROOM;
       const fit = clamp01((bottom - (y1 + PIC_LIFT)) / 30);
       if (!(fit > 0)) continue;
-      const name = T.nameOf(it);
+      const name = T.nameOf(it, noGray);
       const foot = y1 + PIC_LIFT / 2;
       const span = this.midLabels && name.hid.length ? reach(it, Wy(foot)) : null;
       const one = !name.hid.length || (!!span && span[1] <= span[0]);
@@ -2667,6 +2688,7 @@ export class FanView implements InputHandlers {
    * chords between them.
    */
   private drawStrand(b: FanBranch): void {
+    if (!grayOn() && allGray(b)) return;
     const yb = this.fan.trunkBottom.y;
     const cam = this.camera;
     const ayTip = cam.screenY(b.tipY);
@@ -2825,6 +2847,7 @@ export class FanView implements InputHandlers {
       const pc = cam.screenX(f.corner(v, sx, sy, out, stems));
       // (Gray first: where the lines overlap, the living's shows.)
       for (const live of [false, true]) {
+        if (!live && !grayOn()) continue;
         const c = live ? mixInto(EC_MIX, GREEN01, GREEN_DARK01, laneDim(1) * 0.9) : mixInto(GC_MIX, GRAY01, GRAY_DARK01, laneDim(1) * 0.82);
         for (let q = 0; q < v.kids.length; q++) {
           if (out[2 * q + 1] > 0) continue;
@@ -2856,6 +2879,7 @@ export class FanView implements InputHandlers {
       // the whole lane gray (at least 0.6 px), the green lane over its left edge (at least 1 px).
       const k = this.cam.sx;
       const L = this.w;
+      const gray = grayOn();
       // ([cl, cr]: clipped along the row, so a lane's least width across a steep lean reaches only
       // as far as its chord does.)
       const trap = (batch: RectBatch, l0: number, r0: number, l1: number, r1: number, y0: number, y1: number, c: [number, number, number], a: number, cl = -8, cr = L + 8) => {
@@ -2882,7 +2906,7 @@ export class FanView implements InputHandlers {
         const sq = Math.sqrt(1 + ((xp + wp / 2 - xq - wq / 2) / (y1 - y0)) ** 2);
         const xa = Math.min(xq, xp);
         const xr = Math.max(xq + Math.max(0.6, wq), xp + Math.max(0.6, wp)) + 0.5;
-        trap(gl.under, xq, xq + Math.max(0.6 * sq, wq), xp, xp + Math.max(0.6 * sq, wp), y0, y1, gc, 1, xa - 0.5, xr);
+        if (gray) trap(gl.under, xq, xq + Math.max(0.6 * sq, wq), xp, xp + Math.max(0.6 * sq, wp), y0, y1, gc, 1, xa - 0.5, xr);
         if (dim > 0) trap(gl.over, xq, xq + Math.max(sq, wq), xp, xp + Math.max(sq, wp), y0, y1, BG01, dim, xa - 0.5, xr + 0.5);
         if (gq > 0 || gp > 0) {
           const g1q = xq + Math.max(sq, gq);
@@ -2924,8 +2948,10 @@ export class FanView implements InputHandlers {
       }
     } else {
       // (Its run drawn whole.)
-      ctx.fillStyle = GRAY;
-      this.ribbon(pts, (i) => hw - pts.w[i], () => hw, 0.6);
+      if (grayOn()) {
+        ctx.fillStyle = GRAY;
+        this.ribbon(pts, (i) => hw - pts.w[i], () => hw, 0.6);
+      }
       if (pts.f.subarray(0, pts.n).some((f) => f > 0)) {
         // Green lane on the left, floored at 1 px.
         ctx.fillStyle = GREEN;
@@ -2963,7 +2989,9 @@ export class FanView implements InputHandlers {
    */
   private drawEvents(): void {
     const [r, g, bl] = EVENT_TINT.rgb;
+    const gray = grayOn();
     for (const b of this.fan.branches) {
+      if (!gray && allGray(b)) continue;
       for (const s of colEventsY(this.fan, b)) {
         let st = this.toScreen(0, s.top)[1];
         let sb = this.toScreen(0, s.bot)[1];

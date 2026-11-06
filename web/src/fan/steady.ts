@@ -60,6 +60,12 @@ const LIFE_SAMPLES = 48;
  * little height for its move. `peel`: every daughter a ribbon on its S (the way back).
  */
 export type ForkMode = 'thin' | 'flat' | 'peel';
+/** Whether what has no living descendants is drawn (ToLaD#410, `?gray=off`): a look only, the rooms and frames the same either way. */
+let grayNow = true;
+export const grayOn = (): boolean => grayNow;
+export const setGrayOn = (on: boolean): void => {
+  grayNow = on;
+};
 export const FORK_MODES: ForkMode[] = ['thin', 'flat', 'peel'];
 let forkModeNow: ForkMode = 'thin';
 export const forkMode = (): ForkMode => forkModeNow;
