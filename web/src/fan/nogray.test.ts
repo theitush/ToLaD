@@ -1,14 +1,14 @@
-// The gray off (ToLaD#410, `?gray=off`): a look only. Nothing with no living descendants is drawn, named or taken by a
-// tap, under either gaps mode; the frames, the cut and the living columns' places are those with it on.
+// The gray off (ToLaD#410, `?gray=off`): a look only. Only the "line ended" part of a branch with living descendants goes,
+// under either gaps mode: what is extinct is drawn gray; the frames, the cut, the labels and the taps are those with it on.
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { gapMode, setGapMode, type GapMode } from './fold';
-import { laneAt, leftAt, type FanNode } from './layout';
+import { isNode, laneAt, leftAt, nodeLeftAt, type FanBranch, type FanNode } from './layout';
 import { loadMammalsFromFiles } from './mammals-node';
 import { RectBatch } from './meshgl';
 import { CARNIVORA, FELIDAE, mammaliaClade, type CladeRec } from './panthera';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, type Split } from './splits';
 import { grayOn, setGrayOn } from './steady';
-import { allGray, cladeAllGray, FanView, GRAY, type CutLabels } from './view';
+import { allGray, cladeAllGray, FanView, GRAY, grayFoot, type CutLabels } from './view';
 
 const fills: string[] = [];
 function stubView(clade: CladeRec, tree: Split): FanView {
@@ -59,23 +59,16 @@ type Inner = {
   thumbHits: unknown[];
 };
 const inner = (v: FanView) => v as unknown as Inner;
+type Spied = {
+  drawStrand(b: FanBranch): void;
+  drawMerged(v: FanNode): void;
+  drawLanes(pts: { n: number; y: Float64Array }, hw: number, held: unknown, gray: boolean): void;
+};
 const frame = (v: FanView) => {
   v.camera.settle();
   inner(v).applyFold();
   v.draw();
 };
-
-/** A batch's lanes' colours that are not a green (GREEN to its dark tint: green well over blue; gray's dark tint: about level). */
-function grays(b: RectBatch): number {
-  let n = 0;
-  for (let i = 0; i < b.n; i++) {
-    const [r, g, bl] = [b.f[12 * i + 4], b.f[12 * i + 5], b.f[12 * i + 6]];
-    // (The world's layers across the whole screen, the ice ages and the time grid: no part of the tree.)
-    if (b.f[12 * i] <= 0 && b.f[12 * i + 2] >= 390 && b.f[12 * i + 7] <= 0.11) continue;
-    if (!(g > 1.2 * bl && g > r)) n++;
-  }
-  return n;
-}
 
 /** The frames looked at: a level's home, and each named clade's own (fossils in view at some). */
 const LEVELS: [string, () => CladeRec, () => Split][] = [
@@ -113,7 +106,7 @@ describe('gray off (ToLaD#410)', () => {
 
   for (const mode of ['groups', 'clades'] as GapMode[]) {
     for (const [name, c, t] of LEVELS) {
-      it(`${name}, gaps ${mode}: no gray drawn, no label, name or tap for what has no one living; the rest as with it on`, () => {
+      it(`${name}, gaps ${mode}: gray only on what is extinct, drawn gray; labels, names and taps as with it on`, () => {
         const was = gapMode();
         setGapMode(mode);
         try {
@@ -123,42 +116,52 @@ describe('gray off (ToLaD#410)', () => {
             gl.under.n = 0;
             gl.over.n = 0;
           };
-          const cams = frames(v);
+          const S = v.fan.branches;
+          const self = v as unknown as Spied;
+          const proto = FanView.prototype as unknown as Spied;
+          // Each column drawn and whether its gray is: the lanes held back, so the batch is left with the stems and the corners.
+          let now: FanBranch | FanNode | null = null;
+          let graysOn: { of: FanBranch | FanNode; bottom: number }[] = [];
+          self.drawStrand = (b) => {
+            now = b;
+            proto.drawStrand.call(v, b);
+          };
+          self.drawMerged = (n) => {
+            now = n;
+            proto.drawMerged.call(v, n);
+          };
+          const hold = (pts: { n: number; y: Float64Array }, _hw: number, _held: unknown, gray: boolean) => {
+            if (gray && pts.n > 1) graysOn.push({ of: now!, bottom: pts.y[0] });
+          };
+          const release = () => {
+            delete (self as Partial<Spied>).drawLanes;
+          };
           let hitsOn = 0;
-          for (const cam of cams) {
-            // With it on: the gray there, and what is laid out.
+          let drawnGray = 0;
+          for (const cam of frames(v)) {
+            // With it on: what is laid out, and the tap on each.
+            release();
             setGrayOn(true);
             inner(v).gl = gl;
             v.cam = { ...cam } as typeof v.cam;
+            // (Twice: a frame's fork names stand on the one before's.)
             frame(v);
-            const on = inner(v).cutLast!;
-            const grayOnThere = grays(gl.under);
-            const all = on.all.map((it) => `${it.f}:${it.l}:${it.x0}:${it.x1}`);
-            const home = { ...v.cam };
-            // Off: the same frame, no gray.
-            setGrayOn(false);
             frame(v);
-            expect(v.cam).toEqual(home);
-            expect(grays(gl.under)).toBe(0);
-            const off = inner(v).cutLast!;
-            expect(off.all.map((it) => `${it.f}:${it.l}:${it.x0}:${it.x1}`)).toEqual(all);
-            const S = v.fan.branches;
-            const strands = (it: { f: number; l: number }) => {
-              const out = [];
-              for (const b of S) if (b.index >= it.f && b.index <= it.l) out.push(b);
-              return out;
+            const labels = () => {
+              const l = inner(v).cutLast!;
+              const br = inner(v).brackets;
+              return JSON.stringify({
+                all: l.all.map((it) => `${it.f}:${it.l}:${it.x0}:${it.x1}`),
+                items: l.items.map((it) => `${it.f}:${it.l}`),
+                pics: l.pics.map((p) => p.face.index),
+                spots: [...l.spots, ...l.names].map((s) => s.run),
+                groups: [...l.groups].map(([, g]) => g.map(([b]) => b.index)),
+                placed: br.placed.map((p) => p.i),
+                forks: br.forks.slice(0, br.forkN).map((p) => p.i),
+              });
             };
-            for (const it of off.items) expect(strands(it).some((b) => !allGray(b))).toBe(true);
-            for (const p of off.pics) expect(allGray(p.face)).toBe(false);
-            for (const s of [...off.spots, ...off.names]) {
-              const [f, l] = s.run!;
-              expect(strands({ f, l }).some((b) => !allGray(b))).toBe(true);
-            }
-            for (const [, g] of off.groups) for (const [b] of g) expect(allGray(b)).toBe(false);
-            const br = inner(v).brackets;
-            for (const p of br.placed) expect(cladeAllGray(br.list[p.i].v)).toBe(false);
-            for (let k = 0; k < br.forkN; k++) expect(cladeAllGray(br.list[br.forks[k].i].v)).toBe(false);
-            // A tap on an all-gray column on this frame, and across the screen: never one; with it on, it takes it.
+            const on = labels();
+            const home = { ...v.cam };
             const yMid = v.toWorld(0, 400)[1];
             const taps: [number, number][] = [];
             for (const b of S) {
@@ -168,27 +171,67 @@ describe('gray off (ToLaD#410)', () => {
               if (x >= 0 && x <= 390 && sy >= 0 && sy <= 844) taps.push([x, sy]);
             }
             for (let x = 20; x < 390; x += 60) taps.push([x, 300], [x, 600]);
-            for (const [x, y] of taps) {
-              const b = v.hitBranch(x, y);
-              expect(b && allGray(b)).toBeFalsy();
-              setGrayOn(true);
-              const a = v.hitBranch(x, y);
-              if (a && allGray(a)) hitsOn++;
-              setGrayOn(false);
+            const hitOn = taps.map(([x, y]) => v.hitBranch(x, y));
+            for (const a of hitOn) if (a && allGray(a)) hitsOn++;
+
+            // Off: the same frame, the same labels and taps, and its gray with it.
+            setGrayOn(false);
+            graysOn = [];
+            self.drawLanes = hold;
+            frame(v);
+            expect(v.cam).toEqual(home);
+            expect(JSON.parse(labels())).toEqual(JSON.parse(on));
+            expect(taps.map(([x, y]) => v.hitBranch(x, y))).toEqual(hitOn);
+
+            // No gray lane on a branch with living descendants, nor below where an extinct one joins it.
+            for (const { of, bottom } of graysOn) {
+              const foot = isNode(of) ? grayFoot(of.parent, of.yBot) : grayFoot(of.node, of.splitY);
+              expect(isNode(of) ? cladeAllGray(of) : allGray(of)).toBe(true);
+              expect(bottom).toBeLessThanOrEqual(v.camera.screenY(foot) + 1e-6);
             }
-            // And the 2D canvas's path, no GPU layer: no gray fill.
+            // Every extinct species' own column on screen is drawn gray (unless inside a ribbon drawn as one).
+            const lod = v.lodNow();
+            const drawn = new Set(graysOn.map((g) => g.of));
+            const [, wTop] = v.toWorld(0, 0);
+            const [, wBot] = v.toWorld(0, 844);
+            for (const b of S) {
+              if (!allGray(b) || (lod && lod.of[b.index] >= 0)) continue;
+              const y0 = Math.max(b.tipY, wTop);
+              const y1 = Math.min(b.splitY, wBot);
+              if (!(y1 > y0)) continue;
+              const y = (y0 + y1) / 2;
+              const x = v.toScreen(leftAt(b, y) + laneAt(b, y).w / 2, y)[0];
+              if (x < 4 || x > 386) continue;
+              expect([b.sp.sci, drawn.has(b)]).toEqual([b.sp.sci, true]);
+              drawnGray++;
+            }
+            // All that is left in the batch: the stems' backdrop and the corner lines, only for what has no one living.
+            const allGrayKid = (n: FanNode) => n.kids.some((k) => (isNode(k) ? cladeAllGray(k) : allGray(k)));
+            const b = gl.under;
+            for (let i = 0; i < b.n; i++) {
+              const [x0, y0, x1, y1, r, g, bl, a] = Array.from(b.f.subarray(12 * i, 12 * i + 8));
+              if (x0 <= 0 && x1 >= 390 && a <= 0.11) continue;
+              if (g > 1.2 * bl && g > r) continue;
+              const wy = v.toWorld(0, (y0 + y1) / 2)[1];
+              const wx = v.toWorld((x0 + x1) / 2, 0)[0];
+              const stem = v.fan.nodes.some((n) => cladeAllGray(n) && wy >= n.y - 1e-6 && wy <= n.yBot + 1e-6 && wx >= nodeLeftAt(n, wy) - 1 / v.cam.sx && wx <= nodeLeftAt(n, wy) + n.width + 1 / v.cam.sx);
+              const corner = x1 - x0 <= 1.01 || y1 - y0 <= 1.01 ? v.fan.nodes.some((n) => allGrayKid(n) && Math.abs(v.camera.screenY(n.y) - y1) <= 0.6) : false;
+              expect(stem || corner).toBe(true);
+            }
+
+            // And the real thing, on the 2D canvas's path: gray fills where a gray lane was, off and on.
+            release();
+            const any = graysOn.length > 0;
             inner(v).gl = null;
             fills.length = 0;
             frame(v);
-            expect(fills).not.toContain(GRAY);
+            if (any) expect(fills).toContain(GRAY);
             setGrayOn(true);
-            fills.length = 0;
-            frame(v);
-            if (grayOnThere > 0) expect(fills).toContain(GRAY);
             expect(grayOn()).toBe(true);
           }
           // (The cats, the carnivores and the mammals all have fossils: the sweep above met some.)
           expect(hitsOn).toBeGreaterThan(0);
+          expect(drawnGray).toBeGreaterThan(0);
         } finally {
           setGrayOn(true);
           setGapMode(was);
@@ -196,4 +239,22 @@ describe('gray off (ToLaD#410)', () => {
       }, 300000);
     }
   }
+
+  it('a living column with gray keeps no gray fill with it off, on the 2D path', () => {
+    const v = stubView(FELIDAE, FELIDAE_TREE);
+    const lion = v.fan.branches.find((b) => !allGray(b))!;
+    const self = v as unknown as Spied;
+    setGrayOn(false);
+    inner(v).gl = null;
+    v.cam = { ...v.homeCamera() } as typeof v.cam;
+    v.camera.settle();
+    inner(v).applyFold();
+    fills.length = 0;
+    self.drawStrand.call(v, lion);
+    expect(fills).not.toContain(GRAY);
+    setGrayOn(true);
+    fills.length = 0;
+    self.drawStrand.call(v, lion);
+    expect(fills).toContain(GRAY);
+  });
 });
