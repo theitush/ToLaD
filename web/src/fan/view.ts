@@ -2979,9 +2979,21 @@ export class FanView implements InputHandlers {
     // As the strands fade in (twigs.ts), the lanes dim to a backdrop under them: the same
     // lanes, the same geometry, never a switch.
     // (Gray off, ToLaD#410: the gray stays on an extinct species' column, down to where it joins a line that lives.)
-    const gray = grayOn();
-    if (!gray && allGray(b)) pts = this.ptsAbove(pts, cam.screenY(grayFoot(b.node, b.splitY)));
-    this.drawLanes(pts, hw, held, gray || allGray(b));
+    if (grayOn()) this.drawLanes(pts, hw, held, true);
+    else this.drawLanesOff(pts, hw, held, allGray(b), allGray(b) ? cam.screenY(grayFoot(b.node, b.splitY)) : 0);
+  }
+
+  /**
+   * Gray off (ToLaD#410, #444): a column with no gray in it, its silhouette the one with it on, so that anyone alive then is still shown.
+   * All a living column's width is green; an extinct one (`ended`) is gray down to `foot` (screen y), where it joins a line that lives, and green below it: part of that line.
+   */
+  private drawLanesOff(pts: LanePts, hw: number, held: [number, number, number][], ended: boolean, foot: number): void {
+    if (ended) {
+      this.drawLanes(this.ptsAbove(pts, foot), hw, held, true);
+      pts = this.ptsBelow(pts, foot);
+    }
+    pts.f.fill(1, 0, pts.n);
+    this.drawLanes(pts, hw, held, false);
   }
 
   private lod: Lod | null = null;
@@ -3035,10 +3047,11 @@ export class FanView implements InputHandlers {
       if (this.forkCuts.length) out = this.cutForks(pts, (y) => f.left(i0, y)! + RIBBON_INSET_PX / this.cam.sx);
     }
     // (Gray off, ToLaD#410: a ribbon with anyone living in it is a branch with living descendants, its gray goes, its fossils' with it.)
-    const gray = grayOn();
-    const ended = cladeAllGray(v);
-    if (!gray && ended) out = this.ptsAbove(out, cam.screenY(grayFoot(v.parent, v.yBot)));
-    this.drawLanes(out, 0, NO_HELD, gray || ended);
+    if (grayOn()) this.drawLanes(out, 0, NO_HELD, true);
+    else {
+      const ended = cladeAllGray(v);
+      this.drawLanesOff(out, 0, NO_HELD, ended, ended ? cam.screenY(grayFoot(v.parent, v.yBot)) : 0);
+    }
   }
 
   private abovePts = new LanePts();
@@ -3054,6 +3067,22 @@ export class FanView implements InputHandlers {
     const u = (Y[i - 1] - ys) / (Y[i - 1] - Y[i]);
     out.push(X[i - 1] + (X[i] - X[i - 1]) * u, ys, W[i - 1] + (W[i] - W[i - 1]) * u, F[i - 1] + (F[i] - F[i - 1]) * u);
     for (; i < n; i++) out.push(X[i], Y[i], W[i], F[i]);
+    return out;
+  }
+
+  private belowPts = new LanePts();
+  /** Column points (bottom up) from screen height ys downwards. */
+  private ptsBelow(pts: LanePts, ys: number): LanePts {
+    const { x: X, y: Y, w: W, f: F, n } = pts;
+    const out = this.belowPts;
+    out.n = 0;
+    for (let i = 0; i < n && Y[i] > ys; i++) {
+      out.push(X[i], Y[i], W[i], F[i]);
+      if (i + 1 < n && !(Y[i + 1] > ys)) {
+        const u = (Y[i] - ys) / (Y[i] - Y[i + 1]);
+        out.push(X[i] + (X[i + 1] - X[i]) * u, ys, W[i] + (W[i + 1] - W[i]) * u, F[i] + (F[i + 1] - F[i]) * u);
+      }
+    }
     return out;
   }
 
@@ -3137,8 +3166,9 @@ export class FanView implements InputHandlers {
         for (let q = 0; q < v.kids.length; q++) {
           if (out[2 * q + 1] > 0) continue;
           const kid = v.kids[q];
-          const has = isNode(kid) ? nodeQ(kid, v.ageMa) > 0 : laneAt(kid, Math.max(kid.tipY, top)).gw > 0;
-          if (has !== live || (!live && !gray && !(isNode(kid) ? cladeAllGray(kid) : allGray(kid)))) continue;
+          // (Gray off, ToLaD#444: a line to anyone with a living descendant is green, whatever the share at this height.)
+          const has = gray ? (isNode(kid) ? nodeQ(kid, v.ageMa) > 0 : laneAt(kid, Math.max(kid.tipY, top)).gw > 0) : !(isNode(kid) ? cladeAllGray(kid) : allGray(kid));
+          if (has !== live) continue;
           const dc = cam.screenX(out[2 * q]);
           rect(Math.min(pc, dc) - 0.5, y0 - 0.5, Math.max(pc, dc) + 0.5, y0 + 0.5, c);
           // (Its stem a line too, ToLaD#402: on up from the fork to its own split, whose corners start from there.)
