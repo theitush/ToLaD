@@ -167,7 +167,7 @@ class Built(unittest.TestCase):
     def test_every_family_of_2_or_more_is_named_or_its_order_is_it(self):
         np = self.stats["not_placed"]
         unnamed = sorted(k.split()[1] for k, v in np.items() if k.startswith("family ") and "named_as" not in v)
-        self.assertEqual(unnamed, ["Balaenidae"])  # Upham's right whales: its best fork is half rorquals (F 0.667)
+        self.assertEqual(unnamed, ["Balaenidae"])  # Upham's right whales: their fork also holds 2 dolphins and 2 beaked whales (F 0.667)
         self.assertEqual(sorted(k.split()[1] for k, v in np.items() if k.startswith("family ") and "named_as" in v),
                          ["Caenolestidae", "Cynocephalidae", "Didelphidae", "Elephantidae", "Macroscelididae", "Manidae",
                           "Microbiotheriidae", "Notoryctidae", "Procaviidae"])  # the whole of their order

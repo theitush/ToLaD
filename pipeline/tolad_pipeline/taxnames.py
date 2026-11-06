@@ -20,7 +20,7 @@ TOP_DOWN = ("order", "suborder", "family", "subfamily", "tribe")  # MDD's own ne
 # Three quarters: F = 2c / (n + s) with c species shared means n + s - 2c = 2c (1 / F - 1) strays both ways, so at 0.75 at most
 # 2 strays for every 3 species the fork and the taxon share: a few strays are forgiven, a fork half of others is not. The
 # scores have the gap there: the last family above it is Heteromyidae (0.783, 47 of its 73, Upham putting the pocket
-# gophers inside it), the first under it Balaenidae (0.667: 4 of 8, its fork as many rorquals as right whales).
+# gophers inside it), the first under it Balaenidae (0.667: 4 of 8, Upham's fork over them holding 2 dolphins and 2 beaked whales).
 # What it stops: stats.json dated_tree.taxon_names.not_placed.
 F_MIN = 3 / 4
 
