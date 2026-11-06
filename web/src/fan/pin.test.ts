@@ -138,7 +138,8 @@ describe('the groups the view is inside stay pinned at the top (ToLaD#233)', () 
     const br = (v as unknown as Inner).brackets!;
     const b = v.fan.branches.find((q) => /brown bear/i.test(q.sp.common ?? ''))!;
     intoPast(v, b);
-    const genus = ranked(b)[0];
+    // (The innermost with a row: a Latin-only clade has none, ToLaD#288, as the bears' Ursinae.)
+    const genus = ranked(b).find((u) => br.pins.some((p) => br.list[p.i].v === u))!;
     const at = br.pins.find((u) => br.list[u.i].v === genus)!;
     v.tap(at.lx, br.pinY(at.row));
     run(v);
