@@ -196,6 +196,24 @@ describe('a look switch keeps the view where it is (ToLaD#412)', () => {
         }
       }, 300_000);
 
+      it('zoomed inside one column: it stays as wide on screen', () => {
+        for (const [a, b] of pairs) {
+          const [A, B] = [views.get(a)!, views.get(b)!];
+          const f = A.fan.tess.fold as Steady;
+          const u = frames(A)[0] ?? A.fan.root;
+          const fr = P(A).frameOf({ v: u });
+          // (Its widest strand, the screen a third of its room.)
+          const { R } = f.rooms();
+          const i = u.strands.reduce((p, q) => (R[q.index] > R[p.index] ? q : p)).index;
+          stand(A, { ...fr, sx: (3 * A.w) / R[i] });
+          stand(A, { ...A.cam, cx: f.rooms().C[i] });
+          expect(onScreen(A), `${a} at ${A.fan.root.strands[i].sp.sci}`).toEqual([i]);
+          B.goToPlace(A.place());
+          expect(B.cam.sx / A.cam.sx, `${a} to ${b}`).toBeCloseTo(1, 6);
+          expect(onScreen(B)).toEqual([i]);
+        }
+      }, 300_000);
+
       it("the fork names' switch: the frame with the names as they now are; free, the same strands and window", () => {
         const v = views.get(GAP_MODES[1])!;
         const on = forkNames();

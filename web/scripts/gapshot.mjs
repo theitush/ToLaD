@@ -1,7 +1,7 @@
 // The `gaps:` button keeps the view where it is (ToLaD#412): at the mammals, real button presses at home, on Carnivora's
 // frame and on a free zoom, a shot and the view's state before and after each; then a double tap, home and the level
 // button, which still go where they went.
-//   npm run build:single && LEVEL=mammals node scripts/gapshot.mjs <dir for the shots>   (default headless, no GPU flags)
+//   npm run build:single && LEVEL=mammals node scripts/gapshot.mjs <dir for the shots>   (default headless, no GPU flags; FREE_ONLY=1: the free zoom on)
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
@@ -49,31 +49,35 @@ const press = async (what) => {
   await look(what);
 };
 
-await still();
-await look('home-groups');
-await press('home-clades');
+if (!process.env.FREE_ONLY) {
+  await still();
+  await look('home-groups');
+  await press('home-clades');
 
-await page.evaluate(() => {
-  const v = window.__fan;
-  v.flyToClade(v.fan.nodes.find((n) => n.split.taxon === 'Carnivora'));
-});
-await still();
-await look('carnivora-clades');
-await press('carnivora-age');
-await press('carnivora-even');
-await press('carnivora-groups');
+  await page.evaluate(() => {
+    const v = window.__fan;
+    v.flyToClade(v.fan.nodes.find((n) => n.split.taxon === 'Carnivora'));
+  });
+  await still();
+  await look('carnivora-clades');
+  await press('carnivora-age');
+  await press('carnivora-even');
+  await press('carnivora-groups');
 
-// A double tap there: up a level, the switch having left no taps to go back by.
-await page.evaluate(() => window.__fan.doubleTap(-1e4, -1e4));
-await still();
-await look('carnivora-groups-doubletap');
+  // A double tap there: up a level, the switch having left no taps to go back by.
+  await page.evaluate(() => window.__fan.doubleTap(-1e4, -1e4));
+  await still();
+  await look('carnivora-groups-doubletap');
+}
 
-// A free zoom: real wheel events about a point on the screen, then a pan of what stands there.
+// A free zoom: real ctrl+wheel events (a pinch: width and time together) about a point on the screen.
 await page.mouse.move(250, 500);
-for (let k = 0; k < 14; k++) {
-  await page.mouse.wheel(0, -60);
+await page.keyboard.down('Control');
+for (let k = 0; k < 16; k++) {
+  await page.mouse.wheel(0, -30);
   await page.waitForTimeout(30);
 }
+await page.keyboard.up('Control');
 await still();
 await look('free-groups');
 await press('free-clades');
