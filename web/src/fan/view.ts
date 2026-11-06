@@ -286,6 +286,29 @@ class CutTerritories {
     out[1] = leftAt(S[ends[1]], y) + laneAt(S[ends[1]], y).w;
     return y;
   }
+  /**
+   * Strands f..l's branches at a label's foot (ToLaD#368): the middles (world x) of the first and last of them that
+   * reach row `foot` (world y), or null. Above the first row any of them is at ("now", or their youngest tip, the foot
+   * just over the now line, ToLaD#373) the strands of that row: the tips the ticks come down on, and it moves on
+   * continuously as the row comes down past it. The strands stand side by side in drawn order, never crossing, each
+   * inside its share of the row, so they are inside the item's share there and no two items' spans meet.
+   */
+  reach(f: number, l: number, foot: number): [number, number] | null {
+    const S = this.t.strands;
+    const now = this.now;
+    // (The first row any strand is at: "now" as soon as a living one is met.)
+    let first = Infinity;
+    for (let i = f; i <= l && first > now; i++) first = Math.min(first, Math.max(S[i].tipY, now));
+    const wy = Math.max(foot, first);
+    const on = (i: number) => Math.max(S[i].tipY, now) <= wy + 1e-9;
+    let a = f;
+    while (a <= l && !on(a)) a++;
+    if (a > l) return null;
+    let b = l;
+    while (!on(b)) b--;
+    const mid = (s: FanBranch) => leftAt(s, wy) + laneAt(s, wy).w / 2;
+    return [mid(S[a]), mid(S[b])];
+  }
   /** The strands whose tips stand in world x [x0, x1] (drawn order: a binary search): first and last, or null. */
   tipsIn(x0: number, x1: number): [number, number] | null {
     const S = this.t.strands;
@@ -2474,20 +2497,25 @@ export class FanView implements InputHandlers {
 
   /**
    * This frame's labels under `?labels=groups` (ToLaD#417): the real groups, one level down. L, the smallest named level
-   * holding every strand on screen (right of the axis); its groups (nextLevels) with any on screen; of those, most
-   * individuals first, each whose picture can stand on its own branch at its youngest row, "now" for anyone living,
-   * without meeting one already placed (slide.ts). A group with no such place has no label at this zoom: its fork name
-   * still names it. No "+x", no leaders. A function of the camera alone. One label as anywhere: name pill over picture,
-   * a tap on either going to the group's own frame.
+   * holding every strand on screen (right of the axis; none there, in the axis's strip); its groups (nextLevels) whose
+   * branch is on screen, the strip too: over the row the pictures stand on, the axis has nothing (ToLaD#431). Of those,
+   * the ones whose branch's middle is on screen before any whose middle has gone past an edge (a group going off, however
+   * many individuals it holds, gives way to one that is here), and in each most individuals first, each whose picture can
+   * stand on its own branch at its youngest row, "now" for anyone living, without meeting one already placed (slide.ts).
+   * A group with no such place has no label at this zoom: its fork name still names it. No "+x", no leaders.
+   * A function of the camera alone. One label as anywhere: name pill over picture, a tap on either going to the group's
+   * own frame, and over it, for more than one branch, the hairline from the first to the last (LabelSpot.over).
    */
   private groupLabels(T: CutTerritories, row: number): CutLabels {
     const out: CutLabels = { spots: [], groups: new Map(), pics: [], items: [], all: [], names: [] };
     this.picSpots = out.pics;
     const X = (x: number) => this.toScreen(x, 0)[0];
     const Y = (y: number) => this.toScreen(0, y)[1];
-    const tips = T.tipsIn(this.toWorld(LABEL_AXIS_X, 0)[0], this.toWorld(this.w, 0)[0]);
+    const Wy = (y: number) => this.toWorld(0, y)[1];
+    const seen = T.tipsIn(this.toWorld(0, 0)[0], this.toWorld(this.w, 0)[0]);
+    const tips = T.tipsIn(this.toWorld(LABEL_AXIS_X, 0)[0], this.toWorld(this.w, 0)[0]) ?? seen;
     this.groupsOf = null;
-    if (!tips) return out;
+    if (!tips || !seen) return out;
     const L = levelUp(this.fan, T.meet(tips[0], tips[1]), true);
     if (!L) return out;
     this.groupsOf = L;
@@ -2502,14 +2530,13 @@ export class FanView implements InputHandlers {
       this.nextCache.set(L, gs);
     }
     const r0 = PIC_D / 2;
-    const left = LABEL_AXIS_X + r0;
     const right = this.w - r0;
     const bottom = this.h - LABEL_BOTTOM_PX + 30;
     const slots: Slot[] = [];
-    const at: { g: (typeof gs)[number]; d0: number; fit: number }[] = [];
+    const at: { g: (typeof gs)[number]; d0: number; fit: number; here: boolean }[] = [];
     const span: [number, number] = [0, 0];
     for (const g of gs) {
-      if (g.l < tips[0] || g.f > tips[1]) continue;
+      if (g.l < seen[0] || g.f > seen[1]) continue;
       const wy = T.branchOf(g.k, span);
       const d0 = Math.max(Y(wy) - PIC_LIFT - PIC_ROOM, row);
       const fit = clamp01((bottom - (d0 + PIC_ROOM + PIC_LIFT)) / 30);
@@ -2517,13 +2544,14 @@ export class FanView implements InputHandlers {
       // (Its centre on its branch's part on screen. A branch nearer the screen's edge than a picture's half: the picture
       // whole against that edge, its branch under it, as long as the branch is on screen.)
       const [a, b] = [X(span[0]), X(span[1])];
-      if (b < LABEL_AXIS_X || a > this.w) continue;
-      const lo = Math.min(Math.max(a, left), right);
-      const hi = Math.max(Math.min(b, right), left);
+      if (b < 0 || a > this.w) continue;
+      const lo = Math.min(Math.max(a, r0), right);
+      const hi = Math.max(Math.min(b, right), r0);
       slots.push({ lo, hi, at: (lo + hi) / 2 });
-      at.push({ g, d0, fit });
+      const mid = (a + b) / 2;
+      at.push({ g, d0, fit, here: mid >= 0 && mid <= this.w });
     }
-    const order = at.map((_, i) => i).sort((p, q) => T.aliveOf(at[q].g.k) - T.aliveOf(at[p].g.k) || at[q].g.l - at[q].g.f - (at[p].g.l - at[p].g.f) || p - q);
+    const order = at.map((_, i) => i).sort((p, q) => +at[q].here - +at[p].here || T.aliveOf(at[q].g.k) - T.aliveOf(at[p].g.k) || at[q].g.l - at[q].g.f - (at[p].g.l - at[p].g.f) || p - q);
     const on = chooseSlots(slots, order, GROUP_D);
     const xs = placeSlots(slots, on, GROUP_D);
     const { cap } = this.labelBand();
@@ -2539,6 +2567,10 @@ export class FanView implements InputHandlers {
       const s: LabelSpot = { key, id: key, place: 'tip', text, rank: [0, slots[n].hi - slots[n].lo, g.k], x, y1, box: [x - half, y1 - this.nameWidth(text) - 2 * LABEL_PAD, x + half, y1], fit, plus: 0, pic: face };
       if (lv.b) s.b = lv.b;
       else Object.assign(s, { v: lv.v, fam: lv.v });
+      // (Its branches, as a cut label's: in the gap under its picture. One branch, none.)
+      const foot = d0 + PIC_ROOM + PIC_LIFT / 2;
+      const ends = T.reach(g.f, g.l, Wy(foot));
+      if (ends && ends[1] > ends[0]) s.over = [X(ends[0]), X(ends[1]), foot];
       out.spots.push(s);
       out.pics.push({ x, y: d0 + PIC_ROOM - PIC_D / 2, i, lv, face, held: true });
     });
@@ -2639,29 +2671,6 @@ export class FanView implements InputHandlers {
         u = u.parent;
       }
     };
-    /**
-     * Item it's branches at its label's foot (ToLaD#368): the middles (world x) of its first and last strand that
-     * reach row `wy` (world y), or null. Above the first row any of them is at ("now", or the item's youngest tip, the
-     * foot just over the now line, ToLaD#373) the strands of that row: the tips the ticks come down on, and it moves
-     * on continuously as the row comes down past it. The strands stand side by side in drawn order, never crossing,
-     * each inside its share of the row, so they are inside the item's share there and no two items' spans meet.
-     */
-    const now = this.fan.time.y(0);
-    const reach = (it: CutItem, foot: number): [number, number] | null => {
-      const S = T.t.strands;
-      // (The first row any strand is at: "now" as soon as a living one is met.)
-      let first = Infinity;
-      for (let i = it.f; i <= it.l && first > now; i++) first = Math.min(first, Math.max(S[i].tipY, now));
-      const wy = Math.max(foot, first);
-      const on = (i: number) => Math.max(S[i].tipY, now) <= wy + 1e-9;
-      let a = it.f;
-      while (a <= it.l && !on(a)) a++;
-      if (a > it.l) return null;
-      let b = it.l;
-      while (!on(b)) b--;
-      const mid = (s: FanBranch) => leftAt(s, wy) + laneAt(s, wy).w / 2;
-      return [mid(S[a]), mid(S[b])];
-    };
     const cut = T.t.cut(sx, PIC_ROOM, vx0, vx1, rows, ghost);
     for (const it of cut) {
       // (Only the root, before anything fits, does not hold its label.)
@@ -2674,7 +2683,7 @@ export class FanView implements InputHandlers {
       // (A "+x" at the middle of its branches at its foot, ToLaD#368, clamped into its territory as any; a species' at
       // its face's place. Its foot: in the gap under its picture, ToLaD#373.)
       const foot = d0 + PIC_ROOM + PIC_LIFT / 2;
-      const span = this.midLabels && name.hid.length ? reach(it, Wy(foot)) : null;
+      const span = this.midLabels && name.hid.length ? T.reach(it.f, it.l, Wy(foot)) : null;
       // (One branch, a species or an item with one strand at its foot: it stays with that branch; several: held on screen.)
       const one = !name.hid.length || (!!span && span[1] <= span[0]);
       const x = placeX(it.x0, it.x1, PIC_ROOM, span ? X((span[0] + span[1]) / 2) : faceX(it, name.face), !one);
@@ -2736,7 +2745,7 @@ export class FanView implements InputHandlers {
       if (!(fit > 0)) continue;
       const name = T.nameOf(it);
       const foot = y1 + PIC_LIFT / 2;
-      const span = this.midLabels && name.hid.length ? reach(it, Wy(foot)) : null;
+      const span = this.midLabels && name.hid.length ? T.reach(it.f, it.l, Wy(foot)) : null;
       const one = !name.hid.length || (!!span && span[1] <= span[0]);
       let x = placeX(it.x0, it.x1, PIC_D, span ? X((span[0] + span[1]) / 2) : X(groupCentre({ b: name.face })), !one);
       if (x + r0 < 0 || x - r0 > this.w) continue;
