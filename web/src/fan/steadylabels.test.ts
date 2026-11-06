@@ -44,15 +44,11 @@ function stubView(clade: CladeRec = CARNIVORA, tree: Split = CARNIVORA_TREE, fol
     addEventListener: noop,
     removeEventListener: noop,
   };
-  const v = new FanView(canvas as unknown as HTMLCanvasElement, clade, tree, folds);
-  // (The steady place is the named species' (#358); the middle of an item's branches (ToLaD#368, the default while Ita
-  // compares) jumps where the item splits, its branches being the cut's: that switch is off here.)
-  v.midLabels = false;
-  return v;
+  return new FanView(canvas as unknown as HTMLCanvasElement, clade, tree, folds);
 }
 
 /** A label's place and size (screen), and the screen x of the columns it stands on (its anchor: groupCentre; NaN, a "+x"). */
-type Spot = { x: number; y: number; w: number; h: number; c: number };
+type Spot = { x: number; y: number; w: number; h: number; c: number; run?: string };
 type Shot = Map<string, Spot> & { held?: boolean };
 /** A frame's labels: each name pill (by its item and text) and each picture (by what it opens), where and how big. */
 function shot(v: FanView, c: CutLabels): Shot {
@@ -64,7 +60,7 @@ function shot(v: FanView, c: CutLabels): Shot {
     m.set(`name ${s.key} ${s.text}`, { x: s.x, y: s.box[3], w: s.box[2] - s.box[0], h: s.box[3] - s.box[1], c: g ? at(groupCentre(g)) : NaN });
   }
   // (A picture is its face species', whichever item of the cut it stands for.)
-  for (const p of c.pics) m.set(`pic ${p.face.sp.sci}`, { x: p.x, y: p.y, w: PIC_D, h: PIC_D, c: at(groupCentre({ b: p.face })) });
+  for (const p of c.pics) m.set(`pic ${p.face.sp.sci}`, { x: p.x, y: p.y, w: PIC_D, h: PIC_D, c: at(groupCentre({ b: p.face })), run: p.run?.join() });
   return m;
 }
 type Step = (v: FanView) => void;
@@ -120,7 +116,10 @@ function judge(shots: Shot[], moved: number[], monotonic: boolean): string[] {
         // (At the screen's edge, where an item's territory held its label on screen, ToLaD#373: as it splits or merges its
         // label goes to where the new item's territory has it, a picture or so past the hold; it used to vanish.)
         const atEdge = Math.min(p.x, s.x) <= HOLD_LEFT + 1e-6 || Math.max(p.x, s.x) >= HOLD_RIGHT - 1e-6;
-        if (!atEdge && d > 1.35 * moved[f - 1] + 2) bad.push(`frame ${f}: ${k} jumped ${d.toFixed(1)} px, x ${p.x.toFixed(0)} to ${s.x.toFixed(0)} (the world ${moved[f - 1].toFixed(1)})`);
+        // (A "+x" stands at the middle of its item's branches, ToLaD#368: where the item splits or merges that is another
+        // middle, so its label goes there. Within one item it moves as the world does.)
+        const sameItem = p.run === s.run;
+        if (sameItem && !atEdge && d > 1.35 * moved[f - 1] + 2) bad.push(`frame ${f}: ${k} jumped ${d.toFixed(1)} px, x ${p.x.toFixed(0)} to ${s.x.toFixed(0)} (the world ${moved[f - 1].toFixed(1)})`);
       }
     }
     // (Only where no label is held under the top line: a held label's rows come down off the room over "now", where a
@@ -192,7 +191,6 @@ describe('steady labels while the view moves (ToLaD#333)', () => {
     if (name !== 'cats')
       it(`${name}: a pan across: labels slide off the edge, none vanishes on screen`, { timeout: 300_000 }, async () => {
         const v = await mk();
-        v.midLabels = true;
         const h = v.homeCamera();
         const [z, dx] = name === 'mammals' ? [3, 12] : [3, 6];
         const sx = h.sx * z;
@@ -219,7 +217,6 @@ describe('steady labels while the view moves (ToLaD#333)', () => {
     if (name !== 'cats')
       it(`${name}: a pan at one zoom: a one-branch label moves exactly with it`, { timeout: 300_000 }, async () => {
         const v = await mk();
-        v.midLabels = true;
         const h = v.homeCamera();
         const dog = v.fan.branches.find((b) => b.sp.common === 'Domestic dog')!;
         const frame = (sx: number, dx: number) => {

@@ -51,7 +51,7 @@ function stubView(clade: CladeRec = mammaliaClade(), tree: Split = mammaliaTree(
     gl.over.n = 0;
   };
   (v as unknown as { gl: unknown }).gl = gl;
-  Object.assign(v, { labelsNow: () => ({ br: null, cut: null }), drawLabels: noop, drawTimeAxis: noop, drawEvents: noop, drawTrunkLabel: noop, drawWidthScale: noop, drawGutter: noop, drawTouch: noop });
+  Object.assign(v, { labelsNow: () => ({ br: null, cut: null }), drawLabels: noop, drawTimeAxis: noop, drawTrunkLabel: noop, drawWidthScale: noop, drawGutter: noop, drawTouch: noop });
   return { v, under: gl.under, over: gl.over };
 }
 
