@@ -19,7 +19,7 @@ import { MagnifierIcon, SearchPanel } from './SearchPanel';
 import { SourcesPanel } from './SourcesPanel';
 import { statusOf, wildPartSentence } from './status';
 import { cardTapper, onControl } from './cardtap';
-import { flipOn, gapNamesOn, setGapNames } from './flip';
+import { flipOn, forkQuiet, setForkQuiet } from './flip';
 import { FanView, initialMeasure, levelName, type Lineage, type Place, type Selection } from './view';
 
 declare global {
@@ -57,13 +57,14 @@ function initialForks(): ForkMode {
   return forkMode();
 }
 
-/** The upper clades' names (ToLaD#373, #434, #455): on the tree on its side, on the gaps above them, first; at their forks (there `?forknames=fork`), on leaders off them (`?forknames=leaders`), or the stack over "now" (`?forknames=off`). */
-type ForkNaming = 'on gaps' | 'at fork' | 'leaders' | 'off';
-const FORK_NAMINGS: ForkNaming[] = flipOn() ? ['on gaps', 'at fork', 'leaders', 'off'] : ['at fork', 'leaders', 'off'];
+/** The upper clades' names (ToLaD#373, #434, #458): at their forks (`?forknames=fork`), on leaders off them (`?forknames=leaders`), or none: on the tree on its side the labels in the gaps name them (ToLaD#458), elsewhere the stack over "now" (`?forknames=off`). */
+type ForkNaming = 'at fork' | 'leaders' | 'off';
+const FORK_NAMINGS: ForkNaming[] = flipOn() ? ['off', 'at fork', 'leaders'] : ['at fork', 'leaders', 'off'];
 const forkNaming = (m: ForkNaming) => {
-  setForkNames(m !== 'off');
+  // (On its side `off` asks no stack: the brackets keep their fork mode and place no names.)
+  setForkNames(flipOn() || m !== 'off');
   setForkLeaders(m === 'leaders');
-  setGapNames(m === 'on gaps');
+  setForkQuiet(m === 'off');
 };
 /** Set before the first view is built. */
 function initialForkNames(): ForkNaming {
@@ -75,7 +76,7 @@ function initialForkNames(): ForkNaming {
   } catch {
     /* no address */
   }
-  return gapNamesOn() && forkNames() && !forkLeaders() ? 'on gaps' : !forkNames() ? 'off' : forkLeaders() ? 'leaders' : 'at fork';
+  return forkQuiet() || !forkNames() ? 'off' : forkLeaders() ? 'leaders' : 'at fork';
 }
 
 export function FanApp() {

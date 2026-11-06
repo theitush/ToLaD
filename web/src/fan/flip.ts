@@ -10,11 +10,22 @@ export function setFlip(on: boolean): void {
   flipNow = on;
 }
 
-let gapNamesNow = true;
-/** The clades' names on the gaps above them and the species' in their branches (ToLaD#455, the fork-name chip's first step): only ever on the tree on its side. */
-export const gapNamesOn = (): boolean => flipNow && gapNamesNow;
+const namesAsked = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('names') : null;
+// (On the page the stacks stay until Ita picks, `?names=gaps` the new labels, ToLaD#458; tests start without them.)
+let stacksNow = typeof location !== 'undefined' && namesAsked !== 'gaps';
+let forkQuietNow = true;
+/** The stacks of titles on the gaps and the small species' names (ToLaD#455), kept to compare by `?names=stacks` (ToLaD#458): only ever on the tree on its side, the fork names off. */
+export const gapNamesOn = (): boolean => flipNow && stacksNow && forkQuietNow;
+/** (Tests, and the address.) */
 export function setGapNames(on: boolean): void {
-  gapNamesNow = on;
+  stacksNow = on;
+}
+/** One kind of label (ToLaD#458, gaplabels.ts): a group's name in the gap above it, a species' picture and pill in its branch. The tree on its side, but for `?names=stacks`. */
+export const gapLabelsOn = (): boolean => flipNow && !stacksNow;
+/** The fork names' chip at `off`, on the tree on its side: no names at the forks (and no stack over "now": it has the chain). */
+export const forkQuiet = (): boolean => flipNow && forkQuietNow;
+export function setForkQuiet(on: boolean): void {
+  forkQuietNow = on;
 }
 
 /** Room kept under the buttons for the chain of groups (the next task, `chain`): one row of text. */
