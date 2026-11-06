@@ -11,6 +11,7 @@
 // Per frame: a binary search for the strands on screen, two comparisons a strand, and work only for those that fit.
 // A name's text and width are found once and kept.
 
+import { upright } from './flip';
 import { isNode, type Fan, type FanBranch, type FanNode } from './layout';
 import type { Steady } from './steady';
 
@@ -217,8 +218,7 @@ export class GapNames {
   draw(ctx: CanvasRenderingContext2D, names: readonly WrittenName[], h: number, sans: (spec: string) => string, cladeInk: string, speciesInk: string, halo: string): void {
     if (!names.length) return;
     ctx.save();
-    ctx.translate(0, h);
-    ctx.rotate(-Math.PI / 2);
+    upright(ctx, h);
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'left';
     ctx.lineJoin = 'round';

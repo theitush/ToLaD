@@ -52,8 +52,17 @@ const names = (s) => `${s.titles.length} titles (${s.titles.filter((t) => t.ends
   const last = CLADES[CLADES.length - 1];
   console.log(`${last}: ${names(await state())}`);
   await page.evaluate(() => {
+    // Pinched in until its fifth widest species on screen is 18 px tall, centred there: the wide ones (a domestic cat) off the screen.
     const v = window.__fan;
-    v.cam = { ...v.cam, sx: v.cam.sx * 3 };
+    const { C, R } = v.fan.tess.fold.rooms();
+    const on = [];
+    for (let k = 0; k < C.length; k++) {
+      const x = v.toScreen(C[k], 0)[0];
+      if (x >= 0 && x <= v.w) on.push(k);
+    }
+    on.sort((p, q) => R[q] - R[p]);
+    const k = on[Math.min(4, on.length - 1)];
+    v.cam = { ...v.cam, sx: 18 / R[k], cx: C[k] };
     v.request();
   });
   await settle();
@@ -62,6 +71,31 @@ const names = (s) => `${s.titles.length} titles (${s.titles.filter((t) => t.ends
   await page.evaluate(() => window.__fan.resetView());
   await settle();
   console.log(`home: ${names(await state())}`);
+  console.log(
+    'stacks:',
+    await page.evaluate(() => {
+      const v = window.__fan;
+      const g = v.gapNames();
+      const name = (u) => g.cladeName(u);
+      let lines = 0;
+      let kin = 0;
+      let repeats = 0;
+      let deepest = 0;
+      let kinOnly = 0;
+      const n = v.fan.tess.fold.strands.length;
+      for (let k = 0; k < n; k++) {
+        const list = g.headsOf(k).map(name);
+        lines += list.length;
+        deepest = Math.max(deepest, list.length);
+        if (list.length > 1 && list.every((t) => t.endsWith('& kin'))) kinOnly++;
+        list.forEach((t, i) => {
+          if (t.endsWith('& kin')) kin++;
+          if (i && t === list[i - 1]) repeats++;
+        });
+      }
+      return { lines, kin, repeats, deepest, kinOnly };
+    }),
+  );
   const sweep = await page.evaluate(async () => {
     const v = window.__fan;
     const cam = v.cam;
@@ -83,6 +117,25 @@ const names = (s) => `${s.titles.length} titles (${s.titles.filter((t) => t.ends
     return out;
   });
   console.log(`zoom sweep:\n  ${sweep.join('\n  ')}`);
+  console.log(`chip: ${await page.evaluate(() => [...document.querySelectorAll('button')].map((b) => b.textContent).find((t) => t.startsWith('fork names')))}`);
+  // A tap on a title: where its fork name went.
+  await page.evaluate(() => window.__fan.goToClade('Primates'));
+  await settle();
+  const title = await page.evaluate(() => {
+    const v = window.__fan;
+    const m = v.gapLast.find((n) => n.text === 'Great apes');
+    if (!m) return null;
+    const r = v.canvas.getBoundingClientRect();
+    return { x: r.left + r.width - (m.box[1] + m.box[3]) / 2, y: r.top + (m.box[0] + m.box[2]) / 2, text: m.text };
+  });
+  if (title) {
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: title.x, y: title.y, id: 0 }] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await page.waitForTimeout(3500);
+    console.log(`tap on the title ${title.text} at phone (${title.x.toFixed(0)},${title.y.toFixed(0)}): chain ${(await state()).chain}`);
+    await page.screenshot({ path: `${OUT}/after-title-tap.png` });
+  }
 }
 // The chain at every level clade, on the page's type: the longest, how many lost outer names, any whose innermost name alone overflows.
 console.log(
