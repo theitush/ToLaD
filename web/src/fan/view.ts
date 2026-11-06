@@ -1236,12 +1236,14 @@ export class FanView implements InputHandlers {
 
   /**
    * Turned (flip.ts): where the labels' pictures' centres stand, on 100 kya. Off screen in time, at the edge it left by,
-   * so that a picture and its pill stay on screen, as keepOnScreen keeps them at the sides.
+   * so that a picture and its pill stay on screen, as keepOnScreen keeps them at the sides, and clear of the pinned
+   * rows coming in at the right edge as "now" leaves it (the room heldRow makes for them unturned).
    */
   private flipPicY(): number {
     const y = this.toScreen(0, this.fan.time.y(LABELS_MA))[1];
     const r = PIC_D / 2;
-    return Math.max(LABEL_CAP + LABEL_UNDER + r, Math.min(this.h - r, y));
+    const pins = Math.min(STACK_MOST, Math.max(0, NOW_PX - this.toScreen(0, this.yNow)[1]));
+    return Math.max(this.labelTop() + pins + LABEL_CAP + LABEL_UNDER + r, Math.min(this.h - r, y));
   }
 
   /**
@@ -3515,6 +3517,8 @@ export class FanView implements InputHandlers {
 
   /** The labels' top line (screen y): just under the buttons, the same for every label. */
   private labelTop(): number {
+    // (Turned, the buttons are not over the canvas.)
+    if (this.flip) return 8;
     const bar = this.barRect();
     return (bar ? bar[3] : 44) + 8;
   }
@@ -3963,14 +3967,17 @@ export class FanView implements InputHandlers {
     }
     if (this.flip) {
       // Turned: under the stem on the phone, left of the fork; above the stem where it is low; read across, on a halo.
-      const px = Math.max(6, Math.min(this.h - sy - wmax - 10, this.h - wmax - 6));
+      // Only where it fits there, as unturned it goes at the foot (so not at home or a level's frame, the fork near the edge).
+      const px = this.h - sy - wmax - 10;
       const [stemL] = this.toScreen(f.stem[0], 0);
       const py = sx + 8 + 68 <= this.w ? sx + 8 : stemL - 8 - 68;
-      if (py + 68 < 0) {
+      const room = clamp01((px - 6) / 16);
+      if (!(room > 0) || py + 68 < 0) {
         ctx.restore();
         return;
       }
       this.trunkBox = [py, this.h - px - wmax, py + 68, this.h - px];
+      ctx.globalAlpha = room;
       upright(ctx, this.h);
       ctx.lineJoin = 'round';
       ctx.lineWidth = 4;

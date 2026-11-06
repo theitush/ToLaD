@@ -43,6 +43,22 @@ for (const name of CLADES) {
   show(name, await state());
   await page.screenshot({ path: `${OUT}/${name.toLowerCase()}.png` });
 }
+// A group whose branch ended before 100 kya: its label floats past it. The first the ladder has, walking up the zoom.
+const died = await page.evaluate(() => {
+  const v = window.__fan;
+  const T = v.territories();
+  for (let sx = v.homeCamera().sx; sx < 1e5; sx *= 1.25) {
+    const g = v.coverAt(T, sx).find((c) => v.fan.time.ageAt(c.wy) > 0.1);
+    if (!g) continue;
+    v.cam = { ...v.homeCamera(), sx, cx: (g.a + g.b) / 2 };
+    v.request();
+    return { sx, ma: v.fan.time.ageAt(g.wy) };
+  }
+  return null;
+});
+await settle();
+console.log('died before 100 kya:', died, (await state()).names.join(', '));
+await page.screenshot({ path: `${OUT}/died.png` });
 if (DRIVE) {
   const cdp = await page.context().newCDPSession(page);
   const touch = (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts.map(([x, y], id) => ({ x, y, id })) });
@@ -57,7 +73,7 @@ if (DRIVE) {
     await touch('touchEnd', []);
   };
   await page.evaluate(() => window.__fan.resetView());
-  await settle();
+  await page.waitForTimeout(5000);
   const a = await state();
   show('before pan', a);
   // A finger down the phone 120 px: the branches follow it, so the world x at a phone y moves.
@@ -91,12 +107,12 @@ if (DRIVE) {
   show('after pinch across', f);
   await page.screenshot({ path: `${OUT}/after-pinch-time.png` });
   // A tap on a picture: its group's frame.
-  await page.evaluate(() => window.__fan.resetView());
+  await page.evaluate(() => window.__fan.goToClade('Carnivora'));
   await settle();
   const g = await page.evaluate(() => {
     const v = window.__fan;
     const r = v.canvas.getBoundingClientRect();
-    const p = v.cutLast.pics[Math.floor(v.cutLast.pics.length / 2)];
+    const p = v.cutLast.pics[v.cutLast.pics.length - 1];
     return { x: r.left + r.width - p.y, y: r.top + p.x, name: v.cutLast.spots[p.i].text };
   });
   await touch('touchStart', [[g.x, g.y]]);
