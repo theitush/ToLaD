@@ -928,7 +928,9 @@ def mass_entry(nd: Node) -> list | None:
 def common_name(nd: Node) -> str | None:
     # (Then a curated history's own: the Red List does not assess humans, so "Human" comes from its history, #275;
     # then MDD's, for a species only MDD knows, ToLaD#278.)
-    return (nd.data.get("common_override") or (nd.data.get("red_list") or {}).get("common")
+    # (A domestic stock that outweighs the leaf's wild part names it, #435: the Red List names the wild form it assesses,
+    # and most of those alive on the leaf are the pig, the sheep, not the wild boar, the mouflon.)
+    return (nd.data.get("common_override") or nd.data.get("stock_common") or (nd.data.get("red_list") or {}).get("common")
             or (nd.data.get("history") or {}).get("common") or nd.data.get("common_mdd") or None)
 
 

@@ -19,7 +19,7 @@ import { GAP_MODES, gapMode, setGapMode, type GapMode } from './fold';
 import { FORK_MODES, forkMode, grayOn, setForkMode, setGrayOn, type ForkMode } from './steady';
 import { MagnifierIcon, SearchPanel } from './SearchPanel';
 import { SourcesPanel } from './SourcesPanel';
-import { statusOf } from './status';
+import { statusOf, wildPartSentence } from './status';
 import { cardTapper, onControl } from './cardtap';
 import { FanView, initialMeasure, levelName, type Lineage, type Place, type Selection } from './view';
 
@@ -687,6 +687,7 @@ export function SpeciesCard({ sp, onClose, onUp, open, ageMa, startMa, event, ma
   const regional = (sp.history?.events ?? []).map((e, k) => ({ e, k })).filter(({ e }) => e.scope === 'regional');
   const pct = (f: number) => `${Math.round(f * 100)}%`;
   const st = statusOf(sp);
+  const wildPart = wildPartSentence(sp, formatCount);
   // A domestic stock: the years its own births span (its curated segments, from domestication).
   const domestic = sp.history?.component === 'domestic' && sp.births ? sp.history.segments.reduce((a, s) => a + s.generations, 0) * sp.history.G : 0;
   const lived = `from ${plainAgo(sp.t0 * 1e6)} to ${sp.extinct ? plainAgo(sp.t1 * 1e6) : 'today'}`;
@@ -717,6 +718,11 @@ export function SpeciesCard({ sp, onClose, onUp, open, ageMa, startMa, event, ma
       {ev && <EventSection ev={ev} k={event!} />}
       <div className="facts">
         <StatusChip sp={sp} />
+        {wildPart && (
+          <p className="sub" data-wild-part>
+            {wildPart}
+          </p>
+        )}
         <p className="lead">
           <span className={`lane ${sp.extinct ? 'dead' : at.now ? 'alive' : 'lineage'}`} />
           <span>

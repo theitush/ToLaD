@@ -61,8 +61,15 @@ export interface HistEvent {
 export interface HistoryRec {
   /** "counts": the curve is the species' births (EVER, procgen); "display": shown only. */
   use: string;
-  /** "wild", "domestic" (a tamed stock: its segments start at domestication) or "total" (humans). */
+  /**
+   * "wild", "domestic" (a tamed stock: its segments start at domestication), "wild+domestic" (a leaf holding both,
+   * its curve the sum, ToLaD#435) or "total" (humans).
+   */
   component: string;
+  /** Today's two parts of a "wild+domestic" leaf; null otherwise. */
+  parts: { wild: number; domestic: number } | null;
+  /** The Red List's name of the wild form, where a domestic stock names the leaf (the pig's "Wild boar"); else null. */
+  wildCommon: string | null;
   scope: string;
   notes: string;
   /**
@@ -397,6 +404,8 @@ export function extractClade(
       history = {
         use: h.use ?? 'display',
         component: h.component ?? 'wild',
+        parts: h.parts ?? null,
+        wildCommon: h.wild_common ?? null,
         scope: h.scope ?? '',
         notes: (h.notes ?? (h.modelled === 'rangeloss' ? trend?.notes : '') ?? '').trim(),
         modelled: h.modelled ?? null,

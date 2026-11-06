@@ -61,6 +61,9 @@ POINT_KINDS = ["census", "estimate", "index-scaled", "reconstruction", "unverifi
 # point kinds, then span-only kinds, then kinds appended later (the index is the HIST kind code, so
 # new kinds are only ever appended): `genomic` (points compiled from [deep], and the spans between two
 # of them; ToLaD#60), `natural` (the natural baseline held before the first point; ToLaD#61) and
+# A leaf's combined record (combine_stock), never a history file's own component.
+WILD_AND_DOMESTIC = "wild+domestic"
+
 # `rangeloss` (the modelled decline from the natural baseline to today's count of a species with no
 # history file, and its start point; ToLaD#62, see model.rangeloss_record)
 KINDS = POINT_KINDS + ["model", "interpolated", "held", "baseline", "genomic", "natural", "rangeloss"]
@@ -1020,6 +1023,81 @@ def _sd_of(p: dict) -> float:
     return math.log10(p["hi"] / p["lo"]) / (2 * 1.96)
 
 
+def _attr_at(pts: list[dict], year: float, key: str) -> float:
+    """`interp` of another field of the points (lo, hi)."""
+    return interp([{"year": p["year"], "n": p[key]} for p in pts], year)
+
+
+# What a stock's level before its first cited count rests on (the model's shape, not a source's figure).
+STOCK_EARLY_CITE = ("Model: the stock's growth from domestication to its first cited count, shaped like human births "
+                    "(Population Reference Bureau)")
+STOCK_EARLY_URL = "https://github.com/theitush/ToLaD/blob/main/pipeline/history/README.md"
+
+
+# The stock's model has no founding count (its level at domestication is human births' shape, far above any founding
+# group), so its rise out of the wild level runs over this share of its span on the time axis, as the fan's own ramp does
+# for a stock on a leaf of its own (population.ts EMERGE_FRAC).
+STOCK_RAMP = 0.1
+
+
+def combine_stock(wild: dict, dom: dict, leaf_name: str, t0_ma: float, dom_year: float) -> dict:
+    """One record for a leaf that holds a wild population and a domestic stock (the pig and the wild boar, ToLaD#435).
+
+    HIST holds one record per row and the fan draws that record, so the row must be the whole species: at every year
+    the wild curve plus the stock (nobody before domestication, then its early growth and its counts). A knot is kept
+    only where its own part is the larger one, and carries that part's kind, grade and source, so the curve reads as
+    what mostly lives at that date and its note gives both figures. The stock starts from nobody: domestication is a
+    knot at the wild level alone, and the first knot after it lies past the ramp (STOCK_RAMP), so the curve leaves the
+    wild record there without a step."""
+    stock = (dom.get("early") or []) + dom["curve"]
+    wcurve = wild["curve"]
+
+    def w_at(y: float, key: str = "n") -> float:
+        return _attr_at(wcurve, y, key)
+
+    def d_at(y: float, key: str = "n") -> float:
+        return _attr_at(stock, y, key) if y > dom_year else 0.0
+
+    def point(src: dict, y: float, note: str = "") -> dict:
+        w, d = w_at(y), d_at(y)
+        return {**src, "year": y, "n": w + d, "lo": w_at(y, "lo") + d_at(y, "lo"), "hi": w_at(y, "hi") + d_at(y, "hi"),
+                "note": f"{w:,.0f} wild + {d:,.0f} domestic" + (". " + note if note else "")}
+
+    out: list[dict] = []
+    axis0 = math.log10(NOW_YEAR - dom_year + 10)
+    ramp_end = NOW_YEAR - (10 ** (axis0 - STOCK_RAMP * (axis0 - 1)) - 10)
+    knots = [(p["year"], p, True) for p in wcurve] + [(p["year"], p, False) for p in stock if p["year"] > ramp_end]
+    start = next((a for a, b in zip(wcurve, wcurve[1:]) if a["year"] <= dom_year <= b["year"]), wcurve[-1])
+    start = {k: v for k, v in start.items() if k not in ("baseline", "note")}
+    # domestication: the wild level alone, and from it the rise is the model's
+    knots.append((dom_year, {**start, "kind": "model", "grade": "D", "span_kind": "model"}, None))
+    for y, p, is_wild in sorted(knots, key=lambda k: (k[0], k[2] is None)):
+        if out and abs(out[-1]["year"] - y) < 1e-9:
+            continue
+        if is_wild is not None and is_wild != (w_at(y) >= d_at(y)):
+            continue  # the other part is the larger here: its curve carries this date
+        if is_wild is False and "cite" not in p:
+            p = {**p, "cite": STOCK_EARLY_CITE, "url": STOCK_EARLY_URL, "span_kind": "model"}
+        out.append(point(p, y, p.get("note", "")))
+    w_now, d_now = wcurve[-1]["n"], stock[-1]["n"]
+    rec = {
+        **{k: wild[k] for k in ("deep", "deep_bulk", "deep_dropped", "deep_points", "natural") if k in wild},
+        "species": leaf_name, "aliases": [], "common": dom["common"], "component": WILD_AND_DOMESTIC, "use": "counts",
+        "scope": f"wild population and domestic stock together: {_x(d_now)} domestic ({dom['scope']}) and {_x(w_now)} "
+                 f"wild ({wild['scope']})",
+        "faostat_item": dom["faostat_item"], "file": dom["file"], "baseline": None, "modelled": None,
+        "notes": f"{dom['notes']} The wild part: {wild['notes']}", "G": wild["G"], "L": wild["L"], "curve": out,
+        "events": wild.get("events", []) + dom.get("events", []),
+        "parts": {"wild": {"n": w_now, "file": wild["file"], "modelled": wild.get("modelled")},
+                  "domestic": {"n": d_now, "file": dom["file"], "common": dom["common"], "from_year": dom_year}},
+    }
+    if wild.get("deep_join"):
+        rec["deep_join"] = {**wild["deep_join"], "note": wild["deep_join"]["note"] + " That is the wild part's curve: "
+                            "the genome says nothing of the domestic stock, which is added from domestication on."}
+    rec["segments"] = compile_segments(out, wild["G"], wild["L"], t0_ma, False)
+    return rec
+
+
 def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = None,
           start_point=None) -> list[dict]:
     """Rewrite curated leaves in place (before sum_tree). Returns the records
@@ -1043,9 +1121,7 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
     missing, empty = [], []
     for rec in recs:
         cands = [rec["species"]] + rec["aliases"] + DOMESTIC_ALIASES.get(rec["species"], [])
-        # a domestic form may sit on a leaf flagged extinct in the wild (dromedary)
-        leaf = next((leaves[c] for c in cands
-                     if c in leaves and (not leaves[c].extinct or rec["component"] == "domestic")), None)
+        leaf = next((leaves[c] for c in cands if c in leaves and not leaves[c].extinct), None)
         if leaf is None:
             missing.append(rec["species"])
             continue
@@ -1326,6 +1402,37 @@ def apply(root, raw: Path, log: dict, src_bit: int, recs: list[dict] | None = No
     for rec in recs:  # a later record on the same leaf may have taken the HIST row
         if "leaf" in rec:
             rec["report"]["hist_row"] = rec["leaf"].data.get("history") is rec
+    # a leaf with both records draws both (ToLaD#435): its HIST row is the sum, the parts stay in the report
+    for rec in recs:
+        leaf = rec.get("leaf")
+        if leaf is None or rec["component"] != "wild" or leaf.data.get("history") is not rec:
+            continue
+        D = leaf.data
+        dom = D.get("history_beside")
+        if dom is None or dom["component"] != "domestic" or dom["use"] != "counts" or rec["use"] != "counts":
+            continue
+        D["history"] = combine_stock(rec, dom, leaf.name, leaf.t0, D["domestic"]["dom_year"])
+        # the births the leaf's EVER counts are the ones it draws
+        D["pieces"] = curve_pieces(D["history"]["curve"], D["L"], leaf.t0)
+        D["n_wild_pieces"] = len(D["pieces"])
+        D["ever_med"] = pieces_births(D["pieces"])
+        drawn = D["history"]["curve"][-1]["n"]
+        if abs(drawn / D["alive"] - 1) > 0.01:
+            raise HistoryError(f"{leaf.name}: combined curve ends at {drawn:.4g}, the leaf's alive is {D['alive']:.4g}")
+        for r in (rec, dom):
+            r["report"]["drawn_as"] = WILD_AND_DOMESTIC
+    # the leaf's name is what most of it is (ToLaD#435): a domestic stock that outweighs the wild part names it
+    for rec in recs:
+        leaf = rec.get("leaf")
+        if leaf is None or rec["component"] != "domestic" or rec["use"] != "counts":
+            continue
+        D = leaf.data
+        if D.get("domestic_now", 0.0) > D.get("rate_wild_now", 0.0) * D["L"]:
+            D["stock_common"] = rec["common"]
+            # the wild form's own name stays on the record: the card names it, a search finds it
+            wild_name = (D.get("red_list") or {}).get("common")
+            if wild_name and wild_name.lower() != rec["common"].lower():
+                D["history"]["wild_common"] = wild_name
     if missing:
         raise HistoryError(f"history species not found among living tree leaves: {missing}")
     log["history"] = {

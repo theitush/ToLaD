@@ -6,6 +6,8 @@
 export interface Named {
   common: string;
   sci: string;
+  /** A domestic stock's leaf: its wild form's name finds it too (the wild boar finds the pig, ToLaD#435). */
+  history?: { wildCommon: string | null } | null;
 }
 
 /** A name folded for matching: accents stripped, lower case, runs of space and punctuation as one space. */
@@ -46,7 +48,10 @@ export function searchSpecies<T extends Named>(all: readonly T[], query: string)
     if (seen.has(s)) continue;
     seen.add(s);
     const name = fold(s.common);
-    const rc = matchRank(name, q);
+    const wild = s.history?.wildCommon;
+    const rw = wild ? matchRank(fold(wild), q) : -1;
+    const rn = matchRank(name, q);
+    const rc = rn < 0 ? rw : rw < 0 ? rn : Math.min(rn, rw);
     const rs = matchRank(fold(s.sci), q);
     // Ranks interleave: a common prefix (0), a scientific prefix (0.5), a common word start (1)...
     const r = Math.min(rc < 0 ? Infinity : rc, rs < 0 ? Infinity : rs + 0.5);

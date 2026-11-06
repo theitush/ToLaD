@@ -121,6 +121,22 @@ class Guards(unittest.TestCase):
         self.assertIn("Felis affinis", A.render_md(rep))
 
 
+class Drawn(unittest.TestCase):
+    """Stored against drawn today (ToLaD#435): the pig's stock stored and only the wild boar drawn."""
+
+    def test_flags_a_part_not_drawn(self):
+        flags = A.check_drawn({"alive": 9.86e8, "drawn": 2.31e7, "extinct": False})
+        self.assertEqual([f["class"] for f in flags], ["drawn"])
+
+    def test_flags_a_stock_marked_extinct(self):
+        self.assertEqual(len(A.check_drawn({"alive": 4.44e7, "drawn": 0.0, "extinct": True})), 1)
+
+    def test_agreeing_or_no_history_is_quiet(self):
+        self.assertEqual(A.check_drawn({"alive": 9.86e8, "drawn": 9.85e8, "extinct": False}), [])
+        self.assertEqual(A.check_drawn({"alive": 9.86e8, "drawn": None, "extinct": False}), [])
+        self.assertEqual(A.check_drawn({"alive": 0.0, "drawn": 0.0, "extinct": True}), [])
+
+
 class Stale(unittest.TestCase):
     def test_stale_count_with_later_figure(self):
         r = row(file="X.toml", use="counts", today_src="history", curve=[k(1990, 5e3, "cited"), k(2008, 3.5e6, "cited")])
