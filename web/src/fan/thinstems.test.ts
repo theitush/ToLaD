@@ -1,12 +1,12 @@
 // A stem wider than it is tall draws as a line (ToLaD#402, `forks: thin`): measured at the draw itself at the frame Ita
 // saw it at, the marsupials among the mammals, and through a pinch; `flat` and `peel` keep their cuts; a look only.
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { leftAt, type FanBranch, type FanNode } from './layout';
 import { loadMammalsFromFiles } from './mammals-node';
 import { RectBatch } from './meshgl';
 import { CARNIVORA, mammaliaClade, type CladeRec } from './panthera';
 import { CARNIVORA_TREE, mammaliaTree, type Split } from './splits';
-import { FORK_MODES, forkMode, LABEL_PILL, setForkMode, stemShare, Steady, type ForkMode } from './steady';
+import { FORK_MODES, forkMode, LABEL_PILL, setForkMode, setGrayOn, stemShare, Steady, type ForkMode } from './steady';
 import { FanView } from './view';
 
 await loadMammalsFromFiles();
@@ -109,9 +109,9 @@ describe('thin stems: at the marsupial frame', () => {
     return r;
   };
 
-  it('`thin` is the default, and the button goes through all three', () => {
+  it('`thin` is the default, and the button goes through thin and peel', () => {
     expect(mark).toBe('thin');
-    expect(FORK_MODES).toEqual(['thin', 'flat', 'peel']);
+    expect(FORK_MODES).toEqual(['thin', 'peel']);
   });
 
   for (const wx of [1, 2.5]) {
@@ -183,7 +183,10 @@ describe('thin stems: at the marsupial frame', () => {
   });
 });
 
+// (`solid` counts the "line ended" too, what fills the screen deep on a branch: gray on, off in the app since ToLaD#439.)
 describe('thin stems: a column a user sees as a branch never goes', () => {
+  beforeAll(() => setGrayOn(true));
+  afterAll(() => setGrayOn(false));
   const { v, under, over } = stubView(CARNIVORA, CARNIVORA_TREE);
   v.setMode('linear');
   const fan = () => v.fan;
