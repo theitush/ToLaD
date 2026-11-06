@@ -26,10 +26,10 @@ import { ease, laneW, segAt, type Fan, type FanBranch, type FanNode } from './la
 import { smoother } from './population';
 import { ORDER_TAXA, taxonKey } from './splits';
 
-/** How a neighbouring pair's gap is sized (ToLaD#378; `?gaps=`, the button in FanApp). */
+/** How a neighbouring pair's gap is sized (ToLaD#378). The app is always `clades`, with no switch (ToLaD#439). */
 export type GapMode = 'even' | 'groups' | 'clades' | 'age';
 export const GAP_MODES: readonly GapMode[] = ['even', 'groups', 'clades', 'age'];
-let gapModeNow: GapMode = 'groups';
+let gapModeNow: GapMode = 'clades';
 /** The switch: what the layouts built from now on use. */
 export function setGapMode(m: GapMode): void {
   gapModeNow = m;

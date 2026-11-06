@@ -866,7 +866,7 @@ export function groupExtent(v: FanNode): [number, number] {
   return s;
 }
 
-/** Strand b has no living descendants, no green anywhere on its column: what stays gray with `?gray=off` (ToLaD#410). (By extinct, not by who is alive now: the domestic species' counts today are 0, their columns green.) */
+/** Strand b has no living descendants, no green anywhere on its column: what stays gray with the line ended off (ToLaD#410). (By extinct, not by who is alive now: the domestic species' counts today are 0, their columns green.) */
 export const allGray = (b: FanBranch): boolean => b.sp.extinct;
 /** Nor anyone in clade v. */
 export const cladeAllGray = (v: FanNode): boolean => v.strands.every(allGray);

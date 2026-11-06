@@ -60,13 +60,14 @@ const LIFE_SAMPLES = 48;
  * little height for its move. `peel`: every daughter a ribbon on its S (the way back).
  */
 export type ForkMode = 'thin' | 'flat' | 'peel';
-/** Whether the "line ended" part of a branch with living descendants is drawn (ToLaD#410, `?gray=off`): a look only, what is extinct drawn gray either way, the rooms and frames the same. */
-let grayNow = true;
+/** Whether the "line ended" part of a branch with living descendants is drawn (ToLaD#410): a look only, what is extinct drawn gray either way, the rooms and frames the same. Off, with no switch in the app (ToLaD#439). */
+let grayNow = false;
 export const grayOn = (): boolean => grayNow;
 export const setGrayOn = (on: boolean): void => {
   grayNow = on;
 };
-export const FORK_MODES: ForkMode[] = ['thin', 'flat', 'peel'];
+/** The chip's steps (ToLaD#439); `flat` stays what `thin` is built on, no longer a choice. */
+export const FORK_MODES: ForkMode[] = ['thin', 'peel'];
 let forkModeNow: ForkMode = 'thin';
 export const forkMode = (): ForkMode => forkModeNow;
 export const setForkMode = (m: ForkMode): void => {

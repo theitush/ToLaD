@@ -25,11 +25,11 @@ export function picBox(p: { x: number; y: number }): number[] {
 }
 
 /**
- * What the labels name (ToLaD#417, `?labels=`): `cut`, an item of the cut with its "+x"; `groups`, the real groups one
+ * What the labels name (ToLaD#417; always `groups` in the app, no switch, ToLaD#439): `cut`, an item of the cut with its "+x"; `groups`, the real groups one
  * level down from what the screen holds, each on its own branch. A look only: frames and taps' targets do not change.
  */
 export type LabelMode = 'cut' | 'groups';
-let labelNow: LabelMode = 'cut';
+let labelNow: LabelMode = 'groups';
 export const labelMode = (): LabelMode => labelNow;
 export function setLabelMode(m: LabelMode): void {
   labelNow = m;
