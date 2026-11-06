@@ -64,6 +64,11 @@ const scenes = [
   ['domestic-boom', 'split', [0.0095, 3]],
   ['card-sandcat', 'card', ['Sand cat']],
   ['card-domestic', 'card', ['Domestic cat']],
+  // A leaf with a wild part and a domestic stock (ToLaD#435), and a stock with no wild part counted.
+  ['card-pig', 'card', ['Pig']],
+  ['card-goat', 'card', ['Goat']],
+  ['card-sheep', 'card', ['Sheep']],
+  ['card-dromedary', 'card', ['Dromedary']],
   // The Red List chip on a small cat (Least Concern, gray) and on the leopard (ToLaD#98).
   ['card-leopardcat', 'card', ['Mainland leopard cat']],
   ['card-leopard', 'card', ['Leopard']],

@@ -23,6 +23,8 @@ NATB_FIELDS = ["n", "lo", "hi", "km2_natural", "km2_current"]
 RLST_PER_ROW = 3
 # v1.5 (ToLaD#141): META.hist[].events, a history file's curated events (bottlenecks); no new section
 # v1.6 (ToLaD#149): META.hist[].events[].scope ("species" | "regional") and .shown (the column falls through it)
+# (ToLaD#435, no new section: META.hist[].component "wild+domestic" with .parts {wild, domestic} and, where a stock names
+# the leaf, .wild_common)
 EVENT_BUILD_ONLY = {"scope_why", "fall", "end"}  # in stats.json, not shipped (`why` ships, v1.6: the card says it)
 MAGIC = b"TLAD"
 KIND_SKELETON, KIND_TILE = 0, 1
@@ -223,6 +225,15 @@ def encode_hist(rows: list[tuple[Node, bool]], cites: dict[tuple[str, str], int]
             meta.append({"species": rec["species"], "common": rec["common"], "component": rec["component"],
                          "use": rec["use"], "scope": rec["scope"], "file": rec["file"], "notes": rec["notes"],
                          "point_notes": [p["note"] for p in rec["curve"]], "modelled": rec.get("modelled")})
+        if rec.get("parts"):
+            # wild + domestic on one leaf (ToLaD#435): the card says which part is which
+            meta[-1]["parts"] = {"wild": rec["parts"]["wild"]["n"], "domestic": rec["parts"]["domestic"]["n"]}
+        # the Red List's name of the wild form, where a domestic stock names the leaf (ToLaD#435): the card says it, a search
+        # finds it
+        leaf_data = rows[row][0].data
+        wild_name = (leaf_data.get("red_list") or {}).get("common")
+        if leaf_data.get("stock_common") and wild_name and wild_name.lower() != leaf_data["stock_common"].lower():
+            meta[-1]["wild_common"] = wild_name
         if rec.get("deep_join"):
             # how the genomic deep past meets the next level, for the species card (ToLaD#80)
             meta[-1]["deep_join"] = rec["deep_join"]["note"]

@@ -79,6 +79,21 @@ export type StatusChip =
   | { kind: 'domestic'; label: string }
   | null;
 
+/**
+ * What the card says of the wild form on a leaf a domestic stock names (ToLaD#435), or null: the wild part's count and
+ * the wild form's Red List category. `count` formats a number of individuals.
+ */
+export function wildPartSentence(sp: SpeciesRec, count: (n: number) => string): string | null {
+  const h = sp.history;
+  if (!h) return null;
+  const s = redListOf(sp);
+  const cat = s && s.category !== 'NE' ? CATEGORY_NAME[s.category] : null;
+  const name = h.wildCommon ? h.wildCommon.toLowerCase() : 'wild form';
+  if (h.parts) return `Mostly domestic: ${count(h.parts.domestic)} domestic and ${count(h.parts.wild)} wild (the ${name}${cat ? `, ${cat}` : ''}).`;
+  if (h.component === 'domestic' && h.wildCommon && cat) return `Domestic stock. Its wild form, the ${name}, is ${cat} on the Red List; none is counted here.`;
+  return null;
+}
+
 /** The status the card shows: the data's, unless the curated entry is a newer assessment. */
 export function redListOf(sp: SpeciesRec): RedListStatus | null {
   const d = sp.redList;
@@ -93,7 +108,9 @@ export function statusOf(sp: SpeciesRec): StatusChip {
   const s = redListOf(sp);
   // a fossil has no Red List status; one that ended since 1500 CE keeps the list's EX/EW
   if (sp.extinct && !(s && (s.category === 'EX' || s.category === 'EW'))) return { kind: 'prehistoric', label: 'Extinct (prehistoric)' };
-  // a domestic form is not assessed (IUCN lists wild species): NE in the data, "Domesticated" on the card (ToLaD#98)
-  if (sp.history?.component === 'domestic' && (!s || s.category === 'NE')) return { kind: 'domestic', label: 'Domesticated' };
+  // a domestic form is not assessed (IUCN lists wild species): "Domesticated" on the card (ToLaD#98), NE in the data or,
+  // where the leaf's name is the wild form's too, the category of that wild form, which is not this stock's (ToLaD#435).
+  // A leaf that also holds a wild part says so under the chip (wildPartSentence).
+  if (sp.history && (sp.history.component === 'domestic' || sp.history.parts)) return { kind: 'domestic', label: 'Domesticated' };
   return s ? { kind: 'iucn', label: CATEGORY_NAME[s.category], code: s.category, status: s } : null;
 }

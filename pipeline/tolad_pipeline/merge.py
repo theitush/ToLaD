@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 
+from . import anchors
 from .anchors import year_to_ma
 from .load import norm_name
 from .newick import NNode
@@ -149,6 +150,14 @@ def set_extinct_flags(root: Node, phy: dict, pbdb_by_name: dict, log: dict) -> N
                 nd.extinct = True
                 nd.data["extinct_by"] = "OTT flag"
         c["extinct" if nd.extinct else "living"] += 1
+    for nd in root.preorder():
+        if nd.is_leaf and nd.extinct and nd.name in anchors.STOCK_SPECIES:
+            # extinct in the wild is not extinct (#435): a leaf holding a domestic stock today is alive. The flag comes
+            # from a list of wild species (PHYLACINE codes the wild dromedary EP), and it would end the leaf's band in
+            # the past with its stock still counted
+            nd.extinct = False
+            nd.data["extinct_in_wild_by"] = nd.data.pop("extinct_by", None)
+            c["extinct in the wild, alive as a domestic stock"] += 1
     log["extinct_flags"] = dict(c)
 
 
