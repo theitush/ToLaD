@@ -5,7 +5,7 @@
 // Gestures come from the shared engine/input.ts.
 
 import { drawPic, hasPic, livePic, PIC_TRIES, prefetchPics } from './wiki';
-import { AXIS_ROOM, CHAIN_ROOM, flipOn, FORK_PX as FLIP_FORK_PX, LABELS_MA, NOW_PX, turnCanvas, upright } from './flip';
+import { AXIS_ROOM, chainFit, CHAIN_ROOM, flipOn, FORK_PX as FLIP_FORK_PX, LABELS_MA, NOW_PX, turnCanvas, upright } from './flip';
 import { GROUP_D, LABEL_AXIS_X, labelMode, PIC_D, PIC_LIFT, PIC_ROOM, picBox, type PicSpot } from './pics';
 import { coverLadder, keepOnScreen, placeSlots } from './slide';
 import { formatCount, formatMass } from '../data/count';
@@ -710,6 +710,13 @@ export function levelUp(fan: Fan, v: FanNode | null, self = false): FanNode | nu
   return null;
 }
 
+/** The chain of groups clade v stands in (ToLaD#452), outermost first: the named levels from the root down to the level at v (levelUp), each by levelName, the root by its clade's English name. */
+export function chainOf(fan: Fan, v: FanNode): string[] {
+  const out: string[] = [];
+  for (let u = levelUp(fan, v, true); u; u = levelUp(fan, u)) out.unshift(u.parent ? levelName(u) : fan.clade.common);
+  return out;
+}
+
 /** Whether clade v has a familiar name (ToLaD#288): an English one (TAXON_EN, ORDER_EN, FAMILY_EN), or is the root. */
 export function familiar(v: FanNode): boolean {
   const latin = latinOf(v.split);
@@ -998,6 +1005,8 @@ export class FanView implements InputHandlers {
   scaleEl: HTMLElement | null = null;
   /** The buttons (a DOM element over the canvas): labels never go under them. */
   barEl: HTMLElement | null = null;
+  /** The chain of groups under the buttons (flip, ToLaD#452): found by the stage's turn, written by chainFrame. */
+  chainEl: HTMLElement | null = null;
   private scaleKey = '';
   /** `?debug`: a readout of the zooms, years on screen and individuals per px. */
   /** The tree on its side (flip.ts, ToLaD#452): `w` is the phone's height, `h` its width. */
@@ -1129,7 +1138,13 @@ export class FanView implements InputHandlers {
     const r = p.getBoundingClientRect();
     const bar = p.querySelector?.('.bar')?.getBoundingClientRect();
     const foot = p.querySelector?.('.foot')?.getBoundingClientRect();
-    const top = (bar && bar.height > 0 ? bar.bottom - r.top : 0) + CHAIN_ROOM;
+    const under = bar && bar.height > 0 ? bar.bottom - r.top : 0;
+    const top = under + CHAIN_ROOM;
+    this.chainEl = p.querySelector?.('.chain') ?? null;
+    if (this.chainEl) {
+      this.chainEl.style.top = `${under}px`;
+      this.chainEl.style.height = `${CHAIN_ROOM}px`;
+    }
     if (this.flipFoot < 0) this.flipFoot = foot && foot.height > 0 ? r.bottom - foot.top : 0;
     const w = Math.max(1, r.height - top - this.flipFoot - AXIS_ROOM);
     turnCanvas(this.canvas, r.width, top, w + AXIS_ROOM);
@@ -1974,6 +1989,13 @@ export class FanView implements InputHandlers {
       if (!this.anim && !this.gesturing && !this.lvTimer) this.lvTimer = setTimeout(() => ((this.lvTimer = 0), this.request()), LEVEL_MS);
       return k.lv;
     }
+    const lv = this.levelFrom(k && k.fan === this.fan ? k.lv : null);
+    this.lvAt = { fan: this.fan, cam: { ...c }, lv, t };
+    return lv;
+  }
+  /** The level the camera stands at, worked out from it: levelNow's, `was` the level the view was at, kept while the view is near its frame. */
+  private levelFrom(was: Level | null): Level {
+    const c = this.cam;
     const b = this.centreLine();
     const z = (f: Camera) => Math.log(c.sx / f.sx) + Math.log(c.sy / f.sy);
     const ladder: Step[] = [];
@@ -1986,7 +2008,6 @@ export class FanView implements InputHandlers {
     const on = [...ladder].reverse().find((f) => this.offBy(f.cam, c) <= LEVEL_PX);
     // (The level the view was at, while it is still near its frame: a pan of a third of the screen at the Hominins put
     // the centre on a gibbon's line, or the human's, and the level flipped to theirs, the names and pictures with it, ToLaD#311.)
-    const was = k && k.fan === this.fan ? k.lv : null;
     const near = (lv: Level) => {
       const f = this.frameOf(lv);
       return this.offBy(f, c) <= this.w / 2 && Math.abs(z(f)) <= Math.log(LEVEL_KEEP);
@@ -2016,10 +2037,58 @@ export class FanView implements InputHandlers {
         offLv = off;
       }
     }
-    this.lvAt = { fan: this.fan, cam: { ...c }, lv, t };
     return lv;
   }
   private lvAt: { fan: Fan; cam: Camera; lv: Level; t: number } | null = null;
+
+  /**
+   * The chain of groups under the buttons (flip, ToLaD#452), kept with the view once a frame: the groups the level the view
+   * is at stands in. On a free scroll the screen holds several, and the level's own rule says which: the lineage at the screen's
+   * centre, and the innermost frame on its way up the view is zoomed in as far as. Under a finger or in a flight, where
+   * levelNow holds the last one, the same rule at most every LEVEL_MS, what levelNow would say if the view stopped there, the
+   * labels' level left alone. Text only when the group changes: every other frame a comparison.
+   */
+  private chainFrame(): void {
+    const el = this.chainEl;
+    if (!el) return;
+    let lv: Level;
+    if (this.gesturing || this.anim) {
+      const t = performance.now();
+      if (t - this.chainT < LEVEL_MS) return;
+      this.chainT = t;
+      const k = this.lvAt;
+      lv = this.levelFrom(k && k.fan === this.fan ? k.lv : null);
+    } else lv = this.levelNow();
+    const v = levelClade(this.fan, lv);
+    if (v === this.chainV && this.h === this.chainH) return;
+    this.chainV = v;
+    this.chainH = this.h;
+    const write = (parts: string[]) => {
+      const last = document.createElement('b');
+      last.textContent = parts[parts.length - 1];
+      el.replaceChildren(
+        parts
+          .slice(0, -1)
+          .map((n) => `${n} › `)
+          .join(''),
+        last,
+      );
+    };
+    write(
+      chainFit(chainOf(this.fan, v), (parts) => {
+        write(parts);
+        return el.scrollWidth <= el.clientWidth;
+      }),
+    );
+  }
+  private chainT = 0;
+  private chainV: FanNode | null = null;
+  private chainH = 0;
+  /** The page's type has come: the chain fitted again on the next frame. */
+  fontsIn(): void {
+    this.chainV = null;
+    this.request();
+  }
   private lvTimer: ReturnType<typeof setTimeout> | 0 = 0;
   /** A pinch or drag under way (InputHandlers' gestureStart to gestureEnd): the level is worked out once it ends. */
   private gesturing = false;
@@ -2457,6 +2526,7 @@ export class FanView implements InputHandlers {
     // (The columns' paths made again a few a frame while the view moves, all at once at rest: ToLaD#313.)
     pathFrame.start(this.gesturing || !!this.anim);
     this.applyFold();
+    this.chainFrame();
     const ctx = this.ctx;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     this.gl?.begin();
