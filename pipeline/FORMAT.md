@@ -223,10 +223,12 @@ The sidecars are JSON, one per data file, read at build time by the fan (they ar
   `[parent, age, lo, hi, source]` (Ma; `lo`–`hi` its 95% interval, equal to `age` when there is none;
   `source` an index into `sources`); a species is `[parent, row]`. `parent` is an index into `nodes`
   (−1 for the root). Absent when the file has no dated species.
-- `names`: `{node index: name}`, the Open Tree clade name of a split whose species are exactly that
-  clade's matched species (the outermost such name; " (crown)" dropped), or the taxon an
-  `overrides.toml` `[[dated_name]]` entry names (a subfamily Open Tree's NCBI-derived taxonomy
-  circumscribes differently, e.g. Pantherinae = Panthera + Neofelis after Kitchener et al. 2017).
+- `names`: `{node index: name}`. A taxon of MDD's (order, suborder, family, subfamily, tribe) on the split with
+  the best F-score against its living species, if at least 0.75 (`taxnames.py`, tax2tree's decoration, ToLaD#417: a few
+  strays do not lose a family its name; report in `stats.json` → `dated_tree.taxon_names`). Where two want a split, order
+  and family hold it over a genus already named, and a genus over the ranks between. Else the Open Tree clade name of a split whose
+  species are exactly that clade's matched species (the outermost such name, cleaned of " (crown)", a homonym note and
+  "sensu lato"), or the taxon an `overrides.toml` `[[dated_name]]` entry names (those are never moved). A name stands on one split.
 - `names_en`: `{node index: English}`, the well-established English form of that split's taxon, from
   its `[[dated_name]]` entry (`"small cat"` for Felinae); the fan titles the split "Small cat ancestors".
   Absent where there is none (the fan uses the Latin name).

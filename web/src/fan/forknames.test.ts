@@ -241,7 +241,9 @@ describe('names at their forks (ToLaD#373)', () => {
       }
       v.doubleTap(0, 0);
       land(v);
-      expect(iv.offBy(start, v.cam), `${what}: a double tap back`).toBeLessThanOrEqual(2);
+      // Back where the tap was, when that zooms out (ToLaD#416). A name above the view flew out already: on, never tighter on width.
+      if (start.sx < landed.sx && start.sy <= landed.sy) expect(iv.offBy(start, v.cam), `${what}: a double tap back`).toBeLessThanOrEqual(2);
+      else expect(v.w * (v.cam.sx / landed.sx - 1), `${what}: a double tap zooms out`).toBeLessThanOrEqual(12);
     }
   });
 
@@ -253,7 +255,7 @@ describe('names at their forks (ToLaD#373)', () => {
     const iv = inner(v);
     v.cam = v.homeCamera();
     frame(v);
-    const sol = iv.brackets.list.find((c) => c.latin === 'Solenodon')!.v;
+    const sol = iv.brackets.list.find((c) => c.latin === 'Solenodontidae')!.v;
     v.cam = iv.frameOf({ v: sol });
     frame(v);
     v.draw();

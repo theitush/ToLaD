@@ -32,6 +32,7 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 
+from . import taxnames
 from .tree import D_INTERP, D_UPHAM, Node
 
 SRC_NAMES = ["upham", "upham-imputed", "fossil", "interpolated", "override", "alvarez", "ensemble", "upham-interp",
@@ -599,15 +600,14 @@ def build(root: Node, up_root, up_tax: dict[str, dict], ov, log: dict, ac=None, 
     nleaf: dict[int, int] = {}
     for d in reversed(list(droot.preorder())):
         nleaf[id(d)] = 1 if d.leaf is not None else sum(nleaf[id(c)] for c in d.children)
-    # names: the outermost named merged clade with exactly the same species
-    named = 0
+    # names of groups MDD does not rank (Glires, Ferae, ...), and a first name for those it does, which the decoration
+    # below moves to its best fork: the outermost named merged clade with exactly the same species
     for nd in root.preorder():
         d = m[id(nd)]
         if nd.is_leaf or not nd.name or d is None or d.leaf is not None or d.name or k[id(nd)] != nleaf[id(d)]:
             continue
-        d.name = nd.name.removesuffix(" (crown)")
-        named += 1
-    named += apply_names(droot, ov)
+        d.name = taxnames.clean(nd.name)
+    apply_names(droot, ov)
     ov.check_all_used(dated=True)
 
     # fossil floors: no crown younger than a fossil of its genus (capped below the crown's parent split)
@@ -830,6 +830,11 @@ def build(root: Node, up_root, up_tax: dict[str, dict], ov, log: dict, ac=None, 
         if d.leaf is not None:
             d.leaf.data["dleaf"] = d
     leaves = [d for d in droot.preorder() if d.leaf is not None]
+    # the forks named from MDD's taxonomy, now that every species is on the tree (ToLaD#417)
+    rep["taxon_names"] = taxnames.decorate(
+        droot, lambda L: L.data.get("mdd_taxa") if not L.extinct and L.t1 <= 0 else None,
+        locked={e["name"] for e in ov.dated_names},
+        genera={d.leaf.data["mdd_genus"] for d in leaves if d.leaf.data.get("mdd_genus")})
     splits = [d for d in droot.preorder() if d.leaf is None]
     log["dated_tree"] = {
         **rep,
@@ -837,7 +842,7 @@ def build(root: Node, up_root, up_tax: dict[str, dict], ov, log: dict, ac=None, 
         "living": sum(1 for d in leaves if not (d.leaf.extinct or d.leaf.t1 > 0)),
         "splits": len(splits),
         "splits_by_source": dict(Counter(SRC_NAMES[d.src] for d in splits)),
-        "named_splits": named,
+        "named_splits": sum(1 for d in splits if d.name),
         "grafts": dict(how),
         "clamped_below_parent": clamped,
         "zero_length_spliced": spliced,
