@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, type PointerEvent as RPointer
 import { flushSync } from 'react-dom';
 import { approxMa, formatCount, formatMass } from '../data/count';
 import { HistorySpark } from './HistorySpark';
-import type { Measure, WidthMode } from './layout';
+import type { Measure } from './layout';
 import { wikiOf, type WikiRec } from './wiki';
 import { RangeGlobe } from './Globe';
 import { mammaliaClade, NATURAL_META, type HistEvent, type SpeciesRec } from './panthera';
@@ -14,9 +14,7 @@ import { stamp } from '../stamp';
 import { population } from './population';
 import { WorldToggle } from './WorldToggle';
 import { forkLeaders, forkNames, setForkLeaders, setForkNames } from './brackets';
-import { labelMode, setLabelMode, type LabelMode } from './pics';
-import { GAP_MODES, gapMode, setGapMode, type GapMode } from './fold';
-import { FORK_MODES, forkMode, grayOn, setForkMode, setGrayOn, type ForkMode } from './steady';
+import { FORK_MODES, forkMode, setForkMode, type ForkMode } from './steady';
 import { MagnifierIcon, SearchPanel } from './SearchPanel';
 import { SourcesPanel } from './SourcesPanel';
 import { statusOf, wildPartSentence } from './status';
@@ -58,37 +56,6 @@ function initialForks(): ForkMode {
   return forkMode();
 }
 
-/** Whether the "line ended" part of a living branch is drawn (ToLaD#410, `?gray=off`): a look only, no new view. */
-function initialGray(): boolean {
-  try {
-    if (new URLSearchParams(window.location.search).get('gray') === 'off') setGrayOn(false);
-  } catch {
-    /* no address */
-  }
-  return grayOn();
-}
-
-/** How the neighbouring branches are spaced (ToLaD#378, `?gaps=`): set before the first view is built. */
-function initialGaps(): GapMode {
-  try {
-    const q = new URLSearchParams(window.location.search).get('gaps');
-    if (GAP_MODES.includes(q as GapMode)) setGapMode(q as GapMode);
-  } catch {
-    /* no address */
-  }
-  return gapMode();
-}
-
-/** What the labels name (ToLaD#417, `?labels=groups`): a look only. */
-function initialLabels(): LabelMode {
-  try {
-    if (new URLSearchParams(window.location.search).get('labels') === 'groups') setLabelMode('groups');
-  } catch {
-    /* not in a page */
-  }
-  return labelMode();
-}
-
 /** The upper clades' names (ToLaD#373, #434): at their forks, on leaders off them (`?forknames=leaders`), or the stack over "now" (`?forknames=off`). */
 type ForkNaming = 'at fork' | 'leaders' | 'off';
 const FORK_NAMINGS: ForkNaming[] = ['at fork', 'leaders', 'off'];
@@ -115,12 +82,8 @@ export function FanApp() {
   const placeRef = useRef<Place | null>(null);
   // A double tap on the card (ToLaD#301): what one on the tree does, one level up, the card closed.
   const cardUp = (x: number, y: number) => viewRef.current?.doubleTap(x, y);
-  const [mode, setMode] = useState<WidthMode>('linear');
   const [forks, setForks] = useState(initialForkNames);
-  const [gaps, setGaps] = useState<GapMode>(initialGaps);
   const [forkLook, setForkLook] = useState<ForkMode>(initialForks);
-  const [gray, setGray] = useState(initialGray);
-  const [labels, setLabels] = useState(initialLabels);
   // What the widths count (ToLaD#276): individuals, or their mass (`?width=mass`).
   const [measure, setMeasure] = useState<Measure>(initialMeasure);
   const [sel, setSel] = useState<Selection | null>(null);
@@ -156,7 +119,6 @@ export function FanApp() {
     stamp('build');
     const v = new FanView(c, mammaliaClade(), mammaliaTree(), true);
     stamp('view');
-    if (mode !== 'linear') v.setMode(mode);
     v.setMeasure(measure);
     v.onSelect = setSel;
     v.scaleEl = scaleRef.current;
@@ -182,7 +144,7 @@ export function FanApp() {
     };
     // (A new view per look's switch; the toggles' state carries over.)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewReady, gaps, forks]);
+  }, [viewReady, forks]);
 
   return (
     <div className="app fan">
@@ -203,17 +165,6 @@ export function FanApp() {
         </div>
       )}
       <div className="bar" ref={barRef} style={viewReady ? undefined : { visibility: 'hidden' }}>
-        <button
-          type="button"
-          aria-pressed={mode === 'linear'}
-          onClick={() => {
-            const next = mode === 'log' ? 'linear' : 'log';
-            setMode(next);
-            viewRef.current?.setMode(next);
-          }}
-        >
-          {mode === 'log' ? 'log widths' : 'linear widths'}
-        </button>
         {/* ToLaD#373, #434: the upper clades named at their forks, on leaders off them, or in the stack over "now". */}
         <button
           type="button"
@@ -236,31 +187,10 @@ export function FanApp() {
         >
           {`fork names: ${forks}`}
         </button>
-        {/* ToLaD#378, #408: the gaps between neighbouring branches, the same (even), larger between groups, by the clade each parts (clades), or by age (the old look). */}
+        {/* ToLaD#377, #402, #439: how a fork with too little height is drawn: a rectangular tree's corner, and a stem wider than tall a line (thin), or a ribbon (peel, the old look). */}
         <button
           type="button"
-          title="Gaps between branches: even, groups, clades or age"
-          onClick={() => {
-            const next = GAP_MODES[(GAP_MODES.indexOf(gaps) + 1) % GAP_MODES.length];
-            placeRef.current = viewRef.current?.place() ?? null;
-            setGapMode(next);
-            setSel(null);
-            setGaps(next);
-            try {
-              const u = new URL(window.location.href);
-              u.searchParams.set('gaps', next);
-              window.history.replaceState(null, '', u);
-            } catch {
-              /* not in the address */
-            }
-          }}
-        >
-          {`gaps: ${gaps}`}
-        </button>
-        {/* ToLaD#377, #402: how a fork with too little height is drawn: a rectangular tree's corner (flat), that and a stem wider than tall a line (thin), or a ribbon (peel, the old look). */}
-        <button
-          type="button"
-          title="Forks: thin lines for wide stems, flat corners, or peeling ribbons"
+          title="Forks: thin lines for wide stems, or peeling ribbons"
           onClick={() => {
             const next = FORK_MODES[(FORK_MODES.indexOf(forkLook) + 1) % FORK_MODES.length];
             setForkMode(next);
@@ -276,51 +206,6 @@ export function FanApp() {
           }}
         >
           {`forks: ${forkLook}`}
-        </button>
-        {/* ToLaD#410: the "line ended" part of living branches, drawn or not (the extinct stay, gray): a look only. */}
-        <button
-          type="button"
-          title="Gray: the part of living branches whose line ended, drawn or not; extinct animals stay, gray"
-          aria-pressed={gray}
-          onClick={() => {
-            setGrayOn(!gray);
-            setGray(!gray);
-            viewRef.current?.request();
-            try {
-              const u = new URL(window.location.href);
-              if (gray) u.searchParams.set('gray', 'off');
-              else u.searchParams.delete('gray');
-              window.history.replaceState(null, '', u);
-            } catch {
-              /* not in the address */
-            }
-          }}
-        >
-          {`gray: ${gray ? 'on' : 'off'}`}
-        </button>
-        {/* ToLaD#417: the labels: the cut's items, or the real groups one level down, each on its branch: a look only. */}
-        <button
-          type="button"
-          title="Labels: the cut's items, or the real groups one level down, each on its own branch"
-          onClick={() => {
-            const next: LabelMode = labels === 'cut' ? 'groups' : 'cut';
-            setLabelMode(next);
-            setLabels(next);
-            viewRef.current?.request();
-            try {
-              const u = new URL(window.location.href);
-              if (next === 'groups') u.searchParams.set('labels', 'groups');
-              else u.searchParams.delete('labels');
-              window.history.replaceState(null, '', u);
-            } catch {
-              /* not in the address */
-            }
-          }}
-        >
-          {`labels: ${labels}`}
-        </button>
-        <button type="button" onClick={() => viewRef.current?.resetView()}>
-          All mammals
         </button>
         <button
           type="button"
@@ -371,7 +256,7 @@ export function FanApp() {
               <span className="lane lineage" /> living descendants
             </li>
             <li>
-              <span className="lane dead" /> {gray ? 'line ended' : 'extinct'}
+              <span className="lane dead" /> extinct
             </li>
           </ul>
           <button type="button" className="sources-link" onClick={() => setShowSources(true)}>

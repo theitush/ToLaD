@@ -4,9 +4,14 @@
 import { describe, expect, it } from 'vitest';
 import { loadMammalsFromFiles } from './mammals-node';
 import { CARNIVORA, FELIDAE, mammaliaClade, type CladeRec } from './panthera';
-import { PIC_D, PIC_ROOM } from './pics';
+import { setLabelMode, PIC_D, PIC_ROOM } from './pics';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, type Split } from './splits';
 import { FanView, groupCentre, type CutLabels } from './view';
+import { setGapMode } from './fold';
+
+// (Written for the cut's labels and the groups' gaps, modes still in the modules: the app's defaults since ToLaD#439 are `groups` and `clades`.)
+setLabelMode('cut');
+setGapMode('groups');
 
 function stubView(clade: CladeRec = CARNIVORA, tree: Split = CARNIVORA_TREE, folds = true): FanView {
   const noop = () => {};

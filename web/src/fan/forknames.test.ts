@@ -1,7 +1,9 @@
 // The upper clades' names at their forks (ToLaD#373, the switch on, the default): none meets another, a picture or a
 // name pill, the time axis's gutter or the scale bar's foot, at the homes and on the way into a clade; each stands at
 // its fork and moves rigidly with it; a tap on one is the tap on its bracket's name was; the pinned rows still come.
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { setGapMode } from './fold';
+import { setLabelMode } from './pics';
 import { FORK_H, forkNames, setForkNames, type Brackets } from './brackets';
 import { nodeLeftAt, type FanNode } from './layout';
 import { loadMammalsFromFiles } from './mammals-node';
@@ -85,7 +87,12 @@ function clear(v: FanView, where: string): number {
   return boxes.length;
 }
 
+// (Written for the cut's labels and the groups' gaps, modes still in the modules: the app's defaults since ToLaD#439 are `groups` and `clades`.)
 describe('names at their forks (ToLaD#373)', () => {
+  beforeAll(() => {
+    setGapMode('groups');
+    setLabelMode('cut');
+  });
   if (!forkNames()) setForkNames(true);
 
   it('carnivores home: the stack is gone, the names clear of each other, the labels and the margins', () => {
