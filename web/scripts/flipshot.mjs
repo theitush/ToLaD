@@ -31,8 +31,9 @@ const state = () =>
       now: Math.round(v.toScreen(0, v.yNow)[1]),
       cam: v.cam,
       chain: document.querySelector('.chain')?.textContent ?? '',
-      titles: v.gapLast.filter((m) => m.v).map((m) => m.text),
-      spp: v.gapLast.filter((m) => m.v === undefined).map((m) => m.text),
+      // (`?names=stacks`: the stacks; else the labels in the gaps and branches, ToLaD#458.)
+      titles: [...v.gapLast.filter((m) => m.v).map((m) => m.text), ...c.names.filter((s) => s.v).map((s) => s.text)],
+      spp: [...v.gapLast.filter((m) => m.v === undefined).map((m) => m.text), ...c.names.filter((s) => !s.v).map((s) => s.text)],
     };
   });
 const show = (name, s) => console.log(`${name}: ${s.n} labels [${s.names.join(', ')}] picY ${s.picY} 100kya@${s.ka100} now@${s.now} view ${s.w}x${s.h} sx ${s.cam.sx.toPrecision(4)} sy ${s.cam.sy.toPrecision(4)} chain: ${s.chain}`);
@@ -123,7 +124,7 @@ const names = (s) => `${s.titles.length} titles (${s.titles.filter((t) => t.ends
   await settle();
   const title = await page.evaluate(() => {
     const v = window.__fan;
-    const m = v.gapLast.find((n) => n.text === 'Great apes');
+    const m = v.gapLast.find((n) => n.text === 'Great apes') ?? v.cutLast.names.find((n) => n.v && n.text !== 'Primates');
     if (!m) return null;
     const r = v.canvas.getBoundingClientRect();
     return { x: r.left + r.width - (m.box[1] + m.box[3]) / 2, y: r.top + (m.box[0] + m.box[2]) / 2, text: m.text };

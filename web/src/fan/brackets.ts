@@ -813,6 +813,11 @@ export class Brackets {
    * with the shortest leader that clears the forks' horizontals as well (forkRay), a name at its fork being the leader's
    * zero. A fork not on screen has nowhere to join: its name stands as above, clear of the horizontals too.
    */
+  /** No names at the forks this frame (the fork-name chip's `off` on the tree on its side, ToLaD#458). */
+  noForks(): void {
+    this.forkN = 0;
+  }
+
   placeForks(pills: readonly (readonly number[])[], lines: ForkLines | null = null): void {
     const c = this.spanCam;
     this.forkN = 0;
