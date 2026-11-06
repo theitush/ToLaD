@@ -379,9 +379,6 @@ export function colEventsY(fan: Fan, b: FanBranch): EventY[] {
   }
   return out;
 }
-/** An event's tint is at least this tall and this wide on screen (px), so a short window on a thin column still reads. */
-const EVENT_MIN_PX = 2;
-const EVENT_MIN_W = 3;
 /** How far (px) above or below a window a touch still opens it. */
 const EVENT_REACH_PX = 10;
 
@@ -1384,13 +1381,6 @@ export class FanView implements InputHandlers {
     }
     const p = br?.placed.find((q) => br.list[q.i].latin === latin);
     return br && p && p.b - p.a >= 6 ? [(p.a + p.b) / 2, br.rowY(p.row)] : null;
-  }
-
-  /** Whether a "+x" label stands at the middle of its branches with a hairline over them (ToLaD#368), or at its named species' place (#358). A switch while Ita compares: the middle jumps where an item splits, the species' place does not. */
-  midLabels = true;
-  setMidLabels(on: boolean): void {
-    this.midLabels = on;
-    this.request();
   }
 
   setMode(mode: WidthMode): void {
@@ -2429,7 +2419,6 @@ export class FanView implements InputHandlers {
       this.drawCorners(lod);
     }
     this.drawHeld();
-    this.drawEvents();
     this.drawStemFade();
     this.drawGutter();
     this.drawTouch();
@@ -2684,7 +2673,7 @@ export class FanView implements InputHandlers {
       // (A "+x" at the middle of its branches at its foot, ToLaD#368, clamped into its territory as any; a species' at
       // its face's place. Its foot: in the gap under its picture, ToLaD#373.)
       const foot = d0 + PIC_ROOM + PIC_LIFT / 2;
-      const span = this.midLabels && name.hid.length ? T.reach(it.f, it.l, Wy(foot)) : null;
+      const span = name.hid.length ? T.reach(it.f, it.l, Wy(foot)) : null;
       // (One branch, a species or an item with one strand at its foot: it stays with that branch; several: held on screen.)
       const one = !name.hid.length || (!!span && span[1] <= span[0]);
       const x = placeX(it.x0, it.x1, PIC_ROOM, span ? X((span[0] + span[1]) / 2) : faceX(it, name.face), !one);
@@ -2746,7 +2735,7 @@ export class FanView implements InputHandlers {
       if (!(fit > 0)) continue;
       const name = T.nameOf(it);
       const foot = y1 + PIC_LIFT / 2;
-      const span = this.midLabels && name.hid.length ? T.reach(it.f, it.l, Wy(foot)) : null;
+      const span = name.hid.length ? T.reach(it.f, it.l, Wy(foot)) : null;
       const one = !name.hid.length || (!!span && span[1] <= span[0]);
       let x = placeX(it.x0, it.x1, PIC_D, span ? X((span[0] + span[1]) / 2) : X(groupCentre({ b: name.face })), !one);
       if (x + r0 < 0 || x - r0 > this.w) continue;
@@ -3310,63 +3299,6 @@ export class FanView implements InputHandlers {
       this.ribbon(run, (i) => hw - run.w[i], () => hw, 0.6);
     }
     this.heldRuns.length = 0;
-  }
-
-  /**
-   * The curated events on the columns (colstyle.ts, ToLaD#141): each window tinted over its own column,
-   * lanes and individuals alike, after the held fade (so an event in a held stretch still shows). At
-   * least EVENT_MIN_PX tall and EVENT_MIN_W wide, centred, so a short window on a thin column reads at
-   * home. GPU layer: the overlay batch (over the mesh); without it the same polygons on the canvas.
-   */
-  private drawEvents(): void {
-    const [r, g, bl] = EVENT_TINT.rgb;
-    for (const b of this.fan.branches) {
-      for (const s of colEventsY(this.fan, b)) {
-        let st = this.toScreen(0, s.top)[1];
-        let sb = this.toScreen(0, s.bot)[1];
-        if (sb - st < EVENT_MIN_PX) {
-          const m = (st + sb) / 2;
-          st = m - EVENT_MIN_PX / 2;
-          sb = m + EVENT_MIN_PX / 2;
-        }
-        if (sb < -4 || st > this.h + 4) continue;
-        st = Math.max(-4, st);
-        sb = Math.min(this.h + 4, sb);
-        // Slices a few px tall follow the column's curve (straight between them).
-        const n = Math.max(1, Math.min(64, Math.ceil((sb - st) / 6)));
-        let [l0, r0] = this.eventEdges(b, st);
-        for (let i = 1; i <= n; i++) {
-          const y0 = st + ((sb - st) * (i - 1)) / n;
-          const y1 = st + ((sb - st) * i) / n;
-          const [l1, r1] = this.eventEdges(b, y1);
-          if (!((r0 < -8 && r1 < -8) || (l0 > this.w + 8 && l1 > this.w + 8))) {
-            if (this.gl) this.gl.over.push(l0, y0, r0, y1, r, g, bl, EVENT_TINT.a, l1 - l0, r1 - r0, -8, this.w + 8);
-            else {
-              const ctx = this.ctx;
-              ctx.fillStyle = `rgba(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(bl * 255)},${EVENT_TINT.a})`;
-              ctx.beginPath();
-              ctx.moveTo(l0, y0);
-              ctx.lineTo(r0, y0);
-              ctx.lineTo(r1, y1);
-              ctx.lineTo(l1, y1);
-              ctx.closePath();
-              ctx.fill();
-            }
-          }
-          l0 = l1;
-          r0 = r1;
-        }
-      }
-    }
-  }
-
-  /** A species' own column at screen y (clamped to it): its left and right edges on screen, at least EVENT_MIN_W apart. */
-  private eventEdges(b: FanBranch, sy: number): [number, number] {
-    const y = Math.min(b.splitY, Math.max(b.tipY, this.toWorld(0, sy)[1]));
-    const l = this.toScreen(leftAt(b, y), y)[0];
-    const w = laneAt(b, y).w * this.cam.sx;
-    const pad = Math.max(0, (EVENT_MIN_W - w) / 2);
-    return [l - pad, l + w + pad];
   }
 
   /**

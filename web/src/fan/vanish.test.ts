@@ -57,7 +57,7 @@ function stubView(clade: CladeRec, tree: Split, folds = true): { v: FanView; und
   };
   (v as unknown as { gl: unknown }).gl = gl;
   // (The labels draw nothing the branches depend on, and are most of a frame's cost.)
-  Object.assign(v, { labelsNow: () => ({ br: null, cut: null }), drawLabels: noop, drawTimeAxis: noop, drawEvents: noop, drawTrunkLabel: noop, drawWidthScale: noop, drawGutter: noop, drawTouch: noop });
+  Object.assign(v, { labelsNow: () => ({ br: null, cut: null }), drawLabels: noop, drawTimeAxis: noop, drawTrunkLabel: noop, drawWidthScale: noop, drawGutter: noop, drawTouch: noop });
   return { v, under: gl.under };
 }
 

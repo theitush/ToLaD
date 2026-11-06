@@ -116,7 +116,6 @@ export function FanApp() {
   // A double tap on the card (ToLaD#301): what one on the tree does, one level up, the card closed.
   const cardUp = (x: number, y: number) => viewRef.current?.doubleTap(x, y);
   const [mode, setMode] = useState<WidthMode>('linear');
-  const [mid, setMid] = useState(true);
   const [forks, setForks] = useState(initialForkNames);
   const [gaps, setGaps] = useState<GapMode>(initialGaps);
   const [forkLook, setForkLook] = useState<ForkMode>(initialForks);
@@ -158,7 +157,6 @@ export function FanApp() {
     const v = new FanView(c, mammaliaClade(), mammaliaTree(), true);
     stamp('view');
     if (mode !== 'linear') v.setMode(mode);
-    if (!mid) v.setMidLabels(false);
     v.setMeasure(measure);
     v.onSelect = setSel;
     v.scaleEl = scaleRef.current;
@@ -215,17 +213,6 @@ export function FanApp() {
           }}
         >
           {mode === 'log' ? 'log widths' : 'linear widths'}
-        </button>
-        {/* ToLaD#368: a "+x" label at the middle of its branches with a line over them, or at its named species. */}
-        <button
-          type="button"
-          aria-pressed={mid}
-          onClick={() => {
-            setMid(!mid);
-            viewRef.current?.setMidLabels(!mid);
-          }}
-        >
-          mid labels
         </button>
         {/* ToLaD#373, #434: the upper clades named at their forks, on leaders off them, or in the stack over "now". */}
         <button
