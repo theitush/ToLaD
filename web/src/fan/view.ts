@@ -5,7 +5,8 @@
 // Gestures come from the shared engine/input.ts.
 
 import { drawPic, hasPic, livePic, PIC_TRIES, prefetchPics } from './wiki';
-import { LABEL_AXIS_X, PIC_D, PIC_LIFT, PIC_ROOM, picBox, type PicSpot } from './pics';
+import { GROUP_D, LABEL_AXIS_X, labelMode, PIC_D, PIC_LIFT, PIC_ROOM, picBox, type PicSpot } from './pics';
+import { chooseSlots, placeSlots, type Slot } from './slide';
 import { formatCount, formatMass } from '../data/count';
 import { stamp } from '../stamp';
 import { DOUBLE_TAP_MS, Input, type InputHandlers } from '../engine/input';
@@ -261,6 +262,61 @@ class CutTerritories {
     out = { lv, text: lv.b ? levelText(lv.b) : levelName(lv.v), face, hid };
     this.names.set(key, out);
     return out;
+  }
+  /** Per node: its first and last strand standing on its youngest row (ToLaD#417): "now", unless all of it is fossil. */
+  private readonly standing = new Map<number, [number, number]>();
+  /** Daughter k's branch where its label stands, its youngest row (returned, world y; `out`: world x, its first strand's left to its last's right). */
+  branchOf(k: number, out: [number, number]): number {
+    const S = this.t.strands;
+    const y = this.youngOf(k);
+    let ends: [number, number];
+    if (k < 0) ends = [~k, ~k];
+    else {
+      const e = this.standing.get(k);
+      if (e) ends = e;
+      else {
+        const on = (i: number) => Math.max(S[i].tipY, this.now) <= y + 1e-9;
+        let [a, b] = [this.t.first[k], this.t.last[k]];
+        while (a < b && !on(a)) a++;
+        while (b > a && !on(b)) b--;
+        this.standing.set(k, (ends = [a, b]));
+      }
+    }
+    out[0] = leftAt(S[ends[0]], y);
+    out[1] = leftAt(S[ends[1]], y) + laneAt(S[ends[1]], y).w;
+    return y;
+  }
+  /** The strands whose tips stand in world x [x0, x1] (drawn order: a binary search): first and last, or null. */
+  tipsIn(x0: number, x1: number): [number, number] | null {
+    const S = this.t.strands;
+    const mid = (i: number) => {
+      const y = Math.max(S[i].tipY, this.now);
+      return leftAt(S[i], y) + laneAt(S[i], y).w / 2;
+    };
+    let [a, b] = [0, S.length];
+    while (a < b) {
+      const m = (a + b) >> 1;
+      if (mid(m) < x0) a = m + 1;
+      else b = m;
+    }
+    const f = a;
+    b = S.length;
+    while (a < b) {
+      const m = (a + b) >> 1;
+      if (mid(m) <= x1) a = m + 1;
+      else b = m;
+    }
+    return a > f ? [f, a - 1] : null;
+  }
+  /** The smallest clade with all of strands f..l. */
+  meet(f: number, l: number): FanNode {
+    const { first, last, index, strands } = this.t;
+    let u = strands[f].node;
+    for (;;) {
+      const j = index.get(u)!;
+      if ((first[j] <= f && last[j] >= l) || !u.parent) return u;
+      u = u.parent;
+    }
   }
   /** Clade v's territory (world x) at the layout as it stands. */
   spanOf(v: FanNode): [number, number] | null {
@@ -569,6 +625,32 @@ export function isLevel(fan: Fan, v: FanNode): boolean {
 export function levelName(v: FanNode): string {
   const latin = latinOf(v.split);
   return TAXON_EN[latin] ?? (latin || v.name);
+}
+
+/**
+ * A group label's name (ToLaD#417): its English name, or where it has none (the suborders and subfamilies few have one
+ * for) what it is told by: its largest part with one, down the largest parts, that one's first name and "& kin" ("Vesper bats & kin"). No English
+ * name down there: its Latin. One rule at every level; its fork keeps the Latin, levelName.
+ */
+const kinCache = new WeakMap<FanNode, string>();
+export function groupName(fan: Fan, v: FanNode): string {
+  let out = kinCache.get(v);
+  if (out === undefined) {
+    out = levelName(v);
+    if (out === latinOf(v.split) && !familiar(v)) {
+      for (let u: FanNode | undefined = v; u; ) {
+        let big: FanNode | undefined;
+        for (const g of nextLevels(fan, u)) if (g.v && (!big || g.v.strands.length > big.strands.length)) big = g.v;
+        if (big && familiar(big)) {
+          out = `${levelName(big).split(/,| & /)[0]} & kin`;
+          break;
+        }
+        u = big;
+      }
+    }
+    kinCache.set(v, out);
+  }
+  return out;
 }
 
 /**
@@ -2233,7 +2315,9 @@ export class FanView implements InputHandlers {
     }
     const to: Level | null = pinned ? { v: pinned.v } : pill?.v ? { v: pill.v } : pill?.b ? { b: pill.b } : pic ? (pic[4] ? { v: pic[4] } : { b: pic[3] }) : brk ? { v: brk.v } : null;
     if (to) {
-      this.tapInto(to, false);
+      // (A group label, ToLaD#417: its group's own frame, as a fork name's, ToLaD#390.)
+      if (labelMode() === 'groups' && (pill || pic)) this.goLevel(to, this.frameOf(to));
+      else this.tapInto(to, false);
       return;
     }
     // An event's label: opens its event, the touch at the middle of its window on the column.
@@ -2355,7 +2439,7 @@ export class FanView implements InputHandlers {
     if (this.brackets) this.brackets.spanOf = (v) => T.spanOf(v);
     const br = this.layoutBrackets();
     const row = this.heldRow();
-    const cut = (this.cutLast = this.cutLabels(T, row));
+    const cut = (this.cutLast = labelMode() === 'groups' ? this.groupLabels(T, row) : this.cutLabels(T, row));
     this.rowLast = row;
     // (The names at their forks clear of the labels and the axis's labels as last drawn; its origin note reaches past the gutter.)
     if (br && forkNames()) br.placeForks([...[...cut.spots, ...cut.names].filter((s) => s.fit > 0.3).map((s) => s.box), ...cut.pics.map(picBox), ...this.axisBoxes]);
@@ -2382,6 +2466,83 @@ export class FanView implements InputHandlers {
     const f = this.fan.tess.fold;
     if (f) this.foldTo(f);
     return this.cutLabels(this.territories(), -Infinity, true);
+  }
+
+  /** The level the group labels are of this frame (ToLaD#417; tests read it): what holds all the strands on screen. */
+  groupsOf: FanNode | null = null;
+  private readonly nextCache = new Map<FanNode, { lv: Level; k: number; f: number; l: number }[]>();
+
+  /**
+   * This frame's labels under `?labels=groups` (ToLaD#417): the real groups, one level down. L, the smallest named level
+   * holding every strand on screen (right of the axis); its groups (nextLevels) with any on screen; of those, most
+   * individuals first, each whose picture can stand on its own branch at its youngest row, "now" for anyone living,
+   * without meeting one already placed (slide.ts). A group with no such place has no label at this zoom: its fork name
+   * still names it. No "+x", no leaders. A function of the camera alone. One label as anywhere: name pill over picture,
+   * a tap on either going to the group's own frame.
+   */
+  private groupLabels(T: CutTerritories, row: number): CutLabels {
+    const out: CutLabels = { spots: [], groups: new Map(), pics: [], items: [], all: [], names: [] };
+    this.picSpots = out.pics;
+    const X = (x: number) => this.toScreen(x, 0)[0];
+    const Y = (y: number) => this.toScreen(0, y)[1];
+    const tips = T.tipsIn(this.toWorld(LABEL_AXIS_X, 0)[0], this.toWorld(this.w, 0)[0]);
+    this.groupsOf = null;
+    if (!tips) return out;
+    const L = levelUp(this.fan, T.meet(tips[0], tips[1]), true);
+    if (!L) return out;
+    this.groupsOf = L;
+    let gs = this.nextCache.get(L);
+    if (!gs) {
+      const { index } = T.t;
+      gs = nextLevels(this.fan, L).map((lv) => {
+        const k = lv.b ? ~lv.b.index : index.get(lv.v)!;
+        return { lv, k, f: k < 0 ? ~k : T.t.first[k], l: k < 0 ? ~k : T.t.last[k] };
+      });
+      gs.sort((a, b) => a.f - b.f);
+      this.nextCache.set(L, gs);
+    }
+    const r0 = PIC_D / 2;
+    const left = LABEL_AXIS_X + r0;
+    const right = this.w - r0;
+    const bottom = this.h - LABEL_BOTTOM_PX + 30;
+    const slots: Slot[] = [];
+    const at: { g: (typeof gs)[number]; d0: number; fit: number }[] = [];
+    const span: [number, number] = [0, 0];
+    for (const g of gs) {
+      if (g.l < tips[0] || g.f > tips[1]) continue;
+      const wy = T.branchOf(g.k, span);
+      const d0 = Math.max(Y(wy) - PIC_LIFT - PIC_ROOM, row);
+      const fit = clamp01((bottom - (d0 + PIC_ROOM + PIC_LIFT)) / 30);
+      if (!(fit > 0)) continue;
+      // (Its centre on its branch's part on screen. A branch nearer the screen's edge than a picture's half: the picture
+      // whole against that edge, its branch under it, as long as the branch is on screen.)
+      const [a, b] = [X(span[0]), X(span[1])];
+      if (b < LABEL_AXIS_X || a > this.w) continue;
+      const lo = Math.min(Math.max(a, left), right);
+      const hi = Math.max(Math.min(b, right), left);
+      slots.push({ lo, hi, at: (lo + hi) / 2 });
+      at.push({ g, d0, fit });
+    }
+    const order = at.map((_, i) => i).sort((p, q) => T.aliveOf(at[q].g.k) - T.aliveOf(at[p].g.k) || at[q].g.l - at[q].g.f - (at[p].g.l - at[p].g.f) || p - q);
+    const on = chooseSlots(slots, order, GROUP_D);
+    const xs = placeSlots(slots, on, GROUP_D);
+    const { cap } = this.labelBand();
+    const half = LABEL_PILL / 2;
+    on.forEach((n, i) => {
+      const { g, d0, fit } = at[n];
+      const x = xs[i];
+      const { lv } = g;
+      const face = lv.b ?? groupFace(lv.v) ?? lv.v.strands[0];
+      const text = this.pillText(lv.b ? levelText(lv.b) : groupName(this.fan, lv.v), cap - 2 * LABEL_PAD);
+      const y1 = d0 + PIC_ROOM - PIC_D - LABEL_UNDER;
+      const key = `g${g.k}`;
+      const s: LabelSpot = { key, id: key, place: 'tip', text, rank: [0, slots[n].hi - slots[n].lo, g.k], x, y1, box: [x - half, y1 - this.nameWidth(text) - 2 * LABEL_PAD, x + half, y1], fit, plus: 0, pic: face };
+      if (lv.b) s.b = lv.b;
+      else Object.assign(s, { v: lv.v, fam: lv.v });
+      out.spots.push(s);
+      out.pics.push({ x, y: d0 + PIC_ROOM - PIC_D / 2, i, lv, face, held: true });
+    });
+    return out;
   }
 
   /**
