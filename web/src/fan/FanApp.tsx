@@ -64,7 +64,7 @@ function initialForks(): ForkMode {
   return forkMode();
 }
 
-/** Whether what has no living descendants is drawn (ToLaD#410, `?gray=off`): a look only, no new view. */
+/** Whether the "line ended" part of a living branch is drawn (ToLaD#410, `?gray=off`): a look only, no new view. */
 function initialGray(): boolean {
   try {
     if (new URLSearchParams(window.location.search).get('gray') === 'off') setGrayOn(false);
@@ -266,10 +266,10 @@ export function FanApp() {
         >
           {`forks: ${forkLook}`}
         </button>
-        {/* ToLaD#410: the lines that ended, drawn or not: a look only, what is left stands where it stood. */}
+        {/* ToLaD#410: the "line ended" part of living branches, drawn or not (the extinct stay, gray): a look only. */}
         <button
           type="button"
-          title="Gray: the lines with no living descendants, drawn or not"
+          title="Gray: the part of living branches whose line ended, drawn or not; extinct animals stay, gray"
           aria-pressed={gray}
           onClick={() => {
             setGrayOn(!gray);
@@ -359,11 +359,9 @@ export function FanApp() {
           <li>
             <span className="lane lineage" /> living descendants
           </li>
-          {gray && (
-            <li>
-              <span className="lane dead" /> line ended
-            </li>
-          )}
+          <li>
+            <span className="lane dead" /> {gray ? 'line ended' : 'extinct'}
+          </li>
         </ul>
       )}
       </div>
