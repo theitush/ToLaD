@@ -5,6 +5,7 @@
 // Gestures come from the shared engine/input.ts.
 
 import { drawPic, hasPic, livePic, PIC_TRIES, prefetchPics } from './wiki';
+import { AXIS_ROOM, CHAIN_ROOM, flipOn, FORK_PX as FLIP_FORK_PX, LABELS_MA, NOW_PX, turnCanvas, upright } from './flip';
 import { GROUP_D, LABEL_AXIS_X, labelMode, PIC_D, PIC_LIFT, PIC_ROOM, picBox, type PicSpot } from './pics';
 import { coverLadder, keepOnScreen, placeSlots } from './slide';
 import { formatCount, formatMass } from '../data/count';
@@ -999,6 +1000,8 @@ export class FanView implements InputHandlers {
   barEl: HTMLElement | null = null;
   private scaleKey = '';
   /** `?debug`: a readout of the zooms, years on screen and individuals per px. */
+  /** The tree on its side (flip.ts, ToLaD#452): `w` is the phone's height, `h` its width. */
+  readonly flip = flipOn();
   readonly debug = typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug');
   /** Without the GPU layer: this frame's styled column stretches, faded once the individuals are drawn. */
   private heldRuns: { run: LanePts; hw: number; d: number }[] = [];
@@ -1077,8 +1080,11 @@ export class FanView implements InputHandlers {
     stamp('fold');
     // Width and time zoom separately (#138): a sideways pinch zooms width, an upright one time, a diagonal both.
     this.input = new Input(canvas, this, true);
+    this.input.turned = this.flip;
     this.ro = new ResizeObserver(() => this.resize());
     this.ro.observe(canvas);
+    // (Turned, the canvas's size is set from its parent's.)
+    if (this.flip && canvas.parentElement) this.ro.observe(canvas.parentElement);
     this.resize();
     this.camera.cam = this.homeCamera();
     this.camera.settle();
@@ -1093,18 +1099,42 @@ export class FanView implements InputHandlers {
   }
 
   resize(): void {
-    const r = this.canvas.getBoundingClientRect();
+    const r = this.flip ? this.turnStage() : this.canvas.getBoundingClientRect();
     const first = this.w === 1;
     // (A frame is the screen's: the steps' are another screen's.)
     if (Math.max(1, r.width) !== this.w || Math.max(1, r.height) !== this.h) this.steps = [];
     this.camera.w = Math.max(1, r.width);
     this.camera.h = Math.max(1, r.height);
     this.dpr = Math.min(2, window.devicePixelRatio || 1);
-    this.canvas.width = Math.round(this.w * this.dpr);
+    this.canvas.width = Math.round(this.stageW * this.dpr);
     this.canvas.height = Math.round(this.h * this.dpr);
     if (first) this.cam = this.homeCamera();
     this.camera.settle();
     this.request();
+  }
+
+  /** The canvas's width: the view's, and turned, the time axis's band past it. */
+  private get stageW(): number {
+    return this.flip && this.canvas.parentElement ? this.w + AXIS_ROOM : this.w;
+  }
+  /** The phone's foot the DOM holds, under the turned canvas (flip): measured once, before any card opens in it. */
+  private flipFoot = -1;
+  /** Turn the canvases (flip.ts) to fill the phone between the buttons and the foot: the view's size, its `w` the phone's height. */
+  private turnStage(): { width: number; height: number } {
+    const p = this.canvas.parentElement;
+    if (!p) {
+      const r = this.canvas.getBoundingClientRect();
+      return { width: r.width, height: r.height };
+    }
+    const r = p.getBoundingClientRect();
+    const bar = p.querySelector?.('.bar')?.getBoundingClientRect();
+    const foot = p.querySelector?.('.foot')?.getBoundingClientRect();
+    const top = (bar && bar.height > 0 ? bar.bottom - r.top : 0) + CHAIN_ROOM;
+    if (this.flipFoot < 0) this.flipFoot = foot && foot.height > 0 ? r.bottom - foot.top : 0;
+    const w = Math.max(1, r.height - top - this.flipFoot - AXIS_ROOM);
+    turnCanvas(this.canvas, r.width, top, w + AXIS_ROOM);
+    if (this.gl) turnCanvas(this.gl.canvas, r.width, top, w + AXIS_ROOM);
+    return { width: w, height: r.width };
   }
 
   get cam(): Camera {
@@ -1191,6 +1221,10 @@ export class FanView implements InputHandlers {
    * under that row; `room` the stack's foot to "now" (Brackets.pillRoom).
    */
   private labelBand(): { top: number; cap: number; row: number; now: number; room: number } {
+    if (this.flip) {
+      const row = this.flipPicY() + PIC_D / 2 - PIC_ROOM;
+      return { top: 0, cap: LABEL_CAP, row, now: NOW_PX, room: LABEL_CAP };
+    }
     // (Named at their forks, ToLaD#373: no stack to keep rows for, the tree has them; heldRow makes way for the pinned rows.)
     const top = this.labelTop() + (this.brackets && !forkNames() ? STACK_MOST : 0);
     const under = LABEL_UNDER + PIC_ROOM + PIC_LIFT;
@@ -1201,16 +1235,28 @@ export class FanView implements InputHandlers {
   }
 
   /**
+   * Turned (flip.ts): where the labels' pictures' centres stand, on 100 kya. Off screen in time, at the edge it left by,
+   * so that a picture and its pill stay on screen, as keepOnScreen keeps them at the sides.
+   */
+  private flipPicY(): number {
+    const y = this.toScreen(0, this.fan.time.y(LABELS_MA))[1];
+    const r = PIC_D / 2;
+    return Math.max(LABEL_CAP + LABEL_UNDER + r, Math.min(this.h - r, y));
+  }
+
+  /**
    * The row the labels are held on this frame (labelBand's). With the names at their forks the band reserves no rows
    * for the pinned ones, so as "now" scrolls up past where it stands the row comes down as far as those rows' most, and they come in over it.
    */
   private heldRow(): number {
     const { row, now } = this.labelBand();
+    if (this.flip) return row;
     return forkNames() ? row + Math.min(STACK_MOST, Math.max(0, now - this.toScreen(0, this.yNow)[1])) : row;
   }
 
   /** The scale bar's top (screen y), the foot of what stands on the tree. */
   private scaleTop(): number {
+    if (this.flip) return this.h;
     const r = this.scaleEl?.getBoundingClientRect?.();
     return r && r.height > 0 ? r.top - this.canvas.getBoundingClientRect().top : this.h - SCALE_PX;
   }
@@ -1225,7 +1271,7 @@ export class FanView implements InputHandlers {
     const sn = this.h / 2 + (this.yNow - cam.cy) * cam.sy;
     const yFork = cam.cy + (this.h - FRAME_BOTTOM - this.h / 2) / cam.sy;
     const nowS = this.brackets ? this.labelBand().now : sn;
-    const sy = Math.max(1e-300, this.h - FORK_PX - nowS) / Math.max(1e-300, yFork - top);
+    const sy = Math.max(1e-300, this.h - (this.flip ? FLIP_FORK_PX : FORK_PX) - nowS) / Math.max(1e-300, yFork - top);
     return { ...cam, sy, ty: sy, cy: top + (this.h / 2 - nowS) / sy };
   }
 
@@ -2412,10 +2458,10 @@ export class FanView implements InputHandlers {
     const ctx = this.ctx;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     this.gl?.begin();
-    if (this.gl) ctx.clearRect(0, 0, this.w, this.h);
+    if (this.gl) ctx.clearRect(0, 0, this.stageW, this.h);
     else {
       ctx.fillStyle = BG;
-      ctx.fillRect(0, 0, this.w, this.h);
+      ctx.fillRect(0, 0, this.stageW, this.h);
     }
     drawWorldUnder(this);
     this.drawTimeAxis(false);
@@ -2446,7 +2492,7 @@ export class FanView implements InputHandlers {
     this.drawTimeAxis(true);
     drawWorldOver(this);
     if (this.gl) {
-      this.gl.end(this.w, this.h, this.dpr);
+      this.gl.end(this.stageW, this.h, this.dpr);
     }
     this.frameMs.push(performance.now() - t0);
     if (this.frameMs.length > 600) this.frameMs.shift();
@@ -2562,8 +2608,9 @@ export class FanView implements InputHandlers {
     for (const g of this.coverAt(T, this.cam.sx)) {
       const [a, b] = [X(g.a), X(g.b)];
       if (b < 0 || a > this.w) continue;
-      const d0 = Math.max(Y(g.wy) - PIC_LIFT - PIC_ROOM, row);
-      const fit = clamp01((bottom - (d0 + PIC_ROOM + PIC_LIFT)) / 30);
+      // (Turned, every label on the one line, whoever's branch ended earlier: labelBand.)
+      const d0 = this.flip ? row : Math.max(Y(g.wy) - PIC_LIFT - PIC_ROOM, row);
+      const fit = this.flip ? 1 : clamp01((bottom - (d0 + PIC_ROOM + PIC_LIFT)) / 30);
       if (!(fit > 0)) continue;
       here.push({ g, d0, fit });
       wins.push([a, b]);
@@ -3407,7 +3454,14 @@ export class FanView implements InputHandlers {
     let px = rx + 10;
     if (px + tw > this.w - 6) px = rx - 10 - tw;
     px = Math.max(this.w > 200 ? 70 : 4, px);
-    const py = y - 26;
+    let py = y - 26;
+    if (this.flip) {
+      // (Upright on the phone, over its ring, the same way round.)
+      ctx.translate(rx, y);
+      ctx.rotate(-Math.PI / 2);
+      px = y - 10 - tw > 6 ? 10 : -10 - tw;
+      py = -26;
+    }
     ctx.fillStyle = 'rgba(12,23,20,0.86)';
     ctx.beginPath();
     ctx.roundRect(px, py, tw, 20, 10);
@@ -3451,7 +3505,8 @@ export class FanView implements InputHandlers {
 
   /** The buttons' box in canvas px [x0, y0, x1, y1], if any. */
   private barRect(): number[] | null {
-    if (!this.barEl) return null;
+    // (Turned, the canvas stops under the buttons.)
+    if (!this.barEl || this.flip) return null;
     const r = this.barEl.getBoundingClientRect();
     const c = this.canvas.getBoundingClientRect();
     if (!(r.width > 0)) return null;
@@ -3467,6 +3522,20 @@ export class FanView implements InputHandlers {
   /** This frame's pictures (cutLabels), each with the level or species it opens. */
   picSpots: (PicSpot & { lv: Level; face: FanBranch; run?: Run })[] = [];
 
+  /** One picture, standing upright on the phone when the canvas is turned. */
+  private drawDisc(sci: Parameters<typeof drawPic>[1], x: number, y: number): void {
+    const ctx = this.ctx;
+    if (!this.flip) {
+      drawPic(ctx, sci, x, y, PIC_D, () => this.request());
+      return;
+    }
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(-Math.PI / 2);
+    drawPic(ctx, sci, 0, 0, PIC_D, () => this.request());
+    ctx.restore();
+  }
+
   /** Draw this frame's pictures (cutLabels). Each a tap to its group. */
   private drawGroupPics(): void {
     const ctx = this.ctx;
@@ -3478,7 +3547,7 @@ export class FanView implements InputHandlers {
     // (Hits: the one on top found first.)
     for (const p of [...this.picSpots].reverse()) this.thumbHits.push([p.x, p.y, PIC_D / 2, p.face, p.lv.v, p.run]);
     // (Its placeholder at once, the picture fading in when loaded; what a tap would show next fetched ahead, ToLaD#351.)
-    for (const p of this.picSpots) drawPic(ctx, discSci(p.lv, p.face), p.x, p.y, PIC_D, () => this.request());
+    for (const p of this.picSpots) this.drawDisc(discSci(p.lv, p.face), p.x, p.y);
     prefetchPics(this.picSpots.flatMap((p) => (p.lv.v ? nextFaces(this.fan, p.lv.v) : [])));
     ctx.restore();
   }
@@ -3574,7 +3643,7 @@ export class FanView implements InputHandlers {
       const [px0, px1] = s.disc ? [s.x - LABEL_PILL / 2, s.x + LABEL_PILL / 2] : [x0, x1];
       if (s.ev !== undefined && s.b && alpha > 0.5) this.eventLabels.push({ box: [x0, y0, x1, y1], b: s.b, k: s.ev });
       ctx.globalAlpha = alpha;
-      if (s.disc) drawPic(ctx, discSci(s.disc.lv, s.pic!), s.x, s.disc.y, PIC_D, () => this.request());
+      if (s.disc) this.drawDisc(discSci(s.disc.lv, s.pic!), s.x, s.disc.y);
       // (Opaque: a bracket's line behind it never shows through the name.)
       ctx.fillStyle = BG;
       ctx.beginPath();
@@ -3765,6 +3834,11 @@ export class FanView implements InputHandlers {
       ctx.restore();
       return;
     }
+    if (this.flip) {
+      this.drawFlipTicks(placed, origin);
+      ctx.restore();
+      return;
+    }
     // A gutter that fades out from the left edge, and a halo of the ground round each label:
     // the labels read over the branches and the stem.
     // (The gutter itself is drawn under the species' labels: drawGutter.)
@@ -3813,9 +3887,47 @@ export class FanView implements InputHandlers {
     ctx.restore();
   }
 
+  /**
+   * Turned (flip.ts): the time axis in its band along the phone's foot, over the period strip, read across. Ticks by
+   * priority, as many as their own text leaves room for. Called inside drawTimeAxis's save, its font and halo set.
+   */
+  private drawFlipTicks(placed: readonly { yrs: number; step: number; sy: number }[], origin: number): void {
+    const ctx = this.ctx;
+    ctx.fillStyle = BG;
+    ctx.fillRect(this.w, 0, AXIS_ROOM, this.h);
+    upright(ctx, this.h);
+    // (The fork names keep clear of the trunk's label, as of the axis's labels unturned.)
+    this.axisBoxes.length = 0;
+    if (this.trunkBox) this.axisBoxes.push(this.trunkBox);
+    const py = this.w + 11;
+    ctx.textAlign = 'center';
+    ctx.lineWidth = 3.5;
+    const taken: [number, number][] = [];
+    for (const p of placed) {
+      const px = this.h - p.sy;
+      const now = p.yrs === 0;
+      const must = now || p.yrs === origin;
+      const label = now ? 'now' : formatTick(p.yrs, p.step);
+      ctx.font = must ? font('650 12.5px') : font('500 12px');
+      const tw = ctx.measureText(label).width;
+      // (Whole on the phone: "now" is near its right edge, so it may stand back from its tick.)
+      const cx = Math.max(tw / 2 + 2, Math.min(this.h - tw / 2 - 2, px));
+      const span: [number, number] = [cx - tw / 2 - 6, cx + tw / 2 + 6];
+      if (taken.some(([a, b]) => span[0] < b && span[1] > a)) continue;
+      taken.push(span);
+      ctx.fillStyle = now ? GREEN : must ? INK : INK3;
+      ctx.fillRect(Math.round(px), py + 8, 1, now ? 6 : 4);
+      ctx.strokeText(label, cx, py);
+      ctx.fillText(label, cx, py);
+    }
+    ctx.font = font('500 12px');
+  }
+
   /** The time axis's gutter: the branches fade under it at the left edge; the labels go over it. */
   private drawGutter(): void {
     const ctx = this.ctx;
+    // (Turned, the axis has its own band.)
+    if (this.flip) return;
     const gut = ctx.createLinearGradient(0, 0, 96, 0);
     gut.addColorStop(0, 'rgba(12,23,20,0.86)');
     gut.addColorStop(0.55, 'rgba(12,23,20,0.5)');
@@ -3824,12 +3936,16 @@ export class FanView implements InputHandlers {
     ctx.fillRect(0, 0, 96, this.h);
   }
 
+  /** The trunk's label as last drawn, turned (view coordinates). */
+  private trunkBox: Box | null = null;
+
   private drawTrunkLabel(): void {
     const ctx = this.ctx;
+    this.trunkBox = null;
     const f = this.fan;
     // Right of the stem, just below the fork (nothing else is drawn there).
     const [sx, sy] = this.toScreen(f.stem[1], 0);
-    if (sy > this.h + 20 || sy < -80 || sx > this.w) return;
+    if (sy > this.h + 20 || sy < -80 || (sx > this.w && !this.flip)) return;
     ctx.save();
     ctx.textBaseline = 'top';
     ctx.textAlign = 'left';
@@ -3844,6 +3960,30 @@ export class FanView implements InputHandlers {
     for (const [t, ft] of lines) {
       ctx.font = ft;
       wmax = Math.max(wmax, ctx.measureText(t).width);
+    }
+    if (this.flip) {
+      // Turned: under the stem on the phone, left of the fork; above the stem where it is low; read across, on a halo.
+      const px = Math.max(6, Math.min(this.h - sy - wmax - 10, this.h - wmax - 6));
+      const [stemL] = this.toScreen(f.stem[0], 0);
+      const py = sx + 8 + 68 <= this.w ? sx + 8 : stemL - 8 - 68;
+      if (py + 68 < 0) {
+        ctx.restore();
+        return;
+      }
+      this.trunkBox = [py, this.h - px - wmax, py + 68, this.h - px];
+      upright(ctx, this.h);
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = BG;
+      const rows = [0, 21, 39, 55];
+      lines.forEach(([t, ft, c], k) => {
+        ctx.font = ft;
+        ctx.fillStyle = c;
+        ctx.strokeText(t, px, py + rows[k]);
+        ctx.fillText(t, px, py + rows[k]);
+      });
+      ctx.restore();
+      return;
     }
     // Right of the stem if it fits; else on the stem itself, just below the fork, on a halo.
     const onStem = sx + 10 + wmax > this.w - 6;
