@@ -168,6 +168,10 @@ const scenes = [
   ['up-polar2', 'search', ['polar', 'Polar bear', 2]],
   // The fold (ToLaD#146): the dogs at 1.5x, 3x and 6x home's width zoom, opening as they grow.
   // The group labels at each level (ToLaD#417, Q=labels=groups): its groups one level down.
+  // (A pan from home at home's zoom, px across: ToLaD#431.)
+  ['gl-pan-m60', 'across', [1, -60]],
+  ['gl-pan-180', 'across', [1, 180]],
+  ['gl-pan-240', 'across', [1, 240]],
   ['gl-rodents', 'zoomto', ['Rodentia']],
   ['gl-bats', 'zoomto', ['Chiroptera']],
   ['gl-primates', 'zoomto', ['Primates']],
@@ -348,6 +352,12 @@ try {
           const h = f.homeCamera();
           const sy = (f.h - 240) / Math.abs(yb - ya);
           f.cam = { ...h, sy, ty: sy, cy: (ya + yb) / 2 };
+          f.camera.settle();
+        } else if (kind === 'across') {
+          // Home at width zoom z, the view moved dx px across.
+          const [z, dx] = args;
+          const h = f.homeCamera();
+          f.cam = { ...h, sx: h.sx * z, cx: h.cx + dx / (h.sx * z) };
           f.camera.settle();
         } else if (kind === 'pan') {
           // Zoom z with "now" at 160 px from the top, then the view moved down dy px (into the past).

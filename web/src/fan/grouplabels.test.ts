@@ -1,14 +1,15 @@
 // Labels are the real groups one level down (ToLaD#417, `?labels=groups`), at mammals, checked by code at every level
 // on the way down, under `clades` and the default gaps: every label names a group of nextLevels(L), L the smallest named
-// level holding what is on screen; no two meet, none off screen or left of the axis, none with a "+x" or a leader; every
-// picture's centre on its own branch at "now"; a tap lands on its group's frame; a steady pinch changes the set rarely
-// and moves a label smoothly.
+// level holding what is on screen; no two meet, none off screen, none with a "+x" or a leader; every
+// picture's centre on its own branch at "now"; a group of several branches has the hairline from its first to its last
+// under its picture (ToLaD#431); a tap lands on its group's frame; a steady pinch changes the set rarely and moves a
+// label smoothly; a pan never costs a group whose branch's middle is on screen its label for one going off (ToLaD#431).
 import { afterAll, describe, expect, it } from 'vitest';
 import { groupName, levelName, FanView, isLevel, nextLevels, type CutLabels, type Level } from './view';
 import { latinOf } from './brackets';
 import { loadMammalsFromFiles } from './mammals-node';
 import { mammaliaClade } from './panthera';
-import { GROUP_D, LABEL_AXIS_X, PIC_D, setLabelMode } from './pics';
+import { GROUP_D, PIC_D, PIC_LIFT, setLabelMode } from './pics';
 import { chooseSlots, placeSlots, type Slot } from './slide';
 import { mammaliaTree } from './splits';
 import { setGapMode, type GapMode } from './fold';
@@ -82,9 +83,9 @@ function check(v: FanView, c: CutLabels, at: string, bad: string[]): string[] {
     const p = pics[i];
     const s = c.spots[p.i];
     if (!groups.has(p.lv.v ?? p.lv.b!)) bad.push(`${at}: ${nameOfLv(p.lv)} is no group of ${levelName(L)}`);
-    if (p.x - PIC_D / 2 < LABEL_AXIS_X - 1e-6 || p.x + PIC_D / 2 > v.w + 1e-6) bad.push(`${at}: ${nameOfLv(p.lv)} off screen at ${p.x.toFixed(1)}`);
+    if (p.x - PIC_D / 2 < -1e-6 || p.x + PIC_D / 2 > v.w + 1e-6) bad.push(`${at}: ${nameOfLv(p.lv)} off screen at ${p.x.toFixed(1)}`);
     if (i && p.x - pics[i - 1].x < GROUP_D - 1e-6) bad.push(`${at}: ${nameOfLv(p.lv)} meets ${nameOfLv(pics[i - 1].lv)}`);
-    if (/\+\d/.test(s.text) || s.over || s.plus) bad.push(`${at}: ${s.text} has a "+x" or a leader`);
+    if (/\+\d/.test(s.text) || s.plus) bad.push(`${at}: ${s.text} has a "+x"`);
     if (s.box[0] > p.x || s.box[2] < p.x || s.box[3] > p.y) bad.push(`${at}: ${s.text}'s pill is not over its picture`);
     // Its centre on its own branch, at the row it stands on.
     const strands = p.lv.v ? p.lv.v.strands : [p.lv.b!];
@@ -93,8 +94,21 @@ function check(v: FanView, c: CutLabels, at: string, bad: string[]): string[] {
     const a = v.toScreen(Math.min(...on.map((m) => m.left)), 0)[0];
     const b = v.toScreen(Math.max(...on.map((m) => m.left + m.w)), 0)[0];
     // (Its centre on its branch; a branch nearer the screen's edge than a picture's half: the picture whole against that edge, the branch under it.)
-    const pinned = Math.abs(p.x - (LABEL_AXIS_X + PIC_D / 2)) < 1e-6 ? b >= LABEL_AXIS_X : Math.abs(p.x - (v.w - PIC_D / 2)) < 1e-6 ? a <= v.w : false;
+    const pinned = Math.abs(p.x - PIC_D / 2) < 1e-6 ? b >= 0 : Math.abs(p.x - (v.w - PIC_D / 2)) < 1e-6 ? a <= v.w : false;
     if ((p.x < a - 1e-6 || p.x > b + 1e-6) && !pinned) bad.push(`${at}: ${nameOfLv(p.lv)} at ${p.x.toFixed(1)} is off its branch ${a.toFixed(1)}..${b.toFixed(1)}`);
+    // Its hairline: in the gap under its picture, from the first to the last of its branches at that row; one branch, none.
+    const foot = p.y + PIC_D / 2 + PIC_LIFT / 2;
+    const wy = Math.max(v.toWorld(0, foot)[1], young);
+    const row = strands.filter((b) => Math.max(b.tipY, now) <= wy + 1e-9);
+    const mids = row.map((b) => {
+      const m = v.model(b).lanes(wy);
+      return v.toScreen(m.left + m.w / 2, 0)[0];
+    });
+    const [m0, m1] = [Math.min(...mids), Math.max(...mids)];
+    if (row.length < 2 || m1 <= m0) {
+      if (s.over) bad.push(`${at}: ${nameOfLv(p.lv)}, one branch at its foot, has a line`);
+    } else if (!s.over) bad.push(`${at}: ${nameOfLv(p.lv)}, ${row.length} branches, has no line`);
+    else if (Math.abs(s.over[0] - m0) > 0.01 || Math.abs(s.over[1] - m1) > 0.01 || Math.abs(s.over[2] - foot) > 0.01) bad.push(`${at}: ${nameOfLv(p.lv)}'s line ${s.over.map((n) => n.toFixed(1))} is not its branches ${m0.toFixed(1)}..${m1.toFixed(1)} at ${foot.toFixed(1)}`);
   }
   return pics.map((p) => nameOfLv(p.lv));
 }
@@ -172,7 +186,7 @@ describe('labels are the groups one level down (?labels=groups, ToLaD#417)', () 
           const m = st.map((b) => v.model(b).lanes(Math.max(b.tipY, v.fan.time.y(0))));
           const x0 = v.toScreen(Math.min(...m.map((q) => q.left)), 0)[0];
           const x1 = v.toScreen(Math.max(...m.map((q) => q.left + q.w)), 0)[0];
-          if (x1 < LABEL_AXIS_X + PIC_D / 2) {
+          if (x1 < PIC_D / 2) {
             edgeL++;
             if (edgeL <= 8) console.log(`[${gaps}] ${at}: ${nameOfLv(g)} at ${x0.toFixed(1)}..${x1.toFixed(1)}`);
           } else if (x0 > v.w - PIC_D / 2) edgeR++;
@@ -182,7 +196,7 @@ describe('labels are the groups one level down (?labels=groups, ToLaD#417)', () 
         if (depth < 2) for (const g of nextLevels(v.fan, u)) if (g.v && g.v.strands.length >= 8) visit(g.v, depth + 1);
       };
       for (const g of nextLevels(v.fan, v.fan.root)) if (g.v && g.v.strands.length >= 30) visit(g.v, 0);
-      console.log(`[${gaps}] ${framed} frames, ${notOwn} whose L is not the group framed; ${total} groups: ${edgeL} left of a picture's half from the axis, ${edgeR} from the right edge, ${crowded} crowded out\n` + frames.slice(0, 30).join('\n'));
+      console.log(`[${gaps}] ${framed} frames, ${notOwn} whose L is not the group framed; ${total} groups: ${edgeL} left of a picture's half from the left edge, ${edgeR} from the right edge, ${crowded} crowded out\n` + frames.slice(0, 30).join('\n'));
       console.log(`[${gaps}] GROUP_D ${GROUP_D}: home ${names.length}, ${sum} labels over ${framed} frames, ${(sum / framed).toFixed(2)} each`);
       expect(bad.slice(0, 20)).toEqual([]);
 
@@ -274,6 +288,88 @@ describe('labels are the groups one level down (?labels=groups, ToLaD#417)', () 
         console.log(`[${gaps}] labelMs ${mode}: home ${rest.toFixed(2)}, pinch ${pinch.toFixed(2)}`);
       }
       setLabelMode('groups');
+      expect(bad.slice(0, 20)).toEqual([]);
+    });
+});
+
+/** Each group of the frame's level with its branch on screen, left to right: its window (groupLabels') and whether its branch's middle is on screen. */
+function windows(v: FanView): { lv: Level; a: number; b: number; here: boolean; slot: Slot }[] {
+  const now = v.fan.time.y(0);
+  const [left, right] = [PIC_D / 2, v.w - PIC_D / 2];
+  const out = [];
+  for (const lv of nextLevels(v.fan, v.groupsOf!)) {
+    const strands = lv.v ? lv.v.strands : [lv.b!];
+    const young = Math.min(...strands.map((s) => Math.max(s.tipY, now)));
+    const on = strands.filter((s) => Math.max(s.tipY, now) <= young + 1e-9).map((s) => v.model(s).lanes(young));
+    const a = v.toScreen(Math.min(...on.map((m) => m.left)), 0)[0];
+    const b = v.toScreen(Math.max(...on.map((m) => m.left + m.w)), 0)[0];
+    if (b < 0 || a > v.w) continue;
+    const lo = Math.min(Math.max(a, left), right);
+    const hi = Math.max(Math.min(b, right), left);
+    out.push({ lv, a, b, here: (a + b) / 2 >= 0 && (a + b) / 2 <= v.w, slot: { lo, hi, at: (lo + hi) / 2 } });
+  }
+  return out.sort((p, q) => p.a - q.a);
+}
+
+describe('a pan keeps the groups that are here (ToLaD#431)', () => {
+  for (const gaps of ['groups', 'clades'] as GapMode[])
+    it(`mammals, gaps ${gaps}`, { timeout: 600_000 }, async () => {
+      await loadMammalsFromFiles();
+      setGapMode(gaps);
+      setLabelMode('groups');
+      const v = stubView();
+      const home = v.homeCamera();
+      const bad: string[] = [];
+      // From the tree's one end to its other, in steps of a thumb's nudge, at home's zoom and a little in.
+      for (const zoom of [1, 1.2, 1.5, 2.5]) {
+        const a = { ...home, sx: home.sx * zoom };
+        let [frames, changes, jumps, back, lost, step, shift, was] = [0, 0, 0, 0, 0, 0, 0, ''];
+        let last = new Map<string, number>();
+        const gone = new Set<string>();
+        for (let d = -1000; d <= 1000; d += 10) {
+          v.cam = { ...a, cx: a.cx + d / a.sx };
+          const c = frame(v);
+          const at = `zoom ${zoom}, pan ${d}`;
+          check(v, c, at, bad);
+          if (!v.groupsOf) continue;
+          frames++;
+          // Who has no label among those here: there is no room for it beside the ones here that have.
+          const ws = windows(v);
+          const shown = new Set(c.pics.map((p) => p.lv.v ?? p.lv.b!));
+          const on = ws.flatMap((w, i) => (w.here && shown.has(w.lv.v ?? w.lv.b!) ? [i] : []));
+          for (let i = 0; i < ws.length; i++) {
+            if (!ws[i].here || shown.has(ws[i].lv.v ?? ws[i].lv.b!)) continue;
+            lost++;
+            if (chooseSlots(ws.map((w) => w.slot), [...on, i], GROUP_D).includes(i)) bad.push(`${at}: ${nameOfLv(ws[i].lv)} is here, has room, and no label`);
+          }
+          // What Ita saw: two big neighbours, Rodents' label standing and Primates' not, with Primates' branch here.
+          const of = (name: string) => ws.find((w) => nameOfLv(w.lv) === name);
+          const [rod, pri] = [of('Rodents'), of('Primates')];
+          if (rod && pri?.here && shown.has(rod.lv.v!) && !shown.has(pri.lv.v!)) bad.push(`${at}: Rodents stands, Primates at ${pri.a.toFixed(1)}..${pri.b.toFixed(1)} does not`);
+          // A pan is smooth: the set changes rarely, and a label slides.
+          const key = c.spots.map((s) => s.key).join();
+          const moved = was !== '' && key !== was;
+          if (moved) changes++;
+          was = key;
+          const pos = new Map(c.spots.map((s) => [s.key, s.x]));
+          for (const [k, x] of pos) {
+            const x0 = last.get(k);
+            if (x0 === undefined) {
+              if (gone.has(k)) back++;
+              continue;
+            }
+            if (moved) shift = Math.max(shift, Math.abs(x - x0));
+            else {
+              step = Math.max(step, Math.abs(x - x0));
+              if (Math.abs(x - x0) > 24) jumps++;
+            }
+          }
+          for (const k of last.keys()) if (!pos.has(k)) gone.add(k);
+          last = pos;
+        }
+        console.log(`[${gaps}] pan, zoom ${zoom}: ${frames} frames, ${changes} set changes, ${back} back after leaving, ${lost} here with no room; largest step ${step.toFixed(1)} px, at a set change ${shift.toFixed(1)} px`);
+        expect(jumps).toBe(0);
+      }
       expect(bad.slice(0, 20)).toEqual([]);
     });
 });
