@@ -30,6 +30,7 @@
 // row they share: labels inside their own never meet, by construction. They depend on the camera's height too.
 
 import { isNode, type Fan, type FanBranch, type FanNode } from './layout';
+import { LABEL_AXIS_X, PIC_ROOM } from './pics';
 import type { Steady } from './steady';
 
 /** Fit zooms are resolved to 1/LADDER of a doubling (rounded up): a resolution, not a look. */
@@ -244,6 +245,24 @@ export class Territories {
       out[0] = C[i] - this.R[i] / 2 - (i > 0 ? (A[i - 1] * this.G[i - 1]) / 2 : 0);
       out[1] = C[i] + this.R[i] / 2 + (i < this.R.length - 1 ? (A[i] * this.G[i]) / 2 : 0);
     }
+    return out;
+  }
+
+  /**
+   * Node j's frame under `clades` (ToLaD#408). A gap there can stand far wider than what it parts (a small order beside a
+   * split of thousands), and a clade's frame is the clade, not the gaps around it: span()'s half gap past each end, but
+   * no more than the clade's own padding: half its widest gap inside, or half a picture's room at the zoom where it fills
+   * the frame, so its edge columns' labels stand whole.
+   */
+  frameSpan(j: number, out: [number, number] = [0, 0]): [number, number] {
+    const { roomL, roomW } = this.fold.rooms();
+    const [f, l] = [this.first[j], this.last[j]];
+    let top = 0;
+    for (let p = f; p < l; p++) top = Math.max(top, this.G[p]);
+    const pad = Math.max(top / 2, (roomW[j] * PIC_ROOM) / 2 / (this.screenW - LABEL_AXIS_X - PIC_ROOM));
+    this.span(j, out);
+    out[0] = Math.max(out[0], roomL[j] - pad);
+    out[1] = Math.min(out[1], roomL[j] + roomW[j] + pad);
     return out;
   }
 

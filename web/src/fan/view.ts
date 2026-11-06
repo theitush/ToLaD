@@ -5,7 +5,7 @@
 // Gestures come from the shared engine/input.ts.
 
 import { drawPic, hasPic, livePic, PIC_TRIES, prefetchPics } from './wiki';
-import { PIC_D, PIC_LIFT, PIC_ROOM, picBox, type PicSpot } from './pics';
+import { LABEL_AXIS_X, PIC_D, PIC_LIFT, PIC_ROOM, picBox, type PicSpot } from './pics';
 import { formatCount, formatMass } from '../data/count';
 import { stamp } from '../stamp';
 import { DOUBLE_TAP_MS, Input, type InputHandlers } from '../engine/input';
@@ -58,8 +58,6 @@ const LABEL_FONT = '650 15px';
 const PLUS_FONT = '600 11px';
 const PLUS_GAP = 6;
 const LABEL_PAD = 8;
-/** Right edge (px) of the time axis's labels: species' labels keep right of it. */
-const LABEL_AXIS_X = 72;
 /** A level's flight under way (ToLaD#258, #271): the level it lands on and its frame, so a tap or double-tap mid-flight goes on from there. */
 type Step = { lv: Level; cam: Camera };
 /** Where a tap's flight landed (FanView.tapAt). */
@@ -1111,13 +1109,14 @@ export class FanView implements InputHandlers {
    * its edge, at the zoom where it fills it (foldedFrame's bisection: the territory widens as the zoom opens its gaps),
    * "now" (or `top`) down to `yFork` in time. Its labels are the cut at that zoom; each stands inside a territory inside
    * this one, so none is cut off by the time axis or the screen's edge, with no padding. Home, a level, a bracket's tap,
-   * a label's. `fossils`: a level whose living columns dwarf its fossils framed on where they lived (ToLaD#289).
+   * a label's. `fossils`: a level whose living columns dwarf its fossils framed on where they lived (ToLaD#289). `own`:
+   * clade v by its own width (Territories.frameSpan, `clades` only).
    * Kept per screen size (a bisection at the mammals is ~40 refolds of ~6,000 strands, ToLaD#255), the fold put where
    * it leaves it.
    */
-  private runFrame(f: number, l: number, yFork: number, v: FanNode, top = this.yNow, fossils = false): Camera {
+  private runFrame(f: number, l: number, yFork: number, v: FanNode, top = this.yNow, fossils = false, own = false): Camera {
     const fold = this.fan.tess.fold;
-    const key = `${this.w}x${this.h}:${f}:${l}:${yFork}:${top}:${fossils}`;
+    const key = `${this.w}x${this.h}:${f}:${l}:${yFork}:${top}:${fossils}:${own}`;
     if (this.framesFan !== this.fan) [this.framesFan, this.frames] = [this.fan, new Map()];
     const hit = this.frames.get(key);
     if (hit) {
@@ -1126,7 +1125,8 @@ export class FanView implements InputHandlers {
     }
     const s: [number, number] = [0, 0];
     const cam = foldedFrame(this.fan, this.w, () => {
-      const [a, b] = (fossils && fossilSpan(this.fan, v)) || this.runSpan(f, l, s);
+      const T = this.territories().t;
+      const [a, b] = (fossils && fossilSpan(this.fan, v)) || (own ? T.frameSpan(T.index.get(v)!, s) : this.runSpan(f, l, s));
       const x0 = LABEL_AXIS_X;
       const sx = (this.w - LABEL_AXIS_X) / Math.max(1e-300, b - a);
       return this.withBand({ ...this.camera.frame(a, b, yFork, true), sx, cx: a + (this.w / 2 - x0) / sx }, top);
@@ -1173,7 +1173,7 @@ export class FanView implements InputHandlers {
   cladeCamera(v: FanNode): Camera {
     if (!v.parent) return this.homeCamera();
     const top = fossilTop(this.fan, v);
-    return this.runFrame(v.strands[0].index, v.strands[v.strands.length - 1].index, v.y, v, top ?? this.yNow, top !== null);
+    return this.runFrame(v.strands[0].index, v.strands[v.strands.length - 1].index, v.y, v, top ?? this.yNow, top !== null, this.fan.tess.fold?.gaps === 'clades');
   }
 
   /**
