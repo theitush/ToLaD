@@ -126,9 +126,12 @@ describe('names on the gaps and in the branches', () => {
   });
 
   it('titles every clade once, in the gap above its first strand, outermost first', () => {
+    // (Each with a name of its own: which ones have none is the next test's.)
+    const ids = new Map<unknown, string>();
+    const every = new GapNames(v.fan, f, (u) => ids.get(u) ?? (ids.set(u, `c${ids.size}`), ids.get(u)!), () => '', () => 10);
     const seen = new Set<unknown>();
     f.strands.forEach((_, k) => {
-      const list = g.headsOf(k);
+      const list = every.headsOf(k);
       list.forEach((u, i) => {
         expect(seen.has(u)).toBe(false);
         seen.add(u);
@@ -139,7 +142,7 @@ describe('names on the gaps and in the branches', () => {
     });
     expect(seen.size).toBe(v.fan.nodes.length);
     // (A gap's first title: a daughter of a fork the strand above it is under too, the lower one.)
-    for (let k = 1; k < f.strands.length; k++) for (const u of g.headsOf(k).slice(0, 1)) expect(u.parent!.strands).toContain(f.strands[k - 1]);
+    for (let k = 1; k < f.strands.length; k++) for (const u of every.headsOf(k).slice(0, 1)) expect(u.parent!.strands).toContain(f.strands[k - 1]);
   });
 
   it('writes a species in its own branch', () => {
