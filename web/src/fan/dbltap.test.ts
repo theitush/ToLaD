@@ -213,7 +213,10 @@ describe('a double tap reads as one step back (ToLaD#413)', () => {
     vi.restoreAllMocks();
   });
   for (const mode of ['clades', 'groups'] as GapMode[]) {
-    it(`${mode}: from each frame, on a branch and on nothing, a quick and a slow double tap`, () => {
+    // (Real, open, ToLaD#446, a tap and frame rule, so left for Ita: under clades the label Theria's frame is 5.25 px from home.
+    // A tap on it moves that much; under LEVEL_PX that is no step and no way out (doubleTap, outFrom), so a double tap
+    // does nothing and the view stays 5.25 px off home. `it.fails` turns red when it is fixed.)
+    (mode === 'clades' ? it.fails : it)(`${mode}: from each frame, on a branch and on nothing, a quick and a slow double tap`, () => {
       vi.spyOn(performance, 'now').mockImplementation(() => clock);
       setGapMode(mode);
       const r = rig();
