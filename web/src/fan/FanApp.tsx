@@ -19,7 +19,7 @@ import { FORK_MODES, forkMode, grayOn, setForkMode, setGrayOn, type ForkMode } f
 import { MagnifierIcon, SearchPanel } from './SearchPanel';
 import { statusOf } from './status';
 import { cardTapper, onControl } from './cardtap';
-import { FanView, initialMeasure, levelName, type Lineage, type Selection } from './view';
+import { FanView, initialMeasure, levelName, type Lineage, type Place, type Selection } from './view';
 
 declare global {
   interface Window {
@@ -98,6 +98,8 @@ function initialForkNames(): boolean {
 export function FanApp() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const viewRef = useRef<FanView | null>(null);
+  // Where the view stood when a look's switch asked for a new one (ToLaD#412): the new one's first place.
+  const placeRef = useRef<Place | null>(null);
   // A double tap on the card (ToLaD#301): what one on the tree does, one level up, the card closed.
   const cardUp = (x: number, y: number) => viewRef.current?.doubleTap(x, y);
   const [mode, setMode] = useState<WidthMode>('linear');
@@ -149,6 +151,9 @@ export function FanApp() {
     v.onSelect = setSel;
     v.scaleEl = scaleRef.current;
     v.barEl = barRef.current;
+    // (A look's switch stays where the view was, ToLaD#412; a new level starts at its home.)
+    if (placeRef.current) v.goToPlace(placeRef.current);
+    placeRef.current = null;
     viewRef.current = v;
     window.__fan = v;
     window.__levelName = levelName;
@@ -164,7 +169,7 @@ export function FanApp() {
       viewRef.current = null;
       if (window.__fan === v) delete window.__fan;
     };
-    // (A new view per level and per gaps' switch; the toggles' state carries over.)
+    // (A new view per level and per look's switch; the toggles' state carries over.)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [level, viewReady, gaps, forks]);
 
@@ -204,6 +209,7 @@ export function FanApp() {
           type="button"
           aria-pressed={forks}
           onClick={() => {
+            placeRef.current = viewRef.current?.place() ?? null;
             setForkNames(!forks);
             setSel(null);
             setForks(!forks);
@@ -225,6 +231,7 @@ export function FanApp() {
           title="Gaps between branches: even, groups, clades or age"
           onClick={() => {
             const next = GAP_MODES[(GAP_MODES.indexOf(gaps) + 1) % GAP_MODES.length];
+            placeRef.current = viewRef.current?.place() ?? null;
             setGapMode(next);
             setSel(null);
             setGaps(next);
