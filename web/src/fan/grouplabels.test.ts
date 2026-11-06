@@ -104,12 +104,17 @@ function check(v: FanView, c: CutLabels, at: string, bad: string[]): string[] {
       const m = v.model(b).lanes(wy);
       return v.toScreen(m.left + m.w / 2, 0)[0];
     });
-    const [m0, m1] = [Math.min(...mids), Math.max(...mids)];
-    if (row.length < 2 || m1 <= m0) {
+    // (Its ends on the outer edges of its end branches, ToLaD#433.)
+    const m0 = v.toScreen(Math.min(...row.map((b) => v.model(b).lanes(wy).left)), 0)[0];
+    const m1 = v.toScreen(Math.max(...row.map((b) => v.model(b).lanes(wy).left + v.model(b).lanes(wy).w)), 0)[0];
+    if (row.length < 2 || Math.max(...mids) <= Math.min(...mids)) {
       if (s.over) bad.push(`${at}: ${nameOfLv(p.lv)}, one branch at its foot, has a line`);
     } else if (!s.over) bad.push(`${at}: ${nameOfLv(p.lv)}, ${row.length} branches, has no line`);
     else if (Math.abs(s.over[0] - m0) > 0.01 || Math.abs(s.over[1] - m1) > 0.01 || Math.abs(s.over[2] - foot) > 0.01) bad.push(`${at}: ${nameOfLv(p.lv)}'s line ${s.over.map((n) => n.toFixed(1))} is not its branches ${m0.toFixed(1)}..${m1.toFixed(1)} at ${foot.toFixed(1)}`);
   }
+  // (Each line inside its own branches: two neighbours' never overlap, ToLaD#433.)
+  const lines = pics.map((p) => c.spots[p.i]).filter((s) => s.over).sort((s, q) => s.over![0] - q.over![0]);
+  for (let i = 1; i < lines.length; i++) if (lines[i].over![0] < lines[i - 1].over![1] - 1e-6) bad.push(`${at}: ${lines[i - 1].text}'s line runs to ${lines[i - 1].over![1].toFixed(2)}, into ${lines[i].text}'s from ${lines[i].over![0].toFixed(2)}`);
   return pics.map((p) => nameOfLv(p.lv));
 }
 

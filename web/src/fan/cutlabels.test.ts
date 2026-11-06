@@ -62,6 +62,9 @@ function check(c: CutLabels, w: number): void {
       if (s.box[2] > p.x - PIC_D / 2 && s.box[0] < p.x + PIC_D / 2) expect(s.box[3]).toBeLessThanOrEqual(p.y - PIC_D / 2 + 1e-6);
   // (Each on screen, its picture at least: it stays until wholly off the edge.)
   for (const q of c.pics) expect([q.x, q.x + PIC_ROOM / 2 >= 0 && q.x - PIC_ROOM / 2 <= w]).toEqual([q.x, true]);
+  // (Each line inside its own branches: two neighbours' never overlap, ToLaD#433.)
+  const O = c.spots.flatMap((s) => (s.over ? [s.over] : [])).sort((p, q) => p[0] - q[0]);
+  for (let k = 1; k < O.length; k++) expect(O[k][0]).toBeGreaterThanOrEqual(O[k - 1][1] - 1e-6);
 }
 
 const mammals = async () => {
@@ -110,8 +113,12 @@ describe('labels from the cut (?labels=cut, ToLaD#333)', () => {
         // holds that column and the picture), where the screen leaves it room.
         for (let i = 0; i < cut.pics.length; i++) {
           const p = cut.pics[i];
-          const o = cut.spots[i].over;
-          const c = o ? (o[0] + o[1]) / 2 : v.toScreen(groupCentre({ b: p.face }), 0)[0];
+          const s = cut.spots[i];
+          const o = s.over;
+          const reach = o && (v as unknown as { territories(): { reach(f: number, l: number, foot: number): number[] | null } }).territories().reach(s.run![0], s.run![1], v.toWorld(0, o[2])[1]);
+          const c = reach ? v.toScreen((reach[0] + reach[1]) / 2, 0)[0] : v.toScreen(groupCentre({ b: p.face }), 0)[0];
+          // (Its line around its branches, out to their outer edges, ToLaD#433; a branch of no width at that row: its edge is its middle.)
+          if (o && reach) expect([s.text, o[0] <= v.toScreen(reach[0], 0)[0] && o[1] >= v.toScreen(reach[1], 0)[0]]).toEqual([s.text, true]);
           if (c >= 72 + PIC_ROOM / 2 && c <= v.w - PIC_ROOM / 2) expect([p.face.sp.common, Math.abs(p.x - c) <= PIC_ROOM / 2 + 1e-6]).toEqual([p.face.sp.common, true]);
         }
         // With "now" on screen, no label of a living item reaches below the now line (ToLaD#373, Ita: "so that they dont
