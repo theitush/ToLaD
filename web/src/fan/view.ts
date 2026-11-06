@@ -127,9 +127,9 @@ export interface LabelSpot {
   /** A family's label (`fam`, ToLaD#146): the screen x span of its species, bracketed under the pill. */
   span?: [number, number];
   /**
-   * A "+x" label's branches (ToLaD#368, #373): the screen x of its item's first and last branch at the label's foot (the
-   * gap under its picture, screen y; with its tip at "now", just above the now line), which a hairline spans there, a
-   * tick down onto each end branch.
+   * A "+x" label's branches (ToLaD#368, #373): the screen x of its item's first branch's left edge and its last's right
+   * edge at the label's foot (the gap under its picture, screen y; with its tip at "now", just above the now line), which
+   * a hairline spans there, a tick down on each outer edge, so it wraps them whole (ToLaD#433).
    */
   over?: [number, number, number];
   /** A cut item's label (ToLaD#359): the item's strands, first and last, which a tap on it goes into (tapItem). */
@@ -288,12 +288,13 @@ class CutTerritories {
   }
   /**
    * Strands f..l's branches at a label's foot (ToLaD#368): the middles (world x) of the first and last of them that
-   * reach row `foot` (world y), or null. Above the first row any of them is at ("now", or their youngest tip, the foot
+   * reach row `foot` (world y), which place the label, then the first's left edge and the last's right (ToLaD#433),
+   * which its line spans; or null. Above the first row any of them is at ("now", or their youngest tip, the foot
    * just over the now line, ToLaD#373) the strands of that row: the tips the ticks come down on, and it moves on
    * continuously as the row comes down past it. The strands stand side by side in drawn order, never crossing, each
    * inside its share of the row, so they are inside the item's share there and no two items' spans meet.
    */
-  reach(f: number, l: number, foot: number): [number, number] | null {
+  reach(f: number, l: number, foot: number): [number, number, number, number] | null {
     const S = this.t.strands;
     const now = this.now;
     // (The first row any strand is at: "now" as soon as a living one is met.)
@@ -307,7 +308,7 @@ class CutTerritories {
     let b = l;
     while (!on(b)) b--;
     const mid = (s: FanBranch) => leftAt(s, wy) + laneAt(s, wy).w / 2;
-    return [mid(S[a]), mid(S[b])];
+    return [mid(S[a]), mid(S[b]), leftAt(S[a], wy), leftAt(S[b], wy) + laneAt(S[b], wy).w];
   }
   /** The strands whose tips stand in world x [x0, x1] (drawn order: a binary search): first and last, or null. */
   tipsIn(x0: number, x1: number): [number, number] | null {
@@ -2504,7 +2505,7 @@ export class FanView implements InputHandlers {
    * stand on its own branch at its youngest row, "now" for anyone living, without meeting one already placed (slide.ts).
    * A group with no such place has no label at this zoom: its fork name still names it. No "+x", no leaders.
    * A function of the camera alone. One label as anywhere: name pill over picture, a tap on either going to the group's
-   * own frame, and over it, for more than one branch, the hairline from the first to the last (LabelSpot.over).
+   * own frame, and over it, for more than one branch, the hairline around them, the first's left edge to the last's right (LabelSpot.over).
    */
   private groupLabels(T: CutTerritories, row: number): CutLabels {
     const out: CutLabels = { spots: [], groups: new Map(), pics: [], items: [], all: [], names: [] };
@@ -2570,7 +2571,7 @@ export class FanView implements InputHandlers {
       // (Its branches, as a cut label's: in the gap under its picture. One branch, none.)
       const foot = d0 + PIC_ROOM + PIC_LIFT / 2;
       const ends = T.reach(g.f, g.l, Wy(foot));
-      if (ends && ends[1] > ends[0]) s.over = [X(ends[0]), X(ends[1]), foot];
+      if (ends && ends[1] > ends[0]) s.over = [X(ends[2]), X(ends[3]), foot];
       out.spots.push(s);
       out.pics.push({ x, y: d0 + PIC_ROOM - PIC_D / 2, i, lv, face, held: true });
     });
@@ -2702,7 +2703,7 @@ export class FanView implements InputHandlers {
       const lv: Level = k < 0 ? { b: T.t.strands[~k] } : { v: T.t.nodes[k] };
       if (lv.b) s.b = lv.b;
       else Object.assign(s, { v: lv.v, fam: lv.v });
-      if (span && span[1] > span[0]) s.over = [X(span[0]), X(span[1]), foot];
+      if (span && span[1] > span[0]) s.over = [X(span[2]), X(span[3]), foot];
       spots.push(s);
       pics.push({ x, y: d0 + PIC_ROOM - PIC_D / 2, i: pics.length, lv, face: name.face, run: [it.f, it.l], held: !one });
       shown.push(it);
@@ -2781,7 +2782,7 @@ export class FanView implements InputHandlers {
       if (lv.b) s.b = lv.b;
       else Object.assign(s, { v: lv.v, fam: lv.v });
       s.disc = { y: y1 - r0, lv };
-      if (span && span[1] > span[0]) s.over = [X(span[0]), X(span[1]), foot];
+      if (span && span[1] > span[0]) s.over = [X(span[2]), X(span[3]), foot];
       names.push(s);
       const r = named.get(o);
       if (r) r.push([it.f, it.l]);
