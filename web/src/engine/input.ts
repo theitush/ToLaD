@@ -122,8 +122,12 @@ export class Input {
     el.removeEventListener('contextmenu', prevent as EventListener);
   }
 
+  /** The element is drawn a quarter turn clockwise (fan/flip.ts): everything handed on is in its own, unturned, coordinates. */
+  turned = false;
+
   private local(e: { clientX: number; clientY: number }): { x: number; y: number } {
     const r = this.el.getBoundingClientRect();
+    if (this.turned) return { x: e.clientY - r.top, y: r.width - (e.clientX - r.left) };
     return { x: e.clientX - r.left, y: e.clientY - r.top };
   }
 
@@ -337,8 +341,8 @@ export class Input {
     e.preventDefault();
     const p = this.local(e);
     const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? this.el.clientHeight : 1;
-    let dx = e.deltaX * unit;
-    let dy = e.deltaY * unit;
+    let dx = (this.turned ? e.deltaY : e.deltaX) * unit;
+    let dy = (this.turned ? -e.deltaX : e.deltaY) * unit;
     if (!this.wheeling) {
       this.wheeling = true;
       this.wheelAxes = { x: 0, y: 0, peakX: 0, peakY: 0, onX: false, onY: false };
