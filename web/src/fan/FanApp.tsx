@@ -14,6 +14,7 @@ import { stamp } from '../stamp';
 import { population } from './population';
 import { WorldToggle } from './WorldToggle';
 import { forkNames, setForkNames } from './brackets';
+import { labelMode, setLabelMode, type LabelMode } from './pics';
 import { GAP_MODES, gapMode, setGapMode, type GapMode } from './fold';
 import { FORK_MODES, forkMode, grayOn, setForkMode, setGrayOn, type ForkMode } from './steady';
 import { MagnifierIcon, SearchPanel } from './SearchPanel';
@@ -77,6 +78,16 @@ function initialGaps(): GapMode {
   return gapMode();
 }
 
+/** What the labels name (ToLaD#417, `?labels=groups`): a look only. */
+function initialLabels(): LabelMode {
+  try {
+    if (new URLSearchParams(window.location.search).get('labels') === 'groups') setLabelMode('groups');
+  } catch {
+    /* not in a page */
+  }
+  return labelMode();
+}
+
 /** The upper clades' names at their forks (ToLaD#373, `?forknames=off`: the stack over "now"): set before the first view is built. */
 function initialForkNames(): boolean {
   try {
@@ -100,6 +111,7 @@ export function FanApp() {
   const [gaps, setGaps] = useState<GapMode>(initialGaps);
   const [forkLook, setForkLook] = useState<ForkMode>(initialForks);
   const [gray, setGray] = useState(initialGray);
+  const [labels, setLabels] = useState(initialLabels);
   // What the widths count (ToLaD#276): individuals, or their mass (`?width=mass`).
   const [measure, setMeasure] = useState<Measure>(initialMeasure);
   const [sel, setSel] = useState<Selection | null>(null);
@@ -285,6 +297,27 @@ export function FanApp() {
           }}
         >
           {`gray: ${gray ? 'on' : 'off'}`}
+        </button>
+        {/* ToLaD#417: the labels: the cut's items, or the real groups one level down, each on its branch: a look only. */}
+        <button
+          type="button"
+          title="Labels: the cut's items, or the real groups one level down, each on its own branch"
+          onClick={() => {
+            const next: LabelMode = labels === 'cut' ? 'groups' : 'cut';
+            setLabelMode(next);
+            setLabels(next);
+            viewRef.current?.request();
+            try {
+              const u = new URL(window.location.href);
+              if (next === 'groups') u.searchParams.set('labels', 'groups');
+              else u.searchParams.delete('labels');
+              window.history.replaceState(null, '', u);
+            } catch {
+              /* not in the address */
+            }
+          }}
+        >
+          {`labels: ${labels}`}
         </button>
         <button type="button" onClick={() => viewRef.current?.resetView()}>
           All mammals

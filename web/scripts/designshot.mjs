@@ -166,6 +166,13 @@ const scenes = [
   ['up-polar1', 'search', ['polar', 'Polar bear', 1]],
   ['up-polar2', 'search', ['polar', 'Polar bear', 2]],
   // The fold (ToLaD#146): the dogs at 1.5x, 3x and 6x home's width zoom, opening as they grow.
+  // The group labels at each level (ToLaD#417, Q=labels=groups): its groups one level down.
+  ['gl-rodents', 'zoomto', ['Rodentia']],
+  ['gl-bats', 'zoomto', ['Chiroptera']],
+  ['gl-primates', 'zoomto', ['Primates']],
+  ['gl-carnivores', 'zoomto', ['Carnivora']],
+  ['gl-cats', 'zoomto', ['Felidae']],
+  ['gl-genus', 'zoomto', ['Panthera']],
   ['carn-dogs-z15', 'zoomto', ['Canidae', 1.5]],
   ['carn-dogs-z3', 'zoomto', ['Canidae', 3]],
   ['carn-dogs-z6', 'zoomto', ['Canidae', 6]],

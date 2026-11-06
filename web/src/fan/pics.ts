@@ -23,3 +23,16 @@ export const PIC_LIFT = 14;
 export function picBox(p: { x: number; y: number }): number[] {
   return [p.x - PIC_D / 2, p.y - PIC_D / 2, p.x + PIC_D / 2, p.y + PIC_D / 2];
 }
+
+/**
+ * What the labels name (ToLaD#417, `?labels=`): `cut`, an item of the cut with its "+x"; `groups`, the real groups one
+ * level down from what the screen holds, each on its own branch. A look only: frames and taps' targets do not change.
+ */
+export type LabelMode = 'cut' | 'groups';
+let labelNow: LabelMode = 'cut';
+export const labelMode = (): LabelMode => labelNow;
+export function setLabelMode(m: LabelMode): void {
+  labelNow = m;
+}
+/** Group labels' centres stand at least this far apart: a picture and the gap a pill keeps over its picture. (Their pills are narrower.) */
+export const GROUP_D = PIC_D + 4;
