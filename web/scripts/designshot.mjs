@@ -286,6 +286,8 @@ const scenes = [
   ['clades-rodentia', 'level', ['Rodentia']],
   ['clades-felidae', 'level', ['Felidae']],
   ['clades-diprotodontia', 'level', ['Diprotodontia']],
+  ['clades-chiroptera', 'level', ['Chiroptera']],
+  ['clades-primates', 'level', ['Primates']],
   ['pin-home', 'home'],
   ['pin-bear', 'frame', ['Brown bear', 4e5, 40]],
   ['pin-weasel', 'frame', ['Least weasel', 1.5e6, 20]],

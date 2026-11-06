@@ -448,7 +448,7 @@ export const ORDER_CROWNS: Record<string, [string, string]> = {
 };
 
 /**
- * Named clades the dated tree leaves unnamed, each a level (ToLaD#289): the split over both species, named if it has
+ * Named clades the dated tree leaves unnamed, each a level unless above an order (ToLaD#289): the split over both species, named if it has
  * no taxon. The hominins (Hominini: humans and every relative since the split from the chimpanzees' line, Orrorin
  * the oldest the tree puts on our side, Sahelanthropus being a stem hominine) and humans' genus Homo (from H. habilis;
  * A. sediba, placed after it on our line, falls inside, as the placements have it).
@@ -456,6 +456,18 @@ export const ORDER_CROWNS: Record<string, [string, string]> = {
 export const NAMED_CLADES: Record<string, [string, string]> = {
   Hominini: ['Homo sapiens', 'Orrorin tugenensis'],
   Homo: ['Homo sapiens', 'Homo habilis'],
+  // (The forks above the orders the dated tree leaves unnamed (ToLaD#440), each holding just what its citation says:
+  // Euarchonta, Scrotifera, Fereuungulata, Euungulata: Waddell, Okada & Hasegawa 1999, Syst. Biol. 48; Ferae: Linnaeus 1758;
+  // Paenungulata: Simpson 1945; Afroinsectiphilia: Waddell, Kishino & Ota 2001; Australidelphia: Szalay 1982; Sundatheria: as in Janecka et al. 2007, Science 318.)
+  Euarchonta: ['Homo sapiens', 'Galeopterus variegatus'],
+  Sundatheria: ['Galeopterus variegatus', 'Tupaia glis'],
+  Scrotifera: ['Felis catus', 'Rhinolophus ferrumequinum'],
+  Fereuungulata: ['Felis catus', 'Bos taurus'],
+  Euungulata: ['Bos taurus', 'Tapirus terrestris'],
+  Ferae: ['Felis catus', 'Manis javanica'],
+  Paenungulata: ['Loxodonta africana', 'Trichechus manatus'],
+  Afroinsectiphilia: ['Orycteropus afer', 'Echinops telfairi'],
+  Australidelphia: ['Dromiciops gliroides', 'Macropus giganteus'],
 };
 
 /** Name the unnamed orders' splits (ORDER_CROWNS) and NAMED_CLADES' in tree t: the last split over both species, if it has no taxon. */
