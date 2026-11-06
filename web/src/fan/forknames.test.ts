@@ -255,7 +255,7 @@ describe('names at their forks (ToLaD#373)', () => {
     const iv = inner(v);
     v.cam = v.homeCamera();
     frame(v);
-    const sol = iv.brackets.list.find((c) => c.latin === 'Solenodon')!.v;
+    const sol = iv.brackets.list.find((c) => c.latin === 'Solenodontidae')!.v;
     v.cam = iv.frameOf({ v: sol });
     frame(v);
     v.draw();

@@ -1015,7 +1015,7 @@
    },
    {
     "capped": false,
-    "clade": "Aotus (genus in Opisthokonta)",
+    "clade": "Aotus",
     "first_appearance": 13.4,
     "fossil": "Aotus dindensis",
     "from": 12.085,
@@ -1095,7 +1095,7 @@
    },
    {
     "capped": false,
-    "clade": "Hystrix (genus in Opisthokonta)",
+    "clade": "Hystrix",
     "first_appearance": 6.29,
     "fossil": "Hystrix depereti",
     "from": 5.034,
@@ -1275,7 +1275,7 @@
    "family": 14,
    "genus": 450
   },
-  "named_splits": 689,
+  "named_splits": 931,
   "species": 18366,
   "species_rows_left_out": 0,
   "splits": 9143,
@@ -1288,6 +1288,1912 @@
    "upham": 1,
    "upham-imputed": 1387,
    "upham-interp": 1960
+  },
+  "taxon_names": {
+   "by_order": {
+    "Afrosoricida": {
+     "families": 3,
+     "families_of_2_or_more": 3,
+     "named_after": 3,
+     "named_before": 2
+    },
+    "Artiodactyla": {
+     "families": 23,
+     "families_of_2_or_more": 18,
+     "named_after": 17,
+     "named_before": 7
+    },
+    "Carnivora": {
+     "families": 16,
+     "families_of_2_or_more": 14,
+     "named_after": 14,
+     "named_before": 12
+    },
+    "Chiroptera": {
+     "families": 21,
+     "families_of_2_or_more": 20,
+     "named_after": 20,
+     "named_before": 10
+    },
+    "Cingulata": {
+     "families": 4,
+     "families_of_2_or_more": 4,
+     "named_after": 4,
+     "named_before": 0
+    },
+    "Dasyuromorphia": {
+     "families": 2,
+     "families_of_2_or_more": 1,
+     "named_after": 1,
+     "named_before": 0
+    },
+    "Dermoptera": {
+     "families": 1,
+     "families_of_2_or_more": 1,
+     "named_after": 0,
+     "named_before": 0
+    },
+    "Didelphimorphia": {
+     "families": 1,
+     "families_of_2_or_more": 1,
+     "named_after": 0,
+     "named_before": 0
+    },
+    "Diprotodontia": {
+     "families": 11,
+     "families_of_2_or_more": 8,
+     "named_after": 8,
+     "named_before": 8
+    },
+    "Eulipotyphla": {
+     "families": 4,
+     "families_of_2_or_more": 4,
+     "named_after": 4,
+     "named_before": 3
+    },
+    "Hyracoidea": {
+     "families": 1,
+     "families_of_2_or_more": 1,
+     "named_after": 0,
+     "named_before": 0
+    },
+    "Lagomorpha": {
+     "families": 2,
+     "families_of_2_or_more": 2,
+     "named_after": 2,
+     "named_before": 2
+    },
+    "Macroscelidea": {
+     "families": 1,
+     "families_of_2_or_more": 1,
+     "named_after": 0,
+     "named_before": 0
+    },
+    "Microbiotheria": {
+     "families": 1,
+     "families_of_2_or_more": 1,
+     "named_after": 0,
+     "named_before": 0
+    },
+    "Monotremata": {
+     "families": 2,
+     "families_of_2_or_more": 1,
+     "named_after": 1,
+     "named_before": 1
+    },
+    "Notoryctemorphia": {
+     "families": 1,
+     "families_of_2_or_more": 1,
+     "named_after": 0,
+     "named_before": 0
+    },
+    "Paucituberculata": {
+     "families": 1,
+     "families_of_2_or_more": 1,
+     "named_after": 0,
+     "named_before": 0
+    },
+    "Peramelemorphia": {
+     "families": 2,
+     "families_of_2_or_more": 1,
+     "named_after": 1,
+     "named_before": 1
+    },
+    "Perissodactyla": {
+     "families": 3,
+     "families_of_2_or_more": 3,
+     "named_after": 3,
+     "named_before": 3
+    },
+    "Pholidota": {
+     "families": 1,
+     "families_of_2_or_more": 1,
+     "named_after": 0,
+     "named_before": 0
+    },
+    "Pilosa": {
+     "families": 4,
+     "families_of_2_or_more": 4,
+     "named_after": 4,
+     "named_before": 1
+    },
+    "Primates": {
+     "families": 16,
+     "families_of_2_or_more": 15,
+     "named_after": 15,
+     "named_before": 8
+    },
+    "Proboscidea": {
+     "families": 1,
+     "families_of_2_or_more": 1,
+     "named_after": 0,
+     "named_before": 0
+    },
+    "Rodentia": {
+     "families": 35,
+     "families_of_2_or_more": 30,
+     "named_after": 30,
+     "named_before": 20
+    },
+    "Scandentia": {
+     "families": 2,
+     "families_of_2_or_more": 1,
+     "named_after": 1,
+     "named_before": 1
+    },
+    "Sirenia": {
+     "families": 2,
+     "families_of_2_or_more": 1,
+     "named_after": 1,
+     "named_before": 0
+    },
+    "Tubulidentata": {
+     "families": 1,
+     "named_after": 0,
+     "named_before": 0
+    }
+   },
+   "displaced": [
+    {
+     "by": "Alcelaphini",
+     "fork": "Alcelaphinae"
+    },
+    {
+     "by": "Aotidae",
+     "fork": "Aotus"
+    },
+    {
+     "by": "Bradypodidae",
+     "fork": "Bradypus"
+    },
+    {
+     "by": "Callitrichidae",
+     "fork": "Callitrichinae"
+    },
+    {
+     "by": "Calomyscidae",
+     "fork": "Calomyscus"
+    },
+    {
+     "by": "Capromyinae",
+     "fork": "Capromyidae"
+    },
+    {
+     "by": "Cephalophini",
+     "fork": "Cephalophinae"
+    },
+    {
+     "by": "Cercopithecidae",
+     "fork": "Cercopithecoidea"
+    },
+    {
+     "by": "Cistugidae",
+     "fork": "Cistugo"
+    },
+    {
+     "by": "Ctenomyidae",
+     "fork": "Ctenomys"
+    },
+    {
+     "by": "Cuniculidae",
+     "fork": "Cuniculus"
+    },
+    {
+     "by": "Haplorhini",
+     "fork": "Haplorrhini"
+    },
+    {
+     "by": "Hippotragini",
+     "fork": "Hippotraginae"
+    },
+    {
+     "by": "Iniidae",
+     "fork": "Inia"
+    },
+    {
+     "by": "Lepilemuridae",
+     "fork": "Lepilemur"
+    },
+    {
+     "by": "Guloninae",
+     "fork": "Martinae"
+    },
+    {
+     "by": "Choloepodidae",
+     "fork": "Megalonychidae"
+    },
+    {
+     "by": "Miniopteridae",
+     "fork": "Miniopterus"
+    },
+    {
+     "by": "Muntiacini",
+     "fork": "Muntiacinae"
+    },
+    {
+     "by": "Myzopodidae",
+     "fork": "Myzopoda"
+    },
+    {
+     "by": "Notoryctemorphia",
+     "fork": "Notoryctes"
+    },
+    {
+     "by": "Nycteridae",
+     "fork": "Nycteris"
+    },
+    {
+     "by": "Potamogalidae",
+     "fork": "Potamogalinae"
+    },
+    {
+     "by": "Prionodontidae",
+     "fork": "Prionodon"
+    },
+    {
+     "by": "Monotremata",
+     "fork": "Prototheria"
+    },
+    {
+     "by": "Mormoopidae",
+     "fork": "Pteronotus"
+    },
+    {
+     "by": "Saimirinae",
+     "fork": "Saimiriinae"
+    },
+    {
+     "by": "Sminthidae",
+     "fork": "Sicista"
+    },
+    {
+     "by": "Solenodontidae",
+     "fork": "Solenodon"
+    },
+    {
+     "by": "Tarsiidae",
+     "fork": "Tarsiiformes"
+    },
+    {
+     "by": "Thyropteridae",
+     "fork": "Thyroptera"
+    },
+    {
+     "by": "Tragulidae",
+     "fork": "Tragulina"
+    },
+    {
+     "by": "Trichechidae",
+     "fork": "Trichechus"
+    },
+    {
+     "by": "Zapodidae",
+     "fork": "Zapodinae"
+    }
+   ],
+   "f_min": 0.75,
+   "moved": [
+    "Ancodonta",
+    "Bathyergidae",
+    "Cervinae",
+    "Cingulata",
+    "Cricetidae",
+    "Crocidurinae",
+    "Galagidae",
+    "Hemigalinae",
+    "Peramelidae",
+    "Tenrecidae",
+    "Tylopoda",
+    "Viverrinae"
+   ],
+   "not_placed": {
+    "family Balaenidae": {
+     "best_F": 0.667,
+     "best_fork_holds": 8,
+     "species": 4
+    },
+    "family Caenolestidae": {
+     "best_F": 1.0,
+     "best_fork_holds": 7,
+     "named_as": "Paucituberculata",
+     "species": 7
+    },
+    "family Cynocephalidae": {
+     "best_F": 1.0,
+     "best_fork_holds": 2,
+     "named_as": "Dermoptera",
+     "species": 2
+    },
+    "family Didelphidae": {
+     "best_F": 1.0,
+     "best_fork_holds": 132,
+     "named_as": "Didelphimorphia",
+     "species": 132
+    },
+    "family Elephantidae": {
+     "best_F": 1.0,
+     "best_fork_holds": 3,
+     "named_as": "Proboscidea",
+     "species": 3
+    },
+    "family Macroscelididae": {
+     "best_F": 1.0,
+     "best_fork_holds": 20,
+     "named_as": "Macroscelidea",
+     "species": 20
+    },
+    "family Manidae": {
+     "best_F": 1.0,
+     "best_fork_holds": 9,
+     "named_as": "Pholidota",
+     "species": 9
+    },
+    "family Microbiotheriidae": {
+     "best_F": 1.0,
+     "best_fork_holds": 2,
+     "named_as": "Microbiotheria",
+     "species": 2
+    },
+    "family Notoryctidae": {
+     "best_F": 1.0,
+     "best_fork_holds": 2,
+     "named_as": "Notoryctemorphia",
+     "species": 2
+    },
+    "family Procaviidae": {
+     "best_F": 1.0,
+     "best_fork_holds": 6,
+     "named_as": "Hyracoidea",
+     "species": 6
+    },
+    "subfamily Ailurinae": {
+     "best_F": 1.0,
+     "best_fork_holds": 2,
+     "named_as": "Ailuridae",
+     "species": 2
+    },
+    "subfamily Alouattinae": {
+     "best_F": 1.0,
+     "best_fork_holds": 12,
+     "named_as": "Alouatta",
+     "species": 12
+    },
+    "subfamily Anomalurinae": {
+     "best_F": 1.0,
+     "best_fork_holds": 4,
+     "named_as": "Anomalurus",
+     "species": 4
+    },
+    "subfamily Babyrousinae": {
+     "best_F": 1.0,
+     "best_fork_holds": 3,
+     "named_as": "Babyrousa",
+     "species": 3
+    },
+    "subfamily Berardiinae": {
+     "best_F": 1.0,
+     "best_fork_holds": 3,
+     "named_as": "Berardius",
+     "species": 3
+    },
+    "subfamily Camelinae": {
+     "best_F": 1.0,
+     "best_fork_holds": 6,
+     "named_as": "Camelidae",
+     "species": 6
+    },
+    "subfamily Caninae": {
+     "best_F": 1.0,
+     "best_fork_holds": 39,
+     "named_as": "Canidae",
+     "species": 39
+    },
+    "subfamily Carolliinae": {
+     "best_F": 1.0,
+     "best_fork_holds": 8,
+     "named_as": "Carollia",
+     "species": 8
+    },
+    "subfamily Castorinae": {
+     "best_F": 1.0,
+     "best_fork_holds": 2,
+     "named_as": "Castoridae",
+     "species": 2
+    },
+    "subfamily Chlamyphorinae": {
+     "best_F": 1.0,
+     "best_fork_holds": 2,
+     "named_as": "Chlamyphoridae",
+     "species": 2
+    },
+    "subfamily Chrysochlorinae": {
+     "best_F": 0.688,
+     "best_fork_holds": 21,
+     "species": 11
+    },
+    "subfamily Ctenodactylinae": {
+     "best_F": 1.0,
+     "best_fork_holds": 5,
+     "named_as": "Ctenodactylidae",
+     "species": 5
+    },
+    "subfamily Dactylopsilinae": {
+     "best_F": 1.0,
+     "best_fork_holds": 6,
+     "named_as": "Dactylopsila",
+     "species": 6
+    },
+    "subfamily Dasypodinae": {
+     "best_F": 0.9,
+     "best_fork_holds": 9,
+     "named_as": "Dasypodidae",
+     "species": 11
+    },
+    "subfamily Dolichotinae": {
+     "best_F": 1.0,
+     "best_fork_holds": 2,
+     "named_as": "Dolichotis",
+     "species": 2
+    },
+    "subfamily Eidolinae": {
+     "best_F": 1.0,
+     "best_fork_holds": 2,
+     "named_as": "Eidolon",
+     "species": 2
+    },
+    "subfamily Elephantinae": {
+     "best_F": 1.0,
+     "best_fork_holds": 3,
+     "named_as": "Proboscidea",
+     "species": 3
+    },
+    "subfamily Equinae": {
+     "best_F": 1.0,
+     "best_fork_holds": 9,
+     "named_as": "Equidae",
+     "species": 9
+    },
+    "subfamily Euphractinae": {
+     "best_F": 1.0,
+     "best_fork_holds": 4,
+     "named_as": "Euphractidae",
+     "species": 4
+    },
+    "subfamily Galaginae": {
+     "best_F": 1.0,
+     "best_fork_holds": 19,
+     "named_as": "Galagidae",
+     "species": 19
+    },
+    "subfamily Geomyinae": {
+     "best_F": 1.0,
+     "best_fork_holds": 49,
+     "named_as": "Geomyidae",
+     "species": 49
+    },
+    "subfamily Graphiurinae": {
+     "best_F": 1.0,
+     "best_fork_holds": 15,
+     "named_as": "Graphiurus",
+     "species": 15
+    },
+    "subfamily Helictidinae": {
+     "best_F": 1.0,
+     "best_fork_holds": 6,
+     "named_as": "Melogale",
+     "species": 6
+    },
+    "subfamily Hippopotaminae": {
+     "best_F": 1.0,
+     "best_fork_holds": 2,
+     "named_as": "Hippopotamidae",
+     "species": 2
+    },
+    "subfamily Idiurinae": {
+     "best_F": 1.0,
+     "best_fork_holds": 2,
+     "named_as": "Idiurus",
+     "species": 2
+    },
+    "subfamily Kerivoulinae": {
+     "best_F": 0.933,
+     "best_fork_holds": 28,
+     "named_as": "Kerivoula",
+     "species": 32
+    },
+    "subfamily Kogiinae": {
+     "best_F": 1.0,
+     "best_fork_holds": 2,
+     "named_as": "Kogiidae",
+     "species": 2
+    },
+    "subfamily Lonchorhininae": {
+     "best_F": 0.5,
+     "best_fork_holds": 2,
+     "species": 6
+    },
+    "subfamily Lorisinae": {
+     "best_F": 1.0,
+     "best_fork_holds": 12,
+     "named_as": "Lorisidae",
+     "species": 12
+    },
+    "subfamily Macrotinae": {
+     "best_F": 1.0,
+     "best_fork_holds": 2,
+     "named_as": "Macrotus",
+     "species": 2
+    },
+    "subfamily Molossinae": {
+     "best_F": 0.996,
+     "best_fork_holds": 133,
+     "named_as": "Molossidae",
+     "species": 132
+    },
+    "subfamily Mydainae": {
+     "best_F": 1.0,
+     "best_fork_holds": 2,
+     "named_as": "Mydaus",
+     "species": 2
+    },
+    "subfamily Notopterisinae": {
+     "best_F": 1.0,
+     "best_fork_holds": 2,
+     "named_as": "Notopteris",
+     "species": 2
+    },
+    "subfamily Ochotoninae": {
+     "best_F": 1.0,
+     "best_fork_holds": 36,
+     "named_as": "Ochotonidae",
+     "species": 36
+    },
+    "subfamily Peroryctinae": {
+     "best_F": 1.0,
+     "best_fork_holds": 3,
+     "named_as": "Peroryctes",
+     "species": 3
+    },
+    "subfamily Petaurinae": {
+     "best_F": 1.0,
+     "best_fork_holds": 9,
+     "named_as": "Petaurus",
+     "species": 9
+    },
+    "subfamily Planigalinae": {
+     "best_F": 1.0,
+     "best_fork_holds": 9,
+     "named_as": "Planigale",
+     "species": 9
+    },
+    "subfamily Potoroinae": {
+     "best_F": 1.0,
+     "best_fork_holds": 3,
+     "named_as": "Potorous",
+     "species": 3
+    },
+    "subfamily Rhinocerotinae": {
+     "best_F": 1.0,
+     "best_fork_holds": 5,
+     "named_as": "Rhinocerotidae",
+     "species": 5
+    },
+    "subfamily Rhinophyllinae": {
+     "best_F": 1.0,
+     "best_fork_holds": 3,
+     "named_as": "Rhinophylla",
+     "species": 3
+    },
+    "subfamily Rhynchocyoninae": {
+     "best_F": 1.0,
+     "best_fork_holds": 5,
+     "named_as": "Rhynchocyon",
+     "species": 5
+    },
+    "subfamily Suinae": {
+     "best_F": 0.903,
+     "best_fork_holds": 17,
+     "named_as": "Suidae",
+     "species": 14
+    },
+    "subfamily Tayassuinae": {
+     "best_F": 1.0,
+     "best_fork_holds": 3,
+     "named_as": "Tayassuidae",
+     "species": 3
+    },
+    "subfamily Tolypeutinae": {
+     "best_F": 1.0,
+     "best_fork_holds": 8,
+     "named_as": "Tolypeutidae",
+     "species": 8
+    },
+    "subfamily Trichechinae": {
+     "best_F": 1.0,
+     "best_fork_holds": 3,
+     "named_as": "Trichechidae",
+     "species": 3
+    },
+    "subfamily Uropsilinae": {
+     "best_F": 1.0,
+     "best_fork_holds": 17,
+     "named_as": "Uropsilus",
+     "species": 17
+    },
+    "suborder Elephantiformes": {
+     "best_F": 1.0,
+     "best_fork_holds": 3,
+     "named_as": "Proboscidea",
+     "species": 3
+    },
+    "suborder Eucingulata": {
+     "best_F": 1.0,
+     "best_fork_holds": 25,
+     "named_as": "Cingulata",
+     "species": 25
+    },
+    "suborder Eupholidota": {
+     "best_F": 1.0,
+     "best_fork_holds": 9,
+     "named_as": "Pholidota",
+     "species": 9
+    },
+    "suborder Solenodonota": {
+     "best_F": 1.0,
+     "best_fork_holds": 2,
+     "named_as": "Solenodontidae",
+     "species": 2
+    },
+    "tribe Ailurini": {
+     "best_F": 1.0,
+     "best_fork_holds": 2,
+     "named_as": "Ailuridae",
+     "species": 2
+    },
+    "tribe Anourosoricini": {
+     "best_F": 1.0,
+     "best_fork_holds": 4,
+     "named_as": "Anourosorex",
+     "species": 4
+    },
+    "tribe Blarinellini": {
+     "best_F": 1.0,
+     "best_fork_holds": 4,
+     "named_as": "Blarinella",
+     "species": 4
+    },
+    "tribe Cricetomyini": {
+     "best_F": 1.0,
+     "best_fork_holds": 6,
+     "named_as": "Cricetomyinae",
+     "species": 6
+    },
+    "tribe Dasypodini": {
+     "best_F": 0.9,
+     "best_fork_holds": 9,
+     "named_as": "Dasypodidae",
+     "species": 11
+    },
+    "tribe Delomyini": {
+     "best_F": 1.0,
+     "best_fork_holds": 3,
+     "named_as": "Delomys",
+     "species": 3
+    },
+    "tribe Desmodontini": {
+     "best_F": 1.0,
+     "best_fork_holds": 2,
+     "named_as": "Desmodontinae",
+     "species": 2
+    },
+    "tribe Dicrostonychini": {
+     "best_F": 1.0,
+     "best_fork_holds": 7,
+     "named_as": "Dicrostonyx",
+     "species": 7
+    },
+    "tribe Dobsoniini": {
+     "best_F": 0.966,
+     "best_fork_holds": 14,
+     "named_as": "Dobsonia",
+     "species": 15
+    },
+    "tribe Elephantulini": {
+     "best_F": 0.696,
+     "best_fork_holds": 15,
+     "species": 8
+    },
+    "tribe Ellobiusini": {
+     "best_F": 1.0,
+     "best_fork_holds": 4,
+     "named_as": "Ellobius",
+     "species": 4
+    },
+    "tribe Eonycterini": {
+     "best_F": 1.0,
+     "best_fork_holds": 3,
+     "named_as": "Eonycteris",
+     "species": 3
+    },
+    "tribe Equini": {
+     "best_F": 1.0,
+     "best_fork_holds": 9,
+     "named_as": "Equidae",
+     "species": 9
+    },
+    "tribe Erinaceini": {
+     "best_F": 1.0,
+     "best_fork_holds": 19,
+     "named_as": "Erinaceinae",
+     "species": 19
+    },
+    "tribe Exilisciurini": {
+     "best_F": 1.0,
+     "best_fork_holds": 3,
+     "named_as": "Exilisciurus",
+     "species": 3
+    },
+    "tribe Funambulini": {
+     "best_F": 1.0,
+     "best_fork_holds": 6,
+     "named_as": "Funambulus",
+     "species": 6
+    },
+    "tribe Gorillini": {
+     "best_F": 1.0,
+     "best_fork_holds": 2,
+     "named_as": "Gorilla",
+     "species": 2
+    },
+    "tribe Malacomyini": {
+     "best_F": 1.0,
+     "best_fork_holds": 3,
+     "named_as": "Malacomys",
+     "species": 3
+    },
+    "tribe Melonycterini": {
+     "best_F": 1.0,
+     "best_fork_holds": 5,
+     "named_as": "Melonycteris",
+     "species": 5
+    },
+    "tribe Miroungini": {
+     "best_F": 1.0,
+     "best_fork_holds": 2,
+     "named_as": "Mirounga",
+     "species": 2
+    },
+    "tribe Myospalacini": {
+     "best_F": 1.0,
+     "best_fork_holds": 13,
+     "named_as": "Myospalacinae",
+     "species": 13
+    },
+    "tribe Neomicroxini": {
+     "best_F": 0.014,
+     "best_fork_holds": 278,
+     "species": 2
+    },
+    "tribe Notiosoricini": {
+     "best_F": 0.923,
+     "best_fork_holds": 6,
+     "named_as": "Notiosorex",
+     "species": 7
+    },
+    "tribe Nycticeiini": {
+     "best_F": 0.703,
+     "best_fork_holds": 53,
+     "species": 75
+    },
+    "tribe Paradoxurini": {
+     "best_F": 1.0,
+     "best_fork_holds": 8,
+     "named_as": "Paradoxurinae",
+     "species": 8
+    },
+    "tribe Phacochoerini": {
+     "best_F": 0.5,
+     "best_fork_holds": 6,
+     "species": 2
+    },
+    "tribe Pongini": {
+     "best_F": 1.0,
+     "best_fork_holds": 3,
+     "named_as": "Pongo",
+     "species": 3
+    },
+    "tribe Potamochoerini": {
+     "best_F": 0.8,
+     "best_fork_holds": 2,
+     "named_as": "Potamochoerus",
+     "species": 3
+    },
+    "tribe Reithrodontini": {
+     "best_F": 1.0,
+     "best_fork_holds": 3,
+     "named_as": "Reithrodon",
+     "species": 3
+    },
+    "tribe Rhagomyini": {
+     "best_F": 0.017,
+     "best_fork_holds": 459,
+     "species": 4
+    },
+    "tribe Saccostomini": {
+     "best_F": 1.0,
+     "best_fork_holds": 3,
+     "named_as": "Saccostomus",
+     "species": 3
+    },
+    "tribe Sciurotamiini": {
+     "best_F": 1.0,
+     "best_fork_holds": 2,
+     "named_as": "Sciurotamias",
+     "species": 2
+    },
+    "tribe Scotophilini": {
+     "best_F": 1.0,
+     "best_fork_holds": 20,
+     "named_as": "Scotophilus",
+     "species": 20
+    },
+    "tribe Sigmodontini": {
+     "best_F": 1.0,
+     "best_fork_holds": 14,
+     "named_as": "Sigmodon",
+     "species": 14
+    },
+    "tribe Soricini": {
+     "best_F": 0.971,
+     "best_fork_holds": 84,
+     "named_as": "Sorex",
+     "species": 89
+    },
+    "tribe Sturnirini": {
+     "best_F": 1.0,
+     "best_fork_holds": 25,
+     "named_as": "Sturnira",
+     "species": 25
+    },
+    "tribe Tachyoryctini": {
+     "best_F": 1.0,
+     "best_fork_holds": 2,
+     "named_as": "Tachyoryctes",
+     "species": 2
+    },
+    "tribe Tayassuini": {
+     "best_F": 1.0,
+     "best_fork_holds": 3,
+     "named_as": "Tayassuidae",
+     "species": 3
+    },
+    "tribe Thomomyini": {
+     "best_F": 1.0,
+     "best_fork_holds": 18,
+     "named_as": "Thomomys",
+     "species": 18
+    },
+    "tribe Vampyrini": {
+     "best_F": 0.667,
+     "best_fork_holds": 2,
+     "species": 4
+    }
+   },
+   "note": "MDD taxa on the dated tree by best F against living species (taxnames.decorate)",
+   "of": {
+    "family": 138,
+    "order": 26,
+    "subfamily": 163,
+    "suborder": 27,
+    "tribe": 167
+   },
+   "one_species_no_fork": {
+    "family": 23,
+    "order": 1,
+    "subfamily": 25,
+    "tribe": 23
+   },
+   "placed": {
+    "family": 128,
+    "order": 26,
+    "subfamily": 117,
+    "suborder": 23,
+    "tribe": 127
+   },
+   "with_strays": [
+    {
+     "F": 0.75,
+     "fork_holds": 8,
+     "name": "Millardiini",
+     "others_in": 2,
+     "rank": "tribe",
+     "species": 8,
+     "strays_out": 2
+    },
+    {
+     "F": 0.75,
+     "fork_holds": 3,
+     "name": "Urocricetini",
+     "others_in": 0,
+     "rank": "tribe",
+     "species": 5,
+     "strays_out": 2
+    },
+    {
+     "F": 0.778,
+     "fork_holds": 8,
+     "name": "Amblysominae",
+     "others_in": 1,
+     "rank": "subfamily",
+     "species": 10,
+     "strays_out": 3
+    },
+    {
+     "F": 0.783,
+     "fork_holds": 47,
+     "name": "Heteromyidae",
+     "others_in": 0,
+     "rank": "family",
+     "species": 73,
+     "strays_out": 26
+    },
+    {
+     "F": 0.786,
+     "fork_holds": 16,
+     "name": "Euryzygomatomyinae",
+     "others_in": 5,
+     "rank": "subfamily",
+     "species": 12,
+     "strays_out": 1
+    },
+    {
+     "F": 0.8,
+     "fork_holds": 6,
+     "name": "Cricetomyinae",
+     "others_in": 0,
+     "rank": "subfamily",
+     "species": 9,
+     "strays_out": 3
+    },
+    {
+     "F": 0.8,
+     "fork_holds": 2,
+     "name": "Desmodontinae",
+     "others_in": 0,
+     "rank": "subfamily",
+     "species": 3,
+     "strays_out": 1
+    },
+    {
+     "F": 0.8,
+     "fork_holds": 2,
+     "name": "Euplerinae",
+     "others_in": 0,
+     "rank": "subfamily",
+     "species": 3,
+     "strays_out": 1
+    },
+    {
+     "F": 0.8,
+     "fork_holds": 2,
+     "name": "Hyaeninae",
+     "others_in": 0,
+     "rank": "subfamily",
+     "species": 3,
+     "strays_out": 1
+    },
+    {
+     "F": 0.8,
+     "fork_holds": 6,
+     "name": "Iniidae",
+     "others_in": 2,
+     "rank": "family",
+     "species": 4,
+     "strays_out": 0
+    },
+    {
+     "F": 0.8,
+     "fork_holds": 7,
+     "name": "Pteralopini",
+     "others_in": 1,
+     "rank": "tribe",
+     "species": 8,
+     "strays_out": 2
+    },
+    {
+     "F": 0.808,
+     "fork_holds": 51,
+     "name": "Pipistrellini",
+     "others_in": 9,
+     "rank": "tribe",
+     "species": 53,
+     "strays_out": 11
+    },
+    {
+     "F": 0.824,
+     "fork_holds": 15,
+     "name": "Hyperoodontinae",
+     "others_in": 1,
+     "rank": "subfamily",
+     "species": 19,
+     "strays_out": 5
+    },
+    {
+     "F": 0.828,
+     "fork_holds": 12,
+     "name": "Lorisidae",
+     "others_in": 0,
+     "rank": "family",
+     "species": 17,
+     "strays_out": 5
+    },
+    {
+     "F": 0.828,
+     "fork_holds": 14,
+     "name": "Vulpini",
+     "others_in": 2,
+     "rank": "tribe",
+     "species": 15,
+     "strays_out": 3
+    },
+    {
+     "F": 0.833,
+     "fork_holds": 5,
+     "name": "Macroscelidini",
+     "others_in": 0,
+     "rank": "tribe",
+     "species": 7,
+     "strays_out": 2
+    },
+    {
+     "F": 0.842,
+     "fork_holds": 9,
+     "name": "Cricetini",
+     "others_in": 1,
+     "rank": "tribe",
+     "species": 10,
+     "strays_out": 2
+    },
+    {
+     "F": 0.842,
+     "fork_holds": 20,
+     "name": "Phloeomyini",
+     "others_in": 4,
+     "rank": "tribe",
+     "species": 18,
+     "strays_out": 2
+    },
+    {
+     "F": 0.857,
+     "fork_holds": 3,
+     "name": "Hsunycterini",
+     "others_in": 0,
+     "rank": "tribe",
+     "species": 4,
+     "strays_out": 1
+    },
+    {
+     "F": 0.857,
+     "fork_holds": 3,
+     "name": "Macrophyllini",
+     "others_in": 0,
+     "rank": "tribe",
+     "species": 4,
+     "strays_out": 1
+    },
+    {
+     "F": 0.857,
+     "fork_holds": 6,
+     "name": "Wiedomyini",
+     "others_in": 0,
+     "rank": "tribe",
+     "species": 8,
+     "strays_out": 2
+    },
+    {
+     "F": 0.872,
+     "fork_holds": 22,
+     "name": "Balionycterini",
+     "others_in": 5,
+     "rank": "tribe",
+     "species": 17,
+     "strays_out": 0
+    },
+    {
+     "F": 0.88,
+     "fork_holds": 26,
+     "name": "Ichthyomyini",
+     "others_in": 4,
+     "rank": "tribe",
+     "species": 24,
+     "strays_out": 2
+    },
+    {
+     "F": 0.882,
+     "fork_holds": 95,
+     "name": "Vespertilionini",
+     "others_in": 9,
+     "rank": "tribe",
+     "species": 100,
+     "strays_out": 14
+    },
+    {
+     "F": 0.884,
+     "fork_holds": 19,
+     "name": "Ziphiidae",
+     "others_in": 0,
+     "rank": "family",
+     "species": 24,
+     "strays_out": 5
+    },
+    {
+     "F": 0.889,
+     "fork_holds": 4,
+     "name": "Glyphonycterinae",
+     "others_in": 0,
+     "rank": "subfamily",
+     "species": 5,
+     "strays_out": 1
+    },
+    {
+     "F": 0.889,
+     "fork_holds": 4,
+     "name": "Hemibelideinae",
+     "others_in": 0,
+     "rank": "subfamily",
+     "species": 5,
+     "strays_out": 1
+    },
+    {
+     "F": 0.889,
+     "fork_holds": 8,
+     "name": "Lissodelphininae",
+     "others_in": 0,
+     "rank": "subfamily",
+     "species": 10,
+     "strays_out": 2
+    },
+    {
+     "F": 0.889,
+     "fork_holds": 4,
+     "name": "Perodicticinae",
+     "others_in": 0,
+     "rank": "subfamily",
+     "species": 5,
+     "strays_out": 1
+    },
+    {
+     "F": 0.889,
+     "fork_holds": 5,
+     "name": "Petromyscini",
+     "others_in": 1,
+     "rank": "tribe",
+     "species": 4,
+     "strays_out": 0
+    },
+    {
+     "F": 0.893,
+     "fork_holds": 25,
+     "name": "Myocastorini",
+     "others_in": 0,
+     "rank": "tribe",
+     "species": 31,
+     "strays_out": 6
+    },
+    {
+     "F": 0.9,
+     "fork_holds": 9,
+     "name": "Dasypodidae",
+     "others_in": 0,
+     "rank": "family",
+     "species": 11,
+     "strays_out": 2
+    },
+    {
+     "F": 0.903,
+     "fork_holds": 15,
+     "name": "Lonchophyllini",
+     "others_in": 1,
+     "rank": "tribe",
+     "species": 16,
+     "strays_out": 2
+    },
+    {
+     "F": 0.909,
+     "fork_holds": 201,
+     "name": "Hydromyini",
+     "others_in": 21,
+     "rank": "tribe",
+     "species": 195,
+     "strays_out": 15
+    },
+    {
+     "F": 0.909,
+     "fork_holds": 5,
+     "name": "Priodontini",
+     "others_in": 0,
+     "rank": "tribe",
+     "species": 6,
+     "strays_out": 1
+    },
+    {
+     "F": 0.909,
+     "fork_holds": 5,
+     "name": "Urotrichini",
+     "others_in": 0,
+     "rank": "tribe",
+     "species": 6,
+     "strays_out": 1
+    },
+    {
+     "F": 0.917,
+     "fork_holds": 22,
+     "name": "Myosoricinae",
+     "others_in": 0,
+     "rank": "subfamily",
+     "species": 26,
+     "strays_out": 4
+    },
+    {
+     "F": 0.923,
+     "fork_holds": 7,
+     "name": "Anomaluridae",
+     "others_in": 1,
+     "rank": "family",
+     "species": 6,
+     "strays_out": 0
+    },
+    {
+     "F": 0.923,
+     "fork_holds": 6,
+     "name": "Cardiocraniinae",
+     "others_in": 0,
+     "rank": "subfamily",
+     "species": 7,
+     "strays_out": 1
+    },
+    {
+     "F": 0.923,
+     "fork_holds": 6,
+     "name": "Megadermatidae",
+     "others_in": 0,
+     "rank": "family",
+     "species": 7,
+     "strays_out": 1
+    },
+    {
+     "F": 0.923,
+     "fork_holds": 6,
+     "name": "Rousettini",
+     "others_in": 0,
+     "rank": "tribe",
+     "species": 7,
+     "strays_out": 1
+    },
+    {
+     "F": 0.925,
+     "fork_holds": 36,
+     "name": "Cynopterinae",
+     "others_in": 5,
+     "rank": "subfamily",
+     "species": 31,
+     "strays_out": 0
+    },
+    {
+     "F": 0.933,
+     "fork_holds": 8,
+     "name": "Myonycterini",
+     "others_in": 1,
+     "rank": "tribe",
+     "species": 7,
+     "strays_out": 0
+    },
+    {
+     "F": 0.941,
+     "fork_holds": 32,
+     "name": "Cheirogaleidae",
+     "others_in": 0,
+     "rank": "family",
+     "species": 36,
+     "strays_out": 4
+    },
+    {
+     "F": 0.941,
+     "fork_holds": 8,
+     "name": "Globicephalinae",
+     "others_in": 0,
+     "rank": "subfamily",
+     "species": 9,
+     "strays_out": 1
+    },
+    {
+     "F": 0.941,
+     "fork_holds": 16,
+     "name": "Mormoopidae",
+     "others_in": 0,
+     "rank": "family",
+     "species": 18,
+     "strays_out": 2
+    },
+    {
+     "F": 0.941,
+     "fork_holds": 8,
+     "name": "Scalopini",
+     "others_in": 0,
+     "rank": "tribe",
+     "species": 9,
+     "strays_out": 1
+    },
+    {
+     "F": 0.941,
+     "fork_holds": 8,
+     "name": "Suini",
+     "others_in": 0,
+     "rank": "tribe",
+     "species": 9,
+     "strays_out": 1
+    },
+    {
+     "F": 0.942,
+     "fork_holds": 193,
+     "name": "Rattini",
+     "others_in": 6,
+     "rank": "tribe",
+     "species": 204,
+     "strays_out": 17
+    },
+    {
+     "F": 0.943,
+     "fork_holds": 33,
+     "name": "Dendrolagini",
+     "others_in": 0,
+     "rank": "tribe",
+     "species": 37,
+     "strays_out": 4
+    },
+    {
+     "F": 0.943,
+     "fork_holds": 33,
+     "name": "Nectogalini",
+     "others_in": 0,
+     "rank": "tribe",
+     "species": 37,
+     "strays_out": 4
+    },
+    {
+     "F": 0.944,
+     "fork_holds": 90,
+     "name": "Arvicanthini",
+     "others_in": 5,
+     "rank": "tribe",
+     "species": 90,
+     "strays_out": 5
+    },
+    {
+     "F": 0.944,
+     "fork_holds": 17,
+     "name": "Macropodini",
+     "others_in": 0,
+     "rank": "tribe",
+     "species": 19,
+     "strays_out": 2
+    },
+    {
+     "F": 0.947,
+     "fork_holds": 18,
+     "name": "Choeronycterini",
+     "others_in": 0,
+     "rank": "tribe",
+     "species": 20,
+     "strays_out": 2
+    },
+    {
+     "F": 0.949,
+     "fork_holds": 28,
+     "name": "Dendromurinae",
+     "others_in": 0,
+     "rank": "subfamily",
+     "species": 31,
+     "strays_out": 3
+    },
+    {
+     "F": 0.949,
+     "fork_holds": 31,
+     "name": "Nesomyinae",
+     "others_in": 3,
+     "rank": "subfamily",
+     "species": 28,
+     "strays_out": 0
+    },
+    {
+     "F": 0.952,
+     "fork_holds": 10,
+     "name": "Atelinae",
+     "others_in": 0,
+     "rank": "subfamily",
+     "species": 11,
+     "strays_out": 1
+    },
+    {
+     "F": 0.952,
+     "fork_holds": 10,
+     "name": "Balaenopteridae",
+     "others_in": 0,
+     "rank": "family",
+     "species": 11,
+     "strays_out": 1
+    },
+    {
+     "F": 0.952,
+     "fork_holds": 10,
+     "name": "Echymiperinae",
+     "others_in": 0,
+     "rank": "subfamily",
+     "species": 11,
+     "strays_out": 1
+    },
+    {
+     "F": 0.954,
+     "fork_holds": 103,
+     "name": "Arvicolini",
+     "others_in": 0,
+     "rank": "tribe",
+     "species": 113,
+     "strays_out": 10
+    },
+    {
+     "F": 0.954,
+     "fork_holds": 73,
+     "name": "Echimyinae",
+     "others_in": 1,
+     "rank": "subfamily",
+     "species": 78,
+     "strays_out": 6
+    },
+    {
+     "F": 0.96,
+     "fork_holds": 12,
+     "name": "Dipodini",
+     "others_in": 0,
+     "rank": "tribe",
+     "species": 13,
+     "strays_out": 1
+    },
+    {
+     "F": 0.963,
+     "fork_holds": 13,
+     "name": "Dipodinae",
+     "others_in": 0,
+     "rank": "subfamily",
+     "species": 14,
+     "strays_out": 1
+    },
+    {
+     "F": 0.964,
+     "fork_holds": 56,
+     "name": "Murininae",
+     "others_in": 2,
+     "rank": "subfamily",
+     "species": 56,
+     "strays_out": 2
+    },
+    {
+     "F": 0.966,
+     "fork_holds": 14,
+     "name": "Emballonurini",
+     "others_in": 0,
+     "rank": "tribe",
+     "species": 15,
+     "strays_out": 1
+    },
+    {
+     "F": 0.966,
+     "fork_holds": 15,
+     "name": "Micronycterinae",
+     "others_in": 1,
+     "rank": "subfamily",
+     "species": 14,
+     "strays_out": 0
+    },
+    {
+     "F": 0.966,
+     "fork_holds": 30,
+     "name": "Phyllostominae",
+     "others_in": 2,
+     "rank": "subfamily",
+     "species": 28,
+     "strays_out": 0
+    },
+    {
+     "F": 0.967,
+     "fork_holds": 88,
+     "name": "Hipposideridae",
+     "others_in": 0,
+     "rank": "family",
+     "species": 94,
+     "strays_out": 6
+    },
+    {
+     "F": 0.968,
+     "fork_holds": 48,
+     "name": "Echimyini",
+     "others_in": 2,
+     "rank": "tribe",
+     "species": 47,
+     "strays_out": 1
+    },
+    {
+     "F": 0.968,
+     "fork_holds": 30,
+     "name": "Plecotini",
+     "others_in": 0,
+     "rank": "tribe",
+     "species": 32,
+     "strays_out": 2
+    },
+    {
+     "F": 0.97,
+     "fork_holds": 17,
+     "name": "Bovini",
+     "others_in": 1,
+     "rank": "tribe",
+     "species": 16,
+     "strays_out": 0
+    },
+    {
+     "F": 0.971,
+     "fork_holds": 18,
+     "name": "Delphininae",
+     "others_in": 1,
+     "rank": "subfamily",
+     "species": 17,
+     "strays_out": 0
+    },
+    {
+     "F": 0.971,
+     "fork_holds": 17,
+     "name": "Harpyionycterinae",
+     "others_in": 0,
+     "rank": "subfamily",
+     "species": 18,
+     "strays_out": 1
+    },
+    {
+     "F": 0.972,
+     "fork_holds": 87,
+     "name": "Akodontini",
+     "others_in": 0,
+     "rank": "tribe",
+     "species": 92,
+     "strays_out": 5
+    },
+    {
+     "F": 0.973,
+     "fork_holds": 18,
+     "name": "Cricetinae",
+     "others_in": 0,
+     "rank": "subfamily",
+     "species": 19,
+     "strays_out": 1
+    },
+    {
+     "F": 0.974,
+     "fork_holds": 39,
+     "name": "Clethrionomyini",
+     "others_in": 2,
+     "rank": "tribe",
+     "species": 37,
+     "strays_out": 0
+    },
+    {
+     "F": 0.974,
+     "fork_holds": 38,
+     "name": "Glossophaginae",
+     "others_in": 0,
+     "rank": "subfamily",
+     "species": 40,
+     "strays_out": 2
+    },
+    {
+     "F": 0.974,
+     "fork_holds": 19,
+     "name": "Phyllostomini",
+     "others_in": 0,
+     "rank": "tribe",
+     "species": 20,
+     "strays_out": 1
+    },
+    {
+     "F": 0.975,
+     "fork_holds": 39,
+     "name": "Delphinidae",
+     "others_in": 0,
+     "rank": "family",
+     "species": 41,
+     "strays_out": 2
+    },
+    {
+     "F": 0.975,
+     "fork_holds": 39,
+     "name": "Dipodidae",
+     "others_in": 0,
+     "rank": "family",
+     "species": 41,
+     "strays_out": 2
+    },
+    {
+     "F": 0.975,
+     "fork_holds": 39,
+     "name": "Epomophorinae",
+     "others_in": 0,
+     "rank": "subfamily",
+     "species": 41,
+     "strays_out": 2
+    },
+    {
+     "F": 0.976,
+     "fork_holds": 21,
+     "name": "Lonchophyllinae",
+     "others_in": 1,
+     "rank": "subfamily",
+     "species": 20,
+     "strays_out": 0
+    },
+    {
+     "F": 0.977,
+     "fork_holds": 159,
+     "name": "Bovidae",
+     "others_in": 7,
+     "rank": "family",
+     "species": 152,
+     "strays_out": 0
+    },
+    {
+     "F": 0.978,
+     "fork_holds": 23,
+     "name": "Diclidurini",
+     "others_in": 1,
+     "rank": "tribe",
+     "species": 22,
+     "strays_out": 0
+    },
+    {
+     "F": 0.979,
+     "fork_holds": 141,
+     "name": "Myotinae",
+     "others_in": 0,
+     "rank": "subfamily",
+     "species": 147,
+     "strays_out": 6
+    },
+    {
+     "F": 0.98,
+     "fork_holds": 26,
+     "name": "Oryzorictinae",
+     "others_in": 1,
+     "rank": "subfamily",
+     "species": 25,
+     "strays_out": 0
+    },
+    {
+     "F": 0.982,
+     "fork_holds": 29,
+     "name": "Bovinae",
+     "others_in": 1,
+     "rank": "subfamily",
+     "species": 28,
+     "strays_out": 0
+    },
+    {
+     "F": 0.983,
+     "fork_holds": 200,
+     "name": "Soricinae",
+     "others_in": 3,
+     "rank": "subfamily",
+     "species": 201,
+     "strays_out": 4
+    },
+    {
+     "F": 0.985,
+     "fork_holds": 64,
+     "name": "Praomyini",
+     "others_in": 0,
+     "rank": "tribe",
+     "species": 66,
+     "strays_out": 2
+    },
+    {
+     "F": 0.986,
+     "fork_holds": 179,
+     "name": "Oryzomyini",
+     "others_in": 3,
+     "rank": "tribe",
+     "species": 178,
+     "strays_out": 2
+    },
+    {
+     "F": 0.987,
+     "fork_holds": 37,
+     "name": "Antilopini",
+     "others_in": 0,
+     "rank": "tribe",
+     "species": 38,
+     "strays_out": 1
+    },
+    {
+     "F": 0.987,
+     "fork_holds": 312,
+     "name": "Vespertilioninae",
+     "others_in": 0,
+     "rank": "subfamily",
+     "species": 320,
+     "strays_out": 8
+    },
+    {
+     "F": 0.988,
+     "fork_holds": 80,
+     "name": "Pteropodinae",
+     "others_in": 1,
+     "rank": "subfamily",
+     "species": 80,
+     "strays_out": 1
+    },
+    {
+     "F": 0.989,
+     "fork_holds": 92,
+     "name": "Thomasomyini",
+     "others_in": 2,
+     "rank": "tribe",
+     "species": 90,
+     "strays_out": 0
+    },
+    {
+     "F": 0.989,
+     "fork_holds": 45,
+     "name": "Thylamyini",
+     "others_in": 0,
+     "rank": "tribe",
+     "species": 46,
+     "strays_out": 1
+    },
+    {
+     "F": 0.991,
+     "fork_holds": 55,
+     "name": "Deomyinae",
+     "others_in": 1,
+     "rank": "subfamily",
+     "species": 54,
+     "strays_out": 0
+    },
+    {
+     "F": 0.991,
+     "fork_holds": 57,
+     "name": "Talpinae",
+     "others_in": 0,
+     "rank": "subfamily",
+     "species": 58,
+     "strays_out": 1
+    },
+    {
+     "F": 0.992,
+     "fork_holds": 61,
+     "name": "Blarinini",
+     "others_in": 1,
+     "rank": "tribe",
+     "species": 60,
+     "strays_out": 0
+    },
+    {
+     "F": 0.992,
+     "fork_holds": 66,
+     "name": "Pteropodini",
+     "others_in": 0,
+     "rank": "tribe",
+     "species": 67,
+     "strays_out": 1
+    },
+    {
+     "F": 0.994,
+     "fork_holds": 81,
+     "name": "Gerbillini",
+     "others_in": 1,
+     "rank": "tribe",
+     "species": 80,
+     "strays_out": 0
+    },
+    {
+     "F": 0.995,
+     "fork_holds": 502,
+     "name": "Sigmodontinae",
+     "others_in": 0,
+     "rank": "subfamily",
+     "species": 507,
+     "strays_out": 5
+    },
+    {
+     "F": 0.996,
+     "fork_holds": 123,
+     "name": "Antilopinae",
+     "others_in": 0,
+     "rank": "subfamily",
+     "species": 124,
+     "strays_out": 1
+    },
+    {
+     "F": 0.996,
+     "fork_holds": 125,
+     "name": "Didelphinae",
+     "others_in": 0,
+     "rank": "subfamily",
+     "species": 126,
+     "strays_out": 1
+    },
+    {
+     "F": 0.997,
+     "fork_holds": 702,
+     "name": "Murinae",
+     "others_in": 0,
+     "rank": "subfamily",
+     "species": 706,
+     "strays_out": 4
+    },
+    {
+     "F": 0.997,
+     "fork_holds": 558,
+     "name": "Vespertilionidae",
+     "others_in": 3,
+     "rank": "family",
+     "species": 555,
+     "strays_out": 0
+    },
+    {
+     "F": 0.998,
+     "fork_holds": 274,
+     "name": "Crocidurinae",
+     "others_in": 0,
+     "rank": "subfamily",
+     "species": 275,
+     "strays_out": 1
+    },
+    {
+     "F": 0.999,
+     "fork_holds": 864,
+     "name": "Muridae",
+     "others_in": 0,
+     "rank": "family",
+     "species": 865,
+     "strays_out": 1
+    },
+    {
+     "F": 0.999,
+     "fork_holds": 431,
+     "name": "Yinpterochiroptera",
+     "others_in": 0,
+     "rank": "suborder",
+     "species": 432,
+     "strays_out": 1
+    }
+   ]
   },
   "upham_tips_dropped": {
    "extinct, placed without data (grafted instead)": 44,
@@ -31143,13 +33049,6 @@
      ],
      "others": 1
     },
-    "family Bathyergidae": {
-     "e.g.": [
-      "Heterocephalus glaber",
-      "Heterocephalus phillipsi"
-     ],
-     "others": 2
-    },
     "family Bovidae": {
      "e.g.": [
       "Moschus anhuiensis",
@@ -31162,11 +33061,18 @@
      ],
      "others": 7
     },
-    "family Tenrecidae": {
+    "family Iniidae": {
      "e.g.": [
-      "Micropotamogale lamottei",
-      "Micropotamogale ruwenzorii",
-      "Potamogale velox"
+      "Lipotes vexillifer",
+      "Pontoporia blainvillei"
+     ],
+     "others": 2
+    },
+    "family Vespertilionidae": {
+     "e.g.": [
+      "Cistugo lesueuri",
+      "Cistugo seabrae",
+      "Eudiscoderma thongareeae"
      ],
      "others": 3
     }
@@ -32339,7 +34245,7 @@
  },
  "output": {
   "brotli_bytes": 789528,
-  "dated_sidecar_raw": 2057182,
+  "dated_sidecar_raw": 2066684,
   "files": 15,
   "raw_bytes": 3320704,
   "skeleton_brotli": 64671,
