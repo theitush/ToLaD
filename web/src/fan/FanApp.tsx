@@ -1,6 +1,6 @@
 // The main view: the dated tree, OneZoom-style.
 
-import { useEffect, useRef, useState, type PointerEvent as RPointerEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type PointerEvent as RPointerEvent, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import { approxMa, formatCount, formatMass } from '../data/count';
 import { HistorySpark } from './HistorySpark';
@@ -18,6 +18,7 @@ import { labelMode, setLabelMode, type LabelMode } from './pics';
 import { GAP_MODES, gapMode, setGapMode, type GapMode } from './fold';
 import { FORK_MODES, forkMode, grayOn, setForkMode, setGrayOn, type ForkMode } from './steady';
 import { MagnifierIcon, SearchPanel } from './SearchPanel';
+import { SourcesPanel } from './SourcesPanel';
 import { statusOf } from './status';
 import { cardTapper, onControl } from './cardtap';
 import { FanView, initialMeasure, levelName, type Lineage, type Place, type Selection } from './view';
@@ -116,6 +117,8 @@ export function FanApp() {
   const [measure, setMeasure] = useState<Measure>(initialMeasure);
   const [sel, setSel] = useState<Selection | null>(null);
   const [searching, setSearching] = useState(false);
+  const [showSources, setShowSources] = useState(false);
+  const closeSources = useCallback(() => setShowSources(false), []);
   const [mamm, setMamm] = useState<MammState>(mammStart);
   // The view can be built: the mammals' data is in.
   const viewReady = mamm === 'ready';
@@ -359,18 +362,25 @@ export function FanApp() {
         ) : (
           <SpeciesCard sp={sel.sp} mass={measure === 'mass'} ageMa={sel.ageMa} startMa={sel.startMa} event={sel.event?.k} onClose={() => viewRef.current?.tap(-1e6, -1e6)} onUp={cardUp} />
         )
+      ) : showSources ? (
+        <SourcesPanel onClose={closeSources} />
       ) : (
-        <ul className="key" aria-label="key">
-          <li>
-            <span className="lane alive" /> alive now
-          </li>
-          <li>
-            <span className="lane lineage" /> living descendants
-          </li>
-          <li>
-            <span className="lane dead" /> {gray ? 'line ended' : 'extinct'}
-          </li>
-        </ul>
+        <div className="foot-row">
+          <ul className="key" aria-label="key">
+            <li>
+              <span className="lane alive" /> alive now
+            </li>
+            <li>
+              <span className="lane lineage" /> living descendants
+            </li>
+            <li>
+              <span className="lane dead" /> {gray ? 'line ended' : 'extinct'}
+            </li>
+          </ul>
+          <button type="button" className="sources-link" onClick={() => setShowSources(true)}>
+            sources
+          </button>
+        </div>
       )}
       </div>
     </div>

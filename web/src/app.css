@@ -681,6 +681,50 @@
   gap: 6px;
   white-space: nowrap;
 }
+/* The legend's row: the key, and at its end the link to the sources (ToLaD#429). */
+.foot .foot-row {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  gap: 2px 14px;
+  pointer-events: none;
+}
+.fan .sources-link {
+  flex: none;
+  margin: -10px -8px -10px auto;
+  padding: 10px 8px;
+  background: none;
+  border: 0;
+  color: var(--ink-3);
+  font: inherit;
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+.card-sp .sources-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0 4px 0 0;
+  max-height: 58vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.card-sp .sources-list li {
+  padding: 2px 0;
+}
+.card-sp.sources a {
+  color: #9fd3b3;
+}
+.card-sp .sources-end {
+  margin-top: 8px;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
 .fan .lane {
   display: inline-block;
   width: 4px;

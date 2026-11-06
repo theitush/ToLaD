@@ -104,6 +104,7 @@ const scenes = [
   ['bfit-iberian', 'frame', ['Iberian lynx', 2000, 1.6]],
   ['bfit-tiger', 'frame', ['Tiger', 2000, 1.6]],
   // The search (ToLaD#157): its button at home, "li" typed with the list open, the lion picked (flown there, card open).
+  ['sources', 'sources'],
   ['search-home', 'home'],
   ['search-li', 'search', ['li']],
   ['search-lion', 'search', ['li', 'Lion']],
@@ -322,7 +323,7 @@ try {
           f.tap(-1e6, -1e6);
         }
         const fan = f.fan;
-        if (kind === 'home' || kind === 'card' || kind === 'search') {
+        if (kind === 'home' || kind === 'card' || kind === 'search' || kind === 'sources') {
           f.cam = f.homeCamera();
           f.camera.settle();
           if (kind === 'card') {
@@ -667,6 +668,9 @@ try {
       },
       [kind, args ?? [], process.env.WIDTH || 'linear'],
     );
+    if (kind === 'sources') {
+      await page.click('button.sources-link');
+    }
     if (kind === 'search') {
       await page.click('button[aria-label="Find a species"]');
       await page.keyboard.type(args[0], { delay: 40 });
