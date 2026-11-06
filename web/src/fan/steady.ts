@@ -90,6 +90,16 @@ export const LABEL_PILL = 22;
 export const STEM_WHOLE = 1;
 export const STEM_LINE = 2;
 
+/**
+ * How many equal steps of a peel's height draw its S (ease) straight within a fifth of a pixel, for its move on screen (px; a
+ * chord over 1/n of an S strays at most move * 5.77 / (8 n^2)): a power of two, so that a zoom's coarser steps are its finer ones'.
+ */
+export function peelSteps(movePx: number): number {
+  let n = 2;
+  while (n < 256 && (movePx * 5.77) / (8 * n * n) > 0.2) n *= 2;
+  return n;
+}
+
 /** A stretch's share of its width at this zoom, by how far it runs across per px up (across and h world): 1 whole, 0 a line. */
 function share(across: number, h: number, sx: number, sy: number, whole: number, line: number): number {
   const m = Math.abs(across) * sx;
@@ -590,6 +600,20 @@ export class Steady extends Fold {
     this.prep(L);
     out.length = 0;
     this.forksUp(L, this.idx.get(v)!, sx, sy, yTop, yBot, out);
+  }
+
+  /**
+   * The peels node v's column runs through over [yTop, yBot] (a merged clade's ancestors' forks, ToLaD#461), bottom up:
+   * [foot, top] pairs, world y. Each is one S (ease) over one height, however the rows fall on it.
+   */
+  peelsOn(v: FanNode, yTop: number, yBot: number, out: number[]): void {
+    const L = this.cur();
+    out.length = 0;
+    for (let p = this.par[this.idx.get(v)!]; p >= 0; p = this.par[p]) {
+      const foot = this.nY[p];
+      const top = foot - L.h[p];
+      if (foot > top && foot >= yTop && top <= yBot) out.unshift(foot, top);
+    }
   }
 
   /**

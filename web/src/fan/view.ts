@@ -14,12 +14,12 @@ import { formatCount, formatMass } from '../data/count';
 import { stamp } from '../stamp';
 import { DOUBLE_TAP_MS, Input, type InputHandlers } from '../engine/input';
 import { clipPoly, FanCamera, LABELS_SHARE, type Camera } from './camera';
-import { isNode, laneAt, layoutFan, leftAt, nearestStrand, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type Fan, type FanBranch, type FanNode, type Measure, type WidthMode } from './layout';
+import { ease, isNode, laneAt, layoutFan, leftAt, nearestStrand, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type Fan, type FanBranch, type FanNode, type Measure, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01 } from './meshgl';
 import { Lod } from './lod';
 import type { Fold, FoldState } from './fold';
-import { forkMode, grayOn, LABEL_PILL, Steady } from './steady';
+import { forkMode, grayOn, LABEL_PILL, peelSteps, Steady } from './steady';
 import { LADDER, Territories, type CutItem, type Ref, type RowsOf } from './cut';
 import { COLUMN_DIM, columnSpans, EVENT_TINT, eventAt, eventSpans, type EventSpan } from './colstyle';
 import { laneDim, LINEAGE, pathFrame, TwigModel } from './twigs';
@@ -3304,6 +3304,7 @@ export class FanView implements InputHandlers {
   }
 
   /** A merged clade (lod.ts): one ribbon over the grid's rows on screen, its extent the fold's, its green its strands' share of their widths (ToLaD#389). */
+  private mergedPeels: number[] = [];
   private drawMerged(v: FanNode): void {
     const f = this.fan.tess.fold!;
     const H = f.gridH;
@@ -3324,8 +3325,7 @@ export class FanView implements InputHandlers {
     let lo = Infinity;
     let hi = -Infinity;
     const cam = this.camera;
-    const push = (k: number, y: number) => {
-      const [l, r] = f.extent(i0, i1, k, ext);
+    const push = (k: number, y: number, l: number, r: number) => {
       const w = Math.max(0, r - l);
       const px = cam.screenX(l);
       lo = Math.min(lo, px);
@@ -3333,10 +3333,51 @@ export class FanView implements InputHandlers {
       const inset = Math.min(RIBBON_INSET_PX, (w * this.cam.sx) / 4);
       pts.push(px + inset, cam.screenY(y), w - (2 * inset) / this.cam.sx, this.lod!.greenShareAt(v, k, H));
     };
+    const row = (k: number, y: number) => {
+      const [l, r] = f.extent(i0, i1, k, ext);
+      push(k, y, l, r);
+    };
+    // (`forks: peel`, ToLaD#461: each peel its own heights, fixed fractions of it, never the rows': rows ~8 px apart cut a
+    // shorter peel to a chord from wherever they fell, and every grid step of a pinch moved it, by up to its whole width.)
+    const P = this.mergedPeels;
+    if (f instanceof Steady && forkMode() === 'peel') f.peelsOn(v, y0, y1, P);
+    else P.length = 0;
+    /** One peel from its foot up (those heights inside (y0, y1), and an end of the span that falls in it). */
+    const peel = (s: number) => {
+      const foot = P[s];
+      const top = P[s + 1];
+      const [lb, rb] = f.extent(i0, i1, foot / H, ext);
+      const [lt, rt] = f.extent(i0, i1, top / H, ext);
+      const n = peelSteps(Math.max(Math.abs(lt - lb), Math.abs(rt - rb)) * this.cam.sx);
+      const at = (y: number) => {
+        const u = ease((foot - y) / (foot - top));
+        push(Math.ceil(y / H), y, lb + (lt - lb) * u, rb + (rt - rb) * u);
+      };
+      if (y1 < foot) at(y1);
+      for (let q = 0; q <= n; q++) {
+        const y = foot - ((foot - top) * q) / n;
+        if (y < y1 && y > y0) at(y);
+      }
+      if (y0 > top) at(y0);
+    };
+    // (The rows, each peel at and under one before it; a row inside a peel is no point of it.)
+    let s = 0;
+    let done = Infinity;
     // (Bottom up, as lanePoints: its last point at its top, read off the row under it.)
-    if (y1 > k1 * H) push(Math.min(k1 + 1, Math.ceil(y1 / H)), y1);
-    for (let k = k1; k >= k0; k--) push(k, k * H);
-    if (y0 < k0 * H) push(k0, y0);
+    if (y1 > k1 * H && !(P.length && y1 <= P[0] && y1 >= P[1])) row(Math.min(k1 + 1, Math.ceil(y1 / H)), y1);
+    for (let k = k1; k >= k0; k--) {
+      const y = k * H;
+      for (; s < P.length && P[s] >= y; s += 2) {
+        peel(s);
+        done = P[s + 1];
+      }
+      if (y < done) row(k, y);
+    }
+    for (; s < P.length; s += 2) {
+      peel(s);
+      done = P[s + 1];
+    }
+    if (y0 < k0 * H && y0 < done) row(k0, y0);
     if (pts.n < 2 || hi < -12 || lo > this.w + 12) return;
     let out = pts;
     if (f instanceof Steady && forkMode() !== 'peel') {
