@@ -60,7 +60,7 @@ const LIFE_SAMPLES = 48;
  * little height for its move. `peel`: every daughter a ribbon on its S (the way back).
  */
 export type ForkMode = 'thin' | 'flat' | 'peel';
-/** Whether what has no living descendants is drawn (ToLaD#410, `?gray=off`): a look only, the rooms and frames the same either way. */
+/** Whether the "line ended" part of a branch with living descendants is drawn (ToLaD#410, `?gray=off`): a look only, what is extinct drawn gray either way, the rooms and frames the same. */
 let grayNow = true;
 export const grayOn = (): boolean => grayNow;
 export const setGrayOn = (on: boolean): void => {
