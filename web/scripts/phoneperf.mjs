@@ -24,8 +24,6 @@ const H = 844;
 
 // [name, level, setup]: setup runs in the page once loaded (f = window.__fan), the view framed where the gestures start.
 const SCENES = [
-  ['carnivores', 'carnivores', { home: true }],
-  ['cats', 'cats', { home: true }],
   ['mammals', 'mammals', { home: true }],
   ['rodents', 'mammals', { level: 'Rodentia' }],
   ['bats', 'mammals', { level: 'Chiroptera' }],

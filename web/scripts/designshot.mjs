@@ -3,7 +3,7 @@
 // zoomed far out, and a species card open.
 //   npm run build:single && node scripts/designshot.mjs <out-dir> [prefix] [only,names]
 //   (DSF: device scale factor, default 2; CLIP=x,y,w,h; DEBUG=1: the ?debug readout;
-//   WIDTH=linear|log: the widths, default linear; LEVEL=cats|carnivores|mammals: ?level= (default: the carnivores, ToLaD#146, #247))
+//   WIDTH=linear|log: the widths, default linear; LEVEL=cats|carnivores: ?level=, the old links, that clade's frame at mammals (ToLaD#418; default: mammals' home))
 import { mkdirSync, readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
 import { pageUrl } from './pageurl.mjs';

@@ -1,6 +1,6 @@
 // The mammal level's data (ToLaD#247): every mammal under the whole dated tree, ~20x the carnivores. It is not in the
 // page: vite.config.ts writes it as a sibling file (mammals.json, next to index.html; served at /mammals.json in dev)
-// and the level fetches it the first time it opens, so the default page carries only the carnivores.
+// and the page fetches it on open (ToLaD#418: it is the page's only data).
 //
 // Until loadMammals() has resolved, mammalData() throws: the mammal tree and clade (splits.ts mammaliaTree, panthera.ts
 // mammaliaClade) are built from it only when the level is shown. Tests and scripts in node load it from the data files
@@ -15,7 +15,7 @@ import type { RawClade } from './panthera-extract';
 export interface MammalData {
   /** Every mammal of data/mammals under the whole dated tree: only the species the fan draws (trimToFan). */
   clade: RawClade;
-  /** The pictures and links of the species the carnivore page leaves out (data/mammals/wiki.json, ToLaD#182). */
+  /** Every species' pictures and links (data/mammals/wiki.json, ToLaD#182). Node's load leaves them out (mammals-node.ts). */
   wiki: Record<string, { wp?: string; img?: string; file?: string; range?: string; rangeFile?: string } | null>;
   /** The level's default layout, worked out at build time (layout.ts LayoutSeed, ToLaD#255); absent, the page works it out. */
   seed?: LayoutSeed;
