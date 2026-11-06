@@ -1708,14 +1708,15 @@ export class FanView implements InputHandlers {
     this.request();
   }
   /**
-   * A double-tap (ToLaD#376): the reverse of a single tap, back to the frame the last tap that moved the view started
-   * from (steps), as it was there. A tap's flight under way, from where it lands; a pan since changes nothing. A step
-   * within LEVEL_PX of the view is passed (every double-tap visibly moves). `firstRan` (ToLaD#301): its first tap already
-   * ran as a single tap (a level deeper, a "+x"): not a step the user meant, so that tap is undone and one step more.
+   * A double-tap always zooms out (ToLaD#416), on to the nearest place that does (zoomsOut, the one rule of every path here).
+   * First the reverse of a single tap (ToLaD#376), back to the frame the last tap that moved the view started from
+   * (steps), as it was there. A tap's flight under way, from where it lands; a pan since changes nothing. A step that
+   * does not zoom out from the view is passed. `firstRan` (ToLaD#301): its first tap already ran as a single tap (a level
+   * deeper, a "+x"): not a step the user meant, so that tap is undone and one step more.
    *
-   * No steps (a pinch or a search pick since, ToLaD#258, #271, #301): one level up, from the level the view is at
-   * (levelNow; a level's flight under way, from where it lands; its first tap run, from where that tap found the view)
-   * to the level it sits in (levelUp). At home, nothing. The card closes for the flight.
+   * No such step (a pinch or a search pick since, ToLaD#258, #271, #301): up from the level the view is at (levelNow; a
+   * level's flight under way, from where it lands; its first tap run, from where that tap found the view), outFrom. None
+   * there, nothing. The card closes for the flight.
    */
   doubleTap(_x: number, _y: number, firstRan = false): void {
     const pre = firstRan && this.preTap && performance.now() - this.preTap.t < 4 * DOUBLE_TAP_MS ? this.preTap : null;
@@ -1724,16 +1725,18 @@ export class FanView implements InputHandlers {
     const steps = this.steps;
     if (pre?.step && steps[steps.length - 1] === pre.step) steps.pop();
     let back = steps.pop();
-    while (back && this.offBy(back.cam, cam) <= LEVEL_PX) back = steps.pop();
+    while (back && !this.zoomsOut(back.cam, cam)) back = steps.pop();
     if (back) {
       this.goBack(back);
       this.steps = steps;
       return;
     }
-    // (Home: nothing, so the first tap's flight is put back.)
-    if (!this.goUp(pre ? pre.lv : on ? this.backing!.lv : this.levelNow(true), cam) && pre && (this.anim || this.offBy(pre.cam, this.cam) > 0.5)) this.goLevel(pre.lv, pre.cam, false);
+    const out = this.outFrom(pre ? pre.lv : on ? this.backing!.lv : this.levelNow(true), cam);
+    if (out) this.goLevel(out.lv, out.cam, false);
+    // (Nowhere out: nothing, so the first tap's flight is put back.)
+    else if (pre && (this.anim || this.offBy(pre.cam, this.cam) > 0.5)) this.goLevel(pre.lv, pre.cam, false);
   }
-  /** Fly one named level up from level `from`, the view at camera c (upFrom), the card closing for the flight: a double tap's with no steps, the stack's "…"'s. At home nothing, and false. */
+  /** Fly one named level up from level `from`, the view at camera c (upFrom), the card closing for the flight: the stack's "…"'s. At home nothing, and false. */
   private goUp(from: Level, c: Camera): boolean {
     const step = this.upFrom(from, c);
     if (step) this.goLevel(step.lv, step.cam, false);
@@ -1752,9 +1755,36 @@ export class FanView implements InputHandlers {
   private preTap: (Step & { t: number; step: TapStep | null }) | null = null;
 
   /**
-   * Where a double-tap from level `from` goes, the view at camera c (ToLaD#271, #301): the first level `from` sits in
-   * (levelUp, home's root last) whose frame is more than LEVEL_PX off the view. Never `from`'s own frame, even zoomed
-   * in past it (a pinch, a "+x" into part of it): that is back where the view was, not up. Null when there is none (home).
+   * Whether flying from the view at camera c to frame a zooms out (ToLaD#416): it visibly moves (more than LEVEL_PX off),
+   * neither axis tighter, and one wider, each by more than LEVEL_PX of the view's span there. A frame wider on one axis
+   * and tighter on the other does not: the domestic cat's is wider than its genus', the genus' longer in time.
+   */
+  private zoomsOut(a: Camera, c: Camera): boolean {
+    const [x, y] = this.spanChange(a, c);
+    return x <= LEVEL_PX && y <= LEVEL_PX && (x < -LEVEL_PX || y < -LEVEL_PX) && this.offBy(a, c) > LEVEL_PX;
+  }
+  /** What frame a does to the view at camera c, in px of the screen: how much tighter on width and on time (negative: wider). */
+  private spanChange(a: Camera, c: Camera): [number, number] {
+    return [this.w * (a.sx / c.sx - 1), this.h * (a.sy / c.sy - 1)];
+  }
+  /**
+   * Where a double-tap from level `from` goes, the view at camera c (ToLaD#271, #301, #416): the first level `from` sits
+   * in (levelUp, home's root last) whose frame zooms out (zoomsOut). Never `from`'s own frame, even zoomed in past it (a
+   * pinch, a "+x" into part of it): that is back where the view was, not up; but home's when the view is at home's level
+   * and off it. Home is the last resort too while it is wider on width, whatever it does to time. Else null: nowhere out.
+   */
+  private outFrom(from: Level, c: Camera): Step | null {
+    for (const u of this.levelsAbove(from)) {
+      const cam = this.frameOf({ v: u });
+      if (this.zoomsOut(cam, c)) return { lv: { v: u }, cam };
+    }
+    const home = this.frameOf({ v: this.fan.root });
+    return this.zoomsOut(home, c) || (this.spanChange(home, c)[0] < -LEVEL_PX && this.offBy(home, c) > LEVEL_PX) ? { lv: { v: this.fan.root }, cam: home } : null;
+  }
+
+  /**
+   * Where the stack's "…" goes from level `from`, the view at camera c (ToLaD#288): the first level `from` sits in
+   * (levelUp, home's root last) whose frame is more than LEVEL_PX off the view. Null when there is none (home).
    */
   private upFrom(from: Level, c: Camera): Step | null {
     for (const u of this.levelsAbove(from)) {

@@ -49,6 +49,8 @@ type Priv = {
   applyFold(): void;
   frameOf(lv: Level): Camera;
   offBy(a: Camera, c: Camera): number;
+  zoomsOut(a: Camera, c: Camera): boolean;
+  outFrom(lv: Level, c: Camera): { lv: Level; cam: Camera } | null;
   tapAt: unknown;
   steps: { cam: Camera; lv: Level }[];
 };
@@ -67,9 +69,13 @@ function upChain(v: FanView, from: Level): FanNode[] {
   for (let u = from.b ? levelUp(v.fan, from.b.node, true) : levelUp(v.fan, from.v); u; u = levelUp(v.fan, u)) out.push(u);
   return out;
 }
-/** Where a double-tap from `from` should go, the view where it is (ToLaD#271): the first level up whose frame visibly moves. */
-function wantUp(v: FanView, from: Level): FanNode | null {
+/** Where the stack's "…" from `from` should go, the view where it is: the first level up whose frame visibly moves. */
+function wantMore(v: FanView, from: Level): FanNode | null {
   return upChain(v, from).find((u) => P(v).offBy(P(v).frameOf({ v: u }), v.cam) > LEVEL_PX) ?? null;
+}
+/** Where a double-tap from `from` should go, the view where it is (ToLaD#271, #416): the first level up whose frame zooms out (dblout.test.ts has the rule's own check); home as the last resort. */
+function wantUp(v: FanView, from: Level): FanNode | null {
+  return P(v).outFrom(from, v.cam)?.lv.v ?? null;
 }
 /** Whether the view stands at level lv's frame (within 2 px). */
 const atFrame = (v: FanView, lv: Level) => P(v).offBy(P(v).frameOf(lv), v.cam) <= 2;
@@ -343,7 +349,7 @@ describe('with no tap to reverse, a double tap goes up to the parent level, not 
         v.doubleTap(-1e4, -1e4);
         if (card) bad.push(`${nameOf(from)}: the card left open`);
         if (!want) {
-          if (P(v).anim || from.v !== v.fan.root) bad.push(`${nameOf(from)}: ${P(v).anim ? 'flew from home' : 'nowhere to go'}`);
+          if (P(v).anim) bad.push(`${nameOf(from)}: flew with nowhere out`);
           v.cam = cam;
           v.camera.settle();
           P(v).applyFold();
@@ -384,9 +390,9 @@ describe('with no tap to reverse, a double tap goes up to the parent level, not 
         run(v);
         const now = v.levelNow();
         if (!want || now.v !== want || !atFrame(v, now)) bad.push(`${b.sp.common}: went to ${nameOf(now)}, not ${want ? levelName(want) : 'nowhere'}`);
-        // (Its own level: the nearest one it sits in, unless that one's frame is the species' own.)
+        // (Its own level: the nearest one it sits in, unless that one's frame does not zoom out from the species'.)
         const first = upChain(v, { b })[0];
-        if (want !== first && P(v).offBy(P(v).frameOf({ v: first }), P(v).frameOf({ b })) > LEVEL_PX) bad.push(`${b.sp.common}: skipped ${levelName(first)}`);
+        if (want !== first && P(v).zoomsOut(P(v).frameOf({ v: first }), P(v).frameOf({ b }))) bad.push(`${b.sp.common}: skipped ${levelName(first)}`);
         // On up: each a level higher, home at last, then nothing.
         let k = 0;
         for (; k < 12; k++) {
@@ -397,14 +403,14 @@ describe('with no tap to reverse, a double tap goes up to the parent level, not 
           run(v);
           if (v.levelNow().v !== up) bad.push(`${b.sp.common}: from ${nameOf(prev)} went to ${nameOf(v.levelNow())}`);
         }
-        if (!atHome(v) || k === 12) bad.push(`${b.sp.common}: double taps stopped away from home`);
+        if (k === 12 || (!atHome(v) && wantUp(v, v.levelNow(true)))) bad.push(`${b.sp.common}: double taps stopped away from home`);
       }
       expect(bad).toEqual([]);
     });
 
     // (A "+x" is a tap like any (ToLaD#359, #376): a double tap goes out to the frame that tap was made at, also from a
-    // landing on one species.)
-    it(`${name}: after a "+x", back out to the frame it was tapped at`, () => {
+    // landing on one species, where that zooms out, ToLaD#416.)
+    it(`${name}: after a "+x", back out to the frame it was tapped at, where that zooms out`, () => {
       const v = mk();
       const bad: string[] = [];
       let tried = 0;
@@ -417,9 +423,13 @@ describe('with no tap to reverse, a double tap goes up to the parent level, not 
         const cam = { ...v.cam };
         v.tap((h.box[0] + h.box[2]) / 2, (h.box[1] + h.box[3]) / 2);
         run(v);
+        const inside = { ...v.cam };
         v.doubleTap(-1e4, -1e4);
         run(v);
-        if (P(v).offBy(cam, v.cam) > 2) bad.push(`${at}: a "+x" of ${h.bs.length} then a double tap went to ${nameOf(v.levelNow())}, not ${at}`);
+        // (A "+x" whose frame is deeper in time than the frame it was tapped at: going back would zoom in, so that step is passed, ToLaD#416.)
+        if (P(v).zoomsOut(cam, inside)) {
+          if (P(v).offBy(cam, v.cam) > 2) bad.push(`${at}: a "+x" of ${h.bs.length} then a double tap went to ${nameOf(v.levelNow())}, not ${at}`);
+        } else if (P(v).offBy(inside, v.cam) > 2 && !P(v).zoomsOut(v.cam, inside) && !atHome(v)) bad.push(`${at}: a "+x" of ${h.bs.length} then a double tap went to ${nameOf(v.levelNow())}, which does not zoom out`);
         v.cam = cam;
         v.camera.settle();
         P(v).applyFold();
@@ -723,7 +733,7 @@ describe('a double tap is the reverse of a single tap (ToLaD#376)', () => {
         if (!more) continue;
         checked++;
         const start = frameNow(v);
-        const want = wantUp(v, start.lv);
+        const want = wantMore(v, start.lv);
         expect(want, `${b.sp.common}: a level over ${nameOf(start.lv)}`).toBeTruthy();
         v.tap(...more);
         expect(card, `${b.sp.common}: "…" left the card open`).toBe(null);
