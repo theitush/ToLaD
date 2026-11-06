@@ -1,19 +1,18 @@
-// Labels are the real groups one level down (ToLaD#417, `?labels=groups`), at mammals, checked by code at every level
-// on the way down, under `clades` and the default gaps: every label names a group of nextLevels(L), L the smallest named
-// level holding what is on screen; no two meet, none off screen, none with a "+x" or a leader; every
-// picture's centre on its own branch at "now"; a group of several branches has the hairline from its first to its last
-// under its picture (ToLaD#431); a tap lands on its group's frame; a steady pinch changes the set rarely and moves a
-// label smoothly; a pan never costs a group whose branch's middle is on screen its label for one going off (ToLaD#431).
+// Labels cover the screen (ToLaD#417, #440, `?labels=groups`), at mammals, checked by code at every frame of the sweeps, under
+// `clades` and the default gaps: every strand on screen falls under exactly one label's group; no split that could have
+// happened and didn't; no two meet, none off screen, none with a "+x" or a leader; every picture's centre on its own branch
+// at "now"; a group of several branches has the hairline from its first to its last under its picture (ToLaD#431);
+// a tap lands on its group's frame, also above an order; a second tap and a double tap go by the level rules.
 import { afterAll, describe, expect, it } from 'vitest';
-import { groupName, levelName, FanView, isLevel, nextLevels, type CutLabels, type Level } from './view';
+import { groupName, labelParts, LABEL_BOTTOM_PX, levelName, FanView, isLevel, nextLevels, type CutLabels, type Level } from './view';
 import { latinOf } from './brackets';
 import { loadMammalsFromFiles } from './mammals-node';
 import { mammaliaClade } from './panthera';
-import { GROUP_D, PIC_D, PIC_LIFT, setLabelMode } from './pics';
-import { chooseSlots, placeSlots, type Slot } from './slide';
+import { GROUP_D, LABEL_AXIS_X, PIC_D, PIC_LIFT, PIC_ROOM, setLabelMode } from './pics';
+import { fits, placeSlots, type Slot } from './slide';
 import { mammaliaTree } from './splits';
 import { setGapMode, type GapMode } from './fold';
-import type { FanNode } from './layout';
+import type { FanBranch, FanNode } from './layout';
 
 function stubView(): FanView {
   const noop = () => {};
@@ -57,6 +56,7 @@ type Inner = {
   backing: { lv: Level; cam: unknown } | null;
   frameOf(lv: Level): { cx: number; cy: number; sx: number; sy: number; ty: number };
   offBy(a: unknown, c: unknown): number;
+  heldRow(): number;
 };
 const inner = (v: FanView) => v as unknown as Inner;
 const frame = (v: FanView): CutLabels => {
@@ -68,21 +68,77 @@ const frame = (v: FanView): CutLabels => {
 const levelOf = (v: FanView) => (v.groupsOf ? v.fan.nodes.indexOf(v.groupsOf) : -1);
 const nameOfLv = (lv: Level) => (lv.v ? levelName(lv.v) : lv.b!.sp.common);
 
+/** A group's label as groupLabels would stand it: its window, or null if it cannot stand, or "off" under the screen. */
+function standing(v: FanView, lv: Level): Slot | null | 'off' {
+  const now = v.fan.time.y(0);
+  const strands = lv.v ? lv.v.strands : [lv.b!];
+  const young = Math.min(...strands.map((s) => Math.max(s.tipY, now)));
+  const y = v.toScreen(0, young)[1];
+  if (y >= v.h) return 'off';
+  const d0 = Math.max(y - PIC_LIFT - PIC_ROOM, inner(v).heldRow());
+  if (v.h - LABEL_BOTTOM_PX + 30 - (d0 + PIC_ROOM + PIC_LIFT) <= 0) return null;
+  const on = strands.filter((s) => Math.max(s.tipY, now) <= young + 1e-9).map((s) => v.model(s).lanes(young));
+  const a = v.toScreen(Math.min(...on.map((m) => m.left)), 0)[0];
+  const b = v.toScreen(Math.max(...on.map((m) => m.left + m.w)), 0)[0];
+  if (b < 0 || a > v.w) return null;
+  const [left, right] = [PIC_D / 2, v.w - PIC_D / 2];
+  const lo = Math.min(Math.max(a, left), right);
+  const hi = Math.max(Math.min(b, right), left);
+  return { lo, hi, at: (lo + hi) / 2 };
+}
+
+/** The new invariant (ToLaD#440): every strand on screen under exactly one label; no split left undone. */
+function coverCheck(v: FanView, c: CutLabels, at: string, bad: string[]): void {
+  const now = v.fan.time.y(0);
+  const mid = (s: FanBranch) => {
+    const y = Math.max(s.tipY, now);
+    const m = v.model(s).lanes(y);
+    return v.toScreen(m.left + m.w / 2, 0)[0];
+  };
+  // (Tips right of the axis; none there, in its strip, as groupLabels.)
+  const x0 = v.toWorld(LABEL_AXIS_X, 0)[0] < v.toWorld(v.w, 0)[0] ? LABEL_AXIS_X : 0;
+  let inX = v.fan.branches.filter((s) => mid(s) >= x0 && mid(s) <= v.w);
+  if (!inX.length) inX = v.fan.branches.filter((s) => mid(s) >= 0 && mid(s) <= v.w);
+  const onScreen = inX.filter((s) => v.toScreen(0, Math.max(s.tipY, now))[1] < v.h);
+  const under = new Map<FanBranch, number>();
+  for (const p of c.pics) for (const s of p.lv.v ? p.lv.v.strands : [p.lv.b!]) under.set(s, (under.get(s) ?? 0) + 1);
+  if (!c.pics.length) {
+    // (Nothing to stand on: the screen holds only fossils down at its foot.)
+    const low = onScreen.length ? Math.min(...onScreen.map((s) => v.toScreen(0, Math.max(s.tipY, now))[1])) : Infinity;
+    if (onScreen.length && low < v.h - LABEL_BOTTOM_PX) bad.push(`${at}: ${onScreen.length} strands, no label, the youngest at y ${low.toFixed(0)}`);
+    return;
+  }
+  const missing = onScreen.filter((s) => (under.get(s) ?? 0) === 0);
+  if (missing.length) bad.push(`${at}: ${missing.length} strands on screen under no label, as ${missing[0].sp.sci}`);
+  for (const [s, n] of under) if (n > 1) bad.push(`${at}: ${s.sp.sci} under ${n} labels`);
+  // No split that could have happened: each label's parts with a strand on screen cannot all stand.
+  const pics = [...c.pics].sort((p, q) => p.x - q.x);
+  const here = new Set(inX);
+  const slots = pics.map((p) => standing(v, p.lv));
+  if (pics.length === 1 && !slots[0]) return;
+  pics.forEach((p, i) => {
+    if (!p.lv.v) return;
+    const parts = labelParts(p.lv.v)
+      .filter((g) => (g.v ? g.v.strands : [g.b!]).some((s) => here.has(s)))
+      .map((g) => ({ g, s: standing(v, g) }));
+    if (parts.some((q) => q.s === null)) return;
+    const on = parts.filter((q) => q.s !== 'off');
+    if (!on.length) return;
+    const first = (g: Level) => Math.min(...(g.v ? g.v.strands : [g.b!]).map((s) => s.index));
+    const row = on.sort((q, r) => first(q.g) - first(r.g)).map((q) => q.s as Slot);
+    const list = [...slots.slice(0, i), ...row, ...slots.slice(i + 1)];
+    if (list.every(Boolean) && fits(list as Slot[], GROUP_D)) bad.push(`${at}: ${nameOfLv(p.lv)} could split into ${on.map((q) => nameOfLv(q.g)).join(', ')}`);
+  });
+}
+
 /** One frame's invariants; returns its labels' names. */
 function check(v: FanView, c: CutLabels, at: string, bad: string[]): string[] {
-  const L = v.groupsOf;
-  if (!c.pics.length) return [];
-  if (!L) {
-    bad.push(`${at}: labels with no level`);
-    return [];
-  }
-  const groups = new Set(nextLevels(v.fan, L).map((g) => g.v ?? g.b));
+  coverCheck(v, c, at, bad);
   const now = v.fan.time.y(0);
   const pics = [...c.pics].sort((p, q) => p.x - q.x);
   for (let i = 0; i < pics.length; i++) {
     const p = pics[i];
     const s = c.spots[p.i];
-    if (!groups.has(p.lv.v ?? p.lv.b!)) bad.push(`${at}: ${nameOfLv(p.lv)} is no group of ${levelName(L)}`);
     if (p.x - PIC_D / 2 < -1e-6 || p.x + PIC_D / 2 > v.w + 1e-6) bad.push(`${at}: ${nameOfLv(p.lv)} off screen at ${p.x.toFixed(1)}`);
     if (i && p.x - pics[i - 1].x < GROUP_D - 1e-6) bad.push(`${at}: ${nameOfLv(p.lv)} meets ${nameOfLv(pics[i - 1].lv)}`);
     if (/\+\d/.test(s.text) || s.plus) bad.push(`${at}: ${s.text} has a "+x"`);
@@ -94,7 +150,8 @@ function check(v: FanView, c: CutLabels, at: string, bad: string[]): string[] {
     const a = v.toScreen(Math.min(...on.map((m) => m.left)), 0)[0];
     const b = v.toScreen(Math.max(...on.map((m) => m.left + m.w)), 0)[0];
     // (Its centre on its branch; a branch nearer the screen's edge than a picture's half: the picture whole against that edge, the branch under it.)
-    const pinned = Math.abs(p.x - PIC_D / 2) < 1e-6 ? b >= 0 : Math.abs(p.x - (v.w - PIC_D / 2)) < 1e-6 ? a <= v.w : false;
+    // (The one label holding the screen stands whatever its window, against the edge if need be.)
+    const pinned = pics.length === 1 ? Math.abs(p.x - PIC_D / 2) < 1e-6 || Math.abs(p.x - (v.w - PIC_D / 2)) < 1e-6 : Math.abs(p.x - PIC_D / 2) < 1e-6 ? b >= 0 : Math.abs(p.x - (v.w - PIC_D / 2)) < 1e-6 ? a <= v.w : false;
     if ((p.x < a - 1e-6 || p.x > b + 1e-6) && !pinned) bad.push(`${at}: ${nameOfLv(p.lv)} at ${p.x.toFixed(1)} is off its branch ${a.toFixed(1)}..${b.toFixed(1)}`);
     // Its hairline: in the gap under its picture, from the first to the last of its branches at that row; one branch, none.
     const foot = p.y + PIC_D / 2 + PIC_LIFT / 2;
@@ -125,13 +182,9 @@ afterAll(() => {
 
 describe('placing on branches (slide.ts)', () => {
   const S = (lo: number, hi: number): Slot => ({ lo, hi, at: (lo + hi) / 2 });
-  it('a wide branch makes way for a narrow one, a heavier one first', () => {
-    const slots = [S(100, 200), S(150, 150), S(160, 160)];
-    const on = chooseSlots(slots, [1, 0, 2], 40);
-    expect(on).toEqual([0, 1]);
-    const xs = placeSlots(slots, on, 40);
-    expect(xs[1]).toBe(150);
-    expect(xs[0]).toBeLessThanOrEqual(110);
+  it('a set fits only if a sweep over its windows does', () => {
+    expect(fits([S(100, 200), S(150, 150)], 40)).toBe(true);
+    expect(fits([S(100, 200), S(150, 150), S(160, 160)], 40)).toBe(false);
   });
   it('moves continuously with the windows', () => {
     let last: Float64Array | null = null;
@@ -146,7 +199,7 @@ describe('placing on branches (slide.ts)', () => {
   });
 });
 
-describe('labels are the groups one level down (?labels=groups, ToLaD#417)', () => {
+describe('labels cover the screen (?labels=groups, ToLaD#417, #440)', () => {
   for (const gaps of ['groups', 'clades'] as GapMode[])
     it(`mammals, gaps ${gaps}`, { timeout: 600_000 }, async () => {
       await loadMammalsFromFiles();
@@ -165,12 +218,11 @@ describe('labels are the groups one level down (?labels=groups, ToLaD#417)', () 
         const kin = named.filter((u) => groupName(v.fan, u) !== levelName(u));
         console.log(`[${gaps}] ${named.length} big levels with Latin only, ${kin.length} told by a part: ${named.slice(0, 40).map((u) => `${levelName(u)} = ${groupName(v.fan, u)}`).join(' | ')}`);
       }
-      expect(names.length).toBeGreaterThanOrEqual(4);
+      expect(names.length).toBeGreaterThanOrEqual(1);
       const frames: string[] = [];
       let notOwn = 0;
       let framed = 0;
       let sum = 0;
-      let [total, edgeL, edgeR, crowded] = [0, 0, 0, 0];
       const visit = (u: FanNode, depth: number) => {
         v.cam = { ...iv.frameOf({ v: u }) };
         const c = frame(v);
@@ -182,26 +234,11 @@ describe('labels are the groups one level down (?labels=groups, ToLaD#417)', () 
           notOwn++;
           if (notOwn <= 12) console.log(`[${gaps}] ${at} (${u.strands.length} species) framed: L ${v.groupsOf && levelName(v.groupsOf)}`);
         }
-        // (Each group here without a label, by why: its branch nearer the screen's edge than a picture's half.)
-        const shown = new Set(c.pics.map((p) => p.lv.v ?? p.lv.b!));
-        for (const g of nextLevels(v.fan, u)) {
-          total++;
-          if (shown.has(g.v ?? g.b!)) continue;
-          const st = g.v ? g.v.strands : [g.b!];
-          const m = st.map((b) => v.model(b).lanes(Math.max(b.tipY, v.fan.time.y(0))));
-          const x0 = v.toScreen(Math.min(...m.map((q) => q.left)), 0)[0];
-          const x1 = v.toScreen(Math.max(...m.map((q) => q.left + q.w)), 0)[0];
-          if (x1 < PIC_D / 2) {
-            edgeL++;
-            if (edgeL <= 8) console.log(`[${gaps}] ${at}: ${nameOfLv(g)} at ${x0.toFixed(1)}..${x1.toFixed(1)}`);
-          } else if (x0 > v.w - PIC_D / 2) edgeR++;
-          else crowded++;
-        }
-        if (depth <= 1) frames.push(`${at}: ${here.length}/${nextLevels(v.fan, u).length}: ${here.slice(0, 7).join(', ')}`);
+        if (depth <= 1) frames.push(`${at}: ${here.length}: ${here.join(', ')}`);
         if (depth < 2) for (const g of nextLevels(v.fan, u)) if (g.v && g.v.strands.length >= 8) visit(g.v, depth + 1);
       };
       for (const g of nextLevels(v.fan, v.fan.root)) if (g.v && g.v.strands.length >= 30) visit(g.v, 0);
-      console.log(`[${gaps}] ${framed} frames, ${notOwn} whose L is not the group framed; ${total} groups: ${edgeL} left of a picture's half from the left edge, ${edgeR} from the right edge, ${crowded} crowded out\n` + frames.slice(0, 30).join('\n'));
+      console.log(`[${gaps}] ${framed} frames, ${notOwn} whose start is not the group framed\n` + frames.slice(0, 30).join('\n'));
       console.log(`[${gaps}] GROUP_D ${GROUP_D}: home ${names.length}, ${sum} labels over ${framed} frames, ${(sum / framed).toFixed(2)} each`);
       expect(bad.slice(0, 20)).toEqual([]);
 
@@ -228,8 +265,64 @@ describe('labels are the groups one level down (?labels=groups, ToLaD#417)', () 
         }
       }
 
+      // A group above an order: a tap on its label lands on its own frame; a tap from there goes in, a double tap back out.
+      const stood = new Set<string>();
+      for (const name of ['Metatheria', 'Afrotheria']) {
+        const u = v.fan.nodes.find((q) => latinOf(q.split) === name)!;
+        expect(isLevel(v.fan, u), `${name} stays no level`).toBe(false);
+        v.cam = { ...iv.frameOf({ v: u }) };
+        const c = frame(v);
+        const names = check(v, c, `${name}'s frame`, bad);
+        console.log(`[${gaps}] ${name}'s frame (start ${v.groupsOf && levelName(v.groupsOf)}): ${names.join(', ')}`);
+        expect(names.length).toBeGreaterThanOrEqual(1);
+        const land = () => {
+          for (let t = performance.now() + 16; iv.anim; t += 16) {
+            if (!iv.anim(t)) iv.anim = null;
+            iv.applyFold();
+          }
+          return frame(v);
+        };
+        const p = c.pics[0];
+        v.tap(p.x, p.y);
+        expect(iv.backing?.lv.v ?? iv.backing?.lv.b, `${name}: second tap`).toBe(p.lv.v ?? p.lv.b);
+        land();
+        expect(iv.offBy(iv.frameOf(p.lv), v.cam), `${name}: second tap's frame`).toBeLessThanOrEqual(2);
+        const fromIn = { ...v.cam };
+        v.doubleTap(195, 400);
+        land();
+        expect(v.cam.sx, `${name}: double tap goes out`).toBeLessThan(fromIn.sx + 1e-9);
+        stood.add(`${name}: ${nameOfLv(p.lv)} then out to ${v.groupsOf && levelName(v.groupsOf)} (level ${v.levelNow(true).v ? levelName(v.levelNow(true).v!) : '-'})`);
+        // (From there double taps go on out, by the levels, to home at the last.)
+        for (let i = 0; i < 12 && iv.offBy(v.homeCamera(), v.cam) > 2; i++) {
+          const was = v.cam.sx;
+          v.doubleTap(195, 400);
+          land();
+          expect(v.cam.sx, `${name}: double tap ${i} never zooms in`).toBeLessThanOrEqual(was + 1e-9);
+        }
+        expect(iv.offBy(v.homeCamera(), v.cam), `${name}: double taps reach home`).toBeLessThanOrEqual(2);
+        // (The one label holding the screen, at its own frame: a tap goes on a level deeper, it doesn't sit.)
+        if (name === 'Afrotheria') {
+          const rod = v.fan.nodes.find((q) => q.split.taxon === 'Rodentia')!;
+          v.cam = { ...iv.frameOf({ v: rod }) };
+          const one = frame(v);
+          expect(one.pics.map((q) => q.lv.v)).toEqual([rod]);
+          v.tap(one.pics[0].x, one.pics[0].y);
+          land();
+          expect(iv.offBy(iv.frameOf({ v: rod }), v.cam), "a tap on the Rodents' one label moves").toBeGreaterThan(2);
+          console.log(`[${gaps}] a tap on Rodents' one label, at its frame: ${v.levelNow(true).v ? levelName(v.levelNow(true).v!) : v.levelNow(true).b!.sp.sci}: ${check(v, frame(v), 'Rodents tapped', bad).join(', ')}`);
+        }
+      }
+      console.log(`[${gaps}] taps above orders: ${[...stood].join(' | ')}`);
+      // The screens named in the report.
+      for (const t of ['Rodentia', 'Chiroptera', 'Primates', 'Carnivora', 'Felidae']) {
+        const u = v.fan.nodes.find((q) => q.split.taxon === t)!;
+        v.cam = { ...iv.frameOf({ v: u }) };
+        const names = check(v, frame(v), `${t}'s frame`, bad);
+        console.log(`[${gaps}] screen ${t}: start ${v.groupsOf && levelName(v.groupsOf)}: ${names.length}: ${names.join(', ')}`);
+      }
+
       // A steady pinch, about the middle of each of the big orders: the set changes rarely, nothing jumps.
-      for (const t of ['Rodentia', 'Chiroptera', 'Carnivora']) {
+      for (const t of ['Rodentia', 'Chiroptera', 'Carnivora', 'Primates']) {
         const u = v.fan.nodes.find((q) => q.split.taxon === t)!;
         const to = iv.frameOf({ v: u });
         const a = v.homeCamera();
@@ -249,7 +342,8 @@ describe('labels are the groups one level down (?labels=groups, ToLaD#417)', () 
           const k = (1 / sx - 1 / to.sx) / (1 / a.sx - 1 / to.sx || 1);
           v.cam = { ...a, sx, sy: a.sy * (to.sy / a.sy) ** f, cx: to.cx + (a.cx - to.cx) * k, cy: to.cy + (a.cy - to.cy) * k, ty: a.ty * (to.ty / a.ty) ** f };
           const c = frame(v);
-          check(v, c, `${t} pinch ${i}`, bad);
+          const seen = check(v, c, `${t} pinch ${i}`, bad);
+          if (i % 40 === 0) console.log(`[${gaps}] ${t} pinch ${i}/${N}, zoom ${(sx / a.sx).toFixed(1)}: ${seen.length}: ${seen.join(', ')}`);
           const now = c.spots.map((s) => s.key).join();
           const moved = now !== was && i > 0;
           if (moved) changes++;
@@ -297,26 +391,7 @@ describe('labels are the groups one level down (?labels=groups, ToLaD#417)', () 
     });
 });
 
-/** Each group of the frame's level with its branch on screen, left to right: its window (groupLabels') and whether its branch's middle is on screen. */
-function windows(v: FanView): { lv: Level; a: number; b: number; here: boolean; slot: Slot }[] {
-  const now = v.fan.time.y(0);
-  const [left, right] = [PIC_D / 2, v.w - PIC_D / 2];
-  const out = [];
-  for (const lv of nextLevels(v.fan, v.groupsOf!)) {
-    const strands = lv.v ? lv.v.strands : [lv.b!];
-    const young = Math.min(...strands.map((s) => Math.max(s.tipY, now)));
-    const on = strands.filter((s) => Math.max(s.tipY, now) <= young + 1e-9).map((s) => v.model(s).lanes(young));
-    const a = v.toScreen(Math.min(...on.map((m) => m.left)), 0)[0];
-    const b = v.toScreen(Math.max(...on.map((m) => m.left + m.w)), 0)[0];
-    if (b < 0 || a > v.w) continue;
-    const lo = Math.min(Math.max(a, left), right);
-    const hi = Math.max(Math.min(b, right), left);
-    out.push({ lv, a, b, here: (a + b) / 2 >= 0 && (a + b) / 2 <= v.w, slot: { lo, hi, at: (lo + hi) / 2 } });
-  }
-  return out.sort((p, q) => p.a - q.a);
-}
-
-describe('a pan keeps the groups that are here (ToLaD#431)', () => {
+describe('a pan keeps the cover (ToLaD#431, #440)', () => {
   for (const gaps of ['groups', 'clades'] as GapMode[])
     it(`mammals, gaps ${gaps}`, { timeout: 600_000 }, async () => {
       await loadMammalsFromFiles();
@@ -328,7 +403,7 @@ describe('a pan keeps the groups that are here (ToLaD#431)', () => {
       // From the tree's one end to its other, in steps of a thumb's nudge, at home's zoom and a little in.
       for (const zoom of [1, 1.2, 1.5, 2.5]) {
         const a = { ...home, sx: home.sx * zoom };
-        let [frames, changes, jumps, back, lost, step, shift, was] = [0, 0, 0, 0, 0, 0, 0, ''];
+        let [frames, changes, jumps, back, step, shift, was] = [0, 0, 0, 0, 0, 0, ''];
         let last = new Map<string, number>();
         const gone = new Set<string>();
         for (let d = -1000; d <= 1000; d += 10) {
@@ -338,19 +413,6 @@ describe('a pan keeps the groups that are here (ToLaD#431)', () => {
           check(v, c, at, bad);
           if (!v.groupsOf) continue;
           frames++;
-          // Who has no label among those here: there is no room for it beside the ones here that have.
-          const ws = windows(v);
-          const shown = new Set(c.pics.map((p) => p.lv.v ?? p.lv.b!));
-          const on = ws.flatMap((w, i) => (w.here && shown.has(w.lv.v ?? w.lv.b!) ? [i] : []));
-          for (let i = 0; i < ws.length; i++) {
-            if (!ws[i].here || shown.has(ws[i].lv.v ?? ws[i].lv.b!)) continue;
-            lost++;
-            if (chooseSlots(ws.map((w) => w.slot), [...on, i], GROUP_D).includes(i)) bad.push(`${at}: ${nameOfLv(ws[i].lv)} is here, has room, and no label`);
-          }
-          // What Ita saw: two big neighbours, Rodents' label standing and Primates' not, with Primates' branch here.
-          const of = (name: string) => ws.find((w) => nameOfLv(w.lv) === name);
-          const [rod, pri] = [of('Rodents'), of('Primates')];
-          if (rod && pri?.here && shown.has(rod.lv.v!) && !shown.has(pri.lv.v!)) bad.push(`${at}: Rodents stands, Primates at ${pri.a.toFixed(1)}..${pri.b.toFixed(1)} does not`);
           // A pan is smooth: the set changes rarely, and a label slides.
           const key = c.spots.map((s) => s.key).join();
           const moved = was !== '' && key !== was;
@@ -372,7 +434,7 @@ describe('a pan keeps the groups that are here (ToLaD#431)', () => {
           for (const k of last.keys()) if (!pos.has(k)) gone.add(k);
           last = pos;
         }
-        console.log(`[${gaps}] pan, zoom ${zoom}: ${frames} frames, ${changes} set changes, ${back} back after leaving, ${lost} here with no room; largest step ${step.toFixed(1)} px, at a set change ${shift.toFixed(1)} px`);
+        console.log(`[${gaps}] pan, zoom ${zoom}: ${frames} frames, ${changes} set changes, ${back} back after leaving; largest step ${step.toFixed(1)} px, at a set change ${shift.toFixed(1)} px`);
         expect(jumps).toBe(0);
       }
       expect(bad.slice(0, 20)).toEqual([]);

@@ -1,8 +1,8 @@
 /**
  * Labels on their branches (ToLaD#417): the 1-slider model of point-feature label placement. Each label's centre has a
  * window (its branch's span on screen) and a wish (the window's middle); the labels keep their branches' left-to-right
- * order, their centres at least `d` apart. Which stand: weight first, each if the set so far with it still fits (a
- * sweep over the windows). Where: the least squares from their wishes (isotonic regression, pool adjacent violators,
+ * order, their centres at least `d` apart. Whether a set stands: a sweep over
+ * the windows. Where: the least squares from their wishes (isotonic regression, pool adjacent violators,
  * inside what the windows leave each), so for a given set every centre is a continuous function of the windows: a
  * steady pinch or pan moves a label smoothly and it never jumps over another.
  */
@@ -27,20 +27,12 @@ function sweep(slots: readonly Slot[], on: readonly number[], d: number, out?: F
   return true;
 }
 
-/** Which of `slots` (left to right) stand: in `order` (most weight first), each if it still fits. Left to right. */
-export function chooseSlots(slots: readonly Slot[], order: readonly number[], d: number): number[] {
-  const on: number[] = [];
-  for (const k of order) {
-    if (!(slots[k].lo <= slots[k].hi)) continue;
-    let p = on.length;
-    while (p > 0 && on[p - 1] > k) p--;
-    on.splice(p, 0, k);
-    if (!sweep(slots, on, d)) on.splice(p, 1);
-  }
-  return on;
+/** Whether all of `slots` (left to right) fit `d` apart in their windows. */
+export function fits(slots: readonly Slot[], d: number): boolean {
+  return sweep(slots, slots.map((_, i) => i), d);
 }
 
-/** The centres of slots `on` (left to right, chooseSlots'): as near their wishes as the windows and `d` let them. */
+/** The centres of slots `on` (left to right): as near their wishes as the windows and `d` let them. */
 export function placeSlots(slots: readonly Slot[], on: readonly number[], d: number): Float64Array {
   const n = on.length;
   const x = new Float64Array(n);
