@@ -64,6 +64,14 @@ type Step = { lv: Level; cam: Camera };
 type TapAt = { b: FanBranch | null; v: FanNode | null; cam: Camera };
 /** Where a single tap that moved the view started (FanView.steps, ToLaD#376): its frame and level, and its tapAt if a tap had landed it there. */
 type TapStep = Step & { at: TapAt | null };
+/** A screen's edge among the strands (FanView.place): t of the way from site i to the next (strandSites), and px of screen past that (past the tree's ends only). */
+type StrandEdge = { i: number; t: number; px: number };
+/**
+ * Where a view is, in terms that hold in any layout of the same tree (FanView.place, ToLaD#412): its level (a clade by
+ * its place in fan.nodes, a species by its strand), whether the view sits on that level's frame, and if not the strands
+ * at the screen's edges and the time window.
+ */
+export type Place = { node: number; strand: number; framed: boolean; left: StrandEdge; right: StrandEdge; cam: Camera };
 /**
  * The view is "inside" a level's frame when it is zoomed in at least this far less than it (15 %), width and time
  * together (the area's scale): levelNow's. (Zoomed in past it, a pinch or a "+x" into part of it, a double-tap still goes
@@ -1307,6 +1315,67 @@ export class FanView implements InputHandlers {
 
   resetView(): void {
     this.flyTo(() => this.homeCamera());
+  }
+
+  /** Where the view is, for a view of the same tree in another look to stand at (goToPlace). A level's flight under way, where it lands. */
+  place(): Place {
+    const flight = this.anim ? this.backing : null;
+    const lv = flight ? flight.lv : this.levelNow(true);
+    const framed = !!flight || this.offBy(this.frameOf(lv), this.cam) <= LEVEL_PX;
+    this.fan.tess.fold?.setScale(this.cam.sx, this.w);
+    const S = this.strandSites();
+    const edge = (px: number): StrandEdge => {
+      const x = this.toWorld(px, 0)[0];
+      const n = S.length;
+      if (x < S[0]) return { i: 0, t: 0, px: (x - S[0]) * this.cam.sx };
+      if (x >= S[n - 1]) return { i: n - 1, t: 0, px: (x - S[n - 1]) * this.cam.sx };
+      // (The packed fossils' rooms overlap a little, so the sites are not quite sorted; S[lo] <= x < S[hi] holds all the same.)
+      let [lo, hi] = [0, n - 1];
+      while (hi - lo > 1) {
+        const m = (lo + hi) >> 1;
+        if (S[m] <= x) lo = m;
+        else hi = m;
+      }
+      return { i: lo, t: (x - S[lo]) / (S[hi] - S[lo]), px: 0 };
+    };
+    return { node: lv.v ? this.fan.nodes.indexOf(lv.v) : -1, strand: lv.b ? lv.b.index : -1, framed, left: edge(0), right: edge(this.w), cam: { ...this.cam } };
+  }
+
+  /** The strands' rooms' ends, left to right (world x, the layout as it stands): strand i's room from site 2i to 2i + 1, a gap to the next. A look moves the gaps, not the rooms: an edge inside a room stays there at the same zoom. */
+  private strandSites(): Float64Array {
+    const { C, R } = (this.fan.tess.fold as Steady).rooms();
+    const out = new Float64Array(2 * C.length);
+    for (let i = 0; i < C.length; i++) {
+      out[2 * i] = C[i] - R[i] / 2;
+      out[2 * i + 1] = C[i] + R[i] / 2;
+    }
+    return out;
+  }
+
+  /**
+   * Stand at a place another look's view left (place), at once: on its level's frame in this layout if it sat on the
+   * frame, else with the same strands at the screen's edges and the same time window (the zoom where they stand there:
+   * foldedFrame's, the gaps opening with the zoom). No taps to go back by: a double tap goes up from the level.
+   */
+  goToPlace(p: Place): void {
+    const fold = this.fan.tess.fold as Steady;
+    const lv: Level = p.node >= 0 ? { v: this.fan.nodes[p.node] } : { b: this.territories().t.strands[p.strand] };
+    const at = (e: StrandEdge, S: Float64Array) => S[e.i] + e.t * (S[Math.min(e.i + 1, S.length - 1)] - S[e.i]);
+    const cam = p.framed
+      ? this.frameOf(lv)
+      : foldedFrame(this.fan, this.w, () => {
+          const S = this.strandSites();
+          const [a, b] = [at(p.left, S), at(p.right, S)];
+          // (The screen wholly past the tree's end, no strands between its edges: the zoom as it was.)
+          const sx = b > a ? (this.w + p.left.px - p.right.px) / (b - a) : p.cam.sx;
+          return { ...p.cam, sx, cx: a + (p.left.px + this.w / 2) / sx };
+        });
+    fold.setScale(cam.sx, this.w);
+    this.cam = { ...cam };
+    this.camera.settle();
+    if (p.framed) this.tapAt = { b: lv.b ?? null, v: lv.v ?? null, cam: { ...this.cam } };
+    this.lvAt = { fan: this.fan, cam: { ...this.cam }, lv, t: performance.now() };
+    this.request();
   }
 
   /**

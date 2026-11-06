@@ -955,11 +955,11 @@ export class Steady extends Fold {
 
   /**
    * The rooms as they stand (cut.ts's territories, ToLaD#333): per node (fan.nodes' order) its room's left edge and
-   * width, per strand (drawn order) its own column's centre (its room's), world x. Read only.
+   * width, per strand (drawn order) its own column's centre (its room's) and its room's width, world x. Read only.
    */
-  rooms(): { roomL: Float64Array; roomW: Float64Array; C: Float64Array } {
+  rooms(): { roomL: Float64Array; roomW: Float64Array; C: Float64Array; R: Float64Array } {
     const L = this.cur();
-    return { roomL: L.roomL, roomW: L.roomW, C: L.C };
+    return { roomL: L.roomL, roomW: L.roomW, C: L.C, R: this.room };
   }
 
   /**
