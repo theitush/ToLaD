@@ -37,6 +37,58 @@ def _stats():
     return json.loads(p.read_text()).get("history")
 
 
+class WildAndDomestic(unittest.TestCase):
+    """A leaf with both parts draws both (ToLaD#435)."""
+
+    @staticmethod
+    def _pt(y, n, kind, grade="D", cite="c", **kw):
+        return {"year": y, "n": n, "lo": n / 2, "hi": n * 2, "grade": grade, "kind": kind, "cite": cite, "url": "u",
+                "note": "", **kw}
+
+    def setUp(self):
+        wild = [self._pt(-50000, 3e7, "genomic", cite="genome"), self._pt(1500, 3e7, "rangeloss", cite="trend"),
+                self._pt(NOW_YEAR, 2e7, "rangeloss", cite="trend")]
+        early = [{"year": y, "n": n, "lo": n, "hi": n, "grade": "D", "kind": "model", "note": ""}
+                 for y, n in ((-8500, 1e6), (0, 5e7))]
+        stock = [self._pt(1961, 4e8, "estimate", "B", "FAOSTAT"), self._pt(2024, 9e8, "estimate", "B", "FAOSTAT")]
+        base = {"scope": "s", "notes": "n", "file": "f.toml", "G": 7.0, "L": 3.5, "faostat_item": None}
+        self.wild = {**base, "curve": wild, "modelled": "genomic", "common": ""}
+        self.dom = {**base, "curve": stock, "early": early, "common": "Pig"}
+        self.rec = H.combine_stock(self.wild, self.dom, "Sus scrofa", 0.1, -8500)
+
+    def test_today_is_the_sum(self):
+        self.assertEqual(self.rec["component"], H.WILD_AND_DOMESTIC)
+        self.assertAlmostEqual(self.rec["curve"][-1]["n"] / (2e7 + 9e8), 1, delta=1e-3)
+        self.assertEqual(self.rec["parts"]["wild"]["n"], 2e7)
+        self.assertEqual(self.rec["parts"]["domestic"]["n"], 9e8)
+        end = self.rec["segments"][-1]["end"] * self.rec["L"] / self.rec["G"]
+        self.assertAlmostEqual(end / 9.2e8, 1, delta=0.01)
+
+    def test_before_domestication_is_the_wild_record(self):
+        for p in self.rec["curve"]:
+            if p["year"] <= -8500:
+                self.assertAlmostEqual(p["n"], 3e7, delta=1)
+
+    def test_no_step_where_the_parts_meet(self):
+        # no jump of more than the curve's own knots: from domestication on it only rises, by what its knots give
+        pts = self.rec["curve"]
+        k = next(i for i, p in enumerate(pts) if p["year"] == -8500)
+        self.assertAlmostEqual(pts[k]["n"], 3e7, delta=1)
+        for a, b in zip(pts[k:], pts[k + 1:]):
+            self.assertGreaterEqual(b["n"], a["n"] * 0.999)
+        for s in self.rec["segments"]:
+            if s["year0"] > -8500:
+                self.assertLess(max(s["start"], s["end"]) / min(s["start"], s["end"]), 3)
+
+    def test_each_knot_carries_its_larger_part(self):
+        by_year = {p["year"]: p for p in self.rec["curve"]}
+        self.assertEqual(by_year[2024]["cite"], "FAOSTAT")
+        self.assertEqual(by_year[-50000]["cite"], "genome")
+        self.assertEqual(by_year[0]["cite"], H.STOCK_EARLY_CITE)
+        self.assertNotIn(1500, by_year)  # the stock is the larger by then
+        self.assertIn("wild + ", by_year[2024]["note"])
+
+
 class Schema(unittest.TestCase):
     def test_all_files_validate(self):
         recs = H.load_all()
@@ -830,7 +882,8 @@ class DeepJoin(unittest.TestCase):
             self.assertAlmostEqual(nxt["n"] / j["to_n"], 1.0, places=6, msg=sp)
             # the youngest genomic point sits on the next level: no join rises or falls between them
             self.assertAlmostEqual(gen[-1]["n"] / nxt["n"], 1.0, places=6, msg=sp)
-            self.assertEqual(h["deep_join"], j["note"], sp)  # the card's sentence
+            # the card's sentence (a wild + domestic row adds which part the curve is, ToLaD#435)
+            self.assertTrue(h["deep_join"].startswith(j["note"]), sp)
             self.assertEqual(sp in st["deep_join"]["flagged"], j["flag"], sp)
         self.assertEqual(n, st["deep_join"]["by_next"])
         self.assertGreater(n["cited"], 5)  # the history files' cited levels (Bison, tiger, lion, ...)

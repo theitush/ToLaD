@@ -13,6 +13,8 @@ species leaf for each class, with thresholds taken from stated rules, not tuned:
            species (Greenspoon 2023's IUCN census compilation, its per-species model, or a recent cited
            point of a history file that does not drive the count); `unanchored` (a state, not a
            flag) when there is none
+  drawn    today's stored count (`alive`) more than 1.2x off what the fan draws (the end of the leaf's history
+           segments; zero on a leaf marked extinct): a part stored and not drawn (#435)
   ceiling  an IUCN CR/EW species whose today's count is modelled and above 10,000, the largest
            population criterion C or D allows any threatened listing (VU C; #88's rule). EN is not
            checked: listed under criterion A or B, an EN species can be of any size
@@ -53,6 +55,7 @@ import sys
 from pathlib import Path
 
 JOIN_FLAG = 10.0  # ToLaD#77: a ratio beyond 10x either way between two levels is flagged
+DRAWN_FLAG = 1.2  # stored against drawn today: the same bound as web/src/fan/drawn.test.ts
 TODAY_FLAG = 10.0  # the same 10x, for today's count against an independent published figure
 CEILING = 10_000.0  # IUCN Categories and Criteria v3.1: criterion C's VU bound, the largest C/D allows
 # #88; EN/VU are not: listed under A or B they can be any size, and the Red List snapshot (GBIF's
@@ -163,6 +166,9 @@ def leaf_row(n, census: dict, gs_model: dict, deep_reports: dict | None = None) 
         "census": (census.get(n.name) or {}).get("N"), "gs_model": (gs_model.get(n.name) or {}).get("N"),
         "file": rec.get("file"), "modelled": rec.get("modelled"), "use": rec.get("use"),
         "curve": curve,
+        # what the fan draws today (web: population.ts from the HIST segments), None where the width is `alive` itself
+        "drawn": (0.0 if n.extinct else rec["segments"][-1]["end"] * rec["L"] / rec["G"]
+                  if rec.get("segments") and rec.get("use") == "counts" else None),
         "deep": ({k: deep.get(k) for k in ("ratio", "flag", "rule", "next", "to_kind", "to_n", "deep_n", "deep_n_raw",
                                             "factor", "blind", "meet", "res_median_raw", "res_max_raw",
                                             "peak_n", "peak_ago", "held")}
@@ -194,7 +200,7 @@ def snapshot(root, raw: Path, work: Path, log: dict | None = None) -> Path:
     for n in root.preorder():
         if not n.is_leaf or not n.name or n.data.get("empty_higher"):
             continue
-        if n.extinct and not n.data.get("red_list") and n.t1 > 0:
+        if n.extinct and not n.data.get("red_list") and n.t1 > 0 and not n.data.get("alive"):
             continue
         rows.append(leaf_row(n, census, gs_model, deep))
     work.mkdir(parents=True, exist_ok=True)
@@ -299,6 +305,16 @@ def check_ceiling(row: dict) -> list[dict]:
                       f"{_fmt(CEILING)} (criterion C's widest bound; {cat} C bound "
                       f"{_fmt(C_BOUND.get(cat, 0))})", ratio=row["alive"] / CEILING)]
     return []
+
+
+def check_drawn(row: dict) -> list[dict]:
+    """The stored count against what is drawn: a leaf with a stock's count and a wild record's curve fails here (#435)."""
+    drawn, alive = row.get("drawn"), row["alive"]
+    if alive <= 0 or drawn is None or max(alive, drawn) <= DRAWN_FLAG * min(alive, drawn):
+        return []
+    sev = math.log10(alive / drawn) if drawn > 0 else SEV_STATUS
+    return [_flag("drawn", abs(sev), f"stored {_fmt(alive)} but drawn {_fmt(drawn)}"
+                  + (" (marked extinct)" if row["extinct"] else ""), drawn=drawn)]
 
 
 def check_deep(row: dict) -> list[dict]:
@@ -460,7 +476,7 @@ def check_stale(row: dict, notes: str | None = None) -> list[dict]:
                   f"\"{later[0][:160]}\"", held_years=held)]
 
 
-CHECKS = (check_join, check_ceiling, check_deep, check_status, check_name, check_units, check_event, check_stale)
+CHECKS = (check_drawn, check_join, check_ceiling, check_deep, check_status, check_name, check_units, check_event, check_stale)
 
 
 def load_reviewed(path: Path = REVIEWED) -> dict[tuple[str, str], dict]:

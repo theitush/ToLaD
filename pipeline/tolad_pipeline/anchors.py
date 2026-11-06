@@ -317,6 +317,9 @@ DOMESTICATION_YEAR = {
     "Camelus bactrianus": -2500,
 }
 
+# The species whose domestic stock a pinned source counts: alive today whatever a list of wild species says of them.
+STOCK_SPECIES = frozenset(DOMESTICATION_YEAR) - frozenset(DOMESTIC_FORM_NO_STOCK)
+
 # ------------------------------------------------------------------ MOCK
 
 MOCK_NOTE = ("MOCK: placeholder individual for UI development. Not from a records "
