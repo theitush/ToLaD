@@ -276,6 +276,22 @@ describe('a single tap held for the double-tap window (ToLaD#241)', () => {
     expect(r.log).toEqual(['double 105']);
   });
 
+  it('a second tap touched down in the window and lifted after it is a double-tap, not two single taps (ToLaD#413)', () => {
+    const r = taps(true);
+    r.tap(100);
+    r.tap(105, DOUBLE_TAP_MS - 10);
+    r.wait(1000);
+    expect(r.log).toEqual(['double 105']);
+  });
+
+  it('a second tap touched down after the window is its own tap, the first already run', () => {
+    const r = taps(true);
+    r.tap(100);
+    r.tap(105, DOUBLE_TAP_MS + 10);
+    r.wait(1000);
+    expect(r.log).toEqual(['tap 100', 'tap 105']);
+  });
+
   it('a double-tap whose first tap the timer ran before its events came in says so (ToLaD#301)', () => {
     const r = taps(true);
     r.tap(100);

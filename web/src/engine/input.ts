@@ -14,7 +14,7 @@ export const PINCH_MIN_SPREAD = 40;
 export const WHEEL_GAP_MS = 140;
 /** Wheel axis lock: nothing zooms until one axis's scroll has moved this many px in the gesture. */
 export const WHEEL_DEAD_PX = 6;
-/** A second tap within this (ms) of the first's release, and near it, is a double-tap. */
+/** A second tap touching down within this (ms) of the first's release, and near it, is a double-tap. */
 export const DOUBLE_TAP_MS = 320;
 /** Zoom per px of plain scroll (log), and per px of a trackpad pinch (ctrl+wheel). */
 const WHEEL_RATE = 0.002;
@@ -273,7 +273,9 @@ export class Input {
     const isTap = this.maxPointers === 1 && this.moved < 12 && e.timeStamp - this.downAt < 300;
     if (isTap) {
       const lt = this.lastTap;
-      if (e.timeStamp - lt.t < DOUBLE_TAP_MS && Math.hypot(p.x - lt.x, p.y - lt.y) < 40) {
+      // (The window runs from the first tap's lift to the second's touch, as hold()'s timer has it and the platforms do
+      // (ToLaD#413): a second tap touched down in time and lifted after it is a double tap, not two taps deeper.)
+      if (this.downAt - lt.t < DOUBLE_TAP_MS && Math.hypot(p.x - lt.x, p.y - lt.y) < 40) {
         const ran = lt.ran;
         this.lastTap.t = -1e9;
         this.drop();
