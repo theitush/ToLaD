@@ -315,7 +315,7 @@ export const FAMILY_EN: Record<string, string> = {
   Heteromyidae: 'Pocket mice & kangaroo rats',
   Hystricidae: 'Old World porcupines',
   Muridae: 'Old World mice & rats',
-  Nesomyidae: 'African & Malagasy rats',
+  Nesomyidae: 'Afro-Malagasy rats',
   Octodontidae: 'Degus',
   Pedetidae: 'Springhares',
   Petromuridae: 'Dassie rat',
