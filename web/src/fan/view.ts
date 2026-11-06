@@ -366,7 +366,10 @@ function lnCosh(x: number): number {
  * One axis of a flight (ToLaD#246): van Wijk & Nuij's smooth zoom-and-pan from a view `w0` wide (world) to one `w1`
  * wide, `d` away (world). S: its length (log-zoom ÷ ρ plus pan in screens, as the eye sees it). at(e), e from 0 to 1
  * along it at even speed: the view's width there and the share of the pan done (0 to 1). A long trip zooms out to
- * see both ends, pans, zooms in; a short one zooms and pans together.
+ * see both ends, pans, zooms in. Two views that overlap need no such climb (ToLaD#413): the flight is the plain zoom
+ * between them, about the one point of the world that stands at the same place on screen in both (or a plain pan, at
+ * one zoom), so each thing on screen goes straight from where it is to where it lands, never back. Its length, so its
+ * time, stays the trip's.
  */
 export function flightPath(w0: number, w1: number, d: number): { S: number; at(e: number): [number, number] } {
   const rho = FLY_RHO;
@@ -382,6 +385,10 @@ export function flightPath(w0: number, w1: number, d: number): { S: number; at(e
   const r0 = -Math.asinh(b0);
   const r1 = -Math.asinh(b1);
   const S = (r1 - r0) / rho;
+  if (d < (w0 + w1) / 2) {
+    const q = Math.log(w1 / w0);
+    return { S, at: (e) => { const w = w0 * Math.exp(q * e); return [w, q === 0 ? e : (w0 - w) / (w0 - w1)]; } };
+  }
   return {
     S,
     at: (e) => {
