@@ -480,7 +480,16 @@ export function nameOrders(t: Split): Split {
     let k = 0;
     while (k < pa.length && pa[k] === pb[k]) k++;
     const v = pa[k - 1];
-    if (v && v !== t && !v.taxon) v.taxon = name;
+    if (!v || v === t) continue;
+    if (name in NAMED_CLADES) {
+      // (Ours wins: MDD's tribe Hominini holds the chimpanzees too, the fork above; one name, one level, ToLaD#417.)
+      const clear = (s: Split): void => {
+        if (s.taxon === name) s.taxon = undefined;
+        for (const q of s.kids) if (typeof q !== 'string') clear(q);
+      };
+      clear(t);
+      v.taxon = name;
+    } else if (!v.taxon) v.taxon = name;
   }
   return t;
 }
