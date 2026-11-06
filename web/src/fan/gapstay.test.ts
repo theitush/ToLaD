@@ -48,7 +48,7 @@ function stubView(clade: CladeRec, tree: Split, folds: boolean): FanView {
   return new FanView(canvas as unknown as HTMLCanvasElement, clade, tree, folds);
 }
 
-type Priv = { anim: ((t: number) => boolean) | null; applyFold(): void; camera: FanCamera; offBy(a: Camera, c: Camera): number; frameOf(lv: Level): Camera; steps: unknown[] };
+type Priv = { anim: ((t: number) => boolean) | null; applyFold(): void; camera: FanCamera; offBy(a: Camera, c: Camera): number; frameOf(lv: Level): Camera; outFrom(lv: Level, c: Camera): { cam: Camera } | null; steps: unknown[] };
 const P = (v: FanView) => v as unknown as Priv;
 function run(v: FanView): void {
   const iv = P(v);
@@ -154,11 +154,11 @@ describe('a look switch keeps the view where it is (ToLaD#412)', () => {
             expect(lvName(lvB), at).toBe(lvName(lvA));
             expect(P(B).offBy(P(B).frameOf(lvB), B.cam), at).toBeLessThanOrEqual(0.5);
             expect(P(B).steps.length).toBe(0);
-            // A double tap: the first named level up whose frame moves the view.
-            const up = B.levelsAbove(lvB).find((n) => P(B).offBy(P(B).frameOf({ v: n }), B.cam) > 12);
+            // A double tap: the first named level up that zooms out (ToLaD#416).
+            const up = P(B).outFrom(lvB, B.cam);
             B.doubleTap(-1e4, -1e4);
             run(B);
-            if (up) expect(P(B).offBy(P(B).frameOf({ v: up }), B.cam), `${at}: up`).toBeLessThanOrEqual(12);
+            if (up) expect(P(B).offBy(up.cam, B.cam), `${at}: up`).toBeLessThanOrEqual(12);
           }
         }
       }, 300_000);
@@ -185,7 +185,7 @@ describe('a look switch keeps the view where it is (ToLaD#412)', () => {
               expect(B.cam.sy / c0.sy, at).toBeCloseTo(1, 8);
               expect(Math.abs(B.cam.cy - c0.cy) * c0.sy, at).toBeLessThan(0.5);
               expect(lvName(B.levelNow(true)), at).toBe(lvName(lvA));
-              // The double tap: where it goes in the view that stood there (nowhere from a free zoom at home's level).
+              // The double tap: where it goes in the view that stood there.
               B.doubleTap(-1e4, -1e4);
               run(B);
               A.doubleTap(-1e4, -1e4);

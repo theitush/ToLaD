@@ -63,7 +63,7 @@ function rig(): Rig {
   };
   return { v: new FanView(canvas as unknown as HTMLCanvasElement, mammaliaClade(), mammaliaTree(), true), on };
 }
-type Priv = { anim: ((t: number) => boolean) | null; applyFold(): void; camera: FanCamera; frameOf(lv: Level): Camera; upFrom(lv: Level, c: Camera): { cam: Camera } | null; steps: unknown[]; famHits: { box: number[]; v: FanNode }[] };
+type Priv = { anim: ((t: number) => boolean) | null; applyFold(): void; camera: FanCamera; frameOf(lv: Level): Camera; outFrom(lv: Level, c: Camera): { cam: Camera } | null; steps: unknown[]; famHits: { box: number[]; v: FanNode }[] };
 const P = (v: FanView) => v as unknown as Priv;
 const pointer = (x: number, y: number, late = 0) => ({ pointerId: 1, pointerType: 'touch', button: 0, clientX: x, clientY: y, timeStamp: clock - late, preventDefault() {} });
 /** The clock on by ms, a frame (16.7 ms) at a time, the timers due and the flight under way run, the callback after each frame. */
@@ -262,7 +262,7 @@ describe('a double tap reads as one step back (ToLaD#413)', () => {
       for (const [name, lv] of frames) {
         const go = () => stand(v, P(v).frameOf(lv));
         go();
-        const want = P(v).upFrom(lv, v.cam)?.cam;
+        const want = P(v).outFrom(lv, v.cam)?.cam;
         for (const [sn, s] of [['branch', B], ['nothing', E]] as const) {
           check(`${name} ${sn} quick`, go, quick(s), 170, want);
           check(`${name} ${sn} slow`, go, slow(s), 440, want);
