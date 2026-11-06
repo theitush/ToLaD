@@ -7,7 +7,7 @@
 import { drawPic, hasPic, livePic, PIC_TRIES, prefetchPics } from './wiki';
 import { AXIS_ROOM, chainFit, CHAIN_ROOM, flipOn, forkQuiet, FORK_PX as FLIP_FORK_PX, gapLabelsOn, gapNamesOn, LABELS_MA, NOW_PX, turnCanvas, upright } from './flip';
 import { CLADE_FONT, CLADE_PX, GapNames, SPECIES_FONT, SPECIES_PX, type WrittenName } from './gapnames';
-import { columnGaps, gapCover, gapOpens, tiers, type Member, type Tier } from './gaplabels';
+import { columnGaps, gapCover, gapOpens, picFits, tier, type Member, type Tier } from './gaplabels';
 import { GROUP_D, LABEL_AXIS_X, labelMode, PIC_D, PIC_LIFT, PIC_ROOM, picBox, type PicSpot } from './pics';
 import { coverLadder, keepOnScreen, placeSlots } from './slide';
 import { formatCount, formatMass } from '../data/count';
@@ -619,6 +619,7 @@ export interface CoverGroup {
 export interface GapMember extends CoverGroup, Member {
   on: number;
   tier?: Tier;
+  pic?: boolean;
 }
 /** A cut item's strands (drawn order): first and last. */
 export type Run = [number, number];
@@ -2688,7 +2689,7 @@ export class FanView implements InputHandlers {
   private ladder: { T: CutTerritories; at: (sx: number) => { list: CoverGroup[]; at: number } } | null = null;
 
   /**
-   * The cover on the tree on its side (ToLaD#458, gaplabels.ts): the groups and species labelled at zoom sx and each one's tier, from the zoom alone.
+   * The cover on the tree on its side (ToLaD#458, gaplabels.ts): the groups and species labelled at zoom sx, where each one's name goes and whether it has a picture, from the zoom alone.
    * Kept for the last sx, so a pan costs nothing.
    */
   gapCoverAt(T: CutTerritories, sx: number): GapMember[] {
@@ -2710,8 +2711,17 @@ export class FanView implements InputHandlers {
         if (!m) {
           const k = lv.b ? ~lv.b.index : index.get(lv.v)!;
           const wy = T.branchOf(k, span);
-          const on = lv.b ? (there(lv.b) ? lv.b.index : -1) : (lv.v.strands.find(there)?.index ?? -1);
-          memo.set(key, (m = { lv, k, f: k < 0 ? ~k : first[k], l: k < 0 ? ~k : last[k], wy, a: span[0], b: span[1], on, species: !!lv.b, top: on < 0 ? 0 : C[on] - R[on] / 2, at: on < 0 ? 0 : C[on], band: on < 0 ? 0 : R[on], gap: on < 0 ? 0 : gaps[on] }));
+          // (Its band: the room of its strands still there on the column, end to end.)
+          let [on, lo, hi] = [-1, Infinity, -Infinity];
+          for (const b of lv.b ? [lv.b] : lv.v.strands) {
+            if (!there(b)) continue;
+            const c = C[b.index];
+            const r = R[b.index];
+            if (on < 0 || c - r / 2 < lo) on = b.index;
+            lo = Math.min(lo, c - r / 2);
+            hi = Math.max(hi, c + r / 2);
+          }
+          memo.set(key, (m = { lv, k, f: k < 0 ? ~k : first[k], l: k < 0 ? ~k : last[k], wy, a: span[0], b: span[1], on, species: !!lv.b, top: on < 0 ? 0 : lo, at: on < 0 ? 0 : (lo + hi) / 2, band: on < 0 ? 0 : hi - lo, gap: on < 0 ? 0 : gaps[on] }));
         }
         return m;
       };
@@ -2723,11 +2733,10 @@ export class FanView implements InputHandlers {
         return gs;
       };
       const root = of({ v: this.fan.root });
-      L = this.gapLadder = { T, root, parts, opens: gapOpens(root, parts, (g) => g.on, gaps, CLADE_PX) };
+      L = this.gapLadder = { T, root, parts, opens: gapOpens(root, parts, (g) => (g.on < 0 ? 0 : Math.max(g.gap, g.band)), CLADE_PX) };
     }
     const list = gapCover(L.root, L.parts, L.opens, sx).filter((g) => g.on >= 0).sort((p, q) => p.on - q.on);
-    const tier = tiers(list, sx, GROUP_D, CLADE_PX, SPECIES_PX);
-    const out = list.map((g, i) => ({ ...g, tier: tier[i] }));
+    const out = list.map((g) => ({ ...g, tier: tier(g, sx, CLADE_PX, SPECIES_PX), pic: picFits(g, sx, GROUP_D) }));
     this.gapCoverLast = { T, sx, list: out };
     return out;
   }
@@ -2747,9 +2756,9 @@ export class FanView implements InputHandlers {
   }
 
   /**
-   * This frame's labels by one rule (ToLaD#458, gaplabels.ts): a group's name in the gap above its branch, its span line going down the branch from there, and a species' picture and pill in its
-   * branch, or its name alone there, or in the gap above. All on the 100 kya column (labelBand), held on screen as labels are (flipPicY); across, a title stands at its branch's top
-   * and leaves with it, a species stays inside its own band's part on screen. `names` holds the text alone, `spots` and `pics` the pictures, one label a pair as anywhere.
+   * This frame's labels by one rule (ToLaD#458, gaplabels.ts): a name in the gap above its branch, else in its own band, a group's span line going down the branch from there; a picture in the band
+   * of anyone whose band holds one, a species' name then its pill. All on the 100 kya column (labelBand), held on screen as labels are (flipPicY); across, a title stands at its branch's top and leaves
+   * with it, anything in a band stays inside that band's part on screen. `names` holds the text alone, `spots` the pills, `pics` the pictures.
    */
   private gapLabels(T: CutTerritories, row: number): CutLabels {
     const out: CutLabels = { spots: [], groups: new Map(), pics: [], items: [], all: [], names: [] };
@@ -2762,48 +2771,52 @@ export class FanView implements InputHandlers {
     const y1 = row + PIC_ROOM - PIC_D - LABEL_UNDER;
     const r0 = PIC_D / 2;
     for (const g of this.gapCoverAt(T, sx)) {
-      if (!g.tier) continue;
+      if (!g.tier && !g.pic) continue;
       const { lv } = g;
       const key = `g${g.k}`;
       const name = lv.b ? levelText(lv.b) : groupName(this.fan, lv.v);
-      const s: LabelSpot = { key, id: key, place: 'tip', text: name, rank: [0, 0, g.k], x: 0, y1, box: [0, 0, 0, 0], fit: 1, plus: 0, pic: lv.b ?? groupFace(lv.v) ?? lv.v.strands[0] };
+      const face = lv.b ?? groupFace(lv.v) ?? lv.v.strands[0];
+      const s: LabelSpot = { key, id: key, place: 'tip', text: name, rank: [0, 0, g.k], x: 0, y1, box: [0, 0, 0, 0], fit: 1, plus: 0, pic: face };
       if (lv.b) s.b = lv.b;
       else Object.assign(s, { v: lv.v, fam: lv.v });
-      if (g.tier === 'title') {
-        const px = g.gap * sx;
-        const top = X(g.top);
-        const x = top - Math.min((px - CLADE_PX) / 2, CLADE_PX / 4) - CLADE_PX / 2;
-        if (x < -CLADE_PX || x > this.w + CLADE_PX) continue;
-        s.plain = CLADE_FONT;
-        s.text = this.titleWidth(CLADE_FONT, name) <= cap ? name : this.pillText(name, cap);
-        s.x = x;
-        s.box = [x - CLADE_PX / 2, y1 - LABEL_PAD - this.titleWidth(CLADE_FONT, s.text), x + CLADE_PX / 2, y1];
-        if (lv.v) {
-          // (Its branches, from its title: at the title's old end, down them.)
-          const foot = y1 + LABEL_UNDER;
-          const ends = T.reach(g.f, g.l, Wy(foot));
-          if (ends && ends[1] > ends[0]) s.over = [X(ends[2]), X(ends[3]), foot];
-        }
-        out.names.push(s);
-        continue;
-      }
       // (In its own band's part on screen; narrower than the label: on its centre.)
       const [a, b] = [X(g.at - g.band / 2), X(g.at + g.band / 2)];
-      if (b < 0 || a > this.w) continue;
-      const need = g.tier === 'pic' ? r0 : SPECIES_PX / 2;
-      const c = (a + b) / 2;
-      const x = b - a < 2 * need ? c : Math.max(a + need, Math.min(b - need, Math.max(need, Math.min(this.w - need, c))));
-      s.x = x;
-      if (g.tier === 'in') {
-        s.plain = SPECIES_FONT;
-        s.box = [x - SPECIES_PX / 2, y1 - LABEL_PAD - this.titleWidth(SPECIES_FONT, name), x + SPECIES_PX / 2, y1];
-        out.names.push(s);
+      const inBand = (need: number) => (b - a < 2 * need ? (a + b) / 2 : Math.max(a + need, Math.min(b - need, Math.max(need, Math.min(this.w - need, (a + b) / 2)))));
+      const seen = b >= 0 && a <= this.w;
+      const picX = g.pic ? inBand(r0) : 0;
+      if (g.pic && seen) out.pics.push({ x: picX, y: row + PIC_ROOM - PIC_D / 2, i: out.pics.length, lv, face, held: true });
+      if (g.pic && lv.b) {
+        // (A species' name a pill, on its picture.)
+        if (!seen) continue;
+        s.x = picX;
+        s.text = this.pillText(name, cap - 2 * LABEL_PAD);
+        s.box = [picX - half, y1 - this.nameWidth(s.text) - 2 * LABEL_PAD, picX + half, y1];
+        out.spots.push(s);
         continue;
       }
-      s.text = this.pillText(name, cap - 2 * LABEL_PAD);
-      s.box = [x - half, y1 - this.nameWidth(s.text) - 2 * LABEL_PAD, x + half, y1];
-      out.spots.push(s);
-      out.pics.push({ x, y: row + PIC_ROOM - PIC_D / 2, i: out.pics.length, lv, face: lv.b!, held: true });
+      if (!g.tier) continue;
+      // (Text: a group's, or a species' in the gap, the size of a title; a species' in its band its own. In the band, on the picture's line, along time from it.)
+      const small = g.tier === 'in' && !!lv.b;
+      const textPx = small ? SPECIES_PX : CLADE_PX;
+      let x: number;
+      if (g.tier === 'title') {
+        x = X(g.top) - Math.min((g.gap * sx - CLADE_PX) / 2, CLADE_PX / 4) - CLADE_PX / 2;
+        if (x < -CLADE_PX || x > this.w + CLADE_PX) continue;
+      } else {
+        if (!seen) continue;
+        x = g.pic ? picX : inBand(textPx / 2);
+      }
+      s.x = x;
+      s.plain = small ? SPECIES_FONT : CLADE_FONT;
+      s.text = small || this.titleWidth(s.plain, name) <= cap ? name : this.pillText(name, cap);
+      s.box = [x - textPx / 2, y1 - LABEL_PAD - this.titleWidth(s.plain, s.text), x + textPx / 2, y1];
+      if (lv.v) {
+        // (Its branches, from its name: at the name's old end, down them.)
+        const foot = y1 + LABEL_UNDER;
+        const ends = T.reach(g.f, g.l, Wy(foot));
+        if (ends && ends[1] > ends[0]) s.over = [X(ends[2]), X(ends[3]), foot];
+      }
+      out.names.push(s);
     }
     return out;
   }

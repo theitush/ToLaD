@@ -1,4 +1,4 @@
-// One kind of label on the tree on its side (ToLaD#458): a group's title in the gap above its own branch, one a gap; a species' picture in its branch; from the zoom alone, nothing merging on the way in, nothing meeting.
+// One kind of label on the tree on its side (ToLaD#458): a name in the gap above its own branch, else in its band; a picture only in a band, group's or species'; from the zoom alone, nothing merging on the way in, nothing meeting.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { setFlip } from './flip';
 import { CLADE_PX } from './gapnames';
@@ -6,8 +6,8 @@ import { mammaliaClade } from './panthera';
 import { mammaliaTree } from './splits';
 import { loadMammalsFromFiles } from './mammals-node';
 import type { Steady } from './steady';
-import { FanView, type CutLabels, type GapMember } from './view';
-import { picBox } from './pics';
+import { FanView, groupFace, type CutLabels, type GapMember } from './view';
+import { GROUP_D, PIC_D, picBox } from './pics';
 
 function stubView(): FanView {
   const noop = () => {};
@@ -105,13 +105,37 @@ describe('labels in the gaps and in the branches', () => {
         expect(seen.has(k)).toBe(false);
         seen.add(k);
         const top = v.toScreen(C[k] - R[k] / 2, 0)[0];
+        const m = cover(sx).find((g) => g.on === k)!;
+        if (m.tier === 'in') {
+          // (Too thin a gap: on its own band.)
+          expect(s.box[0]).toBeGreaterThanOrEqual(v.toScreen(m.at - m.band / 2, 0)[0] - 1e-6);
+          expect(s.box[2]).toBeLessThanOrEqual(v.toScreen(m.at + m.band / 2, 0)[0] + 1e-6);
+          continue;
+        }
         expect(s.box[2]).toBeLessThanOrEqual(top + 1e-6);
-        expect(top - s.box[0]).toBeLessThanOrEqual(m_gap(sx, k) + 1e-6);
+        expect(top - s.box[0]).toBeLessThanOrEqual(m.gap * sx + 1e-6);
       }
     }
-    function m_gap(sx: number, k: number): number {
-      return cover(sx).find((m) => m.on === k)!.gap * sx;
+  });
+
+  it('a name for everyone in the cover, by the rule: every part that opened has room', () => {
+    for (const z of ZOOMS) for (const m of cover(home * z)) expect(m.tier, String(name(m))).toBeTruthy();
+  });
+
+  it('a picture only in a band that holds it, by the zoom alone, and never in a gap', () => {
+    for (const z of ZOOMS) {
+      const sx = home * z;
+      const byKey = new Map(cover(sx).map((m) => [m.lv, m]));
+      for (const m of cover(sx)) expect(m.pic).toBe(m.band * sx >= GROUP_D);
+      const c = frame(sx, f.rooms().C[f.rooms().C.length >> 1]);
+      for (const p of c.pics) {
+        const m = byKey.get(p.lv)!;
+        expect(m.pic).toBe(true);
+        expect(p.x - PIC_D / 2).toBeGreaterThanOrEqual(v.toScreen(m.at - m.band / 2, 0)[0] - 1e-6);
+        expect(p.x + PIC_D / 2).toBeLessThanOrEqual(v.toScreen(m.at + m.band / 2, 0)[0] + 1e-6);
+      }
     }
+    expect(cover(home).some((m) => m.pic)).toBe(true);
   });
 
   it('never a label over another, a picture and pill counted, at any zoom', () => {
@@ -152,8 +176,19 @@ describe('labels in the gaps and in the branches', () => {
   });
 
   it('has Homo sapiens as a label of its own, its fossils holding nothing back', () => {
-    // (Late, x4096: the forks down to it have small gaps. Reported on ToLaD#458.)
-    const human = cover(home * 8192).find((m) => m.lv.b?.sp.sci === 'Homo sapiens');
-    expect(human?.tier).toBeTruthy();
+    const holder = (taxon: string, sci: string) => {
+      const b = f.strands.find((s) => s.sp.sci === sci)!;
+      return cover(v.levelCamera(taxon)!.sx).find((m) => (m.lv.b ? m.lv.b === b : m.lv.v!.strands.includes(b)))!;
+    };
+    // (At Primates' frame humans stand in a group with a thin first part, that group's picture a human: a funnel, its band read whole. The same for cat and dog at Carnivora's.)
+    for (const [taxon, sci] of [['Primates', 'Homo sapiens'], ['Carnivora', 'Felis catus'], ['Carnivora', 'Canis lupus']]) {
+      const m = holder(taxon, sci);
+      expect(m.pic, sci).toBe(true);
+      expect(m.lv.b?.sp.sci ?? groupFace(m.lv.v!)?.sp.sci, sci).toBe(sci);
+    }
+    let z = 1;
+    while (cover(home * z).find((m) => m.lv.b?.sp.sci === 'Homo sapiens')?.tier == null) z *= Math.SQRT2;
+    console.log(`Homo sapiens its own label from x${z.toFixed(0)} of home; Primates' frame x${(v.levelCamera('Primates')!.sx / home).toFixed(0)}`);
+    expect(z).toBeLessThan(8192);
   });
 });
