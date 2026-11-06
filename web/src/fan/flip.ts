@@ -12,6 +12,18 @@ export function setFlip(on: boolean): void {
 
 /** Room kept under the buttons for the chain of groups (the next task, `chain`): one row of text. */
 export const CHAIN_ROOM = 30;
+/**
+ * The chain of groups as it fits the width, outermost name first (ToLaD#452): the outer ones go first, whole, a "…" leading
+ * where any went; the innermost always stays whole.
+ */
+export function chainFit(names: string[], fits: (parts: string[]) => boolean): string[] {
+  for (let i = 0; i < names.length - 1; i++) {
+    const parts = i ? ['…', ...names.slice(i)] : names;
+    if (fits(parts)) return parts;
+  }
+  return names.slice(-1);
+}
+
 /** Where "now" stands: this far from the phone's right edge. */
 export const NOW_PX = 14;
 /** Where a whole clade's fork stands: this far from the phone's left edge. */

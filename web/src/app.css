@@ -508,6 +508,24 @@
   padding: 8px 13px;
   min-height: 34px;
 }
+/* The tree on its side: the chain of groups in the room kept under the buttons (flip.ts, CHAIN_ROOM). */
+.fan .chain {
+  position: absolute;
+  left: 0;
+  right: 0;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  font: 500 14px/1 var(--sans);
+  color: var(--ink-3);
+  white-space: pre;
+  overflow: hidden;
+  pointer-events: none;
+}
+.fan .chain b {
+  font-weight: 600;
+  color: var(--ink);
+}
 .fan .bar button[aria-pressed='true'] {
   border-color: rgba(63, 210, 134, 0.45);
   box-shadow: none;

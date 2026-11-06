@@ -19,6 +19,7 @@ import { MagnifierIcon, SearchPanel } from './SearchPanel';
 import { SourcesPanel } from './SourcesPanel';
 import { statusOf, wildPartSentence } from './status';
 import { cardTapper, onControl } from './cardtap';
+import { flipOn } from './flip';
 import { FanView, initialMeasure, levelName, type Lineage, type Place, type Selection } from './view';
 
 declare global {
@@ -135,7 +136,7 @@ export function FanApp() {
     if (typeof document !== 'undefined' && document.fonts) {
       Promise.all([document.fonts.load("600 16px 'Sofia Sans Condensed'"), document.fonts.load("italic 400 14px 'Newsreader'")])
         .catch(() => undefined)
-        .then(() => v.request());
+        .then(() => v.fontsIn());
     }
     return () => {
       v.destroy();
@@ -222,6 +223,8 @@ export function FanApp() {
         </button>
         <WorldToggle get={() => viewRef.current} onMeasure={setMeasure} />
       </div>
+      {/* ToLaD#452: the chain of groups the view is in, written by the view (chainFrame). */}
+      {flipOn() && viewReady && <div className="chain" />}
       {searching && (
         <SearchPanel
           species={viewRef.current?.fan.branches.map((b) => b.sp) ?? []}

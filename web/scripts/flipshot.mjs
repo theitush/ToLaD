@@ -30,9 +30,10 @@ const state = () =>
       ka100: Math.round(ka100),
       now: Math.round(v.toScreen(0, v.yNow)[1]),
       cam: v.cam,
+      chain: document.querySelector('.chain')?.textContent ?? '',
     };
   });
-const show = (name, s) => console.log(`${name}: ${s.n} labels [${s.names.join(', ')}] picY ${s.picY} 100kya@${s.ka100} now@${s.now} view ${s.w}x${s.h} sx ${s.cam.sx.toPrecision(4)} sy ${s.cam.sy.toPrecision(4)}`);
+const show = (name, s) => console.log(`${name}: ${s.n} labels [${s.names.join(', ')}] picY ${s.picY} 100kya@${s.ka100} now@${s.now} view ${s.w}x${s.h} sx ${s.cam.sx.toPrecision(4)} sy ${s.cam.sy.toPrecision(4)} chain: ${s.chain}`);
 await settle();
 show('home', await state());
 await page.screenshot({ path: `${OUT}/home.png` });
@@ -43,6 +44,33 @@ for (const name of CLADES) {
   show(name, await state());
   await page.screenshot({ path: `${OUT}/${name.toLowerCase()}.png` });
 }
+// The chain at every level clade, on the page's type: the longest, how many lost outer names, any whose innermost name alone overflows.
+console.log(
+  'chains:',
+  await page.evaluate(() => {
+    const v = window.__fan;
+    const el = document.querySelector('.chain');
+    const levelNow = v.levelNow;
+    let n = 0;
+    let cut = 0;
+    let long = '';
+    const over = [];
+    for (const node of v.fan.nodes) {
+      v.levelNow = () => ({ v: node });
+      v.chainV = null;
+      v.chainFrame();
+      const t = el.textContent;
+      if (n++ && t === long) continue;
+      if (t.startsWith('…')) cut++;
+      if (t.length > long.length) long = t;
+      if (el.scrollWidth > el.clientWidth) over.push(t);
+    }
+    v.levelNow = levelNow;
+    v.chainV = null;
+    v.request();
+    return { n, cut, long, over };
+  }),
+);
 // A group whose branch ended before 100 kya: its label floats past it. The first the ladder has, walking up the zoom.
 const died = await page.evaluate(() => {
   const v = window.__fan;
@@ -69,7 +97,8 @@ if (DRIVE) {
       await page.waitForTimeout(16);
     }
     // (Held still a moment: no fling.)
-    await page.waitForTimeout(150);
+    await page.waitForTimeout(250);
+    console.log(`  finger still down, chain: ${await page.evaluate(() => document.querySelector('.chain')?.textContent)}`);
     await touch('touchEnd', []);
   };
   await page.evaluate(() => window.__fan.resetView());
