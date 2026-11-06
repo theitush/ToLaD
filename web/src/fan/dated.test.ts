@@ -21,7 +21,7 @@ function clade(name: string) {
   const placed = new Set(speciesUnder(tree));
   const species = raw.species.filter((s) => placed.has(s.sci)).map((s, i) => speciesRec(s, i));
   const sum = (f: (s: (typeof species)[number]) => number) => species.reduce((a, s) => a + f(s), 0);
-  const rec: CladeRec = { ...raw, common: name, ever: sum((s) => s.ever), everLo: sum((s) => s.everLo), everHi: sum((s) => s.everHi), alive: sum((s) => s.alive), species };
+  const rec: CladeRec = { ...raw, common: name, ever: sum((s) => s.ever), everLo: sum((s) => s.everLo), everHi: sum((s) => s.everHi), alive: sum((s) => s.alive), species, tree };
   return { raw, tree, rec };
 }
 

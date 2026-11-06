@@ -73,7 +73,7 @@
 import type { Fold } from './fold';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { parentShare, population, smoother, TIME_C, type Population } from './population';
-import { FELIDAE_TREE, type Split } from './splits';
+import type { Split } from './splits';
 
 export { TIME_C };
 
@@ -1057,7 +1057,7 @@ function emergeRun(k: Kid, time: TimeScale, mode: WidthMode, reach: number): num
   return lo;
 }
 
-export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = FELIDAE_TREE, measure: Measure = 'individuals'): Fan {
+export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = clade.tree, measure: Measure = 'individuals'): Fan {
   const W = TRUNK_WIDTH;
   // (A species with no mass in the data, none since ToLaD#276's build: the clade's median.)
   const known = measure === 'mass' ? clade.species.map((s) => s.massKg ?? NaN).filter((m) => m > 0).sort((a, b) => a - b) : [];

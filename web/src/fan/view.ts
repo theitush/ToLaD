@@ -20,7 +20,7 @@ import { LADDER, Territories, type CutItem, type Ref, type RowsOf } from './cut'
 import { COLUMN_DIM, columnSpans, EVENT_TINT, eventAt, eventSpans, type EventSpan } from './colstyle';
 import { laneDim, LINEAGE, pathFrame, TwigModel } from './twigs';
 import type { RectBatch } from './meshgl';
-import { FAMILY_EN, familyLabel, FELIDAE_TREE, ORDER_EN, ORDER_TAXA, taxonKey, type Split } from './splits';
+import { FAMILY_EN, familyLabel, ORDER_EN, ORDER_TAXA, taxonKey, type Split } from './splits';
 import { Brackets, foldedFrame, forkNames, latinOf, rankOf, STACK_MOST, TAXON_EN, type StackAt } from './brackets';
 import { axisInset, drawWorldOver, drawWorldUnder, worldFlags, type Box } from './world';
 
@@ -935,7 +935,7 @@ export class FanView implements InputHandlers {
   constructor(
     readonly canvas: HTMLCanvasElement,
     readonly clade: CladeRec,
-    readonly tree: Split = FELIDAE_TREE,
+    readonly tree: Split = clade.tree,
     /** The fold (fold.ts, ToLaD#146): the order one branch from afar, its splits opening as you zoom in. */
     readonly folds = false,
   ) {
@@ -1377,6 +1377,13 @@ export class FanView implements InputHandlers {
     if (p.framed) this.tapAt = { b: lv.b ?? null, v: lv.v ?? null, cam: { ...this.cam } };
     this.lvAt = { fan: this.fan, cam: { ...this.cam }, lv, t: performance.now() };
     this.request();
+  }
+
+  /** Stand on the frame of the split founding taxon `name`, at once (an old `?level=` link, ToLaD#418); no such split, stay. */
+  goToClade(name: string): void {
+    const node = this.fan.nodes.findIndex((n) => n.split.taxon === name);
+    const edge = { i: 0, t: 0, px: 0 };
+    if (node >= 0) this.goToPlace({ node, strand: -1, framed: true, left: edge, right: edge, cam: this.cam });
   }
 
   /**

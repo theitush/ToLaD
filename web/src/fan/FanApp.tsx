@@ -7,8 +7,8 @@ import { HistorySpark } from './HistorySpark';
 import type { Measure, WidthMode } from './layout';
 import { wikiOf, type WikiRec } from './wiki';
 import { RangeGlobe } from './Globe';
-import { CARNIVORA, FELIDAE, mammaliaClade, NATURAL_META, type HistEvent, type SpeciesRec } from './panthera';
-import { CARNIVORA_TREE, mammaliaTree } from './splits';
+import { mammaliaClade, NATURAL_META, type HistEvent, type SpeciesRec } from './panthera';
+import { mammaliaTree } from './splits';
 import { loadMammals, mammalsLoaded } from './mammals-data';
 import { stamp } from '../stamp';
 import { population } from './population';
@@ -30,27 +30,19 @@ declare global {
 }
 
 /**
- * The view (ToLaD#146): the whole order, each family one branch from afar, opening as you zoom (fold.ts).
- * The level button (ToLaD#247) steps cats -> carnivores -> mammals (every living mammal) -> cats; ?level= opens one.
- */
-type Level = 'cats' | 'carnivores' | 'mammals';
-const LEVELS: Level[] = ['cats', 'carnivores', 'mammals'];
-const LEVEL_NAME: Record<Level, string> = { cats: 'Cats', carnivores: 'Carnivores', mammals: 'Mammals' };
-/**
- * The mammal level's data is a file of its own (mammals-data.ts, ToLaD#247), fetched when the level first opens:
- * 'fetch' while it comes, 'build' for one painted frame (the note shows before the layout's long synchronous build),
- * then 'ready'; any other string is the error.
+ * The view (ToLaD#146): every mammal, each order and family one branch from afar, opening as you zoom (fold.ts). The one
+ * page since ToLaD#418: the cats' and carnivores' are clades in it, and their old links land on their frames.
+ *
+ * Its data is a file of its own (mammals-data.ts, ToLaD#247), fetched on open: 'fetch' while it comes, 'build' for one
+ * painted frame (the note shows before the layout's long synchronous build), then 'ready'; any other string is the error.
  */
 type MammState = 'fetch' | 'build' | 'ready' | string;
 const mammStart = (): MammState => (mammalsLoaded() ? 'build' : 'fetch');
 
-function initialLevel(): Level {
-  try {
-    const q = new URLSearchParams(window.location.search).get('level');
-    return LEVELS.includes(q as Level) ? (q as Level) : 'carnivores';
-  } catch {
-    return 'carnivores';
-  }
+/** The clade an old `?level=` link means (ToLaD#418): `?level=mammals`, or none, is home. */
+export function levelLinkClade(search: string): string | null {
+  const q = new URLSearchParams(search).get('level');
+  return q === 'cats' ? 'Felidae' : q === 'carnivores' ? 'Carnivora' : null;
 }
 
 /** How a fork is drawn (ToLaD#377, `?forks=`): a look only, no new view. */
@@ -112,15 +104,16 @@ export function FanApp() {
   const [measure, setMeasure] = useState<Measure>(initialMeasure);
   const [sel, setSel] = useState<Selection | null>(null);
   const [searching, setSearching] = useState(false);
-  const [level, setLevel] = useState<Level>(initialLevel);
   const [mamm, setMamm] = useState<MammState>(mammStart);
-  // The view can be built: any level but the mammals, or the mammals once their data is in.
-  const viewReady = level !== 'mammals' || mamm === 'ready';
+  // The view can be built: the mammals' data is in.
+  const viewReady = mamm === 'ready';
+  // Where the first view stands, from an old link.
+  const linkRef = useRef(typeof location === 'undefined' ? null : levelLinkClade(location.search));
   const scaleRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (level !== 'mammals' || mamm === 'ready') return;
+    if (mamm === 'ready') return;
     let live = true;
     if (mamm === 'fetch')
       loadMammals().then(
@@ -132,18 +125,13 @@ export function FanApp() {
     return () => {
       live = false;
     };
-  }, [level, mamm]);
+  }, [mamm]);
 
   useEffect(() => {
     if (!viewReady) return;
     const c = canvasRef.current!;
     stamp('build');
-    const v =
-      level === 'mammals'
-        ? new FanView(c, mammaliaClade(), mammaliaTree(), true)
-        : level === 'carnivores'
-          ? new FanView(c, CARNIVORA, CARNIVORA_TREE, true)
-          : new FanView(c, FELIDAE);
+    const v = new FanView(c, mammaliaClade(), mammaliaTree(), true);
     stamp('view');
     if (mode !== 'linear') v.setMode(mode);
     if (!mid) v.setMidLabels(false);
@@ -151,9 +139,10 @@ export function FanApp() {
     v.onSelect = setSel;
     v.scaleEl = scaleRef.current;
     v.barEl = barRef.current;
-    // (A look's switch stays where the view was, ToLaD#412; a new level starts at its home.)
+    // (A look's switch stays where the view was, ToLaD#412; an old link stands on its clade's frame, no flight.)
     if (placeRef.current) v.goToPlace(placeRef.current);
-    placeRef.current = null;
+    else if (linkRef.current) v.goToClade(linkRef.current);
+    placeRef.current = linkRef.current = null;
     viewRef.current = v;
     window.__fan = v;
     window.__levelName = levelName;
@@ -169,19 +158,29 @@ export function FanApp() {
       viewRef.current = null;
       if (window.__fan === v) delete window.__fan;
     };
-    // (A new view per level and per look's switch; the toggles' state carries over.)
+    // (A new view per look's switch; the toggles' state carries over.)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [level, viewReady, gaps, forks]);
+  }, [viewReady, gaps, forks]);
 
   return (
     <div className="app fan">
       <canvas ref={canvasRef} className="stage" />
       {!viewReady && (
         <div className="loading" role="status">
-          {mamm === 'fetch' ? 'loading mammals…' : mamm === 'build' ? 'building the mammal tree…' : mamm}
+          <b>Tree of Life and Death</b>
+          <br />
+          {mamm === 'fetch' ? (
+            'Every mammal, alive and dead: loading…'
+          ) : mamm === 'build' ? (
+            'Every mammal, alive and dead: building the tree…'
+          ) : (
+            <>
+              {mamm} <button type="button" onClick={() => setMamm('fetch')}>Try again</button>
+            </>
+          )}
         </div>
       )}
-      <div className="bar" ref={barRef}>
+      <div className="bar" ref={barRef} style={viewReady ? undefined : { visibility: 'hidden' }}>
         <button
           type="button"
           aria-pressed={mode === 'linear'}
@@ -287,33 +286,9 @@ export function FanApp() {
         >
           {`gray: ${gray ? 'on' : 'off'}`}
         </button>
-        {/* Home for this level, and the level stepper joined to it (ToLaD#247): one pill, so the bar stays one row. */}
-        <span className="pair">
-          <button type="button" onClick={() => viewRef.current?.resetView()}>
-            {level === 'cats' ? 'All cats' : level === 'mammals' ? 'All mammals' : 'All carnivores'}
-          </button>
-          <button
-            type="button"
-            className="step"
-            title={`Change level (now ${LEVEL_NAME[level]})`}
-            aria-label={`level: ${LEVEL_NAME[level]}; tap for ${LEVEL_NAME[LEVELS[(LEVELS.indexOf(level) + 1) % LEVELS.length]]}`}
-            onClick={() => {
-              const next = LEVELS[(LEVELS.indexOf(level) + 1) % LEVELS.length];
-              setSel(null);
-              if (next === 'mammals') setMamm(mammStart());
-              setLevel(next);
-              try {
-                const u = new URL(window.location.href);
-                u.searchParams.set('level', next);
-                window.history.replaceState(null, '', u);
-              } catch {
-                /* not in the address */
-              }
-            }}
-          >
-            ⇅
-          </button>
-        </span>
+        <button type="button" onClick={() => viewRef.current?.resetView()}>
+          All mammals
+        </button>
         <button
           type="button"
           className="icon"
@@ -340,7 +315,7 @@ export function FanApp() {
           }}
         />
       )}
-      <div className="foot">
+      <div className="foot" style={viewReady ? undefined : { visibility: 'hidden' }}>
         <div className="wscale" ref={scaleRef} aria-label="width scale">
           <span className="wbar" />
           <span className="wlab" />

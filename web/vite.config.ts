@@ -25,6 +25,7 @@ const CARNIVORA = 'virtual:carnivora-data';
  * histories are always the dataset's own.
  */
 function pantheraData(): Plugin {
+  let building = false;
   // The order the cats sit in (ToLaD#146): only the species the fan draws (the tile's subspecies and synonym rows left out).
   const ids: Record<string, () => unknown> = {
     [PANTHERA]: () => loadClade((rel) => readFileSync(join(DATA, rel)), 'Felidae'),
@@ -32,6 +33,9 @@ function pantheraData(): Plugin {
   };
   return {
     name: 'panthera-data',
+    configResolved(c) {
+      building = c.command === 'build';
+    },
     resolveId(id) {
       return id in ids ? '\0' + id : null;
     },
@@ -40,13 +44,20 @@ function pantheraData(): Plugin {
       if (!make) return null;
       for (const f of dataFiles()) this.addWatchFile(join(DATA, f));
       if (existsSync(join(DATA, 'wiki.json'))) this.addWatchFile(join(DATA, 'wiki.json'));
-      // The pictures and links (ToLaD#182) for every species either level draws.
-      const sci = (k: string) => (ids[k]() as { species: { sci: string }[] }).species.map((s) => s.sci);
-      const wiki = id === '\0' + PANTHERA ? `\nexport const wiki = ${JSON.stringify(wikiFor(sci(CARNIVORA)))};` : '';
-      return `export default ${JSON.stringify(make())};${wiki}`;
+      // The clades are fixtures for tests now (ToLaD#418): the page reaches neither default export, and its bundle
+      // drops them (their consumers are marked pure). What it does read from here: the natural level's source, and no
+      // pictures (mammals.json holds them all, ToLaD#182); tests and dev keep the carnivores' rows here.
+      if (id !== '\0' + PANTHERA) return `export default ${JSON.stringify(make())};`;
+      const data = make() as { naturalMeta?: unknown };
+      const carn = (ids[CARNIVORA]() as { species: { sci: string }[] }).species.map((s) => s.sci);
+      return [
+        `export default ${JSON.stringify(data)};`,
+        `export const naturalMeta = ${JSON.stringify(data.naturalMeta ?? null)};`,
+        `export const wiki = ${JSON.stringify(building ? {} : wikiFor(carn))};`,
+      ].join('\n');
     },
-    // The mammal level (ToLaD#247) is a sibling file the page fetches when the level opens (fan/mammals-data.ts),
-    // not in the page: the default (carnivores) page stays small. Served at /mammals.json in dev, emitted next to
+    // The mammals (ToLaD#247) are a sibling file the page fetches on open (fan/mammals-data.ts), not in the page, so
+    // the page paints before they come. Served at /mammals.json in dev, emitted next to
     // index.html in both builds.
     configureServer(server) {
       server.middlewares.use('/' + MAMMALS_FILE, (_req, res) => {
@@ -74,8 +85,7 @@ function mammalsJson(): string;
 function mammalsJson(seeded: true): Promise<string>;
 function mammalsJson(seeded = false): string | Promise<string> {
   const clade = trimToFan(loadAll((rel) => readFileSync(join(DATA, rel))));
-  const carn = new Set(trimToFan(loadClade((rel) => readFileSync(join(DATA, rel)), 'Carnivora')).species.map((s) => s.sci));
-  const wiki = wikiFor(clade.species.map((s) => s.sci).filter((s) => !carn.has(s)));
+  const wiki = wikiFor(clade.species.map((s) => s.sci));
   if (!seeded) return JSON.stringify(packMammals(JSON.parse(JSON.stringify({ clade, wiki }))));
   // The build's: with the level's default layout worked out here (fan/mammals-seed.ts, ToLaD#255), on the clade as the
   // page reads it (through JSON). Dev serves it without: the page works it out.

@@ -24,7 +24,7 @@ export interface WikiRec {
 
 /** A species' Wikipedia and Commons URLs, or null when Wikidata has neither. */
 export function wikiOf(sci: string): WikiRec | null {
-  // (The carnivores' rows, then every other mammal's: ToLaD#247.)
+  // (The first table is empty in the page, ToLaD#418: mammals.json holds every species'. Tests and dev have the carnivores' there.)
   return (WIKI as Record<string, WikiRec | null>)[sci] ?? (mammalsLoaded() ? mammalData().wiki[sci] : null) ?? null;
 }
 

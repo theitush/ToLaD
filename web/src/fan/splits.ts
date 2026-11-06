@@ -214,10 +214,10 @@ export function treeOf(raw: RawClade): Split {
 }
 
 /** The cat family's dated tree, from the data. */
-export const FELIDAE_TREE: Split = treeOf(raw);
+export const FELIDAE_TREE: Split = /* @__PURE__ */ treeOf(raw);
 
 /** The order the cats sit in (ToLaD#146): cats, dogs, bears, seals, weasels and the rest. */
-export const CARNIVORA_TREE: Split = treeOf(carnivora);
+export const CARNIVORA_TREE: Split = /* @__PURE__ */ treeOf(carnivora);
 
 let mammTree: Split | null = null;
 /**
