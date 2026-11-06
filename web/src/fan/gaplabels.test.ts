@@ -101,11 +101,10 @@ describe('labels in the gaps and in the branches', () => {
       const seen = new Set<number>();
       for (const s of cut.names) {
         if (!s.v) continue;
-        const k = s.v.strands.find((b) => b.tipY <= v.fan.time.y(0.1))!.index;
-        expect(seen.has(k)).toBe(false);
-        seen.add(k);
-        const top = v.toScreen(C[k] - R[k] / 2, 0)[0];
-        const m = cover(sx).find((g) => g.on === k)!;
+        const m = cover(sx).find((g) => g.lv.v === s.v)!;
+        expect(seen.has(m.on)).toBe(false);
+        seen.add(m.on);
+        const top = v.toScreen(m.top, 0)[0];
         if (m.tier === 'in') {
           // (Too thin a gap: on its own band.)
           expect(s.box[0]).toBeGreaterThanOrEqual(v.toScreen(m.at - m.band / 2, 0)[0] - 1e-6);
@@ -181,14 +180,13 @@ describe('labels in the gaps and in the branches', () => {
       return cover(v.levelCamera(taxon)!.sx).find((m) => (m.lv.b ? m.lv.b === b : m.lv.v!.strands.includes(b)))!;
     };
     // (At Primates' frame humans stand in a group with a thin first part, that group's picture a human: a funnel, its band read whole. The same for cat and dog at Carnivora's.)
-    for (const [taxon, sci] of [['Primates', 'Homo sapiens'], ['Carnivora', 'Felis catus'], ['Carnivora', 'Canis lupus']]) {
+    for (const [taxon, sci] of [['Primates', 'Homo sapiens'], ['Carnivora', 'Felis catus'], ['Carnivora', 'Canis familiaris']]) {
       const m = holder(taxon, sci);
       expect(m.pic, sci).toBe(true);
       expect(m.lv.b?.sp.sci ?? groupFace(m.lv.v!)?.sp.sci, sci).toBe(sci);
     }
     let z = 1;
     while (cover(home * z).find((m) => m.lv.b?.sp.sci === 'Homo sapiens')?.tier == null) z *= Math.SQRT2;
-    console.log(`Homo sapiens its own label from x${z.toFixed(0)} of home; Primates' frame x${(v.levelCamera('Primates')!.sx / home).toFixed(0)}`);
     expect(z).toBeLessThan(8192);
   });
 });

@@ -7,7 +7,7 @@
 import { drawPic, hasPic, livePic, PIC_TRIES, prefetchPics } from './wiki';
 import { AXIS_ROOM, chainFit, CHAIN_ROOM, flipOn, forkQuiet, FORK_PX as FLIP_FORK_PX, gapLabelsOn, gapNamesOn, LABELS_MA, NOW_PX, turnCanvas, upright } from './flip';
 import { CLADE_FONT, CLADE_PX, GapNames, SPECIES_FONT, SPECIES_PX, type WrittenName } from './gapnames';
-import { columnGaps, gapCover, gapOpens, picFits, tier, type Member, type Tier } from './gaplabels';
+import { columnGaps, gapCover, gapOpens, ownLanes, picFits, tier, type Member, type Tier } from './gaplabels';
 import { GROUP_D, LABEL_AXIS_X, labelMode, PIC_D, PIC_LIFT, PIC_ROOM, picBox, type PicSpot } from './pics';
 import { coverLadder, keepOnScreen, placeSlots } from './slide';
 import { formatCount, formatMass } from '../data/count';
@@ -2700,8 +2700,9 @@ export class FanView implements InputHandlers {
       const f = this.fan.tess.fold as Steady;
       const { C, R } = f.rooms();
       const yCol = this.fan.time.y(LABELS_MA);
-      const there = (b: FanBranch) => b.tipY <= yCol;
-      const gaps = columnGaps({ C, R }, (k) => there(f.strands[k]));
+      const own = ownLanes({ C, R }, (k) => f.strands[k].tipY <= yCol);
+      const there = (b: FanBranch) => own[b.index];
+      const gaps = columnGaps({ C, R }, (k) => own[k]);
       const { index, first, last } = T.t;
       const span: [number, number] = [0, 0];
       const memo = new Map<FanNode | FanBranch, GapMember>();

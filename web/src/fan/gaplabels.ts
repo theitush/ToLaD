@@ -5,7 +5,7 @@
 // nobody else's, so nothing meets, whatever the neighbours do. No slide: a title stands at the top of its branch, a name in a band inside that band's part on screen.
 //
 // Everything is read on the labels' column, the only place a label stands: a strand gone by then leaves no line there (rooms by life, steady.ts, may even stand it inside a sister's room),
-// so it takes no room, claims nothing, has no label and holds no fork back. Those few (24 of mammals' strands, fossils) are named by the chain.
+// so it takes no room, claims nothing, has no label and holds no fork back; the same for a hair standing inside a wider lane (ownLanes). Those few, fossils, are named by the chain.
 //
 // A band is the lane's whole room, not the width the line has there: a funnel (humans, dogs) is thin at 100 kya and fat by now, and its lane is kept free for it all the way, so nothing else can stand
 // there and a label on it reads as that funnel's. A group's band is its strands' whole span there, the gaps inside included: its name stands over its parts, which then have no label of their own.
@@ -16,6 +16,25 @@ export type Tier = 'title' | 'in' | null;
 export interface Rooms {
   C: Float64Array;
   R: Float64Array;
+}
+
+/**
+ * Per strand, whether it has a lane of its own on the column: there at all, and not standing inside a wider lane there (a Neanderthal's hair on the centre of humans' funnel: the lane is kept for what
+ * it becomes, their lines don't meet). One inside another has no room to read and no place for a label that isn't its host's, so it claims nothing and holds no fork back, as one gone by then.
+ */
+export function ownLanes({ C, R }: Rooms, there: (k: number) => boolean): boolean[] {
+  const on: number[] = [];
+  for (let k = 0; k < C.length; k++) if (there(k)) on.push(k);
+  // (Top first, the wider first of a tie: anyone ending by the furthest end so far stands inside one before it.)
+  on.sort((p, q) => C[p] - R[p] / 2 - (C[q] - R[q] / 2) || R[q] - R[p]);
+  const own: boolean[] = new Array(C.length).fill(false);
+  let end = -Infinity;
+  for (const k of on) {
+    const hi = C[k] + R[k] / 2;
+    if (hi > end) own[k] = true;
+    end = Math.max(end, hi);
+  }
+  return own;
 }
 
 /** Per strand, world x: the height free above it on the column, up to the nearest strand above it still there; Infinity for the first of them. Not positive: it has no place of its own there. */
