@@ -107,7 +107,6 @@ function sweep(v: FanView, where: string, steps: number, step: () => void, bad: 
   let jump = 0;
   let jumps = 0;
   let flips = 0;
-  const from = v.labelMs.length;
   for (let s = 0; s < steps; s++) {
     step();
     frame(v);
@@ -132,7 +131,7 @@ function sweep(v: FanView, where: string, steps: number, step: () => void, bad: 
     }
     last = now;
   }
-  return { jump, jumps, flips, ms: median(v.labelMs.slice(from)) };
+  return { jump, jumps, flips, ms: median(v.labelMs.slice(-steps)) };
 }
 
 const PLACES: [string, string | null][] = [
