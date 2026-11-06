@@ -1,21 +1,40 @@
-// One kind of label on the tree on its side (ToLaD#458, Ita: "gaps only text no pic"): a group's name, plain text, in the gap above its branch; a species' picture and pill in its own branch.
+// One kind of label on the tree on its side (ToLaD#458, Ita: "gaps only text no pic"): a name in its gap if it fits, else in its own band; a picture, a group's or a species', only in its own band, once that holds one.
 //
-// Which groups comes from the zoom alone, one active range a group (Been, Daiches & Yap 2006): a fork opens once the gap above each of its parts but the first
-// is taller than the text, the first part inheriting the gap above the fork, and never before its parent has opened. So the cover only ever splits on the way in, a pan changes nothing, and every part
-// has a gap of its own to stand in, by construction. No slide: a title stands at the top of its branch.
+// Which groups comes from the zoom alone, one active range a group (Been, Daiches & Yap 2006): a part has room once its gap on the column or its band on the column holds the text, a fork opens once
+// every part has room, and never before its parent. So the cover only ever splits on the way in, a pan changes nothing, and every member has a place of its own by construction: its gap and its band are
+// nobody else's, so nothing meets, whatever the neighbours do. No slide: a title stands at the top of its branch, a name in a band inside that band's part on screen.
 //
-// The gaps are read on the labels' column, the only place a label stands: a strand gone by then leaves no line there (rooms by life, steady.ts, may even stand it inside a sister's room),
-// so it takes no room, has no label and holds no fork back. Those few (24 of mammals' strands, fossils) are named by the chain.
+// Everything is read on the labels' column, the only place a label stands: a strand gone by then leaves no line there (rooms by life, steady.ts, may even stand it inside a sister's room),
+// so it takes no room, claims nothing, has no label and holds no fork back; the same for a hair standing inside a wider lane (ownLanes). Those few, fossils, are named by the chain.
 //
-// A species asks more than a title: its picture needs `d` across. Each neighbour claims its own label's extent, a title its text over its branch, a species half of d whether or not it gets one,
-// so who gets a picture depends on neither order nor the screen: it gets one if its d stays clear of both neighbours' claims; else its name in its branch if that holds the text; else its name in the gap above, as any label.
+// A band is the lane's whole room, not the width the line has there: a funnel (humans, dogs) is thin at 100 kya and fat by now, and its lane is kept free for it all the way, so nothing else can stand
+// there and a label on it reads as that funnel's. A group's band is its strands' whole span there, the gaps inside included: its name stands over its parts, which then have no label of their own.
 
-/** A tier a member of the cover takes. */
-export type Tier = 'title' | 'pic' | 'in' | null;
+/** Where a member of the cover has its name: in its gap, in its band. */
+export type Tier = 'title' | 'in' | null;
 
 export interface Rooms {
   C: Float64Array;
   R: Float64Array;
+}
+
+/**
+ * Per strand, whether it has a lane of its own on the column: there at all, and not standing inside a wider lane there (a Neanderthal's hair on the centre of humans' funnel: the lane is kept for what
+ * it becomes, their lines don't meet). One inside another has no room to read and no place for a label that isn't its host's, so it claims nothing and holds no fork back, as one gone by then.
+ */
+export function ownLanes({ C, R }: Rooms, there: (k: number) => boolean): boolean[] {
+  const on: number[] = [];
+  for (let k = 0; k < C.length; k++) if (there(k)) on.push(k);
+  // (Top first, the wider first of a tie: anyone ending by the furthest end so far stands inside one before it.)
+  on.sort((p, q) => C[p] - R[p] / 2 - (C[q] - R[q] / 2) || R[q] - R[p]);
+  const own: boolean[] = new Array(C.length).fill(false);
+  let end = -Infinity;
+  for (const k of on) {
+    const hi = C[k] + R[k] / 2;
+    if (hi > end) own[k] = true;
+    end = Math.max(end, hi);
+  }
+  return own;
 }
 
 /** Per strand, world x: the height free above it on the column, up to the nearest strand above it still there; Infinity for the first of them. Not positive: it has no place of its own there. */
@@ -30,22 +49,19 @@ export function columnGaps({ C, R }: Rooms, there: (k: number) => boolean): Floa
 }
 
 /**
- * Each group's opening zoom, by world height of the gaps: `first(g)`, the strand its label stands over, -1 for a group with none on the column. A fork waits for its own gaps
- * and for its parent, so any zoom's cover is a cut of the tree: no ladder, and it can only split on the way in. A part with no gap on the column waits for nothing.
+ * Each group's opening zoom, from `room(g)`, the world height it has of its own on the column, gap or band, the more of the two: a fork waits for every part to have the text's px there
+ * and for its parent, so any zoom's cover is a cut of the tree: no ladder, and it can only split on the way in. A part with no room on the column waits for nothing.
  */
-export function gapOpens<G>(root: G, parts: (g: G) => readonly G[], first: (g: G) => number, gaps: Float64Array, px: number): Map<G, number> {
+export function gapOpens<G>(root: G, parts: (g: G) => readonly G[], room: (g: G) => number, px: number): Map<G, number> {
   const opens = new Map<G, number>();
   const stack: [G, number][] = [[root, 0]];
   while (stack.length) {
     const [g, up] = stack.pop()!;
     const ps = parts(g);
     let at = up;
-    let seen = false;
     for (const p of ps) {
-      const k = first(p);
-      if (k < 0) continue;
-      if (seen && gaps[k] > 0) at = Math.max(at, px / gaps[k]);
-      seen = true;
+      const r = room(p);
+      if (r > 0) at = Math.max(at, px / r);
     }
     opens.set(g, at);
     for (const p of ps) stack.push([p, at]);
@@ -69,22 +85,24 @@ export function gapCover<G>(root: G, parts: (g: G) => readonly G[], opens: Map<G
 export interface Member {
   /** A species (else a group). */
   species: boolean;
-  /** The top of the room of the strand its label stands over, its band's centre and height, and the gap above it, world x. */
+  /** Its band on the column, its centre and height, the top of the first strand there, and the gap above that, world x. */
   top: number;
   at: number;
   band: number;
   gap: number;
 }
 
-/** Each member's tier at zoom sx, the members in order down the column. d: a picture's room; px: a title's text; inPx: a species' name's. */
-export function tiers(list: readonly Member[], sx: number, d: number, px: number, inPx: number): Tier[] {
-  const up = (m: Member) => (m.species ? m.at * sx + d / 2 : m.top * sx);
-  const down = (m: Member) => (m.species ? m.at * sx - d / 2 : m.top * sx - px);
-  return list.map((m, i) => {
-    const fitsGap = m.gap * sx >= px;
-    if (!m.species) return fitsGap ? 'title' : null;
-    const c = m.at * sx;
-    const clear = (i === 0 || up(list[i - 1]) <= c - d / 2) && (i === list.length - 1 || down(list[i + 1]) >= c + d / 2);
-    return clear ? 'pic' : m.band * sx >= inPx ? 'in' : fitsGap ? 'title' : null;
-  });
+/**
+ * Where a member's name stands at zoom sx. px: a group's name's text; inPx: a species' in its band. A group's name in its gap, else in its band ("its name over its parts"); a species' in its own band
+ * ("the labels of the species are in the species"), else in the gap.
+ */
+export function tier(m: Member, sx: number, px: number, inPx: number): Tier {
+  const [band, gap] = [m.band * sx, m.gap * sx];
+  if (!m.species) return gap >= px ? 'title' : band >= px ? 'in' : null;
+  return band >= inPx ? 'in' : gap >= px ? 'title' : null;
+}
+
+/** Has it a picture at zoom sx: its band holds one (d, a picture's room). Inside its own band, so it stays clear of every neighbour's name and picture, and never stands in a gap. */
+export function picFits(m: Member, sx: number, d: number): boolean {
+  return m.band * sx >= d;
 }
