@@ -10,7 +10,7 @@ import { CARNIVORA, FELIDAE, mammaliaClade, type CladeRec } from './panthera';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, type Split } from './splits';
 import { PIC_D, PIC_ROOM, setLabelMode } from './pics';
 import { setGapMode } from './fold';
-import { FanView, groupCentre, type CutLabels } from './view';
+import { FanView, groupCentre, type CutLabels, type Level } from './view';
 
 function stubView(clade: CladeRec = CARNIVORA, tree: Split = CARNIVORA_TREE, folds = true): FanView {
   const noop = () => {};
@@ -51,6 +51,8 @@ function stubView(clade: CladeRec = CARNIVORA, tree: Split = CARNIVORA_TREE, fol
 /** A label's place and size (screen), and the screen x of the columns it stands on (its anchor: groupCentre; NaN, a "+x"). */
 type Spot = { x: number; y: number; w: number; h: number; c: number; run?: string };
 type Shot = Map<string, Spot> & { held?: boolean };
+/** Which group a label stands for: a species, or a clade by its strands. */
+const groupId = (lv: Level): string => (lv.b ? `b${lv.b.index}` : `v${lv.v!.strands[0].index}/${lv.v!.strands.length}`);
 /** A frame's labels: each name pill (by its item and text) and each picture (by what it opens), where and how big. */
 function shot(v: FanView, c: CutLabels): Shot {
   const m: Shot = new Map();
@@ -61,7 +63,10 @@ function shot(v: FanView, c: CutLabels): Shot {
     m.set(`name ${s.key} ${s.text}`, { x: s.x, y: s.box[3], w: s.box[2] - s.box[0], h: s.box[3] - s.box[1], c: g ? at(groupCentre(g)) : NaN });
   }
   // (A picture is its face species', whichever item of the cut it stands for.)
-  for (const p of c.pics) m.set(`pic ${p.face.sp.sci}`, { x: p.x, y: p.y, w: PIC_D, h: PIC_D, c: at(groupCentre({ b: p.face })), run: p.run?.join() });
+  // (Under group labels the item is the group it stands for, ToLaD#440: a group's face is often its largest part's too, so
+  // as the group splits the same picture goes on, for another group, at that group's place: Felis catus for 36 cats, then
+  // for 8. Zooming changes the levels; judge() holds one group to the world.)
+  for (const p of c.pics) m.set(`pic ${p.face.sp.sci}`, { x: p.x, y: p.y, w: PIC_D, h: PIC_D, c: at(groupCentre({ b: p.face })), run: p.run?.join() ?? groupId(p.lv) });
   return m;
 }
 type Step = (v: FanView) => void;
@@ -168,8 +173,8 @@ describe('steady labels while the view moves (ToLaD#333)', () => {
     setGapMode('clades');
   });
   // (Real, open, ToLaD#446: under group labels a neighbour giving way at the edge (ToLaD#440) moves a label by more than the
-  // world, and a label comes and goes inside the edge's margin. `it.fails` turns red when it is fixed.)
-  const open = (name: string, what: 'pan' | 'across' | 'flight') => (what === 'across' || (name === 'mammals') ? it.fails : it);
+  // world, Shrews & kin 22.7 px in an 8 px pan at the mammals, and a label comes and goes inside the edge's margin. `it.fails` turns red when it is fixed.)
+  const open = (name: string, what: 'pan' | 'across' | 'flight') => (what === 'across' || (what === 'pan' && name === 'mammals') ? it.fails : it);
   for (const [name, mk, to] of FANS) {
     it(`${name}: a pinch in, one way: sizes kept, no jumps, none back once gone`, { timeout: 300_000 }, async () => {
       const v = await mk();

@@ -601,8 +601,6 @@ describe('a double tap reverses the last tap on every route, and with none goes 
 });
 
 describe('a double tap is the reverse of a single tap (ToLaD#376)', () => {
-  // (Real, open, ToLaD#446: a label still naming a group wider than the view flies out to it, tapInto's "out to it", so the taps down
-  // are not all down and a double tap passes those steps. `it.fails` turns red when it is fixed.)
   type Frame = { cam: Camera; lv: Level };
   const frameNow = (v: FanView): Frame => ({ cam: { ...v.cam }, lv: v.levelNow(true) });
   /** The label of the most species on screen, its run: the route that stays longest above the species. */
@@ -618,9 +616,11 @@ describe('a double tap is the reverse of a single tap (ToLaD#376)', () => {
       const s = widest(v);
       expect(s, `a label to tap after ${k} taps`).toBeTruthy();
       frames.push(frameNow(v));
+      const was = v.cam.sx;
       tapSpot(v, s!.box);
       expect(!!P(v).anim, `tap ${k + 1} flew`).toBe(true);
       run(v);
+      expect(v.cam.sx, `tap ${k + 1} went deeper`).toBeGreaterThan(was);
     }
   };
   const pan = (v: FanView, dx: number) => {
@@ -644,7 +644,7 @@ describe('a double tap is the reverse of a single tap (ToLaD#376)', () => {
     ['cats', () => stubView(FELIDAE, FELIDAE_TREE, false)],
   ];
   for (const [name, mk] of ROUTES) {
-    it.fails(`${name}: four taps down through labels, four double taps back, frame by frame, home at last`, () => {
+    it(`${name}: four taps down through labels, four double taps back, frame by frame, home at last`, () => {
       const v = mk();
       home(v);
       const frames: Frame[] = [];
@@ -658,7 +658,7 @@ describe('a double tap is the reverse of a single tap (ToLaD#376)', () => {
       expect(!!P(v).anim).toBe(false);
     });
 
-    it.fails(`${name}: a sideways pan in the middle, and one before the first double tap, leave the steps`, () => {
+    it(`${name}: a sideways pan in the middle, and one before the first double tap, leave the steps`, () => {
       const v = mk();
       home(v);
       const frames: Frame[] = [];
@@ -672,7 +672,7 @@ describe('a double tap is the reverse of a single tap (ToLaD#376)', () => {
       expect(atHome(v)).toBe(true);
     });
 
-    it.fails(`${name}: a frame flown back to is as it was: the same label tapped again goes where it went`, () => {
+    it(`${name}: a frame flown back to is as it was: the same label tapped again goes where it went`, () => {
       const v = mk();
       home(v);
       const frames: Frame[] = [];
@@ -685,7 +685,7 @@ describe('a double tap is the reverse of a single tap (ToLaD#376)', () => {
       v.doubleTap(-1e4, -1e4);
       run(v);
       settle(v);
-      const again = v.cutLast!.spots.find((q) => q.run && q.run[0] === s.run![0] && q.run[1] === s.run![1]);
+      const again = v.cutLast!.spots.find((q) => q.key === s.key);
       expect(again).toBeTruthy();
       tapSpot(v, again!.box);
       run(v);
@@ -695,7 +695,7 @@ describe('a double tap is the reverse of a single tap (ToLaD#376)', () => {
       expect(bad).toEqual([]);
     });
 
-    it.fails(`${name}: mid-flight, each double tap goes on from where its flight lands; with its first tap run, that tap and one step more`, () => {
+    it(`${name}: mid-flight, each double tap goes on from where its flight lands; with its first tap run, that tap and one step more`, () => {
       const v = mk();
       home(v);
       const frames: Frame[] = [];
@@ -791,8 +791,7 @@ describe('a double tap is the reverse of a single tap (ToLaD#376)', () => {
 });
 
 describe('a tap landing on a species opens its card; a search pick too (ToLaD#266)', () => {
-  // (Open, ToLaD#446: no species' label at that level under group labels; this route is not rewritten yet.)
-  it.fails('the cats: a search pick, then a species picture or name tapped at its level', () => {
+  it('the cats: a search pick, then a species picture or name tapped at its level', () => {
     const v = stubView(FELIDAE, FELIDAE_TREE, false);
     let card: string | null = null;
     v.onSelect = (s) => void (card = s ? s.sp.common : null);
