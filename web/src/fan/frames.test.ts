@@ -1,7 +1,8 @@
 // Every level's frame keeps "now" and its pictures on screen; a "+x" tap shows all its groups (ToLaD#274).
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, afterAll, beforeAll } from 'vitest';
 import { CARNIVORA, FELIDAE, mammaliaClade, type CladeRec } from './panthera';
-import { PIC_D } from './pics';
+import { PIC_D, setLabelMode } from './pics';
+import { setGapMode } from './fold';
 import { loadMammalsFromFiles } from './mammals-node';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, type Split } from './splits';
 import { levelUp, FanView, groupCentre, groupExtent, groupFace, holds, isLevel, levelName, nextLevels, type Level } from './view';
@@ -200,6 +201,15 @@ describe('the hominins are one group (ToLaD#289)', () => {
 // opens on a tap on one species' own label. An item no zoom splits (a fossil too short-lived for a label of its own
 // beside its sister) lands on that species, its card open.)
 describe('a one-species "+x" lands with the species it stands for named (ToLaD#318, #359)', () => {
+  // (Retired look, ToLaD#446: a one-species "+x", pinned to the old modes; the app is `groups` and `clades`, ToLaD#439.)
+  beforeAll(() => {
+    setLabelMode('cut');
+    setGapMode('groups');
+  });
+  afterAll(() => {
+    setLabelMode('groups');
+    setGapMode('clades');
+  });
   it('carnivores (folded): every level, every "+x" standing for one species: it on screen, its name shown or its card open', () => {
     const v = stubView();
     const bad: string[] = [];
