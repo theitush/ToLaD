@@ -15,7 +15,7 @@ import { population } from './population';
 import { WorldToggle } from './WorldToggle';
 import { forkNames, setForkNames } from './brackets';
 import { GAP_MODES, gapMode, setGapMode, type GapMode } from './fold';
-import { FORK_MODES, forkMode, setForkMode, type ForkMode } from './steady';
+import { FORK_MODES, forkMode, grayOn, setForkMode, setGrayOn, type ForkMode } from './steady';
 import { MagnifierIcon, SearchPanel } from './SearchPanel';
 import { statusOf } from './status';
 import { cardTapper, onControl } from './cardtap';
@@ -64,6 +64,16 @@ function initialForks(): ForkMode {
   return forkMode();
 }
 
+/** Whether what has no living descendants is drawn (ToLaD#410, `?gray=off`): a look only, no new view. */
+function initialGray(): boolean {
+  try {
+    if (new URLSearchParams(window.location.search).get('gray') === 'off') setGrayOn(false);
+  } catch {
+    /* no address */
+  }
+  return grayOn();
+}
+
 /** How the neighbouring branches are spaced (ToLaD#378, `?gaps=`): set before the first view is built. */
 function initialGaps(): GapMode {
   try {
@@ -95,6 +105,7 @@ export function FanApp() {
   const [forks, setForks] = useState(initialForkNames);
   const [gaps, setGaps] = useState<GapMode>(initialGaps);
   const [forkLook, setForkLook] = useState<ForkMode>(initialForks);
+  const [gray, setGray] = useState(initialGray);
   // What the widths count (ToLaD#276): individuals, or their mass (`?width=mass`).
   const [measure, setMeasure] = useState<Measure>(initialMeasure);
   const [sel, setSel] = useState<Selection | null>(null);
@@ -248,6 +259,27 @@ export function FanApp() {
         >
           {`forks: ${forkLook}`}
         </button>
+        {/* ToLaD#410: the lines that ended, drawn or not: a look only, what is left stands where it stood. */}
+        <button
+          type="button"
+          title="Gray: the lines with no living descendants, drawn or not"
+          aria-pressed={gray}
+          onClick={() => {
+            setGrayOn(!gray);
+            setGray(!gray);
+            viewRef.current?.request();
+            try {
+              const u = new URL(window.location.href);
+              if (gray) u.searchParams.set('gray', 'off');
+              else u.searchParams.delete('gray');
+              window.history.replaceState(null, '', u);
+            } catch {
+              /* not in the address */
+            }
+          }}
+        >
+          {`gray: ${gray ? 'on' : 'off'}`}
+        </button>
         {/* Home for this level, and the level stepper joined to it (ToLaD#247): one pill, so the bar stays one row. */}
         <span className="pair">
           <button type="button" onClick={() => viewRef.current?.resetView()}>
@@ -320,9 +352,11 @@ export function FanApp() {
           <li>
             <span className="lane lineage" /> living descendants
           </li>
-          <li>
-            <span className="lane dead" /> line ended
-          </li>
+          {gray && (
+            <li>
+              <span className="lane dead" /> line ended
+            </li>
+          )}
         </ul>
       )}
       </div>
