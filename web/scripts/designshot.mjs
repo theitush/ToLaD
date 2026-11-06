@@ -302,6 +302,11 @@ const scenes = [
   ['pstub-murinae', 'level', ['Murinae']],
   ['pstub-chodsigoa', 'level', ['Chodsigoa']],
   ['pstub-cheirogaleus', 'level', ['Cheirogaleus']],
+  // ToLaD#434 (Q=forknames=leaders): the fork names at the orders' levels.
+  ['lv-rodentia', 'level', ['Rodentia']],
+  ['lv-chiroptera', 'level', ['Chiroptera']],
+  ['lv-primates', 'level', ['Primates']],
+  ['lv-carnivora', 'level', ['Carnivora']],
 ];
 const browser = await chromium.launch({ headless: true });
 let served = null;
