@@ -203,9 +203,11 @@ class Built(unittest.TestCase):
         off = {k.split(" ", 1)[1] for k in st["not_one_clade"]}
         self.assertFalse([k for k in st["not_one_clade"] if k.startswith("order ")])
         self.assertEqual(off - set(self.KNOWN_NOT_ONE_CLADE), set(), "a new MDD family not one clade")
-        # a split named for an MDD family holds another's species only where Upham's tree already has it so
+        # a split named for an MDD family holds another's species only where Upham's tree already has it so, and the
+        # decoration forgave it as strays (taxnames.F_MIN, ToLaD#417): Zenkerella, the musk deer, 2 of Pontoporia and
+        # Lipotes among the river dolphins, Cistugo and Eudiscoderma among the vesper bats
         self.assertEqual(set(st["named_off"]),
-                         {"family Anomaluridae", "family Bathyergidae", "family Bovidae", "family Tenrecidae"})
+                         {"family Anomaluridae", "family Bovidae", "family Iniidae", "family Vespertilionidae"})
 
 
 if __name__ == "__main__":
