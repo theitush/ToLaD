@@ -2,21 +2,21 @@
 
 Checked 2026-11-06. **have** = in the pipeline. **get** = open licence, can fetch. **lic!** = exists, licence blocks or is unclear. **none** = none found. **n/c** = not checked today.
 
-| Need | Mammals | Amniotes (added on top) | All life | OneZoom (from `ozdeep`) |
+| Need | Mammals | Amniotes (added on top) | All life | OneZoom ([measured](onezoom.md)) |
 |---|---|---|---|---|
-| Tree shape | **have** Open Tree 16.1 + Upham; **get** PHYLACINE (all 21 bat families) | **get** birds AvesData 1.7 (11,167 tips, CC BY); reptiles Tonini 2016 / Title 2024 (CC0) | **get** Open Tree 16.1 (CC0); GTDB r232 **lic!** (share-alike) | |
-| Dates | **have** Álvarez-Carretero + Upham ensemble; nothing newer found | **get** AvesData dated MCC; Tonini, Title | weak: mostly interpolated. Fish **get**, plants **lic!** | |
-| Current species list | **have** MDD v2.5 (6,904) | **get** Clements via AvesData; AviList **lic!** (licence not found); Reptile Database **lic!** (no licence found) | **get** COL 26.10 (CC BY) | |
-| Extinct species + ages | **have** PBDB (17,269 species names) | **get** PBDB (Amniota 30,207) | **get** PBDB (Metazoa 192,262), COL (170,758 extinct) | |
-| Where fossils attach | taxonomy graft only; **none** published Mammalia-wide | **get?** Hellert 2023 synapsids (file n/c); dinosaurs n/c; else taxonomy graft | taxonomy graft only | |
-| Group names | **have** MDD ranks, Open Tree Taxonomy | **get** AvesData/Clements; Reptile Database **lic!** | **get** COL, Open Tree Taxonomy | |
-| Common names | **have** MDD, Wikidata | **get** Wikidata; Clements n/c | **get** Wikidata (CC0) | |
-| Ranges now | **have** PHYLACINE rasters; **get** MDD-taxonomy maps (v1.3) | **get** reptiles GARD 1.7 (CC0); birds BirdLife **lic!** | patchy, n/c | |
-| Ranges past | **have** PHYLACINE present-natural (one past state) | n/c | n/c | |
-| Population now | **have** Greenspoon, COMBINE, PanTHERIA, Red List | **get** birds Callaghan 2021 (CC BY); reptiles **none** | group totals only ([02](02-population-estimates.md)) | |
-| Population through time | **have** partly (hand curves, Bergman PSMC) | n/c | n/c | |
-| Mass / traits | **have** PHYLACINE, COMBINE | n/c (AVONET, reptile sets) | n/c | |
-| Pictures | **have** Wikidata | **get** Wikidata | **get** Wikidata | |
+| Tree shape | **have** Open Tree 16.1 + Upham; **get** PHYLACINE (all 21 bat families) | **get** birds AvesData 1.7 (11,167 tips, CC BY); reptiles Tonini 2016 / Title 2024 (CC0) | **get** Open Tree 16.1 (CC0); GTDB r232 **lic!** (share-alike) | Same Open Tree 16.1; 53% of mammal forks and 89% of all forks made by rule |
+| Dates | **have** Álvarez-Carretero + Upham ensemble; nothing newer found | **get** AvesData dated MCC; Tonini, Title | weak: mostly interpolated. Fish **get**, plants **lic!** | 6/15, ×1.22 on mammals; a date source on 33% of mammal forks, 3.4% of all nodes. The only fully dated open tree of all life |
+| Current species list | **have** MDD v2.5 (6,904) | **get** Clements via AvesData; AviList **lic!** (licence not found); Reptile Database **lic!** (no licence found) | **get** COL 26.10 (CC BY) | 5,598 of MDD's 6,904; birds 10,857 of 11,167; reptiles 9,779 of 12,687 by exact name |
+| Extinct species + ages | **have** PBDB (17,269 species names) | **get** PBDB (Amniota 30,207) | **get** PBDB (Metazoa 192,262), COL (170,758 extinct) | None |
+| Where fossils attach | taxonomy graft only; **none** published Mammalia-wide | **get?** Hellert 2023 synapsids (file n/c); dinosaurs n/c; else taxonomy graft | taxonomy graft only | None |
+| Group names | **have** MDD ranks, Open Tree Taxonomy | **get** AvesData/Clements; Reptile Database **lic!** | **get** COL, Open Tree Taxonomy | 940 mammal forks named; 10 of 21 bat families |
+| Common names | **have** MDD, Wikidata | **get** Wikidata; Clements n/c | **get** Wikidata (CC0) | Database dump on request only |
+| Ranges now | **have** PHYLACINE rasters; **get** MDD-taxonomy maps (v1.3) | **get** reptiles GARD 1.7 (CC0); birds BirdLife **lic!** | patchy, n/c | None |
+| Ranges past | **have** PHYLACINE present-natural (one past state) | n/c | n/c | None |
+| Population now | **have** Greenspoon, COMBINE, PanTHERIA, Red List | **get** birds Callaghan 2021 (CC BY); reptiles **none** | group totals only ([02](02-population-estimates.md)) | None |
+| Population through time | **have** partly (hand curves, Bergman PSMC) | n/c | n/c | None |
+| Mass / traits | **have** PHYLACINE, COMBINE | n/c (AVONET, reptile sets) | n/c | None |
+| Pictures | **have** Wikidata | **get** Wikidata | **get** Wikidata | Harvested from EoL, licensed per image; on request |
 
 ## What this says
 
