@@ -185,12 +185,14 @@ describe('a look switch keeps the view where it is (ToLaD#412)', () => {
               expect(B.cam.sy / c0.sy, at).toBeCloseTo(1, 8);
               expect(Math.abs(B.cam.cy - c0.cy) * c0.sy, at).toBeLessThan(0.5);
               expect(lvName(B.levelNow(true)), at).toBe(lvName(lvA));
-              // The double tap: where it goes in the view that stood there.
-              B.doubleTap(-1e4, -1e4);
-              run(B);
-              A.doubleTap(-1e4, -1e4);
-              run(A);
-              expect(lvName(B.levelNow(true)), at).toBe(lvName(A.levelNow(true)));
+              // The double tap zooms out in either look (ToLaD#416): never tighter on width. Which level that lands on can
+              // differ, each look's frames being its own (dblout.test holds the rule itself).
+              for (const v of [B, A]) {
+                const c = { ...v.cam };
+                v.doubleTap(-1e4, -1e4);
+                run(v);
+                expect(v.w * (v.cam.sx / c.sx - 1), at).toBeLessThanOrEqual(12);
+              }
             }
           }
         }
