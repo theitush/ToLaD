@@ -75,12 +75,14 @@ export class GapNames {
     const stack: FanNode[] = [fan.root];
     while (stack.length) {
       const v = stack.pop()!;
-      this.heads[v.strands[0].index].push(v);
+      // (A title says a clade's name: an unnamed fork has none, and one repeating its parent's says nothing new.)
+      const text = this.cladeName(v);
+      if (text && !(v.parent && text === this.cladeName(v.parent))) this.heads[v.strands[0].index].push(v);
       for (const c of v.kids) if (isNode(c)) stack.push(c);
     }
   }
 
-  /** The titles in the gap above strand k, outermost first: every clade whose first strand it is. The first strand's gap is the space over the tree, so its stack starts at the root. */
+  /** The titles in the gap above strand k, outermost first: every named clade whose first strand it is. The first strand's gap is the space over the tree, so its stack starts at the root. */
   headsOf(k: number): FanNode[] {
     return this.heads[k];
   }

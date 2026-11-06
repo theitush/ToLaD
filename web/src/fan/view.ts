@@ -2606,7 +2606,7 @@ export class FanView implements InputHandlers {
       this.ctx.font = font(spec);
       return this.ctx.measureText(text).width;
     };
-    const g = new GapNames(this.fan, f, (v) => (v.parent ? groupName(this.fan, v) : this.fan.clade.common), (b) => levelText(b) || b.sp.sci, measure);
+    const g = new GapNames(this.fan, f, (v) => (v.parent ? (latinOf(v.split) ? groupName(this.fan, v) : '') : this.fan.clade.common), (b) => levelText(b) || b.sp.sci, measure);
     this.gapN = { fan: this.fan, fold: f, g };
     return g;
   }

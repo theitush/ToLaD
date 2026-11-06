@@ -7,6 +7,7 @@ import { loadMammalsFromFiles } from './mammals-node';
 import { mammaliaClade } from './panthera';
 import { mammaliaTree } from './splits';
 import type { Steady } from './steady';
+import { latinOf } from './brackets';
 import { FanView, groupName, levelText } from './view';
 
 function stubView(): FanView {
@@ -90,6 +91,19 @@ describe('names on the gaps and in the branches', () => {
       n++;
     }
     expect(n).toBeGreaterThan(0);
+  });
+
+  it('titles named clades only, none repeating its parent', () => {
+    const named = new GapNames(v.fan, f, (u) => (u.parent ? (latinOf(u.split) ? groupName(v.fan, u) : '') : 'root'), () => '', () => 10);
+    let n = 0;
+    for (let i = 0; i < f.strands.length; i++)
+      for (const u of named.headsOf(i)) {
+        n++;
+        expect(!u.parent || !!latinOf(u.split)).toBe(true);
+      }
+    expect(n).toBeGreaterThan(0);
+    const blank = new GapNames(v.fan, f, () => '', () => '', () => 10);
+    expect(f.strands.every((_, i) => blank.headsOf(i).length === 0)).toBe(true);
   });
 
   it('writes a gap taller than the text, and not one shorter', () => {
