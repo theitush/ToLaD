@@ -1,9 +1,9 @@
-// The tree on its side (ToLaD#452, `?flip=1`): on a phone held upright the branches stack down the tall side and time
+// The tree on its side (ToLaD#452; the page since ToLaD#455, `?flip=0` the old one): on a phone held upright the branches stack down the tall side and time
 // runs across, "now" on the right. The view keeps its own coordinates, a screen whose `w` is the phone's height and `h`
 // its width; only its canvases are turned, a quarter turn clockwise (today's top goes right, today's left goes top), and
 // the input turned back, so the camera, the cover, the frames and the tap rules do not know.
 
-let flipNow = typeof location !== 'undefined' && new URLSearchParams(location.search).get('flip') === '1';
+let flipNow = typeof location !== 'undefined' && new URLSearchParams(location.search).get('flip') !== '0';
 export const flipOn = (): boolean => flipNow;
 /** (Tests.) */
 export function setFlip(on: boolean): void {
