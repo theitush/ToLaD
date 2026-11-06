@@ -36,7 +36,7 @@ const state = () =>
       spp: [...v.gapLast.filter((m) => m.v === undefined).map((m) => m.text), ...c.names.filter((s) => !s.v).map((s) => s.text)],
     };
   });
-const show = (name, s) => console.log(`${name}: ${s.n} labels [${s.names.join(', ')}] picY ${s.picY} 100kya@${s.ka100} now@${s.now} view ${s.w}x${s.h} sx ${s.cam.sx.toPrecision(4)} sy ${s.cam.sy.toPrecision(4)} chain: ${s.chain}`);
+const show = (name, s) => console.log(`${name}: ${s.titles.length} titles ${s.spp.length} names [${s.titles.join(' | ')}] ${s.n} labels [${s.names.join(', ')}] picY ${s.picY} 100kya@${s.ka100} now@${s.now} view ${s.w}x${s.h} sx ${s.cam.sx.toPrecision(4)} sy ${s.cam.sy.toPrecision(4)} chain: ${s.chain}`);
 await settle();
 show('home', await state());
 await page.screenshot({ path: `${OUT}/home.png` });
