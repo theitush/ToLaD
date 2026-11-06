@@ -10,6 +10,13 @@ export function setFlip(on: boolean): void {
   flipNow = on;
 }
 
+let gapNamesNow = true;
+/** The clades' names on the gaps above them and the species' in their branches (ToLaD#455, the fork-name chip's first step): only ever on the tree on its side. */
+export const gapNamesOn = (): boolean => flipNow && gapNamesNow;
+export function setGapNames(on: boolean): void {
+  gapNamesNow = on;
+}
+
 /** Room kept under the buttons for the chain of groups (the next task, `chain`): one row of text. */
 export const CHAIN_ROOM = 30;
 /**

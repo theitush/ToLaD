@@ -31,6 +31,8 @@ const state = () =>
       now: Math.round(v.toScreen(0, v.yNow)[1]),
       cam: v.cam,
       chain: document.querySelector('.chain')?.textContent ?? '',
+      titles: v.gapLast.filter((m) => m.v).map((m) => m.text),
+      spp: v.gapLast.filter((m) => m.v === undefined).map((m) => m.text),
     };
   });
 const show = (name, s) => console.log(`${name}: ${s.n} labels [${s.names.join(', ')}] picY ${s.picY} 100kya@${s.ka100} now@${s.now} view ${s.w}x${s.h} sx ${s.cam.sx.toPrecision(4)} sy ${s.cam.sy.toPrecision(4)} chain: ${s.chain}`);
@@ -43,6 +45,97 @@ for (const name of CLADES) {
   await settle();
   show(name, await state());
   await page.screenshot({ path: `${OUT}/${name.toLowerCase()}.png` });
+}
+// The names on the gaps and in the branches (ToLaD#455): how many of each and how many titles are "& kin", at the last clade pinched in, and the labels' ms on the way there from home.
+const names = (s) => `${s.titles.length} titles (${s.titles.filter((t) => t.endsWith('& kin')).length} & kin) [${s.titles.slice(0, 14).join(' | ')}]; ${s.spp.length} species [${s.spp.slice(0, 8).join(', ')}]`;
+{
+  const last = CLADES[CLADES.length - 1];
+  console.log(`${last}: ${names(await state())}`);
+  await page.evaluate(() => {
+    // Pinched in until its fifth widest species on screen is 18 px tall, centred there: the wide ones (a domestic cat) off the screen.
+    const v = window.__fan;
+    const { C, R } = v.fan.tess.fold.rooms();
+    const on = [];
+    for (let k = 0; k < C.length; k++) {
+      const x = v.toScreen(C[k], 0)[0];
+      if (x >= 0 && x <= v.w) on.push(k);
+    }
+    on.sort((p, q) => R[q] - R[p]);
+    const k = on[Math.min(4, on.length - 1)];
+    v.cam = { ...v.cam, sx: 18 / R[k], cx: C[k] };
+    v.request();
+  });
+  await settle();
+  console.log(`${last} pinched in: ${names(await state())}`);
+  await page.screenshot({ path: `${OUT}/${last.toLowerCase()}-in.png` });
+  await page.evaluate(() => window.__fan.resetView());
+  await settle();
+  console.log(`home: ${names(await state())}`);
+  console.log(
+    'stacks:',
+    await page.evaluate(() => {
+      const v = window.__fan;
+      const g = v.gapNames();
+      const name = (u) => g.cladeName(u);
+      let lines = 0;
+      let kin = 0;
+      let repeats = 0;
+      let deepest = 0;
+      let kinOnly = 0;
+      const n = v.fan.tess.fold.strands.length;
+      for (let k = 0; k < n; k++) {
+        const list = g.headsOf(k).map(name);
+        lines += list.length;
+        deepest = Math.max(deepest, list.length);
+        if (list.length > 1 && list.every((t) => t.endsWith('& kin'))) kinOnly++;
+        list.forEach((t, i) => {
+          if (t.endsWith('& kin')) kin++;
+          if (i && t === list[i - 1]) repeats++;
+        });
+      }
+      return { lines, kin, repeats, deepest, kinOnly };
+    }),
+  );
+  const sweep = await page.evaluate(async () => {
+    const v = window.__fan;
+    const cam = v.cam;
+    const med = (a) => [...a].sort((p, q) => p - q)[a.length >> 1];
+    const frame = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const out = [];
+    for (const k of [1, 3, 10, 30, 100, 300]) {
+      v.labelMs.length = 0;
+      v.labelAllMs.length = 0;
+      for (let i = 0; i < 8; i++) {
+        v.cam = { ...cam, sx: cam.sx * k, cx: cam.cx + (i - 4) * (20 / (cam.sx * k)) };
+        v.request();
+        await frame();
+      }
+      out.push(`x${k}: labels ${med(v.labelMs).toFixed(2)} all ${med(v.labelAllMs).toFixed(2)} ms, ${v.gapLast.length} names`);
+    }
+    v.cam = cam;
+    v.request();
+    return out;
+  });
+  console.log(`zoom sweep:\n  ${sweep.join('\n  ')}`);
+  console.log(`chip: ${await page.evaluate(() => [...document.querySelectorAll('button')].map((b) => b.textContent).find((t) => t.startsWith('fork names')))}`);
+  // A tap on a title: where its fork name went.
+  await page.evaluate(() => window.__fan.goToClade('Primates'));
+  await settle();
+  const title = await page.evaluate(() => {
+    const v = window.__fan;
+    const m = v.gapLast.find((n) => n.text === 'Great apes');
+    if (!m) return null;
+    const r = v.canvas.getBoundingClientRect();
+    return { x: r.left + r.width - (m.box[1] + m.box[3]) / 2, y: r.top + (m.box[0] + m.box[2]) / 2, text: m.text };
+  });
+  if (title) {
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: title.x, y: title.y, id: 0 }] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await page.waitForTimeout(3500);
+    console.log(`tap on the title ${title.text} at phone (${title.x.toFixed(0)},${title.y.toFixed(0)}): chain ${(await state()).chain}`);
+    await page.screenshot({ path: `${OUT}/after-title-tap.png` });
+  }
 }
 // The chain at every level clade, on the page's type: the longest, how many lost outer names, any whose innermost name alone overflows.
 console.log(

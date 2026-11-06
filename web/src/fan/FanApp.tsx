@@ -19,7 +19,7 @@ import { MagnifierIcon, SearchPanel } from './SearchPanel';
 import { SourcesPanel } from './SourcesPanel';
 import { statusOf, wildPartSentence } from './status';
 import { cardTapper, onControl } from './cardtap';
-import { flipOn } from './flip';
+import { flipOn, gapNamesOn, setGapNames } from './flip';
 import { FanView, initialMeasure, levelName, type Lineage, type Place, type Selection } from './view';
 
 declare global {
@@ -57,12 +57,13 @@ function initialForks(): ForkMode {
   return forkMode();
 }
 
-/** The upper clades' names (ToLaD#373, #434): at their forks, on leaders off them (`?forknames=leaders`), or the stack over "now" (`?forknames=off`). */
-type ForkNaming = 'at fork' | 'leaders' | 'off';
-const FORK_NAMINGS: ForkNaming[] = ['at fork', 'leaders', 'off'];
+/** The upper clades' names (ToLaD#373, #434, #455): on the tree on its side, on the gaps above them, first; at their forks (there `?forknames=fork`), on leaders off them (`?forknames=leaders`), or the stack over "now" (`?forknames=off`). */
+type ForkNaming = 'on gaps' | 'at fork' | 'leaders' | 'off';
+const FORK_NAMINGS: ForkNaming[] = flipOn() ? ['on gaps', 'at fork', 'leaders', 'off'] : ['at fork', 'leaders', 'off'];
 const forkNaming = (m: ForkNaming) => {
   setForkNames(m !== 'off');
   setForkLeaders(m === 'leaders');
+  setGapNames(m === 'on gaps');
 };
 /** Set before the first view is built. */
 function initialForkNames(): ForkNaming {
@@ -70,10 +71,11 @@ function initialForkNames(): ForkNaming {
     const q = new URLSearchParams(window.location.search).get('forknames');
     if (q === 'off') forkNaming('off');
     if (q === 'leaders') forkNaming('leaders');
+    if (q === 'fork') forkNaming('at fork');
   } catch {
     /* no address */
   }
-  return !forkNames() ? 'off' : forkLeaders() ? 'leaders' : 'at fork';
+  return gapNamesOn() && forkNames() && !forkLeaders() ? 'on gaps' : !forkNames() ? 'off' : forkLeaders() ? 'leaders' : 'at fork';
 }
 
 export function FanApp() {
@@ -169,7 +171,7 @@ export function FanApp() {
         {/* ToLaD#373, #434: the upper clades named at their forks, on leaders off them, or in the stack over "now". */}
         <button
           type="button"
-          title="Upper clades' names: at their forks, on leaders off them, or off (the stack over now)"
+          title="Upper clades' names: on the gaps above them (the tree on its side), at their forks, on leaders off them, or off (the stack over now)"
           onClick={() => {
             const next = FORK_NAMINGS[(FORK_NAMINGS.indexOf(forks) + 1) % FORK_NAMINGS.length];
             placeRef.current = viewRef.current?.place() ?? null;
@@ -178,8 +180,8 @@ export function FanApp() {
             setForks(next);
             try {
               const u = new URL(window.location.href);
-              if (next === 'at fork') u.searchParams.delete('forknames');
-              else u.searchParams.set('forknames', next);
+              if (next === FORK_NAMINGS[0]) u.searchParams.delete('forknames');
+              else u.searchParams.set('forknames', next === 'at fork' ? 'fork' : next);
               window.history.replaceState(null, '', u);
             } catch {
               /* not in the address */
