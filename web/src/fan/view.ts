@@ -6,7 +6,7 @@
 
 import { drawPic, hasPic, livePic, PIC_TRIES, prefetchPics } from './wiki';
 import { GROUP_D, LABEL_AXIS_X, labelMode, PIC_D, PIC_LIFT, PIC_ROOM, picBox, type PicSpot } from './pics';
-import { fits, placeSlots, type Slot } from './slide';
+import { coverOf, keepOnScreen, placeSlots } from './slide';
 import { formatCount, formatMass } from '../data/count';
 import { stamp } from '../stamp';
 import { DOUBLE_TAP_MS, Input, type InputHandlers } from '../engine/input';
@@ -310,41 +310,6 @@ class CutTerritories {
     const mid = (s: FanBranch) => leftAt(s, wy) + laneAt(s, wy).w / 2;
     return [mid(S[a]), mid(S[b]), leftAt(S[a], wy), leftAt(S[b], wy) + laneAt(S[b], wy).w];
   }
-  /** The strands living now, the rest, drawn order (ToLaD#440). */
-  private byNow: { living: number[]; fossil: number[] } | null = null;
-  /**
-   * The strands whose tips stand in world x [x0, x1] (ToLaD#440): `run`, the first and last of the living, whose tips stand
-   * in drawn order on "now" (a binary search), and `fossils`, those of the rest; a fossil's tip, on an older row, can
-   * stand out of that order, as a hominin's past the edge the living primates have gone off. Null if none.
-   */
-  tipsIn(x0: number, x1: number): { run: [number, number] | null; fossils: number[] } | null {
-    const S = this.t.strands;
-    if (!this.byNow) {
-      this.byNow = { living: [], fossil: [] };
-      S.forEach((s, i) => (s.tipY <= this.now ? this.byNow!.living : this.byNow!.fossil).push(i));
-    }
-    const { living, fossil } = this.byNow;
-    const mid = (i: number) => {
-      const y = Math.max(S[i].tipY, this.now);
-      return leftAt(S[i], y) + laneAt(S[i], y).w / 2;
-    };
-    let [a, b] = [0, living.length];
-    while (a < b) {
-      const m = (a + b) >> 1;
-      if (mid(living[m]) < x0) a = m + 1;
-      else b = m;
-    }
-    const f = a;
-    b = living.length;
-    while (a < b) {
-      const m = (a + b) >> 1;
-      if (mid(living[m]) <= x1) a = m + 1;
-      else b = m;
-    }
-    const run: [number, number] | null = a > f ? [living[f], living[a - 1]] : null;
-    const fossils = fossil.filter((i) => mid(i) >= x0 && mid(i) <= x1);
-    return run || fossils.length ? { run, fossils } : null;
-  }
   /** The smallest clade with all of strands f..l. */
   meet(f: number, l: number): FanNode {
     const { first, last, index, strands } = this.t;
@@ -635,6 +600,16 @@ export function commonest(v: FanNode): FanBranch | null {
  * isLevel), or a single species.
  */
 export type Level = { v: FanNode; b?: undefined } | { b: FanBranch; v?: undefined };
+/** A group of the cover (ToLaD#440): its level, node index, strands, its youngest row and the branch's world x there. */
+export interface CoverGroup {
+  lv: Level;
+  k: number;
+  f: number;
+  l: number;
+  wy: number;
+  a: number;
+  b: number;
+}
 /** A cut item's strands (drawn order): first and last. */
 export type Run = [number, number];
 
@@ -723,13 +698,6 @@ export function labelParts(v: FanNode): Level[] {
   };
   go(v);
   return out;
-}
-
-/** The smallest named group holding clade v, from v itself (ToLaD#440): the root at the last. */
-export function namedUp(v: FanNode): FanNode {
-  let u = v;
-  while (u.parent && !rankOf(latinOf(u.split))) u = u.parent;
-  return u;
 }
 
 /** The nearest level clade v sits in, from v itself (`self`) or its parent up (ToLaD#258); null past the root. */
@@ -2522,23 +2490,50 @@ export class FanView implements InputHandlers {
   }
 
   /** The level the group labels are of this frame (ToLaD#417; tests read it): what holds all the strands on screen. */
-  groupsOf: FanNode | null = null;
-  private readonly nextCache = new Map<FanNode, { lv: Level; k: number; f: number; l: number }[]>();
 
   /**
-   * This frame's labels under `?labels=groups` (ToLaD#417, #440): a cover. Every strand on screen (its tip right of the
-   * axis, whose strip belongs to the axis; none there, in the strip) falls under exactly one label, the groups chosen
-   * top down through the named tree, the names above the orders too (labelParts). The list starts as the smallest group
-   * holding the screen. Most individuals first, a group is replaced by its parts with a strand on screen if every label
-   * on the list then still has a place on its own branch, GROUP_D from the next (slide.ts fits). If not, it stays and the
-   * next is tried; more labels and narrower windows never make room, so a group that could not split cannot later in the frame.
-   * What a part needs to stand: its picture at its branch's youngest row, "now" for anyone living, in its branch's part
-   * on screen. A part whose picture would not fit above the screen's foot (`fit`, a fossil group low down), or whose branch
-   * at that row is off screen though a fossil tip of it is on, cannot stand, so its parent does not split: the parent's
-   * label covers it, no hole. A part whose youngest row is under the screen is not on screen at all and needs nothing.
-   * The start's own label stands whatever its branch's window, against the edge if need be; if it does not fit above
-   * the foot, the screen has only fossils at its foot, and no label.
-   * A function of the camera alone. One label as anywhere: name pill over picture, a tap on either going to the group's
+   * The groups the tree is cut into at width zoom sx (ToLaD#440, Ita: "zooming changes the levels but moving around the
+   * graphs shouldnt"): a cover of the whole tree from the root, down the named groups at every height (labelParts), each
+   * group's window its whole branch at its youngest row, world x times sx (slide.ts coverOf): a function of sx alone,
+   * not of where the view stands, nor how high. Kept for the last sx, so a pan costs nothing.
+   */
+  coverAt(T: CutTerritories, sx: number): CoverGroup[] {
+    const had = this.coverLast;
+    if (had && had.T === T && had.sx === sx) return had.list;
+    const { index, first, last } = T.t;
+    const span: [number, number] = [0, 0];
+    const of = (lv: Level): CoverGroup => {
+      const k = lv.b ? ~lv.b.index : index.get(lv.v)!;
+      const wy = T.branchOf(k, span);
+      return { lv, k, f: k < 0 ? ~k : first[k], l: k < 0 ? ~k : last[k], wy, a: span[0], b: span[1] };
+    };
+    const list = coverOf(
+      of({ v: this.fan.root }),
+      (g) => [g.a * sx, g.b * sx],
+      (g) => {
+        if (!g.lv.v) return [];
+        let gs = this.partsCache.get(g.lv.v);
+        if (!gs) this.partsCache.set(g.lv.v, (gs = labelParts(g.lv.v).map(of).sort((p, q) => p.f - q.f)));
+        return gs;
+      },
+      (p, q) => T.aliveOf(p.k) - T.aliveOf(q.k) || p.l - p.f - (q.l - q.f) || q.f - p.f,
+      GROUP_D,
+    );
+    this.coverLast = { T, sx, list };
+    return list;
+  }
+  /** The last cut (tests read it). */
+  coverLast: { T: CutTerritories; sx: number; list: CoverGroup[] } | null = null;
+  private readonly partsCache = new Map<FanNode, CoverGroup[]>();
+
+  /**
+   * This frame's labels under `?labels=groups` (ToLaD#417, #440): which groups comes from the zoom alone (coverAt); a pan
+   * changes which of them are on screen, never which they are. Of that list, each group with its branch on screen has a
+   * label: its picture at its branch's youngest row, "now" for anyone living, inside its branch's part on screen (slide.ts placeSlots), so a wide group
+   * stays on screen. Two places have none, neither deciding the cut: at the side, a group going off an edge with too little left to stand
+   * beside the next one in gives way (keepOnScreen: all of it within GROUP_D + a picture's half of that edge); at the foot, a fossil group
+   * whose tips are under the row a picture fits on (`fit`).
+   * One label as anywhere: name pill over picture, a tap on either going to the group's
    * own frame, and over it, for more than one branch, the hairline around them, the first's left edge to the last's right (LabelSpot.over).
    */
   private groupLabels(T: CutTerritories, row: number): CutLabels {
@@ -2547,80 +2542,27 @@ export class FanView implements InputHandlers {
     const X = (x: number) => this.toScreen(x, 0)[0];
     const Y = (y: number) => this.toScreen(0, y)[1];
     const Wy = (y: number) => this.toWorld(0, y)[1];
-    const tips = T.tipsIn(this.toWorld(LABEL_AXIS_X, 0)[0], this.toWorld(this.w, 0)[0]) ?? T.tipsIn(this.toWorld(0, 0)[0], this.toWorld(this.w, 0)[0]);
-    this.groupsOf = null;
-    if (!tips) return out;
-    const { run, fossils } = tips;
-    const here = (g: { f: number; l: number }) => (run && g.l >= run[0] && g.f <= run[1]) || fossils.some((i) => i >= g.f && i <= g.l);
-    const L = namedUp(T.meet(Math.min(run ? run[0] : Infinity, ...fossils), Math.max(run ? run[1] : -Infinity, ...fossils)));
-    this.groupsOf = L;
-    const { index, first, last } = T.t;
     const r0 = PIC_D / 2;
-    const right = this.w - r0;
     const bottom = this.h - LABEL_BOTTOM_PX + 30;
-    const span: [number, number] = [0, 0];
-    type Group = { lv: Level; k: number; f: number; l: number };
-    type Standing = { g: Group; d0: number; fit: number; slot: Slot };
-    /** Group g's label, if it can stand; null if not; "off" if it is under the screen. */
-    const stand = (g: Group, start = false): Standing | null | 'off' => {
-      const wy = T.branchOf(g.k, span);
-      const y = Y(wy);
-      if (y >= this.h) return 'off';
-      const d0 = Math.max(y - PIC_LIFT - PIC_ROOM, row);
+    const here: { g: CoverGroup; d0: number; fit: number }[] = [];
+    const wins: [number, number][] = [];
+    for (const g of this.coverAt(T, this.cam.sx)) {
+      const [a, b] = [X(g.a), X(g.b)];
+      if (b < 0 || a > this.w) continue;
+      const d0 = Math.max(Y(g.wy) - PIC_LIFT - PIC_ROOM, row);
       const fit = clamp01((bottom - (d0 + PIC_ROOM + PIC_LIFT)) / 30);
-      if (!(fit > 0)) return null;
-      // (Its centre on its branch's part on screen. A branch nearer the screen's edge than a picture's half: the picture
-      // whole against that edge, its branch under it, as long as the branch is on screen.)
-      const [a, b] = [X(span[0]), X(span[1])];
-      if (!start && (b < 0 || a > this.w)) return null;
-      const lo = Math.min(Math.max(a, r0), right);
-      const hi = Math.max(Math.min(b, right), r0);
-      return { g, d0, fit, slot: { lo, hi, at: (lo + hi) / 2 } };
-    };
-    const kL = index.get(L)!;
-    const start = stand({ lv: { v: L }, k: kL, f: first[kL], l: last[kL] }, true);
-    if (!start || start === 'off') return out;
-    let list: Standing[] = [start];
-    const tried = new Set<Standing>();
-    const heavier = (p: Group, q: Group) => T.aliveOf(p.k) - T.aliveOf(q.k) || p.l - p.f - (q.l - q.f) || q.f - p.f;
-    for (;;) {
-      let n = -1;
-      for (let i = 0; i < list.length; i++) if (!tried.has(list[i]) && (n < 0 || heavier(list[i].g, list[n].g) > 0)) n = i;
-      if (n < 0) break;
-      const s = list[n];
-      tried.add(s);
-      const { v } = s.g.lv;
-      if (!v) continue;
-      let gs = this.nextCache.get(v);
-      if (!gs) {
-        gs = labelParts(v).map((lv) => {
-          const k = lv.b ? ~lv.b.index : index.get(lv.v)!;
-          return { lv, k, f: k < 0 ? ~k : first[k], l: k < 0 ? ~k : last[k] };
-        });
-        gs.sort((p, q) => p.f - q.f);
-        this.nextCache.set(v, gs);
-      }
-      const parts: Standing[] = [];
-      let all = true;
-      for (const g of gs) {
-        if (!here(g)) continue;
-        const p = stand(g);
-        if (p === 'off') continue;
-        if (!p) {
-          all = false;
-          break;
-        }
-        parts.push(p);
-      }
-      if (!all || !parts.length) continue;
-      const next = [...list.slice(0, n), ...parts, ...list.slice(n + 1)];
-      if (fits(next.map((q) => q.slot), GROUP_D)) list = next;
+      if (!(fit > 0)) continue;
+      here.push({ g, d0, fit });
+      wins.push([a, b]);
     }
-    const xs = placeSlots(list.map((q) => q.slot), list.map((_, i) => i), GROUP_D);
+    const { first: from, slots } = keepOnScreen(wins, r0, this.w - r0, GROUP_D);
+    const list = here.slice(from, from + slots.length);
+    const xs = placeSlots(slots, list.map((_, i) => i), GROUP_D);
     const { cap } = this.labelBand();
     const half = LABEL_PILL / 2;
-    list.forEach(({ g, d0, fit, slot }, i) => {
+    list.forEach(({ g, d0, fit }, i) => {
       const x = xs[i];
+      const slot = slots[i];
       const { lv } = g;
       const face = lv.b ?? groupFace(lv.v) ?? lv.v.strands[0];
       const text = this.pillText(lv.b ? levelText(lv.b) : groupName(this.fan, lv.v), cap - 2 * LABEL_PAD);

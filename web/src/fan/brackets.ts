@@ -69,6 +69,7 @@ export const TAXON_EN: Record<string, string> = {
   Ferae: 'Carnivores & pangolins',
   Euarchontoglires: 'Primates, rodents & kin',
   Euarchonta: 'Primates & treeshrews',
+  Sundatheria: 'Colugos & treeshrews',
   Glires: 'Rodents & rabbits',
   Australidelphia: 'Australidelphians',
   // (Primates, ToLaD#275: the splits Open Tree names above and between their families.)

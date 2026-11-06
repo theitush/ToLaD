@@ -458,8 +458,9 @@ export const NAMED_CLADES: Record<string, [string, string]> = {
   Homo: ['Homo sapiens', 'Homo habilis'],
   // (The forks above the orders the dated tree leaves unnamed (ToLaD#440), each holding just what its citation says:
   // Euarchonta, Scrotifera, Fereuungulata, Euungulata: Waddell, Okada & Hasegawa 1999, Syst. Biol. 48; Ferae: Linnaeus 1758;
-  // Paenungulata: Simpson 1945; Afroinsectiphilia: Waddell, Kishino & Ota 2001; Australidelphia: Szalay 1982.)
+  // Paenungulata: Simpson 1945; Afroinsectiphilia: Waddell, Kishino & Ota 2001; Australidelphia: Szalay 1982; Sundatheria: as in Janecka et al. 2007, Science 318.)
   Euarchonta: ['Homo sapiens', 'Galeopterus variegatus'],
+  Sundatheria: ['Galeopterus variegatus', 'Tupaia glis'],
   Scrotifera: ['Felis catus', 'Rhinolophus ferrumequinum'],
   Fereuungulata: ['Felis catus', 'Bos taurus'],
   Euungulata: ['Bos taurus', 'Tapirus terrestris'],
