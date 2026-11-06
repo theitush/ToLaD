@@ -7,9 +7,10 @@
 //   5. a name's tap goes into its own run;
 //   6. a one-branch name stays with its branch under a pan;
 //   7. zooming in steadily, no name goes on and off and on again.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, afterAll, beforeAll } from 'vitest';
 import { CARNIVORA, FELIDAE, type CladeRec } from './panthera';
-import { PIC_D, picBox } from './pics';
+import { PIC_D, picBox, setLabelMode } from './pics';
+import { setGapMode } from './fold';
 import { CARNIVORA_TREE, FELIDAE_TREE, type Split } from './splits';
 import { discSci, FanView, groupFace, groupPics, type CutLabels } from './view';
 import { hasPic } from './wiki';
@@ -118,6 +119,16 @@ const LEVELS: [string, CladeRec, Split][] = [
   ['the carnivores', CARNIVORA, CARNIVORA_TREE],
   ['the cats', FELIDAE, FELIDAE_TREE],
 ];
+
+// (Retired look, ToLaD#446: name pills over the cut, pinned to the old modes; the app is `groups` and `clades`, ToLaD#439.)
+beforeAll(() => {
+  setLabelMode('cut');
+  setGapMode('groups');
+});
+afterAll(() => {
+  setLabelMode('groups');
+  setGapMode('clades');
+});
 
 describe.each(LEVELS)('names alone at %s (ToLaD#396)', (_name, clade, tree) => {
   it('never overlap, count every species once, and leave the pictures as they are', () => {

@@ -1,6 +1,8 @@
 // A tap lands at once (ToLaD#359): a tap's own work, before its flight starts, is a few cuts of the item it goes into,
 // never a search over cuts of the whole tree. Timed at the mammals (~6,000 species), each tap from the frame it is made at.
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { setGapMode } from './fold';
+import { setLabelMode } from './pics';
 import { loadMammalsFromFiles } from './mammals-node';
 import { mammaliaClade } from './panthera';
 import { mammaliaTree } from './splits';
@@ -65,6 +67,15 @@ type Spot = { text: string; run?: [number, number] };
 const REFOLDS = 16;
 
 describe('a tap lands at once (ToLaD#359): its own work before the flight', () => {
+  // (Its route names the cut's labels, and tapItem is what it times: pinned, ToLaD#446. A group label's tap is not timed here.)
+  beforeAll(() => {
+    setLabelMode('cut');
+    setGapMode('groups');
+  });
+  afterAll(() => {
+    setLabelMode('groups');
+    setGapMode('clades');
+  });
   it('mammals: the wombats from the kangaroos and kin, the marsupials from home, down to the spectral tarsier', { timeout: 300_000 }, async () => {
     await loadMammalsFromFiles();
     const v = stubView();

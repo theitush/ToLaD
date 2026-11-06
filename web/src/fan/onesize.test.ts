@@ -1,10 +1,11 @@
 // One picture size (ToLaD#400, Ita: "just one size"): every disc a frame draws is PIC_D across, whichever tier its
 // label is; a name alone's pill stays a pill across; and the disc stands at the foot of the room frames and taps go by.
 // Measured at the draw itself, at mammals and the carnivores, home and through a zoom.
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, afterAll, beforeAll } from 'vitest';
 import { loadMammalsFromFiles } from './mammals-node';
 import { CARNIVORA, mammaliaClade, type CladeRec } from './panthera';
-import { PIC_D, PIC_ROOM } from './pics';
+import { PIC_D, PIC_ROOM, setLabelMode } from './pics';
+import { setGapMode } from './fold';
 import { CARNIVORA_TREE, mammaliaTree, type Split } from './splits';
 import { FanView } from './view';
 import { drawPic } from './wiki';
@@ -62,6 +63,15 @@ function stubView(clade: CladeRec, tree: Split): FanView {
 const applyFold = (v: FanView) => (v as unknown as { applyFold(): void }).applyFold();
 
 describe('every picture on screen one size (ToLaD#400)', () => {
+  // (Retired look, ToLaD#446: the cut's name pills and pictures, pinned to the old modes; the app is `groups` and `clades`, ToLaD#439.)
+  beforeAll(() => {
+    setLabelMode('cut');
+    setGapMode('groups');
+  });
+  afterAll(() => {
+    setLabelMode('groups');
+    setGapMode('clades');
+  });
   const FANS: [string, () => Promise<FanView>][] = [
     ['the carnivores', async () => stubView(CARNIVORA, CARNIVORA_TREE)],
     [

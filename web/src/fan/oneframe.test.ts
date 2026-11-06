@@ -2,10 +2,11 @@
 // framed by its territory filling the labels' width (runFrame), and there the cut one step finer shows every species
 // of it under a label of its own, whole on screen; a double tap goes back out to a frame that holds it. Checked over the
 // whole tree by code (no browser): cats and carnivores every item at home and one tap in, the mammals sampled.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, afterAll, beforeAll } from 'vitest';
 import { loadMammalsFromFiles } from './mammals-node';
 import { CARNIVORA, FELIDAE, mammaliaClade, type CladeRec } from './panthera';
-import { PIC_D } from './pics';
+import { PIC_D, setLabelMode } from './pics';
+import { setGapMode } from './fold';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, type Split } from './splits';
 import { FanView } from './view';
 
@@ -152,6 +153,15 @@ const FANS: [string, () => Promise<FanView>, number, number][] = [
 ];
 
 describe('one frame (ToLaD#359): a label\'s tap frames its item, every next-level label whole on screen', () => {
+  // (Retired look, ToLaD#446: every species under a cut label, pinned to the old modes; the app is `groups` and `clades`, ToLaD#439.)
+  beforeAll(() => {
+    setLabelMode('cut');
+    setGapMode('groups');
+  });
+  afterAll(() => {
+    setLabelMode('groups');
+    setGapMode('clades');
+  });
   for (const [name, mk, depth, sample] of FANS)
     it(name, { timeout: 900_000 }, async () => {
       const v = await mk();
