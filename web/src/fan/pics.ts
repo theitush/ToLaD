@@ -14,6 +14,8 @@ export interface PicSpot {
 export const PIC_D = 36;
 /** The room (px, wide and tall) a cut reserves for a label's picture: what frames, taps and "does this level's label fit" go by. */
 export const PIC_ROOM = 50;
+/** Right edge (px) of the time axis's labels: species' labels keep right of it, a frame fills from here to the screen's edge. */
+export const LABEL_AXIS_X = 72;
 /** The discs stand this many px above their tip: the gap a "+x" label's hairline runs in, above "now" (ToLaD#368, #373). */
 export const PIC_LIFT = 14;
 

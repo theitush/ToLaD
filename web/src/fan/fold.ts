@@ -40,9 +40,9 @@ export const gapMode = (): GapMode => gapModeNow;
 export const GAP_SUM = 0.15;
 /** groups: all the larger gaps between the groups (the splits above the families) together, as that share. */
 export const GROUP_SUM = 0.2;
-/** clades: all the gaps together, as that share. */
-export const CLADE_SUM = 0.35;
-/** clades: a split's gap grows as this power of its clade's strands (over 1, the deep splits take most of the budget; the shallow stay closed until zoomed into). */
+/** clades: all the gaps together, as that share (half: at 35% only about 16 splits part by 1.7 px at the mammals' home, still a wall; by looking, ToLaD#408). */
+export const CLADE_SUM = 0.5;
+/** clades: a split's gap grows as this power of its clade's strands (over 1, the deep splits take most of the budget; the shallow stay closed until zoomed into; at 1 the orders' slabs stay a wall, at 2 the rodents turn to a comb of hairlines, by looking, ToLaD#408). */
 export const CLADE_POW = 1.5;
 
 /** A split's full gap, as a share of the order's width: GAP_K * (its age / 2 Ma)^GAP_POW. */

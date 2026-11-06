@@ -262,6 +262,13 @@ const scenes = [
   ['ftap-felidae', 'tapfork', ['Felidae']],
   ['ftap-felinae', 'tapfork', ['Felinae']],
   ['ftap-solenodon', 'tapfork', ['Solenodon']],
+  // The gaps follow the clades (ToLaD#408, Q=gaps=clades LEVEL=mammals): the fan's home and clades framed.
+  ['clades-home', 'home'],
+  ['clades-laurasiatheria', 'level', ['Laurasiatheria']],
+  ['clades-carnivora', 'level', ['Carnivora']],
+  ['clades-rodentia', 'level', ['Rodentia']],
+  ['clades-felidae', 'level', ['Felidae']],
+  ['clades-diprotodontia', 'level', ['Diprotodontia']],
   ['pin-home', 'home'],
   ['pin-bear', 'frame', ['Brown bear', 4e5, 40]],
   ['pin-weasel', 'frame', ['Least weasel', 1.5e6, 20]],

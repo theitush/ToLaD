@@ -69,12 +69,6 @@ describe('a tap lands at once (ToLaD#359): its own work before the flight', () =
     await loadMammalsFromFiles();
     const v = stubView();
     const node = (t: string) => v.fan.nodes.find((u) => u.split.taxon === t)!;
-    /** The label standing for clade t (its strands and at most a few sisters riding with it). */
-    const of = (t: string) => (s: Spot) => {
-      const u = node(t);
-      const [f, l] = [u.strands[0].index, u.strands[u.strands.length - 1].index];
-      return !!s.run && s.run[0] <= f && s.run[1] >= l && s.run[1] - s.run[0] < 2 * (l - f + 1) + 4;
-    };
     const tarsier = v.fan.nodes[0].strands.find((b) => b.sp.common === 'Spectral tarsier')!.index;
     // (One refold of the tree and a cut of the screen there, its median over a few zooms: the unit.)
     const V = v as unknown as { labelsAt(cam: typeof v.cam): unknown };
@@ -107,7 +101,9 @@ describe('a tap lands at once (ToLaD#359): its own work before the flight', () =
     };
     // The wombats from the kangaroos and kin (Ita, 2026-11-03: seconds); a marsupials' and a primates' frame from home.
     v.cam = v.cladeCamera(node('Diprotodontia'));
-    tap('kangaroos & kin > wombats', of('Vombatidae'));
+    // (The label holding them: under `clades` they ride with a neighbour's there, ToLaD#408.)
+    const wombats = node('Vombatidae').strands;
+    tap('kangaroos & kin > wombats', (s) => !!s.run && s.run[0] <= wombats[0].index && s.run[1] >= wombats[wombats.length - 1].index);
     v.cam = v.homeCamera();
     // (The marsupials ride with a neighbour's label at home with `groups`, ToLaD#378: the label holding them.)
     const meta = node('Metatheria').strands;
