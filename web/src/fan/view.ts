@@ -2822,6 +2822,10 @@ export class FanView implements InputHandlers {
     });
     for (const g of list) {
       if (!g.tier && !g.pic) continue;
+      // (Its own room across, its gap and its band, nobody else's: all its labels stand in it but a picture, on its centre. Off screen: nothing to do.)
+      const [ra, rb] = [X(g.top - g.gap), X(g.top + g.band)];
+      const c = X(g.at);
+      if (Math.max(rb, c + PIC_D / 2) < -CLADE_PX || Math.min(ra, c - PIC_D / 2) > this.w + CLADE_PX) continue;
       const { lv } = g;
       const key = `g${g.k}`;
       const name = lv.b ? levelText(lv.b) : groupName(this.fan, lv.v);
@@ -2835,14 +2839,13 @@ export class FanView implements InputHandlers {
       const s: LabelSpot = { key, id: key, place: 'tip', text: name, rank: [0, 0, g.k], x: 0, y1, box: [0, 0, 0, 0], fit: 1, plus: 0, pic: face };
       if (lv.b) s.b = lv.b;
       else Object.assign(s, { v: lv.v, fam: lv.v });
-      // (Its own room across: its gap and its band, nobody else's. In its band's part on screen; narrower than the label: on its centre.)
+      // (In its band's part on screen; narrower than the label: on its centre.)
       const [a, b] = [X(g.at - g.band / 2), X(g.at + g.band / 2)];
-      const [ra, rb] = [X(g.top - g.gap), X(g.top + g.band)];
       const inBand = (need: number) => (b - a < 2 * need ? (a + b) / 2 : Math.max(a + need, Math.min(b - need, Math.max(need, Math.min(this.w - need, (a + b) / 2)))));
       const seen = b >= 0 && a <= this.w;
       let d = g.pic ?? 0;
       const [lo, hi] = slide.get(g) ?? [0, 0];
-      const picX = d ? Math.max(lo, Math.min(hi, Math.max(d / 2, Math.min(this.w - d / 2, X(g.at))))) : 0;
+      const picX = d ? Math.max(lo, Math.min(hi, Math.max(d / 2, Math.min(this.w - d / 2, c)))) : 0;
       // (Stopped at its branch's start it stands younger than its neighbours' names: only while inside its own room.)
       if (d && at !== hold && (picX - d / 2 < ra || picX + d / 2 > rb)) d = 0;
       if (d && picX + d / 2 >= 0 && picX - d / 2 <= this.w) {
