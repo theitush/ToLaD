@@ -69,6 +69,22 @@ const names = (s) => `${s.titles.length} titles (${s.titles.filter((t) => t.ends
   await settle();
   console.log(`${last} pinched in: ${names(await state())}`);
   await page.screenshot({ path: `${OUT}/${last.toLowerCase()}-in.png` });
+  // A pan into the past from there (ToLaD#464): the labels held at the right edge, each no older than its branch's start, leaving with it.
+  const inCam = await page.evaluate(() => window.__fan.cam);
+  for (const back of [0.15, 0.3]) {
+    await page.evaluate(
+      ([cam, k]) => {
+        const v = window.__fan;
+        v.cam = cam;
+        v.cam = { ...cam, cy: v.toWorld(0, v.h / 2 + k * v.h)[1] };
+        v.request();
+      },
+      [inCam, back],
+    );
+    await settle();
+    show(`${last} pinched in, the past ${back} screen in`, await state());
+    await page.screenshot({ path: `${OUT}/${last.toLowerCase()}-past-${back}.png` });
+  }
   await page.evaluate(() => window.__fan.resetView());
   await settle();
   console.log(`home: ${names(await state())}`);

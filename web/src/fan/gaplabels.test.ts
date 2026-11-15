@@ -147,7 +147,7 @@ describe('labels in the gaps and in the branches', () => {
   it('a picture once shown stays as the view zooms in, until its member splits (a small one may grow)', () => {
     let prev = new Map<unknown, number>();
     for (let z = 1; z < 2 ** 12; z *= 1.05) {
-      const now = new Map(cover(home * z).map((m) => [m.lv.b ?? m.lv.v, m.pic ?? 0]));
+      const now = new Map<unknown, number>(cover(home * z).map((m) => [m.lv.b ?? m.lv.v, m.pic ?? 0]));
       for (const [k, d] of prev) if (now.has(k)) expect(now.get(k)!).toBeGreaterThanOrEqual(d);
       prev = now;
     }

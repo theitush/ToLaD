@@ -2746,8 +2746,8 @@ export class FanView implements InputHandlers {
 
   /**
    * Every member's pictures as zoom ranges (ToLaD#464, gaplabels.ts picRanges), once a cover ladder: each member of any cover with a strand on the column a candidate, from the zoom its parent opens at
-   * to its own. Priority: the more individuals alive now, then the wider band, then the first: a picture is a face to know the branch by, and the most living are the faces most met (the cover's own
-   * order, coverAt). Rooms: a picture and a hair to the next, as GROUP_D for a full one.
+   * to its own. Priority: the wider band on the column, then the more individuals alive now, then the first: the band is the branch's room by life as the eye sees it there, so the biggest branch in
+   * sight has its face first and a thin one never takes it from a fat neighbour. Rooms: a picture and a hair to the next, as GROUP_D for a full one.
    */
   private gapPicsOf(L: { T: CutTerritories; root: GapMember; parts: (g: GapMember) => GapMember[]; opens: Map<GapMember, number> }): Map<GapMember, PicRange> {
     if (this.gapPicsLast?.L === L) return this.gapPicsLast.ranges;
@@ -2761,7 +2761,7 @@ export class FanView implements InputHandlers {
       if (g.on >= 0 && enter < exit) cands.push({ m: g, at: g.at, enter, exit, alive: L.T.aliveOf(g.k) });
       for (const p of ps) stack.push([p, exit]);
     }
-    cands.sort((p, q) => q.alive - p.alive || q.m.band - p.m.band || p.m.on - q.m.on);
+    cands.sort((p, q) => q.m.band - p.m.band || q.alive - p.alive || p.m.on - q.m.on);
     for (const c of cands) ms.push(c.m);
     const hair = GROUP_D - PIC_D;
     const rs = picRanges(cands, GROUP_D, PIC_S + hair);
