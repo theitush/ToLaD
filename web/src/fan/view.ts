@@ -1388,6 +1388,44 @@ export class FanView implements InputHandlers {
   }
 
   /**
+   * Where a tap on clade v's name opens it on the tree on its side (ToLaD#465, gaplabels.ts): the view that names its parts. Its frame (cladeCamera) where v
+   * has opened there; else as far in as v opens (gapOpens: a fork waits for its thinnest part, so in linear widths the great apes open some 50 frames in,
+   * where the gorillas have room beside the humans). Across, of the views that wide, the one standing on the most of its parts' names, the nearest to its
+   * frame's middle of those: a title at its branch's top, a name in a band anywhere along it. So a tap always opens what it names, and never moves without.
+   */
+  openCamera(v: FanNode): Camera {
+    const fr = this.frameOf({ v });
+    if (!v.parent) return fr;
+    const T = this.territories();
+    this.gapCoverAt(T, fr.sx);
+    const L = this.gapLadder!;
+    const [vf, vl] = [v.strands[0].index, v.strands[v.strands.length - 1].index];
+    let g: GapMember | undefined = L.root;
+    while (g && g.lv.v !== v) g = L.parts(g).find((p) => p.f <= vf && p.l >= vl);
+    const opens = g ? (L.opens.get(g) ?? Infinity) : Infinity;
+    if (!g || !L.parts(g).length || !(opens < Infinity) || opens <= fr.sx) return fr;
+    // (A hair past its opening, so it has surely opened whatever the rounding.)
+    const sx = opens * (1 + 1e-6);
+    const x0 = LABEL_AXIS_X;
+    const ww = (this.w - x0 - 2 * CLADE_PX) / sx;
+    const mid = fr.cx + x0 / 2 / fr.sx;
+    // Its members' names there, world x: [from, to] that must meet the view for the name to stand on it.
+    const names: [number, number][] = [];
+    for (const m of this.gapCoverAt(T, sx)) {
+      if (m.f < g.f || m.l > g.l || !m.tier) continue;
+      names.push(m.tier === 'title' ? [m.top - CLADE_PX / sx, m.top] : [m.at - m.band / 2, m.at + m.band / 2]);
+    }
+    let [best, bestN, bestD] = [mid - ww / 2, -1, Infinity];
+    for (const a of [mid - ww / 2, ...names.flatMap(([p, q]) => [p, q - ww])]) {
+      let n = 0;
+      for (const [p, q] of names) if (q >= a && p <= a + ww) n++;
+      const d = Math.abs(a + ww / 2 - mid);
+      if (n > bestN || (n === bestN && d < bestD)) [best, bestN, bestD] = [a, n, d];
+    }
+    return { ...fr, sx, cx: best - CLADE_PX / sx + (this.w / 2 - x0) / sx };
+  }
+
+  /**
    * A bracket's tap: fly to its clade (cladeCamera), any card closed for the flight. Folded, the flight tracks the
    * frame as the fold moves and lands on it computed there (flyTo, ToLaD#246).
    */
@@ -2346,6 +2384,15 @@ export class FanView implements InputHandlers {
     this.backing = { lv, cam };
   }
 
+  /** Fly to where clade v opens (openCamera, ToLaD#465), a level as any: a double tap comes back, the landing is where a second tap goes on from. */
+  private goOpen(v: FanNode): void {
+    this.selected = null;
+    this.touch = null;
+    this.onSelect(null);
+    const cam = this.flyTo(() => this.openCamera(v), undefined, () => (this.tapAt = { b: null, v, cam: { ...this.cam } }));
+    this.backing = { lv: { v }, cam };
+  }
+
   /** The level's flight under way (ToLaD#258): where it lands, so a tap or double-tap mid-flight goes on from there (a search pick's too). */
   private backing: Step | null = null;
 
@@ -2466,6 +2513,11 @@ export class FanView implements InputHandlers {
     }
     const to: Level | null = pinned ? { v: pinned.v } : pill?.v ? { v: pill.v } : pill?.b ? { b: pill.b } : pic ? (pic[4] ? { v: pic[4] } : { b: pic[3] }) : brk ? { v: brk.v } : null;
     if (to) {
+      // (A group's name on the tree on its side, ToLaD#465: where it opens, its parts named, openCamera.)
+      if (to.v && (pill || pic) && this.flip && gapLabelsOn()) {
+        this.goOpen(to.v);
+        return;
+      }
       // (A group label, ToLaD#417: its group's own frame, as a fork name's, ToLaD#390.)
       // (Its frame already the view's, the one label holding the screen, ToLaD#440: on, a level deeper, as any tap.)
       if (labelMode() === 'groups' && (pill || pic) && this.offBy(this.frameOf(to), this.anim && this.backing ? this.backing.cam : this.cam) > 0.5) this.goLevel(to, this.frameOf(to));
