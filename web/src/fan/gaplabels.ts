@@ -102,7 +102,75 @@ export function tier(m: Member, sx: number, px: number, inPx: number): Tier {
   return band >= inPx ? 'in' : gap >= px ? 'title' : null;
 }
 
-/** Has it a picture at zoom sx: its band holds one (d, a picture's room). Inside its own band, so it stays clear of every neighbour's name and picture, and never stands in a gap. */
-export function picFits(m: Member, sx: number, d: number): boolean {
-  return m.band * sx >= d;
+/** A candidate for a picture: its centre on the column (world x), and the zooms it is a member of the cover over, from `enter` (its parent opens) to `exit` (it opens). */
+export interface PicCand {
+  at: number;
+  enter: number;
+  exit: number;
+}
+
+/** Each candidate's pictures as zoom ranges: a small one from `small` to `full`, a full one from `full` to its exit. A range empty when its start reaches its end. */
+export interface PicRange {
+  small: number;
+  full: number;
+}
+
+/**
+ * Who has a picture at which zoom (ToLaD#464, Ita: "its fine that the pic would be wider then the branch", "put lil pics on the ones that dont fit"): one active range a picture, Been, Daiches & Yap
+ * 2006, as the names'. Every member of the cover is a candidate, its picture on its band's centre on the column whatever its band, so two pictures meet below the zoom that parts their centres by
+ * their rooms; in priority order (`cands` comes sorted), a candidate's range starts where every higher one it would meet has parted from it or split. Full pictures first, then small ones in what is left,
+ * each before its own full one. So a picture, once shown, stays as the view zooms in until its member splits (a small one until it grows); no two ever meet; and it is the zoom alone: a pan changes nothing.
+ * `fullRoom`, `smallRoom`: px a picture needs across, its own and a hair to the next.
+ */
+export function picRanges(cands: readonly PicCand[], fullRoom: number, smallRoom: number): PicRange[] {
+  const n = cands.length;
+  const byAt = cands.map((_, i) => i).sort((p, q) => cands[p].at - cands[q].at);
+  const pos = new Int32Array(n);
+  byAt.forEach((i, r) => (pos[i] = r));
+  const out: PicRange[] = cands.map((c) => ({ small: c.exit, full: c.exit }));
+  // (Who has been placed: a range is held once its owner's turn has come.)
+  const fullDone = new Uint8Array(n);
+  const smallDone = new Uint8Array(n);
+  const place = (i: number, room: number, end: number, small: boolean): number => {
+    const c = cands[i];
+    let start = c.enter;
+    for (let moved = true; moved && start < end; ) {
+      moved = false;
+      for (const dir of [-1, 1]) {
+        for (let r = pos[i] + dir; r >= 0 && r < n; r += dir) {
+          const j = byAt[r];
+          const d = Math.abs(cands[j].at - c.at);
+          // (Past this one, nobody can meet it at any zoom it still waits for.)
+          if (d * start >= (room + fullRoom) / 2) break;
+          for (const [held, s, e, rj] of [
+            [fullDone[j], out[j].full, cands[j].exit, fullRoom],
+            [small ? smallDone[j] : 0, out[j].small, out[j].full, smallRoom],
+          ]) {
+            if (!held || s >= e) continue;
+            const part = d > 0 ? (room + rj) / 2 / d : Infinity;
+            // (Both shown and meeting over [max(start, s), min(end, e, part)): wait until it parts or splits.)
+            if (Math.max(start, s) < Math.min(end, e, part)) {
+              start = Math.min(e, part);
+              moved = true;
+            }
+          }
+        }
+      }
+    }
+    return Math.min(start, end);
+  };
+  for (let i = 0; i < n; i++) {
+    out[i].full = place(i, fullRoom, cands[i].exit, false);
+    fullDone[i] = 1;
+  }
+  for (let i = 0; i < n; i++) {
+    out[i].small = place(i, smallRoom, out[i].full, true);
+    smallDone[i] = 1;
+  }
+  return out;
+}
+
+/** A picture's size at zoom sx from its ranges: d, the full one's diameter, or ds, the small one's; 0 for none. */
+export function picAt(r: PicRange | undefined, sx: number, d: number, ds: number): number {
+  return !r ? 0 : sx >= r.full ? d : sx >= r.small ? ds : 0;
 }
