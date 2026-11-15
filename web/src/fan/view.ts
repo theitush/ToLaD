@@ -1391,8 +1391,9 @@ export class FanView implements InputHandlers {
   /**
    * Where a tap on clade v's name opens it on the tree on its side (ToLaD#465, gaplabels.ts): the view that names its parts. Its frame (cladeCamera) where v
    * has opened there; else as far in as v opens (gapOpens: a fork waits for its thinnest part, so in linear widths the great apes open some 50 frames in,
-   * where the gorillas have room beside the humans). Across, of the views that wide, the one standing on the most of its parts' names, the nearest to its
-   * frame's middle of those: a title at its branch's top, a name in a band anywhere along it. So a tap always opens what it names, and never moves without.
+   * where the gorillas have room beside the humans). Across, its first branch at the top (ToLaD#468): its room's first edge (the hull of its strands at every
+   * time) where its frame has it, so as far below the screen's top as there, its first part's title above it; the rest of it below, a scroll away. So a
+   * tap always opens what it names, at its start, and never moves without.
    */
   openCamera(v: FanNode): Camera {
     const fr = this.frameOf({ v });
@@ -1407,23 +1408,11 @@ export class FanView implements InputHandlers {
     if (!g || !L.parts(g).length || !(opens < Infinity) || opens <= fr.sx) return fr;
     // (A hair past its opening, so it has surely opened whatever the rounding.)
     const sx = opens * (1 + 1e-6);
-    const x0 = LABEL_AXIS_X;
-    const ww = (this.w - x0 - 2 * CLADE_PX) / sx;
-    const mid = fr.cx + x0 / 2 / fr.sx;
-    // Its members' names there, world x: [from, to] that must meet the view for the name to stand on it.
-    const names: [number, number][] = [];
-    for (const m of this.gapCoverAt(T, sx)) {
-      if (m.f < g.f || m.l > g.l || !m.tier) continue;
-      names.push(m.tier === 'title' ? [m.top - CLADE_PX / sx, m.top] : [m.at - m.band / 2, m.at + m.band / 2]);
-    }
-    let [best, bestN, bestD] = [mid - ww / 2, -1, Infinity];
-    for (const a of [mid - ww / 2, ...names.flatMap(([p, q]) => [p, q - ww])]) {
-      let n = 0;
-      for (const [p, q] of names) if (q >= a && p <= a + ww) n++;
-      const d = Math.abs(a + ww / 2 - mid);
-      if (n > bestN || (n === bestN && d < bestD)) [best, bestN, bestD] = [a, n, d];
-    }
-    return { ...fr, sx, cx: best - CLADE_PX / sx + (this.w / 2 - x0) / sx };
+    // (Its room's first edge on screen at its frame (its territory's from LABEL_AXIS_X, the padding its labels need), kept in px: the padding is world x,
+    // a screen and more at fifty frames in.)
+    const room = (this.fan.tess.fold as Steady).rooms().roomL[T.t.index.get(v)!];
+    const top = (room - fr.cx) * fr.sx + this.w / 2;
+    return { ...fr, sx, cx: room + (this.w / 2 - top) / sx };
   }
 
   /**
