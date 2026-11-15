@@ -111,6 +111,8 @@ const FORK_PX = LABEL_BOTTOM_PX;
 const SCALE_PX = 60;
 /** Gap (px) between a label's name pill and its picture right under it (ToLaD#358: one unit at the tip; #373: the name on top). */
 const LABEL_UNDER = 4;
+/** Two boxes [x0, y0, x1, y1] share some area (touching is not meeting). */
+const boxesMeet = (p: readonly number[], q: readonly number[]): boolean => p[0] < q[2] && p[2] > q[0] && p[1] < q[3] && p[3] > q[1];
 /**
  * The longest name pill (px, ToLaD#373): a label's height never depends on its name, a longer one is cut short. About
  * the 90th percentile of the mammals' names and clades (10.5 % cut), past all but 1 % of the carnivores', all the cats'.
@@ -2860,6 +2862,7 @@ export class FanView implements InputHandlers {
     // (Where each picture may slide across, screen x: inside its band's part on screen, clear of the next pictures' centres by both their rooms, as far as picRanges keeps them apart; one wider than
     // its band stands on its centre. So a hold at the screen's edge never pushes one into another.)
     const shown = list.filter((g) => g.pic);
+    const own: string[] = [];
     const slide = new Map<GapMember, [number, number]>();
     shown.forEach((g, i) => {
       const [d, c] = [g.pic!, X(g.at)];
@@ -2895,14 +2898,13 @@ export class FanView implements InputHandlers {
       const [a, b] = [X(g.at - g.band / 2), X(g.at + g.band / 2)];
       const inBand = (need: number) => (b - a < 2 * need ? (a + b) / 2 : Math.max(a + need, Math.min(b - need, Math.max(need, Math.min(this.w - need, (a + b) / 2)))));
       const seen = b >= 0 && a <= this.w;
-      let d = g.pic ?? 0;
+      const d = g.pic ?? 0;
       const [lo, hi] = slide.get(g) ?? [0, 0];
       const picX = d ? Math.max(lo, Math.min(hi, Math.max(d / 2, Math.min(this.w - d / 2, c)))) : 0;
-      // (Stopped at its branch's start it stands younger than its neighbours' names: only while inside its own room.)
-      if (d && at !== hold && (picX - d / 2 < ra || picX + d / 2 > rb)) d = 0;
       if (d && picX + d / 2 >= 0 && picX - d / 2 <= this.w) {
         const p = { x: picX, y: at - PIC_D / 2 + d / 2, i: out.pics.length, lv, face, held: true };
         out.pics.push(d === PIC_D ? p : { ...p, d });
+        own.push(key);
       }
       if (d && lv.b && lo - half >= ra && hi + half <= rb) {
         // (A species' name a pill, on its picture, where the pill stands in its own room wherever the picture slides.)
@@ -2935,6 +2937,11 @@ export class FanView implements InputHandlers {
       }
       out.names.push(s);
     }
+    // (No picture just goes, ToLaD#469 (Ita: "pics shouldnt dispapper from the left! just stop at the fork"): one stopped at its branch's start keeps its slot as it leaves with its branch, through
+    // the names held on the row, and a name it meets there gives way while they meet, so that a picture never meets a name (#464). Its place is the zoom's (picRanges), the name's what is left.)
+    const meets = (s: LabelSpot) => out.pics.some((p, i) => own[i] !== s.key && boxesMeet(picBox(p), s.box));
+    out.names = out.names.filter((s) => !meets(s));
+    out.spots = out.spots.filter((s) => !meets(s));
     return out;
   }
 
