@@ -624,6 +624,8 @@ export interface GapMember extends CoverGroup, Member {
   /** Its picture's diameter (px) at this zoom, PIC_D or PIC_S; 0 for none (ToLaD#464). */
   pic?: number;
 }
+/** How far (px) a title's foot stands above its member's top, its gap `gapPx` wide (gapLabels): a quarter of its size, or the middle of a gap too tight for that; the title's own size above it. */
+export const titleLift = (gapPx: number): number => Math.min((gapPx - CLADE_PX) / 2, CLADE_PX / 4);
 /** A cut item's strands (drawn order): first and last. */
 export type Run = [number, number];
 
@@ -1391,41 +1393,91 @@ export class FanView implements InputHandlers {
   }
 
   /**
-   * Where a tap on clade v's name opens it on the tree on its side (ToLaD#465, gaplabels.ts): the view that names its parts. Its frame (cladeCamera) where v
-   * has opened there; else as far in as v opens (gapOpens: a fork waits for its thinnest part, so in linear widths the great apes open some 50 frames in,
-   * where the gorillas have room beside the humans). Across, its first branch at the top (ToLaD#468): its room's first edge (the hull of its strands at every
-   * time) where its frame has it, so as far below the screen's top as there, its first part's title above it; the rest of it below, a scroll away. So a
-   * tap always opens what it names, at its start, and never moves without.
+   * Where a tap lands on clade v on the tree on its side (ToLaD#465, #468): its first branch the first thing under the header, the view on v alone, as a
+   * zoomable UI's zoom to an object (Pad++, a zoomable icicle's click): its room (the hull of its strands at every time) filling the screen from the top to the
+   * foot, with only the room its parts' labels need past it (labelsOut: above, its first part's title); nothing of the groups beside it on screen. Where v
+   * opens only deeper than that (gapOpens: a fork waits for its thinnest part, so in linear widths the great apes open some 50 frames in, where the gorillas
+   * have room beside the humans), there, its first branch at the top all the same and the rest of it below, a scroll away. Its time window its frame's
+   * (cladeCamera). So a tap always opens what it names, at its start, and never moves without. (The root: home.)
    */
   openCamera(v: FanNode): Camera {
     const fr = this.frameOf({ v });
     if (!v.parent) return fr;
+    const fold = this.fan.tess.fold as Steady;
     const T = this.territories();
+    const j = T.t.index.get(v)!;
+    const key = `open:${this.w}x${this.h}:${j}`;
+    if (this.framesFan !== this.fan) [this.framesFan, this.frames] = [this.fan, new Map()];
+    const hit = this.frames.get(key);
+    if (hit) {
+      fold.setScale(hit.sx, this.w);
+      return { ...hit };
+    }
     this.gapCoverAt(T, fr.sx);
     const L = this.gapLadder!;
     const [vf, vl] = [v.strands[0].index, v.strands[v.strands.length - 1].index];
     let g: GapMember | undefined = L.root;
     while (g && g.lv.v !== v) g = L.parts(g).find((p) => p.f <= vf && p.l >= vl);
-    const opens = g ? (L.opens.get(g) ?? Infinity) : Infinity;
-    if (!g || !L.parts(g).length || !(opens < Infinity) || opens <= fr.sx) return fr;
+    const opens = g && L.parts(g).length ? (L.opens.get(g) ?? Infinity) : Infinity;
+    // (Its room filling the screen, less its labels' room past it; that room as at the zoom, a few rounds: it moves by a px or two at most.)
+    const fit = foldedFrame(this.fan, this.w, () => {
+      const W = fold.rooms().roomW[j];
+      let sx = this.w / W;
+      for (let k = 0; k < 3; k++) {
+        const [up, down] = this.labelsOut(v, sx);
+        sx = (this.w - up - down) / W;
+      }
+      return { ...fr, sx };
+    });
     // (A hair past its opening, so it has surely opened whatever the rounding.)
-    const sx = opens * (1 + 1e-6);
-    // (Its room's first edge on screen at its frame (its territory's from LABEL_AXIS_X, the padding its labels need), kept in px: the padding is world x,
-    // a screen and more at fifty frames in.)
-    const room = (this.fan.tess.fold as Steady).rooms().roomL[T.t.index.get(v)!];
-    const top = (room - fr.cx) * fr.sx + this.w / 2;
-    return { ...fr, sx, cx: room + (this.w / 2 - top) / sx };
+    const sx = opens < Infinity && opens * (1 + 1e-6) > fit.sx ? opens * (1 + 1e-6) : fit.sx;
+    fold.setScale(sx, this.w);
+    const cam = { ...fr, sx, cx: fold.rooms().roomL[j] + (this.w / 2 - this.labelsOut(v, sx)[0]) / sx };
+    this.frames.set(key, { ...cam });
+    return cam;
+  }
+
+  /**
+   * How far (px, at zoom sx) the labels of clade v's members there (gapCoverAt) stand past its room, above and below (ToLaD#468): a title over its member's top
+   * by its foot and its own size (titleLift, CLADE_PX); a picture wider than its band, on its band's centre, half of it (gapLabels).
+   */
+  private labelsOut(v: FanNode, sx: number): [number, number] {
+    const T = this.territories();
+    const j = T.t.index.get(v)!;
+    const { roomL, roomW } = (this.fan.tess.fold as Steady).rooms();
+    const [a, b] = [roomL[j], roomL[j] + roomW[j]];
+    const [vf, vl] = [v.strands[0].index, v.strands[v.strands.length - 1].index];
+    let [up, down] = [0, 0];
+    for (const m of this.gapCoverAt(T, sx)) {
+      if (m.f < vf || m.l > vl) continue;
+      if (m.tier === 'title') up = Math.max(up, (a - m.top) * sx + titleLift(m.gap * sx) + CLADE_PX);
+      if (m.pic && m.band * sx <= m.pic) {
+        up = Math.max(up, (a - m.at) * sx + m.pic / 2);
+        down = Math.max(down, (m.at - b) * sx + m.pic / 2);
+      }
+    }
+    return [up, down];
+  }
+
+  /** Where a tap on level lv lands (ToLaD#468): a clade on the tree on its side with its names in the gaps, openCamera; else its frame (frameOf). The fold put back after. */
+  private landOf(lv: Level): Camera {
+    if (!lv.v || !this.flip || !gapLabelsOn()) return this.frameOf(lv);
+    const restore = this.fan.tess.fold?.keep();
+    const cam = this.openCamera(lv.v);
+    restore?.();
+    return cam;
   }
 
   /**
    * A bracket's tap: fly to its clade (cladeCamera), any card closed for the flight. Folded, the flight tracks the
    * frame as the fold moves and lands on it computed there (flyTo, ToLaD#246).
    */
-  flyToClade(v: FanNode, landed?: () => void): void {
+  flyToClade(v: FanNode, landed?: () => void): Camera {
     this.selected = null;
     this.touch = null;
     this.onSelect(null);
-    this.flyTo(() => this.cladeCamera(v), undefined, landed);
+    // (On the tree on its side, where a tap lands on it, ToLaD#468.)
+    return this.flyTo(() => (this.flip && gapLabelsOn() && v.parent ? this.openCamera(v) : this.cladeCamera(v)), undefined, landed);
   }
 
   /** One level out from clade v (ToLaD#230): the nearest ranked clade it sits in, the root last; null from the root. */
@@ -1448,8 +1500,8 @@ export class FanView implements InputHandlers {
   }
 
   /** Fly to clade v from a tap (ToLaD#230), remembering where it lands (`b` the species tapped, if any). */
-  private flyLevel(b: FanBranch | null, v: FanNode): void {
-    this.flyToClade(v, () => (this.tapAt = { b, v, cam: { ...this.cam } }));
+  private flyLevel(b: FanBranch | null, v: FanNode): Camera {
+    return this.flyToClade(v, () => (this.tapAt = { b, v, cam: { ...this.cam } }));
   }
 
   /** A tap on a species' name pill or picture (ToLaD#230): fly to its branch (speciesCamera) and open its card (ToLaD#241). */
@@ -2149,7 +2201,7 @@ export class FanView implements InputHandlers {
     for (let u = to.v ? levelUp(this.fan, to.v) : levelUp(this.fan, to.b.node, true); u; u = levelUp(this.fan, u)) chain.push({ v: u });
     const k = Math.max(0, chain.findIndex((a) => holds(a, from)));
     for (const lv of k ? chain.slice(0, k).reverse() : col ? [] : [to]) {
-      const cam = this.frameOf(lv);
+      const cam = this.landOf(lv);
       // (Deeper is never further out (ToLaD#352): a level framed wider than the view is passed over on the way in. A
       // signpost's pill (an unnamed clade named for its largest named one, as "Primates" for the primates, treeshrews and
       // colugos) frames that clade at its narrowest group's fit zoom, tighter than the Primates' own frame of two wide
@@ -2372,7 +2424,8 @@ export class FanView implements InputHandlers {
 
   private goLevel(lv: Level, cam: Camera, card = true): void {
     if (lv.b) this.flyToSpecies(lv.b.sp, card);
-    else this.flyLevel(null, lv.v);
+    // (A clade's flight lands where a tap lands on it, on the tree on its side openCamera: that, the step under way, ToLaD#468.)
+    else cam = this.flyLevel(null, lv.v);
     this.backing = { lv, cam };
   }
 
@@ -2908,7 +2961,7 @@ export class FanView implements InputHandlers {
       // (Text: a group's, or a species' in the gap, the size of a title; a species' in its band its own. In the band, on the picture's line, along time from it.)
       const small = g.tier === 'in' && !!lv.b;
       const textPx = small ? SPECIES_PX : CLADE_PX;
-      let x = X(g.top) - Math.min((g.gap * sx - CLADE_PX) / 2, CLADE_PX / 4) - CLADE_PX / 2;
+      let x = X(g.top) - titleLift(g.gap * sx) - CLADE_PX / 2;
       // (A title a screen away, its band on screen and holding it: in its band, as "a name in its gap, else in its band" says; a wide first lane keeps its name after a tap.)
       if (g.tier !== 'title' || ((x < -CLADE_PX || x > this.w + CLADE_PX) && b - a >= textPx)) {
         if (!seen) continue;
