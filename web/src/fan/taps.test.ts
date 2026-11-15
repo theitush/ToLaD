@@ -7,6 +7,8 @@ import { CLADE_PX } from './gapnames';
 import type { FanBranch, FanNode } from './layout';
 import { loadMammalsFromFiles } from './mammals-node';
 import { mammaliaClade } from './panthera';
+import { LABEL_AXIS_X } from './pics';
+import { latinOf } from './brackets';
 import { mammaliaTree } from './splits';
 import type { Steady } from './steady';
 import { FanView, groupName, type GapMember } from './view';
@@ -59,6 +61,7 @@ type Priv = {
   nameHits: { box: number[]; b: FanBranch }[];
   territories(): never;
   gapCoverAt(T: never, sx: number): GapMember[];
+  frameOf(lv: { v: FanNode }): Camera;
 };
 const P = (v: FanView) => v as unknown as Priv;
 const proc = (globalThis as unknown as { process: { env: Record<string, string>; stderr: { write(s: string): void } } }).process;
@@ -102,6 +105,21 @@ describe('one tap on a label opens it (ToLaD#465)', () => {
   const inside = (g: GapMember, u: FanNode) => g.f >= u.strands[0].index && g.l <= u.strands[u.strands.length - 1].index;
   const off = (a: Camera, b: Camera) => Math.max(Math.abs(a.cx - b.cx) * a.sx, Math.abs(Math.log(a.sx / b.sx)) * v.w);
   const tapBox = (box: number[]) => v.tap((box[0] + box[2]) / 2, (box[1] + box[3]) / 2);
+  /**
+   * Where group u stands on screen now (ToLaD#468), px from the top: its room's first edge (the hull of its strands at every time: its first branch), where
+   * its frame has it (`frame`) and now (`room`); its first strand on the labels' column (the topmost of its members' lanes there); its territory's edge.
+   */
+  const topOf = (u: FanNode): { frame: number; room: number; strand: number; edge: number } => {
+    const fr = P(v).frameOf({ v: u });
+    const T = P(v).territories() as unknown as { t: { index: Map<FanNode, number> } };
+    const room = (v.fan.tess.fold as Steady).rooms().roomL[T.t.index.get(u)!];
+    const X = (x: number) => v.toScreen(x, 0)[0];
+    const ms = P(v)
+      .gapCoverAt(P(v).territories(), v.cam.sx)
+      .filter((g) => inside(g, u) && g.on >= 0);
+    return { frame: (room - fr.cx) * fr.sx + v.w / 2, room: X(room), strand: ms.length ? Math.min(...ms.map((g) => X(g.top))) : NaN, edge: X(fr.cx - (v.w / 2 - LABEL_AXIS_X) / fr.sx) };
+  };
+  const topSay = (t: ReturnType<typeof topOf>) => `its first branch at ${t.room.toFixed(1)} px (its frame's ${t.frame.toFixed(1)}), its first strand at the column ${t.strand.toFixed(1)} px, its territory's edge ${t.edge.toFixed(1)} px`;
 
   /**
    * A tap on group u's name: it opens (the cover splits it: its name gone, two or more of its parts in the cover), one of them or more named on screen, and it moved more than a few
@@ -122,6 +140,11 @@ describe('one tap on a label opens it (ToLaD#465)', () => {
     expect(P(v).gapCoverAt(P(v).territories(), v.cam.sx).filter((g) => inside(g, u)).length, line).toBeGreaterThanOrEqual(2);
     expect(parts.length, line).toBeGreaterThanOrEqual(1);
     expect(off(v.cam, was), line).toBeGreaterThan(12);
+    // (Its first branch at the top, where its frame has it, ToLaD#468: the rest of it below, a scroll away.)
+    const t = topOf(u);
+    say(`  top: ${topSay(t)}`);
+    expect(Math.abs(t.room - t.frame), `${line}\n  ${topSay(t)}`).toBeLessThan(1);
+    expect(t.room, `${line}\n  ${topSay(t)}`).toBeGreaterThanOrEqual(LABEL_AXIS_X - 1);
   };
 
   it('every label at home opens with a tap; a double tap comes home', () => {
@@ -169,6 +192,39 @@ describe('one tap on a label opens it (ToLaD#465)', () => {
         opens(h!.v, sci);
       }
       throw new Error(`${sci}: no card in 40 taps`);
+    });
+  }
+
+  // Down to a group by its labels, from home (ToLaD#468): each tap on the label holding it, the last on its own; where its first strand lands, and the zoom.
+  for (const latin of ['Primates', 'Carnivora', 'Rodentia', 'Hominidae']) {
+    it(`a tap opens ${latin} with its first branch at the top`, () => {
+      const u = v.fan.nodes.find((q) => latinOf(q.split) === latin)!;
+      expect(u, latin).toBeDefined();
+      const up = new Set<FanNode>();
+      for (let p = u.parent; p; p = p.parent) up.add(p);
+      stand(home);
+      for (let k = 0; k < 20; k++) {
+        // (Its label off screen, a fat lane's title a screen away: panned to, as anyone would.)
+        if (!P(v).famHits.some((q) => q.v === u || up.has(q.v))) {
+          const m = P(v)
+            .gapCoverAt(P(v).territories(), v.cam.sx)
+            .find((g) => g.lv.v === u || (g.lv.v && up.has(g.lv.v)));
+          if (m) stand({ ...v.cam, cx: m.top + (v.w / 2 - v.w / 3) / v.cam.sx });
+        }
+        const h = P(v).famHits.find((q) => q.v === u) ?? P(v).famHits.find((q) => up.has(q.v));
+        expect(h, `${latin}: no label holds it at ${(v.cam.sx / home.sx).toFixed(1)}x: ${shown().map(nameOf).join(', ')}`).toBeDefined();
+        opens(h!.v, latin);
+        // (Open: the cover's members on it all inside it, its parts.)
+        const [uf, ul] = [u.strands[0].index, u.strands[u.strands.length - 1].index];
+        if (!P(v).gapCoverAt(P(v).territories(), v.cam.sx).some((g) => g.f <= uf && g.l >= ul)) {
+          const t = topOf(u);
+          say(`${latin}: open after ${k + 1} taps at ${(v.cam.sx / home.sx).toFixed(1)}x, ${topSay(t)}`);
+          expect(t.room).toBeGreaterThanOrEqual(LABEL_AXIS_X - 1);
+          expect(t.room).toBeLessThan(v.w);
+          return;
+        }
+      }
+      throw new Error(`${latin}: not reached in 20 taps`);
     });
   }
 });
