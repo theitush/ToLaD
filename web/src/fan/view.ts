@@ -7,8 +7,8 @@
 import { drawPic, hasPic, livePic, PIC_TRIES, prefetchPics } from './wiki';
 import { AXIS_ROOM, chainFit, CHAIN_ROOM, flipOn, forkQuiet, FORK_PX as FLIP_FORK_PX, gapLabelsOn, gapNamesOn, LABELS_MA, NOW_PX, turnCanvas, upright } from './flip';
 import { CLADE_FONT, CLADE_PX, GapNames, SPECIES_FONT, SPECIES_PX, type WrittenName } from './gapnames';
-import { columnGaps, gapCover, gapOpens, ownLanes, picFits, tier, type Member, type Tier } from './gaplabels';
-import { GROUP_D, LABEL_AXIS_X, labelMode, PIC_D, PIC_LIFT, PIC_ROOM, picBox, type PicSpot } from './pics';
+import { columnGaps, gapCover, gapOpens, ownLanes, picAt, picRanges, tier, type Member, type PicCand, type PicRange, type Tier } from './gaplabels';
+import { GROUP_D, LABEL_AXIS_X, labelMode, PIC_D, PIC_LIFT, PIC_ROOM, PIC_S, picBox, type PicSpot } from './pics';
 import { coverLadder, keepOnScreen, placeSlots } from './slide';
 import { formatCount, formatMass } from '../data/count';
 import { stamp } from '../stamp';
@@ -619,7 +619,8 @@ export interface CoverGroup {
 export interface GapMember extends CoverGroup, Member {
   on: number;
   tier?: Tier;
-  pic?: boolean;
+  /** Its picture's diameter (px) at this zoom, PIC_D or PIC_S; 0 for none (ToLaD#464). */
+  pic?: number;
 }
 /** A cut item's strands (drawn order): first and last. */
 export type Run = [number, number];
@@ -2737,10 +2738,38 @@ export class FanView implements InputHandlers {
       L = this.gapLadder = { T, root, parts, opens: gapOpens(root, parts, (g) => (g.on < 0 ? 0 : Math.max(g.gap, g.band)), CLADE_PX) };
     }
     const list = gapCover(L.root, L.parts, L.opens, sx).filter((g) => g.on >= 0).sort((p, q) => p.on - q.on);
-    const out = list.map((g) => ({ ...g, tier: tier(g, sx, CLADE_PX, SPECIES_PX), pic: picFits(g, sx, GROUP_D) }));
+    const pics = this.gapPicsOf(L);
+    const out = list.map((g) => ({ ...g, tier: tier(g, sx, CLADE_PX, SPECIES_PX), pic: picAt(pics.get(g), sx, PIC_D, PIC_S) }));
     this.gapCoverLast = { T, sx, list: out };
     return out;
   }
+
+  /**
+   * Every member's pictures as zoom ranges (ToLaD#464, gaplabels.ts picRanges), once a cover ladder: each member of any cover with a strand on the column a candidate, from the zoom its parent opens at
+   * to its own. Priority: the more individuals alive now, then the wider band, then the first: a picture is a face to know the branch by, and the most living are the faces most met (the cover's own
+   * order, coverAt). Rooms: a picture and a hair to the next, as GROUP_D for a full one.
+   */
+  private gapPicsOf(L: { T: CutTerritories; root: GapMember; parts: (g: GapMember) => GapMember[]; opens: Map<GapMember, number> }): Map<GapMember, PicRange> {
+    if (this.gapPicsLast?.L === L) return this.gapPicsLast.ranges;
+    const ms: GapMember[] = [];
+    const cands: (PicCand & { m: GapMember; alive: number })[] = [];
+    const stack: [GapMember, number][] = [[L.root, 0]];
+    while (stack.length) {
+      const [g, enter] = stack.pop()!;
+      const ps = L.parts(g);
+      const exit = ps.length ? (L.opens.get(g) ?? Infinity) : Infinity;
+      if (g.on >= 0 && enter < exit) cands.push({ m: g, at: g.at, enter, exit, alive: L.T.aliveOf(g.k) });
+      for (const p of ps) stack.push([p, exit]);
+    }
+    cands.sort((p, q) => q.alive - p.alive || q.m.band - p.m.band || p.m.on - q.m.on);
+    for (const c of cands) ms.push(c.m);
+    const hair = GROUP_D - PIC_D;
+    const rs = picRanges(cands, GROUP_D, PIC_S + hair);
+    const ranges = new Map(ms.map((m, i) => [m, rs[i]]));
+    this.gapPicsLast = { L, ranges };
+    return ranges;
+  }
+  private gapPicsLast: { L: object; ranges: Map<GapMember, PicRange> } | null = null;
   private gapCoverLast: { T: CutTerritories; sx: number; list: GapMember[] } | null = null;
   private gapLadder: { T: CutTerritories; root: GapMember; parts: (g: GapMember) => GapMember[]; opens: Map<GapMember, number> } | null = null;
 
@@ -2757,37 +2786,71 @@ export class FanView implements InputHandlers {
   }
 
   /**
-   * This frame's labels by one rule (ToLaD#458, gaplabels.ts): a name in the gap above its branch, else in its own band, a group's span line going down the branch from there; a picture in the band
-   * of anyone whose band holds one, a species' name then its pill. All on the 100 kya column (labelBand), held on screen as labels are (flipPicY); across, a title stands at its branch's top and leaves
-   * with it, anything in a band stays inside that band's part on screen. `names` holds the text alone, `spots` the pills, `pics` the pictures.
+   * This frame's labels by one rule (ToLaD#458, gaplabels.ts): a name in the gap above its branch, else in its own band, a group's span line going down the branch from there; a picture for anyone
+   * the zoom gives one (ToLaD#464, picRanges), full or small, on its band's centre on the column, wider than its band or not, a species' name then its pill where that stands in its own room (its gap
+   * and its band), else by its tier. All on the 100 kya column (labelBand), held on screen as labels are (flipPicY), but no older than where the member's branch begins: past that it leaves with its
+   * branch, a sticky header stopping at its section's end (Ita: "they should[n't] go left past the beginning of their branchs"). Across, a title stands at its branch's top and leaves with it; a
+   * picture slides inside its band's part on screen, never into a neighbour's picture; anything in a band stays inside that band. `names` holds the text alone, `spots` the pills, `pics` the pictures.
    */
   private gapLabels(T: CutTerritories, row: number): CutLabels {
     const out: CutLabels = { spots: [], groups: new Map(), pics: [], items: [], all: [], names: [] };
     this.picSpots = out.pics;
     const X = (x: number) => this.toScreen(x, 0)[0];
+    const Y = (y: number) => this.toScreen(0, y)[1];
     const Wy = (y: number) => this.toWorld(0, y)[1];
     const { sx } = this.cam;
     const { cap } = this.labelBand();
     const half = LABEL_PILL / 2;
-    const y1 = row + PIC_ROOM - PIC_D - LABEL_UNDER;
-    const r0 = PIC_D / 2;
-    for (const g of this.gapCoverAt(T, sx)) {
+    const hold = row + PIC_ROOM - PIC_D / 2;
+    const col = Y(this.fan.time.y(LABELS_MA));
+    const hair = GROUP_D - PIC_D;
+    const list = this.gapCoverAt(T, sx);
+    // (Where each picture may slide across, screen x: inside its band's part on screen, clear of the next pictures' centres by both their rooms, as far as picRanges keeps them apart; one wider than
+    // its band stands on its centre. So a hold at the screen's edge never pushes one into another.)
+    const shown = list.filter((g) => g.pic);
+    const slide = new Map<GapMember, [number, number]>();
+    shown.forEach((g, i) => {
+      const [d, c] = [g.pic!, X(g.at)];
+      let [lo, hi] = [c, c];
+      if (g.band * sx > d) {
+        [lo, hi] = [X(g.at - g.band / 2) + d / 2, X(g.at + g.band / 2) - d / 2];
+        const [p, q] = [shown[i - 1], shown[i + 1]];
+        if (p) lo = Math.max(lo, X(p.at) + (p.pic! + d) / 2 + hair);
+        if (q) hi = Math.min(hi, X(q.at) - (q.pic! + d) / 2 - hair);
+      }
+      slide.set(g, [Math.min(lo, c), Math.max(hi, c)]);
+    });
+    for (const g of list) {
       if (!g.tier && !g.pic) continue;
       const { lv } = g;
       const key = `g${g.k}`;
       const name = lv.b ? levelText(lv.b) : groupName(this.fan, lv.v);
       const face = lv.b ?? groupFace(lv.v) ?? lv.v.strands[0];
+      // (Its row: held as everyone's, but its pictures' slot no older than its branch's start, the fork it splits from its sister at.)
+      const start = Y(lv.b ? lv.b.splitY : lv.v.yBot);
+      const at = start > col ? Math.min(hold, Math.max(col, start - PIC_D / 2)) : Math.max(hold, Math.min(col, start + PIC_D / 2));
+      // (Gone off the screen's edge with its branch: the names stand younger still.)
+      if (at + PIC_D / 2 < 0) continue;
+      const y1 = at - PIC_D / 2 - LABEL_UNDER;
       const s: LabelSpot = { key, id: key, place: 'tip', text: name, rank: [0, 0, g.k], x: 0, y1, box: [0, 0, 0, 0], fit: 1, plus: 0, pic: face };
       if (lv.b) s.b = lv.b;
       else Object.assign(s, { v: lv.v, fam: lv.v });
-      // (In its own band's part on screen; narrower than the label: on its centre.)
+      // (Its own room across: its gap and its band, nobody else's. In its band's part on screen; narrower than the label: on its centre.)
       const [a, b] = [X(g.at - g.band / 2), X(g.at + g.band / 2)];
+      const [ra, rb] = [X(g.top - g.gap), X(g.top + g.band)];
       const inBand = (need: number) => (b - a < 2 * need ? (a + b) / 2 : Math.max(a + need, Math.min(b - need, Math.max(need, Math.min(this.w - need, (a + b) / 2)))));
       const seen = b >= 0 && a <= this.w;
-      const picX = g.pic ? inBand(r0) : 0;
-      if (g.pic && seen) out.pics.push({ x: picX, y: row + PIC_ROOM - PIC_D / 2, i: out.pics.length, lv, face, held: true });
-      if (g.pic && lv.b) {
-        // (A species' name a pill, on its picture.)
+      let d = g.pic ?? 0;
+      const [lo, hi] = slide.get(g) ?? [0, 0];
+      const picX = d ? Math.max(lo, Math.min(hi, Math.max(d / 2, Math.min(this.w - d / 2, X(g.at))))) : 0;
+      // (Stopped at its branch's start it stands younger than its neighbours' names: only while inside its own room.)
+      if (d && at !== hold && (picX - d / 2 < ra || picX + d / 2 > rb)) d = 0;
+      if (d && picX + d / 2 >= 0 && picX - d / 2 <= this.w) {
+        const p = { x: picX, y: at - PIC_D / 2 + d / 2, i: out.pics.length, lv, face, held: true };
+        out.pics.push(d === PIC_D ? p : { ...p, d });
+      }
+      if (d && lv.b && lo - half >= ra && hi + half <= rb) {
+        // (A species' name a pill, on its picture, where the pill stands in its own room wherever the picture slides.)
         if (!seen) continue;
         s.x = picX;
         s.text = this.pillText(name, cap - 2 * LABEL_PAD);
@@ -2805,7 +2868,7 @@ export class FanView implements InputHandlers {
         if (x < -CLADE_PX || x > this.w + CLADE_PX) continue;
       } else {
         if (!seen) continue;
-        x = g.pic ? picX : inBand(textPx / 2);
+        x = d ? Math.max(a + textPx / 2, Math.min(b - textPx / 2, picX)) : inBand(textPx / 2);
       }
       s.x = x;
       s.plain = small ? SPECIES_FONT : CLADE_FONT;
@@ -3803,16 +3866,16 @@ export class FanView implements InputHandlers {
   picSpots: (PicSpot & { lv: Level; face: FanBranch; run?: Run })[] = [];
 
   /** One picture, standing upright on the phone when the canvas is turned. */
-  private drawDisc(sci: Parameters<typeof drawPic>[1], x: number, y: number): void {
+  private drawDisc(sci: Parameters<typeof drawPic>[1], x: number, y: number, d = PIC_D): void {
     const ctx = this.ctx;
     if (!this.flip) {
-      drawPic(ctx, sci, x, y, PIC_D, () => this.request());
+      drawPic(ctx, sci, x, y, d, () => this.request());
       return;
     }
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(-Math.PI / 2);
-    drawPic(ctx, sci, 0, 0, PIC_D, () => this.request());
+    drawPic(ctx, sci, 0, 0, d, () => this.request());
     ctx.restore();
   }
 
@@ -3825,9 +3888,9 @@ export class FanView implements InputHandlers {
     ctx.strokeStyle = INK3;
     ctx.lineWidth = 1;
     // (Hits: the one on top found first.)
-    for (const p of [...this.picSpots].reverse()) this.thumbHits.push([p.x, p.y, PIC_D / 2, p.face, p.lv.v, p.run]);
+    for (const p of [...this.picSpots].reverse()) this.thumbHits.push([p.x, p.y, (p.d ?? PIC_D) / 2, p.face, p.lv.v, p.run]);
     // (Its placeholder at once, the picture fading in when loaded; what a tap would show next fetched ahead, ToLaD#351.)
-    for (const p of this.picSpots) this.drawDisc(discSci(p.lv, p.face), p.x, p.y);
+    for (const p of this.picSpots) this.drawDisc(discSci(p.lv, p.face), p.x, p.y, p.d);
     prefetchPics(this.picSpots.flatMap((p) => (p.lv.v ? nextFaces(this.fan, p.lv.v) : [])));
     ctx.restore();
   }

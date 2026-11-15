@@ -8,10 +8,14 @@ export interface PicSpot {
   x: number;
   y: number;
   i: number;
+  /** Its diameter (px) when not PIC_D: a small picture's, PIC_S (ToLaD#464). */
+  d?: number;
 }
 
 /** A picture's diameter (px), every picture's, the same at every zoom. */
 export const PIC_D = 36;
+/** A small picture's diameter (px, ToLaD#464, Ita: "put lil pics on the ones that dont fit"): the one other size, for whoever has no room for a full one. */
+export const PIC_S = 22;
 /** The room (px, wide and tall) a cut reserves for a label's picture: what frames, taps and "does this level's label fit" go by. */
 export const PIC_ROOM = 50;
 /** Right edge (px) of the time axis's labels: species' labels keep right of it, a frame fills from here to the screen's edge. */
@@ -20,8 +24,9 @@ export const LABEL_AXIS_X = 72;
 export const PIC_LIFT = 14;
 
 /** The box a disc takes on screen [x0, y0, x1, y1]. */
-export function picBox(p: { x: number; y: number }): number[] {
-  return [p.x - PIC_D / 2, p.y - PIC_D / 2, p.x + PIC_D / 2, p.y + PIC_D / 2];
+export function picBox(p: { x: number; y: number; d?: number }): number[] {
+  const r = (p.d ?? PIC_D) / 2;
+  return [p.x - r, p.y - r, p.x + r, p.y + r];
 }
 
 /**

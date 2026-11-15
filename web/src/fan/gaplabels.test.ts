@@ -7,7 +7,7 @@ import { mammaliaTree } from './splits';
 import { loadMammalsFromFiles } from './mammals-node';
 import type { Steady } from './steady';
 import { FanView, groupFace, type CutLabels, type GapMember } from './view';
-import { GROUP_D, PIC_D, picBox } from './pics';
+import { GROUP_D, PIC_D, PIC_S, picBox } from './pics';
 
 function stubView(): FanView {
   const noop = () => {};
@@ -121,20 +121,78 @@ describe('labels in the gaps and in the branches', () => {
     for (const z of ZOOMS) for (const m of cover(home * z)) expect(m.tier, String(name(m))).toBeTruthy();
   });
 
-  it('a picture only in a band that holds it, by the zoom alone, and never in a gap', () => {
+  it('pictures by priority and collision (ToLaD#464): full or small, no two ever meeting, wider than a band or not', () => {
+    const hair = GROUP_D - PIC_D;
+    let [full, small, held] = [0, 0, 0];
     for (const z of ZOOMS) {
       const sx = home * z;
-      const byKey = new Map(cover(sx).map((m) => [m.lv, m]));
-      for (const m of cover(sx)) expect(m.pic).toBe(m.band * sx >= GROUP_D);
-      const c = frame(sx, f.rooms().C[f.rooms().C.length >> 1]);
-      for (const p of c.pics) {
-        const m = byKey.get(p.lv)!;
-        expect(m.pic).toBe(true);
-        expect(p.x - PIC_D / 2).toBeGreaterThanOrEqual(v.toScreen(m.at - m.band / 2, 0)[0] - 1e-6);
-        expect(p.x + PIC_D / 2).toBeLessThanOrEqual(v.toScreen(m.at + m.band / 2, 0)[0] + 1e-6);
+      const ms = cover(sx).filter((m) => m.pic);
+      for (const m of ms) expect([PIC_D, PIC_S]).toContain(m.pic);
+      // (Centres on the bands' centres, apart by both rooms: from the zoom alone.)
+      for (let i = 1; i < ms.length; i++) expect((ms[i].at - ms[i - 1].at) * sx).toBeGreaterThanOrEqual((ms[i].pic! + ms[i - 1].pic!) / 2 + hair - 1e-6);
+      full += ms.filter((m) => m.pic === PIC_D).length;
+      small += ms.filter((m) => m.pic === PIC_S).length;
+      held += cover(sx).filter((m) => m.band * sx >= GROUP_D).length;
+      // (Drawn, held on screen: still none meeting.)
+      for (const at of [0.1, 0.5, 0.9]) {
+        const ps = [...frame(sx, f.rooms().C[Math.floor(f.rooms().C.length * at)]).pics].sort((p, q) => p.x - q.x);
+        for (let i = 1; i < ps.length; i++) expect(ps[i].x - ps[i - 1].x).toBeGreaterThanOrEqual(((ps[i].d ?? PIC_D) + (ps[i - 1].d ?? PIC_D)) / 2 - 1e-6);
       }
     }
-    expect(cover(home).some((m) => m.pic)).toBe(true);
+    console.log(`[pics] over ${ZOOMS.length} zooms: ${full} full, ${small} small; bands holding one ${held}`);
+    expect(full).toBeGreaterThan(held);
+    expect(small).toBeGreaterThan(0);
+  });
+
+  it('a picture once shown stays as the view zooms in, until its member splits (a small one may grow)', () => {
+    let prev = new Map<unknown, number>();
+    for (let z = 1; z < 2 ** 12; z *= 1.05) {
+      const now = new Map(cover(home * z).map((m) => [m.lv.b ?? m.lv.v, m.pic ?? 0]));
+      for (const [k, d] of prev) if (now.has(k)) expect(now.get(k)!).toBeGreaterThanOrEqual(d);
+      prev = now;
+    }
+  });
+
+  it('a pan at one zoom changes no picture', () => {
+    const { C } = f.rooms();
+    for (const z of [1, 4, 16, 64, 256]) {
+      const sx = home * z;
+      const pics = (cx: number) => new Map(frame(sx, cx).pics.map((p) => [p.lv.b ?? p.lv.v, [p.d ?? PIC_D, Math.round((v.toWorld(p.x, 0)[0] - cx) * sx * 1e3)]]));
+      const [a, b] = [C[C.length >> 1], C[C.length >> 1] + 40 / sx];
+      const [A, B] = [pics(a), pics(b)];
+      let both = 0;
+      for (const [k, d] of A)
+        if (B.has(k)) {
+          expect(B.get(k)![0]).toBe(d[0]);
+          both++;
+        }
+      if (A.size > 2) expect(both).toBeGreaterThan(0);
+    }
+  });
+
+  it('a picture no older than its branch: a pan into the past leaves it at its branch’s start (Ita, ToLaD#464)', () => {
+    const sx = home * 8;
+    const { C } = f.rooms();
+    const Y = (y: number) => v.toScreen(0, y)[1];
+    let stopped = 0;
+    const cam = { ...v.cam, sx, cx: C[C.length >> 1] };
+    for (const back of [0, 0.25, 0.5, 1, 2, 4]) {
+      v.cam = cam;
+      const c0 = inner().labelsNow().cut;
+      // (Older to the larger y: the past comes in by moving the world's older times on screen, here by `back` screens.)
+      expect(Y(v.fan.time.y(1))).toBeGreaterThan(Y(v.fan.time.y(0.1)));
+      v.cam = { ...cam, cy: v.toWorld(0, v.h / 2 + back * v.h)[1] };
+      const c = inner().labelsNow().cut;
+      const col = Y(v.fan.time.y(0.1));
+      for (const p of c.pics) {
+        const start = Y(p.lv.b ? p.lv.b.splitY : p.lv.v!.yBot);
+        const slot = p.y - (p.d ?? PIC_D) / 2 + PIC_D / 2;
+        // (Its slot's old edge at its start at the most, unless the column itself stands there.)
+        expect(slot, String(p.face.sp.sci)).toBeLessThanOrEqual(Math.max(col, start - PIC_D / 2) + 1e-6);
+      }
+      stopped += c0.pics.length - c.pics.length;
+    }
+    expect(stopped).toBeGreaterThan(0);
   });
 
   it('never a label over another, a picture and pill counted, at any zoom', () => {
@@ -182,7 +240,7 @@ describe('labels in the gaps and in the branches', () => {
     // (At Primates' frame humans stand in a group with a thin first part, that group's picture a human: a funnel, its band read whole. The same for cat and dog at Carnivora's.)
     for (const [taxon, sci] of [['Primates', 'Homo sapiens'], ['Carnivora', 'Felis catus'], ['Carnivora', 'Canis familiaris']]) {
       const m = holder(taxon, sci);
-      expect(m.pic, sci).toBe(true);
+      expect(m.pic, sci).toBe(PIC_D);
       expect(m.lv.b?.sp.sci ?? groupFace(m.lv.v!)?.sp.sci, sci).toBe(sci);
     }
     let z = 1;
