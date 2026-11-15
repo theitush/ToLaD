@@ -2865,14 +2865,12 @@ export class FanView implements InputHandlers {
       // (Text: a group's, or a species' in the gap, the size of a title; a species' in its band its own. In the band, on the picture's line, along time from it.)
       const small = g.tier === 'in' && !!lv.b;
       const textPx = small ? SPECIES_PX : CLADE_PX;
-      let x: number;
-      if (g.tier === 'title') {
-        x = X(g.top) - Math.min((g.gap * sx - CLADE_PX) / 2, CLADE_PX / 4) - CLADE_PX / 2;
-        if (x < -CLADE_PX || x > this.w + CLADE_PX) continue;
-      } else {
+      let x = X(g.top) - Math.min((g.gap * sx - CLADE_PX) / 2, CLADE_PX / 4) - CLADE_PX / 2;
+      // (A title a screen away, its band on screen and holding it: in its band, as "a name in its gap, else in its band" says; a wide first lane keeps its name after a tap.)
+      if (g.tier !== 'title' || ((x < -CLADE_PX || x > this.w + CLADE_PX) && b - a >= textPx)) {
         if (!seen) continue;
         x = d ? Math.max(a + textPx / 2, Math.min(b - textPx / 2, picX)) : inBand(textPx / 2);
-      }
+      } else if (x < -CLADE_PX || x > this.w + CLADE_PX) continue;
       s.x = x;
       s.plain = small ? SPECIES_FONT : CLADE_FONT;
       s.text = small || this.titleWidth(s.plain, name) <= cap ? name : this.pillText(name, cap);

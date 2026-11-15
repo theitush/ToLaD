@@ -105,8 +105,8 @@ describe('labels in the gaps and in the branches', () => {
         expect(seen.has(m.on)).toBe(false);
         seen.add(m.on);
         const top = v.toScreen(m.top, 0)[0];
-        if (m.tier === 'in') {
-          // (Too thin a gap: on its own band.)
+        if (m.tier === 'in' || s.box[2] > top + 1e-6) {
+          // (Too thin a gap, or its gap a screen away: on its own band.)
           expect(s.box[0]).toBeGreaterThanOrEqual(v.toScreen(m.at - m.band / 2, 0)[0] - 1e-6);
           expect(s.box[2]).toBeLessThanOrEqual(v.toScreen(m.at + m.band / 2, 0)[0] + 1e-6);
           continue;
