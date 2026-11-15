@@ -1,17 +1,17 @@
-// One tap on a label opens it (ToLaD#465): on the tree on its side, a tap on any group's name lands where that group's parts have names of their own; a second tap never just moves a few px.
+// One tap on a label opens it (ToLaD#465): on the tree on its side, a tap on any group's name lands where that group's parts have names of their own; a second tap never just moves a few px. Every tap that lands on a group lands with its first branch at the top (ToLaD#468).
 // `TAPS_SAY=1` prints what each tap does.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Camera, FanCamera } from './camera';
 import { setFlip } from './flip';
 import { CLADE_PX } from './gapnames';
-import type { FanBranch, FanNode } from './layout';
+import { laneAt, leftAt, type FanBranch, type FanNode } from './layout';
 import { loadMammalsFromFiles } from './mammals-node';
 import { mammaliaClade } from './panthera';
-import { LABEL_AXIS_X } from './pics';
+import { picBox } from './pics';
 import { latinOf } from './brackets';
 import { mammaliaTree } from './splits';
 import type { Steady } from './steady';
-import { FanView, groupName, type GapMember } from './view';
+import { FanView, groupName, type CutLabels, type GapMember } from './view';
 
 function stubView(): FanView {
   const noop = () => {};
@@ -62,6 +62,7 @@ type Priv = {
   territories(): never;
   gapCoverAt(T: never, sx: number): GapMember[];
   frameOf(lv: { v: FanNode }): Camera;
+  picSpots: CutLabels['pics'];
 };
 const P = (v: FanView) => v as unknown as Priv;
 const proc = (globalThis as unknown as { process: { env: Record<string, string>; stderr: { write(s: string): void } } }).process;
@@ -106,20 +107,48 @@ describe('one tap on a label opens it (ToLaD#465)', () => {
   const off = (a: Camera, b: Camera) => Math.max(Math.abs(a.cx - b.cx) * a.sx, Math.abs(Math.log(a.sx / b.sx)) * v.w);
   const tapBox = (box: number[]) => v.tap((box[0] + box[2]) / 2, (box[1] + box[3]) / 2);
   /**
-   * Where group u stands on screen now (ToLaD#468), px from the top: its room's first edge (the hull of its strands at every time: its first branch), where
-   * its frame has it (`frame`) and now (`room`); its first strand on the labels' column (the topmost of its members' lanes there); its territory's edge.
+   * Where group u stands on screen now (ToLaD#468), px from the screen's top (on the tree on its side, the header's foot: the chain of groups stands over the view): its room's first edge (the hull
+   * of its strands at every time: its first branch); the top of all of it there, its parts' labels on screen above that edge (its first part's title, a picture wider than its band) or the edge
+   * itself; and the end of what is drawn before it (the strands outside it, above it, on screen).
    */
-  const topOf = (u: FanNode): { frame: number; room: number; strand: number; edge: number } => {
-    const fr = P(v).frameOf({ v: u });
-    const T = P(v).territories() as unknown as { t: { index: Map<FanNode, number> } };
-    const room = (v.fan.tess.fold as Steady).rooms().roomL[T.t.index.get(u)!];
+  const topOf = (u: FanNode): { room: number; top: number; before: number } => {
+    const T = P(v).territories() as unknown as { t: { index: Map<FanNode, number>; strands: FanBranch[] } };
+    const { roomL, C, R } = (v.fan.tess.fold as Steady).rooms();
     const X = (x: number) => v.toScreen(x, 0)[0];
-    const ms = P(v)
-      .gapCoverAt(P(v).territories(), v.cam.sx)
-      .filter((g) => inside(g, u) && g.on >= 0);
-    return { frame: (room - fr.cx) * fr.sx + v.w / 2, room: X(room), strand: ms.length ? Math.min(...ms.map((g) => X(g.top))) : NaN, edge: X(fr.cx - (v.w / 2 - LABEL_AXIS_X) / fr.sx) };
+    const [uf, ul] = [u.strands[0].index, u.strands[u.strands.length - 1].index];
+    const mine = (q: { v?: FanNode; b?: FanBranch }) => (q.b ? q.b.index >= uf && q.b.index <= ul : !!q.v && q.v.strands[0].index >= uf && q.v.strands[q.v.strands.length - 1].index <= ul);
+    const room = X(roomL[T.t.index.get(u)!]);
+    let top = room;
+    for (const q of [...v.cutLast!.names, ...v.cutLast!.spots]) if (mine(q) && q.box[2] >= 0 && q.box[0] <= v.w) top = Math.min(top, q.box[0]);
+    for (const q of P(v).picSpots) {
+      const box = picBox(q);
+      if (mine(q.lv) && box[2] >= 0 && box[0] <= v.w) top = Math.min(top, box[0]);
+    }
+    // (What is drawn of each strand before it whose room reaches the screen, row by row down the screen: its own column, where it lives, younger than its split.)
+    let before = -Infinity;
+    const strands = T.t.strands;
+    for (let i = 0; i < uf; i++) {
+      if (X(C[i] + R[i] / 2) <= 0) continue;
+      const b = strands[i];
+      for (let y = 0; y <= v.h; y += 2) {
+        const wy = v.toWorld(0, y)[1];
+        const lw = wy < b.splitY ? laneAt(b, wy).w : 0;
+        if (lw > 0) before = Math.max(before, X(leftAt(b, wy) + lw));
+      }
+    }
+    return { room, top, before };
   };
-  const topSay = (t: ReturnType<typeof topOf>) => `its first branch at ${t.room.toFixed(1)} px (its frame's ${t.frame.toFixed(1)}), its first strand at the column ${t.strand.toFixed(1)} px, its territory's edge ${t.edge.toFixed(1)} px`;
+  const topSay = (t: ReturnType<typeof topOf>) => `its first branch at ${t.room.toFixed(1)} px, its top (a title, a picture or that) at ${t.top.toFixed(1)} px, what is before it to ${t.before.toFixed(1)} px`;
+  /** Group u at the top (ToLaD#468): the top of it at the screen's top, its first branch under only its labels' room, nothing of anything before it on screen. */
+  const atTop = (u: FanNode, line: string): void => {
+    const t = topOf(u);
+    say(`  top: ${topSay(t)}`);
+    expect(Math.abs(t.top), `${line}\n  ${topSay(t)}`).toBeLessThan(1);
+    expect(t.room, `${line}\n  ${topSay(t)}`).toBeLessThan(v.w);
+    // (Nothing drawn before it on screen; where its first part's title stands above its first edge, in its gap on the labels' column, a strand before it can reach into that room at another
+    // time (the one before the cats, 4 px, from the lion), never past it.)
+    expect(t.before, `${line}\n  ${topSay(t)}`).toBeLessThan(t.top < t.room - 1 ? t.room : 1);
+  };
 
   /**
    * A tap on group u's name: it opens (the cover splits it: its name gone, two or more of its parts in the cover), one of them or more named on screen, and it moved more than a few
@@ -140,11 +169,8 @@ describe('one tap on a label opens it (ToLaD#465)', () => {
     expect(P(v).gapCoverAt(P(v).territories(), v.cam.sx).filter((g) => inside(g, u)).length, line).toBeGreaterThanOrEqual(2);
     expect(parts.length, line).toBeGreaterThanOrEqual(1);
     expect(off(v.cam, was), line).toBeGreaterThan(12);
-    // (Its first branch at the top, where its frame has it, ToLaD#468: the rest of it below, a scroll away.)
-    const t = topOf(u);
-    say(`  top: ${topSay(t)}`);
-    expect(Math.abs(t.room - t.frame), `${line}\n  ${topSay(t)}`).toBeLessThan(1);
-    expect(t.room, `${line}\n  ${topSay(t)}`).toBeGreaterThanOrEqual(LABEL_AXIS_X - 1);
+    // (Its first branch at the top, ToLaD#468: the rest of it below, a scroll away.)
+    atTop(u, line);
   };
 
   it('every label at home opens with a tap; a double tap comes home', () => {
@@ -217,9 +243,10 @@ describe('one tap on a label opens it (ToLaD#465)', () => {
         // (Open: the cover's members on it all inside it, its parts.)
         const [uf, ul] = [u.strands[0].index, u.strands[u.strands.length - 1].index];
         if (!P(v).gapCoverAt(P(v).territories(), v.cam.sx).some((g) => g.f <= uf && g.l >= ul)) {
+          // (The tap that opened it at the top, opens(); it, its first branch on screen.)
           const t = topOf(u);
           say(`${latin}: open after ${k + 1} taps at ${(v.cam.sx / home.sx).toFixed(1)}x, ${topSay(t)}`);
-          expect(t.room).toBeGreaterThanOrEqual(LABEL_AXIS_X - 1);
+          expect(t.room).toBeGreaterThanOrEqual(-1);
           expect(t.room).toBeLessThan(v.w);
           return;
         }
