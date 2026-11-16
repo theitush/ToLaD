@@ -8,6 +8,8 @@
 // (a name's spaces as _) pinch:f a two-finger spread by f (width); d a double tap (at DY); c a double tap on the card,
 // off its controls (ToLaD#301), which must close it; ~ the next tap's flight not waited
 // for (a double tap mid-flight).
+// SHOTS=<dir>: a screenshot after each step, <dir>/<SHOT_PREFIX><route>-<n>-<step>.png (ToLaD#481).
+import { mkdirSync } from 'node:fs';
 import { chromium } from 'playwright';
 import { pageUrl } from './pageurl.mjs';
 
@@ -28,6 +30,8 @@ const ROUTES = MAMMALS
       midup: 't:Primates t:Primates t:Primates d ~d d',
       card: 't:Homo_sapiens t:Homo_sapiens t:Homo_sapiens t:Homo_sapiens t:Homo_sapiens t:Homo_sapiens c c c',
       cards: 's:chimp|Chimpanzee c c c',
+      bear: 's:asiatic_black|Asiatic_black_bear d d d',
+      bearc: 's:asiatic_black|Asiatic_black_bear c d d',
     }
   : {
       dogs: 't:Canidae t:Canidae t:Canidae t:Canidae d d d d d',
@@ -36,6 +40,8 @@ const ROUTES = MAMMALS
       plus: 'x d d d',
       plus2: 't:Canidae x d d d',
       search: 's:polar|Polar_bear d d d d',
+      bear: 's:asiatic_black|Asiatic_black_bear d d d',
+      bearc: 's:asiatic_black|Asiatic_black_bear c d d',
       pan: 't:Mustelidae t:Mustelidae pan:0,140 d d d',
       pinch: 't:Felidae pinch:1.8 d d',
       more: 't:Canidae t:Canidae m m m',
@@ -94,6 +100,11 @@ try {
     f.tap = ((tp) => (x, y) => ((window.__tlog = `tap ${x | 0},${y | 0} kind=${f.tapKind(x, y)}`), tp(x, y)))(f.tap.bind(f));
   });
   // (A held tap runs once the double-tap window's timer fires, late on a busy page: `taps`, the count it waits to pass.)
+  const shot = async (route, n, st) => {
+    if (!process.env.SHOTS) return;
+    mkdirSync(process.env.SHOTS, { recursive: true });
+    await page.screenshot({ path: `${process.env.SHOTS}/${process.env.SHOT_PREFIX ?? ''}${route}-${n}-${st.replace(/[^a-z0-9]+/gi, '_')}.png` });
+  };
   const land = async (taps = -1) => {
     await page.waitForTimeout(420);
     if (taps >= 0) await page.waitForFunction((n) => window.__taps > n, taps, { timeout: 5000 }).catch(() => {});
@@ -194,6 +205,7 @@ try {
         const ok = (after.at === info.want || (info.want.startsWith('(none') && after.at === info.from)) && after.n === info.n + 1 && !(st === 'c' && after.card);
         rows.push([route, trail.join(' ') + (noWait ? ' (mid-flight)' : ''), info.from, after.at, info.want, after.stack, (after.n === info.n + 1 ? '' : 'NOT A DOUBLE TAP') + (after.t > info.t ? ` (+${after.t - info.t} single tap)` : '') + (process.env.VERBOSE ? ` [${after.log}]` : ''), ok ? 'ok' : 'WRONG']);
         trail.push(st === 'c' ? `c@${at0.x | 0},${at0.y | 0}${after.card ? ' CARD STILL OPEN' : ''}` : 'd');
+        await shot(route, trail.length, st);
         noWait = false;
         continue;
       }
@@ -279,6 +291,7 @@ try {
       const now = await page.evaluate(() => window.__up.now());
       const tl = process.env.VERBOSE ? await page.evaluate(() => ` [${window.__tlog}]`) : '';
       trail.push(`${st}→${now}${tl}`);
+      await shot(route, trail.length, st);
     }
     } catch (e) {
       rows.push([route, '', '', '', '', '', String(e).split('\n')[0], 'ERROR']);

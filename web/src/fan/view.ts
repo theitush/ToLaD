@@ -2023,15 +2023,15 @@ export class FanView implements InputHandlers {
    * would zoom in, the nearest level up that zooms out (ToLaD#416, Ita: "double tap always zooms out to the nearest thing
    * that makes sense"). Only a view wider than every level above it but home's gets there: a search pick of the human,
    * framed on 8 billion at "now", wider than Homo's frame by 7,300x and than Primates' by 1.2x. Null at home's level.
-   * From a species, its group whatever its landing does (ToLaD#481): the species stands in it by the tree, and the walk took a wide one's double tap
-   * several levels up. Its landing opens it where its thinnest part has room (openCamera), so a species framed on its column at half the screen (speciesCamera)
-   * can be wider than its group's landing (the house mouse's, 4x Murini's, the human's, 7,300x Homo's): that double tap zooms in on width, one level up all the same.
+   * From a species, the view at its landing (a tap's, a search pick's, its card open or not), its group whatever its landing does (ToLaD#481): the
+   * species stands in it by the tree, and the walk took a wide one's double tap several levels up. A group's landing opens it where its thinnest part has
+   * room (openCamera), so a species framed on its column at half the screen (speciesCamera) can be wider than its group's landing (the house mouse's, 4x
+   * Murini's on width; the human's, 7,300x Homo's): that double tap zooms in on width, one level up all the same. A view off the species' landing (a pan,
+   * a pinch) is never zoomed in on (ToLaD#416): the walk.
    */
   private upOut(from: Level, c: Camera): Step | null {
-    if (from.b) {
-      const u = this.levelAbove(from);
-      if (u) return this.upOne(from, c) ?? { lv: { v: u }, cam: this.landOf({ v: u }) };
-    }
+    const u = from.b ? this.levelAbove(from) : null;
+    if (u && !this.upOne(from, c) && this.offBy(this.landOf(from), c) <= LEVEL_PX) return { lv: { v: u }, cam: this.landOf({ v: u }) };
     for (let at = from; ; ) {
       const step = this.upOne(at, c);
       if (step) return step;

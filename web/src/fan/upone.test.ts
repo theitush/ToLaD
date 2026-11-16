@@ -237,7 +237,7 @@ describe('a double tap goes exactly one level up (ToLaD#472)', () => {
     else if (inPx > 12 && !homeOk && !lv.b) bad = `zoomed in ${tx.toFixed(0)} px on width, ${ty.toFixed(0)} on time`;
     const row = { route, before, after, lv: lvName(lv), want: up ? lvName({ v: up }) : null, inPx, bad, held };
     rows.push(row);
-    say(`${bad ? 'BAD ' : held ? 'held' : 'ok  '}${route}: [${lvName(lv)}] ${before.join(' › ')}  ->  ${after.join(' › ')}${bad ? `  (${bad})` : ''}`);
+    say(`${bad ? 'BAD ' : held ? 'held' : 'ok  '}${route}: [${lvName(lv)}] ${before.join(' › ')}  ->  ${after.join(' › ')}${bad ? `  (${bad})` : ''}${inPx > 12 ? `  [in ${tx.toFixed(0)} px on width, ${ty.toFixed(0)} on time]` : ''}`);
     return row;
   };
 
