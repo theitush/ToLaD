@@ -74,6 +74,8 @@ type StrandEdge = { i: number; t: number; px: number };
  * at the screen's edges and the time window.
  */
 export type Place = { node: number; strand: number; framed: boolean; left: StrandEdge; right: StrandEdge; cam: Camera };
+/** The card open, in terms a reload of the same page finds again (FanView.cardKey, ToLaD#478): its species' strand, the point touched (world x, Ma), whether it shows the lineage there, the event it explains (-1: none). */
+export type CardKey = { strand: number; x?: number; ageMa?: number; lineage: boolean; k: number };
 /**
  * The view is "inside" a level's frame when it is zoomed in at least this far less than it (15 %), width and time
  * together (the area's scale): levelNow's. (Zoomed in past it, a pinch or a "+x" into part of it, a double-tap still goes
@@ -1083,12 +1085,15 @@ export class FanView implements InputHandlers {
       canvas.parentElement.insertBefore(glc, canvas);
       try {
         this.gl = new FanGL(glc);
+        this.gl.onRestored = this.redraw;
       } catch (e) {
         console.warn('fan: no WebGL2, drawing with Canvas 2D', e);
         glc.remove();
       }
     }
     stamp('gl');
+    // (A 2D canvas's context can be dropped too, and comes back blank: ToLaD#478.)
+    canvas.addEventListener('contextrestored', this.redraw);
     const laid = layoutFan(clade, this.mode, tree, this.measure);
     stamp('layout');
     this.camera = new FanCamera(this.withFold(laid), (b) => this.model(b));
@@ -1110,7 +1115,21 @@ export class FanView implements InputHandlers {
     clearTimeout(this.foldRestT);
     this.input.destroy();
     this.ro.disconnect();
+    this.canvas.removeEventListener('contextrestored', this.redraw);
     this.gl?.canvas.remove();
+  }
+
+  /** The frame drawn again as it stands: a context restored, or the page shown again (ToLaD#478). */
+  readonly redraw = (): void => {
+    cancelAnimationFrame(this.raf);
+    this.raf = 0;
+    this.request();
+  };
+
+  /** A canvas's context lost and not back (ToLaD#478): the page cannot draw until it is. */
+  get contextLost(): boolean {
+    const ctx = this.ctx as CanvasRenderingContext2D & { isContextLost?: () => boolean };
+    return !!this.gl?.lost || !!ctx.isContextLost?.();
   }
 
   resize(): void {
@@ -1589,6 +1608,24 @@ export class FanView implements InputHandlers {
       return { i: lo, t: (x - S[lo]) / (S[hi] - S[lo]), px: 0 };
     };
     return { node: lv.v ? this.fan.nodes.indexOf(lv.v) : -1, strand: lv.b ? lv.b.index : -1, framed, left: edge(0), right: edge(this.w), cam: { ...this.cam } };
+  }
+
+  /** The card `sel` (open in this view) as a CardKey (ToLaD#478). */
+  cardKey(sel: Selection): CardKey | null {
+    const b = this.fan.branches.find((c) => c.sp === sel.sp);
+    return b ? { strand: b.index, x: this.touch?.x, ageMa: sel.ageMa, lineage: !!sel.lineage, k: sel.event?.k ?? -1 } : null;
+  }
+
+  /** Open the card a CardKey kept, as the tap on its column did (tap). */
+  openCard(k: CardKey): void {
+    const b = this.fan.branches.find((c) => c.index === k.strand);
+    if (!b) return;
+    this.selected = b.sp;
+    this.touch = k.x !== undefined && k.ageMa !== undefined ? { x: k.x, ageMa: k.ageMa } : null;
+    const lineage = k.lineage && k.ageMa !== undefined ? lineageAt(b, this.fan, k.ageMa) : undefined;
+    const event = k.k >= 0 ? colEventsY(this.fan, b).find((s) => s.k === k.k) : undefined;
+    this.onSelect({ sp: b.sp, ageMa: k.ageMa, startMa: b.t0, lineage, event });
+    this.request();
   }
 
   /** The strands' rooms' ends, left to right (world x, the layout as it stands): strand i's room from site 2i to 2i + 1, a gap to the next. A look moves the gaps, not the rooms: an edge inside a room stays there at the same zoom. */

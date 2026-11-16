@@ -20,7 +20,8 @@ import { SourcesPanel } from './SourcesPanel';
 import { statusOf, wildPartSentence } from './status';
 import { cardTapper, onControl } from './cardtap';
 import { flipOn, forkQuiet, setForkQuiet } from './flip';
-import { FanView, initialMeasure, levelName, type Lineage, type Place, type Selection } from './view';
+import { FanView, initialMeasure, levelName, type CardKey, type Lineage, type Place, type Selection } from './view';
+import { keptPlace, treeKey, watchBack } from './back';
 
 declare global {
   interface Window {
@@ -83,7 +84,9 @@ export function FanApp() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const viewRef = useRef<FanView | null>(null);
   // Where the view stood when a look's switch asked for a new one (ToLaD#412): the new one's first place.
-  const placeRef = useRef<Place | null>(null);
+  // (Or where it stood when the page went hidden, this load that page coming back, ToLaD#478; with the card it had open.)
+  const placeRef = useRef<Place | null>(keptPlace()?.place ?? null);
+  const cardRef = useRef<CardKey | null>(keptPlace()?.card ?? null);
   // A double tap on the card (ToLaD#301): what one on the tree does, one level up, the card closed.
   const cardUp = (x: number, y: number) => viewRef.current?.doubleTap(x, y);
   const [forks, setForks] = useState(initialForkNames);
@@ -91,6 +94,8 @@ export function FanApp() {
   // What the widths count (ToLaD#276): individuals, or their mass (`?width=mass`).
   const [measure, setMeasure] = useState<Measure>(initialMeasure);
   const [sel, setSel] = useState<Selection | null>(null);
+  const selRef = useRef(sel);
+  selRef.current = sel;
   const [searching, setSearching] = useState(false);
   const [showSources, setShowSources] = useState(false);
   const closeSources = useCallback(() => setShowSources(false), []);
@@ -128,13 +133,24 @@ export function FanApp() {
     v.scaleEl = scaleRef.current;
     v.barEl = barRef.current;
     // (A look's switch stays where the view was, ToLaD#412; an old link stands on its clade's frame, no flight.)
-    if (placeRef.current) v.goToPlace(placeRef.current);
-    else if (linkRef.current) v.goToClade(linkRef.current);
-    placeRef.current = linkRef.current = null;
+    // (A place kept before a reload from another build of the tree is not this one's: home, ToLaD#478.)
+    const kept = keptPlace();
+    if (kept && placeRef.current === kept.place && kept.tree !== treeKey(v)) placeRef.current = cardRef.current = null;
+    try {
+      if (placeRef.current) v.goToPlace(placeRef.current);
+      else if (linkRef.current) v.goToClade(linkRef.current);
+      if (cardRef.current) v.openCard(cardRef.current);
+    } catch (e) {
+      // (A place that no longer fits never leaves the page blank: the view stays home.)
+      console.warn('fan: could not go back to the place kept', e);
+    }
+    placeRef.current = linkRef.current = cardRef.current = null;
     viewRef.current = v;
     window.__fan = v;
     window.__levelName = levelName;
     v.request();
+    // (Back on the tab, ToLaD#478: drawn again, or the page reloaded to here.)
+    const unwatch = watchBack(v, () => selRef.current);
     // The canvas text waits for the faces (drawn in system type until then).
     if (typeof document !== 'undefined' && document.fonts) {
       Promise.all([document.fonts.load("600 16px 'Sofia Sans Condensed'"), document.fonts.load("italic 400 14px 'Newsreader'")])
@@ -142,6 +158,7 @@ export function FanApp() {
         .then(() => v.fontsIn());
     }
     return () => {
+      unwatch();
       v.destroy();
       viewRef.current = null;
       if (window.__fan === v) delete window.__fan;
