@@ -1,7 +1,7 @@
 // One kind of label on the tree on its side (ToLaD#458, Ita: "gaps only text no pic"): a name in its gap if it fits, else in its own band; a picture, a group's or a species', only in its own band, once that holds one.
 //
 // Which groups comes from the zoom alone, one active range a group (Been, Daiches & Yap 2006): a part has room once its gap on the column or its band on the column holds the text, a fork opens once
-// every part has room, and never before its parent; it hands its band down to its parts before that, part by part, once one of them has room (gapHands, ToLaD#500). So the cover only ever splits on the way in, a pan changes nothing, and every member has a place of its own by construction: its gap and its band are
+// every part has room, and never before its parent; it hands its band down to its parts before that, part by part, once its widest part holds that part's name and its own side by side, its title a guest there while its gap cannot hold it (gapHands, ToLaD#500). So the cover only ever splits on the way in, a pan changes nothing, and every member has a place of its own by construction: its gap and its band are
 // nobody else's, so nothing meets, whatever the neighbours do. No slide: a title stands at the top of its branch, a name in a band inside that band's part on screen.
 //
 // Everything is read on the labels' column, the only place a label stands: a strand gone by then leaves no line there (rooms by life, steady.ts, may even stand it inside a sister's room),
