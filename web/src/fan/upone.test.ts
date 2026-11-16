@@ -188,15 +188,16 @@ describe('a double tap goes exactly one level up (ToLaD#472)', () => {
     for (let p = u.parent; p; p = p.parent) up.add(p);
     stand(home);
     // (Open at home already, the bats: landed on as a tap on it lands, a column's or a pinned row's.)
+    // (A title holding it keeps nothing shut: its band is its parts', ToLaD#483, handed down part by part, #500.)
     const [uf, ul] = [u.strands[0].index, u.strands[u.strands.length - 1].index];
-    if (!P(v).gapCoverAt(P(v).territories(), v.cam.sx).some((g) => g.f <= uf && g.l >= ul)) {
+    if (!P(v).gapCoverAt(P(v).territories(), v.cam.sx).some((g) => !g.heads && g.f <= uf && g.l >= ul)) {
       P(v).goLevel({ v: u }, home, false);
       settle(r);
       return;
     }
     for (let k = 0; k < 20; k++) {
       // (Open: the cover's members on it all inside it, its parts.)
-      if (k && !P(v).gapCoverAt(P(v).territories(), v.cam.sx).some((g) => g.f <= uf && g.l >= ul)) return;
+      if (k && !P(v).gapCoverAt(P(v).territories(), v.cam.sx).some((g) => !g.heads && g.f <= uf && g.l >= ul)) return;
       if (!P(v).famHits.some((q) => q.v === u || up.has(q.v))) {
         const m = P(v)
           .gapCoverAt(P(v).territories(), v.cam.sx)

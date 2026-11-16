@@ -245,7 +245,7 @@ describe('one tap on a label opens it (ToLaD#465)', () => {
         opens(h!.v, latin);
         // (Open: the cover's members on it all inside it, its parts.)
         const [uf, ul] = [u.strands[0].index, u.strands[u.strands.length - 1].index];
-        if (!P(v).gapCoverAt(P(v).territories(), v.cam.sx).some((g) => g.f <= uf && g.l >= ul)) {
+        if (!P(v).gapCoverAt(P(v).territories(), v.cam.sx).some((g) => !g.heads && g.f <= uf && g.l >= ul)) {
           // (The tap that opened it at the top, opens(); it, its first branch on screen.)
           const t = topOf(u);
           say(`${latin}: open after ${k + 1} taps at ${(v.cam.sx / home.sx).toFixed(1)}x, ${topSay(t)}`);
