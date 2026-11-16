@@ -63,7 +63,7 @@ function rig(): Rig {
   };
   return { v: new FanView(canvas as unknown as HTMLCanvasElement, mammaliaClade(), mammaliaTree(), true), on };
 }
-type Priv = { anim: ((t: number) => boolean) | null; applyFold(): void; camera: FanCamera; frameOf(lv: Level): Camera; outFrom(lv: Level, c: Camera): { cam: Camera } | null; steps: unknown[]; famHits: { box: number[]; v: FanNode }[] };
+type Priv = { anim: ((t: number) => boolean) | null; applyFold(): void; camera: FanCamera; frameOf(lv: Level): Camera; upOne(lv: Level, c: Camera): { cam: Camera } | null; famHits: { box: number[]; v: FanNode }[] };
 const P = (v: FanView) => v as unknown as Priv;
 const pointer = (x: number, y: number, late = 0) => ({ pointerId: 1, pointerType: 'touch', button: 0, clientX: x, clientY: y, timeStamp: clock - late, preventDefault() {} });
 /** The clock on by ms, a frame (16.7 ms) at a time, the timers due and the flight under way run, the callback after each frame. */
@@ -88,7 +88,6 @@ function fly(r: Rig, frame?: () => void): void {
 }
 function stand(v: FanView, c: Camera): void {
   P(v).anim = null;
-  P(v).steps = [];
   (v.fan.tess.fold as Steady).setScale(c.sx, v.w);
   v.cam = { ...c, ty: c.sy };
   P(v).camera.settle();
@@ -214,7 +213,7 @@ describe('a double tap reads as one step back (ToLaD#413)', () => {
   });
   for (const mode of ['clades', 'groups'] as GapMode[]) {
     // (Real, open, ToLaD#446, a tap and frame rule, so left for Ita: under clades the label Theria's frame is 5.25 px from home.
-    // A tap on it moves that much; under LEVEL_PX that is no step and no way out (doubleTap, outFrom), so a double tap
+    // A tap on it moves that much; under LEVEL_PX that is no step and no way out (doubleTap, upOne), so a double tap
     // does nothing and the view stays 5.25 px off home. `it.fails` turns red when it is fixed.)
     (mode === 'clades' ? it.fails : it)(`${mode}: from each frame, on a branch and on nothing, a quick and a slow double tap`, () => {
       vi.spyOn(performance, 'now').mockImplementation(() => clock);
@@ -265,7 +264,8 @@ describe('a double tap reads as one step back (ToLaD#413)', () => {
       for (const [name, lv] of frames) {
         const go = () => stand(v, P(v).frameOf(lv));
         go();
-        const want = P(v).outFrom(lv, v.cam)?.cam;
+        // (One level up, where a tap on it lands, ToLaD#472.)
+        const want = P(v).upOne(lv, v.cam)?.cam;
         for (const [sn, s] of [['branch', B], ['nothing', E]] as const) {
           check(`${name} ${sn} quick`, go, quick(s), 170, want);
           check(`${name} ${sn} slow`, go, slow(s), 440, want);
@@ -283,7 +283,8 @@ describe('a double tap reads as one step back (ToLaD#413)', () => {
         const [x, y] = [(pick.box[0] + pick.box[2]) / 2, (pick.box[1] + pick.box[3]) / 2];
         check(`tap ${pick.v.split.taxon}`, () => stand(v, home), (frame) => tapAt(r, x, y, frame), 300);
         for (let k = 0; k < 3; k++) v.draw();
-        check(`${pick.v.split.taxon} and back`, () => {}, quick(B), 170, home);
+        // (A double tap one level up from where it landed, ToLaD#472: from a level home holds, home.)
+        check(`${pick.v.split.taxon} and back`, () => {}, quick(B), 170, P(v).upOne(v.levelNow(true), v.cam)?.cam ?? home);
       }
     }, 300_000);
   }

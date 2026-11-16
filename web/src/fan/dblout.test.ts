@@ -55,9 +55,7 @@ type Priv = {
   camera: FanCamera;
   frameOf(lv: Level): Camera;
   offBy(a: Camera, c: Camera): number;
-  upFrom(lv: Level, c: Camera): { lv: Level; cam: Camera } | null;
   centreLine(): FanBranch | null;
-  steps: { cam: Camera }[];
   tapAt: unknown;
   backing: { lv: Level; cam: Camera } | null;
   famHits: { box: number[]; v: FanNode }[];
@@ -95,7 +93,6 @@ function stand(v: FanView, c: Camera): void {
   const iv = P(v);
   iv.anim = null;
   iv.backing = null;
-  iv.steps = [];
   iv.tapAt = null;
   if (v.fan.tess.fold) (v.fan.tess.fold as Steady).setScale(c.sx, v.w);
   v.cam = { ...c, ty: c.sy };
@@ -109,18 +106,23 @@ function zoomsOut(v: FanView, a: Camera, c: Camera): boolean {
   const [x, y] = tighter(v, a, c);
   return x <= STEP && y <= STEP && (x < -STEP || y < -STEP) && P(v).offBy(a, c) > STEP;
 }
-/** Where a double tap should land from level `from`, the view at c: the nearest level up that zooms out; home as the last resort while it is wider on width; else nothing. */
+/**
+ * Where a double tap should land from level `from`, the view at c (ToLaD#472): one level up, the level it sits in, unless its frame is tighter on width or
+ * on time (never in, ToLaD#416: nothing). Home (one level up, or from home's level off home) where it zooms out, or is wider on width, the last resort.
+ */
 function want(v: FanView, from: Level, c: Camera): FanNode | null {
-  const up = v.levelsAbove(from).find((u) => zoomsOut(v, P(v).frameOf({ v: u }), c));
-  if (up) return up;
-  const h = P(v).frameOf({ v: v.fan.root });
-  return zoomsOut(v, h, c) || (tighter(v, h, c)[0] < -STEP && P(v).offBy(h, c) > STEP) ? v.fan.root : null;
+  const u = v.levelAbove(from);
+  const f = P(v).frameOf({ v: u ?? v.fan.root });
+  const [x, y] = tighter(v, f, c);
+  if (u && x <= STEP && y <= STEP) return u;
+  if (u && u !== v.fan.root) return null;
+  return zoomsOut(v, f, c) || (x < -STEP && P(v).offBy(f, c) > STEP) ? v.fan.root : null;
 }
 const nodeName = (u: FanNode | null) => (u ? (u.split.taxon ?? '(node)') : 'nothing');
 const name = (lv: Level) => (lv.b ? lv.b.sp.common : nodeName(lv.v));
 const moved = (v: FanView, c: Camera) => v.cam.cx !== c.cx || v.cam.cy !== c.cy || v.cam.sx !== c.sx || v.cam.sy !== c.sy;
 
-describe('a double tap always zooms out, on to the nearest level that does (ToLaD#416)', () => {
+describe('a double tap goes one level up, never in (ToLaD#416, #472)', () => {
   const was = gapMode();
   beforeAll(async () => {
     await loadMammalsFromFiles();
@@ -137,7 +139,7 @@ describe('a double tap always zooms out, on to the nearest level that does (ToLa
         const bs = v.fan.branches;
         const home = v.homeCamera();
         const bad: string[] = [];
-        const n = { views: 0, wasIn: 0, changed: 0, nothing: 0, nothingWide: 0, lastResort: 0, onHome: 0, below: 0, onwards: 0 };
+        const n = { views: 0, nothing: 0, nothingWide: 0, lastResort: 0, onHome: 0, below: 0, onwards: 0 };
         let belowEg = '';
         for (let k = 0; k < VIEWS; k++) {
           // A pinch from a frame: wide or narrow on each axis on its own, from a level or a species, anywhere near it.
@@ -153,15 +155,8 @@ describe('a double tap always zooms out, on to the nearest level that does (ToLa
           const c = { ...v.cam };
           const from = v.levelNow(true);
           const to = want(v, from, c);
-          const old = P(v).upFrom(from, c);
           const at = `${mode} ${lname} #${k} from ${name(from)} sx ${c.sx.toPrecision(4)} sy ${c.sy.toPrecision(4)}`;
           n.views++;
-          // (What it did before: a landing tighter on an axis, and how many land elsewhere now.)
-          if (old) {
-            const [ox, oy] = tighter(v, old.cam, c);
-            if (ox > STEP || oy > STEP) n.wasIn++;
-          }
-          if ((old?.lv.v ?? null) !== to) n.changed++;
           // (A level of the centre's line deeper than the one the view is read at, that would zoom out from it: levelNow's to answer for.)
           const line = P(v).centreLine();
           if (line && from.v) {
@@ -194,7 +189,6 @@ describe('a double tap always zooms out, on to the nearest level that does (ToLa
           } else {
             if (to === v.fan.root) n.onHome++;
             if (x > STEP || y > STEP) bad.push(`${at}: to ${nodeName(to)} zoomed in, ${x.toFixed(0)}, ${y.toFixed(0)} px`);
-            if (x >= -STEP && y >= -STEP) bad.push(`${at}: to ${nodeName(to)} did not visibly widen`);
           }
           // A second one goes on up.
           const lv2 = v.levelNow(true);
@@ -246,12 +240,14 @@ describe('a double tap always zooms out, on to the nearest level that does (ToLa
             views.push({ ...v.cam });
             n.taps++;
           }
-          // Back out: every double tap zooms out, or nothing, on the way home; straight back where a tap's reversal zooms out.
+          // Back out: every double tap one level up (ToLaD#472), never in, or nothing, on the way home; straight back where the tap went one level down.
           let doubles = 0;
           for (; doubles < 20; doubles++) {
             const c = { ...v.cam };
             const back = views[views.length - 2];
             const at = `${mode} ${lname} path ${path} double ${doubles}`;
+            const lv0 = v.levelNow(true);
+            const up = v.levelAbove(lv0) ?? v.fan.root;
             v.doubleTap(-1e4, -1e4);
             if (!P(v).anim) {
               if (moved(v, c)) bad.push(`${at}: moved with no flight`);
@@ -263,7 +259,7 @@ describe('a double tap always zooms out, on to the nearest level that does (ToLa
             const [x, y] = tighter(v, v.cam, c);
             const homeLast = P(v).offBy(v.cam, home) <= 2 && x < -STEP;
             if ((x > STEP || y > STEP) && !homeLast) bad.push(`${at}: zoomed in ${x.toFixed(0)}, ${y.toFixed(0)} px`);
-            if (x >= -STEP && y >= -STEP) bad.push(`${at}: did not widen`);
+            if (v.levelNow(true).v !== up) bad.push(`${at}: from ${name(lv0)} to ${name(v.levelNow(true))}, not one level up, ${nodeName(up)}`);
             if (back && P(v).offBy(back, v.cam) <= 2) {
               n.straight++;
               views.pop();

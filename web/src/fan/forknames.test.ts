@@ -51,7 +51,6 @@ type Inner = {
   applyFold(): void;
   cutLast: CutLabels | null;
   anim: ((t: number) => boolean) | null;
-  steps: unknown[];
   tapAt: unknown;
   frameOf(lv: Level): { cx: number; cy: number; sx: number; sy: number; ty: number };
   tapInto(lv: Level, column: boolean): boolean;
@@ -177,7 +176,6 @@ describe('names at their forks (ToLaD#373)', () => {
   };
   const atHome = (v: FanView) => {
     const iv = inner(v);
-    iv.steps = [];
     iv.tapAt = null;
     v.cam = v.homeCamera();
     frame(v);
@@ -241,11 +239,16 @@ describe('names at their forks (ToLaD#373)', () => {
         land(v);
         expect(iv.offBy(landed, v.cam), `${what}: a second tap stays`).toBeLessThanOrEqual(2);
       }
+      // One level up from where the tap landed (ToLaD#472), on its frame; never tighter on width (ToLaD#416).
+      const up = v.levelAbove(v.levelNow(true));
       v.doubleTap(0, 0);
       land(v);
-      // Back where the tap was, when that zooms out (ToLaD#416). A name above the view flew out already: on, never tighter on width.
-      if (start.sx < landed.sx && start.sy <= landed.sy) expect(iv.offBy(start, v.cam), `${what}: a double tap back`).toBeLessThanOrEqual(2);
-      else expect(v.w * (v.cam.sx / landed.sx - 1), `${what}: a double tap zooms out`).toBeLessThanOrEqual(12);
+      expect(v.w * (v.cam.sx / landed.sx - 1), `${what}: a double tap zooms out`).toBeLessThanOrEqual(12);
+      if (up && iv.offBy(landed, v.cam) > 2) {
+        expect(v.levelNow(true).v, `${what}: a double tap one level up`).toBe(up);
+        expect(iv.offBy(iv.frameOf({ v: up }), v.cam), `${what}: on its frame`).toBeLessThanOrEqual(2);
+      }
+      void start;
     }
   });
 
@@ -283,9 +286,12 @@ describe('names at their forks (ToLaD#373)', () => {
     v.tap(again.x, again.y);
     land(v);
     expect(iv.offBy(landed, v.cam), 'a second tap stays').toBeLessThanOrEqual(2);
+    // (One level up from where it landed, ToLaD#472.)
+    const up = v.levelAbove(v.levelNow(true));
     v.doubleTap(0, 0);
     land(v);
-    expect(iv.offBy(start, v.cam), 'a double tap back').toBeLessThanOrEqual(2);
+    expect(v.levelNow(true).v, 'a double tap one level up').toBe(up);
+    void start;
   });
 
   it('switched off, a bracket on such a clade still goes as it did', () => {

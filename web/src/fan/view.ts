@@ -66,8 +66,6 @@ const LABEL_PAD = 8;
 type Step = { lv: Level; cam: Camera };
 /** Where a tap's flight landed (FanView.tapAt). */
 type TapAt = { b: FanBranch | null; v: FanNode | null; cam: Camera };
-/** Where a single tap that moved the view started (FanView.steps, ToLaD#376): its frame and level, and its tapAt if a tap had landed it there. */
-type TapStep = Step & { at: TapAt | null };
 /** A screen's edge among the strands (FanView.place): t of the way from site i to the next (strandSites), and px of screen past that (past the tree's ends only). */
 type StrandEdge = { i: number; t: number; px: number };
 /**
@@ -1049,13 +1047,6 @@ export class FanView implements InputHandlers {
    * nothing moved since, it goes one level out.
    */
   private tapAt: TapAt | null = null;
-  /**
-   * The single taps that moved the view, each where it started, last on top (ToLaD#376): a double tap pops one and flies
-   * there, so it is the reverse of a tap, whatever kind of tap it was. A pan leaves them. A flight flown by anything but
-   * a tap or a double tap empties them (flyTo; those two put theirs back), as do a pinch and a new layout or screen size:
-   * then a double tap goes up the named levels (upFrom).
-   */
-  private steps: TapStep[] = [];
   /** The family pills drawn (ToLaD#212): a tap flies to the family, as its bracket's. */
   famHits: { box: [number, number, number, number]; v: FanNode; run?: Run }[] = [];
   /** The chips with a "+x" drawn (ToLaD#197, #262): `box` the whole chip (a tap on its name or its badge alike, ToLaD#287), `badge` the badge's end. */
@@ -1125,8 +1116,6 @@ export class FanView implements InputHandlers {
   resize(): void {
     const r = this.flip ? this.turnStage() : this.canvas.getBoundingClientRect();
     const first = this.w === 1;
-    // (A frame is the screen's: the steps' are another screen's.)
-    if (Math.max(1, r.width) !== this.w || Math.max(1, r.height) !== this.h) this.steps = [];
     this.camera.w = Math.max(1, r.width);
     this.camera.h = Math.max(1, r.height);
     this.dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -1569,7 +1558,6 @@ export class FanView implements InputHandlers {
   }
 
   private relayout(): void {
-    this.steps = [];
     this.camera.fan = this.withFold(layoutFan(this.clade, this.mode, this.tree, this.measure));
     this.camera.settle();
     this.request();
@@ -1768,8 +1756,6 @@ export class FanView implements InputHandlers {
   flyTo(aim: Camera | (() => Camera), ms?: number, done?: () => void): Camera {
     // (A level's flight, backing, is set again after this by what flies it: a tap, a double-tap, a search pick, ToLaD#258.)
     this.backing = null;
-    // (The view moved by other means than a tap's step; a tap and a double tap, flying through here, put theirs back, ToLaD#376.)
-    this.steps = [];
     const fo = this.fan.tess.fold;
     const from = { ...this.cam };
     // (The frame computed moves the fold to it, ToLaD#211: its state kept, the fold put back where the view stands.)
@@ -1944,7 +1930,6 @@ export class FanView implements InputHandlers {
   zoom(px: number, py: number, fx: number, ft: number): void {
     if (fx !== 1 || ft !== 1) {
       this.tapAt = null;
-      this.steps = [];
       if (this.backing) this.stopFlight();
     }
     this.zoomAbout(px, py, fx, ft);
@@ -1969,51 +1954,30 @@ export class FanView implements InputHandlers {
     this.request();
   }
   /**
-   * A double-tap always zooms out (ToLaD#416), on to the nearest place that does (zoomsOut, the one rule of every path here).
-   * First the reverse of a single tap (ToLaD#376), back to the frame the last tap that moved the view started from
-   * (steps), as it was there. A tap's flight under way, from where it lands; a pan since changes nothing. A step that
-   * does not zoom out from the view is passed. `firstRan` (ToLaD#301): its first tap already ran as a single tap (a level
-   * deeper, a "+x"): not a step the user meant, so that tap is undone and one step more.
-   *
-   * No such step (a pinch or a search pick since, ToLaD#258, #271, #301): up from the level the view is at (levelNow; a
-   * level's flight under way, from where it lands; its first tap run, from where that tap found the view), outFrom. None
-   * there, nothing. The card closes for the flight.
+   * A double tap goes exactly one level up (ToLaD#472, #301, #376): from the level on screen, the one the chain of groups
+   * shows (levelNow), to the level it sits in (upOne: the chain's parent; from a species, the group it is in), landing as
+   * a tap on that level lands (goLevel). Never two levels, whatever came before: a tap that went several levels down, a
+   * pan, a pinch, a search pick. A level's flight under way, from where it lands. `firstRan` (ToLaD#301): its first tap
+   * already ran as a single tap (a level deeper, a "+x"), not a step the user meant: from where that tap found the view, so
+   * that tap is undone too. Nowhere up (home, or a landing that would zoom in): nothing. The card closes for the flight.
    */
   doubleTap(_x: number, _y: number, firstRan = false): void {
     const pre = firstRan && this.preTap && performance.now() - this.preTap.t < 4 * DOUBLE_TAP_MS ? this.preTap : null;
     const on = !pre && this.anim && this.backing;
     const cam = pre ? pre.cam : on ? this.backing!.cam : this.cam;
-    const steps = this.steps;
-    if (pre?.step && steps[steps.length - 1] === pre.step) steps.pop();
-    let back = steps.pop();
-    while (back && !this.zoomsOut(back.cam, cam)) back = steps.pop();
-    if (back) {
-      this.goBack(back);
-      this.steps = steps;
-      return;
-    }
-    const out = this.outFrom(pre ? pre.lv : on ? this.backing!.lv : this.levelNow(true), cam);
-    if (out) this.goLevel(out.lv, out.cam, false);
-    // (Nowhere out: nothing, so the first tap's flight is put back.)
+    const up = this.upOne(pre ? pre.lv : on ? this.backing!.lv : this.levelNow(true), cam);
+    if (up) this.goLevel(up.lv, up.cam, false);
+    // (Nowhere up: nothing, so the first tap's flight is put back.)
     else if (pre && (this.anim || this.offBy(pre.cam, this.cam) > 0.5)) this.goLevel(pre.lv, pre.cam, false);
   }
-  /** Fly one named level up from level `from`, the view at camera c (upFrom), the card closing for the flight: the stack's "…"'s. At home nothing, and false. */
+  /** Fly one level up from level `from`, the view at camera c (upOne), the card closing for the flight: the stack's "…"'s. Nowhere up, nothing, and false. */
   private goUp(from: Level, c: Camera): boolean {
-    const step = this.upFrom(from, c);
+    const step = this.upOne(from, c);
     if (step) this.goLevel(step.lv, step.cam, false);
     return !!step;
   }
-  /** Fly back to where a tap started (doubleTap), landing as the view was there (its tapAt, so the next tap or double tap goes on from there as it would have). */
-  private goBack(back: TapStep): void {
-    this.selected = null;
-    this.touch = null;
-    this.onSelect(null);
-    const cam = { ...back.cam };
-    this.flyTo(cam, undefined, () => (this.tapAt = back.at ? { ...back.at, cam: { ...this.cam } } : { b: back.lv.b ?? null, v: back.lv.v ?? null, cam: { ...this.cam } }));
-    this.backing = { lv: back.lv, cam };
-  }
   /** Where the last single tap found the view (ToLaD#301): its level (a flight's under way, where it lands) and frame, when, and its step if it moved the view. */
-  private preTap: (Step & { t: number; step: TapStep | null }) | null = null;
+  private preTap: (Step & { t: number }) | null = null;
 
   /**
    * Whether flying from the view at camera c to frame a zooms out (ToLaD#416): it visibly moves (more than LEVEL_PX off),
@@ -2029,30 +1993,29 @@ export class FanView implements InputHandlers {
     return [this.w * (a.sx / c.sx - 1), this.h * (a.sy / c.sy - 1)];
   }
   /**
-   * Where a double-tap from level `from` goes, the view at camera c (ToLaD#271, #301, #416): the first level `from` sits
-   * in (levelUp, home's root last) whose frame zooms out (zoomsOut). Never `from`'s own frame, even zoomed in past it (a
-   * pinch, a "+x" into part of it): that is back where the view was, not up; but home's when the view is at home's level
-   * and off it. Home is the last resort too while it is wider on width, whatever it does to time. Else null: nowhere out.
+   * One level up from level `from`, the view at camera c (ToLaD#472): the level `from` sits in (levelsAbove's first: the
+   * chain of groups' parent, levelUp's; from a species, its group; from a group the chain does not name, the one it does),
+   * where a tap on it lands (landOf). Never in (ToLaD#416): a landing tighter than the view on width or on time, by more
+   * than LEVEL_PX of the screen, is nowhere up, and null; so is home's level (none above it) unless the view is off home
+   * and home is wider (zoomsOut), or wider on width whatever it does to time, home's last resort since ToLaD#416.
    */
-  private outFrom(from: Level, c: Camera): Step | null {
-    for (const u of this.levelsAbove(from)) {
-      const cam = this.frameOf({ v: u });
-      if (this.zoomsOut(cam, c)) return { lv: { v: u }, cam };
-    }
-    const home = this.frameOf({ v: this.fan.root });
-    return this.zoomsOut(home, c) || (this.spanChange(home, c)[0] < -LEVEL_PX && this.offBy(home, c) > LEVEL_PX) ? { lv: { v: this.fan.root }, cam: home } : null;
+  private upOne(from: Level, c: Camera): Step | null {
+    const u = this.levelAbove(from);
+    const lv: Level = { v: u ?? this.fan.root };
+    const cam = this.landOf(lv);
+    const [x, y] = this.spanChange(cam, c);
+    if (lv.v === this.fan.root) return this.zoomsOut(cam, c) || (x < -LEVEL_PX && this.offBy(cam, c) > LEVEL_PX) || (u && x <= LEVEL_PX && y <= LEVEL_PX) ? { lv, cam } : null;
+    return x <= LEVEL_PX && y <= LEVEL_PX ? { lv, cam } : null;
   }
 
   /**
-   * Where the stack's "…" goes from level `from`, the view at camera c (ToLaD#288): the first level `from` sits in
-   * (levelUp, home's root last) whose frame is more than LEVEL_PX off the view. Null when there is none (home).
+   * The level one up from level `from` (ToLaD#472): the chain of groups' parent (chainOf of levelClade: a group the chain does not name, as "Vesper
+   * bats & kin", stands at the one it does, Yangochiroptera, so up is the bats); from a species, the group it is in. Null at home's level.
    */
-  private upFrom(from: Level, c: Camera): Step | null {
-    for (const u of this.levelsAbove(from)) {
-      const cam = this.frameOf({ v: u });
-      if (this.offBy(cam, c) > LEVEL_PX) return { lv: { v: u }, cam };
-    }
-    return null;
+  levelAbove(from: Level): FanNode | null {
+    if (from.b) return this.levelsAbove(from)[0] ?? null;
+    const at = levelUp(this.fan, from.v, true);
+    return at ? levelUp(this.fan, at) : null;
   }
 
   /** The levels level `from` sits in (levelUp's tree, ToLaD#258), nearest first, home's root last. */
@@ -2498,17 +2461,12 @@ export class FanView implements InputHandlers {
 
   tap(x: number, y: number): void {
     // Where this tap finds the view (a flight's under way, where it lands): a double-tap whose first tap this was goes
-    // from here (ToLaD#301); where the tap moves the view, its step (ToLaD#376).
-    const start: TapStep = this.anim && this.backing ? { at: null, ...this.backing } : { at: this.landedHere() ? this.tapAt : null, lv: this.levelNow(true), cam: { ...this.cam } };
-    const pre = (this.preTap = { lv: start.lv, cam: start.cam, t: performance.now(), step: null as TapStep | null });
-    const steps = this.steps;
-    // The stack's "…": one level up (ToLaD#288), whatever the steps; a tap like any, its step what a double tap comes back by.
+    // up from here (ToLaD#301).
+    const start: Step = this.anim && this.backing ? { ...this.backing } : { lv: this.levelNow(true), cam: { ...this.cam } };
+    this.preTap = { ...start, t: performance.now() };
+    // The stack's "…": one level up (ToLaD#288), as a double tap goes (upOne, ToLaD#472).
     if (this.brackets?.moreHit(x, y)) this.goUp(start.lv, start.cam);
     else this.tapHere(x, y);
-    // (A flight, flyTo emptying the steps; one that stays within LEVEL_PX, a card opening where the view is, moved nothing.)
-    if (this.steps === steps) return;
-    this.steps = steps;
-    if (this.backing && this.offBy(this.backing.cam, start.cam) > LEVEL_PX) steps.push((pre.step = start));
   }
 
   /** What a single tap at (x, y) does. */

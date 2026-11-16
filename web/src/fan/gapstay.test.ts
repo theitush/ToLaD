@@ -48,7 +48,7 @@ function stubView(clade: CladeRec, tree: Split, folds: boolean): FanView {
   return new FanView(canvas as unknown as HTMLCanvasElement, clade, tree, folds);
 }
 
-type Priv = { anim: ((t: number) => boolean) | null; applyFold(): void; camera: FanCamera; offBy(a: Camera, c: Camera): number; frameOf(lv: Level): Camera; outFrom(lv: Level, c: Camera): { cam: Camera } | null; steps: unknown[] };
+type Priv = { anim: ((t: number) => boolean) | null; applyFold(): void; camera: FanCamera; offBy(a: Camera, c: Camera): number; frameOf(lv: Level): Camera; upOne(lv: Level, c: Camera): { cam: Camera } | null; steps: unknown[] };
 const P = (v: FanView) => v as unknown as Priv;
 function run(v: FanView): void {
   const iv = P(v);
@@ -153,9 +153,8 @@ describe('a look switch keeps the view where it is (ToLaD#412)', () => {
             const at = `${a} to ${b} at ${u.name}`;
             expect(lvName(lvB), at).toBe(lvName(lvA));
             expect(P(B).offBy(P(B).frameOf(lvB), B.cam), at).toBeLessThanOrEqual(0.5);
-            expect(P(B).steps.length).toBe(0);
-            // A double tap: the first named level up that zooms out (ToLaD#416).
-            const up = P(B).outFrom(lvB, B.cam);
+            // A double tap: one level up, the level it sits in (ToLaD#472), never in (ToLaD#416).
+            const up = P(B).upOne(lvB, B.cam);
             B.doubleTap(-1e4, -1e4);
             run(B);
             if (up) expect(P(B).offBy(up.cam, B.cam), `${at}: up`).toBeLessThanOrEqual(12);
