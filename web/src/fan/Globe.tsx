@@ -109,7 +109,7 @@ export function RangeGlobe({ sci, fallback }: { sci: string; fallback: ReactNode
       <a href="https://doi.org/10.1002/ecy.2443" target="_blank" rel="noopener">
         {r?.from ? (
           <>
-            Range of <i>{r.from}</i> before the split · PHYLACINE 1.2
+            Range of <i>{r.from}</i> before the split · PHYLACINE{' '}1.2
           </>
         ) : (
           'Range · PHYLACINE 1.2'

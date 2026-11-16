@@ -121,7 +121,7 @@ describe('range globe in the card (ToLaD#267)', () => {
     expect(r.cur).toBe(speciesRange('Loxodonta africana')!.cur);
     const html = renderToStaticMarkup(<RangeGlobe sci="Loxodonta cyclotis" fallback={null} />);
     expect(html).toContain('<canvas');
-    expect(html).toContain('Range of <i>Loxodonta africana</i> before the split · PHYLACINE 1.2');
+    expect(html).toContain('Range of <i>Loxodonta africana</i> before the split · PHYLACINE 1.2'); // 1.2 never wraps alone
   });
 
   it('a species PHYLACINE has no map of falls back to the Wikimedia map, or to nothing', () => {
