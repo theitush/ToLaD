@@ -240,7 +240,7 @@ describe('names at their forks (ToLaD#373)', () => {
         expect(iv.offBy(landed, v.cam), `${what}: a second tap stays`).toBeLessThanOrEqual(2);
       }
       // One level up from where the tap landed (ToLaD#472), on its frame; never tighter on width (ToLaD#416).
-      const up = v.levelsAbove(v.levelNow(true))[0];
+      const up = v.levelAbove(v.levelNow(true));
       v.doubleTap(0, 0);
       land(v);
       expect(v.w * (v.cam.sx / landed.sx - 1), `${what}: a double tap zooms out`).toBeLessThanOrEqual(12);
@@ -287,7 +287,7 @@ describe('names at their forks (ToLaD#373)', () => {
     land(v);
     expect(iv.offBy(landed, v.cam), 'a second tap stays').toBeLessThanOrEqual(2);
     // (One level up from where it landed, ToLaD#472.)
-    const up = v.levelsAbove(v.levelNow(true))[0];
+    const up = v.levelAbove(v.levelNow(true));
     v.doubleTap(0, 0);
     land(v);
     expect(v.levelNow(true).v, 'a double tap one level up').toBe(up);

@@ -111,7 +111,7 @@ function zoomsOut(v: FanView, a: Camera, c: Camera): boolean {
  * on time (never in, ToLaD#416: nothing). Home (one level up, or from home's level off home) where it zooms out, or is wider on width, the last resort.
  */
 function want(v: FanView, from: Level, c: Camera): FanNode | null {
-  const u = v.levelsAbove(from)[0];
+  const u = v.levelAbove(from);
   const f = P(v).frameOf({ v: u ?? v.fan.root });
   const [x, y] = tighter(v, f, c);
   if (u && x <= STEP && y <= STEP) return u;
@@ -247,7 +247,7 @@ describe('a double tap goes one level up, never in (ToLaD#416, #472)', () => {
             const back = views[views.length - 2];
             const at = `${mode} ${lname} path ${path} double ${doubles}`;
             const lv0 = v.levelNow(true);
-            const up = v.levelsAbove(lv0)[0] ?? v.fan.root;
+            const up = v.levelAbove(lv0) ?? v.fan.root;
             v.doubleTap(-1e4, -1e4);
             if (!P(v).anim) {
               if (moved(v, c)) bad.push(`${at}: moved with no flight`);

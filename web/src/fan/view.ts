@@ -2000,12 +2000,20 @@ export class FanView implements InputHandlers {
    * and home is wider (zoomsOut), or wider on width whatever it does to time, home's last resort since ToLaD#416.
    */
   private upOne(from: Level, c: Camera): Step | null {
-    const u = this.levelsAbove(from)[0];
+    const u = this.levelAbove(from);
     const lv: Level = { v: u ?? this.fan.root };
     const cam = this.landOf(lv);
     const [x, y] = this.spanChange(cam, c);
     if (lv.v === this.fan.root) return this.zoomsOut(cam, c) || (x < -LEVEL_PX && this.offBy(cam, c) > LEVEL_PX) || (u && x <= LEVEL_PX && y <= LEVEL_PX) ? { lv, cam } : null;
     return x <= LEVEL_PX && y <= LEVEL_PX ? { lv, cam } : null;
+  }
+
+  /**
+   * The level one up from level `from` (ToLaD#472): the chain of groups' parent (chainOf of levelClade: a group the chain does not name, as "Vesper
+   * bats & kin", stands at the one it does, Yangochiroptera, so up is the bats); from a species, the group it is in. Null at home's level.
+   */
+  levelAbove(from: Level): FanNode | null {
+    return (from.b ? this.levelsAbove(from) : this.levelsAbove({ v: levelClade(this.fan, from) }))[0] ?? null;
   }
 
   /** The levels level `from` sits in (levelUp's tree, ToLaD#258), nearest first, home's root last. */

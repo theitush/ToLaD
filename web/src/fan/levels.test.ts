@@ -76,7 +76,7 @@ function upChain(v: FanView, from: Level): FanNode[] {
  * off home, home. Null where that would zoom in (ToLaD#416: tighter than the view on width or time; home, the last resort, while wider on width) or at home.
  */
 function wantUp(v: FanView, from: Level): FanNode | null {
-  const u = upChain(v, from)[0] ?? (atHome(v) ? null : v.fan.root);
+  const u = v.levelAbove(from) ?? (atHome(v) ? null : v.fan.root);
   if (!u) return null;
   const f = P(v).landOf({ v: u });
   const [x, y] = [v.w * (f.sx / v.cam.sx - 1), v.h * (f.sy / v.cam.sy - 1)];
@@ -673,7 +673,7 @@ describe('a double tap after taps, pans, a "…": one level up each, home at las
       down(v, 3, []);
       // (Its first tap run, its flight under way: that tap undone, and one level up from where it found the view.)
       const at = v.levelNow(true);
-      const want = upChain(v, at)[0];
+      const want = v.levelAbove(at)!;
       const s = widest(v)!;
       tapSpot(v, s.box);
       fly(v, 2);
@@ -686,7 +686,7 @@ describe('a double tap after taps, pans, a "…": one level up each, home at las
         fly(v, 5);
         v.doubleTap(-1e4, -1e4);
         if (!backing(v)) break;
-        expect(backing(v)!.lv.v, `from ${nameOf(to)}`).toBe(upChain(v, to)[0]);
+        expect(backing(v)!.lv.v, `from ${nameOf(to)}`).toBe(v.levelAbove(to));
       }
       run(v);
       expect(atHome(v)).toBe(true);

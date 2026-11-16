@@ -216,7 +216,7 @@ describe('a double tap goes exactly one level up (ToLaD#472)', () => {
     const before = chain();
     const was = { ...v.cam };
     // (One level up: the level the view is at sits in, levelUp's; a species', the clade it is in.)
-    const up = v.levelsAbove(lv)[0] ?? null;
+    const up = v.levelAbove(lv);
     // (Where a tap on it lands tighter than the view, on width or on time: up would be in, so the double tap holds, ToLaD#416.)
     const into = up ? Math.max(...tighter(P(v).landOf({ v: up }), was)) > 12 : false;
     doubleTap(r, v.w / 2, v.h / 2);
@@ -224,7 +224,8 @@ describe('a double tap goes exactly one level up (ToLaD#472)', () => {
     const [tx, ty] = tighter(v.cam, was);
     const inPx = Math.max(tx, ty);
     let bad: string | null = null;
-    const want = up ? chainOf(v.fan, up) : before;
+    // (The chain less its last; from a species, the chain itself, the group it is in.)
+    const want = lv.b || before.length < 2 ? before : before.slice(0, -1);
     // (At home's level off home, home: #416's last resort while it is wider on width, whatever it does to time.)
     const homeOk = after.length === 1 && tx < -12;
     const held = into && after.join(' › ') === before.join(' › ') && P(v).offBy(v.cam, was) < 1;

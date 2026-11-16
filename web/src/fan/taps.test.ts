@@ -180,7 +180,7 @@ describe('one tap on a label opens it (ToLaD#465)', () => {
     for (const u of labels) {
       stand(home);
       opens(u, 'home');
-      const up = v.levelsAbove(v.levelNow(true))[0] ?? v.fan.root;
+      const up = v.levelAbove(v.levelNow(true)) ?? v.fan.root;
       const want = up.parent ? P(v).landOf({ v: up }) : home;
       v.doubleTap(0, 0);
       run();
