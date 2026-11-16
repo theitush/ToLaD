@@ -140,7 +140,8 @@ describe('labels in the gaps and in the branches', () => {
       for (let i = 1; i < ms.length; i++) expect((ms[i].at - ms[i - 1].at) * sx).toBeGreaterThanOrEqual((ms[i].pic! + ms[i - 1].pic!) / 2 + hair - 1e-6);
       full += ms.filter((m) => m.pic === PIC_D).length;
       small += ms.filter((m) => m.pic === PIC_S).length;
-      held += cover(sx).filter((m) => m.band * sx >= GROUP_D).length;
+      // (A title's band is its parts', ToLaD#483, so it holds none of its own: since #500 a group hands its band down part by part, so there are many.)
+      held += cover(sx).filter((m) => !m.heads && m.band * sx >= GROUP_D).length;
       // (Drawn, held on screen: still none meeting.)
       for (const at of [0.1, 0.5, 0.9]) {
         const ps = [...frame(sx, f.rooms().C[Math.floor(f.rooms().C.length * at)]).pics].sort((p, q) => p.x - q.x);

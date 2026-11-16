@@ -1468,8 +1468,7 @@ export class FanView implements InputHandlers {
    * Where a tap lands on clade v on the tree on its side (ToLaD#465, #468): its first branch the first thing under the header, the view on v alone, as a
    * zoomable UI's zoom to an object (Pad++, a zoomable icicle's click): its room (the hull of its strands at every time) filling the screen from the top to the
    * foot, with only the room its parts' labels need past it (labelsOut: above, its first part's title); nothing of the groups beside it on screen. Where v
-   * opens only deeper than that (gapOpens: a fork waits for its thinnest part, so in linear widths the great apes open some 50 frames in, where the gorillas
-   * have room beside the humans), there, its first branch at the top all the same and the rest of it below, a scroll away. Its time window its frame's
+   * opens only deeper than that (gapHands: its band its parts' once one of them has room, ToLaD#500), there, its first branch at the top all the same and the rest of it below, a scroll away. Its time window its frame's
    * (cladeCamera). So a tap always opens what it names, at its start, and never moves without. (The root: home.)
    */
   openCamera(v: FanNode): Camera {
@@ -1490,7 +1489,8 @@ export class FanView implements InputHandlers {
     const [vf, vl] = [v.strands[0].index, v.strands[v.strands.length - 1].index];
     let g: GapMember | undefined = L.root;
     while (g && g.lv.v !== v) g = L.parts(g).find((p) => p.f <= vf && p.l >= vl);
-    const opens = g && L.parts(g).length ? (L.opens.get(g) ?? Infinity) : Infinity;
+    // (Open from where its band is its parts', each labelled where it fits, ToLaD#500: a group opens part by part.)
+    const opens = g && L.parts(g).length ? (L.hands.get(g) ?? Infinity) : Infinity;
     // (Its room filling the screen, less its labels' room past it; that room as at the zoom, a few rounds: it moves by a px or two at most.)
     const fit = foldedFrame(this.fan, this.w, () => {
       const W = fold.rooms().roomW[j];
@@ -2970,8 +2970,9 @@ export class FanView implements InputHandlers {
         return gs;
       };
       const root = of({ v: this.fan.root });
-      const opens = gapOpens(root, parts, (g) => (g.on < 0 ? 0 : Math.max(g.gap, g.band)), CLADE_PX);
-      L = this.gapLadder = { T, root, parts, opens, hands: gapHands(root, parts, opens, (g) => (g.on < 0 ? 0 : g.gap), same, CLADE_PX) };
+      const room = (g: GapMember) => (g.on < 0 ? 0 : Math.max(g.gap, g.band));
+      const opens = gapOpens(root, parts, room, CLADE_PX);
+      L = this.gapLadder = { T, root, parts, opens, hands: gapHands(root, parts, opens, (g) => (g.on < 0 ? 0 : g.gap), room, CLADE_PX) };
     }
     // (A title over its parts' labels, ToLaD#483: the cut below the titles, each title before its parts; a gap a title's is no one else's, a band handed down holds no name of its owner's.)
     const list = gapCut(L.root, L.parts, L.opens, L.hands, same, sx)
@@ -2980,8 +2981,8 @@ export class FanView implements InputHandlers {
     const pics = this.gapPicsOf(L);
     const out = list.map(({ g, heads, taken }): GapMember => {
       const m = { ...g, heads, gap: taken ? 0 : g.gap };
-      // (A group below the titles has not its name in its gap, by the cut: its band, or none.)
-      return { ...m, tier: heads ? 'title' : tier(g.lv.b ? m : { ...m, gap: 0 }, sx, CLADE_PX, SPECIES_PX), pic: heads ? 0 : picAt(pics.get(g), sx, PIC_D, PIC_S) };
+      // (A group below the titles has not its name in its gap, by the cut: its band, or none. A title in its gap once that holds it: one handed down for a part's room first has none till then, ToLaD#500.)
+      return { ...m, tier: tier(heads ? { ...m, band: 0 } : g.lv.b ? m : { ...m, gap: 0 }, sx, CLADE_PX, SPECIES_PX), pic: heads ? 0 : picAt(pics.get(g), sx, PIC_D, PIC_S) };
     });
     this.gapCoverLast = { T, sx, list: out };
     return out;

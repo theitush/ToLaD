@@ -1,7 +1,7 @@
 // One kind of label on the tree on its side (ToLaD#458, Ita: "gaps only text no pic"): a name in its gap if it fits, else in its own band; a picture, a group's or a species', only in its own band, once that holds one.
 //
 // Which groups comes from the zoom alone, one active range a group (Been, Daiches & Yap 2006): a part has room once its gap on the column or its band on the column holds the text, a fork opens once
-// every part has room, and never before its parent. So the cover only ever splits on the way in, a pan changes nothing, and every member has a place of its own by construction: its gap and its band are
+// every part has room, and never before its parent; it hands its band down to its parts before that, part by part, once one of them has room (gapHands, ToLaD#500). So the cover only ever splits on the way in, a pan changes nothing, and every member has a place of its own by construction: its gap and its band are
 // nobody else's, so nothing meets, whatever the neighbours do. No slide: a title stands at the top of its branch, a name in a band inside that band's part on screen.
 //
 // Everything is read on the labels' column, the only place a label stands: a strand gone by then leaves no line there (rooms by life, steady.ts, may even stand it inside a sister's room),
@@ -89,21 +89,23 @@ export function gapCover<G>(root: G, parts: (g: G) => readonly G[], opens: Map<G
 }
 
 /**
- * Each group's handing zoom (ToLaD#483): from it, its name stands in its gap only and its band is its parts', until it, its own. A group hands its band down once its gap holds its name (`gap(g)`, world
- * x, its own gap on the column; px the text), and at its opening anyway; never before its parent hands down. A part whose top strand is its group's (`same(g, p)`) has its group's gap: while the
- * group's title stands there, the title names it too (the run they both top), so it hands its band down with its group, its own name nowhere; its own title once its group opens.
+ * Each group's handing zoom (ToLaD#483, #500): from it, its band is its parts', each labelled there where it fits, and its name stands in its gap only, as their title, until it opens (gapOpens:
+ * every part has room). A group hands its band down as soon as one of its parts has room of its own (`room(p)`, as gapOpens: its gap or its band holds the text, px), or its gap holds its name
+ * (`gap(g)`, world x), whichever comes first, and at its opening anyway; never before its parent hands down. So a group opens part by part (ToLaD#500, Ita: "colinns sequirel money doesnt show the
+ * pic even at the zoom!"): a wide part has its name and picture once it has room, not once its thinnest sister has; a thin one stays unlabelled, under its group's title, until it fits. A part whose
+ * top strand is its group's has its group's gap, so it hands its band down once that gap holds a name, its group's title, which names it too (gapCut), at the latest.
  */
-export function gapHands<G>(root: G, parts: (g: G) => readonly G[], opens: Map<G, number>, gap: (g: G) => number, same: (g: G, p: G) => boolean, px: number): Map<G, number> {
+export function gapHands<G>(root: G, parts: (g: G) => readonly G[], opens: Map<G, number>, gap: (g: G) => number, room: (g: G) => number, px: number): Map<G, number> {
   const hands = new Map<G, number>();
-  const stack: [G, number, number | null][] = [[root, 0, null]];
+  const stack: [G, number][] = [[root, 0]];
   while (stack.length) {
-    const [g, enter, named] = stack.pop()!;
+    const [g, enter] = stack.pop()!;
     const ps = parts(g);
-    const open = opens.get(g) ?? Infinity;
-    const titled = named ?? (gap(g) > 0 ? px / gap(g) : Infinity);
-    const at = ps.length ? Math.min(open, Math.max(enter, titled)) : Infinity;
+    let at = gap(g) > 0 ? px / gap(g) : Infinity;
+    for (const p of ps) if (room(p) > 0) at = Math.min(at, px / room(p));
+    at = ps.length ? Math.min(opens.get(g) ?? Infinity, Math.max(enter, at)) : Infinity;
     hands.set(g, at);
-    for (const p of ps) stack.push([p, at, same(g, p) && at < open ? at : null]);
+    for (const p of ps) stack.push([p, at]);
   }
   return hands;
 }
