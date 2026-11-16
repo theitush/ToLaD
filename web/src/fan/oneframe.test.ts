@@ -8,7 +8,9 @@ import { CARNIVORA, FELIDAE, mammaliaClade, type CladeRec } from './panthera';
 import { PIC_D, setLabelMode } from './pics';
 import { setGapMode } from './fold';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, type Split } from './splits';
-import { FanView } from './view';
+import { FanView, type Level } from './view';
+import type { Camera } from './camera';
+import type { FanNode } from './layout';
 
 function stubView(clade: CladeRec = CARNIVORA, tree: Split = CARNIVORA_TREE, folds = true): FanView {
   const noop = () => {};
@@ -47,8 +49,26 @@ function stubView(clade: CladeRec = CARNIVORA, tree: Split = CARNIVORA_TREE, fol
 }
 
 
-type Priv = { anim: ((t: number) => boolean) | null; applyFold(): void };
+type Priv = { anim: ((t: number) => boolean) | null; applyFold(): void; landOf(lv: Level): Camera; offBy(a: Camera, b: Camera): number };
 const P = (v: FanView) => v as unknown as Priv;
+/** How much tighter frame a is than the view at camera c, in px of the screen, on width and on time (negative: wider). */
+const tighter = (v: FanView, a: Camera, c: Camera): [number, number] => [v.w * (a.sx / c.sx - 1), v.h * (a.sy / c.sy - 1)];
+/**
+ * Where a double tap goes from level `from`, the view at camera c (ToLaD#472, as levels.test's wantUp): one level up, where a tap
+ * on it lands; where that lands tighter than the view on width or on time (more than LEVEL_PX, 12), the nearest level up that
+ * zooms out (ToLaD#416); from home's level off home, home.
+ */
+function wantUp(v: FanView, from: Level, c: Camera): FanNode | null {
+  for (let at = from; ; ) {
+    // (At home's level off home, home, ToLaD#416's last resort.)
+    const u = v.levelAbove(at) ?? (P(v).offBy(P(v).landOf({ v: v.fan.root }), c) > 1 ? v.fan.root : null);
+    if (!u) return null;
+    const [x, y] = tighter(v, P(v).landOf({ v: u }), c);
+    if (x <= 12 && y <= 12) return u;
+    if (u === v.fan.root) return x < -12 ? u : null;
+    at = { v: u };
+  }
+}
 function settle(v: FanView): void {
   for (let k = 0; k < 3; k++) v.draw();
 }
@@ -120,15 +140,19 @@ function tapEach(v: FanView, at: string, bad: string[], depth: number, sample = 
     const [a, b] = T.hull(f, l).map((x) => v.toScreen(x, 0)[0]);
     if (a >= AXIS - 1 && b <= v.w + 1) frameCheck(v, f, l, here, bad);
     if (bad.length >= 20) return n;
-    // A double tap, right after the tap: out one step, back to the frame the tap was made at (never deeper: the item's
-    // own clade's frame is inside it, ToLaD#359).
+    // A double tap, right after the tap: one level up from the level the tap landed on, where a tap on that one lands (ToLaD#472;
+    // where that would zoom in, the nearest level up that zooms out, #416), never in, and out on width or on time.
     if (box) {
+      const lv = v.levelNow(true);
+      const want = wantUp(v, lv, inside);
       v.doubleTap(0, 0);
       run(v);
       const out = v.cam;
-      if (!(out.sx < inside.sx * 0.999)) bad.push(`${here}: a double tap did not go out`);
-      const off = Math.max(Math.abs(Math.log(out.sx / from.sx)), Math.abs(Math.log(out.sy / from.sy))) + Math.abs(out.cx - from.cx) * from.sx / v.w + Math.abs(out.cy - from.cy) * from.sy / v.h;
-      if (off > 1e-2) bad.push(`${here}: the double tap went to x ${(1 / out.sx).toExponential(2)} at ${out.cx.toFixed(1)}, not back to the frame tapped at`);
+      const [x, y] = tighter(v, out, inside);
+      const name = (u: FanNode | undefined) => (u ? u.split.taxon || u.split.name || '?' : lv.b ? `${lv.b.sp.sci} (species)` : '?');
+      if (x > 12 || y > 12 || (x >= -12 && y >= -12)) bad.push(`${here}: a double tap from ${name(lv.v)} did not go out (${x.toFixed(0)}, ${y.toFixed(0)} px tighter)`);
+      else if (!want) bad.push(`${here}: no level up from ${name(lv.v)} zooms out, yet the double tap went`);
+      else if (P(v).offBy(P(v).landOf({ v: want }), out) > 1) bad.push(`${here}: a double tap from ${name(lv.v)} went to x ${(1 / out.sx).toExponential(2)} at ${out.cx.toFixed(1)}, not one level up (${name(want)})`);
     }
     if (depth > 1) {
       v.cam = { ...inside };

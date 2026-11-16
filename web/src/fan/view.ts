@@ -2086,34 +2086,34 @@ export class FanView implements InputHandlers {
       const f = this.landOf(lv);
       return this.offBy(f, c) <= this.w / 2 && Math.abs(z(f)) <= Math.log(LEVEL_KEEP);
     };
+    // (At a level's landing (on), or near the level the view was at (near): that level, whatever its level above does (ToLaD#312: a pan
+    // keeps the level). Where the level above lands tighter, as Hominini's does at Homo's (#289), a double tap goes on up (upOut, #476).)
+    if (on) return on.lv;
+    if (was && near(was)) return was;
     let lv: Level = { v: this.fan.root };
-    if (on) lv = on.lv;
-    else if (was && near(was)) lv = was;
-    else {
-      let offLv = this.offBy(ladder[ladder.length - 1].cam, c);
-      for (let i = ladder.length - 2; i >= 0; i--) {
-        const zi = z(ladder[i].cam);
-        if (zi < -Math.log(BACK_SLACK)) {
-          // (A frame tighter than the next one in, Fit fossils: the great apes framed on "now", the hominins' wider on
-          // their fossils. Passed over, not where the walk ends: else a pan off the Hominins' frame read the view as at
-          // the Catarrhini, the pictures and names gone, ToLaD#311.)
-          if (i > 0 && z(ladder[i - 1].cam) >= zi) continue;
-          break;
-        }
-        // (A level whose frame stands further off the view than the one it sits in is not where the view is, however
-        // far in: a species', the human, its column filling the Hominins' and Homo's frames, else read as the level
-        // there, ToLaD#302; a fossil genus' a pan away from the Hominins' frame, Paranthropus', ToLaD#311. A clade's only
-        // while the view is within a screen of the one it sits in: far from every frame, the outer ones stand further
-        // off the deeper they go.)
-        const off = this.offBy(ladder[i].cam, c);
-        if (ladder[i].lv.b && off > offLv + LEVEL_PX) break;
-        lv = ladder[i].lv;
-        offLv = off;
+    let offLv = this.offBy(ladder[ladder.length - 1].cam, c);
+    for (let i = ladder.length - 2; i >= 0; i--) {
+      const zi = z(ladder[i].cam);
+      if (zi < -Math.log(BACK_SLACK)) {
+        // (A frame tighter than the next one in, Fit fossils: the great apes framed on "now", the hominins' wider on
+        // their fossils. Passed over, not where the walk ends: else a pan off the Hominins' frame read the view as at
+        // the Catarrhini, the pictures and names gone, ToLaD#311.)
+        if (i > 0 && z(ladder[i - 1].cam) >= zi) continue;
+        break;
       }
+      // (A level whose frame stands further off the view than the one it sits in is not where the view is, however
+      // far in: a species', the human, its column filling the Hominins' and Homo's frames, else read as the level
+      // there, ToLaD#302; a fossil genus' a pan away from the Hominins' frame, Paranthropus', ToLaD#311. A clade's only
+      // while the view is within a screen of the one it sits in: far from every frame, the outer ones stand further
+      // off the deeper they go.)
+      const off = this.offBy(ladder[i].cam, c);
+      if (ladder[i].lv.b && off > offLv + LEVEL_PX) break;
+      lv = ladder[i].lv;
+      offLv = off;
     }
-    // (Never a level whose level above lands tighter than the view (ToLaD#472): the view is not zoomed in as far as that one, so not in this one
-    // either; out a level till the one above zooms out (upOne). The walk weighs width and time together and keeps a level a while (near): a pinch
-    // in on time, or out, at a level's landing read a level whose parent's landing is tighter on width, and a double tap held there.)
+    // (The walk reads no level whose level above lands tighter than the view (ToLaD#472): the view is not zoomed in as far as that one, so not
+    // in this one either; out a level till the one above zooms out (upOne). The walk weighs width and time together: a view off every landing
+    // read a level whose parent's landing is tighter on width, and a double tap went two levels up by the chain.)
     for (let u = this.levelAbove(lv); u && !this.upOne(lv, c); u = this.levelAbove(lv)) lv = { v: u };
     return lv;
   }
