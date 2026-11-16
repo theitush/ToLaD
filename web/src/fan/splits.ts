@@ -470,6 +470,16 @@ export const NAMED_CLADES: Record<string, [string, string]> = {
   Australidelphia: ['Dromiciops gliroides', 'Macropus giganteus'],
 };
 
+/**
+ * The highlights' stops (ToLaD#497; CLAUDE.md: "tuning is for highlights only (hominins, cats)"), the one place they live: a species and the named
+ * clade a tap on it stops at first. From a level outside that clade, a tap on the species (its name, its picture, its column) lands at the clade's
+ * level, the species among its relatives; from there, the next tap on it lands on the species, its card open. Humans: from home, the Primates or
+ * the great apes, the hominins first (Ita, 2026-11-16: "clicking humans should show a hominins centered looks .. second tap goes to humans").
+ */
+export const HIGHLIGHT_STOPS: Record<string, string> = {
+  'Homo sapiens': 'Hominini',
+};
+
 /** Name the unnamed orders' splits (ORDER_CROWNS) and NAMED_CLADES' in tree t: the last split over both species, if it has no taxon. */
 export function nameOrders(t: Split): Split {
   const path = (sp: string): Split[] | null => {

@@ -24,7 +24,7 @@ import { LADDER, Territories, type CutItem, type Ref, type RowsOf } from './cut'
 import { COLUMN_DIM, columnSpans, EVENT_TINT, eventAt, eventSpans, type EventSpan } from './colstyle';
 import { laneDim, LINEAGE, pathFrame, TwigModel } from './twigs';
 import type { RectBatch } from './meshgl';
-import { FAMILY_EN, familyLabel, ORDER_EN, ORDER_TAXA, taxonKey, type Split } from './splits';
+import { FAMILY_EN, familyLabel, HIGHLIGHT_STOPS, ORDER_EN, ORDER_TAXA, taxonKey, type Split } from './splits';
 import { Brackets, foldedFrame, forkLeaders, forkNames, latinOf, rankOf, STACK_MOST, TAXON_EN, type ForkLines, type StackAt } from './brackets';
 import { axisInset, drawWorldOver, drawWorldUnder, worldFlags, type Box } from './world';
 
@@ -2296,6 +2296,26 @@ export class FanView implements InputHandlers {
    * (so every tap visibly moves). Already at a species: false, for its card. A clade that holds the view's level (a
    * pinned group, an ancestor's bracket): out to it, unless a column's stretch (`col`: false, its card).
    */
+  /**
+   * A highlight's stop (HIGHLIGHT_STOPS, ToLaD#497, the one place a highlight's taps are tuned): a tap on its species, `to` (its name or picture; a
+   * column: the species' own or a lineage of its, inside the clade), from a level outside its clade, lands at the clade's level (goLevel: as a tap on
+   * the clade lands); at that level, on the species, its card open. True when it flew; false where the highlight has no say, the tap as any.
+   */
+  private stopAt(to: Level, col: boolean): boolean {
+    for (const [sci, latin] of Object.entries(HIGHLIGHT_STOPS)) {
+      const b = this.fan.branches.find((q) => q.sp.sci === sci);
+      let u: FanNode | null = b ? b.node : null;
+      while (u && latinOf(u.split) !== latin) u = u.parent;
+      if (!b || !u || !(to.b === b || (col && to.v && to.v.strands.includes(b))) || !holds({ v: u }, to)) continue;
+      const from = this.anim && this.backing ? this.backing.lv : this.levelNow(true);
+      const stop: Level | null = !holds({ v: u }, from) ? { v: u } : from.v === u && to.b === b ? { b } : null;
+      if (!stop) return false;
+      this.goLevel(stop, this.landOf(stop));
+      return true;
+    }
+    return false;
+  }
+
   private tapInto(to: Level, col: boolean): boolean {
     const on = this.anim && this.backing;
     const from = on ? this.backing!.lv : this.levelNow(true);
@@ -2658,6 +2678,8 @@ export class FanView implements InputHandlers {
     }
     const to: Level | null = pinned ? { v: pinned.v } : pill?.v ? { v: pill.v } : pill?.b ? { b: pill.b } : pic ? (pic[4] ? { v: pic[4] } : { b: pic[3] }) : brk ? { v: brk.v } : null;
     if (to) {
+      // (A highlight's species, ToLaD#497: its clade first.)
+      if (to.b && this.stopAt(to, false)) return;
       // (A group's name on the tree on its side, ToLaD#465: where it opens, its parts named, openCamera.)
       if (to.v && (pill || pic) && this.flip && gapLabelsOn()) {
         this.goOpen(to.v);
@@ -2685,7 +2707,8 @@ export class FanView implements InputHandlers {
     // A column (ToLaD#258): one level deeper towards its species, or below its split towards the lineage there; at it, its card.
     if (b) {
       const wy = Math.min(this.fan.trunkBottom.y, this.toWorld(x, y)[1]);
-      if (this.tapInto(wy >= b.splitY ? { v: segAt(b, wy).node } : { b }, true)) return;
+      const into: Level = wy >= b.splitY ? { v: segAt(b, wy).node } : { b };
+      if (this.stopAt(into, true) || this.tapInto(into, true)) return;
     }
     this.selected = b ? b.sp : null;
     // The time touched, kept within the strand (from its tip down to the bottom of the world).
