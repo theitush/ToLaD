@@ -1,8 +1,9 @@
 // The tree on its side (ToLaD#452, `?flip=1`): a touch at a phone point lands on the world point drawn there, both ways;
 // each picture's centre stands on 100 kya; off, the view is as it was.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { forkNames, setForkNames, type Brackets } from './brackets';
 import { FanView } from './view';
-import { AXIS_ROOM, CHAIN_ROOM, LABELS_MA, setFlip, toPhone, toView } from './flip';
+import { AXIS_ROOM, CHAIN_ROOM, LABELS_MA, NOW_PX, setFlip, toPhone, toView } from './flip';
 import { loadMammalsFromFiles } from './mammals-node';
 import { mammaliaClade } from './panthera';
 import { PIC_D } from './pics';
@@ -162,6 +163,39 @@ describe('the tree on its side', () => {
     v.draw();
     expect(v.toScreen(0, y100)[1]).toBeLessThan(0);
     for (const s of v.cutLast!.spots) expect(s.box[1]).toBeGreaterThanOrEqual(0);
+  });
+
+  it('panned toward the past, "now" off the right edge: no groups pinned there, no "…", nothing there to tap (ToLaD#494)', () => {
+    const { v } = stubView(true);
+    const br = (v as unknown as { brackets: Brackets }).brackets;
+    // (As the page has it: turned, the names at the forks.)
+    const forks = forkNames();
+    setFlip(true);
+    setForkNames(true);
+    try {
+      let frames = 0;
+      for (const name of [null, 'Carnivora', 'Ursidae', 'Primates', 'Rodentia']) {
+        const cam = name ? v.levelCamera(name) : v.homeCamera();
+        expect(cam, String(name)).not.toBeNull();
+        for (const k of [0, 40, 80, 160, 240, 400]) {
+          // "Now" k px past where it stands, towards the right edge (up the view's y).
+          v.cam = { ...cam!, cy: v.yNow - (NOW_PX - k - v.h / 2) / cam!.sy };
+          v.draw();
+          expect(v.toScreen(0, v.yNow)[1]).toBeCloseTo(NOW_PX - k, 3);
+          expect(br.pins, `${name} ${k}`).toEqual([]);
+          expect(br.pinA).toBe(0);
+          for (let y = 0; y < v.h; y += 2) for (const x of [br['x0'] + 8, v.w / 2, v.w - 20]) {
+            expect(br.pinHit(x, y)).toBeNull();
+            expect(br.moreHit(x, y)).toBe(false);
+          }
+          frames++;
+        }
+      }
+      expect(frames).toBe(30);
+    } finally {
+      setForkNames(forks);
+      setFlip(false);
+    }
   });
 
   it('off: the view is the canvas as it is, input untouched', () => {

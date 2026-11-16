@@ -651,10 +651,8 @@ export class Brackets {
    * into a bear's past older than the bears, the bears are not pinned, the dog-like carnivores are).
    */
   pin(top: number, yTop: number, measure: (font: string, text: string) => number, at: FanNode | null = null, keep: ((v: FanNode) => boolean) | null = null): Pin[] {
+    this.unpin(top);
     this.pinA = 1 - this.fit;
-    this.pinTop = top;
-    this.pins = [];
-    this.pinMore = false;
     if (this.pinA <= 0) return this.pins;
     const cx = (this.x0 + this.w) / 2;
     const room = this.w - this.x0 - 2 * LABEL_PAD;
@@ -683,6 +681,17 @@ export class Brackets {
     const k0 = this.pinMore ? 1 : 0;
     this.pins.forEach((p, k) => (p.row = k + k0));
     return this.pins;
+  }
+
+  /**
+   * No groups pinned (the tree on its side, ToLaD#494: the breadcrumb says where the view is), so no "…" over them and
+   * nothing there to tap; the names at the forks keep `top` (the labels' top line) as their top.
+   */
+  unpin(top: number): void {
+    this.pinTop = top;
+    this.pins = [];
+    this.pinA = 0;
+    this.pinMore = false;
   }
 
   /** The pinned rows' height (px below pinTop, the band's own backdrop included), 0 without any. */

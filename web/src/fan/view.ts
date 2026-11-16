@@ -1231,7 +1231,9 @@ export class FanView implements InputHandlers {
     // (The stack at the level the view is at, ToLaD#288: its groups, it and the familiar levels up, "…" over three rows.)
     br.layout(this.camera, this.fan, nowS, LABEL_AXIS_X, fit, measure, top, stackAt(this.fan, levelClade(this.fan, this.levelNow())));
     // The groups the view is inside, pinned under the buttons as the stack scrolls off (ToLaD#233): the familiar levels.
-    br.pin(top, this.camera.toWorld(0, 0)[1], measure, br.fit < 1 ? (this.centreLine()?.node ?? null) : null, (v) => isLevel(this.fan, v) && familiar(v));
+    // On its side none (ToLaD#494): the breadcrumb says where the view is, and the names stand at the forks.
+    if (this.flip) br.unpin(top);
+    else br.pin(top, this.camera.toWorld(0, 0)[1], measure, br.fit < 1 ? (this.centreLine()?.node ?? null) : null, (v) => isLevel(this.fan, v) && familiar(v));
     return br;
   }
 
@@ -1279,14 +1281,13 @@ export class FanView implements InputHandlers {
 
   /**
    * Turned (flip.ts): where the labels' pictures' centres stand, on 100 kya. Off screen in time, at the edge it left by,
-   * so that a picture and its pill stay on screen, as keepOnScreen keeps them at the sides, and clear of the pinned
-   * rows coming in at the right edge as "now" leaves it (the room heldRow makes for them unturned).
+   * so that a picture and its pill stay on screen, as keepOnScreen keeps them at the sides. (No pinned rows come in at
+   * the right edge as "now" leaves it, ToLaD#494: no room kept for them.)
    */
   private flipPicY(): number {
     const y = this.toScreen(0, this.fan.time.y(LABELS_MA))[1];
     const r = PIC_D / 2;
-    const pins = Math.min(STACK_MOST, Math.max(0, NOW_PX - this.toScreen(0, this.yNow)[1]));
-    return Math.max(this.labelTop() + pins + LABEL_CAP + LABEL_UNDER + r, Math.min(this.h - r, y));
+    return Math.max(this.labelTop() + LABEL_CAP + LABEL_UNDER + r, Math.min(this.h - r, y));
   }
 
   /**
