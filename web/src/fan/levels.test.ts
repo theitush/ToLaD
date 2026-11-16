@@ -226,8 +226,13 @@ describe('a tap goes one level deeper, a double-tap one level out (ToLaD#258)', 
         const finer = inside.length >= 2 && !inside.some((s) => s.run![0] === h.run![0] && s.run![1] === h.run![1]);
         const into = now.v === v.fan.root ? v.cam.sx > v.homeCamera().sx * 1.01 && finer : !!now.v;
         expect(holds({ v: g }, now) || (into && holds(now, { v: g }))).toBe(true);
-        v.doubleTap(-1e4, -1e4);
-        run(v);
+        // (Double taps one level up each (ToLaD#472): a pill that went past a level the chain names comes home in more than one.)
+        for (let k = 0; k < 6 && !atHome(v); k++) {
+          const want = wantUp(v, v.levelNow(true));
+          v.doubleTap(-1e4, -1e4);
+          run(v);
+          expect(v.levelNow(true).v).toBe(want);
+        }
         expect(atHome(v)).toBe(true);
       }
     });
