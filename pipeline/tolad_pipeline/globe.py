@@ -6,6 +6,14 @@ name, then PHYLACINE's synonymy table, then its Open Tree synonyms (the order mo
 uses), and writes the matched species' current and present-natural cells. Nothing else under
 data/mammals is touched.
 
+A species PHYLACINE lacks under all its names (most were split or described after its 2019 taxonomy)
+borrows the range of the older species it was split from (ToLaD#486): MDD's CMW name, then its MSW3
+name, then the one species its notes say it was split from, then the one whose notes say it "previously
+included" it (older_names), found by the same chain. A borrowed range must come within NEAR cells of the
+species' type locality where MDD gives one; else the species stays without a range. An older name no
+other current species shares and no note calls a split is the species' own former name (a genus move):
+an exact match.
+
 The grid is PHYLACINE's: 360 x 142 cells, Behrmann cylindrical equal-area (standard parallels
 30 deg), row 0 at the north. Columns are 1 deg of longitude from -180; a row's edges are at
 latitude asin(y / Y_POLE) (the sphere's equal-area formula on the ellipsoid's y, so authalic
@@ -14,22 +22,26 @@ latitude: within 0.13 deg of geodetic, ~1/7 of a cell). The file carries those e
 Packing, per species and kind: the raster's range cells as flat indices (row * 360 + col),
 run-length coded as [gap, length, gap, length, ...], each gap counted from the end of the run
 before (from 0 for the first). `ranges[name] = [current, present_natural]`; an empty list is no
-cells (an extinct species has only its present-natural range).
+cells (an extinct species has only its present-natural range). A borrowed range has a third element,
+the species whose range it is: `[current, present_natural, "Loxodonta africana"]`.
 """
 from __future__ import annotations
 
 import argparse
-import io
+import bisect
+import csv
 import json
 import math
+import re
 import sys
 import zipfile
+from collections import Counter
 from pathlib import Path
 
 import numpy as np
 
-from . import ranges
-from .load import load_phylacine
+from . import mdd, ranges
+from .load import load_phylacine, norm_name
 from .wiki import species_rows, synonyms
 
 ROWS, COLS = ranges.GRID_SHAPE
@@ -97,16 +109,153 @@ def load_masks(raw: Path) -> dict[str, dict[str, np.ndarray]]:
     return out
 
 
+def resolve(cands: list[str], have: set[str], phy_syn: dict[str, str]) -> str | None:
+    """The first of the names that is a PHYLACINE binomial itself or by PHYLACINE's synonymy table."""
+    for c in cands:
+        hit = c if c in have else phy_syn.get(c) if phy_syn.get(c) in have else None
+        if hit:
+            return hit
+    return None
+
+
 def match(names: dict[str, int], have: set[str], phy_syn: dict[str, str], ott_syn: dict[int, list[str]]) -> dict[str, str]:
     """Our species name -> the PHYLACINE binomial whose maps it gets (name, PHYLACINE synonym, OTT synonym)."""
     out: dict[str, str] = {}
     for name, ott in names.items():
-        cands = [name] + ott_syn.get(ott, [])
-        for c in cands:
-            hit = c if c in have else phy_syn.get(c) if phy_syn.get(c) in have else None
+        hit = resolve([name] + ott_syn.get(ott, []), have, phy_syn)
+        if hit:
+            out[name] = hit
+    return out
+
+
+# ---- the species a newer one was split from (ToLaD#486) ------------------------------------
+
+# "split from L. africana" / "split from Loxodonta africana" / "split from phillipsii" (same genus) /
+# "recently described based on populations previously attributed to E. cinereus"
+_SPLIT = re.compile(r"(?i:\b(?:split from|previously attributed to)) (?:([A-Z][a-z]*\.?) )?([a-z][a-z-]+)\b")
+# a second species right after the first ("split from A. b and A. c", "split from b and c"): not clean
+_MORE = re.compile(r"\s*(?:,|/|&|\band\b|\bor\b)\s*[A-Z][a-z]*\.? [a-z]")
+_MORE_EP = re.compile(r"\s*(?:,|/|&|\band\b|\bor\b)\s*[a-z]+\s*(?:[,;.)]|$|\band\b|\bor\b)")
+# "previously included C. catellus, C. dorsalis, and ... C. rufus": the parent's own word for its splits
+_INCL = re.compile(r"\b(?:previously|formerly) includ(?:ed|es)\b([^;]*)")
+_BIN = re.compile(r"\b([A-Z][a-z]*\.?) ([a-z][a-z-]+)\b")
+_WORD = re.compile(r"\b[A-Z][a-z]+\b")
+
+
+def _expand(g: str | None, ep: str, genera: list[str]) -> list[str]:
+    """A binomial as a note writes it -> candidate full names: an abbreviated (or missing) genus is each of
+    `genera` with that initial (or the first, the row's own), in order."""
+    if g and len(g) > 1 and not g.endswith("."):
+        return [f"{g} {ep}"]
+    if not g:
+        return [f"{genera[0]} {ep}"]
+    return [f"{x} {ep}" for x in dict.fromkeys(genera) if x.startswith(g.rstrip("."))]
+
+
+def split_note(note: str, genera: list[str]) -> list[str]:
+    """The species a taxonomy note says this one was split from, as candidate binomials: [] unless the note
+    names exactly one ("split from L. africana", not "split from A. b and A. c")."""
+    hits = list(_SPLIT.finditer(note))
+    if len({h.groups() for h in hits}) != 1 or (_MORE if hits[0].group(1) else _MORE_EP).match(note, hits[0].end()):
+        return []
+    return _expand(hits[0].group(1), hits[0].group(2), genera)
+
+
+def older_names(raw: Path) -> dict[str, list[tuple[str, bool]]]:
+    """MDD species -> the older species it was split from, as (candidate name, split?) in order:
+    its name in the Illustrated Checklist of the Mammals of the World (CMW, 2020: closest in time to
+    PHYLACINE), its name in MSW3 (2005), the one species its taxonomy notes say it was split from (or was
+    described from populations "previously attributed to"), then the one species whose notes say it
+    "previously included" it. A CMW or MSW3 name may be the same species
+    under a former name (a genus move, a spelling) rather than a split: split? is False for those. Names
+    equal to its own are left out (they are what failed)."""
+    p = raw / mdd.MDD_FILE
+    if not p.exists():
+        return {}
+    with p.open(encoding="utf-8", newline="") as f:
+        rows = [(norm_name(r["sciName"]), r) for r in csv.DictReader(f)]
+    names = {n for n, _ in rows}
+
+    def genera(name: str, r: dict, olds: list[str]) -> list[str]:
+        orig = mdd._na(r["originalNameCombination"]).replace("(", "").split()
+        return [name.split()[0]] + [o.split()[0] for o in olds] + orig[:1] + _WORD.findall(r["taxonomyNotes"])
+
+    out: dict[str, list[tuple[str, bool]]] = {}
+    claims: dict[str, set[str]] = {}
+    for name, r in rows:
+        olds = [norm_name(mdd._na(r.get(c))) for c in ("CMW_sciName", "MSW3_sciName") if mdd._na(r.get(c))]
+        gs = genera(name, r, olds)
+        out[name] = [(o, False) for o in olds] + [(c, True) for c in split_note(r["taxonomyNotes"], gs)]
+        for m in _INCL.finditer(r["taxonomyNotes"]):
+            for g, ep in _BIN.findall(m.group(1)):
+                for c in _expand(g, ep, gs):
+                    if c in names and c != name:
+                        claims.setdefault(c, set()).add(name)
+    for child, parents in claims.items():
+        if len(parents) == 1:
+            out[child].append((next(iter(parents)), True))
+    return {n: [c for c in dict.fromkeys(cs) if c[0] != n and len(c[0].split()) == 2] for n, cs in out.items()
+            if any(c[0] != n for c in cs)}
+
+
+def type_localities(raw: Path) -> dict[str, tuple[float, float]]:
+    """MDD species -> its type locality (lat, lon), where MDD gives one."""
+    p = raw / mdd.MDD_FILE
+    if not p.exists():
+        return {}
+    out: dict[str, tuple[float, float]] = {}
+    with p.open(encoding="utf-8", newline="") as f:
+        for r in csv.DictReader(f):
+            try:
+                out[norm_name(r["sciName"])] = (float(r["typeLocalityLatitude"]), float(r["typeLocalityLongitude"]))
+            except (TypeError, ValueError):
+                pass
+    return out
+
+
+# how near a borrowed range must come to the type locality: two cells (~200 km), for a locality given to a
+# country's centre or a small island PHYLACINE's ~96 km cells miss
+NEAR = 2
+
+
+def cell(lat: float, lon: float) -> tuple[int, int]:
+    """The grid cell (row, col) a point falls in."""
+    row = bisect.bisect_left([-x for x in row_edges()], -lat) - 1
+    return min(max(row, 0), ROWS - 1), min(int(lon + 180), COLS - 1)
+
+
+def holds(mask: dict[str, np.ndarray], lat: float, lon: float, pad: int = NEAR) -> bool:
+    """Whether a species' current or present-natural range comes within `pad` cells of a point."""
+    r, c = cell(lat, lon)
+    cols = [(c + d) % COLS for d in range(-pad, pad + 1)]
+    return any(bool(a[max(0, r - pad):r + pad + 1][:, cols].any()) for a in mask.values())
+
+
+def borrow(names: dict[str, int], exact: dict[str, str], older: dict[str, list[tuple[str, bool]]], have: set[str],
+           phy_syn: dict[str, str], ott_syn: dict[int, list[str]]) -> dict[str, tuple[str, str, bool]]:
+    """Our species PHYLACINE lacks under any of its names -> (the PHYLACINE binomial, the older species
+    whose range it is, split?): the first of its older names (older_names) that PHYLACINE has, by the same
+    chain as an exact match (the name, PHYLACINE's synonym, the OTT synonyms of our row of that name); an
+    older name PHYLACINE lacks is followed to its own older names (a species split twice)."""
+    def find(name: str, seen: set[str]) -> tuple[str, str, bool] | None:
+        for p, split in older.get(name, []):
+            if p in seen:
+                continue
+            seen.add(p)
+            hit = resolve([p] + ott_syn.get(names.get(p, 0), []), have, phy_syn)
+            if hit:
+                return hit, p, split
+            up = find(p, seen)
+            if up:
+                return up[0], up[1], up[2] or split
+        return None
+
+    out: dict[str, tuple[str, str, bool]] = {}
+    for name in names:
+        if name not in exact:
+            hit = find(name, {name})
             if hit:
                 out[name] = hit
-                break
     return out
 
 
@@ -116,13 +265,30 @@ def build(raw: Path, mammals: Path) -> tuple[dict, dict]:
     _, phy_syn = load_phylacine(raw)
     ott_syn = synonyms({u for u in species.values() if u}, raw)
     m = match(species, set(masks), phy_syn, ott_syn)
+    b = borrow(species, m, older_names(raw), set(masks), phy_syn, ott_syn)
+    # An older name whose map no other species MDD accepts shares, and no note calls a split, is this
+    # species under a former name (Microtus oeconomus, now Alexandromys): its own range, an exact match.
+    accepted = {r["name"] for r in mdd.load(raw)}
+    uses = Counter(h for n, h in [*m.items(), *((n, v[0]) for n, v in b.items())] if n in accepted)
+    renamed = {n: h for n, (h, _, split) in b.items() if not split and uses[h] <= 1}
+    m |= renamed
+    split = {n: (h, p) for n, (h, p, _) in b.items() if n not in renamed}
+    # ... and a split species' borrowed range must hold where it was described from (MDD's type locality)
+    tl = type_localities(raw)
+    far = {n for n, (h, _) in split.items() if n in tl and not holds(masks[h], *tl[n])}
+    split = {n: v for n, v in split.items() if n not in far}
     empty = np.zeros(ranges.GRID_SHAPE, dtype=bool)
+
+    def cells(p: str) -> list[list[int]]:
+        return [pack(masks[p].get("cur", empty)), pack(masks[p].get("nat", empty))]
+
     out = {
         "grid": {"rows": ROWS, "cols": COLS, "lon0": -180, "lat": row_edges()},
-        "ranges": {n: [pack(masks[p].get("cur", empty)), pack(masks[p].get("nat", empty))] for n, p in sorted(m.items())},
+        "ranges": dict(sorted({**{n: cells(p) for n, p in m.items()},
+                               **{n: cells(h) + [p] for n, (h, p) in split.items()}}.items())),
     }
-    stats = {"species": len(species), "matched": len(m), "maps": len(masks),
-             "maps_shared": len(m) - len(set(m.values()))}
+    stats = {"species": len(species), "matched": len(m), "renamed": len(renamed), "borrowed": len(split),
+             "far": sorted(far), "maps": len(masks), "maps_shared": len(m) - len(set(m.values()))}
     return out, stats
 
 
@@ -144,7 +310,9 @@ def main(argv: list[str] | None = None) -> int:
 
     gz = len(gzip.compress((a.mammals / "ranges.json").read_bytes(), 9))
     print(f"[globe] {stats['matched']}/{stats['species']} species matched to {stats['maps']} PHYLACINE maps "
-          f"({stats['maps_shared']} shared); ranges.json {n / 1e6:.2f} MB, gzip {gz / 1e6:.2f} MB", file=sys.stderr)
+          f"({stats['renamed']} by a former name, {stats['maps_shared']} shared), {stats['borrowed']} borrow the "
+          f"range of the species they were split from ({len(stats['far'])} more left out: the range misses their "
+          f"type locality); ranges.json {n / 1e6:.2f} MB, gzip {gz / 1e6:.2f} MB", file=sys.stderr)
     return 0
 
 

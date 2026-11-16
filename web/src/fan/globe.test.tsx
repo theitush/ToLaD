@@ -114,6 +114,16 @@ describe('range globe in the card (ToLaD#267)', () => {
     expect(html).not.toContain('class="range');
   });
 
+  it('a species split since PHYLACINE draws the range before the split, and its credit says whose (ToLaD#486)', () => {
+    expect(speciesRange('Panthera leo')!.from).toBeUndefined();
+    const r = speciesRange('Loxodonta cyclotis')!;
+    expect(r.from).toBe('Loxodonta africana');
+    expect(r.cur).toBe(speciesRange('Loxodonta africana')!.cur);
+    const html = renderToStaticMarkup(<RangeGlobe sci="Loxodonta cyclotis" fallback={null} />);
+    expect(html).toContain('<canvas');
+    expect(html).toContain('Range of <i>Loxodonta africana</i> before the split · PHYLACINE 1.2');
+  });
+
   it('a species PHYLACINE has no map of falls back to the Wikimedia map, or to nothing', () => {
     const fb = renderToStaticMarkup(<RangeGlobe sci="Not a species" fallback={<RangeMap w={w} />} />);
     expect(fb).toContain('class="range loading"');

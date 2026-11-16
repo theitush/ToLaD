@@ -4,7 +4,9 @@
 //
 // The grid is PHYLACINE's: 360 columns of 1 degree from -180, 142 rows north to south between the latitudes in
 // `grid.lat` (Behrmann equal-area). A species' cells are run-length coded over flat indices (row * 360 + col) as
-// [gap, length, ...], each gap from the end of the run before: `ranges[sci] = [current, present_natural]`.
+// [gap, length, ...], each gap from the end of the run before: `ranges[sci] = [current, present_natural]`. A species
+// PHYLACINE lacks under all its names borrows the range of the older species it was split from (ToLaD#486), named as a
+// third element: `[current, present_natural, "Loxodonta africana"]`.
 
 import type { MultiPolygon } from 'geojson';
 
@@ -12,7 +14,7 @@ export interface GlobeData {
   grid: { rows: number; cols: number; lon0: number; lat: number[] };
   /** Natural Earth land: polygons of rings of flat [lon, lat, lon, lat, ...]. */
   land: number[][][];
-  ranges: Record<string, [number[], number[]]>;
+  ranges: Record<string, [number[], number[]] | [number[], number[], string]>;
 }
 
 /** The sibling file's name (vite.config.ts emits it; pages.yml stages it next to index.html). */
@@ -67,6 +69,8 @@ export interface SpeciesRange {
   lostShape: MultiPolygon;
   /** [lon, lat] to face: the centre of all its cells (current and natural). */
   centre: [number, number];
+  /** A borrowed range (ToLaD#486): the older species it was split from, whose range this is. */
+  from?: string;
 }
 
 const STEP = 3; // degrees between vertices along a parallel (d3 joins vertices by great circles)
@@ -127,7 +131,9 @@ export function speciesRange(sci: string, d: GlobeData | null = data): SpeciesRa
   const n = all.size;
   const spread = n ? Math.min(1, Math.hypot(x, y, z) / (0.4 * n)) : 1;
   const centre: [number, number] = h + Math.abs(z) < 1e-9 ? [0, 0] : [Math.atan2(y, x) / rad, (Math.atan2(z, h) / rad) * spread];
-  return { cur: cur.length, lost: lost.length, curShape: shape(cur, d.grid), lostShape: shape(lost, d.grid), centre };
+  const out: SpeciesRange = { cur: cur.length, lost: lost.length, curShape: shape(cur, d.grid), lostShape: shape(lost, d.grid), centre };
+  if (r.length === 3) out.from = r[2];
+  return out;
 }
 
 /** The land as one d3 MultiPolygon. */
