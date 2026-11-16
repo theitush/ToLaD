@@ -12,7 +12,12 @@ const RESTORE_MS = 2000;
 const RELOAD_GAP_MS = 60_000;
 
 /** Where the page stood (`href` with its toggles), the card open; `reload` when the page reloaded itself (ms since epoch). */
-type Kept = { href: string; place: Place; card: CardKey | null; reload?: number };
+type Kept = { href: string; tree: string; place: Place; card: CardKey | null; reload?: number };
+
+/** The tree a place is in terms of (its nodes and strands, by index): a place kept by another build of the data is not this one's. */
+export function treeKey(v: FanView): string {
+  return `${v.fan.nodes.length}/${v.fan.branches.length}`;
+}
 
 let kept: Kept | null | undefined;
 
@@ -51,7 +56,7 @@ export function watchBack(v: FanView, card: () => Selection | null): () => void 
     if (leaving) return;
     try {
       const sel = card();
-      const k: Kept = { href: location.href, place: v.place(), card: sel ? v.cardKey(sel) : null, reload };
+      const k: Kept = { href: location.href, tree: treeKey(v), place: v.place(), card: sel ? v.cardKey(sel) : null, reload };
       sessionStorage.setItem(KEY, JSON.stringify(k));
     } catch {
       /* no session storage: a reload goes home */

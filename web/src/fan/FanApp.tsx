@@ -21,7 +21,7 @@ import { statusOf, wildPartSentence } from './status';
 import { cardTapper, onControl } from './cardtap';
 import { flipOn, forkQuiet, setForkQuiet } from './flip';
 import { FanView, initialMeasure, levelName, type CardKey, type Lineage, type Place, type Selection } from './view';
-import { keptPlace, watchBack } from './back';
+import { keptPlace, treeKey, watchBack } from './back';
 
 declare global {
   interface Window {
@@ -133,9 +133,17 @@ export function FanApp() {
     v.scaleEl = scaleRef.current;
     v.barEl = barRef.current;
     // (A look's switch stays where the view was, ToLaD#412; an old link stands on its clade's frame, no flight.)
-    if (placeRef.current) v.goToPlace(placeRef.current);
-    else if (linkRef.current) v.goToClade(linkRef.current);
-    if (cardRef.current) v.openCard(cardRef.current);
+    // (A place kept before a reload from another build of the tree is not this one's: home, ToLaD#478.)
+    const kept = keptPlace();
+    if (kept && placeRef.current === kept.place && kept.tree !== treeKey(v)) placeRef.current = cardRef.current = null;
+    try {
+      if (placeRef.current) v.goToPlace(placeRef.current);
+      else if (linkRef.current) v.goToClade(linkRef.current);
+      if (cardRef.current) v.openCard(cardRef.current);
+    } catch (e) {
+      // (A place that no longer fits never leaves the page blank: the view stays home.)
+      console.warn('fan: could not go back to the place kept', e);
+    }
     placeRef.current = linkRef.current = cardRef.current = null;
     viewRef.current = v;
     window.__fan = v;
