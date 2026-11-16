@@ -81,7 +81,8 @@ function GlobeCanvas({ m, d, r, big, onTap }: { m: Draw; d: GlobeData; r: Specie
 
 /**
  * The species' range in the card: the globe once its code and globe.json are in and PHYLACINE maps the species; a
- * dark disc while they load; `fallback` (the Wikimedia map) when PHYLACINE has no map or they cannot load.
+ * dark disc with a spinner while they load, its credit line held hidden (ToLaD#479: the globe's loaded box, which the
+ * Wikimedia map's box matches); `fallback` (the Wikimedia map) when PHYLACINE has no map or they cannot load.
  */
 export function RangeGlobe({ sci, fallback }: { sci: string; fallback: ReactNode }) {
   const [m, setM] = useState<Draw | null | 'failed'>(draw);
@@ -104,11 +105,9 @@ export function RangeGlobe({ sci, fallback }: { sci: string; fallback: ReactNode
   return (
     <figure className={`globe${ok ? '' : ' loading'}${big ? ' big' : ''}`}>
       {ok && d && r ? <GlobeCanvas key={sci} m={ok} d={d} r={r} big={big} onTap={() => setBig((b) => !b)} /> : <div className="disc" />}
-      {ok && r && (
-        <a href="https://doi.org/10.1002/ecy.2443" target="_blank" rel="noopener">
-          Range · PHYLACINE 1.2
-        </a>
-      )}
+      <a href="https://doi.org/10.1002/ecy.2443" target="_blank" rel="noopener">
+        Range · PHYLACINE 1.2
+      </a>
     </figure>
   );
 }

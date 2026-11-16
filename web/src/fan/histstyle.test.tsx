@@ -185,7 +185,9 @@ describe('species card history', () => {
 describe('the species card: the population at the time touched', () => {
   const text = (html: string) => html.replace(/<[^>]+>/g, '').replace(/&#x27;/g, "'").replace(/&amp;/g, '&');
   /** The card's face: everything outside the collapsed details and the sources list. */
-  const face = (html: string) => text(html.replace(/<details[\s\S]*<\/details>/, '').replace(/<ol class="hist-list"[\s\S]*<\/ol>/, ''));
+  // (The pictures' and the globe's credit captions are not the face's words: held from the start since ToLaD#479.)
+  const face = (html: string) =>
+    text(html.replace(/<figure[\s\S]*?<\/figure>/g, '').replace(/<details[\s\S]*<\/details>/, '').replace(/<ol class="hist-list"[\s\S]*<\/ol>/, ''));
   const details = (html: string) => text(html.match(/<details[\s\S]*<\/details>/)![0]);
 
   it('says, in plain words, how many were alive then, how many have descendants today, how many now and roughly how many ever', () => {

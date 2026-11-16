@@ -472,9 +472,9 @@ function EventSource({ ev }: { ev: HistEvent }) {
 }
 
 /**
- * The species' Commons picture (ToLaD#182), hotlinked: nothing at all until it has loaded,
- * and nothing if it fails (no box, no alt text, no gap). Loading, it is a 1 px invisible
- * image, so the browser still fetches it (a lazy image that is not displayed never loads).
+ * The species' Commons picture (ToLaD#182), hotlinked. Loading, its square and its credit line are held at their
+ * loaded size with a spinner over them (ToLaD#479: nothing moves when it arrives; app.css shows the spinner only after
+ * a moment, so a cached picture never flashes it); nothing if it fails (no box, no alt text, no gap).
  * Keyed by its URL, so another species starts over.
  */
 export function WikiPic({ w, initial = 'loading' }: { w: WikiRec | null; initial?: 'loading' | 'ok' | 'failed' }) {
@@ -491,14 +491,14 @@ export function WikiPic({ w, initial = 'loading' }: { w: WikiRec | null; initial
       <img
         src={useBig ? bigSrc : src}
         alt=""
-        loading="lazy"
         decoding="async"
         referrerPolicy="no-referrer"
         onClick={() => setBig((b) => !b)}
         onLoad={() => setState('ok')}
         onError={() => (useBig ? setBigFailed(true) : setState('failed'))}
       />
-      {state === 'ok' && w?.file && (
+      {/* (Its credit line from the start, hidden while loading: the box is its loaded height.) */}
+      {w?.file && (
         <a href={w.file} target="_blank" rel="noopener">
           Wikimedia Commons
         </a>
@@ -509,7 +509,7 @@ export function WikiPic({ w, initial = 'loading' }: { w: WikiRec | null; initial
 
 /**
  * The species' range map (ToLaD#196, Wikidata P181), hotlinked like the photo: under the name,
- * beside the photo (across the card when there is none), nothing until it has loaded and nothing
+ * beside the photo (alone in the row when there is none), its place held with a spinner while it loads, nothing
  * if it fails. A tap enlarges it across the card (the 960 px thumbnail), another shrinks it back.
  * Side by side rather than stacked: stacked, the lion's card filled the whole 390×844 screen.
  */
@@ -526,14 +526,13 @@ export function RangeMap({ w, initial = 'loading' }: { w: WikiRec | null; initia
       <img
         src={useBig ? bigSrc : src}
         alt=""
-        loading="lazy"
         decoding="async"
         referrerPolicy="no-referrer"
         onClick={() => setBig((b) => !b)}
         onLoad={() => setState('ok')}
         onError={() => (useBig ? setBigFailed(true) : setState('failed'))}
       />
-      {state === 'ok' && w?.rangeFile && (
+      {w?.rangeFile && (
         <a href={w.rangeFile} target="_blank" rel="noopener">
           Range map · Wikimedia Commons
         </a>
