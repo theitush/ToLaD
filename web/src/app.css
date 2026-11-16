@@ -74,18 +74,6 @@
   box-shadow: 0 0 12px rgba(63, 210, 134, 0.18);
 }
 
-.legend {
-  position: absolute;
-  left: 10px;
-  bottom: max(10px, env(safe-area-inset-bottom));
-  background: rgba(14, 24, 20, 0.72);
-  border: 1px solid rgba(190, 220, 200, 0.1);
-  border-radius: 10px;
-  padding: 5px 9px;
-  pointer-events: none;
-  backdrop-filter: blur(6px);
-}
-
 .dot {
   display: inline-block;
   width: 9px;
@@ -138,14 +126,14 @@
 .card-sp .pic {
   float: left;
   margin: 2px 10px 2px 0;
-  width: 120px;
+  width: var(--box, 120px);
   text-align: center;
   line-height: 1.1;
 }
 .card-sp .pic img {
   display: block;
-  width: 120px;
-  height: 120px;
+  width: var(--box, 120px);
+  height: var(--box, 120px);
   object-fit: cover;
   border-radius: 8px;
 }
@@ -164,21 +152,13 @@
   object-fit: contain;
   cursor: zoom-out;
 }
-.card-sp .pic a {
+.card-sp .pic a,
+.card-sp .media .cap {
   display: block;
   margin-top: 3px;
   font-size: 9px;
   color: #7f8c85;
   text-decoration: none;
-}
-.card-sp .pic.loading {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: 0;
-  opacity: 0;
-  overflow: hidden;
-  pointer-events: none;
 }
 /* ToLaD#196: the range map under the name (beside the photo, .media below); a tap enlarges it like the photo. */
 .card-sp .range {
@@ -215,6 +195,19 @@
   gap: 0 10px;
   margin: 4px 0 8px;
 }
+/* Each item's image box (--box): the photo's square, the globe's disc, the map's height. Fixed, so the box is known
+   before the image arrives (ToLaD#479); every card has both, a missing one saying so in its box (ToLaD#492). */
+.card-sp .media > * {
+  position: relative;
+  --box: 120px;
+}
+/* ToLaD#492: no photo, the tree's stub (wiki.drawStub) in its square; its caption in the credit's line, like the bare
+   globe's 'Range not known'. */
+.card-sp .pic.stub canvas {
+  display: block;
+  width: var(--box);
+  height: var(--box);
+}
 .card-sp .media .pic {
   float: none;
   margin: 0;
@@ -225,13 +218,8 @@
   margin: 0;
 }
 .card-sp .media .range img {
-  height: 120px;
+  height: var(--box);
   max-height: none;
-}
-/* No photo (none, or it failed): the map alone takes the row. */
-.card-sp .media .range:only-child img {
-  height: auto;
-  max-height: 30vh;
 }
 .card-sp .media .big {
   flex-basis: 100%;
@@ -242,10 +230,7 @@
   height: auto;
   max-height: 70vh;
 }
-/* ToLaD#267: the range globe beside the photo (alone, a little larger); a tap enlarges it across the card. */
-.card-sp .media:empty {
-  display: none;
-}
+/* ToLaD#267: the range globe beside the photo; a tap enlarges it across the card. */
 .card-sp .globe {
   flex: 1 1 0;
   min-width: 0;
@@ -258,19 +243,14 @@
 .card-sp .globe canvas,
 .card-sp .globe .disc {
   display: block;
-  width: 120px;
-  height: 120px;
+  width: var(--box, 120px);
+  height: var(--box, 120px);
   border-radius: 50%;
   touch-action: none;
   cursor: grab;
 }
 .card-sp .globe .disc {
   background: #0b1a24;
-}
-.card-sp .globe:only-child canvas,
-.card-sp .globe:only-child .disc {
-  width: 160px;
-  height: 160px;
 }
 .card-sp .globe.big canvas {
   width: min(100%, 50vh);
@@ -284,14 +264,41 @@
   color: #7f8c85;
   text-decoration: none;
 }
-.card-sp .range.loading {
+/* ToLaD#479: while the photo, the globe or the map loads, its place is held at its loaded size (the image's box and its
+   credit line) with a spinner in it, so nothing moves when it arrives. The spinner fades in after a moment: a picture
+   already in the browser's cache shows at once, with no spinner flash. */
+.card-sp .media .loading img {
+  background: rgba(190, 220, 200, 0.06);
+}
+.card-sp .media .loading a {
+  visibility: hidden;
+}
+.card-sp .media .loading::after {
+  content: '';
   position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: 0;
+  top: calc(var(--box) / 2 - 9px);
+  left: calc(50% - 9px);
+  width: 18px;
+  height: 18px;
+  box-sizing: border-box;
+  border: 2px solid rgba(190, 220, 200, 0.16);
+  border-top-color: #9faba3;
+  border-radius: 50%;
   opacity: 0;
-  overflow: hidden;
   pointer-events: none;
+  animation:
+    card-spin 0.9s linear infinite,
+    card-spin-in 0.2s ease-out 0.25s forwards;
+}
+@keyframes card-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+@keyframes card-spin-in {
+  to {
+    opacity: 1;
+  }
 }
 .card-sp .dim {
   color: #9faba3;
@@ -311,95 +318,28 @@
   padding: 4px 8px;
 }
 
-.overlay {
-  position: absolute;
-  top: max(54px, calc(env(safe-area-inset-top) + 44px));
-  left: 10px;
-  margin: 0;
-  padding: 6px 8px;
-  max-width: calc(100% - 36px);
-  overflow: hidden;
-  font: 11px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace;
-  background: rgba(0, 0, 0, 0.62);
-  border-radius: 6px;
-  pointer-events: none;
-  white-space: pre;
-}
-
-.error {
-  position: absolute;
-  inset: 40% 16px auto;
-  padding: 12px;
-  background: #5a1d1d;
-  border-radius: 8px;
-}
-
-.dot.ghost {
-  background: repeating-linear-gradient(135deg, #8f88a8 0 2px, #5b5670 2px 4px);
-  border-radius: 2px;
-}
-
-.legend {
-  left: 60px;
-  right: 10px;
-  max-width: max-content;
-  font-size: 12px;
-}
-
-.loading {
+/* The page's loading screen (scoped to it: the bare class reached the card's loading globe, ToLaD#479). */
+.app > .loading {
   position: absolute;
   inset: 45% 16px auto;
   text-align: center;
   color: #9fb3a8;
 }
-
-.nowebgl {
-  position: fixed;
-  inset: 0;
-  overflow: auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  background: #0b0f0d;
-  color: #dfe7e2;
-  font: 15px/1.5 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  -webkit-user-select: text;
-  user-select: text;
+.app > .loading b {
+  color: #e6f0ea;
+  font-size: 22px;
+  font-weight: 600;
 }
-
-.nowebgl .card {
-  max-width: 480px;
-  padding: 20px 22px;
-  background: #141c18;
-  border: 1px solid rgba(160, 190, 170, 0.25);
-  border-radius: 12px;
-}
-
-.nowebgl h1 {
-  font-size: 20px;
-  margin: 0 0 10px;
-}
-
-.nowebgl a {
-  color: #5fd38a;
-}
-
-.nowebgl li {
-  margin: 6px 0;
-}
-
-.nowebgl button {
+.app > .loading button {
   font: inherit;
-  color: inherit;
-  background: #1f2b25;
-  border: 1px solid rgba(160, 190, 170, 0.35);
-  border-radius: 8px;
-  padding: 7px 14px;
-  margin-top: 6px;
+  color: #e6f0ea;
+  background: none;
+  border: 1px solid rgba(200, 230, 210, 0.35);
+  border-radius: 999px;
+  padding: 2px 10px;
 }
 
-/* Fan: the width scale sits above the legend or the card, at every zoom. */
+/* Fan: the width scale sits above the card, at every zoom. */
 .foot {
   position: absolute;
   left: 10px;
@@ -414,7 +354,6 @@
 .foot > * {
   pointer-events: auto;
 }
-.foot .legend,
 .foot .card-sp {
   position: relative;
   left: auto;
@@ -443,7 +382,6 @@
   border-top: none;
   box-sizing: border-box;
 }
-.foot .legend,
 .foot .wscale {
   margin-left: 50px;
 }
@@ -574,15 +512,7 @@
   vertical-align: 1px;
 }
 
-.legend .dim {
-  color: #8a978f;
-}
-.legend .dot {
-  margin-left: 2px;
-}
-
-.wscale .wlab,
-.legend .li {
+.wscale .wlab {
   white-space: nowrap;
 }
 
@@ -598,6 +528,24 @@
   padding: 8px 13px;
   min-height: 34px;
 }
+/* The tree on its side: the chain of groups in the room kept under the buttons (flip.ts, CHAIN_ROOM). */
+.fan .chain {
+  position: absolute;
+  left: 0;
+  right: 0;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  font: 500 14px/1 var(--sans);
+  color: var(--ink-3);
+  white-space: pre;
+  overflow: hidden;
+  pointer-events: none;
+}
+.fan .chain b {
+  font-weight: 600;
+  color: var(--ink);
+}
 .fan .bar button[aria-pressed='true'] {
   border-color: rgba(63, 210, 134, 0.45);
   box-shadow: none;
@@ -606,22 +554,6 @@
 .fan .bar {
   flex-wrap: wrap;
   justify-content: flex-end;
-}
-/* Home and the level stepper (ToLaD#247): one pill in two halves, so the level costs the bar no new row. */
-.fan .bar .pair {
-  display: flex;
-}
-.fan .bar .pair > button:first-child {
-  border-radius: 999px 0 0 999px;
-  border-right: none;
-  padding-right: 8px;
-}
-.fan .bar .pair > button.step {
-  border-radius: 0 999px 999px 0;
-  border-left: 1px solid rgba(200, 230, 210, 0.22);
-  width: 30px;
-  padding: 0 4px 0 2px;
-  font-size: 15px;
 }
 /* The search (ToLaD#157): a magnifier in the bar; open, a field over the bar and the matches under it. */
 .fan .bar button.icon {
@@ -753,7 +685,6 @@
   gap: 7px;
   background: linear-gradient(to top, rgba(12, 23, 20, 0.94) 0%, rgba(12, 23, 20, 0.78) 55%, rgba(12, 23, 20, 0) 100%);
 }
-.fan .foot .legend,
 .fan .foot .wscale {
   margin-left: 0;
 }
@@ -787,6 +718,50 @@
   align-items: center;
   gap: 6px;
   white-space: nowrap;
+}
+/* The legend's row: the key, and at its end the link to the sources (ToLaD#429). */
+.foot .foot-row {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  gap: 2px 14px;
+  pointer-events: none;
+}
+.fan .sources-link {
+  flex: none;
+  margin: -10px -8px -10px auto;
+  padding: 10px 8px;
+  background: none;
+  border: 0;
+  color: var(--ink-3);
+  font: inherit;
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+.card-sp .sources-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0 4px 0 0;
+  max-height: 58vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.card-sp .sources-list li {
+  padding: 2px 0;
+}
+.card-sp.sources a {
+  color: #9fd3b3;
+}
+.card-sp .sources-end {
+  margin-top: 8px;
+  font-size: 12.5px;
+  line-height: 1.4;
 }
 .fan .lane {
   display: inline-block;

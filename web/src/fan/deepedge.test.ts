@@ -1,6 +1,6 @@
 // ToLaD#210, #232: zoomed into a small group, the deep past's far columns are drawn whole down to their splits, never end in a cut block.
 import { describe, expect, it } from 'vitest';
-import { MeshBatch, RectBatch } from './meshgl';
+import { RectBatch } from './meshgl';
 import { CARNIVORA } from './panthera';
 import { CARNIVORA_TREE } from './splits';
 import type { WidthMode } from './layout';
@@ -54,17 +54,15 @@ function stubView(): FanView {
     addEventListener: noop,
     removeEventListener: noop,
   };
-  const v = new FanView(canvas as unknown as HTMLCanvasElement, CARNIVORA, 'curved', CARNIVORA_TREE, true);
+  const v = new FanView(canvas as unknown as HTMLCanvasElement, CARNIVORA, CARNIVORA_TREE, true);
   const gl = {
     under: new RectBatch(),
-    mesh: new MeshBatch(),
     over: new RectBatch(),
     begin() {},
     end() {},
   };
   gl.begin = () => {
     gl.under.n = 0;
-    gl.mesh.n = 0;
     gl.over.n = 0;
   };
   (v as unknown as { gl: unknown }).gl = gl;

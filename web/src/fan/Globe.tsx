@@ -1,8 +1,10 @@
 // The species card's range globe (ToLaD#267): one orthographic globe, the same for every species, drawn on a 2D
 // canvas with d3-geo (globe-draw.ts). Dark ocean, Natural Earth land, the current range green and the present-natural
 // range the species has lost grey (PHYLACINE 1.2.1), turned to face the range's centre. Drag spins it (no auto-spin);
-// a tap enlarges it across the card like the photo. A species PHYLACINE has no map of gets the Wikimedia map
+// a tap enlarges it across the card like the photo. A species split since PHYLACINE draws the range of the species it
+// was split from, the same way, its credit saying so (ToLaD#486). A species PHYLACINE has no map of gets the Wikimedia map
 // (ToLaD#196), and so does every card when the drawing code or globe.json cannot load (the artifact link, no network).
+// With neither, or the map failing, the globe bare, captioned 'Range not known' (ToLaD#492).
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { GlobeData, SpeciesRange } from './globe-data';
@@ -27,7 +29,16 @@ export function loadGlobeCode(): Promise<Draw> {
   return pendingDraw;
 }
 
-/** The globe canvas for a species PHYLACINE maps. */
+/** No range: nothing drawn on the land, faced the same for every species (ToLaD#492). */
+const NO_RANGE: SpeciesRange = {
+  cur: 0,
+  lost: 0,
+  curShape: { type: 'MultiPolygon', coordinates: [] },
+  lostShape: { type: 'MultiPolygon', coordinates: [] },
+  centre: [20, 10],
+};
+
+/** The globe canvas for a species PHYLACINE maps (or NO_RANGE, for one nothing maps). */
 function GlobeCanvas({ m, d, r, big, onTap }: { m: Draw; d: GlobeData; r: SpeciesRange; big: boolean; onTap: () => void }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const rot = useRef<[number, number]>([r.centre[0], Math.max(-60, Math.min(60, r.centre[1]))]);
@@ -81,9 +92,12 @@ function GlobeCanvas({ m, d, r, big, onTap }: { m: Draw; d: GlobeData; r: Specie
 
 /**
  * The species' range in the card: the globe once its code and globe.json are in and PHYLACINE maps the species; a
- * dark disc while they load; `fallback` (the Wikimedia map) when PHYLACINE has no map or they cannot load.
+ * dark disc with a spinner while they load, its credit line held hidden (ToLaD#479: the globe's loaded box, which the
+ * Wikimedia map's box matches); `fallback` (the Wikimedia map) when PHYLACINE has no map or they cannot load, given
+ * what to show if it fails; with no fallback, that: the bare globe saying the range is not known (ToLaD#492), in the same
+ * box, so the card moves nothing from open to loaded and every card has a range box.
  */
-export function RangeGlobe({ sci, fallback }: { sci: string; fallback: ReactNode }) {
+export function RangeGlobe({ sci, fallback }: { sci: string; fallback?: (none: ReactNode) => ReactNode }) {
   const [m, setM] = useState<Draw | null | 'failed'>(draw);
   const [big, setBig] = useState(false);
   useEffect(() => {
@@ -100,15 +114,32 @@ export function RangeGlobe({ sci, fallback }: { sci: string; fallback: ReactNode
   const ok = m && m !== 'failed' ? m : null;
   const d = ok?.globeData() ?? null;
   const r = useRangeOf(sci, ok, d);
-  if (m === 'failed' || (ok && !r)) return <>{fallback}</>;
+  if (m === 'failed' || (ok && !r)) {
+    const none = <NoRange m={ok} d={d} />;
+    return <>{fallback ? fallback(none) : none}</>;
+  }
   return (
     <figure className={`globe${ok ? '' : ' loading'}${big ? ' big' : ''}`}>
       {ok && d && r ? <GlobeCanvas key={sci} m={ok} d={d} r={r} big={big} onTap={() => setBig((b) => !b)} /> : <div className="disc" />}
-      {ok && r && (
-        <a href="https://doi.org/10.1002/ecy.2443" target="_blank" rel="noopener">
-          Range · PHYLACINE 1.2
-        </a>
-      )}
+      <a href="https://doi.org/10.1002/ecy.2443" target="_blank" rel="noopener">
+        {r?.from ? (
+          <>
+            Range of <i>{r.from}</i> before the split · PHYLACINE{' '}1.2
+          </>
+        ) : (
+          'Range · PHYLACINE 1.2'
+        )}
+      </a>
+    </figure>
+  );
+}
+
+/** The bare globe, or (its code or data not loaded) its dark disc, captioned in the credit's line. */
+function NoRange({ m, d }: { m: Draw | null; d: GlobeData | null }) {
+  return (
+    <figure className="globe none">
+      {m && d ? <GlobeCanvas m={m} d={d} r={NO_RANGE} big={false} onTap={() => {}} /> : <div className="disc" />}
+      <span className="cap">Range not known</span>
     </figure>
   );
 }

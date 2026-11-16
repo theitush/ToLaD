@@ -75,6 +75,51 @@ class Pick(unittest.TestCase):
         self.assertIsNone(wiki.entry(["Q1", "", ""]))
 
 
+class Fallbacks(unittest.TestCase):
+    Q = "http://www.wikidata.org/entity/"
+    SP = Q + "Q7432"
+    NOWHERE = Path("/nonexistent")
+
+    def snap(self, **kw):
+        return {"names": [], "ott": [], "synonyms": [], "linked": [], **kw}
+
+    def test_alias_finds_the_domestic_form(self):
+        # Wikidata keeps the dog as Canis lupus familiaris; "Canis familiaris" is only an alias of its item.
+        alias = [["Canis familiaris", self.Q + "Q144", self.SP, "Canis", "https://en.wikipedia.org/wiki/Dog", "", ""]]
+        out = wiki.resolve({"Canis familiaris": 0}, self.snap(alias=alias), self.NOWHERE)
+        self.assertEqual(out["Canis familiaris"], {"wp": "https://en.wikipedia.org/wiki/Dog"})
+
+    def test_article_lead_image_fills_a_missing_picture(self):
+        art = "https://en.wikipedia.org/wiki/Dog"
+        names = [["Canis x", self.Q + "Q1", self.SP, "Canis", art, "", ""]]
+        out = wiki.resolve({"Canis x": 0}, self.snap(names=names, pageimg={art: "A dog.jpg"}), self.NOWHERE)
+        self.assertEqual(out["Canis x"]["img"], wiki.thumb_url("A dog.jpg"))
+        # a Wikidata picture wins over the article's
+        names[0][5] = "http://commons.wikimedia.org/wiki/Special:FilePath/W.jpg"
+        out = wiki.resolve({"Canis x": 0}, self.snap(names=names, pageimg={art: "A dog.jpg"}), self.NOWHERE)
+        self.assertEqual(out["Canis x"]["img"], wiki.thumb_url("W.jpg"))
+
+
+class InfoboxImage(unittest.TestCase):
+    def test_takes_the_image_field_only(self):
+        t = "{{Speciesbox\n| name = X\n| image = X_x.jpg\n| image_caption = c\n| range_map = X_map.svg\n}}"
+        self.assertEqual(wiki.infobox_image(t), "X x.jpg")
+
+    def test_forms_of_the_value(self):
+        for v in ("File:A b.png", "[[File:A b.png|thumb]]", "A_b.png"):
+            self.assertEqual(wiki.infobox_image("{{Automatic taxobox\n|image=%s\n}}" % v), "A b.png")
+
+    def test_a_template_of_pictures(self):
+        t = ("{{Speciesbox\n| image = <!-- no change -->\n {{multiple image\n | border = infobox\n"
+             " | image1 = Blue merle.jpg\n | image2 = B.JPG\n }}\n| status = DOM\n| range_map = M.svg\n}}")
+        self.assertEqual(wiki.infobox_image(t), "Blue merle.jpg")
+
+    def test_no_image_field_is_no_picture(self):
+        self.assertIsNone(wiki.infobox_image("{{Speciesbox\n| image =\n| range_map = M.svg\n| image2 = Z.jpg\n}}"))
+        self.assertIsNone(wiki.infobox_image("{{Speciesbox\n| range_map = M.svg\n}}"))
+        self.assertIsNone(wiki.infobox_image("no box here\n| image = A.jpg"))
+
+
 @unittest.skipUnless((MAMMALS / "wiki.json").exists(), "no data/mammals/wiki.json (run make wiki)")
 class Sidecar(unittest.TestCase):
     def test_every_species_row_has_an_entry(self):

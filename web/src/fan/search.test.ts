@@ -2,7 +2,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createElement } from 'react';
 import { describe, expect, it } from 'vitest';
-import { wantCutLabels } from './cut';
 import { FELIDAE, type SpeciesRec } from './panthera';
 import { fold, matchRank, searchSpecies } from './search';
 import { SearchPanel } from './SearchPanel';
@@ -128,7 +127,7 @@ function stubView(): { v: FanView; frames: (t: number) => void } {
   return { v, frames };
 }
 
-describe.skipIf(wantCutLabels())('a pick flies there and opens the card', () => {
+describe('a pick flies there and opens the card', () => {
   const { v, frames } = stubView();
   const fan = v.fan;
   const sels: (Selection | null)[] = [];
@@ -158,8 +157,7 @@ describe.skipIf(wantCutLabels())('a pick flies there and opens the card', () => 
       expect(y).toBeLessThan(0.5 * v.h);
       // Readable: wide on screen (zoomed in from home on width), its label on.
       expect(b.width * v.cam.sx).toBeGreaterThan(0.3 * v.w);
-      const st = (v as unknown as { labelState: Map<string, { on: boolean }> }).labelState;
-      expect([...st].some(([k, s]) => k.startsWith(`${sp.gid}:`) && s.on)).toBe(true);
+      expect(v.cutLast!.spots.some((s) => s.b === b || (s.v?.strands.includes(b) ?? false))).toBe(true);
       // The card: the species at its tip (today, or its last appearance), as a tap there opens it.
       const last = sels[sels.length - 1]!;
       expect(last.sp).toBe(sp);

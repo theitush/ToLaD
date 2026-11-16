@@ -10,8 +10,23 @@
  * the zoom moves, never while panning), the label widths once per text.
  */
 import type { Camera } from './camera';
-import { laneW, leftAt, type Fan, type FanNode } from './layout';
+import { laneW, leftAt, nodeLeftAt, type Fan, type FanNode } from './layout';
 import { FAMILY_EN, ORDER_EN, ORDER_TAXA, type Split } from './splits';
+
+// (FORKNAMES=off in the environment: the test files' run with the switch off.)
+let forkNow = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.FORKNAMES !== 'off';
+/** The switch (ToLaD#373, `?forknames=off`, the button in FanApp): the stack's clades named at their forks, or the stack. What the views built from now on use. */
+export function setForkNames(on: boolean): void {
+  forkNow = on;
+}
+export const forkNames = (): boolean => forkNow;
+// (FORKNAMES=leaders in the environment: the test files' run with the leaders on.)
+let forkLeadNow = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.FORKNAMES === 'leaders';
+/** The names at their forks stand off on leaders (ToLaD#434, `?forknames=leaders`, the button in FanApp), a look to try; only placeForks reads it, so no new view. */
+export function setForkLeaders(on: boolean): void {
+  forkLeadNow = on;
+}
+export const forkLeaders = (): boolean => forkLeadNow;
 
 export type CladeRank = 'genus' | 'subfamily' | 'family' | 'superfamily' | 'suborder' | 'order';
 
@@ -37,11 +52,31 @@ export const TAXON_EN: Record<string, string> = {
   // (The mammal orders, ToLaD#247.)
   ...ORDER_EN,
   Carnivora: 'Carnivores',
+  // (Above the orders, ToLaD#440: an everyday name, or what the group is; a group with neither keeps its real one.)
+  Theria: 'Marsupials & placentals',
+  Metatheria: 'Marsupials',
+  Eutheria: 'Placentals',
+  Atlantogenata: 'Atlantogenata',
+  Xenarthra: 'Armadillos & sloths',
+  Afrotheria: 'Afrotherians',
+  Paenungulata: 'Elephants, sea cows & hyraxes',
+  Afroinsectiphilia: 'Aardvark, tenrecs & kin',
+  Boreoeutheria: 'Boreoeutherians',
+  Laurasiatheria: 'Laurasiatherians',
+  Scrotifera: 'Bats, hoofed mammals & carnivores',
+  Fereuungulata: 'Hoofed mammals & carnivores',
+  Euungulata: 'Hoofed mammals',
+  Ferae: 'Carnivores & pangolins',
+  Euarchontoglires: 'Primates, rodents & kin',
+  Euarchonta: 'Primates & treeshrews',
+  Sundatheria: 'Colugos & treeshrews',
+  Glires: 'Rodents & rabbits',
+  Australidelphia: 'Australidelphians',
   // (Primates, ToLaD#275: the splits Open Tree names above and between their families.)
   Strepsirrhini: 'Lemurs & lorises',
   Lorisiformes: 'Lorises & galagos',
   Lemuriformes: 'Lemurs',
-  Haplorrhini: 'Tarsiers, monkeys & apes',
+  Haplorhini: 'Tarsiers, monkeys & apes',
   Tarsiiformes: 'Tarsiers',
   Simiiformes: 'Monkeys & apes',
   Platyrrhini: 'New World monkeys',
@@ -66,7 +101,7 @@ export const TAXON_EN: Record<string, string> = {
   Galidiinae: 'Malagasy mongooses',
   Melinae: 'Badgers',
   Lutrinae: 'Otters',
-  Martinae: 'Martens',
+  Guloninae: 'Martens & wolverine',
   Panthera: 'Roaring cats',
   Neofelis: 'Clouded leopards',
   Leopardus: 'Ocelot cats',
@@ -240,6 +275,77 @@ export interface StackAt {
 /** Rows the stack shows at a level (ToLaD#288), its "…" over them. */
 export const STACK_ROWS = 3;
 
+/** A clade's name at its fork (ToLaD#373): the pill's centre and size on screen, what it says. */
+export interface ForkName {
+  i: number;
+  form: Form;
+  x: number;
+  y: number;
+  /** The pill's width (its text lw, its padding each side). */
+  pw: number;
+  lw: number;
+  /** Its leader's near end, on its fork (ToLaD#434); NaN: no leader (the at-the-fork names, and a fork not on screen). */
+  ax: number;
+  ay: number;
+}
+/**
+ * The forks' horizontals on screen this frame, for the leaders (ToLaD#434; the view's, from what it draws): a clade's
+ * fork [its left, its right, its y, its parent column's centre], screen px, by node. A clade drawn as one branch has none.
+ */
+export interface ForkLines {
+  n: number;
+  /** n x [a, b, y, c]. */
+  xy: number[];
+  at: Map<FanNode, number>;
+}
+/**
+ * The leaders' rays: x per y travelled, up and then down. The compass's diagonals and verticals, no due east or west: a
+ * level leader would read as one more fork. Sliding along a ray from its fork is the slider model of point-feature
+ * labelling: the least slide that clears moves continuously with what it clears.
+ */
+const FORK_RAYS: readonly (readonly [number, 1 | -1])[] = [
+  [0, -1],
+  [-1, -1],
+  [1, -1],
+  [0, 1],
+  [-1, 1],
+  [1, 1],
+];
+/** Whether segment (x0, y0)-(x1, y1) meets the box (Liang-Barsky). */
+export function segMeetsBox(x0: number, y0: number, x1: number, y1: number, a: number, t: number, b: number, u: number): boolean {
+  let lo = 0;
+  let hi = 1;
+  const dx = x1 - x0;
+  const dy = y1 - y0;
+  const clip = (d: number, q: number): boolean => {
+    if (d === 0) return q > 0;
+    if (d < 0) lo = Math.max(lo, q / d);
+    else hi = Math.min(hi, q / d);
+    return lo <= hi;
+  };
+  return clip(-dx, x0 - a) && clip(dx, b - x0) && clip(-dy, y0 - t) && clip(dy, u - y0);
+}
+/** Whether two segments cross (touching at an end counts). */
+export function segsCross(a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number): boolean {
+  const side = (px: number, py: number, qx: number, qy: number, rx: number, ry: number) => (qx - px) * (ry - py) - (qy - py) * (rx - px);
+  const s1 = side(a, b, c, d, e, f);
+  const s2 = side(a, b, c, d, g, h);
+  const s3 = side(e, f, g, h, a, b);
+  const s4 = side(e, f, g, h, c, d);
+  if (s1 * s2 < 0 && s3 * s4 < 0) return true;
+  // (Collinear and overlapping: two leaders up the same line.)
+  if (s1 === 0 && s2 === 0) return Math.max(a, c) >= Math.min(e, g) && Math.max(e, g) >= Math.min(a, c) && Math.max(b, d) >= Math.min(f, h) && Math.max(f, h) >= Math.min(b, d);
+  return false;
+}
+/** A fork name's pill: its height, the padding each side of its text, the gap kept to what stands near it (px). */
+export const FORK_H = 16;
+const FORK_PAD = 5;
+const FORK_GAP = 2;
+/** Rows a name whose fork is below the screen's foot may climb, clear of what stands there. */
+const FORK_HOLD_ROWS = 2;
+/** Rows a name may slide up into its crotch, clear of what stands there. */
+const FORK_SLIDE_ROWS = 3;
+
 /** The view's side of it: what the stack needs from the camera. */
 export interface BracketCam {
   toScreen(x: number, y: number): [number, number];
@@ -260,6 +366,8 @@ function drawnOrder(fan: Fan): number[] {
 
 /** Each strand's width at "now" (an extinct one's at its tip), per fan (Brackets.spans). */
 const nowWidths = new WeakMap<Fan, { now: number; w: Float64Array }>();
+/** Per clade list (clades()): each clade's index by its node, and its parent's index. */
+const cladeIndex = new WeakMap<Clade[], { at: Map<FanNode, number>; parent: Int32Array }>();
 
 export class Brackets {
   /** `nameFont` the English names' CSS font, `latinFont` the Latin's. */
@@ -269,6 +377,7 @@ export class Brackets {
   ) {}
   private widthCache = new Map<string, [number, number, number]>();
   private probe = '';
+  private measure: ((font: string, text: string) => number) | null = null;
   /** Per row (this frame): the height of the band under it (px above the line's base) and its own height. */
   private rowBase = new Float32Array(1);
   private rowH = new Float32Array(1);
@@ -276,15 +385,46 @@ export class Brackets {
   private rows: Int16Array | null = null;
   placed: Placed[] = [];
   list: Clade[] = [];
+  /** This frame's names at their forks (placeForks; forks[0..forkN), kept from frame to frame, no allocation). */
+  forks: ForkName[] = [];
+  forkN = 0;
+  /** The screen's foot the fork names stay over (the scale bar's top, screen y; the view's). */
+  forkFoot = Infinity;
+  private forkBox = new Float64Array(0);
+  /** This frame's leaders so far, n x [fork x, y, pill x, y] (placeForks, ToLaD#434). */
+  private lead = new Float64Array(64);
+  private leadN = 0;
   /** The stack's foot (screen y): over the species' pills standing on "now" (Ita: the brackets above the names). */
   baseS = 0;
   fit = 1;
   /** The time axis's right edge and the screen's width (px): the lines run between them. */
   private x0 = 0;
   private w = 0;
-  /** This frame's clades' screen spans (spans()). */
-  private sa: ArrayLike<number> = new Float64Array(0);
-  private sb: ArrayLike<number> = new Float64Array(0);
+  /** This frame's clades' screen spans, each worked out when first asked (span(); sGen[i] the frame it was). */
+  private sa = new Float64Array(0);
+  private sb = new Float64Array(0);
+  private sGen = new Uint32Array(0);
+  private spanGen = 0;
+  private spanCam: BracketCam | null = null;
+  private spanFan: Fan | null = null;
+  /** Clade i's screen span this frame (sa[i], sb[i]): its territory (spanOf), else its species' rooms at "now" (spans()). */
+  private span(i: number): void {
+    if (this.sGen[i] === this.spanGen) return;
+    this.sGen[i] = this.spanGen;
+    const q = this.list[i];
+    const t = this.spanOf?.(q.v);
+    if (!t) {
+      // (No territory for it: every clade's rooms, as without territories.)
+      const [a, b] = this.spans(this.spanCam!, this.spanFan!);
+      this.sa.set(a);
+      this.sb.set(b);
+      this.sGen.fill(this.spanGen);
+      return;
+    }
+    const c = this.spanCam!;
+    this.sa[i] = c.toScreen(t[0], 0)[0];
+    this.sb[i] = this.hide?.(q.v) ? this.sa[i] : c.toScreen(t[1], 0)[0];
+  }
   /**
    * The groups the view is inside (ToLaD#233), pinned at the top of the screen while the stack itself is off it:
    * the order on top, the innermost last (nearest the content). Their spans, labels and how much they show (pinA).
@@ -297,9 +437,11 @@ export class Brackets {
    * with them (the rows are laid out again).
    */
   hide: ((v: FanNode) => boolean) | null = null;
-  /** A clade's span (world x) in place of its species' rooms at "now" (?labels=cut: its territory, cut.ts), or null. */
+  /** A clade's span (world x) in place of its species' rooms at "now" (its territory, cut.ts), or null. */
   spanOf: ((v: FanNode) => readonly [number, number] | null) | null = null;
   hideKey = '';
+  /** Room (px) kept for the labels between the stack's foot and "now" (the view's: its label band's, ToLaD#373). */
+  pillRoom: number = PILL_ROOM;
   /** The "…" row over the stack (ToLaD#288): its row, or -1 for none; the pinned rows' likewise (pinMore). */
   moreRow = -1;
   pinMore = false;
@@ -356,7 +498,7 @@ export class Brackets {
         lo = Math.min(lo, l[k]);
         hi = Math.max(hi, r[k]);
       }
-      // (?labels=cut, ToLaD#333: each clade's territory, cut.ts, the same boxes its names and pictures stand in.)
+      // (ToLaD#333: each clade's territory, cut.ts, the same boxes its names and pictures stand in.)
       const t = this.spanOf?.(q.v);
       if (t) [lo, hi] = t;
       a[i] = c.toScreen(lo, 0)[0];
@@ -367,47 +509,66 @@ export class Brackets {
 
   /**
    * Lay the stack out for this frame; `axisX` the time axis's right edge, `fit` (0–1) how far "now" is on screen,
-   * `top` the labels' top line (under the buttons). The stack stands over the species' pills: its foot PILL_ROOM px
+   * `top` the labels' top line (under the buttons). The stack stands over the labels: its foot pillRoom px
    * above "now", or, with less room, its top on the top line (a longer pill then reaches up over its lines).
    */
   layout(c: BracketCam, fan: Fan, nowS: number, axisX: number, fit: number, measure: (font: string, text: string) => number, top = 0, at: StackAt | null = null): Placed[] {
-    const [a, b] = this.spans(c, fan);
-    this.sa = a;
-    this.sb = b;
-    const parent = this.list.map((q) => q.parent);
-    // The rows per zoom bucket (an eighth of a doubling): a pan never moves them.
-    const key = `${this.list.length}:${Math.round(Math.log2(c.cam.sx) * 8)}:${this.hideKey}`;
-    if (key !== this.rowKey || !this.rows || this.rows.length !== a.length) {
-      this.rowKey = key;
-      this.rows = bracketRows(a, b, parent);
-    }
+    const list = (this.list = clades(fan));
+    const n = list.length;
+    let ix = cladeIndex.get(list);
+    if (!ix) cladeIndex.set(list, (ix = { at: new Map(list.map((q, i) => [q.v, i])), parent: Int32Array.from(list, (q) => q.parent) }));
+    const parent = ix.parent;
+    // (The stack is icicle rows over the clades' territories, ToLaD#333, research/scalable-tree.md §3: at a level only
+    // its groups' and the levels' up rows show, so only theirs are worked out, as asked (span()); the whole nesting's,
+    // or every clade's rooms without territories, all at once.)
+    this.spanCam = c;
+    this.spanFan = fan;
+    this.spanGen++;
+    if (this.sGen.length !== n) [this.sa, this.sb, this.sGen] = [new Float64Array(n), new Float64Array(n), new Uint32Array(n)];
+    if (!this.spanOf) {
+      const [a, b] = this.spans(c, fan);
+      this.sa.set(a);
+      this.sb.set(b);
+      this.sGen.fill(this.spanGen);
+    } else if (!at) for (let i = 0; i < n; i++) this.span(i);
+    const a = this.sa;
+    const b = this.sb;
     this.moreRow = -1;
-    let rowsNow = this.rows;
-    if (at) {
+    let rowsNow: Int16Array;
+    if (!at) {
+      // The rows per zoom bucket (an eighth of a doubling): a pan never moves them.
+      const key = `${n}:${Math.round(Math.log2(c.cam.sx) * 8)}:${this.hideKey}`;
+      if (key !== this.rowKey || !this.rows || this.rows.length !== n) {
+        this.rowKey = key;
+        this.rows = bracketRows(a, b, parent);
+      }
+      rowsNow = this.rows;
+    } else {
       // (At a level, ToLaD#288: its groups' row if any is wide enough to show, then the level and the levels up.)
-      const ix = new Map(this.list.map((q, i) => [q.v, i]));
-      if (at !== this.atKey || this.atRows.length !== a.length) {
+      if (at !== this.atKey || this.atRows.length !== n) {
         this.atKey = at;
-        this.atRows = new Int16Array(a.length);
+        this.atRows = new Int16Array(n);
       }
       const r = this.atRows.fill(-1);
       let row = 0;
       for (const v of at.groups) {
-        const i = ix.get(v);
-        if (i !== undefined && b[i] - a[i] >= TICK_MIN && b[i] > axisX && a[i] < c.w) [r[i], row] = [0, 1];
+        const i = ix.at.get(v);
+        if (i !== undefined && (this.span(i), b[i] - a[i] >= TICK_MIN && b[i] > axisX && a[i] < c.w)) [r[i], row] = [0, 1];
       }
       for (const v of at.up) {
-        const i = ix.get(v);
+        const i = ix.at.get(v);
         if (i === undefined || this.hide?.(v)) continue;
         if (row >= STACK_ROWS) {
           this.moreRow = row;
           break;
         }
+        this.span(i);
         r[i] = row++;
       }
       rowsNow = r;
     }
     this.fit = fit;
+    this.measure = measure;
     this.x0 = axisX;
     this.w = c.w;
     // (The widths again once the fonts change: measured before the web font loaded, they were the fallback's.)
@@ -416,11 +577,13 @@ export class Brackets {
       this.probe = probe;
       this.widthCache.clear();
     }
-    this.placed = fit > 0 ? layoutBrackets(a, b, parent, (i) => this.widths(i, measure), axisX, c.w, rowsNow) : [];
+    if (forkNow) fit = fit >= 0.5 ? 1 : 0;
+    this.placed = fit > 0 || forkNow ? layoutBrackets(a, b, parent, (i) => this.widths(i, measure), axisX, c.w, rowsNow) : [];
     // Each row as tall as what it shows here: a name ROW_H, ticks alone TICK_ROW_H, nothing none.
     let rows = 0;
     for (const p of this.placed) rows = Math.max(rows, p.row + 1);
-    if (!this.placed.length || fit <= 0) this.moreRow = -1;
+    // (Named at their forks: no rows to overflow.)
+    if (!this.placed.length || fit <= 0 || forkNow) this.moreRow = -1;
     if (this.moreRow >= 0) {
       this.moreRow = Math.min(this.moreRow, rows);
       rows = this.moreRow + 1;
@@ -435,11 +598,11 @@ export class Brackets {
     for (let r = 1; r <= rows; r++) this.rowBase[r] = this.rowBase[r - 1] + this.rowH[r - 1];
     const height = rows ? this.rowTop(rows - 1) : 0;
     this.stack = [top, height, rows, fit];
-    this.baseS = Math.min(nowS - 4, Math.max(top + height, nowS - 4 - PILL_ROOM));
+    this.baseS = Math.min(nowS - 4, Math.max(top + height, nowS - 4 - this.pillRoom));
     // Pushed up past the top line by "now" (under the buttons) by half a row, it is swapped for the pinned rows
     // (ToLaD#233, like a sticky header): a clean swap, never both at once (a fade showed the order twice, faintly).
     // ("Now" itself near the top line: the same swap, half way through the old fade.)
-    this.fit = (rows && top + height - this.baseS > ROW_H / 2) || fit < 0.5 ? 0 : 1;
+    this.fit = (rows && top + height - this.baseS > ROW_H / 2 && !forkNow) || fit < 0.5 ? 0 : 1;
     return this.placed;
   }
 
@@ -473,7 +636,7 @@ export class Brackets {
     const [top, height, rows, fit0] = this.stack;
     if (!(fit0 > 0)) return;
     const fit = Math.min(1, Math.max(0, (nowS - top) / 24));
-    this.baseS = Math.min(nowS - 4, Math.max(top + height, nowS - 4 - PILL_ROOM));
+    this.baseS = Math.min(nowS - 4, Math.max(top + height, nowS - 4 - this.pillRoom));
     this.fit = (rows && top + height - this.baseS > ROW_H / 2) || fit < 0.5 ? 0 : 1;
     // (The pinned rows swap in as the stack goes: those pinned at the last layout, none if the stack showed then.)
     this.pinA = this.pins.length ? 1 - this.fit : 0;
@@ -488,17 +651,17 @@ export class Brackets {
    * into a bear's past older than the bears, the bears are not pinned, the dog-like carnivores are).
    */
   pin(top: number, yTop: number, measure: (font: string, text: string) => number, at: FanNode | null = null, keep: ((v: FanNode) => boolean) | null = null): Pin[] {
+    this.unpin(top);
     this.pinA = 1 - this.fit;
-    this.pinTop = top;
-    this.pins = [];
-    this.pinMore = false;
     if (this.pinA <= 0) return this.pins;
     const cx = (this.x0 + this.w) / 2;
     const room = this.w - this.x0 - 2 * LABEL_PAD;
     const line = new Set<FanNode>();
     for (let u = at; u; u = u.parent) line.add(u);
     this.list.forEach((q, i) => {
-      if (!(at ? line.has(q.v) : this.sa[i] <= cx && cx < this.sb[i]) || !(q.v.yBot > yTop) || this.hide?.(q.v)) return;
+      if (at ? !line.has(q.v) : (this.span(i), !(this.sa[i] <= cx && cx < this.sb[i]))) return;
+      if (!(q.v.yBot > yTop) || this.hide?.(q.v)) return;
+      this.span(i);
       // (Only the familiar ones, ToLaD#288: no row for a Latin-only clade between them.)
       if (keep && !keep(q.v)) return;
       const [wf, wn, ws] = this.widths(i, measure);
@@ -518,6 +681,17 @@ export class Brackets {
     const k0 = this.pinMore ? 1 : 0;
     this.pins.forEach((p, k) => (p.row = k + k0));
     return this.pins;
+  }
+
+  /**
+   * No groups pinned (the tree on its side, ToLaD#494: the breadcrumb says where the view is), so no "…" over them and
+   * nothing there to tap; the names at the forks keep `top` (the labels' top line) as their top.
+   */
+  unpin(top: number): void {
+    this.pinTop = top;
+    this.pins = [];
+    this.pinA = 0;
+    this.pinMore = false;
   }
 
   /** The pinned rows' height (px below pinTop, the band's own backdrop included), 0 without any. */
@@ -576,6 +750,10 @@ export class Brackets {
 
   /** Whether clade node `v`'s bracket carries its name this frame. */
   named(v: FanNode): boolean {
+    if (forkNow) {
+      for (let k = 0; k < this.forkN; k++) if (this.list[this.forks[k].i].v === v) return true;
+      return false;
+    }
     return this.placed.some((p) => p.form !== 'tick' && this.list[p.i].v === v);
   }
 
@@ -583,7 +761,8 @@ export class Brackets {
     const q = this.list[i];
     let w = this.widthCache.get(q.latin);
     if (!w) {
-      const name = measure(this.nameFont, q.en ?? q.latin);
+      // (A clade with no English name is drawn in the Latin's font: measured in it, else its line ran through its end.)
+      const name = measure(q.en ? this.nameFont : this.latinFont, q.en ?? q.latin);
       const short = TAXON_SHORT[q.latin];
       w = [q.en ? name + 4 + measure(this.latinFont, q.latin) : name, name, short ? measure(this.nameFont, short) : 0];
       this.widthCache.set(q.latin, w);
@@ -607,7 +786,12 @@ export class Brackets {
    * pills' boxes on screen [x0, y0, x1, y1]: a label they would cover slides along its bracket clear of them, or,
    * with no room, leaves the bracket a plain line.
    */
-  draw(ctx: CanvasRenderingContext2D, ink: string, ink2: string, pills: readonly (readonly number[])[] = []): void {
+  draw(ctx: CanvasRenderingContext2D, ink: string, ink2: string, pills: readonly (readonly number[])[] = [], bg = '#000'): void {
+    if (forkNow) {
+      // (Placed with the labels, placeForks: their boxes are its obstacles.)
+      this.drawForks(ctx, ink, ink2, bg);
+      return;
+    }
     if (!this.placed.length || this.fit <= 0) return;
     ctx.save();
     ctx.globalAlpha = this.fit;
@@ -622,6 +806,269 @@ export class Brackets {
       this.drawOne(ctx, p, y, lx, form, (this.rowH[p.row] ?? ROW_H) >= ROW_H ? 4 : 3, ink, ink2);
     }
     if (this.moreRow >= 0) this.drawMore(ctx, this.rowY(this.moreRow), ink2);
+    ctx.restore();
+  }
+
+  /**
+   * Name each clade the stack would at its fork (ToLaD#373), after layout(): greedy point-feature placement, the wider
+   * clade first, its pill centred over the fork in its crotch (node v: the fork moves it, rigidly, how its peels are
+   * drawn does not). A pill that meets what is placed or `pills` (the labels' boxes) slides up the crotch, the least
+   * that clears it, so it moves continuously with what it clears; with no room there down its stem from under the fork, then the same in its shorter forms; else it is
+   * dropped. A fork past the screen's foot: held at the foot over the middle of the clade's span on screen, after the
+   * forks on screen. Off the top, on its stem under the top line. What the pinned rows say is not said again.
+   * A function of the camera alone: no state, so no flicker.
+   *
+   * With `lines` (the leaders, ToLaD#434) a name whose fork is on screen stands off it instead: on the ray from the fork
+   * with the shortest leader that clears the forks' horizontals as well (forkRay), a name at its fork being the leader's
+   * zero. A fork not on screen has nowhere to join: its name stands as above, clear of the horizontals too.
+   */
+  /** No names at the forks this frame (the fork-name chip's `off` on the tree on its side, ToLaD#458). */
+  noForks(): void {
+    this.forkN = 0;
+  }
+
+  placeForks(pills: readonly (readonly number[])[], lines: ForkLines | null = null): void {
+    const c = this.spanCam;
+    this.forkN = 0;
+    if (!c || !this.placed.length) return;
+    const list = this.list;
+    // (By size, the same order each frame: the set changes only with the level.)
+    const by = this.placed.sort((p, q) => list[q.i].strands.length - list[p.i].strands.length || p.i - q.i);
+    if (this.forkBox.length < by.length * 4) this.forkBox = new Float64Array(by.length * 4);
+    const y0 = c.toScreen(0, 0)[1];
+    const sy = c.toScreen(0, 1)[1] - y0;
+    const top = this.pinTop + (this.pinA > 0 ? this.pinH() : 0);
+    const foot = this.forkFoot;
+    const sw = c.cam.sx;
+    const held: Placed[] = [];
+    // (On leaders what stands in a name's way takes the horizontals, and the leaders as they are placed.)
+    const stand: (readonly number[])[] = lines ? [...pills] : (pills as (readonly number[])[]);
+    if (lines) for (let k = 0; k < lines.n; k++) stand.push([lines.xy[4 * k], lines.xy[4 * k + 2], lines.xy[4 * k + 1], lines.xy[4 * k + 2]]);
+    this.leadN = 0;
+    // (The names on leaders first, then the rest clear of the leaders: their boxes, for these few.)
+    const joined = new Set<Placed>();
+    if (lines && sy > 0) {
+      for (const p of by) {
+        const q = list[p.i];
+        if (this.pinA > 0 && this.pins.some((u) => u.i === p.i)) continue;
+        const fork = y0 + q.v.y * sy;
+        if (fork < top || fork >= foot) continue;
+        // (Its fork's on-screen point nearest its parent's column; a clade drawn as one branch, its column.)
+        const j = lines.at.get(q.v);
+        const ax = j === undefined ? c.toScreen(nodeLeftAt(q.v, q.v.y) + q.v.width / 2, 0)[0] : Math.min(Math.max(lines.xy[4 * j + 3], lines.xy[4 * j], this.x0), lines.xy[4 * j + 1], this.w);
+        if (j === undefined ? ax < this.x0 || ax > this.w : lines.xy[4 * j + 1] < this.x0 || lines.xy[4 * j] > this.w) continue;
+        joined.add(p);
+        this.forkRays(p, ax, fork, top, foot, pills, stand);
+      }
+      for (let k = 0; k < this.leadN; k++) stand.push([Math.min(this.lead[4 * k], this.lead[4 * k + 2]), Math.min(this.lead[4 * k + 1], this.lead[4 * k + 3]), Math.max(this.lead[4 * k], this.lead[4 * k + 2]), Math.max(this.lead[4 * k + 1], this.lead[4 * k + 3])]);
+    }
+    for (const p of by) {
+      if (joined.has(p)) continue;
+      const q = list[p.i];
+      if (this.pinA > 0 && this.pins.some((u) => u.i === p.i)) continue;
+      if (!(sy > 0)) continue;
+      const fork = y0 + q.v.y * sy;
+      if (fork + FORK_H >= foot) {
+        held.push(p);
+        continue;
+      }
+      const end = Math.min(foot, y0 + q.v.yBot * sy);
+      if (end < top + FORK_H) continue;
+      const half = FORK_H / 2;
+      // (Over the fork its own x; on its stem under the fork, the stem's: never how the peels above it are drawn.)
+      const xAt = (s: number) => {
+        const x = c.toScreen(nodeLeftAt(q.v, (Math.max(s, fork) - y0) / sy) + q.v.width / 2, 0)[0];
+        return x + (q.v.width * sw) / 2 < this.x0 || x - (q.v.width * sw) / 2 > this.w ? NaN : x;
+      };
+      const upTo = Math.max(top + half, fork - half - 1 - FORK_SLIDE_ROWS * (FORK_H + FORK_GAP));
+      const under = Math.max(fork + half + 1, top + half);
+      this.forkLadder(p, fork - half - 1, upTo, -1, under, end - half, 1, stand, xAt);
+    }
+    for (const p of held) {
+      // (Its middle on screen, as its bracket's name was.)
+      const m = (Math.max(p.a, this.x0) + Math.min(p.b, this.w)) / 2;
+      const y = foot - FORK_H / 2;
+      const e = y - FORK_HOLD_ROWS * (FORK_H + FORK_GAP);
+      this.forkLadder(p, y, e, -1, y, e, -1, stand, () => m);
+    }
+  }
+
+  /** A name on a leader from fork point (ax, ay), in its largest form with room, as forkLadder; else not at all. */
+  private forkRays(p: Placed, ax: number, ay: number, top: number, foot: number, pills: readonly (readonly number[])[], stand: readonly (readonly number[])[]): void {
+    const q = this.list[p.i];
+    const [wf, wn, ws] = this.widths(p.i, this.measure!);
+    const room = Math.min(p.b, this.w) - Math.max(p.a, this.x0) - 2 * LABEL_PAD;
+    if (q.en && wf <= room && this.forkRay(p, 'full', wf, ax, ay, top, foot, pills, stand)) return;
+    if (this.forkRay(p, 'name', wn, ax, ay, top, foot, pills, stand)) return;
+    if (ws > 0) this.forkRay(p, 'short', ws, ax, ay, top, foot, pills, stand);
+  }
+
+  /** The shortest leader from (ax, ay), over FORK_RAYS, whose name clears `stand`, the names and the leaders, and which itself crosses no leader, name or box (`pills`); placed there if there is one. */
+  private forkRay(p: Placed, form: Form, lw: number, ax: number, ay: number, top: number, foot: number, pills: readonly (readonly number[])[], stand: readonly (readonly number[])[]): boolean {
+    const pw = lw + 2 * FORK_PAD;
+    const half = FORK_H / 2;
+    // (The pill's centre at the ray's start: its edge clear of its own fork by the gap.)
+    const off = half + FORK_GAP + 0.5;
+    const box = this.forkBox;
+    const lead = this.lead;
+    let best = Infinity;
+    let bx = 0;
+    let by = 0;
+    for (const [k, d] of FORK_RAYS) {
+      let s = 0;
+      for (let round = 0; round < 64; round++) {
+        const y = ay + d * (off + s);
+        const len = s * Math.hypot(1, k);
+        if (len >= best || y - half < top || y + half > foot) break;
+        const x = Math.min(Math.max(ax + k * s, this.x0 + pw / 2 + 1), this.w - pw / 2 - 1);
+        // (A leader that runs into a box runs into it from here on too.)
+        let dead = false;
+        for (let j = 0; j < this.forkN && !dead; j++) dead = segMeetsBox(ax, ay, x, y, box[4 * j], box[4 * j + 1], box[4 * j + 2], box[4 * j + 3]);
+        for (let j = 0; j < pills.length && !dead; j++) dead = segMeetsBox(ax, ay, x, y, pills[j][0], pills[j][1], pills[j][2], pills[j][3]);
+        for (let j = 0; j < this.leadN && !dead; j++) dead = segsCross(ax, ay, x, y, lead[4 * j], lead[4 * j + 1], lead[4 * j + 2], lead[4 * j + 3]);
+        if (dead) break;
+        const a = x - pw / 2 - FORK_GAP;
+        const b = x + pw / 2 + FORK_GAP;
+        const t = y - half - FORK_GAP;
+        const u = y + half + FORK_GAP;
+        let next = NaN;
+        const meet = (x0: number, y0: number, x1: number, y1: number) => {
+          if (x1 <= a || x0 >= b || y1 <= t || y0 >= u) return;
+          // (Past it in y, or sideways if the ray leans away and comes off it first.)
+          let to = d < 0 ? ay - off - y0 + half + FORK_GAP : y1 + half + FORK_GAP - ay - off;
+          if (k < 0) to = Math.min(to, ax + pw / 2 + FORK_GAP - x0);
+          else if (k > 0) to = Math.min(to, x1 + pw / 2 + FORK_GAP - ax);
+          if (Number.isNaN(next) || to > next) next = to;
+        };
+        for (const r of stand) meet(r[0], r[1], r[2], r[3]);
+        for (let j = 0; j < this.forkN; j++) meet(box[4 * j], box[4 * j + 1], box[4 * j + 2], box[4 * j + 3]);
+        for (let j = 0; j < this.leadN; j++) {
+          const [p0, q0, p1, q1] = [lead[4 * j], lead[4 * j + 1], lead[4 * j + 2], lead[4 * j + 3]];
+          if (segMeetsBox(p0, q0, p1, q1, a, t, b, u)) meet(Math.min(p0, p1), Math.min(q0, q1), Math.max(p0, p1), Math.max(q0, q1));
+        }
+        if (Number.isNaN(next)) {
+          best = len;
+          bx = x;
+          by = y;
+          break;
+        }
+        // (A ray held at an edge comes off nothing sideways: on along it.)
+        s = next > s + 1e-6 ? next : s + half;
+      }
+    }
+    if (best === Infinity) return false;
+    const n = this.forkN++;
+    const f = this.forks[n] ?? (this.forks[n] = { i: 0, form: 'name', x: 0, y: 0, pw: 0, lw: 0, ax: NaN, ay: NaN });
+    f.i = p.i;
+    f.form = form;
+    f.x = bx;
+    f.y = by;
+    f.pw = pw;
+    f.lw = lw;
+    f.ax = ax;
+    f.ay = ay;
+    box[4 * n] = bx - pw / 2;
+    box[4 * n + 1] = by - half;
+    box[4 * n + 2] = bx + pw / 2;
+    box[4 * n + 3] = by + half;
+    if (lead.length < 4 * (this.leadN + 1)) {
+      const more = new Float64Array(2 * lead.length);
+      more.set(lead);
+      this.lead = more;
+    }
+    this.lead.set([ax, ay, bx, by], 4 * this.leadN++);
+    return true;
+  }
+
+  /**
+   * Place clade p's name in its largest form with room: from y along `dir` (1 down, -1 up) as far as `end`, else from
+   * y2 along dir2 as far as end2; then its shorter forms the same way; else not at all.
+   */
+  private forkLadder(p: Placed, y: number, end: number, dir: 1 | -1, y2: number, end2: number, dir2: 1 | -1, pills: readonly (readonly number[])[], xAt: (y: number) => number): void {
+    const q = this.list[p.i];
+    const [wf, wn, ws] = this.widths(p.i, this.measure!);
+    const at = (form: Form, w: number) => this.forkAt(p, form, w, y, end, dir, pills, xAt) || this.forkAt(p, form, w, y2, end2, dir2, pills, xAt);
+    // (The Latin too only where its span has the room for it, as its bracket's; a tick has no fork name, a name has.)
+    const room = Math.min(p.b, this.w) - Math.max(p.a, this.x0) - 2 * LABEL_PAD;
+    if (q.en && wf <= room && at('full', wf)) return;
+    if (at('name', wn)) return;
+    if (ws > 0) at('short', ws);
+  }
+
+  /** The least slide from y that clears everything placed and `pills`; placed there if there is one. */
+  private forkAt(p: Placed, form: Form, lw: number, y: number, end: number, dir: 1 | -1, pills: readonly (readonly number[])[], xAt: (y: number) => number): boolean {
+    const pw = lw + 2 * FORK_PAD;
+    const half = FORK_H / 2;
+    const box = this.forkBox;
+    // (Each round clears one more thing it met, further along.)
+    for (let round = 0; round < 16 && (dir > 0 ? y <= end : y >= end); round++) {
+      let x = xAt(y);
+      if (Number.isNaN(x)) return false;
+      x = Math.min(Math.max(x, this.x0 + pw / 2 + 1), this.w - pw / 2 - 1);
+      const a = x - pw / 2 - FORK_GAP;
+      const b = x + pw / 2 + FORK_GAP;
+      const t = y - half - FORK_GAP;
+      const u = y + half + FORK_GAP;
+      let next = NaN;
+      const meet = (x0: number, y0: number, x1: number, y1: number) => {
+        if (x1 <= a || x0 >= b || y1 <= t || y0 >= u) return;
+        const to = dir > 0 ? y1 + half + FORK_GAP : y0 - half - FORK_GAP;
+        if (Number.isNaN(next) || (dir > 0 ? to > next : to < next)) next = to;
+      };
+      for (const r of pills) meet(r[0], r[1], r[2], r[3]);
+      for (let k = 0; k < this.forkN; k++) meet(box[4 * k], box[4 * k + 1], box[4 * k + 2], box[4 * k + 3]);
+      if (Number.isNaN(next)) {
+        const k = this.forkN++;
+        const f = this.forks[k] ?? (this.forks[k] = { i: 0, form: 'name', x: 0, y: 0, pw: 0, lw: 0, ax: NaN, ay: NaN });
+        f.i = p.i;
+        f.form = form;
+        f.x = x;
+        f.y = y;
+        f.pw = pw;
+        f.lw = lw;
+        f.ax = f.ay = NaN;
+        box[4 * k] = x - pw / 2;
+        box[4 * k + 1] = y - half;
+        box[4 * k + 2] = x + pw / 2;
+        box[4 * k + 3] = y + half;
+        return true;
+      }
+      y = next;
+    }
+    return false;
+  }
+
+  /** Draw the names at their forks: each on an opaque pill, as the other labels. */
+  private drawForks(ctx: CanvasRenderingContext2D, ink: string, ink2: string, bg: string): void {
+    if (!this.forkN) return;
+    ctx.save();
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    // (The leaders under every pill: each from a dot on its fork into its pill.)
+    ctx.strokeStyle = ink2;
+    ctx.fillStyle = ink2;
+    ctx.lineWidth = 1;
+    for (let k = 0; k < this.forkN; k++) {
+      const f = this.forks[k];
+      if (Number.isNaN(f.ax)) continue;
+      ctx.beginPath();
+      ctx.moveTo(f.ax, f.ay);
+      ctx.lineTo(f.x, f.y);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(f.ax, f.ay, 1.5, 0, 2 * Math.PI);
+      ctx.fill();
+    }
+    for (let k = 0; k < this.forkN; k++) {
+      const f = this.forks[k];
+      const x0 = Math.round(f.x - f.pw / 2);
+      const y0 = Math.round(f.y - FORK_H / 2);
+      ctx.fillStyle = bg;
+      ctx.beginPath();
+      ctx.roundRect(x0, y0, f.pw, FORK_H, FORK_H / 2);
+      ctx.fill();
+      this.drawLabel(ctx, this.list[f.i], f.form, x0 + FORK_PAD, y0 + FORK_H / 2 + 0.5, ink, ink2);
+    }
     ctx.restore();
   }
 
@@ -647,7 +1094,11 @@ export class Brackets {
     if (tb) ctx.lineTo(b, y + dy);
     ctx.stroke();
     if (form === 'tick') return;
-    let x = lx - p.lw / 2;
+    this.drawLabel(ctx, q, form, lx - p.lw / 2, y, ink, ink2);
+  }
+
+  /** A clade's label in its form, from x on line y: its name, the Latin past it in the full form. */
+  private drawLabel(ctx: CanvasRenderingContext2D, q: Clade, form: Form, x: number, y: number, ink: string, ink2: string): void {
     const short = form === 'short' && !!TAXON_SHORT[q.latin];
     ctx.font = q.en || short ? this.nameFont : this.latinFont;
     ctx.fillStyle = q.en || short ? ink : ink2;
@@ -663,6 +1114,14 @@ export class Brackets {
 
   /** The clade under screen (x, y): the bracket in that row nearest x (on it, or within a few px of slop). */
   hit(x: number, y: number): Clade | null {
+    if (forkNow) {
+      // (A finger's few px past its pill: nothing else stands that near, placeForks.)
+      for (let k = 0; k < this.forkN; k++) {
+        const f = this.forks[k];
+        if (Math.abs(x - f.x) <= f.pw / 2 + 3 && Math.abs(y - f.y) <= FORK_H / 2 + 3) return this.list[f.i];
+      }
+      return null;
+    }
     // (Faded out, handed over to the pinned rows: not there to tap.)
     if (this.fit < 0.5) return null;
     let best: Placed | null = null;
@@ -686,10 +1145,11 @@ export type Pin = Placed;
 /** Backdrop (px) the pinned rows take beyond their own height. */
 export const PIN_PAD = 6;
 
-/** Room (px) kept for the species' pills between the stack's foot and "now". */
+/** What stands over the labels at its most (px): the stack or the pinned rows at STACK_ROWS rows and the "…" (view.ts labelBand). */
+export const STACK_MOST = (STACK_ROWS + 1) * ROW_H + PIN_PAD;
+
+/** Room (px) kept for the labels between the stack's foot and "now", by default (Brackets.pillRoom: the view's own). */
 export const PILL_ROOM = 96;
-/** How much of the screen's width a tapped clade takes (centred in the room right of the time axis, margins both sides). */
-export const TAP_FILL = 0.72;
 
 /**
  * Where placed bracket `p`'s label (centred at screen x, within [lo, hi]) goes on line y clear of the pills: its own
@@ -712,47 +1172,6 @@ export function clearSpot(p: Placed, lo: number, hi: number, y: number, pills: r
 }
 
 /**
- * Where a tap on a clade's bracket lands (ToLaD#193): the clade (`span` its world x at "now") across the screen and
- * centred, its columns opened as that zoom opens them (the layout left at the frame's zoom for the camera taking it), and its time from "now" at the top down to where its branch started (its stem: its split
- * from its sister, `v.yBot`), a little of the parent below it. `band` makes room above "now" for the brackets.
- */
-export function cladeCamera(
-  c: { frame(x0: number, x1: number, yFork: number, stretch?: boolean): Camera; w: number },
-  fan: Fan,
-  v: FanNode,
-  span: (v: FanNode) => [number, number],
-  band: (cam: Camera) => Camera = (cam) => cam,
-): Camera {
-  // (Framed a little wider than the clade: it takes TAP_FILL of the screen, room left either side.)
-  const room = c.w - 72;
-  const frame = () => {
-    const [a, b] = span(v);
-    const m = (a + b) / 2;
-    const h = ((b - a) / 2) * Math.max(1, room / (TAP_FILL * c.w));
-    return band(c.frame(m - h, m + h, v.yBot, true));
-  };
-  // (The mammal level: each clade's frame kept for the screen's size, the fold put where it leaves it. A level's
-  // ladder (ToLaD#258) asks a few each time the view comes to rest, each ~100 refolds of ~6,000 strands, ToLaD#255.)
-  const f = fan.tess.fold;
-  if (!f?.ordShare.length) return foldedFrame(fan, c.w, frame);
-  const key = `${c.w}x${(c as { h?: number }).h ?? 0}`;
-  let m = frameCache.get(fan);
-  if (!m) frameCache.set(fan, (m = new Map()));
-  let byV = m.get(key);
-  if (!byV) m.set(key, (byV = new Map()));
-  const hit = byV.get(v);
-  if (hit) {
-    f.setScale(hit.sx, c.w);
-    return { ...hit };
-  }
-  const cam = foldedFrame(fan, c.w, frame);
-  byV.set(v, { ...cam });
-  return cam;
-}
-/** cladeCamera's frames at the mammal level, per fan, screen size and clade. */
-const frameCache = new WeakMap<Fan, Map<string, Map<FanNode, Camera>>>();
-
-/**
  * The frame a flight lands on, laid out (steady.ts) or not: `frame` frames what it shows as the layout stands now (a
  * clade's span, a species' column), and what it shows moves with the zoom (its inner gaps open). The one camera both
  * agree on: the zoom that frames what that zoom opens (bisected in log zoom: the span on screen grows with the zoom).
@@ -771,17 +1190,33 @@ export function foldedFrame(fan: Fan, w: number, frame: () => Camera): Camera {
   const fixed = settleAt(cam.sx);
   if (fixed.sx === cam.sx) cam = fixed;
   else {
-    // (The zoom that frames the span it opens to is one point: the span (px) a zoom gives grows with it.)
+    // (The zoom that frames the span it opens to is one point: the span (px) a zoom gives grows with it, so
+    // g(z) = log(the zoom framing the span at z) - z falls through 0 there, once.)
+    const g = (z: number) => Math.log(settleAt(Math.exp(z)).sx) - z;
     let lo = Math.log(cam.sx) - 1;
     let hi = Math.log(cam.sx) + 1;
-    for (let k = 0; k < 8 && settleAt(Math.exp(lo)).sx < Math.exp(lo); k++) lo -= 2;
-    for (let k = 0; k < 8 && settleAt(Math.exp(hi)).sx > Math.exp(hi); k++) hi += 2;
-    // (To a hair of the zoom; at the mammal level a ten-thousandth, each round ~6,000 strands refolded, ToLaD#255.)
+    let [glo, ghi] = [g(lo), g(hi)];
+    for (let k = 0; k < 8 && glo < 0; k++) glo = g((lo -= 2));
+    for (let k = 0; k < 8 && ghi > 0; k++) ghi = g((hi += 2));
+    // (To a hair of the zoom; at the mammal level a ten-thousandth, each round ~6,000 strands refolded, ToLaD#255: by
+    // false position, Illinois's (the end kept twice running weighed half), a handful of rounds, not a bisection's
+    // fifteen; each step at least half the tolerance inside the bracket, so it closes on both sides.)
     const tol = f.ordShare.length ? 1e-4 : 1e-7;
+    let side = 0;
     for (let k = 0; k < 40 && hi - lo > tol; k++) {
-      const m = (lo + hi) / 2;
-      if (settleAt(Math.exp(m)).sx > Math.exp(m)) lo = m;
-      else hi = m;
+      let m = glo > 0 && ghi <= 0 ? (lo * ghi - hi * glo) / (ghi - glo) : (lo + hi) / 2;
+      if (!(m > lo + tol / 2)) m = lo + tol / 2;
+      if (!(m < hi - tol / 2)) m = hi - tol / 2;
+      const gm = g(m);
+      if (gm > 0) {
+        [lo, glo] = [m, gm];
+        if (side > 0) ghi /= 2;
+        side = 1;
+      } else {
+        [hi, ghi] = [m, gm];
+        if (side < 0) glo /= 2;
+        side = -1;
+      }
     }
     cam = settleAt(Math.exp(lo));
   }

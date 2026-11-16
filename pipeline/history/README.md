@@ -14,7 +14,7 @@ figures quoted with a citation, so the build stays CC BY 4.0.
 species   = "Loxodonta africana"   # accepted binomial; must match a tree leaf
 aliases   = ["..."]                # optional: other names the tree may use
 common    = "African savanna elephant"
-component = "wild"     # wild | domestic | total (humans)
+component = "wild"     # wild | domestic | total (humans); the build's "wild+domestic" is never a file's
 use       = "counts"   # counts: the curve drives the model's counts
                        # display: shipped in HIST but does not change counts
                        #          (partial scope, e.g. one subspecies, or humans)
@@ -247,6 +247,20 @@ in 25-year steps.
   `deep.join` says how it met the next level, and `history.deep_join` sums
   the scale factors and lists the flagged species (see "The genome gives
   the shape" below).
+- **Wild + domestic on one leaf** (ToLaD#435): the leaf's HIST row is one
+  record, `component = "wild+domestic"`, built by `history.combine_stock`: at
+  each year the wild curve plus the stock (nobody before domestication, the
+  early growth, the counts). A knot is kept where its own part is the larger
+  and carries that part's kind, grade and source; its note gives both figures;
+  `META.hist[].parts` gives today's two. The fan draws this row, so a record of
+  one part alone in it would leave the other part stored and not drawn. The
+  test `web/src/fan/drawn.test.ts` holds drawn = stored for every species.
+- **The leaf's name** (ToLaD#435): a domestic stock that outweighs the wild
+  part names the leaf (the file's `common`: pig, goat, sheep, horse), over the
+  Red List's name of the wild form, which stays as `wild_common` for the card
+  and the search.
+- **A leaf holding a stock is alive** (`anchors.STOCK_SPECIES`,
+  `merge.set_extinct_flags`): extinct in the wild is not extinct.
 - **Domestic** (`component = "domestic"`): the curve is the domestic stock.
   With `faostat_item`, FAOSTAT World stocks (1961 to the latest year, every 5
   years plus the latest) are added as grade B census points. Before the first
@@ -629,7 +643,8 @@ same `[deep]` structure in memory. Nothing is written into these TOMLs.
     beside the domestic buffalo (domestic genome); the bezoar beside the
     goat file already worked this way. The wild record sets the wild
     births pieces, the domestic file the domestic ones; the leaf's alive is
-    the wild count plus the domestic file's last count.
+    the wild count plus the domestic file's last count. Both are drawn: the HIST
+    row is their sum (see "Wild + domestic on one leaf").
   - A leaf whose domestic form has no wild population of its own (cattle,
     sheep, horse, dromedary) gets none: its wild lineage runs only to
     domestication, modelled.

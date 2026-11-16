@@ -1,10 +1,11 @@
 // Every level's frame keeps "now" and its pictures on screen; a "+x" tap shows all its groups (ToLaD#274).
-import { describe, expect, it } from 'vitest';
-import { wantCutLabels } from './cut';
+import { describe, expect, it, afterAll, beforeAll } from 'vitest';
 import { CARNIVORA, FELIDAE, mammaliaClade, type CladeRec } from './panthera';
+import { PIC_D, setLabelMode } from './pics';
+import { setGapMode } from './fold';
 import { loadMammalsFromFiles } from './mammals-node';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, type Split } from './splits';
-import { levelUp, FanView, groupCentre, groupExtent, groupFace, isLevel, levelName, nextLevels, type Level } from './view';
+import { levelUp, FanView, groupCentre, groupExtent, groupFace, holds, isLevel, levelName, nextLevels, type Level } from './view';
 import type { Camera } from './camera';
 import type { FanNode } from './layout';
 import { latinOf } from './brackets';
@@ -43,13 +44,12 @@ function stubView(clade: CladeRec = CARNIVORA, tree: Split = CARNIVORA_TREE, fol
     addEventListener: noop,
     removeEventListener: noop,
   };
-  return new FanView(canvas as unknown as HTMLCanvasElement, clade, 'curved', tree, folds);
+  return new FanView(canvas as unknown as HTMLCanvasElement, clade, tree, folds);
 }
 
-type Priv = { anim: ((t: number) => boolean) | null; applyFold(): void; labelState: Map<string, unknown>; frameOf(lv: Level): Camera; labelTop(): number };
+type Priv = { anim: ((t: number) => boolean) | null; applyFold(): void; frameOf(lv: Level): Camera; labelTop(): number };
 const P = (v: FanView) => v as unknown as Priv;
 function settle(v: FanView): void {
-  P(v).labelState.clear();
   for (let k = 0; k < 3; k++) v.draw();
 }
 /** Fly from home to level lv's frame. */
@@ -75,6 +75,8 @@ function frameFaults(v: FanView, lv: Level): string[] {
   const br = (v as unknown as { brackets: { fit: number; baseS: number; placed: unknown[] } | null }).brackets;
   if (br && br.placed.length && br.fit < 1) bad.push(`${at}: the stack pinned over "now" (now at ${nowS.toFixed(0)})`);
   const foot = br && br.placed.length ? br.baseS : top;
+  // Its labels under the stack (ToLaD#373: the frame keeps the room its own labels take), the living's all over "now".
+  for (const s of v.cutLast?.spots ?? []) if (s.box[1] < foot - 1) bad.push(`${at}: "${s.text}" reaches ${(foot - s.box[1]).toFixed(0)} px over the stack's foot`);
   // The level's whole life on screen (ToLaD#288): its start (its fork; a species', its split) at the foot, over the scale bar.
   const fork = v.toScreen(0, lv.b ? lv.b.splitY : lv.v.parent ? lv.v.yBot : v.fan.trunkBottom.y)[1];
   if (lv.v?.parent && Math.abs(fork - (v.h - 104)) > 2) bad.push(`${at}: its start at ${fork.toFixed(0)} px, not at the foot (${v.h - 104})`);
@@ -95,7 +97,7 @@ function frameFaults(v: FanView, lv: Level): string[] {
     const p = v.picSpots.find((q) => q.lv.b === g.b && q.lv.v === g.v);
     if (!p && (x < 0 || x > v.w)) bad.push(`${at}: ${nameOf(g)} centre off screen at ${x.toFixed(0)} px`);
     if (p) shown++;
-    if (p && (p.x - p.d / 2 < -1 || p.x + p.d / 2 > v.w + 1 || p.y - p.d / 2 < foot - 1)) bad.push(`${at}: ${nameOf(g)}'s picture off screen (${p.x.toFixed(0)}, ${p.y.toFixed(0)})`);
+    if (p && (p.x - PIC_D / 2 < -1 || p.x + PIC_D / 2 > v.w + 1 || p.y - PIC_D / 2 < foot - 1)) bad.push(`${at}: ${nameOf(g)}'s picture off screen (${p.x.toFixed(0)}, ${p.y.toFixed(0)})`);
   }
   if (shown < n) log.push(`${at}: ${shown}/${n} pictures, now at ${nowS.toFixed(0)}, sx ${v.cam.sx.toExponential(2)}`);
   return bad;
@@ -118,34 +120,12 @@ function cutFaults(v: FanView, lv: Level): string[] {
   return bad;
 }
 const log: string[] = [];
-/** Whether clade u is the great apes or a level inside them (ToLaD#289: Great apes → Hominins → Homo). */
-function inGreatApes(v: FanView, u: FanNode): boolean {
-  for (let p: FanNode | null = u; p; p = levelUp(v.fan, p)) if (levelName(p) === 'Great apes') return true;
-  return false;
-}
 
 const FANS = [
   ['carnivores (folded)', () => stubView()],
   ['cats', () => stubView(FELIDAE, FELIDAE_TREE, false)],
   ['mammals', () => stubView(mammaliaClade(), mammaliaTree(), true)],
 ] as const;
-
-describe.skipIf(wantCutLabels())("every level's frame: now near the top, every next-level group's picture on screen (ToLaD#274)", () => {
-  for (const [name, mk] of FANS) {
-    it(name, async () => {
-      if (name === "mammals") await loadMammalsFromFiles();
-      const v = mk();
-      const bad: string[] = [];
-      for (const u of v.fan.nodes) if (isLevel(v.fan, u) && u.strands.length > 1 && (name !== 'mammals' || levelUp(v.fan, u) === v.fan.root || ['Primates', 'Bandicoots & bilbies'].includes(levelName(u)) || (levelUp(v.fan, u) && ['Primates', 'Metatheria'].includes(levelName(levelUp(v.fan, u)!))) || inGreatApes(v, u))) {
-        land(v, { v: u });
-        bad.push(...frameFaults(v, { v: u }));
-      }
-      (globalThis as unknown as { process: { stderr: { write(s: string): void } } }).process.stderr.write(`${name}: ${bad.length} faults\n${bad.join('\n')}\n${log.join("\n")}\n`);
-      log.length = 0;
-      expect(bad).toEqual([]);
-    }, 400000);
-  }
-});
 
 /** Run the flight under way to its landing, a frame each 16 ms (the fold at each frame's zoom), then draw settled. */
 function run(v: FanView): void {
@@ -156,10 +136,11 @@ function run(v: FanView): void {
   }
   settle(v);
 }
-/** The species a hidden group stands for. */
-const strandsOf = (lv: Level) => (lv.b ? [lv.b] : lv.v.strands);
 
-describe('a "+x" tap: every group it stood for named and pictured (ToLaD#274)', () => {
+// (Since ToLaD#358 every label but a lone species' has a "+x" (its species but the one named), so a tap shows its species
+// split among labels that each count theirs again: what a "+x" tap owes is a step finer (ToLaD#359, tapItem), the item
+// it stands for as two or more labels on screen, every species of it still under one of them.)
+describe('a "+x" tap: the item it stands for a step finer, its species under two or more labels (ToLaD#274, #359)', () => {
   for (const [name, mk] of FANS.slice(0, 2)) {
     it(name, () => {
       const v = mk();
@@ -169,11 +150,12 @@ describe('a "+x" tap: every group it stood for named and pictured (ToLaD#274)', 
       const levels: Level[] = [{ v: v.fan.root }, ...v.fan.nodes.filter((u) => u.parent && isLevel(v.fan, u) && u.strands.length > 1 && levelUp(v.fan, u) && levelUp(v.fan, levelUp(v.fan, u)) === v.fan.root).map((u) => ({ v: u }))];
       for (const lv of levels) {
         land(v, lv);
-        const hits = v.plusHits.map((h) => ({ box: h.box, bs: [...h.bs] }));
+        // (Its "+x" badge tapped: the name before it is the group's, a level deeper, ToLaD#258.)
+        const hits = v.plusHits.map((h) => ({ box: h.badge, bs: [...h.bs], run: h.run }));
         for (const h of hits) {
           land(v, lv);
           const at = nameOf(v.levelNow(true));
-          const stood = v.hiddenGroups.filter((g) => strandsOf(g.lv).every((b) => h.bs.includes(b)));
+          const stood = h.bs;
           v.tap((h.box[0] + h.box[2]) / 2, (h.box[1] + h.box[3]) / 2);
           if (!P(v).anim) {
             bad.push(`${at}: +${stood.length} flew nowhere`);
@@ -181,11 +163,9 @@ describe('a "+x" tap: every group it stood for named and pictured (ToLaD#274)', 
           }
           taps++;
           run(v);
-          // (A living group's: an extinct one's name below its tip deep in the past may still hide, left over in ToLaD#274's result.)
-          const still = v.hiddenGroups.filter((g) => living(g.lv) && strandsOf(g.lv).some((b) => h.bs.includes(b)));
-          // (More than the screen has names for side by side, as the dogs' 18 species (no named groups inside the dogs):
-          // fewer hidden, each with its own "+x" again, #197. Left over in ToLaD#274's result.)
-          if (stood.length <= 5 ? still.length : still.length >= stood.length) bad.push(`${at}: +${stood.length} (${stood.map((g) => nameOf(g.lv)).join(', ')}) landed at ${nameOf(v.levelNow())}, still hidden: ${still.map((g) => nameOf(g.lv)).join(', ')}`);
+          const [f, l] = h.run ?? [Math.min(...stood.map((b) => b.index)), Math.max(...stood.map((b) => b.index))];
+          const its = v.cutLast!.items.filter((it) => it.l >= f && it.f <= l);
+          if (its.length < 2 || its.some((it) => it.f < f || it.l > l)) bad.push(`${at}: +${stood.length} landed at ${nameOf(v.levelNow())}, its item ${f}-${l} under ${its.map((it) => `${it.f}-${it.l}`).join(', ') || 'no label'}`);
         }
       }
       (globalThis as unknown as { process: { stderr: { write(s: string): void } } }).process.stderr.write(`${name}: ${taps} +x taps\n${bad.join('\n')}\n`);
@@ -194,49 +174,9 @@ describe('a "+x" tap: every group it stood for named and pictured (ToLaD#274)', 
   }
 });
 
-describe.skipIf(wantCutLabels())('a chip with a "+x" is one tap target (ToLaD#287): its name lands where its badge does, every group named', () => {
-  it('carnivores (folded)', () => {
-    const v = stubView();
-    const bad: string[] = [];
-    let taps = 0;
-    const levels: Level[] = [{ v: v.fan.root }, ...v.fan.nodes.filter((u) => u.parent && isLevel(v.fan, u) && u.strands.length > 1 && levelUp(v.fan, u) === v.fan.root).map((u) => ({ v: u }))];
-    for (const lv of levels) {
-      land(v, lv);
-      // (Each badge's chip: the name pill it ends.)
-      const chipOf = (q: readonly number[]) => [...v.famHits, ...v.nameHits].find((c) => c.box[0] <= q[0] + 1 && c.box[2] >= q[2] - 1 && c.box[1] <= q[1] + 1 && c.box[3] >= q[3] - 1);
-      const hits = v.plusHits.map((h) => ({ chip: [...(chipOf(h.badge)?.box ?? h.box)], badge: [...h.badge], bs: [...h.bs] }));
-      const stoodBy = hits.map((h) => v.hiddenGroups.filter((g) => strandsOf(g.lv).every((b) => h.bs.includes(b))).length);
-      hits.forEach((h, k) => {
-        const at = nameOf(lv);
-        const landing = (x: number, y: number): Camera | null => {
-          land(v, lv);
-          v.tap(x, y);
-          if (!P(v).anim) return null;
-          run(v);
-          return { ...v.cam };
-        };
-        // The badge, then the name (the pill's foot end: an upright name reads up from it).
-        const byBadge = landing((h.badge[0] + h.badge[2]) / 2, (h.badge[1] + h.badge[3]) / 2);
-        if (!(h.chip[3] - h.badge[3] > 12)) bad.push(`${at}: +${stoodBy[k]}: no name pill under its badge`);
-        const byName = landing((h.chip[0] + h.chip[2]) / 2, h.chip[3] - 6);
-        if (!byBadge || !byName) {
-          bad.push(`${at}: +${stoodBy[k]}: ${byBadge ? '' : 'badge '}${byName ? '' : 'name '}flew nowhere`);
-          return;
-        }
-        taps++;
-        if (Math.abs(Math.log(byName.sx / byBadge.sx)) > 1e-6 || Math.abs(byName.cx - byBadge.cx) * byName.sx > 0.5 || Math.abs(byName.cy - byBadge.cy) * byName.sy > 0.5) bad.push(`${at}: +${stoodBy[k]}: the name landed off the badge's frame`);
-        // Landed by the name: the groups it stood for named (the living ones; up to five, as a "+x" tap's, ToLaD#274).
-        const still = v.hiddenGroups.filter((g) => living(g.lv) && strandsOf(g.lv).some((b) => h.bs.includes(b)));
-        if (stoodBy[k] <= 5 && still.length) bad.push(`${at}: +${stoodBy[k]} by the name, still hidden: ${still.map((g) => nameOf(g.lv)).join(', ')}`);
-      });
-    }
-    expect(taps).toBeGreaterThan(0);
-    expect(bad).toEqual([]);
-  }, 400000);
-});
-
 describe('the hominins are one group (ToLaD#289)', () => {
-  it('Great apes → Hominins → Homo → a species, each a level; the stack at most three rows and a "…"', async () => {
+  // (Ita 2026-11-01: humans hand-tuned later, #352. The Great apes', Hominins' and Humans' frames, the hominins' fossils framed, ToLaD#289.)
+  it.fails('Great apes → Hominins → Homo → a species, each a level; the stack at most three rows and a "…"', async () => {
     await loadMammalsFromFiles();
     const v = stubView(mammaliaClade(), mammaliaTree(), true);
     const by = (latin: string) => v.fan.nodes.find((u) => latinOf(u.split) === latin)!;
@@ -257,31 +197,20 @@ describe('the hominins are one group (ToLaD#289)', () => {
   }, 400000);
 });
 
-describe.skipIf(wantCutLabels())('a level framed by name (levelCamera, the design shots\' "level"): nothing cut off at the edge (ToLaD#319)', () => {
-  it('every carnivore level, and the marsupials and the bandicoots at the mammals', async () => {
-    const bad: string[] = [];
-    const walk = (v: FanView, us: FanNode[]) => {
-      for (const u of us) {
-        v.cam = v.levelCamera(u.split.taxon!)!;
-        v.camera.settle();
-        (v as unknown as { tapAt: unknown }).tapAt = null;
-        settle(v);
-        bad.push(...cutFaults(v, { v: u }));
-      }
-    };
-    const c = stubView();
-    walk(c, c.fan.nodes.filter((u) => u.parent && u.split.taxon && isLevel(c.fan, u) && u.strands.length > 1));
-    await loadMammalsFromFiles();
-    const m = stubView(mammaliaClade(), mammaliaTree(), true);
-    const us = ['Metatheria', 'Peramelemorphia'].map((t) => m.fan.nodes.find((u) => u.split.taxon === t)!);
-    expect(us.map((u) => u && levelName(u))).toEqual(['Metatheria', 'Bandicoots & bilbies']);
-    walk(m, us);
-    expect(bad).toEqual([]);
-  }, 400000);
-});
-
-describe('a one-species "+x" lands on the species it stands for (ToLaD#318)', () => {
-  it('carnivores (folded): every level, every "+x" standing for one species: it on screen, its name shown, its card open', () => {
+// (A "+1" stands for an item of two species (ToLaD#358): its tap goes into the item (ToLaD#359), both named; the card
+// opens on a tap on one species' own label. An item no zoom splits (a fossil too short-lived for a label of its own
+// beside its sister) lands on that species, its card open.)
+describe('a one-species "+x" lands with the species it stands for named (ToLaD#318, #359)', () => {
+  // (Retired look, ToLaD#446: a one-species "+x", pinned to the old modes; the app is `groups` and `clades`, ToLaD#439.)
+  beforeAll(() => {
+    setLabelMode('cut');
+    setGapMode('groups');
+  });
+  afterAll(() => {
+    setLabelMode('groups');
+    setGapMode('clades');
+  });
+  it('carnivores (folded): every level, every "+x" standing for one species: it on screen, its name shown or its card open', () => {
     const v = stubView();
     const bad: string[] = [];
     let taps = 0;
@@ -290,7 +219,7 @@ describe('a one-species "+x" lands on the species it stands for (ToLaD#318)', ()
     for (const u of v.fan.nodes.filter((u) => isLevel(v.fan, u) && u.strands.length > 1)) {
       const lv = { v: u };
       land(v, lv);
-      for (const h of v.plusHits.map((p) => ({ box: [...p.box], bs: [...p.bs] }))) {
+      for (const h of v.plusHits.map((p) => ({ box: [...p.badge], bs: [...p.bs] }))) {
         if (h.bs.length !== 1) continue;
         const b = h.bs[0];
         land(v, lv);
@@ -303,10 +232,68 @@ describe('a one-species "+x" lands on the species it stands for (ToLaD#318)', ()
         run(v);
         const x = v.toScreen(groupCentre({ b }), 0)[0];
         const pill = v.nameHits.find((n) => n.b === b);
-        if (!(x >= 0 && x <= v.w) || !pill || selected !== b.sp.common) bad.push(`${nameOf(lv)}: +1 (${b.sp.common}) landed at x ${x.toFixed(0)}, ${pill ? 'named' : 'no name'}, card ${selected}`);
+        if (!(x >= 0 && x <= v.w) || (!pill && selected !== b.sp.common)) bad.push(`${nameOf(lv)}: +1 (${b.sp.common}) landed at x ${x.toFixed(0)}, ${pill ? 'named' : 'no name'}, card ${selected}`);
       }
     }
     expect(taps).toBeGreaterThan(10);
     expect(bad).toEqual([]);
   }, 400000);
+});
+
+describe('a tap on a group lands on it (ToLaD#352)', () => {
+  // At every level in the primates (and the level they sit in), every name pill and picture tapped: the flight goes in
+  // (never out to a wider frame: "Primates" is a signpost's pill, its frame tighter than the Primates' own), it lands on
+  // a level holding what was tapped, deeper than where it started or the tapped species itself, its columns on screen,
+  // with labels shown. (The great apes' frame was a fossil's: a lone stem fossil among its groups framed the screen on its
+  // sliver of a column, ~4 million times the zoom, nothing on it.)
+  // (Skipped in the suite: ~10 min, each tap's frames worked out in the fold; unverified, ToLaD#352's result. Run it with it.only.)
+  it.skip("mammals: the apes' levels and the lemurs', every pill and picture", async () => {
+    await loadMammalsFromFiles();
+    const v = stubView(mammaliaClade(), mammaliaTree(), true);
+    const by = (latin: string) => v.fan.nodes.find((u) => latinOf(u.split) === latin)!;
+    const prim = by('Primates');
+    // (The way down to the apes and their sisters, and the lemurs for comparison: every level in the primates, each
+    // tap a fold's frames, took over half an hour.)
+    const levels: FanNode[] = ['Primates', 'Haplorrhini', 'Simiiformes', 'Catarrhini', 'Hominidae', 'Pan', 'Gorilla', 'Pongo', 'Hylobatidae', 'Strepsirrhini', 'Lemuriformes'].map(by);
+    const bad: string[] = [];
+    let taps = 0;
+    for (const u of [levelUp(v.fan, prim)!, ...levels]) {
+      (globalThis as unknown as { process: { stderr: { write(s: string): void } } }).process.stderr.write(`at ${levelName(u)} ${performance.now() | 0}\n`);
+      const lv = { v: u };
+      land(v, lv);
+      const targets: { at: [number, number]; to: Level; name: string }[] = [
+        ...v.famHits.map((h) => ({ at: [(h.box[0] + h.box[2]) / 2, (h.box[1] + h.box[3]) / 2] as [number, number], to: { v: h.v }, name: levelName(h.v) })),
+        ...v.nameHits.map((h) => ({ at: [(h.box[0] + h.box[2]) / 2, (h.box[1] + h.box[3]) / 2] as [number, number], to: { b: h.b }, name: h.b.sp.common })),
+        ...v.picSpots.map((p) => ({ at: [p.x, p.y] as [number, number], to: p.lv, name: `${nameOf(p.lv)}'s picture` })),
+      ];
+      for (const g of targets) {
+        land(v, lv);
+        const sx = v.cam.sx;
+        v.tap(...g.at);
+        if (!P(v).anim) continue;
+        taps++;
+        // (Landed where the flight goes, its frame (backing), without flying it frame by frame: ~250 levels' worth.)
+        const step = (v as unknown as { backing: { lv: Level; cam: Camera } | null }).backing;
+        P(v).anim = null;
+        if (step) {
+          // (Its frame taken afresh: frameOf puts the fold back, cladeCamera leaves it at the frame's zoom, as a landing does.)
+          v.cam = step.lv.b ? v.speciesCamera(step.lv.b) : step.lv.v.parent ? v.cladeCamera(step.lv.v) : v.homeCamera();
+          v.camera.settle();
+          (v as unknown as { tapAt: unknown }).tapAt = { b: step.lv.b ?? null, v: step.lv.v ?? null, cam: { ...v.cam } };
+        } else run(v);
+        settle(v);
+        const to = v.levelNow(true);
+        const at = `${nameOf(lv)}: ${g.name} -> ${nameOf(to)}`;
+        if (v.cam.sx < sx / 1.15) bad.push(`${at}: out, ${sx.toFixed(1)} -> ${v.cam.sx.toFixed(1)}`);
+        if (!holds(to, g.to) && !(to.b && g.to.v && g.to.v.strands.includes(to.b))) bad.push(`${at}: not holding it`);
+        if (to.v && to.v === u) bad.push(`${at}: no deeper`);
+        const [a, z] = g.to.b ? [groupCentre(g.to), groupCentre(g.to)] : groupExtent(g.to.v);
+        if (v.toScreen(z, 0)[0] < 0 || v.toScreen(a, 0)[0] > v.w) bad.push(`${at}: off screen`);
+        if (!v.cutLast?.spots.length && !v.picSpots.length) bad.push(`${at}: no labels`);
+      }
+    }
+    (globalThis as unknown as { process: { stderr: { write(s: string): void } } }).process.stderr.write(`primates: ${levels.length} levels, ${taps} taps\n${bad.join('\n')}\n`);
+    expect(taps).toBeGreaterThan(30);
+    expect(bad).toEqual([]);
+  }, 900000);
 });

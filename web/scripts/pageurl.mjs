@@ -1,16 +1,14 @@
-// The built page's URL for the browser scripts (designshot, glcheck). From file:// by default; the mammal level
-// (ToLaD#247) fetches mammals.json beside the page, which a file:// page cannot, so then (or HTTP=1) dist-single is
-// served over http on a free port, as the deployed site serves it. close() stops the server.
+// The built page's URL for the browser scripts (designshot). The page fetches mammals.json beside it (ToLaD#247, #418),
+// which a file:// page cannot, so dist-single is served over http on a free port, as the deployed site serves it.
+// close() stops the server.
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
 
 const TYPES = { '.html': 'text/html', '.json': 'application/json', '.js': 'text/javascript', '.css': 'text/css' };
 
 export async function pageUrl(query, dir = 'dist-single') {
   const q = query ? `?${query}` : '';
-  if (!process.env.HTTP && process.env.LEVEL !== 'mammals') return { url: pathToFileURL(resolve(dir, 'index.html')).href + q, close() {} };
   const root = resolve(dir);
   const server = createServer(async (req, res) => {
     const p = decodeURIComponent(new URL(req.url, 'http://x').pathname);

@@ -30,8 +30,6 @@ const SCENES = SYNTH_N ? [
   [`s${SYNTH_N}-order`, `synthetic&n=${SYNTH_N}`, { synth: 'order' }],
   [`s${SYNTH_N}-family`, `synthetic&n=${SYNTH_N}`, { synth: 'family' }],
 ] : [
-  ['carnivores', 'carnivores', { home: true }],
-  ['cats', 'cats', { home: true }],
   ['mammals', 'mammals', { home: true }],
   ['rodents', 'mammals', { level: 'Rodentia' }],
   ['bats', 'mammals', { level: 'Chiroptera' }],

@@ -49,13 +49,8 @@ export function columnSpans(sp: SpeciesRec, startMa: number): ColumnSpan[] {
   return out;
 }
 
-/**
- * The second per-span style (ToLaD#141): a curated event on the column (a
- * bottleneck), tinted over its window, lanes and individuals alike, and named
- * by a label beside it. A tint, not a fade: drawn over the held fade, so an
- * event inside a held stretch still shows. No dots or lines on the column.
- */
-export const EVENT_TINT = { rgb: [0.93, 0.62, 0.27] as [number, number, number], a: 0.28, css: '#eea045' };
+/** A curated event's colour (a bottleneck, ToLaD#141): its band on the card's sparkline. The column itself carries no mark (ToLaD#436). */
+export const EVENT_TINT = { css: '#eea045' };
 
 /** An event's window on a species' column, years before present, clipped to the column (`ago0` older). */
 export interface EventSpan {
@@ -69,7 +64,7 @@ export interface EventSpan {
 /**
  * The species' curated events as spans of its own column (above its split at `startMa`), oldest first.
  * Species-wide ones only (ToLaD#149): a regional event (a subpopulation, e.g. India's lions) cannot
- * narrow the whole species' column, so it is neither tinted nor labelled there; the card lists it.
+ * narrow the whole species' column, so a tap on the column does not open it; the card lists it.
  */
 export function eventSpans(sp: SpeciesRec, startMa: number): EventSpan[] {
   const evs = sp.history?.events ?? [];

@@ -4,7 +4,7 @@
 // flags a label turning on and off again within one gesture, a picture popping, the camera moving without the
 // fingers, or levelNow flipping. Default headless, no GPU flags; run under flock /tmp/tolad-browser.lock.
 //   npm run build:single && LEVEL=mammals node scripts/navprobe.mjs <taxon> [query] [out-dir]
-//   (e.g. Hominini 'level=mammals&fit=fossils'; SHOTS=1 screenshots each gesture's end)
+//   (e.g. Hominini 'level=mammals'; SHOTS=1 screenshots each gesture's end)
 import { mkdirSync } from 'node:fs';
 import { chromium } from 'playwright';
 import { pageUrl } from './pageurl.mjs';

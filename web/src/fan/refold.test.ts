@@ -9,7 +9,7 @@ import { CARNIVORA_TREE } from './splits';
 import { TwigModel } from './twigs';
 
 describe('refold keeps the widths, reads the left edges again', () => {
-  const fan = layoutFan(CARNIVORA, 'linear', CARNIVORA_TREE, 'curved');
+  const fan = layoutFan(CARNIVORA, 'linear', CARNIVORA_TREE);
   const fold = new Steady(fan);
   fan.tess.fold = fold;
   fold.setAll(0);

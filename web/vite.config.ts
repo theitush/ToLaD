@@ -1,59 +1,19 @@
 /// <reference types="vitest/config" />
-import { createReadStream, existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer, defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
-import { MAMMALS_FILE } from './src/fan/mammals-data';
+import { MAMMALS_FILE, packMammals } from './src/fan/mammals-data';
 import { GLOBE_FILE } from './src/fan/globe-data';
 import { loadAll, loadClade, trimToFan } from './src/fan/panthera-extract';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const DATA = resolve(here, '..', 'data', 'mammals');
-const VIRTUAL = 'virtual:tolad-data';
 
+/** The dataset's files (the cat and carnivore extracts read them; their change rebuilds them in dev). */
 function dataFiles(): string[] {
   return ['skeleton.tld', ...readdirSync(join(DATA, 't')).filter((f) => f.endsWith('.tld')).map((f) => `t/${f}`)];
-}
-
-function base64(u: Uint8Array): string {
-  let s = '';
-  for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000));
-  return btoa(s);
-}
-
-/**
- * Serves ../data/mammals at /data/mammals in dev and copies it into the build
- * (no committed duplicate). In single-file mode the files are inlined as base64
- * through `virtual:tolad-data` instead.
- */
-function toladData(single: boolean): Plugin {
-  return {
-    name: 'tolad-data',
-    resolveId(id) {
-      return id === VIRTUAL ? '\0' + VIRTUAL : null;
-    },
-    load(id) {
-      if (id !== '\0' + VIRTUAL) return null;
-      if (!single) return 'export const inlineData = null;';
-      const obj: Record<string, string> = {};
-      for (const f of dataFiles()) obj[f] = base64(readFileSync(join(DATA, f)));
-      return `export const inlineData = ${JSON.stringify(obj)};`;
-    },
-    configureServer(server) {
-      server.middlewares.use('/data/mammals', (req, res, next) => {
-        const rel = decodeURIComponent(((req as { url?: string }).url ?? "/").split("?")[0]);
-        const p = join(DATA, rel);
-        if (!p.startsWith(DATA) || !existsSync(p) || statSync(p).isDirectory()) return next();
-        res.setHeader('Content-Type', 'application/octet-stream');
-        createReadStream(p).pipe(res);
-      });
-    },
-    generateBundle() {
-      if (single) return;
-      for (const f of dataFiles()) this.emitFile({ type: 'asset', fileName: `data/mammals/${f}`, source: readFileSync(join(DATA, f)) });
-    },
-  };
 }
 
 const PANTHERA = 'virtual:panthera-data';
@@ -65,6 +25,7 @@ const CARNIVORA = 'virtual:carnivora-data';
  * histories are always the dataset's own.
  */
 function pantheraData(): Plugin {
+  let building = false;
   // The order the cats sit in (ToLaD#146): only the species the fan draws (the tile's subspecies and synonym rows left out).
   const ids: Record<string, () => unknown> = {
     [PANTHERA]: () => loadClade((rel) => readFileSync(join(DATA, rel)), 'Felidae'),
@@ -72,6 +33,9 @@ function pantheraData(): Plugin {
   };
   return {
     name: 'panthera-data',
+    configResolved(c) {
+      building = c.command === 'build';
+    },
     resolveId(id) {
       return id in ids ? '\0' + id : null;
     },
@@ -80,13 +44,20 @@ function pantheraData(): Plugin {
       if (!make) return null;
       for (const f of dataFiles()) this.addWatchFile(join(DATA, f));
       if (existsSync(join(DATA, 'wiki.json'))) this.addWatchFile(join(DATA, 'wiki.json'));
-      // The pictures and links (ToLaD#182) for every species either level draws.
-      const sci = (k: string) => (ids[k]() as { species: { sci: string }[] }).species.map((s) => s.sci);
-      const wiki = id === '\0' + PANTHERA ? `\nexport const wiki = ${JSON.stringify(wikiFor(sci(CARNIVORA)))};` : '';
-      return `export default ${JSON.stringify(make())};${wiki}`;
+      // The clades are fixtures for tests now (ToLaD#418): the page reaches neither default export, and its bundle
+      // drops them (their consumers are marked pure). What it does read from here: the natural level's source, and no
+      // pictures (mammals.json holds them all, ToLaD#182); tests and dev keep the carnivores' rows here.
+      if (id !== '\0' + PANTHERA) return `export default ${JSON.stringify(make())};`;
+      const data = make() as { naturalMeta?: unknown };
+      const carn = (ids[CARNIVORA]() as { species: { sci: string }[] }).species.map((s) => s.sci);
+      return [
+        `export default ${JSON.stringify(data)};`,
+        `export const naturalMeta = ${JSON.stringify(data.naturalMeta ?? null)};`,
+        `export const wiki = ${JSON.stringify(building ? {} : wikiFor(carn))};`,
+      ].join('\n');
     },
-    // The mammal level (ToLaD#247) is a sibling file the page fetches when the level opens (fan/mammals-data.ts),
-    // not in the page: the default (carnivores) page stays small. Served at /mammals.json in dev, emitted next to
+    // The mammals (ToLaD#247) are a sibling file the page fetches on open (fan/mammals-data.ts), not in the page, so
+    // the page paints before they come. Served at /mammals.json in dev, emitted next to
     // index.html in both builds.
     configureServer(server) {
       server.middlewares.use('/' + MAMMALS_FILE, (_req, res) => {
@@ -114,12 +85,14 @@ function mammalsJson(): string;
 function mammalsJson(seeded: true): Promise<string>;
 function mammalsJson(seeded = false): string | Promise<string> {
   const clade = trimToFan(loadAll((rel) => readFileSync(join(DATA, rel))));
-  const carn = new Set(trimToFan(loadClade((rel) => readFileSync(join(DATA, rel)), 'Carnivora')).species.map((s) => s.sci));
-  const wiki = wikiFor(clade.species.map((s) => s.sci).filter((s) => !carn.has(s)));
-  if (!seeded) return JSON.stringify({ clade, wiki });
+  const wiki = wikiFor(clade.species.map((s) => s.sci));
+  if (!seeded) return JSON.stringify(packMammals(JSON.parse(JSON.stringify({ clade, wiki }))));
   // The build's: with the level's default layout worked out here (fan/mammals-seed.ts, ToLaD#255), on the clade as the
   // page reads it (through JSON). Dev serves it without: the page works it out.
-  return mammalsSeed(JSON.parse(JSON.stringify(clade))).then((seed) => JSON.stringify({ clade, wiki, seed }));
+  // (The dated tree goes in built, splits.ts mammaliaTree: the clade's raw one is left out.)
+  return mammalsSeed(JSON.parse(JSON.stringify(clade))).then((ahead) =>
+    JSON.stringify(packMammals(JSON.parse(JSON.stringify({ clade: { ...clade, dated: undefined, datedMeta: undefined }, wiki, ...(ahead as object) })))),
+  );
 }
 
 /** fan/mammals-seed.ts run in node through a vite server of its own (the virtual data modules resolved). */
@@ -202,7 +175,7 @@ export default defineConfig(({ mode }) => {
   const single = mode === 'single';
   return {
     base: './',
-    plugins: [react(), toladData(single), pantheraData(), ...(single ? [inlineAll()] : [])],
+    plugins: [react(), pantheraData(), ...(single ? [inlineAll()] : [])],
     build: single
       ? {
           outDir: 'dist-single',
@@ -211,13 +184,7 @@ export default defineConfig(({ mode }) => {
           modulePreload: false,
           // The lazy globe chunk by a fixed name next to index.html (pages.yml stages it: globe-draw.js). The entry is
           // inlined into index.html, so it too is named at the top level: its import of the chunk is then ./, not ../.
-          // The time river's inlined data files (?river only) are such a chunk too, river-data.js (ToLaD#255).
-          rollupOptions: {
-            output: {
-              chunkFileNames: (c) => (c.facadeModuleId === '\0' + VIRTUAL ? 'river-data.js' : '[name].js'),
-              entryFileNames: '[name].js',
-            },
-          },
+          rollupOptions: { output: { chunkFileNames: '[name].js', entryFileNames: '[name].js' } },
         }
       : {},
     server: {

@@ -2,8 +2,6 @@
 // checkboxes (geological periods, ice ages) under it.
 import { useState } from 'react';
 import type { WorldLayers } from './world';
-import { wantFitFossils } from './steady';
-import type { NameMode } from './view';
 import type { Measure } from './layout';
 
 const ROWS: [keyof WorldLayers, string][] = [
@@ -26,7 +24,7 @@ export function WorldToggle({
   get,
   onMeasure,
 }: {
-  get: () => { world: WorldLayers; names: NameMode; measure: Measure; setMeasure(m: Measure): void; request(): void } | null;
+  get: () => { world: WorldLayers; measure: Measure; setMeasure(m: Measure): void; request(): void } | null;
   /** The widths' measure changed (the card says tonnes, ToLaD#276). */
   onMeasure?: (m: Measure) => void;
 }) {
@@ -61,20 +59,6 @@ export function WorldToggle({
               {label}
             </label>
           ))}
-          {/* A level whose living members dwarf its fossils (the hominins beside the humans, ToLaD#289) framed on the fossils, the rooms by life; the page opens again with ?fit=fossils on or off. */}
-          <label>
-            <input
-              type="checkbox"
-              checked={wantFitFossils()}
-              onChange={(e) => {
-                const u = new URL(window.location.href);
-                if (e.target.checked) u.searchParams.set('fit', 'fossils');
-                else u.searchParams.delete('fit');
-                window.location.assign(u.toString());
-              }}
-            />
-            Fit fossils
-          </label>
           {/* What the widths count (ToLaD#276): the individuals alive, or their mass (individuals × adult mass); ?width=mass kept in step. */}
           <label>
             Widths
@@ -90,31 +74,6 @@ export function WorldToggle({
             >
               <option value="individuals">individuals</option>
               <option value="mass">mass (tonnes)</option>
-            </select>
-          </label>
-          {/* Where the groups' names stand (ToLaD#266): switched in place, the URL's ?names= kept in step. */}
-          <label>
-            Names
-            <select
-              aria-label="Where the group names stand"
-              value={v.names}
-              onChange={(e) => {
-                v.names = e.target.value as NameMode;
-                try {
-                  const u = new URL(window.location.href);
-                  if (v.names === 'beside') u.searchParams.delete('names');
-                  else u.searchParams.set('names', v.names);
-                  window.history.replaceState(null, '', u.toString());
-                } catch {
-                  /* no URL */
-                }
-                v.request();
-                bump((n) => n + 1);
-              }}
-            >
-              <option value="beside">beside the branch</option>
-              <option value="mid">mid-branch</option>
-              <option value="gap">between branches</option>
             </select>
           </label>
         </div>

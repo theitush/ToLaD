@@ -2,8 +2,8 @@
 // home, the mesh at a range of individuals per scale bar, deep in the lives,
 // zoomed far out, and a species card open.
 //   npm run build:single && node scripts/designshot.mjs <out-dir> [prefix] [only,names]
-//   (DSF: device scale factor, default 2; CLIP=x,y,w,h; DEBUG=1: the ?debug readout; EDGE=curved|straight: the fan's edges;
-//   WIDTH=linear|log: the widths, default linear; LEVEL=cats|carnivores|mammals: ?level= (default: the carnivores, ToLaD#146, #247))
+//   (DSF: device scale factor, default 2; CLIP=x,y,w,h; DEBUG=1: the ?debug readout;
+//   WIDTH=linear|log: the widths, default linear; LEVEL=cats|carnivores: ?level=, the old links, that clade's frame at mammals (ToLaD#418; default: mammals' home))
 import { mkdirSync, readFileSync } from 'node:fs';
 import { chromium } from 'playwright';
 import { pageUrl } from './pageurl.mjs';
@@ -18,6 +18,11 @@ mkdirSync(OUT, { recursive: true });
 const scenes = [
   ['home', 'home'],
   ['far', 'far'],
+  ['item-dogs', 'tapitem', ['Dogs']],
+  ['item-weasels', 'tapitem', ['Weasels']],
+  ['item-laurasiatheria', 'tapitem', ['Laurasiatheria']],
+  ['item-cats', 'tapitem', ['Cats']],
+  ['item-cats-wild', 'tapitem', ['Cats', 'Wildcats']],
   ['bar-5e4', 'bar', ['Lion', 3000, 5e4, 40]],
   ['bar-1e3', 'bar', ['Lion', 3000, 1e3, 40]],
   ['bar-100', 'bar', ['Lion', 3000, 100, 40]],
@@ -59,6 +64,11 @@ const scenes = [
   ['domestic-boom', 'split', [0.0095, 3]],
   ['card-sandcat', 'card', ['Sand cat']],
   ['card-domestic', 'card', ['Domestic cat']],
+  // A leaf with a wild part and a domestic stock (ToLaD#435), and a stock with no wild part counted.
+  ['card-pig', 'card', ['Pig']],
+  ['card-goat', 'card', ['Goat']],
+  ['card-sheep', 'card', ['Sheep']],
+  ['card-dromedary', 'card', ['Dromedary']],
   // The Red List chip on a small cat (Least Concern, gray) and on the leopard (ToLaD#98).
   ['card-leopardcat', 'card', ['Mainland leopard cat']],
   ['card-leopard', 'card', ['Leopard']],
@@ -67,7 +77,7 @@ const scenes = [
   ['lion-column', 'split', [0.5, 1.5]],
   ['card-lion', 'card', ['Lion']],
   ['card-lynx', 'card', ['Eurasian lynx']],
-  // Texture at every zoom, branch-outs as lines (#100, #101): zoomed 2^k × home (time 2^(k·r)) about a
+  // Branch-outs (#100, #101): zoomed 2^k × home (time 2^(k·r)) about a
   // column `ago` years back: the leopard cat's stem below its start, the river forks at the Felidae base.
   ['stem-leopardcat', 'about', ['Mainland leopard cat', 1.2e7, 9, 1]],
   ['forks-base', 'about', ['Mainland leopard cat', 1.2e7, 12, 0.5]],
@@ -99,6 +109,7 @@ const scenes = [
   ['bfit-iberian', 'frame', ['Iberian lynx', 2000, 1.6]],
   ['bfit-tiger', 'frame', ['Tiger', 2000, 1.6]],
   // The search (ToLaD#157): its button at home, "li" typed with the list open, the lion picked (flown there, card open).
+  ['sources', 'sources'],
   ['search-home', 'home'],
   ['search-li', 'search', ['li']],
   ['search-lion', 'search', ['li', 'Lion']],
@@ -110,9 +121,6 @@ const scenes = [
   // A flagged join met at the genome's long-run level (ToLaD#172): the puma's column from ~2 Mya to now, the
   // young end held at the anchor from ~61 kya, and its card with the one-sentence join.
   ['flag-puma', 'frame', ['Puma', 100000, 1, 0.5]],
-  // The texture inside a column (#192): the domestic cat's boom, its lines straight, only branching and ending.
-  ['tex-domcat300', 'frame', ['Domestic cat', 300, 1.6]],
-  ['tex-domcat2000', 'frame', ['Domestic cat', 2000, 1.6]],
   ['flag-puma-card', 'card', ['Puma']],
   // Wikipedia link + hotlinked Commons pictures (ToLaD#182; WAIT_MS=4000 lets them load): the lion's card,
   // home with the pills' thumbnails (WIDTH=log: eight pills), and a species with no picture (its card, its pill mid-span).
@@ -137,10 +145,11 @@ const scenes = [
   ['mamm-hoofed', 'level', ['Artiodactyla']],
   ['mamm-horses', 'level', ['Perissodactyla']],
   ['mamm-primates', 'level', ['Primates']],
+  ['mamm-shrews', 'level', ['Eulipotyphla']],
   // The great apes and the hominins (ToLaD#275): Hominidae framed, the human lineage, a Neanderthal's card.
   ['mamm-hominidae', 'level', ['Hominidae']],
   ['mamm-homininae', 'level', ['Homininae']],
-  // ToLaD#289: the Hominins and Homo levels (?fit=fossils: framed on the fossils), and tapped down to them from home along the humans.
+  // ToLaD#289: the Hominins and Homo levels (framed on the fossils), and tapped down to them from home along the humans.
   ['mamm-hominini', 'level', ['Hominini']],
   ['mamm-homo', 'level', ['Homo']],
   // ToLaD#302: flown to as a tap on its bracket lands there (cladeCamera, the level the view is at then that one): the
@@ -163,6 +172,17 @@ const scenes = [
   ['up-polar1', 'search', ['polar', 'Polar bear', 1]],
   ['up-polar2', 'search', ['polar', 'Polar bear', 2]],
   // The fold (ToLaD#146): the dogs at 1.5x, 3x and 6x home's width zoom, opening as they grow.
+  // The group labels at each level (ToLaD#417, Q=labels=groups): its groups one level down.
+  // (A pan from home at home's zoom, px across: ToLaD#431.)
+  ['gl-pan-m60', 'across', [1, -60]],
+  ['gl-pan-180', 'across', [1, 180]],
+  ['gl-pan-240', 'across', [1, 240]],
+  ['gl-rodents', 'zoomto', ['Rodentia']],
+  ['gl-bats', 'zoomto', ['Chiroptera']],
+  ['gl-primates', 'zoomto', ['Primates']],
+  ['gl-carnivores', 'zoomto', ['Carnivora']],
+  ['gl-cats', 'zoomto', ['Felidae']],
+  ['gl-genus', 'zoomto', ['Panthera']],
   ['carn-dogs-z15', 'zoomto', ['Canidae', 1.5]],
   ['carn-dogs-z3', 'zoomto', ['Canidae', 3]],
   ['carn-dogs-z6', 'zoomto', ['Canidae', 6]],
@@ -250,6 +270,24 @@ const scenes = [
   ...[0, 360, 720, 1080, 1440, 1800].map((ms) => [`fly-out-${ms}`, 'flyout', ['Fisher', ms]]),
   // The groups the view is inside pinned at the top (ToLaD#233): home (nothing pinned, the stack itself), deep in a
   // bear's and a weasel's past ("now" far off the top), and (LEVEL=cats) the lion's past inside Panthera.
+  ['ftap-home', 'home'],
+  ...[4, 16, 32, 64, 128].map((z) => [`blocks-x${z}`, 'zoomto', ['Primates', z]]),
+  ['ftap-feliformia', 'tapfork', ['Feliformia']],
+  ['ftap-carnivora', 'tapfork', ['Carnivora']],
+  ['ftap-chiroptera', 'tapfork', ['Chiroptera']],
+  ['ftap-primates', 'tapfork', ['Primates']],
+  ['ftap-felidae', 'tapfork', ['Felidae']],
+  ['ftap-felinae', 'tapfork', ['Felinae']],
+  ['ftap-solenodon', 'tapfork', ['Solenodon']],
+  // The gaps follow the clades (ToLaD#408, Q=gaps=clades LEVEL=mammals): the fan's home and clades framed.
+  ['clades-home', 'home'],
+  ['clades-laurasiatheria', 'level', ['Laurasiatheria']],
+  ['clades-carnivora', 'level', ['Carnivora']],
+  ['clades-rodentia', 'level', ['Rodentia']],
+  ['clades-felidae', 'level', ['Felidae']],
+  ['clades-diprotodontia', 'level', ['Diprotodontia']],
+  ['clades-chiroptera', 'level', ['Chiroptera']],
+  ['clades-primates', 'level', ['Primates']],
   ['pin-home', 'home'],
   ['pin-bear', 'frame', ['Brown bear', 4e5, 40]],
   ['pin-weasel', 'frame', ['Least weasel', 1.5e6, 20]],
@@ -264,6 +302,18 @@ const scenes = [
   ['pin-pan2', 'pan', [2, 100]],
   ['pin-pan3', 'pan', [2, 130]],
   ['pin-pan4', 'pan', [2, 220]],
+  // ToLaD#400 (LEVEL=mammals): a small picture on every name alone, a relative's photo, the stub for none.
+  ['pstub-apes', 'level', ['Catarrhini']],
+  ['pstub-gibbons', 'level', ['Hylobatidae']],
+  ['pstub-dasymys', 'level', ['Dasymys']],
+  ['pstub-murinae', 'level', ['Murinae']],
+  ['pstub-chodsigoa', 'level', ['Chodsigoa']],
+  ['pstub-cheirogaleus', 'level', ['Cheirogaleus']],
+  // ToLaD#434 (Q=forknames=leaders): the fork names at the orders' levels.
+  ['lv-rodentia', 'level', ['Rodentia']],
+  ['lv-chiroptera', 'level', ['Chiroptera']],
+  ['lv-primates', 'level', ['Primates']],
+  ['lv-carnivora', 'level', ['Carnivora']],
 ];
 const browser = await chromium.launch({ headless: true });
 let served = null;
@@ -272,7 +322,7 @@ try {
   const page = await ctx.newPage();
   if (process.env.LOGS) page.on('console', (m) => console.log('  [page]', m.text()));
   page.on('pageerror', (e) => console.log('pageerror', String(e)));
-  const q = [process.env.DEBUG ? 'debug' : '', process.env.EDGE ? `edge=${process.env.EDGE}` : '', process.env.LEVEL ? `level=${process.env.LEVEL}` : '', process.env.Q || ''].filter(Boolean).join('&');
+  const q = [process.env.DEBUG ? 'debug' : '', process.env.LEVEL ? `level=${process.env.LEVEL}` : '', process.env.Q || ''].filter(Boolean).join('&');
   served = await pageUrl(q);
   await page.goto(served.url);
   await page.waitForFunction(() => !!window.__fan, null, { timeout: Number(process.env.LOAD_MS || 20000) });
@@ -289,7 +339,7 @@ try {
           f.tap(-1e6, -1e6);
         }
         const fan = f.fan;
-        if (kind === 'home' || kind === 'card' || kind === 'search') {
+        if (kind === 'home' || kind === 'card' || kind === 'search' || kind === 'sources') {
           f.cam = f.homeCamera();
           f.camera.settle();
           if (kind === 'card') {
@@ -314,6 +364,12 @@ try {
           const h = f.homeCamera();
           const sy = (f.h - 240) / Math.abs(yb - ya);
           f.cam = { ...h, sy, ty: sy, cy: (ya + yb) / 2 };
+          f.camera.settle();
+        } else if (kind === 'across') {
+          // Home at width zoom z, the view moved dx px across.
+          const [z, dx] = args;
+          const h = f.homeCamera();
+          f.cam = { ...h, sx: h.sx * z, cx: h.cx + dx / (h.sx * z) };
           f.camera.settle();
         } else if (kind === 'pan') {
           // Zoom z with "now" at 160 px from the top, then the view moved down dy px (into the past).
@@ -530,6 +586,46 @@ try {
           }
           f.labelState.clear();
           f.draw();
+        } else if (kind === 'tapitem') {
+          // ToLaD#359: from home, a tap on the label (picture) of each cut item named in args, each flight landed.
+          f.cam = f.homeCamera();
+          f.camera.settle();
+          f.draw();
+          for (const name of args) {
+            const i = f.cutLast.spots.findIndex((q) => q.text === name);
+            const p = f.cutLast.pics[i];
+            console.log(`tapitem ${name}: ${p ? `at ${p.x.toFixed(0)},${p.y.toFixed(0)}` : `none (${f.cutLast.spots.map((q) => q.text).join(', ')})`}`);
+            if (p) f.tap(p.x, p.y);
+            for (let t = performance.now() + 16; f.anim; t += 16) {
+              if (!f.anim(t)) f.anim = null;
+              f.applyFold();
+            }
+            f.draw();
+          }
+          f.draw();
+        } else if (kind === 'tapfork') {
+          // ToLaD#390: from home, a tap on the fork name of the clade named in args (its Latin), the flight landed.
+          f.cam = f.homeCamera();
+          f.camera.settle();
+          f.draw();
+          const br = f.brackets;
+          const placed = () => Array.from({ length: br.forkN }, (_, k) => br.forks[k]).find((q) => br.list[q.i].latin === args[0]);
+          // (Its name not placed at home: from its own frame, where it is.)
+          if (!placed()) {
+            f.cam = f.frameOf({ v: br.list.find((c) => c.latin === args[0]).v });
+            f.camera.settle();
+            f.draw();
+            f.draw();
+          }
+          const n = placed();
+          console.log(`tapfork ${args[0]}: ${n ? `at ${n.x.toFixed(0)},${n.y.toFixed(0)}` : 'none'}`);
+          if (n) f.tap(n.x, n.y);
+          for (let t = performance.now() + 16; f.anim; t += 16) {
+            if (!f.anim(t)) f.anim = null;
+            f.applyFold();
+          }
+          f.draw();
+          f.draw();
         } else if (kind === 'taps') {
           // ToLaD#258: from home, a tap ('t') on the column of args[0] (a species, or a group by its name: its widest
           // species), or a double-tap ('d') on nothing, for each letter of args[1]; each flight landed.
@@ -594,6 +690,9 @@ try {
       },
       [kind, args ?? [], process.env.WIDTH || 'linear'],
     );
+    if (kind === 'sources') {
+      await page.click('button.sources-link');
+    }
     if (kind === 'search') {
       await page.click('button[aria-label="Find a species"]');
       await page.keyboard.type(args[0], { delay: 40 });

@@ -8,12 +8,14 @@
 import { appendFileSync, writeFileSync } from 'node:fs';
 import { Session } from 'node:inspector/promises';
 import { describe, it } from 'vitest';
-import { MeshBatch, RectBatch } from './meshgl';
-import { MESH_F } from './mesh';
+import { RectBatch } from './meshgl';
 import { CARNIVORA, FELIDAE, mammaliaClade } from './panthera';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree } from './splits';
 import { laneAt, leftAt } from './layout';
-import { ColumnPath, CutMemo, SCALE_BAR_PX } from './twigs';
+import { ColumnPath, CutMemo } from './twigs';
+
+/** The width scale bar's target length (px, view.ts drawWidthScale). */
+const SCALE_BAR_PX = 70;
 import * as VIEW from './view';
 import { FanView } from './view';
 const LC: Record<string, number> = (VIEW as unknown as { LC?: Record<string, number> }).LC ?? { layouts: 0 };
@@ -185,13 +187,12 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
       t0 = performance.now();
     }
     const v = mamm
-      ? new FanView(canvas as unknown as HTMLCanvasElement, mammaliaClade(), 'curved', mammaliaTree(), true)
-      : new FanView(canvas as unknown as HTMLCanvasElement, carn ? CARNIVORA : FELIDAE, 'curved', carn ? CARNIVORA_TREE : FELIDAE_TREE, carn);
+      ? new FanView(canvas as unknown as HTMLCanvasElement, mammaliaClade(), mammaliaTree(), true)
+      : new FanView(canvas as unknown as HTMLCanvasElement, carn ? CARNIVORA : FELIDAE, carn ? CARNIVORA_TREE : FELIDAE_TREE, carn);
     const tNew = performance.now() - t0;
-    const gl = { under: new RectBatch(), mesh: new MeshBatch(), over: new RectBatch(), begin() {}, end() {} };
+    const gl = { under: new RectBatch(), over: new RectBatch(), begin() {}, end() {} };
     gl.begin = () => {
       gl.under.n = 0;
-      gl.mesh.n = 0;
       gl.over.n = 0;
     };
     (v as unknown as { gl: unknown }).gl = gl;
@@ -207,7 +208,7 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
     const tFirst = performance.now() - t1;
     out(`load: new FanView ${tNew.toFixed(0)} ms, first draw ${tFirst.toFixed(0)} ms`);
     // Per-part timings: the view's private draw steps, wrapped.
-    const parts = ['drawStrand', 'drawMerged', 'drawIndividuals', 'drawLabels', 'lodNow', 'drawStem', 'drawStemFade', 'drawTimeAxis', 'drawTouch', 'drawGutter', 'drawEvents', 'drawHeld', 'applyFold', 'layoutBrackets'];
+    const parts = ['drawStrand', 'drawMerged', 'drawIndividuals', 'drawLabels', 'lodNow', 'drawStem', 'drawStemFade', 'drawTimeAxis', 'drawTouch', 'drawGutter', 'drawHeld', 'applyFold', 'layoutBrackets'];
     const acc: Record<string, number> = {};
     const proto = FanView.prototype as unknown as Record<string, (...a: unknown[]) => unknown>;
     for (const p of parts) {
@@ -219,22 +220,14 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
         return r;
       };
     }
-    // The labels (ToLaD#255): each layout's time (labelsNow when it laid out, not carried), and the label work a frame
-    // (labelsNow + drawLabels + the pins, labelAllMs). FANPERF_LAYOUT=1: laid out every frame (no carry), for the layout's spread.
+    // The labels (ToLaD#333): their layout each frame (labelsNow), and the label work a frame (labelsNow + drawLabels + the pins, labelAllMs).
     const labLay: number[] = [];
-    const vl = v as unknown as { labelsNow(l: unknown): { carried: unknown }; labLast: unknown; labelAllMs: number[] };
+    const vl = v as unknown as { labelsNow(): unknown; labelAllMs: number[] };
     const labelsNow = vl.labelsNow.bind(v);
-    vl.labelsNow = (l: unknown) => {
-      if (process.env.FANPERF_LAYOUT) vl.labLast = null;
+    vl.labelsNow = () => {
       const t = CPU ? cpuMs() : performance.now();
-      const L0 = vl.labLast as Record<string, unknown> | null;
-      const g0 = (v as unknown as { gesturing: boolean }).gesturing;
-      const r = labelsNow(l);
-      if (process.env.FANPERF_LABDBG && r.carried === null && L0) {
-        const L1 = vl.labLast as Record<string, unknown>;
-        out(`  relayout: moving ${g0} ${['fan', 'lg', 'lod', 'lodGen', 'w', 'h', 'names', 'topLine'].filter((k) => L0[k] !== L1[k]).join(',')} frames ${L0.frames}`);
-      }
-      if (r.carried === null) labLay.push((CPU ? cpuMs() : performance.now()) - t);
+      const r = labelsNow();
+      labLay.push((CPU ? cpuMs() : performance.now()) - t);
       return r;
     };
     // How many strands get sampled per frame, and at how many points.
@@ -298,7 +291,7 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
     for (const [name, ago, perBar, sy] of [
       ['lion overview', 2e5, 1e9, 0.7],
       ['lion mid', 5e4, 1e7, 3],
-      ['lion texture', 2000, 60, 5],
+      ['lion close', 2000, 60, 5],
       ['lion lives', 300, 20, 30],
       ['lion near now', 25, 0.4, 300],
     ] as const) {
@@ -387,7 +380,6 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
       const times: number[] = [];
       // (The gesture itself: zoomAbout and pan, the camera's settle, the fold's anchor and follow, ToLaD#255.)
       const gest: number[] = [];
-      let inst = 0;
       let rects = 0;
       calls.stroke = calls.fill = calls.text = calls.pieces = 0;
       lp.n = lp.pts = 0;
@@ -416,9 +408,7 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
         v.draw();
         times.push((CPU ? cpuMs() : performance.now()) - t);
         mixArr(gl.under.f, 12 * gl.under.n);
-        mixArr(gl.mesh.f, MESH_F * gl.mesh.n);
         mixArr(gl.over.f, 12 * gl.over.n);
-        inst = Math.max(inst, gl.mesh.n);
         rects = Math.max(rects, gl.under.n);
       }
       vg.gestureEnd();
@@ -432,7 +422,7 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
       v.draw();
       v.draw();
       if (process.env.FANPERF_REST) for (let k = 0; k < +process.env.FANPERF_REST; k++) v.draw();
-      const sp = (vl.labLast as { spots: { key: string; x: number; y1: number; box: number[]; fit: number }[] } | null)?.spots ?? [];
+      const sp = v.cutLast?.spots ?? [];
       if (process.env.FANPERF_SPOTS) appendFileSync(process.env.FANPERF_SPOTS, sp.map((s) => `${name} ${s.key} ${s.x.toFixed(2)} ${s.y1.toFixed(2)} ${s.fit.toFixed(3)}`).join("\n") + "\n");
       const hk = hsh;
       hsh = 0x811c9dc5;
@@ -460,7 +450,7 @@ describe.skipIf(!RUN)('fan draw() CPU (perf)', () => {
       if (HASH) out(`  hash ${(hsh >>> 0).toString(16).padStart(8, '0')} cam ${(chs >>> 0).toString(16).padStart(8, '0')}`);
       hsh = chs = 0x811c9dc5;
       out(
-        `${name.padEnd(20)} ${f(q(times, 0.5))} ${f(q(times, 0.95))} ${f(Math.max(...times))} ${f(q(gest, 0.5))} ${f(q(times.map((x, i) => x + gest[i]), 0.5))} ${f(tLevel)}  inst ${String(inst).padStart(6)} rects ${String(rects).padStart(5)} strokes/f ${(calls.stroke / N).toFixed(0).padStart(5)} pieces/f ${(calls.pieces / N).toFixed(0).padStart(6)} strands/f ${(lp.n / N).toFixed(0).padStart(3)} pts/f ${(lp.pts / N).toFixed(0).padStart(6)} | ${top}`,
+        `${name.padEnd(20)} ${f(q(times, 0.5))} ${f(q(times, 0.95))} ${f(Math.max(...times))} ${f(q(gest, 0.5))} ${f(q(times.map((x, i) => x + gest[i]), 0.5))} ${f(tLevel)}  rects ${String(rects).padStart(5)} strokes/f ${(calls.stroke / N).toFixed(0).padStart(5)} pieces/f ${(calls.pieces / N).toFixed(0).padStart(6)} strands/f ${(lp.n / N).toFixed(0).padStart(3)} pts/f ${(lp.pts / N).toFixed(0).padStart(6)} | ${top}`,
       );
     }
     if (prof) {

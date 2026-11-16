@@ -1,5 +1,7 @@
 # Data sources (mammals v0)
 
+**Policy (Ita, #429):** licences don't rule a source out; we credit every source and take down on request. The page's own list, one line per source, is [`web/src/fan/sources.ts`](../web/src/fan/sources.ts): a new source adds a line there.
+
 All inputs are downloaded by `uv run tolad-fetch` into `data/raw/<source>/`, which is gitignored.
 Each source gets its own directory. The downloads are only parsed by `pipeline/tolad_pipeline/`, never executed.
 On the first download, `pipeline/sources.lock.json` records each file's URL, retrieval date, size and sha256. Later fetches verify against it, and a mismatch fails the fetch.

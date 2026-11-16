@@ -39,6 +39,16 @@ def _na(s: str | None) -> str:
     return "" if s is None or s.strip() in ("", "NA") else s.strip()
 
 
+def _taxon(s: str | None) -> str:
+    """A rank's name in a row, "" for none and for MDD's "incertae sedis" (a place, not a group)."""
+    return "" if "incertae" in _na(s).lower() else _na(s)
+
+
+def _taxa(r: dict) -> dict[str, str]:
+    """A row's taxa by rank, the ones taxnames.decorate names forks from."""
+    return {k: _taxon(r.get(k)) for k in ("order", "suborder", "family", "subfamily", "tribe") if _taxon(r.get(k))}
+
+
 def load(raw: Path) -> list[dict]:
     """Every MDD species row: name, genus, family, order, English name, extinct/domestic flags, IUCN
     category (MDD's), authority year, and the binomial synonyms it can be matched by."""
@@ -67,7 +77,8 @@ def load(raw: Path) -> list[dict]:
             syn = {s for s in syn if _BIN.match(s) and s != name}
             iucn = _na(r["iucnStatus"]).split(" ", 1)[0]
             out.append({"name": name, "id": int(r["id"]), "genus": genus, "family": _na(r["family"]),
-                        "order": _na(r["order"]), "common": _na(r["mainCommonName"]) or None,
+                        "order": _na(r["order"]), "suborder": _taxon(r["suborder"]), "subfamily": _taxon(r["subfamily"]),
+                        "tribe": _taxon(r["tribe"]), "common": _na(r["mainCommonName"]) or None,
                         "extinct": r["extinct"] == "1", "domestic": r["domestic"] == "1", "iucn": iucn or None,
                         "year": _na(r["authoritySpeciesYear"]), "syn": syn, "notes": _na(r.get("taxonomyNotes"))})
     return out
@@ -224,6 +235,7 @@ def graft(root: Node, rows: list[dict], syn_index: dict[str, list[Node]], log: d
             nd.data["mdd_genus"] = r["genus"]
             nd.data["mdd_family"] = r["family"]
             nd.data["mdd_order"] = r["order"]
+            nd.data["mdd_taxa"] = _taxa(r)
             nd.data["mdd_iucn"] = r["iucn"]
             if nd.name != r["name"] and r["name"] not in nd.alt:
                 nd.alt.append(r["name"])
@@ -308,6 +320,7 @@ def graft(root: Node, rows: list[dict], syn_index: dict[str, list[Node]], log: d
         leaf.data["mdd"] = {"id": r["id"], "year": r["year"], "iucn": r["iucn"], "genus": r["genus"],
                             "family": r["family"], "order": r["order"]}
         leaf.data["mdd_genus"], leaf.data["mdd_family"], leaf.data["mdd_order"] = r["genus"], r["family"], r["order"]
+        leaf.data["mdd_taxa"] = _taxa(r)
         leaf.data["mdd_iucn"] = r["iucn"]
         if r["common"]:
             leaf.data["common_mdd"] = r["common"]

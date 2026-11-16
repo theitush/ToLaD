@@ -14,7 +14,7 @@ export const PINCH_MIN_SPREAD = 40;
 export const WHEEL_GAP_MS = 140;
 /** Wheel axis lock: nothing zooms until one axis's scroll has moved this many px in the gesture. */
 export const WHEEL_DEAD_PX = 6;
-/** A second tap within this (ms) of the first's release, and near it, is a double-tap. */
+/** A second tap touching down within this (ms) of the first's release, and near it, is a double-tap. */
 export const DOUBLE_TAP_MS = 320;
 /** Zoom per px of plain scroll (log), and per px of a trackpad pinch (ctrl+wheel). */
 const WHEEL_RATE = 0.002;
@@ -122,8 +122,12 @@ export class Input {
     el.removeEventListener('contextmenu', prevent as EventListener);
   }
 
+  /** The element is drawn a quarter turn clockwise (fan/flip.ts): everything handed on is in its own, unturned, coordinates. */
+  turned = false;
+
   private local(e: { clientX: number; clientY: number }): { x: number; y: number } {
     const r = this.el.getBoundingClientRect();
+    if (this.turned) return { x: e.clientY - r.top, y: r.width - (e.clientX - r.left) };
     return { x: e.clientX - r.left, y: e.clientY - r.top };
   }
 
@@ -273,7 +277,9 @@ export class Input {
     const isTap = this.maxPointers === 1 && this.moved < 12 && e.timeStamp - this.downAt < 300;
     if (isTap) {
       const lt = this.lastTap;
-      if (e.timeStamp - lt.t < DOUBLE_TAP_MS && Math.hypot(p.x - lt.x, p.y - lt.y) < 40) {
+      // (The window runs from the first tap's lift to the second's touch, as hold()'s timer has it and the platforms do
+      // (ToLaD#413): a second tap touched down in time and lifted after it is a double tap, not two taps deeper.)
+      if (this.downAt - lt.t < DOUBLE_TAP_MS && Math.hypot(p.x - lt.x, p.y - lt.y) < 40) {
         const ran = lt.ran;
         this.lastTap.t = -1e9;
         this.drop();
@@ -335,8 +341,8 @@ export class Input {
     e.preventDefault();
     const p = this.local(e);
     const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? this.el.clientHeight : 1;
-    let dx = e.deltaX * unit;
-    let dy = e.deltaY * unit;
+    let dx = (this.turned ? e.deltaY : e.deltaX) * unit;
+    let dy = (this.turned ? -e.deltaX : e.deltaY) * unit;
     if (!this.wheeling) {
       this.wheeling = true;
       this.wheelAxes = { x: 0, y: 0, peakX: 0, peakY: 0, onX: false, onY: false };

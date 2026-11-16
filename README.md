@@ -8,3 +8,5 @@ A mobile-first, zoomable tree of life where every leaf is an individual organism
 - Individuals (e.g. `human#49837299`) are generated procedurally and deterministically from population estimates. Any "real" individuals are clearly marked as mock for now.
 
 Status: research phase — start with [`research/00-synthesis.md`](research/00-synthesis.md).
+
+Data sources: the page credits each one under "sources"; the list is [`web/src/fan/sources.ts`](web/src/fan/sources.ts), the details [`pipeline/SOURCES.md`](pipeline/SOURCES.md).

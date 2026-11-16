@@ -13,10 +13,37 @@
 // ~0.55 on a phone, its families' gaps taking the rest). So a family's crown (12-20 Ma) parts at 1.5-2.5x
 // home, sisters 2 Ma apart by ~6x, 0.5 Ma apart by ~15x: zooming in, the species stand apart one by one.
 // Time zoom changes nothing.
+//
+// That is the `age` switch's look, the way back. By default a gap no longer shows relatedness (Ita, ToLaD#378: a
+// fork's height already does, and a standard tree spaces its neighbouring leaves evenly): `even`, every neighbouring
+// pair the same small gap, at every level of the tree, or `groups` (the default: `even` reads as one solid block from
+// afar), the splits above the named groups (the families, or the orders where the fan has them) one larger gap, so
+// the groups stand apart from afar. Both are fixed in the world, always open, so the layout does not depend on the
+// width zoom at all, and sized by one share per fan (GAP_SUM, GROUP_SUM) of its width at "now". `clades` (ToLaD#408) sizes
+// every split's gap by the clade it parts, so the tree's nesting shows at every level: see Fold.cladeGaps.
 
 import { ease, laneW, segAt, type Fan, type FanBranch, type FanNode } from './layout';
 import { smoother } from './population';
 import { ORDER_TAXA, taxonKey } from './splits';
+
+/** How a neighbouring pair's gap is sized (ToLaD#378). The app is always `clades`, with no switch (ToLaD#439). */
+export type GapMode = 'even' | 'groups' | 'clades' | 'age';
+export const GAP_MODES: readonly GapMode[] = ['even', 'groups', 'clades', 'age'];
+let gapModeNow: GapMode = 'clades';
+/** The switch: what the layouts built from now on use. */
+export function setGapMode(m: GapMode): void {
+  gapModeNow = m;
+}
+export const gapMode = (): GapMode => gapModeNow;
+
+/** even, groups: all the neighbours' small gaps together, as a share of the fan's width at "now". */
+export const GAP_SUM = 0.15;
+/** groups: all the larger gaps between the groups (the splits above the families) together, as that share. */
+export const GROUP_SUM = 0.2;
+/** clades: all the gaps together, as that share (half: at 35% only about 16 splits part by 1.7 px at the mammals' home, still a wall; by looking, ToLaD#408). */
+export const CLADE_SUM = 0.5;
+/** clades: a split's gap grows as this power of its clade's strands (over 1, the deep splits take most of the budget; the shallow stay closed until zoomed into; at 1 the orders' slabs stay a wall, at 2 the rodents turn to a comb of hairlines, by looking, ToLaD#408). */
+export const CLADE_POW = 1.5;
 
 /** A split's full gap, as a share of the order's width: GAP_K * (its age / 2 Ma)^GAP_POW. */
 export const GAP_K = 0.006;
@@ -124,7 +151,10 @@ export abstract class Fold {
   /** The stem's centre (world x): where the closed order stands. */
   readonly home: number;
 
-  constructor(readonly fan: Fan) {
+  constructor(
+    readonly fan: Fan,
+    readonly gaps: GapMode = gapModeNow,
+  ) {
     this.strands = fan.root.strands;
     const n = this.strands.length;
     this.forkTop = new Float64Array(Math.max(0, n - 1));
@@ -164,11 +194,73 @@ export abstract class Fold {
     }
     this.home = fan.root.left + fan.root.width / 2;
     this.yRef = fan.time.y(0);
-    if (ords.size) this.scaleOrders([...ords.keys()]);
+    if (ords.size) this.shareOrders([...ords.keys()]);
+    if (gaps === 'clades') this.cladeGaps();
+    else if (gaps !== 'age') this.fixGaps();
+    else if (ords.size) this.scaleOrders();
   }
 
-  /** The level above the orders (ToLaD#247): each order's share of the width at "now", and the gaps scaled to it (ORDER_OPEN_LO's note). */
-  private scaleOrders(nodes: FanNode[]): void {
+  /**
+   * The fixed gaps (`even`, `groups`, ToLaD#378): one small gap between every neighbouring pair, and under `groups` one
+   * larger gap at a split above the families, each size set by its share of the fan's width at "now": there, neighbouring
+   * living strands stand apart by the widest gap between them (the rooms of steady.ts), so those are the ones counted.
+   */
+  private fixGaps(): void {
+    // (The groups are named, no age: above the families, or above the orders where the fan has them.)
+    const big = (i: number) => this.gaps === 'groups' && this.pairFam[i] === 0 && this.pairOrd[i] < 0;
+    const S = this.strands;
+    let rooms = 0;
+    let nBig = 0;
+    let nSmall = 0;
+    let prev = -1;
+    let sawBig = false;
+    for (let i = 0; i < S.length; i++) {
+      if (S[i].tipY <= this.yRef + 1e-9) {
+        rooms += Math.max(S[i].width, S[i].baseW);
+        if (prev >= 0) {
+          if (sawBig) nBig++;
+          else nSmall++;
+        }
+        prev = i;
+        sawBig = false;
+      }
+      if (i + 1 < S.length && big(i)) sawBig = true;
+    }
+    const sb = nBig ? GROUP_SUM : 0;
+    const width = rooms / (1 - GAP_SUM - sb);
+    const small = nSmall ? (GAP_SUM * width) / nSmall : 0;
+    const large = nBig ? (sb * width) / nBig : 0;
+    for (let i = 0; i < this.pairGap.length; i++) this.pairGap[i] = big(i) ? large : small;
+  }
+
+  /**
+   * The gaps of `clades` (ToLaD#408): a split's gap is k * n^CLADE_POW, n its clade's strands, the padding of a nested
+   * layout grown with the box it pads. One rule for every split at every level: no age, no zoom, no names. A clade holds
+   * more strands than any clade inside it, so a split always stands wider than the splits inside its daughters. k: all of
+   * them together CLADE_SUM of the fan's width at "now", counted as fixGaps' are.
+   */
+  private cladeGaps(): void {
+    const S = this.strands;
+    const raw = (i: number) => Math.pow(this.pairNode[i].strands.length, CLADE_POW);
+    let rooms = 0;
+    let sum = 0;
+    let prev = -1;
+    let widest = 0;
+    for (let i = 0; i < S.length; i++) {
+      if (S[i].tipY <= this.yRef + 1e-9) {
+        rooms += Math.max(S[i].width, S[i].baseW);
+        if (prev >= 0) sum += widest;
+        prev = i;
+        widest = 0;
+      }
+      if (i + 1 < S.length) widest = Math.max(widest, raw(i));
+    }
+    const k = sum > 0 ? (CLADE_SUM / (1 - CLADE_SUM)) * (rooms / sum) : 0;
+    for (let i = 0; i < this.pairGap.length; i++) this.pairGap[i] = k * raw(i);
+  }
+
+  /** The level above the orders (ToLaD#247): each order's share of the width at "now" (ORDER_OPEN_LO's note). */
+  private shareOrders(nodes: FanNode[]): void {
     // (Worked out at build time for the mammal level, the layout's seed: the same numbers, ToLaD#255.)
     const seed = this.fan.ordShare;
     if (seed && seed.length === nodes.length) this.ordShare.push(...seed);
@@ -178,6 +270,10 @@ export abstract class Fold {
       const all = this.strands.reduce((s, b) => s + (r.own[b.index] ? r.w[r.item[b.index]] : 0), 0) || 1;
       for (const v of nodes) this.ordShare.push(wOf(v) / all);
     }
+  }
+
+  /** The `age` gaps scaled to the orders' shares (ORDER_OPEN_LO's note). */
+  private scaleOrders(): void {
     const W = this.fan.trunkWidth;
     let top = 0;
     for (let i = 0; i < this.pairGap.length; i++) {
@@ -238,9 +334,9 @@ export abstract class Fold {
     return this.pairFam[i] === 1 || (this.pairOrd[i] >= 0 && this.pairNode[i].ageMa < ORDER_FAMILY_MA);
   }
 
-  /** Whether pair i's split opens with the zoom (inside a family or an order); else always open. */
+  /** Whether pair i's split opens with the zoom (`age` gaps only, inside a family or an order); else always open. */
   folds(i: number): boolean {
-    return this.pairFam[i] === 1 || this.pairOrd[i] >= 0;
+    return this.gaps === 'age' && (this.pairFam[i] === 1 || this.pairOrd[i] >= 0);
   }
 
   /**
@@ -253,7 +349,6 @@ export abstract class Fold {
   roomAt(b: FanBranch, y: number, age?: number): number {
     const p = this.roomPlan(b);
     const { B, L } = p;
-    const edge = this.fan.edge;
     const yy = Math.max(y, b.tipY);
     let k = 0;
     while (k + 2 < B.length && yy < B[k + 1]) k++;
@@ -261,14 +356,14 @@ export abstract class Fold {
     if (k === 0 && yy > b.splitY - p.peel) {
       // (Its peel: from its founders' slot up to its room; a column widening faster takes the lead, smoothly: one bend.)
       const u = (b.splitY - yy) / p.peel;
-      r = b.baseW + (L[0] - b.baseW) * ease(edge, u);
+      r = b.baseW + (L[0] - b.baseW) * ease(u);
       const w = laneW(b, yy);
       const e = 0.4 * L[0] * u * (1 - u);
       r = (r + w + Math.sqrt((r - w) * (r - w) + e * e)) / 2;
-    } else if (k > 0 && yy > B[k] - ROOM_BEND / 2) r = L[k - 1] + (L[k] - L[k - 1]) * ease(edge, 0.5 + (B[k] - yy) / ROOM_BEND);
-    else if (k + 2 < B.length && yy < B[k + 1] + ROOM_BEND / 2) r = L[k] + (L[k + 1] - L[k]) * ease(edge, 0.5 + (B[k + 1] - yy) / ROOM_BEND);
+    } else if (k > 0 && yy > B[k] - ROOM_BEND / 2) r = L[k - 1] + (L[k] - L[k - 1]) * ease(0.5 + (B[k] - yy) / ROOM_BEND);
+    else if (k + 2 < B.length && yy < B[k + 1] + ROOM_BEND / 2) r = L[k] + (L[k + 1] - L[k]) * ease(0.5 + (B[k + 1] - yy) / ROOM_BEND);
     if (y >= b.tipY) return Math.max(r, laneW(b, y, age));
-    r *= 1 - ease(edge, (b.tipY - y) / Fold.endH(b));
+    r *= 1 - ease((b.tipY - y) / Fold.endH(b));
     return r;
   }
 

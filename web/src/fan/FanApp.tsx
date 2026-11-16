@@ -1,107 +1,118 @@
-// The main view: the dated Panthera tree, OneZoom-style. The time river is
-// still available at ?river (and the synthetic spike tree at ?synthetic).
+// The main view: the dated tree, OneZoom-style.
 
-import * as MeshMirror from './mesh';
-import { useEffect, useRef, useState, type PointerEvent as RPointerEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as RPointerEvent, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import { approxMa, formatCount, formatMass } from '../data/count';
 import { HistorySpark } from './HistorySpark';
-import type { EdgeStyle, Measure, WidthMode } from './layout';
-import { wikiOf, type WikiRec } from './wiki';
+import type { Measure } from './layout';
+import { drawStub, wikiOf, type WikiRec } from './wiki';
 import { RangeGlobe } from './Globe';
-import { CARNIVORA, FELIDAE, mammaliaClade, NATURAL_META, type HistEvent, type SpeciesRec } from './panthera';
-import { CARNIVORA_TREE, mammaliaTree } from './splits';
+import { mammaliaClade, NATURAL_META, type HistEvent, type SpeciesRec } from './panthera';
+import { mammaliaTree } from './splits';
 import { loadMammals, mammalsLoaded } from './mammals-data';
-import { synthLevelData, synthMarksNow, synthQuery } from './synthetic-level';
+import { synthLoader } from './synthetic-level';
 import { stamp } from '../stamp';
 import { population } from './population';
 import { WorldToggle } from './WorldToggle';
+import { forkLeaders, forkNames, setForkLeaders, setForkNames } from './brackets';
+import { FORK_MODES, forkMode, setForkMode, type ForkMode } from './steady';
 import { MagnifierIcon, SearchPanel } from './SearchPanel';
-import { statusOf } from './status';
+import { SourcesPanel } from './SourcesPanel';
+import { statusOf, wildPartSentence } from './status';
 import { cardTapper, onControl } from './cardtap';
-import { FanView, fmtInt, formatYearsAgo, initialMeasure, type IndInfo, type Lineage, type Selection } from './view';
+import { flipOn, forkQuiet, setForkQuiet } from './flip';
+import { FanView, initialMeasure, levelName, type CardKey, type Lineage, type Place, type Selection } from './view';
+import { keptPlace, treeKey, watchBack } from './back';
 
 declare global {
   interface Window {
     __fan?: FanView;
-    /** The mesh's CPU mirror, for scripts/glcheck.mjs (GPU and CPU decisions compared). */
-    __fanMesh?: typeof MeshMirror;
-    /** The synthetic level's depths (ToLaD#343, synthetic.ts synthMarks), for scripts/scale.mjs. */
-    __synth?: { order: string; family: string; species: string } | null;
+    /** The name a group's pill shows, for the browser probes (scripts/tapshot.mjs). */
+    __levelName?: typeof levelName;
   }
 }
 
-/** The edges' design this viewer chose last (remembered on this device); ?edge=curved|straight overrides it. */
-const EDGE_KEY = 'tolad.fan.edge';
-function initialEdge(): EdgeStyle {
-  const isEdge = (v: unknown): v is EdgeStyle => v === 'curved' || v === 'straight';
-  try {
-    const q = new URLSearchParams(window.location.search).get('edge');
-    if (isEdge(q)) return q;
-  } catch {
-    /* no URL */
-  }
-  try {
-    const v = window.localStorage.getItem(EDGE_KEY);
-    if (isEdge(v)) return v;
-  } catch {
-    /* no storage */
-  }
-  return 'curved';
-}
-
 /**
- * The view (ToLaD#146): the whole order, each family one branch from afar, opening as you zoom (fold.ts).
- * The level button (ToLaD#247) steps cats -> carnivores -> mammals (every living mammal) -> cats; ?level= opens one.
- */
-// ('synthetic', ToLaD#343: the scale yardstick's tree, `?level=synthetic&n=70000`, on the mammals' path; not on the stepper.)
-type Level = 'cats' | 'carnivores' | 'mammals' | 'synthetic';
-const LEVELS: Level[] = ['cats', 'carnivores', 'mammals'];
-const LEVEL_NAME: Record<Level, string> = { cats: 'Cats', carnivores: 'Carnivores', mammals: 'Mammals', synthetic: 'Synthetic' };
-/**
- * The mammal level's data is a file of its own (mammals-data.ts, ToLaD#247), fetched when the level first opens:
- * 'fetch' while it comes, 'build' for one painted frame (the note shows before the layout's long synchronous build),
- * then 'ready'; any other string is the error.
+ * The view (ToLaD#146): every mammal, each order and family one branch from afar, opening as you zoom (fold.ts). The one
+ * page since ToLaD#418: the cats' and carnivores' are clades in it, and their old links land on their frames.
+ *
+ * Its data is a file of its own (mammals-data.ts, ToLaD#247), fetched on open: 'fetch' while it comes, 'build' for one
+ * painted frame (the note shows before the layout's long synchronous build), then 'ready'; any other string is the error.
  */
 type MammState = 'fetch' | 'build' | 'ready' | string;
 const mammStart = (): MammState => (mammalsLoaded() ? 'build' : 'fetch');
 
-function initialLevel(): Level {
-  try {
-    const q = new URLSearchParams(window.location.search).get('level');
-    return LEVELS.includes(q as Level) || q === 'synthetic' ? (q as Level) : 'carnivores';
-  } catch {
-    return 'carnivores';
-  }
+/** The clade an old `?level=` link means (ToLaD#418): `?level=mammals`, or none, is home. */
+export function levelLinkClade(search: string): string | null {
+  const q = new URLSearchParams(search).get('level');
+  return q === 'cats' ? 'Felidae' : q === 'carnivores' ? 'Carnivora' : null;
 }
 
-// (A level opens on its first frame; its labels follow in the next slice, ToLaD#255.)
-FanView.labelsAfterFirst = true;
+/** How a fork is drawn (ToLaD#377, `?forks=`): a look only, no new view. */
+function initialForks(): ForkMode {
+  try {
+    const q = new URLSearchParams(window.location.search).get('forks');
+    if (FORK_MODES.includes(q as ForkMode)) setForkMode(q as ForkMode);
+  } catch {
+    /* no address */
+  }
+  return forkMode();
+}
+
+/** The upper clades' names (ToLaD#373, #434, #458): at their forks (`?forknames=fork`), on leaders off them (`?forknames=leaders`), or none: on the tree on its side the labels in the gaps name them (ToLaD#458), elsewhere the stack over "now" (`?forknames=off`). */
+type ForkNaming = 'at fork' | 'leaders' | 'off';
+const FORK_NAMINGS: ForkNaming[] = flipOn() ? ['off', 'at fork', 'leaders'] : ['at fork', 'leaders', 'off'];
+const forkNaming = (m: ForkNaming) => {
+  // (On its side `off` asks no stack: the brackets keep their fork mode and place no names.)
+  setForkNames(flipOn() || m !== 'off');
+  setForkLeaders(m === 'leaders');
+  setForkQuiet(m === 'off');
+};
+/** Set before the first view is built. */
+function initialForkNames(): ForkNaming {
+  try {
+    const q = new URLSearchParams(window.location.search).get('forknames');
+    if (q === 'off') forkNaming('off');
+    if (q === 'leaders') forkNaming('leaders');
+    if (q === 'fork') forkNaming('at fork');
+  } catch {
+    /* no address */
+  }
+  return forkQuiet() || !forkNames() ? 'off' : forkLeaders() ? 'leaders' : 'at fork';
+}
 
 export function FanApp() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const viewRef = useRef<FanView | null>(null);
+  // Where the view stood when a look's switch asked for a new one (ToLaD#412): the new one's first place.
+  // (Or where it stood when the page went hidden, this load that page coming back, ToLaD#478; with the card it had open.)
+  const placeRef = useRef<Place | null>(keptPlace()?.place ?? null);
+  const cardRef = useRef<CardKey | null>(keptPlace()?.card ?? null);
   // A double tap on the card (ToLaD#301): what one on the tree does, one level up, the card closed.
   const cardUp = (x: number, y: number) => viewRef.current?.doubleTap(x, y);
-  const [mode, setMode] = useState<WidthMode>('linear');
+  const [forks, setForks] = useState(initialForkNames);
+  const [forkLook, setForkLook] = useState<ForkMode>(initialForks);
   // What the widths count (ToLaD#276): individuals, or their mass (`?width=mass`).
   const [measure, setMeasure] = useState<Measure>(initialMeasure);
-  const [edge, setEdge] = useState<EdgeStyle>(initialEdge);
   const [sel, setSel] = useState<Selection | null>(null);
+  const selRef = useRef(sel);
+  selRef.current = sel;
   const [searching, setSearching] = useState(false);
-  const [level, setLevel] = useState<Level>(initialLevel);
+  const [showSources, setShowSources] = useState(false);
+  const closeSources = useCallback(() => setShowSources(false), []);
   const [mamm, setMamm] = useState<MammState>(mammStart);
-  // The view can be built: any level but the mammals, or the mammals once their data is in.
-  const onMammals = level === 'mammals' || level === 'synthetic';
-  const viewReady = !onMammals || mamm === 'ready';
+  // The view can be built: the mammals' data is in.
+  const viewReady = mamm === 'ready';
+  // Where the first view stands, from an old link.
+  const linkRef = useRef(typeof location === 'undefined' ? null : levelLinkClade(location.search));
   const scaleRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!onMammals || mamm === 'ready') return;
+    if (mamm === 'ready') return;
     let live = true;
     if (mamm === 'fetch')
-      loadMammals(level === 'synthetic' ? () => synthLevelData(synthQuery(window.location.search)).then((d) => ((window.__synth = synthMarksNow), d)) : undefined).then(
+      loadMammals(synthLoader()).then(
         () => live && setMamm('build'),
         (e: unknown) => live && setMamm(`could not load the mammals (${e instanceof Error ? e.message : String(e)})`),
       );
@@ -110,106 +121,114 @@ export function FanApp() {
     return () => {
       live = false;
     };
-  }, [level, mamm]);
+  }, [mamm]);
 
   useEffect(() => {
     if (!viewReady) return;
     const c = canvasRef.current!;
     stamp('build');
-    const v =
-      onMammals
-        ? new FanView(c, mammaliaClade(), edge, mammaliaTree(), true)
-        : level === 'carnivores'
-          ? new FanView(c, CARNIVORA, edge, CARNIVORA_TREE, true)
-          : new FanView(c, FELIDAE, edge);
+    const v = new FanView(c, mammaliaClade(), mammaliaTree(), true);
     stamp('view');
-    if (mode !== 'linear') v.setMode(mode);
     v.setMeasure(measure);
     v.onSelect = setSel;
     v.scaleEl = scaleRef.current;
     v.barEl = barRef.current;
+    // (A look's switch stays where the view was, ToLaD#412; an old link stands on its clade's frame, no flight.)
+    // (A place kept before a reload from another build of the tree is not this one's: home, ToLaD#478.)
+    const kept = keptPlace();
+    if (kept && placeRef.current === kept.place && kept.tree !== treeKey(v)) placeRef.current = cardRef.current = null;
+    try {
+      if (placeRef.current) v.goToPlace(placeRef.current);
+      else if (linkRef.current) v.goToClade(linkRef.current);
+      if (cardRef.current) v.openCard(cardRef.current);
+    } catch (e) {
+      // (A place that no longer fits never leaves the page blank: the view stays home.)
+      console.warn('fan: could not go back to the place kept', e);
+    }
+    placeRef.current = linkRef.current = cardRef.current = null;
     viewRef.current = v;
     window.__fan = v;
-    window.__fanMesh = MeshMirror;
+    window.__levelName = levelName;
     v.request();
+    // (Back on the tab, ToLaD#478: drawn again, or the page reloaded to here.)
+    const unwatch = watchBack(v, () => selRef.current);
     // The canvas text waits for the faces (drawn in system type until then).
     if (typeof document !== 'undefined' && document.fonts) {
       Promise.all([document.fonts.load("600 16px 'Sofia Sans Condensed'"), document.fonts.load("italic 400 14px 'Newsreader'")])
         .catch(() => undefined)
-        .then(() => v.request());
+        .then(() => v.fontsIn());
     }
     return () => {
+      unwatch();
       v.destroy();
       viewRef.current = null;
       if (window.__fan === v) delete window.__fan;
     };
-    // (A new view per level; the toggles' state carries over.)
+    // (A new view per look's switch; the toggles' state carries over.)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [level, viewReady]);
+  }, [viewReady, forks]);
 
   return (
     <div className="app fan">
       <canvas ref={canvasRef} className="stage" />
       {!viewReady && (
         <div className="loading" role="status">
-          {mamm === 'fetch' ? 'loading mammals…' : mamm === 'build' ? 'building the mammal tree…' : mamm}
+          <b>Tree of Life and Death</b>
+          <br />
+          {mamm === 'fetch' ? (
+            'Every mammal, alive and dead: loading…'
+          ) : mamm === 'build' ? (
+            'Every mammal, alive and dead: building the tree…'
+          ) : (
+            <>
+              {mamm} <button type="button" onClick={() => setMamm('fetch')}>Try again</button>
+            </>
+          )}
         </div>
       )}
-      <div className="bar" ref={barRef}>
+      <div className="bar" ref={barRef} style={viewReady ? undefined : { visibility: 'hidden' }}>
+        {/* ToLaD#373, #434: the upper clades named at their forks, on leaders off them, or in the stack over "now". */}
         <button
           type="button"
-          aria-pressed={mode === 'linear'}
+          title="Upper clades' names: on the gaps above them (the tree on its side), at their forks, on leaders off them, or off (the stack over now)"
           onClick={() => {
-            const next = mode === 'log' ? 'linear' : 'log';
-            setMode(next);
-            viewRef.current?.setMode(next);
-          }}
-        >
-          {mode === 'log' ? 'log widths' : 'linear widths'}
-        </button>
-        <button
-          type="button"
-          aria-label="branch shape"
-          onClick={() => {
-            const next = edge === 'curved' ? 'straight' : 'curved';
-            setEdge(next);
-            viewRef.current?.setEdge(next);
+            const next = FORK_NAMINGS[(FORK_NAMINGS.indexOf(forks) + 1) % FORK_NAMINGS.length];
+            placeRef.current = viewRef.current?.place() ?? null;
+            forkNaming(next);
+            setSel(null);
+            setForks(next);
             try {
-              window.localStorage.setItem(EDGE_KEY, next);
+              const u = new URL(window.location.href);
+              if (next === FORK_NAMINGS[0]) u.searchParams.delete('forknames');
+              else u.searchParams.set('forknames', next === 'at fork' ? 'fork' : next);
+              window.history.replaceState(null, '', u);
             } catch {
-              /* not remembered */
+              /* not in the address */
             }
           }}
         >
-          {edge}
+          {`fork names: ${forks}`}
         </button>
-        {/* Home for this level, and the level stepper joined to it (ToLaD#247): one pill, so the bar stays one row. */}
-        <span className="pair">
-          <button type="button" onClick={() => viewRef.current?.resetView()}>
-            {level === 'cats' ? 'All cats' : level === 'mammals' ? 'All mammals' : level === 'synthetic' ? `Synthetic ${synthQuery(window.location.search).n}` : 'All carnivores'}
-          </button>
-          <button
-            type="button"
-            className="step"
-            title={`Change level (now ${LEVEL_NAME[level]})`}
-            aria-label={`level: ${LEVEL_NAME[level]}; tap for ${LEVEL_NAME[LEVELS[(LEVELS.indexOf(level) + 1) % LEVELS.length]]}`}
-            onClick={() => {
-              const next = LEVELS[(LEVELS.indexOf(level) + 1) % LEVELS.length];
-              setSel(null);
-              if (next === 'mammals') setMamm(mammStart());
-              setLevel(next);
-              try {
-                const u = new URL(window.location.href);
-                u.searchParams.set('level', next);
-                window.history.replaceState(null, '', u);
-              } catch {
-                /* not in the address */
-              }
-            }}
-          >
-            ⇅
-          </button>
-        </span>
+        {/* ToLaD#377, #402, #439: how a fork with too little height is drawn: a rectangular tree's corner, and a stem wider than tall a line (thin), or a ribbon (peel, the old look). */}
+        <button
+          type="button"
+          title="Forks: thin lines for wide stems, or peeling ribbons"
+          onClick={() => {
+            const next = FORK_MODES[(FORK_MODES.indexOf(forkLook) + 1) % FORK_MODES.length];
+            setForkMode(next);
+            setForkLook(next);
+            viewRef.current?.request();
+            try {
+              const u = new URL(window.location.href);
+              u.searchParams.set('forks', next);
+              window.history.replaceState(null, '', u);
+            } catch {
+              /* not in the address */
+            }
+          }}
+        >
+          {`forks: ${forkLook}`}
+        </button>
         <button
           type="button"
           className="icon"
@@ -225,6 +244,8 @@ export function FanApp() {
         </button>
         <WorldToggle get={() => viewRef.current} onMeasure={setMeasure} />
       </div>
+      {/* ToLaD#452: the chain of groups the view is in, written by the view (chainFrame). */}
+      {flipOn() && viewReady && <div className="chain" />}
       {searching && (
         <SearchPanel
           species={viewRef.current?.fan.branches.map((b) => b.sp) ?? []}
@@ -236,7 +257,7 @@ export function FanApp() {
           }}
         />
       )}
-      <div className="foot">
+      <div className="foot" style={viewReady ? undefined : { visibility: 'hidden' }}>
         <div className="wscale" ref={scaleRef} aria-label="width scale">
           <span className="wbar" />
           <span className="wlab" />
@@ -244,23 +265,37 @@ export function FanApp() {
       {sel ? (
         sel.lineage ? (
           <LineageCard lin={sel.lineage} onClose={() => viewRef.current?.tap(-1e6, -1e6)} onUp={cardUp} />
-        ) : sel.ind ? (
-          <IndCard sp={sel.sp} ind={sel.ind} onClose={() => viewRef.current?.tap(-1e6, -1e6)} onUp={cardUp} />
         ) : (
-          <SpeciesCard sp={sel.sp} mass={measure === 'mass'} ageMa={sel.ageMa} startMa={sel.startMa} event={sel.event?.k} onClose={() => viewRef.current?.tap(-1e6, -1e6)} onUp={cardUp} />
+          <SpeciesCard
+            sp={sel.sp}
+            mass={measure === 'mass'}
+            ageMa={sel.ageMa}
+            startMa={sel.startMa}
+            event={sel.event?.k}
+            onClose={() => viewRef.current?.tap(-1e6, -1e6)}
+            onUp={cardUp}
+            onBox={sel.event ? undefined : (el) => viewRef.current?.cardBox(el)}
+          />
         )
+      ) : showSources ? (
+        <SourcesPanel onClose={closeSources} />
       ) : (
-        <ul className="key" aria-label="key">
-          <li>
-            <span className="lane alive" /> alive now
-          </li>
-          <li>
-            <span className="lane lineage" /> living descendants
-          </li>
-          <li>
-            <span className="lane dead" /> line ended
-          </li>
-        </ul>
+        <div className="foot-row">
+          <ul className="key" aria-label="key">
+            <li>
+              <span className="lane alive" /> alive now
+            </li>
+            <li>
+              <span className="lane lineage" /> living descendants
+            </li>
+            <li>
+              <span className="lane dead" /> extinct
+            </li>
+          </ul>
+          <button type="button" className="sources-link" onClick={() => setShowSources(true)}>
+            sources
+          </button>
+        </div>
       )}
       </div>
     </div>
@@ -310,6 +345,9 @@ export function pluralName(sp: SpeciesRec): string {
   const c = midName(sp);
   // (The carnivores bring a -f plural, ToLaD#146: "grey wolves".)
   if (/wolf$/.test(c)) return `${c.slice(0, -1)}ves`;
+  // (The domestic stocks bring these, ToLaD#435: "sheep", "dromedaries".)
+  if (/(sheep|cattle|deer)$/.test(c)) return c;
+  if (/[^aeiou]y$/.test(c)) return `${c.slice(0, -1)}ies`;
   return /(s|x|z|ch|sh)$/.test(c) ? `${c}es` : `${c}s`;
 }
 
@@ -444,9 +482,9 @@ function EventSource({ ev }: { ev: HistEvent }) {
 }
 
 /**
- * The species' Commons picture (ToLaD#182), hotlinked: nothing at all until it has loaded,
- * and nothing if it fails (no box, no alt text, no gap). Loading, it is a 1 px invisible
- * image, so the browser still fetches it (a lazy image that is not displayed never loads).
+ * The species' Commons picture (ToLaD#182), hotlinked. Loading, its square and its credit line are held at their
+ * loaded size with a spinner over them (ToLaD#479: nothing moves when it arrives; app.css shows the spinner only after
+ * a moment, so a cached picture never flashes it). With none, or once it fails, the tree's stub in its box (ToLaD#492).
  * Keyed by its URL, so another species starts over.
  */
 export function WikiPic({ w, initial = 'loading' }: { w: WikiRec | null; initial?: 'loading' | 'ok' | 'failed' }) {
@@ -455,7 +493,7 @@ export function WikiPic({ w, initial = 'loading' }: { w: WikiRec | null; initial
   const [big, setBig] = useState(false);
   const [bigFailed, setBigFailed] = useState(false);
   const src = w?.img;
-  if (!src || state === 'failed') return null;
+  if (!src || state === 'failed') return <PicStub />;
   const bigSrc = bigSrcOf(src);
   const useBig = big && !bigFailed && bigSrc !== src;
   return (
@@ -463,14 +501,14 @@ export function WikiPic({ w, initial = 'loading' }: { w: WikiRec | null; initial
       <img
         src={useBig ? bigSrc : src}
         alt=""
-        loading="lazy"
         decoding="async"
         referrerPolicy="no-referrer"
         onClick={() => setBig((b) => !b)}
         onLoad={() => setState('ok')}
         onError={() => (useBig ? setBigFailed(true) : setState('failed'))}
       />
-      {state === 'ok' && w?.file && (
+      {/* (Its credit line from the start, hidden while loading: the box is its loaded height.) */}
+      {w?.file && (
         <a href={w.file} target="_blank" rel="noopener">
           Wikimedia Commons
         </a>
@@ -481,16 +519,16 @@ export function WikiPic({ w, initial = 'loading' }: { w: WikiRec | null; initial
 
 /**
  * The species' range map (ToLaD#196, Wikidata P181), hotlinked like the photo: under the name,
- * beside the photo (across the card when there is none), nothing until it has loaded and nothing
- * if it fails. A tap enlarges it across the card (the 960 px thumbnail), another shrinks it back.
+ * beside the photo, its place held with a spinner while it loads, `none` (the globe with no range, ToLaD#492) if it
+ * fails. A tap enlarges it across the card (the 960 px thumbnail), another shrinks it back.
  * Side by side rather than stacked: stacked, the lion's card filled the whole 390×844 screen.
  */
-export function RangeMap({ w, initial = 'loading' }: { w: WikiRec | null; initial?: 'loading' | 'ok' | 'failed' }) {
+export function RangeMap({ w, initial = 'loading', none = null }: { w: WikiRec | null; initial?: 'loading' | 'ok' | 'failed'; none?: ReactNode }) {
   const [state, setState] = useState(initial);
   const [big, setBig] = useState(false);
   const [bigFailed, setBigFailed] = useState(false);
   const src = w?.range;
-  if (!src || state === 'failed') return null;
+  if (!src || state === 'failed') return none;
   const bigSrc = bigSrcOf(src);
   const useBig = big && !bigFailed && bigSrc !== src;
   return (
@@ -498,18 +536,39 @@ export function RangeMap({ w, initial = 'loading' }: { w: WikiRec | null; initia
       <img
         src={useBig ? bigSrc : src}
         alt=""
-        loading="lazy"
         decoding="async"
         referrerPolicy="no-referrer"
         onClick={() => setBig((b) => !b)}
         onLoad={() => setState('ok')}
         onError={() => (useBig ? setBigFailed(true) : setState('failed'))}
       />
-      {state === 'ok' && w?.rangeFile && (
+      {w?.rangeFile && (
         <a href={w.rangeFile} target="_blank" rel="noopener">
           Range map · Wikimedia Commons
         </a>
       )}
+    </figure>
+  );
+}
+
+/**
+ * No photo (none in the wiki, or it failed for good): the tree's stub (ToLaD#400, wiki.drawStub), in the picture's box
+ * at its size, its caption in the credit's line (ToLaD#492), so the card shows what is missing as the tree does.
+ */
+function PicStub() {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useLayoutEffect(() => {
+    const c = ref.current;
+    if (!c) return;
+    const px = Math.round((c.clientWidth || 120) * Math.min(2, window.devicePixelRatio || 1));
+    c.width = c.height = px;
+    const ctx = c.getContext('2d');
+    if (ctx) drawStub(ctx, px / 2, px / 2, px);
+  }, []);
+  return (
+    <figure className="pic stub">
+      <canvas ref={ref} />
+      <span className="cap">No photo</span>
     </figure>
   );
 }
@@ -523,9 +582,22 @@ export function bigSrcOf(src: string): string {
  * A card's box (the species', the split's, the individual's): its touches kept from the tree under it, and a double tap
  * on it, off its controls (links, buttons, Details, the pictures, the globe), one level up as on the tree (ToLaD#301).
  */
-function CardShell({ onUp, children }: { onUp?: (x: number, y: number) => void; children: ReactNode }) {
+function CardShell({ onUp, onBox, children }: { onUp?: (x: number, y: number) => void; onBox?: (el: HTMLElement) => void; children: ReactNode }) {
   const up = useRef(onUp);
   up.current = onUp;
+  // (Its box as laid out, and again whenever it changes, to whoever frames the tree in the room it leaves (FanView.cardBox, ToLaD#496).)
+  const box = useRef(onBox);
+  box.current = onBox;
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    box.current?.(el);
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => box.current?.(el));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const tapper = useRef<ReturnType<typeof cardTapper> | null>(null);
   tapper.current ??= cardTapper((x, y) => {
     // (A mouse's double click selects a word: not here.)
@@ -535,6 +607,7 @@ function CardShell({ onUp, children }: { onUp?: (x: number, y: number) => void; 
   const pt = (e: RPointerEvent) => ({ id: e.pointerId, x: e.clientX, y: e.clientY, t: e.timeStamp, ctl: onControl(e.target) });
   return (
     <div
+      ref={ref}
       className="card-sp"
       onPointerDown={(e) => {
         e.stopPropagation();
@@ -558,7 +631,27 @@ function massNote(how: string | undefined): string {
   return ` (adult, ${src[how] ?? how})`;
 }
 
-export function SpeciesCard({ sp, onClose, onUp, open, ageMa, startMa, event, mass }: { sp: SpeciesRec; onClose: () => void; onUp?: (x: number, y: number) => void; open?: boolean; ageMa?: number; startMa?: number; event?: number; mass?: boolean }) {
+export function SpeciesCard({
+  sp,
+  onClose,
+  onUp,
+  onBox,
+  open,
+  ageMa,
+  startMa,
+  event,
+  mass,
+}: {
+  sp: SpeciesRec;
+  onClose: () => void;
+  onUp?: (x: number, y: number) => void;
+  onBox?: (el: HTMLElement) => void;
+  open?: boolean;
+  ageMa?: number;
+  startMa?: number;
+  event?: number;
+  mass?: boolean;
+}) {
   const at = populationAt(sp, ageMa ?? sp.t1, startMa);
   const ev0 = event !== undefined ? sp.history?.events[event] : undefined;
   const ev = ev0?.scope === 'regional' ? undefined : ev0;
@@ -567,6 +660,7 @@ export function SpeciesCard({ sp, onClose, onUp, open, ageMa, startMa, event, ma
   const regional = (sp.history?.events ?? []).map((e, k) => ({ e, k })).filter(({ e }) => e.scope === 'regional');
   const pct = (f: number) => `${Math.round(f * 100)}%`;
   const st = statusOf(sp);
+  const wildPart = wildPartSentence(sp, formatCount);
   // A domestic stock: the years its own births span (its curated segments, from domestication).
   const domestic = sp.history?.component === 'domestic' && sp.births ? sp.history.segments.reduce((a, s) => a + s.generations, 0) * sp.history.G : 0;
   const lived = `from ${plainAgo(sp.t0 * 1e6)} to ${sp.extinct ? plainAgo(sp.t1 * 1e6) : 'today'}`;
@@ -575,7 +669,7 @@ export function SpeciesCard({ sp, onClose, onUp, open, ageMa, startMa, event, ma
   const nat = !spark && sp.natural ? sp.natural : null;
   const wiki = wikiOf(sp.sci);
   return (
-    <CardShell onUp={onUp}>
+    <CardShell onUp={onUp} onBox={onBox}>
       <button type="button" className="x" onClick={onClose} aria-label="Close">
         ×
       </button>
@@ -589,14 +683,20 @@ export function SpeciesCard({ sp, onClose, onUp, open, ageMa, startMa, event, ma
         )}{' '}
         <i>({sp.sci})</i>
       </div>
-      {/* The photo and the range side by side under the name (ToLaD#196): the globe (ToLaD#267), else the Wikimedia map. */}
+      {/* The photo and the range side by side under the name (ToLaD#196): the globe (ToLaD#267), else the Wikimedia map;
+          either missing, what says so in its box (ToLaD#492), so every card has the same two. */}
       <div className="media">
         <WikiPic key={wiki?.img ?? ''} w={wiki} />
-        <RangeGlobe key={sp.sci} sci={sp.sci} fallback={wiki?.range ? <RangeMap key={`range-${wiki.range}`} w={wiki} /> : null} />
+        <RangeGlobe key={sp.sci} sci={sp.sci} fallback={wiki?.range ? (none) => <RangeMap key={`range-${wiki.range}`} w={wiki} none={none} /> : undefined} />
       </div>
       {ev && <EventSection ev={ev} k={event!} />}
       <div className="facts">
         <StatusChip sp={sp} />
+        {wildPart && (
+          <p className="sub" data-wild-part>
+            {wildPart}
+          </p>
+        )}
         <p className="lead">
           <span className={`lane ${sp.extinct ? 'dead' : at.now ? 'alive' : 'lineage'}`} />
           <span>
@@ -762,32 +862,3 @@ export function LineageCard({ lin, onClose, onUp }: { lin: Lineage; onClose: () 
   );
 }
 
-function IndCard({ sp, ind, onClose, onUp }: { sp: SpeciesRec; ind: IndInfo; onClose: () => void; onUp?: (x: number, y: number) => void }) {
-  return (
-    <CardShell onUp={onUp}>
-      <button type="button" className="x" onClick={onClose} aria-label="Close">
-        ×
-      </button>
-      <div className="t">
-        <span className={`dot ${ind.alive ? 'alive' : 'dead'}`} /> <span className="mono">{ind.handle}</span>
-      </div>
-      <div>
-        {ind.sex} {midName(sp)} · {ind.alive ? 'alive now' : 'dead'} · born ~{formatYearsAgo(ind.bornYearsAgo)}
-      </div>
-      <div className="dim">
-        lived {ind.lifespan.toFixed(1)} y · generation {fmtInt(ind.g + 1)} of {fmtInt(ind.G)} · {ind.children} children
-      </div>
-      <div className="dim">
-        parents:{' '}
-        {ind.parents.length === 0
-          ? 'none (founding generation)'
-          : ind.parents.map((p, k) => (
-              <span key={k} className="mono">
-                {k ? ' + ' : ''}
-                {p.handle}
-              </span>
-            ))}
-      </div>
-    </CardShell>
-  );
-}

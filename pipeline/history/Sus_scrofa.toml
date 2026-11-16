@@ -1,5 +1,5 @@
 species   = "Sus scrofa"
-common    = "Pig (domestic)"
+common    = "Pig"
 component = "domestic"
 use       = "counts"
 scope     = "global domestic stock"

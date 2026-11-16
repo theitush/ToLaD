@@ -1,14 +1,14 @@
-// Curated bottlenecks (ToLaD#141): carried from the history files to the fan, marked on their columns
-// (world-fixed, over the held fade), and a tap inside a window opens the card's section on it.
+// Curated bottlenecks (ToLaD#141): carried from the history files to the fan, no mark on their columns
+// (ToLaD#436), and a tap inside a window opens the card's section on it.
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { EVENT_TINT, eventAt, eventSpans } from './colstyle';
+import { eventAt, eventSpans } from './colstyle';
 import { SpeciesCard, unshownSentence } from './FanApp';
 import { HistorySpark } from './HistorySpark';
 import { laneAt, layoutFan, leftAt } from './layout';
-import { RectBatch, MeshBatch } from './meshgl';
+import { RectBatch } from './meshgl';
 import { FELIDAE } from './panthera';
-import { colEventsY, colSpansY, FanView, type Selection } from './view';
+import { colEventsY, FanView, type Selection } from './view';
 
 const sp = (common: string) => FELIDAE.species.find((s) => s.common === common)!;
 
@@ -127,34 +127,24 @@ describe('the fan: marks and tap', () => {
   v.cam = { cx: cxAt(y), cy: y, sx, sy, ty: sy };
   v.camera.settle();
 
-  it('draws each window as a tint over the column, after (over) the held fade', () => {
-    const gl = { under: new RectBatch(), mesh: new MeshBatch(), over: new RectBatch(), begin() {}, end() {} };
+  it('draws no tint over a window (ToLaD#436)', () => {
+    // (The orange the tint was, ToLaD#141.)
+    const isTint = (red: number, green: number) => Math.abs(red - 0.93) < 1e-6 && Math.abs(green - 0.62) < 1e-6;
+    const gl = { under: new RectBatch(), over: new RectBatch(), begin() {}, end() {} };
     gl.begin = () => {
-      gl.under.n = gl.mesh.n = gl.over.n = 0;
+      gl.under.n = gl.over.n = 0;
     };
     (v as unknown as { gl: unknown }).gl = gl;
     v.draw();
+    // (This frame has the cougar's windows on screen.)
+    expect(colEventsY(fan, b).some((w) => v.toScreen(0, w.bot)[1] > 0 && v.toScreen(0, w.top)[1] < v.h)).toBe(true);
     const tints: number[][] = [];
-    for (let i = 0; i < gl.over.n; i++) {
-      const r = Array.from(gl.over.f.subarray(i * 12, i * 12 + 12));
-      if (Math.abs(r[4] - EVENT_TINT.rgb[0]) < 1e-6 && Math.abs(r[5] - EVENT_TINT.rgb[1]) < 1e-6) tints.push(r);
-    }
-    // The cougar's tints: those on its column (since ToLaD#172 narrowed its deep past, the cheetah's
-    // column and its own windows reach the screen's left edge too).
-    const x0 = v.toScreen(cxAt(y) - b.width / 2, y)[0];
-    const x1 = v.toScreen(cxAt(y) + b.width / 2, y)[0];
-    const mine = tints.filter((r) => r[0] >= x0 - 1 && r[2] <= x1 + 1);
-    expect(mine.length).toBeGreaterThan(2);
-    // Within the windows on screen.
-    const ws = colEventsY(fan, b);
-    const sTop = Math.min(...ws.map((w) => v.toScreen(0, w.top)[1]));
-    const sBot = Math.max(...ws.map((w) => v.toScreen(0, w.bot)[1]));
-    for (const r of mine) {
-      expect(r[1]).toBeGreaterThanOrEqual(sTop - 1);
-      expect(r[3]).toBeLessThanOrEqual(sBot + 1);
-    }
-    // Drawn after any held fade on the column (so a held stretch never hides an event).
-    expect(colSpansY(fan, b)).toBeDefined();
+    for (const batch of [gl.under, gl.over])
+      for (let i = 0; i < batch.n; i++) {
+        const r = Array.from(batch.f.subarray(i * 12, i * 12 + 12));
+        if (isTint(r[4], r[5])) tints.push(r);
+      }
+    expect(tints).toEqual([]);
     (v as unknown as { gl: unknown }).gl = undefined;
   });
 
@@ -167,9 +157,15 @@ describe('the fan: marks and tap', () => {
       [15500, undefined],
     ] as const) {
       const wy = fan.time.y(ago / 1e6);
-      // (On the column, a quarter of its width right of its centre line: beside its name, written along that line, a
-      // pill whose tap flies. Since ToLaD#288's taller home the regional window at 10,500 years lies under the name.)
-      const [px, py] = v.toScreen(cxAt(wy) + laneAt(b, wy).w / 4, wy);
+      // (On the column, beside its centre line, off its label: a name or a picture is a tap of its own, which flies.
+      // Since ToLaD#358 the label is held under the top line, so at 10,500 years it stands over the window: the first
+      // place across the column clear of it.)
+      v.draw();
+      const iv = v as unknown as { pillAt(x: number, y: number): unknown; picAt(x: number, y: number): unknown };
+      const at = (k: number) => v.toScreen(cxAt(wy) + k * laneAt(b, wy).w, wy);
+      const k = [0.25, -0.25, 0.375, -0.375, 0.125, -0.125].find((k) => !iv.pillAt(...at(k)) && !iv.picAt(...at(k)))!;
+      expect(k).toBeDefined();
+      const [px, py] = at(k);
       v.tap(px, py);
       expect(sel!.sp.common).toBe('Puma');
       expect(sel!.event?.ev.title).toBe(title);
@@ -233,8 +229,8 @@ describe('the card', () => {
   });
 });
 
-// ToLaD#149: a mark on a column has to look like what it says. Regional events (a subpopulation) are
-// not on the column; a species-wide one the curve doesn't show keeps its tint and says why on the card.
+// ToLaD#149: what the card says of an event. Regional events (a subpopulation) are not the column's to
+// open; a species-wide one the curve doesn't show says why on the card.
 describe('honest marks (ToLaD#149)', () => {
   const lion = sp('Lion');
   const evs = lion.history!.events;
@@ -249,7 +245,7 @@ describe('honest marks (ToLaD#149)', () => {
     expect(ch.why).not.toBe('');
   });
 
-  it('regional: no tint or label on the column; a section titled with its region on the card; an outlined band on the sparkline', () => {
+  it('regional: not of the column; a section titled with its region on the card; an outlined band on the sparkline', () => {
     const fan = layoutFan(FELIDAE, 'log');
     const b = fan.branches.find((x) => x.sp.common === 'Lion')!;
     const titles = eventSpans(lion, b.t0).map((s) => s.ev.title);
@@ -272,14 +268,14 @@ describe('honest marks (ToLaD#149)', () => {
     expect(spark.match(/data-regional=""/g)?.length).toBe(2);
   });
 
-  it('species-wide and shown: tinted, its section has no caveat', () => {
+  it('species-wide and shown: its section has no caveat', () => {
     const k = kOf('Post-glacial decline');
     const html = renderToStaticMarkup(<SpeciesCard sp={lion} onClose={() => {}} ageMa={0.015} event={k} />);
     expect(html).toContain(`<section class="event" data-event="${k}"`);
     expect(html).not.toContain('ev-unshown');
   });
 
-  it('species-wide, not shown: still tinted; its section says plainly that our curve does not show it, and why', () => {
+  it('species-wide, not shown: its section says plainly that our curve does not show it, and why', () => {
     const c = sp('Cheetah');
     const fan = layoutFan(FELIDAE, 'log');
     const b = fan.branches.find((x) => x.sp.common === 'Cheetah')!;

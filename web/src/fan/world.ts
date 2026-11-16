@@ -1,3 +1,4 @@
+import { AXIS_ROOM } from './flip';
 // The world on the time axis (ToLaD#189): what the Earth was like at each age, in
 // two layers Ita asked for ("Ice ages, Geological periods ... makem all
 // togglable", 2026-10-12), each with its own switch (?periods=0&ice=0; the big-events
@@ -228,6 +229,8 @@ export interface WorldHost {
   readonly w: number;
   readonly h: number;
   readonly world: WorldLayers;
+  /** The tree on its side (flip.ts): the strip along the view's right edge, the phone's foot. */
+  readonly flip?: boolean;
   /** The axis labels drawn this frame (screen boxes). */
   readonly axisBoxes: Box[];
   readonly fan: { time: { y(ageMa: number): number }; trunkBottom: { y: number } };
@@ -268,6 +271,8 @@ export function drawWorldOver(v: WorldHost): void {
   const ctx = v.ctx;
   ctx.save();
   if (v.world.periods) drawStrip(v);
+  ctx.restore();
+  ctx.save();
   if (v.world.ice) drawEvents(v);
   ctx.restore();
 }
@@ -279,6 +284,8 @@ function lum(hex: string): number {
 
 function drawStrip(v: WorldHost): void {
   const ctx = v.ctx;
+  // (Turned, flip.ts: along the phone's foot, the end of the axis's band past the view's right edge; its names, sideways here, read across there.)
+  if (v.flip) ctx.translate(v.w + AXIS_ROOM - STRIP_W, 0);
   const bottomY = Math.min(v.h, syAt(v, BOTTOM_MA));
   const cells = stripCells((ma) => syAt(v, ma), v.h, BOTTOM_MA);
   ctx.globalAlpha = STRIP_A;
@@ -294,7 +301,7 @@ function drawStrip(v: WorldHost): void {
   ctx.fillStyle = 'rgba(12,23,20,0.85)';
   for (const c of cells) if (c.y0 > 0 && c.y0 < v.h) ctx.fillRect(0, Math.round(c.y0), STRIP_W, 1);
   const top = Math.max(0, syAt(v, 0));
-  if (bottomY > top) ctx.fillRect(STRIP_W, top, 1, bottomY - top);
+  if (bottomY > top) ctx.fillRect(v.flip ? -1 : STRIP_W, top, 1, bottomY - top);
   // The names, rotated, centred in the unit's part on screen, where they fit.
   ctx.globalAlpha = 1;
   ctx.font = `700 8px 'Sofia Sans Condensed', 'Roboto Condensed', 'Arial Narrow', system-ui, sans-serif`;
@@ -317,6 +324,24 @@ function drawStrip(v: WorldHost): void {
 
 function drawEvents(v: WorldHost): void {
   const ctx = v.ctx;
+  if (v.flip) {
+    // (Turned, flip.ts: read across the band, just above the axis.)
+    const y0 = syAt(v, LGM.toKa / 1e3);
+    const y1 = syAt(v, LGM.fromKa / 1e3);
+    if (y1 - y0 <= 18) return;
+    ctx.font = `600 11.5px 'Sofia Sans Condensed', 'Roboto Condensed', 'Arial Narrow', system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 3.5;
+    ctx.strokeStyle = 'rgba(12,23,20,0.9)';
+    ctx.fillStyle = ICE_INK;
+    ctx.translate(v.w - 10, (Math.max(0, y0) + Math.min(v.h, y1)) / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.strokeText('last glacial maximum', 0, 0);
+    ctx.fillText('last glacial maximum', 0, 0);
+    return;
+  }
   const x0 = axisInset(v) + 6;
   const items: { text: string; sy: number }[] = [];
   if (v.world.ice) {

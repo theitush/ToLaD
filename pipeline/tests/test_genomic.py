@@ -102,6 +102,9 @@ class Build(unittest.TestCase):
         self.assertTrue(wild["hist_row"])
         self.assertEqual((dom["component"], dom["file"], dom["hist_row"]), ("domestic", "Sus_scrofa.toml", False))
         self.assertEqual(self.dbg["Sus scrofa"]["points"][0]["kind"], "genomic")
+        # the row the fan draws is both parts (ToLaD#435), its deep past still the wild curve's
+        self.assertEqual(self.dbg["Sus scrofa"]["component"], "wild+domestic")
+        self.assertEqual(wild["drawn_as"], "wild+domestic")
         # the genome sets the past only: the leaf's alive (wild + the domestic file's count) is unchanged
         self.assertAlmostEqual(wild["alive_after"], dom["alive_after"], delta=1e-6 * dom["alive_after"])
         # domestic forms with their wild ancestor on another leaf get none
@@ -123,6 +126,9 @@ class Build(unittest.TestCase):
             h = self.dbg[sp]
             kinds = [p["kind"] for p in h["points"]]
             n = s["deep"]["points"]
+            if s.get("drawn_as"):  # its row is wild + domestic (ToLaD#435): the curve goes on past the wild record's
+                self.assertEqual(kinds[:n], ["genomic"] * n, sp)
+                continue
             self.assertEqual(kinds[:n], ["genomic"] * n, sp)
             # then the natural level in 1500 (range-loss trend) or straight to today's count
             self.assertIn(kinds[n:], (["rangeloss", "model"], ["model"]), sp)

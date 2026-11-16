@@ -22,7 +22,7 @@
 //     geometry is fixed and every strand is vertical (the gray lane's edge is
 //     a step function), so nothing leans and there is no slope limit.
 //   - zoom out: no further than the whole fan with a margin.
-//   - pan: some of the fan always stays on screen.
+//   - pan: held only by the fan's outer edges (a gap in it can be crossed, ToLaD#403).
 
 import { columnsAt, nearestColumn, type Fan, type FanBranch } from './layout';
 
@@ -34,8 +34,12 @@ export const MAX_YEARS_FRAC = 0.1;
 export const STRAND_PX = 90;
 /** Zoom out to this fraction of the home view at most. */
 export const MIN_ZOOM = 0.75;
+/** "Now" stands no lower than this share of the height down: the labels' band over it shrinks to keep it there on a short screen (ToLaD#373; view.ts labelBand). */
+export const LABELS_SHARE = 0.45;
 const SX_MAX = 1e14;
 const TY_MAX = 1e9;
+/** A point this many fan extents off an end stands past all of the fan, however wide a fold opens it. */
+const OFF_THE_FAN = 1e4;
 
 export interface Camera {
   /** World point at the screen centre. */
@@ -60,6 +64,12 @@ export class FanCamera {
   cam: Camera = { cx: 0, cy: 0, sx: 1, sy: 1, ty: 1 };
   w = 1;
   h = 1;
+  /**
+   * The tree on its side (flip.ts NOW_PX, ToLaD#480): "now" stands no further in than this from the screen's top (the
+   * phone's right edge), where every frame puts it, a time span shorter than the screen hung from there; nothing is drawn
+   * past "now" there but the axis's "now". Null (`?flip=0`): no lower than LABELS_SHARE down, the labels' band over it.
+   */
+  nowPx: number | null = null;
 
   constructor(
     public fan: Fan,
@@ -122,10 +132,10 @@ export class FanCamera {
    */
   frame(x0: number, x1: number, yFork: number, stretch = false): Camera {
     const y0 = this.yNow - yFork;
-    // Pixel margins: time labels on the left, species labels above "now", some stem below the fork.
+    // Pixel margins: time labels on the left, species labels above "now" (on its side, none: nowPx), some stem below the fork.
     const left = 58;
     const right = 14;
-    const top = 120;
+    const top = this.nowPx ?? 120;
     const bottom = 150; // room for the clade label below the fork, above the legend
     // Width and time each fill the screen (a narrow fan is not stretched past its height).
     const sy = (this.h - top - bottom) / -y0;
@@ -134,10 +144,13 @@ export class FanCamera {
     return { cx, cy: this.yNow + (this.h / 2 - top) / sy, sx, sy, ty: sy };
   }
 
-  /** Zoom-out bounds (px per world unit) for width and time. */
+  /**
+   * Zoom-out bounds (px per world unit) for width and time. In time, home's less what the labels' band may take of the
+   * height: the view's frames stand that much shorter than this home (ToLaD#373). On its side (nowPx) there is no band.
+   */
   minScale(): [number, number] {
     const h = this.home();
-    return [h.sx * MIN_ZOOM, h.sy * MIN_ZOOM];
+    return [h.sx * MIN_ZOOM, h.sy * MIN_ZOOM * (this.nowPx === null ? 1 - LABELS_SHARE : 1)];
   }
 
   /**
@@ -242,9 +255,9 @@ export class FanCamera {
    * zoom drops just enough (zooming out, or panning towards "now", where
    * years are taller). Nothing searches outside [shown, asked], so no gesture
    * can jump the view. The asked zoom is not remembered past the limit:
-   * zooming back out starts at once.
+   * zooming back out starts at once. `near`: clampPan's (a pinch's).
    */
-  settle(px = this.w / 2, py = this.h / 2, wx = this.cam.cx, wy = this.cam.cy): void {
+  settle(px = this.w / 2, py = this.h / 2, wx = this.cam.cx, wy = this.cam.cy, near?: number): void {
     const c = this.cam;
     const [sxMin, syMin] = this.minScale();
     const prev = c.sy > 0 && Number.isFinite(c.sy) ? c.sy : c.ty;
@@ -268,14 +281,14 @@ export class FanCamera {
     // The geometry is fixed in world units: the point stays where it is.
     c.cx = wx - (px - this.w / 2) / c.sx;
     c.cy = wy - (py - this.h / 2) / c.sy;
-    this.clampPan();
+    this.clampPan(near);
     // Panning back into reach can bring taller years to the top: drop the zoom about the top edge.
     for (let k = 0; k < 3; k++) {
       const yTop = c.cy - this.h / 2 / c.sy;
       if (this.timeOk(yTop, 0, c.sy)) break;
       c.sy = Math.max(syMin, this.topCap(yTop, c.sy));
       c.cy = yTop + this.h / 2 / c.sy;
-      this.clampPan();
+      this.clampPan(near);
     }
     c.ty = c.sy;
   }
@@ -340,29 +353,50 @@ export class FanCamera {
     return best;
   }
 
-  /**
-   * Keep the fan on screen: content within 40% of the screen's width of the
-   * centre (at some height on screen), "now" no lower than 40% down, the
-   * stem's end no higher than 60%.
-   */
-  clampPan(): void {
+  /** The heights on screen, "now" at the youngest. */
+  private heightsOnScreen(): [number, number] {
     const c = this.cam;
-    const yTop = this.yNow + (0.1 * this.h) / c.sy;
+    return [Math.max(this.yNow, c.cy - this.h / 2 / c.sy), c.cy + this.h / 2 / c.sy];
+  }
+
+  /**
+   * Keep the fan on screen: "now" no lower than LABELS_SHARE down (on its side, nowPx:
+   * a span shorter than the screen hangs from there, its room past the deep end), the stem's end
+   * no higher than 60%, and sideways the centre within 40% of the screen's width
+   * of the fan's outer edges at the heights on screen, so a pan crosses any gap
+   * (ToLaD#403). `near` (a pinch's: px): of the nearest content instead, at most so far.
+   */
+  clampPan(near?: number): void {
+    const c = this.cam;
+    const yTop = this.yNow + (this.h / 2 - (this.nowPx ?? LABELS_SHARE * this.h)) / c.sy;
     const yBot = this.fan.trunkBottom.y - (0.1 * this.h) / c.sy;
-    c.cy = yTop > yBot ? (yTop + yBot) / 2 : Math.min(yBot, Math.max(yTop, c.cy));
-    const p = this.nearestContent(c.cx, Math.max(this.yNow, c.cy - this.h / 2 / c.sy), c.cy + this.h / 2 / c.sy);
+    const short = this.nowPx === null ? (yTop + yBot) / 2 : yTop;
+    c.cy = yTop > yBot ? short : Math.min(yBot, Math.max(yTop, c.cy));
+    const [y0, y1] = this.heightsOnScreen();
+    if (near !== undefined) {
+      const p = this.nearestContent(c.cx, y0, y1);
+      const m = near / c.sx;
+      c.cx = Math.min(p + m, Math.max(p - m, c.cx));
+      return;
+    }
+    // (The content nearest a point off either end of the fan is that end's; a fold opens the fan past its extent.)
+    const [e0, e1] = this.extent();
+    const far = OFF_THE_FAN * (e1 - e0);
     const m = (0.4 * this.w) / c.sx;
-    c.cx = Math.min(p + m, Math.max(p - m, c.cx));
+    c.cx = Math.min(this.nearestContent(e1 + far, y0, y1) + m, Math.max(this.nearestContent(e0 - far, y0, y1) - m, c.cx));
   }
 
   /**
    * Zoom about a screen point by factors fx (width) and fy (time). Zooming in
    * stops at the width limit where the fingers are; between the columns it
    * zooms about the nearest one, kept within 30% of the screen of the fingers.
+   * Content stays within 40% of the screen's width of the centre, or no further
+   * than it is: a view a pan left over a gap does not jump (ToLaD#403).
    */
   zoomAbout(px: number, py: number, fx: number, fy = fx): void {
     const c = this.cam;
     const [wx, wy] = this.toWorld(px, py);
+    const near = Math.max(0.4 * this.w, Math.abs(this.nearestContent(c.cx, ...this.heightsOnScreen()) - c.cx) * c.sx);
     c.ty *= fy;
     let sx = c.sx * fx;
     if (fx > 1) {
@@ -375,12 +409,12 @@ export class FanCamera {
       const reach = Math.max(0.3 * this.w, Math.abs(p - wx) * c.sx);
       if (Math.abs(off) > reach) {
         c.sx = sx;
-        this.settle(px + Math.sign(off) * reach, py, p, wy);
+        this.settle(px + Math.sign(off) * reach, py, p, wy, near);
         return;
       }
     }
     c.sx = sx;
-    this.settle(px, py, wx, wy);
+    this.settle(px, py, wx, wy, near);
   }
 
   pan(dx: number, dy: number): void {

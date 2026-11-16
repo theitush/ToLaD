@@ -14,9 +14,11 @@
 // drives their counts (`use = "counts"`) take the history's own generation length,
 // which its segments are counted in.
 
-import raw from 'virtual:panthera-data';
+import raw, { naturalMeta } from 'virtual:panthera-data';
 import carnivora from 'virtual:carnivora-data';
 import { mammalData } from './mammals-data';
+import { unpackGenealogies } from './packed';
+import { genealogiesAhead } from './population';
 import type { LayoutSeed } from './layout';
 import { BirthCurve, procgenSegments, type GenSegment } from './history';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, sentenceCase, speciesUnder, type Split } from './splits';
@@ -76,6 +78,8 @@ export interface CladeRec {
   t0: number;
   t1: number;
   species: SpeciesRec[];
+  /** The dated tree the species sit in: the layout's unless it is given another. */
+  tree: Split;
   /** The default design's layout, worked out at build time (layout.ts LayoutSeed, ToLaD#255): the mammal level's. */
   seed?: LayoutSeed;
 }
@@ -133,7 +137,7 @@ function clades(species: RawSpecies[], rootGid: number): number[] {
 }
 
 /** What every natural baseline is: label, grade, citation (skeleton META.natural). */
-export const NATURAL_META: NaturalMeta | null = raw.naturalMeta ?? null;
+export const NATURAL_META: NaturalMeta | null = naturalMeta;
 
 /**
  * A clade as the fan shows it: the species its dated tree places, in the tiles' order; its totals are the sums over
@@ -157,18 +161,24 @@ export function cladeOf(r: RawClade, tree: Split, common: string): CladeRec {
     t0: r.t0,
     t1: r.t1,
     species,
+    tree,
   };
 }
 
 /** The cat family. */
-export const FELIDAE: CladeRec = cladeOf(raw, FELIDAE_TREE, 'Cats');
+export const FELIDAE: CladeRec = /* @__PURE__ */ cladeOf(raw, FELIDAE_TREE, 'Cats');
 
 /** The order the cats sit in (ToLaD#146): 284 living species and the dated fossils. */
-export const CARNIVORA: CladeRec = cladeOf(carnivora, CARNIVORA_TREE, 'Carnivores');
+export const CARNIVORA: CladeRec = /* @__PURE__ */ cladeOf(carnivora, CARNIVORA_TREE, 'Carnivores');
 
 
 let mamm: CladeRec | null = null;
 /** Every mammal (ToLaD#247): ~5,850 living species and the dated fossils, built when the level is first shown (after loadMammals, mammals-data.ts). */
 export function mammaliaClade(): CladeRec {
-  return (mamm ??= { ...cladeOf(mammalData().clade, mammaliaTree(), 'Mammals'), seed: mammalData().seed });
+  if (mamm) return mamm;
+  const d = mammalData();
+  mamm = { ...cladeOf(d.clade, mammaliaTree(), 'Mammals'), seed: d.seed };
+  // Its genealogies, worked out at build time (mammals-seed.ts, ToLaD#255), for these species.
+  if (d.gen) genealogiesAhead(unpackGenealogies(d.gen), mamm.species);
+  return mamm;
 }

@@ -4,7 +4,7 @@
 import { writeFileSync } from 'node:fs';
 import { Session } from 'node:inspector/promises';
 import { describe, expect, it } from 'vitest';
-import { MeshBatch, RectBatch } from './meshgl';
+import { RectBatch } from './meshgl';
 import { Steady } from './steady';
 import { layoutFan, layoutSeed, type Fan } from './layout';
 import { mammalData } from './mammals-data';
@@ -74,15 +74,15 @@ describe.skipIf(!RUN)('mammal level open (perf)', () => {
     if (process.env.LOADPERF_SEED) {
       const clade = cladeOf(mammalData().clade, mammaliaTree(), 'Mammals');
       const seed = layoutSeed(clade, mammaliaTree());
-      seed.ord = new Steady(layoutFan({ ...clade, seed }, 'linear', mammaliaTree(), 'curved')).ordShare;
+      seed.ord = new Steady(layoutFan({ ...clade, seed }, 'linear', mammaliaTree())).ordShare;
       mammalData().seed = JSON.parse(JSON.stringify(seed));
       lap('(seed, build)');
     }
     mammaliaClade();
     lap('mammaliaClade');
-    const v = new FanView(canvas as unknown as HTMLCanvasElement, mammaliaClade(), 'curved', mammaliaTree(), true);
+    const v = new FanView(canvas as unknown as HTMLCanvasElement, mammaliaClade(), mammaliaTree(), true);
     lap('new FanView');
-    const gl = { under: new RectBatch(), mesh: new MeshBatch(), over: new RectBatch(), begin() {}, end() {} };
+    const gl = { under: new RectBatch(), over: new RectBatch(), begin() {}, end() {} };
     (v as unknown as { gl: unknown }).gl = gl;
     v.draw();
     lap('draw 1');
@@ -91,22 +91,19 @@ describe.skipIf(!RUN)('mammal level open (perf)', () => {
     v.draw();
     lap('draw 3');
     // The labels laid out at rest at a few frames (labelsNow's layout, the frame's own): the home again, Rodentia, the bats.
-    const at = v as unknown as { cam: unknown; homeCamera(): unknown; levelCamera(n: string): unknown; labelLayMs: number[]; restRoom: unknown; labLast: unknown };
+    const at = v as unknown as { cam: unknown; homeCamera(): unknown; levelCamera(n: string): unknown; labelMs: number[] };
     for (const [s, cam] of [['home', () => at.homeCamera()], ['Rodentia', () => at.levelCamera('Rodentia')], ['Chiroptera', () => at.levelCamera('Chiroptera')]] as const) {
       at.cam = cam();
       v.draw();
       lap(`${s} frame`);
-      at.restRoom = null;
-      at.labLast = null;
-      v.draw();
-      t.push([`  labels ${s}`, at.labelLayMs[at.labelLayMs.length - 1]]);
+      t.push([`  labels ${s}`, at.labelMs[at.labelMs.length - 1]]);
       t0 = performance.now();
     }
     // (Seeded: the layout is the worked-out one, number for number, ToLaD#255.)
     if (process.env.LOADPERF_SEED) {
       const nums = (f: Fan) => JSON.stringify([f.nodes.map((n) => [n.left, n.cx, n.blend, n.leanY, n.tile]), f.branches.map((b) => [b.cx, b.colLeft, b.x0, b.leanY, b.index, b.path.map((p) => [p.left, p.gAbove])])]);
-      expect(JSON.stringify(v.fan.tess.fold!.ordShare)).toBe(JSON.stringify(new Steady(layoutFan({ ...mammaliaClade(), seed: undefined }, 'linear', mammaliaTree(), 'curved')).ordShare));
-      expect(nums(v.fan)).toBe(nums(layoutFan({ ...mammaliaClade(), seed: undefined }, 'linear', mammaliaTree(), 'curved')));
+      expect(JSON.stringify(v.fan.tess.fold!.ordShare)).toBe(JSON.stringify(new Steady(layoutFan({ ...mammaliaClade(), seed: undefined }, 'linear', mammaliaTree())).ordShare));
+      expect(nums(v.fan)).toBe(nums(layoutFan({ ...mammaliaClade(), seed: undefined }, 'linear', mammaliaTree())));
     }
     if (prof) {
       const { profile } = await prof.post('Profiler.stop');

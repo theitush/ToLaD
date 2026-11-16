@@ -1,0 +1,201 @@
+// One frame (ToLaD#359, research/scalable-tree.md §4): a tap on a label goes into exactly the cut item it stands for,
+// framed by its territory filling the labels' width (runFrame), and there the cut one step finer shows every species
+// of it under a label of its own, whole on screen; a double tap goes back out to a frame that holds it. Checked over the
+// whole tree by code (no browser): cats and carnivores every item at home and one tap in, the mammals sampled.
+import { describe, expect, it, afterAll, beforeAll } from 'vitest';
+import { loadMammalsFromFiles } from './mammals-node';
+import { CARNIVORA, FELIDAE, mammaliaClade, type CladeRec } from './panthera';
+import { PIC_D, setLabelMode } from './pics';
+import { setGapMode } from './fold';
+import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, type Split } from './splits';
+import { FanView, type Level } from './view';
+import type { Camera } from './camera';
+import type { FanNode } from './layout';
+
+function stubView(clade: CladeRec = CARNIVORA, tree: Split = CARNIVORA_TREE, folds = true): FanView {
+  const noop = () => {};
+  const g = globalThis as Record<string, unknown>;
+  g.Path2D = class {
+    moveTo() {}
+    lineTo() {}
+    arc() {}
+    bezierCurveTo() {}
+    quadraticCurveTo() {}
+    closePath() {}
+    rect() {}
+  };
+  g.ResizeObserver = class {
+    observe() {}
+    disconnect() {}
+  };
+  g.window = { devicePixelRatio: 2 };
+  g.requestAnimationFrame = () => 1;
+  g.cancelAnimationFrame = noop;
+  const ctx = new Proxy(
+    { measureText: (t: string) => ({ width: t.length * 7.5 }), createLinearGradient: () => ({ addColorStop: noop }) } as Record<string, unknown>,
+    { get: (o, k) => (k in o ? o[k as string] : typeof k === 'string' && /^[a-z]/.test(k) && !['font', 'fillStyle', 'strokeStyle'].includes(k) ? noop : o[k as string]), set: (o, k, v) => ((o[k as string] = v), true) },
+  );
+  const canvas = {
+    width: 0,
+    height: 0,
+    style: {},
+    parentElement: null,
+    getContext: () => ctx,
+    getBoundingClientRect: () => ({ width: 390, height: 844, left: 0, top: 0, right: 390, bottom: 844 }),
+    addEventListener: noop,
+    removeEventListener: noop,
+  };
+  return new FanView(canvas as unknown as HTMLCanvasElement, clade, tree, folds);
+}
+
+
+type Priv = { anim: ((t: number) => boolean) | null; applyFold(): void; landOf(lv: Level): Camera; offBy(a: Camera, b: Camera): number };
+const P = (v: FanView) => v as unknown as Priv;
+/** How much tighter frame a is than the view at camera c, in px of the screen, on width and on time (negative: wider). */
+const tighter = (v: FanView, a: Camera, c: Camera): [number, number] => [v.w * (a.sx / c.sx - 1), v.h * (a.sy / c.sy - 1)];
+/**
+ * Where a double tap goes from level `from`, the view at camera c (ToLaD#472, as levels.test's wantUp): one level up, where a tap
+ * on it lands; where that lands tighter than the view on width or on time (more than LEVEL_PX, 12), the nearest level up that
+ * zooms out (ToLaD#416); from home's level off home, home.
+ */
+function wantUp(v: FanView, from: Level, c: Camera): FanNode | null {
+  for (let at = from; ; ) {
+    // (At home's level off home, home, ToLaD#416's last resort.)
+    const u = v.levelAbove(at) ?? (P(v).offBy(P(v).landOf({ v: v.fan.root }), c) > 1 ? v.fan.root : null);
+    if (!u) return null;
+    const [x, y] = tighter(v, P(v).landOf({ v: u }), c);
+    if (x <= 12 && y <= 12) return u;
+    if (u === v.fan.root) return x < -12 ? u : null;
+    at = { v: u };
+  }
+}
+function settle(v: FanView): void {
+  for (let k = 0; k < 3; k++) v.draw();
+}
+function run(v: FanView): void {
+  const iv = P(v);
+  for (let t = performance.now() + 16; iv.anim; t += 16) {
+    if (!iv.anim(t)) iv.anim = null;
+    iv.applyFold();
+  }
+  settle(v);
+}
+/** The time axis's labels' right edge (view.ts LABEL_AXIS_X): labels keep right of it. */
+const AXIS = 72;
+
+/**
+ * At the view's frame for strands f..l: every label of them shown whole on screen (right of the axis; a neighbour's
+ * may be sliding off the edge, ToLaD#373), and every species of f..l under a shown label that stands for none outside
+ * f..l (its next-level labels, all of them).
+ */
+function frameCheck(v: FanView, f: number, l: number, at: string, bad: string[]): void {
+  settle(v);
+  const c = v.cutLast!;
+  const mine = (run?: readonly number[]) => !!run && run[0] >= f && run[1] <= l;
+  for (const s of c.spots) if (mine(s.run) && (s.box[0] < AXIS - 1e-6 || s.box[2] > v.w + 1e-6 || s.box[3] > v.h)) bad.push(`${at}: "${s.text}" cut off at x ${s.box[0].toFixed(1)}–${s.box[2].toFixed(1)}`);
+  for (const p of c.pics) if (mine(p.run) && (p.x - PIC_D / 2 < AXIS - 1e-6 || p.x + PIC_D / 2 > v.w + 1e-6 || p.y - PIC_D / 2 < 0)) bad.push(`${at}: ${p.face.sp.common}'s picture cut off at ${p.x.toFixed(1)}, ${p.y.toFixed(1)}`);
+  const got = new Int32Array(l - f + 1);
+  for (const it of c.items) {
+    if (it.l < f || it.f > l) continue;
+    if (it.f < f || it.l > l) bad.push(`${at}: a label for strands ${it.f}-${it.l} stands for more than the item ${f}-${l}`);
+    for (let i = Math.max(f, it.f); i <= Math.min(l, it.l); i++) got[i - f]++;
+  }
+  const miss = [...got.keys()].filter((i) => got[i] !== 1);
+  if (miss.length) bad.push(`${at}: ${miss.length} of its ${l - f + 1} species under no label on screen, e.g. strand ${f + miss[0]}`);
+}
+
+const counted = { labelled: 0, bare: 0 };
+/** Tap into each item shown at the view (all, or `sample` of them, spread), check its frame, and a double tap back out; `depth` taps deep. */
+function tapEach(v: FanView, at: string, bad: string[], depth: number, sample = Infinity): number {
+  settle(v);
+  const from = { ...v.cam };
+  const onScreen = (b: readonly number[]) => (b[0] + b[2]) / 2 >= 0 && (b[0] + b[2]) / 2 <= v.w && (b[1] + b[3]) / 2 >= 0 && (b[1] + b[3]) / 2 <= v.h;
+  const labelled = v.cutLast!.spots.filter((s) => s.run && s.run[1] > s.run[0] && onScreen(s.box)).map((s) => [...s.run!, s.box] as [number, number, readonly number[] | null]);
+  // (An item with no label on screen, as one whose label left with its branch, ToLaD#373, has no tap of its own: flown to as a label's tap flies, its frame checked, no step to go back by.)
+  const bare = v.cutLast!.items.filter((it) => it.l > it.f && !labelled.some(([f, l]) => f === it.f && l === it.l)).map((it) => [it.f, it.l, null] as [number, number, readonly number[] | null]);
+  counted.labelled += labelled.length;
+  counted.bare += bare.length;
+  const items = [...labelled, ...bare];
+  const step = Math.max(1, Math.ceil(items.length / sample));
+  let n = 0;
+  for (let i = 0; i < items.length; i += step) {
+    const [f, l, box] = items[i];
+    v.cam = { ...from };
+    settle(v);
+    // (A real tap, on its label: a tap's step is what a double tap goes back by, ToLaD#376.)
+    if (box) v.tap((box[0] + box[2]) / 2, (box[1] + box[3]) / 2);
+    else v.tapItem(f, l);
+    run(v);
+    const here = `${at} > ${f}-${l}`;
+    n++;
+    // (An item no frame splits, down to one species, its widest: its landing and card, the species' frame, not an item's.)
+    if ((v as unknown as { backing: { lv: { b?: unknown } } | null }).backing?.lv.b) continue;
+    const inside = { ...v.cam };
+    if (Math.abs(Math.log(inside.sx / from.sx)) < 1e-3 && Math.abs(inside.cx - from.cx) * from.sx < 1) {
+      bad.push(`${here}: the tap did not move`);
+      continue;
+    }
+    // (A tap into an item whose frame is the view's goes on into its widest daughter: the frame checked is where it landed.)
+    const T = (v as unknown as { territories(): { t: { hull(f: number, l: number): [number, number] } } }).territories().t;
+    const [a, b] = T.hull(f, l).map((x) => v.toScreen(x, 0)[0]);
+    if (a >= AXIS - 1 && b <= v.w + 1) frameCheck(v, f, l, here, bad);
+    if (bad.length >= 20) return n;
+    // A double tap, right after the tap: one level up from the level the tap landed on, where a tap on that one lands (ToLaD#472;
+    // where that would zoom in, the nearest level up that zooms out, #416), never in, and out on width or on time.
+    if (box) {
+      const lv = v.levelNow(true);
+      const want = wantUp(v, lv, inside);
+      v.doubleTap(0, 0);
+      run(v);
+      const out = v.cam;
+      const [x, y] = tighter(v, out, inside);
+      const name = (u: FanNode | undefined) => (u ? u.split.taxon || u.split.name || '?' : lv.b ? `${lv.b.sp.sci} (species)` : '?');
+      if (x > 12 || y > 12 || (x >= -12 && y >= -12)) bad.push(`${here}: a double tap from ${name(lv.v)} did not go out (${x.toFixed(0)}, ${y.toFixed(0)} px tighter)`);
+      else if (!want) bad.push(`${here}: no level up from ${name(lv.v)} zooms out, yet the double tap went`);
+      else if (P(v).offBy(P(v).landOf({ v: want }), out) > 1) bad.push(`${here}: a double tap from ${name(lv.v)} went to x ${(1 / out.sx).toExponential(2)} at ${out.cx.toFixed(1)}, not one level up (${name(want)})`);
+    }
+    if (depth > 1) {
+      v.cam = { ...inside };
+      n += tapEach(v, here, bad, depth - 1, sample);
+    }
+  }
+  return n;
+}
+
+const FANS: [string, () => Promise<FanView>, number, number][] = [
+  ['cats', async () => stubView(FELIDAE as CladeRec, FELIDAE_TREE as Split, false), 2, Infinity],
+  ['carnivores', async () => stubView(), 2, Infinity],
+  [
+    'mammals',
+    async () => {
+      await loadMammalsFromFiles();
+      return stubView(mammaliaClade(), mammaliaTree(), true);
+    },
+    2,
+    3,
+  ],
+];
+
+describe('one frame (ToLaD#359): a label\'s tap frames its item, every next-level label whole on screen', () => {
+  // (Retired look, ToLaD#446: every species under a cut label, pinned to the old modes; the app is `groups` and `clades`, ToLaD#439.)
+  beforeAll(() => {
+    setLabelMode('cut');
+    setGapMode('groups');
+  });
+  afterAll(() => {
+    setLabelMode('groups');
+    setGapMode('clades');
+  });
+  for (const [name, mk, depth, sample] of FANS)
+    it(name, { timeout: 900_000 }, async () => {
+      const v = await mk();
+      const bad: string[] = [];
+      v.cam = v.homeCamera();
+      frameCheck(v, 0, v.fan.root.strands.length - 1, `${name} home`, bad);
+      const n = tapEach(v, `${name} home`, bad, depth, sample);
+      (globalThis as unknown as { process: { stderr: { write(s: string): void } } }).process.stderr.write(`oneframe ${name}: ${n} taps checked, ${counted.labelled} by a label's real tap, ${counted.bare} items with no label on screen flown to\n`);
+      counted.labelled = counted.bare = 0;
+      expect(bad).toEqual([]);
+      expect(n).toBeGreaterThan(0);
+    });
+});

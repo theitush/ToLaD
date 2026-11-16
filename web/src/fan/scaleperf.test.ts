@@ -11,7 +11,8 @@
 import { appendFileSync, writeFileSync } from 'node:fs';
 import { Session } from 'node:inspector/promises';
 import { describe, it } from 'vitest';
-import { MeshBatch, RectBatch } from './meshgl';
+import { setFlip } from './flip';
+import { RectBatch } from './meshgl';
 import { loadMammals } from './mammals-data';
 import { mammaliaClade } from './panthera';
 import { mammaliaTree } from './splits';
@@ -77,7 +78,10 @@ describe.skipIf(!OUT)('scale yardstick (perf)', () => {
       return r;
     };
     const canvas = stubCanvas();
-    // The build's part and the file read (synthetic-level.ts laps: synth-gen, synth-seed, synth-file, fetch, json).
+    // The tree on its side, as the page draws it (flip.ts: node has no location, so it would draw the old one); SCALE_FLIP=0: the old one.
+    setFlip(process.env.SCALE_FLIP !== '0');
+    res.flip = process.env.SCALE_FLIP !== '0';
+    // The build's part and the file read (synthetic-level.ts laps: synth-gen, synth-seed, synth-file, fetch, json, unpack).
     log(`n=${n} start`);
     await loadMammals(() => synthLevelData({ n, seed: process.env.SCALE_SEED !== '0', json: process.env.SCALE_JSON !== '0', orders: process.env.SCALE_ORDERS !== '0' }, load));
     log(`data ${JSON.stringify(load)}`);
@@ -100,9 +104,9 @@ describe.skipIf(!OUT)('scale yardstick (perf)', () => {
     lap('tree');
     mammaliaClade();
     lap('clade');
-    const v = new FanView(canvas as unknown as HTMLCanvasElement, mammaliaClade(), 'curved', mammaliaTree(), true);
+    const v = new FanView(canvas as unknown as HTMLCanvasElement, mammaliaClade(), mammaliaTree(), true);
     lap('view');
-    const gl = { under: new RectBatch(), mesh: new MeshBatch(), over: new RectBatch(), begin() {}, end() {} };
+    const gl = { under: new RectBatch(), over: new RectBatch(), begin() {}, end() {} };
     (v as unknown as { gl: unknown }).gl = gl;
     v.draw();
     lap('first');
@@ -124,6 +128,7 @@ describe.skipIf(!OUT)('scale yardstick (perf)', () => {
         levelNow(now?: boolean): unknown;
         toScreen(x: number, y: number): [number, number];
         w: number;
+        h: number;
       };
       const frames: Record<string, unknown> = {};
       const m = synthMarksNow!;
@@ -146,7 +151,7 @@ describe.skipIf(!OUT)('scale yardstick (perf)', () => {
         // A pinch in and out about the middle (as phoneperf's: 20 steps each way), a pan, a flight in and back.
         const pinch: number[] = [];
         at.gestureStart();
-        for (let k = 0; k < 40; k++) pinch.push(timed(() => v.zoomAbout(195, 464, k < 20 ? 1.06 : 1 / 1.06)));
+        for (let k = 0; k < 40; k++) pinch.push(timed(() => v.zoomAbout(at.w / 2, at.h / 2, k < 20 ? 1.06 : 1 / 1.06)));
         at.gestureEnd();
         at.levelNow(true);
         const pan: number[] = [];

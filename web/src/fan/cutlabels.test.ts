@@ -1,11 +1,17 @@
 // ?labels=cut (ToLaD#333, research/scalable-tree.md §3): names, pictures and "+x" from one cut through the territories.
-// No two names meet, no two pictures, no name and picture (names hang below a tip, pictures stand on it); each stays
+// No two names meet, no two pictures, no name and picture (a name stands on its picture, the picture over its tip); each stays
 // inside its own territory; and what shows depends only on the camera, not the way there.
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { loadMammalsFromFiles } from './mammals-node';
 import { CARNIVORA, FELIDAE, mammaliaClade, type CladeRec } from './panthera';
+import { setLabelMode, PIC_D, PIC_ROOM } from './pics';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, type Split } from './splits';
 import { FanView, groupCentre, type CutLabels } from './view';
+import { setGapMode } from './fold';
+
+// (Written for the cut's labels and the groups' gaps, modes still in the modules: the app's defaults since ToLaD#439 are `groups` and `clades`.)
+setLabelMode('cut');
+setGapMode('groups');
 
 function stubView(clade: CladeRec = CARNIVORA, tree: Split = CARNIVORA_TREE, folds = true): FanView {
   const noop = () => {};
@@ -40,16 +46,9 @@ function stubView(clade: CladeRec = CARNIVORA, tree: Split = CARNIVORA_TREE, fol
     addEventListener: noop,
     removeEventListener: noop,
   };
-  return new FanView(canvas as unknown as HTMLCanvasElement, clade, 'curved', tree, folds);
+  return new FanView(canvas as unknown as HTMLCanvasElement, clade, tree, folds);
 }
 
-const was = FanView.labelsCut;
-beforeAll(() => {
-  FanView.labelsCut = true;
-});
-afterAll(() => {
-  FanView.labelsCut = was;
-});
 
 const shot = (v: FanView): CutLabels => {
   v.draw();
@@ -61,11 +60,16 @@ function check(c: CutLabels, w: number): void {
   const S = [...c.spots].sort((p, q) => p.x - q.x);
   for (let k = 1; k < S.length; k++) expect(S[k].box[0]).toBeGreaterThanOrEqual(S[k - 1].box[2] - 1e-6);
   const P = [...c.pics].sort((p, q) => p.x - q.x);
-  for (let k = 1; k < P.length; k++) expect(P[k].x - P[k].d / 2).toBeGreaterThanOrEqual(P[k - 1].x + P[k - 1].d / 2 - 1e-6);
+  for (let k = 1; k < P.length; k++) expect(P[k].x - PIC_D / 2).toBeGreaterThanOrEqual(P[k - 1].x + PIC_D / 2 - 1e-6);
+  // (No name over a picture, ToLaD#373.)
   for (const p of P)
     for (const s of S)
-      if (s.box[2] > p.x - p.d / 2 && s.box[0] < p.x + p.d / 2) expect(s.box[1]).toBeGreaterThanOrEqual(p.y + p.d / 2 - 1e-6);
-  for (const s of S) expect([s.key, s.x, s.box[2] > 0 && s.box[0] < w]).toEqual([s.key, s.x, true]);
+      if (s.box[2] > p.x - PIC_D / 2 && s.box[0] < p.x + PIC_D / 2) expect(s.box[3]).toBeLessThanOrEqual(p.y - PIC_D / 2 + 1e-6);
+  // (Each on screen, its picture at least: it stays until wholly off the edge.)
+  for (const q of c.pics) expect([q.x, q.x + PIC_ROOM / 2 >= 0 && q.x - PIC_ROOM / 2 <= w]).toEqual([q.x, true]);
+  // (Each line inside its own branches: two neighbours' never overlap, ToLaD#433.)
+  const O = c.spots.flatMap((s) => (s.over ? [s.over] : [])).sort((p, q) => p[0] - q[0]);
+  for (let k = 1; k < O.length; k++) expect(O[k][0]).toBeGreaterThanOrEqual(O[k - 1][1] - 1e-6);
 }
 
 const mammals = async () => {
@@ -109,11 +113,41 @@ describe('labels from the cut (?labels=cut, ToLaD#333)', () => {
         const cut = shot(v);
         if (c === home) expect(cut.spots.length).toBeGreaterThan(0);
         check(cut, v.w);
-        // Each picture stands over the column of the species it shows at "now", its territory only bounding it: within
-        // half its width of it (the territory holds that column and the picture), where the screen leaves it room.
-        for (const p of cut.pics) {
-          const c = v.toScreen(groupCentre({ b: p.face }), 0)[0];
-          if (c >= 72 + p.d / 2 && c <= v.w - p.d / 2) expect([p.face.sp.common, Math.abs(p.x - c) <= p.d / 2 + 1e-6]).toEqual([p.face.sp.common, true]);
+        // Each picture stands over the column of the species it shows at "now", a "+x"'s over the middle of its
+        // branches at its foot (ToLaD#368), its territory only bounding it: within half its width of it (the territory
+        // holds that column and the picture), where the screen leaves it room.
+        for (let i = 0; i < cut.pics.length; i++) {
+          const p = cut.pics[i];
+          const s = cut.spots[i];
+          const o = s.over;
+          const reach = o && (v as unknown as { territories(): { reach(f: number, l: number, foot: number): number[] | null } }).territories().reach(s.run![0], s.run![1], v.toWorld(0, o[2])[1]);
+          const c = reach ? v.toScreen((reach[0] + reach[1]) / 2, 0)[0] : v.toScreen(groupCentre({ b: p.face }), 0)[0];
+          // (Its line around its branches, out to their outer edges, ToLaD#433; a branch of no width at that row: its edge is its middle.)
+          if (o && reach) expect([s.text, o[0] <= v.toScreen(reach[0], 0)[0] && o[1] >= v.toScreen(reach[1], 0)[0]]).toEqual([s.text, true]);
+          if (c >= 72 + PIC_ROOM / 2 && c <= v.w - PIC_ROOM / 2) expect([p.face.sp.common, Math.abs(p.x - c) <= PIC_ROOM / 2 + 1e-6]).toEqual([p.face.sp.common, true]);
+        }
+        // With "now" on screen, no label of a living item reaches below the now line (ToLaD#373, Ita: "so that they dont
+        // cover the branches"): its name over its picture over its "+x" line, all above it, and every picture in one row.
+        const nowY = v.toScreen(0, v.fan.time.y(0))[1];
+        const T = (v as unknown as { territories(): { whole(k: number, f: number, l: number): number; youngOf(k: number): number } }).territories();
+        const row = (v as unknown as { rowLast: number }).rowLast;
+          for (let i = 0; i < cut.spots.length; i++) {
+            const it = cut.items[i];
+            if (T.youngOf(T.whole(it.head, it.f, it.l)) > v.fan.time.y(0)) continue;
+            const s = cut.spots[i];
+            const p = cut.pics[i];
+            if (p.y + PIC_D / 2 - PIC_ROOM > row + 1e-6) {
+              expect([s.text, p.y + PIC_D / 2 + 14]).toEqual([s.text, expect.closeTo(nowY, 6)]);
+              if (s.over) expect([s.text, s.over[2] < nowY && s.over[2] > p.y + PIC_D / 2]).toEqual([s.text, true]);
+            }
+          }
+        // One rigid unit (ToLaD#373, Ita: "the name should be attached to the pic and always above it"): each pill
+        // centred on its picture, its foot just over it, never under the band's row less the longest pill.
+        for (let i = 0; i < cut.spots.length; i++) {
+          const s = cut.spots[i];
+          const p = cut.pics[i];
+          expect([s.text, s.x, s.box[3]]).toEqual([s.text, expect.closeTo(p.x, 6), expect.closeTo(p.y - PIC_D / 2 - 4, 6)]);
+          expect([s.text, p.y + PIC_D / 2 - PIC_ROOM >= row - 1e-6]).toEqual([s.text, true]);
         }
         seen.push(sig(cut));
       }
@@ -122,7 +156,7 @@ describe('labels from the cut (?labels=cut, ToLaD#333)', () => {
         v.cam = { ...cams[i] };
         expect(sig(shot(v))).toEqual(seen[i]);
       }
-      const ms = [...(v as unknown as { labelLayMs: number[] }).labelLayMs].sort((p, q) => p - q);
+      const ms = [...(v as unknown as { labelMs: number[] }).labelMs].sort((p, q) => p - q);
       (globalThis as unknown as { process: { stderr: { write(s: string): void } } }).process.stderr.write(`${name}: labels (brackets' layout included) ${ms[ms.length >> 1].toFixed(3)} ms a frame (median of ${ms.length}), ${seen[0].length} at home\n`);
     });
 });

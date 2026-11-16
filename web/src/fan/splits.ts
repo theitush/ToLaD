@@ -19,6 +19,7 @@
 import raw from 'virtual:panthera-data';
 import carnivora from 'virtual:carnivora-data';
 import { mammalData } from './mammals-data';
+import { unpackTree } from './packed';
 import type { DatedSplit, RawClade } from './panthera-extract';
 
 export type Confidence = 'high' | 'medium' | 'low';
@@ -213,15 +214,19 @@ export function treeOf(raw: RawClade): Split {
 }
 
 /** The cat family's dated tree, from the data. */
-export const FELIDAE_TREE: Split = treeOf(raw);
+export const FELIDAE_TREE: Split = /* @__PURE__ */ treeOf(raw);
 
 /** The order the cats sit in (ToLaD#146): cats, dogs, bears, seals, weasels and the rest. */
-export const CARNIVORA_TREE: Split = treeOf(carnivora);
+export const CARNIVORA_TREE: Split = /* @__PURE__ */ treeOf(carnivora);
 
 let mammTree: Split | null = null;
-/** Every mammal's dated tree (ToLaD#247), built when the level is first shown (after loadMammals, mammals-data.ts). */
+/**
+ * Every mammal's dated tree (ToLaD#247), when the level is first shown (after loadMammals, mammals-data.ts): the one
+ * the build worked out (mammals-seed.ts, ToLaD#255), or built here from the data's dated tree.
+ */
 export function mammaliaTree(): Split {
-  return (mammTree ??= nameOrders(treeOf(mammalData().clade)));
+  const d = mammalData();
+  return (mammTree ??= d.tree ? unpackTree(d.tree) : nameOrders(treeOf(d.clade)));
 }
 
 /**
@@ -264,6 +269,136 @@ export const FAMILY_EN: Record<string, string> = {
   Cercopithecidae: 'Old World monkeys',
   Hylobatidae: 'Gibbons',
   Hominidae: 'Great apes',
+  // (Bats, ToLaD#417, and every other MDD family: the group's name in common English use.)
+  Cistugidae: 'Wing-gland bats',
+  Craseonycteridae: 'Bumblebee bat',
+  Emballonuridae: 'Sac-winged bats',
+  Furipteridae: 'Smoky bats',
+  Hipposideridae: 'Roundleaf bats',
+  Megadermatidae: 'False vampire bats',
+  Miniopteridae: 'Bent-winged bats',
+  Molossidae: 'Free-tailed bats',
+  Mormoopidae: 'Ghost-faced bats',
+  Mystacinidae: 'Short-tailed bats',
+  Myzopodidae: 'Sucker-footed bats',
+  Natalidae: 'Funnel-eared bats',
+  Noctilionidae: 'Bulldog bats',
+  Nycteridae: 'Slit-faced bats',
+  Phyllostomidae: 'Leaf-nosed bats',
+  Pteropodidae: 'Fruit bats',
+  Rhinolophidae: 'Horseshoe bats',
+  Rhinonycteridae: 'Trident bats',
+  Rhinopomatidae: 'Mouse-tailed bats',
+  Thyropteridae: 'Disk-winged bats',
+  Vespertilionidae: 'Vesper bats',
+  Abrocomidae: 'Chinchilla rats',
+  Anomaluridae: 'Scaly-tailed squirrels',
+  Aplodontiidae: 'Mountain beaver',
+  Bathyergidae: 'African mole-rats',
+  Calomyscidae: 'Mouse-like hamsters',
+  Castoridae: 'Beavers',
+  Caviidae: 'Cavies & capybaras',
+  Chinchillidae: 'Chinchillas & viscachas',
+  Cricetidae: 'Hamsters, voles & New World mice',
+  Ctenodactylidae: 'Gundis',
+  Ctenomyidae: 'Tuco-tucos',
+  Cuniculidae: 'Pacas',
+  Dasyproctidae: 'Agoutis',
+  Diatomyidae: 'Laotian rock rat',
+  Dinomyidae: 'Pacarana',
+  Dipodidae: 'Jerboas',
+  Echimyidae: 'Spiny rats',
+  Erethizontidae: 'New World porcupines',
+  Geomyidae: 'Pocket gophers',
+  Gliridae: 'Dormice',
+  Heterocephalidae: 'Naked mole-rats',
+  Heteromyidae: 'Pocket mice & kangaroo rats',
+  Hystricidae: 'Old World porcupines',
+  Muridae: 'Old World mice & rats',
+  Nesomyidae: 'Afro-Malagasy rats',
+  Octodontidae: 'Degus',
+  Pedetidae: 'Springhares',
+  Petromuridae: 'Dassie rat',
+  Platacanthomyidae: 'Spiny dormice',
+  Sciuridae: 'Squirrels',
+  Sminthidae: 'Birch mice',
+  Spalacidae: 'Mole-rats & bamboo rats',
+  Thryonomyidae: 'Cane rats',
+  Zapodidae: 'Jumping mice',
+  Zenkerellidae: 'Cameroon scaly-tail',
+  Antilocapridae: 'Pronghorn',
+  Balaenidae: 'Right whales',
+  Balaenopteridae: 'Rorquals',
+  Bovidae: 'Cattle & antelopes',
+  Camelidae: 'Camels & llamas',
+  Cervidae: 'Deer',
+  Cetotheriidae: 'Pygmy right whale',
+  Delphinidae: 'Dolphins',
+  Giraffidae: 'Giraffes & okapi',
+  Hippopotamidae: 'Hippos',
+  Iniidae: 'Amazon river dolphins',
+  Kogiidae: 'Pygmy sperm whales',
+  Lipotidae: 'Baiji',
+  Monodontidae: 'Narwhal & beluga',
+  Moschidae: 'Musk deer',
+  Phocoenidae: 'Porpoises',
+  Physeteridae: 'Sperm whale',
+  Platanistidae: 'South Asian river dolphins',
+  Pontoporiidae: 'Franciscana',
+  Suidae: 'Pigs',
+  Tayassuidae: 'Peccaries',
+  Tragulidae: 'Chevrotains',
+  Ziphiidae: 'Beaked whales',
+  Equidae: 'Horses',
+  Rhinocerotidae: 'Rhinos',
+  Tapiridae: 'Tapirs',
+  Erinaceidae: 'Hedgehogs & gymnures',
+  Solenodontidae: 'Solenodons',
+  Soricidae: 'Shrews',
+  Talpidae: 'Moles',
+  Leporidae: 'Rabbits & hares',
+  Ochotonidae: 'Pikas',
+  Tupaiidae: 'Treeshrews',
+  Ptilocercidae: 'Pen-tailed treeshrew',
+  Cynocephalidae: 'Colugos',
+  Manidae: 'Pangolins',
+  Bradypodidae: 'Three-toed sloths',
+  Choloepodidae: 'Two-toed sloths',
+  Cyclopedidae: 'Silky anteaters',
+  Myrmecophagidae: 'Anteaters',
+  Chlamyphoridae: 'Fairy armadillos',
+  Dasypodidae: 'Long-nosed armadillos',
+  Euphractidae: 'Hairy armadillos',
+  Tolypeutidae: 'Giant & three-banded armadillos',
+  Chrysochloridae: 'Golden moles',
+  Potamogalidae: 'Otter shrews',
+  Tenrecidae: 'Tenrecs',
+  Macroscelididae: 'Elephant shrews',
+  Procaviidae: 'Hyraxes',
+  Elephantidae: 'Elephants',
+  Dugongidae: 'Dugong',
+  Trichechidae: 'Manatees',
+  Orycteropodidae: 'Aardvark',
+  Didelphidae: 'Opossums',
+  Caenolestidae: 'Shrew opossums',
+  Microbiotheriidae: 'Monito del monte',
+  Dasyuridae: 'Quolls & marsupial mice',
+  Myrmecobiidae: 'Numbat',
+  Notoryctidae: 'Marsupial moles',
+  Thylacomyidae: 'Bilbies',
+  Acrobatidae: 'Feathertail gliders',
+  Burramyidae: 'Pygmy possums',
+  Hypsiprymnodontidae: 'Musky rat-kangaroo',
+  Macropodidae: 'Kangaroos & wallabies',
+  Petauridae: 'Gliders & striped possums',
+  Phalangeridae: 'Cuscuses & brushtail possums',
+  Phascolarctidae: 'Koala',
+  Potoroidae: 'Potoroos & bettongs',
+  Pseudocheiridae: 'Ringtail possums',
+  Tarsipedidae: 'Honey possum',
+  Vombatidae: 'Wombats',
+  Ornithorhynchidae: 'Platypus',
+  Tachyglossidae: 'Echidnas',
 };
 
 /**
@@ -271,12 +406,13 @@ export const FAMILY_EN: Record<string, string> = {
  * is not here: its families stand as branches of their own). Their plain English names label them at the mammal level.
  */
 export const ORDER_EN: Record<string, string> = {
-  Prototheria: 'Monotremes',
+  Monotremata: 'Monotremes',
   Didelphimorphia: 'Opossums',
   Paucituberculata: 'Shrew opossums',
   Diprotodontia: 'Kangaroos & kin',
   Dasyuromorphia: 'Marsupial carnivores',
-  Notoryctes: 'Marsupial moles',
+  Notoryctemorphia: 'Marsupial moles',
+  Microbiotheria: 'Monito del monte',
   Peramelemorphia: 'Bandicoots & bilbies',
   Afrosoricida: 'Tenrecs & golden moles',
   Macroscelidea: 'Elephant shrews',
@@ -304,8 +440,7 @@ export const ORDER_TAXA: ReadonlySet<string> = new Set(Object.keys(ORDER_EN));
  * field): their last common split is the order's, and is named for it (nameOrders), so it folds and is labelled as the
  * others. (Peramelemorphia's living species are one clade, with its Miocene fossils, but the data names only a part of
  * its bandicoots, Peramelidae: unnamed, Echymipera and Microperoryctes stood beside the orders at home, ToLaD#278. The
- * pig-footed bandicoot Chaeropus, extinct, sits among the dasyuromorphs. Microbiotheria and Tubulidentata are one
- * species each.)
+ * pig-footed bandicoot Chaeropus, extinct, sits among the dasyuromorphs. Tubulidentata is one species.)
  */
 export const ORDER_CROWNS: Record<string, [string, string]> = {
   Dasyuromorphia: ['Myrmecobius fasciatus', 'Antechinus mimetes'],
@@ -313,7 +448,7 @@ export const ORDER_CROWNS: Record<string, [string, string]> = {
 };
 
 /**
- * Named clades the dated tree leaves unnamed, each a level (ToLaD#289): the split over both species, named if it has
+ * Named clades the dated tree leaves unnamed, each a level unless above an order (ToLaD#289): the split over both species, named if it has
  * no taxon. The hominins (Hominini: humans and every relative since the split from the chimpanzees' line, Orrorin
  * the oldest the tree puts on our side, Sahelanthropus being a stem hominine) and humans' genus Homo (from H. habilis;
  * A. sediba, placed after it on our line, falls inside, as the placements have it).
@@ -321,6 +456,18 @@ export const ORDER_CROWNS: Record<string, [string, string]> = {
 export const NAMED_CLADES: Record<string, [string, string]> = {
   Hominini: ['Homo sapiens', 'Orrorin tugenensis'],
   Homo: ['Homo sapiens', 'Homo habilis'],
+  // (The forks above the orders the dated tree leaves unnamed (ToLaD#440), each holding just what its citation says:
+  // Euarchonta, Scrotifera, Fereuungulata, Euungulata: Waddell, Okada & Hasegawa 1999, Syst. Biol. 48; Ferae: Linnaeus 1758;
+  // Paenungulata: Simpson 1945; Afroinsectiphilia: Waddell, Kishino & Ota 2001; Australidelphia: Szalay 1982; Sundatheria: as in Janecka et al. 2007, Science 318.)
+  Euarchonta: ['Homo sapiens', 'Galeopterus variegatus'],
+  Sundatheria: ['Galeopterus variegatus', 'Tupaia glis'],
+  Scrotifera: ['Felis catus', 'Rhinolophus ferrumequinum'],
+  Fereuungulata: ['Felis catus', 'Bos taurus'],
+  Euungulata: ['Bos taurus', 'Tapirus terrestris'],
+  Ferae: ['Felis catus', 'Manis javanica'],
+  Paenungulata: ['Loxodonta africana', 'Trichechus manatus'],
+  Afroinsectiphilia: ['Orycteropus afer', 'Echinops telfairi'],
+  Australidelphia: ['Dromiciops gliroides', 'Macropus giganteus'],
 };
 
 /** Name the unnamed orders' splits (ORDER_CROWNS) and NAMED_CLADES' in tree t: the last split over both species, if it has no taxon. */
@@ -345,7 +492,16 @@ export function nameOrders(t: Split): Split {
     let k = 0;
     while (k < pa.length && pa[k] === pb[k]) k++;
     const v = pa[k - 1];
-    if (v && v !== t && !v.taxon) v.taxon = name;
+    if (!v || v === t) continue;
+    if (name in NAMED_CLADES) {
+      // (Ours wins: MDD's tribe Hominini holds the chimpanzees too, the fork above; one name, one level, ToLaD#417.)
+      const clear = (s: Split): void => {
+        if (s.taxon === name) s.taxon = undefined;
+        for (const q of s.kids) if (typeof q !== 'string') clear(q);
+      };
+      clear(t);
+      v.taxon = name;
+    } else if (!v.taxon) v.taxon = name;
   }
   return t;
 }
