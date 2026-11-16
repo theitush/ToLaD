@@ -38,6 +38,42 @@ class Packing(unittest.TestCase):
         self.assertTrue(all(a > b for a, b in zip(lat, lat[1:])))
 
 
+class Borrowing(unittest.TestCase):
+    """ToLaD#486: a species PHYLACINE lacks under all its names gets the range of the one it was split from."""
+
+    def test_split_note(self):
+        g = ["Loxodonta", "Elephas"]
+        self.assertEqual(globe.split_note("split from L. africana, although some authorities", g), ["Loxodonta africana"])
+        self.assertEqual(globe.split_note("Split from Loxodonta africana.", g), ["Loxodonta africana"])
+        self.assertEqual(globe.split_note("split from africana", g), ["Loxodonta africana"])
+        self.assertEqual(globe.split_note("split from L. africana and includes pumilio", g), ["Loxodonta africana"])
+        self.assertEqual(globe.split_note("split from L. africana and E. maximus", g), [])   # two: not clean
+        self.assertEqual(globe.split_note("split from africana and maximus", g), [])
+        self.assertEqual(globe.split_note("split from L. africana; previously attributed to E. maximus", g), [])
+        self.assertEqual(globe.split_note("recently described", g), [])
+
+    def test_borrow(self):
+        names = {"Loxodonta africana": 1, "Loxodonta cyclotis": 2, "Cyclopes ida": 3, "Cyclopes didactylus": 4,
+                 "Novus recens": 5}
+        have = {"Loxodonta africana", "Cyclopes didactylus"}
+        exact = {"Loxodonta africana": "Loxodonta africana", "Cyclopes didactylus": "Cyclopes didactylus"}
+        older = {
+            "Loxodonta cyclotis": [("Loxodonta cyclotis", False), ("Loxodonta africana", True)],
+            "Loxodonta africana": [("Elephas africanus", False)],          # an exact match keeps its own
+            "Cyclopes ida": [("Cyclopes medius", True)],                  # a parent split again: its parent
+            "Cyclopes medius": [("Cyclopes didactylus", True)],
+            "Novus recens": [("Novus vetus", True)],                      # PHYLACINE lacks the parent too
+        }
+        b = globe.borrow(names, exact, older, have, {}, {})
+        self.assertEqual(b, {"Loxodonta cyclotis": ("Loxodonta africana", "Loxodonta africana", True),
+                             "Cyclopes ida": ("Cyclopes didactylus", "Cyclopes didactylus", True)})
+        # the parent by PHYLACINE's synonymy table, and by the OTT synonyms of our row of that name
+        self.assertEqual(globe.borrow({"A b": 1}, {}, {"A b": [("A c", True)]}, {"A d"}, {"A c": "A d"}, {}),
+                         {"A b": ("A d", "A c", True)})
+        self.assertEqual(globe.borrow({"A b": 1, "A c": 2}, {}, {"A b": [("A c", True)]}, {"A d"}, {}, {2: ["A d"]}),
+                         {"A b": ("A d", "A c", True)})
+
+
 @unittest.skipUnless(SIDECAR.exists(), "no data/mammals/ranges.json (make globe)")
 class KnownRanges(unittest.TestCase):
     @classmethod
@@ -77,6 +113,24 @@ class KnownRanges(unittest.TestCase):
 
     def test_coverage(self):
         self.assertGreater(len(self.r), 5500)
+
+    def test_split_species_borrow_the_range_before_the_split(self):
+        # ToLaD#486: the forest elephant, lumped with the savanna elephant in PHYLACINE, draws its range
+        self.assertEqual(len(self.r["Loxodonta africana"]), 2)                          # exact stays exact
+        self.assertEqual(self.r["Loxodonta cyclotis"], self.r["Loxodonta africana"] + ["Loxodonta africana"])
+        self.assertTrue(self.at(self.mask("Loxodonta cyclotis", 0), 3.0, 12.0, pad=1))  # Cameroon
+        for sci in ("Cyclopes ida", "Cyclopes rufus"):                                  # one silky anteater, seven now
+            self.assertEqual(self.r[sci][2], "Cyclopes didactylus", sci)
+        self.assertEqual(self.r["Dasypus beniensis"][2], "Dasypus kappleri")
+
+    def test_a_former_name_is_an_exact_match(self):
+        # the root vole, Microtus oeconomus in PHYLACINE, Alexandromys now: its own range, not a split's
+        self.assertEqual(len(self.r["Alexandromys oeconomus"]), 2)
+
+    def test_holds(self):
+        lion = {"cur": self.mask("Panthera leo", 0)}
+        self.assertTrue(globe.holds(lion, -2.3, 34.8))                 # the Serengeti
+        self.assertFalse(globe.holds(lion, 40.0, -100.0))              # never in the Americas
 
 
 if __name__ == "__main__":
