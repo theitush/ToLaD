@@ -1100,6 +1100,8 @@ export class FanView implements InputHandlers {
     const laid = layoutFan(clade, this.mode, tree, this.measure);
     stamp('layout');
     this.camera = new FanCamera(this.withFold(laid), (b) => this.model(b));
+    // (On its side "now" stands NOW_PX in from the edge, no pan taking it further, ToLaD#480.)
+    if (this.flip) this.camera.nowPx = NOW_PX;
     stamp('fold');
     // Width and time zoom separately (#138): a sideways pinch zooms width, an upright one time, a diagonal both.
     this.input = new Input(canvas, this, true);
