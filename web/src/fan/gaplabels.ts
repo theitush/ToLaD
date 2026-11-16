@@ -89,26 +89,57 @@ export function gapCover<G>(root: G, parts: (g: G) => readonly G[], opens: Map<G
 }
 
 /**
- * Each group's handing zoom (ToLaD#483, #500): from it, its band is its parts', each labelled there where it fits, and its name stands in its gap only, as their title, until it opens (gapOpens:
- * every part has room). A group hands its band down as soon as one of its parts has room of its own (`room(p)`, as gapOpens: its gap or its band holds the text, px), or its gap holds its name
- * (`gap(g)`, world x), whichever comes first, and at its opening anyway; never before its parent hands down. So a group opens part by part (ToLaD#500, Ita: "colinns sequirel money doesnt show the
- * pic even at the zoom!"): a wide part has its name and picture once it has room, not once its thinnest sister has; a thin one stays unlabelled, under its group's title, until it fits. A part whose
- * top strand is its group's has its group's gap, so it hands its band down once that gap holds a name, its group's title, which names it too (gapCut), at the latest.
+ * A group's widest part, `host`, and the zoom `until` which its name is a guest there (ToLaD#500): from its handing zoom, if that comes first, its name stands in its host's band, beside the host's
+ * own label; or, once the host has handed its band down too, in its widest part's, and so on down the widest parts to the first not handed down.
  */
-export function gapHands<G>(root: G, parts: (g: G) => readonly G[], opens: Map<G, number>, gap: (g: G) => number, room: (g: G) => number, px: number): Map<G, number> {
+export interface Guest<G> {
+  host: G;
+  until: number;
+}
+
+/**
+ * Each group's handing zoom (ToLaD#483, #500): from it, its band is its parts', each labelled there where it fits, and its name stands as their title until it opens (gapOpens: every part has room),
+ * so that no part is ever left with nothing naming it. A group hands its band down once its gap holds its name (`gap(g)`, world x; px the text), or before that, once its widest part's band
+ * (`band(p)`) holds that part's own name and its group's side by side (2 px and a `pad` between), and at its opening anyway; never before its parent hands down. So a group opens part by part
+ * (ToLaD#500, Ita: "colinns sequirel money doesnt show the pic even at the zoom!"): a wide part has its name and picture once it has room, a thin one stays under its group's title until it fits.
+ * Until its gap holds its name, the title is a guest in its widest part's band (`guests`); when that part hands its band down in turn, its guests go on down to its widest part with its own, so
+ * a part hands down only once its widest part's band holds them all, its own name and theirs, side by side. Each title moves to its gap (the #483 way) or goes at its opening, once, on the way in.
+ */
+export function gapHands<G>(root: G, parts: (g: G) => readonly G[], opens: Map<G, number>, gap: (g: G) => number, band: (g: G) => number, room: (g: G) => number, px: number, pad: number, guests?: Map<G, Guest<G>>): Map<G, number> {
   const hands = new Map<G, number>();
-  const stack: [G, number][] = [[root, 0]];
+  // (Each with the untils of the guests it brings, its ancestors' titles standing in its band.)
+  const stack: [G, number, number[]][] = [[root, 0, []]];
   while (stack.length) {
-    const [g, enter] = stack.pop()!;
+    const [g, enter, brought] = stack.pop()!;
     const ps = parts(g);
-    let at = gap(g) > 0 ? px / gap(g) : Infinity;
-    for (const p of ps) if (room(p) > 0) at = Math.min(at, px / room(p));
-    at = ps.length ? Math.min(opens.get(g) ?? Infinity, Math.max(enter, at)) : Infinity;
+    const open = opens.get(g) ?? Infinity;
+    const titled = gap(g) > 0 ? px / gap(g) : Infinity;
+    // (Its widest part, the first of a tie.)
+    let [host, w] = [undefined as G | undefined, 0];
+    for (const p of ps) if (band(p) > w) [host, w] = [p, band(p)];
+    // (Its title goes once its gap holds it, or once every part has its own label, room of its own: a part handed down has had that before.)
+    let all = 0;
+    for (const p of ps) if (room(p) > 0) all = Math.max(all, px / room(p));
+    const until = Math.min(titled, open, all);
+    // (The first zoom from `enter` its widest part's band holds the names it would hold then: its own, the guests still there, and its group's till its gap holds it; none needed past those.)
+    let at = Infinity;
+    if (ps.length) {
+      const ends = [...new Set([enter, until, ...brought].filter((z) => z >= enter && z < Infinity))].sort((p, q) => p - q);
+      for (let i = 0; i < ends.length && at === Infinity; i++) {
+        const n = brought.filter((u) => u > ends[i]).length + (ends[i] < until ? 1 : 0);
+        const z = n ? Math.max(ends[i], ((n + 1) * px + n * pad) / w) : ends[i];
+        if (z < (ends[i + 1] ?? Infinity)) at = z;
+      }
+      at = Math.min(open, at);
+    }
     hands.set(g, at);
-    for (const p of ps) stack.push([p, at]);
+    if (host !== undefined) guests?.set(g, { host, until });
+    const down = [...brought.filter((u) => u > at), ...(at < until ? [until] : [])];
+    for (const p of ps) stack.push([p, at, p === host ? down : []]);
   }
   return hands;
 }
+
 
 /** A member of the cut at a zoom: `heads`, its band its parts' (its name in its gap only, no picture); `taken`, its gap its group's title's (no name of its own there). */
 export interface CutMember<G> {
@@ -119,9 +150,9 @@ export interface CutMember<G> {
 
 /**
  * The cut at zoom sx (ToLaD#483): the tree cut where groups have not handed their bands down (gapHands), and over it each group that has but not opened, its title only, before its parts; one whose
- * gap is its group's title's left out (that title names it).
+ * gap is its group's title's left out (that title names it), unless it is a guest in its widest part's band then (`guests`, ToLaD#500).
  */
-export function gapCut<G>(root: G, parts: (g: G) => readonly G[], opens: Map<G, number>, hands: Map<G, number>, same: (g: G, p: G) => boolean, sx: number): CutMember<G>[] {
+export function gapCut<G>(root: G, parts: (g: G) => readonly G[], opens: Map<G, number>, hands: Map<G, number>, same: (g: G, p: G) => boolean, sx: number, guests?: Map<G, Guest<G>>): CutMember<G>[] {
   const out: CutMember<G>[] = [];
   const stack: [G, boolean][] = [[root, false]];
   while (stack.length) {
@@ -129,7 +160,7 @@ export function gapCut<G>(root: G, parts: (g: G) => readonly G[], opens: Map<G, 
     const ps = parts(g);
     if (ps.length && (hands.get(g) ?? Infinity) <= sx) {
       const open = (opens.get(g) ?? Infinity) <= sx;
-      if (!open && !taken) out.push({ g, heads: true, taken });
+      if (!open && (!taken || sx < (guests?.get(g)?.until ?? 0))) out.push({ g, heads: true, taken });
       for (let i = ps.length - 1; i >= 0; i--) stack.push([ps[i], !open && same(g, ps[i])]);
     } else out.push({ g, heads: false, taken });
   }
