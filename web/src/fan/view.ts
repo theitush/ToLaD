@@ -7,7 +7,7 @@
 import { drawPic, hasPic, livePic, PIC_TRIES, prefetchPics } from './wiki';
 import { AXIS_ROOM, chainFit, CHAIN_ROOM, flipOn, forkQuiet, FORK_PX as FLIP_FORK_PX, gapLabelsOn, gapNamesOn, LABELS_MA, NOW_PX, turnCanvas, upright } from './flip';
 import { CLADE_FONT, CLADE_PX, GapNames, SPECIES_FONT, SPECIES_PX, type WrittenName } from './gapnames';
-import { columnGaps, gapCover, gapOpens, ownLanes, picAt, picRanges, tier, type Member, type PicCand, type PicRange, type Tier } from './gaplabels';
+import { columnGaps, gapCut, gapHands, gapOpens, ownLanes, picAt, picRanges, tier, type Member, type PicCand, type PicRange, type Tier } from './gaplabels';
 import { GROUP_D, LABEL_AXIS_X, labelMode, PIC_D, PIC_LIFT, PIC_ROOM, PIC_S, picBox, type PicSpot } from './pics';
 import { coverLadder, keepOnScreen, placeSlots } from './slide';
 import { formatCount, formatMass } from '../data/count';
@@ -622,6 +622,8 @@ export interface CoverGroup {
 export interface GapMember extends CoverGroup, Member {
   on: number;
   tier?: Tier;
+  /** Its band handed down to its parts at this zoom (ToLaD#483, gapCut): its name in its gap only, no picture. */
+  heads?: boolean;
   /** Its picture's diameter (px) at this zoom, PIC_D or PIC_S; 0 for none (ToLaD#464). */
   pic?: number;
 }
@@ -2829,6 +2831,7 @@ export class FanView implements InputHandlers {
     const had = this.gapCoverLast;
     if (had && had.T === T && had.sx === sx) return had.list;
     let L = this.gapLadder;
+    const same = (g: GapMember, p: GapMember) => p.on === g.on;
     if (!L || L.T !== T) {
       const f = this.fan.tess.fold as Steady;
       const { C, R } = f.rooms();
@@ -2867,21 +2870,29 @@ export class FanView implements InputHandlers {
         return gs;
       };
       const root = of({ v: this.fan.root });
-      L = this.gapLadder = { T, root, parts, opens: gapOpens(root, parts, (g) => (g.on < 0 ? 0 : Math.max(g.gap, g.band)), CLADE_PX) };
+      const opens = gapOpens(root, parts, (g) => (g.on < 0 ? 0 : Math.max(g.gap, g.band)), CLADE_PX);
+      L = this.gapLadder = { T, root, parts, opens, hands: gapHands(root, parts, opens, (g) => (g.on < 0 ? 0 : g.gap), same, CLADE_PX) };
     }
-    const list = gapCover(L.root, L.parts, L.opens, sx).filter((g) => g.on >= 0).sort((p, q) => p.on - q.on);
+    // (A title over its parts' labels, ToLaD#483: the cut below the titles, each title before its parts; a gap a title's is no one else's, a band handed down holds no name of its owner's.)
+    const list = gapCut(L.root, L.parts, L.opens, L.hands, same, sx)
+      .filter(({ g }) => g.on >= 0)
+      .sort((p, q) => p.g.on - q.g.on || +q.heads - +p.heads);
     const pics = this.gapPicsOf(L);
-    const out = list.map((g) => ({ ...g, tier: tier(g, sx, CLADE_PX, SPECIES_PX), pic: picAt(pics.get(g), sx, PIC_D, PIC_S) }));
+    const out = list.map(({ g, heads, taken }): GapMember => {
+      const m = { ...g, heads, gap: taken ? 0 : g.gap };
+      // (A group below the titles has not its name in its gap, by the cut: its band, or none.)
+      return { ...m, tier: heads ? 'title' : tier(g.lv.b ? m : { ...m, gap: 0 }, sx, CLADE_PX, SPECIES_PX), pic: heads ? 0 : picAt(pics.get(g), sx, PIC_D, PIC_S) };
+    });
     this.gapCoverLast = { T, sx, list: out };
     return out;
   }
 
   /**
-   * Every member's pictures as zoom ranges (ToLaD#464, gaplabels.ts picRanges), once a cover ladder: each member of any cover with a strand on the column a candidate, from the zoom its parent opens at
-   * to its own. Priority: the wider band on the column, then the more individuals alive now, then the first: the band is the branch's room by life as the eye sees it there, so the biggest branch in
+   * Every member's pictures as zoom ranges (ToLaD#464, gaplabels.ts picRanges), once a cover ladder: each member of any cover with a strand on the column a candidate, from the zoom its parent hands its band down at
+   * to its own (gapHands, ToLaD#483: a title has no picture, its parts have theirs). Priority: the wider band on the column, then the more individuals alive now, then the first: the band is the branch's room by life as the eye sees it there, so the biggest branch in
    * sight has its face first and a thin one never takes it from a fat neighbour. Rooms: a picture and a hair to the next, as GROUP_D for a full one.
    */
-  private gapPicsOf(L: { T: CutTerritories; root: GapMember; parts: (g: GapMember) => GapMember[]; opens: Map<GapMember, number> }): Map<GapMember, PicRange> {
+  private gapPicsOf(L: { T: CutTerritories; root: GapMember; parts: (g: GapMember) => GapMember[]; hands: Map<GapMember, number> }): Map<GapMember, PicRange> {
     if (this.gapPicsLast?.L === L) return this.gapPicsLast.ranges;
     const ms: GapMember[] = [];
     const cands: (PicCand & { m: GapMember; alive: number })[] = [];
@@ -2889,7 +2900,7 @@ export class FanView implements InputHandlers {
     while (stack.length) {
       const [g, enter] = stack.pop()!;
       const ps = L.parts(g);
-      const exit = ps.length ? (L.opens.get(g) ?? Infinity) : Infinity;
+      const exit = ps.length ? (L.hands.get(g) ?? Infinity) : Infinity;
       if (g.on >= 0 && enter < exit) cands.push({ m: g, at: g.at, enter, exit, alive: L.T.aliveOf(g.k) });
       for (const p of ps) stack.push([p, exit]);
     }
@@ -2903,7 +2914,7 @@ export class FanView implements InputHandlers {
   }
   private gapPicsLast: { L: object; ranges: Map<GapMember, PicRange> } | null = null;
   private gapCoverLast: { T: CutTerritories; sx: number; list: GapMember[] } | null = null;
-  private gapLadder: { T: CutTerritories; root: GapMember; parts: (g: GapMember) => GapMember[]; opens: Map<GapMember, number> } | null = null;
+  private gapLadder: { T: CutTerritories; root: GapMember; parts: (g: GapMember) => GapMember[]; opens: Map<GapMember, number>; hands: Map<GapMember, number> } | null = null;
 
   /** A text's width in a font, once a text. */
   private titleWidths = new Map<string, number>();
@@ -2997,8 +3008,9 @@ export class FanView implements InputHandlers {
       const small = g.tier === 'in' && !!lv.b;
       const textPx = small ? SPECIES_PX : CLADE_PX;
       let x = X(g.top) - titleLift(g.gap * sx) - CLADE_PX / 2;
-      // (A title a screen away, its band on screen and holding it: in its band, as "a name in its gap, else in its band" says; a wide first lane keeps its name after a tap.)
-      if (g.tier !== 'title' || ((x < -CLADE_PX || x > this.w + CLADE_PX) && b - a >= textPx)) {
+      // (A title a screen away, its band on screen and holding it: in its band, as "a name in its gap, else in its band" says; a wide first lane keeps its name after a tap. Not one over its parts'
+      // labels, ToLaD#483: that band is theirs.)
+      if (g.tier !== 'title' || (!g.heads && (x < -CLADE_PX || x > this.w + CLADE_PX) && b - a >= textPx)) {
         if (!seen) continue;
         x = d ? Math.max(a + textPx / 2, Math.min(b - textPx / 2, picX)) : inBand(textPx / 2);
       } else if (x < -CLADE_PX || x > this.w + CLADE_PX) continue;
