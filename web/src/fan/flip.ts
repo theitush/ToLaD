@@ -41,7 +41,10 @@ export function chainFit(names: string[], fits: (parts: string[]) => boolean): s
   return names.slice(-1);
 }
 
-/** Where "now" stands: this far from the phone's right edge. */
+/**
+ * Where "now" stands: this far from the phone's right edge, every frame's and the furthest in a pan takes it (camera.ts
+ * nowPx, ToLaD#480): the room the axis's "now" needs, whole on the phone and centred on its tick. Nothing else is drawn past it.
+ */
 export const NOW_PX = 14;
 /** Where a whole clade's fork stands: this far from the phone's left edge. */
 export const FORK_PX = 28;

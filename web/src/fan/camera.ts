@@ -64,6 +64,12 @@ export class FanCamera {
   cam: Camera = { cx: 0, cy: 0, sx: 1, sy: 1, ty: 1 };
   w = 1;
   h = 1;
+  /**
+   * The tree on its side (flip.ts NOW_PX, ToLaD#480): "now" stands no further in than this from the screen's top (the
+   * phone's right edge), where every frame puts it, a time span shorter than the screen hung from there; nothing is drawn
+   * past "now" there but the axis's "now". Null (`?flip=0`): no lower than LABELS_SHARE down, the labels' band over it.
+   */
+  nowPx: number | null = null;
 
   constructor(
     public fan: Fan,
@@ -126,10 +132,10 @@ export class FanCamera {
    */
   frame(x0: number, x1: number, yFork: number, stretch = false): Camera {
     const y0 = this.yNow - yFork;
-    // Pixel margins: time labels on the left, species labels above "now", some stem below the fork.
+    // Pixel margins: time labels on the left, species labels above "now" (on its side, none: nowPx), some stem below the fork.
     const left = 58;
     const right = 14;
-    const top = 120;
+    const top = this.nowPx ?? 120;
     const bottom = 150; // room for the clade label below the fork, above the legend
     // Width and time each fill the screen (a narrow fan is not stretched past its height).
     const sy = (this.h - top - bottom) / -y0;
@@ -140,11 +146,11 @@ export class FanCamera {
 
   /**
    * Zoom-out bounds (px per world unit) for width and time. In time, home's less what the labels' band may take of the
-   * height: the view's frames stand that much shorter than this home (ToLaD#373).
+   * height: the view's frames stand that much shorter than this home (ToLaD#373). On its side (nowPx) there is no band.
    */
   minScale(): [number, number] {
     const h = this.home();
-    return [h.sx * MIN_ZOOM, h.sy * MIN_ZOOM * (1 - LABELS_SHARE)];
+    return [h.sx * MIN_ZOOM, h.sy * MIN_ZOOM * (this.nowPx === null ? 1 - LABELS_SHARE : 1)];
   }
 
   /**
@@ -354,16 +360,18 @@ export class FanCamera {
   }
 
   /**
-   * Keep the fan on screen: "now" no lower than LABELS_SHARE down, the stem's end
+   * Keep the fan on screen: "now" no lower than LABELS_SHARE down (on its side, nowPx:
+   * a span shorter than the screen hangs from there, its room past the deep end), the stem's end
    * no higher than 60%, and sideways the centre within 40% of the screen's width
    * of the fan's outer edges at the heights on screen, so a pan crosses any gap
    * (ToLaD#403). `near` (a pinch's: px): of the nearest content instead, at most so far.
    */
   clampPan(near?: number): void {
     const c = this.cam;
-    const yTop = this.yNow + ((0.5 - LABELS_SHARE) * this.h) / c.sy;
+    const yTop = this.yNow + (this.h / 2 - (this.nowPx ?? LABELS_SHARE * this.h)) / c.sy;
     const yBot = this.fan.trunkBottom.y - (0.1 * this.h) / c.sy;
-    c.cy = yTop > yBot ? (yTop + yBot) / 2 : Math.min(yBot, Math.max(yTop, c.cy));
+    const short = this.nowPx === null ? (yTop + yBot) / 2 : yTop;
+    c.cy = yTop > yBot ? short : Math.min(yBot, Math.max(yTop, c.cy));
     const [y0, y1] = this.heightsOnScreen();
     if (near !== undefined) {
       const p = this.nearestContent(c.cx, y0, y1);
