@@ -136,7 +136,8 @@ export interface LabelSpot {
   /**
    * A "+x" label's branches (ToLaD#368, #373): the screen x of its item's first branch's left edge and its last's right
    * edge at the label's foot (the gap under its picture, screen y; with its tip at "now", just above the now line), which
-   * a hairline spans there, a tick down on each outer edge, so it wraps them whole (ToLaD#433).
+   * a hairline spans there, a tick down on each outer edge, so it wraps them whole (ToLaD#433). Drawn on the old view (`?flip=0`) only: on the tree on its side
+   * a group's title stands at its branch's top and the forks say where it splits (ToLaD#482). A look only: no tap or placement reads it.
    */
   over?: [number, number, number];
   /** A cut item's label (ToLaD#359): the item's strands, first and last, which a tap on it goes into (tapItem). */
@@ -2900,7 +2901,7 @@ export class FanView implements InputHandlers {
   }
 
   /**
-   * This frame's labels by one rule (ToLaD#458, gaplabels.ts): a name in the gap above its branch, else in its own band, a group's span line going down the branch from there; a picture for anyone
+   * This frame's labels by one rule (ToLaD#458, gaplabels.ts): a name in the gap above its branch, else in its own band, no line on its branches (ToLaD#482); a picture for anyone
    * the zoom gives one (ToLaD#464, picRanges), full or small, on its band's centre on the column, wider than its band or not, a species' name then its pill where that stands in its own room (its gap
    * and its band), else by its tier. All on the 100 kya column (labelBand), held on screen as labels are (flipPicY), but no older than where the member's branch begins: past that it leaves with its
    * branch, a sticky header stopping at its section's end (Ita: "they should[n't] go left past the beginning of their branchs"). Across, a title stands at its branch's top and leaves with it; a
@@ -2911,7 +2912,6 @@ export class FanView implements InputHandlers {
     this.picSpots = out.pics;
     const X = (x: number) => this.toScreen(x, 0)[0];
     const Y = (y: number) => this.toScreen(0, y)[1];
-    const Wy = (y: number) => this.toWorld(0, y)[1];
     const { sx } = this.cam;
     const { cap } = this.labelBand();
     const half = LABEL_PILL / 2;
@@ -2989,12 +2989,6 @@ export class FanView implements InputHandlers {
       s.plain = small ? SPECIES_FONT : CLADE_FONT;
       s.text = small || this.titleWidth(s.plain, name) <= cap ? name : this.pillText(name, cap);
       s.box = [x - textPx / 2, y1 - LABEL_PAD - this.titleWidth(s.plain, s.text), x + textPx / 2, y1];
-      if (lv.v) {
-        // (Its branches, from its name: at the name's old end, down them.)
-        const foot = y1 + LABEL_UNDER;
-        const ends = T.reach(g.f, g.l, Wy(foot));
-        if (ends && ends[1] > ends[0]) s.over = [X(ends[2]), X(ends[3]), foot];
-      }
       out.names.push(s);
     }
     // (No picture just goes, ToLaD#469 (Ita: "pics shouldnt dispapper from the left! just stop at the fork"): one stopped at its branch's start keeps its slot as it leaves with its branch, through
@@ -3013,7 +3007,7 @@ export class FanView implements InputHandlers {
    * beside the next one in gives way (keepOnScreen: all of it within GROUP_D + a picture's half of that edge); at the foot, a fossil group
    * whose tips are under the row a picture fits on (`fit`).
    * One label as anywhere: name pill over picture, a tap on either going to the group's
-   * own frame, and over it, for more than one branch, the hairline around them, the first's left edge to the last's right (LabelSpot.over).
+   * own frame, and over it, for more than one branch, the hairline around them, the first's left edge to the last's right (LabelSpot.over, drawn on the old view only).
    */
   private groupLabels(T: CutTerritories, row: number): CutLabels {
     const out: CutLabels = { spots: [], groups: new Map(), pics: [], items: [], all: [], names: [] };
@@ -4077,12 +4071,13 @@ export class FanView implements InputHandlers {
     // The clades' brackets (ToLaD#193) behind the pills: their labels clear of the pills and pictures, their lines behind them.
     br?.draw(ctx, FAMILY_INK, INK3, [...spots.filter((s) => s.fit > 0.3).map((s) => s.box), ...pics.map(picBox)], BG);
     // A "+x" label's branches (ToLaD#368, #373): a hairline at its foot from its first branch to its last, in the gap under its picture,
-    // a tick down onto each end branch, as the brackets draw theirs (open-ended past the screen's edge).
+    // a tick down onto each end branch, as the brackets draw theirs (open-ended past the screen's edge). The old view's only: on the tree
+    // on its side the title at the branch's top and the forks say it (ToLaD#482).
     ctx.save();
     ctx.lineWidth = 1;
     ctx.strokeStyle = 'rgba(185,230,201,0.6)';
     for (const s of spots) {
-      if (!s.over || s.fit < 0.01) continue;
+      if (this.flip || !s.over || s.fit < 0.01) continue;
       const [sa, sb, sy] = s.over;
       if (sb < 0 || sa > this.w) continue;
       const y = Math.round(sy) + 0.5;
