@@ -1,0 +1,228 @@
+// A tap on humans from above the hominins stops at the Hominins first (ToLaD#497): the hominins highlight (HIGHLIGHT_STOPS). From
+// home, Primates and Great apes, a tap on the human's name, picture or column lands at the Hominins level (its chain ending
+// "Hominins", no card); the next tap on humans lands on the Human species with its card (ToLaD#496); a double tap from the
+// Hominins goes up one level, to African great apes (ToLaD#472, #481). Real pointer events through Input, the tree on its side.
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import type { Camera, FanCamera } from './camera';
+import { setFlip } from './flip';
+import { latinOf } from './brackets';
+import type { FanBranch } from './layout';
+import { loadMammalsFromFiles } from './mammals-node';
+import { mammaliaClade } from './panthera';
+import { mammaliaTree } from './splits';
+import type { Steady } from './steady';
+import { chainOf, FanView, levelClade, type Level } from './view';
+
+let clock = 1000;
+const timers: { at: number; f: () => void; id: number }[] = [];
+let tid = 1;
+type Rig = { v: FanView; on: Map<string, (e: unknown) => void> };
+/** The view on its side, as on a phone (taps.test.ts's), its pointer events caught so they go through Input as a finger's. */
+function rig(): Rig {
+  const noop = () => {};
+  const g = globalThis as Record<string, unknown>;
+  g.Path2D = class {
+    moveTo() {}
+    lineTo() {}
+    arc() {}
+    bezierCurveTo() {}
+    quadraticCurveTo() {}
+    closePath() {}
+    rect() {}
+  };
+  g.ResizeObserver = class {
+    observe() {}
+    disconnect() {}
+  };
+  g.window = {
+    devicePixelRatio: 2,
+    addEventListener: noop,
+    removeEventListener: noop,
+    setTimeout: (f: () => void, ms: number) => (timers.push({ at: clock + ms, f, id: ++tid }), tid),
+    clearTimeout: (id: number) => {
+      const i = timers.findIndex((t) => t.id === id);
+      if (i >= 0) timers.splice(i, 1);
+    },
+  };
+  g.requestAnimationFrame = () => 1;
+  g.cancelAnimationFrame = noop;
+  g.document = { createElement: () => ({ textContent: '' }) };
+  const ctx = new Proxy({ measureText: (t: string) => ({ width: t.length * 7.5 }), createLinearGradient: () => ({ addColorStop: noop }) } as Record<string, unknown>, {
+    get: (o, k) => (k in o ? o[k as string] : typeof k === 'string' && /^[a-z]/.test(k) && !['font', 'fillStyle', 'strokeStyle'].includes(k) ? noop : o[k as string]),
+    set: (o, k, v) => ((o[k as string] = v), true),
+  });
+  const on = new Map<string, (e: unknown) => void>();
+  const canvas = {
+    width: 0,
+    height: 0,
+    style: {},
+    parentElement: null,
+    getContext: () => ctx,
+    getBoundingClientRect: () => ({ width: 700, height: 390, left: 0, top: 0, right: 700, bottom: 390 }),
+    addEventListener: (t: string, f: (e: unknown) => void) => on.set(t, f),
+    removeEventListener: noop,
+    setPointerCapture: noop,
+  };
+  return { v: new FanView(canvas as unknown as HTMLCanvasElement, mammaliaClade(), mammaliaTree(), true), on };
+}
+type Priv = {
+  anim: ((t: number) => boolean) | null;
+  applyFold(): void;
+  camera: FanCamera;
+  goLevel(lv: Level, cam: Camera, card?: boolean): void;
+  landOf(lv: Level): Camera;
+  offBy(a: Camera, c: Camera): number;
+  pillAt(x: number, y: number): unknown;
+  picAt(x: number, y: number): unknown;
+  plusAt(x: number, y: number): unknown;
+  carded: FanBranch | null;
+  selected: unknown;
+};
+const P = (v: FanView) => v as unknown as Priv;
+
+/** A finger at view point (x, y): Input turned reads (clientY, box width - clientX), taps.test.ts's box 700 wide. */
+const proc = (globalThis as unknown as { process: { env: Record<string, string>; stderr: { write(s: string): void } } }).process;
+const pointerType = 'touch';
+const finger = (id: number, x: number, y: number) => ({ pointerId: id, pointerType, button: 0, clientX: 700 - y, clientY: x, timeStamp: clock, preventDefault() {} });
+/** The clock on by ms, a frame at a time, the timers due and the flight under way run. */
+function pass(r: Rig, ms: number): void {
+  const end = clock + ms;
+  while (clock < end) {
+    clock += 1000 / 60;
+    for (const t of timers.filter((t) => t.at <= clock)) {
+      timers.splice(timers.indexOf(t), 1);
+      t.f();
+    }
+    const iv = P(r.v);
+    if (iv.anim) {
+      if (!iv.anim(clock)) iv.anim = null;
+      iv.applyFold();
+    }
+  }
+}
+/** Until nothing is under way: the double-tap window's held tap, a flight, a fling. */
+function settle(r: Rig): void {
+  for (let k = 0; (P(r.v).anim || timers.length) && k < 3000; k++) pass(r, 1);
+  for (let k = 0; k < 3; k++) r.v.draw();
+}
+function tapAt(r: Rig, x: number, y: number): void {
+  r.on.get('pointerdown')!(finger(1, x, y));
+  pass(r, 50);
+  r.on.get('pointerup')!(finger(1, x, y));
+}
+/** A real double tap at (x, y), then until it lands. */
+function doubleTap(r: Rig, x: number, y: number): void {
+  tapAt(r, x, y);
+  pass(r, 120);
+  tapAt(r, x, y);
+  settle(r);
+}
+
+describe('a tap on humans stops at the Hominins first (ToLaD#497)', () => {
+  let r: Rig;
+  let v: FanView;
+  let home: Camera;
+  beforeAll(async () => {
+    vi.spyOn(performance, 'now').mockImplementation(() => clock);
+    await loadMammalsFromFiles();
+    setFlip(true);
+    r = rig();
+    v = r.v;
+    home = v.homeCamera();
+  }, 300_000);
+  afterAll(() => {
+    setFlip(false);
+    vi.restoreAllMocks();
+  });
+
+  const stand = (c: Camera) => {
+    P(v).anim = null;
+    timers.length = 0;
+    (v.fan.tess.fold as Steady).setScale(c.sx, v.w);
+    v.cam = { ...c, ty: c.sy };
+    P(v).camera.settle();
+    for (let k = 0; k < 3; k++) v.draw();
+  };
+  const node = (latin: string) => v.fan.nodes.find((q) => latinOf(q.split) === latin)!;
+  /** The chain the view shows (the breadcrumb): the groups the level on screen stands in. */
+  const chain = () => chainOf(v.fan, levelClade(v.fan, v.levelNow(true))).join(' › ');
+  /** At a level, landed as a tap on it lands (home: home's frame), nothing open. */
+  const at = (latin: string | null) => {
+    stand(home);
+    if (latin) {
+      P(v).goLevel({ v: node(latin) }, home, false);
+      settle(r);
+    }
+    v.onSelect(null);
+    P(v).carded = null;
+    for (let k = 0; k < 3; k++) v.draw();
+  };
+  const human = () => v.fan.branches.find((b) => b.sp.sci === 'Homo sapiens')!;
+  /** Where on screen a tap on humans goes: their name, their picture, their column off both. */
+  const spot = (how: 'name' | 'picture' | 'column'): [number, number] | null => {
+    const b = human();
+    if (how === 'name') {
+      const h = v.nameHits.find((q) => q.b === b);
+      return h ? [(h.box[0] + h.box[2]) / 2, (h.box[1] + h.box[3]) / 2] : null;
+    }
+    if (how === 'picture') {
+      const h = v.thumbHits.find((q) => q[3] === b && !q[4]);
+      return h ? [h[0], h[1]] : null;
+    }
+    for (let y = 8; y < v.h - 8; y += 4) for (let x = 8; x < v.w - 8; x += 2) if (v.hitBranch(x, y) === b && !P(v).pillAt(x, y) && !P(v).picAt(x, y) && !P(v).plusAt(x, y)) return [x, y];
+    return null;
+  };
+  const lvName = (lv: Level) => (lv.b ? `${lv.b.sp.common} (species)` : chainOf(v.fan, lv.v).slice(-1)[0]);
+
+  const say = (s: string) => proc.env.HOMININS_SAY && proc.stderr.write(s + '\n');
+  /** What the view shows: its level, the chain's last row, whether a card is open. */
+  const shows = () => `${lvName(v.levelNow(true))} [${chain().split(' › ').slice(-1)[0]}]${P(v).selected ? ' card' : ''}`;
+  const atHominins = () => {
+    const lv = v.levelNow(true);
+    return lv.v === node('Hominini') && chain().endsWith('› Hominins') && !P(v).selected;
+  };
+
+  it('from home, Primates and Great apes: a tap on the human name, picture or column lands at the Hominins, no card', () => {
+    const bad: string[] = [];
+    for (const lv of [null, 'Primates', 'Hominidae'])
+      for (const how of ['name', 'picture', 'column'] as const) {
+        at(lv);
+        const p = spot(how);
+        if (!p) {
+          bad.push(`${lv ?? 'home'}: no human ${how} on screen`);
+          continue;
+        }
+        tapAt(r, ...p);
+        settle(r);
+        say(`${lv ?? 'home'} ${how}: ${shows()}`);
+        if (!atHominins()) bad.push(`${lv ?? 'home'} ${how}: at ${shows()}, not the Hominins`);
+      }
+    expect(bad).toEqual([]);
+  }, 1_200_000);
+
+  it('from the Hominins a tap on humans landed at, a double tap goes up one level: African great apes', () => {
+    at('Primates');
+    tapAt(r, ...spot('picture')!);
+    settle(r);
+    expect(atHominins(), shows()).toBe(true);
+    doubleTap(r, v.w / 2, 40);
+    say(`Hominins, a double tap: ${shows()}`);
+    expect(v.levelNow(true).v === node('Homininae') && chain().endsWith('› African great apes'), shows()).toBe(true);
+  }, 600_000);
+
+  // (Fails: the Hominins' landing on the tree on its side (openCamera) zooms to its room, the hull of its strands at every time, humans' ~8
+  // billion at "now" in it, over the fossils' time window (fossilTop, ToLaD#298), "now" off the screen: no column, humans' or a fossil's, is on
+  // screen, so there is no human to tap a second time. Once the landing frames the hominins with humans in view, the second tap lands on Human.)
+  it.fails('at the Hominins: humans on screen, and the next tap on them lands on Human, its card open', () => {
+    at('Primates');
+    tapAt(r, ...spot('name')!);
+    settle(r);
+    expect(atHominins(), shows()).toBe(true);
+    const p = spot('column');
+    expect(p, 'a human column on screen at the Hominins').toBeTruthy();
+    tapAt(r, ...p!);
+    settle(r);
+    say(`Hominins, a tap on humans: ${shows()}`);
+    expect(v.levelNow(true).b === human() && !!P(v).selected, shows()).toBe(true);
+  }, 600_000);
+});
