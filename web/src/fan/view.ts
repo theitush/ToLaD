@@ -1959,20 +1959,20 @@ export class FanView implements InputHandlers {
    * a tap on that level lands (goLevel). Never two levels, whatever came before: a tap that went several levels down, a
    * pan, a pinch, a search pick. A level's flight under way, from where it lands. `firstRan` (ToLaD#301): its first tap
    * already ran as a single tap (a level deeper, a "+x"), not a step the user meant: from where that tap found the view, so
-   * that tap is undone too. Nowhere up (home, or a landing that would zoom in): nothing. The card closes for the flight.
+   * that tap is undone too. Where one up would zoom in, the nearest level up that zooms out (upOut, ToLaD#416); at home, nothing. The card closes for the flight.
    */
   doubleTap(_x: number, _y: number, firstRan = false): void {
     const pre = firstRan && this.preTap && performance.now() - this.preTap.t < 4 * DOUBLE_TAP_MS ? this.preTap : null;
     const on = !pre && this.anim && this.backing;
     const cam = pre ? pre.cam : on ? this.backing!.cam : this.cam;
-    const up = this.upOne(pre ? pre.lv : on ? this.backing!.lv : this.levelNow(true), cam);
+    const up = this.upOut(pre ? pre.lv : on ? this.backing!.lv : this.levelNow(true), cam);
     if (up) this.goLevel(up.lv, up.cam, false);
     // (Nowhere up: nothing, so the first tap's flight is put back.)
     else if (pre && (this.anim || this.offBy(pre.cam, this.cam) > 0.5)) this.goLevel(pre.lv, pre.cam, false);
   }
   /** Fly one level up from level `from`, the view at camera c (upOne), the card closing for the flight: the stack's "…"'s. Nowhere up, nothing, and false. */
   private goUp(from: Level, c: Camera): boolean {
-    const step = this.upOne(from, c);
+    const step = this.upOut(from, c);
     if (step) this.goLevel(step.lv, step.cam, false);
     return !!step;
   }
@@ -2006,6 +2006,22 @@ export class FanView implements InputHandlers {
     const [x, y] = this.spanChange(cam, c);
     if (lv.v === this.fan.root) return this.zoomsOut(cam, c) || (x < -LEVEL_PX && this.offBy(cam, c) > LEVEL_PX) || (u && x <= LEVEL_PX && y <= LEVEL_PX) ? { lv, cam } : null;
     return x <= LEVEL_PX && y <= LEVEL_PX ? { lv, cam } : null;
+  }
+
+  /**
+   * Where a double tap (or the stack's "…") goes from level `from`, the view at camera c: one level up (upOne); where that
+   * would zoom in, the nearest level up that zooms out (ToLaD#416, Ita: "double tap always zooms out to the nearest thing
+   * that makes sense"). Only a view wider than every level above it but home's gets there: a search pick of the human,
+   * framed on 8 billion at "now", wider than Homo's frame by 7,300x and than Primates' by 1.2x. Null at home's level.
+   */
+  private upOut(from: Level, c: Camera): Step | null {
+    for (let at = from; ; ) {
+      const step = this.upOne(at, c);
+      if (step) return step;
+      const u = this.levelAbove(at);
+      if (!u) return null;
+      at = { v: u };
+    }
   }
 
   /**

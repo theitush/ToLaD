@@ -76,11 +76,16 @@ function upChain(v: FanView, from: Level): FanNode[] {
  * off home, home. Null where that would zoom in (ToLaD#416: tighter than the view on width or time; home, the last resort, while wider on width) or at home.
  */
 function wantUp(v: FanView, from: Level): FanNode | null {
-  const u = v.levelAbove(from) ?? (atHome(v) ? null : v.fan.root);
-  if (!u) return null;
-  const f = P(v).landOf({ v: u });
-  const [x, y] = [v.w * (f.sx / v.cam.sx - 1), v.h * (f.sy / v.cam.sy - 1)];
-  return x <= LEVEL_PX && y <= LEVEL_PX ? u : u === v.fan.root && x < -LEVEL_PX ? u : null;
+  // (Where one up would zoom in, the nearest level up that zooms out, ToLaD#416: a search pick of a wide species.)
+  for (let at = from; ; ) {
+    const u = v.levelAbove(at) ?? (atHome(v) ? null : v.fan.root);
+    if (!u) return null;
+    const f = P(v).landOf({ v: u });
+    const [x, y] = [v.w * (f.sx / v.cam.sx - 1), v.h * (f.sy / v.cam.sy - 1)];
+    if (x <= LEVEL_PX && y <= LEVEL_PX) return u;
+    if (u === v.fan.root) return x < -LEVEL_PX ? u : null;
+    at = { v: u };
+  }
 }
 /** Whether the view stands at level lv's frame (within 2 px). */
 const atFrame = (v: FanView, lv: Level) => P(v).offBy(P(v).frameOf(lv), v.cam) <= 2;
@@ -541,8 +546,7 @@ describe('a double tap goes up one level on every route, never back (ToLaD#301, 
     }
   };
   for (const [name, mk] of FANS) {
-    // (Real, open, ToLaD#446: at the carnivores a step back to the linsangs is passed, as in the reverse below. `it.fails` turns red when it is fixed.)
-    (name.startsWith('carnivores') ? it.fails : it)(`${name}: tapped down, from each level landed, mid-flight and with the first tap run; a search pick`, () => {
+    it(`${name}: tapped down, from each level landed, mid-flight and with the first tap run; a search pick`, () => {
       const v = mk();
       const bad: string[] = [];
       const bs = v.fan.branches;
