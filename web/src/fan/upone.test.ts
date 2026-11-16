@@ -5,11 +5,12 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { Camera, FanCamera } from './camera';
 import { setFlip } from './flip';
 import { latinOf } from './brackets';
-import type { FanNode } from './layout';
+import { laneAt, leftAt, type FanNode } from './layout';
 import { loadMammalsFromFiles } from './mammals-node';
 import { mammaliaClade } from './panthera';
 import { mammaliaTree } from './splits';
 import type { Steady } from './steady';
+import { cardTapper } from './cardtap';
 import { chainOf, FanView, groupName, levelClade, type GapMember, type Level } from './view';
 
 let clock = 1000;
@@ -80,7 +81,8 @@ const proc = (globalThis as unknown as { process: { env: Record<string, string>;
 const say = (s: string) => proc.env.UPONE_SAY && proc.stderr.write(s + '\n');
 
 /** A finger at view point (x, y): Input turned reads (clientY, box width - clientX), taps.test.ts's box 700 wide. */
-const finger = (id: number, x: number, y: number) => ({ pointerId: id, pointerType: 'touch', button: 0, clientX: 700 - y, clientY: x, timeStamp: clock, preventDefault() {} });
+let pointerType = 'touch';
+const finger = (id: number, x: number, y: number) => ({ pointerId: id, pointerType, button: 0, clientX: 700 - y, clientY: x, timeStamp: clock, preventDefault() {} });
 /** The clock on by ms, a frame at a time, the timers due and the flight under way run. */
 function pass(r: Rig, ms: number): void {
   const end = clock + ms;
@@ -210,7 +212,7 @@ describe('a double tap goes exactly one level up (ToLaD#472)', () => {
   /** One double tap from where the view is: what it should do, what it did. */
   type Row = { route: string; before: string[]; after: string[]; lv: string; want: string | null; inPx: number; bad: string | null; held: boolean };
   const rows: Row[] = [];
-  const check = (route: string): Row => {
+  const check = (route: string, how: () => void = () => doubleTap(r, v.w / 2, v.h / 2)): Row => {
     for (let k = 0; k < 3; k++) v.draw();
     const lv = v.levelNow(true);
     const before = chain();
@@ -219,7 +221,7 @@ describe('a double tap goes exactly one level up (ToLaD#472)', () => {
     const up = v.levelAbove(lv);
     // (Where a tap on it lands tighter than the view, on width or on time: up would be in, so the double tap holds, ToLaD#416.)
     const into = up ? Math.max(...tighter(P(v).landOf({ v: up }), was)) > 12 : false;
-    doubleTap(r, v.w / 2, v.h / 2);
+    how();
     const after = chain();
     const [tx, ty] = tighter(v.cam, was);
     const inPx = Math.max(tx, ty);
@@ -231,7 +233,8 @@ describe('a double tap goes exactly one level up (ToLaD#472)', () => {
     const held = into && after.join(' › ') === before.join(' › ') && P(v).offBy(v.cam, was) < 1;
     if (held) bad = null;
     else if (after.join(' › ') !== want.join(' › ')) bad = after.length < want.length ? `up ${before.length - after.length} levels` : `went to ${after.join(' › ')}`;
-    else if (inPx > 12 && !homeOk) bad = `zoomed in ${tx.toFixed(0)} px on width, ${ty.toFixed(0)} on time`;
+    // (From a species, its group whatever its landing does (ToLaD#481): a wide species' column is wider there than in its own frame. Counted, not bad.)
+    else if (inPx > 12 && !homeOk && !lv.b) bad = `zoomed in ${tx.toFixed(0)} px on width, ${ty.toFixed(0)} on time`;
     const row = { route, before, after, lv: lvName(lv), want: up ? lvName({ v: up }) : null, inPx, bad, held };
     rows.push(row);
     say(`${bad ? 'BAD ' : held ? 'held' : 'ok  '}${route}: [${lvName(lv)}] ${before.join(' › ')}  ->  ${after.join(' › ')}${bad ? `  (${bad})` : ''}`);
@@ -323,4 +326,90 @@ describe('a double tap goes exactly one level up (ToLaD#472)', () => {
       expect(mine.filter((q) => q.held).map((q) => `${q.route}: [${q.lv}] ${q.before.join(' › ')} held`)).toEqual([]);
     }, 600_000);
   }
+
+  // From a species (ToLaD#481): reached by a search pick, by taps down to its genus then a tap on its name or picture; a double tap on
+  // the tree (a finger's, a mouse's) and on its open card (two taps on its blank, through cardTapper as CardShell feeds it).
+  /** A double tap on the open card. */
+  const cardDouble = () => {
+    const t = cardTapper((x, y) => v.doubleTap(x, y));
+    const p = (id: number) => ({ id, x: 200, y: 700, t: clock, ctl: false });
+    t.down(p(1));
+    pass(r, 50);
+    t.up(p(1));
+    pass(r, 120);
+    t.down(p(2));
+    pass(r, 50);
+    t.up(p(2));
+    settle(r);
+  };
+  const SAMPLE = (proc.env.UPONE_SP ?? 'Ursus thibetanus,Felis catus,Pipistrellus pipistrellus,Mus musculus,Pan troglodytes').split(',');
+  it('species: a double tap from a species, card open or not, goes to the group the chain shows it in, then one more (ToLaD#481)', () => {
+    for (const sci of SAMPLE) {
+      const b = v.fan.branches.find((q) => q.sp.sci === sci);
+      if (!b) throw new Error(`no ${sci}`);
+      const ways: [string, () => boolean][] = [
+        ['search pick', () => (stand(home), v.flyToSpecies(b.sp), settle(r), true)],
+        [
+          'taps down, a tap on it',
+          () => {
+            const g = b.node.parent ?? b.node;
+            tapDownTo(g);
+            for (let k = 0; k < 3; k++) v.draw();
+            // (Off the screen, a scroll away (openCamera puts the group's first branch at the top): a pan to its column.)
+            if (!v.nameHits.some((q) => q.b === b) && !v.thumbHits.some((q) => q[3] === b && !q[4])) stand({ ...v.cam, cx: leftAt(b, b.tipY) + laneAt(b, b.tipY).w / 2 });
+            const h = v.nameHits.find((q) => q.b === b);
+            const pic = v.thumbHits.find((q) => q[3] === b && !q[4]);
+            say(`  ${sci}: taps down to ${chain().join(' › ')}: ${h ? 'name' : pic ? 'picture' : 'NOTHING to tap'}`);
+            if (h) tapBox(h.box);
+            else if (pic) (tapAt(r, pic[0], pic[1]), settle(r));
+            else return false;
+            return true;
+          },
+        ],
+      ];
+      for (const [way, reach] of ways)
+        for (const [dn, how] of [
+          ['finger', () => doubleTap(r, v.w / 2, v.h / 2)],
+          ['mouse', () => ((pointerType = 'mouse'), doubleTap(r, v.w / 2, v.h / 2), (pointerType = 'touch'))],
+          ['card', cardDouble],
+        ] as const) {
+          if (!reach()) continue;
+          const lv = v.levelNow(true);
+          say(`  ${sci} ${way}: at [${lvName(lv)}] ${chain().join(' › ')}, card ${v.selected ? 'open' : 'shut'}`);
+          check(`species ${sci}: ${way}, double tap (${dn})`, how);
+          check(`species ${sci}: ${way}, double tap (${dn}), a second`);
+        }
+    }
+    const mine = rows.filter((q) => q.route.startsWith('species'));
+    const bad = mine.filter((q) => q.bad);
+    say(`species: ${mine.length} double taps, ${bad.length} not one level up, ${mine.filter((q) => q.held).length} held, ${mine.filter((q) => q.inPx > 12).length} zoomed in on width or time`);
+    expect(bad.map((q) => `${q.route}: [${q.lv}] ${q.before.join(' › ')} -> ${q.after.join(' › ')} (${q.bad})`)).toEqual([]);
+  }, 600_000);
+
+  it.runIf(proc.env.UPONE_ALL)('probe: every species', () => {
+    const pv = v as unknown as { upOne(l: Level, c: Camera): unknown; upOut(l: Level, c: Camera): { lv: Level } | null };
+    const n = v.fan.branches.length;
+    let [tot, inW, inT, skip] = [0, 0, 0, 0];
+    const skips: Record<number, number> = {};
+    for (let k = 0; k < n; k += Number(proc.env.UPONE_ALL)) {
+      const b = v.fan.branches[k];
+      if (b.sp.extinct) continue;
+      const cam = v.speciesCamera(b);
+      stand(cam);
+      tot++;
+      const up = v.levelAbove({ b })!;
+      const [tx, ty] = tighter(P(v).landOf({ v: up }), cam);
+      if (tx > 12) inW++;
+      if (ty > 12) inT++;
+      const o = pv.upOut({ b }, cam);
+      const ab = v.levelsAbove({ b });
+      const d = o ? ab.indexOf(o.lv.v!) : -1;
+      skips[d] = (skips[d] ?? 0) + 1;
+      if (d !== 0) {
+        skip++;
+        if (skip <= 15) say(`skip ${d}: ${b.sp.sci} (${b.sp.common}) group ${lvName({ v: up })} ${tx.toFixed(0)}/${ty.toFixed(0)} -> ${o ? lvName(o.lv) : 'none'}`);
+      }
+    }
+    say(`probe: ${tot} species; group landing tighter on width ${inW}, on time ${inT}; double tap skips ${skip}: ${JSON.stringify(skips)}`);
+  }, 600_000);
 });
