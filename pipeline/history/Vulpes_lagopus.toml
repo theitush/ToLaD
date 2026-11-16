@@ -1,0 +1,25 @@
+species   = "Vulpes lagopus"
+common    = "Arctic fox"
+component = "wild"
+use       = "counts"
+scope     = "global"
+notes     = """
+No census: numbers swing several-fold with the lemming cycle, so the only global figure is an order of
+magnitude, "several hundred thousand" (Tannerfeldt 1997, repeated in the IUCN assessments of 2004 and
+2014). The model's own alive-now was 25,800 (density x range x the land occupancy fit, ToLaD#183/#186), about
+12x below it: the arctic fox has no Greenspoon et al. 2023 per-species estimate to combine with (ToLaD#357),
+and its tundra range is mostly empty between lemming peaks, which the fitted occupancy cannot know. The
+mainland Fennoscandian population is a few hundred and nationally Endangered (Norway's Red List, MOSJ);
+the bulk is in Russia, Canada, Alaska and Greenland.
+"""
+
+[[point]]
+year  = 2014
+n     = 400000
+lo    = 200000
+hi    = 900000
+grade = "C"
+kind  = "estimate"
+cite  = "Angerbjörn, A. & Tannerfeldt, M. 2014. Vulpes lagopus. The IUCN Red List of Threatened Species 2014: e.T899A57549321"
+url   = "https://www.iucnredlist.org/species/899/57549321"
+note  = "'The world population of Arctic Foxes is in the order of several hundred thousand animals. Most populations fluctuate widely in numbers between years in response to varying lemming numbers.' (the assessment, as quoted by SeaWorld's species page, https://seaworld.org/animals/facts/mammals/arctic-fox; the assessment page itself was not read). n = a level inside 'several hundred thousand' (2-9 x 10^5, the bounds); an order of magnitude over the lemming cycle: grade C."

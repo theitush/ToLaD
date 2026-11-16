@@ -78,7 +78,8 @@ K_SHRINK = 3.0  # clade effects in the marine occupancy fit are shrunk by n / (n
 # the living species (Open Tree "Equus quagga" is the extinct quagga)
 NAME_ALIASES = {"Equus quagga": ["Equus burchellii"]}
 MIN_GROUP = 20  # land order groups with fewer reference species use the pooled fit
-SD_GS_MODEL = 0.5  # dex, Greenspoon per-species model estimate (their SVR, CI ~ +-0.2-0.5 dex)
+GS_DISAGREE_FLAG = 1.0  # dex: Greenspoon's per-species model and ours further apart than this are listed (ToLaD#357)
+SD_SPLIT = 0.5  # dex: an MDD split's equal share of its parent's count (its share of the old range is unknown)
 # Greenspoon et al. 2023 report wild land biomass and individuals for these
 # orders; everything else is "Other" (results/results_grouped_by_order.csv)
 LAND_GROUPS = ("Rodentia", "Chiroptera", "Artiodactyla", "Proboscidea", "Primates", "Diprotodontia",
@@ -591,10 +592,13 @@ def near_extinct(n: Node) -> bool:
             and n.data.get("iucn") in NEAR_EXTINCT_STATUS)
 
 
-def count_flags(root: Node, ref: dict[int, float]) -> dict:
+def count_flags(root: Node, ref: dict[int, float], comb: dict[int, dict] | None = None) -> dict:
     """ToLaD#68: the living species whose today's count cannot be trusted as modelled. Listed in
-    stats.json -> count_flags, with what was done (after history files: `today` is the shipped count)."""
-    no_cur, check = [], []
+    stats.json -> count_flags, with what was done (after history files: `today` is the shipped count).
+    ToLaD#357: the species whose two estimates (Greenspoon's per-species model and ours) are more than
+    GS_DISAGREE_FLAG apart, in greenspoon_vs_model."""
+    comb = comb or {}
+    no_cur, check, disagree = [], [], []
     area_with_map: Counter = Counter()
     for n in root.preorder():
         if not n.is_leaf or n.extinct or n.name == "Homo sapiens":
@@ -605,7 +609,7 @@ def count_flags(root: Node, ref: dict[int, float]) -> dict:
                                 for m in D["meth"] if m.startswith("A:")), "none (census, estimate or cap)")] += 1
         today_from = ("history file" if D.get("alive_from_history")
                       else "census" if D.get("census_N") is not None
-                      else "Greenspoon model" if id(n) in ref else "capped" if D.get("near_extinct_cap")
+                      else "Greenspoon model + ours" if id(n) in ref else "capped" if D.get("near_extinct_cap")
                       else "model")
         row = {"leaf": n.name, "iucn": D.get("iucn"), "today": D["alive"], "today_from": today_from,
                "natural": D["natural"]["N"] if D.get("natural") else None,
@@ -617,9 +621,14 @@ def count_flags(root: Node, ref: dict[int, float]) -> dict:
                              else "flagged: no current map, IUCN " + str(D.get("iucn")))
             no_cur.append(row)
         elif D.get("iucn") in NEAR_EXTINCT_STATUS and D["alive"] > CHECK_CR_ABOVE and today_from in (
-                "model", "Greenspoon model"):
+                "model", "Greenspoon model + ours"):
             row["action"] = "flagged: modelled count above IUCN criterion C ceiling"
             check.append(row)
+        c = comb.get(id(n))
+        if c is not None and abs(c["dex"]) > GS_DISAGREE_FLAG:
+            disagree.append({"leaf": n.name, "today": float(f"{D['alive']:.3g}"), "today_from": today_from,
+                             "greenspoon": float(f"{c['gs']:.3g}"), "ours": float(f"{c['model']:.3g}"),
+                             "dex": round(c["dex"], 2)})
     key = lambda r: -r["today"]
     return {
         "note": "ToLaD#68. no_current_range: living leaves with a PHYLACINE map but an empty current range "
@@ -633,6 +642,11 @@ def count_flags(root: Node, ref: dict[int, float]) -> dict:
         "area_method_with_current_map": dict(sorted(area_with_map.items())),
         "no_current_range": sorted(no_cur, key=key),
         "cr_modelled_above_10k": sorted(check, key=key),
+        "greenspoon_vs_model_note": f"ToLaD#357: Greenspoon et al. 2023's per-species model and our density x range "
+                                    f"x occupancy more than {GS_DISAGREE_FLAG:g} dex apart (dex = log10 Greenspoon / "
+                                    "ours). Today's count is the two combined (model.combine_greenspoon) unless a "
+                                    "history file gives a cited one: candidates for a cited count, not changed.",
+        "greenspoon_vs_model": sorted(disagree, key=lambda r: -abs(r["dex"])),
     }
 
 
@@ -827,11 +841,53 @@ def natural_report(root: Node) -> dict:
     }
 
 
-def mdd_fallback(root: Node, census: dict[int, float], gs: dict[int, float]) -> dict[int, dict]:
+def combine_greenspoon(root: Node, gs: dict[int, float], log: dict) -> dict[int, dict]:
+    """ToLaD#357: Greenspoon et al. 2023's per-species model (their SVR's biomass / adult mass) is one estimate
+    of a land species' count today, our own density x range x fitted occupancy (N_model_oos) another. Neither
+    is a census, and taken alone Greenspoon's put big-range Neotropical opossums ~10x above field density x
+    typical occupancy and the Virginia opossum and brushtail possum 1-3 dex below it. The count is the two
+    combined in log space, each weighted by the inverse of its error variance. Greenspoon's model knows a
+    species' Red List category and ours does not (a CR species sits a median ~0.9 dex below ours), so ours is
+    first moved by the mean log10(Greenspoon / ours) of its PHYLACINE IUCN category. Their errors are measured on
+    the species both cover: the spread of log10(Greenspoon / ours) is the two errors together. The data cannot
+    tell them apart (on our census species Greenspoon's figure is the census itself, so its model cannot be
+    tested there), so each is that spread / sqrt 2: equal weights, the geometric mean, with an error of half
+    the spread. A disagreement above GS_DISAGREE_FLAG is listed in stats.json -> count_flags.
+    id(leaf) -> {N, sd, gs, model, dex}."""
+    pts = [n for n in root.preorder() if id(n) in gs]
+    r0 = np.array([math.log10(gs[id(n)] / n.data["N_model_oos"]) for n in pts])
+    cat = [n.data.get("iucn") or "none" for n in pts]
+    offset = {c: float(np.mean([x for x, cc in zip(r0, cat) if cc == c])) for c in set(cat)}
+    r = r0 - np.array([offset[c] for c in cat])
+    spread = float(r.std())
+    sd_g = sd_m = spread / math.sqrt(2)
+    w_g, w_m = 1 / sd_g ** 2, 1 / sd_m ** 2
+    sd = 1 / math.sqrt(w_g + w_m)
+    out = {}
+    for n, ri, c in zip(pts, r, cat):
+        ours = n.data["N_model_oos"] * 10 ** offset[c]
+        lg = (w_g * math.log10(gs[id(n)]) + w_m * math.log10(ours)) / (w_g + w_m)
+        out[id(n)] = {"N": 10 ** lg, "sd": sd, "gs": gs[id(n)], "model": ours, "dex": float(ri)}
+    log["greenspoon_combined"] = {
+        "note": "ToLaD#357: a land species with Greenspoon et al. 2023's per-species model estimate and no census "
+                "gets both estimates combined in log space, inverse-variance weighted (model.combine_greenspoon)",
+        "species": len(pts), "spread_dex": round(spread, 3), "spread_before_category_dex": round(float(r0.std()), 3),
+        "category_offset_dex": {c: [round(offset[c], 3), cat.count(c)] for c in sorted(offset)},
+        "sd_greenspoon_dex": round(sd_g, 3), "sd_ours_dex": round(sd_m, 3), "sd_combined_dex": round(sd, 3),
+        "weight_greenspoon": round(w_g / (w_g + w_m), 3),
+        "disagree_over_flag": int((abs(r) > GS_DISAGREE_FLAG).sum()), "flag_dex": GS_DISAGREE_FLAG}
+    return out
+
+
+def mdd_fallback(root: Node, census: dict[int, float], gs: dict[int, dict]) -> tuple[dict[int, dict], dict[int, int]]:
     """The MDD-grafted species (ToLaD#278) the count model has no inputs for (no census, no Greenspoon
-    estimate, no range of their own: their mass and range would be clade means, a clade-mean copy, #116):
-    the median today's count of the other species of their MDD genus (else family, else order), with that
-    taxon's spread (min 0.5 dex, 1 dex from a single species) as the error. id(leaf) -> the estimate."""
+    estimate, no range of their own: their mass and range would be clade means, a clade-mean copy, #116).
+    One split off a living leaf of ours (mdd_parent, mdd.sisters) takes an equal share of that parent's count,
+    which covers the parent's old, undivided range: the parent and its daughters share it, so the split adds
+    no animals (ToLaD#357; copying it made Metachirus ~3x its pre-split total). The others: the median
+    today's count of the other species of their MDD genus (else family, else order), with that taxon's spread
+    (min 0.5 dex, 1 dex from a single species) as the error. Returns id(leaf) -> the estimate, and id(parent)
+    -> the number of shares its count is cut into."""
     leaves = [n for n in root.preorder() if n.is_leaf and n.kind == "tree" and not n.extinct
               and n.name != "Homo sapiens" and "log_k" in n.data]
 
@@ -840,28 +896,48 @@ def mdd_fallback(root: Node, census: dict[int, float], gs: dict[int, float]) -> 
     need = [n for n in leaves if (n.data.get("mdd") or n.data.get("mdd_rescued")) and id(n) not in census
             and id(n) not in gs and not own_range(n)]
     skip = {id(n) for n in need}
+
+    def count(n: Node) -> tuple[float, float]:
+        if id(n) in census:
+            return census[id(n)], SD_CENSUS
+        if id(n) in gs:
+            return gs[id(n)]["N"], gs[id(n)]["sd"]
+        return n.data["N_raw"] * 10 ** n.data["log_k"], math.hypot(n.data["sd_NA"], n.data.get("k_sd", 0.0))
+    by_name = {n.name: n for n in leaves if id(n) not in skip}
+    kids: dict[int, list[Node]] = {}
+    for n in need:
+        P = by_name.get(n.data.get("mdd_parent") or "")
+        if P is not None and not near_extinct(P):
+            kids.setdefault(id(P), []).append(n)
+    shares = {p: len(k) + 1 for p, k in kids.items()}
+    out = {}
+    for P in (n for n in leaves if id(n) in kids):
+        N, sd = count(P)
+        for n in kids[id(P)]:
+            out[id(n)] = {"N": N / shares[id(P)], "sd": math.hypot(sd, SD_SPLIT), "level": "split", "taxon": P.name,
+                          "of": shares[id(P)]}
     vals: dict[tuple[str, str], list[float]] = {}
     for n in leaves:
         if id(n) in skip:
             continue
-        N = census.get(id(n)) or gs.get(id(n)) or n.data["N_raw"] * 10 ** n.data["log_k"]
+        N = count(n)[0] / shares.get(id(n), 1)
         for lvl in ("genus", "family", "order"):
             t = n.data.get(f"mdd_{lvl}")
             if t:
                 vals.setdefault((lvl, t), []).append(math.log10(N))
-    out = {}
     for n in need:
         for lvl in ("genus", "family", "order"):
+            if id(n) in out:
+                break
             t = n.data.get(f"mdd_{lvl}")
             v = vals.get((lvl, t))
             if v:
                 sd = max(0.5, float(np.std(v))) if len(v) > 1 else 1.0
                 out[id(n)] = {"N": 10 ** float(np.median(v)), "sd": sd, "level": lvl, "taxon": t, "of": len(v)}
-                if n.data.get("mdd_iucn") in NEAR_EXTINCT_STATUS and out[id(n)]["N"] > CR_GUESS_CAP:
-                    # a CR/EW species: its listing says more than its congeners do (Rice's whale, the popa langur)
-                    out[id(n)].update(N=CR_GUESS_CAP, sd=SD_NEAR_EXTINCT, capped=n.data["mdd_iucn"])
-                break
-    return out
+        if id(n) in out and n.data.get("mdd_iucn") in NEAR_EXTINCT_STATUS and out[id(n)]["N"] > CR_GUESS_CAP:
+            # a CR/EW species: its listing says more than its congeners do (Rice's whale, the popa langur)
+            out[id(n)].update(N=CR_GUESS_CAP, sd=SD_NEAR_EXTINCT, capped=n.data["mdd_iucn"])
+    return out, shares
 
 
 def human_rate_at(pieces, age_ma: float) -> float:
@@ -921,6 +997,7 @@ def assign_leaf_counts(root: Node, raw: Path, ctx: dict, log: dict) -> None:
             gs[id(nd)] = gs_model[nm]["N"]
     ref = {**gs, **census}
     fit_occupancy(root, ref, census, anchors.greenspoon_order_targets(raw), log)
+    comb = combine_greenspoon(root, gs, log)
     log["census_anchors"] = {
         "source": anchors.GREENSPOON_CITE,
         "census_reports": len(census_raw), "census_matched_extant_leaves": len(census),
@@ -928,13 +1005,15 @@ def assign_leaf_counts(root: Node, raw: Path, ctx: dict, log: dict) -> None:
         "species_model_estimates": len(gs_model), "species_model_used": len(gs),
         "species_model_unmatched": len(gs_miss),
     }
-    fallback = mdd_fallback(root, census, gs)
+    fallback, shares = mdd_fallback(root, census, comb)
     if "mdd" in log:
         log["mdd"]["genus_median_estimates"] = {
             "note": "MDD-grafted species with no census, Greenspoon estimate or range map of their own: today's "
-                    "count is the median of the other species of their MDD genus (else family, else order), "
-                    "grade D, spread = that taxon's (min 0.5 dex). A guess, listed so it can be checked (ToLaD#278)",
-            "n": len(fallback),
+                    "count is an equal share of the count of the species MDD split it from, where that is a leaf "
+                    "of ours (level 'split': the parent keeps one share, ToLaD#357), else the median of the other "
+                    "species of their MDD genus (else family, else order), grade D, spread = that taxon's (min 0.5 "
+                    "dex). A guess, listed so it can be checked (ToLaD#278)",
+            "n": len(fallback), "split_parents": len(shares),
             "species": {n.name: {k: (round(v, 3) if isinstance(v, float) else v) for k, v in fallback[id(n)].items()}
                         for n in root.preorder() if id(n) in fallback}}
 
@@ -971,11 +1050,14 @@ def assign_leaf_counts(root: Node, raw: Path, ctx: dict, log: dict) -> None:
             D["anchored_count"] = True
             found["census"] += 1
         elif id(n) in gs:
-            N = gs[id(n)]
-            D["sd_leaf"] = math.sqrt(max(D["sd_leaf"] ** 2 - D["sd_NA"] ** 2, 0.0) + SD_GS_MODEL ** 2)
+            # Greenspoon's per-species model and our density x range x occupancy, combined (ToLaD#357)
+            c = comb[id(n)]
+            N = c["N"]
+            D["sd_leaf"] = math.sqrt(max(D["sd_leaf"] ** 2 - D["sd_NA"] ** 2, 0.0) + c["sd"] ** 2)
             D["sys_sd"] = SD_SYSTEMATIC_CENSUS
-            D["meth"] = [m for m in D["meth"] if not m.startswith(("D:", "A:"))]
-            D["meth"].append("N:Greenspoon 2023 per-species model (no census report)")
+            D["meth"].append(f"N:Greenspoon 2023 per-species model {c['gs']:.3g} (no census report) and density x "
+                             f"range x occupancy {c['model']:.3g}, combined in log space by their errors")
+            D["gs_combined"] = c
             D["src"].add(SRC["greenspoon-data"])
             found["greenspoon model"] += 1
         elif id(n) in fallback:
@@ -986,13 +1068,15 @@ def assign_leaf_counts(root: Node, raw: Path, ctx: dict, log: dict) -> None:
             D["sd_leaf"] = math.sqrt(max(D["sd_leaf"] ** 2 - D["sd_NA"] ** 2, 0.0) + f["sd"] ** 2)
             D["sys_sd"] = SD_SYSTEMATIC
             D["meth"] = [m for m in D["meth"] if not m.startswith(("D:", "A:"))]
-            D["meth"].append(f"N:median of the {f['of']} other species of its {f['level']} {f['taxon']} (no census, "
-                             f"range or published estimate of its own; a guess, grade D)"
+            D["meth"].append((f"N:an equal share (1 of {f['of']}) of the count of {f['taxon']}, the species MDD split "
+                              f"it from" if f["level"] == "split" else
+                              f"N:median of the {f['of']} other species of its {f['level']} {f['taxon']}")
+                             + " (no census, range or published estimate of its own; a guess, grade D)"
                              + (f", held to {CR_GUESS_CAP:.0f} (IUCN CR criterion C bound; MDD lists it "
                                 f"{f['capped']})" if f.get("capped") else ""))
             D["genus_median"] = f
             cap = 3
-            found[f"MDD graft: {f['level']} median"] += 1
+            found["MDD graft: split share" if f["level"] == "split" else f"MDD graft: {f['level']} median"] += 1
         else:
             N = D["N_raw"] * 10 ** D["log_k"]
             D["sys_sd"] = SD_SYSTEMATIC
@@ -1007,14 +1091,22 @@ def assign_leaf_counts(root: Node, raw: Path, ctx: dict, log: dict) -> None:
                 D["near_extinct_cap"] = True
                 cap = 3
                 found["near-extinct cap"] += 1
+        if id(n) in shares:
+            # its count covers its old range, now shared with its MDD splits (ToLaD#357, mdd_fallback)
+            N /= shares[id(n)]
+            D["sd_leaf"] = math.hypot(D["sd_leaf"], SD_SPLIT)
+            D["meth"].append(f"N:shared equally with the {shares[id(n)] - 1} species MDD split from it")
+            D["split_shares"] = shares[id(n)]
         r = N / D["L"]
         D["sd_leaf_today"] = D["sd_leaf"]
         D["grade_cap_today"] = cap
         # natural (pre-human) baseline: the level before NATURAL_STEP_YEAR (extinct: the whole band)
-        sd_today = (SD_CENSUS if id(n) in census else SD_GS_MODEL if id(n) in gs
+        sd_today = (SD_CENSUS if id(n) in census else comb[id(n)]["sd"] if id(n) in gs
                     else fallback[id(n)]["sd"] if id(n) in fallback
                     else SD_NEAR_EXTINCT if D.get("near_extinct_cap")
                     else math.hypot(D["sd_NA"], D.get("k_sd", 0.0)))
+        if id(n) in shares:
+            sd_today = math.hypot(sd_today, SD_SPLIT)
         D["sd_today_count"] = sd_today
         nat = natural_level(D, N, sd_today, n.extinct, ctx["area_fit"])
         r_nat = r
@@ -1142,7 +1234,7 @@ def assign_leaf_counts(root: Node, raw: Path, ctx: dict, log: dict) -> None:
             n.data["history"] = rangeloss_record(n)
     log["rangeloss"] = rangeloss_report(root)
     log["natural_baseline"] = natural_report(root)
-    log["count_flags"] = count_flags(root, ref)
+    log["count_flags"] = count_flags(root, ref, comb)
     # layer 2, genetic diversity: a cross-check written to stats.json only (ToLaD#63)
     log["diversity_crosscheck"] = diversity.report(root, raw, ctx)
     unverified = [n for n in root.preorder() if n.is_leaf and n.kind == "tree" and not n.extinct
