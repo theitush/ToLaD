@@ -10,6 +10,7 @@ import { RangeGlobe } from './Globe';
 import { mammaliaClade, NATURAL_META, type HistEvent, type SpeciesRec } from './panthera';
 import { mammaliaTree } from './splits';
 import { loadMammals, mammalsLoaded } from './mammals-data';
+import { synthLoader } from './synthetic-level';
 import { stamp } from '../stamp';
 import { population } from './population';
 import { WorldToggle } from './WorldToggle';
@@ -111,7 +112,7 @@ export function FanApp() {
     if (mamm === 'ready') return;
     let live = true;
     if (mamm === 'fetch')
-      loadMammals().then(
+      loadMammals(synthLoader()).then(
         () => live && setMamm('build'),
         (e: unknown) => live && setMamm(`could not load the mammals (${e instanceof Error ? e.message : String(e)})`),
       );
