@@ -16,3 +16,4 @@ pipeline/.venv/
 .claude/worktrees/
 .claude/handoff/
 .claude/settings.local.json
+web/scale-out/

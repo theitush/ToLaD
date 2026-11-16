@@ -5,7 +5,7 @@
 //
 //   npm run build:single && flock /tmp/tolad-browser.lock node scripts/scale.mjs
 //
-// Env: NS=7000,70000 (sizes; 1M only by hand, NS=1000000, and it needs tens of GB: research/scale-yardstick.md), MODES=default,cut (cut: ?labels=cut&frame=cut; noorders: ?orders=0), NODE=0 / PHONE=0 (skip one side),
+// Env: NS=7000,31000 (sizes; 31k is the amniotes; 1M only by hand, NS=1000000, and it needs tens of GB: research/scale-yardstick.md), MODES=default (noorders: ?orders=0; the October `cut` mode's node switches are gone from main), NODE=0 / PHONE=0 (skip one side),
 // PHONE_NS=7000,70000 (the phone's sizes; default NS), LOAD_TIMEOUT=ms (phone: a size that has not opened by then is
 // recorded as never opening), OUT=<dir> (default scale-out/): node-<n>-<labels>.json, phone-<n>[-load].json, scale.json.
 // Run times on this machine, per mode: node 7k ~1 min (~1 GB); 70k ~1 min load only (SCALE_GESTURES=0) but over 2 h
@@ -18,10 +18,10 @@ import { join, resolve } from 'node:path';
 const WEB = resolve(import.meta.dirname, '..');
 const OUT = resolve(process.env.OUT || join(WEB, 'scale-out'));
 mkdirSync(OUT, { recursive: true });
-const NS = (process.env.NS || '7000,70000').split(',').map(Number);
+const NS = (process.env.NS || '7000,31000').split(',').map(Number);
 const PHONE_NS = process.env.PHONE_NS ? process.env.PHONE_NS.split(',').map(Number) : NS;
 // (Modes: default; cut = ?labels=cut&frame=cut; noorders = ?orders=0, the tree's orders not registered, synthetic-level.ts.)
-const LABELS = (process.env.MODES || process.env.LABELS || 'default,cut').split(',');
+const LABELS = (process.env.MODES || process.env.LABELS || 'default').split(',');
 const NODE_ENV = { default: {}, cut: { TOLAD_LABELS: 'cut', TOLAD_FRAME: 'cut' }, noorders: { SCALE_ORDERS: '0' } };
 const PAGE_Q = { default: {}, cut: { Q: 'labels=cut&frame=cut' }, noorders: { Q: 'orders=0' } };
 const read = (f) => (existsSync(f) ? JSON.parse(readFileSync(f, 'utf8')) : null);

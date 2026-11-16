@@ -8,12 +8,12 @@
 // build's part, then the file parsed, the tree, the clade, the view, the first frames), then frame times of a pinch,
 // a pan and a flight at home and two depths (the largest order, its largest family). TOLAD_LABELS=cut TOLAD_FRAME=cut: ?labels=cut&frame=cut.
 // SCALE_PROF=<file>: a CPU profile of the run after the build's part (.cpuprofile). SCALE_SEED=0 / SCALE_JSON=0 / SCALE_ORDERS=0: no layout seed / no file / its orders not registered (synthetic-level.ts). SCALE_GESTURES=0: the load only.
-import { appendFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { Session } from 'node:inspector/promises';
 import { describe, it } from 'vitest';
 import { setFlip } from './flip';
 import { RectBatch } from './meshgl';
-import { loadMammals } from './mammals-data';
+import { loadMammals, unpackMammals, type MammalFile } from './mammals-data';
 import { mammaliaClade } from './panthera';
 import { mammaliaTree } from './splits';
 import { synthLevelData, synthMarksNow } from './synthetic-level';
@@ -68,7 +68,9 @@ const stats = (a: number[]) => ({ n: a.length, p50: +q(a, 0.5).toFixed(2), p95: 
 
 describe.skipIf(!OUT)('scale yardstick (perf)', () => {
   it('opens and moves', async () => {
-    const n = Number(process.env.SCALE_N || 7000);
+    // SCALE_N=mammals: the real mammals.json as the build wrote it (MAMMALS_JSON, default dist-single/mammals.json), the sanity line.
+    const real = process.env.SCALE_N === 'mammals';
+    const n = real ? 0 : Number(process.env.SCALE_N || 7000);
     const res: Record<string, unknown> = { orders: process.env.SCALE_ORDERS !== '0', n, labels: process.env.TOLAD_LABELS || 'default', node: proc.version };
     const load: Record<string, number> = {};
     let rss = 0;
@@ -83,7 +85,20 @@ describe.skipIf(!OUT)('scale yardstick (perf)', () => {
     res.flip = process.env.SCALE_FLIP !== '0';
     // The build's part and the file read (synthetic-level.ts laps: synth-gen, synth-seed, synth-file, fetch, json, unpack).
     log(`n=${n} start`);
-    await loadMammals(() => synthLevelData({ n, seed: process.env.SCALE_SEED !== '0', json: process.env.SCALE_JSON !== '0', orders: process.env.SCALE_ORDERS !== '0' }, load));
+    const readReal = async () => {
+      let t = performance.now();
+      const text = readFileSync(process.env.MAMMALS_JSON || 'dist-single/mammals.json', 'utf8');
+      load.bytes = text.length;
+      load.fetch = performance.now() - t;
+      t = performance.now();
+      const f = JSON.parse(text) as MammalFile;
+      load.json = performance.now() - t;
+      t = performance.now();
+      const d = unpackMammals(f);
+      load.unpack = performance.now() - t;
+      return d;
+    };
+    await loadMammals(real ? readReal : () => synthLevelData({ n, seed: process.env.SCALE_SEED !== '0', json: process.env.SCALE_JSON !== '0', orders: process.env.SCALE_ORDERS !== '0' }, load));
     log(`data ${JSON.stringify(load)}`);
     mem();
     const prof = process.env.SCALE_PROF ? new Session() : null;
@@ -114,7 +129,7 @@ describe.skipIf(!OUT)('scale yardstick (perf)', () => {
     lap('second');
     res.load = Object.fromEntries(Object.entries(load).map(([k, x]) => [k, Math.round(k === 'bytes' ? x : x)]));
     res.species = mammaliaClade().species.length;
-    res.marks = synthMarksNow;
+    res.marks = real ? { order: 'Rodentia', family: 'Muridae', species: '' } : synthMarksNow;
     res.rssMB = Math.round(rss / 2 ** 20);
     writeFileSync(OUT!, JSON.stringify(res, null, 1));
     if (process.env.SCALE_GESTURES !== '0') {
@@ -131,7 +146,7 @@ describe.skipIf(!OUT)('scale yardstick (perf)', () => {
         h: number;
       };
       const frames: Record<string, unknown> = {};
-      const m = synthMarksNow!;
+      const m = res.marks as { order: string; family: string };
       for (const [depth, cam] of [['home', () => at.homeCamera()], ['order', () => at.levelCamera(m.order)], ['family', () => at.levelCamera(m.family)]] as const) {
         const c = cam();
         if (!c) {
@@ -139,6 +154,9 @@ describe.skipIf(!OUT)('scale yardstick (perf)', () => {
           continue;
         }
         log(`${depth}`);
+        // (SCALE_CAP_MIN, default 20: a depth's gestures stop there, and the run says where it cut them.)
+        const deadline = performance.now() + Number(process.env.SCALE_CAP_MIN || 20) * 60000;
+        const over = (what: string) => performance.now() > deadline && ((res.cut = `${depth} ${what}`), true);
         at.cam = c;
         v.draw();
         v.draw();
@@ -151,12 +169,12 @@ describe.skipIf(!OUT)('scale yardstick (perf)', () => {
         // A pinch in and out about the middle (as phoneperf's: 20 steps each way), a pan, a flight in and back.
         const pinch: number[] = [];
         at.gestureStart();
-        for (let k = 0; k < 40; k++) pinch.push(timed(() => v.zoomAbout(at.w / 2, at.h / 2, k < 20 ? 1.06 : 1 / 1.06)));
+        for (let k = 0; k < 40 && !over('pinch'); k++) pinch.push(timed(() => v.zoomAbout(at.w / 2, at.h / 2, k < 20 ? 1.06 : 1 / 1.06)));
         at.gestureEnd();
         at.levelNow(true);
         const pan: number[] = [];
         at.gestureStart();
-        for (let k = 0; k < 30; k++) pan.push(timed(() => v.pan(k < 15 ? 8 : -8, k % 10 < 5 ? 3 : -3)));
+        for (let k = 0; k < 30 && !over('pan'); k++) pan.push(timed(() => v.pan(k < 15 ? 8 : -8, k % 10 < 5 ? 3 : -3)));
         at.gestureEnd();
         at.levelNow(true);
         log(`${depth} pinch ${JSON.stringify(stats(pinch))} pan ${JSON.stringify(stats(pan))} rss ${Math.round(mem() / 2 ** 20)} MB`);
@@ -169,7 +187,7 @@ describe.skipIf(!OUT)('scale yardstick (perf)', () => {
         for (const go of [() => v.flyToSpecies(b.sp, false), () => v.resetView()]) {
           go();
           let now = performance.now();
-          for (let k = 0; k < 600 && at.anim; k++) {
+          for (let k = 0; k < 600 && at.anim && !over('flight'); k++) {
             now += 16.7;
             const a = at.anim;
             fly.push(timed(() => !a(now) && (at.anim = null)));
