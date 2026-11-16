@@ -73,9 +73,13 @@ describe('labels in the gaps and in the branches', () => {
   it('only ever splits on the way in', () => {
     let prev: GapMember[] | null = null;
     for (const z of ZOOMS) {
-      const now = cover(home * z);
-      // (A cover: runs of strands that do not overlap, never a group with its parts.)
+      const all = cover(home * z);
+      // (The cut below the titles, ToLaD#483: runs of strands that do not overlap, never a group with its parts. Over it, each title over a run of it, one a gap.)
+      const now = all.filter((m) => !m.heads);
       for (let i = 1; i < now.length; i++) expect(now[i].on).toBeGreaterThan(now[i - 1].on);
+      const heads = all.filter((m) => m.heads);
+      for (let i = 1; i < heads.length; i++) expect(heads[i].on).toBeGreaterThan(heads[i - 1].on);
+      for (const h of heads) expect(now.some((m) => m.on === h.on && h.f <= m.f && m.l <= h.l)).toBe(true);
       if (prev) {
         const was = prev;
         expect(now.length).toBeGreaterThanOrEqual(was.length);
@@ -117,8 +121,12 @@ describe('labels in the gaps and in the branches', () => {
     }
   });
 
-  it('a name for everyone in the cover, by the rule: every part that opened has room', () => {
-    for (const z of ZOOMS) for (const m of cover(home * z)) expect(m.tier, String(name(m))).toBeTruthy();
+  it('a name for everyone in the cover, by the rule: every part that opened has room; under a title, where it fits (ToLaD#483)', () => {
+    for (const z of ZOOMS) {
+      const all = cover(home * z);
+      const heads = all.filter((m) => m.heads);
+      for (const m of all) if (!m.tier) expect(heads.some((h) => h.f <= m.f && m.l <= h.l), String(name(m))).toBe(true);
+    }
   });
 
   it('pictures by priority and collision (ToLaD#464): full or small, no two ever meeting, wider than a band or not', () => {
@@ -147,7 +155,8 @@ describe('labels in the gaps and in the branches', () => {
   it('a picture once shown stays as the view zooms in, until its member splits (a small one may grow)', () => {
     let prev = new Map<unknown, number>();
     for (let z = 1; z < 2 ** 12; z *= 1.05) {
-      const now = new Map<unknown, number>(cover(home * z).map((m) => [m.lv.b ?? m.lv.v, m.pic ?? 0]));
+      // (Until its member splits or hands its band down to its parts, ToLaD#483.)
+      const now = new Map<unknown, number>(cover(home * z).filter((m) => !m.heads).map((m) => [m.lv.b ?? m.lv.v, m.pic ?? 0]));
       for (const [k, d] of prev) if (now.has(k)) expect(now.get(k)!).toBeGreaterThanOrEqual(d);
       prev = now;
     }
@@ -235,7 +244,7 @@ describe('labels in the gaps and in the branches', () => {
   it('has Homo sapiens as a label of its own, its fossils holding nothing back', () => {
     const holder = (taxon: string, sci: string) => {
       const b = f.strands.find((s) => s.sp.sci === sci)!;
-      return cover(v.levelCamera(taxon)!.sx).find((m) => (m.lv.b ? m.lv.b === b : m.lv.v!.strands.includes(b)))!;
+      return cover(v.levelCamera(taxon)!.sx).find((m) => !m.heads && (m.lv.b ? m.lv.b === b : m.lv.v!.strands.includes(b)))!;
     };
     // (At Primates' frame humans stand in a group with a thin first part, that group's picture a human: a funnel, its band read whole. The same for cat and dog at Carnivora's.)
     for (const [taxon, sci] of [['Primates', 'Homo sapiens'], ['Carnivora', 'Felis catus'], ['Carnivora', 'Canis familiaris']]) {

@@ -8,7 +8,13 @@
 // so it takes no room, claims nothing, has no label and holds no fork back; the same for a hair standing inside a wider lane (ownLanes). Those few, fossils, are named by the chain.
 //
 // A band is the lane's whole room, not the width the line has there: a funnel (humans, dogs) is thin at 100 kya and fat by now, and its lane is kept free for it all the way, so nothing else can stand
-// there and a label on it reads as that funnel's. A group's band is its strands' whole span there, the gaps inside included: its name stands over its parts, which then have no label of their own.
+// there and a label on it reads as that funnel's. A group's band is its strands' whole span there, the gaps inside included.
+//
+// A title takes only its gap (ToLaD#483, Ita: "theres enough room for the asiatic bear name and pic under the american bear and kin title.. we should avoid them when they fit"): once a group's name
+// stands in its gap, its band is its parts', each labelled there by the same rule as any member of the cover (its gap, unless that is its group's title's; its band; a picture), a second tier, and so on
+// down (gapHands, gapCut). A part whose top strand is its group's has its group's gap, so the title there names it too and it hands its band down with it. Every label still stands in a room of its
+// owner's alone: a title in a gap nobody else names, every other label in a band of the cut below the titles, and those bands are disjoint. Still the zoom alone: a group hands its band down once, on the way in, and never before
+// its parent, so the cut below the titles only ever splits too.
 
 /** Where a member of the cover has its name: in its gap, in its band. */
 export type Tier = 'title' | 'in' | null;
@@ -82,6 +88,52 @@ export function gapCover<G>(root: G, parts: (g: G) => readonly G[], opens: Map<G
   return out;
 }
 
+/**
+ * Each group's handing zoom (ToLaD#483): from it, its name stands in its gap only and its band is its parts', until it, its own. A group hands its band down once its gap holds its name (`gap(g)`, world
+ * x, its own gap on the column; px the text), and at its opening anyway; never before its parent hands down. A part whose top strand is its group's (`same(g, p)`) has its group's gap: while the
+ * group's title stands there, the title names it too (the run they both top), so it hands its band down with its group, its own name nowhere; its own title once its group opens.
+ */
+export function gapHands<G>(root: G, parts: (g: G) => readonly G[], opens: Map<G, number>, gap: (g: G) => number, same: (g: G, p: G) => boolean, px: number): Map<G, number> {
+  const hands = new Map<G, number>();
+  const stack: [G, number, number | null][] = [[root, 0, null]];
+  while (stack.length) {
+    const [g, enter, named] = stack.pop()!;
+    const ps = parts(g);
+    const open = opens.get(g) ?? Infinity;
+    const titled = named ?? (gap(g) > 0 ? px / gap(g) : Infinity);
+    const at = ps.length ? Math.min(open, Math.max(enter, titled)) : Infinity;
+    hands.set(g, at);
+    for (const p of ps) stack.push([p, at, same(g, p) && at < open ? at : null]);
+  }
+  return hands;
+}
+
+/** A member of the cut at a zoom: `heads`, its band its parts' (its name in its gap only, no picture); `taken`, its gap its group's title's (no name of its own there). */
+export interface CutMember<G> {
+  g: G;
+  heads: boolean;
+  taken: boolean;
+}
+
+/**
+ * The cut at zoom sx (ToLaD#483): the tree cut where groups have not handed their bands down (gapHands), and over it each group that has but not opened, its title only, before its parts; one whose
+ * gap is its group's title's left out (that title names it).
+ */
+export function gapCut<G>(root: G, parts: (g: G) => readonly G[], opens: Map<G, number>, hands: Map<G, number>, same: (g: G, p: G) => boolean, sx: number): CutMember<G>[] {
+  const out: CutMember<G>[] = [];
+  const stack: [G, boolean][] = [[root, false]];
+  while (stack.length) {
+    const [g, taken] = stack.pop()!;
+    const ps = parts(g);
+    if (ps.length && (hands.get(g) ?? Infinity) <= sx) {
+      const open = (opens.get(g) ?? Infinity) <= sx;
+      if (!open && !taken) out.push({ g, heads: true, taken });
+      for (let i = ps.length - 1; i >= 0; i--) stack.push([ps[i], !open && same(g, ps[i])]);
+    } else out.push({ g, heads: false, taken });
+  }
+  return out;
+}
+
 export interface Member {
   /** A species (else a group). */
   species: boolean;
@@ -102,7 +154,7 @@ export function tier(m: Member, sx: number, px: number, inPx: number): Tier {
   return band >= inPx ? 'in' : gap >= px ? 'title' : null;
 }
 
-/** A candidate for a picture: its centre on the column (world x), and the zooms it is a member of the cover over, from `enter` (its parent opens) to `exit` (it opens). */
+/** A candidate for a picture: its centre on the column (world x), and the zooms its band is its own over, from `enter` (its parent hands its band down) to `exit` (it does, gapHands). */
 export interface PicCand {
   at: number;
   enter: number;
