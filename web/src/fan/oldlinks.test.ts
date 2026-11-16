@@ -46,7 +46,6 @@ function stubView(): FanView {
 interface Priv {
   anim: unknown;
   cam: Camera;
-  steps: unknown[];
   frameOf(lv: Level): Camera;
 }
 const P = (v: FanView) => v as unknown as Priv;
@@ -72,7 +71,6 @@ describe('the old level links (ToLaD#418)', () => {
     const node = v.fan.nodes.find((n) => n.split.taxon === taxon)!;
     expect(node).toBeTruthy();
     expect(P(v).anim).toBeNull();
-    expect(P(v).steps).toEqual([]);
     expect(P(v).cam).toEqual(P(v).frameOf({ v: node }));
     expect(P(v).cam.sx).toBeGreaterThan(home.sx);
     expect(v.levelNow(true).v).toBe(node);
