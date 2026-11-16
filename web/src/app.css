@@ -152,7 +152,8 @@
   object-fit: contain;
   cursor: zoom-out;
 }
-.card-sp .pic a {
+.card-sp .pic a,
+.card-sp .media .cap {
   display: block;
   margin-top: 3px;
   font-size: 9px;
@@ -194,15 +195,18 @@
   gap: 0 10px;
   margin: 4px 0 8px;
 }
-/* Each item's image box (--box): the photo's square, the globe's disc, the map's height; the range alone in the row
-   (no photo) a little larger. Fixed, so the box is known before the image arrives (ToLaD#479). */
+/* Each item's image box (--box): the photo's square, the globe's disc, the map's height. Fixed, so the box is known
+   before the image arrives (ToLaD#479); every card has both, a missing one saying so in its box (ToLaD#492). */
 .card-sp .media > * {
   position: relative;
   --box: 120px;
 }
-.card-sp .media > .globe:only-child,
-.card-sp .media > .range:only-child {
-  --box: 160px;
+/* ToLaD#492: no photo, the tree's stub (wiki.drawStub) in its square; its caption in the credit's line, like the bare
+   globe's 'Range not known'. */
+.card-sp .pic.stub canvas {
+  display: block;
+  width: var(--box);
+  height: var(--box);
 }
 .card-sp .media .pic {
   float: none;
@@ -226,10 +230,7 @@
   height: auto;
   max-height: 70vh;
 }
-/* ToLaD#267: the range globe beside the photo (alone, a little larger); a tap enlarges it across the card. */
-.card-sp .media:empty {
-  display: none;
-}
+/* ToLaD#267: the range globe beside the photo; a tap enlarges it across the card. */
 .card-sp .globe {
   flex: 1 1 0;
   min-width: 0;

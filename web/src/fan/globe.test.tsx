@@ -119,17 +119,29 @@ describe('range globe in the card (ToLaD#267)', () => {
     const r = speciesRange('Loxodonta cyclotis')!;
     expect(r.from).toBe('Loxodonta africana');
     expect(r.cur).toBe(speciesRange('Loxodonta africana')!.cur);
-    const html = renderToStaticMarkup(<RangeGlobe sci="Loxodonta cyclotis" fallback={null} />);
+    const html = renderToStaticMarkup(<RangeGlobe sci="Loxodonta cyclotis" />);
     expect(html).toContain('<canvas');
     expect(html).toContain('Range of <i>Loxodonta africana</i> before the split · PHYLACINE 1.2'); // 1.2 never wraps alone
   });
 
-  it('a species PHYLACINE has no map of falls back to the Wikimedia map, or to nothing', () => {
-    const fb = renderToStaticMarkup(<RangeGlobe sci="Not a species" fallback={<RangeMap w={w} />} />);
+  it('a species PHYLACINE has no map of falls back to the Wikimedia map, or to the bare globe (ToLaD#492)', () => {
+    const fb = renderToStaticMarkup(<RangeGlobe sci="Not a species" fallback={(none) => <RangeMap w={w} none={none} />} />);
     expect(fb).toContain('class="range loading"');
     expect(fb).toContain(`src="${w.range}"`);
     expect(fb).not.toContain('globe');
-    expect(renderToStaticMarkup(<RangeGlobe sci="Not a species" fallback={null} />)).toBe('');
+    const bare = '<figure class="globe none"><canvas></canvas><span class="cap">Range not known</span></figure>';
+    expect(renderToStaticMarkup(<RangeGlobe sci="Not a species" />)).toBe(bare);
+    // The map failing: the bare globe in its box.
+    expect(renderToStaticMarkup(<RangeGlobe sci="Not a species" fallback={(none) => <RangeMap w={w} initial="failed" none={none} />} />)).toBe(bare);
+  });
+
+  it('a card with neither picture nor range shows both boxes, saying what is missing (ToLaD#492)', () => {
+    const lion = FELIDAE.species.find((s) => s.sci === 'Panthera leo')!;
+    const html = renderToStaticMarkup(<SpeciesCard sp={{ ...lion, sci: 'Not a species', common: 'Nothing' }} onClose={() => {}} />);
+    expect(html).toContain('<div class="media"><figure class="pic stub">');
+    expect(html).toContain('No photo');
+    expect(html).toContain('class="globe none"');
+    expect(html).toContain('Range not known');
   });
 
   it('nearly every cat has a globe', () => {

@@ -211,8 +211,9 @@ export function livePic(sci: string, L = picLoader()): boolean {
 /**
  * The stub for no photo (ToLaD#400): a dashed ring and a camera struck through, all in proportion to `d`, so that it
  * reads as a statement at 22 px and at 50 px, where the loading disc is a plain fill in a whole ring. Paths only.
+ * The species card draws it too, in the picture's box (ToLaD#492).
  */
-function drawStub(ctx: CanvasRenderingContext2D, cx: number, cy: number, d: number): void {
+export function drawStub(ctx: CanvasRenderingContext2D, cx: number, cy: number, d: number): void {
   const r = d / 2 - 1.5;
   const line = Math.max(1, d * 0.03);
   ctx.beginPath();

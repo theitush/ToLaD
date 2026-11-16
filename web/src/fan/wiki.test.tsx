@@ -22,11 +22,12 @@ describe('wiki sidecar (ToLaD#182)', () => {
     expect(html).toContain('<a class="wp" href="https://en.wikipedia.org/wiki/Lion" target="_blank" rel="noopener">Lion</a>');
   });
 
-  it('draws no picture without a URL or after it fails; loading, its box and credit are held (ToLaD#479)', () => {
-    expect(renderToStaticMarkup(<WikiPic w={null} />)).toBe('');
-    expect(renderToStaticMarkup(<WikiPic w={{ wp: 'https://en.wikipedia.org/wiki/X' }} />)).toBe('');
+  it("without a URL or after it fails, the tree's stub in its box (ToLaD#492); loading, its box and credit are held (ToLaD#479)", () => {
+    const stub = '<figure class="pic stub"><canvas></canvas><span class="cap">No photo</span></figure>';
+    expect(renderToStaticMarkup(<WikiPic w={null} />)).toBe(stub);
+    expect(renderToStaticMarkup(<WikiPic w={{ wp: 'https://en.wikipedia.org/wiki/X' }} />)).toBe(stub);
     const w = { img: 'https://upload.wikimedia.org/x/330px-a.jpg', file: 'https://commons.wikimedia.org/wiki/File:a.jpg' };
-    expect(renderToStaticMarkup(<WikiPic w={w} initial="failed" />)).toBe('');
+    expect(renderToStaticMarkup(<WikiPic w={w} initial="failed" />)).toBe(stub);
     const credit = '<a href="https://commons.wikimedia.org/wiki/File:a.jpg" target="_blank" rel="noopener">Wikimedia Commons</a>';
     const loading = renderToStaticMarkup(<WikiPic w={w} />);
     expect(loading).toContain('class="pic loading"');
@@ -112,7 +113,7 @@ describe('range map (ToLaD#196)', () => {
     el.props.children[0].props.onError(); // the big one failed: back to the 500 px one, still shown
     el = render()!;
     expect(el.props.children[0].props.src).toBe(w.range);
-    el.props.children[0].props.onError(); // the map itself failed: gone
+    el.props.children[0].props.onError(); // the map itself failed: gone, its `none` (here none) in its place
     expect(render()).toBeNull();
   });
 });

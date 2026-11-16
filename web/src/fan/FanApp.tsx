@@ -1,11 +1,11 @@
 // The main view: the dated tree, OneZoom-style.
 
-import { useCallback, useEffect, useRef, useState, type PointerEvent as RPointerEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as RPointerEvent, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import { approxMa, formatCount, formatMass } from '../data/count';
 import { HistorySpark } from './HistorySpark';
 import type { Measure } from './layout';
-import { wikiOf, type WikiRec } from './wiki';
+import { drawStub, wikiOf, type WikiRec } from './wiki';
 import { RangeGlobe } from './Globe';
 import { mammaliaClade, NATURAL_META, type HistEvent, type SpeciesRec } from './panthera';
 import { mammaliaTree } from './splits';
@@ -474,7 +474,7 @@ function EventSource({ ev }: { ev: HistEvent }) {
 /**
  * The species' Commons picture (ToLaD#182), hotlinked. Loading, its square and its credit line are held at their
  * loaded size with a spinner over them (ToLaD#479: nothing moves when it arrives; app.css shows the spinner only after
- * a moment, so a cached picture never flashes it); nothing if it fails (no box, no alt text, no gap).
+ * a moment, so a cached picture never flashes it). With none, or once it fails, the tree's stub in its box (ToLaD#492).
  * Keyed by its URL, so another species starts over.
  */
 export function WikiPic({ w, initial = 'loading' }: { w: WikiRec | null; initial?: 'loading' | 'ok' | 'failed' }) {
@@ -483,7 +483,7 @@ export function WikiPic({ w, initial = 'loading' }: { w: WikiRec | null; initial
   const [big, setBig] = useState(false);
   const [bigFailed, setBigFailed] = useState(false);
   const src = w?.img;
-  if (!src || state === 'failed') return null;
+  if (!src || state === 'failed') return <PicStub />;
   const bigSrc = bigSrcOf(src);
   const useBig = big && !bigFailed && bigSrc !== src;
   return (
@@ -509,16 +509,16 @@ export function WikiPic({ w, initial = 'loading' }: { w: WikiRec | null; initial
 
 /**
  * The species' range map (ToLaD#196, Wikidata P181), hotlinked like the photo: under the name,
- * beside the photo (alone in the row when there is none), its place held with a spinner while it loads, nothing
- * if it fails. A tap enlarges it across the card (the 960 px thumbnail), another shrinks it back.
+ * beside the photo, its place held with a spinner while it loads, `none` (the globe with no range, ToLaD#492) if it
+ * fails. A tap enlarges it across the card (the 960 px thumbnail), another shrinks it back.
  * Side by side rather than stacked: stacked, the lion's card filled the whole 390×844 screen.
  */
-export function RangeMap({ w, initial = 'loading' }: { w: WikiRec | null; initial?: 'loading' | 'ok' | 'failed' }) {
+export function RangeMap({ w, initial = 'loading', none = null }: { w: WikiRec | null; initial?: 'loading' | 'ok' | 'failed'; none?: ReactNode }) {
   const [state, setState] = useState(initial);
   const [big, setBig] = useState(false);
   const [bigFailed, setBigFailed] = useState(false);
   const src = w?.range;
-  if (!src || state === 'failed') return null;
+  if (!src || state === 'failed') return none;
   const bigSrc = bigSrcOf(src);
   const useBig = big && !bigFailed && bigSrc !== src;
   return (
@@ -537,6 +537,28 @@ export function RangeMap({ w, initial = 'loading' }: { w: WikiRec | null; initia
           Range map · Wikimedia Commons
         </a>
       )}
+    </figure>
+  );
+}
+
+/**
+ * No photo (none in the wiki, or it failed for good): the tree's stub (ToLaD#400, wiki.drawStub), in the picture's box
+ * at its size, its caption in the credit's line (ToLaD#492), so the card shows what is missing as the tree does.
+ */
+function PicStub() {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useLayoutEffect(() => {
+    const c = ref.current;
+    if (!c) return;
+    const px = Math.round((c.clientWidth || 120) * Math.min(2, window.devicePixelRatio || 1));
+    c.width = c.height = px;
+    const ctx = c.getContext('2d');
+    if (ctx) drawStub(ctx, px / 2, px / 2, px);
+  }, []);
+  return (
+    <figure className="pic stub">
+      <canvas ref={ref} />
+      <span className="cap">No photo</span>
     </figure>
   );
 }
@@ -617,10 +639,11 @@ export function SpeciesCard({ sp, onClose, onUp, open, ageMa, startMa, event, ma
         )}{' '}
         <i>({sp.sci})</i>
       </div>
-      {/* The photo and the range side by side under the name (ToLaD#196): the globe (ToLaD#267), else the Wikimedia map. */}
+      {/* The photo and the range side by side under the name (ToLaD#196): the globe (ToLaD#267), else the Wikimedia map;
+          either missing, what says so in its box (ToLaD#492), so every card has the same two. */}
       <div className="media">
         <WikiPic key={wiki?.img ?? ''} w={wiki} />
-        <RangeGlobe key={sp.sci} sci={sp.sci} fallback={wiki?.range ? <RangeMap key={`range-${wiki.range}`} w={wiki} /> : null} />
+        <RangeGlobe key={sp.sci} sci={sp.sci} fallback={wiki?.range ? (none) => <RangeMap key={`range-${wiki.range}`} w={wiki} none={none} /> : undefined} />
       </div>
       {ev && <EventSection ev={ev} k={event!} />}
       <div className="facts">
