@@ -1303,6 +1303,16 @@ export class FanView implements InputHandlers {
   }
 
   /**
+   * How far up from the screen's foot every frame puts its start, a level's fork (withBand) and a species' split (speciesCamera) alike: on the tree on its
+   * side its FORK_PX (flip.ts), else over the scale bar. One for both, so a species' life is framed on the band its group's is, and its group's frame,
+   * from an older fork, takes in at least its time: a species' landing is never wider in time than its group's (ToLaD#481: the bears' fork 28 px from the
+   * foot, the Asiatic black bear's split 104, so every group up to Carnivora's landed tighter in time than the bear's and a double tap went home).
+   */
+  private forkPx(): number {
+    return this.flip ? FLIP_FORK_PX : FORK_PX;
+  }
+
+  /**
    * A level's frame spans the clade's life (ToLaD#288): "now" at the labels' band's foot (labelBand); its start (the
    * fork camera.frame puts FRAME_BOTTOM px up from the screen's foot) down at FORK_PX from the foot, over the scale bar.
    * Only the time is moved: the width (and with it the stack) stays as framed. `top`: the world y put where "now"
@@ -1312,7 +1322,7 @@ export class FanView implements InputHandlers {
     const sn = this.h / 2 + (this.yNow - cam.cy) * cam.sy;
     const yFork = cam.cy + (this.h - FRAME_BOTTOM - this.h / 2) / cam.sy;
     const nowS = this.brackets ? this.labelBand().now : sn;
-    const sy = Math.max(1e-300, this.h - (this.flip ? FLIP_FORK_PX : FORK_PX) - nowS) / Math.max(1e-300, yFork - top);
+    const sy = Math.max(1e-300, this.h - this.forkPx() - nowS) / Math.max(1e-300, yFork - top);
     return { ...cam, sy, ty: sy, cy: top + (this.h / 2 - nowS) / sy };
   }
 
@@ -1869,9 +1879,9 @@ export class FanView implements InputHandlers {
    */
   speciesCamera(b: FanBranch): Camera {
     const h = this.homeCamera();
-    // (Its tip where every frame stands "now", ToLaD#373; its own split down at FORK_PX from the foot: its whole life on screen.)
+    // (Its tip where every frame stands "now", ToLaD#373; its own split down where every frame's start stands (forkPx): its whole life on screen.)
     const tipPx = this.labelBand().now;
-    const band = Math.max(80, this.h - FORK_PX - tipPx);
+    const band = Math.max(80, this.h - this.forkPx() - tipPx);
     const sy = Math.max(h.sy, band / Math.max(1e-300, b.splitY - b.tipY));
     // Within the time limit (MIN_YEARS on screen) about the tip, where it will sit.
     const s = this.camera.timeCap(b.tipY, tipPx, sy, h.sy);
@@ -2051,8 +2061,15 @@ export class FanView implements InputHandlers {
    * would zoom in, the nearest level up that zooms out (ToLaD#416, Ita: "double tap always zooms out to the nearest thing
    * that makes sense"). Only a view wider than every level above it but home's gets there: a search pick of the human,
    * framed on 8 billion at "now", wider than Homo's frame by 7,300x and than Primates' by 1.2x. Null at home's level.
+   * From a species, the view at its landing (a tap's, a search pick's, its card open or not), its group whatever its landing does (ToLaD#481): the
+   * species stands in it by the tree, and the walk took a wide one's double tap several levels up. A group's landing opens it where its thinnest part has
+   * room (openCamera), so a species framed on its column at half the screen (speciesCamera) can be wider than its group's landing (the house mouse's, 4x
+   * Murini's on width; the human's, 7,300x Homo's): that double tap zooms in on width, one level up all the same. A view off the species' landing (a pan,
+   * a pinch) is never zoomed in on (ToLaD#416): the walk.
    */
   private upOut(from: Level, c: Camera): Step | null {
+    const u = from.b ? this.levelAbove(from) : null;
+    if (u && !this.upOne(from, c) && this.offBy(this.landOf(from), c) <= LEVEL_PX) return { lv: { v: u }, cam: this.landOf({ v: u }) };
     for (let at = from; ; ) {
       const step = this.upOne(at, c);
       if (step) return step;

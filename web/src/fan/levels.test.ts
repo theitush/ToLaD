@@ -76,7 +76,9 @@ function upChain(v: FanView, from: Level): FanNode[] {
  * off home, home. Null where that would zoom in (ToLaD#416: tighter than the view on width or time; home, the last resort, while wider on width) or at home.
  */
 function wantUp(v: FanView, from: Level): FanNode | null {
-  // (Where one up would zoom in, the nearest level up that zooms out, ToLaD#416: a search pick of a wide species.)
+  // (From a species at its landing, its group whatever its landing does, ToLaD#481: the human's search pick, Homo's.)
+  if (from.b && P(v).offBy(P(v).landOf(from), v.cam) <= LEVEL_PX) return v.levelAbove(from);
+  // (Elsewhere, where one up would zoom in, the nearest level up that zooms out, ToLaD#416.)
   for (let at = from; ; ) {
     const u = v.levelAbove(at) ?? (atHome(v) ? null : v.fan.root);
     if (!u) return null;
