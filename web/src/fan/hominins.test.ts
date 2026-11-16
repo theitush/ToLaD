@@ -210,10 +210,8 @@ describe('a tap on humans stops at the Hominins first (ToLaD#497)', () => {
     expect(v.levelNow(true).v === node('Homininae') && chain().endsWith('› African great apes'), shows()).toBe(true);
   }, 600_000);
 
-  // (Fails: the Hominins' landing on the tree on its side (openCamera) zooms to its room, the hull of its strands at every time, humans' ~8
-  // billion at "now" in it, over the fossils' time window (fossilTop, ToLaD#298), "now" off the screen: no column, humans' or a fossil's, is on
-  // screen, so there is no human to tap a second time. Once the landing frames the hominins with humans in view, the second tap lands on Human.)
-  it.fails('at the Hominins: humans on screen, and the next tap on them lands on Human, its card open', () => {
+  // (The Hominins' landing (stopFrame) runs its fossil frame on to "now": humans stand in view there, a column to tap a second time.)
+  it('at the Hominins: humans on screen, and the next tap on them lands on Human, its card open', () => {
     at('Primates');
     tapAt(r, ...spot('name')!);
     settle(r);

@@ -2290,28 +2290,25 @@ export class FanView implements InputHandlers {
   private gesturing = false;
 
   /**
-   * A tap on a branch, a group's pill, picture, bracket or pinned row (ToLaD#258): one level deeper, to the next level
-   * on the way from the level the view is at to what was tapped (`to`: a species, or a clade, an ancestral stretch's
-   * lineage among them). From the level holding both, down: the first whose frame is more than LEVEL_PX off the view's
-   * (so every tap visibly moves). Already at a species: false, for its card. A clade that holds the view's level (a
-   * pinned group, an ancestor's bracket): out to it, unless a column's stretch (`col`: false, its card).
+   * Where a highlight's clade lands on the tree on its side (HIGHLIGHT_STOPS, ToLaD#497), in place of openCamera, whose room (the hull of its strands
+   * at every time, humans' ~8 billion at "now" in it) on the fossils' time window left the Hominins' screen empty: its fossil frame (cladeCamera's
+   * across, where its fossils lived, fossilSpan, ToLaD#289) with its time window run on to its youngest fossil's end (Neanderthals', ~40 kya), no
+   * older than the labels' line (LABELS_MA): its fossils spread across the screen from the fork, and the species stands in view among them, its
+   * name and picture on the labels' line, its column running past the screen's edge. (Run on to "now", log time gave the last 40 kyr most of the
+   * screen and the fossils a quarter of it, ToLaD#497's measures.) Null for any other clade.
    */
+  private stopFrame(v: FanNode): Camera | null {
+    if (!v.parent || !Object.values(HIGHLIGHT_STOPS).includes(latinOf(v.split))) return null;
+    let top = this.fan.time.y(LABELS_MA);
+    for (const b of v.strands) if (b.sp.extinct || !(b.pop.aliveAt(0) > 0)) top = Math.min(top, b.tipY);
+    return this.runFrame(v.strands[0].index, v.strands[v.strands.length - 1].index, v.y, v, top, true, this.fan.tess.fold?.gaps === 'clades');
+  }
+
   /**
    * A highlight's stop (HIGHLIGHT_STOPS, ToLaD#497, the one place a highlight's taps are tuned): a tap on its species, `to` (its name or picture; a
    * column: the species' own or a lineage of its, inside the clade), from a level outside its clade, lands at the clade's level (goLevel: as a tap on
    * the clade lands); at that level, on the species, its card open. True when it flew; false where the highlight has no say, the tap as any.
    */
-  /**
-   * Where a highlight's clade lands on the tree on its side (HIGHLIGHT_STOPS, ToLaD#497), in place of openCamera, whose room (the hull of its strands
-   * at every time, humans' ~8 billion at "now" in it) on the fossils' time window left the Hominins' screen empty: its fossil frame (cladeCamera's
-   * across, where its fossils lived, fossilSpan, ToLaD#289) with its time window run on to "now", so the species stands in view (its column past
-   * the screen's edge near "now") among its fossil relatives. Null for any other clade.
-   */
-  private stopFrame(v: FanNode): Camera | null {
-    if (!v.parent || !Object.values(HIGHLIGHT_STOPS).includes(latinOf(v.split))) return null;
-    return this.runFrame(v.strands[0].index, v.strands[v.strands.length - 1].index, v.y, v, this.yNow, true, this.fan.tess.fold?.gaps === 'clades');
-  }
-
   private stopAt(to: Level, col: boolean): boolean {
     for (const [sci, latin] of Object.entries(HIGHLIGHT_STOPS)) {
       const b = this.fan.branches.find((q) => q.sp.sci === sci);
@@ -2327,6 +2324,13 @@ export class FanView implements InputHandlers {
     return false;
   }
 
+  /**
+   * A tap on a branch, a group's pill, picture, bracket or pinned row (ToLaD#258): one level deeper, to the next level
+   * on the way from the level the view is at to what was tapped (`to`: a species, or a clade, an ancestral stretch's
+   * lineage among them). From the level holding both, down: the first whose frame is more than LEVEL_PX off the view's
+   * (so every tap visibly moves). Already at a species: false, for its card. A clade that holds the view's level (a
+   * pinned group, an ancestor's bracket): out to it, unless a column's stretch (`col`: false, its card).
+   */
   private tapInto(to: Level, col: boolean): boolean {
     const on = this.anim && this.backing;
     const from = on ? this.backing!.lv : this.levelNow(true);
