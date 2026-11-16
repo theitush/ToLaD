@@ -112,18 +112,37 @@ export class RectBatch {
 
 export class FanGL {
   readonly gl: WebGL2RenderingContext;
-  private rectProg: WebGLProgram;
-  private rectVao: WebGLVertexArrayObject;
-  private rectBuf: WebGLBuffer;
-  private uView: WebGLUniformLocation | null;
+  private rectProg!: WebGLProgram;
+  private rectVao!: WebGLVertexArrayObject;
+  private rectBuf!: WebGLBuffer;
+  private uView: WebGLUniformLocation | null = null;
   /** The lanes; over them, lines that must stay on top (grid, "now"). */
   readonly under = new RectBatch();
   readonly over = new RectBatch();
+  /** Called when a lost context is back, its programs and buffers made again (ToLaD#478): the frame is to be drawn again. */
+  onRestored: () => void = () => {};
 
   constructor(readonly canvas: HTMLCanvasElement) {
     const gl = canvas.getContext('webgl2', { antialias: false, premultipliedAlpha: true, alpha: true, preserveDrawingBuffer: false });
     if (!gl) throw new Error('No WebGL2');
     this.gl = gl;
+    // (A browser drops a background tab's context, ToLaD#478: the default kept, it never comes back. Asked back, it does, empty.)
+    canvas.addEventListener('webglcontextlost', (e) => e.preventDefault());
+    canvas.addEventListener('webglcontextrestored', () => {
+      this.setup();
+      this.onRestored();
+    });
+    this.setup();
+  }
+
+  /** The context lost (a background tab, ToLaD#478): nothing drawn until it is restored. */
+  get lost(): boolean {
+    return this.gl.isContextLost();
+  }
+
+  /** The program and buffers, made on a new context or a restored one (all of a lost context's are gone). */
+  private setup(): void {
+    const gl = this.gl;
     this.rectProg = compile(gl, RECT_VS, RECT_FS);
     this.uView = gl.getUniformLocation(this.rectProg, 'uView');
     const quad = gl.createBuffer()!;
@@ -163,6 +182,7 @@ export class FanGL {
   /** Draw the frame: lanes, then overlay lines. w, h in CSS px. */
   end(w: number, h: number, dpr: number): void {
     const gl = this.gl;
+    if (gl.isContextLost()) return;
     const W = Math.round(w * dpr);
     const H = Math.round(h * dpr);
     if (this.canvas.width !== W || this.canvas.height !== H) {
