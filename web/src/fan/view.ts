@@ -2013,7 +2013,9 @@ export class FanView implements InputHandlers {
    * bats & kin", stands at the one it does, Yangochiroptera, so up is the bats); from a species, the group it is in. Null at home's level.
    */
   levelAbove(from: Level): FanNode | null {
-    return (from.b ? this.levelsAbove(from) : this.levelsAbove({ v: levelClade(this.fan, from) }))[0] ?? null;
+    if (from.b) return this.levelsAbove(from)[0] ?? null;
+    const at = levelUp(this.fan, from.v, true);
+    return at ? levelUp(this.fan, at) : null;
   }
 
   /** The levels level `from` sits in (levelUp's tree, ToLaD#258), nearest first, home's root last. */
