@@ -37,7 +37,22 @@ try {
       const stack = at ? at.up.map((u) => u.split?.taxon ?? 'home').join(' < ') : '?';
       const b = f.fan.branches.find((q) => q.sp.sci === 'Homo sapiens');
       const [x0, y0] = f.toScreen(b.cx, b.tipY);
-      return `${nm} | stack ${stack} | card ${!!f.selected} | human tip at view (${x0 | 0}, ${y0 | 0}) of ${f.w}x${f.h}`;
+      // (The hominins on screen: each pictured one's name, its column's widest px on screen, whether its name shows.)
+      const hom = f.fan.nodes.find((q) => q.split?.taxon === 'Hominini');
+      const named = new Set(f.nameHits.map((h) => h.b));
+      const pics = f.thumbHits.filter((t) => hom.strands.includes(t[3]) && !t[4]);
+      const list = pics.map((t) => {
+        const b = t[3];
+        let px = 0;
+        for (let k = 0; k <= 32; k++) {
+          const y = b.tipY + ((b.splitY - b.tipY) * k) / 32;
+          const [, sy] = f.toScreen(0, y);
+          if (sy < 0 || sy > f.h) continue;
+          px = Math.max(px, (f.spanAt(b, y)[1] || 0) * f.cam.sx);
+        }
+        return `${b.sp.sci.replace(/^(\w)\w+ /, '$1. ')}${named.has(b) ? '' : ' (no name)'} ${px.toFixed(1)}px`;
+      });
+      return `${nm} | stack ${stack} | card ${!!f.selected} | human tip at view (${x0 | 0}, ${y0 | 0}) of ${f.w | 0}x${f.h} | ${pics.length} hominin pictures: ${list.join(', ')}`;
     });
   const spot = (how) =>
     page.evaluate((how) => {

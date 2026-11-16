@@ -1535,7 +1535,7 @@ export class FanView implements InputHandlers {
   private landOf(lv: Level): Camera {
     if (!lv.v || !this.flip || !gapLabelsOn()) return this.frameOf(lv);
     const restore = this.fan.tess.fold?.keep();
-    const cam = this.openCamera(lv.v);
+    const cam = this.stopFrame(lv.v) ?? this.openCamera(lv.v);
     restore?.();
     return cam;
   }
@@ -1549,7 +1549,7 @@ export class FanView implements InputHandlers {
     this.touch = null;
     this.onSelect(null);
     // (On the tree on its side, where a tap lands on it, ToLaD#468.)
-    return this.flyTo(() => (this.flip && gapLabelsOn() && v.parent ? this.openCamera(v) : this.cladeCamera(v)), undefined, landed);
+    return this.flyTo(() => (this.flip && gapLabelsOn() && v.parent ? (this.stopFrame(v) ?? this.openCamera(v)) : this.cladeCamera(v)), undefined, landed);
   }
 
   /** One level out from clade v (ToLaD#230): the nearest ranked clade it sits in, the root last; null from the root. */
@@ -2301,6 +2301,17 @@ export class FanView implements InputHandlers {
    * column: the species' own or a lineage of its, inside the clade), from a level outside its clade, lands at the clade's level (goLevel: as a tap on
    * the clade lands); at that level, on the species, its card open. True when it flew; false where the highlight has no say, the tap as any.
    */
+  /**
+   * Where a highlight's clade lands on the tree on its side (HIGHLIGHT_STOPS, ToLaD#497), in place of openCamera, whose room (the hull of its strands
+   * at every time, humans' ~8 billion at "now" in it) on the fossils' time window left the Hominins' screen empty: its fossil frame (cladeCamera's
+   * across, where its fossils lived, fossilSpan, ToLaD#289) with its time window run on to "now", so the species stands in view (its column past
+   * the screen's edge near "now") among its fossil relatives. Null for any other clade.
+   */
+  private stopFrame(v: FanNode): Camera | null {
+    if (!v.parent || !Object.values(HIGHLIGHT_STOPS).includes(latinOf(v.split))) return null;
+    return this.runFrame(v.strands[0].index, v.strands[v.strands.length - 1].index, v.y, v, this.yNow, true, this.fan.tess.fold?.gaps === 'clades');
+  }
+
   private stopAt(to: Level, col: boolean): boolean {
     for (const [sci, latin] of Object.entries(HIGHLIGHT_STOPS)) {
       const b = this.fan.branches.find((q) => q.sp.sci === sci);
@@ -2559,7 +2570,7 @@ export class FanView implements InputHandlers {
     this.selected = null;
     this.touch = null;
     this.onSelect(null);
-    const cam = this.flyTo(() => this.openCamera(v), undefined, () => (this.tapAt = { b: null, v, cam: { ...this.cam } }));
+    const cam = this.flyTo(() => this.stopFrame(v) ?? this.openCamera(v), undefined, () => (this.tapAt = { b: null, v, cam: { ...this.cam } }));
     this.backing = { lv: { v }, cam };
   }
 
