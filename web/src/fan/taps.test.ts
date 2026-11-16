@@ -11,7 +11,7 @@ import { picBox } from './pics';
 import { latinOf } from './brackets';
 import { mammaliaTree } from './splits';
 import type { Steady } from './steady';
-import { FanView, groupName, type CutLabels, type GapMember } from './view';
+import { chainOf, FanView, groupName, levelClade, type CutLabels, type GapMember } from './view';
 
 function stubView(): FanView {
   const noop = () => {};
@@ -55,7 +55,7 @@ type Priv = {
   anim: ((t: number) => boolean) | null;
   applyFold(): void;
   camera: FanCamera;
-  steps: unknown[];
+  landOf(lv: { v: FanNode }): Camera;
   selected: unknown;
   famHits: { box: number[]; v: FanNode }[];
   nameHits: { box: number[]; b: FanBranch }[];
@@ -89,7 +89,6 @@ describe('one tap on a label opens it (ToLaD#465)', () => {
   };
   const stand = (c: Camera) => {
     P(v).anim = null;
-    P(v).steps = [];
     (v.fan.tess.fold as Steady).setScale(c.sx, v.w);
     v.cam = { ...c, ty: c.sy };
     P(v).camera.settle();
@@ -173,17 +172,21 @@ describe('one tap on a label opens it (ToLaD#465)', () => {
     atTop(u, line);
   };
 
-  it('every label at home opens with a tap; a double tap comes home', () => {
+  // (A double tap goes one level up from where the tap landed, ToLaD#472: Vesper bats & kin lands in Yangochiroptera, a double tap there goes to the bats, not home.)
+  it('every label at home opens with a tap; a double tap goes one level up, landing as a tap there lands', () => {
     stand(home);
     const labels = P(v).famHits.map((h) => h.v);
     expect(labels.length).toBeGreaterThan(3);
     for (const u of labels) {
       stand(home);
       opens(u, 'home');
+      const up = v.levelsAbove(v.levelNow(true))[0] ?? v.fan.root;
+      const want = up.parent ? P(v).landOf({ v: up }) : home;
       v.doubleTap(0, 0);
       run();
-      say(`  double tap: ${off(v.cam, home).toFixed(2)} px off home`);
-      expect(off(v.cam, home), groupName(v.fan, u)).toBeLessThan(2);
+      say(`  double tap: at ${chainOf(v.fan, levelClade(v.fan, v.levelNow(true))).join(' › ')}, ${off(v.cam, want).toFixed(2)} px off its landing`);
+      expect(chainOf(v.fan, levelClade(v.fan, v.levelNow(true))), groupName(v.fan, u)).toEqual(chainOf(v.fan, up));
+      expect(off(v.cam, want), groupName(v.fan, u)).toBeLessThan(2);
     }
   });
 
