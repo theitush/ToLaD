@@ -17,6 +17,7 @@ import { clipPoly, FanCamera, LABELS_SHARE, type Camera } from './camera';
 import { ease, isNode, laneAt, layoutFan, leftAt, nearestStrand, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type Fan, type FanBranch, type FanNode, type Measure, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01 } from './meshgl';
+import { Ribbons } from './ribbons';
 import { Lod } from './lod';
 import type { Fold, FoldState } from './fold';
 import { forkMode, grayOn, LABEL_PILL, peelSteps, Steady } from './steady';
@@ -3645,23 +3646,30 @@ export class FanView implements InputHandlers {
     let lo = Infinity;
     let hi = -Infinity;
     const cam = this.camera;
-    const push = (k: number, y: number, l: number, r: number) => {
+    const push = (k: number, y: number, l: number, r: number, g = this.lod!.greenShareAt(v, k, H)) => {
       const w = Math.max(0, r - l);
       const px = cam.screenX(l);
       lo = Math.min(lo, px);
       hi = Math.max(hi, px + w * this.cam.sx);
       const inset = Math.min(RIBBON_INSET_PX, (w * this.cam.sx) / 4);
-      pts.push(px + inset, cam.screenY(y), w - (2 * inset) / this.cam.sx, this.lod!.greenShareAt(v, k, H));
+      pts.push(px + inset, cam.screenY(y), w - (2 * inset) / this.cam.sx, g);
     };
+    // (Its rows kept in world units while the layout and grid stand, ribbons.ts, ToLaD#502: no strand walked a frame.)
+    const rows = this.ribbons.of(f, this.lod!, v, i0, i1);
     const row = (k: number, y: number) => {
-      const [l, r] = f.extent(i0, i1, k, ext);
-      push(k, y, l, r);
+      const [l, r] = rows.row(k, ext);
+      push(k, y, l, r, rows.green(k));
     };
     // (`forks: peel`, ToLaD#461: each peel its own heights, fixed fractions of it, never the rows': rows ~8 px apart cut a
     // shorter peel to a chord from wherever they fell, and every grid step of a pinch moved it, by up to its whole width.)
     const P = this.mergedPeels;
     if (f instanceof Steady && forkMode() === 'peel') f.peelsOn(v, y0, y1, P);
     else P.length = 0;
+    // (Off screen to the side, known from its kept rows' hull: no points made.)
+    if (!P.length) {
+      const [xl, xr] = rows.hull(k0, y1 > k1 * H ? Math.min(k1 + 1, Math.ceil(y1 / H)) : k1, ext);
+      if (!(xr >= xl) || cam.screenX(xr) < -12 || cam.screenX(xl) > this.w + 12) return;
+    }
     /** One peel from its foot up (those heights inside (y0, y1), and an end of the span that falls in it). */
     const peel = (s: number) => {
       const foot = P[s];
@@ -3871,6 +3879,7 @@ export class FanView implements InputHandlers {
     return L;
   }
   private mergedExt: [number, number] = [0, 0];
+  private ribbons = new Ribbons();
   private lodTops = new WeakMap<FanNode, number>();
   private lodTop(v: FanNode): number {
     let t = this.lodTops.get(v);

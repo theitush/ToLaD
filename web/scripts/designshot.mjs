@@ -18,6 +18,9 @@ mkdirSync(OUT, { recursive: true });
 const scenes = [
   ['home', 'home'],
   ['far', 'far'],
+  ['item-carnivora', 'tapitem', ['Carnivora']],
+  ['item-primates', 'tapitem', ['Primates']],
+  ['item-rodents', 'tapitem', ['Rodents']],
   ['item-dogs', 'tapitem', ['Dogs']],
   ['item-weasels', 'tapitem', ['Weasels']],
   ['item-laurasiatheria', 'tapitem', ['Laurasiatheria']],
