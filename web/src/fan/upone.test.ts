@@ -319,6 +319,8 @@ describe('a double tap goes exactly one level up (ToLaD#472)', () => {
       const mine = rows.filter((q) => q.route.startsWith(name));
       say(`${name}: ${mine.length} double taps, ${bad.length} not one level up, ${mine.filter((q) => q.held).length} held (up would zoom in)`);
       expect(bad.map((q) => `${q.route}: [${q.lv}] ${q.before.join(' › ')} -> ${q.after.join(' › ')} (${q.bad})`)).toEqual([]);
+      // (Never nothing (ToLaD#472): the chain read against the landings, the level above a level on screen always lands wider, so no double tap holds.)
+      expect(mine.filter((q) => q.held).map((q) => `${q.route}: [${q.lv}] ${q.before.join(' › ')} held`)).toEqual([]);
     }, 600_000);
   }
 });

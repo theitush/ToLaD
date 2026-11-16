@@ -2026,8 +2026,9 @@ export class FanView implements InputHandlers {
   }
 
   /**
-   * The level the view is at (ToLaD#258): the innermost frame of the ladder over the lineage at the screen's centre
-   * (its species, then each level it sits in, levelUp's, home's root last) that the view is zoomed in at least as far as. Worked out again once the camera
+   * The level the view is at (ToLaD#258): the innermost level of the ladder over the lineage at the screen's centre
+   * (its species, then each level it sits in, levelUp's, home's root last) whose landing (landOf: where a tap on it lands, ToLaD#472; on the
+   * unturned tree its frame) the view is zoomed in at least as far as. Worked out again once the camera
    * has moved and is still (no flight, fling or gesture under way), at most every LEVEL_MS; the last one meanwhile.
    * `now`: worked out now whatever the view is doing (a tap's).
    */
@@ -2054,7 +2055,9 @@ export class FanView implements InputHandlers {
     const b = this.centreLine();
     const z = (f: Camera) => Math.log(c.sx / f.sx) + Math.log(c.sy / f.sy);
     const ladder: Step[] = [];
-    const push = (lv: Level) => ladder.push({ lv, cam: this.frameOf(lv) });
+    // (Each level by where a tap on it lands (landOf, ToLaD#472): on the tree on its side deeper than its frame (openCamera, #468), so the view a
+    // tap leaves is read as the level it landed on, a pan keeps it, and the level above lands wider: a double tap never holds.)
+    const push = (lv: Level) => ladder.push({ lv, cam: this.landOf(lv) });
     if (b) push({ b });
     for (let u = b ? levelUp(this.fan, b.node, true) : null; u; u = levelUp(this.fan, u)) push({ v: u });
     if (ladder[ladder.length - 1]?.lv.v !== this.fan.root) push({ v: this.fan.root });
@@ -2064,7 +2067,7 @@ export class FanView implements InputHandlers {
     // (The level the view was at, while it is still near its frame: a pan of a third of the screen at the Hominins put
     // the centre on a gibbon's line, or the human's, and the level flipped to theirs, the names and pictures with it, ToLaD#311.)
     const near = (lv: Level) => {
-      const f = this.frameOf(lv);
+      const f = this.landOf(lv);
       return this.offBy(f, c) <= this.w / 2 && Math.abs(z(f)) <= Math.log(LEVEL_KEEP);
     };
     let lv: Level = { v: this.fan.root };
@@ -2092,6 +2095,10 @@ export class FanView implements InputHandlers {
         offLv = off;
       }
     }
+    // (Never a level whose level above lands tighter than the view (ToLaD#472): the view is not zoomed in as far as that one, so not in this one
+    // either; out a level till the one above zooms out (upOne). The walk weighs width and time together and keeps a level a while (near): a pinch
+    // in on time, or out, at a level's landing read a level whose parent's landing is tighter on width, and a double tap held there.)
+    for (let u = this.levelAbove(lv); u && !this.upOne(lv, c); u = this.levelAbove(lv)) lv = { v: u };
     return lv;
   }
   private lvAt: { fan: Fan; cam: Camera; lv: Level; t: number } | null = null;
