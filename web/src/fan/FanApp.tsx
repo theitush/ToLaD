@@ -265,7 +265,16 @@ export function FanApp() {
         sel.lineage ? (
           <LineageCard lin={sel.lineage} onClose={() => viewRef.current?.tap(-1e6, -1e6)} onUp={cardUp} />
         ) : (
-          <SpeciesCard sp={sel.sp} mass={measure === 'mass'} ageMa={sel.ageMa} startMa={sel.startMa} event={sel.event?.k} onClose={() => viewRef.current?.tap(-1e6, -1e6)} onUp={cardUp} />
+          <SpeciesCard
+            sp={sel.sp}
+            mass={measure === 'mass'}
+            ageMa={sel.ageMa}
+            startMa={sel.startMa}
+            event={sel.event?.k}
+            onClose={() => viewRef.current?.tap(-1e6, -1e6)}
+            onUp={cardUp}
+            onBox={sel.event ? undefined : (el) => viewRef.current?.cardBox(el)}
+          />
         )
       ) : showSources ? (
         <SourcesPanel onClose={closeSources} />
@@ -572,9 +581,22 @@ export function bigSrcOf(src: string): string {
  * A card's box (the species', the split's, the individual's): its touches kept from the tree under it, and a double tap
  * on it, off its controls (links, buttons, Details, the pictures, the globe), one level up as on the tree (ToLaD#301).
  */
-function CardShell({ onUp, children }: { onUp?: (x: number, y: number) => void; children: ReactNode }) {
+function CardShell({ onUp, onBox, children }: { onUp?: (x: number, y: number) => void; onBox?: (el: HTMLElement) => void; children: ReactNode }) {
   const up = useRef(onUp);
   up.current = onUp;
+  // (Its box as laid out, and again whenever it changes, to whoever frames the tree in the room it leaves (FanView.cardBox, ToLaD#496).)
+  const box = useRef(onBox);
+  box.current = onBox;
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    box.current?.(el);
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => box.current?.(el));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const tapper = useRef<ReturnType<typeof cardTapper> | null>(null);
   tapper.current ??= cardTapper((x, y) => {
     // (A mouse's double click selects a word: not here.)
@@ -584,6 +606,7 @@ function CardShell({ onUp, children }: { onUp?: (x: number, y: number) => void; 
   const pt = (e: RPointerEvent) => ({ id: e.pointerId, x: e.clientX, y: e.clientY, t: e.timeStamp, ctl: onControl(e.target) });
   return (
     <div
+      ref={ref}
       className="card-sp"
       onPointerDown={(e) => {
         e.stopPropagation();
@@ -607,7 +630,27 @@ function massNote(how: string | undefined): string {
   return ` (adult, ${src[how] ?? how})`;
 }
 
-export function SpeciesCard({ sp, onClose, onUp, open, ageMa, startMa, event, mass }: { sp: SpeciesRec; onClose: () => void; onUp?: (x: number, y: number) => void; open?: boolean; ageMa?: number; startMa?: number; event?: number; mass?: boolean }) {
+export function SpeciesCard({
+  sp,
+  onClose,
+  onUp,
+  onBox,
+  open,
+  ageMa,
+  startMa,
+  event,
+  mass,
+}: {
+  sp: SpeciesRec;
+  onClose: () => void;
+  onUp?: (x: number, y: number) => void;
+  onBox?: (el: HTMLElement) => void;
+  open?: boolean;
+  ageMa?: number;
+  startMa?: number;
+  event?: number;
+  mass?: boolean;
+}) {
   const at = populationAt(sp, ageMa ?? sp.t1, startMa);
   const ev0 = event !== undefined ? sp.history?.events[event] : undefined;
   const ev = ev0?.scope === 'regional' ? undefined : ev0;
@@ -625,7 +668,7 @@ export function SpeciesCard({ sp, onClose, onUp, open, ageMa, startMa, event, ma
   const nat = !spark && sp.natural ? sp.natural : null;
   const wiki = wikiOf(sp.sci);
   return (
-    <CardShell onUp={onUp}>
+    <CardShell onUp={onUp} onBox={onBox}>
       <button type="button" className="x" onClick={onClose} aria-label="Close">
         ×
       </button>

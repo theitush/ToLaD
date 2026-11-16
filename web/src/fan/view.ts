@@ -73,7 +73,7 @@ type StrandEdge = { i: number; t: number; px: number };
  * its place in fan.nodes, a species by its strand), whether the view sits on that level's frame, and if not the strands
  * at the screen's edges and the time window.
  */
-export type Place = { node: number; strand: number; framed: boolean; left: StrandEdge; right: StrandEdge; cam: Camera };
+export type Place = { node: number; strand: number; framed: boolean; left: StrandEdge; right: StrandEdge; cam: Camera; card?: boolean };
 /** The card open, in terms a reload of the same page finds again (FanView.cardKey, ToLaD#478): its species' strand, the point touched (world x, Ma), whether it shows the lineage there, the event it explains (-1: none). */
 export type CardKey = { strand: number; x?: number; ageMa?: number; lineage: boolean; k: number };
 /**
@@ -90,6 +90,14 @@ const TOUCH_SLOP = 12;
 const LEVEL_PX = 12;
 /** The level the view is at (levelNow) is worked out at most this often (ms) while the camera moves without a gesture (a wheel). */
 const LEVEL_MS = 200;
+/**
+ * The species card's reach up from the phone's foot, as a share of the phone's height, before any card has been laid out on the page
+ * (ToLaD#496; cardReach after): its layout's (the title, the picture's and the range's boxes, the counts and the history chart), 450-485
+ * px of an 844 px phone.
+ */
+const CARD_SHARE = 0.55;
+/** The species card's reach up from the phone's foot (px), as last laid out (FanView.cardBox, ToLaD#496): the page's, kept across views (a look's switch builds a new one). 0: none yet. */
+let cardReach = 0;
 /** The scale bar and legend at the bottom (px): labels fade out over the 30 px above it. */
 export const LABEL_BOTTOM_PX = 104;
 /** Folded: how far (px) below the order's start its stem fades out (drawStemFade, ToLaD#210). */
@@ -1156,6 +1164,45 @@ export class FanView implements InputHandlers {
   }
   /** The phone's foot the DOM holds, under the turned canvas (flip): measured once, before any card opens in it. */
   private flipFoot = -1;
+  /** The turned canvas's top on the phone (under the buttons and the chain of groups) and the phone's height, px from the page's box (turnStage). */
+  private stage: { top: number; h: number } | null = null;
+  /** The species whose card the last species flight opened (ToLaD#496): its landing (speciesCamera, landOf) is framed in the room the card leaves. */
+  private carded: FanBranch | null = null;
+
+  /** The species whose landing just opened its card (flyToSpecies), till the card is laid out (cardBox). */
+  private cardDue: FanBranch | null = null;
+
+  /**
+   * The species card `el` as laid out (FanApp's ResizeObserver on it, ToLaD#496): its reach up from the page's foot, for the landings' room (cardRoom).
+   * A landing flies with the last card's (no second move where the cards match); its own card standing higher or lower (the lion's, its events listed,
+   * 135 px taller than the human's), the column is re-centred in the room it leaves, a short move, where the view still stands at that landing.
+   */
+  cardBox(el: HTMLElement): void {
+    const p = this.canvas.parentElement?.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    if (!p || r.height <= 0) return;
+    cardReach = p.bottom - r.top;
+    const b = this.cardDue;
+    this.cardDue = null;
+    if (!b || this.carded !== b || this.selected !== b.sp || !this.landedHere() || this.tapAt?.b !== b) return;
+    const to = this.frameOf({ b });
+    if (this.offBy(to, this.cam) <= LEVEL_PX) return;
+    this.flyTo(() => this.speciesCamera(b, true), FLY_MS0, () => {
+      this.tapAt = { b, v: null, cam: { ...this.cam } };
+      this.request();
+    });
+    this.backing = { lv: { b }, cam: to };
+  }
+
+  /**
+   * The room a species' card leaves on the tree on its side (ToLaD#496): the view's lanes (its w, the phone's height) from its edge under the chain of
+   * groups to the card's top, in px; the card's top where the last one laid out stood (cardReach), else where its layout puts it (CARD_SHARE).
+   */
+  private cardRoom(): number {
+    const s = this.stage ?? { top: 0, h: this.w };
+    const reach = cardReach > 0 ? cardReach : CARD_SHARE * s.h;
+    return Math.min(this.w, Math.max(Math.min(this.w, 80), s.h - reach - s.top));
+  }
   /** Turn the canvases (flip.ts) to fill the phone between the buttons and the foot: the view's size, its `w` the phone's height. */
   private turnStage(): { width: number; height: number } {
     const p = this.canvas.parentElement;
@@ -1174,6 +1221,7 @@ export class FanView implements InputHandlers {
       this.chainEl.style.height = `${CHAIN_ROOM}px`;
     }
     if (this.flipFoot < 0) this.flipFoot = foot && foot.height > 0 ? r.bottom - foot.top : 0;
+    if (r.height > 0) this.stage = { top, h: r.height };
     const w = Math.max(1, r.height - top - this.flipFoot - AXIS_ROOM);
     turnCanvas(this.canvas, r.width, top, w + AXIS_ROOM);
     if (this.gl) turnCanvas(this.gl.canvas, r.width, top, w + AXIS_ROOM);
@@ -1623,7 +1671,7 @@ export class FanView implements InputHandlers {
       }
       return { i: lo, t: (x - S[lo]) / (S[hi] - S[lo]), px: 0 };
     };
-    return { node: lv.v ? this.fan.nodes.indexOf(lv.v) : -1, strand: lv.b ? lv.b.index : -1, framed, left: edge(0), right: edge(this.w), cam: { ...this.cam } };
+    return { node: lv.v ? this.fan.nodes.indexOf(lv.v) : -1, strand: lv.b ? lv.b.index : -1, framed, left: edge(0), right: edge(this.w), cam: { ...this.cam }, card: !!lv.b && this.carded === lv.b };
   }
 
   /** The card `sel` (open in this view) as a CardKey (ToLaD#478). */
@@ -1663,6 +1711,8 @@ export class FanView implements InputHandlers {
   goToPlace(p: Place): void {
     const fold = this.fan.tess.fold as Steady;
     const lv: Level = p.node >= 0 ? { v: this.fan.nodes[p.node] } : { b: this.territories().t.strands[p.strand] };
+    // (A species framed in its card's room stays so, ToLaD#496.)
+    this.carded = lv.b && p.card ? lv.b : null;
     const at = (e: StrandEdge, S: Float64Array) => S[e.i] + e.t * (S[Math.min(e.i + 1, S.length - 1)] - S[e.i]);
     const cam = p.framed
       ? this.frameOf(lv)
@@ -1809,6 +1859,7 @@ export class FanView implements InputHandlers {
   flyTo(aim: Camera | (() => Camera), ms?: number, done?: () => void): Camera {
     // (A level's flight, backing, is set again after this by what flies it: a tap, a double-tap, a search pick, ToLaD#258.)
     this.backing = null;
+    this.cardDue = null;
     const fo = this.fan.tess.fold;
     const from = { ...this.cam };
     // (The frame computed moves the fold to it, ToLaD#211: its state kept, the fold put back where the view stands.)
@@ -1882,7 +1933,7 @@ export class FanView implements InputHandlers {
    * its own stretch (tip to split) filling the band above the card. Width and time are framed apart
    * (#138): the column about half the screen wide, within the width limit.
    */
-  speciesCamera(b: FanBranch): Camera {
+  speciesCamera(b: FanBranch, card = this.carded === b): Camera {
     const h = this.homeCamera();
     // (Its tip where every frame stands "now", ToLaD#373; its own split down where every frame's start stands (forkPx): its whole life on screen.)
     const tipPx = this.labelBand().now;
@@ -1891,17 +1942,22 @@ export class FanView implements InputHandlers {
     // Within the time limit (MIN_YEARS on screen) about the tip, where it will sit.
     const s = this.camera.timeCap(b.tipY, tipPx, sy, h.sy);
     const inTime = { cy: b.tipY + (this.h / 2 - tipPx) / s, sy: s, ty: s };
-    const sx = Math.min(Math.max(h.sx, (0.5 * this.w) / Math.max(1e-300, b.width)), Math.max(h.sx, this.camera.sxCap(b.cx, b.tipY)));
+    // (Its card open on the tree on its side (ToLaD#496): framed in the room the card leaves above it, not the whole screen, the card's top hiding
+    // the column's lower half else: about half that room across, centred in it.)
+    const room = card && this.flip ? this.cardRoom() : this.w;
+    const sx = Math.min(Math.max(h.sx, (0.5 * room) / Math.max(1e-300, b.width)), Math.max(h.sx, this.camera.sxCap(b.cx, b.tipY)));
     // Laid out (steady.ts): its column where the layout has it at that zoom (brackets.ts foldedFrame, ToLaD#211: the
     // layout stays there for the camera taking it, so it lands centred).
     const f = this.fan.tess.fold;
-    const cx = () => (f && f.left(b.index, b.tipY) !== null ? leftAt(b, b.tipY) + laneAt(b, b.tipY).w / 2 : b.cx);
+    const mid = (this.w - room) / 2 / sx;
+    const cx = () => (f && f.left(b.index, b.tipY) !== null ? leftAt(b, b.tipY) + laneAt(b, b.tipY).w / 2 : b.cx) + mid;
     return foldedFrame(this.fan, this.w, () => ({ cx: cx(), sx, ...inTime }));
   }
 
   /**
    * A search pick or a tap landing on a species (ToLaD#266): fly to the species' column, then open its card at its tip,
-   * as a tap there would. Without `card` (a double-tap stepping back to it, ToLaD#241): no card. The landing remembered (tapAt).
+   * as a tap there would. Without `card` (a double-tap stepping back to it, ToLaD#241): no card. The landing remembered (tapAt). With the card, the
+   * column framed in the room it leaves (speciesCamera, ToLaD#496), as the species' landing is (landOf) till another species flight.
    */
   flyToSpecies(sp: SpeciesRec, card = true): void {
     const b = this.fan.branches.find((x) => x.sp === sp);
@@ -1910,13 +1966,15 @@ export class FanView implements InputHandlers {
     this.selected = null;
     this.touch = null;
     this.onSelect(null);
-    const to = this.flyTo(() => this.speciesCamera(b), undefined, () => {
+    this.carded = card ? b : null;
+    const to = this.flyTo(() => this.speciesCamera(b, card), undefined, () => {
       this.tapAt = { b, v: null, cam: { ...this.cam } };
       if (!card) {
         this.request();
         return;
       }
       const wy = b.tipY;
+      this.cardDue = b;
       this.selected = sp;
         this.touch = { x: leftAt(b, wy) + laneAt(b, wy).w / 2, ageMa: sp.t1 };
       this.onSelect({ sp, ageMa: sp.t1, startMa: b.t0 });
@@ -2469,9 +2527,10 @@ export class FanView implements InputHandlers {
   }
 
   private goLevel(lv: Level, cam: Camera, card = true): void {
-    if (lv.b) this.flyToSpecies(lv.b.sp, card);
+    // (A species' flight is the step under way, where it lands (flyToSpecies: with its card or not, ToLaD#496).)
+    if (lv.b) return this.flyToSpecies(lv.b.sp, card);
     // (A clade's flight lands where a tap lands on it, on the tree on its side openCamera: that, the step under way, ToLaD#468.)
-    else cam = this.flyLevel(null, lv.v);
+    cam = this.flyLevel(null, lv.v);
     this.backing = { lv, cam };
   }
 
