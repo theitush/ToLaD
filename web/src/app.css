@@ -126,14 +126,14 @@
 .card-sp .pic {
   float: left;
   margin: 2px 10px 2px 0;
-  width: 120px;
+  width: var(--box, 120px);
   text-align: center;
   line-height: 1.1;
 }
 .card-sp .pic img {
   display: block;
-  width: 120px;
-  height: 120px;
+  width: var(--box, 120px);
+  height: var(--box, 120px);
   object-fit: cover;
   border-radius: 8px;
 }
@@ -158,15 +158,6 @@
   font-size: 9px;
   color: #7f8c85;
   text-decoration: none;
-}
-.card-sp .pic.loading {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: 0;
-  opacity: 0;
-  overflow: hidden;
-  pointer-events: none;
 }
 /* ToLaD#196: the range map under the name (beside the photo, .media below); a tap enlarges it like the photo. */
 .card-sp .range {
@@ -203,6 +194,16 @@
   gap: 0 10px;
   margin: 4px 0 8px;
 }
+/* Each item's image box (--box): the photo's square, the globe's disc, the map's height; the range alone in the row
+   (no photo) a little larger. Fixed, so the box is known before the image arrives (ToLaD#479). */
+.card-sp .media > * {
+  position: relative;
+  --box: 120px;
+}
+.card-sp .media > .globe:only-child,
+.card-sp .media > .range:only-child {
+  --box: 160px;
+}
 .card-sp .media .pic {
   float: none;
   margin: 0;
@@ -213,13 +214,8 @@
   margin: 0;
 }
 .card-sp .media .range img {
-  height: 120px;
+  height: var(--box);
   max-height: none;
-}
-/* No photo (none, or it failed): the map alone takes the row. */
-.card-sp .media .range:only-child img {
-  height: auto;
-  max-height: 30vh;
 }
 .card-sp .media .big {
   flex-basis: 100%;
@@ -246,19 +242,14 @@
 .card-sp .globe canvas,
 .card-sp .globe .disc {
   display: block;
-  width: 120px;
-  height: 120px;
+  width: var(--box, 120px);
+  height: var(--box, 120px);
   border-radius: 50%;
   touch-action: none;
   cursor: grab;
 }
 .card-sp .globe .disc {
   background: #0b1a24;
-}
-.card-sp .globe:only-child canvas,
-.card-sp .globe:only-child .disc {
-  width: 160px;
-  height: 160px;
 }
 .card-sp .globe.big canvas {
   width: min(100%, 50vh);
@@ -272,14 +263,41 @@
   color: #7f8c85;
   text-decoration: none;
 }
-.card-sp .range.loading {
+/* ToLaD#479: while the photo, the globe or the map loads, its place is held at its loaded size (the image's box and its
+   credit line) with a spinner in it, so nothing moves when it arrives. The spinner fades in after a moment: a picture
+   already in the browser's cache shows at once, with no spinner flash. */
+.card-sp .media .loading img {
+  background: rgba(190, 220, 200, 0.06);
+}
+.card-sp .media .loading a {
+  visibility: hidden;
+}
+.card-sp .media .loading::after {
+  content: '';
   position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: 0;
+  top: calc(var(--box) / 2 - 9px);
+  left: calc(50% - 9px);
+  width: 18px;
+  height: 18px;
+  box-sizing: border-box;
+  border: 2px solid rgba(190, 220, 200, 0.16);
+  border-top-color: #9faba3;
+  border-radius: 50%;
   opacity: 0;
-  overflow: hidden;
   pointer-events: none;
+  animation:
+    card-spin 0.9s linear infinite,
+    card-spin-in 0.2s ease-out 0.25s forwards;
+}
+@keyframes card-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+@keyframes card-spin-in {
+  to {
+    opacity: 1;
+  }
 }
 .card-sp .dim {
   color: #9faba3;
@@ -299,18 +317,19 @@
   padding: 4px 8px;
 }
 
-.loading {
+/* The page's loading screen (scoped to it: the bare class reached the card's loading globe, ToLaD#479). */
+.app > .loading {
   position: absolute;
   inset: 45% 16px auto;
   text-align: center;
   color: #9fb3a8;
 }
-.loading b {
+.app > .loading b {
   color: #e6f0ea;
   font-size: 22px;
   font-weight: 600;
 }
-.loading button {
+.app > .loading button {
   font: inherit;
   color: #e6f0ea;
   background: none;

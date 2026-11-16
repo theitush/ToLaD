@@ -22,19 +22,21 @@ describe('wiki sidecar (ToLaD#182)', () => {
     expect(html).toContain('<a class="wp" href="https://en.wikipedia.org/wiki/Lion" target="_blank" rel="noopener">Lion</a>');
   });
 
-  it('draws no picture without a URL, before it loads, or after it fails', () => {
+  it('draws no picture without a URL or after it fails; loading, its box and credit are held (ToLaD#479)', () => {
     expect(renderToStaticMarkup(<WikiPic w={null} />)).toBe('');
     expect(renderToStaticMarkup(<WikiPic w={{ wp: 'https://en.wikipedia.org/wiki/X' }} />)).toBe('');
     const w = { img: 'https://upload.wikimedia.org/x/330px-a.jpg', file: 'https://commons.wikimedia.org/wiki/File:a.jpg' };
     expect(renderToStaticMarkup(<WikiPic w={w} initial="failed" />)).toBe('');
+    const credit = '<a href="https://commons.wikimedia.org/wiki/File:a.jpg" target="_blank" rel="noopener">Wikimedia Commons</a>';
     const loading = renderToStaticMarkup(<WikiPic w={w} />);
     expect(loading).toContain('class="pic loading"');
-    expect(loading).toContain('loading="lazy"');
+    expect(loading).not.toContain('loading="lazy"'); // (shown in its box, fetched at once)
     expect(loading).toMatch(/referrerPolicy="no-referrer"/i);
     expect(loading).toContain('alt=""');
-    expect(loading).not.toContain('Wikimedia Commons');
+    expect(loading).toContain(credit); // (hidden by app.css while loading: the box is its loaded height)
     const ok = renderToStaticMarkup(<WikiPic w={w} initial="ok" />);
-    expect(ok).toContain('<a href="https://commons.wikimedia.org/wiki/File:a.jpg" target="_blank" rel="noopener">Wikimedia Commons</a>');
+    expect(ok).toContain('class="pic ok"');
+    expect(ok).toContain(credit);
   });
 });
 
@@ -53,14 +55,14 @@ describe('range map (ToLaD#196)', () => {
     expect(html.indexOf('class="globe loading"')).toBeGreaterThan(html.indexOf('class="t"'));
   });
 
-  it('renders when set: lazy, no referrer, no alt text, credit once loaded', () => {
+  it('renders when set: no referrer, no alt text, its credit held from the start (ToLaD#479)', () => {
     const loading = renderToStaticMarkup(<RangeMap w={w} />);
     expect(loading).toContain('class="range loading"');
     expect(loading).toContain(`src="${w.range}"`);
-    expect(loading).toContain('loading="lazy"');
+    expect(loading).not.toContain('loading="lazy"');
     expect(loading).toMatch(/referrerPolicy="no-referrer"/i);
     expect(loading).toContain('alt=""');
-    expect(loading).not.toContain('Wikimedia Commons');
+    expect(loading).toContain('Range map · Wikimedia Commons');
     const ok = renderToStaticMarkup(<RangeMap w={w} initial="ok" />);
     expect(ok).toContain('class="range ok"');
     expect(ok).toContain(`<a href="${w.rangeFile}" target="_blank" rel="noopener">Range map · Wikimedia Commons</a>`);
