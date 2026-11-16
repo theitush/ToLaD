@@ -146,7 +146,7 @@ class Built(unittest.TestCase):
         self.assertGreater(s["grafted"], 300)
         # every genus-median estimate names its taxon and how many species it is the median of
         for sp, e in s["genus_median_estimates"]["species"].items():
-            self.assertIn(e["level"], ("genus", "family", "order"))
+            self.assertIn(e["level"], ("split", "genus", "family", "order"))
             self.assertGreaterEqual(e["of"], 1)
 
     def test_cr_guesses_held(self):
