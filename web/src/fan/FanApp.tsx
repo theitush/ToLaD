@@ -10,7 +10,7 @@ import { RangeGlobe } from './Globe';
 import { Alone, AloneImg, useAlone } from './Alone';
 import { mammaliaClade, NATURAL_META, type HistEvent, type SpeciesRec } from './panthera';
 import { mammaliaTree } from './splits';
-import { loadMammals, mammalsLoaded } from './mammals-data';
+import { loadMammalCard, loadMammals, mammalCardLoaded, mammalsLoaded } from './mammals-data';
 import { synthLoader } from './synthetic-level';
 import { stamp } from '../stamp';
 import { population } from './population';
@@ -159,6 +159,10 @@ export function FanApp() {
     window.__fan = v;
     window.__levelName = levelName;
     v.request();
+    // The card's kinds (mammals-card.json, ToLaD#502; downloaded while the tree was built) read once the first frame is
+    // on screen, so a tap rarely waits for them.
+    let later = 0;
+    const first = requestAnimationFrame(() => (later = window.setTimeout(() => loadMammalCard().catch((e: unknown) => console.warn('fan: the card data did not load', e)), 0)));
     // (Back on the tab, ToLaD#478: drawn again, or the page reloaded to here.)
     const unwatch = watchBack(v, () => selRef.current);
     // The canvas text waits for the faces (drawn in system type until then).
@@ -168,6 +172,8 @@ export function FanApp() {
         .then(() => v.fontsIn());
     }
     return () => {
+      cancelAnimationFrame(first);
+      clearTimeout(later);
       unwatch();
       v.destroy();
       viewRef.current = null;
@@ -276,7 +282,7 @@ export function FanApp() {
         sel.lineage ? (
           <LineageCard lin={sel.lineage} onClose={closeCard} onUp={cardUp} />
         ) : (
-          <SpeciesCard
+          <SpeciesCardWhenIn
             sp={sel.sp}
             mass={measure === 'mass'}
             ageMa={sel.ageMa}
@@ -717,17 +723,24 @@ function massNote(how: string | undefined): string {
   return ` (adult, ${src[how] ?? how})`;
 }
 
-export function SpeciesCard({
-  sp,
-  onClose,
-  onUp,
-  onBox,
-  open,
-  ageMa,
-  startMa,
-  event,
-  mass,
-}: {
+/** For a card: whether mammals-card.json's kinds are in (ToLaD#502), loading them if not; a re-render when they come. */
+export function useMammalCard(): boolean {
+  const [isIn, setIn] = useState(() => !mammalsLoaded() || mammalCardLoaded());
+  useEffect(() => {
+    if (isIn) return;
+    let live = true;
+    loadMammalCard().then(
+      () => live && setIn(true),
+      (e: unknown) => console.warn('fan: the card data did not load', e),
+    );
+    return () => {
+      live = false;
+    };
+  }, [isIn]);
+  return isIn;
+}
+
+type SpeciesCardProps = {
   sp: SpeciesRec;
   onClose: () => void;
   onUp?: (x: number, y: number) => void;
@@ -737,7 +750,37 @@ export function SpeciesCard({
   startMa?: number;
   event?: number;
   mass?: boolean;
-}) {
+};
+
+/** The page's species card: until the card's kinds are in (ToLaD#502), its name, its picture and its range, the rest a spinner. */
+function SpeciesCardWhenIn(p: SpeciesCardProps) {
+  return useMammalCard() ? <SpeciesCard {...p} /> : <SpeciesCardWait {...p} />;
+}
+
+/** The card while mammals-card.json comes: what the open data has (the name, the picture, the globe), the facts' place a spinner. */
+function SpeciesCardWait({ sp, onClose, onUp, onBox }: SpeciesCardProps) {
+  const wiki = wikiOf(sp.sci);
+  return (
+    <CardShell
+      onUp={onUp}
+      onBox={onBox}
+      onClose={onClose}
+      head={
+        <div className="t">
+          <span>{sp.common}</span> <i>({sp.sci})</i>
+        </div>
+      }
+    >
+      <div className="media">
+        <WikiPic key={wiki?.img ?? ''} w={wiki} />
+        <RangeGlobe key={sp.sci} sci={sp.sci} />
+      </div>
+      <div className="facts-wait loading" role="status" aria-label="loading" />
+    </CardShell>
+  );
+}
+
+export function SpeciesCard({ sp, onClose, onUp, onBox, open, ageMa, startMa, event, mass }: SpeciesCardProps) {
   const at = populationAt(sp, ageMa ?? sp.t1, startMa);
   const ev0 = event !== undefined ? sp.history?.events[event] : undefined;
   const ev = ev0?.scope === 'regional' ? undefined : ev0;

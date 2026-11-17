@@ -4,6 +4,7 @@
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+import { gzipSync } from 'node:zlib';
 
 const TYPES = { '.html': 'text/html', '.json': 'application/json', '.js': 'text/javascript', '.css': 'text/css' };
 
@@ -16,7 +17,10 @@ export async function pageUrl(query, dir = 'dist-single') {
     if (!f.startsWith(root)) return res.writeHead(403).end();
     try {
       const body = await readFile(f);
-      res.writeHead(200, { 'Content-Type': TYPES[f.slice(f.lastIndexOf('.'))] || 'application/octet-stream' }).end(body);
+      const type = { 'Content-Type': TYPES[f.slice(f.lastIndexOf('.'))] || 'application/octet-stream' };
+      // GZIP=1: gzipped as GitHub Pages serves the page and its files (a throttled network's bytes, phoneperf NET).
+      if (process.env.GZIP === '1' && /gzip/.test(req.headers['accept-encoding'] || '')) res.writeHead(200, { ...type, 'Content-Encoding': 'gzip' }).end(gzipSync(body));
+      else res.writeHead(200, type).end(body);
     } catch {
       res.writeHead(404).end();
     }

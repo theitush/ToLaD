@@ -14,7 +14,7 @@ const SPECIES = process.argv[3]
   : ['Panthera leo', 'Panthera uncia', 'Vulpes vulpes', 'Cryptoprocta ferox', 'Panthera spelaea', 'Bos primigenius', 'Balaenoptera musculus'];
 mkdirSync(OUT, { recursive: true });
 const site = mkdtempSync(join(tmpdir(), 'globe-site-'));
-for (const f of ['index.html', 'mammals.json', 'globe.json', 'globe-draw.js']) copyFileSync(join('dist-single', f), join(site, f));
+for (const f of ['index.html', 'mammals.json', 'mammals-card.json', 'globe.json', 'globe-draw.js']) copyFileSync(join('dist-single', f), join(site, f));
 process.env.HTTP = '1';
 const served = await pageUrl('level=mammals', site);
 const browser = await chromium.launch({ headless: true });

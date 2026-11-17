@@ -15,7 +15,7 @@ const OUT = process.argv[2] || 'perf-out/sheet';
 const TAG = process.argv[3] || 'after';
 mkdirSync(OUT, { recursive: true });
 const site = mkdtempSync(join(tmpdir(), 'sheet-site-'));
-for (const f of ['index.html', 'mammals.json', 'globe.json', 'globe-draw.js']) copyFileSync(join('dist-single', f), join(site, f));
+for (const f of ['index.html', 'mammals.json', 'mammals-card.json', 'globe.json', 'globe-draw.js']) copyFileSync(join('dist-single', f), join(site, f));
 const served = await pageUrl('level=mammals', site);
 const browser = await chromium.launch({ headless: true });
 const SPECIES = [

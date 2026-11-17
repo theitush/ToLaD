@@ -295,7 +295,14 @@
 .card-sp .media .loading a {
   visibility: hidden;
 }
-.card-sp .media .loading::after {
+/* ToLaD#502: the card's facts while mammals-card.json comes (fetched after the first frame): the same spinner. */
+.card-sp .facts-wait {
+  position: relative;
+  height: 96px;
+  --box: 96px;
+}
+.card-sp .media .loading::after,
+.card-sp .facts-wait::after {
   content: '';
   position: absolute;
   top: calc(var(--box) / 2 - 9px);
