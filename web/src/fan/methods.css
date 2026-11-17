@@ -1,0 +1,275 @@
+/* "How we count" (ToLaD#508, Methods.tsx): a page over everything, in the card's look (.card-sp), one step a section. */
+.methods {
+  z-index: 1000;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  line-height: 1.45;
+}
+.methods .m-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  max-width: 440px;
+  margin: 0 auto;
+  padding: 10px 13px 8px;
+  background: rgba(12, 23, 20, 0.94);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(190, 220, 200, 0.12);
+}
+.methods .m-title {
+  flex: 1;
+  font-size: 20px;
+  font-weight: 700;
+}
+.methods .x {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--ink-2);
+  font-size: 24px;
+  line-height: 1;
+}
+.methods .m-body {
+  max-width: 440px;
+  margin: 0 auto;
+  padding: 8px 13px 40px;
+  box-sizing: border-box;
+}
+.methods a {
+  color: #9fd3b3;
+}
+.methods .dim {
+  color: var(--ink-3);
+}
+.methods p {
+  margin: 6px 0;
+}
+.methods .m-lede {
+  font-size: 15px;
+  color: var(--ink-2);
+}
+.methods .m-n {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: rgba(63, 210, 134, 0.18);
+  color: var(--living);
+  font-size: 12px;
+  font-weight: 700;
+  vertical-align: 1px;
+}
+.methods .m-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 4px;
+}
+.methods .m-steps a {
+  padding: 4px 9px 4px 4px;
+  border: 1px solid rgba(190, 220, 200, 0.16);
+  border-radius: 14px;
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 13px;
+}
+.methods .m-step {
+  padding: 14px 0 6px;
+  border-top: 1px solid rgba(200, 230, 210, 0.1);
+  margin-top: 12px;
+  scroll-margin-top: 56px;
+}
+.methods h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 700;
+}
+.methods .m-ladder {
+  margin: 4px 0 8px;
+  padding-left: 20px;
+}
+.methods .m-ladder li {
+  margin: 6px 0;
+}
+.methods .m-ladder li::marker {
+  color: var(--living);
+  font-weight: 700;
+}
+.methods .m-quoll {
+  margin: 10px 0 4px;
+  padding: 8px 11px;
+  border-radius: 10px;
+  background: rgba(63, 210, 134, 0.07);
+  border: 1px solid rgba(63, 210, 134, 0.22);
+}
+.methods .m-quoll-t {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--living);
+}
+.methods .m-note {
+  font-style: italic;
+  color: var(--ink-2);
+}
+.methods .m-sum {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 2px 8px;
+  margin: 8px 0;
+}
+.methods .m-fig {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.methods .m-fig b {
+  font-size: 17px;
+  line-height: 1.2;
+}
+.methods .m-fig small {
+  font-size: 11.5px;
+  color: var(--ink-3);
+  line-height: 1.2;
+}
+.methods .m-op {
+  font-size: 18px;
+  color: var(--ink-3);
+  line-height: 1.2;
+}
+.methods .m-maps {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 10px 0 4px;
+}
+.methods .m-maps figure {
+  margin: 0;
+  text-align: center;
+}
+.methods .m-maps canvas,
+.methods .m-disc {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #0b1a24;
+}
+.methods .m-disc {
+  display: grid;
+  place-items: center;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+.methods .m-maps figcaption {
+  display: flex;
+  flex-direction: column;
+  margin-top: 4px;
+  font-size: 15px;
+  line-height: 1.25;
+}
+.methods .m-maps figcaption span {
+  color: var(--ink-2);
+  font-size: 13px;
+}
+.methods .m-key {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+.methods .m-sw {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  vertical-align: -1px;
+}
+.methods .m-bar {
+  height: 26px;
+  margin: 6px 0 8px;
+  border-radius: 6px;
+  background: var(--ended);
+  overflow: hidden;
+}
+.methods .m-bar span {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding-left: 8px;
+  box-sizing: border-box;
+  background: var(--living);
+  color: #06150e;
+  font-weight: 700;
+}
+.methods .m-grades {
+  list-style: none;
+  margin: 6px 0;
+  padding: 0;
+}
+.methods .m-grades li {
+  margin: 5px 0;
+}
+.methods .m-grades b {
+  margin-left: 6px;
+  font-size: 16px;
+}
+.methods .m-gw {
+  font-weight: 600;
+}
+.methods .gdot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.methods .m-chip {
+  white-space: nowrap;
+  margin-left: 6px;
+}
+.methods .m-list {
+  margin: 4px 0;
+  padding-left: 18px;
+}
+.methods .m-list li {
+  margin: 5px 0;
+}
+.methods .m-words dt {
+  margin-top: 9px;
+  font-weight: 700;
+  scroll-margin-top: 56px;
+}
+.methods .m-words dd {
+  margin: 1px 0 0;
+  color: var(--ink-2);
+}
+/* The Sources panel's way in (SourcesPanel.tsx). */
+.card-sp .methods-link {
+  display: block;
+  margin: 4px 0 6px;
+  padding: 7px 10px;
+  border: 1px solid rgba(63, 210, 134, 0.35);
+  border-radius: 8px;
+  background: rgba(63, 210, 134, 0.08);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  width: 100%;
+}
+.card-sp .methods-link b {
+  color: var(--living);
+}
