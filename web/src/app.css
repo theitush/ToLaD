@@ -817,6 +817,63 @@
   line-height: 1.4;
   overflow-wrap: anywhere;
 }
+/* ToLaD#509: the card is a bottom sheet held to its share of the screen (--card-share, view.CARD_SHARE, its reach from the
+   foot): its head (the grab bar, the ×, the name) stays, the rest scrolls under it. In landscape it is a side sheet, as
+   wide as before and as tall as the screen allows: the tree stays beside it. The foot never runs off the top. */
+.fan .foot {
+  box-sizing: border-box;
+  max-height: 100%;
+}
+.fan .foot > .wscale {
+  flex: none;
+}
+.fan .card-sp.sheet {
+  display: flex;
+  flex-direction: column;
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: calc(var(--card-share, 0.5) * 100dvh - max(10px, env(safe-area-inset-bottom)));
+  padding: 0;
+  overflow: hidden;
+}
+@media (orientation: landscape) {
+  .fan .card-sp.sheet {
+    max-height: none;
+  }
+}
+.fan .card-sp.sheet.snap {
+  transition: transform 0.18s ease-out;
+}
+.fan .card-sp.sheet > .head {
+  position: relative;
+  flex: none;
+  padding: 14px 16px 0;
+  touch-action: none;
+  cursor: grab;
+}
+.fan .card-sp.sheet .grab {
+  position: absolute;
+  top: 5px;
+  left: 50%;
+  width: 36px;
+  height: 4px;
+  margin-left: -18px;
+  border-radius: 2px;
+  background: rgba(200, 230, 210, 0.28);
+}
+.fan .card-sp.sheet > .body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 16px 12px;
+}
+/* (One scroll, the sheet's: no lists scrolling inside it.) */
+.fan .card-sp.sheet .more dl,
+.fan .card-sp.sheet .hist-list {
+  max-height: none;
+  overflow: visible;
+}
 .fan .card-sp .t {
   display: flex;
   flex-wrap: wrap;
