@@ -12,8 +12,8 @@ import { allSplits, FELIDAE_TREE, speciesUnder, splitFrom } from './splits';
 
 const DATA = resolve(dirname(fileURLToPath(import.meta.url)), '../../../data/mammals');
 const read = (rel: string) => new Uint8Array(readFileSync(resolve(DATA, rel)));
-/** The page's `?fossils=all` (ToLaD#279): every fossil on the tree, TOLAD_FOSSILS=all (the fixtures too, vite.config.ts). */
-const ALL = process.env.TOLAD_FOSSILS === 'all';
+/** The page's default (ToLaD#279): every fossil on the tree; TOLAD_FOSSILS=old is the old look (the fixtures too, vite.config.ts). */
+const ALL = process.env.TOLAD_FOSSILS !== 'old';
 
 /** A clade as the fan takes it: its dated tree and the species it places. */
 function clade(name: string) {

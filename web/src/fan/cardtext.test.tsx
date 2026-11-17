@@ -101,8 +101,8 @@ describe("the species card's words and their links (ToLaD#508)", () => {
   });
 
   it('a fossil placed by name says so, with its fossils\' date range (ToLaD#279)', () => {
-    // (The page's default draws no fossil placed by name: none says so.)
-    if (process.env.TOLAD_FOSSILS !== 'all') return void expect(all.filter((s) => s.placed)).toEqual([]);
+    // (The old look, TOLAD_FOSSILS=old, draws no fossil placed by name: none says so.)
+    if (process.env.TOLAD_FOSSILS === 'old') return void expect(all.filter((s) => s.placed)).toEqual([]);
     // On its genus: a species of Pseudaelurus beside it under its split.
     const graft = sp('Pseudaelurus validus');
     expect(graft.placed).toBe('genus');

@@ -127,8 +127,8 @@ describe('the dated tree', () => {
     it(`an extinct branch is 0% green above its split, its own column all line-ended (${mode})`, () => {
       const f = layoutFan(FELIDAE, mode);
       const extinct = f.branches.filter((b) => b.sp.extinct);
-      if (process.env.TOLAD_FOSSILS === 'all') {
-        // Every extinct cat in the data is drawn (`?fossils=all`, ToLaD#279): the overrides' four Panthera fossils and the ~94 the data grafts by taxonomy.
+      if (process.env.TOLAD_FOSSILS !== 'old') {
+        // Every extinct cat in the data is drawn (the page's default, ToLaD#279): the overrides' four Panthera fossils and the ~94 the data grafts by taxonomy.
         expect(extinct.map((b) => b.sp.sci).sort()).toEqual(FELIDAE.species.filter((s) => s.extinct).map((s) => s.sci).sort());
         expect(extinct.length).toBeGreaterThan(90);
         for (const c of ['Cave lion', 'European jaguar', 'Longdan tiger', 'Yucatán cave cat']) expect(extinct.map((b) => b.sp.common)).toContain(c);
