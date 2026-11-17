@@ -827,13 +827,25 @@ export function nextLevels(fan: Fan, v: FanNode): Level[] {
 export function labelParts(v: FanNode, fan?: Fan): Level[] {
   const out: Level[] = [];
   const n = countBy(v);
+  // (A part as its own: where one of its daughters holds all its groups' species, the rest fossils placed by name only (keptOf), that daughter, as v's own daughters open to it
+  // (go). ToLaD#279: two unnamed forks over the carnivores and pangolins, Miacidae and two fossils placed by name beside them, stood for Ferae at home as "Carnivores & kin", 12 px
+  // of band and no name; Ferae's own name is the one that holds there.)
+  const own = (k: FanNode): FanNode => {
+    for (;;) {
+      const d = n(k) > 0 ? k.kids.find((q) => isNode(q) && n(q) === n(k)) : undefined;
+      if (!d || !isNode(d)) return k;
+      k = d;
+    }
+  };
   const go = (u: FanNode) => {
     for (const k of u.kids) {
       if (byNameOnly(v, k) && ('sp' in k || !fan || !isLevel(fan, k))) continue;
       if ('sp' in k) out.push({ b: k });
       else if (k.strands.length === 1) out.push({ b: k.strands[0] });
-      else if (n(k) < n(v)) out.push({ v: k });
-      else go(k);
+      else if (n(k) < n(v)) {
+        const c = own(k);
+        out.push(c.strands.length === 1 ? { b: c.strands[0] } : { v: c });
+      } else go(k);
     }
   };
   go(v);
@@ -3579,12 +3591,14 @@ export class FanView implements InputHandlers {
       named.push([k, x, pt, one]);
     }
     // (Then their pictures, in the same order: every fossil's name before any fossil's picture, as a label's name comes before its picture.)
-    for (const [k, x, y0, one] of named)
+    for (const [k, x, y0, one] of named) {
+      [kLo, kHi] = one ? [one.f, one.l] : [k, k];
+      // (Its size its own room's: the first the other species' columns leave it on its name's line, else off it by up to its half, still over it; the screen's edges and the labels
+      // standing not read, so a pan at one zoom changes no picture (gaplabels.test). Then there, whole on screen across as the column's are, and meeting no label: else none.)
       for (const d of [PIC_D, PIC_S]) {
-        [kLo, kHi] = one ? [one.f, one.l] : [k, k];
-        // (On its name's line, else off it by up to its half, still over it: whole on screen across, as the column's are.)
+        if (Number.isNaN(spot(x - d, x + d, y0, y0 + d, d, x, false))) continue;
         const px = spot(Math.max(0, x - d), Math.min(this.w, x + d), y0, y0 + d, d, x);
-        if (Number.isNaN(px)) continue;
+        if (Number.isNaN(px)) break;
         const b = f.strands[k];
         // (A group's: its youngest fossil's face, and its disc a member's photo where that has none, discSci.)
         const p = { x: px, y: y0 + d / 2, i: out.pics.length, lv: (one ? { v: one.v } : { b }) as Level, face: b, held: false };
@@ -3592,6 +3606,7 @@ export class FanView implements InputHandlers {
         taken.push(picBox({ ...p, d }));
         break;
       }
+    }
   }
   /**
    * The fossil groups tipLabels names as one (ToLaD#279), per strand: each outermost clade with a rank name of its own (isLevel) that is only fossils placed by name
