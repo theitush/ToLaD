@@ -271,12 +271,22 @@ export interface DatedFile {
 }
 
 /**
- * Every species of the data's dated tree is drawn (ToLaD#279): those a phylogeny places (Upham et al. 2019, its ages
- * redated with Álvarez-Carretero et al. 2022) or an overrides.toml entry, and the fossils the data grafts on by taxonomy
- * only (PBDB genus at first appearance, the sidecars' `grafts` rows: ~11,300 extinct species). Until ToLaD#279 the fan
- * left the grafted fossils out (ToLaD#145's FAN_PLACEMENT); a graft is now marked (RawSpecies.placed) so its card can
- * say how it was placed.
+ * Which species the fan draws (ToLaD#145, #279):
+ * - 'phylogeny' (the page's default): those whose place in the tree is dated by a phylogeny (Upham et al. 2019, its ages
+ *   redated with Álvarez-Carretero et al. 2022), plus the hand-placed `[[dated_fossil]]` / `[[dated_clade]]` entries of
+ *   overrides.toml, plus every living species (one Upham lacks, like the southern tiger cat, is still a living cat and
+ *   stays). The fossils the data grafts on by taxonomy only (PBDB genus at first appearance, the sidecars' `grafts` rows)
+ *   stay in the data but are not drawn.
+ * - 'all' (`?fossils=all`, its own data files, mammals-all.json): every species of the data's dated tree, the ~11,300
+ *   grafted fossils too, each marked (RawSpecies.placed) so its card can say how it was placed.
  */
+export type Fossils = 'phylogeny' | 'all';
+
+/** Whether the fan draws a species row: under 'phylogeny', not a fossil placed by taxonomy only. */
+export function onFan(fossils: Fossils, grafts: ReadonlySet<number>, row: number, extinct: boolean): boolean {
+  return fossils === 'all' || !(extinct && grafts.has(row));
+}
+
 /**
  * A file's dated tree induced on `rows` (species row index -> scientific name): a split left
  * with fewer than two branches collapses; null if no row is in it.
@@ -405,7 +415,7 @@ function node(f: Tile, i: number): RawNode {
  * Find the tile that holds `name` with its subtree (not as a stub) and extract
  * it. `read` returns a data file's bytes by its path under data/mammals.
  */
-export function loadClade(read: (rel: string) => Uint8Array, name: string): RawClade {
+export function loadClade(read: (rel: string) => Uint8Array, name: string, fossils: Fossils = 'phylogeny'): RawClade {
   const skBytes = read('skeleton.tld');
   const sk = decodeFile(skBytes) as unknown as Tile;
   for (const t of sk.meta.tiles as { id: number; file: string }[]) {
@@ -422,7 +432,7 @@ export function loadClade(read: (rel: string) => Uint8Array, name: string): RawC
         };
         const sk = json('dated/skeleton.json');
         const file = json(`dated/${t.id}.json`);
-        return extractClade(skBytes, bytes, t.id, name, sk && file ? { sk, file } : undefined);
+        return extractClade(skBytes, bytes, t.id, name, sk && file ? { sk, file } : undefined, undefined, fossils);
       }
     }
   }
@@ -441,6 +451,8 @@ export function extractClade(
   dated?: { sk: DatedFile; file: DatedFile },
   /** Filled with the file's on-fan species rows (row -> scientific name), for a tree over several files (loadAll). */
   rowsOut?: Map<number, string>,
+  /** Which fossils it draws (Fossils): the page's default, or every one (`?fossils=all`). */
+  fossils: Fossils = 'phylogeny',
 ): RawClade {
   const sk = decodeFile(skeleton) as unknown as Tile;
   const f = decodeFile(tile) as unknown as Tile;
@@ -521,6 +533,7 @@ export function extractClade(
       mass: m ? { g: m[0], how: dated!.sk.mass_how?.[m[1]] ?? '' } : null,
       loss: lossOf(f, i, sk.meta),
     });
+    if (!onFan(fossils, grafts, i, f.extinct(i))) continue;
     rows.set(i, f.name(i));
     if (grafts.has(i) && f.extinct(i)) graftOf.set(f.name(i), species[species.length - 1]);
   }
@@ -539,7 +552,7 @@ export function extractClade(
  * Every mammal (ToLaD#247): the species of the skeleton and of every tile, under the skeleton's whole dated tree
  * (dated/skeleton.json `all`: the per-file trees cannot be joined without it). The clade row is the skeleton's root.
  */
-export function loadAll(read: (rel: string) => Uint8Array): RawClade {
+export function loadAll(read: (rel: string) => Uint8Array, fossils: Fossils = 'phylogeny'): RawClade {
   const skBytes = read('skeleton.tld');
   const skTile = decodeFile(skBytes) as unknown as Tile;
   const json = (rel: string): DatedFile | null => {
@@ -562,7 +575,7 @@ export function loadAll(read: (rel: string) => Uint8Array): RawClade {
     const file = id < 0 ? skJ : json(`dated/${id}.json`);
     const f = decodeFile(bytes) as unknown as Tile;
     const r = new Map<number, string>();
-    const c = extractClade(skBytes, bytes, id, f.name(0), file ? { sk: skJ, file } : undefined, r);
+    const c = extractClade(skBytes, bytes, id, f.name(0), file ? { sk: skJ, file } : undefined, r, fossils);
     for (const [i, n] of r) rows.set(`${id}:${i}`, n);
     species.push(...c.species);
     if (id < 0) top = c;

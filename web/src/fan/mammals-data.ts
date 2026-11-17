@@ -190,6 +190,13 @@ export function mergeMammalCard(d: MammalData, c: MammalCardFile): void {
 /** The sibling files' names (vite.config.ts emits them; pages.yml stages them next to index.html). */
 export const MAMMALS_FILE = 'mammals.json';
 export const MAMMALS_CARD_FILE = 'mammals-card.json';
+/** The same pair with every fossil on the tree (panthera-extract.ts Fossils 'all', ToLaD#279): what `?fossils=all` fetches instead. */
+export const MAMMALS_ALL_FILE = 'mammals-all.json';
+export const MAMMALS_ALL_CARD_FILE = 'mammals-all-card.json';
+/** Whether the page draws every fossil (`?fossils=all`, ToLaD#279): its own data files; without it, the page's default ones. */
+export const fossilsAll = typeof location !== 'undefined' && new URLSearchParams(location.search).get('fossils') === 'all';
+const OPEN_FILE = fossilsAll ? MAMMALS_ALL_FILE : MAMMALS_FILE;
+const CARD_FILE = fossilsAll ? MAMMALS_ALL_CARD_FILE : MAMMALS_CARD_FILE;
 
 let data: MammalData | null = null;
 let pending: Promise<MammalData> | null = null;
@@ -223,9 +230,9 @@ let cardRequest: Promise<Response> | null = null;
 
 async function fetchMammals(): Promise<MammalData> {
   // (The same request index.html preloads, so the page takes the preload's.)
-  const f = await readJson<MammalFile>(MAMMALS_FILE, request(MAMMALS_FILE), 'fetch');
+  const f = await readJson<MammalFile>(OPEN_FILE, request(OPEN_FILE), 'fetch');
   if (!cardRequest) {
-    cardRequest = request(MAMMALS_CARD_FILE);
+    cardRequest = request(CARD_FILE);
     // (A failure is the card's to report, when it reads it.)
     cardRequest.catch(() => {});
   }
@@ -256,9 +263,9 @@ export function mammalCardLoaded(): boolean {
 
 /** mammals-card.json: the request made when mammals.json came in, or a new one (a failed one is not asked again). */
 function fetchCard(): Promise<MammalCardFile> {
-  const at = cardRequest ?? request(MAMMALS_CARD_FILE);
+  const at = cardRequest ?? request(CARD_FILE);
   cardRequest = null;
-  return readJson<MammalCardFile>(MAMMALS_CARD_FILE, at);
+  return readJson<MammalCardFile>(CARD_FILE, at);
 }
 
 /** Load mammals-card.json's kinds into the data once, after it (later calls share the first; a failure is tried again on the next call). */

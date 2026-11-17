@@ -12,10 +12,12 @@ import { allSplits, FELIDAE_TREE, speciesUnder, splitFrom } from './splits';
 
 const DATA = resolve(dirname(fileURLToPath(import.meta.url)), '../../../data/mammals');
 const read = (rel: string) => new Uint8Array(readFileSync(resolve(DATA, rel)));
+/** The page's `?fossils=all` (ToLaD#279): every fossil on the tree, TOLAD_FOSSILS=all (the fixtures too, vite.config.ts). */
+const ALL = process.env.TOLAD_FOSSILS === 'all';
 
 /** A clade as the fan takes it: its dated tree and the species it places. */
 function clade(name: string) {
-  const raw = loadClade(read, name);
+  const raw = loadClade(read, name, ALL ? 'all' : 'phylogeny');
   const by = new Map(raw.species.map((s) => [s.sci, s]));
   const tree = splitFrom(raw.dated!, (s) => by.get(s)?.common ?? null, (s) => !!by.get(s)?.extinct, raw.datedMeta!, (s) => by.get(s)?.alive ?? 0);
   const placed = new Set(speciesUnder(tree));
@@ -45,14 +47,21 @@ describe('the dated tree from the data', () => {
     // southern tiger cat Upham lacks
     const living = FELIDAE.species.filter((s) => !s.extinct);
     expect(living.length).toBeGreaterThanOrEqual(38);
-    // Every fossil is on the tree (ToLaD#279): the overrides' [[dated_fossil]] cats and the ~94 the data grafts by taxonomy
-    // (PBDB genus at first appearance), each graft marked with how it was placed (on its genus, or its family).
-    const fossils = FELIDAE.species.filter((s) => s.extinct);
-    expect(fossils.length).toBe(clade('Felidae').raw.species.filter((s) => s.extinct).length);
-    expect(fossils.length).toBeGreaterThan(90);
-    for (const s of ['Panthera balamoides', 'Panthera gombaszoegensis', 'Panthera spelaea', 'Panthera zdanskyi']) expect(fossils.find((f) => f.sci === s)?.placed).toBeUndefined();
-    expect(fossils.find((f) => f.sci === 'Pseudaelurus validus')?.placed).toBe('genus');
-    expect(fossils.filter((f) => f.placed).length).toBeGreaterThan(85);
+    if (ALL) {
+      // Every fossil is on the tree (ToLaD#279): the overrides' [[dated_fossil]] cats and the ~94 the data grafts by taxonomy
+      // (PBDB genus at first appearance), each graft marked with how it was placed (on its genus, or its family).
+      const fossils = FELIDAE.species.filter((s) => s.extinct);
+      expect(fossils.length).toBe(clade('Felidae').raw.species.filter((s) => s.extinct).length);
+      expect(fossils.length).toBeGreaterThan(90);
+      for (const s of ['Panthera balamoides', 'Panthera gombaszoegensis', 'Panthera spelaea', 'Panthera zdanskyi']) expect(fossils.find((f) => f.sci === s)?.placed).toBeUndefined();
+      expect(fossils.find((f) => f.sci === 'Pseudaelurus validus')?.placed).toBe('genus');
+      expect(fossils.filter((f) => f.placed).length).toBeGreaterThan(85);
+    } else {
+      // The page's default (Fossils 'phylogeny'): the fan's fossils are the overrides' [[dated_fossil]] cats only; the ~98 the
+      // data grafts by taxonomy (PBDB genus at first appearance) stay in the data and the tiles
+      expect(FELIDAE.species.filter((s) => s.extinct).map((s) => s.sci).sort()).toEqual(['Panthera balamoides', 'Panthera gombaszoegensis', 'Panthera spelaea', 'Panthera zdanskyi']);
+      expect(clade('Felidae').raw.species.filter((s) => s.extinct).length).toBeGreaterThan(90);
+    }
     for (const s of ['Panthera leo', 'Panthera tigris', 'Felis catus', 'Neofelis diardi', 'Lynx pardinus', 'Leopardus guttulus']) expect(sp).toContain(s);
     // no synonym rows (#116): none of Open Tree's extra Felis names
     for (const s of ['Felis affinis', 'Felis haussa', 'Lynx vulgaris', 'Puma yaguarondi']) expect(sp).not.toContain(s);
@@ -79,19 +88,23 @@ describe('the dated tree from the data', () => {
       expect(n).toMatch(/ (ancestors|lineage)$/);
     }
     const by = (sp: string[]) => allSplits().find((s) => [...speciesUnder(s)].sort().join() === [...sp].sort().join())?.name;
-    // (The cat family's crown; the tree's root is older since ToLaD#279: the stem's fossil cats, Proailurus's kin, branch off below it.)
-    expect(allSplits().find((s) => s.taxon === 'Felidae')!.name).toBe('Cat ancestors');
-    expect(FELIDAE_TREE.ageMa).toBeGreaterThan(allSplits().find((s) => s.taxon === 'Felidae')!.ageMa);
+    // (The cat family's crown; with every fossil the tree's root is older, ToLaD#279: the stem's fossil cats, Proailurus's kin, branch off below it.)
+    if (ALL) {
+      expect(allSplits().find((s) => s.taxon === 'Felidae')!.name).toBe('Cat ancestors');
+      expect(FELIDAE_TREE.ageMa).toBeGreaterThan(allSplits().find((s) => s.taxon === 'Felidae')!.ageMa);
+    } else expect(FELIDAE_TREE.name).toBe('Cat ancestors');
     expect(by(['Panthera tigris', 'Panthera zdanskyi', 'Panthera uncia', 'Panthera onca', 'Panthera balamoides', 'Panthera gombaszoegensis', 'Panthera leo', 'Panthera spelaea', 'Panthera pardus', 'Neofelis diardi', 'Neofelis nebulosa'])).toBe('Big cat ancestors');
     // (With every fossil on the tree, ToLaD#279: the lynxes' split holds the fossil lynxes too, the living four among them.)
     const lynx = allSplits().find((s) => ['Lynx lynx', 'Lynx pardinus', 'Lynx canadensis', 'Lynx rufus'].every((n) => speciesUnder(s).includes(n)) && speciesUnder(s).every((n) => n.startsWith('Lynx ')));
     expect(lynx?.name).toBe('Lynx ancestors');
     expect(by(['Neofelis diardi', 'Neofelis nebulosa'])).toBe('Neofelis ancestors');
-    const crown = allSplits().find((s) => s.taxon === 'Felidae')!;
-    // (Under it: the big and small cats, and the fossil genera grafted on it, the sabre-tooths among them.)
-    expect(crown.kids.map((k) => (typeof k === 'string' ? k : k.name))).toContain('Small cat ancestors');
-    expect(allSplits(crown).map((s) => s.name)).toContain('Big cat ancestors');
-    expect(speciesUnder(crown)).toEqual(expect.arrayContaining(['Smilodon fatalis', 'Homotherium latidens']));
+    if (ALL) {
+      const crown = allSplits().find((s) => s.taxon === 'Felidae')!;
+      // (Under it: the big and small cats, and the fossil genera grafted on it, the sabre-tooths among them.)
+      expect(crown.kids.map((k) => (typeof k === 'string' ? k : k.name))).toContain('Small cat ancestors');
+      expect(allSplits(crown).map((s) => s.name)).toContain('Big cat ancestors');
+      expect(speciesUnder(crown)).toEqual(expect.arrayContaining(['Smilodon fatalis', 'Homotherium latidens']));
+    } else expect(FELIDAE_TREE.kids.map((k) => (typeof k === 'string' ? k : k.name)).sort()).toEqual(['Big cat ancestors', 'Small cat ancestors']);
   });
 
   it('Carnivora builds and lays out by the same path', { timeout: 600_000 }, () => {
@@ -105,9 +118,13 @@ describe('the dated tree from the data', () => {
     for (const s of splits) bySource[s.source!] = (bySource[s.source!] ?? 0) + 1;
     console.log(`Carnivora: ${rec.species.length} species (${living} living), ${splits.length} splits, root ${tree.ageMa} Ma, by source ${JSON.stringify(bySource)}`);
     expect(living).toBeGreaterThan(250);
-    // the same rule: every carnivoran in the data, living and fossil (ToLaD#279: ~1,000 fossils, most grafted by taxonomy)
     expect(living).toBe(clade('Carnivora').raw.species.filter((s) => !s.extinct).length);
-    expect(rec.species.length).toBe(clade('Carnivora').raw.species.length);
-    expect(rec.species.length - living).toBeGreaterThan(900);
+    if (ALL) {
+      // every carnivoran in the data, living and fossil (ToLaD#279: ~1,000 fossils, most grafted by taxonomy)
+      expect(rec.species.length).toBe(clade('Carnivora').raw.species.length);
+      expect(rec.species.length - living).toBeGreaterThan(900);
+    }
+    // the default's rule: every living carnivoran, and only the fossils a phylogeny (Upham's extinct tips with data) or an override places
+    else expect(rec.species.length - living).toBeLessThan(20);
   });
 });
