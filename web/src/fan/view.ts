@@ -827,14 +827,16 @@ export function nextLevels(fan: Fan, v: FanNode): Level[] {
 export function labelParts(v: FanNode, fan?: Fan): Level[] {
   const out: Level[] = [];
   const n = countBy(v);
-  // (A part as its own: where one of its daughters holds all its groups' species, the rest fossils placed by name only (keptOf), that daughter, as v's own daughters open to it
-  // (go). ToLaD#279: two unnamed forks over the carnivores and pangolins, Miacidae and two fossils placed by name beside them, stood for Ferae at home as "Carnivores & kin", 12 px
-  // of band and no name; Ferae's own name is the one that holds there.)
+  // (A part with no rank name of its own, where a clade under it with one holds all its groups' species (the rest fossils placed by name only, keptOf), is that clade: the same
+  // groups, by their name. ToLaD#279: two unnamed forks over the carnivores and pangolins, Miacidae and two fossils placed by name beside them, stood for Ferae at home as
+  // "Carnivores & kin". A part with a rank name keeps it: Marsupials, Monotremes.)
   const own = (k: FanNode): FanNode => {
-    for (;;) {
-      const d = n(k) > 0 ? k.kids.find((q) => isNode(q) && n(q) === n(k)) : undefined;
+    if (!fan || isLevel(fan, k) || !(n(k) > 0)) return k;
+    for (let u = k; ; ) {
+      const d = u.kids.find((q) => isNode(q) && n(q) === n(k));
       if (!d || !isNode(d)) return k;
-      k = d;
+      if (isLevel(fan, d)) return d;
+      u = d;
     }
   };
   const go = (u: FanNode) => {
@@ -3593,14 +3595,17 @@ export class FanView implements InputHandlers {
     // (Then their pictures, in the same order: every fossil's name before any fossil's picture, as a label's name comes before its picture.)
     for (const [k, x, y0, one] of named) {
       [kLo, kHi] = one ? [one.f, one.l] : [k, k];
-      // (Its size its own room's: the first the other species' columns leave it on its name's line, else off it by up to its half, still over it; the screen's edges and the labels
-      // standing not read, so a pan at one zoom changes no picture (gaplabels.test). Then there, whole on screen across as the column's are, and meeting no label: else none.)
+      // (On its name's line, else off it by up to its half, still over it: the first size the other species' columns and the labels standing leave it, the smaller where a label is in
+      // the way; whole on screen across, as the column's are, slid onto it, or none: never a smaller one for the screen's edge, so a pan at one zoom changes no picture (gaplabels.test).)
       for (const d of [PIC_D, PIC_S]) {
         const p0 = spot(x - d, x + d, y0, y0 + d, d, x, false);
         if (Number.isNaN(p0)) continue;
-        // (Where that spot is on screen and meets no label, it is the one the screen's would find too, the nearest clear: the columns not read again.)
+        // (Where that spot meets no label it is the one with the labels too, the nearest clear: the columns not read again.)
         const [lo, hi] = [p0 - d / 2, p0 + d / 2];
-        const px = lo >= 0 && hi <= this.w && !taken.some((q) => q[1] < y0 + d && q[3] > y0 && q[0] < hi && q[2] > lo) ? p0 : spot(Math.max(0, x - d), Math.min(this.w, x + d), y0, y0 + d, d, x);
+        let px = !taken.some((q) => q[1] < y0 + d && q[3] > y0 && q[0] < hi && q[2] > lo) ? p0 : spot(x - d, x + d, y0, y0 + d, d, x);
+        if (Number.isNaN(px)) continue;
+        // (Off the screen's edge: slid onto it at that size, where it still has room, else none.)
+        if (px - d / 2 < 0 || px + d / 2 > this.w) px = spot(Math.max(0, x - d), Math.min(this.w, x + d), y0, y0 + d, d, x);
         if (Number.isNaN(px)) break;
         const b = f.strands[k];
         // (A group's: its youngest fossil's face, and its disc a member's photo where that has none, discSci.)
