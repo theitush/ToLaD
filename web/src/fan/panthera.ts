@@ -72,6 +72,8 @@ export interface SpeciesRec {
   /** Adult body mass (kg) and where it came from (the pipeline's mass column, ToLaD#276); null in data before it. */
   massKg?: number | null;
   massHow?: string;
+  /** A fossil the data grafts on by taxonomy only (RawSpecies.placed, ToLaD#279): on its genus, or its family; absent: a phylogeny or an override placed it. The card says so. */
+  placed?: 'genus' | 'family';
 }
 
 export interface CladeRec {
@@ -134,6 +136,7 @@ export function speciesRec(r: RawSpecies, clade: number): SpeciesRec {
     loss: r.loss ?? null,
     massKg: r.mass ? r.mass.g / 1000 : null,
     massHow: r.mass?.how ?? '',
+    ...(r.placed ? { placed: r.placed } : {}),
   };
 }
 

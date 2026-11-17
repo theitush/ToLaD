@@ -100,6 +100,24 @@ describe("the species card's words and their links (ToLaD#508)", () => {
     expect(face(card(genomic))).toContain('alive today counted or modelled');
   });
 
+  it('a fossil placed by name says so, with its fossils\' date range (ToLaD#279)', () => {
+    // On its genus: a species of Pseudaelurus beside it under its split.
+    const graft = sp('Pseudaelurus validus');
+    expect(graft.placed).toBe('genus');
+    expect(face(card(graft))).toContain('Fossils from 17 million to 14 million years ago. Placed on its genus by name; no family tree data.');
+    // On its family (or a group above it): no genus-mate under its split.
+    const alone = all.find((s) => s.placed === 'family')!;
+    expect(face(card(alone))).toContain('Placed on its family by name; no family tree data.');
+    // A fossil a phylogeny or an override places, and a living species: no such line.
+    for (const s of [sp('Panthera balamoides'), sp('Panthera leo')]) {
+      expect(s.placed).toBeUndefined();
+      expect(face(card(s))).not.toContain('by name');
+    }
+    // About every fossil is placed by name, and only fossils say so.
+    expect(all.filter((s) => s.extinct && s.placed).length).toBeGreaterThan(11000);
+    expect(all.filter((s) => !s.extinct && s.placed)).toEqual([]);
+  });
+
   it('a link opens the page at its section, and the page closes back to the card', () => {
     // The link calls the page's opener with its anchor.
     const opened: string[] = [];

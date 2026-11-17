@@ -880,6 +880,12 @@ export function SpeciesCard({ sp, onClose, onUp, onBox, open, ageMa, startMa, ev
           </p>
         )}
         {sp.extinct && !at.end && <p className="sub">Died out {plainAgo(sp.t1 * 1e6)}</p>}
+        {/* A fossil the data grafts on by taxonomy only (ToLaD#279): how it was placed, and its fossils' date range. */}
+        {sp.placed && (
+          <p className="sub" data-placed>
+            Fossils from {plainAgo(sp.t0 * 1e6).replace(/ years ago$/, '')} to {plainAgo(sp.t1 * 1e6)}. Placed on its {sp.placed} by name; no family tree data.
+          </p>
+        )}
         {!sp.extinct && !at.now && !unknown && (
           <p className="lead">
             <span className="lane alive" />
