@@ -736,6 +736,17 @@ export function levelUp(fan: Fan, v: FanNode | null, self = false): FanNode | nu
   return null;
 }
 
+/**
+ * The level species b sits in (ToLaD#258): the nearest level over it (levelUp); for a highlight's species, its stop clade (HIGHLIGHT_STOPS, ToLaD#497),
+ * where a tap on it stops first. Human's is the Hominins, not Humans (Homo): its chain ends "Hominins", and a double tap or the stack's "…" from it
+ * goes there (levelsAbove). Ita, 2026-11-17: "double clicking on humans should return to hominins".
+ */
+export function speciesLevel(fan: Fan, b: FanBranch): FanNode | null {
+  const stop = HIGHLIGHT_STOPS[b.sp.sci];
+  if (stop) for (let u: FanNode | null = b.node; u; u = u.parent) if (latinOf(u.split) === stop) return u;
+  return levelUp(fan, b.node, true);
+}
+
 /** The chain of groups clade v stands in (ToLaD#452), outermost first: the named levels from the root down to the level at v (levelUp), each by levelName, the root by its clade's English name. */
 export function chainOf(fan: Fan, v: FanNode): string[] {
   const out: string[] = [];
@@ -767,9 +778,9 @@ export function stackAt(fan: Fan, v: FanNode): StackAt {
   return out;
 }
 
-/** A level's clade (ToLaD#288): itself, a species' the level it sits in, the root's last. */
+/** A level's clade (ToLaD#288): itself, a species' the level it sits in (speciesLevel), the root's last. */
 export function levelClade(fan: Fan, lv: Level): FanNode {
-  return lv.v ?? levelUp(fan, lv.b.node, true) ?? fan.root;
+  return lv.v ?? speciesLevel(fan, lv.b) ?? fan.root;
 }
 
 /** Whether level a holds level x (itself or inside it). */
@@ -2155,7 +2166,7 @@ export class FanView implements InputHandlers {
   /** The levels level `from` sits in (levelUp's tree, ToLaD#258), nearest first, home's root last. */
   levelsAbove(from: Level): FanNode[] {
     const out: FanNode[] = [];
-    for (let u = from.b ? levelUp(this.fan, from.b.node, true) : levelUp(this.fan, from.v); u; u = levelUp(this.fan, u)) out.push(u);
+    for (let u = from.b ? speciesLevel(this.fan, from.b) : levelUp(this.fan, from.v); u; u = levelUp(this.fan, u)) out.push(u);
     return out;
   }
 

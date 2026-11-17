@@ -13,6 +13,8 @@ import { mammaliaTree } from './splits';
 import type { Steady } from './steady';
 import { chainOf, FanView, levelClade, type Level } from './view';
 
+/** view.ts's: a view within this many px of a frame is at it. */
+const LEVEL_PX = 12;
 let clock = 1000;
 const timers: { at: number; f: () => void; id: number }[] = [];
 let tid = 1;
@@ -209,6 +211,40 @@ describe('a tap on humans stops at the Hominins first (ToLaD#497)', () => {
     say(`Hominins, a double tap: ${shows()}`);
     expect(v.levelNow(true).v === node('Homininae') && chain().endsWith('› African great apes'), shows()).toBe(true);
   }, 600_000);
+
+  // The level above Human is the Hominins (its stop, ToLaD#497, Ita 2026-11-17: "double clicking on humans should return to hominins"): a double
+  // tap from Human, however it was reached, card open or closed, lands at the Hominins level, on the Hominins' landing, its chain ending "Hominins";
+// the next one goes on up to African great apes.
+  it('from Human (two taps from Primates, a search pick, its card closed), a double tap goes back to the Hominins', () => {
+    const toHuman = () => {
+      at('Primates');
+      tapAt(r, ...spot('picture')!);
+      settle(r);
+      tapAt(r, ...spot('column')!);
+      settle(r);
+    };
+    const ways: [string, () => void][] = [
+      ['Primates, Hominins, Human', toHuman],
+      ['a search pick', () => (stand(home), v.flyToSpecies(human().sp), settle(r))],
+      ['Human, its card closed', () => (toHuman(), v.tap(-1e6, -1e6), settle(r))],
+    ];
+    const bad: string[] = [];
+    for (const [way, reach] of ways) {
+      reach();
+      const was = shows();
+      const crumb = chain();
+      if (v.levelNow(true).b !== human()) bad.push(`${way}: at ${was}, not Human`);
+      doubleTap(r, v.w / 2, v.h / 2);
+      const off = P(v).offBy(P(v).landOf({ v: node('Hominini') }), v.cam);
+      say(`${way}: at ${was} (chain ${crumb}); a double tap: ${shows()}, ${off.toFixed(0)} px off the Hominins' landing`);
+      if (!atHominins() || off > LEVEL_PX) bad.push(`${way}: a double tap from ${was} went to ${shows()}, ${off.toFixed(0)} px off the Hominins' landing`);
+      if (!crumb.endsWith('› Hominins')) bad.push(`${way}: the chain at Human is "${crumb}", not "… › Hominins"`);
+      // (A second double tap goes up from the Hominins as before: African great apes.)
+      doubleTap(r, v.w / 2, v.h / 2);
+      if (!(v.levelNow(true).v === node('Homininae') && chain().endsWith('› African great apes'))) bad.push(`${way}: a second double tap went to ${shows()}, not African great apes`);
+    }
+    expect(bad).toEqual([]);
+  }, 1_200_000);
 
   // (The Hominins' landing (stopFrame) runs its fossil frame on to "now": humans stand in view there, a column to tap a second time.)
   it('at the Hominins: humans on screen, and the next tap on them lands on Human, its card open', () => {
