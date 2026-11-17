@@ -591,6 +591,84 @@
   display: grid;
   place-items: center;
 }
+/* A chip that opens its choices (ToLaD#537, ChoiceChip.tsx): its name and value and a chevron; open, a menu under it,
+   the current choice marked with the living green's dot, each row a full touch target; a clear scrim under the menu
+   takes the tap that closes it, so the tree under it does not see that tap. */
+.fan .chip {
+  position: relative;
+  display: inline-flex;
+}
+/* (The chevron sits in the chip's right padding, so the bar keeps to one row on a 390 px phone as before.) */
+.fan .bar .chip > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding-right: 9px;
+}
+.fan .chip .chev {
+  opacity: 0.6;
+  transition: transform 0.15s;
+}
+.fan .chip > button[aria-expanded='true'] {
+  border-color: rgba(63, 210, 134, 0.45);
+}
+.fan .chip > button[aria-expanded='true'] .chev {
+  transform: rotate(180deg);
+}
+.fan .chip-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+}
+.fan .chip-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 5;
+  display: grid;
+  min-width: 100%;
+  max-width: calc(100vw - 16px);
+  padding: 4px;
+  background: rgba(12, 23, 20, 0.94);
+  border: 1px solid rgba(200, 230, 210, 0.16);
+  border-radius: 16px;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.fan .bar .chip-menu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 14px 0 10px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  backdrop-filter: none;
+  color: var(--ink-2);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.fan .bar .chip-menu button::before {
+  content: '';
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(200, 230, 210, 0.3);
+}
+.fan .bar .chip-menu button[aria-checked='true'] {
+  color: var(--ink);
+  background: rgba(63, 210, 134, 0.1);
+}
+.fan .bar .chip-menu button[aria-checked='true']::before {
+  background: #3fd286;
+  border-color: #3fd286;
+}
+.fan .bar .chip-menu button:not([aria-checked='true']):hover {
+  background: rgba(200, 230, 210, 0.07);
+}
 .fan .search {
   position: absolute;
   top: max(10px, env(safe-area-inset-top));

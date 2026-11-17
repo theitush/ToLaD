@@ -15,6 +15,7 @@ import { synthLoader } from './synthetic-level';
 import { stamp } from '../stamp';
 import { population } from './population';
 import { WorldToggle } from './WorldToggle';
+import { ChoiceChip, chosenIn, type Choice } from './ChoiceChip';
 import { forkLeaders, forkNames, setForkLeaders, setForkNames } from './brackets';
 import { FORK_MODES, forkMode, setForkMode, type ForkMode } from './steady';
 import { MagnifierIcon, SearchPanel } from './SearchPanel';
@@ -52,11 +53,13 @@ export function levelLinkClade(search: string): string | null {
   return q === 'cats' ? 'Felidae' : q === 'carnivores' ? 'Carnivora' : null;
 }
 
-/** How a fork is drawn (ToLaD#377, `?forks=`): a look only, no new view. */
+/** How a fork is drawn (ToLaD#377, `?forks=`): a look only, no new view. (The first, `thin`, is forkMode's default: the address leaves it out.) */
+const FORK_LOOKS: Record<ForkMode, string> = { thin: 'thin: wide stems as lines', peel: 'peel: ribbons, the old look', flat: 'flat' };
+export const FORK_CHOICES: Choice<ForkMode>[] = FORK_MODES.map((m) => ({ value: m, short: m, label: FORK_LOOKS[m] }));
 function initialForks(): ForkMode {
   try {
-    const q = new URLSearchParams(window.location.search).get('forks');
-    if (FORK_MODES.includes(q as ForkMode)) setForkMode(q as ForkMode);
+    const m = chosenIn(window.location.search, 'forks', FORK_CHOICES);
+    if (m) setForkMode(m);
   } catch {
     /* no address */
   }
@@ -65,7 +68,13 @@ function initialForks(): ForkMode {
 
 /** The upper clades' names (ToLaD#373, #434, #458): at their forks (`?forknames=fork`), on leaders off them (`?forknames=leaders`), or none: on the tree on its side the labels in the gaps name them (ToLaD#458), elsewhere the stack over "now" (`?forknames=off`). */
 type ForkNaming = 'at fork' | 'leaders' | 'off';
-const FORK_NAMINGS: ForkNaming[] = flipOn() ? ['off', 'at fork', 'leaders'] : ['at fork', 'leaders', 'off'];
+const FORK_NAMINGS: Record<ForkNaming, Choice<ForkNaming>> = {
+  off: { value: 'off', short: 'off', label: flipOn() ? 'off: named in the gaps' : 'off: the stack over now' },
+  'at fork': { value: 'at fork', short: 'at fork', label: 'at their forks', q: 'fork' },
+  leaders: { value: 'leaders', short: 'leaders', label: 'on leaders off the forks' },
+};
+/** The default first (the address leaves it out): on its side none, upright at the forks. */
+export const FORK_NAMING_CHOICES = (flipOn() ? (['off', 'at fork', 'leaders'] as const) : (['at fork', 'leaders', 'off'] as const)).map((k) => FORK_NAMINGS[k]);
 const forkNaming = (m: ForkNaming) => {
   // (On its side `off` asks no stack: the brackets keep their fork mode and place no names.)
   setForkNames(flipOn() || m !== 'off');
@@ -75,15 +84,19 @@ const forkNaming = (m: ForkNaming) => {
 /** Set before the first view is built. */
 function initialForkNames(): ForkNaming {
   try {
-    const q = new URLSearchParams(window.location.search).get('forknames');
-    if (q === 'off') forkNaming('off');
-    if (q === 'leaders') forkNaming('leaders');
-    if (q === 'fork') forkNaming('at fork');
+    const m = chosenIn(window.location.search, 'forknames', FORK_NAMING_CHOICES);
+    if (m) forkNaming(m);
   } catch {
     /* no address */
   }
   return forkQuiet() || !forkNames() ? 'off' : forkLeaders() ? 'leaders' : 'at fork';
 }
+
+/** Which fossils the tree carries (ToLaD#279, `?fossils=old`): a data switch, so a pick reloads (mammals-data.ts reads it). */
+export const FOSSIL_CHOICES: Choice<'all' | 'old'>[] = [
+  { value: 'all', short: 'all', label: 'every fossil' },
+  { value: 'old', short: 'old', label: 'old: dated tree only' },
+];
 
 export function FanApp() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -202,61 +215,43 @@ export function FanApp() {
         </div>
       )}
       <div className="bar" ref={barRef} style={viewReady ? undefined : { visibility: 'hidden' }}>
+        {/* ToLaD#537: each chip opens its choices (ChoiceChip); a pick applies, the address kept in step. */}
         {/* ToLaD#373, #434: the upper clades named at their forks, on leaders off them, or in the stack over "now". */}
-        <button
-          type="button"
+        <ChoiceChip
+          name="fork names"
           title="Upper clades' names: on the gaps above them (the tree on its side), at their forks, on leaders off them, or off (the stack over now)"
-          onClick={() => {
-            const next = FORK_NAMINGS[(FORK_NAMINGS.indexOf(forks) + 1) % FORK_NAMINGS.length];
+          param="forknames"
+          choices={FORK_NAMING_CHOICES}
+          value={forks}
+          onPick={(m) => {
             placeRef.current = viewRef.current?.place() ?? null;
-            forkNaming(next);
+            forkNaming(m);
             setSel(null);
-            setForks(next);
-            try {
-              const u = new URL(window.location.href);
-              if (next === FORK_NAMINGS[0]) u.searchParams.delete('forknames');
-              else u.searchParams.set('forknames', next === 'at fork' ? 'fork' : next);
-              window.history.replaceState(null, '', u);
-            } catch {
-              /* not in the address */
-            }
+            setForks(m);
           }}
-        >
-          {`fork names: ${forks}`}
-        </button>
+        />
         {/* ToLaD#377, #402, #439: how a fork with too little height is drawn: a rectangular tree's corner, and a stem wider than tall a line (thin), or a ribbon (peel, the old look). */}
-        <button
-          type="button"
+        <ChoiceChip
+          name="forks"
           title="Forks: thin lines for wide stems, or peeling ribbons"
-          onClick={() => {
-            const next = FORK_MODES[(FORK_MODES.indexOf(forkLook) + 1) % FORK_MODES.length];
-            setForkMode(next);
-            setForkLook(next);
+          param="forks"
+          choices={FORK_CHOICES}
+          value={forkLook}
+          onPick={(m) => {
+            setForkMode(m);
+            setForkLook(m);
             viewRef.current?.request();
-            try {
-              const u = new URL(window.location.href);
-              u.searchParams.set('forks', next);
-              window.history.replaceState(null, '', u);
-            } catch {
-              /* not in the address */
-            }
           }}
-        >
-          {`forks: ${forkLook}`}
-        </button>
-        {/* ToLaD#279: every fossil on the tree is the page; the old look (the dated phylogeny's fossils only) a tap away to compare. Its own data files, so a reload. */}
-        <button
-          type="button"
+        />
+        {/* ToLaD#279: every fossil on the tree is the page; the old look (the dated phylogeny's fossils only) to compare. Its own data files, so a reload. */}
+        <ChoiceChip
+          name="fossils"
           title="Fossils: every one on the tree (new), or only those in the dated phylogeny (old), to compare"
-          onClick={() => {
-            const u = new URL(window.location.href);
-            if (fossilsAll) u.searchParams.set('fossils', 'old');
-            else u.searchParams.delete('fossils');
-            window.location.assign(u);
-          }}
-        >
-          {fossilsAll ? 'fossils: all' : 'fossils: old'}
-        </button>
+          param="fossils"
+          choices={FOSSIL_CHOICES}
+          value={fossilsAll ? 'all' : 'old'}
+          reload
+        />
         <button
           type="button"
           className="icon"
