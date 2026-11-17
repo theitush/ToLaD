@@ -182,7 +182,9 @@ export function splitFrom(
   }
   if (t.loose > 0)
     notes.push(`${t.loose} ${t.loose === 1 ? 'daughter here is a fossil lineage' : 'daughters here are fossil lineages'} placed in this clade by taxonomy only: where ${t.loose === 1 ? 'it branches' : 'they branch'} off inside it is not known`);
-  if (t.kids.length > 2) notes.push(`${t.kids.length} daughters part at one date: ${daughters.join('; ')}`);
+  // (Named up to a dozen: a polytomy of grafted fossils has up to a few hundred daughters, ToLaD#279.)
+  const shown = daughters.length > 12 ? [...daughters.slice(0, 12), `${daughters.length - 12} more`] : daughters;
+  if (t.kids.length > 2) notes.push(`${t.kids.length} daughters part at one date: ${shown.join('; ')}`);
   return {
     name,
     ageMa: r3(t.age),
@@ -197,12 +199,32 @@ export function splitFrom(
   };
 }
 
+/**
+ * One date, one split (ToLaD#279): a daughter split dated no later than its parent, at the fan's precision (r3), is
+ * spliced into it, its daughters the parent's, as the pipeline splices a zero-length split (dated.py). A split with no
+ * time of its own gives its parent's fork no height to peel in (steady.ts's cap: a share of the shortest daughter's run).
+ * The data has 18 such ties among its grafted fossils' splits, and its 4-digit ages make more.
+ */
+export function spliceTies(t: DatedSplit): DatedSplit {
+  let loose = t.loose;
+  let tied = false;
+  const kids = t.kids.flatMap((k) => {
+    if (typeof k === 'string') return [k];
+    const s = spliceTies(k);
+    if (r3(s.age) < r3(t.age)) return [s];
+    tied = true;
+    loose += s.loose;
+    return s.kids;
+  });
+  return tied || kids.some((k, i) => k !== t.kids[i]) ? { ...t, loose, kids } : t;
+}
+
 /** A clade's dated tree, from the data: any clade, no hand table. */
 export function treeOf(raw: RawClade): Split {
   const bySci = new Map(raw.species.map((s) => [s.sci, s]));
   if (!raw.dated) throw new Error('data/mammals has no dated tree (format 1.6): rebuild it with `make -C pipeline build`');
   return splitFrom(
-    raw.dated,
+    spliceTies(raw.dated),
     (s) => {
       const c = bySci.get(s)?.common;
       return c ? sentenceCase(c) : null;

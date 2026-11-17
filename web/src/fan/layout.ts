@@ -1090,6 +1090,9 @@ function emergeRun(k: Kid, time: TimeScale, mode: WidthMode, reach: number): num
   return lo;
 }
 
+/** The guard's hair (layoutFan): a strand ends at least this share of its split's age after its split. */
+export const END_HAIR = 1e-3;
+
 export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = clade.tree, measure: Measure = 'individuals'): Fan {
   const W = TRUNK_WIDTH;
   // (A species with no mass in the data, none since ToLaD#276's build: the clade's median.)
@@ -1102,8 +1105,12 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = clade.
   const placed = new Set<string>();
   const branches: FanBranch[] = [];
   const nodes: FanNode[] = [];
-  const strand = (sp: SpeciesRec, v: FanNode): FanBranch => {
-    placed.add(sp.sci);
+  const strand = (sp0: SpeciesRec, v: FanNode): FanBranch => {
+    placed.add(sp0.sci);
+    // The guard (ToLaD#281, #279): a strand the data ends at or before its own split (a dating conflict the pipeline
+    // refuses, dated.py) ends just after it instead, at the pipeline's own resolution of one event (1e-3 of the split's
+    // age): one strand drawn a hair long, never a column ending below its split (that once turned every node's left NaN).
+    const sp = sp0.t1 < v.ageMa * (1 - END_HAIR) ? sp0 : { ...sp0, t1: v.ageMa * (1 - END_HAIR) };
     const b: FanBranch = {
       sp,
       index: branches.length,

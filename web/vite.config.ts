@@ -5,9 +5,9 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer, defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
-import { MAMMALS_CARD_FILE, MAMMALS_FILE, packMammals, type MammalCardFile, type MammalFile } from './src/fan/mammals-data';
+import { MAMMALS_ALL_CARD_FILE, MAMMALS_ALL_FILE, MAMMALS_CARD_FILE, MAMMALS_FILE, packMammals, type MammalCardFile, type MammalFile } from './src/fan/mammals-data';
 import { GLOBE_FILE } from './src/fan/globe-data';
-import { loadAll, loadClade, trimToFan } from './src/fan/panthera-extract';
+import { loadAll, loadClade, trimToFan, type Fossils } from './src/fan/panthera-extract';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const DATA = resolve(here, '..', 'data', 'mammals');
@@ -16,6 +16,9 @@ const DATA = resolve(here, '..', 'data', 'mammals');
 function dataFiles(): string[] {
   return ['skeleton.tld', ...readdirSync(join(DATA, 't')).filter((f) => f.endsWith('.tld')).map((f) => `t/${f}`)];
 }
+
+/** The test fixtures' fossils (Felidae, Carnivora): the page's default, or every one with TOLAD_FOSSILS=all (mammals-node.ts reads it too, ToLaD#279). */
+const FIXTURE_FOSSILS: Fossils = process.env.TOLAD_FOSSILS === 'all' ? 'all' : 'phylogeny';
 
 const PANTHERA = 'virtual:panthera-data';
 const CARNIVORA = 'virtual:carnivora-data';
@@ -29,8 +32,8 @@ function pantheraData(): Plugin {
   let building = false;
   // The order the cats sit in (ToLaD#146): only the species the fan draws (the tile's subspecies and synonym rows left out).
   const ids: Record<string, () => unknown> = {
-    [PANTHERA]: () => loadClade((rel) => readFileSync(join(DATA, rel)), 'Felidae'),
-    [CARNIVORA]: () => trimToFan(loadClade((rel) => readFileSync(join(DATA, rel)), 'Carnivora')),
+    [PANTHERA]: () => loadClade((rel) => readFileSync(join(DATA, rel)), 'Felidae', FIXTURE_FOSSILS),
+    [CARNIVORA]: () => trimToFan(loadClade((rel) => readFileSync(join(DATA, rel)), 'Carnivora', FIXTURE_FOSSILS)),
   };
   return {
     name: 'panthera-data',
@@ -59,16 +62,22 @@ function pantheraData(): Plugin {
     },
     // The mammals (ToLaD#247) are sibling files the page fetches (fan/mammals-data.ts), not in the page, so the page
     // paints before they come: mammals.json on open, mammals-card.json after the first frame (ToLaD#502). Served at
-    // /mammals.json and /mammals-card.json in dev, emitted next to index.html in both builds.
+    // /mammals.json and /mammals-card.json in dev, emitted next to index.html in both builds. The same pair with every
+    // fossil (mammals-all.json, mammals-all-card.json) is what `?fossils=all` fetches instead (ToLaD#279).
     configureServer(server) {
-      server.middlewares.use('/' + MAMMALS_FILE, (_req, res) => {
-        res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify(mammalFiles().open));
-      });
-      server.middlewares.use('/' + MAMMALS_CARD_FILE, (_req, res) => {
-        res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify(mammalFiles().card));
-      });
+      for (const [fossils, open, card] of [
+        ['phylogeny', MAMMALS_FILE, MAMMALS_CARD_FILE],
+        ['all', MAMMALS_ALL_FILE, MAMMALS_ALL_CARD_FILE],
+      ] as const) {
+        server.middlewares.use('/' + open, (_req, res) => {
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify(mammalFiles(fossils).open));
+        });
+        server.middlewares.use('/' + card, (_req, res) => {
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify(mammalFiles(fossils).card));
+        });
+      }
       // The card's globe (ToLaD#267): every species' range cells and the land, fetched when a card first shows a map.
       server.middlewares.use('/' + GLOBE_FILE, (_req, res) => {
         res.setHeader('Content-Type', 'application/json');
@@ -76,9 +85,12 @@ function pantheraData(): Plugin {
       });
     },
     async generateBundle() {
-      const f = await mammalFiles(true);
+      const f = await mammalFiles('phylogeny', true);
       this.emitFile({ type: 'asset', fileName: MAMMALS_FILE, source: JSON.stringify(f.open) });
       this.emitFile({ type: 'asset', fileName: MAMMALS_CARD_FILE, source: JSON.stringify(f.card) });
+      const all = await mammalFiles('all', true);
+      this.emitFile({ type: 'asset', fileName: MAMMALS_ALL_FILE, source: JSON.stringify(all.open) });
+      this.emitFile({ type: 'asset', fileName: MAMMALS_ALL_CARD_FILE, source: JSON.stringify(all.card) });
       this.emitFile({ type: 'asset', fileName: GLOBE_FILE, source: globeJson() });
     },
   };
@@ -86,13 +98,14 @@ function pantheraData(): Plugin {
 
 /**
  * mammals.json and mammals-card.json (fan/mammals-data.ts MammalData, split by what the open reads, ToLaD#502): every
- * mammal under the whole dated tree, only the species the fan draws, and their pictures.
+ * mammal under the whole dated tree, only the species the fan draws, and their pictures; with `fossils` 'all', the
+ * same with every fossil (mammals-all.json, mammals-all-card.json, ToLaD#279).
  */
 type MammalFiles = { open: MammalFile; card: MammalCardFile };
-function mammalFiles(): MammalFiles;
-function mammalFiles(seeded: true): Promise<MammalFiles>;
-function mammalFiles(seeded = false): MammalFiles | Promise<MammalFiles> {
-  const clade = trimToFan(loadAll((rel) => readFileSync(join(DATA, rel))));
+function mammalFiles(fossils: Fossils): MammalFiles;
+function mammalFiles(fossils: Fossils, seeded: true): Promise<MammalFiles>;
+function mammalFiles(fossils: Fossils, seeded = false): MammalFiles | Promise<MammalFiles> {
+  const clade = trimToFan(loadAll((rel) => readFileSync(join(DATA, rel)), fossils));
   const wiki = wikiFor(clade.species.map((s) => s.sci));
   if (!seeded) return packMammals(JSON.parse(JSON.stringify({ clade, wiki })));
   // (Each column of numbers written the way that gzips smaller: the bytes the page downloads.)

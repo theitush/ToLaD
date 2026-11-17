@@ -13,7 +13,8 @@ const SCENES = (process.argv[4] || 'home,hominins,Felidae,Panthera,Proboscidea,C
 mkdirSync(OUT, { recursive: true });
 const browser = await chromium.launch({ headless: true });
 // (PAGE=<url>: that page instead of dist-single, e.g. the live site for a before shot.)
-const served = process.env.PAGE ? null : await pageUrl('');
+// (Q=<query>: the page's flags, e.g. Q=fossils=all, ToLaD#279.)
+const served = process.env.PAGE ? null : await pageUrl(process.env.Q || '');
 try {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
   const page = await ctx.newPage();
