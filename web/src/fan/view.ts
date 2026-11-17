@@ -3638,6 +3638,28 @@ export class FanView implements InputHandlers {
     return out;
   }
   /**
+   * The heights of strand b's own column's features, ascending (Tess.bounds' own part: its tip, its peel's 49 steps from its split to its lean's end, its population's
+   * features below its split), kept per fan: what clearIn reads inside a row's band. (Not Tess.bounds itself: that also walks every column below it, a few thousand
+   * heights a strand, and at home with every fossil some 9,000 strands are read: 1.1 s of the first frame.)
+   */
+  private ownFeatures(b: FanBranch): Float64Array {
+    const M = this.ownFeat;
+    if (M.fan !== this.fan) [M.fan, M.m] = [this.fan, new Map()];
+    let v = M.m.get(b);
+    if (!v) {
+      const out = [b.tipY];
+      if (b.leanY < b.splitY) for (let i = 0; i <= 48; i++) out.push(b.splitY - ((b.splitY - b.leanY) * i) / 48);
+      for (const a of b.pop.features()) {
+        const y = this.fan.time.y(a / 1e6);
+        if (y >= b.tipY && y < b.splitY) out.push(y);
+      }
+      out.sort((p, q) => p - q);
+      M.m.set(b, (v = Float64Array.from(out)));
+    }
+    return v;
+  }
+  private readonly ownFeat = { fan: null as Fan | null, m: new Map<FanBranch, Float64Array>() };
+  /**
    * The first strand from i on, in direction dir (drawn order), whose tip is at or below world y `t` (not gone by then), or -1: a min tree over the strands' tips, kept per fold's
    * strands, walked up to the first subtree holding one and down into it (O(log n)).
    */
@@ -3707,11 +3729,11 @@ export class FanView implements InputHandlers {
             const w = laneW(b, ys);
             let l = leftAt(b, ys, w);
             let [r2, own] = [l + w, ys < b.splitY && w > 0];
-            // (Its own column inside the band, where its shape's features fall (Tess.bounds: its taper, its peel's steps, its split), as drawn: between them its edges
-            // are as smooth as a row's px.)
+            // (Its own column inside the band, where its shape's features fall (its own of Tess.bounds': its population's history points, its peel's steps, its split), as
+            // drawn: between them its edges are as smooth as a row's px.)
             const ye = Math.min(y1, b.splitY);
             if (ye > ys) {
-              const B = this.fan.tess.bounds(b);
+              const B = this.ownFeatures(b);
               let q = lowerBound(B, ys);
               for (; q < B.length && B[q] < ye; q++) {
                 const yq = B[q] > ys ? B[q] : ys;
