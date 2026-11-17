@@ -3543,10 +3543,12 @@ export class FanView implements InputHandlers {
    */
   private tipGroupsOf(C: Float64Array, R: Float64Array): Map<number, TipGroup> {
     const had = this.tipGroups;
-    if (had.C === C && had.R === R && had.fan === this.fan) return had.m;
+    if (had.C === C && had.R === R && had.fan === this.fan && had.own === this.gapLadder?.own) return had.m;
     const m = new Map<number, TipGroup>();
+    const own = this.gapLadder?.own;
     for (const v of this.fan.nodes) {
-      if (v.strands.length < 2 || m.has(v.strands[0].index) || !isLevel(this.fan, v) || v.strands.some((b) => !b.sp.placed)) continue;
+      // (Only a group wholly gone by the labels' line: one with a lane there is the column's to name, the cover's, ToLaD#279: Cuvieronius, to ~10 kya, was named twice.)
+      if (v.strands.length < 2 || m.has(v.strands[0].index) || !isLevel(this.fan, v) || v.strands.some((b) => !b.sp.placed || own?.[b.index])) continue;
       let [a, z, minR, young] = [Infinity, -Infinity, Infinity, v.strands[0]];
       for (const b of v.strands) {
         const k = b.index;
@@ -3556,10 +3558,10 @@ export class FanView implements InputHandlers {
       const g: TipGroup = { v, f: v.strands[0].index, l: v.strands[v.strands.length - 1].index, young: young.index, c: (a + z) / 2, r: z - a, open: SPECIES_PX / Math.max(1e-300, minR) };
       for (const b of v.strands) m.set(b.index, g);
     }
-    Object.assign(had, { C, R, fan: this.fan, m });
+    Object.assign(had, { C, R, fan: this.fan, own, m });
     return m;
   }
-  private readonly tipGroups: { C: Float64Array | null; R: Float64Array | null; fan: Fan | null; m: Map<number, TipGroup> } = { C: null, R: null, fan: null, m: new Map() };
+  private readonly tipGroups: { C: Float64Array | null; R: Float64Array | null; fan: Fan | null; own?: boolean[]; m: Map<number, TipGroup> } = { C: null, R: null, fan: null, m: new Map() };
   /** tipLabels' work this frame (strands read on a row, clearIn), and the tips it left untried at TIP_WORK (from where it stopped in tipOrder, on screen or not). */
   tipWork = 0;
   tipCut = 0;

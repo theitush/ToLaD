@@ -89,11 +89,12 @@ describe('the dated tree from the data', () => {
     }
     const by = (sp: string[]) => allSplits().find((s) => [...speciesUnder(s)].sort().join() === [...sp].sort().join())?.name;
     // (The cat family's crown; with every fossil the tree's root is older, ToLaD#279: the stem's fossil cats, Proailurus's kin, branch off below it.)
-    if (ALL) {
-      expect(allSplits().find((s) => s.taxon === 'Felidae')!.name).toBe('Cat ancestors');
-      expect(FELIDAE_TREE.ageMa).toBeGreaterThan(allSplits().find((s) => s.taxon === 'Felidae')!.ageMa);
-    } else expect(FELIDAE_TREE.name).toBe('Cat ancestors');
-    expect(by(['Panthera tigris', 'Panthera zdanskyi', 'Panthera uncia', 'Panthera onca', 'Panthera balamoides', 'Panthera gombaszoegensis', 'Panthera leo', 'Panthera spelaea', 'Panthera pardus', 'Neofelis diardi', 'Neofelis nebulosa'])).toBe('Big cat ancestors');
+    // (With every fossil, the name covers the cats' total group, the fossils on its stem too: splits.ts nameGrafts.)
+    if (ALL) expect(allSplits().find((s) => s.taxon === 'Felidae')!.ageMa).toBeGreaterThan(17);
+    else expect(FELIDAE_TREE.name).toBe('Cat ancestors');
+    // (With every fossil the big cats' name covers their stem's fossils too, Panthera blytheae among them: nameGrafts.)
+    if (ALL) expect(allSplits().find((s) => s.taxon === 'Pantherinae')?.name).toBe('Big cat ancestors');
+    else expect(by(['Panthera tigris', 'Panthera zdanskyi', 'Panthera uncia', 'Panthera onca', 'Panthera balamoides', 'Panthera gombaszoegensis', 'Panthera leo', 'Panthera spelaea', 'Panthera pardus', 'Neofelis diardi', 'Neofelis nebulosa'])).toBe('Big cat ancestors');
     // (With every fossil on the tree, ToLaD#279: the lynxes' split holds the fossil lynxes too, the living four among them.)
     const lynx = allSplits().find((s) => ['Lynx lynx', 'Lynx pardinus', 'Lynx canadensis', 'Lynx rufus'].every((n) => speciesUnder(s).includes(n)) && speciesUnder(s).every((n) => n.startsWith('Lynx ')));
     expect(lynx?.name).toBe('Lynx ancestors');
@@ -101,8 +102,7 @@ describe('the dated tree from the data', () => {
     if (ALL) {
       const crown = allSplits().find((s) => s.taxon === 'Felidae')!;
       // (Under it: the big and small cats, and the fossil genera grafted on it, the sabre-tooths among them.)
-      expect(crown.kids.map((k) => (typeof k === 'string' ? k : k.name))).toContain('Small cat ancestors');
-      expect(allSplits(crown).map((s) => s.name)).toContain('Big cat ancestors');
+      for (const n of ['Small cat ancestors', 'Big cat ancestors']) expect(allSplits(crown).map((s) => s.name)).toContain(n);
       expect(speciesUnder(crown)).toEqual(expect.arrayContaining(['Smilodon fatalis', 'Homotherium latidens']));
     } else expect(FELIDAE_TREE.kids.map((k) => (typeof k === 'string' ? k : k.name)).sort()).toEqual(['Big cat ancestors', 'Small cat ancestors']);
   });
