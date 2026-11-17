@@ -3529,6 +3529,7 @@ export class FanView implements InputHandlers {
     };
     this.tipWork = 0;
     this.tipCut = 0;
+    const nowY = Math.max(0, Y(this.yNow));
     for (let t = 0; t < tips.length; t++) {
       // (A fossil group with a rank name (a fossil genus, tipGroupsOf) is named as one, at its youngest tip, over its band, with a picture of its own, until the zoom
       // gives each of its fossils a name's room across (its `open`): as the column's groups open into their parts, ToLaD#279.)
@@ -3576,7 +3577,8 @@ export class FanView implements InputHandlers {
       for (const [past, d] of [[true, PIC_D], [false, PIC_D], [false, PIC_S]] as const) {
         const y1 = past ? pt - LABEL_UNDER : pt + d + LABEL_UNDER + len;
         const y0 = y1 - len;
-        if ((!past && y1 > start) || y0 < 0 || y1 > this.h) continue;
+        // (On the tree: from "now" back, as the column's names stand, never past it into the margin; ToLaD#279: Heptaxodontidae's ran to the screen's edge at home.)
+        if ((!past && y1 > start) || y0 < nowY || y1 > this.h) continue;
         const xs = spot(lo, hi, y0, y1, SPECIES_PX, c);
         if (Number.isNaN(xs)) continue;
         [x, box] = [xs, [xs - half, y0, xs + half, y1]];
