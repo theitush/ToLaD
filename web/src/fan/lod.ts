@@ -29,21 +29,21 @@ interface GreenRows {
   G: Float64Array;
 }
 
+/** The walks bounded by the screen and the merged clades (ToLaD#502): off, every node and strand is walked as before (lodindex.test holds the two the same). */
+let walksOn = true;
+export function setLodIndex(on: boolean): void {
+  walksOn = on;
+}
+export const lodIndexOn = (): boolean => walksOn;
+
 export class Lod {
   /** The clades drawn as one branch this frame, left to right. */
   merged: FanNode[] = [];
-  /** Per strand (its drawn index, FanBranch.index): the merged clade it is in (an index into merged), or -1. */
-  readonly of: Int32Array;
   /** Bumped whenever merged changes. */
   gen = 0;
   private key = '';
   private readonly idx = new Map<FanNode, number>();
-  /** Per node: 1 merged, 2 inside a merged clade, 0 neither. */
-  private readonly flag: Uint8Array;
   private readonly room: Float64Array;
-  private readonly gap: Float64Array;
-  /** Per node: the gaps inside it, summed (with room, its ribbon's width). */
-  private readonly gaps: Float64Array;
   /** Per merged-able node: its green share per grid row, by the row's world y. */
   private green = new Map<FanNode, GreenRows>();
   private gLast: GreenRows | undefined;
@@ -51,108 +51,299 @@ export class Lod {
   private runs: GreenRuns | null = null;
 
   constructor(readonly fan: Fan) {
-    fan.nodes.forEach((v, i) => this.idx.set(v, i));
-    this.of = new Int32Array(fan.root.strands.length).fill(-1);
-    this.flag = new Uint8Array(fan.nodes.length);
-    this.gap = new Float64Array(fan.nodes.length);
-    this.gaps = new Float64Array(fan.nodes.length);
-    this.room = new Float64Array(fan.nodes.length);
-    fan.nodes.forEach((v, i) => (this.room[i] = v.strands.reduce((s, b) => s + b.width, 0)));
-    this.par = Int32Array.from(fan.nodes, (v) => (v.parent ? this.idx.get(v.parent)! : -1));
-    this.kidN = fan.nodes.map((v) => Int32Array.from(v.kids.filter(isNode), (k) => this.idx.get(k as FanNode)!));
-    this.nStr = Int32Array.from(fan.nodes, (v) => v.strands.length);
+    const N = fan.nodes;
+    N.forEach((v, i) => this.idx.set(v, i));
+    this.room = new Float64Array(N.length);
+    this.tops = new Float64Array(N.length).fill(NaN);
+    N.forEach((v, i) => (this.room[i] = v.strands.reduce((s, b) => s + b.width, 0)));
+    this.par = Int32Array.from(N, (v) => (v.parent ? this.idx.get(v.parent)! : -1));
+    this.kidN = N.map((v) => Int32Array.from(v.kids.filter(isNode), (k) => this.idx.get(k as FanNode)!));
+    this.nStr = Int32Array.from(N, (v) => v.strands.length);
+    this.s0 = Int32Array.from(N, (v) => (v.strands.length ? v.strands[0].index : 0));
     this.rootI = this.idx.get(fan.root)!;
-    this.flag2 = new Uint8Array(fan.nodes.length);
-    this.stack = new Int32Array(fan.nodes.length + 1);
-    this.stack2 = new Int32Array(fan.nodes.length + 1);
+    this.stack = new Int32Array(N.length + 1);
+    this.bPos = new Int32Array(fan.root.strands.length);
+    fan.branches.forEach((b, k) => (this.bPos[b.index] = k));
+    // (The zoom past which no clade inside a node can merge: below MERGE_PX per species and BRANCH_PX across take sx
+    // under nStr / room and BRANCH_PX / room, gaps or none; a hair over, so a rounding never prunes one that does.)
+    const subT = (this.subT = new Float64Array(N.length));
+    const allG = (this.allG = new Uint8Array(N.length));
+    const anyG = (this.anyG = new Uint8Array(N.length));
+    const subTop = (this.subTop = Float64Array.from(N, (v) => v.y));
+    const subBot = (this.subBot = Float64Array.from(N, (v) => v.yBot));
+    for (let i = N.length - 1; i >= 0; i--) {
+      const v = N[i];
+      const r = this.room[i];
+      const t = this.par[i] >= 0 && this.nStr[i] >= 2 ? (r > 0 ? Math.min(MERGE_PX * this.nStr[i], BRANCH_PX) / r : Infinity) * (1 + 1e-9) : 0;
+      subT[i] = Math.max(subT[i], t);
+      // (cladeAllGray (view.ts), from the daughters up: every strand extinct.)
+      let all = 1;
+      for (const k of this.kidN[i]) all &= allG[k];
+      for (const k of v.kids) if (!isNode(k) && !k.sp.extinct) all = 0;
+      allG[i] = all;
+      anyG[i] = Math.max(anyG[i], allG[i]);
+      const p = this.par[i];
+      if (p < 0) continue;
+      subT[p] = Math.max(subT[p], subT[i]);
+      anyG[p] = Math.max(anyG[p], anyG[i]);
+      subTop[p] = Math.min(subTop[p], subTop[i]);
+      subBot[p] = Math.max(subBot[p], subBot[i]);
+    }
+    // (Nodes no daughter list holds (a split with nothing placed under it): no walk from the root reaches them.)
+    const seen = new Uint8Array(N.length);
+    const st = [this.rootI];
+    while (st.length) {
+      const i = st.pop()!;
+      seen[i] = 1;
+      for (const k of this.kidN[i]) st.push(k);
+    }
+    this.lone = Int32Array.from(N.keys()).filter((i) => !seen[i]);
   }
 
   /** Clade v is inside a merged clade (not the merged clade itself): not named on its own. */
   hidden(v: FanNode): boolean {
-    return this.flag[this.idx.get(v) ?? 0] === 2;
+    const S = v.strands;
+    if (!S.length) return false;
+    const m = this.ofStrand(S[0].index);
+    if (m < 0) return false;
+    const M = this.merged[m];
+    if (M === v) return false;
+    // (Both hold the strand, so one is under the other: the one with fewer strands, or of a chain of single daughters the lower.)
+    if (S.length !== M.strands.length) return S.length < M.strands.length;
+    for (let p = v.parent; p && p.strands.length === S.length; p = p.parent) if (p === M) return true;
+    return false;
   }
 
   /** Clade v is drawn as one branch. */
   isMerged(v: FanNode): boolean {
-    return this.flag[this.idx.get(v) ?? 0] === 1;
+    const S = v.strands;
+    if (!S.length) return false;
+    const m = this.ofStrand(S[0].index);
+    return m >= 0 && this.merged[m] === v;
   }
 
-  /** The merged clades at the fold's openness and width zoom sx (px per world unit): true if they changed. */
+  /** Node j (fan.nodes' order) is drawn as one branch. */
+  isMergedAt(j: number): boolean {
+    return this.isMerged(this.fan.nodes[j]);
+  }
+
+  /** The merged clade strand i (its drawn index, FanBranch.index) is in (an index into merged), or -1: a bisection of their runs. */
+  ofStrand(i: number): number {
+    const a0 = this.mS0;
+    let a = 0;
+    let z = this.merged.length;
+    while (a < z) {
+      const m = (a + z) >> 1;
+      if (a0[m] <= i) a = m + 1;
+      else z = m;
+    }
+    return a > 0 && this.mS1[a - 1] >= i ? a - 1 : -1;
+  }
+
+  /** Per strand (its drawn index): the merged clade it is in (an index into merged), or -1. Made when asked (tests): the page asks ofStrand. */
+  get of(): Int32Array {
+    if (this.ofGen !== this.gen || !this.ofArr) {
+      const of = (this.ofArr ??= new Int32Array(this.fan.root.strands.length));
+      of.fill(-1);
+      for (let m = 0; m < this.merged.length; m++) of.fill(m, this.mS0[m], this.mS1[m] + 1);
+      this.ofGen = this.gen;
+    }
+    return this.ofArr;
+  }
+  private ofArr: Int32Array | null = null;
+  private ofGen = -1;
+
+  /**
+   * The merged clades at the fold's openness and width zoom sx (px per world unit): true if they changed. A walk down
+   * from the root that stops at each merged clade (the cut, ToLaD#502): what is inside one is never walked, nor a clade
+   * too wide at this zoom for anything in it to merge (subT); the gaps inside a clade are read off a segment tree over
+   * the pairs, built once a frame and only when a clade is in reach of merging.
+   */
   update(fold: Fold, sx: number): boolean {
     const key = `${fold.ver}:${sx}`;
     if (key === this.key) return false;
     this.key = key;
-    const N = this.fan.nodes;
-    // (Typed arrays, no maps or closures: once a pinch frame at the mammal level, ~5,900 nodes, ToLaD#255.)
-    if (this.pairFold !== fold) {
-      this.pairFold = fold;
-      this.pairIdx = Int32Array.from(fold.pairNode, (v) => this.idx.get(v)!);
-    }
-    const pi = this.pairIdx;
-    const g = this.gap.fill(0);
-    const gs = this.gaps.fill(0);
-    for (let i = 0; i < pi.length; i++) {
-      const k = pi[i];
-      const w = fold.a[i] * fold.pairGap[i];
-      g[k] = Math.max(g[k], w);
-      gs[k] += w;
-    }
-    // (Parents before their daughters in fan.nodes: the widest gap inside each clade and their sum, bottom up.)
+    this.gapsFor = null;
+    const merged = this.mergedNext;
+    merged.length = 0;
     const par = this.par;
-    for (let i = N.length - 1; i > 0; i--) {
-      const k = par[i];
-      if (k >= 0) {
-        g[k] = Math.max(g[k], g[i]);
-        gs[k] += gs[i];
-      }
-    }
-    const merged: FanNode[] = [];
-    const flag = this.flag2.fill(0);
-    // (Depth first, left to right, as the clades stand: a merged clade's nodes inside it marked, its walk stopped.)
+    const subT = this.subT;
     const st = this.stack;
     let n = 0;
     st[n++] = this.rootI;
+    // (Depth first, left to right, as the clades stand.)
     while (n > 0) {
       const i = st[--n];
-      const kids = this.kidN[i];
-      if (par[i] >= 0 && this.nStr[i] >= 2 && g[i] * sx < CLOSED_PX && (this.room[i] * sx) / this.nStr[i] < MERGE_PX && (this.room[i] + gs[i]) * sx < BRANCH_PX) {
-        flag[i] = 1;
-        merged.push(N[i]);
-        // (Every node inside it: its daughters' runs in fan.nodes are not contiguous, so walked.)
-        let m = 0;
-        const st2 = this.stack2;
-        for (let q = 0; q < kids.length; q++) st2[m++] = kids[q];
-        while (m > 0) {
-          const d = st2[--m];
-          flag[d] = 2;
-          const K = this.kidN[d];
-          for (let q = 0; q < K.length; q++) st2[m++] = K[q];
+      if (par[i] >= 0) {
+        if (!(sx < subT[i])) continue;
+        if (this.nStr[i] >= 2 && this.closed(fold, i, sx)) {
+          merged.push(i);
+          continue;
         }
-        continue;
       }
+      const kids = this.kidN[i];
       for (let q = kids.length - 1; q >= 0; q--) st[n++] = kids[q];
     }
-    const same = merged.length === this.merged.length && merged.every((v, i) => v === this.merged[i]);
+    const N = this.fan.nodes;
+    const was = this.merged;
+    let same = merged.length === was.length;
+    for (let m = 0; same && m < merged.length; m++) same = N[merged[m]] === was[m];
     if (same) return false;
-    this.merged = merged;
-    this.flag.set(flag);
-    this.of.fill(-1);
-    merged.forEach((v, m) => {
-      for (const b of v.strands) this.of[b.index] = m;
-    });
+    const M = merged.length;
+    this.merged = merged.map((i) => N[i]);
+    if (this.mS0.length < M) {
+      const c = Math.max(M, 2 * this.mS0.length);
+      this.mS0 = new Int32Array(c);
+      this.mS1 = new Int32Array(c);
+      this.mTop = new Float64Array(c);
+      this.mIdx = new Int32Array(c);
+    }
+    const tops = this.tops;
+    for (let m = 0; m < M; m++) {
+      const i = merged[m];
+      this.mIdx[m] = i;
+      this.mS0[m] = this.s0[i];
+      this.mS1[m] = this.s0[i] + this.nStr[i] - 1;
+      if (tops[i] !== tops[i]) tops[i] = Lod.top(N[i]);
+      this.mTop[m] = tops[i];
+    }
     this.gen++;
     return true;
   }
-  private pairFold: Fold | null = null;
-  private pairIdx = new Int32Array(0);
-  /** Per node: its parent's index (-1 the root's), its daughter nodes' indices, its strands' count; update()'s scratch. */
+  private readonly mergedNext: number[] = [];
+  /** Per merged clade (merged's order): its strands' first and last drawn index (ascending, disjoint), and its top (Lod.top). */
+  mS0 = new Int32Array(0);
+  mS1 = new Int32Array(0);
+  mTop = new Float64Array(0);
+  /** Per merged clade: its index in fan.nodes. */
+  mIdx = new Int32Array(0);
+  /** Per node index: its top (Lod.top), once asked (NaN before). */
+  private readonly tops: Float64Array;
+
+  /** Clade v's top (Lod.top), kept. */
+  topOf(v: FanNode): number {
+    const i = this.idx.get(v)!;
+    if (this.tops[i] !== this.tops[i]) this.tops[i] = Lod.top(v);
+    return this.tops[i];
+  }
+
+  /** The first merged clade from index `from` on whose last strand is at or past strand x (merged.length if none). */
+  mergedFrom(x: number, from = 0): number {
+    const e = this.mS1;
+    let a = from;
+    let z = this.merged.length;
+    while (a < z) {
+      const m = (a + z) >> 1;
+      if (e[m] < x) a = m + 1;
+      else z = m;
+    }
+    return a;
+  }
+
+  /** Node i qualifies to be drawn as one branch: closed (no gap inside it CLOSED_PX on screen), its species under MERGE_PX each, its ribbon under BRANCH_PX. */
+  private closed(fold: Fold, i: number, sx: number): boolean {
+    const r = this.room[i] * sx;
+    // ((r + gaps) * sx is never under r * sx: the room alone decides most, before any gap is read.)
+    if (!(r / this.nStr[i] < MERGE_PX) || !(r < BRANCH_PX)) return false;
+    const T = this.gapsFor === fold ? this.gapTree : this.gaps(fold);
+    // (The pairs inside it: those between its first strand and its last.)
+    let l = this.s0[i] + T.size;
+    let h = this.s0[i] + this.nStr[i] - 2 + T.size + 1;
+    let g = 0;
+    let gs = 0;
+    const mx = T.mx;
+    const sm = T.sm;
+    while (l < h) {
+      if (l & 1) {
+        g = Math.max(g, mx[l]);
+        gs += sm[l++];
+      }
+      if (h & 1) {
+        g = Math.max(g, mx[--h]);
+        gs += sm[h];
+      }
+      l >>= 1;
+      h >>= 1;
+    }
+    return g * sx < CLOSED_PX && (this.room[i] + gs) * sx < BRANCH_PX;
+  }
+
+  /** Every pair's gap as it stands open (fold.a times its gap), most and sum by halves (a segment tree, leaves the pairs). */
+  private gaps(fold: Fold): { size: number; mx: Float64Array; sm: Float64Array } {
+    const P = fold.pairGap.length;
+    let T = this.gapTree;
+    if (T.size < P || T.mx.length === 0) {
+      let size = 1;
+      while (size < P) size *= 2;
+      T = this.gapTree = { size, mx: new Float64Array(2 * size), sm: new Float64Array(2 * size) };
+    }
+    const { size, mx, sm } = T;
+    const a = fold.a;
+    const gap = fold.pairGap;
+    for (let p = 0; p < P; p++) mx[size + p] = sm[size + p] = a[p] * gap[p];
+    for (let k = size - 1; k >= 1; k--) {
+      const l = 2 * k;
+      mx[k] = Math.max(mx[l], mx[l + 1]);
+      sm[k] = sm[l] + sm[l + 1];
+    }
+    this.gapsFor = fold;
+    return T;
+  }
+  private gapTree = { size: 0, mx: new Float64Array(0), sm: new Float64Array(0) };
+  private gapsFor: Fold | null = null;
+
+  /**
+   * The nodes drawStem may draw a backdrop for (fan.nodes' indices, descending, into out): none inside a merged clade,
+   * only those all gray unless gray is on, only those whose span may meet world [yTop, yBot]. A walk down from the root
+   * past what the static bounds rule out (subtrees with nothing gray, wholly above or below), stopping at each merged clade.
+   */
+  stemNodes(gray: boolean, yTop: number, yBot: number, out: { at: Int32Array; n: number }): void {
+    let at = out.at;
+    let c = 0;
+    const st = this.stack;
+    let n = 0;
+    st[n++] = this.rootI;
+    for (let q = 0; ; ) {
+      if (n === 0) {
+        if (q >= this.lone.length) break;
+        st[n++] = this.lone[q++];
+      }
+      const i = st[--n];
+      if ((!gray && !this.anyG[i]) || this.subTop[i] >= yBot || this.subBot[i] <= yTop) continue;
+      if (gray || this.allG[i]) {
+        if (c === at.length) {
+          const b = new Int32Array(Math.max(64, 2 * c));
+          b.set(at);
+          at = out.at = b;
+        }
+        at[c++] = i;
+      }
+      if (this.isMergedAt(i)) continue;
+      const kids = this.kidN[i];
+      for (let k = 0; k < kids.length; k++) st[n++] = kids[k];
+    }
+    at.subarray(0, c).sort();
+    at.subarray(0, c).reverse();
+    out.n = c;
+  }
+
+  /** Per node: its parent's index (-1 the root's), its daughter nodes' indices, its strands' count and first strand (drawn index). */
   private readonly par: Int32Array;
   private readonly kidN: Int32Array[];
   private readonly nStr: Int32Array;
+  private readonly s0: Int32Array;
   private readonly rootI: number;
-  private readonly flag2: Uint8Array;
   private readonly stack: Int32Array;
-  private readonly stack2: Int32Array;
+  /** Per node: the zoom (sx) at and past which nothing in its subtree merges; all gray; anything all gray in its subtree; its subtree's top and bottom (world y). */
+  private readonly subT: Float64Array;
+  private readonly allG: Uint8Array;
+  private readonly anyG: Uint8Array;
+  private readonly subTop: Float64Array;
+  private readonly subBot: Float64Array;
+  /** The nodes no walk from the root reaches. */
+  private readonly lone: Int32Array;
+  /** Per strand (drawn index): its place in fan.branches (the draw's order). */
+  readonly bPos: Int32Array;
 
   /** Clade v's green share at grid row k of height h: its strands' green widths over their widths, so the gaps in its ribbon are not painted as ended lines (ToLaD#389). */
   greenShareAt(v: FanNode, k: number, h: number): number {
