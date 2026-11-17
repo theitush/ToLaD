@@ -123,6 +123,29 @@ export interface NaturalRec {
   km2Current: number;
 }
 
+/**
+ * What dates a living species' range loss (format v1.8 META.loss, ToLaD#507 group 3), its source resolved from skeleton
+ * META.natural.trend.loss (pipeline/FORMAT.md "Loss dates"). Only species whose map difference PHYLACINE's note puts down
+ * to people carry one; every year is the source's, nothing modelled.
+ */
+export interface LossRec {
+  /**
+   * 'later' (the fall starts at the documented start, after 1500), 'dated' (1500 -> today, the source bounded by 1500),
+   * 'prehistoric' (the part lost before 1500 left out of the natural level), 'bound' (only a lower bound: people's
+   * arrival on the island) or 'undated'.
+   */
+  basis: string;
+  /** The year the drawn fall starts: 1500, or the documented later start. */
+  start: number;
+  /** Range lost before 1500 and left out of the natural level, km² ('prehistoric'; else 0). */
+  km2Before1500: number;
+  /** The source's full citation ('' = none), its own years (negative = BCE; null = no bound), and the island or region it names. */
+  cite: string;
+  from: number | null;
+  to: number | null;
+  place: string;
+}
+
 /** What every natural baseline is (skeleton META.natural): its label, grade and source. */
 export interface NaturalMeta {
   label: string;
@@ -200,6 +223,8 @@ export interface RawSpecies extends RawNode {
   gen?: { years: number; how: string } | null;
   /** Adult body mass (g) the model uses, and where it came from (dated/skeleton.json mass_how; ToLaD#276). */
   mass?: { g: number; how: string } | null;
+  /** What dates its range loss (format v1.8, ToLaD#507); null: no loss to date, or data older than 1.8. */
+  loss?: LossRec | null;
 }
 
 export interface RawClade extends RawNode {
@@ -309,7 +334,32 @@ interface Tile {
   history(i: number): any;
   natural?(i: number): NaturalRec | null;
   redList?(i: number): { category: string; source: number; year: number; taxon: number; assessment: number } | null;
+  loss?(i: number, bases: string[]): { basis: string; source: number; start: number; km2Before1500: number } | null;
   meta: any;
+}
+
+interface LossSource {
+  cite: string;
+  from: number | null;
+  to: number | null;
+  place: string;
+}
+
+/** Row `i`'s loss dating with its source resolved (format v1.8, ToLaD#507), or null (none, or data older than 1.8). */
+export function lossOf(f: Tile, i: number, meta: any): LossRec | null {
+  const m = meta?.natural?.trend?.loss as { bases: string[]; sources: LossSource[] } | undefined;
+  const r = m && f.loss ? f.loss(i, m.bases) : null;
+  if (!r) return null;
+  const src = r.source >= 0 ? m!.sources[r.source] : undefined;
+  return {
+    basis: r.basis,
+    start: r.start,
+    km2Before1500: r.km2Before1500,
+    cite: src?.cite ?? '',
+    from: src?.from ?? null,
+    to: src?.to ?? null,
+    place: src?.place ?? '',
+  };
 }
 
 interface RedListSource {
@@ -472,6 +522,7 @@ export function extractClade(
       common: dated?.file.common[i] ?? null,
       gen: g ? { years: g[0], how: dated!.sk.gen_how?.[g[1]] ?? '' } : null,
       mass: m ? { g: m[0], how: dated!.sk.mass_how?.[m[1]] ?? '' } : null,
+      loss: lossOf(f, i, sk.meta),
     });
     if (onFan(grafts, i, f.extinct(i))) rows.set(i, f.name(i));
   }

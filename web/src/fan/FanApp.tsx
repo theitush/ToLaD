@@ -20,7 +20,7 @@ import { FORK_MODES, forkMode, setForkMode, type ForkMode } from './steady';
 import { MagnifierIcon, SearchPanel } from './SearchPanel';
 import { SourcesPanel } from './SourcesPanel';
 import { GRADE_MEANS, METHOD_IDS, MethodLink, OpenMethods, WORD_IDS } from './Methods';
-import { aliveSource, aliveStep, SOURCE_WORD, useMethodsPage } from './cardwords';
+import { aliveSource, aliveStep, LossLine, SOURCE_WORD, useMethodsPage } from './cardwords';
 import { statusOf, wildPartSentence } from './status';
 import { cardTapper, onControl } from './cardtap';
 import { sheetSwipe, useBackCloses } from './sheet';
@@ -902,6 +902,8 @@ export function SpeciesCard({ sp, onClose, onUp, onBox, open, ageMa, startMa, ev
         )}
       </div>
       {spark && <HistorySpark key={sp.gid} h={sp.history!} open={open} natural={sp.natural} naturalMeta={NATURAL_META} activeEvent={ev ? event : undefined} />}
+      {/* What dates the change since 1500 (ToLaD#507), under it: a source's year, a bound, or not known. */}
+      <LossLine sp={sp} />
       {regional.map(({ e, k }) => (
         <RegionalEvent key={`rg${sp.gid}-${k}`} ev={e} k={k} open={touchAgo <= e.fromYa && touchAgo >= e.toYa} />
       ))}
@@ -998,6 +1000,13 @@ function NaturalLine({ sp, nat }: { sp: SpeciesRec; nat: NonNullable<SpeciesRec[
   ) : (
     'PHYLACINE'
   );
+  // (A loss the data dates before 1500 is left out of the level, ToLaD#507: the harp seal's Baltic. Its line says when.)
+  if (flat && sp.loss?.basis === 'prehistoric')
+    return (
+      <>
+        {formatCount(nat.n)}, the same as today: what it lost before 1500 is not counted ({maps}, {cite})
+      </>
+    );
   if (flat)
     return (
       <>

@@ -995,6 +995,12 @@
 .fan .card-sp .spark-foot > .dim {
   white-space: nowrap;
 }
+/* What dates the change since 1500 (ToLaD#507): one line under the chart, its first words opening "How we count". */
+.fan .card-sp .loss {
+  margin: 4px 0 0;
+  font-size: 13.5px;
+  color: var(--ink-2);
+}
 .fan .card-sp .more {
   margin-top: 6px;
   font-size: 13px;

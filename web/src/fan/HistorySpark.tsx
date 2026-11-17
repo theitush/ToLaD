@@ -147,6 +147,11 @@ export function agoTicks(agoMax: number): number[] {
  */
 type Row = { kind: 'point'; p: HistPoint } | { kind: 'genomic'; pts: HistPoint[] } | { kind: 'natural'; start?: HistPoint };
 
+/** Where a range-loss trend starts (its first point): 1500 CE, or the documented later start (ToLaD#507: Australia 1788). */
+export function trendStart(h: HistoryRec): number {
+  return h.points.find((p) => p.kind === 'rangeloss')?.year ?? 1500;
+}
+
 /** A range-loss trend's first point that is the natural level itself (the same count), not a figure of its own. */
 export function isNaturalStart(p: HistPoint, natural: { n: number } | null | undefined): boolean {
   return !!natural && p.kind === 'rangeloss' && Math.abs(p.n - natural.n) <= 1e-6 * natural.n;
@@ -528,7 +533,7 @@ export function HistorySpark({
       {open && h.use !== 'counts' && <div className="dim small">These numbers are shown for reference; the tree's widths use the model.</div>}
       {open && h.modelled === 'rangeloss' && (
         <div className="dim small" data-modelled-note="">
-          Modelled, not counted: the natural level held to 1500 CE, then a steady change to today's count.
+          Modelled, not counted: the natural level held to {fmtYear(trendStart(h))}, then a steady change to today's count.
         </div>
       )}
       {open && before && (
