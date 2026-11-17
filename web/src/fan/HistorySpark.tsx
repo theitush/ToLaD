@@ -16,6 +16,7 @@ import { basisSpans, GRADE_COLOR, GRADE_WORD, MODELLED_KINDS, noDataSpans, style
 import type { HistoryRec, HistPoint, NaturalMeta, NaturalRec } from './panthera';
 import { TIME_C } from './population';
 import { EVENT_TINT } from './colstyle';
+import { METHOD_IDS, MethodLink, WORD_IDS } from './Methods';
 
 const W = 340;
 const H = 90;
@@ -215,8 +216,6 @@ function chevron(x: number, up: boolean): string {
   return up ? `M${x - 2.5} ${TOP + 2.5} L${x} ${TOP} L${x + 2.5} ${TOP + 2.5}` : `M${x - 2.5} ${BOT - 2.5} L${x} ${BOT} L${x + 2.5} ${BOT - 2.5}`;
 }
 
-const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
-
 export function HistorySpark({
   h,
   open: open0 = false,
@@ -409,8 +408,6 @@ export function HistorySpark({
       }
     }
   }
-  const metaHead = naturalMeta?.label.split(':')[0] || 'natural (pre-human) level';
-  const metaRest = naturalMeta?.label.split(':').slice(1).join(':').trim() ?? '';
   return (
     <div className="hist">
       <button
@@ -547,6 +544,12 @@ export function HistorySpark({
         </div>
       )}
       {open && (
+        // (The chart's words, its dots' colours and lines, in "How we count", ToLaD#508.)
+        <div className="small" data-chart-how="">
+          <MethodLink to={WORD_IDS.chart}>How to read this chart</MethodLink>
+        </div>
+      )}
+      {open && (
         <div className="dim small" data-basis-note="">
           Where these numbers come from: {basisRows(h).join('; ')}.
         </div>
@@ -611,7 +614,11 @@ export function HistorySpark({
             return (
               <li key={k} data-row="natural">
                 <div>
-                  <b>{cap(metaHead)}</b> · {formatCount(nat.n)}
+                  {/* (The methods page's name and meaning, ToLaD#508: the level in 1500, from the map without people.) */}
+                  <b>
+                    <MethodLink to={METHOD_IDS.past}>Natural level</MethodLink>
+                  </b>{' '}
+                  · {formatCount(nat.n)}
                   <span className="dim">
                     {' '}
                     ({formatCount(nat.lo)} – {formatCount(nat.hi)})
@@ -622,7 +629,7 @@ export function HistorySpark({
                 <Cite cite={naturalMeta?.cite ?? ''} url={naturalMeta?.url ?? ''} />
                 {st && <Cite cite={st.cite} url={st.url} />}
                 <div className="dim">
-                  {metaRest ? `${cap(metaRest)}: ` : ''}its natural range {formatCount(nat.km2Natural)} km²
+                  The level in 1500, from PHYLACINE’s map without people: {formatCount(nat.km2Natural)} km²
                   {nat.km2Current > 0 ? `, ${formatCount(nat.km2Current)} km² today (${Math.round((100 * nat.km2Current) / nat.km2Natural)}%)` : ''}.
                 </div>
               </li>

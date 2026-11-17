@@ -19,6 +19,8 @@ import { forkLeaders, forkNames, setForkLeaders, setForkNames } from './brackets
 import { FORK_MODES, forkMode, setForkMode, type ForkMode } from './steady';
 import { MagnifierIcon, SearchPanel } from './SearchPanel';
 import { SourcesPanel } from './SourcesPanel';
+import { GRADE_MEANS, METHOD_IDS, MethodLink, OpenMethods, WORD_IDS } from './Methods';
+import { aliveSource, aliveStep, SOURCE_WORD, useMethodsPage } from './cardwords';
 import { statusOf, wildPartSentence } from './status';
 import { cardTapper, onControl } from './cardtap';
 import { sheetSwipe, useBackCloses } from './sheet';
@@ -105,6 +107,8 @@ export function FanApp() {
   const [searching, setSearching] = useState(false);
   const [showSources, setShowSources] = useState(false);
   const closeSources = useCallback(() => setShowSources(false), []);
+  // "How we count" opened from a card's word at its section (ToLaD#508): over everything, the card left as it was under it.
+  const [methodsPage, openMethods] = useMethodsPage();
   const [mamm, setMamm] = useState<MammState>(mammStart);
   // The view can be built: the mammals' data is in.
   const viewReady = mamm === 'ready';
@@ -267,6 +271,7 @@ export function FanApp() {
           <span className="wbar" />
           <span className="wlab" />
         </div>
+      <OpenMethods.Provider value={openMethods}>
       {sel ? (
         sel.lineage ? (
           <LineageCard lin={sel.lineage} onClose={closeCard} onUp={cardUp} />
@@ -302,7 +307,9 @@ export function FanApp() {
           </button>
         </div>
       )}
+      </OpenMethods.Provider>
       </div>
+      {methodsPage}
     </div>
   );
 }
@@ -355,14 +362,6 @@ export function pluralName(sp: SpeciesRec): string {
   if (/[^aeiou]y$/.test(c)) return `${c.slice(0, -1)}ies`;
   return /(s|x|z|ch|sh)$/.test(c) ? `${c}es` : `${c}s`;
 }
-
-/** How far off a data grade can be (research/02-population-estimates.md). */
-const GRADE_MEANS: Record<string, string> = {
-  A: 'a census with stated error, within about 2–3×',
-  B: 'a careful estimate, within about 10×',
-  C: 'a rough figure, within about 100×',
-  D: 'an illustrative model, could be off 1,000× or more',
-};
 
 /**
  * The population at a time (Ma) as the card words it: how many were alive, and
@@ -739,9 +738,27 @@ export function SpeciesCard({
   const domestic = sp.history?.component === 'domestic' && sp.births ? sp.history.segments.reduce((a, s) => a + s.generations, 0) * sp.history.G : 0;
   const lived = `from ${plainAgo(sp.t0 * 1e6)} to ${sp.extinct ? plainAgo(sp.t1 * 1e6) : 'today'}`;
   const spark = !!sp.history && sp.history.points.length > 0;
-  // The natural (pre-human) level: on the sparkline and its sources when there is one, else here.
+  // The natural level (the level in 1500, or an extinct species' own): on the sparkline and its sources when there is one, else here.
   const nat = !spark && sp.natural ? sp.natural : null;
   const wiki = wikiOf(sp.sci);
+  // Every number says in a word or two where it came from, and that word opens "How we count" at its step (ToLaD#508).
+  const src = aliveSource(sp);
+  const today = (
+    <MethodLink to={aliveStep(sp)} className="src">
+      {src ? SOURCE_WORD[src] : 'counted or modelled'}
+    </MethodLink>
+  );
+  // A time before today: its own history's (step 3), an extinct species' (step 7), else the level in 1500 held back (step 2).
+  const past =
+    sp.history && !sp.history.modelled ? (
+      <MethodLink to={METHOD_IDS.histories} className="src">
+        from its history
+      </MethodLink>
+    ) : (
+      <MethodLink to={sp.extinct ? METHOD_IDS.fossils : METHOD_IDS.past} className="src">
+        modelled
+      </MethodLink>
+    );
   return (
     <CardShell
       onUp={onUp}
@@ -777,34 +794,36 @@ export function SpeciesCard({
         <p className="lead">
           <span className={`lane ${sp.extinct ? 'dead' : at.now ? 'alive' : 'lineage'}`} />
           <span>
-            <b>{formatCount(at.alive)}</b> alive {at.when}
+            <b>{formatCount(at.alive)}</b> alive {at.when} {at.now ? today : past}
           </span>
         </p>
         {mass && sp.massKg ? (
           <p className="sub" data-mass>
-            Weighing {formatMass(at.alive * sp.massKg)}, at {formatMass(sp.massKg)} each{massNote(sp.massHow)}
+            <MethodLink to={WORD_IDS.weighing}>Weighing</MethodLink> {formatMass(at.alive * sp.massKg)}, at {formatMass(sp.massKg)} each{massNote(sp.massHow)}
           </p>
         ) : null}
-        {!sp.extinct && !at.now && <p className="sub">{pct(at.green)} have descendants alive today</p>}
+        {!sp.extinct && !at.now && (
+          <p className="sub">
+            {pct(at.green)} have descendants alive today{' '}
+            <MethodLink to={METHOD_IDS.descendants} className="src">
+              modelled
+            </MethodLink>
+          </p>
+        )}
         {sp.extinct && !at.end && <p className="sub">Died out {plainAgo(sp.t1 * 1e6)}</p>}
         {!sp.extinct && !at.now && (
           <p className="lead">
             <span className="lane alive" />
             <span>
-              <b>{formatCount(sp.alive)}</b> alive today
+              <b>{formatCount(sp.alive)}</b> alive today {today}
             </span>
           </p>
         )}
         <p className="ever">
-          {domestic ? (
-            <>
-              Roughly {formatCount(sp.ever, { tilde: false })} {pluralName(sp)} born since domestication <span className="dim">(rough estimate)</span>
-            </>
-          ) : (
-            <>
-              Roughly {formatCount(sp.ever, { tilde: false })} {pluralName(sp)} have ever lived <span className="dim">(rough estimate)</span>
-            </>
-          )}
+          Roughly {formatCount(sp.ever, { tilde: false })} {pluralName(sp)} {domestic ? 'born since domestication' : 'have ever lived'}{' '}
+          <MethodLink to={METHOD_IDS.ever} className="src">
+            (rough estimate)
+          </MethodLink>
         </p>
       </div>
       {spark && <HistorySpark key={sp.gid} h={sp.history!} open={open} natural={sp.natural} naturalMeta={NATURAL_META} activeEvent={ev ? event : undefined} />}
@@ -814,46 +833,43 @@ export function SpeciesCard({
       <details className="more" key={`more-${sp.gid}`}>
         <summary>Details</summary>
         <dl>
-          <dt>Lived</dt>
+          <dt>
+            <MethodLink to={sp.extinct ? METHOD_IDS.fossils : METHOD_IDS.ever}>Lived</MethodLink>
+          </dt>
           <dd>{lived}</dd>
-          <dt>Generation</dt>
+          <dt>
+            <MethodLink to={WORD_IDS.generation}>Generation</MethodLink>
+          </dt>
           <dd>
-            about {Number(sp.genYears.toPrecision(2))} years <span className="dim">({sp.genSource})</span>
+            about {Number(sp.genYears.toPrecision(2))} years <span className="dim">({GEN_HOW[sp.genSource] ?? sp.genSource})</span>
           </dd>
-          <dt>Ever lived</dt>
+          <dt>
+            <MethodLink to={METHOD_IDS.ever}>Ever lived</MethodLink>
+          </dt>
           <dd>
             {domestic
-              ? `${formatCount(sp.ever)} since domestication, ${plainAgo(domestic).replace(/ ago$/, '')} (the model's births; its wild ancestors are the wildcat's)`
-              : `${formatCount(sp.ever)}, range ${formatCount(sp.everLo, { tilde: false })} – ${formatCount(sp.everHi, { tilde: false })} over ${plainAgo((sp.t0 - sp.t1) * 1e6).replace(/ ago$/, '')}`}
+              ? `${formatCount(sp.ever)} since domestication, ${plainAgo(domestic).replace(/ ago$/, '')} (the domestic stock's own births)`
+              : `${formatCount(sp.ever)}, could be ${formatCount(sp.everLo, { tilde: false })} – ${formatCount(sp.everHi, { tilde: false })}, over ${plainAgo((sp.t0 - sp.t1) * 1e6).replace(/ ago$/, '')}`}
           </dd>
-          <dt>Data grade</dt>
+          <dt>
+            <MethodLink to={METHOD_IDS.grades}>Data grade</MethodLink>
+          </dt>
           <dd>
             {sp.grade}: {GRADE_MEANS[sp.grade] ?? 'unknown'}
           </dd>
-          <dt>Method</dt>
-          <dd>
-            Modelled, not counted: births per generation × lifespan ÷ generation length gives those alive at a time
-            {sp.births ? ', following the population history (the chart and its sources), its earliest level held back to the species’ start' : ', held constant over the species’ span'}.
-            The share with descendants alive today comes from a randomly mixing family tree, counted back one generation at a time.
-          </dd>
           {nat && (
             <>
-              <dt>Natural level</dt>
+              <dt>
+                <MethodLink to={sp.extinct ? METHOD_IDS.fossils : METHOD_IDS.past}>Natural level</MethodLink>
+              </dt>
               <dd data-natural="">
-                {formatCount(nat.n)} with no human impact <span className="dim">({formatCount(nat.lo)} – {formatCount(nat.hi)})</span>: modelled, grade{' '}
-                {NATURAL_META?.grade ?? 'D'}; its natural range {formatCount(nat.km2Natural)} km²
-                {nat.km2Current > 0 ? `, ${formatCount(nat.km2Current)} km² today` : ''} ·{' '}
-                {NATURAL_META?.url ? (
-                  <a href={NATURAL_META.url} target="_blank" rel="noopener noreferrer">
-                    {NATURAL_META.cite}
-                  </a>
-                ) : (
-                  NATURAL_META?.cite
-                )}
+                <NaturalLine sp={sp} nat={nat} />
               </dd>
             </>
           )}
-          <dt>Status</dt>
+          <dt>
+            <MethodLink to={WORD_IDS.status}>Status</MethodLink>
+          </dt>
           <dd>
             {st?.kind === 'iucn' && st.code === 'NE' ? (
               <>IUCN Red List: Not Evaluated (NE), on no Red List assessment{st.status.cite ? ` · ${st.status.cite}` : ''}</>
@@ -869,16 +885,55 @@ export function SpeciesCard({
                 )}
               </>
             ) : st?.kind === 'domestic' ? (
-              'Domesticated: the IUCN Red List does not assess domestic forms (Not Evaluated); its wild ancestor is the wildcat.'
+              'Domesticated: the IUCN Red List does not assess domestic forms (Not Evaluated).'
             ) : st?.kind === 'prehistoric' ? (
               'Known from fossils; died out before the Red List’s scope (extinctions since 1500 CE), so no IUCN category.'
             ) : (
               'No Red List category on file.'
             )}
           </dd>
+          <dt>Method</dt>
+          <dd>
+            <MethodLink to={METHOD_IDS.alive}>How we count, step by step</MethodLink>
+          </dd>
         </dl>
       </details>
     </CardShell>
+  );
+}
+
+/** The data's generation sources in the methods page's words (step 4: COMBINE, else from body size). */
+const GEN_HOW: Record<string, string> = { allometric: 'from body size' };
+
+/**
+ * The natural level in the card's details (a species with no chart to carry it): the level in 1500 from PHYLACINE's map
+ * without people (step 2), or an extinct species' level while it lived (step 7). Since ToLaD#507 a map difference that
+ * PHYLACINE puts down to something other than people draws no change: the level is today's, and the card says so.
+ */
+function NaturalLine({ sp, nat }: { sp: SpeciesRec; nat: NonNullable<SpeciesRec['natural']> }) {
+  const flat = !sp.extinct && Math.abs(nat.n - sp.alive) <= 1e-6 * sp.alive;
+  const maps = `${formatCount(nat.km2Natural)} km² without people${nat.km2Current > 0 ? `, ${formatCount(nat.km2Current)} km² today` : ''}`;
+  const cite = NATURAL_META?.url ? (
+    <a href={NATURAL_META.url} target="_blank" rel="noopener noreferrer">
+      PHYLACINE
+    </a>
+  ) : (
+    'PHYLACINE'
+  );
+  if (flat)
+    return (
+      <>
+        {formatCount(nat.n)}, the same as today: {cite}’s maps differ ({maps}), but not by people’s doing, so no change is drawn
+      </>
+    );
+  return (
+    <>
+      {formatCount(nat.n)} {sp.extinct ? 'while it lived' : 'in 1500'}{' '}
+      <span className="dim">
+        (could be {formatCount(nat.lo)} – {formatCount(nat.hi)})
+      </span>
+      , modelled from {cite}’s map without people: {maps}
+    </>
   );
 }
 
