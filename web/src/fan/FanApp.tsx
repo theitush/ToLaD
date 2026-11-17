@@ -159,7 +159,8 @@ export function FanApp() {
     window.__fan = v;
     window.__levelName = levelName;
     v.request();
-    // The card's kinds (mammals-card.json, ToLaD#502) once the first frame is on screen, so a tap rarely waits for them.
+    // The card's kinds (mammals-card.json, ToLaD#502; downloaded while the tree was built) read once the first frame is
+    // on screen, so a tap rarely waits for them.
     let later = 0;
     const first = requestAnimationFrame(() => (later = window.setTimeout(() => loadMammalCard().catch((e: unknown) => console.warn('fan: the card data did not load', e)), 0)));
     // (Back on the tab, ToLaD#478: drawn again, or the page reloaded to here.)

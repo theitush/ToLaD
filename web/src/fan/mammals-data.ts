@@ -1,8 +1,9 @@
 // The mammal level's data (ToLaD#247): every mammal under the whole dated tree, ~20x the carnivores. It is not in the
 // page: vite.config.ts writes it as sibling files next to index.html (served at the same names in dev), split by what
 // the open reads (ToLaD#502): mammals.json, the tree, the layout and what the columns, labels and taps read, fetched
-// on open (index.html preloads it); mammals-card.json, the kinds only a species' card reads (CARD_KINDS), fetched
-// once the first frame is drawn, or when a card opens first (FanApp useMammalCard).
+// on open (index.html preloads it); mammals-card.json, the kinds only a species' card reads (CARD_KINDS), asked for
+// once mammals.json is in (it downloads while the page builds the tree) and read once the first frame is drawn, or
+// when a card opens first (FanApp useMammalCard).
 //
 // Until loadMammals() has resolved, mammalData() throws: the mammal tree and clade (splits.ts mammaliaTree, panthera.ts
 // mammaliaClade) are built from it only when the level is shown. Tests and scripts in node load it from the data files
@@ -206,16 +207,26 @@ export function mammalsLoaded(): boolean {
   return data !== null;
 }
 
-async function fetchJson<T>(name: string, step?: string): Promise<T> {
-  // (mammals.json: the same request index.html preloads, so the page takes the preload's.)
-  const r = await fetch(new URL(name, document.baseURI));
+async function readJson<T>(name: string, at: Promise<Response>, step?: string): Promise<T> {
+  const r = await at;
   if (!r.ok) throw new Error(`${name}: HTTP ${r.status}`);
   if (step) stamp(step);
   return (await r.json()) as T;
 }
 
+const request = (name: string) => fetch(new URL(name, document.baseURI));
+
+/** mammals-card.json's request, made once mammals.json is in: it comes while the page builds the tree (the network idle then); read after the first frame. */
+let cardRequest: Promise<Response> | null = null;
+
 async function fetchMammals(): Promise<MammalData> {
-  const f = await fetchJson<MammalFile>(MAMMALS_FILE, 'fetch');
+  // (The same request index.html preloads, so the page takes the preload's.)
+  const f = await readJson<MammalFile>(MAMMALS_FILE, request(MAMMALS_FILE), 'fetch');
+  if (!cardRequest) {
+    cardRequest = request(MAMMALS_CARD_FILE);
+    // (A failure is the card's to report, when it reads it.)
+    cardRequest.catch(() => {});
+  }
   stamp('json');
   const d = unpackMammals(f);
   cardIn = false;
@@ -241,12 +252,21 @@ export function mammalCardLoaded(): boolean {
   return data !== null && cardIn;
 }
 
-/** Load mammals-card.json once, after the data (later calls share the first; a failure is tried again on the next call). */
-export function loadMammalCard(get: () => Promise<MammalCardFile> = () => fetchJson<MammalCardFile>(MAMMALS_CARD_FILE)): Promise<void> {
+/** mammals-card.json: the request made when mammals.json came in, or a new one (a failed one is not asked again). */
+function fetchCard(): Promise<MammalCardFile> {
+  const at = cardRequest ?? request(MAMMALS_CARD_FILE);
+  cardRequest = null;
+  return readJson<MammalCardFile>(MAMMALS_CARD_FILE, at);
+}
+
+/** Load mammals-card.json's kinds into the data once, after it (later calls share the first; a failure is tried again on the next call). */
+export function loadMammalCard(get: () => Promise<MammalCardFile> = fetchCard): Promise<void> {
   cardPending ??= loadMammals()
     .then(async (d) => {
       if (cardIn) return;
+      stamp('card-read');
       const c = await get();
+      stamp('card-json');
       mergeMammalCard(d, c);
       cardIn = true;
       stamp('card');
