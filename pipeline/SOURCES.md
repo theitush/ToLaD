@@ -79,7 +79,9 @@ Every hand-made change to what the sources say is in [`overrides.toml`](override
 - `placeholder`: no real range is known, so the note sets one (a town near the type locality, a borrowed range, fossil-site estimates for extinct species);
 - `unclear`: none so far.
 
-Columns: `binomial`, `iucn` (PHYLACINE's status), `cells_cur`, `cells_nat`, `class`, `why` (ours), `phylacine_note` (the note's own key phrase, verbatim).
+Columns: `binomial`, `iucn` (PHYLACINE's status), `cells_cur`, `cells_nat`, `class`, `why` (ours), `phylacine_note` (the note's own key phrase, verbatim), `partner` (the other species the note moves land to or from, as the note names it; empty for none).
+
+**Today's map (ToLaD#507).** For a living species classed `taxonomy` or `mapping`, today's count (density × range × occupancy) stands on the map the note corrects, worked out cell by cell from the rasters (`ranges.today_maps`): its present-natural map where that is its current map with land moved to or from its `partner` (every lost cell in the partner's present-natural map, every gained cell in the partner's current map) or with the deleted records taken off; for the partner, its current map minus the cells the note gives away. A note that also adds PHYLACINE's own expansion or historic range, or that names no mapped partner, leaves the species as it is. `stats.json` → `phylacine_ranges.today_maps` lists each one, with the reason. A species whose area comes from PanTHERIA, or whose count is a census, keeps it.
 
 For an extant species classed `taxonomy`, `mapping` or `placeholder`, the build (`model.natural_level`) takes today's count as the natural level. No range-loss trend comes from the map difference, and no level is fitted to a placeholder area. Extinct species are not changed: their present-natural maps are what their counts stand on. `stats.json` → `natural_baseline.phylacine_note_today` lists the leaves this applies to. A test checks that the file still matches PHYLACINE's metadata row for row.
 
