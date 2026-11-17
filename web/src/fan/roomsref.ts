@@ -5,7 +5,7 @@
 
 import { g, laneW, type Fan } from './layout';
 import type { Steady } from './steady';
-import type { FoldState } from './fold';
+import { Fold, type FoldState } from './fold';
 
 /** Grid row k's widths summed along the drawn order (its columns', its live strands' own): as Steady.widthSums had them. */
 function widthSums(fan: Fan, f: Steady, k: number): Float64Array {
@@ -117,7 +117,11 @@ export function followRows(f: Steady, x: number, y: number, prev: FoldState): nu
 export interface RoomsReport {
   extent: { n: number; exact: number; worst: number; at?: unknown };
   xRange: { n: number; exact: number; worst: number; asked: number; passed: number; wrong: number };
+  /** drawMerged's cull (offSideRun) of random clades: how many passed by, and how many of those had a row on screen. */
+  runs: { n: number; off: number; wrong: number };
   follow: { n: number; exact: number; worst: number };
+  /** Steady.rowSpan (read where the entries change) against Fold.rowSpan (every row's rowX): to the bit. */
+  span: { n: number; exact: number };
 }
 
 /**
@@ -141,7 +145,7 @@ export function checkRooms(fan: Fan, f: Steady, cams = 12, seed = 1): RoomsRepor
   const yNow = fan.time.y(0);
   const yBot = fan.trunkBottom.y;
   const root = fan.nodes.indexOf(fan.root);
-  const rep: RoomsReport = { extent: { n: 0, exact: 0, worst: 0 }, xRange: { n: 0, exact: 0, worst: 0, asked: 0, passed: 0, wrong: 0 }, follow: { n: 0, exact: 0, worst: 0 } };
+  const rep: RoomsReport = { extent: { n: 0, exact: 0, worst: 0 }, xRange: { n: 0, exact: 0, worst: 0, asked: 0, passed: 0, wrong: 0 }, follow: { n: 0, exact: 0, worst: 0 }, span: { n: 0, exact: 0 }, runs: { n: 0, off: 0, wrong: 0 } };
   const setCam = (sx: number) => {
     f.setScale(sx, W);
     f.keep()();
@@ -192,6 +196,32 @@ export function checkRooms(fan: Fan, f: Steady, cams = 12, seed = 1): RoomsRepor
       rep.xRange.n++;
       if (d === 0) rep.xRange.exact++;
       rep.xRange.worst = Math.max(rep.xRange.worst, d);
+    }
+    // offSideRun: a clade passed by has no row (its extent, held to the whole rows above) within 12 px of the screen.
+    for (let q = 0; q < 300; q++) {
+      const v = fan.nodes[Math.floor(rnd() * fan.nodes.length)];
+      const i0 = v.strands[0].index;
+      const i1 = v.strands[v.strands.length - 1].index;
+      rep.runs.n++;
+      if (!f.offSideRun(i0, i1, y0, y1, cx - xm, cx + xm)) continue;
+      rep.runs.off++;
+      let lo = Infinity;
+      let hi = -Infinity;
+      for (let k = Math.floor(y0 / H); k <= Math.ceil(y1 / H); k++) {
+        const [l, r] = f.extent(i0, i1, k, [0, 0]);
+        lo = Math.min(lo, l);
+        hi = Math.max(hi, l, r);
+      }
+      if (!(hi < cx - xe || lo > cx + xe)) rep.runs.wrong++;
+    }
+    // rowSpan: every strand's least and most over the window's rows, read where they change against every row's.
+    const ka = Math.floor(y0 / H);
+    const kb = Math.ceil(y1 / H);
+    for (let i = 0; i < f.strands.length; i += 3) {
+      const a = f.rowSpan(i, ka, kb, H, [0, 0]);
+      const b = Fold.prototype.rowSpan.call(f, i, ka, kb, H, [0, 0]);
+      rep.span.n++;
+      if (a[0] === b[0] && a[1] === b[1]) rep.span.exact++;
     }
     // follow: from a random earlier zoom (its snapshot), at random points; asked twice (the kept layout's answer).
     setCam(home * Math.pow(10, 4 * rnd()));

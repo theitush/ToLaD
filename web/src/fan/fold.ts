@@ -523,6 +523,20 @@ export abstract class Fold {
   /** Strand i's entry in the row at world height y (rowXs', one strand: no row made, ToLaD#502). */
   abstract rowX(i: number, y: number): number;
 
+  /** The least and most of strand i's row entries (rowX) at every grid row ka..kb (world y = k * h), into out. */
+  rowSpan(i: number, ka: number, kb: number, h: number, out: [number, number]): [number, number] {
+    let lo = Infinity;
+    let hi = -Infinity;
+    for (let k = ka; k <= kb; k++) {
+      const x = this.rowX(i, k * h);
+      if (x < lo) lo = x;
+      if (x > hi) hi = x;
+    }
+    out[0] = lo;
+    out[1] = hi;
+    return out;
+  }
+
   /** The grid's row k's extent of strands i0..i1 (world [left, right]): strand i0's left edge to strand i1's right. */
   /** (Into out when given: no tuple a row, the draw's merged clades, ToLaD#255.) */
   abstract extent(i0: number, i1: number, k: number, out?: [number, number]): [number, number];

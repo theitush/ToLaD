@@ -148,6 +148,24 @@ interface Lay {
   aHi?: Float64Array;
 }
 
+/** The last grid row k (world y = k * h) with y at most `lim`, by the very product the rows make (-Infinity: none). */
+function lastAtMost(lim: number, h: number): number {
+  if (!(lim < Infinity)) return lim === Infinity ? Infinity : -Infinity;
+  let k = Math.floor(lim / h);
+  while (k * h > lim) k--;
+  while ((k + 1) * h <= lim) k++;
+  return k;
+}
+
+/** The last grid row k with k * h below `lim`. */
+function lastBelow(lim: number, h: number): number {
+  if (!(lim < Infinity)) return lim === Infinity ? Infinity : -Infinity;
+  let k = Math.ceil(lim / h) - 1;
+  while (k * h >= lim) k--;
+  while ((k + 1) * h < lim) k++;
+  return k;
+}
+
 export class Steady extends Fold {
   /** Per node: its index's parent (-1 for the root), its column's offset in its parent's, its fork's cap (world). */
   private readonly par: Int32Array;
@@ -291,8 +309,9 @@ export class Steady extends Fold {
     N.forEach((_, j) => this.runNode.set(this.nFirst[j] * (ns + 1) + this.nLast[j], j));
     this.cand = new Int32Array(ns);
     this.cutStack = new Int32Array(N.length + ns + 1);
-    this.walkLo = new Float64Array(N.length + 1);
-    this.walkHi = new Float64Array(N.length + 1);
+    this.offRuns = new Int32Array(2 * (N.length + ns + 1));
+    this.walkLo = new Float64Array(N.length + ns + 1);
+    this.walkHi = new Float64Array(N.length + ns + 1);
     if (this.open) this.a.fill(1);
   }
 
@@ -763,6 +782,79 @@ export class Steady extends Fold {
     return this.nodeLeft(L, this.pIdx[i][e], y) + this.pOff[i][e];
   }
 
+  /**
+   * rowSpan, from the layout (xRange's table, ToLaD#502): a strand's entry stands still between its peels (an own
+   * column past its peel, its room's centre; a column past its peel off its parent), so each still stretch is read at
+   * one of its rows and only the rows inside a peel one by one. A strand costs its splits and peels, not the rows; the
+   * entries are rowX's own (the stretches found by the very tests rowX makes), so the least and most are the same.
+   */
+  override rowSpan(i: number, ka: number, kb: number, h: number, out: [number, number]): [number, number] {
+    if (!this.mono || this.pLin[i] || !(h > 0)) return super.rowSpan(i, ka, kb, h, out);
+    const L = this.cur();
+    this.prep(L);
+    let lo = Infinity;
+    let hi = -Infinity;
+    let k = ka;
+    // (Its own column, the rows above its split node's height.)
+    const yb = this.bY[i];
+    if (k <= kb && k * h < yb) {
+      const ko = Math.min(kb, lastBelow(yb, h));
+      const hj = L.h[this.bNode[i]];
+      if (hj > 0) {
+        const kc = Math.min(ko, lastAtMost(this.sY[i] - hj, h));
+        if (k <= kc) {
+          lo = hi = L.C[i];
+          k = kc + 1;
+        }
+      }
+      for (; k <= ko; k++) {
+        const x = this.ownC(L, i, k * h);
+        if (x < lo) lo = x;
+        if (x > hi) hi = x;
+      }
+    }
+    // (Then its path's columns, each from its split down to the next one's.)
+    const py = this.pY[i];
+    const n = py.length;
+    let e = 0;
+    while (k <= kb) {
+      const y = k * h;
+      while (e + 1 < n && py[e + 1] <= y) e++;
+      // (At a split with no height, the parent's column: rowIn's.)
+      let g = e;
+      while (g > 0 && py[g - 1] === py[g]) g--;
+      const j = this.pIdx[i][g];
+      const off = this.pOff[i][g];
+      const ke = e + 1 < n ? Math.min(kb, lastBelow(py[e + 1], h)) : kb;
+      // (Past its peel off its parent (u = 1, the test u() makes): still.)
+      let kc = ke;
+      const p = this.par[j];
+      if (p >= 0) {
+        const y0 = this.nY[p];
+        const hp = L.h[p];
+        if (hp > 0) {
+          kc = Math.min(ke, lastAtMost(y0 - hp, h));
+          while (kc >= k && !((y0 - kc * h) / hp >= 1)) kc--;
+          while (kc < ke && (y0 - (kc + 1) * h) / hp >= 1) kc++;
+        }
+      }
+      if (k <= kc) {
+        const x = this.nodeLeft(L, j, k * h) + off;
+        if (x < lo) lo = x;
+        if (x > hi) hi = x;
+        k = kc + 1;
+      }
+      for (; k <= ke; k++) {
+        const x = this.nodeLeft(L, j, k * h) + off;
+        if (x < lo) lo = x;
+        if (x > hi) hi = x;
+      }
+    }
+    out[0] = lo;
+    out[1] = hi;
+    return out;
+  }
+
   /** left() in layout L. */
   private leftIn(L: Lay, i: number, y: number): number {
     if (y < this.sY[i]) return this.ownC(L, i, y);
@@ -983,9 +1075,8 @@ export class Steady extends Fold {
       hi = f < 0 ? -Infinity : this.rowIn(L, l, y) + this.bw[l];
     } else {
       this.bounds(L);
-      const age = this.fan.time.ageAt(y);
-      lo = this.edgeL(L, v, y, age);
-      hi = this.edgeR(L, v, y, age);
+      lo = this.edgeL(L, v, y);
+      hi = this.edgeR(L, v, y);
     }
     if (lo > hi) lo = hi = (this.rowIn(L, i0, y) + this.rowIn(L, i1, y)) / 2;
     out[0] = lo;
@@ -1014,11 +1105,11 @@ export class Steady extends Fold {
   }
 
   /**
-   * The least left edge at y (above node v's split, age `age`) of v's lineages there with width: its daughters left to
+   * The least left edge at y (above node v's split) of v's lineages there with width: its daughters left to
    * right, a column's its first strand with founders' left, an own column its centre less half its width; a daughter
    * whose bound is no less than the least found so far is passed by (a stack: the order a walk down the left takes).
    */
-  private edgeL(L: Lay, v: number, y: number, age: number): number {
+  private edgeL(L: Lay, v: number, y: number): number {
     const st = this.cutStack;
     const aLo = L.aLo!;
     const cLo = L.cLo!;
@@ -1043,14 +1134,14 @@ export class Steady extends Fold {
       }
       const i = ~j;
       if (y < this.tipS[i] || this.ownLo(L, i) >= best) continue;
-      const w = laneW(this.strands[i], y, age);
+      const w = laneW(this.strands[i], y, this.ageAt(y));
       if (w > 0) best = Math.min(best, this.ownC(L, i, y) - w / 2);
     }
     return best;
   }
 
   /** edgeL's right: the greatest right edge, daughters right to left. */
-  private edgeR(L: Lay, v: number, y: number, age: number): number {
+  private edgeR(L: Lay, v: number, y: number): number {
     const st = this.cutStack;
     const aHi = L.aHi!;
     const cHi = L.cHi!;
@@ -1074,11 +1165,23 @@ export class Steady extends Fold {
       }
       const i = ~j;
       if (y < this.tipS[i] || this.ownHi(L, i) <= best) continue;
-      const w = laneW(this.strands[i], y, age);
+      const w = laneW(this.strands[i], y, this.ageAt(y));
       if (w > 0) best = Math.max(best, this.ownC(L, i, y) - w / 2 + w);
     }
     return best;
   }
+
+  /** The age at world height y (the time scale's), kept by y (64 slots by its row): a frame's clades ask the same rows. */
+  private ageAt(y: number): number {
+    const c = Math.floor(y / this.gridH) & 63;
+    if (this.ageY[c] !== y) {
+      this.ageY[c] = y;
+      this.ageV[c] = this.fan.time.ageAt(y);
+    }
+    return this.ageV[c];
+  }
+  private readonly ageY = new Float64Array(64).fill(NaN);
+  private readonly ageV = new Float64Array(64);
 
   /** Strand i's own column's reach at any height (its founders' slot to its room's centre, at its widest), a hair wide. */
   private ownLo(L: Lay, i: number): number {
@@ -1582,6 +1685,30 @@ export class Steady extends Fold {
    * from the rooms' bounds: a clade off to one side is passed by whole, one wholly on screen taken whole.
    */
   offSide(i: number, y0: number, y1: number, xa: number, xb: number): boolean {
+    if (!this.marked(y0, y1, xa, xb)) return false;
+    return this.cand[i] !== this.candGen;
+  }
+
+  /**
+   * Whether strands i0..i1 (a merged clade, drawMerged) all stand wholly to one side of world x [xa, xb] at every height
+   * in [y0, y1], each beyond its own margins: offSide's walk passed by a clade holding them all (its runs, in order).
+   */
+  offSideRun(i0: number, i1: number, y0: number, y1: number, xa: number, xb: number): boolean {
+    if (!this.marked(y0, y1, xa, xb)) return false;
+    const R = this.offRuns;
+    let a = 0;
+    let z = this.offN;
+    // (The last run starting at or before i0.)
+    while (a < z) {
+      const m = (a + z) >> 1;
+      if (R[2 * m] <= i0) a = m + 1;
+      else z = m;
+    }
+    return a > 0 && R[2 * (a - 1) + 1] >= i1;
+  }
+
+  /** offSide's walk for this layout and window, made if not yet: false where it cannot be (no grid, a tree not mono). */
+  private marked(y0: number, y1: number, xa: number, xb: number): boolean {
     const L = this.cur();
     const H = this.gridH;
     if (!this.mono || !(H > 0)) return false;
@@ -1596,8 +1723,11 @@ export class Steady extends Fold {
       this.candLay = L;
       this.marks(L, Math.floor(y0 / H) * H, Math.ceil(y1 / H) * H, xa, xb);
     }
-    return this.cand[i] !== this.candGen;
+    return true;
   }
+  /** The runs of strands (first, last; drawn order, disjoint, ascending) offSide's walk passed by whole. */
+  private readonly offRuns: Int32Array;
+  private offN = 0;
   private readonly candKey = new Float64Array(6).fill(NaN);
   private candLay: Lay | null = null;
   /** Per strand: the walk's generation if it may show (offSide). */
@@ -1611,6 +1741,12 @@ export class Steady extends Fold {
     this.bounds(L);
     const gen = ++this.candGen;
     const cand = this.cand;
+    const runs = this.offRuns;
+    this.offN = 0;
+    const off = (a: number, b: number) => {
+      runs[2 * this.offN] = a;
+      runs[2 * this.offN++ + 1] = b;
+    };
     // (Past the rows xRange reads one by one (XR_ROWS), its reach is widened where the edge turns back: every strand may show.)
     if (!(yb >= ya) || (yb - ya) / this.gridH > 512) {
       cand.fill(gen);
@@ -1641,8 +1777,9 @@ export class Steady extends Fold {
     const all = (j: number) => {
       for (let i = this.nFirst[j], e = this.nLast[j]; i <= e; i++) cand[i] = gen;
     };
-    // (A stack of [node, the reach of its strands' places in its ancestors' columns over the window].)
-    const st = this.stack;
+    // (A stack of [node, or ~ a strand; the reach of its strands' places in its ancestors' columns over the window], in
+    // drawn order: the runs passed by come out ascending.)
+    const st = this.cutStack;
     const lo = this.walkLo;
     const hi = this.walkHi;
     let n = 0;
@@ -1654,6 +1791,15 @@ export class Steady extends Fold {
       const j = st[n];
       let pl = lo[n];
       let ph = hi[n];
+      if (j < 0) {
+        // (A strand above its parent's split: its own column's reach too.)
+        const q = ~j;
+        const w = mx[q] / 2 + this.eps;
+        const t = side(Math.min(pl, Math.min(tc[q], C[q]) - w), Math.max(ph, Math.max(tc[q], C[q]) + w), mx[q]);
+        if (t === 0 || t === 2) cand[q] = gen;
+        else off(q, q);
+        continue;
+      }
       // (Its column, if the window meets its span.)
       if (yb >= nY[j] && ya < nYp[j]) {
         pl = Math.min(pl, cLo[j]);
@@ -1661,22 +1807,19 @@ export class Steady extends Fold {
       }
       const above = ya < nY[j];
       const s = above ? side(Math.min(pl, aLo[j]), Math.max(ph, aHi[j]), mxN[j]) : side(pl, ph, mxN[j]);
-      if (s === -1 || s === 1) continue;
+      if (s === -1 || s === 1) {
+        off(this.nFirst[j], this.nLast[j]);
+        continue;
+      }
       if (s === 2 || !above) {
         all(j);
         continue;
       }
-      for (const k of this.kidsF[j]) {
-        if (k >= 0) {
-          st[n] = k;
-          lo[n] = pl;
-          hi[n++] = ph;
-          continue;
-        }
-        const q = ~k;
-        const w = mx[q] / 2 + this.eps;
-        const t = side(Math.min(pl, Math.min(tc[q], C[q]) - w), Math.max(ph, Math.max(tc[q], C[q]) + w), mx[q]);
-        if (t === 0 || t === 2) cand[q] = gen;
+      const K = this.kidsF[j];
+      for (let q = K.length - 1; q >= 0; q--) {
+        st[n] = K[q];
+        lo[n] = pl;
+        hi[n++] = ph;
       }
     }
   }

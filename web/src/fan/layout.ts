@@ -556,6 +556,13 @@ export class Tess {
       t.R[i] = R;
       return;
     }
+    // (Every row: the least and most of its entries, read where they change (Fold.rowSpan).)
+    if (st === 1) {
+      const o = f.rowSpan(i, kA, kB, h, this.xOut);
+      t.L[i] = o[0];
+      t.R[i] = o[1];
+      return;
+    }
     let prev = 0;
     let dPrev = 0;
     let first = true;
@@ -565,10 +572,6 @@ export class Tess {
         L = R = prev = x;
         dPrev = 0;
         first = false;
-      } else if (st === 1) {
-        // (Every row: the edge is linear between two, within them.)
-        if (x < L) L = x;
-        else if (x > R) R = x;
       } else {
         if (x < L) L = x;
         if (x > R) R = x;
@@ -588,6 +591,7 @@ export class Tess {
     t.R[i] = R;
   }
   private readonly xTables: XTable[] = [];
+  private readonly xOut: [number, number] = [0, 0];
   private xNext = 0;
   private xGen = 0;
   /** The highest tip of any strand (the folded rows over xTable start no higher). */

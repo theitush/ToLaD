@@ -9,7 +9,7 @@ import { Steady } from './steady';
 import { synthData, synthOrders } from './synthetic';
 
 describe('the rooms by range, the synthetic 7k', () => {
-  it('answer as the whole rows did, to the rounding; follow to the bit; the cull never drops a strand that shows', () => {
+  it('answer as the whole rows did, to the rounding; follow and the row spans to the bit; the cull never drops a strand that shows', () => {
     const d = synthData({ n: 7000 });
     for (const name of synthOrders(d)) (ORDER_TAXA as Set<string>).add(name);
     const tree = nameOrders(treeOf(d.clade));
@@ -23,6 +23,8 @@ describe('the rooms by range, the synthetic 7k', () => {
     expect(r.extent.worst).toBeLessThan(1e-13);
     expect(r.xRange.worst).toBeLessThan(1e-13);
     expect(r.xRange.wrong).toBe(0);
+    expect(r.runs.wrong).toBe(0);
     expect(r.follow.exact).toBe(r.follow.n);
+    expect(r.span.exact).toBe(r.span.n);
   }, 300000);
 });

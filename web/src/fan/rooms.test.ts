@@ -10,7 +10,7 @@ import { Steady } from './steady';
 await loadMammalsFromFiles();
 
 describe('the rooms by range, the mammals', () => {
-  it('answer as the whole rows did, to the rounding; follow to the bit; the cull never drops a strand that shows', () => {
+  it('answer as the whole rows did, to the rounding; follow and the row spans to the bit; the cull never drops a strand that shows', () => {
     const fan = layoutFan(mammaliaClade(), 'linear', mammaliaTree());
     const f = new Steady(fan);
     f.setAll(0);
@@ -20,6 +20,8 @@ describe('the rooms by range, the mammals', () => {
     expect(r.extent.worst).toBeLessThan(1e-13);
     expect(r.xRange.worst).toBeLessThan(1e-13);
     expect(r.xRange.wrong).toBe(0);
+    expect(r.runs.wrong).toBe(0);
     expect(r.follow.exact).toBe(r.follow.n);
+    expect(r.span.exact).toBe(r.span.n);
   });
 });
