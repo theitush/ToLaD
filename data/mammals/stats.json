@@ -7954,13 +7954,13 @@
  },
  "counts": {
   "internal": 6803,
-  "nodes": 25166,
-  "taxonomic_nodes": 14905,
-  "tips": 18363,
+  "nodes": 25165,
+  "taxonomic_nodes": 14904,
+  "tips": 18362,
   "tips_extant": 7017,
-  "tips_extinct": 11346,
+  "tips_extinct": 11345,
   "tips_extinct_in_opentree": 326,
-  "tips_fossil_grafted": 11020
+  "tips_fossil_grafted": 11019
  },
  "dated_tree": {
   "ages": {
@@ -8389,7 +8389,7 @@
    "genus": 450
   },
   "named_splits": 3248,
-  "species": 18362,
+  "species": 18361,
   "species_rows_left_out": 0,
   "splits": 9678,
   "splits_by_source": {
@@ -17803,9 +17803,9 @@
     "sampled": 2.374727212140763e+17
    },
    "Paleogene 23-66 Ma": {
-    "ghost": 2.1988730938456215e+18,
+    "ghost": 2.1988731074686907e+18,
     "ghost_share": 0.9859,
-    "sampled": 3.1527412615462972e+16
+    "sampled": 3.152739899239372e+16
    }
   },
   "f_ramp_Ma": [
@@ -17825,9 +17825,9 @@
    "50": 236.567,
    "66": 3035.453
   },
-  "sampled_sum": 3.8701545027466714e+17,
+  "sampled_sum": 3.870154366515979e+17,
   "top_down_estimate": 7.741606243734685e+18,
-  "with_ghosts": 7.74160634735449e+18
+  "with_ghosts": 7.741606347354489e+18
  },
  "greenspoon_combined": {
   "category_offset_dex": {
@@ -30702,14 +30702,14 @@
  "knuckles_collapsed": 3810,
  "mammalia": {
   "alive": 86830099345.03368,
-  "ever": 7.741606347354488e+18,
-  "ghost": 7.35459089707982e+18,
+  "ever": 7.741606347354487e+18,
+  "ghost": 7.354590910702889e+18,
   "grade": "D",
-  "hi": 7.321016464506348e+23,
-  "lo": 71039686461470.81
+  "hi": 7.321016478329455e+23,
+  "lo": 71039686595726.89
  },
  "mass_imputed": {
-  "clade mean": 4634,
+  "clade mean": 4633,
   "family mean": 3585,
   "genus mean": 1353,
   "order mean": 2790,
@@ -41622,11 +41622,11 @@
   "non-species tip": 551
  },
  "output": {
-  "brotli_bytes": 842414,
-  "dated_sidecar_raw": 2195530,
+  "brotli_bytes": 842588,
+  "dated_sidecar_raw": 2195456,
   "files": 15,
-  "raw_bytes": 4595688,
-  "skeleton_brotli": 109185,
+  "raw_bytes": 4595584,
+  "skeleton_brotli": 109397,
   "skeleton_nodes": 2383,
   "skeleton_raw": 1707608,
   "tiles": 14
@@ -42218,11 +42218,11 @@
   "extinct synonym of a PBDB living species (grafted on its own)": 10,
   "grafted: MRCA of OT genus members": 137,
   "grafted: OT genus": 785,
-  "grafted: PBDB genus (created)": 10098,
+  "grafted: PBDB genus (created)": 10097,
   "living, not in OT (skipped)": 365,
-  "matched OT leaf (exact)": 2117,
+  "matched OT leaf (exact)": 2116,
   "matched OT leaf (synonym)": 303,
-  "no occurrences/range (skipped)": 2469,
+  "no occurrences/range (skipped)": 2467,
   "not a plain binomial": 240,
   "status unknown (skipped)": 88
  },
@@ -42235,12 +42235,12 @@
   "grafted under OT family-level node": 4346,
   "grafted under OT genus": 1039,
   "grafted under OT order or higher": 3017,
-  "grafted unplaced (Mammalia root / incertae sedis)": 2618,
-  "matched_existing_OT_species": 2420,
+  "grafted unplaced (Mammalia root / incertae sedis)": 2617,
+  "matched_existing_OT_species": 2419,
   "rate_family_or_better": 0.5807,
-  "rate_matched_species": 0.1801,
-  "rate_species_or_genus": 0.2574,
-  "species_used": 13440
+  "rate_matched_species": 0.18,
+  "rate_species_or_genus": 0.2573,
+  "species_used": 13438
  },
  "phylacine_ranges": {
   "current_vs_pantheria_dex": {
@@ -42426,7 +42426,7 @@
   },
   "today_maps_note": "ToLaD#507: today's map, cell by cell, of each living species whose map difference PHYLACINE's note puts down to taxonomy or a mapping fix, and of the species such a note takes land from (ranges.today_maps): cells = the corrected map's cells (null: left as it is, why says why), cells_map = PHYLACINE's current map"
  },
- "pieces": 258034,
+ "pieces": 258033,
  "rangeloss": {
   "by_basis": {
    "bound": {
@@ -43814,13 +43814,13 @@
   },
   "Mammalia": {
    "alive": 86830099345.03368,
-   "ever": 7.741606347354488e+18,
+   "ever": 7.741606347354487e+18,
    "ever_range": [
-    71039686461470.81,
-    7.321016464506348e+23
+    71039686595726.89,
+    7.321016478329455e+23
    ],
    "extinct(gray)": 0.0,
-   "ghost": 7.35459089707982e+18,
+   "ghost": 7.354590910702889e+18,
    "grade": "D",
    "t0_Ma": 208.64140800000004,
    "t1_Ma": 0.0
@@ -44130,8 +44130,8 @@
   "by_alive": [
    {
     "alive": 41620497751.60199,
-    "ever": 1.1390626099466655e+18,
-    "ghost": 9.719807096796124e+17,
+    "ever": 1.139062611132194e+18,
+    "ghost": 9.71980710865141e+17,
     "ghost_share": 0.853,
     "name": "Chiroptera",
     "sampled": 1.6708190026705306e+17,
@@ -44139,8 +44139,8 @@
    },
    {
     "alive": 24994374910.5098,
-    "ever": 1.838100932499724e+18,
-    "ghost": 1.692687018367334e+18,
+    "ever": 1.8381009398950446e+18,
+    "ghost": 1.6926870257626545e+18,
     "ghost_share": 0.921,
     "name": "Rodentia",
     "sampled": 1.4541391413239014e+17,
@@ -44148,8 +44148,8 @@
    },
    {
     "alive": 5563509634.972329,
-    "ever": 3879632549475707.0,
-    "ghost": 3077277764783804.0,
+    "ever": 3879632563473783.0,
+    "ghost": 3077277778781880.0,
     "ghost_share": 0.793,
     "name": "Artiodactyla",
     "sampled": 802354784691903.0,
@@ -44157,8 +44157,8 @@
    },
    {
     "alive": 1873905651.9487786,
-    "ever": 6934889584039649.0,
-    "ghost": 5948869099401280.0,
+    "ever": 6934889611017476.0,
+    "ghost": 5948869126379107.0,
     "ghost_share": 0.858,
     "name": "Carnivora",
     "sampled": 986020484638369.0,
@@ -44166,8 +44166,8 @@
    },
    {
     "alive": 1339034914.2596385,
-    "ever": 1.7141623924603574e+17,
-    "ghost": 1.3029348391893618e+17,
+    "ever": 1.71416239761067e+17,
+    "ghost": 1.3029348443396744e+17,
     "ghost_share": 0.76,
     "name": "Eulipotyphla",
     "sampled": 4.112275532709957e+16,
@@ -44184,8 +44184,8 @@
    },
    {
     "alive": 414230391.8448181,
-    "ever": 2.585706017263231e+16,
-    "ghost": 2.105726075697469e+16,
+    "ever": 2.5857060269574416e+16,
+    "ghost": 2.105726085391679e+16,
     "ghost_share": 0.814,
     "name": "Didelphimorphia",
     "sampled": 4799799415657624.0,
@@ -44211,19 +44211,19 @@
    },
    {
     "alive": 178243937.6069244,
-    "ever": 4537998276738417.0,
-    "ghost": 3246871758427011.0,
+    "ever": 4537998293108854.0,
+    "ghost": 3246871774797448.5,
     "ghost_share": 0.715,
     "name": "Pilosa (order in Deuterostomia)",
-    "sampled": 1291126518311406.0,
+    "sampled": 1291126518311405.5,
     "t0_Ma": 67.37
    }
   ],
   "by_ever": [
    {
     "alive": 24994374910.5098,
-    "ever": 1.838100932499724e+18,
-    "ghost": 1.692687018367334e+18,
+    "ever": 1.8381009398950446e+18,
+    "ghost": 1.6926870257626545e+18,
     "ghost_share": 0.921,
     "name": "Rodentia",
     "sampled": 1.4541391413239014e+17,
@@ -44231,8 +44231,8 @@
    },
    {
     "alive": 41620497751.60199,
-    "ever": 1.1390626099466655e+18,
-    "ghost": 9.719807096796124e+17,
+    "ever": 1.139062611132194e+18,
+    "ghost": 9.71980710865141e+17,
     "ghost_share": 0.853,
     "name": "Chiroptera",
     "sampled": 1.6708190026705306e+17,
@@ -44240,8 +44240,8 @@
    },
    {
     "alive": 1339034914.2596385,
-    "ever": 1.7141623924603574e+17,
-    "ghost": 1.3029348391893618e+17,
+    "ever": 1.71416239761067e+17,
+    "ghost": 1.3029348443396744e+17,
     "ghost_share": 0.76,
     "name": "Eulipotyphla",
     "sampled": 4.112275532709957e+16,
@@ -44258,8 +44258,8 @@
    },
    {
     "alive": 414230391.8448181,
-    "ever": 2.585706017263231e+16,
-    "ghost": 2.105726075697469e+16,
+    "ever": 2.5857060269574416e+16,
+    "ghost": 2.105726085391679e+16,
     "ghost_share": 0.814,
     "name": "Didelphimorphia",
     "sampled": 4799799415657624.0,
@@ -44276,8 +44276,8 @@
    },
    {
     "alive": 84239192.8805159,
-    "ever": 7115860177864349.0,
-    "ghost": 4205826300107080.5,
+    "ever": 7115860196937530.0,
+    "ghost": 4205826319180261.5,
     "ghost_share": 0.591,
     "name": "Macroscelidea",
     "sampled": 2910033877757268.5,
@@ -44285,8 +44285,8 @@
    },
    {
     "alive": 1873905651.9487786,
-    "ever": 6934889584039649.0,
-    "ghost": 5948869099401280.0,
+    "ever": 6934889611017476.0,
+    "ghost": 5948869126379107.0,
     "ghost_share": 0.858,
     "name": "Carnivora",
     "sampled": 986020484638369.0,
@@ -44294,11 +44294,11 @@
    },
    {
     "alive": 82865794.87760769,
-    "ever": 5640319108442228.0,
-    "ghost": 4639408456028548.0,
+    "ever": 5640319116049758.0,
+    "ghost": 4639408463636079.0,
     "ghost_share": 0.823,
     "name": "Dasyuromorphia",
-    "sampled": 1000910652413680.0,
+    "sampled": 1000910652413679.0,
     "t0_Ma": 58.64
    },
    {
@@ -44314,8 +44314,8 @@
   "by_sampled_ever": [
    {
     "alive": 41620497751.60199,
-    "ever": 1.1390626099466655e+18,
-    "ghost": 9.719807096796124e+17,
+    "ever": 1.139062611132194e+18,
+    "ghost": 9.71980710865141e+17,
     "ghost_share": 0.853,
     "name": "Chiroptera",
     "sampled": 1.6708190026705306e+17,
@@ -44323,8 +44323,8 @@
    },
    {
     "alive": 24994374910.5098,
-    "ever": 1.838100932499724e+18,
-    "ghost": 1.692687018367334e+18,
+    "ever": 1.8381009398950446e+18,
+    "ghost": 1.6926870257626545e+18,
     "ghost_share": 0.921,
     "name": "Rodentia",
     "sampled": 1.4541391413239014e+17,
@@ -44332,8 +44332,8 @@
    },
    {
     "alive": 1339034914.2596385,
-    "ever": 1.7141623924603574e+17,
-    "ghost": 1.3029348391893618e+17,
+    "ever": 1.71416239761067e+17,
+    "ghost": 1.3029348443396744e+17,
     "ghost_share": 0.76,
     "name": "Eulipotyphla",
     "sampled": 4.112275532709957e+16,
@@ -44350,8 +44350,8 @@
    },
    {
     "alive": 414230391.8448181,
-    "ever": 2.585706017263231e+16,
-    "ghost": 2.105726075697469e+16,
+    "ever": 2.5857060269574416e+16,
+    "ghost": 2.105726085391679e+16,
     "ghost_share": 0.814,
     "name": "Didelphimorphia",
     "sampled": 4799799415657624.0,
@@ -44368,8 +44368,8 @@
    },
    {
     "alive": 84239192.8805159,
-    "ever": 7115860177864349.0,
-    "ghost": 4205826300107080.5,
+    "ever": 7115860196937530.0,
+    "ghost": 4205826319180261.5,
     "ghost_share": 0.591,
     "name": "Macroscelidea",
     "sampled": 2910033877757268.5,
@@ -44386,20 +44386,20 @@
    },
    {
     "alive": 178243937.6069244,
-    "ever": 4537998276738417.0,
-    "ghost": 3246871758427011.0,
+    "ever": 4537998293108854.0,
+    "ghost": 3246871774797448.5,
     "ghost_share": 0.715,
     "name": "Pilosa (order in Deuterostomia)",
-    "sampled": 1291126518311406.0,
+    "sampled": 1291126518311405.5,
     "t0_Ma": 67.37
    },
    {
     "alive": 82865794.87760769,
-    "ever": 5640319108442228.0,
-    "ghost": 4639408456028548.0,
+    "ever": 5640319116049758.0,
+    "ghost": 4639408463636079.0,
     "ghost_share": 0.823,
     "name": "Dasyuromorphia",
-    "sampled": 1000910652413680.0,
+    "sampled": 1000910652413679.0,
     "t0_Ma": 58.64
    }
   ]

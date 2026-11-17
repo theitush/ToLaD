@@ -209,7 +209,35 @@ def load_pantheria(raw: Path) -> dict[str, dict]:
 # ---------------------------------------------------------------- PBDB
 
 
+def one_per_taxon(records: list[dict]) -> list[dict]:
+    """PBDB's taxa list gives an accepted taxon one row per original name it absorbed (orig_no): Todralestes variabilis
+    twice, once for its junior synonym, so it was grafted twice (ToLaD#279). One row per taxon_no: its first
+    appearance the older of the rows', its last the younger, its occurrences summed."""
+    def first(x):
+        return x.get("firstapp_max_ma"), x.get("firstapp_min_ma")
+
+    def last(x):  # (a row with no last appearance has one interval: its first)
+        lmax, lmin = x.get("lastapp_max_ma"), x.get("lastapp_min_ma")
+        return (lmax, lmin) if lmax is not None else first(x)
+
+    out: dict = {}
+    for r in records:
+        k = r.get("taxon_no") or r["taxon_name"]
+        a = out.get(k)
+        if a is None:
+            out[k] = r
+            continue
+        rows = [x for x in (a, r) if first(x)[0] is not None]
+        m = dict(a if a.get("orig_no") == a.get("taxon_no") else r)
+        if rows:
+            m["firstapp_max_ma"], m["firstapp_min_ma"] = max((first(x) for x in rows), key=lambda t: (t[0], t[1]))
+            m["lastapp_max_ma"], m["lastapp_min_ma"] = min((last(x) for x in rows), key=lambda t: (t[1], t[0]))
+        m["n_occs"] = (a.get("n_occs") or 0) + (r.get("n_occs") or 0)
+        out[k] = m
+    return list(out.values())
+
+
 def load_pbdb(raw: Path) -> tuple[list[dict], list[dict]]:
     sp = json.loads((raw / "pbdb" / "mammalia_species.json").read_text())["records"]
     ge = json.loads((raw / "pbdb" / "mammalia_genera.json").read_text())["records"]
-    return sp, ge
+    return one_per_taxon(sp), one_per_taxon(ge)

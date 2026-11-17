@@ -12,6 +12,7 @@ from pathlib import Path
 
 from tolad_pipeline import anchors
 from tolad_pipeline import redlist as R
+from tolad_pipeline.load import one_per_taxon
 from tolad_pipeline.merge import (EX_WINDOW_MA, LAD_PLEISTOCENE, LAD_RECENT_EX, MIN_RANGE_MA, assign_bands,
                                   context_ok, date_undated, drop_unrecognised)
 from tolad_pipeline.tree import Node, drop_empty
@@ -138,6 +139,20 @@ class UndatedFossils(unittest.TestCase):
         x = self.build("Lutra nippon")  # on MDD's extinct list (since 1500 CE)
         self.assertAlmostEqual(x.t1, LAD_RECENT_EX)
         self.assertTrue(x.data["lad_default"])
+
+    def test_one_pbdb_row_per_taxon(self):
+        # PBDB lists Todralestes variabilis twice, once per original name (orig_no); it is one species
+        a = {"orig_no": "246754", "taxon_no": "246754", "taxon_name": "Todralestes variabilis", "n_occs": 4,
+             "firstapp_max_ma": 59.24, "firstapp_min_ma": 56, "lastapp_max_ma": 59.24, "lastapp_min_ma": 56}
+        b = {**a, "orig_no": "252525", "n_occs": 1, "firstapp_max_ma": 61.6, "firstapp_min_ma": 59.24,
+             "lastapp_max_ma": 56, "lastapp_min_ma": 47.8}
+        other = {**a, "taxon_no": "1", "orig_no": "1", "taxon_name": "Todralestes butleri"}
+        rows = one_per_taxon([a, b, other])
+        self.assertEqual([r["taxon_name"] for r in rows], ["Todralestes variabilis", "Todralestes butleri"])
+        r = rows[0]
+        self.assertEqual((r["orig_no"], r["n_occs"]), ("246754", 5))
+        self.assertEqual((r["firstapp_max_ma"], r["firstapp_min_ma"]), (61.6, 59.24))
+        self.assertEqual((r["lastapp_max_ma"], r["lastapp_min_ma"]), (56, 47.8))
 
     def test_a_record_without_family_or_order_does_not_block_the_name(self):
         root = Node("Mammalia")
