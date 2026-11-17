@@ -2982,11 +2982,14 @@ export class FanView implements InputHandlers {
    * The cover on the tree on its side (ToLaD#458, gaplabels.ts): the groups and species labelled at zoom sx, where each one's name goes and whether it has a picture, from the zoom alone.
    * Kept for the last sx, so a pan costs nothing.
    */
-  gapCoverAt(T: CutTerritories, sx: number, win?: readonly [number, number]): GapMember[] {
+  gapCoverAt(T: CutTerritories, sx: number, win?: readonly [number, number], pad = 0): GapMember[] {
     const L = this.gapLadderOf(T);
-    // (`win`, world x: only the members whose band on the column meets it, a slack wider (laneSlack), and what they read, labelindex.ts.)
+    // (`win`, world x: only the members whose band on the column meets it, a slack wider (laneSlack), and what they read, labelindex.ts. Kept for the
+    // last zoom and window, `pad` wider each side: a cover over a window holds any window inside it (who meets the inner one is in, with its neighbours),
+    // so a pan inside it costs nothing, as the whole cover's did.)
     const had = win ? this.gapWinLast : this.gapCoverLast;
-    if (had && had.T === T && had.sx === sx && (!win || (had.win![0] === win[0] && had.win![1] === win[1]))) return had.list;
+    if (had && had.T === T && had.sx === sx && (!win || (had.win![0] <= win[0] && had.win![1] >= win[1]))) return had.list;
+    if (win && pad) win = [win[0] - pad, win[1] + pad];
     const at = win && ([win[0] - L.slack, win[1] + L.slack] as const);
     let list = this.coverOf(L, sx, at || undefined);
     // (The pictures the window's first and last shown ones slide against, gapLabels: one step wider.)
@@ -3208,7 +3211,7 @@ export class FanView implements InputHandlers {
     const hair = GROUP_D - PIC_D;
     // (The screen's members only, labelindex.ts: the screen and WIN_PX each side, world x.)
     const win = labelIndexOn() ? ([this.toWorld(-WIN_PX, 0)[0], this.toWorld(this.w + WIN_PX, 0)[0]] as const) : undefined;
-    const list = this.gapCoverAt(T, sx, win);
+    const list = this.gapCoverAt(T, sx, win, this.w / 2 / sx);
     // (Guest titles, ToLaD#500: in their host's band, one at most (gapCoverAt), at the top of that band's part on screen, then the host's own labels, a hair between; gapCoverAt gave it a band
     // holding both.)
     const guestAt = new Map<GapMember, number>();
