@@ -12,10 +12,10 @@ import type { Camera, FanCamera } from './camera';
 import { setFlip } from './flip';
 import { latinOf } from './brackets';
 import { SPECIES_PX } from './gapnames';
-import type { FanBranch } from './layout';
+import { laneW, leftAt, type FanBranch } from './layout';
 import { loadMammalsFromFiles } from './mammals-node';
 import { mammaliaClade } from './panthera';
-import { picBox } from './pics';
+import { PIC_D, picBox } from './pics';
 import { mammaliaTree } from './splits';
 import type { Steady } from './steady';
 import { chainOf, FanView, levelClade, type CutLabels, type Level } from './view';
@@ -116,13 +116,12 @@ function tapAt(r: Rig, x: number, y: number): void {
 }
 
 /** Why a pictured hominin has no name here (tipLabels' reasons, and the ones it never gets to), or 'named'. */
-type Why = 'named' | 'on the column' | 'off screen' | 'no room' | 'crossed' | 'meets';
+type Why = 'named' | 'on the column' | 'off screen' | 'crossed' | 'meets';
 const SAY_WHY: Record<Why, string> = {
   named: 'named',
   'on the column': 'none: it has a lane of its own on the labels’ line',
-  'off screen': 'off screen (its tip, or its band at the screen’s edge)',
-  'no room': 'no room (its band narrower than a name)',
-  crossed: 'no room clear of the lines across its band after its tip',
+  'off screen': 'off screen (its tip: its line or its centre)',
+  crossed: 'another species’ column across every place for its name',
   meets: 'overlapping: its name meets a label',
 };
 
@@ -177,12 +176,66 @@ describe('fossils named and pictured at their own tip (ToLaD#279, #497)', () => 
     if (named(v, b)) return 'named';
     const missed = v.tipMissed.get(b.index);
     if (missed) return missed;
-    const { C, R } = (v.fan.tess.fold as Steady).rooms();
-    const w = R[b.index] * v.cam.sx;
-    const [c, line] = v.toScreen(C[b.index], b.tipY);
-    if (line < 0 || line > v.h || c + w / 2 < 0 || c - w / 2 > v.w) return 'off screen';
-    if (w < SPECIES_PX) return 'no room';
+    const [c, line] = tipAt(v, b);
+    if (line < 0 || line > v.h || c < 0 || c > v.w) return 'off screen';
     return 'on the column';
+  };
+  /** A strand's tip on screen: its line's centre across, its end along time. */
+  const tipAt = (v: FanView, b: FanBranch) => v.toScreen((v.fan.tess.fold as Steady).rooms().C[b.index], b.tipY);
+  /** Its band across on screen, px. */
+  const bandPx = (v: FanView, b: FanBranch) => (v.fan.tess.fold as Steady).rooms().R[b.index] * v.cam.sx;
+  /**
+   * The other species' columns across screen box `bx`, strand k's aside, a row every half px: none where a fossil's name or picture stands. Read here, column by column, not by
+   * view.ts clearIn (which reads a row every px); an edge that moves into the box by less than half a px between its rows is no crossing a screen shows.
+   */
+  const columnsAcross = (v: FanView, k: number, bx: readonly number[]) => {
+    const f = v.fan.tess.fold as Steady;
+    const [[lo, ya], [hi, yb]] = [v.toWorld(bx[0] + 0.5, bx[1]), v.toWorld(bx[2] - 0.5, bx[3])];
+    const n = Math.ceil(2 * (bx[3] - bx[1])) + 1;
+    const out: string[] = [];
+    for (const s of f.strands) {
+      if (s.index === k || s.tipY > Math.max(ya, yb) || s.splitY < Math.min(ya, yb)) continue;
+      for (let r = 0; r < n; r++) {
+        const y = ya + ((yb - ya) * r) / (n - 1);
+        if (y < s.tipY || y >= s.splitY) continue;
+        const w = laneW(s, y);
+        const l = leftAt(s, y, w);
+        if (w > 0 && l < Math.max(lo, hi) && l + w > Math.min(lo, hi)) {
+          out.push(s.sp.sci);
+          break;
+        }
+      }
+    }
+    return out;
+  };
+  /**
+   * The thin lines across screen box `bx` that a name reads over, as the column's names do (view.ts clearIn counts neither): a fork, a strand's step at its split from its slot in its parent's
+   * column to its own column, and a parent column's stretch, a strand's slot there (a row every px).
+   */
+  const thinAcross = (v: FanView, k: number, bx: readonly number[]) => {
+    const f = v.fan.tess.fold as Steady;
+    const { C } = f.rooms();
+    const [[lo, ya], [hi, yb]] = [v.toWorld(bx[0], bx[1]), v.toWorld(bx[2], bx[3])];
+    const [x0, x1, y0, y1] = [Math.min(lo, hi), Math.max(lo, hi), Math.min(ya, yb), Math.max(ya, yb)];
+    let [forks, stems] = [0, 0];
+    const n = Math.ceil(bx[3] - bx[1]) + 1;
+    for (const s of f.strands) {
+      if (s.index === k) continue;
+      if (s.splitY >= y0 && s.splitY <= y1) {
+        const l = leftAt(s, s.splitY);
+        if (Math.min(l, C[s.index]) < x1 && Math.max(l + s.baseW, C[s.index]) > x0) forks++;
+      }
+      for (let r = 0; r < n; r++) {
+        const y = y0 + ((y1 - y0) * r) / (n - 1);
+        if (y < s.splitY) continue;
+        const l = leftAt(s, y);
+        if (l < x1 && l + laneW(s, y) > x0) {
+          stems++;
+          break;
+        }
+      }
+    }
+    return { forks, stems };
   };
   /** Every label's boxes this frame, each with its owner: names, pills, pictures. */
   const boxes = (cut: CutLabels) => [
@@ -202,13 +255,24 @@ describe('fossils named and pictured at their own tip (ToLaD#279, #497)', () => 
       const both = rows.filter((q) => q.why === 'named' && q.pic).length;
       counts.push(both);
       say(`column ${r.w | 0}: the Hominins' landing, ${pics.length} pictured hominins, ${rows.filter((q) => q.why === 'named').length} named, ${both} named and pictured`);
-      for (const q of rows) if (q.why !== 'named' || !q.pic) say(`  ${q.b.sp.sci}: ${q.why === 'named' ? 'named; no picture, both sizes meeting a label' : SAY_WHY[q.why]}`);
+      for (const q of rows) if (q.why !== 'named' || !q.pic) say(`  ${q.b.sp.sci}: ${q.why === 'named' ? 'named; no picture, both sizes meeting a label or a column' : SAY_WHY[q.why]}`);
+      // (Where Neanderthals and H. floresiensis are; the thin lines the fossils' names read across.)
+      for (const sci of ['Homo neanderthalensis', 'Homo floresiensis']) {
+        const b = v.fan.branches.find((q) => q.sp.sci === sci)!;
+        const [c, line] = tipAt(v, b);
+        say(`  ${sci}: tip at ${c.toFixed(1)} px across (screen 0..${v.w | 0}), ${line.toFixed(1)} px along time (0..${v.h | 0}); band ${bandPx(v, b).toFixed(1)} px; ${why(v, b)}`);
+      }
+      const tipNames = v.cutLast!.names.filter((s) => s.key.startsWith('t'));
+      const thin = tipNames.map((s) => ({ s, ...thinAcross(v, s.b!.index, s.box) }));
+      say(`  fossils' names across a thin line: ${thin.filter((q) => q.forks + q.stems > 0).length} of ${tipNames.length} (${thin.filter((q) => q.forks + q.stems > 0).map((q) => `${q.s.text}: ${q.forks} forks, ${q.stems} stems`).join('; ')})`);
       expect(pics.length).toBe(22);
       // (No fossil unnamed with its tip on screen, room, and nothing in its way.)
       expect(rows.filter((q) => q.why === 'on the column' && q.b.sp.extinct).map((q) => q.b.sp.sci)).toEqual([]);
+      // (Neanderthals and H. erectus on the landing and named, ToLaD#279: Ita, "adjust the hominins so that i see also the neandertals ... and also erectus".)
+      for (const sci of ['Homo neanderthalensis', 'Homo erectus']) expect(why(v, v.fan.branches.find((q) => q.sp.sci === sci)!), `column ${r.w | 0}: ${sci}`).toBe('named');
     }
-    // (Before: 0 of 22, ToLaD#497. Now 7 on the 700 px column and 6 on the phone's, 9 and 8 named.)
-    expect(Math.min(...counts)).toBeGreaterThanOrEqual(6);
+    // (Before: 0 of 22, ToLaD#497; then 7 on the 700 px column and 6 on the phone's, 9 and 8 named (#520). Now 11 and 10, 14 and 14 named.)
+    expect(Math.min(...counts)).toBeGreaterThanOrEqual(10);
   }, 600_000);
 
   it('no two labels meet: the Hominins’ landing, home, Carnivora, Felidae, Panthera, Primates, Rodentia, Proboscidea, Cetacea', () => {
@@ -256,4 +320,88 @@ describe('fossils named and pictured at their own tip (ToLaD#279, #497)', () => 
     }
     expect(bad).toEqual([]);
   }, 1_200_000);
+
+  /** Every fossil's name and picture at its tip this frame that stands on another species' column (columnsAcross) or meets another label. */
+  const offRule = (v: FanView, tag: string) => {
+    const bs = boxes(v.cutLast!);
+    const bad: string[] = [];
+    for (const q of bs.filter((q) => q.who.startsWith('t'))) {
+      if (columnsAcross(v, +q.who.slice(1), q.box).length) bad.push(`${tag}: "${q.what}" on another species' column`);
+      for (const o of bs) if (o.who !== q.who && meets(o.box, q.box)) bad.push(`${tag}: "${q.what}" meets "${o.what}"`);
+    }
+    return bad;
+  };
+  const tipName = (v: FanView, b: FanBranch) => v.cutLast!.names.find((s) => s.key === `t${b.index}`);
+
+  it('a fossil whose band is thinner than its name is named on its branch, clear of every other column and every label (H. naledi at the Hominins’ landing)', () => {
+    const bad: string[] = [];
+    for (const r of rigs) {
+      const v = r.v;
+      hominins(r);
+      const b = v.fan.branches.find((q) => q.sp.sci === 'Homo naledi')!;
+      expect(bandPx(v, b)).toBeLessThan(SPECIES_PX);
+      const s = tipName(v, b);
+      expect(s, `column ${r.w | 0}: H. naledi named`).toBeTruthy();
+      // (On its branch: the name covers its line.)
+      const [c] = tipAt(v, b);
+      expect(s!.box[0] <= c && c <= s!.box[2]).toBe(true);
+      bad.push(...offRule(v, `column ${r.w | 0}, the Hominins' landing`));
+    }
+    expect(bad).toEqual([]);
+  }, 600_000);
+
+  it('Neanderthals, H. erectus and H. floresiensis are named where their tips are on screen: at the landing, else after a small pan', () => {
+    const bad: string[] = [];
+    for (const r of rigs) {
+      const v = r.v;
+      hominins(r);
+      const land = { ...v.cam };
+      for (const sci of ['Homo neanderthalensis', 'Homo erectus', 'Homo floresiensis']) {
+        const b = v.fan.branches.find((q) => q.sp.sci === sci)!;
+        v.cam = land;
+        P(v).camera.settle();
+        for (let k = 0; k < 2; k++) v.draw();
+        const [c0, l0] = tipAt(v, b);
+        const at = `at the landing: tip at ${c0.toFixed(1)}, ${l0.toFixed(1)} (screen ${v.w | 0} x ${v.h | 0}), ${why(v, b)}${pictured(v, b) ? ', pictured' : ''}`;
+        if (why(v, b) === 'named') {
+          say(`column ${r.w | 0}: ${sci} ${at}`);
+          continue;
+        }
+        // (The pan that brings its tip a picture's width inside the screen's edge.)
+        const dx = c0 < v.w / 2 ? PIC_D - c0 : v.w - PIC_D - c0;
+        v.cam = { ...land, cx: land.cx - dx / land.sx };
+        P(v).camera.settle();
+        for (let k = 0; k < 2; k++) v.draw();
+        const [c, line] = tipAt(v, b);
+        say(`column ${r.w | 0}: ${sci} ${at}; a pan of ${Math.abs(dx).toFixed(0)} px ${dx > 0 ? 'down' : 'up'} the column: tip at ${c.toFixed(1)}, ${line.toFixed(1)}, ${why(v, b)}${pictured(v, b) ? ', pictured' : ', no picture'}`);
+        expect(why(v, b), `column ${r.w | 0}: ${sci} after the pan`).toBe('named');
+        bad.push(...offRule(v, `column ${r.w | 0}, the pan to ${sci}`));
+      }
+    }
+    expect(bad).toEqual([]);
+  }, 600_000);
+
+  it('tipLabels’ time a frame: home, Primates, the Hominins’ landing', () => {
+    const proto = FanView.prototype as unknown as { tipLabels: (...a: unknown[]) => void };
+    const run = proto.tipLabels;
+    const hr = (proc as unknown as { hrtime: { bigint(): bigint } }).hrtime;
+    for (const r of rigs) {
+      const v = r.v;
+      for (const lv of [null, 'Primates', 'hominins']) {
+        if (lv === 'hominins') hominins(r);
+        else at(r, lv);
+        const each: number[] = [];
+        P(v).tipLabels = function (this: FanView, ...a: unknown[]) {
+          const t0 = hr.bigint();
+          run.apply(this, a);
+          each.push(Number(hr.bigint() - t0) / 1e6);
+        };
+        for (let k = 0; k < 40; k++) v.draw();
+        delete P(v).tipLabels;
+        each.sort((p, q) => p - q);
+        say(`column ${r.w | 0}, ${lv ?? 'home'}: tipLabels ${each[each.length >> 1].toFixed(3)} ms a frame, the median of ${each.length} (mean ${(each.reduce((p, q) => p + q, 0) / each.length).toFixed(3)})`);
+        expect(each.length).toBe(40);
+      }
+    }
+  }, 600_000);
 });
