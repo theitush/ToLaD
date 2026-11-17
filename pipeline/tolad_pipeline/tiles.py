@@ -418,7 +418,10 @@ def write_dated(path: Path, d: dict) -> None:
     path.write_text(json.dumps(d, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
 
 
-def write_all(root: Node, out: Path, log: dict, droot=None) -> None:
+def write_all(root: Node, out: Path, log: dict, droot=None, dataset: str = "mammals-v0", dated_skeleton: dict | None = None,
+              meta_extra: dict | None = None) -> None:
+    """Every file of the output. The amniote build (amniotes.py, ToLaD#539) names its own `dataset`, gives the dated
+    skeleton's shared tables (`dated_skeleton`, else dated.skeleton_meta's) and adds its own skeleton META keys."""
     out.mkdir(parents=True, exist_ok=True)
     tdir = out / "t"
     tdir.mkdir(exist_ok=True)
@@ -466,7 +469,7 @@ def write_all(root: Node, out: Path, log: dict, droot=None) -> None:
     mock = mock_individuals(root, where)
     log["mock_individuals"] = len(mock)
     meta = {
-        "format": "ToLaD tile format", "version": FORMAT_VERSION, "dataset": "mammals-v0",
+        "format": "ToLaD tile format", "version": FORMAT_VERSION, "dataset": dataset,
         "license": "CC BY 4.0 (derived; attribute the sources listed)",
         "built": "2026-10-09",
         "units": {"t0": "Ma", "t1": "Ma (0 = alive now)", "ever": "individuals ever born",
@@ -555,7 +558,9 @@ def write_all(root: Node, out: Path, log: dict, droot=None) -> None:
                            **{f: rl[f] for f in ("category", "source", "year", "taxon", "assessment")}})
         k += 1
     log["history"]["hist_sources"] = len(cites)
-    write_dated(ddir / "skeleton.json", {"tile": -1, **dated.skeleton_meta(droot), **dated.file_meta(droot, sk_rows),
+    meta.update(meta_extra or {})
+    sk_dated = dated.skeleton_meta(droot) if dated_skeleton is None else dated_skeleton
+    write_dated(ddir / "skeleton.json", {"tile": -1, **sk_dated, **dated.file_meta(droot, sk_rows),
                                           "all": dated.all_meta(droot, where)})
     secs, n = encode_rows(sk_rows, methods, tile_id, meta, cites)
     sk_size = write_container(out / "skeleton.tld", KIND_SKELETON, n, secs)

@@ -1,0 +1,62 @@
+# The amniote build's hand values (ToLaD#539; read by tolad_pipeline/amniotes.py, never by the mammal build).
+#
+#   [[dated_clade]]  a backbone split above the per-group dated trees: `between` names the two clades it joins
+#                    (each a group's crown, or another entry), `age` and its 95% interval `lo`-`hi` in Ma.
+#                    The build keeps a split older than every split and fossil below it (the existing rule:
+#                    a node is older than its oldest child and its oldest grafted fossil), so `age` is the
+#                    cited value unless the data below it are older; stats.json -> amniotes.backbone says which.
+#
+# All five come from one source, TimeTree 5's pairwise medians (research/amniote-sources.md, "Backbone ages").
+# TimeTree's terms do not permit redistributing its data; these are five cited numbers.
+
+[[dated_clade]]
+name = "Amniota"
+between = ["Mammalia", "Sauria"]
+age = 318.8
+lo = 316.7
+hi = 321.0
+reason = """Mammals vs reptiles and birds. TimeTree 5's median of the published times; Benton et al. 2015 give \
+318.0 Ma (hard minimum) to 332.9 Ma (soft maximum), Upham 2019's Anolis outgroup 319.5 Ma."""
+citation = """Kumar, S., Suleski, M., Craig, J.M. et al. (2022). TimeTree 5: an expanded resource for species \
+divergence times. Molecular Biology and Evolution 39: msac174. doi:10.1093/molbev/msac174 (timetree.org pairwise median)"""
+
+[[dated_clade]]
+name = "Sauria"
+between = ["Lepidosauria", "Archelosauria"]
+age = 280.7
+lo = 276.6
+hi = 284.8
+reason = """Lepidosaurs vs turtles and archosaurs. Benton et al. 2015: 255.9-295.9 Ma; Colston 2020's tree 276.5 Ma."""
+citation = """Kumar, S., Suleski, M., Craig, J.M. et al. (2022). TimeTree 5: an expanded resource for species \
+divergence times. Molecular Biology and Evolution 39: msac174. doi:10.1093/molbev/msac174 (timetree.org pairwise median)"""
+
+[[dated_clade]]
+name = "Archelosauria"
+between = ["Testudines", "Archosauria"]
+age = 256.8
+lo = 249.0
+hi = 264.7
+reason = """Turtles vs archosaurs. Colston 2020's tree: 264.0 Ma."""
+citation = """Kumar, S., Suleski, M., Craig, J.M. et al. (2022). TimeTree 5: an expanded resource for species \
+divergence times. Molecular Biology and Evolution 39: msac174. doi:10.1093/molbev/msac174 (timetree.org pairwise median)"""
+
+[[dated_clade]]
+name = "Archosauria"
+between = ["Crocodylia", "Aves"]
+age = 243.3
+lo = 239.6
+hi = 247.0
+reason = """Crocodilians vs birds. Younger than Benton et al. 2015's hard minimum of 247.1 Ma: the oldest \
+archosaur fossil will raise it once the fossils are grafted (build order step 6), by the rule above, not by hand."""
+citation = """Kumar, S., Suleski, M., Craig, J.M. et al. (2022). TimeTree 5: an expanded resource for species \
+divergence times. Molecular Biology and Evolution 39: msac174. doi:10.1093/molbev/msac174 (timetree.org pairwise median)"""
+
+[[dated_clade]]
+name = "Lepidosauria"
+between = ["Rhynchocephalia", "Squamata"]
+age = 245.0
+lo = 236.6
+hi = 253.4
+reason = """The tuatara vs lizards and snakes. Benton et al. 2015: 238.0-252.7 Ma; Tonini 2016's tree 246.9 Ma."""
+citation = """Kumar, S., Suleski, M., Craig, J.M. et al. (2022). TimeTree 5: an expanded resource for species \
+divergence times. Molecular Biology and Evolution 39: msac174. doi:10.1093/molbev/msac174 (timetree.org pairwise median)"""

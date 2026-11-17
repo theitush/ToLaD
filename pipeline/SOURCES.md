@@ -58,7 +58,7 @@ All files below were retrieved on **2026-10-09**.
 - **AnAge** (HAGR): its license terms are unclear, and COMBINE + PanTHERIA already cover longevity and maturity.
 - **OneZoom dated tree** (Duke et al. 2026): for all-life scale-out (plan step 5). Upham is the better mammal source.
   Its mammal ages are erratic against fossil-calibrated estimates (crown Canidae 32 Ma, Placentalia 129 Ma; `research/dated-tree-sources.md`).
-- **TimeTree 5** (Kumar et al. 2022): closest to the fossil-calibrated consensus, but its terms forbid redistributing its data "and its transformations". Spot checks only.
+- **TimeTree 5** (Kumar et al. 2022): closest to the fossil-calibrated consensus, but its terms forbid redistributing its data "and its transformations". Spot checks only for the mammals; the amniote build cites five of its pairwise medians as hand values (below, "The amniote build").
 
 ## Amniote inputs (ToLaD#535)
 
@@ -95,6 +95,23 @@ These sites refuse scripts (Dryad answers 401 from its API and 403 from its web 
 | AVOTREX (Sayol et al. 2024: 610 extinct birds, with placements), CC0 | small | Browser: https://datadryad.org/dataset/doi:10.5061/dryad.zgmsbcckk → `data/raw/amniotes/avotrex/` |
 | BirdLife bird range maps (BOTW) | several GB | A data request: datazone.birdlife.org. Non-commercial, no redistribution of the polygons |
 | IUCN reptile range maps (optional; GARD covers 80%) | n/c | An account: iucnredlist.org → Spatial data download, "Reptiles" |
+
+## The amniote build (ToLaD#539)
+
+`make build-amniotes` (`tolad_pipeline/amniotes.py`) writes `data/amniotes/` in the page's format: the living amniotes, with the mammal build grafted in unchanged as their Mammalia (so every mammal input above is an input here too). Steps 2-5 and 9 of [`research/amniote-sources.md`](../research/amniote-sources.md). It reads, from the amniote inputs above:
+
+| Input | What the build takes from it |
+|---|---|
+| Open Tree 16.1 Amniota subtree + the OTT 3.7.3 Amniota cut | The sauropsid topology (Mammalia cut out, the extinct tips dropped), ranks, `extinct` flags, synonyms, and the taxon names a "broken" clade gets back |
+| AvesData 1.7 + Clements 2025 crosswalk | The bird list (11,167 species, joined to Open Tree by OTT id), their dated tree, and their English names (eBird/Clements v2025) |
+| The Reptile Database 2026-10 | The reptile list (12,293 squamates, 365 turtles, 27 crocodilians, 1 tuatara); its order and family place a species no tree has |
+| Title et al. 2024 | The squamates' dates (6,663 of the 12,293 species; the rest join their genus, else their family, by name) |
+| Colston et al. 2020, tree 1 | The turtles' and crocodilians' dates (324 of 365; 26 of 27) |
+| Callaghan et al. 2021 | Bird counts today, with their 95% intervals (9,508 Clements species: exact names, then OTT synonyms) |
+
+**Backbone ages:** Kumar, S., Suleski, M., Craig, J.M. et al. (2022). TimeTree 5: an expanded resource for species divergence times. *Molecular Biology and Evolution* 39: msac174, doi:10.1093/molbev/msac174. Five pairwise medians with their intervals, cited one by one in `pipeline/amniotes.toml` (`[[dated_clade]]`): Amniota 318.8 Ma (316.7-321.0), Sauria 280.7 (276.6-284.8), Archelosauria 256.8 (249.0-264.7), Archosauria 243.3 (239.6-247.0), Lepidosauria 245.0 (236.6-253.4). Five cited numbers, not a copy of its data.
+
+**Assumed:** no source gives a bird or reptile generation length yet, so a bird's or reptile's births use G = 7 yr (`amniotes.ASSUMED_GEN_YR`, the page's own fallback), said in every such row's method. Step 7 replaces it (Bird et al. 2020 for birds; a mass-based estimate from ReptTraits for reptiles).
 
 ## Manual overrides
 

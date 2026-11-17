@@ -1,5 +1,5 @@
 # ToLaD data pipeline v0 (mammals). `make` = fetch (verify pinned checksums) + build + test.
-.PHONY: all fetch fetch-amniotes build test audit wiki globe
+.PHONY: all fetch fetch-amniotes build build-amniotes test audit wiki globe
 
 all: fetch build test
 
@@ -14,6 +14,12 @@ fetch-amniotes:
 
 build:
 	uv run python -I -m tolad_pipeline.build
+
+# The amniotes (ToLaD#539): the living Amniota tree, dated per group, with the mammal build grafted in as its Mammalia,
+# into data/amniotes/ (amniotes.py; its hand values in amniotes.toml). Runs the mammal build in-process and writes
+# nothing of it: data/mammals stays as `make build` left it. Not part of `make`.
+build-amniotes:
+	uv run python -I -m tolad_pipeline.amniotes
 
 test:
 	uv run python -I -m unittest discover -s tests -t .
