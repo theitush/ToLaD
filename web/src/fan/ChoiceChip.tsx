@@ -68,11 +68,17 @@ export function ChoiceChip<T extends string>({
   const id = `chip-${(param ?? name).replace(/\W+/g, '-')}`;
   const cur = choices.find((c) => c.value === value) ?? choices[0];
 
-  // Open: the menu kept on the screen (shifted in from an edge, as a popover's "shift"), and the current choice focused,
-  // so the arrows and Enter work from the keyboard (no ring after a tap: focus-visible).
+  // Open: the menu under the chip, its right edge on the chip's (fixed: the bar's chips scroll sideways in a row that
+  // would clip it, ToLaD#538), kept on the screen (shifted in from an edge, as a popover's "shift"), and the current
+  // choice focused, so the arrows and Enter work from the keyboard (no ring after a tap: focus-visible).
   useLayoutEffect(() => {
     const m = menu.current;
-    if (!open || !m) return;
+    const b = root.current;
+    if (!open || !m || !b) return;
+    const c = b.getBoundingClientRect();
+    m.style.top = `${c.bottom + 6}px`;
+    m.style.right = `${document.documentElement.clientWidth - c.right}px`;
+    m.style.minWidth = `${c.width}px`;
     m.style.transform = '';
     const r = m.getBoundingClientRect();
     const pad = 8;

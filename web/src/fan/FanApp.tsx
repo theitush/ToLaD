@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Pointer
 import { flushSync } from 'react-dom';
 import { approxMa, formatCount, formatMass } from '../data/count';
 import { HistorySpark } from './HistorySpark';
-import type { Measure } from './layout';
+import { fossilOrder, type FossilOrder, type Measure } from './layout';
 import { drawStub, wikiOf, type WikiRec } from './wiki';
 import { RangeGlobe } from './Globe';
 import { Alone, AloneImg, useAlone } from './Alone';
@@ -96,6 +96,15 @@ function initialForkNames(): ForkNaming {
 export const FOSSIL_CHOICES: Choice<'all' | 'old'>[] = [
   { value: 'all', short: 'all', label: 'every fossil' },
   { value: 'old', short: 'old', label: 'old: dated tree only' },
+];
+
+/**
+ * Where the fossils placed by name stand among their sisters (ToLaD#538, `?fossilorder=age`, layout.ts FossilOrder): after
+ * the living, the longest-lived first (today's), or by age, the oldest nearest its fork. The layout reads it once, so a pick reloads.
+ */
+export const FOSSIL_ORDER_CHOICES: Choice<FossilOrder>[] = [
+  { value: 'after', short: 'after the living', label: 'after the living, longest-lived first' },
+  { value: 'age', short: 'by age', label: 'by age: the oldest nearest its fork' },
 ];
 
 export function FanApp() {
@@ -215,43 +224,57 @@ export function FanApp() {
         </div>
       )}
       <div className="bar" ref={barRef} style={viewReady ? undefined : { visibility: 'hidden' }}>
-        {/* ToLaD#537: each chip opens its choices (ChoiceChip); a pick applies, the address kept in step. */}
-        {/* ToLaD#373, #434: the upper clades named at their forks, on leaders off them, or in the stack over "now". */}
-        <ChoiceChip
-          name="fork names"
-          title="Upper clades' names: on the gaps above them (the tree on its side), at their forks, on leaders off them, or off (the stack over now)"
-          param="forknames"
-          choices={FORK_NAMING_CHOICES}
-          value={forks}
-          onPick={(m) => {
-            placeRef.current = viewRef.current?.place() ?? null;
-            forkNaming(m);
-            setSel(null);
-            setForks(m);
-          }}
-        />
-        {/* ToLaD#377, #402, #439: how a fork with too little height is drawn: a rectangular tree's corner, and a stem wider than tall a line (thin), or a ribbon (peel, the old look). */}
-        <ChoiceChip
-          name="forks"
-          title="Forks: thin lines for wide stems, or peeling ribbons"
-          param="forks"
-          choices={FORK_CHOICES}
-          value={forkLook}
-          onPick={(m) => {
-            setForkMode(m);
-            setForkLook(m);
-            viewRef.current?.request();
-          }}
-        />
-        {/* ToLaD#279: every fossil on the tree is the page; the old look (the dated phylogeny's fossils only) to compare. Its own data files, so a reload. */}
-        <ChoiceChip
-          name="fossils"
-          title="Fossils: every one on the tree (new), or only those in the dated phylogeny (old), to compare"
-          param="fossils"
-          choices={FOSSIL_CHOICES}
-          value={fossilsAll ? 'all' : 'old'}
-          reload
-        />
+        {/* ToLaD#537: each chip opens its choices (ChoiceChip); a pick applies, the address kept in step. ToLaD#538: the chips
+            in one row that scrolls sideways where it does not fit, the search and the globe pinned at its right. */}
+        <div className="chips">
+          {/* ToLaD#373, #434: the upper clades named at their forks, on leaders off them, or in the stack over "now". */}
+          <ChoiceChip
+            name="fork names"
+            title="Upper clades' names: on the gaps above them (the tree on its side), at their forks, on leaders off them, or off (the stack over now)"
+            param="forknames"
+            choices={FORK_NAMING_CHOICES}
+            value={forks}
+            onPick={(m) => {
+              placeRef.current = viewRef.current?.place() ?? null;
+              forkNaming(m);
+              setSel(null);
+              setForks(m);
+            }}
+          />
+          {/* ToLaD#377, #402, #439: how a fork with too little height is drawn: a rectangular tree's corner, and a stem wider than tall a line (thin), or a ribbon (peel, the old look). */}
+          <ChoiceChip
+            name="forks"
+            title="Forks: thin lines for wide stems, or peeling ribbons"
+            param="forks"
+            choices={FORK_CHOICES}
+            value={forkLook}
+            onPick={(m) => {
+              setForkMode(m);
+              setForkLook(m);
+              viewRef.current?.request();
+            }}
+          />
+          {/* ToLaD#279: every fossil on the tree is the page; the old look (the dated phylogeny's fossils only) to compare. Its own data files, so a reload. */}
+          <ChoiceChip
+            name="fossils"
+            title="Fossils: every one on the tree (new), or only those in the dated phylogeny (old), to compare"
+            param="fossils"
+            choices={FOSSIL_CHOICES}
+            value={fossilsAll ? 'all' : 'old'}
+            reload
+          />
+          {/* ToLaD#538: the fossils placed by name after their living sisters (today's), or by age, the oldest nearest the fork they hang from (the old look has none). */}
+          {fossilsAll && (
+            <ChoiceChip
+              name="fossil order"
+              title="Fossils placed by name: after their living sisters, the longest-lived first (today's), or by age, the oldest nearest the fork they hang from"
+              param="fossilorder"
+              choices={FOSSIL_ORDER_CHOICES}
+              value={fossilOrder()}
+              reload
+            />
+          )}
+        </div>
         <button
           type="button"
           className="icon"

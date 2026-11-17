@@ -3,7 +3,7 @@
 // genealogy recurrence on the summed population, geometry fixed in the world.
 import { describe, expect, it } from 'vitest';
 import { FanCamera } from './camera';
-import { columnsAt, isNode, laneAt, layoutFan, leftAt, nodeQ, type Fan, type FanBranch, type FanNode, type WidthMode } from './layout';
+import { columnsAt, fossilOrder, isNode, laneAt, layoutFan, leftAt, nodeQ, type Fan, type FanBranch, type FanNode, type WidthMode } from './layout';
 import { FELIDAE } from './panthera';
 import { parentShare, Q_STAR } from './population';
 import { allSplits, FELIDAE_TREE, speciesUnder } from './splits';
@@ -42,8 +42,10 @@ describe('the dated tree', () => {
       expect(new Set(f.branches.map((b) => b.sp.sci)).size).toBe(FELIDAE.species.length);
       expect(f.nodes.length).toBe(allSplits().length);
       // Each split's daughters are its table's, maybe mirrored; every column holds exactly its split's species. (Daughters that are only fossils placed by name
-      // come after the others, the longest-lived first: layout.ts placedLast, ToLaD#279, #468.)
+      // come after the others: the longest-lived first, or by age (TOLAD_FOSSILORDER=age, the page's `?fossilorder=age`), the earliest first appearance
+      // first, the longest-lived first among equals: layout.ts placeFossils, ToLaD#279, #468, #538.)
       const tipOf = (k: FanNode | FanBranch): number => (isNode(k) ? Math.min(...k.strands.map((b) => b.tipY)) : k.tipY);
+      const firstOf = (k: FanNode | FanBranch): number => Math.max(...(isNode(k) ? k.strands : [k]).map((b) => b.sp.t0));
       const placed = (k: FanNode | FanBranch) => (isNode(k) ? k.strands : [k]).every((b) => b.sp.placed);
       for (const v of f.nodes) {
         expect(v.strands.map((b) => b.sp.sci).sort()).toEqual(speciesUnder(v.split).filter((n) => f.branches.some((b) => b.sp.sci === n)).sort());
@@ -51,7 +53,13 @@ describe('the dated tree', () => {
         const rest = v.kids.filter((k) => !placed(k));
         const late = v.kids.filter(placed);
         expect(v.kids, v.split.name).toEqual([...rest, ...late]);
-        for (let i = 1; i < late.length; i++) expect(tipOf(late[i - 1]), v.split.name).toBeLessThanOrEqual(tipOf(late[i]));
+        for (let i = 1; i < late.length; i++) {
+          if (fossilOrder() === 'after') expect(tipOf(late[i - 1]), v.split.name).toBeLessThanOrEqual(tipOf(late[i]));
+          else {
+            expect(firstOf(late[i - 1]), v.split.name).toBeGreaterThanOrEqual(firstOf(late[i]));
+            if (firstOf(late[i - 1]) === firstOf(late[i])) expect(tipOf(late[i - 1]), v.split.name).toBeLessThanOrEqual(tipOf(late[i]));
+          }
+        }
         const names = rest.map(name);
         const table = v.split.kids.map((k) => (typeof k === 'string' ? k : k.name + k.ageMa)).filter((n) => names.includes(n));
         expect([table, [...table].reverse()]).toContainEqual(names);

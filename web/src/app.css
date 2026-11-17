@@ -579,10 +579,28 @@
   border-color: rgba(63, 210, 134, 0.45);
   box-shadow: none;
 }
-/* With every toggle shown (a split design and its window) the buttons wrap rather than run off the left edge. */
+/* The bar keeps to one row (ToLaD#538): its chips scroll sideways where they do not fit, from the first, the search and
+   the globe pinned at its right; never past the screen's left edge, never a second row over the tree. */
 .fan .bar {
-  flex-wrap: wrap;
+  max-width: calc(100% - 20px);
   justify-content: flex-end;
+}
+.fan .bar > button,
+.fan .bar > .chips > .chip {
+  flex: none;
+  white-space: nowrap;
+}
+.fan .bar > .chips {
+  flex: 0 1 auto;
+  min-width: 0;
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+.fan .bar > .chips::-webkit-scrollbar {
+  display: none;
 }
 /* The search (ToLaD#157): a magnifier in the bar; open, a field over the bar and the matches under it. */
 .fan .bar button.icon {
@@ -620,13 +638,12 @@
   inset: 0;
   z-index: 4;
 }
+/* (Fixed, under its chip: ChoiceChip sets its top, right and least width from the chip's place, the chips' row clipping
+   anything inside it.) */
 .fan .chip-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
+  position: fixed;
   z-index: 5;
   display: grid;
-  min-width: 100%;
   max-width: calc(100vw - 16px);
   padding: 4px;
   background: rgba(12, 23, 20, 0.94);
