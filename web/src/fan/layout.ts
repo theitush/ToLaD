@@ -299,6 +299,21 @@ const clampW = (v: number, w: number) => Math.min(w, Math.max(0, v));
 const XR_ROWS = 512;
 /** How many heights xRange reads a folded strand's edge at, at most (exact folds). */
 const XR_N = 48;
+/** One of xRange's tables (xTable): its fold, version, grid and span, its rows (kA..kB by st), and per strand its edge's least and most (L, R), filled as asked (got: the table's generation). */
+interface XTable {
+  fold: Fold;
+  ver: number;
+  h: number;
+  y0: number;
+  y1: number;
+  kA: number;
+  kB: number;
+  st: number;
+  gen: number;
+  got: Int32Array;
+  L: Float64Array;
+  R: Float64Array;
+}
 
 /**
  * Branch b's width and green lane's width at world y: [w, gw], exact. Above
@@ -409,6 +424,7 @@ export class Tess {
     if (f && f.gridH > 0) {
       const t = this.xTable(y0, y1, slot);
       const i = b.index;
+      if (t.got[i] !== t.gen) this.xFill(t, i);
       if (t.L[i] > t.R[i]) return [Infinity, -Infinity];
       const wMax = Math.max(b.baseW, lo < b.splitY ? b.unit * g(b.pop.max, this.mode) : 0);
       const l = t.L[i] - wMax;
@@ -482,14 +498,17 @@ export class Tess {
   }
 
   /**
-   * The folded strands' edges (fold.left: a left edge, or an own column's centre) over the world heights
-   * [y0, y1], every strand's at once (xRange, folded on a grid): per strand the least and most of its edge at
-   * the fold's rows from the row at or above y0 to the one at or below y1 (every one, or XR_ROWS + 1 evenly
-   * strided over a longer span: there each widened where the edge turns back between two by half the larger step
-   * beside it). Rows above a strand's tip or below the bottom count too (only wider). The last two tables kept for
-   * the fold's version and grid, one serving any span within its own (the lanes' a frame, the individuals' within it).
+   * The folded strands' edges (fold.rowX: a left edge, or an own column's centre) over the world heights
+   * [y0, y1] (xRange, folded on a grid): per strand the least and most of its edge at the fold's rows from the row at
+   * or above y0 to the one at or below y1 (every one, or XR_ROWS + 1 evenly strided over a longer span: there each
+   * widened where the edge turns back between two by half the larger step beside it). Rows above a strand's tip or
+   * below the bottom count too (only wider). The last two tables kept for the fold's version and grid, one serving
+   * any span within its own (the lanes' a frame, the individuals' within it).
+   *
+   * A table is filled strand by strand, as each is asked (xFill, ToLaD#502): the draw asks only of the strands that may
+   * show (Steady.offSide), so a frame reads the rows of those, not every strand's.
    */
-  private xTable(y0: number, y1: number, slot = -1): { L: Float64Array; R: Float64Array } {
+  private xTable(y0: number, y1: number, slot = -1): XTable {
     const f = this.fold!;
     // (A table over a span holding this one does: wider only. The individuals' spans lie within the lanes'.)
     // (`slot` (2): a caller's own table (the labels' boxes, ToLaD#255), apart from the draw's two, which it never widens.)
@@ -500,7 +519,7 @@ export class Tess {
     }
     const S = f.strands.length;
     const at = slot >= 0 ? slot : this.xNext;
-    const t = this.xTables[at] ?? { fold: f, ver: 0, h: 0, y0: 0, y1: 0, L: new Float64Array(S), R: new Float64Array(S), prev: new Float64Array(S), dPrev: new Float64Array(S) };
+    const t = this.xTables[at] ?? { fold: f, ver: 0, h: 0, y0: 0, y1: 0, kA: 0, kB: -1, st: 1, gen: 0, got: new Int32Array(S), L: new Float64Array(S), R: new Float64Array(S) };
     this.xTables[at] = t;
     if (slot < 0) this.xNext ^= 1;
     t.fold = f;
@@ -508,59 +527,69 @@ export class Tess {
     t.h = f.gridH;
     t.y0 = y0;
     t.y1 = y1;
-    const { L, R, prev, dPrev } = t;
-    L.fill(Infinity);
-    R.fill(-Infinity);
+    t.gen = ++this.xGen;
     const h = f.gridH;
     const a = Math.max(y0, this.tipMin);
     const z = Math.min(y1, this.bottom);
+    // (No rows: every strand's edge nowhere, [Infinity, -Infinity].)
+    t.kA = 0;
+    t.kB = -1;
+    t.st = 1;
     if (!(z >= a)) return t;
-    const kA = Math.floor(a / h);
-    const kB = Math.max(kA, Math.ceil(z / h));
+    t.kA = Math.floor(a / h);
+    t.kB = Math.max(t.kA, Math.ceil(z / h));
     // (Every row over a screen's height or so (the grid is about 3 px: the draw's spans), exact at the rows and the edge
     // linear between them; strided beyond.)
-    const st = Math.max(1, Math.ceil((kB - kA) / XR_ROWS));
+    t.st = Math.max(1, Math.ceil((t.kB - t.kA) / XR_ROWS));
+    return t;
+  }
+
+  /** Table t's strand i: its edge's least and most over the table's rows (xTable). */
+  private xFill(t: XTable, i: number): void {
+    const f = t.fold;
+    const { kA, kB, st, h } = t;
+    t.got[i] = t.gen;
+    let L = Infinity;
+    let R = -Infinity;
+    if (kB < kA) {
+      t.L[i] = L;
+      t.R[i] = R;
+      return;
+    }
+    let prev = 0;
+    let dPrev = 0;
     let first = true;
     for (let k = kA; ; k = Math.min(kB, k + st)) {
-      const xs = f.rowXs(k);
+      const x = f.rowX(i, k * h);
       if (first) {
-        for (let i = 0; i < S; i++) {
-          const x = xs[i];
-          L[i] = R[i] = prev[i] = x;
-          dPrev[i] = 0;
-        }
+        L = R = prev = x;
+        dPrev = 0;
         first = false;
       } else if (st === 1) {
         // (Every row: the edge is linear between two, within them.)
-        for (let i = 0; i < S; i++) {
-          const x = xs[i];
-          if (x < L[i]) L[i] = x;
-          else if (x > R[i]) R[i] = x;
-        }
+        if (x < L) L = x;
+        else if (x > R) R = x;
       } else {
-        for (let i = 0; i < S; i++) {
-          const x = xs[i];
-          if (x < L[i]) L[i] = x;
-          if (x > R[i]) R[i] = x;
-          // (Where the edge turns back, at the row before, it may reach past it between: by half the larger step beside.)
-          const p = prev[i];
-          const dx = x - p;
-          const dp = dPrev[i];
-          if ((dp > 0 && dx < 0) || (dp < 0 && dx > 0)) {
-            const over = 0.5 * Math.max(Math.abs(dx), Math.abs(dp));
-            if (dp > 0) R[i] = Math.max(R[i], p + over);
-            else L[i] = Math.min(L[i], p - over);
-          }
-          dPrev[i] = dx;
-          prev[i] = x;
+        if (x < L) L = x;
+        if (x > R) R = x;
+        // (Where the edge turns back, at the row before, it may reach past it between: by half the larger step beside.)
+        const dx = x - prev;
+        if ((dPrev > 0 && dx < 0) || (dPrev < 0 && dx > 0)) {
+          const over = 0.5 * Math.max(Math.abs(dx), Math.abs(dPrev));
+          if (dPrev > 0) R = Math.max(R, prev + over);
+          else L = Math.min(L, prev - over);
         }
+        dPrev = dx;
+        prev = x;
       }
       if (k >= kB) break;
     }
-    return t;
+    t.L[i] = L;
+    t.R[i] = R;
   }
-  private readonly xTables: { fold: Fold; ver: number; h: number; y0: number; y1: number; L: Float64Array; R: Float64Array; prev: Float64Array; dPrev: Float64Array }[] = [];
+  private readonly xTables: XTable[] = [];
   private xNext = 0;
+  private xGen = 0;
   /** The highest tip of any strand (the folded rows over xTable start no higher). */
   private get tipMin(): number {
     if (this.tipMin_ === undefined) this.tipMin_ = Math.min(...this.fold!.strands.map((s) => s.tipY));

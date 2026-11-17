@@ -520,6 +520,9 @@ export abstract class Fold {
   /** The grid's row k's edges per strand (left(i, k * gridH) for every strand i at once). */
   abstract rowXs(k: number): Float64Array;
 
+  /** Strand i's entry in the row at world height y (rowXs', one strand: no row made, ToLaD#502). */
+  abstract rowX(i: number, y: number): number;
+
   /** The grid's row k's extent of strands i0..i1 (world [left, right]): strand i0's left edge to strand i1's right. */
   /** (Into out when given: no tuple a row, the draw's merged clades, ToLaD#255.) */
   abstract extent(i0: number, i1: number, k: number, out?: [number, number]): [number, number];
