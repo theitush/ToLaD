@@ -147,6 +147,59 @@ class PhylacineNotes(unittest.TestCase):
         self.assertEqual(notes["Canis latrans"]["class"], "people")
 
 
+def _cells(*xs):
+    return frozenset((0, x) for x in xs)
+
+
+class TodayMaps(unittest.TestCase):
+    """ToLaD#507: today's map where PHYLACINE's note moves land between species or deletes bad records."""
+
+    def test_swapped_pair_takes_the_corrected_cells(self):
+        # the night monkeys: A's current map holds 2..5, which the note gives to B (B's natural map); B's current
+        # map is cell 6 only
+        a = {"cur": _cells(0, 1, 2, 3, 4, 5), "nat": _cells(0, 1)}
+        b = {"cur": _cells(6), "nat": _cells(2, 3, 4, 5, 6)}
+        got_a, _ = R.subject_map("taxonomy", a["cur"], a["nat"], b, "B")
+        got_b, why_b = R.subject_map("taxonomy", b["cur"], b["nat"], a, "A")
+        self.assertEqual(got_a, _cells(0, 1))
+        self.assertEqual(got_b, _cells(2, 3, 4, 5, 6))
+        self.assertIn("4 cells taken from A's current map", why_b)
+        # as the partner of a note: its current map minus the cells given away (same answer)
+        self.assertEqual(R.partner_map(a["cur"], a["nat"], b["nat"], "B")[0], _cells(0, 1))
+
+    def test_mixed_note_is_left_as_it_is(self):
+        # B's natural map also adds cell 9, in no current map: PHYLACINE's own historic range, not moved land
+        a = {"cur": _cells(0, 1, 2), "nat": _cells(0, 1, 2)}
+        got, why = R.subject_map("taxonomy", _cells(6), _cells(2, 6, 9), a, "A")
+        self.assertIsNone(got)
+        self.assertIn("1 of its 2 cells changed", why)
+        # A keeps every current cell in its own natural map: nothing to take off it
+        self.assertIsNone(R.partner_map(a["cur"], a["nat"], _cells(2, 6, 9), "B")[0])
+        # a merger with no mapped partner, and a mapping fix that adds cells: left too
+        self.assertIsNone(R.subject_map("taxonomy", _cells(0), _cells(0, 1), None)[0])
+        self.assertIsNone(R.subject_map("mapping", _cells(0, 1), _cells(0, 2), None)[0])
+
+    def test_deleted_records_come_off(self):
+        got, why = R.subject_map("mapping", _cells(0, 1, 2, 3), _cells(0, 1), None)
+        self.assertEqual(got, _cells(0, 1))
+        self.assertIn("2 cells of the records the note deletes", why)
+
+    @unittest.skipUnless((RAW / R.ZIP_REL).exists(), "no PHYLACINE zip in data/raw")
+    def test_phylacine_pairs(self):
+        t = R.today_maps(RAW)
+        cells = {k: (v["cells_map"], v["cells"]) for k, v in t.items()}
+        self.assertEqual(cells["Aotus zonalis"], (42, 20))  # the Colombian part given to A. jorgehernandezi
+        self.assertEqual(cells["Aotus jorgehernandezi"], (1, 25))
+        self.assertEqual(cells["Tupaia palawanensis"], (12, 9))
+        self.assertEqual(cells["Tupaia moellendorffi"], (0, 3))
+        self.assertEqual(cells["Eudorcas rufifrons"], (326, 304))
+        self.assertEqual(cells["Mormopterus acetabulosus"], (4, 2))  # rare migrants' records deleted
+        # mixed notes and partners whose current map holds none of the moved land: unchanged
+        for sp in ("Rhinopithecus strykeri", "Rhinopithecus bieti", "Lepilemur hollandorum", "Lepilemur seali",
+                   "Eupleres major", "Eupleres goudotii", "Cheirogaleus medius", "Eudorcas rufina"):
+            self.assertIsNone(cells[sp][1], sp)
+
+
 def _stats():
     p = DATA / "stats.json"
     return json.loads(p.read_text()) if p.exists() else None
@@ -175,15 +228,28 @@ class Build(unittest.TestCase):
         self.assertEqual(rows["Panthera uncia"]["area_ratio"], 1.0)
 
     def test_phylacine_notes_flat_people_rise(self):
-        # ToLaD#507: the night monkeys, the stray-migrant bat and the placeholder gerbil are flat from 1500;
-        # the coyote, the house mouse and the rats still rise
+        # ToLaD#507: the night monkeys, the stray-migrant bat and the tree shrews are flat from 1500; the
+        # placeholder species are unknown, with no natural level; the coyote, the house mouse and the rats still rise
         flat = {r["leaf"] for r in self.st["natural_baseline"]["phylacine_note_today"]}
         for sp in ("Aotus zonalis", "Aotus jorgehernandezi", "Mormopterus acetabulosus", "Tupaia palawanensis",
-                   "Gerbillus agag", "Makalata obscura"):
+                   "Tupaia moellendorffi"):
             self.assertIn(sp, flat)
+        unknown = {r["leaf"] for r in self.st["count_unknown"]["list"]}
+        self.assertTrue({"Gerbillus agag", "Makalata obscura"} <= unknown)
+        self.assertFalse(unknown & flat)
         rises = {r["leaf"] for r in self.st["rangeloss"]["rises_list"]}
-        self.assertFalse(rises & flat)
+        self.assertFalse(rises & (flat | unknown))
         self.assertTrue({"Canis latrans", "Mus musculus", "Rattus norvegicus", "Rattus rattus"} <= rises)
+
+    def test_swapped_pair_counts_on_the_corrected_map(self):
+        # ToLaD#507: today's count of the night monkeys stands on PHYLACINE's corrected cells, ours alone
+        rows = {r["leaf"]: r for r in self.st["natural_baseline"]["phylacine_note_today"]}
+        self.assertEqual(rows["Aotus zonalis"]["cells_cur"], 20)
+        self.assertEqual(rows["Aotus jorgehernandezi"]["cells_cur"], 25)
+        tm = self.st["phylacine_ranges"]["today_maps"]
+        self.assertEqual((tm["Aotus zonalis"]["cells_map"], tm["Aotus zonalis"]["cells"]), (42, 20))
+        self.assertEqual(set(self.st["census_anchors"]["species_model_on_old_map"]),
+                         {"Aotus zonalis", "Aotus jorgehernandezi"})
 
     def test_extinct_have_no_current_area(self):
         for r in self.st["natural_baseline"]["showcase"]:

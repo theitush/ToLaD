@@ -88,6 +88,8 @@ F_STUB = 1 << 7
 F_ANCHORED = 1 << 8
 F_GRAFT = 1 << 9
 F_GROUP = 1 << 10
+F_COUNT_UNKNOWN = 1 << 11  # ToLaD#507: nobody knows today's count (model.count_unknown); ALIV is the thinnest
+F_RANGE_EX_PE = 1 << 12  # ToLaD#507: IUCN codes the whole mapped range Extinct or Possibly Extinct
 
 
 def node_flags(n: Node, stub: bool) -> int:
@@ -107,6 +109,10 @@ def node_flags(n: Node, stub: bool) -> int:
         f |= F_GRAFT
     if n.kind in ("group", "bucket"):
         f |= F_GROUP
+    if n.is_leaf and n.data.get("count_unknown"):
+        f |= F_COUNT_UNKNOWN
+    if n.is_leaf and n.data.get("range_ex_pe"):
+        f |= F_RANGE_EX_PE
     return f
 
 

@@ -40,6 +40,8 @@ export const FLAG = Object.freeze({
   ANCHORED: 1 << 8,
   GRAFT: 1 << 9,
   GROUP: 1 << 10,
+  COUNT_UNKNOWN: 1 << 11,
+  RANGE_EX_PE: 1 << 12,
 });
 
 export const GRADES = ['A', 'B', 'C', 'D'];

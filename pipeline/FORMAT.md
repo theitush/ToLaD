@@ -93,6 +93,8 @@ Bin 0 is the youngest (ends at `t1`) and bin 15 the oldest (starts at `t0`). Eac
 | 8 | anchored count: humans, an IUCN census figure, a domestic stock (FAOSTAT livestock, dogs, cats), or a curated history (`HIST`) |
 | 9 | PBDB fossil species graft |
 | 10 | created taxonomic group (genus, family or order from PBDB, or the "incertae sedis" bucket) |
+| 11 | count unknown (ToLaD#507): a living species PHYLACINE lists with an empty current map (IUCN maps no current range for it), Data Deficient on the IUCN Red List, and counted by no census or history file. Nobody knows how many there are. `ALIV` and the births are the thinnest a living species is drawn at (the smallest today's count of any other living species, `stats.json` → `count_unknown.thinnest`) over its whole band, so its share of the clade sums is negligible; it has no natural baseline (`NATB` all 0) |
+| 12 | range coded extinct (ToLaD#507): IUCN codes the species' whole mapped range Extinct or Possibly Extinct (PHYLACINE's note gives those cells back to its present-natural map; its current map is empty). Living species only |
 
 ### META
 

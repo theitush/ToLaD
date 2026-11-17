@@ -145,12 +145,12 @@ def main(argv: list[str] | None = None) -> int:
     root, ctx = build_tree(a.raw, a.work, log, t_start)
     log_step(t_start, "tree built")
 
-    from . import model, tiles
-    model.run(root, a.raw, ctx, log)
-    log_step(t_start, "counts modelled")
-    from . import redlist
+    from . import model, redlist, tiles
+    # (before the counts: a Data Deficient species with no current map and no count is unknown, ToLaD#507)
     redlist.attach(root, a.raw, ctx, log)
     log_step(t_start, f"Red List status: {log['red_list']['living_by_source']}")
+    model.run(root, a.raw, ctx, log)
+    log_step(t_start, "counts modelled")
     dj = log.get("history", {}).get("deep_join")
     if dj:  # the genomic deep past scaled to the next level (ToLaD#143): factors and species beyond the flag
         fq = dj["factor"]

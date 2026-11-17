@@ -98,6 +98,8 @@ def _today_src(n) -> str:
         return "history"
     if D.get("domestic"):
         return "domestic"
+    if D.get("count_unknown"):
+        return "unknown"  # nobody knows it: drawn at the thinnest, not a modelled level (ToLaD#507)
     meth = " ".join(D.get("meth", []))
     if "N:census" in meth:
         return "census"
