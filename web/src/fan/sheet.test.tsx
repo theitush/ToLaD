@@ -1,6 +1,8 @@
 // The species card as a bottom sheet (ToLaD#509): held to its share of the screen whatever is open, its head (the ×, the
 // name) outside its scroll, and closed by the ×, a swipe down and back.
 import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -10,6 +12,7 @@ import { FELIDAE } from './panthera';
 import { backEntry, sheetSwipe, SWIPE_CLOSE_SHARE } from './sheet';
 import { CARD_SHARE } from './view';
 
+const HERE = dirname(fileURLToPath(import.meta.url));
 const lion = FELIDAE.species.find((s) => s.common === 'Lion')!;
 
 describe('the card is a sheet held to its share (ToLaD#509)', () => {
@@ -25,13 +28,13 @@ describe('the card is a sheet held to its share (ToLaD#509)', () => {
 
   it('is held to CARD_SHARE of the screen with Details open: the sheet the one scroll, its lists not scrolling inside it', () => {
     expect(CARD_SHARE).toBeLessThanOrEqual(0.55);
-    const css = readFileSync(new URL('../app.css', import.meta.url), 'utf8');
+    const css = readFileSync(resolve(HERE, '..', 'app.css'), 'utf8');
     const rule = (sel: string) => css.slice(css.indexOf(`${sel} {`), css.indexOf('}', css.indexOf(`${sel} {`)));
     expect(rule('.fan .card-sp.sheet')).toMatch(/max-height: calc\(var\(--card-share, [\d.]+\) \* 100dvh/);
     expect(rule('.fan .card-sp.sheet > .body')).toContain('overflow-y: auto');
     expect(css).toMatch(/\.fan \.card-sp\.sheet \.more dl,\s*\.fan \.card-sp\.sheet \.hist-list \{\s*max-height: none;/);
     // (FanApp hands the share to the sheet's foot, so the cap and the room the landings leave (cardRoom) are one figure.)
-    expect(readFileSync(new URL('./FanApp.tsx', import.meta.url), 'utf8')).toContain("['--card-share' as string]: CARD_SHARE");
+    expect(readFileSync(resolve(HERE, 'FanApp.tsx'), 'utf8')).toContain("['--card-share' as string]: CARD_SHARE");
   });
 });
 
