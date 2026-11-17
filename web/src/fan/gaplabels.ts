@@ -170,16 +170,17 @@ export interface CutMember<G> {
  * The cut at zoom sx (ToLaD#483): the tree cut where groups have not handed their bands down (gapHands), and over it each group that has but not opened, its title only, before its parts; one whose
  * gap is its group's title's left out (that title names it), unless it is a guest in its widest part's band then (`guests`, ToLaD#500).
  */
-export function gapCut<G>(root: G, parts: (g: G) => readonly G[], opens: Map<G, number>, hands: Map<G, number>, same: (g: G, p: G) => boolean, sx: number, guests?: Map<G, Guest<G>>): CutMember<G>[] {
+export function gapCut<G>(root: G, parts: (g: G) => readonly G[], opens: Map<G, number>, hands: Map<G, number>, same: (g: G, p: G) => boolean, sx: number, guests?: Map<G, Guest<G>>, meets?: (g: G) => boolean): CutMember<G>[] {
   const out: CutMember<G>[] = [];
-  const stack: [G, boolean][] = [[root, false]];
+  // (`meets`: only the members it holds and their parts it holds, a branch it does not hold skipped whole: the cut walk over a window, labelindex.ts.)
+  const stack: [G, boolean][] = !meets || meets(root) ? [[root, false]] : [];
   while (stack.length) {
     const [g, taken] = stack.pop()!;
     const ps = parts(g);
     if (ps.length && (hands.get(g) ?? Infinity) <= sx) {
       const open = (opens.get(g) ?? Infinity) <= sx;
       if (!open && (!taken || sx < (guests?.get(g)?.until ?? 0))) out.push({ g, heads: true, taken });
-      for (let i = ps.length - 1; i >= 0; i--) stack.push([ps[i], !open && same(g, ps[i])]);
+      for (let i = ps.length - 1; i >= 0; i--) if (!meets || meets(ps[i])) stack.push([ps[i], !open && same(g, ps[i])]);
     } else out.push({ g, heads: false, taken });
   }
   return out;
@@ -234,30 +235,26 @@ export function picRanges(cands: readonly PicCand[], fullRoom: number, smallRoom
   // (Who has been placed: a range is held once its owner's turn has come.)
   const fullDone = new Uint8Array(n);
   const smallDone = new Uint8Array(n);
+  // (A held range [s, e) of a neighbour d away, rj its room: the zooms it blocks are [s, the first of e and where they part); one that meets [start, end) moves the start past it.)
+  const block = (start: number, end: number, s: number, e: number, room: number, rj: number, d: number): number => {
+    if (s >= e) return start;
+    const part = d > 0 ? (room + rj) / 2 / d : Infinity;
+    // (Both shown and meeting over [max(start, s), min(end, e, part)): wait until it parts or splits.)
+    return Math.max(start, s) < Math.min(end, e, part) ? Math.min(e, part) : start;
+  };
+  // (One scan each way, ToLaD#502: the start only grows, so a range it passed by never meets it later, and past the first neighbour far enough to part at the start, all part at any later
+  // one. So it ends where scanning again and again till nothing moves it ended: the least start no held range meets.)
   const place = (i: number, room: number, end: number, small: boolean): number => {
     const c = cands[i];
     let start = c.enter;
-    for (let moved = true; moved && start < end; ) {
-      moved = false;
-      for (const dir of [-1, 1]) {
-        for (let r = pos[i] + dir; r >= 0 && r < n; r += dir) {
-          const j = byAt[r];
-          const d = Math.abs(cands[j].at - c.at);
-          // (Past this one, nobody can meet it at any zoom it still waits for.)
-          if (d * start >= (room + fullRoom) / 2) break;
-          for (const [held, s, e, rj] of [
-            [fullDone[j], out[j].full, cands[j].exit, fullRoom],
-            [small ? smallDone[j] : 0, out[j].small, out[j].full, smallRoom],
-          ]) {
-            if (!held || s >= e) continue;
-            const part = d > 0 ? (room + rj) / 2 / d : Infinity;
-            // (Both shown and meeting over [max(start, s), min(end, e, part)): wait until it parts or splits.)
-            if (Math.max(start, s) < Math.min(end, e, part)) {
-              start = Math.min(e, part);
-              moved = true;
-            }
-          }
-        }
+    for (let dir = -1; dir <= 1; dir += 2) {
+      for (let r = pos[i] + dir; r >= 0 && r < n && start < end; r += dir) {
+        const j = byAt[r];
+        const d = Math.abs(cands[j].at - c.at);
+        // (Past this one, nobody can meet it at any zoom it still waits for.)
+        if (d * start >= (room + fullRoom) / 2) break;
+        if (fullDone[j]) start = block(start, end, out[j].full, cands[j].exit, room, fullRoom, d);
+        if (small && smallDone[j]) start = block(start, end, out[j].small, out[j].full, room, smallRoom, d);
       }
     }
     return Math.min(start, end);
