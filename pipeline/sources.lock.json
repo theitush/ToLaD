@@ -6,6 +6,182 @@
   "sha256": "c2914c4f99742bdabd58c17d89ebb9b67b34f0d3c1dd8c8caf35ee1a33f85aa8",
   "url": "https://raw.githubusercontent.com/sabifo4/mammals_dating/4c564448c0a99f84aa78f34f05dc24b926cdcbf6/02_SeqBayes_S2/03_Generate_final_mammal_tree/4705sp.tree"
  },
+ "amniotes/avesdata/OTT_crosswalk_2025.csv": {
+  "bytes": 3685459,
+  "post_body": null,
+  "retrieved": "2026-11-17",
+  "sha256": "b9db44d58f24b059610109b132f652d97e1dfcb35866015bf501991445bf84b3",
+  "url": "https://raw.githubusercontent.com/McTavishLab/AvesData/4af84f14f8f3df26bd4480202689b08ea0fc2c48/Taxonomy_versions/Clements2025/OTT_crosswalk_2025.csv"
+ },
+ "amniotes/avesdata/studies_per_tip.txt": {
+  "bytes": 1094528,
+  "post_body": null,
+  "retrieved": "2026-11-17",
+  "sha256": "388c9ca220034fe0067cfa043120d7fa455d14b9834f87304b6dc4c1cfc64ceb",
+  "url": "https://raw.githubusercontent.com/McTavishLab/AvesData/4af84f14f8f3df26bd4480202689b08ea0fc2c48/Tree_versions/Aves_1.7/Clements2025/studies_per_tip.txt"
+ },
+ "amniotes/avesdata/summary_dated_clements.nex": {
+  "bytes": 2077841,
+  "post_body": null,
+  "retrieved": "2026-11-17",
+  "sha256": "f973043745b1e56006136a5b4cabab1384f771a622c0282f68256ce02480bc42",
+  "url": "https://raw.githubusercontent.com/McTavishLab/AvesData/4af84f14f8f3df26bd4480202689b08ea0fc2c48/Tree_versions/Aves_1.7/Clements2025/summary_dated_clements.nex"
+ },
+ "amniotes/avonet/AVONET_Supplementary_dataset_1.xlsx": {
+  "bytes": 21524673,
+  "post_body": null,
+  "retrieved": "2026-11-17",
+  "sha256": "eb645e83dddb40f1654a3e8d721998dbca76eff540231b7b809267c1e96f8d3e",
+  "url": "https://ndownloader.figshare.com/files/34480856"
+ },
+ "amniotes/calfface_synapsid_metatree/mpt1.tre": {
+  "bytes": 35300,
+  "cut": [
+   "first_line"
+  ],
+  "post_body": null,
+  "retrieved": "2026-11-17",
+  "sha256": "24d32bf130a121e665c9073a22dbbb31b5e658f115c1ad4ba35177e03a58c9d2",
+  "url": "https://raw.githubusercontent.com/graemetlloyd/ProjectCalfFace/693779ca6d12dd197edbf5109884cbef8fcd0b2e/Trees/MPTs.tre"
+ },
+ "amniotes/callaghan2021/all_species_summary_table.csv": {
+  "bytes": 1164922,
+  "post_body": null,
+  "retrieved": "2026-11-17",
+  "sha256": "330658698091fc5506720ae2f0848246bedfff6d346f9672a4e27847778f833d",
+  "url": "https://zenodo.org/api/records/4723365/files/Tables.zip/content"
+ },
+ "amniotes/colston2020/colston2020_pastis_tree1.tre": {
+  "bytes": 15584,
+  "cut": [
+   "first_line"
+  ],
+  "post_body": null,
+  "retrieved": "2026-11-17",
+  "sha256": "746c893ae3b12130eb6d5b949bf0da190ac8c5f71014d2df13fce0602c7b879c",
+  "url": "https://zenodo.org/api/records/4986456/files/archosauromorpha_PASTIS_386_10000.trees/content"
+ },
+ "amniotes/gard17/Gard_1_7_ranges.cpg": {
+  "bytes": 5,
+  "post_body": null,
+  "retrieved": "2026-11-17",
+  "sha256": "3ad3031f5503a4404af825262ee8232cc04d4ea6683d42c5dd0a2f2a27ac9824",
+  "url": "https://zenodo.org/api/records/6499637/files/Gard_1_7_ranges.cpg/content"
+ },
+ "amniotes/gard17/Gard_1_7_ranges.dbf": {
+  "bytes": 3383534,
+  "post_body": null,
+  "retrieved": "2026-11-17",
+  "sha256": "463edcf27b1a4a86635171051445e617f67e33e4c006e1f3c20800780c0dbb92",
+  "url": "https://zenodo.org/api/records/6499637/files/Gard_1_7_ranges.dbf/content"
+ },
+ "amniotes/gard17/Gard_1_7_ranges.prj": {
+  "bytes": 145,
+  "post_body": null,
+  "retrieved": "2026-11-17",
+  "sha256": "a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4",
+  "url": "https://zenodo.org/api/records/6499637/files/Gard_1_7_ranges.prj/content"
+ },
+ "amniotes/gard17/Gard_1_7_ranges.shx": {
+  "bytes": 87412,
+  "post_body": null,
+  "retrieved": "2026-11-17",
+  "sha256": "07ea1d25fdf86aa28ec4bcdce0940fba5834e5025676bff43cdd847c7676f159",
+  "url": "https://zenodo.org/api/records/6499637/files/Gard_1_7_ranges.shx/content"
+ },
+ "amniotes/ioc/IOC_15.2_vs_other_lists.xlsx": {
+  "bytes": 6159747,
+  "post_body": null,
+  "retrieved": "2026-11-17",
+  "sha256": "1637a5b4948bec487ebc586924ecb4426811f0b645c9dfa73c17037d3b7147d3",
+  "url": "https://www.worldbirdnames.org/IOC_15.2_vs_other_lists.xlsx"
+ },
+ "amniotes/ioc/IOC_Names_File_Plus-15.2.xlsx": {
+  "bytes": 3581248,
+  "post_body": null,
+  "retrieved": "2026-11-17",
+  "sha256": "b3adbdc3f8f3e21bf8f0b5d5a52dcd79c8aa19e49b5441ac9dca74965f9aeb07",
+  "url": "https://www.worldbirdnames.org/IOC_Names_File_Plus-15.2.xlsx"
+ },
+ "amniotes/opentree/amniota_subtree.json": {
+  "bytes": 1615238,
+  "post_body": {
+   "format": "newick",
+   "height_limit": -1,
+   "label_format": "name_and_id",
+   "node_id": "ott229560"
+  },
+  "retrieved": "2026-11-17",
+  "sha256": "9d6dbb030a634edbcddb2fc2185fc29fec26e9987c365c4facd0a1c6a3ef034e",
+  "url": "https://api.opentreeoflife.org/v3/tree_of_life/subtree"
+ },
+ "amniotes/ott/amniota_synonyms.tsv": {
+  "bytes": 1995067,
+  "derived_from": "ott/ott3.7.3.tgz",
+  "retrieved": "2026-11-17",
+  "script": "pipeline/tolad_pipeline/ott_amniota.py",
+  "sha256": "a7e3d08b09a851d46fc9ff08e91075019a068820da11f11814c0bf13a8264947"
+ },
+ "amniotes/ott/amniota_taxonomy.tsv": {
+  "bytes": 6888191,
+  "derived_from": "ott/ott3.7.3.tgz",
+  "retrieved": "2026-11-17",
+  "script": "pipeline/tolad_pipeline/ott_amniota.py",
+  "sha256": "0586d4af86200ffcbcde323d83715085a03ce3f2462ed95ecbe0c10b9d1269e1"
+ },
+ "amniotes/pbdb/amniota_genera.json": {
+  "bytes": 6056963,
+  "post_body": null,
+  "retrieved": "2026-11-17",
+  "sha256": "bcf1d7c3ce85fb4e79c88b14557916659ea427b8ee03bad528f31eb9b7742b9c",
+  "url": "https://paleobiodb.org/data1.2/taxa/list.json?base_name=Amniota&rank=genus&taxon_status=accepted&pres=regular&show=app,parent,class&vocab=pbdb"
+ },
+ "amniotes/pbdb/amniota_species.json": {
+  "bytes": 11479261,
+  "post_body": null,
+  "retrieved": "2026-11-17",
+  "sha256": "6d1a5fecc2cd4db2a7e6c76ad96edf2ad08ae7628e9f758f6ac05076d82d1a74",
+  "url": "https://paleobiodb.org/data1.2/taxa/list.json?base_name=Amniota&rank=species&taxon_status=accepted&pres=regular&show=app,parent,class&vocab=pbdb"
+ },
+ "amniotes/reptiledb/reptile_checklist_2026_10.xlsx": {
+  "bytes": 733456,
+  "post_body": null,
+  "retrieved": "2026-11-17",
+  "sha256": "463275b93d1f2efc5dd467a120f380aa977d69ec7819a2cab2b7ae21a7bf88c5",
+  "url": "https://www.reptile-database.org/data/reptile_checklist_2026_10.xlsx"
+ },
+ "amniotes/repttraits/ReptTraits_v1-2.xlsx": {
+  "bytes": 18545434,
+  "post_body": null,
+  "retrieved": "2026-11-17",
+  "sha256": "74eb6fd0e2626c75bdbeacb50a08b1762eee42e2b3cfda4a0f1134b84971718a",
+  "url": "https://ndownloader.figshare.com/files/45408133"
+ },
+ "amniotes/tetradensity/TetraDENSITY_v2.5_Database.csv": {
+  "bytes": 15160428,
+  "post_body": null,
+  "retrieved": "2026-11-17",
+  "sha256": "3db53165034774f4bf62c1fe39a9e4cc4c9bf4721f132d05969f3966e72ad93a",
+  "url": "https://raw.githubusercontent.com/andrewzamp/TetraDENSITY/cfa9c059009ca5433d863b1a74d67bd1db1c047d/data/TetraDENSITY_v2.5_Database.csv"
+ },
+ "amniotes/title2024/squamates_Title_Science2024_ultrametric_constrained.tre": {
+  "bytes": 296587,
+  "post_body": null,
+  "retrieved": "2026-11-17",
+  "sha256": "269f8f0c8da3e950d6d4b8c40e4247d35b336d2c17cd21e8e596f73e93e54abe",
+  "url": "https://raw.githubusercontent.com/macroevolution/squamata/cff10111854513d2405144e40bee95476e84a8b7/data/1.tree_inference/mainTrees/squamates_Title_Science2024_ultrametric_constrained.tre"
+ },
+ "amniotes/tonini2016/tonini2016_posterior_9755_tree1.tre": {
+  "bytes": 455804,
+  "cut": [
+   "zip_first_line",
+   "squam_shl_new_Posterior_9755.1000.trees"
+  ],
+  "post_body": null,
+  "retrieved": "2026-11-17",
+  "sha256": "e0723d10a3b4d5eb0d084ab30fc94658ac662ea33b0ecf6fda7349e72cabd525",
+  "url": "https://data.vertlife.org/squamatetree/squam_shl_new_Posterior_9755.1000-10000.trees.zip"
+ },
  "bergeron/Bergeron2023_SupplementaryTables.xlsx": {
   "bytes": 885604,
   "post_body": null,

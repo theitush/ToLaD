@@ -1,10 +1,16 @@
 # ToLaD data pipeline v0 (mammals). `make` = fetch (verify pinned checksums) + build + test.
-.PHONY: all fetch build test audit wiki globe
+.PHONY: all fetch fetch-amniotes build test audit wiki globe
 
 all: fetch build test
 
 fetch:
 	uv run tolad-fetch
+
+# The amniote sources (ToLaD#535; research/amniote-sources.md, build order step 1) into data/raw/amniotes/,
+# plus the OTT Amniota cut, pinned in sources.lock.json. Not part of `make`: the mammal build never reads them.
+# RAW=<dir> fetches into another raw root.
+fetch-amniotes:
+	uv run tolad-fetch --set amniotes $(if $(RAW),--raw $(RAW))
 
 build:
 	uv run python -I -m tolad_pipeline.build
