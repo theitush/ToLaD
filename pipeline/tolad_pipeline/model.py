@@ -55,7 +55,8 @@ SOURCES = [
     ("mock", "MOCK placeholder (not a real record)"),
     ("greenspoon-data", "Greenspoon et al. 2023 data release (Zenodo 10.5281/zenodo.7594807): per-species "
                         "population reports (IUCN Red List), dog and cat numbers; CC BY 4.0"),
-    ("overrides", "ToLaD manual overrides (pipeline/overrides.toml): fossil dates, placements and hominin census sizes, with citations"),
+    ("overrides", "ToLaD manual overrides (pipeline/overrides.toml): fossil dates, placements, hominin census sizes "
+                  "and field-measured densities, with citations"),
     ("history", history.HISTORY_SRC_LABEL),
     ("mdd", "Mammal Diversity Database v2.5 (2026, doi:10.5281/zenodo.21654811): living species our backbone "
             "lacks, placed on their genus by taxonomy, with their English names; CC BY 4.0"),
@@ -221,6 +222,9 @@ def resolve_traits(root: Node, raw: Path, ctx: dict, log: dict) -> None:
     cell_km2 = next(r["km2_nat"] / r["cells_nat"] for r in rng.values() if r["cells_nat"])
     hits = Counter()
     rng_used: Counter = Counter()
+    ov = ctx.get("overrides")
+    dens_ov = ov.densities if ov is not None else {}
+    dens_log: list[dict] = []
 
     def candidates(nd: Node) -> list[str]:
         c = [nd.name] + [a for a in nd.alt if " " in a] + nd.data.get("upham_names", [])
@@ -262,6 +266,13 @@ def resolve_traits(root: Node, raw: Path, ctx: dict, log: dict) -> None:
             v = first(pan, names, "density")
             if v:
                 D["log_density_obs"], D["density_src"] = math.log10(v), "pantheria"
+        fd = dens_ov.get(nd.name) if not nd.extinct else None
+        if fd is not None:
+            # ToLaD#507: a density measured in the field replaces the source's (overrides.toml [[density]])
+            dens_log.append({"name": nd.name, "was": v, "was_src": D.get("density_src"), "density": fd["density"],
+                             "sites": fd["sites"], "citation": " ".join(fd["citation"].split())})
+            D["log_density_obs"], D["density_src"] = math.log10(fd["density"]), "overrides"
+            D["density_cite"] = " ".join(fd["citation"].split())
         v = first(pan, names, "range_km2")
         if v:
             D["log_range_obs"] = math.log10(v)
@@ -311,6 +322,15 @@ def resolve_traits(root: Node, raw: Path, ctx: dict, log: dict) -> None:
         if nd.kind == "tree" and not nd.extinct:
             for k in ("log_mass", "log_density_obs", "log_range_obs", "log_gen_obs", "phy_range"):
                 hits[k + (":yes" if k in D else ":no")] += 1
+    unused = sorted(set(dens_ov) - {r["name"] for r in dens_log})
+    if unused:
+        raise RuntimeError(f"overrides.toml density entries matched no living leaf: {unused}")
+    if ov is not None:
+        ov.applied["density"].extend(r["name"] for r in dens_log)
+    log["density_overrides"] = {
+        "note": "ToLaD#507: population densities measured in the field (overrides.toml [[density]]) replace "
+                "COMBINE's or PanTHERIA's (was, ind/km2); the mean of the sites where the species was found",
+        "species": dens_log}
     log["trait_coverage_extant"] = {k: v for k, v in sorted(hits.items()) if not k.startswith("mass:")}
     log["mass_sources"] = {k: v for k, v in hits.items() if k.startswith("mass:")}
     shared = sorted(k for k, v in rng_used.items() if v > 1)
@@ -411,7 +431,8 @@ def model_leaves(root: Node, raw: Path, log: dict) -> None:
             ld = D["log_density_obs"]
             sdNA2 += 0.5 ** 2
             src.add(SRC[D["density_src"]])
-            meth.append(f"D:obs({D['density_src']})")
+            meth.append(f"D:obs({D['density_src']})" if "density_cite" not in D else
+                        f"D:field {10 ** ld:.3g}/km2 (overrides.toml; {D['density_cite']})")
         else:
             ld = dA + dB * lm
             sdNA2 += dS ** 2 + (dB * msd) ** 2
