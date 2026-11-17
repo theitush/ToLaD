@@ -27,6 +27,7 @@
 
 import { ease, g, isNode, laneW, segAt, type Fan, type FanBranch, type FanNode } from './layout';
 import { Fold, ROOM_BEND, gapMode, type FoldState, type GapMode } from './fold';
+import { lodIndexOn } from './lod';
 
 /** A split's fork is at most this share of its shortest daughter's run (to its own split or tip). */
 export const STEADY_RUN = 0.85;
@@ -149,6 +150,10 @@ interface Lay {
   cHi?: Float64Array;
   aLo?: Float64Array;
   aHi?: Float64Array;
+  /** Per node, over its subtree (splitsOn's walk, ToLaD#502): the highest fork's top (nY - h) and the rooms' reach (roomL to roomL + roomW). */
+  sFork?: Float64Array;
+  sRoomL?: Float64Array;
+  sRoomR?: Float64Array;
 }
 
 /** The last grid row k (world y = k * h) with y at most `lim`, by the very product the rows make (-Infinity: none). */
@@ -603,6 +608,9 @@ export class Steady extends Fold {
 
   /** The clades drawn as one branch this frame (lod.ts): each one's stem runs up to its youngest tip, its split being inside the branch. */
   setMerged(merged: readonly FanNode[], top: (v: FanNode) => number): void {
+    // (The same list as last time (Lod.update makes a new one when they change): nothing to do, ToLaD#502.)
+    if (merged === this.mergedLast) return;
+    this.mergedLast = merged;
     for (const j of this.stemTopSet) this.stemTop[j] = this.nY[j];
     this.stemTopSet.length = 0;
     for (const v of merged) {
@@ -626,15 +634,107 @@ export class Steady extends Fold {
     return this.nodeStem(this.cur(), j, sx, sy);
   }
 
-  /** Each split whose fork and room meet the screen (world heights and x): ~13,000 nodes at the mammal level, most off it. */
-  splitsOn(yTop: number, yBot: number, x0: number, x1: number, visit: (j: number, top: number) => void): void {
-    const { h, roomL, roomW } = this.cur();
+  private mergedLast: readonly FanNode[] | null = null;
+
+  /**
+   * Each split whose fork and room meet the screen (world heights and x), in fan.nodes' order: ~13,000 nodes at the
+   * mammal level, most off it. With `cut` (a clade drawn as one branch: it and all under it passed by), a walk down from
+   * the root that passes by each subtree whose splits all miss the screen (the layout's subtree bounds, ToLaD#502).
+   */
+  splitsOn(yTop: number, yBot: number, x0: number, x1: number, visit: (j: number, top: number) => void, cut?: (j: number) => boolean): void {
+    const L = this.cur();
+    const { h, roomL, roomW } = L;
     const nY = this.nY;
-    for (let j = 0; j < nY.length; j++) {
-      if (nY[j] < yTop || nY[j] - h[j] > yBot || roomL[j] > x1 || roomL[j] + roomW[j] < x0) continue;
-      visit(j, nY[j] - h[j]);
+    const off = (j: number) => nY[j] < yTop || nY[j] - h[j] > yBot || roomL[j] > x1 || roomL[j] + roomW[j] < x0;
+    if (!cut || !lodIndexOn()) {
+      for (let j = 0; j < nY.length; j++) if (!off(j)) visit(j, nY[j] - h[j]);
+      return;
     }
+    this.splitBounds(L);
+    const sF = L.sFork!;
+    const sL = L.sRoomL!;
+    const sR = L.sRoomR!;
+    const sNY = this.sNY!;
+    const st = this.cutStack;
+    let at = this.splitsAt;
+    let c = 0;
+    let n = 0;
+    st[n++] = this.rootJ;
+    for (let q = 0; ; ) {
+      if (n === 0) {
+        if (q >= this.lone!.length) break;
+        st[n++] = this.lone![q++];
+      }
+      const j = st[--n];
+      if (sNY[j] < yTop || sF[j] > yBot || sL[j] > x1 || sR[j] < x0 || cut(j)) continue;
+      if (!off(j)) {
+        if (c === at.length) {
+          const b = new Int32Array(2 * c);
+          b.set(at);
+          at = this.splitsAt = b;
+        }
+        at[c++] = j;
+      }
+      const K = this.kidsF[j];
+      for (let k = 0; k < K.length; k++) if (K[k] >= 0) st[n++] = K[k];
+    }
+    const on = at.subarray(0, c).sort();
+    for (let k = 0; k < c; k++) visit(on[k], nY[on[k]] - h[on[k]]);
   }
+  private splitsAt = new Int32Array(256);
+  /** Per node: the lowest split in its subtree (the most nY); the nodes no walk from the root reaches. Made when first asked. */
+  private sNY: Float64Array | null = null;
+  private lone: Int32Array | null = null;
+
+  /** splitsOn's subtree bounds into L (once per layout): per node the highest fork top and the rooms' reach of all under it. */
+  private splitBounds(L: Lay): void {
+    const nY = this.nY;
+    const n = nY.length;
+    const par = this.par;
+    if (!this.sNY) {
+      const s = Float64Array.from(nY);
+      for (let j = n - 1; j >= 0; j--) if (par[j] >= 0) s[par[j]] = Math.max(s[par[j]], s[j]);
+      this.sNY = s;
+      const seen = new Uint8Array(n);
+      const st = [this.rootJ];
+      while (st.length) {
+        const j = st.pop()!;
+        seen[j] = 1;
+        for (const k of this.kidsF[j]) if (k >= 0) st.push(k);
+      }
+      this.lone = Int32Array.from(nY.keys()).filter((j) => !seen[j]);
+    }
+    if (L.sFork) return;
+    const { h, roomL, roomW } = L;
+    const sF = new Float64Array(n).fill(Infinity);
+    const sL = new Float64Array(n).fill(Infinity);
+    const sR = new Float64Array(n).fill(-Infinity);
+    for (let j = n - 1; j >= 0; j--) {
+      sF[j] = Math.min(sF[j], nY[j] - h[j]);
+      sL[j] = Math.min(sL[j], roomL[j]);
+      sR[j] = Math.max(sR[j], roomL[j] + roomW[j]);
+      const p = par[j];
+      if (p < 0) continue;
+      sF[p] = Math.min(sF[p], sF[j]);
+      sL[p] = Math.min(sL[p], sL[j]);
+      sR[p] = Math.max(sR[p], sR[j]);
+    }
+    L.sFork = sF;
+    L.sRoomL = sL;
+    L.sRoomR = sR;
+  }
+
+  /**
+   * offSide's walk for this window, made if not yet: the runs of strands it passed by whole (ascending, disjoint; first,
+   * last pairs), or null where it cannot be made (a tree not mono, no grid): then no strand is passed by (ToLaD#502).
+   */
+  offRunsOn(y0: number, y1: number, xa: number, xb: number): { runs: Int32Array; n: number } | null {
+    if (!this.marked(y0, y1, xa, xb)) return null;
+    this.offOut.runs = this.offRuns;
+    this.offOut.n = this.offN;
+    return this.offOut;
+  }
+  private readonly offOut: { runs: Int32Array; n: number } = { runs: new Int32Array(0), n: 0 };
 
   /**
    * The stretches on the way up from node j that are not whole at this zoom, youngest first: its stem (ToLaD#402), then
