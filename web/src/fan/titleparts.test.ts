@@ -93,10 +93,9 @@ describe('under a title, its parts labelled where they fit', () => {
     expect(bad).toEqual([]);
   });
 
-  it('at the bears, the Asiatic black bear has its name and picture under its group’s title', () => {
+  // (Its group, "American black bear & kin", opens part by part, ToLaD#500: the bears' landing is where they fit the screen, its gap there too tight for its title, which stands once that holds it.)
+  it('at the bears, the Asiatic black bear has its name and picture', () => {
     const c = at('Ursidae');
-    const title = c.names.find((s) => s.v && !s.b && s.text.startsWith('American black bear'));
-    expect(title, 'the title').toBeTruthy();
     const named = [...c.names, ...c.spots].some((s) => s.b?.sp.sci === 'Ursus thibetanus');
     expect(named, 'its name').toBe(true);
     expect(c.pics.some((p) => p.lv.b?.sp.sci === 'Ursus thibetanus'), 'its picture').toBe(true);
