@@ -143,7 +143,8 @@ class CorrectedMaps(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.r = json.loads(SIDECAR.read_text())["ranges"]
+        d = json.loads(SIDECAR.read_text())
+        cls.r, cls.before = d["ranges"], d["before_1500"]
         cls.today = ranges.today_cells(RAW)
         cls.raw = ranges.read_cells(RAW, ["Aotus zonalis", "Aotus jorgehernandezi", "Cuon alpinus",
                                           "Gerbillus agag"])
@@ -187,9 +188,16 @@ class CorrectedMaps(unittest.TestCase):
     def test_people_and_extinct_unchanged(self):
         d = self.raw["Cuon alpinus"]                           # the dhole: its losses are people's
         self.assertEqual(self.cells("Cuon alpinus", 0), set(d["cur"]))
-        self.assertEqual(self.cells("Cuon alpinus", 1), set(d["nat"]))
-        self.assertGreater(len(d["nat"] - d["cur"]), 1000)
+        # ToLaD#507: less North America, which the evidence dates to the Late Pleistocene (lossdates.PREHISTORIC):
+        # listed apart, so the grey is the range the tree draws as lost since 1500
+        before = {(int(i), int(j)) for i, j in np.argwhere(globe.unpack(self.before["Cuon alpinus"]))}
+        self.assertGreater(len(before), 2000)
+        self.assertEqual(self.cells("Cuon alpinus", 1), set(d["nat"]) - before)
+        self.assertLessEqual(before, set(d["nat"]) - set(d["cur"]))
+        self.assertGreater(len(set(d["nat"]) - before - set(d["cur"])), 1000)  # the rest still drawn lost
+        self.assertTrue(all(j < 130 for _, j in before))       # all west of 50 W: the Americas
         self.assertEqual(self.r["Mammuthus primigenius"][0], [])
+        self.assertNotIn("Alces alces", self.before)           # the moose: only a bound, no cells dated
 
 
 if __name__ == "__main__":

@@ -30,7 +30,9 @@ note puts down to taxonomy or a mapping fix, and the species such a note takes l
 cells today's corrected map (ranges.today_cells, the count's): the night monkey's present-natural map without
 Colombia, which the note gives to Aotus jorgehernandezi, is its current map, so nothing of the move shows as
 range lost. A living species whose present-natural map is a placeholder (stand_ins) is an empty pair: no range
-to draw.
+to draw. The lost cells the evidence dates before 1500 (lossdates.PREHISTORIC: the Tasmanian devil's mainland
+Australia, the dhole's North America, ...) are not in the level the tree holds to 1500, so they are not drawn grey:
+they leave the species' present-natural cells and are packed apart, `before_1500[name]`, the same run-length way.
 """
 from __future__ import annotations
 
@@ -47,7 +49,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import mdd, ranges
+from . import lossdates, mdd, ranges
 from .load import load_phylacine, norm_name
 from .wiki import living_species, species_rows, synonyms
 
@@ -294,27 +296,41 @@ def build(raw: Path, mammals: Path) -> tuple[dict, dict]:
     today = {p: t["map"] for p, t in ranges.today_cells(raw).items() if t["map"] is not None}
     stand_in = set(stand_ins())
     living = living_species(mammals)
+    # ToLaD#507: the lost cells the evidence dates before 1500 (lossdates.PREHISTORIC) are not in the level the tree
+    # holds to 1500, so they are not drawn as range lost (grey): they leave the present-natural list and are listed
+    # apart, in `before_1500`
+    pre = {p: v["cells"] for p, v in lossdates.prehistoric_cells(raw, lossdates.load()).items()}
+    before = {}
+
+    def mask(cs) -> np.ndarray:
+        a = np.zeros(ranges.GRID_SHAPE, dtype=bool)
+        for r, c in cs:
+            a[r, c] = True
+        return a
 
     def cells(n: str, p: str, own: bool = True) -> list[list[int]]:
         if own and n in living and p in stand_in:
             return [[], []]
         cur = masks[p].get("cur", empty)
         if own and n in living and p in today:
-            cur = np.zeros(ranges.GRID_SHAPE, dtype=bool)
-            for r, c in today[p]:
-                cur[r, c] = True
-        return [pack(cur), pack(masks[p].get("nat", empty))]
+            cur = mask(today[p])
+        nat = masks[p].get("nat", empty)
+        if own and n in living and p in pre:
+            nat = nat & ~mask(pre[p])
+            before[n] = pack(mask(pre[p]))
+        return [pack(cur), pack(nat)]
 
     out = {
         "grid": {"rows": ROWS, "cols": COLS, "lon0": -180, "lat": row_edges()},
         "ranges": dict(sorted({**{n: cells(n, p) for n, p in m.items()},
                                **{n: cells(n, h, own=False) + [p] for n, (h, p) in split.items()}}.items())),
     }
+    out["before_1500"] = dict(sorted(before.items()))
     uses = [(n, p) for n, p in m.items() if n in living]
     stats = {"species": len(species), "matched": len(m), "renamed": len(renamed), "borrowed": len(split),
              "far": sorted(far), "maps": len(masks), "maps_shared": len(m) - len(set(m.values())),
              "corrected": sorted(n for n, p in uses if p in today),
-             "stand_in": sorted(n for n, p in uses if p in stand_in)}
+             "stand_in": sorted(n for n, p in uses if p in stand_in), "before_1500": sorted(before)}
     return out, stats
 
 
@@ -352,7 +368,8 @@ def main(argv: list[str] | None = None) -> int:
           f"type locality); ranges.json {n / 1e6:.2f} MB, gzip {gz / 1e6:.2f} MB", file=sys.stderr)
     print(f"[globe] ToLaD#507: {len(stats['corrected'])} living species drawn on today's corrected map "
           f"({', '.join(stats['corrected'])}); {len(stats['stand_in'])} whose present-natural map is a placeholder "
-          f"draw no range ({', '.join(stats['stand_in'])})", file=sys.stderr)
+          f"draw no range ({', '.join(stats['stand_in'])}); {len(stats['before_1500'])} with range lost before "
+          f"1500 listed apart ({', '.join(stats['before_1500'])})", file=sys.stderr)
     return 0
 
 

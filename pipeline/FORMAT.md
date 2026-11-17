@@ -1,8 +1,8 @@
-# ToLaD tile format, version 1.7
+# ToLaD tile format, version 1.8
 
 Binary columnar format for the river data. The decoder is `pipeline/decoder/tolad-decoder.js`; the round-trip test is `pipeline/decoder/test/roundtrip.test.mjs`. The writer is `pipeline/tolad_pipeline/tiles.py`.
 
-**Versioning:** the `version` field in the header is bumped on any incompatible change. Decoders must reject unknown versions. Additive changes (new sections) keep the version, and decoders must skip sections they do not know. Minor revisions: **1.0** the base format; **1.1** adds the optional `HIST` section (curated population history) and the `hist*` META keys; **1.2** adds the `NATB` section (natural, pre-human baseline), the skeleton `META.natural` key and the HIST kind 10 `natural` (kind 9 `genomic` came with the optional `[deep]` history, no new section). **1.3** adds HIST kind 11 `rangeloss` (modelled range-loss records); **1.4** adds the `RLST` section (IUCN Red List status per species row) and the skeleton `META.red_list` key; **1.5** adds `events` to a history file's `META.hist` entry (curated bottlenecks, ToLaD#141; no new section); **1.6** adds the dated tree's JSON sidecars `dated/<id>.json` (ToLaD#145, "Dated tree" below; the `.tld` files are unchanged); **1.7** adds `scope`, `shown` and `why` to each event (ToLaD#149). The header `version` stays 1, and a 1.0 decoder reads 1.1 to 1.7 files unchanged (it skips `HIST`, `NATB` and `RLST`).
+**Versioning:** the `version` field in the header is bumped on any incompatible change. Decoders must reject unknown versions. Additive changes (new sections) keep the version, and decoders must skip sections they do not know. Minor revisions: **1.0** the base format; **1.1** adds the optional `HIST` section (curated population history) and the `hist*` META keys; **1.2** adds the `NATB` section (natural, pre-human baseline), the skeleton `META.natural` key and the HIST kind 10 `natural` (kind 9 `genomic` came with the optional `[deep]` history, no new section). **1.3** adds HIST kind 11 `rangeloss` (modelled range-loss records); **1.4** adds the `RLST` section (IUCN Red List status per species row) and the skeleton `META.red_list` key; **1.5** adds `events` to a history file's `META.hist` entry (curated bottlenecks, ToLaD#141; no new section); **1.6** adds the dated tree's JSON sidecars `dated/<id>.json` (ToLaD#145, "Dated tree" below; the `.tld` files are unchanged); **1.7** adds `scope`, `shown` and `why` to each event (ToLaD#149); **1.8** adds `META.loss` (what dates each species' range loss, per row) and the skeleton `META.natural.trend.loss` citation table (ToLaD#507, "Loss dates" below; no new section). The header `version` stays 1, and a 1.0 decoder reads 1.1 to 1.8 files unchanged (it skips `HIST`, `NATB` and `RLST`).
 
 ## Files
 
@@ -144,7 +144,7 @@ impact. Per row, five LOG16 codes:
 |---|---|
 | `n` | natural baseline, individuals alive |
 | `lo`, `hi` | its 95% range (the model's error, see below) |
-| `km2_natural` | PHYLACINE 1.2.1 present-natural range area, km² (equal-area cells × 9,312 km²) |
+| `km2_natural` | PHYLACINE 1.2.1 present-natural range area, km² (equal-area cells × 9,312 km²); v1.8: less the cells the evidence dates before 1500, for the 5 `prehistoric` species (see "Loss dates") |
 | `km2_current` | PHYLACINE current range area, km² (0 for extinct species) |
 
 It is always modelled: skeleton `META.natural` carries `grade` (`"D"`), `kind` (`"reconstruction"`),
@@ -166,7 +166,7 @@ It is always modelled: skeleton `META.natural` carries `grade` (`"D"`), `kind` (
 
 **Where it drives the counts:** an extinct species runs at `N_nat` over its whole band. An extant species
 whose natural baseline differs from today's count runs at `N_nat` until 1500 CE (IUCN's "since 1500"
-window), then (v1.3, ToLaD#62) changes log-linearly to today's count now, if it has both range maps (with no
+window; v1.8: or until the documented start of its loss where a source gives one later, see "Loss dates"), then (v1.3, ToLaD#62) changes log-linearly to today's count now, if it has both range maps (with no
 current map it still steps at 1500). That trend ships as a HIST record (`META.hist[].modelled = "rangeloss"`,
 two points, segments `natural` then kind 11 `rangeloss`, grade D) for every such species without a history
 file; skeleton `META.natural.trend` gives its shape, years, kind, cite and the timing assumption (one date,
@@ -175,6 +175,34 @@ Its leaf error is widened by the 0.2 dex and its grade capped at D. A domestic f
 runs its wild ancestor at `N_nat` up to domestication. Curated species (`HIST`): a cited baseline wins; with
 none, the natural baseline is held before the first cited point (segment kind 10 `natural`; with a genomic deep past, the genomic curve instead, see "HIST"). `ALIV` is
 always today's count. Report: `stats.json` → `natural_baseline` and `phylacine_ranges`.
+
+### Loss dates (v1.8): what dates each species' range loss
+
+ToLaD#507. For the living species whose present-natural map PHYLACINE's note puts down to people
+(`pipeline/phylacine_notes.csv` class `people`) and which `pipeline/range_loss_dates.csv` dates (682 rows; a
+copy of `research/range-loss-dates.csv`, ToLaD#515, where each species was classed by its PHYLACINE note),
+`tolad_pipeline/lossdates.py` gives one **basis**. Every year comes from a cited source; nothing is modelled.
+
+| code | basis | drawing | species |
+|---|---|---|---|
+| 0 | `later` | the natural level is held to the documented start of the loss (Strahan & Van Dyck's Australia 1788, the sea otter's fur trade 1741, the chinchillas' 1828, the Cape mountain zebra 1652, Rodrigues settled 1691, ...), then the same log-linear fall runs from that year to today's count: same shape, same end | 77 |
+| 1 | `dated` | unchanged, 1500 → today: IUCN's Extinct / Possibly Extinct codes (78), historic-range sources bounded by 1500 (86: Hall 1981, Ray et al. 2005, ...), three with only an end year (European bison 1927, Père David's deer ~1900, the Atlantic grey whale ~1750) | 167 |
+| 2 | `prehistoric` | the lost cells the evidence dates before 1500 (`lossdates.PREHISTORIC`, cell by cell from the rasters: the Tasmanian devil's mainland Australia, the harp seal's Baltic, the NZ sea lion's mainland New Zealand, the dhole's North America, the wild horse's Americas) are left out of `N_nat` and `km2_natural`; the rest is drawn as before | 5 |
+| 3 | `bound` | unchanged; the source gives only a lower bound: people's arrival on the island that holds most of the lost cells (247), or the Iron Age range the moose's map was taken from (Willms 1987: lost after it, which does not say which cells went before 1500) | 248 |
+| 4 | `undated` | unchanged; nothing dates the loss (181, and 4 maps built from fossils) | 185 |
+
+The counts are the CSV's; `stats.json` → `rangeloss.by_basis` gives them as built (`all`: living leaves that
+carry one; `trend`: those drawn with the range-loss trend; a species with a history file or with no fall left is
+not). Per file (skeleton and tiles), `META.loss`: `[[row, basis, source, start], ...]`, one entry per such species
+row, `basis` the code above, `source` an index into the skeleton's `META.natural.trend.loss.sources` (−1: none),
+`start` the year the fall starts (1500, or the documented later start), and for a `prehistoric` row a fifth
+number, the km² left out as lost before 1500. Skeleton `META.natural.trend.loss`: `{fields, bases, sources}`,
+`bases` the names by code, `sources` the citation table `[{cite, from, to, place}]`: the full citation, the
+source's own years (negative = BCE, null = no bound), and the island or region it names (`bound`: the island,
+"Madagascar"; `prehistoric`: the part, "North America"; else ""). A `later` species' trend start point
+(HIST kind 11) sits at `start`. The card's globe (`ranges.json`, `make globe`) leaves a `prehistoric` species'
+cells lost before 1500 out of its present-natural cells, so they are not drawn grey, and lists them apart in
+`before_1500`.
 
 ### RLST (v1.4): IUCN Red List status
 

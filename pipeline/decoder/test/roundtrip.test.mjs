@@ -288,7 +288,10 @@ test('HIST: modelled range-loss records run natural -> log-linear -> today, grad
     const w = h.species;
     assert.equal(h.points.length, 2, `${w}: two points`);
     assert.equal(h.points[0].kind, 'rangeloss');
-    assert.equal(h.points[0].year, 1500);
+    const f0 = h.tile < 0 ? sk : load(`t/${h.tile}.tld`);
+    const ls = f0.loss(h.row, t.loss.bases);
+    // v1.8 (ToLaD#507): the trend starts at the documented start of the loss where a source gives one later
+    assert.equal(h.points[0].year, ls ? ls.start : 1500, `${w}: the trend starts at its loss's start`);
     assert.equal(h.points[0].grade, 'D');
     assert.equal(h.segments[0].kind, 'natural', `${w}: natural level held first`);
     closeLog(h.segments[0].start * h.L / h.G, h.points[0].n, LOG_TOL, `${w} natural level`);
@@ -303,6 +306,37 @@ test('HIST: modelled range-loss records run natural -> log-linear -> today, grad
     const f = h.tile < 0 ? sk : load(`t/${h.tile}.tld`);
     assert.equal(f.history(h.row).modelled, 'rangeloss', `${w}: META.hist marks it modelled`);
   }
+});
+
+// ---- v1.8: META.loss (what dates each range loss, ToLaD#507) -------------------------------------
+test('META.loss: every row has a basis, a source in the table and its start; later ones start after 1500', () => {
+  const L = sk.meta.natural.trend.loss;
+  assert.deepEqual(L.bases, ['later', 'dated', 'prehistoric', 'bound', 'undated']);
+  assert.ok(L.sources.length > 50 && L.sources.every((x) => x.cite), 'the citation table');
+  const by = {};
+  const seen = new Map();
+  for (const f of [sk, ...sk.meta.tiles.map((t) => load(t.file))]) {
+    for (const e of f.meta.loss || []) {
+      const r = f.loss(e[0], L.bases);
+      by[r.basis] = (by[r.basis] || 0) + 1;
+      seen.set(f.name(e[0]), r);
+      assert.ok(r.source >= -1 && r.source < L.sources.length);
+      assert.equal(r.source === -1, r.basis === 'undated' && !L.sources[r.source], `${f.name(e[0])}: a source unless undated`);
+      if (r.basis === 'later') assert.ok(r.start > 1500, `${f.name(e[0])}: starts after 1500`);
+      else assert.equal(r.start, 1500);
+      assert.equal(r.km2Before1500 > 0, r.basis === 'prehistoric', `${f.name(e[0])}: km2 lost before 1500`);
+    }
+  }
+  for (const b of L.bases) assert.ok(by[b] > 0, `basis ${b}: ${by[b]}`);
+  const numbat = seen.get('Myrmecobius fasciatus');
+  assert.equal(numbat.basis, 'later');
+  assert.equal(numbat.start, 1788);
+  assert.match(L.sources[numbat.source].cite, /Strahan/);
+  const dhole = seen.get('Cuon alpinus');
+  assert.equal(dhole.basis, 'prehistoric');
+  assert.equal(L.sources[dhole.source].place, 'North America');
+  const aye = seen.get('Daubentonia madagascariensis');
+  if (aye) assert.equal(L.sources[aye.source].place, 'Madagascar');
 });
 
 // ---- v1.4: RLST (IUCN Red List status, ToLaD#48) ---------------------------

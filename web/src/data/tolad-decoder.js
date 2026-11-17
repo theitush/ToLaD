@@ -9,6 +9,7 @@
 //                                                // .modelled === 'rangeloss': a modelled range-loss trend
 //                                                // .events: curated bottlenecks (v1.5), [] if none
 //   file.natural(row)                            // natural (pre-human) baseline (NATB, v1.2) or null
+//   file.loss(row, bases)                        // what dates its range loss (META.loss, v1.8) or null
 //   file.redList(row)                            // IUCN Red List status (RLST, v1.4) or null
 //
 // All per-row columns are exposed as typed arrays (zero-copy views) in
@@ -271,6 +272,23 @@ export class TileFile {
       n: dqLog16(a[5 * i]), lo: dqLog16(a[5 * i + 1]), hi: dqLog16(a[5 * i + 2]),
       km2Natural: dqLog16(a[5 * i + 3]), km2Current: dqLog16(a[5 * i + 4]),
     };
+  }
+  /**
+   * What dates a species row's range loss (META.loss, format v1.8, ToLaD#507), or null.
+   * { basis, source, start, km2Before1500 }: basis is one of skeleton META.natural.trend.loss.bases
+   * ('later', 'dated', 'prehistoric', 'bound', 'undated'), source the index into its `sources`
+   * table ({cite, from, to, place}; -1 = none), start the year the fall starts (1500, or later),
+   * km2Before1500 the range lost before 1500 left out of the natural level (0 unless 'prehistoric').
+   * `bases` is the skeleton's META.natural.trend.loss.bases.
+   */
+  loss(i, bases) {
+    if (!this._loss) {
+      this._loss = new Map();
+      for (const e of (this.meta && this.meta.loss) || []) this._loss.set(e[0], e);
+    }
+    const e = this._loss.get(i);
+    if (!e) return null;
+    return { basis: bases ? bases[e[1]] : e[1], source: e[2], start: e[3], km2Before1500: e[4] || 0 };
   }
   /**
    * IUCN Red List status of a species row (RLST, format v1.4), or null (fossils, internal nodes).

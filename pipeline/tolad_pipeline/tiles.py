@@ -253,6 +253,23 @@ def encode_hist(rows: list[tuple[Node, bool]], cites: dict[tuple[str, str], int]
     return blob, len(recs), meta
 
 
+def encode_loss(rows: list[tuple[Node, bool]]) -> list[list[int]]:
+    """META.loss (ToLaD#507): what dates each species row's range loss, `[row, basis, source, start]`, plus
+    `km2_before_1500` for a `prehistoric` one. basis indexes lossdates.BASES, source the skeleton's
+    META.natural.trend.loss.sources (-1: none), start the year the fall starts (1500, or later)."""
+    from .lossdates import BASES
+    out = []
+    for i, (nd, stub) in enumerate(rows):
+        ls = nd.data.get("loss")
+        if ls is None or stub:
+            continue
+        e = [i, BASES.index(ls["basis"]), -1 if ls.get("key") is None else ls["key"], int(ls["start"])]
+        if ls["basis"] == "prehistoric":
+            e.append(round((nd.data.get("natural") or {}).get("km2_pre", 0.0)))
+        out.append(e)
+    return out
+
+
 def hist_debug(rec: dict, tile: int, row: int, gid: int) -> dict:
     from .history import KINDS
     return {
@@ -341,6 +358,9 @@ def encode_rows(rows: list[tuple[Node, bool]], methods: dict[str, int], stub_til
     hist_blob, n_hist, hist_meta = encode_hist(rows, cites or {})
     if n_hist:
         meta["hist"] = hist_meta
+    loss = encode_loss(rows)
+    if loss:
+        meta["loss"] = loss
     secs = [
         ("CHLD", chld.tobytes(), n), ("T0__", t0.tobytes(), n), ("T1__", t1.tobytes(), n),
         ("EVER", ever.tobytes(), n), ("ALIV", aliv.tobytes(), n), ("GHST", ghst.tobytes(), n),
@@ -467,6 +487,7 @@ def write_all(root: Node, out: Path, log: dict, droot=None) -> None:
     from .history import KINDS
     hist_index = []
     hist_dbg = []
+    from .lossdates import BASES as LOSS_BASES
     from .model import (RANGELOSS_CITE, RANGELOSS_NOTE, RANGELOSS_SHOWCASE, RANGELOSS_START_YEAR,
                         RANGELOSS_URL)
     n_rl = 0
@@ -508,8 +529,11 @@ def write_all(root: Node, out: Path, log: dict, droot=None) -> None:
         # layer 4 (ToLaD#62): where N_nat differs from today's count, a log-linear trend between them
         "trend": {"shape": "log-linear", "from_year": RANGELOSS_START_YEAR, "to_year": anchors.NOW_YEAR,
                   "kind": "rangeloss", "grade": "D", "records": n_rl,
-                  "label": "modelled range-loss trend: natural level held to 1500 CE, then log-linear to "
-                           "today's count; the timing is an assumption (IUCN's 1500 CE window)",
+                  # ToLaD#507: what dates each species' loss; the rows are in each file's META.loss
+                  "loss": {"fields": ["row", "basis", "source", "start", "km2_before_1500"],
+                           "bases": list(LOSS_BASES), "sources": log["rangeloss"]["loss_sources"]},
+                  "label": "modelled range-loss trend: natural level held to 1500 CE (or the documented start of "
+                           "the loss, META.loss), then log-linear to today's count",
                   "notes": RANGELOSS_NOTE, "cite": RANGELOSS_CITE, "url": RANGELOSS_URL},
     }
     meta["red_list"] = {

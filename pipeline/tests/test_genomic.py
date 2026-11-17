@@ -9,6 +9,9 @@ from pathlib import Path
 
 from tolad_pipeline import genomic as GN
 from tolad_pipeline import history as H
+from tolad_pipeline import lossdates as LD
+
+LATER = {k: v["start"] for k, v in LD.load().items() if v["basis"] == "later"}
 
 ROOT = Path(__file__).resolve().parents[2]
 RAW = ROOT / "data" / "raw"
@@ -146,7 +149,8 @@ class Build(unittest.TestCase):
             if "rangeloss" in kinds:
                 n_rl += 1
                 self.assertEqual(segk[-1], "rangeloss", sp)
-                self.assertEqual(h["points"][n]["year"], 1500, sp)
+                # at 1500, or at the documented start of the loss where a source gives one later (ToLaD#507)
+                self.assertEqual(h["points"][n]["year"], LATER.get(sp, 1500), sp)
         self.assertGreater(n_rl, 30)
 
     def test_join_is_continuous(self):
