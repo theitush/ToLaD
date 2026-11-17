@@ -96,6 +96,17 @@ describe('a group opens part by part', () => {
       }
     return bad;
   };
+  /** Every pair of names reading the same, side by side in one band (a slot apart or less across, ToLaD#500: guest titles and their band's own label). */
+  const twice = (c: CutLabels, tag: string): string[] => {
+    const ns = [...c.names, ...c.spots];
+    const bad: string[] = [];
+    for (let i = 0; i < ns.length; i++)
+      for (let j = i + 1; j < ns.length; j++) {
+        const [p, q] = [ns[i].box, ns[j].box];
+        if (ns[i].text === ns[j].text && Math.abs(p[0] + p[2] - q[0] - q[2]) / 2 <= 2 * CLADE_PX + 4 && p[1] < q[3] + 4 * CLADE_PX && p[3] > q[1] - 4 * CLADE_PX) bad.push(`${tag}: ${ns[i].text} twice`);
+      }
+    return bad;
+  };
   const labelled = (c: CutLabels, sci: string) => ({ name: [...c.names, ...c.spots].some((s) => s.b?.sp.sci === sci), pic: c.pics.some((p) => p.lv.b?.sp.sci === sci) });
   /** Zoom by f about species sci's band on the column (Ita's pinch about Collins'). */
   const zoomAbout = (sci: string, f: number) => {
@@ -169,7 +180,7 @@ describe('a group opens part by part', () => {
     }
   });
 
-  it('no two labels meet across a sweep of frames; a label once shown stays as the view zooms in, until its member splits', () => {
+  it('no two labels meet, and no band shows a name twice, across a sweep of frames; a label once shown stays as the view zooms in, until its member splits', () => {
     const bad: string[] = [];
     for (const [latin, sci] of [
       ['Saimirinae', 'Saimiri collinsi'],
@@ -177,9 +188,12 @@ describe('a group opens part by part', () => {
       ['Carnivora', 'Ursus arctos'],
       ['Rodentia', 'Mus musculus'],
     ]) {
-      land(clade(latin));
+      bad.push(...twice(land(clade(latin)), `${latin} landing`));
       v.zoom(...v.toScreen(v.speciesCamera(sp(sci)).cx, sp(sci).tipY), 0.5, 1);
-      for (let k = 0; k < 12; k++) bad.push(...meeting(zoomAbout(sci, 1.3), `${latin} ${k}`));
+      for (let k = 0; k < 12; k++) {
+        const c = zoomAbout(sci, 1.3);
+        bad.push(...meeting(c, `${latin} ${k}`), ...twice(c, `${latin} ${k}`));
+      }
     }
     expect(bad).toEqual([]);
   });

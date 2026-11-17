@@ -1493,7 +1493,11 @@ export class FanView implements InputHandlers {
     while (g && g.lv.v !== v) g = L.parts(g).find((p) => p.f <= vf && p.l >= vl);
     // (Open from where its band is its parts', each labelled where it fits, ToLaD#500: a group opens part by part. `deep`, a second tap on it: from where every part has room (gapOpens), its
     // thin parts, till then under its title alone, named.)
-    const opens = g && L.parts(g).length ? ((deep ? L.opens : L.hands).get(g) ?? Infinity) : Infinity;
+    const hands = g && L.parts(g).length ? (L.hands.get(g) ?? Infinity) : Infinity;
+    // (Deep: where each part has a label of its own (room for its name) or its own title (it has split too), the next step in; at its opening if that is no step.)
+    const reach = (g: GapMember) =>
+      Math.max(hands, ...L.parts(g).map((p) => Math.min(p.on >= 0 && Math.max(p.gap, p.band) > 0 ? CLADE_PX / Math.max(p.gap, p.band) : Infinity, L.parts(p).length ? (L.hands.get(p) ?? Infinity) : Infinity)));
+    const opens = !g || !deep || hands === Infinity ? hands : reach(g) > hands * 1.05 ? reach(g) : (L.opens.get(g) ?? hands);
     // (Its room filling the screen, less its labels' room past it; that room as at the zoom, a few rounds: it moves by a px or two at most.)
     const fit = foldedFrame(this.fan, this.w, () => {
       const W = fold.rooms().roomW[j];
@@ -2577,8 +2581,12 @@ export class FanView implements InputHandlers {
     this.selected = null;
     this.touch = null;
     this.onSelect(null);
-    // (A second tap on it, nothing moved since the first landed: on, to where its every part has room, ToLaD#500; its thin parts are under its title alone till then.)
-    const deep = this.landedHere() && this.tapAt?.v === v && !this.tapAt.b;
+    // (A tap where it would land already (a second tap on it, or one on a part that splits where its group did), or out of where the view is: on, to where each part has a label, ToLaD#500; its
+    // thin parts are under its title alone till then. So a tap always moves, and in.)
+    const restore = this.fan.tess.fold?.keep();
+    const first = this.stopFrame(v) ? null : this.openCamera(v);
+    const deep = !!first && (this.offBy(first, this.cam) <= LEVEL_PX || first.sx < this.cam.sx);
+    restore?.();
     const cam = this.flyTo(() => this.stopFrame(v) ?? this.openCamera(v, deep), undefined, () => (this.tapAt = { b: null, v, cam: { ...this.cam } }));
     this.backing = { lv: { v }, cam };
   }
@@ -3000,6 +3008,16 @@ export class FanView implements InputHandlers {
       while (h && (L.hands.get(h) ?? Infinity) <= sx) h = L.guests.get(h)?.host;
       if (h && at.has(h)) Object.assign(m, { tier: 'title', host: at.get(h) });
     });
+    // (No name twice side by side, ToLaD#500: groupName names a group for its best-known species, so a group and a part of it can read the same. A name reading as a title over it that it stands
+    // beside (a guest of the same band, or that band's own label; under a title in its gap, its first strand that title's; or its band's top two slots or less from that title's) is shown once, as the outermost group's; a tap on it goes to that group.)
+    const text = (m: GapMember) => (m.lv.b ? levelText(m.lv.b) : groupName(this.fan, m.lv.v!));
+    const titles = out.filter((m) => m.heads && m.tier === 'title').sort((p, q) => q.l - q.f - (p.l - p.f) || p.f - q.f);
+    for (const m of [...titles, ...out.filter((m) => m.tier && !m.heads)]) {
+      if (!m.tier) continue;
+      const t = text(m);
+      const beside = (o: GapMember) => (o.host ? m.host === o.host || m === o.host : m.f === o.f) || Math.abs((m.host ?? m).top - (o.host ?? o).top) * sx <= 2 * (CLADE_PX + GROUP_D - PIC_D);
+      if (titles.some((o) => o !== m && o.tier && o.f <= m.f && o.l >= m.l && o.l - o.f > m.l - m.f && beside(o) && text(o) === t)) Object.assign(m, { tier: null, host: undefined });
+    }
     this.gapCoverLast = { T, sx, list: out };
     return out;
   }
