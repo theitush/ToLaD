@@ -29,6 +29,7 @@ META (FORMAT.md, "Dated tree").
 
 from __future__ import annotations
 
+import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 
@@ -502,7 +503,9 @@ def _lca(a: DNode, b: DNode, dep: dict[int, int]) -> DNode:
 
 
 def _sub(nd: Node, skip: set[int]) -> DNode | None:
-    """A fossil-only (or unmatched) merged subtree as dated nodes: eligible leaves, merged ages."""
+    """A fossil-only (or unmatched) merged subtree as dated nodes: eligible leaves, merged ages. A split of fossils only
+    keeps its merged node's name (Mammutidae, Smilodon; ToLaD#279), the outermost where a chain of them holds the same
+    species, as the living's names are placed; one holding a living species is left to taxnames.decorate."""
     if nd.is_leaf:
         if id(nd) in skip or not eligible(nd):
             return None
@@ -511,12 +514,24 @@ def _sub(nd: Node, skip: set[int]) -> DNode | None:
     if not kids:
         return None
     if len(kids) == 1:
-        return kids[0]
-    src = S_UPHAM if nd.date_src == D_UPHAM else S_INTERP if nd.date_src == D_INTERP and nd.kind == "tree" else S_FOSSIL
-    d = DNode(age=nd.age, lo=nd.age, hi=nd.age, src=src)
-    for k in kids:
-        d.add(k)
+        d = kids[0]
+    else:
+        src = S_UPHAM if nd.date_src == D_UPHAM else S_INTERP if nd.date_src == D_INTERP and nd.kind == "tree" else S_FOSSIL
+        d = DNode(age=nd.age, lo=nd.age, hi=nd.age, src=src)
+        for k in kids:
+            d.add(k)
+    name = taxnames.clean(nd.name or "")
+    if d.leaf is None and _UNINOMIAL.fullmatch(name) and nd.kind != "bucket" and _fossils_only(d):
+        d.name = name
     return d
+
+
+_UNINOMIAL = re.compile(r"[A-Z][a-z]+")  # a taxon's name above a species: one Latin word ("Myoxus (Glis)" is none)
+
+
+def _fossils_only(d: DNode) -> bool:
+    """Whether every species under dated node d is extinct."""
+    return all(x.leaf.extinct for x in d.preorder() if x.leaf is not None)
 
 
 def _mrca_map(root: Node, droot: DNode) -> tuple[dict, dict, dict]:
@@ -809,11 +824,22 @@ def build(root: Node, up_root, up_tax: dict[str, dict], ov, log: dict, ac=None, 
         waiting = still
     # a graft's merged subtree resolves polytomies with zero-length branches (merge.EPS): splice those into their
     # parent, so a split dated by fossils or interpolation that is no later than its parent becomes one event
-    spliced = 0
+    spliced = kept = 0
+    tie = lambda a, b: 0 <= a - b < max(1e-3 * a, 2 * EPS)  # noqa: E731
     for d in reversed(list(droot.preorder())):
         p = d.parent
         if (p is not None and d.leaf is None and d.src in (S_FOSSIL, S_INTERP) and d.note < 0
-                and 0 <= p.age - d.age < max(1e-3 * p.age, 2 * EPS)):
+                and tie(p.age, d.age)):
+            # a named fossil group keeps its fork (ToLaD#279: Mammutidae, its genus Gomphotherium in Gomphotheriidae): where
+            # its parent is a split the grafts dated (a stem's junction, a fossil group's first appearance), the parent moves
+            # halfway up its own branch instead, as an MDD species' new split stands halfway down its mate's
+            pp = p.parent
+            if (d.name and _fossils_only(d) and pp is not None and p.src in (S_FOSSIL, S_INTERP) and p.note < 0
+                    and not tie((pp.age + d.age) / 2, d.age) and not tie(pp.age, (pp.age + d.age) / 2)):
+                p.age = (pp.age + d.age) / 2
+                p.lo, p.hi = min(p.lo, p.age), max(p.hi, p.age)
+                kept += 1
+                continue
             i = p.children.index(d)
             p.children[i:i + 1] = d.children
             for c in d.children:
@@ -846,6 +872,7 @@ def build(root: Node, up_root, up_tax: dict[str, dict], ov, log: dict, ac=None, 
         "grafts": dict(how),
         "clamped_below_parent": clamped,
         "zero_length_spliced": spliced,
+        "zero_length_named_kept": kept,
         "mdd_crowns_by_rank": dict(crown_by),
         # a fossil whose last appearance is older than the split it hangs from (a dating conflict; should be none)
         "ended_before_split": sorted(d.leaf.name for d in leaves if d.parent is not None and d.leaf.t1 >= d.parent.age)[:20],

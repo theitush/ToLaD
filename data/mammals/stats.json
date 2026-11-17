@@ -8107,7 +8107,7 @@
     "of": 15
    }
   },
-  "clamped_below_parent": 103,
+  "clamped_below_parent": 109,
   "ended_before_split": [],
   "fossil_floors": [
    {
@@ -8388,15 +8388,15 @@
    "family": 14,
    "genus": 450
   },
-  "named_splits": 931,
+  "named_splits": 3250,
   "species": 18366,
   "species_rows_left_out": 0,
-  "splits": 9143,
+  "splits": 9679,
   "splits_by_source": {
    "ensemble": 2264,
-   "fossil": 2715,
+   "fossil": 3246,
    "fossil-floor": 33,
-   "interpolated": 750,
+   "interpolated": 755,
    "override": 33,
    "upham": 1,
    "upham-imputed": 1387,
@@ -8414,7 +8414,7 @@
      "families": 23,
      "families_of_2_or_more": 18,
      "named_after": 17,
-     "named_before": 7
+     "named_before": 10
     },
     "Carnivora": {
      "families": 16,
@@ -8432,7 +8432,7 @@
      "families": 4,
      "families_of_2_or_more": 4,
      "named_after": 4,
-     "named_before": 0
+     "named_before": 2
     },
     "Dasyuromorphia": {
      "families": 2,
@@ -8546,7 +8546,7 @@
      "families": 35,
      "families_of_2_or_more": 30,
      "named_after": 30,
-     "named_before": 20
+     "named_before": 23
     },
     "Scandentia": {
      "families": 2,
@@ -8707,17 +8707,22 @@
    "f_min": 0.75,
    "moved": [
     "Ancodonta",
+    "Balaenopteridae",
     "Bathyergidae",
     "Cervinae",
+    "Chlamyphoridae",
     "Cingulata",
     "Cricetidae",
     "Crocidurinae",
+    "Dasypodidae",
     "Galagidae",
     "Hemigalinae",
+    "Moschidae",
     "Peramelidae",
     "Tenrecidae",
     "Tylopoda",
-    "Viverrinae"
+    "Viverrinae",
+    "Zapodidae"
    ],
    "not_placed": {
     "family Balaenidae": {
@@ -10312,7 +10317,8 @@
    "extinct, placed without data (grafted instead)": 44,
    "unmatched tip": 217
   },
-  "zero_length_spliced": 793
+  "zero_length_named_kept": 412,
+  "zero_length_spliced": 257
  },
  "dating": {
   "calibrated_raised_by_fossils": 402,
@@ -41617,7 +41623,7 @@
  },
  "output": {
   "brotli_bytes": 842673,
-  "dated_sidecar_raw": 2065827,
+  "dated_sidecar_raw": 2195985,
   "files": 15,
   "raw_bytes": 4596184,
   "skeleton_brotli": 109289,
