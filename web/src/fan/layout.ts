@@ -1225,11 +1225,14 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = clade.
   // Only for its own widths: the mass widths place their columns, and share the orders' width, afresh.)
   const seed = key === ORDER_MODE ? clade.seed : undefined;
   const seeded = !!seed && seedFits(seed, nodes, branches);
-  if (seeded) byMode.set(key, applySeed(seed, nodes, branches));
-  else {
+  if (seeded) {
+    byMode.set(key, applySeed(seed, nodes, branches));
+    placedLast(nodes);
+  } else {
     const P = new Packer(time, mode, W, branches.length > HUGE_TREE ? HUGE_CELLS : CELLS);
     const { sides } = chooseSides(root, P, byMode.get(ORDER_MODE));
     byMode.set(key, sides);
+    placedLast(nodes);
     placeRiver(root, P, time, mode);
   }
   if (SEED_OUT && key === ORDER_MODE) SEED_OUT.seed = takeSeed(nodes, branches, byMode.get(key)!);
@@ -1336,6 +1339,37 @@ function takeSeed(nodes: FanNode[], branches: FanBranch[], sides: Map<Split, boo
   const leaf: number[] = [];
   for (const b of branches) leaf.push(b.cx, b.colLeft, b.leanY);
   return { flips, node, leaf };
+}
+
+/**
+ * Each split's daughters that are only fossils placed by name (SpeciesRec.placed, ToLaD#279) after the others, the longest-lived first (their youngest tip
+ * the latest), the rest in chooseSides' order. A fossil grafted by taxonomy has no place of its own among its sisters; after those that outlive it, rooms by
+ * life (steady.ts computeLife) put it beside what they were while it lived, and a sister before a group then outlives it: nothing from outside a group stands
+ * in its room while it lives, or on its stem's stretch before its split (ToLaD#468, a tap's landing). The default data has none (Fossils 'phylogeny').
+ */
+function placedLast(nodes: readonly FanNode[]): void {
+  const tip = new Map<FanNode | FanBranch, number>();
+  /** A daughter's youngest tip (world y, least), or NaN where it holds any species not placed by name. */
+  const placedTip = (k: FanNode | FanBranch): number => {
+    let t = tip.get(k);
+    if (t === undefined) {
+      if (!isNode(k)) t = k.sp.placed ? k.tipY : NaN;
+      else {
+        t = Infinity;
+        // (Math.min carries a NaN through.)
+        for (const d of k.kids) t = Math.min(t, placedTip(d));
+      }
+      tip.set(k, t);
+    }
+    return t;
+  };
+  for (const v of nodes) {
+    if (!v.kids.some((k) => !Number.isNaN(placedTip(k)))) continue;
+    const rest = v.kids.filter((k) => Number.isNaN(placedTip(k)));
+    const late = v.kids.filter((k) => !Number.isNaN(placedTip(k)));
+    late.sort((a, b) => placedTip(a) - placedTip(b));
+    v.kids = [...rest, ...late];
+  }
 }
 
 /** The seed's sides and places on a fresh layout (chooseSides' daughters' order, placeRiver's places); the sides chosen. */
