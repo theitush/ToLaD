@@ -3052,15 +3052,25 @@ export class FanView implements InputHandlers {
   private coverOf(L: GapLadder, sx: number, win?: readonly [number, number]): GapMember[] {
     const same = (g: GapMember, p: GapMember) => p.on === g.on;
     // (A title over its parts' labels, ToLaD#483: the cut below the titles, each title before its parts; a gap a title's is no one else's, a band handed down holds no name of its owner's.)
-    const list = gapCut(L.root, L.parts, L.opens, L.hands, same, sx, L.guests, win ? (g) => bandMeets(g, win[0], win[1]) : undefined)
-      .filter(({ g }) => g.on >= 0)
-      .sort((p, q) => p.g.on - q.g.on || +q.heads - +p.heads);
+    // (A window, labelindex.ts: the branches whose band meets it and where something can show at this zoom.)
+    const shows = win && this.gapShowsOf(L);
     const pics = this.gapPicsOf(L);
-    const out = list.map(({ g, heads, taken }): GapMember => {
-      const m = { ...g, heads, gap: taken ? 0 : g.gap };
-      // (A group below the titles has not its name in its gap, by the cut: its band, or none. A title in its gap once that holds it, till then in its widest part's band, a guest, ToLaD#500.)
-      return { ...m, tier: tier(heads ? { ...m, band: 0 } : g.lv.b ? m : { ...m, gap: 0 }, sx, CLADE_PX, SPECIES_PX), pic: heads ? 0 : picAt(pics.get(g), sx, PIC_D, PIC_S) };
-    });
+    const [tiers, picd]: [Tier[], number[]] = [[], []];
+    const list = gapCut(L.root, L.parts, L.opens, L.hands, same, sx, L.guests, shows ? (g) => bandMeets(g, win[0], win[1]) && sx >= shows.get(g)! : undefined)
+      .filter(({ g }) => g.on >= 0)
+      .sort((p, q) => p.g.on - q.g.on || +q.heads - +p.heads)
+      .filter(({ g, heads, taken }) => {
+        // (A group below the titles has not its name in its gap, by the cut: its band, or none. A title in its gap once that holds it, till then in its widest part's band, a guest, ToLaD#500.)
+        const gap = taken ? 0 : g.gap;
+        const t = tier({ species: g.species, top: g.top, at: g.at, band: heads ? 0 : g.band, gap: heads || g.lv.b ? gap : 0 }, sx, CLADE_PX, SPECIES_PX);
+        const pic = heads ? 0 : picAt(pics.get(g), sx, PIC_D, PIC_S);
+        // (A window keeps no member with nothing to show: no name, no picture, no title over parts.)
+        if (win && !heads && !t && !pic) return false;
+        tiers.push(t);
+        picd.push(pic);
+        return true;
+      });
+    const out = list.map(({ g, heads, taken }, i): GapMember => ({ ...g, heads, gap: taken ? 0 : g.gap, tier: tiers[i], pic: picd[i] }));
     // (A title its gap cannot hold yet, a guest: in the band of its widest part, or of that one's widest part once it has handed its band down too, and so on, ToLaD#500; while that band holds
     // both names, side by side, a hair between; else that part's own label stands and the title waits for its gap.)
     const at = new Map(list.map(({ g }, i) => [g, out[i]]));
@@ -3128,6 +3138,30 @@ export class FanView implements InputHandlers {
     return ranges;
   }
   private gapPicsLast: { L: object; ranges: Map<GapMember, PicRange> } | null = null;
+  /**
+   * The least zoom anything in each member's branch can show at (labelindex.ts, a window's cover skips a branch below it): a name needs a band or gap SPECIES_PX across at least, a guest title
+   * its host's band more, a picture its range's start (gapPicsOf). Once a ladder.
+   */
+  private gapShowsOf(L: GapLadder): Map<GapMember, number> {
+    if (this.gapShowsLast?.L === L) return this.gapShowsLast.z;
+    const pics = this.gapPicsOf(L);
+    const order: GapMember[] = [];
+    for (const stack = [L.root]; stack.length; ) {
+      const g = stack.pop()!;
+      order.push(g);
+      for (const p of L.parts(g)) stack.push(p);
+    }
+    const z = new Map<GapMember, number>();
+    for (let i = order.length - 1; i >= 0; i--) {
+      const g = order[i];
+      let s = Math.min(g.on >= 0 ? SPECIES_PX / Math.max(g.band, g.gap) : Infinity, pics.get(g)?.small ?? Infinity);
+      for (const p of L.parts(g)) s = Math.min(s, z.get(p)!);
+      z.set(g, s);
+    }
+    this.gapShowsLast = { L, z };
+    return z;
+  }
+  private gapShowsLast: { L: GapLadder; z: Map<GapMember, number> } | null = null;
   private gapCoverLast: { T: CutTerritories; sx: number; win?: [number, number]; list: GapMember[] } | null = null;
   private gapWinLast: { T: CutTerritories; sx: number; win: [number, number]; list: GapMember[] } | null = null;
   private gapLadder: GapLadder | null = null;
