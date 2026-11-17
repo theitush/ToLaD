@@ -579,7 +579,7 @@ export function bigSrcOf(src: string): string {
  * A bottom sheet (ToLaD#509, sheet.ts): its head (a grab bar, the ×, the name) stays, and the rest scrolls under it, the
  * whole held to its share of the screen (view.CARD_SHARE); a swipe down closes it.
  */
-function CardShell({
+export function CardShell({
   onUp,
   onBox,
   onClose,

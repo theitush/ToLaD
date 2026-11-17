@@ -86,20 +86,22 @@ function ours(): boolean {
 export function useBackCloses(open: boolean, close: () => void): void {
   const shut = useRef(close);
   shut.current = close;
-  useEffect(() => {
-    if (!open || typeof window === 'undefined') return;
-    try {
-      if (!ours()) window.history.pushState({ [ENTRY]: true }, '');
-    } catch {
-      /* no history: back is not ours */
-    }
-    const onPop = () => {
-      if (!ours()) shut.current();
-    };
-    window.addEventListener('popstate', onPop);
-    return () => {
-      window.removeEventListener('popstate', onPop);
-      if (ours()) window.history.back();
-    };
-  }, [open]);
+  useEffect(() => (open && typeof window !== 'undefined' ? backEntry(() => shut.current()) : undefined), [open]);
+}
+
+/** The card's history entry added and back watched (useBackCloses' effect, while one is open); returns its undoing. */
+export function backEntry(close: () => void): () => void {
+  try {
+    if (!ours()) window.history.pushState({ [ENTRY]: true }, '');
+  } catch {
+    /* no history: back is not ours */
+  }
+  const onPop = () => {
+    if (!ours()) close();
+  };
+  window.addEventListener('popstate', onPop);
+  return () => {
+    window.removeEventListener('popstate', onPop);
+    if (ours()) window.history.back();
+  };
 }
