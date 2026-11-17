@@ -1072,6 +1072,17 @@ export function levelText(b: FanBranch): string {
   return m && b.sp.sci.endsWith(` ${m[2]}`) ? `${t.startsWith('Ardipithecus ') ? 'Ar' : m[1]}. ${m[2]}` : t;
 }
 
+/** The first index of ascending `a` at or past x. */
+function lowerBound(a: Float64Array, x: number): number {
+  let [lo, hi] = [0, a.length];
+  while (lo < hi) {
+    const m = (lo + hi) >> 1;
+    if (a[m] < x) lo = m + 1;
+    else hi = m;
+  }
+  return lo;
+}
+
 function clamp01(v: number): number {
   return v < 0 ? 0 : v > 1 ? 1 : v;
 }
@@ -3134,8 +3145,6 @@ export class FanView implements InputHandlers {
       };
       const root = of({ v: this.fan.root });
       const room = (g: GapMember) => (g.on < 0 ? 0 : Math.max(g.gap, g.band));
-      const opens = gapOpens(root, parts, room, CLADE_PX);
-      const guests = new Map<GapMember, Guest<GapMember>>();
       // (The highlights' lineages, HIGHLIGHT_STOPS: a band holding one is its own label's before a title's, gapHands' `dear`.)
       const lineage = new Set<FanNode | FanBranch>();
       for (const b of this.fan.branches)
@@ -3143,7 +3152,21 @@ export class FanView implements InputHandlers {
           lineage.add(b);
           for (let u: FanNode | null = b.node; u; u = u.parent) lineage.add(u);
         }
-      const hands = gapHands(root, parts, opens, (g) => (g.on < 0 ? 0 : g.gap), (g) => (g.on < 0 ? 0 : g.band), room, CLADE_PX, GROUP_D - PIC_D, guests, same, (g) => lineage.has(g.lv.b ?? g.lv.v!));
+      const dear = (g: GapMember) => lineage.has(g.lv.b ?? g.lv.v!);
+      // (An order's band goes to a highlight's label before its own name (`dear`: Primates' to Human's, ToLaD#500), and then its name waits for its gap: so for its group's
+      // opening, an order on a highlight's lineage has only its gap for its name. Its group's title stands over it till that gap holds it, and the order is named at every zoom, by
+      // its own title or its group's, whichever side of its group's fork it falls (ToLaD#279: with every fossil Primates fell second in Euarchonta's, 0.4 px of gap at home, and
+      // had no name there; with the default data it falls first, under Euarchonta's title, as before).)
+      // (Its widest part's, as gapHands' host: the first of a tie.)
+      const yields = (g: GapMember) => {
+        if (!g.lv.v || !ORDER_TAXA.has(taxonKey(g.lv.v.split.taxon ?? ''))) return false;
+        let [host, w] = [null as GapMember | null, 0];
+        for (const p of parts(g)) if ((p.on < 0 ? 0 : p.band) > w) [host, w] = [p, p.band];
+        return !!host && dear(host);
+      };
+      const opens = gapOpens(root, parts, (g) => (yields(g) ? (g.on < 0 ? 0 : g.gap) : room(g)), CLADE_PX);
+      const guests = new Map<GapMember, Guest<GapMember>>();
+      const hands = gapHands(root, parts, opens, (g) => (g.on < 0 ? 0 : g.gap), (g) => (g.on < 0 ? 0 : g.band), room, CLADE_PX, GROUP_D - PIC_D, guests, same, dear);
       const tips = tipOrder(own, R);
       L = this.gapLadder = { T, root, parts, opens, hands, guests, tips, own, C, R, slack: laneSlack(own, C, R), tipIx: new TipIndex(tips, C, R) };
     }
@@ -3434,6 +3457,9 @@ export class FanView implements InputHandlers {
     const [[xa, ya], [xb, yb]] = [this.toWorld(0, 0), this.toWorld(this.w, this.h)];
     const [x0, x1, y0w, y1w] = [Math.min(xa, xb), Math.max(xa, xb), Math.min(ya, yb), Math.max(ya, yb)];
     const { cap } = this.labelBand();
+    this.clearRows.now = C;
+    const TT = this.tipTexts;
+    if (TT.fan !== this.fan || TT.cap !== cap) [TT.fan, TT.cap, TT.m] = [this.fan, cap, new Map()];
     // (Every label standing, and the axis's labels as last drawn (its era and event notes), as the names at the forks keep clear of them.)
     const taken: number[][] = [...[...out.spots, ...out.names].map((s) => s.box), ...out.pics.map(picBox), ...this.axisBoxes];
     const half = SPECIES_PX / 2;
@@ -3496,10 +3522,16 @@ export class FanView implements InputHandlers {
       // own branch, its young edge on its tip, where its branch holds one; the name laid from there.)
       let pt = at - PIC_D / 2;
       if (line + PIC_S <= start && Number.isNaN(spot(Math.max(0, c - PIC_S), Math.min(this.w, c + PIC_S), pt, pt + PIC_S, PIC_S, c, false))) pt = line;
-      const name = one ? levelName(one.v) : levelText(b);
       this.tryEnd = this.tipWork + TIP_TRY;
-      const text = this.titleWidth(SPECIES_FONT, name) <= cap ? name : this.pillText(name, cap);
-      const len = LABEL_PAD + this.titleWidth(SPECIES_FONT, text);
+      // (Its name and its length along time, kept per strand (a group's by its youngest's, ~) and band: at home, with every fossil, ~9,000 are tried a frame.)
+      const tk = one ? ~k : k;
+      let tt = TT.m.get(tk);
+      if (!tt) {
+        const name = one ? levelName(one.v) : levelText(b);
+        const text = this.titleWidth(SPECIES_FONT, name) <= cap ? name : this.pillText(name, cap);
+        TT.m.set(tk, (tt = { text, len: LABEL_PAD + this.titleWidth(SPECIES_FONT, text) }));
+      }
+      const { text, len } = tt;
       // (Past its tip toward "now", as the column's names stand; else in its own branch, up to its picture, full, else small (the name before the picture's size, as a label's name comes
       // before its picture), as a species' name in its band; the first with room, on screen, where it meets no label.)
       let [x, box] = [NaN, [0, 0, 0, 0] as [number, number, number, number]];
@@ -3565,6 +3597,8 @@ export class FanView implements InputHandlers {
     return m;
   }
   private readonly tipGroups: { C: Float64Array | null; R: Float64Array | null; fan: Fan | null; own?: boolean[]; m: Map<number, TipGroup> } = { C: null, R: null, fan: null, m: new Map() };
+  /** tipLabels' names and their lengths (px), per strand (a group's by ~ its youngest's), at a fan and a band's cap. */
+  private readonly tipTexts = { fan: null as Fan | null, cap: NaN, m: new Map<number, { text: string; len: number }>() };
   /** tipLabels' work this frame (strands read on a row, clearIn), and the tips it left untried at TIP_WORK (from where it stopped in tipOrder, on screen or not). */
   tipWork = 0;
   tipCut = 0;
@@ -3580,7 +3614,6 @@ export class FanView implements InputHandlers {
    * is passed over at once.
    */
   private clearIn(k: number, ya: number, yb: number, min: number, out: number[], kHi = k): number[] {
-    const S = (this.fan.tess.fold as Steady).strands;
     // (Its rows on the screen's whole px (ToLaD#279): the same rows for every fossil a frame, so a strand's place on a row is worked out once a frame
     // (clearRows), not once a fossil: at home some 8,000 fossils' names are tried, all among the same few thousand strands.)
     const sy = Math.abs(this.cam.sy);
@@ -3588,24 +3621,101 @@ export class FanView implements InputHandlers {
     const n = Math.max(2, p1 - p0 + 1);
     const C = this.clearRows;
     const c = this.cam;
-    const fold = this.fan.tess.fold as Steady;
-    if (C.cx !== c.cx || C.cy !== c.cy || C.sx !== c.sx || C.sy !== c.sy || C.fold !== fold || C.ver !== fold.ver) {
-      [C.cx, C.cy, C.sx, C.sy, C.fold, C.ver] = [c.cx, c.cy, c.sx, c.sy, fold, fold.ver];
+    // (Kept per zoom and layout (by its rooms: a frame worked out for another view puts the fold's version up, not its layout), not per camera: its rows are the world's at this
+    // zoom and its columns world x, so a pan reads none again, ToLaD#279. tipLabels reads the layout once a frame, `C.now`.)
+    if (C.sx !== c.sx || C.sy !== c.sy || C.lay !== C.now) {
+      [C.sx, C.sy, C.lay] = [c.sx, c.sy, C.now];
       C.at.clear();
       C.len = 0;
     }
-    const open = new Uint8Array(n);
+    if (C.open.length < n) C.open = new Uint8Array(2 * n);
+    const scr = this.camera.screenX(0);
+    // (Its two end rows first, each alone: what is clear over every row is clear on each, so where one end leaves no room the rest is unread. Most tries that
+    // fail, fail there: a neighbour's column across the name's whole length, ToLaD#279. Then every row, the ends again read from clearRows.)
+    this.clearScan(k, kHi, p0, 0, 0, sy, min, out, scr);
+    if (out.length) this.clearScan(k, kHi, p0, n - 1, n - 1, sy, min, out, scr);
+    if (n > 2 && out.length) this.clearScan(k, kHi, p0, 0, n - 1, sy, min, out, scr);
+    return out;
+  }
+  /**
+   * The heights of strand b's own column's features, ascending (Tess.bounds' own part: its tip, its peel's 49 steps from its split to its lean's end, its population's
+   * features below its split), kept per fan: what clearIn reads inside a row's band. (Not Tess.bounds itself: that also walks every column below it, a few thousand
+   * heights a strand, and at home with every fossil some 9,000 strands are read: 1.1 s of the first frame.)
+   */
+  private ownFeatures(b: FanBranch): Float64Array {
+    const M = this.ownFeat;
+    if (M.fan !== this.fan) [M.fan, M.m] = [this.fan, new Map()];
+    let v = M.m.get(b);
+    if (!v) {
+      const out = [b.tipY];
+      if (b.leanY < b.splitY) for (let i = 0; i <= 48; i++) out.push(b.splitY - ((b.splitY - b.leanY) * i) / 48);
+      for (const a of b.pop.features()) {
+        const y = this.fan.time.y(a / 1e6);
+        if (y >= b.tipY && y < b.splitY) out.push(y);
+      }
+      out.sort((p, q) => p - q);
+      M.m.set(b, (v = Float64Array.from(out)));
+    }
+    return v;
+  }
+  private readonly ownFeat = { fan: null as Fan | null, m: new Map<FanBranch, Float64Array>() };
+  /**
+   * The first strand from i on, in direction dir (drawn order), whose tip is at or below world y `t` (not gone by then), or -1: a min tree over the strands' tips, kept per fold's
+   * strands, walked up to the first subtree holding one and down into it (O(log n)).
+   */
+  private liveFrom(i: number, dir: number, t: number): number {
+    const S = (this.fan.tess.fold as Steady).strands;
+    let T = this.tipTree;
+    if (T.S !== S) {
+      let N = 1;
+      while (N < S.length) N <<= 1;
+      const m = new Float64Array(2 * N).fill(Infinity);
+      for (let j = 0; j < S.length; j++) m[N + j] = S[j].tipY;
+      for (let j = N - 1; j >= 1; j--) m[j] = Math.min(m[2 * j], m[2 * j + 1]);
+      T = this.tipTree = { S, N, m };
+    }
+    if (i < 0 || i >= S.length) return -1;
+    const { N, m } = T;
+    let p = N + i;
+    if (m[p] <= t) return i;
+    // (Up: the first sibling past p, that way, holding one.)
+    for (;;) {
+      if (p === 1) return -1;
+      const sib = dir > 0 ? p + 1 : p - 1;
+      if ((dir > 0 ? (p & 1) === 0 : (p & 1) === 1) && m[sib] <= t) {
+        p = sib;
+        break;
+      }
+      p >>= 1;
+    }
+    // (Down: its nearest child that way holding one.)
+    while (p < N) {
+      p = dir > 0 ? 2 * p : 2 * p + 1;
+      if (m[p] > t) p += dir > 0 ? 1 : -1;
+    }
+    return p - N;
+  }
+  private tipTree: { S: readonly FanBranch[] | null; N: number; m: Float64Array } = { S: null, N: 0, m: new Float64Array(0) };
+  /** clearIn's rows r0..r1 (from world row p0, `sy` rows a world unit) read: from strands k..kHi outward on each side, a row closed at the first strand past what is left. */
+  private clearScan(k: number, kHi: number, p0: number, r0: number, r1: number, sy: number, min: number, out: number[], scr: number): void {
+    const S = (this.fan.tess.fold as Steady).strands;
+    const C = this.clearRows;
+    const open = C.open;
+    const yTop = (p0 + r1 + 1) / sy;
     for (let dir = -1; dir <= 1 && out.length; dir += 2) {
-      open.fill(1);
-      let rows = n;
-      for (let i = (dir < 0 ? k : kHi) + dir; i >= 0 && i < S.length && rows && out.length; i += dir) {
+      open.fill(1, r0, r1 + 1);
+      let rows = r1 - r0 + 1;
+      // (Only strands not gone before every row: the next one each way from a min tree on their tips, not a strand at a time, ToLaD#279: at home with every fossil a name's
+      // neighbours in drawn order are mostly fossils gone long before.)
+      for (let i = this.liveFrom((dir < 0 ? k : kHi) + dir, dir, yTop); i >= 0 && rows && out.length; i = this.liveFrom(i + dir, dir, yTop)) {
         const b = S[i];
-        const yTop = (p0 + n - 1) / sy;
-        if (b.tipY > yTop) continue;
-        for (let r = 0; r < n && out.length; r++) {
+        for (let r = r0; r <= r1 && out.length; r++) {
           if (!open[r]) continue;
-          const y = (p0 + r) / sy;
-          if (y < b.tipY) continue;
+          // (Row p is the band from it to the next row: a strand there anywhere in it is read, at its start or at its tip, and at its own column's end, its split, where that falls
+          // inside the band, so a column whose own stretch is shorter than a px, or steps across at its split between two rows, is not passed over (ToLaD#279: Ar. ramidus'
+          // 3 px own column leans toward Ar. kadabba's picture in its last px).)
+          const [y, y1] = [(p0 + r) / sy, (p0 + r + 1) / sy];
+          if (y1 <= b.tipY) continue;
           // (One try's share of the budget, TIP_TRY: past it the name has no place here, as if crossed.)
           if (++this.tipWork > this.tryEnd) {
             out.length = 0;
@@ -3615,21 +3725,43 @@ export class FanView implements InputHandlers {
           const key = (p0 + r) * S.length + i;
           let j = C.at.get(key);
           if (j === undefined) {
-            const w = laneW(b, y);
-            const l = leftAt(b, y, w);
+            const ys = Math.max(y, b.tipY);
+            const w = laneW(b, ys);
+            let l = leftAt(b, ys, w);
+            let [r2, own] = [l + w, ys < b.splitY && w > 0];
+            // (Its own column inside the band, where its shape's features fall (its own of Tess.bounds': its population's history points, its peel's steps, its split), as
+            // drawn: between them its edges are as smooth as a row's px.)
+            const ye = Math.min(y1, b.splitY);
+            if (ye > ys) {
+              const B = this.ownFeatures(b);
+              let q = lowerBound(B, ys);
+              for (; q < B.length && B[q] < ye; q++) {
+                const yq = B[q] > ys ? B[q] : ys;
+                const wq = laneW(b, yq);
+                const lq = leftAt(b, yq, wq);
+                if (wq > 0) [l, r2, own] = [own ? Math.min(l, lq) : lq, own ? Math.max(r2, lq + wq) : lq + wq, true];
+              }
+              if (b.splitY < y1) {
+                const yq = b.splitY - (b.splitY - ys) * 1e-9;
+                const wq = laneW(b, yq);
+                const lq = leftAt(b, yq, wq);
+                if (wq > 0) [l, r2, own] = [own ? Math.min(l, lq) : lq, own ? Math.max(r2, lq + wq) : lq + wq, true];
+              }
+            }
             if (C.len + 3 > C.buf.length) {
               const g = new Float64Array(C.buf.length * 2);
               g.set(C.buf);
               C.buf = g;
             }
             j = C.len;
-            C.buf[j] = this.camera.screenX(l);
-            C.buf[j + 1] = this.camera.screenX(l + w);
-            C.buf[j + 2] = y < b.splitY && w > 0 ? 1 : 0;
+            C.buf[j] = l * this.cam.sx;
+            C.buf[j + 1] = r2 * this.cam.sx;
+            C.buf[j + 2] = own ? 1 : 0;
             C.len += 3;
             C.at.set(key, j);
           }
-          const [a, z] = [C.buf[j], C.buf[j + 1]];
+          const a = C.buf[j] + scr;
+          const z = C.buf[j + 1] + scr;
           if (dir < 0 ? z <= out[0] : a >= out[out.length - 1]) {
             open[r] = 0;
             rows--;
@@ -3637,10 +3769,9 @@ export class FanView implements InputHandlers {
         }
       }
     }
-    return out;
   }
-  /** clearIn's strands on the screen's rows, a camera and layout: row * strands + strand -> [a, z, own column] at buf[j..j + 2]. */
-  private readonly clearRows = { cx: NaN, cy: NaN, sx: NaN, sy: NaN, fold: null as Steady | null, ver: -1, at: new Map<number, number>(), buf: new Float64Array(3 << 12), len: 0 };
+  /** clearIn's strands on the world's rows at a zoom and layout: row * strands + strand -> [a, z, own column] at buf[j..j + 2], a and z its column's edges, world x times the zoom (screen x less the pan's). */
+  private readonly clearRows = { sx: NaN, sy: NaN, lay: null as Float64Array | null, now: null as Float64Array | null, at: new Map<number, number>(), buf: new Float64Array(3 << 12), len: 0, open: new Uint8Array(256) };
 
   /** Takes [a, z] out of the stretches in `out` ([from, to] pairs, in order), keeping the pieces at least `min` wide. */
   private cutOut(out: number[], a: number, z: number, min: number): void {

@@ -217,11 +217,11 @@ export class Steady extends Fold {
   private rowsVer = -1;
   private readonly sRows = new Map<number, Float64Array>();
   private homeExtS: [number, number] | null = null;
-  /** Rooms by life: per strand its tip, per node its last tip (the youngest), now's height; a strand's widest in a window (laneW sampled), by `${i} ${t0}`. */
+  /** Rooms by life: per strand its tip, per node its last tip (the youngest), now's height; per strand its lane's widest from each step of its life to its split (widestSince). */
   private readonly tipS: Float64Array;
   private readonly tipN: Float64Array;
   private readonly yNow: number;
-  private readonly winW: (Map<number, number> | undefined)[] = [];
+  private readonly lifeW: (Float64Array | undefined)[] = [];
   /**
    * The range answers' constants (ToLaD#502): per strand its widest anywhere (its room, its founders, its most alive:
    * a bound on its column's width), per node its strands' founders summed (its column's width, a bound), its first
@@ -395,25 +395,31 @@ export class Steady extends Fold {
     return { ver: this.ver, A: Float64Array.from(A), colL, roomL, roomW, h, C };
   }
 
-  /** Strand i's widest from its split up to window bottom t0 (world y; its tip if later): laneW sampled, its founders' at the split. */
+  /**
+   * Strand i's widest from its split up to window bottom t0 (world y; its tip if later): its founders' at the split, laneW at the steps of a grid fixed
+   * per strand (LIFE_SAMPLES from its tip to its split) inside the window, and at t0 itself. The grid's widest from each step on is worked out once per strand
+   * (ToLaD#279: a window per pair of sisters, a few million with every fossil, each read in O(1) and one laneW); over its whole life, the grid's alone.
+   */
   private widestSince(i: number, t0: number): number {
     const b = this.strands[i];
     const lo = Math.max(t0, b.tipY);
-    // (Kept per strand by its window's bottom, a number: no key to build, ToLaD#279, a few million asks a layout with every fossil.)
-    const m = (this.winW[i] ??= new Map());
-    let w = m.get(lo);
-    if (w !== undefined) return w;
-    w = b.baseW;
     const hi = b.splitY;
-    if (hi > lo) {
+    if (!(hi > lo)) return b.baseW;
+    let S = this.lifeW[i];
+    if (!S) {
+      S = this.lifeW[i] = new Float64Array(LIFE_SAMPLES + 1);
       const age = this.fan.time;
       for (let k = 0; k <= LIFE_SAMPLES; k++) {
-        const y = lo + ((hi - lo) * k) / LIFE_SAMPLES;
-        w = Math.max(w, laneW(b, y, age.ageAt(y)));
+        const y = b.tipY + ((hi - b.tipY) * k) / LIFE_SAMPLES;
+        S[k] = laneW(b, y, age.ageAt(y));
       }
+      S[LIFE_SAMPLES] = Math.max(S[LIFE_SAMPLES], b.baseW);
+      for (let k = LIFE_SAMPLES - 1; k >= 0; k--) S[k] = Math.max(S[k], S[k + 1]);
     }
-    m.set(lo, w);
-    return w;
+    if (lo === b.tipY) return S[0];
+    const f = ((lo - b.tipY) / (hi - b.tipY)) * LIFE_SAMPLES;
+    const k = Math.ceil(f);
+    return Math.max(k <= LIFE_SAMPLES ? S[k] : b.baseW, laneW(b, lo, this.fan.time.ageAt(lo)));
   }
 
   /**
