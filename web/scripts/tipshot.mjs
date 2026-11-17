@@ -2,6 +2,7 @@
 // Home; the levels as a tap on them lands (goLevel); the Hominins' landing as a real tap on the human picture from Primates lands (ToLaD#497).
 // Each shot's line: the level, and its fossils (strands ended before the labels' line, or standing inside a wider lane there) on screen, named or not.
 //   npm run build:single && flock /tmp/tolad-browser.lock node scripts/tipshot.mjs <out-dir> <prefix> [home,hominins,Felidae,...]
+// A scene `hominins>Homo floresiensis`: the Hominins' landing, then the pan, if any, that brings that species' tip a picture's width (36 px) inside the screen's nearer edge (ToLaD#279).
 import { mkdirSync } from 'node:fs';
 import { chromium } from 'playwright';
 import { pageUrl } from './pageurl.mjs';
@@ -59,7 +60,8 @@ try {
       f.request();
     }, latin);
   for (const sc of SCENES) {
-    if (sc === 'hominins') {
+    const [scene, panTo] = sc.split('>');
+    if (scene === 'hominins') {
       await go('Primates');
       await still();
       const p = await page.evaluate(() => {
@@ -75,10 +77,24 @@ try {
         continue;
       }
       await page.touchscreen.tap(p[0], p[1]);
+      if (panTo) {
+        await still();
+        const dx = await page.evaluate((sci) => {
+          const f = window.__fan;
+          const b = f.fan.branches.find((q) => q.sp.sci === sci);
+          const [c] = f.toScreen(f.fan.tess.fold.rooms().C[b.index], b.tipY);
+          const d = c < 36 ? 36 - c : c > f.w - 36 ? f.w - 36 - c : 0;
+          f.cam = { ...f.cam, cx: f.cam.cx - d / f.cam.sx };
+          f.camera.settle();
+          f.request();
+          return d;
+        }, panTo);
+        console.log(`${sc}: panned ${dx.toFixed(0)} px`);
+      }
     } else await go(sc === 'home' ? null : sc);
     await still();
     console.log(`${PREFIX}${sc}:`, await say());
-    await page.screenshot({ path: `${OUT}/${PREFIX}${sc}.png` });
+    await page.screenshot({ path: `${OUT}/${PREFIX}${sc.replace(/>.*\s(\w+)$/, '-$1')}.png` });
   }
 } finally {
   await browser.close();
