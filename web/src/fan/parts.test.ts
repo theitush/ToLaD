@@ -161,7 +161,9 @@ describe('a group opens part by part', () => {
       }
       if (now > 5 * second) late5++;
     }
-    // (Measured 2026-11-16: before 3,719 >2x and 2,493 >5x of 6,245; now 785 and 18, held by their parent or by guests riding down; 2026-11-17, 846 and 21, a first part's title a guest till its group opens, gapHands' `same`.)
+    // (Measured 2026-11-16: before 3,719 >2x and 2,493 >5x of 6,245; now 785 and 18, held by their parent or by guests riding down; 2026-11-17, 846 and 21, a first part's title a guest till its group opens, gapHands' `same`;
+    // 2026-11-17, one guest a band: 0 and 0 of 6,245 (before 3,719 and 2,491), each part handing down once its widest part holds its own name and one title, no stack of guests holding it.)
+    say(`late splits: ${late2} >2x, ${late5} >5x of ${groups} (before ${late2Before}, ${late5Before}); first: ${late.join(', ')}`);
     expect(late2 * 4).toBeLessThan(late2Before);
     expect(late5 * 100).toBeLessThan(late5Before);
   });

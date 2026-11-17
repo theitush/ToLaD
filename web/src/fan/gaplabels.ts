@@ -102,9 +102,11 @@ export interface Guest<G> {
  * so that no part is ever left with nothing naming it. A group hands its band down once its gap holds its name (`gap(g)`, world x; px the text), or before that, once its widest part's band
  * (`band(p)`) holds that part's own name and its group's side by side (2 px and a `pad` between), and at its opening anyway; never before its parent hands down. So a group opens part by part
  * (ToLaD#500, Ita: "colinns sequirel money doesnt show the pic even at the zoom!"): a wide part has its name and picture once it has room, a thin one stays under its group's title until it fits.
- * Until its gap holds its name, the title is a guest in its widest part's band (`guests`); when that part hands its band down in turn, its guests go on down to its widest part with its own, so
- * a part hands down only once its widest part's band holds them all, its own name and theirs, side by side. Each title moves to its gap (the #483 way) or goes at its opening, once, on the way in.
- * A gap its group's (`same`: a first part's) is its group's title's till that group opens, so a title holds it only from there: a chain of first parts under one title stays named, each a guest.
+ * Until its gap holds its name, the title is a guest in its widest part's band (`guests`); when that part hands its band down in turn, its guests go on down to its widest part with its own. A band
+ * holds one guest at most, the outermost of the chain still standing (the inner ones of a chain of first parts no name there: a tap goes one level deeper to each), so a part hands down once its
+ * widest part's band holds its own name and one title beside it. Each title moves to its gap (the #483 way) or goes at its opening, once, on the way in.
+ * A gap its group's (`same`: a first part's) is its group's title's till that group opens, so a title holds it only from there: a chain of first parts under one title is named by its outermost
+ * guest still standing.
  */
 export function gapHands<G>(root: G, parts: (g: G) => readonly G[], opens: Map<G, number>, gap: (g: G) => number, band: (g: G) => number, room: (g: G) => number, px: number, pad: number, guests?: Map<G, Guest<G>>, same?: (g: G, p: G) => boolean): Map<G, number> {
   const hands = new Map<G, number>();
@@ -127,8 +129,9 @@ export function gapHands<G>(root: G, parts: (g: G) => readonly G[], opens: Map<G
     if (ps.length) {
       const ends = [...new Set([enter, until, ...brought].filter((z) => z >= enter && z < Infinity))].sort((p, q) => p - q);
       for (let i = 0; i < ends.length && at === Infinity; i++) {
-        const n = brought.filter((u) => u > ends[i]).length + (ends[i] < until ? 1 : 0);
-        const z = n ? Math.max(ends[i], ((n + 1) * px + n * pad) / w) : ends[i];
+        // (One guest a band at most, ToLaD#500: its own name and one title beside it, the outermost of the chain still standing.)
+        const n = brought.some((u) => u > ends[i]) || ends[i] < until;
+        const z = n ? Math.max(ends[i], (2 * px + pad) / w) : ends[i];
         if (z < (ends[i + 1] ?? Infinity)) at = z;
       }
       at = Math.min(open, at);

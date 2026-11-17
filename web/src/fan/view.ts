@@ -3020,6 +3020,14 @@ export class FanView implements InputHandlers {
       while (h && (L.hands.get(h) ?? Infinity) <= sx) h = L.guests.get(h)?.host;
       if (h && at.has(h)) Object.assign(m, { tier: 'title', host: at.get(h) });
     });
+    // (One guest a band, ToLaD#500 (gapHands): the outermost of its chain still standing; the inner ones have no name there, a tap going one level deeper to each: of a band's guests,
+    // the widest.)
+    const guested = new Map<GapMember, GapMember>();
+    for (const m of out) {
+      const o = m.host && guested.get(m.host);
+      if (m.host && (!o || m.l - m.f > o.l - o.f)) guested.set(m.host, m);
+    }
+    for (const m of out) if (m.host && guested.get(m.host) !== m) Object.assign(m, { tier: null, host: undefined });
     // (No name twice side by side, ToLaD#500: groupName names a group for its best-known species, so a group and a part of it can read the same. A name reading as a title over it that it stands
     // beside (a guest of the same band, or that band's own label; under a title in its gap, its first strand that title's; or its band's top two slots or less from that title's) is shown once, as the outermost group's; a tap on it goes to that group.)
     const text = (m: GapMember) => (m.lv.b ? levelText(m.lv.b) : groupName(this.fan, m.lv.v!));
@@ -3094,8 +3102,8 @@ export class FanView implements InputHandlers {
     const col = Y(this.fan.time.y(LABELS_MA));
     const hair = GROUP_D - PIC_D;
     const list = this.gapCoverAt(T, sx);
-    // (Guest titles, ToLaD#500: in their host's band, from the top of that band's part on screen, the outer group first, side by side, then the host's own labels, a hair between each; gapHands
-    // gave the band room for them all.)
+    // (Guest titles, ToLaD#500: in their host's band, one at most (gapCoverAt), at the top of that band's part on screen, then the host's own labels, a hair between; gapHands gave the band room
+    // for both.)
     const guestAt = new Map<GapMember, number>();
     const ceded = new Map<GapMember, number>();
     const guests = new Map<GapMember, GapMember[]>();
