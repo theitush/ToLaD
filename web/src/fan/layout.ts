@@ -333,6 +333,22 @@ export function lanesAt(b: FanBranch, y: number, mode: WidthMode = b.tess.mode):
   return [b.baseW, segGreen(s, age, y)];
 }
 
+/** lanesAt(b, y) at y's age (given: a grid row's strands share it, green.ts, ToLaD#502), into out[o] and out[o + 1]: no tuple, the same sums. */
+export function lanesAtAge(b: FanBranch, y: number, age: number, out: Float64Array, o: number): void {
+  if (y < b.tipY) {
+    out[o] = 0;
+    out[o + 1] = 0;
+  } else if (y < b.splitY) {
+    const n = b.pop.aliveAt(age);
+    const w = n > 0 ? b.unit * g(n, b.tess.mode) : 0;
+    out[o] = w;
+    out[o + 1] = w * b.pop.greenAt(age);
+  } else {
+    out[o] = b.baseW;
+    out[o + 1] = segGreen(segAt(b, y), age, y);
+  }
+}
+
 /** lanesAt(b, y)[0] alone (its width, the green not worked out): the fold's rooms and edges ask it ~6,000 times a row (ToLaD#255). */
 export function laneW(b: FanBranch, y: number, age?: number): number {
   if (y < b.tipY) return 0;

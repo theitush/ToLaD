@@ -11,6 +11,7 @@
 
 import { isNode, lanesAt, type Fan, type FanNode } from './layout';
 import type { Fold } from './fold';
+import { GreenRuns } from './green';
 
 /** A closed clade is drawn as one branch while its species are under this many px wide each on screen, on average. */
 export const MERGE_PX = 1;
@@ -46,6 +47,8 @@ export class Lod {
   /** Per merged-able node: its green share per grid row, by the row's world y. */
   private green = new Map<FanNode, GreenRows>();
   private gLast: GreenRows | undefined;
+  /** The strands' green and whole widths by blocks of the tree order, per row (green.ts), made when first asked. */
+  private runs: GreenRuns | null = null;
 
   constructor(readonly fan: Fan) {
     fan.nodes.forEach((v, i) => this.idx.set(v, i));
@@ -168,15 +171,23 @@ export class Lod {
     let G = m.get(y);
     if (G === undefined) {
       if (m.size >= 8192) m.clear();
-      let g = 0;
-      let w = 0;
-      for (const b of v.strands) {
-        if (y < b.tipY) continue;
-        const l = lanesAt(b, y);
-        w += l[0];
-        g += l[1];
+      // (Its strands one run of the tree order: their sums by blocks kept per row, green.ts, ToLaD#502: a clade that parts or
+      // closes reads its blocks, where it walked every strand at every row.)
+      const S = v.strands;
+      const i0 = S.length ? S[0].index : 0;
+      const i1 = S.length ? S[S.length - 1].index : -1;
+      if (i1 - i0 + 1 === S.length) G = (this.runs ??= new GreenRuns(this.fan)).share(i0, i1, y);
+      else {
+        let g = 0;
+        let w = 0;
+        for (const b of S) {
+          if (y < b.tipY) continue;
+          const l = lanesAt(b, y);
+          w += l[0];
+          g += l[1];
+        }
+        G = w > 0 ? Math.min(1, g / w) : 0;
       }
-      G = w > 0 ? Math.min(1, g / w) : 0;
       m.set(y, G);
     }
     e.K[c] = k;
