@@ -17,14 +17,14 @@ import { DOUBLE_TAP_MS, Input, type InputHandlers } from '../engine/input';
 import { clipPoly, FanCamera, LABELS_SHARE, type Camera } from './camera';
 import { ease, isNode, laneAt, laneW, layoutFan, leftAt, nearestStrand, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type Fan, type FanBranch, type FanNode, type Measure, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
-import { FanGL, rgb01 } from './meshgl';
+import { FanGL, rgb01, type Batches, type ChordStyle } from './meshgl';
 import { Ribbons } from './ribbons';
 import { Lod, lodIndexOn } from './lod';
 import type { Fold, FoldState } from './fold';
 import { forkMode, grayOn, LABEL_PILL, peelSteps, Steady } from './steady';
 import { LADDER, Territories, type CutItem, type Ref, type RowsOf } from './cut';
 import { COLUMN_DIM, columnSpans, EVENT_TINT, eventAt, eventSpans, type EventSpan } from './colstyle';
-import { laneDim, LINEAGE, pathFrame, TwigModel } from './twigs';
+import { DIM_NARROW, DIM_WIDE, laneDim, LINEAGE, pathFrame, TwigModel } from './twigs';
 import type { RectBatch } from './meshgl';
 import { FAMILY_EN, familyLabel, HIGHLIGHT_STOPS, ORDER_EN, ORDER_TAXA, taxonKey, type Split } from './splits';
 import { Brackets, foldedFrame, forkLeaders, forkNames, latinOf, rankOf, STACK_MOST, TAXON_EN, type ForkLines, type StackAt } from './brackets';
@@ -1238,6 +1238,7 @@ export class FanView implements InputHandlers {
       canvas.parentElement.insertBefore(glc, canvas);
       try {
         this.gl = new FanGL(glc);
+        this.gl.style = CHORD_STYLE;
         this.gl.onRestored = this.redraw;
       } catch (e) {
         console.warn('fan: no WebGL2, drawing with Canvas 2D', e);
@@ -2965,6 +2966,7 @@ export class FanView implements InputHandlers {
     this.drawTimeAxis(true);
     drawWorldOver(this);
     if (this.gl) {
+      this.gl.laneW = this.w;
       this.gl.end(this.stageW, this.h, this.dpr);
     }
     this.frameMs.push(performance.now() - t0);
@@ -4608,6 +4610,9 @@ export class FanView implements InputHandlers {
         batch.push(l0, y0, r0, y1, c[0], c[1], c[2], a, l1 - l0, r1 - r0, cl, cr);
       };
       const gl = this.gl;
+      // (The chords sent as they are, each spread into its trapezoids on the GPU, SEG_VS, ToLaD#502: piece()'s work
+      // per chord off the CPU, a fifth of the data sent. A batch with no chords' (a test's stub): piece() here.)
+      const segs = (gl as Partial<Batches>).lanes ? gl.lanes() : null;
       // A stretch: q's row (top) to p's.
       const piece = (xq: number, wq: number, gq: number, xp: number, wp: number, gp: number, y0: number, y1: number) => {
         const wm = (wq + wp) / 2;
@@ -4660,7 +4665,17 @@ export class FanView implements InputHandlers {
         const gp = wp * F[i];
         const sq = Math.sqrt(1 + ((xp + wp / 2 - xq - wq / 2) / (y1 - y0)) ** 2);
         if ((xq + Math.max(wq, gq, sq) + 4 * sq < -8 && xp + Math.max(wp, gp, sq) + 4 * sq < -8) || (xq - 4 * sq > L + 8 && xp - 4 * sq > L + 8)) continue;
-        piece(xq, wq, gq, xp, wp, gp, y0, y1);
+        if (!segs) {
+          piece(xq, wq, gq, xp, wp, gp, y0, y1);
+          continue;
+        }
+        // (A styled stretch's fade over it stays a rect over the lanes, as piece() makes it.)
+        const dim = held.length ? dimAt(held, (y0 + y1) / 2) : 0;
+        if (dim > 0) {
+          const xr = Math.max(xq + Math.max(0.6, wq), xp + Math.max(0.6, wp)) + 0.5;
+          trap(gl.over, xq, xq + Math.max(sq, wq), xp, xp + Math.max(sq, wp), y0, y1, BG01, dim, Math.min(xq, xp) - 0.5, xr + 0.5);
+        }
+        segs.push(xq, wq, gq, y0, xp, wp, gp, y1, gray, dim);
       }
     } else {
       // (Its run drawn whole.)
@@ -5389,6 +5404,8 @@ const GRAY01 = rgb01(GRAY);
 const GRAY_DARK01 = rgb01('#131c19');
 const GREEN01 = rgb01(GREEN);
 const GREEN_DARK01 = rgb01('#0d2318');
+/** The chords' colours and constants, for SEG_VS (meshgl.ts): piece()'s. */
+export const CHORD_STYLE: ChordStyle = { gray: GRAY01, grayDark: GRAY_DARK01, green: GREEN01, greenDark: GREEN_DARK01, k: [DIM_WIDE, DIM_NARROW, GLOW_W, GLOW_LEAN] };
 /** drawLanes' piece colours: written per piece, read at once by trap(). */
 const GC_MIX: [number, number, number] = [0, 0, 0];
 const EC_MIX: [number, number, number] = [0, 0, 0];

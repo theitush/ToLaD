@@ -284,9 +284,9 @@ export const TWIG_GRAY = '#95a2b0';
 const smoothstep = (t: number) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
 
 /** The lanes' fill dims towards a dark tint of itself (wide lanes)... */
-const DIM_WIDE = 0.72;
+export const DIM_WIDE = 0.72;
 /** ...less where a lane is narrow. A lane `px` wide: its dimming (0–1). */
-const DIM_NARROW = 0.3;
+export const DIM_NARROW = 0.3;
 export function laneDim(px: number): number {
   return DIM_WIDE + (DIM_NARROW - DIM_WIDE) * (1 - smoothstep((px - 2) / 8));
 }

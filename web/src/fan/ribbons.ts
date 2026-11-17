@@ -11,7 +11,8 @@
 // peels' steps are measured in pixels), so the look is the same to the bit; what is kept is the world geometry under it.
 //
 // (The width zoom opens the gaps (fold.ts setScale bumps `ver`), so a pinch that changes the width scale still
-// rebuilds the rows on screen once a frame; the rooms answered by range, step 2, is what makes that rebuild cheap.)
+// rebuilds the rows on screen once a frame; the rooms answered by range, step 2, is what makes that rebuild cheap.
+// A grid change is no layout change: the rows are kept by height across a coarser grid, Ribbons.)
 
 import type { Fold } from './fold';
 import type { FanNode } from './layout';
@@ -32,6 +33,8 @@ export class Rows {
 
   /** Row k's chunk (a, made all unasked when new) and its offset in it (j); the last chunk asked kept before the map. */
   private at(k: number): void {
+    // (k on the grid drawn; kept by its row on the finest grid since the layout's (Ribbons.step): the same height.)
+    k *= this.owner.step;
     const c = Math.floor(k / CH);
     if (c !== this.c || !this.a) {
       let a = this.chunks.get(c);
@@ -87,18 +90,44 @@ export class Rows {
   }
 }
 
-/** Every merged clade's rows at the layout and grid they were asked at; dropped (their chunks pooled) when either changes. */
+/** Rows kept across a grid this many times coarser than the finest asked since the layout's; past it, made again. */
+const KEEP_STEPS = 4;
+/** Whether the rows outlast a coarser grid (ToLaD#502); off, they are made again at every grid change, as before (tests). */
+let keepAcross = true;
+export function setRibbonsKeep(on: boolean): void {
+  keepAcross = on;
+}
+
+/**
+ * Every merged clade's rows at the layout they were asked at, by height; dropped (their chunks pooled) when it changes.
+ *
+ * A row is a height (y = k * gridH), and the grids are powers of two, so a coarser grid's rows are a finer one's. The rows
+ * are kept by their place on the finest grid asked since the layout (`H0`): the grid's change at a gesture's start and
+ * end (twice as coarse while the fold moves, view.ts applyFold) and a pinch out read the rows already made, where each
+ * made every clade's rows on screen again. A finer grid than H0 (a pinch in), or one more than KEEP_STEPS coarser,
+ * starts again from it.
+ */
 export class Ribbons {
   fold: Fold | null = null;
   lod: Lod | null = null;
   private ver = -1;
   private H = NaN;
+  /** The finest grid since the layout's, and the grid drawn's rows' step on it (H / H0). */
+  private H0 = NaN;
+  step = 1;
   private readonly by = new Map<FanNode, Rows>();
   private readonly pool: Float64Array[] = [];
 
   /** Clade v's rows (strands i0..i1) at fold f's layout and grid. */
   of(f: Fold, lod: Lod, v: FanNode, i0: number, i1: number): Rows {
-    if (f !== this.fold || lod !== this.lod || f.ver !== this.ver || f.gridH !== this.H) this.reset(f, lod);
+    if (f !== this.fold || lod !== this.lod || f.ver !== this.ver) this.reset(f, lod);
+    else if (f.gridH !== this.H) {
+      const s = f.gridH / this.H0;
+      if (keepAcross && s >= 1 && s <= KEEP_STEPS) {
+        this.H = f.gridH;
+        this.step = s;
+      } else this.reset(f, lod);
+    }
     let r = this.by.get(v);
     if (!r) this.by.set(v, (r = new Rows(this, v, i0, i1)));
     return r;
@@ -115,6 +144,7 @@ export class Ribbons {
     this.fold = f;
     this.lod = lod;
     this.ver = f.ver;
-    this.H = f.gridH;
+    this.H = this.H0 = f.gridH;
+    this.step = 1;
   }
 }
