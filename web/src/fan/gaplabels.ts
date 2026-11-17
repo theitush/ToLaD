@@ -104,16 +104,17 @@ export interface Guest<G> {
  * (ToLaD#500, Ita: "colinns sequirel money doesnt show the pic even at the zoom!"): a wide part has its name and picture once it has room, a thin one stays under its group's title until it fits.
  * Until its gap holds its name, the title is a guest in its widest part's band (`guests`); when that part hands its band down in turn, its guests go on down to its widest part with its own, so
  * a part hands down only once its widest part's band holds them all, its own name and theirs, side by side. Each title moves to its gap (the #483 way) or goes at its opening, once, on the way in.
+ * A gap its group's (`same`: a first part's) is its group's title's till that group opens, so a title holds it only from there: a chain of first parts under one title stays named, each a guest.
  */
-export function gapHands<G>(root: G, parts: (g: G) => readonly G[], opens: Map<G, number>, gap: (g: G) => number, band: (g: G) => number, room: (g: G) => number, px: number, pad: number, guests?: Map<G, Guest<G>>): Map<G, number> {
+export function gapHands<G>(root: G, parts: (g: G) => readonly G[], opens: Map<G, number>, gap: (g: G) => number, band: (g: G) => number, room: (g: G) => number, px: number, pad: number, guests?: Map<G, Guest<G>>, same?: (g: G, p: G) => boolean): Map<G, number> {
   const hands = new Map<G, number>();
-  // (Each with the untils of the guests it brings, its ancestors' titles standing in its band.)
-  const stack: [G, number, number[]][] = [[root, 0, []]];
+  // (Each with the untils of the guests it brings, its ancestors' titles standing in its band, and the zoom its gap is its own from: a gap its group's (`same`) is that group's title's till it opens.)
+  const stack: [G, number, number[], number][] = [[root, 0, [], 0]];
   while (stack.length) {
-    const [g, enter, brought] = stack.pop()!;
+    const [g, enter, brought, free] = stack.pop()!;
     const ps = parts(g);
     const open = opens.get(g) ?? Infinity;
-    const titled = gap(g) > 0 ? px / gap(g) : Infinity;
+    const titled = gap(g) > 0 ? Math.max(free, px / gap(g)) : Infinity;
     // (Its widest part, the first of a tie.)
     let [host, w] = [undefined as G | undefined, 0];
     for (const p of ps) if (band(p) > w) [host, w] = [p, band(p)];
@@ -135,7 +136,7 @@ export function gapHands<G>(root: G, parts: (g: G) => readonly G[], opens: Map<G
     hands.set(g, at);
     if (host !== undefined) guests?.set(g, { host, until });
     const down = [...brought.filter((u) => u > at), ...(at < until ? [until] : [])];
-    for (const p of ps) stack.push([p, at, p === host ? down : []]);
+    for (const p of ps) stack.push([p, at, p === host ? down : [], same?.(g, p) ? open : 0]);
   }
   return hands;
 }

@@ -150,7 +150,7 @@ describe('a group opens part by part', () => {
       }
       if (now > 5 * second) late5++;
     }
-    // (Measured 2026-11-16: before 3,719 >2x and 2,493 >5x of 6,245; now 785 and 18, held by their parent or by guests riding down.)
+    // (Measured 2026-11-16: before 3,719 >2x and 2,493 >5x of 6,245; now 785 and 18, held by their parent or by guests riding down; 2026-11-17, 846 and 21, a first part's title a guest till its group opens, gapHands' `same`.)
     expect(late2 * 4).toBeLessThan(late2Before);
     expect(late5 * 100).toBeLessThan(late5Before);
   });

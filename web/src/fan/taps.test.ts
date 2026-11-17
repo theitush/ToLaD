@@ -164,7 +164,10 @@ describe('one tap on a label opens it (ToLaD#465)', () => {
     const parts = now.filter((g) => inside(g, u));
     const line = `${where}: ${groupName(v.fan, u)} at ${(was.sx / home.sx).toFixed(1)}x -> ${(v.cam.sx / home.sx).toFixed(1)}x, moved ${off(v.cam, was).toFixed(0)} px\n  before: ${before.join(', ')}\n  after: ${now.map(nameOf).join(', ')}`;
     say(line);
-    expect(now.some((g) => g.lv.v === u), line).toBe(false);
+    // (Split: no member of the cover is u whole. Its name may stay as a title over its parts, a guest in its widest part's band while its gap cannot hold it, ToLaD#500: a tap lands where
+    // u hands its band down (gapHands), before its gap holds its title, so its name stays on screen beside its widest part's. Measured: Vesper bats & kin 1.0x -> 8.5x, Tarsiers, monkeys & apes
+    // 18.6x -> 20.7x, Cats 242.7x -> 291.0x, Domestic dog & kin 181.9x -> 188.9x, each a guest there.)
+    expect(now.some((g) => g.lv.v === u && !g.heads), line).toBe(false);
     expect(P(v).gapCoverAt(P(v).territories(), v.cam.sx).filter((g) => inside(g, u)).length, line).toBeGreaterThanOrEqual(2);
     expect(parts.length, line).toBeGreaterThanOrEqual(1);
     expect(off(v.cam, was), line).toBeGreaterThan(12);
@@ -213,10 +216,14 @@ describe('one tap on a label opens it (ToLaD#465)', () => {
         if (!P(v).famHits.some((q) => q.v.strands.includes(b))) {
           const m = P(v)
             .gapCoverAt(P(v).territories(), v.cam.sx)
-            .find((g) => g.lv.v?.strands.includes(b));
+            .find((g) => !g.heads && (g.lv.b === b || g.lv.v?.strands.includes(b)));
           if (m) stand({ ...v.cam, cx: m.top + (v.w / 2 - v.w / 3) / v.cam.sx });
         }
-        const h = P(v).famHits.find((q) => q.v.strands.includes(b));
+        // (The innermost label holding it: a group's title stays beside its widest part's label after a tap, a guest, ToLaD#500, with its thin parts under it alone; a second tap on it goes on to
+        // where every part has room, openCamera's deep.)
+        const h = P(v)
+          .famHits.filter((q) => q.v.strands.includes(b))
+          .sort((p, q) => p.v.strands.length - q.v.strands.length)[0];
         expect(h, `${sci}: no label holds it at ${(v.cam.sx / home.sx).toFixed(1)}x: ${shown().map(nameOf).join(', ')}`).toBeDefined();
         opens(h!.v, sci);
       }
