@@ -33,7 +33,7 @@
     "Amniota": 0,
     "sauropsids": 0
    },
-   "mammal_tips": 18367,
+   "mammal_tips": 18362,
    "rows_bands_not_positive": {
     "Amniota": 0,
     "sauropsids": 0
@@ -47,14 +47,8 @@
     "Squamata": 12293,
     "Testudines": 365
    },
-   "species_twice": [
-    "Asiatherium reshetovi",
-    "Kokopellia juddi",
-    "Todralestes variabilis",
-    "Vulpavus ovatus",
-    "Vulpavus profectus"
-   ],
-   "tips": 42220
+   "species_twice": [],
+   "tips": 42215
   },
   "counts": {
    "assumed_generation_yr": 7.0,
@@ -871,11 +865,11 @@
   }
  },
  "output": {
-  "brotli_bytes": 1442594,
-  "dated_sidecar_raw": 4419175,
+  "brotli_bytes": 1443491,
+  "dated_sidecar_raw": 4418644,
   "files": 35,
-  "raw_bytes": 8235384,
-  "skeleton_brotli": 97770,
+  "raw_bytes": 8234784,
+  "skeleton_brotli": 97653,
   "skeleton_nodes": 1779,
   "skeleton_raw": 1635720,
   "tiles": 34
