@@ -25,6 +25,7 @@
 //   - pan: held only by the fan's outer edges (a gap in it can be crossed, ToLaD#403).
 
 import { columnsAt, nearestColumn, type Fan, type FanBranch } from './layout';
+import { linearPitch } from './twigs';
 
 /** A span of this many years ... */
 export const MIN_YEARS = 10;
@@ -58,6 +59,21 @@ export interface CellModel {
   readonly GL: number;
   /** World width of one individual (one slot, either lane) at height y (twigs.ts TwigModel.pitch). */
   pitch(y: number): number;
+}
+
+/** FanCamera.thinnestAt's index for one fan (cellsOf). */
+interface CellIndex {
+  fan: Fan;
+  bs: FanBranch[];
+  n: number;
+  yb: number;
+  /** Linear widths: the branches' tips ascending (NaN ones left out), and the least cell among those up to each; null: log widths. */
+  tip: Float64Array | null;
+  least: Float64Array;
+  /** The least cell of every branch. */
+  all: number;
+  /** Log widths: the thinnest cell by wy, as asked. */
+  by: Map<number, number>;
 }
 
 export class FanCamera {
@@ -237,14 +253,67 @@ export class FanCamera {
 
   /** The deepest width zoom allowed at world point (wx, wy) (time zoom sy: kept for callers, unused). */
   sxCap(_wx: number, wy: number, _sy?: number): number {
-    const bs = this.fan.branches;
-    const yb = this.fan.trunkBottom.y;
-    const span = bs.filter((b) => wy >= b.tipY && wy <= yb);
-    let cell = Infinity;
-    for (const b of span.length ? span : bs) cell = Math.min(cell, this.cellAt(b, Math.min(yb, Math.max(b.tipY, wy))));
-    const cap = Math.min(SX_MAX, STRAND_PX / cell);
-    return cap;
+    return Math.min(SX_MAX, STRAND_PX / this.thinnestAt(wy));
   }
+
+  /**
+   * The thinnest cell (cellAt) of the branches standing at wy (their tips at or below it, wy not below the trunk's foot),
+   * each at wy (at its tip, or the foot, if wy is past them); of every branch if none stands there.
+   *
+   * (It depends on wy and the fan alone. With linear widths a branch's cell is the same at every height (linearPitch),
+   * so it is a least-so-far over the branches by tip, found by halves; with log widths, a walk over every branch, kept by
+   * wy (a flight's target asks the same one every frame). The camera asks it every pinch and flight frame (speciesCamera),
+   * where it walked every branch, ToLaD#502.)
+   */
+  private thinnestAt(wy: number): number {
+    const fan = this.fan;
+    const bs = fan.branches;
+    const yb = fan.trunkBottom.y;
+    let c = this.cells;
+    if (!c || c.fan !== fan || c.bs !== bs || c.yb !== yb || c.n !== bs.length) c = this.cells = this.cellsOf(fan);
+    if (c.tip) {
+      const T = c.tip;
+      let lo = 0;
+      let hi = T.length;
+      if (wy <= yb)
+        while (lo < hi) {
+          const mid = (lo + hi) >> 1;
+          if (T[mid] <= wy) lo = mid + 1;
+          else hi = mid;
+        }
+      return lo > 0 ? c.least[lo - 1] : c.all;
+    }
+    let cell = c.by.get(wy);
+    if (cell === undefined) {
+      if (c.by.size >= 4096) c.by.clear();
+      const span = bs.filter((b) => wy >= b.tipY && wy <= yb);
+      cell = Infinity;
+      for (const b of span.length ? span : bs) cell = Math.min(cell, this.cellAt(b, Math.min(yb, Math.max(b.tipY, wy))));
+      c.by.set(wy, cell);
+    }
+    return cell;
+  }
+
+  /** thinnestAt's index for the fan: by tip, the least cell so far (linear widths), or its walks kept by wy. */
+  private cellsOf(fan: Fan): CellIndex {
+    const bs = fan.branches;
+    const c: CellIndex = { fan, bs, n: bs.length, yb: fan.trunkBottom.y, tip: null, least: new Float64Array(0), all: Infinity, by: new Map() };
+    if (fan.mode !== 'linear') return c;
+    // (Each branch's cell its pitch with linear widths, as TwigModel's, read off the branch: no model made for every branch on the
+    // first frame's cap, ToLaD#502.)
+    const cell = Float64Array.from(bs, linearPitch);
+    for (let i = 0; i < cell.length; i++) c.all = Math.min(c.all, cell[i]);
+    // (A NaN tip is never at or below a height: left out, the rest bisectable.)
+    const order = Array.from(bs.keys())
+      .filter((i) => bs[i].tipY === bs[i].tipY)
+      .sort((i, j) => bs[i].tipY - bs[j].tipY);
+    c.tip = Float64Array.from(order, (i) => bs[i].tipY);
+    c.least = new Float64Array(order.length);
+    let m = Infinity;
+    order.forEach((i, k) => (c.least[k] = m = Math.min(m, cell[i])));
+    return c;
+  }
+  private cells: CellIndex | null = null;
 
   /**
    * Apply the zooms the gestures asked for (sx, and ty for time) so world
