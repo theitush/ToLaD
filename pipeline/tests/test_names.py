@@ -12,7 +12,8 @@ from pathlib import Path
 
 from tolad_pipeline import anchors
 from tolad_pipeline import redlist as R
-from tolad_pipeline.merge import EX_WINDOW_MA, LAD_RECENT_EX, assign_bands, drop_unrecognised
+from tolad_pipeline.merge import (EX_WINDOW_MA, LAD_PLEISTOCENE, LAD_RECENT_EX, MIN_RANGE_MA, assign_bands,
+                                  context_ok, date_undated, drop_unrecognised)
 from tolad_pipeline.tree import Node, drop_empty
 
 DATA = Path(__file__).resolve().parents[2] / "data" / "mammals"
@@ -84,6 +85,68 @@ class BandEnds(unittest.TestCase):
     def test_older_last_appearance_kept(self):
         x = self.band(kind="graft", extinct=True, fad=2.0, lad=1.0)
         self.assertAlmostEqual(x.t1, 1.0)
+
+
+class UndatedFossils(unittest.TestCase):
+    """An extinct Open Tree leaf with no date of its own is never drawn alive into the recent (ToLaD#279)."""
+
+    GENERA = [
+        {"taxon_name": "Proconsul", "is_extant": "extinct", "family": "Proconsulidae", "order": "Primates",
+         "firstapp_max_ma": 27.3, "firstapp_min_ma": 23.04, "lastapp_max_ma": 13.82, "lastapp_min_ma": 11.63},
+        {"taxon_name": "Macaca", "is_extant": "extant", "family": "Cercopithecidae", "order": "Primates",
+         "firstapp_max_ma": 11.63, "firstapp_min_ma": 7.246, "lastapp_max_ma": 0.0117, "lastapp_min_ma": 0.0},
+    ]
+    MDD = [{"name": "Lutra nippon", "extinct": True}, {"name": "Lutra lutra", "extinct": False}]
+
+    def build(self, name, knuckle=False, **data):
+        root = Node("Mammalia", age=40.0)
+        order = Node("Primates", rank="order", age=30.0)
+        root.add(order)
+        order.add(Node("Living one"))
+        x = Node(name, extinct=True, data=data)
+        if knuckle:  # a one-child genus between the leaf and its split
+            g = Node(name.split()[0], rank="genus", age=10.0)
+            g.add(x)
+            order.add(g)
+        else:
+            order.add(x)
+        date_undated(root, self.GENERA, self.MDD, {})
+        assign_bands(root, {})
+        return x
+
+    def test_genus_range_when_the_genus_is_extinct(self):
+        x = self.build("Proconsul heseloni")
+        self.assertAlmostEqual(x.fad, (27.3 + 23.04) / 2)
+        self.assertAlmostEqual(x.t1, (13.82 + 11.63) / 2)
+        self.assertEqual(x.data["date_from"], "PBDB genus")
+
+    def test_living_genus_gives_a_stub_at_the_split(self):
+        x = self.build("Macaca prisca")
+        self.assertIsNone(x.fad)
+        self.assertTrue(x.data["undated"])
+        self.assertAlmostEqual(x.t0, 30.0)
+        self.assertAlmostEqual(x.t1, 30.0 - MIN_RANGE_MA)
+
+    def test_stub_hangs_from_the_split_above_a_one_child_parent(self):
+        x = self.build("Nogenus fossilis", knuckle=True)
+        self.assertAlmostEqual(x.t1, 30.0 - MIN_RANGE_MA)
+
+    def test_late_quaternary_lists_keep_their_end(self):
+        self.assertAlmostEqual(self.build("Proconsul heseloni", iucn="EP").t1, LAD_PLEISTOCENE)
+        self.assertAlmostEqual(self.build("Macaca prisca", upham_extinct=True).t1, LAD_PLEISTOCENE)
+        self.assertAlmostEqual(self.build("Macaca prisca", iucn="EX").t1, LAD_RECENT_EX)
+        x = self.build("Lutra nippon")  # on MDD's extinct list (since 1500 CE)
+        self.assertAlmostEqual(x.t1, LAD_RECENT_EX)
+        self.assertTrue(x.data["lad_default"])
+
+    def test_a_record_without_family_or_order_does_not_block_the_name(self):
+        root = Node("Mammalia")
+        order = Node("Carnivora", rank="order")
+        root.add(order)
+        x = Node("Vulpavus ovatus")
+        order.add(x)
+        self.assertTrue(context_ok(x, None, None))
+        self.assertFalse(context_ok(x, "Muridae", "Rodentia"))
 
 
 class RedListExtinct(unittest.TestCase):

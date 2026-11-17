@@ -64,7 +64,9 @@ def context_ok(nd: Node, family: str | None, order: str | None) -> bool:
     """Parent-context check: the candidate must sit under the given family or
     order (by name, anywhere in its ancestry) when we know them."""
     names = ancestor_names(nd)
-    if not names:
+    if not names or not (family or order):
+        # (a record with neither family nor order has nothing to contradict the name: PBDB's Vulpavus ovatus, Kokopellia
+        # juddi, Turgidodon rhaister are Open Tree's leaves, not second leaves of the same species; ToLaD#279)
         return True
     if family and family in names:
         return True
@@ -220,6 +222,9 @@ def drop_unrecognised(root: Node, recognised, ott_syn: dict[int, list[str]], phy
 # ------------------------------------------------------------------ PBDB
 
 
+MIN_RANGE_MA = 0.05  # Myr: the shortest band a fossil range gets (pbdb_range); an undated fossil's stub (assign_bands)
+
+
 def pbdb_range(r: dict) -> tuple[float, float] | None:
     fmax, fmin = r.get("firstapp_max_ma"), r.get("firstapp_min_ma")
     lmax, lmin = r.get("lastapp_max_ma"), r.get("lastapp_min_ma")
@@ -236,9 +241,9 @@ def pbdb_range(r: dict) -> tuple[float, float] | None:
     else:
         t0 = (fmax + fmin) / 2
         t1 = (lmax + lmin) / 2
-    if t0 - t1 < 0.05:
+    if t0 - t1 < MIN_RANGE_MA:
         c = (t0 + t1) / 2
-        t0, t1 = c + 0.025, max(0.0, c - 0.025)
+        t0, t1 = c + MIN_RANGE_MA / 2, max(0.0, c - MIN_RANGE_MA / 2)
     return t0, t1
 
 
@@ -781,17 +786,72 @@ def date_tree(root: Node, log: dict) -> None:
 # (or PHYLACINE, which takes the Red List's EX) calls EX ended after 1500, and with no date of its own it ends a
 # century ago; any other extinct species ended before 1500 CE, however young its last fossil (PBDB rounds a
 # Holocene last appearance to the present). No extinct leaf reaches the present (T1 = 0).
+#
+# An extinct Open Tree leaf with no date of its own (ToLaD#279) is dated, in this order: from PBDB by its name or one of
+# its Open Tree synonyms (graft_pbdb's match; a PBDB record with no family or order does not block it, context_ok);
+# else, if a late-Quaternary list names it, by that list (_late_quaternary: ends at the end of the Pleistocene, or a
+# century ago for an extinction since 1500 CE); else from its extinct genus's PBDB range (date_undated);
+# else it is a short stub at its parent's split, flagged undated (assign_bands), never drawn alive into the recent.
 LAD_RECENT_EX = 0.0001  # Ma
-LAD_PLEISTOCENE = 0.0117  # Ma, end of the Pleistocene: an extinct leaf with no date at all
+LAD_PLEISTOCENE = 0.0117  # Ma, end of the Pleistocene: a late-Quaternary extinct leaf with no date of its own
 EX_WINDOW_MA = year_to_ma(1500)  # 1500 CE, the start of the Red List's EX window
 
 
 def _recent_ex(nd: Node) -> bool:
-    return nd.data.get("iucn") == "EX" or bool(nd.data.get("red_list_ex"))
+    """Extinct since 1500 CE: the Red List's EX (or PHYLACINE's, which takes it), or on MDD's extinct list."""
+    return nd.data.get("iucn") == "EX" or bool(nd.data.get("red_list_ex")) or bool(nd.data.get("mdd_ex"))
+
+
+def _late_quaternary(nd: Node) -> bool:
+    """A list of the late Quaternary names it extinct: the Red List (since 1500 CE), PHYLACINE (EP: every species
+    alive since the Last Interglacial, ~130 kya, gone before 1500) or Upham's extinct tips (recently extinct)."""
+    return _recent_ex(nd) or nd.data.get("iucn") == "EP" or bool(nd.data.get("upham_extinct"))
 
 
 def _end_floor(nd: Node) -> float:
     return LAD_RECENT_EX if _recent_ex(nd) else EX_WINDOW_MA
+
+
+def _undated(nd: Node) -> bool:
+    return (nd.is_leaf and nd.kind == "tree" and nd.extinct and nd.fad is None and nd.lad is None
+            and not nd.data.get("empty_higher"))
+
+
+def date_undated(root: Node, genera: list[dict], mdd_rows: list[dict], log: dict) -> None:
+    """An undated extinct Open Tree leaf that MDD lists as extinct (since 1500 CE) is marked so (Lutra nippon, the
+    Japanese otter). One no late-Quaternary list names takes its genus's PBDB range, when PBDB has the genus as
+    extinct, with a range, and in the leaf's family or order (Proconsul heseloni: Proconsul, 25.2-12.7 Ma). A living
+    genus's range runs to the present, which says nothing of when the species ended: such a leaf stays undated."""
+    by_name: dict[str, list[dict]] = defaultdict(list)
+    for r in genera:
+        by_name[norm_name(r["taxon_name"])].append(r)
+    mdd_ex = {r["name"] for r in mdd_rows if r["extinct"]}
+    c = Counter()
+    for nd in root.preorder():
+        if not _undated(nd):
+            continue
+        if nd.name in mdd_ex:
+            nd.data["mdd_ex"] = True
+        if _late_quaternary(nd):
+            c["on a late-Quaternary list"] += 1
+            continue
+        recs = [r for r in by_name.get(nd.genus() or "", []) if context_ok(nd, r.get("family"), r.get("order"))]
+        rng = pbdb_range(recs[0]) if len(recs) == 1 and recs[0].get("is_extant") == "extinct" else None
+        if rng is None:
+            c["no extinct PBDB genus with a range"] += 1
+            continue
+        nd.fad, nd.lad = rng
+        nd.data["date_from"] = "PBDB genus"
+        c["dated from the PBDB genus"] += 1
+    log["undated_leaves"] = dict(c)
+
+
+def _drawn_start(nd: Node) -> float:
+    """A leaf's band start once collapse_knuckles has folded its one-child parents into it (it keeps the oldest)."""
+    t0, p = nd.t0, nd.parent
+    while p is not None and p.parent is not None and len(p.children) == 1:
+        t0, p = max(t0, p.t0), p.parent
+    return t0
 
 
 def assign_bands(root: Node, anchors_t0: dict[str, float]) -> None:
@@ -816,10 +876,17 @@ def assign_bands(root: Node, anchors_t0: dict[str, float]) -> None:
                     # there, not at its parent's split (H. erectus's at Homo's 3.8 Ma; Sahelanthropus's at 11 Ma),
                     # so its count is not spread over millions of years it is not known from (ToLaD#302)
                     nd.t0 = nd.fad
-                if nd.lad is None:
+                start = nd.t0
+                if nd.lad is None and _late_quaternary(nd):
                     nd.lad = LAD_RECENT_EX if _recent_ex(nd) else LAD_PLEISTOCENE
                     nd.data["lad_default"] = True
-                nd.t1 = min(max(nd.lad, _end_floor(nd)), nd.t0 - EPS)
+                elif nd.lad is None:
+                    # no date anywhere (date_undated): a stub at the split it is drawn from, flagged, never a band to
+                    # the present
+                    start = _drawn_start(nd)
+                    nd.lad = max(start - MIN_RANGE_MA, EX_WINDOW_MA)
+                    nd.data["undated"] = True
+                nd.t1 = min(max(nd.lad, _end_floor(nd)), start - EPS)
             else:
                 nd.t1 = 0.0
             if nd.name in anchors_t0:
