@@ -54,6 +54,7 @@ export class Lod {
     const N = fan.nodes;
     N.forEach((v, i) => this.idx.set(v, i));
     this.room = new Float64Array(N.length);
+    this.tops = new Float64Array(N.length).fill(NaN);
     N.forEach((v, i) => (this.room[i] = v.strands.reduce((s, b) => s + b.width, 0)));
     this.par = Int32Array.from(N, (v) => (v.parent ? this.idx.get(v.parent)! : -1));
     this.kidN = N.map((v) => Int32Array.from(v.kids.filter(isNode), (k) => this.idx.get(k as FanNode)!));
@@ -76,7 +77,10 @@ export class Lod {
       const t = this.par[i] >= 0 && this.nStr[i] >= 2 ? (r > 0 ? Math.min(MERGE_PX * this.nStr[i], BRANCH_PX) / r : Infinity) * (1 + 1e-9) : 0;
       subT[i] = Math.max(subT[i], t);
       // (cladeAllGray (view.ts), from the daughters up: every strand extinct.)
-      allG[i] = v.kids.every((k) => (isNode(k) ? allG[this.idx.get(k)!] === 1 : k.sp.extinct)) ? 1 : 0;
+      let all = 1;
+      for (const k of this.kidN[i]) all &= allG[k];
+      for (const k of v.kids) if (!isNode(k) && !k.sp.extinct) all = 0;
+      allG[i] = all;
       anyG[i] = Math.max(anyG[i], allG[i]);
       const p = this.par[i];
       if (p < 0) continue;
@@ -192,14 +196,16 @@ export class Lod {
       this.mS0 = new Int32Array(c);
       this.mS1 = new Int32Array(c);
       this.mTop = new Float64Array(c);
+      this.mIdx = new Int32Array(c);
     }
+    const tops = this.tops;
     for (let m = 0; m < M; m++) {
       const i = merged[m];
+      this.mIdx[m] = i;
       this.mS0[m] = this.s0[i];
       this.mS1[m] = this.s0[i] + this.nStr[i] - 1;
-      let t = this.tops.get(i);
-      if (t === undefined) this.tops.set(i, (t = Lod.top(N[i])));
-      this.mTop[m] = t;
+      if (tops[i] !== tops[i]) tops[i] = Lod.top(N[i]);
+      this.mTop[m] = tops[i];
     }
     this.gen++;
     return true;
@@ -209,15 +215,16 @@ export class Lod {
   mS0 = new Int32Array(0);
   mS1 = new Int32Array(0);
   mTop = new Float64Array(0);
-  /** Per node index: its top (Lod.top), once asked. */
-  private readonly tops = new Map<number, number>();
+  /** Per merged clade: its index in fan.nodes. */
+  mIdx = new Int32Array(0);
+  /** Per node index: its top (Lod.top), once asked (NaN before). */
+  private readonly tops: Float64Array;
 
   /** Clade v's top (Lod.top), kept. */
   topOf(v: FanNode): number {
     const i = this.idx.get(v)!;
-    let t = this.tops.get(i);
-    if (t === undefined) this.tops.set(i, (t = Lod.top(v)));
-    return t;
+    if (this.tops[i] !== this.tops[i]) this.tops[i] = Lod.top(v);
+    return this.tops[i];
   }
 
   /** The first merged clade from index `from` on whose last strand is at or past strand x (merged.length if none). */

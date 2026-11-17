@@ -607,15 +607,17 @@ export class Steady extends Fold {
   }
 
   /** The clades drawn as one branch this frame (lod.ts): each one's stem runs up to its youngest tip, its split being inside the branch. */
-  setMerged(merged: readonly FanNode[], top: (v: FanNode) => number): void {
+  /** (at: per merged clade, its index in fan.nodes, when the caller keeps them (Lod.mIdx); top(v, m): its top.) */
+  setMerged(merged: readonly FanNode[], top: (v: FanNode, m: number) => number, at?: ArrayLike<number>): void {
     // (The same list as last time (Lod.update makes a new one when they change): nothing to do, ToLaD#502.)
     if (merged === this.mergedLast) return;
     this.mergedLast = merged;
     for (const j of this.stemTopSet) this.stemTop[j] = this.nY[j];
     this.stemTopSet.length = 0;
-    for (const v of merged) {
-      const j = this.idx.get(v)!;
-      this.stemTop[j] = Math.max(top(v), this.yNow);
+    for (let m = 0; m < merged.length; m++) {
+      const v = merged[m];
+      const j = at ? at[m] : this.idx.get(v)!;
+      this.stemTop[j] = Math.max(top(v, m), this.yNow);
       this.stemTopSet.push(j);
     }
   }

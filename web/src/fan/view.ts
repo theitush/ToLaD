@@ -2849,7 +2849,7 @@ export class FanView implements InputHandlers {
     // (The mammal level, lod.ts: a closed clade of hairline strands drawn as its one branch, its columns inside it not drawn.)
     const lod = this.lodNow();
     const sf = this.fan.tess.fold;
-    if (sf instanceof Steady) sf.setMerged(lod ? lod.merged : NO_MERGED, (v) => lod!.topOf(v));
+    if (sf instanceof Steady) sf.setMerged(lod ? lod.merged : NO_MERGED, (_, m) => lod!.mTop[m], lod?.mIdx);
     this.drawStem(lod);
     {
       this.drawStrands(lod);
