@@ -13,7 +13,7 @@ import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { Session } from 'node:inspector/promises';
 import { describe, it } from 'vitest';
 import { setFlip } from './flip';
-import { RectBatch } from './meshgl';
+import { Batches } from './meshgl';
 import { loadMammals, unpackMammals, type MammalFile } from './mammals-data';
 import { mammaliaClade } from './panthera';
 import { mammaliaTree } from './splits';
@@ -131,7 +131,8 @@ describe.skipIf(!OUT)('scale yardstick (perf)', () => {
     lap('clade');
     const v = new FanView(canvas as unknown as HTMLCanvasElement, mammaliaClade(), mammaliaTree(), true);
     lap('view');
-    const gl = { under: new RectBatch(), over: new RectBatch(), begin() {}, end() {} };
+    // (The page's batches, as FanGL keeps them: emptied each frame, the lanes sent as chords, ToLaD#502.)
+    const gl = Object.assign(new Batches(), { end() {} });
     (v as unknown as { gl: unknown }).gl = gl;
     v.draw();
     lap('first');
