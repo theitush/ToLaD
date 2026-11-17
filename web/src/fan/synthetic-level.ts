@@ -23,13 +23,16 @@ export interface SynthQuery {
   seed: boolean;
   json: boolean;
   orders: boolean;
+  /** Fossils, as a fraction of the living (synthetic.ts `fossil`; default the mammals' rate): `&fossil=1.6` about the mammals' with all their fossils (ToLaD#279). */
+  fossil?: number;
 }
 
 /** The query's synthetic-level options (n defaults to 70,000). */
 export function synthQuery(search: string): SynthQuery {
   const q = new URLSearchParams(search);
   const n = Number(q.get('n'));
-  return { n: Number.isFinite(n) && n >= 2 ? Math.floor(n) : 70000, seed: q.get('seed') !== '0', json: q.get('json') !== '0', orders: q.get('orders') !== '0' };
+  const fossil = Number(q.get('fossil'));
+  return { n: Number.isFinite(n) && n >= 2 ? Math.floor(n) : 70000, seed: q.get('seed') !== '0', json: q.get('json') !== '0', orders: q.get('orders') !== '0', ...(q.get('fossil') && Number.isFinite(fossil) ? { fossil } : {}) };
 }
 
 /** Where the benchmark frames its depths, the last tree made (window.__synth in the page). */
@@ -60,7 +63,7 @@ export async function synthLevelData(o: SynthQuery, ms?: Record<string, number>)
     if (ms) ms[k] = n - t;
     t = n;
   };
-  const d = synthData({ n: o.n });
+  const d = synthData({ n: o.n, fossil: o.fossil });
   synthMarksNow = synthMarks(d);
   if (o.orders) for (const name of synthOrders(d)) (ORDER_TAXA as Set<string>).add(name);
   lap('synth-gen');

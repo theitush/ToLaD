@@ -7,6 +7,7 @@
 // A synthetic tree of SCALE_N living species (synthetic.ts) opened as the page opens it (synthetic-level.ts: the
 // build's part, then the file parsed, the tree, the clade, the view, the first frames), then frame times of a pinch,
 // a pan and a flight at home and two depths (the largest order, its largest family). TOLAD_LABELS=cut TOLAD_FRAME=cut: ?labels=cut&frame=cut.
+// SCALE_FOSSIL=1.6: fossils as a fraction of the living (synthetic.ts), about the mammals' with all their fossils (ToLaD#279).
 // SCALE_PROF=<file>: a CPU profile of the run after the build's part (.cpuprofile). SCALE_SEED=0 / SCALE_JSON=0 / SCALE_ORDERS=0: no layout seed / no file / its orders not registered (synthetic-level.ts). SCALE_GESTURES=0: the load only.
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { Session } from 'node:inspector/promises';
@@ -98,7 +99,7 @@ describe.skipIf(!OUT)('scale yardstick (perf)', () => {
       load.unpack = performance.now() - t;
       return d;
     };
-    await loadMammals(real ? readReal : () => synthLevelData({ n, seed: process.env.SCALE_SEED !== '0', json: process.env.SCALE_JSON !== '0', orders: process.env.SCALE_ORDERS !== '0' }, load));
+    await loadMammals(real ? readReal : () => synthLevelData({ n, seed: process.env.SCALE_SEED !== '0', json: process.env.SCALE_JSON !== '0', orders: process.env.SCALE_ORDERS !== '0', ...(process.env.SCALE_FOSSIL ? { fossil: Number(process.env.SCALE_FOSSIL) } : {}) }, load));
     log(`data ${JSON.stringify(load)}`);
     mem();
     const prof = process.env.SCALE_PROF ? new Session() : null;
