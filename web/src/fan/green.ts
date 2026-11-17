@@ -11,12 +11,13 @@
 // out, then reads O(log n) blocks and at most 2 BLOCK strands at its ends, where it walked every strand it has, at every
 // row, each time the merged clades changed. A row's strands are worked out at its age, found once a row (lanesAtAge).
 //
-// The sums are the same terms added in another order (block by block, not strand by strand): the same shares to ~1e-15.
+// A clade holding no whole block (most merged clades at home) is summed from its strands, left to right, as before: the
+// same share to the bit. A bigger one's are the same terms added in another order (block by block): the same to ~1e-14.
 
 import { lanesAtAge, type Fan, type FanBranch, type TimeScale } from './layout';
 
 /** Strands in a kept block at the least: shorter runs are summed from their strands. */
-const BLOCK = 16;
+const BLOCK = 32;
 /** The rows' kept sums take at most about this many bytes; past it they are all dropped and worked out again as asked. */
 const BYTES = 64 * 2 ** 20;
 
@@ -62,13 +63,18 @@ export class GreenRuns {
   /** Strands i0..i1's green share at world y (lanesAt's green widths over their widths; 0 with no width). */
   share(i0: number, i1: number, y: number): number {
     this.row(y);
+    // (A run holding no whole block, as most merged clades at home are: its strands summed straight, left to right, as before.)
+    if (Math.ceil(i0 / BLOCK) * BLOCK + BLOCK > i1 + 1) {
+      this.run(i0, i1 + 1);
+      return this.rw > 0 ? Math.min(1, this.rg / this.rw) : 0;
+    }
     this.sw = 0;
     this.sg = 0;
     this.add(1, 0, this.P, i0, i1 + 1);
     return this.sw > 0 ? Math.min(1, this.sg / this.sw) : 0;
   }
 
-  /** Row y's blocks, made (none worked out) if new. */
+  /** Row y's blocks, made (none worked out, its age in T[0], no node's) if new. */
   private row(y: number): void {
     if (y === this.y) return;
     let T = this.rows.get(y);
@@ -78,11 +84,12 @@ export class GreenRuns {
         this.rows.clear();
       }
       T = (this.pool.pop() ?? new Float64Array(2 * this.M)).fill(NaN);
+      T[0] = this.time.ageAt(y);
       this.rows.set(y, T);
     }
     this.T = T;
     this.y = y;
-    this.age = this.time.ageAt(y);
+    this.age = T[0];
   }
 
   /** Strands a..b - 1's sums at the row into the query's: node t covers lo..hi - 1. */

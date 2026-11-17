@@ -25,6 +25,7 @@
 //   - pan: held only by the fan's outer edges (a gap in it can be crossed, ToLaD#403).
 
 import { columnsAt, nearestColumn, type Fan, type FanBranch } from './layout';
+import { linearPitch } from './twigs';
 
 /** A span of this many years ... */
 export const MIN_YEARS = 10;
@@ -259,7 +260,7 @@ export class FanCamera {
    * The thinnest cell (cellAt) of the branches standing at wy (their tips at or below it, wy not below the trunk's foot),
    * each at wy (at its tip, or the foot, if wy is past them); of every branch if none stands there.
    *
-   * (It depends on wy and the fan alone. With linear widths a branch's cell is the same at every height (TwigModel.pitch),
+   * (It depends on wy and the fan alone. With linear widths a branch's cell is the same at every height (linearPitch),
    * so it is a least-so-far over the branches by tip, found by halves; with log widths, a walk over every branch, kept by
    * wy (a flight's target asks the same one every frame). The camera asks it every pinch and flight frame (speciesCamera),
    * where it walked every branch, ToLaD#502.)
@@ -298,7 +299,9 @@ export class FanCamera {
     const bs = fan.branches;
     const c: CellIndex = { fan, bs, n: bs.length, yb: fan.trunkBottom.y, tip: null, least: new Float64Array(0), all: Infinity, by: new Map() };
     if (fan.mode !== 'linear') return c;
-    const cell = Float64Array.from(bs, (b) => this.cellAt(b, b.tipY));
+    // (Each branch's cell its pitch with linear widths, as TwigModel's, read off the branch: no model made for every branch on the
+    // first frame's cap, ToLaD#502.)
+    const cell = Float64Array.from(bs, linearPitch);
     for (let i = 0; i < cell.length; i++) c.all = Math.min(c.all, cell[i]);
     // (A NaN tip is never at or below a height: left out, the rest bisectable.)
     const order = Array.from(bs.keys())

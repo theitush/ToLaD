@@ -254,17 +254,22 @@ export class TwigModel {
    */
   pitch(y: number): number {
     // (By mass, ToLaD#276: one individual is its adult mass wide, pop.weight units.)
-    return this.mode === 'linear' ? this.b.unit * this.b.pop.weight : this.at(y)[3];
+    return this.mode === 'linear' ? linearPitch(this.b) : this.at(y)[3];
   }
 
   /** pitch(y), the column's width there w. */
   private pitchOf(y: number, w: number): number {
-    const lin = this.b.unit * this.b.pop.weight;
+    const lin = linearPitch(this.b);
     if (this.mode === 'linear') return lin;
     const n = this.b.pop.stepAt(Math.min(this.b.t0, this.time.ageAt(y))).n / this.b.pop.weight;
     // (Never wider than the column: one slot at least, where the steps count under one alive.)
     return w > 0 && n > 0 ? w / Math.max(1, n) : lin;
   }
+}
+
+/** One individual's width with linear widths (TwigModel.pitch): the fan's fixed width per individual, by mass its adult mass's (pop.weight, ToLaD#276), the same at every height. */
+export function linearPitch(b: FanBranch): number {
+  return b.unit * b.pop.weight;
 }
 
 // ---- drawing ------------------------------------------------------------------
