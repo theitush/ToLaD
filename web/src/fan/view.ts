@@ -3815,6 +3815,10 @@ export class FanView implements InputHandlers {
     // Wholly left or right of the screen (zoomed in, most strands are): nothing to sample.
     const sTop = cam.worldY(-20);
     const sBot = cam.worldY(this.h + 20);
+    // (Off to one side over the whole span, known from the rooms' bounds before its rows are read, ToLaD#502.)
+    const sf = this.fan.tess.fold;
+    const xm = (this.w / 2 + 13) / this.cam.sx;
+    if (sf instanceof Steady && sf.offSide(b.index, sTop, sBot, this.cam.cx - xm, this.cam.cx + xm)) return;
     const xr = this.fan.tess.xRange(b, sTop, sBot);
     if (cam.screenX(xr[1]) < -12 || cam.screenX(xr[0]) > this.w + 12) return;
     const hw = b.width / 2;
@@ -3876,6 +3880,9 @@ export class FanView implements InputHandlers {
     if (!(y1 > y0)) return;
     const i0 = v.strands[0].index;
     const i1 = v.strands[v.strands.length - 1].index;
+    // (Off to one side over the whole span, known from the rooms' bounds before any row is read, ToLaD#502.)
+    const xm = (this.w / 2 + 13) / this.cam.sx;
+    if (f instanceof Steady && f.offSideRun(i0, i1, sTop, sBot, this.cam.cx - xm, this.cam.cx + xm)) return;
     const k0 = Math.ceil(y0 / H);
     const k1 = Math.floor(y1 / H);
     const pts = this.lanePts;
