@@ -98,7 +98,8 @@ describe('gray off (ToLaD#410)', () => {
     for (const [, c, t] of LEVELS) {
       const v = stubView(c(), t());
       for (const b of v.fan.branches) {
-        const ages = [0, 1e-3, 0.01, 0.1, b.t0 / 2, b.t0 * 0.99];
+        // (Its own column's span, up from its split: a fossil the data grafts on a young split, ToLaD#279 (Octomys rosiae, 31 kya), has none at 0.1 Ma.)
+        const ages = [0, 1e-3, 0.01, 0.1, b.t0 / 2, b.t0 * 0.99].filter((a) => a < b.t0);
         const green = ages.some((a) => b.pop.greenAt(a) > 0 && b.pop.aliveAt(a) > 0);
         expect([b.sp.sci, allGray(b)]).toEqual([b.sp.sci, !green]);
       }
