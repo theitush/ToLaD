@@ -189,11 +189,14 @@ export function mergeMammalCard(d: MammalData, c: MammalCardFile): void {
 /** The sibling files' names (vite.config.ts emits them; pages.yml stages them next to index.html). */
 export const MAMMALS_FILE = 'mammals.json';
 export const MAMMALS_CARD_FILE = 'mammals-card.json';
-/** The same pair with every fossil on the tree (panthera-extract.ts Fossils 'all', ToLaD#279): what `?fossils=all` fetches instead. */
+/** The same pair with every fossil on the tree (panthera-extract.ts Fossils 'all', ToLaD#279): the page's default since Ita's call (2026-11-17). */
 export const MAMMALS_ALL_FILE = 'mammals-all.json';
 export const MAMMALS_ALL_CARD_FILE = 'mammals-all-card.json';
-/** Whether the page draws every fossil (`?fossils=all`, ToLaD#279): its own data files; without it, the page's default ones. */
-export const fossilsAll = typeof location !== 'undefined' && new URLSearchParams(location.search).get('fossils') === 'all';
+/**
+ * Whether the page draws every fossil (ToLaD#279): the default, from the all pair. `?fossils=old` is the old look to compare
+ * (the fossils in the dated phylogeny only, from mammals.json and mammals-card.json); the bar's "fossils" button switches.
+ */
+export const fossilsAll = typeof location !== 'undefined' && new URLSearchParams(location.search).get('fossils') !== 'old';
 const OPEN_FILE = fossilsAll ? MAMMALS_ALL_FILE : MAMMALS_FILE;
 const CARD_FILE = fossilsAll ? MAMMALS_ALL_CARD_FILE : MAMMALS_CARD_FILE;
 

@@ -10,7 +10,7 @@ import { RangeGlobe } from './Globe';
 import { Alone, AloneImg, useAlone } from './Alone';
 import { mammaliaClade, NATURAL_META, type HistEvent, type SpeciesRec } from './panthera';
 import { mammaliaTree } from './splits';
-import { loadMammalCard, loadMammals, mammalCardLoaded, mammalsLoaded } from './mammals-data';
+import { fossilsAll, loadMammalCard, loadMammals, mammalCardLoaded, mammalsLoaded } from './mammals-data';
 import { synthLoader } from './synthetic-level';
 import { stamp } from '../stamp';
 import { population } from './population';
@@ -243,6 +243,19 @@ export function FanApp() {
           }}
         >
           {`forks: ${forkLook}`}
+        </button>
+        {/* ToLaD#279: every fossil on the tree is the page; the old look (the dated phylogeny's fossils only) a tap away to compare. Its own data files, so a reload. */}
+        <button
+          type="button"
+          title="Fossils: every one on the tree (new), or only those in the dated phylogeny (old), to compare"
+          onClick={() => {
+            const u = new URL(window.location.href);
+            if (fossilsAll) u.searchParams.set('fossils', 'old');
+            else u.searchParams.delete('fossils');
+            window.location.assign(u);
+          }}
+        >
+          {fossilsAll ? 'fossils: all' : 'fossils: old'}
         </button>
         <button
           type="button"
