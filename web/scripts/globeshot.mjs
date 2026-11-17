@@ -1,6 +1,6 @@
 // The card's range globe (ToLaD#267) at 390×844, default headless (no GPU flags), from the page as pages.yml stages
 // it (index.html + mammals.json + globe.json + globe-draw.js, served over http on a free port): one card per species
-// (by scientific name, the mammal level so every mammal is there), then the lion's globe dragged and enlarged.
+// (by scientific name, the mammal level so every mammal is there), then the lion's globe dragged and shown alone.
 //   npm run build:single && node scripts/globeshot.mjs <out-dir> [Genus species,...]
 import { copyFileSync, mkdirSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -51,7 +51,7 @@ try {
     console.log(sci, what);
   }
   console.log('after:', [...new Set(fetched.filter((p) => /globe/.test(p)))].join(' '));
-  // The lion's globe dragged a quarter turn west, then tapped to enlarge.
+  // The lion's globe dragged a quarter turn west, then tapped: alone, full screen (ToLaD#506).
   await page.evaluate(() => {
     const f = window.__fan;
     const b = f.fan.branches.find((b) => b.sp.sci === 'Panthera leo');

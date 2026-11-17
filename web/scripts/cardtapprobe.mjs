@@ -30,7 +30,7 @@ try {
         dbl: window.__dbl,
         cam: [f.cam.cx, f.cam.cy, f.cam.sx, f.cam.sy].map((v) => +v.toPrecision(5)).join(','),
         details: !!card?.querySelector('details.more[open]'),
-        big: card ? [...card.querySelectorAll('figure.big, .globe.big, canvas.big')].length : 0,
+        big: document.querySelectorAll('.alone').length, // (a picture or globe opened alone, ToLaD#506)
         spark: card?.querySelector('button.spark')?.getAttribute('aria-expanded') ?? '-',
       };
     };

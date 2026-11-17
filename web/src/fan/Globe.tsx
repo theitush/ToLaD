@@ -1,13 +1,14 @@
 // The species card's range globe (ToLaD#267): one orthographic globe, the same for every species, drawn on a 2D
 // canvas with d3-geo (globe-draw.ts). Dark ocean, Natural Earth land, the current range green and the present-natural
 // range the species has lost grey (PHYLACINE 1.2.1), turned to face the range's centre. Drag spins it (no auto-spin);
-// a tap enlarges it across the card like the photo. A species split since PHYLACINE draws the range of the species it
+// a tap shows it alone, full screen, still turned by a drag (ToLaD#506, Alone.tsx), like the photo. A species split since PHYLACINE draws the range of the species it
 // was split from, the same way, its credit saying so (ToLaD#486). A species PHYLACINE has no map of gets the Wikimedia map
 // (ToLaD#196), and so does every card when the drawing code or globe.json cannot load (the artifact link, no network).
 // With neither, or the map failing, the globe bare, captioned 'Range not known' (ToLaD#492).
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { GlobeData, SpeciesRange } from './globe-data';
+import { Alone, useAlone } from './Alone';
 
 // The drawing and the data (globe-draw.ts with d3-geo, ~25 kB; globe.json) load when a card first shows a range.
 type Draw = typeof import('./globe-draw');
@@ -38,10 +39,16 @@ const NO_RANGE: SpeciesRange = {
   centre: [20, 10],
 };
 
-/** The globe canvas for a species PHYLACINE maps (or NO_RANGE, for one nothing maps). */
-function GlobeCanvas({ m, d, r, big, onTap }: { m: Draw; d: GlobeData; r: SpeciesRange; big: boolean; onTap: () => void }) {
+type Rot = [number, number];
+
+/**
+ * The globe canvas for a species PHYLACINE maps (or NO_RANGE, for one nothing maps), facing `start` if given (the card's
+ * globe as turned, for the one alone), else the range's centre; `onTurn` told each turn. Drawn at its laid-out size,
+ * again when the window's changes (the one alone fills the screen).
+ */
+function GlobeCanvas({ m, d, r, onTap, start, onTurn }: { m: Draw; d: GlobeData; r: SpeciesRange; onTap: () => void; start?: Rot | null; onTurn?: (rot: Rot) => void }) {
   const ref = useRef<HTMLCanvasElement>(null);
-  const rot = useRef<[number, number]>([r.centre[0], Math.max(-60, Math.min(60, r.centre[1]))]);
+  const rot = useRef<Rot>(start ? [start[0], start[1]] : [r.centre[0], Math.max(-60, Math.min(60, r.centre[1]))]);
   const frame = useRef(0);
   const paint = () => {
     frame.current = 0;
@@ -57,8 +64,14 @@ function GlobeCanvas({ m, d, r, big, onTap }: { m: Draw; d: GlobeData; r: Specie
   const ask = () => {
     if (!frame.current) frame.current = requestAnimationFrame(paint);
   };
-  useLayoutEffect(paint, [m, d, r, big]);
-  useEffect(() => () => cancelAnimationFrame(frame.current), []);
+  useLayoutEffect(paint, [m, d, r]);
+  useEffect(() => {
+    window.addEventListener('resize', ask);
+    return () => {
+      window.removeEventListener('resize', ask);
+      cancelAnimationFrame(frame.current);
+    };
+  }, []);
   const drag = useRef<{ x: number; y: number; moved: number; id: number } | null>(null);
   return (
     <canvas
@@ -78,6 +91,7 @@ function GlobeCanvas({ m, d, r, big, onTap }: { m: Draw; d: GlobeData; r: Specie
         // A drag across the globe turns it a third of the way round.
         const k = 120 / (ref.current?.clientWidth || 120);
         rot.current = [rot.current[0] - dx * k, Math.max(-90, Math.min(90, rot.current[1] + dy * k))];
+        onTurn?.(rot.current);
         ask();
       }}
       onPointerUp={(e) => {
@@ -99,7 +113,9 @@ function GlobeCanvas({ m, d, r, big, onTap }: { m: Draw; d: GlobeData; r: Specie
  */
 export function RangeGlobe({ sci, fallback }: { sci: string; fallback?: (none: ReactNode) => ReactNode }) {
   const [m, setM] = useState<Draw | null | 'failed'>(draw);
-  const [big, setBig] = useState(false);
+  const [alone, show, close] = useAlone();
+  // (The card's globe as turned: the one alone starts there.)
+  const turned = useRef<Rot | null>(null);
   useEffect(() => {
     if (m) return;
     let live = true;
@@ -118,18 +134,27 @@ export function RangeGlobe({ sci, fallback }: { sci: string; fallback?: (none: R
     const none = <NoRange m={ok} d={d} />;
     return <>{fallback ? fallback(none) : none}</>;
   }
+  const credit = (
+    <a href="https://doi.org/10.1002/ecy.2443" target="_blank" rel="noopener">
+      {r?.from ? (
+        <>
+          Range of <i>{r.from}</i> before the split · PHYLACINE{'\u00a0'}1.2
+        </>
+      ) : (
+        'Range · PHYLACINE 1.2'
+      )}
+    </a>
+  );
   return (
-    <figure className={`globe${ok ? '' : ' loading'}${big ? ' big' : ''}`}>
-      {ok && d && r ? <GlobeCanvas key={sci} m={ok} d={d} r={r} big={big} onTap={() => setBig((b) => !b)} /> : <div className="disc" />}
-      <a href="https://doi.org/10.1002/ecy.2443" target="_blank" rel="noopener">
-        {r?.from ? (
-          <>
-            Range of <i>{r.from}</i> before the split · PHYLACINE{' '}1.2
-          </>
-        ) : (
-          'Range · PHYLACINE 1.2'
-        )}
-      </a>
+    <figure className={`globe${ok ? '' : ' loading'}`}>
+      {ok && d && r ? <GlobeCanvas key={sci} m={ok} d={d} r={r} onTap={show} onTurn={(x) => (turned.current = x)} /> : <div className="disc" />}
+      {credit}
+      {alone && ok && d && r && (
+        <Alone credit={credit} onClose={close}>
+          {/* (A tap here is the view's to close it, Alone.tsx: the canvas's own tap does nothing.) */}
+          <GlobeCanvas m={ok} d={d} r={r} onTap={() => {}} start={turned.current} />
+        </Alone>
+      )}
     </figure>
   );
 }
@@ -138,7 +163,7 @@ export function RangeGlobe({ sci, fallback }: { sci: string; fallback?: (none: R
 function NoRange({ m, d }: { m: Draw | null; d: GlobeData | null }) {
   return (
     <figure className="globe none">
-      {m && d ? <GlobeCanvas m={m} d={d} r={NO_RANGE} big={false} onTap={() => {}} /> : <div className="disc" />}
+      {m && d ? <GlobeCanvas m={m} d={d} r={NO_RANGE} onTap={() => {}} /> : <div className="disc" />}
       <span className="cap">Range not known</span>
     </figure>
   );

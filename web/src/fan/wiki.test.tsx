@@ -1,9 +1,11 @@
 import * as React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { Alone, AloneImg, AloneView, aloneTapper } from './Alone';
 import { bigSrcOf, RangeMap, SpeciesCard, WikiPic } from './FanApp';
+import { hookHarness } from './hookharness';
 import { FELIDAE } from './panthera';
-import { drawPic, livePic, PIC_CAP, PIC_FADE_MS, PicLoader, picSrcOf, wikiOf } from './wiki';
+import { drawPic, livePic, PIC_CAP, PIC_FADE_MS, PicLoader, picSrcOf, wikiOf, type WikiRec } from './wiki';
 
 const lion = FELIDAE.species.find((s) => s.sci === 'Panthera leo')!;
 
@@ -77,44 +79,102 @@ describe('range map (ToLaD#196)', () => {
     expect(renderToStaticMarkup(<SpeciesCard sp={none!} onClose={() => {}} />)).not.toContain('class="range');
   });
 
-  it('an image error removes it; a tap enlarges it to the 960 px thumbnail, whose error falls back', () => {
-    // A hook harness: RangeMap called as a function, its state kept here (no DOM in these tests).
-    const slots: unknown[] = [];
-    let i = 0;
-    // React 19's hook dispatcher, set for the call (there is no DOM renderer in these tests):
-    // the same path React itself takes, so the component's own onLoad/onClick/onError run.
-    const internals = (React as unknown as Record<string, { H: unknown }>).__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE;
-    const useState = (init: unknown) => {
-      const k = i++;
-      if (!(k in slots)) slots[k] = init;
-      return [slots[k], (v: unknown) => (slots[k] = typeof v === 'function' ? (v as (x: unknown) => unknown)(slots[k]) : v)];
-    };
+  it('an image error removes it; a tap shows it alone at the 960 px thumbnail, a tap there closes it (ToLaD#506)', () => {
+    const { render } = hookHarness();
     type Img = React.ReactElement<{ src: string; onClick: () => void; onLoad: () => void; onError: () => void }>;
-    const render = () => {
-      i = 0;
-      const prev = internals.H;
-      internals.H = { useState };
-      try {
-        return RangeMap({ w }) as React.ReactElement<{ className: string; children: [Img, unknown] }> | null;
-      } finally {
-        internals.H = prev;
-      }
-    };
-    let el = render()!;
+    type Fig = React.ReactElement<{ className: string; children: [Img, React.ReactElement, React.ReactElement<AloneProps> | false] }>;
+    const map = () => render(() => RangeMap({ w })) as Fig | null;
+    let el = map()!;
     expect(el.props.className).toBe('range loading');
     el.props.children[0].props.onLoad();
-    el = render()!;
+    el = map()!;
     expect(el.props.className).toBe('range ok');
-    el.props.children[0].props.onClick();
-    el = render()!;
-    expect(el.props.className).toBe('range ok big');
-    expect(el.props.children[0].props.src).toBe(bigSrcOf(w.range));
-    expect(el.props.children[0].props.src).toContain('/960px-M.svg.png');
-    el.props.children[0].props.onError(); // the big one failed: back to the 500 px one, still shown
-    el = render()!;
-    expect(el.props.children[0].props.src).toBe(w.range);
+    expect(el.props.children[2]).toBe(false);
+    el.props.children[0].props.onClick(); // a tap: alone, full screen; the card's figure itself unchanged
+    el = map()!;
+    expect(el.props.className).toBe('range ok');
+    const alone = el.props.children[2] as React.ReactElement<AloneProps>;
+    expect(alone.type).toBe(Alone);
+    const html = renderToStaticMarkup(<AloneView {...alone.props} />);
+    expect(html).toContain(`src="${bigSrcOf(w.range)}"`);
+    expect(bigSrcOf(w.range)).toContain('/960px-M.svg.png');
+    expect(html).toContain('Range map · Wikimedia Commons');
+    alone.props.onClose(); // a tap on it (no history here): closed, back to the card
+    el = map()!;
+    expect(el.props.children[2]).toBe(false);
     el.props.children[0].props.onError(); // the map itself failed: gone, its `none` (here none) in its place
-    expect(render()).toBeNull();
+    expect(map()).toBeNull();
+  });
+});
+
+type AloneProps = { credit: React.ReactNode; onClose: () => void; children: React.ReactNode };
+
+describe('the picture, map or globe alone, full screen (ToLaD#506)', () => {
+  const w = {
+    img: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/PZ_lion_pride.jpg/330px-PZ_lion_pride.jpg',
+    file: 'https://commons.wikimedia.org/wiki/File:PZ_lion_pride.jpg',
+  } as WikiRec;
+
+  it('a tap on the picture opens it alone, the large thumbnail and its credit and nothing else; a second tap closes it', () => {
+    const { render } = hookHarness();
+    type Fig = React.ReactElement<{ className: string; children: [React.ReactElement<{ onClick: () => void; onLoad: () => void }>, unknown, React.ReactElement<AloneProps> | false] }>;
+    const pic = () => render(() => WikiPic({ w })) as Fig;
+    pic().props.children[0].props.onLoad();
+    expect(pic().props.children[2]).toBe(false);
+    pic().props.children[0].props.onClick(); // first tap
+    const alone = pic().props.children[2] as React.ReactElement<AloneProps>;
+    expect(alone.type).toBe(Alone);
+    // (The server renderer's own image preloads aside.)
+    const html = renderToStaticMarkup(<AloneView {...alone.props} />).replace(/<link rel="preload"[^>]*\/>/g, '');
+    // Only the picture (the card's thumbnail at once, the 960 px one over it) and the credit: no name, no facts.
+    expect(html).toBe(
+      '<div class="alone"><div class="alone-it">' +
+        `<img src="${w.img}" alt="" decoding="async" referrerPolicy="no-referrer"/>` +
+        `<img class="big loading" src="${bigSrcOf(w.img!)}" alt="" decoding="async" referrerPolicy="no-referrer"/>` +
+        `</div><div class="alone-credit"><a href="${w.file}" target="_blank" rel="noopener">Wikimedia Commons</a></div></div>`,
+    );
+    // The second tap, as the view sees it: down and up in place.
+    const t = aloneTapper(alone.props.onClose);
+    t.down({ id: 1, x: 200, y: 400, t: 0, link: false });
+    t.up({ id: 1, x: 202, y: 401, t: 120, link: false });
+    expect(pic().props.children[2]).toBe(false);
+  });
+
+  it('the large thumbnail shows once it arrives; if it fails, the card one stays', () => {
+    const { render } = hookHarness();
+    type Big = React.ReactElement<{ className: string; onLoad: () => void; onError: () => void }>;
+    type Imgs = React.ReactElement<{ children: [React.ReactElement, Big | false] }>;
+    const big = bigSrcOf(w.img!);
+    const bigImg = () => (render(() => AloneImg({ src: w.img!, big })) as Imgs).props.children[1];
+    expect((bigImg() as Big).props.className).toBe('big loading');
+    (bigImg() as Big).props.onLoad();
+    expect((bigImg() as Big).props.className).toBe('big ok');
+    (bigImg() as Big).props.onError();
+    expect(bigImg()).toBe(false);
+    // An unsized URL has no larger one: only the card's.
+    expect(render(() => AloneImg({ src: 'x.jpg', big: 'x.jpg' })).props.children[1]).toBe(false);
+  });
+
+  it('only a tap closes it: not a drag (the globe turned), a hold, a pinch, or a tap on the credit', () => {
+    let closed = 0;
+    const t = aloneTapper(() => closed++);
+    const p = (id: number, x: number, y: number, ms: number, link = false) => ({ id, x, y, t: ms, link });
+    t.down(p(1, 100, 100, 0)); // a drag that comes back where it started
+    t.move(p(1, 160, 100, 50));
+    t.up(p(1, 101, 100, 200));
+    t.down(p(1, 100, 100, 1000)); // a hold
+    t.up(p(1, 100, 100, 1900));
+    t.down(p(1, 100, 100, 3000)); // a pinch
+    t.down(p(2, 200, 200, 3010));
+    t.up(p(1, 100, 100, 3100));
+    t.up(p(2, 200, 200, 3110));
+    t.down(p(1, 100, 820, 4000, true)); // the credit
+    t.up(p(1, 100, 820, 4080, true));
+    expect(closed).toBe(0);
+    t.down(p(1, 100, 100, 5000));
+    t.move(p(1, 104, 103, 5040));
+    t.up(p(1, 104, 103, 5100));
+    expect(closed).toBe(1);
   });
 });
 
