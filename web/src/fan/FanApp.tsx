@@ -21,8 +21,9 @@ import { MagnifierIcon, SearchPanel } from './SearchPanel';
 import { SourcesPanel } from './SourcesPanel';
 import { statusOf, wildPartSentence } from './status';
 import { cardTapper, onControl } from './cardtap';
+import { sheetSwipe, useBackCloses } from './sheet';
 import { flipOn, forkQuiet, setForkQuiet } from './flip';
-import { FanView, initialMeasure, levelName, type CardKey, type Lineage, type Place, type Selection } from './view';
+import { CARD_SHARE, FanView, initialMeasure, levelName, type CardKey, type Lineage, type Place, type Selection } from './view';
 import { keptPlace, treeKey, watchBack } from './back';
 
 declare global {
@@ -96,6 +97,9 @@ export function FanApp() {
   // What the widths count (ToLaD#276): individuals, or their mass (`?width=mass`).
   const [measure, setMeasure] = useState<Measure>(initialMeasure);
   const [sel, setSel] = useState<Selection | null>(null);
+  // (Back closes the card, whichever it is (ToLaD#509): the same close as its ×.)
+  const closeCard = useCallback(() => viewRef.current?.tap(-1e6, -1e6), []);
+  useBackCloses(!!sel, closeCard);
   const selRef = useRef(sel);
   selRef.current = sel;
   const [searching, setSearching] = useState(false);
@@ -258,14 +262,14 @@ export function FanApp() {
           }}
         />
       )}
-      <div className="foot" style={viewReady ? undefined : { visibility: 'hidden' }}>
+      <div className="foot" style={{ ['--card-share' as string]: CARD_SHARE, visibility: viewReady ? undefined : 'hidden' }}>
         <div className="wscale" ref={scaleRef} aria-label="width scale">
           <span className="wbar" />
           <span className="wlab" />
         </div>
       {sel ? (
         sel.lineage ? (
-          <LineageCard lin={sel.lineage} onClose={() => viewRef.current?.tap(-1e6, -1e6)} onUp={cardUp} />
+          <LineageCard lin={sel.lineage} onClose={closeCard} onUp={cardUp} />
         ) : (
           <SpeciesCard
             sp={sel.sp}
@@ -273,7 +277,7 @@ export function FanApp() {
             ageMa={sel.ageMa}
             startMa={sel.startMa}
             event={sel.event?.k}
-            onClose={() => viewRef.current?.tap(-1e6, -1e6)}
+            onClose={closeCard}
             onUp={cardUp}
             onBox={sel.event ? undefined : (el) => viewRef.current?.cardBox(el)}
           />
@@ -572,14 +576,31 @@ export function bigSrcOf(src: string): string {
 /**
  * A card's box (the species', the split's, the individual's): its touches kept from the tree under it, and a double tap
  * on it, off its controls (links, buttons, Details, the pictures, the globe), one level up as on the tree (ToLaD#301).
+ * A bottom sheet (ToLaD#509, sheet.ts): its head (a grab bar, the ×, the name) stays, and the rest scrolls under it, the
+ * whole held to its share of the screen (view.CARD_SHARE); a swipe down closes it.
  */
-function CardShell({ onUp, onBox, children }: { onUp?: (x: number, y: number) => void; onBox?: (el: HTMLElement) => void; children: ReactNode }) {
+export function CardShell({
+  onUp,
+  onBox,
+  onClose,
+  head,
+  children,
+}: {
+  onUp?: (x: number, y: number) => void;
+  onBox?: (el: HTMLElement) => void;
+  onClose: () => void;
+  head: ReactNode;
+  children: ReactNode;
+}) {
   const up = useRef(onUp);
   up.current = onUp;
+  const shut = useRef(onClose);
+  shut.current = onClose;
   // (Its box as laid out, and again whenever it changes, to whoever frames the tree in the room it leaves (FanView.cardBox, ToLaD#496).)
   const box = useRef(onBox);
   box.current = onBox;
   const ref = useRef<HTMLDivElement>(null);
+  const body = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -595,19 +616,81 @@ function CardShell({ onUp, onBox, children }: { onUp?: (x: number, y: number) =>
     window.getSelection?.()?.removeAllRanges();
     up.current?.(x, y);
   });
+  const swipe = useRef<ReturnType<typeof sheetSwipe> | null>(null);
+  swipe.current ??= sheetSwipe();
+  // (A swipe's end is no click on the link or the picture it started on.)
+  const swiped = useRef(false);
+  const shift = (dy: number, snap = false) => {
+    const el = ref.current;
+    if (!el) return;
+    el.classList.toggle('snap', snap);
+    el.style.transform = dy > 0 ? `translateY(${dy}px)` : '';
+  };
+  // (A touch pulling the sheet down is not also the content's scroll, nor the page's: its moves are kept from the browser
+  // while the sheet follows. React's touch listeners are passive, so this one is the element's own.)
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const keep = (e: TouchEvent) => {
+      if (swipe.current?.following) e.preventDefault();
+    };
+    el.addEventListener('touchmove', keep, { passive: false });
+    return () => el.removeEventListener('touchmove', keep);
+  }, []);
   const pt = (e: RPointerEvent) => ({ id: e.pointerId, x: e.clientX, y: e.clientY, t: e.timeStamp, ctl: onControl(e.target) });
   return (
     <div
       ref={ref}
-      className="card-sp"
+      className="card-sp sheet"
       onPointerDown={(e) => {
         e.stopPropagation();
-        tapper.current!.down(pt(e));
+        const p = pt(e);
+        tapper.current!.down(p);
+        const b = body.current;
+        swiped.current = false;
+        swipe.current!.down(p, !b || !b.contains(e.target as Node) || b.scrollTop <= 0);
       }}
-      onPointerUp={(e) => tapper.current!.up(pt(e))}
-      onPointerCancel={() => tapper.current!.cancel()}
+      onPointerMove={(e) => {
+        const dy = swipe.current!.move(pt(e));
+        if (dy === null) return;
+        if (!swiped.current) {
+          swiped.current = true;
+          tapper.current!.cancel();
+          ref.current?.setPointerCapture?.(e.pointerId);
+        }
+        shift(dy);
+      }}
+      onPointerUp={(e) => {
+        const p = pt(e);
+        tapper.current!.up(p);
+        const h = ref.current?.getBoundingClientRect().height ?? 0;
+        if (swipe.current!.up(p, h)) {
+          shift(0);
+          shut.current();
+        } else if (swiped.current) shift(0, true);
+      }}
+      onPointerCancel={() => {
+        tapper.current!.cancel();
+        swipe.current!.cancel();
+        shift(0, true);
+      }}
+      onClickCapture={(e) => {
+        if (!swiped.current) return;
+        swiped.current = false;
+        e.preventDefault();
+        e.stopPropagation();
+      }}
     >
-      {children}
+      <div className="head">
+        <span className="grab" aria-hidden="true" />
+        <button type="button" className="x" onClick={onClose} aria-label="Close">
+          ×
+        </button>
+        {head}
+      </div>
+      <div className="body" ref={body}>
+        {children}
+      </div>
     </div>
   );
 }
@@ -660,20 +743,23 @@ export function SpeciesCard({
   const nat = !spark && sp.natural ? sp.natural : null;
   const wiki = wikiOf(sp.sci);
   return (
-    <CardShell onUp={onUp} onBox={onBox}>
-      <button type="button" className="x" onClick={onClose} aria-label="Close">
-        ×
-      </button>
-      <div className="t">
-        {wiki?.wp ? (
-          <a className="wp" href={wiki.wp} target="_blank" rel="noopener">
-            {sp.common}
-          </a>
-        ) : (
-          <span>{sp.common}</span>
-        )}{' '}
-        <i>({sp.sci})</i>
-      </div>
+    <CardShell
+      onUp={onUp}
+      onBox={onBox}
+      onClose={onClose}
+      head={
+        <div className="t">
+          {wiki?.wp ? (
+            <a className="wp" href={wiki.wp} target="_blank" rel="noopener">
+              {sp.common}
+            </a>
+          ) : (
+            <span>{sp.common}</span>
+          )}{' '}
+          <i>({sp.sci})</i>
+        </div>
+      }
+    >
       {/* The photo and the range side by side under the name (ToLaD#196): the globe (ToLaD#267), else the Wikimedia map;
           either missing, what says so in its box (ToLaD#492), so every card has the same two. */}
       <div className="media">
@@ -803,13 +889,15 @@ export function LineageCard({ lin, onClose, onUp }: { lin: Lineage; onClose: () 
   const [lo, hi] = [approxMa(s.lo), approxMa(s.hi)];
   const range = s.lo === s.hi ? 'no range found' : lo === hi ? `range ~${lo} million` : `range ${lo}–${hi} million`;
   return (
-    <CardShell onUp={onUp}>
-      <button type="button" className="x" onClick={onClose} aria-label="Close">
-        ×
-      </button>
-      <div className="t">
-        <span>{lin.name}</span>
-      </div>
+    <CardShell
+      onUp={onUp}
+      onClose={onClose}
+      head={
+        <div className="t">
+          <span>{lin.name}</span>
+        </div>
+      }
+    >
       <div className="facts">
         <p className="lead">
           <span className="lane lineage" />

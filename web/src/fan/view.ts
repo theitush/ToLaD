@@ -92,11 +92,11 @@ const LEVEL_PX = 12;
 /** The level the view is at (levelNow) is worked out at most this often (ms) while the camera moves without a gesture (a wheel). */
 const LEVEL_MS = 200;
 /**
- * The species card's reach up from the phone's foot, as a share of the phone's height, before any card has been laid out on the page
- * (ToLaD#496; cardReach after): its layout's (the title, the picture's and the range's boxes, the counts and the history chart), 450-485
- * px of an 844 px phone.
+ * The species card's reach up from the phone's foot, as a share of the phone's height, at most (ToLaD#509: the sheet is held to it, its
+ * content scrolling inside, FanApp's `--card-share`), and the room the landings leave it before any card has been laid out on the page
+ * (ToLaD#496; cardReach after): most cards fill it (the title, the picture's and the range's boxes, the counts and the history chart).
  */
-const CARD_SHARE = 0.55;
+export const CARD_SHARE = 0.5;
 /** The species card's reach up from the phone's foot (px), as last laid out (FanView.cardBox, ToLaD#496): the page's, kept across views (a look's switch builds a new one). 0: none yet. */
 let cardReach = 0;
 /** The scale bar and legend at the bottom (px): labels fade out over the 30 px above it. */
