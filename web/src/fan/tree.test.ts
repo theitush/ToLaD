@@ -41,10 +41,18 @@ describe('the dated tree', () => {
       expect(drawn).toEqual(f.root.strands);
       expect(new Set(f.branches.map((b) => b.sp.sci)).size).toBe(FELIDAE.species.length);
       expect(f.nodes.length).toBe(allSplits().length);
-      // Each split's daughters are its table's, maybe mirrored; every column holds exactly its split's species.
+      // Each split's daughters are its table's, maybe mirrored; every column holds exactly its split's species. (Daughters that are only fossils placed by name
+      // come after the others, the longest-lived first: layout.ts placedLast, ToLaD#279, #468.)
+      const tipOf = (k: FanNode | FanBranch): number => (isNode(k) ? Math.min(...k.strands.map((b) => b.tipY)) : k.tipY);
+      const placed = (k: FanNode | FanBranch) => (isNode(k) ? k.strands : [k]).every((b) => b.sp.placed);
       for (const v of f.nodes) {
         expect(v.strands.map((b) => b.sp.sci).sort()).toEqual(speciesUnder(v.split).filter((n) => f.branches.some((b) => b.sp.sci === n)).sort());
-        const names = v.kids.map((k) => (isNode(k) ? k.split.name + k.ageMa : k.sp.sci));
+        const name = (k: FanNode | FanBranch) => (isNode(k) ? k.split.name + k.ageMa : k.sp.sci);
+        const rest = v.kids.filter((k) => !placed(k));
+        const late = v.kids.filter(placed);
+        expect(v.kids, v.split.name).toEqual([...rest, ...late]);
+        for (let i = 1; i < late.length; i++) expect(tipOf(late[i - 1]), v.split.name).toBeLessThanOrEqual(tipOf(late[i]));
+        const names = rest.map(name);
         const table = v.split.kids.map((k) => (typeof k === 'string' ? k : k.name + k.ageMa)).filter((n) => names.includes(n));
         expect([table, [...table].reverse()]).toContainEqual(names);
       }

@@ -131,7 +131,7 @@ const LABEL_UNDER = 4;
 export const TIP_WORK = 150_000;
 export const TIP_TRY = 8_000;
 /** A fossil group tipLabels names as one (FanView.tipGroupsOf, ToLaD#279). */
-type TipGroup = { v: FanNode; f: number; l: number; young: number; c: number; r: number; open: number };
+type TipGroup = { v: FanNode; f: number; l: number; young: number; c: number; r: number; open: number; sub: TipGroup[] };
 /** Two boxes [x0, y0, x1, y1] share some area (touching is not meeting). */
 const boxesMeet = (p: readonly number[], q: readonly number[]): boolean => p[0] < q[2] && p[2] > q[0] && p[1] < q[3] && p[3] > q[1];
 /**
@@ -564,6 +564,17 @@ function fossilEnd(fan: Fan, v: FanNode): number | null {
  * log time gives most of the screen) above the screen; otherwise null ("now" there).
  */
 export function fossilTop(fan: Fan, v: FanNode): number | null {
+  // (A level with nothing alive (a fossil family placed by name, as the pangolins' Patriomanidae): its fossils are all it holds, so it is framed on their time, to its
+  // youngest's end, whatever its kin did since, ToLaD#279. To "now", its three fossils stood at the screen's foot under 17 Myr of nothing.)
+  let young = Infinity;
+  for (const b of v.strands) {
+    if (!b.sp.extinct && b.pop.aliveAt(0) > 0) {
+      young = NaN;
+      break;
+    }
+    young = Math.min(young, b.tipY);
+  }
+  if (young < Infinity) return young;
   return fossilSpan(fan, v) ? fossilEnd(fan, v) : null;
 }
 
@@ -1651,7 +1662,15 @@ export class FanView implements InputHandlers {
       return { ...fr, sx };
     });
     // (A hair past its opening, so it has surely opened whatever the rounding.)
-    const sx = opens < Infinity && opens * (1 + 1e-6) > fit.sx ? opens * (1 + 1e-6) : fit.sx;
+    let sx = opens < Infinity && opens * (1 + 1e-6) > fit.sx ? opens * (1 + 1e-6) : fit.sx;
+    // (A fossil group named at its tip (tipGroupsOf, ToLaD#279) has no band on the column: it opens where each of its parts has a name's room, its fossil groups and its fossils at
+    // their tips. That zoom read at the rooms there, a few rounds, as the fold's rooms move with the zoom.)
+    for (let k = 0; k < 4; k++) {
+      fold.setScale(sx, this.w);
+      const o = this.tipOpen(v) * (1 + 1e-6);
+      if (!(o > sx)) break;
+      sx = o;
+    }
     fold.setScale(sx, this.w);
     const cam = { ...fr, sx, cx: fold.rooms().roomL[j] + (this.w / 2 - this.labelsOut(v, sx)[0]) / sx };
     this.frames.set(key, { ...cam });
@@ -3110,7 +3129,11 @@ export class FanView implements InputHandlers {
       const f = this.fan.tess.fold as Steady;
       const { C, R } = f.rooms();
       const yCol = this.fan.time.y(LABELS_MA);
-      const own = ownLanes({ C, R }, (k) => f.strands[k].tipY <= yCol);
+      // (The column names the tree's lineages there. A fossil placed by name (no tree data, drawn on its genus, SpeciesRec.placed) is named at its own tip, as one gone by then
+      // (tipOrder, tipGroupsOf), wherever its date ends: its lane is a hair (its rooms by life ~1e-4 px at home), and a part with no room holds its group's opening back, gapOpens.
+      // ToLaD#279: the subfossil sloth lemurs (to ~500 years ago) and an undated Proconsul (the pipeline's end-Pleistocene, merge.py LAD_PLEISTOCENE) held Primates and all
+      // under it shut to 86,562x, their titles over every ape's band at every zoom.)
+      const own = ownLanes({ C, R }, (k) => f.strands[k].tipY <= yCol && !f.strands[k].sp.placed);
       const there = (b: FanBranch) => own[b.index];
       const gaps = columnGaps({ C, R }, (k) => own[k]);
       const { index, first, last } = T.t;
@@ -3495,8 +3518,8 @@ export class FanView implements InputHandlers {
     for (let t = 0; t < tips.length; t++) {
       // (A fossil group with a rank name (a fossil genus, tipGroupsOf) is named as one, at its youngest tip, over its band, with a picture of its own, until the zoom
       // gives each of its fossils a name's room across (its `open`): as the column's groups open into their parts, ToLaD#279.)
-      const g0 = groups.get(tips[t]);
-      const one = g0 && sx < g0.open ? g0 : null;
+      let one = groups.get(tips[t]) ?? null;
+      while (one && sx >= one.open) one = one.sub.find((q) => q.f <= tips[t] && tips[t] <= q.l) ?? null;
       if (one) {
         if (done.has(one)) continue;
         done.add(one);
@@ -3573,28 +3596,56 @@ export class FanView implements InputHandlers {
   /**
    * The fossil groups tipLabels names as one (ToLaD#279), per strand: each outermost clade with a rank name of its own (isLevel) that is only fossils placed by name
    * (splits.ts nameGrafts: a fossil genus, as Smilodon), with its strands f..l in drawn order, its youngest fossil, its band's centre and width (world x, its strands'
-   * rooms side by side), and `open`, the zoom from which each of its fossils has a name's room across (SPECIES_PX), where they are named each at its own tip instead.
-   * Kept per layout (its rooms).
+   * rooms side by side), and `open`, the zoom from which each of its parts has a name's room across (SPECIES_PX), where they are named instead: the fossil groups right under
+   * it (`sub`, named as one in turn till their own `open`) and each of its fossils in none of them at its own tip. So a fossil family opens genus by genus, as the cover's
+   * groups do (gapOpens), not only once its thinnest fossil has room (ToLaD#279: Eomyidae's ~80 fossils, one name till ~30,000x). Kept per layout (its rooms).
    */
   private tipGroupsOf(C: Float64Array, R: Float64Array): Map<number, TipGroup> {
     const had = this.tipGroups;
     if (had.C === C && had.R === R && had.fan === this.fan && had.own === this.gapLadder?.own) return had.m;
     const m = new Map<number, TipGroup>();
     const own = this.gapLadder?.own;
-    for (const v of this.fan.nodes) {
-      // (Only a group wholly gone by the labels' line: one with a lane there is the column's to name, the cover's, ToLaD#279: Cuvieronius, to ~10 kya, was named twice.)
-      if (v.strands.length < 2 || m.has(v.strands[0].index) || !isLevel(this.fan, v) || v.strands.some((b) => !b.sp.placed || own?.[b.index])) continue;
-      let [a, z, minR, young] = [Infinity, -Infinity, Infinity, v.strands[0]];
+    // (Only a group wholly gone by the labels' line: one with a lane there is the column's to name, the cover's, ToLaD#279: Cuvieronius, to ~10 kya, was named twice.)
+    const fossil = (v: FanNode) => v.strands.length >= 2 && isLevel(this.fan, v) && v.strands.every((b) => b.sp.placed && !own?.[b.index]);
+    /** Fossil group v's, its parts' opening from `up` (its group's) on, as the cover's (gapOpens: each part a name's room). */
+    const make = (v: FanNode, up: number): TipGroup => {
+      let [a, z, young] = [Infinity, -Infinity, v.strands[0]];
       for (const b of v.strands) {
         const k = b.index;
-        [a, z, minR] = [Math.min(a, C[k] - R[k] / 2), Math.max(z, C[k] + R[k] / 2), Math.min(minR, R[k])];
+        [a, z] = [Math.min(a, C[k] - R[k] / 2), Math.max(z, C[k] + R[k] / 2)];
         if (b.sp.t1 < young.sp.t1) young = b;
       }
-      const g: TipGroup = { v, f: v.strands[0].index, l: v.strands[v.strands.length - 1].index, young: young.index, c: (a + z) / 2, r: z - a, open: SPECIES_PX / Math.max(1e-300, minR) };
+      // (Its parts: the fossil groups right under it, and its fossils in none of them.)
+      const subs: FanNode[] = [];
+      let open = up;
+      const walk = (u: FanNode) => {
+        for (const k of u.kids)
+          if (!isNode(k)) open = Math.max(open, SPECIES_PX / Math.max(1e-300, R[k.index]));
+          else if (fossil(k)) {
+            subs.push(k);
+            let [ka, kz] = [Infinity, -Infinity];
+            for (const b of k.strands) [ka, kz] = [Math.min(ka, C[b.index] - R[b.index] / 2), Math.max(kz, C[b.index] + R[b.index] / 2)];
+            open = Math.max(open, SPECIES_PX / Math.max(1e-300, kz - ka));
+          } else walk(k);
+      };
+      walk(v);
+      return { v, f: v.strands[0].index, l: v.strands[v.strands.length - 1].index, young: young.index, c: (a + z) / 2, r: z - a, open, sub: subs.map((k) => make(k, open)) };
+    };
+    for (const v of this.fan.nodes) {
+      if (m.has(v.strands[0].index) || !fossil(v)) continue;
+      const g = make(v, 0);
       for (const b of v.strands) m.set(b.index, g);
     }
     Object.assign(had, { C, R, fan: this.fan, own, m });
     return m;
+  }
+  /** Where fossil group v (tipGroupsOf) opens into its parts, at the rooms as they stand; NaN for a clade that is none. */
+  private tipOpen(v: FanNode): number {
+    const { C, R } = (this.fan.tess.fold as Steady).rooms();
+    const [vf, vl] = [v.strands[0].index, v.strands[v.strands.length - 1].index];
+    let g = this.tipGroupsOf(C, R).get(vf) ?? null;
+    while (g && g.v !== v) g = g.sub.find((q) => q.f <= vf && vl <= q.l) ?? null;
+    return g ? g.open : NaN;
   }
   private readonly tipGroups: { C: Float64Array | null; R: Float64Array | null; fan: Fan | null; own?: boolean[]; m: Map<number, TipGroup> } = { C: null, R: null, fan: null, m: new Map() };
   /** tipLabels' names and their lengths (px), per strand (a group's by ~ its youngest's), at a fan and a band's cap. */
