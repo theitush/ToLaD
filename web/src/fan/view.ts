@@ -809,25 +809,14 @@ export function nextLevels(fan: Fan, v: FanNode): Level[] {
  * The parts of clade v for a group label (ToLaD#440), left to right: its daughters, every fork a group, named or not (groupName), so a
  * group opens one fork at a time and a tight pair stays together under their own small fork rather than holding the whole of v up.
  * Frames and taps step through fewer of them (isLevel). A daughter with all of v's species opens to its own. Fossils placed by name, as
- * nextLevels (keptOf, ToLaD#279): a daughter of only those is no part where v holds others, unless it has a rank name of its own; and an unnamed
- * fork that is only such fossils beside one daughter (a stem the data grafted fossils on, below a crown) is that daughter.
+ * nextLevels (keptOf, ToLaD#279): a daughter of only those is no part where v holds others, unless it has a rank name of its own.
  */
 export function labelParts(v: FanNode, fan?: Fan): Level[] {
   const out: Level[] = [];
   const n = countBy(v);
-  const crown = (k: FanNode): FanNode | FanBranch => {
-    for (let u: FanNode = k; ; ) {
-      if (fan && isLevel(fan, u)) return u;
-      const d = u.kids.filter((x) => !byNameOnly(u, x));
-      if (d.length !== 1) return u;
-      if ('sp' in d[0]) return d[0];
-      u = d[0];
-    }
-  };
   const go = (u: FanNode) => {
-    for (const k0 of u.kids) {
-      if (byNameOnly(v, k0) && ('sp' in k0 || !fan || !isLevel(fan, k0))) continue;
-      const k = 'sp' in k0 ? k0 : crown(k0);
+    for (const k of u.kids) {
+      if (byNameOnly(v, k) && ('sp' in k || !fan || !isLevel(fan, k))) continue;
       if ('sp' in k) out.push({ b: k });
       else if (k.strands.length === 1) out.push({ b: k.strands[0] });
       else if (n(k) < n(v)) out.push({ v: k });
@@ -4939,7 +4928,8 @@ export class FanView implements InputHandlers {
   private drawTimeAxis(labels: boolean): void {
     const ctx = this.ctx;
     const ts = this.fan.time;
-    const origin = ts.originMa * 1e6;
+    // (Its origin home's fork, the living's crown (homeOf, ToLaD#279): with every fossil the tree's root is the Triassic stem's, 205 Ma, a hair before it.)
+    const origin = homeOf(this.fan).split.ageMa * 1e6;
     // The axis goes on below the origin, down the stem to the bottom of the world.
     const bottom = ts.ageAt(this.fan.trunkBottom.y) * 1e6;
     const yrsAt = (py: number) => ts.ageAt(this.toWorld(0, py)[1]) * 1e6;
