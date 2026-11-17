@@ -124,6 +124,9 @@ SD_NAT_RANGE = 0.2  # dex, a present-natural range that differs from the current
 NATURAL_METHOD_SCALED = "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
 METHOD_A_PHYLACINE = "A:PHYLACINE current (rescaled to PanTHERIA areas)"
 NATURAL_METHOD_FIT = "N_nat: D x natural range (PHYLACINE, rescaled to PanTHERIA areas) x fitted occupancy"
+# ToLaD#507: where PHYLACINE's own note says the map difference is not people's doing (taxonomy, a
+# mapping fix, a placeholder range; pipeline/phylacine_notes.csv), no change is drawn from it
+NATURAL_METHOD_NOTE = "N_nat: today's count (PHYLACINE's note: the map difference is {cls}, not people's doing)"
 # how a [[fossil_count]] was obtained (overrides.FOSSIL_COUNT_KINDS), as the leaf's method line says it
 FOSSIL_COUNT_LABEL = {"census": "census estimate", "ne-ratio": "effective size x census/Ne ratio",
                       "density-area": "density x area", "analog": "census of living analogs"}
@@ -199,6 +202,7 @@ def resolve_traits(root: Node, raw: Path, ctx: dict, log: dict) -> None:
     pan = load_pantheria(raw)
     rng = ranges.load_ranges(raw)
     rng_meta = ranges.load_spatial_metadata(raw)
+    rng_notes = ranges.load_notes()
     hits = Counter()
     rng_used: Counter = Counter()
 
@@ -274,7 +278,8 @@ def resolve_traits(root: Node, raw: Path, ctx: dict, log: dict) -> None:
         for n in names:
             r = rng.get(n)
             if r is not None:
-                D["phy_range"] = {**r, "name": n, "certainty": rng_meta.get(n, {}).get("certainty", "")}
+                D["phy_range"] = {**r, "name": n, "certainty": rng_meta.get(n, {}).get("certainty", ""),
+                                  "note_class": rng_notes.get(n, {}).get("class", "")}
                 rng_used[n] += 1
                 break
         if nd.kind == "tree" and not nd.extinct:
@@ -662,10 +667,24 @@ def natural_level(D: dict, N_today: float, sd_today: float, extinct: bool, area_
     species with no current range (extinct, or extinct in the wild) uses
     D x A_nat x k: A_nat mapped from the PHYLACINE grid onto PanTHERIA's area
     scale (area_fit), k the fitted group occupancy. Returns None without a
-    present-natural map."""
+    present-natural map.
+
+    An extant species whose map difference PHYLACINE's own note puts down to
+    taxonomy, a mapping fix or a placeholder range (ranges.NOT_PEOPLE,
+    ToLaD#507) gets today's count: no change is drawn from that difference,
+    and no level is fitted to a placeholder area (None without a count)."""
     pr = D.get("phy_range")
     if not pr or pr["cells_nat"] <= 0:
         return None
+    if not extinct and pr.get("note_class") in ranges.NOT_PEOPLE:
+        if N_today <= 0:
+            return None
+        h = 1.96 * sd_today
+        return {"N": N_today, "lo": N_today / 10 ** h, "hi": N_today * 10 ** h, "sd": sd_today, "sd_extra": 0.0,
+                "method": NATURAL_METHOD_NOTE.format(cls=pr["note_class"]), "grade": "D",
+                "kind": "reconstruction", "map": pr["name"], "certainty": pr.get("certainty", ""),
+                "scaled": False, "note_class": pr["note_class"], "km2_cur": pr["km2_cur"], "km2_nat": pr["km2_nat"],
+                "cells_cur": pr["cells_cur"], "cells_nat": pr["cells_nat"]}
     if not extinct and pr["cells_cur"] > 0 and N_today > 0:
         # exactly today's count where the maps agree (x * a / a can miss x by an ulp)
         N = N_today if pr["cells_nat"] == pr["cells_cur"] else N_today * pr["cells_nat"] / pr["cells_cur"]
@@ -836,6 +855,15 @@ def natural_report(root: Node) -> dict:
                          "natural": sum(n.data["natural"]["N"] for n in ext)},
         "extinct_total_natural": sum(n.data["natural"]["N"] for n in extinct),
         "showcase": [row(by_name[s]) for s in NATURAL_SHOWCASE if s in by_name],
+        "phylacine_note_today_note": "ToLaD#507: extant leaves whose map difference PHYLACINE's own note puts down "
+                                     "to taxonomy, a mapping fix or a placeholder range "
+                                     "(pipeline/phylacine_notes.csv): natural level = today's count",
+        "phylacine_note_today": sorted(({"leaf": n.name, "map": n.data["natural"]["map"],
+                                         "class": n.data["natural"]["note_class"],
+                                         "cells_cur": n.data["natural"]["cells_cur"],
+                                         "cells_nat": n.data["natural"]["cells_nat"]}
+                                        for n in ext if n.data["natural"].get("note_class")),
+                                       key=lambda r: r["leaf"]),
         "highest_ratio": [row(n) for n in ranked[::-1][:10]],
         "lowest_ratio": [row(n) for n in ranked[:10]],
     }
