@@ -69,6 +69,20 @@ Every hand-made change to what the sources say is in [`overrides.toml`](override
 - **Hominins (ToLaD#275):** 23 first/last appearances from the literature in place of PBDB's wide windows (e.g. *Homo erectus* 2.0 Ma–108 ka, Rizal et al. 2020, *Nature* 577:381; Neanderthals 430–40 ka, Arsuaga et al. 2014 and Higham et al. 2014; *Sahelanthropus* 7.2–6.8 Ma, Lebatard et al. 2008; the rest as tabulated in Wood & Boyle 2016, *Am. J. Phys. Anthropol.* 159 S61:37–78, with the primary paper per entry). 22 `[[dated_fossil]]` entries hang them on the human lineage at their first appearance (grade-honest: their relationships are argued over), Neanderthals at their genomic split from us (550–765 ka, Prüfer et al. 2014, *Nature* 505:43). A [[date]] also stands in for occurrences PBDB lacks (*H. naledi*, Dirks et al. 2017; *Kenyanthropus platyops*, Leakey et al. 2001). Denisovans have no species record in PBDB or Open Tree here (Upham's `Homo_denisova` tip matches no leaf).
 - **Placements:** Stagodontidae, Pediomyidae, *Kokopellia* and *Asiatherium* are Cretaceous metatherians outside crown Marsupialia (Williamson, Brusatte & Wilson 2014, *ZooKeys* 465:1–76). OTT and the PBDB graft put them under Didelphimorphia, which dragged the order back to 98 Ma. They now sit on the stem of Metatheria.
 
+## PHYLACINE's map notes, classed by hand (ToLaD#507)
+
+[`phylacine_notes.csv`](phylacine_notes.csv) has one row for each of the 1,069 PHYLACINE 1.2.1 species whose current and present-natural cells differ. Its source is PHYLACINE's own note on each change: Faurby et al. 2018, *Ecology* 99:2626, `Data/Ranges/Spatial_metadata.csv` in the range-map zip above, columns `Modification`, `Motivation`, `Certainty.Level`. The 400 distinct note texts were read one by one, and each species got a class from what its note says:
+
+- `people`: the change is people's doing by the note's own reasoning, or the note sits in PHYLACINE's human-impact codes 1–5 (historic range, introductions, disjunct ranges, whole islands, suitable areas next to a known decline) and says nothing else;
+- `taxonomy`: range split, reassigned or lumped between species;
+- `mapping`: records deleted as errors, misidentifications or rare migrants;
+- `placeholder`: no real range is known, so the note sets one (a town near the type locality, a borrowed range, fossil-site estimates for extinct species);
+- `unclear`: none so far.
+
+Columns: `binomial`, `iucn` (PHYLACINE's status), `cells_cur`, `cells_nat`, `class`, `why` (ours), `phylacine_note` (the note's own key phrase, verbatim).
+
+For an extant species classed `taxonomy`, `mapping` or `placeholder`, the build (`model.natural_level`) takes today's count as the natural level. No range-loss trend comes from the map difference, and no level is fitted to a placeholder area. Extinct species are not changed: their present-natural maps are what their counts stand on. `stats.json` → `natural_baseline.phylacine_note_today` lists the leaves this applies to. A test checks that the file still matches PHYLACINE's metadata row for row.
+
 ## Stem fossils (automatic)
 
 Taxonomy often files a fossil inside a crown group that it predates. The dating rule "a parent is at least as old as its oldest child" then drags the crown node and every extant lineage under it back to the fossil's age. Examples are Cretaceous "didelphimorphs", Paleocene "carnivorans", Eocene equids and the Cretaceous "soricid" *Cretasorex*. These old crowns then soaked up deep-time ghost lineages.

@@ -7,6 +7,7 @@ import { HistorySpark } from './HistorySpark';
 import type { Measure } from './layout';
 import { drawStub, wikiOf, type WikiRec } from './wiki';
 import { RangeGlobe } from './Globe';
+import { Alone, AloneImg, useAlone } from './Alone';
 import { mammaliaClade, NATURAL_META, type HistEvent, type SpeciesRec } from './panthera';
 import { mammaliaTree } from './splits';
 import { loadMammals, mammalsLoaded } from './mammals-data';
@@ -489,29 +490,24 @@ function EventSource({ ev }: { ev: HistEvent }) {
  */
 export function WikiPic({ w, initial = 'loading' }: { w: WikiRec | null; initial?: 'loading' | 'ok' | 'failed' }) {
   const [state, setState] = useState(initial);
-  // A tap opens it across the card at a larger Commons thumbnail (ToLaD#182); another tap closes it.
-  const [big, setBig] = useState(false);
-  const [bigFailed, setBigFailed] = useState(false);
+  // A tap shows it alone, full screen, at a larger Commons thumbnail (ToLaD#506, Alone.tsx); a tap there closes it.
+  const [alone, show, close] = useAlone();
   const src = w?.img;
   if (!src || state === 'failed') return <PicStub />;
-  const bigSrc = bigSrcOf(src);
-  const useBig = big && !bigFailed && bigSrc !== src;
+  const credit = w?.file && (
+    <a href={w.file} target="_blank" rel="noopener">
+      Wikimedia Commons
+    </a>
+  );
   return (
-    <figure className={`pic ${state}${big ? ' big' : ''}`}>
-      <img
-        src={useBig ? bigSrc : src}
-        alt=""
-        decoding="async"
-        referrerPolicy="no-referrer"
-        onClick={() => setBig((b) => !b)}
-        onLoad={() => setState('ok')}
-        onError={() => (useBig ? setBigFailed(true) : setState('failed'))}
-      />
+    <figure className={`pic ${state}`}>
+      <img src={src} alt="" decoding="async" referrerPolicy="no-referrer" onClick={show} onLoad={() => setState('ok')} onError={() => setState('failed')} />
       {/* (Its credit line from the start, hidden while loading: the box is its loaded height.) */}
-      {w?.file && (
-        <a href={w.file} target="_blank" rel="noopener">
-          Wikimedia Commons
-        </a>
+      {credit}
+      {alone && (
+        <Alone credit={credit} onClose={close}>
+          <AloneImg src={src} big={bigSrcOf(src)} />
+        </Alone>
       )}
     </figure>
   );
@@ -520,32 +516,27 @@ export function WikiPic({ w, initial = 'loading' }: { w: WikiRec | null; initial
 /**
  * The species' range map (ToLaD#196, Wikidata P181), hotlinked like the photo: under the name,
  * beside the photo, its place held with a spinner while it loads, `none` (the globe with no range, ToLaD#492) if it
- * fails. A tap enlarges it across the card (the 960 px thumbnail), another shrinks it back.
+ * fails. A tap shows it alone, full screen (the 960 px thumbnail, ToLaD#506); a tap there closes it.
  * Side by side rather than stacked: stacked, the lion's card filled the whole 390×844 screen.
  */
 export function RangeMap({ w, initial = 'loading', none = null }: { w: WikiRec | null; initial?: 'loading' | 'ok' | 'failed'; none?: ReactNode }) {
   const [state, setState] = useState(initial);
-  const [big, setBig] = useState(false);
-  const [bigFailed, setBigFailed] = useState(false);
+  const [alone, show, close] = useAlone();
   const src = w?.range;
   if (!src || state === 'failed') return none;
-  const bigSrc = bigSrcOf(src);
-  const useBig = big && !bigFailed && bigSrc !== src;
+  const credit = w?.rangeFile && (
+    <a href={w.rangeFile} target="_blank" rel="noopener">
+      Range map · Wikimedia Commons
+    </a>
+  );
   return (
-    <figure className={`range ${state}${big ? ' big' : ''}`}>
-      <img
-        src={useBig ? bigSrc : src}
-        alt=""
-        decoding="async"
-        referrerPolicy="no-referrer"
-        onClick={() => setBig((b) => !b)}
-        onLoad={() => setState('ok')}
-        onError={() => (useBig ? setBigFailed(true) : setState('failed'))}
-      />
-      {w?.rangeFile && (
-        <a href={w.rangeFile} target="_blank" rel="noopener">
-          Range map · Wikimedia Commons
-        </a>
+    <figure className={`range ${state}`}>
+      <img src={src} alt="" decoding="async" referrerPolicy="no-referrer" onClick={show} onLoad={() => setState('ok')} onError={() => setState('failed')} />
+      {credit}
+      {alone && (
+        <Alone credit={credit} onClose={close}>
+          <AloneImg src={src} big={bigSrcOf(src)} />
+        </Alone>
       )}
     </figure>
   );
