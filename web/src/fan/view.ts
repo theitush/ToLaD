@@ -1072,6 +1072,17 @@ export function levelText(b: FanBranch): string {
   return m && b.sp.sci.endsWith(` ${m[2]}`) ? `${t.startsWith('Ardipithecus ') ? 'Ar' : m[1]}. ${m[2]}` : t;
 }
 
+/** The first index of ascending `a` at or past x. */
+function lowerBound(a: Float64Array, x: number): number {
+  let [lo, hi] = [0, a.length];
+  while (lo < hi) {
+    const m = (lo + hi) >> 1;
+    if (a[m] < x) lo = m + 1;
+    else hi = m;
+  }
+  return lo;
+}
+
 function clamp01(v: number): number {
   return v < 0 ? 0 : v > 1 ? 1 : v;
 }
@@ -3132,8 +3143,6 @@ export class FanView implements InputHandlers {
       };
       const root = of({ v: this.fan.root });
       const room = (g: GapMember) => (g.on < 0 ? 0 : Math.max(g.gap, g.band));
-      const opens = gapOpens(root, parts, room, CLADE_PX);
-      const guests = new Map<GapMember, Guest<GapMember>>();
       // (The highlights' lineages, HIGHLIGHT_STOPS: a band holding one is its own label's before a title's, gapHands' `dear`.)
       const lineage = new Set<FanNode | FanBranch>();
       for (const b of this.fan.branches)
@@ -3141,7 +3150,21 @@ export class FanView implements InputHandlers {
           lineage.add(b);
           for (let u: FanNode | null = b.node; u; u = u.parent) lineage.add(u);
         }
-      const hands = gapHands(root, parts, opens, (g) => (g.on < 0 ? 0 : g.gap), (g) => (g.on < 0 ? 0 : g.band), room, CLADE_PX, GROUP_D - PIC_D, guests, same, (g) => lineage.has(g.lv.b ?? g.lv.v!));
+      const dear = (g: GapMember) => lineage.has(g.lv.b ?? g.lv.v!);
+      // (An order's band goes to a highlight's label before its own name (`dear`: Primates' to Human's, ToLaD#500), and then its name waits for its gap: so for its group's
+      // opening, an order on a highlight's lineage has only its gap for its name. Its group's title stands over it till that gap holds it, and the order is named at every zoom, by
+      // its own title or its group's, whichever side of its group's fork it falls (ToLaD#279: with every fossil Primates fell second in Euarchonta's, 0.4 px of gap at home, and
+      // had no name there; with the default data it falls first, under Euarchonta's title, as before).)
+      // (Its widest part's, as gapHands' host: the first of a tie.)
+      const yields = (g: GapMember) => {
+        if (!g.lv.v || !ORDER_TAXA.has(taxonKey(g.lv.v.split.taxon ?? ''))) return false;
+        let [host, w] = [null as GapMember | null, 0];
+        for (const p of parts(g)) if ((p.on < 0 ? 0 : p.band) > w) [host, w] = [p, p.band];
+        return !!host && dear(host);
+      };
+      const opens = gapOpens(root, parts, (g) => (yields(g) ? (g.on < 0 ? 0 : g.gap) : room(g)), CLADE_PX);
+      const guests = new Map<GapMember, Guest<GapMember>>();
+      const hands = gapHands(root, parts, opens, (g) => (g.on < 0 ? 0 : g.gap), (g) => (g.on < 0 ? 0 : g.band), room, CLADE_PX, GROUP_D - PIC_D, guests, same, dear);
       const tips = tipOrder(own, R);
       L = this.gapLadder = { T, root, parts, opens, hands, guests, tips, own, C, R, slack: laneSlack(own, C, R), tipIx: new TipIndex(tips, C, R) };
     }
@@ -3654,7 +3677,7 @@ export class FanView implements InputHandlers {
     const S = (this.fan.tess.fold as Steady).strands;
     const C = this.clearRows;
     const open = C.open;
-    const yTop = (p0 + r1) / sy;
+    const yTop = (p0 + r1 + 1) / sy;
     for (let dir = -1; dir <= 1 && out.length; dir += 2) {
       open.fill(1, r0, r1 + 1);
       let rows = r1 - r0 + 1;
@@ -3664,8 +3687,11 @@ export class FanView implements InputHandlers {
         const b = S[i];
         for (let r = r0; r <= r1 && out.length; r++) {
           if (!open[r]) continue;
-          const y = (p0 + r) / sy;
-          if (y < b.tipY) continue;
+          // (Row p is the band from it to the next row: a strand there anywhere in it is read, at its start or at its tip, and at its own column's end, its split, where that falls
+          // inside the band, so a column whose own stretch is shorter than a px, or steps across at its split between two rows, is not passed over (ToLaD#279: Ar. ramidus'
+          // 3 px own column leans toward Ar. kadabba's picture in its last px).)
+          const [y, y1] = [(p0 + r) / sy, (p0 + r + 1) / sy];
+          if (y1 <= b.tipY) continue;
           // (One try's share of the budget, TIP_TRY: past it the name has no place here, as if crossed.)
           if (++this.tipWork > this.tryEnd) {
             out.length = 0;
@@ -3675,8 +3701,29 @@ export class FanView implements InputHandlers {
           const key = (p0 + r) * S.length + i;
           let j = C.at.get(key);
           if (j === undefined) {
-            const w = laneW(b, y);
-            const l = leftAt(b, y, w);
+            const ys = Math.max(y, b.tipY);
+            const w = laneW(b, ys);
+            let l = leftAt(b, ys, w);
+            let [r2, own] = [l + w, ys < b.splitY && w > 0];
+            // (Its own column inside the band, where its shape's features fall (Tess.bounds: its taper, its peel's steps, its split), as drawn: between them its edges
+            // are as smooth as a row's px.)
+            const ye = Math.min(y1, b.splitY);
+            if (ye > ys) {
+              const B = this.fan.tess.bounds(b);
+              let q = lowerBound(B, ys);
+              for (; q < B.length && B[q] < ye; q++) {
+                const yq = B[q] > ys ? B[q] : ys;
+                const wq = laneW(b, yq);
+                const lq = leftAt(b, yq, wq);
+                if (wq > 0) [l, r2, own] = [own ? Math.min(l, lq) : lq, own ? Math.max(r2, lq + wq) : lq + wq, true];
+              }
+              if (b.splitY < y1) {
+                const yq = b.splitY - (b.splitY - ys) * 1e-9;
+                const wq = laneW(b, yq);
+                const lq = leftAt(b, yq, wq);
+                if (wq > 0) [l, r2, own] = [own ? Math.min(l, lq) : lq, own ? Math.max(r2, lq + wq) : lq + wq, true];
+              }
+            }
             if (C.len + 3 > C.buf.length) {
               const g = new Float64Array(C.buf.length * 2);
               g.set(C.buf);
@@ -3684,8 +3731,8 @@ export class FanView implements InputHandlers {
             }
             j = C.len;
             C.buf[j] = l * this.cam.sx;
-            C.buf[j + 1] = (l + w) * this.cam.sx;
-            C.buf[j + 2] = y < b.splitY && w > 0 ? 1 : 0;
+            C.buf[j + 1] = r2 * this.cam.sx;
+            C.buf[j + 2] = own ? 1 : 0;
             C.len += 3;
             C.at.set(key, j);
           }

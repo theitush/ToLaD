@@ -188,13 +188,13 @@ describe('fossils named and pictured at their own tip (ToLaD#279, #497)', () => 
    * The other species' columns across screen box `bx`, strand k's aside, a row every half px: none where a fossil's name or picture stands. Read here, column by column, not by
    * view.ts clearIn (which reads a row every px); an edge that moves into the box by less than half a px between its rows is no crossing a screen shows.
    */
-  const columnsAcross = (v: FanView, k: number, bx: readonly number[]) => {
+  const columnsAcross = (v: FanView, k: number, bx: readonly number[], kHi = k) => {
     const f = v.fan.tess.fold as Steady;
     const [[lo, ya], [hi, yb]] = [v.toWorld(bx[0] + 0.5, bx[1]), v.toWorld(bx[2] - 0.5, bx[3])];
     const n = Math.ceil(2 * (bx[3] - bx[1])) + 1;
     const out: string[] = [];
     for (const s of f.strands) {
-      if (s.index === k || s.tipY > Math.max(ya, yb) || s.splitY < Math.min(ya, yb)) continue;
+      if ((s.index >= k && s.index <= kHi) || s.tipY > Math.max(ya, yb) || s.splitY < Math.min(ya, yb)) continue;
       for (let r = 0; r < n; r++) {
         const y = ya + ((yb - ya) * r) / (n - 1);
         if (y < s.tipY || y >= s.splitY) continue;
@@ -238,9 +238,14 @@ describe('fossils named and pictured at their own tip (ToLaD#279, #497)', () => 
     return { forks, stems };
   };
   /** Every label's boxes this frame, each with its owner: names, pills, pictures. */
+  // (A fossil group named as one at its tip (tipGroupsOf, key `tg` and its youngest's index) has its picture there too, its face that youngest: a tip's, not the column's.)
   const boxes = (cut: CutLabels) => [
     ...[...cut.spots, ...cut.names].map((s) => ({ who: s.key, what: s.text, box: s.box as readonly number[] })),
-    ...cut.pics.map((p) => ({ who: p.lv.b && !p.held ? `t${p.lv.b.index}` : `g${p.lv.b ? ~p.lv.b.index : p.face.index}`, what: `picture of ${p.face.sp.sci}`, box: picBox(p) })),
+    ...cut.pics.map((p) => ({
+      who: p.lv.b && !p.held ? `t${p.lv.b.index}` : p.lv.v && cut.names.some((s) => s.key === `tg${p.face.index}`) ? `tg${p.face.index}` : `g${p.lv.b ? ~p.lv.b.index : p.face.index}`,
+      what: `picture of ${p.face.sp.sci}`,
+      box: picBox(p),
+    })),
   ];
   const meets = (p: readonly number[], q: readonly number[]) => p[0] < q[2] && p[2] > q[0] && p[1] < q[3] && p[3] > q[1];
 
@@ -326,7 +331,10 @@ describe('fossils named and pictured at their own tip (ToLaD#279, #497)', () => 
     const bs = boxes(v.cutLast!);
     const bad: string[] = [];
     for (const q of bs.filter((q) => q.who.startsWith('t'))) {
-      if (columnsAcross(v, +q.who.slice(1), q.box).length) bad.push(`${tag}: "${q.what}" on another species' column`);
+      // (A fossil group's name or picture (`tg`): its own strands, first to last, are no other species'.)
+      const g = q.who.startsWith('tg') ? v.cutLast!.names.find((s) => s.key === q.who)?.v : undefined;
+      const [k, kHi] = g ? [g.strands[0].index, g.strands[g.strands.length - 1].index] : [+q.who.slice(1), +q.who.slice(1)];
+      if (columnsAcross(v, k, q.box, kHi).length) bad.push(`${tag}: "${q.what}" on another species' column`);
       for (const o of bs) if (o.who !== q.who && meets(o.box, q.box)) bad.push(`${tag}: "${q.what}" meets "${o.what}"`);
     }
     return bad;
