@@ -162,8 +162,20 @@ describe('one tap on a label opens it (ToLaD#465)', () => {
     run();
     const now = shown();
     const parts = now.filter((g) => inside(g, u));
-    const line = `${where}: ${groupName(v.fan, u)} at ${(was.sx / home.sx).toFixed(1)}x -> ${(v.cam.sx / home.sx).toFixed(1)}x, moved ${off(v.cam, was).toFixed(0)} px\n  before: ${before.join(', ')}\n  after: ${now.map(nameOf).join(', ')}`;
+    // (A fossil group placed by name, named as one at its youngest tip (tipLabels' TipGroup, ToLaD#279), has no lane on the labels' column and so no member in the cover: it opens into its
+    // fossils, each named at its own tip.)
+    const fossils = u.strands.every((b) => b.sp.placed);
+    const onScreen = (s: { box: number[] }) => s.box[2] >= 0 && s.box[0] <= v.w && s.box[3] >= 0 && s.box[1] <= v.h;
+    const tips = v.cutLast!.names.filter((s) => s.place === 'tip' && s.b && u.strands.includes(s.b) && onScreen(s));
+    const line = `${where}: ${groupName(v.fan, u)} at ${(was.sx / home.sx).toFixed(1)}x -> ${(v.cam.sx / home.sx).toFixed(1)}x, moved ${off(v.cam, was).toFixed(0)} px\n  before: ${before.join(', ')}\n  after: ${[...now.map(nameOf), ...tips.map((s) => s.text)].join(', ')}`;
     say(line);
+    if (fossils) {
+      expect(v.cutLast!.names.some((s) => s.v === u && onScreen(s)), line).toBe(false);
+      expect(tips.length, line).toBeGreaterThanOrEqual(Math.min(2, u.strands.length));
+      expect(off(v.cam, was), line).toBeGreaterThan(12);
+      atTop(u, line);
+      return;
+    }
     // (Split: no member of the cover is u whole. Its name may stay as a title over its parts, a guest in its widest part's band while its gap cannot hold it, ToLaD#500: a tap lands where
     // u hands its band down (gapHands), before its gap holds its title, so its name stays on screen beside its widest part's. Measured: Vesper bats & kin 1.0x -> 8.5x, Tarsiers, monkeys & apes
     // 18.6x -> 20.7x, Cats 242.7x -> 291.0x, Domestic dog & kin 181.9x -> 188.9x, each a guest there.)
@@ -218,6 +230,8 @@ describe('one tap on a label opens it (ToLaD#465)', () => {
             .gapCoverAt(P(v).territories(), v.cam.sx)
             .find((g) => !g.heads && (g.lv.b === b || g.lv.v?.strands.includes(b)));
           if (m) stand({ ...v.cam, cx: m.top + (v.w / 2 - v.w / 3) / v.cam.sx });
+          // (There, its own name: tapped, at the loop's top. ToLaD#279: the domestic dog's band is ~190 screens wide at its kin's landing, the wolves a scroll under it.)
+          if (m && P(v).nameHits.some((q) => q.b === b)) continue;
         }
         // (The innermost label holding it: a group's title stays beside its widest part's label after a tap, a guest, ToLaD#500, with its thin parts under it alone; a second tap on it goes on to
         // where every part has room, openCamera's deep.)

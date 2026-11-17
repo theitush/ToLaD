@@ -112,7 +112,8 @@ describe('labels in the gaps and in the branches', () => {
       const cut = frame(sx, c);
       const seen = new Set<number>();
       for (const s of cut.names) {
-        if (!s.v) continue;
+        // (A fossil group named at its youngest tip (tipLabels, ToLaD#279) is no member of the cover, which names the column: tipnames.test holds it.)
+        if (!s.v || s.place === 'tip') continue;
         const m = cover(sx).find((g) => g.lv.v === s.v)!;
         if (m.host) {
           // (A guest title, ToLaD#500: its gap is the title's over it, on the same strand, so it stands in its host's band, beside the host's own label.)

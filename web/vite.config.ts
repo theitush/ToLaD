@@ -17,8 +17,8 @@ function dataFiles(): string[] {
   return ['skeleton.tld', ...readdirSync(join(DATA, 't')).filter((f) => f.endsWith('.tld')).map((f) => `t/${f}`)];
 }
 
-/** The test fixtures' fossils (Felidae, Carnivora): the page's default, or every one with TOLAD_FOSSILS=all (mammals-node.ts reads it too, ToLaD#279). */
-const FIXTURE_FOSSILS: Fossils = process.env.TOLAD_FOSSILS === 'all' ? 'all' : 'phylogeny';
+/** The test fixtures' fossils (Felidae, Carnivora): what the page shows, every fossil, or the old look with TOLAD_FOSSILS=old (mammals-node.ts reads it too, ToLaD#279). */
+const FIXTURE_FOSSILS: Fossils = process.env.TOLAD_FOSSILS === 'old' ? 'phylogeny' : 'all';
 
 const PANTHERA = 'virtual:panthera-data';
 const CARNIVORA = 'virtual:carnivora-data';

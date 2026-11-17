@@ -9,10 +9,11 @@ import { loadAll, trimToFan, type Fossils } from './panthera-extract';
 const DATA = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'data', 'mammals');
 
 /**
- * Which fossils node's data draws (panthera-extract.ts Fossils): the page's default, or every one with TOLAD_FOSSILS=all
- * (the page's `?fossils=all`, mammals-all.json, ToLaD#279). vite.config.ts's test fixtures (Felidae, Carnivora) read it too.
+ * Which fossils node's data draws (panthera-extract.ts Fossils): what the page shows, every fossil (mammals-all.json,
+ * ToLaD#279), or the old look with TOLAD_FOSSILS=old (the page's `?fossils=old`). vite.config.ts's test fixtures
+ * (Felidae, Carnivora) read it too.
  */
-export const NODE_FOSSILS: Fossils = process.env.TOLAD_FOSSILS === 'all' ? 'all' : 'phylogeny';
+export const NODE_FOSSILS: Fossils = process.env.TOLAD_FOSSILS === 'old' ? 'phylogeny' : 'all';
 
 /** Load the mammal data from the files (once per process, as the page's fetch). */
 export function loadMammalsFromFiles(): Promise<MammalData> {
