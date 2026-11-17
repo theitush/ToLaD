@@ -10,7 +10,7 @@ import { CLADE_FONT, CLADE_PX, GapNames, SPECIES_FONT, SPECIES_PX, type WrittenN
 import { columnGaps, gapCut, gapHands, gapOpens, ownLanes, picAt, picRanges, tier, tipOrder, type Guest, type Member, type PicCand, type PicRange, type Tier } from './gaplabels';
 import { GROUP_D, LABEL_AXIS_X, labelMode, PIC_D, PIC_LIFT, PIC_ROOM, PIC_S, picBox, type PicSpot } from './pics';
 import { coverLadder, keepOnScreen, placeSlots } from './slide';
-import { bandMeets, labelIndexOn, lanesInOrder, runsOver, slideWindow, TipIndex, WIN_PX } from './labelindex';
+import { bandMeets, labelIndexOn, laneSlack, runsOver, slideWindow, TipIndex, WIN_PX } from './labelindex';
 import { formatCount, formatMass } from '../data/count';
 import { stamp } from '../stamp';
 import { DOUBLE_TAP_MS, Input, type InputHandlers } from '../engine/input';
@@ -656,8 +656,8 @@ type GapLadder = {
   own: boolean[];
   C: Float64Array;
   R: Float64Array;
-  /** The own lanes in drawn order (lanesInOrder): else no window, the whole cover. */
-  inOrder: boolean;
+  /** How far the own lanes stand out of drawn order (laneSlack): the windows widen by it. */
+  slack: number;
   tipIx: TipIndex;
 };
 
@@ -2974,13 +2974,13 @@ export class FanView implements InputHandlers {
    */
   gapCoverAt(T: CutTerritories, sx: number, win?: readonly [number, number]): GapMember[] {
     const L = this.gapLadderOf(T);
-    // (`win`, world x: only the members whose band on the column meets it, and what they read (labelindex.ts); the whole cover where the lanes are not in order.)
-    if (win && !L.inOrder) win = undefined;
+    // (`win`, world x: only the members whose band on the column meets it, a slack wider (laneSlack), and what they read, labelindex.ts.)
     const had = win ? this.gapWinLast : this.gapCoverLast;
     if (had && had.T === T && had.sx === sx && (!win || (had.win![0] === win[0] && had.win![1] === win[1]))) return had.list;
-    let list = this.coverOf(L, sx, win);
+    const at = win && ([win[0] - L.slack, win[1] + L.slack] as const);
+    let list = this.coverOf(L, sx, at || undefined);
     // (The pictures the window's first and last shown ones slide against, gapLabels: one step wider.)
-    const wider = win && slideWindow(list.filter((m) => m.pic), win[0], win[1], (PIC_D / 2 + GROUP_D - PIC_D + 1) / sx);
+    const wider = at && slideWindow(list.filter((m) => m.pic), at[0], at[1], (PIC_D / 2 + GROUP_D - PIC_D + 1) / sx + 3 * L.slack);
     if (wider) list = this.coverOf(L, sx, wider);
     if (win) this.gapWinLast = { T, sx, win: [win[0], win[1]], list };
     else this.gapCoverLast = { T, sx, list };
@@ -3033,7 +3033,7 @@ export class FanView implements InputHandlers {
       const guests = new Map<GapMember, Guest<GapMember>>();
       const hands = gapHands(root, parts, opens, (g) => (g.on < 0 ? 0 : g.gap), (g) => (g.on < 0 ? 0 : g.band), room, CLADE_PX, GROUP_D - PIC_D, guests, same);
       const tips = tipOrder(own, R);
-      L = this.gapLadder = { T, root, parts, opens, hands, guests, tips, own, C, R, inOrder: lanesInOrder(own, C, R), tipIx: new TipIndex(tips, C, R) };
+      L = this.gapLadder = { T, root, parts, opens, hands, guests, tips, own, C, R, slack: laneSlack(own, C, R), tipIx: new TipIndex(tips, C, R) };
     }
     return L;
   }

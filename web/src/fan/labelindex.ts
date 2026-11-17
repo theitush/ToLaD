@@ -1,11 +1,12 @@
 // The labels answered for the screen's range only (ToLaD#502, step 2; scalable-tree.md §3, §5 "the cut walk"): a frame's
 // labels walk the cover from the root down the branches whose band on the labels' column meets the screen's world x (a
-// band holds its parts' bands, so a branch whose band misses the screen has nothing on it: the walk skips it whole), and
+// band holds its parts' bands, so a branch whose band misses the screen has nothing on it: the walk skips it whole; so
+// too a branch where nothing is wide enough for a name or far enough in for a picture at the zoom, gapShowsOf), and
 // the fossils at their own tips are found by an interval query over their rooms; neither walks every item. What shows is
 // the same as from the whole tree: the window is the screen and a margin wider than anything a label stands off its band
 // by (WIN_PX), and the one thing a label reads from a neighbour off screen, the next picture's centre (gapLabels' slide),
-// is brought in by widening the window to it (slideWindow). That rests on one property of the layout, checked once a
-// layout (lanesInOrder): the column's own lanes stand in drawn order, so the cover's members' bands do too.
+// is brought in by widening the window to it (slideWindow). That uses one property of the layout, measured once a
+// layout (laneSlack): the column's own lanes stand in drawn order, but for a slack the windows are widened by.
 
 import { CLADE_PX } from './gapnames';
 import { GROUP_D, PIC_D } from './pics';
@@ -26,19 +27,23 @@ export function setLabelIndex(on: boolean): void {
 export const WIN_PX = 2 * (PIC_D + CLADE_PX + GROUP_D);
 
 /**
- * Whether the column's own lanes (ownLanes) stand in drawn order: by strand, each own lane's two edges no lower than
- * the last one's. Then two members of a cut (disjoint runs of strands) have bands in the order of their runs, and the
- * members whose band meets a window are a run of the cut in its order (gapCoverAt's), which the windowed walk relies on.
+ * How far (world x) the column's own lanes (ownLanes) stand out of drawn order: by strand, the most either edge of an own
+ * lane falls short of the furthest that edge reached before it (0: in order), and a hair for rounding. Two members of a
+ * cut (disjoint runs of strands, gapCoverAt's order) then have bands in the order of their runs to within it: the later
+ * one's ends past the earlier one's, less the slack. The synthetic 31k: one own lane in 31,095 out of order, a hair's
+ * room (1.7e-7 wide) at its neighbour's edge, by rounding. The windows widen by it (gapCoverAt, slideWindow), so the
+ * cover stays exact whatever it is; only a large one would cost.
  */
-export function lanesInOrder(own: readonly boolean[], C: ArrayLike<number>, R: ArrayLike<number>): boolean {
-  let [lo, hi] = [-Infinity, -Infinity];
+export function laneSlack(own: readonly boolean[], C: ArrayLike<number>, R: ArrayLike<number>): number {
+  let [lo, hi, slack, span] = [-Infinity, -Infinity, 0, 0];
   for (let k = 0; k < own.length; k++) {
     if (!own[k]) continue;
     const [a, b] = [C[k] - R[k] / 2, C[k] + R[k] / 2];
-    if (a < lo || b < hi) return false;
-    [lo, hi] = [a, b];
+    slack = Math.max(slack, lo - a, hi - b);
+    [lo, hi] = [Math.max(lo, a), Math.max(hi, b)];
+    span = Math.max(span, Math.abs(a), Math.abs(b));
   }
-  return true;
+  return slack + 1e-12 * span;
 }
 
 /** A member of the cover as the window sees it: its band on the column (world x) from `top`, `band` wide; `on` < 0 for none. */
@@ -53,10 +58,11 @@ export const bandMeets = (m: Banded, lo: number, hi: number): boolean => m.on >=
 
 /**
  * The window that brings in the pictures a windowed cover's shown pictures slide against (gapLabels: each picture
- * slides clear of the previous and next ones' centres, in the cover's order): the first and the last shown ones'
- * neighbours matter only where their centres stand within `reach` (world: a picture's half and a hair) of those
- * bands' ends, and a neighbour off the window has its band past the window's end (lanesInOrder). So the window reaching
- * that far past both bands holds them; one step, as the members inside keep their neighbours inside. Null: nothing to add.
+ * slides clear of the previous and next ones' centres, in the cover's order): a neighbour's centre matters only within
+ * `reach` (world: a picture's half and a hair, and three slacks, laneSlack) of the band's ends, and one off the window
+ * has its band past the window's end, as all before or after it (the bands in the cover's order to within the slack).
+ * So the window reaching that far past the first and the last shown bands gives every member whose band meets the window
+ * it was widened from (less a slack) its true neighbours, or ones that cannot reach it either way; one step. Null: nothing to add.
  */
 export function slideWindow(shown: readonly Banded[], lo: number, hi: number, reach: number): [number, number] | null {
   if (!shown.length) return null;
