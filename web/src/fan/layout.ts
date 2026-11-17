@@ -1225,14 +1225,17 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = clade.
   // Only for its own widths: the mass widths place their columns, and share the orders' width, afresh.)
   const seed = key === ORDER_MODE ? clade.seed : undefined;
   const seeded = !!seed && seedFits(seed, nodes, branches);
+  const packer = () => new Packer(time, mode, W, branches.length > HUGE_TREE ? HUGE_CELLS : CELLS);
   if (seeded) {
     byMode.set(key, applySeed(seed, nodes, branches));
-    placedLast(nodes);
+    // (The seed's places are for today's order, the build's; another order keeps its sides, a choice made on the table's
+    // order before the fossils move, and packs its columns afresh, ToLaD#538.)
+    if (placeFossils(nodes, FOSSIL_ORDER)) placeRiver(root, packer(), time, mode);
   } else {
-    const P = new Packer(time, mode, W, branches.length > HUGE_TREE ? HUGE_CELLS : CELLS);
+    const P = packer();
     const { sides } = chooseSides(root, P, byMode.get(ORDER_MODE));
     byMode.set(key, sides);
-    placedLast(nodes);
+    placeFossils(nodes, FOSSIL_ORDER);
     placeRiver(root, P, time, mode);
   }
   if (SEED_OUT && key === ORDER_MODE) SEED_OUT.seed = takeSeed(nodes, branches, byMode.get(key)!);
@@ -1317,11 +1320,15 @@ let SEED_OUT: { seed?: LayoutSeed } | null = null;
 /** The seed of this clade's default design (linear widths) on this tree: layoutFan run once, its decisions kept. */
 export function layoutSeed(clade: CladeRec, tree: Split): LayoutSeed {
   SEED_OUT = {};
+  // (Today's fossil order, whatever the build's address or environment: the page applies the seed to that one, ToLaD#538.)
+  const order = FOSSIL_ORDER;
+  FOSSIL_ORDER = 'after';
   try {
     layoutFan({ ...clade, seed: undefined }, ORDER_MODE, tree);
     return SEED_OUT.seed!;
   } finally {
     SEED_OUT = null;
+    FOSSIL_ORDER = order;
   }
 }
 
@@ -1342,12 +1349,52 @@ function takeSeed(nodes: FanNode[], branches: FanBranch[], sides: Map<Split, boo
 }
 
 /**
- * Each split's daughters that are only fossils placed by name (SpeciesRec.placed, ToLaD#279) after the others, the longest-lived first (their youngest tip
- * the latest), the rest in chooseSides' order. A fossil grafted by taxonomy has no place of its own among its sisters; after those that outlive it, rooms by
- * life (steady.ts computeLife) put it beside what they were while it lived, and a sister before a group then outlives it: nothing from outside a group stands
- * in its room while it lives, or on its stem's stretch before its split (ToLaD#468, a tap's landing). The default data has none (Fossils 'phylogeny').
+ * Where the fossils placed by name (SpeciesRec.placed, ToLaD#279) stand among their sisters: a split's daughters made
+ * only of them come after the others, in either order (ToLaD#538, the page's `?fossilorder=age`, the bar's "fossil order"):
+ * - 'after' (today's): the longest-lived first, their youngest tip the latest.
+ * - 'age': the oldest first, their earliest first appearance (SpeciesRec.t0) the oldest, the longest-lived first among
+ *   equals: the oldest nearest the fork they hang from.
+ * The others keep chooseSides' order.
  */
-function placedLast(nodes: readonly FanNode[]): void {
+export type FossilOrder = 'after' | 'age';
+
+/** The page's (`?fossilorder=age`) or, in node, TOLAD_FOSSILORDER's (the suites run with either); 'after' by default. */
+function fossilOrderAsked(): FossilOrder {
+  let q: string | null | undefined;
+  try {
+    q = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('fossilorder') : (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.TOLAD_FOSSILORDER;
+  } catch {
+    /* no address */
+  }
+  return q === 'age' ? 'age' : 'after';
+}
+let FOSSIL_ORDER: FossilOrder = fossilOrderAsked();
+
+/** The fossils' order every layout from now takes (ToLaD#538): set before the level is laid out (the page reloads on a pick). */
+export function fossilOrder(): FossilOrder {
+  return FOSSIL_ORDER;
+}
+export function setFossilOrder(o: FossilOrder): void {
+  FOSSIL_ORDER = o;
+}
+
+/**
+ * Each split's daughters that are only fossils placed by name after the others, in `order` (FossilOrder); true where
+ * 'age' stood any of them otherwise than 'after' would (the seed's places are 'after's).
+ *
+ * After, either way, and the oldest of them first, next to their living sisters: "nearest the fork" in the layout's
+ * terms. A split's column holds its daughters' founders side by side in their order and sits where they move least
+ * (steady.ts computeLife, placeRiver); its living daughters, the most founders, hold the most of it, so the first
+ * daughter after them is the fossil nearest the column the fork stands on, and each next one a step further out, a
+ * stair by age. Not before them: a fossil grafted by taxonomy has no place of its own among its sisters, and rooms by
+ * life (computeLife) put a daughter beside a sister before it only where both lived; a fossil before a living group, dead
+ * before the group's room is at its widest, would stand inside that room on the group's stem's stretch before its split,
+ * at a tap's landing on it (ToLaD#468: nothing from outside a group stands before it). After them, every sister before
+ * a living group is one of today's, as in 'after'. Among the fossils themselves 'after' (the longest-lived first) keeps
+ * every sister before a fossil group alive as long as it is; 'age' does where the older fossils outlive the younger.
+ * The old look's data has none (Fossils 'phylogeny').
+ */
+function placeFossils(nodes: readonly FanNode[], order: FossilOrder): boolean {
   const tip = new Map<FanNode | FanBranch, number>();
   /** A daughter's youngest tip (world y, least), or NaN where it holds any species not placed by name. */
   const placedTip = (k: FanNode | FanBranch): number => {
@@ -1363,13 +1410,30 @@ function placedLast(nodes: readonly FanNode[]): void {
     }
     return t;
   };
+  const first = new Map<FanNode | FanBranch, number>();
+  /** A daughter's earliest first appearance (Ma, the most). */
+  const firstMa = (k: FanNode | FanBranch): number => {
+    let t = first.get(k);
+    if (t === undefined) {
+      t = isNode(k) ? Math.max(...k.kids.map(firstMa)) : k.sp.t0;
+      first.set(k, t);
+    }
+    return t;
+  };
+  let moved = false;
   for (const v of nodes) {
     if (!v.kids.some((k) => !Number.isNaN(placedTip(k)))) continue;
     const rest = v.kids.filter((k) => Number.isNaN(placedTip(k)));
     const late = v.kids.filter((k) => !Number.isNaN(placedTip(k)));
     late.sort((a, b) => placedTip(a) - placedTip(b));
+    if (order === 'age') {
+      const was = [...late];
+      late.sort((a, b) => firstMa(b) - firstMa(a) || placedTip(a) - placedTip(b));
+      if (late.some((k, i) => k !== was[i])) moved = true;
+    }
     v.kids = [...rest, ...late];
   }
+  return moved;
 }
 
 /** The seed's sides and places on a fresh layout (chooseSides' daughters' order, placeRiver's places); the sides chosen. */
