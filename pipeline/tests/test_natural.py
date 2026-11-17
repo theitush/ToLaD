@@ -103,6 +103,50 @@ class NaturalLevel(unittest.TestCase):
         self.assertEqual(M.natural_level(_leaf(5, 300), 1e3, 0.25, True, FIT)["method"], M.NATURAL_METHOD_FIT)
 
 
+class PhylacineNotes(unittest.TestCase):
+    """ToLaD#507: a map difference PHYLACINE's own note does not put down to people draws no change."""
+
+    def _nat(self, cur, nat, cls, n_today=1e4, extinct=False):
+        D = _leaf(cur, nat)
+        D["phy_range"]["note_class"] = cls
+        return M.natural_level(D, n_today, 0.25, extinct, FIT)
+
+    def test_taxonomy_and_placeholder_get_todays_count_people_keep_the_trend(self):
+        # Aotus zonalis: its Colombian cells given to A. jorgehernandezi (taxonomy) -> flat
+        for cls in ("taxonomy", "mapping"):
+            nat = self._nat(42, 20, cls)
+            self.assertEqual(nat["N"], 1e4)
+            self.assertFalse(nat["scaled"])  # model.py draws a range-loss trend only from a scaled level
+            self.assertEqual(nat["method"], M.NATURAL_METHOD_NOTE.format(cls=cls))
+            self.assertEqual(nat["sd_extra"], 0.0)
+        # Gerbillus agag: no current map, a town as its "natural range" -> today's count, no fitted level
+        nat = self._nat(0, 1, "placeholder")
+        self.assertEqual((nat["N"], nat["scaled"]), (1e4, False))
+        self.assertIsNone(self._nat(0, 1, "placeholder", n_today=0.0))
+        # the coyote: spread by people -> the trend stays
+        for cls in ("people", "unclear", ""):
+            nat = self._nat(2113, 301, cls)
+            self.assertTrue(nat["scaled"])
+            self.assertAlmostEqual(nat["N"], 1e4 * 301 / 2113)
+        # extinct species are not changed by their note
+        self.assertEqual(self._nat(0, 300, "placeholder", n_today=0.0, extinct=True)["method"],
+                         M.NATURAL_METHOD_FIT)
+
+    def test_notes_file_covers_every_map_difference(self):
+        if not (RAW / R.ZIP_REL).exists():
+            self.skipTest("no PHYLACINE download")
+        meta = R.load_spatial_metadata(RAW)
+        notes = R.load_notes()
+        diff = {k for k, v in meta.items() if v["cells_cur"] != v["cells_nat"]}
+        self.assertEqual(set(notes), diff)
+        bad = [k for k, r in notes.items() if (r["cells_cur"], r["cells_nat"])
+               != (meta[k]["cells_cur"], meta[k]["cells_nat"])]
+        self.assertEqual(bad, [])
+        self.assertTrue(all(r["phylacine_note"] and r["why"] for r in notes.values()))
+        self.assertEqual(notes["Aotus zonalis"]["class"], "taxonomy")
+        self.assertEqual(notes["Canis latrans"]["class"], "people")
+
+
 def _stats():
     p = DATA / "stats.json"
     return json.loads(p.read_text()) if p.exists() else None
@@ -129,6 +173,17 @@ class Build(unittest.TestCase):
             self.assertGreaterEqual(r["hi"], r["natural"])
         self.assertGreater(rows["Panthera leo"]["area_ratio"], 3)  # lions lost most of their range
         self.assertEqual(rows["Panthera uncia"]["area_ratio"], 1.0)
+
+    def test_phylacine_notes_flat_people_rise(self):
+        # ToLaD#507: the night monkeys, the stray-migrant bat and the placeholder gerbil are flat from 1500;
+        # the coyote, the house mouse and the rats still rise
+        flat = {r["leaf"] for r in self.st["natural_baseline"]["phylacine_note_today"]}
+        for sp in ("Aotus zonalis", "Aotus jorgehernandezi", "Mormopterus acetabulosus", "Tupaia palawanensis",
+                   "Gerbillus agag", "Makalata obscura"):
+            self.assertIn(sp, flat)
+        rises = {r["leaf"] for r in self.st["rangeloss"]["rises_list"]}
+        self.assertFalse(rises & flat)
+        self.assertTrue({"Canis latrans", "Mus musculus", "Rattus norvegicus", "Rattus rattus"} <= rises)
 
     def test_extinct_have_no_current_area(self):
         for r in self.st["natural_baseline"]["showcase"]:

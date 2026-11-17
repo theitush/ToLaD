@@ -23,6 +23,12 @@ import numpy as np
 
 ZIP_REL = "phylacine/PHYLACINE_1.2.1.zip"
 PREFIX = "Data/Ranges/"
+# PHYLACINE's own note on why each species' present-natural map differs from its current one
+# (Spatial_metadata.csv: Modification, Motivation), read and classed by hand (ToLaD#507)
+NOTES_PATH = Path(__file__).resolve().parents[1] / "phylacine_notes.csv"
+NOTE_CLASSES = ("people", "taxonomy", "mapping", "placeholder", "unclear")
+# the classes whose map difference is not people's doing: no change is drawn from it
+NOT_PEOPLE = ("taxonomy", "mapping", "placeholder")
 KINDS = {"Current": "cur", "Present_natural": "nat"}
 GRID_SHAPE = (142, 360)
 
@@ -95,4 +101,17 @@ def load_spatial_metadata(raw: Path) -> dict[str, dict]:
             "cells_nat": int(r["Number.Cells.Present.Natural.Range"]),
             "certainty": r["Certainty.Level"],
         }
+    return out
+
+
+def load_notes(path: Path = NOTES_PATH) -> dict[str, dict]:
+    """Binomial ("Genus species") -> {class, why, phylacine_note, cells_cur, cells_nat}: one row per
+    PHYLACINE species whose current and present-natural cells differ (pipeline/phylacine_notes.csv,
+    ToLaD#507). `class` is people / taxonomy / mapping / placeholder / unclear."""
+    out = {}
+    with path.open(encoding="utf-8", newline="") as f:
+        for r in csv.DictReader(f):
+            if r["class"] not in NOTE_CLASSES:
+                raise ValueError(f"{path.name}: {r['binomial']}: unknown class {r['class']!r}")
+            out[r["binomial"]] = {**r, "cells_cur": int(r["cells_cur"]), "cells_nat": int(r["cells_nat"])}
     return out

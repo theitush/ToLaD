@@ -18,8 +18,8 @@
   "domestic:Ovis aries": 1,
   "domestic:Sus scrofa": 1,
   "greenspoon model": 4381,
-  "natural: extant, differs from today": 719,
-  "natural: extant, same as today": 4725,
+  "natural: extant, differs from today": 700,
+  "natural: extant, same as today": 4744,
   "natural: extinct, whole band": 236,
   "near-extinct cap": 15
  },
@@ -7559,7 +7559,7 @@
     "area": "A:obs(PanTHERIA)",
     "iucn": "DD",
     "leaf": "Rhinopoma macinnesi",
-    "natural": 11046736.839872168,
+    "natural": 18717971.34513833,
     "today": 18717971.34513833,
     "today_from": "model"
    },
@@ -7568,7 +7568,7 @@
     "area": "A:genus mean",
     "iucn": "DD",
     "leaf": "Makalata obscura",
-    "natural": 29274.553171284522,
+    "natural": 8656791.244433695,
     "today": 8656791.244433695,
     "today_from": "model"
    },
@@ -7595,7 +7595,7 @@
     "area": "A:obs(PanTHERIA)",
     "iucn": "DD",
     "leaf": "Gerbillus agag",
-    "natural": 8510.448352143767,
+    "natural": 3123596.8788509644,
     "today": 3123596.8788509644,
     "today_from": "Greenspoon model + ours"
    },
@@ -7613,7 +7613,7 @@
     "area": "A:clade mean",
     "iucn": "DD",
     "leaf": "Oryzomys curasoae",
-    "natural": 33577.8107377688,
+    "natural": 1087242.2725112222,
     "today": 1087242.2725112222,
     "today_from": "model"
    },
@@ -7703,7 +7703,7 @@
     "area": "A:genus mean",
     "iucn": "DD",
     "leaf": "Eudorcas rufina",
-    "natural": 7513.8707713067315,
+    "natural": 164282.3154296953,
     "today": 164282.3154296953,
     "today_from": "model"
    },
@@ -7712,7 +7712,7 @@
     "area": "A:obs(PanTHERIA)",
     "iucn": "DD",
     "leaf": "Gerbillus burtoni",
-    "natural": 8324.477139873956,
+    "natural": 161511.05639202782,
     "today": 161511.05639202782,
     "today_from": "model"
    },
@@ -7766,7 +7766,7 @@
     "area": "A:obs(PanTHERIA)",
     "iucn": "DD",
     "leaf": "Tupaia moellendorffi",
-    "natural": 8763.316936466166,
+    "natural": 3006.7229456964883,
     "today": 3006.7229456964883,
     "today_from": "model"
    },
@@ -11883,7 +11883,7 @@
    "note": "What the per-lineage mutation rate (ToLaD#74) changed against the flat 1e-9 per year: flat = N_div with DEEP_MU_YEAR for every species; lineage = with mutation.py's rate (the rest of this block). N_div scales by 1 / mu_vs_flat.",
    "slope_log_div_on_log_natural": {
     "flat": {
-     "intercept": 4.803,
+     "intercept": 4.804,
      "n": 200,
      "r": 0.472,
      "slope": 0.18,
@@ -11891,7 +11891,7 @@
      "span_dex_other": 5.9
     },
     "lineage": {
-     "intercept": 5.391,
+     "intercept": 5.392,
      "n": 200,
      "r": 0.232,
      "slope": 0.067,
@@ -11967,7 +11967,7 @@
    "pipeline_G_over_zoonomia_G_median": 0.0
   },
   "slope_log_div_on_log_natural": {
-   "intercept": 5.391,
+   "intercept": 5.392,
    "n": 200,
    "r": 0.232,
    "slope": 0.067,
@@ -12741,9 +12741,9 @@
     "G": 7.077,
     "N": 763899,
     "N_flat": 829370,
-    "dex_flat_vs_natural": 0.047,
+    "dex_flat_vs_natural": 0.195,
     "dex_flat_vs_today": 0.195,
-    "dex_vs_natural": 0.011,
+    "dex_vs_natural": 0.16,
     "dex_vs_today": 0.16,
     "div_in_natural_range": true,
     "het": 0.00234781,
@@ -12753,7 +12753,7 @@
     "mu_clade": "Primates",
     "mu_vs_flat": 1.0857,
     "mu_year": 1.086e-09,
-    "natural": 745040,
+    "natural": 529086,
     "ne": 76390,
     "sample": "captive",
     "species": "Cheirogaleus medius",
@@ -17740,29 +17740,29 @@
   "births_now_per_yr": 51639891689.75635,
   "by_era": {
    "Cretaceous 66-145 Ma": {
-    "ghost": 3.42238161795211e+18,
+    "ghost": 3.4223816370424586e+18,
     "ghost_share": 0.9999,
-    "sampled": 180056419942023.3
+    "sampled": 180037329593962.3
    },
    "Holocene-Pleistocene 0-2.58 Ma": {
-    "ghost": 1.5658851491908666e+16,
-    "ghost_share": 0.1173,
-    "sampled": 1.1785557368151106e+17
+    "ghost": 1.5622804822710948e+16,
+    "ghost_share": 0.117,
+    "sampled": 1.1789162034941608e+17
    },
    "Jurassic and older >145 Ma": {
-    "ghost": 8.957585556210525e+17,
+    "ghost": 8.957585557195276e+17,
     "ghost_share": 1.0,
-    "sampled": 16465901876884.822
+    "sampled": 16465803401926.314
    },
    "Neogene 2.58-23 Ma": {
-    "ghost": 8.250313552558829e+17,
-    "ghost_share": 0.7765,
-    "sampled": 2.374396883713986e+17
+    "ghost": 8.248704420347245e+17,
+    "ghost_share": 0.7764,
+    "sampled": 2.376006015925569e+17
    },
    "Paleogene 23-66 Ma": {
-    "ghost": 2.2000329593370168e+18,
+    "ghost": 2.1999381647179192e+18,
     "ghost_share": 0.9858,
-    "sampled": 3.162873241413343e+16
+    "sampled": 3.1723527033231224e+16
    }
   },
   "f_ramp_Ma": [
@@ -17770,21 +17770,21 @@
    91.36
   ],
   "ghost_share": 0.95,
-  "max_multiplier": 88674.73414025274,
+  "max_multiplier": 88675.1247912019,
   "multiplier_at_Ma": {
-   "0.01": 1.042,
+   "0.01": 1.041,
    "1": 1.069,
-   "100": 65071.538,
-   "150": 42479.519,
-   "20": 10.26,
-   "200": 24201.608,
-   "5": 2.282,
-   "50": 236.33,
-   "66": 3009.207
+   "100": 65072.48,
+   "150": 42479.76,
+   "20": 10.253,
+   "200": 24201.749,
+   "5": 2.281,
+   "50": 235.358,
+   "66": 3009.442
   },
-  "sampled_sum": 3.871205167888619e+17,
+  "sampled_sum": 3.8741225210820006e+17,
   "top_down_estimate": 7.745983753463452e+18,
-  "with_ghosts": 7.745983856446834e+18
+  "with_ghosts": 7.745983856445541e+18
  },
  "greenspoon_combined": {
   "category_offset_dex": {
@@ -30659,11 +30659,11 @@
  "knuckles_collapsed": 3808,
  "mammalia": {
   "alive": 86889688643.68596,
-  "ever": 7.745983856446834e+18,
-  "ghost": 7.358863339657972e+18,
+  "ever": 7.745983856445541e+18,
+  "ghost": 7.358571604337341e+18,
   "grade": "D",
-  "hi": 2.1299616343541694e+23,
-  "lo": 244453575152182.38
+  "hi": 2.130163486688458e+23,
+  "lo": 244430410500712.22
  },
  "mass_imputed": {
   "clade mean": 4636,
@@ -40552,29 +40552,29 @@
  "natural_baseline": {
   "extant": 5441,
   "extant_log10_natural_over_today": {
-   "higher": 684,
+   "higher": 677,
    "histogram_dex": {
-    "+0.0..+0.5": 5240,
-    "+0.5..+1.0": 99,
-    "+1.0..+1.5": 37,
+    "+0.0..+0.5": 5255,
+    "+0.5..+1.0": 97,
+    "+1.0..+1.5": 36,
     "+1.5..+2.0": 13,
     "+2.0..+2.5": 7,
-    "-0.5..+0.0": 19,
+    "-0.5..+0.0": 12,
     "-1.0..-0.5": 3
    },
-   "lower": 27,
+   "lower": 15,
    "n": 5435,
    "p5_25_50_75_95": [
     0.0,
     0.0,
     0.0,
     0.0,
-    0.317
+    0.309
    ],
-   "same": 4724
+   "same": 4743
   },
   "extant_total": {
-   "natural": 55667283935.81599,
+   "natural": 55687692777.0538,
    "today": 57252006648.26152
   },
   "extinct": 234,
@@ -40724,76 +40724,6 @@
   "leaves": 5678,
   "lowest_ratio": [
    {
-    "area_ratio": null,
-    "extinct": false,
-    "hi": 4995267.037718912,
-    "km2_cur": 0,
-    "km2_nat": 9312,
-    "leaf": "Gerbillus agag",
-    "lo": 14.499271131575115,
-    "map": "Gerbillus agag",
-    "method": "N_nat: D x natural range (PHYLACINE, rescaled to PanTHERIA areas) x fitted occupancy",
-    "natural": 8510.448352143767,
-    "ratio": 0.002724566799821618,
-    "today": 3123596.8788509644
-   },
-   {
-    "area_ratio": null,
-    "extinct": false,
-    "hi": 17182903.232546035,
-    "km2_cur": 0,
-    "km2_nat": 27937,
-    "leaf": "Makalata obscura",
-    "lo": 49.87512597726368,
-    "map": "Makalata obscura",
-    "method": "N_nat: D x natural range (PHYLACINE, rescaled to PanTHERIA areas) x fitted occupancy",
-    "natural": 29274.553171284522,
-    "ratio": 0.00338168639449496,
-    "today": 8656791.244433695
-   },
-   {
-    "area_ratio": null,
-    "extinct": false,
-    "hi": 19708730.28503718,
-    "km2_cur": 0,
-    "km2_nat": 27937,
-    "leaf": "Oryzomys curasoae",
-    "lo": 57.20659614472444,
-    "map": "Oryzomys curasoae",
-    "method": "N_nat: D x natural range (PHYLACINE, rescaled to PanTHERIA areas) x fitted occupancy",
-    "natural": 33577.8107377688,
-    "ratio": 0.030883466902196097,
-    "today": 1087242.2725112222
-   },
-   {
-    "area_ratio": null,
-    "extinct": false,
-    "hi": 2239148.7367689987,
-    "km2_cur": 0,
-    "km2_nat": 204872,
-    "leaf": "Eudorcas rufina",
-    "lo": 25.214159756696017,
-    "map": "Eudorcas rufina",
-    "method": "N_nat: D x natural range (PHYLACINE, rescaled to PanTHERIA areas) x fitted occupancy",
-    "natural": 7513.8707713067315,
-    "ratio": 0.04573755094486902,
-    "today": 164282.31542969533
-   },
-   {
-    "area_ratio": null,
-    "extinct": false,
-    "hi": 4886109.937155343,
-    "km2_cur": 0,
-    "km2_nat": 9312,
-    "leaf": "Gerbillus burtoni",
-    "lo": 14.182431534200852,
-    "map": "Gerbillus burtoni",
-    "method": "N_nat: D x natural range (PHYLACINE, rescaled to PanTHERIA areas) x fitted occupancy",
-    "natural": 8324.477139873956,
-    "ratio": 0.051541221547510424,
-    "today": 161511.05639202782
-   },
-   {
     "area_ratio": 0.14245149077141506,
     "extinct": false,
     "hi": 101614.45878909103,
@@ -40862,13 +40792,222 @@
     "natural": 11269.167169291944,
     "ratio": 0.37219138486354436,
     "today": 30277.88290538625
+   },
+   {
+    "area_ratio": null,
+    "extinct": false,
+    "hi": 31501747.15591824,
+    "km2_cur": 0,
+    "km2_nat": 27937,
+    "leaf": "Pteropus loochoensis",
+    "lo": 211.34150483104395,
+    "map": "Pteropus loochoensis",
+    "method": "N_nat: D x natural range (PHYLACINE, rescaled to PanTHERIA areas) x fitted occupancy",
+    "natural": 81594.28073547079,
+    "ratio": 0.5466951982663603,
+    "today": 149250.0409628923
+   },
+   {
+    "area_ratio": 0.5961538461538461,
+    "extinct": false,
+    "hi": 17327751.55971791,
+    "km2_cur": 968486,
+    "km2_nat": 577367,
+    "leaf": "Rattus praetor",
+    "lo": 224873.10721344457,
+    "map": "Rattus praetor",
+    "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count",
+    "natural": 1973966.903029627,
+    "ratio": 0.5961538461538461,
+    "today": 3311170.288952923
+   },
+   {
+    "area_ratio": 0.7,
+    "extinct": false,
+    "hi": 64609.56259338057,
+    "km2_cur": 186247,
+    "km2_nat": 130373,
+    "leaf": "Crocidura pachyura",
+    "lo": 838.4788439517281,
+    "map": "Crocidura pachyura",
+    "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count",
+    "natural": 7360.282015760304,
+    "ratio": 0.7000000000000002,
+    "today": 10514.688593943289
+   },
+   {
+    "area_ratio": 0.7948717948717948,
+    "extinct": false,
+    "hi": 40969391.142810196,
+    "km2_cur": 1452729,
+    "km2_nat": 1154734,
+    "leaf": "Oryctolagus cuniculus",
+    "lo": 77958.85775364963,
+    "map": "Oryctolagus cuniculus",
+    "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count",
+    "natural": 1787156.1029624618,
+    "ratio": 0.7948717948717948,
+    "today": 2248357.6779205166
+   },
+   {
+    "area_ratio": 0.8711879836140192,
+    "extinct": false,
+    "hi": 6679803.483751643,
+    "km2_cur": 20459274,
+    "km2_nat": 17823873,
+    "leaf": "Dasypus novemcinctus",
+    "lo": 12710.70511633696,
+    "map": "Dasypus novemcinctus",
+    "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count",
+    "natural": 291384.64667351206,
+    "ratio": 0.8711879836140191,
+    "today": 334468.16548678477
    }
   ],
   "methods": {
-   "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count": 5416,
-   "N_nat: D x natural range (PHYLACINE, rescaled to PanTHERIA areas) x fitted occupancy": 262
+   "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count": 5404,
+   "N_nat: D x natural range (PHYLACINE, rescaled to PanTHERIA areas) x fitted occupancy": 255,
+   "N_nat: today's count (PHYLACINE's note: the map difference is mapping, not people's doing)": 3,
+   "N_nat: today's count (PHYLACINE's note: the map difference is placeholder, not people's doing)": 6,
+   "N_nat: today's count (PHYLACINE's note: the map difference is taxonomy, not people's doing)": 10
   },
   "note": "Layer 1 of the estimate stack (ToLaD#61): N_nat = density x PHYLACINE present-natural range x occupancy, grade D, kind reconstruction. Extant species: today's count x natural/current range cells (the same occupancy and area scale as today's count). No current range: density x natural area (rescaled to PanTHERIA areas) x fitted occupancy. Held before 1500 where it differs from today's count; extinct species: the whole band.",
+  "phylacine_note_today": [
+   {
+    "cells_cur": 1,
+    "cells_nat": 25,
+    "class": "taxonomy",
+    "leaf": "Aotus jorgehernandezi",
+    "map": "Aotus jorgehernandezi"
+   },
+   {
+    "cells_cur": 42,
+    "cells_nat": 20,
+    "class": "taxonomy",
+    "leaf": "Aotus zonalis",
+    "map": "Aotus zonalis"
+   },
+   {
+    "cells_cur": 6,
+    "cells_nat": 14,
+    "class": "taxonomy",
+    "leaf": "Apomys littoralis",
+    "map": "Apomys littoralis"
+   },
+   {
+    "cells_cur": 49,
+    "cells_nat": 69,
+    "class": "taxonomy",
+    "leaf": "Cheirogaleus medius",
+    "map": "Cheirogaleus medius"
+   },
+   {
+    "cells_cur": 3,
+    "cells_nat": 4,
+    "class": "taxonomy",
+    "leaf": "Dobsonia emersa",
+    "map": "Dobsonia emersa"
+   },
+   {
+    "cells_cur": 326,
+    "cells_nat": 304,
+    "class": "taxonomy",
+    "leaf": "Eudorcas rufifrons",
+    "map": "Eudorcas rufifrons"
+   },
+   {
+    "cells_cur": 0,
+    "cells_nat": 22,
+    "class": "placeholder",
+    "leaf": "Eudorcas rufina",
+    "map": "Eudorcas rufina"
+   },
+   {
+    "cells_cur": 0,
+    "cells_nat": 1,
+    "class": "placeholder",
+    "leaf": "Gerbillus agag",
+    "map": "Gerbillus agag"
+   },
+   {
+    "cells_cur": 0,
+    "cells_nat": 1,
+    "class": "placeholder",
+    "leaf": "Gerbillus burtoni",
+    "map": "Gerbillus burtoni"
+   },
+   {
+    "cells_cur": 22,
+    "cells_nat": 20,
+    "class": "mapping",
+    "leaf": "Kerivoula myrella",
+    "map": "Kerivoula myrella"
+   },
+   {
+    "cells_cur": 1,
+    "cells_nat": 6,
+    "class": "taxonomy",
+    "leaf": "Lepilemur hollandorum",
+    "map": "Lepilemur hollandorum"
+   },
+   {
+    "cells_cur": 0,
+    "cells_nat": 3,
+    "class": "placeholder",
+    "leaf": "Makalata obscura",
+    "map": "Makalata obscura"
+   },
+   {
+    "cells_cur": 4,
+    "cells_nat": 2,
+    "class": "mapping",
+    "leaf": "Mormopterus acetabulosus",
+    "map": "Mormopterus acetabulosus"
+   },
+   {
+    "cells_cur": 0,
+    "cells_nat": 3,
+    "class": "placeholder",
+    "leaf": "Oryzomys curasoae",
+    "map": "Oryzomys curasoae"
+   },
+   {
+    "cells_cur": 35,
+    "cells_nat": 34,
+    "class": "mapping",
+    "leaf": "Pattonomys occasius",
+    "map": "Pattonomys occasius"
+   },
+   {
+    "cells_cur": 1,
+    "cells_nat": 4,
+    "class": "taxonomy",
+    "leaf": "Rhinopithecus strykeri",
+    "map": "Rhinopithecus strykeri"
+   },
+   {
+    "cells_cur": 0,
+    "cells_nat": 198,
+    "class": "placeholder",
+    "leaf": "Rhinopoma macinnesi",
+    "map": "Rhinopoma macinnesi"
+   },
+   {
+    "cells_cur": 0,
+    "cells_nat": 3,
+    "class": "taxonomy",
+    "leaf": "Tupaia moellendorffi",
+    "map": "Tupaia moellendorffi"
+   },
+   {
+    "cells_cur": 12,
+    "cells_nat": 9,
+    "class": "taxonomy",
+    "leaf": "Tupaia palawanensis",
+    "map": "Tupaia palawanensis"
+   }
+  ],
+  "phylacine_note_today_note": "ToLaD#507: extant leaves whose map difference PHYLACINE's own note puts down to taxonomy, a mapping fix or a placeholder range (pipeline/phylacine_notes.csv): natural level = today's count",
   "showcase": [
    {
     "area_ratio": 6.383064516129032,
@@ -41478,13 +41617,13 @@
   "non-species tip": 551
  },
  "output": {
-  "brotli_bytes": 834631,
+  "brotli_bytes": 835370,
   "dated_sidecar_raw": 2065827,
   "files": 15,
-  "raw_bytes": 4565352,
-  "skeleton_brotli": 103706,
+  "raw_bytes": 4561008,
+  "skeleton_brotli": 103917,
   "skeleton_nodes": 2383,
-  "skeleton_raw": 1684712,
+  "skeleton_raw": 1683048,
   "tiles": 14
  },
  "overrides": {
@@ -42148,12 +42287,12 @@
   "maps_used": 5675,
   "range_maps": 5831
  },
- "pieces": 259223,
+ "pieces": 258952,
  "rangeloss": {
   "carried_by_genomic_record": 45,
-  "declines": 587,
+  "declines": 581,
   "end_year": 2026.77,
-  "hist_records": 606,
+  "hist_records": 594,
   "largest_declines": [
    {
     "G_yr": 4.329639972621492,
@@ -42277,24 +42416,24 @@
    }
   ],
   "log10_factor_histogram": {
-   "+0.0..+0.5": 462,
-   "+0.5..+1.0": 84,
-   "+1.0..+1.5": 31,
+   "+0.0..+0.5": 459,
+   "+0.5..+1.0": 82,
+   "+1.0..+1.5": 30,
    "+1.5..+2.0": 8,
    "+2.0..+2.5": 2,
-   "-0.5..+0.0": 16,
+   "-0.5..+0.0": 10,
    "-1.0..-0.5": 3
   },
   "log10_factor_p5_25_50_75_95": [
-   0.007,
+   0.01,
    0.097,
-   0.238,
+   0.241,
    0.451,
-   1.098
+   1.094
   ],
   "note": "Layer 4 of the estimate stack (ToLaD#62): an extant species whose natural baseline (layer 1, PHYLACINE present-natural vs current range) differs from today's count changes log-linearly from N_nat in 1500 CE to today's count in 2026.77 (IUCN's 'since 1500' window, one date for all). factor = N_nat / N_today (> 1 = decline). HIST kind 11 `rangeloss`, grade D. A history file replaces it (showcase rows with from=history: the factor shown is the model's, the curve is the history file's).",
   "replaced_by_history_file": 34,
-  "rises": 19,
+  "rises": 13,
   "rises_list": [
    {
     "G_yr": 7.033626283367556,
@@ -42345,30 +42484,6 @@
     "today": 556642582.1053464
    },
    {
-    "G_yr": 7.994524298425737,
-    "factor": 0.47619047619047616,
-    "from": "rangeloss",
-    "km2_cur": 391119.4764390075,
-    "km2_nat": 186247.3697328607,
-    "leaf": "Aotus zonalis",
-    "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count",
-    "natural": 81622.01994960515,
-    "segments": 5,
-    "today": 171406.24189417082
-   },
-   {
-    "G_yr": 5.0978507871321,
-    "factor": 0.5,
-    "from": "rangeloss",
-    "km2_cur": 37249.47394657214,
-    "km2_nat": 18624.73697328607,
-    "leaf": "Mormopterus acetabulosus",
-    "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count",
-    "natural": 88533.57731062018,
-    "segments": 3,
-    "today": 177067.15462124036
-   },
-   {
     "G_yr": 1.513013004791239,
     "factor": 0.5961538461538461,
     "from": "rangeloss",
@@ -42393,18 +42508,6 @@
     "today": 10514.688593943289
    },
    {
-    "G_yr": 3.1607364818617385,
-    "factor": 0.7499999999999999,
-    "from": "rangeloss",
-    "km2_cur": 111748.42183971644,
-    "km2_nat": 83811.31637978733,
-    "leaf": "Tupaia palawanensis",
-    "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count",
-    "natural": 42826.753322077115,
-    "segments": 3,
-    "today": 57102.33776276949
-   },
-   {
     "G_yr": 4.148813141683778,
     "factor": 0.7948717948717948,
     "from": "rangeloss",
@@ -42427,42 +42530,6 @@
     "natural": 291384.64667351206,
     "segments": 3,
     "today": 334468.16548678477
-   },
-   {
-    "G_yr": 5.647909650924024,
-    "factor": 0.9090909090909091,
-    "from": "rangeloss",
-    "km2_cur": 204872.1067061468,
-    "km2_nat": 186247.3697328607,
-    "leaf": "Kerivoula myrella",
-    "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count",
-    "natural": 265663.7405299873,
-    "segments": 3,
-    "today": 292230.11458298605
-   },
-   {
-    "G_yr": 4.996577686516085,
-    "factor": 0.9325153374233129,
-    "from": "rangeloss",
-    "km2_cur": 3035832.1266456298,
-    "km2_nat": 2830960.0199394827,
-    "leaf": "Eudorcas rufifrons",
-    "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count",
-    "natural": 11190.184049079755,
-    "segments": 3,
-    "today": 12000.0
-   },
-   {
-    "G_yr": 3.0697494866529778,
-    "factor": 0.9714285714285714,
-    "from": "rangeloss",
-    "km2_cur": 325932.89703250624,
-    "km2_nat": 316620.5285458632,
-    "leaf": "Pattonomys occasius",
-    "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count",
-    "natural": 1157254.3634652877,
-    "segments": 3,
-    "today": 1191291.2565083844
    },
    {
     "G_yr": 4.034633812457221,
@@ -42526,15 +42593,15 @@
    }
   ],
   "segments_per_record": {
-   "3": 378,
-   "5": 74,
-   "6": 52,
+   "3": 371,
+   "5": 72,
+   "6": 51,
    "7": 25,
-   "8": 28,
+   "8": 27,
    "9": 12,
    "10": 12,
    "11": 6,
-   "12": 9,
+   "12": 8,
    "13": 2,
    "14": 4,
    "15": 1,
@@ -42711,7 +42778,7 @@
     "today": 50002.00000000001
    }
   ],
-  "species_with_trend": 685,
+  "species_with_trend": 673,
   "start_year": 1500
  },
  "red_list": {
@@ -42902,13 +42969,13 @@
   },
   "Hominidae": {
    "alive": 8301368127.59714,
-   "ever": 2818889427414.9673,
+   "ever": 2818702456730.1445,
    "ever_range": [
-    47162717509.93139,
-    288513762169581.5
+    47159984350.02471,
+    288499637286291.5
    ],
    "extinct(gray)": false,
-   "ghost": 368982290309.89795,
+   "ghost": 368795319625.0754,
    "grade": "D",
    "t0_Ma": 14.805233333333334,
    "t1_Ma": 0.0
@@ -42928,13 +42995,13 @@
   },
   "Mammalia": {
    "alive": 86889688643.68596,
-   "ever": 7.745983856446834e+18,
+   "ever": 7.745983856445541e+18,
    "ever_range": [
-    244453575152182.38,
-    2.1299616343541694e+23
+    244430410500712.22,
+    2.130163486688458e+23
    ],
    "extinct(gray)": 0.0,
-   "ghost": 7.358863339657972e+18,
+   "ghost": 7.358571604337341e+18,
    "grade": "D",
    "t0_Ma": 208.64140800000004,
    "t1_Ma": 0.0
@@ -43244,35 +43311,35 @@
   "by_alive": [
    {
     "alive": 41613407364.20052,
-    "ever": 1.1382663884305754e+18,
-    "ghost": 9.712526717402586e+17,
+    "ever": 1.1381945741608858e+18,
+    "ghost": 9.711419641418922e+17,
     "ghost_share": 0.853,
     "name": "Chiroptera",
-    "sampled": 1.670137166903168e+17,
+    "sampled": 1.6705261001899354e+17,
     "t0_Ma": 69.1
    },
    {
     "alive": 25028091759.75262,
-    "ever": 1.8400151741454313e+18,
-    "ghost": 1.6946081981592686e+18,
+    "ever": 1.8401101283168658e+18,
+    "ghost": 1.694449735492297e+18,
     "ghost_share": 0.921,
     "name": "Rodentia",
-    "sampled": 1.454069759861627e+17,
+    "sampled": 1.4566039282456883e+17,
     "t0_Ma": 72.45
    },
    {
     "alive": 5563751052.228135,
-    "ever": 3884069939335992.0,
-    "ghost": 3081741331472122.0,
+    "ever": 3883942730122031.0,
+    "ghost": 3081399271131718.5,
     "ghost_share": 0.793,
     "name": "Artiodactyla",
-    "sampled": 802328607863870.0,
+    "sampled": 802543458990312.5,
     "t0_Ma": 61.87
    },
    {
     "alive": 1873954957.4718935,
-    "ever": 6950761931351257.0,
-    "ghost": 5952158025649711.0,
+    "ever": 6950184196388889.0,
+    "ghost": 5951580290687343.0,
     "ghost_share": 0.856,
     "name": "Carnivora",
     "sampled": 998603905701546.0,
@@ -43280,26 +43347,26 @@
    },
    {
     "alive": 1340272958.874403,
-    "ever": 1.715888860599031e+17,
-    "ghost": 1.3042835821889958e+17,
+    "ever": 1.7157785178120832e+17,
+    "ghost": 1.3041732394020477e+17,
     "ghost_share": 0.76,
     "name": "Eulipotyphla",
-    "sampled": 4.116052784100352e+16,
+    "sampled": 4.116052784100355e+16,
     "t0_Ma": 75.11
    },
    {
     "alive": 820088846.73222,
-    "ever": 4.49715850270769e+16,
-    "ghost": 3.2441124903920176e+16,
+    "ever": 4.496756280522805e+16,
+    "ghost": 3.2437102682071332e+16,
     "ghost_share": 0.721,
     "name": "Lagomorpha",
-    "sampled": 1.253046012315672e+16,
+    "sampled": 1.2530460123156716e+16,
     "t0_Ma": 72.45
    },
    {
     "alive": 414480516.1373025,
-    "ever": 2.5881763964734572e+16,
-    "ghost": 2.1070194556611188e+16,
+    "ever": 2.5879687798863744e+16,
+    "ghost": 2.106811839074036e+16,
     "ghost_share": 0.814,
     "name": "Didelphimorphia",
     "sampled": 4811569408123384.0,
@@ -43307,26 +43374,26 @@
    },
    {
     "alive": 308479715.25670695,
-    "ever": 1.0706516624019248e+16,
-    "ghost": 7726635462496240.0,
+    "ever": 1.070546902866388e+16,
+    "ghost": 7725587867140873.0,
     "ghost_share": 0.722,
     "name": "Diprotodontia",
-    "sampled": 2979881161523008.0,
+    "sampled": 2979881161523007.0,
     "t0_Ma": 61.06
    },
    {
     "alive": 303988895.6444644,
-    "ever": 5229228911785620.0,
-    "ghost": 3709742678816472.0,
+    "ever": 5228768958312968.0,
+    "ghost": 3709282725343819.5,
     "ghost_share": 0.709,
     "name": "Hyracoidea",
-    "sampled": 1519486232969148.0,
+    "sampled": 1519486232969148.5,
     "t0_Ma": 58.62
    },
    {
     "alive": 178268910.55467132,
-    "ever": 4534781407002718.0,
-    "ghost": 3245429717023503.0,
+    "ever": 4534431179804851.0,
+    "ghost": 3245079489825636.0,
     "ghost_share": 0.716,
     "name": "Pilosa (order in Deuterostomia)",
     "sampled": 1289351689979215.0,
@@ -43336,44 +43403,44 @@
   "by_ever": [
    {
     "alive": 25028091759.75262,
-    "ever": 1.8400151741454313e+18,
-    "ghost": 1.6946081981592686e+18,
+    "ever": 1.8401101283168658e+18,
+    "ghost": 1.694449735492297e+18,
     "ghost_share": 0.921,
     "name": "Rodentia",
-    "sampled": 1.454069759861627e+17,
+    "sampled": 1.4566039282456883e+17,
     "t0_Ma": 72.45
    },
    {
     "alive": 41613407364.20052,
-    "ever": 1.1382663884305754e+18,
-    "ghost": 9.712526717402586e+17,
+    "ever": 1.1381945741608858e+18,
+    "ghost": 9.711419641418922e+17,
     "ghost_share": 0.853,
     "name": "Chiroptera",
-    "sampled": 1.670137166903168e+17,
+    "sampled": 1.6705261001899354e+17,
     "t0_Ma": 69.1
    },
    {
     "alive": 1340272958.874403,
-    "ever": 1.715888860599031e+17,
-    "ghost": 1.3042835821889958e+17,
+    "ever": 1.7157785178120832e+17,
+    "ghost": 1.3041732394020477e+17,
     "ghost_share": 0.76,
     "name": "Eulipotyphla",
-    "sampled": 4.116052784100352e+16,
+    "sampled": 4.116052784100355e+16,
     "t0_Ma": 75.11
    },
    {
     "alive": 820088846.73222,
-    "ever": 4.49715850270769e+16,
-    "ghost": 3.2441124903920176e+16,
+    "ever": 4.496756280522805e+16,
+    "ghost": 3.2437102682071332e+16,
     "ghost_share": 0.721,
     "name": "Lagomorpha",
-    "sampled": 1.253046012315672e+16,
+    "sampled": 1.2530460123156716e+16,
     "t0_Ma": 72.45
    },
    {
     "alive": 414480516.1373025,
-    "ever": 2.5881763964734572e+16,
-    "ghost": 2.1070194556611188e+16,
+    "ever": 2.5879687798863744e+16,
+    "ghost": 2.106811839074036e+16,
     "ghost_share": 0.814,
     "name": "Didelphimorphia",
     "sampled": 4811569408123384.0,
@@ -43381,26 +43448,26 @@
    },
    {
     "alive": 308479715.25670695,
-    "ever": 1.0706516624019248e+16,
-    "ghost": 7726635462496240.0,
+    "ever": 1.070546902866388e+16,
+    "ghost": 7725587867140873.0,
     "ghost_share": 0.722,
     "name": "Diprotodontia",
-    "sampled": 2979881161523008.0,
+    "sampled": 2979881161523007.0,
     "t0_Ma": 61.06
    },
    {
     "alive": 84305964.3452397,
-    "ever": 7119535570246550.0,
-    "ghost": 4207528582881816.5,
+    "ever": 7119127175143302.0,
+    "ghost": 4207120187778569.5,
     "ghost_share": 0.591,
     "name": "Macroscelidea",
-    "sampled": 2912006987364733.5,
+    "sampled": 2912006987364732.5,
     "t0_Ma": 65.7
    },
    {
     "alive": 1873954957.4718935,
-    "ever": 6950761931351257.0,
-    "ghost": 5952158025649711.0,
+    "ever": 6950184196388889.0,
+    "ghost": 5951580290687343.0,
     "ghost_share": 0.856,
     "name": "Carnivora",
     "sampled": 998603905701546.0,
@@ -43408,8 +43475,8 @@
    },
    {
     "alive": 82839258.9210515,
-    "ever": 5638850415744934.0,
-    "ghost": 4638640240565371.0,
+    "ever": 5638323654037749.0,
+    "ghost": 4638113478858186.0,
     "ghost_share": 0.823,
     "name": "Dasyuromorphia",
     "sampled": 1000210175179563.0,
@@ -43417,55 +43484,55 @@
    },
    {
     "alive": 303988895.6444644,
-    "ever": 5229228911785620.0,
-    "ghost": 3709742678816472.0,
+    "ever": 5228768958312968.0,
+    "ghost": 3709282725343819.5,
     "ghost_share": 0.709,
     "name": "Hyracoidea",
-    "sampled": 1519486232969148.0,
+    "sampled": 1519486232969148.5,
     "t0_Ma": 58.62
    }
   ],
   "by_sampled_ever": [
    {
     "alive": 41613407364.20052,
-    "ever": 1.1382663884305754e+18,
-    "ghost": 9.712526717402586e+17,
+    "ever": 1.1381945741608858e+18,
+    "ghost": 9.711419641418922e+17,
     "ghost_share": 0.853,
     "name": "Chiroptera",
-    "sampled": 1.670137166903168e+17,
+    "sampled": 1.6705261001899354e+17,
     "t0_Ma": 69.1
    },
    {
     "alive": 25028091759.75262,
-    "ever": 1.8400151741454313e+18,
-    "ghost": 1.6946081981592686e+18,
+    "ever": 1.8401101283168658e+18,
+    "ghost": 1.694449735492297e+18,
     "ghost_share": 0.921,
     "name": "Rodentia",
-    "sampled": 1.454069759861627e+17,
+    "sampled": 1.4566039282456883e+17,
     "t0_Ma": 72.45
    },
    {
     "alive": 1340272958.874403,
-    "ever": 1.715888860599031e+17,
-    "ghost": 1.3042835821889958e+17,
+    "ever": 1.7157785178120832e+17,
+    "ghost": 1.3041732394020477e+17,
     "ghost_share": 0.76,
     "name": "Eulipotyphla",
-    "sampled": 4.116052784100352e+16,
+    "sampled": 4.116052784100355e+16,
     "t0_Ma": 75.11
    },
    {
     "alive": 820088846.73222,
-    "ever": 4.49715850270769e+16,
-    "ghost": 3.2441124903920176e+16,
+    "ever": 4.496756280522805e+16,
+    "ghost": 3.2437102682071332e+16,
     "ghost_share": 0.721,
     "name": "Lagomorpha",
-    "sampled": 1.253046012315672e+16,
+    "sampled": 1.2530460123156716e+16,
     "t0_Ma": 72.45
    },
    {
     "alive": 414480516.1373025,
-    "ever": 2.5881763964734572e+16,
-    "ghost": 2.1070194556611188e+16,
+    "ever": 2.5879687798863744e+16,
+    "ghost": 2.106811839074036e+16,
     "ghost_share": 0.814,
     "name": "Didelphimorphia",
     "sampled": 4811569408123384.0,
@@ -43473,35 +43540,35 @@
    },
    {
     "alive": 308479715.25670695,
-    "ever": 1.0706516624019248e+16,
-    "ghost": 7726635462496240.0,
+    "ever": 1.070546902866388e+16,
+    "ghost": 7725587867140873.0,
     "ghost_share": 0.722,
     "name": "Diprotodontia",
-    "sampled": 2979881161523008.0,
+    "sampled": 2979881161523007.0,
     "t0_Ma": 61.06
    },
    {
     "alive": 84305964.3452397,
-    "ever": 7119535570246550.0,
-    "ghost": 4207528582881816.5,
+    "ever": 7119127175143302.0,
+    "ghost": 4207120187778569.5,
     "ghost_share": 0.591,
     "name": "Macroscelidea",
-    "sampled": 2912006987364733.5,
+    "sampled": 2912006987364732.5,
     "t0_Ma": 65.7
    },
    {
     "alive": 303988895.6444644,
-    "ever": 5229228911785620.0,
-    "ghost": 3709742678816472.0,
+    "ever": 5228768958312968.0,
+    "ghost": 3709282725343819.5,
     "ghost_share": 0.709,
     "name": "Hyracoidea",
-    "sampled": 1519486232969148.0,
+    "sampled": 1519486232969148.5,
     "t0_Ma": 58.62
    },
    {
     "alive": 178268910.55467132,
-    "ever": 4534781407002718.0,
-    "ghost": 3245429717023503.0,
+    "ever": 4534431179804851.0,
+    "ghost": 3245079489825636.0,
     "ghost_share": 0.716,
     "name": "Pilosa (order in Deuterostomia)",
     "sampled": 1289351689979215.0,
@@ -43509,8 +43576,8 @@
    },
    {
     "alive": 82839258.9210515,
-    "ever": 5638850415744934.0,
-    "ghost": 4638640240565371.0,
+    "ever": 5638323654037749.0,
+    "ghost": 4638113478858186.0,
     "ghost_share": 0.823,
     "name": "Dasyuromorphia",
     "sampled": 1000210175179563.0,
