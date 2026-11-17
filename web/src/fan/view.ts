@@ -19,7 +19,7 @@ import { ease, isNode, laneAt, laneW, layoutFan, leftAt, nearestStrand, nodeLeft
 import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01 } from './meshgl';
 import { Ribbons } from './ribbons';
-import { Lod } from './lod';
+import { Lod, lodIndexOn } from './lod';
 import type { Fold, FoldState } from './fold';
 import { forkMode, grayOn, LABEL_PILL, peelSteps, Steady } from './steady';
 import { LADDER, Territories, type CutItem, type Ref, type RowsOf } from './cut';
@@ -110,6 +110,8 @@ const RIBBON_INSET_PX = 1;
 const GLOW_W = 6;
 /** A column with no styled spans on screen (drawStrand): shared, never written. */
 const NO_HELD: [number, number, number][] = [];
+/** No merged clades (a level with no orders): one array, so Steady.setMerged knows it unchanged. */
+const NO_MERGED: FanNode[] = [];
 /** The glow fades out across a lean: gone where the lane runs √(1 + s²) - 1 = GLOW_LEAN off straight down (s ≈ 0.75 px per px). */
 const GLOW_LEAN = 0.25;
 
@@ -2929,11 +2931,10 @@ export class FanView implements InputHandlers {
     // (The mammal level, lod.ts: a closed clade of hairline strands drawn as its one branch, its columns inside it not drawn.)
     const lod = this.lodNow();
     const sf = this.fan.tess.fold;
-    if (sf instanceof Steady) sf.setMerged(lod ? lod.merged : [], Lod.top);
+    if (sf instanceof Steady) sf.setMerged(lod ? lod.merged : NO_MERGED, (_, m) => lod!.mTop[m], lod?.mIdx);
     this.drawStem(lod);
     {
-      for (const b of this.fan.branches) if (!lod || lod.of[b.index] < 0) this.drawStrand(b);
-      if (lod) for (const v of lod.merged) this.drawMerged(v);
+      this.drawStrands(lod);
       this.drawCorners(lod);
     }
     this.drawHeld();
@@ -3946,6 +3947,8 @@ export class FanView implements InputHandlers {
    */
   /** drawStem's heights, pooled. */
   private stemYs: number[] = [];
+  /** drawStem's nodes (Lod.stemNodes), pooled. */
+  private stemWalk = { at: new Int32Array(256), n: 0 };
   private drawStem(lod: Lod | null = null): void {
     const c = rgb01(this.gl ? mix(GRAY, '#131c19', 0.86) : GRAY);
     const cam = this.camera;
@@ -3956,9 +3959,14 @@ export class FanView implements InputHandlers {
     const steady = this.fan.tess.fold instanceof Steady ? this.fan.tess.fold : null;
     const corners = !!steady && forkMode() !== 'peel';
     const gray = grayOn();
-    for (let ni = nodes.length - 1; ni >= 0; ni--) {
+    // (Only the nodes it may draw, ToLaD#502: none inside a merged clade, none with no gray in it (gray off), none off
+    // the screen's heights, from a walk down to the merged clades; in the order of fan.nodes from the end, as ever.)
+    const walk = lod && lodIndexOn() ? this.stemWalk : null;
+    if (walk) lod!.stemNodes(gray, wTop, wBot, walk);
+    for (let q = 0, n = walk ? walk.n : nodes.length; q < n; q++) {
+      const ni = walk ? walk.at[q] : nodes.length - 1 - q;
       const v = nodes[ni];
-      if (lod?.hidden(v) || (!gray && !cladeAllGray(v))) continue;
+      if (!walk && (lod?.hidden(v) || (!gray && !cladeAllGray(v)))) continue;
       const ya = Math.max(v.y, wTop);
       // (Its peel no whole ribbon, ToLaD#377: the backdrop stops where its column does.)
       const cutH = corners ? steady!.footCut(ni, this.cam.sx, this.cam.sy) : 0;
@@ -4144,6 +4152,61 @@ export class FanView implements InputHandlers {
     this.drawLanes(pts, hw, held, false);
   }
 
+  /** drawStrands' strands, by their place in fan.branches. */
+  private strandsOn = new Int32Array(256);
+  /**
+   * The strands drawn one by one (those in no merged clade), then the merged clades, in their orders as ever; only those
+   * that may show (ToLaD#502): the strands of the runs offSide's walk passed by whole are never asked, nor a merged
+   * clade inside one of them (offSideRun's answer), nor the strands of a merged clade.
+   */
+  private drawStrands(lod: Lod | null): void {
+    const B = this.fan.branches;
+    const sf = this.fan.tess.fold;
+    const cam = this.camera;
+    const xm = (this.w / 2 + 13) / this.cam.sx;
+    const off = lod && lodIndexOn() && sf instanceof Steady ? sf.offRunsOn(cam.worldY(-20), cam.worldY(this.h + 20), this.cam.cx - xm, this.cam.cx + xm) : null;
+    if (!lod || !off) {
+      for (const b of B) if (!lod || lod.ofStrand(b.index) < 0) this.drawStrand(b);
+      if (lod) for (let m = 0; m < lod.merged.length; m++) this.drawMerged(lod.merged[m], lod.mTop[m]);
+      return;
+    }
+    const { runs: R, n: nR } = off;
+    const S = B.length;
+    const M = lod.merged.length;
+    const pos = lod.bPos;
+    let at = this.strandsOn;
+    let c = 0;
+    // (The runs between those passed by, each less its merged clades' strands: both lists ascending.)
+    for (let r = 0; r <= nR; r++) {
+      const a = r === 0 ? 0 : R[2 * r - 1] + 1;
+      const b = r < nR ? R[2 * r] - 1 : S - 1;
+      if (a > b) continue;
+      let m = lod.mergedFrom(a);
+      for (let i = a; i <= b; ) {
+        if (m < M && lod.mS0[m] <= i) {
+          i = lod.mS1[m++] + 1;
+          continue;
+        }
+        const stop = m < M ? Math.min(b, lod.mS0[m] - 1) : b;
+        if (c + stop - i + 1 > at.length) {
+          const n = new Int32Array(Math.max(2 * at.length, c + stop - i + 1));
+          n.set(at.subarray(0, c));
+          at = this.strandsOn = n;
+        }
+        for (; i <= stop; i++) at[c++] = pos[i];
+      }
+    }
+    const on = at.subarray(0, c).sort();
+    for (let q = 0; q < c; q++) this.drawStrand(B[on[q]]);
+    // (Every merged clade but those inside one run passed by: before each run, those starting before it; in it, past those it holds.)
+    let m = 0;
+    for (let r = 0; r < nR; r++) {
+      for (; m < M && lod.mS0[m] < R[2 * r]; m++) this.drawMerged(lod.merged[m], lod.mTop[m]);
+      m = lod.mergedFrom(R[2 * r + 1] + 1, m);
+    }
+    for (; m < M; m++) this.drawMerged(lod.merged[m], lod.mTop[m]);
+  }
+
   private lod: Lod | null = null;
   /** The mammal level's merged clades at this frame's zoom (lod.ts), after applyFold; null at a level with no orders. */
   lodNow(): Lod | null {
@@ -4156,13 +4219,13 @@ export class FanView implements InputHandlers {
 
   /** A merged clade (lod.ts): one ribbon over the grid's rows on screen, its extent the fold's, its green its strands' share of their widths (ToLaD#389). */
   private mergedPeels: number[] = [];
-  private drawMerged(v: FanNode): void {
+  /** (top: its top, Lod.top, kept by the Lod: drawStrands passes it.) */
+  private drawMerged(v: FanNode, top = this.lod!.topOf(v)): void {
     const f = this.fan.tess.fold!;
     const H = f.gridH;
     if (!(H > 0)) return;
     const [, sTop] = this.toWorld(0, -20);
     const [, sBot] = this.toWorld(0, this.h + 20);
-    const top = this.lodTop(v);
     const y0 = Math.max(top, sTop);
     const y1 = Math.min(this.fan.trunkBottom.y, sBot);
     if (!(y1 > y0)) return;
@@ -4374,7 +4437,7 @@ export class FanView implements InputHandlers {
           rect(dc - 0.5, stems[2 * q] > 0 ? yt : cam.screenY(stems[2 * q + 1]), dc + 0.5, y0, c);
         }
       }
-    });
+    }, lod ? (j) => lod.isMergedAt(j) : undefined);
   }
   private forkLines: ForkLines = { n: 0, xy: [], at: new Map() };
   /** The horizontals drawCorners draws this frame, for the leaders (ToLaD#434); none under `peel`, which draws none. */
@@ -4408,17 +4471,11 @@ export class FanView implements InputHandlers {
       L.xy[4 * k + 2] = cam.screenY(v.y);
       L.xy[4 * k + 3] = c;
       L.at.set(v, k);
-    });
+    }, lod ? (j) => lod.isMergedAt(j) : undefined);
     return L;
   }
   private mergedExt: [number, number] = [0, 0];
   private ribbons = new Ribbons();
-  private lodTops = new WeakMap<FanNode, number>();
-  private lodTop(v: FanNode): number {
-    let t = this.lodTops.get(v);
-    if (t === undefined) this.lodTops.set(v, (t = Lod.top(v)));
-    return t;
-  }
 
   /** A column's lanes (drawStrand's, or a merged clade's, lod.ts): its points, spine offset hw, styled spans and twig fade. */
   private drawLanes(pts: LanePts, hw: number, held: [number, number, number][], gray: boolean): void {
@@ -4537,9 +4594,11 @@ export class FanView implements InputHandlers {
    * with that time ("70 yr ago").
    */
   private drawTouch(): void {
-    const b = this.fan.branches.find((x) => x.sp === this.selected);
+    // (No touch, no walk over every strand for the selected one: a frame's whole-tree pass, ToLaD#502.)
     const t = this.touch;
-    if (!b || !t) return;
+    if (!t || !this.selected) return;
+    const b = this.fan.branches.find((x) => x.sp === this.selected);
+    if (!b) return;
     const wy = this.fan.time.y(t.ageMa);
     const [, y] = this.toScreen(0, wy);
     if (y < -10 || y > this.h + 10) return;
