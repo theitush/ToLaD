@@ -78,7 +78,12 @@ describe('labels in the gaps and in the branches', () => {
       const now = all.filter((m) => !m.heads);
       for (let i = 1; i < now.length; i++) expect(now[i].on).toBeGreaterThan(now[i - 1].on);
       const heads = all.filter((m) => m.heads);
-      for (let i = 1; i < heads.length; i++) expect(heads[i].on).toBeGreaterThan(heads[i - 1].on);
+      // (A group whose gap is its group's title's stays a head over that title's strand while its name is a guest in its widest part's band, ToLaD#500 (gapCut): no gap of its own, 0.
+      // Measured: 1745 shared by two heads before this allowed it.)
+      for (let i = 1; i < heads.length; i++) {
+        if (heads[i].on === heads[i - 1].on) expect(heads[i].gap).toBe(0);
+        else expect(heads[i].on).toBeGreaterThan(heads[i - 1].on);
+      }
       for (const h of heads) expect(now.some((m) => m.on === h.on && h.f <= m.f && m.l <= h.l)).toBe(true);
       if (prev) {
         const was = prev;
@@ -98,7 +103,9 @@ describe('labels in the gaps and in the branches', () => {
       for (const m of cover(sx)) {
         if (m.tier !== 'title') continue;
         expect(m.top).toBeCloseTo(C[m.on] - R[m.on] / 2, 9);
-        expect(m.gap * sx).toBeGreaterThanOrEqual(CLADE_PX);
+        // (A title its gap cannot hold yet stands in its widest part's band instead, a guest, ToLaD#500: its host one of its parts. Measured: a guest's gap 0 px, its gap its group's title's.)
+        if (m.host) expect(m.f <= m.host.f && m.host.l <= m.l && m.host !== m).toBe(true);
+        else expect(m.gap * sx).toBeGreaterThanOrEqual(CLADE_PX);
       }
       const c = C[C.length >> 1];
       const cut = frame(sx, c);
@@ -106,8 +113,12 @@ describe('labels in the gaps and in the branches', () => {
       for (const s of cut.names) {
         if (!s.v) continue;
         const m = cover(sx).find((g) => g.lv.v === s.v)!;
-        expect(seen.has(m.on)).toBe(false);
-        seen.add(m.on);
+        if (m.host) {
+          // (A guest title, ToLaD#500: its gap is the title's over it, on the same strand, so it stands in its host's band, beside the host's own label.)
+          expect(s.box[0]).toBeGreaterThanOrEqual(v.toScreen(m.host.at - m.host.band / 2, 0)[0] - 1e-6);
+          expect(s.box[2]).toBeLessThanOrEqual(v.toScreen(m.host.at + m.host.band / 2, 0)[0] + 1e-6);
+          continue;
+        }
         const top = v.toScreen(m.top, 0)[0];
         if (m.tier === 'in' || s.box[2] > top + 1e-6) {
           // (Too thin a gap, or its gap a screen away: on its own band.)
@@ -115,6 +126,10 @@ describe('labels in the gaps and in the branches', () => {
           expect(s.box[2]).toBeLessThanOrEqual(v.toScreen(m.at + m.band / 2, 0)[0] + 1e-6);
           continue;
         }
+        // (One title a gap. A name in its band may share its strand with the title in the gap over it, ToLaD#500: a group splits once its widest part's band holds that part's name
+        // and the group's; measured at home, Primates in its band under Primates & treeshrews in the gap, both on strand 3491.)
+        expect(seen.has(m.on)).toBe(false);
+        seen.add(m.on);
         expect(s.box[2]).toBeLessThanOrEqual(top + 1e-6);
         expect(top - s.box[0]).toBeLessThanOrEqual(m.gap * sx + 1e-6);
       }
