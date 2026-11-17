@@ -1,6 +1,6 @@
 // Numbers packed for mammals.json (ToLaD#255): typed arrays as base64, so the page reads a few long strings instead of
 // parsing millions of JSON numbers, and every number comes back bit for bit (a float64 is its own 8 bytes).
-import type { Genealogy } from './population';
+import type { Genealogy, GenealogyAhead } from './population';
 import type { Confidence, Split } from './splits';
 
 /** Bytes to base64 (in chunks: String.fromCharCode takes so many arguments at a time). */
@@ -75,7 +75,8 @@ export function f64PlanesFromBase64(s: string): Float64Array {
 /**
  * Genealogies as mammals.json carries them: per entry its gid and start, and either an earlier entry whose genealogy
  * it is (most are the same walk as another: same size, generation and start) or its own: the generations as varint
- * steps, the shares as float64s in byte planes.
+ * steps, the shares as float64s in byte planes. The build leaves the shares out (ToLaD#502): the page replays them
+ * from the generations (population.ts shareReplay), number for number, so h is absent.
  */
 export interface PackedGenealogies {
   gid: string;
@@ -85,10 +86,12 @@ export interface PackedGenealogies {
   /** Per own genealogy: its samples. */
   n: string;
   k: string;
-  h: string;
+  /** The shares (absent: replayed from k, ToLaD#502). */
+  h?: string;
 }
 
-export function packGenealogies(g: Map<string, Genealogy>): PackedGenealogies {
+/** `shares: false` leaves the shares out (the page replays them: only for genealogies shareReplay gives back exactly). */
+export function packGenealogies(g: Map<string, Genealogy>, { shares = true }: { shares?: boolean } = {}): PackedGenealogies {
   const gid: number[] = [];
   const start: number[] = [];
   const same: number[] = [];
@@ -115,29 +118,31 @@ export function packGenealogies(g: Map<string, Genealogy>): PackedGenealogies {
     }
     e++;
   }
-  return { gid: uintsToBase64(gid), start: f64ToBase64(start), same: uintsToBase64(same), n: uintsToBase64(n), k: uintsToBase64(dk), h: f64PlanesToBase64(h) };
+  const out: PackedGenealogies = { gid: uintsToBase64(gid), start: f64ToBase64(start), same: uintsToBase64(same), n: uintsToBase64(n), k: uintsToBase64(dk) };
+  if (shares) out.h = f64PlanesToBase64(h);
+  return out;
 }
 
-export function unpackGenealogies(p: PackedGenealogies): Map<string, Genealogy> {
+export function unpackGenealogies(p: PackedGenealogies): Map<string, GenealogyAhead> {
   const gid = uintsFromBase64(p.gid);
   const start = f64FromBase64(p.start);
   const same = uintsFromBase64(p.same);
   const n = uintsFromBase64(p.n);
   const dk = uintsFromBase64(p.k);
-  const h = f64PlanesFromBase64(p.h);
-  const out = new Map<string, Genealogy>();
-  const all: Genealogy[] = [];
+  const h = p.h === undefined ? null : f64PlanesFromBase64(p.h);
+  const out = new Map<string, GenealogyAhead>();
+  const all: GenealogyAhead[] = [];
   let at = 0;
   let own = 0;
   for (let e = 0; e < gid.length; e++) {
-    let g: Genealogy;
+    let g: GenealogyAhead;
     if (same[e]) g = all[e - same[e]];
     else {
       const c = n[own++];
       const k = new Float64Array(c);
       let acc = 0;
       for (let i = 0; i < c; i++) k[i] = acc += dk[at + i];
-      g = { k, h: h.subarray(at, at + c) };
+      g = h ? { k, h: h.subarray(at, at + c) } : { k };
       at += c;
     }
     all.push(g);
@@ -154,7 +159,9 @@ export function unpackGenealogies(p: PackedGenealogies): Map<string, Genealogy> 
  */
 export type Columns =
   | { u: string } // whole numbers >= 0
-  | { f: string } // any numbers
+  | { f: string } // any numbers (float64s; files before ToLaD#502)
+  | { p: string } // any numbers: float64s in byte planes (f64PlanesToBase64)
+  | { d: number[] } // any numbers with short decimals, as JSON writes them (its shortest form: bit for bit)
   | { b: string } // booleans
   | { s: string[]; i: string } // strings: the table and each one's index
   | { o: Record<string, Columns>; has?: Record<string, string> } // objects: per field its values (and which have it, when not all)
@@ -164,16 +171,27 @@ export type Columns =
 
 const isObj = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
 
-export function packColumns(vals: unknown[]): Columns {
+/**
+ * A column's size where it can be written two ways (numbers: as decimals or as float64 planes): by default its
+ * characters; the build passes gzip's (vite.config.ts), the bytes the page downloads (ToLaD#502).
+ */
+export type SizeOf = (s: string) => number;
+
+export function packColumns(vals: unknown[], size: SizeOf = (s) => s.length): Columns {
   if (vals.some((x) => x === null)) {
     const nul: number[] = [];
     const rest: unknown[] = [];
     vals.forEach((x, i) => (x === null ? nul.push(i) : rest.push(x)));
-    return { nul: uintsToBase64(nul), v: packColumns(rest) };
+    return { nul: uintsToBase64(nul), v: packColumns(rest, size) };
   }
   if (vals.every((x) => typeof x === 'number')) {
     const nums = vals as number[];
-    return nums.every((x) => Number.isSafeInteger(x) && x >= 0 && !Object.is(x, -0)) ? { u: uintsToBase64(nums) } : { f: f64ToBase64(nums) };
+    if (nums.every((x) => Number.isSafeInteger(x) && x >= 0 && !Object.is(x, -0))) return { u: uintsToBase64(nums) };
+    // (Whichever is the smaller: the decimals (a generation length, a year; a count whose digits gzip finds again) or
+    // the float64s in planes (a layout's coordinates). JSON keeps every number but -0 and the non-finite.)
+    const p = f64PlanesToBase64(nums);
+    if (nums.some((x) => Object.is(x, -0) || !Number.isFinite(x))) return { p };
+    return size(JSON.stringify(nums)) < size(p) ? { d: nums.slice() } : { p };
   }
   if (vals.every((x) => typeof x === 'boolean')) return { b: uintsToBase64(vals.map((x) => (x ? 1 : 0))) };
   if (vals.every((x) => typeof x === 'string')) {
@@ -199,14 +217,14 @@ export function packColumns(vals: unknown[]): Columns {
       rows.forEach((r, i) => {
         if (k in r && r[k] !== undefined) at.push(i), v.push(r[k]);
       });
-      o[k] = packColumns(v);
+      o[k] = packColumns(v, size);
       if (at.length < rows.length) has[k] = uintsToBase64(at);
     }
     return Object.keys(has).length ? { o, has } : { o };
   }
   if (vals.every(Array.isArray)) {
     const arrs = vals as unknown[][];
-    return { a: uintsToBase64(arrs.map((x) => x.length)), v: packColumns(arrs.flat()) };
+    return { a: uintsToBase64(arrs.map((x) => x.length)), v: packColumns(arrs.flat(), size) };
   }
   return { j: vals };
 }
@@ -223,6 +241,8 @@ export function unpackColumns(c: Columns, n: number): unknown[] {
   }
   if ('u' in c) return uintsFromBase64(c.u);
   if ('f' in c) return Array.from(f64FromBase64(c.f));
+  if ('p' in c) return Array.from(f64PlanesFromBase64(c.p));
+  if ('d' in c) return c.d.slice();
   if ('b' in c) return uintsFromBase64(c.b).map((x) => x === 1);
   if ('s' in c) return uintsFromBase64(c.i).map((x) => c.s[x]);
   if ('a' in c) {

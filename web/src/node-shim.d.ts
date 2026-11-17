@@ -26,3 +26,6 @@ declare module 'node:path' {
 declare module 'node:url' {
   export function fileURLToPath(u: string): string;
 }
+declare module 'node:zlib' {
+  export function gzipSync(data: string | Uint8Array, options?: { level?: number }): Uint8Array;
+}

@@ -1,10 +1,11 @@
 /// <reference types="vitest/config" />
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { gzipSync } from 'node:zlib';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer, defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
-import { MAMMALS_FILE, packMammals } from './src/fan/mammals-data';
+import { MAMMALS_CARD_FILE, MAMMALS_FILE, packMammals, type MammalCardFile, type MammalFile } from './src/fan/mammals-data';
 import { GLOBE_FILE } from './src/fan/globe-data';
 import { loadAll, loadClade, trimToFan } from './src/fan/panthera-extract';
 
@@ -56,13 +57,17 @@ function pantheraData(): Plugin {
         `export const wiki = ${JSON.stringify(building ? {} : wikiFor(carn))};`,
       ].join('\n');
     },
-    // The mammals (ToLaD#247) are a sibling file the page fetches on open (fan/mammals-data.ts), not in the page, so
-    // the page paints before they come. Served at /mammals.json in dev, emitted next to
-    // index.html in both builds.
+    // The mammals (ToLaD#247) are sibling files the page fetches (fan/mammals-data.ts), not in the page, so the page
+    // paints before they come: mammals.json on open, mammals-card.json after the first frame (ToLaD#502). Served at
+    // /mammals.json and /mammals-card.json in dev, emitted next to index.html in both builds.
     configureServer(server) {
       server.middlewares.use('/' + MAMMALS_FILE, (_req, res) => {
         res.setHeader('Content-Type', 'application/json');
-        res.end(mammalsJson());
+        res.end(JSON.stringify(mammalFiles().open));
+      });
+      server.middlewares.use('/' + MAMMALS_CARD_FILE, (_req, res) => {
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify(mammalFiles().card));
       });
       // The card's globe (ToLaD#267): every species' range cells and the land, fetched when a card first shows a map.
       server.middlewares.use('/' + GLOBE_FILE, (_req, res) => {
@@ -71,27 +76,32 @@ function pantheraData(): Plugin {
       });
     },
     async generateBundle() {
-      this.emitFile({ type: 'asset', fileName: MAMMALS_FILE, source: await mammalsJson(true) });
+      const f = await mammalFiles(true);
+      this.emitFile({ type: 'asset', fileName: MAMMALS_FILE, source: JSON.stringify(f.open) });
+      this.emitFile({ type: 'asset', fileName: MAMMALS_CARD_FILE, source: JSON.stringify(f.card) });
       this.emitFile({ type: 'asset', fileName: GLOBE_FILE, source: globeJson() });
     },
   };
 }
 
 /**
- * mammals.json (fan/mammals-data.ts MammalData): every mammal under the whole dated tree, only the species the fan
- * draws, and the pictures of those the carnivore page leaves out.
+ * mammals.json and mammals-card.json (fan/mammals-data.ts MammalData, split by what the open reads, ToLaD#502): every
+ * mammal under the whole dated tree, only the species the fan draws, and their pictures.
  */
-function mammalsJson(): string;
-function mammalsJson(seeded: true): Promise<string>;
-function mammalsJson(seeded = false): string | Promise<string> {
+type MammalFiles = { open: MammalFile; card: MammalCardFile };
+function mammalFiles(): MammalFiles;
+function mammalFiles(seeded: true): Promise<MammalFiles>;
+function mammalFiles(seeded = false): MammalFiles | Promise<MammalFiles> {
   const clade = trimToFan(loadAll((rel) => readFileSync(join(DATA, rel))));
   const wiki = wikiFor(clade.species.map((s) => s.sci));
-  if (!seeded) return JSON.stringify(packMammals(JSON.parse(JSON.stringify({ clade, wiki }))));
+  if (!seeded) return packMammals(JSON.parse(JSON.stringify({ clade, wiki })));
+  // (Each column of numbers written the way that gzips smaller: the bytes the page downloads.)
+  const gz = (s: string) => gzipSync(s).length;
   // The build's: with the level's default layout worked out here (fan/mammals-seed.ts, ToLaD#255), on the clade as the
   // page reads it (through JSON). Dev serves it without: the page works it out.
   // (The dated tree goes in built, splits.ts mammaliaTree: the clade's raw one is left out.)
   return mammalsSeed(JSON.parse(JSON.stringify(clade))).then((ahead) =>
-    JSON.stringify(packMammals(JSON.parse(JSON.stringify({ clade: { ...clade, dated: undefined, datedMeta: undefined }, wiki, ...(ahead as object) })))),
+    packMammals(JSON.parse(JSON.stringify({ clade: { ...clade, dated: undefined, datedMeta: undefined }, wiki, ...(ahead as object) })), gz),
   );
 }
 

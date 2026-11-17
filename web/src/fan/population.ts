@@ -214,6 +214,42 @@ export function shareBackSampled(n: (k: number) => number, varGens: number, maxG
   return { k: Float64Array.from(ks), h: Float64Array.from(hs) };
 }
 
+/**
+ * shareBackSampled's shares again from its generations `ks` alone (ToLaD#502): each sample is the walk's own step, a
+ * generation (ks[i + 1] = ks[i] + 1: parentShare) or a jump (two or more: the settled share there), worked out as the
+ * walk works it out, so number for number its h. It skips the walk's search for the jumps, the bulk of its cost: the
+ * build ships the generations, not the shares (mammals-data.ts).
+ */
+export function shareReplay(n: (k: number) => number, ks: ArrayLike<number>): Float64Array {
+  const out = new Float64Array(ks.length);
+  if (!ks.length) return out;
+  out[0] = 1;
+  let h = 1;
+  // (n(k) and n(k + 1) of a step: the next step's n(k) is this one's n(k + 1).)
+  let kn = -1;
+  let nAt = 0;
+  const nk = (k: number) => (k === kn ? nAt : n(k));
+  for (let i = 1; i < ks.length; i++) {
+    const k = ks[i - 1];
+    const j = ks[i] - k;
+    if (j === 1) {
+      const a = nk(k);
+      const b = n(k + 1);
+      h = parentShare(h, a, b);
+      kn = k + 1;
+      nAt = b;
+    } else {
+      const a = nk(ks[i] - 1);
+      const b = n(ks[i]);
+      h = settledShare(a > 0 && b > 0 ? a / b : 0);
+      kn = ks[i];
+      nAt = b;
+    }
+    out[i] = h;
+  }
+  return out;
+}
+
 /** One history point: age (years before present), ln N, its corner's half-window (years) and the slope of ln N (per year) on to the next older point. */
 interface Knot {
   ago: number;
@@ -379,7 +415,9 @@ export class Population {
       const own = Math.max(1, (startMa - sp.t1) * 1e6);
       // Sampled (bounded: per generation only where the share moves, ToLaD#70), back to the species' start; or the
       // build's, worked out ahead from the same data (genealogiesAhead, ToLaD#255).
-      const g = (AHEAD_FOR.has(sp) ? AHEAD.get(`${sp.gid}:${startMa}`) : undefined) ?? shareBackSampled((k) => this.count(ago(k) / 1e6), varGens, Math.ceil(own / GL), GL);
+      // (The build ships the generations only, ToLaD#502: the shares replayed from them, once per genealogy.)
+      const ahead = AHEAD_FOR.has(sp) ? AHEAD.get(`${sp.gid}:${startMa}`) : undefined;
+      const g = ahead ? { k: ahead.k, h: (ahead.h ??= shareReplay((k) => this.count(ago(k) / 1e6), ahead.k)) } : shareBackSampled((k) => this.count(ago(k) / 1e6), varGens, Math.ceil(own / GL), GL);
       this.hk = g.k;
       this.h = g.h;
       this.qBase = this.h[this.h.length - 1];
@@ -452,6 +490,14 @@ export class Population {
   /** The genealogy walked for this species and start (null: none, extinct or weighed, the weight-1 one's). */
   genealogy(): Genealogy | null {
     return this.weight === 1 && !this.sp.extinct && this.sp.alive > 0 ? { k: this.hk, h: this.h } : null;
+  }
+
+  /** Whether its genealogy's shares replay from its generations alone, number for number (shareReplay; the build checks every one, ToLaD#502). */
+  replays(): boolean {
+    const g = this.genealogy();
+    if (!g) return true;
+    const h = shareReplay((k) => this.count((k * this.GL) / 1e6), g.k);
+    return h.length === g.h.length && h.every((x, i) => Object.is(x, g.h[i]));
   }
 
   /** The genealogy's samples (how many steps of the green share the fan keeps for this species). */
@@ -532,8 +578,14 @@ export interface Genealogy {
   k: Float64Array;
   h: Float64Array;
 }
+/** A genealogy worked out ahead: its generations, and its shares unless they are to be replayed (shareReplay, ToLaD#502). */
+export interface GenealogyAhead {
+  k: Float64Array;
+  h?: Float64Array;
+}
+
 /** Genealogies worked out ahead, by `gid:startMa` (the mammal level's, at build time: panthera.ts mammaliaClade, ToLaD#255). */
-const AHEAD = new Map<string, Genealogy>();
+const AHEAD = new Map<string, GenealogyAhead>();
 /** The species they were worked out for (another level's record of the same gid walks its own). */
 const AHEAD_FOR = new WeakSet<SpeciesRec>();
 
@@ -541,7 +593,7 @@ const AHEAD_FOR = new WeakSet<SpeciesRec>();
  * Take these genealogies as worked out (the build's, from the same data) for these species: a Population of one of
  * them, at a start worked out, reads its genealogy instead of walking it.
  */
-export function genealogiesAhead(g: Map<string, Genealogy>, species: Iterable<SpeciesRec>): void {
+export function genealogiesAhead(g: Map<string, GenealogyAhead>, species: Iterable<SpeciesRec>): void {
   for (const [key, v] of g) AHEAD.set(key, v);
   for (const sp of species) AHEAD_FOR.add(sp);
 }
