@@ -238,6 +238,7 @@
 }
 .methods .m-chip {
   white-space: nowrap;
+  margin-left: 6px;
 }
 .methods .m-list {
   margin: 4px 0;

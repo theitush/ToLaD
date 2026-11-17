@@ -259,7 +259,7 @@ export function MethodsView({ onClose, at }: { onClose: () => void; at?: string 
           </ol>
           <p>
             <b>The share:</b> density is measured where an animal is common, and a range map is its outer edge, so density ×
-            range counts far too many. We keep a share, typically <b>1–8%</b>, fitted per order (rodents, bats, …) and body size on
+            range counts far too many. We keep a share, typically <b>0.5–8%</b>, fitted per order (rodents, bats, …) and body size on
             the ~4,800 species that have a number (mostly Greenspoon’s model). For one species it can be off <b>10×</b> either way.
           </p>
           <Quoll>
@@ -395,14 +395,16 @@ export function MethodsView({ onClose, at }: { onClose: () => void; at?: string 
               carries every step’s error.
             </dd>
             <dt id={WORD_IDS.generation}>Generation</dt>
-            <dd>The average age of parents, and its source in brackets: step 4.</dd>
+            <dd>
+              The average age of parents, and its source in brackets: <Jump to={METHOD_IDS.ever}>step 4</Jump>.
+            </dd>
             <dt id={WORD_IDS.grade}>Data grade</dt>
             <dd>
               A–D, how far off the number can be: <Jump to={METHOD_IDS.grades}>step 6</Jump>.
             </dd>
             <dt id={WORD_IDS.method}>Method</dt>
             <dd>
-              “Modelled, not counted”: steps 1–4. Its “lifespan” is the half a generation each animal is counted for.
+              “Modelled, not counted”: steps <Jump to={METHOD_IDS.alive}>1</Jump>–<Jump to={METHOD_IDS.ever}>4</Jump>. Its “lifespan” is the half a generation each animal is counted for.
             </dd>
             <dt id={WORD_IDS.natural}>Natural level</dt>
             <dd>
@@ -410,7 +412,7 @@ export function MethodsView({ onClose, at }: { onClose: () => void; at?: string 
               <Jump to={METHOD_IDS.past}>step 2</Jump>.
             </dd>
             <dt id={WORD_IDS.status}>Status</dt>
-            <dd>The IUCN Red List category (Least Concern … Critically Endangered, Extinct) and its year. Not used in the count.</dd>
+            <dd>The IUCN Red List category (Least Concern … Critically Endangered, Extinct) and its year.</dd>
             <dt id={WORD_IDS.chart}>The chart</dt>
             <dd>
               The species’ number through time. Dot colours are grades:{' '}
