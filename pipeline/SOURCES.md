@@ -79,9 +79,30 @@ Every hand-made change to what the sources say is in [`overrides.toml`](override
 - `placeholder`: no real range is known, so the note sets one (a town near the type locality, a borrowed range, fossil-site estimates for extinct species);
 - `unclear`: none so far.
 
-Columns: `binomial`, `iucn` (PHYLACINE's status), `cells_cur`, `cells_nat`, `class`, `why` (ours), `phylacine_note` (the note's own key phrase, verbatim).
+Columns: `binomial`, `iucn` (PHYLACINE's status), `cells_cur`, `cells_nat`, `class`, `why` (ours), `phylacine_note` (the note's own key phrase, verbatim), `partner` (the other species the note moves land to or from, as the note names it; empty for none).
+
+**Today's map (ToLaD#507).** For a living species classed `taxonomy` or `mapping`, today's count (density × range × occupancy) stands on the map the note corrects, worked out cell by cell from the rasters (`ranges.today_maps`): its present-natural map where that is its current map with land moved to or from its `partner` (every lost cell in the partner's present-natural map, every gained cell in the partner's current map) or with the deleted records taken off; for the partner, its current map minus the cells the note gives away. A note that also adds PHYLACINE's own expansion or historic range, or that names no mapped partner, leaves the species as it is. `stats.json` → `phylacine_ranges.today_maps` lists each one, with the reason. A species whose area comes from PanTHERIA, or whose count is a census, keeps it.
 
 For an extant species classed `taxonomy`, `mapping` or `placeholder`, the build (`model.natural_level`) takes today's count as the natural level. No range-loss trend comes from the map difference, and no level is fitted to a placeholder area. Extinct species are not changed: their present-natural maps are what their counts stand on. `stats.json` → `natural_baseline.phylacine_note_today` lists the leaves this applies to. A test checks that the file still matches PHYLACINE's metadata row for row.
+
+## When each range was lost (ToLaD#507)
+
+[`range_loss_dates.csv`](range_loss_dates.csv) is this directory's copy of `research/range-loss-dates.csv` (ToLaD#515,
+commit d24d17b), columns `binomial, basis, earliest_year, latest_year, source, citation, confidence, dated_share`: the
+682 living species drawn falling since 1500, each with what dates its loss and the citation. How each was classed is
+in `research/range-loss-dates.md`; rebuild it there, then copy the columns here. `tolad_pipeline/lossdates.py` reads
+it and gives each species one basis (`later`, `dated`, `prehistoric`, `bound`, `undated`; FORMAT.md, "Loss dates"):
+a documented start later than 1500 moves the start of the range-loss trend to it, and the lost cells the evidence
+dates before 1500 (`lossdates.PREHISTORIC`, by place) are left out of the level held to 1500. Every year is the
+source's; nothing is modelled.
+
+## Field densities (ToLaD#507)
+
+`overrides.toml [[density]]` replaces COMBINE's density of a living species with one measured in the field, cited:
+the study's overall density, else the mean of its sites where the species was found. Of the four night monkeys
+split from *Aotus lemurinus*, to which COMBINE gives one copied 1.5/km², three have one (*A. zonalis*, *A. lemurinus*,
+*A. brumbacki*); *A. griseimembra* keeps COMBINE's: its only figure is an unnamed census its reporter calls unusually
+high (the comment in `overrides.toml` says why).
 
 ## Stem fossils (automatic)
 

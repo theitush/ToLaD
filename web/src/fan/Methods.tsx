@@ -91,6 +91,9 @@ export const WALK = {
   grade: 'D',
   /** PHYLACINE 1.2.1 Spatial_metadata.csv, its "Motivation". */
   note: 'Disjunct range likely anthropogenic in cause.',
+  /** What dates its loss (META.loss, ToLaD#507): Australia's former ranges are recorded from European settlement. */
+  lossStart: 1788,
+  lossCite: 'Strahan & Van Dyck 2008',
 };
 
 const c = (n: number) => formatCount(n);
@@ -294,6 +297,29 @@ export function MethodsView({ onClose, at }: { onClose: () => void; at?: string 
           <Sum parts={[['today’s count', ''], '×', ['map without people', ''], '÷', ['map today', ''], '=', ['the level in 1500', '']]} />
           <p>From 1500 to today the tree draws a steady fall (or rise) between the two.</p>
           <p>
+            <b>When the fall starts</b> comes from a source, and the card says which:
+          </p>
+          <ul className="m-list" data-loss-cases="">
+            <li>
+              <b>A documented start:</b> the level holds until then, and the fall starts there (Australia from 1788, the sea
+              otter’s fur trade from 1741).
+            </li>
+            <li>
+              <b>Since 1500:</b> IUCN maps the lost part as Extinct or Possibly Extinct, or a historic range from written
+              records (Hall 1981, Ray et al. 2005).
+            </li>
+            <li>
+              <b>Before 1500:</b> a part lost long before (the dhole’s North America, the Tasmanian devil’s mainland) is left
+              out of the 1500 level: not counted.
+            </li>
+            <li>
+              <b>Islands:</b> only a bound, lost after people reached the island (Madagascar). The fall is drawn from 1500.
+            </li>
+            <li>
+              <b>Not known:</b> nothing dates it, and the fall is drawn from 1500 (<Jump to={METHOD_IDS.unknown}>step 8</Jump>).
+            </li>
+          </ul>
+          <p>
             <b>Only what people did counts.</b> When PHYLACINE’s own note says the maps differ for another reason (a name change, a
             map error, a placeholder where no range is known), no change is drawn. The Panamanian night monkey’s map without
             people leaves out Colombia only because that part now belongs to another species: that is not a loss, so its line
@@ -304,6 +330,9 @@ export function MethodsView({ onClose, at }: { onClose: () => void; at?: string 
             <Sum parts={[[c(WALK.alive), 'today'], '×', [`${ratio.toFixed(1)}×`, 'range'], '=', [c(WALK.nat), 'in 1500']]} />
             <p className="dim">
               Could be {c(WALK.natLo)} – {c(WALK.natHi)}.
+            </p>
+            <p data-walk-loss="">
+              Its fall starts in {WALK.lossStart} ({WALK.lossCite}).
             </p>
           </Quoll>
         </Step>
@@ -316,7 +345,7 @@ export function MethodsView({ onClose, at }: { onClose: () => void; at?: string 
           </p>
           <p>Some deep pasts come from genomes (Bergman et al. 2023): the curve’s shape, scaled to meet the counts.</p>
           <Quoll>
-            <p>No history: its chart is the 1500 level, then the steady fall to today.</p>
+            <p>No history: its chart is the 1500 level, held to {WALK.lossStart}, then the steady fall to today.</p>
           </Quoll>
         </Step>
 
@@ -387,6 +416,15 @@ export function MethodsView({ onClose, at }: { onClose: () => void; at?: string 
         <Step id={METHOD_IDS.unknown} n={8} title="What we don’t know">
           <ul className="m-list">
             <li>Most species have never been counted: their numbers are models, often 10× off.</li>
+            <li data-unknown="">
+              A few species, Data Deficient on the Red List, have no range map and were never counted: nobody knows how many
+              there are, or if any are left. Their card says “unknown”, and the tree draws them as thin as a species gets, faint,
+              as the chart draws “no data”.
+            </li>
+            <li data-loss-undated="">
+              For many species nothing dates when their range was lost: the fall is drawn from 1500, and the card says “not
+              known”.
+            </li>
             <li>The share of its range a species fills is the weakest step.</li>
             <li>Before 1500 the 1500 level is held flat for millions of years; real numbers rose and fell (ice ages, droughts).</li>
             <li>The maps are 1° squares (about 100 km): small ranges are rough.</li>
@@ -404,7 +442,7 @@ export function MethodsView({ onClose, at }: { onClose: () => void; at?: string 
               <Jump to={METHOD_IDS.past}>2</Jump>–<Jump to={METHOD_IDS.histories}>3</Jump>. The small word after it says where
               it came from: <b>counted</b> (a census), <b>published estimate</b> (the latest figure of its history),{' '}
               <b>modelled</b> (no count: the two models, or ours), <b>from its history</b> (the chart). “Counted or modelled”:
-              the data does not say which.
+              the data does not say which. <b>Unknown</b>: no range map, never counted (<Jump to={METHOD_IDS.unknown}>step 8</Jump>).
             </dd>
             <dt id={WORD_IDS.weighing}>Weighing</dt>
             <dd>Those alive × one’s body mass (its source in brackets), when the tree is set to mass.</dd>

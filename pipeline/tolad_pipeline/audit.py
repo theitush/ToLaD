@@ -98,6 +98,8 @@ def _today_src(n) -> str:
         return "history"
     if D.get("domestic"):
         return "domestic"
+    if D.get("count_unknown"):
+        return "unknown"  # nobody knows it: drawn at the thinnest, not a modelled level (ToLaD#507)
     meth = " ".join(D.get("meth", []))
     if "N:census" in meth:
         return "census"
@@ -163,6 +165,9 @@ def leaf_row(n, census: dict, gs_model: dict, deep_reports: dict | None = None) 
         "graft": D.get("dleaf") is not None and D["dleaf"].graft,
         "red_list": rl.get("category"), "red_list_year": rl.get("year"),
         "natural": {k: nat[k] for k in ("N", "lo", "hi")} if nat else None,
+        # what dates its range loss (ToLaD#507, lossdates): basis, the fall's first year, the cells lost before 1500
+        "loss": ({k: v for k, v in D["loss"].items() if k in ("basis", "start", "place", "cells_pre")}
+                 if D.get("loss") else None),
         "census": (census.get(n.name) or {}).get("N"), "gs_model": (gs_model.get(n.name) or {}).get("N"),
         "file": rec.get("file"), "modelled": rec.get("modelled"), "use": rec.get("use"),
         "curve": curve,

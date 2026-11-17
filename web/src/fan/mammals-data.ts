@@ -41,7 +41,7 @@ export interface Kinds {
 
 /**
  * A species' kinds only its card reads (ToLaD#502; opentrace.test.ts checks the open reads none of them): the counts'
- * ranges, the Red List assessment, the natural level, and the history's words and ranges (its points' sources and
+ * ranges, the Red List assessment, the natural level, what dates its range loss (ToLaD#507), and the history's words and ranges (its points' sources and
  * bounds, its events' text). What the layout, the columns, the labels, search and a tap read stays in mammals.json,
  * with whatever fields the data adds.
  */
@@ -50,6 +50,7 @@ export const CARD_KINDS: Kinds = {
   everHi: true,
   redList: true,
   natural: true,
+  loss: true,
   history: {
     scope: true,
     notes: true,

@@ -30,10 +30,12 @@ class Overrides:
     fossil_leaves: list[dict] = field(default_factory=list)
     # cited census sizes for fossil species (hominins, ToLaD#302): they replace the allometric model's count
     fossil_counts: dict[str, dict] = field(default_factory=dict)
+    # field-measured population densities replacing COMBINE's or PanTHERIA's (ToLaD#507): model.resolve_traits
+    densities: dict[str, dict] = field(default_factory=dict)
     applied: dict[str, list] = field(default_factory=lambda: {"exclude": [], "date": [], "placement": [],
                                                               "dated_clade": [], "dated_fossil": [],
                                                               "dated_name": [], "domestic_leaf": [],
-                                                              "fossil_leaf": [], "fossil_count": []})
+                                                              "fossil_leaf": [], "fossil_count": [], "density": []})
 
     def check_all_used(self, dated: bool = False) -> None:
         """Every entry matched something; `dated` checks the dated tree's sections (applied later)."""
@@ -67,7 +69,7 @@ class Overrides:
 def load(path: Path = PATH) -> Overrides:
     d = tomllib.loads(path.read_text(encoding="utf-8"))
     for sec in ("exclude", "date", "placement", "dated_clade", "dated_fossil", "dated_name", "domestic_leaf",
-                "fossil_leaf", "fossil_count"):
+                "fossil_leaf", "fossil_count", "density"):
         for e in d.get(sec, []):
             if not e.get("reason") or not e.get("citation"):
                 raise RuntimeError(f"overrides.toml [{sec}] {e.get('name')}: reason and citation are required")
@@ -82,6 +84,7 @@ def load(path: Path = PATH) -> Overrides:
         domestic_leaves=list(d.get("domestic_leaf", [])),
         fossil_leaves=list(d.get("fossil_leaf", [])),
         fossil_counts={e["name"]: check_count(e) for e in d.get("fossil_count", [])},
+        densities={e["name"]: check_density(e) for e in d.get("density", [])},
     )
 
 
@@ -102,3 +105,14 @@ def check_count(e: dict) -> dict:
     if e.get("kind") not in FOSSIL_COUNT_KINDS:
         raise RuntimeError(f"overrides.toml [fossil_count] {e['name']}: kind must be one of {FOSSIL_COUNT_KINDS}")
     return {**e, "n": n, "lo": lo, "hi": hi}
+
+
+def check_density(e: dict) -> dict:
+    """A [[density]]: individuals per km2 measured in the field (`sites`: where, and each site's figure)."""
+    try:
+        v = float(e["density"])
+    except (KeyError, TypeError, ValueError) as err:
+        raise RuntimeError(f"overrides.toml [density] {e.get('name')}: density is a required number") from err
+    if not v > 0 or not e.get("sites"):
+        raise RuntimeError(f"overrides.toml [density] {e['name']}: need density > 0 and its sites")
+    return {**e, "density": v}

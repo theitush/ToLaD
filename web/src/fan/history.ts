@@ -115,6 +115,12 @@ export class BirthCurve {
 /** Kinds that are the pipeline's model, never a cited figure: drawn dashed, their points hollow. */
 export const MODELLED_KINDS = new Set(['natural', 'rangeloss']);
 
+/**
+ * "No data": a stretch the chart holds flat for want of figures, faint and finely dashed (HistorySpark), and on the
+ * tree a column whose count nobody knows (colstyle.ts, ToLaD#507), drawn as faint.
+ */
+export const NODATA = { dash: '2 2.5', opacity: 0.4 };
+
 /** How well a span of the curve is known (the card's sparkline draws it so). */
 export type SpanStyle = 'solid' | 'dashed' | 'dotted';
 

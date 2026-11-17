@@ -31,7 +31,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import anchors, diversity, genomic, history, ranges
+from . import anchors, diversity, genomic, history, lossdates, ranges
 from .anchors import year_to_ma
 from .load import load_combine, load_pantheria
 from .tree import D_ANCHOR, D_FOSSIL, D_INTERP, D_UPHAM, Node, ancestor_of_rank
@@ -55,7 +55,8 @@ SOURCES = [
     ("mock", "MOCK placeholder (not a real record)"),
     ("greenspoon-data", "Greenspoon et al. 2023 data release (Zenodo 10.5281/zenodo.7594807): per-species "
                         "population reports (IUCN Red List), dog and cat numbers; CC BY 4.0"),
-    ("overrides", "ToLaD manual overrides (pipeline/overrides.toml): fossil dates, placements and hominin census sizes, with citations"),
+    ("overrides", "ToLaD manual overrides (pipeline/overrides.toml): fossil dates, placements, hominin census sizes "
+                  "and field-measured densities, with citations"),
     ("history", history.HISTORY_SRC_LABEL),
     ("mdd", "Mammal Diversity Database v2.5 (2026, doi:10.5281/zenodo.21654811): living species our backbone "
             "lacks, placed on their genus by taxonomy, with their English names; CC BY 4.0"),
@@ -80,6 +81,18 @@ NAME_ALIASES = {"Equus quagga": ["Equus burchellii"]}
 MIN_GROUP = 20  # land order groups with fewer reference species use the pooled fit
 GS_DISAGREE_FLAG = 1.0  # dex: Greenspoon's per-species model and ours further apart than this are listed (ToLaD#357)
 SD_SPLIT = 0.5  # dex: an MDD split's equal share of its parent's count (its share of the old range is unknown)
+# ToLaD#507: species whose today's map is corrected (ranges.today_maps) and whose Greenspoon et al. 2023 per-species
+# estimate was made on the old IUCN map, the one still holding the land PHYLACINE moves. Their model counts a species
+# as a density x its range (Range_km_2 in data/species_to_infer_w_ranges.csv of their repository): A. zonalis
+# 104,429 km2, more than Panama's whole land area (~75,000 km2), so with the Colombian part PHYLACINE gives
+# A. jorgehernandezi; A. jorgehernandezi 1,252 km2, a small map without it. Their two estimates (1.50M,
+# 18.1k) stand 83x apart, as those two areas do. Today's count is ours alone, on the corrected map. (For the other
+# corrected maps Greenspoon's range cannot be told to hold the moved land or not, so the two stay combined.)
+GS_ON_OLD_MAP = {"Aotus zonalis": "IUCN range 104,429 km2, with the Colombian part",
+                 "Aotus jorgehernandezi": "IUCN range 1,252 km2, without the Colombian part"}
+# ToLaD#507: a living species nobody knows the count of (count_unknown) is drawn at the thinnest a living species is
+METHOD_UNKNOWN = ("N:unknown: IUCN maps no current range for it and lists it Data Deficient, and no census or "
+                  "history counts it; drawn at the thinnest a living species is ({n:.3g}, {who})")
 # Greenspoon et al. 2023 report wild land biomass and individuals for these
 # orders; everything else is "Other" (results/results_grouped_by_order.csv)
 LAND_GROUPS = ("Rodentia", "Chiroptera", "Artiodactyla", "Proboscidea", "Primates", "Diprotodontia",
@@ -98,9 +111,11 @@ RANGELOSS_CITE = ("ToLaD range-loss trend (ToLaD#62): natural baseline from PHYL
                   "(the IUCN Red List 'since 1500' window, IUCN Categories and Criteria v3.1) to today's count")
 RANGELOSS_URL = "https://github.com/theitush/ToLaD/blob/main/pipeline/history/README.md"
 RANGELOSS_NOTE = ("Modelled, not counted (grade D). The natural (pre-human) level from the PHYLACINE present-natural "
-                  "range, held until 1500 CE, then a log-linear change to today's count. The timing is an "
-                  "assumption: IUCN's 1500 CE window, one date for every species and region; real declines "
-                  "were mostly later (19th-20th century land use) and uneven.")
+                  "range, held until 1500 CE, then a log-linear change to today's count. Where a source documents "
+                  "the loss starting later (Australia 1788, the fur trade ...), the level holds until then and "
+                  "the same change runs from that year; range the evidence dates before 1500 is left out of the "
+                  "level (META.loss, ToLaD#507). Elsewhere the timing is an assumption: IUCN's 1500 CE window; "
+                  "real declines were mostly later (19th-20th century land use) and uneven.")
 RANGELOSS_SHOWCASE = ["Bison bison", "Elephas maximus", "Ursus arctos", "Canis lupus", "Equus ferus",
                       "Gorilla gorilla", "Ceratotherium simum", "Vulpes vulpes", "Rattus norvegicus",
                       "Canis latrans", "Lynx canadensis", "Mustela nigripes", "Procyon lotor", "Sorex araneus"]
@@ -127,6 +142,8 @@ NATURAL_METHOD_FIT = "N_nat: D x natural range (PHYLACINE, rescaled to PanTHERIA
 # ToLaD#507: where PHYLACINE's own note says the map difference is not people's doing (taxonomy, a
 # mapping fix, a placeholder range; pipeline/phylacine_notes.csv), no change is drawn from it
 NATURAL_METHOD_NOTE = "N_nat: today's count (PHYLACINE's note: the map difference is {cls}, not people's doing)"
+# ToLaD#507: the lost cells the evidence dates before 1500 (lossdates.PREHISTORIC) are left out of the level held to 1500
+NATURAL_METHOD_PRE = ", without the {k} cells lost before 1500"
 # how a [[fossil_count]] was obtained (overrides.FOSSIL_COUNT_KINDS), as the leaf's method line says it
 FOSSIL_COUNT_LABEL = {"census": "census estimate", "ne-ratio": "effective size x census/Ne ratio",
                       "density-area": "density x area", "analog": "census of living analogs"}
@@ -203,8 +220,21 @@ def resolve_traits(root: Node, raw: Path, ctx: dict, log: dict) -> None:
     rng = ranges.load_ranges(raw)
     rng_meta = ranges.load_spatial_metadata(raw)
     rng_notes = ranges.load_notes()
+    # today's map where PHYLACINE's note moves land between species or deletes bad records (ToLaD#507): the
+    # corrected one, cell by cell, so today's count (density x range x occupancy) stands on it
+    today = ranges.today_maps(raw, rng_notes)
+    cell_km2 = next(r["km2_nat"] / r["cells_nat"] for r in rng.values() if r["cells_nat"])
     hits = Counter()
     rng_used: Counter = Counter()
+    ov = ctx.get("overrides")
+    dens_ov = ov.densities if ov is not None else {}
+    # when each range was lost, from cited evidence (ToLaD#507, pipeline/range_loss_dates.csv), and the cells the
+    # evidence dates before 1500
+    loss_dates = lossdates.load()
+    loss_sources = lossdates.sources(loss_dates)
+    loss_pre = lossdates.prehistoric_cells(raw, loss_dates)
+    ctx["loss_sources"] = loss_sources
+    dens_log: list[dict] = []
 
     def candidates(nd: Node) -> list[str]:
         c = [nd.name] + [a for a in nd.alt if " " in a] + nd.data.get("upham_names", [])
@@ -246,6 +276,13 @@ def resolve_traits(root: Node, raw: Path, ctx: dict, log: dict) -> None:
             v = first(pan, names, "density")
             if v:
                 D["log_density_obs"], D["density_src"] = math.log10(v), "pantheria"
+        fd = dens_ov.get(nd.name) if not nd.extinct else None
+        if fd is not None:
+            # ToLaD#507: a density measured in the field replaces the source's (overrides.toml [[density]])
+            dens_log.append({"name": nd.name, "was": v, "was_src": D.get("density_src"), "density": fd["density"],
+                             "sites": fd["sites"], "citation": " ".join(fd["citation"].split())})
+            D["log_density_obs"], D["density_src"] = math.log10(fd["density"]), "overrides"
+            D["density_cite"] = " ".join(fd["citation"].split())
         v = first(pan, names, "range_km2")
         if v:
             D["log_range_obs"] = math.log10(v)
@@ -278,19 +315,52 @@ def resolve_traits(root: Node, raw: Path, ctx: dict, log: dict) -> None:
         for n in names:
             r = rng.get(n)
             if r is not None:
+                note = rng_notes.get(n, {})
                 D["phy_range"] = {**r, "name": n, "certainty": rng_meta.get(n, {}).get("certainty", ""),
-                                  "note_class": rng_notes.get(n, {}).get("class", "")}
+                                  "note_class": note.get("class", ""),
+                                  "ex_pe": ranges.EX_PE_NOTE in note.get("phylacine_note", "")}
+                t = today.get(n)
+                if t is not None and t["cells"] is not None and not nd.extinct:
+                    D["phy_range"].update(cells_cur=t["cells"], km2_cur=t["cells"] * cell_km2,
+                                          cells_map=r["cells_cur"], today_map=t["why"])
+                ld = loss_dates.get(n) if not nd.extinct and note.get("class") == "people" else None
+                if ld is not None:
+                    # ToLaD#507: what dates the loss (lossdates.BASES), the fall's first year, the source's index
+                    D["loss"] = {"basis": ld["basis"], "start": ld["start"], "key": ld.get("key"),
+                                 "place": ld["place"]}
+                    if n in loss_pre:
+                        # the cells the evidence dates before 1500, left out of the level held to 1500
+                        D["phy_range"]["cells_pre"] = len(loss_pre[n]["cells"])
+                        D["loss"]["cells_pre"] = len(loss_pre[n]["cells"])
+                if not nd.extinct and D["phy_range"]["cells_cur"] == 0 and D["phy_range"]["ex_pe"]:
+                    # ToLaD#507: IUCN codes the species' whole mapped range Extinct or Possibly Extinct
+                    # (PHYLACINE's note; its current map is empty): FLAG bit 12
+                    D["range_ex_pe"] = True
                 rng_used[n] += 1
                 break
         if nd.kind == "tree" and not nd.extinct:
             for k in ("log_mass", "log_density_obs", "log_range_obs", "log_gen_obs", "phy_range"):
                 hits[k + (":yes" if k in D else ":no")] += 1
+    unused = sorted(set(dens_ov) - {r["name"] for r in dens_log})
+    if unused:
+        raise RuntimeError(f"overrides.toml density entries matched no living leaf: {unused}")
+    if ov is not None:
+        ov.applied["density"].extend(r["name"] for r in dens_log)
+    log["density_overrides"] = {
+        "note": "ToLaD#507: population densities measured in the field (overrides.toml [[density]]) replace "
+                "COMBINE's or PanTHERIA's (was, ind/km2); the mean of the sites where the species was found",
+        "species": dens_log}
     log["trait_coverage_extant"] = {k: v for k, v in sorted(hits.items()) if not k.startswith("mass:")}
     log["mass_sources"] = {k: v for k, v in hits.items() if k.startswith("mass:")}
     shared = sorted(k for k, v in rng_used.items() if v > 1)
     log["phylacine_ranges"] = {
         "range_maps": len(rng), "maps_used": len(rng_used), "leaves_with_map": sum(rng_used.values()),
         "maps_on_more_than_one_leaf": len(shared), "examples_shared": shared[:10],
+        "today_maps_note": "ToLaD#507: today's map, cell by cell, of each living species whose map difference "
+                           "PHYLACINE's note puts down to taxonomy or a mapping fix, and of the species such a note "
+                           "takes land from (ranges.today_maps): cells = the corrected map's cells (null: left as "
+                           "it is, why says why), cells_map = PHYLACINE's current map",
+        "today_maps": today,
     }
 
 
@@ -380,7 +450,8 @@ def model_leaves(root: Node, raw: Path, log: dict) -> None:
             ld = D["log_density_obs"]
             sdNA2 += 0.5 ** 2
             src.add(SRC[D["density_src"]])
-            meth.append(f"D:obs({D['density_src']})")
+            meth.append(f"D:obs({D['density_src']})" if "density_cite" not in D else
+                        f"D:field {10 ** ld:.3g}/km2 (overrides.toml; {D['density_cite']})")
         else:
             ld = dA + dB * lm
             sdNA2 += dS ** 2 + (dB * msd) ** 2
@@ -599,6 +670,58 @@ def near_extinct(n: Node) -> bool:
             and n.data.get("iucn") in NEAR_EXTINCT_STATUS)
 
 
+def count_unknown(n: Node, census: dict[int, float], history_names: set[str]) -> bool:
+    """ToLaD#507: a living species nobody knows the count of. PHYLACINE lists it but its current map is empty
+    (IUCN maps no current range for it; today's map after ranges.today_maps), the IUCN Red List has it Data
+    Deficient, and no census or curated history counts it. Its count is marked unknown (FLAG bit 11) and drawn
+    at the thinnest a living species is (mark_unknown). A species missing from PHYLACINE altogether (a newer
+    split or description) is not one: PHYLACINE says nothing about its map."""
+    D = n.data
+    pr = D.get("phy_range")
+    return (n.is_leaf and not n.extinct and n.name != "Homo sapiens" and pr is not None and pr["cells_cur"] == 0
+            and (D.get("red_list") or {}).get("category") == "DD" and id(n) not in census
+            and n.name not in history_names)
+
+
+def mark_unknown(root: Node, unknown: set[int]) -> dict:
+    """The count of each species nobody knows (count_unknown, ToLaD#507) becomes the thinnest a living species is
+    drawn at: the smallest today's count of any other living species, held over its whole band. No natural level
+    or range-loss trend is drawn for it. Runs after the history files, which set some living counts. Returns the
+    stats.json report."""
+    living = [n for n in root.preorder() if n.is_leaf and not n.extinct and n.name != "Homo sapiens"]
+    thin = min((n for n in living if id(n) not in unknown and n.data["alive"] > 0), key=lambda n: n.data["alive"])
+    N = thin.data["alive"]
+    rows = []
+    for n in living:
+        if id(n) not in unknown:
+            continue
+        D = n.data
+        rows.append({"leaf": n.name, "was": D["alive"], "note_class": D["phy_range"]["note_class"],
+                     "range_ex_pe": bool(D.get("range_ex_pe"))})
+        r = N / D["L"]
+        D["alive"] = N
+        D["rate_wild_now"] = r
+        D["pieces"] = [(n.t0, n.t1, r)]
+        D["n_wild_pieces"] = 1
+        D["ever_med"] = (n.t0 - n.t1) * 1e6 * r
+        D["grade_cap"] = D["grade_cap_today"] = 3
+        for k in ("natural", "rangeloss", "gs_combined", "genus_median"):
+            D.pop(k, None)
+        D["meth"] = ([m for m in D["meth"] if not m.startswith(("D:", "A:", "k:", "N:", "N_nat:"))]
+                     + [METHOD_UNKNOWN.format(n=N, who=thin.name)])
+        D["src"] -= {SRC["greenspoon"], SRC["greenspoon-data"]}  # (the occupancy fit and Greenspoon's estimate)
+        D["count_unknown"] = {"N": N, "thinnest": thin.name}
+    return {
+        "note": "ToLaD#507: living species nobody knows the count of (model.count_unknown): PHYLACINE lists them "
+                "but their current map is empty, the IUCN Red List has them Data Deficient, and no census or "
+                "history counts them. FLAG bit 11; their count is the thinnest a living species is drawn at "
+                "(`thinnest`, the smallest today's count of any other living species), over the whole band, with "
+                "no natural level. was = the count the model gave them, which nothing checks",
+        "thinnest": {"leaf": thin.name, "N": N}, "species": len(rows),
+        "was_total": sum(r["was"] for r in rows), "list": sorted(rows, key=lambda r: -r["was"]),
+    }
+
+
 def count_flags(root: Node, ref: dict[int, float], comb: dict[int, dict] | None = None) -> dict:
     """ToLaD#68: the living species whose today's count cannot be trusted as modelled. Listed in
     stats.json -> count_flags, with what was done (after history files: `today` is the shipped count).
@@ -615,6 +738,7 @@ def count_flags(root: Node, ref: dict[int, float], comb: dict[int, dict] | None 
             area_with_map[next((m.split(" mean")[0] + " mean" if " mean" in m else m
                                 for m in D["meth"] if m.startswith("A:")), "none (census, estimate or cap)")] += 1
         today_from = ("history file" if D.get("alive_from_history")
+                      else "unknown" if D.get("count_unknown")
                       else "census" if D.get("census_N") is not None
                       else "Greenspoon model + ours" if id(n) in ref else "capped" if D.get("near_extinct_cap")
                       else "model")
@@ -625,6 +749,8 @@ def count_flags(root: Node, ref: dict[int, float], comb: dict[int, dict] | None 
         if pr is not None and pr["cells_cur"] == 0 and not D.get("domestic"):
             row["action"] = ("cited count (history file)" if today_from == "history file"
                              else "capped: possibly extinct" if D.get("near_extinct_cap")
+                             else "count unknown (IUCN DD, never counted): drawn at the thinnest"
+                             if D.get("count_unknown")
                              else "flagged: no current map, IUCN " + str(D.get("iucn")))
             no_cur.append(row)
         elif D.get("iucn") in NEAR_EXTINCT_STATUS and D["alive"] > CHECK_CR_ABOVE and today_from in (
@@ -641,8 +767,10 @@ def count_flags(root: Node, ref: dict[int, float], comb: dict[int, dict] | None 
         "note": "ToLaD#68. no_current_range: living leaves with a PHYLACINE map but an empty current range "
                 "(PHYLACINE's current range is IUCN's without 'possibly extinct' areas). IUCN CR/EW ones are "
                 f"capped at {NEAR_EXTINCT_CAP:.0f} (CR criterion D, IUCN Categories and Criteria v3.1) unless a "
-                "history file gives a cited count; the rest (DD/LC/unassessed: unmapped, mostly taxonomic) are "
-                "flagged only. Their natural baseline takes the density route. cr_modelled_above_10k: IUCN CR/EW "
+                "history file gives a cited count; the Red List DD ones no census or history counts are unknown "
+                "(ToLaD#507, count_unknown: drawn at the thinnest, no natural level); the rest (LC/unassessed: "
+                "unmapped, mostly taxonomic) are flagged only, their natural baseline taking the density route. "
+                "cr_modelled_above_10k: IUCN CR/EW "
                 f"species whose today's count is still modelled and above {CHECK_CR_ABOVE:.0f} (the ceiling of "
                 "IUCN criterion C): candidates for a census anchor, not changed. today = the shipped alive count.",
         "cite": " ".join(IUCN_CRITERIA_CITE),
@@ -687,10 +815,13 @@ def natural_level(D: dict, N_today: float, sd_today: float, extinct: bool, area_
                 "kind": "reconstruction", "map": pr["name"], "certainty": pr.get("certainty", ""),
                 "scaled": False, "note_class": pr["note_class"], "km2_cur": pr["km2_cur"], "km2_nat": pr["km2_nat"],
                 "cells_cur": pr["cells_cur"], "cells_nat": pr["cells_nat"]}
+    # ToLaD#507: the cells the evidence dates before 1500 (lossdates.PREHISTORIC) are not in the level held to 1500
+    pre = 0 if extinct else pr.get("cells_pre", 0)
+    nat_cells = pr["cells_nat"] - pre
     if not extinct and pr["cells_cur"] > 0 and N_today > 0:
         # exactly today's count where the maps agree (x * a / a can miss x by an ulp)
-        N = N_today if pr["cells_nat"] == pr["cells_cur"] else N_today * pr["cells_nat"] / pr["cells_cur"]
-        sd_x = 0.0 if pr["cells_nat"] == pr["cells_cur"] else SD_NAT_RANGE
+        N = N_today if nat_cells == pr["cells_cur"] else N_today * nat_cells / pr["cells_cur"]
+        sd_x = 0.0 if nat_cells == pr["cells_cur"] else SD_NAT_RANGE
         sd = math.hypot(sd_today, sd_x)
         how = NATURAL_METHOD_SCALED
     else:
@@ -700,16 +831,27 @@ def natural_level(D: dict, N_today: float, sd_today: float, extinct: bool, area_
         sd = math.hypot(sd_x, D.get("k_sd", 0.0))
         how = NATURAL_METHOD_FIT
     h = 1.96 * sd
-    return {"N": N, "lo": N / 10 ** h, "hi": N * 10 ** h, "sd": sd, "sd_extra": sd_x, "method": how,
-            "grade": "D", "kind": "reconstruction", "map": pr["name"], "certainty": pr.get("certainty", ""),
-            "scaled": how == NATURAL_METHOD_SCALED,
-            "km2_cur": pr["km2_cur"], "km2_nat": pr["km2_nat"],
-            "cells_cur": pr["cells_cur"], "cells_nat": pr["cells_nat"]}
+    out = {"N": N, "lo": N / 10 ** h, "hi": N * 10 ** h, "sd": sd, "sd_extra": sd_x, "method": how,
+           "grade": "D", "kind": "reconstruction", "map": pr["name"], "certainty": pr.get("certainty", ""),
+           "scaled": how == NATURAL_METHOD_SCALED,
+           "km2_cur": pr["km2_cur"], "km2_nat": pr["km2_nat"] - (pr["km2_nat"] * pre / pr["cells_nat"] if pre else 0.0),
+           "cells_cur": pr["cells_cur"], "cells_nat": nat_cells}
+    if pre:
+        out.update(cells_pre=pre, km2_pre=pr["km2_nat"] * pre / pr["cells_nat"],
+                   method=how + NATURAL_METHOD_PRE.format(k=pre))
+    return out
 
 
-def rangeloss_points(n_nat: float, n_today: float) -> list[dict]:
-    """The two knots of the range-loss trend: the natural level in 1500, today's count now."""
-    return [{"year": RANGELOSS_START_YEAR, "n": n_nat}, {"year": anchors.NOW_YEAR, "n": n_today}]
+def rangeloss_points(n_nat: float, n_today: float, start: float = RANGELOSS_START_YEAR) -> list[dict]:
+    """The two knots of the range-loss trend: the natural level in `start` (1500, or the documented start of the
+    loss, loss_start), today's count now."""
+    return [{"year": start, "n": n_nat}, {"year": anchors.NOW_YEAR, "n": n_today}]
+
+
+def loss_start(D: dict) -> int:
+    """The year the range-loss trend starts (ToLaD#507): a documented start later than 1500 where the evidence
+    gives one (lossdates `later`), else 1500."""
+    return (D.get("loss") or {}).get("start", RANGELOSS_START_YEAR)
 
 
 def rangeloss_start(leaf: Node, any_natural: bool = False) -> dict | None:
@@ -728,7 +870,7 @@ def rangeloss_start(leaf: Node, any_natural: bool = False) -> dict | None:
 def _rangeloss_p0(leaf: Node) -> dict:
     D = leaf.data
     nat = D["natural"]
-    p0 = rangeloss_points(nat["N"], D["rate_wild_now"] * D["L"])[0]
+    p0 = rangeloss_points(nat["N"], D["rate_wild_now"] * D["L"], loss_start(D))[0]
     p0.update(lo=nat["lo"], hi=nat["hi"], grade="D", kind="rangeloss", span_kind="rangeloss",
               cite=RANGELOSS_CITE, url=RANGELOSS_URL,
               note="natural (pre-human) level from the PHYLACINE present-natural range; the modelled "
@@ -749,7 +891,7 @@ def rangeloss_record(leaf: Node) -> dict:
     nat = D["natural"]
     n_now = D["rate_wild_now"] * L
     h = 1.96 * D.get("sd_today_count", 0.0)
-    p0, p1 = rangeloss_points(nat["N"], n_now)
+    p0, p1 = rangeloss_points(nat["N"], n_now, loss_start(D))
     p0 = _rangeloss_p0(leaf)
     p1.update(lo=n_now / 10 ** h, hi=n_now * 10 ** h, grade="ABCD"[min(3, D.get("grade_cap_today", 3))],
               kind="model", cite="ToLaD model (stats.json, this leaf)", url="https://github.com/theitush/ToLaD",
@@ -768,8 +910,10 @@ def rangeloss_record(leaf: Node) -> dict:
 
 
 def rangeloss_report(root: Node) -> dict:
-    """stats.json -> rangeloss: coverage, the factors N_nat / N_today, outliers, showcase."""
+    """stats.json -> rangeloss: coverage, the factors N_nat / N_today, outliers, showcase, and what dates each
+    loss (ToLaD#507: lossdates.BASES, the fall's first year, the cells left out as lost before 1500)."""
     leaves = [n for n in root.preorder() if n.is_leaf and n.data.get("rangeloss")]
+    dated = [n for n in root.preorder() if n.is_leaf and n.data.get("loss")]
     recs = [n for n in leaves if (n.data.get("history") or {}).get("modelled") == "rangeloss"]
 
     def factor(n):
@@ -790,11 +934,32 @@ def rangeloss_report(root: Node) -> dict:
     return {
         "note": "Layer 4 of the estimate stack (ToLaD#62): an extant species whose natural baseline (layer 1, "
                 "PHYLACINE present-natural vs current range) differs from today's count changes log-linearly "
-                f"from N_nat in {RANGELOSS_START_YEAR} CE to today's count in {anchors.NOW_YEAR} (IUCN's "
-                "'since 1500' window, one date for all). factor = N_nat / N_today (> 1 = decline). HIST kind "
+                f"from N_nat in {RANGELOSS_START_YEAR} CE (IUCN's 'since 1500' window; ToLaD#507: or the "
+                f"documented start of the loss where a source gives one later, by_basis.later) to today's count "
+                f"in {anchors.NOW_YEAR}. factor = N_nat / N_today (> 1 = decline). HIST kind "
                 "11 `rangeloss`, grade D. A history file replaces it (showcase rows with from=history: the "
                 "factor shown is the model's, the curve is the history file's).",
         "start_year": RANGELOSS_START_YEAR, "end_year": anchors.NOW_YEAR,
+        "loss_note": "ToLaD#507: what dates each species' loss (pipeline/range_loss_dates.csv, from research/"
+                     "range-loss-dates.md): later = a documented start after 1500, where the trend starts instead "
+                     "of 1500; dated = 1500 -> today; prehistoric = the cells the evidence dates before 1500 are "
+                     "left out of the level held to 1500; bound = only a lower bound (people's arrival on an "
+                     "island; the moose's Iron Age range); undated = nothing dates it. by_basis counts the living "
+                     "leaves that carry one (all), and those drawn with the trend (trend). loss_sources is the "
+                     "citation table (META.natural.trend.loss.sources).",
+        "by_basis": {b: {"all": sum(n.data["loss"]["basis"] == b for n in dated),
+                         "trend": sum(n.data["loss"]["basis"] == b for n in dated if n.data.get("rangeloss"))}
+                     for b in lossdates.BASES},
+        "later_starts": dict(sorted(Counter(n.data["loss"]["start"] for n in dated
+                                            if n.data["loss"]["basis"] == "later").items())),
+        "prehistoric": [{"leaf": n.name, "place": n.data["loss"]["place"],
+                         "cells_left_out": n.data["loss"].get("cells_pre", 0),
+                         "km2_left_out": round(n.data["natural"].get("km2_pre", 0.0)) if n.data.get("natural") else None,
+                         "natural": n.data["natural"]["N"] if n.data.get("natural") else None,
+                         "today": n.data["rate_wild_now"] * n.data["L"],
+                         "trend": bool(n.data.get("rangeloss")),
+                         "from": (n.data.get("history") or {}).get("file") or (n.data.get("history") or {}).get("modelled")}
+                        for n in dated if n.data["loss"]["basis"] == "prehistoric"],
         "species_with_trend": len(leaves), "hist_records": len(recs),
         "replaced_by_history_file": sum((n.data.get("history") or {}).get("file") is not None for n in leaves),
         "carried_by_genomic_record": sum((n.data.get("history") or {}).get("modelled") == "genomic"
@@ -909,17 +1074,19 @@ def combine_greenspoon(root: Node, gs: dict[int, float], log: dict) -> dict[int,
     return out
 
 
-def mdd_fallback(root: Node, census: dict[int, float], gs: dict[int, dict]) -> tuple[dict[int, dict], dict[int, int]]:
+def mdd_fallback(root: Node, census: dict[int, float], gs: dict[int, dict],
+                 unknown: set[int] = frozenset()) -> tuple[dict[int, dict], dict[int, int]]:
     """The MDD-grafted species (ToLaD#278) the count model has no inputs for (no census, no Greenspoon
     estimate, no range of their own: their mass and range would be clade means, a clade-mean copy, #116).
     One split off a living leaf of ours (mdd_parent, mdd.sisters) takes an equal share of that parent's count,
     which covers the parent's old, undivided range: the parent and its daughters share it, so the split adds
     no animals (ToLaD#357; copying it made Metachirus ~3x its pre-split total). The others: the median
     today's count of the other species of their MDD genus (else family, else order), with that taxon's spread
-    (min 0.5 dex, 1 dex from a single species) as the error. Returns id(leaf) -> the estimate, and id(parent)
-    -> the number of shares its count is cut into."""
+    (min 0.5 dex, 1 dex from a single species) as the error. A species whose count nobody knows (`unknown`,
+    count_unknown, ToLaD#507) is no parent and no part of a median. Returns id(leaf) -> the estimate, and
+    id(parent) -> the number of shares its count is cut into."""
     leaves = [n for n in root.preorder() if n.is_leaf and n.kind == "tree" and not n.extinct
-              and n.name != "Homo sapiens" and "log_k" in n.data]
+              and n.name != "Homo sapiens" and "log_k" in n.data and id(n) not in unknown]
 
     def own_range(n: Node) -> bool:
         return "log_range_obs" in n.data or n.data.get("phy_range", {}).get("km2_cur", 0) > 0
@@ -1021,9 +1188,16 @@ def assign_leaf_counts(root: Node, raw: Path, ctx: dict, log: dict) -> None:
     # species without a census report
     gs_model = anchors.greenspoon_species_model(raw)
     gs_hits, gs_miss = match_species(sorted(gs_model), ctx)
+    # the species nobody knows the count of (ToLaD#507): set aside before any count leans on a figure for them
+    hist_names = {r["species"] for r in history.load_all()}
+    unknown = {id(n) for n in root.preorder() if count_unknown(n, census, hist_names)}
     gs: dict[int, float] = {}
+    gs_old_map = []
     for nm, nd in gs_hits.items():
-        if id(nd) not in census and id(nd) not in gs and not nd.data["marine"]:
+        if id(nd) not in census and id(nd) not in gs and not nd.data["marine"] and id(nd) not in unknown:
+            if nd.name in GS_ON_OLD_MAP:
+                gs_old_map.append(nd.name)  # made on the old map: ours alone (ToLaD#507)
+                continue
             gs[id(nd)] = gs_model[nm]["N"]
     ref = {**gs, **census}
     fit_occupancy(root, ref, census, anchors.greenspoon_order_targets(raw), log)
@@ -1034,8 +1208,11 @@ def assign_leaf_counts(root: Node, raw: Path, ctx: dict, log: dict) -> None:
         "census_unmatched_or_extinct": sorted(misses), "census_duplicates_skipped": dup,
         "species_model_estimates": len(gs_model), "species_model_used": len(gs),
         "species_model_unmatched": len(gs_miss),
+        "species_model_on_old_map": {k: GS_ON_OLD_MAP[k] for k in sorted(gs_old_map)},
+        "species_model_on_old_map_note": "ToLaD#507: Greenspoon's estimate made on the IUCN map that still holds the "
+                                         "land PHYLACINE moves (model.GS_ON_OLD_MAP): today's count is ours alone",
     }
-    fallback, shares = mdd_fallback(root, census, comb)
+    fallback, shares = mdd_fallback(root, census, comb, unknown)
     if "mdd" in log:
         log["mdd"]["genus_median_estimates"] = {
             "note": "MDD-grafted species with no census, Greenspoon estimate or range map of their own: today's "
@@ -1138,7 +1315,10 @@ def assign_leaf_counts(root: Node, raw: Path, ctx: dict, log: dict) -> None:
         if id(n) in shares:
             sd_today = math.hypot(sd_today, SD_SPLIT)
         D["sd_today_count"] = sd_today
-        nat = natural_level(D, N, sd_today, n.extinct, ctx["area_fit"])
+        # (nobody knows the count of an unknown one, nor its natural level: mark_unknown, after the history files)
+        nat = None if id(n) in unknown else natural_level(D, N, sd_today, n.extinct, ctx["area_fit"])
+        if id(n) in unknown:
+            found["count unknown"] += 1
         r_nat = r
         if nat is not None:
             D["natural"] = nat
@@ -1152,7 +1332,8 @@ def assign_leaf_counts(root: Node, raw: Path, ctx: dict, log: dict) -> None:
                 found["natural: extinct, whole band"] += 1
             elif nat["N"] != N:
                 D["sd_leaf"] = math.hypot(D["sd_leaf"], nat["sd_extra"])
-                D["meth"].append(f"{nat['method']}, held before {RANGELOSS_START_YEAR}"
+                y_start = loss_start(D) if nat["scaled"] else RANGELOSS_START_YEAR
+                D["meth"].append(f"{nat['method']}, held before {y_start}"
                                  + (", then log-linear to today's count (range loss, modelled)"
                                     if nat["scaled"] else ""))
                 cap = 3
@@ -1190,7 +1371,8 @@ def assign_leaf_counts(root: Node, raw: Path, ctx: dict, log: dict) -> None:
             # range loss (ToLaD#62): the natural level held to 1500, then log-linear to today's count.
             # Only with both maps: N_nat is then today's count x natural / current cells, so the
             # factor is the range ratio and not a mismatch between two methods
-            pieces = history.curve_pieces(rangeloss_points(nat["N"], N), D["L"], n.t0, step=RANGELOSS_PIECE_YR)
+            pieces = history.curve_pieces(rangeloss_points(nat["N"], N, loss_start(D)), D["L"], n.t0,
+                                          step=RANGELOSS_PIECE_YR)
             D["rangeloss"] = True
         elif r_nat != r and n.t0 > step:
             # extant with no current range map (N_nat from density x area x occupancy): the #61 step
@@ -1254,15 +1436,17 @@ def assign_leaf_counts(root: Node, raw: Path, ctx: dict, log: dict) -> None:
     recs = history.load_all()
     living = {}
     for n in root.preorder():
-        if n.is_leaf and n.name and not n.extinct:
+        if n.is_leaf and n.name and not n.extinct and id(n) not in unknown:
             living.setdefault(n.name, n)
     recs += genomic.attach(recs, living, genomic.load(raw), rangeloss_start, log)
     ctx["history"] = history.apply(root, raw, log, SRC["history"], recs, rangeloss_start)
+    log["count_unknown"] = mark_unknown(root, unknown)
     # range-loss trend records for the species no history file covers (a history file wins)
     for n in root.preorder():
         if n.is_leaf and n.data.get("rangeloss") and n.data.get("history") is None:
             n.data["history"] = rangeloss_record(n)
     log["rangeloss"] = rangeloss_report(root)
+    log["rangeloss"]["loss_sources"] = ctx["loss_sources"]
     log["natural_baseline"] = natural_report(root)
     log["count_flags"] = count_flags(root, ref, comb)
     # layer 2, genetic diversity: a cross-check written to stats.json only (ToLaD#63)

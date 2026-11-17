@@ -23,6 +23,8 @@ export const FLAG: {
   readonly ANCHORED: number;
   readonly GRAFT: number;
   readonly GROUP: number;
+  readonly COUNT_UNKNOWN: number;
+  readonly RANGE_EX_PE: number;
 };
 export const GRADES: string[];
 export const DATE_SOURCES: string[];

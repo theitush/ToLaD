@@ -48,8 +48,18 @@
 #                     tree splits it off `sister`'s lineage at `age` (`lo`-`hi`)
 #                     and names it `common`. The ancestor's own leaf, band and
 #                     counts are untouched.
+#
+# And one section corrects a trait (ToLaD#507), at the very end:
+#   [[density]]       a living species' population density (individuals per
+#                     km2) measured in the field, replacing COMBINE's or
+#                     PanTHERIA's: the overall density where the study gives
+#                     one, else the mean of its sites where the species was
+#                     found (`sites` lists them); with more than one study, the
+#                     mean of all their sites. Absence elsewhere is the model's
+#                     occupancy, as with every density. Another species' figure
+#                     is never borrowed.
 
-version = 6
+version = 8
 
 [[exclude]]
 name = "Tikitherium copei"
@@ -1003,3 +1013,56 @@ species is taken at the census of the living great apes like it: bonobos 15,000-
 species) to chimpanzees 173,000-300,000 (four subspecies across Africa); 50,000 (15,000-300,000)."""
 citation = """Fruth, B. et al. (2016). Pan paniscus. IUCN Red List: e.T15932A102331567; Humle, T. et al. \
 (2016). Pan troglodytes. IUCN Red List: e.T15933A129038584"""
+
+# --- Night monkeys: the ex-lemurinus species (ToLaD#507) -----------------------------------------
+# COMBINE (Soria et al. 2021, trait_data_reported.csv) gives 1.5 individuals/km2 to all four species split
+# from Aotus lemurinus (A. zonalis, A. lemurinus, A. griseimembra, A. brumbacki), one value copied across
+# them; the other Aotus species there are at 19.5-35.4. Where a field survey of the species measured a
+# density, that replaces it.
+
+[[density]]
+name = "Aotus zonalis"
+density = 17.0
+sites = "Campo Chagres 19.7, Cerro Azul 14.3; not found at La Llana (Chagres National Park, Panama, 2008)"
+reason = """Line-transect survey in Chagres National Park, Panama, May-July 2008: 19.7 individuals/km2 at \
+Campo Chagres and 14.3 at Cerro Azul; not found at La Llana. The abstract gives no overall density (the \
+paper is behind a paywall), so the mean of the two sites where the species was found: 17.0."""
+citation = """Svensson, M.S., Samudio, R., Bearder, S.K. & Nekaris, K.A.I. (2010). Density estimates of \
+Panamanian owl monkeys (Aotus zonalis) in three habitat types. American Journal of Primatology 72(2):187-192. \
+doi:10.1002/ajp.20758"""
+
+[[density]]
+name = "Aotus lemurinus"
+density = 76.0
+sites = "Dapa, Valle del Cauca 113 (2015); Otun Quimbaya, Risaralda 39 (2018) (Andes of Colombia)"
+reason = """Two distance-sampling surveys of the Andean night monkey in Colombia: 113 individuals/km2 in the \
+subandean forest of Dapa, Valle del Cauca (2015; Hirche et al. 2017, as Aotus cf. lemurinus), and 39 \
+(95% CI 24.0-63.2) in the Otun Quimbaya Wildlife Sanctuary, Risaralda (2018; Chica Florez et al. 2022). \
+Neither gives an overall density across sites; the mean of the two: 76.0."""
+citation = """Hirche, A., Jimenez, A., Roncancio-Duque, N. & Ansorge, H. (2017). Population density of Aotus \
+cf. lemurinus (Primates: Aotidae) in a subandean forest patch on the eastern slopes of the Western Andes, \
+region of Dapa, Yumbo, Valle del Cauca, Colombia. Primate Conservation 31:1-7; Chica Florez, L., Roncancio \
+Duque, N. & Solari, S. (2022). Variation in population density of the Andean night monkey (Aotus lemurinus) \
+in areas with different landscape characteristics. THERYA 13(3):287-294. doi:10.12933/therya-22-2126"""
+
+# Aotus griseimembra: no [[density]] entry, on purpose; it stays on COMBINE's 1.5/km2 (ToLaD#507). The only field
+# figure found is one census in northern Colombia that the Handbook of the Mammals of the World (vol. 3, Aotidae,
+# 2013) reports at 150 ind/km2 without naming it, and itself calls "unusually high ... a forest remnant that may
+# have served as a refuge". A census nobody can read, discounted by its own reporter, is not evidence enough: add
+# one only from a field survey that can be read and cited.
+
+[[density]]
+name = "Aotus brumbacki"
+density = 34.1
+sites = "San Martin, Meta: fragments 13.10 and 3.26 (2004-2011); 32.3, 69.5, 83.3 and 3.1 (2020-21)"
+reason = """Two surveys of forest fragments at San Martin, Meta, in the Colombian Llanos: Carretero-Pinzon \
+(2013, counts at sleeping sites, 2004-2011) found 3.26-13.10 individuals/km2 (13.10 in fragment 1, a mean \
+of 3.26 in fragment 2, as Gomez Castaneda 2021 cites them; the chapter itself was not read), and Gomez \
+Castaneda (2021, a thesis co-supervised by Carretero-Pinzon; direct counts on 1-km transects, Nov 2020-Feb 2021) found 32.3, 69.5, 83.3 and 3.1 in four fragments (Table \
+1), the highest in the smallest, which the author reads as crowding. Neither gives an overall density; the \
+mean of the six: 34.1."""
+citation = """Carretero-Pinzon, X. (2013). An eight-year life history of a primate community in the Colombian \
+Llanos. In Marsh, L.K. & Chapman, C.A. (eds), Primates in Fragments, pp. 159-182. Springer. \
+doi:10.1007/978-1-4614-8839-2_12; Gomez Castaneda, F.S. (2021). Densidad poblacional del mico llanero \
+(Aotus brumbacki) en un paisaje fragmentado en San Martin, Meta, Colombia. Undergraduate thesis, Universidad \
+Pedagogica Nacional, Bogota"""

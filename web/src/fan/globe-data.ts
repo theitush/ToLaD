@@ -6,7 +6,9 @@
 // `grid.lat` (Behrmann equal-area). A species' cells are run-length coded over flat indices (row * 360 + col) as
 // [gap, length, ...], each gap from the end of the run before: `ranges[sci] = [current, present_natural]`. A species
 // PHYLACINE lacks under all its names borrows the range of the older species it was split from (ToLaD#486), named as a
-// third element: `[current, present_natural, "Loxodonta africana"]`.
+// third element: `[current, present_natural, "Loxodonta africana"]`. A species' current cells are the map its count
+// stands on (ToLaD#507: where PHYLACINE's note moves land between species or deletes bad records, the corrected one); an
+// empty pair is a species PHYLACINE lists but draws no range for (no current map, its present-natural one a placeholder).
 
 import type { MultiPolygon } from 'geojson';
 

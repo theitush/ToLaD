@@ -219,7 +219,8 @@ describe('the species card: the population at the time touched', () => {
         const html = renderToStaticMarkup(<SpeciesCard sp={sp} ageMa={ageMa} onClose={() => {}} />);
         const tags = [...html.replace(/<details[\s\S]*<\/details>/, '').matchAll(/<a [^>]*class="mlink src"[^>]*>([^<]*)<\/a>/g)].map((m) => m[1]);
         for (const t of tags) expect(SOURCES, `${sp.common}: "${t}"`).toContain(t);
-        const f = face(html.replace(/<a [^>]*class="mlink src"[^>]*>[^<]*<\/a>/g, ''));
+        // (The loss line's "range" is where the species lives, not a number's range: "Range lost since 1788", ToLaD#507.)
+        const f = face(html.replace(/<a [^>]*class="mlink src"[^>]*>[^<]*<\/a>/g, '').replace(/<p class="loss"[\s\S]*?<\/p>/, ''));
         for (const jargon of ['grade', 'model', 'generation', 'range', 'Myr', 'kyr', '≈', 'lineage', 'curated', ' × 10', 'born in total', 'line ended'])
           expect(f, `${sp.common}: "${jargon}" on the face`).not.toContain(jargon);
         // A few short lines: the face stays tight.

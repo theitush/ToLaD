@@ -6,7 +6,7 @@
 import { useState, type ReactNode } from 'react';
 import { useAlone } from './Alone';
 import { CURVE_KINDS } from './HistorySpark';
-import { METHOD_IDS, Methods } from './Methods';
+import { METHOD_IDS, MethodLink, Methods } from './Methods';
 import type { SpeciesRec } from './panthera';
 
 /**
@@ -58,4 +58,81 @@ export const SOURCE_WORD: Record<Exclude<AliveSource, null>, string> = {
 /** Where a species' count today is explained: its history (step 3) when it has one of its own, else step 1. */
 export function aliveStep(sp: SpeciesRec): string {
   return sp.history && !sp.history.modelled ? METHOD_IDS.histories : METHOD_IDS.alive;
+}
+
+/**
+ * A citation's short name for the card (ToLaD#507): its first author and year ("Strahan & Van Dyck 2008", "Ray, Hunter &
+ * Zigouris 2005", "Faurby et al. 2018"); a citation that names none is PHYLACINE's note's own ("PHYLACINE"), else ''.
+ * The whole citation is in the chart's sources.
+ */
+export function shortCite(cite: string): string {
+  const m = cite.match(AUTHOR_YEAR);
+  if (m) return m[0].replace(/,(?= \d)/, '');
+  return /^PHYLACINE note/.test(cite) ? 'PHYLACINE' : '';
+}
+// A surname has a small letter (so "BP" is none), a particle may lead it ("Van Dyck", "van Strien").
+const SURNAME = "(?:(?:[Dd]e|[Vv]an|[Vv]on|[Dd]a) )?[A-Z][\\p{L}'’-]*\\p{Ll}[\\p{L}'’-]*";
+const AUTHOR_YEAR = new RegExp(`${SURNAME}(?:(?:, | & | and )${SURNAME})*(?: et al\\.)?,? (?:1[5-9]\\d\\d|20\\d\\d)(?!\\d)`, 'u');
+
+/** A source's year in the card's words: a year from 1000 CE as it is ("1788"), an older one as years ago, rounded ("~10,500 years ago"). */
+export function yearWords(y: number, now = new Date().getFullYear()): string {
+  if (y >= 1000) return String(y);
+  const ago = now - y;
+  const r = ago < 1e4 ? Math.round(ago / 100) * 100 : Math.round(ago / 500) * 500;
+  return `~${r.toLocaleString('en-US')} years ago`;
+}
+
+/** A source's window in words: "by ~11,000 years ago", "after 1280", "~7,500–2,500 years ago", "1280–1850". */
+function spanWords(from: number | null, to: number | null): string {
+  if (from === null && to === null) return 'before 1500';
+  if (from === null) return `by ${yearWords(to!)}`;
+  if (to === null) return `after ${yearWords(from)}`;
+  const [a, b] = [yearWords(from), yearWords(to)];
+  if (a === b) return a;
+  const ago = / years ago$/;
+  return ago.test(a) && ago.test(b) ? `${a.replace(ago, '')}–${b.replace(/^~/, '')}` : ago.test(a) || ago.test(b) ? `${a} to ${b}` : `${a}–${b}`;
+}
+
+/**
+ * What dates a living species' fall since 1500, in a few words (ToLaD#507 group 3, research/range-loss-dates.md): the
+ * words linked to the methods page, the rest, and the page's section. Null: no line, the species has no loss the data
+ * dates, or no fall (a domestic stock's rise). The five bases (pipeline/FORMAT.md "Loss dates"):
+ * - later: "Range lost since 1788 (Strahan & Van Dyck 2008)": the fall starts at the documented start;
+ * - dated: "Range lost since 1500 (Hall 1981)": the source is bounded by 1500;
+ * - prehistoric: "Range in mainland Australia lost ~3,300–3,100 years ago, not counted": left out of the 1500 level;
+ * - bound: "Range lost after people reached Madagascar (~10,500 years ago)": only a lower bound; a bound that names no
+ *   land (the moose's Iron Age range) says its year and source;
+ * - undated: "When it lost its range is not known".
+ */
+export function lossWords(sp: SpeciesRec): { link: string; rest: string; to: string } | null {
+  const l = sp.loss;
+  const nat = sp.natural;
+  if (!l || sp.extinct || !nat || nat.n < sp.alive * (1 - 1e-6)) return null;
+  const cite = shortCite(l.cite);
+  const by = cite ? ` (${cite})` : '';
+  switch (l.basis) {
+    case 'later':
+    case 'dated':
+      return { link: 'Range lost', rest: ` since ${l.start}${by}`, to: METHOD_IDS.past };
+    case 'prehistoric':
+      return { link: l.place ? `Range in ${l.place} lost` : 'Part of its range lost', rest: ` ${spanWords(l.from, l.to)}, not counted`, to: METHOD_IDS.past };
+    case 'bound':
+      if (l.from === null) break;
+      return /^\p{Lu}/u.test(l.place)
+        ? { link: 'Range lost', rest: ` after people reached ${l.place} (${yearWords(l.from)})`, to: METHOD_IDS.past }
+        : { link: 'Range lost', rest: ` after ${yearWords(l.from)}${by}`, to: METHOD_IDS.past };
+  }
+  return { link: 'When it lost its range', rest: ' is not known', to: METHOD_IDS.unknown };
+}
+
+/** The card's line under the change since 1500 (lossWords), its first words opening the methods page; nothing when it has none. */
+export function LossLine({ sp }: { sp: SpeciesRec }) {
+  const w = lossWords(sp);
+  if (!w) return null;
+  return (
+    <p className="loss" data-loss={sp.loss!.basis}>
+      <MethodLink to={w.to}>{w.link}</MethodLink>
+      {w.rest}
+    </p>
+  );
 }

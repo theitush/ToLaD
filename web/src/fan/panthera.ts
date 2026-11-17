@@ -24,9 +24,9 @@ import { BirthCurve, procgenSegments, type GenSegment } from './history';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, sentenceCase, speciesUnder, type Split } from './splits';
 
 export { sentenceCase };
-import type { Grade, HistoryRec, NaturalMeta, NaturalRec, RawClade, RawSpecies, RedListRec } from './panthera-extract';
+import type { Grade, HistoryRec, LossRec, NaturalMeta, NaturalRec, RawClade, RawSpecies, RedListRec } from './panthera-extract';
 
-export type { Grade, HistEvent, HistoryRec, HistPoint, HistSegment, NaturalMeta, NaturalRec } from './panthera-extract';
+export type { Grade, HistEvent, HistoryRec, HistPoint, HistSegment, LossRec, NaturalMeta, NaturalRec } from './panthera-extract';
 
 export interface SpeciesRec {
   gid: number;
@@ -46,6 +46,10 @@ export interface SpeciesRec {
   dateSource: string;
   /** Today's count is anchored (FLAG bit 8: a census, a domestic stock, humans, or a history that drives the counts). */
   anchored: boolean;
+  /** Nobody knows how many there are (FLAG bit 11, ToLaD#507): `alive` is the thinnest width a living species gets, never a figure to show. */
+  countUnknown: boolean;
+  /** IUCN codes its whole mapped range Extinct or Possibly Extinct (FLAG bit 12, ToLaD#507). */
+  rangeExPe: boolean;
   /** Generation length in years. */
   genYears: number;
   genSource: string;
@@ -63,6 +67,8 @@ export interface SpeciesRec {
   redList?: RedListRec | null;
   /** The natural (pre-human) baseline from the data (format v1.2), always modelled; null if none. */
   natural?: NaturalRec | null;
+  /** What dates its range loss (format v1.8, ToLaD#507): the card's line beside the change since 1500; null: none. */
+  loss?: LossRec | null;
   /** Adult body mass (kg) and where it came from (the pipeline's mass column, ToLaD#276); null in data before it. */
   massKg?: number | null;
   massHow?: string;
@@ -116,6 +122,8 @@ export function speciesRec(r: RawSpecies, clade: number): SpeciesRec {
     extinct: r.extinct,
     dateSource: r.dateSource,
     anchored: !!r.anchored,
+    countUnknown: !!r.countUnknown,
+    rangeExPe: !!r.rangeExPe,
     genYears,
     genSource: x.src,
     clade,
@@ -123,6 +131,7 @@ export function speciesRec(r: RawSpecies, clade: number): SpeciesRec {
     births,
     redList: r.redList ?? null,
     natural: r.natural ?? null,
+    loss: r.loss ?? null,
     massKg: r.mass ? r.mass.g / 1000 : null,
     massHow: r.mass?.how ?? '',
   };

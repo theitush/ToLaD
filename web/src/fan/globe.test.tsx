@@ -159,6 +159,23 @@ describe('range globe in the card (ToLaD#267)', () => {
     expect(renderToStaticMarkup(<RangeGlobe sci="Not a species" fallback={(none) => <RangeMap w={w} initial="failed" none={none} />} />)).toBe(bare);
   });
 
+  it("a placeholder map is no range: 'Range not known', not the Wikimedia map (ToLaD#507)", () => {
+    const bare = '<figure class="globe none"><canvas></canvas><span class="cap">Range not known</span></figure>';
+    for (const sci of ['Gerbillus agag', 'Oryzomys curasoae', 'Rhinopoma macinnesi']) {
+      expect(globeData()!.ranges[sci]).toEqual([[], []]);
+      expect(renderToStaticMarkup(<RangeGlobe sci={sci} fallback={(none) => <RangeMap w={w} none={none} />} />)).toBe(bare);
+    }
+  });
+
+  it("the night monkeys: Colombia is A. jorgehernandezi's, green, and nothing of the move grey (ToLaD#507)", () => {
+    const z = speciesRange('Aotus zonalis')!;
+    const j = speciesRange('Aotus jorgehernandezi')!;
+    expect([z.cur, z.lost, j.cur, j.lost]).toEqual([20, 0, 25, 0]);
+    const zc = new Set(unpackRuns(globeData()!.ranges['Aotus zonalis'][0]));
+    // 22 cells of Colombia are A. jorgehernandezi's alone; 3 at the border both maps hold
+    expect(unpackRuns(globeData()!.ranges['Aotus jorgehernandezi'][0]).filter((i) => !zc.has(i)).length).toBe(22);
+  });
+
   it('a card with neither picture nor range shows both boxes, saying what is missing (ToLaD#492)', () => {
     const lion = FELIDAE.species.find((s) => s.sci === 'Panthera leo')!;
     const html = renderToStaticMarkup(<SpeciesCard sp={{ ...lion, sci: 'Not a species', common: 'Nothing' }} onClose={() => {}} />);

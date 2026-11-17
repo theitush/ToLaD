@@ -12,8 +12,8 @@
 
 import { useId, useState } from 'react';
 import { approxCountsIn, formatCount } from '../data/count';
-import { basisSpans, GRADE_COLOR, GRADE_WORD, MODELLED_KINDS, noDataSpans, styleBetween, type Basis, type SpanStyle } from './history';
-import type { HistoryRec, HistPoint, NaturalMeta, NaturalRec } from './panthera';
+import { basisSpans, GRADE_COLOR, GRADE_WORD, MODELLED_KINDS, NODATA, noDataSpans, styleBetween, type Basis, type SpanStyle } from './history';
+import type { HistoryRec, HistPoint, LossRec, NaturalMeta, NaturalRec } from './panthera';
 import { TIME_C } from './population';
 import { EVENT_TINT } from './colstyle';
 import { METHOD_IDS, MethodLink, WORD_IDS } from './Methods';
@@ -33,8 +33,6 @@ const BOT = H - B;
 
 const DASH: Record<SpanStyle, string | undefined> = { solid: undefined, dashed: '4 3', dotted: '1.2 3' };
 const OPACITY: Record<SpanStyle, number> = { solid: 0.9, dashed: 0.75, dotted: 0.5 };
-/** A stretch held flat for want of figures: faint, finely dashed. */
-const NODATA = { dash: '2 2.5', opacity: 0.4 };
 const STUB = 40; // px of chart left of the first point for a "no data" lead-in
 
 /** Kinds whose figures are cited from a source (a census, an agency estimate), not modelled. */
@@ -149,6 +147,11 @@ export function agoTicks(agoMax: number): number[] {
  */
 type Row = { kind: 'point'; p: HistPoint } | { kind: 'genomic'; pts: HistPoint[] } | { kind: 'natural'; start?: HistPoint };
 
+/** Where a range-loss trend starts (its first point): 1500 CE, or the documented later start (ToLaD#507: Australia 1788). */
+export function trendStart(h: HistoryRec): number {
+  return h.points.find((p) => p.kind === 'rangeloss')?.year ?? 1500;
+}
+
 /** A range-loss trend's first point that is the natural level itself (the same count), not a figure of its own. */
 export function isNaturalStart(p: HistPoint, natural: { n: number } | null | undefined): boolean {
   return !!natural && p.kind === 'rangeloss' && Math.abs(p.n - natural.n) <= 1e-6 * natural.n;
@@ -221,10 +224,13 @@ export function HistorySpark({
   open: open0 = false,
   natural = null,
   naturalMeta = null,
+  loss = null,
   activeEvent,
 }: {
   h: HistoryRec;
   open?: boolean;
+  /** What dates its range loss (ToLaD#507): its full citation listed with the natural level (the card's line names it short). */
+  loss?: LossRec | null;
   /** The curated event the card is on (its index in h.events): its band drawn stronger. */
   activeEvent?: number;
   /** The species' natural (pre-human) baseline, drawn as a faint level and listed with the sources. */
@@ -530,7 +536,7 @@ export function HistorySpark({
       {open && h.use !== 'counts' && <div className="dim small">These numbers are shown for reference; the tree's widths use the model.</div>}
       {open && h.modelled === 'rangeloss' && (
         <div className="dim small" data-modelled-note="">
-          Modelled, not counted: the natural level held to 1500 CE, then a steady change to today's count.
+          Modelled, not counted: the natural level held to {fmtYear(trendStart(h))}, then a steady change to today's count.
         </div>
       )}
       {open && before && (
@@ -628,6 +634,12 @@ export function HistorySpark({
                 </div>
                 <Cite cite={naturalMeta?.cite ?? ''} url={naturalMeta?.url ?? ''} />
                 {st && <Cite cite={st.cite} url={st.url} />}
+                {loss?.cite && (
+                  <div className="cite" data-loss-cite="">
+                    <span className="dim">When it was lost: </span>
+                    {loss.cite}
+                  </div>
+                )}
                 <div className="dim">
                   The level in 1500, from PHYLACINE’s map without people: {formatCount(nat.km2Natural)} km²
                   {nat.km2Current > 0 ? `, ${formatCount(nat.km2Current)} km² today (${Math.round((100 * nat.km2Current) / nat.km2Natural)}%)` : ''}.

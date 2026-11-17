@@ -1,14 +1,13 @@
 // Per-span styles on a species' column in the fan (ToLaD#55): stretches of the
 // column drawn differently from a measured span, world-fixed (in years before
-// present, so they hold still under zoom). Today one style: `held`, where the
-// column is held flat for want of any figure (cited or modelled), drawn faint.
-// The same mechanism can carry other per-span styles later (e.g. ToLaD#119's
-// "not from a source").
+// present, so they hold still under zoom). `held`, where the column is held flat
+// for want of any figure (cited or modelled), no longer faded (#146); `unknown`
+// (ToLaD#507), a column whose count nobody knows, faint as the chart's "no data".
 
-import { noDataSpans } from './history';
+import { NODATA, noDataSpans } from './history';
 import type { HistEvent, SpeciesRec } from './panthera';
 
-export type ColumnStyle = 'held';
+export type ColumnStyle = 'held' | 'unknown';
 
 export interface ColumnSpan {
   /** Years before present: the span runs from `ago0` (older) up to `ago1`. */
@@ -24,6 +23,9 @@ export interface ColumnSpan {
  */
 export const COLUMN_DIM: Record<ColumnStyle, number> = {
   held: 0,
+  // A species nobody knows the number of (FLAG bit 11, ToLaD#507): its whole column faint, as the chart draws "no data"
+  // (NODATA's opacity), at the thinnest width a living species gets. The card says "unknown" and why.
+  unknown: 1 - NODATA.opacity,
 };
 
 /**
@@ -32,11 +34,13 @@ export const COLUMN_DIM: Record<ColumnStyle, number> = {
  * point back to its start (population.ts holds the oldest level there) and
  * after its last point to now (history.ts
  * noDataSpans); a living species whose counts no history drives is the Red
- * List count held flat over its whole column. Extinct species: none.
+ * List count held flat over its whole column. Unknown (count nobody knows, ToLaD#507): its whole column. Extinct
+ * species: none.
  */
 export function columnSpans(sp: SpeciesRec, startMa: number): ColumnSpan[] {
   if (sp.extinct) return [];
   const start = startMa * 1e6;
+  if (sp.countUnknown) return start > 0 ? [{ ago0: start, ago1: 0, style: 'unknown' }] : [];
   const h = sp.history;
   if (!sp.births || !h) return start > 0 ? [{ ago0: start, ago1: 0, style: 'held' }] : [];
   const out: ColumnSpan[] = [];
