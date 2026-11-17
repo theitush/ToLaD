@@ -14,8 +14,8 @@ from pathlib import Path
 
 from . import load, mdd
 from . import overrides as overrides_mod
-from .merge import (add_domestic_leaves, apply_placements, assign_bands, build_leaf_index, calibrate, date_tree,
-                    drop_unrecognised, graft_pbdb, match_upham, rehome_stem_fossils, set_extinct_flags)
+from .merge import (add_domestic_leaves, apply_placements, assign_bands, build_leaf_index, calibrate, date_undated,
+                    date_tree, drop_unrecognised, graft_pbdb, match_upham, rehome_stem_fossils, set_extinct_flags)
 from .tree import (clean_opentree, collapse_knuckles, drop_empty,
                    from_opentree)
 
@@ -92,8 +92,11 @@ def build_tree(raw: Path, work: Path, log: dict, t_start: float):
     log_step(t_start, f"stem re-homing: {log['stem_rehoming']['subtrees_moved']} fossil subtrees")
     ov.check_all_used()
     log["overrides"] = ov.report()
+    date_undated(root, _pb_genera, ctx["mdd"], log)  # an extinct leaf PBDB has no species range for (ToLaD#279)
     date_tree(root, log)
     assign_bands(root, {**ANCHOR_T0, **{e["name"]: float(e["age"]) for e in ov.domestic_leaves}})
+    log["undated_leaves"]["undated: a stub at the parent's split"] = sorted(
+        n.name for n in root.preorder() if n.data.get("undated"))
     n_k = collapse_knuckles(root)
     log["knuckles_collapsed"] = n_k
     ctx.update(exact=exact, syn=syn, upham=(up_root, up_tax), overrides=ov)
