@@ -4093,7 +4093,8 @@ export class FanView implements InputHandlers {
 
   /** A merged clade (lod.ts): one ribbon over the grid's rows on screen, its extent the fold's, its green its strands' share of their widths (ToLaD#389). */
   private mergedPeels: number[] = [];
-  private drawMerged(v: FanNode, top: number): void {
+  /** (top: its top, Lod.top, kept by the Lod: drawStrands passes it.) */
+  private drawMerged(v: FanNode, top = this.lod!.topOf(v)): void {
     const f = this.fan.tess.fold!;
     const H = f.gridH;
     if (!(H > 0)) return;
