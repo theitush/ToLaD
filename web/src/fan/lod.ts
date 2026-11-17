@@ -35,6 +35,11 @@ export function setLodIndex(on: boolean): void {
   walksOn = on;
 }
 export const lodIndexOn = (): boolean => walksOn;
+/** Lod.update's merged clades from the last frame's and what earlier frames found (ToLaD#502): off, the walk from the root every frame as before (lodlearn.test holds the two the same). */
+let learnOn = true;
+export function setLodLearn(on: boolean): void {
+  learnOn = on;
+}
 
 export class Lod {
   /** The clades drawn as one branch this frame, left to right. */
@@ -67,6 +72,7 @@ export class Lod {
     // (The zoom past which no clade inside a node can merge: below MERGE_PX per species and BRANCH_PX across take sx
     // under nStr / room and BRANCH_PX / room, gaps or none; a hair over, so a rounding never prunes one that does.)
     const subT = (this.subT = new Float64Array(N.length));
+    const own = (this.own = new Float64Array(N.length));
     const allG = (this.allG = new Uint8Array(N.length));
     const anyG = (this.anyG = new Uint8Array(N.length));
     const subTop = (this.subTop = Float64Array.from(N, (v) => v.y));
@@ -75,6 +81,7 @@ export class Lod {
       const v = N[i];
       const r = this.room[i];
       const t = this.par[i] >= 0 && this.nStr[i] >= 2 ? (r > 0 ? Math.min(MERGE_PX * this.nStr[i], BRANCH_PX) / r : Infinity) * (1 + 1e-9) : 0;
+      own[i] = t;
       subT[i] = Math.max(subT[i], t);
       // (cladeAllGray (view.ts), from the daughters up: every strand extinct.)
       let all = 1;
@@ -98,6 +105,16 @@ export class Lod {
       for (const k of this.kidN[i]) st.push(k);
     }
     this.lone = Int32Array.from(N.keys()).filter((i) => !seen[i]);
+    this.dead = Float64Array.from(own);
+    this.subD = Float64Array.from(subT);
+    this.seen = new Int32Array(N.length);
+    this.kid0 = new Int32Array(N.length + 1);
+    for (let i = 0; i < N.length; i++) this.kid0[i + 1] = this.kid0[i] + this.kidN[i].length;
+    this.kids = new Int32Array(this.kid0[N.length]);
+    for (let i = 0; i < N.length; i++) this.kids.set(this.kidN[i], this.kid0[i]);
+    this.gMx = new Float64Array(N.length);
+    this.gSm = new Float64Array(N.length);
+    this.gVer = new Int32Array(N.length).fill(-1);
   }
 
   /** Clade v is inside a merged clade (not the merged clade itself): not named on its own. */
@@ -158,6 +175,13 @@ export class Lod {
    * from the root that stops at each merged clade (the cut, ToLaD#502): what is inside one is never walked, nor a clade
    * too wide at this zoom for anything in it to merge (subT); the gaps inside a clade are read off a segment tree over
    * the pairs, built once a frame and only when a clade is in reach of merging.
+   *
+   * With the fold's openness its own at sx (fold.ts setScale: opennessAt, which never falls as sx grows), whether a
+   * clade qualifies only ever goes from yes to no as sx grows: its room, its widest gap and its gaps' sum on screen all
+   * grow. So what one frame found holds at the next (ToLaD#502): a clade found open at a zoom stays open at every zoom
+   * past it (dead, and subD over its subtree, bound the walk tighter than subT as the zooms go by); zoomed in from the
+   * last frame, the merged clades can only part, so only they are read again, and the walk goes on inside those that
+   * parted. Off its own openness (a frame computed for another zoom: brackets.ts foldedFrame), the walk as before.
    */
   update(fold: Fold, sx: number): boolean {
     const key = `${fold.ver}:${sx}`;
@@ -166,24 +190,25 @@ export class Lod {
     this.gapsFor = null;
     const merged = this.mergedNext;
     merged.length = 0;
-    const par = this.par;
-    const subT = this.subT;
-    const st = this.stack;
-    let n = 0;
-    st[n++] = this.rootI;
-    // (Depth first, left to right, as the clades stand.)
-    while (n > 0) {
-      const i = st[--n];
-      if (par[i] >= 0) {
-        if (!(sx < subT[i])) continue;
-        if (this.nStr[i] >= 2 && this.closed(fold, i, sx)) {
-          merged.push(i);
-          continue;
-        }
-      }
-      const kids = this.kidN[i];
-      for (let q = kids.length - 1; q >= 0; q--) st[n++] = kids[q];
+    // (Learnt for this fold at this screen width: its openness a function of sx alone.)
+    const atOwn = fold.sx === sx && learnOn;
+    if (atOwn && (fold !== this.learnt || fold.screenW !== this.learntW)) {
+      this.dead.set(this.own);
+      this.subD.set(this.subT);
+      this.learnt = fold;
+      this.learntW = fold.screenW;
+      this.lastSx = NaN;
     }
+    if (!atOwn) this.walk(fold, sx, this.rootI, merged, this.subT, false);
+    else if (sx >= this.lastSx) {
+      // Zoomed in (or not at all): each merged clade still closed stays; inside each that parted, the walk.
+      for (let m = 0; m < this.merged.length; m++) {
+        const i = this.mIdx[m];
+        if (this.closed(fold, i, sx)) merged.push(i);
+        else this.walk(fold, sx, i, merged, this.subD, true);
+      }
+    } else this.walk(fold, sx, this.rootI, merged, this.subD, true);
+    this.lastSx = atOwn ? sx : NaN;
     const N = this.fan.nodes;
     const was = this.merged;
     let same = merged.length === was.length;
@@ -211,6 +236,64 @@ export class Lod {
     return true;
   }
   private readonly mergedNext: number[] = [];
+  /** The fold and screen width dead and subD were learnt for (null: none), and the zoom the merged clades are for when at the fold's own openness (NaN: not). */
+  private learnt: Fold | null = null;
+  private learntW = NaN;
+  private lastSx = NaN;
+  /** Per node: own, the zoom at and past which its room alone keeps it from merging (subT's term, 0: never merges); dead, at and past which it never merges, own lowered to every zoom it was found open at; subD, dead's most over its subtree. */
+  private readonly own: Float64Array;
+  private readonly dead: Float64Array;
+  private readonly subD: Float64Array;
+  /** The walk's nodes passed through (neither merged nor ruled out), in the order met: their subD made again after it, daughters first. */
+  private readonly seen: Int32Array;
+
+  /**
+   * The merged clades in node from's subtree, depth first, left to right, into merged: from itself if it qualifies, else
+   * the walk down from it that stops at each that does, past each subtree bound rules out (sx at or past it). learn:
+   * every clade found open has its dead lowered to sx, and subD is made again over the nodes passed through.
+   */
+  private walk(fold: Fold, sx: number, from: number, merged: number[], bound: Float64Array, learn: boolean): void {
+    const par = this.par;
+    const nStr = this.nStr;
+    const st = this.stack;
+    const seen = this.seen;
+    const dead = this.dead;
+    const k0 = this.kid0;
+    const K = this.kids;
+    let c = 0;
+    let n = 0;
+    st[n++] = from;
+    // (Depth first, left to right, as the clades stand.)
+    while (n > 0) {
+      const i = st[--n];
+      if (par[i] >= 0) {
+        if (!(sx < bound[i])) continue;
+        // (Learning, a clade found open at a zoom at or under this one is open now: not read again.)
+        if (nStr[i] >= 2 && (!learn || sx < dead[i])) {
+          if (this.closed(fold, i, sx)) {
+            merged.push(i);
+            continue;
+          }
+          if (learn) dead[i] = sx;
+        }
+      }
+      if (learn) seen[c++] = i;
+      for (let q = k0[i + 1] - 1; q >= k0[i]; q--) st[n++] = K[q];
+    }
+    // (Daughters before their parents: each node after all it passed through below it.)
+    if (learn) {
+      const subD = this.subD;
+      for (let q = c - 1; q >= 0; q--) {
+        const i = seen[q];
+        let d = dead[i];
+        for (let k = k0[i], e = k0[i + 1]; k < e; k++) if (subD[K[k]] > d) d = subD[K[k]];
+        subD[i] = d;
+      }
+    }
+  }
+  /** kidN flat: node i's daughter nodes at kids[kid0[i] .. kid0[i + 1] - 1]. */
+  private readonly kid0: Int32Array;
+  private readonly kids: Int32Array;
   /** Per merged clade (merged's order): its strands' first and last drawn index (ascending, disjoint), and its top (Lod.top). */
   mS0 = new Int32Array(0);
   mS1 = new Int32Array(0);
@@ -246,6 +329,8 @@ export class Lod {
     // ((r + gaps) * sx is never under r * sx: the room alone decides most, before any gap is read.)
     if (!(r / this.nStr[i] < MERGE_PX) || !(r < BRANCH_PX)) return false;
     const T = this.gapsFor === fold ? this.gapTree : this.gaps(fold);
+    // (Its widest gap and their sum kept while the tree stands as it was (gaps(): at an order's or a family's zoom, frame after frame).)
+    if (learnOn && this.gVer[i] === this.treeVer) return this.gMx[i] * sx < CLOSED_PX && (this.room[i] + this.gSm[i]) * sx < BRANCH_PX;
     // (The pairs inside it: those between its first strand and its last.)
     let l = this.s0[i] + T.size;
     let h = this.s0[i] + this.nStr[i] - 2 + T.size + 1;
@@ -265,6 +350,11 @@ export class Lod {
       l >>= 1;
       h >>= 1;
     }
+    if (learnOn) {
+      this.gVer[i] = this.treeVer;
+      this.gMx[i] = g;
+      this.gSm[i] = gs;
+    }
     return g * sx < CLOSED_PX && (this.room[i] + gs) * sx < BRANCH_PX;
   }
 
@@ -280,17 +370,52 @@ export class Lod {
     const { size, mx, sm } = T;
     const a = fold.a;
     const gap = fold.pairGap;
+    this.gapsFor = fold;
+    // (Kept from the last frame's for the pairs whose openness is the same (ToLaD#502: at an order's or a family's zoom
+    // every split is wholly open or shut, none moves): those that moved, and the halves above them, made again.)
+    const A = this.treeA;
+    if (learnOn && this.treeFold === fold && A.length === P) {
+      let moved = 0;
+      for (let p = 0; p < P; p++) if (A[p] !== a[p]) moved++;
+      if (moved === 0) return T;
+      if (moved * 16 < P) {
+        for (let p = 0; p < P; p++) {
+          if (A[p] === a[p]) continue;
+          A[p] = a[p];
+          let k = size + p;
+          mx[k] = sm[k] = a[p] * gap[p];
+          for (k >>= 1; k >= 1; k >>= 1) {
+            const l = 2 * k;
+            mx[k] = Math.max(mx[l], mx[l + 1]);
+            sm[k] = sm[l] + sm[l + 1];
+          }
+        }
+        this.treeVer++;
+        return T;
+      }
+    }
     for (let p = 0; p < P; p++) mx[size + p] = sm[size + p] = a[p] * gap[p];
     for (let k = size - 1; k >= 1; k--) {
       const l = 2 * k;
       mx[k] = Math.max(mx[l], mx[l + 1]);
       sm[k] = sm[l] + sm[l + 1];
     }
-    this.gapsFor = fold;
+    if (A.length !== P) this.treeA = Float64Array.from(a);
+    else A.set(a);
+    this.treeFold = fold;
+    this.treeVer++;
     return T;
   }
   private gapTree = { size: 0, mx: new Float64Array(0), sm: new Float64Array(0) };
   private gapsFor: Fold | null = null;
+  /** The fold and openness the tree was made for, and its version (bumped as it changes). */
+  private treeFold: Fold | null = null;
+  private treeA = new Float64Array(0);
+  private treeVer = 0;
+  /** Per node: its widest gap and their sum (closed()), and the tree's version they were read at. */
+  private readonly gMx: Float64Array;
+  private readonly gSm: Float64Array;
+  private readonly gVer: Int32Array;
 
   /**
    * The nodes drawStem may draw a backdrop for (fan.nodes' indices, descending, into out): none inside a merged clade,
