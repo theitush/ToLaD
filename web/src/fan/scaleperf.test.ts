@@ -23,7 +23,12 @@ import { FanView } from './view';
 const OUT = process.env.SCALEPERF;
 /** Progress, as it goes (<out>.log): a step that never ends shows where. */
 const log = (s: string) => OUT && appendFileSync(OUT + '.log', `${new Date().toISOString().slice(11, 19)} ${s}\n`);
-const proc = process as unknown as { version: string; memoryUsage(): { rss: number } };
+const proc = process as unknown as { version: string; memoryUsage(): { rss: number }; threadCpuUsage?(): { user: number; system: number } };
+/** The main thread's CPU time (ms; node 22.19+, else 0): a frame's own work, not the time it waited for a CPU on a busy machine. */
+const cpuMs = () => {
+  const u = proc.threadCpuUsage?.();
+  return u ? (u.user + u.system) / 1000 : 0;
+};
 
 function stubCanvas() {
   const noop = () => {};
@@ -109,9 +114,13 @@ describe.skipIf(!OUT)('scale yardstick (perf)', () => {
       await prof.post('Profiler.start');
     }
     let t0 = performance.now();
+    let c0 = cpuMs();
     const lap = (k: string) => {
       const t = performance.now();
+      const c = cpuMs();
       load[k] = t - t0;
+      load[k + 'Cpu'] = c - c0;
+      c0 = c;
       log(`${k} ${Math.round(t - t0)} ms`);
       mem();
       t0 = t;
@@ -164,13 +173,17 @@ describe.skipIf(!OUT)('scale yardstick (perf)', () => {
         at.cam = c;
         v.draw();
         v.draw();
+        // (Each frame's main-thread CPU time too, into cpu[g]: on a shared machine the wall time swings with the load.)
+        const cpu: Record<string, number[]> = { pinch: [], pan: [], flight: [] };
         const lab: number[] = [];
         const labAll: number[] = [];
-        const timed = (f: () => void) => {
+        const timed = (f: () => void, g: string) => {
           const t = performance.now();
+          const c = cpuMs();
           const n0 = v.labelMs.length;
           f();
           v.draw();
+          cpu[g].push(cpuMs() - c);
           // (labelsNow's ms, and with drawLabels, of this frame: the labels' share.)
           if (v.labelMs.length > n0 || v.labelMs.length === 600) {
             lab.push(v.labelMs[v.labelMs.length - 1]);
@@ -181,12 +194,12 @@ describe.skipIf(!OUT)('scale yardstick (perf)', () => {
         // A pinch in and out about the middle (as phoneperf's: 20 steps each way), a pan, a flight in and back.
         const pinch: number[] = [];
         at.gestureStart();
-        for (let k = 0; k < 40 && !over('pinch'); k++) pinch.push(timed(() => v.zoomAbout(at.w / 2, at.h / 2, k < 20 ? 1.06 : 1 / 1.06)));
+        for (let k = 0; k < 40 && !over('pinch'); k++) pinch.push(timed(() => v.zoomAbout(at.w / 2, at.h / 2, k < 20 ? 1.06 : 1 / 1.06), 'pinch'));
         at.gestureEnd();
         at.levelNow(true);
         const pan: number[] = [];
         at.gestureStart();
-        for (let k = 0; k < 30 && !over('pan'); k++) pan.push(timed(() => v.pan(k < 15 ? 8 : -8, k % 10 < 5 ? 3 : -3)));
+        for (let k = 0; k < 30 && !over('pan'); k++) pan.push(timed(() => v.pan(k < 15 ? 8 : -8, k % 10 < 5 ? 3 : -3), 'pan'));
         at.gestureEnd();
         at.levelNow(true);
         log(`${depth} pinch ${JSON.stringify(stats(pinch))} pan ${JSON.stringify(stats(pan))} rss ${Math.round(mem() / 2 ** 20)} MB`);
@@ -202,11 +215,11 @@ describe.skipIf(!OUT)('scale yardstick (perf)', () => {
           for (let k = 0; k < 600 && at.anim && !over('flight'); k++) {
             now += 16.7;
             const a = at.anim;
-            fly.push(timed(() => !a(now) && (at.anim = null)));
+            fly.push(timed(() => !a(now) && (at.anim = null), 'flight'));
           }
         }
         mem();
-        frames[depth] = { pinch: stats(pinch), pan: stats(pan), flight: stats(fly), labels: stats(lab), labelsAll: stats(labAll) };
+        frames[depth] = { pinch: stats(pinch), pan: stats(pan), flight: stats(fly), cpu: { pinch: stats(cpu.pinch), pan: stats(cpu.pan), flight: stats(cpu.flight) }, labels: stats(lab), labelsAll: stats(labAll) };
         // (Written as it goes: a run stopped part way keeps what it measured.)
         res.frames = frames;
         res.rssMB = Math.round(rss / 2 ** 20);
