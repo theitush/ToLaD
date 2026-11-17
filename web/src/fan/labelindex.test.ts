@@ -74,6 +74,7 @@ type Inner = {
   territories(): never;
   gapCoverAt(T: never, sx: number, win?: readonly [number, number]): GapMember[];
   gapWinLast: { list: GapMember[] } | null;
+  gapCoverLast: unknown;
   gapLadder: { inOrder: boolean } | null;
   toWorld(x: number, y: number): [number, number];
   toScreen(x: number, y: number): [number, number];
@@ -224,6 +225,13 @@ describe(`labels from the screen's range against the whole tree's (${N ? `synthe
       const cy = home.cy + (rnd() - 0.5) * (I().h / home.sy);
       I().cam = { ...home, sx, sy, cx, cy };
       same(`random ${k}`);
+      // (The whole cover too, its titles' test over each name from its own titles: as from all of them.)
+      const cover = (on: boolean) => {
+        setLabelIndex(on);
+        I().gapCoverLast = null;
+        return JSON.stringify(I().gapCoverAt(I().territories(), sx).map((m) => [m.k, m.heads, m.tier, m.pic, m.host?.k ?? null, m.gap]));
+      };
+      expect(cover(true), `cover sx ${sx}`).toBe(cover(false));
     }
   }, 1200000);
 

@@ -10,7 +10,7 @@ import { CLADE_FONT, CLADE_PX, GapNames, SPECIES_FONT, SPECIES_PX, type WrittenN
 import { columnGaps, gapCut, gapHands, gapOpens, ownLanes, picAt, picRanges, tier, tipOrder, type Guest, type Member, type PicCand, type PicRange, type Tier } from './gaplabels';
 import { GROUP_D, LABEL_AXIS_X, labelMode, PIC_D, PIC_LIFT, PIC_ROOM, PIC_S, picBox, type PicSpot } from './pics';
 import { coverLadder, keepOnScreen, placeSlots } from './slide';
-import { bandMeets, labelIndexOn, lanesInOrder, slideWindow, TipIndex, WIN_PX } from './labelindex';
+import { bandMeets, labelIndexOn, lanesInOrder, runsOver, slideWindow, TipIndex, WIN_PX } from './labelindex';
 import { formatCount, formatMass } from '../data/count';
 import { stamp } from '../stamp';
 import { DOUBLE_TAP_MS, Input, type InputHandlers } from '../engine/input';
@@ -3090,11 +3090,14 @@ export class FanView implements InputHandlers {
     // beside (a guest of the same band, or that band's own label; under a title in its gap, its first strand that title's; or its band's top two slots or less from that title's) is shown once, as the outermost group's; a tap on it goes to that group.)
     const text = (m: GapMember) => (m.lv.b ? levelText(m.lv.b) : groupName(this.fan, m.lv.v!));
     const titles = out.filter((m) => m.heads && m.tier === 'title').sort((p, q) => q.l - q.f - (p.l - p.f) || p.f - q.f);
-    for (const m of [...titles, ...out.filter((m) => m.tier && !m.heads)]) {
+    const named = [...titles, ...out.filter((m) => m.tier && !m.heads)];
+    // (Of the titles, only those over its run can be over it: theirs, labelindex.ts runsOver, not all the cover's; all of them as before, the index off.)
+    const over = labelIndexOn() ? runsOver(titles, named) : null;
+    for (const m of named) {
       if (!m.tier) continue;
       const t = text(m);
       const beside = (o: GapMember) => (o.host ? m.host === o.host || m === o.host : m.f === o.f) || Math.abs((m.host ?? m).top - (o.host ?? o).top) * sx <= 2 * (CLADE_PX + GROUP_D - PIC_D);
-      if (titles.some((o) => o !== m && o.tier && o.f <= m.f && o.l >= m.l && o.l - o.f > m.l - m.f && beside(o) && text(o) === t)) Object.assign(m, { tier: null, host: undefined });
+      if ((over ? over.get(m)! : titles).some((o) => o !== m && o.tier && o.f <= m.f && o.l >= m.l && o.l - o.f > m.l - m.f && beside(o) && text(o) === t)) Object.assign(m, { tier: null, host: undefined });
     }
     return out;
   }

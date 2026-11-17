@@ -117,3 +117,23 @@ export class TipIndex {
     return found.sort((p, q) => p - q).map((i) => this.tips[i]);
   }
 }
+
+/**
+ * For each of `items`, the ones of `over` whose run of strands holds its own (f..l), at least: a sweep down the runs by
+ * their first strand, the runs that hold the one at hand on a stack (a cover's runs nest, so the stack is a chain and a
+ * member's are its own titles, not every title of the cover: gapCoverAt's "a name reading as a title over it" asks those).
+ * A run that ends before the one at hand begins never holds a later one; any it leaves on the stack the caller's test drops.
+ */
+export function runsOver<T extends { f: number; l: number }>(over: readonly T[], items: readonly T[]): Map<T, T[]> {
+  const isOver = new Set(over);
+  const isItem = new Set(items);
+  const all = [...new Set([...over, ...items])].sort((p, q) => p.f - q.f || q.l - p.l);
+  const out = new Map<T, T[]>();
+  const stack: T[] = [];
+  for (const x of all) {
+    while (stack.length && stack[stack.length - 1].l < x.f) stack.pop();
+    if (isItem.has(x)) out.set(x, stack.filter((o) => o.l >= x.l));
+    if (isOver.has(x)) stack.push(x);
+  }
+  return out;
+}
