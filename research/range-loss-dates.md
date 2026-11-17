@@ -195,7 +195,7 @@ written into `earliest_year`/`latest_year`.
   localities ("Connected via suitable habitat", "Connected as a line"). 68 are Data Deficient. For
   these, whether the gap was occupied in 1500 is itself unknown. A date cannot be found for a loss that may
   not have happened.
-- 41 are certainty 5, "expanded to suitable areas contiguous with the current range". These include the
+- 34 are certainty 5, "expanded to suitable areas contiguous with the current range" (4 more are certainty 1, 2, 4 and 8). These include the
   red fox (its 2,093 extra cells lie in North America, which its note does not mention), the Eurasian beaver, the Eurasian lynx, the kulan and the Iberian lynx (range of
   the rabbit). For several of them, European records date some of the loss. For example, Crees et al. 2016
   (Proc. R. Soc. B 283:20152152) date Holocene range collapse in European large mammals, and much of it
