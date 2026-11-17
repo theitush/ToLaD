@@ -10,7 +10,7 @@
 // file past V8's string limit, ~512 MB, cannot be parsed: the 1M tree's).
 import { stamp } from '../stamp';
 import { layoutFan, layoutSeed } from './layout';
-import { packMammals, unpackMammals, type MammalData, type MammalFile } from './mammals-data';
+import { mergeMammalCard, packMammals, unpackMammals, type MammalCardFile, type MammalData, type MammalFile } from './mammals-data';
 import { packGenealogies, packTree } from './packed';
 import { cladeOf } from './panthera';
 import { genealogiesOf, population } from './population';
@@ -82,8 +82,11 @@ export async function synthLevelData(o: SynthQuery, ms?: Record<string, number>)
     lap('fetch');
     return d;
   }
-  // (As vite.config.ts writes mammals.json: through JSON once, packed in columns; then read as mammals-data.ts reads it.)
-  const text = JSON.stringify(packMammals(JSON.parse(JSON.stringify(d)) as MammalData));
+  // (As vite.config.ts writes mammals.json: through JSON once, packed in columns; then read as mammals-data.ts reads it.
+  // Its card's file read at once: the synthetic tree has no cards to wait for.)
+  const files = packMammals(JSON.parse(JSON.stringify(d)) as MammalData);
+  const text = JSON.stringify(files.open);
+  const card = JSON.stringify(files.card);
   if (ms) ms.bytes = text.length;
   lap('synth-file');
   lap('fetch');
@@ -91,5 +94,6 @@ export async function synthLevelData(o: SynthQuery, ms?: Record<string, number>)
   lap('json');
   const out = unpackMammals(f);
   lap('unpack');
+  mergeMammalCard(out, JSON.parse(card) as MammalCardFile);
   return out;
 }

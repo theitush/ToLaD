@@ -5,7 +5,8 @@
 // nobody else's, so nothing meets, whatever the neighbours do. No slide: a title stands at the top of its branch, a name in a band inside that band's part on screen.
 //
 // Everything is read on the labels' column, the only place a label stands: a strand gone by then leaves no line there (rooms by life, steady.ts, may even stand it inside a sister's room),
-// so it takes no room, claims nothing, has no label and holds no fork back; the same for a hair standing inside a wider lane (ownLanes). Those few, fossils, are named by the chain.
+// so it takes no room, claims nothing, has no label and holds no fork back; the same for a hair standing inside a wider lane (ownLanes). Those, fossils, are named at their own tip
+// instead (tipOrder, ToLaD#279, #497), the way the upright tree names a tip: where their line ends, in what room the column's labels leave.
 //
 // A band is the lane's whole room, not the width the line has there: a funnel (humans, dogs) is thin at 100 kya and fat by now, and its lane is kept free for it all the way, so nothing else can stand
 // there and a label on it reads as that funnel's. A group's band is its strands' whole span there, the gaps inside included.
@@ -41,6 +42,16 @@ export function ownLanes({ C, R }: Rooms, there: (k: number) => boolean): boolea
     end = Math.max(end, hi);
   }
   return own;
+}
+
+/**
+ * The strands named at their own tip (ToLaD#279, #497): every one with no lane of its own on the labels' column (ownLanes: gone by then, or a hair inside a wider lane there), which
+ * the column can never name, in the order they claim room: the wider room first (`R`, as the column's pictures go by the wider band), then the first.
+ */
+export function tipOrder(own: readonly boolean[], R: ArrayLike<number>): number[] {
+  const out: number[] = [];
+  for (let k = 0; k < own.length; k++) if (!own[k]) out.push(k);
+  return out.sort((p, q) => R[q] - R[p] || p - q);
 }
 
 /** Per strand, world x: the height free above it on the column, up to the nearest strand above it still there; Infinity for the first of them. Not positive: it has no place of its own there. */

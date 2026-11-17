@@ -146,6 +146,7 @@ describe('labels in the gaps and in the branches', () => {
 
   it('pictures by priority and collision (ToLaD#464): full or small, no two ever meeting, wider than a band or not', () => {
     const hair = GROUP_D - PIC_D;
+    const boxesMeet = (p: readonly number[], q: readonly number[]) => p[0] < q[2] && p[2] > q[0] && p[1] < q[3] && p[3] > q[1];
     let [full, small, held] = [0, 0, 0];
     for (const z of ZOOMS) {
       const sx = home * z;
@@ -157,10 +158,12 @@ describe('labels in the gaps and in the branches', () => {
       small += ms.filter((m) => m.pic === PIC_S).length;
       // (A title's band is its parts', ToLaD#483, so it holds none of its own: since #500 a group hands its band down part by part, so there are many.)
       held += cover(sx).filter((m) => !m.heads && m.band * sx >= GROUP_D).length;
-      // (Drawn, held on screen: still none meeting.)
+      // (Drawn, held on screen: still none meeting; the column's apart along it, a fossil's at its own tip (ToLaD#279, tipLabels) meeting none.)
       for (const at of [0.1, 0.5, 0.9]) {
-        const ps = [...frame(sx, f.rooms().C[Math.floor(f.rooms().C.length * at)]).pics].sort((p, q) => p.x - q.x);
+        const all = frame(sx, f.rooms().C[Math.floor(f.rooms().C.length * at)]).pics;
+        const ps = all.filter((p) => p.held).sort((p, q) => p.x - q.x);
         for (let i = 1; i < ps.length; i++) expect(ps[i].x - ps[i - 1].x).toBeGreaterThanOrEqual(((ps[i].d ?? PIC_D) + (ps[i - 1].d ?? PIC_D)) / 2 - 1e-6);
+        for (const p of all.filter((p) => !p.held)) for (const q of all) if (q !== p) expect(boxesMeet(picBox(p), picBox(q))).toBe(false);
       }
     }
     console.log(`[pics] over ${ZOOMS.length} zooms: ${full} full, ${small} small; bands holding one ${held}`);

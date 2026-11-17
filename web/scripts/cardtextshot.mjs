@@ -15,7 +15,7 @@ const TAG = process.argv[3] || 'after';
 const DIST = process.argv[4] || 'dist-single';
 mkdirSync(OUT, { recursive: true });
 const site = mkdtempSync(join(tmpdir(), 'cardtext-site-'));
-for (const f of ['index.html', 'mammals.json', 'globe.json', 'globe-draw.js']) copyFileSync(join(DIST, f), join(site, f));
+for (const f of ['index.html', 'mammals.json', 'mammals-card.json', 'globe.json', 'globe-draw.js']) copyFileSync(join(DIST, f), join(site, f));
 const served = await pageUrl('level=mammals', site);
 const browser = await chromium.launch({ headless: true });
 const SPECIES = [

@@ -19,7 +19,12 @@ export async function mammalsSeed(clade: RawClade): Promise<MammalAhead> {
   // (The orders' shares, fold.ts scaleOrders: worked out on the layout without them.)
   const fan = layoutFan({ ...mammaliaClade(), seed }, 'linear', mammaliaTree());
   seed.ord = new Steady(fan).ordShare;
-  // Every strand's genealogy (the walk back, population.ts shareBackSampled): the bulk of the level's layout.
-  const gen = packGenealogies(genealogiesOf(fan.branches.map((b) => population(b.sp, b.t0))));
+  // Every strand's genealogy (the walk back, population.ts shareBackSampled): the bulk of the level's layout. Its
+  // generations only, when every one replays its shares number for number (shareReplay, ToLaD#502): the page works them
+  // out again in a fraction of the walk, and the file loses most of its weight (the shares were a fifth of it).
+  const pops = fan.branches.map((b) => population(b.sp, b.t0));
+  const replays = pops.every((p) => p.replays());
+  if (!replays) console.warn('mammals-seed: a genealogy does not replay its shares exactly: mammals.json carries them');
+  const gen = packGenealogies(genealogiesOf(pops), { shares: !replays });
   return { seed, gen, tree };
 }

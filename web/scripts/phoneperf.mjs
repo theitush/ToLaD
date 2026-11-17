@@ -7,6 +7,8 @@
 // Env: SYNTH_N=70000: the synthetic level's scenes instead (ToLaD#343: home, its largest order, that order's largest
 // family; scripts/scale.mjs), LOAD_TIMEOUT=ms (default 120000). Q=extra query, THROTTLE=4, LOADONLY=1 (load times only), ONLY=scene,scene, PROFILE=scene (a CDP CPU profile of that
 // scene's gestures, written to PROFILE_OUT, default phoneperf.cpuprofile), REPS=1 (gestures repeated).
+// NET=1.5: the network throttled to that many Mbit/s (CDP Network.emulateNetworkConditions, 40 ms latency), the files
+// gzipped as Pages serves them (pageurl.mjs GZIP=1). LOADONLY also waits for the cards' file where there is one (tl:card, ToLaD#502).
 // Per scene: load ms (navigation to the first frame drawn), then over the gestures the rAF deltas' p50/p95/max,
 // dropped frames (each delta over 16.7 ms counts the vsyncs it missed) and the draw()'s own p50/p95 (frameMs).
 // SwiftShader runs the GL on the CPU too: a phone GPU does that part elsewhere, so treat the deltas as a ceiling.
@@ -20,6 +22,8 @@ const Q = process.env.Q ?? '';
 const ONLY = process.env.ONLY ? new Set(process.env.ONLY.split(',')) : null;
 const PROFILE = process.env.PROFILE || '';
 const REPS = Number(process.env.REPS || 1);
+const NET = Number(process.env.NET || 0);
+if (NET) process.env.GZIP = '1';
 const W = 390;
 const H = 844;
 
@@ -72,6 +76,10 @@ try {
     });
     const cdp = await ctx.newCDPSession(page);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: THROTTLE });
+    if (NET) {
+      await cdp.send('Network.enable');
+      await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 40, downloadThroughput: (NET * 1e6) / 8, uploadThroughput: (NET * 1e6) / 8 });
+    }
     const url = served.url.replace(/\/\?$|\/$/, '/') + `?level=${level}${Q ? '&' + Q : ''}`;
     // (LOADONLY=1: the load times only, no gestures, ToLaD#255; with PROFILE=scene, the load's CPU profile.)
     const LOADONLY = !!process.env.LOADONLY;
@@ -97,6 +105,8 @@ try {
       // The page's own load stamps (src/stamp.ts, tl:<step>) and the HTML's arrival, ms from navigation (ToLaD#255);
       // the second frame (the labels') waited for.
       await page.waitForFunction(() => performance.getEntriesByName('tl:second').length > 0, null, { timeout: 60000 }).catch(() => {});
+      // (A build before the split has no cards' file to wait for.)
+      if (await page.evaluate(async () => (await fetch('mammals-card.json', { method: 'HEAD' })).ok)) await page.waitForFunction(() => performance.getEntriesByName('tl:card').length > 0, null, { timeout: 120000 }).catch(() => {});
       const marks = await page.evaluate(() => {
         const n = performance.getEntriesByType('navigation')[0];
         const out = n ? [['html', n.responseEnd], ['parsed', n.domInteractive]] : [];
@@ -138,6 +148,10 @@ try {
     }
     await sleep(1500);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: THROTTLE });
+    if (NET) {
+      await cdp.send('Network.enable');
+      await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 40, downloadThroughput: (NET * 1e6) / 8, uploadThroughput: (NET * 1e6) / 8 });
+    }
     await sleep(500);
 
     const touch = (type, points) =>
