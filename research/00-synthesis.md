@@ -3,6 +3,7 @@
 Date: 2026-10-09. This combines the four research notes:
 [01 tree data](01-tree-data.md), [02 population estimates](02-population-estimates.md), [03 rendering](03-rendering.md) and [04 layout and mesh](04-layout-and-mesh.md).
 Those notes have the details and sources. This one has the decisions.
+Next clade up (2026-11-17, #519): the bird and reptile sources, opened and measured, with a recommended join and build order, are in [amniote-sources.md](amniote-sources.md).
 
 ## The picture in one paragraph
 
