@@ -59,7 +59,7 @@
 #                     occupancy, as with every density. Another species' figure
 #                     is never borrowed.
 
-version = 7
+version = 8
 
 [[exclude]]
 name = "Tikitherium copei"
@@ -1045,17 +1045,11 @@ region of Dapa, Yumbo, Valle del Cauca, Colombia. Primate Conservation 31:1-7; C
 Duque, N. & Solari, S. (2022). Variation in population density of the Andean night monkey (Aotus lemurinus) \
 in areas with different landscape characteristics. THERYA 13(3):287-294. doi:10.12933/therya-22-2126"""
 
-[[density]]
-name = "Aotus griseimembra"
-density = 150.0
-sites = "one census in a forest remnant in northern Colombia, as reported by the Handbook"
-reason = """The only field density found for the species: "A density of 150 ind/km2 has been reported in a \
-census conducted in northern Colombia, but this unusually high density may be explained by the fact that \
-data were collected in a forest remnant that may have served as a refuge" (Handbook of the Mammals of the \
-World 3, Aotidae). The Handbook does not name the census (likely Green 1978, Primates 19:537, not read)."""
-citation = """Fernandez-Duque, E. (2013). Aotidae: Aotus griseimembra. In Mittermeier, R.A., Rylands, A.B. & \
-Wilson, D.E. (eds), Handbook of the Mammals of the World, Vol. 3 Primates, pp. 414-431. Lynx Edicions, \
-Barcelona"""
+# Aotus griseimembra: no [[density]] entry, on purpose; it stays on COMBINE's 1.5/km2 (ToLaD#507). The only field
+# figure found is one census in northern Colombia that the Handbook of the Mammals of the World (vol. 3, Aotidae,
+# 2013) reports at 150 ind/km2 without naming it, and itself calls "unusually high ... a forest remnant that may
+# have served as a refuge". A census nobody can read, discounted by its own reporter, is not evidence enough: add
+# one only from a field survey that can be read and cited.
 
 [[density]]
 name = "Aotus brumbacki"

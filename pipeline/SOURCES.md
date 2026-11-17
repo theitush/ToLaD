@@ -99,8 +99,10 @@ source's; nothing is modelled.
 ## Field densities (ToLaD#507)
 
 `overrides.toml [[density]]` replaces COMBINE's density of a living species with one measured in the field, cited:
-the study's overall density, else the mean of its sites where the species was found. The four night monkeys split
-from *Aotus lemurinus*, to which COMBINE gives one copied 1.5/km²: see the entries for each study and site.
+the study's overall density, else the mean of its sites where the species was found. Of the four night monkeys
+split from *Aotus lemurinus*, to which COMBINE gives one copied 1.5/km², three have one (*A. zonalis*, *A. lemurinus*,
+*A. brumbacki*); *A. griseimembra* keeps COMBINE's: its only figure is an unnamed census its reporter calls unusually
+high (the comment in `overrides.toml` says why).
 
 ## Stem fossils (automatic)
 
