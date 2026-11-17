@@ -3144,7 +3144,14 @@ export class FanView implements InputHandlers {
       const room = (g: GapMember) => (g.on < 0 ? 0 : Math.max(g.gap, g.band));
       const opens = gapOpens(root, parts, room, CLADE_PX);
       const guests = new Map<GapMember, Guest<GapMember>>();
-      const hands = gapHands(root, parts, opens, (g) => (g.on < 0 ? 0 : g.gap), (g) => (g.on < 0 ? 0 : g.band), room, CLADE_PX, GROUP_D - PIC_D, guests, same);
+      // (The highlights' lineages, HIGHLIGHT_STOPS: a band holding one is its own label's before a title's, gapHands' `dear`.)
+      const lineage = new Set<FanNode | FanBranch>();
+      for (const b of this.fan.branches)
+        if (HIGHLIGHT_STOPS[b.sp.sci]) {
+          lineage.add(b);
+          for (let u: FanNode | null = b.node; u; u = u.parent) lineage.add(u);
+        }
+      const hands = gapHands(root, parts, opens, (g) => (g.on < 0 ? 0 : g.gap), (g) => (g.on < 0 ? 0 : g.band), room, CLADE_PX, GROUP_D - PIC_D, guests, same, (g) => lineage.has(g.lv.b ?? g.lv.v!));
       const tips = tipOrder(own, R);
       L = this.gapLadder = { T, root, parts, opens, hands, guests, tips, own, C, R, slack: laneSlack(own, C, R), tipIx: new TipIndex(tips, C, R) };
     }
