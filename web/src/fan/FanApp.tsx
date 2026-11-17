@@ -901,7 +901,7 @@ export function SpeciesCard({ sp, onClose, onUp, onBox, open, ageMa, startMa, ev
           </p>
         )}
       </div>
-      {spark && <HistorySpark key={sp.gid} h={sp.history!} open={open} natural={sp.natural} naturalMeta={NATURAL_META} activeEvent={ev ? event : undefined} />}
+      {spark && <HistorySpark key={sp.gid} h={sp.history!} open={open} natural={sp.natural} naturalMeta={NATURAL_META} loss={sp.loss} activeEvent={ev ? event : undefined} />}
       {/* What dates the change since 1500 (ToLaD#507), under it: a source's year, a bound, or not known. */}
       <LossLine sp={sp} />
       {regional.map(({ e, k }) => (

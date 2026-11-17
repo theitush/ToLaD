@@ -13,7 +13,7 @@
 import { useId, useState } from 'react';
 import { approxCountsIn, formatCount } from '../data/count';
 import { basisSpans, GRADE_COLOR, GRADE_WORD, MODELLED_KINDS, NODATA, noDataSpans, styleBetween, type Basis, type SpanStyle } from './history';
-import type { HistoryRec, HistPoint, NaturalMeta, NaturalRec } from './panthera';
+import type { HistoryRec, HistPoint, LossRec, NaturalMeta, NaturalRec } from './panthera';
 import { TIME_C } from './population';
 import { EVENT_TINT } from './colstyle';
 import { METHOD_IDS, MethodLink, WORD_IDS } from './Methods';
@@ -224,10 +224,13 @@ export function HistorySpark({
   open: open0 = false,
   natural = null,
   naturalMeta = null,
+  loss = null,
   activeEvent,
 }: {
   h: HistoryRec;
   open?: boolean;
+  /** What dates its range loss (ToLaD#507): its full citation listed with the natural level (the card's line names it short). */
+  loss?: LossRec | null;
   /** The curated event the card is on (its index in h.events): its band drawn stronger. */
   activeEvent?: number;
   /** The species' natural (pre-human) baseline, drawn as a faint level and listed with the sources. */
@@ -631,6 +634,12 @@ export function HistorySpark({
                 </div>
                 <Cite cite={naturalMeta?.cite ?? ''} url={naturalMeta?.url ?? ''} />
                 {st && <Cite cite={st.cite} url={st.url} />}
+                {loss?.cite && (
+                  <div className="cite" data-loss-cite="">
+                    <span className="dim">When it was lost: </span>
+                    {loss.cite}
+                  </div>
+                )}
                 <div className="dim">
                   The level in 1500, from PHYLACINE’s map without people: {formatCount(nat.km2Natural)} km²
                   {nat.km2Current > 0 ? `, ${formatCount(nat.km2Current)} km² today (${Math.round((100 * nat.km2Current) / nat.km2Natural)}%)` : ''}.

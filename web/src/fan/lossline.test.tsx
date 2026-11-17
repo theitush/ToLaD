@@ -96,6 +96,11 @@ describe("the card says what dates a species' range loss (ToLaD#507)", () => {
       text(renderToStaticMarkup(<HistorySpark h={s.history!} open natural={s.natural} />).match(/data-modelled-note="">([^<]*)</)![1]);
     expect(note(sp('Myrmecobius fasciatus'))).toContain('the natural level held to 1788, then');
     expect(note(sp('Lemur catta'))).toContain('the natural level held to 1500, then');
+    // Its sources list the loss's whole citation with the natural level (the line names it short).
+    const numbat = sp('Myrmecobius fasciatus');
+    const list = text(renderToStaticMarkup(<HistorySpark h={numbat.history!} open natural={numbat.natural} loss={numbat.loss} />));
+    expect(list).toContain(`When it was lost: ${numbat.loss!.cite}`);
+    expect(numbat.loss!.cite).toMatch(/^Strahan & Van Dyck 2008, The Mammals of Australia/);
   });
 
   it("the methods page's walked quoll is the data's: its fall starts in 1788, from Strahan & Van Dyck", () => {
