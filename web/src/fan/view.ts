@@ -10,6 +10,7 @@ import { CLADE_FONT, CLADE_PX, GapNames, SPECIES_FONT, SPECIES_PX, type WrittenN
 import { columnGaps, gapCut, gapHands, gapOpens, ownLanes, picAt, picRanges, tier, tipOrder, type Guest, type Member, type PicCand, type PicRange, type Tier } from './gaplabels';
 import { GROUP_D, LABEL_AXIS_X, labelMode, PIC_D, PIC_LIFT, PIC_ROOM, PIC_S, picBox, type PicSpot } from './pics';
 import { coverLadder, keepOnScreen, placeSlots } from './slide';
+import { bandMeets, labelIndexOn, lanesInOrder, slideWindow, TipIndex, WIN_PX } from './labelindex';
 import { formatCount, formatMass } from '../data/count';
 import { stamp } from '../stamp';
 import { DOUBLE_TAP_MS, Input, type InputHandlers } from '../engine/input';
@@ -642,6 +643,23 @@ export interface GapMember extends CoverGroup, Member {
 export const titleLift = (gapPx: number): number => Math.min((gapPx - CLADE_PX) / 2, CLADE_PX / 4);
 /** A cut item's strands (drawn order): first and last. */
 export type Run = [number, number];
+/** The cover's ladder on the tree on its side (gapCoverAt), once a layout and screen width: its zooms, guests and pictures' tips, and what the window needs (labelindex.ts). */
+type GapLadder = {
+  T: CutTerritories;
+  root: GapMember;
+  parts: (g: GapMember) => GapMember[];
+  opens: Map<GapMember, number>;
+  hands: Map<GapMember, number>;
+  guests: Map<GapMember, Guest<GapMember>>;
+  tips: number[];
+  /** Per strand, its own lane on the column (ownLanes), and the rooms the bands were taken from. */
+  own: boolean[];
+  C: Float64Array;
+  R: Float64Array;
+  /** The own lanes in drawn order (lanesInOrder): else no window, the whole cover. */
+  inOrder: boolean;
+  tipIx: TipIndex;
+};
 
 /** The clades above an order (ToLaD#258): a superordinal one (Theria, Glires…) is no level, so mammal home opens on the orders. Kept per fan. */
 const aboveCache = new WeakMap<Fan, Set<FanNode>>();
@@ -1498,8 +1516,7 @@ export class FanView implements InputHandlers {
       fold.setScale(hit.sx, this.w);
       return { ...hit };
     }
-    this.gapCoverAt(T, fr.sx);
-    const L = this.gapLadder!;
+    const L = this.gapLadderOf(T);
     const [vf, vl] = [v.strands[0].index, v.strands[v.strands.length - 1].index];
     let g: GapMember | undefined = L.root;
     while (g && g.lv.v !== v) g = L.parts(g).find((p) => p.f <= vf && p.l >= vl);
@@ -1539,7 +1556,10 @@ export class FanView implements InputHandlers {
     const [a, b] = [roomL[j], roomL[j] + roomW[j]];
     const [vf, vl] = [v.strands[0].index, v.strands[v.strands.length - 1].index];
     let [up, down] = [0, 0];
-    for (const m of this.gapCoverAt(T, sx)) {
+    // (Its members' bands are inside its own: the cover over that, labelindex.ts.)
+    const band = labelIndexOn() ? this.bandOf(T, v) : undefined;
+    if (band === null) return [0, 0];
+    for (const m of this.gapCoverAt(T, sx, band)) {
       if (m.f < vf || m.l > vl) continue;
       if (m.tier === 'title' && !m.host) up = Math.max(up, (a - m.top) * sx + titleLift(m.gap * sx) + CLADE_PX);
       if (m.pic && m.band * sx <= m.pic) {
@@ -2952,9 +2972,22 @@ export class FanView implements InputHandlers {
    * The cover on the tree on its side (ToLaD#458, gaplabels.ts): the groups and species labelled at zoom sx, where each one's name goes and whether it has a picture, from the zoom alone.
    * Kept for the last sx, so a pan costs nothing.
    */
-  gapCoverAt(T: CutTerritories, sx: number): GapMember[] {
-    const had = this.gapCoverLast;
-    if (had && had.T === T && had.sx === sx) return had.list;
+  gapCoverAt(T: CutTerritories, sx: number, win?: readonly [number, number]): GapMember[] {
+    const L = this.gapLadderOf(T);
+    // (`win`, world x: only the members whose band on the column meets it, and what they read (labelindex.ts); the whole cover where the lanes are not in order.)
+    if (win && !L.inOrder) win = undefined;
+    const had = win ? this.gapWinLast : this.gapCoverLast;
+    if (had && had.T === T && had.sx === sx && (!win || (had.win![0] === win[0] && had.win![1] === win[1]))) return had.list;
+    let list = this.coverOf(L, sx, win);
+    // (The pictures the window's first and last shown ones slide against, gapLabels: one step wider.)
+    const wider = win && slideWindow(list.filter((m) => m.pic), win[0], win[1], (PIC_D / 2 + GROUP_D - PIC_D + 1) / sx);
+    if (wider) list = this.coverOf(L, sx, wider);
+    if (win) this.gapWinLast = { T, sx, win: [win[0], win[1]], list };
+    else this.gapCoverLast = { T, sx, list };
+    return list;
+  }
+  /** The cover's ladder, once a layout and screen width (gapCoverAt). */
+  private gapLadderOf(T: CutTerritories): GapLadder {
     let L = this.gapLadder;
     const same = (g: GapMember, p: GapMember) => p.on === g.on;
     if (!L || L.T !== T) {
@@ -2999,10 +3032,27 @@ export class FanView implements InputHandlers {
       const opens = gapOpens(root, parts, room, CLADE_PX);
       const guests = new Map<GapMember, Guest<GapMember>>();
       const hands = gapHands(root, parts, opens, (g) => (g.on < 0 ? 0 : g.gap), (g) => (g.on < 0 ? 0 : g.band), room, CLADE_PX, GROUP_D - PIC_D, guests, same);
-      L = this.gapLadder = { T, root, parts, opens, hands, guests, tips: tipOrder(own, R) };
+      const tips = tipOrder(own, R);
+      L = this.gapLadder = { T, root, parts, opens, hands, guests, tips, own, C, R, inOrder: lanesInOrder(own, C, R), tipIx: new TipIndex(tips, C, R) };
     }
+    return L;
+  }
+  /** Clade v's band on the column (world x, as its member's in the cover), null for none: its own lanes' hull. */
+  private bandOf(T: CutTerritories, v: FanNode): [number, number] | null {
+    const { own, C, R } = this.gapLadderOf(T);
+    let [lo, hi] = [Infinity, -Infinity];
+    for (const b of v.strands) {
+      if (!own[b.index]) continue;
+      lo = Math.min(lo, C[b.index] - R[b.index] / 2);
+      hi = Math.max(hi, C[b.index] + R[b.index] / 2);
+    }
+    return lo <= hi ? [lo, hi] : null;
+  }
+  /** The cover at zoom sx (gapCoverAt), the whole of it or the members whose band meets world x `win`. */
+  private coverOf(L: GapLadder, sx: number, win?: readonly [number, number]): GapMember[] {
+    const same = (g: GapMember, p: GapMember) => p.on === g.on;
     // (A title over its parts' labels, ToLaD#483: the cut below the titles, each title before its parts; a gap a title's is no one else's, a band handed down holds no name of its owner's.)
-    const list = gapCut(L.root, L.parts, L.opens, L.hands, same, sx, L.guests)
+    const list = gapCut(L.root, L.parts, L.opens, L.hands, same, sx, L.guests, win ? (g) => bandMeets(g, win[0], win[1]) : undefined)
       .filter(({ g }) => g.on >= 0)
       .sort((p, q) => p.g.on - q.g.on || +q.heads - +p.heads);
     const pics = this.gapPicsOf(L);
@@ -3014,13 +3064,19 @@ export class FanView implements InputHandlers {
     // (A title its gap cannot hold yet, a guest: in the band of its widest part, or of that one's widest part once it has handed its band down too, and so on, ToLaD#500; while that band holds
     // both names, side by side, a hair between; else that part's own label stands and the title waits for its gap.)
     const at = new Map(list.map(({ g }, i) => [g, out[i]]));
+    // (A host off the window, labelindex.ts: a member of the cut, not handed down; only its band is read, and one object a host, as the whole cover's.)
+    const hostOf = (h: GapMember) => {
+      let m = at.get(h);
+      if (!m && win && h.on >= 0) at.set(h, (m = { ...h, heads: false }));
+      return m;
+    };
     const both = 2 * CLADE_PX + GROUP_D - PIC_D;
     out.forEach((m, i) => {
       const guest = L.guests.get(list[i].g);
       if (!m.heads || m.tier === 'title' || !guest || sx >= guest.until) return;
       let h: GapMember | undefined = guest.host;
       while (h && (L.hands.get(h) ?? Infinity) <= sx) h = L.guests.get(h)?.host;
-      const host = h && at.get(h);
+      const host = h && hostOf(h);
       if (host && host.band * sx >= both) Object.assign(m, { tier: 'title', host });
     });
     // (One guest a band, ToLaD#500: the outermost of its chain still standing; the inner ones have no name there, a tap going one level deeper to each: of a band's guests, the widest.)
@@ -3040,7 +3096,6 @@ export class FanView implements InputHandlers {
       const beside = (o: GapMember) => (o.host ? m.host === o.host || m === o.host : m.f === o.f) || Math.abs((m.host ?? m).top - (o.host ?? o).top) * sx <= 2 * (CLADE_PX + GROUP_D - PIC_D);
       if (titles.some((o) => o !== m && o.tier && o.f <= m.f && o.l >= m.l && o.l - o.f > m.l - m.f && beside(o) && text(o) === t)) Object.assign(m, { tier: null, host: undefined });
     }
-    this.gapCoverLast = { T, sx, list: out };
     return out;
   }
 
@@ -3070,8 +3125,9 @@ export class FanView implements InputHandlers {
     return ranges;
   }
   private gapPicsLast: { L: object; ranges: Map<GapMember, PicRange> } | null = null;
-  private gapCoverLast: { T: CutTerritories; sx: number; list: GapMember[] } | null = null;
-  private gapLadder: { T: CutTerritories; root: GapMember; parts: (g: GapMember) => GapMember[]; opens: Map<GapMember, number>; hands: Map<GapMember, number>; guests: Map<GapMember, Guest<GapMember>>; tips: number[] } | null = null;
+  private gapCoverLast: { T: CutTerritories; sx: number; win?: [number, number]; list: GapMember[] } | null = null;
+  private gapWinLast: { T: CutTerritories; sx: number; win: [number, number]; list: GapMember[] } | null = null;
+  private gapLadder: GapLadder | null = null;
 
   /** A text's width in a font, once a text. */
   private titleWidths = new Map<string, number>();
@@ -3103,7 +3159,9 @@ export class FanView implements InputHandlers {
     const hold = row + PIC_ROOM - PIC_D / 2;
     const col = Y(this.fan.time.y(LABELS_MA));
     const hair = GROUP_D - PIC_D;
-    const list = this.gapCoverAt(T, sx);
+    // (The screen's members only, labelindex.ts: the screen and WIN_PX each side, world x.)
+    const win = labelIndexOn() ? ([this.toWorld(-WIN_PX, 0)[0], this.toWorld(this.w + WIN_PX, 0)[0]] as const) : undefined;
+    const list = this.gapCoverAt(T, sx, win);
     // (Guest titles, ToLaD#500: in their host's band, one at most (gapCoverAt), at the top of that band's part on screen, then the host's own labels, a hair between; gapCoverAt gave it a band
     // holding both.)
     const guestAt = new Map<GapMember, number>();
@@ -3199,7 +3257,8 @@ export class FanView implements InputHandlers {
     const meets = (s: LabelSpot) => out.pics.some((p, i) => own[i] !== s.key && boxesMeet(picBox(p), s.box));
     out.names = out.names.filter((s) => !meets(s));
     out.spots = out.spots.filter((s) => !meets(s));
-    this.tipLabels(out, this.gapLadder!.tips);
+    const L = this.gapLadder!;
+    this.tipLabels(out, win ? L.tipIx.within(win[0], win[1]) : L.tips);
     return out;
   }
 

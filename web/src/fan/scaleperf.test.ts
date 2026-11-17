@@ -125,6 +125,9 @@ describe.skipIf(!OUT)('scale yardstick (perf)', () => {
     (v as unknown as { gl: unknown }).gl = gl;
     v.draw();
     lap('first');
+    // (The labels' share: labelsNow alone, and with drawLabels, of the first frame.)
+    load.firstLabels = v.labelMs[v.labelMs.length - 1];
+    load.firstLabelsAll = v.labelAllMs[v.labelAllMs.length - 1];
     v.draw();
     lap('second');
     res.load = Object.fromEntries(Object.entries(load).map(([k, x]) => [k, Math.round(k === 'bytes' ? x : x)]));
@@ -160,10 +163,18 @@ describe.skipIf(!OUT)('scale yardstick (perf)', () => {
         at.cam = c;
         v.draw();
         v.draw();
+        const lab: number[] = [];
+        const labAll: number[] = [];
         const timed = (f: () => void) => {
           const t = performance.now();
+          const n0 = v.labelMs.length;
           f();
           v.draw();
+          // (labelsNow's ms, and with drawLabels, of this frame: the labels' share.)
+          if (v.labelMs.length > n0 || v.labelMs.length === 600) {
+            lab.push(v.labelMs[v.labelMs.length - 1]);
+            labAll.push(v.labelAllMs[v.labelAllMs.length - 1]);
+          }
           return performance.now() - t;
         };
         // A pinch in and out about the middle (as phoneperf's: 20 steps each way), a pan, a flight in and back.
@@ -194,7 +205,7 @@ describe.skipIf(!OUT)('scale yardstick (perf)', () => {
           }
         }
         mem();
-        frames[depth] = { pinch: stats(pinch), pan: stats(pan), flight: stats(fly) };
+        frames[depth] = { pinch: stats(pinch), pan: stats(pan), flight: stats(fly), labels: stats(lab), labelsAll: stats(labAll) };
         // (Written as it goes: a run stopped part way keeps what it measured.)
         res.frames = frames;
         res.rssMB = Math.round(rss / 2 ** 20);
