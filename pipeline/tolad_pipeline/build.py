@@ -142,14 +142,28 @@ def main(argv: list[str] | None = None) -> int:
     a = ap.parse_args(argv)
     t_start = time.time()
     log: dict = {}
-    root, ctx = build_tree(a.raw, a.work, log, t_start)
+    root, ctx, droot = build_mammals(a.raw, a.work, log, t_start)
+    from . import audit, tiles  # the data audit's per-leaf snapshot (ToLaD#113): `make audit` checks it
+    log_step(t_start, f"audit snapshot {audit.snapshot(root, a.raw, a.work, log)}")
+    tiles.write_all(root, a.out, log, droot)
+    log_step(t_start, "tiles written")
+    (a.out / "stats.json").write_text(json.dumps(log, indent=1, default=_json_default, sort_keys=True) + "\n")
+    print(json.dumps({k: log[k] for k in ("counts", "spot_checks", "output", "upham_match", "pbdb_match")},
+                     indent=1, default=_json_default))
+    return 0
+
+
+def build_mammals(raw: Path, work: Path, log: dict, t_start: float):
+    """The whole mammal build up to its output: the merged tree with its counts, and the dated tree. The amniote
+    build (amniotes.py, ToLaD#539) grafts exactly this in as its Mammalia."""
+    root, ctx = build_tree(raw, work, log, t_start)
     log_step(t_start, "tree built")
 
-    from . import model, redlist, tiles
+    from . import model, redlist
     # (before the counts: a Data Deficient species with no current map and no count is unknown, ToLaD#507)
-    redlist.attach(root, a.raw, ctx, log)
+    redlist.attach(root, raw, ctx, log)
     log_step(t_start, f"Red List status: {log['red_list']['living_by_source']}")
-    model.run(root, a.raw, ctx, log)
+    model.run(root, raw, ctx, log)
     log_step(t_start, "counts modelled")
     dj = log.get("history", {}).get("deep_join")
     if dj:  # the genomic deep past scaled to the next level (ToLaD#143): factors and species beyond the flag
@@ -160,7 +174,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"    flagged {sp}: scaled x{f['factor']:.3g} to the {f['to_kind']} level ({f['next']})",
                   file=sys.stderr)
     from . import dated  # the dated tree (format 1.6, ToLaD#145): Upham topology + grafts, per file META
-    droot = dated.build(root, *ctx["upham"], ctx["overrides"], log, ac=dated.load_alvarez(a.raw),
+    droot = dated.build(root, *ctx["upham"], ctx["overrides"], log, ac=dated.load_alvarez(raw),
                         names=(ctx["exact"], ctx["syn"]))
     log_step(t_start, f"dated tree: {log['dated_tree']['species']} species, {log['dated_tree']['splits']} splits")
     if "mdd" in log:  # is every MDD order and family one clade of it (ToLaD#278)? tests/test_mdd.py names the exceptions
@@ -170,16 +184,9 @@ def main(argv: list[str] | None = None) -> int:
         log_step(t_start, f"dates benchmark, {rule}: {b['inside']}/{b['of']} inside, x{b['median_factor_off']} off")
     log["counts"] = counts(root)
     log["spot_checks"] = spot_checks(root)
-    log["calibration_check"] = calibration_report(root, a.raw)
+    log["calibration_check"] = calibration_report(root, raw)
     log["top_orders"] = top_orders(root)
-    from . import audit  # the data audit's per-leaf snapshot (ToLaD#113): `make audit` checks it
-    log_step(t_start, f"audit snapshot {audit.snapshot(root, a.raw, a.work, log)}")
-    tiles.write_all(root, a.out, log, droot)
-    log_step(t_start, "tiles written")
-    (a.out / "stats.json").write_text(json.dumps(log, indent=1, default=_json_default, sort_keys=True) + "\n")
-    print(json.dumps({k: log[k] for k in ("counts", "spot_checks", "output", "upham_match", "pbdb_match")},
-                     indent=1, default=_json_default))
-    return 0
+    return root, ctx, droot
 
 
 def _json_default(o):

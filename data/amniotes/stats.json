@@ -1,0 +1,883 @@
+{
+ "amniotes": {
+  "callaghan": {
+   "clements_with_a_count": 9508,
+   "matched_by": {
+    "OTT synonym": 644,
+    "exact": 8864,
+    "no match": 190,
+    "two or more Clements species": 2
+   },
+   "species": 9700,
+   "training_matched": 677
+  },
+  "checks": {
+   "Amniota_Ma": 318.8,
+   "Mammalia_dated_Ma": 204.55,
+   "alive": {
+    "Aves": 50244701902.0,
+    "Mammalia": 86830099345.03368,
+    "Sauropsida": 50244711402.80891
+   },
+   "crowns_Ma": {
+    "Archelosauria": 256.8,
+    "Archosauria": 243.3,
+    "Aves": 98.99,
+    "Crocodylia": 93.11,
+    "Lepidosauria": 245.0,
+    "Sauria": 280.7,
+    "Squamata": 213.19,
+    "Testudines": 176.66
+   },
+   "dated_branches_not_positive": {
+    "Amniota": 0,
+    "sauropsids": 0
+   },
+   "mammal_tips": 18367,
+   "rows_bands_not_positive": {
+    "Amniota": 0,
+    "sauropsids": 0
+   },
+   "sauropsid_in_dated_tree": 23853,
+   "sauropsid_tips": 23853,
+   "sauropsid_tips_by_group": {
+    "Aves": 11167,
+    "Crocodylia": 27,
+    "Rhynchocephalia": 1,
+    "Squamata": 12293,
+    "Testudines": 365
+   },
+   "species_twice": [
+    "Asiatherium reshetovi",
+    "Kokopellia juddi",
+    "Todralestes variabilis",
+    "Vulpavus ovatus",
+    "Vulpavus profectus"
+   ],
+   "tips": 42220
+  },
+  "counts": {
+   "assumed_generation_yr": 7.0,
+   "by_kind": {
+    "bird: Callaghan, model": 8828,
+    "bird: Callaghan, training": 675,
+    "bird: extinct, unknown": 78,
+    "bird: unknown": 1586,
+    "reptile: extinct, unknown": 8,
+    "reptile: unknown": 12678
+   },
+   "thinnest": {
+    "N": 0.6660690486578963,
+    "leaf": "Peromyscus dickeyi"
+   }
+  },
+  "dated": {
+   "backbone": {
+    "Amniota": {
+     "age": 318.8,
+     "between": [
+      "Mammalia",
+      "Sauria"
+     ],
+     "cited": 318.8,
+     "oldest_below_Ma": 280.7,
+     "raised_by": null
+    },
+    "Archelosauria": {
+     "age": 256.8,
+     "between": [
+      "Testudines",
+      "Archosauria"
+     ],
+     "cited": 256.8,
+     "raised_by": null
+    },
+    "Archosauria": {
+     "age": 243.3,
+     "between": [
+      "Crocodylia",
+      "Aves"
+     ],
+     "cited": 243.3,
+     "raised_by": null
+    },
+    "Lepidosauria": {
+     "age": 245.0,
+     "between": [
+      "Rhynchocephalia",
+      "Squamata"
+     ],
+     "cited": 245.0,
+     "raised_by": null
+    },
+    "Sauria": {
+     "age": 280.7,
+     "between": [
+      "Lepidosauria",
+      "Archelosauria"
+     ],
+     "cited": 280.7,
+     "raised_by": null
+    }
+   },
+   "grafted": {
+    "at_crown_of": {
+     "family": 348,
+     "genus": 5324
+    },
+    "by_group": {
+     "Crocodylia": 1,
+     "Squamata": 5630,
+     "Testudines": 41
+    },
+    "n": 5672,
+    "new_halfway_splits": 130
+   },
+   "groups": {
+    "Aves": {
+     "crown_Ma": 98.99,
+     "rows": 11167,
+     "source": "avesdata",
+     "source_tips_under_crown": 11167,
+     "species": 11167
+    },
+    "Crocodylia": {
+     "crown_Ma": 93.11,
+     "rows": 27,
+     "source": "colston2020",
+     "source_tips_under_crown": 27,
+     "species": 26,
+     "tips not on a list or not in the rows": 1
+    },
+    "Rhynchocephalia": {
+     "crown_Ma": 0.0,
+     "rows": 1,
+     "source": "colston2020",
+     "source_tips_under_crown": 1,
+     "species": 1
+    },
+    "Squamata": {
+     "a second tip for one species": 15,
+     "crown_Ma": 213.19,
+     "rows": 12293,
+     "source": "title2024",
+     "source_tips_under_crown": 6885,
+     "species": 6663,
+     "tips not on a list or not in the rows": 207
+    },
+    "Testudines": {
+     "crown_Ma": 176.66,
+     "rows": 365,
+     "source": "colston2020",
+     "source_tips_under_crown": 357,
+     "species": 324,
+     "tips not on a list or not in the rows": 33
+    }
+   },
+   "named_by_open_tree": 1742
+  },
+  "dating": {
+   "calibrated_nodes": 9952,
+   "calibrated_raised_by_fossils": 178,
+   "uncalibrated_internal": 6484
+  },
+  "faults": {
+   "homonym_notes_dropped": [
+    [
+     "Woodworthia (genus in Opisthokonta)",
+     "Woodworthia"
+    ],
+    [
+     "Homopholis (genus in Opisthokonta)",
+     "Homopholis"
+    ],
+    [
+     "Eurylepis (genus in Opisthokonta)",
+     "Eurylepis"
+    ],
+    [
+     "Dracaena (genus in Opisthokonta)",
+     "Dracaena"
+    ],
+    [
+     "Placosoma (genus in Holozoa)",
+     "Placosoma"
+    ],
+    [
+     "Leposoma (genus in Deuterostomia)",
+     "Leposoma"
+    ],
+    [
+     "Gambelia (genus in Opisthokonta)",
+     "Gambelia"
+    ],
+    [
+     "Cyclura (genus in Deuterostomia)",
+     "Cyclura"
+    ],
+    [
+     "Ctenophorus (genus in Deuterostomia)",
+     "Ctenophorus"
+    ],
+    [
+     "Draco (genus in Opisthokonta)",
+     "Draco"
+    ],
+    [
+     "Ceratophora (genus in Opisthokonta)",
+     "Ceratophora"
+    ],
+    [
+     "Xenopeltis (genus in Holozoa)",
+     "Xenopeltis"
+    ],
+    [
+     "Aspidites (genus in Deuterostomia)",
+     "Aspidites"
+    ],
+    [
+     "Homalopsis (genus in Deuterostomia)",
+     "Homalopsis"
+    ],
+    [
+     "Aipysurus (genus in family Hydrophiidae)",
+     "Aipysurus"
+    ],
+    [
+     "Polemon (genus in Deuterostomia)",
+     "Polemon"
+    ],
+    [
+     "Natrix (genus in Opisthokonta)",
+     "Natrix"
+    ],
+    [
+     "Heterodon (genus in Opisthokonta)",
+     "Heterodon"
+    ],
+    [
+     "Clelia (genus in Deuterostomia)",
+     "Clelia"
+    ],
+    [
+     "Grayia (genus in Opisthokonta)",
+     "Grayia"
+    ],
+    [
+     "Salvadora (genus in Opisthokonta)",
+     "Salvadora"
+    ],
+    [
+     "Conopsis (genus in Deuterostomia)",
+     "Conopsis"
+    ],
+    [
+     "Ptyas (genus in Opisthokonta)",
+     "Ptyas"
+    ],
+    [
+     "Lampropeltis (genus in Deuterostomia)",
+     "Lampropeltis"
+    ],
+    [
+     "Squamata (order in Deuterostomia)",
+     "Squamata"
+    ],
+    [
+     "Cycloderma (genus in Holozoa)",
+     "Cycloderma"
+    ],
+    [
+     "Pelodiscus (genus in Holozoa)",
+     "Pelodiscus"
+    ],
+    [
+     "Nilssonia (genus in Opisthokonta)",
+     "Nilssonia"
+    ],
+    [
+     "Eudromia (genus in Deuterostomia)",
+     "Eudromia"
+    ],
+    [
+     "Ortalis (genus in Deuterostomia)",
+     "Ortalis"
+    ],
+    [
+     "Odontophorus (genus in Opisthokonta)",
+     "Odontophorus"
+    ],
+    [
+     "Bambusicola (genus in Deuterostomia)",
+     "Bambusicola"
+    ],
+    [
+     "Chrysolophus (genus in Deuterostomia)",
+     "Chrysolophus"
+    ],
+    [
+     "Lophura (genus in Opisthokonta)",
+     "Lophura"
+    ],
+    [
+     "Lagopus (genus in Opisthokonta)",
+     "Lagopus"
+    ],
+    [
+     "Eudocimus (genus in Deuterostomia)",
+     "Eudocimus"
+    ],
+    [
+     "Bostrychia (genus in Opisthokonta)",
+     "Bostrychia"
+    ],
+    [
+     "Morus (genus in Opisthokonta)",
+     "Morus"
+    ],
+    [
+     "Oxypogon (genus in Opisthokonta)",
+     "Oxypogon"
+    ],
+    [
+     "Archilochus (genus in Deuterostomia)",
+     "Archilochus"
+    ],
+    [
+     "Lewinia (genus in Eumetazoa)",
+     "Lewinia"
+    ],
+    [
+     "Himantopus (genus in Opisthokonta)",
+     "Himantopus"
+    ],
+    [
+     "Anarhynchus (genus in Deuterostomia)",
+     "Anarhynchus"
+    ],
+    [
+     "Arenaria (genus in Deuterostomia)",
+     "Arenaria"
+    ],
+    [
+     "Priotelus (genus in Deuterostomia)",
+     "Priotelus"
+    ],
+    [
+     "Aulacorhynchus (genus in Opisthokonta)",
+     "Aulacorhynchus"
+    ],
+    [
+     "Ptilopsis (genus in Deuterostomia)",
+     "Ptilopsis"
+    ],
+    [
+     "Leptodon (genus in Opisthokonta)",
+     "Leptodon"
+    ],
+    [
+     "Heterocercus (genus in Deuterostomia)",
+     "Heterocercus"
+    ],
+    [
+     "Rupicola (genus in Opisthokonta)",
+     "Rupicola"
+    ],
+    [
+     "Leptopogon (genus in domain Eukaryota)",
+     "Leptopogon"
+    ],
+    [
+     "Lessonia (genus in Opisthokonta)",
+     "Lessonia"
+    ],
+    [
+     "Inezia (genus in Opisthokonta)",
+     "Inezia"
+    ],
+    [
+     "Hypocnemis (genus in Deuterostomia)",
+     "Hypocnemis"
+    ],
+    [
+     "Artamus (genus in Deuterostomia)",
+     "Artamus"
+    ],
+    [
+     "Newtonia (genus in Opisthokonta)",
+     "Newtonia"
+    ],
+    [
+     "Podoces (genus in Deuterostomia)",
+     "Podoces"
+    ],
+    [
+     "Eremophila (genus in Opisthokonta)",
+     "Eremophila"
+    ],
+    [
+     "Leiothrix (genus in Opisthokonta)",
+     "Leiothrix"
+    ],
+    [
+     "Prunella (genus in Opisthokonta)",
+     "Prunella"
+    ],
+    [
+     "Chloris (genus in Opisthokonta)",
+     "Chloris"
+    ],
+    [
+     "Linaria (genus in Opisthokonta)",
+     "Linaria"
+    ],
+    [
+     "Zonotrichia (genus in domain Eukaryota)",
+     "Zonotrichia"
+    ],
+    [
+     "Passerina (genus in Opisthokonta)",
+     "Passerina"
+    ],
+    [
+     "Cardinalis (genus in Opisthokonta)",
+     "Cardinalis"
+    ],
+    [
+     "Conirostrum (genus in Opisthokonta)",
+     "Conirostrum"
+    ],
+    [
+     "Leptocoma (genus in Opisthokonta)",
+     "Leptocoma"
+    ],
+    [
+     "Cyphorhinus (genus in Deuterostomia)",
+     "Cyphorhinus"
+    ]
+   ],
+   "lepidosauria_tips_by_group": {
+    "Rhynchocephalia": 1,
+    "Squamata": 12293
+   },
+   "named_by_taxonomy": {
+    "n": 25,
+    "names": [
+     "Abronia",
+     "Acrodonta",
+     "Archelosauria",
+     "Archosauria",
+     "Brachypteraciidae",
+     "Crocodylia",
+     "Cyanoderma",
+     "Echinanthera",
+     "Eremopterix",
+     "Eurylaimus",
+     "Galliformes",
+     "Heliangelus",
+     "Illadopsis",
+     "Madascincus polleni species complex",
+     "Malacocincla",
+     "Megapodiidae",
+     "Philemon",
+     "Phoenicoparrus",
+     "Pteroglossus",
+     "Spheniscidae",
+     "Spheniscus",
+     "Thamnophis",
+     "Toxicofera",
+     "Urostrophus",
+     "Xenicus"
+    ]
+   },
+   "tips_left_by_ott_group": {
+    "(no OTT row)": 2335,
+    "Aves": 11161,
+    "Crocodylia": 26,
+    "Rhynchocephalia": 1,
+    "Squamata": 9990,
+    "Testudines": 340
+   }
+  },
+  "lists": {
+   "clements": 11167,
+   "rdb": 12686,
+   "rdb_by_group": {
+    "Crocodylia": 27,
+    "Rhynchocephalia": 1,
+    "Squamata": 12293,
+    "Testudines": 365
+   },
+   "rdb_no_order": [
+    "Arizona occidentalis"
+   ]
+  },
+  "opentree": {
+   "opentree_dropped": {
+    "duplicate binomial": 103,
+    "infraspecific": 5249,
+    "non-species tip": 591
+   }
+  },
+  "rows": {
+   "duplicate_tips_dropped": {
+    "n": 61,
+    "names": [
+     "Acanthodactylus scutellatus",
+     "Acontias lineatus",
+     "Acritoscincus platynotus",
+     "Acritoscincus trilineatus",
+     "Aenigmatolimnas marginalis",
+     "Aethomyias perspicillatus",
+     "Ammospiza leconteii",
+     "Anolis breslini",
+     "Anolis limifrons",
+     "Argya striata",
+     "Artomyias fuliginosa",
+     "Artomyias ussheri",
+     "Aspidoscelis exsanguis",
+     "Aspidoscelis rodecki",
+     "Aspidoscelis velox",
+     "Caliechthrus leucolophus",
+     "Calotes minor",
+     "Chlorophoneus bocagei",
+     "Corvus torquatus",
+     "Corythornis vintsioides",
+     "Curruca nana",
+     "Cyrtodactylus dattanensis",
+     "Empidornis semipartitus",
+     "Eryx vittatus",
+     "Fowlea piscator",
+     "Geobiastes squamiger",
+     "Icthyophaga humilis",
+     "Icthyophaga ichthyaetus",
+     "Kaestlea palnica",
+     "Lerista microtis",
+     "Leuconotopicus arizonae",
+     "Leuconotopicus borealis",
+     "Liasis fuscus",
+     "Liolaemus stolzmanni",
+     "Macronyx sharpei",
+     "Microcarbo pygmaeus",
+     "Muscicapa dauurica",
+     "Namibornis herero",
+     "Ninia atrata",
+     "Pachydactylus weberi",
+     "Panaspis wahlbergii",
+     "Philodice mitchellii",
+     "Phoenicurus hodgsoni",
+     "Phyllodactylus pumilus",
+     "Phyllodactylus xanti",
+     "Phyllodactylus xanti",
+     "Pogonotriccus poecilotis",
+     "Prionodura newtoniana",
+     "Pyrgilauda davidiana",
+     "Rhinotyphlops leucocephalus",
+     "Silvicultrix diadema",
+     "Sporathraupis cyanocephala",
+     "Stegonotus muelleri",
+     "Stizorhina fraseri",
+     "Strix albitarsis",
+     "Systellura longirostris",
+     "Trachylepis margaritifer",
+     "Turdoides nipalensis",
+     "Uropeltis grandis",
+     "Vipera ammodytes",
+     "Zosterops rendovae"
+    ]
+   },
+   "emptied_higher_taxa_dropped": 680,
+   "extinct_flagged_but_listed_kept": {
+    "n": 108,
+    "names": [
+     "Acratosaura mentalis",
+     "Aegolius gradyi",
+     "Alectroenas nitidissimus",
+     "Alopochen kervazoi",
+     "Anas theodori",
+     "Anthornis melanocephala",
+     "Aphanapteryx bonasia",
+     "Aplonis fusca",
+     "Aplonis mavornata",
+     "Aplonis ulietensis",
+     "Ara tricolor",
+     "Botaurus novaezelandiae",
+     "Caloenas maculata",
+     "Camptorhynchus labradorius",
+     "Caracara lutosa",
+     "Carpodacus ferreorostris",
+     "Chaetoptila angustipluma",
+     "Chioninia coctei",
+     "Chloridops kona",
+     "Chroicocephalus bulleri",
+     "Chroicocephalus novaehollandiae",
+     "Ciridops anna",
+     "Coenocorypha barrierensis",
+     "Coenocorypha iredalei",
+     "Columba jouyi",
+     "Columba versicolor",
+     "Conuropsis carolinensis",
+     "Coturnix novaezelandiae",
+     "Cyanoramphus ulietanus",
+     "Cyanoramphus zealandicus",
+     "Diaphorapteryx hawkinsi",
+     "Dryolimnas augusti",
+     "Dysmorodrepanis munroi",
+     "Elseya lavarackorum",
+     "Erythromachus leguati",
+     "Farancia abacura",
+     "Foudia delloni",
+     "Fregilupus varius",
+     "Gallirallus dieffenbachii",
+     "Gallirallus modestus",
+     "Gallirallus poecilopterus",
+     "Gerygone insularis",
+     "Haematopus meadewaldoi",
+     "Heteralocha acutirostris",
+     "Limnornis curvirostris",
+     "Mabuya mabouya",
+     "Melamprosops phaeosoma",
+     "Mergus australis",
+     "Microgoura meeki",
+     "Moho apicalis",
+     "Moho bishopi",
+     "Moho braccatus",
+     "Moho nobilis",
+     "Myiagra freycineti",
+     "Nannococcyx psix",
+     "Nestor productus",
+     "Ninox albifacies",
+     "Otus murivorus",
+     "Otus sauzieri",
+     "Pampusana salamonis",
+     "Pezophaps solitaria",
+     "Philydor novaesi",
+     "Pipilo naufragus",
+     "Podocnemis expansa",
+     "Podocnemis sextuberculata",
+     "Podocnemis unifilis",
+     "Podocnemis vogli",
+     "Pomarea maupitiensis",
+     "Porphyrio caerulescens",
+     "Porphyrio kukwiedei",
+     "Porphyrio paepae",
+     "Prosobonia cancellata",
+     "Prosobonia ellisi",
+     "Psittacula bensoni",
+     "Psittacula exsul",
+     "Pterodroma rupinarum",
+     "Quiscalus palustris",
+     "Raphus cucullatus",
+     "Rhineura floridana",
+     "Tachybaptus rufolavatus",
+     "Threskiornis solitarius",
+     "Traversia lyalli",
+     "Tribonyx hodgenorum",
+     "Turdus ravidus",
+     "Tyrannus albogularis",
+     "Tyrannus caudifasciatus",
+     "Tyrannus couchii",
+     "Tyrannus crassirostris",
+     "Tyrannus cubensis",
+     "Tyrannus dominicensis",
+     "Tyrannus forficatus",
+     "Tyrannus melancholicus",
+     "Tyrannus niveigularis",
+     "Tyrannus savana",
+     "Tyrannus tyrannus",
+     "Tyrannus verticalis",
+     "Tyrannus vociferans",
+     "Viridonia sagittirostris",
+     "Zapornia akool",
+     "Zapornia atra",
+     "Zapornia bicolor",
+     "Zapornia flavirostra",
+     "Zapornia fusca",
+     "Zapornia monasa",
+     "Zapornia olivieri",
+     "Zapornia palmeri",
+     "Zapornia paykullii",
+     "Zoothera terrestris"
+    ]
+   },
+   "extinct_tips_dropped": {
+    "Amniota": 5,
+    "Aves": 27,
+    "Crocodylia": 8,
+    "Dinosauria": 224,
+    "Pterosauria": 62,
+    "Rhynchocephalia": 1,
+    "Squamata": 19,
+    "Testudines": 16
+   },
+   "grafted_on_genus": {
+    "by_group": {
+     "Aves": 158,
+     "Crocodylia": 2,
+     "Squamata": 2632,
+     "Testudines": 38
+    },
+    "n": 2830,
+    "on": {
+     "Open Tree's genus node": 78,
+     "a new genus under the common ancestor of its family-mates": 492,
+     "a new split above its one genus-mate": 189,
+     "the common ancestor of its genus-mates": 2071
+    }
+   },
+   "listed": {
+    "Aves": 11167,
+    "Crocodylia": 27,
+    "Rhynchocephalia": 1,
+    "Squamata": 12293,
+    "Testudines": 365
+   },
+   "listed_but_extinct": {
+    "by_group": {
+     "Aves": 78,
+     "Squamata": 3,
+     "Testudines": 5
+    },
+    "n": 86,
+    "names": [
+     "Acrocephalus luscinius",
+     "Acrocephalus musae",
+     "Aegolius gradyi",
+     "Alectroenas nitidissimus",
+     "Alopochen kervazoi",
+     "Anas theodori",
+     "Anthornis melanocephala",
+     "Aphanapteryx bonasia",
+     "Aplonis fusca",
+     "Aplonis mavornata",
+     "Aplonis ulietensis",
+     "Ara tricolor",
+     "Botaurus novaezelandiae",
+     "Caloenas maculata",
+     "Camptorhynchus labradorius",
+     "Caracara lutosa",
+     "Carpodacus ferreorostris",
+     "Chaetoptila angustipluma",
+     "Chioninia coctei",
+     "Chloridops kona",
+     "Ciridops anna",
+     "Coenocorypha barrierensis",
+     "Coenocorypha iredalei",
+     "Columba jouyi",
+     "Columba versicolor",
+     "Conuropsis carolinensis",
+     "Coturnix novaezelandiae",
+     "Cyanoramphus ulietanus",
+     "Cyanoramphus zealandicus",
+     "Diaphorapteryx hawkinsi",
+     "Dryolimnas augusti",
+     "Dysmorodrepanis munroi",
+     "Elseya lavarackorum",
+     "Erythromachus leguati",
+     "Farancia abacura",
+     "Foudia delloni",
+     "Fregilupus varius",
+     "Gallinula nesiotis",
+     "Gallirallus dieffenbachii",
+     "Gallirallus modestus",
+     "Gallirallus poecilopterus",
+     "Gerygone insularis",
+     "Haematopus meadewaldoi",
+     "Heteralocha acutirostris",
+     "Mabuya mabouya",
+     "Melamprosops phaeosoma",
+     "Mergus australis",
+     "Microgoura meeki",
+     "Moho apicalis",
+     "Moho bishopi",
+     "Moho braccatus",
+     "Moho nobilis",
+     "Myiagra freycineti",
+     "Nannococcyx psix",
+     "Nestor productus",
+     "Ninox albifacies",
+     "Otus murivorus",
+     "Otus sauzieri",
+     "Pampusana salamonis",
+     "Pezophaps solitaria",
+     "Philydor novaesi",
+     "Pipilo naufragus",
+     "Podocnemis expansa",
+     "Podocnemis sextuberculata",
+     "Podocnemis unifilis",
+     "Podocnemis vogli",
+     "Pomarea maupitiensis",
+     "Porphyrio caerulescens",
+     "Porphyrio kukwiedei",
+     "Porphyrio mantelli",
+     "Porphyrio paepae",
+     "Prosobonia cancellata",
+     "Prosobonia ellisi",
+     "Psittacula bensoni",
+     "Psittacula exsul",
+     "Pterodroma rupinarum",
+     "Quiscalus palustris",
+     "Raphus cucullatus",
+     "Tachybaptus rufolavatus",
+     "Threskiornis solitarius",
+     "Traversia lyalli",
+     "Tribonyx hodgenorum",
+     "Turdus ravidus",
+     "Turnagra capensis",
+     "Viridonia sagittirostris",
+     "Zoothera terrestris"
+    ]
+   },
+   "matched_by": {
+    "name": 9849,
+    "ott": 10934,
+    "synonym": 240
+   },
+   "not_placed": {},
+   "opentree_tips_without_mammalia": {
+    "Amniota": 7,
+    "Aves": 18979,
+    "Crocodylia": 47,
+    "Dinosauria": 295,
+    "Pterosauria": 62,
+    "Rhynchocephalia": 3,
+    "Squamata": 11762,
+    "Testudines": 888
+   },
+   "ott_extinct_but_counted_today": [
+    "Chroicocephalus bulleri",
+    "Chroicocephalus novaehollandiae",
+    "Zosterops conspicillatus"
+   ],
+   "species_by_group": {
+    "Aves": 11167,
+    "Crocodylia": 27,
+    "Rhynchocephalia": 1,
+    "Squamata": 12293,
+    "Testudines": 365
+   },
+   "unlisted_tips_dropped": {
+    "(no OTT group)": 4,
+    "Amniota": 2,
+    "Aves": 5481,
+    "Crocodylia": 6,
+    "Dinosauria": 70,
+    "Rhynchocephalia": 1,
+    "Squamata": 1184,
+    "Squamata: two list names": 10,
+    "Testudines": 438,
+    "Testudines: two list names": 1
+   }
+  }
+ },
+ "output": {
+  "brotli_bytes": 1442594,
+  "dated_sidecar_raw": 4419175,
+  "files": 35,
+  "raw_bytes": 8235384,
+  "skeleton_brotli": 97770,
+  "skeleton_nodes": 1779,
+  "skeleton_raw": 1635720,
+  "tiles": 34
+ }
+}

@@ -15,6 +15,8 @@ data/mammals/
   stats.json        build report (counts, match rates, fits, sizes, spot checks)
 ```
 
+`data/amniotes/` (ToLaD#539, `make build-amniotes`) is a second dataset in this format, the same files: the living amniotes, with `data/mammals`' rows unchanged as its Mammalia (global ids shifted by one, for its `Amniota` row 0). Its skeleton `META.dataset` is `amniotes-v0` and `META.amniotes` says what differs: its bird and reptile rows set only the `opentree` bit of `SRCM` (all 16 bits are taken) and name their sources in `METH`; a calibrated row's date source (code 0) is Upham's for a mammal and AvesData 1.7's, Title 2024's, Colston 2020's or TimeTree 5's elsewhere; and the dated sidecars' `sources` append `avesdata`, `title2024`, `colston2020` and `timetree` (with their citations) to the list below.
+
 Load `skeleton.tld` first. It holds the tables that tile rows index into: `methods` and `sources`, plus the tile manifest. A **stub** row is a node whose children live in another tile. Its own row carries all the aggregates needed to draw the unloaded subtree as one band: width (`EVER`, `PPK_`/`PROF`), age span (`T0__`, `T1__`), alive fraction (`ALIV`/`EVER`), ghost share (`GHST`), grade, and tip count (`NTIP`). The representative name is in `META.stub_rep`. Row 0 of the referenced tile is the same node again with identical values, minus the STUB flag. Layout is stable under lazy loading (03 §3.3) because a node's children are laid out only from the children's own rows.
 
 ## Container

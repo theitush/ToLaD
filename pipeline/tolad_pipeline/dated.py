@@ -958,7 +958,8 @@ def common_name(nd: Node) -> str | None:
     # (A domestic stock that outweighs the leaf's wild part names it, #435: the Red List names the wild form it assesses,
     # and most of those alive on the leaf are the pig, the sheep, not the wild boar, the mouflon.)
     return (nd.data.get("common_override") or nd.data.get("stock_common") or (nd.data.get("red_list") or {}).get("common")
-            or (nd.data.get("history") or {}).get("common") or nd.data.get("common_mdd") or None)
+            or (nd.data.get("history") or {}).get("common") or nd.data.get("common_mdd")
+            or nd.data.get("common_list") or None)  # (a bird's eBird/Clements English name, amniotes.py, ToLaD#539)
 
 
 def file_meta(droot: DNode | None, rows: list[tuple[Node, bool]]) -> dict | None:
