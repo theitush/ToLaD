@@ -4,7 +4,8 @@
 // a tap shows it alone, full screen, still turned by a drag (ToLaD#506, Alone.tsx), like the photo. A species split since PHYLACINE draws the range of the species it
 // was split from, the same way, its credit saying so (ToLaD#486). A species PHYLACINE has no map of gets the Wikimedia map
 // (ToLaD#196), and so does every card when the drawing code or globe.json cannot load (the artifact link, no network).
-// With neither, or the map failing, the globe bare, captioned 'Range not known' (ToLaD#492).
+// With neither, or the map failing, the globe bare, captioned 'Range not known' (ToLaD#492), and so for a species PHYLACINE
+// lists with no cells to draw (ToLaD#507: its present-natural map a placeholder).
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { GlobeData, SpeciesRange } from './globe-data';
@@ -130,6 +131,9 @@ export function RangeGlobe({ sci, fallback }: { sci: string; fallback?: (none: R
   const ok = m && m !== 'failed' ? m : null;
   const d = ok?.globeData() ?? null;
   const r = useRangeOf(sci, ok, d);
+  // PHYLACINE lists the species but draws no range for it: no current map, and a present-natural map that is a
+  // placeholder, not a range (ToLaD#507). Not known, whatever map Wikimedia has (Oryzomys curasoae's is the genus's).
+  if (ok && r && !r.cur && !r.lost) return <NoRange m={ok} d={d} />;
   if (m === 'failed' || (ok && !r)) {
     const none = <NoRange m={ok} d={d} />;
     return <>{fallback ? fallback(none) : none}</>;

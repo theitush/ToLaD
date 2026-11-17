@@ -24,6 +24,13 @@ run-length coded as [gap, length, gap, length, ...], each gap counted from the e
 before (from 0 for the first). `ranges[name] = [current, present_natural]`; an empty list is no
 cells (an extinct species has only its present-natural range). A borrowed range has a third element,
 the species whose range it is: `[current, present_natural, "Loxodonta africana"]`.
+
+The globe follows the maps the count stands on (ToLaD#507). A living species whose map difference PHYLACINE's
+note puts down to taxonomy or a mapping fix, and the species such a note takes land from, have as current
+cells today's corrected map (ranges.today_cells, the count's): the night monkey's present-natural map without
+Colombia, which the note gives to Aotus jorgehernandezi, is its current map, so nothing of the move shows as
+range lost. A living species whose present-natural map is a placeholder (stand_ins) is an empty pair: no range
+to draw.
 """
 from __future__ import annotations
 
@@ -42,7 +49,7 @@ import numpy as np
 
 from . import mdd, ranges
 from .load import load_phylacine, norm_name
-from .wiki import species_rows, synonyms
+from .wiki import living_species, species_rows, synonyms
 
 ROWS, COLS = ranges.GRID_SHAPE
 # The grid's geotransform (ModelTiepointTag / ModelPixelScaleTag, identical in every raster).
@@ -278,18 +285,48 @@ def build(raw: Path, mammals: Path) -> tuple[dict, dict]:
     far = {n for n, (h, _) in split.items() if n in tl and not holds(masks[h], *tl[n])}
     split = {n: v for n, v in split.items() if n not in far}
     empty = np.zeros(ranges.GRID_SHAPE, dtype=bool)
+    # ToLaD#507: a living species' globe follows the maps its count stands on. Where PHYLACINE's note moves land
+    # between species or deletes bad records, today's map is the corrected one (ranges.today_cells): green, and
+    # grey only the present-natural cells outside it. A living species whose present-natural map is a placeholder
+    # has no current map and no range to draw (stand_in). A range borrowed from the species a newer one was split
+    # from is PHYLACINE's map of that species before the split, as it was (Eudorcas tilonura, the population
+    # PHYLACINE gives Eudorcas rufina, keeps it in E. rufifrons's): no count stands on it.
+    today = {p: t["map"] for p, t in ranges.today_cells(raw).items() if t["map"] is not None}
+    stand_in = set(stand_ins())
+    living = living_species(mammals)
 
-    def cells(p: str) -> list[list[int]]:
-        return [pack(masks[p].get("cur", empty)), pack(masks[p].get("nat", empty))]
+    def cells(n: str, p: str, own: bool = True) -> list[list[int]]:
+        if own and n in living and p in stand_in:
+            return [[], []]
+        cur = masks[p].get("cur", empty)
+        if own and n in living and p in today:
+            cur = np.zeros(ranges.GRID_SHAPE, dtype=bool)
+            for r, c in today[p]:
+                cur[r, c] = True
+        return [pack(cur), pack(masks[p].get("nat", empty))]
 
     out = {
         "grid": {"rows": ROWS, "cols": COLS, "lon0": -180, "lat": row_edges()},
-        "ranges": dict(sorted({**{n: cells(p) for n, p in m.items()},
-                               **{n: cells(h) + [p] for n, (h, p) in split.items()}}.items())),
+        "ranges": dict(sorted({**{n: cells(n, p) for n, p in m.items()},
+                               **{n: cells(n, h, own=False) + [p] for n, (h, p) in split.items()}}.items())),
     }
+    uses = [(n, p) for n, p in m.items() if n in living]
     stats = {"species": len(species), "matched": len(m), "renamed": len(renamed), "borrowed": len(split),
-             "far": sorted(far), "maps": len(masks), "maps_shared": len(m) - len(set(m.values()))}
+             "far": sorted(far), "maps": len(masks), "maps_shared": len(m) - len(set(m.values())),
+             "corrected": sorted(n for n, p in uses if p in today),
+             "stand_in": sorted(n for n, p in uses if p in stand_in)}
     return out, stats
+
+
+def stand_ins(notes: dict[str, dict] | None = None) -> list[str]:
+    """The living species whose present-natural map is a placeholder (ToLaD#507, phylacine_notes.csv class
+    `placeholder`): IUCN maps no current range for them, and PHYLACINE's map stands in for one nobody knows
+    (a town or the province's main city near the type locality, the ecoregion round a city when the type
+    locality is only "Brazil", the range of the likely closest relative's subspecies, two whole ecoregions for
+    a bat IUCN does not map, the whole island it is known from). Their globe draws no range: 'Range not
+    known'."""
+    notes = ranges.load_notes() if notes is None else notes
+    return sorted(k for k, r in notes.items() if r["class"] == "placeholder" and r["iucn"] not in ranges.EXTINCT_STATUS)
 
 
 def write(out: dict, path: Path) -> int:
@@ -313,6 +350,9 @@ def main(argv: list[str] | None = None) -> int:
           f"({stats['renamed']} by a former name, {stats['maps_shared']} shared), {stats['borrowed']} borrow the "
           f"range of the species they were split from ({len(stats['far'])} more left out: the range misses their "
           f"type locality); ranges.json {n / 1e6:.2f} MB, gzip {gz / 1e6:.2f} MB", file=sys.stderr)
+    print(f"[globe] ToLaD#507: {len(stats['corrected'])} living species drawn on today's corrected map "
+          f"({', '.join(stats['corrected'])}); {len(stats['stand_in'])} whose present-natural map is a placeholder "
+          f"draw no range ({', '.join(stats['stand_in'])})", file=sys.stderr)
     return 0
 
 

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
-from tolad_pipeline import globe
+from tolad_pipeline import globe, ranges
 
 ROOT = Path(__file__).resolve().parents[2]
 SIDECAR = ROOT / "data" / "mammals" / "ranges.json"
@@ -131,6 +131,65 @@ class KnownRanges(unittest.TestCase):
         lion = {"cur": self.mask("Panthera leo", 0)}
         self.assertTrue(globe.holds(lion, -2.3, 34.8))                 # the Serengeti
         self.assertFalse(globe.holds(lion, 40.0, -100.0))              # never in the Americas
+
+
+RAW = ROOT / "data" / "raw"
+
+
+@unittest.skipUnless(SIDECAR.exists() and (RAW / ranges.ZIP_REL).exists(), "no ranges.json or PHYLACINE zip")
+class CorrectedMaps(unittest.TestCase):
+    """ToLaD#507: the globe draws the maps the count stands on (ranges.today_cells): no grey 'lost' range from a
+    taxonomy move or a mapping fix, and no placeholder drawn as a range."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.r = json.loads(SIDECAR.read_text())["ranges"]
+        cls.today = ranges.today_cells(RAW)
+        cls.raw = ranges.read_cells(RAW, ["Aotus zonalis", "Aotus jorgehernandezi", "Cuon alpinus",
+                                          "Gerbillus agag"])
+
+    def cells(self, sci: str, kind: int) -> set[tuple[int, int]]:
+        return {(int(i), int(j)) for i, j in np.argwhere(globe.unpack(self.r[sci][kind]))}
+
+    def test_note_species_green_is_todays_map_and_no_grey_from_the_move(self):
+        drawn = [sp for sp, t in self.today.items() if t["map"] is not None and sp in self.r]
+        self.assertGreaterEqual(len(drawn), 8)
+        for sp in drawn:
+            cur, nat = self.cells(sp, 0), self.cells(sp, 1)
+            self.assertEqual(cur, set(self.today[sp]["map"]), sp)
+            self.assertEqual(nat - cur, set(), sp)             # the whole difference is the move or the fix
+
+    def test_night_monkeys_colombia_moves(self):
+        z, j = self.raw["Aotus zonalis"], self.raw["Aotus jorgehernandezi"]
+        given = z["cur"] - z["nat"]                            # the Colombian part, A. jorgehernandezi's now
+        self.assertEqual(len(given), 22)
+        self.assertEqual(self.cells("Aotus zonalis", 0) & given, set())
+        self.assertLessEqual(given, self.cells("Aotus jorgehernandezi", 0))
+        self.assertEqual(len(self.cells("Aotus zonalis", 0)), 20)
+        self.assertEqual(len(self.cells("Aotus jorgehernandezi", 0)), 25)
+        self.assertEqual(self.cells("Aotus jorgehernandezi", 1) - self.cells("Aotus jorgehernandezi", 0), set())
+        self.assertLess(len(j["cur"]), 25)                     # (PHYLACINE's own current map: 1 cell)
+
+    def test_tupaia_islands_move(self):
+        pal, moe = self.cells("Tupaia palawanensis", 0), self.cells("Tupaia moellendorffi", 0)
+        self.assertEqual((len(pal), len(moe)), (9, 3))
+        self.assertEqual(pal & moe, set())
+        self.assertLessEqual(moe, set(self.today["Tupaia palawanensis"]["cur"]))  # the islands it gave up
+
+    def test_placeholders_draw_no_range(self):
+        for sp in ("Gerbillus agag", "Gerbillus burtoni", "Makalata obscura", "Oryzomys curasoae",
+                   "Rhinopoma macinnesi", "Eudorcas rufina"):
+            self.assertEqual(self.r[sp], [[], []], sp)
+        self.assertEqual(sorted(globe.stand_ins()), ["Eudorcas rufina", "Gerbillus agag", "Gerbillus burtoni",
+                                                     "Makalata obscura", "Oryzomys curasoae", "Rhinopoma macinnesi"])
+        self.assertTrue(self.raw["Gerbillus agag"]["nat"])     # PHYLACINE's stand-in, one town's cell
+
+    def test_people_and_extinct_unchanged(self):
+        d = self.raw["Cuon alpinus"]                           # the dhole: its losses are people's
+        self.assertEqual(self.cells("Cuon alpinus", 0), set(d["cur"]))
+        self.assertEqual(self.cells("Cuon alpinus", 1), set(d["nat"]))
+        self.assertGreater(len(d["nat"] - d["cur"]), 1000)
+        self.assertEqual(self.r["Mammuthus primigenius"][0], [])
 
 
 if __name__ == "__main__":

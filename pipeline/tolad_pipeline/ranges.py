@@ -195,12 +195,12 @@ def partner_map(cur: frozenset, nat: frozenset, other_nat: frozenset,
     return cur - given, f"the {_cells(len(given))} the note gives to {other_name} taken off"
 
 
-def today_maps(raw: Path, notes: dict[str, dict] | None = None) -> dict[str, dict]:
+def today_cells(raw: Path, notes: dict[str, dict] | None = None) -> dict[str, dict]:
     """Today's map, worked out cell by cell from the rasters (ToLaD#507), for every living species whose map
     difference PHYLACINE's note puts down to taxonomy or a mapping fix (`subject_map`) and for the species
-    such a note names as the other side of the move (`partner_map`). Binomial -> {"cells": today's cells
-    (None: left as it is), "cells_map": its PHYLACINE current cells, "role": "note" / "partner", "partner",
-    "why"}."""
+    such a note names as the other side of the move (`partner_map`). Binomial -> {"map": today's (row, column)
+    cells (None: left as it is), "cur": its PHYLACINE current cells, "role": "note" / "partner", "partner",
+    "why"}. The count (today_maps) and the card's globe (globe.py) both stand on it."""
     notes = load_notes() if notes is None else notes
     subj = {k: r for k, r in notes.items() if r["class"] in CORRECTED and r["iucn"] not in EXTINCT_STATUS}
     cells = read_cells(raw, set(subj) | {r["partner"] for r in subj.values() if r["partner"]})
@@ -208,13 +208,19 @@ def today_maps(raw: Path, notes: dict[str, dict] | None = None) -> dict[str, dic
     for sp, r in sorted(subj.items()):
         p = r["partner"]
         m, why = subject_map(r["class"], cells[sp]["cur"], cells[sp]["nat"], cells[p] if p else None, p)
-        out[sp] = {"cells": None if m is None else len(m), "cells_map": len(cells[sp]["cur"]), "role": "note",
-                   "partner": p, "why": why}
+        out[sp] = {"map": m, "cur": cells[sp]["cur"], "role": "note", "partner": p, "why": why}
     for sp, r in sorted(subj.items()):
         p = r["partner"]
         if not p or p in out:
             continue
         m, why = partner_map(cells[p]["cur"], cells[p]["nat"], cells[sp]["nat"], sp)
-        out[p] = {"cells": None if m is None else len(m), "cells_map": len(cells[p]["cur"]), "role": "partner",
-                  "partner": sp, "why": why}
+        out[p] = {"map": m, "cur": cells[p]["cur"], "role": "partner", "partner": sp, "why": why}
     return out
+
+
+def today_maps(raw: Path, notes: dict[str, dict] | None = None) -> dict[str, dict]:
+    """today_cells, counted: binomial -> {"cells": today's cells (None: left as it is), "cells_map": its PHYLACINE
+    current cells, "role": "note" / "partner", "partner", "why"}."""
+    return {sp: {"cells": None if t["map"] is None else len(t["map"]), "cells_map": len(t["cur"]), "role": t["role"],
+                 "partner": t["partner"], "why": t["why"]}
+            for sp, t in today_cells(raw, notes).items()}
