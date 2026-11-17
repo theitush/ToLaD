@@ -219,12 +219,61 @@ export function spliceTies(t: DatedSplit): DatedSplit {
   return tied || kids.some((k, i) => k !== t.kids[i]) ? { ...t, loose, kids } : t;
 }
 
+/**
+ * A fossil genus's split named by its genus (ToLaD#279): the data names the clades of its phylogeny (Open Tree's names), but a subtree of fossils it
+ * grafts by taxonomy comes unnamed (dated.py `_sub`), so a fossil genus of several species is a fork with no name, and no group. Its name is read off
+ * its species' (a binomial's first word is its genus): an unnamed split whose species are all fossils placed by name (`placed`) of one genus, the
+ * outermost such, takes that genus as its name. Ranks above a genus (Machairodontinae) are not in the species' names: they wait for the pipeline.
+ *
+ * And a named clade takes in the fossils placed by name on its stem (its total group): the data grafts a fossil its taxonomy puts in a clade, older than
+ * the clade's crown, on a split of its own below the crown (dated.py, "on a stem"), so the clade's name, on the crown, left it outside: a tap on Primates
+ * framed the crown with its stem's fossils beside it, and the Felidae their three oldest genera. Where an unnamed split holds a named one and otherwise only
+ * fossils placed by name, the name moves down onto it, split by split.
+ */
+export function nameGrafts(t: DatedSplit, placed: (sci: string) => boolean): DatedSplit {
+  const genus = (sci: string) => sci.split(' ')[0];
+  // (Whether a daughter is only fossils placed by name.)
+  const byName = (k: string | DatedSplit): boolean => (typeof k === 'string' ? placed(k) : k.kids.every(byName));
+  // (Per split: its one genus when every species under it is a graft of that genus, else ''.)
+  const one = (s: DatedSplit): string => {
+    let g: string | null = null;
+    for (const k of s.kids) {
+      const h = typeof k === 'string' ? (placed(k) ? genus(k) : '') : one(k);
+      if (!h || (g !== null && h !== g)) g = '';
+      else g ??= h;
+    }
+    return g ?? '';
+  };
+  const go = (s: DatedSplit, parentG: string): DatedSplit => {
+    const g = one(s);
+    let name = !s.name && g && g !== parentG ? g : s.name;
+    let nameEn = s.nameEn;
+    let changed = name !== s.name;
+    const kids = s.kids.map((k) => {
+      if (typeof k === 'string') return k;
+      const n = go(k, g);
+      changed ||= n !== k;
+      return n;
+    });
+    // (Its one daughter that is not only fossils placed by name, named: its name comes down onto this split, its stem.)
+    const rest = kids.filter((k) => !byName(k));
+    const crown = rest.length === 1 && typeof rest[0] !== 'string' && rest[0].name && kids.length > 1 ? rest[0] : null;
+    if (!name && crown) {
+      [name, nameEn] = [crown.name, crown.nameEn];
+      kids[kids.indexOf(crown)] = { ...crown, name: '', nameEn: '' };
+      changed = true;
+    }
+    return changed ? { ...s, name, nameEn, kids } : s;
+  };
+  return go(t, '');
+}
+
 /** A clade's dated tree, from the data: any clade, no hand table. */
 export function treeOf(raw: RawClade): Split {
   const bySci = new Map(raw.species.map((s) => [s.sci, s]));
   if (!raw.dated) throw new Error('data/mammals has no dated tree (format 1.6): rebuild it with `make -C pipeline build`');
   return splitFrom(
-    spliceTies(raw.dated),
+    nameGrafts(spliceTies(raw.dated), (s) => !!bySci.get(s)?.placed),
     (s) => {
       const c = bySci.get(s)?.common;
       return c ? sentenceCase(c) : null;

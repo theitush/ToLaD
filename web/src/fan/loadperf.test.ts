@@ -64,11 +64,17 @@ describe.skipIf(!RUN)('mammal level open (perf)', () => {
     setFlip(process.env.LOADPERF_FLIP !== '0');
     const canvas = stubCanvas();
     const t: [string, number][] = [];
+    // (Each open step's main-thread CPU too, ms: what an interleaved A/B compares when the machine is shared, ToLaD#279.)
+    const cpuNow = () => {
+      const u = (process as unknown as { threadCpuUsage?(): { user: number; system: number } }).threadCpuUsage?.();
+      return u ? (u.user + u.system) / 1000 : 0;
+    };
     let t0 = performance.now();
+    let c0 = cpuNow();
     const lap = (s: string) => {
-      const n = performance.now();
-      t.push([s, n - t0]);
-      t0 = n;
+      const [n, c] = [performance.now(), cpuNow()];
+      t.push([s, n - t0], [`  cpu ${s}`, c - c0]);
+      [t0, c0] = [n, c];
     };
     await loadMammalsFromFiles();
     lap('data (files)');
@@ -101,7 +107,7 @@ describe.skipIf(!RUN)('mammal level open (perf)', () => {
       v.draw();
       lap(`${s} frame`);
       t.push([`  labels ${s}`, at.labelMs[at.labelMs.length - 1]]);
-      t0 = performance.now();
+      [t0, c0] = [performance.now(), cpuNow()];
     }
     // LOADPERF_GESTURES=1 (ToLaD#279): at home, Rodentia (the biggest order), Primates and the Hominins, a still frame's
     // labels and the fossils' tip names (tipLabels) in it, then a pinch in and out (20 steps each way) and a pan, each
@@ -158,7 +164,7 @@ describe.skipIf(!RUN)('mammal level open (perf)', () => {
         const pan = run((k) => v.pan(k < 15 ? 8 : -8, k % 10 < 5 ? 3 : -3), 30);
         t.push([`${s}: still labels ${st(still)}, tips ${st(tips)}; pinch ${pinch}; pan ${pan}`, 0]);
       }
-      t0 = performance.now();
+      [t0, c0] = [performance.now(), cpuNow()];
     }
     // (Seeded: the layout is the worked-out one, number for number, ToLaD#255.)
     if (process.env.LOADPERF_SEED) {
