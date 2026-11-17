@@ -3282,7 +3282,8 @@ export class FanView implements InputHandlers {
       out.names.push({ key, id: key, place: 'tip', text, rank: [0, 0, k], x, y1, box, fit: 1, plus: 0, pic: b, b, plain: SPECIES_FONT });
       taken.push(box);
       for (const d of [PIC_D, PIC_S]) {
-        const p = { x, y: at - PIC_D / 2 + d / 2, i: out.pics.length, lv: { b } as Level, face: b, held: false };
+        // (Whole on screen across, as the column's are: off its name's line by at most its half at an edge.)
+        const p = { x: Math.max(d / 2, Math.min(this.w - d / 2, x)), y: at - PIC_D / 2 + d / 2, i: out.pics.length, lv: { b } as Level, face: b, held: false };
         const pb = picBox({ ...p, d });
         if (!free(pb)) continue;
         out.pics.push(d === PIC_D ? p : { ...p, d });

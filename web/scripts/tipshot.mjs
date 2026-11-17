@@ -8,15 +8,16 @@ import { pageUrl } from './pageurl.mjs';
 
 const OUT = process.argv[2];
 const PREFIX = process.argv[3] || '';
-const SCENES = (process.argv[4] || 'home,hominins,Felidae,Proboscidea,Cetacea,Carnivora,Primates,Rodentia').split(',');
+const SCENES = (process.argv[4] || 'home,hominins,Felidae,Panthera,Proboscidea,Cetacea,Carnivora,Primates,Rodentia').split(',');
 mkdirSync(OUT, { recursive: true });
 const browser = await chromium.launch({ headless: true });
-const served = await pageUrl('');
+// (PAGE=<url>: that page instead of dist-single, e.g. the live site for a before shot.)
+const served = process.env.PAGE ? null : await pageUrl('');
 try {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
   const page = await ctx.newPage();
   page.on('pageerror', (e) => console.log('pageerror', String(e)));
-  await page.goto(served.url);
+  await page.goto(process.env.PAGE || served.url);
   await page.waitForFunction(() => !!window.__fan, null, { timeout: 60000 });
   const still = async () => {
     await page.waitForTimeout(700);
@@ -81,5 +82,5 @@ try {
   }
 } finally {
   await browser.close();
-  served.close();
+  served?.close();
 }
