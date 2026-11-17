@@ -55,7 +55,8 @@ describe('the dated tree from the data', () => {
     // common names and generation lengths come from the data
     expect(FELIDAE.species.find((s) => s.sci === 'Panthera leo')!.common).toBe('Lion');
     expect(FELIDAE.species.find((s) => s.sci === 'Panthera spelaea')!.common).toBe('Cave lion');
-    for (const s of living) expect(s.genSource, s.sci).toMatch(MDD_CATS.includes(s.sci) ? /allometric/ : /COMBINE|curated history/);
+    // (the model's own source, a history's too: its generation is the model's, ToLaD#508; the domestic cat's from its mass)
+    for (const s of living) expect(s.genSource, s.sci).toMatch(MDD_CATS.includes(s.sci) || s.sci === 'Felis catus' ? /allometric/ : /COMBINE/);
   });
 
   it('Felidae: the override table holds Panthera (Figueiró 2017) and the domestic cat', () => {
