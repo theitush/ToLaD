@@ -3596,8 +3596,11 @@ export class FanView implements InputHandlers {
       // (Its size its own room's: the first the other species' columns leave it on its name's line, else off it by up to its half, still over it; the screen's edges and the labels
       // standing not read, so a pan at one zoom changes no picture (gaplabels.test). Then there, whole on screen across as the column's are, and meeting no label: else none.)
       for (const d of [PIC_D, PIC_S]) {
-        if (Number.isNaN(spot(x - d, x + d, y0, y0 + d, d, x, false))) continue;
-        const px = spot(Math.max(0, x - d), Math.min(this.w, x + d), y0, y0 + d, d, x);
+        const p0 = spot(x - d, x + d, y0, y0 + d, d, x, false);
+        if (Number.isNaN(p0)) continue;
+        // (Where that spot is on screen and meets no label, it is the one the screen's would find too, the nearest clear: the columns not read again.)
+        const [lo, hi] = [p0 - d / 2, p0 + d / 2];
+        const px = lo >= 0 && hi <= this.w && !taken.some((q) => q[1] < y0 + d && q[3] > y0 && q[0] < hi && q[2] > lo) ? p0 : spot(Math.max(0, x - d), Math.min(this.w, x + d), y0, y0 + d, d, x);
         if (Number.isNaN(px)) break;
         const b = f.strands[k];
         // (A group's: its youngest fossil's face, and its disc a member's photo where that has none, discSci.)
