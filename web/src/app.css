@@ -140,18 +140,6 @@
 .card-sp .pic img {
   cursor: zoom-in;
 }
-.card-sp .pic.big {
-  float: none;
-  width: 100%;
-  margin: 0 0 10px;
-}
-.card-sp .pic.big img {
-  width: 100%;
-  height: auto;
-  max-height: 70vh;
-  object-fit: contain;
-  cursor: zoom-out;
-}
 .card-sp .pic a,
 .card-sp .media .cap {
   display: block;
@@ -160,7 +148,7 @@
   color: #7f8c85;
   text-decoration: none;
 }
-/* ToLaD#196: the range map under the name (beside the photo, .media below); a tap enlarges it like the photo. */
+/* ToLaD#196: the range map under the name (beside the photo, .media below); a tap shows it alone like the photo (.alone). */
 .card-sp .range {
   clear: both;
   margin: 6px 0 8px;
@@ -174,10 +162,6 @@
   object-fit: contain;
   border-radius: 8px;
   cursor: zoom-in;
-}
-.card-sp .range.big img {
-  max-height: 70vh;
-  cursor: zoom-out;
 }
 .card-sp .range a {
   display: block;
@@ -221,16 +205,7 @@
   height: var(--box);
   max-height: none;
 }
-.card-sp .media .big {
-  flex-basis: 100%;
-  order: -1;
-  margin-bottom: 8px;
-}
-.card-sp .media .range.big img {
-  height: auto;
-  max-height: 70vh;
-}
-/* ToLaD#267: the range globe beside the photo; a tap enlarges it across the card. */
+/* ToLaD#267: the range globe beside the photo; a tap shows it alone (.alone), still turned by a drag. */
 .card-sp .globe {
   flex: 1 1 0;
   min-width: 0;
@@ -252,17 +227,64 @@
 .card-sp .globe .disc {
   background: #0b1a24;
 }
-.card-sp .globe.big canvas {
-  width: min(100%, 50vh);
-  height: auto;
-  aspect-ratio: 1;
-}
 .card-sp .globe a {
   display: block;
   margin-top: 3px;
   font-size: 9px;
   color: #7f8c85;
   text-decoration: none;
+}
+/* ToLaD#506: the card's picture, map or globe alone (Alone.tsx): over everything (a portal in the body), filling the
+   screen, aspect kept, on a plain dark backdrop; its credit small at the bottom. */
+.alone {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  background: #05090a;
+  touch-action: none;
+  cursor: zoom-out;
+}
+.alone-it {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  container-type: size;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.alone-it img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+/* (The larger thumbnail over the card's, shown once it has arrived.) */
+.alone-it img.big.loading {
+  opacity: 0;
+}
+.alone-it canvas {
+  display: block;
+  width: min(100cqw, 100cqh);
+  height: min(100cqw, 100cqh);
+  border-radius: 50%;
+  cursor: grab;
+}
+.alone-credit {
+  flex: none;
+  padding: 6px 12px calc(8px + env(safe-area-inset-bottom));
+  text-align: center;
+  font-size: 11px;
+  line-height: 1.2;
+  color: #7f8c85;
+}
+.alone-credit a {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
 }
 /* ToLaD#479: while the photo, the globe or the map loads, its place is held at its loaded size (the image's box and its
    credit line) with a spinner in it, so nothing moves when it arrives. The spinner fades in after a moment: a picture

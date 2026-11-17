@@ -4,7 +4,10 @@ import { fileURLToPath } from 'node:url';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { RangeMap, SpeciesCard } from './FanApp';
+import type { ReactElement, ReactNode } from 'react';
+import { Alone, AloneView } from './Alone';
 import { loadGlobeCode, RangeGlobe } from './Globe';
+import { hookHarness } from './hookharness';
 import { drawGlobe, GLOBE_COLORS } from './globe-draw';
 import { globeData, loadGlobe, speciesRange, unpackRuns, type GlobeData } from './globe-data';
 import { FELIDAE } from './panthera';
@@ -112,6 +115,27 @@ describe('range globe in the card (ToLaD#267)', () => {
     expect(html).toContain('<canvas');
     expect(html).toContain('Range · PHYLACINE 1.2');
     expect(html).not.toContain('class="range');
+  });
+
+  it("a tap on the globe shows it alone, facing as the card's was turned; a tap there closes it (ToLaD#506)", () => {
+    const { render } = hookHarness();
+    type AloneProps = { credit: ReactNode; onClose: () => void; children: ReactNode };
+    type Canvas = ReactElement<{ onTap: () => void; onTurn?: (r: [number, number]) => void; start?: [number, number] | null }>;
+    type Fig = ReactElement<{ className: string; children: [Canvas, ReactElement, ReactElement<AloneProps> | false] }>;
+    const globe = () => render(() => RangeGlobe({ sci: 'Panthera leo' })) as Fig;
+    expect(globe().props.children[2]).toBe(false);
+    const card = globe().props.children[0];
+    card.props.onTurn!([30, 5]); // turned in the card
+    card.props.onTap(); // a tap: alone
+    const alone = globe().props.children[2] as ReactElement<AloneProps>;
+    expect(alone.type).toBe(Alone);
+    expect(globe().props.className).toBe('globe');
+    expect((alone.props.children as Canvas).props.start).toEqual([30, 5]);
+    // The globe and its credit, nothing of the card.
+    const html = renderToStaticMarkup(<AloneView {...alone.props} />);
+    expect(html).toMatch(/^<div class="alone"><div class="alone-it"><canvas><\/canvas><\/div><div class="alone-credit"><a [^>]*>Range · PHYLACINE 1.2<\/a><\/div><\/div>$/);
+    alone.props.onClose(); // a tap on it (no history here): back to the card
+    expect(globe().props.children[2]).toBe(false);
   });
 
   it('a species split since PHYLACINE draws the range before the split, and its credit says whose (ToLaD#486)', () => {
