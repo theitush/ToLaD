@@ -1021,6 +1021,21 @@
 .fan .card-sp .more a {
   color: #9fd3b3;
 }
+/* ToLaD#508: a card word that opens "How we count" at its step: the word as it was, dotted underneath; a number's source
+   ("counted", "modelled", …) small and dim after it. */
+.fan .card-sp a.mlink,
+.fan .card-sp .more a.mlink {
+  color: inherit;
+  text-decoration: underline dotted;
+  text-decoration-color: rgba(190, 220, 200, 0.5);
+  text-underline-offset: 3px;
+}
+.fan .card-sp a.mlink.src {
+  color: var(--ink-3);
+  font-size: 13px;
+  font-weight: 400;
+  white-space: nowrap;
+}
 .fan .card-sp .dim {
   color: var(--ink-3);
 }

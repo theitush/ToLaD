@@ -1,10 +1,11 @@
 // "How we count" (ToLaD#508): the method in plain words, one step a section, walking one species (the northern quoll)
 // through every step with its real numbers, and every word the species card shows. Opened from the Sources panel
-// (SourcesPanel.tsx); a page over everything (a portal into the body), closed by its × or back (useAlone's history
-// entry). Each step has a stable anchor id (METHOD_IDS, WORD_IDS) for the card to link to. The method is read from the
+// (SourcesPanel.tsx), and from the card's words at their step (MethodLink, FanApp's cardwords.useMethodsPage); a page
+// over everything (a portal into the body), closed by its × or back (useAlone's history entry). Each step has a stable
+// anchor id (METHOD_IDS, WORD_IDS) for the card to link to. The method is read from the
 // pipeline (pipeline/tolad_pipeline/model.py, pipeline/FORMAT.md), not from research/02, which is older.
 
-import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { formatCount } from '../data/count';
 import type { GlobeData } from './globe-data';
@@ -39,6 +40,24 @@ export const WORD_IDS = {
   status: 'w-status',
   chart: 'w-chart',
 } as const;
+
+/** Opens the page at an anchor id (FanApp's useMethodsPage), or null: no page. */
+export const OpenMethods = createContext<((at: string) => void) | null>(null);
+
+/** A word on the card that opens the page at its section (`to`: a METHOD_IDS or WORD_IDS id). */
+export function MethodLink({ to, className, children }: { to: string; className?: string; children: ReactNode }) {
+  const open = useContext(OpenMethods);
+  const go = (e: MouseEvent) => {
+    if (!open) return;
+    e.preventDefault();
+    open(to);
+  };
+  return (
+    <a href={`#${to}`} className={className ? `mlink ${className}` : 'mlink'} data-method={to} onClick={go}>
+      {children}
+    </a>
+  );
+}
 
 /** How far off a data grade can be: the card's words (FanApp GRADE_MEANS; model.grade_from_sd: the 95% range). */
 export const GRADE_MEANS: Record<string, string> = {
@@ -359,8 +378,9 @@ export function MethodsView({ onClose, at }: { onClose: () => void; at?: string 
         <Step id={METHOD_IDS.fossils} n={7} title="Fossils and the deep past">
           <p>
             About 11,000 fossil species (Paleobiology Database) live from their first fossil to their last; their size and range
-            are borrowed from relatives (grade D). Where no species is known, “ghost” lines fill in, so that all mammals together
-            match a top-down total.
+            are borrowed from relatives (grade D). The ~230 that died out in the last ~130,000 years (the cave lion, the woolly
+            mammoth) have a PHYLACINE map without people: their level is drawn from it, as in step 2. Where no species is known,
+            “ghost” lines fill in, so that all mammals together match a top-down total.
           </p>
         </Step>
 
@@ -381,22 +401,26 @@ export function MethodsView({ onClose, at }: { onClose: () => void; at?: string 
             <dt id={WORD_IDS.alive}>alive today, alive … ago</dt>
             <dd>
               How many were alive at that moment. Today: <Jump to={METHOD_IDS.alive}>step 1</Jump>; the past:{' '}
-              <Jump to={METHOD_IDS.past}>2</Jump>–<Jump to={METHOD_IDS.histories}>3</Jump>.
+              <Jump to={METHOD_IDS.past}>2</Jump>–<Jump to={METHOD_IDS.histories}>3</Jump>. The small word after it says where
+              it came from: <b>counted</b> (a census), <b>published estimate</b> (the latest figure of its history),{' '}
+              <b>modelled</b> (no count: the two models, or ours), <b>from its history</b> (the chart). “Counted or modelled”:
+              the data does not say which.
             </dd>
             <dt id={WORD_IDS.weighing}>Weighing</dt>
-            <dd>Those alive × an adult’s body mass (PHYLACINE), when the tree is set to mass.</dd>
+            <dd>Those alive × one’s body mass (its source in brackets), when the tree is set to mass.</dd>
             <dt id={WORD_IDS.descendants}>have descendants alive today</dt>
             <dd>
               The share of them with a line to someone alive now: <Jump to={METHOD_IDS.descendants}>step 5</Jump>.
             </dd>
             <dt id={WORD_IDS.ever}>have ever lived, Ever lived</dt>
             <dd>
-              Everyone ever born into the species, and its range (95%): <Jump to={METHOD_IDS.ever}>step 4</Jump>. “Rough estimate”: it
-              carries every step’s error.
+              Everyone ever born into the species; “could be”: its 95% range. <Jump to={METHOD_IDS.ever}>Step 4</Jump>. “Rough
+              estimate”: it carries every step’s error.
             </dd>
             <dt id={WORD_IDS.generation}>Generation</dt>
             <dd>
-              The average age of parents, and its source in brackets: <Jump to={METHOD_IDS.ever}>step 4</Jump>.
+              The average age of parents, and its source in brackets (COMBINE, or from body size):{' '}
+              <Jump to={METHOD_IDS.ever}>step 4</Jump>.
             </dd>
             <dt id={WORD_IDS.grade}>Data grade</dt>
             <dd>
@@ -404,12 +428,13 @@ export function MethodsView({ onClose, at }: { onClose: () => void; at?: string 
             </dd>
             <dt id={WORD_IDS.method}>Method</dt>
             <dd>
-              “Modelled, not counted”: steps <Jump to={METHOD_IDS.alive}>1</Jump>–<Jump to={METHOD_IDS.ever}>4</Jump>. Its “lifespan” is the half a generation each animal is counted for.
+              This page, from <Jump to={METHOD_IDS.alive}>step 1</Jump>.
             </dd>
             <dt id={WORD_IDS.natural}>Natural level</dt>
             <dd>
-              The level in 1500, from the map without people (“no human impact”), and the two maps’ areas:{' '}
-              <Jump to={METHOD_IDS.past}>step 2</Jump>.
+              The level in 1500, from the map without people, and the two maps’ areas:{' '}
+              <Jump to={METHOD_IDS.past}>step 2</Jump>. “The same as today”: the maps differ for another reason, so no change is
+              drawn. A species that died out: its level while it lived (<Jump to={METHOD_IDS.fossils}>step 7</Jump>).
             </dd>
             <dt id={WORD_IDS.status}>Status</dt>
             <dd>The IUCN Red List category (Least Concern … Critically Endangered, Extinct) and its year.</dd>

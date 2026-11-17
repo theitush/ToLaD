@@ -494,8 +494,10 @@ def fit_occupancy(root: Node, ref: dict[int, float], census: dict[int, float],
     (densities are measured where a species is common; ranges are extents of
     occurrence). Most extant species have a reference population `ref`: an
     IUCN census report, or else Greenspoon et al.'s per-species model
-    estimate. Those species use it directly (see assign_leaf_counts). For the
-    rest (fossils, species missing from Greenspoon's list) N = N_raw * k with
+    estimate. A census species uses it directly; a Greenspoon one gets his
+    estimate and ours (N_raw * k, out of sample) combined, their geometric mean
+    (ToLaD#357, combine_greenspoon; see assign_leaf_counts). For the rest
+    (fossils, species missing from Greenspoon's list) N = N_raw * k with
 
         log10 k = a_g + b_g * (log10 mass - xbar_g)
 

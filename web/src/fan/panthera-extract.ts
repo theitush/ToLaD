@@ -3,7 +3,7 @@
 // Panthera and serves the result as `virtual:panthera-data`, so the fan's
 // numbers are the dataset's own and cannot go stale. Pure: bytes in, JSON out.
 
-import { decodeFile } from '../data/tolad-decoder.js';
+import { decodeFile, FLAG } from '../data/tolad-decoder.js';
 
 export type Grade = 'A' | 'B' | 'C' | 'D';
 
@@ -144,6 +144,12 @@ export interface RawNode {
   t1: number;
   extinct: boolean;
   dateSource: string;
+  /**
+   * FLAG bit 8 (pipeline/FORMAT.md): the count is anchored, not modelled: humans, an IUCN census figure, a domestic
+   * stock, or a curated history with use = "counts" (a modelled genomic one too). The card reads it with the history
+   * to say where today's count came from (FanApp aliveSource, ToLaD#508). Absent in data read before it: false.
+   */
+  anchored?: boolean;
 }
 
 /** One split of the dated tree (pipeline/FORMAT.md, "Dated tree", format 1.6, ToLaD#145). */
@@ -291,6 +297,7 @@ interface Tile {
   t1(i: number): number;
   extinct(i: number): boolean;
   dateSource(i: number): string;
+  flags(i: number): number;
   isSpecies(i: number): boolean;
   history(i: number): any;
   natural?(i: number): NaturalRec | null;
@@ -335,6 +342,7 @@ function node(f: Tile, i: number): RawNode {
     t1: f.t1(i),
     extinct: f.extinct(i),
     dateSource: f.dateSource(i),
+    anchored: (f.flags(i) & FLAG.ANCHORED) !== 0,
   };
 }
 

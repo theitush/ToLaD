@@ -212,10 +212,14 @@ describe('the species card: the population at the time touched', () => {
   });
 
   it('has no jargon on its face: the method, grade, range and generation length are tucked into the details', () => {
+    // (Each number's source, a word or two after it that opens "How we count" at its step, ToLaD#508, is one of these.)
+    const SOURCES = ['counted', 'published estimate', 'modelled', 'counted or modelled', 'from its history', '(rough estimate)'];
     for (const sp of FELIDAE.species) {
       for (const ageMa of [undefined, 70e-6, (sp.t0 + sp.t1) / 2]) {
         const html = renderToStaticMarkup(<SpeciesCard sp={sp} ageMa={ageMa} onClose={() => {}} />);
-        const f = face(html);
+        const tags = [...html.replace(/<details[\s\S]*<\/details>/, '').matchAll(/<a [^>]*class="mlink src"[^>]*>([^<]*)<\/a>/g)].map((m) => m[1]);
+        for (const t of tags) expect(SOURCES, `${sp.common}: "${t}"`).toContain(t);
+        const f = face(html.replace(/<a [^>]*class="mlink src"[^>]*>[^<]*<\/a>/g, ''));
         for (const jargon of ['grade', 'model', 'generation', 'range', 'Myr', 'kyr', '≈', 'lineage', 'curated', ' × 10', 'born in total', 'line ended'])
           expect(f, `${sp.common}: "${jargon}" on the face`).not.toContain(jargon);
         // A few short lines: the face stays tight.
@@ -385,7 +389,8 @@ describe('the card shows the deep past and the natural level (ToLaD#69)', () => 
       expect(html).toContain('data-natural=""');
       expect(html).toContain('data-key="reconstructed"');
       const row = text(html.match(/<li data-row="natural">[\s\S]*?<\/li>/)![0]);
-      expect(row).toContain('Natural (pre-human) baseline');
+      expect(row).toContain('Natural level');
+      expect(row).toContain('The level in 1500, from PHYLACINE’s map without people');
       expect(row).toContain(`${formatCount(sp.natural!.n)} (${formatCount(sp.natural!.lo)} – ${formatCount(sp.natural!.hi)})`);
       expect(row).toContain('grade D · modelled');
       expect(row).toContain('PHYLACINE');

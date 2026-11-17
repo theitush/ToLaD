@@ -44,6 +44,8 @@ export interface SpeciesRec {
   t1: number;
   extinct: boolean;
   dateSource: string;
+  /** Today's count is anchored (FLAG bit 8: a census, a domestic stock, humans, or a history that drives the counts). */
+  anchored: boolean;
   /** Generation length in years. */
   genYears: number;
   genSource: string;
@@ -85,7 +87,8 @@ export interface CladeRec {
 }
 
 export function speciesRec(r: RawSpecies, clade: number): SpeciesRec {
-  // generation length: the model's (COMBINE, else its mass fit); a curated history's own wins below
+  // generation length: the model's (COMBINE, else its mass fit); a history's G is the same, twice the model's L
+  // (pipeline history.py), so its source stays the model's (ToLaD#508: "curated history" was never where it came from)
   const x = { common: r.common ? sentenceCase(r.common) : r.sci, gen: r.gen?.years ?? 7, src: r.gen?.how ?? 'assumed' };
   const h = r.history;
   const counts = !!h && h.use === 'counts' && h.segments.length > 0 && !r.extinct;
@@ -112,8 +115,9 @@ export function speciesRec(r: RawSpecies, clade: number): SpeciesRec {
     t1: r.t1,
     extinct: r.extinct,
     dateSource: r.dateSource,
+    anchored: !!r.anchored,
     genYears,
-    genSource: counts ? 'curated history' : x.src,
+    genSource: x.src,
     clade,
     history: h,
     births,
