@@ -121,6 +121,13 @@ const FORK_PX = LABEL_BOTTOM_PX;
 const SCALE_PX = 60;
 /** Gap (px) between a label's name pill and its picture right under it (ToLaD#358: one unit at the tip; #373: the name on top). */
 const LABEL_UNDER = 4;
+/**
+ * tipLabels' budget a frame (ToLaD#279), in strands read on a row by clearIn (~0.3 µs each in node): the whole frame's, and
+ * one fossil's (its name's places and its picture's). Measured with every fossil on the tree: a fossil named took at most
+ * ~6,400 (Primates); at home 187 of ~8,300 tries that found no place read 3.4 of their 4.2 million.
+ */
+export const TIP_WORK = 150_000;
+export const TIP_TRY = 8_000;
 /** Two boxes [x0, y0, x1, y1] share some area (touching is not meeting). */
 const boxesMeet = (p: readonly number[], q: readonly number[]): boolean => p[0] < q[2] && p[2] > q[0] && p[1] < q[3] && p[3] > q[1];
 /**
@@ -3361,9 +3368,18 @@ export class FanView implements InputHandlers {
       }
       return xs;
     };
-    for (const k of tips) {
+    this.tipWork = 0;
+    this.tipCut = 0;
+    for (let t = 0; t < tips.length; t++) {
+      const k = tips[t];
       const b = f.strands[k];
       if (C[k] < x0 || C[k] > x1 || b.tipY < y0w || b.tipY > y1w) continue;
+      // (A frame's budget, in strands read on a row (clearIn): past it the rest wait for a closer view, the narrower rooms last in tipOrder. Every
+      // tip is still tried where few are on screen; at home, with every fossil, ~8,000 are and a frame would read millions, ToLaD#279.)
+      if (this.tipWork > TIP_WORK) {
+        this.tipCut = tips.length - t;
+        break;
+      }
       const [c, line] = [X(C[k]), Y(b.tipY)];
       // (Its room across, on screen: its band, or where that is narrower, wherever the name still covers its line: centred on it, else slid off it by up to its half.)
       const span = Math.max(R[k] * sx, 2 * SPECIES_PX);
@@ -3374,6 +3390,7 @@ export class FanView implements InputHandlers {
       let pt = at - PIC_D / 2;
       if (line + PIC_S <= start && Number.isNaN(spot(k, Math.max(0, c - PIC_S), Math.min(this.w, c + PIC_S), pt, pt + PIC_S, PIC_S, c, false))) pt = line;
       const name = levelText(b);
+      this.tryEnd = this.tipWork + TIP_TRY;
       const text = this.titleWidth(SPECIES_FONT, name) <= cap ? name : this.pillText(name, cap);
       const len = LABEL_PAD + this.titleWidth(SPECIES_FONT, text);
       // (Past its tip toward "now", as the column's names stand; else in its own branch, up to its picture, full, else small (the name before the picture's size, as a label's name comes
@@ -3412,6 +3429,10 @@ export class FanView implements InputHandlers {
         break;
       }
   }
+  /** tipLabels' work this frame (strands read on a row, clearIn), and the tips it left untried at TIP_WORK (from where it stopped in tipOrder, on screen or not). */
+  tipWork = 0;
+  tipCut = 0;
+  private tryEnd = Infinity;
   /** (Tests.) The last frame's fossils with a tip on screen that went unnamed (tipLabels): another species' column across every place for the name, or a label in the way. */
   readonly tipMissed = new Map<number, 'crossed' | 'meets'>();
 
@@ -3424,31 +3445,66 @@ export class FanView implements InputHandlers {
    */
   private clearIn(k: number, ya: number, yb: number, min: number, out: number[]): number[] {
     const S = (this.fan.tess.fold as Steady).strands;
-    const [y0, y1] = [Math.min(ya, yb), Math.max(ya, yb)];
-    const n = Math.max(2, Math.ceil((y1 - y0) * Math.abs(this.cam.sy)) + 1);
+    // (Its rows on the screen's whole px (ToLaD#279): the same rows for every fossil a frame, so a strand's place on a row is worked out once a frame
+    // (clearRows), not once a fossil: at home some 8,000 fossils' names are tried, all among the same few thousand strands.)
+    const sy = Math.abs(this.cam.sy);
+    const [p0, p1] = [Math.floor(Math.min(ya, yb) * sy), Math.ceil(Math.max(ya, yb) * sy)];
+    const n = Math.max(2, p1 - p0 + 1);
+    const C = this.clearRows;
+    const c = this.cam;
+    const fold = this.fan.tess.fold as Steady;
+    if (C.cx !== c.cx || C.cy !== c.cy || C.sx !== c.sx || C.sy !== c.sy || C.fold !== fold || C.ver !== fold.ver) {
+      [C.cx, C.cy, C.sx, C.sy, C.fold, C.ver] = [c.cx, c.cy, c.sx, c.sy, fold, fold.ver];
+      C.at.clear();
+      C.len = 0;
+    }
     const open = new Uint8Array(n);
     for (let dir = -1; dir <= 1 && out.length; dir += 2) {
       open.fill(1);
       let rows = n;
       for (let i = k + dir; i >= 0 && i < S.length && rows && out.length; i += dir) {
         const b = S[i];
-        if (b.tipY > y1) continue;
+        const yTop = (p0 + n - 1) / sy;
+        if (b.tipY > yTop) continue;
         for (let r = 0; r < n && out.length; r++) {
-          const y = y0 + ((y1 - y0) * r) / (n - 1);
-          if (!open[r] || y < b.tipY) continue;
-          const w = laneW(b, y);
-          const l = leftAt(b, y, w);
-          const a = this.camera.screenX(l);
-          const z = this.camera.screenX(l + w);
+          if (!open[r]) continue;
+          const y = (p0 + r) / sy;
+          if (y < b.tipY) continue;
+          // (One try's share of the budget, TIP_TRY: past it the name has no place here, as if crossed.)
+          if (++this.tipWork > this.tryEnd) {
+            out.length = 0;
+            break;
+          }
+          // (Strand i on row p: its column's screen [a, z], and whether it is its own column there (a parent column's stretch is no column).)
+          const key = (p0 + r) * S.length + i;
+          let j = C.at.get(key);
+          if (j === undefined) {
+            const w = laneW(b, y);
+            const l = leftAt(b, y, w);
+            if (C.len + 3 > C.buf.length) {
+              const g = new Float64Array(C.buf.length * 2);
+              g.set(C.buf);
+              C.buf = g;
+            }
+            j = C.len;
+            C.buf[j] = this.camera.screenX(l);
+            C.buf[j + 1] = this.camera.screenX(l + w);
+            C.buf[j + 2] = y < b.splitY && w > 0 ? 1 : 0;
+            C.len += 3;
+            C.at.set(key, j);
+          }
+          const [a, z] = [C.buf[j], C.buf[j + 1]];
           if (dir < 0 ? z <= out[0] : a >= out[out.length - 1]) {
             open[r] = 0;
             rows--;
-          } else if (y < b.splitY && w > 0 && a < out[out.length - 1] && z > out[0]) this.cutOut(out, a, z, min);
+          } else if (C.buf[j + 2] && a < out[out.length - 1] && z > out[0]) this.cutOut(out, a, z, min);
         }
       }
     }
     return out;
   }
+  /** clearIn's strands on the screen's rows, a camera and layout: row * strands + strand -> [a, z, own column] at buf[j..j + 2]. */
+  private readonly clearRows = { cx: NaN, cy: NaN, sx: NaN, sy: NaN, fold: null as Steady | null, ver: -1, at: new Map<number, number>(), buf: new Float64Array(3 << 12), len: 0 };
 
   /** Takes [a, z] out of the stretches in `out` ([from, to] pairs, in order), keeping the pieces at least `min` wide. */
   private cutOut(out: number[], a: number, z: number, min: number): void {

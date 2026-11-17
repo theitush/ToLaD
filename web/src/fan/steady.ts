@@ -51,6 +51,9 @@ function rangeAt(W: Int32Array, i: number): number {
 }
 const inRanges = (W: Int32Array, i: number) => rangeAt(W, i) >= 0;
 
+/** How many layouts the fold keeps by their a's (Steady.cur, ToLaD#279): a still frame's own and the frames it works out. */
+const LAYS_KEPT = 8;
+
 /** Rooms by life: a strand's widest over a window is laneW at this many steps (and its ends). */
 const LIFE_SAMPLES = 48;
 
@@ -213,7 +216,7 @@ export class Steady extends Fold {
   private readonly tipS: Float64Array;
   private readonly tipN: Float64Array;
   private readonly yNow: number;
-  private readonly winW = new Map<string, number>();
+  private readonly winW: (Map<number, number> | undefined)[] = [];
   /**
    * The range answers' constants (ToLaD#502): per strand its widest anywhere (its room, its founders, its most alive:
    * a bound on its column's width), per node its strands' founders summed (its column's width, a bound), its first
@@ -391,8 +394,9 @@ export class Steady extends Fold {
   private widestSince(i: number, t0: number): number {
     const b = this.strands[i];
     const lo = Math.max(t0, b.tipY);
-    const key = `${i} ${lo}`;
-    let w = this.winW.get(key);
+    // (Kept per strand by its window's bottom, a number: no key to build, ToLaD#279, a few million asks a layout with every fossil.)
+    const m = (this.winW[i] ??= new Map());
+    let w = m.get(lo);
     if (w !== undefined) return w;
     w = b.baseW;
     const hi = b.splitY;
@@ -403,7 +407,7 @@ export class Steady extends Fold {
         w = Math.max(w, laneW(b, y, age.ageAt(y)));
       }
     }
-    this.winW.set(key, w);
+    m.set(lo, w);
     return w;
   }
 
@@ -478,7 +482,10 @@ export class Steady extends Fold {
           g = Math.max(g, A[P[p]] * G[P[p]]);
           const t0 = Math.max(tip[p], tip[q]);
           if (t0 <= now) x = Math.max(x, o[p] + full[p] + g);
-          else {
+          // (Bound first, ToLaD#279: each extent is inside its room and a gap at most g, so p can push q no further than
+          // its whole room and g would. Where that is not past x already, its extents are not worked out: a polytomy of a
+          // few hundred fossils is a few hundred thousand pairs.)
+          else if (o[p] + full[p] + g > x) {
             ext(K[p], t0, ea);
             ext(K[q], t0, eb);
             // (The gap too: a share of the order's width, the humans' 8e9 at the primates', would dwarf the fossils; at most LIFE_GAP of the narrower of the two then.)
@@ -542,8 +549,19 @@ export class Steady extends Fold {
     const L = this.lay;
     if (L && L.ver === this.ver) return L;
     this.layPrev = L;
-    return (this.lay = this.compute(this.a));
+    // (A layout is its a's alone (the rest is fixed with the fold): one laid out at these a's already is taken again, ToLaD#279.
+    // A frame worked out for another view moves the a's there and back (keep(), brackets.ts foldedFrame), and a still frame
+    // asks for its level's frame and its neighbours': with every fossil on the tree a layout is ~0.5 s in node, 8 a frame.)
+    const a = this.a;
+    let k = this.recent.findIndex((M) => M.A.length === a.length && M.A.every((x, i) => x === a[i]));
+    const M = k >= 0 ? this.recent.splice(k, 1)[0] : this.compute(a);
+    M.ver = this.ver;
+    this.recent.unshift(M);
+    if (this.recent.length > LAYS_KEPT) this.recent.length = LAYS_KEPT;
+    return (this.lay = M);
   }
+  /** The layouts laid out last, the latest first (cur()). */
+  private readonly recent: Lay[] = [];
 
   /** Split v's fork (world): how far above it its daughters' peels end. */
   forkH(v: FanNode): number {
