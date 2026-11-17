@@ -386,11 +386,24 @@ export function StatusChip({ sp }: { sp: SpeciesRec }) {
   if (s.kind === 'prehistoric') return <span className="status prehistoric">{s.label}</span>;
   if (s.kind === 'domestic') return <span className="status domestic">{s.label}</span>;
   return (
-    <span className={`status iucn-${s.code.toLowerCase()}`} title={`IUCN Red List: ${s.label} (${s.status.year} assessment)`}>
-      {s.label}
-    </span>
+    <>
+      <span className={`status iucn-${s.code.toLowerCase()}`} title={`IUCN Red List: ${s.label} (${s.status.year} assessment)`}>
+        {s.label}
+      </span>
+      {sp.rangeExPe && (
+        <span className="status-note" data-range-ex="">
+          {RANGE_EX_PE_WORDS}
+        </span>
+      )}
+    </>
   );
 }
+
+/** FLAG bit 12 (ToLaD#507) on the status line: IUCN's map codes every part of its range as gone or perhaps gone. */
+export const RANGE_EX_PE_WORDS = 'whole range coded extinct or possibly extinct by IUCN';
+
+/** A species nobody knows the number of (FLAG bit 11, ToLaD#507): why, in the card's few words. */
+export const UNKNOWN_WHY = 'no range map, never counted';
 
 /** Years before present, written out: "25,000". */
 const fmtYa = (ya: number) => Math.round(ya).toLocaleString('en-US');
@@ -732,6 +745,13 @@ export function SpeciesCard({
   const touchAgo = (ageMa ?? sp.t1) * 1e6;
   const regional = (sp.history?.events ?? []).map((e, k) => ({ e, k })).filter(({ e }) => e.scope === 'regional');
   const pct = (f: number) => `${Math.round(f * 100)}%`;
+  // Nobody knows how many (ToLaD#507): its count is a width, the thinnest, never a figure; the card says "unknown" and why.
+  const unknown = sp.countUnknown && !sp.extinct;
+  const why = (
+    <MethodLink to={METHOD_IDS.unknown} className="src">
+      {UNKNOWN_WHY}
+    </MethodLink>
+  );
   const st = statusOf(sp);
   const wildPart = wildPartSentence(sp, formatCount);
   // A domestic stock: the years its own births span (its curated segments, from domestication).
@@ -791,18 +811,24 @@ export function SpeciesCard({
             {wildPart}
           </p>
         )}
-        <p className="lead">
+        <p className="lead" data-unknown={unknown ? '' : undefined}>
           <span className={`lane ${sp.extinct ? 'dead' : at.now ? 'alive' : 'lineage'}`} />
-          <span>
-            <b>{formatCount(at.alive)}</b> alive {at.when} {at.now ? today : past}
-          </span>
+          {unknown ? (
+            <span>
+              <b>Unknown</b> alive {at.when}: {why}
+            </span>
+          ) : (
+            <span>
+              <b>{formatCount(at.alive)}</b> alive {at.when} {at.now ? today : past}
+            </span>
+          )}
         </p>
-        {mass && sp.massKg ? (
+        {mass && sp.massKg && !unknown ? (
           <p className="sub" data-mass>
             <MethodLink to={WORD_IDS.weighing}>Weighing</MethodLink> {formatMass(at.alive * sp.massKg)}, at {formatMass(sp.massKg)} each{massNote(sp.massHow)}
           </p>
         ) : null}
-        {!sp.extinct && !at.now && (
+        {!sp.extinct && !at.now && !unknown && (
           <p className="sub">
             {pct(at.green)} have descendants alive today{' '}
             <MethodLink to={METHOD_IDS.descendants} className="src">
@@ -811,7 +837,7 @@ export function SpeciesCard({
           </p>
         )}
         {sp.extinct && !at.end && <p className="sub">Died out {plainAgo(sp.t1 * 1e6)}</p>}
-        {!sp.extinct && !at.now && (
+        {!sp.extinct && !at.now && !unknown && (
           <p className="lead">
             <span className="lane alive" />
             <span>
@@ -819,12 +845,18 @@ export function SpeciesCard({
             </span>
           </p>
         )}
-        <p className="ever">
-          Roughly {formatCount(sp.ever, { tilde: false })} {pluralName(sp)} {domestic ? 'born since domestication' : 'have ever lived'}{' '}
-          <MethodLink to={METHOD_IDS.ever} className="src">
-            (rough estimate)
-          </MethodLink>
-        </p>
+        {unknown ? (
+          <p className="ever">
+            How many {pluralName(sp)} have ever lived: unknown
+          </p>
+        ) : (
+          <p className="ever">
+            Roughly {formatCount(sp.ever, { tilde: false })} {pluralName(sp)} {domestic ? 'born since domestication' : 'have ever lived'}{' '}
+            <MethodLink to={METHOD_IDS.ever} className="src">
+              (rough estimate)
+            </MethodLink>
+          </p>
+        )}
       </div>
       {spark && <HistorySpark key={sp.gid} h={sp.history!} open={open} natural={sp.natural} naturalMeta={NATURAL_META} activeEvent={ev ? event : undefined} />}
       {regional.map(({ e, k }) => (
@@ -847,7 +879,9 @@ export function SpeciesCard({
             <MethodLink to={METHOD_IDS.ever}>Ever lived</MethodLink>
           </dt>
           <dd>
-            {domestic
+            {unknown
+              ? 'unknown: no count today to reckon it from'
+              : domestic
               ? `${formatCount(sp.ever)} since domestication, ${plainAgo(domestic).replace(/ ago$/, '')} (the domestic stock's own births)`
               : `${formatCount(sp.ever)}, could be ${formatCount(sp.everLo, { tilde: false })} – ${formatCount(sp.everHi, { tilde: false })}, over ${plainAgo((sp.t0 - sp.t1) * 1e6).replace(/ ago$/, '')}`}
           </dd>
@@ -883,6 +917,7 @@ export function SpeciesCard({
                 ) : (
                   st.status.cite
                 )}
+                {sp.rangeExPe && <>. Its map codes the whole range Extinct or Possibly Extinct</>}
               </>
             ) : st?.kind === 'domestic' ? (
               'Domesticated: the IUCN Red List does not assess domestic forms (Not Evaluated).'

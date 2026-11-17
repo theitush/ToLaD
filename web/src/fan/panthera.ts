@@ -46,6 +46,10 @@ export interface SpeciesRec {
   dateSource: string;
   /** Today's count is anchored (FLAG bit 8: a census, a domestic stock, humans, or a history that drives the counts). */
   anchored: boolean;
+  /** Nobody knows how many there are (FLAG bit 11, ToLaD#507): `alive` is the thinnest width a living species gets, never a figure to show. */
+  countUnknown: boolean;
+  /** IUCN codes its whole mapped range Extinct or Possibly Extinct (FLAG bit 12, ToLaD#507). */
+  rangeExPe: boolean;
   /** Generation length in years. */
   genYears: number;
   genSource: string;
@@ -116,6 +120,8 @@ export function speciesRec(r: RawSpecies, clade: number): SpeciesRec {
     extinct: r.extinct,
     dateSource: r.dateSource,
     anchored: !!r.anchored,
+    countUnknown: !!r.countUnknown,
+    rangeExPe: !!r.rangeExPe,
     genYears,
     genSource: x.src,
     clade,

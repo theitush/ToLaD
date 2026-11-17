@@ -38,7 +38,8 @@ describe("the species card's words and their links (ToLaD#508)", () => {
     const fox = sp('Vulpes vulpes');
     expect(aliveSource(fox)).toBe('modelled');
     expect(fox.natural!.n).toBeGreaterThan(fox.alive * 1.2);
-    // Made flat by #507: its natural level is today's, its maps differing for taxonomy.
+    // Made flat by #507: its natural level is today's, its maps differing for taxonomy; today's count on PHYLACINE's
+    // corrected map, Colombia given to A. jorgehernandezi (#507 group 1: 171k -> 5.0k).
     const monkey = sp('Aotus zonalis');
     expect(monkey.natural!.n).toBe(monkey.alive);
     // Domestic: its history's latest figure (Greenspoon's pet cats).
@@ -51,7 +52,7 @@ describe("the species card's words and their links (ToLaD#508)", () => {
       [lion, '~23k alive today published estimate', [['published estimate', METHOD_IDS.histories]]],
       [quoll, '~400k alive today modelled', [['modelled', METHOD_IDS.alive]]],
       [fox, '~1.9 million alive today modelled', [['modelled', METHOD_IDS.alive]]],
-      [monkey, '~170k alive today modelled', [['modelled', METHOD_IDS.alive], ['Natural level', METHOD_IDS.past]]],
+      [monkey, '~5k alive today modelled', [['modelled', METHOD_IDS.alive], ['Natural level', METHOD_IDS.past]]],
       [cat, '~600 million alive today published estimate', [['published estimate', METHOD_IDS.histories]]],
       [fossil, 'alive at the end, 11,700 years ago modelled', [['modelled', METHOD_IDS.fossils], ['Lived', METHOD_IDS.fossils]]],
     ];

@@ -387,6 +387,11 @@ export function MethodsView({ onClose, at }: { onClose: () => void; at?: string 
         <Step id={METHOD_IDS.unknown} n={8} title="What we don’t know">
           <ul className="m-list">
             <li>Most species have never been counted: their numbers are models, often 10× off.</li>
+            <li data-unknown="">
+              A few species, Data Deficient on the Red List, have no range map and were never counted: nobody knows how many
+              there are, or if any are left. Their card says “unknown”, and the tree draws them as thin as a species gets, faint,
+              as the chart draws “no data”.
+            </li>
             <li>The share of its range a species fills is the weakest step.</li>
             <li>Before 1500 the 1500 level is held flat for millions of years; real numbers rose and fell (ice ages, droughts).</li>
             <li>The maps are 1° squares (about 100 km): small ranges are rough.</li>
@@ -404,7 +409,7 @@ export function MethodsView({ onClose, at }: { onClose: () => void; at?: string 
               <Jump to={METHOD_IDS.past}>2</Jump>–<Jump to={METHOD_IDS.histories}>3</Jump>. The small word after it says where
               it came from: <b>counted</b> (a census), <b>published estimate</b> (the latest figure of its history),{' '}
               <b>modelled</b> (no count: the two models, or ours), <b>from its history</b> (the chart). “Counted or modelled”:
-              the data does not say which.
+              the data does not say which. <b>Unknown</b>: no range map, never counted (<Jump to={METHOD_IDS.unknown}>step 8</Jump>).
             </dd>
             <dt id={WORD_IDS.weighing}>Weighing</dt>
             <dd>Those alive × one’s body mass (its source in brackets), when the tree is set to mass.</dd>

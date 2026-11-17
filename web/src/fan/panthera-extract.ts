@@ -150,6 +150,13 @@ export interface RawNode {
    * to say where today's count came from (FanApp aliveSource, ToLaD#508). Absent in data read before it: false.
    */
   anchored?: boolean;
+  /**
+   * FLAG bit 11 (ToLaD#507): nobody knows how many there are: Data Deficient, no current range map, never counted. Its
+   * count is the thinnest a living species is drawn at, a width, not a figure: the card says "unknown". Absent: false.
+   */
+  countUnknown?: boolean;
+  /** FLAG bit 12 (ToLaD#507): IUCN codes its whole mapped range Extinct or Possibly Extinct. Absent: false. */
+  rangeExPe?: boolean;
 }
 
 /** One split of the dated tree (pipeline/FORMAT.md, "Dated tree", format 1.6, ToLaD#145). */
@@ -343,6 +350,8 @@ function node(f: Tile, i: number): RawNode {
     extinct: f.extinct(i),
     dateSource: f.dateSource(i),
     anchored: (f.flags(i) & FLAG.ANCHORED) !== 0,
+    countUnknown: (f.flags(i) & FLAG.COUNT_UNKNOWN) !== 0,
+    rangeExPe: (f.flags(i) & FLAG.RANGE_EX_PE) !== 0,
   };
 }
 

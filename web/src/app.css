@@ -960,6 +960,12 @@
   color: #cfc4b1;
   border: 1px solid #8b806d;
 }
+/* Beside the chip, a word on IUCN's range map (ToLaD#507): its whole range coded extinct or possibly extinct. */
+.fan .card-sp .status-note {
+  margin-left: 8px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
 .fan .card-sp .spark-h {
   display: block;
   color: var(--ink-3);

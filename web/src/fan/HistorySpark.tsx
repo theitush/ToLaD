@@ -12,7 +12,7 @@
 
 import { useId, useState } from 'react';
 import { approxCountsIn, formatCount } from '../data/count';
-import { basisSpans, GRADE_COLOR, GRADE_WORD, MODELLED_KINDS, noDataSpans, styleBetween, type Basis, type SpanStyle } from './history';
+import { basisSpans, GRADE_COLOR, GRADE_WORD, MODELLED_KINDS, NODATA, noDataSpans, styleBetween, type Basis, type SpanStyle } from './history';
 import type { HistoryRec, HistPoint, NaturalMeta, NaturalRec } from './panthera';
 import { TIME_C } from './population';
 import { EVENT_TINT } from './colstyle';
@@ -33,8 +33,6 @@ const BOT = H - B;
 
 const DASH: Record<SpanStyle, string | undefined> = { solid: undefined, dashed: '4 3', dotted: '1.2 3' };
 const OPACITY: Record<SpanStyle, number> = { solid: 0.9, dashed: 0.75, dotted: 0.5 };
-/** A stretch held flat for want of figures: faint, finely dashed. */
-const NODATA = { dash: '2 2.5', opacity: 0.4 };
 const STUB = 40; // px of chart left of the first point for a "no data" lead-in
 
 /** Kinds whose figures are cited from a source (a census, an agency estimate), not modelled. */
