@@ -271,8 +271,8 @@ describe('fossils named and pictured at their own tip (ToLaD#279, #497)', () => 
       // (Neanderthals and H. erectus on the landing and named, ToLaD#279: Ita, "adjust the hominins so that i see also the neandertals ... and also erectus".)
       for (const sci of ['Homo neanderthalensis', 'Homo erectus']) expect(why(v, v.fan.branches.find((q) => q.sp.sci === sci)!), `column ${r.w | 0}: ${sci}`).toBe('named');
     }
-    // (Before: 0 of 22, ToLaD#497; then 7 on the 700 px column and 6 on the phone's, 9 and 8 named (#520). Now 11 and 10, 14 and 14 named.)
-    expect(Math.min(...counts)).toBeGreaterThanOrEqual(10);
+    // (Before: 0 of 22, ToLaD#497; then 7 on the 700 px column and 6 on the phone's, 9 and 8 named (#520). Now 13 and 12, 14 and 14 named.)
+    expect(Math.min(...counts)).toBeGreaterThanOrEqual(12);
   }, 600_000);
 
   it('no two labels meet: the Hominins’ landing, home, Carnivora, Felidae, Panthera, Primates, Rodentia, Proboscidea, Cetacea', () => {

@@ -3243,12 +3243,12 @@ export class FanView implements InputHandlers {
     const named: [number, number, number][] = [];
     let why: 'crossed' | 'meets' = 'crossed';
     /**
-     * Where strand k's name or picture, `size` px across over screen rows y0..y1, stands in [lo, hi] (screen): clear of the labels standing, then of the other species' columns
-     * (clearIn), its centre nearest `near`; NaN where nowhere, `why` saying what was in the way.
+     * Where strand k's name or picture, `size` px across over screen rows y0..y1, stands in [lo, hi] (screen): clear of the labels standing (unless `labels` is false), then of the
+     * other species' columns (clearIn), its centre nearest `near`; NaN where nowhere, `why` saying what was in the way.
      */
-    const spot = (k: number, lo: number, hi: number, y0: number, y1: number, size: number, near: number): number => {
+    const spot = (k: number, lo: number, hi: number, y0: number, y1: number, size: number, near: number, labels = true): number => {
       [clear.length, clear[0], clear[1]] = [2, lo, hi];
-      for (const q of taken) if (q[1] < y1 && q[3] > y0 && q[0] < hi && q[2] > lo && clear.length) this.cutOut(clear, q[0], q[2], size);
+      if (labels) for (const q of taken) if (q[1] < y1 && q[3] > y0 && q[0] < hi && q[2] > lo && clear.length) this.cutOut(clear, q[0], q[2], size);
       if (!clear.length) {
         why = 'meets';
         return NaN;
@@ -3269,6 +3269,10 @@ export class FanView implements InputHandlers {
       const span = Math.max(R[k] * sx, 2 * SPECIES_PX);
       const [lo, hi] = [Math.max(0, Math.min(c - span / 2, this.w - SPECIES_PX)), Math.min(this.w, Math.max(c + span / 2, SPECIES_PX))];
       const [at, start] = [Math.min(line, Y(b.splitY) - PIC_D / 2), Y(b.splitY)];
+      // (Its picture's top: on its tip; else, where even a small one there sits on a later lineage standing in its room past its tip (humans over Neanderthals'), just inside its
+      // own branch, its young edge on its tip, where its branch holds one; the name laid from there.)
+      let pt = at - PIC_D / 2;
+      if (line + PIC_S <= start && Number.isNaN(spot(k, Math.max(0, c - PIC_S), Math.min(this.w, c + PIC_S), pt, pt + PIC_S, PIC_S, c, false))) pt = line;
       const name = levelText(b);
       const text = this.titleWidth(SPECIES_FONT, name) <= cap ? name : this.pillText(name, cap);
       const len = LABEL_PAD + this.titleWidth(SPECIES_FONT, text);
@@ -3277,7 +3281,7 @@ export class FanView implements InputHandlers {
       let [x, box] = [NaN, [0, 0, 0, 0] as [number, number, number, number]];
       why = 'crossed';
       for (const [past, d] of [[true, PIC_D], [false, PIC_D], [false, PIC_S]] as const) {
-        const y1 = past ? at - PIC_D / 2 - LABEL_UNDER : at - PIC_D / 2 + d + LABEL_UNDER + len;
+        const y1 = past ? pt - LABEL_UNDER : pt + d + LABEL_UNDER + len;
         const y0 = y1 - len;
         if ((!past && y1 > start) || y0 < 0 || y1 > this.h) continue;
         const xs = spot(k, lo, hi, y0, y1, SPECIES_PX, c);
@@ -3293,7 +3297,7 @@ export class FanView implements InputHandlers {
       const key = `t${k}`;
       out.names.push({ key, id: key, place: 'tip', text, rank: [0, 0, k], x, y1, box, fit: 1, plus: 0, pic: b, b, plain: SPECIES_FONT });
       taken.push(box);
-      named.push([k, x, at - PIC_D / 2]);
+      named.push([k, x, pt]);
     }
     // (Then their pictures, in the same order: every fossil's name before any fossil's picture, as a label's name comes before its picture.)
     for (const [k, x, y0] of named)
