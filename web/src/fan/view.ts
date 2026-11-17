@@ -3011,17 +3011,19 @@ export class FanView implements InputHandlers {
       // (A group below the titles has not its name in its gap, by the cut: its band, or none. A title in its gap once that holds it, till then in its widest part's band, a guest, ToLaD#500.)
       return { ...m, tier: tier(heads ? { ...m, band: 0 } : g.lv.b ? m : { ...m, gap: 0 }, sx, CLADE_PX, SPECIES_PX), pic: heads ? 0 : picAt(pics.get(g), sx, PIC_D, PIC_S) };
     });
-    // (A title its gap cannot hold yet, a guest: in the band of its widest part, or of that one's widest part once it has handed its band down too, and so on, ToLaD#500.)
+    // (A title its gap cannot hold yet, a guest: in the band of its widest part, or of that one's widest part once it has handed its band down too, and so on, ToLaD#500; while that band holds
+    // both names, side by side, a hair between; else that part's own label stands and the title waits for its gap.)
     const at = new Map(list.map(({ g }, i) => [g, out[i]]));
+    const both = 2 * CLADE_PX + GROUP_D - PIC_D;
     out.forEach((m, i) => {
       const guest = L.guests.get(list[i].g);
       if (!m.heads || m.tier === 'title' || !guest || sx >= guest.until) return;
       let h: GapMember | undefined = guest.host;
       while (h && (L.hands.get(h) ?? Infinity) <= sx) h = L.guests.get(h)?.host;
-      if (h && at.has(h)) Object.assign(m, { tier: 'title', host: at.get(h) });
+      const host = h && at.get(h);
+      if (host && host.band * sx >= both) Object.assign(m, { tier: 'title', host });
     });
-    // (One guest a band, ToLaD#500 (gapHands): the outermost of its chain still standing; the inner ones have no name there, a tap going one level deeper to each: of a band's guests,
-    // the widest.)
+    // (One guest a band, ToLaD#500: the outermost of its chain still standing; the inner ones have no name there, a tap going one level deeper to each: of a band's guests, the widest.)
     const guested = new Map<GapMember, GapMember>();
     for (const m of out) {
       const o = m.host && guested.get(m.host);
@@ -3102,8 +3104,8 @@ export class FanView implements InputHandlers {
     const col = Y(this.fan.time.y(LABELS_MA));
     const hair = GROUP_D - PIC_D;
     const list = this.gapCoverAt(T, sx);
-    // (Guest titles, ToLaD#500: in their host's band, one at most (gapCoverAt), at the top of that band's part on screen, then the host's own labels, a hair between; gapHands gave the band room
-    // for both.)
+    // (Guest titles, ToLaD#500: in their host's band, one at most (gapCoverAt), at the top of that band's part on screen, then the host's own labels, a hair between; gapCoverAt gave it a band
+    // holding both.)
     const guestAt = new Map<GapMember, number>();
     const ceded = new Map<GapMember, number>();
     const guests = new Map<GapMember, GapMember[]>();

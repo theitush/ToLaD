@@ -13,7 +13,7 @@ import type { Steady } from './steady';
 import { CLADE_PX } from './gapnames';
 import { FanView, type CutLabels, type GapMember, type Level } from './view';
 
-function stubView(): FanView {
+function stubView(w: number, h: number): FanView {
   const noop = () => {};
   const g = globalThis as Record<string, unknown>;
   g.Path2D = class {
@@ -43,7 +43,7 @@ function stubView(): FanView {
     style: {},
     parentElement: null,
     getContext: () => ctx,
-    getBoundingClientRect: () => ({ width: 390, height: 844, left: 0, top: 0, right: 390, bottom: 844 }),
+    getBoundingClientRect: () => ({ width: w, height: h, left: 0, top: 0, right: w, bottom: h }),
     addEventListener: noop,
     removeEventListener: noop,
   };
@@ -55,13 +55,16 @@ type Inner = { landOf(lv: Level): Camera; labelsNow(): { cut: CutLabels }; terri
 const env = (globalThis as { process?: { env: Record<string, string | undefined>; stderr: { write(s: string): void } } }).process;
 const say = (s: string) => env?.env.PARTS_SAY && env.stderr.write(s + '\n');
 
-describe('a group opens part by part', () => {
+// (Two views: the rig's 390 x 844, and the phone's: 390 x 844 under the bar, the chain and the time axis leaves the view on its side a column 663 px long and 390 across, measured in the
+// browser, ToLaD#500.)
+for (const [w, h, tag] of [[390, 844, ''], [663.109375, 390, ', on the phone’s column']] as const)
+describe(`a group opens part by part${tag}`, () => {
   let v: FanView;
   let home: Camera;
   beforeAll(async () => {
     await loadMammalsFromFiles();
     setFlip(true);
-    v = stubView();
+    v = stubView(w, h);
     home = { ...v.cam };
   }, 120000);
   afterAll(() => setFlip(false));
@@ -116,6 +119,12 @@ describe('a group opens part by part', () => {
     return I().labelsNow().cut;
   };
 
+  // (Home on the phone, ToLaD#500, #497: the human lane, 27.8 px there, holds its own name, so the groups over it hand their bands down to it; a guest title beside it only while it holds both.)
+  if (tag)
+    it('at home, Human is named and pictured', () => {
+      expect(labelled(land(null), 'Homo sapiens')).toEqual({ name: true, pic: true });
+    });
+
   it('at Saimirinae’s frame, the Golden-backed, Guianan, Collins’ and Ecuadorian squirrel monkeys each have their name and picture', () => {
     const c = land(clade('Saimirinae'));
     for (const sci of ['Saimiri ustus', 'Saimiri sciureus', 'Saimiri collinsi', 'Saimiri macrodon']) expect(labelled(c, sci), sci).toEqual({ name: true, pic: true });
@@ -162,7 +171,8 @@ describe('a group opens part by part', () => {
       if (now > 5 * second) late5++;
     }
     // (Measured 2026-11-16: before 3,719 >2x and 2,493 >5x of 6,245; now 785 and 18, held by their parent or by guests riding down; 2026-11-17, 846 and 21, a first part's title a guest till its group opens, gapHands' `same`;
-    // 2026-11-17, one guest a band: 0 and 0 of 6,245 (before 3,719 and 2,491), each part handing down once its widest part holds its own name and one title, no stack of guests holding it.)
+    // 2026-11-17, one guest a band: 0 and 0 of 6,245 (before 3,719 and 2,491), on the rig's view and on the phone's column alike: a part hands down once its widest part holds its own name and
+    // one title, or its own name alone under a title standing over its first strand, no stack of guests holding it.)
     say(`late splits: ${late2} >2x, ${late5} >5x of ${groups} (before ${late2Before}, ${late5Before}); first: ${late.join(', ')}`);
     expect(late2 * 4).toBeLessThan(late2Before);
     expect(late5 * 100).toBeLessThan(late5Before);

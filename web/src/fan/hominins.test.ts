@@ -20,7 +20,8 @@ const timers: { at: number; f: () => void; id: number }[] = [];
 let tid = 1;
 type Rig = { v: FanView; on: Map<string, (e: unknown) => void> };
 /** The view on its side, as on a phone (taps.test.ts's), its pointer events caught so they go through Input as a finger's. */
-function rig(): Rig {
+/** The view on its side, its column w px long (700, or the phone's 663: 390 x 844 under the bar, the chain and the time axis, measured in the browser). */
+function rig(w = 700): Rig {
   const noop = () => {};
   const g = globalThis as Record<string, unknown>;
   g.Path2D = class {
@@ -60,7 +61,7 @@ function rig(): Rig {
     style: {},
     parentElement: null,
     getContext: () => ctx,
-    getBoundingClientRect: () => ({ width: 700, height: 390, left: 0, top: 0, right: 700, bottom: 390 }),
+    getBoundingClientRect: () => ({ width: w, height: 390, left: 0, top: 0, right: w, bottom: 390 }),
     addEventListener: (t: string, f: (e: unknown) => void) => on.set(t, f),
     removeEventListener: noop,
     setPointerCapture: noop,
@@ -183,6 +184,21 @@ describe('a tap on humans stops at the Hominins first (ToLaD#497)', () => {
     const lv = v.levelNow(true);
     return lv.v === node('Hominini') && chain().endsWith('› Hominins') && !P(v).selected;
   };
+
+  // (On the phone's column too, ToLaD#500: the human lane at home is 27.8 px there, room for its own name but not for a guest title beside it, so the label is Human's own.)
+  it('on the phone’s column, home names and pictures Human', () => {
+    const p = rig(663.109375).v;
+    const c = p.homeCamera();
+    (p.fan.tess.fold as Steady).setScale(c.sx, p.w);
+    p.cam = { ...c, ty: c.sy };
+    P(p).camera.settle();
+    for (let k = 0; k < 3; k++) p.draw();
+    const b = p.fan.branches.find((q) => q.sp.sci === 'Homo sapiens')!;
+    expect(p.nameHits.some((q) => q.b === b), 'its name').toBe(true);
+    expect(p.thumbHits.some((q) => q[3] === b && !q[4]), 'its picture').toBe(true);
+    // (Back to the 700 px rig's scale for the tests after.)
+    (v.fan.tess.fold as Steady).setScale(v.cam.sx, v.w);
+  });
 
   it('from home, Primates and Great apes: a tap on the human name, picture or column lands at the Hominins, no card', () => {
     const bad: string[] = [];

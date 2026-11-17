@@ -98,22 +98,22 @@ export interface Guest<G> {
 }
 
 /**
- * Each group's handing zoom (ToLaD#483, #500): from it, its band is its parts', each labelled there where it fits, and its name stands as their title until it opens (gapOpens: every part has room),
- * so that no part is ever left with nothing naming it. A group hands its band down once its gap holds its name (`gap(g)`, world x; px the text), or before that, once its widest part's band
- * (`band(p)`) holds that part's own name and its group's side by side (2 px and a `pad` between), and at its opening anyway; never before its parent hands down. So a group opens part by part
- * (ToLaD#500, Ita: "colinns sequirel money doesnt show the pic even at the zoom!"): a wide part has its name and picture once it has room, a thin one stays under its group's title until it fits.
- * Until its gap holds its name, the title is a guest in its widest part's band (`guests`); when that part hands its band down in turn, its guests go on down to its widest part with its own. A band
- * holds one guest at most, the outermost of the chain still standing (the inner ones of a chain of first parts no name there: a tap goes one level deeper to each), so a part hands down once its
- * widest part's band holds its own name and one title beside it. Each title moves to its gap (the #483 way) or goes at its opening, once, on the way in.
- * A gap its group's (`same`: a first part's) is its group's title's till that group opens, so a title holds it only from there: a chain of first parts under one title is named by its outermost
- * guest still standing.
+ * Each group's handing zoom (ToLaD#483, #500): from it, its band is its parts', each labelled there where it fits, and its name stands as their title until it opens (gapOpens: every part has room).
+ * A group hands its band down at the first of: its gap holding its name (`gap(g)`, world x; px the text), its widest part's band (`band(p)`) holding that part's own name and its group's side by
+ * side (2 px and a `pad` between), its opening; never before its parent hands down. So a group opens part by part (ToLaD#500, Ita: "colinns sequirel money doesnt show the pic even at the zoom!"):
+ * a wide part has its name and picture once it has room, a thin one stays under its group's title until it fits. Until its gap holds its name, the title is a guest in its widest part's band
+ * (`guests`), or down the widest parts to the first not handed down, one guest a band, the outermost (gapCoverAt); a guest it brings holds a part's band too, till its widest part holds both.
+ * A gap its group's (`same`: a first part's) is its group's title's till that group opens, so a title holds it only from there; and while a title stands over its first strand (its group's in its
+ * gap, or the one over its group's), its own name claims nothing (ToLaD#483): it hands down once its widest part's band holds that part's own name, its title a guest only where a band holds
+ * both, else waiting for its gap.
  */
 export function gapHands<G>(root: G, parts: (g: G) => readonly G[], opens: Map<G, number>, gap: (g: G) => number, band: (g: G) => number, room: (g: G) => number, px: number, pad: number, guests?: Map<G, Guest<G>>, same?: (g: G, p: G) => boolean): Map<G, number> {
   const hands = new Map<G, number>();
-  // (Each with the untils of the guests it brings, its ancestors' titles standing in its band, and the zoom its gap is its own from: a gap its group's (`same`) is that group's title's till it opens.)
-  const stack: [G, number, number[], number][] = [[root, 0, [], 0]];
+  // (Each with its parent's handing zoom, the untils of the guests it brings, the zoom its gap is its own from (a gap its group's, `same`, is that group's title's till it opens), and the zoom from
+  // which a title stands over its first strand.)
+  const stack: [G, number, number[], number, number][] = [[root, 0, [], 0, Infinity]];
   while (stack.length) {
-    const [g, enter, brought, free] = stack.pop()!;
+    const [g, enter, brought, free, named] = stack.pop()!;
     const ps = parts(g);
     const open = opens.get(g) ?? Infinity;
     const titled = gap(g) > 0 ? Math.max(free, px / gap(g)) : Infinity;
@@ -124,22 +124,25 @@ export function gapHands<G>(root: G, parts: (g: G) => readonly G[], opens: Map<G
     let all = 0;
     for (const p of ps) if (room(p) > 0) all = Math.max(all, px / room(p));
     const until = Math.min(titled, open, all);
-    // (The first zoom from `enter` its widest part's band holds the names it would hold then: its own, the guests still there, and its group's till its gap holds it; none needed past those.)
+    // (The first zoom from `enter` its widest part's band holds what it would hold then: its own name, and one title beside it while a guest stands, one it brings or its own till its gap holds
+    // it, unless a title over its first strand names it already.)
     let at = Infinity;
     if (ps.length) {
-      const ends = [...new Set([enter, until, ...brought].filter((z) => z >= enter && z < Infinity))].sort((p, q) => p - q);
+      const ends = [...new Set([enter, until, named, ...brought].filter((z) => z >= enter && z < Infinity))].sort((p, q) => p - q);
       for (let i = 0; i < ends.length && at === Infinity; i++) {
-        // (One guest a band at most, ToLaD#500: its own name and one title beside it, the outermost of the chain still standing.)
-        const n = brought.some((u) => u > ends[i]) || ends[i] < until;
-        const z = n ? Math.max(ends[i], (2 * px + pad) / w) : ends[i];
+        const [own, guest] = [ends[i] < until, brought.some((u) => u > ends[i]) || (ends[i] < until && ends[i] < named)];
+        const z = guest ? Math.max(ends[i], (2 * px + pad) / w) : own ? Math.max(ends[i], px / w) : ends[i];
         if (z < (ends[i + 1] ?? Infinity)) at = z;
       }
       at = Math.min(open, at);
     }
     hands.set(g, at);
     if (host !== undefined) guests?.set(g, { host, until });
-    const down = [...brought.filter((u) => u > at), ...(at < until ? [until] : [])];
-    for (const p of ps) stack.push([p, at, p === host ? down : [], same?.(g, p) ? open : 0]);
+    const down = [...brought.filter((u) => u > at), ...(at < until && at < named ? [until] : [])];
+    for (const p of ps) {
+      const first = same?.(g, p) ?? false;
+      stack.push([p, at, p === host ? down : [], first ? open : 0, first ? Math.min(named, titled) : Infinity]);
+    }
   }
   return hands;
 }
