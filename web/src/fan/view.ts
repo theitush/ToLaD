@@ -3236,7 +3236,8 @@ export class FanView implements InputHandlers {
     const [[xa, ya], [xb, yb]] = [this.toWorld(0, 0), this.toWorld(this.w, this.h)];
     const [x0, x1, y0w, y1w] = [Math.min(xa, xb), Math.max(xa, xb), Math.min(ya, yb), Math.max(ya, yb)];
     const { cap } = this.labelBand();
-    const taken: number[][] = [...[...out.spots, ...out.names].map((s) => s.box), ...out.pics.map(picBox)];
+    // (Every label standing, and the axis's labels as last drawn (its era and event notes), as the names at the forks keep clear of them.)
+    const taken: number[][] = [...[...out.spots, ...out.names].map((s) => s.box), ...out.pics.map(picBox), ...this.axisBoxes];
     const half = SPECIES_PX / 2;
     const clear: number[] = [];
     /** The fossils named, in order: each its name's centre across and its picture's top (screen). */
