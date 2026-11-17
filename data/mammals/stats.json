@@ -19,8 +19,8 @@
   "domestic:Ovis aries": 1,
   "domestic:Sus scrofa": 1,
   "greenspoon model": 4378,
-  "natural: extant, differs from today": 698,
-  "natural: extant, same as today": 4738,
+  "natural: extant, differs from today": 697,
+  "natural: extant, same as today": 4739,
   "natural: extinct, whole band": 236,
   "near-extinct cap": 15
  },
@@ -11893,7 +11893,7 @@
     "Rodentia": 48
    },
    "median_dex_vs_natural": {
-    "flat": -0.137,
+    "flat": -0.124,
     "lineage": -0.177
    },
    "mu_vs_flat": {
@@ -11904,17 +11904,17 @@
    "note": "What the per-lineage mutation rate (ToLaD#74) changed against the flat 1e-9 per year: flat = N_div with DEEP_MU_YEAR for every species; lineage = with mutation.py's rate (the rest of this block). N_div scales by 1 / mu_vs_flat.",
    "slope_log_div_on_log_natural": {
     "flat": {
-     "intercept": 4.804,
+     "intercept": 4.805,
      "n": 200,
-     "r": 0.472,
+     "r": 0.471,
      "slope": 0.18,
      "span_dex_div": 2.42,
      "span_dex_other": 5.9
     },
     "lineage": {
-     "intercept": 5.392,
+     "intercept": 5.395,
      "n": 200,
-     "r": 0.232,
+     "r": 0.231,
      "slope": 0.067,
      "span_dex_div": 1.88,
      "span_dex_other": 5.9
@@ -11988,9 +11988,9 @@
    "pipeline_G_over_zoonomia_G_median": 0.0
   },
   "slope_log_div_on_log_natural": {
-   "intercept": 5.392,
+   "intercept": 5.395,
    "n": 200,
-   "r": 0.232,
+   "r": 0.231,
    "slope": 0.067,
    "span_dex_div": 1.88,
    "span_dex_other": 5.9
@@ -13466,9 +13466,9 @@
     "G": 7.795,
     "N": 3130341,
     "N_flat": 2266943,
-    "dex_flat_vs_natural": -0.172,
+    "dex_flat_vs_natural": 0.042,
     "dex_flat_vs_today": null,
-    "dex_vs_natural": -0.032,
+    "dex_vs_natural": 0.183,
     "dex_vs_today": null,
     "div_in_natural_range": true,
     "het": 0.00706802,
@@ -13478,7 +13478,7 @@
     "mu_clade": "Perissodactyla",
     "mu_vs_flat": 0.7242,
     "mu_year": 7.242e-10,
-    "natural": 3371740,
+    "natural": 2056117,
     "ne": 313034,
     "sample": "domestic",
     "species": "Equus caballus",
@@ -16526,10 +16526,10 @@
    "div_in_natural_95_range": 108,
    "div_lower_10x": 61,
    "histogram_dex": {
-    "+0..+1": 56,
+    "+0..+1": 57,
     "+1..+2": 24,
     "+2..+3": 6,
-    "-1..+0": 53,
+    "-1..+0": 52,
     "-2..-1": 45,
     "-3..-2": 15,
     "<-3": 1,
@@ -17761,29 +17761,29 @@
   "births_now_per_yr": 51590043663.10185,
   "by_era": {
    "Cretaceous 66-145 Ma": {
-    "ghost": 3.4190772663954575e+18,
+    "ghost": 3.4190772663953224e+18,
     "ghost_share": 0.9999,
-    "sampled": 180606593824158.28
+    "sampled": 180606593960875.47
    },
    "Holocene-Pleistocene 0-2.58 Ma": {
-    "ghost": 1.5599193869096208e+16,
-    "ghost_share": 0.1169,
-    "sampled": 1.1778634998457182e+17
+    "ghost": 1.5600436903877042e+16,
+    "ghost_share": 0.117,
+    "sampled": 1.1778510749585272e+17
    },
    "Jurassic and older >145 Ma": {
-    "ghost": 8.948937987650835e+17,
+    "ghost": 8.948937987650678e+17,
     "ghost_share": 1.0,
-    "sampled": 16530449473756.006
+    "sampled": 16530449489546.174
    },
    "Neogene 2.58-23 Ma": {
-    "ghost": 8.239769047277453e+17,
+    "ghost": 8.239782180663657e+17,
     "ghost_share": 0.7763,
-    "sampled": 2.374685347944667e+17
+    "sampled": 2.3746722145584618e+17
    },
    "Paleogene 23-66 Ma": {
-    "ghost": 2.1979686881448092e+18,
+    "ghost": 2.197968688647539e+18,
     "ghost_share": 0.9859,
-    "sampled": 3.1538778880957092e+16
+    "sampled": 3.153877837822762e+16
    }
   },
   "f_ramp_Ma": [
@@ -17791,7 +17791,7 @@
    91.36
   ],
   "ghost_share": 0.95,
-  "max_multiplier": 88224.62012960871,
+  "max_multiplier": 88224.62003653956,
   "multiplier_at_Ma": {
    "0.01": 1.041,
    "1": 1.069,
@@ -17803,9 +17803,9 @@
    "50": 236.241,
    "66": 3005.613
   },
-  "sampled_sum": 3.869908007032935e+17,
+  "sampled_sum": 3.869882443733769e+17,
   "top_down_estimate": 7.738506549465278e+18,
-  "with_ghosts": 7.738506652605487e+18
+  "with_ghosts": 7.738506653151547e+18
  },
  "greenspoon_combined": {
   "category_offset_dex": {
@@ -18034,7 +18034,7 @@
      "next": "modelled",
      "ratio": 36.11431782699694,
      "to_kind": "rangeloss",
-     "to_year": 1500
+     "to_year": 1652
     },
     "Hemitragus hylocrius": {
      "factor": 0.02800898941708582,
@@ -22863,8 +22863,8 @@
      }
     ],
     "ever_after": 114792561277.5976,
-    "ever_before": 120465652067.48639,
-    "ever_ratio": 0.9529069847502203,
+    "ever_before": 120467609933.45744,
+    "ever_ratio": 0.9528914978972807,
     "file": "Enhydra_lutris.toml",
     "grades": "C",
     "hist_row": true,
@@ -23010,26 +23010,26 @@
     "beside": null,
     "component": "domestic",
     "deep": null,
-    "deep_after": 3371739.7556172814,
-    "deep_before": 3371739.7556172814,
+    "deep_after": 2056116.5518482828,
+    "deep_before": 2056116.5518482828,
     "deep_from": null,
     "domestic_on_leaf": true,
     "events": [],
-    "ever_after": 3445460670847.2197,
-    "ever_before": 3427158028054.1885,
-    "ever_ratio": 1.0053404723806747,
+    "ever_after": 2111729304849.3704,
+    "ever_before": 2093426662056.339,
+    "ever_ratio": 1.008742910905249,
     "file": "Equus_caballus.toml",
     "grades": "BC",
     "hist_row": true,
     "leaf": "Equus caballus",
     "modelled": null,
     "natural": {
-     "N": 3371739.7556172814,
-     "hi": 2341713551.614983,
+     "N": 2056116.5518482828,
+     "hi": 1427997515.2713168,
      "km2_cur": 167622.63275957466,
-     "km2_nat": 86204595.08085458,
-     "lo": 4854.833321423797,
-     "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
+     "km2_nat": 52568320.107099935,
+     "lo": 2960.5200496313423,
+     "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count, without the 3612 cells lost before 1500"
     },
     "points": 19,
     "segments": 23,
@@ -23046,29 +23046,29 @@
     "beside": null,
     "component": "wild",
     "deep": null,
-    "deep_after": 699417.7777777776,
-    "deep_before": 3371739.7556172814,
+    "deep_after": 426511.11111111107,
+    "deep_before": 2056116.5518482828,
     "deep_from": "natural",
     "domestic_on_leaf": false,
     "events": [],
-    "ever_after": 709956805957.6367,
-    "ever_before": 3422546751465.8374,
-    "ever_ratio": 0.20743523975342934,
+    "ever_after": 432938677314.1637,
+    "ever_before": 2087102867609.696,
+    "ever_ratio": 0.20743523667810249,
     "file": "Equus_ferus.toml",
     "grades": "C",
     "hist_row": true,
     "leaf": "Equus ferus",
     "modelled": null,
     "natural": {
-     "N": 699417.7777777776,
-     "hi": 485754004.5117782,
+     "N": 426511.11111111107,
+     "hi": 296217063.3541091,
      "km2_cur": 167622.63275957466,
-     "km2_nat": 86204595.08085458,
-     "lo": 1007.06370576044,
-     "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
+     "km2_nat": 52568320.107099935,
+     "lo": 614.1163032318984,
+     "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count, without the 3612 cells lost before 1500"
     },
     "points": 1,
-    "segments": 21,
+    "segments": 20,
     "trend_1500": true,
     "trend_held": null,
     "use": "counts"
@@ -23390,7 +23390,7 @@
       "rule": "scaled",
       "to_kind": "rangeloss",
       "to_n": 6288.106282967399,
-      "to_year": 1500
+      "to_year": 1652
      },
      "kept_blind": 0,
      "method": "PSMC",
@@ -23415,9 +23415,9 @@
     "deep_from": "genomic",
     "domestic_on_leaf": false,
     "events": [],
-    "ever_after": 3463655606.3284874,
-    "ever_before": 4317489708.921158,
-    "ever_ratio": 0.8022383004576925,
+    "ever_after": 3463669804.214706,
+    "ever_before": 4317503906.807378,
+    "ever_ratio": 0.8022389507867178,
     "file": null,
     "grades": "D",
     "hist_row": true,
@@ -28324,8 +28324,8 @@
     "domestic_on_leaf": false,
     "events": [],
     "ever_after": 45376649107346.414,
-    "ever_before": 2402235935529.3335,
-    "ever_ratio": 18.88933906791618,
+    "ever_before": 2402240122984.096,
+    "ever_ratio": 18.889306141044262,
     "file": "Phascolarctos_cinereus.toml",
     "grades": "C",
     "hist_row": true,
@@ -29181,25 +29181,25 @@
     "component": "wild",
     "deep": null,
     "deep_after": 53000.0,
-    "deep_before": 511233.1111111111,
+    "deep_before": 25034.61111111111,
     "deep_from": "baseline",
     "domestic_on_leaf": false,
     "events": [],
     "ever_after": 138922654476.41064,
-    "ever_before": 1339958650211.8472,
-    "ever_ratio": 0.1036768220082366,
+    "ever_before": 65620278971.684395,
+    "ever_ratio": 2.117068940477329,
     "file": "Sarcophilus_harrisii.toml",
     "grades": "B",
     "hist_row": true,
     "leaf": "Sarcophilus harrisii",
     "modelled": null,
     "natural": {
-     "N": 366444.44444444444,
-     "hi": 1554226.527223321,
+     "N": 17944.44444444444,
+     "hi": 76109.03097227603,
      "km2_cur": 167622.63275957466,
-     "km2_nat": 3613198.972817498,
-     "lo": 86397.65729909146,
-     "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count"
+     "km2_nat": 176935.00124621764,
+     "lo": 4230.813115161694,
+     "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count, without the 369 cells lost before 1500"
     },
     "points": 1,
     "segments": 7,
@@ -30680,11 +30680,11 @@
  "knuckles_collapsed": 3808,
  "mammalia": {
   "alive": 86811345375.82185,
-  "ever": 7.738506652605486e+18,
-  "ghost": 7.351515851902193e+18,
+  "ever": 7.738506653151547e+18,
+  "ghost": 7.35151840877817e+18,
   "grade": "D",
-  "hi": 7.320126380675456e+23,
-  "lo": 70991435077197.98
+  "hi": 7.320126418487425e+23,
+  "lo": 70991434720643.25
  },
  "mass_imputed": {
   "clade mean": 4636,
@@ -40573,13 +40573,13 @@
  "natural_baseline": {
   "extant": 5433,
   "extant_log10_natural_over_today": {
-   "higher": 677,
+   "higher": 676,
    "histogram_dex": {
-    "+0.0..+0.5": 5249,
-    "+0.5..+1.0": 97,
-    "+1.0..+1.5": 36,
+    "+0.0..+0.5": 5250,
+    "+0.5..+1.0": 98,
+    "+1.0..+1.5": 34,
     "+1.5..+2.0": 13,
-    "+2.0..+2.5": 7,
+    "+2.0..+2.5": 8,
     "-0.5..+0.0": 10,
     "-1.0..-0.5": 3
    },
@@ -40590,12 +40590,12 @@
     0.0,
     0.0,
     0.0,
-    0.309
+    0.301
    ],
-   "same": 4737
+   "same": 4738
   },
   "extant_total": {
-   "natural": 55612650493.13618,
+   "natural": 55609994201.370766,
    "today": 57172858148.721016
   },
   "extinct": 234,
@@ -40714,20 +40714,6 @@
     "today": 12209.000000000002
    },
    {
-    "area_ratio": 514.2777777777778,
-    "extinct": false,
-    "hi": 485754004.5117782,
-    "km2_cur": 167623,
-    "km2_nat": 86204595,
-    "leaf": "Equus ferus",
-    "lo": 1007.06370576044,
-    "map": "Equus ferus",
-    "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count",
-    "natural": 699417.7777777776,
-    "ratio": 514.2777777777777,
-    "today": 1360.0
-   },
-   {
     "area_ratio": null,
     "extinct": false,
     "hi": 11927948.624455852,
@@ -40739,6 +40725,20 @@
     "method": "N_nat: D x natural range (PHYLACINE, rescaled to PanTHERIA areas) x fitted occupancy",
     "natural": 20560.663768525163,
     "ratio": 411.21327537050325,
+    "today": 50.0
+   },
+   {
+    "area_ratio": null,
+    "extinct": false,
+    "hi": 7096860.392738604,
+    "km2_cur": 0,
+    "km2_nat": 9312,
+    "leaf": "Pteropus tuberculatus",
+    "lo": 48.626891374929876,
+    "map": "Pteropus tuberculatus",
+    "method": "N_nat: D x natural range (PHYLACINE, rescaled to PanTHERIA areas) x fitted occupancy",
+    "natural": 18576.820487390793,
+    "ratio": 371.53640974781587,
     "today": 50.0
    }
   ],
@@ -40886,7 +40886,12 @@
    }
   ],
   "methods": {
-   "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count": 5404,
+   "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count": 5398,
+   "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count, without the 135 cells lost before 1500": 1,
+   "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count, without the 2297 cells lost before 1500": 1,
+   "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count, without the 3612 cells lost before 1500": 2,
+   "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count, without the 369 cells lost before 1500": 1,
+   "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count, without the 76 cells lost before 1500": 1,
    "N_nat: D x natural range (PHYLACINE, rescaled to PanTHERIA areas) x fitted occupancy": 253,
    "N_nat: today's count (PHYLACINE's note: the map difference is mapping, not people's doing)": 3,
    "N_nat: today's count (PHYLACINE's note: the map difference is taxonomy, not people's doing)": 10
@@ -41170,17 +41175,17 @@
     "today": 31000.0
    },
    {
-    "area_ratio": 514.2777777777778,
+    "area_ratio": 313.6111111111111,
     "extinct": false,
-    "hi": 485754004.5117782,
+    "hi": 296217063.3541091,
     "km2_cur": 167623,
-    "km2_nat": 86204595,
+    "km2_nat": 52568320,
     "leaf": "Equus ferus",
-    "lo": 1007.06370576044,
+    "lo": 614.1163032318984,
     "map": "Equus ferus",
-    "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count",
-    "natural": 699417.7777777776,
-    "ratio": 514.2777777777777,
+    "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count, without the 3612 cells lost before 1500",
+    "natural": 426511.11111111107,
+    "ratio": 313.6111111111111,
     "today": 1360.0
    },
    {
@@ -41595,13 +41600,13 @@
   "non-species tip": 551
  },
  "output": {
-  "brotli_bytes": 834706,
+  "brotli_bytes": 842362,
   "dated_sidecar_raw": 2065827,
   "files": 15,
-  "raw_bytes": 4561544,
-  "skeleton_brotli": 104594,
+  "raw_bytes": 4596184,
+  "skeleton_brotli": 109221,
   "skeleton_nodes": 2383,
-  "skeleton_raw": 1683584,
+  "skeleton_raw": 1707608,
   "tiles": 14
  },
  "overrides": {
@@ -42400,12 +42405,34 @@
   },
   "today_maps_note": "ToLaD#507: today's map, cell by cell, of each living species whose map difference PHYLACINE's note puts down to taxonomy or a mapping fix, and of the species such a note takes land from (ranges.today_maps): cells = the corrected map's cells (null: left as it is, why says why), cells_map = PHYLACINE's current map"
  },
- "pieces": 258950,
+ "pieces": 258038,
  "rangeloss": {
+  "by_basis": {
+   "bound": {
+    "all": 247,
+    "trend": 246
+   },
+   "dated": {
+    "all": 167,
+    "trend": 148
+   },
+   "later": {
+    "all": 77,
+    "trend": 77
+   },
+   "prehistoric": {
+    "all": 6,
+    "trend": 4
+   },
+   "undated": {
+    "all": 187,
+    "trend": 184
+   }
+  },
   "carried_by_genomic_record": 45,
-  "declines": 581,
+  "declines": 580,
   "end_year": 2026.77,
-  "hist_records": 594,
+  "hist_records": 593,
   "largest_declines": [
    {
     "G_yr": 4.329639972621492,
@@ -42512,7 +42539,7 @@
     "leaf": "Lasiorhinus krefftii",
     "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count",
     "natural": 4140.0,
-    "segments": 13,
+    "segments": 12,
     "today": 120.0
    },
    {
@@ -42528,10 +42555,21 @@
     "today": 45000.0
    }
   ],
+  "later_starts": {
+   "1600": 4,
+   "1652": 1,
+   "1691": 1,
+   "1741": 1,
+   "1788": 64,
+   "1798": 1,
+   "1800": 2,
+   "1828": 2,
+   "1868": 1
+  },
   "log10_factor_histogram": {
-   "+0.0..+0.5": 459,
-   "+0.5..+1.0": 82,
-   "+1.0..+1.5": 30,
+   "+0.0..+0.5": 458,
+   "+0.5..+1.0": 83,
+   "+1.0..+1.5": 29,
    "+1.5..+2.0": 8,
    "+2.0..+2.5": 2,
    "-0.5..+0.0": 10,
@@ -42540,11 +42578,658 @@
   "log10_factor_p5_25_50_75_95": [
    0.01,
    0.097,
-   0.241,
+   0.239,
    0.451,
    1.094
   ],
-  "note": "Layer 4 of the estimate stack (ToLaD#62): an extant species whose natural baseline (layer 1, PHYLACINE present-natural vs current range) differs from today's count changes log-linearly from N_nat in 1500 CE to today's count in 2026.77 (IUCN's 'since 1500' window, one date for all). factor = N_nat / N_today (> 1 = decline). HIST kind 11 `rangeloss`, grade D. A history file replaces it (showcase rows with from=history: the factor shown is the model's, the curve is the history file's).",
+  "loss_note": "ToLaD#507: what dates each species' loss (pipeline/range_loss_dates.csv, from research/range-loss-dates.md): later = a documented start after 1500, where the trend starts instead of 1500; dated = 1500 -> today; prehistoric = the cells the evidence dates before 1500 are left out of the level held to 1500; bound = only a lower bound (people's arrival on an island; the moose's Iron Age range); undated = nothing dates it. by_basis counts the living leaves that carry one (all), and those drawn with the trend (trend). loss_sources is the citation table (META.natural.trend.loss.sources).",
+  "loss_sources": [
+   {
+    "cite": "Modern humans on Palawan ~47,000 BP (Detroit et al. 2004 C. R. Palevol 3:705); hominins on Luzon by 709,000 BP (Ingicco et al. 2018 Nature 557:233)",
+    "from": -45000,
+    "place": "Philippines",
+    "to": 2016
+   },
+   {
+    "cite": "Ray, Hunter & Zigouris 2005, WCS Working Paper 24: historic ranges of African carnivores from literature records (no single baseline year stated)",
+    "from": 1500,
+    "place": "",
+    "to": 2005
+   },
+   {
+    "cite": "Strahan & Van Dyck 2008, The Mammals of Australia, 3rd ed.: former ranges from records since European settlement in 1788; Woinarski, Burbidge & Harrison 2015 PNAS 112:4531 (declines mostly 1850s-1950s)",
+    "from": 1788,
+    "place": "",
+    "to": 2008
+   },
+   {
+    "cite": "Faurby et al. 2018 Ecology 99:2626 (PHYLACINE adds IUCN's Extinct and Possibly Extinct polygons to the present-natural range); IUCN Mapping attribute codes v1.19 (2021): Possibly Extinct (4) and Extinct (5) mean known or thought very likely to occur post-1500 and now gone",
+    "from": 1500,
+    "place": "",
+    "to": 2016
+   },
+   {
+    "cite": "Cave art >=45,500 BP (Brumm et al. 2021 Sci. Adv. 7:eabd4648) | Modern humans on Palawan ~47,000 BP (Detroit et al. 2004 C. R. Palevol 3:705); hominins on Luzon by 709,000 BP (Ingicco et al. 2018 Nature 557:233) | Sumatra (Lida Ajer) 73,000-63,000 BP (Westaway et al. 2017 Nature 548:322); Niah, Borneo ~46,000 BP (Barker et al. 2007 J. Hum. Evol. 52:243); joined to Asia at glacial low sea level (Voris 2000)",
+    "from": -61000,
+    "place": "Philippines, Sulawesi, Sundaland islands",
+    "to": 2016
+   },
+   {
+    "cite": "Historic and fossil range (Mol. Ecol. 21:5660, 2012): part prehistoric",
+    "from": null,
+    "place": "",
+    "to": 2016
+   },
+   {
+    "cite": "PHYLACINE note cites: Smith and Xie. Mammals of China (2008).. Written-record historic range; no window stated by the source, so bounded by 1500 and the 2016 map",
+    "from": 1500,
+    "place": "",
+    "to": 2016
+   },
+   {
+    "cite": "Iron Age range (Willms 1987 Archeologia Polski 32:249): lost from that range after the Iron Age",
+    "from": -800,
+    "place": "its Iron Age range",
+    "to": null
+   },
+   {
+    "cite": "Possible Early Holocene presence (cut-marked elephant-bird bones ~10,500 BP, Hansford et al. 2018 Sci. Adv. 4:eaat6925); presence secure by ~2,000 cal BP (Douglass et al. 2019 Quat. Sci. Rev. 221:105878)",
+    "from": -8500,
+    "place": "Madagascar",
+    "to": 2016
+   },
+   {
+    "cite": "Hall 1981, The Mammals of North America (2nd ed.): ranges from specimen and literature records of the historic period; used as the pre-settlement range by Laliberte & Ripple 2004 BioScience 54:123",
+    "from": 1500,
+    "place": "",
+    "to": 1981
+   },
+   {
+    "cite": "Ivane Valley occupied 49,000-43,000 BP (Summerhayes et al. 2010 Science 330:78)",
+    "from": -47000,
+    "place": "New Guinea",
+    "to": 2016
+   },
+   {
+    "cite": "Sumatra (Lida Ajer) 73,000-63,000 BP (Westaway et al. 2017 Nature 548:322); Niah, Borneo ~46,000 BP (Barker et al. 2007 J. Hum. Evol. 52:243); joined to Asia at glacial low sea level (Voris 2000)",
+    "from": -61000,
+    "place": "Sundaland islands",
+    "to": 2016
+   },
+   {
+    "cite": "PHYLACINE note cites: Kingdon J, Hoffmann M. (2013) Mammals of Africa Volume VI.. Written-record historic range; no window stated by the source, so bounded by 1500 and the 2016 map",
+    "from": 1500,
+    "place": "",
+    "to": 2016
+   },
+   {
+    "cite": "LHN historic range (lhnet.org) spans Holocene records; last wild bison 1919 (Bialowieza) and 1927 (Caucasus) (Pucek et al. 2004, Status Survey and Conservation Action Plan: European Bison, IUCN)",
+    "from": null,
+    "place": "",
+    "to": 1927
+   },
+   {
+    "cite": "Range set as the range of domestic yaks (ILRI-SLU): not a dated historic range",
+    "from": null,
+    "place": "",
+    "to": null
+   },
+   {
+    "cite": "PHYLACINE note cites: IUCN.. Written-record historic range; no window stated by the source, so bounded by 1500 and the 2016 map",
+    "from": 1500,
+    "place": "",
+    "to": 2016
+   },
+   {
+    "cite": "Cave art >=45,500 BP (Brumm et al. 2021 Sci. Adv. 7:eabd4648)",
+    "from": -43500,
+    "place": "Sulawesi",
+    "to": 2016
+   },
+   {
+    "cite": "PHYLACINE note cites: The large herbivore network: http://www.lhnet.org/bactrian-camel/.. Written-record historic range; no window stated by the source, so bounded by 1500 and the 2016 map",
+    "from": 1500,
+    "place": "",
+    "to": 2016
+   },
+   {
+    "cite": "PHYLACINE note cites: Range set as entire Iberian peninsula northern range set by expanding the borders of the \"Pyrenees conifer and mixed forests\" ecoregion to the coast. The range . Written-record historic range; no window stated by the source, so bounded by 1500 and the 2016 map",
+    "from": 1500,
+    "place": "",
+    "to": 2016
+   },
+   {
+    "cite": "Joined to mainland Asia at glacial low sea level (Voris 2000 J. Biogeogr. 27:1153): people there in the Late Pleistocene",
+    "from": -30000,
+    "place": "Taiwan",
+    "to": 2016
+   },
+   {
+    "cite": "First settlement of the Greater Antilles ~5,800 BP (Napolitano et al. 2019 Sci. Adv. 5:eaar7806)",
+    "from": -3800,
+    "place": "Cuba",
+    "to": 2016
+   },
+   {
+    "cite": "Modern humans on Palawan ~47,000 BP (Detroit et al. 2004 C. R. Palevol 3:705); hominins on Luzon by 709,000 BP (Ingicco et al. 2018 Nature 557:233) | Sumatra (Lida Ajer) 73,000-63,000 BP (Westaway et al. 2017 Nature 548:322); Niah, Borneo ~46,000 BP (Barker et al. 2007 J. Hum. Evol. 52:243); joined to Asia at glacial low sea level (Voris 2000)",
+    "from": -61000,
+    "place": "Philippines, Sundaland islands",
+    "to": 2016
+   },
+   {
+    "cite": "PHYLACINE note cites: Range expanded to all of the West Guinean lowland forest within Sierra Leone or Guinea. The former presence in Guinea is not known but suspected. Information fr. Written-record historic range; no window stated by the source, so bounded by 1500 and the 2016 map",
+    "from": 1500,
+    "place": "",
+    "to": 2016
+   },
+   {
+    "cite": "Emslie & Brooks 1999, African Rhino: Status Survey and Conservation Action Plan, IUCN",
+    "from": 1500,
+    "place": "",
+    "to": 1999
+   },
+   {
+    "cite": "Lapita settlement ~3,000-2,850 cal BP (Sheppard 2011 Curr. Anthropol. 52:799; Burley et al. 2012 PLoS ONE 7:e48769)",
+    "from": -1050,
+    "place": "Fiji/Tonga",
+    "to": 2016
+   },
+   {
+    "cite": "Polynesian arrival ~1280 CE (Wilmshurst et al. 2011 PNAS 108:1815)",
+    "from": 1280,
+    "place": "New Zealand",
+    "to": 2016
+   },
+   {
+    "cite": "Fur trade, peak 1895-1910 (Jimenez 1996 Biol. Conserv. 77:1)",
+    "from": 1828,
+    "place": "",
+    "to": 1996
+   },
+   {
+    "cite": "Archaeology only from ~2,200 BP (Cooper 2002, Archaeology and History: Early Settlements in the Andaman Islands, OUP); genetics suggests settlement tens of thousands of years ago (Endicott et al. 2003 Am. J. Hum. Genet. 72:178)",
+    "from": -50000,
+    "place": "Andaman Islands",
+    "to": 2016
+   },
+   {
+    "cite": "Fa-Hien Lena ~48,000 BP (Wedage et al. 2019 Nat. Commun. 10:739); joined to India at glacial low sea level",
+    "from": -46000,
+    "place": "Sri Lanka",
+    "to": 2016
+   },
+   {
+    "cite": "The dated part: dholes in North America are known only from Late Pleistocene fossils (Kurten & Anderson 1980, Pleistocene Mammals of North America)",
+    "from": null,
+    "place": "North America",
+    "to": -9000
+   },
+   {
+    "cite": "PHYLACINE note cites: Species appear absent from fossils older than human arrival on Rhodes but the species has been found in northern Europe in earlier interstadials as for instance. Written-record historic range; no window stated by the source, so bounded by 1500 and the 2016 map",
+    "from": 1500,
+    "place": "",
+    "to": 2016
+   },
+   {
+    "cite": "PHYLACINE note cites: Range set as the Middle east and African estimated range for Bos primigenius which correspond to the historic countries based on IUCN.. Written-record historic range; no window stated by the source, so bounded by 1500 and the 2016 map",
+    "from": 1500,
+    "place": "",
+    "to": 2016
+   },
+   {
+    "cite": "PHYLACINE note: Disjunct ranges connected via suitable habitat. Range expanded to suitable areas in Belarus where the species formerly occurred. Only the named part is historic; the rest of the added range is suitable habitat with no date",
+    "from": 1500,
+    "place": "",
+    "to": 2016
+   },
+   {
+    "cite": "Foose & van Strien 1997 (Asian Rhinos action plan); part from C. R. Palevol 11:159 (2012), a prehistoric record",
+    "from": 1500,
+    "place": "",
+    "to": 1997
+   },
+   {
+    "cite": "Historic occurrence north to 43 N per IUCN; wild population gone by ~1900 or earlier",
+    "from": null,
+    "place": "",
+    "to": 1900
+   },
+   {
+    "cite": "PHYLACINE note cites: Stevenson MF and Walter O (2002) Elephants Loxodonta africana and Elephas maximus.. Written-record historic range; no window stated by the source, so bounded by 1500 and the 2016 map",
+    "from": 1500,
+    "place": "",
+    "to": 2016
+   },
+   {
+    "cite": "Maritime fur trade 1741-1911 (Kenyon 1969, The Sea Otter in the Eastern Pacific Ocean, N. Am. Fauna 68); historic range per USFWS Biol. Rep. 90(1) 1990",
+    "from": 1741,
+    "place": "",
+    "to": 1911
+   },
+   {
+    "cite": "Japanese Palaeolithic from ~38,000 BP (Izuho & Kaifu 2015, in Emergence and Diversity of Modern Human Behavior in Paleolithic Asia, Texas A&M UP)",
+    "from": -36000,
+    "place": "Japan",
+    "to": 2016
+   },
+   {
+    "cite": "PHYLACINE note cites: Mammalian Species 794:1-9 (2006). The part of the range attributed to E. a. asinus attributed to E. hemionus instead.. Written-record historic range; no window stated by the source, so bounded by 1500 and the 2016 map",
+    "from": 1500,
+    "place": "",
+    "to": 2016
+   },
+   {
+    "cite": "Suitable areas on four continents (Naundrup 2014 rewilding assessment); the dated part: horses died out in the Americas in the Late Pleistocene (Guthrie 2003 Nature 426:169)",
+    "from": null,
+    "place": "the Americas",
+    "to": -9000
+   },
+   {
+    "cite": "Fossil history of Grevy's zebra (Faith et al. 2013 J. Biogeogr. 40:359): prehistoric range",
+    "from": null,
+    "place": "",
+    "to": null
+   },
+   {
+    "cite": "PHYLACINE note cites: Macroevolution: http://www.macroevolution.net/zebra-habitat.html.. Written-record historic range; no window stated by the source, so bounded by 1500 and the 2016 map",
+    "from": 1500,
+    "place": "",
+    "to": 2016
+   },
+   {
+    "cite": "Penzhorn 1988 Mammalian Species 314: decline after Cape settlement (1652)",
+    "from": 1652,
+    "place": "",
+    "to": 1988
+   },
+   {
+    "cite": "Atlantic gray whale: last records 17th-18th century (Mead & Mitchell 1984, in The Gray Whale, Academic Press); Mediterranean from a Holocene subfossil",
+    "from": null,
+    "place": "",
+    "to": 1750
+   },
+   {
+    "cite": "PHYLACINE note cites: Range set as the triangle between the three known sites and everything south of this in Florida.. Written-record historic range; no window stated by the source, so bounded by 1500 and the 2016 map",
+    "from": 1500,
+    "place": "",
+    "to": 2016
+   },
+   {
+    "cite": "Earliest sites shortly after AD 600, no Archaic sites (Callaghan 2008 J. Island Coastal Archaeol. 3:54-71)",
+    "from": 600,
+    "place": "Jamaica",
+    "to": 2016
+   },
+   {
+    "cite": "Assumed former range per Kingdon & Hoffmann 2013 (Mammals of Africa), plus suitable habitat between the parts",
+    "from": 1500,
+    "place": "",
+    "to": 2013
+   },
+   {
+    "cite": "Ray, Hunter & Zigouris 2005, WCS Working Paper 24: historic ranges of African carnivores from literature records (no single baseline year stated) [PHYLACINE cites Ray et al. 2005 for an American cat: the source does not cover it]",
+    "from": 1500,
+    "place": "",
+    "to": 2005
+   },
+   {
+    "cite": "PHYLACINE note cites: Ecoscience 10: 443-454 (2003).. Written-record historic range; no window stated by the source, so bounded by 1500 and the 2016 map",
+    "from": 1500,
+    "place": "",
+    "to": 2016
+   },
+   {
+    "cite": "African part: historic range per wildliferanching.com as cited by PHYLACINE; the Eurasian part is suitable habitat with no date (hippos in the Levant are known from the Bronze and Iron Ages)",
+    "from": 1500,
+    "place": "",
+    "to": 2016
+   },
+   {
+    "cite": "Timor occupied ~44,000 BP (Hawkins et al. 2017 Quat. Sci. Rev. 171:58)",
+    "from": -42000,
+    "place": "Lesser Sundas",
+    "to": 2016
+   },
+   {
+    "cite": "PHYLACINE note cites: Mammal Review 20: 125-144 (1990).. Written-record historic range; no window stated by the source, so bounded by 1500 and the 2016 map",
+    "from": 1500,
+    "place": "",
+    "to": 2016
+   },
+   {
+    "cite": "Queensland Government (DEHP) species profile: former range from post-1788 records",
+    "from": 1788,
+    "place": "",
+    "to": 2013
+   },
+   {
+    "cite": "Queensland Government (DEHP) source as cited by PHYLACINE; post-1788 records",
+    "from": 1788,
+    "place": "",
+    "to": 2013
+   },
+   {
+    "cite": "PHYLACINE note cites: Range set as continuous from the northern limit to the southernmost point in Italy and all of Sicily.. Written-record historic range; no window stated by the source, so bounded by 1500 and the 2016 map",
+    "from": 1500,
+    "place": "",
+    "to": 2016
+   },
+   {
+    "cite": "PHYLACINE note cites: Douglas-Hamilton I and Douglas-Hamilton O. Battle for the Elephants (1993) .. Written-record historic range; no window stated by the source, so bounded by 1500 and the 2016 map",
+    "from": 1500,
+    "place": "",
+    "to": 2016
+   },
+   {
+    "cite": "Japanese otter: fur hunting from the Meiji era, last record 1979, declared extinct 2012 (Ministry of the Environment, Japan)",
+    "from": 1868,
+    "place": "",
+    "to": 1979
+   },
+   {
+    "cite": "People on the outer coast of British Columbia by ~13,000 BP (McLaren et al. 2018 PLoS ONE 13:e0193522)",
+    "from": -11000,
+    "place": "Vancouver Island",
+    "to": 2016
+   },
+   {
+    "cite": "Langley & Yalden 1977 Mammal Rev. 7:95: decline of rarer carnivores in Great Britain in the 19th century",
+    "from": 1800,
+    "place": "",
+    "to": 1977
+   },
+   {
+    "cite": "PHYLACINE note: Range expanded to suitable areas connected to current distributions. Range also expanded to the border of Poland since the species historically occurred in the Only the named part is historic; the rest of the added range is suitable habitat with no date",
+    "from": 1500,
+    "place": "",
+    "to": 2016
+   },
+   {
+    "cite": "Wallacea crossed by ~47,000-55,000 BP (O'Connell et al. 2018 PNAS 115:8482)",
+    "from": -45000,
+    "place": "Moluccas",
+    "to": 2016
+   },
+   {
+    "cite": "Cave art >=45,500 BP (Brumm et al. 2021 Sci. Adv. 7:eabd4648) | Modern humans on Palawan ~47,000 BP (Detroit et al. 2004 C. R. Palevol 3:705); hominins on Luzon by 709,000 BP (Ingicco et al. 2018 Nature 557:233) | Timor occupied ~44,000 BP (Hawkins et al. 2017 Quat. Sci. Rev. 171:58) | Wallacea crossed by ~47,000-55,000 BP (O'Connell et al. 2018 PNAS 115:8482)",
+    "from": -45000,
+    "place": "Lesser Sundas, Moluccas, Philippines, Sulawesi",
+    "to": 2016
+   },
+   {
+    "cite": "PHYLACINE note cites: The Monachus guardian website http://www.monachus-guardian.org/factfiles/medit15.htm.. Written-record historic range; no window stated by the source, so bounded by 1500 and the 2016 map",
+    "from": 1500,
+    "place": "",
+    "to": 2016
+   },
+   {
+    "cite": "Okinawa occupied from ~36,000-35,000 BP (Fujita et al. 2016 PNAS 113:11184)",
+    "from": -34000,
+    "place": "Ryukyu Islands",
+    "to": 2016
+   },
+   {
+    "cite": "Maran 2007, Conservation biology of the European mink (Tallinn Univ. diss.): decline since the 19th century",
+    "from": 1800,
+    "place": "",
+    "to": 2007
+   },
+   {
+    "cite": "Historically widespread in NZ (Lloyd 2001 NZ J. Zool. 28:59); no people before ~1280 CE (Wilmshurst et al. 2011)",
+    "from": 1280,
+    "place": "New Zealand",
+    "to": 2001
+   },
+   {
+    "cite": "Joined to mainland Asia at glacial low sea level (Voris 2000 J. Biogeogr. 27:1153): people there in the Late Pleistocene",
+    "from": -30000,
+    "place": "Hainan",
+    "to": 2016
+   },
+   {
+    "cite": "Bass Strait range lost to sealing from 1798 (King 1989, Fauna of Australia 1B, ch. 56)",
+    "from": 1798,
+    "place": "",
+    "to": 1989
+   },
+   {
+    "cite": "Lapita settlement ~3,000 cal BP (Sheppard 2011 Curr. Anthropol. 52:799)",
+    "from": -1100,
+    "place": "New Caledonia",
+    "to": 2016
+   },
+   {
+    "cite": "PHYLACINE note cites: Wildlife Ranching: http://wildliferanching.com/.. Written-record historic range; no window stated by the source, so bounded by 1500 and the 2016 map",
+    "from": 1500,
+    "place": "",
+    "to": 2016
+   },
+   {
+    "cite": "Afr. J. Ecol. 2:103 (1963) historic range; last wild animals shot 1972 (Henderson 1974 Oryx 12:347)",
+    "from": 1500,
+    "place": "",
+    "to": 1972
+   },
+   {
+    "cite": "Mid-Holocene Baltic breeding population, gone in prehistory (Stora & Ericson 2004 Mar. Mamm. Sci. 20:115)",
+    "from": -5500,
+    "place": "the Baltic Sea",
+    "to": -500
+   },
+   {
+    "cite": "PHYLACINE note cites: Panthera http://www.panthera.org/species/lion.. Written-record historic range; no window stated by the source, so bounded by 1500 and the 2016 map",
+    "from": 1500,
+    "place": "",
+    "to": 2016
+   },
+   {
+    "cite": "PHYLACINE note cites: Conservation Biology 16: 58-72 (2002).. Written-record historic range; no window stated by the source, so bounded by 1500 and the 2016 map",
+    "from": 1500,
+    "place": "",
+    "to": 2016
+   },
+   {
+    "cite": "PHYLACINE note cites: Panthera http://www.panthera.org/species/lion. Borneo and Palawan added based on Palaeogeography, Palaeoclimatology, Palaeoecology 264: 123-127 (2008). Sri Lank. Written-record historic range; no window stated by the source, so bounded by 1500 and the 2016 map",
+    "from": 1500,
+    "place": "",
+    "to": 2016
+   },
+   {
+    "cite": "Mainland NZ breeding range lost after Polynesian arrival (Collins et al. 2014 Proc. R. Soc. B 281:20140097; Wilmshurst et al. 2011 PNAS 108:1815)",
+    "from": 1280,
+    "place": "mainland New Zealand",
+    "to": 1850
+   },
+   {
+    "cite": "PHYLACINE note: Range expanded to the south west to the border of Phyllomys pattoni since Phyllomys brasiliensis is known to formerly occur in Rio de Janeiro state. Only the named part is historic; the rest of the added range is suitable habitat with no date",
+    "from": 1500,
+    "place": "",
+    "to": 2016
+   },
+   {
+    "cite": "First settlement of the Greater Antilles ~5,800 BP (Napolitano et al. 2019 Sci. Adv. 5:eaar7806)",
+    "from": -3800,
+    "place": "Hispaniola",
+    "to": 2016
+   },
+   {
+    "cite": "PHYLACINE note cites: Range set as the Ordos Plateau steppe ecoregion, the Central Tibetan Plateau alpine steppe ecoregion east of the current distribution and all intervening areas.. Written-record historic range; no window stated by the source, so bounded by 1500 and the 2016 map",
+    "from": 1500,
+    "place": "",
+    "to": 2016
+   },
+   {
+    "cite": "Buka (Kilu Cave) occupied ~29,000 BP (Wickler & Spriggs 1988 Antiquity 62:703)",
+    "from": -27000,
+    "place": "Solomon Islands",
+    "to": 2016
+   },
+   {
+    "cite": "Am. Mus. Novit. 3646 (2009): historic records",
+    "from": 1500,
+    "place": "",
+    "to": 2009
+   },
+   {
+    "cite": "Rodrigues had no people before 1691 (Cheke & Hume 2008, Lost Land of the Dodo)",
+    "from": 1691,
+    "place": "Rodrigues",
+    "to": 2016
+   },
+   {
+    "cite": "PHYLACINE note cites: Panthera http://www.panthera.org/species/cougar.. Written-record historic range; no window stated by the source, so bounded by 1500 and the 2016 map",
+    "from": 1500,
+    "place": "",
+    "to": 2016
+   },
+   {
+    "cite": "Foose & van Strien 1997, Asian Rhinos: Status Survey and Conservation Action Plan, IUCN",
+    "from": 1500,
+    "place": "",
+    "to": 1997
+   },
+   {
+    "cite": "Li, Pan & Oxnard 2002 Int. J. Primatol. 23:1227, 'Extinction of snub-nosed monkeys in China during the past 400 years' (local gazetteers)",
+    "from": 1600,
+    "place": "",
+    "to": 2002
+   },
+   {
+    "cite": "Li, Pan & Oxnard 2002 Int. J. Primatol. 23:1227",
+    "from": 1600,
+    "place": "",
+    "to": 2002
+   },
+   {
+    "cite": "PHYLACINE note cites: Historic range taken from Molecular Ecology 12: 1-10 (2003). The part of the South China-Vietnam subtropical evergreen forests ecoregion closest to Hainan is ad. Written-record historic range; no window stated by the source, so bounded by 1500 and the 2016 map",
+    "from": 1500,
+    "place": "",
+    "to": 2016
+   },
+   {
+    "cite": "Sumatra (Lida Ajer) 73,000-63,000 BP (Westaway et al. 2017 Nature 548:322); Niah, Borneo ~46,000 BP (Barker et al. 2007 J. Hum. Evol. 52:243); joined to Asia at glacial low sea level (Voris 2000) | Timor occupied ~44,000 BP (Hawkins et al. 2017 Quat. Sci. Rev. 171:58)",
+    "from": -61000,
+    "place": "Lesser Sundas, Sundaland islands",
+    "to": 2016
+   },
+   {
+    "cite": "Eurasian range from ancient DNA (Campos et al. 2010 Mol. Ecol. 19:4863); North America from fossil co-occurrence: Pleistocene",
+    "from": null,
+    "place": "",
+    "to": null
+   },
+   {
+    "cite": "Mainland extinction ~3,200 BP (Brown 2006 Alcheringa 30(S1):49; White et al. 2018 The Holocene 28:1145)",
+    "from": -1300,
+    "place": "mainland Australia",
+    "to": -1100
+   },
+   {
+    "cite": "PHYLACINE note: Ranges connected via suitable habitat and expanded into parts of Germany, Poland and Croatia since all three countries historically had the species. Only the named part is historic; the rest of the added range is suitable habitat with no date",
+    "from": 1500,
+    "place": "",
+    "to": 2016
+   },
+   {
+    "cite": "PHYLACINE note: Historic range estimated based on written information. Range expanded to suitable areas but not north of its current range. Only the named part is historic; the rest of the added range is suitable habitat with no date",
+    "from": 1500,
+    "place": "",
+    "to": 2016
+   },
+   {
+    "cite": "PHYLACINE note cites: Mohd Khan bin Momin Khan. Status and action plan of the Malayan tapir (Tapirus indicus). (1997) InTapirs - Status Survey and Conservation Action Plan. IUCN/SSC . Written-record historic range; no window stated by the source, so bounded by 1500 and the 2016 map",
+    "from": 1500,
+    "place": "",
+    "to": 2016
+   },
+   {
+    "cite": "PHYLACINE note cites: Status and Action Plan of the Mountain Tapir (Tapirus pinchaque). Craig C. Downer (1997). Both suggested and confirmed range added.. Written-record historic range; no window stated by the source, so bounded by 1500 and the 2016 map",
+    "from": 1500,
+    "place": "",
+    "to": 2016
+   },
+   {
+    "cite": "PHYLACINE note cites: Range set as the Southern Vietnam lowland dry forests ecoregion.. Written-record historic range; no window stated by the source, so bounded by 1500 and the 2016 map",
+    "from": 1500,
+    "place": "",
+    "to": 2016
+   },
+   {
+    "cite": "PHYLACINE note cites: Mammal Review 42: 85-119 (2012).. Written-record historic range; no window stated by the source, so bounded by 1500 and the 2016 map",
+    "from": 1500,
+    "place": "",
+    "to": 2016
+   },
+   {
+    "cite": "PHYLACINE note cites: Journal of Mammalogy 72: 583-600 ( 1991).. Written-record historic range; no window stated by the source, so bounded by 1500 and the 2016 map",
+    "from": 1500,
+    "place": "",
+    "to": 2016
+   }
+  ],
+  "note": "Layer 4 of the estimate stack (ToLaD#62): an extant species whose natural baseline (layer 1, PHYLACINE present-natural vs current range) differs from today's count changes log-linearly from N_nat in 1500 CE (IUCN's 'since 1500' window; ToLaD#507: or the documented start of the loss where a source gives one later, by_basis.later) to today's count in 2026.77. factor = N_nat / N_today (> 1 = decline). HIST kind 11 `rangeloss`, grade D. A history file replaces it (showcase rows with from=history: the factor shown is the model's, the curve is the history file's).",
+  "prehistoric": [
+   {
+    "cells_left_out": 3612,
+    "from": "Equus_ferus.toml",
+    "km2_left_out": 33636275,
+    "leaf": "Equus ferus",
+    "natural": 426511.11111111107,
+    "place": "the Americas",
+    "today": 1360.0,
+    "trend": true
+   },
+   {
+    "cells_left_out": 3612,
+    "from": "Equus_caballus.toml",
+    "km2_left_out": 33636275,
+    "leaf": "Equus caballus",
+    "natural": 2056116.5518482828,
+    "place": "the Americas",
+    "today": 0.0,
+    "trend": false
+   },
+   {
+    "cells_left_out": 76,
+    "from": null,
+    "km2_left_out": 707740,
+    "leaf": "Phoca groenlandica",
+    "natural": 13500000.0,
+    "place": "the Baltic Sea",
+    "today": 13500000.0,
+    "trend": false
+   },
+   {
+    "cells_left_out": 135,
+    "from": "rangeloss",
+    "km2_left_out": 1257170,
+    "leaf": "Phocarctos hookeri",
+    "natural": 21210.928571428572,
+    "place": "mainland New Zealand",
+    "today": 12911.0,
+    "trend": true
+   },
+   {
+    "cells_left_out": 2297,
+    "from": "rangeloss",
+    "km2_left_out": 21390510,
+    "leaf": "Cuon alpinus",
+    "natural": 54936.47495961228,
+    "place": "North America",
+    "today": 6874.0,
+    "trend": true
+   },
+   {
+    "cells_left_out": 369,
+    "from": "Sarcophilus_harrisii.toml",
+    "km2_left_out": 3436264,
+    "leaf": "Sarcophilus harrisii",
+    "natural": 17944.44444444444,
+    "place": "mainland Australia",
+    "today": 17000.0,
+    "trend": true
+   }
+  ],
   "replaced_by_history_file": 34,
   "rises": 13,
   "rises_list": [
@@ -42708,14 +43393,14 @@
   "segments_per_record": {
    "3": 371,
    "5": 72,
-   "6": 51,
+   "6": 50,
    "7": 25,
-   "8": 27,
+   "8": 28,
    "9": 12,
-   "10": 12,
-   "11": 6,
+   "10": 11,
+   "11": 7,
    "12": 8,
-   "13": 2,
+   "13": 1,
    "14": 4,
    "15": 1,
    "16": 2,
@@ -42760,14 +43445,14 @@
    },
    {
     "G_yr": 7.794661190965091,
-    "factor": 514.2777777777777,
+    "factor": 313.6111111111111,
     "from": "history",
     "km2_cur": 167622.63275957466,
-    "km2_nat": 86204595.08085458,
+    "km2_nat": 52568320.107099935,
     "leaf": "Equus ferus",
-    "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count",
-    "natural": 699417.7777777776,
-    "segments": 21,
+    "method": "N_nat: D x natural range (PHYLACINE) x occupancy, scaled as today's count, without the 3612 cells lost before 1500",
+    "natural": 426511.11111111107,
+    "segments": 20,
     "today": 1360.0
    },
    {
@@ -42891,7 +43576,7 @@
     "today": 50002.00000000001
    }
   ],
-  "species_with_trend": 673,
+  "species_with_trend": 672,
   "start_year": 1500
  },
  "red_list": {
@@ -43082,13 +43767,13 @@
   },
   "Hominidae": {
    "alive": 8301368220.178283,
-   "ever": 2819574901259.02,
+   "ever": 2819578089203.4707,
    "ever_range": [
-    47622592292.70394,
-    288099047215104.3
+    47622653539.5305,
+    288099160769111.25
    ],
    "extinct(gray)": false,
-   "ghost": 368688288477.74365,
+   "ghost": 368691476422.1945,
    "grade": "D",
    "t0_Ma": 14.805233333333334,
    "t1_Ma": 0.0
@@ -43108,13 +43793,13 @@
   },
   "Mammalia": {
    "alive": 86811345375.82185,
-   "ever": 7.738506652605486e+18,
+   "ever": 7.738506653151547e+18,
    "ever_range": [
-    70991435077197.98,
-    7.320126380675456e+23
+    70991434720643.25,
+    7.320126418487425e+23
    ],
    "extinct(gray)": 0.0,
-   "ghost": 7.351515851902193e+18,
+   "ghost": 7.35151840877817e+18,
    "grade": "D",
    "t0_Ma": 208.64140800000004,
    "t1_Ma": 0.0
@@ -43424,26 +44109,26 @@
   "by_alive": [
    {
     "alive": 41629738949.74236,
-    "ever": 1.1392477436419991e+18,
-    "ghost": 9.721386841424026e+17,
+    "ever": 1.1392487162521453e+18,
+    "ghost": 9.721396562757897e+17,
     "ghost_share": 0.853,
     "name": "Chiroptera",
-    "sampled": 1.6710905949959654e+17,
+    "sampled": 1.671090599763556e+17,
     "t0_Ma": 69.1
    },
    {
     "alive": 24976579554.61533,
-    "ever": 1.836758206655019e+18,
-    "ghost": 1.6913941426750264e+18,
+    "ever": 1.8367595993435745e+18,
+    "ghost": 1.6913955302341834e+18,
     "ghost_share": 0.921,
     "name": "Rodentia",
-    "sampled": 1.4536406397999258e+17,
+    "sampled": 1.453640691093911e+17,
     "t0_Ma": 72.45
    },
    {
     "alive": 5563462014.376363,
-    "ever": 3879504634021618.5,
-    "ghost": 3076530673588784.5,
+    "ever": 3879507629850091.5,
+    "ghost": 3076533669417257.5,
     "ghost_share": 0.793,
     "name": "Artiodactyla",
     "sampled": 802973960432834.0,
@@ -43451,35 +44136,35 @@
    },
    {
     "alive": 1873866768.3392582,
-    "ever": 6946908600043414.0,
-    "ghost": 5946468196675638.0,
+    "ever": 6946596276588740.0,
+    "ghost": 5946473260266413.0,
     "ghost_share": 0.856,
     "name": "Carnivora",
-    "sampled": 1000440403367776.0,
+    "sampled": 1000123016322327.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 1338642949.1155112,
-    "ever": 1.7135713183839757e+17,
-    "ghost": 1.3024624378625578e+17,
+    "ever": 1.713572285104378e+17,
+    "ghost": 1.3024634045829598e+17,
     "ghost_share": 0.76,
     "name": "Eulipotyphla",
-    "sampled": 4.111088805214179e+16,
+    "sampled": 4.111088805214181e+16,
     "t0_Ma": 75.11
    },
    {
     "alive": 816850667.8537138,
-    "ever": 4.478876478470017e+16,
-    "ghost": 3.231312431160703e+16,
+    "ever": 4.478879994251186e+16,
+    "ghost": 3.2313159469418724e+16,
     "ghost_share": 0.721,
     "name": "Lagomorpha",
-    "sampled": 1.2475640473093136e+16,
+    "sampled": 1.2475640473093132e+16,
     "t0_Ma": 72.45
    },
    {
     "alive": 414141287.9812347,
-    "ever": 2.586189002265849e+16,
-    "ghost": 2.105171758686378e+16,
+    "ever": 2.5861908220727824e+16,
+    "ghost": 2.1051735784933116e+16,
     "ghost_share": 0.814,
     "name": "Didelphimorphia",
     "sampled": 4810172435794708.0,
@@ -43487,26 +44172,26 @@
    },
    {
     "alive": 308065584.2688041,
-    "ever": 1.0687989213203966e+16,
-    "ghost": 7712815769799701.0,
+    "ever": 1.068800055723644e+16,
+    "ghost": 7712825031465737.0,
     "ghost_share": 0.722,
     "name": "Diprotodontia",
-    "sampled": 2975173443404265.0,
+    "sampled": 2975175525770703.0,
     "t0_Ma": 61.06
    },
    {
     "alive": 303282980.280005,
-    "ever": 5221967704688368.0,
-    "ghost": 3700865304680390.5,
+    "ever": 5221971731359519.0,
+    "ghost": 3700869331351541.0,
     "ghost_share": 0.709,
     "name": "Hyracoidea",
-    "sampled": 1521102400007977.5,
+    "sampled": 1521102400007978.0,
     "t0_Ma": 58.62
    },
    {
     "alive": 178237828.56098697,
-    "ever": 4539592575100641.0,
-    "ghost": 3247596758831318.5,
+    "ever": 4539595649682911.0,
+    "ghost": 3247599833413588.5,
     "ghost_share": 0.715,
     "name": "Pilosa (order in Deuterostomia)",
     "sampled": 1291995816269322.5,
@@ -43516,44 +44201,44 @@
   "by_ever": [
    {
     "alive": 24976579554.61533,
-    "ever": 1.836758206655019e+18,
-    "ghost": 1.6913941426750264e+18,
+    "ever": 1.8367595993435745e+18,
+    "ghost": 1.6913955302341834e+18,
     "ghost_share": 0.921,
     "name": "Rodentia",
-    "sampled": 1.4536406397999258e+17,
+    "sampled": 1.453640691093911e+17,
     "t0_Ma": 72.45
    },
    {
     "alive": 41629738949.74236,
-    "ever": 1.1392477436419991e+18,
-    "ghost": 9.721386841424026e+17,
+    "ever": 1.1392487162521453e+18,
+    "ghost": 9.721396562757897e+17,
     "ghost_share": 0.853,
     "name": "Chiroptera",
-    "sampled": 1.6710905949959654e+17,
+    "sampled": 1.671090599763556e+17,
     "t0_Ma": 69.1
    },
    {
     "alive": 1338642949.1155112,
-    "ever": 1.7135713183839757e+17,
-    "ghost": 1.3024624378625578e+17,
+    "ever": 1.713572285104378e+17,
+    "ghost": 1.3024634045829598e+17,
     "ghost_share": 0.76,
     "name": "Eulipotyphla",
-    "sampled": 4.111088805214179e+16,
+    "sampled": 4.111088805214181e+16,
     "t0_Ma": 75.11
    },
    {
     "alive": 816850667.8537138,
-    "ever": 4.478876478470017e+16,
-    "ghost": 3.231312431160703e+16,
+    "ever": 4.478879994251186e+16,
+    "ghost": 3.2313159469418724e+16,
     "ghost_share": 0.721,
     "name": "Lagomorpha",
-    "sampled": 1.2475640473093136e+16,
+    "sampled": 1.2475640473093132e+16,
     "t0_Ma": 72.45
    },
    {
     "alive": 414141287.9812347,
-    "ever": 2.586189002265849e+16,
-    "ghost": 2.105171758686378e+16,
+    "ever": 2.5861908220727824e+16,
+    "ghost": 2.1051735784933116e+16,
     "ghost_share": 0.814,
     "name": "Didelphimorphia",
     "sampled": 4810172435794708.0,
@@ -43561,91 +44246,91 @@
    },
    {
     "alive": 308065584.2688041,
-    "ever": 1.0687989213203966e+16,
-    "ghost": 7712815769799701.0,
+    "ever": 1.068800055723644e+16,
+    "ghost": 7712825031465737.0,
     "ghost_share": 0.722,
     "name": "Diprotodontia",
-    "sampled": 2975173443404265.0,
+    "sampled": 2975175525770703.0,
     "t0_Ma": 61.06
    },
    {
     "alive": 84218619.16054884,
-    "ever": 7114950001500246.0,
-    "ghost": 4205474945066870.5,
+    "ever": 7114953582578437.0,
+    "ghost": 4205478526145061.0,
     "ghost_share": 0.591,
     "name": "Macroscelidea",
-    "sampled": 2909475056433375.5,
+    "sampled": 2909475056433376.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 1873866768.3392582,
-    "ever": 6946908600043414.0,
-    "ghost": 5946468196675638.0,
+    "ever": 6946596276588740.0,
+    "ghost": 5946473260266413.0,
     "ghost_share": 0.856,
     "name": "Carnivora",
-    "sampled": 1000440403367776.0,
+    "sampled": 1000123016322327.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 82887405.16801824,
-    "ever": 5641515309142044.0,
-    "ghost": 4640167015423400.0,
+    "ever": 5641520671318562.0,
+    "ghost": 4640171638262232.0,
     "ghost_share": 0.823,
     "name": "Dasyuromorphia",
-    "sampled": 1001348293718644.0,
+    "sampled": 1001349033056330.0,
     "t0_Ma": 58.64
    },
    {
     "alive": 303282980.280005,
-    "ever": 5221967704688368.0,
-    "ghost": 3700865304680390.5,
+    "ever": 5221971731359519.0,
+    "ghost": 3700869331351541.0,
     "ghost_share": 0.709,
     "name": "Hyracoidea",
-    "sampled": 1521102400007977.5,
+    "sampled": 1521102400007978.0,
     "t0_Ma": 58.62
    }
   ],
   "by_sampled_ever": [
    {
     "alive": 41629738949.74236,
-    "ever": 1.1392477436419991e+18,
-    "ghost": 9.721386841424026e+17,
+    "ever": 1.1392487162521453e+18,
+    "ghost": 9.721396562757897e+17,
     "ghost_share": 0.853,
     "name": "Chiroptera",
-    "sampled": 1.6710905949959654e+17,
+    "sampled": 1.671090599763556e+17,
     "t0_Ma": 69.1
    },
    {
     "alive": 24976579554.61533,
-    "ever": 1.836758206655019e+18,
-    "ghost": 1.6913941426750264e+18,
+    "ever": 1.8367595993435745e+18,
+    "ghost": 1.6913955302341834e+18,
     "ghost_share": 0.921,
     "name": "Rodentia",
-    "sampled": 1.4536406397999258e+17,
+    "sampled": 1.453640691093911e+17,
     "t0_Ma": 72.45
    },
    {
     "alive": 1338642949.1155112,
-    "ever": 1.7135713183839757e+17,
-    "ghost": 1.3024624378625578e+17,
+    "ever": 1.713572285104378e+17,
+    "ghost": 1.3024634045829598e+17,
     "ghost_share": 0.76,
     "name": "Eulipotyphla",
-    "sampled": 4.111088805214179e+16,
+    "sampled": 4.111088805214181e+16,
     "t0_Ma": 75.11
    },
    {
     "alive": 816850667.8537138,
-    "ever": 4.478876478470017e+16,
-    "ghost": 3.231312431160703e+16,
+    "ever": 4.478879994251186e+16,
+    "ghost": 3.2313159469418724e+16,
     "ghost_share": 0.721,
     "name": "Lagomorpha",
-    "sampled": 1.2475640473093136e+16,
+    "sampled": 1.2475640473093132e+16,
     "t0_Ma": 72.45
    },
    {
     "alive": 414141287.9812347,
-    "ever": 2.586189002265849e+16,
-    "ghost": 2.105171758686378e+16,
+    "ever": 2.5861908220727824e+16,
+    "ghost": 2.1051735784933116e+16,
     "ghost_share": 0.814,
     "name": "Didelphimorphia",
     "sampled": 4810172435794708.0,
@@ -43653,35 +44338,35 @@
    },
    {
     "alive": 308065584.2688041,
-    "ever": 1.0687989213203966e+16,
-    "ghost": 7712815769799701.0,
+    "ever": 1.068800055723644e+16,
+    "ghost": 7712825031465737.0,
     "ghost_share": 0.722,
     "name": "Diprotodontia",
-    "sampled": 2975173443404265.0,
+    "sampled": 2975175525770703.0,
     "t0_Ma": 61.06
    },
    {
     "alive": 84218619.16054884,
-    "ever": 7114950001500246.0,
-    "ghost": 4205474945066870.5,
+    "ever": 7114953582578437.0,
+    "ghost": 4205478526145061.0,
     "ghost_share": 0.591,
     "name": "Macroscelidea",
-    "sampled": 2909475056433375.5,
+    "sampled": 2909475056433376.0,
     "t0_Ma": 65.7
    },
    {
     "alive": 303282980.280005,
-    "ever": 5221967704688368.0,
-    "ghost": 3700865304680390.5,
+    "ever": 5221971731359519.0,
+    "ghost": 3700869331351541.0,
     "ghost_share": 0.709,
     "name": "Hyracoidea",
-    "sampled": 1521102400007977.5,
+    "sampled": 1521102400007978.0,
     "t0_Ma": 58.62
    },
    {
     "alive": 178237828.56098697,
-    "ever": 4539592575100641.0,
-    "ghost": 3247596758831318.5,
+    "ever": 4539595649682911.0,
+    "ghost": 3247599833413588.5,
     "ghost_share": 0.715,
     "name": "Pilosa (order in Deuterostomia)",
     "sampled": 1291995816269322.5,
@@ -43689,11 +44374,11 @@
    },
    {
     "alive": 82887405.16801824,
-    "ever": 5641515309142044.0,
-    "ghost": 4640167015423400.0,
+    "ever": 5641520671318562.0,
+    "ghost": 4640171638262232.0,
     "ghost_share": 0.823,
     "name": "Dasyuromorphia",
-    "sampled": 1001348293718644.0,
+    "sampled": 1001349033056330.0,
     "t0_Ma": 58.64
    }
   ]
