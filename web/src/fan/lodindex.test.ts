@@ -7,6 +7,7 @@
 // the same steps, one walking the old way, one the new (a frame drawn twice in one view is not the same frame: its first
 // draw moves the grid and the columns' paths the second one finds).
 // On the mammals; LODINDEX_N=7000 (or any size) on the synthetic tree instead, on demand (one tree a process).
+import { appendFileSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { setFlip } from './flip';
 import { setLodIndex, type Lod } from './lod';
@@ -246,6 +247,6 @@ describe(`the merged clades and the draw's walks from the cut against the whole 
   }, 1200000);
 
   afterAll(() => {
-    console.log(`lodindex ${N || 'mammals'}: ${frames} frames the same; ${(mergedSum / Math.max(1, frames)).toFixed(0)} merged clades and ${(rects / Math.max(1, frames)).toFixed(0)} rectangles a frame`);
+    if (process.env.LODINDEX_OUT) appendFileSync(process.env.LODINDEX_OUT, `lodindex ${N || 'mammals'}: ${frames} frames the same; ${(mergedSum / Math.max(1, frames)).toFixed(0)} merged clades and ${(rects / Math.max(1, frames)).toFixed(0)} rectangles a frame\n`);
   });
 });
