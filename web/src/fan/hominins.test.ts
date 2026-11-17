@@ -8,7 +8,8 @@ import { setFlip } from './flip';
 import { latinOf } from './brackets';
 import type { FanBranch } from './layout';
 import { loadMammalsFromFiles } from './mammals-node';
-import { mammaliaClade } from './panthera';
+import { BirthCurve } from './history';
+import { mammaliaClade, type CladeRec, type SpeciesRec } from './panthera';
 import { mammaliaTree } from './splits';
 import type { Steady } from './steady';
 import { chainOf, FanView, levelClade, type Level } from './view';
@@ -21,7 +22,7 @@ let tid = 1;
 type Rig = { v: FanView; on: Map<string, (e: unknown) => void> };
 /** The view on its side, as on a phone (taps.test.ts's), its pointer events caught so they go through Input as a finger's. */
 /** The view on its side, its column w px long (700, or the phone's 663: 390 x 844 under the bar, the chain and the time axis, measured in the browser). */
-function rig(w = 700): Rig {
+function rig(w = 700, clade: CladeRec = mammaliaClade()): Rig {
   const noop = () => {};
   const g = globalThis as Record<string, unknown>;
   g.Path2D = class {
@@ -66,7 +67,7 @@ function rig(w = 700): Rig {
     removeEventListener: noop,
     setPointerCapture: noop,
   };
-  return { v: new FanView(canvas as unknown as HTMLCanvasElement, mammaliaClade(), mammaliaTree(), true), on };
+  return { v: new FanView(canvas as unknown as HTMLCanvasElement, clade, mammaliaTree(), true), on };
 }
 type Priv = {
   anim: ((t: number) => boolean) | null;
@@ -119,6 +120,41 @@ function doubleTap(r: Rig, x: number, y: number): void {
   pass(r, 120);
   tapAt(r, x, y);
   settle(r);
+}
+
+/** Whether home names and pictures Human in view p. */
+function humanAtHome(p: FanView): { name: boolean; picture: boolean } {
+  const c = p.homeCamera();
+  (p.fan.tess.fold as Steady).setScale(c.sx, p.w);
+  p.cam = { ...c, ty: c.sy };
+  P(p).camera.settle();
+  for (let k = 0; k < 3; k++) p.draw();
+  const b = p.fan.branches.find((q) => q.sp.sci === 'Homo sapiens')!;
+  return { name: p.nameHits.some((q) => q.b === b), picture: p.thumbHits.some((q) => q[3] === b && !q[4]) };
+}
+
+/** Clade c with every species' count times its own factor in 1 ± by (mulberry32 from seed): today's, ever, its history's points and births; no build seed, so the layout chooses its sides on these widths. */
+function jittered(c: CladeRec, seed: number, by: number): CladeRec {
+  let a = seed >>> 0;
+  const rnd = () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const one = (sp: SpeciesRec): SpeciesRec => {
+    const f = 1 + by * (2 * rnd() - 1);
+    // (Whole individuals, as the data's: a count stays a count, a living species keeps one at least, a segment two parents.)
+    const n = (x: number, least = 0) => (x > 0 ? Math.max(least, Math.round(x * f)) : x);
+    const out: SpeciesRec = { ...sp, alive: n(sp.alive, 1), ever: n(sp.ever, 1), everLo: n(sp.everLo, 1), everHi: n(sp.everHi, 1) };
+    if (sp.history) out.history = { ...sp.history, points: sp.history.points.map((q) => ({ ...q, n: n(q.n, 1), lo: n(q.lo), hi: n(q.hi) })) };
+    if (sp.births) {
+      const segments = sp.births.segments.map((q) => ({ ...q, startSize: n(q.startSize, 2), endSize: n(q.endSize, 2) }));
+      out.births = { ...sp.births, segments, curve: new BirthCurve(segments, sp.genYears) };
+    }
+    return out;
+  };
+  return { ...c, species: c.species.map(one), seed: undefined };
 }
 
 describe('a tap on humans stops at the Hominins first (ToLaD#497)', () => {
@@ -185,20 +221,22 @@ describe('a tap on humans stops at the Hominins first (ToLaD#497)', () => {
     return lv.v === node('Hominini') && chain().endsWith('› Hominins') && !P(v).selected;
   };
 
-  // (On the phone's column too, ToLaD#500: the human lane at home is 27.8 px there, room for its own name but not for a guest title beside it, so the label is Human's own.)
+  // (On the phone's column too, ToLaD#500: the human lane at home is 27.8 px there, room for its own name but not for a guest title beside it, so the label is Human's own: the highlight's
+  // band is its own label's before a title's, gapHands' `dear`, whichever side of Primates' fork the lemurs fall, ToLaD#525's data.)
   it('on the phone’s column, home names and pictures Human', () => {
-    const p = rig(663.109375).v;
-    const c = p.homeCamera();
-    (p.fan.tess.fold as Steady).setScale(c.sx, p.w);
-    p.cam = { ...c, ty: c.sy };
-    P(p).camera.settle();
-    for (let k = 0; k < 3; k++) p.draw();
-    const b = p.fan.branches.find((q) => q.sp.sci === 'Homo sapiens')!;
-    expect(p.nameHits.some((q) => q.b === b), 'its name').toBe(true);
-    expect(p.thumbHits.some((q) => q[3] === b && !q[4]), 'its picture').toBe(true);
+    expect(humanAtHome(rig(663.109375).v)).toEqual({ name: true, picture: true });
     // (Back to the 700 px rig's scale for the tests after.)
     (v.fan.tess.fold as Steady).setScale(v.cam.sx, v.w);
   });
+
+  // (A small data change must never drop the most familiar name at home, ToLaD#500 after #507's data: every species' count jittered by up to ±20%, a few seeds, the layout's sides chosen
+  // afresh on the new widths as the build's seed would be.)
+  for (const seed of [1, 2, 3, 4])
+    it(`on the phone’s column, home names and pictures Human with every count jittered ±20% (seed ${seed})`, () => {
+      const p = rig(663.109375, jittered(mammaliaClade(), seed, 0.2)).v;
+      expect(humanAtHome(p), `seed ${seed}`).toEqual({ name: true, picture: true });
+      (v.fan.tess.fold as Steady).setScale(v.cam.sx, v.w);
+    }, 600_000);
 
   it('from home, Primates and Great apes: a tap on the human name, picture or column lands at the Hominins, no card', () => {
     const bad: string[] = [];

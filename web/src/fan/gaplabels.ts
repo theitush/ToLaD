@@ -117,8 +117,11 @@ export interface Guest<G> {
  * A gap its group's (`same`: a first part's) is its group's title's till that group opens, so a title holds it only from there; and while a title stands over its first strand (its group's in its
  * gap, or the one over its group's), its own name claims nothing (ToLaD#483): it hands down once its widest part's band holds that part's own name, its title a guest only where a band holds
  * both, else waiting for its gap.
+ * A highlight outranks a title (`dear`, scalable-tree.md §7 step 9, ToLaD#500: the degree of interest reorders who yields, no px changes): where the widest part holds a highlight (Human), that
+ * part's own label has its band once the band holds it, as under a standing title, and a title it cannot hold beside it waits for its gap (a guest there only where the band holds both), so the
+ * most familiar name never hangs on a hair of width or on which side a fork's daughters fall.
  */
-export function gapHands<G>(root: G, parts: (g: G) => readonly G[], opens: Map<G, number>, gap: (g: G) => number, band: (g: G) => number, room: (g: G) => number, px: number, pad: number, guests?: Map<G, Guest<G>>, same?: (g: G, p: G) => boolean): Map<G, number> {
+export function gapHands<G>(root: G, parts: (g: G) => readonly G[], opens: Map<G, number>, gap: (g: G) => number, band: (g: G) => number, room: (g: G) => number, px: number, pad: number, guests?: Map<G, Guest<G>>, same?: (g: G, p: G) => boolean, dear?: (g: G) => boolean): Map<G, number> {
   const hands = new Map<G, number>();
   // (Each with its parent's handing zoom, the untils of the guests it brings, the zoom its gap is its own from (a gap its group's, `same`, is that group's title's till it opens), and the zoom from
   // which a title stands over its first strand.)
@@ -140,8 +143,10 @@ export function gapHands<G>(root: G, parts: (g: G) => readonly G[], opens: Map<G
     let at = Infinity;
     if (ps.length) {
       const ends = [...new Set([enter, until, named, ...brought].filter((z) => z >= enter && z < Infinity))].sort((p, q) => p - q);
+      // (Its widest part a highlight's: no title rides in that band unless it holds both, so none holds it back.)
+      const yields = host !== undefined && !!dear?.(host);
       for (let i = 0; i < ends.length && at === Infinity; i++) {
-        const [own, guest] = [ends[i] < until, brought.some((u) => u > ends[i]) || (ends[i] < until && ends[i] < named)];
+        const [own, guest] = [ends[i] < until, !yields && (brought.some((u) => u > ends[i]) || (ends[i] < until && ends[i] < named))];
         const z = guest ? Math.max(ends[i], (2 * px + pad) / w) : own ? Math.max(ends[i], px / w) : ends[i];
         if (z < (ends[i + 1] ?? Infinity)) at = z;
       }
