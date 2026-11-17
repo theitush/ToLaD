@@ -1,6 +1,7 @@
 // One kind of label on the tree on its side (ToLaD#458): a name in the gap above its own branch, else in its band; a picture only in a band, group's or species'; from the zoom alone, nothing merging on the way in, nothing meeting.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { setFlip } from './flip';
+import { gapHands, type Guest } from './gaplabels';
 import { CLADE_PX } from './gapnames';
 import { mammaliaClade } from './panthera';
 import { mammaliaTree } from './splits';
@@ -274,5 +275,30 @@ describe('labels in the gaps and in the branches', () => {
     let z = 1;
     while (cover(home * z).find((m) => m.lv.b?.sp.sci === 'Homo sapiens')?.tier == null) z *= Math.SQRT2;
     expect(z).toBeLessThan(8192);
+  });
+});
+
+// A highlight outranks a title (ToLaD#500 after #507's data, gapHands' `dear`): a group whose title its gap cannot hold hands its band down once its widest part holds that part's own name, if
+// that part holds a highlight, instead of waiting for room for both; nothing else moves, and the highlight's group never hands down later than without it.
+describe('a highlight’s band is its own label’s before a title’s', () => {
+  type N = { id: string; gap: number; band: number; kids: N[] };
+  const n = (id: string, gap: number, band: number, kids: N[] = []): N => ({ id, gap, band, kids });
+  const hands = (root: N, dear?: (g: N) => boolean) =>
+    gapHands(root, (g) => g.kids, new Map([[root, 9]]), (g) => g.gap, (g) => g.band, (g) => Math.max(g.gap, g.band), CLADE_PX, GROUP_D - PIC_D, new Map<N, Guest<N>>(), (g, p) => g.kids[0] === p, dear);
+  it('hands down at the part’s own name, not both names, where the widest part is the highlight’s', () => {
+    // (A group, its gap a hair, its parts: a thin first one and a wide second one, the highlight's, 27.9 band units, 12 px a name, 4 a hair: both names need 28. Its parent's title stands in
+    // the parent's gap, but over the parent's first part, a thin sister: no title over g's first strand names g, as Primates' lemurs on #507's data.)
+    const human = n('human', 0, 27.9);
+    const g = n('g', 0.5, 29, [n('thin', 0, 0.9), human]);
+    const root = n('root', 30, 40, [n('lemurs', 0, 1.7), g]);
+    const was = hands(root).get(g)!;
+    const now = hands(root, (q) => q === human).get(g)!;
+    expect(was).toBeCloseTo((2 * CLADE_PX + GROUP_D - PIC_D) / 27.9, 9);
+    expect(now).toBeCloseTo(CLADE_PX / 27.9, 9);
+    // (Where the highlight is not the widest part, no change: its band was never the one a title waits on.)
+    expect(hands(root, (q) => q.id === 'thin').get(g)).toBe(was);
+    // (And a tree with no highlight is as it was, member by member.)
+    const none = hands(root, () => false);
+    for (const [q, z] of hands(root)) expect(none.get(q), q.id).toBe(z);
   });
 });
