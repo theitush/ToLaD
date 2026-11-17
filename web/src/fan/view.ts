@@ -483,16 +483,16 @@ export const FIT_DWARF = 3;
 /**
  * Where a level's fossils lived (Fit fossils, ToLaD#289): the world x its columns took (each at its own width
  * there) from the level's start up to its youngest fossil group's end (fossilEnd), or null when it has no fossil or its span at "now"
- * (familySpan) is under FIT_DWARF times that: the living columns' widening since is left to run off the screen.
+ * (familySpan) is under FIT_DWARF times that: the living columns' widening since is left to run off the screen. A frame whose time
+ * runs on to world y `top`, younger than that (a highlight's stop, stopFrame: the Hominins' to Neanderthals' ~40 kya), holds its
+ * fossils' columns to there too, each to its own end, so every fossil's tip in its time stands on it (ToLaD#279: Neanderthals,
+ * H. erectus and H. floresiensis had theirs off the screen's edges); the living's widening since is still left out.
  */
-export function fossilSpan(fan: Fan, v: FanNode): [number, number] | null {
+export function fossilSpan(fan: Fan, v: FanNode, top = Infinity): [number, number] | null {
   const yEnd = fossilEnd(fan, v);
   if (yEnd === null) return null;
   const s: [number, number] = [Infinity, -Infinity];
-  for (const b of v.strands) {
-    const hi = Math.min(b.splitY, v.yBot);
-    const lo = Math.max(b.tipY, yEnd);
-    if (!(hi > lo)) continue;
+  const take = (b: FanBranch, lo: number, hi: number) => {
     for (let k = 0; k <= 32; k++) {
       const y = lo + ((hi - lo) * k) / 32 - (k === 32 ? 1e-9 : 0);
       const w = laneAt(b, y).w;
@@ -500,10 +500,20 @@ export function fossilSpan(fan: Fan, v: FanNode): [number, number] | null {
       s[0] = Math.min(s[0], l);
       s[1] = Math.max(s[1], l + w);
     }
+  };
+  for (const b of v.strands) {
+    const hi = Math.min(b.splitY, v.yBot);
+    const lo = Math.max(b.tipY, yEnd);
+    if (hi > lo) take(b, lo, hi);
   }
   if (!(s[1] > s[0])) return null;
   const [a, z] = familySpan(v);
-  return z - a > FIT_DWARF * (s[1] - s[0]) ? s : null;
+  if (!(z - a > FIT_DWARF * (s[1] - s[0]))) return null;
+  for (const b of v.strands) {
+    const [lo, hi] = [Math.max(b.tipY, top), Math.min(b.splitY, v.yBot, yEnd)];
+    if (hi > lo && (b.sp.extinct || !(b.pop.aliveAt(0) > 0))) take(b, lo, hi);
+  }
+  return s;
 }
 
 /**
@@ -1428,7 +1438,7 @@ export class FanView implements InputHandlers {
     const s: [number, number] = [0, 0];
     const cam = foldedFrame(this.fan, this.w, () => {
       const T = this.territories().t;
-      const [a, b] = (fossils && fossilSpan(this.fan, v)) || (own ? T.frameSpan(T.index.get(v)!, s) : this.runSpan(f, l, s));
+      const [a, b] = (fossils && fossilSpan(this.fan, v, top)) || (own ? T.frameSpan(T.index.get(v)!, s) : this.runSpan(f, l, s));
       const x0 = LABEL_AXIS_X;
       const sx = (this.w - LABEL_AXIS_X) / Math.max(1e-300, b - a);
       return this.withBand({ ...this.camera.frame(a, b, yFork, true), sx, cx: a + (this.w / 2 - x0) / sx }, top);
@@ -3206,11 +3216,13 @@ export class FanView implements InputHandlers {
   /**
    * The fossils at their own tip (ToLaD#279, #497; gaplabels.ts tipOrder): a strand the labels' column cannot name (gone by then, or a hair inside a wider lane there) is named where its
    * line ends, the way the upright tree names a tip: its picture (or its stub) on its tip as the column's are on the column, no older than its branch's start; its name from there toward
-   * "now" as the column's names stand, or, where that has no room, in its own branch up to its picture, as a species' name stands in its band (two places a label, the first free: point
-   * labelling's fixed candidate positions, greedy by priority). Only where its branch has room, by the column's rules: its band (its room, on screen) holds the name, clear of every other
-   * species' column drawn across the rows the name takes (linesIn: past its tip, a later lineage may stand in its room), the name sliding in its band to the clear stretch nearest its
-   * line; and only where the name meets no label standing, the column's first, then the fossils' in their order. Its picture on the name's line, full where that meets nothing, else
-   * small, else none. The living keep the column: the fossils fill what it leaves.
+   * "now" as the column's names stand, or, where that has no room, in its own branch up to its picture (full, else small: the name before the picture's size), as a species' name stands
+   * in its band (point labelling's fixed candidate positions, the first free, greedy by priority). Across, its room is its band, or, where the band is narrower than a name, wherever the
+   * name still covers its line (Ita, ToLaD#279: "the text can go on the branch even if the branch is too small to fit it. just make sure it doesnt sit on other branches or other
+   * text"): there the name stands clear of every other species' column drawn across the rows it takes (clearIn: past its tip, a later lineage may stand in its room), at the clear
+   * stretch nearest its line, on screen, and meeting no label standing, the column's first, then the fossils' in their order. The thin fork lines are no column: it reads across them
+   * as the column's names do. Its picture on the name's line by the same rule, full where that meets no other column and no label, else small, else none. Only tips on screen, their
+   * line and their centre, are tried. The living keep the column: the fossils fill what it leaves.
    */
   private tipLabels(out: CutLabels, tips: readonly number[]): void {
     this.tipMissed.clear();
@@ -3219,58 +3231,63 @@ export class FanView implements InputHandlers {
     const { sx } = this.cam;
     const X = (x: number) => this.toScreen(x, 0)[0];
     const Y = (y: number) => this.toScreen(0, y)[1];
-    const Wx = (x: number) => this.toWorld(x, 0)[0];
     const Wy = (y: number) => this.toWorld(0, y)[1];
+    // (The screen in the world: a tip off it costs a compare.)
+    const [[xa, ya], [xb, yb]] = [this.toWorld(0, 0), this.toWorld(this.w, this.h)];
+    const [x0, x1, y0w, y1w] = [Math.min(xa, xb), Math.max(xa, xb), Math.min(ya, yb), Math.max(ya, yb)];
     const { cap } = this.labelBand();
-    const taken: number[][] = [...[...out.spots, ...out.names].map((s) => s.box), ...out.pics.map(picBox)];
-    const free = (box: number[]) => !taken.some((q) => boxesMeet(box, q));
+    // (Every label standing, and the axis's labels as last drawn (its era and event notes), as the names at the forks keep clear of them.)
+    const taken: number[][] = [...[...out.spots, ...out.names].map((s) => s.box), ...out.pics.map(picBox), ...this.axisBoxes];
     const half = SPECIES_PX / 2;
-    const lines: number[] = [];
-    for (const k of tips) {
-      const w = R[k] * sx;
-      // (In order of room: the rest have less.)
-      if (w < SPECIES_PX) break;
-      const b = f.strands[k];
-      const [c, line] = [X(C[k]), Y(b.tipY)];
-      if (line < 0 || line > this.h || c + w / 2 < 0 || c - w / 2 > this.w) continue;
-      // (Its band's part on screen.)
-      const [lo, hi] = [Math.max(c - w / 2, 0), Math.min(c + w / 2, this.w)];
-      if (hi - lo < SPECIES_PX) {
-        this.tipMissed.set(k, 'off screen');
-        continue;
+    const clear: number[] = [];
+    /** The fossils named, in order: each its name's centre across and its picture's top (screen). */
+    const named: [number, number, number][] = [];
+    let why: 'crossed' | 'meets' = 'crossed';
+    /**
+     * Where strand k's name or picture, `size` px across over screen rows y0..y1, stands in [lo, hi] (screen): clear of the labels standing (unless `labels` is false), then of the
+     * other species' columns (clearIn), its centre nearest `near`; NaN where nowhere, `why` saying what was in the way.
+     */
+    const spot = (k: number, lo: number, hi: number, y0: number, y1: number, size: number, near: number, labels = true): number => {
+      [clear.length, clear[0], clear[1]] = [2, lo, hi];
+      if (labels) for (const q of taken) if (q[1] < y1 && q[3] > y0 && q[0] < hi && q[2] > lo && clear.length) this.cutOut(clear, q[0], q[2], size);
+      if (!clear.length) {
+        why = 'meets';
+        return NaN;
       }
+      this.clearIn(k, Wy(y0), Wy(y1), size, clear);
+      let xs = NaN;
+      for (let i = 0; i < clear.length; i += 2) {
+        const xi = Math.max(clear[i] + size / 2, Math.min(clear[i + 1] - size / 2, near));
+        if (!(Math.abs(xi - near) >= Math.abs(xs - near))) xs = xi;
+      }
+      return xs;
+    };
+    for (const k of tips) {
+      const b = f.strands[k];
+      if (C[k] < x0 || C[k] > x1 || b.tipY < y0w || b.tipY > y1w) continue;
+      const [c, line] = [X(C[k]), Y(b.tipY)];
+      // (Its room across, on screen: its band, or where that is narrower, wherever the name still covers its line: centred on it, else slid off it by up to its half.)
+      const span = Math.max(R[k] * sx, 2 * SPECIES_PX);
+      const [lo, hi] = [Math.max(0, Math.min(c - span / 2, this.w - SPECIES_PX)), Math.min(this.w, Math.max(c + span / 2, SPECIES_PX))];
       const [at, start] = [Math.min(line, Y(b.splitY) - PIC_D / 2), Y(b.splitY)];
+      // (Its picture's top: on its tip; else, where even a small one there sits on a later lineage standing in its room past its tip (humans over Neanderthals'), just inside its
+      // own branch, its young edge on its tip, where its branch holds one; the name laid from there.)
+      let pt = at - PIC_D / 2;
+      if (line + PIC_S <= start && Number.isNaN(spot(k, Math.max(0, c - PIC_S), Math.min(this.w, c + PIC_S), pt, pt + PIC_S, PIC_S, c, false))) pt = line;
       const name = levelText(b);
       const text = this.titleWidth(SPECIES_FONT, name) <= cap ? name : this.pillText(name, cap);
       const len = LABEL_PAD + this.titleWidth(SPECIES_FONT, text);
-      // (Past its tip toward "now", as the column's names stand; else in its own branch, ending at its picture, as a species' name in its band; the first with room, where it meets no label.)
-      let [x, box, why] = [NaN, [0, 0, 0, 0] as [number, number, number, number], 'crossed' as 'crossed' | 'meets'];
-      for (const past of [true, false]) {
-        const y1 = past ? at - PIC_D / 2 - LABEL_UNDER : at + PIC_D / 2 + LABEL_UNDER + len;
+      // (Past its tip toward "now", as the column's names stand; else in its own branch, up to its picture, full, else small (the name before the picture's size, as a label's name comes
+      // before its picture), as a species' name in its band; the first with room, on screen, where it meets no label.)
+      let [x, box] = [NaN, [0, 0, 0, 0] as [number, number, number, number]];
+      why = 'crossed';
+      for (const [past, d] of [[true, PIC_D], [false, PIC_D], [false, PIC_S]] as const) {
+        const y1 = past ? pt - LABEL_UNDER : pt + d + LABEL_UNDER + len;
         const y0 = y1 - len;
-        if (!past && y1 > start) continue;
-        // (The clear stretches of its band over the name's rows, a row every few px: the one nearest its line that holds the name.)
-        lines.length = 0;
-        this.linesIn(k, Wx(lo), Wx(hi), Wy(y0), Wy(y1), Math.max(2, Math.ceil((y1 - y0) / 6) + 1), lines);
-        const cut: [number, number][] = [];
-        for (let i = 0; i < lines.length; i += 2) cut.push([X(lines[i]), X(lines[i + 1])]);
-        cut.sort((p, q) => p[0] - q[0]);
-        let [xs, from] = [NaN, lo];
-        for (const [a, z] of [...cut, [hi, hi] as [number, number]]) {
-          const to = Math.min(a, hi);
-          if (to - from >= SPECIES_PX) {
-            const xi = Math.max(from + half, Math.min(to - half, c));
-            if (!(Math.abs(xi - c) >= Math.abs(xs - c))) xs = xi;
-          }
-          from = Math.max(from, z);
-        }
+        if ((!past && y1 > start) || y0 < 0 || y1 > this.h) continue;
+        const xs = spot(k, lo, hi, y0, y1, SPECIES_PX, c);
         if (Number.isNaN(xs)) continue;
-        const bx: [number, number, number, number] = [xs - half, y0, xs + half, y1];
-        if (!free(bx)) {
-          why = 'meets';
-          continue;
-        }
-        [x, box] = [xs, bx];
+        [x, box] = [xs, [xs - half, y0, xs + half, y1]];
         break;
       }
       if (Number.isNaN(x)) {
@@ -3281,41 +3298,73 @@ export class FanView implements InputHandlers {
       const key = `t${k}`;
       out.names.push({ key, id: key, place: 'tip', text, rank: [0, 0, k], x, y1, box, fit: 1, plus: 0, pic: b, b, plain: SPECIES_FONT });
       taken.push(box);
+      named.push([k, x, pt]);
+    }
+    // (Then their pictures, in the same order: every fossil's name before any fossil's picture, as a label's name comes before its picture.)
+    for (const [k, x, y0] of named)
       for (const d of [PIC_D, PIC_S]) {
-        // (Whole on screen across, as the column's are: off its name's line by at most its half at an edge.)
-        const p = { x: Math.max(d / 2, Math.min(this.w - d / 2, x)), y: at - PIC_D / 2 + d / 2, i: out.pics.length, lv: { b } as Level, face: b, held: false };
-        const pb = picBox({ ...p, d });
-        if (!free(pb)) continue;
+        // (On its name's line, else off it by up to its half, still over it: whole on screen across, as the column's are.)
+        const px = spot(k, Math.max(0, x - d), Math.min(this.w, x + d), y0, y0 + d, d, x);
+        if (Number.isNaN(px)) continue;
+        const b = f.strands[k];
+        const p = { x: px, y: y0 + d / 2, i: out.pics.length, lv: { b } as Level, face: b, held: false };
         out.pics.push(d === PIC_D ? p : { ...p, d });
-        taken.push(pb);
+        taken.push(picBox({ ...p, d }));
         break;
       }
-    }
   }
-  /** (Tests.) The last frame's fossils with a tip on screen and a band holding a name that went unnamed (tipLabels): too little of the band on screen, another line across it, or a label in the way. */
-  readonly tipMissed = new Map<number, 'off screen' | 'crossed' | 'meets'>();
+  /** (Tests.) The last frame's fossils with a tip on screen that went unnamed (tipLabels): another species' column across every place for the name, or a label in the way. */
+  readonly tipMissed = new Map<number, 'crossed' | 'meets'>();
 
   /**
-   * The species' own columns drawn across world x [lo, hi] over world y [ya, yb], strand k's aside (ToLaD#279: what a fossil's name past its tip keeps clear of), as [left, right] pairs
-   * into `out`, at `n` rows evenly from ya to yb. A parent column's stretch, its forks, is not one: drawn a fine line where it is wider than tall, which a name's halo reads over as the
-   * column's names do. The columns and slots at a row stand in drawn order, never crossing (Steady), so from k the scan outward ends on each side at the first one past [lo, hi] there.
+   * Of the stretches of screen x in `out` ([from, to] pairs, in order), what stays clear over world y [ya, yb], strand k's aside (ToLaD#279: where a fossil's name and picture may stand):
+   * no other species' own column drawn there at any row, a row every screen px; each piece kept at least `min` px wide, none once none is left, the rest unread. A parent
+   * column's stretch, its forks, is not one: drawn a fine line where it is wider than tall, which a name's halo reads over as the column's names do. The columns and slots at a row
+   * stand in drawn order, never crossing (Steady), so from k the scan outward ends on each side, row by row, at the first one past what is left; a strand gone before every row
+   * is passed over at once.
    */
-  private linesIn(k: number, lo: number, hi: number, ya: number, yb: number, n: number, out: number[]): number[] {
+  private clearIn(k: number, ya: number, yb: number, min: number, out: number[]): number[] {
     const S = (this.fan.tess.fold as Steady).strands;
-    for (let r = 0; r < n; r++) {
-      const y = ya + ((yb - ya) * r) / (n - 1);
-      for (const dir of [-1, 1]) {
-        for (let i = k + dir; i >= 0 && i < S.length; i += dir) {
-          const b = S[i];
-          if (y < b.tipY) continue;
+    const [y0, y1] = [Math.min(ya, yb), Math.max(ya, yb)];
+    const n = Math.max(2, Math.ceil((y1 - y0) * Math.abs(this.cam.sy)) + 1);
+    const open = new Uint8Array(n);
+    for (let dir = -1; dir <= 1 && out.length; dir += 2) {
+      open.fill(1);
+      let rows = n;
+      for (let i = k + dir; i >= 0 && i < S.length && rows && out.length; i += dir) {
+        const b = S[i];
+        if (b.tipY > y1) continue;
+        for (let r = 0; r < n && out.length; r++) {
+          const y = y0 + ((y1 - y0) * r) / (n - 1);
+          if (!open[r] || y < b.tipY) continue;
           const w = laneW(b, y);
           const l = leftAt(b, y, w);
-          if (dir < 0 ? l + w <= lo : l >= hi) break;
-          if (y < b.splitY && w > 0 && l < hi && l + w > lo) out.push(l, l + w);
+          const a = this.camera.screenX(l);
+          const z = this.camera.screenX(l + w);
+          if (dir < 0 ? z <= out[0] : a >= out[out.length - 1]) {
+            open[r] = 0;
+            rows--;
+          } else if (y < b.splitY && w > 0 && a < out[out.length - 1] && z > out[0]) this.cutOut(out, a, z, min);
         }
       }
     }
     return out;
+  }
+
+  /** Takes [a, z] out of the stretches in `out` ([from, to] pairs, in order), keeping the pieces at least `min` wide. */
+  private cutOut(out: number[], a: number, z: number, min: number): void {
+    const len = out.length;
+    for (let j = 0; j < len; j += 2) {
+      const f = out[j];
+      const t = out[j + 1];
+      if (z <= f || a >= t) out.push(f, t);
+      else {
+        if (a - f >= min) out.push(f, a);
+        if (t - z >= min) out.push(z, t);
+      }
+    }
+    out.copyWithin(0, len);
+    out.length -= len;
   }
 
   /**
