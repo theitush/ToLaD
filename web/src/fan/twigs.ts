@@ -460,9 +460,9 @@ export class ColumnPath {
 
   /**
    * The fold moved the columns (fold.ts, ToLaD#146: on every pan and pinch, folded): the kept samples stay,
-   * their left edges read again (the fold moves a column smoothly, by a little a frame), and once it has moved
-   * PATH_REFOLDS times since they were chosen they are chosen afresh; exact() chooses them afresh once the
-   * fold comes to rest.
+   * their left edges read again (the fold moves a column smoothly, by a little a frame), and every
+   * PATH_REFOLDS-th time they are chosen afresh (the columns' phases staggered, a few a frame); exact()
+   * chooses them afresh once the fold comes to rest.
    */
   reset(): void {
     this.ticks++;
@@ -470,11 +470,9 @@ export class ColumnPath {
     if (this.n === 0) return;
     this.stale = true;
     this.moved++;
-    // (PATH_REFOLDS moves on: chosen afresh, when the frame's budget allows (span(), pathFrame); drawn till then as they
-    // are, their left edges read again: ToLaD#313, at the mammal level ~3,000 strands a frame were forgotten in turn.
-    // Counted from their choice (ToLaD#502): a pinch chooses them afresh as its zoom passes PATH_ZOOM, every few moves,
-    // so the turn by the column's phase, PATH_REFOLDS moves apart whatever chose them last, mostly chose them twice.)
-    if (pathByPhase ? (this.ticks + this.m.b.index) % PATH_REFOLDS === 0 : this.moved >= PATH_REFOLDS) this.redo = true;
+    // (Every PATH_REFOLDS-th: chosen afresh, when the frame's budget allows (span(), pathFrame); drawn till then as they
+    // are, their left edges read again: ToLaD#313, at the mammal level ~3,000 strands a frame were forgotten in turn.)
+    if ((this.ticks + this.m.b.index) % PATH_REFOLDS === 0) this.redo = true;
   }
 
   /** The fold came to rest: the kept samples chosen afresh if it moved since they were (reset()), as the frame's budget allows. */
@@ -658,12 +656,6 @@ export const pathFrame = {
 const PATH_BUDGET = 120_000;
 /** A height worked out anew (TwigModel.sample twice) costs about this many cuts. */
 const PATH_FRESH = 4;
-
-/** The kept samples chosen afresh on their column's turn, every PATH_REFOLDS-th move of the fold whenever they were chosen, as before ToLaD#502 (paths.test holds the two). */
-let pathByPhase = false;
-export function setPathByPhase(on: boolean): void {
-  pathByPhase = on;
-}
 
 /** How far the zoom may move from the one a ColumnPath was made at (either way) before it is made again. */
 const PATH_ZOOM = 1.4;
