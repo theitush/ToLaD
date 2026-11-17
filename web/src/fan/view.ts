@@ -128,6 +128,8 @@ const LABEL_UNDER = 4;
  */
 export const TIP_WORK = 150_000;
 export const TIP_TRY = 8_000;
+/** A fossil group tipLabels names as one (FanView.tipGroupsOf, ToLaD#279). */
+type TipGroup = { v: FanNode; f: number; l: number; young: number; c: number; r: number; open: number };
 /** Two boxes [x0, y0, x1, y1] share some area (touching is not meeting). */
 const boxesMeet = (p: readonly number[], q: readonly number[]): boolean => p[0] < q[2] && p[2] > q[0] && p[1] < q[3] && p[3] > q[1];
 /**
@@ -543,6 +545,9 @@ function fossilEnd(fan: Fan, v: FanNode): number | null {
   let living = 0;
   for (const g of nextLevels(fan, v)) {
     const bs = g.b ? [g.b] : g.v.strands;
+    // (A group of fossils placed by name, a fossil genus the data grafts by taxonomy, has no place in the tree to frame a level on (keptOf, ToLaD#279): at
+    // Rodentia some fifty such genera beside three living groups.)
+    if (bs.every((b) => b.sp.placed)) continue;
     if (bs.every(gone)) {
       fossil++;
       for (const b of bs) y = Math.min(y, b.tipY);
@@ -690,9 +695,36 @@ function aboveOrders(fan: Fan): Set<FanNode> {
   return out;
 }
 
-/** Whether clade v is a level (ToLaD#258): the root, or a ranked clade (rankOf: order, suborder, family, …, genus) not above an order. */
+/** The clades inside an order (ToLaD#279: where a fossil group may be a level). Kept per fan. */
+const inOrderCache = new WeakMap<Fan, Set<FanNode>>();
+function inOrders(fan: Fan): Set<FanNode> {
+  let out = inOrderCache.get(fan);
+  if (!out) {
+    out = new Set();
+    const go = (v: FanNode, inside: boolean) => {
+      if (inside) out!.add(v);
+      for (const k of v.kids) if (!('sp' in k)) go(k, inside || ORDER_TAXA.has(taxonKey(v.split.taxon ?? '')));
+    };
+    go(fan.root, false);
+    inOrderCache.set(fan, out);
+  }
+  return out;
+}
+
+/**
+ * Whether clade v is a level (ToLaD#258): the root, or a ranked clade (rankOf: order, suborder, family, …, genus) not above an order. A clade of
+ * fossils placed by name (splits.ts nameGrafts: a fossil genus) only inside an order (ToLaD#279): one grafted on the stem beside the orders is no
+ * home group, as home opens on the orders.
+ */
+const levelCache = new WeakMap<FanNode, boolean>();
 export function isLevel(fan: Fan, v: FanNode): boolean {
-  return !v.parent || (!!rankOf(latinOf(v.split)) && !aboveOrders(fan).has(v));
+  if (!v.parent) return true;
+  let out = levelCache.get(v);
+  if (out === undefined) {
+    out = !!rankOf(latinOf(v.split)) && !aboveOrders(fan).has(v) && (!v.strands[0].sp.placed || keptOf(v) > 0 || inOrders(fan).has(v));
+    levelCache.set(v, out);
+  }
+  return out;
 }
 
 /** A level's name on its pill (ToLaD#258): its English name where there is one (TAXON_EN: the orders', families' …), else its Latin. */
@@ -716,7 +748,8 @@ export function groupName(fan: Fan, v: FanNode): string {
     if (out === latin && !familiar(v)) {
       for (let u: FanNode | undefined = v; u; ) {
         let big: FanNode | undefined;
-        for (const g of nextLevels(fan, u)) if (g.v && (!big || g.v.strands.length > big.strands.length)) big = g.v;
+        // (Its largest part by what it is today, ToLaD#279: by living species, then by strands; with every fossil on the tree a part's fossils outnumbered its living.)
+        for (const g of nextLevels(fan, u)) if (g.v && (!big || (livingOf(g.v).length - livingOf(big).length || g.v.strands.length - big.strands.length) > 0)) big = g.v;
         if (big && familiar(big)) {
           out = `${levelName(big).split(/,| & /)[0]} & kin`;
           break;
@@ -731,17 +764,40 @@ export function groupName(fan: Fan, v: FanNode): string {
 }
 
 /**
+ * Clade v's strands that make up its groups (ToLaD#279): all but the fossils placed by name (SpeciesRec.placed: hung on their genus or family by
+ * taxonomy at first appearance, no family-tree data). Such a fossil has no place in the tree of its own, so it is no group one level down, and a daughter
+ * of only such fossils is none either unless it has a rank name of its own (isLevel): they are drawn, and named at their tips where room allows. Where v
+ * holds nothing else (a fossil genus of its own), its fossils are its groups. With the page's default data (no fossil placed by name) every strand counts.
+ */
+const keptCache = new WeakMap<FanNode, number>();
+function keptOf(v: FanNode): number {
+  let n = keptCache.get(v);
+  if (n === undefined) {
+    n = 0;
+    for (const b of v.strands) if (!b.sp.placed) n++;
+    keptCache.set(v, n);
+  }
+  return n;
+}
+/** A daughter's strands as v's groups count them (keptOf; all of them where v holds only fossils placed by name). */
+const countBy = (v: FanNode): ((u: FanNode) => number) => (keptOf(v) ? keptOf : (u: FanNode) => u.strands.length);
+/** Whether daughter k of v is no group of v's (keptOf): only fossils placed by name, where v holds others. */
+const byNameOnly = (v: FanNode, k: FanNode | FanBranch): boolean => keptOf(v) > 0 && ('sp' in k ? !!k.sp.placed : keptOf(k) === 0);
+
+/**
  * The groups one level down from clade v (ToLaD#258), left to right: each daughter that is a level or a species, an
  * unnamed daughter's own groups in its place. A group with all of v's species (v's one named daughter) opens to its own;
- * a named group of a single species is that species.
+ * a named group of a single species is that species. Fossils placed by name count only where v holds nothing else (keptOf, ToLaD#279).
  */
 export function nextLevels(fan: Fan, v: FanNode): Level[] {
   const out: Level[] = [];
+  const n = countBy(v);
   const go = (u: FanNode) => {
     for (const k of u.kids) {
+      if (byNameOnly(v, k) && ('sp' in k || !isLevel(fan, k))) continue;
       if ('sp' in k) out.push({ b: k });
       else if (k.strands.length === 1) out.push({ b: k.strands[0] });
-      else if (isLevel(fan, k) && k.strands.length < v.strands.length) out.push({ v: k });
+      else if (isLevel(fan, k) && n(k) < n(v)) out.push({ v: k });
       else go(k);
     }
   };
@@ -752,19 +808,54 @@ export function nextLevels(fan: Fan, v: FanNode): Level[] {
 /**
  * The parts of clade v for a group label (ToLaD#440), left to right: its daughters, every fork a group, named or not (groupName), so a
  * group opens one fork at a time and a tight pair stays together under their own small fork rather than holding the whole of v up.
- * Frames and taps step through fewer of them (isLevel). A daughter with all of v's species opens to its own.
+ * Frames and taps step through fewer of them (isLevel). A daughter with all of v's species opens to its own. Fossils placed by name, as
+ * nextLevels (keptOf, ToLaD#279): a daughter of only those is no part where v holds others, unless it has a rank name of its own; and an unnamed
+ * fork that is only such fossils beside one daughter (a stem the data grafted fossils on, below a crown) is that daughter.
  */
-export function labelParts(v: FanNode): Level[] {
+export function labelParts(v: FanNode, fan?: Fan): Level[] {
   const out: Level[] = [];
+  const n = countBy(v);
+  const crown = (k: FanNode): FanNode | FanBranch => {
+    for (let u: FanNode = k; ; ) {
+      if (fan && isLevel(fan, u)) return u;
+      const d = u.kids.filter((x) => !byNameOnly(u, x));
+      if (d.length !== 1) return u;
+      if ('sp' in d[0]) return d[0];
+      u = d[0];
+    }
+  };
   const go = (u: FanNode) => {
-    for (const k of u.kids) {
+    for (const k0 of u.kids) {
+      if (byNameOnly(v, k0) && ('sp' in k0 || !fan || !isLevel(fan, k0))) continue;
+      const k = 'sp' in k0 ? k0 : crown(k0);
       if ('sp' in k) out.push({ b: k });
       else if (k.strands.length === 1) out.push({ b: k.strands[0] });
-      else if (k.strands.length < v.strands.length) out.push({ v: k });
+      else if (n(k) < n(v)) out.push({ v: k });
       else go(k);
     }
   };
   go(v);
+  return out;
+}
+
+/**
+ * Home's clade (ToLaD#279): the least clade holding every living species, the crown of the living. Home frames it, from its split to "now"
+ * (homeCamera); the stem's fossils branching off below it (with every fossil on the tree, the Triassic's, 205 Ma) are drawn beside and before it,
+ * there when the view pans or zooms out to them. With the page's default data the root.
+ */
+const homeCache = new WeakMap<Fan, FanNode>();
+export function homeOf(fan: Fan): FanNode {
+  let out = homeCache.get(fan);
+  if (!out) {
+    let v: FanNode = fan.root;
+    for (;;) {
+      const live: (FanNode | FanBranch)[] = v.kids.filter((k) => ('sp' in k ? !k.sp.extinct : livingOf(k).length > 0));
+      const k = live.length === 1 ? live[0] : null;
+      if (!k || 'sp' in k) break;
+      v = k;
+    }
+    homeCache.set(fan, (out = v));
+  }
   return out;
 }
 
@@ -1295,8 +1386,10 @@ export class FanView implements InputHandlers {
 
   /** The whole fan: "now" near the top, the stem entering from the bottom edge. */
   homeCamera(): Camera {
-    const n = this.fan.root.strands.length;
-    return this.fan.tess.fold ? this.runFrame(0, n - 1, 0, this.fan.root) : this.withBand(this.camera.home());
+    // (The crown of the living, homeOf, ToLaD#279: the stem's fossils before it are off the frame, a pan or zoom out away.)
+    const v = homeOf(this.fan);
+    const [f, l] = [v.strands[0].index, v.strands[v.strands.length - 1].index];
+    return this.fan.tess.fold ? this.runFrame(f, l, v === this.fan.root ? 0 : v.y, this.fan.root) : this.withBand(this.camera.home());
   }
 
   /**
@@ -2969,7 +3062,7 @@ export class FanView implements InputHandlers {
           (g) => {
             if (!g.lv.v) return [];
             let gs = parts.get(g.lv.v);
-            if (!gs) parts.set(g.lv.v, (gs = labelParts(g.lv.v).map(of).sort((p, q) => p.f - q.f)));
+            if (!gs) parts.set(g.lv.v, (gs = labelParts(g.lv.v, this.fan).map(of).sort((p, q) => p.f - q.f)));
             return gs;
           },
           (p, q) => T.aliveOf(p.k) - T.aliveOf(q.k) || p.l - p.f - (q.l - q.f) || q.f - p.f,
@@ -3044,7 +3137,7 @@ export class FanView implements InputHandlers {
       const parts = (g: GapMember) => {
         if (!g.lv.v) return [];
         let gs = kids.get(g);
-        if (!gs) kids.set(g, (gs = labelParts(g.lv.v).map(of).sort((p, q) => p.f - q.f)));
+        if (!gs) kids.set(g, (gs = labelParts(g.lv.v, this.fan).map(of).sort((p, q) => p.f - q.f)));
         return gs;
       };
       const root = of({ v: this.fan.root });
@@ -3346,21 +3439,25 @@ export class FanView implements InputHandlers {
     const taken: number[][] = [...[...out.spots, ...out.names].map((s) => s.box), ...out.pics.map(picBox), ...this.axisBoxes];
     const half = SPECIES_PX / 2;
     const clear: number[] = [];
-    /** The fossils named, in order: each its name's centre across and its picture's top (screen). */
-    const named: [number, number, number][] = [];
+    /** The fossils named, in order: each its name's centre across and its picture's top (screen), and the fossil group it names (tipGroupsOf), if one. */
+    const named: [number, number, number, TipGroup | null][] = [];
+    // (The strands a name or picture is about, kLo..kHi in drawn order: one fossil's, or a fossil group's, whose own columns are no blockers to it.)
+    let [kLo, kHi] = [0, 0];
+    const groups = this.tipGroupsOf(C, R);
+    const done = new Set<TipGroup>();
     let why: 'crossed' | 'meets' = 'crossed';
     /**
-     * Where strand k's name or picture, `size` px across over screen rows y0..y1, stands in [lo, hi] (screen): clear of the labels standing (unless `labels` is false), then of the
+     * Where strands kLo..kHi's name or picture, `size` px across over screen rows y0..y1, stands in [lo, hi] (screen): clear of the labels standing (unless `labels` is false), then of the
      * other species' columns (clearIn), its centre nearest `near`; NaN where nowhere, `why` saying what was in the way.
      */
-    const spot = (k: number, lo: number, hi: number, y0: number, y1: number, size: number, near: number, labels = true): number => {
+    const spot = (lo: number, hi: number, y0: number, y1: number, size: number, near: number, labels = true): number => {
       [clear.length, clear[0], clear[1]] = [2, lo, hi];
       if (labels) for (const q of taken) if (q[1] < y1 && q[3] > y0 && q[0] < hi && q[2] > lo && clear.length) this.cutOut(clear, q[0], q[2], size);
       if (!clear.length) {
         why = 'meets';
         return NaN;
       }
-      this.clearIn(k, Wy(y0), Wy(y1), size, clear);
+      this.clearIn(kLo, Wy(y0), Wy(y1), size, clear, kHi);
       let xs = NaN;
       for (let i = 0; i < clear.length; i += 2) {
         const xi = Math.max(clear[i] + size / 2, Math.min(clear[i + 1] - size / 2, near));
@@ -3371,25 +3468,36 @@ export class FanView implements InputHandlers {
     this.tipWork = 0;
     this.tipCut = 0;
     for (let t = 0; t < tips.length; t++) {
-      const k = tips[t];
+      // (A fossil group with a rank name (a fossil genus, tipGroupsOf) is named as one, at its youngest tip, over its band, with a picture of its own, until the zoom
+      // gives each of its fossils a name's room across (its `open`): as the column's groups open into their parts, ToLaD#279.)
+      const g0 = groups.get(tips[t]);
+      const one = g0 && sx < g0.open ? g0 : null;
+      if (one) {
+        if (done.has(one)) continue;
+        done.add(one);
+      }
+      const k = one ? one.young : tips[t];
       const b = f.strands[k];
-      if (C[k] < x0 || C[k] > x1 || b.tipY < y0w || b.tipY > y1w) continue;
+      const cx = one ? one.c : C[k];
+      if (cx < x0 || cx > x1 || b.tipY < y0w || b.tipY > y1w) continue;
+      [kLo, kHi] = one ? [one.f, one.l] : [k, k];
       // (A frame's budget, in strands read on a row (clearIn): past it the rest wait for a closer view, the narrower rooms last in tipOrder. Every
       // tip is still tried where few are on screen; at home, with every fossil, ~8,000 are and a frame would read millions, ToLaD#279.)
       if (this.tipWork > TIP_WORK) {
         this.tipCut = tips.length - t;
         break;
       }
-      const [c, line] = [X(C[k]), Y(b.tipY)];
+      const [c, line] = [X(cx), Y(b.tipY)];
       // (Its room across, on screen: its band, or where that is narrower, wherever the name still covers its line: centred on it, else slid off it by up to its half.)
-      const span = Math.max(R[k] * sx, 2 * SPECIES_PX);
+      const span = Math.max((one ? one.r : R[k]) * sx, 2 * SPECIES_PX);
       const [lo, hi] = [Math.max(0, Math.min(c - span / 2, this.w - SPECIES_PX)), Math.min(this.w, Math.max(c + span / 2, SPECIES_PX))];
-      const [at, start] = [Math.min(line, Y(b.splitY) - PIC_D / 2), Y(b.splitY)];
+      const splitY = one ? one.v.yBot : b.splitY;
+      const [at, start] = [Math.min(line, Y(splitY) - PIC_D / 2), Y(splitY)];
       // (Its picture's top: on its tip; else, where even a small one there sits on a later lineage standing in its room past its tip (humans over Neanderthals'), just inside its
       // own branch, its young edge on its tip, where its branch holds one; the name laid from there.)
       let pt = at - PIC_D / 2;
-      if (line + PIC_S <= start && Number.isNaN(spot(k, Math.max(0, c - PIC_S), Math.min(this.w, c + PIC_S), pt, pt + PIC_S, PIC_S, c, false))) pt = line;
-      const name = levelText(b);
+      if (line + PIC_S <= start && Number.isNaN(spot(Math.max(0, c - PIC_S), Math.min(this.w, c + PIC_S), pt, pt + PIC_S, PIC_S, c, false))) pt = line;
+      const name = one ? levelName(one.v) : levelText(b);
       this.tryEnd = this.tipWork + TIP_TRY;
       const text = this.titleWidth(SPECIES_FONT, name) <= cap ? name : this.pillText(name, cap);
       const len = LABEL_PAD + this.titleWidth(SPECIES_FONT, text);
@@ -3401,7 +3509,7 @@ export class FanView implements InputHandlers {
         const y1 = past ? pt - LABEL_UNDER : pt + d + LABEL_UNDER + len;
         const y0 = y1 - len;
         if ((!past && y1 > start) || y0 < 0 || y1 > this.h) continue;
-        const xs = spot(k, lo, hi, y0, y1, SPECIES_PX, c);
+        const xs = spot(lo, hi, y0, y1, SPECIES_PX, c);
         if (Number.isNaN(xs)) continue;
         [x, box] = [xs, [xs - half, y0, xs + half, y1]];
         break;
@@ -3411,24 +3519,51 @@ export class FanView implements InputHandlers {
         continue;
       }
       const y1 = box[3];
-      const key = `t${k}`;
-      out.names.push({ key, id: key, place: 'tip', text, rank: [0, 0, k], x, y1, box, fit: 1, plus: 0, pic: b, b, plain: SPECIES_FONT });
+      const key = one ? `tg${k}` : `t${k}`;
+      out.names.push({ key, id: key, place: 'tip', text, rank: [0, 0, k], x, y1, box, fit: 1, plus: 0, pic: b, ...(one ? { v: one.v, fam: one.v } : { b }), plain: SPECIES_FONT });
       taken.push(box);
-      named.push([k, x, pt]);
+      named.push([k, x, pt, one]);
     }
     // (Then their pictures, in the same order: every fossil's name before any fossil's picture, as a label's name comes before its picture.)
-    for (const [k, x, y0] of named)
+    for (const [k, x, y0, one] of named)
       for (const d of [PIC_D, PIC_S]) {
+        [kLo, kHi] = one ? [one.f, one.l] : [k, k];
         // (On its name's line, else off it by up to its half, still over it: whole on screen across, as the column's are.)
-        const px = spot(k, Math.max(0, x - d), Math.min(this.w, x + d), y0, y0 + d, d, x);
+        const px = spot(Math.max(0, x - d), Math.min(this.w, x + d), y0, y0 + d, d, x);
         if (Number.isNaN(px)) continue;
         const b = f.strands[k];
-        const p = { x: px, y: y0 + d / 2, i: out.pics.length, lv: { b } as Level, face: b, held: false };
+        // (A group's: its youngest fossil's face, and its disc a member's photo where that has none, discSci.)
+        const p = { x: px, y: y0 + d / 2, i: out.pics.length, lv: (one ? { v: one.v } : { b }) as Level, face: b, held: false };
         out.pics.push(d === PIC_D ? p : { ...p, d });
         taken.push(picBox({ ...p, d }));
         break;
       }
   }
+  /**
+   * The fossil groups tipLabels names as one (ToLaD#279), per strand: each outermost clade with a rank name of its own (isLevel) that is only fossils placed by name
+   * (splits.ts nameGrafts: a fossil genus, as Smilodon), with its strands f..l in drawn order, its youngest fossil, its band's centre and width (world x, its strands'
+   * rooms side by side), and `open`, the zoom from which each of its fossils has a name's room across (SPECIES_PX), where they are named each at its own tip instead.
+   * Kept per layout (its rooms).
+   */
+  private tipGroupsOf(C: Float64Array, R: Float64Array): Map<number, TipGroup> {
+    const had = this.tipGroups;
+    if (had.C === C && had.R === R && had.fan === this.fan) return had.m;
+    const m = new Map<number, TipGroup>();
+    for (const v of this.fan.nodes) {
+      if (v.strands.length < 2 || m.has(v.strands[0].index) || !isLevel(this.fan, v) || v.strands.some((b) => !b.sp.placed)) continue;
+      let [a, z, minR, young] = [Infinity, -Infinity, Infinity, v.strands[0]];
+      for (const b of v.strands) {
+        const k = b.index;
+        [a, z, minR] = [Math.min(a, C[k] - R[k] / 2), Math.max(z, C[k] + R[k] / 2), Math.min(minR, R[k])];
+        if (b.sp.t1 < young.sp.t1) young = b;
+      }
+      const g: TipGroup = { v, f: v.strands[0].index, l: v.strands[v.strands.length - 1].index, young: young.index, c: (a + z) / 2, r: z - a, open: SPECIES_PX / Math.max(1e-300, minR) };
+      for (const b of v.strands) m.set(b.index, g);
+    }
+    Object.assign(had, { C, R, fan: this.fan, m });
+    return m;
+  }
+  private readonly tipGroups: { C: Float64Array | null; R: Float64Array | null; fan: Fan | null; m: Map<number, TipGroup> } = { C: null, R: null, fan: null, m: new Map() };
   /** tipLabels' work this frame (strands read on a row, clearIn), and the tips it left untried at TIP_WORK (from where it stopped in tipOrder, on screen or not). */
   tipWork = 0;
   tipCut = 0;
@@ -3443,7 +3578,7 @@ export class FanView implements InputHandlers {
    * stand in drawn order, never crossing (Steady), so from k the scan outward ends on each side, row by row, at the first one past what is left; a strand gone before every row
    * is passed over at once.
    */
-  private clearIn(k: number, ya: number, yb: number, min: number, out: number[]): number[] {
+  private clearIn(k: number, ya: number, yb: number, min: number, out: number[], kHi = k): number[] {
     const S = (this.fan.tess.fold as Steady).strands;
     // (Its rows on the screen's whole px (ToLaD#279): the same rows for every fossil a frame, so a strand's place on a row is worked out once a frame
     // (clearRows), not once a fossil: at home some 8,000 fossils' names are tried, all among the same few thousand strands.)
@@ -3462,7 +3597,7 @@ export class FanView implements InputHandlers {
     for (let dir = -1; dir <= 1 && out.length; dir += 2) {
       open.fill(1);
       let rows = n;
-      for (let i = k + dir; i >= 0 && i < S.length && rows && out.length; i += dir) {
+      for (let i = (dir < 0 ? k : kHi) + dir; i >= 0 && i < S.length && rows && out.length; i += dir) {
         const b = S[i];
         const yTop = (p0 + n - 1) / sy;
         if (b.tipY > yTop) continue;
