@@ -16,7 +16,7 @@
 
 import raw, { naturalMeta } from 'virtual:panthera-data';
 import carnivora from 'virtual:carnivora-data';
-import { mammalData } from './mammals-data';
+import { mammalCardLoaded, mammalData, onMammalCard } from './mammals-data';
 import { unpackGenealogies } from './packed';
 import { genealogiesAhead } from './population';
 import type { LayoutSeed } from './layout';
@@ -152,21 +152,40 @@ export function cladeOf(r: RawClade, tree: Split, common: string): CladeRec {
   const kept = r.species.filter((s) => placed.has(s.sci));
   const cl = clades(kept, r.gid);
   const species = kept.map((s, i) => speciesRec(s, cl[i]));
-  const sum = (f: (s: SpeciesRec) => number) => species.reduce((a, s) => a + f(s), 0);
   return {
     gid: r.gid,
     sci: r.sci,
     common,
-    ever: sum((s) => s.ever),
-    everLo: sum((s) => s.everLo),
-    everHi: sum((s) => s.everHi),
-    alive: sum((s) => s.alive),
+    ...cladeSums(species),
     grade: r.grade,
     t0: r.t0,
     t1: r.t1,
     species,
     tree,
   };
+}
+
+/** A clade's totals: the sums over its species. */
+function cladeSums(species: SpeciesRec[]): Pick<CladeRec, 'ever' | 'everLo' | 'everHi' | 'alive'> {
+  const sum = (f: (s: SpeciesRec) => number) => species.reduce((a, s) => a + f(s), 0);
+  return { ever: sum((s) => s.ever), everLo: sum((s) => s.everLo), everHi: sum((s) => s.everHi), alive: sum((s) => s.alive) };
+}
+
+/**
+ * The clade's species again once mammals-card.json's kinds are in their rows (ToLaD#502): each field as speciesRec makes
+ * it, in place; a record it already holds (the history, merged in place, and the births) kept, so nothing the layout
+ * holds changes.
+ */
+function cardIn(c: CladeRec, rows: RawSpecies[]): void {
+  const raw = new Map(rows.map((r) => [r.gid, r]));
+  for (const sp of c.species) {
+    const r = raw.get(sp.gid);
+    if (!r) continue;
+    const fresh = speciesRec(r, sp.clade) as unknown as Record<string, unknown>;
+    const was = sp as unknown as Record<string, unknown>;
+    for (const [k, v] of Object.entries(fresh)) if (was[k] === null || was[k] === undefined || typeof v !== 'object' || v === null) was[k] = v;
+  }
+  Object.assign(c, cladeSums(c.species));
 }
 
 /** The cat family. */
@@ -181,8 +200,10 @@ let mamm: CladeRec | null = null;
 export function mammaliaClade(): CladeRec {
   if (mamm) return mamm;
   const d = mammalData();
-  mamm = { ...cladeOf(d.clade, mammaliaTree(), 'Mammals'), seed: d.seed };
+  const m: CladeRec = (mamm = { ...cladeOf(d.clade, mammaliaTree(), 'Mammals'), seed: d.seed });
   // Its genealogies, worked out at build time (mammals-seed.ts, ToLaD#255), for these species.
-  if (d.gen) genealogiesAhead(unpackGenealogies(d.gen), mamm.species);
-  return mamm;
+  if (d.gen) genealogiesAhead(unpackGenealogies(d.gen), m.species);
+  // (The card's kinds come after the open, ToLaD#502: then its species take them.)
+  if (!mammalCardLoaded()) onMammalCard(() => cardIn(m, d.clade.species));
+  return m;
 }
