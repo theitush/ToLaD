@@ -245,7 +245,17 @@ curated history covers; a name no species list knows is left out). A graft hangs
 that is the common ancestor of the matched species under its Open Tree parent: older than that node (or
 on a total group's stem), it branches off the node's stem at its band start; younger, it joins that
 node's split (`loose`: where inside is not known). A fossil-only subtree keeps the merged tree's shape
-and ages. Extinct tips Upham placed with no genetic data are grafted like any fossil.
+and ages. Extinct tips Upham placed with no genetic data are grafted like any fossil. A fossil-dated split sits at
+its oldest fossil, so nested fossil groups that share their oldest fossil (a family and the genus that holds it; a stem
+and the clade inside it) come at one date: zero-length branches (ToLaD#561, `dated.zero_length`). They get the minimum
+branch length (Laurin 2004, as paleotree's `timePaleoPhy(type = "mbl")` does it): each such split is pushed older just
+far enough that it and the split inside it are told apart at the data's precision (1e-3 of the age), the youngest
+staying at its fossil. Only ages set by fossils (or a graft's interpolation, or a backbone split raised to a fossil)
+move, never a dated tree's, an override's or a cited backbone age; a run with no room under a fixed split stays at
+one date (and in the mammal build is spliced into its parent). The "equal" method (Brusatte et al. 2008) is the
+build's other choice (`dated.ZERO_LENGTH`): on these taxonomy-shaped fossil trees it shares a whole ghost branch down a
+run and moves families tens of Ma before their oldest fossil, so it is not the one applied. Report: `stats.json` →
+`dated_tree.zero_length` (the amniotes: `amniotes.fossils.zero_length`).
 
 The sidecars are JSON, one per data file, read at build time by the fan (they are not served):
 `dated/<tile id>.json` for a tile, `dated/skeleton.json` for the skeleton. Each has
@@ -280,7 +290,7 @@ rows, keyed as `nodes`/`names`/`names_en`/`loose`/`notes`/`grafts` above, except
 `[parent, tile, row]` (tile −1: the skeleton) and `grafts` lists `[tile, row]` pairs (the whole-mammal fan reads
 it; the per-file trees cannot be joined without it). Then `sources` (`upham`, `upham-imputed`: a split that joins a tip
 Upham placed with no genetic data, `fossil`: a graft's first appearance or a fossil subtree's
-fossil-range age, `interpolated`: an Open Tree node's interpolated age, `override`, and since #145's ages
+fossil-range age (a little older where a zero-length branch was given time; its `lo` stays the fossil's date), `interpolated`: an Open Tree node's interpolated age, `override`, and since #145's ages
 rule: `ensemble`: a clade of both Upham and Álvarez-Carretero 2022 dated by the geometric mean of their ages
 (interval: the union of their 95% ranges), `alvarez`: the same clade dated by A-C alone (the rule not chosen,
 dated.AGES), `upham-interp`: any other Upham split, interpolated in Upham's height between the dated splits

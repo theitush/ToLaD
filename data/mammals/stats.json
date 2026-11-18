@@ -8107,7 +8107,7 @@
     "of": 15
    }
   },
-  "clamped_below_parent": 109,
+  "clamped_below_parent": 409,
   "ended_before_split": [],
   "fossil_floors": [
    {
@@ -8388,15 +8388,15 @@
    "family": 14,
    "genus": 450
   },
-  "named_splits": 3248,
+  "named_splits": 3311,
   "species": 18361,
   "species_rows_left_out": 0,
-  "splits": 9678,
+  "splits": 9934,
   "splits_by_source": {
    "ensemble": 2264,
-   "fossil": 3247,
+   "fossil": 3485,
    "fossil-floor": 33,
-   "interpolated": 753,
+   "interpolated": 771,
    "override": 33,
    "upham": 1,
    "upham-imputed": 1387,
@@ -8862,8 +8862,8 @@
      "species": 6
     },
     "subfamily Dasypodinae": {
-     "best_F": 0.9,
-     "best_fork_holds": 9,
+     "best_F": 1.0,
+     "best_fork_holds": 11,
      "named_as": "Dasypodidae",
      "species": 11
     },
@@ -9107,8 +9107,8 @@
      "species": 6
     },
     "tribe Dasypodini": {
-     "best_F": 0.9,
-     "best_fork_holds": 9,
+     "best_F": 1.0,
+     "best_fork_holds": 11,
      "named_as": "Dasypodidae",
      "species": 11
     },
@@ -9617,15 +9617,6 @@
      "rank": "tribe",
      "species": 31,
      "strays_out": 6
-    },
-    {
-     "F": 0.9,
-     "fork_holds": 9,
-     "name": "Dasypodidae",
-     "others_in": 0,
-     "rank": "family",
-     "species": 11,
-     "strays_out": 2
     },
     {
      "F": 0.903,
@@ -10317,8 +10308,20 @@
    "extinct, placed without data (grafted instead)": 44,
    "unmatched tip": 217
   },
-  "zero_length_named_kept": 411,
-  "zero_length_spliced": 256
+  "zero_length": {
+   "fossil_splits_at_one_date": 0,
+   "largest_move": {
+    "from_Ma": 20.363,
+    "split": "Rhinoceros unicornis + Aceratherium incisivum",
+    "to_Ma": 20.651
+   },
+   "method": "mbl",
+   "moved_younger": 0,
+   "not_below_parent": 0,
+   "note": "zero-length branches given the minimum branch length (Laurin 2004; paleotree timePaleoPhy type='mbl'): ToLaD#561",
+   "splits_moved": 459
+  },
+  "zero_length_spliced": 0
  },
  "dating": {
   "calibrated_raised_by_fossils": 402,
@@ -40418,21 +40421,6 @@
      "species": 36,
      "split_holds": 71
     },
-    "family Dasypodidae": {
-     "e.g.": [
-      "Cabassous centralis",
-      "Cabassous chacoensis",
-      "Cabassous squamicaudis",
-      "Cabassous tatouay",
-      "Cabassous unicinctus",
-      "Calyptophractus retusus",
-      "Chaetophractus vellerosus",
-      "Chaetophractus villosus"
-     ],
-     "others": 14,
-     "species": 11,
-     "split_holds": 26
-    },
     "family Delphinidae": {
      "e.g.": [
       "Balaena mysticetus",
@@ -41623,7 +41611,7 @@
  },
  "output": {
   "brotli_bytes": 842588,
-  "dated_sidecar_raw": 2195456,
+  "dated_sidecar_raw": 2215240,
   "files": 15,
   "raw_bytes": 4595584,
   "skeleton_brotli": 109397,

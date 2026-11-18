@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import type { SpeciesRec } from './panthera';
-import { searchSpecies } from './search';
+import { foldNames, searchSpecies } from './search';
 
 /** A magnifier drawn in SVG (no icon font). */
 export function MagnifierIcon() {
@@ -25,6 +25,12 @@ export function SearchPanel({ species, onPick, onClose, initial = '' }: { specie
   const hits = useMemo(() => searchSpecies(species, q), [species, q]);
   const listRef = useRef<HTMLUListElement>(null);
   const k = Math.min(active, hits.length - 1);
+
+  // The names folded as the panel opens (after its first paint), not on the first keystroke (ToLaD#564).
+  useEffect(() => {
+    const t = setTimeout(() => foldNames(species), 0);
+    return () => clearTimeout(t);
+  }, [species]);
 
   // The active row kept in view as the arrows move it.
   useEffect(() => {

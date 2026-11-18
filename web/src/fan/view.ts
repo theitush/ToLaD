@@ -25,6 +25,7 @@ import type { Fold, FoldState } from './fold';
 import { forkMode, grayOn, LABEL_PILL, peelSteps, Steady } from './steady';
 import { LADDER, Territories, type CutItem, type Ref, type RowsOf } from './cut';
 import { COLUMN_DIM, columnSpans, EVENT_TINT, eventAt, eventSpans, type EventSpan } from './colstyle';
+import { allUnknown, cladeDashes, DASH_OFF, DASH_ON, DASH_PERIOD, DASH_SKIP, DASH_W, dashAt, strandDashes, unknownLook } from './dashed';
 import { DIM_NARROW, DIM_WIDE, laneDim, LINEAGE, pathFrame, TwigModel } from './twigs';
 import type { RectBatch } from './meshgl';
 import { FAMILY_EN, familyLabel, HIGHLIGHT_STOPS, ORDER_EN, ORDER_TAXA, taxonKey, type Split } from './splits';
@@ -111,6 +112,8 @@ const RIBBON_INSET_PX = 1;
 const GLOW_W = 6;
 /** A column with no styled spans on screen (drawStrand): shared, never written. */
 const NO_HELD: [number, number, number][] = [];
+/** A column with no dashed stretch (dashed.ts): its band all along. */
+const NO_DASH: number[] = [];
 /** No merged clades (a level with no orders): one array, so Steady.setMerged knows it unchanged. */
 const NO_MERGED: FanNode[] = [];
 /** The glow fades out across a lean: gone where the lane runs √(1 + s²) - 1 = GLOW_LEAN off straight down (s ≈ 0.75 px per px). */
@@ -4436,10 +4439,13 @@ export class FanView implements InputHandlers {
     // the screen's heights, from a walk down to the merged clades; in the order of fan.nodes from the end, as ever.)
     const walk = lod && lodIndexOn() ? this.stemWalk : null;
     if (walk) lod!.stemNodes(gray, wTop, wBot, walk);
+    // (A column with no count in it is its dashed line, ToLaD#565: no backdrop its width.)
+    const dashK = unknownLook() === 'dashed';
     for (let q = 0, n = walk ? walk.n : nodes.length; q < n; q++) {
       const ni = walk ? walk.at[q] : nodes.length - 1 - q;
       const v = nodes[ni];
       if (!walk && (lod?.hidden(v) || (!gray && !cladeAllGray(v)))) continue;
+      if (dashK && allUnknown(this.fan, v)) continue;
       const ya = Math.max(v.y, wTop);
       // (Its peel no whole ribbon, ToLaD#377: the backdrop stops where its column does.)
       const cutH = corners ? steady!.footCut(ni, this.cam.sx, this.cam.sy) : 0;
@@ -4599,30 +4605,50 @@ export class FanView implements InputHandlers {
       if (this.forkCuts.length) pts = this.cutForks(pts, (y) => leftAt(b, y) + hw);
     }
     // The column's styled spans on screen ([top, bottom, dim]), clipped to it: none for most strands.
+    // (A count nobody has drawn as one dashed line, ToLaD#565: no faint band, its dashed stretches on screen instead.)
+    const dashed = b.sp.countUnknown && unknownLook() === 'dashed';
     let held = NO_HELD;
-    for (const [t, bt, d] of colSpansY(this.fan, b)) {
-      const st = cam.screenY(t);
-      const sb = cam.screenY(bt);
-      if (sb > -20 && st < this.h + 20) (held === NO_HELD ? (held = []) : held).push([st, sb, d]);
-    }
+    if (!dashed)
+      for (const [t, bt, d] of colSpansY(this.fan, b)) {
+        const st = cam.screenY(t);
+        const sb = cam.screenY(bt);
+        if (sb > -20 && st < this.h + 20) (held === NO_HELD ? (held = []) : held).push([st, sb, d]);
+      }
+    const dash = dashed ? this.dashOn(strandDashes(this.fan, b)) : NO_DASH;
     // As the strands fade in (twigs.ts), the lanes dim to a backdrop under them: the same
     // lanes, the same geometry, never a switch.
     // (Gray off, ToLaD#410: the gray stays on an extinct species' column, down to where it joins a line that lives.)
-    if (grayOn()) this.drawLanes(pts, hw, held, true);
-    else this.drawLanesOff(pts, hw, held, allGray(b), allGray(b) ? cam.screenY(grayFoot(b.node, b.splitY)) : 0);
+    if (grayOn()) this.drawLanes(pts, hw, held, true, dash);
+    else this.drawLanesOff(pts, hw, held, allGray(b), allGray(b) ? cam.screenY(grayFoot(b.node, b.splitY)) : 0, dash);
+  }
+
+  private dashScr: number[] = [];
+  /** A column's dashed stretches (dashed.ts, world [top, bottom, off]) on screen, those that meet it: their offsets in px. */
+  private dashOn(spans: readonly number[]): number[] {
+    if (!spans.length) return NO_DASH;
+    const out = this.dashScr;
+    out.length = 0;
+    const cam = this.camera;
+    for (let k = 0; k < spans.length; k += 3) {
+      const t = spans[k] === -Infinity ? -Infinity : cam.screenY(spans[k]);
+      const bt = cam.screenY(spans[k + 1]);
+      const o = spans[k + 2];
+      if (bt > -20 && t < this.h + 20) out.push(t, bt, o === DASH_SKIP ? o : o * this.cam.sx);
+    }
+    return out.length ? out : NO_DASH;
   }
 
   /**
    * Gray off (ToLaD#410, #444): a column with no gray in it, its silhouette the one with it on, so that anyone alive then is still shown.
    * All a living column's width is green; an extinct one (`ended`) is gray down to `foot` (screen y), where it joins a line that lives, and green below it: part of that line.
    */
-  private drawLanesOff(pts: LanePts, hw: number, held: [number, number, number][], ended: boolean, foot: number): void {
+  private drawLanesOff(pts: LanePts, hw: number, held: [number, number, number][], ended: boolean, foot: number, dash = NO_DASH): void {
     if (ended) {
-      this.drawLanes(this.ptsAbove(pts, foot), hw, held, true);
+      this.drawLanes(this.ptsAbove(pts, foot), hw, held, true, dash);
       pts = this.ptsBelow(pts, foot);
     }
     pts.f.fill(1, 0, pts.n);
-    this.drawLanes(pts, hw, held, false);
+    this.drawLanes(pts, hw, held, false, dash);
   }
 
   /** drawStrands' strands, by their place in fan.branches. */
@@ -4781,11 +4807,13 @@ export class FanView implements InputHandlers {
       f.nodeForks(v, this.cam.sx, this.cam.sy, sTop, sBot, this.forkCuts);
       if (this.forkCuts.length) out = this.cutForks(pts, (y) => f.left(i0, y)! + RIBBON_INSET_PX / this.cam.sx);
     }
+    // (A clade none of whose species has a count, ToLaD#565: one dashed line, as one such species'.)
+    const dash = unknownLook() === 'dashed' ? this.dashOn(cladeDashes(this.fan, v)) : NO_DASH;
     // (Gray off, ToLaD#410: a ribbon with anyone living in it is a branch with living descendants, its gray goes, its fossils' with it.)
-    if (grayOn()) this.drawLanes(out, 0, NO_HELD, true);
+    if (grayOn()) this.drawLanes(out, 0, NO_HELD, true, dash);
     else {
       const ended = cladeAllGray(v);
-      this.drawLanesOff(out, 0, NO_HELD, ended, ended ? cam.screenY(grayFoot(v.parent, v.yBot)) : 0);
+      this.drawLanesOff(out, 0, NO_HELD, ended, ended ? cam.screenY(grayFoot(v.parent, v.yBot)) : 0, dash);
     }
   }
 
@@ -4888,6 +4916,7 @@ export class FanView implements InputHandlers {
       }
     };
     const nodes = this.fan.nodes;
+    const dashK = unknownLook() === 'dashed';
     f.splitsOn(cam.worldY(-4), cam.worldY(this.h + 4), this.toWorld(-8, 0)[0], this.toWorld(this.w + 8, 0)[0], (j, top) => {
       const v = nodes[j];
       if (lod && (lod.hidden(v) || lod.isMerged(v))) return;
@@ -4906,11 +4935,37 @@ export class FanView implements InputHandlers {
           if (has !== live) continue;
           const dc = cam.screenX(out[2 * q]);
           rect(Math.min(pc, dc) - 0.5, y0 - 0.5, Math.max(pc, dc) + 0.5, y0 + 0.5, c);
-          // (Its stem a line too, ToLaD#402: on up from the fork to its own split, whose corners start from there.)
-          rect(dc - 0.5, stems[2 * q] > 0 ? yt : cam.screenY(stems[2 * q + 1]), dc + 0.5, y0, c);
+          // (Its stem a line too, ToLaD#402: on up from the fork to its own split, whose corners start from there. A
+          // daughter with no count in it, ToLaD#565: dashed, as its column above.)
+          const st = stems[2 * q] > 0 ? yt : cam.screenY(stems[2 * q + 1]);
+          if (dashK && (isNode(kid) ? allUnknown(this.fan, kid) : kid.sp.countUnknown)) this.dashStem(dc, st, y0, live);
+          else rect(dc - 0.5, st, dc + 0.5, y0, c);
         }
       }
     }, lod ? (j) => lod.isMergedAt(j) : undefined);
+  }
+  /** A fork's stem as a dashed line (drawCorners, ToLaD#565): straight up at x from bot to top (screen), its dashes from "now" as a column's. */
+  private dashStem(x: number, top: number, bot: number, live: boolean): void {
+    if (x < -10 || x > this.w + 10) return;
+    const anchor = this.camera.screenY(this.fan.time.y(0));
+    const t = Math.max(-8, top);
+    const b = Math.min(this.h + 8, bot);
+    if (!(b > t)) return;
+    if (this.gl) {
+      this.dashChord(x, t, x, b, live, t - anchor);
+      return;
+    }
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.setLineDash([DASH_ON, DASH_OFF]);
+    ctx.lineDashOffset = (((t - anchor) % DASH_PERIOD) + DASH_PERIOD) % DASH_PERIOD;
+    ctx.lineWidth = DASH_W;
+    ctx.strokeStyle = live ? DASH_GREEN_CSS : DASH_GRAY_CSS;
+    ctx.beginPath();
+    ctx.moveTo(x, t);
+    ctx.lineTo(x, b);
+    ctx.stroke();
+    ctx.restore();
   }
   private forkLines: ForkLines = { n: 0, xy: [], at: new Map() };
   /** The horizontals drawCorners draws this frame, for the leaders (ToLaD#434); none under `peel`, which draws none. */
@@ -4950,10 +5005,9 @@ export class FanView implements InputHandlers {
   private mergedExt: [number, number] = [0, 0];
   private ribbons = new Ribbons();
 
-  /** A column's lanes (drawStrand's, or a merged clade's, lod.ts): its points, spine offset hw, styled spans and twig fade. */
-  private drawLanes(pts: LanePts, hw: number, held: [number, number, number][], gray: boolean): void {
+  /** A column's lanes (drawStrand's, or a merged clade's, lod.ts): its points, spine offset hw, styled spans and twig fade; its dashed stretches (dashOn: a line, no band). */
+  private drawLanes(pts: LanePts, hw: number, held: [number, number, number][], gray: boolean, dash = NO_DASH): void {
     if (pts.n < 2) return;
-    const ctx = this.ctx;
     // On the GPU layer each stretch sinks to a dark tint of itself by its own lanes' widths (twigs.ts laneDim).
     if (this.gl) {
       // Between neighbouring samples each lane is a trapezoid (the curve's chord, a few px at most):
@@ -5016,6 +5070,8 @@ export class FanView implements InputHandlers {
         const y0 = Y[i + 1];
         const y1 = Y[i];
         if (!(y1 > y0) || y1 < -4 || y0 > this.h + 4) continue;
+        // (A dashed stretch, or one another column's line holds: no band; its line drawDashes'.)
+        if (dash.length && !Number.isNaN(dashAt(dash, (y0 + y1) / 2))) continue;
         const xq = X[i + 1] - hk;
         const xp = X[i] - hk;
         const wq = W[i + 1] * k;
@@ -5039,27 +5095,133 @@ export class FanView implements InputHandlers {
         }
         segs.push(xq, wq, gq, y0, xp, wp, gp, y1, gray, dim);
       }
-    } else {
-      // (Its run drawn whole.)
-      if (gray) {
-        ctx.fillStyle = GRAY;
-        this.ribbon(pts, (i) => hw - pts.w[i], () => hw, 0.6);
-      }
-      if (pts.f.subarray(0, pts.n).some((f) => f > 0)) {
-        // Green lane on the left, floored at 1 px.
-        ctx.fillStyle = GREEN;
-        this.ribbon(pts, () => hw, (i) => hw - pts.w[i] * pts.f[i], -1);
-      }
-      // Its styled stretches: faded over the individuals too, once they are drawn (drawHeld).
-      for (const [t, bt, d] of held) {
-        // (The points are bottom up: y falls along them.)
-        let i1 = 0;
-        while (i1 < pts.n && !(pts.y[i1] <= bt + 0.5)) i1++;
-        let i0 = i1;
-        while (i0 < pts.n && pts.y[i0] >= t - 0.5) i0++;
-        if (i0 - i1 > 1) this.heldRuns.push({ run: pts.slice(i1, i0 - 1), hw, d });
+    } else if (!dash.length) this.bandRun(pts, hw, held, gray);
+    else {
+      // (The runs of band between the dashed stretches, each drawn whole.)
+      let a = 0;
+      for (let i = 0; i + 1 <= pts.n; i++) {
+        const lined = i + 1 < pts.n && !Number.isNaN(dashAt(dash, (pts.y[i] + pts.y[i + 1]) / 2));
+        if (!lined && i + 1 < pts.n) continue;
+        if (i > a) this.bandRun(pts.slice(a, i), hw, held, gray);
+        a = i + 1;
       }
     }
+    if (dash.length) this.drawDashes(pts, hw, dash, gray);
+  }
+
+  /** drawLanes without the GPU layer: a run of band drawn whole. */
+  private bandRun(pts: LanePts, hw: number, held: [number, number, number][], gray: boolean): void {
+    const ctx = this.ctx;
+    if (gray) {
+      ctx.fillStyle = GRAY;
+      this.ribbon(pts, (i) => hw - pts.w[i], () => hw, 0.6);
+    }
+    if (pts.f.subarray(0, pts.n).some((f) => f > 0)) {
+      // Green lane on the left, floored at 1 px.
+      ctx.fillStyle = GREEN;
+      this.ribbon(pts, () => hw, (i) => hw - pts.w[i] * pts.f[i], -1);
+    }
+    // Its styled stretches: faded over the individuals too, once they are drawn (drawHeld).
+    for (const [t, bt, d] of held) {
+      // (The points are bottom up: y falls along them.)
+      let i1 = 0;
+      while (i1 < pts.n && !(pts.y[i1] <= bt + 0.5)) i1++;
+      let i0 = i1;
+      while (i0 < pts.n && pts.y[i0] >= t - 0.5) i0++;
+      if (i0 - i1 > 1) this.heldRuns.push({ run: pts.slice(i1, i0 - 1), hw, d });
+    }
+  }
+
+  /**
+   * A column's dashed stretches (dashed.ts, ToLaD#565; drawLanes' points, spine offset hw, its stretches on screen):
+   * one line DASH_W px across at the centre of the column it stands for, wherever the band would have width, green
+   * where any of it lives (else gray, if drawn). Its dashes run along it from "now" (straight down to where it starts
+   * on screen, then along it), so they hold still as the view pans and are the same px at every zoom.
+   */
+  private drawDashes(pts: LanePts, hw: number, dash: number[], gray: boolean): void {
+    const k = this.cam.sx;
+    const hk = hw * k;
+    const { x: X, y: Y, w: W, f: F } = pts;
+    const anchor = this.camera.screenY(this.fan.time.y(0));
+    const L = this.w;
+    const ctx = this.ctx;
+    const twoD = !this.gl;
+    if (twoD) {
+      ctx.save();
+      ctx.setLineDash([DASH_ON, DASH_OFF]);
+      ctx.lineWidth = DASH_W;
+      ctx.lineCap = 'butt';
+    }
+    let open = false;
+    let was = false;
+    const end = () => {
+      if (open) ctx.stroke();
+      open = false;
+    };
+    // (Top down: its run along the line so far, NaN where none runs on.)
+    let s = NaN;
+    for (let i = pts.n - 2; i >= 0; i--) {
+      const y0 = Y[i + 1];
+      const y1 = Y[i];
+      if (!(y1 > y0)) continue;
+      const off = dashAt(dash, (y0 + y1) / 2);
+      const wq = W[i + 1] * k;
+      const wp = W[i] * k;
+      if (Number.isNaN(off) || off === DASH_SKIP || (!(wq > 0) && !(wp > 0))) {
+        s = NaN;
+        end();
+        continue;
+      }
+      const cq = X[i + 1] - hk + wq / 2 + off;
+      const cp = X[i] - hk + wp / 2 + off;
+      if (Number.isNaN(s)) s = y0 - anchor;
+      const len = Math.hypot(cp - cq, y1 - y0);
+      const live = F[i + 1] > 0 || F[i] > 0;
+      const on = (live || gray) && y1 >= -4 && y0 <= this.h + 4 && Math.max(cq, cp) + 2 >= -8 && Math.min(cq, cp) - 2 <= L + 8;
+      if (!on) end();
+      else if (!twoD) this.dashChord(cq, y0, cp, y1, live, s);
+      else {
+        if (!open || was !== live) {
+          end();
+          ctx.strokeStyle = live ? DASH_GREEN_CSS : DASH_GRAY_CSS;
+          ctx.lineDashOffset = ((s % DASH_PERIOD) + DASH_PERIOD) % DASH_PERIOD;
+          ctx.beginPath();
+          ctx.moveTo(cq, y0);
+          open = true;
+          was = live;
+        }
+        ctx.lineTo(cp, y1);
+      }
+      s += len;
+    }
+    end();
+    if (twoD) ctx.restore();
+  }
+
+  /**
+   * One chord of a dashed line on the GPU layer (SegBatch.dash), s its run along the line at its top (px from where the
+   * dashes start); with a batch that takes no chords (a test's stub), the trapezoid SEG_VS makes of it.
+   */
+  private dashChord(cq: number, y0: number, cp: number, y1: number, live: boolean, s: number): void {
+    const gl = this.gl!;
+    const phase = ((s % DASH_PERIOD) + DASH_PERIOD) % DASH_PERIOD;
+    if ((gl as Partial<Batches>).lanes) {
+      gl.lanes().dash(cq, y0, cp, y1, live, phase);
+      return;
+    }
+    const hw = (DASH_W / 2) * Math.sqrt(1 + ((cp - cq) / (y1 - y0)) ** 2);
+    const c = live ? DASH_GREEN01 : DASH_GRAY01;
+    const R = this.w + 8;
+    let l0 = cq - hw;
+    let r0 = cq + hw;
+    let l1 = cp - hw;
+    let r1 = cp + hw;
+    if ((r0 < -8 && r1 < -8) || (l0 > R && l1 > R)) return;
+    const cl = Math.max(-8, Math.min(l0, l1) - 0.5);
+    const cr = Math.min(R, Math.max(r0, r1) + 0.5);
+    if (l0 < -8 && l1 < -8) l0 = l1 = -8;
+    if (r0 > R && r1 > R) r0 = r1 = R;
+    gl.under.push(l0, y0, r0, y1, c[0], c[1], c[2], 1, l1 - l0, r1 - r0, cl, cr);
   }
 
   /**
@@ -5771,6 +5933,12 @@ export const CHORD_STYLE: ChordStyle = { gray: GRAY01, grayDark: GRAY_DARK01, gr
 /** drawLanes' piece colours: written per piece, read at once by trap(). */
 const GC_MIX: [number, number, number] = [0, 0, 0];
 const EC_MIX: [number, number, number] = [0, 0, 0];
+/** A dashed line's colours (ToLaD#565): a fork line's (drawCorners), as SEG_VS mixes them. */
+const DASH_GREEN01 = mixInto([0, 0, 0], GREEN01, GREEN_DARK01, laneDim(1) * 0.9);
+const DASH_GRAY01 = mixInto([0, 0, 0], GRAY01, GRAY_DARK01, laneDim(1) * 0.82);
+const css01 = (c: readonly number[]) => `rgb(${c.map((x) => Math.round(x * 255)).join(',')})`;
+const DASH_GREEN_CSS = css01(DASH_GREEN01);
+const DASH_GRAY_CSS = css01(DASH_GRAY01);
 
 export function fmtInt(n: number): string {
   return Math.round(n).toLocaleString('en-US');

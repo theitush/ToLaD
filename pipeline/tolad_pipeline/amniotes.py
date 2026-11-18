@@ -1132,6 +1132,10 @@ def build_amniotes(raw: Path, work: Path, log: dict, alog: dict, t_start: float)
         for x in d.preorder():
             if x.leaf is not None:
                 x.leaf.data["dleaf"] = x
+    # the stems' zero-length branches (a stem at its oldest fossil, as old as the clade inside it: Dinosauria in
+    # Avemetatarsalia), given time as the mammal build gives its own (dated.zero_length, ToLaD#561);
+    # the mammals' dated tree stays exactly theirs
+    dated.zero_length(adroot, alog["fossils"], skip=mdroot)
     adroot.data_notes = notes
     stop.t0 = age
     if ttop is not mroot:
