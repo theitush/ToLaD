@@ -2542,7 +2542,8 @@ export class FanView implements InputHandlers {
    * lineage among them). From the level holding both, down: the first whose frame is more than LEVEL_PX off the view's
    * (so every tap visibly moves). Already at a species: false, for its card. A clade that holds the view's level (a
    * pinned group, an ancestor's bracket): out to it, unless a column's stretch (`col`: false, its card). `inward` (a
-   * label's tap, ToLaD#446): never out, its own landing too passed over where it is wider than the view.
+   * label's tap, ToLaD#446): never out, its own landing too passed over where it is wider than the view, or where it is
+   * the level the view is at (a pan off its frame is no reason to go back: on in).
    */
   private tapInto(to: Level, col: boolean, inward = false): boolean {
     const on = this.anim && this.backing;
@@ -2559,6 +2560,7 @@ export class FanView implements InputHandlers {
       // colugos) frames that clade at its narrowest group's fit zoom, tighter than the Primates' own frame of two wide
       // groups: a tap on the humans' picture there flew out to the Primates, the bats and rodents beside them.)
       if ((k || inward) && this.outward(cam, cur)) continue;
+      if (!k && inward && holds(from, lv)) continue;
       if (this.offBy(cam, cur) > LEVEL_PX) {
         this.goLevel(lv, cam);
         return true;
@@ -2922,23 +2924,25 @@ export class FanView implements InputHandlers {
     if (to) {
       // (A highlight's species, ToLaD#497: its clade first.)
       if (to.b && this.stopAt(to, false)) return;
+      const label = !!(pill || pic);
+      // (A group's name on the tree on its side, ToLaD#465: where it opens, its parts named, openCamera; there, at that opening already
+      // or out of where the view is, its deep opening, ToLaD#500. An ancestor's title over a lineage's view (Murinae's over the herb field
+      // mouse's) opens deeper than the view already, where the view's own level would not move: its own rule, as it was.)
+      if (to.v && label && this.flip && gapLabelsOn()) {
+        this.goOpen(to.v);
+        return;
+      }
       // (A label always goes one level deeper, never out (ToLaD#258, #446): one naming a group the view's level sits in, wider
       // than the view (the one label holding the screen, as "Carnivores" at the dog-like carnivores with every fossil), is a
-      // tap on the view's level, on from there.)
-      const label = !!(pill || pic);
+      // tap on the view's level; and one on the view's level goes on in from there, a pan off its frame no step back to it.)
       const on = this.anim && this.backing ? this.backing : null;
       const at = label && to.v ? (on ? on.lv : this.levelNow(true)) : null;
       const into = at && at.v !== to.v && holds(to, at) ? at : to;
-      // (A group's name on the tree on its side, ToLaD#465: where it opens, its parts named, openCamera.)
-      if (into.v && label && this.flip && gapLabelsOn()) {
-        this.goOpen(into.v);
-        return;
-      }
       // (A group label, ToLaD#417: its group's own frame, as a fork name's, ToLaD#390.)
       // (Its frame already the view's (within LEVEL_PX, as a tap passes a level: Theria's 5 px off home's under `clades`), the one
       // label holding the screen, ToLaD#440, #446: on, a level deeper, as any tap. Its frame wider than the view: on in, too.)
       const cur = on ? on.cam : this.cam;
-      const f = labelMode() === 'groups' && label ? this.frameOf(into) : null;
+      const f = labelMode() === 'groups' && label && !(at && holds(into, at)) ? this.frameOf(into) : null;
       if (f && this.offBy(f, cur) > LEVEL_PX && !this.outward(f, cur)) this.goLevel(into, f);
       else this.tapInto(into, false, label);
       return;
