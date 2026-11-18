@@ -34,7 +34,7 @@
     "sauropsids": 0,
     "synapsids": 0
    },
-   "fossil_tips": 7773,
+   "fossil_tips": 7778,
    "fossils": {
     "by_group": {
      "Birds": 1472,
@@ -44,7 +44,7 @@
      "Marine reptiles": 465,
      "Non-avian dinosaurs": 1424,
      "Non-mammal synapsids": 783,
-     "Other amniotes": 366,
+     "Other amniotes": 371,
      "Other archosaurs": 162,
      "Other crocodylomorphs": 392,
      "Parareptiles": 112,
@@ -53,7 +53,7 @@
      "Tuatara and kin": 73,
      "Turtles (crown)": 922
     },
-    "fossils": 7773,
+    "fossils": 7778,
     "fossils_alive_into_the_recent": [],
     "non_avian_dinosaurs_after_K_Pg": {
      "n": 0,
@@ -112,7 +112,7 @@
       "research": 786
      },
      "Other": {
-      "here": 672,
+      "here": 677,
       "research": 639
      },
      "Pterosaurs": {
@@ -129,7 +129,7 @@
      }
     }
    },
-   "fossils_in_dated_tree": 7773,
+   "fossils_in_dated_tree": 7778,
    "mammal_tips": 18362,
    "rows_bands_not_positive": {
     "Amniota": 0,
@@ -155,9 +155,9 @@
     "bird: Callaghan, training": 675,
     "bird: extinct, unknown": 171,
     "bird: unknown": 1493,
-    "fossil: unknown": 7773,
+    "fossil: unknown": 7778,
     "reptile: extinct, unknown": 7,
-    "reptile: unknown": 12684
+    "reptile: unknown": 12679
    },
    "thinnest": {
     "N": 0.6660690486578963,
@@ -1865,11 +1865,11 @@
   }
  },
  "output": {
-  "brotli_bytes": 1637801,
-  "dated_sidecar_raw": 4940661,
+  "brotli_bytes": 1637712,
+  "dated_sidecar_raw": 4940845,
   "files": 39,
   "raw_bytes": 9262944,
-  "skeleton_brotli": 103951,
+  "skeleton_brotli": 103862,
   "skeleton_nodes": 1904,
   "skeleton_raw": 1673480,
   "tiles": 38
