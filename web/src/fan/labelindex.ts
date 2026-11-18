@@ -19,6 +19,14 @@ export function setLabelIndex(on: boolean): void {
   indexOn = on;
 }
 
+let tipRoomsOn = true;
+/** Whether the fossils' names at their tips read their rooms across from the zoom's memo (view.ts clearAt; else scanned every frame, as before ToLaD#502: tests compare the two). */
+export const tipRoomsKept = (): boolean => tipRoomsOn;
+/** (Tests.) */
+export function setTipRooms(on: boolean): void {
+  tipRoomsOn = on;
+}
+
 /**
  * How far (px) past the screen a member's band may stand and still put something on it (gapLabels): a picture slides
  * at most its half off its band's ends, a title stands within its own size of its band's top, a guest title within two
