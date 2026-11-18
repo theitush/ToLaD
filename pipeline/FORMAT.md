@@ -15,7 +15,7 @@ data/mammals/
   stats.json        build report (counts, match rates, fits, sizes, spot checks)
 ```
 
-`data/amniotes/` (ToLaD#539, `make build-amniotes`) is a second dataset in this format, the same files: the living amniotes, with `data/mammals`' rows unchanged as its Mammalia (global ids shifted by one, for its `Amniota` row 0). Its skeleton `META.dataset` is `amniotes-v0` and `META.amniotes` says what differs: its bird and reptile rows set only the `opentree` bit of `SRCM` (all 16 bits are taken) and name their sources in `METH`; a calibrated row's date source (code 0) is Upham's for a mammal and AvesData 1.7's, Title 2024's, Colston 2020's or TimeTree 5's elsewhere; and the dated sidecars' `sources` append `avesdata`, `title2024`, `colston2020` and `timetree` (with their citations) to the list below.
+`data/amniotes/` (ToLaD#539, `make build-amniotes`) is a second dataset in this format, the same files: the living amniotes, with `data/mammals`' rows unchanged as its Mammalia (global ids shifted by one, for its `Amniota` row 0). Its skeleton `META.dataset` is `amniotes-v0` and `META.amniotes` says what differs: its bird and reptile rows set only the `opentree` bit of `SRCM` (all 16 bits are taken) and name their sources in `METH`; a reptile is count unknown (FLAG bit 11) unless `pipeline/reptile_counts.toml` gives it a published count (bit 8, the sidecar's `count`; ToLaD#578); a calibrated row's date source (code 0) is Upham's for a mammal and AvesData 1.7's, Title 2024's, Colston 2020's or TimeTree 5's elsewhere; and the dated sidecars' `sources` append `avesdata`, `title2024`, `colston2020` and `timetree` (with their citations) to the list below.
 
 Load `skeleton.tld` first. It holds the tables that tile rows index into: `methods` and `sources`, plus the tile manifest. A **stub** row is a node whose children live in another tile. Its own row carries all the aggregates needed to draw the unloaded subtree as one band: width (`EVER`, `PPK_`/`PROF`), age span (`T0__`, `T1__`), alive fraction (`ALIV`/`EVER`), ghost share (`GHST`), grade, and tip count (`NTIP`). The representative name is in `META.stub_rep`. Row 0 of the referenced tile is the same node again with identical values, minus the STUB flag. Layout is stable under lazy loading (03 §3.3) because a node's children are laid out only from the children's own rows.
 
@@ -92,7 +92,7 @@ Bin 0 is the youngest (ends at `t1`) and bin 15 the oldest (starts at `t0`). Eac
 | 4–5 | date source: 0 = Upham-calibrated, 1 = interpolated, 2 = fossil range or fossil-constrained, 3 = anchored |
 | 6 | species tip (in the full tree) |
 | 7 | stub: children are in tile `STUB[...]` |
-| 8 | anchored count: humans, an IUCN census figure, a domestic stock (FAOSTAT livestock, dogs, cats), or a curated history (`HIST`) |
+| 8 | anchored count: humans, an IUCN census figure, a domestic stock (FAOSTAT livestock, dogs, cats), a curated history (`HIST`), or (`data/amniotes`) a reptile's published count (the dated sidecar's `count`, ToLaD#578) |
 | 9 | PBDB fossil species graft |
 | 10 | created taxonomic group (genus, family or order from PBDB, or the "incertae sedis" bucket) |
 | 11 | count unknown (ToLaD#507): a living species PHYLACINE lists with an empty current map (IUCN maps no current range for it), Data Deficient on the IUCN Red List, and counted by no census or history file. Nobody knows how many there are. `ALIV` and the births are the thinnest a living species is drawn at (the smallest today's count of any other living species, `stats.json` → `count_unknown.thinnest`) over its whole band, so its share of the clade sums is negligible; it has no natural baseline (`NATB` all 0) |
@@ -284,6 +284,11 @@ The sidecars are JSON, one per data file, read at build time by the fan (they ar
 - `gen`: `{row: [years, how]}`, the species' generation length as the model uses it; `how` indexes
   `gen_how`: `COMBINE reported`, `COMBINE imputed` (Soria et al. 2021, Pacifici et al. 2013's values),
   or `allometric` (the model's mass fit, for fossils and species COMBINE lacks).
+- `count` (only in `data/amniotes`, only in files that hold one; ToLaD#578): `{row: {counts, year, kind, cite, short,
+  url}}`, a reptile's published count (`pipeline/reptile_counts.toml`): its `ALIV` is the source's own figure, not
+  converted to all ages, so the card says what it counts (`counts`: "mature individuals", "adult females", "all
+  ages", ...), its year and its source (`short`, e.g. "Isberg et al. 2019", linked to `url`); `kind` is `census`
+  (the card's "counted") or `estimate` ("published estimate"). Such a row has FLAG bit 8 set and bit 11 clear.
 
 `skeleton.json` adds the shared tables and `all` (ToLaD#247): the dated tree induced on every file's species
 rows, keyed as `nodes`/`names`/`names_en`/`loose`/`notes`/`grafts` above, except that a species is

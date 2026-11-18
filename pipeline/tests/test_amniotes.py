@@ -10,8 +10,9 @@ from pathlib import Path
 
 import numpy as np
 
-from tolad_pipeline import amniotes
+from tolad_pipeline import amniotes, reptcounts
 from tolad_pipeline.dated import DNode
+from tolad_pipeline.tiles import q_log16
 from tolad_pipeline.tree import Node, collapse_knuckles
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -124,6 +125,48 @@ class TestRules(unittest.TestCase):
         (sp,) = holder.children
         self.assertEqual((sp.name, sp.alt, sp.is_leaf), ("Gen sp", ["Gen"], True))
         self.assertEqual(holder.alt, [])
+
+    def test_reptile_counts(self):
+        # ToLaD#578: a reptile a published number counts gets it, as its source gives it; any other stays unknown
+        e = reptcounts.load()
+        rows = clade("Testudines", leaf("Chelonia mydas", group="Testudines"), leaf("Caretta caretta", group="Testudines"))
+        for n in rows.children:
+            n.t0, n.t1 = 1.0, 0.0
+        log = {}
+        amniotes.count_leaves(rows, {}, (11.0, "T t"), log, rept={"Chelonia mydas": e["Chelonia mydas"]})
+        cm, cc = (n.data for n in rows.children)
+        self.assertAlmostEqual(cm["alive"], e["Chelonia mydas"]["n"])
+        self.assertTrue(cm["anchored_count"])
+        self.assertNotIn("count_unknown", cm)
+        self.assertEqual(cm["count_src"]["counts"], "adult females")
+        self.assertIn("not converted", cm["meth"][0])
+        self.assertEqual(cm["kever"], cm["ever"])
+        self.assertEqual((cc["alive"], cc["count_unknown"]["thinnest"]), (11.0, "T t"))  # no number: unknown
+        self.assertNotIn("anchored_count", cc)
+        self.assertEqual(log["counts"]["by_kind"], {"reptile: published count": 1, "reptile: unknown": 1})
+        self.assertEqual((log["reptile_counts"]["on_a_living_row"], log["reptile_counts"]["not_found"]), (1, []))
+
+    def test_reptile_count_table(self):
+        """pipeline/reptile_counts.toml: every number has its source, what it counts, its year and a quote; a range's
+        middle is its geometric middle; none is implausible (no sea turtle in billions, no species under 10)."""
+        e = reptcounts.load()
+        self.assertGreaterEqual(len(e), 25)
+        for sp, r in e.items():
+            for k in ("cite", "url", "counts", "scope", "quote"):
+                self.assertTrue(r[k].strip(), f"{sp}: {k}")
+            self.assertTrue(1990 <= r["year"] <= 2026, sp)
+            self.assertTrue(10 <= r["n"] <= 1e7, f"{sp}: {r['n']}")
+            if r["middle"]:
+                self.assertAlmostEqual(r["n"], math.sqrt(r["lo"] * r["hi"]))
+            self.assertGreaterEqual(r["grade_i"], amniotes.grade_from_sd(r["sd"]))
+        with self.assertRaises(ValueError):  # a number with no source is refused
+            bad = ROOT / "data" / "build" / "_bad_reptile_counts.toml"
+            bad.parent.mkdir(parents=True, exist_ok=True)
+            bad.write_text('[[count]]\nspecies = "Aus bus"\nn = 5\ncounts = "all ages"\n')
+            try:
+                reptcounts.load(bad)
+            finally:
+                bad.unlink()
 
     def test_backbone_file(self):
         bb = amniotes.load_backbone(ROOT / "pipeline" / "amniotes.toml")
@@ -284,6 +327,34 @@ class TestOutput(unittest.TestCase):
         self.assertEqual(m["nodes"][mammalia(m)][0], 0)  # the mammal tree's root: Mammalia's stem, its fossils on it
         top = a["nodes"][mammalia(a)][0]  # the same split in the amniotes, under the synapsid stems
         self.assertEqual(splits(AMN, top), splits(MAM, 0))
+
+    def test_reptile_counts_wired(self):
+        """ToLaD#578: each reptile with a count has a source, and no reptile without one has a count. A reptile row
+        is anchored (FLAG bit 8) with its known count exactly when the table counts it; its sidecar names the source."""
+        table = reptcounts.load()
+        meta, rows = all_rows(AMN)
+        _, mrows = all_rows(MAM)
+        sp = lambda r: r["FLAG"] & (1 << 6) and not r["FLAG"] & (1 << 2)  # noqa: E731  (a living species row)
+        m_anch = {r["NAME"].split("|")[0] for r in mrows.values() if sp(r) and r["FLAG"] & (1 << 8)}
+        anch = {r["NAME"].split("|")[0]: r for r in rows.values() if sp(r) and r["FLAG"] & (1 << 8)}
+        rept = {k: r for k, r in anch.items() if k not in m_anch}
+        self.assertEqual(set(rept), set(table))  # no bird is anchored: the rest are the table's reptiles
+        for k, r in rept.items():
+            self.assertFalse(r["FLAG"] & (1 << 11), k)
+            self.assertIn("not converted", r["METH"], k)
+            self.assertAlmostEqual(r["ALIV"], q_log16(table[k]["n"]), delta=1, msg=k)
+        rc = self.s["reptile_counts"]
+        self.assertEqual((rc["entries"], rc["on_a_living_row"], rc["not_found"]), (len(table), len(table), []))
+        k = self.s["counts"]["by_kind"]
+        self.assertEqual(k["reptile: published count"], len(table))
+        # the sidecars: every counted reptile's source, and only theirs
+        side = {}
+        for f in (AMN / "dated").glob("*.json"):
+            d = json.loads(f.read_text())
+            for row, c in d.get("count", {}).items():
+                side[c["cite"]] = side.get(c["cite"], 0) + 1
+                self.assertTrue(c["url"].startswith("https://") and c["counts"] and c["year"], f.name)
+        self.assertEqual(sum(side.values()), len(table))
 
     def test_page_reads_unknown_flag(self):
         meta, rows = all_rows(AMN)

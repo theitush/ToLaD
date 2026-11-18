@@ -1,0 +1,431 @@
+# Reptile counts (ToLaD#578): the reptiles a published number counts, read by the amniote build (amniotes.py,
+# reptcounts.py). Every other reptile stays unknown (FLAG bit 11, drawn dashed): there is no reptile model.
+#
+# Ita, 2026-11-18: "dont fit but im sure some animals do have counts like i dunno the sea turtles for example".
+#
+# The rules:
+# - Only species-level, global or near-global numbers: a survey, a census, a nesting index or an assessment's figure
+#   for the whole species (`scope`). A partial one only where the source says it covers most of the range, marked.
+# - The number is used as the source gives it (`counts` says what it counts: mature individuals, adult females, ...).
+#   No conversion: a figure of females or of mature individuals is not turned into all ages, since no cited rule for
+#   it exists (the IUCN Red List counts only mature individuals; a sea turtle survey counts the females that come
+#   ashore). The card says what the number counts. The mammals' census tier is the same kind of figure (IUCN
+#   population reports, mostly mature individuals, Greenspoon et al. 2023, model.py).
+# - `n` is the source's figure. A source that gives only a range (`lo`-`hi`) has its geometric middle as `n`, set by
+#   the build (reptcounts.py) and said in the method; `lo`-`hi` is then the range the row's error is drawn from.
+# - A sum of a source's own parts (sea turtle populations) is that sum, said in `note`.
+# - `grade` (A-D, the page's grades): B a survey of the whole wild population with a stated method; C an assessment's
+#   or a status review's figure, or a count of one sex or of nesters only; D a rough bound.
+# - `kind`: "census" (counted, or a survey estimate of the population) or "estimate" (an assessment's or an index's
+#   figure). The card says "counted" for a census and "published estimate" for an estimate.
+# - `cite` and `url` name the source the figure is from; `via` names where it was read when that is a summary of it
+#   (the IUCN website refuses scripted reads, so the Red List figures were read through the pages named). `quote` is
+#   the passage the figure was read from, verbatim.
+#
+# Looked for and not found (left unknown): a global count of loggerhead, hawksbill or flatback turtles (the
+# sources give nesting females per site or region only); the blue iguana, Jamaican iguana, Round Island boa and
+# Antiguan racer (figures seen only without a source); the black caiman and false gharial (their list figures
+# looked wrong: 10,000 for a Least Concern Amazon caiman; the false gharial's equal to the Cuban crocodile's).
+
+# ------------------------------------------------------------------ sea turtles
+
+[[count]]
+species = "Dermochelys coriacea"
+n = 32174
+counts = "adult females"
+scope = "global: the seven populations' monitored beaches"
+year = 2020
+grade = "C"
+kind = "estimate"
+cite = "NMFS & USFWS (2020). Endangered and Threatened Wildlife; 12-Month Finding on a Petition To Identify the Northwest Atlantic Leatherback Turtle as a Distinct Population Segment. Federal Register 85 (154): 48332-48387, citing the Leatherback Status Review Team (2020)"
+url = "https://www.govinfo.gov/content/pkg/FR-2020-08-10/pdf/2020-16277.pdf"
+quote = "The total index of nesting female abundance for the NW Atlantic DPS is 20,659 females. ... for the SW Atlantic DPS is 27 females. ... for the SE Atlantic DPS is 9,198 females. ... of the SW Indian DPS is 149 females. ... of the NE Indian DPS is 109 females. ... of the West Pacific DPS is 1,277 females. ... for the East Pacific DPS is 755 females."
+note = "The sum of the seven populations' indices (20,659 + 27 + 9,198 + 149 + 109 + 1,277 + 755). Each index is the nests laid over the latest remigration interval divided by the clutch frequency: the adult females that nest there, 'an index (rather than a census)', unmonitored beaches with few nesters left out. Males and juveniles are not counted."
+
+[[count]]
+species = "Chelonia mydas"
+lo = 570682
+hi = 572193
+counts = "adult females"
+scope = "global: the eleven populations' nesting sites"
+year = 2015
+grade = "C"
+kind = "estimate"
+cite = "NMFS & USFWS (2016). Endangered and Threatened Wildlife and Plants; Final Rule To List Eleven Distinct Population Segments of the Green Sea Turtle. Federal Register 81 (66): 20057-20090, citing Seminoff, J.A. et al. (2015), Status Review of the Green Turtle (Chelonia mydas) Under the Endangered Species Act, NOAA-TM-NMFS-SWFSC-539"
+url = "https://www.govinfo.gov/content/pkg/FR-2016-04-06/pdf/2016-07587.pdf"
+quote = "an estimated total nester abundance of 167,424 females at 73 nesting sites [North Atlantic] ... 404 to 992 females at 32 sites [Mediterranean] ... 63,332 females [South Atlantic] ... 91,059 females at 15 nesting sites [Southwest Indian] ... 55,243 females at 38 nesting sites [North Indian] ... 77,009 females at 50 nesting sites [East Indian-West Pacific] ... 6,518 females at 50 nesting sites [Central West Pacific] ... 83,058 females at 12 aggregated nesting sites [Southwest Pacific] ... 2,677 to 3,600 nesting females at 59 nesting sites [Central South Pacific] ... 3,846 nesting females at 13 nesting sites [Central North Pacific] ... 20,112 females at 39 nesting sites [East Pacific]"
+note = "The sum of the eleven populations' total nester abundance (the two given as ranges at their ends). Total nester abundance is the females nesting in a year times the remigration interval: the adult females. Males and juveniles are not counted."
+
+[[count]]
+species = "Lepidochelys kempii"
+n = 177540
+lo = 115110
+hi = 239970
+counts = "females aged 2 and over"
+scope = "global: the one nesting population (Gulf of Mexico)"
+year = 2013
+grade = "C"
+kind = "estimate"
+cite = "Gallaway, B.J., Gazey, W.J., Wibbels, T., Bevan, E., Shaver, D.J. & George, J. (2016). Evaluation of the Status of the Kemp's Ridley Sea Turtle After the 2010 Deepwater Horizon Oil Spill. Gulf of Mexico Science 33 (2): 192-205, Table 4. doi:10.18785/goms.3302.06"
+url = "https://doi.org/10.18785/goms.3302.06"
+quote = "TABLE 4. Fundamental parameters and terminal (i.e., 2013) postpelagic female population size estimates with standard deviations (SD). ... Terminal population size (2013) ... Ages 2+ 177,540 31,852"
+note = "A stock-assessment model fitted to the nest counts. lo-hi is 177,540 +- 1.96 x its SD 31,852, set here. Males are not counted."
+
+[[count]]
+species = "Lepidochelys olivacea"
+n = 852550
+counts = "females nesting in a year"
+scope = "global"
+year = 2008
+grade = "C"
+kind = "estimate"
+cite = "Abreu-Grobois, A. & Plotkin, P. (IUCN SSC Marine Turtle Specialist Group) (2008). Lepidochelys olivacea. The IUCN Red List of Threatened Species 2008: e.T11534A3292503. doi:10.2305/IUCN.UK.2008.RLTS.T11534A3292503.en"
+url = "https://doi.org/10.2305/IUCN.UK.2008.RLTS.T11534A3292503.en"
+via = "Wikipedia, Olive ridley sea turtle (revision 1378052141, 2026-10-02), citing the assessment"
+quote = "the global population of annual nesting females has been reduced to about two million by 2004, and was further reduced to 852,550 by 2008."
+note = "Females that nest in one year only: females that skip a year, males and juveniles are not counted."
+
+# ------------------------------------------------------------------ crocodilians
+# The IUCN Red List's number of mature individuals in each species' latest assessment (the Crocodile Specialist
+# Group is its Red List Authority), read through the population column of Wikipedia's List of crocodilians
+# (revision 1360129066, 2026-06-19), which cites each assessment. The Nile crocodile's figure matches the San Diego
+# Zoo Wildlife Alliance Library's (below), the gharial's its own article.
+
+[[count]]
+species = "Alligator mississippiensis"
+lo = 3000000
+hi = 4000000
+counts = "mature individuals"
+scope = "global"
+year = 2019
+grade = "C"
+kind = "estimate"
+cite = "Elsey, R., Woodward, A. & Balaguera-Reina, S.A. (2019). Alligator mississippiensis. The IUCN Red List of Threatened Species 2019: e.T46583A3009637. doi:10.2305/IUCN.UK.2019-2.RLTS.T46583A3009637.en"
+url = "https://doi.org/10.2305/IUCN.UK.2019-2.RLTS.T46583A3009637.en"
+via = "Wikipedia, List of crocodilians (revision 1360129066), population column"
+quote = "|iucn-status=LC |population=3,000,000-4,000,000"
+
+[[count]]
+species = "Alligator sinensis"
+lo = 136
+hi = 173
+counts = "mature individuals"
+scope = "global"
+year = 2018
+grade = "C"
+kind = "estimate"
+cite = "Jiang, H. & Wu, X. (2018). Alligator sinensis. The IUCN Red List of Threatened Species 2018: e.T867A3146005. doi:10.2305/IUCN.UK.2018-1.RLTS.T867A3146005.en"
+url = "https://doi.org/10.2305/IUCN.UK.2018-1.RLTS.T867A3146005.en"
+via = "Wikipedia, List of crocodilians (revision 1360129066), population column"
+quote = "|iucn-status=CR |population=136–173"
+
+[[count]]
+species = "Caiman crocodilus"
+n = 1000000
+counts = "mature individuals"
+scope = "global"
+year = 2019
+grade = "C"
+kind = "estimate"
+cite = "Balaguera-Reina, S.A. & Velasco, A. (2019). Caiman crocodilus. The IUCN Red List of Threatened Species 2019: e.T46584A3009688. doi:10.2305/IUCN.UK.2019-1.RLTS.T46584A3009688.en"
+url = "https://doi.org/10.2305/IUCN.UK.2019-1.RLTS.T46584A3009688.en"
+via = "Wikipedia, List of crocodilians (revision 1360129066), population column"
+quote = "|iucn-status=LC |population= 1,000,000"
+
+[[count]]
+species = "Caiman latirostris"
+n = 500000
+counts = "mature individuals"
+scope = "global"
+year = 2020
+grade = "C"
+kind = "estimate"
+cite = "Siroski, P., Bassetti, L.A.B., Piña, C. & Larriera, A. (2020). Caiman latirostris. The IUCN Red List of Threatened Species 2020: e.T46585A3009813. doi:10.2305/IUCN.UK.2020-3.RLTS.T46585A3009813.en"
+url = "https://doi.org/10.2305/IUCN.UK.2020-3.RLTS.T46585A3009813.en"
+via = "Wikipedia, List of crocodilians (revision 1360129066), population column"
+quote = "|iucn-status=LC |population=500,000"
+
+[[count]]
+species = "Caiman yacare"
+lo = 2000000
+hi = 5000000
+counts = "mature individuals"
+scope = "global"
+year = 2020
+grade = "C"
+kind = "estimate"
+cite = "Campos, Z., Llobet, A., Magnusson, W.E. & Piña, C. (2020). Caiman yacare. The IUCN Red List of Threatened Species 2020: e.T46586A3009881. doi:10.2305/IUCN.UK.2020-3.RLTS.T46586A3009881.en"
+url = "https://doi.org/10.2305/IUCN.UK.2020-3.RLTS.T46586A3009881.en"
+via = "Wikipedia, List of crocodilians (revision 1360129066), population column"
+quote = "|iucn-status=LC |population=2,000,000 - 5,000,000"
+
+[[count]]
+species = "Crocodylus acutus"
+n = 5000
+counts = "mature individuals"
+scope = "global"
+year = 2022
+grade = "C"
+kind = "estimate"
+cite = "Rainwater, T.R., Platt, S.G., Charruau, P., Balaguera-Reina, S.A., Sigler, L., Cedeño-Vázquez, J.R. & Thorbjarnarson, J.B. (2022). Crocodylus acutus. The IUCN Red List of Threatened Species 2022: e.T5659A212805700. doi:10.2305/IUCN.UK.2022-1.RLTS.T5659A212805700.en"
+url = "https://doi.org/10.2305/IUCN.UK.2022-1.RLTS.T5659A212805700.en"
+via = "Wikipedia, List of crocodilians (revision 1360129066), population column"
+quote = "|iucn-status=VU |population=5,000"
+
+[[count]]
+species = "Crocodylus intermedius"
+lo = 90
+hi = 250
+counts = "mature individuals"
+scope = "global"
+year = 2018
+grade = "C"
+kind = "estimate"
+cite = "Balaguera-Reina, S.A., Espinosa-Blanco, A., Antelo, R., Morales-Betancourt, M. & Seijas, A. (2018, errata 2020). Crocodylus intermedius. The IUCN Red List of Threatened Species 2018: e.T5661A181089024. doi:10.2305/IUCN.UK.2018-1.RLTS.T5661A181089024.en"
+url = "https://doi.org/10.2305/IUCN.UK.2018-1.RLTS.T5661A181089024.en"
+via = "Wikipedia, List of crocodilians (revision 1360129066), population column"
+quote = "|iucn-status=CR |population=90–250"
+
+[[count]]
+species = "Crocodylus mindorensis"
+lo = 92
+hi = 137
+counts = "mature individuals"
+scope = "global"
+year = 2016
+grade = "C"
+kind = "estimate"
+cite = "van Weerd, M., Pomaro, C., de Leon, J., Antolin, R. & Mercado, V. (2016). Crocodylus mindorensis. The IUCN Red List of Threatened Species 2016: e.T5672A3048281. doi:10.2305/IUCN.UK.2016-3.RLTS.T5672A3048281.en"
+url = "https://doi.org/10.2305/IUCN.UK.2016-3.RLTS.T5672A3048281.en"
+via = "Wikipedia, List of crocodilians (revision 1360129066), population column"
+quote = "|iucn-status=CR |population=92–137"
+
+[[count]]
+species = "Crocodylus moreletii"
+lo = 79000
+hi = 100000
+counts = "mature individuals"
+scope = "global"
+year = 2023
+grade = "C"
+kind = "estimate"
+cite = "Platt, S.G., Sigler, L., Rainwater, T.R., Cedeño-Vázquez, J.R. & Villegas, A. (2023). Crocodylus moreletii. The IUCN Red List of Threatened Species 2023: e.T5663A193672551. doi:10.2305/IUCN.UK.2023-1.RLTS.T5663A193672551.en"
+url = "https://doi.org/10.2305/IUCN.UK.2023-1.RLTS.T5663A193672551.en"
+via = "Wikipedia, List of crocodilians (revision 1360129066), population column"
+quote = "|iucn-status=LC |population=79,000–100,000"
+
+[[count]]
+species = "Crocodylus niloticus"
+lo = 50000
+hi = 70000
+counts = "mature individuals"
+scope = "global"
+year = 2019
+grade = "C"
+kind = "estimate"
+cite = "Isberg, S., Combrink, X., Lippai, C. & Balaguera-Reina, S.A. (2019). Crocodylus niloticus. The IUCN Red List of Threatened Species 2019: e.T45433088A3010181. doi:10.2305/IUCN.UK.2019-1.RLTS.T45433088A3010181.en"
+url = "https://doi.org/10.2305/IUCN.UK.2019-1.RLTS.T45433088A3010181.en"
+via = "San Diego Zoo Wildlife Alliance Library, Nile Crocodile Fact Sheet: Population & Conservation Status (https://ielc.libguides.com/sdzg/factsheets/nile_crocodile/population, read 2026-11-18); the same in Wikipedia's List of crocodilians"
+quote = "Global population Crocodylus niloticus 50,000-70,000 mature individuals (Isberg et al. 2019)"
+note = "Its surveyed populations: the factsheet points to the assessment for country-by-country estimates. An older total for the whole range, 250,000-500,000 individuals of all ages, is not this figure."
+
+[[count]]
+species = "Crocodylus novaeguineae"
+n = 100000
+counts = "mature individuals"
+scope = "global"
+year = 2019
+grade = "C"
+kind = "estimate"
+cite = "Solmu, G. & Manolis, C. (2019). Crocodylus novaeguineae. The IUCN Red List of Threatened Species 2019: e.T46591A3010398. doi:10.2305/IUCN.UK.2019-2.RLTS.T46591A3010398.en"
+url = "https://doi.org/10.2305/IUCN.UK.2019-2.RLTS.T46591A3010398.en"
+via = "Wikipedia, List of crocodilians (revision 1360129066), population column"
+quote = "|iucn-status=LC |population=100,000"
+
+[[count]]
+species = "Crocodylus palustris"
+lo = 5700
+hi = 8700
+counts = "mature individuals"
+scope = "global"
+year = 2013
+grade = "C"
+kind = "estimate"
+cite = "Choudhury, B.C. & de Silva, A. (2013). Crocodylus palustris. The IUCN Red List of Threatened Species 2013: e.T5667A3046723. doi:10.2305/IUCN.UK.2013-2.RLTS.T5667A3046723.en"
+url = "https://doi.org/10.2305/IUCN.UK.2013-2.RLTS.T5667A3046723.en"
+via = "Wikipedia, List of crocodilians (revision 1360129066), population column"
+quote = "|iucn-status=VU |population=5,700–8,700"
+
+[[count]]
+species = "Crocodylus porosus"
+n = 500000
+counts = "mature individuals"
+scope = "global"
+year = 2021
+grade = "C"
+kind = "estimate"
+cite = "Webb, G.J.W., Manolis, C., Brien, M.L., Balaguera-Reina, S.A. & Isberg, S. (2021). Crocodylus porosus. The IUCN Red List of Threatened Species 2021: e.T5668A268788998. doi:10.2305/IUCN.UK.2021-2.RLTS.T5668A268788998.en"
+url = "https://doi.org/10.2305/IUCN.UK.2021-2.RLTS.T5668A268788998.en"
+via = "Wikipedia, List of crocodilians (revision 1360129066), population column"
+quote = "|population= 500,000"
+
+[[count]]
+species = "Crocodylus rhombifer"
+n = 2400
+counts = "mature individuals"
+scope = "global"
+year = 2022
+grade = "C"
+kind = "estimate"
+cite = "McMahan, W., Targarona, R., Soberón, R. & Alonso-Tabet, M. (2022). Crocodylus rhombifer. The IUCN Red List of Threatened Species 2022: e.T5670A130856048. doi:10.2305/IUCN.UK.2022-2.RLTS.T5670A130856048.en"
+url = "https://doi.org/10.2305/IUCN.UK.2022-2.RLTS.T5670A130856048.en"
+via = "Wikipedia, List of crocodilians (revision 1360129066), population column"
+quote = "|iucn-status=CR |population=2,400"
+
+[[count]]
+species = "Crocodylus siamensis"
+lo = 500
+hi = 1000
+counts = "mature individuals"
+scope = "global"
+year = 2012
+grade = "C"
+kind = "estimate"
+cite = "Bezuijen, M., Simpson, B., Behler, N., Daltry, J. & Tempsiripong, Y. (2012). Crocodylus siamensis. The IUCN Red List of Threatened Species 2012: e.T5671A3048087. doi:10.2305/IUCN.UK.2012.RLTS.T5671A3048087.en"
+url = "https://doi.org/10.2305/IUCN.UK.2012.RLTS.T5671A3048087.en"
+via = "Wikipedia, List of crocodilians (revision 1360129066), population column"
+quote = "|iucn-status=CR |population=500–1,000"
+
+[[count]]
+species = "Mecistops cataphractus"
+lo = 1000
+hi = 20000
+counts = "mature individuals"
+scope = "global"
+year = 2014
+grade = "D"
+kind = "estimate"
+cite = "Shirley, M.H. (2014). Mecistops cataphractus. The IUCN Red List of Threatened Species 2014: e.T5660A3044332. doi:10.2305/IUCN.UK.2014-1.RLTS.T5660A3044332.en"
+url = "https://doi.org/10.2305/IUCN.UK.2014-1.RLTS.T5660A3044332.en"
+via = "Wikipedia, List of crocodilians (revision 1360129066), population column"
+quote = "|iucn-status=CR |population=1,000–20,000"
+note = "A twentyfold range: grade D."
+
+[[count]]
+species = "Gavialis gangeticus"
+n = 650
+counts = "mature individuals"
+scope = "global"
+year = 2019
+grade = "C"
+kind = "estimate"
+cite = "Lang, J., Chowfin, S. & Ross, J.P. (2019). Gavialis gangeticus (errata version). The IUCN Red List of Threatened Species 2019: e.T8966A149227430. doi:10.2305/IUCN.UK.2019-1.RLTS.T8966A149227430.en"
+url = "https://doi.org/10.2305/IUCN.UK.2019-1.RLTS.T8966A149227430.en"
+via = "Wikipedia, Gharial (revision 1380762499, 2026-10-17), citing the assessment"
+quote = "As of 2019, the global population was estimated to comprise at maximum 900 individuals, including about 600 mature adults in six major subpopulations along 1,100 km of river courses and another 50 mature adults in eight minor subpopulations along 1,200 km of river courses."
+note = "600 + 50 mature adults; all ages at most 900."
+
+# ------------------------------------------------------------------ tortoises
+
+[[count]]
+species = "Aldabrachelys gigantea"
+n = 180000
+counts = "individuals (distance sampling)"
+scope = "global: Aldabra Atoll, its wild population"
+year = 2021
+grade = "B"
+kind = "census"
+cite = "Hillyard, L.B., Bunbury, N., Kaiser-Bunbury, C.N., Hodgson, D., A'Bear, L., Sanchez, C.L., Jones, C.W., Burt, A., Fleischer-Dogley, F. & Hudson, D.W. (2026). Inferring the Abundance of an Island Megaherbivore From Semi-Structured Distance Sampling. Ecology and Evolution 16. doi:10.1002/ece3.74282"
+url = "https://doi.org/10.1002/ece3.74282"
+via = "its abstract (Europe PMC, PMC13542991)"
+quote = "Between 2018 and 2021 the population was apparently relatively stable and numbered approximately 180,000 individuals, the highest estimate so far made for this population."
+note = "The small translocated populations (Seychelles granitic islands, Changuu) are not in it."
+
+[[count]]
+species = "Chelonoidis niger"
+lo = 20000
+hi = 25000
+counts = "all ages"
+scope = "global: every Galápagos giant tortoise (The Reptile Database lumps them as one species)"
+year = 2017
+grade = "C"
+kind = "estimate"
+cite = "Galápagos Conservancy (2017). Giant tortoises. Fairfax (VA): Galápagos Conservancy"
+url = "https://ielc.libguides.com/sdzg/factsheets/galapagostortoises/population"
+via = "San Diego Zoo Wildlife Alliance Library, Galápagos Giant Tortoises Fact Sheet: Population & Conservation Status (read 2026-11-18)"
+quote = "Total number of Giant Galápagos Tortoises (GGTs) 20,000-25,000 (Galápagos Conservancy 2017)"
+note = "The factsheet's per-island figures (San Cristóbal more than 6,000, Alcedo about 6,300, western Santa Cruz about 3,400, ...) are in this total."
+
+# ------------------------------------------------------------------ lizards, the tuatara, snakes
+
+[[count]]
+species = "Varanus komodoensis"
+n = 3500
+counts = "all ages"
+scope = "global"
+year = 2021
+grade = "B"
+kind = "census"
+cite = "Jessop et al. (2021), as cited by the San Diego Zoo Wildlife Alliance Library"
+url = "https://ielc.libguides.com/sdzg/factsheets/komododragon/population"
+via = "San Diego Zoo Wildlife Alliance Library, Komodo Dragon Fact Sheet: Population & Conservation Status (read 2026-11-18)"
+quote = "Global estimate Approximately 3,500 individuals, including adults and juveniles (Jessop et al. 2021) Approximately 1,400 mature individuals (all island populations combined)"
+note = "From long-term capture-mark-recapture monitoring on the islands; about 1,400 of them mature."
+
+[[count]]
+species = "Sphenodon punctatus"
+lo = 60000
+hi = 100000
+counts = "all ages"
+scope = "global"
+year = 2002
+grade = "C"
+kind = "estimate"
+cite = "Cree, A. (2002). Tuatara. In Halliday, T. & Adler, K. (eds.), The New Encyclopedia of Reptiles and Amphibians. Oxford University Press: 210-211; Daugherty, C. & Keall, S. Tuatara. Te Ara - the Encyclopedia of New Zealand"
+url = "https://teara.govt.nz/en/tuatara/page-1"
+via = "Wikipedia, Tuatara (revision 1386322912, 2026-11-17), citing both"
+quote = "The total population of tuatara is estimated to be between 60,000 and 100,000."
+
+[[count]]
+species = "Cyclura pinguis"
+lo = 350
+hi = 400
+counts = "mature individuals"
+scope = "Anegada, its one wild population"
+year = 2020
+grade = "C"
+kind = "estimate"
+cite = "Bradley & Grant (2020) and Bradley (2018), as cited by the San Diego Zoo Wildlife Alliance Library"
+url = "https://ielc.libguides.com/sdzg/factsheets/anegadaiguana/population"
+via = "San Diego Zoo Wildlife Alliance Library, Anegada Iguana Fact Sheet: Population & Conservation Status (read 2026-11-18)"
+quote = "Total population Estimated to be less than 350-400 mature adults (Bradley 2018; Bradley and Grant 2020)"
+note = "The 300-400 iguanas repatriated to other islands (a personal communication in the same factsheet) are not counted."
+
+[[count]]
+species = "Bothrops insularis"
+lo = 2414
+hi = 2899
+counts = "all ages"
+scope = "global: Queimada Grande, its one island"
+year = 2015
+grade = "B"
+kind = "census"
+cite = "Abrahão, C.R., Amorim, L.G., Magalhães, A.M., Azevedo, C.R., Grisi-Filho, J.H. & Dias, R.A. (2021). Extinction Risk Evaluation and Population Size Estimation of Bothrops insularis (Serpentes: Viperidae), a Critically Endangered Insular Pitviper Species of Brazil. South American Journal of Herpetology 19 (1): 32-39. doi:10.2994/SAJH-D-17-00104.1"
+url = "https://doi.org/10.2994/SAJH-D-17-00104.1"
+via = "Wikipedia, Golden lancehead (revision 1385850283, 2026-11-15), citing the paper"
+quote = "The population of B. insularis on the island was estimated in 2021, based on a combination of observations and two- and three-dimensional scanning of the island in 2015, to be between 2,414 (2D scan estimate) and 2,899 (3D scan estimate)."
+
+[[count]]
+species = "Protobothrops mangshanensis"
+lo = 300
+hi = 500
+counts = "all ages"
+scope = "global"
+year = 2013
+grade = "D"
+kind = "estimate"
+cite = "Gong et al. (2013) and Zhou (2022), as cited by the San Diego Zoo Wildlife Alliance Library"
+url = "https://ielc.libguides.com/sdzg/factsheets/mangshanpitviper/population"
+via = "San Diego Zoo Wildlife Alliance Library, Mangshan Pit Viper Fact Sheet: Population & Conservation Status (read 2026-11-18)"
+quote = "Rough estimate of fewer than 500 individuals in wild populations (Zhou 2022) Based on data collected between 2007 and 2010 by Gong et al. (2013) Estimates of 300 to 500 individuals have changed little since 2000 (Gong et al. 2013)"
+note = "A rough estimate: grade D."

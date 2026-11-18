@@ -1157,7 +1157,7 @@ def common_name(nd: Node) -> str | None:
 def file_meta(droot: DNode | None, rows: list[tuple[Node, bool]]) -> dict | None:
     """The dated tree induced on this file's species rows, plus their common names and generation lengths."""
     row_of = {id(nd): i for i, (nd, stub) in enumerate(rows) if not stub}
-    common, gen, mass = {}, {}, {}
+    common, gen, mass, count = {}, {}, {}, {}
     for nd, stub in rows:
         if stub or not nd.is_leaf or not nd.name:
             continue
@@ -1171,7 +1171,11 @@ def file_meta(droot: DNode | None, rows: list[tuple[Node, bool]]) -> dict | None
         m = mass_entry(nd)
         if m:
             mass[str(i)] = m
+        if nd.data.get("count_src"):
+            count[str(i)] = nd.data["count_src"]
     out: dict = {"common": common, "gen": gen, "mass": mass}
+    if count:  # (a reptile's published count, ToLaD#578: only files that hold one carry the key)
+        out["count"] = count
     if droot is None:
         return out
     marked = {id(nd.data["dleaf"]) for nd, stub in rows if not stub and nd.data.get("dleaf") is not None}
