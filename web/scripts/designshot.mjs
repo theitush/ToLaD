@@ -317,6 +317,14 @@ const scenes = [
   ['lv-chiroptera', 'level', ['Chiroptera']],
   ['lv-primates', 'level', ['Primates']],
   ['lv-carnivora', 'level', ['Carnivora']],
+  // Where a tap on a group lands (ToLaD#468), for the fossils' order (ToLaD#538: Q=fossilorder=age; WAIT_MS for the flight).
+  ['land-carnivora', 'tapclade', ['Carnivora']],
+  ['land-felidae', 'tapclade', ['Felidae']],
+  ['land-cetacea', 'tapclade', ['Cetacea']],
+  ['land-rodentia', 'tapclade', ['Rodentia']],
+  // (Their deep time, where the fossils placed by name stand: the frame centred on that age, time zoomed.)
+  ['deep-felidae', 'level', ['Felidae', 6, 4]],
+  ['deep-carnivora', 'level', ['Carnivora', 25, 4]],
 ];
 const browser = await chromium.launch({ headless: true });
 let served = null;
