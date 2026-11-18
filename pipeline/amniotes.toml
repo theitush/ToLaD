@@ -6,6 +6,10 @@
 #                    a node is older than its oldest child and its oldest grafted fossil), so `age` is the
 #                    cited value unless the data below it are older; stats.json -> amniotes.backbone says which.
 #
+#                    `soft_max`: the oldest a fossil inside the split may be (Benton et al. 2015's soft maximum,
+#                    `bound_citation`); a fossil subtree or stem older than it goes on the split's stem
+#                    (fossils.py). With none, the bound is `hi`. Below it a fossil raises the split (a minimum).
+#
 # All five come from one source, TimeTree 5's pairwise medians (research/amniote-sources.md, "Backbone ages").
 # TimeTree's terms do not permit redistributing its data; these are five cited numbers.
 
@@ -15,6 +19,9 @@ between = ["Mammalia", "Sauria"]
 age = 318.8
 lo = 316.7
 hi = 321.0
+soft_max = 332.9
+bound_citation = """Benton, M.J., Donoghue, P.C.J., Asher, R.J., Friedman, M., Near, T.J. & Vinther, J. (2015). \
+Constraints on the timescale of animal evolutionary history. Palaeontologia Electronica 18.1.1FC: 1-106 (soft maximum)"""
 reason = """Mammals vs reptiles and birds. TimeTree 5's median of the published times; Benton et al. 2015 give \
 318.0 Ma (hard minimum) to 332.9 Ma (soft maximum), Upham 2019's Anolis outgroup 319.5 Ma."""
 citation = """Kumar, S., Suleski, M., Craig, J.M. et al. (2022). TimeTree 5: an expanded resource for species \
@@ -26,6 +33,9 @@ between = ["Lepidosauria", "Archelosauria"]
 age = 280.7
 lo = 276.6
 hi = 284.8
+soft_max = 295.9
+bound_citation = """Benton, M.J., Donoghue, P.C.J., Asher, R.J., Friedman, M., Near, T.J. & Vinther, J. (2015). \
+Constraints on the timescale of animal evolutionary history. Palaeontologia Electronica 18.1.1FC: 1-106 (soft maximum)"""
 reason = """Lepidosaurs vs turtles and archosaurs. Benton et al. 2015: 255.9-295.9 Ma; Colston 2020's tree 276.5 Ma."""
 citation = """Kumar, S., Suleski, M., Craig, J.M. et al. (2022). TimeTree 5: an expanded resource for species \
 divergence times. Molecular Biology and Evolution 39: msac174. doi:10.1093/molbev/msac174 (timetree.org pairwise median)"""
@@ -46,6 +56,9 @@ between = ["Crocodylia", "Aves"]
 age = 243.3
 lo = 239.6
 hi = 247.0
+soft_max = 260.2
+bound_citation = """Benton, M.J., Donoghue, P.C.J., Asher, R.J., Friedman, M., Near, T.J. & Vinther, J. (2015). \
+Constraints on the timescale of animal evolutionary history. Palaeontologia Electronica 18.1.1FC: 1-106 (soft maximum)"""
 reason = """Crocodilians vs birds. Younger than Benton et al. 2015's hard minimum of 247.1 Ma: the oldest \
 archosaur fossil will raise it once the fossils are grafted (build order step 6), by the rule above, not by hand."""
 citation = """Kumar, S., Suleski, M., Craig, J.M. et al. (2022). TimeTree 5: an expanded resource for species \
@@ -57,6 +70,9 @@ between = ["Rhynchocephalia", "Squamata"]
 age = 245.0
 lo = 236.6
 hi = 253.4
+soft_max = 252.7
+bound_citation = """Benton, M.J., Donoghue, P.C.J., Asher, R.J., Friedman, M., Near, T.J. & Vinther, J. (2015). \
+Constraints on the timescale of animal evolutionary history. Palaeontologia Electronica 18.1.1FC: 1-106 (soft maximum)"""
 reason = """The tuatara vs lizards and snakes. Benton et al. 2015: 238.0-252.7 Ma; Tonini 2016's tree 246.9 Ma."""
 citation = """Kumar, S., Suleski, M., Craig, J.M. et al. (2022). TimeTree 5: an expanded resource for species \
 divergence times. Molecular Biology and Evolution 39: msac174. doi:10.1093/molbev/msac174 (timetree.org pairwise median)"""

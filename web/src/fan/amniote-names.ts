@@ -32,6 +32,19 @@ export const AMNIOTE_EN: Record<string, string> = {
   Aves: 'Birds',
   Palaeognathae: 'Ratites & tinamous',
   Galloanserae: 'Landfowl & waterfowl',
+  // (The fossils' great groups, ToLaD#539 step 6. A stem round a class with no name here is told by that class, view.ts groupName:
+  // the synapsids "Mammals & kin".)
+  Avemetatarsalia: 'Dinosaurs, pterosaurs & birds',
+  Dinosauria: 'Dinosaurs',
+  Theropoda: 'Theropods',
+  Sauropodomorpha: 'Sauropods & kin',
+  Ornithischia: 'Bird-hipped dinosaurs',
+  Pterosauria: 'Pterosaurs',
+  Ichthyosauromorpha: 'Ichthyosaurs & kin',
+  Ichthyosauria: 'Ichthyosaurs',
+  Sauropterygia: 'Plesiosaurs & kin',
+  Plesiosauria: 'Plesiosaurs',
+  Mosasauridae: 'Mosasaurs',
 };
 
 /**

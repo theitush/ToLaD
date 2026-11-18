@@ -1,7 +1,8 @@
 // The amniotes (ToLaD#539, the bar's "tree: amniotes", `?tree=amniotes`): data/amniotes loads and opens as the page opens it, home
-// titled "Amniotes" with the human named on it and its picture whole, a tap on the birds' name lands inside the birds, a level
-// of their own, and a bird's card and a reptile's say what is known (a bird's modelled count; a reptile's unknown, its Latin
-// once, the stubs for its picture and globe). One process: the level's data is module state, so this file loads only these.
+// titled "Amniotes" with the human named on it and its picture whole, taps on the names of the groups the birds are in (their line
+// with its fossils first) land inside the birds, a level of their own, and a bird's card and a reptile's say what is known (a bird's
+// modelled count; a reptile's unknown, its Latin once, the stubs for its picture and globe). One process: the level's data is module
+// state, so this file loads only these.
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { Camera, FanCamera } from './camera';
@@ -101,8 +102,13 @@ describe('the amniotes (ToLaD#539)', () => {
       expect(isLevel(v.fan, node(t)), t).toBe(true);
       expect(chainOf(v.fan, node(t))[0], t).toBe('Amniotes');
     }
-    // (Above the orders no level, as at the mammals: Sauria, Archosauria are fork names.)
-    expect(isLevel(v.fan, node('Archosauria'))).toBe(false);
+    // (Above the orders no level, as at the mammals: Sauria, Archosauromorpha are fork names. Archosauria is none with every fossil: its
+    // split is as old as the stem split round it, spliceTies' one date.)
+    for (const t of ['Sauria', 'Archosauromorpha']) expect(isLevel(v.fan, node(t)), t).toBe(false);
+    // (The fossils: the synapsids, a stem round the mammals, told by them; the dinosaurs' line by its name.)
+    expect(groupName(v.fan, node('Synapsida'))).toBe('Mammals & kin');
+    expect(groupName(v.fan, node('Avemetatarsalia'))).toBe('Dinosaurs, pterosaurs & birds');
+    expect(chainOf(v.fan, v.fan.branches.find((b) => b.sp.sci === 'Tyrannosaurus rex')!.node)[0]).toBe('Amniotes');
     expect(chainOf(v.fan, v.fan.branches.find((b) => b.sp.sci === 'Passer domesticus')!.node).slice(0, 3)).toEqual(['Amniotes', 'Birds', 'Perching birds']);
     expect(chainOf(v.fan, v.fan.branches.find((b) => b.sp.sci === 'Homo sapiens')!.node).slice(0, 3)).toEqual(['Amniotes', 'Mammals', 'Primates']);
   });
@@ -120,14 +126,22 @@ describe('the amniotes (ToLaD#539)', () => {
     for (const g of P(v).gapCoverAt(P(v).territories(), v.cam.sx)) if (g.lv.v) expect(latin.has(groupName(v.fan, g.lv.v).replace(/ & kin$/, ''))).toBe(false);
   });
 
-  it('a tap on the birds\' name at home lands inside the birds', () => {
+  it('from home, taps on the names of the groups the birds are in reach the birds', () => {
+    // (With every fossil the birds sit in their line's stems, the dinosaurs': home names the line, "Birds & kin", and each tap on the name
+    // of the group holding the house sparrow goes a group deeper, to the birds' own name; a tap on it lands inside the birds.)
     stand(home);
-    const h = P(v).famHits.find((q) => groupName(v.fan, q.v) === 'Birds');
-    expect(h, `Birds among home's names: ${P(v).famHits.map((q) => groupName(v.fan, q.v)).join(', ')}`).toBeTruthy();
-    v.tap((h!.box[0] + h!.box[2]) / 2, (h!.box[1] + h!.box[3]) / 2);
-    run();
+    const sparrow = v.fan.branches.find((b) => b.sp.sci === 'Passer domesticus')!;
+    const seen: string[] = [];
+    for (let k = 0; k < 6 && !chainOf(v.fan, levelClade(v.fan, v.levelNow())).includes('Birds'); k++) {
+      const h = P(v).famHits.find((q) => q.v.strands.includes(sparrow));
+      expect(h, `the sparrow's group among the names after ${seen.join(' > ') || 'home'}: ${P(v).famHits.map((q) => groupName(v.fan, q.v)).join(', ')}`).toBeTruthy();
+      seen.push(groupName(v.fan, h!.v));
+      v.tap((h!.box[0] + h!.box[2]) / 2, (h!.box[1] + h!.box[3]) / 2);
+      run();
+    }
+    expect(seen[0]).toBe('Birds & kin');
     expect(v.cam.sx).toBeGreaterThan(home.sx * 1.2);
-    expect(chainOf(v.fan, levelClade(v.fan, v.levelNow()))).toContain('Birds');
+    expect(chainOf(v.fan, levelClade(v.fan, v.levelNow())), seen.join(' > ')).toContain('Birds');
   });
 
   it("a bird's card and a reptile's", () => {

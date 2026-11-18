@@ -12,7 +12,7 @@ import numpy as np
 
 from tolad_pipeline import amniotes
 from tolad_pipeline.dated import DNode
-from tolad_pipeline.tree import Node
+from tolad_pipeline.tree import Node, collapse_knuckles
 
 ROOT = Path(__file__).resolve().parents[2]
 AMN = ROOT / "data" / "amniotes"
@@ -98,8 +98,9 @@ class TestRules(unittest.TestCase):
 
     def test_graft_dated_one_mate_halfway(self):
         # a species no dated tree has, with one genus-mate on it: a new split halfway down the mate's branch
-        m, o, g = leaf("Aa a", family="F", group="Aves"), leaf("Bb b", family="F", group="Aves"), \
-            leaf("Aa c", family="F", group="Aves")
+        # (a listed species: graft_dated places the lists' species; a fossil goes on by fossils.dated_fossils)
+        m, o, g = leaf("Aa a", family="F", group="Aves", list="clements"), \
+            leaf("Bb b", family="F", group="Aves", list="clements"), leaf("Aa c", family="F", group="Aves", list="clements")
         rows = clade("R", clade(None, m, g), o)
         top = DNode(age=10.0, lo=10.0, hi=10.0)
         dm, do = DNode(leaf=m), DNode(leaf=o)
@@ -113,6 +114,16 @@ class TestRules(unittest.TestCase):
         self.assertIs(dg.parent, dm.parent)
         self.assertEqual(dg.parent.age, 5.0)
         self.assertEqual(dg.parent.loose, 1)
+
+    def test_genus_of_one_species_at_the_root_is_that_species(self):
+        # a fossil genus PBDB files straight under Amniota is a top of its own, dated under a holder: its one species
+        # takes its place (a holder never absorbs its child), not the genus with the species' name as an alias
+        g = clade("Gen", leaf("Gen sp"))
+        holder = clade("(holder)", g)
+        collapse_knuckles(holder, absorb_root=False)
+        (sp,) = holder.children
+        self.assertEqual((sp.name, sp.alt, sp.is_leaf), ("Gen sp", ["Gen"], True))
+        self.assertEqual(holder.alt, [])
 
     def test_backbone_file(self):
         bb = amniotes.load_backbone(ROOT / "pipeline" / "amniotes.toml")
@@ -183,7 +194,7 @@ class TestOutput(unittest.TestCase):
         self.assertEqual(self.c["sauropsid_tips_by_group"], {"Aves": 11167, "Squamata": 12293, "Testudines": 365,
                                                             "Crocodylia": 27, "Rhynchocephalia": 1})
         self.assertEqual(self.c["sauropsid_in_dated_tree"], self.c["sauropsid_tips"])
-        self.assertEqual(self.c["tips"], self.c["mammal_tips"] + self.c["sauropsid_tips"])
+        self.assertEqual(self.c["tips"], self.c["mammal_tips"] + self.c["sauropsid_tips"] + self.c["fossil_tips"])
 
     def test_crown_ages(self):
         a = self.c["crowns_Ma"]
@@ -215,8 +226,8 @@ class TestOutput(unittest.TestCase):
         self.assertIn("timetree", sk["sources"])
 
     def test_branches_positive(self):
-        self.assertEqual(self.c["dated_branches_not_positive"], {"sauropsids": 0, "Amniota": 0})
-        self.assertEqual(self.c["rows_bands_not_positive"], {"sauropsids": 0, "Amniota": 0})
+        self.assertEqual(self.c["dated_branches_not_positive"], {"sauropsids": 0, "synapsids": 0, "Amniota": 0})
+        self.assertEqual(self.c["rows_bands_not_positive"], {"sauropsids": 0, "synapsids": 0, "Amniota": 0})
 
     def test_faults(self):
         f = self.s["faults"]
@@ -237,17 +248,18 @@ class TestOutput(unittest.TestCase):
         self.assertAlmostEqual(self.c["alive"]["Aves"] / 50.5e9, 1.0, delta=0.03)
 
     def test_mammals_identical(self):
-        """Every mammal row of data/amniotes is data/mammals' row, field for field (global ids shifted by
-        Amniota's own row, 0; tiling aside)."""
+        """Every mammal row of data/amniotes is data/mammals' row, field for field (global ids shifted by the rows
+        above Mammalia: Amniota's, 0, and the synapsid stems round it; tiling aside)."""
         _, mrows = all_rows(MAM)
         meta, arows = all_rows(AMN)
         self.assertEqual(arows[0]["NAME"], "Amniota")
-        self.assertEqual(arows[1]["NAME"], "Mammalia")
+        off = next(g for g in sorted(arows) if arows[g]["NAME"] == "Mammalia")
+        self.assertEqual(arows[off - 1]["NAME"], "Mammaliaformes")  # its stems (fossils.py), nearest first
         for g, r in mrows.items():
-            a = arows[g + 1]
+            a = arows[g + off]
             for k in r:
                 self.assertEqual(a[k], r[k], f"{r['NAME']} (gid {g}): {k}")
-        self.assertEqual(sum(1 for g in arows if 1 <= g <= max(mrows) + 1), len(mrows))
+        self.assertEqual(sum(1 for g in arows if off <= g <= max(mrows) + off), len(mrows))
 
     def test_mammal_dated_tree_identical(self):
         """The amniote dated tree's Mammalia is the mammal build's, split for split."""
@@ -266,7 +278,11 @@ class TestOutput(unittest.TestCase):
                 st.extend(reversed(kids[i]))
             return out
         a = json.loads((AMN / "dated" / "skeleton.json").read_text())["all"]
-        top = next(i for i, n in enumerate(a["nodes"]) if n[0] == 0)  # the root's first daughter: the mammals
+        m = json.loads((MAM / "dated" / "skeleton.json").read_text())["all"]
+        def mammalia(t: dict) -> int:
+            return next(int(k) for k, v in t["names"].items() if v == "Mammalia")
+        self.assertEqual(m["nodes"][mammalia(m)][0], 0)  # the mammal tree's root: Mammalia's stem, its fossils on it
+        top = a["nodes"][mammalia(a)][0]  # the same split in the amniotes, under the synapsid stems
         self.assertEqual(splits(AMN, top), splits(MAM, 0))
 
     def test_page_reads_unknown_flag(self):

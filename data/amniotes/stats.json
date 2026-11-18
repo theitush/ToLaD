@@ -17,26 +17,124 @@
    "alive": {
     "Aves": 50244701902.0,
     "Mammalia": 86830099345.03368,
-    "Sauropsida": 50244711402.80891
+    "Sauropsida": 50244711341.53055
    },
    "crowns_Ma": {
-    "Archelosauria": 256.8,
-    "Archosauria": 243.3,
+    "Archelosauria": 263.07,
+    "Archosauria": 251.25,
     "Aves": 98.99,
     "Crocodylia": 93.11,
-    "Lepidosauria": 245.0,
+    "Lepidosauria": 247.0,
     "Sauria": 280.7,
     "Squamata": 213.19,
     "Testudines": 176.66
    },
    "dated_branches_not_positive": {
     "Amniota": 0,
-    "sauropsids": 0
+    "sauropsids": 0,
+    "synapsids": 0
    },
+   "fossil_tips": 7778,
+   "fossils": {
+    "by_group": {
+     "Birds": 1472,
+     "Choristoderes": 32,
+     "Crocodilians (crown)": 234,
+     "Lizards and snakes": 946,
+     "Marine reptiles": 465,
+     "Non-avian dinosaurs": 1424,
+     "Non-mammal synapsids": 783,
+     "Other amniotes": 371,
+     "Other archosaurs": 162,
+     "Other crocodylomorphs": 392,
+     "Parareptiles": 112,
+     "Pterosaurs": 253,
+     "Stem turtles": 137,
+     "Tuatara and kin": 73,
+     "Turtles (crown)": 922
+    },
+    "fossils": 7778,
+    "fossils_alive_into_the_recent": [],
+    "non_avian_dinosaurs_after_K_Pg": {
+     "n": 0,
+     "names": []
+    },
+    "oldest_Ma": {
+     "Birds": 167.75,
+     "Choristoderes": 204.55,
+     "Crocodilians (crown)": 167.75,
+     "Lizards and snakes": 247.0,
+     "Marine reptiles": 250.7,
+     "Non-avian dinosaurs": 245.23,
+     "Non-mammal synapsids": 318.7,
+     "Other amniotes": 318.7,
+     "Other archosaurs": 251.25,
+     "Other crocodylomorphs": 233.15,
+     "Parareptiles": 309.6,
+     "Pterosaurs": 217.5,
+     "Stem turtles": 239.24,
+     "Tuatara and kin": 246.7,
+     "Turtles (crown)": 231.45
+    },
+    "outside_the_Mesozoic": {
+     "Marine reptiles": {
+      "n": 0,
+      "names": []
+     },
+     "Pterosaurs": {
+      "n": 0,
+      "names": []
+     }
+    },
+    "vs_research_graftable": {
+     "Birds": {
+      "here": 1472,
+      "research": 1273
+     },
+     "Crocodilians + crocodylomorphs": {
+      "here": 626,
+      "research": 630
+     },
+     "Lizards and snakes": {
+      "here": 946,
+      "research": 972
+     },
+     "Marine reptiles": {
+      "here": 465,
+      "research": 467
+     },
+     "Non-avian dinosaurs": {
+      "here": 1424,
+      "research": 1717
+     },
+     "Non-mammal synapsids": {
+      "here": 783,
+      "research": 786
+     },
+     "Other": {
+      "here": 677,
+      "research": 639
+     },
+     "Pterosaurs": {
+      "here": 253,
+      "research": 255
+     },
+     "Tuatara and kin": {
+      "here": 73,
+      "research": 74
+     },
+     "Turtles (crown + stem)": {
+      "here": 1059,
+      "research": 1068
+     }
+    }
+   },
+   "fossils_in_dated_tree": 7778,
    "mammal_tips": 18362,
    "rows_bands_not_positive": {
     "Amniota": 0,
-    "sauropsids": 0
+    "sauropsids": 0,
+    "synapsids": 0
    },
    "sauropsid_in_dated_tree": 23853,
    "sauropsid_tips": 23853,
@@ -48,17 +146,18 @@
     "Testudines": 365
    },
    "species_twice": [],
-   "tips": 42215
+   "tips": 49993
   },
   "counts": {
    "assumed_generation_yr": 7.0,
    "by_kind": {
     "bird: Callaghan, model": 8828,
     "bird: Callaghan, training": 675,
-    "bird: extinct, unknown": 78,
-    "bird: unknown": 1586,
-    "reptile: extinct, unknown": 8,
-    "reptile: unknown": 12678
+    "bird: extinct, unknown": 171,
+    "bird: unknown": 1493,
+    "fossil: unknown": 7778,
+    "reptile: extinct, unknown": 7,
+    "reptile: unknown": 12679
    },
    "thinnest": {
     "N": 0.6660690486578963,
@@ -74,7 +173,7 @@
       "Sauria"
      ],
      "cited": 318.8,
-     "oldest_below_Ma": 280.7,
+     "oldest_below_Ma": 318.7,
      "raised_by": null
     },
     "Archelosauria": {
@@ -168,11 +267,11 @@
      "tips not on a list or not in the rows": 33
     }
    },
-   "named_by_open_tree": 1742
+   "named_by_open_tree": 1743
   },
   "dating": {
    "calibrated_nodes": 9952,
-   "calibrated_raised_by_fossils": 178,
+   "calibrated_raised_by_fossils": 0,
    "uncalibrated_internal": 6484
   },
   "faults": {
@@ -200,6 +299,10 @@
     [
      "Leposoma (genus in Deuterostomia)",
      "Leposoma"
+    ],
+    [
+     "Strobilurus (genus in Holozoa)",
+     "Strobilurus"
     ],
     [
      "Gambelia (genus in Opisthokonta)",
@@ -234,6 +337,14 @@
      "Homalopsis"
     ],
     [
+     "Tetralepis (genus in Opisthokonta)",
+     "Tetralepis"
+    ],
+    [
+     "Virginia (genus in Opisthokonta)",
+     "Virginia"
+    ],
+    [
      "Aipysurus (genus in family Hydrophiidae)",
      "Aipysurus"
     ],
@@ -248,6 +359,10 @@
     [
      "Heterodon (genus in Opisthokonta)",
      "Heterodon"
+    ],
+    [
+     "Tomodon (genus in Opisthokonta)",
+     "Tomodon"
     ],
     [
      "Clelia (genus in Deuterostomia)",
@@ -278,6 +393,10 @@
      "Squamata"
     ],
     [
+     "Chelonia (genus in order Sauria)",
+     "Chelonia"
+    ],
+    [
      "Cycloderma (genus in Holozoa)",
      "Cycloderma"
     ],
@@ -292,6 +411,18 @@
     [
      "Eudromia (genus in Deuterostomia)",
      "Eudromia"
+    ],
+    [
+     "Camptorhynchus (genus in Deuterostomia)",
+     "Camptorhynchus"
+    ],
+    [
+     "Cereopsis (genus in Bilateria)",
+     "Cereopsis"
+    ],
+    [
+     "Polysticta (genus in Holozoa)",
+     "Polysticta"
     ],
     [
      "Ortalis (genus in Deuterostomia)",
@@ -318,6 +449,10 @@
      "Lagopus"
     ],
     [
+     "Rhinortha (genus in Deuterostomia)",
+     "Rhinortha"
+    ],
+    [
      "Eudocimus (genus in Deuterostomia)",
      "Eudocimus"
     ],
@@ -326,8 +461,16 @@
      "Bostrychia"
     ],
     [
+     "Scopus (genus in Opisthokonta)",
+     "Scopus"
+    ],
+    [
      "Morus (genus in Opisthokonta)",
      "Morus"
+    ],
+    [
+     "Ensifera (genus in Deuterostomia)",
+     "Ensifera"
     ],
     [
      "Oxypogon (genus in Opisthokonta)",
@@ -336,6 +479,18 @@
     [
      "Archilochus (genus in Deuterostomia)",
      "Archilochus"
+    ],
+    [
+     "Rhodopis (genus in Opisthokonta)",
+     "Rhodopis"
+    ],
+    [
+     "Philodice (genus in Opisthokonta)",
+     "Philodice"
+    ],
+    [
+     "Goethalsia (genus in Opisthokonta)",
+     "Goethalsia"
     ],
     [
      "Lewinia (genus in Eumetazoa)",
@@ -350,24 +505,60 @@
      "Anarhynchus"
     ],
     [
+     "Bartramia (genus in Opisthokonta)",
+     "Bartramia"
+    ],
+    [
+     "Xenus (genus in Holozoa)",
+     "Xenus"
+    ],
+    [
      "Arenaria (genus in Deuterostomia)",
      "Arenaria"
+    ],
+    [
+     "Leptosomus (genus in Deuterostomia)",
+     "Leptosomus"
     ],
     [
      "Priotelus (genus in Deuterostomia)",
      "Priotelus"
     ],
     [
+     "Melidora (genus in Opisthokonta)",
+     "Melidora"
+    ],
+    [
+     "Chelidoptera (genus in Deuterostomia)",
+     "Chelidoptera"
+    ],
+    [
      "Aulacorhynchus (genus in Opisthokonta)",
      "Aulacorhynchus"
+    ],
+    [
+     "Verreauxia (genus in Deuterostomia)",
+     "Verreauxia"
     ],
     [
      "Ptilopsis (genus in Deuterostomia)",
      "Ptilopsis"
     ],
     [
+     "Jubula (genus in Opisthokonta)",
+     "Jubula"
+    ],
+    [
+     "Sagittariidae (family in Opisthokonta)",
+     "Sagittariidae"
+    ],
+    [
      "Leptodon (genus in Opisthokonta)",
      "Leptodon"
+    ],
+    [
+     "Traversia (genus in Opisthokonta)",
+     "Traversia"
     ],
     [
      "Heterocercus (genus in Deuterostomia)",
@@ -394,12 +585,32 @@
      "Hypocnemis"
     ],
     [
+     "Macgregoria (genus in Opisthokonta)",
+     "Macgregoria"
+    ],
+    [
+     "Finschia (genus in Opisthokonta)",
+     "Finschia"
+    ],
+    [
+     "Oreocharis (genus in Deuterostomia)",
+     "Oreocharis"
+    ],
+    [
      "Artamus (genus in Deuterostomia)",
      "Artamus"
     ],
     [
      "Newtonia (genus in Opisthokonta)",
      "Newtonia"
+    ],
+    [
+     "Metabolus (genus in Opisthokonta)",
+     "Metabolus"
+    ],
+    [
+     "Platylophus (genus in Opisthokonta)",
+     "Platylophus"
     ],
     [
      "Podoces (genus in Deuterostomia)",
@@ -410,12 +621,44 @@
      "Eremophila"
     ],
     [
+     "Eminia (genus in Opisthokonta)",
+     "Eminia"
+    ],
+    [
+     "Randia (genus in Opisthokonta)",
+     "Randia"
+    ],
+    [
+     "Graueria (genus in Deuterostomia)",
+     "Graueria"
+    ],
+    [
+     "Woodfordia (genus in Opisthokonta)",
+     "Woodfordia"
+    ],
+    [
      "Leiothrix (genus in Opisthokonta)",
      "Leiothrix"
     ],
     [
+     "Kakamega (genus in Deuterostomia)",
+     "Kakamega"
+    ],
+    [
      "Prunella (genus in Opisthokonta)",
      "Prunella"
+    ],
+    [
+     "Palmeria (genus in Opisthokonta)",
+     "Palmeria"
+    ],
+    [
+     "Chaunoproctus (genus in Deuterostomia)",
+     "Chaunoproctus"
+    ],
+    [
+     "Uragus (genus in Deuterostomia)",
+     "Uragus"
     ],
     [
      "Chloris (genus in Opisthokonta)",
@@ -438,12 +681,40 @@
      "Cardinalis"
     ],
     [
+     "Chlorophanes (genus in Deuterostomia)",
+     "Chlorophanes"
+    ],
+    [
      "Conirostrum (genus in Opisthokonta)",
      "Conirostrum"
     ],
     [
+     "Orchesticus (genus in Deuterostomia)",
+     "Orchesticus"
+    ],
+    [
+     "Stephanophorus (genus in Deuterostomia)",
+     "Stephanophorus"
+    ],
+    [
      "Leptocoma (genus in Opisthokonta)",
      "Leptocoma"
+    ],
+    [
+     "Irania (genus in Deuterostomia)",
+     "Irania"
+    ],
+    [
+     "Cinclidium (genus in Opisthokonta)",
+     "Cinclidium"
+    ],
+    [
+     "Heinrichia (genus in Deuterostomia)",
+     "Heinrichia"
+    ],
+    [
+     "Salpinctes (genus in Opisthokonta)",
+     "Salpinctes"
     ],
     [
      "Cyphorhinus (genus in Deuterostomia)",
@@ -455,19 +726,17 @@
     "Squamata": 12293
    },
    "named_by_taxonomy": {
-    "n": 25,
+    "n": 21,
     "names": [
      "Abronia",
      "Acrodonta",
      "Archelosauria",
      "Archosauria",
-     "Brachypteraciidae",
      "Crocodylia",
      "Cyanoderma",
      "Echinanthera",
      "Eremopterix",
      "Eurylaimus",
-     "Galliformes",
      "Heliangelus",
      "Illadopsis",
      "Madascincus polleni species complex",
@@ -476,8 +745,6 @@
      "Philemon",
      "Phoenicoparrus",
      "Pteroglossus",
-     "Spheniscidae",
-     "Spheniscus",
      "Thamnophis",
      "Toxicofera",
      "Urostrophus",
@@ -492,6 +759,622 @@
     "Squamata": 9990,
     "Testudines": 340
    }
+  },
+  "fossils": {
+   "at_amniota": [
+    "Amniota incertae sedis (fossil)",
+    "Colognathus",
+    "Gnorhimosuchus",
+    "Kraterokheirodon",
+    "Mesosauria",
+    "Recumbirostra",
+    "Timanosaurus",
+    "Vitalia"
+   ],
+   "backbone": {
+    "Amniota": {
+     "after_Ma": 318.8,
+     "before_Ma": 318.8,
+     "raised_by": null
+    },
+    "Archelosauria": {
+     "after_Ma": 263.069,
+     "before_Ma": 256.8,
+     "raised_by": "a fossil inside it"
+    },
+    "Archosauria": {
+     "after_Ma": 251.252,
+     "before_Ma": 243.3,
+     "raised_by": "a fossil inside it"
+    },
+    "Lepidosauria": {
+     "after_Ma": 247.0,
+     "before_Ma": 245.0,
+     "raised_by": "a fossil inside it"
+    },
+    "Sauria": {
+     "after_Ma": 280.7,
+     "before_Ma": 280.7,
+     "raised_by": null
+    }
+   },
+   "dated": {
+    "clamped_below_parent": 72,
+    "how": {
+     "joins a split (loose)": 1140,
+     "on a stem (fossil)": 239,
+     "on a stem's own split": 600,
+     "on a stem, joins a split of the same age": 12
+    }
+   },
+   "graft": {
+    "grafted: MRCA of OT genus members": 101,
+    "grafted: OT genus": 500,
+    "grafted: PBDB genus (created)": 3517,
+    "grafted: taxonomy path (genus created)": 3660,
+    "living, not in OT (skipped)": 182,
+    "matched OT leaf (synonym)": 322,
+    "no occurrences/range (skipped)": 826,
+    "not a plain binomial": 46,
+    "status unknown (skipped)": 22
+   },
+   "grafted_by_group": {
+    "Birds": 1472,
+    "Choristoderes": 32,
+    "Crocodilians (crown)": 234,
+    "Lizards and snakes": 946,
+    "Marine reptiles": 465,
+    "Non-avian dinosaurs": 1424,
+    "Non-mammal synapsids": 783,
+    "Other amniotes": 371,
+    "Other archosaurs": 162,
+    "Other crocodylomorphs": 392,
+    "Parareptiles": 112,
+    "Pterosaurs": 253,
+    "Stem turtles": 137,
+    "Tuatara and kin": 73,
+    "Turtles (crown)": 922
+   },
+   "match": {
+    "grafted under OT family-level node": 857,
+    "grafted under OT genus": 500,
+    "grafted under OT order or higher": 2109,
+    "grafted unplaced (Mammalia root / incertae sedis)": 33,
+    "matched_existing_OT_species": 322,
+    "rate_family_or_better": 0.4394,
+    "rate_matched_species": 0.0843,
+    "rate_species_or_genus": 0.2151,
+    "species_used": 3821
+   },
+   "moved_out": [
+    {
+     "from": "Archelosauria",
+     "oldest_first_appearance_Ma": 316.9,
+     "stem": "Eureptilia",
+     "to": "Sauria"
+    },
+    {
+     "from": "Archelosauria",
+     "oldest_first_appearance_Ma": 303.7,
+     "stem": "Diapsida",
+     "to": "Sauria"
+    },
+    {
+     "from": "Aves",
+     "oldest_first_appearance_Ma": 241.46,
+     "stem": "Avemetatarsalia",
+     "to": "(unnamed: Polioptila guianensis, Polioptila schistaceigula, Polioptila)"
+    },
+    {
+     "from": "Aves",
+     "oldest_first_appearance_Ma": 237.0,
+     "stem": "Ornithodira",
+     "to": "(unnamed: Polioptila guianensis, Polioptila schistaceigula, Polioptila)"
+    },
+    {
+     "from": "Aves",
+     "oldest_first_appearance_Ma": 237.0,
+     "stem": "Dinosauriformes",
+     "to": "(unnamed: Polioptila guianensis, Polioptila schistaceigula, Polioptila)"
+    },
+    {
+     "from": "Aves",
+     "oldest_first_appearance_Ma": 184.2,
+     "stem": "Tetanurae",
+     "to": "(unnamed: Polioptila guianensis, Polioptila schistaceigula, Polioptila)"
+    },
+    {
+     "from": "Aves",
+     "oldest_first_appearance_Ma": 199.5,
+     "stem": "Coelurosauria",
+     "to": "(unnamed: Polioptila guianensis, Polioptila schistaceigula, Polioptila)"
+    },
+    {
+     "from": "Aves",
+     "oldest_first_appearance_Ma": 165.3,
+     "stem": "Maniraptora",
+     "to": "(unnamed: Polioptila guianensis, Polioptila schistaceigula, Polioptila)"
+    },
+    {
+     "from": "Aves",
+     "oldest_first_appearance_Ma": 161.5,
+     "stem": "Paraves",
+     "to": "(unnamed: Polioptila guianensis, Polioptila schistaceigula, Polioptila)"
+    },
+    {
+     "from": "Aves",
+     "oldest_first_appearance_Ma": 192.9,
+     "stem": "Averostra",
+     "to": "(unnamed: Polioptila guianensis, Polioptila schistaceigula, Polioptila)"
+    },
+    {
+     "from": "Aves",
+     "oldest_first_appearance_Ma": 227.3,
+     "stem": "Neotheropoda",
+     "to": "(unnamed: Polioptila guianensis, Polioptila schistaceigula, Polioptila)"
+    },
+    {
+     "from": "Aves",
+     "oldest_first_appearance_Ma": 227.3,
+     "stem": "Theropoda",
+     "to": "(unnamed: Polioptila guianensis, Polioptila schistaceigula, Polioptila)"
+    },
+    {
+     "from": "Aves",
+     "oldest_first_appearance_Ma": 241.46,
+     "stem": "Dinosauria",
+     "to": "(unnamed: Polioptila guianensis, Polioptila schistaceigula, Polioptila)"
+    }
+   ],
+   "path_used": {
+    "a rows node by name": 301,
+    "no PBDB path": 32,
+    "no rows node on the path": 1,
+    "the root": 37,
+    "the stem of living species": 3289
+   },
+   "pbdb": {
+    "a listed species by name": 2601,
+    "in_the_mammal_build": 16604,
+    "species_outside_the_mammals": 11777
+   },
+   "rehomed": {
+    "by_crown": {
+     "(unnamed clade)": 73,
+     "Agamidae": 1,
+     "Alligatoridae": 11,
+     "Alligatorinae": 4,
+     "Anguidae": 18,
+     "Anser": 3,
+     "Apalone": 2,
+     "Batagurinae": 1,
+     "Blanidae": 3,
+     "Branta": 1,
+     "Butorides": 1,
+     "Caiman": 1,
+     "Casuariidae": 1,
+     "Chelidae": 3,
+     "Cheloniidae": 14,
+     "Chelonioidea": 15,
+     "Chelydridae": 3,
+     "Chelydroidea": 1,
+     "Chrysemys": 1,
+     "Coliiformes": 3,
+     "Columbiformes": 1,
+     "Cordylidae": 1,
+     "Cracidae": 1,
+     "Crocodylia": 2,
+     "Crocodylidae": 5,
+     "Cycloderma": 1,
+     "Diomedea": 2,
+     "Durocryptodira": 5,
+     "Emydidae": 6,
+     "Eudocimus": 1,
+     "Falconiformes": 2,
+     "Fregatidae": 1,
+     "Gambelia": 1,
+     "Gavialidae": 9,
+     "Gaviiformes": 1,
+     "Geochelone": 3,
+     "Geoemyda": 1,
+     "Geoemydidae": 7,
+     "Glyptemys": 1,
+     "Gopherus": 3,
+     "Haliaeetus": 1,
+     "Helodermatidae": 1,
+     "Heterodon": 2,
+     "Hydromedusa": 1,
+     "Jacana": 1,
+     "Kinosternidae": 2,
+     "Lacerta": 1,
+     "Longirostres": 11,
+     "Macrochelys": 2,
+     "Mauremys": 2,
+     "Mecistops": 1,
+     "Melanochelys": 1,
+     "Menura": 1,
+     "Morus": 7,
+     "Mycteria": 1,
+     "Natrix": 3,
+     "Neognathae": 1,
+     "Numididae": 1,
+     "Ortalis": 2,
+     "Oxyura": 1,
+     "Phalacrocoracidae": 11,
+     "Phoebastria": 1,
+     "Phoenicopteriformes": 3,
+     "Phoenicopterus": 1,
+     "Piciformes": 1,
+     "Picus": 1,
+     "Plegadis": 1,
+     "Podocnemididae": 1,
+     "Podocnemis": 2,
+     "Polychrotidae": 2,
+     "Pseudemys": 4,
+     "Rafetus": 2,
+     "Recurvirostra": 1,
+     "Rheiformes": 1,
+     "Sauria": 1,
+     "Sphenisciformes": 18,
+     "Spheniscus": 3,
+     "Squamata": 3,
+     "Sula": 3,
+     "Sulidae": 1,
+     "Terrapene": 1,
+     "Testudines": 1,
+     "Testudinidae": 9,
+     "Trionychidae": 6,
+     "Trogoniformes": 3,
+     "Trogonophidae": 1,
+     "Uromastycinae": 1,
+     "Varanidae": 3,
+     "Varanoidea": 3,
+     "Vipera": 2,
+     "Viperinae": 1,
+     "Xenosauridae": 3
+    },
+    "largest_age_gaps": [
+     {
+      "crown": "Xenosauridae",
+      "crown_Ma": 29.58,
+      "fossil_Ma": 120.48,
+      "moved": "Shestakovia"
+     },
+     {
+      "crown": "Xenosauridae",
+      "crown_Ma": 29.58,
+      "fossil_Ma": 115.83,
+      "moved": "Xenostius"
+     },
+     {
+      "crown": "Crocodylia",
+      "crown_Ma": 93.11,
+      "fossil_Ma": 167.75,
+      "moved": "Gavialinum"
+     },
+     {
+      "crown": "(unnamed clade)",
+      "crown_Ma": 98.99,
+      "fossil_Ma": 159.15,
+      "moved": "Praeornithes"
+     },
+     {
+      "crown": "Testudines",
+      "crown_Ma": 176.66,
+      "fossil_Ma": 231.45,
+      "moved": "Odontochelys"
+     },
+     {
+      "crown": "Durocryptodira",
+      "crown_Ma": 82.78,
+      "fossil_Ma": 135.82,
+      "moved": "Chelone"
+     },
+     {
+      "crown": "Chelydridae",
+      "crown_Ma": 16.38,
+      "fossil_Ma": 65.7,
+      "moved": "Tavachelydra"
+     },
+     {
+      "crown": "Xenosauridae",
+      "crown_Ma": 29.58,
+      "fossil_Ma": 77.9,
+      "moved": "Exostinus"
+     },
+     {
+      "crown": "Neognathae",
+      "crown_Ma": 84.03,
+      "fossil_Ma": 130.19,
+      "moved": "Neoaves"
+     },
+     {
+      "crown": "Longirostres",
+      "crown_Ma": 48.53,
+      "fossil_Ma": 92.85,
+      "moved": "Zhyrasuchus"
+     },
+     {
+      "crown": "Longirostres",
+      "crown_Ma": 48.53,
+      "fossil_Ma": 91.85,
+      "moved": "Tadzhikosuchus"
+     },
+     {
+      "crown": "Trionychidae",
+      "crown_Ma": 76.43,
+      "fossil_Ma": 118.3,
+      "moved": "Perochelys"
+     },
+     {
+      "crown": "Rheiformes",
+      "crown_Ma": 13.03,
+      "fossil_Ma": 53.03,
+      "moved": "Diogenornis"
+     },
+     {
+      "crown": "Chelidae",
+      "crown_Ma": 79.28,
+      "fossil_Ma": 117.38,
+      "moved": "Prochelidella"
+     },
+     {
+      "crown": "Fregatidae",
+      "crown_Ma": 17.03,
+      "fossil_Ma": 54.55,
+      "moved": "Limnofregata"
+     },
+     {
+      "crown": "Sphenisciformes",
+      "crown_Ma": 23.41,
+      "fossil_Ma": 59.83,
+      "moved": "Crossvallia"
+     },
+     {
+      "crown": "Sphenisciformes",
+      "crown_Ma": 23.41,
+      "fossil_Ma": 59.83,
+      "moved": "Sequiwaimanu"
+     },
+     {
+      "crown": "Sphenisciformes",
+      "crown_Ma": 23.41,
+      "fossil_Ma": 59.83,
+      "moved": "Archaeodyptes"
+     },
+     {
+      "crown": "Sphenisciformes",
+      "crown_Ma": 23.41,
+      "fossil_Ma": 59.83,
+      "moved": "Muriwaimanu"
+     },
+     {
+      "crown": "Sphenisciformes",
+      "crown_Ma": 23.41,
+      "fossil_Ma": 59.83,
+      "moved": "Waimanutaha"
+     },
+     {
+      "crown": "Sphenisciformes",
+      "crown_Ma": 23.41,
+      "fossil_Ma": 59.83,
+      "moved": "Daniadyptes"
+     },
+     {
+      "crown": "Sphenisciformes",
+      "crown_Ma": 23.41,
+      "fossil_Ma": 59.83,
+      "moved": "Waiparadyptes"
+     },
+     {
+      "crown": "Sphenisciformes",
+      "crown_Ma": 23.41,
+      "fossil_Ma": 59.83,
+      "moved": "Waimanu"
+     },
+     {
+      "crown": "Longirostres",
+      "crown_Ma": 48.53,
+      "fossil_Ma": 84.25,
+      "moved": "Thoracosaurus"
+     },
+     {
+      "crown": "Trionychidae",
+      "crown_Ma": 76.43,
+      "fossil_Ma": 111.95,
+      "moved": "Trionyx"
+     }
+    ],
+    "subtrees_moved": 352
+   },
+   "stems": {
+    "Archosauriformes": {
+     "fossils": 1583,
+     "oldest_fossil_Ma": 259.33,
+     "round": "Archosauria"
+    },
+    "Archosauromorpha": {
+     "fossils": 2488,
+     "oldest_fossil_Ma": 297.21,
+     "round": "Archelosauria"
+    },
+    "Avemetatarsalia": {
+     "fossils": 3173,
+     "oldest_fossil_Ma": 245.23,
+     "round": "(unnamed: Polioptila guianensis, Polioptila schistaceigula, Polioptila)"
+    },
+    "Averostra": {
+     "fossils": 1919,
+     "oldest_fossil_Ma": 197.2,
+     "round": "(unnamed: Polioptila guianensis, Polioptila schistaceigula, Polioptila)"
+    },
+    "Coelurosauria": {
+     "fossils": 1771,
+     "oldest_fossil_Ma": 201.4,
+     "round": "(unnamed: Polioptila guianensis, Polioptila schistaceigula, Polioptila)"
+    },
+    "Crocodyliformes": {
+     "fossils": 512,
+     "oldest_fossil_Ma": 217.5,
+     "round": "Crocodylia"
+    },
+    "Crocodylomorpha": {
+     "fossils": 628,
+     "oldest_fossil_Ma": 233.15,
+     "round": "Crocodylia"
+    },
+    "Crocopoda": {
+     "fossils": 1623,
+     "oldest_fossil_Ma": 263.07,
+     "round": "Archosauria"
+    },
+    "Cynodontia": {
+     "fossils": 11237,
+     "oldest_fossil_Ma": 263.07,
+     "round": "Mammalia"
+    },
+    "Diapsida": {
+     "fossils": 4013,
+     "oldest_fossil_Ma": 305.85,
+     "round": "Sauria"
+    },
+    "Dinosauria": {
+     "fossils": 2902,
+     "oldest_fossil_Ma": 245.23,
+     "round": "(unnamed: Polioptila guianensis, Polioptila schistaceigula, Polioptila)"
+    },
+    "Dinosauriformes": {
+     "fossils": 2904,
+     "oldest_fossil_Ma": 240.23,
+     "round": "(unnamed: Polioptila guianensis, Polioptila schistaceigula, Polioptila)"
+    },
+    "Eucrocopoda": {
+     "fossils": 1539,
+     "oldest_fossil_Ma": 245.23,
+     "round": "Archosauria"
+    },
+    "Eureptilia": {
+     "fossils": 4070,
+     "oldest_fossil_Ma": 318.7,
+     "round": "Sauria"
+    },
+    "Eusuchia": {
+     "fossils": 278,
+     "oldest_fossil_Ma": 156.35,
+     "round": "Crocodylia"
+    },
+    "Lepidosauromorpha": {
+     "fossils": 1043,
+     "oldest_fossil_Ma": 251.9,
+     "round": "Lepidosauria"
+    },
+    "Loricata": {
+     "fossils": 650,
+     "oldest_fossil_Ma": 251.25,
+     "round": "Crocodylia"
+    },
+    "Mammaliaformes": {
+     "fossils": 11084,
+     "oldest_fossil_Ma": 233.15,
+     "round": "Mammalia"
+    },
+    "Mammaliamorpha": {
+     "fossils": 11097,
+     "oldest_fossil_Ma": 251.25,
+     "round": "Mammalia"
+    },
+    "Maniraptora": {
+     "fossils": 1636,
+     "oldest_fossil_Ma": 167.75,
+     "round": "(unnamed: Polioptila guianensis, Polioptila schistaceigula, Polioptila)"
+    },
+    "Mesoeucrocodylia": {
+     "fossils": 477,
+     "oldest_fossil_Ma": 197.2,
+     "round": "Crocodylia"
+    },
+    "Neodiapsida": {
+     "fossils": 4031,
+     "oldest_fossil_Ma": 287.7,
+     "round": "Sauria"
+    },
+    "Neosuchia": {
+     "fossils": 370,
+     "oldest_fossil_Ma": 192.85,
+     "round": "Crocodylia"
+    },
+    "Neotheropoda": {
+     "fossils": 1941,
+     "oldest_fossil_Ma": 233.15,
+     "round": "(unnamed: Polioptila guianensis, Polioptila schistaceigula, Polioptila)"
+    },
+    "Ornithodira": {
+     "fossils": 3168,
+     "oldest_fossil_Ma": 240.23,
+     "round": "(unnamed: Polioptila guianensis, Polioptila schistaceigula, Polioptila)"
+    },
+    "Pantestudines": {
+     "fossils": 1065,
+     "oldest_fossil_Ma": 239.24,
+     "round": "Testudines"
+    },
+    "Paracrocodylomorpha": {
+     "fossils": 653,
+     "oldest_fossil_Ma": 249.9,
+     "round": "Crocodylia"
+    },
+    "Paraves": {
+     "fossils": 1386,
+     "oldest_fossil_Ma": 164.4,
+     "round": "(unnamed: Polioptila guianensis, Polioptila schistaceigula, Polioptila)"
+    },
+    "Pseudosuchia": {
+     "fossils": 769,
+     "oldest_fossil_Ma": 249.9,
+     "round": "Crocodylia"
+    },
+    "Reptilia": {
+     "fossils": 4186,
+     "oldest_fossil_Ma": 309.6,
+     "round": "Sauria"
+    },
+    "Solidocrania": {
+     "fossils": 515,
+     "oldest_fossil_Ma": 164.4,
+     "round": "Crocodylia"
+    },
+    "Suchia": {
+     "fossils": 702,
+     "oldest_fossil_Ma": 245.23,
+     "round": "Crocodylia"
+    },
+    "Synapsida": {
+     "fossils": 11803,
+     "oldest_fossil_Ma": 318.7,
+     "round": "Mammalia"
+    },
+    "Testudinata": {
+     "fossils": 1063,
+     "oldest_fossil_Ma": 217.5,
+     "round": "Testudines"
+    },
+    "Tetanurae": {
+     "fossils": 1863,
+     "oldest_fossil_Ma": 192.85,
+     "round": "(unnamed: Polioptila guianensis, Polioptila schistaceigula, Polioptila)"
+    },
+    "Therapsida": {
+     "fossils": 11689,
+     "oldest_fossil_Ma": 279.85,
+     "round": "Mammalia"
+    },
+    "Theropoda": {
+     "fossils": 1982,
+     "oldest_fossil_Ma": 233.15,
+     "round": "(unnamed: Polioptila guianensis, Polioptila schistaceigula, Polioptila)"
+    }
+   },
+   "stems_emptied": []
   },
   "lists": {
    "clements": 11167,
@@ -729,10 +1612,13 @@
    "listed_but_extinct": {
     "by_group": {
      "Aves": 78,
-     "Squamata": 3,
-     "Testudines": 5
+     "Squamata": 1
     },
-    "n": 86,
+    "lost_since_1500": {
+     "IOC 15.2 dagger": 73,
+     "Red List 2026-1 EX": 75
+    },
+    "n": 79,
     "names": [
      "Acrocephalus luscinius",
      "Acrocephalus musae",
@@ -766,9 +1652,7 @@
      "Diaphorapteryx hawkinsi",
      "Dryolimnas augusti",
      "Dysmorodrepanis munroi",
-     "Elseya lavarackorum",
      "Erythromachus leguati",
-     "Farancia abacura",
      "Foudia delloni",
      "Fregilupus varius",
      "Gallinula nesiotis",
@@ -778,7 +1662,6 @@
      "Gerygone insularis",
      "Haematopus meadewaldoi",
      "Heteralocha acutirostris",
-     "Mabuya mabouya",
      "Melamprosops phaeosoma",
      "Mergus australis",
      "Microgoura meeki",
@@ -796,10 +1679,6 @@
      "Pezophaps solitaria",
      "Philydor novaesi",
      "Pipilo naufragus",
-     "Podocnemis expansa",
-     "Podocnemis sextuberculata",
-     "Podocnemis unifilis",
-     "Podocnemis vogli",
      "Pomarea maupitiensis",
      "Porphyrio caerulescens",
      "Porphyrio kukwiedei",
@@ -820,6 +1699,115 @@
      "Turnagra capensis",
      "Viridonia sagittirostris",
      "Zoothera terrestris"
+    ]
+   },
+   "lost_since_1500_not_flagged_by_ott": {
+    "by_group": {
+     "Aves": 93,
+     "Squamata": 5,
+     "Testudines": 1
+    },
+    "n": 99,
+    "names": [
+     "Acrocephalus longirostris",
+     "Acrocephalus yamashinae",
+     "Akialoa ellisiana",
+     "Akialoa lanaiensis",
+     "Akialoa obscura",
+     "Akialoa stejnegeri",
+     "Alectroenas payandeei",
+     "Alopochen mauritiana",
+     "Amazona martinicana",
+     "Amazona violacea",
+     "Anodorhynchus glaucus",
+     "Aphanocrex podarces",
+     "Aplonis corvina",
+     "Bulweria bifax",
+     "Callaeas cinereus",
+     "Chelonoidis niger",
+     "Chenonetta finschi",
+     "Cichlocolaptes mazarbarnetti",
+     "Colaptes oceanicus",
+     "Columba thiriouxi",
+     "Coua delalandei",
+     "Drepanis funerea",
+     "Drepanis pacifica",
+     "Eclectus infectus",
+     "Ectopistes migratorius",
+     "Emoia nativitatis",
+     "Falco duboisi",
+     "Fulica newtonii",
+     "Gallinula pacifica",
+     "Gallirallus pacificus",
+     "Gallirallus wakensis",
+     "Hemignathus affinis",
+     "Hemignathus hanapepe",
+     "Hemignathus lucidus",
+     "Himatione fraithii",
+     "Hydrobates macrodactylus",
+     "Leiolopisma ceciliae",
+     "Lophopsittacus mauritianus",
+     "Loxops ochraceus",
+     "Loxops wolstenholmei",
+     "Mareca marecula",
+     "Mascarinus mascarinus",
+     "Melopyrrha grandis",
+     "Mundia elpenor",
+     "Myadestes myadestinus",
+     "Nactus soniae",
+     "Necropsar rodericanus",
+     "Nesillas aldabrana",
+     "Nesoenas cicur",
+     "Nesoenas rodericanus",
+     "Numenius tenuirostris",
+     "Nyctanassa carcinocatactes",
+     "Nycticorax duboisi",
+     "Nycticorax mauritianus",
+     "Nycticorax megacephalus",
+     "Nycticorax olsoni",
+     "Ophrysia superciliosa",
+     "Otus grucheti",
+     "Pampusana ferruginea",
+     "Pampusana norfolkensis",
+     "Paroreomyza flammea",
+     "Phelsuma gigas",
+     "Pinguinus impennis",
+     "Podiceps andinus",
+     "Podilymbus gigas",
+     "Pomarea nukuhivae",
+     "Poodytes rufescens",
+     "Porphyrio albus",
+     "Prosobonia leucoptera",
+     "Psephotellus pulcherrimus",
+     "Psittacara labati",
+     "Psittacara maugei",
+     "Psittacula wardi",
+     "Psittirostra psittacea",
+     "Pterodroma caribbaea",
+     "Ptilinopus mercierii",
+     "Rhodacanthis flaviceps",
+     "Rhodacanthis palmeri",
+     "Rhodonessa caryophyllacea",
+     "Riccordia bracei",
+     "Scelotes guentheri",
+     "Siphonorhis americana",
+     "Tadorna cristata",
+     "Todiramphus gambieri",
+     "Turnagra tanagra",
+     "Turnix novaecaledoniae",
+     "Upupa antaios",
+     "Urile perspicillatus",
+     "Vanellus macropterus",
+     "Vini diadema",
+     "Xenicus longipes",
+     "Zapornia astrictocarpus",
+     "Zapornia monasa",
+     "Zapornia nigra",
+     "Zapornia palmeri",
+     "Zapornia sandwichensis",
+     "Zosterops albogularis",
+     "Zosterops semiflavus",
+     "Zosterops strenuus"
     ]
    },
    "matched_by": {
@@ -843,6 +1831,18 @@
     "Chroicocephalus novaehollandiae",
     "Zosterops conspicillatus"
    ],
+   "ott_extinct_but_living_on_the_lists": {
+    "n": 7,
+    "names": [
+     "Elseya lavarackorum",
+     "Farancia abacura",
+     "Mabuya mabouya",
+     "Podocnemis expansa",
+     "Podocnemis sextuberculata",
+     "Podocnemis unifilis",
+     "Podocnemis vogli"
+    ]
+   },
    "species_by_group": {
     "Aves": 11167,
     "Crocodylia": 27,
@@ -865,13 +1865,13 @@
   }
  },
  "output": {
-  "brotli_bytes": 1443491,
-  "dated_sidecar_raw": 4418644,
-  "files": 35,
-  "raw_bytes": 8234784,
-  "skeleton_brotli": 97653,
-  "skeleton_nodes": 1779,
-  "skeleton_raw": 1635720,
-  "tiles": 34
+  "brotli_bytes": 1637712,
+  "dated_sidecar_raw": 4940845,
+  "files": 39,
+  "raw_bytes": 9262944,
+  "skeleton_brotli": 103862,
+  "skeleton_nodes": 1904,
+  "skeleton_raw": 1673480,
+  "tiles": 38
  }
 }

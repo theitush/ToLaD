@@ -51,11 +51,12 @@ from pathlib import Path
 
 import numpy as np
 
-from . import build, dated, tiles
+from . import build, dated, fossils, tiles
 from .dated import EPS, SRC_NAMES, S_INTERP, DNode
 from .merge import LAD_RECENT_EX, _mrca, assign_bands, date_tree
 from .model import SRC, grade_from_sd, lognormal_sum, profile_edges
 from .newick import NNode, parse_comment, parse_newick, parse_nexus_tree
+from .overrides import Overrides
 from .tree import BINOMIAL, D_UPHAM, Node, clean_opentree, collapse_knuckles, from_opentree
 
 OTT_AMNIOTA, OTT_MAMMALIA = 229560, 244265
@@ -175,6 +176,34 @@ def load_rdb(raw: Path) -> tuple[dict[str, dict], list[str]]:
     return out, no_order
 
 
+def load_lost(raw: Path) -> dict[str, set[str]]:
+    """The birds and reptiles lost since 1500 CE: IOC 15.2's species marked extinct (a dagger, or two: known from
+    subfossils), and the Red List 2026-1's Extinct (the GBIF copy the mammal build pins; Extinct in the Wild lives on,
+    in captivity). Neither gives a year."""
+    import io
+    import zipfile
+
+    import openpyxl
+    ioc = set()
+    ws = openpyxl.load_workbook(raw / "amniotes" / "ioc" / "IOC_Names_File_Plus-15.2.xlsx", read_only=True).worksheets[0]
+    for r in ws.iter_rows(min_row=4, values_only=True):
+        if r[4] == "Species" and r[5] and "\u2020" in str(r[5]) and r[7]:
+            ioc.add(" ".join(str(r[7]).split()))
+    rl, ids = set(), {}
+    with zipfile.ZipFile(raw / "redlist" / "iucn-2026-1.zip") as z:
+        with z.open("taxon.txt") as f:
+            for line in io.TextIOWrapper(f, encoding="utf-8"):
+                p = line.rstrip("\n").split("\t")
+                if len(p) > 10 and p[4] in ("AVES", "REPTILIA") and p[10] == "species":
+                    ids[p[0]] = f"{p[7]} {p[8]}"
+        with z.open("distribution.txt") as f:
+            for line in io.TextIOWrapper(f, encoding="utf-8"):
+                p = line.rstrip("\n").split("\t")
+                if p[0] in ids and len(p) > 5 and p[5] == "Extinct":
+                    rl.add(ids[p[0]])
+    return {"IOC 15.2 dagger": ioc, "Red List 2026-1 EX": rl}
+
+
 def load_callaghan(raw: Path) -> dict[str, dict]:
     out = {}
     with (raw / "amniotes" / "callaghan2021" / "all_species_summary_table.csv").open(encoding="utf-8-sig") as f:
@@ -258,8 +287,9 @@ def detach(nd: Node) -> None:
     nd.parent = None
 
 
-def sauropsid_rows(nroot: NNode, tax: dict, lists: Lists, log: dict, counted: set[str] = frozenset()
-                   ) -> tuple[Node, dict]:
+def sauropsid_rows(nroot: NNode, tax: dict, lists: Lists, log: dict, counted: set[str] = frozenset(),
+                   lost: dict[str, set[str]] | None = None) -> tuple[Node, dict]:
+    lost = lost or {}
     root = from_opentree(nroot, tax)
     mam = [n for n in root.preorder() if n.ott == OTT_MAMMALIA]
     assert len(mam) == 1, "no single Mammalia node in the Open Tree Amniota subtree"
@@ -292,6 +322,8 @@ def sauropsid_rows(nroot: NNode, tax: dict, lists: Lists, log: dict, counted: se
     unlisted: Counter = Counter()
     dup: list[str] = []
     extinct: list[str] = []
+    lost_unflagged: list[str] = []
+    ott_only: list[str] = []
     counted_ext: list[str] = []
     for n in list(root.preorder()):
         if not n.is_leaf or n is root or n.data.get("empty_higher"):
@@ -309,15 +341,20 @@ def sauropsid_rows(nroot: NNode, tax: dict, lists: Lists, log: dict, counted: se
         how[h] += 1
         if "extinct" in n.data.get("ott_flags", set()) and sp in counted:
             counted_ext.append(sp)  # a count today says it lives (OTT flags the silver gull extinct)
-        elif "extinct" in n.data.get("ott_flags", set()):
-            # A list species OTT flags extinct itself (not by inheritance: Acratosaura mentalis is "extinct_inherited"
-            # and alive), and no count today has: lost in historical times (Raphus cucullatus, Aplonis fusca). No date
-            # of its own yet (the Red List step): merge.assign_bands' rule for an extinct species with none ends it at
-            # 1500 CE.
+        elif sp not in counted and any(sp in names or n.name in names for names in lost.values()):
+            # A list species IOC 15.2 marks extinct (a dagger) or the Red List 2026-1 assesses Extinct, and no count
+            # today has: lost since 1500 CE (Raphus cucullatus, Aplonis fusca, the great auk). With no year in either
+            # source, it ends a century ago (merge's rule for the Red List's EX, `red_list_ex`). OTT flags most of
+            # them extinct itself (not by inheritance: Acratosaura mentalis is "extinct_inherited" and alive).
             n.extinct = True
             n.lad = LAD_RECENT_EX
-            n.data["lad_default"] = True
-            extinct.append(sp)
+            n.data.update(lad_default=True, red_list_ex=True,
+                          lost_since_1500=[w for w, names in lost.items() if sp in names or n.name in names])
+            (extinct if "extinct" in n.data.get("ott_flags", set()) else lost_unflagged).append(sp)
+        elif "extinct" in n.data.get("ott_flags", set()):
+            # OTT alone calls it extinct: the list carries it as a living species and neither IOC nor the Red List
+            # says it is lost (Podocnemis expansa, Farancia abacura): it lives
+            ott_only.append(sp)
         r = lists.sp[sp]
         if n.name != sp:
             n.alt.insert(0, n.name)
@@ -350,7 +387,13 @@ def sauropsid_rows(nroot: NNode, tax: dict, lists: Lists, log: dict, counted: se
         "extinct_tips_dropped": dict(dropped_ext.most_common()),
         "extinct_flagged_but_listed_kept": {"n": len(kept_listed_ext), "names": sorted(kept_listed_ext)},
         "listed_but_extinct": {"n": len(extinct), "by_group": dict(Counter(seen[x].data["group"] for x in extinct)),
-                               "names": sorted(extinct)},
+                               "names": sorted(extinct),
+                               "lost_since_1500": {w: sum(1 for x in extinct if w in seen[x].data.get("lost_since_1500", ()))
+                                                   for w in lost}},
+        "ott_extinct_but_living_on_the_lists": {"n": len(ott_only), "names": sorted(ott_only)},
+        "lost_since_1500_not_flagged_by_ott": {"n": len(lost_unflagged),
+                                               "by_group": dict(Counter(seen[x].data["group"] for x in lost_unflagged)),
+                                               "names": sorted(lost_unflagged)},
         "ott_extinct_but_counted_today": sorted(counted_ext),
         "unlisted_tips_dropped": dict(unlisted.most_common()),
         "duplicate_tips_dropped": {"n": len(dup), "names": sorted(dup)},
@@ -619,7 +662,9 @@ def sauropsid_dated(rows: Node, trees: dict[str, NNode], lists: Lists, backbone:
         n_rows = sum(1 for n in by_name.values() if n.data.get("group") == g)
         rep[g] = {"source": key, **r, "rows": n_rows, "crown_Ma": round(d.age, 2),
                   "source_tips_under_crown": sum(1 for _ in _tips(top))}
-    # the backbone (amniotes.toml): each split older than every split below it (fossils: none outside mammals yet)
+    # the backbone (amniotes.toml): each split older than every split below it (the fossils inside raise it later:
+    # fossils.backbone_minima). Its upper bound for a fossil inside it (fossils.py): Benton's soft maximum, else its
+    # TimeTree interval.
     bb = {}
     pending = {e["name"]: e for e in backbone if e["name"] != "Amniota"}
     while pending:
@@ -632,6 +677,7 @@ def sauropsid_dated(rows: Node, trees: dict[str, NNode], lists: Lists, backbone:
             age = max(float(e["age"]), floor)
             d = DNode(age=age, lo=min(float(e["lo"]), age), hi=max(float(e["hi"]), age), src=S_TIMETREE,
                       name=e["name"], note=notes0 + [x["name"] for x in backbone].index(e["name"]))
+            d.bound = float(e.get("soft_max", e["hi"]))
             for k in kids:
                 d.add(k)
             crowns[e["name"]] = d
@@ -686,7 +732,7 @@ def calibrate_rows(rows: Node, droot: DNode, log: dict) -> None:
         if m is not None and k >= 2 and nmatch[id(m)] == k and m.leaf is None:
             nd.age = m.age
             nd.date_src = D_UPHAM  # (code 0: calibrated on a dated tree; FORMAT.md's label says Upham, the mammals')
-            nd.data["age_hpd"] = (m.lo, m.hi)
+            nd.data["age_hpd"] = (m.lo, getattr(m, "bound", None) or m.hi)
             nd.data["dated_src"] = m.src
             n_cal += 1
         else:
@@ -743,7 +789,7 @@ def graft_dated(rows: Node, droot: DNode, lists: Lists, log: dict) -> None:
     split_of: dict[int, DNode] = {}
     at_rank: Counter = Counter()
     by_group: Counter = Counter()
-    for L in [n for n in rows.preorder() if n.is_leaf and n.data.get("dleaf") is None]:
+    for L in [n for n in rows.preorder() if n.is_leaf and n.data.get("dleaf") is None and n.data.get("list")]:
         r = {"genus": L.name.split()[0], "family": L.data.get("family"), "group": L.data.get("group")}
         target, rank = None, None
         for rk in ("genus", "family", "group"):
@@ -788,7 +834,7 @@ def name_dated(rows: Node, droot: DNode) -> int:
     names: dict[tuple[int, int], str] = {}
     for n in rows.postorder():
         if n.is_leaf:
-            sig[id(n)] = (1, key[id(n)])
+            sig[id(n)] = (1, key[id(n)]) if n.data.get("dleaf") is not None else (0, 0)
             continue
         s = (sum(sig[id(c)][0] for c in n.children), 0)
         x = 0
@@ -816,13 +862,22 @@ def name_dated(rows: Node, droot: DNode) -> int:
 # ------------------------------------------------------------------ counts and sums
 
 
-def count_leaves(rows: Node, birds_n: dict[str, dict], thin: tuple[float, str], log: dict) -> None:
-    """Step 9: Callaghan 2021's totals for birds; every other species' count unknown (module docstring)."""
+def count_leaves(rows: Node, birds_n: dict[str, dict], thin: tuple[float, str], log: dict,
+                 skip: Node | None = None) -> None:
+    """Step 9: Callaghan 2021's totals for birds; every other species' count unknown (module docstring). Every leaf
+    under `rows` but `skip`'s (the mammals, counted by their own build)."""
     L_yr = ASSUMED_GEN_YR / 2
     rep: Counter = Counter()
-    for n in rows.preorder():
-        if not n.is_leaf:
+    leaves = []
+    st = [rows]
+    while st:
+        n = st.pop()
+        if n is skip:
             continue
+        if n.is_leaf:
+            leaves.append(n)
+        st.extend(n.children)
+    for n in leaves:
         D = n.data
         c = birds_n.get(n.name) if D.get("group") == "Aves" else None
         span = (n.t0 - n.t1) * 1e6
@@ -831,7 +886,15 @@ def count_leaves(rows: Node, birds_n: dict[str, dict], thin: tuple[float, str], 
         t_how = ("t: its band from the Open Tree node above it, dated on "
                  + (AMNIOTE_SRC[dl.src - len(SRC_NAMES)] + "'s tree" if dl is not None and not dl.graft else
                     "the group's dated tree; the species placed by name (its genus, else family), no tree has it"))
-        if n.extinct:
+        if n.kind == "graft":
+            N = thin[0]
+            D.update(alive=0.0, lo=0.0, hi=0.0, sd=0.0, grade=3, count_unknown={"N": N, "thinnest": thin[1]})
+            D["src"] = {SRC["pbdb"]}
+            D["meth"] = ["N:unknown: a fossil species (PBDB); how many there were is not known: drawn at the thinnest "
+                         f"a living species is ({N:.3g}, {thin[1]}), a width, not a figure", ASSUMED_GEN_NOTE,
+                         "t: its band from its first to its last appearance in the Paleobiology Database (PBDB)"]
+            rep["fossil: unknown"] += 1
+        elif n.extinct:
             N = thin[0]
             D.update(alive=0.0, lo=0.0, hi=0.0, sd=0.0, grade=3, count_unknown={"N": N, "thinnest": thin[1]})
             D["meth"] = ["N:unknown: a species lost in historical times (OTT flags it extinct); how many there were is "
@@ -993,7 +1056,8 @@ def build_amniotes(raw: Path, work: Path, log: dict, alog: dict, t_start: float)
     alog["lists"] = {"clements": len(birds), "rdb": len(reptiles), "rdb_no_order": no_order,
                      "rdb_by_group": dict(Counter(r["group"] for r in reptiles.values()))}
     cal = match_callaghan(load_callaghan(raw), birds, lists, alog)
-    srows, seen = sauropsid_rows(load_ot(raw), tax, lists, alog, {n for n, c in cal.items() if c["N"] > 0})
+    srows, seen = sauropsid_rows(load_ot(raw), tax, lists, alog, {n for n, c in cal.items() if c["N"] > 0},
+                                 load_lost(raw))
     log_step(t_start, f"sauropsid rows: {alog['rows']['species_by_group']}")
     backbone = load_backbone(Path(__file__).resolve().parents[1] / "amniotes.toml")
     notes = list(getattr(mdroot, "data_notes", []))
@@ -1004,60 +1068,132 @@ def build_amniotes(raw: Path, work: Path, log: dict, alog: dict, t_start: float)
     # the rows: Sauria is Open Tree's Sauropsida (its only living members); dated on the group trees + backbone
     calibrate_rows(srows, sdroot, alog)
     srows.age = sdroot.age
-    date_tree(srows, alog)
-    assign_bands(srows, {})
-    collapse_knuckles(srows)
     name_by_taxonomy(srows, tax, alog)
-    graft_dated(srows, sdroot, lists, alog)
-    alog["dated"]["named_by_open_tree"] = name_dated(srows, sdroot)
-    log_step(t_start, f"sauropsid dated tree: {alog['dated']['groups']}")
-    # Amniota: the mammals and the sauropsids, at the backbone's oldest split
+    # the fossils (step 6, fossils.py), on Amniota: the mammals as their build left them, the sauropsids
     am = next(e for e in backbone if e["name"] == "Amniota")
-    m_floor = max([mdroot.age] + [n.fad or 0.0 for n in mroot.preorder() if n.is_leaf])
-    age = max(float(am["age"]), m_floor + EPS, sdroot.age + EPS)
-    alog["dated"]["backbone"]["Amniota"] = {"cited": am["age"], "age": round(age, 3), "between": am["between"],
-                                            "raised_by": "the splits or fossils below it" if age > am["age"] else None,
-                                            "oldest_below_Ma": round(max(m_floor, sdroot.age), 3)}
-    adroot = DNode(age=age, lo=min(float(am["lo"]), age), hi=max(float(am["hi"]), age), src=S_TIMETREE,
-                   name="Amniota", note=len(notes) - len(backbone) + [x["name"] for x in backbone].index("Amniota"))
-    adroot.add(mdroot)
-    adroot.add(sdroot)
-    adroot.data_notes = notes
-    srows.t0 = age
     root = Node(name="Amniota", ott=OTT_AMNIOTA, rank="no rank", kind="tree")
-    root.age, root.t0, root.t1, root.date_src = age, age * 1.02, 0.0, D_UPHAM
     root.add(mroot)
     root.add(srows)
+    ttop, stop = fossils.graft(root, mroot, srows, lists, raw, Overrides(version=1),
+                               list(GROUPS) + [e["name"] for e in backbone] + ["Mammalia"], alog)
+    for n in srows.preorder():  # a listed species PBDB also has keeps the list's end (graft_pbdb gave it PBDB's)
+        if n.is_leaf and n.extinct and n.data.get("list"):
+            n.lad = LAD_RECENT_EX
+    log_step(t_start, f"fossils grafted: {alog['fossils']['grafted_by_group']}")
+    # dates and bands, each side on its own (a holder stands for Amniota, so each side's top is dated as any node)
+    mt0, mt1 = mroot.t0, mroot.t1
+    extra = [c for c in root.children if c is not ttop and c is not stop]  # fossils PBDB places in Amniota only
+    for top, hide in [(stop, None), (ttop, mroot)] + [(c, None) for c in extra]:
+        if top is mroot:
+            continue
+        kids = None
+        if hide is not None:  # the mammals: a leaf as old as their band start; nothing inside them changes
+            kids, hide.children, hide.fad = hide.children, [], hide.t0
+        holder = Node(name="(holder)")
+        holder.age = 1e4
+        root.children[root.children.index(top)] = holder
+        holder.add(top)
+        try:
+            date_tree(holder, alog)
+            assign_bands(holder, {})
+            # (the holder's own: a genus PBDB files straight under Amniota, of one species, is that species)
+            collapse_knuckles(holder, absorb_root=False)
+        finally:
+            root.children[root.children.index(holder)] = holder.children[0]
+            holder.children[0].parent = root
+            if hide is not None:
+                hide.children, hide.fad = kids, None
+                hide.t0, hide.t1 = mt0, mt1
+    ttop, stop, *extra = root.children
+    graft_dated(srows, sdroot, lists, alog)
+    alog["dated"]["named_by_open_tree"] = name_dated(srows, sdroot)
+    # the backbone: each split no younger than the fossils inside it (the rows' ages after date_tree)
+    named = {(n.data.get("crown_of") or n.name): n for n in stop.preorder()
+             if (n.data.get("crown_of") or n.name) in crowns and not n.is_leaf and not n.data.get("total_group_of")}
+    named.setdefault("Sauria", srows)  # (the rows' top is the crown the dated tree's Sauria is: calibrate_rows)
+    fossils.backbone_minima(crowns, named, [e["name"] for e in backbone if e["name"] != "Amniota"], alog["fossils"])
+    tops = fossils.dated_fossils([(ttop, mdroot), (stop, sdroot)], mroot, alog["fossils"])
+    log_step(t_start, f"sauropsid dated tree: {alog['dated']['groups']}")
+    # Amniota: the mammals' side and the sauropsids', at the backbone's oldest split
+    m_floor = max([mdroot.age] + [n.fad or 0.0 for n in mroot.preorder() if n.is_leaf])
+    extra_d = [d for d in (dated._sub(c, set()) for c in extra) if d is not None]
+    age = max(float(am["age"]), m_floor + EPS, ttop.age + EPS, stop.age + EPS, *(t.age + EPS for t in tops),
+              *(c.t0 + EPS for c in extra), *(d.age + EPS for d in extra_d))
+    alog["dated"]["backbone"]["Amniota"] = {"cited": am["age"], "age": round(age, 3), "between": am["between"],
+                                            "raised_by": "the splits or fossils below it" if age > am["age"] else None,
+                                            "oldest_below_Ma": round(max(m_floor, ttop.age, stop.age), 3)}
+    alog["fossils"]["backbone"]["Amniota"] = {"before_Ma": am["age"], "after_Ma": round(age, 3),
+                                              "raised_by": "a fossil inside it" if age > am["age"] else None}
+    adroot = DNode(age=age, lo=min(float(am["lo"]), age), hi=max(float(am["hi"]), age), src=S_TIMETREE,
+                   name="Amniota", note=len(notes) - len(backbone) + [x["name"] for x in backbone].index("Amniota"))
+    for t in tops + extra_d:
+        adroot.add(t)
+    for d in extra_d:
+        for x in d.preorder():
+            if x.leaf is not None:
+                x.leaf.data["dleaf"] = x
+    adroot.data_notes = notes
+    stop.t0 = age
+    if ttop is not mroot:
+        ttop.t0 = age
+    root.age, root.t0, root.t1, root.date_src = age, age * 1.02, 0.0, D_UPHAM
     # counts
     thin = thinnest(mroot, cal)
-    count_leaves(srows, cal, thin, alog)
+    count_leaves(root, cal, thin, alog, skip=mroot)
     sum_rows(root, extra=[mroot])
-    alog["checks"] = checks(root, mroot, srows, adroot, sdroot, crowns)
+    alog["checks"] = checks(root, mroot, srows, adroot, mdroot, tops, crowns)
+    alog["checks"]["fossils"] = fossils.checks(root, mroot)
     return root, adroot, mdroot
 
 
-def checks(root: Node, mroot: Node, srows: Node, adroot: DNode, sdroot: DNode, crowns: dict) -> dict:
+def checks(root: Node, mroot: Node, srows: Node, adroot: DNode, mdroot: DNode, tops: list[DNode], crowns: dict
+           ) -> dict:
     """The plausibility checks (the #113 habit): tips per group, crown ages, duplicates, branch lengths."""
     leaves = [n for n in root.preorder() if n.is_leaf]
     names = Counter(n.name for n in leaves)
-    sl = [n for n in srows.preorder() if n.is_leaf]
-    def bad_branches(top: DNode) -> int:
-        return sum(1 for d in top.preorder() for c in d.children
-                   if not (d.age > (0.0 if c.leaf is not None else c.age)))
+    sl = [n for n in srows.preorder() if n.is_leaf and n.data.get("list")]
+    mam = {id(n) for n in mroot.preorder()}
+    fos = [n for n in leaves if n.kind == "graft" and id(n) not in mam]
 
-    bad_branch = {"sauropsids": bad_branches(sdroot), "Amniota": int(not (adroot.age > max(c.age for c in adroot.children)))}
-    bad_rows = {"sauropsids": sum(1 for n in srows.preorder() if not (n.t0 > n.t1)),
+    def bad_branches(top: DNode, skip: DNode | None = None) -> int:
+        out, st = 0, [top]
+        while st:
+            d = st.pop()
+            if d is skip:
+                continue
+            for c in d.children:
+                if not (d.age > (0.0 if c.leaf is not None else c.age)):
+                    out += 1
+            st.extend(d.children)
+        return out
+
+    def bad_rows(top: Node, skip: Node | None = None) -> int:
+        out, st = 0, [top]
+        while st:
+            n = st.pop()
+            if n is skip:
+                continue
+            out += int(not (n.t0 > n.t1))
+            st.extend(n.children)
+        return out
+
+    bad_branch = {"sauropsids": bad_branches(tops[1]), "synapsids": bad_branches(tops[0], skip=mdroot),
+                  "Amniota": int(not (adroot.age > max(c.age for c in adroot.children)))}
+    bad_band = {"sauropsids": bad_rows(root.children[1]), "synapsids": bad_rows(root.children[0], skip=mroot),
                 "Amniota": int(not (root.t0 > max(c.t0 for c in root.children)))}
-    in_dated = sum(1 for d in sdroot.preorder() if d.leaf is not None)
+    in_dated = sum(1 for d in tops[1].preorder() if d.leaf is not None and d.leaf.data.get("list"))
     return {
         "tips": len(leaves), "mammal_tips": sum(1 for n in mroot.preorder() if n.is_leaf),
         "sauropsid_tips": len(sl), "sauropsid_tips_by_group": dict(Counter(n.data.get("group") for n in sl)),
+        "fossil_tips": len(fos),
         "sauropsid_in_dated_tree": in_dated,
+        "fossils_in_dated_tree": sum(1 for d in adroot.preorder()
+                                     if d.leaf is not None and d.leaf.kind == "graft" and id(d.leaf) not in mam),
         "crowns_Ma": {k: round(v.age, 2) for k, v in crowns.items() if v.leaf is None},
-        "Amniota_Ma": round(adroot.age, 2), "Mammalia_dated_Ma": round(adroot.children[0].age, 2),
+        "Amniota_Ma": round(adroot.age, 2), "Mammalia_dated_Ma": round(mdroot.age, 2),
         "species_twice": sorted(k for k, v in names.items() if v > 1),
-        "dated_branches_not_positive": bad_branch, "rows_bands_not_positive": bad_rows,
-        "alive": {"Mammalia": mroot.data["alive"], "Sauropsida": srows.data["alive"],
+        "dated_branches_not_positive": bad_branch, "rows_bands_not_positive": bad_band,
+        "alive": {"Mammalia": mroot.data["alive"], "Sauropsida": root.children[1].data["alive"],
                   "Aves": sum(n.data["alive"] for n in sl if n.data.get("group") == "Aves" and
                               not n.data.get("count_unknown"))},
     }
