@@ -9,7 +9,7 @@ import { SpeciesCard } from './FanApp';
 import { setFlip } from './flip';
 import type { FanNode } from './layout';
 import { mammalData } from './mammals-data';
-import { loadMammalsFromFiles } from './mammals-node';
+import { loadMammalsFromFiles, NODE_FOSSILS } from './mammals-node';
 import { mammaliaClade } from './panthera';
 import { picBox } from './pics';
 import { mammaliaTree } from './splits';
@@ -96,7 +96,8 @@ describe('the amniotes (ToLaD#539)', () => {
     const c = mammaliaClade();
     expect(c.sci).toBe('Amniota');
     expect(c.common).toBe('Amniotes');
-    expect(c.species.length).toBeGreaterThan(40_000);
+    // (The look it runs on, ToLaD#279: every fossil, the page's, 40,000 and more; the old look (TOLAD_FOSSILS=old), the living and the phylogeny's fossils, ~31,000.)
+    expect(c.species.length).toBeGreaterThan(NODE_FOSSILS === 'all' ? 40_000 : 30_000);
     for (const t of ['Mammalia', 'Aves', 'Squamata', 'Testudines', 'Crocodylia']) {
       expect(isLevel(v.fan, node(t)), t).toBe(true);
       expect(chainOf(v.fan, node(t))[0], t).toBe('Amniotes');
@@ -110,11 +111,16 @@ describe('the amniotes (ToLaD#539)', () => {
   it('home: the human named, its picture whole on the screen', () => {
     stand(home);
     const hum = v.fan.branches.find((b) => b.sp.sci === 'Homo sapiens')!;
+    expect([...v.cutLast!.names, ...v.cutLast!.spots].some((s) => s.b === hum && s.box[2] >= 0 && s.box[0] <= v.w), 'the human named at home').toBe(true);
     const pic = P(v).picSpots.find((q) => q.lv.b === hum);
-    expect(pic, 'a picture for the human at home').toBeTruthy();
-    const box = picBox(pic!);
-    expect(box[0]).toBeGreaterThanOrEqual(-0.5);
-    expect(box[2]).toBeLessThanOrEqual(v.w + 0.5);
+    // (Its picture: on every fossil, the page's look, the zoom gives it one at home (picRanges); on the old look its room goes to others' (the skinks', the
+    // sparrows', the hamsters'...) and it is named alone. Where it has one, whole on the screen.)
+    if (NODE_FOSSILS === 'all') expect(pic, 'a picture for the human at home').toBeTruthy();
+    if (pic) {
+      const box = picBox(pic);
+      expect(box[0]).toBeGreaterThanOrEqual(-0.5);
+      expect(box[2]).toBeLessThanOrEqual(v.w + 0.5);
+    }
     // (No group told by a binomial: a face with no English name tells it by a rank name.)
     const latin = new Set(v.fan.branches.map((b) => b.sp.sci));
     for (const g of P(v).gapCoverAt(P(v).territories(), v.cam.sx)) if (g.lv.v) expect(latin.has(groupName(v.fan, g.lv.v).replace(/ & kin$/, ''))).toBe(false);
