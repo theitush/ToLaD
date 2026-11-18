@@ -14,7 +14,7 @@ flat out vec4 vRect;
 flat out vec4 vColor;
 flat out vec2 vSkew;
 flat out vec2 vClip;
-flat out vec2 vDash;
+flat out vec3 vDash;
 void main() {
   // A trapezoid: [x0, x1] at y0, shifted by (dl, dr) at y1 (a rectangle when 0).
   // Its bounding box, grown so the anti-aliased edges have room (RECT_FS's filter, hw).
@@ -28,7 +28,7 @@ void main() {
   vColor = aColor;
   vSkew = aSkew.xy;
   vClip = aSkew.zw;
-  vDash = vec2(0.0);
+  vDash = vec3(0.0);
   gl_Position = vec4(p.x / uView.x * 2.0 - 1.0, 1.0 - p.y / uView.y * 2.0, 0.0, 1.0);
 }`;
 
@@ -39,7 +39,7 @@ flat in vec4 vRect;
 flat in vec4 vColor;
 flat in vec2 vSkew;
 flat in vec2 vClip;
-flat in vec2 vDash;
+flat in vec3 vDash;
 out vec4 o;
 const float DASH_ON = ${DASH_ON.toFixed(3)};
 const float DASH_P = ${DASH_PERIOD.toFixed(3)};
@@ -64,11 +64,12 @@ void main() {
   float hw = 0.5 * clamp(sk / H, 1.0, max(3.0, sk));
   float c = clamp(min(vP.x + hw, xr) - max(vP.x - hw, xl), 0.0, 2.0 * hw) / (2.0 * hw);
   float a = vColor.a * c;
-  // A dashed line (ToLaD#565, vDash.y its run along it per px down, > 0): the pixel row's run along it, [m - h, m + h]
-  // from where a dash starts, covered by this dash and the next.
-  if (vDash.y > 0.0) {
-    float m = mod(vDash.x + vP.y * vDash.y, DASH_P);
-    float h = 0.5 * vDash.y;
+  // A dashed line (ToLaD#565, vDash.z > 0): the pixel's run along it, s = A + (x, y).(B, C) from where the dashes start
+  // ((B, C) the line's direction), as [m - h, m + h] from where a dash starts, covered by this dash and the next. Along the
+  // line, not by the row: a lean (a fork's peel, nearly across the rows) is dashed as a straight run is.
+  if (vDash.z > 0.0) {
+    float m = mod(vDash.x + vP.x * vDash.y + vP.y * vDash.z, DASH_P);
+    float h = 0.5 * (abs(vDash.y) + vDash.z);
     float on = clamp(min(m + h, DASH_ON) - max(m - h, 0.0), 0.0, 2.0 * h) + clamp(min(m + h, DASH_P + DASH_ON) - max(m - h, DASH_P), 0.0, 2.0 * h);
     a *= on / (2.0 * h);
   }
@@ -98,7 +99,7 @@ flat out vec4 vRect;
 flat out vec4 vColor;
 flat out vec2 vSkew;
 flat out vec2 vClip;
-flat out vec2 vDash;
+flat out vec3 vDash;
 float laneDim(float px) {
   float t = clamp((px - 2.0) / 8.0, 0.0, 1.0);
   return uK.x + (uK.y - uK.x) * (1.0 - t * t * (3.0 - 2.0 * t));
@@ -204,8 +205,8 @@ void main() {
   vColor = vec4(c, a);
   vSkew = S;
   vClip = vec2(cl, cr);
-  // (Its run along the line from y0's phase: s(y) = phase + (y - y0) sq.)
-  vDash = dashed ? vec2(aE.w - 1.0 - y0 * sq, sq) : vec2(0.0);
+  // (Its run along the line from y0's phase: s(p) = phase + (p - (xq, y0)).(d, 1) / sq, the line's direction (d, 1) / sq.)
+  vDash = dashed ? vec3(aE.w - 1.0 - (xq * d + y0) / sq, d / sq, 1.0 / sq) : vec3(0.0);
   gl_Position = vec4(p.x / uView.x * 2.0 - 1.0, 1.0 - p.y / uView.y * 2.0, 0.0, 1.0);
 }`;
 
