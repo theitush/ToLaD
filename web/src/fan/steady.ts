@@ -249,39 +249,30 @@ export class Steady extends Fold {
     const N = fan.nodes;
     N.forEach((v, j) => this.idx.set(v, j));
     this.par = typedFrom(Int32Array, N, (v) => (v.parent ? this.idx.get(v.parent)! : -1));
+    // (The strands' paths, flat: the layout's (Tess.paths, ToLaD#502), its node indices fan.nodes' as idx's.)
+    const PP = fan.tess.paths;
     this.off = typedFrom(Float64Array, N, (v) => {
       if (!v.parent) return 0;
-      const s = v.strands[0].path.find((p) => p.node === v.parent);
-      return s ? s.off : 0;
+      const b = v.strands[0];
+      const pj = this.idx.get(v.parent)!;
+      for (let k = b.pAt; k < b.pAt + b.pN; k++) if (PP.node[k] === pj) return PP.off[k];
+      return 0;
     });
     const S = this.strands;
     this.room = typedFrom(Float64Array, S, (b) => Math.max(b.width, b.baseW));
     this.bNode = typedFrom(Int32Array, S, (b) => this.idx.get(b.node)!);
-    // (Every strand's path in one pass, into three flat arrays its rows are views of (ToLaD#502): 1.6M splits on the amniotes, where a typed
-    // array made per strand with from() and a map function cost 1.5 s of the open.)
-    let tot = 0;
-    for (const b of S) tot += b.path.length;
-    const fIdx = new Int32Array(tot);
-    const fY = new Float64Array(tot);
-    const fOff = new Float64Array(tot);
+    // (Every strand's path a view of the layout's flat paths (ToLaD#502): 1.6M splits on the amniotes, no copy.)
     this.pIdx = new Array<Int32Array>(S.length);
     this.pY = new Array<Float64Array>(S.length);
     this.pOff = new Array<Float64Array>(S.length);
     this.pLin = new Uint8Array(S.length);
-    for (let i = 0, o = 0; i < S.length; i++) {
-      const P = S[i].path;
-      const o0 = o;
-      for (let k = 0; k < P.length; k++, o++) {
-        const p = P[k];
-        fIdx[o] = this.idx.get(p.node)!;
-        fY[o] = p.y;
-        fOff[o] = p.off;
-        // (A path not ascending: walked, not bisected.)
-        if (k > 0 && !(fY[o] >= fY[o - 1])) this.pLin[i] = 1;
-      }
-      this.pIdx[i] = fIdx.subarray(o0, o);
-      this.pY[i] = fY.subarray(o0, o);
-      this.pOff[i] = fOff.subarray(o0, o);
+    for (let i = 0; i < S.length; i++) {
+      const { pAt: a, pN } = S[i];
+      this.pIdx[i] = PP.node.subarray(a, a + pN);
+      this.pY[i] = PP.y.subarray(a, a + pN);
+      this.pOff[i] = PP.off.subarray(a, a + pN);
+      // (A path not ascending: walked, not bisected.)
+      for (let k = a + 1; k < a + pN; k++) if (!(PP.y[k] >= PP.y[k - 1])) this.pLin[i] = 1;
     }
     const yRef = fan.time.y(0);
     this.cap = typedFrom(Float64Array, N, (v) => {
@@ -302,7 +293,7 @@ export class Steady extends Fold {
     this.kidsF = N.map((v) => typedFrom(Int32Array, v.kids, (k) => (isNode(k) ? this.idx.get(k)! : ~k.index)));
     this.bw = typedFrom(Float64Array, S, (b) => b.baseW);
     this.sY = typedFrom(Float64Array, S, (b) => b.splitY);
-    this.tcOff = typedFrom(Float64Array, S, (b) => b.path[0].off + b.baseW / 2);
+    this.tcOff = typedFrom(Float64Array, S, (b) => PP.off[b.pAt] + b.baseW / 2);
     this.rootJ = this.idx.get(fan.root)!;
     this.stack = new Int32Array(N.length + 1);
     this.nYp = typedFrom(Float64Array, N, (_, j) => (this.par[j] < 0 ? Infinity : this.nY[this.par[j]]));
