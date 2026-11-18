@@ -1136,6 +1136,8 @@ def build_amniotes(raw: Path, work: Path, log: dict, alog: dict, t_start: float)
     # Avemetatarsalia), given time as the mammal build gives its own (dated.zero_length, ToLaD#561);
     # the mammals' dated tree stays exactly theirs
     dated.zero_length(adroot, alog["fossils"], skip=mdroot)
+    # a stem named as the crown inside it (PBDB's Squamata round the squamates' crown): the crown keeps the name (ToLaD#561)
+    alog["fossils"]["stems_unnamed"] = dated.crown_names(adroot)
     adroot.data_notes = notes
     stop.t0 = age
     if ttop is not mroot:
