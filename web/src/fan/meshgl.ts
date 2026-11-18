@@ -1,6 +1,8 @@
 // WebGL2 layer of the fan: the lanes, flat trapezoids with anti-aliased edges (the columns' chords). Drawn on its
 // own canvas under the Canvas 2D one, which keeps the text and the history marks.
 
+import { DASH_ON, DASH_PERIOD, DASH_W } from './dashed';
+
 const RECT_VS = /* glsl */ `#version 300 es
 layout(location = 0) in vec2 corner;
 layout(location = 1) in vec4 aRect;
@@ -12,6 +14,7 @@ flat out vec4 vRect;
 flat out vec4 vColor;
 flat out vec2 vSkew;
 flat out vec2 vClip;
+flat out vec2 vDash;
 void main() {
   // A trapezoid: [x0, x1] at y0, shifted by (dl, dr) at y1 (a rectangle when 0).
   // Its bounding box, grown so the anti-aliased edges have room (RECT_FS's filter, hw).
@@ -25,6 +28,7 @@ void main() {
   vColor = aColor;
   vSkew = aSkew.xy;
   vClip = aSkew.zw;
+  vDash = vec2(0.0);
   gl_Position = vec4(p.x / uView.x * 2.0 - 1.0, 1.0 - p.y / uView.y * 2.0, 0.0, 1.0);
 }`;
 
@@ -35,7 +39,10 @@ flat in vec4 vRect;
 flat in vec4 vColor;
 flat in vec2 vSkew;
 flat in vec2 vClip;
+flat in vec2 vDash;
 out vec4 o;
+const float DASH_ON = ${DASH_ON.toFixed(3)};
+const float DASH_P = ${DASH_PERIOD.toFixed(3)};
 void main() {
   // The edges at this row (linear between y0 and y1), and the pixel's horizontal coverage by
   // [xl, xr]: crisp edges, hairlines stay visible. A slanted edge is filtered over its
@@ -57,6 +64,14 @@ void main() {
   float hw = 0.5 * clamp(sk / H, 1.0, max(3.0, sk));
   float c = clamp(min(vP.x + hw, xr) - max(vP.x - hw, xl), 0.0, 2.0 * hw) / (2.0 * hw);
   float a = vColor.a * c;
+  // A dashed line (ToLaD#565, vDash.y its run along it per px down, > 0): the pixel row's run along it, [m - h, m + h]
+  // from where a dash starts, covered by this dash and the next.
+  if (vDash.y > 0.0) {
+    float m = mod(vDash.x + vP.y * vDash.y, DASH_P);
+    float h = 0.5 * vDash.y;
+    float on = clamp(min(m + h, DASH_ON) - max(m - h, 0.0), 0.0, 2.0 * h) + clamp(min(m + h, DASH_P + DASH_ON) - max(m - h, DASH_P), 0.0, 2.0 * h);
+    a *= on / (2.0 * h);
+  }
   o = vec4(vColor.rgb * a, a);
 }`;
 
@@ -83,6 +98,7 @@ flat out vec4 vRect;
 flat out vec4 vColor;
 flat out vec2 vSkew;
 flat out vec2 vClip;
+flat out vec2 vDash;
 float laneDim(float px) {
   float t = clamp((px - 2.0) / 8.0, 0.0, 1.0);
   return uK.x + (uK.y - uK.x) * (1.0 - t * t * (3.0 - 2.0 * t));
@@ -106,7 +122,22 @@ void main() {
   float xa = min(xq, xp);
   float l0 = 0.0, r0 = 0.0, l1 = 0.0, r1 = 0.0, a = 0.0, cl = 0.0, cr = 0.0;
   vec3 c = vec3(0.0);
-  if (role == 0) {
+  // A dashed line (SegBatch.dash, ToLaD#565: aE.w its dash's phase at y0, plus 1): one trapezoid DASH_W across its centre
+  // line (q's left edge, p's), in a fork line's colour (view.ts drawCorners), green if it holds any living descendants.
+  bool dashed = aE.w > 0.5;
+  if (dashed) {
+    if (role == 3) {
+      float hw = ${(DASH_W / 2).toFixed(4)} * sq;
+      l0 = xq - hw;
+      r0 = xq + hw;
+      l1 = xp - hw;
+      r1 = xp + hw;
+      c = gq > 0.0 ? mixc(uGreen, uGreenD, laneDim(1.0) * 0.9) : mixc(uGray, uGrayD, laneDim(1.0) * 0.82);
+      a = 1.0;
+      cl = min(l0, l1) - 0.5;
+      cr = max(r0, r1) + 0.5;
+    }
+  } else if (role == 0) {
     if (aE.y > 0.5) {
       l0 = xq;
       r0 = wq >= 0.6 * sq ? rq : xq + 0.6 * sq;
@@ -173,6 +204,8 @@ void main() {
   vColor = vec4(c, a);
   vSkew = S;
   vClip = vec2(cl, cr);
+  // (Its run along the line from y0's phase: s(y) = phase + (y - y0) sq.)
+  vDash = dashed ? vec2(aE.w - 1.0 - y0 * sq, sq) : vec2(0.0);
   gl_Position = vec4(p.x / uView.x * 2.0 - 1.0, 1.0 - p.y / uView.y * 2.0, 0.0, 1.0);
 }`;
 
@@ -270,6 +303,38 @@ export class SegBatch {
     f[o + 15] = 0;
     this.n++;
   }
+
+  /**
+   * A dashed line's chord (ToLaD#565): its centre at rows q (top, y0) and p (bottom, y1), green (`live`) or gray, its
+   * dash's phase at y0 (px along it from where a dash starts, 0 to DASH_PERIOD). SEG_VS draws it DASH_W across.
+   */
+  dash(cq: number, y0: number, cp: number, y1: number, live: boolean, phase: number): void {
+    if ((this.n + 1) * SEG_F > this.f.length) {
+      const nf = new Float32Array(this.f.length * 2);
+      nf.set(this.f);
+      this.f = nf;
+    }
+    const f = this.f;
+    const o = this.n * SEG_F;
+    const g = live ? 1 : 0;
+    f[o] = cq;
+    f[o + 1] = cq;
+    f[o + 2] = cq;
+    f[o + 3] = y0;
+    f[o + 4] = cp;
+    f[o + 5] = cp;
+    f[o + 6] = cp;
+    f[o + 7] = y1 - y0;
+    f[o + 8] = 0;
+    f[o + 9] = g;
+    f[o + 10] = 0;
+    f[o + 11] = g;
+    f[o + 12] = cp - cq;
+    f[o + 13] = 1;
+    f[o + 14] = 0;
+    f[o + 15] = 1 + phase;
+    this.n++;
+  }
 }
 
 /**
@@ -326,8 +391,16 @@ export function expandChords(b: Batches, L: number, st: ChordStyle, out: RectBat
   const chord = (j: number) => {
     const F = b.segs.f;
     const o = SEG_F * j;
-    const [xq, rq, eq, y0, xp, rp, ep, dy, wq, gq, wp, gp, dc, gray, dim] = F.subarray(o, o + 15);
+    const [xq, rq, eq, y0, xp, rp, ep, dy, wq, gq, wp, gp, dc, gray, dim, ph] = F.subarray(o, o + 16);
     const y1 = y0 + dy;
+    if (ph > 0.5) {
+      // (A dashed line, SegBatch.dash: one trapezoid DASH_W across, its dashes the fragment's.)
+      const sq = Math.sqrt(1 + (dc / dy) ** 2);
+      const hw = Number((DASH_W / 2).toFixed(4)) * sq;
+      const c = gq > 0 ? mixc(st.green, st.greenDark, laneDim(1) * 0.9) : mixc(st.gray, st.grayDark, laneDim(1) * 0.82);
+      trap(xq - hw, xq + hw, xp - hw, xp + hw, y0, y1, c, 1, Math.min(xq - hw, xp - hw) - 0.5, Math.max(xq + hw, xp + hw) + 0.5);
+      return;
+    }
     const wm = (wq + wp) / 2;
     const gm = (gq + gp) / 2;
     const d = dc / dy;
