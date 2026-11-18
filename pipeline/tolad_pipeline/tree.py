@@ -172,10 +172,11 @@ def name_index(root: Node) -> dict[str, list[Node]]:
     return idx
 
 
-def collapse_knuckles(root: Node) -> int:
+def collapse_knuckles(root: Node, absorb_root: bool = True) -> int:
     """Remove unary nodes. The surviving child keeps its own name, records the
     removed ancestors' names in .alt (nearest first), and takes over the band
-    start (t0) and the taxon ids it lacks."""
+    start (t0) and the taxon ids it lacks. A root of one child absorbs it unless
+    `absorb_root` is false (a temporary holder: its one child is collapsed as any node)."""
     n = 0
     for nd in list(root.preorder()):
         if nd is root or len(nd.children) != 1 or nd.parent is None:
@@ -194,7 +195,7 @@ def collapse_knuckles(root: Node) -> int:
         if c.ott is None:
             c.ott = nd.ott
         n += 1
-    while len(root.children) == 1:
+    while absorb_root and len(root.children) == 1:
         c = root.children[0]
         if c.name:
             root.alt.append(c.name)

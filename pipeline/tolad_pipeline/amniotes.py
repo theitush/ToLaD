@@ -1096,7 +1096,8 @@ def build_amniotes(raw: Path, work: Path, log: dict, alog: dict, t_start: float)
         try:
             date_tree(holder, alog)
             assign_bands(holder, {})
-            collapse_knuckles(top)
+            # (the holder's own: a genus PBDB files straight under Amniota, of one species, is that species)
+            collapse_knuckles(holder, absorb_root=False)
         finally:
             root.children[root.children.index(holder)] = holder.children[0]
             holder.children[0].parent = root

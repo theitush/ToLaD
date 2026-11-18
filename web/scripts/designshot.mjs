@@ -325,6 +325,12 @@ const scenes = [
         ['amn-testudines', 'level', ['Testudines']],
         ['amn-card-bird', 'card', ['House sparrow']],
         ['amn-card-reptile', 'card', ['Varanus komodoensis']],
+        // The fossils (ToLaD#539 step 6): the bird line's deep time (its dinosaurs and pterosaurs), the synapsids round the
+        // mammals, the marine reptiles.
+        ['amn-birdline', 'level', ['Avemetatarsalia']],
+        ['amn-synapsids', 'level', ['Synapsida']],
+        ['amn-sauropterygia', 'level', ['Sauropterygia']],
+        ['amn-ichthyosaurs', 'level', ['Ichthyosauromorpha']],
       ]
     : []),
 ];
@@ -672,7 +678,7 @@ try {
         } else if (kind === 'level') {
           // A level (ToLaD#146): the split founding taxon args[0] framed as home frames the fan; with args[1] (Ma),
           // centred on that time, time zoomed args[2] and width args[3] × the frame.
-          const h = f.levelCamera(args[0]) ?? f.homeCamera();
+          const h = f.levelCamera(args[0]) ?? (console.log(`level ${args[0]}: no such split, home`), f.homeCamera());
           f.cam = args[1] === undefined ? h : { ...h, cy: fan.time.y(args[1]), sy: h.sy * (args[2] ?? 1), ty: h.sy * (args[2] ?? 1), sx: h.sx * (args[3] ?? 1) };
           f.camera.settle();
         } else if (kind === 'decline') {
