@@ -63,7 +63,6 @@ type Inner = {
   tipMissed: Map<number, string>;
   tipWork: number;
   tipCut: number;
-  tipTryCut: number;
   gestureStart(): void;
   gestureEnd(): void;
   levelNow(now?: boolean): unknown;
@@ -73,14 +72,17 @@ type Inner = {
   toScreen(x: number, y: number): [number, number];
 };
 
-/** What a frame shows of the fossils at their tips (and all else): every name and picture with its place, and the fossils unnamed and why. */
+/**
+ * What a frame shows of the fossils at their tips (and all else): every name and picture with its place, and the fossils unnamed. Why one went unnamed may differ: where its
+ * rooms are kept the columns are read first, so a place the columns and the labels standing shut out only together is "meets" or "crossed" by which came last (counted).
+ */
 function shown(c: CutLabels, missed: Map<number, string>): string {
   const spot = (s: CutLabels['names'][number]) => [s.key, s.text, s.x, s.y1, s.box, s.plain ?? '', s.fit];
   return JSON.stringify({
     names: c.names.map(spot),
     spots: c.spots.map(spot),
     pics: c.pics.map((p) => [p.x, p.y, p.d ?? 0, p.i, p.face?.index ?? -1, p.held, p.lv.b?.index ?? p.lv.v?.split.taxon ?? '']),
-    missed: [...missed],
+    missed: [...missed.keys()],
   });
 }
 
@@ -115,7 +117,7 @@ describe(`fossils' rooms kept per zoom against scanned each frame (${N ? `synthe
   let frames = 0;
   let named = 0;
   // (Strands read on a row a frame, scanned against kept; and frames whose scan ran out of a budget, TIP_WORK or TIP_TRY.)
-  const work = { before: 0, after: 0, panBefore: 0, panAfter: 0, budget: 0, tries: 0 };
+  const work = { before: 0, after: 0, panBefore: 0, panAfter: 0, budget: 0, budgetAfter: 0, whys: 0, whyOther: 0 };
   beforeAll(async () => {
     if (N) await loadMammals(() => synthLevelData({ n: N, seed: true, json: true, orders: true, ...(process.env.TIPROOMS_FOSSIL ? { fossil: Number(process.env.TIPROOMS_FOSSIL) } : {}) }));
     else await loadMammalsFromFiles();
@@ -131,19 +133,22 @@ describe(`fossils' rooms kept per zoom against scanned each frame (${N ? `synthe
   const same = (what: string, pan = false) => {
     const cam = { ...I().cam };
     setTipRooms(false);
-    I().tipTryCut = 0;
     v.draw();
     const before = shown(I().cutLast!, I().tipMissed);
-    const [wb, cut, tries] = [I().tipWork, I().tipCut, I().tipTryCut];
+    const [wb, cut] = [I().tipWork, I().tipCut];
+    const whyBefore = new Map(I().tipMissed);
     I().cam = { ...cam };
     setTipRooms(true);
     v.draw();
     const after = shown(I().cutLast!, I().tipMissed);
-    // (Where the scan ran out of its budget it named less than it could: no answer to hold the kept rooms to.)
-    if (cut || tries) {
-      work.budget += cut ? 1 : 0;
-      work.tries += tries ? 1 : 0;
-    } else {
+    work.budgetAfter += I().tipCut ? 1 : 0;
+    for (const [k, w] of I().tipMissed) {
+      const w0 = whyBefore.get(k);
+      if (w0 !== undefined && w0 !== w) work[w0 === 'meets' ? 'whys' : 'whyOther']++;
+    }
+    // (Where the scan ran out of its budget (TIP_WORK) it named less than it could: no answer to hold the kept rooms to.)
+    if (cut) work.budget++;
+    else {
       if (after !== before) console.log(`${what}: ${diff(before, after)}`);
       expect(after, `${what} sx ${cam.sx} cx ${cam.cx} cy ${cam.cy} sy ${cam.sy}`).toBe(before);
     }
@@ -213,7 +218,7 @@ describe(`fossils' rooms kept per zoom against scanned each frame (${N ? `synthe
 
   afterAll(() => {
     console.log(
-      `tiprooms ${N || NODE_TREE}: ${frames} frames the same, ${named} fossil names; strands read on a row ${work.before} -> ${work.after}, on pans ${work.panBefore} -> ${work.panAfter}; frames the scan ran out of TIP_WORK ${work.budget}, of TIP_TRY ${work.tries}`,
+      `tiprooms ${N || NODE_TREE}: ${frames} frames the same, ${named} fossil names; strands read on a row ${work.before} -> ${work.after}, on pans ${work.panBefore} -> ${work.panAfter}; frames the scan ran out of TIP_WORK ${work.budget}; kept ran out of TIP_WORK ${work.budgetAfter}; why "meets" -> "crossed" ${work.whys}, "crossed" -> "meets" ${work.whyOther}`,
     );
   });
 });

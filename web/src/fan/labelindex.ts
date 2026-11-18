@@ -117,19 +117,35 @@ export class TipIndex {
       else b = m;
     }
     const end = a;
-    const found: number[] = [];
-    // (Node j covers leaves [s, s + n).)
-    const stack: number[] = end ? [1, 0, this.size] : [];
-    while (stack.length) {
-      const n = stack.pop()!;
-      const s = stack.pop()!;
-      const j = stack.pop()!;
+    // (Node j covers leaves [s, s + n). Found into a typed array and sorted there: at home with every fossil some 11,000 are a frame.)
+    if (this.found.length < end) this.found = new Int32Array(this.lo.length);
+    const found = this.found;
+    let m = 0;
+    const stack = this.stack;
+    let top = 0;
+    if (end) [stack[0], stack[1], stack[2], top] = [1, 0, this.size, 3];
+    while (top) {
+      const n = stack[--top];
+      const s = stack[--top];
+      const j = stack[--top];
       if (s >= end || this.maxHi[j] < lo) continue;
-      if (n === 1) found.push(this.byLo[s]);
-      else stack.push(2 * j + 1, s + n / 2, n / 2, 2 * j, s, n / 2);
+      if (n === 1) found[m++] = this.byLo[s];
+      else {
+        stack[top++] = 2 * j + 1;
+        stack[top++] = s + n / 2;
+        stack[top++] = n / 2;
+        stack[top++] = 2 * j;
+        stack[top++] = s;
+        stack[top++] = n / 2;
+      }
     }
-    return found.sort((p, q) => p - q).map((i) => this.tips[i]);
+    const sorted = found.subarray(0, m).sort();
+    const out = new Array<number>(m);
+    for (let i = 0; i < m; i++) out[i] = this.tips[sorted[i]];
+    return out;
   }
+  private found = new Int32Array(0);
+  private readonly stack = new Float64Array(6 * 64);
 }
 
 /**
