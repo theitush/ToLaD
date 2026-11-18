@@ -87,6 +87,17 @@ export function foldNames(all: readonly Named[]): void {
   indexOf(all);
 }
 
+/** Fold the species' names when the page is idle (requestIdleCallback, else a timeout), as the tree is up; the cancel. */
+export function foldNamesIdle(all: () => readonly Named[]): () => void {
+  const w = globalThis as { requestIdleCallback?: (f: () => void, o: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
+  if (w.requestIdleCallback && w.cancelIdleCallback) {
+    const id = w.requestIdleCallback(() => foldNames(all()), { timeout: 10_000 });
+    return () => w.cancelIdleCallback!(id);
+  }
+  const id = setTimeout(() => foldNames(all()), 2000);
+  return () => clearTimeout(id);
+}
+
 /**
  * The species matching a query, best first: by how well either name matches (prefix, word start,
  * substring), a common-name match before a scientific one of the same kind, then by common name

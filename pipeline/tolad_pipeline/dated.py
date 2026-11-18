@@ -570,13 +570,27 @@ def zero_length(droot: DNode, log: dict, skip: DNode | None = None) -> None:
     log["zero_length"]["fossil_splits_at_one_date"] = _ties_left(droot)
 
 
+# The minimum branch length (mbl_dates; paleotree's `vartime`, ToLaD#561), as a share of the split's age: the shortest
+# branch the page's layout needs. Its time axis is log (web/src/fan/layout.ts TimeScale: TIME_H = 900 world units over a
+# level's ~6-7.5 decades), so a share of the age is one height at any age and on any level, ~0.3 world units here. A split's
+# daughters peel off over FORK_FRAC (0.85) of the shortest branch below it, each peel's edge at most PEEL_SLOPE (8) sideways
+# per unit of height where the tree allows (boundPeels), and a branch too short for that forces steeper peels. On the
+# data's tightest run of fossil stems (the cats', Felinae: five splits within 0.05 Ma at 12.2 Ma, a fossil genus off each)
+# the steepest peel by the minimum, measured on the cats' level: 1e-3 of the age (the data's precision, `tied`) 29, past
+# the layout's limit of 12 (web/src/fan/tree.test.ts); 2e-3 17.8; 3e-3 11.9; 4e-3 8.9; 5e-3 8.0, PEEL_SLOPE's own. One
+# setting for every split of both builds, at every age (1.5 Ma a branch at 300 Ma, 0.06 Ma at 12 Ma).
+MBL = 5e-3
+
+
 def mbl_dates(droot: DNode, log: dict, skip: DNode | None = None) -> None:
     """Zero-length branches given the minimum branch length (Laurin, M. 2004. The evolution of body size, Cope's rule
     and the origin of amniotes. Syst. Biol. 53: 594-622), as paleotree's timePaleoPhy(type = "mbl") / minBranchLength
     does it (Bapst 2012): every branch at least `mbl` long, a split too close to a daughter pushed older just enough,
-    the time taken from the branch above it, rootward. `mbl` here is the data's precision, so no two nested splits are
-    tied: a split at least 1e-3 of its age (or 2 EPS) older than each daughter. Only MOVABLE splits move (as
-    equal_dates), and never younger; one under a fixed split is held below it (its tie with a daughter left)."""
+    the time taken from the branch above it, rootward. `mbl` here is MBL of the split's age (paleotree's is a length in
+    time units; the page's time axis is log), the shortest branch the page's layout needs. Only MOVABLE splits move (as
+    equal_dates), and never younger. Under a fixed split a run of them gets what room there is: each held a tie's width
+    (`tied`, the data's precision) below the split above it, so a run with less room than MBL a branch is packed at the
+    data's precision instead, and one with none at all keeps its tie (spliced after)."""
     inside = {id(x) for x in skip.preorder()} if skip is not None else set()
     before: dict[int, float] = {}
     # (the oldest each can go: below the nearest fixed split above it, a tie's width per split between)
@@ -591,7 +605,7 @@ def mbl_dates(droot: DNode, log: dict, skip: DNode | None = None) -> None:
             kids = [c.age for c in d.children if c.leaf is None]
             if not kids:
                 continue
-            need = min((max(kids) + 2 * EPS) / (1 - 1e-3), ceil[id(d)])
+            need = min(max(kids) * (1 + MBL) + 2 * EPS, ceil[id(d)])
             if need > d.age:
                 before.setdefault(id(d), d.age)
                 d.lo, d.hi = min(d.lo, d.age), max(d.hi, need)
@@ -601,6 +615,7 @@ def mbl_dates(droot: DNode, log: dict, skip: DNode | None = None) -> None:
     log["zero_length"] = {
         "note": "zero-length branches given the minimum branch length (Laurin 2004; paleotree timePaleoPhy "
                 "type='mbl'): ToLaD#561",
+        "min_share_of_age": MBL,
         "splits_moved": len(moved),
         "largest_move": None if big is None else {"split": _label(big), "from_Ma": round(before[id(big)], 3),
                                                   "to_Ma": round(big.age, 3)},
@@ -691,6 +706,33 @@ def equal_dates(droot: DNode, log: dict, skip: DNode | None = None) -> None:
         "tied_left": left,
         "tied_left_e.g.": left_eg,
     }
+
+
+def crown_names(droot: DNode) -> list[str]:
+    """A name belongs to one split (ToLaD#561): where a taxon's name stands on a split and again on one inside it that
+    holds living species, its crown, the crown keeps it and the split round it, its stem, takes none (crown-group
+    naming: a stem gets a name of its own, a total group's or a "stem-" name, only where a source gives one). Both
+    builds name a stem by its source's taxon (PBDB files Megachirella in Squamata, so the amniotes' fossil stem round the
+    squamates' crown was Squamata too, fossils.dated_fossils), and nested splits named alike only stood apart once the
+    zero-length branches had time. Returns the stems unnamed (name and age)."""
+    by: dict[str, list[DNode]] = defaultdict(list)
+    for d in droot.preorder():
+        if d.leaf is None and d.name:
+            by[d.name].append(d)
+    out = []
+    for name, ds in by.items():
+        if len(ds) < 2:
+            continue
+        crowns = {id(d) for d in ds if not _fossils_only(d)}
+        for d in ds:
+            if id(d) in crowns:
+                p = d.parent
+                while p is not None:
+                    if p.name == name and p.leaf is None:
+                        out.append({"name": name, "stem_Ma": round(p.age, 3), "crown_Ma": round(d.age, 3)})
+                        p.name, p.name_en = None, None
+                    p = p.parent
+    return sorted(out, key=lambda x: (x["name"], -x["stem_Ma"]))
 
 
 def _mrca_map(root: Node, droot: DNode) -> tuple[dict, dict, dict]:
@@ -1011,6 +1053,7 @@ def build(root: Node, up_root, up_tax: dict[str, dict], ov, log: dict, ac=None, 
         droot, lambda L: L.data.get("mdd_taxa") if not L.extinct and L.t1 <= 0 else None,
         locked={e["name"] for e in ov.dated_names},
         genera={d.leaf.data["mdd_genus"] for d in leaves if d.leaf.data.get("mdd_genus")})
+    rep["stems_unnamed"] = crown_names(droot)
     splits = [d for d in droot.preorder() if d.leaf is None]
     log["dated_tree"] = {
         **rep,

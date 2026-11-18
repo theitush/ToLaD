@@ -739,7 +739,7 @@
   touch-action: manipulation;
 }
 .fan .search-list {
-  /* About eight rows, the rest scrolled. */
+  /* Eight rows, the rest scrolled; only those in view are drawn (SearchPanel.tsx ROW, PAD, VIEW, ToLaD#564). */
   max-height: calc(8 * 44px);
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -755,7 +755,7 @@
   display: flex;
   align-items: baseline;
   gap: 8px;
-  min-height: 44px;
+  height: 44px;
   box-sizing: border-box;
   padding: 11px 14px;
   cursor: pointer;
