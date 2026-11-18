@@ -4,6 +4,7 @@
 import json
 import math
 import struct
+import tempfile
 import unittest
 from collections import Counter
 from pathlib import Path
@@ -159,14 +160,10 @@ class TestRules(unittest.TestCase):
             if r["middle"]:
                 self.assertAlmostEqual(r["n"], math.sqrt(r["lo"] * r["hi"]))
             self.assertGreaterEqual(r["grade_i"], amniotes.grade_from_sd(r["sd"]))
-        with self.assertRaises(ValueError):  # a number with no source is refused
-            bad = ROOT / "data" / "build" / "_bad_reptile_counts.toml"
-            bad.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory() as d, self.assertRaises(ValueError):  # a number with no source is refused
+            bad = Path(d) / "counts.toml"
             bad.write_text('[[count]]\nspecies = "Aus bus"\nn = 5\ncounts = "all ages"\n')
-            try:
-                reptcounts.load(bad)
-            finally:
-                bad.unlink()
+            reptcounts.load(bad)
 
     def test_backbone_file(self):
         bb = amniotes.load_backbone(ROOT / "pipeline" / "amniotes.toml")
