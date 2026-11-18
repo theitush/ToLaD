@@ -342,12 +342,12 @@
   "url": "https://raw.githubusercontent.com/n8upham/MamPhy_v1/740b70189c77fc168be17bd6ade204c755bcb19b/_DATA/taxonomy_mamPhy_5911species_toPublish.csv"
  },
  "wikidata/amniotes.json": {
-  "bytes": 8085462,
+  "bytes": 9056386,
   "post_body": {
    "query": "see the snapshot's `query`, keys: the dated tree's species"
   },
   "retrieved": "2026-11-18",
-  "sha256": "7564cf3fd7fdb9bedd433d8a50b2a16d6f18d45b1495095a018e72d73eedd1f4",
+  "sha256": "e862c500c057c53d7d64b12c053a54470d1cfa6a14e8f98c416dabaec8bdc563",
   "url": "https://query.wikidata.org/sparql"
  },
  "wikidata/taxa.json": {
