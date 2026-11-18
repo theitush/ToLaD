@@ -317,6 +317,16 @@ const scenes = [
   ['lv-chiroptera', 'level', ['Chiroptera']],
   ['lv-primates', 'level', ['Primates']],
   ['lv-carnivora', 'level', ['Carnivora']],
+  // ToLaD#539 (Q=tree=amniotes): the birds, the lizards and snakes and the turtles at their levels, a bird's card and a reptile's.
+  ...(/(^|&)tree=amniotes/.test(process.env.Q || '')
+    ? [
+        ['amn-aves', 'level', ['Aves']],
+        ['amn-squamata', 'level', ['Squamata']],
+        ['amn-testudines', 'level', ['Testudines']],
+        ['amn-card-bird', 'card', ['House sparrow']],
+        ['amn-card-reptile', 'card', ['Varanus komodoensis']],
+      ]
+    : []),
 ];
 const browser = await chromium.launch({ headless: true });
 let served = null;
