@@ -247,7 +247,11 @@ def pbdb_range(r: dict) -> tuple[float, float] | None:
     return t0, t1
 
 
-def graft_pbdb(root: Node, species: list[dict], exact, syn, log: dict, ov) -> None:
+def graft_pbdb(root: Node, species: list[dict], exact, syn, log: dict, ov,
+               bucket_name: str = "Mammalia incertae sedis (fossil)", path=None) -> None:
+    """`path` (the amniotes, fossils.Path_): where the tree has no node for a fossil's genus, family or order, a
+    hook `path(record, genus) -> (node, [(rank, name), ...]) | None` gives the node to graft under and the taxa
+    between it and the genus (outer first), made as groups; None leaves the fossil to the ladder below (the bucket)."""
     how = Counter()
     # OT name indices for higher taxa
     by_name: dict[str, list[Node]] = defaultdict(list)
@@ -283,7 +287,7 @@ def graft_pbdb(root: Node, species: list[dict], exact, syn, log: dict, ov) -> No
         n_named += 1
     log["upham_named_broken_taxa"] = n_named
 
-    bucket =Node(name="Mammalia incertae sedis (fossil)", rank="no rank", kind="bucket", taxonomic=True)
+    bucket = Node(name=bucket_name, rank="no rank", kind="bucket", taxonomic=True)
     created: dict[tuple[str, str], Node] = {}
 
     def pick(name: str | None, under: Node | None, ranks: tuple[str, ...]) -> Node | None:
@@ -430,6 +434,17 @@ def graft_pbdb(root: Node, species: list[dict], exact, syn, log: dict, ov) -> No
                 if m is not None and m is not root and _n_leaves(m) <= 3 * len(gl) + 2:
                     g = m
                     how["grafted: MRCA of OT genus members"] += 1
+            fam_in = pick(fam, None, ("family", "subfamily", "superfamily")) if fam and path is not None else None
+            ord_in = pick(order, None, ("order", "superorder", "suborder", "infraorder")) if order and path else None
+            if g is None and path is not None and not (  # (a node of the tree, not a group grafted here)
+                    (fam_in is not None and fam_in.kind == "tree") or (ord_in is not None and ord_in.kind == "tree")):
+                res = path(r, genus)
+                if res is not None:
+                    at, between = res
+                    for rk, nm in between:
+                        at = group(rk, nm, at)
+                    g = group("genus", genus, at)
+                    how["grafted: taxonomy path (genus created)"] += 1
             if g is None:
                 fnode = family_node(fam, order)
                 g = group("genus", genus, fnode)
@@ -471,7 +486,7 @@ def graft_pbdb(root: Node, species: list[dict], exact, syn, log: dict, ov) -> No
         else:
             level["under OT order or higher"] += 1
     matched_leaf = sum(v for k, v in how.items() if k.startswith("matched OT leaf"))
-    used = matched_leaf + sum(level.values())
+    used = max(matched_leaf + sum(level.values()), 1)  # (a tree whose grafts all went onto a taxonomy path's stems)
     log["pbdb_match"] = {
         "species_used": used,
         "matched_existing_OT_species": matched_leaf,

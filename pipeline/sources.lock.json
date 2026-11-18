@@ -136,6 +136,13 @@
   "sha256": "bcf1d7c3ce85fb4e79c88b14557916659ea427b8ee03bad528f31eb9b7742b9c",
   "url": "https://paleobiodb.org/data1.2/taxa/list.json?base_name=Amniota&rank=genus&taxon_status=accepted&pres=regular&show=app,parent,class&vocab=pbdb"
  },
+ "amniotes/pbdb/amniota_higher.json": {
+  "bytes": 2087500,
+  "post_body": null,
+  "retrieved": "2026-11-18",
+  "sha256": "4e538b1b97318a6ac40ba268ec66c95e4f4149c8165bc3ee0ea0c1c899ef948e",
+  "url": "https://paleobiodb.org/data1.2/taxa/list.json?base_name=Amniota&rank=above_genus&taxon_status=accepted&pres=regular&show=app,parent,class&vocab=pbdb"
+ },
  "amniotes/pbdb/amniota_species.json": {
   "bytes": 11479261,
   "post_body": null,

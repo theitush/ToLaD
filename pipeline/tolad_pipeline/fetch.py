@@ -254,10 +254,12 @@ AMNIOTES: dict[str, list[tuple[str, str, dict | None]]] = {
         ("amniotes/calfface_synapsid_metatree/mpt1.tre",
          f"https://raw.githubusercontent.com/graemetlloyd/ProjectCalfFace/{CALFFACE_SHA}/Trees/MPTs.tre", None),
     ],
-    # The PBDB Amniota species and genera: the mammals' query with base_name=Amniota.
+    # The PBDB Amniota species and genera: the mammals' query with base_name=Amniota. And every Amniota taxon above
+    # the genus, with its parent: PBDB's own classification, the path a fossil grafts through (fossils.py, ToLaD#539).
     "pbdb": [
         ("amniotes/pbdb/amniota_species.json", _pbdb("Amniota", "species"), None),
         ("amniotes/pbdb/amniota_genera.json", _pbdb("Amniota", "genus"), None),
+        ("amniotes/pbdb/amniota_higher.json", _pbdb("Amniota", "above_genus"), None),
     ],
     # Callaghan et al. 2021 (Zenodo 4723365 v1): the per-species abundance estimates, one member of Tables.zip.
     "callaghan2021": [

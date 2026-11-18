@@ -183,7 +183,7 @@ class TestOutput(unittest.TestCase):
         self.assertEqual(self.c["sauropsid_tips_by_group"], {"Aves": 11167, "Squamata": 12293, "Testudines": 365,
                                                             "Crocodylia": 27, "Rhynchocephalia": 1})
         self.assertEqual(self.c["sauropsid_in_dated_tree"], self.c["sauropsid_tips"])
-        self.assertEqual(self.c["tips"], self.c["mammal_tips"] + self.c["sauropsid_tips"])
+        self.assertEqual(self.c["tips"], self.c["mammal_tips"] + self.c["sauropsid_tips"] + self.c["fossil_tips"])
 
     def test_crown_ages(self):
         a = self.c["crowns_Ma"]
@@ -215,8 +215,8 @@ class TestOutput(unittest.TestCase):
         self.assertIn("timetree", sk["sources"])
 
     def test_branches_positive(self):
-        self.assertEqual(self.c["dated_branches_not_positive"], {"sauropsids": 0, "Amniota": 0})
-        self.assertEqual(self.c["rows_bands_not_positive"], {"sauropsids": 0, "Amniota": 0})
+        self.assertEqual(self.c["dated_branches_not_positive"], {"sauropsids": 0, "synapsids": 0, "Amniota": 0})
+        self.assertEqual(self.c["rows_bands_not_positive"], {"sauropsids": 0, "synapsids": 0, "Amniota": 0})
 
     def test_faults(self):
         f = self.s["faults"]
@@ -237,17 +237,18 @@ class TestOutput(unittest.TestCase):
         self.assertAlmostEqual(self.c["alive"]["Aves"] / 50.5e9, 1.0, delta=0.03)
 
     def test_mammals_identical(self):
-        """Every mammal row of data/amniotes is data/mammals' row, field for field (global ids shifted by
-        Amniota's own row, 0; tiling aside)."""
+        """Every mammal row of data/amniotes is data/mammals' row, field for field (global ids shifted by the rows
+        above Mammalia: Amniota's, 0, and the synapsid stems round it; tiling aside)."""
         _, mrows = all_rows(MAM)
         meta, arows = all_rows(AMN)
         self.assertEqual(arows[0]["NAME"], "Amniota")
-        self.assertEqual(arows[1]["NAME"], "Mammalia")
+        off = next(g for g in sorted(arows) if arows[g]["NAME"] == "Mammalia")
+        self.assertEqual(arows[off - 1]["NAME"], "Mammaliaformes")  # its stems (fossils.py), nearest first
         for g, r in mrows.items():
-            a = arows[g + 1]
+            a = arows[g + off]
             for k in r:
                 self.assertEqual(a[k], r[k], f"{r['NAME']} (gid {g}): {k}")
-        self.assertEqual(sum(1 for g in arows if 1 <= g <= max(mrows) + 1), len(mrows))
+        self.assertEqual(sum(1 for g in arows if off <= g <= max(mrows) + off), len(mrows))
 
     def test_mammal_dated_tree_identical(self):
         """The amniote dated tree's Mammalia is the mammal build's, split for split."""
@@ -266,7 +267,8 @@ class TestOutput(unittest.TestCase):
                 st.extend(reversed(kids[i]))
             return out
         a = json.loads((AMN / "dated" / "skeleton.json").read_text())["all"]
-        top = next(i for i, n in enumerate(a["nodes"]) if n[0] == 0)  # the root's first daughter: the mammals
+        m = json.loads((MAM / "dated" / "skeleton.json").read_text())["all"]
+        top = next(i for i in range(len(a["nodes"])) if a["names"].get(str(i)) == m["names"]["0"])  # under its stems
         self.assertEqual(splits(AMN, top), splits(MAM, 0))
 
     def test_page_reads_unknown_flag(self):
