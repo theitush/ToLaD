@@ -18,6 +18,7 @@ import raw, { naturalMeta } from 'virtual:panthera-data';
 import carnivora from 'virtual:carnivora-data';
 import { mammalCardLoaded, mammalData, onMammalCard } from './mammals-data';
 import { unpackGenealogies } from './packed';
+import { AMNIOTE_EN } from './amniote-names';
 import { genealogiesAhead } from './population';
 import type { LayoutSeed } from './layout';
 import { BirthCurve, procgenSegments, type GenSegment } from './history';
@@ -212,7 +213,8 @@ let mamm: CladeRec | null = null;
 export function mammaliaClade(): CladeRec {
   if (mamm) return mamm;
   const d = mammalData();
-  const m: CladeRec = (mamm = { ...cladeOf(d.clade, mammaliaTree(), 'Mammals'), seed: d.seed });
+  // (Its title the root's English name (ToLaD#539): "Mammals", or "Amniotes" for data/amniotes.)
+  const m: CladeRec = (mamm = { ...cladeOf(d.clade, mammaliaTree(), AMNIOTE_EN[d.clade.sci] ?? d.clade.sci), seed: d.seed });
   // Its genealogies, worked out at build time (mammals-seed.ts, ToLaD#255), for these species.
   if (d.gen) genealogiesAhead(unpackGenealogies(d.gen), m.species);
   // (The card's kinds come after the open, ToLaD#502: then its species take them.)

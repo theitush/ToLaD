@@ -392,7 +392,17 @@ export function redListOf(f: Tile, i: number, meta: any): RedListRec | null {
   };
 }
 
-function node(f: Tile, i: number): RawNode {
+/**
+ * A row's date source (FLAG bits, the decoder's label). Code 0 reads "upham-calibrated", as data/mammals means it; on
+ * data/amniotes (ToLaD#539) its skeleton's META.amniotes says code 0 is calibrated on a dated tree, whichever its group's
+ * (Upham 2019 for a mammal, AvesData 1.7, Title 2024, Colston 2020 or TimeTree 5 elsewhere): there it reads "calibrated".
+ */
+function dateSourceOf(f: Tile, i: number, meta: any): string {
+  const s = f.dateSource(i);
+  return s === 'upham-calibrated' && meta?.amniotes ? 'calibrated' : s;
+}
+
+function node(f: Tile, i: number, meta: any): RawNode {
   return {
     gid: f.gid(i),
     sci: f.name(i),
@@ -404,7 +414,7 @@ function node(f: Tile, i: number): RawNode {
     t0: f.t0(i),
     t1: f.t1(i),
     extinct: f.extinct(i),
-    dateSource: f.dateSource(i),
+    dateSource: dateSourceOf(f, i, meta),
     anchored: (f.flags(i) & FLAG.ANCHORED) !== 0,
     countUnknown: (f.flags(i) & FLAG.COUNT_UNKNOWN) !== 0,
     rangeExPe: (f.flags(i) & FLAG.RANGE_EX_PE) !== 0,
@@ -523,7 +533,7 @@ export function extractClade(
     const g = dated?.file.gen[i];
     const m = dated?.file.mass?.[i];
     species.push({
-      ...node(f, i),
+      ...node(f, i, sk.meta),
       parentGid: f.gid(f.parent[i]),
       history,
       redList: redListOf(f, i, sk.meta),
@@ -545,7 +555,7 @@ export function extractClade(
   const datedMeta: DatedMeta | null = dated
     ? { upham: dated.sk.upham ?? '', alvarez: dated.sk.alvarez ?? '', genHow: dated.sk.gen_how ?? [], commonSource: dated.sk.common_source ?? '' }
     : null;
-  return { ...node(f, root), tile: tileId, species, naturalMeta, dated: tree, datedMeta };
+  return { ...node(f, root, sk.meta), tile: tileId, species, naturalMeta, dated: tree, datedMeta };
 }
 
 /**

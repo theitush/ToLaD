@@ -9,6 +9,7 @@
  * over the species at "now") and a pass over the clades; the rows are kept per zoom bucket (they move only as
  * the zoom moves, never while panning), the label widths once per text.
  */
+import { AMNIOTE_EN } from './amniote-names';
 import type { Camera } from './camera';
 import { laneW, leftAt, nodeLeftAt, type Fan, type FanNode } from './layout';
 import { FAMILY_EN, ORDER_EN, ORDER_TAXA, type Split } from './splits';
@@ -51,6 +52,8 @@ export const TAXON_EN: Record<string, string> = {
   ...FAMILY_EN,
   // (The mammal orders, ToLaD#247.)
   ...ORDER_EN,
+  // (The amniotes' groups above and among the birds' and reptiles' orders, ToLaD#539.)
+  ...AMNIOTE_EN,
   Carnivora: 'Carnivores',
   // (Above the orders, ToLaD#440: an everyday name, or what the group is; a group with neither keeps its real one.)
   Theria: 'Marsupials & placentals',
