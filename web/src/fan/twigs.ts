@@ -3,7 +3,7 @@
 // the columns (lines and lives on the GPU, ToLaD#100, #101, #192) was deleted with ?texture=1 (ToLaD#342).
 
 import { Species } from '../../../packages/procgen/src/index.ts';
-import { laneAt, leftAt, type FanBranch, type TimeScale, type WidthMode } from './layout';
+import { lanesAtAge, leftAt, type FanBranch, type TimeScale, type WidthMode } from './layout';
 import type { SpeciesRec } from './panthera';
 import type { GenSegment } from './history';
 
@@ -164,13 +164,17 @@ export class TwigModel {
     return { left: r[0], w: r[1], gw: r[2] };
   }
 
-  /** [left, w, gw, pitch] at y into out[o..o + 3], worked out (not remembered: at()). */
+  /**
+   * [left, w, gw, pitch] at y into out[o..o + 3], worked out (not remembered: at()). (laneAt's lanes at y's age, read
+   * once for the lanes and the pitch, into out: no tuple, the same sums, ToLaD#502.)
+   */
   sample(y: number, out: Float64Array, o: number): void {
-    const L = laneAt(this.b, y);
-    out[o] = leftAt(this.b, y, L.w);
-    out[o + 1] = L.w;
-    out[o + 2] = L.gw;
-    out[o + 3] = this.pitchOf(y, L.w);
+    const b = this.b;
+    const age = y < b.tipY ? NaN : b.tess.time.ageAt(y);
+    lanesAtAge(b, y, age, out, o + 1);
+    const w = out[o + 1];
+    out[o] = leftAt(b, y, w);
+    out[o + 3] = this.pitchOf(y, w, age);
   }
 
   /** The left edge at y of a column w wide there (sample()'s first value; the fold's alone moves it). */
@@ -257,11 +261,11 @@ export class TwigModel {
     return this.mode === 'linear' ? linearPitch(this.b) : this.at(y)[3];
   }
 
-  /** pitch(y), the column's width there w. */
-  private pitchOf(y: number, w: number): number {
+  /** pitch(y), the column's width there w (age: y's, if known). */
+  private pitchOf(y: number, w: number, age = NaN): number {
     const lin = linearPitch(this.b);
     if (this.mode === 'linear') return lin;
-    const n = this.b.pop.stepAt(Math.min(this.b.t0, this.time.ageAt(y))).n / this.b.pop.weight;
+    const n = this.b.pop.stepAt(Math.min(this.b.t0, age === age ? age : this.time.ageAt(y))).n / this.b.pop.weight;
     // (Never wider than the column: one slot at least, where the steps count under one alive.)
     return w > 0 && n > 0 ? w / Math.max(1, n) : lin;
   }
@@ -568,52 +572,81 @@ export class ColumnPath {
       while (sp < spEnd && splits[sp] < y) sp++;
       return sp < spEnd && splits[sp] === y;
     };
-    let k = 0;
-    const keep = (i: number) => {
-      ys[k] = cuts[i];
-      for (let j = 0; j < 8; j++) out[8 * k + j] = v[8 * i + j];
-      steps[k] = isSplit(cuts[i]) ? 1 : 0;
-      k++;
-    };
-    const val = new Float64Array(4);
-    const tol = new Float64Array(4);
-    // Per sample, from the lanes at offset o: left, right and green edges, and the pitch.
-    const ends = (o: number) => {
-      val[0] = v[o];
-      val[1] = v[o] + v[o + 1];
-      val[2] = v[o + 2] > 0 ? v[o] + v[o + 2] : 0;
-      val[3] = v[o + 3];
-      return val;
-    };
-    const sl = new Sleeve(4);
-    keep(0);
-    sl.start(cuts[0], ends(0));
+    // (The sleeve, Sleeve's sums step for step, in locals, a sample's values read in place, ToLaD#502: a flight makes
+    // thousands of paths a frame. Per sample, from the lanes at offset o: left, right and green edges, and the pitch.)
+    let y0 = cuts[0];
+    let a0 = v[0];
+    let a1 = v[0] + v[1];
+    let a2 = v[2] > 0 ? v[0] + v[2] : 0;
+    let a3 = v[3];
+    let lo0 = -Infinity;
+    let lo1 = -Infinity;
+    let lo2 = -Infinity;
+    let lo3 = -Infinity;
+    let hi0 = Infinity;
+    let hi1 = Infinity;
+    let hi2 = Infinity;
+    let hi3 = Infinity;
+    ys[0] = cuts[0];
+    for (let j = 0; j < 8; j++) out[j] = v[j];
+    steps[0] = isSplit(cuts[0]) ? 1 : 0;
+    let k = 1;
     for (let i = 1; i + 1 < n; i++) {
       const y = cuts[i];
       const o = 8 * i;
+      const split = isSplit(y);
       // A sample may go only where the lanes go on through it (not at a split, where the green lane
       // steps), its chords both drawn or both not (a column of no width), green or not alike.
       const w0 = v[o + 1] > 0;
       const g0 = v[o + 2] > 0;
       // (Elsewhere both the lanes just below it and just above it stay within the tolerance.)
-      const soft =
-        !isSplit(y) &&
-        w0 === v[o - 8 + 1] > 0 &&
-        w0 === v[o + 8 + 4 + 1] > 0 &&
-        g0 === v[o - 8 + 2] > 0 &&
-        g0 === v[o + 8 + 4 + 2] > 0;
-      if (soft) {
-        tol[0] = tol[1] = tol[2] = tolX;
+      if (!split && w0 === v[o - 8 + 1] > 0 && w0 === v[o + 8 + 4 + 1] > 0 && g0 === v[o - 8 + 2] > 0 && g0 === v[o + 8 + 4 + 2] > 0) {
         // (The pitch within the tolerance over all the column's slots: its lines stay within it.)
-        tol[3] = (tolX * v[o + 3]) / Math.max(v[o + 3], v[o + 1]);
-        sl.pass(y, ends(o), tol);
-        sl.pass(y, ends(o + 4), tol);
-        if (sl.fits(cuts[i + 1], ends(8 * (i + 1) + 4))) continue;
+        const t3 = (tolX * v[o + 3]) / Math.max(v[o + 3], v[o + 1]);
+        const du = Math.abs(y - y0);
+        for (let p = o; p <= o + 4; p += 4) {
+          const e0 = v[p];
+          const e1 = v[p] + v[p + 1];
+          const e2 = v[p + 2] > 0 ? v[p] + v[p + 2] : 0;
+          const e3 = v[p + 3];
+          lo0 = Math.max(lo0, (e0 - tolX - a0) / du);
+          hi0 = Math.min(hi0, (e0 + tolX - a0) / du);
+          lo1 = Math.max(lo1, (e1 - tolX - a1) / du);
+          hi1 = Math.min(hi1, (e1 + tolX - a1) / du);
+          lo2 = Math.max(lo2, (e2 - tolX - a2) / du);
+          hi2 = Math.min(hi2, (e2 + tolX - a2) / du);
+          lo3 = Math.max(lo3, (e3 - t3 - a3) / du);
+          hi3 = Math.min(hi3, (e3 + t3 - a3) / du);
+        }
+        // (Can the run end at the next sample's lanes just above it, keeping every sample passed within its tolerance?)
+        const q = o + 8 + 4;
+        const dn = Math.abs(cuts[i + 1] - y0);
+        if (dn > 0) {
+          const s0 = (v[q] - a0) / dn;
+          const s1 = (v[q] + v[q + 1] - a1) / dn;
+          const s2 = ((v[q + 2] > 0 ? v[q] + v[q + 2] : 0) - a2) / dn;
+          const s3 = (v[q + 3] - a3) / dn;
+          if (s0 >= lo0 && s0 <= hi0 && s1 >= lo1 && s1 <= hi1 && s2 >= lo2 && s2 <= hi2 && s3 >= lo3 && s3 <= hi3) continue;
+        }
       }
-      keep(i);
-      sl.start(y, ends(o));
+      ys[k] = y;
+      for (let j = 0; j < 8; j++) out[8 * k + j] = v[o + j];
+      steps[k] = split ? 1 : 0;
+      k++;
+      y0 = y;
+      a0 = v[o];
+      a1 = v[o] + v[o + 1];
+      a2 = v[o + 2] > 0 ? v[o] + v[o + 2] : 0;
+      a3 = v[o + 3];
+      lo0 = lo1 = lo2 = lo3 = -Infinity;
+      hi0 = hi1 = hi2 = hi3 = Infinity;
     }
-    if (n > 1) keep(n - 1);
+    if (n > 1) {
+      ys[k] = cuts[n - 1];
+      for (let j = 0; j < 8; j++) out[8 * k + j] = v[8 * (n - 1) + j];
+      steps[k] = isSplit(cuts[n - 1]) ? 1 : 0;
+      k++;
+    }
     this.ys2 = this.ys;
     this.vals2 = this.vals;
     this.steps2 = this.steps;
