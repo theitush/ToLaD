@@ -328,7 +328,9 @@ const scenes = [
         // The fossils (ToLaD#539 step 6): the bird line's deep time (its dinosaurs and pterosaurs), the synapsids round the
         // mammals, the marine reptiles.
         ['amn-birdline', 'level', ['Avemetatarsalia']],
+        ['amn-birdline-mesozoic', 'level', ['Avemetatarsalia', 150, 8]],
         ['amn-synapsids', 'level', ['Synapsida']],
+        ['amn-synapsids-permian', 'level', ['Synapsida', 260, 8]],
         ['amn-sauropterygia', 'level', ['Sauropterygia']],
         ['amn-ichthyosaurs', 'level', ['Ichthyosauromorpha']],
       ]

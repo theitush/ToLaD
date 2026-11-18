@@ -768,7 +768,11 @@ export function groupName(fan: Fan, v: FanNode): string {
     out = latin ? levelName(v) : '';
     // (The first part down the largest parts with a rank name of its own, for a group whose face has no English name.)
     let ranked: FanNode | undefined;
-    if (out === latin && !familiar(v)) {
+    // (A stem round a class, ToLaD#539: every living species of v in one class is told by that class, "Mammals & kin"; down the largest parts
+    // the synapsids would be told by the mammals' largest order.)
+    const cls = out === latin && !familiar(v) ? classCrown(v) : undefined;
+    if (cls) out = `${levelName(cls)} & kin`;
+    else if (out === latin && !familiar(v)) {
       for (let u: FanNode | undefined = v; u; ) {
         let big: FanNode | undefined;
         // (Its largest part by what it is today, ToLaD#279: by living species, then by strands; with every fossil on the tree a part's fossils outnumbered its living.)
@@ -790,6 +794,17 @@ export function groupName(fan: Fan, v: FanNode): string {
     kinCache.set(v, out);
   }
   return out;
+}
+
+/** The class (CLASS_TAXA) below clade v holding every living species of v, if one does (ToLaD#539): v a stem round it. */
+function classCrown(v: FanNode): FanNode | undefined {
+  const n = livingOf(v).length;
+  for (let u = v; n > 0; ) {
+    const k = u.kids.find((k): k is FanNode => !('sp' in k) && livingOf(k).length === n);
+    if (!k || CLASS_TAXA.has(taxonKey(k.split.taxon ?? ''))) return k;
+    u = k;
+  }
+  return undefined;
 }
 
 /**
