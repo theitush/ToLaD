@@ -318,52 +318,77 @@ export class CutMemo {
     if (this.m.leftPair) this.stale = true;
     else this.n = 0;
   }
-  update(cuts: ArrayLike<number>): Float64Array {
+  /**
+   * The lanes at these heights (ascending), the kept ones taken again. Lazy (ColumnPath.build, ToLaD#502): a new height
+   * is only marked, worked out when need() asks for it; a height marked and never asked for stays unknown.
+   */
+  update(cuts: ArrayLike<number>, lazy = false): Float64Array {
     const n = cuts.length;
     const oy = this.ys;
     // (The same heights as last time (a refold's re-choice, the zoom about the same): their left edges read again in place.)
     this.fresh = 0;
+    this.cur = cuts;
     if (n === this.n) {
       let k = 0;
       while (k < n && oy[k] === cuts[k]) k++;
       if (k === n) {
-        if (this.stale) for (let i = 0; i < n; i++) this.m.leftPair!(oy[i], this.v, 8 * i);
+        if (this.stale) for (let i = 0; i < n; i++) if (this.known[i]) this.m.leftPair!(oy[i], this.v, 8 * i);
         this.stale = false;
+        if (!lazy) for (let i = 0; i < n; i++) this.need(i);
         return this.v;
       }
     }
     // (Into the spare buffers, swapped with the kept ones at the end: no garbage a frame.)
     if (this.ys2.length < n) {
-      this.ys2 = new Float64Array(n + (n >> 2));
-      this.v2 = new Float64Array(8 * (n + (n >> 2)));
+      const c = n + (n >> 2);
+      this.ys2 = new Float64Array(c);
+      this.v2 = new Float64Array(8 * c);
+      this.known2 = new Uint8Array(c);
     }
     const ys = this.ys2;
     const v = this.v2;
+    const kn = this.known2;
     const ov = this.v;
+    const ok = this.known;
     const stale = this.stale;
     let j = 0;
     for (let k = 0; k < n; k++) {
       const y = cuts[k];
       ys[k] = y;
       while (j < this.n && oy[j] < y) j++;
-      const e = 1e-9 * Math.max(1, Math.abs(y));
-      if (j < this.n && oy[j] === y) {
+      if (j < this.n && oy[j] === y && ok[j]) {
         for (let i = 0; i < 8; i++) v[8 * k + i] = ov[8 * j + i];
         if (stale) this.m.leftPair!(y, v, 8 * k);
+        kn[k] = 1;
         continue;
       }
-      this.m.sample(y + e, v, 8 * k);
-      this.m.sample(y - e, v, 8 * k + 4);
-      this.fresh++;
+      kn[k] = 0;
     }
     this.ys2 = this.ys;
     this.v2 = this.v;
+    this.known2 = this.known;
     this.ys = ys;
     this.v = v;
+    this.known = kn;
     this.n = n;
     this.stale = false;
+    if (!lazy) for (let k = 0; k < n; k++) this.need(k);
     return v;
   }
+  /** The lanes at the last update()'s height k worked out, if they are not yet (its values in the array update() gave). */
+  need(k: number): void {
+    if (this.known[k]) return;
+    const y = this.cur[k];
+    const e = 1e-9 * Math.max(1, Math.abs(y));
+    this.m.sample(y + e, this.v, 8 * k);
+    this.m.sample(y - e, this.v, 8 * k + 4);
+    this.known[k] = 1;
+    this.fresh++;
+  }
+  /** Per height of the last update(): 1 once its lanes are worked out. */
+  private known = new Uint8Array(0);
+  private known2 = new Uint8Array(0);
+  private cur: ArrayLike<number> = [];
   private ys2 = new Float64Array(0);
   private v2 = new Float64Array(0);
 }
@@ -445,6 +470,9 @@ export class ColumnPath {
   private ys2 = new Float64Array(0);
   private vals2 = new Float64Array(0);
   private steps2 = new Uint8Array(0);
+  /** build()'s cuts worked out, in order (indices), and per cut: 2 a split, 1 always worked out (an end, the coarse grid). */
+  private sel = new Int32Array(0);
+  private fl = new Uint8Array(0);
   /** build()'s last cuts and the span and grid they are for. */
   private cuts: number[] = [];
   private cutsA = NaN;
@@ -548,7 +576,8 @@ export class ColumnPath {
       this.cutsGrid = grid;
     }
     const cuts = this.cuts;
-    const v = this.m.cutMemo.update(cuts);
+    const memo = this.m.cutMemo;
+    const v = memo.update(cuts, true);
     const n = cuts.length;
     // (Into the spare buffers, swapped with the kept ones at the end: no garbage a frame. The kept ones are read
     // only until the next span().)
@@ -557,6 +586,10 @@ export class ColumnPath {
       this.ys2 = new Float64Array(c);
       this.vals2 = new Float64Array(8 * c);
       this.steps2 = new Uint8Array(c);
+    }
+    if (this.sel.length < n) {
+      this.sel = new Int32Array(n + (n >> 2));
+      this.fl = new Uint8Array(n + (n >> 2));
     }
     const ys = this.ys2;
     const out = this.vals2;
@@ -568,12 +601,75 @@ export class ColumnPath {
     const splits = b.tess.paths.y;
     const spEnd = b.pAt + b.pN;
     let sp = b.pAt;
-    const isSplit = (y: number) => {
+    // Which of the cuts are worked out (ToLaD#502: a new strand's first path sampled ~660 heights over its three screens,
+    // most where it runs straight): the ends, the splits and the coarse grid (PATH_ANCHOR of the grid's steps, world-fixed)
+    // always; between two of those, by the screen's tolerance at this zoom (adaptive subdivision, as a curve is flattened
+    // for drawing): the middle cut and the quarters within half the chords' tolerance of the straight line between the
+    // two, their lanes drawn or not and green or not alike, or both halves are worked out the same way.
+    const fl = this.fl;
+    const coarse = PATH_ANCHOR * Math.pow(2, Math.floor(Math.log2(Math.max(1e-9, 4 / Math.max(1e-12, sy)))));
+    for (let i = 0; i < n; i++) {
+      const y = cuts[i];
       while (sp < spEnd && splits[sp] < y) sp++;
-      return sp < spEnd && splits[sp] === y;
+      fl[i] = sp < spEnd && splits[sp] === y ? 2 : i === 0 || i === n - 1 || y % coarse === 0 ? 1 : 0;
+    }
+    const tA = tolX / 2;
+    // (Within tA of the line from p's lanes just below it to q's just above it, at cut t, just above and just below it.)
+    const flat = (p: number, q: number, t: number): boolean => {
+      const P = 8 * p;
+      const Q = 8 * q + 4;
+      const wp = v[P + 1] > 0;
+      const gp = v[P + 2] > 0;
+      if (wp !== v[Q + 1] > 0 || gp !== v[Q + 2] > 0) return false;
+      const f = (cuts[t] - cuts[p]) / (cuts[q] - cuts[p]);
+      const l0 = v[P];
+      const l1 = v[P] + v[P + 1];
+      const l2 = gp ? v[P] + v[P + 2] : 0;
+      const d0 = v[Q] - l0;
+      const d1 = v[Q] + v[Q + 1] - l1;
+      const d2 = (gp ? v[Q] + v[Q + 2] : 0) - l2;
+      const d3 = v[Q + 3] - v[P + 3];
+      for (let o = 8 * t; o <= 8 * t + 4; o += 4) {
+        if (wp !== v[o + 1] > 0 || gp !== v[o + 2] > 0) return false;
+        const t3 = (tA * v[o + 3]) / Math.max(v[o + 3], v[o + 1]);
+        if (!(Math.abs(v[o] - (l0 + d0 * f)) <= tA)) return false;
+        if (!(Math.abs(v[o] + v[o + 1] - (l1 + d1 * f)) <= tA)) return false;
+        if (!(Math.abs((gp ? v[o] + v[o + 2] : 0) - (l2 + d2 * f)) <= tA)) return false;
+        if (!(Math.abs(v[o + 3] - (v[P + 3] + d3 * f)) <= t3)) return false;
+      }
+      return true;
     };
-    // (The sleeve, Sleeve's sums step for step, in locals, a sample's values read in place, ToLaD#502: a flight makes
-    // thousands of paths a frame. Per sample, from the lanes at offset o: left, right and green edges, and the pitch.)
+    const sel = this.sel;
+    let ns = 0;
+    const refine = (p: number, q: number): void => {
+      if (q - p < 2) return;
+      const m = (p + q) >> 1;
+      memo.need(m);
+      let ok = flat(p, q, m);
+      if (q - p <= 4) for (let t = p + 1; ok && t < q; t++) ok = t === m || (memo.need(t), flat(p, q, t));
+      else if (ok) {
+        const t1 = (p + m) >> 1;
+        const t3 = (m + q) >> 1;
+        memo.need(t1);
+        memo.need(t3);
+        ok = flat(p, q, t1) && flat(p, q, t3);
+      }
+      if (ok) return;
+      refine(p, m);
+      sel[ns++] = m;
+      refine(m, q);
+    };
+    memo.need(0);
+    sel[ns++] = 0;
+    for (let i = 1, p = 0; i < n; i++) {
+      if (!fl[i]) continue;
+      memo.need(i);
+      refine(p, i);
+      sel[ns++] = i;
+      p = i;
+    }
+    // Then the chords merged where they run straight on screen (the sleeve, Sleeve's sums step for step, in locals, a
+    // sample's values read in place). Per sample, from the lanes at offset o: left, right and green edges, and the pitch.
     let y0 = cuts[0];
     let a0 = v[0];
     let a1 = v[0] + v[1];
@@ -589,18 +685,21 @@ export class ColumnPath {
     let hi3 = Infinity;
     ys[0] = cuts[0];
     for (let j = 0; j < 8; j++) out[j] = v[j];
-    steps[0] = isSplit(cuts[0]) ? 1 : 0;
+    steps[0] = fl[0] === 2 ? 1 : 0;
     let k = 1;
-    for (let i = 1; i + 1 < n; i++) {
+    for (let j = 1; j + 1 < ns; j++) {
+      const i = sel[j];
       const y = cuts[i];
       const o = 8 * i;
-      const split = isSplit(y);
+      const op = 8 * sel[j - 1];
+      const on = 8 * sel[j + 1];
+      const split = fl[i] === 2;
       // A sample may go only where the lanes go on through it (not at a split, where the green lane
       // steps), its chords both drawn or both not (a column of no width), green or not alike.
       const w0 = v[o + 1] > 0;
       const g0 = v[o + 2] > 0;
       // (Elsewhere both the lanes just below it and just above it stay within the tolerance.)
-      if (!split && w0 === v[o - 8 + 1] > 0 && w0 === v[o + 8 + 4 + 1] > 0 && g0 === v[o - 8 + 2] > 0 && g0 === v[o + 8 + 4 + 2] > 0) {
+      if (!split && w0 === v[op + 1] > 0 && w0 === v[on + 4 + 1] > 0 && g0 === v[op + 2] > 0 && g0 === v[on + 4 + 2] > 0) {
         // (The pitch within the tolerance over all the column's slots: its lines stay within it.)
         const t3 = (tolX * v[o + 3]) / Math.max(v[o + 3], v[o + 1]);
         const du = Math.abs(y - y0);
@@ -619,8 +718,8 @@ export class ColumnPath {
           hi3 = Math.min(hi3, (e3 + t3 - a3) / du);
         }
         // (Can the run end at the next sample's lanes just above it, keeping every sample passed within its tolerance?)
-        const q = o + 8 + 4;
-        const dn = Math.abs(cuts[i + 1] - y0);
+        const q = on + 4;
+        const dn = Math.abs(cuts[sel[j + 1]] - y0);
         if (dn > 0) {
           const s0 = (v[q] - a0) / dn;
           const s1 = (v[q] + v[q + 1] - a1) / dn;
@@ -630,7 +729,7 @@ export class ColumnPath {
         }
       }
       ys[k] = y;
-      for (let j = 0; j < 8; j++) out[8 * k + j] = v[o + j];
+      for (let c = 0; c < 8; c++) out[8 * k + c] = v[o + c];
       steps[k] = split ? 1 : 0;
       k++;
       y0 = y;
@@ -641,10 +740,11 @@ export class ColumnPath {
       lo0 = lo1 = lo2 = lo3 = -Infinity;
       hi0 = hi1 = hi2 = hi3 = Infinity;
     }
-    if (n > 1) {
-      ys[k] = cuts[n - 1];
-      for (let j = 0; j < 8; j++) out[8 * k + j] = v[8 * (n - 1) + j];
-      steps[k] = isSplit(cuts[n - 1]) ? 1 : 0;
+    if (ns > 1) {
+      const i = sel[ns - 1];
+      ys[k] = cuts[i];
+      for (let j = 0; j < 8; j++) out[8 * k + j] = v[8 * i + j];
+      steps[k] = fl[i] === 2 ? 1 : 0;
       k++;
     }
     this.ys2 = this.ys;
@@ -692,6 +792,8 @@ const PATH_BUDGET = 120_000;
 /** A height worked out anew (TwigModel.sample twice) costs about this many cuts. */
 const PATH_FRESH = 4;
 
+/** A ColumnPath works out its cuts on the grid every this many of the grid's steps at least (~64 screen px), the rest as the screen's tolerance asks (build). */
+const PATH_ANCHOR = 16;
 /** How far the zoom may move from the one a ColumnPath was made at (either way) before it is made again. */
 const PATH_ZOOM = 1.4;
 /** A ColumnPath chooses its samples afresh every this many moves of the fold (between, it reads their left edges again). */
