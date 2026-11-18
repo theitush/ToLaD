@@ -8402,6 +8402,7 @@
    "upham-imputed": 1387,
    "upham-interp": 1960
   },
+  "stems_unnamed": [],
   "taxon_names": {
    "by_order": {
     "Afrosoricida": {
@@ -10313,13 +10314,14 @@
    "largest_move": {
     "from_Ma": 20.363,
     "split": "Rhinoceros unicornis + Aceratherium incisivum",
-    "to_Ma": 20.651
+    "to_Ma": 21.837
    },
    "method": "mbl",
+   "min_share_of_age": 0.005,
    "moved_younger": 0,
    "not_below_parent": 0,
    "note": "zero-length branches given the minimum branch length (Laurin 2004; paleotree timePaleoPhy type='mbl'): ToLaD#561",
-   "splits_moved": 459
+   "splits_moved": 760
   },
   "zero_length_spliced": 0
  },
@@ -41611,7 +41613,7 @@
  },
  "output": {
   "brotli_bytes": 842588,
-  "dated_sidecar_raw": 2215240,
+  "dated_sidecar_raw": 2215830,
   "files": 15,
   "raw_bytes": 4595584,
   "skeleton_brotli": 109397,
