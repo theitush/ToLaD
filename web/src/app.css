@@ -187,10 +187,27 @@
 }
 /* ToLaD#492: no photo, the tree's stub (wiki.drawStub) in its square; its caption in the credit's line, like the bare
    globe's 'Range not known'. */
-.card-sp .pic.stub canvas {
+.card-sp .pic.stub canvas,
+.card-sp .pic.outline canvas {
   display: block;
   width: var(--box);
   height: var(--box);
+}
+/* ToLaD#577: no photo, a PhyloPic outline drawn light in its square (FanApp OutlinePic); under it what it stands for and
+   its credit (PhyloPic and the artist, the licence) in the credit's type, the two links on one line. */
+.card-sp .pic.outline canvas {
+  border-radius: 8px;
+  background: rgba(125, 142, 132, 0.1);
+}
+.card-sp .pic.outline .credit {
+  display: block;
+  margin-top: 2px;
+  font-size: 9px;
+  color: #7f8c85;
+}
+.card-sp .pic.outline .credit a {
+  display: inline;
+  margin: 0;
 }
 .card-sp .media .pic {
   float: none;

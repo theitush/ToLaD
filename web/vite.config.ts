@@ -158,15 +158,37 @@ function globeJson(): string {
  * the species the fan has, so the page does not carry the whole tree's. {} when there is none.
  * Another dataset's (`dir`, ToLaD#539) is its own wiki.json over data/mammals': data/amniotes/wiki.json (pipeline
  * `make wiki-amniotes`) has the birds and reptiles, and the mammals' rows copied as they are; a species in neither
- * has none.
+ * has none. A species with no photo carries its PhyloPic outline from phylopic.json beside it (ToLaD#577), the same way.
  */
 function wikiFor(names: string[], dir = DATA): Record<string, unknown> {
-  const read = (d: string): Record<string, unknown> => {
-    const p = join(d, 'wiki.json');
-    return existsSync(p) ? (JSON.parse(readFileSync(p, 'utf8')) as Record<string, unknown>) : {};
+  const read = <T,>(d: string, f = 'wiki.json'): Record<string, T> => {
+    const p = join(d, f);
+    return existsSync(p) ? (JSON.parse(readFileSync(p, 'utf8')) as Record<string, T>) : {};
   };
-  const all = dir === DATA ? read(DATA) : { ...read(DATA), ...read(dir) };
-  return Object.fromEntries(names.filter((n) => n in all).map((n) => [n, all[n]]));
+  const all = dir === DATA ? read<unknown>(DATA) : { ...read<unknown>(DATA), ...read<unknown>(dir) };
+  // Where there is no photo, the PhyloPic outline (ToLaD#577, data/<tree>/phylopic.json, pipeline `make phylopic`; the photo
+  // always wins): `ol`, the image's id (the tree's disc), and `olw`, what the card says of it (fan/wiki.ts outlineRec).
+  const pp = (d: string): Outlines => ({ images: {}, species: {}, ...read<unknown>(d, 'phylopic.json') }) as Outlines;
+  const [m, t] = [pp(DATA), dir === DATA ? null : pp(dir)];
+  const images = { ...m.images, ...t?.images };
+  const ols = { ...m.species, ...t?.species };
+  const rec = (n: string): unknown => {
+    const w = (all[n] ?? null) as Record<string, unknown> | null;
+    const o = ols[n];
+    if (!o || w?.img) return w;
+    const [id, group, rank, shows] = o;
+    const im = images[id];
+    const credit = [im.r, im.a, im.c, im.l, im.u];
+    if (credit.some((x) => x.includes('|'))) throw new Error(`phylopic.json: a "|" in image ${id}'s credit`);
+    return { ...w, ol: id, olw: [group, rank, shows, credit.join('|')] };
+  };
+  return Object.fromEntries(names.filter((n) => n in all || n in ols).map((n) => [n, rec(n)]));
+}
+
+/** data/<tree>/phylopic.json (pipeline/tolad_pipeline/phylopic.py `sidecar`): each image once, each species its image's id, group, rank and the taxon shown. */
+interface Outlines {
+  images: Record<string, { r: string; a: string; c: string; l: string; u: string }>;
+  species: Record<string, [string, string, string, string]>;
 }
 
 /** Single-file build: inline the JS and CSS chunks into index.html. */
