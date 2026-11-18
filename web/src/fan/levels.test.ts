@@ -114,18 +114,18 @@ function home(v: FanView): void {
   settle(v);
 }
 const nameOf = (lv: Level) => (lv.b ? lv.b.sp.common : levelName(lv.v));
-/** A point on b's column, above its split. */
-function onColumn(v: FanView, b: FanBranch): [number, number] {
-  // (Off the names and pictures, ToLaD#262: a name may stand over a neighbour's column; a tap there is the name's.)
-  const iv = v as unknown as { pillAt(x: number, y: number): unknown; picAt(x: number, y: number): unknown };
-  let first: [number, number] | null = null;
-  for (const f of [0.4, 0.5, 0.6, 0.7, 0.3, 0.8, 0.2]) {
+/** A point on b's column, above its split, clear of every label; null where a label covers all of it (a tap there is the label's). */
+function onColumn(v: FanView, b: FanBranch): [number, number] | null {
+  // (Off the names and pictures, ToLaD#262: a name may stand over a neighbour's column; a tap there is the name's. A fork's
+  // name too (ToLaD#373): with every fossil a fossil's column, a hair across, can run its whole length under a fork's name, and
+  // there is no column to tap.)
+  const iv = v as unknown as { pillAt(x: number, y: number): unknown; picAt(x: number, y: number): unknown; brackets: { hit(x: number, y: number): unknown } | null };
+  for (const f of [0.4, 0.5, 0.6, 0.7, 0.3, 0.8, 0.2, 0.9, 0.1]) {
     const y = b.tipY + f * (b.splitY - b.tipY);
     const p = v.toScreen(leftAt(b, y) + laneAt(b, y).w / 2, y);
-    first ??= p;
-    if (!iv.pillAt(...p) && !iv.picAt(...p)) return p;
+    if (!iv.pillAt(...p) && !iv.picAt(...p) && !(forkNames() && iv.brackets?.hit(...p))) return p;
   }
-  return first!;
+  return null;
 }
 
 /** The fans: the folded carnivores and the cats. */
@@ -159,15 +159,22 @@ describe('a tap goes one level deeper, a double-tap one level out (ToLaD#258)', 
       const log: string[] = [];
       // (Folded, a flight frame by frame takes seconds: a few of the carnivores, more of the cats.)
       const bs = v.fan.branches.filter((_, i) => i % (v.fan.tess.fold ? 61 : 7) === 3);
+      let reached = 0;
       for (const b of bs) {
         home(v);
         card = null;
+        let covered = false;
         const path: Level[] = [v.levelNow()];
         // (The frames the taps left, and their levels: a tap that opened a card where the view stood is no step, ToLaD#376.)
         const frames = [{ cam: { ...v.cam }, lv: path[0] }];
         // One tap at a time: each flies one level deeper, towards b, to b itself at last.
         for (let k = 0; k < 12 && !path[path.length - 1].b; k++) {
-          v.tap(...onColumn(v, b));
+          const p = onColumn(v, b);
+          if (!p) {
+            covered = true;
+            break;
+          }
+          v.tap(...p);
           if (!P(v).anim) {
             log.push(`${b.sp.common}: tap ${k + 1} flew nowhere (at ${nameOf(path[path.length - 1])})`);
             break;
@@ -182,11 +189,14 @@ describe('a tap goes one level deeper, a double-tap one level out (ToLaD#258)', 
           if (P(v).offBy(frames[frames.length - 1].cam, v.cam) > LEVEL_PX) frames.push({ cam: { ...v.cam }, lv: now });
         }
         if (path[path.length - 1].b !== b) {
-          log.push(`${b.sp.common}: ended at ${nameOf(path[path.length - 1])}`);
+          // (No column left to tap, a label over all of it: the walk ends there, no tap rule broken.)
+          if (!covered) log.push(`${b.sp.common}: ended at ${nameOf(path[path.length - 1])}`);
           continue;
         }
+        reached++;
         // At it: a tap keeps its card, no flight.
-        v.tap(...onColumn(v, b));
+        const p = onColumn(v, b);
+        if (p) v.tap(...p);
         if (P(v).anim || card !== b.sp.common) log.push(`${b.sp.common}: at it, a tap: card ${card}${P(v).anim ? ', and a flight' : ''}`);
         // Double-taps: each one level up (ToLaD#472), on its frame, home at last; at home, nothing. The first closes the card.
         for (let k = 0; k < 12 && !atHome(v); k++) {
@@ -208,6 +218,7 @@ describe('a tap goes one level deeper, a double-tap one level out (ToLaD#258)', 
         if (!atHome(v)) log.push(`${b.sp.common}: double-taps ended away from home`);
       }
       expect(log).toEqual([]);
+      expect(reached).toBeGreaterThan(0);
     });
 
     it(`${name}: each group's pill at home flies one level deeper towards that group; a double-tap, home`, () => {
@@ -281,7 +292,9 @@ function levelsOnTheWay(v: FanView, step: number, at: (v: FanView) => void): voi
     home(v);
     at(v);
     for (let k = 0; k < 8 && !v.levelNow().b; k++) {
-      v.tap(...onColumn(v, b));
+      const p = onColumn(v, b);
+      if (!p) break;
+      v.tap(...p);
       if (!P(v).anim) break;
       run(v);
       at(v);
@@ -525,9 +538,10 @@ describe('a double tap goes up one level on every route, never back (ToLaD#301, 
       home(v);
       for (let k = 0; down && k < 10; k++) {
         const lv = v.levelNow(true);
-        for (const how of ['landed', 'mid', 'ran'] as const) check(v, `${name} at ${nameOf(lv)}`, bad, how, onColumn(v, b));
-        if (lv.b) break;
-        v.tap(...onColumn(v, b));
+        const p = onColumn(v, b);
+        for (const how of ['landed', 'mid', 'ran'] as const) check(v, `${name} at ${nameOf(lv)}`, bad, how, p ?? undefined);
+        if (lv.b || !p) break;
+        v.tap(...p);
         if (!P(v).anim) break;
         run(v);
       }
@@ -583,7 +597,7 @@ describe('a double tap goes up one level on every route, never back (ToLaD#301, 
   it("at home, a double tap whose first tap ran puts that tap's flight back: home", () => {
     const v = stubView(FELIDAE, FELIDAE_TREE, false);
     home(v);
-    v.tap(...onColumn(v, v.fan.branches[7]));
+    v.tap(...onColumn(v, v.fan.branches[7])!);
     expect(!!P(v).anim).toBe(true);
     fly(v, 3);
     v.doubleTap(-1e4, -1e4, true);
@@ -619,11 +633,17 @@ describe('a double tap after taps, pans, a "…": one level up each, home at las
       const s = widest(v);
       expect(s, `a label to tap after ${k} taps`).toBeTruthy();
       frames.push(frameNow(v));
-      const was = v.cam.sx;
+      const was = { ...v.cam };
+      const lv = v.levelNow(true);
       tapSpot(v, s!.box);
       expect(!!P(v).anim, `tap ${k + 1} flew`).toBe(true);
       run(v);
-      expect(v.cam.sx, `tap ${k + 1} went deeper`).toBeGreaterThan(was);
+      // (One level deeper (ToLaD#258), never out (ToLaD#352, #446): a level inside the last, the view tighter on width and time
+      // together. A species' frame can be wider on width than its group's and tighter in time: the domestic dog's in Canini's,
+      // where with every fossil the one label on screen, "Carnivores", walks down to it.)
+      const now = v.levelNow(true);
+      expect(holds(lv, now) && (now.v ?? now.b) !== (lv.v ?? lv.b), `tap ${k + 1} went a level deeper: ${nameOf(lv)} to ${nameOf(now)}`).toBe(true);
+      expect(Math.log(v.cam.sx / was.sx) + Math.log(v.cam.sy / was.sy), `tap ${k + 1} went deeper`).toBeGreaterThan(0);
     }
   };
   const pan = (v: FanView, dx: number) => {
@@ -725,7 +745,9 @@ describe('a double tap after taps, pans, a "…": one level up each, home at las
         // Tapped down its column, each tap a step, to the first frame with a "…" at least two taps in.
         for (let k = 0; k < 12 && !(frames.length >= 2 && moreAt()); k++) {
           const before = frameNow(v);
-          v.tap(...onColumn(v, b));
+          const p = onColumn(v, b);
+          if (!p) break;
+          v.tap(...p);
           if (!P(v).anim) break;
           frames.push(before);
           run(v);
@@ -803,7 +825,7 @@ describe('a tap landing on a species opens its card; a search pick too (ToLaD#26
       run(v);
       const at = v.levelNow();
       expect(card).toBe(at.b ? at.b.sp.common : null);
-      if (!at.b) v.tap(...onColumn(v, b));
+      if (!at.b) v.tap(...onColumn(v, b)!);
     }
     expect(v.levelNow().b).toBeTruthy();
   });
