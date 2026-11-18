@@ -2,7 +2,7 @@
 // stages it (served over http), at 390×844: each scene drawn dashed (the page) and faint (the old look, the bar's
 // "unknown counts" chip picked), and the two side by side. The amniotes: home, the lizards and snakes framed (merged clades
 // with no count in them), the skinks, a lone lizard, a fossil dinosaur; the mammals: a #507 species (Data Deficient, never counted).
-//   npm run build:single && node scripts/dashedshot.mjs <out-dir> [dist-dir] [only,scenes]
+//   npm run build:single && node scripts/dashedshot.mjs <out-dir> [dist-dir, or the live page's URL] [only,scenes]
 // Two builds' shots side by side (each scene: before dashed | after dashed | after faint):
 //   node scripts/dashedshot.mjs compose <out-dir> <before-dir> <after-dir> [only,scenes]
 import { mkdirSync, readFileSync } from 'node:fs';
@@ -70,7 +70,9 @@ try {
   for (const tree of ['amniotes', 'mammals']) {
     const scenes = SCENES.filter((s) => s[1] === tree);
     if (!scenes.length) continue;
-    const served = await pageUrl(tree === 'amniotes' ? 'tree=amniotes' : '', DIST);
+    // (A dist dir served over http, or the live page: `https://…/ToLaD/`.)
+    const q = tree === 'amniotes' ? 'tree=amniotes' : '';
+    const served = /^https?:/.test(DIST) ? { url: `${DIST}${q ? `?${q}` : ''}`, close() {} } : await pageUrl(q, DIST);
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
     const page = await ctx.newPage();
     page.on('pageerror', (e) => console.log('pageerror', String(e)));
