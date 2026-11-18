@@ -156,8 +156,9 @@ function globeJson(): string {
 /**
  * The clade's rows of the Wikipedia/Commons sidecar (data/mammals/wiki.json, ToLaD#182): only
  * the species the fan has, so the page does not carry the whole tree's. {} when there is none.
- * Another dataset's (`dir`, ToLaD#539) is its own wiki.json over data/mammals': the amniotes carry the mammals'
- * rows unchanged, so their pictures too; a species in neither has none.
+ * Another dataset's (`dir`, ToLaD#539) is its own wiki.json over data/mammals': data/amniotes/wiki.json (pipeline
+ * `make wiki-amniotes`) has the birds and reptiles, and the mammals' rows copied as they are; a species in neither
+ * has none.
  */
 function wikiFor(names: string[], dir = DATA): Record<string, unknown> {
   const read = (d: string): Record<string, unknown> => {
