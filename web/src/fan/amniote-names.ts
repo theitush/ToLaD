@@ -5,15 +5,13 @@
 // The rest follow TAXON_EN's rule (ToLaD#440): an everyday name, or what the group is; a group with neither keeps its
 // Latin. No module imports here: splits.ts and brackets.ts both read it.
 
-/** The groups above the orders, the reptiles' orders and big clades, and the birds' orders (Clements' 45, no English of its own there). */
+/** The groups above the orders and the reptiles' big clades inside them (the orders' are below: ORDER_EN reads them). */
 export const AMNIOTE_EN: Record<string, string> = {
   Amniota: 'Amniotes',
   Mammalia: 'Mammals',
   Sauropsida: 'Reptiles & birds',
   Sauria: 'Reptiles & birds',
   Lepidosauria: 'Lizards, snakes & tuatara',
-  Rhynchocephalia: 'Tuatara',
-  Squamata: 'Lizards & snakes',
   Serpentes: 'Snakes',
   Alethinophidia: 'Typical snakes',
   Scolecophidia: 'Blind snakes',
@@ -25,18 +23,34 @@ export const AMNIOTE_EN: Record<string, string> = {
   Lacertibaenia: 'Wall lizards, tegus & worm lizards',
   Amphisbaenia: 'Worm lizards',
   Archelosauria: 'Turtles, crocodilians & birds',
-  Testudines: 'Turtles',
   Cryptodira: 'Hidden-necked turtles',
   Pleurodira: 'Side-necked turtles',
   Testudinoidea: 'Tortoises & pond turtles',
   Chelonioidea: 'Sea turtles',
   Trionychia: 'Softshell turtles & kin',
   Archosauria: 'Crocodilians & birds',
-  Crocodylia: 'Crocodilians',
   Aves: 'Birds',
   Palaeognathae: 'Ratites & tinamous',
   Galloanserae: 'Landfowl & waterfowl',
-  // (The birds' orders, eBird/Clements v2025's.)
+};
+
+/**
+ * The classes above the orders (ToLaD#539): each a level, as the root is, though above orders (view.ts isLevel: home
+ * opens on the classes and the reptiles' orders, a class's level on its orders). The reptiles are no class (not a clade):
+ * their orders stand on their own.
+ */
+export const CLASS_TAXA: ReadonlySet<string> = new Set(['Mammalia', 'Aves']);
+
+/** The reptiles' orders (the Reptile Database's), as splits.ts ORDER_EN lists the mammals'. */
+export const REPTILE_ORDER_EN: Record<string, string> = {
+  Squamata: 'Lizards & snakes',
+  Testudines: 'Turtles',
+  Crocodylia: 'Crocodilians',
+  Rhynchocephalia: 'Tuatara',
+};
+
+/** The birds' orders (eBird/Clements v2025's 45; Clements names none in English), as splits.ts ORDER_EN lists the mammals'. */
+export const BIRD_ORDER_EN: Record<string, string> = {
   Struthioniformes: 'Ostriches',
   Casuariiformes: 'Cassowaries & emu',
   Apterygiformes: 'Kiwis',
@@ -130,7 +144,7 @@ export const REPTILE_FAMILY_EN: Record<string, string> = {
   Testudinidae: 'Tortoises',
   Emydidae: 'Pond turtles',
   Geoemydidae: 'Asian river turtles & kin',
-  Cheloniidae: 'Sea turtles',
+  Cheloniidae: 'Hard-shelled sea turtles',
   Dermochelyidae: 'Leatherback',
   Chelydridae: 'Snapping turtles',
   Kinosternidae: 'Mud turtles',

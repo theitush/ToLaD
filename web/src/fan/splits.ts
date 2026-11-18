@@ -16,7 +16,7 @@
 // A split may have more than two daughters (a polytomy: Upham dates them as one
 // event, or fossils join it by taxonomy only).
 
-import { BIRD_FAMILY_EN, REPTILE_FAMILY_EN } from './amniote-names';
+import { BIRD_FAMILY_EN, BIRD_ORDER_EN, REPTILE_FAMILY_EN, REPTILE_ORDER_EN } from './amniote-names';
 import raw from 'virtual:panthera-data';
 import carnivora from 'virtual:carnivora-data';
 import { mammalData } from './mammals-data';
@@ -507,6 +507,9 @@ export const ORDER_EN: Record<string, string> = {
   Carnivora: 'Carnivores',
   Perissodactyla: 'Horses & rhinos',
   Artiodactyla: 'Hoofed mammals & whales',
+  // (The amniotes' reptile and bird orders, ToLaD#539: amniote-names.ts; none is a mammal taxon.)
+  ...REPTILE_ORDER_EN,
+  ...BIRD_ORDER_EN,
 };
 export const ORDER_TAXA: ReadonlySet<string> = new Set(Object.keys(ORDER_EN));
 
