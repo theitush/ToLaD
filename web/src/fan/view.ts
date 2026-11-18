@@ -891,6 +891,13 @@ export function labelParts(v: FanNode, fan?: Fan): Level[] {
  * there when the view pans or zooms out to them. With the page's default data the root.
  */
 const homeCache = new WeakMap<Fan, FanNode>();
+/** The fan's highlights' strands (HIGHLIGHT_STOPS, ToLaD#497, #539), in fan.branches' order, kept per fan (ToLaD#502). */
+const highlightCache = new WeakMap<Fan, FanBranch[]>();
+function highlightsOf(fan: Fan): FanBranch[] {
+  let out = highlightCache.get(fan);
+  if (!out) highlightCache.set(fan, (out = fan.branches.filter((b) => HIGHLIGHT_STOPS[b.sp.sci])));
+  return out;
+}
 export function homeOf(fan: Fan): FanNode {
   let out = homeCache.get(fan);
   if (!out) {
@@ -1450,7 +1457,8 @@ export class FanView implements InputHandlers {
     const [f, l] = [v.strands[0].index, v.strands[v.strands.length - 1].index];
     // (A highlight's picture whole on home (ToLaD#539): on the amniotes the human is home's last strand, and its picture, wider than its band, stood on its centre half
     // under the time axis. The highlights only, as CLAUDE.md allows: the frame's far end holds it; on the mammals, where it stands first, nothing changes.)
-    const keep = this.fan.branches.filter((b) => HIGHLIGHT_STOPS[b.sp.sci] && b.index >= f && b.index <= l);
+    // (The highlights' strands kept per fan: home is framed on every flight frame and on each level's ladder, and a walk of every species there cost a tenth of a frame on the amniotes, ToLaD#502.)
+    const keep = highlightsOf(this.fan).filter((b) => b.index >= f && b.index <= l);
     return this.fan.tess.fold ? this.runFrame(f, l, v === this.fan.root ? 0 : v.y, this.fan.root, this.yNow, false, false, keep) : this.withBand(this.camera.home());
   }
 

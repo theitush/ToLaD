@@ -29,7 +29,14 @@ const H = 844;
 
 // [name, level, setup]: setup runs in the page once loaded (f = window.__fan), the view framed where the gestures start.
 const SYNTH_N = Number(process.env.SYNTH_N || 0);
-const SCENES = SYNTH_N ? [
+// TREE=amniotes: the amniotes' page (`?tree=amniotes`, every fossil, ToLaD#539) at home, and Ita's route (ToLaD#502): from home the
+// names of the groups holding Tyrannosaurus rex tapped till it is named, a pinch and a pan there, then a tap on its name (its card).
+// The mammals' scenes carry the same route to the lion (`mammals-route`).
+const TREE = process.env.TREE || 'mammals';
+const SCENES = TREE === 'amniotes' ? [
+  ['amn-home', 'mammals&tree=amniotes', { home: true }],
+  ['amn-route', 'mammals&tree=amniotes', { home: true, route: 'Tyrannosaurus rex' }],
+] : SYNTH_N ? [
   [`s${SYNTH_N}-home`, `synthetic&n=${SYNTH_N}`, { home: true }],
   [`s${SYNTH_N}-order`, `synthetic&n=${SYNTH_N}`, { synth: 'order' }],
   [`s${SYNTH_N}-family`, `synthetic&n=${SYNTH_N}`, { synth: 'family' }],
@@ -38,6 +45,7 @@ const SCENES = SYNTH_N ? [
   ['rodents', 'mammals', { level: 'Rodentia' }],
   ['bats', 'mammals', { level: 'Chiroptera' }],
   ['species', 'mammals', { species: 'Domestic cat' }],
+  ['mammals-route', 'mammals', { home: true, route: 'Panthera leo' }],
 ];
 
 process.env.HTTP = '1';
@@ -53,7 +61,15 @@ try {
     // Every rAF's delta from the start; the first frame the fan draws.
     await page.addInitScript(() => {
       const w = window;
-      w.__pp = { deltas: [], cb: [], rec: false, first: 0, heap: 0, phase: '', by: {} };
+      w.__pp = { deltas: [], cb: [], rec: false, first: 0, heap: 0, phase: '', by: {}, cbBy: {}, long: {} };
+      // (Long tasks by phase, ToLaD#502: a tap's own work runs in its event, not a frame.)
+      try {
+        new PerformanceObserver((l) => {
+          for (const e of l.getEntries()) if (w.__pp.rec && w.__pp.phase) (w.__pp.long[w.__pp.phase] ??= []).push(e.duration);
+        }).observe({ type: 'longtask', buffered: false });
+      } catch {
+        /* no long tasks */
+      }
       let last = 0;
       // The page's own rAF callbacks timed (the fan's frame: its flight step and draw, on the main thread).
       const raf = w.requestAnimationFrame.bind(w);
@@ -62,6 +78,7 @@ try {
           const a = performance.now();
           f(t);
           if (w.__pp.rec) w.__pp.cb.push(performance.now() - a);
+          if (w.__pp.rec && w.__pp.phase) (w.__pp.cbBy[w.__pp.phase] ??= []).push(performance.now() - a);
         });
       const tick = (t) => {
         if (w.__pp.rec && last) w.__pp.deltas.push(t - last);
@@ -192,7 +209,68 @@ try {
     });
     const t0 = Date.now();
     const phase = (k) => page.evaluate((x) => (window.__pp.phase = x), k);
-    for (let r = 0; r < REPS; r++) {
+    // (A flight's end: its animation done, whatever else asks for frames (pictures coming in); 3 minutes at most.)
+    const landed = () => page.waitForFunction(() => !window.__fan.anim, null, { timeout: 180000 }).catch(() => {});
+    const tap = async (x, y) => {
+      await touch('touchStart', [[x, y]]);
+      await sleep(40);
+      await touch('touchEnd', []);
+      // (A single tap may wait out the double-tap window, DOUBLE_TAP_MS 320, before it runs.)
+      await sleep(450);
+      await landed();
+    };
+    const steps = [];
+    if (setup.route) {
+      // Where the target is drawn now: its name's box (a tap there is a tap on it), and the name of the deepest group holding it.
+      const where = (sci) =>
+        page.evaluate((sci) => {
+          const f = window.__fan;
+          const b = f.fan.branches.find((x) => x.sp.sci === sci);
+          const mid = (q) => [(q[0] + q[2]) / 2, (q[1] + q[3]) / 2];
+          const on = (q) => q[2] > 0 && q[0] < f.w && q[3] > 0 && q[1] < f.h;
+          const name = f.nameHits.find((h) => h.b === b && on(h.box));
+          const groups = f.famHits.filter((h) => on(h.box) && h.v.strands.includes(b)).sort((p, q) => p.v.strands.length - q.v.strands.length);
+          const [x, y] = f.toScreen(b.cx, b.tipY);
+          return { name: name ? mid(name.box) : null, group: groups.length ? { at: mid(groups[0].box), n: groups[0].v.strands.length } : null, at: [x, y], sx: f.cam.sx };
+        }, sci);
+      await phase('grouptap');
+      let w = await where(setup.route);
+      // (Each tap a group deeper; a tap that leaves the same group the deepest named is the last.)
+      for (let k = 0, was = 0; k < 8 && !w.name && w.group && w.group.n !== was; k++) {
+        steps.push(`group(${w.group.n})`);
+        was = w.group.n;
+        await tap(...w.group.at);
+        w = await where(setup.route);
+      }
+      // A pinch in about it and a pan, as a finger looks round there; pinches till it is named.
+      for (let k = 0; k < 4 && (k === 0 || !w.name); k++) {
+        await phase('pinch');
+        const [x, y] = w.at;
+        steps.push(`pinch@${Math.round(x)},${Math.round(y)}`);
+        await pinch(Math.min(W - 60, Math.max(60, x)), Math.min(H - 120, Math.max(120, y)), 90, 250);
+        await landed();
+        w = await where(setup.route);
+      }
+      await phase('pan');
+      steps.push('pan');
+      await pan(W * 0.45, H * 0.5, W * 0.55, H * 0.45);
+      await landed();
+      w = await where(setup.route);
+      // The tap on its name: the flight to it and its card.
+      await phase('sptap');
+      const c0 = await page.evaluate(() => performance.now());
+      if (w.name) {
+        steps.push('tap name');
+        await tap(...w.name);
+      } else {
+        steps.push('flyToSpecies (not named)');
+        await page.evaluate((sci) => window.__fan.flyToSpecies(window.__fan.fan.branches.find((x) => x.sp.sci === sci).sp), setup.route);
+        await landed();
+      }
+      const card = await page.evaluate(() => [!!window.__fan.selected, performance.now()]);
+      steps.push(`card ${card[0] ? 'open' : 'NOT open'} ${Math.round(card[1] - c0)} ms after the tap`);
+    }
+    for (let r = 0; r < (setup.route ? 0 : REPS); r++) {
       await phase('pinch');
       await pinch(W / 2, H * 0.55, 90, 300); // in
       await idle();
@@ -222,7 +300,7 @@ try {
     const secs = (Date.now() - t0) / 1000;
     const rec = await page.evaluate(() => {
       window.__pp.rec = false;
-      return { by: window.__pp.by, heap: Math.round(window.__pp.heap), deltas: window.__pp.deltas, cb: window.__pp.cb, draw: [...window.__fan.frameMs], lab: [...(window.__fan.labelAllMs ?? [])], lay: [...(window.__fan.labelLayMs ?? [])] };
+      return { by: window.__pp.by, cbBy: window.__pp.cbBy, long: window.__pp.long, heap: Math.round(window.__pp.heap), deltas: window.__pp.deltas, cb: window.__pp.cb, draw: [...window.__fan.frameMs], lab: [...(window.__fan.labelAllMs ?? [])], lay: [...(window.__fan.labelLayMs ?? [])] };
     });
     if (PROFILE === name) {
       const { profile } = await cdp.send('Profiler.stop');
@@ -242,6 +320,10 @@ try {
       heap: rec.heap,
       // (Per gesture, ToLaD#343: the rAF deltas' p50/p95 while pinching, panning, flying.)
       by: Object.fromEntries(Object.entries(rec.by).map(([k, a]) => [k, { p50: q(a, 0.5), p95: q(a, 0.95), n: a.length }])),
+      // (Per phase the page's rAF callbacks' main-thread ms (its frames' own work) and its long tasks (a tap's work in its event).)
+      cbBy: Object.fromEntries(Object.entries(rec.cbBy).map(([k, a]) => [k, { p50: +q(a, 0.5).toFixed(1), p95: +q(a, 0.95).toFixed(1), max: +q(a, 1).toFixed(1), n: a.length }])),
+      long: Object.fromEntries(Object.entries(rec.long).map(([k, a]) => [k, { n: a.length, max: Math.round(q(a, 1)), sum: Math.round(a.reduce((x, y) => x + y, 0)) }])),
+      steps,
       frames: d.length,
       p50: q(d, 0.5),
       p95: q(d, 0.95),
@@ -264,6 +346,8 @@ try {
     };
     rows.push(row);
     const f = (v) => v.toFixed(1).padStart(7);
+    if (steps.length) console.log(`${name} route: ${steps.join(' > ')}`);
+    for (const [k, c] of Object.entries(row.cbBy)) console.log(`${name.padEnd(11)} ${k.padEnd(8)} frames' main ms n ${c.n} p50 ${c.p50} p95 ${c.p95} max ${c.max} | rAF p50 ${row.by[k]?.p50?.toFixed(1)} p95 ${row.by[k]?.p95?.toFixed(1)} | long tasks ${JSON.stringify(row.long[k] ?? {})}`);
     console.log(
       `${name.padEnd(11)} load ${String(row.load).padStart(6)} ms | frames ${String(row.frames).padStart(4)} p50 ${f(row.p50)} p95 ${f(row.p95)} max ${f(row.max)} dropped ${String(dropped).padStart(4)} | main n ${String(row.cbs).padStart(4)} p50 ${f(row.c50)} p95 ${f(row.c95)} >16 ${String(row.over16).padStart(3)} | draw n ${String(row.draws).padStart(4)} p50 ${f(row.d50)} p95 ${f(row.d95)} | labels/f p50 ${f(row.lab50)} mean ${f(row.labMean)} | layouts ${String(row.lays).padStart(3)} p50 ${f(row.lay50)} p95 ${f(row.lay95)} | ${secs.toFixed(1)} s`,
     );
