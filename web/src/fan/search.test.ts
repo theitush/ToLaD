@@ -1,10 +1,11 @@
 // Species search (ToLaD#157): the matcher, and a pick flying the fan to the species' column with its card open.
 import { renderToStaticMarkup } from 'react-dom/server';
-import { createElement } from 'react';
+import { createElement, type ReactElement, type ReactNode } from 'react';
 import { describe, expect, it } from 'vitest';
 import { FELIDAE, type SpeciesRec } from './panthera';
 import { fold, matchAbbrev, matchRank, searchSpecies } from './search';
-import { SearchPanel } from './SearchPanel';
+import { ROW, SearchPanel } from './SearchPanel';
+import { hookHarness } from './hookharness';
 import { laneAt, leftAt } from './layout';
 import { FanView, type Selection } from './view';
 
@@ -119,6 +120,84 @@ describe('the list', () => {
     expect(none).toContain('No species by that name');
     const empty = renderToStaticMarkup(createElement(SearchPanel, { species: FELIDAE.species, onPick: () => {}, onClose: () => {} }));
     expect(empty).not.toContain('listbox');
+  });
+});
+
+/** The first element under `el` (itself included) whose props pass `ok`. */
+function findEl(el: ReactNode, ok: (p: Record<string, unknown>) => boolean): ReactElement<Record<string, unknown>> | null {
+  if (Array.isArray(el)) {
+    for (const x of el) {
+      const f = findEl(x, ok);
+      if (f) return f;
+    }
+    return null;
+  }
+  if (!el || typeof el !== 'object' || !('props' in el)) return null;
+  const e = el as ReactElement<Record<string, unknown>>;
+  return ok(e.props) ? e : findEl(e.props.children as ReactNode, ok);
+}
+
+describe('a long list (ToLaD#564)', () => {
+  // 3,000 species that all match "sp", listed "Sp 0000" to "Sp 2999".
+  const N = 3000;
+  const all: SpeciesRec[] = Array.from({ length: N }, (_, i) => ({ ...FELIDAE.species[0], gid: 1e6 + i, common: `Sp ${String(i).padStart(4, '0')}`, sci: `Genus sp${i}`, extinct: false }));
+  const open = () => {
+    const h = hookHarness();
+    return () => h.render(() => SearchPanel({ species: all, onPick: () => {}, onClose: () => {}, initial: 'sp' }));
+  };
+  const rows = (html: string) => html.match(/<li [^>]*role="option".*?<\/li>/g) ?? [];
+  // The list's height stands whole: its padding and the rows drawn make every row's room.
+  const whole = (html: string) => {
+    const [, t, b] = html.match(/padding-top:(\d+)px;padding-bottom:(\d+)px/)!;
+    return Number(t) + Number(b) + rows(html).length * ROW;
+  };
+
+  it('draws only the rows in view, each saying where it stands in the whole list', () => {
+    const html = renderToStaticMarkup(open()());
+    expect(rows(html).length).toBeGreaterThanOrEqual(8);
+    expect(rows(html).length).toBeLessThan(30);
+    expect(rows(html)[0]).toContain('Sp 0000');
+    expect(rows(html)[0]).toContain('aria-setsize="3000"');
+    expect(rows(html)[0]).toContain('aria-posinset="1"');
+    expect(rows(html)[0]).toContain('aria-selected="true"');
+    expect(whole(html)).toBe(8 + N * ROW);
+  });
+
+  it('scrolled to the end, draws the last hit there', () => {
+    const run = open();
+    const ul = findEl(run(), (p) => p.role === 'listbox')!;
+    const view = 8 * ROW + 8;
+    (ul.props.onScroll as (e: unknown) => void)({ currentTarget: { scrollTop: 8 + N * ROW - view, clientHeight: view } });
+    const html = renderToStaticMarkup(run());
+    const r = rows(html);
+    expect(r.length).toBeLessThan(30);
+    expect(r[r.length - 1]).toContain('Sp 2999');
+    expect(r[r.length - 1]).toContain('aria-posinset="3000"');
+    expect(html).not.toContain('Sp 0000');
+    expect(whole(html)).toBe(8 + N * ROW);
+  });
+
+  it('the arrows go round to the last hit and back, the active row drawn and named by the field', () => {
+    const run = open();
+    const key = (k: string) => {
+      const input = findEl(run(), (p) => p.role === 'combobox')!;
+      (input.props.onKeyDown as (e: unknown) => void)({ key: k, preventDefault: () => {} });
+      return run();
+    };
+    let el = key('ArrowUp');
+    let html = renderToStaticMarkup(el);
+    expect(findEl(el, (p) => p.role === 'combobox')!.props['aria-activedescendant']).toBe('fan-search-list-2999');
+    expect(rows(html).find((r) => r.includes('aria-selected="true"'))).toContain('Sp 2999');
+    expect(whole(html)).toBe(8 + N * ROW);
+    el = key('ArrowDown');
+    html = renderToStaticMarkup(el);
+    expect(findEl(el, (p) => p.role === 'combobox')!.props['aria-activedescendant']).toBe('fan-search-list-0');
+    expect(rows(html).find((r) => r.includes('aria-selected="true"'))).toContain('Sp 0000');
+    // Down a page and more: the row the arrows reach is drawn, in view.
+    for (let k = 0; k < 20; k++) el = key('ArrowDown');
+    html = renderToStaticMarkup(el);
+    expect(rows(html).find((r) => r.includes('aria-selected="true"'))).toContain('Sp 0020');
+    expect(html).not.toContain('Sp 0000');
   });
 });
 
