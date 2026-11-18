@@ -9,12 +9,14 @@
     <meta name="theme-color" content="#0b0f0d" />
     <title>ToLaD: mammals</title>
     <!-- The tree's data (fan/mammals-data.ts, ToLaD#502): fetched with the page, not after its script has run.
-         Every fossil's pair by default; ?fossils=old the old look's (ToLaD#279). -->
+         Every fossil's pair by default; ?fossils=old the old look's (ToLaD#279). The mammals', or with ?tree=amniotes
+         the amniotes' (ToLaD#539); mammals-data.ts treeFiles names them the same way. -->
     <script>
       (function () {
+        var q = new URLSearchParams(location.search);
         var l = document.createElement('link');
         l.rel = 'preload'; l.as = 'fetch'; l.type = 'application/json'; l.crossOrigin = 'anonymous';
-        l.href = new URLSearchParams(location.search).get('fossils') === 'old' ? 'mammals.json' : 'mammals-all.json';
+        l.href = (q.get('tree') === 'amniotes' ? 'amniotes' : 'mammals') + (q.get('fossils') === 'old' ? '' : '-all') + '.json';
         document.head.appendChild(l);
       })();
     </script>

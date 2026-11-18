@@ -16,6 +16,7 @@
 // A split may have more than two daughters (a polytomy: Upham dates them as one
 // event, or fossils join it by taxonomy only).
 
+import { BIRD_FAMILY_EN, REPTILE_FAMILY_EN } from './amniote-names';
 import raw from 'virtual:panthera-data';
 import carnivora from 'virtual:carnivora-data';
 import { mammalData } from './mammals-data';
@@ -470,6 +471,9 @@ export const FAMILY_EN: Record<string, string> = {
   Vombatidae: 'Wombats',
   Ornithorhynchidae: 'Platypus',
   Tachyglossidae: 'Echidnas',
+  // (The amniotes' birds and reptiles, ToLaD#539: amniote-names.ts.)
+  ...BIRD_FAMILY_EN,
+  ...REPTILE_FAMILY_EN,
 };
 
 /**
