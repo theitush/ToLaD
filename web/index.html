@@ -16,7 +16,9 @@
         var q = new URLSearchParams(location.search);
         var l = document.createElement('link');
         l.rel = 'preload'; l.as = 'fetch'; l.type = 'application/json'; l.crossOrigin = 'anonymous';
-        l.href = (q.get('tree') === 'amniotes' ? 'amniotes' : 'mammals') + (q.get('fossils') === 'old' ? '' : '-all') + '.json';
+        var tree = q.get('tree') === 'amniotes' ? 'amniotes' : 'mammals';
+        l.href = tree + (q.get('fossils') === 'old' ? '' : '-all') + '.json';
+        document.title = 'ToLaD: ' + tree;
         document.head.appendChild(l);
       })();
     </script>
