@@ -1,5 +1,5 @@
 # ToLaD data pipeline v0 (mammals). `make` = fetch (verify pinned checksums) + build + test.
-.PHONY: all fetch fetch-amniotes build build-amniotes test audit wiki wiki-amniotes globe
+.PHONY: all fetch fetch-amniotes build build-amniotes test audit wiki wiki-amniotes phylopic phylopic-amniotes globe
 
 all: fetch build test
 
@@ -42,6 +42,17 @@ wiki:
 # A run cut off resumes where it stopped. ARGS: `--names-only` (steps 1-2, ~10 min), `--extend` (the rest, ~13 min).
 wiki-amniotes:
 	uv run python -I -m tolad_pipeline.wiki --tree amniotes $(ARGS)
+
+# A PhyloPic outline for every species wiki.json has no picture for (ToLaD#577): its own, else its nearest relative's up
+# the dated tree (phylopic.py). Its own step over the built data and wiki.json; asks PhyloPic only when
+# data/raw/phylopic/amniota.json is missing (or `ARGS=--refresh`; ~10 min, resumes), else verifies its pinned checksum;
+# writes data/mammals/phylopic.json (data/amniotes/phylopic.json) and nothing else. Reads data/raw/amniotes/ott and pbdb
+# for the splits' ids and ranks (`make fetch-amniotes`).
+phylopic:
+	uv run python -I -m tolad_pipeline.phylopic $(ARGS)
+
+phylopic-amniotes:
+	uv run python -I -m tolad_pipeline.phylopic --tree amniotes $(ARGS)
 
 # Every species' range cells for the card's globe (ToLaD#267): PHYLACINE 1.2.1's current and present-natural rasters,
 # run-length packed, matched to the dated tree's species. Its own step over the built data; writes
