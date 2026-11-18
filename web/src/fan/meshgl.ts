@@ -3,6 +3,25 @@
 
 import { DASH_ON, DASH_PERIOD, DASH_W } from './dashed';
 
+// One rect's vertex (RECT_VS's, and SEG_VS's for a rect among the chords, ToLaD#502: the same text, so the same floats).
+const RECT_AT = /* glsl */ `
+void rectAt(vec4 rr, vec4 rc, vec4 rs) {
+  // A trapezoid: [x0, x1] at y0, shifted by (dl, dr) at y1 (a rectangle when 0).
+  // Its bounding box, grown so the anti-aliased edges have room (RECT_FS's filter, hw).
+  float sk = max(abs(rs.x), abs(rs.y));
+  float g = 2.5 + 0.5 * clamp(sk / max(1e-6, rr.w - rr.y), 1.0, max(3.0, sk));
+  vec2 lo = vec2(min(rr.x, rr.x + rs.x) - g, rr.y);
+  vec2 hi = vec2(max(rr.z, rr.z + rs.y) + g, rr.w);
+  vec2 p = mix(lo, hi, corner);
+  vP = p;
+  vRect = rr;
+  vColor = rc;
+  vSkew = rs.xy;
+  vClip = rs.zw;
+  vDash = vec3(0.0);
+  gl_Position = vec4(p.x / uView.x * 2.0 - 1.0, 1.0 - p.y / uView.y * 2.0, 0.0, 1.0);
+}`;
+
 const RECT_VS = /* glsl */ `#version 300 es
 layout(location = 0) in vec2 corner;
 layout(location = 1) in vec4 aRect;
@@ -15,21 +34,9 @@ flat out vec4 vColor;
 flat out vec2 vSkew;
 flat out vec2 vClip;
 flat out vec3 vDash;
+${RECT_AT}
 void main() {
-  // A trapezoid: [x0, x1] at y0, shifted by (dl, dr) at y1 (a rectangle when 0).
-  // Its bounding box, grown so the anti-aliased edges have room (RECT_FS's filter, hw).
-  float sk = max(abs(aSkew.x), abs(aSkew.y));
-  float g = 2.5 + 0.5 * clamp(sk / max(1e-6, aRect.w - aRect.y), 1.0, max(3.0, sk));
-  vec2 lo = vec2(min(aRect.x, aRect.x + aSkew.x) - g, aRect.y);
-  vec2 hi = vec2(max(aRect.z, aRect.z + aSkew.y) + g, aRect.w);
-  vec2 p = mix(lo, hi, corner);
-  vP = p;
-  vRect = aRect;
-  vColor = aColor;
-  vSkew = aSkew.xy;
-  vClip = aSkew.zw;
-  vDash = vec3(0.0);
-  gl_Position = vec4(p.x / uView.x * 2.0 - 1.0, 1.0 - p.y / uView.y * 2.0, 0.0, 1.0);
+  rectAt(aRect, aColor, aSkew);
 }`;
 
 const RECT_FS = /* glsl */ `#version 300 es
@@ -107,8 +114,16 @@ float laneDim(float px) {
 vec3 mixc(vec3 A, vec3 B, float t) {
   return floor((A * (1.0 - t) + B * t) * 255.0 + 0.5) / 255.0;
 }
+${RECT_AT}
 void main() {
   int role = gl_InstanceID % 4;
+  // A rect among the chords (FanGL.end: the batch's rects and chords in their order, one draw, ToLaD#502; aE.w < 0): RectBatch's
+  // twelve floats in aQ, aP, aW, drawn as RECT_VS draws it, by its first instance; the other three draw nothing.
+  if (aE.w < -0.5) {
+    if (role == 0) rectAt(aQ, aP, aW);
+    else gl_Position = vec4(2.0, 2.0, 0.0, 1.0);
+    return;
+  }
   // The chord: per row (q its top, p its bottom) its lane's left, right and green edges (px, as the CPU made them: no
   // edge a sum of two rounded values, however wide the lane), and widths; its height, and its centre line's run over it
   // (its lean, exact however short the chord); gray or not, its dim.
@@ -362,6 +377,39 @@ export class Batches {
     if (!C.length || C[C.length - 2] !== this.under.n) C.push(this.under.n, this.segs.n);
     return this.segs;
   }
+  /**
+   * The rects under and the chords as one batch, in the order drawn (ToLaD#502: FanGL draws it at once, SEG_VS; expandChords
+   * spreads it): a chord as it is, a rect as its twelve floats and then 0, 0, 0, -1 (aE.w < 0: a rect). Into `all`; how many.
+   */
+  all = new Float32Array(SEG_F * 256);
+  merged(): number {
+    const C = this.cuts;
+    const U = this.under.f;
+    const n = this.under.n + this.segs.n;
+    if (n * SEG_F > this.all.length) this.all = new Float32Array(Math.max(n * SEG_F, 2 * this.all.length));
+    const A = this.all;
+    let m = 0;
+    const rects = (a: number, b: number) => {
+      for (let i = a; i < b; i++, m++) {
+        const o = SEG_F * m;
+        for (let q = 0; q < 12; q++) A[o + q] = U[12 * i + q];
+        A[o + 12] = 0;
+        A[o + 13] = 0;
+        A[o + 14] = 0;
+        A[o + 15] = -1;
+      }
+    };
+    let u = 0;
+    for (let k = 0; k < C.length; k += 2) {
+      rects(u, C[k]);
+      u = Math.max(u, C[k]);
+      const e = k + 2 < C.length ? C[k + 3] : this.segs.n;
+      A.set(this.segs.f.subarray(SEG_F * C[k + 1], SEG_F * e), SEG_F * m);
+      m += e - C[k + 1];
+    }
+    rects(u, this.under.n);
+    return m;
+  }
 }
 
 /**
@@ -370,9 +418,7 @@ export class Batches {
  */
 export function expandChords(b: Batches, L: number, st: ChordStyle, out: RectBatch): RectBatch {
   out.n = 0;
-  const U = b.under.f;
-  const copy = (i: number) => {
-    const o = 12 * i;
+  const copy = (U: Float32Array, o: number) => {
     out.push(U[o], U[o + 1], U[o + 2], U[o + 3], U[o + 4], U[o + 5], U[o + 6], U[o + 7], U[o + 8], U[o + 9], U[o + 10], U[o + 11]);
   };
   const laneDim = (px: number) => {
@@ -389,9 +435,7 @@ export function expandChords(b: Batches, L: number, st: ChordStyle, out: RectBat
     if (r0 > R && r1 > R) r0 = r1 = R;
     out.push(l0, y0, r0, y1, c[0], c[1], c[2], a, l1 - l0, r1 - r0, cl, cr);
   };
-  const chord = (j: number) => {
-    const F = b.segs.f;
-    const o = SEG_F * j;
+  const chord = (F: Float32Array, o: number) => {
     const [xq, rq, eq, y0, xp, rp, ep, dy, wq, gq, wp, gp, dc, gray, dim, ph] = F.subarray(o, o + 16);
     const y1 = y0 + dy;
     if (ph > 0.5) {
@@ -424,14 +468,13 @@ export function expandChords(b: Batches, L: number, st: ChordStyle, out: RectBat
       if (glow > 0.01) trap(xq - e, g1q + e, xp - e, g1p + e, y0, y1, c, a * glow, xa - e, xb + e);
     trap(xq, g1q, xp, g1p, y0, y1, c, 1, xa - 0.5, xb + 0.5);
   };
-  const C = b.cuts;
-  let u = 0;
-  for (let k = 0; k < C.length; k += 2) {
-    for (; u < C[k]; u++) copy(u);
-    const e = k + 2 < C.length ? C[k + 3] : b.segs.n;
-    for (let j = C[k + 1]; j < e; j++) chord(j);
+  // (The batch as FanGL draws it, one list of rects and chords in their order: Batches.merged.)
+  const n = b.merged();
+  const A = b.all;
+  for (let j = 0; j < n; j++) {
+    if (A[SEG_F * j + 15] < -0.5) copy(A, SEG_F * j);
+    else chord(A, SEG_F * j);
   }
-  for (; u < b.under.n; u++) copy(u);
   return out;
 }
 
@@ -565,24 +608,34 @@ export class FanGL extends Batches {
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-    // (The rects under, the chords' runs among them where they were drawn, then the rects over; each batch sent once.)
+    // (The rects under, the chords' runs among them where they were drawn, then the rects over. With chords, the rects
+    // under go in among them, in that order, into one batch drawn by SEG_VS at once (ToLaD#502): a run a switch of
+    // program and its draw, and a lizard's screen, its forks' dashed stems between their corners, held ~260 runs.)
     const C = this.cuts;
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.rectBuf);
-    gl.bufferData(gl.ARRAY_BUFFER, this.under.f.subarray(0, this.under.n * 12), gl.STREAM_DRAW);
-    if (this.segs.n) {
+    if (C.length && this.style) {
+      const n = this.merged();
       gl.bindBuffer(gl.ARRAY_BUFFER, this.segBuf);
-      gl.bufferData(gl.ARRAY_BUFFER, this.segs.f.subarray(0, this.segs.n * SEG_F), gl.STREAM_DRAW);
+      gl.bufferData(gl.ARRAY_BUFFER, this.all.subarray(0, n * SEG_F), gl.STREAM_DRAW);
+      this.chords(w, h, 0, n);
+    } else {
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.rectBuf);
+      gl.bufferData(gl.ARRAY_BUFFER, this.under.f.subarray(0, this.under.n * 12), gl.STREAM_DRAW);
+      if (this.segs.n) {
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.segBuf);
+        gl.bufferData(gl.ARRAY_BUFFER, this.segs.f.subarray(0, this.segs.n * SEG_F), gl.STREAM_DRAW);
+      }
+      let u = 0;
+      for (let k = 0; k < C.length; k += 2) {
+        this.rects(this.under, w, h, u, C[k], false);
+        u = Math.max(u, C[k]);
+        this.chords(w, h, C[k + 1], k + 2 < C.length ? C[k + 3] : this.segs.n);
+      }
+      this.rects(this.under, w, h, u, this.under.n, false);
     }
-    let u = 0;
-    for (let k = 0; k < C.length; k += 2) {
-      this.rects(this.under, w, h, u, C[k], false);
-      u = Math.max(u, C[k]);
-      this.chords(w, h, C[k + 1], k + 2 < C.length ? C[k + 3] : this.segs.n);
-    }
-    this.rects(this.under, w, h, u, this.under.n, false);
     this.rects(this.over, w, h);
     gl.bindVertexArray(null);
   }
+
 }
 
 /** '#rrggbb' → [r, g, b] in 0–1. */
