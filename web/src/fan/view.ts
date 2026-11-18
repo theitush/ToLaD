@@ -4041,6 +4041,41 @@ export class FanView implements InputHandlers {
     return p - N;
   }
   private tipTree: { S: readonly FanBranch[] | null; N: number; m: Float64Array } = { S: null, N: 0, m: new Float64Array(0) };
+  /**
+   * The first strand from i on, that way (dir), whose own column (or tip) reaches below world y (its split under it): -1 or S.length where none. A max tree on
+   * the strands' splits (and tips) in drawn order (clearScan's runs, ToLaD#502), as liveFrom's min tree on their tips.
+   */
+  private splitFrom(i: number, dir: number, y: number): number {
+    const S = (this.fan.tess.fold as Steady).strands;
+    let T = this.splitTree;
+    if (T.S !== S) {
+      let N = 1;
+      while (N < S.length) N <<= 1;
+      const m = new Float64Array(2 * N).fill(-Infinity);
+      for (let j = 0; j < S.length; j++) m[N + j] = Math.max(S[j].splitY, S[j].tipY);
+      for (let j = N - 1; j >= 1; j--) m[j] = Math.max(m[2 * j], m[2 * j + 1]);
+      T = this.splitTree = { S, N, m };
+    }
+    if (i < 0 || i >= S.length) return dir < 0 ? -1 : S.length;
+    const { N, m } = T;
+    let p = N + i;
+    if (m[p] > y) return i;
+    for (;;) {
+      if (p === 1) return dir < 0 ? -1 : S.length;
+      const sib = dir > 0 ? p + 1 : p - 1;
+      if ((dir > 0 ? (p & 1) === 0 : (p & 1) === 1) && m[sib] > y) {
+        p = sib;
+        break;
+      }
+      p >>= 1;
+    }
+    while (p < N) {
+      p = dir > 0 ? 2 * p : 2 * p + 1;
+      if (!(m[p] > y)) p += dir > 0 ? 1 : -1;
+    }
+    return p - N;
+  }
+  private splitTree: { S: readonly FanBranch[] | null; N: number; m: Float64Array } = { S: null, N: 0, m: new Float64Array(0) };
   /** clearIn's rows r0..r1 (from world row p0, `sy` rows a world unit) read: from strands k..kHi outward on each side, a row closed at the first strand past what is left. */
   private clearScan(k: number, kHi: number, p0: number, r0: number, r1: number, sy: number, min: number, out: number[], scr: number): void {
     const S = (this.fan.tess.fold as Steady).strands;
@@ -4052,55 +4087,28 @@ export class FanView implements InputHandlers {
       let rows = r1 - r0 + 1;
       // (Only strands not gone before every row: the next one each way from a min tree on their tips, not a strand at a time, ToLaD#279: at home with every fossil a name's
       // neighbours in drawn order are mostly fossils gone long before.)
+      let rlo = r0;
       for (let i = this.liveFrom((dir < 0 ? k : kHi) + dir, dir, yTop); i >= 0 && rows && out.length; i = this.liveFrom(i + dir, dir, yTop)) {
         const b = S[i];
+        // (A run of strands whose own columns all end above the first open row (split there or before): on every open row each is there and in a parent's
+        // column, never its own, so it takes nothing out and only a column past what is left closes a row. In drawn order they never cross, so on each row
+        // the first that closes it is found by bisection, not a strand at a time; the work counted as the strand at a time read it, ToLaD#502: a lizard's
+        // name read 670,000 such rows a frame, the skinks' thousands of columns in their parents'.)
+        while (!open[rlo]) rlo++;
+        if (Math.max(b.splitY, b.tipY) <= (p0 + rlo) / sy) {
+          i = this.runPast(i, this.splitFrom(i, dir, (p0 + rlo) / sy), dir, p0, rlo, r1, sy, out, scr) - dir;
+          rows = 0;
+          for (let r = rlo; r <= r1; r++) rows += open[r];
+          continue;
+        }
         for (let r = r0; r <= r1 && out.length; r++) {
           if (!open[r]) continue;
           // (Row p is the band from it to the next row: a strand there anywhere in it is read, at its start or at its tip, and at its own column's end, its split, where that falls
           // inside the band, so a column whose own stretch is shorter than a px, or steps across at its split between two rows, is not passed over (ToLaD#279: Ar. ramidus'
           // 3 px own column leans toward Ar. kadabba's picture in its last px).)
-          const [y, y1] = [(p0 + r) / sy, (p0 + r + 1) / sy];
-          if (y1 <= b.tipY) continue;
+          if ((p0 + r + 1) / sy <= b.tipY) continue;
           this.tipWork++;
-          // (Strand i on row p: its column's screen [a, z], and whether it is its own column there (a parent column's stretch is no column).)
-          const key = (p0 + r) * S.length + i;
-          let j = C.at.get(key);
-          if (j === undefined) {
-            const ys = Math.max(y, b.tipY);
-            const w = laneW(b, ys);
-            let l = leftAt(b, ys, w);
-            let [r2, own] = [l + w, ys < b.splitY && w > 0];
-            // (Its own column inside the band, where its shape's features fall (its own of Tess.bounds': its population's history points, its peel's steps, its split), as
-            // drawn: between them its edges are as smooth as a row's px.)
-            const ye = Math.min(y1, b.splitY);
-            if (ye > ys) {
-              const B = this.ownFeatures(b);
-              let q = lowerBound(B, ys);
-              for (; q < B.length && B[q] < ye; q++) {
-                const yq = B[q] > ys ? B[q] : ys;
-                const wq = laneW(b, yq);
-                const lq = leftAt(b, yq, wq);
-                if (wq > 0) [l, r2, own] = [own ? Math.min(l, lq) : lq, own ? Math.max(r2, lq + wq) : lq + wq, true];
-              }
-              if (b.splitY < y1) {
-                const yq = b.splitY - (b.splitY - ys) * 1e-9;
-                const wq = laneW(b, yq);
-                const lq = leftAt(b, yq, wq);
-                if (wq > 0) [l, r2, own] = [own ? Math.min(l, lq) : lq, own ? Math.max(r2, lq + wq) : lq + wq, true];
-              }
-            }
-            if (C.len + 3 > C.buf.length) {
-              const g = new Float64Array(C.buf.length * 2);
-              g.set(C.buf);
-              C.buf = g;
-            }
-            j = C.len;
-            C.buf[j] = l * this.cam.sx;
-            C.buf[j + 1] = r2 * this.cam.sx;
-            C.buf[j + 2] = own ? 1 : 0;
-            C.len += 3;
-            C.at.set(key, j);
-          }
+          const j = this.colAt(i, p0 + r, sy);
           const a = C.buf[j] + scr;
           const z = C.buf[j + 1] + scr;
           if (dir < 0 ? z <= out[0] : a >= out[out.length - 1]) {
@@ -4110,6 +4118,84 @@ export class FanView implements InputHandlers {
         }
       }
     }
+  }
+  /**
+   * clearScan's run of strands from..to (to not included; drawn order, that way: dir), none an own column on rows rlo..r1: on each open row, the first of them
+   * past what is left in `out` (all are there, in their parents' columns, in drawn order) closes it, bisected; tipWork counts the rows' reads up to it, or the
+   * whole run's, as a strand at a time. Returns `to`.
+   */
+  private runPast(from: number, to: number, dir: number, p0: number, rlo: number, r1: number, sy: number, out: number[], scr: number): number {
+    const C = this.clearRows;
+    const open = C.open;
+    const E = (to - from) * dir;
+    const past = (q: number, row: number) => {
+      const j = this.colAt(from + q * dir, row, sy);
+      return dir < 0 ? C.buf[j + 1] + scr <= out[0] : C.buf[j] + scr >= out[out.length - 1];
+    };
+    for (let r = rlo; r <= r1; r++) {
+      if (!open[r]) continue;
+      if (!past(E - 1, p0 + r)) {
+        this.tipWork += E;
+        continue;
+      }
+      let lo = -1;
+      let hi = E - 1;
+      while (hi - lo > 1) {
+        const m = (lo + hi) >> 1;
+        if (past(m, p0 + r)) hi = m;
+        else lo = m;
+      }
+      this.tipWork += hi + 1;
+      open[r] = 0;
+    }
+    return to;
+  }
+  /** Strand i on world row p (clearRows, kept): its column's [a, z] (screen x less the pan's) and whether it is its own column there (a parent column's stretch is no column), at buf[j..j + 2]. */
+  private colAt(i: number, p: number, sy: number): number {
+    const C = this.clearRows;
+    const S = (this.fan.tess.fold as Steady).strands;
+    const key = p * S.length + i;
+    let j = C.at.get(key);
+    if (j === undefined) {
+      const b = S[i];
+      const y = p / sy;
+      const y1 = (p + 1) / sy;
+      const ys = Math.max(y, b.tipY);
+      const w = laneW(b, ys);
+      let l = leftAt(b, ys, w);
+      let [r2, own] = [l + w, ys < b.splitY && w > 0];
+      // (Its own column inside the band, where its shape's features fall (its own of Tess.bounds': its population's history points, its peel's steps, its split), as
+      // drawn: between them its edges are as smooth as a row's px.)
+      const ye = Math.min(y1, b.splitY);
+      if (ye > ys) {
+        const B = this.ownFeatures(b);
+        let q = lowerBound(B, ys);
+        for (; q < B.length && B[q] < ye; q++) {
+          const yq = B[q] > ys ? B[q] : ys;
+          const wq = laneW(b, yq);
+          const lq = leftAt(b, yq, wq);
+          if (wq > 0) [l, r2, own] = [own ? Math.min(l, lq) : lq, own ? Math.max(r2, lq + wq) : lq + wq, true];
+        }
+        if (b.splitY < y1) {
+          const yq = b.splitY - (b.splitY - ys) * 1e-9;
+          const wq = laneW(b, yq);
+          const lq = leftAt(b, yq, wq);
+          if (wq > 0) [l, r2, own] = [own ? Math.min(l, lq) : lq, own ? Math.max(r2, lq + wq) : lq + wq, true];
+        }
+      }
+      if (C.len + 3 > C.buf.length) {
+        const g = new Float64Array(C.buf.length * 2);
+        g.set(C.buf);
+        C.buf = g;
+      }
+      j = C.len;
+      C.buf[j] = l * this.cam.sx;
+      C.buf[j + 1] = r2 * this.cam.sx;
+      C.buf[j + 2] = own ? 1 : 0;
+      C.len += 3;
+      C.at.set(key, j);
+    }
+    return j;
   }
   /** clearIn's strands on the world's rows at a zoom and layout: row * strands + strand -> [a, z, own column] at buf[j..j + 2], a and z its column's edges, world x times the zoom (screen x less the pan's). */
   private readonly clearRows = { sx: NaN, sy: NaN, lay: null as Float64Array | null, now: null as Float64Array | null, at: new Map<number, number>(), buf: new Float64Array(3 << 12), len: 0, open: new Uint8Array(256) };
