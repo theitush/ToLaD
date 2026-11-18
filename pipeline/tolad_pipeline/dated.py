@@ -534,6 +534,165 @@ def _fossils_only(d: DNode) -> bool:
     return all(x.leaf.extinct for x in d.preorder() if x.leaf is not None)
 
 
+def tied(a: float, b: float) -> bool:
+    """A daughter split at its parent's date, at the data's precision (a: the parent's age, b: the daughter's): closer
+    than 1e-3 of the age (the page tells ages apart at four significant digits) or than 2 EPS. A zero-length branch."""
+    return 0 <= a - b < max(1e-3 * a, 2 * EPS)
+
+
+MOVABLE = (S_FOSSIL, S_INTERP, S_FLOOR)  # ages set by fossils (or interpolated for a graft): the zero-length pass moves only these
+# How zero-length branches get time (ToLaD#561): "mbl" (Laurin 2004) or "equal" (Brusatte et al. 2008), both as paleotree's
+# timePaleoPhy implements them; the build reports what it applied in stats.json -> dated_tree.zero_length. "equal" shares
+# the whole branch above a run, and on fossil trees shaped by taxonomy (a family's branch spans its superfamily's range; a
+# fossil family hangs loose at a living crown) that is a ghost lineage: it moved 144 amniote splits more than 20 Ma before
+# their oldest fossil (Colubridae 34 -> 124 Ma, Tyrannosauridae 87 -> 141 Ma). "mbl" moves each just past its daughter's
+# tie (at most 1.8 Ma in either build) and names the same splits.
+ZERO_LENGTH = "mbl"
+
+
+def _movable(v: DNode, inside: set[int]) -> bool:
+    """A split whose age a fossil set (or a graft's interpolation): never a dated tree's, an override's or a cited
+    backbone age. (A backbone split raised to a fossil inside it, `fossil-floor`, keeps its citation's note, but its age
+    is the fossil's.)"""
+    return v.leaf is None and v.parent is not None and v.src in MOVABLE and id(v) not in inside
+
+
+def _ties_left(droot: DNode) -> int:
+    """Nested splits both dated by fossils (MOVABLE) still at one date."""
+    return sum(1 for d in droot.preorder() if d.leaf is None and d.parent is not None and d.src in MOVABLE
+               and d.parent.src in MOVABLE and tied(d.parent.age, d.age))
+
+
+def zero_length(droot: DNode, log: dict, skip: DNode | None = None) -> None:
+    """Zero-length branches given time by the ZERO_LENGTH method; log["zero_length"]."""
+    (equal_dates if ZERO_LENGTH == "equal" else mbl_dates)(droot, log, skip)
+    log["zero_length"]["method"] = ZERO_LENGTH
+    log["zero_length"]["fossil_splits_at_one_date"] = _ties_left(droot)
+
+
+def mbl_dates(droot: DNode, log: dict, skip: DNode | None = None) -> None:
+    """Zero-length branches given the minimum branch length (Laurin, M. 2004. The evolution of body size, Cope's rule
+    and the origin of amniotes. Syst. Biol. 53: 594-622), as paleotree's timePaleoPhy(type = "mbl") / minBranchLength
+    does it (Bapst 2012): every branch at least `mbl` long, a split too close to a daughter pushed older just enough,
+    the time taken from the branch above it, rootward. `mbl` here is the data's precision, so no two nested splits are
+    tied: a split at least 1e-3 of its age (or 2 EPS) older than each daughter. Only MOVABLE splits move (as
+    equal_dates), and never younger; one under a fixed split is held below it (its tie with a daughter left)."""
+    inside = {id(x) for x in skip.preorder()} if skip is not None else set()
+    before: dict[int, float] = {}
+    # (the oldest each can go: below the nearest fixed split above it, a tie's width per split between)
+    ceil: dict[int, float] = {}
+    order = list(droot.preorder())
+    for d in order:
+        if d.leaf is None and _movable(d, inside):
+            P = d.parent
+            ceil[id(d)] = (ceil[id(P)] if id(P) in ceil else P.age) * (1 - 1e-3) - 2 * EPS
+    for d in reversed(order):  # daughters first
+        if id(d) in ceil:
+            kids = [c.age for c in d.children if c.leaf is None]
+            if not kids:
+                continue
+            need = min((max(kids) + 2 * EPS) / (1 - 1e-3), ceil[id(d)])
+            if need > d.age:
+                before.setdefault(id(d), d.age)
+                d.lo, d.hi = min(d.lo, d.age), max(d.hi, need)
+                d.age = need
+    moved = [x for x in droot.preorder() if id(x) in before]
+    big = max(moved, key=lambda x: x.age - before[id(x)], default=None)
+    log["zero_length"] = {
+        "note": "zero-length branches given the minimum branch length (Laurin 2004; paleotree timePaleoPhy "
+                "type='mbl'): ToLaD#561",
+        "splits_moved": len(moved),
+        "largest_move": None if big is None else {"split": _label(big), "from_Ma": round(before[id(big)], 3),
+                                                  "to_Ma": round(big.age, 3)},
+        "moved_younger": sum(1 for x in moved if x.age < before[id(x)]),
+        "not_below_parent": sum(1 for x in droot.preorder() if x.leaf is None and x.parent is not None
+                                and x.age >= x.parent.age),
+    }
+
+
+def equal_dates(droot: DNode, log: dict, skip: DNode | None = None) -> None:
+    """Zero-length branches dated by the "equal" method (ToLaD#561): Brusatte, S.L., Benton, M.J., Ruta, M. & Lloyd,
+    G.T. (2008). Superiority, competition, and opportunism in the evolutionary radiation of dinosaurs. Science 321:
+    1485-1488 (G. Lloyd's method), as paleotree's timePaleoPhy(type = "equal") implements it (Bapst, D.W. 2012.
+    paleotree: an R package for paleontological and phylogenetic analyses of evolution. Methods Ecol. Evol. 3:
+    803-807; its branch order since 2014: Bapst, D.W. 2014. Paleobiology 40: 331-351). paleotree may also push the
+    root back (`vartime`); here every root is a fixed age.
+
+    A fossil-dated split sits at its oldest fossil, so a group whose oldest fossil is also the oldest of a group inside
+    it gets that group's date: a zero-length branch, and two names at one date (Dinosauria inside Avemetatarsalia,
+    Archosauria inside Eucrocopoda). paleotree's rule: take the zero-length branches in order of the number of splits
+    between them and the root, furthest first; from each, walk up the run of zero-length branches above it to the first
+    branch with length; that branch's time is shared equally among it and the run, the youngest split staying where it
+    is and every split above it moved older, evenly spaced. So no split moves younger than its oldest fossil (its age
+    is a minimum) and none above its parent.
+
+    Here: only splits whose age a fossil (or a graft's interpolation) set move (MOVABLE; never a dated tree's, an
+    override's or a cited backbone age), and a fixed split ends a run: with fixed ages at both ends, the time between
+    them is what is shared. "Zero-length" is `tied` (the data's precision, not exactly 0), and a run whose equal share
+    would itself be tied has no time to share at that precision: it is left as it is, and the run above it tries
+    again from the next split up (so the innermost names stay at the date of the one round them). `skip`: a subtree
+    left exactly as it is (the mammal build's own dated tree, inside the amniotes'). Report: log["zero_length"]."""
+    inside: set[int] = set()
+    if skip is not None:
+        inside = {id(x) for x in skip.preorder()}
+    dep: dict[int, int] = {}
+    order: list[DNode] = []
+    for d in droot.preorder():
+        dep[id(d)] = 0 if d.parent is None else dep[id(d.parent)] + 1
+        if d.leaf is None and d.parent is not None and (id(d) not in inside or d is skip):
+            order.append(d)
+    order.sort(key=lambda d: -dep[id(d)])  # (stable: preorder within a depth)
+    done: set[int] = set()  # splits whose branch above has had its turn
+
+    def can_move(v: DNode) -> bool:
+        return _movable(v, inside) and id(v) not in done
+
+    before: dict[int, float] = {}
+    runs = left = 0
+    left_eg = []
+    for d in order:
+        if id(d) in done or not tied(d.parent.age, d.age):
+            continue
+        run, v = [d], d.parent
+        while can_move(v):
+            run.append(v)
+            if not tied(v.parent.age, v.age):
+                break
+            v = v.parent
+        u = run[-1].parent  # the split above the run: the first branch with time, or a fixed split
+        share = (u.age - d.age) / len(run)
+        if len(run) == 1 or share <= 0 or tied(u.age, u.age - share):
+            done.add(id(d))
+            left += 1
+            if len(left_eg) < 20:
+                left_eg.append({"split": _label(d), "Ma": round(d.age, 3), "above": _label(d.parent),
+                                "time_to_share_Ma": round(u.age - d.age, 4), "branches": len(run)})
+            continue
+        for k, x in enumerate(run[1:], 1):
+            new = d.age + k * share
+            if new > x.age:
+                before.setdefault(id(x), x.age)
+                x.lo, x.hi = min(x.lo, x.age), max(x.hi, new)
+                x.age = new
+        done.update(id(x) for x in run)
+        runs += 1
+    moved = [x for x in droot.preorder() if id(x) in before]
+    big = max(moved, key=lambda x: x.age - before[id(x)], default=None)
+    log["zero_length"] = {
+        "note": "zero-length branches dated by the equal method (Brusatte et al. 2008; paleotree timePaleoPhy "
+                "type='equal'): ToLaD#561",
+        "runs_dated": runs,
+        "splits_moved": len(moved),
+        "largest_move": None if big is None else {"split": _label(big), "from_Ma": round(before[id(big)], 3),
+                                                  "to_Ma": round(big.age, 3)},
+        "moved_younger": sum(1 for x in moved if x.age < before[id(x)]),
+        "not_below_parent": sum(1 for x in droot.preorder() if x.leaf is None and x.parent is not None
+                                and x.age >= x.parent.age),
+        "tied_left": left,
+        "tied_left_e.g.": left_eg,
+    }
+
+
 def _mrca_map(root: Node, droot: DNode) -> tuple[dict, dict, dict]:
     """The dated tree's MRCA of the matched species under every merged node, and how many there are."""
     dep = _depths(droot)
@@ -822,36 +981,27 @@ def build(root: Node, up_root, up_tax: dict[str, dict], ov, log: dict, ac=None, 
                     G.loose += 1
                     dl[nd.name] = sub
         waiting = still
-    # a graft's merged subtree resolves polytomies with zero-length branches (merge.EPS): splice those into their
-    # parent, so a split dated by fossils or interpolation that is no later than its parent becomes one event
-    spliced = kept = 0
-    tie = lambda a, b: 0 <= a - b < max(1e-3 * a, 2 * EPS)  # noqa: E731
-    for d in reversed(list(droot.preorder())):
-        p = d.parent
-        if (p is not None and d.leaf is None and d.src in (S_FOSSIL, S_INTERP) and d.note < 0
-                and tie(p.age, d.age)):
-            # a named fossil group keeps its fork (ToLaD#279: Mammutidae, its genus Gomphotherium in Gomphotheriidae): where
-            # its parent is a split the grafts dated (a stem's junction, a fossil group's first appearance), the parent moves
-            # halfway up its own branch instead, as an MDD species' new split stands halfway down its mate's
-            pp = p.parent
-            if (d.name and _fossils_only(d) and pp is not None and p.src in (S_FOSSIL, S_INTERP) and p.note < 0
-                    and not tie((pp.age + d.age) / 2, d.age) and not tie(pp.age, (pp.age + d.age) / 2)):
-                p.age = (pp.age + d.age) / 2
-                p.lo, p.hi = min(p.lo, p.age), max(p.hi, p.age)
-                kept += 1
-                continue
-            i = p.children.index(d)
-            p.children[i:i + 1] = d.children
-            for c in d.children:
-                c.parent = p
-            p.loose += d.loose
-            spliced += 1
     # merged ages inside a graft can sit above a clamped attachment: keep every split below its parent
     for d in droot.preorder():
         if d.parent is not None and d.leaf is None and d.age >= d.parent.age:
             d.age = d.parent.age * (1 - 2e-3)
             d.lo, d.hi = min(d.lo, d.age), min(max(d.hi, d.age), d.parent.age)
             clamped += 1
+    # a fossil-dated split is as old as its oldest fossil, so nested fossil groups (a family and the genus holding its
+    # oldest fossil) come at one date: zero-length branches, given time by ZERO_LENGTH's method (ToLaD#561)
+    zero_length(droot, rep)
+    # a split still at its parent's date (no time to share at the data's precision) is spliced into it: one event
+    spliced = 0
+    for d in reversed(list(droot.preorder())):
+        p = d.parent
+        if (p is not None and d.leaf is None and d.src in (S_FOSSIL, S_INTERP) and d.note < 0
+                and tied(p.age, d.age)):
+            i = p.children.index(d)
+            p.children[i:i + 1] = d.children
+            for c in d.children:
+                c.parent = p
+            p.loose += d.loose
+            spliced += 1
     for d in droot.preorder():
         if d.leaf is not None:
             d.leaf.data["dleaf"] = d
@@ -872,7 +1022,6 @@ def build(root: Node, up_root, up_tax: dict[str, dict], ov, log: dict, ac=None, 
         "grafts": dict(how),
         "clamped_below_parent": clamped,
         "zero_length_spliced": spliced,
-        "zero_length_named_kept": kept,
         "mdd_crowns_by_rank": dict(crown_by),
         # a fossil whose last appearance is older than the split it hangs from (a dating conflict; should be none)
         "ended_before_split": sorted(d.leaf.name for d in leaves if d.parent is not None and d.leaf.t1 >= d.parent.age)[:20],
