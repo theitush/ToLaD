@@ -5,12 +5,14 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer, defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
-import { MAMMALS_ALL_CARD_FILE, MAMMALS_ALL_FILE, MAMMALS_CARD_FILE, MAMMALS_FILE, packMammals, type MammalCardFile, type MammalFile } from './src/fan/mammals-data';
+import { packMammals, treeFiles, TREES, type MammalCardFile, type MammalFile, type TreeName } from './src/fan/mammals-data';
 import { GLOBE_FILE } from './src/fan/globe-data';
 import { loadAll, loadClade, trimToFan, type Fossils } from './src/fan/panthera-extract';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const DATA = resolve(here, '..', 'data', 'mammals');
+/** A tree's dataset (ToLaD#539): data/mammals, or data/amniotes (the mammals grafted in unchanged). */
+const dataOf = (tree: TreeName) => resolve(here, '..', 'data', tree);
 
 /** The dataset's files (the cat and carnivore extracts read them; their change rebuilds them in dev). */
 function dataFiles(): string[] {
@@ -64,20 +66,19 @@ function pantheraData(): Plugin {
     // paints before they come: mammals.json on open, mammals-card.json after the first frame (ToLaD#502). Served at
     // /mammals.json and /mammals-card.json in dev, emitted next to index.html in both builds. The same pair with every
     // fossil (mammals-all.json, mammals-all-card.json) is what `?fossils=all` fetches instead (ToLaD#279).
+    // The amniotes' pairs the same way (ToLaD#539, `?tree=amniotes`): amniotes.json, amniotes-card.json, amniotes-all.json, amniotes-all-card.json.
     configureServer(server) {
-      for (const [fossils, open, card] of [
-        ['phylogeny', MAMMALS_FILE, MAMMALS_CARD_FILE],
-        ['all', MAMMALS_ALL_FILE, MAMMALS_ALL_CARD_FILE],
-      ] as const) {
-        server.middlewares.use('/' + open, (_req, res) => {
-          res.setHeader('Content-Type', 'application/json');
-          res.end(JSON.stringify(mammalFiles(fossils).open));
-        });
-        server.middlewares.use('/' + card, (_req, res) => {
-          res.setHeader('Content-Type', 'application/json');
-          res.end(JSON.stringify(mammalFiles(fossils).card));
-        });
-      }
+      for (const tree of TREES)
+        for (const fossils of ['phylogeny', 'all'] as const) {
+          const { open, card } = treeFiles(tree, fossils === 'all');
+          const at = (name: string, part: keyof MammalFiles) =>
+            server.middlewares.use('/' + name, (_req, res) => {
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify(mammalFiles(fossils, tree)[part]));
+            });
+          at(open, 'open');
+          at(card, 'card');
+        }
       // The card's globe (ToLaD#267): every species' range cells and the land, fetched when a card first shows a map.
       server.middlewares.use('/' + GLOBE_FILE, (_req, res) => {
         res.setHeader('Content-Type', 'application/json');
@@ -85,12 +86,13 @@ function pantheraData(): Plugin {
       });
     },
     async generateBundle() {
-      const f = await mammalFiles('phylogeny', true);
-      this.emitFile({ type: 'asset', fileName: MAMMALS_FILE, source: JSON.stringify(f.open) });
-      this.emitFile({ type: 'asset', fileName: MAMMALS_CARD_FILE, source: JSON.stringify(f.card) });
-      const all = await mammalFiles('all', true);
-      this.emitFile({ type: 'asset', fileName: MAMMALS_ALL_FILE, source: JSON.stringify(all.open) });
-      this.emitFile({ type: 'asset', fileName: MAMMALS_ALL_CARD_FILE, source: JSON.stringify(all.card) });
+      for (const tree of TREES)
+        for (const fossils of ['phylogeny', 'all'] as const) {
+          const f = await mammalFiles(fossils, tree, true);
+          const name = treeFiles(tree, fossils === 'all');
+          this.emitFile({ type: 'asset', fileName: name.open, source: JSON.stringify(f.open) });
+          this.emitFile({ type: 'asset', fileName: name.card, source: JSON.stringify(f.card) });
+        }
       this.emitFile({ type: 'asset', fileName: GLOBE_FILE, source: globeJson() });
     },
   };
@@ -102,11 +104,12 @@ function pantheraData(): Plugin {
  * same with every fossil (mammals-all.json, mammals-all-card.json, ToLaD#279).
  */
 type MammalFiles = { open: MammalFile; card: MammalCardFile };
-function mammalFiles(fossils: Fossils): MammalFiles;
-function mammalFiles(fossils: Fossils, seeded: true): Promise<MammalFiles>;
-function mammalFiles(fossils: Fossils, seeded = false): MammalFiles | Promise<MammalFiles> {
-  const clade = trimToFan(loadAll((rel) => readFileSync(join(DATA, rel)), fossils));
-  const wiki = wikiFor(clade.species.map((s) => s.sci));
+function mammalFiles(fossils: Fossils, tree: TreeName): MammalFiles;
+function mammalFiles(fossils: Fossils, tree: TreeName, seeded: true): Promise<MammalFiles>;
+function mammalFiles(fossils: Fossils, tree: TreeName, seeded = false): MammalFiles | Promise<MammalFiles> {
+  const dir = dataOf(tree);
+  const clade = trimToFan(loadAll((rel) => readFileSync(join(dir, rel)), fossils));
+  const wiki = wikiFor(clade.species.map((s) => s.sci), dir);
   if (!seeded) return packMammals(JSON.parse(JSON.stringify({ clade, wiki })));
   // (Each column of numbers written the way that gzips smaller: the bytes the page downloads.)
   const gz = (s: string) => gzipSync(s).length;
@@ -153,11 +156,15 @@ function globeJson(): string {
 /**
  * The clade's rows of the Wikipedia/Commons sidecar (data/mammals/wiki.json, ToLaD#182): only
  * the species the fan has, so the page does not carry the whole tree's. {} when there is none.
+ * Another dataset's (`dir`, ToLaD#539) is its own wiki.json over data/mammals': the amniotes carry the mammals'
+ * rows unchanged, so their pictures too; a species in neither has none.
  */
-function wikiFor(names: string[]): Record<string, unknown> {
-  const p = join(DATA, 'wiki.json');
-  if (!existsSync(p)) return {};
-  const all = JSON.parse(readFileSync(p, 'utf8')) as Record<string, unknown>;
+function wikiFor(names: string[], dir = DATA): Record<string, unknown> {
+  const read = (d: string): Record<string, unknown> => {
+    const p = join(d, 'wiki.json');
+    return existsSync(p) ? (JSON.parse(readFileSync(p, 'utf8')) as Record<string, unknown>) : {};
+  };
+  const all = dir === DATA ? read(DATA) : { ...read(DATA), ...read(dir) };
   return Object.fromEntries(names.filter((n) => n in all).map((n) => [n, all[n]]));
 }
 

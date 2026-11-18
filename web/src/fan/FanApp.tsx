@@ -10,7 +10,7 @@ import { RangeGlobe } from './Globe';
 import { Alone, AloneImg, useAlone } from './Alone';
 import { mammaliaClade, NATURAL_META, type HistEvent, type SpeciesRec } from './panthera';
 import { mammaliaTree } from './splits';
-import { fossilsAll, loadMammalCard, loadMammals, mammalCardLoaded, mammalsLoaded } from './mammals-data';
+import { fossilsAll, loadMammalCard, loadMammals, mammalCardLoaded, mammalsLoaded, treeName, type TreeName } from './mammals-data';
 import { synthLoader } from './synthetic-level';
 import { stamp } from '../stamp';
 import { population } from './population';
@@ -98,6 +98,15 @@ export const FOSSIL_CHOICES: Choice<'all' | 'old'>[] = [
   { value: 'old', short: 'old', label: 'old: dated tree only' },
 ];
 
+/** Which tree the page draws (ToLaD#539, `?tree=amniotes`): its own data files, so a pick reloads (mammals-data.ts reads it). */
+export const TREE_CHOICES: Choice<TreeName>[] = [
+  { value: 'mammals', short: 'mammals', label: 'mammals' },
+  { value: 'amniotes', short: 'amniotes', label: 'amniotes: birds, reptiles & mammals' },
+];
+
+/** What the loading note calls the tree's members ("Every mammal, alive and dead"). */
+const TREE_ONE: Record<TreeName, string> = { mammals: 'mammal', amniotes: 'amniote' };
+
 /**
  * Where the fossils placed by name stand among their sisters (ToLaD#538, `?fossilorder=age`, layout.ts FossilOrder): after
  * the living, the longest-lived first (today's), or by age, the oldest nearest its fork. The layout reads it once, so a pick reloads.
@@ -145,7 +154,7 @@ export function FanApp() {
     if (mamm === 'fetch')
       loadMammals(synthLoader()).then(
         () => live && setMamm('build'),
-        (e: unknown) => live && setMamm(`could not load the mammals (${e instanceof Error ? e.message : String(e)})`),
+        (e: unknown) => live && setMamm(`could not load the ${treeName} (${e instanceof Error ? e.message : String(e)})`),
       );
     // (Two frames: the note paints before the view's build holds the page.)
     else if (mamm === 'build') requestAnimationFrame(() => setTimeout(() => live && setMamm('ready'), 30));
@@ -213,9 +222,9 @@ export function FanApp() {
           <b>Tree of Life and Death</b>
           <br />
           {mamm === 'fetch' ? (
-            'Every mammal, alive and dead: loading…'
+            `Every ${TREE_ONE[treeName]}, alive and dead: loading…`
           ) : mamm === 'build' ? (
-            'Every mammal, alive and dead: building the tree…'
+            `Every ${TREE_ONE[treeName]}, alive and dead: building the tree…`
           ) : (
             <>
               {mamm} <button type="button" onClick={() => setMamm('fetch')}>Try again</button>
@@ -227,6 +236,15 @@ export function FanApp() {
         {/* ToLaD#537: each chip opens its choices (ChoiceChip); a pick applies, the address kept in step. ToLaD#538: the chips
             in one row that scrolls sideways where it does not fit, the search and the globe pinned at its right. */}
         <div className="chips">
+          {/* ToLaD#539: the tree, every mammal (the page) or every amniote (birds and reptiles too). Its own data files, so a reload. */}
+          <ChoiceChip
+            name="tree"
+            title="The tree: every mammal, or every amniote (birds, reptiles and mammals)"
+            param="tree"
+            choices={TREE_CHOICES}
+            value={treeName}
+            reload
+          />
           {/* ToLaD#373, #434: the upper clades named at their forks, on leaders off them, or in the stack over "now". */}
           <ChoiceChip
             name="fork names"

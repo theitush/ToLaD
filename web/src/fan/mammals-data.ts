@@ -181,7 +181,7 @@ export function unpackMammals(f: MammalFile): MammalData {
 export function mergeMammalCard(d: MammalData, c: MammalCardFile): void {
   const sp = d.clade.species;
   const names = Object.keys(d.wiki);
-  if (c.species.n !== sp.length || c.wiki.n !== names.length) throw new Error(`${MAMMALS_CARD_FILE} is not the build of ${MAMMALS_FILE}`);
+  if (c.species.n !== sp.length || c.wiki.n !== names.length) throw new Error(`${CARD_FILE} is not the build of ${OPEN_FILE}`);
   unpackColumns(c.species.cols, c.species.n).forEach((x, i) => mergeKinds(sp[i], x));
   unpackColumns(c.wiki.cols, c.wiki.n).forEach((x, i) => mergeKinds(d.wiki[names[i]], x));
 }
@@ -197,8 +197,21 @@ export const MAMMALS_ALL_CARD_FILE = 'mammals-all-card.json';
  * (the fossils in the dated phylogeny only, from mammals.json and mammals-card.json); the bar's "fossils" button switches.
  */
 export const fossilsAll = typeof location !== 'undefined' && new URLSearchParams(location.search).get('fossils') !== 'old';
-const OPEN_FILE = fossilsAll ? MAMMALS_ALL_FILE : MAMMALS_FILE;
-const CARD_FILE = fossilsAll ? MAMMALS_ALL_CARD_FILE : MAMMALS_CARD_FILE;
+
+/**
+ * Which tree the page draws (ToLaD#539): every mammal (data/mammals, the default), or every amniote (data/amniotes:
+ * birds, reptiles and the mammals unchanged, `?tree=amniotes`); the bar's "tree" chip switches, a reload.
+ */
+export type TreeName = 'mammals' | 'amniotes';
+export const TREES: readonly TreeName[] = ['mammals', 'amniotes'];
+export const treeName: TreeName = typeof location !== 'undefined' && new URLSearchParams(location.search).get('tree') === 'amniotes' ? 'amniotes' : 'mammals';
+
+/** A tree's pair of files, with every fossil or the old look's: `mammals.json` and `mammals-card.json`, `amniotes-all.json` and `amniotes-all-card.json`. */
+export function treeFiles(tree: TreeName, all: boolean): { open: string; card: string } {
+  const base = tree + (all ? '-all' : '');
+  return { open: `${base}.json`, card: `${base}-card.json` };
+}
+const { open: OPEN_FILE, card: CARD_FILE } = treeFiles(treeName, fossilsAll);
 
 let data: MammalData | null = null;
 let pending: Promise<MammalData> | null = null;
