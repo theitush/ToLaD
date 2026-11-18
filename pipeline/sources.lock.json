@@ -313,6 +313,12 @@
   "sha256": "ab035a8fab3d18673dea1d4a56f741e3ea9f8ba460461c7a1e738621ca315ec7",
   "url": "https://raw.githubusercontent.com/MegaPast2Future/PHYLACINE_1.2/2fb87f0b994ee82daa6691931f15971535322a2e/Data/Traits/Trait_data.csv"
  },
+ "phylopic/amniota.json": {
+  "bytes": 4745516,
+  "retrieved": "2026-11-18",
+  "sha256": "2a6ec4d4915230b752f0ad38e085de279ba91167c01cbc0f85f768f0a7316511",
+  "url": "https://api.phylopic.org/images?build=562&filter_clade=7d115d90-9e94-4c77-9509-6916c67f6342&embed_items=true&embed_nodes=true"
+ },
  "prb/how-many-people-have-ever-lived-on-earth.html": {
   "bytes": 487806,
   "post_body": null,
