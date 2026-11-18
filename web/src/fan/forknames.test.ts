@@ -185,21 +185,23 @@ describe('names at their forks (ToLaD#373)', () => {
     const br = inner(v).brackets;
     return Array.from({ length: br.forkN }, (_, k) => br.forks[k]).map((f) => ({ x: f.x, y: f.y, v: br.list[f.i].v, latin: br.list[f.i].latin }));
   };
+  // (At the weasels' own frame, as a tap on their name lands: under group labels home names "Weasels & kin", and with every
+  // fossil only "Carnivores", so no picture of theirs to tap from home.)
   const intoWeasels = (v: FanView) => {
-    atHome(v);
-    const cut = inner(v).cutLast!;
-    const p = cut.pics[cut.spots.findIndex((s) => s.text === 'Weasels')];
-    v.tap(p.x, p.y);
-    land(v);
+    const iv = inner(v);
+    iv.tapAt = null;
+    v.cam = iv.frameOf({ v: v.fan.nodes.find((u) => u.split.taxon === 'Mustelidae')! });
+    frame(v);
+    v.draw();
   };
   const scenes: [string, () => FanView, (v: FanView) => void][] = [
     ['carnivores home', () => stubView(), atHome],
     ['cats home', () => stubView(FELIDAE, FELIDAE_TREE), atHome],
     ['the weasels', () => stubView(), intoWeasels],
   ];
-  // (Real, open, ToLaD#446: a fork name asks whether the cut shows its clade split at its own frame, and tapItem asks the same of
-  // another frame (runFrame, not the own width), so a second tap goes on a step. `it.fails` turns red when it is fixed.)
-  it.fails.each(scenes)('%s: a tap on each name lands on that clade, its fork on screen and its name there; a double tap comes back', (where, make, at) => {
+  // (ToLaD#446: a clade has one frame, its own (cladeCamera), for its fork name, its level and tapItem alike, so a second tap stays;
+  // at that frame already, a name stays there.)
+  it.each(scenes)('%s: a tap on each name lands on that clade, its fork on screen and its name there; a double tap comes back', (where, make, at) => {
     const v = make();
     const iv = inner(v);
     const offFrame = (n: FanNode) => iv.offBy(iv.frameOf({ v: n }), v.cam);
