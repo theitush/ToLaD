@@ -16,6 +16,7 @@ import { stamp } from '../stamp';
 import { population } from './population';
 import { WorldToggle } from './WorldToggle';
 import { ChoiceChip, chosenIn, type Choice } from './ChoiceChip';
+import { setUnknownLook, unknownLook, type UnknownLook } from './dashed';
 import { forkLeaders, forkNames, setForkLeaders, setForkNames } from './brackets';
 import { FORK_MODES, forkMode, setForkMode, type ForkMode } from './steady';
 import { MagnifierIcon, SearchPanel } from './SearchPanel';
@@ -64,6 +65,21 @@ function initialForks(): ForkMode {
     /* no address */
   }
   return forkMode();
+}
+
+/** How a species whose count nobody has is drawn (ToLaD#565, `?unknown=faint`): one thin dashed line, or the faint band (the old look). A look only. */
+export const UNKNOWN_CHOICES: Choice<UnknownLook>[] = [
+  { value: 'dashed', short: 'dashed', label: 'dashed: one thin line' },
+  { value: 'faint', short: 'faint', label: 'faint: a faint band, the old look' },
+];
+function initialUnknown(): UnknownLook {
+  try {
+    const m = chosenIn(window.location.search, 'unknown', UNKNOWN_CHOICES);
+    if (m) setUnknownLook(m);
+  } catch {
+    /* no address */
+  }
+  return unknownLook();
 }
 
 /** The upper clades' names (ToLaD#373, #434, #458): at their forks (`?forknames=fork`), on leaders off them (`?forknames=leaders`), or none: on the tree on its side the labels in the gaps name them (ToLaD#458), elsewhere the stack over "now" (`?forknames=off`). */
@@ -127,6 +143,7 @@ export function FanApp() {
   const cardUp = (x: number, y: number) => viewRef.current?.doubleTap(x, y);
   const [forks, setForks] = useState(initialForkNames);
   const [forkLook, setForkLook] = useState<ForkMode>(initialForks);
+  const [unknown, setUnknown] = useState<UnknownLook>(initialUnknown);
   // What the widths count (ToLaD#276): individuals, or their mass (`?width=mass`).
   const [measure, setMeasure] = useState<Measure>(initialMeasure);
   const [sel, setSel] = useState<Selection | null>(null);
@@ -269,6 +286,19 @@ export function FanApp() {
             onPick={(m) => {
               setForkMode(m);
               setForkLook(m);
+              viewRef.current?.request();
+            }}
+          />
+          {/* ToLaD#565: a species whose count nobody has (and a clade of only such) one thin dashed line, or the faint band, the old look. */}
+          <ChoiceChip
+            name="unknown counts"
+            title="Species whose count nobody has: one thin dashed line, or a faint band (the old look)"
+            param="unknown"
+            choices={UNKNOWN_CHOICES}
+            value={unknown}
+            onPick={(m) => {
+              setUnknownLook(m);
+              setUnknown(m);
               viewRef.current?.request();
             }}
           />
