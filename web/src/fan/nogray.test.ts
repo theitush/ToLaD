@@ -310,20 +310,24 @@ describe('gray off (ToLaD#410)', () => {
           expect(off.map((r) => r.box).sort()).toEqual(on.map((r) => r.box).sort());
           // A line stands in where a column has no width at a fork, only under `thin`.
           const green = off.filter((r) => r.green).sort((p, q) => p.y0 - q.y0);
-          const bridged = (y0: number, y1: number) => {
-            if (forks !== 'thin') return false;
+          // (How far down from y0 the lines carry a column.)
+          const reach = (y0: number) => {
+            if (forks !== 'thin') return y0;
             let y = y0;
             // (A flat line running off the screen's edge: the upright from it is off screen, not sent.)
             for (const r of green) if ((r.y0 <= y + 1 || r.edge) && r.y1 > y) y = r.y1;
-            return y >= y1 - 1;
+            return y;
           };
+          const bridged = (y0: number, y1: number) => reach(y0) >= y1 - 1;
           const bottom = Math.min(844, v.camera.screenY(v.fan.trunkBottom.y));
-          // (Where its lane is on screen at all: a line off screen is not sent.)
+          // (Where its lane is on screen at all: a line off screen is not sent. A merged clade's (drawMerged): its strands' span.)
           const seen = (of: FanBranch | FanNode, y0: number, y1: number) => {
-            if (isNode(of)) return true;
             for (let k = 0; k <= 8; k++) {
-              const x = v.camera.screenX(leftAt(of, v.camera.worldY(y0 + ((y1 - y0) * k) / 8)));
-              if (x >= -8 && x <= 398) return true;
+              const wy = v.camera.worldY(y0 + ((y1 - y0) * k) / 8);
+              const l = isNode(of) ? nodeLeftAt(of, wy) : leftAt(of, wy);
+              const x0 = v.camera.screenX(l);
+              const x1 = isNode(of) ? v.camera.screenX(l + of.width) : x0;
+              if (x1 >= -8 && x0 <= 398) return true;
             }
             return false;
           };
@@ -337,7 +341,8 @@ describe('gray off (ToLaD#410)', () => {
             let y = at.length ? at[0][0] : Infinity;
             if (!isNode(of) && y > Math.max(-20, v.camera.screenY(of.tipY)) + 1) bad.push(`${name}: its tip not drawn, starts at ${y}`);
             for (const [t, b] of at) {
-              if (t > y + 0.01 && !bridged(y, t) && seen(of, y, t)) bad.push(`${name}: a gap ${y}..${t}`);
+              // (Judged where no line carries it: a line that runs off the screen takes the column with it, ToLaD#279.)
+              if (t > y + 0.01 && !bridged(y, t) && seen(of, reach(y), t)) bad.push(`${name}: a gap ${y}..${t}`);
               y = Math.max(y, b);
               met++;
             }
