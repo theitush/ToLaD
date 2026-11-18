@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { createElement } from 'react';
 import { describe, expect, it } from 'vitest';
 import { FELIDAE, type SpeciesRec } from './panthera';
-import { fold, matchRank, searchSpecies } from './search';
+import { fold, matchAbbrev, matchRank, searchSpecies } from './search';
 import { SearchPanel } from './SearchPanel';
 import { laneAt, leftAt } from './layout';
 import { FanView, type Selection } from './view';
@@ -46,9 +46,51 @@ describe('the matcher', () => {
     expect(names('panthera leo')).toEqual(['Lion']);
     expect(names('spelaea')).toEqual(['Cave lion']);
     expect(names('balam')).toEqual(['Yucatán cave cat']);
-    // A genus lists all its species; a common-name prefix ranks with a scientific one.
-    expect(names('lynx').slice(0, 4).sort()).toEqual(['Bobcat', 'Canada lynx', 'Eurasian lynx', 'Iberian lynx']);
+    // A genus lists all its species first, fossils too (their only name its Latin, ToLaD#279); a common-name prefix ranks
+    // with a scientific one.
+    const lynx = FELIDAE.species.filter((s) => s.sci.startsWith('Lynx ')).map((s) => s.common);
+    expect(lynx).toEqual(expect.arrayContaining(['Bobcat', 'Canada lynx', 'Eurasian lynx', 'Iberian lynx']));
+    expect(names('lynx').slice(0, lynx.length).sort()).toEqual([...lynx].sort());
     expect(names('felis')).toContain('European wildcat'); // the Red List's name for Felis silvestris (ToLaD#145)
+  });
+
+  it('takes a letter and a word for a genus and its epithet: "t rex", "T. rex" (ToLaD#564)', () => {
+    expect(matchAbbrev('tyrannosaurus rex', 't rex')).toBe(true);
+    expect(matchAbbrev('tyrannosaurus rex', 't r')).toBe(true);
+    expect(matchAbbrev('homo sapiens sapiens', 'h sapiens s')).toBe(true);
+    // The genus's initial and the epithet's start, nothing looser.
+    expect(matchAbbrev('tyrannosaurus rex', 'r rex')).toBe(false);
+    expect(matchAbbrev('tyrannosaurus rex', 't ex')).toBe(false);
+    expect(matchAbbrev('tyrannosaurus rex', 'ty rex')).toBe(false);
+    expect(matchAbbrev('tyrannosaurus', 't rex')).toBe(false);
+    expect(matchAbbrev('tyrannosaurus rex', 't')).toBe(false);
+    expect(matchAbbrev('tyrannosaurus rex', '')).toBe(false);
+
+    const all = [
+      { common: 'Great rex', sci: 'Oryctolagus cuniculus' }, // "great rex" holds "t rex" inside a word: a looser match
+      { common: 'Tyrannosaurus rex', sci: 'Tyrannosaurus rex' },
+      { common: 'Tyrannosaurus mcraeensis', sci: 'Tyrannosaurus mcraeensis' },
+      { common: 'Tropical kingbird', sci: 'Tyrannus melancholicus' },
+      { common: 'Human', sci: 'Homo sapiens' },
+      { common: 'Lion', sci: 'Panthera leo' },
+      { common: 'Leopard', sci: 'Panthera pardus' },
+    ];
+    // The dot and the space as one likes; the abbreviation ranks as the name's prefix, before a looser match.
+    for (const q of ['t rex', 'T. rex', 'T.rex', 'T rex', 't-rex', 'T. re']) expect(names(q, all), q).toEqual(['Tyrannosaurus rex', 'Great rex']);
+    expect(names('h sapiens', all)).toEqual(['Human']);
+    expect(names('p leo', all)).toEqual(['Lion']);
+    expect(names('t m', all)).toEqual(['Tropical kingbird', 'Tyrannosaurus mcraeensis']);
+    // Nothing looser: another initial, the epithet's middle, the two glued together.
+    expect(names('r rex', all)).toEqual([]);
+    expect(names('t ex', all)).toEqual([]);
+    expect(names('trex', all)).toEqual([]);
+    // A letter alone abbreviates nothing: it lists what it did, the names that start with it.
+    expect(names('t', all)).toEqual(['Tropical kingbird', 'Tyrannosaurus mcraeensis', 'Tyrannosaurus rex']);
+    expect(names('p', all)).toEqual(['Leopard', 'Lion']);
+    // With the scientific prefixes, after a common name's.
+    const toy = [...all, { common: 'T. rex toy', sci: 'Aus bus' }, { common: 'Tyrannosaurus x', sci: 'Tyrannosaurus x' }];
+    expect(names('t rex', toy)).toEqual(['T. rex toy', 'Tyrannosaurus rex', 'Great rex']);
+    expect(names('tyrannosaurus', toy)).toEqual(['Tyrannosaurus mcraeensis', 'Tyrannosaurus rex', 'Tyrannosaurus x']);
   });
 
   it('lists each species once, nothing for an empty query or no match', () => {

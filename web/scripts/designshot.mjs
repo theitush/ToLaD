@@ -329,6 +329,11 @@ const scenes = [
         // mammals, the marine reptiles.
         ['amn-birdline', 'level', ['Avemetatarsalia']],
         ['amn-birdline-mesozoic', 'level', ['Avemetatarsalia', 150, 8]],
+        // The Triassic archosaurs (ToLaD#561): Archosauria, the crocodiles' line (Pseudosuchia) and Dinosauria framed as levels,
+        // each a split of its own now that its zero-length branch has time, not spliced into the split round it.
+        ['amn-archosauria', 'level', ['Archosauria']],
+        ['amn-pseudosuchia', 'level', ['Pseudosuchia']],
+        ['amn-dinosauria', 'level', ['Dinosauria']],
         ['amn-synapsids', 'level', ['Synapsida']],
         ['amn-synapsids-permian', 'level', ['Synapsida', 260, 8]],
         ['amn-sauropterygia', 'level', ['Sauropterygia']],
