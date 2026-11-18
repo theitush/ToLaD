@@ -265,7 +265,9 @@ export function MethodsView({ onClose, at }: { onClose: () => void; at?: string 
           <ol className="m-ladder">
             <li>
               <b>Counted</b> <span className="dim">484 species</span>
-              <br />A census: an IUCN population report (Greenspoon et al. 2023 collected them).
+              <br />A census: an IUCN population report (Greenspoon et al. 2023 collected them). A reptile: a published
+              count (sea turtles, crocodilians, giant tortoises…), as its source gives it, and the card says what it counts
+              (mature individuals, adult females); a reptile without one is unknown.
             </li>
             <li>
               <b>Two models, met in the middle</b> <span className="dim">4,381 species</span>

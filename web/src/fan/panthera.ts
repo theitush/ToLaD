@@ -25,9 +25,9 @@ import { BirthCurve, procgenSegments, type GenSegment } from './history';
 import { CARNIVORA_TREE, FELIDAE_TREE, mammaliaTree, sentenceCase, speciesUnder, type Split } from './splits';
 
 export { sentenceCase };
-import type { Grade, HistoryRec, LossRec, NaturalMeta, NaturalRec, RawClade, RawSpecies, RedListRec } from './panthera-extract';
+import type { CountRec, Grade, HistoryRec, LossRec, NaturalMeta, NaturalRec, RawClade, RawSpecies, RedListRec } from './panthera-extract';
 
-export type { Grade, HistEvent, HistoryRec, HistPoint, HistSegment, LossRec, NaturalMeta, NaturalRec } from './panthera-extract';
+export type { CountRec, Grade, HistEvent, HistoryRec, HistPoint, HistSegment, LossRec, NaturalMeta, NaturalRec } from './panthera-extract';
 
 export interface SpeciesRec {
   gid: number;
@@ -73,6 +73,8 @@ export interface SpeciesRec {
   /** Adult body mass (kg) and where it came from (the pipeline's mass column, ToLaD#276); null in data before it. */
   massKg?: number | null;
   massHow?: string;
+  /** A reptile's published count, what it counts and its source (ToLaD#578); null: none. The card says it. */
+  count?: CountRec | null;
   /** A fossil the data grafts on by taxonomy only (RawSpecies.placed, ToLaD#279): on its genus, or its family; absent: a phylogeny or an override placed it. The card says so. */
   placed?: 'genus' | 'family';
 }
@@ -137,6 +139,7 @@ export function speciesRec(r: RawSpecies, clade: number): SpeciesRec {
     loss: r.loss ?? null,
     massKg: r.mass ? r.mass.g / 1000 : null,
     massHow: r.mass?.how ?? '',
+    count: r.count ?? null,
     ...(r.placed ? { placed: r.placed } : {}),
   };
 }
