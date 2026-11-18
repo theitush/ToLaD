@@ -9,6 +9,7 @@
 // a pan and a flight at home and two depths (the largest order, its largest family). TOLAD_LABELS=cut TOLAD_FRAME=cut: ?labels=cut&frame=cut.
 // SCALE_FOSSIL=1.6: fossils as a fraction of the living (synthetic.ts), about the mammals' with all their fossils (ToLaD#279).
 // SCALE_PROF=<file>: a CPU profile of the run after the build's part (.cpuprofile). SCALE_SEED=0 / SCALE_JSON=0 / SCALE_ORDERS=0: no layout seed / no file / its orders not registered (synthetic-level.ts). SCALE_GESTURES=0: the load only.
+// SCALE_N=mammals: the page's data as the build wrote it (MAMMALS_JSON: dist-single/mammals-all.json every fossil, amniotes-all.json the amniotes); SCALE_MARKS=order,family its two depths (Rodentia,Muridae).
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
 import { Session } from 'node:inspector/promises';
 import { describe, it } from 'vitest';
@@ -143,7 +144,8 @@ describe.skipIf(!OUT)('scale yardstick (perf)', () => {
     lap('second');
     res.load = Object.fromEntries(Object.entries(load).map(([k, x]) => [k, Math.round(k === 'bytes' ? x : x)]));
     res.species = mammaliaClade().species.length;
-    res.marks = real ? { order: 'Rodentia', family: 'Muridae', species: '' } : synthMarksNow;
+    const MK = process.env.SCALE_MARKS?.split(',') ?? [];
+    res.marks = real ? { order: MK[0] ?? 'Rodentia', family: MK[1] ?? 'Muridae', species: '' } : synthMarksNow;
     res.rssMB = Math.round(rss / 2 ** 20);
     writeFileSync(OUT!, JSON.stringify(res, null, 1));
     if (process.env.SCALE_GESTURES !== '0') {

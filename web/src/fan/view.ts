@@ -11,7 +11,7 @@ import { CLADE_FONT, CLADE_PX, GapNames, SPECIES_FONT, SPECIES_PX, type WrittenN
 import { columnGaps, gapCut, gapHands, gapOpens, ownLanes, picAt, picRanges, tier, tipOrder, type Guest, type Member, type PicCand, type PicRange, type Tier } from './gaplabels';
 import { GROUP_D, LABEL_AXIS_X, labelMode, PIC_D, PIC_LIFT, PIC_ROOM, PIC_S, picBox, type PicSpot } from './pics';
 import { coverLadder, keepOnScreen, placeSlots } from './slide';
-import { bandMeets, labelIndexOn, laneSlack, runsOver, slideWindow, TipIndex, WIN_PX } from './labelindex';
+import { bandMeets, labelIndexOn, laneSlack, runsOver, slideWindow, TipIndex, tipRoomsKept, WIN_PX } from './labelindex';
 import { formatCount, formatMass } from '../data/count';
 import { stamp } from '../stamp';
 import { DOUBLE_TAP_MS, Input, type InputHandlers } from '../engine/input';
@@ -125,12 +125,14 @@ const SCALE_PX = 60;
 /** Gap (px) between a label's name pill and its picture right under it (ToLaD#358: one unit at the tip; #373: the name on top). */
 const LABEL_UNDER = 4;
 /**
- * tipLabels' budget a frame (ToLaD#279), in strands read on a row by clearIn (~0.3 µs each in node): the whole frame's, and
- * one fossil's (its name's places and its picture's). Measured with every fossil on the tree: a fossil named took at most
- * ~6,400 (Primates); at home 187 of ~8,300 tries that found no place read 3.4 of their 4.2 million.
+ * tipLabels' budget a frame (ToLaD#279), in strands read on a row by clearIn (~0.3 µs each in node): past it the rest wait. With the
+ * rooms kept per zoom (clearAt, ToLaD#502) only a zoom's first pass reads them all: of 1,261 frames of tiprooms.test's gestures and
+ * random cameras it ran out in 0 on the mammals, 2 on the amniotes (a pinch's first frames at home). One fossil's own budget (TIP_TRY,
+ * 8,000, "as if crossed") is gone: it ran out in 65 and 45 of them, each a name the rule gives (a pan, reading the kept rooms, found it).
  */
 export const TIP_WORK = 150_000;
-export const TIP_TRY = 8_000;
+/** How far (px) a frame's stretches may stand past the ones clearAt kept, and be read from them: a pan's rounding of screen x (ToLaD#502). */
+const TIP_HAIR = 1e-6;
 /** A fossil group tipLabels names as one (FanView.tipGroupsOf, ToLaD#279). */
 type TipGroup = { v: FanNode; f: number; l: number; young: number; c: number; r: number; open: number; sub: TipGroup[] };
 /** Two boxes [x0, y0, x1, y1] share some area (touching is not meeting). */
@@ -3537,9 +3539,11 @@ export class FanView implements InputHandlers {
     const f = this.fan.tess.fold as Steady;
     const { C, R } = f.rooms();
     const { sx } = this.cam;
-    const X = (x: number) => this.toScreen(x, 0)[0];
-    const Y = (y: number) => this.toScreen(0, y)[1];
-    const Wy = (y: number) => this.toWorld(0, y)[1];
+    // (toScreen's and toWorld's, with no pair made: at home some 11,000 fossils are read a frame, ToLaD#502.)
+    const cam = this.camera;
+    const X = (x: number) => cam.screenX(x);
+    const Y = (y: number) => cam.screenY(y);
+    const Wy = (y: number) => cam.worldY(y);
     // (The screen in the world: a tip off it costs a compare.)
     const [[xa, ya], [xb, yb]] = [this.toWorld(0, 0), this.toWorld(this.w, this.h)];
     const [x0, x1, y0w, y1w] = [Math.min(xa, xb), Math.max(xa, xb), Math.min(ya, yb), Math.max(ya, yb)];
@@ -3558,18 +3562,36 @@ export class FanView implements InputHandlers {
     const groups = this.tipGroupsOf(C, R);
     const done = new Set<TipGroup>();
     let why: 'crossed' | 'meets' = 'crossed';
+    // (The zoom's memo of the fossils' rooms across, ToLaD#502 (clearAt): kept while the zoom and the layout hold, so a pan reads no column again, from the zoom's second
+    // pass on (a pinch's every frame is a new zoom: nothing kept there that no frame reads); the fossil at hand's key there.)
+    const kept = tipRoomsKept() && this.tipRoomsAt(C);
+    const scr = this.camera.screenX(0);
+    let tk = 0;
     /**
      * Where strands kLo..kHi's name or picture, `size` px across over screen rows y0..y1, stands in [lo, hi] (screen): clear of the labels standing (unless `labels` is false), then of the
-     * other species' columns (clearIn), its centre nearest `near`; NaN where nowhere, `why` saying what was in the way.
+     * other species' columns (clearIn; through the zoom's memo for `slot` >= 0, clearAt), its centre nearest `near`; NaN where
+     * nowhere, `why` saying what was in the way.
      */
-    const spot = (lo: number, hi: number, y0: number, y1: number, size: number, near: number, labels = true): number => {
-      [clear.length, clear[0], clear[1]] = [2, lo, hi];
-      if (labels) for (const q of taken) if (q[1] < y1 && q[3] > y0 && q[0] < hi && q[2] > lo && clear.length) this.cutOut(clear, q[0], q[2], size);
+    const spot = (lo: number, hi: number, y0: number, y1: number, size: number, near: number, labels = true, slot = -1): number => {
+      clear.length = 2;
+      clear[0] = lo;
+      clear[1] = hi;
+      // (Its rooms kept at this zoom for the whole stretch (clearAt): the columns first, then the labels; where the columns leave nothing it is crossed, whatever stands there.)
+      const first = kept && slot >= 0 && labels && this.clearAt(tk, slot, kLo, kHi, Wy(y0), Wy(y1), size, clear, scr, true);
+      if (first && !clear.length) return NaN;
+      if (labels)
+        for (let i = 0; i < taken.length; i++) {
+          const q = taken[i];
+          if (q[1] < y1 && q[3] > y0 && q[0] < hi && q[2] > lo && clear.length) this.cutOut(clear, q[0], q[2], size);
+        }
       if (!clear.length) {
         why = 'meets';
         return NaN;
       }
-      this.clearIn(kLo, Wy(y0), Wy(y1), size, clear, kHi);
+      if (first) {
+        // (Done: the columns are out.)
+      } else if (kept && slot >= 0) this.clearAt(tk, slot, kLo, kHi, Wy(y0), Wy(y1), size, clear, scr);
+      else this.clearIn(kLo, Wy(y0), Wy(y1), size, clear, kHi);
       let xs = NaN;
       for (let i = 0; i < clear.length; i += 2) {
         const xi = Math.max(clear[i] + size / 2, Math.min(clear[i + 1] - size / 2, near));
@@ -3593,48 +3615,56 @@ export class FanView implements InputHandlers {
       const b = f.strands[k];
       const cx = one ? one.c : C[k];
       if (cx < x0 || cx > x1 || b.tipY < y0w || b.tipY > y1w) continue;
-      [kLo, kHi] = one ? [one.f, one.l] : [k, k];
+      kLo = one ? one.f : k;
+      kHi = one ? one.l : k;
       // (A frame's budget, in strands read on a row (clearIn): past it the rest wait for a closer view, the narrower rooms last in tipOrder. Every
       // tip is still tried where few are on screen; at home, with every fossil, ~8,000 are and a frame would read millions, ToLaD#279.)
       if (this.tipWork > TIP_WORK) {
         this.tipCut = tips.length - t;
         break;
       }
-      const [c, line] = [X(cx), Y(b.tipY)];
+      const c = X(cx);
+      const line = Y(b.tipY);
+      tk = one ? 2 * k + 1 : 2 * k;
       // (Its room across, on screen: its band, or where that is narrower, wherever the name still covers its line: centred on it, else slid off it by up to its half.)
       const span = Math.max((one ? one.r : R[k]) * sx, 2 * SPECIES_PX);
-      const [lo, hi] = [Math.max(0, Math.min(c - span / 2, this.w - SPECIES_PX)), Math.min(this.w, Math.max(c + span / 2, SPECIES_PX))];
+      const lo = Math.max(0, Math.min(c - span / 2, this.w - SPECIES_PX));
+      const hi = Math.min(this.w, Math.max(c + span / 2, SPECIES_PX));
       const splitY = one ? one.v.yBot : b.splitY;
-      const [at, start] = [Math.min(line, Y(splitY) - PIC_D / 2), Y(splitY)];
+      const start = Y(splitY);
+      const at = Math.min(line, start - PIC_D / 2);
       // (Its picture's top: on its tip; else, where even a small one there sits on a later lineage standing in its room past its tip (humans over Neanderthals'), just inside its
       // own branch, its young edge on its tip, where its branch holds one; the name laid from there.)
       let pt = at - PIC_D / 2;
-      if (line + PIC_S <= start && Number.isNaN(spot(Math.max(0, c - PIC_S), Math.min(this.w, c + PIC_S), pt, pt + PIC_S, PIC_S, c, false))) pt = line;
-      this.tryEnd = this.tipWork + TIP_TRY;
+      if (line + PIC_S <= start && Number.isNaN(spot(Math.max(0, c - PIC_S), Math.min(this.w, c + PIC_S), pt, pt + PIC_S, PIC_S, c, false, 0))) pt = line;
+      const onLine = pt === line ? 3 : 0;
       // (Its name and its length along time, kept per strand (a group's by its youngest's, ~) and band: at home, with every fossil, ~9,000 are tried a frame.)
-      const tk = one ? ~k : k;
-      let tt = TT.m.get(tk);
+      const tx = one ? ~k : k;
+      let tt = TT.m.get(tx);
       if (!tt) {
         const name = one ? levelName(one.v) : levelText(b);
         const text = this.titleWidth(SPECIES_FONT, name) <= cap ? name : this.pillText(name, cap);
-        TT.m.set(tk, (tt = { text, len: LABEL_PAD + this.titleWidth(SPECIES_FONT, text) }));
+        TT.m.set(tx, (tt = { text, len: LABEL_PAD + this.titleWidth(SPECIES_FONT, text) }));
       }
       const { text, len } = tt;
       // (Past its tip toward "now", as the column's names stand; else in its own branch, up to its picture, full, else small (the name before the picture's size, as a label's name comes
       // before its picture), as a species' name in its band; the first with room, on screen, where it meets no label.)
-      let [x, box] = [NaN, [0, 0, 0, 0] as [number, number, number, number]];
+      let x = NaN;
+      let box: [number, number, number, number] | null = null;
       why = 'crossed';
-      for (const [past, d] of [[true, PIC_D], [false, PIC_D], [false, PIC_S]] as const) {
-        const y1 = past ? pt - LABEL_UNDER : pt + d + LABEL_UNDER + len;
+      for (let slot = 1; slot <= 3; slot++) {
+        const past = slot === 1;
+        const y1 = past ? pt - LABEL_UNDER : pt + (slot === 2 ? PIC_D : PIC_S) + LABEL_UNDER + len;
         const y0 = y1 - len;
         // (On the tree: from "now" back, as the column's names stand, never past it into the margin; ToLaD#279: Heptaxodontidae's ran to the screen's edge at home.)
         if ((!past && y1 > start) || y0 < nowY || y1 > this.h) continue;
-        const xs = spot(lo, hi, y0, y1, SPECIES_PX, c);
+        const xs = spot(lo, hi, y0, y1, SPECIES_PX, c, true, slot + onLine);
         if (Number.isNaN(xs)) continue;
-        [x, box] = [xs, [xs - half, y0, xs + half, y1]];
+        x = xs;
+        box = [xs - half, y0, xs + half, y1];
         break;
       }
-      if (Number.isNaN(x)) {
+      if (!box) {
         this.tipMissed.set(k, why);
         continue;
       }
@@ -3728,7 +3758,6 @@ export class FanView implements InputHandlers {
   /** tipLabels' work this frame (strands read on a row, clearIn), and the tips it left untried at TIP_WORK (from where it stopped in tipOrder, on screen or not). */
   tipWork = 0;
   tipCut = 0;
-  private tryEnd = Infinity;
   /** (Tests.) The last frame's fossils with a tip on screen that went unnamed (tipLabels): another species' column across every place for the name, or a label in the way. */
   readonly tipMissed = new Map<number, 'crossed' | 'meets'>();
 
@@ -3745,6 +3774,17 @@ export class FanView implements InputHandlers {
     const sy = Math.abs(this.cam.sy);
     const [p0, p1] = [Math.floor(Math.min(ya, yb) * sy), Math.ceil(Math.max(ya, yb) * sy)];
     const n = Math.max(2, p1 - p0 + 1);
+    this.clearRowsAt(n);
+    const scr = this.camera.screenX(0);
+    // (Its two end rows first, each alone: what is clear over every row is clear on each, so where one end leaves no room the rest is unread. Most tries that
+    // fail, fail there: a neighbour's column across the name's whole length, ToLaD#279. Then every row, the ends again read from clearRows.)
+    this.clearScan(k, kHi, p0, 0, 0, sy, min, out, scr);
+    if (out.length) this.clearScan(k, kHi, p0, n - 1, n - 1, sy, min, out, scr);
+    if (n > 2 && out.length) this.clearScan(k, kHi, p0, 0, n - 1, sy, min, out, scr);
+    return out;
+  }
+  /** clearRows at this zoom and layout, its scan's rows `n` at least. */
+  private clearRowsAt(n: number): void {
     const C = this.clearRows;
     const c = this.cam;
     // (Kept per zoom and layout (by its rooms: a frame worked out for another view puts the fold's version up, not its layout), not per camera: its rows are the world's at this
@@ -3755,14 +3795,90 @@ export class FanView implements InputHandlers {
       C.len = 0;
     }
     if (C.open.length < n) C.open = new Uint8Array(2 * n);
-    const scr = this.camera.screenX(0);
-    // (Its two end rows first, each alone: what is clear over every row is clear on each, so where one end leaves no room the rest is unread. Most tries that
-    // fail, fail there: a neighbour's column across the name's whole length, ToLaD#279. Then every row, the ends again read from clearRows.)
-    this.clearScan(k, kHi, p0, 0, 0, sy, min, out, scr);
-    if (out.length) this.clearScan(k, kHi, p0, n - 1, n - 1, sy, min, out, scr);
-    if (n > 2 && out.length) this.clearScan(k, kHi, p0, 0, n - 1, sy, min, out, scr);
-    return out;
   }
+  /**
+   * clearIn through the zoom's memo (ToLaD#502): what a fossil's slot keeps clear of the other species' columns over its rows, worked out once a zoom and layout for the
+   * stretches a frame asks of it (`out`, screen: its room less the labels standing), kept in screen x less the pan's (`scr`), and read again by a later frame at that zoom
+   * whose stretches lie inside those (to a rounding's TIP_HAIR px), else worked out anew. The same as clearIn's answer: a stretch keeps what no column takes, in pieces
+   * `min` wide at least, whatever order the columns are taken out in, so a narrower stretch keeps its overlaps with a wider one's answer, and a piece's end that was the
+   * stretch's own is the frame's stretch's. So a pan at one zoom reads no column: at home with every fossil some 6,000 fossils are tried a frame. `kept`: only where
+   * kept, false where not (out untouched).
+   */
+  private clearAt(tk: number, slot: number, kLo: number, kHi: number, ya: number, yb: number, min: number, out: number[], scr: number, kept = false): boolean {
+    const sy = Math.abs(this.cam.sy);
+    const p0 = Math.floor(Math.min(ya, yb) * sy);
+    const p1 = Math.ceil(Math.max(ya, yb) * sy);
+    const n = Math.max(2, p1 - p0 + 1);
+    const len = out.length;
+    // (A stretch narrower than a piece, as the screen's edge can leave one, clearIn keeps where no column meets it: worked out as it does.)
+    for (let i = 0; i < len; i += 2)
+      if (out[i + 1] - out[i] < min) {
+        if (!kept) this.clearIn(kLo, ya, yb, min, out, kHi);
+        return !kept;
+      }
+    const M = this.tipRooms;
+    let e = M.m.get(tk);
+    if (!e || e.kLo !== kLo || e.kHi !== kHi) M.m.set(tk, (e = { kLo, kHi, s: [] }));
+    let s = e.s[slot];
+    // (Kept for these rows, and every stretch inside one it was worked out for.)
+    let ok = !!s && s.p0 === p0 && s.n === n;
+    for (let i = 0, j = 0; ok && i < len; i += 2) {
+      const w = s!.w;
+      while (j < w.length && w[j + 1] + scr < out[i + 1] - TIP_HAIR) j += 2;
+      ok = j < w.length && w[j] + scr <= out[i] + TIP_HAIR;
+    }
+    if (!ok) {
+      if (kept) return false;
+      this.clearRowsAt(n);
+      const w = out.map((x) => x - scr);
+      const v = w.slice();
+      this.clearScan(kLo, kHi, p0, 0, 0, sy, min, v, 0);
+      if (v.length) this.clearScan(kLo, kHi, p0, n - 1, n - 1, sy, min, v, 0);
+      if (n > 2 && v.length) this.clearScan(kLo, kHi, p0, 0, n - 1, sy, min, v, 0);
+      // (Which ends are the stretch's own, no column's: 1 its start, 2 its end.)
+      const own = new Uint8Array(v.length / 2);
+      for (let q = 0, j = 0; q < v.length; q += 2) {
+        while (w[j + 1] < v[q + 1]) j += 2;
+        own[q / 2] = (v[q] === w[j] ? 1 : 0) | (v[q + 1] === w[j + 1] ? 2 : 0);
+      }
+      e.s[slot] = s = { p0, n, w, v, own };
+    }
+    // (Each stretch less what the columns take: its overlaps with the kept pieces, a piece narrower than `min` gone, as clearIn's cutOut leaves them.)
+    const v = s!.v;
+    const own = s!.own;
+    let j = 0;
+    for (let i = 0; i < len; i += 2) {
+      const f = out[i];
+      const t = out[i + 1];
+      while (j < v.length && v[j + 1] + scr <= f) j += 2;
+      for (let q = j; q < v.length && v[q] + scr < t; q += 2) {
+        const va = v[q] + scr;
+        const vz = v[q + 1] + scr;
+        const a = own[q / 2] & 1 && va <= f + TIP_HAIR ? f : Math.max(f, va);
+        const z = own[q / 2] & 2 && vz >= t - TIP_HAIR ? t : Math.min(t, vz);
+        if (z - a >= min || (a === f && z === t)) out.push(a, z);
+      }
+    }
+    out.copyWithin(0, len);
+    out.length -= len;
+    return true;
+  }
+  /** clearAt's memo at this zoom and layout, emptied where they changed: whether it is kept, from the second pass at them on. */
+  private tipRoomsAt(lay: Float64Array): boolean {
+    const M = this.tipRooms;
+    const c = this.cam;
+    if (M.sx !== c.sx || M.sy !== c.sy || M.lay !== lay || M.fan !== this.fan) [M.sx, M.sy, M.lay, M.fan, M.m, M.passes] = [c.sx, c.sy, lay, this.fan, new Map(), 0];
+    return ++M.passes > 1;
+  }
+  /** clearAt's memo, at the zoom and layout it was worked out for: per fossil (2k, a fossil group's 2k + 1) its strands, and per slot its rows and its pieces across. */
+  private tipRooms = {
+    passes: 0,
+    sx: NaN,
+    sy: NaN,
+    lay: null as Float64Array | null,
+    fan: null as Fan | null,
+    m: new Map<number, { kLo: number; kHi: number; s: ({ p0: number; n: number; w: number[]; v: number[]; own: Uint8Array } | undefined)[] }>(),
+  };
   /**
    * The heights of strand b's own column's features, ascending (Tess.bounds' own part: its tip, its peel's 49 steps from its split to its lean's end, its population's
    * features below its split), kept per fan: what clearIn reads inside a row's band. (Not Tess.bounds itself: that also walks every column below it, a few thousand
@@ -3842,11 +3958,7 @@ export class FanView implements InputHandlers {
           // 3 px own column leans toward Ar. kadabba's picture in its last px).)
           const [y, y1] = [(p0 + r) / sy, (p0 + r + 1) / sy];
           if (y1 <= b.tipY) continue;
-          // (One try's share of the budget, TIP_TRY: past it the name has no place here, as if crossed.)
-          if (++this.tipWork > this.tryEnd) {
-            out.length = 0;
-            break;
-          }
+          this.tipWork++;
           // (Strand i on row p: its column's screen [a, z], and whether it is its own column there (a parent column's stretch is no column).)
           const key = (p0 + r) * S.length + i;
           let j = C.at.get(key);
