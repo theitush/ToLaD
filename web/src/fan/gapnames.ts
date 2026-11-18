@@ -199,7 +199,8 @@ export class GapNames {
     const tw = this.width(SPECIES_FONT, text);
     const pad = SPECIES_PX * PAD;
     // (Its own column, from where it has peeled off its split to its tip.)
-    const birth = b.splitY - this.fold.forkH(b.path[0].node);
+    const PP = b.tess.paths;
+    const birth = b.splitY - this.fold.forkH(PP.nodes[PP.node[b.pAt]]);
     const tip = Math.max(b.tipY, this.yNow);
     if ((birth - tip) * sy < tw + 2 * pad) return;
     const right = Math.max(Math.min(P(tip) - pad, h - pad), P(birth) + pad + tw);

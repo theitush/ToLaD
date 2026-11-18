@@ -22,7 +22,7 @@
 // width zoom at all, and sized by one share per fan (GAP_SUM, GROUP_SUM) of its width at "now". `clades` (ToLaD#408) sizes
 // every split's gap by the clade it parts, so the tree's nesting shows at every level: see Fold.cladeGaps.
 
-import { ease, laneW, segAt, type Fan, type FanBranch, type FanNode } from './layout';
+import { ease, laneW, segNode, type Fan, type FanBranch, type FanNode } from './layout';
 import { smoother } from './population';
 import { ORDER_TAXA, taxonKey } from './splits';
 
@@ -174,15 +174,20 @@ export abstract class Fold {
       return -1;
     };
     this.a = new Float64Array(Math.max(0, n - 1)).fill(1);
+    // (Each pair's split: the first of the left one's path the right one's passes too, its paths read flat (ToLaD#502: no Set per pair).)
+    const P = fan.tess.paths;
+    const mark = new Int32Array(P.nodes.length).fill(-1);
     for (let i = 0; i + 1 < n; i++) {
-      const p = this.strands[i].path;
-      const q = this.strands[i + 1].path;
-      const inQ = new Set(q.map((s) => s.node));
-      const k = p.findIndex((s) => inQ.has(s.node));
-      const v = p[k].node;
-      const kq = q.findIndex((s) => s.node === v);
-      const dp: FanNode | FanBranch = k === 0 ? this.strands[i] : p[k - 1].node;
-      const dq: FanNode | FanBranch = kq === 0 ? this.strands[i + 1] : q[kq - 1].node;
+      const p = this.strands[i];
+      const q = this.strands[i + 1];
+      for (let j = q.pAt; j < q.pAt + q.pN; j++) mark[P.node[j]] = i;
+      let k = p.pAt;
+      while (mark[P.node[k]] !== i) k++;
+      const v = P.nodes[P.node[k]];
+      let kq = q.pAt;
+      while (P.node[kq] !== P.node[k]) kq++;
+      const dp: FanNode | FanBranch = k === p.pAt ? p : P.nodes[P.node[k - 1]];
+      const dq: FanNode | FanBranch = kq === q.pAt ? q : P.nodes[P.node[kq - 1]];
       this.pairNode.push(v);
       this.pairFam[i] = inFamily(v) ? 1 : 0;
       this.pairOrd[i] = ordOf(v);
@@ -310,7 +315,7 @@ export abstract class Fold {
           item[i] = m - 1;
           continue;
         }
-        const v = segAt(b, y).node;
+        const v = segNode(b, y);
         if (v === node) {
           item[i] = m - 1;
           continue;

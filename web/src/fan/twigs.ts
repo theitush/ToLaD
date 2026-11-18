@@ -560,11 +560,13 @@ export class ColumnPath {
     // In world units: the tolerance at this zoom, a little under CHORD_TOL_PX (the zoom moves on).
     const tolX = CHORD_TOL_PX / PATH_ZOOM / sx;
     // The lanes step at the splits (the green lane: the strand leaves its parent's prefix there).
-    const splits = b.path;
-    let sp = 0;
+    // (Its splits' heights, ascending: its run in the flat paths, ToLaD#502.)
+    const splits = b.tess.paths.y;
+    const spEnd = b.pAt + b.pN;
+    let sp = b.pAt;
     const isSplit = (y: number) => {
-      while (sp < splits.length && splits[sp].y < y) sp++;
-      return sp < splits.length && splits[sp].y === y;
+      while (sp < spEnd && splits[sp] < y) sp++;
+      return sp < spEnd && splits[sp] === y;
     };
     let k = 0;
     const keep = (i: number) => {

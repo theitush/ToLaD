@@ -25,7 +25,7 @@
 // It is the view's layout (fan.tess.fold; its base, fold.ts, holds the splits' gaps and their openness by zoom), the
 // only one since ToLaD#300 retired the fold's own packing. At the cats' level (the view's `folds` off) every split is open, at every zoom.
 
-import { ease, g, isNode, laneW, segAt, type Fan, type FanBranch, type FanNode } from './layout';
+import { ease, g, isNode, laneW, segAt, typedFrom, type Fan, type FanBranch, type FanNode } from './layout';
 import { Fold, ROOM_BEND, gapMode, type FoldState, type GapMode } from './fold';
 import { lodIndexOn } from './lod';
 
@@ -248,21 +248,34 @@ export class Steady extends Fold {
     this.open = open || gaps !== 'age';
     const N = fan.nodes;
     N.forEach((v, j) => this.idx.set(v, j));
-    this.par = Int32Array.from(N, (v) => (v.parent ? this.idx.get(v.parent)! : -1));
-    this.off = Float64Array.from(N, (v) => {
+    this.par = typedFrom(Int32Array, N, (v) => (v.parent ? this.idx.get(v.parent)! : -1));
+    // (The strands' paths, flat: the layout's (Tess.paths, ToLaD#502), its node indices fan.nodes' as idx's.)
+    const PP = fan.tess.paths;
+    this.off = typedFrom(Float64Array, N, (v) => {
       if (!v.parent) return 0;
-      const s = v.strands[0].path.find((p) => p.node === v.parent);
-      return s ? s.off : 0;
+      const b = v.strands[0];
+      const pj = this.idx.get(v.parent)!;
+      for (let k = b.pAt; k < b.pAt + b.pN; k++) if (PP.node[k] === pj) return PP.off[k];
+      return 0;
     });
     const S = this.strands;
-    this.room = Float64Array.from(S, (b) => Math.max(b.width, b.baseW));
-    this.bNode = Int32Array.from(S, (b) => this.idx.get(b.node)!);
-    this.pIdx = S.map((b) => Int32Array.from(b.path, (p) => this.idx.get(p.node)!));
-    this.pY = S.map((b) => Float64Array.from(b.path, (p) => p.y));
-    this.pOff = S.map((b) => Float64Array.from(b.path, (p) => p.off));
-    this.pLin = Uint8Array.from(this.pY, (py) => (py.some((y, k) => k > 0 && !(y >= py[k - 1])) ? 1 : 0));
+    this.room = typedFrom(Float64Array, S, (b) => Math.max(b.width, b.baseW));
+    this.bNode = typedFrom(Int32Array, S, (b) => this.idx.get(b.node)!);
+    // (Every strand's path a view of the layout's flat paths (ToLaD#502): 1.6M splits on the amniotes, no copy.)
+    this.pIdx = new Array<Int32Array>(S.length);
+    this.pY = new Array<Float64Array>(S.length);
+    this.pOff = new Array<Float64Array>(S.length);
+    this.pLin = new Uint8Array(S.length);
+    for (let i = 0; i < S.length; i++) {
+      const { pAt: a, pN } = S[i];
+      this.pIdx[i] = PP.node.subarray(a, a + pN);
+      this.pY[i] = PP.y.subarray(a, a + pN);
+      this.pOff[i] = PP.off.subarray(a, a + pN);
+      // (A path not ascending: walked, not bisected.)
+      for (let k = a + 1; k < a + pN; k++) if (!(PP.y[k] >= PP.y[k - 1])) this.pLin[i] = 1;
+    }
     const yRef = fan.time.y(0);
-    this.cap = Float64Array.from(N, (v) => {
+    this.cap = typedFrom(Float64Array, N, (v) => {
       let run = Infinity;
       let fork = 0;
       for (const k of v.kids) {
@@ -271,25 +284,25 @@ export class Steady extends Fold {
       }
       return Math.max(0, Math.min(Math.max(fork, ROOM_BEND), STEADY_RUN * run));
     });
-    this.nY = Float64Array.from(N, (v) => v.y);
-    this.nW = Float64Array.from(N, (v) => v.width);
+    this.nY = typedFrom(Float64Array, N, (v) => v.y);
+    this.nW = typedFrom(Float64Array, N, (v) => v.width);
     this.stemTop = this.nY.slice();
     this.yFloor = fan.trunkBottom.y;
-    this.nFirst = Int32Array.from(N, (v) => v.strands[0].index);
-    this.nLast = Int32Array.from(N, (v) => v.strands[v.strands.length - 1].index);
-    this.kidsF = N.map((v) => Int32Array.from(v.kids, (k) => (isNode(k) ? this.idx.get(k)! : ~k.index)));
-    this.bw = Float64Array.from(S, (b) => b.baseW);
-    this.sY = Float64Array.from(S, (b) => b.splitY);
-    this.tcOff = Float64Array.from(S, (b) => b.path[0].off + b.baseW / 2);
+    this.nFirst = typedFrom(Int32Array, N, (v) => v.strands[0].index);
+    this.nLast = typedFrom(Int32Array, N, (v) => v.strands[v.strands.length - 1].index);
+    this.kidsF = N.map((v) => typedFrom(Int32Array, v.kids, (k) => (isNode(k) ? this.idx.get(k)! : ~k.index)));
+    this.bw = typedFrom(Float64Array, S, (b) => b.baseW);
+    this.sY = typedFrom(Float64Array, S, (b) => b.splitY);
+    this.tcOff = typedFrom(Float64Array, S, (b) => PP.off[b.pAt] + b.baseW / 2);
     this.rootJ = this.idx.get(fan.root)!;
     this.stack = new Int32Array(N.length + 1);
-    this.nYp = Float64Array.from(N, (_, j) => (this.par[j] < 0 ? Infinity : this.nY[this.par[j]]));
-    this.bY = Float64Array.from(S, (_, i) => this.nY[this.bNode[i]]);
+    this.nYp = typedFrom(Float64Array, N, (_, j) => (this.par[j] < 0 ? Infinity : this.nY[this.par[j]]));
+    this.bY = typedFrom(Float64Array, S, (_, i) => this.nY[this.bNode[i]]);
     this.mono = this.nY.every((y, j) => y <= this.nYp[j]);
     const last = (k: FanNode | FanBranch) => (isNode(k) ? k.strands[k.strands.length - 1].index : k.index);
-    this.kidPair = N.map((v) => Int32Array.from(v.kids.slice(0, -1), last));
+    this.kidPair = N.map((v) => typedFrom(Int32Array, v.kids.slice(0, -1), last));
     // (Rooms by life: each node's last tip, the youngest of its strands', and now.)
-    this.tipS = Float64Array.from(S, (b) => b.tipY);
+    this.tipS = typedFrom(Float64Array, S, (b) => b.tipY);
     this.crossL = new Float64Array(S.length);
     this.crossR = new Float64Array(S.length);
     this.crossF = new Int32Array(S.length);
@@ -301,7 +314,7 @@ export class Steady extends Fold {
       this.tipN[j] = t;
     }
     this.yNow = yRef;
-    this.mx = Float64Array.from(S, (b, i) => Math.max(b.baseW, this.room[i], b.unit * g(b.pop.max, b.tess.mode)));
+    this.mx = typedFrom(Float64Array, S, (b, i) => Math.max(b.baseW, this.room[i], b.unit * g(b.pop.max, b.tess.mode)));
     const ns = S.length;
     const sum = new Float64Array(ns + 1);
     const next = new Int32Array(ns + 1).fill(-1);
@@ -311,9 +324,9 @@ export class Steady extends Fold {
       prev[i] = this.bw[i] > 0 ? i : i > 0 ? prev[i - 1] : -1;
     }
     for (let i = ns - 1; i >= 0; i--) next[i] = this.bw[i] > 0 ? i : next[i + 1];
-    this.wc = Float64Array.from(N, (v, j) => Math.max(v.width, sum[this.nLast[j] + 1] - sum[this.nFirst[j]]));
-    this.fPos = Int32Array.from(N, (_, j) => (next[this.nFirst[j]] >= 0 && next[this.nFirst[j]] <= this.nLast[j] ? next[this.nFirst[j]] : -1));
-    this.lPos = Int32Array.from(N, (_, j) => (prev[this.nLast[j]] >= this.nFirst[j] ? prev[this.nLast[j]] : -1));
+    this.wc = typedFrom(Float64Array, N, (v, j) => Math.max(v.width, sum[this.nLast[j] + 1] - sum[this.nFirst[j]]));
+    this.fPos = typedFrom(Int32Array, N, (_, j) => (next[this.nFirst[j]] >= 0 && next[this.nFirst[j]] <= this.nLast[j] ? next[this.nFirst[j]] : -1));
+    this.lPos = typedFrom(Int32Array, N, (_, j) => (prev[this.nLast[j]] >= this.nFirst[j] ? prev[this.nLast[j]] : -1));
     N.forEach((_, j) => this.runNode.set(this.nFirst[j] * (ns + 1) + this.nLast[j], j));
     this.cand = new Int32Array(ns);
     this.cutStack = new Int32Array(N.length + ns + 1);

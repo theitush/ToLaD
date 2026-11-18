@@ -29,7 +29,7 @@
 // that high over its tip). Items are runs of strands that do not overlap, so their territories are disjoint at every
 // row they share: labels inside their own never meet, by construction. They depend on the camera's height too.
 
-import { isNode, type Fan, type FanBranch, type FanNode } from './layout';
+import { isNode, typedFrom, type Fan, type FanBranch, type FanNode } from './layout';
 import { LABEL_AXIS_X, PIC_ROOM } from './pics';
 import type { Steady } from './steady';
 
@@ -94,12 +94,12 @@ export class Territories {
     this.nodes = fan.nodes;
     this.strands = fold.strands;
     this.nodes.forEach((v, j) => this.index.set(v, j));
-    this.R = Float64Array.from(this.strands, (b) => Math.max(b.width, b.baseW));
+    this.R = typedFrom(Float64Array, this.strands, (b) => Math.max(b.width, b.baseW));
     this.G = fold.pairGap;
-    this.first = Int32Array.from(this.nodes, (v) => v.strands[0].index);
-    this.last = Int32Array.from(this.nodes, (v) => v.strands[v.strands.length - 1].index);
-    this.count = Int32Array.from(this.nodes, (v) => v.strands.length);
-    this.kids = this.nodes.map((v) => Int32Array.from(v.kids, (k) => (isNode(k) ? this.index.get(k)! : ~k.index)));
+    this.first = typedFrom(Int32Array, this.nodes, (v) => v.strands[0].index);
+    this.last = typedFrom(Int32Array, this.nodes, (v) => v.strands[v.strands.length - 1].index);
+    this.count = typedFrom(Int32Array, this.nodes, (v) => v.strands.length);
+    this.kids = this.nodes.map((v) => typedFrom(Int32Array, v.kids, (k) => (isNode(k) ? this.index.get(k)! : ~k.index)));
     this.PR = new Float64Array(this.R.length + 1);
     for (let i = 0; i < this.R.length; i++) this.PR[i + 1] = this.PR[i] + this.R[i];
     const now = fan.time.y(0);

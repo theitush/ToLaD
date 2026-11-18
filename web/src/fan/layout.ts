@@ -6,7 +6,7 @@
 // straight design, lines that lean, was deleted in ToLaD#342). The population
 // (population.ts: N(t), the green share, the extinct taper), the parent
 // columns and their green (FanNode.q), the lanes' blend below a split
-// (segGreen) and the tessellation (Tess); where the columns sit (placeRiver)
+// (greenBelow) and the tessellation (Tess); where the columns sit (placeRiver)
 // and how a column moves from its slot in the parent to its own place above a
 // split (ease: a smootherstep S-curve).
 //
@@ -182,12 +182,35 @@ export interface FanBranch {
   leanY: number;
   /** The split it starts at (its parent column). */
   node: FanNode;
-  /** Its place in each ancestral column, the parent's first (ascending y, down to the root). */
-  path: PathSeg[];
+  /**
+   * Its place in each ancestral column, the parent's first (ascending y, down to the root): made from the layout's flat paths (Tess.paths,
+   * pAt..pAt + pN) when first read, for the few that read it whole. The layout and the frames read the flat paths (segAt, ToLaD#502).
+   */
+  readonly path: PathSeg[];
+  /** Its run in the layout's flat paths (Tess.paths): at pAt, pN splits. */
+  pAt: number;
+  pN: number;
   /** The tip (last appearance) height. */
   tipY: number;
   /** The fan's tessellation, which samples its edges. */
   tess: Tess;
+}
+
+/**
+ * Every strand's place in each ancestral column, flat (ToLaD#502): what FanBranch.path held as one object per strand and split (1.6M on the
+ * amniotes, a quarter of the open with their garbage). A strand's run is pAt..pAt + pN, ascending in y as the path was sorted (a split's
+ * parent first where two stand at one height); per split its node (index in Fan.nodes), height, offset in the column and left edge there,
+ * and the strand's green just above it, worked out per strand when first read (gIn).
+ */
+export interface Paths {
+  nodes: readonly FanNode[];
+  node: Int32Array;
+  y: Float64Array;
+  off: Float64Array;
+  left: Float64Array;
+  g: Float64Array;
+  /** Per run (at its pAt): whether its green above each split is in g. */
+  gIn: Uint8Array;
 }
 
 /** A split of the dated tree and the parent column below it (the daughters' ancestors). */
@@ -263,18 +286,94 @@ export function nodeQ(v: FanNode, ageMa: number): number {
   return v.q[k] + (v.q[k + 1] - v.q[k]) * (x - k);
 }
 
-/** The column strand b is in at height y ≥ b.splitY: the deepest split at or above y. */
-export function segAt(b: FanBranch, y: number): PathSeg {
+/** The strand's green just above each split of its path (PathSeg.gAbove), into P.g once (ToLaD#502: per strand when first read, not every strand's at the open). */
+function greenIn(b: FanBranch, P: Paths): void {
+  const a = b.pAt;
+  if (P.gIn[a]) return;
+  P.gIn[a] = 1;
+  const { node, off, g, nodes } = P;
+  for (let k = a; k < a + b.pN; k++) {
+    if (k === a) g[k] = b.baseW * b.pop.greenAt(Math.max(b.sp.t1, b.t0 - 1e-9));
+    else {
+      const v = nodes[node[k]];
+      g[k] = greenBelow(nodes[node[k - 1]], off[k - 1], b.baseW, g[k - 1], v.ageMa, v.y);
+    }
+  }
+}
+
+/** A split of a strand's path read off the flat paths (segAt's answer, and FanBranch.path's): its green above worked out when read. */
+class Seg implements PathSeg {
+  y = 0;
+  left = 0;
+  off = 0;
+  node = null as unknown as FanNode;
+  w = 0;
+  b = null as unknown as FanBranch;
+  /** Its place in the flat paths. */
+  at = 0;
+  fill(b: FanBranch, at: number): this {
+    const P = b.tess.paths;
+    this.b = b;
+    this.at = at;
+    this.y = P.y[at];
+    this.left = P.left[at];
+    this.off = P.off[at];
+    this.node = P.nodes[P.node[at]];
+    this.w = b.baseW;
+    return this;
+  }
+  get gAbove(): number {
+    const P = this.b.tess.paths;
+    greenIn(this.b, P);
+    return P.g[this.at];
+  }
+}
+
+const pathMemo = new WeakMap<FanBranch, PathSeg[]>();
+/** FanBranch.path, made from the flat paths when first read. */
+function pathOf(b: FanBranch): PathSeg[] {
+  let p = pathMemo.get(b);
+  if (!p) pathMemo.set(b, (p = Array.from({ length: b.pN }, (_, k) => new Seg().fill(b, b.pAt + k))));
+  return p;
+}
+
+/** segAt's answer: one object, filled again by each call (ToLaD#502: no object per strand and split). Read it before the next segAt. */
+const SEG = new Seg();
+
+/** segAt's split as its place in the flat paths (Tess.paths). */
+function segIdx(b: FanBranch, y: number): number {
   // (Its path runs down, older splits ever lower: the last seg at or above y, by halves (~50 deep at the mammal level, ToLaD#255).)
-  const p = b.path;
-  let lo = 0;
-  let hi = p.length - 1;
+  const Y = b.tess.paths.y;
+  let lo = b.pAt;
+  let hi = b.pAt + b.pN - 1;
   while (lo < hi) {
     const mid = (lo + hi + 1) >> 1;
-    if (p[mid].y <= y) lo = mid;
+    if (Y[mid] <= y) lo = mid;
     else hi = mid - 1;
   }
-  return p[lo];
+  return lo;
+}
+
+/**
+ * The column strand b is in at height y ≥ b.splitY: the deepest split at or above y. The answer is segAt's own object, filled again by the
+ * next call: read it at once.
+ */
+export function segAt(b: FanBranch, y: number): PathSeg {
+  return SEG.fill(b, segIdx(b, y));
+}
+
+/** segAt's column alone (ToLaD#502: the frames' hot paths read the flat paths, no object filled). */
+export function segNode(b: FanBranch, y: number): FanNode {
+  const P = b.tess.paths;
+  return P.nodes[P.node[segIdx(b, y)]];
+}
+
+/** A strand's green in its parent column at height y (age: y's), from the flat paths (greenBelow). */
+function pathGreen(b: FanBranch, y: number, age: number): number {
+  const P = b.tess.paths;
+  const k = segIdx(b, y);
+  greenIn(b, P);
+  return greenBelow(P.nodes[P.node[k]], P.off[k], b.baseW, P.g[k], age, y);
 }
 
 /** The curve of a column's move from its slot (u = 0) to its own place (u = 1): smootherstep (C2, flat at both ends). */
@@ -329,8 +428,7 @@ export function lanesAt(b: FanBranch, y: number, mode: WidthMode = b.tess.mode):
     const w = n > 0 ? b.unit * g(n, mode) : 0;
     return [w, w * b.pop.greenAt(age)];
   }
-  const s = segAt(b, y);
-  return [b.baseW, segGreen(s, age, y)];
+  return [b.baseW, pathGreen(b, y, age)];
 }
 
 /** lanesAt(b, y) at y's age (given: a grid row's strands share it, green.ts, ToLaD#502), into out[o] and out[o + 1]: no tuple, the same sums. */
@@ -345,7 +443,7 @@ export function lanesAtAge(b: FanBranch, y: number, age: number, out: Float64Arr
     out[o + 1] = w * b.pop.greenAt(age);
   } else {
     out[o] = b.baseW;
-    out[o + 1] = segGreen(segAt(b, y), age, y);
+    out[o + 1] = pathGreen(b, y, age);
   }
 }
 
@@ -357,11 +455,14 @@ export function laneW(b: FanBranch, y: number, age?: number): number {
   return n > 0 ? b.unit * g(n, b.tess.mode) : 0;
 }
 
-/** A strand's green in a parent column at height y: from its own share at the split into the column's prefix (see FanNode.blend). */
-function segGreen(s: PathSeg, age: number, y: number): number {
-  const gw = clampW(nodeQ(s.node, age) * s.node.width - s.off, s.w);
-  const u = s.node.blend > 0 ? smoother((y - s.node.y) / s.node.blend) : 1;
-  return u >= 1 ? gw : s.gAbove + (gw - s.gAbove) * u;
+/**
+ * A strand's green in a parent column at height y: from its own share at the split into the column's prefix (see FanNode.blend). From a
+ * split's fields: its column v, the strand's offset and width there, its green above it.
+ */
+function greenBelow(v: FanNode, off: number, w: number, gAbove: number, age: number, y: number): number {
+  const gw = clampW(nodeQ(v, age) * v.width - off, w);
+  const u = v.blend > 0 ? smoother((y - v.y) / v.blend) : 1;
+  return u >= 1 ? gw : gAbove + (gw - gAbove) * u;
 }
 
 /**
@@ -379,6 +480,8 @@ export class Tess {
   private readonly ys = new Map<FanBranch, Float64Array>();
   /** The fold (fold.ts, ToLaD#146): how far the splits are open at the view's zoom; none: the river, fully open. */
   fold?: Fold;
+  /** Every strand's path, flat (layoutFan fills it, ToLaD#502). */
+  paths!: Paths;
 
   constructor(
     readonly time: TimeScale,
@@ -400,13 +503,15 @@ export class Tess {
     };
     // Its own peel, and each ancestral column's (where its column peels off the one below).
     peel(b.splitY, b.leanY);
-    for (const s of b.path) {
-      add(s.y);
-      if (s.node.parent) peel(s.node.yBot, s.node.leanY);
+    const P = this.paths;
+    for (let j = b.pAt; j < b.pAt + b.pN; j++) {
+      const v = P.nodes[P.node[j]];
+      add(P.y[j]);
+      if (v.parent) peel(v.yBot, v.leanY);
       // Where the column's green share still moves (its first generations below the split).
-      const q = s.node.q;
+      const q = v.q;
       const n = Math.min(q.length, 64);
-      for (let k = 0; k < n; k++) add(this.time.y(s.node.ageMa + ((k + 0.5) * s.node.genYears) / 1e6));
+      for (let k = 0; k < n; k++) add(this.time.y(v.ageMa + ((k + 0.5) * v.genYears) / 1e6));
     }
     for (const a of b.pop.features()) {
       const y = this.time.y(a / 1e6);
@@ -463,13 +568,14 @@ export class Tess {
       L = Math.min(ca, cb) - hw;
       R = Math.max(ca, cb) + hw;
     }
-    const p = b.path;
-    for (let k = 0; k < p.length; k++) {
-      const a = Math.max(lo, p[k].y);
-      const z = Math.min(hi, k + 1 < p.length ? p[k + 1].y : this.bottom);
+    const P = this.paths;
+    const pz = b.pAt + b.pN;
+    for (let k = b.pAt; k < pz; k++) {
+      const a = Math.max(lo, P.y[k]);
+      const z = Math.min(hi, k + 1 < pz ? P.y[k + 1] : this.bottom);
       if (!(z >= a)) continue;
       for (const y of [a, z]) {
-        const x = nodeLeftAt(p[k].node, y, true) + p[k].off;
+        const x = nodeLeftAt(P.nodes[P.node[k]], y, true) + P.off[k];
         L = Math.min(L, x);
         R = Math.max(R, x + b.baseW);
       }
@@ -622,7 +728,7 @@ export class Tess {
   /** The heights of the splits branch b passes (a cut always falls on each). */
   private splitYs(b: FanBranch): Set<number> {
     let v = this.splits.get(b);
-    if (!v) this.splits.set(b, (v = new Set(b.path.map((s) => s.y))));
+    if (!v) this.splits.set(b, (v = new Set(this.paths.y.subarray(b.pAt, b.pAt + b.pN))));
     return v;
   }
 
@@ -688,8 +794,9 @@ export function leftAt(b: FanBranch, y: number, w?: number, river = false): numb
     const c = tc + (b.cx - tc) * peelU(b.splitY, b.leanY, y);
     return c - (w ?? laneW(b, y)) / 2;
   }
-  const s = segAt(b, y);
-  return nodeLeftAt(s.node, y, true) + s.off;
+  const P = b.tess.paths;
+  const k = segIdx(b, y);
+  return nodeLeftAt(P.nodes[P.node[k]], y, true) + P.off[k];
 }
 
 /**
@@ -803,7 +910,7 @@ function columnOf(B: readonly FanBranch[], i: number, y: number): [number, numbe
     const l = leftAt(b, y);
     return [l, l + laneAt(b, y).w, i + 1];
   }
-  const v = segAt(b, y).node;
+  const v = segNode(b, y);
   const l = nodeLeftAt(v, y);
   return [l, l + v.width, v.strands[v.strands.length - 1].index + 1];
 }
@@ -849,7 +956,7 @@ export function nearestColumn(fan: Fan, x: number, y: number): number | null {
     near(columnOf(B, i, y));
     found++;
     // (Past its column's first strand.)
-    if (y >= B[i].splitY) i = segAt(B[i], y).node.strands[0].index;
+    if (y >= B[i].splitY) i = segNode(B[i], y).strands[0].index;
     i = standingBefore(S, i - 1, y);
   }
   return bd === 0 ? x : best;
@@ -1177,14 +1284,23 @@ export function strandAt(b: FanBranch, ageMa: number, mode: WidthMode): { w: num
 const MAX_Q_GENS = 5000;
 
 type Kid = FanNode | FanBranch;
-/** Each node's strands, left to right (every node's, in one pass from the leaves up: nodes in build order, parents first). */
-const underAll = (nodes: FanNode[]): Map<FanNode, FanBranch[]> => {
-  const m = new Map<FanNode, FanBranch[]>();
-  for (let i = nodes.length - 1; i >= 0; i--) {
-    const v = nodes[i];
-    m.set(v, v.kids.flatMap((k) => (isNode(k) ? m.get(k)! : [k])));
-  }
-  return m;
+/**
+ * Each node's strands, left to right: the strands of one walk of the tree from its root, in its daughters' order, each node's a run
+ * [a, z) of them (ToLaD#502: not each node's list flattened from its daughters', 1.6M entries made twice on the amniotes).
+ */
+const underAll = (root: FanNode): { order: FanBranch[]; run: Map<FanNode, [number, number]> } => {
+  const order: FanBranch[] = [];
+  const run = new Map<FanNode, [number, number]>();
+  const walk = (v: FanNode): void => {
+    const a = order.length;
+    for (const k of v.kids) {
+      if (isNode(k)) walk(k);
+      else order.push(k);
+    }
+    run.set(v, [a, order.length]);
+  };
+  walk(root);
+  return { order, run };
 };
 
 /**
@@ -1220,6 +1336,87 @@ function emergeRun(k: Kid, time: TimeScale, mode: WidthMode, reach: number): num
 /** The guard's hair (layoutFan): a strand ends at least this share of its split's age after its split. */
 export const END_HAIR = 1e-3;
 
+/**
+ * `C.from(a, f)` as a plain loop (ToLaD#502): a typed array's from() with a map function takes V8's slow path, some 20x a loop, and the
+ * open makes dozens of them over every species and split (1.6 s of the amniotes' 18 s in node). The same values: each is converted by the
+ * array's own element type as from() converts them.
+ */
+export function typedFrom<T extends Float64Array | Int32Array | Uint8Array, U>(C: new (n: number) => T, a: ArrayLike<U>, f: (x: U, i: number) => number): T {
+  const out = new C(a.length);
+  for (let i = 0; i < a.length; i++) out[i] = f(a[i], i);
+  return out;
+}
+
+/**
+ * Each strand's place in its ancestors' columns (offsets in the column's order), flat (Paths, ToLaD#502), and each column's tile in its
+ * parent, each leaf's slot. `nodes` parents first, `S` the strands left to right (their runs in that order). A strand's run is its splits
+ * by height, its parent's first, and where two stand at one height the older in the tree first: the order a stable sort by height left the
+ * path in, filled root first. The green above each split is worked out when first read (greenIn).
+ */
+function flatPaths(nodes: FanNode[], S: readonly FanBranch[]): Paths {
+  const nAt = new Map<FanNode, number>();
+  const depth = new Int32Array(nodes.length);
+  for (let j = 0; j < nodes.length; j++) {
+    const v = nodes[j];
+    nAt.set(v, j);
+    depth[j] = v.parent ? depth[nAt.get(v.parent)!] + 1 : 0;
+  }
+  let tot = 0;
+  for (const b of S) {
+    b.pAt = tot;
+    b.pN = depth[nAt.get(b.node)!] + 1;
+    tot += b.pN;
+  }
+  const node = new Int32Array(tot);
+  const y = new Float64Array(tot);
+  const off = new Float64Array(tot);
+  const left = new Float64Array(tot);
+  // (Filled from each run's end: the root's split last, its own first, so a run comes nearly in order.)
+  const cur = new Int32Array(S.length);
+  for (let i = 0; i < S.length; i++) cur[i] = S[i].pAt + S[i].pN;
+  for (let j = 0; j < nodes.length; j++) {
+    const v = nodes[j];
+    let o = 0;
+    for (const k of v.kids) {
+      if (isNode(k)) k.tile = v.left + o;
+      else k.x0 = v.left + o;
+      const put = (b: FanBranch) => {
+        const at = --cur[b.index];
+        node[at] = j;
+        y[at] = v.y;
+        off[at] = o;
+        left[at] = v.left + o;
+        o += b.baseW;
+      };
+      if (isNode(k)) for (const b of k.strands) put(b);
+      else put(k);
+    }
+  }
+  // Each run by height, the older in the tree first at one height (insertion: a run is near sorted).
+  for (const b of S) {
+    const a = b.pAt;
+    const z = a + b.pN;
+    for (let i = a + 1; i < z; i++) {
+      const yi = y[i];
+      const di = depth[node[i]];
+      if (y[i - 1] < yi || (y[i - 1] === yi && depth[node[i - 1]] < di)) continue;
+      const [ni, oi, li] = [node[i], off[i], left[i]];
+      let j = i - 1;
+      for (; j >= a && (y[j] > yi || (y[j] === yi && depth[node[j]] > di)); j--) {
+        node[j + 1] = node[j];
+        y[j + 1] = y[j];
+        off[j + 1] = off[j];
+        left[j + 1] = left[j];
+      }
+      node[j + 1] = ni;
+      y[j + 1] = yi;
+      off[j + 1] = oi;
+      left[j + 1] = li;
+    }
+  }
+  return { nodes, node, y, off, left, g: new Float64Array(tot), gIn: new Uint8Array(tot) };
+}
+
 export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = clade.tree, measure: Measure = 'individuals'): Fan {
   const W = TRUNK_WIDTH;
   // (A species with no mass in the data, none since ToLaD#276's build: the clade's median.)
@@ -1253,7 +1450,11 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = clade.
       x0: 0,
       leanY: v.y,
       node: v,
-      path: [],
+      get path(): PathSeg[] {
+        return pathOf(this);
+      },
+      pAt: 0,
+      pN: 0,
       tipY: time.y(sp.t1),
       tess,
     };
@@ -1289,13 +1490,15 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = clade.
     b.baseW = unit * g(b.pop.founders, mode);
   });
   // Parent columns, daughters first: the sum of the strands' founders; green by the genealogy.
-  const below = underAll(nodes);
+  const below = underAll(root);
   const sizes = (v: FanNode): void => {
     for (const k of v.kids) if (isNode(k)) sizes(k);
     let n = 0;
     let gl = 0;
     let w = 0;
-    for (const b of below.get(v)!) {
+    const [a, z] = below.run.get(v)!;
+    for (let i = a; i < z; i++) {
+      const b = below.order[i];
       n += b.pop.founders;
       gl += b.pop.founders * b.sp.genYears;
       w += b.baseW;
@@ -1351,32 +1554,12 @@ export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = clade.
   }
   if (SEED_OUT && key === ORDER_MODE) SEED_OUT.seed = takeSeed(nodes, branches, byMode.get(key)!);
   // Each strand's place in its ancestors' columns (offsets in the column's order), each column's tile in its parent, each leaf's slot.
-  for (const [v, s] of underAll(nodes)) v.strands = s;
-  for (const v of nodes) {
-    let off = 0;
-    for (const k of v.kids) {
-      if (isNode(k)) k.tile = v.left + off;
-      else k.x0 = v.left + off;
-      for (const b of isNode(k) ? k.strands : [k]) {
-        b.path.push({ y: v.y, left: v.left + off, off, node: v, w: b.baseW, gAbove: 0 });
-        off += b.baseW;
-      }
-    }
-  }
+  const runs = underAll(root);
+  for (const [v, [a, z]] of runs.run) v.strands = runs.order.slice(a, z);
+  root.strands.forEach((b, i) => (b.index = i));
+  tess.paths = flatPaths(nodes, root.strands);
   root.tile = root.left;
   root.leanY = root.yBot;
-  root.strands.forEach((b, i) => (b.index = i));
-  for (const b of branches) {
-    b.path.sort((p, q) => p.y - q.y);
-    // Each strand's green just above each split it passes: its own share (the species'), or its place in the daughter column's prefix.
-    b.path.forEach((s, k) => {
-      if (k === 0) s.gAbove = b.baseW * b.pop.greenAt(Math.max(b.sp.t1, b.t0 - 1e-9));
-      else {
-        const d = b.path[k - 1];
-        s.gAbove = segGreen(d, s.node.ageMa, s.node.y);
-      }
-    });
-  }
   // The branches in the dataset's order (callers index them by species); `index` is the drawn order.
   const rank = new Map(clade.species.map((s, i) => [s, i]));
   branches.sort((p, q) => rank.get(p.sp)! - rank.get(q.sp)!);
