@@ -772,6 +772,32 @@ function massNote(how: string | undefined): string {
   return ` (adult, ${src[how] ?? how})`;
 }
 
+/**
+ * A card's name (ToLaD#539): the English name, linked to its article where there is one, and the Latin after it; a
+ * species with no English name (its common is its Latin: most reptiles, many fossils) its Latin once, not twice.
+ */
+function CardName({ sp, wp }: { sp: SpeciesRec; wp?: string }) {
+  const latinOnly = sp.common === sp.sci;
+  const cls = latinOnly ? 'sci' : undefined;
+  return (
+    <>
+      {wp ? (
+        <a className={latinOnly ? 'wp sci' : 'wp'} href={wp} target="_blank" rel="noopener">
+          {sp.common}
+        </a>
+      ) : (
+        <span className={cls}>{sp.common}</span>
+      )}
+      {!latinOnly && (
+        <>
+          {' '}
+          <i>({sp.sci})</i>
+        </>
+      )}
+    </>
+  );
+}
+
 /** For a card: whether mammals-card.json's kinds are in (ToLaD#502), loading them if not; a re-render when they come. */
 export function useMammalCard(): boolean {
   const [isIn, setIn] = useState(() => !mammalsLoaded() || mammalCardLoaded());
@@ -816,7 +842,7 @@ function SpeciesCardWait({ sp, onClose, onUp, onBox }: SpeciesCardProps) {
       onClose={onClose}
       head={
         <div className="t">
-          <span>{sp.common}</span> <i>({sp.sci})</i>
+          <CardName sp={sp} />
         </div>
       }
     >
@@ -878,14 +904,7 @@ export function SpeciesCard({ sp, onClose, onUp, onBox, open, ageMa, startMa, ev
       onClose={onClose}
       head={
         <div className="t">
-          {wiki?.wp ? (
-            <a className="wp" href={wiki.wp} target="_blank" rel="noopener">
-              {sp.common}
-            </a>
-          ) : (
-            <span>{sp.common}</span>
-          )}{' '}
-          <i>({sp.sci})</i>
+          <CardName sp={sp} wp={wiki?.wp} />
         </div>
       }
     >

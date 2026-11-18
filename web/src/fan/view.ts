@@ -4,6 +4,7 @@
 // in far enough, a branch resolves into the individuals themselves (twigs.ts).
 // Gestures come from the shared engine/input.ts.
 
+import { CLASS_TAXA } from './amniote-names';
 import { drawPic, hasPic, livePic, PIC_TRIES, prefetchPics } from './wiki';
 import { AXIS_ROOM, chainFit, CHAIN_ROOM, flipOn, forkQuiet, FORK_PX as FLIP_FORK_PX, gapLabelsOn, gapNamesOn, LABELS_MA, NOW_PX, turnCanvas, upright } from './flip';
 import { CLADE_FONT, CLADE_PX, GapNames, SPECIES_FONT, SPECIES_PX, type WrittenName } from './gapnames';
@@ -698,13 +699,18 @@ type GapLadder = {
   tipIx: TipIndex;
 };
 
-/** The clades above an order (ToLaD#258): a superordinal one (Theria, Glires…) is no level, so mammal home opens on the orders. Kept per fan. */
+/**
+ * The clades above an order (ToLaD#258): a superordinal one (Theria, Glires…) is no level, so mammal home opens on the orders. A class
+ * (CLASS_TAXA, ToLaD#539: the mammals and the birds among the amniotes) is not one of them: a level, so amniote home opens on the classes
+ * and the reptiles' orders. Kept per fan.
+ */
 const aboveCache = new WeakMap<Fan, Set<FanNode>>();
 function aboveOrders(fan: Fan): Set<FanNode> {
   let out = aboveCache.get(fan);
   if (!out) {
     out = new Set();
-    for (const v of fan.nodes) if (ORDER_TAXA.has(taxonKey(v.split.taxon ?? ''))) for (let p = v.parent; p; p = p.parent) out.add(p);
+    for (const v of fan.nodes)
+      if (ORDER_TAXA.has(taxonKey(v.split.taxon ?? ''))) for (let p = v.parent; p; p = p.parent) if (!CLASS_TAXA.has(taxonKey(p.split.taxon ?? ''))) out.add(p);
     aboveCache.set(fan, out);
   }
   return out;
@@ -760,6 +766,8 @@ export function groupName(fan: Fan, v: FanNode): string {
   if (out === undefined) {
     const latin = latinOf(v.split);
     out = latin ? levelName(v) : '';
+    // (The first part down the largest parts with a rank name of its own, for a group whose face has no English name.)
+    let ranked: FanNode | undefined;
     if (out === latin && !familiar(v)) {
       for (let u: FanNode | undefined = v; u; ) {
         let big: FanNode | undefined;
@@ -769,10 +777,16 @@ export function groupName(fan: Fan, v: FanNode): string {
           out = `${levelName(big).split(/,| & /)[0]} & kin`;
           break;
         }
+        if (big && !ranked && latinOf(big.split)) ranked = big;
         u = big;
       }
     }
-    if (!out) out = `${levelText(groupFace(v) ?? v.strands[0])} & kin`;
+    if (!out) {
+      // (Told by its picture's species; one with no English name (its common its Latin, ToLaD#539: most reptiles, many fossils) tells it by a rank name, not a
+      // binomial: that first ranked part's ("Natricinae & kin"), else that species' genus ("Regina & kin").)
+      const face = groupFace(v) ?? v.strands[0];
+      out = face.sp.common !== face.sp.sci ? `${levelText(face)} & kin` : `${ranked ? latinOf(ranked.split) : face.sp.sci.split(' ')[0]} & kin`;
+    }
     kinCache.set(v, out);
   }
   return out;
@@ -1419,7 +1433,10 @@ export class FanView implements InputHandlers {
     // (The crown of the living, homeOf, ToLaD#279: the stem's fossils before it are off the frame, a pan or zoom out away.)
     const v = homeOf(this.fan);
     const [f, l] = [v.strands[0].index, v.strands[v.strands.length - 1].index];
-    return this.fan.tess.fold ? this.runFrame(f, l, v === this.fan.root ? 0 : v.y, this.fan.root) : this.withBand(this.camera.home());
+    // (A highlight's picture whole on home (ToLaD#539): on the amniotes the human is home's last strand, and its picture, wider than its band, stood on its centre half
+    // under the time axis. The highlights only, as CLAUDE.md allows: the frame's far end holds it; on the mammals, where it stands first, nothing changes.)
+    const keep = this.fan.branches.filter((b) => HIGHLIGHT_STOPS[b.sp.sci] && b.index >= f && b.index <= l);
+    return this.fan.tess.fold ? this.runFrame(f, l, v === this.fan.root ? 0 : v.y, this.fan.root, this.yNow, false, false, keep) : this.withBand(this.camera.home());
   }
 
   /**
@@ -1574,9 +1591,9 @@ export class FanView implements InputHandlers {
    * Kept per screen size (a bisection at the mammals is ~40 refolds of ~6,000 strands, ToLaD#255), the fold put where
    * it leaves it.
    */
-  private runFrame(f: number, l: number, yFork: number, v: FanNode, top = this.yNow, fossils = false, own = false): Camera {
+  private runFrame(f: number, l: number, yFork: number, v: FanNode, top = this.yNow, fossils = false, own = false, keep: FanBranch[] = []): Camera {
     const fold = this.fan.tess.fold;
-    const key = `${this.w}x${this.h}:${f}:${l}:${yFork}:${top}:${fossils}:${own}`;
+    const key = `${this.w}x${this.h}:${f}:${l}:${yFork}:${top}:${fossils}:${own}:${keep.map((b) => b.index).join(',')}`;
     if (this.framesFan !== this.fan) [this.framesFan, this.frames] = [this.fan, new Map()];
     const hit = this.frames.get(key);
     if (hit) {
@@ -1586,9 +1603,17 @@ export class FanView implements InputHandlers {
     const s: [number, number] = [0, 0];
     const cam = foldedFrame(this.fan, this.w, () => {
       const T = this.territories().t;
-      const [a, b] = (fossils && fossilSpan(this.fan, v, top)) || (own ? T.frameSpan(T.index.get(v)!, s) : this.runSpan(f, l, s));
+      const [a, b0] = (fossils && fossilSpan(this.fan, v, top)) || (own ? T.frameSpan(T.index.get(v)!, s) : this.runSpan(f, l, s));
       const x0 = LABEL_AXIS_X;
-      const sx = (this.w - LABEL_AXIS_X) / Math.max(1e-300, b - a);
+      // (`keep`: strands whose picture stands whole in the frame, its far end stretched past one nearer it than half a picture: c + r / sx = b at sx = W / (b - a). Its near end has LABEL_AXIS_X.)
+      let b = b0;
+      const [W, r] = [this.w - LABEL_AXIS_X, PIC_D / 2];
+      const C = keep.length ? (fold as Steady | undefined)?.rooms?.().C : undefined;
+      for (const k of keep) {
+        const c = C ? C[k.index] : k.cx;
+        if (c > a && (b - c) * (W / Math.max(1e-300, b - a)) < r) b = Math.max(b, (c - (a * r) / W) / (1 - r / W));
+      }
+      const sx = W / Math.max(1e-300, b - a);
       return this.withBand({ ...this.camera.frame(a, b, yFork, true), sx, cx: a + (this.w / 2 - x0) / sx }, top);
     });
     this.frames.set(key, { ...cam });

@@ -1,5 +1,5 @@
 # ToLaD data pipeline v0 (mammals). `make` = fetch (verify pinned checksums) + build + test.
-.PHONY: all fetch fetch-amniotes build build-amniotes test audit wiki globe
+.PHONY: all fetch fetch-amniotes build build-amniotes test audit wiki wiki-amniotes globe
 
 all: fetch build test
 
@@ -36,6 +36,12 @@ audit:
 # verifies its pinned checksum; writes data/mammals/wiki.json and nothing else.
 wiki:
 	uv run python -I -m tolad_pipeline.wiki
+
+# The same for the amniotes (ToLaD#539): data/amniotes/wiki.json, the birds and reptiles asked about on Wikidata (its
+# own snapshot, data/raw/wikidata/amniotes.json), the mammals' entries copied from data/mammals/wiki.json as they are.
+# A run cut off resumes where it stopped. ARGS: `--names-only` (steps 1-2, ~10 min), `--extend` (the rest, ~13 min).
+wiki-amniotes:
+	uv run python -I -m tolad_pipeline.wiki --tree amniotes $(ARGS)
 
 # Every species' range cells for the card's globe (ToLaD#267): PHYLACINE 1.2.1's current and present-natural rasters,
 # run-length packed, matched to the dated tree's species. Its own step over the built data; writes

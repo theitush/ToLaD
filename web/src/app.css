@@ -994,6 +994,12 @@
   font-size: 17px;
   color: var(--ink-2);
 }
+/* ToLaD#539: a species with no English name (most reptiles, many fossils) is titled by its Latin, once, in the Latin's face. */
+.fan .card-sp .t .sci {
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 500;
+}
 .fan .card-sp .facts p {
   margin: 0;
 }
