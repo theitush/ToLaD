@@ -20,12 +20,18 @@ export function hookHarness(contexts: Map<unknown, unknown> = new Map()) {
     if (!(k in slots)) slots[k] = { current: init };
     return slots[k];
   };
+  const useMemo = (f: () => unknown, deps: unknown[]) => {
+    const k = i++;
+    const had = slots[k] as { v: unknown; deps: unknown[] } | undefined;
+    if (!had || had.deps.length !== deps.length || deps.some((d, j) => !Object.is(d, had.deps[j]))) slots[k] = { v: f(), deps };
+    return (slots[k] as { v: unknown }).v;
+  };
   const render = <T,>(f: () => T): T => {
     i = 0;
     const prev = internals.H;
     // (A context reads the value given here for it, else its default: no providers without a renderer.)
     const useContext = (c: { _currentValue?: unknown }) => (contexts.has(c) ? contexts.get(c) : c._currentValue);
-    internals.H = { useState, useRef, useContext, useEffect: () => {}, useLayoutEffect: () => {} };
+    internals.H = { useState, useRef, useMemo, useContext, useEffect: () => {}, useLayoutEffect: () => {} };
     try {
       return f();
     } finally {

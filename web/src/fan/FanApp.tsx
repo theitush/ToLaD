@@ -20,6 +20,7 @@ import { setUnknownLook, unknownLook, type UnknownLook } from './dashed';
 import { forkLeaders, forkNames, setForkLeaders, setForkNames } from './brackets';
 import { FORK_MODES, forkMode, setForkMode, type ForkMode } from './steady';
 import { MagnifierIcon, SearchPanel } from './SearchPanel';
+import { foldNamesIdle } from './search';
 import { SourcesPanel } from './SourcesPanel';
 import { GRADE_MEANS, METHOD_IDS, MethodLink, OpenMethods, WORD_IDS } from './Methods';
 import { aliveSource, aliveStep, LossLine, SOURCE_WORD, useMethodsPage } from './cardwords';
@@ -213,6 +214,8 @@ export function FanApp() {
     const first = requestAnimationFrame(() => (later = window.setTimeout(() => loadMammalCard().catch((e: unknown) => console.warn('fan: the card data did not load', e)), 0)));
     // (Back on the tab, ToLaD#478: drawn again, or the page reloaded to here.)
     const unwatch = watchBack(v, () => selRef.current);
+    // The search's names folded at idle, not when it opens (ToLaD#564).
+    const unfold = foldNamesIdle(() => v.fan.branches.map((b) => b.sp));
     // The canvas text waits for the faces (drawn in system type until then).
     if (typeof document !== 'undefined' && document.fonts) {
       Promise.all([document.fonts.load("600 16px 'Sofia Sans Condensed'"), document.fonts.load("italic 400 14px 'Newsreader'")])
@@ -223,6 +226,7 @@ export function FanApp() {
       cancelAnimationFrame(first);
       clearTimeout(later);
       unwatch();
+      unfold();
       v.destroy();
       viewRef.current = null;
       if (window.__fan === v) delete window.__fan;
