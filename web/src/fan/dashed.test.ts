@@ -3,7 +3,8 @@
 // centre, from its top down to where it joins a column with a count in it; a clade with any counted species is the band
 // it was; a lone such species is a dashed line down to its split. `?unknown=faint`, the old look: bands, no dash
 // anywhere. Drawn as FanGL draws: its batches, the chords as SEG_VS takes them. (The mammals' own, one species:
-// unknown.test.tsx.) One process: the level's data is module state, so this file loads only the amniotes.
+// unknown.test.tsx.) One process: the level's data is module state, so this file loads only the amniotes. (Each frame
+// test ~5 s alone; 300 s, as the load's, for a machine shared with other runs.)
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Camera, FanCamera } from './camera';
 import { allUnknown, cladeDashes, DASH_SKIP, DASH_SPACE, setUnknownLook, strandDashes } from './dashed';
@@ -171,7 +172,7 @@ describe('a count nobody has, one dashed line, on the amniotes (ToLaD#565)', () 
     expect(strandDashes(f, liz).slice(0, 3)).toEqual([-Infinity, liz.splitY, 0]);
     // A bird with a count, a mammal: none.
     for (const n of ['Passer domesticus', 'Homo sapiens']) expect(strandDashes(f, f.branches.find((b) => b.sp.sci === n)!), n).toEqual([]);
-  });
+  }, 300_000);
 
   it('home: the reptiles\' merged clades dashed lines, the birds\' and mammals\' bands', () => {
     stand(home);
@@ -182,7 +183,7 @@ describe('a count nobody has, one dashed line, on the amniotes (ToLaD#565)', () 
     const lizards = [...merged.keys()].filter((u) => allUnknown(v.fan, u) && u.strands.some((b) => b.sp.sci === 'Lacerta agilis'));
     expect(lizards.length).toBe(1);
     expect(merged.get(lizards[0])!.dash.length).toBeGreaterThan(0);
-  });
+  }, 300_000);
 
   it('the lizards and snakes framed: their clades and lone species dashed lines, none a band', () => {
     stand(v.levelCamera('Squamata')!);
@@ -197,7 +198,7 @@ describe('a count nobody has, one dashed line, on the amniotes (ToLaD#565)', () 
       if (s.dash.length) lone++;
     }
     expect(lone + merged.size).toBeGreaterThan(0);
-  });
+  }, 300_000);
 
   it('no two dashed lines closer than DASH_SPACE on screen: lines packed closer are their clade\'s one line, parting as the view zooms in', () => {
     const near: string[] = [];
@@ -229,7 +230,7 @@ describe('a count nobody has, one dashed line, on the amniotes (ToLaD#565)', () 
     console.log(near.join('\n'));
     // (Zoomed in, the lizards' and snakes' lines part: more than one line a row.)
     expect(parted).toBeGreaterThan(1);
-  });
+  }, 300_000);
 
   it('the dashed chords as SEG_VS spreads them (expandChords) are the trapezoids drawn on the CPU (a batch that takes no chords)', () => {
     const gl = P(v).gl;
@@ -263,7 +264,7 @@ describe('a count nobody has, one dashed line, on the amniotes (ToLaD#565)', () 
     } finally {
       P(v).gl = gl;
     }
-  });
+  }, 300_000);
 
   it('`?unknown=faint`, the old look: bands, no dash anywhere', () => {
     setUnknownLook('faint');
@@ -281,5 +282,5 @@ describe('a count nobody has, one dashed line, on the amniotes (ToLaD#565)', () 
     } finally {
       setUnknownLook('dashed');
     }
-  });
+  }, 300_000);
 });
