@@ -22,6 +22,12 @@ export const DASH_W = 1.25;
 export const DASH_ON = 4;
 export const DASH_OFF = 3;
 export const DASH_PERIOD = DASH_ON + DASH_OFF;
+/**
+ * The least spacing (css px, centre to centre) at which neighbouring dashed lines are drawn each its own: a line's width
+ * and, across, as much room as a dash's gap has along it. Closer, a clade with no count in it is one line (lod.ts): rooms
+ * packed closer than this read as a striped block, not as lines. Zoomed in, it parts into its daughters' lines.
+ */
+export const DASH_SPACE = DASH_W + DASH_OFF;
 
 /** A stretch of a column drawn as no line at all: another column's line holds it (its first strand's, dashSpans). */
 export const DASH_SKIP = Infinity;

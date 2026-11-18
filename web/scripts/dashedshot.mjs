@@ -1,22 +1,27 @@
 // A count nobody has drawn as one thin dashed line (ToLaD#565), default headless (no GPU flags), from the page as pages.yml
 // stages it (served over http), at 390×844: each scene drawn dashed (the page) and faint (the old look, the bar's
 // "unknown counts" chip picked), and the two side by side. The amniotes: home, the lizards and snakes framed (merged clades
-// with no count in them), a lone lizard, a fossil dinosaur; the mammals: a #507 species (Data Deficient, never counted).
+// with no count in them), the skinks, a lone lizard, a fossil dinosaur; the mammals: a #507 species (Data Deficient, never counted).
 //   npm run build:single && node scripts/dashedshot.mjs <out-dir> [dist-dir] [only,scenes]
+// Two builds' shots side by side (each scene: before dashed | after dashed | after faint):
+//   node scripts/dashedshot.mjs compose <out-dir> <before-dir> <after-dir> [only,scenes]
 import { mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
 import { pageUrl } from './pageurl.mjs';
 
-const OUT = process.argv[2] || 'perf-out/dashed';
-const DIST = process.argv[3] || 'dist-single';
-const ONLY = process.argv[4] ? new Set(process.argv[4].split(',')) : null;
+const COMPOSE = process.argv[2] === 'compose';
+const A = COMPOSE ? process.argv.slice(3) : process.argv.slice(2);
+const OUT = A[0] || 'perf-out/dashed';
+const DIST = COMPOSE ? '' : A[1] || 'dist-single';
+const ONLY = (COMPOSE ? A[3] : A[2]) ? new Set((COMPOSE ? A[3] : A[2]).split(',')) : null;
 mkdirSync(OUT, { recursive: true });
 
 // [name, tree, kind, arg]: 'home' | 'clade' [taxon] | 'species' [sci]
 const SCENES = [
   ['amniotes-home', 'amniotes', 'home'],
   ['squamates', 'amniotes', 'clade', 'Squamata'],
+  ['skinks', 'amniotes', 'clade', 'Scincidae'],
   ['lizards', 'amniotes', 'clade', 'Lacertidae'],
   ['lizard', 'amniotes', 'species', 'Lacerta agilis'],
   ['dinosaur', 'amniotes', 'species', 'Tyrannosaurus rex'],
@@ -34,6 +39,33 @@ async function pick(page, name, label) {
 }
 
 const browser = await chromium.launch({ headless: true });
+/** Images side by side, each under its title, into file. */
+async function sideBySide(file, items) {
+  const ctx = await browser.newContext({ viewport: { width: 410 * items.length, height: 880 }, deviceScaleFactor: 1 });
+  const page = await ctx.newPage();
+  const src = (f) => `data:image/png;base64,${readFileSync(f).toString('base64')}`;
+  await page.setContent(
+    `<body style="margin:0;background:#222;color:#ddd;font:14px sans-serif;display:flex;gap:20px">` +
+      items.map(([title, f]) => `<div><div style="height:30px;line-height:30px;padding-left:6px">${title}</div><img src="${src(f)}" width="390" height="844"></div>`).join('') +
+      `</body>`,
+  );
+  await page.waitForTimeout(200);
+  await page.screenshot({ path: file, clip: { x: 0, y: 0, width: 410 * items.length - 20, height: 874 } });
+  await ctx.close();
+}
+if (COMPOSE) {
+  try {
+    for (const [name] of SCENES)
+      await sideBySide(join(OUT, `${name}.png`), [
+        [`${name}: before (main)`, join(A[1], `${name}-dashed.png`)],
+        [`${name}: after`, join(A[2], `${name}-dashed.png`)],
+        [`${name}: after, faint (the old look)`, join(A[2], `${name}-faint.png`)],
+      ]);
+  } finally {
+    await browser.close();
+  }
+  process.exit(0);
+}
 try {
   for (const tree of ['amniotes', 'mammals']) {
     const scenes = SCENES.filter((s) => s[1] === tree);
@@ -88,19 +120,11 @@ try {
     served.close();
   }
   // Side by side: dashed (the page) on the left, faint (the old look) on the right.
-  const ctx = await browser.newContext({ viewport: { width: 800, height: 880 }, deviceScaleFactor: 1 });
-  const page = await ctx.newPage();
-  for (const [name] of SCENES) {
-    const src = (k) => `data:image/png;base64,${readFileSync(join(OUT, `${name}-${k}.png`)).toString('base64')}`;
-    await page.setContent(
-      `<body style="margin:0;background:#222;color:#ddd;font:14px sans-serif;display:flex;gap:20px">` +
-        ['dashed', 'faint'].map((k) => `<div><div style="height:30px;line-height:30px;padding-left:6px">${name}: ${k === 'dashed' ? 'dashed (the page)' : 'faint (the old look)'}</div><img src="${src(k)}" width="390" height="844"></div>`).join('') +
-        `</body>`,
-    );
-    await page.waitForTimeout(200);
-    await page.screenshot({ path: join(OUT, `${name}.png`), clip: { x: 0, y: 0, width: 800, height: 874 } });
-  }
-  await ctx.close();
+  for (const [name] of SCENES)
+    await sideBySide(join(OUT, `${name}.png`), [
+      [`${name}: dashed (the page)`, join(OUT, `${name}-dashed.png`)],
+      [`${name}: faint (the old look)`, join(OUT, `${name}-faint.png`)],
+    ]);
 } finally {
   await browser.close();
 }
