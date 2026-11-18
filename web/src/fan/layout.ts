@@ -1777,6 +1777,22 @@ interface Cand extends Plan {
 const MAX_CANDS = 16;
 
 /**
+ * A split's two sides are one run when their least runs are closer than this share of it (ToLaD#561): then the table's
+ * order holds, and only that side goes up to its parent, so no split above can mirror it back for a hair of run. The
+ * runs of a big split's two sides differ by a hair: its leans sum thousands of columns, fossils' among them, and the two
+ * sides of Euarchontoglires came 0.07% apart on the data of ToLaD#561 and 0.16% the other way just before it. Searched by
+ * least run alone (and only MAX_CANDS_HUGE candidates kept), each side hung on fossil branches nowhere near the screen:
+ * the zero-length ones given time (#561) swapped rodents and primates at the mammal home, and mirrored 711 of the 6,213
+ * splits with two living daughters, 50 of over 100 species (Mammalia, Theria, Euarchontoglires). At this share, 45, the
+ * largest of 128 species, and the home the same on both. The share: MBL (pipeline dated.py), the share of its age the data's
+ * zero-length rule moves a fossil split, so a run difference smaller than what that nudge makes is no difference. Both
+ * runs are still searched; a split whose sides differ by more takes the shorter, as before. Only in the narrow search of
+ * a tree over HUGE_TREE (the page's: every mammal, every amniote), where two candidates a subtree are a guess at the least
+ * run; a smaller tree's search finds it, and keeps it (the cats' and the carnivores' levels in the tests).
+ */
+const SIDE_TIE = 5e-3;
+
+/**
  * A tree of more species than BIG_TREE keeps only MAX_CANDS_BIG candidates per subtree (ToLaD#146): the search
  * costs ~MAX_CANDS² plans per split, so at Carnivora's 291 species the full one took ~1.5 s (a phone: several)
  * for a total sideways run within 0.5% of what 4 find (measured: 202.1 vs 203.3 linear, 236.4 vs 237.5 log). A
@@ -1880,9 +1896,14 @@ function chooseSides(root: FanNode, P: Packer, known?: Map<Split, boolean>): { p
       if (v.kids.length > 1) all.push(plan(v, kc, true));
     }
     all.sort(better);
+    // (In the narrow search, its two sides' least runs within SIDE_TIE of each other: one run, so the table's order, and
+    // only it goes up.)
+    const b0 = all.find((c) => !c.flip);
+    const b1 = all.find((c) => c.flip);
+    const tied = cap === MAX_CANDS_HUGE && !!b0 && !!b1 && Math.abs(b0.cost - b1.cost) <= SIDE_TIE * Math.min(b0.cost, b1.cost) + 1e-9;
     // Keep those no kept one beats on all of left, right, run and mirrored splits.
     const keep: Cand[] = [];
-    for (const c of all) {
+    for (const c of tied ? all.filter((x) => !x.flip) : all) {
       if (keep.some((k) => k.cost <= c.cost + 1e-9 && k.flips <= c.flips && P.inside(k.out, c.out))) continue;
       keep.push(c);
       if (keep.length >= cap) break;
