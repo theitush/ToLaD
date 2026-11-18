@@ -518,10 +518,12 @@ export class Tess {
       if (y < b.splitY) add(y);
     }
     add(this.bottom);
-    out.sort((p, q) => p - q);
-    const u: number[] = [];
-    for (const y of out) if (!u.length || y - u[u.length - 1] > 1e-9) u.push(y);
-    v = Float64Array.from(u);
+    // (Sorted as numbers, natively, and the ties within 1e-9 of the last kept dropped in place: a strand's heights are its
+    // ancestors' features, thousands deep in the reptiles, ToLaD#502.)
+    const s = Float64Array.from(out).sort();
+    let m = 0;
+    for (let i = 0; i < s.length; i++) if (m === 0 || s[i] - s[m - 1] > 1e-9) s[m++] = s[i];
+    v = s.slice(0, m);
     this.ys.set(b, v);
     return v;
   }
