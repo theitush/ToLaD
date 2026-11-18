@@ -16,7 +16,7 @@ import { formatCount, formatMass } from '../data/count';
 import { stamp } from '../stamp';
 import { DOUBLE_TAP_MS, Input, type InputHandlers } from '../engine/input';
 import { clipPoly, FanCamera, LABELS_SHARE, type Camera } from './camera';
-import { ease, isNode, laneAt, laneW, layoutFan, leftAt, nearestStrand, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, type Fan, type FanBranch, type FanNode, type Measure, type WidthMode } from './layout';
+import { ease, isNode, laneAt, laneW, layoutFan, leftAt, nearestStrand, nodeLeftAt, nodeQ, segAt, STEM_FADE_MA, typedFrom, type Fan, type FanBranch, type FanNode, type Measure, type WidthMode } from './layout';
 import type { CladeRec, SpeciesRec } from './panthera';
 import { FanGL, rgb01, type Batches, type ChordStyle } from './meshgl';
 import { Ribbons } from './ribbons';
@@ -227,12 +227,13 @@ class CutTerritories {
   constructor(fan: Fan, fold: Steady, w: number) {
     this.t = new Territories(fan, fold, w);
     this.now = fan.time.y(0);
-    this.young = Float64Array.from(fan.nodes, (v) => {
+    this.young = typedFrom(Float64Array, fan.nodes, (v) => {
       let y = Infinity;
       for (const b of v.strands) y = Math.min(y, Math.max(b.tipY, this.now));
       return y;
     });
-    this.alive = Float64Array.from(fan.nodes, (v) => groupAlive({ v }));
+    primeAlive(fan);
+    this.alive = typedFrom(Float64Array, fan.nodes, (v) => groupAlive({ v }));
   }
   /** Daughter k's (a node's index, ~ a strand's) youngest tip (world y). */
   youngOf(k: number): number {
@@ -1057,6 +1058,22 @@ function nextFaces(fan: Fan, v: FanNode): string[] {
 
 /** A level's group's individuals alive now (ToLaD#266: whose picture stays, and on top, when they crowd). */
 const aliveCache = new WeakMap<FanNode, number>();
+/**
+ * Every node's groupAlive at once (ToLaD#502): each strand's alive now read once, then each node's summed over its strands in their order, as
+ * groupAlive sums them (the same additions, so the same number): not each strand's population read again for every node over it, 1.6M reads
+ * on the amniotes.
+ */
+function primeAlive(fan: Fan): void {
+  const S = fan.root.strands;
+  const A = typedFrom(Float64Array, S, (b) => (b.sp.extinct ? 0 : b.pop.aliveAt(0)));
+  for (const v of fan.nodes) {
+    if (aliveCache.has(v)) continue;
+    let n = 0;
+    for (const b of v.strands) n += A[b.index];
+    aliveCache.set(v, n);
+  }
+}
+
 export function groupAlive(g: Level): number {
   if (g.b) return g.b.sp.extinct ? 0 : g.b.pop.aliveAt(0);
   let n = aliveCache.get(g.v);
@@ -2471,16 +2488,20 @@ export class FanView implements InputHandlers {
     const c = this.cam;
     const b = this.centreLine();
     const z = (f: Camera) => Math.log(c.sx / f.sx) + Math.log(c.sy / f.sy);
-    const ladder: Step[] = [];
+    const ladder: { lv: Level; at?: Camera }[] = [];
     // (Each level by where a tap on it lands (landOf, ToLaD#472): on the tree on its side deeper than its frame (openCamera, #468), so the view a
     // tap leaves is read as the level it landed on, a pan keeps it, and the level above lands wider: a double tap never holds.)
-    const push = (lv: Level) => ladder.push({ lv, cam: this.landOf(lv) });
+    // (Each landing worked out when first read, ToLaD#502: at home the outermost is the view's, and the levels inside it, each a layout at
+    // another zoom, were 2 s of the amniotes' open.)
+    const push = (lv: Level) => ladder.push({ lv });
+    const cam = (i: number): Camera => (ladder[i].at ??= this.landOf(ladder[i].lv));
     if (b) push({ b });
     for (let u = b ? levelUp(this.fan, b.node, true) : null; u; u = levelUp(this.fan, u)) push({ v: u });
     if (ladder[ladder.length - 1]?.lv.v !== this.fan.root) push({ v: this.fan.root });
     // At a frame (within LEVEL_PX, as a tap passes them): the outermost there. Else from home in, while the view is
     // inside each (a wide species' frame, as the house cat's, can take in its group's, even home's).
-    const on = [...ladder].reverse().find((f) => this.offBy(f.cam, c) <= LEVEL_PX);
+    let on: { lv: Level } | undefined;
+    for (let i = ladder.length - 1; i >= 0 && !on; i--) if (this.offBy(cam(i), c) <= LEVEL_PX) on = ladder[i];
     // (The level the view was at, while it is still near its frame: a pan of a third of the screen at the Hominins put
     // the centre on a gibbon's line, or the human's, and the level flipped to theirs, the names and pictures with it, ToLaD#311.)
     const near = (lv: Level) => {
@@ -2492,14 +2513,14 @@ export class FanView implements InputHandlers {
     if (on) return on.lv;
     if (was && near(was)) return was;
     let lv: Level = { v: this.fan.root };
-    let offLv = this.offBy(ladder[ladder.length - 1].cam, c);
+    let offLv = this.offBy(cam(ladder.length - 1), c);
     for (let i = ladder.length - 2; i >= 0; i--) {
-      const zi = z(ladder[i].cam);
+      const zi = z(cam(i));
       if (zi < -Math.log(BACK_SLACK)) {
         // (A frame tighter than the next one in, Fit fossils: the great apes framed on "now", the hominins' wider on
         // their fossils. Passed over, not where the walk ends: else a pan off the Hominins' frame read the view as at
         // the Catarrhini, the pictures and names gone, ToLaD#311.)
-        if (i > 0 && z(ladder[i - 1].cam) >= zi) continue;
+        if (i > 0 && z(cam(i - 1)) >= zi) continue;
         break;
       }
       // (A level whose frame stands further off the view than the one it sits in is not where the view is, however
@@ -2507,7 +2528,7 @@ export class FanView implements InputHandlers {
       // there, ToLaD#302; a fossil genus' a pan away from the Hominins' frame, Paranthropus', ToLaD#311. A clade's only
       // while the view is within a screen of the one it sits in: far from every frame, the outer ones stand further
       // off the deeper they go.)
-      const off = this.offBy(ladder[i].cam, c);
+      const off = this.offBy(cam(i), c);
       if (ladder[i].lv.b && off > offLv + LEVEL_PX) break;
       lv = ladder[i].lv;
       offLv = off;

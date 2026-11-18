@@ -1220,6 +1220,17 @@ function emergeRun(k: Kid, time: TimeScale, mode: WidthMode, reach: number): num
 /** The guard's hair (layoutFan): a strand ends at least this share of its split's age after its split. */
 export const END_HAIR = 1e-3;
 
+/**
+ * `C.from(a, f)` as a plain loop (ToLaD#502): a typed array's from() with a map function takes V8's slow path, some 20x a loop, and the
+ * open makes dozens of them over every species and split (1.6 s of the amniotes' 18 s in node). The same values: each is converted by the
+ * array's own element type as from() converts them.
+ */
+export function typedFrom<T extends Float64Array | Int32Array | Uint8Array, U>(C: new (n: number) => T, a: ArrayLike<U>, f: (x: U, i: number) => number): T {
+  const out = new C(a.length);
+  for (let i = 0; i < a.length; i++) out[i] = f(a[i], i);
+  return out;
+}
+
 export function layoutFan(clade: CladeRec, mode: WidthMode, tree: Split = clade.tree, measure: Measure = 'individuals'): Fan {
   const W = TRUNK_WIDTH;
   // (A species with no mass in the data, none since ToLaD#276's build: the clade's median.)

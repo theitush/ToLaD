@@ -9,7 +9,7 @@
 // The clade's brackets and labels go with it: what is inside a merged clade is not named on its own (the stack reads
 // the path from the root down to the merged clades, the orders at home), and its species have no pills.
 
-import { isNode, lanesAt, type Fan, type FanNode } from './layout';
+import { isNode, lanesAt, typedFrom, type Fan, type FanNode } from './layout';
 import type { Fold } from './fold';
 import { GreenRuns } from './green';
 
@@ -61,10 +61,10 @@ export class Lod {
     this.room = new Float64Array(N.length);
     this.tops = new Float64Array(N.length).fill(NaN);
     N.forEach((v, i) => (this.room[i] = v.strands.reduce((s, b) => s + b.width, 0)));
-    this.par = Int32Array.from(N, (v) => (v.parent ? this.idx.get(v.parent)! : -1));
-    this.kidN = N.map((v) => Int32Array.from(v.kids.filter(isNode), (k) => this.idx.get(k as FanNode)!));
-    this.nStr = Int32Array.from(N, (v) => v.strands.length);
-    this.s0 = Int32Array.from(N, (v) => (v.strands.length ? v.strands[0].index : 0));
+    this.par = typedFrom(Int32Array, N, (v) => (v.parent ? this.idx.get(v.parent)! : -1));
+    this.kidN = N.map((v) => typedFrom(Int32Array, v.kids.filter(isNode), (k) => this.idx.get(k as FanNode)!));
+    this.nStr = typedFrom(Int32Array, N, (v) => v.strands.length);
+    this.s0 = typedFrom(Int32Array, N, (v) => (v.strands.length ? v.strands[0].index : 0));
     this.rootI = this.idx.get(fan.root)!;
     this.stack = new Int32Array(N.length + 1);
     this.bPos = new Int32Array(fan.root.strands.length);
@@ -75,8 +75,8 @@ export class Lod {
     const own = (this.own = new Float64Array(N.length));
     const allG = (this.allG = new Uint8Array(N.length));
     const anyG = (this.anyG = new Uint8Array(N.length));
-    const subTop = (this.subTop = Float64Array.from(N, (v) => v.y));
-    const subBot = (this.subBot = Float64Array.from(N, (v) => v.yBot));
+    const subTop = (this.subTop = typedFrom(Float64Array, N, (v) => v.y));
+    const subBot = (this.subBot = typedFrom(Float64Array, N, (v) => v.yBot));
     for (let i = N.length - 1; i >= 0; i--) {
       const v = N[i];
       const r = this.room[i];
