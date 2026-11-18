@@ -48,6 +48,14 @@ export const SOURCES: readonly Source[] = [
   { name: 'LR04 stack', by: 'Lisiecki & Raymo', when: '2005', use: 'the ice ages', url: 'https://doi.org/10.1029/2004PA001071' },
   { name: 'The Last Glacial Maximum', by: 'Clark et al.', when: '2009', use: 'its dates', url: 'https://doi.org/10.1126/science.1172873' },
   { name: 'Natural Earth', when: '1:110m, through world-atlas 2.0.2', use: 'land on the globe', url: 'https://www.naturalearthdata.com/' },
+  // (The amniotes, ToLaD#539: what `make build-amniotes` reads beside the mammals' inputs, pipeline/SOURCES.md "The amniote build".)
+  { name: 'AvesData', by: 'McTavish et al.', when: '1.7, 2025', use: 'the dated bird tree', url: 'https://doi.org/10.1073/pnas.2409658122' },
+  { name: 'eBird/Clements Checklist', by: 'Clements et al.', when: 'v2025', use: 'bird species, English names', url: 'https://www.birds.cornell.edu/clementschecklist/' },
+  { name: 'Global bird abundance', by: 'Callaghan, Nakagawa & Cornwell', when: '2021', use: 'bird counts', url: 'https://doi.org/10.1073/pnas.2023170118' },
+  { name: 'The Reptile Database', by: 'Uetz et al.', when: 'October 2026', use: 'the reptile species list', url: 'https://www.reptile-database.org/' },
+  { name: 'Squamate timetree', by: 'Title et al.', when: '2024', use: 'lizard and snake split dates', url: 'https://doi.org/10.5061/dryad.p5hqbzkvb' },
+  { name: 'Turtle & crocodilian trees', by: 'Colston et al.', when: '2020', use: 'their split dates', url: 'https://doi.org/10.5281/zenodo.4986456' },
+  { name: 'TimeTree 5', by: 'Kumar et al.', when: '2022', use: 'five deep amniote splits', url: 'https://doi.org/10.1093/molbev/msac174' },
 ];
 
 /** Where to ask for something to be taken down. */
