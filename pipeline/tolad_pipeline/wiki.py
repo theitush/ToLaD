@@ -36,6 +36,14 @@ is a standard thumbnail step that reads well across the card (~350 CSS px) on a 
 to enlarge asks for the 960 px step like the photo. Most maps are SVGs: upload.wikimedia.org
 renders those as PNG (`500px-X.svg.png`), so an SVG is taken like any other file; with several
 values, the first in sorted order.
+
+`--tree amniotes` (ToLaD#539, `make wiki-amniotes`) does the same over data/amniotes into data/amniotes/wiki.json, with
+its own pinned snapshot (`data/raw/wikidata/amniotes.json`). The mammals in it are not asked again: their entries are
+data/mammals/wiki.json's, copied as they are, so the birds and reptiles are all it asks about.
+
+Every batch's answer is kept as it comes (`<snapshot>.batches.jsonl` beside the snapshot), so a run cut off picks up
+where it stopped: a rerun asks only for the keys no kept batch has. `--refresh` starts it afresh. `--names-only` runs
+steps 1 and 2 alone (the cheap ones, about 10 minutes for the amniotes); `--extend` adds steps 3 and 4 later.
 """
 from __future__ import annotations
 
@@ -59,6 +67,8 @@ from .load import load_ott
 ENDPOINT = "https://query.wikidata.org/sparql"
 UA = "ToLaD-pipeline/0.1 (+https://github.com/theitush/ToLaD; species links, ToLaD#182)"
 SNAPSHOT = "wikidata/taxa.json"
+# Each tree's snapshot (ToLaD#539): the mammals' is the first one, kept under its old name.
+SNAPSHOTS = {"mammals": SNAPSHOT, "amniotes": "wikidata/amniotes.json"}
 BATCH = 150
 ALIAS_BATCH = 100
 PAUSE_S = 1.5
@@ -217,34 +227,71 @@ def _sparql(query: str) -> list[list[str]]:
     return [[b.get(c, {}).get("value", "") for c in cols] for b in res["results"]["bindings"]]
 
 
-def query_all(prop: str, keys: list[str]) -> list[list[str]]:
-    rows: list[list[str]] = []
-    step = ALIAS_BATCH if prop == "alias" else BATCH  # the alias query is heavier: 150 names time out at 60 s
-    for i in range(0, len(keys), step):
-        chunk = keys[i: i + step]
-        if prop == "alias":
-            q = ALIAS_QUERY.format(
-                                   labels=" ".join(f"{_literal(k)}@{lang}" for k in chunk for lang in ("mul", "en")))
-            found = {(r[0], r[1]) for r in _sparql(q) if ITEM.fullmatch(r[1])}
-            time.sleep(PAUSE_S)
-            if found:
-                detail: dict[str, list[list[str]]] = {}
-                items = sorted({it for _, it in found})
-                for j in range(0, len(items), BATCH):
-                    ids = " ".join("wd:" + it.rsplit("/", 1)[-1] for it in items[j: j + BATCH])
-                    for r in _sparql(ITEM_QUERY.format(values=ids)):
-                        detail.setdefault(r[0], []).append(r)
-                    time.sleep(PAUSE_S)
-                rows += [[k] + r[1:] for k, it in sorted(found) for r in detail.get(it, [])]
-            print(f"[wiki] alias {i + len(chunk)}/{len(keys)}: {len(rows)} rows", file=sys.stderr)
-            continue
-        elif prop == "P1420":
-            q = LINK_QUERY.format(values=" ".join("wd:" + k.rsplit("/", 1)[-1] for k in chunk))
-        else:
-            q = QUERY.format(values=" ".join(_literal(k) for k in chunk), prop=prop)
-        rows += _sparql(q)
-        print(f"[wiki] {prop} {i + len(chunk)}/{len(keys)}: {len(rows)} rows", file=sys.stderr)
+# The kept batches of the run (module docstring): one JSON line per batch, {"prop", "keys", "rows"}, each row's first
+# column its key. None: nothing kept.
+BATCHES: Path | None = None
+
+
+def _recall(prop: str, keys: list[str]) -> tuple[set[str], list[list[str]]]:
+    """The keys of `keys` a kept batch has asked for `prop`, and those batches' rows for them."""
+    if BATCHES is None or not BATCHES.exists():
+        return set(), []
+    want, done, rows = set(keys), set(), []
+    with BATCHES.open(encoding="utf-8") as f:
+        for line in f:
+            try:
+                b = json.loads(line)
+            except json.JSONDecodeError:
+                continue  # a line cut off mid-write: that batch is asked again
+            if b["prop"] == prop:
+                done |= want.intersection(b["keys"])
+                rows += [r for r in b["rows"] if r[0] in want]
+    return done, rows
+
+
+def _remember(prop: str, keys: list[str], rows: list[list[str]]) -> None:
+    if BATCHES is not None:
+        BATCHES.parent.mkdir(parents=True, exist_ok=True)
+        with BATCHES.open("a", encoding="utf-8") as f:
+            f.write(json.dumps({"prop": prop, "keys": keys, "rows": rows}, ensure_ascii=False) + "\n")
+
+
+def _alias_rows(chunk: list[str]) -> list[list[str]]:
+    q = ALIAS_QUERY.format(labels=" ".join(f"{_literal(k)}@{lang}" for k in chunk for lang in ("mul", "en")))
+    found = {(r[0], r[1]) for r in _sparql(q) if ITEM.fullmatch(r[1])}
+    time.sleep(PAUSE_S)
+    if not found:
+        return []
+    detail: dict[str, list[list[str]]] = {}
+    items = sorted({it for _, it in found})
+    for j in range(0, len(items), BATCH):
+        ids = " ".join("wd:" + it.rsplit("/", 1)[-1] for it in items[j: j + BATCH])
+        for r in _sparql(ITEM_QUERY.format(values=ids)):
+            detail.setdefault(r[0], []).append(r)
         time.sleep(PAUSE_S)
+    return [[k] + r[1:] for k, it in sorted(found) for r in detail.get(it, [])]
+
+
+def query_all(prop: str, keys: list[str]) -> list[list[str]]:
+    done, rows = _recall(prop, keys)
+    todo = [k for k in keys if k not in done]
+    if done:
+        print(f"[wiki] {prop}: {len(done)} keys kept from an earlier run, {len(todo)} to ask", file=sys.stderr)
+    step = ALIAS_BATCH if prop == "alias" else BATCH  # the alias query is heavier: 150 names time out at 60 s
+    for i in range(0, len(todo), step):
+        chunk = todo[i: i + step]
+        if prop == "alias":
+            got = _alias_rows(chunk)
+        else:
+            if prop == "P1420":
+                q = LINK_QUERY.format(values=" ".join("wd:" + k.rsplit("/", 1)[-1] for k in chunk))
+            else:
+                q = QUERY.format(values=" ".join(_literal(k) for k in chunk), prop=prop)
+            got = _sparql(q)
+            time.sleep(PAUSE_S)
+        _remember(prop, chunk, got)
+        rows += got
+        print(f"[wiki] {prop} {i + len(chunk)}/{len(todo)}: {len(rows)} rows", file=sys.stderr)
     return rows
 
 
@@ -307,9 +354,10 @@ def infobox_image(wikitext: str) -> str | None:
 
 def page_images(articles: list[str]) -> dict[str, str]:
     """English article URL -> Commons file name of its taxobox `image` (redirects followed)."""
-    titles = {urllib.parse.unquote(a.rsplit("/wiki/", 1)[-1]).replace("_", " "): a for a in articles}
+    done, kept = _recall("pageimg", articles)
+    titles = {urllib.parse.unquote(a.rsplit("/wiki/", 1)[-1]).replace("_", " "): a for a in articles if a not in done}
     keys = sorted(titles)
-    out: dict[str, str] = {}
+    out: dict[str, str] = {a: f for a, f in kept}
     for i in range(0, len(keys), PAGEIMG_BATCH):
         chunk = keys[i: i + PAGEIMG_BATCH]
         res = _api({"action": "query", "prop": "revisions", "rvprop": "content", "rvslots": "main", "redirects": "1",
@@ -326,12 +374,14 @@ def page_images(articles: list[str]) -> dict[str, str]:
                 t2 = moved.get(t2, t2)
             if t2 in got:
                 out[titles[t]] = got[t2]
+        _remember("pageimg", [titles[t] for t in chunk], [[titles[t], out[titles[t]]] for t in chunk if titles[t] in out])
         print(f"[wiki] infobox images {i + len(chunk)}/{len(keys)}: {len(out)} images", file=sys.stderr)
         time.sleep(PAUSE_S)
     return out
 
 
-def extend_snapshot(species: dict[str, int], snap: dict, raw: Path, living: set[str] | None = None) -> dict:
+def extend_snapshot(species: dict[str, int], snap: dict, raw: Path, living: set[str] | None = None,
+                    path: Path | None = None) -> dict:
     """Bring a pinned snapshot up to the species rows and to steps 3 and 4 of the docstring.
 
     The dated tree grows after a snapshot is taken (MDD's living species were grafted on two days after the first
@@ -345,7 +395,7 @@ def extend_snapshot(species: dict[str, int], snap: dict, raw: Path, living: set[
     snap = dict(snap, names=sorted(map(list, {tuple(r) for r in snap["names"]} | {tuple(r) for r in query_all("P225", fresh)})),
                 asked=sorted(species))
     # Saved here, so that a failure in the heavier steps below costs only them (the next --extend skips this one).
-    (raw / SNAPSHOT).write_text(json.dumps(snap, ensure_ascii=False, indent=0, sort_keys=True) + "\n", encoding="utf-8")
+    (path or raw / SNAPSHOT).write_text(json.dumps(snap, ensure_ascii=False, indent=0, sort_keys=True) + "\n", encoding="utf-8")
     # The alias step only for living species: it is one lookup per name (~10 s per 100), and a fossil's name is a
     # paleontological one that Wikidata rarely has a picture for.
     miss = sorted(n for n, e in resolve(species, dict(snap, alias=[], pageimg={}), raw).items()
@@ -363,7 +413,9 @@ def pic_less(out: dict[str, dict | None]) -> list[str]:
     return sorted({e["wp"] for e in out.values() if e and e.get("wp") and not e.get("img")})
 
 
-def fetch_snapshot(species: dict[str, int], raw: Path) -> dict:
+def fetch_snapshot(species: dict[str, int], raw: Path, living: set[str] | None = None, path: Path | None = None,
+                   extend: bool = True) -> dict:
+    """Steps 1 and 2 of the module docstring; with `extend`, steps 3 and 4 too (extend_snapshot)."""
     by_name = query_all("P225", sorted(species))
     found = {r[0] for r in by_name}
     miss = sorted(n for n in species if n not in found)
@@ -388,7 +440,7 @@ def fetch_snapshot(species: dict[str, int], raw: Path) -> dict:
         "link_query": LINK_QUERY,
         "linked": sorted(by_link),
     }
-    return extend_snapshot(species, snap, raw)
+    return extend_snapshot(species, snap, raw, living, path) if extend else snap
 
 
 def synonyms(ids: set[int], raw: Path) -> dict[int, list[str]]:
@@ -520,46 +572,76 @@ def rates(out: dict[str, dict | None], names: set[str]) -> str:
             f"range map {rng} ({100 * rng / n:.0f}%)")
 
 
+def amniote_groups(raw: Path) -> dict[str, str]:
+    """Species name -> its group (Aves, Squamata, Testudines, Crocodylia, Rhynchocephalia), from the lists the
+    amniote build takes them from (Clements 2025, the Reptile Database): for the coverage line only."""
+    from .amniotes import load_clements, load_rdb
+    return {n: r["group"] for n, r in {**load_clements(raw), **load_rdb(raw)[0]}.items()}
+
+
 def main(argv: list[str] | None = None) -> int:
     root = Path(__file__).resolve().parents[2]
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--tree", choices=sorted(SNAPSHOTS), default="mammals")
     ap.add_argument("--raw", type=Path, default=root / "data" / "raw")
-    ap.add_argument("--mammals", type=Path, default=root / "data" / "mammals")
+    ap.add_argument("--data", type=Path, help="the built dataset (default data/<tree>)")
+    ap.add_argument("--mammals", type=Path, default=root / "data" / "mammals",
+                    help="the mammals' dataset, whose wiki.json another tree's mammals are copied from")
     ap.add_argument("--lock", type=Path, default=root / "pipeline" / "sources.lock.json")
     ap.add_argument("--extend", action="store_true",
                     help="keep the snapshot's rows and run only the steps it lacks (alias, page images), re-pinning it")
+    ap.add_argument("--names-only", action="store_true",
+                    help="with no snapshot: steps 1 and 2 only (name, OTT id, synonyms, links); --extend adds the rest")
     ap.add_argument("--refresh", action="store_true", help="query Wikidata again and re-pin the snapshot")
     a = ap.parse_args(argv)
 
-    species = species_rows(a.mammals)
-    snap_path = a.raw / SNAPSHOT
+    global BATCHES
+    data = a.data or root / "data" / a.tree
+    name = SNAPSHOTS[a.tree]
+    snap_path = a.raw / name
+    BATCHES = snap_path.with_suffix(".batches.jsonl")
+    if a.refresh and BATCHES.exists():
+        BATCHES.unlink()
+    every = species_rows(data)
+    # Another tree's mammals are the mammals' own entries, as they are: only the rest is asked about.
+    kept: dict[str, dict | None] = {}
+    if data.resolve() != a.mammals.resolve():
+        mw = json.loads((a.mammals / "wiki.json").read_text(encoding="utf-8"))
+        kept = {n: mw[n] for n in every if n in mw}
+    species = {n: o for n, o in every.items() if n not in kept}
     lock = json.loads(a.lock.read_text())
     extend = a.extend and snap_path.exists()
     if extend or a.refresh or not snap_path.exists():
-        snap = (extend_snapshot(species, json.loads(snap_path.read_text(encoding="utf-8")), a.raw,
-                                         living_species(a.mammals)) if extend
-                else fetch_snapshot(species, a.raw))
+        living = living_species(data)
+        snap = (extend_snapshot(species, json.loads(snap_path.read_text(encoding="utf-8")), a.raw, living, snap_path)
+                if extend else fetch_snapshot(species, a.raw, living, snap_path, extend=not a.names_only))
         snap_path.parent.mkdir(parents=True, exist_ok=True)
         snap_path.write_text(json.dumps(snap, ensure_ascii=False, indent=0, sort_keys=True) + "\n", encoding="utf-8")
-        lock[SNAPSHOT] = {"url": ENDPOINT, "post_body": {"query": "see the snapshot's `query`, keys: the dated tree's species"},
-                          "sha256": sha256(snap_path), "bytes": snap_path.stat().st_size, "retrieved": snap["retrieved"]}
+        lock[name] = {"url": ENDPOINT, "post_body": {"query": "see the snapshot's `query`, keys: the dated tree's species"},
+                      "sha256": sha256(snap_path), "bytes": snap_path.stat().st_size, "retrieved": snap["retrieved"]}
         a.lock.write_text(json.dumps(lock, indent=1, sort_keys=True) + "\n")
-        print(f"[lock] {SNAPSHOT} {lock[SNAPSHOT]['sha256'][:16]}", file=sys.stderr)
+        print(f"[lock] {name} {lock[name]['sha256'][:16]}", file=sys.stderr)
     else:
-        rec = lock.get(SNAPSHOT)
+        rec = lock.get(name)
         digest = sha256(snap_path)
         if rec is None or rec["sha256"] != digest:
-            print(f"[MISMATCH] {SNAPSHOT}: got {digest[:16]} (use --refresh to re-pin)", file=sys.stderr)
+            print(f"[MISMATCH] {name}: got {digest[:16]} (use --refresh to re-pin)", file=sys.stderr)
             return 1
         snap = json.loads(snap_path.read_text(encoding="utf-8"))
     out = resolve(species, snap, a.raw)
-    for name, (article, photo) in HAND.items():
-        if name in out:
-            e = dict(out[name] or {}, wp=article)
+    for sp, (article, photo) in HAND.items():
+        if sp in out:
+            e = dict(out[sp] or {}, wp=article)
             e["img"], e["file"] = _commons("/Special:FilePath/" + photo, THUMB_W)
-            out[name] = e
-    write_sidecar(out, a.mammals / "wiki.json")
-    print(f"[wiki] all {rates(out, set(out))}", file=sys.stderr)
+            out[sp] = e
+    write_sidecar({**kept, **out}, data / "wiki.json")
+    if kept:
+        print(f"[wiki] mammals, kept as they are: {rates(kept, set(kept))}", file=sys.stderr)
+        by = amniote_groups(a.raw)
+        for g in ("Aves", "Squamata", "Testudines", "Crocodylia", "Rhynchocephalia"):
+            print(f"[wiki] {g}: {rates(out, {n for n in out if by.get(n) == g})}", file=sys.stderr)
+        print(f"[wiki] in no list (fossils, ...): {rates(out, {n for n in out if n not in by})}", file=sys.stderr)
+    print(f"[wiki] asked {rates(out, set(out))}", file=sys.stderr)
     return 0
 
 

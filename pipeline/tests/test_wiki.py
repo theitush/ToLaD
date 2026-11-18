@@ -1,12 +1,15 @@
 """The Wikipedia/Commons sidecar step (ToLaD#182)."""
 import json
+import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from tolad_pipeline import wiki
 
 ROOT = Path(__file__).resolve().parents[2]
 MAMMALS = ROOT / "data" / "mammals"
+AMNIOTES = ROOT / "data" / "amniotes"
 
 
 class ThumbUrl(unittest.TestCase):
@@ -120,6 +123,28 @@ class InfoboxImage(unittest.TestCase):
         self.assertIsNone(wiki.infobox_image("no box here\n| image = A.jpg"))
 
 
+class KeptBatches(unittest.TestCase):
+    """A run cut off resumes: a rerun asks only for the keys no kept batch has (ToLaD#539)."""
+
+    def test_rerun_asks_only_the_rest(self):
+        asked: list[list[str]] = []
+
+        def sparql(q):
+            keys = [k for k in ("A a", "B b", "C c") if f'"{k}"' in q]
+            asked.append(keys)
+            return [[k, "http://www.wikidata.org/entity/Q1", "", "", "", "", ""] for k in keys]
+
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(wiki, "BATCHES", Path(d) / "x.batches.jsonl"), \
+                mock.patch.object(wiki, "BATCH", 2), mock.patch.object(wiki, "PAUSE_S", 0), \
+                mock.patch.object(wiki, "_sparql", sparql):
+            wiki._remember("P225", ["A a", "B b"], sparql('"A a" "B b"'))
+            asked.clear()
+            rows = wiki.query_all("P225", ["A a", "B b", "C c"])
+            self.assertEqual(asked, [["C c"]])
+            self.assertEqual(sorted(r[0] for r in rows), ["A a", "B b", "C c"])
+            self.assertEqual(wiki._recall("P9157", ["A a"]), (set(), []))  # another step's batches are its own
+
+
 @unittest.skipUnless((MAMMALS / "wiki.json").exists(), "no data/mammals/wiki.json (run make wiki)")
 class Sidecar(unittest.TestCase):
     def test_every_species_row_has_an_entry(self):
@@ -133,6 +158,17 @@ class Sidecar(unittest.TestCase):
                 self.assertTrue(set(v) <= {"wp", "img", "file", "range", "rangeFile"} and v)
                 self.assertEqual("img" in v, "file" in v)
                 self.assertEqual("range" in v, "rangeFile" in v)
+
+
+@unittest.skipUnless((AMNIOTES / "wiki.json").exists(), "no data/amniotes/wiki.json (run make wiki-amniotes)")
+class AmnioteSidecar(unittest.TestCase):
+    def test_every_species_row_and_the_mammals_as_they_are(self):
+        side = json.loads((AMNIOTES / "wiki.json").read_text(encoding="utf-8"))
+        self.assertEqual(set(side), set(wiki.species_rows(AMNIOTES)))
+        def lines(d: Path) -> set[str]:
+            return {ln.rstrip(",") for ln in (d / "wiki.json").read_text(encoding="utf-8").splitlines()[1:-1]}
+        self.assertLessEqual(lines(MAMMALS), lines(AMNIOTES))  # every mammal's line, byte for byte
+        self.assertIn("upload.wikimedia.org", (side["Passer domesticus"] or {}).get("img", ""))
 
 
 if __name__ == "__main__":
