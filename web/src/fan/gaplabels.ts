@@ -199,16 +199,21 @@ export interface Member {
   at: number;
   band: number;
   gap: number;
+  /** The gap above its band that is its own, no title's (not its group's title's), world x (ToLaD#279): a name in its band too thin for it may take that too. */
+  free?: number;
 }
 
 /**
  * Where a member's name stands at zoom sx. px: a group's name's text; inPx: a species' in its band. A group's name in its gap, else in its band ("its name over its parts"); a species' in its own band
- * ("the labels of the species are in the species"), else in the gap.
+ * ("the labels of the species are in the species"), else in the gap. A name in its band may take the free gap above it too (`free`, ToLaD#279): its band and that gap are its own room on the column,
+ * nobody else's, so where the two together hold the name it stands there, in its band as far as that goes (gapLabels). Only its own gap, never its group's title's: that title takes it once it
+ * fits, and a name there would go on the way in.
  */
 export function tier(m: Member, sx: number, px: number, inPx: number): Tier {
   const [band, gap] = [m.band * sx, m.gap * sx];
-  if (!m.species) return gap >= px ? 'title' : band >= px ? 'in' : null;
-  return band >= inPx ? 'in' : gap >= px ? 'title' : null;
+  const room = band > 0 ? band + (m.free ?? 0) * sx : 0;
+  if (!m.species) return gap >= px ? 'title' : room >= px ? 'in' : null;
+  return band >= inPx ? 'in' : gap >= px ? 'title' : room >= inPx ? 'in' : null;
 }
 
 /** A candidate for a picture: its centre on the column (world x), and the zooms its band is its own over, from `enter` (its parent hands its band down) to `exit` (it does, gapHands). */

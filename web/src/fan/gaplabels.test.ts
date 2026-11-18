@@ -99,6 +99,7 @@ describe('labels in the gaps and in the branches', () => {
 
   it('a title in the gap above its own branch, one a gap', () => {
     const { C, R } = f.rooms();
+    let spilled = 0;
     for (const z of ZOOMS) {
       const sx = home * z;
       for (const m of cover(sx)) {
@@ -108,34 +109,47 @@ describe('labels in the gaps and in the branches', () => {
         if (m.host) expect(m.f <= m.host.f && m.host.l <= m.l && m.host !== m).toBe(true);
         else expect(m.gap * sx).toBeGreaterThanOrEqual(CLADE_PX);
       }
-      const c = C[C.length >> 1];
-      const cut = frame(sx, c);
-      const seen = new Set<number>();
-      for (const s of cut.names) {
-        // (A fossil group named at its youngest tip (tipLabels, ToLaD#279) is no member of the cover, which names the column: tipnames.test holds it.)
-        if (!s.v || s.place === 'tip') continue;
-        const m = cover(sx).find((g) => g.lv.v === s.v)!;
-        if (m.host) {
-          // (A guest title, ToLaD#500: its gap is the title's over it, on the same strand, so it stands in its host's band, beside the host's own label.)
-          expect(s.box[0]).toBeGreaterThanOrEqual(v.toScreen(m.host.at - m.host.band / 2, 0)[0] - 1e-6);
-          expect(s.box[2]).toBeLessThanOrEqual(v.toScreen(m.host.at + m.host.band / 2, 0)[0] + 1e-6);
-          continue;
+      // (The middle of the tree, and a group named in a band too thin for it, ToLaD#279, if the cover has one: its band and the free gap above it.)
+      const thin = cover(sx).find((m) => !m.lv.b && m.tier === 'in' && m.band * sx < CLADE_PX);
+      for (const c of [C[C.length >> 1], ...(thin ? [thin.at] : [])]) {
+        const cut = frame(sx, c);
+        const seen = new Set<number>();
+        for (const s of cut.names) {
+          // (A fossil group named at its youngest tip (tipLabels, ToLaD#279, its key `tg…`) is no member of the cover, which names the column (`g…`): tipnames.test holds it. Every name
+          // stands at a tip, `place`, the column's too: that skipped them all from cfe6ee7 on.)
+          if (!s.v || !s.key.startsWith('g')) continue;
+          const m = cover(sx).find((g) => g.lv.v === s.v)!;
+          if (m.host) {
+            // (A guest title, ToLaD#500: its gap is the title's over it, on the same strand, so it stands in its host's band, beside the host's own label.)
+            expect(s.box[0]).toBeGreaterThanOrEqual(v.toScreen(m.host.at - m.host.band / 2, 0)[0] - 1e-6);
+            expect(s.box[2]).toBeLessThanOrEqual(v.toScreen(m.host.at + m.host.band / 2, 0)[0] + 1e-6);
+            continue;
+          }
+          const top = v.toScreen(m.top, 0)[0];
+          if (m.tier === 'in' || s.box[2] > top + 1e-6) {
+            // (Too thin a gap, or its gap a screen away: on its own band. A band too thin for its name: its band and the free gap above it (ToLaD#279), its own, no title's, only what it
+            // needs of that gap, its foot at its band's end.)
+            const spills = m.tier === 'in' && m.band * sx < s.box[2] - s.box[0] - 1e-6;
+            expect(s.box[0]).toBeGreaterThanOrEqual(v.toScreen(m.top - (spills ? m.gap : 0), 0)[0] - 1e-6);
+            expect(s.box[2]).toBeLessThanOrEqual(v.toScreen(m.at + m.band / 2, 0)[0] + 1e-6);
+            if (spills) {
+              spilled++;
+              expect(s.box[2]).toBeCloseTo(v.toScreen(m.top + m.band, 0)[0], 6);
+              expect(cover(sx).some((o) => o !== m && o.on === m.on && o.tier === 'title' && !o.host)).toBe(false);
+            }
+            continue;
+          }
+          // (One title a gap. A name in its band may share its strand with the title in the gap over it, ToLaD#500: a group splits once its widest part's band holds that part's name
+          // and the group's; measured at home, Primates in its band under Primates & treeshrews in the gap, both on strand 3491.)
+          expect(seen.has(m.on)).toBe(false);
+          seen.add(m.on);
+          expect(s.box[2]).toBeLessThanOrEqual(top + 1e-6);
+          expect(top - s.box[0]).toBeLessThanOrEqual(m.gap * sx + 1e-6);
         }
-        const top = v.toScreen(m.top, 0)[0];
-        if (m.tier === 'in' || s.box[2] > top + 1e-6) {
-          // (Too thin a gap, or its gap a screen away: on its own band.)
-          expect(s.box[0]).toBeGreaterThanOrEqual(v.toScreen(m.at - m.band / 2, 0)[0] - 1e-6);
-          expect(s.box[2]).toBeLessThanOrEqual(v.toScreen(m.at + m.band / 2, 0)[0] + 1e-6);
-          continue;
-        }
-        // (One title a gap. A name in its band may share its strand with the title in the gap over it, ToLaD#500: a group splits once its widest part's band holds that part's name
-        // and the group's; measured at home, Primates in its band under Primates & treeshrews in the gap, both on strand 3491.)
-        expect(seen.has(m.on)).toBe(false);
-        seen.add(m.on);
-        expect(s.box[2]).toBeLessThanOrEqual(top + 1e-6);
-        expect(top - s.box[0]).toBeLessThanOrEqual(m.gap * sx + 1e-6);
       }
     }
+    // (Measured: 39 names in a band and the free gap above it at these frames, every fossil.)
+    expect(spilled).toBeGreaterThan(0);
   });
 
   it('a name for everyone in the cover, by the rule: every part that opened has room; under a title, where it fits (ToLaD#483)', () => {

@@ -342,9 +342,11 @@ describe("the groups' names beside their branch: none meet, each within its bran
               const [p, q] = [hits[i].box, hits[j].box];
               if (p[0] < q[2] && q[0] < p[2] && p[1] < q[3] && q[1] < p[3]) bad.push(`${at}: ${nameOf(hits[i].lv)} meets ${nameOf(hits[j].lv)}`);
             }
-          // Over its branch's run: above where it splits off, as far as the screen shows, standing on its tip (ToLaD#373).
+          // Over its branch's run: above where it splits off, as far as the screen shows, standing on its tip (ToLaD#373). A group's tip its youngest: "now", or a fossil group's
+          // youngest fossil's end (ToLaD#279: Desmatophocidae, framed on its own time, "now" 4,000 px over the screen).
           for (const h of hits) {
-            const wTop = h.lv.b ? Math.max(h.lv.b.tipY, v.fan.time.y(0)) : v.fan.time.y(0);
+            const y0 = v.fan.time.y(0);
+            const wTop = h.lv.b ? Math.max(h.lv.b.tipY, y0) : h.lv.v.strands.reduce((y, b) => Math.min(y, Math.max(b.tipY, y0)), Infinity);
             const wBot = h.lv.b ? h.lv.b.splitY : h.lv.v.yBot;
             const y = (h.box[1] + h.box[3]) / 2;
             if (h.box[3] > Math.max(nowS, v.toScreen(0, wTop)[1]) + 1 || y > v.toScreen(0, wBot)[1] + 1) bad.push(`${at}: ${nameOf(h.lv)}'s name off its branch's run (${y.toFixed(0)})`);
