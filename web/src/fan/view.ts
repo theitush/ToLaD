@@ -1563,9 +1563,25 @@ export class FanView implements InputHandlers {
   private withBand(cam: Camera, top = this.yNow): Camera {
     const sn = this.h / 2 + (this.yNow - cam.cy) * cam.sy;
     const yFork = cam.cy + (this.h - FRAME_BOTTOM - this.h / 2) / cam.sy;
-    const nowS = this.brackets ? this.labelBand().now : sn;
-    const sy = Math.max(1e-300, this.h - this.forkPx() - nowS) / Math.max(1e-300, yFork - top);
+    // (Its top at the band's foot as held there (topPx), "now" that far above it at the frame's zoom: a few rounds, the zoom moving with it.)
+    let [nowS, sy] = [this.brackets ? this.labelBand().now : sn, 0];
+    for (let k = 0; k < 4; k++) {
+      sy = Math.max(1e-300, this.h - this.forkPx() - nowS) / Math.max(1e-300, yFork - top);
+      const next = this.brackets ? this.topPx((top - this.yNow) * sy) : nowS;
+      if (next === nowS || k === 3) break;
+      nowS = next;
+    }
     return { ...cam, sy, ty: sy, cy: top + (this.h / 2 - nowS) / sy };
+  }
+
+  /**
+   * Where a frame stands its top (screen y, ToLaD#373): the labels' band's foot as held there (heldRow), "now" `lead` px above it. A level or a species framed on its fossils
+   * (fossilTop, ToLaD#279) has "now" above the screen, so its row is down with the pinned rows in: its top that far down too, so its labels stand on its tips as everyone's on
+   * "now". (heldRow there: its row down min(STACK_MOST, lead - x) for a top x px down, so x = min(STACK_MOST, lead / 2).)
+   */
+  private topPx(lead: number): number {
+    const { now } = this.labelBand();
+    return this.flip || !forkNames() ? now : now + Math.min(STACK_MOST, Math.max(0, lead / 2));
   }
 
   /** Name `text` as its pill shows it: whole, or past `max` (px) cut short with an ellipsis. */
@@ -1720,7 +1736,7 @@ export class FanView implements InputHandlers {
 
   /**
    * How far (px, at zoom sx) the labels of clade v's members there (gapCoverAt) stand past its room, above and below (ToLaD#468): a title over its member's top
-   * by its foot and its own size (titleLift, CLADE_PX); a picture wider than its band, on its band's centre, half of it (gapLabels).
+   * by its foot and its own size (titleLift, CLADE_PX); a name in the free gap above its band (ToLaD#279), what it takes there; a picture wider than its band, on its band's centre, half of it (gapLabels).
    */
   private labelsOut(v: FanNode, sx: number): [number, number] {
     const T = this.territories();
@@ -1735,6 +1751,9 @@ export class FanView implements InputHandlers {
     for (const m of this.gapCoverAt(T, sx, band)) {
       if (m.f < vf || m.l > vl) continue;
       if (m.tier === 'title' && !m.host) up = Math.max(up, (a - m.top) * sx + titleLift(m.gap * sx) + CLADE_PX);
+      // (A name in a band too thin for it, in the free gap above too (ToLaD#279, gapLabels): what it takes there.)
+      const textPx = m.lv.b ? SPECIES_PX : CLADE_PX;
+      if (m.tier === 'in' && m.band * sx < textPx) up = Math.max(up, (a - m.top) * sx + textPx - m.band * sx);
       if (m.pic && m.band * sx <= m.pic) {
         up = Math.max(up, (a - m.at) * sx + m.pic / 2);
         down = Math.max(down, (m.at - b) * sx + m.pic / 2);
@@ -2147,12 +2166,18 @@ export class FanView implements InputHandlers {
    */
   speciesCamera(b: FanBranch, card = this.carded === b): Camera {
     const h = this.homeCamera();
-    // (Its tip where every frame stands "now", ToLaD#373; its own split down where every frame's start stands (forkPx): its whole life on screen.)
-    const tipPx = this.labelBand().now;
-    const band = Math.max(80, this.h - this.forkPx() - tipPx);
-    const sy = Math.max(h.sy, band / Math.max(1e-300, b.splitY - b.tipY));
-    // Within the time limit (MIN_YEARS on screen) about the tip, where it will sit.
-    const s = this.camera.timeCap(b.tipY, tipPx, sy, h.sy);
+    // (Its tip where every frame stands "now", ToLaD#373, the band's foot as held there (topPx: a fossil's, "now" above it, ToLaD#279); its own split down where every frame's start
+    // stands (forkPx): its whole life on screen. A few rounds, the zoom moving with it.)
+    let [tipPx, s] = [this.labelBand().now, 0];
+    for (let k = 0; k < 4; k++) {
+      const band = Math.max(80, this.h - this.forkPx() - tipPx);
+      const sy = Math.max(h.sy, band / Math.max(1e-300, b.splitY - b.tipY));
+      // Within the time limit (MIN_YEARS on screen) about the tip, where it will sit.
+      s = this.camera.timeCap(b.tipY, tipPx, sy, h.sy);
+      const next = this.topPx((b.tipY - this.yNow) * s);
+      if (next === tipPx || k === 3) break;
+      tipPx = next;
+    }
     const inTime = { cy: b.tipY + (this.h / 2 - tipPx) / s, sy: s, ty: s };
     // (Its card open on the tree on its side (ToLaD#496): framed in the room the card leaves above it, not the whole screen, the card's top hiding
     // the column's lower half else: about half that room across, centred in it.)
@@ -3284,9 +3309,11 @@ export class FanView implements InputHandlers {
       .filter(({ g }) => g.on >= 0)
       .sort((p, q) => p.g.on - q.g.on || +q.heads - +p.heads)
       .filter(({ g, heads, taken }) => {
-        // (A group below the titles has not its name in its gap, by the cut: its band, or none. A title in its gap once that holds it, till then in its widest part's band, a guest, ToLaD#500.)
+        // (A group below the titles has not its name in its gap, by the cut: its band, or none. A title in its gap once that holds it, till then in its widest part's band, a guest, ToLaD#500.
+        // A name in its band may take the free gap above it too (ToLaD#279, tier): its own, no title's: not one its group's title's (`taken`), which that title takes once it fits there,
+        // so a name in it would go on the way in.)
         const gap = taken ? 0 : g.gap;
-        const t = tier({ species: g.species, top: g.top, at: g.at, band: heads ? 0 : g.band, gap: heads || g.lv.b ? gap : 0 }, sx, CLADE_PX, SPECIES_PX);
+        const t = tier({ species: g.species, top: g.top, at: g.at, band: heads ? 0 : g.band, gap: heads || g.lv.b ? gap : 0, free: heads ? 0 : gap }, sx, CLADE_PX, SPECIES_PX);
         const pic = heads ? 0 : picAt(pics.get(g), sx, PIC_D, PIC_S);
         // (A window keeps no member with nothing to show: no name, no picture, no title over parts.)
         if (win && !heads && !t && !pic) return false;
@@ -3363,7 +3390,7 @@ export class FanView implements InputHandlers {
   }
   private gapPicsLast: { L: object; ranges: Map<GapMember, PicRange> } | null = null;
   /**
-   * The least zoom anything in each member's branch can show at (labelindex.ts, a window's cover skips a branch below it): a name needs a band or gap SPECIES_PX across at least, a guest title
+   * The least zoom anything in each member's branch can show at (labelindex.ts, a window's cover skips a branch below it): a name needs its band and gap SPECIES_PX across at least, a guest title
    * its host's band more, a picture its range's start (gapPicsOf). Once a ladder.
    */
   private gapShowsOf(L: GapLadder): Map<GapMember, number> {
@@ -3378,7 +3405,7 @@ export class FanView implements InputHandlers {
     const z = new Map<GapMember, number>();
     for (let i = order.length - 1; i >= 0; i--) {
       const g = order[i];
-      let s = Math.min(g.on >= 0 ? SPECIES_PX / Math.max(g.band, g.gap) : Infinity, pics.get(g)?.small ?? Infinity);
+      let s = Math.min(g.on >= 0 ? SPECIES_PX / (g.band + g.gap) : Infinity, pics.get(g)?.small ?? Infinity);
       for (const p of L.parts(g)) s = Math.min(s, z.get(p)!);
       z.set(g, s);
     }
@@ -3505,7 +3532,9 @@ export class FanView implements InputHandlers {
         if (x < -CLADE_PX || x > this.w + CLADE_PX) continue;
       } else if (g.tier !== 'title' || (!g.heads && (x < -CLADE_PX || x > this.w + CLADE_PX) && b - a >= textPx)) {
         if (!seen) continue;
-        x = d ? Math.max(a + textPx / 2, Math.min(b - textPx / 2, picX)) : inBand(textPx / 2);
+        // (Its band too thin for its name: it takes the free gap above it too (ToLaD#279, tier), only what it needs, its foot at its band's end.)
+        if (g.tier === 'in' && b - a < textPx) x = Math.max(Math.max(X(g.top - g.gap), cede) + textPx / 2, b - textPx / 2);
+        else x = d ? Math.max(a + textPx / 2, Math.min(b - textPx / 2, picX)) : inBand(textPx / 2);
       } else if (x < -CLADE_PX || x > this.w + CLADE_PX) continue;
       s.x = x;
       s.plain = small ? SPECIES_FONT : CLADE_FONT;
@@ -4050,8 +4079,10 @@ export class FanView implements InputHandlers {
     for (const g of this.coverAt(T, this.cam.sx)) {
       const [a, b] = [X(g.a), X(g.b)];
       if (b < 0 || a > this.w) continue;
-      // (Turned, every label on the one line, whoever's branch ended earlier: labelBand.)
-      const d0 = this.flip ? row : Math.max(Y(g.wy) - PIC_LIFT - PIC_ROOM, row);
+      // (Turned, every label on the one line, whoever's branch ended earlier: labelBand. Upright, held on the row, but its picture no older than its branch's start, the fork it
+      // splits from its sister at, as gapLabels': past that it leaves with its branch, a sticky header stopping at its section's end, and off the screen's top it has none.)
+      const d0 = this.flip ? row : Math.min(Math.max(Y(g.wy) - PIC_LIFT - PIC_ROOM, row), Y(g.lv.b ? g.lv.b.splitY : g.lv.v.yBot) - PIC_ROOM);
+      if (d0 + PIC_ROOM < 0) continue;
       const fit = this.flip ? 1 : clamp01((bottom - (d0 + PIC_ROOM + PIC_LIFT)) / 30);
       if (!(fit > 0)) continue;
       here.push({ g, d0, fit });
