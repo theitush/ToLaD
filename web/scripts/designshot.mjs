@@ -338,6 +338,11 @@ const scenes = [
         ['amn-synapsids-permian', 'level', ['Synapsida', 260, 8]],
         ['amn-sauropterygia', 'level', ['Sauropterygia']],
         ['amn-ichthyosaurs', 'level', ['Ichthyosauromorpha']],
+        // PhyloPic outlines where there is no photo (ToLaD#577; Q=tree=amniotes&outlines=off: photos only): the sauropodomorphs,
+        // a lizard family, and the card of a sauropodomorph PhyloPic has no outline of its own for.
+        ['amn-sauropodomorpha', 'level', ['Sauropodomorpha']],
+        ['amn-agamidae', 'level', ['Agamidae']],
+        ['amn-card-blikanasaurus', 'card', ['Blikanasaurus cromptoni']],
       ]
     : []),
 ];
