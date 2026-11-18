@@ -187,8 +187,8 @@ describe('a sideways swipe crosses any gap (ToLaD#403)', () => {
     expect(v.cam.cx).toBe(held);
   });
 
-  // (Real, open, ToLaD#446: under `clades` a pinch in over a gap jumps 53 px; a camera rule, not changed here. `it.fails` turns red when it is fixed.)
-  it.fails('a view left over a gap stays: no later settle snaps it back, a pinch does not jump', () => {
+  // (ToLaD#446: under `clades` a pinch in over a gap jumped 53 px; it holds now, on both looks.)
+  it('a view left over a gap stays: no later settle snaps it back, a pinch does not jump', () => {
     const v = stubView(CARNIVORA, CARNIVORA_TREE);
     at(v, gapFrame(v));
     for (let k = 0; k < 200 && !overGap(v); k++) v.pan(v.w / 2, 0);

@@ -212,11 +212,10 @@ describe('a double tap reads as one step back (ToLaD#413)', () => {
     vi.restoreAllMocks();
   });
   for (const mode of ['clades', 'groups'] as GapMode[]) {
-    // (Real, open, ToLaD#446, a tap and frame rule, so left for Ita: under clades the label Theria's frame is 5.25 px from home.
-    // A tap on it moves that much; under LEVEL_PX that is no step and no way out (doubleTap, upOne), so a double tap
-    // does nothing and the view stays 5.25 px off home. `it.fails` turns red when it is fixed. With every fossil on the tree,
-    // the page's default (ToLaD#279), home reached back to the Triassic stem and no frame sat that close; TOLAD_FOSSILS=old is the old look.)
-    (mode === 'clades' && process.env.TOLAD_FOSSILS === 'old' ? it.fails : it)(`${mode}: from each frame, on a branch and on nothing, a quick and a slow double tap`, () => {
+    // (ToLaD#446: under clades, TOLAD_FOSSILS=old, the label Theria's frame is 5.25 px from home's. A frame within LEVEL_PX of the view
+    // is no step, so the tap on it goes on a level deeper, visibly; and a double tap from a view off home at all goes home, so from
+    // Theria's frame, by any route, home.)
+    it(`${mode}: from each frame, on a branch and on nothing, a quick and a slow double tap`, () => {
       vi.spyOn(performance, 'now').mockImplementation(() => clock);
       setGapMode(mode);
       const r = rig();

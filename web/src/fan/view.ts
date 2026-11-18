@@ -2318,14 +2318,16 @@ export class FanView implements InputHandlers {
    * chain of groups' parent, levelUp's; from a species, its group; from a group the chain does not name, the one it does),
    * where a tap on it lands (landOf). Never in (ToLaD#416): a landing tighter than the view on width or on time, by more
    * than LEVEL_PX of the screen, is nowhere up, and null; so is home's level (none above it) unless the view is off home
-   * and home is wider (zoomsOut), or wider on width whatever it does to time, home's last resort since ToLaD#416.
+   * (by any amount, ToLaD#446) and home is not tighter (zoomsOut's), or wider on width whatever it does to time, home's last resort since ToLaD#416.
    */
   private upOne(from: Level, c: Camera): Step | null {
     const u = this.levelAbove(from);
     const lv: Level = { v: u ?? this.fan.root };
     const cam = this.landOf(lv);
     const [x, y] = this.spanChange(cam, c);
-    if (lv.v === this.fan.root) return this.zoomsOut(cam, c) || (x < -LEVEL_PX && this.offBy(cam, c) > LEVEL_PX) || (u && x <= LEVEL_PX && y <= LEVEL_PX) ? { lv, cam } : null;
+    // (Home's level: home, wherever the view is off it at all, as long as home is not tighter; a frame nearly home's (Theria's, 5 px off it
+    // under `clades`, ToLaD#446) is a level all the same, and a double tap from it goes home. Home itself: nothing.)
+    if (lv.v === this.fan.root) return this.zoomsOut(cam, c) || (x <= LEVEL_PX && y <= LEVEL_PX && (u || this.offBy(cam, c) > 0.5)) || (x < -LEVEL_PX && this.offBy(cam, c) > LEVEL_PX) ? { lv, cam } : null;
     return x <= LEVEL_PX && y <= LEVEL_PX ? { lv, cam } : null;
   }
 
@@ -2539,9 +2541,10 @@ export class FanView implements InputHandlers {
    * on the way from the level the view is at to what was tapped (`to`: a species, or a clade, an ancestral stretch's
    * lineage among them). From the level holding both, down: the first whose frame is more than LEVEL_PX off the view's
    * (so every tap visibly moves). Already at a species: false, for its card. A clade that holds the view's level (a
-   * pinned group, an ancestor's bracket): out to it, unless a column's stretch (`col`: false, its card).
+   * pinned group, an ancestor's bracket): out to it, unless a column's stretch (`col`: false, its card). `inward` (a
+   * label's tap, ToLaD#446): never out, its own landing too passed over where it is wider than the view.
    */
-  private tapInto(to: Level, col: boolean): boolean {
+  private tapInto(to: Level, col: boolean, inward = false): boolean {
     const on = this.anim && this.backing;
     const from = on ? this.backing!.lv : this.levelNow(true);
     const cur = on ? this.backing!.cam : this.cam;
@@ -2555,7 +2558,7 @@ export class FanView implements InputHandlers {
       // signpost's pill (an unnamed clade named for its largest named one, as "Primates" for the primates, treeshrews and
       // colugos) frames that clade at its narrowest group's fit zoom, tighter than the Primates' own frame of two wide
       // groups: a tap on the humans' picture there flew out to the Primates, the bats and rodents beside them.)
-      if (k && Math.log(cam.sx / cur.sx) + Math.log(cam.sy / cur.sy) < -Math.log(BACK_SLACK)) continue;
+      if ((k || inward) && this.outward(cam, cur)) continue;
       if (this.offBy(cam, cur) > LEVEL_PX) {
         this.goLevel(lv, cam);
         return true;
@@ -2573,6 +2576,11 @@ export class FanView implements InputHandlers {
       return true;
     }
     return !col;
+  }
+
+  /** Whether frame a is wider than the view at camera c, width and time weighed together, past BACK_SLACK: a flight there zooms out. */
+  private outward(a: Camera, c: Camera): boolean {
+    return Math.log(a.sx / c.sx) + Math.log(a.sy / c.sy) < -Math.log(BACK_SLACK);
   }
 
   /** Level lv's frame: a species' (speciesCamera) or a clade's (cladeCamera; the root's, home), the fold put back after. */
@@ -2623,13 +2631,15 @@ export class FanView implements InputHandlers {
       return;
     }
     const v = this.meetOf(f, l);
+    // (A whole clade has one frame, its own (cladeCamera), the one its fork name and its level land on: a second frame of its
+    // strands' runSpan, a step wider under `clades`, made "already here" false at the first and a second tap moved, ToLaD#446.)
     const whole = v.strands[0].index === f && v.strands[v.strands.length - 1].index === l;
-    const top = (whole && fossilTop(this.fan, v)) || this.yNow;
+    const frame = () => (whole ? this.cladeCamera(v) : this.runFrame(f, l, v.y, v));
     const keep = this.fan.tess.fold?.keep();
-    const cam = this.runFrame(f, l, v.y, v, top);
+    const cam = frame();
     if (this.offBy(cam, cur) > LEVEL_PX && this.labelsCover(cam, f, l)) {
       keep?.();
-      go(cam, () => this.runFrame(f, l, v.y, v, top), v);
+      go(cam, frame, v);
       return;
     }
     // (Its next split (its active range's end): the least rung of the cut's ladder (LADDER) past its frame's zoom where
@@ -2887,14 +2897,15 @@ export class FanView implements InputHandlers {
     // framed already, it stays. (A flight that moves nothing is no step, tap().) A clade its own frame does not show
     // split (as the solenodons, their branches a sliver of their territory) goes where a tap on its picture goes, its
     // next split (tapItem), and stays there too, the same frame computed again; unless its fork is not on that frame,
-    // which the name is for: then its own.
+    // which the name is for: then its own. At its own frame already (within LEVEL_PX, as a tap passes a level), it stays
+    // there: the next split is where its picture goes, a step finer (ToLaD#446).
     if (brk && forkNames()) {
       const v = brk.v;
       const [f, l] = [v.strands[0].index, v.strands[v.strands.length - 1].index];
       const fold = this.fan.tess.fold;
       const keep = fold?.keep();
       const cam = v.parent ? this.cladeCamera(v) : this.homeCamera();
-      const shown = this.labelsCover(cam, f, l);
+      const shown = this.offBy(cam, this.anim && this.backing ? this.backing.cam : this.cam) <= LEVEL_PX || this.labelsCover(cam, f, l);
       keep?.();
       if (!shown) {
         this.tapItem(f, l);
@@ -2911,15 +2922,25 @@ export class FanView implements InputHandlers {
     if (to) {
       // (A highlight's species, ToLaD#497: its clade first.)
       if (to.b && this.stopAt(to, false)) return;
+      // (A label always goes one level deeper, never out (ToLaD#258, #446): one naming a group the view's level sits in, wider
+      // than the view (the one label holding the screen, as "Carnivores" at the dog-like carnivores with every fossil), is a
+      // tap on the view's level, on from there.)
+      const label = !!(pill || pic);
+      const on = this.anim && this.backing ? this.backing : null;
+      const at = label && to.v ? (on ? on.lv : this.levelNow(true)) : null;
+      const into = at && at.v !== to.v && holds(to, at) ? at : to;
       // (A group's name on the tree on its side, ToLaD#465: where it opens, its parts named, openCamera.)
-      if (to.v && (pill || pic) && this.flip && gapLabelsOn()) {
-        this.goOpen(to.v);
+      if (into.v && label && this.flip && gapLabelsOn()) {
+        this.goOpen(into.v);
         return;
       }
       // (A group label, ToLaD#417: its group's own frame, as a fork name's, ToLaD#390.)
-      // (Its frame already the view's, the one label holding the screen, ToLaD#440: on, a level deeper, as any tap.)
-      if (labelMode() === 'groups' && (pill || pic) && this.offBy(this.frameOf(to), this.anim && this.backing ? this.backing.cam : this.cam) > 0.5) this.goLevel(to, this.frameOf(to));
-      else this.tapInto(to, false);
+      // (Its frame already the view's (within LEVEL_PX, as a tap passes a level: Theria's 5 px off home's under `clades`), the one
+      // label holding the screen, ToLaD#440, #446: on, a level deeper, as any tap. Its frame wider than the view: on in, too.)
+      const cur = on ? on.cam : this.cam;
+      const f = labelMode() === 'groups' && label ? this.frameOf(into) : null;
+      if (f && this.offBy(f, cur) > LEVEL_PX && !this.outward(f, cur)) this.goLevel(into, f);
+      else this.tapInto(into, false, label);
       return;
     }
     // An event's label: opens its event, the touch at the middle of its window on the column.
