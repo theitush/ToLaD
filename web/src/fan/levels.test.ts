@@ -410,7 +410,8 @@ describe('a double tap goes up to the parent level, never back (ToLaD#271, #472)
       expect(bad).toEqual([]);
       // (Steady widths, ToLaD#259: the cats' taps from home pass fewer levels.)
       expect(n).toBeGreaterThan(1);
-    });
+      // (Folded, with every fossil (the page's default, ToLaD#279), its taps and flights take ~2-3 minutes.)
+    }, 300_000);
 
     it(`${name}: after a search pick, the species' own level, not home; double taps on reach home and stop`, () => {
       const v = mk();
@@ -474,7 +475,8 @@ describe('a double tap goes up to the parent level, never back (ToLaD#271, #472)
       });
       expect(bad).toEqual([]);
       expect(tried).toBeGreaterThan(0);
-    });
+      // (Folded, with every fossil (the page's default, ToLaD#279), its taps and flights take ~2-3 minutes.)
+    }, 300_000);
   }
 });
 
