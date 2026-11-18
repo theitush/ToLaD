@@ -1699,13 +1699,13 @@ export class FanView implements InputHandlers {
    * opens only deeper than that (gapHands: its band its parts' once one of them has room, ToLaD#500), there, its first branch at the top all the same and the rest of it below, a scroll away. Its time window its frame's
    * (cladeCamera). So a tap always opens what it names, at its start, and never moves without. (The root: home.)
    */
-  openCamera(v: FanNode, deep = false): Camera {
+  openCamera(v: FanNode, deep = false, past = 0): Camera {
     const fr = this.frameOf({ v });
     if (!v.parent) return fr;
     const fold = this.fan.tess.fold as Steady;
     const T = this.territories();
     const j = T.t.index.get(v)!;
-    const key = `open:${this.w}x${this.h}:${j}${deep ? ':deep' : ''}`;
+    const key = `open:${this.w}x${this.h}:${j}${deep ? `:deep:${past}` : ''}`;
     if (this.framesFan !== this.fan) [this.framesFan, this.frames] = [this.fan, new Map()];
     const hit = this.frames.get(key);
     if (hit) {
@@ -1735,6 +1735,13 @@ export class FanView implements InputHandlers {
     });
     // (A hair past its opening, so it has surely opened whatever the rounding.)
     let sx = opens < Infinity && opens * (1 + 1e-6) > fit.sx ? opens * (1 + 1e-6) : fit.sx;
+    // (Deep from a view at zoom `past` already as deep or deeper (an ancestor's title over a lineage's view: its parts each labelled there, its room wider than the
+    // screen; ToLaD#279, Greater spear-nosed bat & kin's at an inner one's opening went out x0.93): the ladder's next rung inside it past the view's, where its
+    // cover next changes. So a tap always moves, and in.)
+    if (deep && g && sx <= past * (1 + 1e-6)) {
+      const z = this.nextRung(L, g, past * (1 + 1e-6));
+      if (z < Infinity) sx = z * (1 + 1e-6);
+    }
     // (A fossil group named at its tip (tipGroupsOf, ToLaD#279) has no band on the column: it opens where each of its parts has a name's room, its fossil groups and its fossils at
     // their tips. That zoom read at the rooms there, a few rounds, as the fold's rooms move with the zoom.)
     for (let k = 0; k < 4; k++) {
@@ -1747,6 +1754,20 @@ export class FanView implements InputHandlers {
     const cam = { ...fr, sx, cx: fold.rooms().roomL[j] + (this.w / 2 - this.labelsOut(v, sx)[0]) / sx };
     this.frames.set(key, { ...cam });
     return cam;
+  }
+
+  /** The least zoom past `past` at which the cover inside ladder member g changes (a member's handing or opening zoom, gapHands, gapOpens); Infinity if none. */
+  private nextRung(L: GapLadder, g: GapMember, past: number): number {
+    let best = Infinity;
+    const stack = [g];
+    while (stack.length) {
+      const p = stack.pop()!;
+      const [h, o] = [L.hands.get(p) ?? Infinity, L.opens.get(p) ?? Infinity];
+      for (const z of [h, o]) if (z > past && z < best) best = z;
+      // (A part hands down no sooner than its group, and opens no sooner than it hands down: past a member handed down later than `past`, nothing comes sooner.)
+      if (h <= past) stack.push(...L.parts(p));
+    }
+    return best;
   }
 
   /**
@@ -2844,7 +2865,8 @@ export class FanView implements InputHandlers {
     const first = this.stopFrame(v) ? null : this.openCamera(v);
     const deep = !!first && (this.offBy(first, this.cam) <= LEVEL_PX || first.sx < this.cam.sx);
     restore?.();
-    const cam = this.flyTo(() => this.stopFrame(v) ?? this.openCamera(v, deep), undefined, () => (this.tapAt = { b: null, v, cam: { ...this.cam } }));
+    const past = this.cam.sx;
+    const cam = this.flyTo(() => this.stopFrame(v) ?? this.openCamera(v, deep, past), undefined, () => (this.tapAt = { b: null, v, cam: { ...this.cam } }));
     this.backing = { lv: { v }, cam };
   }
 
@@ -2924,7 +2946,12 @@ export class FanView implements InputHandlers {
     // A "+x" (ToLaD#262): the smallest frame holding the groups whose names it stands for.
     const plus = pinned ? null : this.plusAt(x, y);
     if (plus) {
-      if (plus.run) this.tapItem(...plus.run);
+      // (Into what it counts: a name on a piece of its item takes that piece's species out of its "+x" (labelsAt, every species counted once), so a
+      // chip counting fewer than its item's others stands for those alone, their run (ToLaD#279: with every fossil a "+1" on an item of six strands
+      // went into all six, a step finer, its one species still unnamed). One: its landing, its card.)
+      const ix = plus.bs.map((b) => b.index);
+      const run: Run | undefined = plus.run && ix.length && ix.length < plus.run[1] - plus.run[0] ? [Math.min(...ix), Math.max(...ix)] : plus.run;
+      if (run) this.tapItem(...run);
       else this.flyToGroup(plus.bs);
       return;
     }
