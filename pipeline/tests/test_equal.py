@@ -144,7 +144,9 @@ class TestRule(unittest.TestCase):
         self.assertEqual(dino.age, 245.0)
         self.assertTrue(arch.age > ave.age > dfm.age > dino.age)
         self.assertTrue(not tied(dfm.age, dino.age) and not tied(ave.age, dfm.age) and not tied(arch.age, ave.age))
-        self.assertLess(ave.age - 245.0, 1.0)  # (moved just enough: under 1 Ma for three branches at 245 Ma)
+        # (moved just enough: each branch MBL of its age, the shortest the page's layout needs, no more)
+        self.assertAlmostEqual(dfm.age, 245.0 * (1 + dated.MBL), delta=1e-3)
+        self.assertAlmostEqual(ave.age, 245.0 * (1 + dated.MBL) ** 2, delta=1e-3)
         self.assertEqual((arch.age, log["zero_length"]["moved_younger"], log["zero_length"]["not_below_parent"]),
                          (251.0, 0, 0))
         # under a fixed split with no room (0.1 Ma above at 318.7 Ma): nothing moves, never past the fixed split
@@ -166,6 +168,11 @@ class TestRule(unittest.TestCase):
         top = split(300.5, c, tip(), src=S_UPHAM)
         mbl_dates(top, {})
         self.assertTrue(top.age > c.age >= b.age >= a.age == 300.0, (c.age, b.age))
+        # room for a tie's width a branch but not MBL (1.5 Ma at 300 Ma): packed at the data's precision, none left tied
+        top.age = 301.5
+        mbl_dates(top, {})
+        self.assertTrue(not tied(top.age, c.age) and not tied(c.age, b.age) and not tied(b.age, a.age), (c.age, b.age))
+        self.assertTrue(c.age - b.age < 300.0 * dated.MBL)
 
     def test_method_switch(self):
         a = split(245.0, tip(), tip())
