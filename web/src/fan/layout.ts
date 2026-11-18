@@ -723,36 +723,110 @@ export function columnsAt(fan: Fan, y: number): [number, number][] {
 }
 
 /**
- * The point of columnsAt(fan, y) nearest x (x itself on a column), or NaN if there is none; null if it takes
- * columnsAt's pass (no fold, or below the stem). Folded, the strands stand left to right: a binary search on their
- * folded edges and a few columns either side, not every species (ToLaD#255: ~6,000 a height at the mammal level).
+ * Which folded strands stand at a height (ToLaD#279): a strand has a column from its tip down, none above it (a fossil's
+ * tip is in the past). Their edges are in order only among those standing (an absent one's fold.left is where its column
+ * would be, anywhere), so the searches below go by the strands standing at y alone: a min tree of the tips over the
+ * fold's order finds the nearest standing strand either side of any place in O(log n).
  */
-export function nearestColumn(fan: Fan, x: number, y: number): number | null {
-  const S = fan.branches;
-  const f = S[0]?.tess.fold;
-  if (!f || !(y <= fan.root.yBot) || f.strands.length !== S.length) return null;
-  const B = f.strands;
-  const n = B.length;
-  // (The last strand whose folded edge is at or left of x.)
+interface Standing {
+  strands: readonly FanBranch[];
+  n: number;
+  size: number;
+  /** The tree: leaves at size.., each node the least tip under it (a NaN tip stands everywhere, as col() takes it; padding never). */
+  t: Float64Array;
+}
+const STANDING = new WeakMap<readonly FanBranch[], Standing>();
+
+function standing(B: readonly FanBranch[]): Standing {
+  let s = STANDING.get(B);
+  if (s && s.n === B.length) return s;
+  let size = 1;
+  while (size < B.length) size <<= 1;
+  const t = new Float64Array(2 * size).fill(Infinity);
+  B.forEach((b, i) => (t[size + i] = b.tipY === b.tipY ? b.tipY : -Infinity));
+  for (let k = size - 1; k >= 1; k--) t[k] = Math.min(t[2 * k], t[2 * k + 1]);
+  STANDING.set(B, (s = { strands: B, n: B.length, size, t }));
+  return s;
+}
+
+/** The last strand at or before i standing at y (its tip at or above y; `strict`: above), or -1. */
+function standingBefore(S: Standing, i: number, y: number, strict = false): number {
+  if (i < 0) return -1;
+  const t = S.t;
+  const ok = (v: number) => (strict ? v < y : v <= y);
+  let p = Math.min(i, S.size - 1) + S.size;
+  if (ok(t[p])) return p - S.size;
+  for (; p > 1; p >>= 1) {
+    if (p & 1 && ok(t[p - 1])) {
+      p--;
+      while (p < S.size) p = ok(t[2 * p + 1]) ? 2 * p + 1 : 2 * p;
+      return p - S.size;
+    }
+  }
+  return -1;
+}
+
+/** The first strand at or after i standing at y (`strict`: its tip above y), or -1. */
+function standingAfter(S: Standing, i: number, y: number, strict = false): number {
+  if (i >= S.strands.length) return -1;
+  const t = S.t;
+  const ok = (v: number) => (strict ? v < y : v <= y);
+  let p = Math.max(0, i) + S.size;
+  if (ok(t[p])) return p - S.size;
+  for (; p > 1; p >>= 1) {
+    if (!(p & 1) && ok(t[p + 1])) {
+      p++;
+      while (p < S.size) p = ok(t[2 * p]) ? 2 * p : 2 * p + 1;
+      return p - S.size < S.strands.length ? p - S.size : -1;
+    }
+  }
+  return -1;
+}
+
+/** The last strand standing at y whose folded edge is at or left of x, or -1 (a binary search on the standing ones' edges, in order). */
+function lastLeftOf(f: Fold, S: Standing, x: number, y: number): number {
   let lo = -1;
-  let hi = n - 1;
+  let hi = S.strands.length - 1;
   while (lo < hi) {
     const mid = (lo + hi + 1) >> 1;
-    if ((f.left(mid, y) ?? -Infinity) <= x) lo = mid;
+    const j = standingBefore(S, mid, y);
+    if (j < 0 || (f.left(j, y) ?? -Infinity) <= x) lo = mid;
     else hi = mid - 1;
   }
-  // Strand i's column at y: [a, b] (its own lanes, or the parent column it is in), and the strands after it in that column.
-  const col = (i: number): [number, number, number] | null => {
-    const b = B[i];
-    if (y < b.tipY) return null;
-    if (y < b.splitY) {
-      const l = leftAt(b, y);
-      return [l, l + laneAt(b, y).w, i + 1];
-    }
-    const v = segAt(b, y).node;
-    const l = nodeLeftAt(v, y);
-    return [l, l + v.width, v.strands[v.strands.length - 1].index + 1];
-  };
+  return standingBefore(S, lo, y);
+}
+
+/** Folded strand i's column at y, standing: [a, b] (its own lanes, or the parent column it is in), and the strands after it in that column. */
+function columnOf(B: readonly FanBranch[], i: number, y: number): [number, number, number] {
+  const b = B[i];
+  if (y < b.splitY) {
+    const l = leftAt(b, y);
+    return [l, l + laneAt(b, y).w, i + 1];
+  }
+  const v = segAt(b, y).node;
+  const l = nodeLeftAt(v, y);
+  return [l, l + v.width, v.strands[v.strands.length - 1].index + 1];
+}
+
+/** Whether nearestColumn and outerColumns can go by the fold's order at y (folded, y not below the stem). */
+function foldedAt(fan: Fan, y: number): Fold | null {
+  const S = fan.branches;
+  const f = S[0]?.tess.fold;
+  return f && y <= fan.root.yBot && f.strands.length === S.length ? f : null;
+}
+
+/**
+ * The point of columnsAt(fan, y) nearest x (x itself on a column), or NaN if there is none; null if it takes
+ * columnsAt's pass (no fold, or below the stem). Folded, the strands stand left to right: a binary search on their
+ * folded edges and a few columns either side, not every species (ToLaD#255: ~6,000 a height at the mammal level), by
+ * the strands standing at y alone (ToLaD#279: a fossil's absent column is anywhere).
+ */
+export function nearestColumn(fan: Fan, x: number, y: number): number | null {
+  const f = foldedAt(fan, y);
+  if (!f) return null;
+  const B = f.strands;
+  const S = standing(B);
+  const lo = lastLeftOf(f, S, x, y);
   let best = NaN;
   let bd = Infinity;
   const near = (c: [number, number, number]) => {
@@ -762,29 +836,71 @@ export function nearestColumn(fan: Fan, x: number, y: number): number | null {
       best = p;
     }
   };
-  // (Two columns either side: the strands' edges are in order, so the nearest is among them.)
+  // (Two columns either side: the standing strands' edges are in order, so the nearest is among them.)
   let found = 0;
-  for (let i = Math.max(0, lo); i < n && found < 3; ) {
-    const c = col(i);
-    if (!c) {
-      i++;
-      continue;
-    }
+  for (let i = standingAfter(S, Math.max(0, lo), y); i >= 0 && found < 3; ) {
+    const c = columnOf(B, i, y);
     near(c);
     found++;
-    i = c[2];
+    i = standingAfter(S, c[2], y);
   }
   found = 0;
-  for (let i = lo - 1; i >= 0 && found < 2; i--) {
-    const c = col(i);
-    if (!c) continue;
-    near(c);
+  for (let i = standingBefore(S, lo - 1, y); i >= 0 && found < 2; ) {
+    near(columnOf(B, i, y));
     found++;
     // (Past its column's first strand.)
     if (y >= B[i].splitY) i = segAt(B[i], y).node.strands[0].index;
+    i = standingBefore(S, i - 1, y);
   }
   return bd === 0 ? x : best;
 }
+
+/**
+ * The fan's outer edges over the heights [y0, y1] (ToLaD#279), exact as drawn: the leftmost and rightmost x of any column
+ * there, or null if it takes columnsAt's samples (no fold). At each height the outermost column is the outermost
+ * standing strand's (its own, or the parent column it ends; the strands stand in order), and going down more strands
+ * stand (a fossil from its tip). So each side is a short run of strands, each the outermost from its tip down to where
+ * the next one out stands, and each one's edge is read over its own stretch where it is drawn (Tess.cuts at time zoom sy,
+ * as twigs.ts draws it): with every fossil a side's edge varies with height, and samples spread
+ * over the whole screen pass over a fossil's column between them.
+ */
+export function outerColumns(fan: Fan, y0: number, y1: number, sy: number): [number, number] | null {
+  const ya = y0;
+  const yb = Math.min(y1, fan.root.yBot);
+  const f = foldedAt(fan, ya);
+  if (!f) return null;
+  if (!(yb >= ya)) return [Infinity, -Infinity];
+  // (The last answer, while the layout, the heights and the time zoom hold: a sideways pan asks the same every move.)
+  const key = [f.ver, f.sx, f.screenW, ya, yb, sy];
+  const had = OUTER.get(fan);
+  if (had && had.f === f && had.key.every((k, i) => k === key[i])) return had.out;
+  const B = f.strands;
+  const S = standing(B);
+  const tess = fan.tess;
+  const edge = (side: 0 | 1): number => {
+    let e = side ? -Infinity : Infinity;
+    let i = side ? standingBefore(S, B.length - 1, yb) : standingAfter(S, 0, yb);
+    let hi = yb;
+    while (i >= 0) {
+      const tip = B[i].tipY === B[i].tipY ? B[i].tipY : -Infinity;
+      const lo = Math.max(ya, tip);
+      const ys = hi > lo ? tess.cuts(B[i], lo, hi, sy, 4) : [lo];
+      for (const y of ys) {
+        const c = columnOf(B, i, y);
+        e = side ? Math.max(e, c[1]) : Math.min(e, c[0]);
+      }
+      if (tip <= ya) break;
+      // (The next one out: the outermost strand standing above this one's tip.)
+      hi = tip;
+      i = side ? standingBefore(S, i - 1, tip, true) : standingAfter(S, i + 1, tip, true);
+    }
+    return e;
+  };
+  const out: [number, number] = [edge(0), edge(1)];
+  OUTER.set(fan, { f, key, out });
+  return out;
+}
+const OUTER = new WeakMap<Fan, { f: Fold; key: number[]; out: [number, number] }>();
 
 /** Each fan's strands' places in Fan.branches (their order, which a tie goes by). */
 const branchPos = new WeakMap<Fan, Int32Array>();
@@ -804,14 +920,9 @@ export function nearestStrand(fan: Fan, x: number, y: number): FanBranch | null 
     branchPos.set(fan, pos);
   }
   const B = f.strands;
-  const n = B.length;
-  let lo = -1;
-  let hi = n - 1;
-  while (lo < hi) {
-    const mid = (lo + hi + 1) >> 1;
-    if ((f.left(mid, y) ?? -Infinity) <= x) lo = mid;
-    else hi = mid - 1;
-  }
+  const St = standing(B);
+  // (By the strands standing at y alone, as nearestColumn, ToLaD#279.)
+  const lo = lastLeftOf(f, St, x, y);
   let best: FanBranch | null = null;
   let bd = Infinity;
   const try1 = (i: number): boolean => {
@@ -826,8 +937,8 @@ export function nearestStrand(fan: Fan, x: number, y: number): FanBranch | null 
     return true;
   };
   // (Three strands either side with lanes there: their edges are in order, so the nearest is among them.)
-  for (let i = Math.max(0, lo), k = 0; i < n && k < 3; i++) if (try1(i)) k++;
-  for (let i = lo - 1, k = 0; i >= 0 && k < 3; i--) if (try1(i)) k++;
+  for (let i = standingAfter(St, Math.max(0, lo), y), k = 0; i >= 0 && k < 3; i = standingAfter(St, i + 1, y)) if (try1(i)) k++;
+  for (let i = standingBefore(St, lo - 1, y), k = 0; i >= 0 && k < 3; i = standingBefore(St, i - 1, y)) if (try1(i)) k++;
   return best;
 }
 

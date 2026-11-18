@@ -24,7 +24,7 @@
 //   - zoom out: no further than the whole fan with a margin.
 //   - pan: held only by the fan's outer edges (a gap in it can be crossed, ToLaD#403).
 
-import { columnsAt, nearestColumn, type Fan, type FanBranch } from './layout';
+import { columnsAt, nearestColumn, outerColumns, type Fan, type FanBranch } from './layout';
 import { linearPitch } from './twigs';
 
 /** A span of this many years ... */
@@ -448,11 +448,22 @@ export class FanCamera {
       c.cx = Math.min(p + m, Math.max(p - m, c.cx));
       return;
     }
-    // (The content nearest a point off either end of the fan is that end's; a fold opens the fan past its extent.)
+    const [l, r] = this.outerEdges(y0, y1);
+    const m = (0.4 * this.w) / c.sx;
+    c.cx = Math.min(r + m, Math.max(l - m, c.cx));
+  }
+
+  /**
+   * The fan's outer edges at heights [y0, y1]: folded, exact as drawn (layout.ts outerColumns: with every fossil an edge
+   * varies with height, ToLaD#279); else the content nearest a point off either end, at nearestContent's heights (a fold
+   * opens the fan past its extent).
+   */
+  outerEdges(y0: number, y1: number): [number, number] {
+    const o = outerColumns(this.fan, y0, y1, this.cam.sy);
+    if (o && o[0] <= o[1]) return o;
     const [e0, e1] = this.extent();
     const far = OFF_THE_FAN * (e1 - e0);
-    const m = (0.4 * this.w) / c.sx;
-    c.cx = Math.min(this.nearestContent(e1 + far, y0, y1) + m, Math.max(this.nearestContent(e0 - far, y0, y1) - m, c.cx));
+    return [this.nearestContent(e0 - far, y0, y1), this.nearestContent(e1 + far, y0, y1)];
   }
 
   /**
