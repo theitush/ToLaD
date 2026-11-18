@@ -220,6 +220,61 @@ export interface ItemName {
   hid: FanBranch[][];
 }
 
+/**
+ * (row, strand) -> an index, as a Map keyed by row * strands + strand held it (ToLaD#502): open addressing on the pair, emptied by a
+ * generation stamp, no key boxed or hashed as a big number. At home with every fossil a frame of the fossils' names reads up to
+ * TIP_WORK pairs, and the Map's set alone was a third of their work. get: -1 where none.
+ */
+class PairIndex {
+  private rows = new Float64Array(1 << 12);
+  private ids = new Int32Array(1 << 12);
+  private vals = new Int32Array(1 << 12);
+  private stamp = new Uint32Array(1 << 12);
+  private gen = 1;
+  private n = 0;
+  clear(): void {
+    this.n = 0;
+    if (++this.gen === 0xffffffff) {
+      this.stamp.fill(0);
+      this.gen = 1;
+    }
+  }
+  private static hash(row: number, id: number): number {
+    return Math.imul(row | 0, 0x9e3779b1) ^ Math.imul(id + 1, 0x85ebca77);
+  }
+  get(row: number, id: number): number {
+    const mask = this.ids.length - 1;
+    for (let s = PairIndex.hash(row, id) & mask; ; s = (s + 1) & mask) {
+      if (this.stamp[s] !== this.gen) return -1;
+      if (this.ids[s] === id && this.rows[s] === row) return this.vals[s];
+    }
+  }
+  set(row: number, id: number, v: number): void {
+    if (2 * (this.n + 1) > this.ids.length) this.grow();
+    const mask = this.ids.length - 1;
+    for (let s = PairIndex.hash(row, id) & mask; ; s = (s + 1) & mask) {
+      if (this.stamp[s] !== this.gen) {
+        this.stamp[s] = this.gen;
+        this.rows[s] = row;
+        this.ids[s] = id;
+        this.vals[s] = v;
+        this.n++;
+        return;
+      }
+      if (this.ids[s] === id && this.rows[s] === row) {
+        this.vals[s] = v;
+        return;
+      }
+    }
+  }
+  private grow(): void {
+    const [rows, ids, vals, stamp, gen] = [this.rows, this.ids, this.vals, this.stamp, this.gen];
+    const cap = 2 * ids.length;
+    [this.rows, this.ids, this.vals, this.stamp, this.gen, this.n] = [new Float64Array(cap), new Int32Array(cap), new Int32Array(cap), new Uint32Array(cap), 1, 0];
+    for (let s = 0; s < ids.length; s++) if (stamp[s] === gen) this.set(rows[s], ids[s], vals[s]);
+  }
+}
+
 /** The territories (cut.ts) with what the labels read off a cut item: its youngest tip, its name, the species its "+x" counts. */
 class CutTerritories {
   readonly t: Territories;
@@ -4059,17 +4114,18 @@ export class FanView implements InputHandlers {
           // (Row p is the band from it to the next row: a strand there anywhere in it is read, at its start or at its tip, and at its own column's end, its split, where that falls
           // inside the band, so a column whose own stretch is shorter than a px, or steps across at its split between two rows, is not passed over (ToLaD#279: Ar. ramidus'
           // 3 px own column leans toward Ar. kadabba's picture in its last px).)
-          const [y, y1] = [(p0 + r) / sy, (p0 + r + 1) / sy];
+          const y = (p0 + r) / sy;
+          const y1 = (p0 + r + 1) / sy;
           if (y1 <= b.tipY) continue;
           this.tipWork++;
           // (Strand i on row p: its column's screen [a, z], and whether it is its own column there (a parent column's stretch is no column).)
-          const key = (p0 + r) * S.length + i;
-          let j = C.at.get(key);
-          if (j === undefined) {
+          let j = C.at.get(p0 + r, i);
+          if (j < 0) {
             const ys = Math.max(y, b.tipY);
             const w = laneW(b, ys);
             let l = leftAt(b, ys, w);
-            let [r2, own] = [l + w, ys < b.splitY && w > 0];
+            let r2 = l + w;
+            let own = ys < b.splitY && w > 0;
             // (Its own column inside the band, where its shape's features fall (its own of Tess.bounds': its population's history points, its peel's steps, its split), as
             // drawn: between them its edges are as smooth as a row's px.)
             const ye = Math.min(y1, b.splitY);
@@ -4080,13 +4136,21 @@ export class FanView implements InputHandlers {
                 const yq = B[q] > ys ? B[q] : ys;
                 const wq = laneW(b, yq);
                 const lq = leftAt(b, yq, wq);
-                if (wq > 0) [l, r2, own] = [own ? Math.min(l, lq) : lq, own ? Math.max(r2, lq + wq) : lq + wq, true];
+                if (wq > 0) {
+                  r2 = own ? Math.max(r2, lq + wq) : lq + wq;
+                  l = own ? Math.min(l, lq) : lq;
+                  own = true;
+                }
               }
               if (b.splitY < y1) {
                 const yq = b.splitY - (b.splitY - ys) * 1e-9;
                 const wq = laneW(b, yq);
                 const lq = leftAt(b, yq, wq);
-                if (wq > 0) [l, r2, own] = [own ? Math.min(l, lq) : lq, own ? Math.max(r2, lq + wq) : lq + wq, true];
+                if (wq > 0) {
+                  r2 = own ? Math.max(r2, lq + wq) : lq + wq;
+                  l = own ? Math.min(l, lq) : lq;
+                  own = true;
+                }
               }
             }
             if (C.len + 3 > C.buf.length) {
@@ -4099,7 +4163,7 @@ export class FanView implements InputHandlers {
             C.buf[j + 1] = r2 * this.cam.sx;
             C.buf[j + 2] = own ? 1 : 0;
             C.len += 3;
-            C.at.set(key, j);
+            C.at.set(p0 + r, i, j);
           }
           const a = C.buf[j] + scr;
           const z = C.buf[j + 1] + scr;
@@ -4112,7 +4176,7 @@ export class FanView implements InputHandlers {
     }
   }
   /** clearIn's strands on the world's rows at a zoom and layout: row * strands + strand -> [a, z, own column] at buf[j..j + 2], a and z its column's edges, world x times the zoom (screen x less the pan's). */
-  private readonly clearRows = { sx: NaN, sy: NaN, lay: null as Float64Array | null, now: null as Float64Array | null, at: new Map<number, number>(), buf: new Float64Array(3 << 12), len: 0, open: new Uint8Array(256) };
+  private readonly clearRows = { sx: NaN, sy: NaN, lay: null as Float64Array | null, now: null as Float64Array | null, at: new PairIndex(), buf: new Float64Array(3 << 12), len: 0, open: new Uint8Array(256) };
 
   /** Takes [a, z] out of the stretches in `out` ([from, to] pairs, in order), keeping the pieces at least `min` wide. */
   private cutOut(out: number[], a: number, z: number, min: number): void {
