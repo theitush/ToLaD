@@ -10,6 +10,7 @@
 // the path from the root down to the merged clades, the orders at home), and its species have no pills.
 
 import { isNode, lanesAt, type Fan, type FanNode } from './layout';
+import { DASH_SPACE, unknownLook, type UnknownLook } from './dashed';
 import type { Fold } from './fold';
 import { GreenRuns } from './green';
 
@@ -75,12 +76,19 @@ export class Lod {
     const own = (this.own = new Float64Array(N.length));
     const allG = (this.allG = new Uint8Array(N.length));
     const anyG = (this.anyG = new Uint8Array(N.length));
+    const allU = (this.allU = new Uint8Array(N.length));
     const subTop = (this.subTop = Float64Array.from(N, (v) => v.y));
     const subBot = (this.subBot = Float64Array.from(N, (v) => v.yBot));
     for (let i = N.length - 1; i >= 0; i--) {
       const v = N[i];
       const r = this.room[i];
-      const t = this.par[i] >= 0 && this.nStr[i] >= 2 ? (r > 0 ? Math.min(MERGE_PX * this.nStr[i], BRANCH_PX) / r : Infinity) * (1 + 1e-9) : 0;
+      // (No count in any of its species, ToLaD#565: drawn as one dashed line while its lines are closer than DASH_SPACE (closed()), whatever its width.)
+      let u = v.strands.length > 0 ? 1 : 0;
+      for (const k of this.kidN[i]) u &= allU[k];
+      for (const k of v.kids) if (!isNode(k) && !k.sp.countUnknown) u = 0;
+      allU[i] = u;
+      const tl = u && this.par[i] >= 0 && this.nStr[i] >= 2 ? (r > 0 ? (DASH_SPACE * this.nStr[i]) / r : Infinity) * (1 + 1e-9) : 0;
+      const t = Math.max(tl, this.par[i] >= 0 && this.nStr[i] >= 2 ? (r > 0 ? Math.min(MERGE_PX * this.nStr[i], BRANCH_PX) / r : Infinity) * (1 + 1e-9) : 0);
       own[i] = t;
       subT[i] = Math.max(subT[i], t);
       // (cladeAllGray (view.ts), from the daughters up: every strand extinct.)
@@ -184,7 +192,12 @@ export class Lod {
    * parted. Off its own openness (a frame computed for another zoom: brackets.ts foldedFrame), the walk as before.
    */
   update(fold: Fold, sx: number): boolean {
-    const key = `${fold.ver}:${sx}`;
+    const look = unknownLook();
+    if (look !== this.look) {
+      this.look = look;
+      this.learnt = null;
+    }
+    const key = `${fold.ver}:${sx}:${look}`;
     if (key === this.key) return false;
     this.key = key;
     this.gapsFor = null;
@@ -323,14 +336,22 @@ export class Lod {
     return a;
   }
 
-  /** Node i qualifies to be drawn as one branch: closed (no gap inside it CLOSED_PX on screen), its species under MERGE_PX each, its ribbon under BRANCH_PX. */
+  /**
+   * Node i qualifies to be drawn as one branch: closed (no gap inside it CLOSED_PX on screen), its species under MERGE_PX
+   * each, its ribbon under BRANCH_PX. Or, no species in it with a count (ToLaD#565, the dashed look): its lines closer than
+   * DASH_SPACE on screen (its widest gap and its mean room), one dashed line whatever its width.
+   */
   private closed(fold: Fold, i: number, sx: number): boolean {
     const r = this.room[i] * sx;
+    const n = this.nStr[i];
+    const line = this.allU[i] === 1 && this.look === 'dashed';
     // ((r + gaps) * sx is never under r * sx: the room alone decides most, before any gap is read.)
-    if (!(r / this.nStr[i] < MERGE_PX) || !(r < BRANCH_PX)) return false;
+    const branch = r / n < MERGE_PX && r < BRANCH_PX;
+    if (!branch && !(line && r / n < DASH_SPACE)) return false;
+    const ok = (g: number, gs: number) => (branch && g * sx < CLOSED_PX && (this.room[i] + gs) * sx < BRANCH_PX) || (line && g * sx + r / n < DASH_SPACE);
     const T = this.gapsFor === fold ? this.gapTree : this.gaps(fold);
     // (Its widest gap and their sum kept while the tree stands as it was (gaps(): at an order's or a family's zoom, frame after frame).)
-    if (learnOn && this.gVer[i] === this.treeVer) return this.gMx[i] * sx < CLOSED_PX && (this.room[i] + this.gSm[i]) * sx < BRANCH_PX;
+    if (learnOn && this.gVer[i] === this.treeVer) return ok(this.gMx[i], this.gSm[i]);
     // (The pairs inside it: those between its first strand and its last.)
     let l = this.s0[i] + T.size;
     let h = this.s0[i] + this.nStr[i] - 2 + T.size + 1;
@@ -355,7 +376,7 @@ export class Lod {
       this.gMx[i] = g;
       this.gSm[i] = gs;
     }
-    return g * sx < CLOSED_PX && (this.room[i] + gs) * sx < BRANCH_PX;
+    return ok(g, gs);
   }
 
   /** Every pair's gap as it stands open (fold.a times its gap), most and sum by halves (a segment tree, leaves the pairs). */
@@ -462,6 +483,10 @@ export class Lod {
   /** Per node: the zoom (sx) at and past which nothing in its subtree merges; all gray; anything all gray in its subtree; its subtree's top and bottom (world y). */
   private readonly subT: Float64Array;
   private readonly allG: Uint8Array;
+  /** Per node: no species in it has a count (dashed.ts): one dashed line while its lines are closer than DASH_SPACE. */
+  private readonly allU: Uint8Array;
+  /** The look the merged clades are for (dashed.ts): a pick asks them again, and unlearns what was learnt under the other. */
+  private look: UnknownLook = unknownLook();
   private readonly anyG: Uint8Array;
   private readonly subTop: Float64Array;
   private readonly subBot: Float64Array;

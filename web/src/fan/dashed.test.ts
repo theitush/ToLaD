@@ -6,7 +6,7 @@
 // unknown.test.tsx.) One process: the level's data is module state, so this file loads only the amniotes.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Camera, FanCamera } from './camera';
-import { allUnknown, cladeDashes, DASH_SKIP, setUnknownLook, strandDashes } from './dashed';
+import { allUnknown, cladeDashes, DASH_SKIP, DASH_SPACE, setUnknownLook, strandDashes } from './dashed';
 import { setFlip } from './flip';
 import type { FanBranch, FanNode } from './layout';
 import { loadMammalsFromFiles } from './mammals-node';
@@ -197,6 +197,38 @@ describe('a count nobody has, one dashed line, on the amniotes (ToLaD#565)', () 
       if (s.dash.length) lone++;
     }
     expect(lone + merged.size).toBeGreaterThan(0);
+  });
+
+  it('no two dashed lines closer than DASH_SPACE on screen: lines packed closer are their clade\'s one line, parting as the view zooms in', () => {
+    const near: string[] = [];
+    let parted = 0;
+    for (const t of ['home', 'Squamata', 'Scincidae', 'Lacertidae']) {
+      stand(t === 'home' ? home : v.levelCamera(t)!);
+      const S = P(v).gl.segs;
+      let worst = Infinity;
+      let lines = 0;
+      for (const fy of [0.2, 0.35, 0.5, 0.65, 0.8]) {
+        const y = fy * v.h;
+        const xs: number[] = [];
+        for (let j = 0; j < S.n; j++) {
+          const o = SEG_F * j;
+          if (!(S.f[o + 15] > 0.5) || S.f[o + 3] > y || S.f[o + 3] + S.f[o + 7] < y) continue;
+          const u = (y - S.f[o + 3]) / S.f[o + 7];
+          xs.push(S.f[o] + (S.f[o + 4] - S.f[o]) * u);
+        }
+        xs.sort((a, b) => a - b);
+        // (One line drawn by more than one chord at a row's height (a chord's end on it) is one line.)
+        const X = xs.filter((x, k) => k === 0 || x - xs[k - 1] > 1e-3);
+        lines = Math.max(lines, X.length);
+        for (let k = 1; k < X.length; k++) worst = Math.min(worst, X[k] - X[k - 1]);
+      }
+      near.push(`${t}: ${lines} lines a row at most, the closest ${worst.toFixed(2)} px`);
+      expect(worst, t).toBeGreaterThanOrEqual(DASH_SPACE - 0.05);
+      if (t !== 'home') parted = Math.max(parted, lines);
+    }
+    console.log(near.join('\n'));
+    // (Zoomed in, the lizards' and snakes' lines part: more than one line a row.)
+    expect(parted).toBeGreaterThan(1);
   });
 
   it('the dashed chords as SEG_VS spreads them (expandChords) are the trapezoids drawn on the CPU (a batch that takes no chords)', () => {
