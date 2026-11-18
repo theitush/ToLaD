@@ -20,11 +20,11 @@
     "Sauropsida": 50244711341.53055
    },
    "crowns_Ma": {
-    "Archelosauria": 263.07,
-    "Archosauria": 251.25,
+    "Archelosauria": 263.33,
+    "Archosauria": 252.77,
     "Aves": 98.99,
     "Crocodylia": 93.11,
-    "Lepidosauria": 247.0,
+    "Lepidosauria": 247.25,
     "Sauria": 280.7,
     "Squamata": 213.19,
     "Testudines": 176.66
@@ -1374,7 +1374,20 @@
      "round": "(unnamed: Polioptila guianensis, Polioptila schistaceigula, Polioptila)"
     }
    },
-   "stems_emptied": []
+   "stems_emptied": [],
+   "zero_length": {
+    "fossil_splits_at_one_date": 6,
+    "largest_move": {
+     "from_Ma": 251.252,
+     "split": "Eucrocopoda",
+     "to_Ma": 253.018
+    },
+    "method": "mbl",
+    "moved_younger": 0,
+    "not_below_parent": 0,
+    "note": "zero-length branches given the minimum branch length (Laurin 2004; paleotree timePaleoPhy type='mbl'): ToLaD#561",
+    "splits_moved": 439
+   }
   },
   "lists": {
    "clements": 11167,
@@ -1866,7 +1879,7 @@
  },
  "output": {
   "brotli_bytes": 1637712,
-  "dated_sidecar_raw": 4940845,
+  "dated_sidecar_raw": 4961463,
   "files": 39,
   "raw_bytes": 9262944,
   "skeleton_brotli": 103862,
