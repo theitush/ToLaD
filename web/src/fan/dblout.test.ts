@@ -54,6 +54,7 @@ type Priv = {
   applyFold(): void;
   camera: FanCamera;
   frameOf(lv: Level): Camera;
+  landOf(lv: Level): Camera;
   offBy(a: Camera, c: Camera): number;
   centreLine(): FanBranch | null;
   tapAt: unknown;
@@ -258,7 +259,10 @@ describe('a double tap goes one level up, never in (ToLaD#416, #472)', () => {
             draw();
             const [x, y] = tighter(v, v.cam, c);
             const homeLast = P(v).offBy(v.cam, home) <= 2 && x < -STEP;
-            if ((x > STEP || y > STEP) && !homeLast) bad.push(`${at}: zoomed in ${x.toFixed(0)}, ${y.toFixed(0)} px`);
+            // (From a species at its landing, its group whatever its landing does, ToLaD#481: a wide species' frame, the domestic dog's, is wider on width than
+            // Canini's, which a label's tap now reaches at the carnivores with every fossil, ToLaD#446.)
+            const species = !!lv0.b && P(v).offBy(P(v).landOf(lv0), c) <= STEP;
+            if ((x > STEP || y > STEP) && !homeLast && !species) bad.push(`${at}: zoomed in ${x.toFixed(0)}, ${y.toFixed(0)} px`);
             if (v.levelNow(true).v !== up) bad.push(`${at}: from ${name(lv0)} to ${name(v.levelNow(true))}, not one level up, ${nodeName(up)}`);
             if (back && P(v).offBy(back, v.cam) <= 2) {
               n.straight++;

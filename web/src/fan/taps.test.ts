@@ -11,7 +11,7 @@ import { picBox } from './pics';
 import { latinOf } from './brackets';
 import { mammaliaTree } from './splits';
 import type { Steady } from './steady';
-import { chainOf, FanView, groupName, levelClade, type CutLabels, type GapMember } from './view';
+import { chainOf, FanView, groupName, holds, levelClade, type CutLabels, type GapMember } from './view';
 
 function stubView(): FanView {
   const noop = () => {};
@@ -278,4 +278,42 @@ describe('one tap on a label opens it (ToLaD#465)', () => {
       throw new Error(`${latin}: not reached in 20 taps`);
     });
   }
+
+  // (ToLaD#446: a tap on a label never goes out, and always moves. Down the tree on its side, label by label, a view at a lineage shows the titles of
+  // groups it sits in (Murinae's at the herb field mouse lineage, Leaf-nosed bats & kin's at the golden bat's); a tap on one opens that group where each
+  // of its parts has a name (goOpen's deep opening, ToLaD#500), deeper than the view. Sent to the view's own level instead, it flew nowhere: that
+  // level opens where the view already is, 92b26c4.)
+  it("an ancestor's title tapped at a lineage's view moves, and never further out", () => {
+    let seen = 0;
+    stand(home);
+    for (const g of P(v).famHits.map((h) => h.v)) {
+      if (seen >= 3) break;
+      stand(home);
+      let h = P(v).famHits.find((q) => q.v === g);
+      for (let d = 0; d < 4 && h && seen < 3; d++) {
+        tapBox(h.box);
+        run();
+        const at = v.levelNow(true);
+        const here = { ...v.cam };
+        for (const q of P(v).famHits.filter((q) => at.v && q.v !== at.v && holds({ v: q.v }, at))) {
+          stand(here);
+          const box = P(v).famHits.find((r) => r.v === q.v)?.box;
+          if (!box) continue;
+          tapBox(box);
+          run();
+          seen++;
+          const line = `${groupName(v.fan, q.v)} at ${at.v ? groupName(v.fan, at.v) : at.b!.sp.common}: sx x${(v.cam.sx / here.sx).toFixed(2)}, sy x${(v.cam.sy / here.sy).toFixed(2)}`;
+          say(line);
+          expect(off(v.cam, here), line).toBeGreaterThan(12);
+          // (Never further out than BACK_SLACK, width and time together, as a tap's every step, view.ts outward().)
+          expect(Math.log(v.cam.sx / here.sx) + Math.log(v.cam.sy / here.sy), line).toBeGreaterThan(-Math.log(1.15));
+        }
+        stand(here);
+        h = P(v)
+          .famHits.filter((q) => at.v && q.v !== at.v && holds(at, { v: q.v }))
+          .sort((p, q) => q.v.strands.length - p.v.strands.length)[0];
+      }
+    }
+    expect(seen).toBeGreaterThan(0);
+  });
 });
