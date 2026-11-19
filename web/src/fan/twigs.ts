@@ -339,13 +339,14 @@ export class CutMemo {
         return this.v;
       }
     }
-    // (Into the spare buffers, swapped with the kept ones at the end: no garbage a frame.)
-    if (this.ys2.length < n) {
-      this.ys2 = new Float64Array(n + (n >> 2));
-      this.v2 = new Float64Array(8 * (n + (n >> 2)));
+    // (Into the spare buffers, shared by every CutMemo (one update at a time), then copied into its own, sized to its
+    // heights: no garbage a frame, and no spare per column, ToLaD#502.)
+    if (CUT_SPARE.ys.length < n) {
+      CUT_SPARE.ys = new Float64Array(n + (n >> 2));
+      CUT_SPARE.v = new Float64Array(8 * (n + (n >> 2)));
     }
-    const ys = this.ys2;
-    const v = this.v2;
+    const ys = CUT_SPARE.ys;
+    const v = CUT_SPARE.v;
     const ov = this.v;
     const stale = this.stale;
     let j = 0;
@@ -363,20 +364,28 @@ export class CutMemo {
       this.m.sample(y - e, v, 8 * k + 4);
       this.fresh++;
     }
-    this.ys2 = this.ys;
-    this.v2 = this.v;
-    this.ys = ys;
-    this.v = v;
+    if (!keeps(this.ys.length, n)) {
+      this.ys = new Float64Array(n + (n >> 2));
+      this.v = new Float64Array(8 * (n + (n >> 2)));
+    }
+    this.ys.set(ys.subarray(0, n));
+    this.v.set(v.subarray(0, 8 * n));
     this.n = n;
     this.stale = false;
-    return v;
+    return this.v;
   }
-  private ys2 = new Float64Array(0);
-  private v2 = new Float64Array(0);
-  /** The bytes its buffers hold. */
+  /** The bytes its buffers hold (the spare ones, CUT_SPARE, are all columns'). */
   bytes(): number {
-    return 8 * (this.ys.length + this.v.length + this.ys2.length + this.v2.length);
+    return 8 * (this.ys.length + this.v.length);
   }
+}
+
+/** CutMemo.update's and ColumnPath.build's spare buffers, one for all (ToLaD#502: a pair per column held ~half their bytes). */
+const CUT_SPARE = { ys: new Float64Array(0), v: new Float64Array(0) };
+const PATH_SPARE = { ys: new Float64Array(0), vals: new Float64Array(0), steps: new Uint8Array(0) };
+/** Whether a column's own buffer, `cap` long, keeps `n`: long enough, and not past four times as long (made again at n + n / 4). */
+function keeps(cap: number, n: number): boolean {
+  return cap >= n && cap <= 4 * n + 32;
 }
 
 /** How far (screen px) a merged chord may stray from the samples it drops (Sleeve). */
@@ -453,9 +462,6 @@ export class ColumnPath {
   private yLo = 0;
   private yHi = 0;
   constructor(private readonly m: TwigModel) {}
-  private ys2 = new Float64Array(0);
-  private vals2 = new Float64Array(0);
-  private steps2 = new Uint8Array(0);
   /** build()'s last cuts and the span and grid they are for. */
   private cuts: number[] = [];
   private cutsA = NaN;
@@ -470,9 +476,9 @@ export class ColumnPath {
   /** How many times the fold moved the columns since the kept samples were chosen (reset()), and ever. */
   private moved = 0;
   private ticks = 0;
-  /** The bytes its buffers and its cuts hold. */
+  /** The bytes its buffers and its cuts hold (the spare ones, PATH_SPARE, are all columns'). */
   bytes(): number {
-    return 8 * (this.ys.length + this.vals.length + this.ys2.length + this.vals2.length + this.cuts.length) + this.steps.length + this.steps2.length + 4 * this.leftGen.length;
+    return 8 * (this.ys.length + this.vals.length + this.cuts.length) + this.steps.length + 4 * this.leftGen.length;
   }
   /** The kept samples are due to be chosen afresh (reset()'s turn, exact()): at the next span() the frame's budget allows (pathFrame). */
   private redo = false;
@@ -565,17 +571,17 @@ export class ColumnPath {
     const cuts = this.cuts;
     const v = this.m.cutMemo.update(cuts);
     const n = cuts.length;
-    // (Into the spare buffers, swapped with the kept ones at the end: no garbage a frame. The kept ones are read
-    // only until the next span().)
-    if (this.ys2.length < n) {
+    // (Into the spare buffers, shared by every ColumnPath (PATH_SPARE: one build at a time), then the kept samples copied
+    // into its own, sized to them (~1 in 7 of the cuts), ToLaD#502. Its own are read only until the next span().)
+    if (PATH_SPARE.ys.length < n) {
       const c = n + (n >> 2);
-      this.ys2 = new Float64Array(c);
-      this.vals2 = new Float64Array(8 * c);
-      this.steps2 = new Uint8Array(c);
+      PATH_SPARE.ys = new Float64Array(c);
+      PATH_SPARE.vals = new Float64Array(8 * c);
+      PATH_SPARE.steps = new Uint8Array(c);
     }
-    const ys = this.ys2;
-    const out = this.vals2;
-    const steps = this.steps2;
+    const ys = PATH_SPARE.ys;
+    const out = PATH_SPARE.vals;
+    const steps = PATH_SPARE.steps;
     // In world units: the tolerance at this zoom, a little under CHORD_TOL_PX (the zoom moves on).
     const tolX = CHORD_TOL_PX / PATH_ZOOM / sx;
     // The lanes step at the splits (the green lane: the strand leaves its parent's prefix there).
@@ -662,14 +668,17 @@ export class ColumnPath {
       steps[k] = isSplit(cuts[n - 1]) ? 1 : 0;
       k++;
     }
-    this.ys2 = this.ys;
-    this.vals2 = this.vals;
-    this.steps2 = this.steps;
-    this.ys = ys;
-    this.vals = out;
-    this.steps = steps;
+    if (!keeps(this.ys.length, k)) {
+      const c = k + (k >> 2);
+      this.ys = new Float64Array(c);
+      this.vals = new Float64Array(8 * c);
+      this.steps = new Uint8Array(c);
+      this.leftGen = new Int32Array(c);
+    }
+    this.ys.set(ys.subarray(0, k));
+    this.vals.set(out.subarray(0, 8 * k));
+    this.steps.set(steps.subarray(0, k));
     this.n = k;
-    if (this.leftGen.length < k) this.leftGen = new Int32Array(ys.length);
     this.leftGen.fill(this.gen, 0, k);
     this.sxRef = sx;
     this.grid = grid;
