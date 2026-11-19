@@ -3822,64 +3822,78 @@ export class FanView implements InputHandlers {
       }
     }
     // (Where they are drawn: as laid, moved only by the screen, ToLaD#279 (Ita, option 1, as #469 for the column's pictures: "pics shouldnt dispapper from the left! just stop at
-    // the fork"). A fossil's label with a picture is held at the screen's top edge, its top (its name's, where that stands toward "now") never above it, till its fork takes it
-    // along: its picture never older than its fork, a sticky header in its branch. Its picture never stands on a label standing: it waits under it, in its place across, the
-    // column's labels first, then the fossils' in the order they reach the edge (sticky headers stacked). Its name goes with it, and gives way where it meets a label standing or
-    // would leave its branch past its fork. Where nothing is held, each stands as laid: the choice kept them apart.)
+    // the fork"). A fossil's picture is held at the screen's top edge, till its fork takes it along: never older than its fork, a sticky header in its branch (a name
+    // that stands past it toward "now" goes off the top first, as the world does). A picture never stands on another: it waits under it, in its place across, the column's
+    // first, then the fossils' in the order their forks leave (sticky headers stacked: the one whose branch ends first at the edge), till its fork comes up under it and takes
+    // it over. A name a picture meets gives way
+    // while they meet (#469), the column's too; a fossil's name goes with its picture, and gives way where it meets a label standing or would leave its branch past its fork.
+    // Where nothing is held, each stands as laid: the choice kept them apart.)
     const hair = GROUP_D - PIC_D;
     const meet = (p: readonly number[], q: readonly number[]) => p[0] < q[2] && p[2] > q[0] && p[1] < q[3] - TIP_HAIR && p[3] > q[1] + TIP_HAIR;
-    const stand: number[][] = [...[...out.spots, ...out.names].map((s) => s.box), ...out.pics.map(picBox)];
-    const topOf = (i: number) => Math.min(named[i].top, named[i].s.box[1]);
-    const order = named.map((_, i) => i);
-    order.sort((i, j) => (named[j].d ? 1 : 0) - (named[i].d ? 1 : 0) || topOf(i) - topOf(j) || i - j);
-    // (What is drawn, listed in the fossils' order, as laid: each one's picture and name.)
+    const stand = out.pics.map(picBox);
+    const order = named.map((_, i) => i).filter((i) => named[i].d);
+    order.sort((i, j) => named[i].start - named[j].start || i - j);
+    // (Each one's picture as drawn, listed in the fossils' order, and how far it moved from where it was laid; NaN: none drawn, nor its name.)
     const pics: (CutLabels['pics'][number] | undefined)[] = [];
-    const names: (LabelSpot | undefined)[] = [];
+    const dys = named.map(() => 0);
     for (const i of order) {
       const n = named[i];
-      const { d, s } = n;
-      let dy = 0;
-      if (d) {
-        // (Held at the edge, by no more than its branch has left below its picture.)
-        dy = Math.min(Math.max(0, -topOf(i)), Math.max(0, n.start - n.top - d));
-        let y0 = n.top + dy;
-        // (Gone with its fork.)
-        if (y0 + d <= 0) continue;
-        for (let moved = true; moved; ) {
-          moved = false;
-          for (const q of stand)
-            if (q[0] < n.px + d / 2 && q[2] > n.px - d / 2 && q[1] < y0 + d - TIP_HAIR && q[3] > y0 + TIP_HAIR) {
-              y0 = q[3] + hair;
-              moved = true;
-            }
-        }
-        dy = y0 - n.top;
-        const b = f.strands[n.k];
-        // (A group's: its youngest fossil's face, and its disc a member's photo where that has none, discSci.)
-        const p = { x: n.px, y: y0 + d / 2, i: 0, lv: (n.one ? { v: n.one.v } : { b }) as Level, face: b, held: false };
-        if (y0 < this.h) {
-          pics[i] = d === PIC_D ? p : { ...p, d };
-          stand.push(picBox({ ...p, d }));
-        }
+      const d = n.d;
+      // (Held at the edge, by no more than its branch has left below its picture; gone with its fork.)
+      let y0 = n.top + Math.min(Math.max(0, -n.top), Math.max(0, n.start - n.top - d));
+      dys[i] = NaN;
+      if (y0 + d <= 0) continue;
+      const at = (y: number) => (q: readonly number[]) => q[0] < n.px + d / 2 && q[2] > n.px - d / 2 && q[1] < y + d - TIP_HAIR && q[3] > y + TIP_HAIR;
+      const on = (q: readonly number[]) => at(y0)(q);
+      // (Under a picture it meets while its branch holds it there; else over it, its fork taking it past (never older than its fork, #464), where that is free and on screen;
+      // else, crowded at the edge, under it still till its fork leaves: no picture goes while its fork is on screen.)
+      for (let moved = true, pass = 0; moved && pass <= stand.length; pass++) {
+        moved = false;
+        for (const q of stand)
+          if (on(q)) {
+            const over = q[1] - hair - d;
+            y0 = q[3] + hair + d <= n.start + TIP_HAIR || over + d <= 0 || stand.some(at(over)) ? q[3] + hair : over;
+            moved = true;
+          }
       }
+      if (y0 + d <= 0 || stand.some(on)) {
+        this.tipMissed.set(n.k, 'meets');
+        continue;
+      }
+      dys[i] = y0 - n.top;
+      if (y0 >= this.h) continue;
+      const b = f.strands[n.k];
+      // (A group's: its youngest fossil's face, and its disc a member's photo where that has none, discSci.)
+      const p = { x: n.px, y: y0 + d / 2, i: 0, lv: (n.one ? { v: n.one.v } : { b }) as Level, face: b, held: false };
+      pics[i] = d === PIC_D ? p : { ...p, d };
+      stand.push(picBox(pics[i]!));
+    }
+    const fos = pics.filter((p) => p).map((p) => picBox(p!));
+    const given = (s: LabelSpot) => !fos.some((q) => meet(q, s.box));
+    out.names = out.names.filter(given);
+    out.spots = out.spots.filter(given);
+    for (const p of pics) if (p) out.pics.push({ ...p, i: out.pics.length });
+    stand.push(...[...out.spots, ...out.names].map((s) => s.box));
+    named.forEach((n, i) => {
+      const dy = dys[i];
+      const s = n.s;
+      if (Number.isNaN(dy)) return;
       if (dy) {
         if (n.under && s.box[3] + dy > n.start) {
           this.tipMissed.set(n.k, 'crossed');
-          continue;
+          return;
         }
         s.box = [s.box[0], s.box[1] + dy, s.box[2], s.box[3] + dy];
         s.y1 += dy;
       }
-      if (s.box[3] <= 0 || s.box[1] >= this.h) continue;
+      if (s.box[3] <= 0 || s.box[1] >= this.h) return;
       if (stand.some((q) => meet(q, s.box))) {
         this.tipMissed.set(n.k, 'meets');
-        continue;
+        return;
       }
-      names[i] = s;
+      out.names.push(s);
       stand.push(s.box);
-    }
-    for (const p of pics) if (p) out.pics.push({ ...p, i: out.pics.length });
-    for (const s of names) if (s) out.names.push(s);
+    });
   }
   /**
    * The fossil groups tipLabels names as one (ToLaD#279), per strand: each outermost clade with a rank name of its own (isLevel) that is only fossils placed by name
