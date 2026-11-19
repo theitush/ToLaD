@@ -53,7 +53,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import build, dated, fossils, reptcounts, tiles
+from . import build, dated, fossils, redlist, reptcounts, tiles
 from .dated import EPS, SRC_NAMES, S_INTERP, DNode
 from .merge import LAD_RECENT_EX, _mrca, assign_bands, date_tree
 from .model import SRC, grade_from_sd, lognormal_sum, profile_edges
@@ -178,32 +178,64 @@ def load_rdb(raw: Path) -> tuple[dict[str, dict], list[str]]:
     return out, no_order
 
 
-def load_lost(raw: Path) -> dict[str, set[str]]:
+def load_lost(raw: Path, rl: dict[str, dict]) -> dict[str, set[str]]:
     """The birds and reptiles lost since 1500 CE: IOC 15.2's species marked extinct (a dagger, or two: known from
-    subfossils), and the Red List 2026-1's Extinct (the GBIF copy the mammal build pins; Extinct in the Wild lives on,
-    in captivity). Neither gives a year."""
-    import io
-    import zipfile
-
+    subfossils), and the Red List 2026-1's Extinct (`rl`: its birds and reptiles, redlist.load_redlist, the GBIF copy
+    the mammal build pins; Extinct in the Wild lives on, in captivity). Neither gives a year."""
     import openpyxl
     ioc = set()
     ws = openpyxl.load_workbook(raw / "amniotes" / "ioc" / "IOC_Names_File_Plus-15.2.xlsx", read_only=True).worksheets[0]
     for r in ws.iter_rows(min_row=4, values_only=True):
         if r[4] == "Species" and r[5] and "\u2020" in str(r[5]) and r[7]:
             ioc.add(" ".join(str(r[7]).split()))
-    rl, ids = set(), {}
-    with zipfile.ZipFile(raw / "redlist" / "iucn-2026-1.zip") as z:
-        with z.open("taxon.txt") as f:
-            for line in io.TextIOWrapper(f, encoding="utf-8"):
-                p = line.rstrip("\n").split("\t")
-                if len(p) > 10 and p[4] in ("AVES", "REPTILIA") and p[10] == "species":
-                    ids[p[0]] = f"{p[7]} {p[8]}"
-        with z.open("distribution.txt") as f:
-            for line in io.TextIOWrapper(f, encoding="utf-8"):
-                p = line.rstrip("\n").split("\t")
-                if p[0] in ids and len(p) > 5 and p[5] == "Extinct":
-                    rl.add(ids[p[0]])
-    return {"IOC 15.2 dagger": ioc, "Red List 2026-1 EX": rl}
+    return {"IOC 15.2 dagger": ioc, "Red List 2026-1 EX": {n for n, r in rl.items() if r["category"] == "EX"}}
+
+
+def name_reptiles(reptiles: dict[str, dict], rl: dict[str, dict], tax: dict[int, dict], syn: dict[int, list[str]],
+                  uids: dict[str, set[int]], counted: set[str]) -> dict:
+    """ToLaD#592: each Reptile Database species takes its IUCN Red List 2026-1 English name (redlist.english_names, the
+    mammals' rule, #145) as its list name (`common`, as a bird's eBird/Clements one): by its own binomial; else, when
+    the Red List does not have that binomial, by an established synonym (the Red List's own for one of its species, or
+    Open Tree's for ours: `tax`/`syn`/`uids`, load_ott_cut) that is the same species renamed (a genus move or a Latin
+    gender ending: the epithet's stem the same; Aldabrachelys gigantea is the Red List's Geochelone gigantea), when
+    the Red List's name is no species of ours and no other of ours takes it. A lump (the Red List folds our species
+    into another: Dinodon yunnanensis into Lycodon fasciatus) names none, and neither does a Red List species assessed
+    Extinct that a count today (`counted`) says lives: the name is the lost taxon's, not our species' (Chelonoidis
+    niger is the Floreana tortoise alone on the Red List; ours is the counted Galapagos tortoise, as redlist.REDEFINED
+    for the mammals). Returns the counts by group and how."""
+    from .redlist import _stem
+
+    def key(b: str) -> tuple[str, str]:  # (genus, epithet stem): a Latin gender ending aside, the same binomial
+        g, e = b.split(" ", 1)
+        return g, _stem(e)
+
+    rept = {n: r for n, r in rl.items() if r["class"] == "REPTILIA" and r.get("common")}
+    of_syn: dict[tuple[str, str], set[str]] = defaultdict(set)  # a Red List synonym -> the accepted names it is one of
+    for n, r in rept.items():
+        for s in r.get("synonyms", ()):
+            of_syn[key(s)].add(n)
+    via: dict[str, tuple[str, str]] = {sp: (sp, "name") for sp in reptiles if sp in rept}
+    for sp in reptiles:
+        if sp in rl:
+            continue
+        rls = of_syn.get(key(sp), set())
+        ott = {nm for u in uids.get(sp, ()) for nm in (tax[u]["name"], *syn.get(u, ()))} & rept.keys()
+        c = {n for n in rls | ott if n not in reptiles and key(n)[1] == key(sp)[1]}
+        if len(c) == 1:
+            n = c.pop()
+            via[sp] = (n, "Red List synonym" if n in rls else "Open Tree synonym")
+    taken = Counter(n for n, _ in via.values())
+    named: Counter = Counter()
+    for sp, r in reptiles.items():
+        n, how = via.get(sp, (None, "unnamed"))
+        if n and taken[n] > 1:
+            n, how = None, "unnamed: a Red List species two of ours are"
+        elif n and sp in counted and rept[n]["category"] == "EX":
+            n, how = None, "unnamed: the Red List's is an extinct taxon, ours is counted alive"
+        if n:
+            r["common"] = rept[n]["common"]
+        named[f"{r['group']}: {how}"] += 1
+    return dict(sorted(named.items()))
 
 
 def load_callaghan(raw: Path) -> dict[str, dict]:
@@ -1079,13 +1111,15 @@ def build_amniotes(raw: Path, work: Path, log: dict, alog: dict, t_start: float)
     tax, syn, uids = load_ott_cut(raw)
     birds = load_clements(raw)
     reptiles, no_order = load_rdb(raw)
+    rl = redlist.load_redlist(raw, ("AVES", "REPTILIA"), synonyms=True)
+    rept = reptcounts.load()
     lists = Lists(birds, reptiles, syn, uids)
     alog["lists"] = {"clements": len(birds), "rdb": len(reptiles), "rdb_no_order": no_order,
-                     "rdb_by_group": dict(Counter(r["group"] for r in reptiles.values()))}
+                     "rdb_by_group": dict(Counter(r["group"] for r in reptiles.values())),
+                     "rdb_red_list_names": name_reptiles(reptiles, rl, tax, syn, uids, set(rept))}
     cal = match_callaghan(load_callaghan(raw), birds, lists, alog)
-    rept = reptcounts.load()
     srows, seen = sauropsid_rows(load_ot(raw), tax, lists, alog,
-                                 {n for n, c in cal.items() if c["N"] > 0} | set(rept), load_lost(raw))
+                                 {n for n, c in cal.items() if c["N"] > 0} | set(rept), load_lost(raw, rl))
     log_step(t_start, f"sauropsid rows: {alog['rows']['species_by_group']}")
     backbone = load_backbone(Path(__file__).resolve().parents[1] / "amniotes.toml")
     notes = list(getattr(mdroot, "data_notes", []))
@@ -1247,7 +1281,7 @@ def main(argv: list[str] | None = None) -> int:
     sk = {**dated.skeleton_meta(mdroot), "sources": SRC_NAMES + AMNIOTE_SRC, "overrides": adroot.data_notes,
           **{k: CITES[k] for k in AMNIOTE_SRC},
           "common_source": "IUCN Red List 2026-1 (GBIF checklist doi:10.15468/0qnb58), preferred English name "
-                           "(mammals); eBird/Clements v2025 English name (birds)"}
+                           "(mammals, reptiles); eBird/Clements v2025 English name (birds)"}
     extra = {"amniotes": {
         "note": "ToLaD#539: the living amniotes. Mammals exactly as data/mammals; birds and reptiles from the Open "
                 "Tree Amniota synthesis, dated per group (dated/skeleton.json sources), counts for birds from "

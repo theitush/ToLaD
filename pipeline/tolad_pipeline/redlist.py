@@ -34,6 +34,9 @@ CODE = {c: i for i, c in enumerate(CATEGORIES) if c}
 THREAT_STATUS = {
     "least concern": "LC", "near threatened": "NT", "vulnerable": "VU", "endangered": "EN",
     "critically endangered": "CR", "extinct in the wild": "EW", "extinct": "EX", "data deficient": "DD",
+    # Lower Risk/conservation dependent, a pre-2001 (version 2.3) category the Red List counts with Near Threatened;
+    # only old bird and reptile assessments carry it (Podocnemis expansa, ToLaD#592), no mammal
+    "conservation dependent": "NT",
 }
 # PHYLACINE 1.2 codes that are a Red List category of a living species (EP/EX: extinct, no fallback)
 PHYLACINE_LIVING = {"LC", "NT", "VU", "EN", "CR", "EW", "DD"}
@@ -66,25 +69,36 @@ REDEFINED = {
     "Dasycercus cristicauda",
 }
 
+# the lower-case words that start an authority ("Typhlops boettgeri de Witte"), not an infraspecific epithet
+AUTHOR_PARTICLES = {"d", "da", "de", "del", "della", "den", "der", "di", "du", "la", "le", "ter", "van", "von"}
 YEAR_RE = re.compile(r"The IUCN Red List of Threatened Species (\d{4})")
 URL_RE = re.compile(r"/species/(\d+)/(\d+)")
 
 
-def load_redlist(raw: Path) -> dict[str, dict]:
-    """Mammal binomial -> {category, year, taxon, assessment} from the Red List checklist."""
+def load_redlist(raw: Path, classes: tuple[str, ...] = ("MAMMALIA",), synonyms: bool = False) -> dict[str, dict]:
+    """Binomial -> {category, year, taxon, assessment[, common]} for the checklist's accepted species of `classes` (the
+    mammals by default; the amniote build asks for the birds and reptiles, ToLaD#539/#592). `synonyms`: each record
+    also carries its class and the binomials the checklist gives as its synonyms (authority dropped; no trinomials)."""
     out: dict[str, dict] = {}
     with zipfile.ZipFile(raw / ZIP) as z:
         recs: dict[str, dict] = {}
+        syn_rows: list[tuple[str, str]] = []
         with z.open("taxon.txt") as f:
             for line in io.TextIOWrapper(f, encoding="utf-8"):
                 r = line.rstrip("\n").split("\t")
-                if len(r) < 16 or r[4] != "MAMMALIA" or r[10] != "species" or r[12] != "accepted":
+                if synonyms and len(r) > 13 and r[12] == "synonym":
+                    syn_rows.append((r[13], r[1]))
+                if len(r) < 16 or r[4] not in classes or r[10] != "species" or r[12] != "accepted":
                     continue
                 y = YEAR_RE.search(r[14])
                 u = URL_RE.search(r[15])
-                recs[r[0]] = {"name": norm_name(f"{r[7]} {r[8]}"), "year": int(y.group(1)) if y else 0,
+                recs[r[0]] = {"name": norm_name(f"{r[7]} {r[8]}"), "class": r[4], "year": int(y.group(1)) if y else 0,
                               "taxon": int(u.group(1)) if u else int(r[0]),
                               "assessment": int(u.group(2)) if u else 0}
+        for acc, sci in syn_rows:
+            b = _binomial(sci)
+            if acc in recs and b:
+                recs[acc].setdefault("synonyms", []).append(b)
         with z.open("distribution.txt") as f:
             for line in io.TextIOWrapper(f, encoding="utf-8"):
                 r = line.rstrip("\n").split("\t")
@@ -95,22 +109,41 @@ def load_redlist(raw: Path) -> dict[str, dict]:
                 if cat is None:
                     raise ValueError(f"unknown Red List status {r[5]!r} for {rec['name']}")
                 rec["category"] = cat
-        # English common names (ToLaD#145): the checklist's preferred English name, else its first English one
-        eng: dict[str, tuple[bool, str]] = {}
-        with z.open("vernacularname.txt") as f:
-            for line in io.TextIOWrapper(f, encoding="utf-8"):
-                r = line.rstrip("\n").split("\t")
-                if len(r) < 4 or r[0] not in recs or r[1] != "eng" or not r[2].strip():
-                    continue
-                pref = r[3].strip().lower() == "true"
-                if r[0] not in eng or (pref and not eng[r[0]][0]):
-                    eng[r[0]] = (pref, r[2].strip())
+        eng = english_names(z, recs)
+    keys = ("category", "year", "taxon", "assessment") + (("class", "synonyms") if synonyms else ())
     for tid, rec in recs.items():
         if "category" in rec:
-            out[rec["name"]] = {k: rec[k] for k in ("category", "year", "taxon", "assessment")}
+            out[rec["name"]] = {k: rec[k] for k in keys if k in rec}
             if tid in eng:
-                out[rec["name"]]["common"] = eng[tid][1]
+                out[rec["name"]]["common"] = eng[tid]
     return out
+
+
+def english_names(z: zipfile.ZipFile, ids) -> dict[str, str]:
+    """Red List taxon id (of `ids`) -> its English common name (ToLaD#145): the checklist's preferred English name,
+    else its first English one. The one rule for every class the build names from the Red List (mammals, #592 reptiles)."""
+    eng: dict[str, tuple[bool, str]] = {}
+    with z.open("vernacularname.txt") as f:
+        for line in io.TextIOWrapper(f, encoding="utf-8"):
+            r = line.rstrip("\n").split("\t")
+            if len(r) < 4 or r[0] not in ids or r[1] != "eng" or not r[2].strip():
+                continue
+            pref = r[3].strip().lower() == "true"
+            if r[0] not in eng or (pref and not eng[r[0]][0]):
+                eng[r[0]] = (pref, r[2].strip())
+    return {k: v[1] for k, v in eng.items()}
+
+
+def _binomial(sci: str) -> str | None:
+    """A checklist synonym's binomial: 'Ramphotyphlops affinis (Boulenger, 1889)' -> 'Ramphotyphlops affinis'; None for
+    a name that is no plain binomial (a trinomial, 'ssp.', 'var.')."""
+    w = sci.split()
+    if len(w) < 2 or not w[0][:1].isupper() or not w[1].isalpha() or not w[1].islower():
+        return None
+    if len(w) > 2 and (w[2].islower() and w[2].isalpha() and w[2] not in AUTHOR_PARTICLES
+                       or w[2].rstrip(".") in ("ssp", "subsp", "var")):
+        return None
+    return norm_name(f"{w[0]} {w[1]}")
 
 
 def _bridges(raw: Path, phy_syn: dict[str, str]) -> dict[str, list[str]]:

@@ -280,7 +280,8 @@ The sidecars are JSON, one per data file, read at build time by the fan (they ar
   sorted; every other species row is placed by Upham's phylogeny or an override. The fan draws every one (ToLaD#279;
   ToLaD#145 left the grafted fossils out), and a grafted fossil's card says it was placed by name.
 - `common`: `{row: name}`, the species' English common name (IUCN Red List 2026-1's preferred English
-  vernacular name; a `[[dated_fossil]]` entry's `common`).
+  vernacular name, mammals and, in `data/amniotes`, reptiles; a bird's eBird/Clements v2025 name; a
+  `[[dated_fossil]]` entry's `common`). The skeleton's `common_source` says which.
 - `gen`: `{row: [years, how]}`, the species' generation length as the model uses it; `how` indexes
   `gen_how`: `COMBINE reported`, `COMBINE imputed` (Soria et al. 2021, Pacifici et al. 2013's values),
   or `allometric` (the model's mass fit, for fossils and species COMBINE lacks).
