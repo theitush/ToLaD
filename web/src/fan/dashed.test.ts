@@ -157,11 +157,12 @@ describe('a count nobody has, one dashed line, on the amniotes (ToLaD#565)', () 
 
   it('the rule: a clade none of whose species has a count is one dashed line; one with a count stays a band', () => {
     const f = v.fan;
-    // (The lizards and snakes, the turtles: every one without a count. The birds with a count, Aves: not; nor Amniota, nor Dinosauria (birds in it).)
-    for (const t of ['Squamata', 'Testudines', 'Crocodylia']) expect(allUnknown(f, node(t)), t).toBe(true);
-    for (const t of ['Aves', 'Mammalia', 'Amniota', 'Dinosauria', 'Archosauria']) expect(allUnknown(f, node(t)), t).toBe(false);
-    // A merged Squamata: its line from its top down to its foot, its parents with no counts on down at their centres, held by their first strand.
-    const sq = node('Squamata');
+    // (The skinks, the lacertids: every one without a count. The birds with a count, Aves: not; nor Amniota, nor Dinosauria (birds in it); nor,
+    // since ToLaD#578's reptile counts, the squamates (the Komodo dragon, ...), the turtles (sea turtles, ...) or the crocodilians.)
+    for (const t of ['Scincidae', 'Lacertidae']) expect(allUnknown(f, node(t)), t).toBe(true);
+    for (const t of ['Aves', 'Mammalia', 'Amniota', 'Dinosauria', 'Archosauria', 'Squamata', 'Testudines', 'Crocodylia']) expect(allUnknown(f, node(t)), t).toBe(false);
+    // A merged clade (the skinks): its line from its top down to its foot, its parents with no counts on down at their centres, held by their first strand.
+    const sq = node('Scincidae');
     const D = cladeDashes(f, sq);
     expect(D.slice(0, 3)).toEqual([-Infinity, sq.yBot, 0]);
     for (let k = 3, u = sq.parent!; k < D.length; k += 3, u = u.parent!) {

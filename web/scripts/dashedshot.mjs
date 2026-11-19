@@ -26,6 +26,11 @@ const SCENES = [
   ['lizard', 'amniotes', 'species', 'Lacerta agilis'],
   ['dinosaur', 'amniotes', 'species', 'Tyrannosaurus rex'],
   ['mammal-507', 'mammals', 'species', 'Gerbillus agag'],
+  // the reptiles a published number counts (ToLaD#578): reptiles and birds, the crocodilians, the turtles, a counted species' card
+  ['reptiles', 'amniotes', 'clade', 'Sauria'],
+  ['crocodiles', 'amniotes', 'clade', 'Crocodylia'],
+  ['turtles', 'amniotes', 'clade', 'Testudines'],
+  ['leatherback', 'amniotes', 'species', 'Dermochelys coriacea'],
 ].filter((s) => !ONLY || ONLY.has(s[0]));
 
 const still = (page) =>
