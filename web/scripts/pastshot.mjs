@@ -1,5 +1,5 @@
 // ToLaD#279 picstop shots: a pan into the past at a level, a shot every STEP px (390x844, default headless, no GPU flags), and per shot the fossils' pictures on screen,
-// each held (at the column's row) or at its tip. A scene is a level as a tap on it lands (goLevel), `home`, or `hominins`: the Hominins' landing as a tap on the human picture
+// each with its top (screen px, along time): held at the screen's top edge (0) or under a label there, else as laid at its tip. A scene is a level as a tap on it lands (goLevel), `home`, or `hominins`: the Hominins' landing as a tap on the human picture
 // from Primates lands (ToLaD#497).
 //   npm run build:single && flock /tmp/tolad-browser.lock node scripts/pastshot.mjs <out-dir> <prefix> [hominins,Carnivora] [0,120,240,360]
 import { mkdirSync } from 'node:fs';
@@ -42,8 +42,7 @@ try {
       const f = window.__fan;
       const pics = f.cutLast?.pics ?? [];
       const fos = pics.filter((p) => !p.held);
-      const row = f.flipPicY();
-      return `${pics.length - fos.length} column pictures, ${fos.length} fossils': ${fos.map((p) => `${p.face.sp.sci.replace(/^(\w)\w+ /, '$1. ')}${Math.abs(p.y - (p.d ?? 36) / 2 - (row - 18)) < 0.5 ? ' (held)' : ''}`).join(', ')}`;
+      return `${pics.length - fos.length} column pictures, ${fos.length} fossils': ${fos.map((p) => `${p.face.sp.sci.replace(/^(\w)\w+ /, '$1. ')} @${Math.round(p.y - (p.d ?? 36) / 2)}`).join(', ')}`;
     });
   for (const sc of SCENES) {
     if (sc === 'hominins') {

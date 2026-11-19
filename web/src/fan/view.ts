@@ -1564,7 +1564,8 @@ export class FanView implements InputHandlers {
    * so that a picture and its pill stay on screen, as keepOnScreen keeps them at the sides. (No pinned rows come in at
    * the right edge as "now" leaves it, ToLaD#494: no room kept for them.)
    */
-  private flipPicY(y = this.toScreen(0, this.fan.time.y(LABELS_MA))[1]): number {
+  private flipPicY(): number {
+    const y = this.toScreen(0, this.fan.time.y(LABELS_MA))[1];
     const r = PIC_D / 2;
     return Math.max(this.labelTop() + LABEL_CAP + LABEL_UNDER + r, Math.min(this.h - r, y));
   }
@@ -3511,10 +3512,11 @@ export class FanView implements InputHandlers {
    */
   private gapLabels(T: CutTerritories, row: number): CutLabels {
     const out: CutLabels = { spots: [], groups: new Map(), pics: [], items: [], all: [], names: [] };
-    // (Where each label stood, relative to the tree, at the frame a pan into the past took "now" past the screen's top, `lag` px ago, ToLaD#279: its box (`then`, moved
-    // with the tree since), gone off the screen since or not, a name a picture met there given way as below. The fossils at their tips are judged against that, tipLabels.)
-    const then: { key: string; pic: boolean; box: number[] }[] = [];
-    const was = (key: string, pic: boolean, b: readonly number[], dv: number) => then.push({ key, pic, box: [b[0], b[1] + dv, b[2], b[3] + dv] });
+    // (Where each label stands in the world at this zoom, ToLaD#279: on 100 kya (LABELS_MA), as at rest where the screen holds none, gone off the screen or not, a name
+    // a picture meets there given way as below. The fossils at their tips are judged against that (tipLabels): which fossils show is the zoom's, a pan only moves them,
+    // as in dynamic map labelling (Been, Daiches & Yap 2006); the screen's holds decide where they are drawn, not whether.)
+    const world: { key: string; pic: boolean; box: number[] }[] = [];
+    const was = (key: string, pic: boolean, b: readonly number[], dv: number) => world.push({ key, pic, box: [b[0], b[1] + dv, b[2], b[3] + dv] });
     const gone: CutLabels = { spots: [], groups: new Map(), pics: [], items: [], all: [], names: [] };
     this.picSpots = out.pics;
     const X = (x: number) => this.toScreen(x, 0)[0];
@@ -3530,10 +3532,6 @@ export class FanView implements InputHandlers {
     const list = this.gapCoverAt(T, sx, win, this.w / 2 / sx);
     const L = this.gapLadder!;
     const tips = win ? L.tipIx.within(win[0], win[1]) : L.tips;
-    // (How far a pan into the past has taken "now" past the screen's top, ToLaD#279.)
-    const nowAt = Y(this.yNow);
-    const lag = Math.max(0, -nowAt);
-    const holdThen = this.flipPicY(col + lag);
     // (Guest titles, ToLaD#500: in their host's band, one at most (gapCoverAt), at the top of that band's part on screen, then the host's own labels, a hair between; gapCoverAt gave it a band
     // holding both.)
     const guestAt = new Map<GapMember, number>();
@@ -3577,12 +3575,10 @@ export class FanView implements InputHandlers {
       // (Its row: held as everyone's, but its pictures' slot no older than its branch's start, the fork it splits from its sister at.)
       const start = Y(lv.b ? lv.b.splitY : lv.v.yBot);
       const at = start > col ? Math.min(hold, Math.max(col, start - PIC_D / 2)) : Math.max(hold, Math.min(col, start + PIC_D / 2));
-      // (Gone off the screen's edge with its branch: the names stand younger still. Where it stood then, still.)
+      // (Gone off the screen's edge with its branch: the names stand younger still. In the world, on 100 kya still: `dv` takes it there.)
       const off = at + PIC_D / 2 < 0;
-      if (off && !lag) continue;
       const to = off ? gone : out;
-      const [colT, startT] = [col + lag, start + lag];
-      const dv = (startT > colT ? Math.min(holdThen, Math.max(colT, startT - PIC_D / 2)) : Math.max(holdThen, Math.min(colT, startT + PIC_D / 2))) - lag - at;
+      const dv = col - at;
       const y1 = at - PIC_D / 2 - LABEL_UNDER;
       const s: LabelSpot = { key, id: key, place: 'tip', text: name, rank: [0, 0, g.k], x: 0, y1, box: [0, 0, 0, 0], fit: 1, plus: 0, pic: face };
       if (lv.b) s.b = lv.b;
@@ -3639,11 +3635,11 @@ export class FanView implements InputHandlers {
     const meets = (s: LabelSpot) => out.pics.some((p, i) => own[i] !== s.key && boxesMeet(picBox(p), s.box));
     out.names = out.names.filter((s) => !meets(s));
     out.spots = out.spots.filter((s) => !meets(s));
-    const thenPics = then.filter((q) => q.pic);
-    const thenBoxes = then.filter((q) => q.pic || !thenPics.some((p) => p.key !== q.key && boxesMeet(p.box, q.box))).map((q) => q.box);
-    this.tipLabels(out, tips, nowAt, thenBoxes);
+    const worldPics = world.filter((q) => q.pic);
+    this.tipLabels(out, tips, world.filter((q) => q.pic || !worldPics.some((p) => p.key !== q.key && boxesMeet(p.box, q.box))).map((q) => q.box));
     return out;
   }
+
   /**
    * The fossils at their own tip (ToLaD#279, #497; gaplabels.ts tipOrder): a strand the labels' column cannot name (gone by then, or a hair inside a wider lane there) is named where its
    * line ends, the way the upright tree names a tip: its picture (or its stub) on its tip as the column's are on the column, no older than its branch's start; its name from there toward
@@ -3652,13 +3648,13 @@ export class FanView implements InputHandlers {
    * name still covers its line (Ita, ToLaD#279: "the text can go on the branch even if the branch is too small to fit it. just make sure it doesnt sit on other branches or other
    * text"): there the name stands clear of every other species' column drawn across the rows it takes (clearIn: past its tip, a later lineage may stand in its room), at the clear
    * stretch nearest its line, on screen, and meeting no label standing, the column's first, then the fossils' in their order. The thin fork lines are no column: it reads across them
-   * as the column's names do. Its picture on the name's line by the same rule, full where that meets no other column and no label, else small, else none. Only tips on screen, their
-   * line and their centre, are tried. The living keep the column: the fossils fill what it leaves.
-   * In a pan into the past (ToLaD#279, Ita: option 1, as #469 for the column's pictures), each picture is held where the column's are, till its fork takes it along: what each fossil
-   * shows is judged as laid at its tip, against the column's labels where they stood as "now" left the screen (gapLabels' `then`) and the fossils gone past the top since, so the pan
-   * decides it once; where it stands is the hold's (see below), a name it meets giving way.
+   * as the column's names do. Its picture on the name's line by the same rule, full where that meets no other column and no label, else small, else none. Only tips across the
+   * screen are tried. The living keep the column: the fossils fill what it leaves.
+   * Which fossils show, and how, is the zoom's, not the pan's (ToLaD#279; dynamic map labelling, Been, Daiches & Yap 2006): judged in the world, every tip across the screen
+   * whatever its time, against the column's labels as laid in the world (`world`, gapLabels: on 100 kya) and "now" where it is, so a pan only moves them. The screen decides where
+   * they are drawn (see below): each held at its top edge till its fork takes it along (Ita, option 1, as #469 for the column's pictures), never on a picture or a name.
    */
-  private tipLabels(out: CutLabels, tips: readonly number[], nowAt = 0, then?: number[][]): void {
+  private tipLabels(out: CutLabels, tips: readonly number[], world: number[][]): void {
     this.tipMissed.clear();
     const f = this.fan.tess.fold as Steady;
     const { C, R } = f.rooms();
@@ -3668,16 +3664,15 @@ export class FanView implements InputHandlers {
     const X = (x: number) => cam.screenX(x);
     const Y = (y: number) => cam.screenY(y);
     const Wy = (y: number) => cam.worldY(y);
-    // (The screen in the world: a tip off it costs a compare.)
-    const [[xa, ya], [xb, yb]] = [this.toWorld(0, 0), this.toWorld(this.w, this.h)];
-    const [x0, x1, y0w, y1w] = [Math.min(xa, xb), Math.max(xa, xb), Math.min(ya, yb), Math.max(ya, yb)];
+    // (The screen across, in the world: a tip off it costs a compare.)
+    const [xa, xb] = [this.toWorld(0, 0)[0], this.toWorld(this.w, this.h)[0]];
+    const [x0, x1] = [Math.min(xa, xb), Math.max(xa, xb)];
     const { cap } = this.labelBand();
     this.clearRows.now = C;
     const TT = this.tipTexts;
     if (TT.fan !== this.fan || TT.cap !== cap) [TT.fan, TT.cap, TT.m] = [this.fan, cap, new Map()];
-    // (Every label standing, and the axis's labels as last drawn (its era and event notes), as the names at the forks keep clear of them: the column's where they stood, relative
-    // to the tree, as "now" left the screen (gapLabels' `then`), so that a pan into the past decides no fossil's name or picture again, ToLaD#279.)
-    const taken: number[][] = [...(then ?? [...[...out.spots, ...out.names].map((s) => s.box), ...out.pics.map(picBox)]), ...this.axisBoxes];
+    // (The column's labels as laid in the world (gapLabels), and the axis's labels as last drawn (its era and event notes), as the names at the forks keep clear of them.)
+    const taken: number[][] = [...world, ...this.axisBoxes];
     const half = SPECIES_PX / 2;
     const clear: number[] = [];
     /** The fossils named, in order: each its name (as laid at its tip), its picture's top (screen) there, its fork's row, whether its name stands in its branch (under its picture), and the fossil group it names (tipGroupsOf), if one. */
@@ -3728,10 +3723,8 @@ export class FanView implements InputHandlers {
     };
     this.tipWork = 0;
     this.tipCut = 0;
-    // (The names never past "now" (`nowAt`, on screen or above it): once a pan into the past has taken it `lag` px past the screen's top, judged as then, when that was
-    // the screen's top.)
-    const lag = Math.max(0, -nowAt);
-    const nowY = nowAt;
+    // (The names never past "now", where it is, on screen or above it: the screen's top is no margin to the choice, ToLaD#279.)
+    const nowY = Y(this.yNow);
     for (let t = 0; t < tips.length; t++) {
       // (A fossil group with a rank name (a fossil genus, tipGroupsOf) is named as one, at its youngest tip, over its band, with a picture of its own, until the zoom
       // gives each of its fossils a name's room across (its `open`): as the column's groups open into their parts, ToLaD#279.)
@@ -3745,9 +3738,9 @@ export class FanView implements InputHandlers {
       const b = f.strands[k];
       const cx = one ? one.c : C[k];
       const splitY = one ? one.v.yBot : b.splitY;
-      // (Its tip on screen; or, once a pan into the past has taken "now" past the top, gone past it: its picture held there till its fork goes too, and judged as then
-      // till the screen's foot, so that a fork gone changes no one's place, ToLaD#279.)
-      if (cx < x0 || cx > x1 || b.tipY > y1w || (b.tipY < y0w && !lag)) continue;
+      // (Its tip across the screen, at any time: one off the screen's top or foot is judged too, so that a pan, which brings it on or takes it off, changes no one's
+      // choice, ToLaD#279.)
+      if (cx < x0 || cx > x1) continue;
       kLo = one ? one.f : k;
       kHi = one ? one.l : k;
       // (A frame's budget, in strands read on a row (clearIn): past it the rest wait for a closer view, the narrower rooms last in tipOrder. Every
@@ -3789,7 +3782,7 @@ export class FanView implements InputHandlers {
         const y1 = past ? pt - LABEL_UNDER : pt + (slot === 2 ? PIC_D : PIC_S) + LABEL_UNDER + len;
         const y0 = y1 - len;
         // (On the tree: from "now" back, as the column's names stand, never past it into the margin; ToLaD#279: Heptaxodontidae's ran to the screen's edge at home.)
-        if ((!past && y1 > start) || y0 < nowY || y1 > this.h) continue;
+        if ((!past && y1 > start) || y0 < nowY) continue;
         const xs = spot(lo, hi, y0, y1, SPECIES_PX, c, true, slot + onLine);
         if (Number.isNaN(xs)) continue;
         x = xs;
@@ -3828,60 +3821,60 @@ export class FanView implements InputHandlers {
         break;
       }
     }
-    // (Where they stand. A pan into the past takes each picture to the column's pictures' row (flipPicY) and holds it there, as the column's are, its name with it, till its fork
-    // takes it along (ToLaD#279, as #469 for the column's: Ita, "pics shouldnt dispapper from the left! just stop at the fork"); held by no more than the column's labels have been
-    // (so a landing's stand where they are laid, and at a zoom where the column's ride with the tree, they ride with it too). A picture never goes through another standing:
-    // where it would, it waits under it, in its place across, the one nearer the screen's edge first (sticky headers stacked), till that one goes; the column's stand first.)
-    const row = this.flipPicY() - PIC_D / 2;
-    const hold = Math.min(lag, Math.max(0, this.flipPicY() - Y(this.fan.time.y(LABELS_MA))));
-    const pics = out.pics.map(picBox);
-    const fos: number[][] = [];
+    // (Where they are drawn: as laid, moved only by the screen, ToLaD#279 (Ita, option 1, as #469 for the column's pictures: "pics shouldnt dispapper from the left! just stop at
+    // the fork"). A fossil's label with a picture is held at the screen's top edge, its top (its name's, where that stands toward "now") never above it, till its fork takes it
+    // along: its picture never older than its fork, a sticky header in its branch. Its picture never stands on a label standing: it waits under it, in its place across, the
+    // column's labels first, then the fossils' in the order they reach the edge (sticky headers stacked). Its name goes with it, and gives way where it meets a label standing or
+    // would leave its branch past its fork. Where nothing is held, each stands as laid: the choice kept them apart.)
     const hair = GROUP_D - PIC_D;
-    const lift = named.map((n) => Math.min(Math.max(0, row - n.top), hold, Math.max(0, n.start - n.top - (n.d || PIC_D))));
-    // (A fossil whose fork has gone past the screen's top is judged, not drawn.)
-    const order = named.map((_, i) => i).filter((i) => named[i].d && named[i].start > 0);
-    if (hold) order.sort((i, j) => named[i].top - named[j].top || i - j);
+    const meet = (p: readonly number[], q: readonly number[]) => p[0] < q[2] && p[2] > q[0] && p[1] < q[3] - TIP_HAIR && p[3] > q[1] + TIP_HAIR;
+    const stand: number[][] = [...[...out.spots, ...out.names].map((s) => s.box), ...out.pics.map(picBox)];
+    const topOf = (i: number) => Math.min(named[i].top, named[i].s.box[1]);
+    const order = named.map((_, i) => i);
+    order.sort((i, j) => (named[j].d ? 1 : 0) - (named[i].d ? 1 : 0) || topOf(i) - topOf(j) || i - j);
     for (const i of order) {
       const n = named[i];
-      const d = n.d;
-      let y0 = n.top + lift[i];
-      for (let moved = true; moved; ) {
-        moved = false;
-        for (const q of pics)
-          if (q[0] < n.px + d / 2 && q[2] > n.px - d / 2 && q[1] < y0 + d - TIP_HAIR && q[3] > y0 + TIP_HAIR) {
-            y0 = q[3] + hair;
-            moved = true;
-          }
+      const { d, s } = n;
+      let dy = 0;
+      if (d) {
+        // (Held at the edge, by no more than its branch has left below its picture.)
+        dy = Math.min(Math.max(0, -topOf(i)), Math.max(0, n.start - n.top - d));
+        let y0 = n.top + dy;
+        // (Gone with its fork.)
+        if (y0 + d <= 0) continue;
+        for (let moved = true; moved; ) {
+          moved = false;
+          for (const q of stand)
+            if (q[0] < n.px + d / 2 && q[2] > n.px - d / 2 && q[1] < y0 + d - TIP_HAIR && q[3] > y0 + TIP_HAIR) {
+              y0 = q[3] + hair;
+              moved = true;
+            }
+        }
+        dy = y0 - n.top;
+        const b = f.strands[n.k];
+        // (A group's: its youngest fossil's face, and its disc a member's photo where that has none, discSci.)
+        const p = { x: n.px, y: y0 + d / 2, i: out.pics.length, lv: (n.one ? { v: n.one.v } : { b }) as Level, face: b, held: false };
+        if (y0 < this.h) {
+          out.pics.push(d === PIC_D ? p : { ...p, d });
+          stand.push(picBox({ ...p, d }));
+        }
       }
-      if (y0 > this.h) continue;
-      lift[i] = y0 - n.top;
-      const b = f.strands[n.k];
-      // (A group's: its youngest fossil's face, and its disc a member's photo where that has none, discSci.)
-      const p = { x: n.px, y: y0 + d / 2, i: out.pics.length, lv: (n.one ? { v: n.one.v } : { b }) as Level, face: b, held: false };
-      out.pics.push(d === PIC_D ? p : { ...p, d });
-      pics.push(picBox({ ...p, d }));
-      fos.push(pics[pics.length - 1]);
-    }
-    // (The column's names and pills a fossil's picture meets give way while they meet, as to the column's own pictures, #469. Where they are laid, none does.)
-    if (lag && fos.length) {
-      const meets = (s: LabelSpot) => fos.some((q) => boxesMeet(q, s.box));
-      out.names = out.names.filter((s) => !meets(s));
-      out.spots = out.spots.filter((s) => !meets(s));
-    }
-    const stand: number[][] = [...[...out.spots, ...out.names].map((s) => s.box), ...pics];
-    named.forEach((n, i) => {
-      const dy = lift[i];
-      const s = n.s;
-      if (n.start <= 0) return;
       if (dy) {
-        if (n.under && s.box[3] + dy > n.start) return;
+        if (n.under && s.box[3] + dy > n.start) {
+          this.tipMissed.set(n.k, 'crossed');
+          continue;
+        }
         s.box = [s.box[0], s.box[1] + dy, s.box[2], s.box[3] + dy];
         s.y1 += dy;
       }
-      if (lag && (s.box[3] < 0 || stand.some((q) => boxesMeet(q, s.box)))) return;
+      if (s.box[3] <= 0 || s.box[1] >= this.h) continue;
+      if (stand.some((q) => meet(q, s.box))) {
+        this.tipMissed.set(n.k, 'meets');
+        continue;
+      }
       out.names.push(s);
       stand.push(s.box);
-    });
+    }
   }
   /**
    * The fossil groups tipLabels names as one (ToLaD#279), per strand: each outermost clade with a rank name of its own (isLevel) that is only fossils placed by name
