@@ -351,6 +351,12 @@ export class SegBatch {
     f[o + 15] = 1 + phase;
     this.n++;
   }
+
+  /** Dashed chord j (dash()) green: the line it draws holds a living one's too (view.ts drawDashes, dashed.ts DashRows). */
+  liven(j: number): void {
+    const o = j * SEG_F;
+    this.f[o + 9] = this.f[o + 11] = 1;
+  }
 }
 
 /**

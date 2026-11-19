@@ -25,7 +25,7 @@ import type { Fold, FoldState } from './fold';
 import { forkMode, grayOn, LABEL_PILL, peelSteps, Steady } from './steady';
 import { LADDER, Territories, type CutItem, type Ref, type RowsOf } from './cut';
 import { COLUMN_DIM, columnSpans, EVENT_TINT, eventAt, eventSpans, type EventSpan } from './colstyle';
-import { allUnknown, cladeDashes, DASH_OFF, DASH_ON, DASH_PERIOD, DASH_SKIP, DASH_W, dashAt, strandDashes, unknownLook } from './dashed';
+import { allUnknown, cladeDashes, DASH_OFF, DASH_ON, DASH_PERIOD, DASH_SKIP, DASH_W, dashAt, DashRows, strandDashes, unknownLook } from './dashed';
 import { DIM_NARROW, DIM_WIDE, laneDim, LINEAGE, pathFrame, TwigModel } from './twigs';
 import type { RectBatch } from './meshgl';
 import { FAMILY_EN, familyLabel, HIGHLIGHT_STOPS, ORDER_EN, ORDER_TAXA, taxonKey, type Split } from './splits';
@@ -4825,6 +4825,7 @@ export class FanView implements InputHandlers {
    * clade inside one of them (offSideRun's answer), nor the strands of a merged clade.
    */
   private drawStrands(lod: Lod | null): void {
+    this.dashRows.clear(-24, this.h + 48);
     const B = this.fan.branches;
     const sf = this.fan.tess.fold;
     const cam = this.camera;
@@ -5305,6 +5306,9 @@ export class FanView implements InputHandlers {
    * on screen, then along it), so they hold still as the view pans and are the same px at every zoom.
    */
   private drawDashes(pts: LanePts, hw: number, dash: number[], gray: boolean): void {
+    // (Another column's line within DASH_SPACE over the rows they share holds this one's there: dashed.ts DashRows.)
+    const rows = this.dashRows;
+    const col = rows.column();
     const k = this.cam.sx;
     const hk = hw * k;
     const { x: X, y: Y, w: W, f: F } = pts;
@@ -5344,9 +5348,15 @@ export class FanView implements InputHandlers {
       const len = Math.hypot(cp - cq, y1 - y0);
       const live = F[i + 1] > 0 || F[i] > 0;
       const on = (live || gray) && y1 >= -4 && y0 <= this.h + 4 && Math.max(cq, cp) + 2 >= -8 && Math.min(cq, cp) - 2 <= L + 8;
-      if (!on) end();
-      else if (!twoD) this.dashChord(cq, y0, cp, y1, live, s);
+      const held = on ? rows.near(col, cq, y0, cp, y1) : -1;
+      if (held >= 0) {
+        // (Held: not drawn, the holder green if this one lives.)
+        end();
+        if (live && !rows.live(held)) this.livenDash(held);
+      } else if (!on) end();
+      else if (!twoD) rows.add(col, cq, y0, cp, y1, live, this.dashChord(cq, y0, cp, y1, live, s), s);
       else {
+        rows.add(col, cq, y0, cp, y1, live, -1, s);
         if (!open || was !== live) {
           end();
           ctx.strokeStyle = live ? DASH_GREEN_CSS : DASH_GRAY_CSS;
@@ -5368,12 +5378,13 @@ export class FanView implements InputHandlers {
    * One chord of a dashed line on the GPU layer (SegBatch.dash), s its run along the line at its top (px from where the
    * dashes start); with a batch that takes no chords (a test's stub), the trapezoid SEG_VS makes of it.
    */
-  private dashChord(cq: number, y0: number, cp: number, y1: number, live: boolean, s: number): void {
+  private dashChord(cq: number, y0: number, cp: number, y1: number, live: boolean, s: number): number {
     const gl = this.gl!;
     const phase = ((s % DASH_PERIOD) + DASH_PERIOD) % DASH_PERIOD;
     if ((gl as Partial<Batches>).lanes) {
-      gl.lanes().dash(cq, y0, cp, y1, live, phase);
-      return;
+      const segs = gl.lanes();
+      segs.dash(cq, y0, cp, y1, live, phase);
+      return segs.n - 1;
     }
     const hw = (DASH_W / 2) * Math.sqrt(1 + ((cp - cq) / (y1 - y0)) ** 2);
     const c = live ? DASH_GREEN01 : DASH_GRAY01;
@@ -5382,12 +5393,40 @@ export class FanView implements InputHandlers {
     let r0 = cq + hw;
     let l1 = cp - hw;
     let r1 = cp + hw;
-    if ((r0 < -8 && r1 < -8) || (l0 > R && l1 > R)) return;
+    if ((r0 < -8 && r1 < -8) || (l0 > R && l1 > R)) return -1;
     const cl = Math.max(-8, Math.min(l0, l1) - 0.5);
     const cr = Math.min(R, Math.max(r0, r1) + 0.5);
     if (l0 < -8 && l1 < -8) l0 = l1 = -8;
     if (r0 > R && r1 > R) r0 = r1 = R;
     gl.under.push(l0, y0, r0, y1, c[0], c[1], c[2], 1, l1 - l0, r1 - r0, cl, cr);
+    return gl.under.n - 1;
+  }
+
+  /** The dashed lines drawn this frame by rows (drawDashes): one line where two pack closer than DASH_SPACE. */
+  private readonly dashRows = new DashRows();
+  /** Kept dashed chord k green (DashRows: it holds a living line's): in its batch, or drawn again so on the canvas. */
+  private livenDash(k: number): void {
+    const ref = this.dashRows.liven(k);
+    const gl = this.gl;
+    if (gl && (gl as Partial<Batches>).lanes) {
+      if (ref >= 0) (gl as Batches).segs.liven(ref);
+    } else if (gl) {
+      if (ref >= 0) gl.under.f.set(DASH_GREEN01, 12 * ref + 4);
+    } else {
+      const [cq, y0, cp, y1, s] = this.dashRows.ends(k);
+      const ctx = this.ctx;
+      ctx.save();
+      ctx.setLineDash([DASH_ON, DASH_OFF]);
+      ctx.lineWidth = DASH_W;
+      ctx.lineCap = 'butt';
+      ctx.strokeStyle = DASH_GREEN_CSS;
+      ctx.lineDashOffset = ((s % DASH_PERIOD) + DASH_PERIOD) % DASH_PERIOD;
+      ctx.beginPath();
+      ctx.moveTo(cq, y0);
+      ctx.lineTo(cp, y1);
+      ctx.stroke();
+      ctx.restore();
+    }
   }
 
   /**
