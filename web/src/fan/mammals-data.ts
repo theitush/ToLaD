@@ -13,13 +13,14 @@ import { stamp } from '../stamp';
 import type { LayoutSeed } from './layout';
 import { packColumns, uintsFromBase64, uintsToBase64, unpackColumns, type Columns, type PackedGenealogies, type PackedTree, type SizeOf } from './packed';
 import type { RawClade } from './panthera-extract';
+import type { WikiRec } from './wiki';
 
 /** What mammals.json holds. */
 export interface MammalData {
   /** Every mammal of data/mammals under the whole dated tree: only the species the fan draws (trimToFan). */
   clade: RawClade;
   /** Every species' pictures and links (data/mammals/wiki.json, ToLaD#182). Node's load leaves them out (mammals-node.ts). */
-  wiki: Record<string, { wp?: string; img?: string; file?: string; range?: string; rangeFile?: string } | null>;
+  wiki: Record<string, WikiRec | null>;
   /** The level's default layout, worked out at build time (layout.ts LayoutSeed, ToLaD#255); absent, the page works it out. */
   seed?: LayoutSeed;
   /** Every strand's genealogy, worked out at build time (population.ts genealogiesAhead, ToLaD#255); absent, the page walks them. */
@@ -61,7 +62,9 @@ export const CARD_KINDS: Kinds = {
 };
 
 /** A species' picture records' kinds only the card reads (ToLaD#502): its links and credits; the picture (`img`) is drawn on the tree. */
-export const WIKI_CARD_KINDS: Kinds = { wp: true, file: true, range: true, rangeFile: true };
+// (An outline (ToLaD#577) is the card's file's whole, its image id too: the open pays nothing for it, and the tree's discs
+// hold their placeholder until it is in, wiki.outlineWaits.)
+export const WIKI_CARD_KINDS: Kinds = { wp: true, file: true, range: true, rangeFile: true, ol: true, olw: true };
 
 const isObj = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
 

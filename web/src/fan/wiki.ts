@@ -7,7 +7,7 @@
 // discs show the stub for no photo (drawPic, ToLaD#351, #400).
 
 import { wiki as WIKI } from 'virtual:panthera-data';
-import { mammalData, mammalsLoaded } from './mammals-data';
+import { mammalCardLoaded, mammalData, mammalsLoaded } from './mammals-data';
 
 export interface WikiRec {
   /** The English Wikipedia article. */
@@ -20,6 +20,15 @@ export interface WikiRec {
   range?: string;
   /** The range map's Commons file page (its credit and licence). */
   rangeFile?: string;
+  /**
+   * Where there is no photo, a PhyloPic outline (ToLaD#577, data/<tree>/phylopic.json, pipeline `make phylopic`): its
+   * own, else its nearest relative's up the dated tree. `ol`, the image's id on images.phylopic.org (its 192 px square
+   * thumbnail, hotlinked, black on transparent; the page tints it); `olw` (the card's), the group it stands for, its
+   * rank, the taxon the image shows, and the image's credit as "raster size|artist|contributor|licence|licence URL"
+   * (outlineRec reads them).
+   */
+  ol?: string;
+  olw?: [string, string, string, string];
 }
 
 /** A species' Wikipedia and Commons URLs, or null when Wikidata has neither. */
@@ -30,6 +39,67 @@ export function wikiOf(sci: string): WikiRec | null {
 
 /** `?thumbs=0` turns the name pills' thumbnails off. */
 export const thumbsOn = typeof location === 'undefined' || new URLSearchParams(location.search).get('thumbs') !== '0';
+
+/**
+ * The pictures (ToLaD#577, `?outlines=off`): photos, and a PhyloPic outline where there is none (the page), or photos
+ * only (the old look, the stub where there is none). The photo always wins where there is one.
+ */
+export type PicLook = 'outlines' | 'photos';
+let picLookNow: PicLook = 'outlines';
+export const picLook = (): PicLook => picLookNow;
+export const setPicLook = (m: PicLook): void => {
+  picLookNow = m;
+  aheadKey = '';
+};
+
+/** PhyloPic's image host: an image's files under its id. */
+export const OUTLINE_HOST = 'https://images.phylopic.org/images/';
+/** An outline's 192 px square thumbnail (the tree's disc): the smallest of PhyloPic's steps (64, 128, 192) that covers a 50 px disc at devicePixelRatio 3. */
+export const outlineThumb = (id: string): string => `${OUTLINE_HOST}${id}/thumbnail/192x192.png`;
+
+/** A species' outline as the card shows it (ToLaD#577): its URLs, what it stands for, and its credit. */
+export interface Outline {
+  id: string;
+  thumb: string;
+  /** The raster (the card's box), 512 px wide (a tall one taller); the thumbnail before the card's data is in. */
+  big: string;
+  /** The group it stands for (the species itself, its genus, a split above it) and its rank; absent before the card's data is in. */
+  of?: string;
+  rank?: string;
+  /** The taxon the image shows: a relative's, where it is not its own. */
+  shows?: string;
+  /** The artist (else the contributor), the licence and its URL. */
+  by?: string;
+  lic?: string;
+  licUrl?: string;
+}
+
+/** A record's outline, read (WikiRec `ol`, `olw`); null when it has none. */
+export function outlineRec(w: WikiRec | null | undefined): Outline | null {
+  if (!w?.ol) return null;
+  const [of, rank, shows, credit] = w.olw ?? [];
+  const [r, a, c, l, u] = credit ? credit.split('|') : [];
+  const thumb = outlineThumb(w.ol);
+  return { id: w.ol, thumb, big: r ? `${OUTLINE_HOST}${w.ol}/raster/${r}.png` : thumb, of, rank, shows, by: a || c || undefined, lic: l || undefined, licUrl: u || undefined };
+}
+
+/**
+ * Whether a species with no photo may yet have an outline (ToLaD#577): its `ol` is in the card's file (mammals-card.json,
+ * WIKI_CARD_KINDS), fetched after the first frame so the open pays nothing for it; until it is in, its disc holds the
+ * placeholder, not the stub. (The dev and test table, `virtual:panthera-data`'s, has the whole record.)
+ */
+export function outlineWaits(sci: string): boolean {
+  if (!thumbsOn || picLookNow !== 'outlines' || sci in (WIKI as Record<string, unknown>)) return false;
+  if (!mammalsLoaded() || mammalCardLoaded()) return false;
+  const w = mammalData().wiki[sci];
+  return !w?.img && !w?.ol;
+}
+
+/** The species' outline URL to draw: thumbs and outlines on, no photo, and an outline. */
+export function outlineOf(sci: string): string | undefined {
+  const w = thumbsOn && picLookNow === 'outlines' ? wikiOf(sci) : null;
+  return w && !w.img && w.ol ? outlineThumb(w.ol) : undefined;
+}
 
 /** Whether the species has a picture to show (thumbs on and a URL): its disc's place is kept whether it has loaded or not. */
 export function hasPic(sci: string): boolean {
@@ -50,6 +120,10 @@ export function picSrcOf(src: string): string {
 
 /** How long a loaded picture fades in over its placeholder (ms); after it, no further redraws. */
 export const PIC_FADE_MS = 150;
+/** An outline's ink on the dark disc (ToLaD#577): the palette's INK2, light but under a photo's colour. */
+export const OUTLINE_INK = '#a9b8ae';
+/** The outline's square inside the disc, as a share of its inner diameter: the inscribed square (1/√2) and a little, so a long body's ends stay off the ring. */
+export const OUTLINE_FIT = 0.74;
 /** The stub's dashes round its ring; its ink (the palette's INK3), the slash's (INK2) and what cuts them (the disc's dark). */
 const STUB_DASHES = 10;
 const STUB_INK = '#7d8e84';
@@ -182,18 +256,18 @@ export class PicLoader {
 }
 
 let loader: PicLoader | null = null;
+let aheadKey = '';
 function picLoader(): PicLoader | null {
   if (!loader && typeof Image !== 'undefined') loader = new PicLoader(() => new Image(), () => performance.now());
   return loader;
 }
 
-let aheadKey = '';
 /**
  * Fetch these species' pictures ahead (ToLaD#351): the view gives what a tap would show next; they load after the
  * pictures on screen, a few at a time. The same list again does nothing.
  */
 export function prefetchPics(scis: readonly (string | null | undefined)[]): void {
-  const urls = thumbsOn ? scis.flatMap((s) => (s ? (wikiOf(s)?.img ?? []) : [])) : [];
+  const urls = thumbsOn ? scis.flatMap((s) => (s ? (wikiOf(s)?.img ?? outlineOf(s) ?? []) : [])) : [];
   const key = urls.join('\n');
   if (key === aheadKey) return;
   aheadKey = key;
@@ -263,13 +337,17 @@ export function drawStub(ctx: CanvasRenderingContext2D, cx: number, cy: number, 
  * with the data any other species is drawn from). Thumbnails off, the placeholder alone. `L` for tests.
  */
 export function drawPic(ctx: CanvasRenderingContext2D, sci: string, cx: number, cy: number, d: number, request: () => void, L = picLoader()): void {
-  const url = thumbsOn ? wikiOf(sci)?.img : undefined;
+  const photo = thumbsOn ? wikiOf(sci)?.img : undefined;
+  // No photo: its PhyloPic outline (ToLaD#577), loaded like a photo, tinted light; with none, or once it fails, the stub.
+  const ol = photo ? undefined : outlineOf(sci);
+  const url = photo ?? ol;
   if (url && L) {
     L.onChange = request;
     L.want(url);
   }
   const got = url && L ? L.ready(url) : null;
-  const none = thumbsOn && (!url || !!L?.failed(url));
+  // (No URL while the card's file may yet bring an outline: the placeholder, not the stub, outlineWaits.)
+  const none = thumbsOn && (url ? !!L?.failed(url) : !outlineWaits(sci));
   ctx.save();
   ctx.beginPath();
   ctx.arc(cx, cy, d / 2, 0, Math.PI * 2);
@@ -277,6 +355,11 @@ export function drawPic(ctx: CanvasRenderingContext2D, sci: string, cx: number, 
   ctx.fill();
   if (none) {
     drawStub(ctx, cx, cy, d);
+    ctx.restore();
+    return;
+  }
+  if (ol) {
+    drawOutlineDisc(ctx, got, cx, cy, d, request);
     ctx.restore();
     return;
   }
@@ -305,3 +388,53 @@ export function drawPic(ctx: CanvasRenderingContext2D, sci: string, cx: number, 
   ctx.restore();
 }
 
+/** The tinted copy of each outline (ToLaD#577): drawn once, its black turned to OUTLINE_INK; null where no canvas can be had. */
+const tinted = new WeakMap<HTMLImageElement, CanvasImageSource | null>();
+function tintOf(img: HTMLImageElement): CanvasImageSource | null {
+  let t = tinted.get(img);
+  if (t === undefined) {
+    t = null;
+    const c = typeof document !== 'undefined' ? document.createElement('canvas') : null;
+    const g = c?.getContext('2d');
+    if (c && g && img.naturalWidth) {
+      c.width = img.naturalWidth;
+      c.height = img.naturalHeight;
+      g.drawImage(img, 0, 0);
+      g.globalCompositeOperation = 'source-in';
+      g.fillStyle = OUTLINE_INK;
+      g.fillRect(0, 0, c.width, c.height);
+      t = c;
+    }
+    tinted.set(img, t);
+  }
+  return t;
+}
+
+/**
+ * An outline in its disc (ToLaD#577): on the photo's placeholder (its quiet fill and whole ring, kept under it), the
+ * silhouette tinted and fitted inside (OUTLINE_FIT of the disc), fading in like a photo. Inside drawPic's save.
+ */
+function drawOutlineDisc(ctx: CanvasRenderingContext2D, got: { img: HTMLImageElement; fade: number } | null, cx: number, cy: number, d: number, request: () => void): void {
+  ctx.beginPath();
+  ctx.arc(cx, cy, d / 2 - 1.5, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(125,142,132,0.16)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(125,142,132,0.55)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  if (!got) return;
+  const { img, fade } = got;
+  const src = tintOf(img) ?? img;
+  const s = (d - 3) * OUTLINE_FIT;
+  ctx.globalAlpha *= fade;
+  ctx.drawImage(src, cx - s / 2, cy - s / 2, s, s);
+  if (fade < 1) request();
+}
+
+/** An outline drawn into a canvas box (the card, ToLaD#577): the same tint, fitted to the box. */
+export function drawOutline(ctx: CanvasRenderingContext2D, img: HTMLImageElement, w: number, h: number): void {
+  const src = tintOf(img) ?? img;
+  const k = Math.min(w / (img.naturalWidth || 1), h / (img.naturalHeight || 1));
+  const [iw, ih] = [img.naturalWidth * k, img.naturalHeight * k];
+  ctx.drawImage(src, (w - iw) / 2, (h - ih) / 2, iw, ih);
+}
