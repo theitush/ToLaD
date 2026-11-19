@@ -3822,12 +3822,12 @@ export class FanView implements InputHandlers {
       }
     }
     // (Where they are drawn: as laid, moved only by the screen, ToLaD#279 (Ita, option 1, as #469 for the column's pictures: "pics shouldnt dispapper from the left! just stop at
-    // the fork"). A fossil's picture is held at the screen's top edge, till its fork takes it along: never older than its fork, a sticky header in its branch (a name
-    // that stands past it toward "now" goes off the top first, as the world does). A picture never stands on another: it waits under it, in its place across, the column's
-    // first, then the fossils' in the order their forks leave (sticky headers stacked: the one whose branch ends first at the edge), till its fork comes up under it and takes
-    // it over. A name a picture meets gives way
-    // while they meet (#469), the column's too; a fossil's name goes with its picture, and gives way where it meets a label standing or would leave its branch past its fork.
-    // Where nothing is held, each stands as laid: the choice kept them apart.)
+    // the fork"). A fossil's picture is held at the screen's top edge, till its fork takes it along: never older than its fork (#464), a sticky header in its branch (a
+    // name that stands past it toward "now" goes off the top first, as the world does). A picture never stands on another: it waits under it, in its place across, the
+    // column's first, then the fossils' in the order their forks leave (sticky headers stacked: the one whose branch ends first at the edge), till its fork comes up under it
+    // and takes it over; only where the edge is too crowded for that does it wait under it past its fork, till its fork leaves. A name a picture meets gives way while they
+    // meet (#469), the column's too; a fossil's name goes with its picture, and gives way where it meets a label standing or would leave its branch past its fork. Where
+    // nothing is held, each stands as laid: the choice kept them apart.)
     const hair = GROUP_D - PIC_D;
     const meet = (p: readonly number[], q: readonly number[]) => p[0] < q[2] && p[2] > q[0] && p[1] < q[3] - TIP_HAIR && p[3] > q[1] + TIP_HAIR;
     const stand = out.pics.map(picBox);
