@@ -175,7 +175,7 @@ describe('the amniotes (ToLaD#539)', () => {
     const komodo = card('Varanus komodoensis');
     expect(komodo.sp.countUnknown).toBe(false);
     expect(komodo.sp.count?.counts).toBe('all ages');
-    expect(text(komodo.html)).toMatch(/~3\.5k alive today counted/);
+    expect(text(komodo.html)).toMatch(/~3k alive today counted/);
     expect(text(komodo.html)).toMatch(/all ages, 2021 \( Jessop et al\. 2021 \)/);
     const leatherback = card('Dermochelys coriacea');
     expect(text(leatherback.html)).toMatch(/alive today published estimate/);

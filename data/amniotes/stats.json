@@ -17,7 +17,7 @@
    "alive": {
     "Aves": 50244701902.0,
     "Mammalia": 86830099345.03368,
-    "Sauropsida": 50244711341.53055
+    "Sauropsida": 50255526860.69925
    },
    "crowns_Ma": {
     "Archelosauria": 264.38,
@@ -156,8 +156,9 @@
     "bird: extinct, unknown": 171,
     "bird: unknown": 1493,
     "fossil: unknown": 7778,
-    "reptile: extinct, unknown": 7,
-    "reptile: unknown": 12679
+    "reptile: extinct, unknown": 6,
+    "reptile: published count": 28,
+    "reptile: unknown": 12652
    },
    "thinnest": {
     "N": 0.6660690486578963,
@@ -1437,6 +1438,116 @@
     "non-species tip": 591
    }
   },
+  "reptile_counts": {
+   "by_counts": {
+    "adult females": 2,
+    "all ages": 5,
+    "females aged 2 and over": 1,
+    "females nesting in a year": 1,
+    "individuals (distance sampling)": 1,
+    "mature individuals": 18
+   },
+   "by_grade": {
+    "B": 3,
+    "C": 23,
+    "D": 2
+   },
+   "by_group": {
+    "Crocodylia": 17,
+    "Rhynchocephalia": 1,
+    "Squamata": 4,
+    "Testudines": 6
+   },
+   "entries": 28,
+   "largest": [
+    [
+     "Alligator mississippiensis",
+     3464101.6151377545
+    ],
+    [
+     "Caiman yacare",
+     3162277.6601683795
+    ],
+    [
+     "Caiman crocodilus",
+     1000000.0
+    ],
+    [
+     "Lepidochelys olivacea",
+     852550.0
+    ],
+    [
+     "Chelonia mydas",
+     571437.0005748665
+    ],
+    [
+     "Caiman latirostris",
+     500000.0
+    ],
+    [
+     "Crocodylus porosus",
+     500000.0
+    ],
+    [
+     "Aldabrachelys gigantea",
+     180000.0
+    ],
+    [
+     "Lepidochelys kempii",
+     177540.0
+    ],
+    [
+     "Crocodylus novaeguineae",
+     100000.0
+    ]
+   ],
+   "not_found": [],
+   "note": "each figure as its source gives it (mature individuals, adult females, all ages: `by_counts`), not converted; every other reptile's count unknown",
+   "on_a_living_row": 28,
+   "smallest": [
+    [
+     "Crocodylus mindorensis",
+     112.26753760548951
+    ],
+    [
+     "Crocodylus intermedius",
+     150.0
+    ],
+    [
+     "Alligator sinensis",
+     153.3883959105121
+    ],
+    [
+     "Cyclura pinguis",
+     374.16573867739413
+    ],
+    [
+     "Protobothrops mangshanensis",
+     387.2983346207417
+    ],
+    [
+     "Gavialis gangeticus",
+     650.0
+    ],
+    [
+     "Crocodylus siamensis",
+     707.1067811865476
+    ],
+    [
+     "Crocodylus rhombifer",
+     2400.0
+    ],
+    [
+     "Bothrops insularis",
+     2645.4084750752577
+    ],
+    [
+     "Varanus komodoensis",
+     3500.0
+    ]
+   ],
+   "table": "pipeline/reptile_counts.toml (ToLaD#578)"
+  },
   "rows": {
    "duplicate_tips_dropped": {
     "n": 61,
@@ -1745,10 +1856,9 @@
    "lost_since_1500_not_flagged_by_ott": {
     "by_group": {
      "Aves": 93,
-     "Squamata": 5,
-     "Testudines": 1
+     "Squamata": 5
     },
-    "n": 99,
+    "n": 98,
     "names": [
      "Acrocephalus longirostris",
      "Acrocephalus yamashinae",
@@ -1765,7 +1875,6 @@
      "Aplonis corvina",
      "Bulweria bifax",
      "Callaeas cinereus",
-     "Chelonoidis niger",
      "Chenonetta finschi",
      "Cichlocolaptes mazarbarnetti",
      "Colaptes oceanicus",
@@ -1906,13 +2015,13 @@
   }
  },
  "output": {
-  "brotli_bytes": 1637712,
-  "dated_sidecar_raw": 4961991,
+  "brotli_bytes": 1640104,
+  "dated_sidecar_raw": 4972641,
   "files": 39,
-  "raw_bytes": 9262944,
-  "skeleton_brotli": 103862,
+  "raw_bytes": 9280536,
+  "skeleton_brotli": 106505,
   "skeleton_nodes": 1904,
-  "skeleton_raw": 1673480,
+  "skeleton_raw": 1691072,
   "tiles": 38
  }
 }
