@@ -401,6 +401,11 @@ const EVENT_REACH_PX = 10;
 
 /** How long (ms) after the fold last moved the columns' edges are made exact (FanView.applyFold). */
 const FOLD_REST_MS = 120;
+/**
+ * The columns' models keep at most about this many bytes of samples (FanView.trimModels, ToLaD#502), more only while
+ * one frame reads more: the least recently read go first.
+ */
+const MODEL_BYTES = 64 * 2 ** 20;
 /** The fold's rows at a level with orders above its families (the mammals: every row folds ~5,900 strands): about this many px apart (else 3), ToLaD#247. */
 const GRID_PX_ORDERS = 8;
 
@@ -1292,7 +1297,17 @@ export class FanView implements InputHandlers {
   famHits: { box: [number, number, number, number]; v: FanNode; run?: Run }[] = [];
   /** The chips with a "+x" drawn (ToLaD#197, #262): `box` the whole chip (a tap on its name or its badge alike, ToLaD#287), `badge` the badge's end. */
   plusHits: { box: [number, number, number, number]; badge: [number, number, number, number]; bs: FanBranch[]; run?: Run }[] = [];
+  /**
+   * The columns' models (twigs.ts TwigModel: each column's kept samples, CutMemo and ColumnPath), least recently read
+   * first: model() moves one to the end the first time a frame reads it, and trimModels() drops from the front, past
+   * MODEL_BYTES, those no frame has read since (an LRU cache with a byte budget, ToLaD#502: kept for every column ever
+   * drawn, their buffers as large as the deepest zoom ever made them, two mammal views held ~9 GB).
+   */
   private models = new Map<string, TwigModel>();
+  /** The models' bytes as last counted (trimModels), the frame model() stamps them with, and those read this frame. */
+  private modelBytes = 0;
+  private modelFrame = 0;
+  private readonly modelsNow: TwigModel[] = [];
   private raf = 0;
   private anim: ((t: number) => boolean) | null = null;
   private ro: ResizeObserver;
@@ -2114,10 +2129,42 @@ export class FanView implements InputHandlers {
     const key = `${b.sp.gid}:${this.mode}`;
     let m = this.models.get(key);
     if (!m || m.b !== b) {
+      if (m) {
+        this.modelBytes -= m.counted;
+        m.used = -2;
+      }
       m = new TwigModel(b, this.fan.time, this.mode);
+      this.models.delete(key);
+      this.models.set(key, m);
+    } else if (m.used !== this.modelFrame) {
+      // (The first read this frame: to the end, the most recently read.)
+      this.models.delete(key);
       this.models.set(key, m);
     }
+    if (m.used !== this.modelFrame) {
+      m.used = this.modelFrame;
+      this.modelsNow.push(m);
+    }
     return m;
+  }
+
+  /** After a frame: the models it read counted again, and past MODEL_BYTES the least recently read dropped (never one this frame read). */
+  private trimModels(): void {
+    for (const m of this.modelsNow) {
+      // (Not one replaced since it was read: a new layout's.)
+      if (m.used !== this.modelFrame) continue;
+      const n = m.bytes();
+      this.modelBytes += n - m.counted;
+      m.counted = n;
+    }
+    this.modelsNow.length = 0;
+    if (this.modelBytes > MODEL_BYTES)
+      for (const [k, m] of this.models) {
+        if (this.modelBytes <= MODEL_BYTES || m.used === this.modelFrame) break;
+        this.models.delete(k);
+        this.modelBytes -= m.counted;
+      }
+    this.modelFrame++;
   }
 
   // ---- camera helpers -------------------------------------------------------
@@ -3156,6 +3203,7 @@ export class FanView implements InputHandlers {
       this.gl.laneW = this.w;
       this.gl.end(this.stageW, this.h, this.dpr);
     }
+    this.trimModels();
     this.frameMs.push(performance.now() - t0);
     if (this.frameMs.length > 600) this.frameMs.shift();
     if (this.frameMs.length <= 2) stamp(this.frameMs.length === 1 ? 'first' : 'second');
