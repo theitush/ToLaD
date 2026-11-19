@@ -212,6 +212,13 @@ export class TwigModel {
 
   /** at()'s values by height: [left, w, gw, pitch, the fold version its left is for]. */
   private readonly atMemo = new Map<number, Float64Array>();
+  /** The frame the view last read this model in, and its bytes as the view last counted them (FanView.model, trimModels). */
+  used = -1;
+  counted = 0;
+  /** The bytes its kept samples hold (CutMemo, ColumnPath, at()'s memo): what FanView's budget for the models counts. */
+  bytes(): number {
+    return this.cutMemo.bytes() + this.path.bytes() + 64 * this.atMemo.size;
+  }
   /** Bumped by refold(): a kept left edge from before it is worked out again (the widths and pitch stand). */
   private foldVer = 0;
   /**
@@ -366,6 +373,10 @@ export class CutMemo {
   }
   private ys2 = new Float64Array(0);
   private v2 = new Float64Array(0);
+  /** The bytes its buffers hold. */
+  bytes(): number {
+    return 8 * (this.ys.length + this.v.length + this.ys2.length + this.v2.length);
+  }
 }
 
 /** How far (screen px) a merged chord may stray from the samples it drops (Sleeve). */
@@ -459,6 +470,10 @@ export class ColumnPath {
   /** How many times the fold moved the columns since the kept samples were chosen (reset()), and ever. */
   private moved = 0;
   private ticks = 0;
+  /** The bytes its buffers and its cuts hold. */
+  bytes(): number {
+    return 8 * (this.ys.length + this.vals.length + this.ys2.length + this.vals2.length + this.cuts.length) + this.steps.length + this.steps2.length + 4 * this.leftGen.length;
+  }
   /** The kept samples are due to be chosen afresh (reset()'s turn, exact()): at the next span() the frame's budget allows (pathFrame). */
   private redo = false;
 
