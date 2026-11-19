@@ -7,7 +7,7 @@
 // test ~5 s alone; 300 s, as the load's, for a machine shared with other runs.)
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { Camera, FanCamera } from './camera';
-import { allUnknown, cladeDashes, DASH_SKIP, DASH_SPACE, setUnknownLook, strandDashes } from './dashed';
+import { allUnknown, cladeDashes, DASH_SKIP, DASH_SPACE, DashRows, setUnknownLook, strandDashes } from './dashed';
 import { setFlip } from './flip';
 import type { FanBranch, FanNode } from './layout';
 import { loadMammalsFromFiles } from './mammals-node';
@@ -119,6 +119,8 @@ describe('a count nobody has, one dashed line, on the amniotes (ToLaD#565)', () 
     (v.fan.tess.fold as Steady).setScale(c.sx, v.w);
     v.cam = { ...c, ty: c.sy };
     P(v).camera.settle();
+    // (The level it stands at, as after LEVEL_MS at rest: else the level a frame reads hangs on the wall clock (levelNow).)
+    v.levelNow(true);
     for (let k = 0; k < 3; k++) v.draw();
     merged.clear();
     strands.clear();
@@ -201,16 +203,19 @@ describe('a count nobody has, one dashed line, on the amniotes (ToLaD#565)', () 
     expect(lone + merged.size).toBeGreaterThan(0);
   }, 300_000);
 
-  it('no two dashed lines closer than DASH_SPACE on screen: lines packed closer are their clade\'s one line, parting as the view zooms in', () => {
+  it('no two dashed lines closer than DASH_SPACE on screen: lines packed closer are one line (their clade\'s, or the first drawn holds them, DashRows), parting as the view zooms in', () => {
     const near: string[] = [];
+    const worst = new Map<string, number>();
     let parted = 0;
+    // (Each level measured before any is held to it: home's crocodiles beside the choristoderes (0.01 px apart from the
+    // Triassic up, the groups between them dead), the skinks' level's girdled lizards beside the iguanas (0.39 px).)
     for (const t of ['home', 'Squamata', 'Scincidae', 'Lacertidae']) {
       stand(t === 'home' ? home : v.levelCamera(t)!);
       const S = P(v).gl.segs;
-      let worst = Infinity;
+      let w = Infinity;
       let lines = 0;
-      for (const fy of [0.2, 0.35, 0.5, 0.65, 0.8]) {
-        const y = fy * v.h;
+      // (Every other px from a fifth of the height down to four fifths: the columns, not the forks' tangle at the foot.)
+      for (let y = Math.ceil(0.2 * v.h); y <= 0.8 * v.h; y += 2) {
         const xs: number[] = [];
         for (let j = 0; j < S.n; j++) {
           const o = SEG_F * j;
@@ -222,16 +227,46 @@ describe('a count nobody has, one dashed line, on the amniotes (ToLaD#565)', () 
         // (One line drawn by more than one chord at a row's height (a chord's end on it) is one line.)
         const X = xs.filter((x, k) => k === 0 || x - xs[k - 1] > 1e-3);
         lines = Math.max(lines, X.length);
-        for (let k = 1; k < X.length; k++) worst = Math.min(worst, X[k] - X[k - 1]);
+        for (let k = 1; k < X.length; k++) w = Math.min(w, X[k] - X[k - 1]);
       }
-      near.push(`${t}: ${lines} lines a row at most, the closest ${worst.toFixed(2)} px`);
-      expect(worst, t).toBeGreaterThanOrEqual(DASH_SPACE - 0.05);
+      near.push(`${t}: ${lines} lines a row at most, the closest ${w.toFixed(2)} px`);
+      worst.set(t, w);
       if (t !== 'home') parted = Math.max(parted, lines);
     }
     console.log(near.join('\n'));
+    for (const [t, w] of worst) expect(w, `${t} (${near.join('; ')})`).toBeGreaterThanOrEqual(DASH_SPACE - 0.05);
     // (Zoomed in, the lizards' and snakes' lines part: more than one line a row.)
     expect(parted).toBeGreaterThan(1);
   }, 300_000);
+
+  it('DashRows: a chord within DASH_SPACE of another column\'s over the rows they share is held by it; farther, or crossing, or its own column\'s, not', () => {
+    const R = new DashRows();
+    R.clear(-24, 400);
+    const a = R.column();
+    R.add(a, 100, 50, 100, 60, false, 7, 0);
+    const b = R.column();
+    // (Beside it, a hair off and a little under the space: held; at the space, or past it at one end of the rows they share: not.)
+    expect(R.near(b, 100.01, 52, 100.01, 58)).toBe(0);
+    expect(R.near(b, 100 + DASH_SPACE - 0.01, 40, 100 + DASH_SPACE - 0.01, 55)).toBe(0);
+    expect(R.near(b, 100 + DASH_SPACE, 50, 100 + DASH_SPACE, 60)).toBe(-1);
+    expect(R.near(b, 100, 50, 100 + 2 * DASH_SPACE, 60)).toBe(-1);
+    // (Across it, nearly flat (a fork's peel): not; no rows shared: not; its own column's next chord: not.)
+    expect(R.near(b, 80, 54, 120, 55)).toBe(-1);
+    expect(R.near(b, 100, 60, 100, 70)).toBe(-1);
+    expect(R.near(a, 100, 50, 100, 60)).toBe(-1);
+    // (A living line held by a gray one: the holder green, at its place in the batch.)
+    expect(R.live(0)).toBe(false);
+    expect(R.liven(0)).toBe(7);
+    expect(R.live(0)).toBe(true);
+    // (A new frame: none held.)
+    R.clear(-24, 400);
+    expect(R.near(b, 100, 50, 100, 60)).toBe(-1);
+    // (Many in a band, in any order: found by x.)
+    const c = R.column();
+    for (let k = 0; k < 200; k++) R.add(c, ((k * 37) % 200) * 10, 0, ((k * 37) % 200) * 10, 300, true, k, 0);
+    expect(R.near(b, 1234, 10, 1234, 20)).toBeGreaterThanOrEqual(0);
+    expect(R.near(b, 1235, 10, 1235, 20)).toBe(-1);
+  });
 
   it('the dashed chords as SEG_VS spreads them (expandChords) are the trapezoids drawn on the CPU (a batch that takes no chords)', () => {
     const gl = P(v).gl;
