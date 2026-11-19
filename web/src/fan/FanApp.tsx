@@ -23,7 +23,7 @@ import { MagnifierIcon, SearchPanel } from './SearchPanel';
 import { foldNamesIdle } from './search';
 import { SourcesPanel } from './SourcesPanel';
 import { GRADE_MEANS, METHOD_IDS, MethodLink, OpenMethods, WORD_IDS } from './Methods';
-import { aliveSource, aliveStep, LossLine, SOURCE_WORD, useMethodsPage } from './cardwords';
+import { aliveSource, aliveStep, CountLine, LossLine, SOURCE_WORD, useMethodsPage } from './cardwords';
 import { statusOf, wildPartSentence } from './status';
 import { cardTapper, onControl } from './cardtap';
 import { sheetSwipe, useBackCloses } from './sheet';
@@ -1082,6 +1082,7 @@ export function SpeciesCard({ sp, onClose, onUp, onBox, open, ageMa, startMa, ev
             </span>
           )}
         </p>
+        {at.now && <CountLine sp={sp} />}
         {mass && sp.massKg && !unknown ? (
           <p className="sub" data-mass>
             <MethodLink to={WORD_IDS.weighing}>Weighing</MethodLink> {formatMass(at.alive * sp.massKg)}, at {formatMass(sp.massKg)} each{massNote(sp.massHow)}

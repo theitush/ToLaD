@@ -1,7 +1,8 @@
 // The amniotes (ToLaD#539, the bar's "tree: amniotes", `?tree=amniotes`): data/amniotes loads and opens as the page opens it, home
 // titled "Amniotes" with the human named on it and its picture whole, taps on the names of the groups the birds are in (their line
 // with its fossils first) land inside the birds, a level of their own, and a bird's card and a reptile's say what is known (a bird's
-// modelled count; a reptile's unknown, its Latin once, the stubs for its picture and globe). One process: the level's data is module
+// modelled count; a reptile's unknown, its Latin once, the stubs for its picture and globe; a reptile a published number
+// counts, what it counts and its source, ToLaD#578). One process: the level's data is module
 // state, so this file loads only these.
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -164,11 +165,23 @@ describe('the amniotes (ToLaD#539)', () => {
     expect(mammaliaClade().species.some((s) => s.dateSource === 'upham-calibrated')).toBe(false);
     expect(text(bird.html)).toMatch(/House sparrow \(Passer domesticus\)/);
     expect(text(bird.html)).toMatch(/alive today/);
-    const lizard = card('Varanus komodoensis');
+    const lizard = card('Varanus salvator');
     expect(lizard.sp.countUnknown).toBe(true);
     // (No English name: its Latin once, as the title.)
-    expect(text(lizard.html)).not.toMatch(/Varanus komodoensis \(Varanus komodoensis\)/);
-    expect(lizard.html).toMatch(/class="sci"[^>]*>Varanus komodoensis</);
+    expect(text(lizard.html)).not.toMatch(/Varanus salvator \(Varanus salvator\)/);
+    expect(lizard.html).toMatch(/class="sci"[^>]*>Varanus salvator</);
     expect(text(lizard.html)).toMatch(/Unknown/);
+    // A reptile with a published count (ToLaD#578): its number as the source gives it, what it counts, its source linked.
+    const komodo = card('Varanus komodoensis');
+    expect(komodo.sp.countUnknown).toBe(false);
+    expect(komodo.sp.count?.counts).toBe('all ages');
+    expect(text(komodo.html)).toMatch(/~3k alive today counted/);
+    expect(text(komodo.html)).toMatch(/all ages, 2021 \( Jessop et al\. 2021 \)/);
+    const leatherback = card('Dermochelys coriacea');
+    expect(text(leatherback.html)).toMatch(/alive today published estimate/);
+    expect(text(leatherback.html)).toMatch(/adult females, 2020 \( NMFS & USFWS 2020 \)/);
+    expect(leatherback.html).toMatch(/href="https:\/\/www\.govinfo\.gov\//);
+    const caiman = card('Caiman crocodilus');
+    expect(text(caiman.html)).toMatch(/mature individuals, 2019/);
   });
 });

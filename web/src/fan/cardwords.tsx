@@ -36,6 +36,8 @@ export type AliveSource = 'counted' | 'published' | 'modelled' | null;
 
 export function aliveSource(sp: SpeciesRec): AliveSource {
   if (sp.extinct) return null;
+  // A reptile's published count (ToLaD#578): a survey or census is counted, an assessment's or an index's figure published.
+  if (sp.count) return sp.count.kind === 'census' ? 'counted' : 'published';
   const h = sp.history;
   const file = !!h && !h.modelled;
   if (file && h!.use === 'counts') {
@@ -54,6 +56,32 @@ export const SOURCE_WORD: Record<Exclude<AliveSource, null>, string> = {
   published: 'published estimate',
   modelled: 'modelled',
 };
+
+/**
+ * What a reptile's published count counts, its year and source (ToLaD#578): the number is the source's own, not turned
+ * into all ages, so the card says "mature individuals, 2019 (Isberg et al. 2019)" under it, the source linked. Null:
+ * no such count (every mammal and bird).
+ */
+export function countWords(sp: SpeciesRec): { what: string; cite: string; url: string } | null {
+  const c = sp.count;
+  if (!c || sp.extinct) return null;
+  return { what: `${c.counts}, ${c.year}`, cite: c.short || shortCite(c.cite) || 'source', url: c.url };
+}
+
+/** The card's line under today's count of a reptile with a published one: what it counts, its year, its source. */
+export function CountLine({ sp }: { sp: SpeciesRec }) {
+  const w = countWords(sp);
+  if (!w) return null;
+  return (
+    <p className="sub" data-count-src>
+      {w.what} (
+      <a href={w.url} target="_blank" rel="noreferrer">
+        {w.cite}
+      </a>
+      )
+    </p>
+  );
+}
 
 /** Where a species' count today is explained: its history (step 3) when it has one of its own, else step 1. */
 export function aliveStep(sp: SpeciesRec): string {

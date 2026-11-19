@@ -30,8 +30,10 @@ else its family's, else its group's.
 
 **Counts (step 9).** Mammals as their build counts them. Birds: Callaghan et al. 2021's global abundance estimate
 and its 95% interval, graded from the interval, no better than C except for its 684 training species (independent
-estimates). Every reptile, and every bird Callaghan lacks: count unknown (FLAG bit 11), drawn at the thinnest a
-living species is (the smallest count of any other living species). No source yet gives a bird or reptile
+estimates). Reptiles: the ones a published number counts (pipeline/reptile_counts.toml, ToLaD#578: sea turtles,
+crocodilians, giant tortoises, the Komodo dragon, the tuatara, ...), each figure as its source gives it, anchored as a
+mammal's census is. Every other reptile, and every bird Callaghan lacks: count unknown (FLAG bit 11), drawn at the
+thinnest a living species is (the smallest count of any other living species); there is no reptile model. No source yet gives a bird or reptile
 generation length, so births use an assumed one (`ASSUMED_GEN_YR`, the page's own fallback) and say so.
 Histories, ranges, natural baselines, Red List status and traits stay "none" until their steps.
 """
@@ -51,7 +53,7 @@ from pathlib import Path
 
 import numpy as np
 
-from . import build, dated, fossils, tiles
+from . import build, dated, fossils, reptcounts, tiles
 from .dated import EPS, SRC_NAMES, S_INTERP, DNode
 from .merge import LAD_RECENT_EX, _mrca, assign_bands, date_tree
 from .model import SRC, grade_from_sd, lognormal_sum, profile_edges
@@ -863,9 +865,11 @@ def name_dated(rows: Node, droot: DNode) -> int:
 
 
 def count_leaves(rows: Node, birds_n: dict[str, dict], thin: tuple[float, str], log: dict,
-                 skip: Node | None = None) -> None:
-    """Step 9: Callaghan 2021's totals for birds; every other species' count unknown (module docstring). Every leaf
-    under `rows` but `skip`'s (the mammals, counted by their own build)."""
+                 skip: Node | None = None, rept: dict[str, dict] | None = None) -> None:
+    """Step 9: Callaghan 2021's totals for birds; the reptiles a published number counts (`rept`, reptcounts.load,
+    ToLaD#578); every other species' count unknown (module docstring). Every leaf under `rows` but `skip`'s (the
+    mammals, counted by their own build)."""
+    rept = rept or {}
     L_yr = ASSUMED_GEN_YR / 2
     rep: Counter = Counter()
     leaves = []
@@ -880,6 +884,7 @@ def count_leaves(rows: Node, birds_n: dict[str, dict], thin: tuple[float, str], 
     for n in leaves:
         D = n.data
         c = birds_n.get(n.name) if D.get("group") == "Aves" else None
+        e = rept.get(n.name) if D.get("group") != "Aves" and n.kind != "graft" else None
         span = (n.t0 - n.t1) * 1e6
         D.update(ghost=0.0, src={SRC["opentree"]}, red_list=None, natural=None, history=None)
         dl = D.get("dleaf")
@@ -917,10 +922,18 @@ def count_leaves(rows: Node, birds_n: dict[str, dict], thin: tuple[float, str], 
                          + ("" if c["lo"] and 0 < c["lo"] < N else " (no lower bound given: taken symmetric in log)"),
                          ASSUMED_GEN_NOTE, t_how]
             rep["bird: Callaghan, training" if c["training"] else "bird: Callaghan, model"] += 1
+        elif e is not None:
+            # a published count (ToLaD#578): its figure as the source gives it, its range and grade (reptcounts.py);
+            # anchored, as a mammal's census is: the card says "counted" or "published estimate" and what it counts
+            N = e["n"]
+            D.update(alive=N, lo=e["dlo"], hi=e["dhi"], sd=e["sd"], grade=e["grade_i"], anchored_count=True,
+                     count_src=reptcounts.card(e))
+            D["meth"] = [reptcounts.method(e), ASSUMED_GEN_NOTE, t_how]
+            rep["reptile: published count"] += 1
         else:
             N = thin[0]
             why = "Callaghan et al. 2021 has no estimate for it" if D.get("group") == "Aves" else \
-                "no reptile species total has been compiled"
+                "no published count of it was found (pipeline/reptile_counts.toml has the reptiles one counts)"
             D.update(alive=N, lo=0.0, hi=0.0, sd=0.0, grade=3, count_unknown={"N": N, "thinnest": thin[1]})
             D["meth"] = [METHOD_UNKNOWN.format(why=why, n=N, who=thin[1]), ASSUMED_GEN_NOTE, t_how]
             rep[("bird" if D.get("group") == "Aves" else "reptile") + ": unknown"] += 1
@@ -930,6 +943,17 @@ def count_leaves(rows: Node, birds_n: dict[str, dict], thin: tuple[float, str], 
         D["kever"] = 0.0 if D.get("count_unknown") else D["ever"]  # the part of ever with a known count
         D["by_grade"] = np.bincount([D["grade"]], weights=[D["ever"]], minlength=4)
         D["profile"] = np.full(16, r)
+    seen = {n.name for n in leaves if n.name in rept and not n.extinct and n.kind != "graft"}
+    log["reptile_counts"] = {
+        "table": "pipeline/reptile_counts.toml (ToLaD#578)", "entries": len(rept), "on_a_living_row": len(seen),
+        "not_found": sorted(set(rept) - seen),
+        "by_group": dict(Counter(n.data.get("group") for n in leaves if n.name in seen)),
+        "by_counts": dict(Counter(rept[s]["counts"] for s in seen)),
+        "by_grade": dict(Counter("ABCD"[rept[s]["grade_i"]] for s in seen)),
+        "largest": [[s, rept[s]["n"]] for s in sorted(seen, key=lambda s: -rept[s]["n"])[:10]],
+        "smallest": [[s, rept[s]["n"]] for s in sorted(seen, key=lambda s: rept[s]["n"])[:10]],
+        "note": "each figure as its source gives it (mature individuals, adult females, all ages: `by_counts`), not "
+                "converted; every other reptile's count unknown"}
     log["counts"] = {"by_kind": dict(rep), "thinnest": {"N": thin[0], "leaf": thin[1]},
                      "assumed_generation_yr": ASSUMED_GEN_YR}
 
@@ -1006,7 +1030,7 @@ def sum_rows(root: Node, extra: list[Node]) -> None:
         D["src"] = set().union(*(c.data["src"] for c in n.children))
 
 
-def thinnest(mroot: Node, birds_n: dict[str, dict]) -> tuple[float, str]:
+def thinnest(mroot: Node, birds_n: dict[str, dict], rept: dict[str, dict] | None = None) -> tuple[float, str]:
     """The smallest today's count of any living species with one (model.mark_unknown's rule, over the amniotes)."""
     best = (math.inf, "")
     for n in mroot.preorder():
@@ -1017,6 +1041,9 @@ def thinnest(mroot: Node, birds_n: dict[str, dict]) -> tuple[float, str]:
     for name, c in birds_n.items():
         if 0 < c["N"] < best[0]:
             best = (c["N"], name)
+    for name, e in (rept or {}).items():
+        if e["n"] < best[0]:
+            best = (e["n"], name)
     return best
 
 
@@ -1056,8 +1083,9 @@ def build_amniotes(raw: Path, work: Path, log: dict, alog: dict, t_start: float)
     alog["lists"] = {"clements": len(birds), "rdb": len(reptiles), "rdb_no_order": no_order,
                      "rdb_by_group": dict(Counter(r["group"] for r in reptiles.values()))}
     cal = match_callaghan(load_callaghan(raw), birds, lists, alog)
-    srows, seen = sauropsid_rows(load_ot(raw), tax, lists, alog, {n for n, c in cal.items() if c["N"] > 0},
-                                 load_lost(raw))
+    rept = reptcounts.load()
+    srows, seen = sauropsid_rows(load_ot(raw), tax, lists, alog,
+                                 {n for n, c in cal.items() if c["N"] > 0} | set(rept), load_lost(raw))
     log_step(t_start, f"sauropsid rows: {alog['rows']['species_by_group']}")
     backbone = load_backbone(Path(__file__).resolve().parents[1] / "amniotes.toml")
     notes = list(getattr(mdroot, "data_notes", []))
@@ -1144,8 +1172,8 @@ def build_amniotes(raw: Path, work: Path, log: dict, alog: dict, t_start: float)
         ttop.t0 = age
     root.age, root.t0, root.t1, root.date_src = age, age * 1.02, 0.0, D_UPHAM
     # counts
-    thin = thinnest(mroot, cal)
-    count_leaves(root, cal, thin, alog, skip=mroot)
+    thin = thinnest(mroot, cal, rept)
+    count_leaves(root, cal, thin, alog, skip=mroot, rept=rept)
     sum_rows(root, extra=[mroot])
     alog["checks"] = checks(root, mroot, srows, adroot, mdroot, tops, crowns)
     alog["checks"]["fossils"] = fossils.checks(root, mroot)

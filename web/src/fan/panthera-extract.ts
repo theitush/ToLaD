@@ -146,6 +146,21 @@ export interface LossRec {
   place: string;
 }
 
+/**
+ * A reptile's published count (ToLaD#578, pipeline/reptile_counts.toml): the figure its source gives, used as it is
+ * (ALIV), so the card says what it counts ("mature individuals", "adult females", "all ages"), its year and source.
+ */
+export interface CountRec {
+  counts: string;
+  year: number;
+  /** 'census': counted or surveyed; 'estimate': an assessment's or an index's figure. */
+  kind: string;
+  cite: string;
+  /** The citation in a few words for the card ("Isberg et al. 2019"). */
+  short: string;
+  url: string;
+}
+
 /** What every natural baseline is (skeleton META.natural): its label, grade and source. */
 export interface NaturalMeta {
   label: string;
@@ -225,6 +240,8 @@ export interface RawSpecies extends RawNode {
   mass?: { g: number; how: string } | null;
   /** What dates its range loss (format v1.8, ToLaD#507); null: no loss to date, or data older than 1.8. */
   loss?: LossRec | null;
+  /** A reptile's published count (the dated sidecar's `count`, ToLaD#578); null: none (every mammal and bird). */
+  count?: CountRec | null;
   /**
    * A fossil the data grafts on by taxonomy only (the sidecars' `grafts`, ToLaD#279): placed on its genus (a species of
    * its genus under the split it hangs from) or else on its family or a group above it, by name, with no family-tree
@@ -258,6 +275,8 @@ export interface DatedFile {
   gen: Record<string, [number, number]>;
   /** Adult body mass (g) and its source (an index into mass_how); absent in data before ToLaD#276. */
   mass?: Record<string, [number, number]>;
+  /** A reptile's published count (ToLaD#578): what it counts and its source; only in files that hold one. */
+  count?: Record<string, CountRec>;
   // skeleton.json only
   sources?: string[];
   upham?: string;
@@ -542,6 +561,7 @@ export function extractClade(
       gen: g ? { years: g[0], how: dated!.sk.gen_how?.[g[1]] ?? '' } : null,
       mass: m ? { g: m[0], how: dated!.sk.mass_how?.[m[1]] ?? '' } : null,
       loss: lossOf(f, i, sk.meta),
+      count: dated?.file.count?.[i] ?? null,
     });
     if (!onFan(fossils, grafts, i, f.extinct(i))) continue;
     rows.set(i, f.name(i));
