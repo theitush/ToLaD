@@ -43,6 +43,7 @@ export const SOURCES: readonly Source[] = [
   { name: 'Wikidata', when: 'read 2026-10-12', use: 'finds pictures, articles', url: 'https://www.wikidata.org/' },
   { name: 'Wikipedia', use: 'species article links', url: 'https://en.wikipedia.org/' },
   { name: 'Wikimedia Commons', use: 'pictures; each card links its file', url: 'https://commons.wikimedia.org/' },
+  { name: 'PhyloPic', by: 'Keesey et al.; each outline its artist', when: 'build 562, read 2026-11-18', use: 'outlines where there is no photo; each card credits its artist', url: 'https://www.phylopic.org/' },
   { name: 'Chronostratigraphic Chart', by: 'ICS; Cohen, Finney, Gibbard & Fan', when: 'v2024/12', use: 'geologic periods', url: 'https://stratigraphy.org/ICSchart/ChronostratChart2024-12.pdf' },
   { name: 'Macrostrat', when: 'read 2026-10-12', use: 'colours of the periods', url: 'https://macrostrat.org/' },
   { name: 'LR04 stack', by: 'Lisiecki & Raymo', when: '2005', use: 'the ice ages', url: 'https://doi.org/10.1029/2004PA001071' },

@@ -5,7 +5,7 @@ import { flushSync } from 'react-dom';
 import { approxMa, formatCount, formatMass } from '../data/count';
 import { HistorySpark } from './HistorySpark';
 import { fossilOrder, type FossilOrder, type Measure } from './layout';
-import { drawStub, wikiOf, type WikiRec } from './wiki';
+import { drawOutline, drawStub, outlineRec, picLook, setPicLook, wikiOf, type Outline, type PicLook, type WikiRec } from './wiki';
 import { RangeGlobe } from './Globe';
 import { Alone, AloneImg, useAlone } from './Alone';
 import { mammaliaClade, NATURAL_META, type HistEvent, type SpeciesRec } from './panthera';
@@ -83,6 +83,21 @@ function initialUnknown(): UnknownLook {
   return unknownLook();
 }
 
+/** The pictures (ToLaD#577, `?outlines=off`): photos and a PhyloPic outline where there is none, or photos only (the old look). */
+export const PIC_CHOICES: Choice<PicLook>[] = [
+  { value: 'outlines', short: 'photos + outlines', label: 'photos, and outlines where there is no photo' },
+  { value: 'photos', short: 'photos only', label: 'photos only, the old look', q: 'off' },
+];
+function initialPics(): PicLook {
+  try {
+    const m = chosenIn(window.location.search, 'outlines', PIC_CHOICES);
+    if (m) setPicLook(m);
+  } catch {
+    /* no address */
+  }
+  return picLook();
+}
+
 /** The upper clades' names (ToLaD#373, #434, #458): at their forks (`?forknames=fork`), on leaders off them (`?forknames=leaders`), or none: on the tree on its side the labels in the gaps name them (ToLaD#458), elsewhere the stack over "now" (`?forknames=off`). */
 type ForkNaming = 'at fork' | 'leaders' | 'off';
 const FORK_NAMINGS: Record<ForkNaming, Choice<ForkNaming>> = {
@@ -145,6 +160,7 @@ export function FanApp() {
   const [forks, setForks] = useState(initialForkNames);
   const [forkLook, setForkLook] = useState<ForkMode>(initialForks);
   const [unknown, setUnknown] = useState<UnknownLook>(initialUnknown);
+  const [pics, setPics] = useState<PicLook>(initialPics);
   // What the widths count (ToLaD#276): individuals, or their mass (`?width=mass`).
   const [measure, setMeasure] = useState<Measure>(initialMeasure);
   const [sel, setSel] = useState<Selection | null>(null);
@@ -211,7 +227,10 @@ export function FanApp() {
     // The card's kinds (mammals-card.json, ToLaD#502; downloaded while the tree was built) read once the first frame is
     // on screen, so a tap rarely waits for them.
     let later = 0;
-    const first = requestAnimationFrame(() => (later = window.setTimeout(() => loadMammalCard().catch((e: unknown) => console.warn('fan: the card data did not load', e)), 0)));
+    // (Then the tree drawn again: the outlines are in it, ToLaD#577, their discs' placeholders until now.)
+    const first = requestAnimationFrame(
+      () => (later = window.setTimeout(() => loadMammalCard().then(() => viewRef.current === v && v.request(), (e: unknown) => console.warn('fan: the card data did not load', e)), 0)),
+    );
     // (Back on the tab, ToLaD#478: drawn again, or the page reloaded to here.)
     const unwatch = watchBack(v, () => selRef.current);
     // The search's names folded at idle, not when it opens (ToLaD#564).
@@ -303,6 +322,19 @@ export function FanApp() {
             onPick={(m) => {
               setUnknownLook(m);
               setUnknown(m);
+              viewRef.current?.request();
+            }}
+          />
+          {/* ToLaD#577: where a species has no photo, its PhyloPic outline (its own, else its nearest relative's); photos only, the old look (the stub). */}
+          <ChoiceChip
+            name="pictures"
+            title="Pictures: photos, and a PhyloPic outline where there is no photo; or photos only (the old look)"
+            param="outlines"
+            choices={PIC_CHOICES}
+            value={pics}
+            onPick={(m) => {
+              setPicLook(m);
+              setPics(m);
               viewRef.current?.request();
             }}
           />
@@ -593,11 +625,16 @@ function EventSource({ ev }: { ev: HistEvent }) {
  * a moment, so a cached picture never flashes it). With none, or once it fails, the tree's stub in its box (ToLaD#492).
  * Keyed by its URL, so another species starts over.
  */
-export function WikiPic({ w, initial = 'loading' }: { w: WikiRec | null; initial?: 'loading' | 'ok' | 'failed' }) {
+export function WikiPic({ w, initial = 'loading', pending = false }: { w: WikiRec | null; initial?: 'loading' | 'ok' | 'failed'; pending?: boolean }) {
   const [state, setState] = useState(initial);
   // A tap shows it alone, full screen, at a larger Commons thumbnail (ToLaD#506, Alone.tsx); a tap there closes it.
   const [alone, show, close] = useAlone();
   const src = w?.img;
+  // No photo: its PhyloPic outline (ToLaD#577), unless the pictures are photos only. The photo always wins.
+  // (`pending`: the card's data, the outline with it, not in yet: its box held with the spinner, not the stub.)
+  const ol = src ? null : outlineRec(w);
+  if (ol && picLook() === 'outlines') return <OutlinePic key={ol.id} o={ol} />;
+  if (!src && pending && picLook() === 'outlines') return <figure className="pic outline loading" role="status" aria-label="loading"><canvas /></figure>;
   if (!src || state === 'failed') return <PicStub />;
   const credit = w?.file && (
     <a href={w.file} target="_blank" rel="noopener">
@@ -666,6 +703,83 @@ function PicStub() {
       <canvas ref={ref} />
       <span className="cap">No photo</span>
     </figure>
+  );
+}
+
+/**
+ * No photo, a PhyloPic outline (ToLaD#577): drawn light in the picture's box as on the tree (wiki.drawOutline), what it
+ * stands for under it (outlineWords) and its credit: PhyloPic and the artist, linking the image's page, and the licence.
+ * Loading, its box held with the spinner (ToLaD#479); if it fails, the stub. The 512 px raster, sharp in the 120 px box.
+ */
+export function OutlinePic({ o, initial = 'loading' }: { o: Outline; initial?: 'loading' | 'ok' | 'failed' }) {
+  const [state, setState] = useState(initial);
+  const ref = useRef<HTMLCanvasElement>(null);
+  const src = o.big;
+  useEffect(() => {
+    if (typeof Image === 'undefined') return;
+    let live = true;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.referrerPolicy = 'no-referrer';
+    img.onload = () => {
+      if (!live) return;
+      const c = ref.current;
+      const ctx = c?.getContext('2d');
+      if (c && ctx) {
+        const px = Math.round((c.clientWidth || 120) * Math.min(2, window.devicePixelRatio || 1));
+        c.width = c.height = px;
+        drawOutline(ctx, img, px, px);
+      }
+      setState('ok');
+    };
+    img.onerror = () => live && setState('failed');
+    img.src = src;
+    return () => {
+      live = false;
+    };
+  }, [src]);
+  if (state === 'failed') return <PicStub />;
+  return (
+    <figure className={`pic outline ${state}`}>
+      <canvas ref={ref} />
+      <span className="cap">{outlineWords(o)}</span>
+      {(o.by || o.lic) && (
+        <span className="credit">
+          <a href={`https://www.phylopic.org/images/${o.id}`} target="_blank" rel="noopener">
+            PhyloPic{o.by ? ` · ${o.by}` : ''}
+          </a>
+          {o.lic && (
+            <>
+              {' · '}
+              <a href={o.licUrl} target="_blank" rel="noopener">
+                {o.lic}
+              </a>
+            </>
+          )}
+        </span>
+      )}
+    </figure>
+  );
+}
+
+/** A species' or genus's name in italics, a higher group's upright. */
+const taxonName = (name: string, rank?: string): ReactNode => (rank === 'species' || rank === 'genus' || name.includes(' ') ? <i>{name}</i> : name);
+
+/**
+ * What an outline stands for (ToLaD#577): "Outline" for the species' own; else "Outline of its genus, Felis (shows
+ * F. silvestris)": the group and, where the picture is of a relative, the taxon it shows (the genus abbreviated where it
+ * is the group's). Before the card's data is in, "Outline".
+ */
+export function outlineWords(o: Outline): ReactNode {
+  const of = o.of;
+  if (!of || o.rank === 'species') return 'Outline';
+  const shows = o.shows && o.shows !== of ? o.shows : '';
+  const short = shows && o.rank === 'genus' && shows.startsWith(`${of} `) ? `${of[0]}. ${shows.slice(of.length + 1)}` : shows;
+  return (
+    <>
+      Outline of its {o.rank ?? 'group'}, {taxonName(of, o.rank)}
+      {short && <> (shows {taxonName(short, shows.includes(' ') ? 'species' : undefined)})</>}
+    </>
   );
 }
 
@@ -881,7 +995,7 @@ function SpeciesCardWait({ sp, onClose, onUp, onBox }: SpeciesCardProps) {
       }
     >
       <div className="media">
-        <WikiPic key={wiki?.img ?? ''} w={wiki} />
+        <WikiPic key={wiki?.img ?? ''} w={wiki} pending />
         <RangeGlobe key={sp.sci} sci={sp.sci} />
       </div>
       <div className="facts-wait loading" role="status" aria-label="loading" />
