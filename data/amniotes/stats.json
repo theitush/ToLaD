@@ -1429,7 +1429,20 @@
    },
    "rdb_no_order": [
     "Arizona occidentalis"
-   ]
+   ],
+   "rdb_red_list_names": {
+    "Crocodylia: name": 23,
+    "Crocodylia: unnamed": 4,
+    "Rhynchocephalia: name": 1,
+    "Squamata: Open Tree synonym": 5,
+    "Squamata: Red List synonym": 53,
+    "Squamata: name": 7277,
+    "Squamata: unnamed": 4958,
+    "Testudines: Open Tree synonym": 1,
+    "Testudines: name": 262,
+    "Testudines: unnamed": 101,
+    "Testudines: unnamed: the Red List's is an extinct taxon, ours is counted alive": 1
+   }
   },
   "opentree": {
    "opentree_dropped": {
@@ -2016,7 +2029,7 @@
  },
  "output": {
   "brotli_bytes": 1640104,
-  "dated_sidecar_raw": 4972641,
+  "dated_sidecar_raw": 5204820,
   "files": 39,
   "raw_bytes": 9280536,
   "skeleton_brotli": 106505,

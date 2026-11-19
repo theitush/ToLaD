@@ -147,6 +147,26 @@ class TestRules(unittest.TestCase):
         self.assertEqual(log["counts"]["by_kind"], {"reptile: published count": 1, "reptile: unknown": 1})
         self.assertEqual((log["reptile_counts"]["on_a_living_row"], log["reptile_counts"]["not_found"]), (1, []))
 
+    def test_reptile_names(self):
+        # ToLaD#592: a reptile takes the Red List's English name by its binomial, else by an established synonym that
+        # renames the same species (genus move, gender ending); never through a lump, a shared record or a name the
+        # Red List gives an extinct taxon when a count says ours lives
+        def rec(common, cat="LC", syn=()):
+            return {"class": "REPTILIA", "category": cat, "common": common, "synonyms": list(syn)}
+        rl = {"Aus bus": rec("Bee Lizard"), "Eus dus": rec("Dee Snake", syn=["Cus dus"]),
+              "Hus ius": rec("Eye Gecko", syn=["Fus gus"]), "Lus kus": rec("Kay Skink", syn=["Jus ka"]),
+              "Pus nus": rec("En Turtle"), "Qus rus": rec("Lost Tortoise", "EX"),
+              "Wus tus": rec("Tee Viper", syn=["Sus tus", "Vus tus"]), "Xus yus": rec("Bird", syn=["Zus yus"])}
+        rl["Xus yus"]["class"] = "AVES"
+        names = ["Aus bus", "Cus dus", "Fus gus", "Jus kus", "Mus nus", "Qus rus", "Sus tus", "Vus tus", "Zus yus"]
+        rept = {n: {"group": "Squamata", "common": None} for n in names}
+        tax, syn, uids = {5: {"name": "Mus nus"}}, {5: ["Pus nus"]}, {"Mus nus": {5}}
+        log = amniotes.name_reptiles(rept, rl, tax, syn, uids, counted={"Qus rus"})
+        self.assertEqual({n: r["common"] for n, r in rept.items() if r["common"]},
+                         {"Aus bus": "Bee Lizard", "Cus dus": "Dee Snake", "Jus kus": "Kay Skink", "Mus nus": "En Turtle"})
+        self.assertEqual(log["Squamata: name"], 1)
+        self.assertEqual((log["Squamata: Red List synonym"], log["Squamata: Open Tree synonym"]), (2, 1))
+
     def test_reptile_count_table(self):
         """pipeline/reptile_counts.toml: every number has its source, what it counts, its year and a quote; a range's
         middle is its geometric middle; none is implausible (no sea turtle in billions, no species under 10)."""
@@ -352,6 +372,26 @@ class TestOutput(unittest.TestCase):
                 side[c["cite"]] = side.get(c["cite"], 0) + 1
                 self.assertTrue(c["url"].startswith("https://") and c["counts"] and c["year"], f.name)
         self.assertEqual(sum(side.values()), len(table))
+
+    def test_reptile_names_in_sidecars(self):
+        """ToLaD#592: the reptiles carry their Red List English names in the file sidecars, as the mammals and birds;
+        the Floreana tortoise's name is not on the counted Galapagos tortoise."""
+        names = set()
+        for f in (AMN / "dated").glob("*.json"):
+            names |= set(json.loads(f.read_text()).get("common", {}).values())
+        for n in ("Olive Ridley Turtle", "Leatherback Turtle", "Green Turtle", "Aldabra Giant Tortoise", "Nile Crocodile",
+                  "Tuatara", "Komodo Dragon", "Burmese Python", "Pond Slider"):
+            self.assertIn(n, names)
+        self.assertNotIn("Floreana Giant Tortoise", names)
+        nm = self.s["lists"]["rdb_red_list_names"]
+        named = Counter()
+        for k, v in nm.items():
+            if "unnamed" not in k:
+                named[k.split(":")[0]] += v
+        self.assertEqual(named["Crocodylia"], 23)
+        self.assertEqual(named["Rhynchocephalia"], 1)
+        self.assertGreater(named["Testudines"], 250)
+        self.assertGreater(named["Squamata"], 7000)
 
     def test_page_reads_unknown_flag(self):
         meta, rows = all_rows(AMN)
