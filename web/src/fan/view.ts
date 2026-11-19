@@ -3832,6 +3832,9 @@ export class FanView implements InputHandlers {
     const topOf = (i: number) => Math.min(named[i].top, named[i].s.box[1]);
     const order = named.map((_, i) => i);
     order.sort((i, j) => (named[j].d ? 1 : 0) - (named[i].d ? 1 : 0) || topOf(i) - topOf(j) || i - j);
+    // (What is drawn, listed in the fossils' order, as laid: each one's picture and name.)
+    const pics: (CutLabels['pics'][number] | undefined)[] = [];
+    const names: (LabelSpot | undefined)[] = [];
     for (const i of order) {
       const n = named[i];
       const { d, s } = n;
@@ -3853,9 +3856,9 @@ export class FanView implements InputHandlers {
         dy = y0 - n.top;
         const b = f.strands[n.k];
         // (A group's: its youngest fossil's face, and its disc a member's photo where that has none, discSci.)
-        const p = { x: n.px, y: y0 + d / 2, i: out.pics.length, lv: (n.one ? { v: n.one.v } : { b }) as Level, face: b, held: false };
+        const p = { x: n.px, y: y0 + d / 2, i: 0, lv: (n.one ? { v: n.one.v } : { b }) as Level, face: b, held: false };
         if (y0 < this.h) {
-          out.pics.push(d === PIC_D ? p : { ...p, d });
+          pics[i] = d === PIC_D ? p : { ...p, d };
           stand.push(picBox({ ...p, d }));
         }
       }
@@ -3872,9 +3875,11 @@ export class FanView implements InputHandlers {
         this.tipMissed.set(n.k, 'meets');
         continue;
       }
-      out.names.push(s);
+      names[i] = s;
       stand.push(s.box);
     }
+    for (const p of pics) if (p) out.pics.push({ ...p, i: out.pics.length });
+    for (const s of names) if (s) out.names.push(s);
   }
   /**
    * The fossil groups tipLabels names as one (ToLaD#279), per strand: each outermost clade with a rank name of its own (isLevel) that is only fossils placed by name
