@@ -43,7 +43,7 @@ export function setLodLearn(on: boolean): void {
   learnOn = on;
 }
 
-/** The drawing's cut coarsened by the view (Lod.see, ToLaD#591): off, the strands are drawn by the zoom's cut alone (lodview.test holds the two apart only where the view sees a hair). */
+/** The strands' cut coarsened by the view (Lod.see, ToLaD#591): off, the strands are asked by the zoom's cut alone (lodview.test: the same rectangles either way). */
 let viewOn = true;
 export function setLodView(on: boolean): void {
   viewOn = on;
@@ -325,22 +325,21 @@ export class Lod {
   private readonly tops: Float64Array;
 
   /**
-   * The clades the strands are drawn as one ribbon by this frame (drawStrands, ToLaD#591), left to right: the merged
-   * clades, and coarser, each clade the window sees no more than a hair of (Steady.viewCut: under CLOSED_PX across
-   * wherever it meets the window, nothing of it above its split there). A clade beside the view, whose lineages run
-   * through it only as hairlines deep in the trunk or step across it at a split, is one ribbon, not thousands of strands
-   * sampled for no pixel. Only the drawing reads them: names, brackets, corners and stems go by merged, which depends on
-   * the zoom alone, so a pan never moves them.
+   * The clades whose strands are not drawn one by one this frame (drawStrands, ToLaD#591), left to right: the merged
+   * clades (drawn as ribbons), and coarser, each clade the window sees nothing of (Steady.viewCut: no stretch of it with
+   * a share in the window, no dashed line, nothing above its split). A clade beside the view, whose lineages run through
+   * it only as corners deep in the trunk or step across it at a split, asks none of its thousands of strands to be
+   * sampled for no pixel; the picture is the same. The ribbons stay the merged clades', and names, brackets, corners and
+   * stems go by merged too, which depends on the zoom alone.
    */
-  drawn: FanNode[] = [];
-  /** Per drawn clade: its strands' first and last drawn index, and its top (as mS0, mS1, mTop). */
-  dS0 = new Int32Array(0);
-  dS1 = new Int32Array(0);
-  dTop = new Float64Array(0);
+  cut: FanNode[] = [];
+  /** Per clade in cut: its strands' first and last drawn index (as mS0, mS1). */
+  cS0 = new Int32Array(0);
+  cS1 = new Int32Array(0);
 
   /**
-   * The drawn clades for the window world x [xa, xb], heights [ya, yb] at zoom sx, sy (px per world unit; sf: the layout,
-   * a Steady; null, or a tree viewCut cannot read: the merged clades as they are). After update and Steady.setMerged.
+   * The cut for the window world x [xa, xb], heights [ya, yb] at zoom sx, sy (px per world unit; sf: the layout, a
+   * Steady; null, or a tree viewCut cannot read: the merged clades as they are). After update and Steady.setMerged.
    */
   see(sf: Steady | null, ya: number, yb: number, xa: number, xb: number, sx: number, sy: number): void {
     const key = `${this.gen}:${sf?.ver}:${ya}:${yb}:${xa}:${xb}:${sx}:${sy}:${this.look}:${forkMode()}`;
@@ -352,45 +351,36 @@ export class Lod {
       this.stamp++;
       for (let m = 0; m < this.merged.length; m++) this.mark[this.mIdx[m]] = this.stamp;
     }
-    const cut = this.drawnNext;
-    if (!viewOn || !sf || !sf.viewCut(ya, yb, xa, xb, sx, sy, CLOSED_PX / sx, this.heldFn, this.look === 'dashed' ? this.lineFn : null, cut)) {
-      this.drawn = this.merged;
-      this.dS0 = this.mS0;
-      this.dS1 = this.mS1;
-      this.dTop = this.mTop;
+    const ids = this.cutNext;
+    if (!viewOn || !sf || !sf.viewCut(ya, yb, xa, xb, sx, sy, this.heldFn, this.look === 'dashed' ? this.lineFn : null, ids)) {
+      this.cut = this.merged;
+      this.cS0 = this.mS0;
+      this.cS1 = this.mS1;
       return;
     }
     const N = this.fan.nodes;
-    const M = cut.length;
-    if (this.drawn === this.merged || this.vS0.length < M) {
-      if (this.vS0.length < M) {
-        const c = Math.max(M, 2 * this.vS0.length);
-        this.vS0 = new Int32Array(c);
-        this.vS1 = new Int32Array(c);
-        this.vTop = new Float64Array(c);
-      }
-      this.dS0 = this.vS0;
-      this.dS1 = this.vS1;
-      this.dTop = this.vTop;
+    const M = ids.length;
+    if (this.vS0.length < M) {
+      const c = Math.max(M, 2 * this.vS0.length);
+      this.vS0 = new Int32Array(c);
+      this.vS1 = new Int32Array(c);
     }
-    const D = (this.drawn = this.drawn === this.merged ? [] : this.drawn);
-    D.length = M;
-    const tops = this.tops;
+    this.cS0 = this.vS0;
+    this.cS1 = this.vS1;
+    const C = (this.cut = this.cut === this.merged ? [] : this.cut);
+    C.length = M;
     for (let m = 0; m < M; m++) {
-      const i = cut[m];
-      D[m] = N[i];
+      const i = ids[m];
+      C[m] = N[i];
       this.vS0[m] = this.s0[i];
       this.vS1[m] = this.s0[i] + this.nStr[i] - 1;
-      if (tops[i] !== tops[i]) tops[i] = Lod.top(N[i]);
-      this.vTop[m] = tops[i];
     }
   }
   private viewKey = '';
   private viewSf: Steady | null = null;
-  private readonly drawnNext: number[] = [];
+  private readonly cutNext: number[] = [];
   private vS0 = new Int32Array(0);
   private vS1 = new Int32Array(0);
-  private vTop = new Float64Array(0);
   /** Per node: the stamp of the merged clades it is one of (markGen: the gen they were stamped at). */
   private readonly mark: Int32Array;
   private stamp = 0;
@@ -398,11 +388,11 @@ export class Lod {
   private readonly heldFn = (j: number): boolean => this.mark[j] === this.stamp;
   private readonly lineFn = (j: number): boolean => this.allU[j] === 1;
 
-  /** The first drawn clade from index `from` on whose last strand is at or past strand x (drawn.length if none). */
-  drawnFrom(x: number, from = 0): number {
-    const e = this.dS1;
+  /** The first clade in cut from index `from` on whose last strand is at or past strand x (cut.length if none). */
+  cutFrom(x: number, from = 0): number {
+    const e = this.cS1;
     let a = from;
-    let z = this.drawn.length;
+    let z = this.cut.length;
     while (a < z) {
       const m = (a + z) >> 1;
       if (e[m] < x) a = m + 1;
@@ -411,10 +401,10 @@ export class Lod {
     return a;
   }
 
-  /** The drawn clade strand i is in (an index into drawn), or -1. */
-  drawnOf(i: number): number {
-    const m = this.drawnFrom(i);
-    return m < this.drawn.length && this.dS0[m] <= i ? m : -1;
+  /** The clade in cut strand i is in (an index into cut), or -1. */
+  cutOf(i: number): number {
+    const m = this.cutFrom(i);
+    return m < this.cut.length && this.cS0[m] <= i ? m : -1;
   }
 
   /** Clade v's top (Lod.top), kept. */

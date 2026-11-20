@@ -232,7 +232,7 @@ export class Steady extends Fold {
   private readonly fPos: Int32Array;
   private readonly lPos: Int32Array;
   private readonly runNode = new Map<number, number>();
-  /** Per strand (drawn order) the founders' widths of all before it (viewCut: a run's slot in a column, side by side). */
+  /** Per strand (drawn order) the founders' widths of all before it (viewCut: a run's place in a column, side by side). */
   private readonly bwSum: Float64Array;
 
   /** Every split open at every zoom, so nothing here depends on the width zoom: the cats' level, or fixed gaps (ToLaD#378). */
@@ -764,29 +764,30 @@ export class Steady extends Fold {
   private readonly offOut: { runs: Int32Array; n: number } = { runs: new Int32Array(0), n: 0 };
 
   /**
-   * The clades drawn as one ribbon where the view sees no more than a hair of them (ToLaD#591): view-dependent refinement
-   * (Hoppe 1997; Luebke et al., Level of Detail for 3D Graphics, ch. 4), a clade parted only where what of it falls inside
-   * the window (world x [xa, xb], heights [ya, yb]) is px wide or more. Down from the root, depth first, left to right,
-   * into out (fan.nodes' indices); a node held (drawn as one already: the zoom's cut, lod.ts) taken as it is.
+   * The clades the window sees nothing of (ToLaD#591): the cull of a bounding hierarchy (Clark 1976; Luebke et al., Level
+   * of Detail for 3D Graphics, ch. 4: view-dependent refinement), down from the root, depth first, left to right, into out
+   * (fan.nodes' indices); a node held (drawn as one already: the zoom's cut, lod.ts) taken as it is. A clade taken whole
+   * draws nothing in the window (world x [xa, xb], heights [ya, yb]): none of its strands need be asked to (view.ts
+   * drawStrands), and the picture is the same to the rectangle.
    *
    * A clade of two strands or more is taken whole when nothing of it above its split meets the window (its lineages'
-   * bound, aLo..aHi, or the window's heights all under its split or over its youngest tip) and, below its split, where
-   * its run of strands stands side by side (its founders' width, in its own column and in each one down to the root),
-   * it is narrower than px wherever it meets the window. That is read column by column, each column's two stretches on
-   * their own, as the lanes draw them: its stem, straight, and its peel, the sweep from its tile in its parent's column to
-   * its place; a stretch the zoom draws as no lane (a share of nil: drawCorners' line stands for it) is none of it. So a
-   * run that steps across the screen at a split, never on it, meets it nowhere. In a column drawn as one dashed line
-   * (line(j), dashed.ts: no count in it) the run is that line, at the column's centre, if it holds the column's first
-   * strand (the line's holder), else nothing; a line has a width of its own on screen, never a hair. Each daughter's
-   * list of the columns it may meet is its parent's, read again for its own run (inside its parent's), and its own
-   * column: the walk's work is what the window holds. False where it cannot tell (a tree not mono): out then holds nothing.
+   * bound, aLo..aHi, or the window's heights all under its split or over its youngest tip) and, below its split, its run
+   * of strands (side by side by their founders' widths, in its own column and in each one down to the root) meets it
+   * nowhere. That is read column by column, each column's two stretches on their own, as the lanes draw them: its stem,
+   * straight, and its peel, the sweep from its tile in its parent's column to its place; a stretch the zoom draws as no
+   * lane (a share of nil: drawCorners' line stands for it) is none of it. So a run that steps across the screen at a
+   * split, never on it, meets it nowhere. In a column drawn as one dashed line (line(j), dashed.ts: no count in it) the
+   * run is that line, at the column's centre, if it holds the column's first strand (the line's holder), else nothing.
+   * Each daughter's list of the columns it meets is its parent's, read again for its own run (inside its parent's), and
+   * its own column: the walk's work is what the window holds. False where it cannot tell (a tree not mono): out then
+   * holds nothing.
    */
-  viewCut(ya: number, yb: number, xa: number, xb: number, sx: number, sy: number, px: number, held: (j: number) => boolean, line: ((j: number) => boolean) | null, out: number[]): boolean {
+  viewCut(ya: number, yb: number, xa: number, xb: number, sx: number, sy: number, held: (j: number) => boolean, line: ((j: number) => boolean) | null, out: number[]): boolean {
     out.length = 0;
     if (!this.mono) return false;
     const L = this.cur();
     this.bounds(L);
-    const { cLo, cHi, aLo, aHi, colL, h } = L as Required<Lay>;
+    const { aLo, aHi, colL, h } = L as Required<Lay>;
     const tile = L.tile!;
     const { nY, wc, nFirst: nF, nLast: nL, bwSum: sum, tipN, par } = this;
     const peelMode = forkModeNow === 'peel';
@@ -839,23 +840,16 @@ export class Steady extends Fold {
       }
       const a = nc;
       const w = sum[nL[j] + 1] - sum[nF[j]];
-      const wide = !(w < px);
-      let hair = true;
       for (let q = pa; q < pa + pn; q++) {
         const u = cols[q];
-        const isLine = !!line && line(u);
-        if (isLine ? nF[j] !== nF[u] || !meets(u, 0, wc[u], true) : !meets(u, sum[nF[j]] - sum[nF[u]], w, false)) continue;
+        if (line && line(u) ? nF[j] !== nF[u] || !meets(u, 0, wc[u], true) : !meets(u, sum[nF[j]] - sum[nF[u]], w, false)) continue;
         cols[nc++] = u;
-        if (isLine || wide) hair = false;
       }
       const ownLine = !!line && line(j);
-      if (meets(j, 0, ownLine ? wc[j] : w, ownLine)) {
-        cols[nc++] = j;
-        if (ownLine || wide) hair = false;
-      }
+      if (meets(j, 0, ownLine ? wc[j] : w, ownLine)) cols[nc++] = j;
       // (Anything of it above its split in the window.)
       const above = Math.max(ya, tipN[j]) < Math.min(yb, nY[j]) && !(aHi[j] < xa || aLo[j] > xb);
-      if (hair && !above && par[j] >= 0 && nL[j] > nF[j]) {
+      if (nc === a && !above && par[j] >= 0 && nL[j] > nF[j]) {
         out.push(j);
         continue;
       }

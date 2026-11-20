@@ -1,9 +1,9 @@
-// The drawing's cut coarsened by the view (ToLaD#591, lod.ts Lod.see, steady.ts viewCut): a clade the window sees no
-// more than a hair of is drawn as one ribbon, not strand by strand. On the amniotes, where the turtles' and the crocodiles'
-// levels sent thousands of strands to be sampled for no pixel (lizards and birds running into the trunk beside them),
-// against the drawing by the zoom's cut alone (setLodView(false)): the same rectangles drawn, in the same order, at every
-// frame of a pinch in and out, a pan and a flight into a family, at both levels and at the mammals' home; and far fewer
-// strands asked of drawStrand at the two levels. Two views, each its own tree and state, take the same steps (lodindex.test's way).
+// The strands' cut coarsened by the view (ToLaD#591, lod.ts Lod.see, steady.ts viewCut): a clade the window sees nothing
+// of asks none of its strands to be drawn. On the amniotes, where the turtles' and the crocodiles' levels sent thousands
+// of strands to be sampled for no pixel (lizards and birds running into the trunk beside them), against the strands asked
+// by the zoom's cut alone (setLodView(false)): the same rectangles drawn, in the same order, at every frame of a pinch in
+// and out, a pan and a flight into a family, at both levels and at the mammals' home; and far fewer strands asked of
+// drawStrand at the two levels. Two views, each its own tree and state, take the same steps (lodindex.test's way).
 import { appendFileSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { setFlip } from './flip';
@@ -144,9 +144,9 @@ describe('the drawing coarsened by the view against the zoom’s cut alone (amni
     expect(b.over.n, `${at}: over`).toBe(a.over.n);
     expect(Array.from(b.under.f.subarray(0, 12 * b.under.n)), `${at}: under`).toEqual(Array.from(a.under.f.subarray(0, 12 * a.under.n)));
     expect(Array.from(b.over.f.subarray(0, 12 * b.over.n)), `${at}: over`).toEqual(Array.from(a.over.f.subarray(0, 12 * a.over.n)));
-    // (What the view decides only coarsens the zoom's cut: every merged clade is drawn as one, or inside one drawn as one.)
+    // (What the view decides only coarsens the zoom's cut: every merged clade's strands are in the cut.)
     const lod = I(B).lod!;
-    for (const v of lod.merged) expect(lod.drawnOf(v.strands[0].index), `${at}: ${v.name}`).toBeGreaterThanOrEqual(0);
+    for (const v of lod.merged) expect(lod.cutOf(v.strands[0].index), `${at}: ${v.name}`).toBeGreaterThanOrEqual(0);
     sum[0] += asked[0];
     sum[1] += asked[1];
   };
