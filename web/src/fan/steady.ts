@@ -232,6 +232,8 @@ export class Steady extends Fold {
   private readonly fPos: Int32Array;
   private readonly lPos: Int32Array;
   private readonly runNode = new Map<number, number>();
+  /** Per strand (drawn order) the founders' widths of all before it (viewCut: a run's slot in a column, side by side). */
+  private readonly bwSum: Float64Array;
 
   /** Every split open at every zoom, so nothing here depends on the width zoom: the cats' level, or fixed gaps (ToLaD#378). */
   readonly open: boolean;
@@ -324,11 +326,15 @@ export class Steady extends Fold {
       prev[i] = this.bw[i] > 0 ? i : i > 0 ? prev[i - 1] : -1;
     }
     for (let i = ns - 1; i >= 0; i--) next[i] = this.bw[i] > 0 ? i : next[i + 1];
+    this.bwSum = sum;
     this.wc = typedFrom(Float64Array, N, (v, j) => Math.max(v.width, sum[this.nLast[j] + 1] - sum[this.nFirst[j]]));
     this.fPos = typedFrom(Int32Array, N, (_, j) => (next[this.nFirst[j]] >= 0 && next[this.nFirst[j]] <= this.nLast[j] ? next[this.nFirst[j]] : -1));
     this.lPos = typedFrom(Int32Array, N, (_, j) => (prev[this.nLast[j]] >= this.nFirst[j] ? prev[this.nLast[j]] : -1));
     N.forEach((_, j) => this.runNode.set(this.nFirst[j] * (ns + 1) + this.nLast[j], j));
     this.cand = new Int32Array(ns);
+    this.vcAt = new Int32Array(N.length);
+    this.vcStem = new Float64Array(N.length);
+    this.vcPeel = new Float64Array(N.length);
     this.cutStack = new Int32Array(N.length + ns + 1);
     this.offRuns = new Int32Array(2 * (N.length + ns + 1));
     this.walkLo = new Float64Array(N.length + ns + 1);
@@ -756,6 +762,129 @@ export class Steady extends Fold {
     return this.offOut;
   }
   private readonly offOut: { runs: Int32Array; n: number } = { runs: new Int32Array(0), n: 0 };
+
+  /**
+   * The clades drawn as one ribbon where the view sees no more than a hair of them (ToLaD#591): view-dependent refinement
+   * (Hoppe 1997; Luebke et al., Level of Detail for 3D Graphics, ch. 4), a clade parted only where what of it falls inside
+   * the window (world x [xa, xb], heights [ya, yb]) is px wide or more. Down from the root, depth first, left to right,
+   * into out (fan.nodes' indices); a node held (drawn as one already: the zoom's cut, lod.ts) taken as it is.
+   *
+   * A clade of two strands or more is taken whole when nothing of it above its split meets the window (its lineages'
+   * bound, aLo..aHi, or the window's heights all under its split or over its youngest tip) and, below its split, where
+   * its run of strands stands side by side (its founders' width, in its own column and in each one down to the root),
+   * it is narrower than px wherever it meets the window. That is read column by column, each column's two stretches on
+   * their own, as the lanes draw them: its stem, straight, and its peel, the sweep from its tile in its parent's column to
+   * its place; a stretch the zoom draws as no lane (a share of nil: drawCorners' line stands for it) is none of it. So a
+   * run that steps across the screen at a split, never on it, meets it nowhere. In a column drawn as one dashed line
+   * (line(j), dashed.ts: no count in it) the run is that line, at the column's centre, if it holds the column's first
+   * strand (the line's holder), else nothing; a line has a width of its own on screen, never a hair. Each daughter's
+   * list of the columns it may meet is its parent's, read again for its own run (inside its parent's), and its own
+   * column: the walk's work is what the window holds. False where it cannot tell (a tree not mono): out then holds nothing.
+   */
+  viewCut(ya: number, yb: number, xa: number, xb: number, sx: number, sy: number, px: number, held: (j: number) => boolean, line: ((j: number) => boolean) | null, out: number[]): boolean {
+    out.length = 0;
+    if (!this.mono) return false;
+    const L = this.cur();
+    this.bounds(L);
+    const { cLo, cHi, aLo, aHi, colL, h } = L as Required<Lay>;
+    const tile = L.tile!;
+    const { nY, wc, nFirst: nF, nLast: nL, bwSum: sum, tipN, par } = this;
+    const peelMode = forkModeNow === 'peel';
+    // (Each column's two shares at this zoom, read once a walk.)
+    const g = ++this.vcG;
+    const at = this.vcAt;
+    const shS = this.vcStem;
+    const shP = this.vcPeel;
+    const shares = (u: number) => {
+      if (at[u] === g) return;
+      at[u] = g;
+      shS[u] = peelMode ? 1 : this.nodeStem(L, u, sx, sy);
+      shP[u] = peelMode || par[u] < 0 ? 1 : this.nodePeel(L, u, sx, sy);
+    };
+    // Whether the run at offset d, w wide, in column u, meets the window (whole: a dashed line, drawn whatever its shares).
+    const meets = (u: number, d: number, w: number, whole: boolean): boolean => {
+      if (!whole) shares(u);
+      const c = colL[u] + d;
+      const p = par[u];
+      if (p < 0) return nY[u] <= yb && c + w >= xa && c <= xb && (whole || shS[u] > 0);
+      const f = Math.max(nY[u], nY[p] - h[p]);
+      if (f > nY[u] && nY[u] <= yb && f >= ya && c + w >= xa && c <= xb && (whole || shS[u] > 0)) return true;
+      if (!(f <= yb && nY[p] >= ya)) return false;
+      const t = tile[u] + d;
+      return Math.max(c, t) + w >= xa && Math.min(c, t) <= xb && (whole || shP[u] > 0);
+    };
+    const st = this.cutStack;
+    let la = this.vcA;
+    let ln = this.vcN;
+    let cols = this.vcCols;
+    let nc = 0;
+    let n = 0;
+    st[n] = this.rootJ;
+    la[n] = 0;
+    ln[n++] = 0;
+    while (n > 0) {
+      n--;
+      const j = st[n];
+      const pa = la[n];
+      const pn = ln[n];
+      if (held(j)) {
+        out.push(j);
+        continue;
+      }
+      // (Its columns below its split that its run meets the window in: its parent's list read again, and its own.)
+      if (nc + pn + 1 > cols.length) {
+        const c = new Int32Array(Math.max(2 * cols.length, nc + pn + 1));
+        c.set(cols.subarray(0, nc));
+        cols = this.vcCols = c;
+      }
+      const a = nc;
+      const w = sum[nL[j] + 1] - sum[nF[j]];
+      const wide = !(w < px);
+      let hair = true;
+      for (let q = pa; q < pa + pn; q++) {
+        const u = cols[q];
+        const isLine = !!line && line(u);
+        if (isLine ? nF[j] !== nF[u] || !meets(u, 0, wc[u], true) : !meets(u, sum[nF[j]] - sum[nF[u]], w, false)) continue;
+        cols[nc++] = u;
+        if (isLine || wide) hair = false;
+      }
+      const ownLine = !!line && line(j);
+      if (meets(j, 0, ownLine ? wc[j] : w, ownLine)) {
+        cols[nc++] = j;
+        if (ownLine || wide) hair = false;
+      }
+      // (Anything of it above its split in the window.)
+      const above = Math.max(ya, tipN[j]) < Math.min(yb, nY[j]) && !(aHi[j] < xa || aLo[j] > xb);
+      if (hair && !above && par[j] >= 0 && nL[j] > nF[j]) {
+        out.push(j);
+        continue;
+      }
+      const K = this.kidsF[j];
+      if (n + K.length > la.length) {
+        const A = new Int32Array(2 * (n + K.length));
+        const B = new Int32Array(2 * (n + K.length));
+        A.set(la.subarray(0, n));
+        B.set(ln.subarray(0, n));
+        la = this.vcA = A;
+        ln = this.vcN = B;
+      }
+      for (let q = K.length - 1; q >= 0; q--) {
+        if (K[q] < 0) continue;
+        st[n] = K[q];
+        la[n] = a;
+        ln[n++] = nc - a;
+      }
+    }
+    return true;
+  }
+  /** viewCut's stack's lists (start, length) and the columns they hold; per node its shares (stem, peel) and the walk they are for. */
+  private vcA = new Int32Array(256);
+  private vcN = new Int32Array(256);
+  private vcCols = new Int32Array(1024);
+  private vcG = 0;
+  private vcAt = new Int32Array(0);
+  private vcStem = new Float64Array(0);
+  private vcPeel = new Float64Array(0);
 
   /**
    * The stretches on the way up from node j that are not whole at this zoom, youngest first: its stem (ToLaD#402), then
