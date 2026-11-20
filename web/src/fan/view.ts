@@ -114,6 +114,8 @@ const GLOW_W = 6;
 const NO_HELD: [number, number, number][] = [];
 /** A column with no dashed stretch (dashed.ts): its band all along. */
 const NO_DASH: number[] = [];
+/** No fork cuts (forkMode peel: the lanes run whole through every peel). */
+const NO_CUTS: number[] = [];
 /** No merged clades (a level with no orders): one array, so Steady.setMerged knows it unchanged. */
 const NO_MERGED: FanNode[] = [];
 /** The glow fades out across a lean: gone where the lane runs √(1 + s²) - 1 = GLOW_LEAN off straight down (s ≈ 0.75 px per px). */
@@ -4852,20 +4854,19 @@ export class FanView implements InputHandlers {
     if (sf instanceof Steady && sf.offSide(b.index, sTop, sBot, this.cam.cx - xm, this.cam.cx + xm)) return;
     const xr = this.fan.tess.xRange(b, sTop, sBot);
     if (cam.screenX(xr[1]) < -12 || cam.screenX(xr[0]) > this.w + 12) return;
+    const forks = sf instanceof Steady && forkMode() !== 'peel';
+    if (forks) sf.strandForks(b.index, this.cam.sx, this.cam.sy, sTop, sBot, this.forkCuts);
     // (Its reach taken stretch by stretch (ToLaD#591): a path that steps across the screen at a split, from one side to the
-    // other, meets it nowhere. Its lanes reach its widest past its edge, and a dashed line its column's centre.)
+    // other, meets it nowhere. Its lanes reach its widest past its edge, a dashed line its column's centre.)
     if (sf instanceof Steady) {
       const r = Math.max(b.baseW, b.width) + this.dashReach(b) + 12 / this.cam.sx;
-      if (!sf.meets(b.index, sTop, sBot, this.cam.cx - (this.w / 2) / this.cam.sx - r, this.cam.cx + (this.w / 2) / this.cam.sx + r)) return;
+      const xm = this.w / 2 / this.cam.sx + r;
+      if (!sf.meets(b.index, sTop, sBot, this.cam.cx - xm, this.cam.cx + xm, forks ? this.forkCuts : NO_CUTS)) return;
     }
     const hw = b.width / 2;
     let pts = this.lanePoints(b, hw);
     if (pts.n < 2) return;
-    const fo = this.fan.tess.fold;
-    if (fo instanceof Steady && forkMode() !== 'peel') {
-      fo.strandForks(b.index, this.cam.sx, this.cam.sy, sTop, sBot, this.forkCuts);
-      if (this.forkCuts.length) pts = this.cutForks(pts, (y) => leftAt(b, y) + hw);
-    }
+    if (forks && this.forkCuts.length) pts = this.cutForks(pts, (y) => leftAt(b, y) + hw);
     // The column's styled spans on screen ([top, bottom, dim]), clipped to it: none for most strands.
     // (A count nobody has drawn as one dashed line, ToLaD#565: no faint band, its dashed stretches on screen instead.)
     const dashed = b.sp.countUnknown && unknownLook() === 'dashed';

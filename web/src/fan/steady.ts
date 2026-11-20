@@ -995,26 +995,33 @@ export class Steady extends Fold {
   }
 
   /**
-   * Whether strand i's left edge (left()) comes within world x [xa, xb] anywhere between heights y0 and y1, read stretch
-   * by stretch along its path (ToLaD#591, the cull by stretches): its own column, then each column it runs in, each
-   * stretch's reach read at its two ends, the edge moving one way along it (one ease: ownC's, nodeLeft's). At a split it
-   * steps from one column to the next at one height, so the whole path's reach (xRange's) may take in the screen while no
-   * stretch comes near it: a lineage running from far off the screen on one side into the trunk far off on the other, as
-   * every lineage of a clade beside the level does, drawn point by point to no pixel. True where it cannot tell.
+   * Whether strand i's lanes, as the draw makes them, come within world x [xa, xb] anywhere between heights y0 and y1,
+   * read stretch by stretch along its path (ToLaD#591, the cull by stretches): its own column, then each column it runs
+   * in, each stretch's reach read at its two ends (the edge moves one way along a stretch: one ease, ownC's or
+   * nodeLeft's). `cuts`: its fork cuts there (strandForks, view.ts cutForks), [top, bottom, share] each; one of no share
+   * draws no lane over its height (its corner is drawCorners'), so it is left out. At a split, or across a peel with no
+   * share, the path steps from one column to the next, so the whole path's reach (xRange's box) takes in the screen
+   * whenever it steps from one side of it to the other, while no stretch comes near it: every lineage of a clade beside
+   * the level running into the trunk, drawn point by point to no pixel. True where it cannot tell.
    */
-  meets(i: number, y0: number, y1: number, xa: number, xb: number, dbg?: number[]): boolean {
+  meets(i: number, y0: number, y1: number, xa: number, xb: number, cuts: readonly number[]): boolean {
     if (!this.mono || this.pLin[i]) return true;
     const L = this.cur();
     this.prep(L);
+    // Stretch [s, t] of column j (-1: its own) at offset off, less the cuts of no share: whether a piece left meets [xa, xb].
+    const meet = (j: number, off: number, s: number, t: number, end: number): boolean => {
+      let c = s;
+      for (let k = 0; k + 2 < cuts.length; k += 3) {
+        if (cuts[k + 2] > 0 || !(cuts[k + 1] > c) || !(cuts[k] < t)) continue;
+        if (cuts[k] > c && this.reach(L, i, j, off, c, Math.min(cuts[k], t), end, xa, xb)) return true;
+        c = Math.max(c, cuts[k + 1]);
+        if (c >= t) return false;
+      }
+      return this.reach(L, i, j, off, c, t, end, xa, xb);
+    };
     const sy = this.sY[i];
-    // (A stretch's far end read just inside it, as the kept samples read a split's two sides (twigs.ts leftPair): a column
-    // with no peel steps to its slot at its parent's split itself.)
-    const inside = (y: number) => y - 1e-9 * Math.max(1, Math.abs(y));
     if (y0 < sy) {
-      const p = this.ownC(L, i, y0);
-      const q = this.ownC(L, i, y1 < sy ? y1 : inside(sy));
-      dbg?.push(-1, y0, y1 < sy ? y1 : inside(sy), p, q);
-      if (Math.max(p, q) >= xa && Math.min(p, q) <= xb) return true;
+      if (meet(-1, 0, y0, Math.min(y1, sy), sy)) return true;
       if (y1 <= sy) return false;
     }
     const py = this.pY[i];
@@ -1033,14 +1040,23 @@ export class Steady extends Fold {
     for (let e = a - 1; e < n; e++) {
       const s = e === a - 1 ? ya : py[e];
       if (s > y1) break;
-      const t = e + 1 < n && py[e + 1] <= y1 ? inside(py[e + 1]) : y1;
-      if (t < s) continue;
-      const p = this.nodeLeft(L, pi[e], s) + po[e];
-      const q = this.nodeLeft(L, pi[e], t) + po[e];
-      dbg?.push(e, s, t, p, q);
-      if (Math.max(p, q) >= xa && Math.min(p, q) <= xb) return true;
+      const end = e + 1 < n ? py[e + 1] : Infinity;
+      const t = Math.min(y1, end);
+      if (t >= s && meet(pi[e], po[e], s, t, end)) return true;
     }
     return false;
+  }
+
+  /**
+   * meets()' one piece: column j's edge (-1: strand i's own column) at offset off over [s, t] within [xa, xb]. At `end`,
+   * where the column stops, read just inside it, as the kept samples read a split's two sides (twigs.ts leftPair): a
+   * column with no peel steps to its slot at its parent's split itself.
+   */
+  private reach(L: Lay, i: number, j: number, off: number, s: number, t: number, end: number, xa: number, xb: number): boolean {
+    const u = t >= end ? t - 1e-9 * Math.max(1, Math.abs(t)) : t;
+    const p = j < 0 ? this.ownC(L, i, s) : this.nodeLeft(L, j, s) + off;
+    const q = j < 0 ? this.ownC(L, i, u) : this.nodeLeft(L, j, u) + off;
+    return Math.max(p, q) >= xa && Math.min(p, q) <= xb;
   }
 
   /** left() in layout L. */
