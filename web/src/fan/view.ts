@@ -4852,6 +4852,12 @@ export class FanView implements InputHandlers {
     if (sf instanceof Steady && sf.offSide(b.index, sTop, sBot, this.cam.cx - xm, this.cam.cx + xm)) return;
     const xr = this.fan.tess.xRange(b, sTop, sBot);
     if (cam.screenX(xr[1]) < -12 || cam.screenX(xr[0]) > this.w + 12) return;
+    // (Its reach taken stretch by stretch (ToLaD#591): a path that steps across the screen at a split, from one side to the
+    // other, meets it nowhere. Its lanes reach its widest past its edge, and a dashed line its column's centre.)
+    if (sf instanceof Steady) {
+      const r = Math.max(b.baseW, b.width) + this.dashReach(b) + 12 / this.cam.sx;
+      if (!sf.meets(b.index, sTop, sBot, this.cam.cx - (this.w / 2) / this.cam.sx - r, this.cam.cx + (this.w / 2) / this.cam.sx + r)) return;
+    }
     const hw = b.width / 2;
     let pts = this.lanePoints(b, hw);
     if (pts.n < 2) return;
@@ -4876,6 +4882,15 @@ export class FanView implements InputHandlers {
     // (Gray off, ToLaD#410: the gray stays on an extinct species' column, down to where it joins a line that lives.)
     if (grayOn()) this.drawLanes(pts, hw, held, true, dash);
     else this.drawLanesOff(pts, hw, held, allGray(b), allGray(b) ? cam.screenY(grayFoot(b.node, b.splitY)) : 0, dash);
+  }
+
+  /** How far (world x) strand b's dashed line strays from its own lane: the most of its stretches' offsets (dashed.ts; 0 drawn as a band). */
+  private dashReach(b: FanBranch): number {
+    if (!b.sp.countUnknown || unknownLook() !== 'dashed') return 0;
+    const s = strandDashes(this.fan, b);
+    let r = 0;
+    for (let k = 2; k < s.length; k += 3) if (s[k] !== DASH_SKIP && Math.abs(s[k]) > r) r = Math.abs(s[k]);
+    return r;
   }
 
   private dashScr: number[] = [];

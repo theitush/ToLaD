@@ -994,6 +994,55 @@ export class Steady extends Fold {
     return out;
   }
 
+  /**
+   * Whether strand i's left edge (left()) comes within world x [xa, xb] anywhere between heights y0 and y1, read stretch
+   * by stretch along its path (ToLaD#591, the cull by stretches): its own column, then each column it runs in, each
+   * stretch's reach read at its two ends, the edge moving one way along it (one ease: ownC's, nodeLeft's). At a split it
+   * steps from one column to the next at one height, so the whole path's reach (xRange's) may take in the screen while no
+   * stretch comes near it: a lineage running from far off the screen on one side into the trunk far off on the other, as
+   * every lineage of a clade beside the level does, drawn point by point to no pixel. True where it cannot tell.
+   */
+  meets(i: number, y0: number, y1: number, xa: number, xb: number, dbg?: number[]): boolean {
+    if (!this.mono || this.pLin[i]) return true;
+    const L = this.cur();
+    this.prep(L);
+    const sy = this.sY[i];
+    // (A stretch's far end read just inside it, as the kept samples read a split's two sides (twigs.ts leftPair): a column
+    // with no peel steps to its slot at its parent's split itself.)
+    const inside = (y: number) => y - 1e-9 * Math.max(1, Math.abs(y));
+    if (y0 < sy) {
+      const p = this.ownC(L, i, y0);
+      const q = this.ownC(L, i, y1 < sy ? y1 : inside(sy));
+      dbg?.push(-1, y0, y1 < sy ? y1 : inside(sy), p, q);
+      if (Math.max(p, q) >= xa && Math.min(p, q) <= xb) return true;
+      if (y1 <= sy) return false;
+    }
+    const py = this.pY[i];
+    const pi = this.pIdx[i];
+    const po = this.pOff[i];
+    const n = py.length;
+    const ya = Math.max(y0, sy);
+    // (The stretch holding ya, as leftIn finds it: the last split at or above it, the first if none.)
+    let a = 1;
+    let z = n;
+    while (a < z) {
+      const m = (a + z) >> 1;
+      if (py[m] <= ya) a = m + 1;
+      else z = m;
+    }
+    for (let e = a - 1; e < n; e++) {
+      const s = e === a - 1 ? ya : py[e];
+      if (s > y1) break;
+      const t = e + 1 < n && py[e + 1] <= y1 ? inside(py[e + 1]) : y1;
+      if (t < s) continue;
+      const p = this.nodeLeft(L, pi[e], s) + po[e];
+      const q = this.nodeLeft(L, pi[e], t) + po[e];
+      dbg?.push(e, s, t, p, q);
+      if (Math.max(p, q) >= xa && Math.min(p, q) <= xb) return true;
+    }
+    return false;
+  }
+
   /** left() in layout L. */
   private leftIn(L: Lay, i: number, y: number): number {
     if (y < this.sY[i]) return this.ownC(L, i, y);
