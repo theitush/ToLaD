@@ -114,8 +114,6 @@ const GLOW_W = 6;
 const NO_HELD: [number, number, number][] = [];
 /** A column with no dashed stretch (dashed.ts): its band all along. */
 const NO_DASH: number[] = [];
-/** No fork cuts (forkMode peel: the lanes run whole through every peel). */
-const NO_CUTS: number[] = [];
 /** No merged clades (a level with no orders): one array, so Steady.setMerged knows it unchanged. */
 const NO_MERGED: FanNode[] = [];
 /** The glow fades out across a lean: gone where the lane runs √(1 + s²) - 1 = GLOW_LEAN off straight down (s ≈ 0.75 px per px). */
@@ -4854,19 +4852,14 @@ export class FanView implements InputHandlers {
     if (sf instanceof Steady && sf.offSide(b.index, sTop, sBot, this.cam.cx - xm, this.cam.cx + xm)) return;
     const xr = this.fan.tess.xRange(b, sTop, sBot);
     if (cam.screenX(xr[1]) < -12 || cam.screenX(xr[0]) > this.w + 12) return;
-    const forks = sf instanceof Steady && forkMode() !== 'peel';
-    if (forks) sf.strandForks(b.index, this.cam.sx, this.cam.sy, sTop, sBot, this.forkCuts);
-    // (Its reach taken stretch by stretch (ToLaD#591): a path that steps across the screen at a split, from one side to the
-    // other, meets it nowhere. The window is offSide's (and drawStrands' lod.see), widened by its lanes' reach past its
-    // edge, its widest, and a dashed line's from its column's centre.)
-    if (sf instanceof Steady) {
-      const r = xm + Math.max(b.baseW, b.width) + this.dashReach(b);
-      if (!sf.meets(b.index, sTop, sBot, this.cam.cx - r, this.cam.cx + r, forks ? this.forkCuts : NO_CUTS)) return;
-    }
     const hw = b.width / 2;
     let pts = this.lanePoints(b, hw);
     if (pts.n < 2) return;
-    if (forks && this.forkCuts.length) pts = this.cutForks(pts, (y) => leftAt(b, y) + hw);
+    const fo = this.fan.tess.fold;
+    if (fo instanceof Steady && forkMode() !== 'peel') {
+      fo.strandForks(b.index, this.cam.sx, this.cam.sy, sTop, sBot, this.forkCuts);
+      if (this.forkCuts.length) pts = this.cutForks(pts, (y) => leftAt(b, y) + hw);
+    }
     // The column's styled spans on screen ([top, bottom, dim]), clipped to it: none for most strands.
     // (A count nobody has drawn as one dashed line, ToLaD#565: no faint band, its dashed stretches on screen instead.)
     const dashed = b.sp.countUnknown && unknownLook() === 'dashed';
@@ -4883,15 +4876,6 @@ export class FanView implements InputHandlers {
     // (Gray off, ToLaD#410: the gray stays on an extinct species' column, down to where it joins a line that lives.)
     if (grayOn()) this.drawLanes(pts, hw, held, true, dash);
     else this.drawLanesOff(pts, hw, held, allGray(b), allGray(b) ? cam.screenY(grayFoot(b.node, b.splitY)) : 0, dash);
-  }
-
-  /** How far (world x) strand b's dashed line strays from its own lane: the most of its stretches' offsets (dashed.ts; 0 drawn as a band). */
-  private dashReach(b: FanBranch): number {
-    if (!b.sp.countUnknown || unknownLook() !== 'dashed') return 0;
-    const s = strandDashes(this.fan, b);
-    let r = 0;
-    for (let k = 2; k < s.length; k += 3) if (s[k] !== DASH_SKIP && Math.abs(s[k]) > r) r = Math.abs(s[k]);
-    return r;
   }
 
   private dashScr: number[] = [];
