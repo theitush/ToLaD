@@ -4,7 +4,6 @@
 // by the zoom's cut alone (setLodView(false)): the same rectangles drawn, in the same order, at every frame of a pinch in
 // and out, a pan and a flight into a family, at both levels and at the mammals' home; and far fewer strands asked of
 // drawStrand at the two levels. Two views, each its own tree and state, take the same steps (lodindex.test's way).
-import { appendFileSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { setFlip } from './flip';
 import { setLodView, type Lod } from './lod';
@@ -71,7 +70,7 @@ type Inner = {
   drawStrand(b: unknown): void;
 };
 
-describe('the drawing coarsened by the view against the zoom’s cut alone (amniotes)', () => {
+describe('the strands asked by the view’s cut against the zoom’s cut alone (amniotes)', () => {
   /** By the zoom's cut alone, and coarsened by the view. */
   let views: [FanView, FanView];
   const I = (v: FanView) => v as unknown as Inner;
@@ -130,24 +129,6 @@ describe('the drawing coarsened by the view against the zoom’s cut alone (amni
     const b = I(B).gl;
     const at = `${what} sx ${I(B).cam.sx} cx ${I(B).cam.cx} cy ${I(B).cam.cy} sy ${I(B).cam.sy}`;
     expect(I(A).cam, at).toEqual(I(B).cam);
-    if (process.env.LODVIEW_DEBUG) {
-      const rows = (g: { under: RectBatch; over: RectBatch }) => [...Array.from({ length: g.under.n }, (_, k) => 'u' + Array.from(g.under.f.subarray(12 * k, 12 * k + 12), (x) => x.toFixed(2)).join(',')), ...Array.from({ length: g.over.n }, (_, k) => 'o' + Array.from(g.over.f.subarray(12 * k, 12 * k + 12), (x) => x.toFixed(2)).join(','))];
-      const ra = rows(a);
-      const rb = rows(b);
-      const c = new Map<string, number>();
-      for (const r of ra) c.set(r, (c.get(r) ?? 0) + 1);
-      const onlyB: string[] = [];
-      for (const r of rb) {
-        const n = c.get(r) ?? 0;
-        if (n) c.set(r, n - 1);
-        else onlyB.push(r);
-      }
-      const onlyA = [...c].flatMap(([r, n]) => Array(n).fill(r));
-      if (onlyA.length || onlyB.length) appendFileSync(process.env.LODVIEW_DEBUG!, `DIFF ${at}: onlyA ${onlyA.length} onlyB ${onlyB.length}\n  A ${onlyA.slice(0, 6).join('\n  A ')}\n  B ${onlyB.slice(0, 6).join('\n  B ')}\n`);
-      sum[0] += asked[0];
-      sum[1] += asked[1];
-      return;
-    }
     expect(b.under.n, `${at}: under`).toBe(a.under.n);
     expect(b.over.n, `${at}: over`).toBe(a.over.n);
     expect(Array.from(b.under.f.subarray(0, 12 * b.under.n)), `${at}: under`).toEqual(Array.from(a.under.f.subarray(0, 12 * a.under.n)));
