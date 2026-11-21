@@ -3162,9 +3162,16 @@ export class FanView implements InputHandlers {
 
   draw(): void {
     const t0 = performance.now();
-    // (The columns' paths made again a few a frame while the view moves, all at once at rest: ToLaD#313.)
-    pathFrame.start(this.gesturing || !!this.anim);
+    // (The columns' paths made again a few a frame while the view moves, all at once at rest: ToLaD#313. Once it holds
+    // still, the paths drawn that were chosen for another view are made again for this one, a budget a frame, ToLaD#591.)
+    const moving = this.gesturing || !!this.anim;
+    const c = this.cam;
+    const L = this.stillCam;
+    const held = !moving && L[0] === c.cx && L[1] === c.cy && L[2] === c.sx && L[3] === c.sy && L[4] === this.w && L[5] === this.h;
     this.applyFold();
+    // (Still: the camera as last frame's and the fold at rest, its frames on its fine grid.)
+    const still = held && !this.foldMoving;
+    pathFrame.start(moving, still);
     this.chainFrame();
     const ctx = this.ctx;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
@@ -3206,9 +3213,35 @@ export class FanView implements InputHandlers {
       this.gl.end(this.stageW, this.h, this.dpr);
     }
     this.trimModels();
+    this.settleNext(moving, still);
     this.frameMs.push(performance.now() - t0);
     if (this.frameMs.length > 600) this.frameMs.shift();
     if (this.frameMs.length <= 2) stamp(this.frameMs.length === 1 ? 'first' : 'second');
+  }
+
+  /** The camera of the last frame drawn (draw: whether the view holds still), and w, h. */
+  private readonly stillCam = [NaN, NaN, NaN, NaN, NaN, NaN];
+  /** Whether frames are asked for while paths drawn are still chosen for another view (ColumnPath's settle), and one was asked for by a frame that did not hold still. */
+  settling = false;
+  private settleAsked = false;
+  /**
+   * After a frame (ToLaD#591): while a path it drew is still chosen for another view, another frame. One that held still
+   * made some of them again (its budget's worth), so each such frame gets nearer, and the next holds still too unless
+   * the view moves. One that did not hold still asks for one frame, the first still one; never two in a row, so a view
+   * that moves by a hair every frame asks for none past it.
+   */
+  private settleNext(moving: boolean, still: boolean): void {
+    const c = this.cam;
+    const L = this.stillCam;
+    L[0] = c.cx;
+    L[1] = c.cy;
+    L[2] = c.sx;
+    L[3] = c.sy;
+    L[4] = this.w;
+    L[5] = this.h;
+    this.settling = !moving && pathFrame.inexact > 0 && (still ? pathFrame.settled > 0 : !this.settleAsked);
+    this.settleAsked = this.settling && !still;
+    if (this.settling) this.request();
   }
 
   /**
