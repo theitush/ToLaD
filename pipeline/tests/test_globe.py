@@ -299,7 +299,7 @@ class KnownReptileRanges(unittest.TestCase):
         self.assertTrue(self.at("Varanus komodoensis", -8.6, 119.5, pad=1))     # Komodo
         self.assertLessEqual(sum(self.r["Varanus komodoensis"][0][1::2]), 6)
         self.assertTrue(self.at("Aldabrachelys gigantea", -9.4, 46.4, pad=1))   # Aldabra
-        self.assertTrue(self.at("Sphenodon punctatus", -41.0, 174.0, pad=2))    # New Zealand's islands
+        self.assertTrue(self.at("Sphenodon punctatus", -36.0, 175.5, pad=1))    # New Zealand's northern islands
         self.assertNotIn("Lepidochelys olivacea", self.r)                       # GARD maps no sea turtle
 
 
