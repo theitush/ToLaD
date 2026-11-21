@@ -2114,17 +2114,21 @@ export class FanView implements InputHandlers {
     this.foldVer = f.ver;
     for (const m of this.models.values()) m.refold();
     if (!moved && f.ordShare.length) {
-      // (Only the grid changed (finer, at rest): the edges exact at once.)
+      // (Only the grid changed: finer at rest, the edges exact at once; or coarser on the frame after the fold moved. Then
+      // its rest frame, if already due (the timer fired while this frame was pending, its ask lost to it), is asked for
+      // now: a fold that stopped always comes to rest, never held on the coarse grid till the next touch, ToLaD#591.)
       for (const m of this.models.values()) m.foldRest();
+      if (this.foldMoving && this.foldRestT === undefined) this.request();
       return;
     }
     this.foldMoving = true;
     // (One frame more once it rests, FOLD_REST_MS on: the edges exact.)
     clearTimeout(this.foldRestT);
-    this.foldRestT = setTimeout(() => this.request(), FOLD_REST_MS);
+    this.foldRestT = setTimeout(() => ((this.foldRestT = undefined), this.request()), FOLD_REST_MS);
   }
   private foldMoving = false;
   private foldVer = -1;
+  /** The fold's rest frame's timer (applyFold), undefined once it has fired. */
   private foldRestT: ReturnType<typeof setTimeout> | undefined;
 
   model(b: FanBranch): TwigModel {
