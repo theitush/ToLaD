@@ -4857,11 +4857,11 @@ export class FanView implements InputHandlers {
     const forks = sf instanceof Steady && forkMode() !== 'peel';
     if (forks) sf.strandForks(b.index, this.cam.sx, this.cam.sy, sTop, sBot, this.forkCuts);
     // (Its reach taken stretch by stretch (ToLaD#591): a path that steps across the screen at a split, from one side to the
-    // other, meets it nowhere. Its lanes reach its widest past its edge, a dashed line its column's centre.)
+    // other, meets it nowhere. The window is offSide's (and drawStrands' lod.see), widened by its lanes' reach past its
+    // edge, its widest, and a dashed line's from its column's centre.)
     if (sf instanceof Steady) {
-      const r = Math.max(b.baseW, b.width) + this.dashReach(b) + 12 / this.cam.sx;
-      const xm = this.w / 2 / this.cam.sx + r;
-      if (!sf.meets(b.index, sTop, sBot, this.cam.cx - xm, this.cam.cx + xm, forks ? this.forkCuts : NO_CUTS)) return;
+      const r = xm + Math.max(b.baseW, b.width) + this.dashReach(b);
+      if (!sf.meets(b.index, sTop, sBot, this.cam.cx - r, this.cam.cx + r, forks ? this.forkCuts : NO_CUTS)) return;
     }
     const hw = b.width / 2;
     let pts = this.lanePoints(b, hw);
