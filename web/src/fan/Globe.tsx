@@ -5,11 +5,15 @@
 // was split from, the same way, its credit saying so (ToLaD#486). A species PHYLACINE has no map of gets the Wikimedia map
 // (ToLaD#196), and so does every card when the drawing code or globe.json cannot load (the artifact link, no network).
 // With neither, or the map failing, the globe bare, captioned 'Range not known' (ToLaD#492), and so for a species PHYLACINE
-// lists with no cells to draw (ToLaD#507: its present-natural map a placeholder).
+// lists with no cells to draw (ToLaD#507: its present-natural map a placeholder). A reptile (ToLaD#601, the amniotes' page)
+// draws GARD 1.7's map of where it lives today, green alone: no map of its range without people exists, so nothing is
+// grey. Its cells are a file of their own (globe-reptiles.json), fetched the first time a card's species has none in
+// globe.json, so a mammal's card never waits on them.
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { GlobeData, SpeciesRange } from './globe-data';
 import { Alone, useAlone } from './Alone';
+import { treeName, type TreeName } from './mammals-data';
 
 // The drawing and the data (globe-draw.ts with d3-geo, ~25 kB; globe.json) load when a card first shows a range.
 type Draw = typeof import('./globe-draw');
@@ -112,9 +116,11 @@ function GlobeCanvas({ m, d, r, onTap, start, onTurn }: { m: Draw; d: GlobeData;
  * what to show if it fails; with no fallback, that: the bare globe saying the range is not known (ToLaD#492), in the same
  * box, so the card moves nothing from open to loaded and every card has a range box.
  */
-export function RangeGlobe({ sci, fallback }: { sci: string; fallback?: (none: ReactNode) => ReactNode }) {
+export function RangeGlobe({ sci, fallback, tree = treeName }: { sci: string; fallback?: (none: ReactNode) => ReactNode; tree?: TreeName }) {
   const [m, setM] = useState<Draw | null | 'failed'>(draw);
   const [alone, show, close] = useAlone();
+  // The reptiles' cells (ToLaD#601), asked for on the amniotes' page when globe.json has no range for the species.
+  const [more, setMore] = useState<'in' | 'failed' | null>(null);
   // (The card's globe as turned: the one alone starts there.)
   const turned = useRef<Rot | null>(null);
   useEffect(() => {
@@ -131,14 +137,31 @@ export function RangeGlobe({ sci, fallback }: { sci: string; fallback?: (none: R
   const ok = m && m !== 'failed' ? m : null;
   const d = ok?.globeData() ?? null;
   const r = useRangeOf(sci, ok, d);
+  const asking = !!ok && !!d && !r && tree === 'amniotes' && !ok.reptilesIn() && more !== 'failed';
+  useEffect(() => {
+    if (!asking || !ok) return;
+    let live = true;
+    ok.loadReptiles().then(
+      () => live && setMore('in'),
+      () => live && setMore('failed'),
+    );
+    return () => {
+      live = false;
+    };
+  }, [asking, ok]);
   // PHYLACINE lists the species but draws no range for it: no current map, and a present-natural map that is a
   // placeholder, not a range (ToLaD#507). Not known, whatever map Wikimedia has (Oryzomys curasoae's is the genus's).
   if (ok && r && !r.cur && !r.lost) return <NoRange m={ok} d={d} />;
-  if (m === 'failed' || (ok && !r)) {
+  if (m === 'failed' || (ok && !r && !asking)) {
     const none = <NoRange m={ok} d={d} />;
     return <>{fallback ? fallback(none) : none}</>;
   }
-  const credit = (
+  const credit = r?.today ? (
+    // GARD 1.7 (Roll et al. 2017, Caetano et al. 2022): where it lives today, nothing drawn lost.
+    <a href="https://doi.org/10.1038/s41559-017-0332-2" target="_blank" rel="noopener">
+      Range today · GARD{'\u00a0'}1.7
+    </a>
+  ) : (
     <a href="https://doi.org/10.1002/ecy.2443" target="_blank" rel="noopener">
       {r?.from ? (
         <>
@@ -150,7 +173,7 @@ export function RangeGlobe({ sci, fallback }: { sci: string; fallback?: (none: R
     </a>
   );
   return (
-    <figure className={`globe${ok ? '' : ' loading'}`}>
+    <figure className={`globe${ok && r ? '' : ' loading'}`}>
       {ok && d && r ? <GlobeCanvas key={sci} m={ok} d={d} r={r} onTap={show} onTurn={(x) => (turned.current = x)} /> : <div className="disc" />}
       {credit}
       {alone && ok && d && r && (

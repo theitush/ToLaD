@@ -57,6 +57,7 @@ export const SOURCES: readonly Source[] = [
   { name: 'Squamate timetree', by: 'Title et al.', when: '2024', use: 'lizard and snake split dates', url: 'https://doi.org/10.5061/dryad.p5hqbzkvb' },
   { name: 'Turtle & crocodilian trees', by: 'Colston et al.', when: '2020', use: 'their split dates', url: 'https://doi.org/10.5281/zenodo.4986456' },
   { name: 'Reptile counts', use: 'sea turtles, crocodilians, …; each card names its own', url: `${REPO}/pipeline/reptile_counts.toml` },
+  { name: 'GARD', by: 'Roll et al.; Caetano et al.', when: '1.7, 2022', use: 'reptile range maps', url: 'https://doi.org/10.1038/s41559-017-0332-2' },
   { name: 'TimeTree 5', by: 'Kumar et al.', when: '2022', use: 'five deep amniote splits', url: 'https://doi.org/10.1093/molbev/msac174' },
 ];
 

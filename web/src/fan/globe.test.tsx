@@ -9,11 +9,12 @@ import { Alone, AloneView } from './Alone';
 import { loadGlobeCode, RangeGlobe } from './Globe';
 import { hookHarness } from './hookharness';
 import { drawGlobe, GLOBE_COLORS } from './globe-draw';
-import { globeData, loadGlobe, speciesRange, unpackRuns, type GlobeData } from './globe-data';
+import { globeData, loadGlobe, loadReptiles, reptilesIn, speciesRange, unpackRuns, type GlobeData } from './globe-data';
 import { FELIDAE } from './panthera';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const DATA = resolve(here, '..', '..', '..', 'data', 'mammals');
+const AMNIOTES = resolve(here, '..', '..', '..', 'data', 'amniotes');
 
 // What vite.config.ts globeJson() serves as globe.json.
 beforeAll(async () => {
@@ -62,7 +63,7 @@ describe('range globe data (ToLaD#267)', () => {
     expect(r.cur).toBe(496);
     const raw = globeData()!.ranges['Panthera leo'];
     const cur = new Set(unpackRuns(raw[0]));
-    expect(r.lost).toBe(unpackRuns(raw[1]).filter((i) => !cur.has(i)).length);
+    expect(r.lost).toBe(unpackRuns(raw[1]!).filter((i) => !cur.has(i)).length);
     expect(r.lost).toBeGreaterThan(2000);
     expect(r.centre[0]).toBeGreaterThan(0);
     expect(r.centre[0]).toBeLessThan(60);
@@ -189,5 +190,53 @@ describe('range globe in the card (ToLaD#267)', () => {
     const cats = FELIDAE.species.filter((s) => !MDD_CATS.includes(s.sci));
     const n = cats.filter((s) => speciesRange(s.sci)).length;
     expect(n).toBeGreaterThan(cats.length * 0.9);
+  });
+});
+
+describe('the reptiles: GARD 1.7, today only (ToLaD#601)', () => {
+  const w = {
+    range: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/M.svg/500px-M.svg.png',
+    rangeFile: 'https://commons.wikimedia.org/wiki/File:M.svg',
+  };
+  const croc = 'Crocodylus niloticus';
+
+  it("not in globe.json: the mammals' page falls back as before; the amniotes' asks for the reptiles' file, its disc loading", () => {
+    expect(reptilesIn()).toBe(false);
+    expect(speciesRange(croc)).toBeNull();
+    const fb = renderToStaticMarkup(<RangeGlobe sci={croc} tree="mammals" fallback={(none) => <RangeMap w={w} none={none} />} />);
+    expect(fb).toContain('class="range loading"');
+    const amn = renderToStaticMarkup(<RangeGlobe sci={croc} tree="amniotes" fallback={(none) => <RangeMap w={w} none={none} />} />);
+    expect(amn).toMatch(/^<figure class="globe loading"><div class="disc"><\/div>/);
+    expect(amn).not.toContain('class="range');
+  });
+
+  it("once in: a reptile's range is today's alone, drawn green with nothing grey, its credit GARD's", async () => {
+    const lion = speciesRange('Panthera leo');
+    const lionCells = globeData()!.ranges['Panthera leo'];
+    await loadReptiles(async () => ({ ranges: JSON.parse(readFileSync(join(AMNIOTES, 'ranges.json'), 'utf8')).ranges }));
+    expect(reptilesIn()).toBe(true);
+    // The mammals' ranges as they were.
+    expect(globeData()!.ranges['Panthera leo']).toBe(lionCells);
+    expect(speciesRange('Panthera leo')).toEqual(lion);
+    const raw = globeData()!.ranges[croc];
+    expect(raw).toHaveLength(1);
+    const r = speciesRange(croc)!;
+    expect(r.today).toBe(true);
+    expect(r.lost).toBe(0);
+    expect(r.cur).toBe(unpackRuns(raw[0]).length);
+    expect(r.cur).toBeGreaterThan(1000);
+    expect(r.centre[0]).toBeGreaterThan(0); // Africa
+    expect(r.centre[0]).toBeLessThan(50);
+    const { ctx, fills } = recorder();
+    drawGlobe(ctx, globeData()!, r, 240, r.centre);
+    expect(fills.map((f) => f.color)).toEqual([GLOBE_COLORS.ocean, GLOBE_COLORS.land, GLOBE_COLORS.cur]);
+    const html = renderToStaticMarkup(<RangeGlobe sci={croc} tree="amniotes" fallback={(none) => <RangeMap w={w} none={none} />} />);
+    expect(html).toMatch(/^<figure class="globe"><canvas><\/canvas><a href="https:\/\/doi.org\/10.1038\/s41559-017-0332-2"[^>]*>Range today · GARD\u00a01.7<\/a><\/figure>$/);
+    // A mammal's card on the amniotes' page: PHYLACINE's, as on the mammals'.
+    expect(renderToStaticMarkup(<RangeGlobe sci="Panthera leo" tree="amniotes" />)).toBe(renderToStaticMarkup(<RangeGlobe sci="Panthera leo" />));
+    // A species neither maps (a bird, a sea turtle) falls back once the file is in.
+    const turtle = renderToStaticMarkup(<RangeGlobe sci="Lepidochelys olivacea" tree="amniotes" fallback={(none) => <RangeMap w={w} none={none} />} />);
+    expect(turtle).toContain('class="range loading"');
+    for (const sci of ['Aldabrachelys gigantea', 'Varanus komodoensis', 'Sphenodon punctatus']) expect(speciesRange(sci)?.today, sci).toBe(true);
   });
 });

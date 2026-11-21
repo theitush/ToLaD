@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { createServer, defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { packMammals, treeFiles, TREES, type MammalCardFile, type MammalFile, type TreeName } from './src/fan/mammals-data';
-import { GLOBE_FILE } from './src/fan/globe-data';
+import { GLOBE_FILE, REPTILES_FILE } from './src/fan/globe-data';
 import { loadAll, loadClade, trimToFan, type Fossils } from './src/fan/panthera-extract';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -84,6 +84,11 @@ function pantheraData(): Plugin {
         res.setHeader('Content-Type', 'application/json');
         res.end(globeJson());
       });
+      // The reptiles' cells (ToLaD#601), fetched on the amniotes' page when a card's species has none in globe.json.
+      server.middlewares.use('/' + REPTILES_FILE, (_req, res) => {
+        res.setHeader('Content-Type', 'application/json');
+        res.end(reptilesJson());
+      });
     },
     async generateBundle() {
       for (const tree of TREES)
@@ -94,6 +99,7 @@ function pantheraData(): Plugin {
           this.emitFile({ type: 'asset', fileName: name.card, source: JSON.stringify(f.card) });
         }
       this.emitFile({ type: 'asset', fileName: GLOBE_FILE, source: globeJson() });
+      this.emitFile({ type: 'asset', fileName: REPTILES_FILE, source: reptilesJson() });
     },
   };
 }
@@ -151,6 +157,21 @@ function globeJson(): string {
   const r = existsSync(p) ? (JSON.parse(readFileSync(p, 'utf8')) as { grid: unknown; ranges: unknown }) : { grid: null, ranges: {} };
   const land = JSON.parse(readFileSync(resolve(here, 'src', 'fan', 'globe-land.json'), 'utf8')) as unknown;
   return JSON.stringify({ grid: r.grid, land, ranges: r.ranges });
+}
+
+/**
+ * globe-reptiles.json (ToLaD#601): data/amniotes/ranges.json's ranges alone (pipeline `make globe-amniotes`: GARD 1.7's
+ * reptiles, each `[current]`, today's range only), on globe.json's grid (checked: a different grid is an error). Without
+ * the file, no ranges: a reptile's card falls back to the Wikimedia map.
+ */
+function reptilesJson(): string {
+  const p = join(dataOf('amniotes'), 'ranges.json');
+  if (!existsSync(p)) return JSON.stringify({ ranges: {} });
+  const r = JSON.parse(readFileSync(p, 'utf8')) as { grid: unknown; ranges: unknown };
+  const m = join(DATA, 'ranges.json');
+  if (existsSync(m) && JSON.stringify((JSON.parse(readFileSync(m, 'utf8')) as { grid: unknown }).grid) !== JSON.stringify(r.grid))
+    throw new Error(`${p}: its grid is not data/mammals/ranges.json's`);
+  return JSON.stringify({ ranges: r.ranges });
 }
 
 /**

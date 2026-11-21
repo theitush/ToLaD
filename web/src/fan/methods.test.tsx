@@ -21,6 +21,8 @@ describe('"How we count" (ToLaD#508)', () => {
     expect(html).toContain('data-maps=""');
     expect(html.match(/<figcaption>/g)).toHaveLength(2);
     expect(html).toContain('Without people');
+    // ToLaD#601: a reptile's globe, today's map alone.
+    expect(html).toMatch(/data-range-word="">[^<]*green where the species lives today[\s\S]*GARD 1\.7[\s\S]*none of it is grey/);
     for (const g of ['counted', 'estimated', 'rough', 'guess']) expect(html).toContain(g);
     // Plain words: none of the jargon the brief rules out.
     for (const w of ['dex', 'occupancy', 'present-natural']) expect(html.toLowerCase()).not.toContain(w);

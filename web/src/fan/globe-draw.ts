@@ -6,7 +6,7 @@ import { geoGraticule10, geoOrthographic, geoPath, type GeoPermissibleObjects } 
 import type { MultiPolygon } from 'geojson';
 import { landShape, type GlobeData, type SpeciesRange } from './globe-data';
 
-export { globeData, loadGlobe, speciesRange } from './globe-data';
+export { globeData, loadGlobe, loadReptiles, reptilesIn, speciesRange } from './globe-data';
 
 export const GLOBE_COLORS = {
   ocean: '#0b1a24',
@@ -50,6 +50,7 @@ export function drawGlobe(ctx: CanvasRenderingContext2D, d: GlobeData, r: Specie
   ctx.stroke();
   const ls = landOf(d);
   fill(ls, GLOBE_COLORS.land);
+  // (A range of today alone, GARD's reptiles: none lost, nothing grey, ToLaD#601.)
   if (r.lost) fill(r.lostShape, GLOBE_COLORS.lost);
   if (r.cur) fill(r.curShape, GLOBE_COLORS.cur);
   ctx.beginPath();
