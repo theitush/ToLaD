@@ -307,8 +307,8 @@ export function MethodsView({ onClose, at }: { onClose: () => void; at?: string 
               otter’s fur trade from 1741).
             </li>
             <li>
-              <b>Since 1500:</b> IUCN maps the lost part as Extinct or Possibly Extinct, or a historic range from written
-              records (Hall 1981, Ray et al. 2005).
+              <b>Since 1500:</b> IUCN’s maps code the lost part Extinct or Possibly Extinct (IUCN 2026), or a historic range
+              from written records (Hall 1981, Ray et al. 2005).
             </li>
             <li>
               <b>Before 1500:</b> a part lost long before (the dhole’s North America, the Tasmanian devil’s mainland) is left

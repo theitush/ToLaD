@@ -1,14 +1,17 @@
 """Date the range losses of the 682 species the tree draws falling since 1500 (ToLaD#515).
 
-Inputs (from lost_cells.py and hyde_fetch.py): lost_cells.json and hyde_on_phylacine.npz.
-Output: research/range-loss-dates.csv, one row per species, and a summary on stdout.
+Inputs (from lost_cells.py, hyde_fetch.py and iucn_codes.py): lost_cells.json, hyde_on_phylacine.npz and, optional,
+iucn_codes.json. Output: research/range-loss-dates.csv, one row per species, and a summary on stdout.
 
-Every date here comes from a cited source; nothing is fitted. Three kinds of evidence:
+Every date here comes from a cited source; nothing is fitted. Four kinds of evidence:
   1. PHYLACINE's own note (Spatial_metadata.csv) and what its cited source covers;
   2. for islands, the archaeological date of people's first arrival: a bound, not a date;
-  3. HYDE 3.2.1 land use over the lost cells: an inference ("lost when converted"), kept in its
+  3. (ToLaD#594) IUCN 2026's range maps: the lost cells coded Possibly Extinct or Extinct were lost after 1500, by
+     the species' assessment (iucn_*; the rule is in apply_iucn);
+  4. HYDE 3.2.1 land use over the lost cells: an inference ("lost when converted"), kept in its
      own columns (hyde_*) and never written into earliest_year/latest_year.
-Run from pipeline/: `uv run python ../research/range-loss-dates/build_dates.py LOST.json HYDE.npz OUT.csv`.
+Run from pipeline/: `uv run python ../research/range-loss-dates/build_dates.py LOST.json HYDE.npz OUT.csv [IUCN.json]`.
+HYDE.npz `-` keeps the hyde_* columns OUT.csv already has (the HYDE slices are a ~10 min fetch).
 """
 import csv
 import json
@@ -18,6 +21,17 @@ import sys
 import numpy as np
 
 MAP_YEAR = 2016  # PHYLACINE 1.2's current ranges are IUCN 2016-3: a loss in them happened by then
+# ToLaD#594: the evidence that covers at least half a species' lost cells dates it, as an island does (step 4 below)
+HALF = 0.5
+IUCN_SOURCE = "IUCN 2026 range map, presence codes 4-5"
+IUCN_CITE = ("IUCN 2026, The IUCN Red List of Threatened Species: range maps (search download, requested 2026-11-17): "
+             "lost cells coded Possibly Extinct (4) or Extinct (5), which mean known or thought very likely to occur "
+             "post-1500 and now gone (IUCN Mapping attribute codes v1.19, 2021); lost by the year of the species' "
+             "assessment")
+IUCN_COLS = ["iucn_name", "iucn_match", "iucn_assessed", "iucn_share", "iucn_extant_share", "iucn_ex_countries",
+             "iucn_pe_countries"]
+HYDE_COLS = ["hyde_q25", "hyde_q50", "hyde_q75", "hyde_conv_1500", "hyde_conv_2017", "hyde_used_2017",
+             "hyde_conv_cur_2017"]
 
 # ---------------------------------------------------------------- regions (lost-cell centres)
 
@@ -281,11 +295,35 @@ def classify(b, s):
     return "none"
 
 
-def main(lost_json, hyde_npz, out_csv):
+def apply_iucn(basis, e, l, share, dated, lost, iu):
+    """ToLaD#594: IUCN 2026's Possibly Extinct / Extinct codes on a species' lost cells. They mean lost after 1500, by
+    the assessment's year: the rule that dates PHYLACINE's 78 certainty-0 species (their 2016-3 maps), on the 2026 maps.
+    `dated`: the lost cells the basis's evidence dates after 1500 (a mask; None: not known which). Returns (basis, e, l,
+    share, source, cite, conf), source None for the basis's own. A documented later start and a prehistoric part stay
+    as they are; so does a historic source bounded by 1500, its dated share now the cells it or the codes cover."""
+    coded = np.isin(lost, iu.get("coded", []))
+    ish = float(coded.mean()) if len(lost) else 0.0
+    later = e is not None and e > 1500
+    if basis == "iucn_codes":
+        if ish >= HALF:  # the 2026 maps still code the loss: they date it, by the 2026 assessment
+            return basis, 1500, iu["assessed"], ish, IUCN_SOURCE, IUCN_CITE, "high"
+        return basis, e, l, share, None, None, None  # the 2016-3 maps did; the 2026 ones no longer do
+    if basis in ("island", "none", "fossil") and not later and ish >= HALF:
+        return "iucn_codes", 1500, iu["assessed"], ish, IUCN_SOURCE, IUCN_CITE, "high"
+    if basis == "historic" and not later and dated is not None:
+        share = float((dated | coded).mean())
+    elif basis in ("none", "fossil") and e is None and l is None:
+        share = ish or 0  # undated: the codes date less than half of it
+    return basis, e, l, share, None, None, None
+
+
+def main(lost_json, hyde_npz, out_csv, iucn_json=None):
     d = json.load(open(lost_json))
     lons, lats = np.array(d["lons"]), np.array(d["lats"])
-    h = dict(np.load(hyde_npz))  # decompress every array once
-    slices = [str(x) for x in h["slices"]]
+    h = dict(np.load(hyde_npz)) if hyde_npz != "-" else None  # decompress every array once
+    prev = {r["binomial"]: r for r in csv.DictReader(open(out_csv))} if h is None else {}
+    iucn = json.load(open(iucn_json)) if iucn_json else {}
+    slices = [str(x) for x in h["slices"]] if h else []
     years = [slice_year(x) for x in slices]
     rows = []
     for b, s in d["species"].items():
@@ -295,14 +333,14 @@ def main(lost_json, hyde_npz, out_csv):
         t = s["modification"] + " || " + s["motivation"]
         basis = classify(b, s)
         e = l = None
-        conf, cite, source, region, share = "", "", "", None, 0.0
+        conf, cite, source, region, share, dated = "", "", "", None, 0.0, None
         if basis == "iucn_codes":
             e, l, conf = 1500, MAP_YEAR, "high"
             source = "IUCN 2016-3 range map, presence codes 4-5"
             cite = ("Faurby et al. 2018 Ecology 99:2626 (PHYLACINE adds IUCN's Extinct and Possibly Extinct polygons "
                     "to the present-natural range); IUCN Mapping attribute codes v1.19 (2021): Possibly Extinct (4) "
                     "and Extinct (5) mean known or thought very likely to occur post-1500 and now gone")
-            share = 1.0
+            share, dated = 1.0, np.ones(len(lost), bool)
         elif b in NAMED:
             e, l, region, conf, _, cite = NAMED[b]
             source = cite if len(cite) <= 90 else cite[:87] + "..."
@@ -341,16 +379,35 @@ def main(lost_json, hyde_npz, out_csv):
                 m = [(110 <= lo <= 156 and -39.5 <= la <= -9) for lo, la in zip(clon, clat)]
             else:
                 m = [in_region(region, lo, la) for lo, la in zip(clon, clat)]
-            share = float(np.mean(m))
+            share, dated = float(np.mean(m)), np.array(m)
             if basis == "historic" and b not in NAMED and s["certainty"][:1] == "5" and not region:
-                share = None  # only a named part of the added range is historic: its share is not known
-        hc = hyde_curve(h, lost, years, slices)
-        cc = hyde_curve(h, cur, years, slices) if len(cur) else None
+                share, dated = None, None  # only a named part of the added range is historic: its share is not known
+        if not (e is not None or l is not None):
+            share = 0
+        iu = iucn.get(b)
+        if iu and iu["how"] != "no match":
+            basis, e, l, share, src26, cite26, conf26 = apply_iucn(basis, e, l, share, dated, lost, iu)
+            if src26:
+                source, cite, conf = src26, cite26, conf26
         row = {"binomial": b, "iucn": s["iucn"], "order": s["order"], "lost_cells": len(lost),
                "earliest_year": "" if e is None else e, "latest_year": "" if l is None else l,
-               "basis": basis, "dated_share": ("" if share is None else round(share, 2)) if (e is not None or l is not None) else 0,
+               "basis": basis, "dated_share": "" if share is None else round(share, 2),
                "source": source, "citation": cite, "confidence": conf,
                "phylacine_certainty": s["certainty"][:2], "phylacine_note": re.sub(r"\s+", " ", t)[:300]}
+        if iu:
+            row.update(iucn_name=iu["name"], iucn_match=iu["how"])
+            if iu["how"] != "no match":
+                row.update(iucn_assessed=iu["assessed"],
+                           iucn_share=round(float(np.isin(lost, iu["coded"]).mean()), 2),
+                           iucn_extant_share=round(float(np.isin(lost, iu["extant"]).mean()), 2),
+                           iucn_ex_countries="; ".join(iu["ex_countries"]),
+                           iucn_pe_countries="; ".join(iu["pe_countries"]))
+        if h is None:
+            row.update({k: prev[b][k] for k in HYDE_COLS})
+            hc = None
+        else:
+            hc = hyde_curve(h, lost, years, slices)
+            cc = hyde_curve(h, cur, years, slices) if len(cur) else None
         if hc:
             conv, used = hc
             row.update(hyde_q25=q_year(conv, years, 0.25), hyde_q50=q_year(conv, years, 0.5),
@@ -359,9 +416,9 @@ def main(lost_json, hyde_npz, out_csv):
                        hyde_used_2017=round(float(used[-1]), 3),
                        hyde_conv_cur_2017=round(float(cc[0][-1]), 3) if cc else "")
         rows.append(row)
-    cols = ["binomial", "earliest_year", "latest_year", "basis", "source", "citation", "confidence", "dated_share",
-            "iucn", "order", "lost_cells", "phylacine_certainty", "hyde_q25", "hyde_q50", "hyde_q75",
-            "hyde_conv_1500", "hyde_conv_2017", "hyde_used_2017", "hyde_conv_cur_2017", "phylacine_note"]
+    cols = (["binomial", "earliest_year", "latest_year", "basis", "source", "citation", "confidence", "dated_share",
+             "iucn", "order", "lost_cells", "phylacine_certainty"] + HYDE_COLS + (IUCN_COLS if iucn else [])
+            + ["phylacine_note"])
     with open(out_csv, "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=cols, extrasaction="ignore")
         w.writeheader()
@@ -374,4 +431,4 @@ def main(lost_json, hyde_npz, out_csv):
 
 
 if __name__ == "__main__":
-    main(*sys.argv[1:4])
+    main(*sys.argv[1:5])

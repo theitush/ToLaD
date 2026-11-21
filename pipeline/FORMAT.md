@@ -182,16 +182,17 @@ always today's count. Report: `stats.json` → `natural_baseline` and `phylacine
 
 ToLaD#507. For the living species whose present-natural map PHYLACINE's note puts down to people
 (`pipeline/phylacine_notes.csv` class `people`) and which `pipeline/range_loss_dates.csv` dates (682 rows; a
-copy of `research/range-loss-dates.csv`, ToLaD#515, where each species was classed by its PHYLACINE note),
-`tolad_pipeline/lossdates.py` gives one **basis**. Every year comes from a cited source; nothing is modelled.
+copy of `research/range-loss-dates.csv`, ToLaD#515, where each species was classed by its PHYLACINE note, and
+ToLaD#594, where IUCN 2026's range maps were read on each species' lost cells), `tolad_pipeline/lossdates.py` gives
+one **basis**. Every year comes from a cited source; nothing is modelled.
 
 | code | basis | drawing | species |
 |---|---|---|---|
 | 0 | `later` | the natural level is held to the documented start of the loss (Strahan & Van Dyck's Australia 1788, the sea otter's fur trade 1741, the chinchillas' 1828, the Cape mountain zebra 1652, Rodrigues settled 1691, ...), then the same log-linear fall runs from that year to today's count: same shape, same end | 77 |
-| 1 | `dated` | unchanged, 1500 → today: IUCN's Extinct / Possibly Extinct codes (78), historic-range sources bounded by 1500 (86: Hall 1981, Ray et al. 2005, ...), three with only an end year (European bison 1927, Père David's deer ~1900, the Atlantic grey whale ~1750) | 167 |
+| 1 | `dated` | unchanged, 1500 → today: IUCN's Extinct / Possibly Extinct codes (86: PHYLACINE's 78, whose maps add the coded polygons, and 8 more whose lost cells IUCN 2026's maps code at least half of, ToLaD#594; cited "IUCN 2026", by the year of the species' assessment, except 12 of the 78 the 2026 maps no longer code, which keep Faurby et al. 2018 and IUCN 2016-3), historic-range sources bounded by 1500 (86: Hall 1981, Ray et al. 2005, ...), three with only an end year (European bison 1927, Père David's deer ~1900, the Atlantic grey whale ~1750) | 175 |
 | 2 | `prehistoric` | the lost cells the evidence dates before 1500 (`lossdates.PREHISTORIC`, cell by cell from the rasters: the Tasmanian devil's mainland Australia, the harp seal's Baltic, the NZ sea lion's mainland New Zealand, the dhole's North America, the wild horse's Americas) are left out of `N_nat` and `km2_natural`; the rest is drawn as before | 5 |
-| 3 | `bound` | unchanged; the source gives only a lower bound: people's arrival on the island that holds most of the lost cells (247), or the Iron Age range the moose's map was taken from (Willms 1987: lost after it, which does not say which cells went before 1500) | 248 |
-| 4 | `undated` | unchanged; nothing dates the loss (181, and 4 maps built from fossils) | 185 |
+| 3 | `bound` | unchanged; the source gives only a lower bound: people's arrival on the island that holds most of the lost cells (244), or the Iron Age range the moose's map was taken from (Willms 1987: lost after it, which does not say which cells went before 1500) | 245 |
+| 4 | `undated` | unchanged; nothing dates the loss (176, and 4 maps built from fossils) | 180 |
 
 The counts are the CSV's; `stats.json` → `rangeloss.by_basis` gives them as built (`all`: living leaves that
 carry one; `trend`: those drawn with the range-loss trend; a species with a history file or with no fall left is

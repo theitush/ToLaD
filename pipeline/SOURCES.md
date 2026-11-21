@@ -144,13 +144,25 @@ For an extant species classed `taxonomy`, `mapping` or `placeholder`, the build 
 ## When each range was lost (ToLaD#507)
 
 [`range_loss_dates.csv`](range_loss_dates.csv) is this directory's copy of `research/range-loss-dates.csv` (ToLaD#515,
-commit d24d17b), columns `binomial, basis, earliest_year, latest_year, source, citation, confidence, dated_share`: the
+commit d24d17b; ToLaD#594 added IUCN 2026's codes), columns `binomial, basis, earliest_year, latest_year, source,
+citation, confidence, dated_share`: the
 682 living species drawn falling since 1500, each with what dates its loss and the citation. How each was classed is
 in `research/range-loss-dates.md`; rebuild it there, then copy the columns here. `tolad_pipeline/lossdates.py` reads
 it and gives each species one basis (`later`, `dated`, `prehistoric`, `bound`, `undated`; FORMAT.md, "Loss dates"):
 a documented start later than 1500 moves the start of the range-loss trend to it, and the lost cells the evidence
 dates before 1500 (`lossdates.PREHISTORIC`, by place) are left out of the level held to 1500. Every year is the
 source's; nothing is modelled.
+
+**IUCN 2026 range maps and country records (ToLaD#594).** IUCN 2026, *The IUCN Red List of Threatened Species*:
+the mammals' spatial data (`spatial_data.gpkg`, every range polygon with its presence code) and their assessment
+tables (`assessments.csv`, `countries.csv`, `synonyms.csv`), a search download Ita requested on 2026-11-17 under
+IUCN's Terms and Conditions of Use (non-commercial), in `data/raw/redlist/search-2026-11-17/` (`SOURCE.txt`; not
+fetched by the build, not in the lock: IUCN gives it only to an account, by request). Read only by
+`research/range-loss-dates/iucn_codes.py`: the lost cells a polygon coded Possibly Extinct (4) or Extinct (5)
+covers, on PHYLACINE's grid, date the loss to after 1500, by the year of the species' assessment. IUCN's terms forbid
+redistributing the range data, so only per-species figures are committed (the CSV's `iucn_*` columns, and the
+`dated` basis and "IUCN 2026" citation they give 8 more species and 66 of PHYLACINE's 78); no polygon and no cell
+list drawn from them.
 
 ## Field densities (ToLaD#507)
 

@@ -1,4 +1,4 @@
-# When did each species lose its range? (ToLaD#515)
+# When did each species lose its range? (ToLaD#515, #594)
 
 The tree draws 682 living species falling from 1500 to today, because PHYLACINE's map without people
 (present-natural) is bigger than today's map. Here is what dates each of those losses. Every date comes
@@ -7,23 +7,23 @@ not used for any date. Per species: [`range-loss-dates.csv`](range-loss-dates.cs
 
 | Evidence | Species | What it dates | How sure |
 |---|---:|---|---|
-| IUCN map codes the lost area *Extinct* or *Possibly Extinct* | **78** | lost between 1500 and 2016 | high: that is what the codes mean |
+| IUCN map codes the lost area *Extinct* or *Possibly Extinct* | **86** | lost between 1500 and the assessment (2008–2025). PHYLACINE's 78 (2016-3 maps; the 2026 maps still code 66 of them), and 8 more on IUCN's 2026 maps (#594, section 1b) | high: that is what the codes mean |
 | A named historic-range source | **165** | 62 Australian species: 1788–2008. 21 North American: 1500–1981 (American part). 4 snub-nosed monkeys: 1600–2002. 14 more start later than 1500 (fur trade 1741/1828, Cape 1652, mink 1800, Japanese otter 1868 …). The rest: 1500 to the source's year | medium (97), low (61), high (7) |
 | Dated before 1500 | **6** | Tasmanian devil, mainland: ~3,200 years ago. Baltic harp seal: mid-Holocene. NZ sea lion, mainland: 1280–1850. Moose: after the Iron Age. Dhole in North America and wild horse in the Americas: Late Pleistocene (that part only) | medium–high |
-| Island: lost after people arrived | **248** | a lower bound only. Madagascar 118: after ~10,500 BP (possible) or ~2,000 BP (certain). Cuba and Hispaniola 9: after ~3800 BCE. Jamaica: after 600 CE. Fiji, Tonga and New Caledonia 3: after ~1000 BCE. New Zealand 3: after 1280. Rodrigues: after 1691. 113 more are on islands people reached 11,000–61,000 years ago, which says little | a bound, not a date |
+| Island: lost after people arrived | **245** | a lower bound only. Madagascar 118: after ~10,500 BP (possible) or ~2,000 BP (certain). Cuba and Hispaniola 9: after ~3800 BCE. Jamaica: after 600 CE. Fiji, Tonga and New Caledonia 3: after ~1000 BCE. New Zealand 3: after 1280. Rodrigues: after 1691. 113 more are on islands people reached 11,000–61,000 years ago, which says little | a bound, not a date |
 | Map from fossils, no date | **4** | nothing | – |
-| **Nothing dates it** | **181** | 143 of them are "disjunct range connected"; 68 are Data Deficient | – |
+| **Nothing dates it** | **176** | 143 of them are "disjunct range connected"; 68 are Data Deficient. IUCN 2026 codes less than half the loss of 8 of them (section 1b) | – |
 | HYDE land use (inference, tested) | (621 computed) | gives 1900–1949 for most species, whatever their history. 14 of 19 documented windows hit, against 11.8 expected by chance. 0 of 3 prehistoric losses | weak: **not used** |
 
 **Against the tree's rule** (a steady fall from 1500), the 682 split like this:
 
-- **241:** the evidence agrees the loss came after 1500. For 77 of them it starts later than 1500,
-  mostly Australia's 1788.
+- **249:** the evidence agrees the loss came after 1500. For 77 of them it starts later than 1500,
+  mostly Australia's 1788. 8 of them are dated by IUCN 2026's maps (#594): 5 that nothing dated, 3 island bounds.
 - **3:** only an end date (European bison 1927, Père David's deer ~1900, Atlantic grey whale ~1750).
 - **6:** at least part of the loss is dated before 1500.
-- **247 island species:** people's arrival gives only a lower bound. In Madagascar, a loss before 1500
+- **244 island species:** people's arrival gives only a lower bound. In Madagascar, a loss before 1500
   is possible.
-- **185:** no evidence found here dates the loss.
+- **180:** no evidence found here dates the loss.
 
 ## How the 682 were classed
 
@@ -31,6 +31,8 @@ Each species is classed by its full PHYLACINE note (`Certainty.Level`, `Modifica
 `Data/Ranges/Spatial_metadata.csv`), in this order:
 
 1. **IUCN codes** (certainty 0, 78 species). The note reads "Added cells coded Extinct or Possibly Extinct by IUCN".
+   After step 5, IUCN 2026's own codes (section 1b) date 8 more: a species still `none`, `fossil` or island-bound whose
+   coded lost cells are at least half its lost cells, the same majority as step 4.
 2. **Historic source** (165 species). Certainty 2 ("range expansions based on other sources for species with known range
    declines"), or any note naming Strahan & Van Dyck, Hall or Ray et al. Also certainty 5 notes that add
    a historic part ("historically had the species", "formerly occurred").
@@ -38,7 +40,7 @@ Each species is classed by its full PHYLACINE note (`Certainty.Level`, `Modifica
 4. **Island.** Any species still undated whose lost cells lie at least half on an island in the arrival table below.
    This covers certainty 4 ("expansion to entire islands"), certainty 5 "inhabited island" notes, and the
    Madagascar lemurs and tenrecs whose notes only say "suitable areas for the genus".
-5. **None** (181 species): everything else.
+5. **None** (181 species): everything else. 5 of them are then dated by IUCN 2026 (section 1b): 176 stay.
 
 The rough pass in #507 counted 250 recorded-history notes, 129 islands, 2 fossil maps and 301 with no time.
 This pass reads every note, so the counts differ. Island dating now covers every species on a dated island,
@@ -64,9 +66,99 @@ Examples: marsh deer *Blastocerus dichotomus* (400 lost cells), Asiatic black be
 anteater *Myrmecophaga tridactyla* (97).
 
 **Every other species carries such polygons too.** The same metadata says the coded polygons are in every
-present-natural map. So part of the loss of many species in the other groups is also IUCN-coded post-1500,
-but without IUCN's polygons we cannot tell which cells. That is what the IUCN spatial download would give
-(see Downloads).
+present-natural map. So part of the loss of many species in the other groups is also IUCN-coded post-1500.
+Section 1b reads which cells, on IUCN's 2026 maps.
+
+## 1b. IUCN 2026's maps on all 682 (ToLaD#594)
+
+Ita's IUCN Red List search download (requested 2026-11-17, `data/raw/redlist/search-2026-11-17/`) has every
+mammal's 2026 range polygons with their presence codes, and the assessment tables: the year of each assessment, the
+presence per country, the synonyms. `range-loss-dates/iucn_codes.py` puts the polygons coded Possibly Extinct (4) or
+Extinct (5) onto each species' lost cells. It uses PHYLACINE's grid and PHYLACINE's own rule: "a cell was considered
+as occupied if any part of the cell was overlapping with the range polygon" (PHYLACINE 1.2 metadata). Only polygons of
+native or reintroduced origin count, as in PHYLACINE's current maps. The codes mean "lost after 1500", so a coded lost
+cell was lost between 1500 and the year of the species' assessment. `iucn_share` in the CSV is the coded share of the
+lost cells. `iucn_extant_share` is the share a 2026 polygon coded extant (1–3) touches.
+
+**The rule** is the one that dates the 78, applied to everyone, with step 4's majority:
+
+- A species that nothing dated (`none`, a fossil map) or that only an island bound dated is dated 1500 → assessment,
+  cited "IUCN 2026", when its coded cells are at least half its lost cells.
+- A documented later start (`later`) stays. So does a prehistoric part.
+- A historic source bounded by 1500 stays, and its `dated_share` becomes the cells it or the codes cover.
+- Below half, the basis stays. For an undated species `dated_share` is then the coded share.
+- Every year is the source's: the assessment's. Nothing is modelled, and there are no per-species exceptions.
+
+**Names.** 649 of the 682 are on the 2026 list under their PHYLACINE binomial. 26 more take a name the Red List
+lists as their synonym, by the rule of `amniotes.name_reptiles` (#592): the same species renamed (the epithet the
+same but for its Latin ending), no other PHYLACINE species, the only candidate. Examples: *Canis mesomelas* → *Lupulella
+mesomelas*, 5 *Chaerephon* → *Mops*, *Proteles cristata* → *cristatus*, *Piliocolobus waldronae* → *waldroni*. 7 stay
+unmatched, because the Red List folds them into another species or renames the epithet:
+
+| PHYLACINE | Red List 2026 | lost cells | basis |
+|---|---|---:|---|
+| *Capromys garridoi* | a synonym of *C. pilorides* | 1 | IUCN 2016-3 (one of the 78) |
+| *Sminthopsis aitkeni* | a synonym of *S. fuliginosa* | 1 | IUCN 2016-3 (one of the 78) |
+| *Crocidura zaitsevi* | a synonym of *C. kegoensis* | 6 | none |
+| *Microtus bavaricus* | a synonym of *M. liechtensteini* | 7 | none |
+| *Ovis orientalis* | not listed (the Red List has *O. gmelini*) | 68 | none |
+| *Pseudomys fieldi* | a synonym of *P. gouldii* | 167 | historic |
+| *Suncus madagascariensis* | a synonym of *S. etruscus* | 7 | island |
+
+**What the 2026 maps date:**
+
+| Group (before #594) | Species | Some lost cells coded | At least half coded | Becomes |
+|---|---:|---:|---:|---|
+| PHYLACINE's IUCN-coded 78 (2016-3 maps) | 78 | 67 | 66 | 66 cite IUCN 2026 and their assessment's year; 12 keep the 2016-3 citation |
+| Nothing dates it | 181 | 13 | 5 | 5 dated 1500 → assessment |
+| Island bound (incl. 3 fossil maps on islands) | 248 | 12 | 3 | 3 dated 1500 → assessment |
+| Fossil maps, no date | 4 | 0 | 0 | – |
+| Historic source | 165 | 22 | 13 | basis kept; `dated_share` up for 4 |
+| Prehistoric part | 6 | 0 | 0 | – |
+
+The 8 newly dated:
+
+| Species | Before | Coded share | Assessed | Countries IUCN lists as Possibly Extinct |
+|---|---|---:|---|---|
+| clouded leopard *Neofelis nebulosa* | none | 0.97 | 2020 | (Extinct: Taiwan) |
+| Asiatic golden cat *Catopuma temminckii* | none | 0.96 | 2023 | Viet Nam (Extinct: Singapore) |
+| *Chaerephon bregullae* (Fijian free-tailed bat) | Fiji/Tonga bound | 0.75 | 2018 | – |
+| northern white-cheeked gibbon *Nomascus leucogenys* | none | 0.70 | 2015 | China |
+| hog deer *Axis porcinus* | none | 0.65 | 2014 | China, Laos, Myanmar, Viet Nam |
+| bearded pig *Sus barbatus* | Philippines/Sulawesi/Sundaland bound | 0.58 | 2016 | Philippines (Extinct: Singapore) |
+| large-spotted civet *Viverra megaspila* | none | 0.56 | 2015 | China, Viet Nam |
+| Muennink's spiny rat *Tokudaia muenninki* | Ryukyus bound | 0.50 (1 of 2 cells) | 2015 | – |
+
+Below half, the basis stays. Among the undated are *Hapalomys longicaudatus* 0.47, the markhor 0.22, the
+hartebeest 0.13 and *Piliocolobus tephrosceles* 0.10. The highest island shares left are *Rusa marianna* 0.43,
+*Sus cebifrons* 0.29 and *Acerodon jubatus* 0.27.
+Historic sources whose dated share the codes raise: the cheetah 0.65 → 0.99, the wolf 0.57 → 0.78, the leopard 0.36 →
+0.66 and the brown bear 0.37 → 0.52. Three `later` species have coded cells that fit their later start: the
+European mink (0.98 coded; from 1800), *Bettongia tropica* (0.14) and *Phascogale pirata* (0.05).
+
+**The 78 on the 2026 maps.** For 66, the 2026 maps still code at least half the lost cells; for 65 of them, all of
+them. Their assessments run from 2008 to 2025, mostly 2016 (46) and 2015 (13). The other 12 keep PHYLACINE's citation
+(Faurby et al. 2018; IUCN 2016-3) and the 2016 bound:
+
+- now drawn extant on the 2026 maps (rediscovered or remapped): *Pteralopex taki*, *Pteropus niger*, *Pteropus
+  tuberculatus*, *Rhinolophus canuti*, *Wilfredomys oenax* (all their lost cells), *Ammospermophilus nelsoni* (half);
+- no 2026 polygon on the lost cells: *Pteropus melanotus*, *Rhinolophus pusillus*, *Scotophilus borbonicus* (one cell each);
+- coded, but less than half: *Cricetulus migratorius* (0.26, as *Nothocricetulus migratorius*);
+- not on the 2026 list (folded into another species): *Capromys garridoi*, *Sminthopsis aitkeni*.
+
+**Conflicts.** No coded cell falls in a part dated before 1500: the 6 prehistoric species have none. No coded cell
+contradicts a documented later start. What the 2026 maps do differently: for 39 species, a 2026 extant polygon touches
+at least half the lost cells. 5 of those are among the 78 (above); among the others are *Equus zebra* 0.79, *Sminthopsis
+gilberti* 0.76 and the greater one-horned rhino 0.57. Most have only a few lost cells at the edge of the current range,
+where the any-overlap rule turns a slightly wider 2026 polygon into a whole cell. This dates nothing and changes nothing
+here.
+
+**Countries.** IUCN lists 147 of the 682 as Extinct Post-1500 or Possibly Extinct in at least one country. The repo has
+no country boundaries, so these records are kept per species (`iucn_ex_countries`, `iucn_pe_countries`) as
+corroboration and are not put onto cells. For 25 undated species they are the only IUCN record of a post-1500 loss:
+the kulan (Extinct in 14 countries), the Eurasian beaver, the red fox, the addax, the gaur, the wild yak, the Barbary
+macaque, the chimpanzee, the pygmy hog and others. Their polygons code nothing. Country boundaries (for example
+Natural Earth, a few MB) would date the lost cells inside those countries. That is a next step, not done here.
 
 ## 2. Named historic-range sources: 165 species
 
@@ -189,7 +281,9 @@ The sources for each documented window are in `range-loss-dates/hyde_test.py`.
 So HYDE's dates (`hyde_q25`/`hyde_q50`/`hyde_q75` in the CSV) are kept for reference only. They are never
 written into `earliest_year`/`latest_year`.
 
-## What stays undated: 181 species, plus 4 fossil maps
+## What stays undated: 176 species, plus 4 fossil maps
+
+(181 before #594; IUCN 2026 dates 5 of them, section 1b. The counts below are the 181's.)
 
 - 143 are certainty 3, "disjunct range likely anthropogenic": PHYLACINE filled the gap between known
   localities ("Connected via suitable habitat", "Connected as a line"). 68 are Data Deficient. For
@@ -207,8 +301,8 @@ written into `earliest_year`/`latest_year`.
 | What | Size and time | Needs | Status |
 |---|---|---|---|
 | HYDE 3.2.1 baseline (DANS, doi:10.17026/dans-25g-gez3, CC0) | 5.34 GB zip. Only the members used were read, over HTTP range requests (~350 MB, ~10 min at ~6 MB/s) | nothing | **done** (`range-loss-dates/hyde_fetch.py`). HYDE 3.3 on yoda.uu.nl sits behind a bot wall (Anubis) that refuses scripts |
-| IUCN Red List API v4: assessments of the 682 (country presence including "Extinct Post-1500" and "Possibly Extinct"; range and threats text) | 682 × 2 small JSON calls, ~12 min | a free personal token: account at api.iucnredlist.org/users/sign_up | **Ita runs it**: `IUCN_REDLIST_KEY=… python3 research/range-loss-dates/iucn_api_fetch.py research/range-loss-dates.csv data/raw/redlist/api/` (resumable; just rerun). Without a token every call returns 403, including the docs, so the field names come from the client docs and must be checked on the first saved file |
-| IUCN spatial data, mammals (shapefile with `presence` 4/5 polygons, 2026 maps) | size shown only after login. At the ~6 MB/s measured here, even 5 GB is under 15 min | IUCN account, then a request form for non-commercial use at iucnredlist.org/resources/spatial-data-download, then a browser download | **Ita downloads it**. It is the one source that dates cells: every lost cell IUCN codes 4 or 5 is a post-1500 loss, for all 682 and not just the 78 |
+| IUCN Red List API v4: assessments of the 682 (country presence including "Extinct Post-1500" and "Possibly Extinct"; range and threats text) | 682 × 2 small JSON calls, ~12 min | a free personal token: account at api.iucnredlist.org/users/sign_up | **not needed**: the search download below has the same tables (`assessments.csv`, `countries.csv`). `range-loss-dates/iucn_api_fetch.py` is kept for a later refresh |
+| IUCN spatial data and assessment tables, mammals (a search download: `spatial_data.gpkg` with presence 1–7 polygons, 2026 maps; `assessments.csv`, `countries.csv`, `synonyms.csv`, …) | 1.47 GB + 21 MB zips; the GeoPackage unpacks to 2.07 GB | IUCN account, then a request form for non-commercial use, then a browser download | **done** (Ita, 2026-11-21; `data/raw/redlist/search-2026-11-17/`, section 1b). IUCN's terms forbid redistributing it: only per-species figures are committed |
 | Past-range maps of Pacifici et al. 2020 (Nat. Commun. 11:2840): 204 mammals, 1970s vs 2017 | small | check the paper's data availability | not fetched. It would date the post-1970 part for the species in both lists |
 | Ceballos, Ehrlich & Dirzo 2017 (PNAS 114:E6089): 177 mammals, ~1900 vs 2015 | small (supplement) | none | not fetched. It would date the post-1900 part |
 
@@ -232,16 +326,22 @@ There is no open mirror of IUCN's country or spatial data. The GBIF copy of the 
    control, and on historic losses they do little better than chance.
 6. **The next step that dates the most:** the IUCN spatial download (Ita, one browser session), then the
    API token (~12 min script). The polygons would turn part of many of the 181 undated losses into dated
-   post-1500 losses, and the range text often names a decade.
+   post-1500 losses, and the range text often names a decade. **Done in #594** (section 1b): the 2026 polygons
+   date 5 of the 181 and 3 of the 248 island bounds. The country records cover 25 more undated species but need
+   country boundaries to place. Years from the assessments' range text are a later step.
 
 ## Files
 
 - `range-loss-dates.csv`: one row per species. `earliest_year` and `latest_year` (negative = BCE; blank =
-  no bound), `basis`, `source`, `citation`, `confidence`, `dated_share`, PHYLACINE's note, and the HYDE
-  reference columns.
+  no bound), `basis`, `source`, `citation`, `confidence`, `dated_share`, PHYLACINE's note, the HYDE
+  reference columns, and IUCN 2026's (`iucn_name`, `iucn_match`, `iucn_assessed`, `iucn_share`, `iucn_extant_share`,
+  `iucn_ex_countries`, `iucn_pe_countries`; #594).
 - `range-loss-dates/lost_cells.py`: the 682 and their lost cells, from PHYLACINE 1.2.1.
 - `range-loss-dates/hyde_fetch.py` and `range-loss-dates/httpzip.py`: HYDE slices summed onto PHYLACINE's grid.
-- `range-loss-dates/build_dates.py`: the classing, the source and island tables, and the CSV.
+- `range-loss-dates/build_dates.py`: the classing, the source and island tables, IUCN 2026's rule (`apply_iucn`), and the CSV.
+- `range-loss-dates/iucn_codes.py`: IUCN 2026's coded and extant polygons on each species' lost cells, the names, the
+  assessment years and the country records (#594). Its output holds cell lists drawn from IUCN's polygons: it stays
+  out of the repo.
 - `range-loss-dates/hyde_test.py`: the 22-species test.
 - `range-loss-dates/iucn_api_fetch.py`: for Ita, with a token.
 
@@ -250,6 +350,10 @@ To rebuild from `pipeline/`:
 ```
 uv run --with zipfile-deflate64 python ../research/range-loss-dates/hyde_fetch.py H.npz
 uv run python ../research/range-loss-dates/lost_cells.py L.json
-uv run python ../research/range-loss-dates/build_dates.py L.json H.npz ../research/range-loss-dates.csv
+uv run --with shapely python ../research/range-loss-dates/iucn_codes.py L.json I.json
+uv run python ../research/range-loss-dates/build_dates.py L.json H.npz ../research/range-loss-dates.csv I.json
 uv run python ../research/range-loss-dates/hyde_test.py L.json H.npz
 ```
+
+`H.npz` given as `-` keeps the CSV's HYDE columns as they are. Then copy the first eight columns to
+`pipeline/range_loss_dates.csv`.
