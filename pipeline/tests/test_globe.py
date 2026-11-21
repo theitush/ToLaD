@@ -200,5 +200,108 @@ class CorrectedMaps(unittest.TestCase):
         self.assertNotIn("Alces alces", self.before)           # the moose: only a bound, no cells dated
 
 
+class ReptileCells(unittest.TestCase):
+    """ToLaD#601: GARD's polygons on the mammals' grid, by PHYLACINE's rule (a cell counts when any part of it overlaps
+    the polygon: an edge only touched is not in it)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.lat = globe.geodetic_row_edges()
+
+    def row(self, lat: float) -> int:
+        return int(np.flatnonzero((self.lat[:-1] > lat) & (self.lat[1:] <= lat))[0])
+
+    def test_edges(self):
+        lat = self.lat
+        self.assertEqual(len(lat), globe.ROWS + 1)
+        self.assertEqual(lat[0], 90.0)
+        self.assertTrue(all(a > b for a, b in zip(lat, lat[1:])))
+        # the geodetic latitudes; the page's (row_edges, asin(y / Y_TOP)) are within 0.25 deg of them (a fraction of a
+        # cell) south of 75 N (0.34 deg at the top row's edge)
+        off = np.abs(lat - np.array(globe.row_edges()))
+        self.assertLess(off[lat < 75].max(), 0.25)
+        self.assertLess(off.max(), 0.35)
+
+    def test_a_cell_counts_when_any_part_of_it_overlaps(self):
+        import shapely
+        r = self.row(10.5)
+        # a speck inside one cell: that cell
+        self.assertEqual(globe.polygon_cells(shapely.box(10.2, 10.4, 10.3, 10.5), self.lat).tolist(), [r * 360 + 190])
+        # a polygon reaching just over a column's edge takes the next cell too
+        self.assertEqual(globe.polygon_cells(shapely.box(10.2, 10.4, 11.01, 10.5), self.lat).tolist(),
+                         [r * 360 + 190, r * 360 + 191])
+        # one that stops exactly on the meridian 11 E only touches the cell beyond it: not in it
+        self.assertEqual(globe.polygon_cells(shapely.box(10.2, 10.4, 11.0, 10.5), self.lat).tolist(), [r * 360 + 190])
+        # two polygons of one map: both their cells, once each
+        two = shapely.MultiPolygon([shapely.box(10.2, 10.4, 10.3, 10.5), shapely.box(10.6, 10.4, 10.7, 10.5)])
+        self.assertEqual(globe.polygon_cells(two, self.lat).tolist(), [r * 360 + 190])
+
+    def test_an_invalid_ring_is_made_valid(self):
+        import shapely
+        # a bow tie (a ring crossing itself), as GARD has some: its two halves' cells
+        bow = shapely.Polygon([(10.2, 10.1), (12.5, 10.6), (12.5, 10.1), (10.2, 10.6)])
+        self.assertFalse(bow.is_valid)
+        r = self.row(10.5)
+        self.assertEqual(globe.polygon_cells(bow, self.lat).tolist(), [r * 360 + c for c in (190, 191, 192)])
+
+    def test_names(self):
+        ours = {"Aspidoscelis cozumela", "Ramphotyphlops affinis", "Hebius monticola", "Lycodon septentrionalis",
+                "Oligodon septentrionalis",
+                "Scincella capitanea", "Novus speciesus", "Crocodylus niloticus", "Ptychoglossus plicatus"}
+        gard = {"Aspidoscelis cozumelus", "Anilios affinis", "Amphiesma monticola", "Dinodon septentrionalis",
+                "Asymblepharus capitaneus", "Crocodylus niloticus", "Ptychoglossus plicatus", "Alopoglossus plicatus",
+                "Geochelone gigantea"}
+        m, how = globe.gard_match(
+            ours | {"Dinodon c"}, gard, {"Ramphotyphlops affinis": "Anilios affinis"},
+            {"Hebius monticola": {"Amphiesma monticola"}, "Lycodon septentrionalis": {"Dinodon septentrionalis"},
+             "Oligodon septentrionalis": {"Dinodon septentrionalis"},
+             "Ptychoglossus plicatus": {"Alopoglossus plicatus"}},
+            {"Scincella capitanea": {"Asymblepharus capitaneus"}})
+        self.assertEqual(m, {"Aspidoscelis cozumela": "Aspidoscelis cozumelus",      # a Latin ending
+                             "Ramphotyphlops affinis": "Anilios affinis",            # the RDB's former genus
+                             "Hebius monticola": "Amphiesma monticola",              # Open Tree's synonym
+                             "Scincella capitanea": "Asymblepharus capitaneus",      # the Red List's synonym
+                             "Crocodylus niloticus": "Crocodylus niloticus",
+                             "Ptychoglossus plicatus": "Ptychoglossus plicatus"})    # its own name first
+        # "Dinodon septentrionalis" is a synonym of two of ours (a lump): neither; another epithet is never the same
+        # species
+        self.assertEqual((how["Lycodon septentrionalis"], how["Oligodon septentrionalis"]), ("lump", "lump"))
+        self.assertNotIn("Dinodon c", m)
+
+
+REPTILES = ROOT / "data" / "amniotes" / "ranges.json"
+
+
+@unittest.skipUnless(REPTILES.exists() and SIDECAR.exists(), "no data/amniotes/ranges.json (make globe-amniotes)")
+class KnownReptileRanges(unittest.TestCase):
+    """ToLaD#601: the reptiles' globe, today's range only (GARD 1.7)."""
+
+    @classmethod
+    def setUpClass(cls):
+        d = json.loads(REPTILES.read_text())
+        cls.grid, cls.r = d["grid"], d["ranges"]
+        cls.lat = cls.grid["lat"]
+
+    def at(self, sci: str, lat: float, lon: float, pad: int = 0) -> bool:
+        m = globe.unpack(self.r[sci][0])
+        row = bisect.bisect_left([-x for x in self.lat], -lat) - 1
+        col = int(lon + 180)
+        return bool(m[max(0, row - pad):row + pad + 1, max(0, col - pad):col + pad + 1].any())
+
+    def test_the_mammals_grid_and_today_only(self):
+        self.assertEqual(self.grid, json.loads(SIDECAR.read_text())["grid"])
+        self.assertGreater(len(self.r), 10000)
+        self.assertTrue(all(len(v) == 1 and v[0] for v in self.r.values()))  # [current], never empty
+
+    def test_known_ranges(self):
+        self.assertTrue(self.at("Crocodylus niloticus", 0.0, 32.0, pad=1))      # Lake Victoria
+        self.assertFalse(self.at("Crocodylus niloticus", 10.0, -60.0, pad=5))   # not in the Americas
+        self.assertTrue(self.at("Varanus komodoensis", -8.6, 119.5, pad=1))     # Komodo
+        self.assertLessEqual(sum(self.r["Varanus komodoensis"][0][1::2]), 6)
+        self.assertTrue(self.at("Aldabrachelys gigantea", -9.4, 46.4, pad=1))   # Aldabra
+        self.assertTrue(self.at("Sphenodon punctatus", -36.0, 175.5, pad=1))    # New Zealand's northern islands
+        self.assertNotIn("Lepidochelys olivacea", self.r)                       # GARD maps no sea turtle
+
+
 if __name__ == "__main__":
     unittest.main()

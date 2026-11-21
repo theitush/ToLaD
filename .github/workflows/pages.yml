@@ -33,9 +33,10 @@ jobs:
         working-directory: web
       # (The mammal level's data, mammals.json, is fetched by the page when that level opens: ToLaD#247; mammals-card.json,
       # the cards' kinds, after the first frame: ToLaD#502; globe.json and globe-draw.js, the card's range globe, when a
-      # card first shows one: ToLaD#267.)
+      # card first shows one: ToLaD#267; globe-reptiles.json, the reptiles' cells, when an amniote card first has none in
+      # globe.json: ToLaD#601.)
       - name: Stage the page
-        run: mkdir _site && cp web/dist-single/index.html web/dist-single/mammals.json web/dist-single/mammals-card.json web/dist-single/mammals-all.json web/dist-single/mammals-all-card.json web/dist-single/amniotes.json web/dist-single/amniotes-card.json web/dist-single/amniotes-all.json web/dist-single/amniotes-all-card.json web/dist-single/globe.json web/dist-single/globe-draw.js _site/ && touch _site/.nojekyll
+        run: mkdir _site && cp web/dist-single/index.html web/dist-single/mammals.json web/dist-single/mammals-card.json web/dist-single/mammals-all.json web/dist-single/mammals-all-card.json web/dist-single/amniotes.json web/dist-single/amniotes-card.json web/dist-single/amniotes-all.json web/dist-single/amniotes-all-card.json web/dist-single/globe.json web/dist-single/globe-reptiles.json web/dist-single/globe-draw.js _site/ && touch _site/.nojekyll
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

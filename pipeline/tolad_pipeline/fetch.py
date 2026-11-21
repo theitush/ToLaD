@@ -281,11 +281,12 @@ AMNIOTES: dict[str, list[tuple[str, str, dict | None]]] = {
          f"https://raw.githubusercontent.com/andrewzamp/TetraDENSITY/{TETRADENSITY_SHA}/data/"
          "TetraDENSITY_v2.5_Database.csv", None),
     ],
-    # GARD 1.7 (Zenodo 6499637, CC0): the range shapes' attribute table, index and projection. The 855 MB
-    # .shp itself is Ita's download (SOURCES.md, "Downloads left to Ita").
+    # GARD 1.7 (Zenodo 6499637, CC0): the reptiles' range shapes (the 855 MB .shp: ~30 min from Zenodo, so a fresh
+    # copy is better fetched with SOURCES.md's resumable curl line first; the reptile globe, ToLaD#601), their attribute
+    # table, index and projection.
     "gard17": [
         (f"amniotes/gard17/Gard_1_7_ranges.{ext}", f"{ZENODO}/6499637/files/Gard_1_7_ranges.{ext}/content", None)
-        for ext in ("dbf", "shx", "prj", "cpg")
+        for ext in ("shp", "dbf", "shx", "prj", "cpg")
     ],
 }
 

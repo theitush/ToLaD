@@ -9,6 +9,12 @@
 // third element: `[current, present_natural, "Loxodonta africana"]`. A species' current cells are the map its count
 // stands on (ToLaD#507: where PHYLACINE's note moves land between species or deletes bad records, the corrected one); an
 // empty pair is a species PHYLACINE lists but draws no range for (no current map, its present-natural one a placeholder).
+//
+// The reptiles (ToLaD#601) are a sibling file of their own (globe-reptiles.json: data/amniotes/ranges.json, pipeline
+// `make globe-amniotes`), fetched on the amniotes' page the first time a card's species has no range in globe.json, so
+// a mammal's card never waits on them. Their cells are GARD 1.7's polygons on the same grid, and only today's: no map of
+// where a reptile would live without people exists, so a reptile's range is one element, `[current]`, and nothing of it
+// is drawn as lost.
 
 import type { MultiPolygon } from 'geojson';
 
@@ -16,11 +22,19 @@ export interface GlobeData {
   grid: { rows: number; cols: number; lon0: number; lat: number[] };
   /** Natural Earth land: polygons of rings of flat [lon, lat, lon, lat, ...]. */
   land: number[][][];
-  ranges: Record<string, [number[], number[]] | [number[], number[], string]>;
+  ranges: Record<string, GlobeRange>;
 }
+
+/**
+ * One species' cells: `[current, present_natural]` (PHYLACINE), with the borrowed range's species third (ToLaD#486); or
+ * `[current]`, today's range alone with no present-natural map (GARD 1.7's reptiles, ToLaD#601).
+ */
+export type GlobeRange = [number[]] | [number[], number[]] | [number[], number[], string];
 
 /** The sibling file's name (vite.config.ts emits it; pages.yml stages it next to index.html). */
 export const GLOBE_FILE = 'globe.json';
+/** The reptiles' sibling file (ToLaD#601): `{ ranges }` alone, every range `[current]`, on globe.json's grid. */
+export const REPTILES_FILE = 'globe-reptiles.json';
 
 let data: GlobeData | null = null;
 let pending: Promise<GlobeData> | null = null;
@@ -40,13 +54,49 @@ async function fetchGlobe(): Promise<GlobeData> {
 export function loadGlobe(get: () => Promise<GlobeData> = fetchGlobe): Promise<GlobeData> {
   if (data) return Promise.resolve(data);
   pending ??= get().then(
-    (d) => (data = d),
+    (d) => (data = reptiles ? { ...d, ranges: { ...reptiles, ...d.ranges } } : d),
     (e) => {
       pending = null;
       throw e;
     },
   );
   return pending;
+}
+
+type Ranges = GlobeData['ranges'];
+let reptiles: Ranges | null = null;
+let pendingReptiles: Promise<void> | null = null;
+
+async function fetchReptiles(): Promise<{ ranges: Ranges }> {
+  const r = await fetch(new URL(REPTILES_FILE, document.baseURI));
+  if (!r.ok) throw new Error(`${REPTILES_FILE}: HTTP ${r.status}`);
+  return (await r.json()) as { ranges: Ranges };
+}
+
+/** Whether the reptiles' cells are in (loadReptiles has resolved). */
+export function reptilesIn(): boolean {
+  return reptiles !== null;
+}
+
+/**
+ * Load the reptiles' cells once (ToLaD#601; later calls share the first, a failure lets the next try again): once in,
+ * globeData() is a new object holding them beside the mammals', so a card that had no range looks again. `get`
+ * replaces the fetch (tests).
+ */
+export function loadReptiles(get: () => Promise<{ ranges: Ranges }> = fetchReptiles): Promise<void> {
+  if (reptiles) return Promise.resolve();
+  pendingReptiles ??= get().then(
+    (f) => {
+      reptiles = f.ranges;
+      // (A name both had would stay the mammal's: globe.json's ranges are never changed.)
+      if (data) data = { ...data, ranges: { ...reptiles, ...data.ranges } };
+    },
+    (e) => {
+      pendingReptiles = null;
+      throw e;
+    },
+  );
+  return pendingReptiles;
 }
 
 /** Flat cell indices of a run list. */
@@ -65,7 +115,7 @@ export function unpackRuns(runs: number[]): number[] {
 export interface SpeciesRange {
   /** Current range cells. */
   cur: number;
-  /** Present-natural cells outside the current range (the range lost). */
+  /** Present-natural cells outside the current range (the range lost); 0 with no present-natural map (`today`). */
   lost: number;
   curShape: MultiPolygon;
   lostShape: MultiPolygon;
@@ -73,6 +123,8 @@ export interface SpeciesRange {
   centre: [number, number];
   /** A borrowed range (ToLaD#486): the older species it was split from, whose range this is. */
   from?: string;
+  /** Today's range alone (ToLaD#601: GARD 1.7's reptiles): no map of where it would live without people, none drawn. */
+  today?: true;
 }
 
 const STEP = 3; // degrees between vertices along a parallel (d3 joins vertices by great circles)
@@ -106,13 +158,13 @@ function shape(cells: Iterable<number>, g: GlobeData['grid']): MultiPolygon {
   return { type: 'MultiPolygon', coordinates: polys };
 }
 
-/** The species' range for the globe, or null when PHYLACINE has no map of it (or the data is not loaded). */
+/** The species' range for the globe, or null when neither PHYLACINE nor GARD has a map of it (or the data is not loaded). */
 export function speciesRange(sci: string, d: GlobeData | null = data): SpeciesRange | null {
   const r = d?.ranges[sci];
   if (!d || !r) return null;
   const cur = unpackRuns(r[0]);
   const curSet = new Set(cur);
-  const nat = unpackRuns(r[1]);
+  const nat = r.length === 1 ? [] : unpackRuns(r[1]);
   const lost = nat.filter((i) => !curSet.has(i));
   // The centre: the mean of the cells' unit vectors (equal-area cells, so a plain mean).
   let x = 0,
@@ -135,6 +187,7 @@ export function speciesRange(sci: string, d: GlobeData | null = data): SpeciesRa
   const centre: [number, number] = h + Math.abs(z) < 1e-9 ? [0, 0] : [Math.atan2(y, x) / rad, (Math.atan2(z, h) / rad) * spread];
   const out: SpeciesRange = { cur: cur.length, lost: lost.length, curShape: shape(cur, d.grid), lostShape: shape(lost, d.grid), centre };
   if (r.length === 3) out.from = r[2];
+  if (r.length === 1) out.today = true;
   return out;
 }
 

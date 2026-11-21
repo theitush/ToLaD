@@ -33,6 +33,15 @@ range lost. A living species whose present-natural map is a placeholder (stand_i
 to draw. The lost cells the evidence dates before 1500 (lossdates.PREHISTORIC: the Tasmanian devil's mainland
 Australia, the dhole's North America, ...) are not in the level the tree holds to 1500, so they are not drawn grey:
 they leave the species' present-natural cells and are packed apart, `before_1500[name]`, the same run-length way.
+
+The reptiles (ToLaD#601, `--tree amniotes`, `make globe-amniotes`) are `data/amniotes/ranges.json`: GARD 1.7's range
+polygons (Roll et al. 2017; Caetano et al. 2022; CC0) on the same grid, by PHYLACINE's own rule, "a cell was considered
+as occupied if any part of the cell was overlapping with the range polygon" (PHYLACINE 1.2 metadata): a cell counts when
+its interior and a polygon's share some area (a polygon that only touches its edge is not in it). The cells are the
+WGS 84 lon/lat boxes of the grid (the ellipsoidal Behrmann inverted: geodetic_row_edges, as ToLaD#594's iucn_codes.py),
+tested polygon by polygon of each species' map (shapely). GARD maps where a reptile lives today, and no one has mapped
+where it would live without people, so each is `ranges[name] = [current]`: one element, nothing to draw as lost. A
+species is matched by its Reptile Database name, else an established synonym (gard_match).
 """
 from __future__ import annotations
 
@@ -44,7 +53,7 @@ import math
 import re
 import sys
 import zipfile
-from collections import Counter
+from collections import Counter, defaultdict
 from pathlib import Path
 
 import numpy as np
@@ -351,12 +360,208 @@ def write(out: dict, path: Path) -> int:
     return len(text.encode("utf-8"))
 
 
+# ---- the reptiles (ToLaD#601): GARD 1.7, today's range only ----------------------------------------------------
+
+GARD = Path("amniotes") / "gard17" / "Gard_1_7_ranges.shp"
+# WGS 84, the ellipsoid of PHYLACINE's Behrmann (research/range-loss-dates/hyde_fetch.py)
+_A, _F = 6378137.0, 1 / 298.257223563
+
+
+def geodetic_row_edges() -> np.ndarray:
+    """The latitude (WGS 84 degrees) of each row's edges, north to south (ROWS + 1): the ellipsoidal Behrmann's y
+    inverted on a 1e-4 degree table, as research/range-loss-dates/iucn_codes.py cell_edges (ToLaD#594). (row_edges, the
+    page's, asin(y / Y_TOP), is within 0.25 deg of them south of 75 N, a fraction of a cell.) The columns are whole
+    degrees from -180."""
+    e2 = _F * (2 - _F)
+    e = math.sqrt(e2)
+    k0 = math.cos(math.radians(30)) / math.sqrt(1 - e2 * math.sin(math.radians(30)) ** 2)
+    lat_t = np.linspace(-90, 90, 1_800_001)
+    s = np.sin(np.radians(lat_t))
+    y_t = _A * (1 - e2) * (s / (1 - e2 * s * s) - 1 / (2 * e) * np.log((1 - e * s) / (1 + e * s))) / (2 * k0)
+    return np.interp(Y_TOP - np.arange(ROWS + 1) * CELL_Y, y_t, lat_t)
+
+
+def polygon_cells(geom, lat: np.ndarray, tally: Counter | None = None) -> np.ndarray:
+    """The flat cells (row * COLS + col, sorted) a (multi)polygon in lon/lat overlaps: each cell whose box's interior
+    shares area with one of its polygons (intersects, and not only touches). An invalid polygon (GARD's are mostly a
+    ring touching itself) is made valid first, alone. `tally` counts the maps with an invalid polygon (`invalid`) and
+    the cells left out because a polygon only touches them (`touch_only`)."""
+    import shapely
+
+    lon = np.arange(-180.0, 180.0 + 1, 1.0)
+    polys = shapely.get_parts(geom)
+    bad = ~shapely.is_valid(polys)
+    if bad.any():
+        if tally is not None:
+            tally["invalid"] += 1
+        fixed = shapely.get_parts(shapely.make_valid(polys[bad]))
+        polys = np.concatenate([polys[~bad], fixed[np.isin(shapely.get_type_id(fixed), (3, 6))]])
+        polys = shapely.get_parts(polys)
+    hit = np.zeros(ROWS * COLS, dtype=bool)
+    touched = np.zeros(ROWS * COLS, dtype=bool)
+    for g in polys:
+        if g.is_empty:
+            continue
+        x0, y0, x1, y1 = g.bounds
+        cols = np.flatnonzero((lon[1:] >= x0) & (lon[:-1] <= x1))
+        rows = np.flatnonzero((lat[:-1] >= y0) & (lat[1:] <= y1))
+        if not len(cols) or not len(rows):
+            continue
+        r, c = (a.ravel() for a in np.meshgrid(rows, cols, indexing="ij"))
+        flat = r * COLS + c
+        todo = ~hit[flat]
+        if not todo.any():
+            continue
+        r, c, flat = r[todo], c[todo], flat[todo]
+        boxes = shapely.box(lon[c], lat[r + 1], lon[c + 1], lat[r])
+        shapely.prepare(g)
+        meets = shapely.intersects(g, boxes)
+        ok = meets.copy()
+        if ok.any():
+            ok[ok] = ~shapely.touches(g, boxes[ok])
+        hit[flat[ok]] = True
+        touched[flat[meets & ~ok]] = True
+    if tally is not None:
+        tally["touch_only"] += int((touched & ~hit).sum())
+    return np.flatnonzero(hit)
+
+
+def gard_ranges(raw: Path, want: set[str] | None = None, batch: int = 64, log=None, tally: Counter | None = None):
+    """GARD 1.7 binomial -> its cells (polygon_cells), the shapefile read feature by feature (pyogrio, `batch` at a
+    time: never the whole 855 MB in memory). `want`: only these binomials."""
+    import pyogrio
+    import pyogrio.raw
+    import shapely
+
+    p = raw / GARD
+    lat = geodetic_row_edges()
+    n = pyogrio.read_info(p)["features"]
+    out: dict[str, np.ndarray] = {}
+    for i0 in range(0, n, batch):
+        _, _, wkb, (names,) = pyogrio.raw.read(p, skip_features=i0, max_features=batch, columns=["binomial"])
+        for name, b in zip((" ".join(str(n).split()) for n in names), wkb):
+            if want is None or name in want:
+                out[name] = polygon_cells(shapely.from_wkb(b), lat, tally)
+        if log and (i0 // batch % 16 == 15 or i0 + batch >= n):
+            log(f"[globe] GARD {min(i0 + batch, n)}/{n} maps read")
+    return out
+
+
+def gard_names(raw: Path) -> list[str]:
+    """GARD 1.7's binomials (the attribute table alone)."""
+    import pyogrio.raw
+
+    _, _, _, (names,) = pyogrio.raw.read(raw / GARD, read_geometry=False, columns=["binomial"])
+    return [" ".join(str(n).split()) for n in names]
+
+
+_WAS = re.compile(r"\(was: ([A-Z][a-z]+)\)")
+
+
+def rdb_former(raw: Path) -> dict[str, str]:
+    """The Reptile Database 2026-10's own synonym of each species it moved this release: 'new genus (was: Anilios)'
+    -> the binomial in its former genus (Ramphotyphlops affinis -> Anilios affinis)."""
+    import openpyxl
+
+    path = raw / "amniotes" / "reptiledb" / "reptile_checklist_2026_10.xlsx"
+    ws = openpyxl.load_workbook(path, read_only=True).worksheets[0]
+    out = {}
+    for r in ws.iter_rows(min_row=2, values_only=True):
+        m = _WAS.search(str(r[6] or "")) if r[1] else None
+        if m:
+            name = " ".join(str(r[1]).split())
+            out[name] = f"{m.group(1)} {name.split(' ', 1)[1]}"
+    return out
+
+
+def gard_match(reptiles: set[str], gard: set[str], former: dict[str, str], ott_names: dict[str, set[str]],
+               rl_syn: dict[str, set[str]]) -> tuple[dict[str, str], dict[str, str]]:
+    """Our reptile (Reptile Database name) -> the GARD binomial whose map it gets, and how: by its own name; else
+    #592's rule (amniotes.name_reptiles) over the established synonyms, in order: the Reptile Database's own (its former
+    genus, `former`), Open Tree's (`ott_names`: the names and synonyms of the OTT taxa of that name), the Red List's
+    (`rl_syn`: the binomials one Red List species goes by, its own and its synonyms). A synonym counts when it renames
+    the same species (the epithet's stem the same: a genus move or a Latin gender ending), is no species of ours, and is
+    the only GARD name the species' synonyms give; a GARD name two of ours would take (a lump) goes to neither."""
+    from .redlist import _stem
+
+    def key(b: str) -> tuple[str, str]:
+        g, e = b.split(" ", 1)
+        return g, _stem(e)
+
+    by_key: dict[tuple[str, str], set[str]] = defaultdict(set)
+    for g in gard:
+        by_key[key(g)].add(g)
+    out = {sp: sp for sp in reptiles if sp in gard}
+    how = {sp: "name" for sp in out}
+    for sp in sorted(reptiles - set(out)):
+        k = key(sp)
+        sources = [("name (a Latin ending)", {sp}),
+                   ("Reptile Database synonym", {former[sp]} if sp in former else set()),
+                   ("Open Tree synonym", ott_names.get(sp, set())), ("Red List synonym", rl_syn.get(sp, set()))]
+        found: dict[str, str] = {}
+        for label, names in sources:
+            for n in names:
+                for g in by_key.get(key(n), ()):
+                    if g not in reptiles and key(g)[1] == k[1]:
+                        found.setdefault(g, label)
+        if len(found) == 1:
+            g, label = next(iter(found.items()))
+            out[sp], how[sp] = g, label
+    taken = Counter(out.values())
+    for sp in [sp for sp, g in out.items() if taken[g] > 1]:
+        del out[sp]
+        how[sp] = "lump"
+    return out, how
+
+
+def build_reptiles(raw: Path, amniotes: Path, log=None) -> tuple[dict, dict]:
+    """data/amniotes/ranges.json: every reptile of the amniotes' tree GARD 1.7 maps, `[current]`."""
+    from .amniotes import load_ott_cut, load_rdb
+    from .redlist import load_redlist
+
+    rdb, _ = load_rdb(raw)
+    reptiles = set(rdb) & set(species_rows(amniotes))
+    gard = gard_names(raw)
+    tax, syn, uids = load_ott_cut(raw)
+    ott_names = {sp: {nm for u in uids.get(sp, ()) for nm in (tax[u]["name"], *syn.get(u, ()))} - {sp}
+                 for sp in reptiles}
+    rl_syn: dict[str, set[str]] = defaultdict(set)
+    for n, r in load_redlist(raw, ("REPTILIA",), synonyms=True).items():
+        group = {n, *r.get("synonyms", ())}
+        for s in group:
+            rl_syn[s] |= group - {s}
+    m, how = gard_match(reptiles, set(gard), rdb_former(raw), ott_names, rl_syn)
+    tally: Counter = Counter()
+    cells = gard_ranges(raw, set(m.values()), log=log, tally=tally)
+    flat = np.zeros(ROWS * COLS, dtype=bool)
+
+    def packed(c: np.ndarray) -> list[int]:
+        flat[:] = False
+        flat[c] = True
+        return pack(flat)
+
+    out = {"grid": {"rows": ROWS, "cols": COLS, "lon0": -180, "lat": row_edges()},
+           "ranges": {sp: [packed(cells[g])] for sp, g in sorted(m.items()) if len(cells[g])}}
+    stats = {"reptiles": len(reptiles), "gard": len(gard), "matched": len(m), "drawn": len(out["ranges"]),
+             "how": dict(Counter(how.get(sp, "unmatched") for sp in reptiles).most_common()),
+             "gard_unused": len(set(gard) - set(m.values())), "invalid_maps": tally["invalid"],
+             "touch_only_cells": tally["touch_only"], "cells": int(sum(len(c) for c in cells.values())),
+             "unmatched_by_group": dict(Counter(rdb[sp]["group"] for sp in reptiles if sp not in m).most_common()),
+             "by_synonym": {sp: [g, how[sp]] for sp, g in sorted(m.items()) if g != sp}}
+    return out, stats
+
+
 def main(argv: list[str] | None = None) -> int:
     root = Path(__file__).resolve().parents[2]
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--raw", type=Path, default=root / "data" / "raw")
     ap.add_argument("--mammals", type=Path, default=root / "data" / "mammals")
+    ap.add_argument("--tree", choices=("mammals", "amniotes"), default="mammals",
+                    help="amniotes: the reptiles' GARD 1.7 cells into data/amniotes/ranges.json (ToLaD#601)")
+    ap.add_argument("--amniotes", type=Path, default=root / "data" / "amniotes")
     a = ap.parse_args(argv)
+    if a.tree == "amniotes":
+        return main_reptiles(a.raw, a.amniotes)
     out, stats = build(a.raw, a.mammals)
     n = write(out, a.mammals / "ranges.json")
     import gzip
@@ -370,6 +575,26 @@ def main(argv: list[str] | None = None) -> int:
           f"({', '.join(stats['corrected'])}); {len(stats['stand_in'])} whose present-natural map is a placeholder "
           f"draw no range ({', '.join(stats['stand_in'])}); {len(stats['before_1500'])} with range lost before "
           f"1500 listed apart ({', '.join(stats['before_1500'])})", file=sys.stderr)
+    return 0
+
+
+def main_reptiles(raw: Path, amniotes: Path) -> int:
+    import gzip
+    import time
+
+    t0 = time.time()
+    out, stats = build_reptiles(raw, amniotes, log=lambda m: print(f"{m} ({time.time() - t0:.0f}s)", file=sys.stderr))
+    n = write(out, amniotes / "ranges.json")
+    gz = len(gzip.compress((amniotes / "ranges.json").read_bytes(), 9))
+    # (Each match by a synonym, and the counts, for a look: data/build/, not the page's.)
+    work = amniotes.parent / "build"
+    work.mkdir(exist_ok=True)
+    (work / "globe_amniotes.json").write_text(json.dumps(stats, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+    print(f"[globe] ToLaD#601: {stats['matched']}/{stats['reptiles']} reptiles matched to GARD 1.7's "
+          f"{stats['gard']} maps ({', '.join(f'{v} {k}' for k, v in stats['how'].items())}); {stats['drawn']} drawn; "
+          f"{stats['gard_unused']} GARD maps no species of ours takes; {stats['invalid_maps']} maps with an invalid "
+          f"polygon made valid, {stats['touch_only_cells']} cells only touched left out; ranges.json "
+          f"{n / 1e6:.2f} MB, gzip {gz / 1e6:.2f} MB ({time.time() - t0:.0f}s)", file=sys.stderr)
     return 0
 
 

@@ -9,6 +9,8 @@ dependencies = [
     "numpy>=1.26",
     "tifffile>=2026.3.3",
     "imagecodecs>=2026.3.6",
+    "shapely>=2.2.0",
+    "pyogrio>=0.13.0",
 ]
 
 [project.scripts]

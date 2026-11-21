@@ -35,6 +35,7 @@ export const WORD_IDS = {
   ever: 'w-ever',
   generation: 'w-generation',
   grade: 'w-grade',
+  range: 'w-range',
   method: 'w-method',
   natural: 'w-natural',
   status: 'w-status',
@@ -172,8 +173,8 @@ function TwoMaps() {
   }, []);
   const d = m?.globeData() ?? null;
   const r = d?.ranges[WALK.sci];
-  // Today alone: its current cells as both maps (nothing lost drawn).
-  const today = d && r ? { ...d, ranges: { [WALK.sci]: [r[0], r[0]] as [number[], number[]] } } : null;
+  // Today alone: its current cells, a range of today only (globe-data.ts GlobeRange `[current]`: nothing lost drawn).
+  const today = d && r ? { ...d, ranges: { [WALK.sci]: [r[0]] as [number[]] } } : null;
   return (
     <div className="m-maps" data-maps="">
       <figure>
@@ -461,6 +462,13 @@ export function MethodsView({ onClose, at }: { onClose: () => void; at?: string 
             <dd>
               The average age of parents, and its source in brackets (COMBINE, or from body size):{' '}
               <Jump to={METHOD_IDS.ever}>step 4</Jump>.
+            </dd>
+            <dt id={WORD_IDS.range}>Range</dt>
+            <dd data-range-word="">
+              The globe: green where the species lives today, grey the part of its range it has lost (a mammal’s two maps,
+              PHYLACINE 1.2: <Jump to={METHOD_IDS.past}>step 2</Jump>). A reptile’s map is today’s alone (GARD 1.7, “Range
+              today”): nobody has mapped where reptiles would live without people, so none of it is grey. Sea turtles and
+              most sea snakes are not in it.
             </dd>
             <dt id={WORD_IDS.grade}>Data grade</dt>
             <dd>

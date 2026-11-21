@@ -1,5 +1,5 @@
 # ToLaD data pipeline v0 (mammals). `make` = fetch (verify pinned checksums) + build + test.
-.PHONY: all fetch fetch-amniotes build build-amniotes test audit wiki wiki-amniotes phylopic phylopic-amniotes globe
+.PHONY: all fetch fetch-amniotes build build-amniotes test audit wiki wiki-amniotes phylopic phylopic-amniotes globe globe-amniotes
 
 all: fetch build test
 
@@ -59,3 +59,10 @@ phylopic-amniotes:
 # data/mammals/ranges.json and nothing else.
 globe:
 	uv run python -I -m tolad_pipeline.globe
+
+# The reptiles' cells for the same globe (ToLaD#601): GARD 1.7's range polygons (data/raw/amniotes/gard17/, the 855 MB
+# .shp pinned in the lock: `make fetch-amniotes`) on the mammals' grid, today's range only, matched to the amniotes'
+# reptiles by name or an established synonym. Its own step over data/amniotes (read, not rebuilt); writes
+# data/amniotes/ranges.json and nothing else there (~6 min).
+globe-amniotes:
+	uv run python -I -m tolad_pipeline.globe --tree amniotes
