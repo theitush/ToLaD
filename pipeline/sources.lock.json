@@ -82,6 +82,13 @@
   "sha256": "a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4",
   "url": "https://zenodo.org/api/records/6499637/files/Gard_1_7_ranges.prj/content"
  },
+ "amniotes/gard17/Gard_1_7_ranges.shp": {
+  "bytes": 854546856,
+  "post_body": null,
+  "retrieved": "2026-11-21",
+  "sha256": "2b795b9a1cc8d07ebce999511efba3020dd1010bfb5b0cb87c2837d61cba4411",
+  "url": "https://zenodo.org/api/records/6499637/files/Gard_1_7_ranges.shp/content"
+ },
  "amniotes/gard17/Gard_1_7_ranges.shx": {
   "bytes": 87412,
   "post_body": null,

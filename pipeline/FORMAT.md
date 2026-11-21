@@ -13,6 +13,7 @@ data/mammals/
   dated/<id>.json   the dated tree over each file's species rows (1.6; `skeleton.json` for the skeleton)
   debug_top.json    human-readable dump of the skeleton rows (unquantized), one node per line
   stats.json        build report (counts, match rates, fits, sizes, spot checks)
+  ranges.json       the card globe's range cells (`make globe`; "The globe's range cells" below)
 ```
 
 `data/amniotes/` (ToLaD#539, `make build-amniotes`) is a second dataset in this format, the same files: the living amniotes, with `data/mammals`' rows unchanged as its Mammalia (global ids shifted by one, for its `Amniota` row 0). Its skeleton `META.dataset` is `amniotes-v0` and `META.amniotes` says what differs: its bird and reptile rows set only the `opentree` bit of `SRCM` (all 16 bits are taken) and name their sources in `METH`; a reptile is count unknown (FLAG bit 11) unless `pipeline/reptile_counts.toml` gives it a published count (bit 8, the sidecar's `count`; ToLaD#578); a calibrated row's date source (code 0) is Upham's for a mammal and AvesData 1.7's, Title 2024's, Colston 2020's or TimeTree 5's elsewhere; and the dated sidecars' `sources` append `avesdata`, `title2024`, `colston2020` and `timetree` (with their citations) to the list below.
@@ -306,6 +307,24 @@ around it, `fossil-floor`: a crown raised to the first appearance of a fossil of
 `[{name, cite, reason}]`. Report: `stats.json` → `dated_tree.ages`, `.benchmark` (both rules on 15 nodes,
 research/dated-tree-sources.md §5), `.fossil_floors`.
 Report: `stats.json` → `dated_tree`.
+
+## The globe's range cells (`ranges.json`)
+
+A sidecar of its own step (ToLaD#267), not a tile: the card's globe reads it (the page fetches it as `globe.json`,
+with the land). JSON, `{grid, ranges}` (the mammals' also `before_1500`):
+
+- `grid`: `{rows: 142, cols: 360, lon0: -180, lat}`, PHYLACINE 1.2.1's Behrmann grid: columns of 1 degree from
+  -180, rows north to south between the latitudes `lat` (143 values).
+- `ranges[name]`: a species' cells, each list run-length coded over flat indices (`row * 360 + col`) as
+  `[gap, length, gap, length, ...]`, each gap from the end of the run before (from 0 for the first). Its forms:
+  - `[current, present_natural]`: PHYLACINE's two maps (`data/mammals/ranges.json`). An empty list is no cells: an
+    extinct species has only its present-natural range; `[[], []]` is a species PHYLACINE lists with no range to draw.
+  - `[current, present_natural, "Loxodonta africana"]`: the range of the older species it was split from (ToLaD#486).
+  - `[current]`: today's range alone, no present-natural map (ToLaD#601): `data/amniotes/ranges.json`, GARD 1.7's
+    reptiles, on the same grid (the page fetches it as `globe-reptiles.json`, `{ranges}` alone). Nothing of it is
+    lost: no map of where a reptile would live without people exists, so none is implied.
+- `before_1500[name]` (mammals): the lost cells the evidence dates before 1500, left out of `present_natural`
+  ("Loss dates" above).
 
 ## Semantics of the counts
 

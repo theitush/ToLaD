@@ -81,7 +81,7 @@ Step 1 of the amniote build order in [`research/amniote-sources.md`](../research
 | AVONET (Tobias et al. 2022, *Ecol Lett* 25:581), figshare 16586228 v7 | Bird body mass (every one of the eBird-taxonomy sheet's 10,661 species) | https://ndownloader.figshare.com/files/34480856 → `amniotes/avonet/AVONET_Supplementary_dataset_1.xlsx` (21.5 MB) | `eb645e83dddb40f1654a3e8d721998dbca76eff540231b7b809267c1e96f8d3e` | CC BY 4.0 |
 | ReptTraits **1.2** (Oskyrko, Mi, Meiri & Du 2024, *Sci Data* 11:243), figshare 24572683 v4 | Reptile maximum mass and longevity (12,060 species) | https://ndownloader.figshare.com/files/45408133 → `amniotes/repttraits/ReptTraits_v1-2.xlsx` (18.5 MB) | `74eb6fd0e2626c75bdbeacb50a08b1762eee42e2b3cfda4a0f1134b84971718a` | CC BY 4.0 |
 | TetraDENSITY **2.5** (Santini et al. 2024, *Glob Ecol Biogeogr* 33:e13929) | Site population densities of terrestrial vertebrates, the reptiles' density data | `https://raw.githubusercontent.com/andrewzamp/TetraDENSITY/cfa9c059009ca5433d863b1a74d67bd1db1c047d/data/TetraDENSITY_v2.5_Database.csv` (commit pinned; the repo now also has 2.6) → `amniotes/tetradensity/` | `3db53165034774f4bf62c1fe39a9e4cc4c9bf4721f132d05969f3966e72ad93a` | CC BY-NC 4.0 |
-| GARD **1.7** (Roll et al. 2017, *Nat Ecol Evol* 1:1677; Caetano et al. 2022, *PLoS Biol* 20:e3001544), Zenodo 6499637 | Reptile ranges for 10,914 species: the attribute table (`binomial`, `group`, `family`, `area`), its index and projection. The 855 MB `.shp` is Ita's download (below) | `https://zenodo.org/api/records/6499637/files/Gard_1_7_ranges.{dbf,shx,prj,cpg}/content` → `amniotes/gard17/` | .dbf `463edcf27b1a4a86635171051445e617f67e33e4c006e1f3c20800780c0dbb92`, .shx `07ea1d25fdf86aa28ec4bcdce0940fba5834e5025676bff43cdd847c7676f159`, .prj `a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4`, .cpg `3ad3031f5503a4404af825262ee8232cc04d4ea6683d42c5dd0a2f2a27ac9824` | CC0 (Dryad doi:10.5061/dryad.9cnp5hqmb) |
+| GARD **1.7** (Roll et al. 2017, *Nat Ecol Evol* 1:1677; Caetano et al. 2022, *PLoS Biol* 20:e3001544), Zenodo 6499637 | Reptile ranges for 10,914 species: the range polygons (`.shp`, 854,546,856 B, md5 `47785536b2910edd03fac2ece9d1eead` as Zenodo lists it), the attribute table (`binomial`, `group`, `family`, `area`), its index and projection. The reptiles' globe (ToLaD#601, `make globe-amniotes`): each species' cells today on the mammals' grid, below. The `.shp` is ~30 min from Zenodo, so a fresh copy is best fetched with the resumable line below before `make fetch-amniotes` verifies it | `https://zenodo.org/api/records/6499637/files/Gard_1_7_ranges.{shp,dbf,shx,prj,cpg}/content` → `amniotes/gard17/`; the `.shp` resumably: `curl -C - --retry 20 --retry-delay 10 --retry-all-errors -L -o data/raw/amniotes/gard17/Gard_1_7_ranges.shp https://zenodo.org/api/records/6499637/files/Gard_1_7_ranges.shp/content` | .shp `2b795b9a1cc8d07ebce999511efba3020dd1010bfb5b0cb87c2837d61cba4411`, .dbf `463edcf27b1a4a86635171051445e617f67e33e4c006e1f3c20800780c0dbb92`, .shx `07ea1d25fdf86aa28ec4bcdce0940fba5834e5025676bff43cdd847c7676f159`, .prj `a02a27b1d1982c8516d83398e85a3c8b1aef1713c13ef4d84d7bde17430c07c4`, .cpg `3ad3031f5503a4404af825262ee8232cc04d4ea6683d42c5dd0a2f2a27ac9824` | CC0 (Dryad doi:10.5061/dryad.9cnp5hqmb): the derived cells are published (`data/amniotes/ranges.json`) |
 
 ### Downloads left to Ita
 
@@ -89,13 +89,12 @@ These sites refuse scripts (Dryad answers 401 from its API and 403 from its web 
 
 | What | Size | How |
 |---|---|---|
-| GARD 1.7 range shapes (the reptile globe) | 854,546,856 B, ~30 min | `curl -C - --retry 20 --retry-delay 10 --retry-all-errors -L -o ~/ToLaD/data/raw/amniotes/gard17/Gard_1_7_ranges.shp https://zenodo.org/api/records/6499637/files/Gard_1_7_ranges.shp/content` (Zenodo honours ranges, so a rerun resumes; md5 `47785536b2910edd03fac2ece9d1eead`) |
 | Tonini 2016 full posterior (only for a squamate summary tree; one draw is fetched above) | 1,882,223,234 B, ~22 min | `curl -C - --retry 20 --retry-delay 10 --retry-all-errors -L -o ~/ToLaD/data/raw/amniotes/tonini2016/squam_shl_new_Posterior_9755.1000-10000.trees.zip https://data.vertlife.org/squamatetree/squam_shl_new_Posterior_9755.1000-10000.trees.zip` |
 | Thomson, Spinks & Shaffer 2021 turtle MCC (`bd.mcc.median_heights.tre` + `ReadMe.txt`), CC0 | 0.3 MB | Browser: https://datadryad.org/dataset/doi:10.5061/dryad.jh9w0vt8w → `data/raw/amniotes/thomson2021/` |
 | Tonini 2016 methods (`Squamata_Tree_Methods_Data.zip`: which tips had DNA), CC0 | 6.5 MB | Browser: https://datadryad.org/dataset/doi:10.5061/dryad.db005 → `data/raw/amniotes/tonini2016/` |
 | AVOTREX (Sayol et al. 2024: 610 extinct birds, with placements), CC0 | small | Browser: https://datadryad.org/dataset/doi:10.5061/dryad.zgmsbcckk → `data/raw/amniotes/avotrex/` |
 | BirdLife bird range maps (BOTW) | several GB | A data request: datazone.birdlife.org. Non-commercial, no redistribution of the polygons |
-| IUCN reptile range maps (optional; GARD covers 80%) | n/c | An account: iucnredlist.org → Spatial data download, "Reptiles" |
+| IUCN reptile range maps (optional; GARD maps 84% of our reptiles, below) | n/c | An account: iucnredlist.org → Spatial data download, "Reptiles" |
 
 ## The amniote build (ToLaD#539)
 
@@ -115,6 +114,36 @@ These sites refuse scripts (Dryad answers 401 from its API and 403 from its web 
 **Backbone ages:** Kumar, S., Suleski, M., Craig, J.M. et al. (2022). TimeTree 5: an expanded resource for species divergence times. *Molecular Biology and Evolution* 39: msac174, doi:10.1093/molbev/msac174. Five pairwise medians with their intervals, cited one by one in `pipeline/amniotes.toml` (`[[dated_clade]]`): Amniota 318.8 Ma (316.7-321.0), Sauria 280.7 (276.6-284.8), Archelosauria 256.8 (249.0-264.7), Archosauria 243.3 (239.6-247.0), Lepidosauria 245.0 (236.6-253.4). Five cited numbers, not a copy of its data.
 
 **Assumed:** no source gives a bird or reptile generation length yet, so a bird's or reptile's births use G = 7 yr (`amniotes.ASSUMED_GEN_YR`, the page's own fallback), said in every such row's method. Step 7 replaces it (Bird et al. 2020 for birds; a mass-based estimate from ReptTraits for reptiles).
+
+## The reptiles' globe (ToLaD#601)
+
+`make globe-amniotes` (`tolad_pipeline/globe.py --tree amniotes`) writes `data/amniotes/ranges.json`: each reptile's
+cells today on the mammals' grid, from **GARD 1.7** (Roll, U. et al. 2017. The global distribution of tetrapods reveals
+a need for targeted reptile conservation. *Nature Ecology & Evolution* 1: 1677-1682, doi:10.1038/s41559-017-0332-2;
+Caetano, G.H.O. et al. 2022. Automated assessment reveals that the extinction risk of reptiles is widely underestimated
+across space and phylogeny. *PLoS Biology* 20: e3001544; data Zenodo 6499637, CC0). The page draws them on the card's
+globe, green, credited "Range today · GARD 1.7".
+
+- **Cells:** PHYLACINE's grid and PHYLACINE's own rule, "a cell was considered as occupied if any part of the cell was
+  overlapping with the range polygon" (PHYLACINE 1.2 metadata): a cell is in when its box (WGS 84, the Behrmann rows'
+  geodetic edges, as ToLaD#594) and one of the species' polygons share area; a polygon that only touches the cell's
+  edge does not put it in (in GARD that leaves out 8 cells of 828,249). A polygon GARD has invalid (449 species;
+  the largest, a ring touching itself) is made valid alone (shapely `make_valid`) before it is tested.
+- **Today only:** GARD maps where a reptile lives now. Nobody has mapped where reptiles would live without people,
+  so each range is `[current]` (FORMAT.md, "The globe's range cells") and nothing is drawn as lost.
+- **Names:** our reptiles are the Reptile Database 2026-10's (12,686). A species takes the GARD map of its own name
+  (10,188); else, by ToLaD#592's rule (`amniotes.name_reptiles`), the one GARD map its established synonyms give, when
+  that name renames the same species (the epithet's stem the same: a Latin ending, a genus move) and is no species of
+  ours: the same name with another Latin ending (58), the Reptile Database's own former genus (its `change`
+  column, "new genus (was: …)": 106), Open Tree 3.7.3's synonyms (64), the Red List 2026-1's (199). A GARD
+  map two of ours would take (a lump) goes to neither (none in GARD 1.7). No hand map. 10,615 (84%) of the 12,686 have a range;
+  2,071 have none: the sea turtles and nearly every sea snake (GARD maps land reptiles; 2 of the ~70 sea snakes),
+  and species described or split since GARD's taxonomy (a split species does not borrow its parent's map, as a mammal
+  does, ToLaD#486). 299 GARD maps no species of ours takes: species the Reptile Database now
+  lumps into one of ours under another epithet (the thirteen Galápagos tortoises GARD keeps apart from its *Chelonoidis niger*,
+  which ours takes and which spans the archipelago), so not the same species by the rule above, and two extinct Malagasy giant
+  tortoises (*Aldabrachelys abrupta*, *A. grandidieri*). Each match by a synonym, and the counts, are in
+  `data/build/globe_amniotes.json`.
 
 ## Manual overrides
 
