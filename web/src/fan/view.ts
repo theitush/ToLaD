@@ -114,6 +114,8 @@ const GLOW_W = 6;
 const NO_HELD: [number, number, number][] = [];
 /** A column with no dashed stretch (dashed.ts): its band all along. */
 const NO_DASH: number[] = [];
+/** No fork cuts (forkMode peel: the lanes run whole through every peel). */
+const NO_CUTS: number[] = [];
 /** No merged clades (a level with no orders): one array, so Steady.setMerged knows it unchanged. */
 const NO_MERGED: FanNode[] = [];
 /** The glow fades out across a lean: gone where the lane runs √(1 + s²) - 1 = GLOW_LEAN off straight down (s ≈ 0.75 px per px). */
@@ -2112,17 +2114,21 @@ export class FanView implements InputHandlers {
     this.foldVer = f.ver;
     for (const m of this.models.values()) m.refold();
     if (!moved && f.ordShare.length) {
-      // (Only the grid changed (finer, at rest): the edges exact at once.)
+      // (Only the grid changed: finer at rest, the edges exact at once; or coarser on the frame after the fold moved. Then
+      // its rest frame, if already due (the timer fired while this frame was pending, its ask lost to it), is asked for
+      // now: a fold that stopped always comes to rest, never held on the coarse grid till the next touch, ToLaD#591.)
       for (const m of this.models.values()) m.foldRest();
+      if (this.foldMoving && this.foldRestT === undefined) this.request();
       return;
     }
     this.foldMoving = true;
     // (One frame more once it rests, FOLD_REST_MS on: the edges exact.)
     clearTimeout(this.foldRestT);
-    this.foldRestT = setTimeout(() => this.request(), FOLD_REST_MS);
+    this.foldRestT = setTimeout(() => ((this.foldRestT = undefined), this.request()), FOLD_REST_MS);
   }
   private foldMoving = false;
   private foldVer = -1;
+  /** The fold's rest frame's timer (applyFold), undefined once it has fired. */
   private foldRestT: ReturnType<typeof setTimeout> | undefined;
 
   model(b: FanBranch): TwigModel {
@@ -3160,9 +3166,17 @@ export class FanView implements InputHandlers {
 
   draw(): void {
     const t0 = performance.now();
-    // (The columns' paths made again a few a frame while the view moves, all at once at rest: ToLaD#313.)
-    pathFrame.start(this.gesturing || !!this.anim);
+    // (The columns' paths made again a few a frame while the view moves, all at once at rest: ToLaD#313. Once it holds
+    // still, the paths drawn that were chosen for another view are made again for this one, a share of each frame,
+    // ToLaD#591.)
+    const moving = this.gesturing || !!this.anim;
+    const c = this.cam;
+    const L = this.stillCam;
+    const held = !moving && L[0] === c.cx && L[1] === c.cy && L[2] === c.sx && L[3] === c.sy && L[4] === this.w && L[5] === this.h;
     this.applyFold();
+    // (Still: the camera as last frame's and the fold at rest, its frames on its fine grid.)
+    const still = held && !this.foldMoving;
+    pathFrame.start(moving, still);
     this.chainFrame();
     const ctx = this.ctx;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
@@ -3204,9 +3218,35 @@ export class FanView implements InputHandlers {
       this.gl.end(this.stageW, this.h, this.dpr);
     }
     this.trimModels();
+    this.settleNext(moving, still);
     this.frameMs.push(performance.now() - t0);
     if (this.frameMs.length > 600) this.frameMs.shift();
     if (this.frameMs.length <= 2) stamp(this.frameMs.length === 1 ? 'first' : 'second');
+  }
+
+  /** The camera of the last frame drawn (draw: whether the view holds still), and w, h. */
+  private readonly stillCam = [NaN, NaN, NaN, NaN, NaN, NaN];
+  /** Whether frames are asked for while paths drawn are still chosen for another view (ColumnPath's settle), and one was asked for by a frame that did not hold still. */
+  settling = false;
+  private settleAsked = false;
+  /**
+   * After a frame (ToLaD#591): while a path it drew is still chosen for another view, another frame. One that held still
+   * made some of them again (its share of the frame, pathFrame.settleWork), so each such frame gets nearer, and the next
+   * holds still too unless the view moves. One that did not hold still asks for one frame, the first still one; never
+   * two in a row, so a view that moves by a hair every frame asks for none past it.
+   */
+  private settleNext(moving: boolean, still: boolean): void {
+    const c = this.cam;
+    const L = this.stillCam;
+    L[0] = c.cx;
+    L[1] = c.cy;
+    L[2] = c.sx;
+    L[3] = c.sy;
+    L[4] = this.w;
+    L[5] = this.h;
+    this.settling = !moving && pathFrame.inexact > 0 && (still ? pathFrame.settled > 0 : !this.settleAsked);
+    this.settleAsked = this.settling && !still;
+    if (this.settling) this.request();
   }
 
   /**
@@ -4852,14 +4892,19 @@ export class FanView implements InputHandlers {
     if (sf instanceof Steady && sf.offSide(b.index, sTop, sBot, this.cam.cx - xm, this.cam.cx + xm)) return;
     const xr = this.fan.tess.xRange(b, sTop, sBot);
     if (cam.screenX(xr[1]) < -12 || cam.screenX(xr[0]) > this.w + 12) return;
+    const forks = sf instanceof Steady && forkMode() !== 'peel';
+    if (forks) sf.strandForks(b.index, this.cam.sx, this.cam.sy, sTop, sBot, this.forkCuts);
+    // (Its reach taken stretch by stretch (ToLaD#591): a path that steps across the screen at a split, from one side to the
+    // other, meets it nowhere. The window is offSide's (and drawStrands' lod.see), widened by its lanes' reach past its
+    // edge, its widest, and a dashed line's from its column's centre.)
+    if (sf instanceof Steady) {
+      const r = xm + Math.max(b.baseW, b.width) + this.dashReach(b);
+      if (!sf.meets(b.index, sTop, sBot, this.cam.cx - r, this.cam.cx + r, forks ? this.forkCuts : NO_CUTS)) return;
+    }
     const hw = b.width / 2;
     let pts = this.lanePoints(b, hw);
     if (pts.n < 2) return;
-    const fo = this.fan.tess.fold;
-    if (fo instanceof Steady && forkMode() !== 'peel') {
-      fo.strandForks(b.index, this.cam.sx, this.cam.sy, sTop, sBot, this.forkCuts);
-      if (this.forkCuts.length) pts = this.cutForks(pts, (y) => leftAt(b, y) + hw);
-    }
+    if (forks && this.forkCuts.length) pts = this.cutForks(pts, (y) => leftAt(b, y) + hw);
     // The column's styled spans on screen ([top, bottom, dim]), clipped to it: none for most strands.
     // (A count nobody has drawn as one dashed line, ToLaD#565: no faint band, its dashed stretches on screen instead.)
     const dashed = b.sp.countUnknown && unknownLook() === 'dashed';
@@ -4876,6 +4921,15 @@ export class FanView implements InputHandlers {
     // (Gray off, ToLaD#410: the gray stays on an extinct species' column, down to where it joins a line that lives.)
     if (grayOn()) this.drawLanes(pts, hw, held, true, dash);
     else this.drawLanesOff(pts, hw, held, allGray(b), allGray(b) ? cam.screenY(grayFoot(b.node, b.splitY)) : 0, dash);
+  }
+
+  /** How far (world x) strand b's dashed line strays from its own lane: the most of its stretches' offsets (dashed.ts; 0 drawn as a band). */
+  private dashReach(b: FanBranch): number {
+    if (!b.sp.countUnknown || unknownLook() !== 'dashed') return 0;
+    const s = strandDashes(this.fan, b);
+    let r = 0;
+    for (let k = 2; k < s.length; k += 3) if (s[k] !== DASH_SKIP && Math.abs(s[k]) > r) r = Math.abs(s[k]);
+    return r;
   }
 
   private dashScr: number[] = [];

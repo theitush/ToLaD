@@ -362,6 +362,9 @@ export class CutMemo {
       }
       this.m.sample(y + e, v, 8 * k);
       this.m.sample(y - e, v, 8 * k + 4);
+      // (Its left edges by the rule a kept height's are read again by (leftPair): a height worked out now and one kept
+      // from an earlier frame hold the same values to the bit, so what is drawn never depends on which it is, ToLaD#591.)
+      if (this.m.leftPair) this.m.leftPair(y, v, 8 * k);
       this.fresh++;
     }
     if (!keeps(this.ys.length, n)) {
@@ -450,6 +453,12 @@ export class Sleeve {
  * of sampling the column anew every frame. Per kept sample k, in world units:
  * the lanes just below it at vals[8k .. 8k + 3] (the chord from it down),
  * just above it at [8k + 4 .. 8k + 7] (the chord up to it): CutMemo.
+ *
+ * Progressive refinement (ToLaD#591): kept samples are what an earlier frame chose, and which frames those were is
+ * the view's history (which strands each frame drew, the budget's order). While the view moves they stand in for this
+ * view's own, within the tolerance; once it holds still (pathFrame.settle) each one drawn is made again for this view
+ * exactly, an equal share of each frame's work (pathFrame.settleWork), frames asked for until none drawn is left: the
+ * picture at rest is the one a fresh model makes, whatever came before.
  */
 export class ColumnPath {
   ys = new Float64Array(0);
@@ -461,6 +470,9 @@ export class ColumnPath {
   private grid = NaN;
   private yLo = 0;
   private yHi = 0;
+  /** The span (span()'s lo and hi, clamped) the kept samples were chosen for, with sxRef and grid: the view they are exact for. */
+  private forLo = NaN;
+  private forHi = NaN;
   constructor(private readonly m: TwigModel) {}
   /** build()'s last cuts and the span and grid they are for. */
   private cuts: number[] = [];
@@ -533,6 +545,13 @@ export class ColumnPath {
     if (must || ((this.redo || !(z < Math.log(PATH_ZOOM)) || grid !== this.grid) && pathFrame.spend())) {
       this.build(sx, sy, lo, hi, grid);
       pathFrame.left -= this.cuts.length + PATH_FRESH * this.m.cutMemo.fresh;
+    } else if (!this.exactFor(sx, lo, hi, grid)) {
+      // (Chosen for another view: made again for this one once the view holds still, as its share of the frame allows.)
+      if (pathFrame.settle && (pathFrame.settled === 0 || pathFrame.settleWork <= pathFrame.drawn)) {
+        this.build(sx, sy, lo, hi, grid);
+        pathFrame.settleWork += this.cuts.length + PATH_FRESH * this.m.cutMemo.fresh;
+        pathFrame.settled++;
+      } else pathFrame.inexact++;
     }
     // (Bisect: the last kept at or above lo, the first at or below hi.)
     const ys = this.ys;
@@ -553,7 +572,13 @@ export class ColumnPath {
     }
     const i1 = Math.min(this.n - 1, a);
     if (this.stale) this.releft(i0, i1);
+    pathFrame.drawn += i1 - i0 + 1;
     return [i0, i1];
+  }
+
+  /** Whether the kept samples are the ones build() chooses for this view: made at this zoom, span and grid, the fold not moved since. */
+  private exactFor(sx: number, lo: number, hi: number, grid: number): boolean {
+    return this.n > 0 && sx === this.sxRef && lo === this.forLo && hi === this.forHi && grid === this.grid && this.moved === 0 && !this.redo;
   }
 
   private build(sx: number, sy: number, lo: number, hi: number, grid: number): void {
@@ -684,6 +709,8 @@ export class ColumnPath {
     this.grid = grid;
     this.yLo = A;
     this.yHi = B;
+    this.forLo = lo;
+    this.forHi = hi;
     this.stale = false;
     this.moved = 0;
     this.redo = false;
@@ -699,10 +726,29 @@ export const pathFrame = {
   left: Infinity,
   /** Builds put off this frame. */
   owed: 0,
-  /** A new frame: moving, the budget; at rest, none. */
-  start(moving: boolean): void {
+  /** Whether the view holds still this frame (no gesture, no flight, the camera as last frame's): kept samples chosen for another view are made again for this one (ColumnPath, ToLaD#591). */
+  settle: false,
+  /**
+   * Those builds' work this frame, and the kept samples the frame's paths have handed out so far (span()), in the same
+   * units (a cut). The settle takes an equal share: a build goes while its work so far is no more than that, the
+   * first always (every frame that holds still makes progress). A frame that settles costs about twice one that does
+   * not, never one long frame after a gesture (PATH_BUDGET a frame was 0.42 s at the turtles in the phone proxy, a
+   * frame there 0.08, ToLaD#591).
+   */
+  settleWork: 0,
+  drawn: 0,
+  /** How many of them this frame made, and how many paths it drew still chosen for another view (the view asks for another frame while any are). */
+  settled: 0,
+  inexact: 0,
+  /** A new frame: moving, the budget; at rest, none. still: the view holds still (settle). */
+  start(moving: boolean, still = false): void {
     this.left = moving ? PATH_BUDGET : Infinity;
     this.owed = 0;
+    this.settle = still && !moving;
+    this.settleWork = 0;
+    this.drawn = 0;
+    this.settled = 0;
+    this.inexact = 0;
   },
   /** Whether a build that can wait goes this frame. */
   spend(): boolean {
