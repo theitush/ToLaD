@@ -12,7 +12,10 @@ Each species gets one basis (BASES):
   Rodrigues settled 1691 ...). The level holds at the natural level to that year, and the same fall is drawn
   from it to today's count.
 - `dated`: the loss is dated 1500 -> today (IUCN's Extinct / Possibly Extinct codes, historic-range sources
-  bounded by 1500, and three with only an end year). The drawing is unchanged.
+  bounded by 1500, and three with only an end year). The drawing is unchanged. ToLaD#594: the codes are read on
+  IUCN 2026's own maps for all 682 (research/range-loss-dates/iucn_codes.py): a species that nothing else dated, or
+  only an island bound, is `dated` when the 2026 codes cover at least half its lost cells (the island rule's majority);
+  PHYLACINE's 78, dated by the 2016-3 maps, cite IUCN 2026 where the 2026 maps still code at least half of theirs.
 - `prehistoric`: part of the loss is dated before 1500 (PREHISTORIC: the place the evidence names). Those cells,
   worked out from the rasters, are left out of the level held to 1500 (model.natural_level).
 - `bound`: only a lower bound: people's arrival on the island that holds most of the lost cells, or (the moose)

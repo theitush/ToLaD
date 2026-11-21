@@ -94,7 +94,7 @@
    "nodes": 2470,
    "root_gid": 1,
    "root_name": "Theria (subclass in Deuterostomia)",
-   "bytes": 308328
+   "bytes": 308336
   },
   {
    "id": 1,
@@ -158,7 +158,7 @@
    "nodes": 2200,
    "root_gid": 9469,
    "root_name": "Ruminantia",
-   "bytes": 449560
+   "bytes": 449584
   },
   {
    "id": 9,
@@ -174,7 +174,7 @@
    "nodes": 1945,
    "root_gid": 16316,
    "root_name": "Carnivora",
-   "bytes": 359712
+   "bytes": 359728
   },
   {
    "id": 11,

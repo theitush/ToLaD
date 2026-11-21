@@ -41612,13 +41612,13 @@
   "non-species tip": 551
  },
  "output": {
-  "brotli_bytes": 842588,
+  "brotli_bytes": 842656,
   "dated_sidecar_raw": 2215830,
   "files": 15,
-  "raw_bytes": 4595584,
-  "skeleton_brotli": 109397,
+  "raw_bytes": 4600336,
+  "skeleton_brotli": 109234,
   "skeleton_nodes": 2383,
-  "skeleton_raw": 1707608,
+  "skeleton_raw": 1712312,
   "tiles": 14
  },
  "overrides": {
@@ -42420,12 +42420,12 @@
  "rangeloss": {
   "by_basis": {
    "bound": {
-    "all": 247,
-    "trend": 246
+    "all": 244,
+    "trend": 243
    },
    "dated": {
-    "all": 167,
-    "trend": 148
+    "all": 175,
+    "trend": 156
    },
    "later": {
     "all": 77,
@@ -42436,8 +42436,8 @@
     "trend": 4
    },
    "undated": {
-    "all": 187,
-    "trend": 184
+    "all": 182,
+    "trend": 179
    }
   },
   "carried_by_genomic_record": 45,
@@ -42614,7 +42614,7 @@
     "to": 2008
    },
    {
-    "cite": "Faurby et al. 2018 Ecology 99:2626 (PHYLACINE adds IUCN's Extinct and Possibly Extinct polygons to the present-natural range); IUCN Mapping attribute codes v1.19 (2021): Possibly Extinct (4) and Extinct (5) mean known or thought very likely to occur post-1500 and now gone",
+    "cite": "IUCN 2026, The IUCN Red List of Threatened Species: range maps (search download, requested 2026-11-17): lost cells coded Possibly Extinct (4) or Extinct (5), which mean known or thought very likely to occur post-1500 and now gone (IUCN Mapping attribute codes v1.19, 2021); lost by the year of the species' assessment",
     "from": 1500,
     "place": "",
     "to": 2016
@@ -42650,6 +42650,12 @@
     "to": 2016
    },
    {
+    "cite": "Faurby et al. 2018 Ecology 99:2626 (PHYLACINE adds IUCN's Extinct and Possibly Extinct polygons to the present-natural range); IUCN Mapping attribute codes v1.19 (2021): Possibly Extinct (4) and Extinct (5) mean known or thought very likely to occur post-1500 and now gone",
+    "from": 1500,
+    "place": "",
+    "to": 2016
+   },
+   {
     "cite": "Hall 1981, The Mammals of North America (2nd ed.): ranges from specimen and literature records of the historic period; used as the pre-settlement range by Laliberte & Ripple 2004 BioScience 54:123",
     "from": 1500,
     "place": "",
@@ -42662,10 +42668,28 @@
     "to": 2016
    },
    {
+    "cite": "IUCN 2026, The IUCN Red List of Threatened Species: range maps (search download, requested 2026-11-17): lost cells coded Possibly Extinct (4) or Extinct (5), which mean known or thought very likely to occur post-1500 and now gone (IUCN Mapping attribute codes v1.19, 2021); lost by the year of the species' assessment",
+    "from": 1500,
+    "place": "",
+    "to": 2015
+   },
+   {
     "cite": "Sumatra (Lida Ajer) 73,000-63,000 BP (Westaway et al. 2017 Nature 548:322); Niah, Borneo ~46,000 BP (Barker et al. 2007 J. Hum. Evol. 52:243); joined to Asia at glacial low sea level (Voris 2000)",
     "from": -61000,
     "place": "Sundaland islands",
     "to": 2016
+   },
+   {
+    "cite": "IUCN 2026, The IUCN Red List of Threatened Species: range maps (search download, requested 2026-11-17): lost cells coded Possibly Extinct (4) or Extinct (5), which mean known or thought very likely to occur post-1500 and now gone (IUCN Mapping attribute codes v1.19, 2021); lost by the year of the species' assessment",
+    "from": 1500,
+    "place": "",
+    "to": 2014
+   },
+   {
+    "cite": "IUCN 2026, The IUCN Red List of Threatened Species: range maps (search download, requested 2026-11-17): lost cells coded Possibly Extinct (4) or Extinct (5), which mean known or thought very likely to occur post-1500 and now gone (IUCN Mapping attribute codes v1.19, 2021); lost by the year of the species' assessment",
+    "from": 1500,
+    "place": "",
+    "to": 2008
    },
    {
     "cite": "PHYLACINE note cites: Kingdon J, Hoffmann M. (2013) Mammals of Africa Volume VI.. Written-record historic range; no window stated by the source, so bounded by 1500 and the 2016 map",
@@ -42728,6 +42752,12 @@
     "to": 2016
    },
    {
+    "cite": "IUCN 2026, The IUCN Red List of Threatened Species: range maps (search download, requested 2026-11-17): lost cells coded Possibly Extinct (4) or Extinct (5), which mean known or thought very likely to occur post-1500 and now gone (IUCN Mapping attribute codes v1.19, 2021); lost by the year of the species' assessment",
+    "from": 1500,
+    "place": "",
+    "to": 2023
+   },
+   {
     "cite": "PHYLACINE note cites: Range expanded to all of the West Guinean lowland forest within Sierra Leone or Guinea. The former presence in Guinea is not known but suspected. Information fr. Written-record historic range; no window stated by the source, so bounded by 1500 and the 2016 map",
     "from": 1500,
     "place": "",
@@ -42740,10 +42770,10 @@
     "to": 1999
    },
    {
-    "cite": "Lapita settlement ~3,000-2,850 cal BP (Sheppard 2011 Curr. Anthropol. 52:799; Burley et al. 2012 PLoS ONE 7:e48769)",
-    "from": -1050,
-    "place": "Fiji/Tonga",
-    "to": 2016
+    "cite": "IUCN 2026, The IUCN Red List of Threatened Species: range maps (search download, requested 2026-11-17): lost cells coded Possibly Extinct (4) or Extinct (5), which mean known or thought very likely to occur post-1500 and now gone (IUCN Mapping attribute codes v1.19, 2021); lost by the year of the species' assessment",
+    "from": 1500,
+    "place": "",
+    "to": 2018
    },
    {
     "cite": "Polynesian arrival ~1280 CE (Wilmshurst et al. 2011 PNAS 108:1815)",
@@ -42758,16 +42788,34 @@
     "to": 1996
    },
    {
+    "cite": "IUCN 2026, The IUCN Red List of Threatened Species: range maps (search download, requested 2026-11-17): lost cells coded Possibly Extinct (4) or Extinct (5), which mean known or thought very likely to occur post-1500 and now gone (IUCN Mapping attribute codes v1.19, 2021); lost by the year of the species' assessment",
+    "from": 1500,
+    "place": "",
+    "to": 2024
+   },
+   {
     "cite": "Archaeology only from ~2,200 BP (Cooper 2002, Archaeology and History: Early Settlements in the Andaman Islands, OUP); genetics suggests settlement tens of thousands of years ago (Endicott et al. 2003 Am. J. Hum. Genet. 72:178)",
     "from": -50000,
     "place": "Andaman Islands",
     "to": 2016
    },
    {
+    "cite": "IUCN 2026, The IUCN Red List of Threatened Species: range maps (search download, requested 2026-11-17): lost cells coded Possibly Extinct (4) or Extinct (5), which mean known or thought very likely to occur post-1500 and now gone (IUCN Mapping attribute codes v1.19, 2021); lost by the year of the species' assessment",
+    "from": 1500,
+    "place": "",
+    "to": 2022
+   },
+   {
     "cite": "Fa-Hien Lena ~48,000 BP (Wedage et al. 2019 Nat. Commun. 10:739); joined to India at glacial low sea level",
     "from": -46000,
     "place": "Sri Lanka",
     "to": 2016
+   },
+   {
+    "cite": "IUCN 2026, The IUCN Red List of Threatened Species: range maps (search download, requested 2026-11-17): lost cells coded Possibly Extinct (4) or Extinct (5), which mean known or thought very likely to occur post-1500 and now gone (IUCN Mapping attribute codes v1.19, 2021); lost by the year of the species' assessment",
+    "from": 1500,
+    "place": "",
+    "to": 2025
    },
    {
     "cite": "The dated part: dholes in North America are known only from Late Pleistocene fossils (Kurten & Anderson 1980, Pleistocene Mammals of North America)",
@@ -42810,6 +42858,12 @@
     "from": 1500,
     "place": "",
     "to": 2016
+   },
+   {
+    "cite": "IUCN 2026, The IUCN Red List of Threatened Species: range maps (search download, requested 2026-11-17): lost cells coded Possibly Extinct (4) or Extinct (5), which mean known or thought very likely to occur post-1500 and now gone (IUCN Mapping attribute codes v1.19, 2021); lost by the year of the species' assessment",
+    "from": 1500,
+    "place": "",
+    "to": 2019
    },
    {
     "cite": "Maritime fur trade 1741-1911 (Kenyon 1969, The Sea Otter in the Eastern Pacific Ocean, N. Am. Fauna 68); historic range per USFWS Biol. Rep. 90(1) 1990",
@@ -42926,6 +42980,12 @@
     "to": 2016
    },
    {
+    "cite": "IUCN 2026, The IUCN Red List of Threatened Species: range maps (search download, requested 2026-11-17): lost cells coded Possibly Extinct (4) or Extinct (5), which mean known or thought very likely to occur post-1500 and now gone (IUCN Mapping attribute codes v1.19, 2021); lost by the year of the species' assessment",
+    "from": 1500,
+    "place": "",
+    "to": 2017
+   },
+   {
     "cite": "PHYLACINE note cites: Douglas-Hamilton I and Douglas-Hamilton O. Battle for the Elephants (1993) .. Written-record historic range; no window stated by the source, so bounded by 1500 and the 2016 map",
     "from": 1500,
     "place": "",
@@ -42968,6 +43028,12 @@
     "to": 2016
    },
    {
+    "cite": "Lapita settlement ~3,000-2,850 cal BP (Sheppard 2011 Curr. Anthropol. 52:799; Burley et al. 2012 PLoS ONE 7:e48769)",
+    "from": -1050,
+    "place": "Fiji/Tonga",
+    "to": 2016
+   },
+   {
     "cite": "PHYLACINE note cites: The Monachus guardian website http://www.monachus-guardian.org/factfiles/medit15.htm.. Written-record historic range; no window stated by the source, so bounded by 1500 and the 2016 map",
     "from": 1500,
     "place": "",
@@ -42990,6 +43056,12 @@
     "from": 1280,
     "place": "New Zealand",
     "to": 2001
+   },
+   {
+    "cite": "IUCN 2026, The IUCN Red List of Threatened Species: range maps (search download, requested 2026-11-17): lost cells coded Possibly Extinct (4) or Extinct (5), which mean known or thought very likely to occur post-1500 and now gone (IUCN Mapping attribute codes v1.19, 2021); lost by the year of the species' assessment",
+    "from": 1500,
+    "place": "",
+    "to": 2020
    },
    {
     "cite": "Joined to mainland Asia at glacial low sea level (Voris 2000 J. Biogeogr. 27:1153): people there in the Late Pleistocene",
@@ -43044,6 +43116,12 @@
     "from": 1500,
     "place": "",
     "to": 2016
+   },
+   {
+    "cite": "IUCN 2026, The IUCN Red List of Threatened Species: range maps (search download, requested 2026-11-17): lost cells coded Possibly Extinct (4) or Extinct (5), which mean known or thought very likely to occur post-1500 and now gone (IUCN Mapping attribute codes v1.19, 2021); lost by the year of the species' assessment",
+    "from": 1500,
+    "place": "",
+    "to": 2011
    },
    {
     "cite": "Mainland NZ breeding range lost after Polynesian arrival (Collins et al. 2014 Proc. R. Soc. B 281:20140097; Wilmshurst et al. 2011 PNAS 108:1815)",

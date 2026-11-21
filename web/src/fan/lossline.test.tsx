@@ -34,8 +34,13 @@ describe("the card says what dates a species' range loss (ToLaD#507)", () => {
     const want: [string, string, string, string][] = [
       // Australia: the fall starts at European settlement (Strahan & Van Dyck's former ranges).
       ['Myrmecobius fasciatus', 'later', 'Range lost since 1788 (Strahan & Van Dyck 2008)', METHOD_IDS.past],
-      // IUCN's Extinct / Possibly Extinct codes on its map, which PHYLACINE adds (Faurby et al. 2018): since 1500.
-      ['Myrmecophaga tridactyla', 'dated', 'Range lost since 1500 (Faurby et al. 2018)', METHOD_IDS.past],
+      // IUCN's Extinct / Possibly Extinct codes on its map, which PHYLACINE adds (Faurby et al. 2018), and IUCN 2026's
+      // maps still code (ToLaD#594): since 1500.
+      ['Myrmecophaga tridactyla', 'dated', 'Range lost since 1500 (IUCN 2026)', METHOD_IDS.past],
+      // One of PHYLACINE's 78 whose loss IUCN 2026's maps no longer code: the 2016-3 maps' citation stays.
+      ['Pteropus niger', 'dated', 'Range lost since 1500 (Faurby et al. 2018)', METHOD_IDS.past],
+      // Undated before ToLaD#594: IUCN 2026 codes 97% of its lost cells Extinct or Possibly Extinct.
+      ['Neofelis nebulosa', 'dated', 'Range lost since 1500 (IUCN 2026)', METHOD_IDS.past],
       // A historic range from records (Hall 1981): bounded by 1500.
       ['Antilocapra americana', 'dated', 'Range lost since 1500 (Hall 1981)', METHOD_IDS.past],
       // The dhole's North America, known only from Late Pleistocene fossils: left out of the 1500 level.
@@ -124,6 +129,9 @@ describe("the card says what dates a species' range loss (ToLaD#507)", () => {
     expect(shortCite('Foose & van Strien 1997, Asian Rhinos')).toBe('Foose & van Strien 1997');
     expect(shortCite('PHYLACINE note cites: Smith and Xie. Mammals of China (2008).')).toBe('PHYLACINE');
     expect(shortCite('Queensland Government (DEHP) species profile')).toBe('');
+    expect(shortCite('IUCN 2026, The IUCN Red List of Threatened Species: range maps (IUCN Mapping attribute codes v1.19, 2021)')).toBe(
+      'IUCN 2026',
+    );
     expect(yearWords(1788)).toBe('1788');
     expect(yearWords(-8500, 2026)).toBe('~10,500 years ago');
     expect(yearWords(-1300, 2026)).toBe('~3,300 years ago');

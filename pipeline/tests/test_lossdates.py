@@ -42,11 +42,29 @@ class Classes(unittest.TestCase):
         d = LD.load()
         self.assertEqual(len(d), 682)
         self.assertEqual(Counter(x["basis"] for x in d.values()),
-                         {"later": 77, "dated": 167, "prehistoric": 5, "bound": 248, "undated": 185})
+                         {"later": 77, "dated": 175, "prehistoric": 5, "bound": 245, "undated": 180})
         later = Counter(x["start"] for x in d.values() if x["basis"] == "later")
         self.assertEqual(later[1788], 64)  # Strahan & Van Dyck's 62 and the two hairy-nosed wombats
         self.assertEqual(d["Enhydra lutris"]["start"], 1741)
         self.assertTrue(all(x["start"] == 1500 for x in d.values() if x["basis"] != "later"))
+
+    def test_iucn_2026_codes_date_what_they_cover(self):
+        # ToLaD#594: IUCN 2026's Possibly Extinct / Extinct codes cover at least half the lost cells: lost after 1500, by
+        # the assessment. An undated species (the clouded leopard) and an island-bound one (the bearded pig) are dated so.
+        d = LD.load()
+        for sp, was in (("Neofelis nebulosa", "none"), ("Sus barbatus", "island")):
+            x = d[sp]
+            self.assertEqual((x["basis"], x["start"], x["row"]["basis"]), ("dated", 1500, "iucn_codes"), sp)
+            self.assertTrue(x["src"].startswith("IUCN 2026,"), sp)
+            self.assertGreaterEqual(float(x["row"]["dated_share"]), 0.5, sp)
+        self.assertEqual(d["Neofelis nebulosa"]["row"]["latest_year"], "2020")  # its assessment's year
+        # PHYLACINE's own 78: IUCN 2026 where the 2026 maps still code its loss, else the 2016-3 maps' citation
+        self.assertTrue(d["Myrmecophaga tridactyla"]["src"].startswith("IUCN 2026,"))
+        self.assertTrue(d["Pteropus niger"]["src"].startswith("Faurby et al. 2018"))
+        # under half: the basis stays (the hartebeest's codes cover 13%: undated)
+        self.assertEqual(d["Alcelaphus buselaphus"]["basis"], "undated")
+        # a documented later start stays: the European mink's 1800, though IUCN codes 98% of its loss
+        self.assertEqual((d["Mustela lutreola"]["basis"], d["Mustela lutreola"]["start"]), ("later", 1800))
 
     def test_bounds_name_their_island(self):
         d = LD.load()
@@ -61,7 +79,7 @@ class Classes(unittest.TestCase):
     def test_undated_have_no_start_but_1500(self):
         d = LD.load()
         und = [x for x in d.values() if x["basis"] == "undated"]
-        self.assertEqual(len(und), 185)
+        self.assertEqual(len(und), 180)  # 185 before ToLaD#594: 5 dated by IUCN 2026
         self.assertTrue(all(x["start"] == 1500 for x in und))
 
 

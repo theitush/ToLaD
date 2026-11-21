@@ -90,10 +90,12 @@ export function aliveStep(sp: SpeciesRec): string {
 
 /**
  * A citation's short name for the card (ToLaD#507): its first author and year ("Strahan & Van Dyck 2008", "Ray, Hunter &
- * Zigouris 2005", "Faurby et al. 2018"); a citation that names none is PHYLACINE's note's own ("PHYLACINE"), else ''.
- * The whole citation is in the chart's sources.
+ * Zigouris 2005", "Faurby et al. 2018"); IUCN's own maps by their year ("IUCN 2026", ToLaD#594); a citation that names
+ * none is PHYLACINE's note's own ("PHYLACINE"), else ''. The whole citation is in the chart's sources.
  */
 export function shortCite(cite: string): string {
+  const iucn = cite.match(/^IUCN (\d{4})(?!\d)/);
+  if (iucn) return `IUCN ${iucn[1]}`;
   const m = cite.match(AUTHOR_YEAR);
   if (m) return m[0].replace(/,(?= \d)/, '');
   return /^PHYLACINE note/.test(cite) ? 'PHYLACINE' : '';
@@ -126,7 +128,8 @@ function spanWords(from: number | null, to: number | null): string {
  * words linked to the methods page, the rest, and the page's section. Null: no line, the species has no loss the data
  * dates, or no fall (a domestic stock's rise). The five bases (pipeline/FORMAT.md "Loss dates"):
  * - later: "Range lost since 1788 (Strahan & Van Dyck 2008)": the fall starts at the documented start;
- * - dated: "Range lost since 1500 (Hall 1981)": the source is bounded by 1500;
+ * - dated: "Range lost since 1500 (Hall 1981)": the source is bounded by 1500; "Range lost since 1500 (IUCN 2026)": IUCN's
+ *   maps code the lost part Extinct or Possibly Extinct (ToLaD#594);
  * - prehistoric: "Range in mainland Australia lost ~3,300–3,100 years ago, not counted": left out of the 1500 level;
  * - bound: "Range lost after people reached Madagascar (~10,500 years ago)": only a lower bound; a bound that names no
  *   land (the moose's Iron Age range) says its year and source;
