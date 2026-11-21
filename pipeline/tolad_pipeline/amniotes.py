@@ -35,7 +35,11 @@ crocodilians, giant tortoises, the Komodo dragon, the tuatara, ...), each figure
 mammal's census is. Every other reptile, and every bird Callaghan lacks: count unknown (FLAG bit 11), drawn at the
 thinnest a living species is (the smallest count of any other living species); there is no reptile model. No source yet gives a bird or reptile
 generation length, so births use an assumed one (`ASSUMED_GEN_YR`, the page's own fallback) and say so.
-Histories, ranges, natural baselines, Red List status and traits stay "none" until their steps.
+
+**Red List status (ToLaD#600).** Every bird and reptile its IUCN Red List 2026-1 category by the mammals' rule and
+code (redlist.match_all): its list name, alt names, Open Tree synonyms, the Red List's own synonyms, a gender ending;
+a living one the list does not have is Not Evaluated, a fossil has none, one lost since 1500 keeps the list's EX/EW.
+Histories, ranges, natural baselines and traits stay "none" until their steps.
 """
 
 from __future__ import annotations
@@ -375,15 +379,9 @@ def sauropsid_rows(nroot: NNode, tax: dict, lists: Lists, log: dict, counted: se
         how[h] += 1
         if "extinct" in n.data.get("ott_flags", set()) and sp in counted:
             counted_ext.append(sp)  # a count today says it lives (OTT flags the silver gull extinct)
-        elif sp not in counted and any(sp in names or n.name in names for names in lost.values()):
-            # A list species IOC 15.2 marks extinct (a dagger) or the Red List 2026-1 assesses Extinct, and no count
-            # today has: lost since 1500 CE (Raphus cucullatus, Aplonis fusca, the great auk). With no year in either
-            # source, it ends a century ago (merge's rule for the Red List's EX, `red_list_ex`). OTT flags most of
-            # them extinct itself (not by inheritance: Acratosaura mentalis is "extinct_inherited" and alive).
-            n.extinct = True
-            n.lad = LAD_RECENT_EX
-            n.data.update(lad_default=True, red_list_ex=True,
-                          lost_since_1500=[w for w, names in lost.items() if sp in names or n.name in names])
+        elif sp not in counted and _mark_lost(n, sp, lost):
+            # OTT flags most of the lost extinct itself (not by inheritance: Acratosaura mentalis is
+            # "extinct_inherited" and alive)
             (extinct if "extinct" in n.data.get("ott_flags", set()) else lost_unflagged).append(sp)
         elif "extinct" in n.data.get("ott_flags", set()):
             # OTT alone calls it extinct: the list carries it as a living species and neither IOC nor the Red List
@@ -397,8 +395,12 @@ def sauropsid_rows(nroot: NNode, tax: dict, lists: Lists, log: dict, counted: se
         n.data.update(group=r["group"], list=r["list"], family=r["family"], order=r["order"])
         if r["common"]:
             n.data["common_list"] = r["common"]
-    # 3. listed species Open Tree lacks: onto their genus
+    # 3. listed species Open Tree lacks: onto their genus; lost since 1500 by the same rule as a tip (ToLaD#600:
+    # Bolyeria multocarinata, Necropsittacus rodricanus were drawn living)
     grafted, skipped = graft_on_genus(root, lists, seen, tax)
+    lost_grafted = [sp for sp, n in seen.items() if n.data.get("list_graft") and sp not in counted
+                    and _mark_lost(n, sp, lost)]
+    lost_unflagged.extend(lost_grafted)
     n_drop = 0  # what is left of the higher taxa whose species all went: leaves that are no listed species
     changed = True
     while changed:
@@ -428,6 +430,9 @@ def sauropsid_rows(nroot: NNode, tax: dict, lists: Lists, log: dict, counted: se
         "lost_since_1500_not_flagged_by_ott": {"n": len(lost_unflagged),
                                                "by_group": dict(Counter(seen[x].data["group"] for x in lost_unflagged)),
                                                "names": sorted(lost_unflagged)},
+        "lost_since_1500_grafted_on_genus": {"n": len(lost_grafted),
+                                             "by_group": dict(Counter(seen[x].data["group"] for x in lost_grafted)),
+                                             "names": sorted(lost_grafted)},
         "ott_extinct_but_counted_today": sorted(counted_ext),
         "unlisted_tips_dropped": dict(unlisted.most_common()),
         "duplicate_tips_dropped": {"n": len(dup), "names": sorted(dup)},
@@ -436,6 +441,19 @@ def sauropsid_rows(nroot: NNode, tax: dict, lists: Lists, log: dict, counted: se
         "listed": {g: sum(1 for r in lists.sp.values() if r["group"] == g) for g in GROUPS},
     }
     return root, seen
+
+
+def _mark_lost(n: Node, sp: str, lost: dict[str, set[str]]) -> bool:
+    """A list species IOC 15.2 marks extinct (a dagger) or the Red List 2026-1 assesses Extinct (`lost`, load_lost), by
+    its list name or its Open Tree name: lost since 1500 CE (Raphus cucullatus, Aplonis fusca, the great auk). With no
+    year in either source, it ends a century ago (merge's rule for the Red List's EX, `red_list_ex`). The caller
+    leaves out a species a count today has (it lives). Returns whether it was lost."""
+    by = [w for w, names in lost.items() if sp in names or n.name in names]
+    if by:
+        n.extinct = True
+        n.lad = LAD_RECENT_EX
+        n.data.update(lad_default=True, red_list_ex=True, lost_since_1500=by)
+    return bool(by)
 
 
 def _tight(m: Node, k: int) -> bool:
@@ -990,6 +1008,65 @@ def count_leaves(rows: Node, birds_n: dict[str, dict], thin: tuple[float, str], 
                      "assumed_generation_yr": ASSUMED_GEN_YR}
 
 
+SAUROPSID_RL = {"AVES": "Aves", "SQUAMATA": "Squamata", "TESTUDINES": "Testudines", "CROCODYLIA": "Crocodylia",
+                "RHYNCHOCEPHALIA": "Rhynchocephalia"}
+
+
+def red_list_status(top: Node, rl: dict[str, dict], syn: dict[int, list[str]]) -> dict:
+    """ToLaD#600: each bird and reptile leaf under `top` (the sauropsids; the mammals keep their own build's) its IUCN
+    Red List 2026-1 status, by the mammals' rule and code (redlist.match_all, module docstring): no PHYLACINE or
+    COMBINE bridges here, the Red List's own synonymy instead (redlist.synonym_index). The record is the status alone:
+    a leaf's name stays its list's (eBird/Clements, or the Red List's English name by name_reptiles' rule, #592).
+    Returns the report: per group, how each living leaf matched and its category, and the other side, the Red List
+    species no leaf took."""
+    status = {n: {k: r[k] for k in ("category", "year", "taxon", "assessment")} for n, r in rl.items()}
+    ctx = {"phy": {}, "phy_syn": {}, "ott_syn": syn}
+    by, used, lost_not_ours = redlist.match_all(top, status, {}, ctx, redlist.synonym_index(rl))
+
+    def grp(n: Node) -> str:
+        g = n.data.get("group") or "?"
+        return f"{g}: {n.data.get('order')}" if g == "Squamata" else g
+
+    leaves = [n for n in top.preorder() if n.is_leaf and n.kind == "tree" and n.name and n.data.get("list")]
+    living = [n for n in leaves if n.t1 == 0]
+    how: dict[str, Counter] = defaultdict(Counter)
+    cats: dict[str, Counter] = defaultdict(Counter)
+    for n in living:
+        r = n.data["red_list"]
+        how[grp(n)]["not listed" if r["source"] == redlist.SRC_NONE else r["via"]] += 1
+        cats[grp(n)][r["category"]] += 1
+    taken = {n.data["red_list"]["taxon"] for n in leaves if n.data.get("red_list") and n.data["red_list"]["taxon"]}
+    untaken: dict[str, list[str]] = defaultdict(list)
+    for nm, r in sorted(rl.items()):
+        if r["taxon"] not in taken:
+            untaken[SAUROPSID_RL.get(r["order"] if r["class"] == "REPTILIA" else "AVES", r["order"])].append(nm)
+    return {
+        "note": "IUCN Red List 2026-1 category of every bird and reptile leaf (ToLaD#600), the mammals' rule "
+                "(redlist.match_all): list name, alt names, Open Tree synonyms, the Red List's own synonyms, a gender "
+                "ending; not listed: NE. Fossils none; a leaf lost since 1500 only the list's EX/EW.",
+        "living_leaves": len(living),
+        "living_matched_by": {g: dict(sorted(c.items())) for g, c in sorted(how.items())},
+        "living_by_category": {g: dict(sorted(c.items())) for g, c in sorted(cats.items())},
+        "living_but_red_list_ex_not_taken": sorted(lost_not_ours),
+        "ended_with_status": {n.name: n.data["red_list"]["category"] for n in leaves
+                              if n.t1 > 0 and n.data.get("red_list")},
+        "ended_without_status": sum(1 for n in leaves if n.t1 > 0 and not n.data.get("red_list")),
+        "matched_by": dict(sorted(by.items())),
+        "redlist_species": dict(Counter(SAUROPSID_RL.get(r["order"] if r["class"] == "REPTILIA" else "AVES", r["order"])
+                                        for r in rl.values())),
+        "redlist_taxa_on_two_leaves": sum(1 for v in used.values() if v > 1),
+        "redlist_not_taken": {g: _untaken(v, rl) for g, v in sorted(untaken.items())},
+    }
+
+
+def _untaken(v: list[str], rl: dict[str, dict]) -> dict:
+    """The Red List species of a group no leaf took: how many, by category, five examples spread over the living
+    (a missed synonym would show) and five of the lost (species our lists do not carry)."""
+    alive = [x for x in v if rl[x]["category"] != "EX"]
+    return {"n": len(v), "by_category": dict(sorted(Counter(rl[x]["category"] for x in v).items())),
+            "examples": alive[::max(1, len(alive) // 5)][:5], "examples_ex": [x for x in v if rl[x]["category"] == "EX"][:5]}
+
+
 def _cum(n: Node, x: np.ndarray) -> np.ndarray:
     """Births of n's band older-than-t1 up to each age in x, from its 16-bin profile (piecewise constant)."""
     e = profile_edges(n.t0, n.t1)
@@ -1208,6 +1285,8 @@ def build_amniotes(raw: Path, work: Path, log: dict, alog: dict, t_start: float)
     # counts
     thin = thinnest(mroot, cal, rept)
     count_leaves(root, cal, thin, alog, skip=mroot, rept=rept)
+    alog["red_list"] = red_list_status(stop, rl, syn)
+    log_step(t_start, f"Red List status: {alog['red_list']['living_by_category']}")
     sum_rows(root, extra=[mroot])
     alog["checks"] = checks(root, mroot, srows, adroot, mdroot, tops, crowns)
     alog["checks"]["fossils"] = fossils.checks(root, mroot)

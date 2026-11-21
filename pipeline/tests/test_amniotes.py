@@ -167,6 +167,66 @@ class TestRules(unittest.TestCase):
         self.assertEqual(log["Squamata: name"], 1)
         self.assertEqual((log["Squamata: Red List synonym"], log["Squamata: Open Tree synonym"]), (2, 1))
 
+    def test_grafted_lost_species_ends(self):
+        # ToLaD#600: a list species Open Tree lacks (grafted on its genus) that the Red List calls EX is lost since
+        # 1500, as a tip is (Bolyeria multocarinata was drawn living); unless a count today has it
+        from tolad_pipeline.merge import LAD_RECENT_EX
+        from tolad_pipeline.newick import parse_newick
+        nroot = parse_newick("((Homo_sapiens_ott1)Mammalia_ott244265,(Aus_bus_ott902,Aus_cus_ott903)Aus_ott901)"
+                             "Amniota_ott229560;")
+        for nd in nroot.iter_preorder():
+            m = amniotes.OTT_LABEL.match(nd.label or "")
+            nd.ott, nd.name = int(m.group(2)), m.group(1).replace("_", " ")
+        rank = {1: "species", 244265: "class", 901: "genus", 902: "species", 903: "species", 229560: "no rank"}
+        tax = {u: {"parent": None, "name": "", "rank": r, "flags": set(), "group": "Squamata"} for u, r in rank.items()}
+        sp = lambda: {"ott": None, "group": "Squamata", "family": "F", "order": "Sauria", "common": None, "list": "rdb"}  # noqa: E731
+        rept = {n: sp() for n in ("Aus bus", "Aus cus", "Aus dus", "Aus eus", "Aus fus")}
+        lists = amniotes.Lists({}, rept, {}, {})
+        log = {}
+        _, seen = amniotes.sauropsid_rows(nroot, tax, lists, log, counted={"Aus eus"},
+                                          lost={"Red List 2026-1 EX": {"Aus dus", "Aus eus"}})
+        self.assertTrue(seen["Aus dus"].data.get("list_graft"))
+        self.assertEqual((seen["Aus dus"].extinct, seen["Aus dus"].lad), (True, LAD_RECENT_EX))
+        self.assertEqual(seen["Aus dus"].data["lost_since_1500"], ["Red List 2026-1 EX"])
+        self.assertFalse(seen["Aus eus"].extinct)  # counted today: it lives
+        self.assertFalse(seen["Aus fus"].extinct or seen["Aus bus"].extinct)
+        self.assertEqual(log["rows"]["lost_since_1500_grafted_on_genus"]["names"], ["Aus dus"])
+
+    def test_red_list_status(self):
+        # ToLaD#600: a bird's or reptile's Red List status by the mammals' rule (redlist.match_all): its name, alt name,
+        # Open Tree synonym, the Red List's own synonym, a gender ending; never a name another leaf has; a living leaf
+        # never takes an EX record; one lost since 1500 only EX/EW; a fossil none; not listed: NE. The record carries no
+        # English name (the lists' names stay).
+        def rec(cat, taxon, syn=(), cls="REPTILIA", order="SQUAMATA"):
+            return {"category": cat, "year": 2020, "taxon": taxon, "assessment": taxon * 10, "class": cls, "order": order,
+                    "synonyms": list(syn), "common": "Red List Name"}
+        rl = {"Aus bus": rec("LC", 1, cls="AVES", order="PASSERIFORMES"), "Eus dus": rec("VU", 2, syn=["Cus dus"]),
+              "Hus ius": rec("EN", 3, syn=["Fus gus"]), "Pus nus": rec("CR", 4), "Qus rus": rec("EX", 5),
+              "Tus vus": rec("EX", 6), "Wus xa": rec("NT", 7), "Yus za": rec("DD", 8)}
+        names = {"Aus bus": dict(group="Aves", order="Passeriformes"), "Cus dus": {}, "Fus gus": {}, "Hus ius": {},
+                 "Mus nus": {}, "Qus rus": {}, "Tus vus": {}, "Wus xus": {}, "Kus lus": {}}
+        top = clade("Sauropsida")
+        for n, d in names.items():
+            top.add(leaf(n, ott=50 if n == "Mus nus" else None,
+                         **{"group": "Squamata", "order": "Sauria", "list": "rdb", **d}))
+        by = {n.name: n for n in top.preorder() if n.is_leaf}
+        by["Tus vus"].t1 = 1e-4  # lost since 1500
+        top.add(Node(name="Yus za", kind="graft", t1=50.0))  # a fossil of a listed name
+        rep = amniotes.red_list_status(top, rl, {50: ["Pus nus"]})
+        got = {n: (x.data["red_list"]["category"], x.data["red_list"]["via"]) for n, x in by.items()}
+        self.assertEqual(got, {"Aus bus": ("LC", "name"), "Cus dus": ("VU", "Red List synonym"),
+                               "Fus gus": ("NE", None),  # its Red List species is another leaf's own name: a lump
+                               "Hus ius": ("EN", "name"), "Mus nus": ("CR", "Open Tree synonym"),
+                               "Qus rus": ("NE", None),  # lives here, the list's taxon lost
+                               "Tus vus": ("EX", "name"), "Wus xus": ("NT", "spelling variant"), "Kus lus": ("NE", None)})
+        self.assertNotIn("common", by["Aus bus"].data["red_list"])
+        self.assertNotIn("red_list", top.children[-1].data)
+        self.assertEqual(rep["living_but_red_list_ex_not_taken"], ["Qus rus"])
+        self.assertEqual(rep["ended_with_status"], {"Tus vus": "EX"})
+        self.assertEqual(rep["living_matched_by"]["Aves"], {"name": 1})
+        self.assertEqual(rep["redlist_not_taken"]["Squamata"]["n"], 2)  # Qus rus (EX, not taken) and Yus za
+        self.assertEqual(rep["redlist_not_taken"]["Squamata"]["examples"], ["Yus za"])
+
     def test_reptile_count_table(self):
         """pipeline/reptile_counts.toml: every number has its source, what it counts, its year and a quote; a range's
         middle is its geometric middle; none is implausible (no sea turtle in billions, no species under 10)."""
@@ -392,6 +452,29 @@ class TestOutput(unittest.TestCase):
         self.assertEqual(named["Rhynchocephalia"], 1)
         self.assertGreater(named["Testudines"], 250)
         self.assertGreater(named["Squamata"], 7000)
+
+    def test_red_list_status_wired(self):
+        """ToLaD#600: every living bird and reptile row carries its Red List status (RLST), as every mammal's; a fossil
+        none; one lost since 1500 the list's EX; the list's taxa a leaf took counted the other way too."""
+        meta, rows = all_rows(AMN)
+        _, mrows = all_rows(MAM)
+        mam = {r["NAME"] for r in mrows.values()}
+        cats = meta["red_list"]["categories"]
+        cat = lambda r: cats[r["RLST"][0] & 255]  # noqa: E731
+        sau = [r for r in rows.values() if r["FLAG"] & (1 << 6) and r["NAME"] not in mam]
+        living = [r for r in sau if not r["FLAG"] & (1 << 2)]
+        self.assertEqual(len(living), self.s["red_list"]["living_leaves"])
+        self.assertEqual([r["NAME"] for r in living if not cat(r)], [])
+        self.assertTrue(all(cat(r) == "" for r in sau if r["FLAG"] & (1 << 9)))  # PBDB fossils: none
+        lost = [r for r in sau if r["FLAG"] & (1 << 2) and not r["FLAG"] & (1 << 9)]
+        self.assertEqual(Counter(cat(r) for r in lost if cat(r)), {"EX": len(self.s["red_list"]["ended_with_status"])})
+        by = Counter(cat(r) for r in living)
+        self.assertNotIn("EX", by)  # a living row never carries EX
+        self.assertGreater(by["LC"], 14000)
+        self.assertLess(by["NE"] / len(living), 0.15)
+        self.assertEqual(self.s["red_list"]["living_by_category"]["Crocodylia"], {"CR": 7, "EN": 1, "LC": 12, "NE": 4, "VU": 3})
+        self.assertEqual(self.s["red_list"]["living_but_red_list_ex_not_taken"], ["Chelonoidis niger", "Zosterops conspicillatus"])
+        self.assertEqual(self.s["rows"]["lost_since_1500_grafted_on_genus"]["n"], 21)
 
     def test_page_reads_unknown_flag(self):
         meta, rows = all_rows(AMN)

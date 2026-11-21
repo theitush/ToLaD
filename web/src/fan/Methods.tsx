@@ -485,7 +485,10 @@ export function MethodsView({ onClose, at }: { onClose: () => void; at?: string 
               drawn. A species that died out: its level while it lived (<Jump to={METHOD_IDS.fossils}>step 7</Jump>).
             </dd>
             <dt id={WORD_IDS.status}>Status</dt>
-            <dd>The IUCN Red List category (Least Concern … Critically Endangered, Extinct) and its year.</dd>
+            <dd>
+              The IUCN Red List category (Least Concern … Critically Endangered, Extinct) and its year, for a mammal, bird or
+              reptile alike: found by the species’ name or a known synonym. Not on the list: Not Evaluated. A fossil has none.
+            </dd>
             <dt id={WORD_IDS.chart}>The chart</dt>
             <dd>
               The species’ number through time. Dot colours are grades:{' '}

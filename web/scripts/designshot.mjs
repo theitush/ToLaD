@@ -325,6 +325,10 @@ const scenes = [
         ['amn-testudines', 'level', ['Testudines']],
         ['amn-card-bird', 'card', ['House sparrow']],
         ['amn-card-reptile', 'card', ['Varanus komodoensis']],
+        // Their Red List status (ToLaD#600): a sea turtle's, a tortoise's (its Red List name a synonym of ours), a crocodile's.
+        ['amn-card-ridley', 'card', ['Lepidochelys olivacea']],
+        ['amn-card-aldabra', 'card', ['Aldabrachelys gigantea']],
+        ['amn-card-croc', 'card', ['Crocodylus niloticus']],
         // The fossils (ToLaD#539 step 6): the bird line's deep time (its dinosaurs and pterosaurs), the synapsids round the
         // mammals, the marine reptiles.
         ['amn-birdline', 'level', ['Avemetatarsalia']],
