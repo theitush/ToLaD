@@ -60,6 +60,8 @@ type Inner = {
   h: number;
   gl: { under: RectBatch; over: RectBatch; begin(): void; end(): void };
   lod: Lod | null;
+  models: Map<string, unknown>;
+  modelBytes: number;
   gestureStart(): void;
   gestureEnd(): void;
   levelNow(now?: boolean): unknown;
@@ -113,6 +115,12 @@ describe('the drawing coarsened by the view against the zoom’s cut alone (amni
     clock += 16.7;
     const t = clock;
     asked[0] = asked[1] = 0;
+    // (Each strand's samples made afresh in both: the kept ones (twigs.ts ColumnPath, CutMemo) are chosen by what was drawn
+    // on frames before, and on this one before it (pathFrame's budget), which the views differ in by what each asks.)
+    both((v) => {
+      I(v).models.clear();
+      I(v).modelBytes = 0;
+    });
     setLodView(false);
     A.draw();
     clock = t;
