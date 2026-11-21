@@ -1117,6 +1117,71 @@ export class Steady extends Fold {
     return out;
   }
 
+  /**
+   * Whether strand i's lanes, as the draw makes them, come within world x [xa, xb] anywhere between heights y0 and y1,
+   * read stretch by stretch along its path (ToLaD#591, the cull by stretches): its own column, then each column it runs
+   * in, each stretch's reach read at its two ends (the edge moves one way along a stretch: one ease, ownC's or
+   * nodeLeft's). `cuts`: its fork cuts there (strandForks, view.ts cutForks), [top, bottom, share] each; one of no share
+   * draws no lane over its height (its corner is drawCorners'), so it is left out. At a split, or across a peel with no
+   * share, the path steps from one column to the next, so the whole path's reach (xRange's box) takes in the screen
+   * whenever it steps from one side of it to the other, while no stretch comes near it: every lineage of a clade beside
+   * the level running into the trunk, drawn point by point to no pixel. True where it cannot tell.
+   */
+  meets(i: number, y0: number, y1: number, xa: number, xb: number, cuts: readonly number[]): boolean {
+    if (!this.mono || this.pLin[i]) return true;
+    const L = this.cur();
+    this.prep(L);
+    // Stretch [s, t] of column j (-1: its own) at offset off, less the cuts of no share: whether a piece left meets [xa, xb].
+    const meet = (j: number, off: number, s: number, t: number, end: number): boolean => {
+      let c = s;
+      for (let k = 0; k + 2 < cuts.length; k += 3) {
+        if (cuts[k + 2] > 0 || !(cuts[k + 1] > c) || !(cuts[k] < t)) continue;
+        if (cuts[k] > c && this.reach(L, i, j, off, c, Math.min(cuts[k], t), end, xa, xb)) return true;
+        c = Math.max(c, cuts[k + 1]);
+        if (c >= t) return false;
+      }
+      return this.reach(L, i, j, off, c, t, end, xa, xb);
+    };
+    const sy = this.sY[i];
+    if (y0 < sy) {
+      if (meet(-1, 0, y0, Math.min(y1, sy), sy)) return true;
+      if (y1 <= sy) return false;
+    }
+    const py = this.pY[i];
+    const pi = this.pIdx[i];
+    const po = this.pOff[i];
+    const n = py.length;
+    const ya = Math.max(y0, sy);
+    // (The stretch holding ya, as leftIn finds it: the last split at or above it, the first if none.)
+    let a = 1;
+    let z = n;
+    while (a < z) {
+      const m = (a + z) >> 1;
+      if (py[m] <= ya) a = m + 1;
+      else z = m;
+    }
+    for (let e = a - 1; e < n; e++) {
+      const s = e === a - 1 ? ya : py[e];
+      if (s > y1) break;
+      const end = e + 1 < n ? py[e + 1] : Infinity;
+      const t = Math.min(y1, end);
+      if (t >= s && meet(pi[e], po[e], s, t, end)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * meets()' one piece: column j's edge (-1: strand i's own column) at offset off over [s, t] within [xa, xb]. At `end`,
+   * where the column stops, read just inside it, as the kept samples read a split's two sides (twigs.ts leftPair): a
+   * column with no peel steps to its slot at its parent's split itself.
+   */
+  private reach(L: Lay, i: number, j: number, off: number, s: number, t: number, end: number, xa: number, xb: number): boolean {
+    const u = t >= end ? t - 1e-9 * Math.max(1, Math.abs(t)) : t;
+    const p = j < 0 ? this.ownC(L, i, s) : this.nodeLeft(L, j, s) + off;
+    const q = j < 0 ? this.ownC(L, i, u) : this.nodeLeft(L, j, u) + off;
+    return Math.max(p, q) >= xa && Math.min(p, q) <= xb;
+  }
+
   /** left() in layout L. */
   private leftIn(L: Lay, i: number, y: number): number {
     if (y < this.sY[i]) return this.ownC(L, i, y);
