@@ -1,7 +1,7 @@
-"""IUCN Red List status of every living species (ToLaD#48).
+"""IUCN Red List status of every living species (ToLaD#48; the birds and reptiles of data/amniotes, ToLaD#600).
 
 Source: the IUCN Red List of Threatened Species, version 2026-1, as GBIF publishes it (a Darwin Core
-checklist, doi:10.15468/0qnb58, CC BY 4.0). Per mammal: the category (`distribution.txt`
+checklist, doi:10.15468/0qnb58, CC BY 4.0). Per species: the category (`distribution.txt`
 threatStatus), the current assessment's year (its citation, "The IUCN Red List of Threatened Species
 2017: ..."), the IUCN taxon id and the assessment id (its URL, iucnredlist.org/species/<taxon>/<assessment>).
 
@@ -9,7 +9,12 @@ A leaf is matched by its own name, then its alt names and Open Tree synonyms, th
 taxonomies that already bridge IUCN names to ours (PHYLACINE 1.2's synonymy table, IUCN 2016-3 names;
 COMBINE's iucn2020 -> PHYLACINE binomial). A living leaf the 2026-1 list does not have takes PHYLACINE
 1.2's status (IUCN 2016-3); with neither it is "NE", not evaluated. Fossils get none; a leaf that ended
-after 1500 CE keeps the Red List's EX/EW where the list has it.
+after 1500 CE keeps the Red List's EX/EW where the list has it, and a leaf that lives in our tree never takes an EX
+record (the name is then the lost taxon's, not our species').
+
+The birds and reptiles (amniotes.py) take the same rule through the same Matcher, with no PHYLACINE or COMBINE to
+bridge them: their list name (eBird/Clements v2025, the Reptile Database), alt names, Open Tree synonyms, then the Red
+List's own synonyms (`synonym_index`), then the gender ending; not listed: NE.
 """
 
 from __future__ import annotations
@@ -78,7 +83,8 @@ URL_RE = re.compile(r"/species/(\d+)/(\d+)")
 def load_redlist(raw: Path, classes: tuple[str, ...] = ("MAMMALIA",), synonyms: bool = False) -> dict[str, dict]:
     """Binomial -> {category, year, taxon, assessment[, common]} for the checklist's accepted species of `classes` (the
     mammals by default; the amniote build asks for the birds and reptiles, ToLaD#539/#592). `synonyms`: each record
-    also carries its class and the binomials the checklist gives as its synonyms (authority dropped; no trinomials)."""
+    also carries its class, order and the binomials the checklist gives as its synonyms (authority dropped; no
+    trinomials)."""
     out: dict[str, dict] = {}
     with zipfile.ZipFile(raw / ZIP) as z:
         recs: dict[str, dict] = {}
@@ -92,7 +98,7 @@ def load_redlist(raw: Path, classes: tuple[str, ...] = ("MAMMALIA",), synonyms: 
                     continue
                 y = YEAR_RE.search(r[14])
                 u = URL_RE.search(r[15])
-                recs[r[0]] = {"name": norm_name(f"{r[7]} {r[8]}"), "class": r[4], "year": int(y.group(1)) if y else 0,
+                recs[r[0]] = {"name": norm_name(f"{r[7]} {r[8]}"), "class": r[4], "order": r[5], "year": int(y.group(1)) if y else 0,
                               "taxon": int(u.group(1)) if u else int(r[0]),
                               "assessment": int(u.group(2)) if u else 0}
         for acc, sci in syn_rows:
@@ -110,7 +116,7 @@ def load_redlist(raw: Path, classes: tuple[str, ...] = ("MAMMALIA",), synonyms: 
                     raise ValueError(f"unknown Red List status {r[5]!r} for {rec['name']}")
                 rec["category"] = cat
         eng = english_names(z, recs)
-    keys = ("category", "year", "taxon", "assessment") + (("class", "synonyms") if synonyms else ())
+    keys = ("category", "year", "taxon", "assessment") + (("class", "order", "synonyms") if synonyms else ())
     for tid, rec in recs.items():
         if "category" in rec:
             out[rec["name"]] = {k: rec[k] for k in keys if k in rec}
@@ -132,6 +138,17 @@ def english_names(z: zipfile.ZipFile, ids) -> dict[str, str]:
             if r[0] not in eng or (pref and not eng[r[0]][0]):
                 eng[r[0]] = (pref, r[2].strip())
     return {k: v[1] for k, v in eng.items()}
+
+
+def synonym_index(rl: dict[str, dict]) -> dict[str, str]:
+    """The Red List's own synonymy (load_redlist(synonyms=True)): a synonym binomial -> the one accepted species it is
+    a synonym of. A binomial the checklist gives as a synonym of two species names none."""
+    of: dict[str, set[str]] = {}
+    for n, r in rl.items():
+        for s in r.get("synonyms", ()):
+            if s != n:
+                of.setdefault(s, set()).add(n)
+    return {s: next(iter(ns)) for s, ns in of.items() if len(ns) == 1}
 
 
 def _binomial(sci: str) -> str | None:
@@ -176,11 +193,14 @@ def attach(root: Node, raw: Path, ctx: dict, log: dict) -> None:
 
 class Matcher:
     """A leaf's Red List record: by its own name, alt names, Open Tree synonyms, PHYLACINE/COMBINE
-    bridges, then a Latin gender ending. A synonym that is another leaf's own name is that leaf's record
-    (Bos taurus is not the aurochs); a name the list re-pointed at another taxon (REDEFINED) has none."""
+    bridges, the Red List's own synonyms (`rl_syn`, synonym_index; the birds and reptiles, ToLaD#600: none for the
+    mammals, whose bridges are PHYLACINE's and COMBINE's), then a Latin gender ending. A synonym that is another
+    leaf's own name is that leaf's record (Bos taurus is not the aurochs); a name the list re-pointed at another
+    taxon (REDEFINED) has none."""
 
-    def __init__(self, root: Node, rl: dict[str, dict], rev: dict[str, list[str]], ctx: dict):
-        self.rl, self.rev = rl, rev
+    def __init__(self, root: Node, rl: dict[str, dict], rev: dict[str, list[str]], ctx: dict,
+                 rl_syn: dict[str, str] | None = None):
+        self.rl, self.rev, self.rl_syn = rl, rev, rl_syn or {}
         self.phy_syn, self.ott_syn = ctx["phy_syn"], ctx.get("ott_syn", {})
         self.leaf_names = {n.name for n in root.preorder() if n.is_leaf and n.name}
         self.variants: dict[tuple[str, str], list[str]] = {}
@@ -196,6 +216,7 @@ class Matcher:
         cands += [(norm_name(s), "Open Tree synonym") for s in self.ott_syn.get(nd.ott, [])]
         own = self.phy_syn.get(nd.name, nd.name)
         cands += [(own, "PHYLACINE synonym")] + [(s, "PHYLACINE/COMBINE synonym") for s in self.rev.get(own, [])]
+        cands += [(self.rl_syn[a], "Red List synonym") for a in [nd.name, *nd.alt] if a in self.rl_syn]
         for c, how in cands:
             if c in rl and (c == nd.name or c not in leaf_names):
                 return rl[c], how if c != nd.name else "name"
@@ -229,15 +250,30 @@ def flag_extinct(root: Node, raw: Path, ctx: dict, log: dict) -> None:
 
 def assign(root: Node, rl: dict[str, dict], rev: dict[str, list[str]], ctx: dict) -> dict:
     """attach()'s matching, on a loaded list (`rl`) and bridge map (`rev`); returns the report."""
+    by, used, _ = match_all(root, rl, rev, ctx)
+    return report(root, rl, by, used)
+
+
+def match_all(root: Node, rl: dict[str, dict], rev: dict[str, list[str]], ctx: dict,
+              rl_syn: dict[str, str] | None = None) -> tuple[Counter, Counter, list[str]]:
+    """Every species leaf under `root` its n.data["red_list"] (attach's rule); returns how many matched how, each Red
+    List taxon's leaf count, and the living leaves whose match is an EX record not taken (lost_not_ours)."""
     phy, phy_syn = ctx["phy"], ctx["phy_syn"]
     by = Counter()
     used: Counter = Counter()
-    match = Matcher(root, rl, rev, ctx)
+    lost_not_ours: list[str] = []
+    match = Matcher(root, rl, rev, ctx, rl_syn)
     for nd in root.preorder():
         if not nd.is_leaf or not nd.name or nd.kind != "tree":
             continue
         living = nd.t1 == 0
         hit, via = match(nd)
+        if hit is not None and living and hit["category"] == "EX":
+            # a leaf that lives in our tree, the list's taxon under its name lost: the name is the lost taxon's, not
+            # ours (the build marks a leaf the list has EX extinct unless a count today says it lives: Chelonoidis
+            # niger is the Floreana tortoise alone on the Red List, ours the counted Galapagos tortoise, ToLaD#592)
+            lost_not_ours.append(nd.name)
+            hit = None
         if hit is not None and (living or hit["category"] in ("EX", "EW")):
             nd.data["red_list"] = {**hit, "source": SRC_IUCN, "via": via}
             used[(hit["taxon"])] += 1
@@ -256,7 +292,7 @@ def assign(root: Node, rl: dict[str, dict], rev: dict[str, list[str]], ctx: dict
             nd.data["red_list"] = {"category": "NE", "year": SOURCES[SRC_NONE]["vintage"], "taxon": 0,
                                    "assessment": 0, "source": SRC_NONE, "via": None}
             by["not listed"] += 1
-    return report(root, rl, by, used)
+    return by, used, lost_not_ours
 
 
 def report(root: Node, rl: dict, by: Counter, used: Counter) -> dict:

@@ -15,7 +15,7 @@ data/mammals/
   stats.json        build report (counts, match rates, fits, sizes, spot checks)
 ```
 
-`data/amniotes/` (ToLaD#539, `make build-amniotes`) is a second dataset in this format, the same files: the living amniotes, with `data/mammals`' rows unchanged as its Mammalia (global ids shifted by one, for its `Amniota` row 0). Its skeleton `META.dataset` is `amniotes-v0` and `META.amniotes` says what differs: its bird and reptile rows set only the `opentree` bit of `SRCM` (all 16 bits are taken) and name their sources in `METH`; a reptile is count unknown (FLAG bit 11) unless `pipeline/reptile_counts.toml` gives it a published count (bit 8, the sidecar's `count`; ToLaD#578); a calibrated row's date source (code 0) is Upham's for a mammal and AvesData 1.7's, Title 2024's, Colston 2020's or TimeTree 5's elsewhere; and the dated sidecars' `sources` append `avesdata`, `title2024`, `colston2020` and `timetree` (with their citations) to the list below.
+`data/amniotes/` (ToLaD#539, `make build-amniotes`) is a second dataset in this format, the same files: the living amniotes, with `data/mammals`' rows unchanged as its Mammalia (global ids shifted by one, for its `Amniota` row 0). Its skeleton `META.dataset` is `amniotes-v0` and `META.amniotes` says what differs: its bird and reptile rows set only the `opentree` bit of `SRCM` (all 16 bits are taken) and name their sources in `METH`; a reptile is count unknown (FLAG bit 11) unless `pipeline/reptile_counts.toml` gives it a published count (bit 8, the sidecar's `count`; ToLaD#578); a calibrated row's date source (code 0) is Upham's for a mammal and AvesData 1.7's, Title 2024's, Colston 2020's or TimeTree 5's elsewhere; and the dated sidecars' `sources` append `avesdata`, `title2024`, `colston2020` and `timetree` (with their citations) to the list below; and every bird and reptile row carries its IUCN Red List status in `RLST`, as a mammal's does (ToLaD#600, "RLST" below).
 
 Load `skeleton.tld` first. It holds the tables that tile rows index into: `methods` and `sources`, plus the tile manifest. A **stub** row is a node whose children live in another tile. Its own row carries all the aggregates needed to draw the unloaded subtree as one band: width (`EVER`, `PPK_`/`PROF`), age span (`T0__`, `T1__`), alive fraction (`ALIV`/`EVER`), ghost share (`GHST`), grade, and tip count (`NTIP`). The representative name is in `META.stub_rep`. Row 0 of the referenced tile is the same node again with identical values, minus the STUB flag. Layout is stable under lazy loading (03 §3.3) because a node's children are laid out only from the children's own rows.
 
@@ -209,7 +209,7 @@ cells lost before 1500 out of its present-natural cells, so they are not drawn g
 
 ### RLST (v1.4): IUCN Red List status
 
-ToLaD#48. Per row, three u32 words:
+ToLaD#48 (mammals); ToLaD#600 (in `data/amniotes`, the birds and reptiles, by the same rule). Per row, three u32 words:
 
 | word | bits | meaning |
 |---|---|---|
@@ -224,15 +224,22 @@ Sources, in order (`pipeline/tolad_pipeline/redlist.py`):
 0. `iucn-2026-1`: the IUCN Red List of Threatened Species version 2026-1, GBIF's Darwin Core checklist
    (doi:10.15468/0qnb58, CC BY 4.0). A leaf matches by its own name, then its alt names and Open Tree
    synonyms, then PHYLACINE 1.2's synonymy (IUCN 2016-3 names) and COMBINE's IUCN 2020 binomials, then a
-   Latin gender-ending variant. A synonym that is another leaf's own name is never taken.
+   Latin gender-ending variant. A synonym that is another leaf's own name is never taken. A bird or reptile
+   (`data/amniotes`, `amniotes.red_list_status`) goes through the same matcher by its list name (eBird/Clements
+   v2025, the Reptile Database 2026-10), alt names and Open Tree 3.7.3 synonyms, then the Red List's own synonymy
+   (a synonym of exactly one accepted species), then the gender ending; no PHYLACINE or COMBINE bridges them.
 1. `phylacine-1.2`: PHYLACINE 1.2's status column (IUCN Red List 2016-3), year 2016, for a living leaf the
    2026-1 list does not have, and for the few names the list has re-pointed at a different, extinct taxon
    (`redlist.REDEFINED`).
 2. `not-listed`: neither has it (a domestic form, a recent split, an Open Tree tip no species list
-   recognises): category `NE`, Not Evaluated, year 2026.
+   recognises; a bird or reptile the Red List has not assessed, or knows under no name of ours): category `NE`,
+   Not Evaluated, year 2026.
 
 Every living species row (`T1 = 0`) has a status. A fossil has none; a species that ended after 1500 CE
-carries the Red List's `EX` or `EW` where the list has it. Report: `stats.json` → `red_list`.
+carries the Red List's `EX` or `EW` where the list has it. A living row never carries `EX`: where the list's
+taxon under the name is lost and ours lives (a count today: the Red List's *Chelonoidis niger* is the Floreana
+tortoise alone, ours the Galápagos tortoise), the record is not taken. Report: `stats.json` → `red_list`
+(`data/amniotes`: `amniotes.red_list`, per group, with the Red List species no leaf took).
 
 ## Dated tree (v1.6)
 

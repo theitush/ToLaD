@@ -165,11 +165,12 @@ describe('the amniotes (ToLaD#539)', () => {
     expect(mammaliaClade().species.some((s) => s.dateSource === 'upham-calibrated')).toBe(false);
     expect(text(bird.html)).toMatch(/House sparrow \(Passer domesticus\)/);
     expect(text(bird.html)).toMatch(/alive today/);
-    const lizard = card('Varanus salvator');
+    // (Varanus salvator has the Red List's English name since ToLaD#592: a monitor the Red List has not assessed has none.)
+    const lizard = card('Varanus bennetti');
     expect(lizard.sp.countUnknown).toBe(true);
     // (No English name: its Latin once, as the title.)
-    expect(text(lizard.html)).not.toMatch(/Varanus salvator \(Varanus salvator\)/);
-    expect(lizard.html).toMatch(/class="sci"[^>]*>Varanus salvator</);
+    expect(text(lizard.html)).not.toMatch(/Varanus bennetti \(Varanus bennetti\)/);
+    expect(lizard.html).toMatch(/class="sci"[^>]*>Varanus bennetti</);
     expect(text(lizard.html)).toMatch(/Unknown/);
     // A reptile with a published count (ToLaD#578): its number as the source gives it, what it counts, its source linked.
     const komodo = card('Varanus komodoensis');
@@ -183,5 +184,33 @@ describe('the amniotes (ToLaD#539)', () => {
     expect(leatherback.html).toMatch(/href="https:\/\/www\.govinfo\.gov\//);
     const caiman = card('Caiman crocodilus');
     expect(text(caiman.html)).toMatch(/mature individuals, 2019/);
+  });
+
+  it("a bird's, a turtle's and a crocodile's Red List status, as a mammal's (ToLaD#600)", () => {
+    const text = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/&#x27;/g, "'").replace(/&amp;/g, '&').replace(/\s+/g, ' ');
+    const card = (sci: string) => {
+      const sp = mammaliaClade().species.find((s) => s.sci === sci)!;
+      return { sp, html: renderToStaticMarkup(<SpeciesCard sp={sp} onClose={() => {}} />) };
+    };
+    for (const [sci, cat, code] of [
+      ['Panthera tigris', 'Endangered', 'EN'],
+      ['Passer domesticus', 'Least Concern', 'LC'],
+      ['Lepidochelys olivacea', 'Vulnerable', 'VU'],
+      // (The Red List's Geochelone gigantea: an Open Tree synonym of ours.)
+      ['Aldabrachelys gigantea', 'Vulnerable', 'VU'],
+      ['Crocodylus niloticus', 'Least Concern', 'LC'],
+    ]) {
+      const { sp, html } = card(sci);
+      expect(sp.redList?.source, sci).toBe('iucn-2026-1');
+      expect(html, sci).toMatch(new RegExp(`class="status iucn-${code.toLowerCase()}"`));
+      expect(text(html), sci).toMatch(new RegExp(`IUCN Red List: ${cat} \\(${code}\\), \\d{4} assessment · IUCN Red List 2026-1, e\\.T\\d+A\\d+`));
+      expect(html, sci).toMatch(/href="https:\/\/www\.iucnredlist\.org\/species\/\d+\/\d+"/);
+    }
+    // Every living bird and reptile has a status; one the Red List has not assessed is Not Evaluated (the Red List's
+    // Chelonoidis niger is the lost Floreana tortoise: ours, the Galapagos tortoise, lives).
+    const living = mammaliaClade().species.filter((s) => !s.extinct);
+    expect(living.filter((s) => !s.redList).map((s) => s.sci)).toEqual([]);
+    expect(card('Chelodina longicollis').sp.redList).toMatchObject({ category: 'NE', source: 'not-listed' });
+    expect(text(card('Chelonoidis niger').html)).toMatch(/IUCN Red List: Not Evaluated \(NE\)/);
   });
 });
