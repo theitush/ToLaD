@@ -13,6 +13,7 @@ import { isNode, lanesAt, typedFrom, type Fan, type FanNode } from './layout';
 import { DASH_SPACE, unknownLook, type UnknownLook } from './dashed';
 import type { Fold } from './fold';
 import { GreenRuns } from './green';
+import { forkMode, type Steady } from './steady';
 
 /** A closed clade is drawn as one branch while its species are under this many px wide each on screen, on average. */
 export const MERGE_PX = 1;
@@ -40,6 +41,12 @@ export const lodIndexOn = (): boolean => walksOn;
 let learnOn = true;
 export function setLodLearn(on: boolean): void {
   learnOn = on;
+}
+
+/** The strands' cut coarsened by the view (Lod.see, ToLaD#591): off, the strands are asked by the zoom's cut alone (lodview.test: the same rectangles either way). */
+let viewOn = true;
+export function setLodView(on: boolean): void {
+  viewOn = on;
 }
 
 export class Lod {
@@ -123,6 +130,7 @@ export class Lod {
     this.gMx = new Float64Array(N.length);
     this.gSm = new Float64Array(N.length);
     this.gVer = new Int32Array(N.length).fill(-1);
+    this.mark = new Int32Array(N.length);
   }
 
   /** Clade v is inside a merged clade (not the merged clade itself): not named on its own. */
@@ -315,6 +323,89 @@ export class Lod {
   mIdx = new Int32Array(0);
   /** Per node index: its top (Lod.top), once asked (NaN before). */
   private readonly tops: Float64Array;
+
+  /**
+   * The clades whose strands are not drawn one by one this frame (drawStrands, ToLaD#591), left to right: the merged
+   * clades (drawn as ribbons), and coarser, each clade the window sees nothing of (Steady.viewCut: no stretch of it with
+   * a share in the window, no dashed line, nothing above its split). A clade beside the view, whose lineages run through
+   * it only as corners deep in the trunk or step across it at a split, asks none of its thousands of strands to be
+   * sampled for no pixel; the picture is the same. The ribbons stay the merged clades', and names, brackets, corners and
+   * stems go by merged too, which depends on the zoom alone.
+   */
+  cut: FanNode[] = [];
+  /** Per clade in cut: its strands' first and last drawn index (as mS0, mS1). */
+  cS0 = new Int32Array(0);
+  cS1 = new Int32Array(0);
+
+  /**
+   * The cut for the window world x [xa, xb], heights [ya, yb] at zoom sx, sy (px per world unit; sf: the layout, a
+   * Steady; null, or a tree viewCut cannot read: the merged clades as they are). After update and Steady.setMerged.
+   */
+  see(sf: Steady | null, ya: number, yb: number, xa: number, xb: number, sx: number, sy: number): void {
+    const key = `${this.gen}:${sf?.ver}:${ya}:${yb}:${xa}:${xb}:${sx}:${sy}:${this.look}:${forkMode()}`;
+    if (key === this.viewKey && sf === this.viewSf) return;
+    this.viewKey = key;
+    this.viewSf = sf;
+    if (this.markGen !== this.gen) {
+      this.markGen = this.gen;
+      this.stamp++;
+      for (let m = 0; m < this.merged.length; m++) this.mark[this.mIdx[m]] = this.stamp;
+    }
+    const ids = this.cutNext;
+    if (!viewOn || !sf || !sf.viewCut(ya, yb, xa, xb, sx, sy, this.heldFn, this.look === 'dashed' ? this.lineFn : null, ids)) {
+      this.cut = this.merged;
+      this.cS0 = this.mS0;
+      this.cS1 = this.mS1;
+      return;
+    }
+    const N = this.fan.nodes;
+    const M = ids.length;
+    if (this.vS0.length < M) {
+      const c = Math.max(M, 2 * this.vS0.length);
+      this.vS0 = new Int32Array(c);
+      this.vS1 = new Int32Array(c);
+    }
+    this.cS0 = this.vS0;
+    this.cS1 = this.vS1;
+    const C = (this.cut = this.cut === this.merged ? [] : this.cut);
+    C.length = M;
+    for (let m = 0; m < M; m++) {
+      const i = ids[m];
+      C[m] = N[i];
+      this.vS0[m] = this.s0[i];
+      this.vS1[m] = this.s0[i] + this.nStr[i] - 1;
+    }
+  }
+  private viewKey = '';
+  private viewSf: Steady | null = null;
+  private readonly cutNext: number[] = [];
+  private vS0 = new Int32Array(0);
+  private vS1 = new Int32Array(0);
+  /** Per node: the stamp of the merged clades it is one of (markGen: the gen they were stamped at). */
+  private readonly mark: Int32Array;
+  private stamp = 0;
+  private markGen = -1;
+  private readonly heldFn = (j: number): boolean => this.mark[j] === this.stamp;
+  private readonly lineFn = (j: number): boolean => this.allU[j] === 1;
+
+  /** The first clade in cut from index `from` on whose last strand is at or past strand x (cut.length if none). */
+  cutFrom(x: number, from = 0): number {
+    const e = this.cS1;
+    let a = from;
+    let z = this.cut.length;
+    while (a < z) {
+      const m = (a + z) >> 1;
+      if (e[m] < x) a = m + 1;
+      else z = m;
+    }
+    return a;
+  }
+
+  /** The clade in cut strand i is in (an index into cut), or -1. */
+  cutOf(i: number): number {
+    const m = this.cutFrom(i);
+    return m < this.cut.length && this.cS0[m] <= i ? m : -1;
+  }
 
   /** Clade v's top (Lod.top), kept. */
   topOf(v: FanNode): number {

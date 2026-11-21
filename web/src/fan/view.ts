@@ -4936,30 +4936,32 @@ export class FanView implements InputHandlers {
     const sf = this.fan.tess.fold;
     const cam = this.camera;
     const xm = (this.w / 2 + 13) / this.cam.sx;
+    // (The clades whose strands are not asked: the merged ones, and those the window sees nothing of, ToLaD#591.)
+    lod?.see(sf instanceof Steady ? sf : null, cam.worldY(-20), cam.worldY(this.h + 20), this.cam.cx - xm, this.cam.cx + xm, this.cam.sx, this.cam.sy);
     const off = lod && lodIndexOn() && sf instanceof Steady ? sf.offRunsOn(cam.worldY(-20), cam.worldY(this.h + 20), this.cam.cx - xm, this.cam.cx + xm) : null;
     if (!lod || !off) {
-      for (const b of B) if (!lod || lod.ofStrand(b.index) < 0) this.drawStrand(b);
+      for (const b of B) if (!lod || lod.cutOf(b.index) < 0) this.drawStrand(b);
       if (lod) for (let m = 0; m < lod.merged.length; m++) this.drawMerged(lod.merged[m], lod.mTop[m]);
       return;
     }
     const { runs: R, n: nR } = off;
     const S = B.length;
-    const M = lod.merged.length;
+    const C = lod.cut.length;
     const pos = lod.bPos;
     let at = this.strandsOn;
     let c = 0;
-    // (The runs between those passed by, each less its merged clades' strands: both lists ascending.)
+    // (The runs between those passed by, each less its cut clades' strands: both lists ascending.)
     for (let r = 0; r <= nR; r++) {
       const a = r === 0 ? 0 : R[2 * r - 1] + 1;
       const b = r < nR ? R[2 * r] - 1 : S - 1;
       if (a > b) continue;
-      let m = lod.mergedFrom(a);
+      let m = lod.cutFrom(a);
       for (let i = a; i <= b; ) {
-        if (m < M && lod.mS0[m] <= i) {
-          i = lod.mS1[m++] + 1;
+        if (m < C && lod.cS0[m] <= i) {
+          i = lod.cS1[m++] + 1;
           continue;
         }
-        const stop = m < M ? Math.min(b, lod.mS0[m] - 1) : b;
+        const stop = m < C ? Math.min(b, lod.cS0[m] - 1) : b;
         if (c + stop - i + 1 > at.length) {
           const n = new Int32Array(Math.max(2 * at.length, c + stop - i + 1));
           n.set(at.subarray(0, c));
@@ -4971,6 +4973,7 @@ export class FanView implements InputHandlers {
     const on = at.subarray(0, c).sort();
     for (let q = 0; q < c; q++) this.drawStrand(B[on[q]]);
     // (Every merged clade but those inside one run passed by: before each run, those starting before it; in it, past those it holds.)
+    const M = lod.merged.length;
     let m = 0;
     for (let r = 0; r < nR; r++) {
       for (; m < M && lod.mS0[m] < R[2 * r]; m++) this.drawMerged(lod.merged[m], lod.mTop[m]);
