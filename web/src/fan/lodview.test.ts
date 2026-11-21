@@ -200,8 +200,9 @@ describe('the drawing coarsened by the view against the zoom’s cut alone (amni
         });
         same(`${tag} flight ${k}`);
       }
-      // (The levels beside the trunk: a tenth of the strands asked, or fewer.)
-      if (level !== 'home') expect(sum[1] * 10, `${tag}: strands asked ${sum[1]} against ${sum[0]}`).toBeLessThan(sum[0]);
+      // (The levels beside the trunk: a fifth of the strands asked, or fewer. Those left are the strands with a lane on
+      // screen and the dashed ones DashRows may hold (#584: first come in the frame, so no clade's turn is known before).)
+      if (level !== 'home') expect(sum[1] * 5, `${tag}: strands asked ${sum[1]} against ${sum[0]}`).toBeLessThan(sum[0]);
     }, 1200000);
   }
 });
