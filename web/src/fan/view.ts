@@ -3167,7 +3167,8 @@ export class FanView implements InputHandlers {
   draw(): void {
     const t0 = performance.now();
     // (The columns' paths made again a few a frame while the view moves, all at once at rest: ToLaD#313. Once it holds
-    // still, the paths drawn that were chosen for another view are made again for this one, a budget a frame, ToLaD#591.)
+    // still, the paths drawn that were chosen for another view are made again for this one, a share of each frame,
+    // ToLaD#591.)
     const moving = this.gesturing || !!this.anim;
     const c = this.cam;
     const L = this.stillCam;
@@ -3230,9 +3231,9 @@ export class FanView implements InputHandlers {
   private settleAsked = false;
   /**
    * After a frame (ToLaD#591): while a path it drew is still chosen for another view, another frame. One that held still
-   * made some of them again (its budget's worth), so each such frame gets nearer, and the next holds still too unless
-   * the view moves. One that did not hold still asks for one frame, the first still one; never two in a row, so a view
-   * that moves by a hair every frame asks for none past it.
+   * made some of them again (its share of the frame, pathFrame.settleWork), so each such frame gets nearer, and the next
+   * holds still too unless the view moves. One that did not hold still asks for one frame, the first still one; never
+   * two in a row, so a view that moves by a hair every frame asks for none past it.
    */
   private settleNext(moving: boolean, still: boolean): void {
     const c = this.cam;

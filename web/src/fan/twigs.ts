@@ -457,8 +457,8 @@ export class Sleeve {
  * Progressive refinement (ToLaD#591): kept samples are what an earlier frame chose, and which frames those were is
  * the view's history (which strands each frame drew, the budget's order). While the view moves they stand in for this
  * view's own, within the tolerance; once it holds still (pathFrame.settle) each one drawn is made again for this view
- * exactly, as the frame's budget allows, frames asked for until none drawn is left: the picture at rest is the one a
- * fresh model makes, whatever came before.
+ * exactly, an equal share of each frame's work (pathFrame.settleWork), frames asked for until none drawn is left: the
+ * picture at rest is the one a fresh model makes, whatever came before.
  */
 export class ColumnPath {
   ys = new Float64Array(0);
@@ -546,10 +546,10 @@ export class ColumnPath {
       this.build(sx, sy, lo, hi, grid);
       pathFrame.left -= this.cuts.length + PATH_FRESH * this.m.cutMemo.fresh;
     } else if (!this.exactFor(sx, lo, hi, grid)) {
-      // (Chosen for another view: made again for this one once the view holds still, as its budget allows.)
-      if (pathFrame.settle && pathFrame.settleLeft > 0) {
+      // (Chosen for another view: made again for this one once the view holds still, as its share of the frame allows.)
+      if (pathFrame.settle && (pathFrame.settled === 0 || pathFrame.settleWork <= pathFrame.drawn)) {
         this.build(sx, sy, lo, hi, grid);
-        pathFrame.settleLeft -= this.cuts.length + PATH_FRESH * this.m.cutMemo.fresh;
+        pathFrame.settleWork += this.cuts.length + PATH_FRESH * this.m.cutMemo.fresh;
         pathFrame.settled++;
       } else pathFrame.inexact++;
     }
@@ -572,6 +572,7 @@ export class ColumnPath {
     }
     const i1 = Math.min(this.n - 1, a);
     if (this.stale) this.releft(i0, i1);
+    pathFrame.drawn += i1 - i0 + 1;
     return [i0, i1];
   }
 
@@ -727,8 +728,15 @@ export const pathFrame = {
   owed: 0,
   /** Whether the view holds still this frame (no gesture, no flight, the camera as last frame's): kept samples chosen for another view are made again for this one (ColumnPath, ToLaD#591). */
   settle: false,
-  /** Those builds' budget left this frame (PATH_BUDGET a frame: spread over the frames after a gesture, never one long one). */
-  settleLeft: 0,
+  /**
+   * Those builds' work this frame, and the kept samples the frame's paths have handed out so far (span()), in the same
+   * units (a cut). The settle takes an equal share: a build goes while its work so far is no more than that, the
+   * first always (every frame that holds still makes progress). A frame that settles costs about twice one that does
+   * not, never one long frame after a gesture (PATH_BUDGET a frame was 0.42 s at the turtles in the phone proxy, a
+   * frame there 0.08, ToLaD#591).
+   */
+  settleWork: 0,
+  drawn: 0,
   /** How many of them this frame made, and how many paths it drew still chosen for another view (the view asks for another frame while any are). */
   settled: 0,
   inexact: 0,
@@ -737,7 +745,8 @@ export const pathFrame = {
     this.left = moving ? PATH_BUDGET : Infinity;
     this.owed = 0;
     this.settle = still && !moving;
-    this.settleLeft = PATH_BUDGET;
+    this.settleWork = 0;
+    this.drawn = 0;
     this.settled = 0;
     this.inexact = 0;
   },
